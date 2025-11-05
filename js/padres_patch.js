@@ -26,7 +26,8 @@ document.addEventListener('DOMContentLoaded', ()=>{
     class: document.getElementById('tab-class'),
     tasks: document.getElementById('tab-tasks'),
     notifications: document.getElementById('tab-notifications'),
-    profile: document.getElementById('tab-profile')
+    profile: document.getElementById('tab-profile'),
+    mejora: document.getElementById('tab-mejora')
   };
 
   function showTab(name) {
@@ -318,11 +319,34 @@ document.addEventListener('DOMContentLoaded', ()=>{
     btn.addEventListener('click', () => renderAttendanceChart(btn.dataset.period));
   });
   
+  function renderImprovementPlans(){
+    const container = document.getElementById('improvementSection');
+    if(!container) return;
+    const plans = KarpusStore.getImprovementPlans();
+    container.innerHTML = '';
+    plans.forEach(plan => {
+      const card = document.createElement('div');
+      card.className = 'p-4 rounded-3xl bg-white border';
+      card.innerHTML = `
+        <div class="flex justify-between items-center mb-2">
+          <p class="text-sm font-medium">${plan.title}</p>
+          <span class="text-xs text-slate-500">${plan.due}</span>
+        </div>
+        <p class="text-sm">${plan.actions}</p>
+        <div class="mt-3 flex items-center gap-2">
+          <span class="text-xs px-2 py-1 rounded-xl bg-slate-100">${plan.status}</span>
+        </div>
+      `;
+      container.appendChild(card);
+    });
+  }
+
   // Renderizado inicial
   renderPosts();
   renderTasks();
   renderGeneralFeed();
   renderAttendanceChart('month'); // Renderizar gráfico inicial
+  renderImprovementPlans();
   showTab('home'); // Mostrar la pestaña de inicio por defecto
 });
  
