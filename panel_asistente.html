@@ -78,6 +78,7 @@
         <button data-section="comunicacion" class="w-full text-left px-3 py-2 rounded hover:bg-white/50 flex items-center gap-3"><i data-lucide="message-square"></i><span class="label">Comunicación</span></button>
         <button data-section="alumnos" class="w-full text-left px-3 py-2 rounded hover:bg-white/50 flex items-center gap-3"><i data-lucide="users"></i><span class="label">Alumnos</span></button>
         <button data-section="apoyo" class="w-full text-left px-3 py-2 rounded hover:bg-white/50 flex items-center gap-3"><i data-lucide="briefcase"></i><span class="label">Apoyo Admin</span></button>
+        <button data-section="mejora" class="w-full text-left px-3 py-2 rounded hover:bg-white/50 flex items-center gap-3"><i data-lucide="bar-chart-2"></i><span class="label">Sistema de Mejora</span></button>
         <a id="logoutLink" href="#" class="w-full text-left px-3 py-2 rounded hover:bg-white/50 flex items-center gap-3"><i data-lucide="log-out"></i><span class="label">Cerrar sesión</span></a>
       </div>
     </aside>
@@ -159,6 +160,12 @@
             <div id="parentRequests" class="text-sm space-y-2"></div>
           </div>
         </div>
+      </section>
+
+      <!-- MEJORA -->
+      <section id="mejora" class="section hidden">
+        <h3 class="text-lg font-semibold mb-4">Sistema de Mejora</h3>
+        <div id="improvementSection" class="mt-6"></div>
       </section>
 
     </main>
@@ -359,10 +366,33 @@
       sampleRequests.forEach(r=>{ const p=document.createElement('p'); p.textContent=r; box.appendChild(p); });
     }
 
+    function renderImprovementPlans(){
+      const container = document.getElementById('improvementSection');
+      if(!container) return;
+      const plans = KarpusStore.getImprovementPlans();
+      container.innerHTML = '';
+      plans.forEach(plan => {
+        const card = document.createElement('div');
+        card.className = 'p-4 rounded-3xl bg-white border';
+        card.innerHTML = `
+          <div class="flex justify-between items-center mb-2">
+            <p class="text-sm font-medium">${plan.title}</p>
+            <span class="text-xs text-slate-500">${plan.due}</span>
+          </div>
+          <p class="text-sm">${plan.actions}</p>
+          <div class="mt-3 flex items-center gap-2">
+            <span class="text-xs px-2 py-1 rounded-xl bg-slate-100">${plan.status}</span>
+          </div>
+        `;
+        container.appendChild(card);
+      });
+    }
+
     // Initialize
     renderAttendance();
     renderBasicStudents();
     renderRequests();
+    renderImprovementPlans();
   </script>
 </body>
 </html>
