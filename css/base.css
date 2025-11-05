@@ -1,0 +1,42 @@
+:root {
+      /* Paleta de colores oficial de Karpus Kids */
+      --verde: 124, 252, 0;   /* #7CFC00 */
+      --azul: 0, 206, 209;    /* #00CED1 */
+      --rosa: 255, 105, 180;     /* #FF69B4 */
+      --naranja: 255, 140, 0;  /* #FF8C00 */
+      --amarillo: 255, 215, 0; /* #FFD700 */
+    }
+
+    /* Logo multicolor */
+    .karpus-kids-colored span {
+      display: inline-block;
+      font-weight: 800;
+      text-shadow: 2px 2px 10px rgba(0,0,0,0.5);
+      font-size: 3rem;
+    }
+
+    .k-1 { color: rgb(var(--naranja)); }
+    .k-2 { color: rgb(var(--azul)); }
+    .k-3 { color: rgb(var(--rosa)); }
+    .k-4 { color: rgb(var(--verde)); }
+    .k-5 { color: rgb(var(--naranja)); }
+    .k-6 { color: rgb(var(--azul)); }
+    .k-7 { color: rgb(var(--verde)); }
+    .k-8 { color: rgb(var(--rosa)); }
+    .k-9 { color: rgb(var(--azul)); }
+    .k-10 { color: rgb(var(--naranja)); }
+
+    /* Versión pequeña para texto */
+    .karpus-kids-inline {
+      font-weight: 700;
+    }
+    .karpus-kids-inline .k-1 { color: #FF8C00; }
+    .karpus-kids-inline .k-2 { color: #00CED1; }
+    .karpus-kids-inline .k-3 { color: #FF69B4; }
+    .karpus-kids-inline .k-4 { color: #7CFC00; }
+    .karpus-kids-inline .k-5 { color: #FF8C00; }
+    .karpus-kids-inline .k-6 { color: #00CED1; }
+    .karpus-kids-inline .k-7 { color: #7CFC00; }
+    .karpus-kids-inline .k-8 { color: #FF69B4; }
+    .karpus-kids-inline .k-9 { color: #00CED1; }
+    .karpus-kids-inline .k-10 { color: #FF8C00; }

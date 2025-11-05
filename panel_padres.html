@@ -5,6 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Panel de Padres - Karpus Kids</title>
   <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="stylesheet" href="css/base.css" />
   <link rel="stylesheet" href="css/theme.css" />
   <link rel="stylesheet" href="css/karpus-modern.css" />
   <script src="js/auth.js?v=1"></script>
@@ -20,10 +21,11 @@
       theme: {
         extend: {
           colors: {
-            'karpus-green': '#4CAF50',
-            'karpus-blue': '#2196F3',
-            'karpus-pink': '#FF4081',
-            'karpus-orange': '#FF9800',
+            'karpus-green': '#7CFC00',
+            'karpus-blue': '#00CED1',
+            'karpus-pink': '#FF69B4',
+            'karpus-orange': '#FF8C00',
+            'karpus-yellow': '#FFD700',
             'karpus-blue-soft': '#7AB8FF',
             'karpus-sky': { light: '#F0F7FF', DEFAULT: '#D6E9FF' }
           },
@@ -60,18 +62,6 @@
     .sidebar-blue { background: linear-gradient(135deg,#E3F2FD,#BBDEFB); }
     .sidebar-green { background: linear-gradient(135deg,#E8F8F0,#D0F0E0); }
     .sidebar-pink { background: linear-gradient(135deg,#FFF0F6,#FFE3F0); }
-    /* Karpus colored letters small */
-    .karpus-kids-inline { font-weight: 700; }
-    .karpus-kids-inline .k-1 { color: #FF9800; }
-    .karpus-kids-inline .k-2 { color: #2196F3; }
-    .karpus-kids-inline .k-3 { color: #E91E63; }
-    .karpus-kids-inline .k-4 { color: #4CAF50; }
-    .karpus-kids-inline .k-5 { color: #FF9800; }
-    .karpus-kids-inline .k-6 { color: #2196F3; }
-    .karpus-kids-inline .k-7 { color: #4CAF50; }
-    .karpus-kids-inline .k-8 { color: #E91E63; }
-    .karpus-kids-inline .k-9 { color: #2196F3; }
-    .karpus-kids-inline .k-10 { color: #FF9800; }
     
     /* Estilos para modales más grandes y profesionales */
     .modal-container {
@@ -141,7 +131,7 @@
       <div class="flex flex-col h-full">
         <div class="flex items-center gap-3 mb-6">
           <div class="h-12 w-12 rounded-2xl bg-white flex items-center justify-center shadow-soft">
-            <img src="img/mundo.jpg" alt="logo" class="h-10 w-10 rounded-lg object-cover" />
+            <img src="logo/favicon.ico" alt="logo" class="h-10 w-10 rounded-lg object-cover" />
           </div>
           <div class="label">
             <h3 class="font-semibold text-white"><span class="karpus-kids-inline"><span class="k-1">K</span><span class="k-2">a</span><span class="k-3">r</span><span class="k-4">p</span><span class="k-5">u</span><span class="k-6">s</span> <span class="k-7">K</span><span class="k-8">i</span><span class="k-9">d</span><span class="k-10">s</span></span></h3>
@@ -198,7 +188,7 @@
         <button id="menuBtn" class="p-2"><i data-lucide="menu"></i></button>
         <div class="flex items-center gap-3">
           <div class="w-9 h-9 rounded-2xl bg-karpus-blue flex items-center justify-center shadow-soft">
-            <img src="img/mundo.jpg" alt="logo" class="h-6 w-6 rounded" />
+            <img src="logo/favicon.ico" alt="logo" class="h-6 w-6 rounded" />
           </div>
           <div>
             <h1 class="text-lg font-poppins font-semibold"><span class="karpus-kids-inline"><span class="k-1">K</span><span class="k-2">a</span><span class="k-3">r</span><span class="k-4">p</span><span class="k-5">u</span><span class="k-6">s</span> <span class="k-7">K</span><span class="k-8">i</span><span class="k-9">d</span><span class="k-10">s</span></span></h1>

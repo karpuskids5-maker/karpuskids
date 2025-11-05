@@ -5,6 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>Karpus Kids — Panel Director</title>
   <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="stylesheet" href="css/base.css" />
   <link rel="stylesheet" href="css/theme.css" />
   <link rel="stylesheet" href="css/karpus-modern.css" />
   <script src="js/auth.js?v=1"></script>
@@ -33,18 +34,6 @@
     .sidebar-purple { background: linear-gradient(135deg, #7c3aed, #4f46e5); }
     .glass { background: rgba(255,255,255,0.6); backdrop-filter: blur(6px); }
     .sidebar-scroll { max-height: calc(100vh - 4rem); overflow:auto; }
-    /* Karpus colored letters small */
-    .karpus-kids-inline { font-weight: 700; }
-    .karpus-kids-inline .k-1 { color: #FF9800; }
-    .karpus-kids-inline .k-2 { color: #2196F3; }
-    .karpus-kids-inline .k-3 { color: #E91E63; }
-    .karpus-kids-inline .k-4 { color: #4CAF50; }
-    .karpus-kids-inline .k-5 { color: #FF9800; }
-    .karpus-kids-inline .k-6 { color: #2196F3; }
-    .karpus-kids-inline .k-7 { color: #4CAF50; }
-    .karpus-kids-inline .k-8 { color: #E91E63; }
-    .karpus-kids-inline .k-9 { color: #2196F3; }
-    .karpus-kids-inline .k-10 { color: #FF9800; }
     
     /* Estilos para modales más grandes y profesionales */
     .modal-container {
@@ -141,7 +130,7 @@
     <aside id="sidebar" class="hidden md:block sidebar-purple p-4 rounded-r-3xl shadow-lg fixed inset-y-0 left-0 z-10">
       <div class="flex items-center gap-3 mb-6">
         <div class="h-12 w-12 rounded-2xl bg-white/20 flex items-center justify-center shadow-soft">
-          <img src="img/mundo.jpg" alt="logo" class="h-10 w-10 rounded-lg object-cover" />
+          <img src="logo/favicon.ico" alt="logo" class="h-10 w-10 rounded-lg object-cover" />
         </div>
         <div class="label">
           <h3 class="font-semibold text-white"><span class="karpus-kids-inline"><span class="k-1">K</span><span class="k-2">a</span><span class="k-3">r</span><span class="k-4">p</span><span class="k-5">u</span><span class="k-6">s</span> <span class="k-7">K</span><span class="k-8">i</span><span class="k-9">d</span><span class="k-10">s</span></span></h3>
@@ -234,7 +223,7 @@
             <p class="text-sm text-slate-500">Visión rápida de la estancia</p>
           </div>
           <div class="flex items-center gap-3">
-            <button id="exportBtn" class="px-3 py-2 bg-blue-600 text-white rounded">Exportar datos</button>
+            <button id="exportBtn" class="px-3 py-2 bg-karpus-blue text-white rounded">Exportar datos</button>
             <button id="nuevoMaestroBtn" class="px-3 py-2 border rounded">Crear maestro</button>
           </div>
         </div>
@@ -329,7 +318,7 @@
             <i data-lucide="users" class="w-5 h-5 text-slate-600"></i><span>Maestros</span>
           </h2>
           <div>
-            <button id="addTeacher" class="px-3 py-2 bg-green-600 text-white rounded">Agregar maestro</button>
+            <button id="addTeacher" class="px-3 py-2 bg-karpus-green text-white rounded">Agregar maestro</button>
           </div>
         </div>
         <div class="bg-white rounded shadow p-4">
@@ -377,7 +366,7 @@
           </h2>
           <div class="flex gap-2">
             <input id="searchStudent" placeholder="Buscar estudiante..." class="px-3 py-2 border rounded-lg" />
-            <button id="addStudentBtn" class="px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 flex items-center gap-2">
+            <button id="addStudentBtn" class="px-4 py-2 bg-karpus-purple text-white rounded-lg hover:bg-indigo-700 flex items-center gap-2">
               <i data-lucide="user-plus" class="w-4 h-4"></i>
               Agregar Estudiante
             </button>
@@ -471,7 +460,7 @@
             <i data-lucide="home" class="w-5 h-5 text-slate-600"></i><span>Aulas</span>
           </h2>
           <div>
-            <button id="addRoomBtn" class="px-3 py-2 bg-yellow-600 text-white rounded">Nueva aula</button>
+            <button id="addRoomBtn" class="px-3 py-2 bg-karpus-yellow text-white rounded">Nueva aula</button>
           </div>
         </div>
         
@@ -533,7 +522,7 @@
           <table class="w-full text-sm">
             <thead class="text-slate-500 text-left"><tr><th>Estudiante</th><th>Aula</th><th>Estado</th><th>Acciones</th></tr></thead>
             <tbody>
-              <tr><td>María P.</td><td>A1</td><td><select class="border rounded px-2 py-1"><option>Presente</option><option>Ausente</option></select></td><td><button class="px-2 py-1 bg-blue-600 text-white rounded">Guardar</button></td></tr>
+              <tr><td>María P.</td><td>A1</td><td><select class="border rounded px-2 py-1"><option>Presente</option><option>Ausente</option></select></td><td><button class="px-2 py-1 bg-karpus-blue text-white rounded">Guardar</button></td></tr>
             </tbody>
           </table>
         </div>
@@ -568,7 +557,7 @@
               <option value="teachers">De Maestros</option>
               <option value="parents">De Padres</option>
             </select>
-            <button id="refreshReports" class="px-3 py-2 bg-blue-600 text-white rounded">Actualizar</button>
+            <button id="refreshReports" class="px-3 py-2 bg-karpus-blue text-white rounded">Actualizar</button>
           </div>
         </div>
         
@@ -607,8 +596,8 @@
                   </div>
                 </div>
                 <div class="flex gap-2">
-                  <button onclick="resolveReport(this)" class="px-3 py-2 bg-green-600 text-white rounded text-sm">Marcar como Resuelto</button>
-                  <button onclick="respondReport(this)" class="px-3 py-2 bg-blue-600 text-white rounded text-sm">Responder</button>
+                  <button onclick="resolveReport(this)" class="px-3 py-2 bg-karpus-green text-white rounded text-sm">Marcar como Resuelto</button>
+                  <button onclick="respondReport(this)" class="px-3 py-2 bg-karpus-blue text-white rounded text-sm">Responder</button>
                 </div>
               </div>
             </div>
@@ -652,8 +641,8 @@
                   </div>
                 </div>
                 <div class="flex gap-2">
-                  <button onclick="resolveReport(this)" class="px-3 py-2 bg-green-600 text-white rounded text-sm">Marcar como Resuelto</button>
-                  <button onclick="respondReport(this)" class="px-3 py-2 bg-blue-600 text-white rounded text-sm">Responder</button>
+                  <button onclick="resolveReport(this)" class="px-3 py-2 bg-karpus-green text-white rounded text-sm">Marcar como Resuelto</button>
+                  <button onclick="respondReport(this)" class="px-3 py-2 bg-karpus-blue text-white rounded text-sm">Responder</button>
                 </div>
               </div>
             </div>
@@ -753,7 +742,7 @@
             <h3 class="text-sm font-semibold mb-2">Anuncio general</h3>
             <textarea id="announcementText" class="w-full border rounded p-3" rows="4" placeholder="Escribe un comunicado para todos..."></textarea>
             <div class="mt-3 flex justify-end">
-              <button class="px-3 py-2 bg-indigo-600 text-white rounded">Enviar a todos</button>
+              <button class="px-3 py-2 bg-karpus-purple text-white rounded">Enviar a todos</button>
             </div>
           </div>
           
@@ -793,7 +782,7 @@
               </div>
               <textarea class="w-full border rounded p-3" rows="2" placeholder="Texto de la notificación..."></textarea>
               <div class="flex justify-end">
-                <button class="px-3 py-2 bg-green-600 text-white rounded">Programar</button>
+                <button class="px-3 py-2 bg-karpus-green text-white rounded">Programar</button>
               </div>
             </div>
           </div>
@@ -848,7 +837,7 @@
         </div>
         <div class="flex justify-end gap-2 mt-3">
           <button id="cancelModal" class="px-4 py-2 border rounded-lg hover:bg-slate-50">Cancelar</button>
-          <button id="saveModal" class="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700">Crear Maestro</button>
+          <button id="saveModal" class="px-4 py-2 bg-karpus-green text-white rounded-lg hover:bg-green-700">Crear Maestro</button>
         </div>
       </div>
     </div>
@@ -910,7 +899,7 @@
         </div>
         <div class="flex justify-end gap-2 mt-3">
           <button id="cancelRoomModal" class="px-4 py-2 border rounded-lg hover:bg-slate-50">Cancelar</button>
-          <button id="saveRoomModal" class="px-4 py-2 bg-yellow-600 text-white rounded-lg hover:bg-yellow-700">Guardar Aula</button>
+          <button id="saveRoomModal" class="px-4 py-2 bg-karpus-yellow text-white rounded-lg hover:bg-yellow-700">Guardar Aula</button>
         </div>
       </div>
     </div>
@@ -1039,7 +1028,7 @@
         </div>
 
         <div class="flex justify-end gap-2 mt-6">
-          <button id="editStudentProfile" class="px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700">
+          <button id="editStudentProfile" class="px-4 py-2 bg-karpus-purple text-white rounded-lg hover:bg-indigo-700">
             Editar Información
           </button>
           <button id="closeStudentProfile" class="px-4 py-2 border rounded-lg hover:bg-slate-50">

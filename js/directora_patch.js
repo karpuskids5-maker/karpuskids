@@ -141,7 +141,7 @@ document.addEventListener('DOMContentLoaded', ()=>{
         datasets: [{
           label: 'Pagos',
           data: [pagados, pendientes],
-          backgroundColor: ['#4CAF50','#FF9800'],
+          backgroundColor: ['var(--karpus-green)','var(--karpus-orange)'],
           borderRadius: 6
         }]
       },
