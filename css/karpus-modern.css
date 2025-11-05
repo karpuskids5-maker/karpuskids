@@ -1,13 +1,13 @@
 /* Karpus Modern CSS - Estilo profesional similar a Teams */
 
 :root {
-  --karpus-blue: #1e88e5;
-  --karpus-green: #43a047;
-  --karpus-orange: #fb8c00;
-  --karpus-pink: #ec407a;
-  --karpus-purple: #7b1fa2;
-  --karpus-teal: #00897b;
-  --karpus-yellow: #fdd835;
+  --karpus-blue: #00CED1;
+  --karpus-green: #7CFC00;
+  --karpus-orange: #FF8C00;
+  --karpus-pink: #FF69B4;
+  --karpus-purple: #9C27B0;
+  --karpus-teal: #009688;
+  --karpus-yellow: #FFD700;
   --teams-purple: #6264a7;
   --teams-dark: #2d2c2c;
 }

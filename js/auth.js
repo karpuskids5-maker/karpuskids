@@ -1,4 +1,7 @@
 // Simple auth module using localStorage (demo only)
+// IMPORTANT: This is a demo authentication system. For a production environment,
+// you should use a secure authentication backend with proper user management and
+// session handling. Do not use hardcoded credentials in a real application.
 const Auth = (function(){
   const KEY = 'karpus_current_user';
   const USERS = [
