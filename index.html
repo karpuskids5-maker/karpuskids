@@ -1,0 +1,546 @@
+<!DOCTYPE html>
+<html lang="es" class="scroll-smooth">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Karpus Kids - Estancia Infantil</title>
+  
+  <!-- Tailwind CSS -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  
+  <!-- AOS Animations -->
+  <link href="https://unpkg.com/aos@2.3.1/dist/aos.css" rel="stylesheet">
+  <script src="https://unpkg.com/aos@2.3.1/dist/aos.js"></script>
+  
+  <!-- Bootstrap Icons -->
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css" rel="stylesheet">
+  
+  <!-- Alpine.js para interactividad -->
+  <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>
+
+  <!-- Favicon -->
+  <link rel="icon" href="logo/favicon.ico" sizes="any">
+  <link rel="icon" href="logo/favicon.svg" type="image/svg+xml">
+  <link rel="apple-touch-icon" href="logo/apple-touch-icon.png">
+  
+  <style>
+    :root {
+      /* Paleta de colores oficial de Karpus Kids */
+      --verde: 76, 175, 80;   /* #4CAF50 */
+      --azul: 33, 150, 243;    /* #2196F3 */
+      --rosa: 233, 30, 99;     /* #E91E63 */
+      --naranja: 255, 152, 0;  /* #FF9800 */
+    }
+    
+    /* Logo multicolor */
+    .karpus-kids-colored span {
+      display: inline-block;
+      font-weight: 800;
+      text-shadow: 2px 2px 10px rgba(0,0,0,0.5);
+      font-size: 3rem;
+    }
+    
+    .k-1 { color: rgb(var(--naranja)); }
+    .k-2 { color: rgb(var(--azul)); }
+    .k-3 { color: rgb(var(--rosa)); }
+    .k-4 { color: rgb(var(--verde)); }
+    .k-5 { color: rgb(var(--naranja)); }
+    .k-6 { color: rgb(var(--azul)); }
+    .k-7 { color: rgb(var(--verde)); }
+    .k-8 { color: rgb(var(--rosa)); }
+    .k-9 { color: rgb(var(--azul)); }
+    .k-10 { color: rgb(var(--naranja)); }
+
+    /* Versión pequeña para texto */
+    .karpus-kids-inline {
+      font-weight: 700;
+    }
+    .karpus-kids-inline .k-1 { color: #FF9800; }
+    .karpus-kids-inline .k-2 { color: #2196F3; }
+    .karpus-kids-inline .k-3 { color: #E91E63; }
+    .karpus-kids-inline .k-4 { color: #4CAF50; }
+    .karpus-kids-inline .k-5 { color: #FF9800; }
+    .karpus-kids-inline .k-6 { color: #2196F3; }
+    .karpus-kids-inline .k-7 { color: #4CAF50; }
+    .karpus-kids-inline .k-8 { color: #E91E63; }
+    .karpus-kids-inline .k-9 { color: #2196F3; }
+    .karpus-kids-inline .k-10 { color: #FF9800; }
+
+
+    
+    /* Botones flotantes */
+    .floating-btn {
+      position: fixed;
+      bottom: 20px;
+      z-index: 9999;
+      width: 56px;
+      height: 56px;
+      border-radius: 50%;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      color: white;
+      font-size: 1.8rem;
+      box-shadow: 0 4px 8px rgba(0,0,0,0.2);
+      cursor: pointer;
+      transition: transform 0.3s ease;
+    }
+    
+    .floating-btn:hover { transform: scale(1.1); }
+    
+    .btn-ws { background-color: #25D366; right: 90px; }
+    .btn-ig { background-color: #E4405F; right: 20px; }
+    
+    /* Video de fondo */
+    .video-bg {
+      position: absolute;
+      top: 0; left: 0;
+      width: 100%; height: 100%;
+      object-fit: cover;
+      z-index: -1;
+    }
+    
+    /* Galería horizontal animada */
+    .scroll-horizontal {
+      display: flex;
+      overflow-x: auto;
+      scroll-snap-type: x mandatory;
+      gap: 1rem;
+      padding: 0.5rem 0 1.5rem 0;
+    }
+    
+    .scroll-horizontal > div {
+      flex: 0 0 auto;
+      scroll-snap-align: start;
+      transition: transform 0.5s ease;
+    }
+    
+    .scroll-horizontal > div:hover {
+        transform: scale(1.05);
+    }
+    
+    .scroll-horizontal::-webkit-scrollbar { display: none; }
+
+    /* Animación de galería tipo película */
+    @keyframes scroll-left {
+      0% { transform: translateX(0); }
+      100% { transform: translateX(-100%); }
+    }
+    @keyframes scroll-right {
+      0% { transform: translateX(-100%); }
+      100% { transform: translateX(0); }
+    }
+    .film-strip {
+      display: flex;
+      width: fit-content;
+    }
+    .film-strip-left { animation: scroll-left 40s linear infinite; }
+    .film-strip-right { animation: scroll-right 40s linear infinite; }
+    .film-strip-container:hover .film-strip {
+      animation-play-state: paused;
+    }
+    .film-strip img {
+      height: 16rem; /* 256px */
+    }
+
+    /* Animación para testimonios */
+    .testimonial-strip {
+      display: flex;
+      width: fit-content;
+      animation: scroll-left 50s linear infinite;
+    }
+    .testimonial-container:hover .testimonial-strip {
+      animation-play-state: paused;
+    }
+    
+  </style>
+</head>
+<body class="bg-white text-gray-800">
+  <!-- Header Fijo -->
+  <header x-data="{ open: false }" class="bg-white/80 backdrop-blur-sm fixed top-0 left-0 right-0 z-50 shadow-md">
+    <div class="container mx-auto px-6 py-2 flex justify-between items-center">
+      <a href="#" class="flex items-center gap-3">
+        <img src="img/mundo.jpg" alt="Karpus Kids Logo" class="h-12">
+        <span class="hidden sm:block text-xl karpus-kids-inline"><span class="k-1">K</span><span class="k-2">a</span><span class="k-3">r</span><span class="k-4">p</span><span class="k-5">u</span><span class="k-6">s</span> <span class="k-7">K</span><span class="k-8">i</span><span class="k-9">d</span><span class="k-10">s</span></span>
+      </a>
+      <nav class="hidden md:flex items-center space-x-8 text-base">
+        <a href="#nosotros" class="text-gray-700 hover:text-blue-600 transition-colors">Nosotros</a>
+        <a href="#galeria-fotos" class="text-gray-700 hover:text-blue-600 transition-colors">Galería</a>
+        <a href="#precios" class="text-gray-700 hover:text-blue-600 transition-colors">Servicios</a>
+        <a href="#footer" class="text-gray-700 hover:text-blue-600 transition-colors">Contacto</a>
+      </nav>
+      <button @click="open = !open" class="md:hidden text-gray-700">
+        <i class="bi bi-list text-2xl"></i>
+      </button>
+    </div>
+    <!-- Menú Móvil -->
+    <div x-show="open" @click.away="open = false" class="md:hidden bg-white">
+      <a href="#nosotros" class="block py-2 px-6 text-sm text-gray-700">Nosotros</a>
+      <a href="#galeria-fotos" class="block py-2 px-6 text-sm text-gray-700">Galería</a>
+      <a href="#precios" class="block py-2 px-6 text-sm text-gray-700">Servicios</a>
+      <a href="#footer" class="block py-2 px-6 text-sm text-gray-700">Contacto</a>
+    </div>
+  </header>
+
+  <!-- Hero con Video -->
+  <section class="relative h-screen flex flex-col justify-center items-center text-center overflow-hidden">
+    <video class="video-bg" autoplay muted loop>
+      <source src="img/15.mp4" type="video/mp4">
+      Tu navegador no soporta videos.
+    </video>
+    <div class="bg-black bg-opacity-70 absolute inset-0"></div>
+    <div x-data="{ contactModal: false }" class="relative z-10 p-8 text-white" data-aos="fade-up">
+      <h1 class="karpus-kids-colored mb-4" style="font-size: 5.5rem;">
+        <span class="k-1">K</span><span class="k-2">A</span><span class="k-3">R</span><span class="k-4">P</span><span class="k-5">U</span><span class="k-6">S</span>&nbsp;<span class="k-7">K</span><span class="k-8">I</span><span class="k-9">D</span><span class="k-10">S</span>
+      </h1>
+      <p class="text-xl font-light max-w-2xl mx-auto mb-10">
+        ¡Bienvenidos a Karpus Kids! Donde cada niño aprende, juega y crece rodeado de amor, valores y alegría.
+      </p>
+      <div class="flex justify-center items-center gap-4">
+        <a href="https://wa.me/18298038484?text=¡Hola! Me interesa inscribir a mi pequeño en Karpus Kids" target="_blank" class="bg-pink-500 text-white font-bold px-8 py-4 rounded-full shadow-lg hover:bg-pink-600 transition transform hover:scale-105">Inscribir Ahora</a>
+      </div>
+
+      <!-- Modal de Contacto -->
+      <div x-show="contactModal" @keydown.escape.window="contactModal = false" class="fixed inset-0 bg-black/50 z-50 flex items-center justify-center" style="display: none;">
+        <div @click.away="contactModal = false" class="bg-white rounded-2xl p-8 w-full max-w-md text-gray-800">
+          <h3 class="text-2xl font-bold mb-4 text-blue-600">¡Contáctanos!</h3>
+          <p class="text-sm mb-6">¡Hola! Estamos aquí para ayudarte. ¿Cómo podemos asistirte hoy?</p>
+          <div class="space-y-4">
+            <a href="https://wa.me/18298038484?text=¡Hola! Me interesa inscribir a mi pequeño en Karpus Kids" target="_blank" class="block w-full text-center bg-green-500 text-white font-bold px-6 py-3 rounded-lg hover:bg-green-600 transition">
+              <i class="bi bi-whatsapp mr-2"></i>Inscribir a mi Pequeño
+            </a>
+            <a href="https://wa.me/18298038484?text=¡Hola! Me gustaría obtener más información sobre Karpus Kids" target="_blank" class="block w-full text-center bg-blue-500 text-white font-bold px-6 py-3 rounded-lg hover:bg-blue-600 transition">
+              <i class="bi bi-info-circle mr-2"></i>Solicitar Información
+            </a>
+            <a href="https://wa.me/18298038484?text=¡Hola! Me gustaría contactarlos sobre Karpus Kids" target="_blank" class="block w-full text-center bg-pink-500 text-white font-bold px-6 py-3 rounded-lg hover:bg-pink-600 transition">
+              <i class="bi bi-chat-dots mr-2"></i>Contactar por WhatsApp
+            </a>
+          </div>
+          <button type="button" @click="contactModal = false" class="mt-6 w-full px-6 py-2 text-gray-600 hover:text-gray-800">Cerrar</button>
+        </div>
+      </div>
+
+    </div>
+  </section>
+  
+  <!-- Sobre Nosotros -->
+  <section id="nosotros" class="py-20 px-8 bg-gray-50">
+    <h2 class="text-3xl font-bold text-center mb-6 text-blue-600" data-aos="fade-up">Sobre Nosotros</h2>
+    <div class="max-w-6xl mx-auto flex flex-col gap-8">
+      <div class="space-y-6 text-center" data-aos="fade-down">
+        <p class="text-gray-700">
+          <span class="karpus-kids-inline"><span class="k-1">K</span><span class="k-2">a</span><span class="k-3">r</span><span class="k-4">p</span><span class="k-5">u</span><span class="k-6">s</span> <span class="k-7">K</span><span class="k-8">i</span><span class="k-9">d</span><span class="k-10">s</span></span> es mucho más que una estancia infantil: es un espacio donde los niños crecen, aprenden y descubren el mundo con amor y alegría.
+        </p>
+        <p class="text-gray-700">
+          Detrás de este hermoso proyecto está Karonlyn García, fundadora y CEO, una mujer apasionada por la educación y el bienestar infantil. Con una visión clara y un corazón dedicado, Karonlyn creó <span class="karpus-kids-inline"><span class="k-1">K</span><span class="k-2">a</span><span class="k-3">r</span><span class="k-4">p</span><span class="k-5">u</span><span class="k-6">s</span> <span class="k-7">K</span><span class="k-8">i</span><span class="k-9">d</span><span class="k-10">s</span></span> con el sueño de ofrecer a las familias un lugar donde cada niño se sienta único, protegido y motivado a desarrollar todo su potencial.
+        </p>
+        <p class="text-gray-700">
+          En <span class="karpus-kids-inline"><span class="k-1">K</span><span class="k-2">a</span><span class="k-3">r</span><span class="k-4">p</span><span class="k-5">u</span><span class="k-6">s</span> <span class="k-7">K</span><span class="k-8">i</span><span class="k-9">d</span><span class="k-10">s</span></span>, cada sonrisa cuenta. Combinamos aprendizaje, juego y valores para que los más pequeños crezcan seguros, felices y llenos de confianza. Nuestro equipo de profesionales cuida cada detalle, desde el entorno educativo hasta las actividades diarias, para asegurar una experiencia inolvidable.
+        </p>
+        <p class="text-gray-700">
+          🌟 Aquí, la educación se vive con cariño, creatividad y propósito.
+          Cada día es una nueva oportunidad para descubrir, reír y aprender.
+        </p>
+        <p class="text-gray-700">
+          Si quieres que tu hijo crezca en un ambiente donde el amor y la educación se unen, <span class="karpus-kids-inline"><span class="k-1">K</span><span class="k-2">a</span><span class="k-3">r</span><span class="k-4">p</span><span class="k-5">u</span><span class="k-6">s</span> <span class="k-7">K</span><span class="k-8">i</span><span class="k-9">d</span><span class="k-10">s</span></span> es el lugar perfecto para empezar ese hermoso viaje.
+        </p>
+        <p class="text-gray-700">
+          👉 Descubre más sobre nosotros y únete a la familia <span class="karpus-kids-inline"><span class="k-1">K</span><span class="k-2">a</span><span class="k-3">r</span><span class="k-4">p</span><span class="k-5">u</span><span class="k-6">s</span> <span class="k-7">K</span><span class="k-8">i</span><span class="k-9">d</span><span class="k-10">s</span></span>.
+          Tu niño merece lo mejor, y aquí lo encontrará. 💫
+        </p>
+        <div class="pt-4">
+          <a href="https://wa.me/18298038484?text=¡Hola! Me gustaría conocer más sobre Karpus Kids" target="_blank" class="bg-pink-500 text-white font-bold px-8 py-3 rounded-full shadow-lg hover:bg-pink-600 transition transform hover:scale-105 inline-block">
+            ¡Quiero más Información!
+          </a>
+        </div>
+      </div>
+      <div class="w-full" data-aos="fade-up">
+        <img src="img/1.jpg" alt="Karpus Kids Interior" class="w-full h-96 object-cover rounded-xl shadow-lg">
+      </div>
+    </div>
+  </section>
+
+  <!-- Objetivo, Misión y Visión (Carrusel) -->
+  <section class="py-20 bg-blue-50">
+    <div class="max-w-7xl mx-auto px-8 grid md:grid-cols-3 gap-8">
+      <!-- Objetivo -->
+      <div class="p-6 rounded-xl shadow-lg bg-green-50 text-green-800" data-aos="fade-right">
+        <img src="img/4.jpg" alt="Objetivo" class="h-40 w-full object-cover rounded-lg mb-4">
+        <h3 class="text-2xl font-bold mb-3 text-green-600">Objetivo</h3>
+        <p>Brindar un espacio seguro donde los niños desarrollen habilidades cognitivas, sociales y emocionales.</p>
+      </div>
+      <!-- Misión -->
+      <div class="p-6 rounded-xl shadow-lg bg-blue-50 text-blue-800" data-aos="fade-up" data-aos-delay="200">
+        <img src="img/3.jpg" alt="Misión" class="h-40 w-full object-cover rounded-lg mb-4">
+        <h3 class="text-2xl font-bold mb-3 text-blue-600">Misión</h3>
+        <p>Formar niños felices y seguros, fomentando valores y aprendizaje integral mediante actividades lúdicas.</p>
+      </div>
+      <!-- Visión -->
+      <div class="p-6 rounded-xl shadow-lg bg-orange-50 text-orange-800" data-aos="fade-left" data-aos-delay="400">
+        <img src="img/1.jpg" alt="Visión" class="h-40 w-full object-cover rounded-lg mb-4">
+        <h3 class="text-2xl font-bold mb-3 text-orange-500">Visión</h3>
+        <p>Ser un referente en educación infantil, reconocido por nuestro amor, respeto y calidad educativa.</p>
+      </div>
+    </div>
+  </section>
+  
+  <!-- Galería de Fotos -->
+  <section id="galeria-fotos" class="py-20 bg-white overflow-hidden">
+    <h2 class="text-3xl font-bold text-center mb-8 text-rose-500" data-aos="fade-up">Galería de Fotos</h2>
+    <!-- Fila 1: se mueve a la izquierda -->
+    <div class="film-strip-container mb-4">
+      <div class="film-strip film-strip-left">
+        <!-- Imágenes duplicadas para el bucle -->
+        <div class="flex gap-4 px-2">
+          <img src="img/2.jpg" class="rounded-xl object-cover" alt="Niños jugando">
+          <img src="img/3.jpg" class="rounded-xl object-cover" alt="Actividad de pintura">
+          <img src="img/4.jpg" class="rounded-xl object-cover" alt="Niños en el patio">
+          <img src="img/5.jpg" class="rounded-xl object-cover" alt="Aprendiendo los números">
+          <img src="img/6.jpg" class="rounded-xl object-cover" alt="Hora del cuento">
+          <img src="img/7.jpg" class="rounded-xl object-cover" alt="Juegos en grupo">
+        </div>
+        <div class="flex gap-4 px-2">
+          <img src="img/2.jpg" class="rounded-xl object-cover" alt="Niños jugando">
+          <img src="img/3.jpg" class="rounded-xl object-cover" alt="Actividad de pintura">
+          <img src="img/4.jpg" class="rounded-xl object-cover" alt="Niños en el patio">
+          <img src="img/5.jpg" class="rounded-xl object-cover" alt="Aprendiendo los números">
+          <img src="img/6.jpg" class="rounded-xl object-cover" alt="Hora del cuento">
+          <img src="img/7.jpg" class="rounded-xl object-cover" alt="Juegos en grupo">
+        </div>
+      </div>
+    </div>
+    <!-- Fila 2: se mueve a la derecha -->
+    <div class="film-strip-container">
+      <div class="film-strip film-strip-right">
+        <!-- Imágenes duplicadas para el bucle -->
+        <div class="flex gap-4 px-2">
+          <img src="img/1.jpg" class="rounded-xl object-cover" alt="Placeholder 1">
+          <img src="img/8.jpg" class="rounded-xl object-cover" alt="Placeholder 2">
+          <img src="img/9.jpg" class="rounded-xl object-cover" alt="Placeholder 3">
+          <img src="img/10.jpg" class="rounded-xl object-cover" alt="Placeholder 4">
+          <img src="img/11.jpg" class="rounded-xl object-cover" alt="Placeholder 5">
+          <img src="img/12.jpg" class="rounded-xl object-cover" alt="Placeholder 6">
+        </div>
+        <div class="flex gap-4 px-2">
+          <img src="img/1.jpg" class="rounded-xl object-cover" alt="Placeholder 1">
+          <img src="img/8.jpg" class="rounded-xl object-cover" alt="Placeholder 2">
+          <img src="img/9.jpg" class="rounded-xl object-cover" alt="Placeholder 3">
+          <img src="img/10.jpg" class="rounded-xl object-cover" alt="Placeholder 4">
+          <img src="img/11.jpg" class="rounded-xl object-cover" alt="Placeholder 5">
+          <img src="img/12.jpg" class="rounded-xl object-cover" alt="Placeholder 6">
+        </div>
+      </div>
+    </div>
+  </section>
+  
+  <!-- Galería de Videos -->
+  <section id="galeria-videos" class="py-20 bg-orange-50">
+    <div x-data="{ videoModal: false, videoSrc: '' }">
+      <h2 class="text-3xl font-bold text-center mb-8 text-orange-500" data-aos="fade-up">Galería de Videos</h2>
+      <div class="max-w-5xl mx-auto flex justify-center flex-wrap gap-8 px-8">
+        <!-- Video 1 -->
+        <div class="bg-white rounded-xl shadow-lg overflow-hidden w-full sm:w-72 transform transition-transform duration-300 hover:scale-105" data-aos="fade-up" data-aos-delay="100">
+          <div @click="videoModal = true; videoSrc = 'img/14.mp4'" class="relative cursor-pointer group">
+            <video muted loop playsinline class="h-56 w-full object-cover" src="img/14.mp4"></video>
+            <div class="absolute inset-0 bg-black/30 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
+              <i class="bi bi-play-circle-fill text-white text-5xl"></i>
+            </div>
+          </div>
+          <div class="p-4 text-center">
+            <h4 class="font-semibold text-gray-800">¡La diversión es importante!</h4>
+            <p class="text-sm text-gray-600 mt-1">En Karpus Kids, cada día es una nueva aventura llena de sonrisas.</p>
+          </div>
+        </div>
+        <!-- Video 2 -->
+        <div class="bg-white rounded-xl shadow-lg overflow-hidden w-full sm:w-72 transform transition-transform duration-300 hover:scale-105" data-aos="fade-up" data-aos-delay="200">
+          <div @click="videoModal = true; videoSrc = 'img/karpus invitacion.mp4'" class="relative cursor-pointer group">
+            <video muted loop playsinline class="h-56 w-full object-cover" src="img/karpus invitacion.mp4"></video>
+            <div class="absolute inset-0 bg-black/30 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
+              <i class="bi bi-play-circle-fill text-white text-5xl"></i>
+            </div>
+          </div>
+          <div class="p-4 text-center">
+            <h4 class="font-semibold text-gray-800">Momentos Inolvidables</h4>
+            <p class="text-sm text-gray-600 mt-1">Creamos recuerdos que durarán toda la vida a través del juego y la amistad.</p>
+          </div>
+        </div>
+        <!-- Video 3 -->
+        <div class="bg-white rounded-xl shadow-lg overflow-hidden w-full sm:w-72 transform transition-transform duration-300 hover:scale-105" data-aos="fade-up" data-aos-delay="300">
+          <div @click="videoModal = true; videoSrc = 'img/13.mp4'" class="relative cursor-pointer group">
+            <video muted loop playsinline class="h-56 w-full object-cover" src="img/13.mp4"></video>
+            <div class="absolute inset-0 bg-black/30 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
+              <i class="bi bi-play-circle-fill text-white text-5xl"></i>
+            </div>
+          </div>
+          <div class="p-4 text-center">
+            <h4 class="font-semibold text-gray-800">Aprendizaje Creativo</h4>
+            <p class="text-sm text-gray-600 mt-1">Nuestras actividades fomentan la imaginación y el desarrollo de habilidades.</p>
+          </div>
+        </div>
+      </div>
+
+      <!-- Modal de Video -->
+      <div x-show="videoModal" @keydown.escape.window="videoModal = false; videoSrc = ''" class="fixed inset-0 bg-black/80 z-50 flex items-center justify-center p-4" style="display: none;">
+        <div @click.away="videoModal = false; videoSrc = ''" class="relative w-full max-w-4xl">
+          <button @click="videoModal = false; videoSrc = ''" class="absolute -top-10 right-0 text-white text-3xl">&times;</button>
+          <video x-show="videoSrc" :src="videoSrc" class="w-full h-auto rounded-lg" controls autoplay></video>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Testimonios -->
+  <section id="testimonios" class="py-20 bg-pink-50">
+    <h2 class="text-3xl font-bold text-center mb-8 text-pink-600" data-aos="fade-up">Lo que dicen nuestros padres</h2>
+    <div class="testimonial-container overflow-hidden">
+      <div class="testimonial-strip">
+        <!-- Testimonios duplicados para el bucle -->
+        <div class="flex gap-4 px-2">
+          <!-- Testimonio 1 -->
+          <div class="flex-shrink-0 w-80 md:w-96 p-6 rounded-xl shadow-lg bg-white text-gray-700">
+            <div class="flex items-center mb-4">
+              <img src="https://i.pravatar.cc/150?u=a042581f4e29026704d" alt="Padre" class="w-12 h-12 rounded-full object-cover mr-4">
+              <div><h4 class="font-bold">Carlos Pérez</h4><div class="text-yellow-400">★★★★★</div></div>
+            </div>
+            <p class="text-sm">"¡Increíble! Mi hijo ha aprendido muchísimo y siempre llega a casa feliz. El personal es muy atento y cariñoso."</p>
+          </div>
+          <!-- Testimonio 2 -->
+          <div class="flex-shrink-0 w-80 md:w-96 p-6 rounded-xl shadow-lg bg-white text-gray-700">
+            <div class="flex items-center mb-4">
+              <img src="https://i.pravatar.cc/150?u=a042581f4e29026704e" alt="Madre" class="w-12 h-12 rounded-full object-cover mr-4">
+              <div><h4 class="font-bold">Ana García</h4><div class="text-yellow-400">★★★★★</div></div>
+            </div>
+            <p class="text-sm">"La mejor decisión que hemos tomado. Las instalaciones son seguras y las actividades muy creativas. ¡Totalmente recomendado!"</p>
+          </div>
+          <!-- Testimonio 3 -->
+          <div class="flex-shrink-0 w-80 md:w-96 p-6 rounded-xl shadow-lg bg-white text-gray-700">
+            <div class="flex items-center mb-4">
+              <img src="https://i.pravatar.cc/150?u=a042581f4e29026704f" alt="Madre" class="w-12 h-12 rounded-full object-cover mr-4">
+              <div><h4 class="font-bold">Laura Martínez</h4><div class="text-yellow-400">★★★★★</div></div>
+            </div>
+            <p class="text-sm">"<span class="karpus-kids-inline"><span class="k-1">K</span><span class="k-2">a</span><span class="k-3">r</span><span class="k-4">p</span><span class="k-5">u</span><span class="k-6">s</span> <span class="k-7">K</span><span class="k-8">i</span><span class="k-9">d</span><span class="k-10">s</span></span> es más que una estancia, es una segunda familia. Mi hija adora a sus maestras."</p>
+          </div>
+        </div>
+        <div class="flex gap-4 px-2">
+          <!-- Testimonio 1 -->
+          <div class="flex-shrink-0 w-80 md:w-96 p-6 rounded-xl shadow-lg bg-white text-gray-700">
+            <div class="flex items-center mb-4">
+              <img src="https://i.pravatar.cc/150?u=a042581f4e29026704d" alt="Padre" class="w-12 h-12 rounded-full object-cover mr-4">
+              <div><h4 class="font-bold">Carlos Pérez</h4><div class="text-yellow-400">★★★★★</div></div>
+            </div>
+            <p class="text-sm">"¡Increíble! Mi hijo ha aprendido muchísimo y siempre llega a casa feliz. El personal es muy atento y cariñoso."</p>
+          </div>
+          <!-- Testimonio 2 -->
+          <div class="flex-shrink-0 w-80 md:w-96 p-6 rounded-xl shadow-lg bg-white text-gray-700">
+            <div class="flex items-center mb-4">
+              <img src="https://i.pravatar.cc/150?u=a042581f4e29026704e" alt="Madre" class="w-12 h-12 rounded-full object-cover mr-4">
+              <div><h4 class="font-bold">Ana García</h4><div class="text-yellow-400">★★★★★</div></div>
+            </div>
+            <p class="text-sm">"La mejor decisión que hemos tomado. Las instalaciones son seguras y las actividades muy creativas. ¡Totalmente recomendado!"</p>
+          </div>
+          <!-- Testimonio 3 -->
+          <div class="flex-shrink-0 w-80 md:w-96 p-6 rounded-xl shadow-lg bg-white text-gray-700">
+            <div class="flex items-center mb-4">
+              <img src="https://i.pravatar.cc/150?u=a042581f4e29026704f" alt="Madre" class="w-12 h-12 rounded-full object-cover mr-4">
+              <div><h4 class="font-bold">Laura Martínez</h4><div class="text-yellow-400">★★★★★</div></div>
+            </div>
+            <p class="text-sm">"<span class="karpus-kids-inline"><span class="k-1">K</span><span class="k-2">a</span><span class="k-3">r</span><span class="k-4">p</span><span class="k-5">u</span><span class="k-6">s</span> <span class="k-7">K</span><span class="k-8">i</span><span class="k-9">d</span><span class="k-10">s</span></span> es más que una estancia, es una segunda familia. Mi hija adora a sus maestras."</p>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+  
+  <!-- Cuadro de Precios y Servicios -->
+  <section id="precios" class="py-20 bg-blue-800 text-white">
+    <h2 class="text-3xl font-bold text-center mb-12 uppercase" data-aos="fade-up">PRECIO DE NUESTROS SERVICIOS</h2>
+    <div class="max-w-6xl mx-auto grid md:grid-cols-3 gap-8 px-8">
+      <!-- Estancia Infantil -->
+      <div class="bg-blue-600 p-6 rounded-xl shadow-lg flex flex-col" data-aos="fade-up" data-aos-delay="100">
+        <h3 class="text-xl font-bold mb-3">ESTANCIA INFANTIL</h3>
+        <p class="mb-2 font-semibold">INSCRIPCIÓN: 5,000 PESOS.</p>
+        <ul class="list-disc list-inside">
+          <li>Plan A: 7:00 AM - 1:00 PM - RD$ 3,800</li>
+          <li>Plan B: 2:30 PM - 5:30 PM - RD$ 3,800</li>
+          <li>Plan C: 7:00 AM - 2:30 PM (Incluye comida) - RD$ 5,400</li>
+        </ul>
+        <p class="mt-auto pt-4 text-xs text-blue-200">Nota: Recibimos niños hasta 5 años.</p>
+      </div>
+      <!-- Sala de Tareas -->
+      <div class="bg-green-600 p-6 rounded-xl shadow-lg flex flex-col" data-aos="fade-up" data-aos-delay="200">
+        <h3 class="text-xl font-bold mb-3">SALA DE TAREAS</h3>
+        <p class="mb-2 font-semibold">¿EN QUÉ NOSOTROS APOYAMOS?</p>
+        <ul class="list-disc list-inside">
+          <li>Lectoescritura</li>
+          <li>Refuerzo académico en matemáticas y español</li>
+          <li>Apoyo en las tareas</li>
+        </ul>
+        <p class="mt-4 font-semibold">INVERSIÓN:</p>
+        <p>Inscripción $1,500. Mensualidad desde $2,000.</p>
+        <p class="mt-auto pt-4 text-xs text-green-200">Horario: L-J de 4:00 PM a 8:00 PM. Mínimo un mes.</p>
+      </div>
+      <!-- Cursos Gratuitos -->
+      <div class="bg-orange-600 p-6 rounded-xl shadow-lg flex flex-col" data-aos="fade-up" data-aos-delay="300">
+        <h3 class="text-xl font-bold mb-3">CURSOS GRATUITOS</h3>
+        <p class="mb-2 font-semibold">TOTALMENTE GRATIS</p>
+        <ul class="list-disc list-inside">
+          <li>English, Pintura, Barbería, Bisutería, y más.</li>
+        </ul>
+        <p class="mt-4 text-yellow-200 text-sm">Nota: Edad de 7 a 18 años. Se imparten Sábados y Domingos.</p>
+        <p class="mt-auto pt-4 text-center italic text-yellow-200">"¡Vive la vida llena de oportunidades y haz que las aprovechen!"</p>
+      </div>
+    </div>
+    <div class="text-center mt-12" data-aos="fade-up">
+      <a href="https://wa.me/18298038484?text=¡Hola! Me interesa inscribir a mi pequeño en Karpus Kids" target="_blank" class="bg-white text-blue-800 font-bold px-8 py-3 rounded-full shadow-lg hover:bg-blue-100 transition transform hover:scale-105 inline-block">
+        Inscribir Ahora
+      </a>
+    </div>
+  </section>
+  
+  <!-- Footer con Contacto + Horarios + Mapa -->
+  <footer id="footer" class="bg-green-600 text-white py-14">
+    <div class="max-w-6xl mx-auto px-4 grid md:grid-cols-3 gap-10 text-center md:text-left">
+      <!-- Logo e Info -->
+      <div data-aos="fade-up" class="flex flex-col items-center md:items-start">
+        <img src="img/mundo.jpg" alt="Karpus Kids Logo" class="h-12 mb-4 bg-white p-1 rounded-lg">
+        <h3 class="text-xl font-bold karpus-kids-inline"><span class="k-1">K</span><span class="k-2">a</span><span class="k-3">r</span><span class="k-4">p</span><span class="k-5">u</span><span class="k-6">s</span> <span class="k-7">K</span><span class="k-8">i</span><span class="k-9">d</span><span class="k-10">s</span></h3>
+        <p class="text-sm mt-2 text-green-100">Donde cada niño aprende, juega y crece.</p>
+      </div>
+      <!-- Contacto -->
+      <div data-aos="fade-up" data-aos-delay="100">
+        <h3 class="text-xl font-bold mb-4">Contáctanos</h3>
+        <p class="mb-2"><i class="bi bi-telephone-fill mr-2"></i> +1 (829) 803-8424</p>
+        <p class="mb-2"><i class="bi bi-instagram mr-2"></i> <a href="https://www.instagram.com/karpus_kids/" target="_blank" class="text-green-200 hover:underline">@karpus_kids</a></p>
+        <p class="mb-2"><i class="bi bi-envelope-fill mr-2"></i> info@karpuskids.com</p>
+        <h3 class="text-xl font-bold mb-4 mt-6">Horario</h3>
+        <p><i class="bi bi-clock-fill mr-2"></i> Lunes a Viernes: 7:00 AM - 6:00 PM</p>
+      </div>
+      <!-- Mapa -->
+      <div data-aos="fade-up" data-aos-delay="200">
+        <iframe src="https://www.google.com/maps/embed?pb=!1m18!1m12!1m3!1d3785.686618411939!2d-70.09190389999999!3d18.407108499999996!2m3!1f0!2f0!3f0!3m2!1i1024!2i768!4f13.1!3m3!1m2!1s0x8ea55f2cf6f6cc17%3A0x31dbf4c810db6cd7!2sKarpus%20Kids!5e0!3m2!1ses-419!2sdo!4v1761453539695!5m2!1ses-419!2sdo" width="100%" height="200" style="border:0;" allowfullscreen="" loading="lazy" class="rounded-lg"></iframe>
+      </div>
+    </div>
+    <p class="text-center mt-8 text-green-200 text-sm">© 2025 <span class="karpus-kids-inline"><span class="k-1">K</span><span class="k-2">a</span><span class="k-3">r</span><span class="k-4">p</span><span class="k-5">u</span><span class="k-6">s</span> <span class="k-7">K</span><span class="k-8">i</span><span class="k-9">d</span><span class="k-10">s</span></span> | Todos los derechos reservados</p>
+  </footer>
+  
+  <!-- Botones flotantes -->
+  <a href="https://wa.me/18298038424" target="_blank" class="floating-btn btn-ws"><i class="bi bi-whatsapp"></i></a>
+  <a href="https://www.instagram.com/karpus_kids/" target="_blank" class="floating-btn btn-ig"><i class="bi bi-instagram"></i></a>
+  
+  <script>
+    AOS.init({ duration: 1200 });
+
+    // Script para reproducir videos al pasar el cursor
+    document.querySelectorAll('.video-container').forEach(container => {
+      const video = container.querySelector('video');
+      container.addEventListener('mouseenter', () => {
+        video.play();
+      });
+      container.addEventListener('mouseleave', () => {
+        video.pause();
+        video.currentTime = 0;
+      });
+    });
+  </script>
+</body>
+</html>

@@ -1,0 +1,594 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Panel de Padres - Karpus Kids</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="stylesheet" href="css/theme.css" />
+  <link rel="stylesheet" href="css/karpus-modern.css" />
+  <script src="js/auth.js?v=1"></script>
+  <script>
+    (function(){
+      const check = Auth.requireRole('padre');
+      if(!check.ok){ window.location.href = 'login.html'; }
+    })();
+  </script>
+  <link href="https://fonts.googleapis.com/css2?family=Nunito:wght@400;600;700&family=Poppins:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          colors: {
+            'karpus-green': '#4CAF50',
+            'karpus-blue': '#2196F3',
+            'karpus-pink': '#FF4081',
+            'karpus-orange': '#FF9800',
+            'karpus-blue-soft': '#7AB8FF',
+            'karpus-sky': { light: '#F0F7FF', DEFAULT: '#D6E9FF' }
+          },
+          fontFamily: {
+            nunito: ['Nunito', 'sans-serif'],
+            poppins: ['Poppins', 'sans-serif'],
+          },
+          boxShadow: {
+            soft: '0 4px 12px rgba(0, 0, 0, 0.05)'
+          },
+          borderRadius: {
+            xl: '1rem',
+            '2xl': '1.25rem',
+            '3xl': '1.75rem'
+          }
+        }
+      }
+    }
+  </script>
+  <style>
+    body { 
+      font-family: 'Nunito', sans-serif; 
+      background-color: #F0F7FF; /* karpus-sky-light */
+      background-image: linear-gradient(to bottom, #F0F7FF, #FFFFFF);
+    }
+    /* Sidebar styles */
+    aside#sidebar { width: 260px; transition: width .25s ease, transform .25s ease; }
+    aside#sidebar.collapsed { width: 72px; }
+    aside#sidebar .label { transition: opacity .2s ease; }
+    aside#sidebar.collapsed .label { opacity: 0; }
+    /* mobile helper */
+    .hidden-mobile { display: none !important; }
+    /* color variants */
+    .sidebar-blue { background: linear-gradient(135deg,#E3F2FD,#BBDEFB); }
+    .sidebar-green { background: linear-gradient(135deg,#E8F8F0,#D0F0E0); }
+    .sidebar-pink { background: linear-gradient(135deg,#FFF0F6,#FFE3F0); }
+    /* Karpus colored letters small */
+    .karpus-kids-inline { font-weight: 700; }
+    .karpus-kids-inline .k-1 { color: #FF9800; }
+    .karpus-kids-inline .k-2 { color: #2196F3; }
+    .karpus-kids-inline .k-3 { color: #E91E63; }
+    .karpus-kids-inline .k-4 { color: #4CAF50; }
+    .karpus-kids-inline .k-5 { color: #FF9800; }
+    .karpus-kids-inline .k-6 { color: #2196F3; }
+    .karpus-kids-inline .k-7 { color: #4CAF50; }
+    .karpus-kids-inline .k-8 { color: #E91E63; }
+    .karpus-kids-inline .k-9 { color: #2196F3; }
+    .karpus-kids-inline .k-10 { color: #FF9800; }
+    
+    /* Estilos para modales más grandes y profesionales */
+    .modal-container {
+      position: fixed;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      background-color: rgba(0, 0, 0, 0.5);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      z-index: 50;
+      opacity: 0;
+      visibility: hidden;
+      transition: opacity 0.3s ease, visibility 0.3s ease;
+    }
+    
+    .modal-container.active {
+      opacity: 1;
+      visibility: visible;
+    }
+    
+    .modal-content {
+      background: white;
+      border-radius: 16px;
+      box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
+      width: 90%;
+      max-width: 800px;
+      max-height: 90vh;
+      overflow-y: auto;
+      transform: scale(0.9);
+      transition: transform 0.3s ease;
+    }
+    
+    .modal-container.active .modal-content {
+      transform: scale(1);
+    }
+    
+    .modal-header {
+      padding: 1.5rem;
+      border-bottom: 1px solid #e5e7eb;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+    
+    .modal-body {
+      padding: 1.5rem;
+    }
+    
+    .modal-footer {
+      padding: 1.5rem;
+      border-top: 1px solid #e5e7eb;
+      display: flex;
+      justify-content: flex-end;
+      gap: 0.75rem;
+    }
+  </style>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <script src="https://unpkg.com/lucide@latest/dist/umd/lucide.min.js"></script>
+</head>
+<body class="text-slate-800 min-h-screen">
+  <div class="min-h-screen flex flex-col font-nunito">
+    <!-- Sidebar -->
+    <aside id="sidebar" class="hidden md:flex gradient-purple-blue fixed inset-y-0 left-0 p-4 rounded-r-3xl shadow-lg z-10">
+      <div class="flex flex-col h-full">
+        <div class="flex items-center gap-3 mb-6">
+          <div class="h-12 w-12 rounded-2xl bg-white flex items-center justify-center shadow-soft">
+            <img src="img/mundo.jpg" alt="logo" class="h-10 w-10 rounded-lg object-cover" />
+          </div>
+          <div class="label">
+            <h3 class="font-semibold text-white"><span class="karpus-kids-inline"><span class="k-1">K</span><span class="k-2">a</span><span class="k-3">r</span><span class="k-4">p</span><span class="k-5">u</span><span class="k-6">s</span> <span class="k-7">K</span><span class="k-8">i</span><span class="k-9">d</span><span class="k-10">s</span></span></h3>
+            <p class="text-xs text-white text-opacity-80">Panel - Padres</p>
+          </div>
+        </div>
+
+        <nav class="teams-nav bg-white bg-opacity-10 rounded-xl mb-4 flex-grow">
+          <button data-section="home" class="teams-nav-item active">
+            <i data-lucide="home" class="text-karpus-orange"></i>
+            <span class="label text-white">Inicio</span>
+          </button>
+          <button data-section="class" class="teams-nav-item">
+            <i data-lucide="globe" class="text-karpus-blue"></i>
+            <span class="label text-white">Aula</span>
+          </button>
+          <button data-section="tasks" class="teams-nav-item">
+            <i data-lucide="book-open" class="text-karpus-green"></i>
+            <span class="label text-white">Tareas</span>
+            <span class="notification-badge ml-auto">2</span>
+          </button>
+          <button data-section="notifications" class="teams-nav-item">
+            <i data-lucide="bell" class="text-karpus-pink"></i>
+            <span class="label text-white">Avisos</span>
+            <span class="notification-badge ml-auto">3</span>
+          </button>
+          <button data-section="development" class="teams-nav-item">
+            <i data-lucide="trending-up" class="text-karpus-teal"></i>
+            <span class="label text-white">Plan Educativo</span>
+          </button>
+          <button data-section="calendar" class="teams-nav-item">
+            <i data-lucide="calendar" class="text-karpus-purple"></i>
+            <span class="label text-white">Calendario</span>
+          </button>
+          <button data-section="profile" class="teams-nav-item">
+            <i data-lucide="user" class="text-karpus-yellow"></i>
+            <span class="label text-white">Perfil</span>
+          </button>
+        </nav>
+
+      <div class="mt-6">
+        <p class="text-xs text-slate-600 mb-2">Color sidebar</p>
+        <div class="flex gap-2">
+          <button class="w-8 h-8 rounded-full bg-blue-500" data-color="blue" title="Azul"></button>
+          <button class="w-8 h-8 rounded-full bg-green-500" data-color="green" title="Verde"></button>
+          <button class="w-8 h-8 rounded-full bg-pink-400" data-color="pink" title="Rosa"></button>
+        </div>
+      </div>
+    </aside>
+
+    <!-- Mobile header -->
+    <div class="md:hidden w-full fixed top-0 left-0 right-0 bg-white/80 backdrop-blur-sm border-b z-10 shadow-soft">
+      <header class="px-4 py-2 flex items-center justify-between">
+        <button id="menuBtn" class="p-2"><i data-lucide="menu"></i></button>
+        <div class="flex items-center gap-3">
+          <div class="w-9 h-9 rounded-2xl bg-karpus-blue flex items-center justify-center shadow-soft">
+            <img src="img/mundo.jpg" alt="logo" class="h-6 w-6 rounded" />
+          </div>
+          <div>
+            <h1 class="text-lg font-poppins font-semibold"><span class="karpus-kids-inline"><span class="k-1">K</span><span class="k-2">a</span><span class="k-3">r</span><span class="k-4">p</span><span class="k-5">u</span><span class="k-6">s</span> <span class="k-7">K</span><span class="k-8">i</span><span class="k-9">d</span><span class="k-10">s</span></span></h1>
+            <p class="text-xs text-slate-500">Panel de Padres</p>
+          </div>
+        </div>
+        <!-- Menú de Avatar de Usuario -->
+        <div class="relative">
+          <button id="avatarMenuBtn">
+            <img src="https://placehold.co/200x200" alt="Avatar del alumno" class="w-9 h-9 rounded-full object-cover border-2 border-karpus-blue-soft">
+          </button>
+          <!-- Menú desplegable -->
+          <div id="avatarDropdown" class="hidden absolute right-0 mt-2 w-48 bg-white rounded-xl shadow-lg border z-20">
+            <div class="p-3">
+              <p class="text-sm font-semibold">Andrea Flores</p>
+              <p class="text-xs text-slate-500">Estudiante</p>
+            </div>
+            <button id="editProfileBtn" class="w-full text-left px-3 py-2 text-sm text-slate-700 hover:bg-slate-100 rounded-b-xl">Editar Perfil</button>
+          </div>
+        </div>
+      </header>
+    </div>
+
+    <!-- Content -->
+    <main class="flex-1 pb-20 px-4 space-y-6 md:pt-6 mt-16 md:mt-0">
+    <!-- Home -->
+    <section id="tab-home" class="space-y-6">
+      <div class="modern-card p-4">
+        <div class="flex items-center justify-between mb-3">
+          <h2 class="text-base font-semibold font-poppins text-karpus-purple flex items-center gap-2">
+            <i data-lucide="sparkles" class="text-karpus-purple h-5 w-5"></i>
+            Actividad Reciente
+          </h2>
+          <button class="modern-button modern-button-primary text-xs">
+            <i data-lucide="refresh-cw" class="h-4 w-4"></i>
+            Actualizar
+          </button>
+        </div>
+        
+        <div class="space-y-3">
+          <div class="flex items-center gap-3 p-3 bg-blue-50 rounded-xl">
+            <div class="bg-blue-100 p-2 rounded-lg">
+              <i data-lucide="book-open" class="text-karpus-blue h-5 w-5"></i>
+            </div>
+            <div class="flex-1">
+              <p class="text-sm font-medium">Nueva tarea asignada</p>
+              <p class="text-xs text-slate-500">Proyecto de ciencias - Entrega: 15/06/2023</p>
+            </div>
+            <span class="text-xs text-slate-400">Hace 2h</span>
+          </div>
+          
+          <div class="flex items-center gap-3 p-3 bg-green-50 rounded-xl">
+            <div class="bg-green-100 p-2 rounded-lg">
+              <i data-lucide="award" class="text-karpus-green h-5 w-5"></i>
+            </div>
+            <div class="flex-1">
+              <p class="text-sm font-medium">Logro desbloqueado</p>
+              <p class="text-xs text-slate-500">Participación destacada en clase</p>
+            </div>
+            <span class="text-xs text-slate-400">Ayer</span>
+          </div>
+          
+          <div class="flex items-center gap-3 p-3 bg-purple-50 rounded-xl">
+            <div class="bg-purple-100 p-2 rounded-lg">
+              <i data-lucide="calendar" class="text-karpus-purple h-5 w-5"></i>
+            </div>
+            <div class="flex-1">
+              <p class="text-sm font-medium">Evento próximo</p>
+              <p class="text-xs text-slate-500">Reunión de padres - 20/06/2023</p>
+            </div>
+            <span class="text-xs text-slate-400">En 5 días</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="space-y-4">
+        <h3 class="text-base font-semibold text-slate-700 px-1 flex items-center gap-2">
+          <i data-lucide="message-circle" class="text-karpus-blue h-5 w-5"></i>
+          Mensajes Generales
+        </h3>
+        <div id="feed" class="space-y-4"></div>
+      </div>
+    </section>
+    
+    <!-- Plan de Desarrollo Educativo -->
+    <section id="tab-development" class="hidden space-y-6">
+      <div class="modern-card p-4">
+        <div class="modern-card-header flex items-center justify-between">
+          <h2 class="text-base font-semibold font-poppins text-karpus-teal flex items-center gap-2">
+            <i data-lucide="trending-up" class="text-karpus-teal h-5 w-5"></i>
+            Plan de Desarrollo Educativo
+          </h2>
+          <button class="modern-button modern-button-success text-xs">
+            <i data-lucide="download" class="h-4 w-4"></i>
+            Descargar PDF
+          </button>
+        </div>
+        
+        <div class="modern-card-body">
+          <div class="mb-6">
+            <h3 class="text-sm font-semibold mb-2">Objetivos Trimestrales</h3>
+            <div class="space-y-3">
+              <div class="bg-slate-50 p-3 rounded-xl">
+                <div class="flex justify-between mb-1">
+                  <p class="text-sm font-medium">Lectura comprensiva</p>
+                  <span class="text-xs bg-green-100 text-green-800 px-2 py-0.5 rounded-full">75% completado</span>
+                </div>
+                <div class="w-full bg-slate-200 rounded-full h-2">
+                  <div class="bg-karpus-green h-2 rounded-full" style="width: 75%"></div>
+                </div>
+              </div>
+              
+              <div class="bg-slate-50 p-3 rounded-xl">
+                <div class="flex justify-between mb-1">
+                  <p class="text-sm font-medium">Matemáticas básicas</p>
+                  <span class="text-xs bg-blue-100 text-blue-800 px-2 py-0.5 rounded-full">90% completado</span>
+                </div>
+                <div class="w-full bg-slate-200 rounded-full h-2">
+                  <div class="bg-karpus-blue h-2 rounded-full" style="width: 90%"></div>
+                </div>
+              </div>
+              
+              <div class="bg-slate-50 p-3 rounded-xl">
+                <div class="flex justify-between mb-1">
+                  <p class="text-sm font-medium">Habilidades sociales</p>
+                  <span class="text-xs bg-orange-100 text-orange-800 px-2 py-0.5 rounded-full">60% completado</span>
+                </div>
+                <div class="w-full bg-slate-200 rounded-full h-2">
+                  <div class="bg-karpus-orange h-2 rounded-full" style="width: 60%"></div>
+                </div>
+              </div>
+            </div>
+          </div>
+          
+          <div class="mb-6">
+            <h3 class="text-sm font-semibold mb-2">Áreas de Enfoque</h3>
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
+              <div class="border border-slate-200 p-3 rounded-xl">
+                <div class="flex items-center gap-2 mb-2">
+                  <div class="bg-purple-100 p-1.5 rounded-lg">
+                    <i data-lucide="brain" class="text-karpus-purple h-4 w-4"></i>
+                  </div>
+                  <p class="text-sm font-medium">Desarrollo Cognitivo</p>
+                </div>
+                <p class="text-xs text-slate-600">Enfoque en resolución de problemas y pensamiento crítico mediante actividades lúdicas.</p>
+              </div>
+              
+              <div class="border border-slate-200 p-3 rounded-xl">
+                <div class="flex items-center gap-2 mb-2">
+                  <div class="bg-green-100 p-1.5 rounded-lg">
+                    <i data-lucide="heart-handshake" class="text-karpus-green h-4 w-4"></i>
+                  </div>
+                  <p class="text-sm font-medium">Inteligencia Emocional</p>
+                </div>
+                <p class="text-xs text-slate-600">Desarrollo de habilidades para reconocer y gestionar emociones propias y ajenas.</p>
+              </div>
+              
+              <div class="border border-slate-200 p-3 rounded-xl">
+                <div class="flex items-center gap-2 mb-2">
+                  <div class="bg-blue-100 p-1.5 rounded-lg">
+                    <i data-lucide="users" class="text-karpus-blue h-4 w-4"></i>
+                  </div>
+                  <p class="text-sm font-medium">Habilidades Sociales</p>
+                </div>
+                <p class="text-xs text-slate-600">Fomento de la cooperación, empatía y trabajo en equipo mediante actividades grupales.</p>
+              </div>
+              
+              <div class="border border-slate-200 p-3 rounded-xl">
+                <div class="flex items-center gap-2 mb-2">
+                  <div class="bg-orange-100 p-1.5 rounded-lg">
+                    <i data-lucide="pencil-ruler" class="text-karpus-orange h-4 w-4"></i>
+                  </div>
+                  <p class="text-sm font-medium">Creatividad</p>
+                </div>
+                <p class="text-xs text-slate-600">Estimulación de la expresión artística y pensamiento divergente a través de proyectos creativos.</p>
+              </div>
+            </div>
+          </div>
+          
+          <div>
+            <h3 class="text-sm font-semibold mb-2">Recomendaciones Personalizadas</h3>
+            <div class="bg-karpus-sky p-4 rounded-xl">
+              <p class="text-sm mb-3">Basado en el progreso actual, recomendamos:</p>
+              <ul class="space-y-2 text-xs text-slate-700">
+                <li class="flex items-start gap-2">
+                  <i data-lucide="check-circle" class="text-karpus-green h-4 w-4 flex-shrink-0 mt-0.5"></i>
+                  <span>Dedicar 15 minutos diarios a la lectura compartida para reforzar la comprensión lectora.</span>
+                </li>
+                <li class="flex items-start gap-2">
+                  <i data-lucide="check-circle" class="text-karpus-green h-4 w-4 flex-shrink-0 mt-0.5"></i>
+                  <span>Practicar actividades de socialización en entornos diversos para mejorar habilidades sociales.</span>
+                </li>
+                <li class="flex items-start gap-2">
+                  <i data-lucide="check-circle" class="text-karpus-green h-4 w-4 flex-shrink-0 mt-0.5"></i>
+                  <span>Utilizar juegos matemáticos interactivos para mantener el excelente progreso en esta área.</span>
+                </li>
+              </ul>
+            </div>
+          </div>
+        </div>
+        
+        <div class="modern-card-footer flex justify-between">
+          <button class="modern-button bg-slate-100 text-slate-700 text-xs">
+            <i data-lucide="message-square" class="h-4 w-4"></i>
+            Solicitar reunión
+          </button>
+          <button class="modern-button modern-button-primary text-xs">
+            <i data-lucide="calendar-plus" class="h-4 w-4"></i>
+            Agendar seguimiento
+          </button>
+        </div>
+      </div>
+    </section>
+
+    <!-- Aula -->
+    <section id="tab-class" class="hidden space-y-4">
+      <div class="flex items-center justify-between">
+        <h2 class="text-sm font-semibold flex items-center gap-2">
+          <i data-lucide="layout-dashboard" class="w-4 h-4 text-karpus-green"></i>
+          <span>Publicaciones del aula</span>
+        </h2>
+        <span class="text-xs text-karpus-green">Aula: Pequeños</span>
+      </div>
+      <div id="classFeed" class="space-y-4"></div>
+    </section>
+
+    <!-- Tareas -->
+    <section id="tab-tasks" class="hidden space-y-4">
+      <div class="flex items-center justify-between">
+        <h2 class="text-sm font-semibold flex items-center gap-2">
+          <i data-lucide="book-check" class="w-4 h-4 text-karpus-orange"></i>
+          <span>Tareas Asignadas</span>
+        </h2>
+        <select id="classroomSelectParent" class="px-3 py-1 border rounded-xl text-xs">
+          <option value="pequenos">Pequeños</option>
+          <option value="medianos">Medianos</option>
+          <option value="grandes">Grandes</option>
+        </select>
+      </div>
+      <div id="tasksList" class="space-y-4"></div>
+    </section>
+
+    <!-- Avisos / Chat privado -->
+    <section id="tab-notifications" class="hidden space-y-4">
+      <h2 class="text-sm font-semibold flex items-center gap-2">
+        <i data-lucide="message-square" class="w-4 h-4 text-karpus-pink"></i>
+        <span>Chat privado</span>
+      </h2>
+      <div class="grid md:grid-cols-3 gap-4">
+        <div class="md:col-span-1 rounded-3xl bg-white p-3 border">
+          <input id="contactFilter" class="w-full border rounded-xl px-2 py-1 text-sm" placeholder="Filtrar contacto" />
+          <div id="contactList" class="mt-2 space-y-1 max-h-64 overflow-auto"></div>
+        </div>
+        <div class="md:col-span-2 rounded-3xl bg-white p-3 border flex flex-col">
+          <div id="chatHeader" class="text-sm font-semibold">Chat</div>
+          <div id="chatMessages" class="flex-1 mt-2 space-y-2 max-h-64 overflow-auto"></div>
+          <div id="typingIndicator" class="text-[11px] text-slate-500"></div>
+          <div class="mt-2 flex gap-2 items-center">
+            <button id="chatEmoji" class="px-2 py-1 rounded bg-slate-100">😀</button>
+            <input id="chatInput" class="flex-1 border rounded-xl px-2 py-1 text-sm" placeholder="Escribe un mensaje" />
+            <button id="chatSend" class="text-sm px-3 py-2 rounded-xl bg-karpus-pink text-white">Enviar</button>
+          </div>
+          <div id="emojiMenu" class="hidden border rounded p-2"></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Perfil -->
+    <section id="tab-profile" class="hidden space-y-4">
+      <div class="p-4 rounded-3xl bg-white shadow-soft border">
+        <div class="flex items-center gap-4">
+          <img src="https://placehold.co/200x200" alt="Niño" class="w-16 h-16 rounded-2xl object-cover" />
+          <div>
+            <h3 class="text-base font-semibold">Andrea Flores</h3>
+            <p class="text-sm text-slate-600">3 años • Aula Pequeños</p>
+          </div>
+        </div>
+        <div class="mt-4 flex items-center gap-3">
+          <button id="openTeacherProfileBtn" class="px-3 py-2 rounded-xl bg-karpus-green text-white text-xs">Ver Maestra</button>
+          <button id="openDirectorProfileBtn" class="px-3 py-2 rounded-xl border text-xs">Ver Directora</button>
+        </div>
+      </div>
+      <div class="p-4 rounded-3xl bg-white shadow-soft border">
+        <div class="flex items-center justify-between">
+          <h4 class="text-sm font-semibold">Pago del mes</h4>
+          <span class="text-xs px-2 py-1 rounded-lg bg-green-100 text-green-700">Pagado</span>
+        </div>
+        <p class="text-xs text-slate-600 mt-2">Vencimiento: 30 Oct</p>
+      </div>
+    </section>
+  </main>
+
+  <!-- Menú inferior -->
+  <nav class="fixed bottom-0 inset-x-0 bg-white/80 backdrop-blur-sm border-t border-slate-200/80">
+    <div class="grid grid-cols-6">
+      <button data-tab="home" class="tab-btn py-3 flex flex-col items-center gap-1 text-karpus-blue rounded-lg">
+        <i data-lucide="home" class="w-6 h-6"></i>
+        <span class="text-[11px]">Inicio</span>
+      </button>
+      <button data-tab="attendance" class="tab-btn py-3 flex flex-col items-center gap-1 text-slate-500 rounded-lg">
+        <i data-lucide="user-check" class="w-6 h-6"></i>
+        <span class="text-[11px]">Asistencia</span>
+      </button>
+      <button data-tab="class" class="tab-btn py-3 flex flex-col items-center gap-1 text-slate-500 rounded-lg">
+        <i data-lucide="globe" class="w-6 h-6"></i>
+        <span class="text-[11px]">Aula</span>
+      </button>
+      <button data-tab="tasks" class="tab-btn py-3 flex flex-col items-center gap-1 text-slate-500 rounded-lg">
+        <i data-lucide="book-open" class="w-6 h-6"></i>
+        <span class="text-[11px]">Tareas</span>
+      </button>
+      <button data-tab="notifications" class="tab-btn py-3 flex flex-col items-center gap-1 text-slate-500 rounded-lg">
+        <i data-lucide="bell" class="w-6 h-6"></i>
+        <span class="text-[11px]">Avisos</span>
+      </button>
+      <button data-tab="profile" class="tab-btn py-3 flex flex-col items-center gap-1 text-slate-500 rounded-lg">
+        <i data-lucide="user" class="w-6 h-6"></i>
+        <span class="text-[11px]">Perfil</span>
+      </button>
+    </div>
+  </nav>
+
+  <!-- Modales -->
+  <div id="modalStats" class="hidden fixed inset-0 bg-black/30 flex items-end">
+    <div class="bg-white w-full rounded-t-3xl p-4 space-y-3">
+      <div class="flex justify-between items-center">
+        <h3 class="text-sm font-semibold">Estadísticas de asistencia</h3>
+        <button id="closeStats" class="text-slate-500">Cerrar</button>
+      </div>
+      <ul class="text-sm text-slate-700">
+        <li>Días asistidos: <span id="daysPresent">18</span></li>
+        <li>Días ausentes: <span id="daysAbsent">2</span></li>
+        <li>Total del mes: <span id="daysTotal">20</span></li>
+        <li>Última asistencia: <span id="lastAttendance">24 Oct</span></li>
+      </ul>
+    </div>
+  </div>
+
+  <div id="modalSubmitTask" class="hidden fixed inset-0 bg-black/30 flex items-end">
+    <div class="bg-white w-full rounded-t-3xl p-4 space-y-3">
+      <div class="flex justify-between items-center">
+        <h3 class="text-sm font-semibold">Enviar tarea</h3>
+        <button id="closeSubmitTask" class="text-slate-500">Cerrar</button>
+      </div>
+      <div id="submitTaskForm" class="space-y-3">
+        <input id="taskComment" type="text" placeholder="Comentario (opcional)" class="w-full px-3 py-2 rounded-xl border" />
+        <label class="block text-xs text-slate-600">Adjuntar archivo (foto, video, doc)</label>
+        <input id="taskFile" type="file" class="w-full border rounded-xl p-2 text-sm" />
+        <div class="flex gap-2">
+          <p id="taskTitleModal" class="text-sm font-semibold"></p>
+        </div>
+        <button id="submitTaskParent" class="w-full px-3 py-2 rounded-xl bg-karpus-orange text-white">Enviar Entrega</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="modalClassInfo" class="hidden fixed inset-0 bg-black/30 flex items-end">
+    <div class="bg-white w-full rounded-t-3xl p-4 space-y-3">
+      <div class="flex justify-between items-center">
+        <h3 class="text-sm font-semibold">Aula Pequeños</h3>
+        <button id="closeClassInfo" class="text-slate-500">Cerrar</button>
+      </div>
+      <p class="text-sm">Niños inscritos: 15</p>
+      <p class="text-sm">Maestra: Sofía Gómez</p>
+    </div>
+  </div>
+
+  <div id="modalProfileView" class="hidden fixed inset-0 bg-black/30 flex items-end">
+    <div class="bg-white w-full rounded-t-3xl p-4 space-y-3">
+      <div class="flex justify-between items-center">
+        <h3 id="modalProfileTitle" class="text-sm font-semibold">Perfil</h3>
+        <button id="closeProfileView" class="text-slate-500">Cerrar</button>
+      </div>
+      <div class="flex items-center gap-4">
+        <img id="modalProfileAvatar" src="https://placehold.co/200x200" alt="Avatar" class="w-16 h-16 rounded-2xl object-cover" />
+        <div>
+          <h4 id="modalProfileName" class="text-base font-semibold">Nombre</h4>
+          <p id="modalProfileRole" class="text-sm text-slate-600">Rol</p>
+        </div>
+      </div>
+      <p id="modalProfileBio" class="text-sm text-slate-700 pt-3 border-t mt-3"></p>
+      <button id="sendMessageToProfile" class="hidden mt-3 w-full px-3 py-2 rounded-xl bg-karpus-pink text-white text-sm flex items-center justify-center gap-2">
+        <i data-lucide="message-circle" class="w-4 h-4"></i>
+        Enviar Mensaje
+      </button>
+    </div>
+  </div>
+
+  <!-- Script -->
+  <script src="js/store.js?v=2"></script>
+  <script src="js/padres_patch.js?v=2"></script>
+</body>
+</html>

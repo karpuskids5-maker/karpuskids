@@ -1,0 +1,367 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Panel de Asistente (Recepcionista) - Karpus Kids</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="stylesheet" href="css/theme.css" />
+  <link rel="stylesheet" href="css/karpus-modern.css" />
+  <script src="js/auth.js?v=1"></script>
+  <script>
+    (function(){
+      const check = Auth.requireRole('asistente');
+      if(!check.ok){ window.location.href = 'login.html'; }
+    })();
+  </script>
+  <script src="https://unpkg.com/lucide@latest/dist/umd/lucide.min.js"></script>
+  <!-- Chart.js (para gráficas) -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <style>
+    aside#sidebar { width: 280px; transition: width .25s ease, transform .25s ease; }
+    aside#sidebar.collapsed { width: 72px; }
+    aside#sidebar .label { transition: opacity .2s ease; }
+    aside#sidebar.collapsed .label { opacity: 0; }
+    /* color variants */
+    .sidebar-indigo { background: linear-gradient(135deg,#EEF2FF,#E0E7FF); }
+    .sidebar-blue { background: linear-gradient(135deg,#E3F2FD,#BBDEFB); }
+    .sidebar-green { background: linear-gradient(135deg,#E8F8F0,#D0F0E0); }
+    .sidebar-teal { background: linear-gradient(135deg, #0d9488, #14b8a6); }
+    /* Estilos para modales más profesionales */
+    .modal-container {
+      position: fixed;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      background-color: rgba(0, 0, 0, 0.5);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      z-index: 50;
+      opacity: 0;
+      visibility: hidden;
+      transition: opacity 0.3s ease, visibility 0.3s ease;
+    }
+    
+    .modal-container.active {
+      opacity: 1;
+      visibility: visible;
+    }
+    
+    .modal-content {
+      background: white;
+      border-radius: 16px;
+      box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
+      width: 90%;
+      max-width: 800px;
+      max-height: 90vh;
+      overflow-y: auto;
+      transform: scale(0.9);
+      transition: transform 0.3s ease;
+    }
+  </style>
+<body class="bg-slate-100 min-h-screen">
+  <div class="flex">
+    <!-- Sidebar -->
+    <aside id="sidebar" class="sidebar-green h-screen p-4 sticky top-0">
+      <div class="flex items-center gap-3 px-2 mb-4">
+        <img src="img/mundo.jpg" class="w-8 h-8 rounded" alt="Karpus">
+        <div>
+          <h1 class="karpus-kids-inline text-sm"><span class="k-1">K</span><span class="k-2">a</span><span class="k-3">r</span><span class="k-4">p</span><span class="k-5">u</span><span class="k-6">s</span> <span class="k-7">K</span><span class="k-8">i</span><span class="k-9">d</span><span class="k-10">s</span></h1>
+          <p class="text-xs text-slate-600">Recepción</p>
+        </div>
+      </div>
+      <div class="sidebar-scroll glass rounded-xl p-2 space-y-1">
+        <button data-section="asistencia" class="w-full text-left px-3 py-2 rounded hover:bg-white/50 flex items-center gap-3"><i data-lucide="user-check"></i><span class="label">Entrada/Salida</span></button>
+        <button data-section="comunicacion" class="w-full text-left px-3 py-2 rounded hover:bg-white/50 flex items-center gap-3"><i data-lucide="message-square"></i><span class="label">Comunicación</span></button>
+        <button data-section="alumnos" class="w-full text-left px-3 py-2 rounded hover:bg-white/50 flex items-center gap-3"><i data-lucide="users"></i><span class="label">Alumnos</span></button>
+        <button data-section="apoyo" class="w-full text-left px-3 py-2 rounded hover:bg-white/50 flex items-center gap-3"><i data-lucide="briefcase"></i><span class="label">Apoyo Admin</span></button>
+        <a id="logoutLink" href="#" class="w-full text-left px-3 py-2 rounded hover:bg-white/50 flex items-center gap-3"><i data-lucide="log-out"></i><span class="label">Cerrar sesión</span></a>
+      </div>
+    </aside>
+
+    <!-- Main content -->
+    <main class="flex-1 p-6 space-y-6">
+      <div class="flex items-center justify-between mb-4">
+        <h2 class="text-xl font-semibold flex items-center gap-2"><i data-lucide="user"></i><span>Panel del Asistente</span></h2>
+        <button id="toggleSidebar" class="px-3 py-2 rounded bg-slate-200">Colapsar</button>
+      </div>
+
+      <!-- Asistencia -->
+      <section id="asistencia" class="section">
+        <div class="mb-4 flex items-center gap-3">
+          <h3 class="text-lg font-semibold">Control de entrada y salida</h3>
+          <button id="generateDailyReport" class="px-3 py-2 bg-blue-600 text-white rounded">Reporte diario</button>
+        </div>
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
+          <div class="p-4 bg-white rounded shadow"><p class="text-sm text-slate-500">Presentes</p><p id="presentCount" class="text-2xl font-bold">0</p></div>
+          <div class="p-4 bg-white rounded shadow"><p class="text-sm text-slate-500">Ausentes</p><p id="absentCount" class="text-2xl font-bold">0</p></div>
+          <div class="p-4 bg-white rounded shadow"><p class="text-sm text-slate-500">Retirados</p><p id="retiredCount" class="text-2xl font-bold">0</p></div>
+        </div>
+        <div class="bg-white rounded shadow p-4">
+          <div class="flex items-center justify-between mb-2">
+            <input id="attendanceSearch" placeholder="Buscar alumno..." class="px-3 py-2 border rounded" />
+            <div class="flex gap-2">
+              <button id="scanQR" class="px-3 py-2 border rounded">Registrar por QR</button>
+              <button id="scanCode" class="px-3 py-2 border rounded">Registrar por Código</button>
+              <button id="scanFace" class="px-3 py-2 border rounded">Registrar por Rostro</button>
+            </div>
+          </div>
+          <table class="w-full text-sm">
+            <thead class="text-slate-500 text-left"><tr><th>Alumno</th><th>Grupo</th><th>Estado</th><th>Acciones</th></tr></thead>
+            <tbody id="attendanceTable"></tbody>
+          </table>
+        </div>
+      </section>
+
+      <!-- Comunicación básica -->
+      <section id="comunicacion" class="section hidden">
+        <h3 class="text-lg font-semibold mb-4">Mensajes rápidos a padres</h3>
+        <div class="bg-white rounded shadow p-4 space-y-3">
+          <div class="flex items-center gap-2">
+            <input id="quickMsgParent" placeholder="Correo del padre" class="flex-1 border rounded px-3 py-2" />
+            <input id="quickMsgText" placeholder="Mensaje (ej: Favor traer muda de ropa)" class="flex-1 border rounded px-3 py-2" />
+            <button id="sendQuickMsg" class="px-3 py-2 bg-green-600 text-white rounded">Enviar</button>
+          </div>
+          <p class="text-xs text-slate-500">Notificaciones automáticas: se envían al registrar entrada/salida.</p>
+          <div id="quickMsgLog" class="text-sm text-slate-700 space-y-2"></div>
+        </div>
+      </section>
+
+      <!-- Gestión de alumnos -->
+      <section id="alumnos" class="section hidden">
+        <div class="flex items-center justify-between mb-2">
+          <h3 class="text-lg font-semibold">Fichas básicas</h3>
+          <button id="openAddStudent" class="px-3 py-2 bg-indigo-600 text-white rounded">Añadir alumno</button>
+        </div>
+        <div class="bg-white rounded shadow p-4">
+          <table class="w-full text-sm">
+            <thead class="text-slate-500 text-left"><tr><th>Nombre</th><th>Grupo</th><th>Tutor</th><th>Autorizados</th><th>Acciones</th></tr></thead>
+            <tbody id="studentsBasicTable"></tbody>
+          </table>
+        </div>
+      </section>
+
+      <!-- Apoyo administrativo -->
+      <section id="apoyo" class="section hidden">
+        <h3 class="text-lg font-semibold mb-4">Apoyo a dirección</h3>
+        <div class="bg-white rounded shadow p-4 space-y-4">
+          <div>
+            <h4 class="font-medium mb-2">Carga de documentos</h4>
+            <input id="adminFile" type="file" class="border rounded px-3 py-2" />
+            <button id="uploadDoc" class="px-3 py-2 bg-blue-600 text-white rounded">Subir</button>
+            <div id="uploadedDocs" class="mt-2 text-sm text-slate-700 space-y-1"></div>
+          </div>
+          <div>
+            <h4 class="font-medium mb-2">Mensajes generales de padres</h4>
+            <div id="parentRequests" class="text-sm space-y-2"></div>
+          </div>
+        </div>
+      </section>
+
+    </main>
+  </div>
+
+  <!-- Modal alumno básico -->
+  <div id="studentModal" class="fixed inset-0 bg-black/50 hidden items-center justify-center">
+    <div class="bg-white rounded-lg shadow p-4 w-full max-w-lg">
+      <h4 class="font-semibold mb-3">Alumno</h4>
+      <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
+        <div><label class="text-sm">Nombre</label><input id="mName" class="w-full border rounded px-3 py-2" /></div>
+        <div><label class="text-sm">Grupo</label><input id="mGroup" class="w-full border rounded px-3 py-2" /></div>
+        <div><label class="text-sm">Tutor</label><input id="mTutor" class="w-full border rounded px-3 py-2" /></div>
+        <div><label class="text-sm">Autorizados a retirar</label><input id="mAuth" class="w-full border rounded px-3 py-2" /></div>
+      </div>
+      <div class="flex justify-end gap-2 mt-4">
+        <button id="closeStudentModal" class="px-3 py-2 border rounded">Cancelar</button>
+        <button id="saveStudentModal" class="px-3 py-2 bg-indigo-600 text-white rounded">Guardar</button>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    document.addEventListener('DOMContentLoaded', ()=>{
+      if(window.lucide && typeof lucide.createIcons === 'function') lucide.createIcons();
+    });
+
+    // Sidebar toggle
+    document.getElementById('toggleSidebar')?.addEventListener('click', ()=>{
+      document.getElementById('sidebar').classList.toggle('collapsed');
+    });
+
+    // Nav sections
+    document.querySelectorAll('aside [data-section]').forEach(btn=>{
+      btn.addEventListener('click', ()=>{
+        document.querySelectorAll('.section').forEach(s=> s.classList.add('hidden'));
+        document.getElementById(btn.getAttribute('data-section')).classList.remove('hidden');
+      });
+    });
+    
+    // Logout
+    document.getElementById('logoutLink')?.addEventListener('click', (e)=>{
+      e.preventDefault();
+      Auth.logout();
+      window.location.href = 'login.html';
+    });
+
+    // Demo data
+    const demoStudents = [
+      { name:'María P.', group:'A1', status:'Ausente' },
+      { name:'Javier R.', group:'A2', status:'Ausente' },
+      { name:'Sofía L.', group:'A1', status:'Ausente' },
+      { name:'Carlos M.', group:'A3', status:'Ausente' }
+    ];
+
+    function renderAttendance(){
+      const tbody = document.getElementById('attendanceTable');
+      tbody.innerHTML = '';
+      demoStudents.forEach(st => {
+        const tr = document.createElement('tr');
+        tr.innerHTML = `<td>${st.name}</td><td>${st.group}</td><td>${st.status}</td>
+          <td class="space-x-2">
+            <button class="px-2 py-1 bg-green-600 text-white rounded" data-act="in">Entrada</button>
+            <button class="px-2 py-1 bg-orange-600 text-white rounded" data-act="out">Salida</button>
+            <button class="px-2 py-1 bg-slate-200 rounded" data-act="ret">Retirar</button>
+          </td>`;
+        tr.querySelectorAll('button').forEach(btn=>{
+          btn.addEventListener('click', ()=>{
+            if(btn.dataset.act==='in'){ st.status='Presente'; notifyParent(st, 'Entrada registrada'); }
+            else if(btn.dataset.act==='out'){ st.status='Ausente'; notifyParent(st, 'Salida registrada'); }
+            else { st.status='Retirado'; notifyParent(st, 'Retiro registrado'); }
+            renderAttendance();
+          });
+        });
+        tbody.appendChild(tr);
+      });
+      updateCounters();
+    }
+
+    function updateCounters(){
+      const present = demoStudents.filter(s=> s.status==='Presente').length;
+      const absent = demoStudents.filter(s=> s.status==='Ausente').length;
+      const retired = demoStudents.filter(s=> s.status==='Retirado').length;
+      document.getElementById('presentCount').textContent = present;
+      document.getElementById('absentCount').textContent = absent;
+      document.getElementById('retiredCount').textContent = retired;
+    }
+
+    // Search
+    document.getElementById('attendanceSearch')?.addEventListener('input', function(){
+      const q = this.value.toLowerCase();
+      document.querySelectorAll('#attendanceTable tr').forEach(tr=>{
+        const name = tr.children[0]?.textContent.toLowerCase() || '';
+        tr.style.display = name.includes(q) ? '' : 'none';
+      });
+    });
+
+    // Quick messaging
+    function notifyParent(student, message){
+      const log = document.getElementById('quickMsgLog');
+      const p = document.createElement('p');
+      p.textContent = `[Auto] ${student.name}: ${message}`;
+      log.prepend(p);
+    }
+    document.getElementById('sendQuickMsg')?.addEventListener('click', ()=>{
+      const parent = document.getElementById('quickMsgParent').value;
+      const msg = document.getElementById('quickMsgText').value;
+      if(!msg.trim()) return alert('Escribe un mensaje');
+      const log = document.getElementById('quickMsgLog');
+      const p = document.createElement('p');
+      p.textContent = `[Manual] ${parent||'Padre'}: ${msg}`;
+      log.prepend(p);
+      document.getElementById('quickMsgText').value='';
+    });
+
+    // Daily report CSV
+    document.getElementById('generateDailyReport')?.addEventListener('click', ()=>{
+      const rows = [['Nombre','Grupo','Estado']].concat(demoStudents.map(s=>[s.name,s.group,s.status]));
+      const csv = rows.map(r=> r.map(v=>`"${String(v).replace(/"/g,'""')}"`).join(',')).join('\n');
+      const blob = new Blob([csv], {type:'text/csv'});
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url; a.download = `reporte_asistencia_${new Date().toISOString().slice(0,10)}.csv`;
+      a.click(); URL.revokeObjectURL(url);
+    });
+
+    // Students basic management
+    const basicStudents = [
+      { name:'María P.', group:'A1', tutor:'Ana Pérez', auth:'Padres y Abuela' },
+      { name:'Javier R.', group:'A2', tutor:'María R.', auth:'Padres' }
+    ];
+    let editIndex = null;
+    function renderBasicStudents(){
+      const tbody = document.getElementById('studentsBasicTable');
+      tbody.innerHTML = '';
+      basicStudents.forEach((s, idx)=>{
+        const tr = document.createElement('tr');
+        tr.innerHTML = `<td>${s.name}</td><td>${s.group}</td><td>${s.tutor}</td><td>${s.auth}</td>
+          <td>
+            <button class="text-blue-600 mr-2" data-edit="${idx}">Editar</button>
+            <button class="text-red-600" data-del="${idx}">Eliminar</button>
+          </td>`;
+        tr.querySelector('[data-edit]')?.addEventListener('click', ()=>{
+          editIndex = idx;
+          document.getElementById('mName').value = s.name;
+          document.getElementById('mGroup').value = s.group;
+          document.getElementById('mTutor').value = s.tutor;
+          document.getElementById('mAuth').value = s.auth;
+          document.getElementById('studentModal').classList.remove('hidden');
+        });
+        tr.querySelector('[data-del]')?.addEventListener('click', ()=>{
+          if(confirm('¿Eliminar alumno?')){ basicStudents.splice(idx,1); renderBasicStudents(); }
+        });
+        tbody.appendChild(tr);
+      });
+    }
+    document.getElementById('openAddStudent')?.addEventListener('click', ()=>{
+      editIndex = null;
+      document.getElementById('mName').value = '';
+      document.getElementById('mGroup').value = '';
+      document.getElementById('mTutor').value = '';
+      document.getElementById('mAuth').value = '';
+      document.getElementById('studentModal').classList.remove('hidden');
+    });
+    document.getElementById('closeStudentModal')?.addEventListener('click', ()=>{
+      document.getElementById('studentModal').classList.add('hidden');
+    });
+    document.getElementById('saveStudentModal')?.addEventListener('click', ()=>{
+      const s = {
+        name: document.getElementById('mName').value.trim(),
+        group: document.getElementById('mGroup').value.trim(),
+        tutor: document.getElementById('mTutor').value.trim(),
+        auth: document.getElementById('mAuth').value.trim(),
+      };
+      if(!s.name) return alert('El nombre es obligatorio');
+      if(editIndex==null) basicStudents.push(s); else basicStudents[editIndex] = s;
+      document.getElementById('studentModal').classList.add('hidden');
+      renderBasicStudents();
+    });
+
+    // Admin support
+    document.getElementById('uploadDoc')?.addEventListener('click', ()=>{
+      const f = document.getElementById('adminFile').files?.[0];
+      if(!f) return alert('Selecciona un archivo');
+      const list = document.getElementById('uploadedDocs');
+      const item = document.createElement('div');
+      item.textContent = `Cargado: ${f.name}`;
+      list.prepend(item);
+      document.getElementById('adminFile').value = '';
+    });
+    const sampleRequests = [
+      'Solicitud: Cambio de horario de recogida (Familia Pérez)',
+      'Aviso: Niño con alergia hoy (Familia Rodríguez)'
+    ];
+    function renderRequests(){
+      const box = document.getElementById('parentRequests');
+      box.innerHTML = '';
+      sampleRequests.forEach(r=>{ const p=document.createElement('p'); p.textContent=r; box.appendChild(p); });
+    }
+
+    // Initialize
+    renderAttendance();
+    renderBasicStudents();
+    renderRequests();
+  </script>
+</body>
+</html>

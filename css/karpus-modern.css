@@ -1,0 +1,588 @@
+/* Karpus Modern CSS - Estilo profesional similar a Teams */
+
+:root {
+  --karpus-blue: #1e88e5;
+  --karpus-green: #43a047;
+  --karpus-orange: #fb8c00;
+  --karpus-pink: #ec407a;
+  --karpus-purple: #7b1fa2;
+  --karpus-teal: #00897b;
+  --karpus-yellow: #fdd835;
+  --teams-purple: #6264a7;
+  --teams-dark: #2d2c2c;
+}
+
+/* Gradientes profesionales */
+.gradient-purple-blue {
+  background: linear-gradient(135deg, var(--karpus-purple), var(--karpus-blue));
+}
+
+.gradient-green-teal {
+  background: linear-gradient(135deg, var(--karpus-green), var(--karpus-teal));
+}
+
+.gradient-orange-pink {
+  background: linear-gradient(135deg, var(--karpus-orange), var(--karpus-pink));
+}
+
+/* Estilo de navegación similar a Teams */
+.teams-nav {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  padding: 0.5rem;
+}
+
+.teams-nav-item {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.75rem 1rem;
+  border-radius: 0.5rem;
+  transition: all 0.2s ease;
+  text-align: left;
+  width: 100%;
+}
+
+.teams-nav-item:hover {
+  background-color: rgba(255, 255, 255, 0.2);
+}
+
+.teams-nav-item.active {
+  background-color: rgba(255, 255, 255, 0.3);
+}
+
+/* Notificaciones estilo Teams */
+.notification-badge {
+  background-color: #ff4081;
+  color: white;
+  border-radius: 1rem;
+  padding: 0.1rem 0.5rem;
+  font-size: 0.75rem;
+  font-weight: bold;
+}
+
+/* Tarjetas modernas */
+.modern-card {
+  background-color: white;
+  border-radius: 1rem;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08);
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+  overflow: hidden;
+}
+
+.modern-card:hover {
+  transform: translateY(-5px);
+  box-shadow: 0 8px 25px rgba(0, 0, 0, 0.12);
+}
+
+.modern-card-header {
+  padding: 1.25rem;
+  border-bottom: 1px solid rgba(0, 0, 0, 0.05);
+  font-weight: 600;
+}
+
+.modern-card-body {
+  padding: 1.25rem;
+}
+
+.modern-card-footer {
+  padding: 1rem 1.25rem;
+  background-color: rgba(0, 0, 0, 0.02);
+  border-top: 1px solid rgba(0, 0, 0, 0.05);
+}
+
+/* Botones modernos */
+.modern-button {
+  padding: 0.6rem 1.2rem;
+  border-radius: 0.5rem;
+  font-weight: 500;
+  transition: all 0.2s ease;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  cursor: pointer;
+}
+
+.modern-button-primary {
+  background-color: var(--teams-purple);
+  color: white;
+}
+
+.modern-button-primary:hover {
+  background-color: #7476b5;
+  box-shadow: 0 4px 12px rgba(98, 100, 167, 0.3);
+}
+
+.modern-button-success {
+  background-color: var(--karpus-green);
+  color: white;
+}
+
+.modern-button-success:hover {
+  background-color: #4caf50;
+  box-shadow: 0 4px 12px rgba(67, 160, 71, 0.3);
+}
+
+.modern-button-danger {
+  background-color: #e53935;
+  color: white;
+}
+
+.modern-button-danger:hover {
+  background-color: #f44336;
+  box-shadow: 0 4px 12px rgba(229, 57, 53, 0.3);
+}
+
+/* Mensajes estilo Teams */
+.teams-message {
+  display: flex;
+  margin-bottom: 1rem;
+}
+
+.teams-message-avatar {
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  margin-right: 0.75rem;
+  flex-shrink: 0;
+}
+
+.teams-message-content {
+  background-color: #f5f5f5;
+  border-radius: 0.75rem;
+  padding: 0.75rem 1rem;
+  max-width: 80%;
+}
+
+.teams-message-sender {
+  font-weight: 600;
+  margin-bottom: 0.25rem;
+  color: var(--teams-purple);
+}
+
+.teams-message-time {
+  font-size: 0.75rem;
+  color: #757575;
+  margin-top: 0.25rem;
+}
+
+.teams-message-mine {
+  flex-direction: row-reverse;
+}
+
+.teams-message-mine .teams-message-avatar {
+  margin-right: 0;
+  margin-left: 0.75rem;
+}
+
+.teams-message-mine .teams-message-content {
+  background-color: #e3f2fd;
+}
+
+/* Animaciones */
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes slideInUp {
+  from { transform: translateY(20px); opacity: 0; }
+  to { transform: translateY(0); opacity: 1; }
+}
+
+.fade-in {
+  animation: fadeIn 0.3s ease forwards;
+}
+
+.slide-in {
+  animation: slideInUp 0.4s ease forwards;
+}
+
+/* Notificación temporal */
+.notification-toast {
+  position: fixed;
+  bottom: 20px;
+  right: 20px;
+  background-color: white;
+  border-radius: 0.5rem;
+  padding: 1rem;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.15);
+  z-index: 1000;
+  animation: slideInUp 0.3s ease, fadeOut 0.3s ease 2.7s forwards;
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+@keyframes fadeOut {
+  from { opacity: 1; }
+  to { opacity: 0; }
+}
+
+.notification-toast-success {
+  border-left: 4px solid var(--karpus-green);
+}
+
+.notification-toast-error {
+  border-left: 4px solid #e53935;
+}
+
+.notification-toast-info {
+  border-left: 4px solid var(--karpus-blue);
+}
+
+/* Actualización de variables adicionales */
+:root {
+  --karpus-pink: #FF4081;
+  --karpus-orange: #FF9800;
+  --karpus-green: #4CAF50;
+  --karpus-purple: #9C27B0;
+  --karpus-teal: #009688;
+  --karpus-yellow: #FFC107;
+  --karpus-red: #F44336;
+  --karpus-gray: #607D8B;
+  
+  --shadow-sm: 0 2px 4px rgba(0,0,0,0.05);
+  --shadow-md: 0 4px 8px rgba(0,0,0,0.1);
+  --shadow-lg: 0 8px 16px rgba(0,0,0,0.1);
+  
+  --radius-sm: 4px;
+  --radius-md: 8px;
+  --radius-lg: 12px;
+  --radius-xl: 20px;
+}
+
+/* Estilos base */
+body {
+  font-family: 'Nunito', sans-serif;
+  background-color: #f5f7fb;
+  color: #333;
+  transition: all 0.3s ease;
+}
+
+/* Gradientes profesionales */
+.gradient-blue-green {
+  background: linear-gradient(135deg, var(--karpus-blue), var(--karpus-green));
+  color: white;
+}
+
+.gradient-orange-pink {
+  background: linear-gradient(135deg, var(--karpus-orange), var(--karpus-pink));
+  color: white;
+}
+
+.gradient-purple-blue {
+  background: linear-gradient(135deg, var(--karpus-purple), var(--karpus-blue));
+  color: white;
+}
+
+/* Tarjetas modernas */
+.card-modern {
+  background-color: white;
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-md);
+  transition: all 0.3s ease;
+  overflow: hidden;
+}
+
+.card-modern:hover {
+  transform: translateY(-5px);
+  box-shadow: var(--shadow-lg);
+}
+
+.card-modern-header {
+  padding: 16px 20px;
+  border-bottom: 1px solid #f0f0f0;
+  font-weight: 600;
+}
+
+.card-modern-body {
+  padding: 20px;
+}
+
+.card-modern-footer {
+  padding: 12px 20px;
+  border-top: 1px solid #f0f0f0;
+  background-color: #fafafa;
+}
+
+/* Botones modernos */
+.btn-modern {
+  padding: 10px 20px;
+  border-radius: var(--radius-md);
+  font-weight: 600;
+  transition: all 0.3s ease;
+  box-shadow: var(--shadow-sm);
+  border: none;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+}
+
+.btn-modern:hover {
+  transform: translateY(-2px);
+  box-shadow: var(--shadow-md);
+}
+
+.btn-modern:active {
+  transform: translateY(0);
+}
+
+.btn-primary {
+  background-color: var(--karpus-blue);
+  color: white;
+}
+
+.btn-success {
+  background-color: var(--karpus-green);
+  color: white;
+}
+
+.btn-danger {
+  background-color: var(--karpus-red);
+  color: white;
+}
+
+.btn-warning {
+  background-color: var(--karpus-orange);
+  color: white;
+}
+
+/* Navegación estilo Teams */
+.teams-nav {
+  background-color: white;
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-md);
+  overflow: hidden;
+}
+
+.teams-nav-item {
+  padding: 12px 16px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  color: #555;
+  transition: all 0.2s ease;
+  border-left: 3px solid transparent;
+}
+
+.teams-nav-item:hover {
+  background-color: #f5f7fb;
+  color: var(--karpus-blue);
+}
+
+.teams-nav-item.active {
+  background-color: rgba(33, 150, 243, 0.1);
+  color: var(--karpus-blue);
+  border-left: 3px solid var(--karpus-blue);
+}
+
+.teams-nav-item i {
+  font-size: 20px;
+}
+
+/* Mensajes estilo Teams */
+.teams-message {
+  border-left: 4px solid var(--karpus-blue);
+  padding: 16px;
+  margin-bottom: 16px;
+  background-color: white;
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-sm);
+  transition: all 0.3s ease;
+}
+
+.teams-message:hover {
+  box-shadow: var(--shadow-md);
+}
+
+.teams-message-header {
+  display: flex;
+  justify-content: space-between;
+  margin-bottom: 8px;
+}
+
+.teams-message-sender {
+  font-weight: 600;
+  color: var(--karpus-blue);
+}
+
+.teams-message-time {
+  color: #888;
+  font-size: 0.85em;
+}
+
+.teams-message-content {
+  color: #333;
+}
+
+.teams-message-actions {
+  margin-top: 12px;
+  display: flex;
+  gap: 8px;
+}
+
+/* Notificaciones */
+.notification-badge {
+  position: absolute;
+  top: -5px;
+  right: -5px;
+  background-color: var(--karpus-pink);
+  color: white;
+  border-radius: 50%;
+  width: 20px;
+  height: 20px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 12px;
+  font-weight: bold;
+}
+
+.notification-toast {
+  position: fixed;
+  bottom: 24px;
+  right: 24px;
+  padding: 12px 20px;
+  background-color: white;
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-lg);
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  z-index: 1000;
+  animation: slideInUp 0.3s ease-out;
+}
+
+@keyframes slideInUp {
+  from {
+    transform: translateY(100%);
+    opacity: 0;
+  }
+  to {
+    transform: translateY(0);
+    opacity: 1;
+  }
+}
+
+.notification-toast.success {
+  border-left: 4px solid var(--karpus-green);
+}
+
+.notification-toast.error {
+  border-left: 4px solid var(--karpus-red);
+}
+
+.notification-toast.info {
+  border-left: 4px solid var(--karpus-blue);
+}
+
+.notification-toast.warning {
+  border-left: 4px solid var(--karpus-orange);
+}
+
+/* Avatares */
+.avatar {
+  border-radius: 50%;
+  object-fit: cover;
+  border: 2px solid white;
+  box-shadow: var(--shadow-sm);
+}
+
+.avatar-sm {
+  width: 32px;
+  height: 32px;
+}
+
+.avatar-md {
+  width: 48px;
+  height: 48px;
+}
+
+.avatar-lg {
+  width: 64px;
+  height: 64px;
+}
+
+.avatar-group .avatar {
+  margin-left: -10px;
+  transition: transform 0.3s ease;
+}
+
+.avatar-group .avatar:hover {
+  transform: translateY(-5px);
+  z-index: 10;
+}
+
+/* Pestañas estilo Teams */
+.teams-tabs {
+  display: flex;
+  border-bottom: 1px solid #e0e0e0;
+  margin-bottom: 20px;
+}
+
+.teams-tab {
+  padding: 12px 20px;
+  cursor: pointer;
+  position: relative;
+  font-weight: 600;
+  color: #666;
+  transition: all 0.3s ease;
+}
+
+.teams-tab.active {
+  color: var(--karpus-blue);
+}
+
+.teams-tab.active::after {
+  content: '';
+  position: absolute;
+  bottom: -1px;
+  left: 0;
+  width: 100%;
+  height: 3px;
+  background-color: var(--karpus-blue);
+  border-radius: 3px 3px 0 0;
+}
+
+.teams-tab:hover {
+  color: var(--karpus-blue);
+}
+
+/* Animaciones */
+.animate-fadeIn {
+  animation: fadeIn 0.5s ease-in-out;
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+.animate-slideIn {
+  animation: slideIn 0.5s ease-in-out;
+}
+
+@keyframes slideIn {
+  from { transform: translateY(20px); opacity: 0; }
+  to { transform: translateY(0); opacity: 1; }
+}
+
+/* Diseño responsivo */
+@media (max-width: 768px) {
+  .card-modern {
+    margin-bottom: 16px;
+  }
+  
+  .teams-tabs {
+    overflow-x: auto;
+    white-space: nowrap;
+  }
+  
+  .teams-nav {
+    margin-bottom: 16px;
+  }
+}
