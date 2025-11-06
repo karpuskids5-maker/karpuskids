@@ -138,53 +138,36 @@
         </div>
       </div>
 
-      <nav class="space-y-2 teams-nav bg-white/10 p-2 rounded-xl mb-4">
-        <button data-section="dashboard" class="nav-button teams-nav-item text-white hover:bg-white/20">
-          <i data-lucide="grid" class="text-karpus-blue"></i>
-          <span class="label">Dashboard</span>
+      <nav class="space-y-1 teams-nav">
+        <button data-section="dashboard" class="teams-nav-item active">
+          <i data-lucide="layout-dashboard"></i><span class="label">Dashboard</span>
         </button>
-        <button data-section="maestros" class="nav-button teams-nav-item text-white hover:bg-white/20">
-          <i data-lucide="users" class="text-karpus-green"></i>
-          <span class="label">Maestros</span>
-          <span class="badge">5</span>
+        <button data-section="maestros" class="teams-nav-item">
+          <i data-lucide="users"></i><span class="label">Maestros</span>
         </button>
-        <button data-section="estudiantes" class="nav-button teams-nav-item text-white hover:bg-white/20">
-          <i data-lucide="user-check" class="text-karpus-orange"></i>
-          <span class="label">Estudiantes</span>
-          <span class="badge">24</span>
+        <button data-section="estudiantes" class="teams-nav-item">
+          <i data-lucide="smile"></i><span class="label">Estudiantes</span>
         </button>
-        <button data-section="aulas" class="nav-button teams-nav-item text-white hover:bg-white/20">
-          <i data-lucide="home" class="text-karpus-purple"></i>
-          <span class="label">Aulas</span>
+        <button data-section="aulas" class="teams-nav-item">
+          <i data-lucide="home"></i><span class="label">Aulas</span>
         </button>
-        <button data-section="asistencia" class="nav-button teams-nav-item text-white hover:bg-white/20">
-          <i data-lucide="calendar" class="text-karpus-pink"></i>
-          <span class="label">Asistencia</span>
+        <button data-section="asistencia" class="teams-nav-item">
+          <i data-lucide="check-square"></i><span class="label">Asistencia</span>
         </button>
-        <button data-section="calificaciones" class="nav-button teams-nav-item text-white hover:bg-white/20">
-          <i data-lucide="graduation-cap" class="text-karpus-teal"></i>
-          <span class="label">Calificaciones</span>
+        <button data-section="calificaciones" class="teams-nav-item">
+          <i data-lucide="file-text"></i><span class="label">Calificaciones</span>
         </button>
-        <button data-section="reportes" class="nav-button teams-nav-item text-white hover:bg-white/20">
-          <i data-lucide="file-text" class="text-karpus-indigo"></i>
-          <span class="label">Reportes</span>
+        <button data-section="reportes" class="teams-nav-item">
+          <i data-lucide="alert-triangle"></i><span class="label">Reportes</span>
         </button>
-        <button data-section="pagos" class="nav-button teams-nav-item text-white hover:bg-white/20">
-          <i data-lucide="credit-card" class="text-karpus-yellow"></i>
-          <span class="label">Pagos</span>
+        <button data-section="pagos" class="teams-nav-item">
+          <i data-lucide="credit-card"></i><span class="label">Pagos</span>
         </button>
-        <button data-section="comunicacion" class="nav-button teams-nav-item text-white hover:bg-white/20">
-          <i data-lucide="message-square" class="text-karpus-blue"></i>
-          <span class="label">Comunicaciones</span>
-          <span class="badge">3</span>
+        <button data-section="comunicacion" class="teams-nav-item">
+          <i data-lucide="message-square"></i><span class="label">Comunicación</span>
         </button>
-        <button data-section="configuracion" class="nav-button teams-nav-item text-white hover:bg-white/20">
-          <i data-lucide="settings" class="text-karpus-gray"></i>
-          <span class="label">Configuración</span>
-        </button>
-        <button data-section="mejora" class="nav-button teams-nav-item text-white hover:bg-white/20">
-          <i data-lucide="bar-chart-2" class="text-karpus-yellow"></i>
-          <span class="label">Sistema de Mejora</span>
+        <button data-section="configuracion" class="teams-nav-item">
+          <i data-lucide="settings"></i><span class="label">Configuración</span>
         </button>
       </nav>
 
@@ -207,7 +190,16 @@
     </aside>
 
     <!-- MAIN -->
-    <main class="flex-1 p-6">
+    <main id="main-content" class="flex-1 p-6 md:ml-[280px] transition-all duration-300">
+      <!-- Header -->
+      <header class="hidden md:flex items-center justify-between mb-6">
+        <button id="toggleSidebarBtn" class="p-2 rounded-full hover:bg-slate-200">
+          <i data-lucide="menu"></i>
+        </button>
+        <h1 class="text-xl font-semibold">Panel de Director</h1>
+        <div><!-- Other header content can go here --></div>
+      </header>
+
       <!-- Topbar mobile -->
       <div class="md:hidden mb-4 flex items-center justify-between">
         <button id="menuBtn" class="p-2 rounded bg-white shadow"><i data-lucide="menu" class="lucide"></i></button>
@@ -810,16 +802,6 @@
             </div>
           </div>
         </div>
-      </section>
-
-      <!-- MEJORA -->
-      <section id="mejora" class="section hidden">
-        <div class="flex items-center justify-between mb-4">
-          <h2 class="text-xl font-semibold flex items-center gap-2">
-            <i data-lucide="bar-chart-2" class="w-5 h-5 text-slate-600"></i><span>Sistema de Mejora</span>
-          </h2>
-        </div>
-        <div id="improvementSection" class="mt-6"></div>
       </section>
 
     </main>
@@ -1651,5 +1633,6 @@
     document.getElementById('dashboard').classList.remove('hidden');
   </script>
   <script src="js/store.js?v=2"></script>
+  <script src="js/sidebar.js"></script>
 </body>
 </html>

@@ -73,22 +73,34 @@
           <p class="text-xs text-slate-600">Recepción</p>
         </div>
       </div>
-      <div class="sidebar-scroll glass rounded-xl p-2 space-y-1">
-        <button data-section="asistencia" class="w-full text-left px-3 py-2 rounded hover:bg-white/50 flex items-center gap-3"><i data-lucide="user-check"></i><span class="label">Entrada/Salida</span></button>
-        <button data-section="comunicacion" class="w-full text-left px-3 py-2 rounded hover:bg-white/50 flex items-center gap-3"><i data-lucide="message-square"></i><span class="label">Comunicación</span></button>
-        <button data-section="alumnos" class="w-full text-left px-3 py-2 rounded hover:bg-white/50 flex items-center gap-3"><i data-lucide="users"></i><span class="label">Alumnos</span></button>
-        <button data-section="apoyo" class="w-full text-left px-3 py-2 rounded hover:bg-white/50 flex items-center gap-3"><i data-lucide="briefcase"></i><span class="label">Apoyo Admin</span></button>
-        <button data-section="mejora" class="w-full text-left px-3 py-2 rounded hover:bg-white/50 flex items-center gap-3"><i data-lucide="bar-chart-2"></i><span class="label">Sistema de Mejora</span></button>
-        <a id="logoutLink" href="#" class="w-full text-left px-3 py-2 rounded hover:bg-white/50 flex items-center gap-3"><i data-lucide="log-out"></i><span class="label">Cerrar sesión</span></a>
+      <div class="space-y-1 teams-nav">
+        <button data-section="asistencia" class="teams-nav-item active">
+          <i data-lucide="user-check"></i><span class="label">Entrada/Salida</span>
+        </button>
+        <button data-section="comunicacion" class="teams-nav-item">
+          <i data-lucide="message-square"></i><span class="label">Comunicación</span>
+        </button>
+        <button data-section="alumnos" class="teams-nav-item">
+          <i data-lucide="users"></i><span class="label">Alumnos</span>
+        </button>
+        <button data-section="apoyo" class="teams-nav-item">
+          <i data-lucide="briefcase"></i><span class="label">Apoyo Admin</span>
+        </button>
+        <a id="logoutLink" href="#" class="teams-nav-item">
+          <i data-lucide="log-out"></i><span class="label">Cerrar sesión</span>
+        </a>
       </div>
     </aside>
 
     <!-- Main content -->
-    <main class="flex-1 p-6 space-y-6">
-      <div class="flex items-center justify-between mb-4">
+    <main id="main-content" class="flex-1 p-6 space-y-6 md:ml-[280px] transition-all duration-300">
+      <header class="flex items-center justify-between mb-4">
+        <button id="toggleSidebarBtn" class="p-2 rounded-full hover:bg-slate-200">
+            <i data-lucide="menu"></i>
+        </button>
         <h2 class="text-xl font-semibold flex items-center gap-2"><i data-lucide="user"></i><span>Panel del Asistente</span></h2>
-        <button id="toggleSidebar" class="px-3 py-2 rounded bg-slate-200">Colapsar</button>
-      </div>
+        <div></div>
+      </header>
 
       <!-- Asistencia -->
       <section id="asistencia" class="section">
@@ -162,10 +174,6 @@
         </div>
       </section>
 
-      <!-- MEJORA -->
-      <section id="mejora" class="section hidden">
-        <h3 class="text-lg font-semibold mb-4">Sistema de Mejora</h3>
-        <div id="improvementSection" class="mt-6"></div>
       </section>
 
     </main>
@@ -392,7 +400,7 @@
     renderAttendance();
     renderBasicStudents();
     renderRequests();
-    renderImprovementPlans();
   </script>
+  <script src="js/sidebar.js"></script>
 </body>
 </html>

@@ -166,9 +166,9 @@
   </style>
 </head>
 <body class="bg-gradient-to-b from-white to-slate-50 text-slate-900 min-h-screen">
-  <header class="p-4 flex items-center justify-between">
+  <header class="p-4 flex items-center justify-between md:hidden">
     <div class="flex items-center gap-3">
-      <button id="toggleSidebar" class="p-2 mr-2 rounded bg-white shadow hidden md:inline-flex" title="Ocultar/Mostrar sidebar">☰</button>
+      <button id="menuBtn" class="p-2 mr-2 rounded bg-white shadow" title="Ocultar/Mostrar sidebar">☰</button>
       <h1 class="text-lg font-semibold">Panel de Maestra</h1>
       <select id="classroomSelect" class="px-3 py-2 border rounded-xl text-sm">
         <option value="pequenos">Pequeños</option>
@@ -222,50 +222,34 @@
     </div>
   </div>
 
-      <nav class="teams-nav bg-white bg-opacity-10 rounded-xl mb-4">
+      <nav class="space-y-1 teams-nav">
         <button data-section="t-home" class="teams-nav-item active">
-          <i data-lucide="home" class="text-white"></i>
-          <span class="label text-white">Inicio</span>
+          <i data-lucide="home"></i><span class="label">Inicio</span>
         </button>
         <button data-section="t-classroom" class="teams-nav-item">
-          <i data-lucide="globe" class="text-white"></i>
-          <span class="label text-white">Aula</span>
+          <i data-lucide="users"></i><span class="label">Aula</span>
         </button>
         <button data-section="t-tasks" class="teams-nav-item">
-          <i data-lucide="book-open" class="text-white"></i>
-          <span class="label text-white">Tareas</span>
-          <span class="notification-badge ml-auto">3</span>
+          <i data-lucide="book-open"></i><span class="label">Tareas</span>
         </button>
         <button data-section="t-attendance" class="teams-nav-item">
-          <i data-lucide="check-square" class="text-white"></i>
-          <span class="label text-white">Asistencia</span>
+          <i data-lucide="check-square"></i><span class="label">Asistencia</span>
         </button>
         <button data-section="t-notifications" class="teams-nav-item">
-          <i data-lucide="bell" class="text-white"></i>
-          <span class="label text-white">Avisos</span>
-          <span class="notification-badge ml-auto">5</span>
+          <i data-lucide="bell"></i><span class="label">Avisos</span>
         </button>
         <button data-section="t-chat" class="teams-nav-item">
-          <i data-lucide="message-circle" class="text-white"></i>
-          <span class="label text-white">Chat</span>
-          <span class="notification-badge ml-auto">2</span>
+          <i data-lucide="message-circle"></i><span class="label">Chat</span>
         </button>
         <button data-section="t-calendar" class="teams-nav-item">
-          <i data-lucide="calendar" class="text-white"></i>
-          <span class="label text-white">Calendario</span>
+          <i data-lucide="calendar"></i><span class="label">Calendario</span>
         </button>
         <button data-section="t-profile" class="teams-nav-item">
-          <i data-lucide="user" class="text-white"></i>
-          <span class="label text-white">Perfil</span>
+          <i data-lucide="user"></i><span class="label">Perfil</span>
         </button>
         <a href="index.html" class="teams-nav-item">
-          <i data-lucide="log-out" class="text-white"></i>
-          <span class="label text-white">Cerrar sesión</span>
+          <i data-lucide="log-out"></i><span class="label">Cerrar sesión</span>
         </a>
-        <button data-section="t-mejora" class="teams-nav-item">
-          <i data-lucide="bar-chart-2" class="text-white"></i>
-          <span class="label text-white">Sistema de Mejora</span>
-        </button>
       </nav>
 
       <div class="mt-6">
@@ -278,7 +262,14 @@
       </div>
     </aside>
 
-    <main class="flex-1 pb-24 px-4">
+    <main id="main-content" class="flex-1 pb-24 px-4 md:ml-[280px] transition-all duration-300">
+    <header class="hidden md:flex items-center justify-between mb-6">
+      <button id="toggleSidebarBtn" class="p-2 rounded-full hover:bg-slate-200">
+        <i data-lucide="menu"></i>
+      </button>
+      <h1 class="text-xl font-semibold">Panel de Maestra</h1>
+      <div><!-- Other header content can go here --></div>
+    </header>
     <!-- Dashboard -->
     <section id="t-home" class="space-y-4">
       <h2 class="text-xl font-semibold flex items-center gap-2">
@@ -376,14 +367,6 @@
           <a href="panel_directora.html" class="text-sm px-3 py-2 rounded-xl border">Ver panel Directora</a>
         </div>
       </div>
-    </section>
-
-    <!-- MEJORA -->
-    <section id="t-mejora" class="space-y-3 hidden">
-      <h2 class="text-xl font-semibold flex items-center gap-2">
-        <i data-lucide="bar-chart-2" class="w-5 h-5 text-karpus-blue"></i><span>Sistema de Mejora</span>
-      </h2>
-      <div id="improvementSection" class="mt-6"></div>
     </section>
   </main>
   </div>
@@ -514,6 +497,7 @@
   <script src="js/store.js?v=2"></script>
   <script src="js/maestra_patch.js?v=2"></script>
   <script src="js/asistencia_maestra.js?v=1"></script>
+  <script src="js/sidebar.js"></script>
 </body>
 </html>
 

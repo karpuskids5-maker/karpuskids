@@ -139,40 +139,27 @@
           </div>
         </div>
 
-        <nav class="teams-nav bg-white bg-opacity-10 rounded-xl mb-4 flex-grow">
+        <nav class="space-y-1 teams-nav">
           <button data-section="home" class="teams-nav-item active">
-            <i data-lucide="home" class="text-karpus-orange"></i>
-            <span class="label text-white">Inicio</span>
+            <i data-lucide="home"></i><span class="label">Inicio</span>
           </button>
           <button data-section="class" class="teams-nav-item">
-            <i data-lucide="globe" class="text-karpus-blue"></i>
-            <span class="label text-white">Aula</span>
+            <i data-lucide="users"></i><span class="label">Aula</span>
           </button>
           <button data-section="tasks" class="teams-nav-item">
-            <i data-lucide="book-open" class="text-karpus-green"></i>
-            <span class="label text-white">Tareas</span>
-            <span class="notification-badge ml-auto">2</span>
+            <i data-lucide="book-open"></i><span class="label">Tareas</span>
           </button>
           <button data-section="notifications" class="teams-nav-item">
-            <i data-lucide="bell" class="text-karpus-pink"></i>
-            <span class="label text-white">Avisos</span>
-            <span class="notification-badge ml-auto">3</span>
+            <i data-lucide="bell"></i><span class="label">Avisos</span>
           </button>
           <button data-section="development" class="teams-nav-item">
-            <i data-lucide="trending-up" class="text-karpus-teal"></i>
-            <span class="label text-white">Plan Educativo</span>
+            <i data-lucide="trending-up"></i><span class="label">Plan Educativo</span>
           </button>
           <button data-section="calendar" class="teams-nav-item">
-            <i data-lucide="calendar" class="text-karpus-purple"></i>
-            <span class="label text-white">Calendario</span>
+            <i data-lucide="calendar"></i><span class="label">Calendario</span>
           </button>
           <button data-section="profile" class="teams-nav-item">
-            <i data-lucide="user" class="text-karpus-yellow"></i>
-            <span class="label text-white">Perfil</span>
-          </button>
-          <button data-section="mejora" class="teams-nav-item">
-            <i data-lucide="bar-chart-2" class="text-karpus-yellow"></i>
-            <span class="label text-white">Plan de Mejora</span>
+            <i data-lucide="user"></i><span class="label">Perfil</span>
           </button>
         </nav>
 
@@ -185,6 +172,15 @@
         </div>
       </div>
     </aside>
+
+    <!-- Header -->
+    <header class="hidden md:flex items-center justify-between mb-6">
+        <button id="toggleSidebarBtn" class="p-2 rounded-full hover:bg-slate-200">
+            <i data-lucide="menu"></i>
+        </button>
+        <h1 class="text-xl font-semibold">Panel de Padres</h1>
+        <div><!-- Other header content can go here --></div>
+    </header>
 
     <!-- Mobile header -->
     <div class="md:hidden w-full fixed top-0 left-0 right-0 bg-white/80 backdrop-blur-sm border-b z-10 shadow-soft">
@@ -217,7 +213,7 @@
     </div>
 
     <!-- Content -->
-    <main class="flex-1 pb-20 px-4 space-y-6 md:pt-6 mt-16 md:mt-0">
+    <main id="main-content" class="flex-1 pb-20 px-4 space-y-6 md:pt-6 mt-16 md:mt-0 md:ml-[280px] transition-all duration-300">
     <!-- Home -->
     <section id="tab-home" class="space-y-6">
       <div class="modern-card p-4">
@@ -484,13 +480,6 @@
       </div>
     </section>
 
-    <!-- MEJORA -->
-    <section id="tab-mejora" class="hidden space-y-4">
-        <h2 class="text-sm font-semibold flex items-center gap-2">
-            <i data-lucide="bar-chart-2" class="w-4 h-4 text-karpus-blue"></i>
-            <span>Plan de Mejora</span>
-        </h2>
-        <div id="improvementSection" class="space-y-4"></div>
     </section>
   </main>
 
@@ -593,5 +582,6 @@
   <!-- Script -->
   <script src="js/store.js?v=2"></script>
   <script src="js/padres_patch.js?v=2"></script>
+  <script src="js/sidebar.js"></script>
 </body>
 </html>
