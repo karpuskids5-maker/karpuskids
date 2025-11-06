@@ -1,21 +1,30 @@
-// Simple auth module using localStorage (demo only)
-// IMPORTANT: This is a demo authentication system. For a production environment,
-// you should use a secure authentication backend with proper user management and
-// session handling. Do not use hardcoded credentials in a real application.
-const Auth = (function(){
-  const KEY = 'karpus_current_user';
-  const USERS = [
-    { email: 'directora@karpus.local', password: '123456', role: 'directora', name: 'Directora' },
-    { email: 'maestra@karpus.local', password: '123456', role: 'maestra', name: 'Maestra' },
-    { email: 'padre@karpus.local', password: '123456', role: 'padre', name: 'Padre/Madre' },
-    { email: 'asistente@karpus.local', password: '123456', role: 'asistente', name: 'Recepcionista' },
-  ];
+// js/auth.js
 
-  function login(email, password){
-    const user = USERS.find(u => u.email.toLowerCase() === String(email).toLowerCase() && u.password === String(password));
-    if(!user) return null;
-    localStorage.setItem(KEY, JSON.stringify({ email: user.email, role: user.role, name: user.name }));
-    return { email: user.email, role: user.role, name: user.name };
+const Auth = (()=>{
+  const KEY = 'karpus-auth';
+
+  async function login(email, password){
+    try {
+      const response = await fetch('/api/login', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ email, password }),
+      });
+
+      const data = await response.json();
+
+      if (data.success) {
+        localStorage.setItem(KEY, JSON.stringify(data.user));
+        return data.user;
+      } else {
+        return null;
+      }
+    } catch (error) {
+      console.error('Login failed:', error);
+      return null;
+    }
   }
 
   function logout(){
