@@ -6,8 +6,6 @@
   <title>Karpus Kids — Panel Director</title>
   <script src="https://cdn.tailwindcss.com"></script>
   <link rel="stylesheet" href="css/base.css" />
-  <link rel="stylesheet" href="css/theme.css" />
-  <link rel="stylesheet" href="css/karpus-modern.css" />
   <script src="js/auth.js?v=1"></script>
   <script>
     (function(){
@@ -19,118 +17,14 @@
   <script src="https://unpkg.com/lucide/dist/lucide.min.js"></script>
   <!-- Chart.js (para gráficas) -->
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-  <style>
-    /* Sidebar styles */
-    aside#sidebar { width: 280px; transition: width .25s ease, transform .25s ease; }
-    aside#sidebar.collapsed { width: 72px; }
-    aside#sidebar .label { transition: opacity .2s ease; }
-    aside#sidebar.collapsed .label { opacity: 0; }
-    /* mobile helper */
-    .hidden-mobile { display: none !important; }
-    /* color variants */
-    .sidebar-indigo { background: linear-gradient(135deg,#EEF2FF,#E0E7FF); }
-    .sidebar-blue { background: linear-gradient(135deg,#E3F2FD,#BBDEFB); }
-    .sidebar-green { background: linear-gradient(135deg,#E8F8F0,#D0F0E0); }
-    .sidebar-purple { background: linear-gradient(135deg, #7c3aed, #4f46e5); }
-    .glass { background: rgba(255,255,255,0.6); backdrop-filter: blur(6px); }
-    .sidebar-scroll { max-height: calc(100vh - 4rem); overflow:auto; }
-    
-    /* Estilos para modales más grandes y profesionales */
-    .modal-container {
-      position: fixed;
-      top: 0;
-      left: 0;
-      right: 0;
-      bottom: 0;
-      background-color: rgba(0, 0, 0, 0.5);
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      z-index: 50;
-      opacity: 0;
-      visibility: hidden;
-      transition: opacity 0.3s ease, visibility 0.3s ease;
-    }
-    
-    .modal-container.active {
-      opacity: 1;
-      visibility: visible;
-    }
-    
-    .modal-content {
-      background: white;
-      border-radius: 16px;
-      box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
-      width: 90%;
-      max-width: 800px;
-      max-height: 90vh;
-      overflow-y: auto;
-      transform: scale(0.9);
-      transition: transform 0.3s ease;
-    }
-    
-    .modal-container.active .modal-content {
-      transform: scale(1);
-    }
-    
-    .modal-header {
-      padding: 1.5rem;
-      border-bottom: 1px solid #e5e7eb;
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-    }
-    
-    .modal-body {
-      padding: 1.5rem;
-    }
-    
-    .modal-footer {
-      padding: 1.5rem;
-      border-top: 1px solid #e5e7eb;
-      display: flex;
-      justify-content: flex-end;
-      gap: 0.75rem;
-    }
-    
-    /* Estilos para botones de navegación */
-    .nav-button {
-      width: 100%;
-      text-align: left;
-      padding: 0.75rem 1rem;
-      border-radius: 0.5rem;
-      display: flex;
-      align-items: center;
-      gap: 0.75rem;
-      transition: all 0.2s ease;
-      position: relative;
-    }
-    
-    .nav-button i {
-      transition: color 0.2s ease;
-    }
-    
-    .nav-button .badge {
-      position: absolute;
-      top: 0.5rem;
-      right: 0.5rem;
-      background: #e91e63;
-      color: white;
-      border-radius: 9999px;
-      font-size: 0.75rem;
-      padding: 0.125rem 0.375rem;
-      min-width: 1.5rem;
-      text-align: center;
-    }
-  </style>
 </head>
 <body class="bg-slate-50 text-slate-800 font-nunito">
   <div class="min-h-screen flex">
     <!-- SIDEBAR -->
-    <aside id="sidebar" class="hidden md:block sidebar-purple p-4 rounded-r-3xl shadow-lg fixed inset-y-0 left-0 z-10">
+    <aside id="sidebar" class="hidden md:block bg-karpus-blue p-4 rounded-r-3xl shadow-lg fixed inset-y-0 left-0 z-10">
       <div class="flex items-center gap-3 mb-6">
         <div class="h-12 w-12 rounded-2xl bg-white/20 flex items-center justify-center shadow-soft">
-          <img src="logo/favicon.ico" alt="logo" class="h-10 w-10 rounded-lg object-cover" />
+          <img src="img/mundo.jpg" alt="logo" class="h-10 w-10 rounded-lg object-cover" />
         </div>
         <div class="label">
           <h3 class="font-semibold text-white"><span class="karpus-kids-inline"><span class="k-1">K</span><span class="k-2">a</span><span class="k-3">r</span><span class="k-4">p</span><span class="k-5">u</span><span class="k-6">s</span> <span class="k-7">K</span><span class="k-8">i</span><span class="k-9">d</span><span class="k-10">s</span></span></h3>
@@ -140,7 +34,7 @@
 
       <nav class="space-y-2 teams-nav bg-white/10 p-2 rounded-xl mb-4">
         <button data-section="dashboard" class="nav-button teams-nav-item text-white hover:bg-white/20">
-          <i data-lucide="grid" class="text-karpus-blue"></i>
+          <i data-lucide="grid" class="text-karpus-yellow"></i>
           <span class="label">Dashboard</span>
         </button>
         <button data-section="maestros" class="nav-button teams-nav-item text-white hover:bg-white/20">
@@ -154,19 +48,19 @@
           <span class="badge">24</span>
         </button>
         <button data-section="aulas" class="nav-button teams-nav-item text-white hover:bg-white/20">
-          <i data-lucide="home" class="text-karpus-purple"></i>
+          <i data-lucide="home" class="text-karpus-pink"></i>
           <span class="label">Aulas</span>
         </button>
         <button data-section="asistencia" class="nav-button teams-nav-item text-white hover:bg-white/20">
-          <i data-lucide="calendar" class="text-karpus-pink"></i>
+          <i data-lucide="calendar" class="text-karpus-yellow"></i>
           <span class="label">Asistencia</span>
         </button>
         <button data-section="calificaciones" class="nav-button teams-nav-item text-white hover:bg-white/20">
-          <i data-lucide="graduation-cap" class="text-karpus-teal"></i>
+          <i data-lucide="graduation-cap" class="text-karpus-green"></i>
           <span class="label">Calificaciones</span>
         </button>
         <button data-section="reportes" class="nav-button teams-nav-item text-white hover:bg-white/20">
-          <i data-lucide="file-text" class="text-karpus-indigo"></i>
+          <i data-lucide="file-text" class="text-karpus-orange"></i>
           <span class="label">Reportes</span>
         </button>
         <button data-section="pagos" class="nav-button teams-nav-item text-white hover:bg-white/20">
@@ -179,29 +73,17 @@
           <span class="badge">3</span>
         </button>
         <button data-section="configuracion" class="nav-button teams-nav-item text-white hover:bg-white/20">
-          <i data-lucide="settings" class="text-karpus-gray"></i>
+          <i data-lucide="settings" class="text-karpus-white"></i>
           <span class="label">Configuración</span>
-        </button>
-        <button data-section="mejora" class="nav-button teams-nav-item text-white hover:bg-white/20">
-          <i data-lucide="bar-chart-2" class="text-karpus-yellow"></i>
-          <span class="label">Sistema de Mejora</span>
         </button>
       </nav>
 
-      <div class="mt-6">
-        <p class="text-xs text-slate-600 mb-2">Color sidebar</p>
-        <div class="flex gap-2">
-          <button class="w-8 h-8 rounded-full bg-indigo-500" data-color="indigo" title="Indigo"></button>
-          <button class="w-8 h-8 rounded-full bg-blue-500" data-color="blue" title="Azul"></button>
-          <button class="w-8 h-8 rounded-full bg-green-500" data-color="green" title="Verde"></button>
-        </div>
-      </div>
-      <div class="mt-6 text-xs text-slate-600">
+      <div class="mt-6 text-xs text-slate-200">
         <p>Usuario: <span class="font-medium">Director(a)</span></p>
         <p class="mt-2">Último acceso: <span class="font-medium">Hoy</span></p>
         <div class="mt-3 flex flex-wrap gap-2">
-          <a href="panel-maestra.html" class="px-2 py-1 rounded border text-xs">Ver panel Maestra</a>
-          <a href="panel_padres.html" class="px-2 py-1 rounded border text-xs">Ver panel Padres</a>
+          <a href="panel-maestra.html" class="px-2 py-1 rounded border border-white/20 text-xs">Ver panel Maestra</a>
+          <a href="panel_padres.html" class="px-2 py-1 rounded border border-white/20 text-xs">Ver panel Padres</a>
         </div>
       </div>
     </aside>
@@ -222,7 +104,7 @@
       <section id="dashboard" class="section">
         <div class="flex items-center justify-between mb-6">
           <div class="flex items-center gap-3">
-            <i data-lucide="layout-dashboard" class="w-7 h-7 text-blue-600"></i>
+            <i data-lucide="layout-dashboard" class="w-7 h-7 text-karpus-blue"></i>
             <h1 class="text-2xl font-bold">Resumen general</h1>
             <p class="text-sm text-slate-500">Visión rápida de la estancia</p>
           </div>
@@ -235,8 +117,8 @@
         <!-- cards -->
         <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
           <!-- Card 1: Niños Presentes -->
-          <div class="p-4 bg-blue-100 text-blue-800 rounded-2xl shadow flex items-center gap-4">
-            <div class="bg-blue-500 text-white p-3 rounded-xl">
+          <div class="p-4 bg-karpus-blue bg-opacity-20 text-blue-800 rounded-2xl shadow flex items-center gap-4">
+            <div class="bg-karpus-blue text-white p-3 rounded-xl">
               <i data-lucide="smile" class="w-8 h-8"></i>
             </div>
             <div>
@@ -245,8 +127,8 @@
             </div>
           </div>
           <!-- Card 2: Maestros Activos -->
-          <div class="p-4 bg-green-100 text-green-800 rounded-2xl shadow flex items-center gap-4">
-            <div class="bg-green-500 text-white p-3 rounded-xl">
+          <div class="p-4 bg-karpus-green bg-opacity-20 text-green-800 rounded-2xl shadow flex items-center gap-4">
+            <div class="bg-karpus-green text-white p-3 rounded-xl">
               <i data-lucide="user-check" class="w-8 h-8"></i>
             </div>
             <div>
@@ -255,8 +137,8 @@
             </div>
           </div>
           <!-- Card 3: Solicitudes -->
-          <div class="p-4 bg-orange-100 text-orange-800 rounded-2xl shadow flex items-center gap-4">
-            <div class="bg-orange-500 text-white p-3 rounded-xl">
+          <div class="p-4 bg-karpus-orange bg-opacity-20 text-orange-800 rounded-2xl shadow flex items-center gap-4">
+            <div class="bg-karpus-orange text-white p-3 rounded-xl">
               <i data-lucide="inbox" class="w-8 h-8"></i>
             </div>
             <div>
@@ -265,8 +147,8 @@
             </div>
           </div>
           <!-- Card 4: Aulas -->
-          <div class="p-4 bg-purple-100 text-purple-800 rounded-2xl shadow flex items-center gap-4">
-            <div class="bg-purple-500 text-white p-3 rounded-xl">
+          <div class="p-4 bg-karpus-pink bg-opacity-20 text-pink-800 rounded-2xl shadow flex items-center gap-4">
+            <div class="bg-karpus-pink text-white p-3 rounded-xl">
               <i data-lucide="home" class="w-8 h-8"></i>
             </div>
             <div>
@@ -343,8 +225,8 @@
                 <td class="py-2">+57 300 123 4567</td>
                 <td class="py-2"><span class="px-2 py-1 bg-green-100 text-green-800 rounded-full text-xs">Activo</span></td>
                 <td class="py-2">
-                  <button class="text-blue-600 hover:text-blue-800 mr-2" onclick="editTeacher(this)">Editar</button>
-                  <button class="text-red-600 hover:text-red-800" onclick="deleteTeacher(this)">Eliminar</button>
+                  <button class="text-karpus-blue hover:text-opacity-80 mr-2" onclick="editTeacher(this)">Editar</button>
+                  <button class="text-karpus-pink hover:text-opacity-80" onclick="deleteTeacher(this)">Eliminar</button>
                 </td>
               </tr>
               <tr>
@@ -353,8 +235,8 @@
                 <td class="py-2">+57 301 987 6543</td>
                 <td class="py-2"><span class="px-2 py-1 bg-yellow-100 text-yellow-800 rounded-full text-xs">Inactivo</span></td>
                 <td class="py-2">
-                  <button class="text-blue-600 hover:text-blue-800 mr-2" onclick="editTeacher(this)">Editar</button>
-                  <button class="text-red-600 hover:text-red-800" onclick="deleteTeacher(this)">Eliminar</button>
+                  <button class="text-karpus-blue hover:text-opacity-80 mr-2" onclick="editTeacher(this)">Editar</button>
+                  <button class="text-karpus-pink hover:text-opacity-80" onclick="deleteTeacher(this)">Eliminar</button>
                 </td>
               </tr>
             </tbody>
@@ -370,7 +252,7 @@
           </h2>
           <div class="flex gap-2">
             <input id="searchStudent" placeholder="Buscar estudiante..." class="px-3 py-2 border rounded-lg" />
-            <button id="addStudentBtn" class="px-4 py-2 bg-karpus-purple text-white rounded-lg hover:bg-indigo-700 flex items-center gap-2">
+            <button id="addStudentBtn" class="px-4 py-2 bg-karpus-pink text-white rounded-lg hover:bg-opacity-90 flex items-center gap-2">
               <i data-lucide="user-plus" class="w-4 h-4"></i>
               Agregar Estudiante
             </button>
@@ -395,14 +277,14 @@
               <tr class="hover:bg-slate-50">
                 <td class="py-4 px-4">
                   <div class="flex items-center gap-3">
-                    <div class="w-8 h-8 bg-indigo-100 rounded-full flex items-center justify-center">
-                      <i data-lucide="user" class="w-4 h-4 text-indigo-600"></i>
+                    <div class="w-8 h-8 bg-karpus-blue bg-opacity-20 rounded-full flex items-center justify-center">
+                      <i data-lucide="user" class="w-4 h-4 text-karpus-blue"></i>
                     </div>
                     <span class="font-medium text-slate-800">María Fernanda Pérez</span>
                   </div>
                 </td>
                 <td class="py-4 px-4 text-center">
-                  <button onclick="viewStudentProfile(this)" class="px-3 py-1 bg-blue-100 text-blue-700 rounded-lg hover:bg-blue-200 text-sm font-medium">
+                  <button onclick="viewStudentProfile(this)" class="px-3 py-1 bg-karpus-blue text-white rounded-lg hover:bg-opacity-90 text-sm font-medium">
                     Ver Perfil
                   </button>
                 </td>
@@ -410,14 +292,14 @@
               <tr class="hover:bg-slate-50">
                 <td class="py-4 px-4">
                   <div class="flex items-center gap-3">
-                    <div class="w-8 h-8 bg-green-100 rounded-full flex items-center justify-center">
-                      <i data-lucide="user" class="w-4 h-4 text-green-600"></i>
+                    <div class="w-8 h-8 bg-karpus-green bg-opacity-20 rounded-full flex items-center justify-center">
+                      <i data-lucide="user" class="w-4 h-4 text-karpus-green"></i>
                     </div>
                     <span class="font-medium text-slate-800">Javier Alejandro Rodríguez</span>
                   </div>
                 </td>
                 <td class="py-4 px-4 text-center">
-                  <button onclick="viewStudentProfile(this)" class="px-3 py-1 bg-blue-100 text-blue-700 rounded-lg hover:bg-blue-200 text-sm font-medium">
+                  <button onclick="viewStudentProfile(this)" class="px-3 py-1 bg-karpus-blue text-white rounded-lg hover:bg-opacity-90 text-sm font-medium">
                     Ver Perfil
                   </button>
                 </td>
@@ -425,14 +307,14 @@
               <tr class="hover:bg-slate-50">
                 <td class="py-4 px-4">
                   <div class="flex items-center gap-3">
-                    <div class="w-8 h-8 bg-purple-100 rounded-full flex items-center justify-center">
-                      <i data-lucide="user" class="w-4 h-4 text-purple-600"></i>
+                    <div class="w-8 h-8 bg-karpus-pink bg-opacity-20 rounded-full flex items-center justify-center">
+                      <i data-lucide="user" class="w-4 h-4 text-karpus-pink"></i>
                     </div>
                     <span class="font-medium text-slate-800">Ana Sofía González</span>
                   </div>
                 </td>
                 <td class="py-4 px-4 text-center">
-                  <button onclick="viewStudentProfile(this)" class="px-3 py-1 bg-blue-100 text-blue-700 rounded-lg hover:bg-blue-200 text-sm font-medium">
+                  <button onclick="viewStudentProfile(this)" class="px-3 py-1 bg-karpus-blue text-white rounded-lg hover:bg-opacity-90 text-sm font-medium">
                     Ver Perfil
                   </button>
                 </td>
@@ -440,14 +322,14 @@
               <tr class="hover:bg-slate-50">
                 <td class="py-4 px-4">
                   <div class="flex items-center gap-3">
-                    <div class="w-8 h-8 bg-orange-100 rounded-full flex items-center justify-center">
-                      <i data-lucide="user" class="w-4 h-4 text-orange-600"></i>
+                    <div class="w-8 h-8 bg-karpus-orange bg-opacity-20 rounded-full flex items-center justify-center">
+                      <i data-lucide="user" class="w-4 h-4 text-karpus-orange"></i>
                     </div>
                     <span class="font-medium text-slate-800">Carlos Eduardo Martínez</span>
                   </div>
                 </td>
                 <td class="py-4 px-4 text-center">
-                  <button onclick="viewStudentProfile(this)" class="px-3 py-1 bg-blue-100 text-blue-700 rounded-lg hover:bg-blue-200 text-sm font-medium">
+                  <button onclick="viewStudentProfile(this)" class="px-3 py-1 bg-karpus-blue text-white rounded-lg hover:bg-opacity-90 text-sm font-medium">
                     Ver Perfil
                   </button>
                 </td>
@@ -489,9 +371,9 @@
                 <td class="py-2">12/15</td>
                 <td class="py-2"><span class="px-2 py-1 bg-green-100 text-green-800 rounded-full text-xs">Activa</span></td>
                 <td class="py-2">
-                  <button class="text-blue-600 hover:text-blue-800 mr-2" onclick="editRoom(this)">Editar</button>
-                  <button class="text-green-600 hover:text-green-800 mr-2" onclick="viewRoomStudents(this)">Ver Estudiantes</button>
-                  <button class="text-red-600 hover:text-red-800" onclick="deleteRoom(this)">Eliminar</button>
+                  <button class="text-karpus-blue hover:text-opacity-80 mr-2" onclick="editRoom(this)">Editar</button>
+                  <button class="text-karpus-green hover:text-opacity-80 mr-2" onclick="viewRoomStudents(this)">Ver Estudiantes</button>
+                  <button class="text-karpus-pink hover:text-opacity-80" onclick="deleteRoom(this)">Eliminar</button>
                 </td>
               </tr>
               <tr>
@@ -501,9 +383,9 @@
                 <td class="py-2">10/18</td>
                 <td class="py-2"><span class="px-2 py-1 bg-green-100 text-green-800 rounded-full text-xs">Activa</span></td>
                 <td class="py-2">
-                  <button class="text-blue-600 hover:text-blue-800 mr-2" onclick="editRoom(this)">Editar</button>
-                  <button class="text-green-600 hover:text-green-800 mr-2" onclick="viewRoomStudents(this)">Ver Estudiantes</button>
-                  <button class="text-red-600 hover:text-red-800" onclick="deleteRoom(this)">Eliminar</button>
+                  <button class="text-karpus-blue hover:text-opacity-80 mr-2" onclick="editRoom(this)">Editar</button>
+                  <button class="text-karpus-green hover:text-opacity-80 mr-2" onclick="viewRoomStudents(this)">Ver Estudiantes</button>
+                  <button class="text-karpus-pink hover:text-opacity-80" onclick="deleteRoom(this)">Eliminar</button>
                 </td>
               </tr>
             </tbody>
@@ -579,7 +461,7 @@
               </div>
               <div class="flex gap-2">
                 <span class="px-2 py-1 bg-red-100 text-red-800 rounded-full text-xs">Pendiente</span>
-                <button onclick="toggleReportDetails(this)" class="text-blue-600 hover:text-blue-800 text-sm">Ver detalles</button>
+                <button onclick="toggleReportDetails(this)" class="text-karpus-blue hover:text-opacity-80 text-sm">Ver detalles</button>
               </div>
             </div>
             <p class="text-sm text-slate-700 mb-3">
@@ -596,7 +478,7 @@
                   <div class="flex items-center gap-2 px-3 py-2 bg-slate-100 rounded">
                     <i data-lucide="image" class="w-4 h-4"></i>
                     <span class="text-sm">foto_almuerzo.jpg</span>
-                    <button class="text-blue-600 hover:text-blue-800 text-xs">Ver</button>
+                    <button class="text-karpus-blue hover:text-opacity-80 text-xs">Ver</button>
                   </div>
                 </div>
                 <div class="flex gap-2">
@@ -619,7 +501,7 @@
               </div>
               <div class="flex gap-2">
                 <span class="px-2 py-1 bg-yellow-100 text-yellow-800 rounded-full text-xs">En proceso</span>
-                <button onclick="toggleReportDetails(this)" class="text-blue-600 hover:text-blue-800 text-sm">Ver detalles</button>
+                <button onclick="toggleReportDetails(this)" class="text-karpus-blue hover:text-opacity-80 text-sm">Ver detalles</button>
               </div>
             </div>
             <p class="text-sm text-slate-700 mb-3">
@@ -636,12 +518,12 @@
                   <div class="flex items-center gap-2 px-3 py-2 bg-slate-100 rounded">
                     <i data-lucide="file-text" class="w-4 h-4"></i>
                     <span class="text-sm">lista_materiales.pdf</span>
-                    <button class="text-blue-600 hover:text-blue-800 text-xs">Ver</button>
+                    <button class="text-karpus-blue hover:text-opacity-80 text-xs">Ver</button>
                   </div>
                   <div class="flex items-center gap-2 px-3 py-2 bg-slate-100 rounded">
                     <i data-lucide="image" class="w-4 h-4"></i>
                     <span class="text-sm">trabajos_arte.jpg</span>
-                    <button class="text-blue-600 hover:text-blue-800 text-xs">Ver</button>
+                    <button class="text-karpus-blue hover:text-opacity-80 text-xs">Ver</button>
                   </div>
                 </div>
                 <div class="flex gap-2">
@@ -664,7 +546,7 @@
               </div>
               <div class="flex gap-2">
                 <span class="px-2 py-1 bg-green-100 text-green-800 rounded-full text-xs">Resuelto</span>
-                <button onclick="toggleReportDetails(this)" class="text-blue-600 hover:text-blue-800 text-sm">Ver detalles</button>
+                <button onclick="toggleReportDetails(this)" class="text-karpus-blue hover:text-opacity-80 text-sm">Ver detalles</button>
               </div>
             </div>
             <p class="text-sm text-slate-700 mb-3">
@@ -699,17 +581,17 @@
               <option value="Medianos">Medianos</option>
               <option value="Grandes">Grandes</option>
             </select>
-            <button id="btnRecordatorioMasivo" class="btn btn-pink">Recordatorio masivo</button>
-            <button id="btnNuevoPago" class="btn btn-green">Registrar pago</button>
+            <button id="btnRecordatorioMasivo" class="btn bg-karpus-pink text-white">Recordatorio masivo</button>
+            <button id="btnNuevoPago" class="btn bg-karpus-green text-white">Registrar pago</button>
           </div>
         </div>
         <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
           <div class="col-span-2 bg-white rounded shadow p-4">
             <h3 class="font-semibold mb-3">Resumen</h3>
             <div class="flex gap-3">
-              <span id="paymentsTotal" class="chip chip-blue">Total: 0</span>
-              <span id="paymentsPagados" class="chip chip-green">Pagados: 0</span>
-              <span id="paymentsPendientes" class="chip chip-orange">Pendientes: 0</span>
+              <span id="paymentsTotal" class="chip bg-karpus-blue text-white">Total: 0</span>
+              <span id="paymentsPagados" class="chip bg-karpus-green text-white">Pagados: 0</span>
+              <span id="paymentsPendientes" class="chip bg-karpus-orange text-white">Pendientes: 0</span>
             </div>
             <canvas id="paymentsChart" height="120" class="mt-4"></canvas>
           </div>
@@ -737,7 +619,7 @@
             <i data-lucide="message-square" class="w-5 h-5 text-slate-600"></i><span>Comunicaciones</span>
           </h2>
           <div>
-            <button id="sendAnnouncement" class="px-3 py-2 bg-pink-600 text-white rounded">Enviar anuncio</button>
+            <button id="sendAnnouncement" class="px-3 py-2 bg-karpus-pink text-white rounded">Enviar anuncio</button>
           </div>
         </div>
         <div class="space-y-4">
@@ -746,7 +628,7 @@
             <h3 class="text-sm font-semibold mb-2">Anuncio general</h3>
             <textarea id="announcementText" class="w-full border rounded p-3" rows="4" placeholder="Escribe un comunicado para todos..."></textarea>
             <div class="mt-3 flex justify-end">
-              <button class="px-3 py-2 bg-karpus-purple text-white rounded">Enviar a todos</button>
+              <button class="px-3 py-2 bg-karpus-blue text-white rounded">Enviar a todos</button>
             </div>
           </div>
           
@@ -812,16 +694,6 @@
         </div>
       </section>
 
-      <!-- MEJORA -->
-      <section id="mejora" class="section hidden">
-        <div class="flex items-center justify-between mb-4">
-          <h2 class="text-xl font-semibold flex items-center gap-2">
-            <i data-lucide="bar-chart-2" class="w-5 h-5 text-slate-600"></i><span>Sistema de Mejora</span>
-          </h2>
-        </div>
-        <div id="improvementSection" class="mt-6"></div>
-      </section>
-
     </main>
   </div>
 
@@ -851,7 +723,7 @@
         </div>
         <div class="flex justify-end gap-2 mt-3">
           <button id="cancelModal" class="px-4 py-2 border rounded-lg hover:bg-slate-50">Cancelar</button>
-          <button id="saveModal" class="px-4 py-2 bg-karpus-green text-white rounded-lg hover:bg-green-700">Crear Maestro</button>
+          <button id="saveModal" class="px-4 py-2 bg-karpus-green text-white rounded-lg hover:bg-opacity-90">Crear Maestro</button>
         </div>
       </div>
     </div>
@@ -913,7 +785,7 @@
         </div>
         <div class="flex justify-end gap-2 mt-3">
           <button id="cancelRoomModal" class="px-4 py-2 border rounded-lg hover:bg-slate-50">Cancelar</button>
-          <button id="saveRoomModal" class="px-4 py-2 bg-karpus-yellow text-white rounded-lg hover:bg-yellow-700">Guardar Aula</button>
+          <button id="saveRoomModal" class="px-4 py-2 bg-karpus-yellow text-white rounded-lg hover:bg-opacity-90">Guardar Aula</button>
         </div>
       </div>
     </div>
@@ -933,8 +805,8 @@
         <!-- Información del Estudiante -->
         <div class="mb-6">
           <div class="flex items-center gap-4 mb-4">
-            <div class="w-16 h-16 bg-indigo-100 rounded-full flex items-center justify-center">
-              <i data-lucide="user" class="w-8 h-8 text-indigo-600"></i>
+            <div class="w-16 h-16 bg-karpus-blue bg-opacity-20 rounded-full flex items-center justify-center">
+              <i data-lucide="user" class="w-8 h-8 text-karpus-blue"></i>
             </div>
             <div>
               <h4 id="studentProfileName" class="text-lg font-semibold text-slate-800">Nombre del Estudiante</h4>
@@ -1042,7 +914,7 @@
         </div>
 
         <div class="flex justify-end gap-2 mt-6">
-          <button id="editStudentProfile" class="px-4 py-2 bg-karpus-purple text-white rounded-lg hover:bg-indigo-700">
+          <button id="editStudentProfile" class="px-4 py-2 bg-karpus-pink text-white rounded-lg hover:bg-opacity-90">
             Editar Información
           </button>
           <button id="closeStudentProfile" class="px-4 py-2 border rounded-lg hover:bg-slate-50">
@@ -1053,603 +925,8 @@
     </div>
   </div>
 
-  <script>
-    // Init lucide icons
-    document.addEventListener('DOMContentLoaded', ()=>{ 
-      if(window.lucide && typeof lucide.createIcons === 'function') {
-        lucide.createIcons();
-      }
-      
-      // Load saved theme
-      const savedColor = localStorage.getItem('karpus_director_theme') || 'indigo';
-      document.getElementById('sidebar').className = 
-        document.getElementById('sidebar').className.replace(/sidebar-\w+/, `sidebar-${savedColor}`);
-    });
-
-    // Toggle sidebar collapse
-    let isSidebarCollapsed = false;
-    document.getElementById('toggleSidebar')?.addEventListener('click', ()=>{
-      const sb = document.getElementById('sidebar');
-      if(sb) {
-        isSidebarCollapsed = !isSidebarCollapsed;
-        sb.classList.toggle('collapsed', isSidebarCollapsed);
-      }
-    });
-
-    // Theme color switching
-    document.querySelectorAll('[data-color]').forEach(btn => {
-      btn.addEventListener('click', ()=>{
-        const color = btn.getAttribute('data-color');
-        const sb = document.getElementById('sidebar');
-        if(sb && color) {
-          sb.className = sb.className.replace(/sidebar-\w+/, `sidebar-${color}`);
-          localStorage.setItem('karpus_director_theme', color);
-        }
-      });
-    });
-
-    // Navegación de secciones
-    document.querySelectorAll('[data-section]').forEach(btn=>{
-      btn.addEventListener('click', ()=>{
-        const target = btn.getAttribute('data-section');
-        document.querySelectorAll('.section').forEach(s=> s.classList.add('hidden'));
-        document.querySelectorAll('[data-section]').forEach(b => 
-          b.classList.toggle('text-blue-600', b.getAttribute('data-section') === target));
-        const el = document.getElementById(target);
-        if(el) el.classList.remove('hidden');
-      });
-    });
-
-    // Mobile menu
-    document.getElementById('menuBtn')?.addEventListener('click', ()=>{
-      const sb = document.getElementById('sidebar');
-      if(sb) sb.classList.toggle('hidden');
-    });
-
-    // Modal maestro
-    const modal = document.getElementById('modal');
-    document.getElementById('addTeacher')?.addEventListener('click', ()=> modal.classList.remove('hidden'));
-    document.getElementById('nuevoMaestroBtn')?.addEventListener('click', ()=> modal.classList.remove('hidden'));
-    document.getElementById('cancelModal')?.addEventListener('click', ()=> {
-      modal.classList.add('hidden');
-      // Limpiar campos
-      document.getElementById('tmName').value = '';
-      document.getElementById('tmPhone').value = '';
-      document.getElementById('tmEmail').value = '';
-      document.getElementById('tmPassword').value = '';
-    });
-    document.getElementById('saveModal')?.addEventListener('click', ()=>{
-      const name = document.getElementById('tmName').value.trim();
-      const phone = document.getElementById('tmPhone').value.trim();
-      const email = document.getElementById('tmEmail').value.trim();
-      const password = document.getElementById('tmPassword').value.trim();
-      
-      // Validaciones básicas
-      if(!name || !phone || !email || !password) {
-        alert('Por favor complete todos los campos');
-        return;
-      }
-      
-      if(!email.includes('@')) {
-        alert('Por favor ingrese un correo válido');
-        return;
-      }
-      
-      if(password.length < 6) {
-        alert('La contraseña debe tener al menos 6 caracteres');
-        return;
-      }
-      
-      // Crear fila en la tabla
-      const tr = document.createElement('tr');
-      tr.innerHTML = `
-        <td class="py-2">${name}</td>
-        <td class="py-2">${email}</td>
-        <td class="py-2">${phone}</td>
-        <td class="py-2"><span class="px-2 py-1 bg-green-100 text-green-800 rounded-full text-xs">Activo</span></td>
-        <td class="py-2">
-          <button class="text-blue-600 hover:text-blue-800 mr-2" onclick="editTeacher(this)">Editar</button>
-          <button class="text-red-600 hover:text-red-800" onclick="deleteTeacher(this)">Eliminar</button>
-        </td>
-      `;
-      document.getElementById('teachersTable').appendChild(tr);
-      
-      // Limpiar y cerrar modal
-      modal.classList.add('hidden');
-      document.getElementById('tmName').value = '';
-      document.getElementById('tmPhone').value = '';
-      document.getElementById('tmEmail').value = '';
-      document.getElementById('tmPassword').value = '';
-      
-      alert(`Maestro ${name} creado exitosamente. Credenciales: ${email} / ${password}`);
-    });
-
-    // Funciones para editar y eliminar maestros
-    window.editTeacher = function(button) {
-      const row = button.closest('tr');
-      const cells = row.querySelectorAll('td');
-      const name = cells[0].textContent;
-      const email = cells[1].textContent;
-      const phone = cells[2].textContent;
-      
-      // Llenar el modal con los datos actuales
-      document.getElementById('tmName').value = name;
-      document.getElementById('tmEmail').value = email;
-      document.getElementById('tmPhone').value = phone;
-      document.getElementById('tmPassword').value = '';
-      
-      // Mostrar modal
-      document.getElementById('teacherModal').classList.remove('hidden');
-      
-      // Cambiar el comportamiento del botón guardar para edición
-      const saveBtn = document.getElementById('saveTeacher');
-      saveBtn.onclick = function() {
-        const newName = document.getElementById('tmName').value.trim();
-        const newEmail = document.getElementById('tmEmail').value.trim();
-        const newPhone = document.getElementById('tmPhone').value.trim();
-        const newPassword = document.getElementById('tmPassword').value.trim();
-        
-        if(!newName || !newEmail || !newPhone) {
-          alert('Por favor complete todos los campos obligatorios');
-          return;
-        }
-        
-        // Actualizar la fila
-        cells[0].textContent = newName;
-        cells[1].textContent = newEmail;
-        cells[2].textContent = newPhone;
-        
-        // Cerrar modal y limpiar
-        document.getElementById('teacherModal').classList.add('hidden');
-        document.getElementById('tmName').value = '';
-        document.getElementById('tmPhone').value = '';
-        document.getElementById('tmEmail').value = '';
-        document.getElementById('tmPassword').value = '';
-        
-        alert('Maestro actualizado exitosamente');
-      };
-    };
-
-    window.deleteTeacher = function(button) {
-      const row = button.closest('tr');
-      const teacherName = row.querySelector('td').textContent;
-      
-      if(confirm(`¿Está seguro de eliminar al maestro ${teacherName}?`)) {
-        row.remove();
-        alert('Maestro eliminado exitosamente');
-      }
-    };
-
-    // FUNCIONES PARA AULAS
-    // Abrir modal de crear aula
-    document.getElementById('addRoomBtn').addEventListener('click', function() {
-      document.getElementById('roomModalTitle').textContent = 'Crear Aula';
-      document.getElementById('roomModal').classList.remove('hidden');
-      clearRoomModal();
-    });
-
-    // Cerrar modal de aula
-    document.getElementById('cancelRoomModal').addEventListener('click', function() {
-      document.getElementById('roomModal').classList.add('hidden');
-      clearRoomModal();
-    });
-
-    // Guardar aula
-    document.getElementById('saveRoomModal').addEventListener('click', function() {
-      const name = document.getElementById('roomName').value.trim();
-      const teacher = document.getElementById('roomTeacher').value;
-      const capacity = document.getElementById('roomCapacity').value;
-      const selectedStudents = Array.from(document.querySelectorAll('#studentsList input[type="checkbox"]:checked'))
-        .map(cb => cb.value);
-      
-      if(!name || !teacher || !capacity) {
-        alert('Por favor complete todos los campos obligatorios');
-        return;
-      }
-      
-      if(capacity < 1 || capacity > 30) {
-        alert('La capacidad debe estar entre 1 y 30 estudiantes');
-        return;
-      }
-      
-      if(selectedStudents.length > capacity) {
-        alert(`No puede asignar más estudiantes (${selectedStudents.length}) que la capacidad del aula (${capacity})`);
-        return;
-      }
-      
-      // Crear fila en la tabla
-      const tr = document.createElement('tr');
-      tr.innerHTML = `
-        <td class="py-2 font-medium">${name}</td>
-        <td class="py-2">${teacher}</td>
-        <td class="py-2">${capacity}</td>
-        <td class="py-2">${selectedStudents.length}/${capacity}</td>
-        <td class="py-2"><span class="px-2 py-1 bg-green-100 text-green-800 rounded-full text-xs">Activa</span></td>
-        <td class="py-2">
-          <button class="text-blue-600 hover:text-blue-800 mr-2" onclick="editRoom(this)">Editar</button>
-          <button class="text-green-600 hover:text-green-800 mr-2" onclick="viewRoomStudents(this)">Ver Estudiantes</button>
-          <button class="text-red-600 hover:text-red-800" onclick="deleteRoom(this)">Eliminar</button>
-        </td>
-      `;
-      tr.dataset.students = JSON.stringify(selectedStudents);
-      document.getElementById('roomsTable').appendChild(tr);
-      
-      // Cerrar modal y limpiar
-      document.getElementById('roomModal').classList.add('hidden');
-      clearRoomModal();
-      
-      alert(`Aula "${name}" creada exitosamente con ${selectedStudents.length} estudiantes asignados`);
-    });
-
-    // Filtro de estudiantes en el modal
-    document.getElementById('studentSearch').addEventListener('input', function() {
-      const searchTerm = this.value.toLowerCase();
-      const studentLabels = document.querySelectorAll('#studentsList label');
-      
-      studentLabels.forEach(label => {
-        const studentName = label.querySelector('span').textContent.toLowerCase();
-        if(studentName.includes(searchTerm)) {
-          label.style.display = 'flex';
-        } else {
-          label.style.display = 'none';
-        }
-      });
-    });
-
-    // Funciones para manejar aulas
-    window.editRoom = function(button) {
-      const row = button.closest('tr');
-      const cells = row.querySelectorAll('td');
-      const name = cells[0].textContent;
-      const teacher = cells[1].textContent;
-      const capacity = cells[2].textContent;
-      const students = JSON.parse(row.dataset.students || '[]');
-      
-      // Llenar el modal con los datos actuales
-      document.getElementById('roomName').value = name;
-      document.getElementById('roomTeacher').value = teacher;
-      document.getElementById('roomCapacity').value = capacity;
-      
-      // Marcar estudiantes seleccionados
-      document.querySelectorAll('#studentsList input[type="checkbox"]').forEach(cb => {
-        cb.checked = students.includes(cb.value);
-      });
-      
-      document.getElementById('roomModalTitle').textContent = 'Editar Aula';
-      document.getElementById('roomModal').classList.remove('hidden');
-    };
-
-    window.viewRoomStudents = function(button) {
-      const row = button.closest('tr');
-      const roomName = row.querySelector('td').textContent;
-      const students = JSON.parse(row.dataset.students || '[]');
-      
-      if(students.length === 0) {
-        alert(`El aula "${roomName}" no tiene estudiantes asignados`);
-      } else {
-        alert(`Estudiantes en "${roomName}":\n\n${students.join('\n')}`);
-      }
-    };
-
-    window.deleteRoom = function(button) {
-      const row = button.closest('tr');
-      const roomName = row.querySelector('td').textContent;
-      
-      if(confirm(`¿Está seguro de eliminar el aula "${roomName}"?`)) {
-        row.remove();
-        alert('Aula eliminada exitosamente');
-      }
-    };
-
-    function clearRoomModal() {
-      document.getElementById('roomName').value = '';
-      document.getElementById('roomTeacher').value = '';
-      document.getElementById('roomCapacity').value = '';
-      document.getElementById('studentSearch').value = '';
-      document.querySelectorAll('#studentsList input[type="checkbox"]').forEach(cb => {
-        cb.checked = false;
-      });
-      document.querySelectorAll('#studentsList label').forEach(label => {
-        label.style.display = 'flex';
-      });
-    }
-
-    // Initialize charts
-    const ctx = document.getElementById('attendanceChart')?.getContext('2d');
-    if(ctx){
-      new Chart(ctx, {
-        type: 'bar',
-        data: {
-          labels: ['Pequeños', 'Medianos', 'Grandes', 'Bebés', 'Especial'],
-          datasets: [
-            {
-              label: 'Asistencia',
-              data: [0.92, 0.89, 0.94, 0.88, 0.91],
-              backgroundColor: '#4CAF50',
-              borderRadius: 6
-            },
-            {
-              label: 'Participación',
-              data: [0.88, 0.85, 0.89, 0.82, 0.87],
-              backgroundColor: '#2196F3',
-              borderRadius: 6
-            }
-          ]
-        },
-        options: { 
-          responsive: true, 
-          scales: {
-            y: { 
-              beginAtZero: true,
-              max: 1,
-              ticks: {
-                callback: value => value * 100 + '%'
-              }
-            }
-          },
-          plugins: {
-            legend: { display: true, position: 'top' }
-          } 
-        }
-      });
-    }
-
-    // FUNCIONES PARA REPORTES Y QUEJAS
-    // Alternar detalles de reporte
-    window.toggleReportDetails = function(button) {
-      const reportCard = button.closest('.bg-white');
-      const details = reportCard.querySelector('.report-details');
-      
-      if (details.classList.contains('hidden')) {
-        details.classList.remove('hidden');
-        button.textContent = 'Ocultar detalles';
-      } else {
-        details.classList.add('hidden');
-        button.textContent = 'Ver detalles';
-      }
-    };
-
-    // Resolver reporte
-    window.resolveReport = function(button) {
-      const reportCard = button.closest('.bg-white');
-      const statusBadge = reportCard.querySelector('.px-2.py-1');
-      const borderColor = reportCard.classList;
-      
-      if (confirm('¿Está seguro de marcar este reporte como resuelto?')) {
-        // Cambiar estado visual
-        statusBadge.className = 'px-2 py-1 bg-green-100 text-green-800 rounded-full text-xs';
-        statusBadge.textContent = 'Resuelto';
-        
-        // Cambiar color del borde
-        borderColor.remove('border-red-500', 'border-yellow-500');
-        borderColor.add('border-green-500');
-        
-        // Cambiar color del título
-        const title = reportCard.querySelector('h3');
-        title.className = 'font-semibold text-green-700';
-        
-        // Agregar información de resolución
-        const details = reportCard.querySelector('.report-details .border-t');
-        const resolutionInfo = document.createElement('div');
-        resolutionInfo.innerHTML = `
-          <h4 class="font-medium mb-2 text-green-700">Resolución:</h4>
-          <p class="text-sm text-green-700 mb-3">
-            Reporte marcado como resuelto por la directora.
-          </p>
-          <p class="text-xs text-slate-500">Resuelto por: Directora • ${new Date().toLocaleDateString('es-ES')} ${new Date().toLocaleTimeString('es-ES', {hour: '2-digit', minute: '2-digit'})}</p>
-        `;
-        details.appendChild(resolutionInfo);
-        
-        // Ocultar botones de acción
-        button.parentElement.style.display = 'none';
-        
-        alert('Reporte marcado como resuelto exitosamente');
-      }
-    };
-
-    // Responder a reporte
-    window.respondReport = function(button) {
-      const reportCard = button.closest('.bg-white');
-      const title = reportCard.querySelector('h3').textContent;
-      
-      const response = prompt(`Escriba su respuesta al reporte: "${title}"`);
-      if (response && response.trim()) {
-        // Agregar respuesta al reporte
-        const details = reportCard.querySelector('.report-details .border-t');
-        const responseDiv = document.createElement('div');
-        responseDiv.innerHTML = `
-          <h4 class="font-medium mb-2 text-blue-700">Respuesta de la Directora:</h4>
-          <p class="text-sm text-blue-700 mb-3">${response}</p>
-          <p class="text-xs text-slate-500">Respondido: ${new Date().toLocaleDateString('es-ES')} ${new Date().toLocaleTimeString('es-ES', {hour: '2-digit', minute: '2-digit'})}</p>
-        `;
-        details.appendChild(responseDiv);
-        
-        alert('Respuesta enviada exitosamente');
-      }
-    };
-
-    // Filtrar reportes
-    document.getElementById('reportFilter')?.addEventListener('change', function() {
-      const filterValue = this.value;
-      const reports = document.querySelectorAll('#reportes .space-y-4 > div');
-      
-      reports.forEach(report => {
-        const statusBadge = report.querySelector('.px-2.py-1');
-        const statusText = statusBadge.textContent.toLowerCase();
-        const fromText = report.querySelector('.text-sm.text-slate-600').textContent.toLowerCase();
-        
-        let shouldShow = true;
-        
-        switch(filterValue) {
-          case 'pending':
-            shouldShow = statusText.includes('pendiente');
-            break;
-          case 'resolved':
-            shouldShow = statusText.includes('resuelto');
-            break;
-          case 'teachers':
-            shouldShow = fromText.includes('maestra') || fromText.includes('maestro');
-            break;
-          case 'parents':
-            shouldShow = fromText.includes('madre') || fromText.includes('padre');
-            break;
-          case 'all':
-          default:
-            shouldShow = true;
-            break;
-        }
-        
-        report.style.display = shouldShow ? 'block' : 'none';
-      });
-    });
-
-    // Actualizar reportes
-    document.getElementById('refreshReports')?.addEventListener('click', function() {
-      // Simular actualización
-      this.textContent = 'Actualizando...';
-      this.disabled = true;
-      
-      setTimeout(() => {
-        this.textContent = 'Actualizar';
-        this.disabled = false;
-        alert('Reportes actualizados (simulado)');
-      }, 1500);
-    });
-
-    // Exportar (simulación)
-    document.getElementById('exportBtn')?.addEventListener('click', ()=> alert('Función de exportar: conectar con backend / generar CSV o PDF.'));
-
-    // Enviar anuncio
-    document.getElementById('sendAnnouncement')?.addEventListener('click', ()=>{
-      const t = document.getElementById('announcementText').value;
-      if(t.trim()==='') return alert('Escribe un anuncio antes.');
-      alert('Anuncio enviado (simulado)');
-      document.getElementById('announcementText').value='';
-    });
-
-    // ==========================
-    // Estudiantes: perfil y tabla
-    // ==========================
-    const studentParentData = {
-      'María Fernanda Pérez': {
-        parent1: { name: 'Ana María Pérez González', phone: '+57 300 123 4567', email: 'ana.perez@email.com', job: 'Ingeniera de Sistemas', address: 'Calle 123 #45-67, Bogotá', emergency: '+57 301 987 6543' },
-        parent2: { name: 'Carlos Eduardo Pérez', phone: '+57 310 456 7890', email: 'carlos.perez@email.com', job: 'Contador Público', address: 'Calle 123 #45-67, Bogotá', emergency: '+57 320 111 2233' },
-        extra: { room: 'Aula Pequeños A1', startDate: '15 de Febrero, 2024', allergies: 'Ninguna conocida', pickup: 'Padres y Abuela Materna' }
-      },
-      'Javier Alejandro Rodríguez': {
-        parent1: { name: 'María Teresa Rodríguez', phone: '+57 302 111 2233', email: 'maria.rodriguez@email.com', job: 'Docente', address: 'Cra 45 #10-20, Bogotá', emergency: '+57 300 987 0011' },
-        parent2: { name: 'Eduardo Rodríguez', phone: '+57 315 555 6677', email: 'edu.rodriguez@email.com', job: 'Técnico Electricista', address: 'Cra 45 #10-20, Bogotá', emergency: '+57 310 222 3344' },
-        extra: { room: 'Aula Pequeños A2', startDate: '10 de Marzo, 2024', allergies: 'Alergia leve al polvo', pickup: 'Padres' }
-      },
-      'Ana Sofía González': {
-        parent1: { name: 'Laura González', phone: '+57 320 000 1122', email: 'laura.gonzalez@email.com', job: 'Arquitecta', address: 'Av. 7 #23-90, Bogotá', emergency: '+57 311 222 3345' },
-        parent2: { name: 'Marco González', phone: '+57 321 777 8899', email: 'marco.gonzalez@email.com', job: 'Diseñador', address: 'Av. 7 #23-90, Bogotá', emergency: '+57 321 555 6677' },
-        extra: { room: 'Aula Pequeños A1', startDate: '1 de Abril, 2024', allergies: 'Intolerancia a lactosa', pickup: 'Padres y Tía' }
-      },
-      'Carlos Eduardo Martínez': {
-        parent1: { name: 'Patricia Martínez', phone: '+57 312 333 4455', email: 'patricia.martinez@email.com', job: 'Odontóloga', address: 'Calle 9 #30-12, Bogotá', emergency: '+57 313 444 5566' },
-        parent2: { name: 'Ricardo Martínez', phone: '+57 314 666 7788', email: 'ricardo.martinez@email.com', job: 'Administrador', address: 'Calle 9 #30-12, Bogotá', emergency: '+57 314 999 0001' },
-        extra: { room: 'Aula Pequeños A3', startDate: '20 de Enero, 2024', allergies: 'Ninguna', pickup: 'Padres' }
-      }
-    };
-
-    function openStudentProfile(name) {
-      const modal = document.getElementById('studentProfileModal');
-      const data = studentParentData[name] || null;
-
-      document.getElementById('studentProfileName').textContent = name;
-
-      // Rellenar datos si existen, de lo contrario valores por defecto
-      const safe = (val, def='No registrado') => (val && String(val).trim()) ? val : def;
-
-      const p1 = data?.parent1 || {};
-      const p2 = data?.parent2 || {};
-      const ex = data?.extra   || {};
-
-      document.getElementById('parent1Name').textContent = safe(p1.name);
-      document.getElementById('parent1Phone').textContent = safe(p1.phone);
-      document.getElementById('parent1Email').textContent = safe(p1.email);
-      document.getElementById('parent1Job').textContent = safe(p1.job);
-      document.getElementById('parent1Address').textContent = safe(p1.address);
-      document.getElementById('parent1Emergency').textContent = safe(p1.emergency);
-
-      document.getElementById('parent2Name').textContent = safe(p2.name);
-      document.getElementById('parent2Phone').textContent = safe(p2.phone);
-      document.getElementById('parent2Email').textContent = safe(p2.email);
-      document.getElementById('parent2Job').textContent = safe(p2.job);
-      document.getElementById('parent2Address').textContent = safe(p2.address);
-      document.getElementById('parent2Emergency').textContent = safe(p2.emergency);
-
-      document.getElementById('studentRoom').textContent = safe(ex.room);
-      document.getElementById('studentStartDate').textContent = safe(ex.startDate);
-      document.getElementById('studentAllergies').textContent = safe(ex.allergies);
-      document.getElementById('studentPickup').textContent = safe(ex.pickup);
-
-      modal.classList.remove('hidden');
-      // Render icons in modal
-      if(window.lucide && typeof lucide.createIcons === 'function') {
-        lucide.createIcons();
-      }
-    }
-
-    window.viewStudentProfile = function(button) {
-      const row = button.closest('tr');
-      const nameEl = row.querySelector('td .font-medium');
-      const name = nameEl ? nameEl.textContent.trim() : 'Estudiante';
-      openStudentProfile(name);
-    };
-
-    // Cerrar modal de perfil
-    document.getElementById('closeStudentProfile')?.addEventListener('click', ()=>{
-      document.getElementById('studentProfileModal').classList.add('hidden');
-    });
-    document.getElementById('closeStudentProfileModal')?.addEventListener('click', ()=>{
-      document.getElementById('studentProfileModal').classList.add('hidden');
-    });
-
-    // Búsqueda de estudiantes por nombre
-    document.getElementById('searchStudent')?.addEventListener('input', function(){
-      const q = this.value.toLowerCase();
-      const rows = document.querySelectorAll('#studentsTable tr');
-      rows.forEach(r => {
-        const name = r.querySelector('.font-medium')?.textContent.toLowerCase() || '';
-        r.style.display = name.includes(q) ? '' : 'none';
-      });
-    });
-
-    // Agregar estudiante (solo nombre en la tabla)
-    document.getElementById('addStudentBtn')?.addEventListener('click', ()=>{
-      const name = prompt('Nombre completo del estudiante:');
-      if(!name || !name.trim()) return;
-
-      const tr = document.createElement('tr');
-      tr.className = 'hover:bg-slate-50';
-      tr.innerHTML = `
-        <td class="py-4 px-4">
-          <div class="flex items-center gap-3">
-            <div class="w-8 h-8 bg-slate-100 rounded-full flex items-center justify-center">
-              <i data-lucide="user" class="w-4 h-4 text-slate-600"></i>
-            </div>
-            <span class="font-medium text-slate-800">${name.trim()}</span>
-          </div>
-        </td>
-        <td class="py-4 px-4 text-center">
-          <button onclick="viewStudentProfile(this)" class="px-3 py-1 bg-blue-100 text-blue-700 rounded-lg hover:bg-blue-200 text-sm font-medium">Ver Perfil</button>
-        </td>
-      `;
-      document.getElementById('studentsTable').appendChild(tr);
-
-      // Render icon for new row
-      if(window.lucide && typeof lucide.createIcons === 'function') {
-        lucide.createIcons();
-      }
-
-      alert(`Estudiante "${name.trim()}" agregado a la lista.`);
-    });
-
-    // Inicial: mostrar dashboard
-    document.getElementById('dashboard').classList.remove('hidden');
-  </script>
   <script src="js/store.js?v=2"></script>
+  <script src="js/panel_directora.js"></script>
+  <script src="js/sidebar.js"></script>
 </body>
 </html>

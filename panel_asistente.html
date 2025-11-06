@@ -6,8 +6,6 @@
   <title>Panel de Asistente (Recepcionista) - Karpus Kids</title>
   <script src="https://cdn.tailwindcss.com"></script>
   <link rel="stylesheet" href="css/base.css" />
-  <link rel="stylesheet" href="css/theme.css" />
-  <link rel="stylesheet" href="css/karpus-modern.css" />
   <script src="js/auth.js?v=1"></script>
   <script>
     (function(){
@@ -18,77 +16,46 @@
   <script src="https://unpkg.com/lucide@latest/dist/umd/lucide.min.js"></script>
   <!-- Chart.js (para gráficas) -->
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-  <style>
-    aside#sidebar { width: 280px; transition: width .25s ease, transform .25s ease; }
-    aside#sidebar.collapsed { width: 72px; }
-    aside#sidebar .label { transition: opacity .2s ease; }
-    aside#sidebar.collapsed .label { opacity: 0; }
-    /* color variants */
-    .sidebar-indigo { background: linear-gradient(135deg,#EEF2FF,#E0E7FF); }
-    .sidebar-blue { background: linear-gradient(135deg,#E3F2FD,#BBDEFB); }
-    .sidebar-green { background: linear-gradient(135deg,#E8F8F0,#D0F0E0); }
-    .sidebar-teal { background: linear-gradient(135deg, #0d9488, #14b8a6); }
-    /* Estilos para modales más profesionales */
-    .modal-container {
-      position: fixed;
-      top: 0;
-      left: 0;
-      right: 0;
-      bottom: 0;
-      background-color: rgba(0, 0, 0, 0.5);
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      z-index: 50;
-      opacity: 0;
-      visibility: hidden;
-      transition: opacity 0.3s ease, visibility 0.3s ease;
-    }
-    
-    .modal-container.active {
-      opacity: 1;
-      visibility: visible;
-    }
-    
-    .modal-content {
-      background: white;
-      border-radius: 16px;
-      box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
-      width: 90%;
-      max-width: 800px;
-      max-height: 90vh;
-      overflow-y: auto;
-      transform: scale(0.9);
-      transition: transform 0.3s ease;
-    }
-  </style>
+</head>
 <body class="bg-slate-100 min-h-screen">
   <div class="flex">
     <!-- Sidebar -->
-    <aside id="sidebar" class="sidebar-green h-screen p-4 sticky top-0">
+    <aside id="sidebar" class="bg-karpus-green h-screen p-4 sticky top-0">
       <div class="flex items-center gap-3 px-2 mb-4">
         <img src="logo/favicon.ico" class="w-8 h-8 rounded" alt="Karpus">
         <div>
-          <h1 class="karpus-kids-inline text-sm"><span class="k-1">K</span><span class="k-2">a</span><span class="k-3">r</span><span class="k-4">p</span><span class="k-5">u</span><span class="k-6">s</span> <span class="k-7">K</span><span class="k-8">i</span><span class="k-9">d</span><span class="k-10">s</span></h1>
+          <h1 class="karpus-kids-inline text-sm">Karpus Kids</h1>
           <p class="text-xs text-slate-600">Recepción</p>
         </div>
       </div>
-      <div class="sidebar-scroll glass rounded-xl p-2 space-y-1">
-        <button data-section="asistencia" class="w-full text-left px-3 py-2 rounded hover:bg-white/50 flex items-center gap-3"><i data-lucide="user-check"></i><span class="label">Entrada/Salida</span></button>
-        <button data-section="comunicacion" class="w-full text-left px-3 py-2 rounded hover:bg-white/50 flex items-center gap-3"><i data-lucide="message-square"></i><span class="label">Comunicación</span></button>
-        <button data-section="alumnos" class="w-full text-left px-3 py-2 rounded hover:bg-white/50 flex items-center gap-3"><i data-lucide="users"></i><span class="label">Alumnos</span></button>
-        <button data-section="apoyo" class="w-full text-left px-3 py-2 rounded hover:bg-white/50 flex items-center gap-3"><i data-lucide="briefcase"></i><span class="label">Apoyo Admin</span></button>
-        <button data-section="mejora" class="w-full text-left px-3 py-2 rounded hover:bg-white/50 flex items-center gap-3"><i data-lucide="bar-chart-2"></i><span class="label">Sistema de Mejora</span></button>
-        <a id="logoutLink" href="#" class="w-full text-left px-3 py-2 rounded hover:bg-white/50 flex items-center gap-3"><i data-lucide="log-out"></i><span class="label">Cerrar sesión</span></a>
-      </div>
+      <nav class="space-y-2 teams-nav bg-white/10 p-2 rounded-xl mb-4">
+        <button data-section="asistencia" class="nav-button teams-nav-item text-white hover:bg-white/20">
+          <i data-lucide="user-check" class="text-karpus-blue"></i><span class="label">Entrada/Salida</span>
+        </button>
+        <button data-section="comunicacion" class="nav-button teams-nav-item text-white hover:bg-white/20">
+          <i data-lucide="message-square" class="text-karpus-pink"></i><span class="label">Comunicación</span>
+        </button>
+        <button data-section="alumnos" class="nav-button teams-nav-item text-white hover:bg-white/20">
+          <i data-lucide="users" class="text-karpus-orange"></i><span class="label">Alumnos</span>
+        </button>
+        <button data-section="apoyo" class="nav-button teams-nav-item text-white hover:bg-white/20">
+          <i data-lucide="briefcase" class="text-karpus-yellow"></i><span class="label">Apoyo Admin</span>
+        </button>
+        <a id="logoutLink" href="#" class="nav-button teams-nav-item text-white hover:bg-white/20">
+          <i data-lucide="log-out" class="text-karpus-white"></i><span class="label">Cerrar sesión</span>
+        </a>
+      </nav>
     </aside>
 
     <!-- Main content -->
-    <main class="flex-1 p-6 space-y-6">
-      <div class="flex items-center justify-between mb-4">
+    <main id="main-content" class="flex-1 p-6 space-y-6 md:ml-[280px] transition-all duration-300">
+      <header class="flex items-center justify-between mb-4">
+        <button id="toggleSidebarBtn" class="p-2 rounded-full hover:bg-slate-200">
+            <i data-lucide="menu"></i>
+        </button>
         <h2 class="text-xl font-semibold flex items-center gap-2"><i data-lucide="user"></i><span>Panel del Asistente</span></h2>
-        <button id="toggleSidebar" class="px-3 py-2 rounded bg-slate-200">Colapsar</button>
-      </div>
+        <div></div>
+      </header>
 
       <!-- Asistencia -->
       <section id="asistencia" class="section">
@@ -135,7 +102,7 @@
       <section id="alumnos" class="section hidden">
         <div class="flex items-center justify-between mb-2">
           <h3 class="text-lg font-semibold">Fichas básicas</h3>
-          <button id="openAddStudent" class="px-3 py-2 bg-karpus-purple text-white rounded">Añadir alumno</button>
+          <button id="openAddStudent" class="px-3 py-2 bg-karpus-pink text-white rounded">Añadir alumno</button>
         </div>
         <div class="bg-white rounded shadow p-4">
           <table class="w-full text-sm">
@@ -161,41 +128,13 @@
           </div>
         </div>
       </section>
-
-      <!-- MEJORA -->
-      <section id="mejora" class="section hidden">
-        <h3 class="text-lg font-semibold mb-4">Sistema de Mejora</h3>
-        <div id="improvementSection" class="mt-6"></div>
-      </section>
-
     </main>
   </div>
-
-  <!-- Modal alumno básico -->
-  <div id="studentModal" class="fixed inset-0 bg-black/50 hidden items-center justify-center">
-    <div class="bg-white rounded-lg shadow p-4 w-full max-w-lg">
-      <h4 class="font-semibold mb-3">Alumno</h4>
-      <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
-        <div><label class="text-sm">Nombre</label><input id="mName" class="w-full border rounded px-3 py-2" /></div>
-        <div><label class="text-sm">Grupo</label><input id="mGroup" class="w-full border rounded px-3 py-2" /></div>
-        <div><label class="text-sm">Tutor</label><input id="mTutor" class="w-full border rounded px-3 py-2" /></div>
-        <div><label class="text-sm">Autorizados a retirar</label><input id="mAuth" class="w-full border rounded px-3 py-2" /></div>
-      </div>
-      <div class="flex justify-end gap-2 mt-4">
-        <button id="closeStudentModal" class="px-3 py-2 border rounded">Cancelar</button>
-        <button id="saveStudentModal" class="px-3 py-2 bg-karpus-purple text-white rounded">Guardar</button>
-      </div>
-    </div>
-  </div>
-
+  <script src="js/store.js?v=2"></script>
+  <script src="js/sidebar.js"></script>
   <script>
     document.addEventListener('DOMContentLoaded', ()=>{
       if(window.lucide && typeof lucide.createIcons === 'function') lucide.createIcons();
-    });
-
-    // Sidebar toggle
-    document.getElementById('toggleSidebar')?.addEventListener('click', ()=>{
-      document.getElementById('sidebar').classList.toggle('collapsed');
     });
 
     // Nav sections
@@ -228,8 +167,8 @@
         const tr = document.createElement('tr');
         tr.innerHTML = `<td>${st.name}</td><td>${st.group}</td><td>${st.status}</td>
           <td class="space-x-2">
-            <button class="px-2 py-1 bg-karpus-green text-white rounded" data-act="in">Entrada</button>
-            <button class="px-2 py-1 bg-karpus-orange text-white rounded" data-act="out">Salida</button>
+            <button class="px-2 py-1 bg-green-600 text-white rounded" data-act="in">Entrada</button>
+            <button class="px-2 py-1 bg-orange-600 text-white rounded" data-act="out">Salida</button>
             <button class="px-2 py-1 bg-slate-200 rounded" data-act="ret">Retirar</button>
           </td>`;
         tr.querySelectorAll('button').forEach(btn=>{
@@ -366,33 +305,10 @@
       sampleRequests.forEach(r=>{ const p=document.createElement('p'); p.textContent=r; box.appendChild(p); });
     }
 
-    function renderImprovementPlans(){
-      const container = document.getElementById('improvementSection');
-      if(!container) return;
-      const plans = KarpusStore.getImprovementPlans();
-      container.innerHTML = '';
-      plans.forEach(plan => {
-        const card = document.createElement('div');
-        card.className = 'p-4 rounded-3xl bg-white border';
-        card.innerHTML = `
-          <div class="flex justify-between items-center mb-2">
-            <p class="text-sm font-medium">${plan.title}</p>
-            <span class="text-xs text-slate-500">${plan.due}</span>
-          </div>
-          <p class="text-sm">${plan.actions}</p>
-          <div class="mt-3 flex items-center gap-2">
-            <span class="text-xs px-2 py-1 rounded-xl bg-slate-100">${plan.status}</span>
-          </div>
-        `;
-        container.appendChild(card);
-      });
-    }
-
     // Initialize
     renderAttendance();
     renderBasicStudents();
     renderRequests();
-    renderImprovementPlans();
   </script>
 </body>
 </html>

@@ -1,42 +1,119 @@
 :root {
-      /* Paleta de colores oficial de Karpus Kids */
-      --verde: 124, 252, 0;   /* #7CFC00 */
-      --azul: 0, 206, 209;    /* #00CED1 */
-      --rosa: 255, 105, 180;     /* #FF69B4 */
-      --naranja: 255, 140, 0;  /* #FF8C00 */
-      --amarillo: 255, 215, 0; /* #FFD700 */
-    }
+  --karpus-orange: #FF8C00;
+  --karpus-green: #7CFC00;
+  --karpus-blue: #00CED1;
+  --karpus-pink: #FF69B4;
+  --karpus-yellow: #FFD700;
+  --karpus-white: #FFFFFF;
+  --karpus-black: #000000;
 
-    /* Logo multicolor */
-    .karpus-kids-colored span {
-      display: inline-block;
-      font-weight: 800;
-      text-shadow: 2px 2px 10px rgba(0,0,0,0.5);
-      font-size: 3rem;
-    }
+  --primary-bg: var(--karpus-white);
+  --text-primary: var(--karpus-black);
+  --text-secondary: #4A5568;
+  --border-color: #E2E8F0;
+  --card-bg: var(--karpus-white);
+  --button-cta-bg: var(--karpus-orange);
+}
 
-    .k-1 { color: rgb(var(--naranja)); }
-    .k-2 { color: rgb(var(--azul)); }
-    .k-3 { color: rgb(var(--rosa)); }
-    .k-4 { color: rgb(var(--verde)); }
-    .k-5 { color: rgb(var(--naranja)); }
-    .k-6 { color: rgb(var(--azul)); }
-    .k-7 { color: rgb(var(--verde)); }
-    .k-8 { color: rgb(var(--rosa)); }
-    .k-9 { color: rgb(var(--azul)); }
-    .k-10 { color: rgb(var(--naranja)); }
+body {
+  font-family: 'Nunito', sans-serif;
+  background-color: var(--primary-bg);
+  color: var(--text-primary);
+}
 
-    /* Versión pequeña para texto */
-    .karpus-kids-inline {
-      font-weight: 700;
-    }
-    .karpus-kids-inline .k-1 { color: #FF8C00; }
-    .karpus-kids-inline .k-2 { color: #00CED1; }
-    .karpus-kids-inline .k-3 { color: #FF69B4; }
-    .karpus-kids-inline .k-4 { color: #7CFC00; }
-    .karpus-kids-inline .k-5 { color: #FF8C00; }
-    .karpus-kids-inline .k-6 { color: #00CED1; }
-    .karpus-kids-inline .k-7 { color: #7CFC00; }
-    .karpus-kids-inline .k-8 { color: #FF69B4; }
-    .karpus-kids-inline .k-9 { color: #00CED1; }
-    .karpus-kids-inline .k-10 { color: #FF8C00; }
+.karpus-kids-inline .k-1 { color: var(--karpus-orange); }
+.karpus-kids-inline .k-2 { color: var(--karpus-blue); }
+.karpus-kids-inline .k-3 { color: var(--karpus-pink); }
+.karpus-kids-inline .k-4 { color: var(--karpus-green); }
+.karpus-kids-inline .k-5 { color: var(--karpus-orange); }
+.karpus-kids-inline .k-6 { color: var(--karpus-blue); }
+.karpus-kids-inline .k-7 { color: var(--karpus-green); }
+.karpus-kids-inline .k-8 { color: var(--karpus-pink); }
+.karpus-kids-inline .k-9 { color: var(--karpus-blue); }
+.karpus-kids-inline .k-10 { color: var(--karpus-orange); }
+
+.bg-karpus-orange { background-color: var(--karpus-orange); }
+.bg-karpus-green { background-color: var(--karpus-green); }
+.bg-karpus-blue { background-color: var(--karpus-blue); }
+.bg-karpus-pink { background-color: var(--karpus-pink); }
+.bg-karpus-yellow { background-color: var(--karpus-yellow); }
+
+.text-karpus-orange { color: var(--karpus-orange); }
+.text-karpus-green { color: var(--karpus-green); }
+.text-karpus-blue { color: var(--karpus-blue); }
+.text-karpus-pink { color: var(--karpus-pink); }
+.text-karpus-yellow { color: var(--karpus-yellow); }
+
+.border-karpus-orange { border-color: var(--karpus-orange); }
+.border-karpus-green { border-color: var(--karpus-green); }
+.border-karpus-blue { border-color: var(--karpus-blue); }
+.border-karpus-pink { border-color: var(--karpus-pink); }
+.border-karpus-yellow { border-color: var(--karpus-yellow); }
+
+.btn-cta {
+  background-color: var(--button-cta-bg);
+  color: var(--karpus-white);
+  font-weight: bold;
+  padding: 0.75rem 1.5rem;
+  border-radius: 9999px;
+  box-shadow: 0 4px 8px rgba(0,0,0,0.2);
+  transition: transform 0.3s ease, background-color 0.3s ease;
+}
+
+.btn-cta:hover {
+  transform: scale(1.05);
+  background-color: #ff9d2d;
+}
+
+/* Estilos de la barra lateral */
+aside#sidebar {
+  width: 280px;
+  transition: width .25s ease, transform .25s ease;
+}
+aside#sidebar.collapsed {
+  width: 72px;
+}
+aside#sidebar .label {
+  transition: opacity .2s ease;
+}
+aside#sidebar.collapsed .label {
+  opacity: 0;
+}
+
+/* Estilos de modal */
+.modal-container {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-color: rgba(0, 0, 0, 0.5);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 50;
+  opacity: 0;
+  visibility: hidden;
+  transition: opacity 0.3s ease, visibility 0.3s ease;
+}
+
+.modal-container.active {
+  opacity: 1;
+  visibility: visible;
+}
+
+.modal-content {
+  background: white;
+  border-radius: 16px;
+  box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
+  width: 90%;
+  max-width: 800px;
+  max-height: 90vh;
+  overflow-y: auto;
+  transform: scale(0.9);
+  transition: transform 0.3s ease;
+}
+
+.modal-container.active .modal-content {
+  transform: scale(1);
+}
