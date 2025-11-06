@@ -109,63 +109,71 @@
             <p class="text-sm text-slate-500">Visión rápida de la estancia</p>
           </div>
           <div class="flex items-center gap-3">
-            <button id="exportBtn" class="px-3 py-2 bg-karpus-blue text-white rounded">Exportar datos</button>
-            <button id="nuevoMaestroBtn" class="px-3 py-2 border rounded">Crear maestro</button>
+            <button id="exportBtn" class="btn btn-primary">Exportar datos</button>
+            <button id="nuevoMaestroBtn" class="btn btn-secondary">Crear maestro</button>
           </div>
         </div>
 
         <!-- cards -->
         <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
           <!-- Card 1: Niños Presentes -->
-          <div class="p-4 bg-karpus-blue bg-opacity-20 text-blue-800 rounded-2xl shadow flex items-center gap-4">
-            <div class="bg-karpus-blue text-white p-3 rounded-xl">
-              <i data-lucide="smile" class="w-8 h-8"></i>
-            </div>
-            <div>
-              <p class="text-sm">Niños presentes</p>
-              <p id="ninosPresentes" class="text-2xl font-bold">24</p>
+          <div class="card">
+            <div class="flex items-center gap-4">
+              <div class="bg-karpus-blue text-white p-3 rounded-xl">
+                <i data-lucide="smile" class="w-8 h-8"></i>
+              </div>
+              <div>
+                <p class="text-sm">Niños presentes</p>
+                <p id="ninosPresentes" class="text-2xl font-bold">24</p>
+              </div>
             </div>
           </div>
           <!-- Card 2: Maestros Activos -->
-          <div class="p-4 bg-karpus-green bg-opacity-20 text-green-800 rounded-2xl shadow flex items-center gap-4">
-            <div class="bg-karpus-green text-white p-3 rounded-xl">
-              <i data-lucide="user-check" class="w-8 h-8"></i>
-            </div>
-            <div>
-              <p class="text-sm">Maestros activos</p>
-              <p id="maestrosActivos" class="text-2xl font-bold">7</p>
+          <div class="card">
+            <div class="flex items-center gap-4">
+              <div class="bg-karpus-green text-white p-3 rounded-xl">
+                <i data-lucide="user-check" class="w-8 h-8"></i>
+              </div>
+              <div>
+                <p class="text-sm">Maestros activos</p>
+                <p id="maestrosActivos" class="text-2xl font-bold">7</p>
+              </div>
             </div>
           </div>
           <!-- Card 3: Solicitudes -->
-          <div class="p-4 bg-karpus-orange bg-opacity-20 text-orange-800 rounded-2xl shadow flex items-center gap-4">
-            <div class="bg-karpus-orange text-white p-3 rounded-xl">
-              <i data-lucide="inbox" class="w-8 h-8"></i>
-            </div>
-            <div>
-              <p class="text-sm">Solicitudes hoy</p>
-              <p id="solicitudesHoy" class="text-2xl font-bold">3</p>
+          <div class="card">
+            <div class="flex items-center gap-4">
+              <div class="bg-karpus-orange text-white p-3 rounded-xl">
+                <i data-lucide="inbox" class="w-8 h-8"></i>
+              </div>
+              <div>
+                <p class="text-sm">Solicitudes hoy</p>
+                <p id="solicitudesHoy" class="text-2xl font-bold">3</p>
+              </div>
             </div>
           </div>
           <!-- Card 4: Aulas -->
-          <div class="p-4 bg-karpus-pink bg-opacity-20 text-pink-800 rounded-2xl shadow flex items-center gap-4">
-            <div class="bg-karpus-pink text-white p-3 rounded-xl">
-              <i data-lucide="home" class="w-8 h-8"></i>
-            </div>
-            <div>
-              <p class="text-sm">Aulas ocupadas</p>
-              <p id="aulasOcupadas" class="text-2xl font-bold">5/6</p>
+          <div class="card">
+            <div class="flex items-center gap-4">
+              <div class="bg-karpus-pink text-white p-3 rounded-xl">
+                <i data-lucide="home" class="w-8 h-8"></i>
+              </div>
+              <div>
+                <p class="text-sm">Aulas ocupadas</p>
+                <p id="aulasOcupadas" class="text-2xl font-bold">5/6</p>
+              </div>
             </div>
           </div>
         </div>
 
         <!-- charts + tabla resumen -->
         <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
-          <div class="col-span-2 bg-white rounded shadow p-4">
+          <div class="col-span-2 card">
             <h3 class="font-semibold mb-3">Asistencia (últimas 8 semanas)</h3>
             <canvas id="attendanceChart" height="120"></canvas>
           </div>
 
-          <div class="bg-white rounded shadow p-4">
+          <div class="card">
             <h3 class="font-semibold mb-3">Últimas evaluaciones</h3>
             <table class="w-full text-sm">
               <thead class="text-slate-500 text-left">
@@ -706,24 +714,24 @@
       </h3>
       <div class="grid gap-3">
         <div>
-          <label class="text-sm text-slate-600 block mb-1">Nombre completo</label>
-          <input id="tmName" placeholder="Ej: María González" class="w-full border rounded px-3 py-2" />
+          <label class="form-label">Nombre completo</label>
+          <input id="tmName" placeholder="Ej: María González" class="form-input" />
         </div>
         <div>
-          <label class="text-sm text-slate-600 block mb-1">Teléfono</label>
-          <input id="tmPhone" type="tel" placeholder="Ej: +57 300 123 4567" class="w-full border rounded px-3 py-2" />
+          <label class="form-label">Teléfono</label>
+          <input id="tmPhone" type="tel" placeholder="Ej: +57 300 123 4567" class="form-input" />
         </div>
         <div>
-          <label class="text-sm text-slate-600 block mb-1">Correo electrónico</label>
-          <input id="tmEmail" type="email" placeholder="Ej: maria@karpus.com" class="w-full border rounded px-3 py-2" />
+          <label class="form-label">Correo electrónico</label>
+          <input id="tmEmail" type="email" placeholder="Ej: maria@karpus.com" class="form-input" />
         </div>
         <div>
-          <label class="text-sm text-slate-600 block mb-1">Contraseña</label>
-          <input id="tmPassword" type="password" placeholder="Contraseña para acceder al panel" class="w-full border rounded px-3 py-2" />
+          <label class="form-label">Contraseña</label>
+          <input id="tmPassword" type="password" placeholder="Contraseña para acceder al panel" class="form-input" />
         </div>
         <div class="flex justify-end gap-2 mt-3">
-          <button id="cancelModal" class="px-4 py-2 border rounded-lg hover:bg-slate-50">Cancelar</button>
-          <button id="saveModal" class="px-4 py-2 bg-karpus-green text-white rounded-lg hover:bg-opacity-90">Crear Maestro</button>
+          <button id="cancelModal" class="btn btn-secondary">Cancelar</button>
+          <button id="saveModal" class="btn btn-primary">Crear Maestro</button>
         </div>
       </div>
     </div>
@@ -926,7 +934,7 @@
   </div>
 
   <script src="js/store.js?v=2"></script>
-  <script src="js/panel_directora.js"></script>
+  <script type="module" src="js/panel_directora/_main.js"></script>
   <script src="js/sidebar.js"></script>
 </body>
 </html>
