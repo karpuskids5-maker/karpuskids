@@ -18,83 +18,55 @@
   <script src="https://unpkg.com/lucide@latest/dist/umd/lucide.min.js"></script>
 </head>
 <body class="bg-gray-100 font-nunito">
-  <!-- User Profile Sidebar (Left) -->
-  <aside id="user-sidebar" class="fixed inset-y-0 left-0 bg-karpus-blue text-white w-72 p-6 transform -translate-x-full transition-transform duration-300 ease-in-out z-40">
-    <div class="flex flex-col h-full">
-      <!-- User Info -->
-      <div class="mb-8">
-        <h2 class="text-2xl font-bold">Familia García</h2>
-        <p class="text-sm opacity-80">padres.garcia@email.com</p>
-      </div>
-
-      <!-- Account Switcher -->
-      <div>
-        <h3 class="text-sm font-semibold opacity-90 mb-3">Cuentas de Estudiantes</h3>
-        <div class="space-y-3">
-          <!-- Active Account -->
-          <a href="#" class="flex items-center gap-4 p-3 bg-white/20 rounded-lg">
-            <img src="https://placehold.co/100x100/FF8C00/FFFFFF?text=L" alt="Avatar" class="w-10 h-10 rounded-full border-2 border-white">
-            <div>
-              <p class="font-bold">Lucía García</p>
-              <p class="text-xs opacity-80">Aula Pequeños</p>
-            </div>
-            <i data-lucide="check-circle" class="ml-auto text-white"></i>
-          </a>
-          <!-- Inactive Account -->
-          <a href="#" class="flex items-center gap-4 p-3 hover:bg-white/10 rounded-lg">
-            <img src="https://placehold.co/100x100/FF69B4/FFFFFF?text=M" alt="Avatar" class="w-10 h-10 rounded-full border-2 border-transparent">
-            <div>
-              <p class="font-bold">Mateo García</p>
-              <p class="text-xs opacity-80">Aula Grandes</p>
-            </div>
-          </a>
+  <div class="min-h-screen flex">
+    <!-- SIDEBAR -->
+    <aside id="sidebar" class="hidden md:block bg-karpus-blue p-4 rounded-r-3xl shadow-lg fixed inset-y-0 left-0 z-10">
+      <div class="flex items-center gap-3 mb-6">
+        <div class="h-12 w-12 rounded-2xl bg-white/20 flex items-center justify-center shadow-soft">
+          <img src="img/mundo.jpg" alt="logo" class="h-10 w-10 rounded-lg object-cover" />
+        </div>
+        <div class="label">
+          <h3 class="font-semibold text-white"><span class="karpus-kids-inline">Karpus Kids</span></h3>
+          <p class="text-xs text-white text-opacity-80">Panel - Padres</p>
         </div>
       </div>
-
-      <!-- Add Account Button -->
-      <div class="mt-6">
-        <button class="w-full flex items-center justify-center gap-2 py-2 px-4 border-2 border-white/50 rounded-lg hover:bg-white/10 transition-colors">
-          <i data-lucide="plus-circle" class="w-5 h-5"></i>
-          <span>Agregar Cuenta</span>
+      <button id="toggleSidebarBtn" class="w-full text-left text-white p-2 rounded-lg hover:bg-white/20 mb-4">
+        <i data-lucide="menu" class="inline-block mr-2"></i>
+        <span class="label">Ocultar Menú</span>
+      </button>
+      <nav class="space-y-2 teams-nav bg-white/10 p-2 rounded-xl mb-4">
+        <button data-tab="home" class="tab-btn nav-button teams-nav-item text-white hover:bg-white/20">
+          <i data-lucide="home" class="text-karpus-yellow"></i><span class="label">Inicio</span>
         </button>
-      </div>
-
-      <!-- Logout Button -->
-      <div class="mt-auto">
-        <button class="w-full flex items-center gap-3 py-2 px-4 text-left hover:bg-white/10 rounded-lg">
-          <i data-lucide="log-out" class="w-5 h-5"></i>
-          <span>Cerrar Sesión</span>
+        <button data-tab="class" class="tab-btn nav-button teams-nav-item text-white hover:bg-white/20">
+          <i data-lucide="globe" class="text-karpus-green"></i><span class="label">Aula</span>
         </button>
-      </div>
-    </div>
-  </aside>
-
-  <div id="main-content-wrapper" class="transition-transform duration-300 ease-in-out">
-    <div class="min-h-screen flex flex-col font-nunito">
-      <!-- Mobile header -->
-      <header class="md:hidden w-full fixed top-0 left-0 right-0 bg-white/80 backdrop-blur-sm border-b z-10 shadow-soft">
-        <div class="px-4 py-2 flex items-center justify-between">
-          <button id="toggle-user-sidebar" class="p-2"><i data-lucide="menu"></i></button>
-          <div class="flex items-center gap-3">
-            <div class="w-9 h-9 rounded-2xl bg-karpus-blue flex items-center justify-center shadow-soft">
-              <img src="img/mundo.jpg" alt="logo" class="h-6 w-6 rounded" />
-            </div>
-            <div>
-              <h1 class="text-lg font-poppins font-semibold"><span class="karpus-kids-inline">Karpus Kids</span></h1>
-              <p class="text-xs text-slate-500">Panel de Padres</p>
-            </div>
-          </div>
-          <!-- Menú de Avatar de Usuario -->
-          <div class="relative">
-            <button id="avatarMenuBtn">
-              <img src="https://placehold.co/200x200" alt="Avatar del alumno" class="w-9 h-9 rounded-full object-cover border-2 border-karpus-blue">
-            </button>
-          </div>
+        <button data-tab="tasks" class="tab-btn nav-button teams-nav-item text-white hover:bg-white/20">
+          <i data-lucide="book-open" class="text-karpus-orange"></i><span class="label">Tareas</span>
+        </button>
+        <button data-tab="notifications" class="tab-btn nav-button teams-nav-item text-white hover:bg-white/20">
+          <i data-lucide="bell" class="text-karpus-pink"></i><span class="label">Avisos</span>
+        </button>
+        <button data-tab="profile" class="tab-btn nav-button teams-nav-item text-white hover:bg-white/20">
+          <i data-lucide="user" class="text-karpus-white"></i><span class="label">Perfil</span>
+        </button>
+        <a href="index.html" class="nav-button teams-nav-item text-white hover:bg-white/20">
+          <i data-lucide="log-out" class="text-karpus-white"></i><span class="label">Cerrar sesión</span>
+        </a>
+      </nav>
+    </aside>
+    <main id="main-content" class="flex-1 p-6 md:ml-[280px] transition-all duration-300">
+      <!-- Topbar mobile -->
+      <div class="md:hidden mb-4 flex items-center justify-between">
+        <button id="menuBtn" class="p-2 rounded bg-white shadow"><i data-lucide="menu" class="lucide"></i></button>
+        <h2 class="font-semibold">Panel Padres</h2>
+        <div class="flex items-center gap-2">
+          <button class="p-2 rounded bg-white shadow"><i data-lucide="bell" class="lucide"></i></button>
+          <img src="https://via.placeholder.com/36" class="rounded-full" alt="avatar">
         </div>
-      </header>
+      </div>
 
       <!-- Content -->
-      <main class="flex-1 pb-20 px-4 space-y-6 md:pt-6 mt-16 md:mt-0">
       <!-- Home -->
       <section id="tab-home" class="space-y-6">
         <div class="p-4 rounded-3xl bg-white shadow-soft border">
