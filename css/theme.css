@@ -1,0 +1,47 @@
+:root{
+  --karpus-green: #4CAF50;
+  --karpus-pink: #FF4081;
+  --karpus-blue: #2196F3;
+  --karpus-orange: #FF9800;
+  --karpus-yellow: #FFC107;
+  --karpus-purple: #9C27B0;
+  --karpus-teal: #009688;
+}
+
+/* Estilos generales */
+body {
+  font-family: 'Nunito', sans-serif;
+  background-color: #f5f7fb;
+  transition: all 0.3s ease;
+}
+
+/* Accents on white cards */
+.card-white{ background:#fff; border:1px solid #e5e7eb; border-radius: 1rem; }
+.badge{ display:inline-block; padding:2px 8px; border-radius:10px; font-size:12px; }
+.badge-green{ background: #E8F5E9; color:#2E7D32; }
+.badge-pink{ background: #FCE4EC; color:#C2185B; }
+.badge-blue{ background: #E3F2FD; color:#1565C0; }
+.badge-orange{ background: #FFF3E0; color:#EF6C00; }
+.badge-yellow{ background: #FFF9C4; color:#F57F17; }
+
+.btn{ border-radius:12px; padding:6px 10px; font-size:13px; }
+.btn-green{ background:var(--karpus-green); color:#fff; }
+.btn-pink{ background:var(--karpus-pink); color:#fff; }
+.btn-blue{ background:var(--karpus-blue); color:#fff; }
+.btn-orange{ background:var(--karpus-orange); color:#fff; }
+.btn-yellow{ background:var(--karpus-yellow); color:#fff; }
+
+/* Sidebar gradients in requested palette */
+.sidebar-green { background: linear-gradient(135deg,#E8F8F0,#D0F0E0); }
+.sidebar-yellow { background: linear-gradient(135deg,#FFF8E0,#FFF1C2); }
+.sidebar-pink { background: linear-gradient(135deg,#FFF0F6,#FFE3F0); }
+.sidebar-blue { background: linear-gradient(135deg,#E3F2FD,#BBDEFB); }
+.sidebar-orange { background: linear-gradient(135deg,#FFF3E0,#FFE0B2); }
+
+/* Small colorful chips */
+.chip{ display:inline-block; border-radius:9999px; padding:2px 10px; font-size:11px; }
+.chip-green{ background:#E8F5E9; color:#2E7D32; }
+.chip-pink{ background:#FCE4EC; color:#C2185B; }
+.chip-blue{ background:#E3F2FD; color:#1565C0; }
+.chip-orange{ background:#FFF3E0; color:#EF6C00; }
+.chip-yellow{ background:#FFF9C4; color:#F57F17; }

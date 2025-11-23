@@ -1,0 +1,1642 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Karpus Kids — Panel Director</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="stylesheet" href="css/theme.css" />
+  <link rel="stylesheet" href="css/karpus-modern.css" />
+  <script src="js/auth.js?v=1"></script>
+  <script>
+    (function(){
+      const check = Auth.requireRole('directora');
+      if(!check.ok){ window.location.href = 'login.html'; }
+    })();
+  </script>
+  <!-- Lucide icons -->
+  <script src="https://unpkg.com/lucide/dist/lucide.min.js"></script>
+  <!-- Chart.js (para gráficas) -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <style>
+    /* Sidebar styles */
+    aside#sidebar { width: 280px; transition: width .25s ease, transform .25s ease; }
+    aside#sidebar.collapsed { width: 72px; }
+    aside#sidebar .label { transition: opacity .2s ease; }
+    aside#sidebar.collapsed .label { opacity: 0; }
+    /* mobile helper */
+    .hidden-mobile { display: none !important; }
+    /* color variants */
+    .sidebar-indigo { background: linear-gradient(135deg,#EEF2FF,#E0E7FF); }
+    .sidebar-blue { background: linear-gradient(135deg,#E3F2FD,#BBDEFB); }
+    .sidebar-green { background: linear-gradient(135deg,#E8F8F0,#D0F0E0); }
+    .sidebar-purple { background: linear-gradient(135deg, #7c3aed, #4f46e5); }
+    .glass { background: rgba(255,255,255,0.6); backdrop-filter: blur(6px); }
+    .sidebar-scroll { max-height: calc(100vh - 4rem); overflow:auto; }
+    /* Karpus colored letters small */
+    .karpus-kids-inline { font-weight: 700; }
+    .karpus-kids-inline .k-1 { color: #FF9800; }
+    .karpus-kids-inline .k-2 { color: #2196F3; }
+    .karpus-kids-inline .k-3 { color: #E91E63; }
+    .karpus-kids-inline .k-4 { color: #4CAF50; }
+    .karpus-kids-inline .k-5 { color: #FF9800; }
+    .karpus-kids-inline .k-6 { color: #2196F3; }
+    .karpus-kids-inline .k-7 { color: #4CAF50; }
+    .karpus-kids-inline .k-8 { color: #E91E63; }
+    .karpus-kids-inline .k-9 { color: #2196F3; }
+    .karpus-kids-inline .k-10 { color: #FF9800; }
+    
+    /* Estilos para modales más grandes y profesionales */
+    .modal-container {
+      position: fixed;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      background-color: rgba(0, 0, 0, 0.5);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      z-index: 50;
+      opacity: 0;
+      visibility: hidden;
+      transition: opacity 0.3s ease, visibility 0.3s ease;
+    }
+    
+    .modal-container.active {
+      opacity: 1;
+      visibility: visible;
+    }
+    
+    .modal-content {
+      background: white;
+      border-radius: 16px;
+      box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
+      width: 90%;
+      max-width: 800px;
+      max-height: 90vh;
+      overflow-y: auto;
+      transform: scale(0.9);
+      transition: transform 0.3s ease;
+    }
+    
+    .modal-container.active .modal-content {
+      transform: scale(1);
+    }
+    
+    .modal-header {
+      padding: 1.5rem;
+      border-bottom: 1px solid #e5e7eb;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+    
+    .modal-body {
+      padding: 1.5rem;
+    }
+    
+    .modal-footer {
+      padding: 1.5rem;
+      border-top: 1px solid #e5e7eb;
+      display: flex;
+      justify-content: flex-end;
+      gap: 0.75rem;
+    }
+    
+    /* Estilos para botones de navegación */
+    .nav-button {
+      width: 100%;
+      text-align: left;
+      padding: 0.75rem 1rem;
+      border-radius: 0.5rem;
+      display: flex;
+      align-items: center;
+      gap: 0.75rem;
+      transition: all 0.2s ease;
+      position: relative;
+    }
+    
+    .nav-button i {
+      transition: color 0.2s ease;
+    }
+    
+    .nav-button .badge {
+      position: absolute;
+      top: 0.5rem;
+      right: 0.5rem;
+      background: #e91e63;
+      color: white;
+      border-radius: 9999px;
+      font-size: 0.75rem;
+      padding: 0.125rem 0.375rem;
+      min-width: 1.5rem;
+      text-align: center;
+    }
+  </style>
+</head>
+<body class="bg-slate-50 text-slate-800 font-nunito">
+  <div class="min-h-screen flex">
+    <!-- SIDEBAR -->
+    <aside id="sidebar" class="hidden md:block sidebar-blue p-4 rounded-r-3xl shadow-lg fixed inset-y-0 left-0 z-10">
+      <div class="flex items-center gap-3 mb-6">
+        <div class="h-12 w-12 rounded-2xl bg-white/20 flex items-center justify-center shadow-soft">
+          <img src="img/mundo.jpg" alt="logo" class="h-10 w-10 rounded-lg object-cover" />
+        </div>
+        <div class="label">
+          <h3 class="font-semibold text-white"><span class="karpus-kids-inline"><span class="k-1">K</span><span class="k-2">a</span><span class="k-3">r</span><span class="k-4">p</span><span class="k-5">u</span><span class="k-6">s</span> <span class="k-7">K</span><span class="k-8">i</span><span class="k-9">d</span><span class="k-10">s</span></span></h3>
+          <p class="text-xs text-white text-opacity-80">Panel - Director(a)</p>
+        </div>
+      </div>
+
+      <div class="sidebar-scroll">
+      <nav class="space-y-2 teams-nav bg-white/10 p-2 rounded-xl mb-4">
+        <button data-section="dashboard" class="nav-button teams-nav-item text-white hover:bg-white/20">
+          <i data-lucide="grid" class="text-karpus-blue"></i>
+          <span class="label">Dashboard</span>
+        </button>
+        <button data-section="maestros" class="nav-button teams-nav-item text-white hover:bg-white/20">
+          <i data-lucide="users" class="text-karpus-green"></i>
+          <span class="label">Maestros</span>
+          <span class="badge">5</span>
+        </button>
+        <button data-section="estudiantes" class="nav-button teams-nav-item text-white hover:bg-white/20">
+          <i data-lucide="user-check" class="text-karpus-orange"></i>
+          <span class="label">Estudiantes</span>
+          <span class="badge">24</span>
+        </button>
+        <button data-section="aulas" class="nav-button teams-nav-item text-white hover:bg-white/20">
+          <i data-lucide="home" class="text-karpus-purple"></i>
+          <span class="label">Aulas</span>
+        </button>
+        <button data-section="asistencia" class="nav-button teams-nav-item text-white hover:bg-white/20">
+          <i data-lucide="calendar" class="text-karpus-pink"></i>
+          <span class="label">Asistencia</span>
+        </button>
+        <button data-section="calificaciones" class="nav-button teams-nav-item text-white hover:bg-white/20">
+          <i data-lucide="graduation-cap" class="text-karpus-teal"></i>
+          <span class="label">Calificaciones</span>
+        </button>
+        <button data-section="reportes" class="nav-button teams-nav-item text-white hover:bg-white/20">
+          <i data-lucide="file-text" class="text-karpus-indigo"></i>
+          <span class="label">Reportes</span>
+        </button>
+        <button data-section="pagos" class="nav-button teams-nav-item text-white hover:bg-white/20">
+          <i data-lucide="credit-card" class="text-karpus-yellow"></i>
+          <span class="label">Pagos</span>
+        </button>
+        <button data-section="comunicacion" class="nav-button teams-nav-item text-white hover:bg-white/20">
+          <i data-lucide="message-square" class="text-karpus-blue"></i>
+          <span class="label">Comunicaciones</span>
+          <span class="badge">3</span>
+        </button>
+        <button data-section="configuracion" class="nav-button teams-nav-item text-white hover:bg-white/20">
+          <i data-lucide="settings" class="text-karpus-gray"></i>
+          <span class="label">Configuración</span>
+        </button>
+      </nav>
+
+      <!-- Color sidebar eliminado: se usa estilo único -->
+      <div class="mt-6 text-xs text-slate-600">
+        <p>Usuario: <span class="font-medium">Director(a)</span></p>
+        <p class="mt-2">Último acceso: <span class="font-medium">Hoy</span></p>
+        <div class="mt-3 flex flex-wrap gap-2">
+          <a href="panel-maestra.html" class="px-2 py-1 rounded border text-xs">Ver panel Maestra</a>
+          <a href="panel_padres.html" class="px-2 py-1 rounded border text-xs">Ver panel Padres</a>
+        </div>
+      </div>
+      </div>
+    </aside>
+
+    <!-- MAIN -->
+    <main class="flex-1 p-6">
+      <!-- Topbar mobile -->
+      <div class="md:hidden mb-4 flex items-center justify-between">
+        <button id="menuBtn" class="p-2 rounded bg-white shadow"><i data-lucide="menu" class="lucide"></i></button>
+        <h2 class="font-semibold">Panel Director</h2>
+        <div class="flex items-center gap-2">
+          <button class="p-2 rounded bg-white shadow"><i data-lucide="bell" class="lucide"></i></button>
+          <img src="https://via.placeholder.com/36" class="rounded-full" alt="avatar">
+        </div>
+      </div>
+
+      <!-- SECTIONS -->
+      <section id="dashboard" class="section">
+        <div class="flex items-center justify-between mb-6">
+          <div class="flex items-center gap-3">
+            <i data-lucide="layout-dashboard" class="w-7 h-7 text-blue-600"></i>
+            <h1 class="text-2xl font-bold">Resumen general</h1>
+            <p class="text-sm text-slate-500">Visión rápida de la estancia</p>
+          </div>
+          <div class="flex items-center gap-3">
+            <button id="exportBtn" class="px-3 py-2 bg-blue-600 text-white rounded">Exportar datos</button>
+            <button id="nuevoMaestroBtn" class="px-3 py-2 border rounded">Crear maestro</button>
+          </div>
+        </div>
+
+        <!-- cards -->
+        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+          <!-- Card 1: Niños Presentes -->
+          <div class="p-4 bg-blue-100 text-blue-800 rounded-2xl shadow flex items-center gap-4">
+            <div class="bg-blue-500 text-white p-3 rounded-xl">
+              <i data-lucide="smile" class="w-8 h-8"></i>
+            </div>
+            <div>
+              <p class="text-sm">Niños presentes</p>
+              <p id="ninosPresentes" class="text-2xl font-bold">24</p>
+            </div>
+          </div>
+          <!-- Card 2: Maestros Activos -->
+          <div class="p-4 bg-green-100 text-green-800 rounded-2xl shadow flex items-center gap-4">
+            <div class="bg-green-500 text-white p-3 rounded-xl">
+              <i data-lucide="user-check" class="w-8 h-8"></i>
+            </div>
+            <div>
+              <p class="text-sm">Maestros activos</p>
+              <p id="maestrosActivos" class="text-2xl font-bold">7</p>
+            </div>
+          </div>
+          <!-- Card 3: Solicitudes -->
+          <div class="p-4 bg-orange-100 text-orange-800 rounded-2xl shadow flex items-center gap-4">
+            <div class="bg-orange-500 text-white p-3 rounded-xl">
+              <i data-lucide="inbox" class="w-8 h-8"></i>
+            </div>
+            <div>
+              <p class="text-sm">Solicitudes hoy</p>
+              <p id="solicitudesHoy" class="text-2xl font-bold">3</p>
+            </div>
+          </div>
+          <!-- Card 4: Aulas -->
+          <div class="p-4 bg-purple-100 text-purple-800 rounded-2xl shadow flex items-center gap-4">
+            <div class="bg-purple-500 text-white p-3 rounded-xl">
+              <i data-lucide="home" class="w-8 h-8"></i>
+            </div>
+            <div>
+              <p class="text-sm">Aulas ocupadas</p>
+              <p id="aulasOcupadas" class="text-2xl font-bold">5/6</p>
+            </div>
+          </div>
+        </div>
+
+        <!-- charts + tabla resumen -->
+        <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+          <div class="col-span-2 bg-white rounded shadow p-4">
+            <h3 class="font-semibold mb-3">Asistencia (últimas 8 semanas)</h3>
+            <canvas id="attendanceChart" height="120"></canvas>
+          </div>
+
+          <div class="bg-white rounded shadow p-4">
+            <h3 class="font-semibold mb-3">Últimas evaluaciones</h3>
+            <table class="w-full text-sm">
+              <thead class="text-slate-500 text-left">
+                <tr><th>Estudiante</th><th>Aula</th><th>Nota</th></tr>
+              </thead>
+              <tbody id="evaluacionesList">
+                <tr><td>María P.</td><td>A1</td><td>Excelente</td></tr>
+                <tr><td>Javier R.</td><td>A2</td><td>Bueno</td></tr>
+                <tr><td>Sofia L.</td><td>A1</td><td>Muy bueno</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        <!-- Log de Actividad Biométrica Reciente -->
+        <div class="mt-6 bg-white rounded shadow p-4">
+            <h3 class="font-semibold mb-3">Actividad Biométrica Reciente</h3>
+            <div id="biometricLog" class="space-y-2 text-sm max-h-48 overflow-y-auto">
+                <div class="flex justify-between items-center p-2 rounded bg-green-50">
+                    <p><strong>Entrada:</strong> María P. (Aula A1)</p>
+                    <span class="text-xs text-slate-500">8:15 AM</span>
+                </div>
+                <div class="flex justify-between items-center p-2 rounded bg-green-50">
+                    <p><strong>Entrada:</strong> Javier R. (Aula A2)</p>
+                    <span class="text-xs text-slate-500">8:07 AM</span>
+                </div>
+            </div>
+        </div>
+
+      </section>
+
+      <!-- MAESTROS -->
+      <section id="maestros" class="section hidden">
+        <div class="flex items-center justify-between mb-4">
+          <h2 class="text-xl font-semibold flex items-center gap-2">
+            <i data-lucide="users" class="w-5 h-5 text-slate-600"></i><span>Maestros</span>
+          </h2>
+          <div>
+            <button id="addTeacher" class="px-3 py-2 bg-green-600 text-white rounded">Agregar maestro</button>
+          </div>
+        </div>
+        <div class="bg-white rounded shadow p-4">
+          <table class="w-full text-sm">
+            <thead class="text-slate-500 text-left">
+              <tr>
+                <th class="py-2">Nombre</th>
+                <th class="py-2">Correo</th>
+                <th class="py-2">Teléfono</th>
+                <th class="py-2">Estado</th>
+                <th class="py-2">Acciones</th>
+              </tr>
+            </thead>
+            <tbody id="teachersTable">
+              <tr>
+                <td class="py-2">Carolina Martínez</td>
+                <td class="py-2">carolina@karpus.com</td>
+                <td class="py-2">+57 300 123 4567</td>
+                <td class="py-2"><span class="px-2 py-1 bg-green-100 text-green-800 rounded-full text-xs">Activo</span></td>
+                <td class="py-2">
+                  <button class="text-blue-600 hover:text-blue-800 mr-2" onclick="editTeacher(this)">Editar</button>
+                  <button class="text-red-600 hover:text-red-800" onclick="deleteTeacher(this)">Eliminar</button>
+                </td>
+              </tr>
+              <tr>
+                <td class="py-2">Andrés Pérez</td>
+                <td class="py-2">andres@karpus.com</td>
+                <td class="py-2">+57 301 987 6543</td>
+                <td class="py-2"><span class="px-2 py-1 bg-yellow-100 text-yellow-800 rounded-full text-xs">Inactivo</span></td>
+                <td class="py-2">
+                  <button class="text-blue-600 hover:text-blue-800 mr-2" onclick="editTeacher(this)">Editar</button>
+                  <button class="text-red-600 hover:text-red-800" onclick="deleteTeacher(this)">Eliminar</button>
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      <!-- ESTUDIANTES -->
+      <section id="estudiantes" class="section hidden">
+        <div class="flex items-center justify-between mb-4">
+          <h2 class="text-xl font-semibold flex items-center gap-2">
+            <i data-lucide="users" class="w-5 h-5 text-slate-600"></i><span>Estudiantes</span>
+          </h2>
+          <div class="flex gap-2">
+            <input id="searchStudent" placeholder="Buscar estudiante..." class="px-3 py-2 border rounded-lg" />
+            <button id="addStudentBtn" class="px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 flex items-center gap-2">
+              <i data-lucide="user-plus" class="w-4 h-4"></i>
+              Agregar Estudiante
+            </button>
+          </div>
+        </div>
+
+        <!-- Tabla de estudiantes simplificada -->
+        <div class="bg-white rounded-lg shadow p-6">
+          <div class="mb-4">
+            <h3 class="text-lg font-medium text-slate-800 mb-2">Lista de Estudiantes</h3>
+            <p class="text-sm text-slate-600">Haga clic en "Ver Perfil" para acceder a los datos de los padres</p>
+          </div>
+          
+          <table class="w-full">
+            <thead class="bg-slate-50">
+              <tr>
+                <th class="text-left py-3 px-4 font-medium text-slate-700">Nombre del Estudiante</th>
+                <th class="text-center py-3 px-4 font-medium text-slate-700">Acciones</th>
+              </tr>
+            </thead>
+            <tbody id="studentsTable" class="divide-y divide-slate-200">
+              <tr class="hover:bg-slate-50">
+                <td class="py-4 px-4">
+                  <div class="flex items-center gap-3">
+                    <div class="w-8 h-8 bg-indigo-100 rounded-full flex items-center justify-center">
+                      <i data-lucide="user" class="w-4 h-4 text-indigo-600"></i>
+                    </div>
+                    <span class="font-medium text-slate-800">María Fernanda Pérez</span>
+                  </div>
+                </td>
+                <td class="py-4 px-4 text-center">
+                  <button onclick="viewStudentProfile(this)" class="px-3 py-1 bg-blue-100 text-blue-700 rounded-lg hover:bg-blue-200 text-sm font-medium">
+                    Ver Perfil
+                  </button>
+                </td>
+              </tr>
+              <tr class="hover:bg-slate-50">
+                <td class="py-4 px-4">
+                  <div class="flex items-center gap-3">
+                    <div class="w-8 h-8 bg-green-100 rounded-full flex items-center justify-center">
+                      <i data-lucide="user" class="w-4 h-4 text-green-600"></i>
+                    </div>
+                    <span class="font-medium text-slate-800">Javier Alejandro Rodríguez</span>
+                  </div>
+                </td>
+                <td class="py-4 px-4 text-center">
+                  <button onclick="viewStudentProfile(this)" class="px-3 py-1 bg-blue-100 text-blue-700 rounded-lg hover:bg-blue-200 text-sm font-medium">
+                    Ver Perfil
+                  </button>
+                </td>
+              </tr>
+              <tr class="hover:bg-slate-50">
+                <td class="py-4 px-4">
+                  <div class="flex items-center gap-3">
+                    <div class="w-8 h-8 bg-purple-100 rounded-full flex items-center justify-center">
+                      <i data-lucide="user" class="w-4 h-4 text-purple-600"></i>
+                    </div>
+                    <span class="font-medium text-slate-800">Ana Sofía González</span>
+                  </div>
+                </td>
+                <td class="py-4 px-4 text-center">
+                  <button onclick="viewStudentProfile(this)" class="px-3 py-1 bg-blue-100 text-blue-700 rounded-lg hover:bg-blue-200 text-sm font-medium">
+                    Ver Perfil
+                  </button>
+                </td>
+              </tr>
+              <tr class="hover:bg-slate-50">
+                <td class="py-4 px-4">
+                  <div class="flex items-center gap-3">
+                    <div class="w-8 h-8 bg-orange-100 rounded-full flex items-center justify-center">
+                      <i data-lucide="user" class="w-4 h-4 text-orange-600"></i>
+                    </div>
+                    <span class="font-medium text-slate-800">Carlos Eduardo Martínez</span>
+                  </div>
+                </td>
+                <td class="py-4 px-4 text-center">
+                  <button onclick="viewStudentProfile(this)" class="px-3 py-1 bg-blue-100 text-blue-700 rounded-lg hover:bg-blue-200 text-sm font-medium">
+                    Ver Perfil
+                  </button>
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      <!-- AULAS -->
+      <section id="aulas" class="section hidden">
+        <div class="flex items-center justify-between mb-4">
+          <h2 class="text-xl font-semibold flex items-center gap-2">
+            <i data-lucide="home" class="w-5 h-5 text-slate-600"></i><span>Aulas</span>
+          </h2>
+          <div>
+            <button id="addRoomBtn" class="px-3 py-2 bg-yellow-600 text-white rounded">Nueva aula</button>
+          </div>
+        </div>
+        
+        <!-- Tabla de aulas -->
+        <div class="bg-white rounded shadow p-4">
+          <table class="w-full text-sm">
+            <thead class="text-slate-500 text-left">
+              <tr>
+                <th class="py-2">Nombre del Aula</th>
+                <th class="py-2">Maestro Asignado</th>
+                <th class="py-2">Capacidad</th>
+                <th class="py-2">Estudiantes</th>
+                <th class="py-2">Estado</th>
+                <th class="py-2">Acciones</th>
+              </tr>
+            </thead>
+            <tbody id="roomsTable">
+              <tr>
+                <td class="py-2 font-medium">Aula Pequeños A1</td>
+                <td class="py-2">Carolina Martínez</td>
+                <td class="py-2">15</td>
+                <td class="py-2">12/15</td>
+                <td class="py-2"><span class="px-2 py-1 bg-green-100 text-green-800 rounded-full text-xs">Activa</span></td>
+                <td class="py-2">
+                  <button class="text-blue-600 hover:text-blue-800 mr-2" onclick="editRoom(this)">Editar</button>
+                  <button class="text-green-600 hover:text-green-800 mr-2" onclick="viewRoomStudents(this)">Ver Estudiantes</button>
+                  <button class="text-red-600 hover:text-red-800" onclick="deleteRoom(this)">Eliminar</button>
+                </td>
+              </tr>
+              <tr>
+                <td class="py-2 font-medium">Aula Medianos B1</td>
+                <td class="py-2">Andrés Pérez</td>
+                <td class="py-2">18</td>
+                <td class="py-2">10/18</td>
+                <td class="py-2"><span class="px-2 py-1 bg-green-100 text-green-800 rounded-full text-xs">Activa</span></td>
+                <td class="py-2">
+                  <button class="text-blue-600 hover:text-blue-800 mr-2" onclick="editRoom(this)">Editar</button>
+                  <button class="text-green-600 hover:text-green-800 mr-2" onclick="viewRoomStudents(this)">Ver Estudiantes</button>
+                  <button class="text-red-600 hover:text-red-800" onclick="deleteRoom(this)">Eliminar</button>
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      <!-- ASISTENCIA -->
+      <section id="asistencia" class="section hidden">
+        <div class="flex items-center justify-between mb-4">
+          <h2 class="text-xl font-semibold flex items-center gap-2">
+            <i data-lucide="calendar-check" class="w-5 h-5 text-slate-600"></i><span>Control de Asistencia</span>
+          </h2>
+          <div>
+            <button id="exportAttendance" class="px-3 py-2 border rounded">Exportar</button>
+          </div>
+        </div>
+        <div class="bg-white rounded shadow p-4">
+          <p class="text-sm text-slate-500 mb-3">Marcar / corregir asistencia</p>
+          <table class="w-full text-sm">
+            <thead class="text-slate-500 text-left"><tr><th>Estudiante</th><th>Aula</th><th>Estado</th><th>Acciones</th></tr></thead>
+            <tbody>
+              <tr><td>María P.</td><td>A1</td><td><select class="border rounded px-2 py-1"><option>Presente</option><option>Ausente</option></select></td><td><button class="px-2 py-1 bg-blue-600 text-white rounded">Guardar</button></td></tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      <!-- CALIFICACIONES -->
+      <section id="calificaciones" class="section hidden">
+        <div class="flex items-center justify-between mb-4">
+          <h2 class="text-xl font-semibold flex items-center gap-2">
+            <i data-lucide="graduation-cap" class="w-5 h-5 text-slate-600"></i><span>Resumen de Calificaciones</span>
+          </h2>
+          <div>
+            <button id="exportGrades" class="px-3 py-2 border rounded">Exportar Resumen</button>
+          </div>
+        </div>
+        <p class="text-sm text-slate-600 mb-4">Vista general del rendimiento académico por aula.</p>
+        <div id="gradesSummaryContainer" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+        </div>
+      </section>
+
+      <!-- REPORTES Y QUEJAS -->
+      <section id="reportes" class="section hidden">
+        <div class="flex items-center justify-between mb-4">
+          <h2 class="text-xl font-semibold flex items-center gap-2">
+            <i data-lucide="alert-triangle" class="w-5 h-5 text-slate-600"></i><span>Reportes y Quejas</span>
+          </h2>
+          <div class="flex gap-2">
+            <select id="reportFilter" class="px-3 py-2 border rounded">
+              <option value="all">Todos los reportes</option>
+              <option value="pending">Pendientes</option>
+              <option value="resolved">Resueltos</option>
+              <option value="teachers">De Maestros</option>
+              <option value="parents">De Padres</option>
+            </select>
+            <button id="refreshReports" class="px-3 py-2 bg-blue-600 text-white rounded">Actualizar</button>
+          </div>
+        </div>
+        
+        <!-- Lista de reportes/quejas -->
+        <div class="space-y-4">
+          <!-- Reporte ejemplo 1 -->
+          <div class="bg-white rounded shadow p-4 border-l-4 border-red-500">
+            <div class="flex items-start justify-between mb-3">
+              <div>
+                <h3 class="font-semibold text-red-700">Queja - Comportamiento en el aula</h3>
+                <p class="text-sm text-slate-600">
+                  <span class="font-medium">De:</span> María González (Madre de Ana López) • 
+                  <span class="font-medium">Fecha:</span> 15 Dic 2024, 10:30 AM
+                </p>
+              </div>
+              <div class="flex gap-2">
+                <span class="px-2 py-1 bg-red-100 text-red-800 rounded-full text-xs">Pendiente</span>
+                <button onclick="toggleReportDetails(this)" class="text-blue-600 hover:text-blue-800 text-sm">Ver detalles</button>
+              </div>
+            </div>
+            <p class="text-sm text-slate-700 mb-3">
+              Mi hija Ana me comentó que hubo un incidente durante la hora del almuerzo donde otro niño le quitó su comida y la maestra no intervino adecuadamente...
+            </p>
+            <div class="report-details hidden">
+              <div class="border-t pt-3 mt-3">
+                <h4 class="font-medium mb-2">Mensaje completo:</h4>
+                <p class="text-sm text-slate-700 mb-3">
+                  Mi hija Ana me comentó que hubo un incidente durante la hora del almuerzo donde otro niño le quitó su comida y la maestra no intervino adecuadamente. Ana llegó a casa muy triste y sin haber comido bien. Necesito que se tome acción inmediata para resolver esta situación y evitar que se repita.
+                </p>
+                <h4 class="font-medium mb-2">Archivos adjuntos:</h4>
+                <div class="flex gap-2 mb-3">
+                  <div class="flex items-center gap-2 px-3 py-2 bg-slate-100 rounded">
+                    <i data-lucide="image" class="w-4 h-4"></i>
+                    <span class="text-sm">foto_almuerzo.jpg</span>
+                    <button class="text-blue-600 hover:text-blue-800 text-xs">Ver</button>
+                  </div>
+                </div>
+                <div class="flex gap-2">
+                  <button onclick="resolveReport(this)" class="px-3 py-2 bg-green-600 text-white rounded text-sm">Marcar como Resuelto</button>
+                  <button onclick="respondReport(this)" class="px-3 py-2 bg-blue-600 text-white rounded text-sm">Responder</button>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Reporte ejemplo 2 -->
+          <div class="bg-white rounded shadow p-4 border-l-4 border-yellow-500">
+            <div class="flex items-start justify-between mb-3">
+              <div>
+                <h3 class="font-semibold text-yellow-700">Reporte - Solicitud de material</h3>
+                <p class="text-sm text-slate-600">
+                  <span class="font-medium">De:</span> Carolina Martínez (Maestra Aula A1) • 
+                  <span class="font-medium">Fecha:</span> 14 Dic 2024, 2:15 PM
+                </p>
+              </div>
+              <div class="flex gap-2">
+                <span class="px-2 py-1 bg-yellow-100 text-yellow-800 rounded-full text-xs">En proceso</span>
+                <button onclick="toggleReportDetails(this)" class="text-blue-600 hover:text-blue-800 text-sm">Ver detalles</button>
+              </div>
+            </div>
+            <p class="text-sm text-slate-700 mb-3">
+              Necesito solicitar material adicional para las actividades de arte. Los niños han mostrado mucho interés y necesitamos más suministros...
+            </p>
+            <div class="report-details hidden">
+              <div class="border-t pt-3 mt-3">
+                <h4 class="font-medium mb-2">Mensaje completo:</h4>
+                <p class="text-sm text-slate-700 mb-3">
+                  Necesito solicitar material adicional para las actividades de arte. Los niños han mostrado mucho interés y necesitamos más suministros como pintura, pinceles, papel de colores y plastilina. Adjunto la lista detallada y algunas fotos de los trabajos que han realizado.
+                </p>
+                <h4 class="font-medium mb-2">Archivos adjuntos:</h4>
+                <div class="flex gap-2 mb-3">
+                  <div class="flex items-center gap-2 px-3 py-2 bg-slate-100 rounded">
+                    <i data-lucide="file-text" class="w-4 h-4"></i>
+                    <span class="text-sm">lista_materiales.pdf</span>
+                    <button class="text-blue-600 hover:text-blue-800 text-xs">Ver</button>
+                  </div>
+                  <div class="flex items-center gap-2 px-3 py-2 bg-slate-100 rounded">
+                    <i data-lucide="image" class="w-4 h-4"></i>
+                    <span class="text-sm">trabajos_arte.jpg</span>
+                    <button class="text-blue-600 hover:text-blue-800 text-xs">Ver</button>
+                  </div>
+                </div>
+                <div class="flex gap-2">
+                  <button onclick="resolveReport(this)" class="px-3 py-2 bg-green-600 text-white rounded text-sm">Marcar como Resuelto</button>
+                  <button onclick="respondReport(this)" class="px-3 py-2 bg-blue-600 text-white rounded text-sm">Responder</button>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Reporte ejemplo 3 - Resuelto -->
+          <div class="bg-white rounded shadow p-4 border-l-4 border-green-500">
+            <div class="flex items-start justify-between mb-3">
+              <div>
+                <h3 class="font-semibold text-green-700">Queja - Horario de recogida</h3>
+                <p class="text-sm text-slate-600">
+                  <span class="font-medium">De:</span> Carlos Rodríguez (Padre de Luis Rodríguez) • 
+                  <span class="font-medium">Fecha:</span> 12 Dic 2024, 4:45 PM
+                </p>
+              </div>
+              <div class="flex gap-2">
+                <span class="px-2 py-1 bg-green-100 text-green-800 rounded-full text-xs">Resuelto</span>
+                <button onclick="toggleReportDetails(this)" class="text-blue-600 hover:text-blue-800 text-sm">Ver detalles</button>
+              </div>
+            </div>
+            <p class="text-sm text-slate-700 mb-3">
+              Tengo dificultades con el horario de recogida actual. Mi trabajo termina a las 5:30 PM y necesito flexibilidad...
+            </p>
+            <div class="report-details hidden">
+              <div class="border-t pt-3 mt-3">
+                <h4 class="font-medium mb-2">Mensaje completo:</h4>
+                <p class="text-sm text-slate-700 mb-3">
+                  Tengo dificultades con el horario de recogida actual. Mi trabajo termina a las 5:30 PM y necesito flexibilidad en el horario. ¿Es posible extender el horario hasta las 6:00 PM?
+                </p>
+                <h4 class="font-medium mb-2 text-green-700">Resolución:</h4>
+                <p class="text-sm text-green-700 mb-3">
+                  Se ha aprobado la extensión del horario hasta las 6:00 PM para casos especiales. Se ha actualizado el registro del estudiante.
+                </p>
+                <p class="text-xs text-slate-500">Resuelto por: Directora • 13 Dic 2024, 9:00 AM</p>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- PAGOS -->
+      <section id="pagos" class="section hidden">
+        <div class="flex items-center justify-between mb-4">
+          <h2 class="text-xl font-semibold flex items-center gap-2">
+            <i data-lucide="credit-card" class="w-5 h-5 text-slate-600"></i><span>Pagos</span>
+          </h2>
+          <div class="flex items-center gap-2">
+            <select id="paymentsClassFilter" class="px-3 py-2 border rounded">
+              <option value="Pequeños">Pequeños</option>
+              <option value="Medianos">Medianos</option>
+              <option value="Grandes">Grandes</option>
+            </select>
+            <button id="btnRecordatorioMasivo" class="btn btn-pink">Recordatorio masivo</button>
+            <button id="btnNuevoPago" class="btn btn-green">Registrar pago</button>
+          </div>
+        </div>
+        <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+          <div class="col-span-2 bg-white rounded shadow p-4">
+            <h3 class="font-semibold mb-3">Resumen</h3>
+            <div class="flex gap-3">
+              <span id="paymentsTotal" class="chip chip-blue">Total: 0</span>
+              <span id="paymentsPagados" class="chip chip-green">Pagados: 0</span>
+              <span id="paymentsPendientes" class="chip chip-orange">Pendientes: 0</span>
+            </div>
+            <canvas id="paymentsChart" height="120" class="mt-4"></canvas>
+          </div>
+          <div class="bg-white rounded shadow p-4">
+            <h3 class="font-semibold mb-3">Importe</h3>
+            <p id="paymentsAmount" class="text-lg font-semibold">$0.00</p>
+            <p class="text-xs text-slate-500">Suma de importes en la clase seleccionada.</p>
+          </div>
+        </div>
+        <div class="mt-6 bg-white rounded shadow p-4">
+          <h3 class="font-semibold mb-3">Listado</h3>
+          <table class="w-full text-sm">
+            <thead class="text-slate-500 text-left">
+              <tr><th>Estudiante</th><th>Aula</th><th>Mes</th><th>Monto</th><th>Estado</th><th>Acciones</th></tr>
+            </thead>
+            <tbody id="paymentsTable"></tbody>
+          </table>
+        </div>
+      </section>
+
+      <!-- COMUNICACION -->
+      <section id="comunicacion" class="section hidden">
+        <div class="flex items-center justify-between mb-4">
+          <h2 class="text-xl font-semibold flex items-center gap-2">
+            <i data-lucide="message-square" class="w-5 h-5 text-slate-600"></i><span>Comunicaciones</span>
+          </h2>
+          <div>
+            <button id="sendAnnouncement" class="px-3 py-2 bg-pink-600 text-white rounded">Enviar anuncio</button>
+          </div>
+        </div>
+        <div class="space-y-4">
+          <!-- Anuncio general -->
+          <div class="bg-white rounded shadow p-4">
+            <h3 class="text-sm font-semibold mb-2">Anuncio general</h3>
+            <textarea id="announcementText" class="w-full border rounded p-3" rows="4" placeholder="Escribe un comunicado para todos..."></textarea>
+            <div class="mt-3 flex justify-end">
+              <button class="px-3 py-2 bg-indigo-600 text-white rounded">Enviar a todos</button>
+            </div>
+          </div>
+          
+          <!-- Chat privado -->
+          <div class="bg-white rounded shadow p-4">
+            <h3 class="text-sm font-semibold mb-2">Mensajes privados</h3>
+            <div class="grid md:grid-cols-3 gap-3">
+              <div class="md:col-span-1 rounded-3xl bg-white p-3 border">
+                <input id="contactFilter" class="w-full border rounded-xl px-2 py-1 text-sm" placeholder="Filtrar contacto" />
+                <div id="contactList" class="mt-2 space-y-1 max-h-64 overflow-auto"></div>
+              </div>
+              <div class="md:col-span-2 rounded-3xl bg-white p-3 border flex flex-col">
+                <div id="chatHeader" class="text-sm font-semibold">Chat</div>
+                <div id="chatMessages" class="flex-1 mt-2 space-y-2 max-h-64 overflow-auto"></div>
+                <div id="typingIndicator" class="text-[11px] text-slate-500"></div>
+                <div class="mt-2 flex gap-2 items-center">
+                  <button id="chatEmoji" class="px-2 py-1 rounded bg-slate-100">😀</button>
+                  <input id="chatInput" class="flex-1 border rounded-xl px-2 py-1 text-sm" placeholder="Escribe un mensaje" />
+                  <button id="chatSend" class="text-sm px-3 py-2 rounded-xl bg-karpus-pink text-white">Enviar</button>
+                </div>
+                <div id="emojiMenu" class="hidden border rounded p-2"></div>
+              </div>
+            </div>
+          </div>
+          
+          <!-- Notificaciones -->
+          <div class="bg-white rounded shadow p-4">
+            <h3 class="text-sm font-semibold mb-2">Notificaciones programadas</h3>
+            <div class="space-y-2">
+              <div class="flex gap-3">
+                <input type="datetime-local" class="border rounded px-3 py-2 flex-1">
+                <select class="border rounded px-3 py-2">
+                  <option value="all">Todos</option>
+                  <option value="teachers">Maestros</option>
+                  <option value="parents">Padres</option>
+                </select>
+              </div>
+              <textarea class="w-full border rounded p-3" rows="2" placeholder="Texto de la notificación..."></textarea>
+              <div class="flex justify-end">
+                <button class="px-3 py-2 bg-green-600 text-white rounded">Programar</button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- CONFIGURACIÓN -->
+      <section id="configuracion" class="section hidden">
+        <div class="bg-white rounded shadow p-4">
+          <h2 class="text-xl font-semibold mb-3 flex items-center gap-2">
+            <i data-lucide="settings" class="w-5 h-5 text-slate-600"></i><span>Configuración</span>
+          </h2>
+          <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div>
+              <label class="text-sm">Nombre institución</label>
+              <input class="w-full border rounded px-3 py-2" value="Karpus Kids" />
+            </div>
+            <div>
+              <label class="text-sm">Correo de contacto</label>
+              <input class="w-full border rounded px-3 py-2" value="contacto@karpus.example" />
+            </div>
+          </div>
+        </div>
+      </section>
+
+    </main>
+  </div>
+
+  <!-- MODAL: Crear Maestro -->
+  <div id="modal" class="fixed inset-0 bg-black/40 hidden items-center justify-center">
+    <div class="bg-white rounded-lg p-6 w-full max-w-md">
+      <h3 class="font-semibold mb-3 flex items-center gap-2">
+        <i data-lucide="user-plus" class="w-5 h-5"></i>
+        Crear Maestro
+      </h3>
+      <div class="grid gap-3">
+        <div>
+          <label class="text-sm text-slate-600 block mb-1">Nombre completo</label>
+          <input id="tmName" placeholder="Ej: María González" class="w-full border rounded px-3 py-2" />
+        </div>
+        <div>
+          <label class="text-sm text-slate-600 block mb-1">Teléfono</label>
+          <input id="tmPhone" type="tel" placeholder="Ej: +57 300 123 4567" class="w-full border rounded px-3 py-2" />
+        </div>
+        <div>
+          <label class="text-sm text-slate-600 block mb-1">Correo electrónico</label>
+          <input id="tmEmail" type="email" placeholder="Ej: maria@karpus.com" class="w-full border rounded px-3 py-2" />
+        </div>
+        <div>
+          <label class="text-sm text-slate-600 block mb-1">Contraseña</label>
+          <input id="tmPassword" type="password" placeholder="Contraseña para acceder al panel" class="w-full border rounded px-3 py-2" />
+        </div>
+        <div class="flex justify-end gap-2 mt-3">
+          <button id="cancelModal" class="px-4 py-2 border rounded-lg hover:bg-slate-50">Cancelar</button>
+          <button id="saveModal" class="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700">Crear Maestro</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- MODAL: Crear/Editar Aula -->
+  <div id="roomModal" class="fixed inset-0 bg-black/40 hidden items-center justify-center">
+    <div class="bg-white rounded-lg p-6 w-full max-w-lg">
+      <h3 class="font-semibold mb-3 flex items-center gap-2">
+        <i data-lucide="home" class="w-5 h-5"></i>
+        <span id="roomModalTitle">Crear Aula</span>
+      </h3>
+      <div class="grid gap-3">
+        <div>
+          <label class="text-sm text-slate-600 block mb-1">Nombre del Aula</label>
+          <input id="roomName" placeholder="Ej: Aula Pequeños A1" class="w-full border rounded px-3 py-2" />
+        </div>
+        <div>
+          <label class="text-sm text-slate-600 block mb-1">Maestro Asignado</label>
+          <select id="roomTeacher" class="w-full border rounded px-3 py-2">
+            <option value="">Seleccionar maestro...</option>
+            <option value="Carolina Martínez">Carolina Martínez</option>
+            <option value="Andrés Pérez">Andrés Pérez</option>
+          </select>
+        </div>
+        <div>
+          <label class="text-sm text-slate-600 block mb-1">Capacidad Máxima</label>
+          <input id="roomCapacity" type="number" min="1" max="30" placeholder="Ej: 15" class="w-full border rounded px-3 py-2" />
+        </div>
+        <div>
+          <label class="text-sm text-slate-600 block mb-1">Estudiantes Asignados</label>
+          <div class="border rounded px-3 py-2 max-h-32 overflow-y-auto">
+            <input id="studentSearch" placeholder="Buscar estudiante por nombre..." class="w-full mb-2 text-sm" />
+            <div id="studentsList" class="space-y-1">
+              <!-- Lista de estudiantes con checkboxes -->
+              <label class="flex items-center gap-2 text-sm">
+                <input type="checkbox" value="María Pérez" />
+                <span>María Pérez</span>
+              </label>
+              <label class="flex items-center gap-2 text-sm">
+                <input type="checkbox" value="Juan García" />
+                <span>Juan García</span>
+              </label>
+              <label class="flex items-center gap-2 text-sm">
+                <input type="checkbox" value="Ana López" />
+                <span>Ana López</span>
+              </label>
+              <label class="flex items-center gap-2 text-sm">
+                <input type="checkbox" value="Carlos Rodríguez" />
+                <span>Carlos Rodríguez</span>
+              </label>
+              <label class="flex items-center gap-2 text-sm">
+                <input type="checkbox" value="Sofia Martín" />
+                <span>Sofia Martín</span>
+              </label>
+            </div>
+          </div>
+          <p class="text-xs text-slate-500 mt-1">Selecciona los estudiantes que pertenecerán a esta aula</p>
+        </div>
+        <div class="flex justify-end gap-2 mt-3">
+          <button id="cancelRoomModal" class="px-4 py-2 border rounded-lg hover:bg-slate-50">Cancelar</button>
+          <button id="saveRoomModal" class="px-4 py-2 bg-yellow-600 text-white rounded-lg hover:bg-yellow-700">Guardar Aula</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal Perfil del Estudiante -->
+  <div id="studentProfileModal" class="fixed inset-0 bg-black bg-opacity-50 hidden flex items-center justify-center z-50">
+    <div class="bg-white rounded-lg shadow-xl max-w-2xl w-full mx-4 max-h-[90vh] overflow-y-auto">
+      <div class="p-6">
+        <div class="flex items-center justify-between mb-6">
+          <h3 class="text-xl font-semibold text-slate-800">Perfil del Estudiante</h3>
+          <button id="closeStudentProfileModal" class="text-slate-400 hover:text-slate-600">
+            <i data-lucide="x" class="w-6 h-6"></i>
+          </button>
+        </div>
+        
+        <!-- Información del Estudiante -->
+        <div class="mb-6">
+          <div class="flex items-center gap-4 mb-4">
+            <div class="w-16 h-16 bg-indigo-100 rounded-full flex items-center justify-center">
+              <i data-lucide="user" class="w-8 h-8 text-indigo-600"></i>
+            </div>
+            <div>
+              <h4 id="studentProfileName" class="text-lg font-semibold text-slate-800">Nombre del Estudiante</h4>
+              <p class="text-sm text-slate-600">Estudiante activo</p>
+            </div>
+          </div>
+        </div>
+
+        <!-- Datos de los Padres -->
+        <div class="space-y-6">
+          <div>
+            <h5 class="text-lg font-medium text-slate-800 mb-4 flex items-center gap-2">
+              <i data-lucide="users" class="w-5 h-5 text-slate-600"></i>
+              Información de los Padres
+            </h5>
+            
+            <!-- Padre/Madre 1 -->
+            <div class="bg-slate-50 rounded-lg p-4 mb-4">
+              <h6 class="font-medium text-slate-700 mb-3">Padre/Madre Principal</h6>
+              <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <label class="text-sm text-slate-600 block mb-1">Nombre Completo</label>
+                  <p id="parent1Name" class="text-sm font-medium text-slate-800">Ana María Pérez González</p>
+                </div>
+                <div>
+                  <label class="text-sm text-slate-600 block mb-1">Teléfono</label>
+                  <p id="parent1Phone" class="text-sm font-medium text-slate-800">+57 300 123 4567</p>
+                </div>
+                <div>
+                  <label class="text-sm text-slate-600 block mb-1">Correo Electrónico</label>
+                  <p id="parent1Email" class="text-sm font-medium text-slate-800">ana.perez@email.com</p>
+                </div>
+                <div>
+                  <label class="text-sm text-slate-600 block mb-1">Ocupación</label>
+                  <p id="parent1Job" class="text-sm font-medium text-slate-800">Ingeniera de Sistemas</p>
+                </div>
+                <div>
+                  <label class="text-sm text-slate-600 block mb-1">Dirección</label>
+                  <p id="parent1Address" class="text-sm font-medium text-slate-800">Calle 123 #45-67, Bogotá</p>
+                </div>
+                <div>
+                  <label class="text-sm text-slate-600 block mb-1">Contacto de Emergencia</label>
+                  <p id="parent1Emergency" class="text-sm font-medium text-slate-800">+57 301 987 6543</p>
+                </div>
+              </div>
+            </div>
+
+            <!-- Padre/Madre 2 -->
+            <div class="bg-slate-50 rounded-lg p-4">
+              <h6 class="font-medium text-slate-700 mb-3">Padre/Madre Secundario</h6>
+              <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <label class="text-sm text-slate-600 block mb-1">Nombre Completo</label>
+                  <p id="parent2Name" class="text-sm font-medium text-slate-800">Carlos Eduardo Pérez</p>
+                </div>
+                <div>
+                  <label class="text-sm text-slate-600 block mb-1">Teléfono</label>
+                  <p id="parent2Phone" class="text-sm font-medium text-slate-800">+57 310 456 7890</p>
+                </div>
+                <div>
+                  <label class="text-sm text-slate-600 block mb-1">Correo Electrónico</label>
+                  <p id="parent2Email" class="text-sm font-medium text-slate-800">carlos.perez@email.com</p>
+                </div>
+                <div>
+                  <label class="text-sm text-slate-600 block mb-1">Ocupación</label>
+                  <p id="parent2Job" class="text-sm font-medium text-slate-800">Contador Público</p>
+                </div>
+                <div>
+                  <label class="text-sm text-slate-600 block mb-1">Dirección</label>
+                  <p id="parent2Address" class="text-sm font-medium text-slate-800">Calle 123 #45-67, Bogotá</p>
+                </div>
+                <div>
+                  <label class="text-sm text-slate-600 block mb-1">Contacto de Emergencia</label>
+                  <p id="parent2Emergency" class="text-sm font-medium text-slate-800">+57 320 111 2233</p>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Información Adicional -->
+          <div class="bg-blue-50 rounded-lg p-4">
+            <h6 class="font-medium text-blue-800 mb-3 flex items-center gap-2">
+              <i data-lucide="info" class="w-4 h-4"></i>
+              Información Adicional
+            </h6>
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div>
+                <label class="text-sm text-blue-700 block mb-1">Aula Asignada</label>
+                <p id="studentRoom" class="text-sm font-medium text-blue-800">Aula Pequeños A1</p>
+              </div>
+              <div>
+                <label class="text-sm text-blue-700 block mb-1">Fecha de Ingreso</label>
+                <p id="studentStartDate" class="text-sm font-medium text-blue-800">15 de Febrero, 2024</p>
+              </div>
+              <div>
+                <label class="text-sm text-blue-700 block mb-1">Alergias/Condiciones</label>
+                <p id="studentAllergies" class="text-sm font-medium text-blue-800">Ninguna conocida</p>
+              </div>
+              <div>
+                <label class="text-sm text-blue-700 block mb-1">Autorizado para Recoger</label>
+                <p id="studentPickup" class="text-sm font-medium text-blue-800">Padres y Abuela Materna</p>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="flex justify-end gap-2 mt-6">
+          <button id="editStudentProfile" class="px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700">
+            Editar Información
+          </button>
+          <button id="closeStudentProfile" class="px-4 py-2 border rounded-lg hover:bg-slate-50">
+            Cerrar
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    // Init lucide icons
+    document.addEventListener('DOMContentLoaded', ()=>{ 
+      if(window.lucide && typeof lucide.createIcons === 'function') {
+        lucide.createIcons();
+      }
+    });
+
+    // Toggle sidebar collapse
+    let isSidebarCollapsed = false;
+    document.getElementById('toggleSidebar')?.addEventListener('click', ()=>{
+      const sb = document.getElementById('sidebar');
+      if(sb) {
+        isSidebarCollapsed = !isSidebarCollapsed;
+        sb.classList.toggle('collapsed', isSidebarCollapsed);
+      }
+    });
+
+    // Sistema de color eliminado: sidebar usa estilo único
+
+    // Navegación de secciones (activo visual y cierre en móvil)
+    const navButtons = Array.from(document.querySelectorAll('[data-section]'));
+    navButtons.forEach(btn=>{
+      btn.addEventListener('click', ()=>{
+        const target = btn.getAttribute('data-section');
+        // ocultar todas las secciones
+        document.querySelectorAll('.section').forEach(s=> s.classList.add('hidden'));
+        // estado activo visual del botón
+        navButtons.forEach(b=> b.classList.remove('bg-white/20'));
+        btn.classList.add('bg-white/20');
+        // mostrar sección seleccionada
+        const el = document.getElementById(target);
+        if(el) el.classList.remove('hidden');
+        // cerrar sidebar en móvil
+        const sb = document.getElementById('sidebar');
+        if(window.innerWidth < 768 && sb) sb.classList.add('hidden');
+      });
+    });
+    // estado inicial activo
+    const initialBtn = document.querySelector('[data-section="dashboard"]');
+    if(initialBtn) initialBtn.classList.add('bg-white/20');
+
+    // Mobile menu
+    document.getElementById('menuBtn')?.addEventListener('click', ()=>{
+      const sb = document.getElementById('sidebar');
+      if(sb) sb.classList.toggle('hidden');
+    });
+
+    // Modal maestro
+    const modal = document.getElementById('modal');
+    document.getElementById('addTeacher')?.addEventListener('click', ()=> modal.classList.remove('hidden'));
+    document.getElementById('nuevoMaestroBtn')?.addEventListener('click', ()=> modal.classList.remove('hidden'));
+    document.getElementById('cancelModal')?.addEventListener('click', ()=> {
+      modal.classList.add('hidden');
+      // Limpiar campos
+      document.getElementById('tmName').value = '';
+      document.getElementById('tmPhone').value = '';
+      document.getElementById('tmEmail').value = '';
+      document.getElementById('tmPassword').value = '';
+    });
+    document.getElementById('saveModal')?.addEventListener('click', ()=>{
+      const name = document.getElementById('tmName').value.trim();
+      const phone = document.getElementById('tmPhone').value.trim();
+      const email = document.getElementById('tmEmail').value.trim();
+      const password = document.getElementById('tmPassword').value.trim();
+      
+      // Validaciones básicas
+      if(!name || !phone || !email || !password) {
+        alert('Por favor complete todos los campos');
+        return;
+      }
+      
+      if(!email.includes('@')) {
+        alert('Por favor ingrese un correo válido');
+        return;
+      }
+      
+      if(password.length < 6) {
+        alert('La contraseña debe tener al menos 6 caracteres');
+        return;
+      }
+      
+      // Crear fila en la tabla
+      const tr = document.createElement('tr');
+      tr.innerHTML = `
+        <td class="py-2">${name}</td>
+        <td class="py-2">${email}</td>
+        <td class="py-2">${phone}</td>
+        <td class="py-2"><span class="px-2 py-1 bg-green-100 text-green-800 rounded-full text-xs">Activo</span></td>
+        <td class="py-2">
+          <button class="text-blue-600 hover:text-blue-800 mr-2" onclick="editTeacher(this)">Editar</button>
+          <button class="text-red-600 hover:text-red-800" onclick="deleteTeacher(this)">Eliminar</button>
+        </td>
+      `;
+      document.getElementById('teachersTable').appendChild(tr);
+      
+      // Limpiar y cerrar modal
+      modal.classList.add('hidden');
+      document.getElementById('tmName').value = '';
+      document.getElementById('tmPhone').value = '';
+      document.getElementById('tmEmail').value = '';
+      document.getElementById('tmPassword').value = '';
+      
+      alert(`Maestro ${name} creado exitosamente. Credenciales: ${email} / ${password}`);
+    });
+
+    // Funciones para editar y eliminar maestros
+    window.editTeacher = function(button) {
+      const row = button.closest('tr');
+      const cells = row.querySelectorAll('td');
+      const name = cells[0].textContent;
+      const email = cells[1].textContent;
+      const phone = cells[2].textContent;
+      
+      // Llenar el modal con los datos actuales
+      document.getElementById('tmName').value = name;
+      document.getElementById('tmEmail').value = email;
+      document.getElementById('tmPhone').value = phone;
+      document.getElementById('tmPassword').value = '';
+      
+      // Mostrar modal
+      document.getElementById('teacherModal').classList.remove('hidden');
+      
+      // Cambiar el comportamiento del botón guardar para edición
+      const saveBtn = document.getElementById('saveTeacher');
+      saveBtn.onclick = function() {
+        const newName = document.getElementById('tmName').value.trim();
+        const newEmail = document.getElementById('tmEmail').value.trim();
+        const newPhone = document.getElementById('tmPhone').value.trim();
+        const newPassword = document.getElementById('tmPassword').value.trim();
+        
+        if(!newName || !newEmail || !newPhone) {
+          alert('Por favor complete todos los campos obligatorios');
+          return;
+        }
+        
+        // Actualizar la fila
+        cells[0].textContent = newName;
+        cells[1].textContent = newEmail;
+        cells[2].textContent = newPhone;
+        
+        // Cerrar modal y limpiar
+        document.getElementById('teacherModal').classList.add('hidden');
+        document.getElementById('tmName').value = '';
+        document.getElementById('tmPhone').value = '';
+        document.getElementById('tmEmail').value = '';
+        document.getElementById('tmPassword').value = '';
+        
+        alert('Maestro actualizado exitosamente');
+      };
+    };
+
+    window.deleteTeacher = function(button) {
+      const row = button.closest('tr');
+      const teacherName = row.querySelector('td').textContent;
+      
+      if(confirm(`¿Está seguro de eliminar al maestro ${teacherName}?`)) {
+        row.remove();
+        alert('Maestro eliminado exitosamente');
+      }
+    };
+
+    // FUNCIONES PARA AULAS
+    // Abrir modal de crear aula
+    document.getElementById('addRoomBtn').addEventListener('click', function() {
+      document.getElementById('roomModalTitle').textContent = 'Crear Aula';
+      document.getElementById('roomModal').classList.remove('hidden');
+      clearRoomModal();
+    });
+
+    // Cerrar modal de aula
+    document.getElementById('cancelRoomModal').addEventListener('click', function() {
+      document.getElementById('roomModal').classList.add('hidden');
+      clearRoomModal();
+    });
+
+    // Guardar aula
+    document.getElementById('saveRoomModal').addEventListener('click', function() {
+      const name = document.getElementById('roomName').value.trim();
+      const teacher = document.getElementById('roomTeacher').value;
+      const capacity = document.getElementById('roomCapacity').value;
+      const selectedStudents = Array.from(document.querySelectorAll('#studentsList input[type="checkbox"]:checked'))
+        .map(cb => cb.value);
+      
+      if(!name || !teacher || !capacity) {
+        alert('Por favor complete todos los campos obligatorios');
+        return;
+      }
+      
+      if(capacity < 1 || capacity > 30) {
+        alert('La capacidad debe estar entre 1 y 30 estudiantes');
+        return;
+      }
+      
+      if(selectedStudents.length > capacity) {
+        alert(`No puede asignar más estudiantes (${selectedStudents.length}) que la capacidad del aula (${capacity})`);
+        return;
+      }
+      
+      // Crear fila en la tabla
+      const tr = document.createElement('tr');
+      tr.innerHTML = `
+        <td class="py-2 font-medium">${name}</td>
+        <td class="py-2">${teacher}</td>
+        <td class="py-2">${capacity}</td>
+        <td class="py-2">${selectedStudents.length}/${capacity}</td>
+        <td class="py-2"><span class="px-2 py-1 bg-green-100 text-green-800 rounded-full text-xs">Activa</span></td>
+        <td class="py-2">
+          <button class="text-blue-600 hover:text-blue-800 mr-2" onclick="editRoom(this)">Editar</button>
+          <button class="text-green-600 hover:text-green-800 mr-2" onclick="viewRoomStudents(this)">Ver Estudiantes</button>
+          <button class="text-red-600 hover:text-red-800" onclick="deleteRoom(this)">Eliminar</button>
+        </td>
+      `;
+      tr.dataset.students = JSON.stringify(selectedStudents);
+      document.getElementById('roomsTable').appendChild(tr);
+      
+      // Cerrar modal y limpiar
+      document.getElementById('roomModal').classList.add('hidden');
+      clearRoomModal();
+      
+      alert(`Aula "${name}" creada exitosamente con ${selectedStudents.length} estudiantes asignados`);
+    });
+
+    // Filtro de estudiantes en el modal
+    document.getElementById('studentSearch').addEventListener('input', function() {
+      const searchTerm = this.value.toLowerCase();
+      const studentLabels = document.querySelectorAll('#studentsList label');
+      
+      studentLabels.forEach(label => {
+        const studentName = label.querySelector('span').textContent.toLowerCase();
+        if(studentName.includes(searchTerm)) {
+          label.style.display = 'flex';
+        } else {
+          label.style.display = 'none';
+        }
+      });
+    });
+
+    // Funciones para manejar aulas
+    window.editRoom = function(button) {
+      const row = button.closest('tr');
+      const cells = row.querySelectorAll('td');
+      const name = cells[0].textContent;
+      const teacher = cells[1].textContent;
+      const capacity = cells[2].textContent;
+      const students = JSON.parse(row.dataset.students || '[]');
+      
+      // Llenar el modal con los datos actuales
+      document.getElementById('roomName').value = name;
+      document.getElementById('roomTeacher').value = teacher;
+      document.getElementById('roomCapacity').value = capacity;
+      
+      // Marcar estudiantes seleccionados
+      document.querySelectorAll('#studentsList input[type="checkbox"]').forEach(cb => {
+        cb.checked = students.includes(cb.value);
+      });
+      
+      document.getElementById('roomModalTitle').textContent = 'Editar Aula';
+      document.getElementById('roomModal').classList.remove('hidden');
+    };
+
+    window.viewRoomStudents = function(button) {
+      const row = button.closest('tr');
+      const roomName = row.querySelector('td').textContent;
+      const students = JSON.parse(row.dataset.students || '[]');
+      
+      if(students.length === 0) {
+        alert(`El aula "${roomName}" no tiene estudiantes asignados`);
+      } else {
+        alert(`Estudiantes en "${roomName}":\n\n${students.join('\n')}`);
+      }
+    };
+
+    window.deleteRoom = function(button) {
+      const row = button.closest('tr');
+      const roomName = row.querySelector('td').textContent;
+      
+      if(confirm(`¿Está seguro de eliminar el aula "${roomName}"?`)) {
+        row.remove();
+        alert('Aula eliminada exitosamente');
+      }
+    };
+
+    function clearRoomModal() {
+      document.getElementById('roomName').value = '';
+      document.getElementById('roomTeacher').value = '';
+      document.getElementById('roomCapacity').value = '';
+      document.getElementById('studentSearch').value = '';
+      document.querySelectorAll('#studentsList input[type="checkbox"]').forEach(cb => {
+        cb.checked = false;
+      });
+      document.querySelectorAll('#studentsList label').forEach(label => {
+        label.style.display = 'flex';
+      });
+    }
+
+    // Initialize charts
+    const ctx = document.getElementById('attendanceChart')?.getContext('2d');
+    if(ctx){
+      new Chart(ctx, {
+        type: 'bar',
+        data: {
+          labels: ['Pequeños', 'Medianos', 'Grandes', 'Bebés', 'Especial'],
+          datasets: [
+            {
+              label: 'Asistencia',
+              data: [0.92, 0.89, 0.94, 0.88, 0.91],
+              backgroundColor: '#4CAF50',
+              borderRadius: 6
+            },
+            {
+              label: 'Participación',
+              data: [0.88, 0.85, 0.89, 0.82, 0.87],
+              backgroundColor: '#2196F3',
+              borderRadius: 6
+            }
+          ]
+        },
+        options: { 
+          responsive: true, 
+          scales: {
+            y: { 
+              beginAtZero: true,
+              max: 1,
+              ticks: {
+                callback: value => value * 100 + '%'
+              }
+            }
+          },
+          plugins: {
+            legend: { display: true, position: 'top' }
+          } 
+        }
+      });
+    }
+
+    // FUNCIONES PARA REPORTES Y QUEJAS
+    // Alternar detalles de reporte
+    window.toggleReportDetails = function(button) {
+      const reportCard = button.closest('.bg-white');
+      const details = reportCard.querySelector('.report-details');
+      
+      if (details.classList.contains('hidden')) {
+        details.classList.remove('hidden');
+        button.textContent = 'Ocultar detalles';
+      } else {
+        details.classList.add('hidden');
+        button.textContent = 'Ver detalles';
+      }
+    };
+
+    // Resolver reporte
+    window.resolveReport = function(button) {
+      const reportCard = button.closest('.bg-white');
+      const statusBadge = reportCard.querySelector('.px-2.py-1');
+      const borderColor = reportCard.classList;
+      
+      if (confirm('¿Está seguro de marcar este reporte como resuelto?')) {
+        // Cambiar estado visual
+        statusBadge.className = 'px-2 py-1 bg-green-100 text-green-800 rounded-full text-xs';
+        statusBadge.textContent = 'Resuelto';
+        
+        // Cambiar color del borde
+        borderColor.remove('border-red-500', 'border-yellow-500');
+        borderColor.add('border-green-500');
+        
+        // Cambiar color del título
+        const title = reportCard.querySelector('h3');
+        title.className = 'font-semibold text-green-700';
+        
+        // Agregar información de resolución
+        const details = reportCard.querySelector('.report-details .border-t');
+        const resolutionInfo = document.createElement('div');
+        resolutionInfo.innerHTML = `
+          <h4 class="font-medium mb-2 text-green-700">Resolución:</h4>
+          <p class="text-sm text-green-700 mb-3">
+            Reporte marcado como resuelto por la directora.
+          </p>
+          <p class="text-xs text-slate-500">Resuelto por: Directora • ${new Date().toLocaleDateString('es-ES')} ${new Date().toLocaleTimeString('es-ES', {hour: '2-digit', minute: '2-digit'})}</p>
+        `;
+        details.appendChild(resolutionInfo);
+        
+        // Ocultar botones de acción
+        button.parentElement.style.display = 'none';
+        
+        alert('Reporte marcado como resuelto exitosamente');
+      }
+    };
+
+    // Responder a reporte
+    window.respondReport = function(button) {
+      const reportCard = button.closest('.bg-white');
+      const title = reportCard.querySelector('h3').textContent;
+      
+      const response = prompt(`Escriba su respuesta al reporte: "${title}"`);
+      if (response && response.trim()) {
+        // Agregar respuesta al reporte
+        const details = reportCard.querySelector('.report-details .border-t');
+        const responseDiv = document.createElement('div');
+        responseDiv.innerHTML = `
+          <h4 class="font-medium mb-2 text-blue-700">Respuesta de la Directora:</h4>
+          <p class="text-sm text-blue-700 mb-3">${response}</p>
+          <p class="text-xs text-slate-500">Respondido: ${new Date().toLocaleDateString('es-ES')} ${new Date().toLocaleTimeString('es-ES', {hour: '2-digit', minute: '2-digit'})}</p>
+        `;
+        details.appendChild(responseDiv);
+        
+        alert('Respuesta enviada exitosamente');
+      }
+    };
+
+    // Filtrar reportes
+    document.getElementById('reportFilter')?.addEventListener('change', function() {
+      const filterValue = this.value;
+      const reports = document.querySelectorAll('#reportes .space-y-4 > div');
+      
+      reports.forEach(report => {
+        const statusBadge = report.querySelector('.px-2.py-1');
+        const statusText = statusBadge.textContent.toLowerCase();
+        const fromText = report.querySelector('.text-sm.text-slate-600').textContent.toLowerCase();
+        
+        let shouldShow = true;
+        
+        switch(filterValue) {
+          case 'pending':
+            shouldShow = statusText.includes('pendiente');
+            break;
+          case 'resolved':
+            shouldShow = statusText.includes('resuelto');
+            break;
+          case 'teachers':
+            shouldShow = fromText.includes('maestra') || fromText.includes('maestro');
+            break;
+          case 'parents':
+            shouldShow = fromText.includes('madre') || fromText.includes('padre');
+            break;
+          case 'all':
+          default:
+            shouldShow = true;
+            break;
+        }
+        
+        report.style.display = shouldShow ? 'block' : 'none';
+      });
+    });
+
+    // Actualizar reportes
+    document.getElementById('refreshReports')?.addEventListener('click', function() {
+      // Simular actualización
+      this.textContent = 'Actualizando...';
+      this.disabled = true;
+      
+      setTimeout(() => {
+        this.textContent = 'Actualizar';
+        this.disabled = false;
+        alert('Reportes actualizados (simulado)');
+      }, 1500);
+    });
+
+    // Exportar (simulación)
+    document.getElementById('exportBtn')?.addEventListener('click', ()=> alert('Función de exportar: conectar con backend / generar CSV o PDF.'));
+
+    // Enviar anuncio
+    document.getElementById('sendAnnouncement')?.addEventListener('click', ()=>{
+      const t = document.getElementById('announcementText').value;
+      if(t.trim()==='') return alert('Escribe un anuncio antes.');
+      alert('Anuncio enviado (simulado)');
+      document.getElementById('announcementText').value='';
+    });
+
+    // ==========================
+    // Estudiantes: perfil y tabla
+    // ==========================
+    const studentParentData = {
+      'María Fernanda Pérez': {
+        parent1: { name: 'Ana María Pérez González', phone: '+57 300 123 4567', email: 'ana.perez@email.com', job: 'Ingeniera de Sistemas', address: 'Calle 123 #45-67, Bogotá', emergency: '+57 301 987 6543' },
+        parent2: { name: 'Carlos Eduardo Pérez', phone: '+57 310 456 7890', email: 'carlos.perez@email.com', job: 'Contador Público', address: 'Calle 123 #45-67, Bogotá', emergency: '+57 320 111 2233' },
+        extra: { room: 'Aula Pequeños A1', startDate: '15 de Febrero, 2024', allergies: 'Ninguna conocida', pickup: 'Padres y Abuela Materna' }
+      },
+      'Javier Alejandro Rodríguez': {
+        parent1: { name: 'María Teresa Rodríguez', phone: '+57 302 111 2233', email: 'maria.rodriguez@email.com', job: 'Docente', address: 'Cra 45 #10-20, Bogotá', emergency: '+57 300 987 0011' },
+        parent2: { name: 'Eduardo Rodríguez', phone: '+57 315 555 6677', email: 'edu.rodriguez@email.com', job: 'Técnico Electricista', address: 'Cra 45 #10-20, Bogotá', emergency: '+57 310 222 3344' },
+        extra: { room: 'Aula Pequeños A2', startDate: '10 de Marzo, 2024', allergies: 'Alergia leve al polvo', pickup: 'Padres' }
+      },
+      'Ana Sofía González': {
+        parent1: { name: 'Laura González', phone: '+57 320 000 1122', email: 'laura.gonzalez@email.com', job: 'Arquitecta', address: 'Av. 7 #23-90, Bogotá', emergency: '+57 311 222 3345' },
+        parent2: { name: 'Marco González', phone: '+57 321 777 8899', email: 'marco.gonzalez@email.com', job: 'Diseñador', address: 'Av. 7 #23-90, Bogotá', emergency: '+57 321 555 6677' },
+        extra: { room: 'Aula Pequeños A1', startDate: '1 de Abril, 2024', allergies: 'Intolerancia a lactosa', pickup: 'Padres y Tía' }
+      },
+      'Carlos Eduardo Martínez': {
+        parent1: { name: 'Patricia Martínez', phone: '+57 312 333 4455', email: 'patricia.martinez@email.com', job: 'Odontóloga', address: 'Calle 9 #30-12, Bogotá', emergency: '+57 313 444 5566' },
+        parent2: { name: 'Ricardo Martínez', phone: '+57 314 666 7788', email: 'ricardo.martinez@email.com', job: 'Administrador', address: 'Calle 9 #30-12, Bogotá', emergency: '+57 314 999 0001' },
+        extra: { room: 'Aula Pequeños A3', startDate: '20 de Enero, 2024', allergies: 'Ninguna', pickup: 'Padres' }
+      }
+    };
+
+    function openStudentProfile(name) {
+      const modal = document.getElementById('studentProfileModal');
+      const data = studentParentData[name] || null;
+
+      document.getElementById('studentProfileName').textContent = name;
+
+      // Rellenar datos si existen, de lo contrario valores por defecto
+      const safe = (val, def='No registrado') => (val && String(val).trim()) ? val : def;
+
+      const p1 = data?.parent1 || {};
+      const p2 = data?.parent2 || {};
+      const ex = data?.extra   || {};
+
+      document.getElementById('parent1Name').textContent = safe(p1.name);
+      document.getElementById('parent1Phone').textContent = safe(p1.phone);
+      document.getElementById('parent1Email').textContent = safe(p1.email);
+      document.getElementById('parent1Job').textContent = safe(p1.job);
+      document.getElementById('parent1Address').textContent = safe(p1.address);
+      document.getElementById('parent1Emergency').textContent = safe(p1.emergency);
+
+      document.getElementById('parent2Name').textContent = safe(p2.name);
+      document.getElementById('parent2Phone').textContent = safe(p2.phone);
+      document.getElementById('parent2Email').textContent = safe(p2.email);
+      document.getElementById('parent2Job').textContent = safe(p2.job);
+      document.getElementById('parent2Address').textContent = safe(p2.address);
+      document.getElementById('parent2Emergency').textContent = safe(p2.emergency);
+
+      document.getElementById('studentRoom').textContent = safe(ex.room);
+      document.getElementById('studentStartDate').textContent = safe(ex.startDate);
+      document.getElementById('studentAllergies').textContent = safe(ex.allergies);
+      document.getElementById('studentPickup').textContent = safe(ex.pickup);
+
+      modal.classList.remove('hidden');
+      // Render icons in modal
+      if(window.lucide && typeof lucide.createIcons === 'function') {
+        lucide.createIcons();
+      }
+    }
+
+    window.viewStudentProfile = function(button) {
+      const row = button.closest('tr');
+      const nameEl = row.querySelector('td .font-medium');
+      const name = nameEl ? nameEl.textContent.trim() : 'Estudiante';
+      openStudentProfile(name);
+    };
+
+    // Cerrar modal de perfil
+    document.getElementById('closeStudentProfile')?.addEventListener('click', ()=>{
+      document.getElementById('studentProfileModal').classList.add('hidden');
+    });
+    document.getElementById('closeStudentProfileModal')?.addEventListener('click', ()=>{
+      document.getElementById('studentProfileModal').classList.add('hidden');
+    });
+
+    // Búsqueda de estudiantes por nombre
+    document.getElementById('searchStudent')?.addEventListener('input', function(){
+      const q = this.value.toLowerCase();
+      const rows = document.querySelectorAll('#studentsTable tr');
+      rows.forEach(r => {
+        const name = r.querySelector('.font-medium')?.textContent.toLowerCase() || '';
+        r.style.display = name.includes(q) ? '' : 'none';
+      });
+    });
+
+    // Agregar estudiante (solo nombre en la tabla)
+    document.getElementById('addStudentBtn')?.addEventListener('click', ()=>{
+      const name = prompt('Nombre completo del estudiante:');
+      if(!name || !name.trim()) return;
+
+      const tr = document.createElement('tr');
+      tr.className = 'hover:bg-slate-50';
+      tr.innerHTML = `
+        <td class="py-4 px-4">
+          <div class="flex items-center gap-3">
+            <div class="w-8 h-8 bg-slate-100 rounded-full flex items-center justify-center">
+              <i data-lucide="user" class="w-4 h-4 text-slate-600"></i>
+            </div>
+            <span class="font-medium text-slate-800">${name.trim()}</span>
+          </div>
+        </td>
+        <td class="py-4 px-4 text-center">
+          <button onclick="viewStudentProfile(this)" class="px-3 py-1 bg-blue-100 text-blue-700 rounded-lg hover:bg-blue-200 text-sm font-medium">Ver Perfil</button>
+        </td>
+      `;
+      document.getElementById('studentsTable').appendChild(tr);
+
+      // Render icon for new row
+      if(window.lucide && typeof lucide.createIcons === 'function') {
+        lucide.createIcons();
+      }
+
+      alert(`Estudiante "${name.trim()}" agregado a la lista.`);
+    });
+
+    // Inicial: mostrar dashboard
+    document.getElementById('dashboard').classList.remove('hidden');
+  </script>
+  <script src="js/store.js?v=2"></script>
+</body>
+</html>
