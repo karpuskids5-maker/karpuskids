@@ -1,0 +1,326 @@
+:root {
+  /* Official Karpus Kids color palette */
+  --color-primary: #FF8C00; /* Naranja Brillante */
+  --color-secondary: #7CFC00; /* Verde Lima */
+  --color-accent: #FF69B4; /* Rosa Chicle */
+  --color-info: #00CED1; /* Azul Celeste */
+  --color-warning: #FFD700; /* Amarillo Brillante */
+  --color-background: #FFFFFF; /* Blanco */
+  --color-text-base: #000000; /* Negro */
+  --color-text-muted: #6B7280; /* Gris */
+  --color-border: #E5E7EB; /* Gris Claro */
+
+  /* Gradients */
+  --gradient-primary: linear-gradient(135deg, var(--color-primary), var(--color-accent));
+  --gradient-secondary: linear-gradient(135deg, var(--color-secondary), var(--color-info));
+}
+
+/* Base body styles */
+body {
+  font-family: 'Nunito', sans-serif;
+  background-color: #F9FAFB; /* Un gris muy claro para el fondo */
+  color: var(--color-text-base);
+}
+
+/* --- Botones --- */
+.btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.625rem 1.25rem; /* 10px 20px */
+  border-radius: 0.75rem; /* 12px */
+  font-weight: 600;
+  font-size: 0.875rem; /* 14px */
+  border: none;
+  cursor: pointer;
+  transition: all 0.2s ease-in-out;
+  box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.btn:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 7px 10px rgba(0,0,0,0.15);
+}
+
+.btn:active {
+  transform: translateY(0);
+  box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+}
+
+/* Primary Button (Naranja) */
+.btn-primary {
+  background-color: var(--color-primary);
+  color: var(--color-background);
+}
+.btn-primary:hover {
+  background-color: #FF7000;
+}
+
+/* Secondary Button (Verde) */
+.btn-secondary {
+  background-color: var(--color-secondary);
+  color: var(--color-text-base);
+}
+.btn-secondary:hover {
+  background-color: #6BEA00;
+}
+
+/* Accent Button (Rosa) */
+.btn-accent {
+  background-color: var(--color-accent);
+  color: var(--color-background);
+}
+.btn-accent:hover {
+  background-color: #FF50A0;
+}
+
+/* Info Button (Azul) */
+.btn-info {
+  background-color: var(--color-info);
+  color: var(--color-background);
+}
+.btn-info:hover {
+  background-color: #00BABC;
+}
+
+/* Outline/Secondary action button */
+.btn-outline {
+  background-color: transparent;
+  color: var(--color-primary);
+  border: 2px solid var(--color-primary);
+  box-shadow: none;
+}
+.btn-outline:hover {
+  background-color: var(--color-primary);
+  color: var(--color-background);
+  box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+}
+
+
+/* --- Tarjetas (Cards) --- */
+.card {
+  background-color: var(--color-background);
+  border-radius: 1rem; /* 16px */
+  box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.07), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
+  border: 1px solid var(--color-border);
+  overflow: hidden;
+}
+
+.card-header {
+  padding: 1.25rem 1.5rem; /* 20px 24px */
+  border-bottom: 1px solid var(--color-border);
+  font-size: 1.125rem; /* 18px */
+  font-weight: 700;
+}
+
+.card-body {
+  padding: 1.5rem; /* 24px */
+}
+
+.card-footer {
+  padding: 1.25rem 1.5rem;
+  border-top: 1px solid var(--color-border);
+  background-color: #F9FAFB;
+}
+
+/* --- Badges/Chips --- */
+.badge {
+  display: inline-block;
+  padding: 0.25rem 0.75rem; /* 4px 12px */
+  border-radius: 9999px;
+  font-size: 0.75rem; /* 12px */
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.badge-primary { background-color: #FFE8CC; color: #E56A00; }
+.badge-secondary { background-color: #E4FCCF; color: #4D8B00; }
+.badge-accent { background-color: #FFDDF0; color: #D4007B; }
+.badge-info { background-color: #D4F8F8; color: #00898B; }
+.badge-success { background-color: #D1FAE5; color: #065F46; }
+.badge-warning { background-color: #FEF3C7; color: #92400E; }
+.badge-danger { background-color: #FEE2E2; color: #991B1B; }
+
+
+/* --- Sidebar --- */
+#sidebar {
+  width: 280px;
+  transition: width 0.3s ease;
+  background: var(--gradient-secondary);
+  color: var(--color-text-base);
+  padding: 1rem;
+  border-radius: 0 1.5rem 1.5rem 0; /* 0 24px 24px 0 */
+  box-shadow: 0 10px 25px rgba(0,0,0,0.1);
+}
+
+#sidebar.collapsed {
+  width: 80px;
+}
+
+#sidebar .sidebar-header {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem; /* 12px */
+  margin-bottom: 1.5rem; /* 24px */
+}
+
+#sidebar .sidebar-logo {
+  flex-shrink: 0;
+  width: 48px;
+  height: 48px;
+  border-radius: 0.75rem;
+  background-color: rgba(255,255,255,0.3);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+#sidebar .sidebar-logo img {
+  width: 40px;
+  height: 40px;
+  object-fit: cover;
+  border-radius: 0.5rem;
+}
+
+#sidebar .sidebar-title {
+  font-size: 1.125rem;
+  font-weight: 700;
+  opacity: 1;
+  transition: opacity 0.2s ease;
+}
+
+#sidebar.collapsed .sidebar-title,
+#sidebar.collapsed .nav-item .label {
+  opacity: 0;
+  pointer-events: none;
+}
+
+/* Sidebar Navigation */
+.nav-item {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.875rem 1rem; /* 14px 16px */
+  border-radius: 0.75rem;
+  color: #333;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background-color 0.2s ease, color 0.2s ease;
+  position: relative;
+  white-space: nowrap;
+}
+
+.nav-item:hover {
+  background-color: rgba(255,255,255,0.4);
+}
+
+.nav-item.active {
+  background-color: rgba(255,255,255,0.6);
+  color: var(--color-primary);
+  font-weight: 700;
+}
+
+.nav-item .icon {
+  flex-shrink: 0;
+  width: 24px;
+  height: 24px;
+}
+
+.nav-item .label {
+  transition: opacity 0.2s ease;
+}
+
+.nav-item .badge {
+  position: absolute;
+  top: 0.5rem;
+  right: 0.75rem;
+  background-color: var(--color-accent);
+  color: white;
+  min-width: 20px;
+  height: 20px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+#sidebar.collapsed .nav-item .badge {
+  top: 50%;
+  right: 50%;
+  transform: translate(50%, -50%);
+}
+
+/* Main Content Area */
+#main-content {
+  flex-grow: 1;
+  padding: 1.5rem;
+  transition: margin-left 0.3s ease;
+  margin-left: 280px;
+}
+
+#sidebar.collapsed + #main-content {
+  margin-left: 80px;
+}
+
+/* Toggle Sidebar Button */
+#toggleSidebarBtn {
+  position: fixed;
+  left: 260px; /* Al borde del sidebar expandido */
+  top: 1rem;
+  z-index: 100;
+  width: 40px;
+  height: 40px;
+  background: white;
+  border: 1px solid var(--color-border);
+  border-radius: 50%;
+  box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: left 0.3s ease, transform 0.3s ease;
+}
+
+#toggleSidebarBtn:hover {
+  transform: scale(1.1);
+}
+
+#sidebar.collapsed #toggleSidebarBtn {
+  left: 60px; /* Al borde del sidebar colapsado */
+}
+
+/* Responsive styles */
+@media (max-width: 768px) {
+  #sidebar {
+    position: fixed;
+    left: 0;
+    top: 0;
+    bottom: 0;
+    z-index: 100;
+    transform: translateX(-100%);
+    transition: transform 0.3s ease;
+    border-radius: 0;
+  }
+
+  #sidebar.open {
+    transform: translateX(0);
+  }
+
+  #main-content {
+    margin-left: 0 !important;
+  }
+
+  #toggleSidebarBtn {
+    display: none; /* Ocultamos el botón de escritorio */
+  }
+
+  #mobileMenuBtn { /* Botón específico para móvil */
+    display: block;
+    position: fixed;
+    top: 1rem;
+    left: 1rem;
+    z-index: 101;
+  }
+}
