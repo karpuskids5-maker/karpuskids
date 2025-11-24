@@ -29,19 +29,114 @@ document.addEventListener('DOMContentLoaded', ()=>{
     profile: document.getElementById('tab-profile')
   };
 
+  // Preparar secciones para animación
+  Object.values(sections).forEach(el => el?.classList.add('section-anim'));
+
   function showTab(name) {
     if (!name || !sections[name]) name = 'home'; // Default a home
-    Object.values(sections).forEach(el => el?.classList.add('hidden'));
-    sections[name]?.classList.remove('hidden');
+    Object.values(sections).forEach(el => {
+      if (!el) return;
+      el.classList.remove('section-visible');
+      el.classList.add('hidden');
+    });
+    const target = sections[name];
+    if (target) {
+      target.classList.remove('hidden');
+      requestAnimationFrame(() => target.classList.add('section-visible'));
+    }
     tabButtons.forEach(btn => {
       const isTarget = btn.dataset.tab === name;
       btn.classList.toggle('text-karpus-blue', isTarget);
       btn.classList.toggle('text-slate-500', !isTarget);
+      btn.setAttribute('aria-selected', isTarget ? 'true' : 'false');
+      btn.setAttribute('aria-current', isTarget ? 'page' : 'false');
     });
+    // Auto-scroll en móvil
+    if (window.innerWidth < 768) {
+      try { window.scrollTo({ top: 0, behavior: 'smooth' }); } catch(e) { window.scrollTo(0,0); }
+    }
     if(window.lucide) lucide.createIcons();
+
+    // Renderizar gráfico de asistencia al entrar en la sección
+    if (name === 'attendance') {
+      renderAttendanceChart();
+    }
   }
 
-  tabButtons.forEach(btn => btn.addEventListener('click', () => showTab(btn.dataset.tab)));
+  tabButtons.forEach(btn => {
+    const target = btn.dataset.tab;
+    if (target && sections[target]) btn.setAttribute('aria-controls', sections[target].id);
+    btn.addEventListener('click', () => showTab(target));
+  });
+
+  // Gráfico simple de asistencia (donut SVG) sin dependencias externas
+  function renderAttendanceChart() {
+    const container = sections.attendance;
+    if (!container) return;
+
+    let chartWrap = container.querySelector('#attendance-chart');
+    if (!chartWrap) {
+      chartWrap = document.createElement('div');
+      chartWrap.id = 'attendance-chart';
+      chartWrap.className = 'attendance-chart';
+      container.prepend(chartWrap);
+    }
+
+    // Obtener porcentaje de asistencia (si existe), por defecto 92
+    const rateAttr = container.getAttribute('data-attendance-rate');
+    const rate = Math.max(0, Math.min(100, Number(rateAttr ?? 92)));
+
+    const size = 140;
+    const stroke = 16;
+    const radius = (size - stroke) / 2;
+    const circumference = 2 * Math.PI * radius;
+    const offset = circumference * (1 - rate / 100);
+
+    chartWrap.innerHTML = `
+      <div class="attendance-inner">
+        <svg width="${size}" height="${size}" viewBox="0 0 ${size} ${size}">
+          <circle cx="${size/2}" cy="${size/2}" r="${radius}" stroke="#e5e7eb" stroke-width="${stroke}" fill="none"/>
+          <circle cx="${size/2}" cy="${size/2}" r="${radius}" stroke="#0ea5e9" stroke-width="${stroke}" fill="none"
+                  stroke-linecap="round" stroke-dasharray="${circumference}" stroke-dashoffset="${offset}"
+                  transform="rotate(-90 ${size/2} ${size/2})"/>
+          <text x="50%" y="50%" dominant-baseline="middle" text-anchor="middle" fill="#0f172a" font-size="20" font-weight="600">${rate}%</text>
+        </svg>
+        <div class="attendance-legend">
+          <span class="block text-sm text-slate-600">Asistencia del período</span>
+        </div>
+      </div>
+    `;
+  }
+
+  // Inicializar con la pestaña por defecto visible sin espacio sobrante
+  // Si hay una pestaña activa marcada, usarla; de lo contrario 'home'
+  const activeBtn = Array.from(tabButtons).find(b => b.getAttribute('aria-selected') === 'true');
+  showTab(activeBtn?.dataset.tab || 'home');
+
+  // Navegación desde el sidebar (data-section)
+  const sidebarNavBtns = document.querySelectorAll('#sidebar [data-section]');
+  const sectionMap = {
+    home: 'home',
+    class: 'class',
+    tasks: 'tasks',
+    notifications: 'notifications',
+    profile: 'profile',
+    calendar: 'attendance', // en padres, el calendario está en sección de asistencia / live
+    development: 'home' // redirigir a inicio si no existe sección dedicada
+  };
+  sidebarNavBtns.forEach(b => {
+    b.addEventListener('click', () => {
+      const target = sectionMap[b.dataset.section] || b.dataset.section;
+      showTab(target);
+      // Cerrar sidebar en móvil
+      const overlay = document.getElementById('sidebarOverlay');
+      const sb = document.getElementById('sidebar');
+      if (sb?.classList.contains('mobile-visible')) {
+        sb.classList.add('hidden'); sb.classList.remove('mobile-visible');
+        if (overlay) overlay.style.display = 'none';
+      }
+    });
+  });
 
   // --- Renderizado de Contenido ---
   function renderPosts(){

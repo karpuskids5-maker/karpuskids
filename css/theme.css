@@ -9,6 +9,8 @@
 }
 
 /* Estilos generales */
+html { text-size-adjust: 100%; -webkit-text-size-adjust: 100%; }
+*, *::before, *::after { box-sizing: border-box; }
 body {
   font-family: 'Nunito', sans-serif;
   background-color: #f5f7fb;
@@ -38,6 +40,9 @@ body {
 .sidebar-blue { background: linear-gradient(135deg,#E3F2FD,#BBDEFB); }
 .sidebar-orange { background: linear-gradient(135deg,#FFF3E0,#FFE0B2); }
 
+/* Scroll container para sidebars */
+.sidebar-scroll { max-height: calc(100vh - 4rem); overflow: auto; }
+
 /* Small colorful chips */
 .chip{ display:inline-block; border-radius:9999px; padding:2px 10px; font-size:11px; }
 .chip-green{ background:#E8F5E9; color:#2E7D32; }
@@ -45,3 +50,64 @@ body {
 .chip-blue{ background:#E3F2FD; color:#1565C0; }
 .chip-orange{ background:#FFF3E0; color:#EF6C00; }
 .chip-yellow{ background:#FFF9C4; color:#F57F17; }
+/* Utilidad: mostrar sidebar en móvil */
+.mobile-visible { display: block !important; }
+
+/* Botón de cierre de sección */
+.section-close {
+  position: absolute;
+  top: 0.5rem;
+  right: 0.5rem;
+  background: rgba(255, 255, 255, 0.85);
+  border: 1px solid rgba(0, 0, 0, 0.06);
+  color: #334155;
+  padding: 0.25rem 0.5rem;
+  border-radius: 0.5rem;
+  line-height: 1;
+  font-size: 14px;
+  cursor: pointer;
+  box-shadow: 0 2px 6px rgba(0,0,0,0.08);
+}
+.section-close:hover { background: rgba(255, 255, 255, 1); }
+
+/* Transiciones del sidebar en móvil */
+#sidebar.sidebar-mobile { opacity: 0; transform: translateX(-12px); transition: opacity 200ms ease, transform 200ms ease; }
+#sidebar.sidebar-mobile.sidebar-open { opacity: 1; transform: translateX(0); }
+
+/* Fade/slide suave de secciones */
+.section-anim { opacity: 0; transform: translateY(6px); transition: opacity 180ms ease, transform 180ms ease; }
+.section-anim.section-visible { opacity: 1; transform: translateY(0); }
+
+/* Overlay transición */
+#sidebarOverlay { transition: opacity 180ms ease; }
+/* ===== Ajustes específicos Panel Padres ===== */
+/* Evitar desbordes horizontales */
+body { overflow-x: hidden; }
+
+/* Alturas base estimadas para header y barra inferior */
+:root {
+  --header-h: 56px; /* h-14 */
+  --bottom-nav-h: 64px; /* h-16 */
+}
+
+/* Secciones a pantalla completa menos header+bottom-nav para evitar scroll global */
+main {
+  min-height: calc(100vh - var(--header-h) - var(--bottom-nav-h));
+  padding-bottom: 0 !important;
+}
+
+/* Secciones del panel padres (ids tab-*) */
+[id^="tab-"] {
+  min-height: calc(100vh - var(--header-h) - var(--bottom-nav-h));
+}
+
+/* Gráfico de asistencia */
+.attendance-chart {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 12px 0;
+}
+.attendance-inner { text-align: center; }
+.attendance-chart svg { display: block; margin: 0 auto; }
+.attendance-legend { margin-top: 8px; }

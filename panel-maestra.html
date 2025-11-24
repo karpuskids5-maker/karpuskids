@@ -42,9 +42,9 @@
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
   <script src="https://unpkg.com/lucide@latest/dist/umd/lucide.min.js"></script>
   <style>
-    /* Sidebar styles */
-    aside#sidebar { width: 260px; transition: width .25s ease, transform .25s ease; }
-    aside#sidebar.collapsed { width: 72px; }
+    /* Sidebar styles (unificado) */
+    aside#sidebar { width: 260px; transition: transform .28s ease, width .28s ease, padding .2s ease; }
+    aside#sidebar.collapsed { width: 72px !important; }
     aside#sidebar .label { transition: opacity .2s ease; }
     aside#sidebar.collapsed .label { opacity: 0; }
     /* mobile helper */
@@ -53,6 +53,8 @@
     .sidebar-green { background: linear-gradient(135deg,#E8F8F0,#D0F0E0); }
     .sidebar-yellow { background: linear-gradient(135deg,#FFF8E0,#FFF1C2); }
     .sidebar-pink { background: linear-gradient(135deg,#FFF0F6,#FFE3F0); }
+    .sidebar-blue { background: linear-gradient(135deg,#E3F2FD,#BBDEFB); }
+    /* soft shadow used in many places - prefer Tailwind utilities (shadow-lg) */
     /* Karpus colored letters small */
     .karpus-kids-inline { font-weight: 700; }
     .karpus-kids-inline .k-1 { color: #FF9800; }
@@ -123,6 +125,26 @@
       justify-content: flex-end;
       gap: 0.75rem;
     }
+
+    /* Layout shell: use CSS grid so main expands/shrinks when sidebar collapses */
+    .layout-shell { display: grid; grid-template-columns: 260px 1fr; min-height: 100vh; transition: grid-template-columns .28s ease; }
+    .layout-shell.sidebar-collapsed { grid-template-columns: 72px 1fr; }
+
+    /* Prevent horizontal scroll when sidebar animates */
+    html, body { overflow-x: hidden; }
+
+    /* Smooth sidebar visual transform for tactile feel */
+    aside#sidebar { transition: transform .28s ease, width .28s ease, padding .2s ease; }
+    aside#sidebar.collapsed { width: 72px !important; }
+
+    /* Modern card fixes: ensure responsive wrapping, consistent sizing and no overflow */
+    .modern-card { box-sizing: border-box; padding: 1rem; border-radius: 1rem; overflow: hidden; }
+    .modern-card .flex { flex-wrap: wrap; gap: 0.75rem; }
+    .modern-card h2, .modern-card h3, .modern-card p { word-break: break-word; white-space: normal; }
+    .modern-card img, .modern-card canvas, .modern-card video { max-width: 100%; height: auto; display: block; }
+
+    /* Prevent jumpy header when sidebar toggles */
+    header { transition: margin-left .28s ease, padding .12s ease; }
     
     /* Estilos para formularios en modales */
     .form-group {
@@ -168,20 +190,20 @@
 <body class="bg-gradient-to-b from-white to-slate-50 text-slate-900 min-h-screen">
   <header class="p-4 flex items-center justify-between">
     <div class="flex items-center gap-3">
-      <button id="toggleSidebar" class="p-2 mr-2 rounded bg-white shadow hidden md:inline-flex" title="Ocultar/Mostrar sidebar">☰</button>
+      <button id="menuBtn" class="p-2 mr-2 rounded bg-white shadow hidden md:inline-flex" title="Abrir/ocultar menú">☰</button>
       <h1 class="text-lg font-semibold">Panel de Maestra</h1>
-      <select id="classroomSelect" class="px-3 py-2 border rounded-xl text-sm">
-        <option value="pequenos">Pequeños</option>
-        <option value="medianos">Medianos</option>
-        <option value="grandes">Grandes</option>
-      </select>
     </div>
     <div class="hidden md:block text-xs text-slate-500">Bienvenida, Ana</div>
   </header>
 
-  <div class="min-h-screen flex font-nunito">
+  <div id="layoutShell" class="min-h-screen layout-shell font-nunito">
     <!-- Sidebar -->
-    <aside id="sidebar" class="hidden md:block sidebar-blue p-4 rounded-r-3xl shadow-lg">
+    <aside id="sidebar" class="hidden md:block sidebar-blue p-4 rounded-r-3xl shadow-lg" role="navigation" aria-label="Sidebar principal">
+      <!-- Collapse toggle (sticky) -->
+      <div style="position:sticky; top:1rem; z-index:30;">
+        <button id="toggleSidebar" aria-expanded="true" aria-controls="sidebar" class="p-2 rounded-lg bg-white shadow-sm" title="Colapsar menú">❮❯</button>
+      </div>
+      <div class="mt-4" style="height:0.5rem"></div>
       <div class="flex items-center gap-3 mb-6">
         <div class="h-12 w-12 rounded-2xl bg-white flex items-center justify-center shadow-soft">
           <img src="img/mundo.jpg" alt="logo" class="h-10 w-10 rounded-lg object-cover" />
@@ -192,8 +214,8 @@
         </div>
       </div>
 
-  <div id="modalEditTask" class="hidden fixed inset-0 bg-black/40 flex items-center justify-center">
-    <div class="bg-white rounded-3xl p-4 w-80">
+  <div id="modalEditTask" class="modal-container">
+    <div class="modal-content bg-white rounded-3xl p-4 w-80">
       <h3 class="text-sm font-semibold mb-2">Editar tarea</h3>
       <input id="editTaskTitle" class="w-full border rounded-xl p-2 text-sm" placeholder="Título" />
       <textarea id="editTaskDesc" class="w-full border rounded-xl p-2 text-sm mt-2" rows="3" placeholder="Descripción"></textarea>
@@ -210,8 +232,8 @@
     </div>
   </div>
 
-  <div id="modalAttendanceDetails" class="hidden fixed inset-0 bg-black/40 flex items-center justify-center">
-    <div class="bg-white rounded-3xl p-4 w-96">
+  <div id="modalAttendanceDetails" class="modal-container">
+    <div class="modal-content bg-white rounded-3xl p-4 w-96">
       <h3 class="text-sm font-semibold mb-2">Detalles de Asistencia</h3>
       <div id="attendanceDetailsContent" class="space-y-2 max-h-80 overflow-auto">
         <!-- Contenido dinámico de asistencia -->
@@ -222,8 +244,8 @@
     </div>
   </div>
 
-      <nav class="teams-nav bg-white bg-opacity-10 rounded-xl mb-4">
-        <button data-section="t-home" class="teams-nav-item active">
+      <nav class="teams-nav bg-white bg-opacity-10 rounded-xl mb-4" aria-label="Navegación de la maestra">
+        <button data-section="t-home" class="teams-nav-item active" title="Inicio" tabindex="0">
           <i data-lucide="home" class="text-white"></i>
           <span class="label text-white">Inicio</span>
         </button>
@@ -258,13 +280,22 @@
           <i data-lucide="user" class="text-white"></i>
           <span class="label text-white">Perfil</span>
         </button>
-        <a href="index.html" class="teams-nav-item">
+        <!-- bottom fixed items are placed separately to remain at the bottom -->
+      </nav>
+
+      <div class="sidebar-bottom mt-auto pt-4">
+        <button class="teams-nav-item w-full text-left" title="Configuración" tabindex="0" data-section="t-settings">
+          <i data-lucide="settings" class="text-white"></i>
+          <span class="label text-white">Configuración</span>
+        </button>
+        <a href="index.html" class="teams-nav-item w-full text-left" title="Cerrar sesión">
           <i data-lucide="log-out" class="text-white"></i>
           <span class="label text-white">Cerrar sesión</span>
         </a>
-      </nav>
-
-      <!-- Selector de color eliminado: estilo único de sidebar -->
+        <div class="mt-3 text-xs text-white text-opacity-80 px-2">Maestra: Ana</div>
+      </div>
+      
+        <!-- Selector de color eliminado: estilo único de sidebar -->
     </aside>
 
     <main class="flex-1 pb-24 px-4">
@@ -314,11 +345,11 @@
         <i data-lucide="message-square" class="w-5 h-5 text-karpus-pink"></i><span>Comunicaciones</span>
       </h2>
       <div class="grid md:grid-cols-3 gap-3">
-        <div class="md:col-span-1 rounded-3xl bg-white p-3 border shadow-soft">
+        <div class="md:col-span-1 rounded-3xl bg-white p-3 border shadow-lg">
           <input id="contactFilter" class="w-full border rounded-xl px-2 py-1 text-sm" placeholder="Filtrar contacto" />
           <div id="contactList" class="mt-2 space-y-1 max-h-64 overflow-auto"></div>
         </div>
-        <div class="md:col-span-2 rounded-3xl bg-white p-3 border shadow-soft flex flex-col">
+        <div class="md:col-span-2 rounded-3xl bg-white p-3 border shadow-lg flex flex-col">
           <div id="chatHeader" class="text-sm font-semibold">Chat</div>
           <div id="chatMessages" class="flex-1 mt-2 space-y-2 max-h-64 overflow-auto"></div>
           <div id="typingIndicator" class="text-[11px] text-slate-500"></div>
@@ -383,8 +414,8 @@
   </nav>
 
   <!-- Modals -->
-  <div id="modalAddPost" class="hidden fixed inset-0 bg-black/40 flex items-center justify-center">
-    <div class="bg-white rounded-3xl p-4 w-80">
+  <div id="modalAddPost" class="modal-container">
+    <div class="modal-content bg-white rounded-3xl p-4 w-80">
       <h3 class="text-sm font-semibold mb-2">Nueva publicación</h3>
       <textarea id="postText" class="w-full border rounded-xl p-2 text-sm" rows="3" placeholder="Texto"></textarea>
       <label class="block text-xs text-slate-600 mt-2">Foto (opcional)</label>
@@ -400,16 +431,16 @@
     </div>
   </div>
 
-  <div id="modalHistory" class="hidden fixed inset-0 bg-black/40 flex items-center justify-center">
-    <div class="bg-white rounded-3xl p-4 w-96">
+  <div id="modalHistory" class="modal-container">
+    <div class="modal-content bg-white rounded-3xl p-4 w-96">
       <h3 class="text-sm font-semibold mb-2">Historial de publicaciones</h3>
       <div id="historyList" class="space-y-2 max-h-64 overflow-auto"></div>
       <div class="flex justify-end mt-3"><button id="closeHistory" class="text-sm px-3 py-2 rounded-xl bg-slate-100">Cerrar</button></div>
     </div>
   </div>
 
-  <div id="modalCreateTask" class="hidden fixed inset-0 bg-black/40 flex items-center justify-center">
-    <div class="bg-white rounded-3xl p-4 w-80">
+  <div id="modalCreateTask" class="modal-container">
+    <div class="modal-content bg-white rounded-3xl p-4 w-80">
       <h3 class="text-sm font-semibold mb-2">Crear tarea</h3>
       <input id="taskTitle" class="w-full border rounded-xl p-2 text-sm" placeholder="Título" />
       <textarea id="taskDesc" class="w-full border rounded-xl p-2 text-sm mt-2" rows="3" placeholder="Descripción"></textarea>
@@ -426,8 +457,8 @@
     </div>
   </div>
 
-  <div id="modalGradeTask" class="hidden fixed inset-0 bg-black/40 flex items-center justify-center">
-    <div class="bg-white rounded-3xl p-4 w-80">
+  <div id="modalGradeTask" class="modal-container">
+    <div class="modal-content bg-white rounded-3xl p-4 w-80">
       <h3 class="text-sm font-semibold mb-2">Calificar Tarea: <span id="gradeTaskTitle" class="font-normal"></span></h3>
       <div id="gradeList" class="space-y-3 max-h-72 overflow-auto">
         <!-- Las entregas de los estudiantes se renderizarán aquí -->
@@ -440,16 +471,16 @@
     </div>
   </div>
 
-  <div id="modalViewSubmissions" class="hidden fixed inset-0 bg-black/40 flex items-center justify-center">
-    <div class="bg-white rounded-3xl p-4 w-80">
+  <div id="modalViewSubmissions" class="modal-container">
+    <div class="modal-content bg-white rounded-3xl p-4 w-80">
       <h3 class="text-sm font-semibold mb-2">Entregas de padres</h3>
       <div id="submissionsList" class="space-y-2 max-h-64 overflow-auto"></div>
       <div class="flex justify-end mt-3"><button id="closeViewSubmissions" class="text-sm px-3 py-2 rounded-xl bg-slate-100">Cerrar</button></div>
     </div>
   </div>
 
-  <div id="modalSendNotification" class="hidden fixed inset-0 bg-black/40 flex items-center justify-center">
-    <div class="bg-white rounded-3xl p-4 w-80">
+  <div id="modalSendNotification" class="modal-container">
+    <div class="modal-content bg-white rounded-3xl p-4 w-80">
       <h3 class="text-sm font-semibold mb-2">Enviar notificación</h3>
       <textarea id="notifText" class="w-full border rounded-xl p-2 text-sm" rows="3" placeholder="Mensaje"></textarea>
       <div class="flex justify-end gap-2 mt-3">
@@ -459,24 +490,24 @@
     </div>
   </div>
 
-  <div id="modalViewParents" class="hidden fixed inset-0 bg-black/40 flex items-center justify-center">
-    <div class="bg-white rounded-3xl p-4 w-96">
+  <div id="modalViewParents" class="modal-container">
+    <div class="modal-content bg-white rounded-3xl p-4 w-96">
       <h3 class="text-sm font-semibold mb-2">Padres</h3>
       <div id="parentsList" class="space-y-2 max-h-64 overflow-auto"></div>
       <div class="flex justify-end mt-3"><button id="closeViewParents" class="text-sm px-3 py-2 rounded-xl bg-slate-100">Cerrar</button></div>
     </div>
   </div>
 
-  <div id="modalCalendar" class="hidden fixed inset-0 bg-black/40 flex items-center justify-center">
-    <div class="bg-white rounded-3xl p-4 w-80">
+  <div id="modalCalendar" class="modal-container">
+    <div class="modal-content bg-white rounded-3xl p-4 w-80">
       <h3 class="text-sm font-semibold mb-2">Calendario</h3>
       <p class="text-sm text-slate-600">(Placeholder de calendario)</p>
       <div class="flex justify-end mt-3"><button id="closeCalendar" class="text-sm px-3 py-2 rounded-xl bg-slate-100">Cerrar</button></div>
     </div>
   </div>
 
-  <div id="modalMessage" class="hidden fixed inset-0 bg-black/40 flex items-center justify-center">
-    <div class="bg-white rounded-3xl p-4 w-80">
+  <div id="modalMessage" class="modal-container">
+    <div class="modal-content bg-white rounded-3xl p-4 w-80">
       <h3 class="text-sm font-semibold mb-2">Mensaje privado</h3>
       <select id="messageTo" class="w-full border rounded-xl p-2 text-sm bg-white"></select>
       <textarea id="messageText" class="w-full border rounded-xl p-2 text-sm mt-2" rows="3" placeholder="Mensaje"></textarea>
@@ -484,8 +515,8 @@
     </div>
   </div>
 
-  <div id="modalExport" class="hidden fixed inset-0 bg-black/40 flex items-center justify-center">
-    <div class="bg-white rounded-3xl p-4 w-80">
+  <div id="modalExport" class="modal-container">
+    <div class="modal-content bg-white rounded-3xl p-4 w-80">
       <h3 class="text-sm font-semibold mb-2">Exportar</h3>
       <p class="text-sm text-slate-600">Generar reporte de aula (placeholder).</p>
       <div class="flex justify-end gap-2 mt-3"><button id="closeExport" class="text-sm px-3 py-2 rounded-xl bg-slate-100">Cerrar</button><button id="doExport" class="text-sm px-3 py-2 rounded-xl bg-karpus-orange text-white">Exportar</button></div>
@@ -495,387 +526,70 @@
   <script src="js/store.js?v=2"></script>
   <script src="js/maestra_patch.js?v=2"></script>
   <script src="js/asistencia_maestra.js?v=1"></script>
+  <script src="js/common_ui.js"></script>
+  <script>
+    document.addEventListener('DOMContentLoaded', function(){
+      // Init lucide icons if available
+      if(window.lucide && typeof lucide.createIcons === 'function') {
+        try{ lucide.createIcons(); }catch(e){console.warn('lucide init failed', e);}  
+      }
+
+      // Sidebar collapse behavior with persistence
+      const toggleBtn = document.getElementById('toggleSidebar');
+      const layoutShell = document.getElementById('layoutShell');
+      const sidebar = document.getElementById('sidebar');
+      const LS_KEY = 'maestra_sidebar_collapsed_v1';
+      let collapsed = localStorage.getItem(LS_KEY) === 'true';
+
+      function applySidebarState(){
+        if(!layoutShell || !sidebar) return;
+        layoutShell.classList.toggle('sidebar-collapsed', collapsed);
+        sidebar.classList.toggle('collapsed', collapsed);
+        if(toggleBtn) toggleBtn.setAttribute('aria-expanded', String(!collapsed));
+      }
+
+      applySidebarState();
+
+      if(toggleBtn){
+        toggleBtn.addEventListener('click', function(){
+          collapsed = !collapsed;
+          applySidebarState();
+          try{ localStorage.setItem(LS_KEY, String(collapsed)); }catch(e){}
+        });
+        // keyboard support
+        toggleBtn.addEventListener('keydown', function(e){ if(e.key === 'Enter' || e.key === ' ') { e.preventDefault(); toggleBtn.click(); } });
+      }
+
+      // Section navigation (teams-nav)
+      const navButtons = Array.from(document.querySelectorAll('.teams-nav-item[data-section]'));
+      const sections = Array.from(document.querySelectorAll('main section[id^="t-"]'));
+
+      function showSection(id){
+        sections.forEach(s => s.classList.add('hidden'));
+        const el = document.getElementById(id);
+        if(el) el.classList.remove('hidden');
+        navButtons.forEach(b => b.classList.remove('active'));
+        const activeBtn = navButtons.find(b => b.dataset.section === id);
+        if(activeBtn) activeBtn.classList.add('active');
+      }
+
+      navButtons.forEach(b => {
+        b.addEventListener('click', function(){
+          const id = this.dataset.section;
+          if(!id) return;
+          showSection(id);
+        });
+        b.addEventListener('keydown', function(e){ if(e.key === 'Enter' || e.key === ' ') { e.preventDefault(); this.click(); } });
+      });
+
+      // initialize visible section
+      const initial = navButtons.find(b => b.classList.contains('active'))?.dataset.section || 't-home';
+      showSection(initial);
+
+      // Simple modal helpers for consistent show/hide
+      window.showModal = function(id){ const m = document.getElementById(id); if(m) m.classList.remove('hidden'); };
+      window.hideModal = function(id){ const m = document.getElementById(id); if(m) m.classList.add('hidden'); };
+    });
+  </script>
 </body>
 </html>
-
-// Sistema de asistencia
-document.addEventListener('DOMContentLoaded', function() {
-  // Datos de ejemplo para estudiantes
-  const estudiantes = [
-    { id: 1, nombre: 'Ana García', estado: 'Ausente', hora: '', notificado: false, padre: 'Juan García', telefono: '555-1234' },
-    { id: 2, nombre: 'Carlos Pérez', estado: 'Ausente', hora: '', notificado: false, padre: 'María Pérez', telefono: '555-5678' },
-    { id: 3, nombre: 'Sofía Rodríguez', estado: 'Ausente', hora: '', notificado: false, padre: 'Roberto Rodríguez', telefono: '555-9012' },
-    { id: 4, nombre: 'Diego Martínez', estado: 'Ausente', hora: '', notificado: false, padre: 'Laura Martínez', telefono: '555-3456' },
-    { id: 5, nombre: 'Valentina López', estado: 'Ausente', hora: '', notificado: false, padre: 'Pedro López', telefono: '555-7890' },
-    { id: 6, nombre: 'Mateo Sánchez', estado: 'Ausente', hora: '', notificado: false, padre: 'Ana Sánchez', telefono: '555-2345' },
-    { id: 7, nombre: 'Isabella Gómez', estado: 'Ausente', hora: '', notificado: false, padre: 'Carlos Gómez', telefono: '555-6789' },
-    { id: 8, nombre: 'Santiago Torres', estado: 'Ausente', hora: '', notificado: false, padre: 'Elena Torres', telefono: '555-0123' }
-  ];
-  
-  // Elementos DOM
-  const seccionAsistencia = document.getElementById('asistencia');
-  const seccionDashboard = document.getElementById('dashboard');
-  const listaAsistencia = document.getElementById('listaAsistencia');
-  const fechaAsistencia = document.getElementById('fechaAsistencia');
-  const contPresentes = document.getElementById('contPresentes');
-  const contAusentes = document.getElementById('contAusentes');
-  const contRetardos = document.getElementById('contRetardos');
-  const buscarEstudiante = document.getElementById('buscarEstudiante');
-  const exportarAsistencia = document.getElementById('exportarAsistencia');
-  const notificarTodos = document.getElementById('notificarTodos');
-  const modalAsistenciaDetalles = document.getElementById('modalAsistenciaDetalles');
-  const detallesAsistenciaContent = document.getElementById('detallesAsistenciaContent');
-  const cerrarDetallesAsistencia = document.getElementById('cerrarDetallesAsistencia');
-  const modalNotificarPadre = document.getElementById('modalNotificarPadre');
-  const nombreEstudianteNotificacion = document.getElementById('nombreEstudianteNotificacion');
-  const estadoEstudianteNotificacion = document.getElementById('estadoEstudianteNotificacion');
-  const mensajeAdicional = document.getElementById('mensajeAdicional');
-  const cerrarNotificarPadre = document.getElementById('cerrarNotificarPadre');
-  const enviarNotificacion = document.getElementById('enviarNotificacion');
-  
-  // Mostrar fecha actual
-  const hoy = new Date();
-  fechaAsistencia.textContent = hoy.toLocaleDateString('es-ES', { 
-    weekday: 'long', 
-    year: 'numeric', 
-    month: 'long', 
-    day: 'numeric' 
-  });
-  
-  // Función para actualizar contadores
-  function actualizarContadores() {
-    const presentes = estudiantes.filter(e =&gt; e.estado === 'Presente').length;
-    const ausentes = estudiantes.filter(e =&gt; e.estado === 'Ausente').length;
-    const retardos = estudiantes.filter(e =&gt; e.estado === 'Retardo').length;
-    
-    contPresentes.textContent = presentes;
-    contAusentes.textContent = ausentes;
-    contRetardos.textContent = retardos;
-  }
-  
-  // Función para renderizar la lista de asistencia
-  function renderizarAsistencia(filtro = '') {
-    listaAsistencia.innerHTML = '';
-    
-    const estudiantesFiltrados = estudiantes.filter(e =&gt;
-      e.nombre.toLowerCase().includes(filtro.toLowerCase())
-    );
-    
-    estudiantesFiltrados.forEach(estudiante =&gt; {
-      const fila = document.createElement('tr');
-      fila.className = 'border-b hover:bg-slate-50';
-      
-      // Clase para el estado
-      let estadoClase = '';
-      let estadoIcono = '';
-      
-      switch(estudiante.estado) {
-        case 'Presente':
-          estadoClase = 'bg-green-100 text-green-800';
-          estadoIcono = 'check';
-          break;
-        case 'Ausente':
-          estadoClase = 'bg-red-100 text-red-800';
-          estadoIcono = 'x';
-          break;
-        case 'Retardo':
-          estadoClase = 'bg-yellow-100 text-yellow-800';
-          estadoIcono = 'clock';
-          break;
-      }
-      
-      fila.innerHTML = `
-        <td class="py-2 px-3">${estudiante.nombre}</td>
-        <td class="py-2 px-3 text-center">
-          <span class="inline-flex items-center gap-1 px-2 py-1 rounded-xl ${estadoClase}">
-            <i data-lucide="${estadoIcono}" class="w-3 h-3"></i> ${estudiante.estado}
-          </span>
-        </td>
-        <td class="py-2 px-3 text-center">${estudiante.hora || '-'}</td>
-        <td class="py-2 px-3 text-center">
-          ${estudiante.notificado 
-            ? '<span class="text-green-600"><i data-lucide="check" class="w-4 h-4"></i></span>' 
-            : '<span class="text-slate-400">No</span>'}
-        </td>
-        <td class="py-2 px-3 text-right">
-          <div class="flex justify-end gap-1">
-            <button class="btn-presente p-1 rounded-full hover:bg-green-100" title="Marcar presente" data-id="${estudiante.id}">
-              <i data-lucide="check" class="w-4 h-4 text-green-600"></i>
-            </button>
-            <button class="btn-ausente p-1 rounded-full hover:bg-red-100" title="Marcar ausente" data-id="${estudiante.id}">
-              <i data-lucide="x" class="w-4 h-4 text-red-600"></i>
-            </button>
-            <button class="btn-retardo p-1 rounded-full hover:bg-yellow-100" title="Marcar retardo" data-id="${estudiante.id}">
-              <i data-lucide="clock" class="w-4 h-4 text-yellow-600"></i>
-            </button>
-            <button class="btn-notificar p-1 rounded-full hover:bg-blue-100" title="Notificar a padre/madre" data-id="${estudiante.id}">
-              <i data-lucide="bell" class="w-4 h-4 text-blue-600"></i>
-            </button>
-            <button class="btn-detalles p-1 rounded-full hover:bg-slate-100" title="Ver detalles" data-id="${estudiante.id}">
-              <i data-lucide="info" class="w-4 h-4 text-slate-600"></i>
-            </button>
-          </div>
-        </td>
-      `;
-      
-      listaAsistencia.appendChild(fila);
-    });
-    
-    // Recrear íconos
-    lucide.createIcons();
-    
-    // Añadir event listeners a los botones
-    document.querySelectorAll('.btn-presente').forEach(btn =&gt; {
-      btn.addEventListener('click', function() {
-        const id = parseInt(this.getAttribute('data-id'));
-        marcarAsistencia(id, 'Presente');
-      });
-    });
-    
-    document.querySelectorAll('.btn-ausente').forEach(btn =&gt; {
-      btn.addEventListener('click', function() {
-        const id = parseInt(this.getAttribute('data-id'));
-        marcarAsistencia(id, 'Ausente');
-      });
-    });
-    
-    document.querySelectorAll('.btn-retardo').forEach(btn =&gt; {
-      btn.addEventListener('click', function() {
-        const id = parseInt(this.getAttribute('data-id'));
-        marcarAsistencia(id, 'Retardo');
-      });
-    });
-    
-    document.querySelectorAll('.btn-notificar').forEach(btn =&gt; {
-      btn.addEventListener('click', function() {
-        const id = parseInt(this.getAttribute('data-id'));
-        abrirModalNotificar(id);
-      });
-    });
-    
-    document.querySelectorAll('.btn-detalles').forEach(btn =&gt; {
-      btn.addEventListener('click', function() {
-        const id = parseInt(this.getAttribute('data-id'));
-        mostrarDetallesAsistencia(id);
-      });
-    });
-  }
-  
-  // Función para marcar asistencia
-  function marcarAsistencia(id, estado) {
-    const estudiante = estudiantes.find(e =&gt; e.id === id);
-    if (estudiante) {
-      const horaActual = new Date().toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' });
-      estudiante.estado = estado;
-      estudiante.hora = horaActual;
-      
-      // Si el estado es "Presente", notificar automáticamente
-      if (estado === 'Presente') {
-        notificarPadre(id, `Su hijo/a ${estudiante.nombre} ha llegado a la escuela y está presente en el aula.`);
-      }
-      
-      renderizarAsistencia(buscarEstudiante.value);
-      actualizarContadores();
-    }
-  }
-  
-  // Función para mostrar detalles de asistencia
-  function mostrarDetallesAsistencia(id) {
-    const estudiante = estudiantes.find(e =&gt; e.id === id);
-    if (estudiante) {
-      detallesAsistenciaContent.innerHTML = `
-        <div class="p-3 bg-slate-50 rounded-xl">
-          <h4 class="font-medium">${estudiante.nombre}</h4>
-          <div class="grid grid-cols-2 gap-2 mt-2 text-xs">
-            <div>
-              <p class="text-slate-500">Estado:</p>
-              <p class="font-medium">${estudiante.estado}</p>
-            </div>
-            <div>
-              <p class="text-slate-500">Hora:</p>
-              <p class="font-medium">${estudiante.hora || 'No registrada'}</p>
-            </div>
-            <div>
-              <p class="text-slate-500">Padre/Madre:</p>
-              <p class="font-medium">${estudiante.padre}</p>
-            </div>
-            <div>
-              <p class="text-slate-500">Teléfono:</p>
-              <p class="font-medium">${estudiante.telefono}</p>
-            </div>
-            <div class="col-span-2">
-              <p class="text-slate-500">Notificación:</p>
-              <p class="font-medium">${estudiante.notificado ? 'Enviada' : 'No enviada'}</p>
-            </div>
-          </div>
-        </div>
-      `;
-      
-      modalAsistenciaDetalles.classList.remove('hidden');
-    }
-  }
-  
-  // Función para abrir modal de notificación
-  function abrirModalNotificar(id) {
-    const estudiante = estudiantes.find(e =&gt; e.id === id);
-    if (estudiante) {
-      nombreEstudianteNotificacion.textContent = estudiante.nombre;
-      estadoEstudianteNotificacion.textContent = estudiante.estado;
-      mensajeAdicional.value = '';
-      
-      // Guardar ID del estudiante en el botón de enviar
-      enviarNotificacion.setAttribute('data-id', id);
-      
-      modalNotificarPadre.classList.remove('hidden');
-    }
-  }
-  
-  // Función para notificar a padre/madre
-  function notificarPadre(id, mensaje = '') {
-    const estudiante = estudiantes.find(e =&gt; e.id === id);
-    if (estudiante) {
-      estudiante.notificado = true;
-      
-      // Aquí iría la lógica para enviar la notificación real
-      console.log(`Notificación enviada a ${estudiante.padre} (${estudiante.telefono}): ${mensaje}`);
-      
-      // Actualizar la interfaz
-      renderizarAsistencia(buscarEstudiante.value);
-    }
-  }
-  
-  // Función para exportar asistencia
-  function exportarReporteAsistencia() {
-    const fecha = new Date().toLocaleDateString('es-ES');
-    let csv = `Reporte de Asistencia - ${fecha}\n\n`;
-    csv += 'Nombre,Estado,Hora,Notificado\n';
-    
-    estudiantes.forEach(e =&gt; {
-      csv += `${e.nombre},${e.estado},${e.hora || '-'},${e.notificado ? 'Sí' : 'No'}\n`;
-    });
-    
-    // Crear blob y descargar
-    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
-    const link = document.createElement('a');
-    const url = URL.createObjectURL(blob);
-    
-    link.setAttribute('href', url);
-    link.setAttribute('download', `asistencia_${fecha.replace(/\//g, '-')}.csv`);
-    link.style.visibility = 'hidden';
-    
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-  }
-  
-  // Función para notificar a todos los padres
-  function notificarTodosLosPadres() {
-    const presentes = estudiantes.filter(e =&gt; e.estado === 'Presente' &amp;&amp; !e.notificado);
-    
-    presentes.forEach(estudiante =&gt;
-      notificarPadre(estudiante.id, `Su hijo/a ${estudiante.nombre} está presente en el aula.`);
-    });
-    
-    alert(`Se han enviado ${presentes.length} notificaciones a padres de alumnos presentes.`);
-  }
-  
-  // Event Listeners
-  buscarEstudiante.addEventListener('input', function() {
-    renderizarAsistencia(this.value);
-  });
-  
-  exportarAsistencia.addEventListener('click', exportarReporteAsistencia);
-  
-  notificarTodos.addEventListener('click', notificarTodosLosPadres);
-  
-  cerrarDetallesAsistencia.addEventListener('click', function() {
-    modalAsistenciaDetalles.classList.add('hidden');
-  });
-  
-  cerrarNotificarPadre.addEventListener('click', function() {
-    modalNotificarPadre.classList.add('hidden');
-  });
-  
-  enviarNotificacion.addEventListener('click', function() {
-    const id = parseInt(this.getAttribute('data-id'));
-    const mensaje = mensajeAdicional.value.trim();
-    const estudiante = estudiantes.find(e =&gt; e.id === id);
-    
-    if (estudiante) {
-      let mensajeCompleto = `Su hijo/a ${estudiante.nombre} está ${estudiante.estado.toLowerCase()} en el aula.`;
-      
-      if (mensaje) {
-        mensajeCompleto += ` Mensaje adicional: ${mensaje}`;
-      }
-      
-      notificarPadre(id, mensajeCompleto);
-      modalNotificarPadre.classList.add('hidden');
-    }
-  });
-  
-  // Navegación entre secciones
-  document.querySelectorAll('nav a').forEach(link =&gt; {
-    link.addEventListener('click', function(e) {
-      e.preventDefault();
-      const targetId = this.getAttribute('href').substring(1);
-      
-      // Ocultar todas las secciones
-      document.querySelectorAll('main &gt; div').forEach(section =&gt; {
-        section.classList.add('hidden');
-      });
-      
-      // Mostrar la sección seleccionada
-      const targetSection = document.getElementById(targetId);
-      if (targetSection) {
-        targetSection.classList.remove('hidden');
-      }
-      
-      // Actualizar clase activa en la navegación
-      document.querySelectorAll('nav a').forEach(navLink =&gt; {
-        navLink.classList.remove('bg-white', 'bg-opacity-60');
-        navLink.classList.add('hover:bg-white', 'hover:bg-opacity-60');
-      });
-      
-      this.classList.add('bg-white', 'bg-opacity-60');
-      this.classList.remove('hover:bg-white', 'hover:bg-opacity-60');
-    });
-  });
-  
-  // Inicializar
-  renderizarAsistencia();
-  actualizarContadores();
-});
-
-<!-- Modal para detalles de asistencia -->
-<div id="modalAsistenciaDetalles" class="hidden fixed inset-0 bg-black/40 flex items-center justify-center z-50">
-  <div class="bg-white rounded-3xl p-4 w-96 max-w-full">
-    <h3 class="text-sm font-semibold mb-2">Detalles de Asistencia</h3>
-    <div id="detallesAsistenciaContent" class="space-y-2 max-h-80 overflow-auto">
-      <!-- Contenido dinámico -->
-    </div>
-    <div class="flex justify-end gap-2 mt-3">
-      <button id="cerrarDetallesAsistencia" class="text-sm px-3 py-2 rounded-xl bg-slate-100">Cerrar</button>
-    </div>
-  </div>
-</div>
-
-<!-- Modal para notificar a padres -->
-<div id="modalNotificarPadre" class="hidden fixed inset-0 bg-black/40 flex items-center justify-center z-50">
-  <div class="bg-white rounded-3xl p-4 w-96 max-w-full">
-    <h3 class="text-sm font-semibold mb-2">Notificar a Padre/Madre</h3>
-    <div class="mb-3">
-      <p class="text-sm mb-2">Enviando notificación a padre/madre de: <span id="nombreEstudianteNotificacion" class="font-medium"></span></p>
-      <p class="text-sm mb-2">Estado: <span id="estadoEstudianteNotificacion" class="font-medium"></span></p>
-    </div>
-    <div class="mb-3">
-      <label class="block text-xs text-slate-600 mb-1">Mensaje adicional (opcional)</label>
-      <textarea id="mensajeAdicional" class="w-full border rounded-xl p-2 text-sm" rows="3" placeholder="Escriba un mensaje adicional..."></textarea>
-    </div>
-    <div class="flex justify-end gap-2 mt-3">
-      <button id="cerrarNotificarPadre" class="text-sm px-3 py-2 rounded-xl bg-slate-100">Cancelar</button>
-      <button id="enviarNotificacion" class="text-sm px-3 py-2 rounded-xl bg-karpus-blue text-white">Enviar Notificación</button>
-    </div>
-  </div>
-</div>
-<!-- orphaned </script> removed -->
-  <!-- ===== FIX: orphaned closing script tag paired ===== -->

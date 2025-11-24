@@ -140,7 +140,7 @@
     <!-- SIDEBAR -->
     <aside id="sidebar" class="hidden md:block sidebar-blue p-4 rounded-r-3xl shadow-lg fixed inset-y-0 left-0 z-10">
       <div class="flex items-center gap-3 mb-6">
-        <div class="h-12 w-12 rounded-2xl bg-white/20 flex items-center justify-center shadow-soft">
+        <div class="h-12 w-12 rounded-2xl bg-white/20 flex items-center justify-center shadow-lg">
           <img src="img/mundo.jpg" alt="logo" class="h-10 w-10 rounded-lg object-cover" />
         </div>
         <div class="label">
@@ -1045,6 +1045,45 @@
     </div>
   </div>
 
+  <!-- MODAL: Agregar Estudiante (Director) -->
+  <div id="modalAddStudent" class="fixed inset-0 bg-black/40 hidden items-center justify-center z-50">
+    <div class="bg-white rounded-lg p-6 w-full max-w-lg">
+      <h3 class="font-semibold mb-3 flex items-center gap-2">
+        <i data-lucide="user-plus" class="w-5 h-5"></i>
+        Agregar Estudiante
+      </h3>
+      <div class="grid gap-3">
+        <div>
+          <label class="text-sm text-slate-600 block mb-1">Nombre del niño</label>
+          <input id="stName" placeholder="Ej: Juan Pérez" class="w-full border rounded px-3 py-2" />
+        </div>
+        <div class="grid grid-cols-2 gap-2">
+          <div>
+            <label class="text-sm text-slate-600 block mb-1">Edad</label>
+            <input id="stAge" type="number" min="0" placeholder="Edad" class="w-full border rounded px-3 py-2" />
+          </div>
+          <div>
+            <label class="text-sm text-slate-600 block mb-1">Horario</label>
+            <input id="stSchedule" placeholder="08:00-12:00" class="w-full border rounded px-3 py-2" />
+          </div>
+        </div>
+        <div class="grid grid-cols-2 gap-2">
+          <input id="p1Name" placeholder="Padre/Madre 1 (nombre)" class="border rounded px-3 py-2" />
+          <input id="p1Phone" placeholder="Teléfono 1" class="border rounded px-3 py-2" />
+        </div>
+        <div class="grid grid-cols-2 gap-2">
+          <input id="p2Name" placeholder="Padre/Madre 2 (nombre)" class="border rounded px-3 py-2" />
+          <input id="p2Phone" placeholder="Teléfono 2" class="border rounded px-3 py-2" />
+        </div>
+        <label class="flex items-center gap-2"><input id="stActive" type="checkbox" checked class="rounded" /> Estudiante activo</label>
+        <div class="flex justify-end gap-2 mt-3">
+          <button id="closeAddStudent" class="px-4 py-2 border rounded-lg">Cancelar</button>
+          <button id="saveAddStudent" class="px-4 py-2 bg-indigo-600 text-white rounded-lg">Agregar Estudiante</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
   <script>
     // Init lucide icons
     document.addEventListener('DOMContentLoaded', ()=>{ 
@@ -1095,6 +1134,8 @@
 
     // Modal maestro
     const modal = document.getElementById('modal');
+    // When editing a teacher, this holds the row being edited. null means creating new.
+    let currentEditingTeacherRow = null;
     document.getElementById('addTeacher')?.addEventListener('click', ()=> modal.classList.remove('hidden'));
     document.getElementById('nuevoMaestroBtn')?.addEventListener('click', ()=> modal.classList.remove('hidden'));
     document.getElementById('cancelModal')?.addEventListener('click', ()=> {
@@ -1104,29 +1145,55 @@
       document.getElementById('tmPhone').value = '';
       document.getElementById('tmEmail').value = '';
       document.getElementById('tmPassword').value = '';
+      // Clear editing state
+      currentEditingTeacherRow = null;
+      if (modal) delete modal.dataset.editing;
     });
+
     document.getElementById('saveModal')?.addEventListener('click', ()=>{
       const name = document.getElementById('tmName').value.trim();
       const phone = document.getElementById('tmPhone').value.trim();
       const email = document.getElementById('tmEmail').value.trim();
       const password = document.getElementById('tmPassword').value.trim();
-      
+
       // Validaciones básicas
-      if(!name || !phone || !email || !password) {
-        alert('Por favor complete todos los campos');
+      if(!name || !phone || !email) {
+        alert('Por favor complete todos los campos obligatorios (nombre, teléfono, email)');
         return;
       }
-      
+
       if(!email.includes('@')) {
         alert('Por favor ingrese un correo válido');
         return;
       }
-      
+
+      // If we are editing an existing row, update it instead of creating
+      if(currentEditingTeacherRow && currentEditingTeacherRow instanceof HTMLElement) {
+        const cells = currentEditingTeacherRow.querySelectorAll('td');
+        if(cells && cells.length >= 3) {
+          cells[0].textContent = name;
+          cells[1].textContent = email;
+          cells[2].textContent = phone;
+        }
+        // Clear editing state
+        currentEditingTeacherRow = null;
+        if (modal) delete modal.dataset.editing;
+        // Close modal and cleanup
+        modal.classList.add('hidden');
+        document.getElementById('tmName').value = '';
+        document.getElementById('tmPhone').value = '';
+        document.getElementById('tmEmail').value = '';
+        document.getElementById('tmPassword').value = '';
+        alert(`Maestro ${name} actualizado exitosamente.`);
+        return;
+      }
+
+      // Creating a new teacher (password optional for creation flow)
       if(password.length < 6) {
         alert('La contraseña debe tener al menos 6 caracteres');
         return;
       }
-      
+
       // Crear fila en la tabla
       const tr = document.createElement('tr');
       tr.innerHTML = `
@@ -1140,14 +1207,14 @@
         </td>
       `;
       document.getElementById('teachersTable').appendChild(tr);
-      
+
       // Limpiar y cerrar modal
       modal.classList.add('hidden');
       document.getElementById('tmName').value = '';
       document.getElementById('tmPhone').value = '';
       document.getElementById('tmEmail').value = '';
       document.getElementById('tmPassword').value = '';
-      
+
       alert(`Maestro ${name} creado exitosamente. Credenciales: ${email} / ${password}`);
     });
 
@@ -1158,43 +1225,19 @@
       const name = cells[0].textContent;
       const email = cells[1].textContent;
       const phone = cells[2].textContent;
-      
+
       // Llenar el modal con los datos actuales
       document.getElementById('tmName').value = name;
       document.getElementById('tmEmail').value = email;
       document.getElementById('tmPhone').value = phone;
       document.getElementById('tmPassword').value = '';
-      
-      // Mostrar modal
-      document.getElementById('teacherModal').classList.remove('hidden');
-      
-      // Cambiar el comportamiento del botón guardar para edición
-      const saveBtn = document.getElementById('saveTeacher');
-      saveBtn.onclick = function() {
-        const newName = document.getElementById('tmName').value.trim();
-        const newEmail = document.getElementById('tmEmail').value.trim();
-        const newPhone = document.getElementById('tmPhone').value.trim();
-        const newPassword = document.getElementById('tmPassword').value.trim();
-        
-        if(!newName || !newEmail || !newPhone) {
-          alert('Por favor complete todos los campos obligatorios');
-          return;
-        }
-        
-        // Actualizar la fila
-        cells[0].textContent = newName;
-        cells[1].textContent = newEmail;
-        cells[2].textContent = newPhone;
-        
-        // Cerrar modal y limpiar
-        document.getElementById('teacherModal').classList.add('hidden');
-        document.getElementById('tmName').value = '';
-        document.getElementById('tmPhone').value = '';
-        document.getElementById('tmEmail').value = '';
-        document.getElementById('tmPassword').value = '';
-        
-        alert('Maestro actualizado exitosamente');
-      };
+
+      // Set editing state: the global handler for save will detect this and update the row
+      currentEditingTeacherRow = row;
+      if (modal) modal.dataset.editing = 'true';
+
+      // Mostrar modal (re-uses the same modal used for crear)
+      modal.classList.remove('hidden');
     };
 
     window.deleteTeacher = function(button) {
@@ -1604,10 +1647,37 @@
       });
     });
 
-    // Agregar estudiante (solo nombre en la tabla)
+    // Agregar estudiante: abrir modal del director y manejar creación
     document.getElementById('addStudentBtn')?.addEventListener('click', ()=>{
-      const name = prompt('Nombre completo del estudiante:');
-      if(!name || !name.trim()) return;
+      const modal = document.getElementById('modalAddStudent');
+      if(modal) modal.classList.remove('hidden');
+    });
+
+    document.getElementById('closeAddStudent')?.addEventListener('click', ()=>{
+      const modal = document.getElementById('modalAddStudent');
+      if(modal) modal.classList.add('hidden');
+      clearStudentModal();
+    });
+
+    function clearStudentModal(){
+      ['stName','stAge','stSchedule','p1Name','p1Phone','p2Name','p2Phone'].forEach(id=>{
+        const el = document.getElementById(id);
+        if(!el) return;
+        el.value = '';
+      });
+      const ch = document.getElementById('stActive'); if(ch) ch.checked = true;
+    }
+
+    document.getElementById('saveAddStudent')?.addEventListener('click', ()=>{
+      const name = (document.getElementById('stName')?.value || '').trim();
+      if(!name) { alert('Ingrese el nombre del estudiante'); return; }
+      const age = (document.getElementById('stAge')?.value || '').trim();
+      const schedule = (document.getElementById('stSchedule')?.value || '').trim();
+      const p1Name = (document.getElementById('p1Name')?.value || '').trim();
+      const p1Phone = (document.getElementById('p1Phone')?.value || '').trim();
+      const p2Name = (document.getElementById('p2Name')?.value || '').trim();
+      const p2Phone = (document.getElementById('p2Phone')?.value || '').trim();
+      const active = !!document.getElementById('stActive')?.checked;
 
       const tr = document.createElement('tr');
       tr.className = 'hover:bg-slate-50';
@@ -1617,26 +1687,78 @@
             <div class="w-8 h-8 bg-slate-100 rounded-full flex items-center justify-center">
               <i data-lucide="user" class="w-4 h-4 text-slate-600"></i>
             </div>
-            <span class="font-medium text-slate-800">${name.trim()}</span>
+            <div>
+              <div class="font-medium text-slate-800">${name}</div>
+              <div class="text-xs text-slate-500">${age? age + ' años' : ''} ${schedule? '• '+schedule : ''}</div>
+            </div>
           </div>
         </td>
+        <td class="py-4 px-4 text-sm text-slate-700">
+          ${p1Name? `<div>${p1Name}</div>` : ''} ${p2Name? `<div>${p2Name}</div>` : ''}
+        </td>
+        <td class="py-4 px-4 text-sm text-slate-700">
+          ${p1Phone? `<div>${p1Phone}</div>` : ''} ${p2Phone? `<div>${p2Phone}</div>` : ''}
+        </td>
         <td class="py-4 px-4 text-center">
-          <button onclick="viewStudentProfile(this)" class="px-3 py-1 bg-blue-100 text-blue-700 rounded-lg hover:bg-blue-200 text-sm font-medium">Ver Perfil</button>
+          ${active? `<span class="px-2 py-1 bg-green-100 text-green-800 rounded-full text-xs">Activo</span>` : `<span class="px-2 py-1 bg-slate-100 text-slate-600 rounded-full text-xs">Inactivo</span>`}
+        </td>
+        <td class="py-4 px-4 text-center">
+          <button onclick="viewStudentProfile(this)" class="px-3 py-1 bg-blue-100 text-blue-700 rounded-lg hover:bg-blue-200 text-sm font-medium mr-2">Ver Perfil</button>
+          <button onclick="deleteStudent(this)" class="px-3 py-1 bg-red-100 text-red-700 rounded-lg hover:bg-red-200 text-sm font-medium">Eliminar</button>
         </td>
       `;
+
+      // guardar datos básicos de padres para la vista rápida
+      studentParentData[name] = {
+        parent1: { name: p1Name || '', phone: p1Phone || '' },
+        parent2: { name: p2Name || '', phone: p2Phone || '' },
+        extra: { room: '', startDate: '', allergies: '', pickup: '', schedule: schedule || '' }
+      };
+
       document.getElementById('studentsTable').appendChild(tr);
-
-      // Render icon for new row
-      if(window.lucide && typeof lucide.createIcons === 'function') {
-        lucide.createIcons();
-      }
-
-      alert(`Estudiante "${name.trim()}" agregado a la lista.`);
+      if(window.lucide && typeof lucide.createIcons === 'function') lucide.createIcons();
+      document.getElementById('modalAddStudent').classList.add('hidden');
+      clearStudentModal();
+      alert(`Estudiante "${name}" agregado.`);
     });
+
+    window.deleteStudent = function(button){
+      const row = button.closest('tr');
+      const name = row.querySelector('.font-medium')?.textContent.trim();
+      if(confirm(`Eliminar estudiante ${name}?`)){
+        row.remove();
+        try{ delete studentParentData[name]; }catch(e){}
+      }
+    };
+
+    // Ajuste dinámico del offset superior para evitar espacio vacío cuando hay header fijo
+    function adjustMainOffset(){
+      const mainEl = document.querySelector('main');
+      if(!mainEl) return;
+      // buscar primer elemento fijo en top
+      const fixedTop = document.querySelector('.fixed.top-0, header.fixed, .md\\:hidden.fixed, .mobile-fixed-top');
+      if(fixedTop && fixedTop.offsetHeight){
+        mainEl.style.marginTop = fixedTop.offsetHeight + 'px';
+      } else {
+        mainEl.style.marginTop = '';
+      }
+    }
+    window.addEventListener('resize', adjustMainOffset);
+    // also run after icons render / DOM ready
+    setTimeout(adjustMainOffset, 50);
+    document.addEventListener('DOMContentLoaded', adjustMainOffset);
+
+    // asegurar scroll-top al cambiar secciones
+    document.querySelectorAll('[data-section]').forEach(btn => btn.addEventListener('click', ()=>{
+      const mainEl = document.querySelector('main');
+      if(mainEl) mainEl.scrollTo({top:0, behavior:'auto'});
+      try{ window.scrollTo({top:0, behavior:'auto'}); } catch(e){}
+    }));
 
     // Inicial: mostrar dashboard
     document.getElementById('dashboard').classList.remove('hidden');
   </script>
   <script src="js/store.js?v=2"></script>
+  <script src="js/common_ui.js"></script>
 </body>
 </html>

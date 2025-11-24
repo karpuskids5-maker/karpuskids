@@ -16,7 +16,8 @@ document.addEventListener('DOMContentLoaded', ()=>{
 
 // --- Navegación entre secciones ---
 function initNavigation(){
-  qsa('.nav-btn').forEach(btn=>{
+  // Aceptar tanto '.nav-button' como '.nav-btn' por compatibilidad
+  qsa('.nav-button, .nav-btn').forEach(btn=>{
     btn.addEventListener('click', ()=>{
       const target = btn.getAttribute('data-section');
       document.querySelectorAll('.section').forEach(s=> s.classList.add('hidden'));
@@ -26,11 +27,6 @@ function initNavigation(){
       const sb = document.getElementById('sidebar');
       if(window.innerWidth < 768 && sb) sb.classList.add('hidden');
     });
-  });
-
-  qs('#menuBtn')?.addEventListener('click', ()=>{
-    const sb = document.getElementById('sidebar');
-    if(sb) sb.classList.toggle('hidden');
   });
 }
 

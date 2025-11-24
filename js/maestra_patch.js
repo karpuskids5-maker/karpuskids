@@ -1,9 +1,18 @@
 document.addEventListener('DOMContentLoaded', () => {
   if(!window.KarpusStore) return;
 
-  const selToCls = (v) => v==='pequenos' ? 'Pequeños' : v==='medianos' ? 'Medianos' : 'Grandes';
+  // Safe init for lucide icons (UMD)
+  try { if (window.lucide && typeof lucide.createIcons === 'function') lucide.createIcons(); } catch(e){}
+
+  const selToCls = (v) => v === 'pequenos' ? 'Pequeños' : v === 'medianos' ? 'Medianos' : 'Grandes';
   const classroomSelect = document.getElementById('classroomSelect');
-  let currentClass = selToCls(classroomSelect?.value || 'pequenos');
+  // Determine current class safely even if the select was removed from the UI
+  let currentClass;
+  if (classroomSelect && classroomSelect.value) {
+    currentClass = selToCls(classroomSelect.value);
+  } else {
+    currentClass = selToCls('pequenos');
+  }
 
   // Renderizar posts del aula con adjuntos, reacciones y comentarios
   function renderClassPosts(){
@@ -77,10 +86,10 @@ document.addEventListener('DOMContentLoaded', () => {
 
   // Nueva publicación: usar el store v2
   document.getElementById('openAddPost')?.addEventListener('click', ()=>{
-    document.getElementById('modalAddPost')?.classList.remove('hidden');
+    showModal('modalAddPost');
   });
   document.getElementById('closeAddPost')?.addEventListener('click', ()=>{
-    document.getElementById('modalAddPost')?.classList.add('hidden');
+    hideModal('modalAddPost');
   });
   async function readFileDataURL(input){
     const f = input?.files?.[0];
@@ -102,19 +111,24 @@ document.addEventListener('DOMContentLoaded', () => {
     KarpusStore.addPost({ class: currentClass, teacher: 'Ana Pérez', text, photo, video, docUrl, docType });
     ['postText'].forEach(id=>{ const el=document.getElementById(id); if(el) el.value=''; });
     [photoEl, videoEl, docEl].forEach(el=>{ if(el) el.value=''; });
-    document.getElementById('modalAddPost')?.classList.add('hidden');
+    hideModal('modalAddPost');
     renderClassPosts();
   });
 
-  classroomSelect?.addEventListener('change', ()=>{
-    currentClass = selToCls(classroomSelect.value);
-    renderClassPosts();
-    renderTasks();
-  });
+  if (classroomSelect) {
+    classroomSelect.addEventListener('change', ()=>{
+      currentClass = selToCls(classroomSelect.value);
+      renderClassPosts();
+      renderTasks();
+    });
+  }
 
   // Inicial
   renderClassPosts();
   renderTasks();
+
+  // Debug info to help validate in browser console
+  try { console.info('maestra_patch initialized — currentClass =', currentClass); } catch(e){}
 
   // ======================
   // Tareas
@@ -152,8 +166,8 @@ document.addEventListener('DOMContentLoaded', () => {
       list.appendChild(card);
     });
   }
-  document.getElementById('openCreateTask')?.addEventListener('click', ()=> document.getElementById('modalCreateTask')?.classList.remove('hidden'));
-  document.getElementById('closeCreateTask')?.addEventListener('click', ()=> document.getElementById('modalCreateTask')?.classList.add('hidden'));
+  document.getElementById('openCreateTask')?.addEventListener('click', ()=> showModal('modalCreateTask'));
+  document.getElementById('closeCreateTask')?.addEventListener('click', ()=> hideModal('modalCreateTask'));
   document.getElementById('submitTask')?.addEventListener('click', async ()=>{
     const title = document.getElementById('taskTitle')?.value||'';
     const desc = document.getElementById('taskDesc')?.value||'';
@@ -165,7 +179,7 @@ document.addEventListener('DOMContentLoaded', () => {
     KarpusStore.addTask({ class: currentClass, title, desc, publish, due, attachments });
     ['taskTitle','taskDesc','taskPublish','taskDue'].forEach(id=>{ const el=document.getElementById(id); if(el) el.value=''; });
     if(filesEl) filesEl.value='';
-    document.getElementById('modalCreateTask')?.classList.add('hidden');
+    hideModal('modalCreateTask');
     renderTasks();
   });
   document.getElementById('taskList')?.addEventListener('click', async (e)=>{
@@ -197,7 +211,7 @@ document.addEventListener('DOMContentLoaded', () => {
         });
       }
 
-      document.getElementById('modalGradeTask')?.classList.remove('hidden');
+      showModal('modalGradeTask');
 
       document.getElementById('saveGrades').onclick = () => {
         const gradeElements = gradeList.querySelectorAll('[data-student-name]');
@@ -208,7 +222,7 @@ document.addEventListener('DOMContentLoaded', () => {
           KarpusStore.gradeSubmission(id, studentName, grade, comment);
         });
         alert('Calificaciones guardadas.');
-        document.getElementById('modalGradeTask')?.classList.add('hidden');
+        hideModal('modalGradeTask');
       };
     } else if(action==='edit-task'){
       const t = KarpusStore.getTaskById(id);
@@ -216,7 +230,7 @@ document.addEventListener('DOMContentLoaded', () => {
       document.getElementById('editTaskDesc').value = t.desc||'';
       document.getElementById('editTaskPublish').value = t.publish||'';
       document.getElementById('editTaskDue').value = t.due||'';
-      document.getElementById('modalEditTask')?.classList.remove('hidden');
+      showModal('modalEditTask');
       document.getElementById('submitEditTask').onclick = async ()=>{
         const title = document.getElementById('editTaskTitle')?.value||'';
         const desc = document.getElementById('editTaskDesc')?.value||'';
@@ -226,12 +240,12 @@ document.addEventListener('DOMContentLoaded', () => {
         const current = KarpusStore.getTaskById(id);
         const attachments = [...(current.attachments||[]), ...newFiles];
         KarpusStore.updateTask(id, { title, desc, publish, due, attachments });
-        if(filesEl) filesEl.value=''; document.getElementById('modalEditTask')?.classList.add('hidden'); renderTasks();
+        if(filesEl) filesEl.value=''; hideModal('modalEditTask'); renderTasks();
       };
     }
   });
-  document.getElementById('closeEditTask')?.addEventListener('click', ()=> document.getElementById('modalEditTask')?.classList.add('hidden'));
-  document.getElementById('closeGradeTask')?.addEventListener('click', ()=> document.getElementById('modalGradeTask')?.classList.add('hidden'));
+  document.getElementById('closeEditTask')?.addEventListener('click', ()=> hideModal('modalEditTask'));
+  document.getElementById('closeGradeTask')?.addEventListener('click', ()=> hideModal('modalGradeTask'));
 
   // ======================
   // Historial
@@ -240,9 +254,9 @@ document.addEventListener('DOMContentLoaded', () => {
     const list = document.getElementById('historyList');
     const posts = KarpusStore.getClassPosts(currentClass);
     list.innerHTML = posts.map(p=> `<div class='p-2 rounded-xl bg-white border'><div class='text-xs text-slate-500'>${p.date} · ${p.teacher}</div><div class='text-sm'>${p.text}</div></div>`).join('');
-    document.getElementById('modalHistory')?.classList.remove('hidden');
+    showModal('modalHistory');
   });
-  document.getElementById('closeHistory')?.addEventListener('click', ()=> document.getElementById('modalHistory')?.classList.add('hidden'));
+  document.getElementById('closeHistory')?.addEventListener('click', ()=> hideModal('modalHistory'));
 
   // ======================
   // Chat privado (Avisos)
@@ -349,8 +363,8 @@ document.addEventListener('DOMContentLoaded', () => {
     const closeBtn = document.getElementById(closeBtnId);
     const modal = document.getElementById(modalId);
 
-    openBtn?.addEventListener('click', () => modal?.classList.remove('hidden'));
-    closeBtn?.addEventListener('click', () => modal?.classList.add('hidden'));
+    openBtn?.addEventListener('click', () => showModal(modalId));
+    closeBtn?.addEventListener('click', () => hideModal(modalId));
   };
 
   // Modal: Ver Padres
@@ -383,15 +397,15 @@ document.addEventListener('DOMContentLoaded', () => {
       if (!text || !text.trim()) return alert('El mensaje no puede estar vacío.');
       
       const recipientName = document.querySelector(`#messageTo option[value="${recipientId}"]`)?.textContent;
-      alert(`Mensaje enviado a ${recipientName} (simulación).`);
-      document.getElementById('modalMessage')?.classList.add('hidden');
+        alert(`Mensaje enviado a ${recipientName} (simulación).`);
+        hideModal('modalMessage');
   });
 
   // Modal: Exportar
   setupModal('openExport', 'closeExport', 'modalExport');
   document.getElementById('doExport')?.addEventListener('click', () => {
       alert('Reporte exportado (simulación).');
-      document.getElementById('modalExport')?.classList.add('hidden');
+      hideModal('modalExport');
   });
 
   // Modal: Enviar Notificación (general)
@@ -400,6 +414,18 @@ document.addEventListener('DOMContentLoaded', () => {
       const text = document.getElementById('notifText')?.value || '';
       if (!text.trim()) return alert('El mensaje no puede estar vacío.');
       alert('Notificación enviada (simulación).');
-      document.getElementById('modalSendNotification')?.classList.add('hidden');
+      hideModal('modalSendNotification');
   });
+  
+  // Modal helpers: use consistent show/hide and focus management
+  function showModal(id){
+    const m = document.getElementById(id); if(!m) return;
+    m.classList.remove('hidden'); m.setAttribute('aria-hidden','false');
+    const focusable = m.querySelector('button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])');
+    try{ if(focusable) focusable.focus(); } catch(e){}
+  }
+  function hideModal(id){
+    const m = document.getElementById(id); if(!m) return;
+    m.classList.add('hidden'); m.setAttribute('aria-hidden','true');
+  }
 });

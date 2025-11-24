@@ -136,65 +136,15 @@
 </head>
 <body class="text-slate-800 min-h-screen">
   <div class="min-h-screen flex flex-col font-nunito">
-    <!-- fixed missing closing tag -->
-  </div>
-    <!-- Sidebar -->
-    <aside id="sidebar" class="hidden md:flex sidebar-blue fixed inset-y-0 left-0 p-4 rounded-r-3xl shadow-lg z-10">
-      <div class="flex flex-col h-full">
-        <!-- sidebar content moved inside this wrapper -->
-      </div>
-        <div class="flex items-center gap-3 mb-6">
-          <div class="h-12 w-12 rounded-2xl bg-white flex items-center justify-center shadow-soft">
-            <img src="img/mundo.jpg" alt="logo" class="h-10 w-10 rounded-lg object-cover" />
-          </div>
-          <div class="label">
-            <h3 class="font-semibold text-white"><span class="karpus-kids-inline"><span class="k-1">K</span><span class="k-2">a</span><span class="k-3">r</span><span class="k-4">p</span><span class="k-5">u</span><span class="k-6">s</span> <span class="k-7">K</span><span class="k-8">i</span><span class="k-9">d</span><span class="k-10">s</span></span></h3>
-            <p class="text-xs text-white text-opacity-80">Panel - Padres</p>
-          </div>
-        </div>
-
-        <nav class="teams-nav bg-white bg-opacity-10 rounded-xl mb-4 flex-grow">
-          <button data-section="home" class="teams-nav-item active">
-            <i data-lucide="home" class="text-karpus-orange"></i>
-            <span class="label text-white">Inicio</span>
-          </button>
-          <button data-section="class" class="teams-nav-item">
-            <i data-lucide="globe" class="text-karpus-blue"></i>
-            <span class="label text-white">Aula</span>
-          </button>
-          <button data-section="tasks" class="teams-nav-item">
-            <i data-lucide="book-open" class="text-karpus-green"></i>
-            <span class="label text-white">Tareas</span>
-            <span class="notification-badge ml-auto">2</span>
-          </button>
-          <button data-section="notifications" class="teams-nav-item">
-            <i data-lucide="bell" class="text-karpus-pink"></i>
-            <span class="label text-white">Avisos</span>
-            <span class="notification-badge ml-auto">3</span>
-          </button>
-          <button data-section="development" class="teams-nav-item">
-            <i data-lucide="trending-up" class="text-karpus-teal"></i>
-            <span class="label text-white">Plan Educativo</span>
-          </button>
-          <button data-section="calendar" class="teams-nav-item">
-            <i data-lucide="calendar" class="text-karpus-purple"></i>
-            <span class="label text-white">Calendario</span>
-          </button>
-          <button data-section="profile" class="teams-nav-item">
-            <i data-lucide="user" class="text-karpus-yellow"></i>
-            <span class="label text-white">Perfil</span>
-          </button>
-        </nav>
-
-      <!-- Selector de color eliminado: sidebar único -->
-    </aside>
+    <!-- page wrapper: ensure main content lives inside this container -->
+    <!-- Sidebar eliminado para enfoque en navegación inferior -->
 
     <!-- Mobile header -->
-    <div class="md:hidden w-full fixed top-0 left-0 right-0 bg-white/80 backdrop-blur-sm border-b z-10 shadow-soft">
+    <div class="md:hidden w-full fixed top-0 left-0 right-0 bg-white/80 backdrop-blur-sm border-b z-10 shadow-lg">
       <header class="px-4 py-2 flex items-center justify-between">
-        <button id="menuBtn" class="p-2"><i data-lucide="menu"></i></button>
+        <!-- Botón hamburguesa eliminado al no existir sidebar izquierdo -->
         <div class="flex items-center gap-3">
-          <div class="w-9 h-9 rounded-2xl bg-karpus-blue flex items-center justify-center shadow-soft">
+          <div class="w-9 h-9 rounded-2xl bg-karpus-blue flex items-center justify-center shadow-lg">
             <img src="img/mundo.jpg" alt="logo" class="h-6 w-6 rounded" />
           </div>
           <div>
@@ -410,6 +360,31 @@
       </div>
     </section>
 
+    <!-- Asistencia (se muestra al pulsar 'Asistencia' en el menú inferior) -->
+    <section id="tab-live-attendance" class="hidden space-y-6">
+      <div class="modern-card p-4">
+        <div class="flex items-center justify-between mb-3">
+          <h2 class="text-base font-semibold font-poppins text-karpus-blue flex items-center gap-2">
+            <i data-lucide="user-check" class="text-karpus-blue h-5 w-5"></i>
+            Asistencia
+          </h2>
+          <div class="flex items-center gap-2">
+            <button class="period-btn text-xs px-2 py-1 rounded-xl bg-slate-100" data-period="day">Día</button>
+            <button class="period-btn text-xs px-2 py-1 rounded-xl bg-slate-100" data-period="week">Semana</button>
+            <button class="period-btn text-xs px-2 py-1 rounded-xl bg-slate-100" data-period="month">Mes</button>
+          </div>
+        </div>
+
+        <div class="mt-3">
+          <canvas id="attendanceChart" class="w-full rounded-xl bg-white p-2" height="160"></canvas>
+        </div>
+
+        <div class="mt-4 text-sm text-slate-600">
+          <p>Selecciona el periodo para ver la asistencia de tu estudiante.</p>
+        </div>
+      </div>
+    </section>
+
     <!-- Aula -->
     <section id="tab-class" class="hidden space-y-4">
       <div class="flex items-center justify-between">
@@ -465,7 +440,7 @@
 
     <!-- Perfil -->
     <section id="tab-profile" class="hidden space-y-4">
-      <div class="p-4 rounded-3xl bg-white shadow-soft border">
+      <div class="p-4 rounded-3xl bg-white shadow-lg border">
         <div class="flex items-center gap-4">
           <img src="https://placehold.co/200x200" alt="Niño" class="w-16 h-16 rounded-2xl object-cover" />
           <div>
@@ -478,7 +453,7 @@
           <button id="openDirectorProfileBtn" class="px-3 py-2 rounded-xl border text-xs">Ver Directora</button>
         </div>
       </div>
-      <div class="p-4 rounded-3xl bg-white shadow-soft border">
+      <div class="p-4 rounded-3xl bg-white shadow-lg border">
         <div class="flex items-center justify-between">
           <h4 class="text-sm font-semibold">Pago del mes</h4>
           <span class="text-xs px-2 py-1 rounded-lg bg-green-100 text-green-700">Pagado</span>
@@ -585,7 +560,9 @@
   </div>
 
   <!-- Script -->
+  </div>
   <script src="js/store.js?v=2"></script>
   <script src="js/padres_patch.js?v=2"></script>
+  <script src="js/common_ui.js"></script>
 </body>
 </html>
