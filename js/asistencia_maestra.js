@@ -126,7 +126,9 @@ document.addEventListener('DOMContentLoaded', function() {
       });
       
       // Recrear íconos
-      lucide.createIcons();
+      if (window.lucide) {
+        lucide.createIcons();
+      }
       
       // Añadir event listeners a los botones
       document.querySelectorAll('.btn-presente').forEach(btn => {
@@ -534,33 +536,10 @@ document.addEventListener('DOMContentLoaded', function() {
     });
   }
   
-  // Verificar funcionamiento de botones
-  function verificarBotones() {
-    console.log("Verificando funcionamiento de botones...");
-    
-    // Asegurar que los botones de asistencia funcionen correctamente
-    document.querySelectorAll('.btn-presente, .btn-ausente, .btn-retardo, .btn-notificar, .btn-detalles').forEach(btn => {
-      btn.addEventListener('click', function(e) {
-        // Prevenir múltiples event listeners
-        e.stopPropagation();
-      });
-    });
-    
-    // Verificar botones de navegación
-    document.querySelectorAll('nav a, nav button').forEach(btn => {
-      btn.addEventListener('click', function(e) {
-        console.log("Navegación activada: ", this.getAttribute('href') || this.getAttribute('data-section'));
-      });
-    });
-    
-    console.log("Verificación de botones completada");
-  }
-  
   // Inicializar todo el sistema de asistencia
   agregarEnlaceAsistencia();
   agregarSeccionAsistencia();
   agregarModales();
   inicializarAsistencia();
   configurarNavegacion();
-  verificarBotones();
 });
