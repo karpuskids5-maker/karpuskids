@@ -4,7 +4,6 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Panel de Padres - Karpus Kids</title>
-  <script src="https://cdn.tailwindcss.com"></script>
   <link rel="stylesheet" href="css/theme.css" />
   <link rel="stylesheet" href="css/karpus-modern.css" />
   <script src="js/auth.js?v=1"></script>
@@ -26,6 +25,7 @@
   </script>
   <link href="https://fonts.googleapis.com/css2?family=Nunito:wght@400;600;700&family=Poppins:wght@400;500;600;700&display=swap" rel="stylesheet">
   <script>
+    // Configuración de Tailwind: debe estar ANTES del CDN
     tailwind.config = {
       theme: {
         extend: {
@@ -35,6 +35,8 @@
             'karpus-pink': '#EC4899',
             'karpus-orange': '#FB923C',
             'karpus-blue-soft': '#93C5FD',
+            'karpus-purple': '#7C3AED',
+            'karpus-teal': '#14B8A6',
             'karpus-sky': { light: '#E0F2FE', DEFAULT: '#D6E9FF' }
           },
           fontFamily: {
@@ -53,6 +55,7 @@
       }
     }
   </script>
+  <script src="https://cdn.tailwindcss.com"></script>
   <style>
     :root {
       --color-primary: #2563EB; /* Azul moderno */
@@ -244,7 +247,7 @@
   <div class="flex min-h-screen font-nunito">
     <!-- SIDEBAR DESKTOP -->
     <aside id="sidebar" class="hidden md:flex flex-col w-[260px] sidebar-sky border-r shadow-soft px-4 py-6 fixed inset-y-0 left-0 z-20">
-      <button id="toggleSidebar" class="absolute right-2 top-6 toggle-btn-padres rounded-full w-10 h-10 flex items-center justify-center shadow-lg z-30 hidden md:flex"><i data-lucide="chevron-left" class="w-6 h-6"></i></button>
+      <button id="toggleSidebar" aria-label="Colapsar sidebar" class="absolute right-2 top-6 toggle-btn-padres rounded-full w-10 h-10 flex items-center justify-center shadow-lg z-30 hidden md:flex"><i data-lucide="chevron-left" class="w-6 h-6"></i></button>
       <div class="flex items-center gap-3 mb-8">
         <img src="img/mundo.jpg" class="w-10 h-10 rounded-xl" />
         <div class="label">
@@ -293,7 +296,7 @@
     <!-- Mobile header -->
     <div class="md:hidden w-full fixed top-0 left-0 right-0 bg-white/80 backdrop-blur-sm border-b z-10 shadow-lg">
       <header class="px-4 py-2 flex items-center justify-between">
-        <button id="menuBtn" class="p-2 -ml-2 rounded-lg text-slate-600 hover:bg-slate-100"><i data-lucide="menu" class="w-6 h-6"></i></button>
+        <button id="menuBtn" aria-label="Abrir menú móvil" class="p-2 -ml-2 rounded-lg text-slate-600 hover:bg-slate-100"><i data-lucide="menu" class="w-6 h-6"></i></button>
         <div class="flex items-center gap-3">
           <div class="w-9 h-9 rounded-2xl bg-karpus-blue flex items-center justify-center shadow-lg">
             <img src="img/mundo.jpg" alt="logo" class="h-6 w-6 rounded" />
@@ -305,7 +308,7 @@
         </div>
         <!-- Menú de Avatar de Usuario -->
         <div class="relative">
-          <button id="avatarMenuBtn">
+          <button id="avatarMenuBtn" aria-label="Abrir menú de avatar">
             <img src="https://placehold.co/200x200" alt="Avatar del alumno" class="w-9 h-9 rounded-full object-cover border-2 border-karpus-blue-soft">
           </button>
           <!-- Menú desplegable -->
@@ -314,7 +317,7 @@
               <p class="text-sm font-semibold">Padre / Tutor</p>
               <p class="text-xs text-slate-500">Alumno: Andrea Flores</p>
             </div>
-            <button id="editProfileBtn" class="w-full text-left px-3 py-2 text-sm text-slate-700 hover:bg-slate-100 rounded-b-xl">Editar Perfil</button>
+            <button id="editProfileBtn" aria-label="Editar perfil" class="w-full text-left px-3 py-2 text-sm text-slate-700 hover:bg-slate-100 rounded-b-xl">Editar Perfil</button>
           </div>
         </div>
       </header>
@@ -504,7 +507,7 @@
         </div>
         
         <div class="modern-card-footer flex justify-between">
-          <button id="requestMeetingBtn" class="modern-button bg-slate-100 text-slate-700 text-xs">
+          <button id="requestMeetingBtn" aria-label="Solicitar reunión" class="modern-button bg-slate-100 text-slate-700 text-xs">
             <i data-lucide="message-square" class="h-4 w-4"></i>
             Solicitar reunión
           </button>
@@ -543,9 +546,9 @@
           <div class="flex items-center justify-between mb-4">
             <h3 class="text-sm font-semibold text-slate-700">Calendario Mensual</h3>
             <div class="flex items-center gap-2 bg-slate-50 rounded-lg p-1 border">
-              <button id="calPrevBtn" class="p-1 hover:bg-white rounded shadow-sm transition-all"><i data-lucide="chevron-left" class="w-4 h-4"></i></button>
+              <button id="calPrevBtn" aria-label="Mes anterior" class="p-1 hover:bg-white rounded shadow-sm transition-all"><i data-lucide="chevron-left" class="w-4 h-4"></i></button>
               <span id="calMonthLabel" class="text-xs font-bold w-24 text-center text-slate-700 capitalize"></span>
-              <button id="calNextBtn" class="p-1 hover:bg-white rounded shadow-sm transition-all"><i data-lucide="chevron-right" class="w-4 h-4"></i></button>
+              <button id="calNextBtn" aria-label="Mes siguiente" class="p-1 hover:bg-white rounded shadow-sm transition-all"><i data-lucide="chevron-right" class="w-4 h-4"></i></button>
             </div>
           </div>
           <div class="bg-slate-50/50 rounded-2xl border border-slate-100 p-4">
@@ -617,7 +620,7 @@
           <i data-lucide="graduation-cap" class="w-6 h-6 text-karpus-blue"></i>
           Desarrollo Infantil
         </h2>
-        <button id="downloadGradesBtn" class="text-xs px-3 py-2 bg-white border border-slate-200 text-slate-700 rounded-xl flex items-center gap-2 hover:bg-slate-50 hover:text-karpus-blue transition-colors shadow-sm">
+        <button id="downloadGradesBtn" aria-label="Descargar reporte de desarrollo en PDF" class="text-xs px-3 py-2 bg-white border border-slate-200 text-slate-700 rounded-xl flex items-center gap-2 hover:bg-slate-50 hover:text-karpus-blue transition-colors shadow-sm">
           <i data-lucide="file-down" class="w-4 h-4"></i> Descargar PDF
         </button>
       </div>
@@ -646,7 +649,7 @@
       <p class="text-xs text-slate-600">🎯 Objetivo: Comunicación institucional. Chat con Maestra y Administración. 🚫 Nunca con estudiantes. Etiqueta: “Chat institucional”. Historial guardado.</p>
       <div class="grid md:grid-cols-3 gap-4">
         <div class="md:col-span-1 rounded-3xl bg-white p-3 border">
-          <input id="contactFilter" class="w-full border rounded-xl px-2 py-1 text-sm" placeholder="Filtrar contacto" />
+          <input id="contactFilter" aria-label="Filtrar contacto" class="w-full border rounded-xl px-2 py-1 text-sm" placeholder="Filtrar contacto" />
           <div id="contactList" class="mt-2 space-y-1 max-h-64 overflow-auto"></div>
         </div>
         <div class="md:col-span-2 rounded-3xl bg-white p-3 border flex flex-col">
@@ -654,9 +657,9 @@
           <div id="chatMessages" class="flex-1 mt-2 space-y-2 max-h-64 overflow-auto"></div>
           <div id="typingIndicator" class="text-[11px] text-slate-500"></div>
           <div class="mt-2 flex gap-2 items-center">
-            <button id="chatEmoji" class="px-2 py-1 rounded bg-slate-100">😀</button>
-            <input id="chatInput" class="flex-1 border rounded-xl px-2 py-1 text-sm" placeholder="Escribe un mensaje" />
-            <button id="chatSend" class="text-sm px-3 py-2 rounded-xl bg-karpus-pink text-white">Enviar</button>
+            <button id="chatEmoji" aria-label="Abrir menú de emojis" class="px-2 py-1 rounded bg-slate-100">😀</button>
+            <input id="chatInput" aria-label="Escribir mensaje" class="flex-1 border rounded-xl px-2 py-1 text-sm" placeholder="Escribe un mensaje" />
+            <button id="chatSend" aria-label="Enviar mensaje" class="text-sm px-3 py-2 rounded-xl bg-karpus-pink text-white">Enviar</button>
           </div>
           <div id="emojiMenu" class="hidden border rounded p-2"></div>
         </div>
@@ -669,7 +672,7 @@
       <div class="p-4 rounded-3xl bg-white shadow-lg border">
         <h3 class="text-sm font-semibold text-slate-500 mb-3 uppercase tracking-wider">Datos del Estudiante</h3>
         <div class="flex items-center gap-4">
-          <img src="https://placehold.co/200x200" alt="Niño" class="w-16 h-16 rounded-2xl object-cover" />
+          <img src="https://placehold.co/200x200" alt="Foto del estudiante" class="w-16 h-16 rounded-2xl object-cover" />
           <div>
             <h3 class="text-base font-semibold">Andrea Flores</h3>
             <p class="text-sm text-slate-600">3 años • Aula Pequeños</p>

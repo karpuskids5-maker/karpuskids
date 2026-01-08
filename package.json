@@ -1,0 +1,26 @@
+{
+  "name": "karpus",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "db:init": "node scripts/init-db.js",
+    "db:reset": "node scripts/init-db.js --reset"
+  },
+  "description": "��#\u0000 \u0000k\u0000a\u0000r\u0000p\u0000u\u0000s\u0000k\u0000i\u0000d\u0000s\u0000\r\u0000 \u0000",
+  "main": "index.js",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/karpuskids5-maker/karpuskids.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/karpuskids5-maker/karpuskids/issues"
+  },
+  "homepage": "https://github.com/karpuskids5-maker/karpuskids#readme",
+  "dependencies": {
+    "better-sqlite3": "^12.5.0"
+  }
+}

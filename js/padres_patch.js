@@ -1,6 +1,6 @@
-document.addEventListener('DOMContentLoaded', ()=>{
-  if(window.Auth && !Auth.enforceRole('padre')) return;
-  if(!window.KarpusStore) return;
+document.addEventListener('DOMContentLoaded', () => {
+  if (window.Auth && !Auth.enforceRole('padre')) return;
+  if (!window.KarpusStore) return;
   const CURRENT_PARENT = (window.Auth && Auth.user) ? { id: Auth.user.id || 'padre_demo', name: Auth.user.name || Auth.user.fullName || 'Padre Demo' } : { id: 'padre_demo', name: 'Padre Demo' };
   const selToCls = (v) => v==='pequenos' ? 'Pequeños' : v==='medianos' ? 'Medianos' : 'Grandes';
   const pickEl = (ids) => ids.map(id=> document.getElementById(id)).find(Boolean);
@@ -557,17 +557,8 @@ document.addEventListener('DOMContentLoaded', ()=>{
     });
   }
 
-  // Inicialización general: íconos y contenidos por defecto
+  // Inicialización general: íconos
   try { window.lucide && window.lucide.createIcons(); } catch(e) {}
-  // Renderizar contenido inicial para que las secciones muestren datos
-  try { renderDashboard(); } catch(e) {}
-  try { renderPosts(); } catch(e) {}
-  try { renderTasks(); } catch(e) {}
-  try { renderGrades(); } catch(e) {}
-  // Mostrar la pestaña Home al cargar
-  showTab('home');
-  // Preparar contactos del chat si existe la sección
-  try { loadContacts(); } catch(e) {}
 
   function renderGeneralFeed() {
     if (!generalFeedEl) return;
@@ -594,13 +585,7 @@ document.addEventListener('DOMContentLoaded', ()=>{
     if(window.lucide) lucide.createIcons();
   }
 
-  // Función global para manejar clic en notificación
-  window.handleNotificationClick = function(contactId) {
-      showTab('notifications');
-      if(!contacts.length) loadContacts();
-      const contact = contacts.find(c => c.id === contactId);
-      if(contact) openChatWith(contact);
-  };
+  // (Se mantiene la versión segura de handleNotificationClick definida más arriba)
 
   // (Eliminado el gráfico dinámico de Chart.js; se usa donut SVG ligero definido arriba)
 
@@ -687,10 +672,7 @@ document.addEventListener('DOMContentLoaded', ()=>{
     renderTasks();
   });
 
-  // Interacciones en posts deshabilitadas (vista de solo lectura)
-  postsEl?.addEventListener('click', (e)=>{
-    return;
-  });
+  // (Eliminado listener vacío de posts)
 
   classSelect?.addEventListener('change', ()=>{
     currentClass = selToCls(classSelect.value);
