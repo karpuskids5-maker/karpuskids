@@ -15,21 +15,11 @@
     })();
   </script>
   <script src="https://unpkg.com/lucide@latest/dist/umd/lucide.min.js"></script>
-  <!-- Chart.js (para gráficas) -->
-  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
   <style>
     aside#sidebar { width: 280px; transition: width .25s ease, transform .25s ease; }
     aside#sidebar.collapsed { width: 72px; }
     aside#sidebar .label { transition: opacity .2s ease; }
     aside#sidebar.collapsed .label { opacity: 0; }
-    /* color variants */
-    .sidebar-indigo { background: linear-gradient(135deg,#EEF2FF,#E0E7FF); }
-    .sidebar-blue { background: linear-gradient(135deg,#E3F2FD,#BBDEFB); }
-    .sidebar-green { background: linear-gradient(135deg,#E8F8F0,#D0F0E0); }
-    .sidebar-teal { background: linear-gradient(135deg, #0d9488, #14b8a6); }
-    /* Estilos para modales más profesionales */
-    .modal-container {
-      position: fixed;
       top: 0;
       left: 0;
       right: 0;
@@ -62,70 +52,10 @@
     }
   </style>
 </head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Panel de Asistente (Recepcionista) - Karpus Kids</title>
-  <script src="https://cdn.tailwindcss.com"></script>
-  <link rel="stylesheet" href="css/theme.css" />
-  <link rel="stylesheet" href="css/karpus-modern.css" />
-  <script src="js/auth.js?v=1"></script>
-  <script>
-    (function(){
-      const check = Auth.requireRole('asistente');
-      if(!check.ok){ window.location.href = 'login.html'; }
-    })();
-  </script>
-  <script src="https://unpkg.com/lucide@latest/dist/umd/lucide.min.js"></script>
-  <!-- Chart.js (para gráficas) -->
-  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-  <style>
-    aside#sidebar { width: 280px; transition: width .25s ease, transform .25s ease; }
-    aside#sidebar.collapsed { width: 72px; }
-    aside#sidebar .label { transition: opacity .2s ease; }
-    aside#sidebar.collapsed .label { opacity: 0; }
-    /* color variants */
-    .sidebar-indigo { background: linear-gradient(135deg,#EEF2FF,#E0E7FF); }
-    .sidebar-blue { background: linear-gradient(135deg,#E3F2FD,#BBDEFB); }
-    .sidebar-green { background: linear-gradient(135deg,#E8F8F0,#D0F0E0); }
-    .sidebar-teal { background: linear-gradient(135deg, #0d9488, #14b8a6); }
-    /* Estilos para modales más profesionales */
-    .modal-container {
-      position: fixed;
-      top: 0;
-      left: 0;
-      right: 0;
-      bottom: 0;
-      background-color: rgba(0, 0, 0, 0.5);
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      z-index: 50;
-      opacity: 0;
-      visibility: hidden;
-      transition: opacity 0.3s ease, visibility 0.3s ease;
-    }
-    
-    .modal-container.active {
-      opacity: 1;
-      visibility: visible;
-    }
-    
-    .modal-content {
-      background: white;
-      border-radius: 16px;
-      box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
-      width: 90%;
-      max-width: 800px;
-      max-height: 90vh;
-      overflow-y: auto;
-      transform: scale(0.9);
-      transition: transform 0.3s ease;
-    }
-  </style>
 <body class="bg-slate-100 min-h-screen">
   <div class="flex">
     <!-- Sidebar -->
-    <aside id="sidebar" class="sidebar-blue h-screen p-4 sticky top-0">
+    <aside id="sidebar" class="sidebar-blue h-screen p-4 sticky top-0 relative">
       <div class="flex items-center gap-3 px-2 mb-4">
         <img src="img/mundo.jpg" class="w-8 h-8 rounded" alt="Karpus">
         <div>
@@ -133,74 +63,202 @@
           <p class="text-xs text-slate-600">Recepción</p>
         </div>
       </div>
-      <div class="sidebar-scroll glass rounded-xl p-2 space-y-1">
-        <button data-section="asistencia" class="w-full text-left px-3 py-2 rounded hover:bg-white/50 flex items-center gap-3"><i data-lucide="user-check"></i><span class="label">Entrada/Salida</span></button>
-        <button data-section="comunicacion" class="w-full text-left px-3 py-2 rounded hover:bg-white/50 flex items-center gap-3"><i data-lucide="message-square"></i><span class="label">Comunicación</span></button>
+      <!-- Botón de colapsar/expandir -->
+      <button id="toggleSidebar" aria-label="Colapsar sidebar" class="absolute top-2 right-2 w-10 h-10 rounded-full bg-white shadow-lg flex items-center justify-center text-slate-700 hover:bg-slate-100">
+        <i data-lucide="chevrons-left" class="w-6 h-6"></i>
+      </button>
+      <div class="sidebar-scroll glass rounded-xl p-2 space-y-1 label">
+        <button data-section="inicio" class="w-full text-left px-3 py-2 rounded hover:bg-white/50 flex items-center gap-3"><i data-lucide="home"></i><span class="label">Inicio</span></button>
         <button data-section="alumnos" class="w-full text-left px-3 py-2 rounded hover:bg-white/50 flex items-center gap-3"><i data-lucide="users"></i><span class="label">Alumnos</span></button>
-        <button data-section="apoyo" class="w-full text-left px-3 py-2 rounded hover:bg-white/50 flex items-center gap-3"><i data-lucide="briefcase"></i><span class="label">Apoyo Admin</span></button>
+        <button data-section="maestros" class="w-full text-left px-3 py-2 rounded hover:bg-white/50 flex items-center gap-3"><i data-lucide="graduation-cap"></i><span class="label">Maestros</span></button>
+        <button data-section="padres" class="w-full text-left px-3 py-2 rounded hover:bg-white/50 flex items-center gap-3"><i data-lucide="user"></i><span class="label">Padres</span></button>
+        <button data-section="aulas" class="w-full text-left px-3 py-2 rounded hover:bg-white/50 flex items-center gap-3"><i data-lucide="school"></i><span class="label">Aulas</span></button>
+        <button data-section="pagos" class="w-full text-left px-3 py-2 rounded hover:bg-white/50 flex items-center gap-3"><i data-lucide="credit-card"></i><span class="label">Pagos</span></button>
+        <button data-section="visitas" class="w-full text-left px-3 py-2 rounded hover:bg-white/50 flex items-center gap-3"><i data-lucide="id-card"></i><span class="label">Visitas</span></button>
+        <button data-section="reportes" class="w-full text-left px-3 py-2 rounded hover:bg-white/50 flex items-center gap-3"><i data-lucide="file-text"></i><span class="label">Reportes</span></button>
+        <button data-section="config" class="w-full text-left px-3 py-2 rounded hover:bg-white/50 flex items-center gap-3"><i data-lucide="settings"></i><span class="label">Configuración</span></button>
         <a id="logoutLink" href="#" class="w-full text-left px-3 py-2 rounded hover:bg-white/50 flex items-center gap-3"><i data-lucide="log-out"></i><span class="label">Cerrar sesión</span></a>
       </div>
     </aside>
 
     <!-- Main content -->
-    <main class="flex-1 p-6 space-y-6">
-      <div class="flex items-center justify-between mb-4">
+    <main id="layoutShell" class="flex-1 p-6 space-y-6 md:ml-[280px]">
+      <div class="flex items-center justify-between mb-4 md:hidden">
         <h2 class="text-xl font-semibold flex items-center gap-2"><i data-lucide="user"></i><span>Panel del Asistente</span></h2>
-        <button id="toggleSidebar" class="px-3 py-2 rounded bg-slate-200">Colapsar</button>
+        <button id="menuBtn" class="p-2 rounded bg-white shadow"><i data-lucide="menu"></i></button>
       </div>
 
-      <!-- Asistencia -->
-      <section id="asistencia" class="section">
-        <div class="mb-4 flex items-center gap-3">
-          <h3 class="text-lg font-semibold">Control de entrada y salida</h3>
-          <button id="generateDailyReport" class="px-3 py-2 bg-blue-600 text-white rounded">Reporte diario</button>
+      <!-- Inicio (Dashboard administrativo) -->
+      <section id="inicio" class="section">
+        <div class="grid grid-cols-1 md:grid-cols-4 gap-4 mb-2">
+          <div class="p-4 bg-white rounded shadow"><p class="text-sm text-slate-500">Alumnos activos</p><p id="dashStudentsActive" class="text-2xl font-bold">0</p></div>
+          <div class="p-4 bg-white rounded shadow"><p class="text-sm text-slate-500">Pagos pendientes</p><p id="dashPaymentsPending" class="text-2xl font-bold">0</p></div>
+          <div class="p-4 bg-white rounded shadow"><p class="text-sm text-slate-500">Pagos del día</p><p id="dashPaymentsToday" class="text-2xl font-bold">0</p></div>
+          <div class="p-4 bg-white rounded shadow"><p class="text-sm text-slate-500">Aulas activas</p><p id="dashClassesActive" class="text-2xl font-bold">0</p></div>
         </div>
-        <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
-          <div class="p-4 bg-white rounded shadow"><p class="text-sm text-slate-500">Presentes</p><p id="presentCount" class="text-2xl font-bold">0</p></div>
-          <div class="p-4 bg-white rounded shadow"><p class="text-sm text-slate-500">Ausentes</p><p id="absentCount" class="text-2xl font-bold">0</p></div>
-          <div class="p-4 bg-white rounded shadow"><p class="text-sm text-slate-500">Retirados</p><p id="retiredCount" class="text-2xl font-bold">0</p></div>
-        </div>
-        <div class="bg-white rounded shadow p-4">
-          <div class="flex items-center justify-between mb-2">
-            <input id="attendanceSearch" placeholder="Buscar alumno..." class="px-3 py-2 border rounded" />
-            <div class="flex gap-2">
-              <button id="scanQR" class="px-3 py-2 border rounded">Registrar por QR</button>
-              <button id="scanCode" class="px-3 py-2 border rounded">Registrar por Código</button>
-              <button id="scanFace" class="px-3 py-2 border rounded">Registrar por Rostro</button>
-            </div>
-          </div>
-          <table class="w-full text-sm">
-            <thead class="text-slate-500 text-left"><tr><th>Alumno</th><th>Grupo</th><th>Estado</th><th>Acciones</th></tr></thead>
-            <tbody id="attendanceTable"></tbody>
-          </table>
-        </div>
+        <div id="alertsList" class="space-y-2"></div>
       </section>
 
-      <!-- Comunicación básica -->
-      <section id="comunicacion" class="section hidden">
-        <h3 class="text-lg font-semibold mb-4">Mensajes rápidos a padres</h3>
-        <div class="bg-white rounded shadow p-4 space-y-3">
-          <div class="flex items-center gap-2">
-            <input id="quickMsgParent" placeholder="Correo del padre" class="flex-1 border rounded px-3 py-2" />
-            <input id="quickMsgText" placeholder="Mensaje (ej: Favor traer muda de ropa)" class="flex-1 border rounded px-3 py-2" />
-            <button id="sendQuickMsg" class="px-3 py-2 bg-green-600 text-white rounded">Enviar</button>
-          </div>
-          <p class="text-xs text-slate-500">Notificaciones automáticas: se envían al registrar entrada/salida.</p>
-          <div id="quickMsgLog" class="text-sm text-slate-700 space-y-2"></div>
-        </div>
-      </section>
-
-      <!-- Gestión de alumnos -->
+      <!-- Alumnos -->
       <section id="alumnos" class="section hidden">
         <div class="flex items-center justify-between mb-2">
-          <h3 class="text-lg font-semibold">Fichas básicas</h3>
+          <h3 class="text-lg font-semibold">Alumnos</h3>
           <button id="openAddStudent" class="px-3 py-2 bg-indigo-600 text-white rounded">Añadir alumno</button>
         </div>
         <div class="bg-white rounded shadow p-4">
+          <div class="flex items-center gap-2 mb-2">
+            <input id="studentSearch" class="border rounded px-2 py-1 text-sm" placeholder="Buscar por nombre" />
+            <select id="studentFilterStatus" class="border rounded px-2 py-1 text-sm"><option value="all">Todos</option><option value="activo">Activo</option><option value="pendiente">Pendiente</option></select>
+            <input id="studentFilterClass" class="border rounded px-2 py-1 text-sm" placeholder="Filtrar por aula" />
+          </div>
           <table class="w-full text-sm">
-            <thead class="text-slate-500 text-left"><tr><th>Nombre</th><th>Grupo</th><th>Tutor</th><th>Autorizados</th><th>Acciones</th></tr></thead>
-            <tbody id="studentsBasicTable"></tbody>
+            <thead class="text-slate-500 text-left"><tr><th>Nombre</th><th>Aula</th><th>Padre</th><th>Estado</th><th>Acciones</th></tr></thead>
+            <tbody id="studentsTable"></tbody>
           </table>
+        </div>
+      </section>
+
+      <!-- Maestros -->
+      <section id="maestros" class="section hidden">
+        <div class="flex items-center justify-between mb-2">
+          <h3 class="text-lg font-semibold">Maestros</h3>
+          <button id="openAddTeacher" class="px-3 py-2 bg-green-600 text-white rounded">Crear maestra</button>
+        </div>
+        <div class="bg-white rounded shadow p-4">
+          <table class="w-full text-sm">
+            <thead class="text-slate-500 text-left"><tr><th>Nombre</th><th>Correo</th><th>Teléfono</th><th>Aula</th><th>Estado</th><th>Acciones</th></tr></thead>
+            <tbody id="teachersTable"></tbody>
+          </table>
+        </div>
+      </section>
+
+      <!-- Padres -->
+      <section id="padres" class="section hidden">
+        <div class="flex items-center justify-between mb-2">
+          <h3 class="text-lg font-semibold">Padres</h3>
+          <button id="openAddParent" class="px-3 py-2 bg-slate-800 text-white rounded">Añadir padre</button>
+        </div>
+        <div class="bg-white rounded shadow p-4">
+          <div class="flex items-center gap-2 mb-2">
+            <input id="parentSearch" class="border rounded px-2 py-1 text-sm" placeholder="Buscar por nombre" />
+            <select id="parentFilterStatus" class="border rounded px-2 py-1 text-sm"><option value="all">Todos</option><option value="activo">Activo</option><option value="bloqueado">Bloqueado</option></select>
+          </div>
+          <table class="w-full text-sm">
+            <thead class="text-slate-500 text-left"><tr><th>Nombre</th><th>Hijos</th><th>Teléfono</th><th>Estado</th><th>Acciones</th></tr></thead>
+            <tbody id="parentsTable"></tbody>
+          </table>
+        </div>
+      </section>
+
+      <!-- Aulas -->
+      <section id="aulas" class="section hidden">
+        <div class="flex items-center justify-between mb-2">
+          <h3 class="text-lg font-semibold">Aulas</h3>
+          <button id="openAddClass" class="px-3 py-2 bg-blue-600 text-white rounded">Crear aula</button>
+        </div>
+        <div class="bg-white rounded shadow p-4">
+          <div class="flex items-center gap-2 mb-2">
+            <input id="classSearch" class="border rounded px-2 py-1 text-sm" placeholder="Buscar por nombre/maestra" />
+          </div>
+          <table class="w-full text-sm">
+            <thead class="text-slate-500 text-left"><tr><th>Nombre</th><th>Maestra</th><th>Alumnos</th><th>Acciones</th></tr></thead>
+            <tbody id="classesTable"></tbody>
+          </table>
+          <!-- Modal asignar alumnos -->
+          <div id="assignModal" class="fixed inset-0 bg-black/40 hidden items-center justify-center">
+            <div class="bg-white rounded shadow p-4 w-full max-w-md">
+              <h4 class="text-lg font-semibold mb-2">Asignar alumnos</h4>
+              <div id="assignList" class="max-h-60 overflow-y-auto border rounded p-2 mb-3"></div>
+              <div class="flex justify-end gap-2">
+                <button id="assignCancel" class="px-3 py-2 rounded border">Cancelar</button>
+                <button id="assignConfirm" class="px-3 py-2 bg-teal-600 text-white rounded">Asignar</button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- Pagos -->
+      <section id="pagos" class="section hidden">
+        <div class="grid md:grid-cols-2 gap-4">
+          <div class="bg-white rounded shadow p-4">
+            <h3 class="text-lg font-semibold mb-2">Registrar pago</h3>
+            <div class="space-y-2">
+              <input id="payStudent" class="w-full border rounded px-3 py-2" placeholder="Alumno" />
+              <input id="payMonth" class="w-full border rounded px-3 py-2" placeholder="Mes" />
+              <input id="payAmount" type="number" class="w-full border rounded px-3 py-2" placeholder="Monto" />
+              <input id="payPartial" type="number" class="w-full border rounded px-3 py-2" placeholder="Pago parcial (opcional)" />
+              <select id="payMethod" class="w-full border rounded px-3 py-2"><option>Efectivo</option><option>Transferencia</option></select>
+              <input id="payRef" class="w-full border rounded px-3 py-2" placeholder="Referencia" />
+              <input id="payNote" class="w-full border rounded px-3 py-2" placeholder="Observación" />
+              <button id="savePayment" class="px-3 py-2 bg-green-600 text-white rounded">Guardar</button>
+            </div>
+          </div>
+          <div class="bg-white rounded shadow p-4">
+            <h3 class="text-lg font-semibold mb-2">Estado de pagos</h3>
+            <div class="flex items-center gap-2 mb-2">
+              <input id="paySearch" class="border rounded px-2 py-1 text-sm" placeholder="Buscar alumno/mes" />
+              <select id="payFilter" class="border rounded px-2 py-1 text-sm"><option value="all">Todos</option><option value="pendiente">Pendiente</option><option value="parcial">Parcial</option><option value="pagado">Pagado</option></select>
+            </div>
+            <table class="w-full text-sm">
+              <thead class="text-slate-500 text-left"><tr><th>Alumno</th><th>Mes</th><th>Estado</th><th>Monto</th><th>Saldo</th><th>Acciones</th></tr></thead>
+              <tbody id="paymentsTable"></tbody>
+            </table>
+          </div>
+        </div>
+      </section>
+
+      <!-- Visitas -->
+      <section id="visitas" class="section hidden">
+        <div class="grid md:grid-cols-2 gap-4">
+          <div class="bg-white rounded shadow p-4">
+            <h3 class="text-lg font-semibold mb-2">Registro de visitas</h3>
+            <div class="space-y-2">
+              <input id="visitVisitor" class="w-full border rounded px-3 py-2" placeholder="Visitante" />
+              <input id="visitStudent" class="w-full border rounded px-3 py-2" placeholder="Alumno (opcional)" />
+              <input id="visitPurpose" class="w-full border rounded px-3 py-2" placeholder="Motivo" />
+              <input id="visitNotes" class="w-full border rounded px-3 py-2" placeholder="Notas (opcional)" />
+              <button id="saveVisit" class="px-3 py-2 bg-teal-600 text-white rounded">Registrar entrada</button>
+            </div>
+          </div>
+          <div class="bg-white rounded shadow p-4">
+            <h3 class="text-lg font-semibold mb-2">Visitas en curso</h3>
+            <table class="w-full text-sm">
+              <thead class="text-slate-500 text-left"><tr><th>Visitante</th><th>Alumno</th><th>Motivo</th><th>Entrada</th><th>Acciones</th></tr></thead>
+              <tbody id="visitsTable"></tbody>
+            </table>
+          </div>
+        </div>
+      </section>
+
+      <!-- Reportes -->
+      <section id="reportes" class="section hidden">
+        <div class="bg-white rounded shadow p-4 space-y-4">
+          <h3 class="text-lg font-semibold">Reportes administrativos</h3>
+          <div class="grid md:grid-cols-2 gap-3">
+            <button id="exportPaymentsCsv" class="px-3 py-2 border rounded">Exportar pagos (CSV)</button>
+            <button id="exportActiveStudentsCsv" class="px-3 py-2 border rounded">Exportar alumnos activos (CSV)</button>
+            <button id="exportPaymentsPdf" class="px-3 py-2 border rounded">Exportar pagos (PDF)</button>
+            <button id="exportActiveStudentsPdf" class="px-3 py-2 border rounded">Exportar alumnos activos (PDF)</button>
+          </div>
+          <p class="text-xs text-slate-500">Exporta CSV o imprime/guarda en PDF.</p>
+        </div>
+      </section>
+
+      <!-- Configuración -->
+      <section id="config" class="section hidden">
+        <div class="bg-white rounded shadow p-4 space-y-3">
+          <h3 class="text-lg font-semibold">Configuración</h3>
+          <div class="grid md:grid-cols-2 gap-3">
+            <input id="cfgCycle" class="border rounded px-3 py-2" placeholder="Ciclo escolar" />
+            <input id="cfgTariffs" class="border rounded px-3 py-2" placeholder="Tarifas" />
+            <input id="cfgSchedule" class="border rounded px-3 py-2" placeholder="Horarios" />
+            <input id="cfgMethods" class="border rounded px-3 py-2" placeholder="Métodos de pago" />
+          </div>
+          <div class="flex justify-end">
+            <button id="saveConfig" class="px-3 py-2 bg-slate-800 text-white rounded">Guardar configuración</button>
+          </div>
+          <p class="text-xs text-slate-500">Sin permisos académicos.</p>
         </div>
       </section>
 
@@ -224,15 +282,19 @@
     </main>
   </div>
 
-  <!-- Modal alumno básico -->
+  <!-- Modal: Añadir alumno -->
   <div id="studentModal" class="fixed inset-0 bg-black/50 hidden items-center justify-center">
     <div class="bg-white rounded-lg shadow p-4 w-full max-w-lg">
       <h4 class="font-semibold mb-3">Alumno</h4>
       <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
-        <div><label class="text-sm">Nombre</label><input id="mName" class="w-full border rounded px-3 py-2" /></div>
-        <div><label class="text-sm">Grupo</label><input id="mGroup" class="w-full border rounded px-3 py-2" /></div>
-        <div><label class="text-sm">Tutor</label><input id="mTutor" class="w-full border rounded px-3 py-2" /></div>
-        <div><label class="text-sm">Autorizados a retirar</label><input id="mAuth" class="w-full border rounded px-3 py-2" /></div>
+        <div><label class="text-sm">Nombre completo</label><input id="mName" class="w-full border rounded px-3 py-2" /></div>
+        <div><label class="text-sm">Fecha de nacimiento</label><input id="mBirth" type="date" class="w-full border rounded px-3 py-2" /></div>
+        <div><label class="text-sm">Sexo</label><select id="mSex" class="w-full border rounded px-3 py-2"><option>F</option><option>M</option></select></div>
+        <div><label class="text-sm">Documento</label><input id="mDoc" class="w-full border rounded px-3 py-2" /></div>
+        <div><label class="text-sm">Padre / tutor</label><input id="mTutor" class="w-full border rounded px-3 py-2" /></div>
+        <div><label class="text-sm">Teléfono</label><input id="mPhone" class="w-full border rounded px-3 py-2" /></div>
+        <div><label class="text-sm">Aula</label><input id="mClass" class="w-full border rounded px-3 py-2" /></div>
+        <div><label class="text-sm">Estado</label><select id="mStatus" class="w-full border rounded px-3 py-2"><option>activo</option><option>pendiente</option></select></div>
       </div>
       <div class="flex justify-end gap-2 mt-4">
         <button id="closeStudentModal" class="px-3 py-2 border rounded">Cancelar</button>
@@ -246,19 +308,16 @@
       if(window.lucide && typeof lucide.createIcons === 'function') lucide.createIcons();
     });
 
-    // Sidebar toggle
-    document.getElementById('toggleSidebar')?.addEventListener('click', ()=>{
-      document.getElementById('sidebar').classList.toggle('collapsed');
-    });
-
-    // Nav sections
-    document.querySelectorAll('aside [data-section]').forEach(btn=>{
+    // Navegación sidebar
+    const sections = ['inicio','alumnos','maestros','padres','aulas','pagos','visitas','reportes','config'];
+    document.querySelectorAll('#sidebar [data-section]').forEach(btn=>{
       btn.addEventListener('click', ()=>{
-        document.querySelectorAll('.section').forEach(s=> s.classList.add('hidden'));
-        document.getElementById(btn.getAttribute('data-section')).classList.remove('hidden');
+        const target = btn.dataset.section;
+        sections.forEach(id=> document.getElementById(id)?.classList.add('hidden'));
+        document.getElementById(target)?.classList.remove('hidden');
       });
     });
-    
+
     // Logout
     document.getElementById('logoutLink')?.addEventListener('click', (e)=>{
       e.preventDefault();
@@ -266,121 +325,101 @@
       window.location.href = 'login.html';
     });
 
-    // Demo data
-    const demoStudents = [
-      { name:'María P.', group:'A1', status:'Ausente' },
-      { name:'Javier R.', group:'A2', status:'Ausente' },
-      { name:'Sofía L.', group:'A1', status:'Ausente' },
-      { name:'Carlos M.', group:'A3', status:'Ausente' }
+    // Datos demo mínimos (operativos, no académicos)
+    const students = [
+      { name:'Andrea Flores', class:'1° A', parent:'Karolina F.', status:'activo' },
+      { name:'Juan Pérez', class:'2° B', parent:'Mario P.', status:'pendiente' }
     ];
-
-    function renderAttendance(){
-      const tbody = document.getElementById('attendanceTable');
-      tbody.innerHTML = '';
-      demoStudents.forEach(st => {
-        const tr = document.createElement('tr');
-        tr.innerHTML = `<td>${st.name}</td><td>${st.group}</td><td>${st.status}</td>
-          <td class="space-x-2">
-            <button class="px-2 py-1 bg-green-600 text-white rounded" data-act="in">Entrada</button>
-            <button class="px-2 py-1 bg-orange-600 text-white rounded" data-act="out">Salida</button>
-            <button class="px-2 py-1 bg-slate-200 rounded" data-act="ret">Retirar</button>
-          </td>`;
-        tr.querySelectorAll('button').forEach(btn=>{
-          btn.addEventListener('click', ()=>{
-            if(btn.dataset.act==='in'){ st.status='Presente'; notifyParent(st, 'Entrada registrada'); }
-            else if(btn.dataset.act==='out'){ st.status='Ausente'; notifyParent(st, 'Salida registrada'); }
-            else { st.status='Retirado'; notifyParent(st, 'Retiro registrado'); }
-            renderAttendance();
-          });
-        });
-        tbody.appendChild(tr);
-      });
-      updateCounters();
-    }
-
-    function updateCounters(){
-      const present = demoStudents.filter(s=> s.status==='Presente').length;
-      const absent = demoStudents.filter(s=> s.status==='Ausente').length;
-      const retired = demoStudents.filter(s=> s.status==='Retirado').length;
-      document.getElementById('presentCount').textContent = present;
-      document.getElementById('absentCount').textContent = absent;
-      document.getElementById('retiredCount').textContent = retired;
-    }
-
-    // Search
-    document.getElementById('attendanceSearch')?.addEventListener('input', function(){
-      const q = this.value.toLowerCase();
-      document.querySelectorAll('#attendanceTable tr').forEach(tr=>{
-        const name = tr.children[0]?.textContent.toLowerCase() || '';
-        tr.style.display = name.includes(q) ? '' : 'none';
-      });
-    });
-
-    // Quick messaging
-    function notifyParent(student, message){
-      const log = document.getElementById('quickMsgLog');
-      const p = document.createElement('p');
-      p.textContent = `[Auto] ${student.name}: ${message}`;
-      log.prepend(p);
-    }
-    document.getElementById('sendQuickMsg')?.addEventListener('click', ()=>{
-      const parent = document.getElementById('quickMsgParent').value;
-      const msg = document.getElementById('quickMsgText').value;
-      if(!msg.trim()) return alert('Escribe un mensaje');
-      const log = document.getElementById('quickMsgLog');
-      const p = document.createElement('p');
-      p.textContent = `[Manual] ${parent||'Padre'}: ${msg}`;
-      log.prepend(p);
-      document.getElementById('quickMsgText').value='';
-    });
-
-    // Daily report CSV
-    document.getElementById('generateDailyReport')?.addEventListener('click', ()=>{
-      const rows = [['Nombre','Grupo','Estado']].concat(demoStudents.map(s=>[s.name,s.group,s.status]));
-      const csv = rows.map(r=> r.map(v=>`"${String(v).replace(/"/g,'""')}"`).join(',')).join('\n');
-      const blob = new Blob([csv], {type:'text/csv'});
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url; a.download = `reporte_asistencia_${new Date().toISOString().slice(0,10)}.csv`;
-      a.click(); URL.revokeObjectURL(url);
-    });
-
-    // Students basic management
-    const basicStudents = [
-      { name:'María P.', group:'A1', tutor:'Ana Pérez', auth:'Padres y Abuela' },
-      { name:'Javier R.', group:'A2', tutor:'María R.', auth:'Padres' }
+    const teachers = [
+      { name:'Ana Pérez', email:'ana@karpus.edu', phone:'', class:'1° A', status:'activo' }
     ];
-    let editIndex = null;
-    function renderBasicStudents(){
-      const tbody = document.getElementById('studentsBasicTable');
+    const parents = [
+      { name:'Karolina F.', kids:1, phone:'', status:'activo' }
+    ];
+    const classes = [
+      { name:'1° A', teacher:'Ana Pérez', students:1 }
+    ];
+    // Pagos y visitas ahora persistentes en KarpusStore
+    const Store = window.KarpusStore;
+    function getAllPayments(){ return Store.getState().payments; }
+    function getPendingPayments(){ return Store.getPaymentsPending(); }
+
+    // Dashboard
+    function renderDashboard(){
+      document.getElementById('dashStudentsActive').textContent = students.filter(s=>s.status==='activo').length;
+      const allPays = getAllPayments();
+      document.getElementById('dashPaymentsPending').textContent = allPays.filter(p=>p.status!=='pagado').length;
+      document.getElementById('dashPaymentsToday').textContent = allPays.filter(p=>p.paidDate===new Date().toISOString().slice(0,10)).length;
+      document.getElementById('dashClassesActive').textContent = classes.length;
+
+      // Alertas dinámicas
+      const alertsBox = document.getElementById('alertsList');
+      alertsBox.innerHTML = '';
+      const today = new Date().toISOString().slice(0,10);
+      const overdue = getPendingPayments().filter(p=> (p.dueDate||'') < today);
+      if(overdue.length){
+        const a = document.createElement('div'); a.className = 'p-3 bg-red-50 border-l-4 border-red-600 rounded-r-xl';
+        a.innerHTML = `<p class="text-sm font-semibold text-red-700">Pago vencido</p><p class="text-xs text-red-700">${overdue.length} familia(s) con pagos vencidos. <a href="#" class="underline" data-go="pagos">Ir a pagos</a></p>`;
+        a.querySelector('[data-go]')?.addEventListener('click', (e)=>{ e.preventDefault(); sections.forEach(id=> document.getElementById(id)?.classList.add('hidden')); document.getElementById('pagos').classList.remove('hidden'); });
+        alertsBox.appendChild(a);
+      }
+      const noClass = students.filter(s=> !s.class || !s.class.trim());
+      if(noClass.length){
+        const a = document.createElement('div'); a.className = 'p-3 bg-yellow-50 border-l-4 border-yellow-500 rounded-r-xl';
+        a.innerHTML = `<p class="text-sm font-semibold text-yellow-700">Alumno sin aula</p><p class="text-xs text-yellow-700">${noClass.length} alumno(s) sin aula. <a href="#" class="underline" data-go="aulas">Asignar</a></p>`;
+        a.querySelector('[data-go]')?.addEventListener('click', (e)=>{ e.preventDefault(); sections.forEach(id=> document.getElementById(id)?.classList.add('hidden')); document.getElementById('aulas').classList.remove('hidden'); });
+        alertsBox.appendChild(a);
+      }
+      const unlinked = parents.filter(p=> (p.kids||0)===0);
+      if(unlinked.length){
+        const a = document.createElement('div'); a.className = 'p-3 bg-blue-50 border-l-4 border-blue-600 rounded-r-xl';
+        a.innerHTML = `<p class="text-sm font-semibold text-blue-700">Padre sin vincular</p><p class="text-xs text-blue-700">${unlinked.length} padre(s) sin vincular. <a href="#" class="underline" data-go="padres">Vincular</a></p>`;
+        a.querySelector('[data-go]')?.addEventListener('click', (e)=>{ e.preventDefault(); sections.forEach(id=> document.getElementById(id)?.classList.add('hidden')); document.getElementById('padres').classList.remove('hidden'); });
+        alertsBox.appendChild(a);
+      }
+    }
+
+    // Alumnos
+    function renderStudents(){
+      const tbody = document.getElementById('studentsTable');
       tbody.innerHTML = '';
-      basicStudents.forEach((s, idx)=>{
+      const q = (document.getElementById('studentSearch')?.value||'').toLowerCase();
+      const fStatus = document.getElementById('studentFilterStatus')?.value||'all';
+      const fClass = (document.getElementById('studentFilterClass')?.value||'').toLowerCase();
+      let data = students.filter(s=> s.name.toLowerCase().includes(q));
+      if(fStatus!=='all') data = data.filter(s=> s.status===fStatus);
+      if(fClass) data = data.filter(s=> (s.class||'').toLowerCase().includes(fClass));
+      data.forEach((s, idx)=>{
         const tr = document.createElement('tr');
-        tr.innerHTML = `<td>${s.name}</td><td>${s.group}</td><td>${s.tutor}</td><td>${s.auth}</td>
+        tr.innerHTML = `<td>${s.name}</td><td>${s.class}</td><td>${s.parent}</td><td>${s.status}</td>
           <td>
             <button class="text-blue-600 mr-2" data-edit="${idx}">Editar</button>
             <button class="text-red-600" data-del="${idx}">Eliminar</button>
           </td>`;
-        tr.querySelector('[data-edit]')?.addEventListener('click', ()=>{
-          editIndex = idx;
-          document.getElementById('mName').value = s.name;
-          document.getElementById('mGroup').value = s.group;
-          document.getElementById('mTutor').value = s.tutor;
-          document.getElementById('mAuth').value = s.auth;
-          document.getElementById('studentModal').classList.remove('hidden');
-        });
         tr.querySelector('[data-del]')?.addEventListener('click', ()=>{
-          if(confirm('¿Eliminar alumno?')){ basicStudents.splice(idx,1); renderBasicStudents(); }
+          if(confirm('¿Eliminar alumno?')){ students.splice(idx,1); renderStudents(); renderDashboard(); }
+        });
+        tr.querySelector('[data-edit]')?.addEventListener('click', ()=>{
+          document.getElementById('mName').value = s.name;
+          document.getElementById('mBirth').value = '';
+          document.getElementById('mSex').value = 'F';
+          document.getElementById('mDoc').value = '';
+          document.getElementById('mTutor').value = s.parent;
+          document.getElementById('mPhone').value = '';
+          document.getElementById('mClass').value = s.class;
+          document.getElementById('mStatus').value = s.status;
+          document.getElementById('studentModal').classList.remove('hidden');
         });
         tbody.appendChild(tr);
       });
     }
+    document.getElementById('studentSearch')?.addEventListener('input', renderStudents);
+    document.getElementById('studentFilterStatus')?.addEventListener('change', renderStudents);
+    document.getElementById('studentFilterClass')?.addEventListener('input', renderStudents);
     document.getElementById('openAddStudent')?.addEventListener('click', ()=>{
-      editIndex = null;
-      document.getElementById('mName').value = '';
-      document.getElementById('mGroup').value = '';
-      document.getElementById('mTutor').value = '';
-      document.getElementById('mAuth').value = '';
+      ['mName','mBirth','mDoc','mTutor','mPhone','mClass'].forEach(id=> document.getElementById(id).value='');
+      document.getElementById('mSex').value='F';
+      document.getElementById('mStatus').value='pendiente';
       document.getElementById('studentModal').classList.remove('hidden');
     });
     document.getElementById('closeStudentModal')?.addEventListener('click', ()=>{
@@ -389,41 +428,250 @@
     document.getElementById('saveStudentModal')?.addEventListener('click', ()=>{
       const s = {
         name: document.getElementById('mName').value.trim(),
-        group: document.getElementById('mGroup').value.trim(),
-        tutor: document.getElementById('mTutor').value.trim(),
-        auth: document.getElementById('mAuth').value.trim(),
+        parent: document.getElementById('mTutor').value.trim(),
+        class: document.getElementById('mClass').value.trim(),
+        status: document.getElementById('mStatus').value.trim()||'pendiente'
       };
       if(!s.name) return alert('El nombre es obligatorio');
-      if(editIndex==null) basicStudents.push(s); else basicStudents[editIndex] = s;
+      students.push(s);
       document.getElementById('studentModal').classList.add('hidden');
-      renderBasicStudents();
+      renderStudents(); renderDashboard();
     });
 
-    // Admin support
-    document.getElementById('uploadDoc')?.addEventListener('click', ()=>{
-      const f = document.getElementById('adminFile').files?.[0];
-      if(!f) return alert('Selecciona un archivo');
-      const list = document.getElementById('uploadedDocs');
-      const item = document.createElement('div');
-      item.textContent = `Cargado: ${f.name}`;
-      list.prepend(item);
-      document.getElementById('adminFile').value = '';
-    });
-    const sampleRequests = [
-      'Solicitud: Cambio de horario de recogida (Familia Pérez)',
-      'Aviso: Niño con alergia hoy (Familia Rodríguez)'
-    ];
-    function renderRequests(){
-      const box = document.getElementById('parentRequests');
-      box.innerHTML = '';
-      sampleRequests.forEach(r=>{ const p=document.createElement('p'); p.textContent=r; box.appendChild(p); });
+    // Maestros
+    function renderTeachers(){
+      const tbody = document.getElementById('teachersTable');
+      tbody.innerHTML = '';
+      teachers.forEach((t, idx)=>{
+        const tr = document.createElement('tr');
+        tr.innerHTML = `<td>${t.name}</td><td>${t.email}</td><td>${t.phone}</td><td>${t.class}</td><td>${t.status}</td>
+          <td><button class="text-red-600" data-del="${idx}">Eliminar</button></td>`;
+        tr.querySelector('[data-del]')?.addEventListener('click', ()=>{ teachers.splice(idx,1); renderTeachers(); });
+        tbody.appendChild(tr);
+      });
     }
+    document.getElementById('openAddTeacher')?.addEventListener('click', ()=>{
+      teachers.push({ name:'Nueva Maestra', email:'', phone:'', class:'', status:'activo' });
+      renderTeachers();
+    });
 
-    // Initialize
-    renderAttendance();
-    renderBasicStudents();
-    renderRequests();
+    // Padres
+    function renderParents(){
+      const tbody = document.getElementById('parentsTable');
+      tbody.innerHTML = '';
+      const q = (document.getElementById('parentSearch')?.value||'').toLowerCase();
+      const fStatus = document.getElementById('parentFilterStatus')?.value||'all';
+      let data = parents.filter(p=> p.name.toLowerCase().includes(q));
+      if(fStatus!=='all') data = data.filter(p=> p.status===fStatus);
+      data.forEach((p, idx)=>{
+        const tr = document.createElement('tr');
+        tr.innerHTML = `<td>${p.name}</td><td>${p.kids}</td><td>${p.phone}</td><td>${p.status}</td>
+          <td>
+            <button class="text-blue-600 mr-2">Vincular hijo</button>
+            <button class="text-orange-600 mr-2">Reset acceso</button>
+            <button class="text-red-600" data-block="${idx}">Bloquear</button>
+          </td>`;
+        tr.querySelector('[data-block]')?.addEventListener('click', ()=>{ p.status='bloqueado'; renderParents(); });
+        tbody.appendChild(tr);
+      });
+    }
+    document.getElementById('parentSearch')?.addEventListener('input', renderParents);
+    document.getElementById('parentFilterStatus')?.addEventListener('change', renderParents);
+    document.getElementById('openAddParent')?.addEventListener('click', ()=>{
+      parents.push({ name:'Nuevo Padre', kids:0, phone:'', status:'activo' }); renderParents();
+    });
+
+    // Aulas
+    function renderClasses(){
+      const tbody = document.getElementById('classesTable');
+      tbody.innerHTML = '';
+      const q = (document.getElementById('classSearch')?.value||'').toLowerCase();
+      const data = classes.filter(c=> `${c.name} ${c.teacher}`.toLowerCase().includes(q));
+      data.forEach((c, idx)=>{
+        const count = students.filter(s=> s.class===c.name).length;
+        const tr = document.createElement('tr');
+        tr.innerHTML = `<td>${c.name}</td><td>${c.teacher}</td><td>${count}</td>
+          <td><button class="text-blue-600" data-assign="${c.name}">Asignar alumnos</button> <button class="text-red-600" data-del="${idx}">Eliminar</button></td>`;
+        tr.querySelector('[data-assign]')?.addEventListener('click', ()=> openAssignModal(c.name));
+        tr.querySelector('[data-del]')?.addEventListener('click', ()=>{ classes.splice(idx,1); renderClasses(); renderDashboard(); });
+        tbody.appendChild(tr);
+      });
+    }
+    document.getElementById('classSearch')?.addEventListener('input', renderClasses);
+    function openAssignModal(className){
+      const modal = document.getElementById('assignModal');
+      const list = document.getElementById('assignList');
+      modal.classList.remove('hidden'); modal.classList.add('flex');
+      list.innerHTML = '';
+      const unassigned = students.map((s, i)=> ({...s, idx: i})).filter(s=> !s.class || !s.class.trim());
+      if(unassigned.length===0){ list.innerHTML = '<p class="text-sm text-slate-600">No hay alumnos sin aula.</p>'; return; }
+      unassigned.forEach((s)=>{
+        const div = document.createElement('div');
+        div.className = 'flex items-center gap-2 py-1';
+        div.innerHTML = `<input type="checkbox" data-index="${s.idx}"><span>${s.name}</span>`;
+        list.appendChild(div);
+      });
+      document.getElementById('assignCancel').onclick = ()=>{ modal.classList.add('hidden'); modal.classList.remove('flex'); };
+      document.getElementById('assignConfirm').onclick = ()=>{
+        const ids = Array.from(list.querySelectorAll('input[type=checkbox]:checked')).map(el=> Number(el.getAttribute('data-index')));
+        students.forEach((s, i)=>{ if(ids.includes(i)) s.class = className; });
+        modal.classList.add('hidden'); modal.classList.remove('flex');
+        renderClasses(); renderStudents(); renderDashboard();
+      };
+    }
+    document.getElementById('openAddClass')?.addEventListener('click', ()=>{
+      classes.push({ name:'Nueva Aula', teacher:'', students:0 }); renderClasses(); renderDashboard();
+    });
+
+    // Pagos
+    function renderPayments(){
+      const tbody = document.getElementById('paymentsTable');
+      tbody.innerHTML = '';
+      const q = (document.getElementById('paySearch')?.value||'').toLowerCase();
+      const filter = document.getElementById('payFilter')?.value||'all';
+      let data = getAllPayments();
+      if(filter!=='all') data = data.filter(p=> p.status===filter);
+      data = data.filter(p=> `${p.student} ${p.month}`.toLowerCase().includes(q));
+      data.forEach((p)=>{
+        const badge = p.status==='pagado' ? '<span class="px-2 py-1 text-xs rounded bg-green-100 text-green-700">Pagado</span>' : p.status==='parcial' ? '<span class="px-2 py-1 text-xs rounded bg-yellow-100 text-yellow-700">Parcial</span>' : '<span class="px-2 py-1 text-xs rounded bg-red-100 text-red-700">Pendiente</span>';
+        const saldo = Math.max(0, Number(p.amount||0) - Number(p.paidAmount||0));
+        const tr = document.createElement('tr');
+        tr.innerHTML = `<td>${p.student}</td><td>${p.month}</td><td>${badge}</td><td>$${Number(p.amount||0).toFixed(2)}</td><td>$${saldo.toFixed(2)}</td>
+          <td>
+            ${p.status!=='pagado' ? `<button class="text-blue-600 mr-2" data-pay="${p.id}">Marcar pagado</button><button class="text-yellow-600" data-partial="${p.id}">Registrar parcial</button>` : ''}
+          </td>`;
+        tr.querySelector('[data-pay]')?.addEventListener('click', ()=>{ Store.markPaymentStatus(p.id, 'pagado'); renderPayments(); renderDashboard(); });
+        tr.querySelector('[data-partial]')?.addEventListener('click', ()=>{
+          const amt = prompt('Monto parcial recibido:', '0');
+          if(amt==null) return; const num = Number(amt||0); if(!(num>0)) return;
+          Store.addPaymentPartial(p.id, num); renderPayments(); renderDashboard();
+        });
+        tbody.appendChild(tr);
+      });
+    }
+    function monthToDueDate(m){
+      const months = ['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'];
+      const idx = months.findIndex(x=> x.toLowerCase() === String(m).toLowerCase());
+      const year = new Date().getFullYear();
+      const lastDay = new Date(year, idx+1, 0).getDate();
+      const pad=n=> String(n).padStart(2,'0');
+      return `${year}-${pad(idx+1)}-${pad(lastDay)}`;
+    }
+    document.getElementById('savePayment')?.addEventListener('click', ()=>{
+      const student = document.getElementById('payStudent').value.trim();
+      const month = document.getElementById('payMonth').value.trim();
+      const amount = Number(document.getElementById('payAmount').value||0);
+      const partial = Number(document.getElementById('payPartial').value||0);
+      const note = document.getElementById('payNote').value.trim();
+      if(!student || !month || !amount) return alert('Completa alumno, mes y monto');
+      const status = partial>0 && partial<amount ? 'parcial' : 'pagado';
+      Store.addPayment({ student, class: '', month, amount, paidAmount: status==='pagado'? amount: partial, status, dueDate: monthToDueDate(month), notes: note });
+      document.getElementById('payStudent').value=''; document.getElementById('payMonth').value=''; document.getElementById('payAmount').value=''; document.getElementById('payPartial').value=''; document.getElementById('payRef').value=''; document.getElementById('payNote').value='';
+      renderPayments(); renderDashboard();
+    });
+    document.getElementById('paySearch')?.addEventListener('input', renderPayments);
+    document.getElementById('payFilter')?.addEventListener('change', renderPayments);
+
+    // Visitas
+    function renderVisits(){
+      const tbody = document.getElementById('visitsTable');
+      if(!tbody) return;
+      tbody.innerHTML = '';
+      const open = Store.getOpenVisits();
+      open.forEach(v=>{
+        const tr = document.createElement('tr');
+        tr.innerHTML = `<td>${v.visitor}</td><td>${v.student||'-'}</td><td>${v.purpose||''}</td><td>${v.enteredAt||''}</td>
+          <td><button class="text-red-600" data-exit="${v.id}">Marcar salida</button></td>`;
+        tr.querySelector('[data-exit]')?.addEventListener('click', ()=>{ Store.markVisitExit(v.id); renderVisits(); });
+        tbody.appendChild(tr);
+      });
+    }
+    document.getElementById('saveVisit')?.addEventListener('click', ()=>{
+      const visitor = document.getElementById('visitVisitor').value.trim();
+      const student = document.getElementById('visitStudent').value.trim();
+      const purpose = document.getElementById('visitPurpose').value.trim();
+      const notes = document.getElementById('visitNotes').value.trim();
+      if(!visitor) return alert('Ingresa el nombre del visitante');
+      Store.addVisit({ visitor, student, purpose, notes });
+      document.getElementById('visitVisitor').value=''; document.getElementById('visitStudent').value=''; document.getElementById('visitPurpose').value=''; document.getElementById('visitNotes').value='';
+      renderVisits();
+    });
+
+    // Configuración persistente
+    function loadConfig(){
+      const { config } = Store.getState();
+      document.getElementById('cfgCycle').value = config.cycle||'';
+      document.getElementById('cfgTariffs').value = config.tariffs||'';
+      document.getElementById('cfgSchedule').value = config.schedule||'';
+      document.getElementById('cfgMethods').value = (config.methods||[]).join(', ');
+    }
+    document.getElementById('saveConfig')?.addEventListener('click', ()=>{
+      const cycle = document.getElementById('cfgCycle').value.trim();
+      const tariffs = document.getElementById('cfgTariffs').value.trim();
+      const schedule = document.getElementById('cfgSchedule').value.trim();
+      const methodsStr = document.getElementById('cfgMethods').value.trim();
+      const methods = methodsStr ? methodsStr.split(',').map(x=>x.trim()).filter(Boolean) : [];
+      Store.setConfig({ cycle, tariffs, schedule, methods });
+      alert('Configuración guardada');
+    });
+
+    // Reportes
+    document.getElementById('exportPaymentsCsv')?.addEventListener('click', ()=>{
+      const pays = getAllPayments();
+      const rows = [['Alumno','Mes','Estado','Monto']].concat(pays.map(p=>[p.student,p.month,p.status,p.amount]));
+      const csv = rows.map(r=> r.map(v=>`"${String(v).replace(/"/g,'""')}"`).join(',')).join('\n');
+      const blob = new Blob([csv], {type:'text/csv'});
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a'); a.href = url; a.download = 'pagos.csv'; a.click(); URL.revokeObjectURL(url);
+    });
+    document.getElementById('exportActiveStudentsCsv')?.addEventListener('click', ()=>{
+      const rows = [['Nombre','Aula','Padre','Estado']].concat(students.filter(s=>s.status==='activo').map(s=>[s.name,s.class,s.parent,s.status]));
+      const csv = rows.map(r=> r.map(v=>`"${String(v).replace(/"/g,'""')}"`).join(',')).join('\n');
+      const blob = new Blob([csv], {type:'text/csv'});
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a'); a.href = url; a.download = 'alumnos_activos.csv'; a.click(); URL.revokeObjectURL(url);
+    });
+    function printTableAsPdf(title, headers, rows){
+      const win = window.open('', '_blank');
+      const table = `
+        <html><head><title>${title}</title>
+        <style>body{font-family:Arial,sans-serif;padding:16px} table{width:100%;border-collapse:collapse} th,td{border:1px solid #ddd;padding:8px;text-align:left} h1{font-size:18px;margin-bottom:12px}</style>
+        </head><body>
+        <h1>${title}</h1>
+        <table><thead><tr>${headers.map(h=>`<th>${h}</th>`).join('')}</tr></thead>
+        <tbody>${rows.map(r=>`<tr>${r.map(c=>`<td>${c}</td>`).join('')}</tr>`).join('')}</tbody></table>
+        <script>window.print();</script>
+        </body></html>`;
+      win.document.write(table);
+      win.document.close();
+    }
+    document.getElementById('exportPaymentsPdf')?.addEventListener('click', ()=>{
+      const pays = getAllPayments();
+      const rows = pays.map(p=>[p.student,p.month,p.status,`$${Number(p.amount||0).toFixed(2)}`]);
+      printTableAsPdf('Pagos', ['Alumno','Mes','Estado','Monto'], rows);
+    });
+    document.getElementById('exportActiveStudentsPdf')?.addEventListener('click', ()=>{
+      const rows = students.filter(s=>s.status==='activo').map(s=>[s.name,s.class,s.parent,s.status]);
+      printTableAsPdf('Alumnos activos', ['Nombre','Aula','Padre','Estado'], rows);
+    });
+
+    // Init
+    renderDashboard();
+    renderStudents();
+    renderTeachers();
+    renderParents();
+    renderClasses();
+    renderPayments();
+    renderVisits();
+    loadConfig();
+    // Mostrar inicio por defecto
+    sections.forEach(id=> document.getElementById(id)?.classList.add('hidden'));
+    document.getElementById('inicio')?.classList.remove('hidden');
   </script>
   <script src="js/common_ui.js"></script>
 </body>
 </html>
+
+
+
+

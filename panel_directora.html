@@ -5,25 +5,24 @@
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>Karpus Kids — Panel Director</title>
   <script src="https://cdn.tailwindcss.com"></script>
-  <link rel="stylesheet" href="css/theme.css" />
-  <link rel="stylesheet" href="css/karpus-modern.css" />
+  
   <script src="js/auth.js?v=1"></script>
-  <script>
-    (function(){
-      const check = Auth.requireRole('directora');
-      if(!check.ok){ window.location.href = 'login.html'; }
-    })();
-  </script>
-  <!-- Lucide icons -->
-  <script src="https://unpkg.com/lucide/dist/lucide.min.js"></script>
-  <!-- Chart.js (para gráficas) -->
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <script src="https://unpkg.com/lucide@latest/dist/umd/lucide.min.js"></script>
+  
   <style>
     /* Sidebar styles */
     aside#sidebar { width: 280px; transition: width .25s ease, transform .25s ease; }
     aside#sidebar.collapsed { width: 72px; }
     aside#sidebar .label { transition: opacity .2s ease; }
     aside#sidebar.collapsed .label { opacity: 0; }
+    
+    /* Hover expand logic */
+    aside#sidebar.collapsed:hover { width: 280px; }
+    aside#sidebar.collapsed:hover .label { opacity: 1; }
+    aside#sidebar.collapsed:hover .badge { opacity: 1; }
+    aside#sidebar.collapsed .badge { opacity: 0; transition: opacity .2s; }
+
     /* mobile helper */
     .hidden-mobile { display: none !important; }
     /* color variants */
@@ -105,7 +104,7 @@
     }
     
     /* Estilos para botones de navegación */
-    .nav-button {
+    .nav-btn {
       width: 100%;
       text-align: left;
       padding: 0.75rem 1rem;
@@ -117,11 +116,11 @@
       position: relative;
     }
     
-    .nav-button i {
+    .nav-btn i {
       transition: color 0.2s ease;
     }
     
-    .nav-button .badge {
+    .nav-btn .badge {
       position: absolute;
       top: 0.5rem;
       right: 0.5rem;
@@ -133,12 +132,40 @@
       min-width: 1.5rem;
       text-align: center;
     }
+
+    /* Animación suave para reportes */
+    .report-details {
+      display: grid;
+      grid-template-rows: 0fr;
+      transition: grid-template-rows 0.3s ease-out;
+    }
+    .report-details.open {
+      grid-template-rows: 1fr;
+    }
+    .report-details > div {
+      overflow: hidden;
+    }
+
+    /* Layout adjustments */
+    #layoutShell { transition: margin-left .25s ease; }
+    #layoutShell.sidebar-collapsed { margin-left: 72px !important; }
+    
+    @media (max-width: 768px) {
+      #layoutShell { margin-left: 0 !important; }
+    }
+
+    /* Chips para resumen de pagos */
+    .chip { padding: 0.25rem 0.75rem; border-radius: 9999px; font-size: 0.75rem; font-weight: 600; }
+    .chip-blue { background-color: #dbeafe; color: #1e40af; }
+    .chip-green { background-color: #dcfce7; color: #166534; }
+    .chip-orange { background-color: #ffedd5; color: #9a3412; }
   </style>
 </head>
 <body class="bg-slate-50 text-slate-800 font-nunito">
   <div class="min-h-screen flex">
     <!-- SIDEBAR -->
-    <aside id="sidebar" class="hidden md:block sidebar-blue p-4 rounded-r-3xl shadow-lg fixed inset-y-0 left-0 z-10">
+    <aside id="sidebar" class="hidden md:block sidebar-purple p-4 rounded-r-3xl shadow-lg fixed inset-y-0 left-0 z-10">
+      <button id="toggleSidebar" class="absolute -right-3 top-6 bg-white rounded-full p-1 shadow-md border border-slate-100 text-slate-500 hover:text-purple-600 hidden md:block"><i data-lucide="chevron-left" class="w-4 h-4"></i></button>
       <div class="flex items-center gap-3 mb-6">
         <div class="h-12 w-12 rounded-2xl bg-white/20 flex items-center justify-center shadow-lg">
           <img src="img/mundo.jpg" alt="logo" class="h-10 w-10 rounded-lg object-cover" />
@@ -151,72 +178,68 @@
 
       <div class="sidebar-scroll">
       <nav class="space-y-2 teams-nav bg-white/10 p-2 rounded-xl mb-4">
-        <button data-section="dashboard" class="nav-button teams-nav-item text-white hover:bg-white/20">
+        <button data-section="dashboard" class="nav-btn teams-nav-item text-white hover:bg-white/20" title="Dashboard">
           <i data-lucide="grid" class="text-karpus-blue"></i>
           <span class="label">Dashboard</span>
         </button>
-        <button data-section="maestros" class="nav-button teams-nav-item text-white hover:bg-white/20">
+        <button data-section="maestros" class="nav-btn teams-nav-item text-white hover:bg-white/20" title="Maestros">
           <i data-lucide="users" class="text-karpus-green"></i>
           <span class="label">Maestros</span>
           <span class="badge">5</span>
         </button>
-        <button data-section="estudiantes" class="nav-button teams-nav-item text-white hover:bg-white/20">
+        <button data-section="estudiantes" class="nav-btn teams-nav-item text-white hover:bg-white/20" title="Estudiantes">
           <i data-lucide="user-check" class="text-karpus-orange"></i>
           <span class="label">Estudiantes</span>
           <span class="badge">24</span>
         </button>
-        <button data-section="aulas" class="nav-button teams-nav-item text-white hover:bg-white/20">
+        <button data-section="aulas" class="nav-btn teams-nav-item text-white hover:bg-white/20" title="Aulas">
           <i data-lucide="home" class="text-karpus-purple"></i>
           <span class="label">Aulas</span>
         </button>
-        <button data-section="asistencia" class="nav-button teams-nav-item text-white hover:bg-white/20">
+        <button data-section="asistencia" class="nav-btn teams-nav-item text-white hover:bg-white/20" title="Asistencia">
           <i data-lucide="calendar" class="text-karpus-pink"></i>
           <span class="label">Asistencia</span>
         </button>
-        <button data-section="calificaciones" class="nav-button teams-nav-item text-white hover:bg-white/20">
+        <button data-section="calificaciones" class="nav-btn teams-nav-item text-white hover:bg-white/20" title="Calificaciones">
           <i data-lucide="graduation-cap" class="text-karpus-teal"></i>
           <span class="label">Calificaciones</span>
         </button>
-        <button data-section="reportes" class="nav-button teams-nav-item text-white hover:bg-white/20">
+        <button data-section="reportes" class="nav-btn teams-nav-item text-white hover:bg-white/20" title="Reportes">
           <i data-lucide="file-text" class="text-karpus-indigo"></i>
           <span class="label">Reportes</span>
         </button>
-        <button data-section="pagos" class="nav-button teams-nav-item text-white hover:bg-white/20">
+        <button data-section="pagos" class="nav-btn teams-nav-item text-white hover:bg-white/20" title="Pagos">
           <i data-lucide="credit-card" class="text-karpus-yellow"></i>
           <span class="label">Pagos</span>
         </button>
-        <button data-section="comunicacion" class="nav-button teams-nav-item text-white hover:bg-white/20">
+        <button data-section="comunicacion" class="nav-btn teams-nav-item text-white hover:bg-white/20" title="Comunicaciones">
           <i data-lucide="message-square" class="text-karpus-blue"></i>
           <span class="label">Comunicaciones</span>
           <span class="badge">3</span>
         </button>
-        <button data-section="configuracion" class="nav-button teams-nav-item text-white hover:bg-white/20">
+        <button data-section="configuracion" class="nav-btn teams-nav-item text-white hover:bg-white/20" title="Configuración">
           <i data-lucide="settings" class="text-karpus-gray"></i>
           <span class="label">Configuración</span>
         </button>
       </nav>
 
       <!-- Color sidebar eliminado: se usa estilo único -->
-      <div class="mt-6 text-xs text-slate-600">
+      <div class="mt-6 text-xs text-white/80">
         <p>Usuario: <span class="font-medium">Director(a)</span></p>
         <p class="mt-2">Último acceso: <span class="font-medium">Hoy</span></p>
-        <div class="mt-3 flex flex-wrap gap-2">
-          <a href="panel-maestra.html" class="px-2 py-1 rounded border text-xs">Ver panel Maestra</a>
-          <a href="panel_padres.html" class="px-2 py-1 rounded border text-xs">Ver panel Padres</a>
-        </div>
       </div>
       </div>
     </aside>
 
     <!-- MAIN -->
-    <main class="flex-1 p-6">
+    <main class="flex-1 p-6 ml-[280px]" id="layoutShell">
       <!-- Topbar mobile -->
       <div class="md:hidden mb-4 flex items-center justify-between">
         <button id="menuBtn" class="p-2 rounded bg-white shadow"><i data-lucide="menu" class="lucide"></i></button>
         <h2 class="font-semibold">Panel Director</h2>
         <div class="flex items-center gap-2">
           <button class="p-2 rounded bg-white shadow"><i data-lucide="bell" class="lucide"></i></button>
-          <img src="https://via.placeholder.com/36" class="rounded-full" alt="avatar">
+          <img src="img/mundo.jpg" class="rounded-full w-9 h-9 object-cover" alt="avatar">
         </div>
       </div>
 
@@ -229,10 +252,13 @@
             <p class="text-sm text-slate-500">Visión rápida de la estancia</p>
           </div>
           <div class="flex items-center gap-3">
-            <button id="exportBtn" class="px-3 py-2 bg-blue-600 text-white rounded">Exportar datos</button>
-            <button id="nuevoMaestroBtn" class="px-3 py-2 border rounded">Crear maestro</button>
+            <button onclick="exportDashboardData()" class="px-3 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 transition-colors flex items-center gap-2"><i data-lucide="download" class="w-4 h-4"></i> Exportar datos</button>
+            <button onclick="openTeacherModal()" class="px-3 py-2 border rounded hover:bg-slate-50 transition-colors flex items-center gap-2"><i data-lucide="user-plus" class="w-4 h-4"></i> Crear maestro</button>
           </div>
         </div>
+
+        <!-- ALERTAS AUTOMÁTICAS (Notificaciones) -->
+        <div id="dashboardAlerts" class="mb-6 hidden"></div>
 
         <!-- cards -->
         <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
@@ -276,12 +302,29 @@
               <p id="aulasOcupadas" class="text-2xl font-bold">5/6</p>
             </div>
           </div>
+          <!-- Card 5: Eventos (Nuevo) -->
+          <div class="p-4 bg-pink-100 text-pink-800 rounded-2xl shadow flex items-center gap-4 sm:col-span-2 lg:col-span-4">
+            <div class="bg-pink-500 text-white p-3 rounded-xl">
+              <i data-lucide="calendar-heart" class="w-8 h-8"></i>
+            </div>
+            <div class="flex-1">
+              <p class="text-sm font-semibold">Eventos del Mes</p>
+              <p class="text-sm">🎂 Cumpleaños de <span class="font-bold">Ana Sofía</span> (Mañana) • 🎭 Obra de teatro (Viernes 15)</p>
+            </div>
+          </div>
         </div>
 
         <!-- charts + tabla resumen -->
         <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
           <div class="col-span-2 bg-white rounded shadow p-4">
-            <h3 class="font-semibold mb-3">Asistencia (últimas 8 semanas)</h3>
+            <div class="flex items-center justify-between mb-3">
+              <h3 class="font-semibold">Estadísticas de Asistencia</h3>
+              <div class="flex bg-slate-100 rounded-lg p-1 gap-1">
+                <button onclick="updateChart('day')" class="px-3 py-1 text-xs rounded-md bg-white shadow-sm text-slate-700 font-medium transition-all hover:bg-white/80">Día</button>
+                <button onclick="updateChart('week')" class="px-3 py-1 text-xs rounded-md text-slate-500 hover:bg-white hover:shadow-sm transition-all">Semana</button>
+                <button onclick="updateChart('month')" class="px-3 py-1 text-xs rounded-md text-slate-500 hover:bg-white hover:shadow-sm transition-all">Mes</button>
+              </div>
+            </div>
             <canvas id="attendanceChart" height="120"></canvas>
           </div>
 
@@ -324,7 +367,7 @@
             <i data-lucide="users" class="w-5 h-5 text-slate-600"></i><span>Maestros</span>
           </h2>
           <div>
-            <button id="addTeacher" class="px-3 py-2 bg-green-600 text-white rounded">Agregar maestro</button>
+            <button onclick="openTeacherModal()" class="px-3 py-2 bg-green-600 text-white rounded">Agregar maestro</button>
           </div>
         </div>
         <div class="bg-white rounded shadow p-4">
@@ -338,28 +381,7 @@
                 <th class="py-2">Acciones</th>
               </tr>
             </thead>
-            <tbody id="teachersTable">
-              <tr>
-                <td class="py-2">Carolina Martínez</td>
-                <td class="py-2">carolina@karpus.com</td>
-                <td class="py-2">+57 300 123 4567</td>
-                <td class="py-2"><span class="px-2 py-1 bg-green-100 text-green-800 rounded-full text-xs">Activo</span></td>
-                <td class="py-2">
-                  <button class="text-blue-600 hover:text-blue-800 mr-2" onclick="editTeacher(this)">Editar</button>
-                  <button class="text-red-600 hover:text-red-800" onclick="deleteTeacher(this)">Eliminar</button>
-                </td>
-              </tr>
-              <tr>
-                <td class="py-2">Andrés Pérez</td>
-                <td class="py-2">andres@karpus.com</td>
-                <td class="py-2">+57 301 987 6543</td>
-                <td class="py-2"><span class="px-2 py-1 bg-yellow-100 text-yellow-800 rounded-full text-xs">Inactivo</span></td>
-                <td class="py-2">
-                  <button class="text-blue-600 hover:text-blue-800 mr-2" onclick="editTeacher(this)">Editar</button>
-                  <button class="text-red-600 hover:text-red-800" onclick="deleteTeacher(this)">Eliminar</button>
-                </td>
-              </tr>
-            </tbody>
+            <tbody id="teachersTable"><!-- Se llena dinámicamente con JS --></tbody>
           </table>
         </div>
       </section>
@@ -372,7 +394,7 @@
           </h2>
           <div class="flex gap-2">
             <input id="searchStudent" placeholder="Buscar estudiante..." class="px-3 py-2 border rounded-lg" />
-            <button id="addStudentBtn" class="px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 flex items-center gap-2">
+            <button onclick="openAddStudentModal()" class="px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 flex items-center gap-2">
               <i data-lucide="user-plus" class="w-4 h-4"></i>
               Agregar Estudiante
             </button>
@@ -466,7 +488,7 @@
             <i data-lucide="home" class="w-5 h-5 text-slate-600"></i><span>Aulas</span>
           </h2>
           <div>
-            <button id="addRoomBtn" class="px-3 py-2 bg-yellow-600 text-white rounded">Nueva aula</button>
+            <button onclick="openRoomModal()" class="px-3 py-2 bg-yellow-600 text-white rounded">Nueva aula</button>
           </div>
         </div>
         
@@ -476,39 +498,13 @@
             <thead class="text-slate-500 text-left">
               <tr>
                 <th class="py-2">Nombre del Aula</th>
-                <th class="py-2">Maestro Asignado</th>
-                <th class="py-2">Capacidad</th>
-                <th class="py-2">Estudiantes</th>
-                <th class="py-2">Estado</th>
+                <th class="py-2 hidden md:table-cell">Maestro Asignado</th>
+                <th class="py-2">Ocupación</th>
+                <th class="py-2 text-center">Estado</th>
                 <th class="py-2">Acciones</th>
               </tr>
             </thead>
-            <tbody id="roomsTable">
-              <tr>
-                <td class="py-2 font-medium">Aula Pequeños A1</td>
-                <td class="py-2">Carolina Martínez</td>
-                <td class="py-2">15</td>
-                <td class="py-2">12/15</td>
-                <td class="py-2"><span class="px-2 py-1 bg-green-100 text-green-800 rounded-full text-xs">Activa</span></td>
-                <td class="py-2">
-                  <button class="text-blue-600 hover:text-blue-800 mr-2" onclick="editRoom(this)">Editar</button>
-                  <button class="text-green-600 hover:text-green-800 mr-2" onclick="viewRoomStudents(this)">Ver Estudiantes</button>
-                  <button class="text-red-600 hover:text-red-800" onclick="deleteRoom(this)">Eliminar</button>
-                </td>
-              </tr>
-              <tr>
-                <td class="py-2 font-medium">Aula Medianos B1</td>
-                <td class="py-2">Andrés Pérez</td>
-                <td class="py-2">18</td>
-                <td class="py-2">10/18</td>
-                <td class="py-2"><span class="px-2 py-1 bg-green-100 text-green-800 rounded-full text-xs">Activa</span></td>
-                <td class="py-2">
-                  <button class="text-blue-600 hover:text-blue-800 mr-2" onclick="editRoom(this)">Editar</button>
-                  <button class="text-green-600 hover:text-green-800 mr-2" onclick="viewRoomStudents(this)">Ver Estudiantes</button>
-                  <button class="text-red-600 hover:text-red-800" onclick="deleteRoom(this)">Eliminar</button>
-                </td>
-              </tr>
-            </tbody>
+            <tbody id="roomsTable"><!-- Llenado dinámicamente por JS --></tbody>
           </table>
         </div>
       </section>
@@ -519,16 +515,22 @@
           <h2 class="text-xl font-semibold flex items-center gap-2">
             <i data-lucide="calendar-check" class="w-5 h-5 text-slate-600"></i><span>Control de Asistencia</span>
           </h2>
-          <div>
+          <div class="flex gap-2">
+            <input type="date" class="px-3 py-2 border rounded text-sm" value="2024-01-06">
             <button id="exportAttendance" class="px-3 py-2 border rounded">Exportar</button>
           </div>
         </div>
         <div class="bg-white rounded shadow p-4">
-          <p class="text-sm text-slate-500 mb-3">Marcar / corregir asistencia</p>
+          <div class="flex justify-between items-center mb-3">
+            <p class="text-sm text-slate-500">Marcar / corregir asistencia del día</p>
+            <button onclick="markAllPresent()" class="text-sm text-blue-600 hover:underline">Marcar todos presente</button>
+          </div>
           <table class="w-full text-sm">
             <thead class="text-slate-500 text-left"><tr><th>Estudiante</th><th>Aula</th><th>Estado</th><th>Acciones</th></tr></thead>
-            <tbody>
-              <tr><td>María P.</td><td>A1</td><td><select class="border rounded px-2 py-1"><option>Presente</option><option>Ausente</option></select></td><td><button class="px-2 py-1 bg-blue-600 text-white rounded">Guardar</button></td></tr>
+            <tbody id="attendanceListBody">
+              <tr><td>María P.</td><td>A1</td><td><select class="border rounded px-2 py-1 attendance-select"><option value="Presente">Presente</option><option value="Ausente">Ausente</option><option value="Excusa">Excusa Médica</option></select></td><td><button class="text-blue-600 hover:text-blue-800"><i data-lucide="save" class="w-4 h-4"></i></button></td></tr>
+              <tr><td>Javier R.</td><td>A2</td><td><select class="border rounded px-2 py-1 attendance-select"><option value="Presente">Presente</option><option value="Ausente">Ausente</option><option value="Excusa">Excusa Médica</option></select></td><td><button class="text-blue-600 hover:text-blue-800"><i data-lucide="save" class="w-4 h-4"></i></button></td></tr>
+              <tr><td>Ana Sofía G.</td><td>A1</td><td><select class="border rounded px-2 py-1 attendance-select"><option value="Presente">Presente</option><option value="Ausente">Ausente</option><option value="Excusa">Excusa Médica</option></select></td><td><button class="text-blue-600 hover:text-blue-800"><i data-lucide="save" class="w-4 h-4"></i></button></td></tr>
             </tbody>
           </table>
         </div>
@@ -538,14 +540,26 @@
       <section id="calificaciones" class="section hidden">
         <div class="flex items-center justify-between mb-4">
           <h2 class="text-xl font-semibold flex items-center gap-2">
-            <i data-lucide="graduation-cap" class="w-5 h-5 text-slate-600"></i><span>Resumen de Calificaciones</span>
+            <i data-lucide="graduation-cap" class="w-5 h-5 text-slate-600"></i><span>Calificaciones</span>
           </h2>
-          <div>
-            <button id="exportGrades" class="px-3 py-2 border rounded">Exportar Resumen</button>
+          <div class="flex gap-2">
+            <select id="gradesFilter" class="px-3 py-2 border rounded text-sm" onchange="renderGrades()">
+              <option value="all">Todas las aulas</option>
+              <option value="Pequeños">Pequeños</option>
+              <option value="Medianos">Medianos</option>
+              <option value="Grandes">Grandes</option>
+            </select>
+            <button onclick="alert('Exportando calificaciones...')" class="px-3 py-2 border rounded hover:bg-slate-50 text-sm">Exportar</button>
           </div>
         </div>
-        <p class="text-sm text-slate-600 mb-4">Vista general del rendimiento académico por aula.</p>
-        <div id="gradesSummaryContainer" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+        
+        <div class="bg-white rounded shadow p-4">
+          <table class="w-full text-sm">
+            <thead class="text-slate-500 text-left bg-slate-50">
+              <tr><th class="p-3">Estudiante</th><th class="p-3">Aula</th><th class="p-3">Matemáticas</th><th class="p-3">Lenguaje</th><th class="p-3">Arte</th><th class="p-3">Promedio</th><th class="p-3">Estado</th></tr>
+            </thead>
+            <tbody id="gradesTable"><!-- Llenado por JS --></tbody>
+          </table>
         </div>
       </section>
 
@@ -587,7 +601,8 @@
             <p class="text-sm text-slate-700 mb-3">
               Mi hija Ana me comentó que hubo un incidente durante la hora del almuerzo donde otro niño le quitó su comida y la maestra no intervino adecuadamente...
             </p>
-            <div class="report-details hidden">
+            <div class="report-details">
+              <div>
               <div class="border-t pt-3 mt-3">
                 <h4 class="font-medium mb-2">Mensaje completo:</h4>
                 <p class="text-sm text-slate-700 mb-3">
@@ -605,6 +620,7 @@
                   <button onclick="resolveReport(this)" class="px-3 py-2 bg-green-600 text-white rounded text-sm">Marcar como Resuelto</button>
                   <button onclick="respondReport(this)" class="px-3 py-2 bg-blue-600 text-white rounded text-sm">Responder</button>
                 </div>
+              </div>
               </div>
             </div>
           </div>
@@ -627,7 +643,8 @@
             <p class="text-sm text-slate-700 mb-3">
               Necesito solicitar material adicional para las actividades de arte. Los niños han mostrado mucho interés y necesitamos más suministros...
             </p>
-            <div class="report-details hidden">
+            <div class="report-details">
+              <div>
               <div class="border-t pt-3 mt-3">
                 <h4 class="font-medium mb-2">Mensaje completo:</h4>
                 <p class="text-sm text-slate-700 mb-3">
@@ -651,6 +668,7 @@
                   <button onclick="respondReport(this)" class="px-3 py-2 bg-blue-600 text-white rounded text-sm">Responder</button>
                 </div>
               </div>
+              </div>
             </div>
           </div>
 
@@ -672,7 +690,8 @@
             <p class="text-sm text-slate-700 mb-3">
               Tengo dificultades con el horario de recogida actual. Mi trabajo termina a las 5:30 PM y necesito flexibilidad...
             </p>
-            <div class="report-details hidden">
+            <div class="report-details">
+              <div>
               <div class="border-t pt-3 mt-3">
                 <h4 class="font-medium mb-2">Mensaje completo:</h4>
                 <p class="text-sm text-slate-700 mb-3">
@@ -685,6 +704,7 @@
                 <p class="text-xs text-slate-500">Resuelto por: Directora • 13 Dic 2024, 9:00 AM</p>
               </div>
             </div>
+            </div>
           </div>
         </div>
       </section>
@@ -696,13 +716,14 @@
             <i data-lucide="credit-card" class="w-5 h-5 text-slate-600"></i><span>Pagos</span>
           </h2>
           <div class="flex items-center gap-2">
+            <input id="searchPayment" placeholder="Buscar alumno..." class="px-3 py-2 border rounded text-sm hidden md:block" onkeyup="filterPayments()">
             <select id="paymentsClassFilter" class="px-3 py-2 border rounded">
               <option value="Pequeños">Pequeños</option>
               <option value="Medianos">Medianos</option>
               <option value="Grandes">Grandes</option>
             </select>
             <button id="btnRecordatorioMasivo" class="btn btn-pink">Recordatorio masivo</button>
-            <button id="btnNuevoPago" class="btn btn-green">Registrar pago</button>
+            <button id="btnNuevoPago" class="px-3 py-2 bg-green-600 text-white rounded hover:bg-green-700 text-sm">Registrar pago</button>
           </div>
         </div>
         <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
@@ -727,7 +748,7 @@
             <thead class="text-slate-500 text-left">
               <tr><th>Estudiante</th><th>Aula</th><th>Mes</th><th>Monto</th><th>Estado</th><th>Acciones</th></tr>
             </thead>
-            <tbody id="paymentsTable"></tbody>
+            <tbody id="paymentsTable"><!-- Llenado dinámicamente por JS --></tbody>
           </table>
         </div>
       </section>
@@ -797,18 +818,71 @@
 
       <!-- CONFIGURACIÓN -->
       <section id="configuracion" class="section hidden">
-        <div class="bg-white rounded shadow p-4">
-          <h2 class="text-xl font-semibold mb-3 flex items-center gap-2">
-            <i data-lucide="settings" class="w-5 h-5 text-slate-600"></i><span>Configuración</span>
-          </h2>
-          <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div>
-              <label class="text-sm">Nombre institución</label>
-              <input class="w-full border rounded px-3 py-2" value="Karpus Kids" />
+        <div class="flex items-center gap-3 mb-6">
+          <i data-lucide="settings" class="w-7 h-7 text-slate-600"></i>
+          <h2 class="text-2xl font-bold">Configuración y Perfil</h2>
+        </div>
+
+        <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+          <!-- Perfil Directora -->
+          <div class="lg:col-span-2 space-y-6">
+            <div class="bg-white rounded shadow p-6">
+              <h3 class="text-lg font-semibold mb-4 border-b pb-2 flex items-center gap-2"><i data-lucide="user-circle" class="w-5 h-5"></i> Perfil Profesional (Directora)</h3>
+              <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <label class="block text-sm font-medium text-slate-700 mb-1">Nombre Completo</label>
+                  <input id="confDirName" type="text" class="w-full border rounded px-3 py-2 focus:ring-2 focus:ring-purple-500 outline-none" value="Karonlyn García">
+                </div>
+                <div>
+                  <label class="block text-sm font-medium text-slate-700 mb-1">Título / Cargo</label>
+                  <input id="confDirTitle" type="text" class="w-full border rounded px-3 py-2 focus:ring-2 focus:ring-purple-500 outline-none" value="Directora General">
+                </div>
+                <div class="md:col-span-2">
+                  <label class="block text-sm font-medium text-slate-700 mb-1">Presentación / Biografía</label>
+                  <textarea id="confDirBio" rows="4" class="w-full border rounded px-3 py-2 focus:ring-2 focus:ring-purple-500 outline-none" placeholder="Escribe una breve presentación...">Fundadora y CEO, apasionada por la educación y el bienestar infantil. Con una visión clara y un corazón dedicado...</textarea>
+                  <p class="text-xs text-slate-500 mt-1">Esta información será visible en el perfil público para padres y maestros.</p>
+                </div>
+              </div>
             </div>
-            <div>
-              <label class="text-sm">Correo de contacto</label>
-              <input class="w-full border rounded px-3 py-2" value="contacto@karpus.example" />
+
+            <div class="bg-white rounded shadow p-6">
+              <h3 class="text-lg font-semibold mb-4 border-b pb-2 flex items-center gap-2"><i data-lucide="building" class="w-5 h-5"></i> Información Institucional</h3>
+              <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <label class="block text-sm font-medium text-slate-700 mb-1">Teléfono Institucional</label>
+                  <input id="confPhone" type="tel" class="w-full border rounded px-3 py-2 focus:ring-2 focus:ring-purple-500 outline-none" value="+1 (829) 803-8424">
+                </div>
+                <div>
+                  <label class="block text-sm font-medium text-slate-700 mb-1">Correo de Contacto</label>
+                  <input id="confEmail" type="email" class="w-full border rounded px-3 py-2 focus:ring-2 focus:ring-purple-500 outline-none" value="info@karpuskids.com">
+                </div>
+                <div class="md:col-span-2">
+                  <label class="block text-sm font-medium text-slate-700 mb-1">Dirección Física</label>
+                  <input id="confAddress" type="text" class="w-full border rounded px-3 py-2 focus:ring-2 focus:ring-purple-500 outline-none" value="Calle Principal #123, Santo Domingo">
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Avatar y Acciones -->
+          <div class="space-y-6">
+            <div class="bg-white rounded shadow p-6 text-center">
+              <h3 class="text-sm font-semibold mb-4">Foto de Perfil</h3>
+              <div class="relative w-32 h-32 mx-auto mb-4 group">
+                <img src="img/mundo.jpg" alt="Avatar" class="w-full h-full object-cover rounded-full border-4 border-slate-100 shadow-sm group-hover:opacity-90 transition-opacity">
+                <button class="absolute bottom-0 right-0 bg-purple-600 text-white p-2 rounded-full shadow hover:bg-purple-700 transition-colors" title="Cambiar foto">
+                  <i data-lucide="camera" class="w-4 h-4"></i>
+                </button>
+              </div>
+              <p class="text-xs text-slate-500 mb-4">JPG, PNG o WEBP. Máx 2MB.</p>
+            </div>
+
+            <div class="bg-white rounded shadow p-6">
+              <h3 class="text-sm font-semibold mb-4">Acciones</h3>
+              <button onclick="alert('Configuración guardada exitosamente')" class="w-full py-2 bg-green-600 text-white rounded hover:bg-green-700 mb-3 flex items-center justify-center gap-2 transition-colors">
+                <i data-lucide="save" class="w-4 h-4"></i> Guardar Cambios
+              </button>
+              <button class="w-full py-2 border border-slate-300 text-slate-700 rounded hover:bg-slate-50 transition-colors">Cancelar</button>
             </div>
           </div>
         </div>
@@ -817,13 +891,14 @@
     </main>
   </div>
 
-  <!-- MODAL: Crear Maestro -->
-  <div id="modal" class="fixed inset-0 bg-black/40 hidden items-center justify-center">
+  <!-- MODAL: Crear/Editar Maestro -->
+  <div id="teacherModal" class="fixed inset-0 bg-black/40 hidden flex items-center justify-center z-50">
     <div class="bg-white rounded-lg p-6 w-full max-w-md">
       <h3 class="font-semibold mb-3 flex items-center gap-2">
-        <i data-lucide="user-plus" class="w-5 h-5"></i>
-        Crear Maestro
+        <i data-lucide="user-cog" class="w-5 h-5"></i>
+        <span id="teacherModalTitle">Crear Maestro</span>
       </h3>
+      <input type="hidden" id="tmId">
       <div class="grid gap-3">
         <div>
           <label class="text-sm text-slate-600 block mb-1">Nombre completo</label>
@@ -837,25 +912,62 @@
           <label class="text-sm text-slate-600 block mb-1">Correo electrónico</label>
           <input id="tmEmail" type="email" placeholder="Ej: maria@karpus.com" class="w-full border rounded px-3 py-2" />
         </div>
+        <div class="grid grid-cols-2 gap-3">
+          <div>
+            <label class="text-sm text-slate-600 block mb-1">Usuario</label>
+            <input id="tmUsername" placeholder="Ej: maria.g" class="w-full border rounded px-3 py-2" />
+          </div>
+          <div>
+            <label class="text-sm text-slate-600 block mb-1">Especialidad</label>
+            <input id="tmSpecialty" placeholder="Ej: Inglés" class="w-full border rounded px-3 py-2" />
+          </div>
+        </div>
         <div>
           <label class="text-sm text-slate-600 block mb-1">Contraseña</label>
-          <input id="tmPassword" type="password" placeholder="Contraseña para acceder al panel" class="w-full border rounded px-3 py-2" />
+          <input id="tmPassword" type="password" placeholder="••••••" class="w-full border rounded px-3 py-2" />
+        </div>
+        <div>
+          <label class="text-sm text-slate-600 block mb-1">Estado</label>
+          <select id="tmStatus" class="w-full border rounded px-3 py-2">
+            <option value="Activo">Activo</option>
+            <option value="Inactivo">Inactivo</option>
+          </select>
         </div>
         <div class="flex justify-end gap-2 mt-3">
-          <button id="cancelModal" class="px-4 py-2 border rounded-lg hover:bg-slate-50">Cancelar</button>
-          <button id="saveModal" class="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700">Crear Maestro</button>
+          <button onclick="document.getElementById('teacherModal').classList.add('hidden')" class="px-4 py-2 border rounded-lg hover:bg-slate-50">Cancelar</button>
+          <button onclick="saveTeacher()" class="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700">Guardar</button>
         </div>
       </div>
     </div>
   </div>
 
+  <!-- MODAL: Ver Estudiantes de Aula -->
+  <div id="roomStudentsModal" class="fixed inset-0 bg-black/40 hidden items-center justify-center z-50">
+    <div class="bg-white rounded-lg p-6 w-full max-w-md">
+      <div class="flex justify-between items-center mb-4">
+        <h3 class="font-semibold flex items-center gap-2">
+          <i data-lucide="users" class="w-5 h-5 text-slate-600"></i>
+          <span id="roomStudentsTitle">Estudiantes</span>
+        </h3>
+        <button onclick="document.getElementById('roomStudentsModal').classList.add('hidden')" class="text-slate-400 hover:text-slate-600"><i data-lucide="x" class="w-5 h-5"></i></button>
+      </div>
+      <div id="roomStudentsList" class="space-y-2 max-h-80 overflow-y-auto">
+        <!-- Lista dinámica -->
+      </div>
+      <div class="flex justify-end mt-4">
+        <button onclick="document.getElementById('roomStudentsModal').classList.add('hidden')" class="px-4 py-2 bg-slate-100 text-slate-700 rounded-lg hover:bg-slate-200">Cerrar</button>
+      </div>
+    </div>
+  </div>
+
   <!-- MODAL: Crear/Editar Aula -->
-  <div id="roomModal" class="fixed inset-0 bg-black/40 hidden items-center justify-center">
+  <div id="roomModal" class="fixed inset-0 bg-black/40 hidden flex items-center justify-center z-50">
     <div class="bg-white rounded-lg p-6 w-full max-w-lg">
       <h3 class="font-semibold mb-3 flex items-center gap-2">
         <i data-lucide="home" class="w-5 h-5"></i>
-        <span id="roomModalTitle">Crear Aula</span>
+        <span id="roomModalTitle">Gestionar Aula</span>
       </h3>
+      <input type="hidden" id="roomId">
       <div class="grid gap-3">
         <div>
           <label class="text-sm text-slate-600 block mb-1">Nombre del Aula</label>
@@ -875,37 +987,16 @@
         </div>
         <div>
           <label class="text-sm text-slate-600 block mb-1">Estudiantes Asignados</label>
-          <div class="border rounded px-3 py-2 max-h-32 overflow-y-auto">
-            <input id="studentSearch" placeholder="Buscar estudiante por nombre..." class="w-full mb-2 text-sm" />
-            <div id="studentsList" class="space-y-1">
-              <!-- Lista de estudiantes con checkboxes -->
-              <label class="flex items-center gap-2 text-sm">
-                <input type="checkbox" value="María Pérez" />
-                <span>María Pérez</span>
-              </label>
-              <label class="flex items-center gap-2 text-sm">
-                <input type="checkbox" value="Juan García" />
-                <span>Juan García</span>
-              </label>
-              <label class="flex items-center gap-2 text-sm">
-                <input type="checkbox" value="Ana López" />
-                <span>Ana López</span>
-              </label>
-              <label class="flex items-center gap-2 text-sm">
-                <input type="checkbox" value="Carlos Rodríguez" />
-                <span>Carlos Rodríguez</span>
-              </label>
-              <label class="flex items-center gap-2 text-sm">
-                <input type="checkbox" value="Sofia Martín" />
-                <span>Sofia Martín</span>
-              </label>
+          <div class="border rounded px-3 py-2 max-h-40 overflow-y-auto bg-slate-50">
+            <div id="roomStudentsChecklist" class="space-y-1 p-1">
+              <!-- Lista dinámica de estudiantes con checkboxes -->
             </div>
           </div>
           <p class="text-xs text-slate-500 mt-1">Selecciona los estudiantes que pertenecerán a esta aula</p>
         </div>
         <div class="flex justify-end gap-2 mt-3">
-          <button id="cancelRoomModal" class="px-4 py-2 border rounded-lg hover:bg-slate-50">Cancelar</button>
-          <button id="saveRoomModal" class="px-4 py-2 bg-yellow-600 text-white rounded-lg hover:bg-yellow-700">Guardar Aula</button>
+          <button onclick="document.getElementById('roomModal').classList.add('hidden')" class="px-4 py-2 border rounded-lg hover:bg-slate-50">Cancelar</button>
+          <button onclick="saveRoom()" class="px-4 py-2 bg-yellow-600 text-white rounded-lg hover:bg-yellow-700">Guardar</button>
         </div>
       </div>
     </div>
@@ -1029,6 +1120,10 @@
                 <label class="text-sm text-blue-700 block mb-1">Autorizado para Recoger</label>
                 <p id="studentPickup" class="text-sm font-medium text-blue-800">Padres y Abuela Materna</p>
               </div>
+              <div>
+                <label class="text-sm text-blue-700 block mb-1">Tipo de Sangre</label>
+                <p id="studentBlood" class="text-sm font-medium text-blue-800">O+</p>
+              </div>
             </div>
           </div>
         </div>
@@ -1046,7 +1141,7 @@
   </div>
 
   <!-- MODAL: Agregar Estudiante (Director) -->
-  <div id="modalAddStudent" class="fixed inset-0 bg-black/40 hidden items-center justify-center z-50">
+  <div id="modalAddStudent" class="fixed inset-0 bg-black/40 hidden flex items-center justify-center z-50">
     <div class="bg-white rounded-lg p-6 w-full max-w-lg">
       <h3 class="font-semibold mb-3 flex items-center gap-2">
         <i data-lucide="user-plus" class="w-5 h-5"></i>
@@ -1075,690 +1170,724 @@
           <input id="p2Name" placeholder="Padre/Madre 2 (nombre)" class="border rounded px-3 py-2" />
           <input id="p2Phone" placeholder="Teléfono 2" class="border rounded px-3 py-2" />
         </div>
+        <div class="grid grid-cols-2 gap-2">
+          <input id="stAllergies" placeholder="Alergias" class="border rounded px-3 py-2" />
+          <input id="stBlood" placeholder="Tipo de Sangre" class="border rounded px-3 py-2" />
+        </div>
+        <div>
+          <label class="text-sm text-slate-600 block mb-1">Personas autorizadas para recoger</label>
+          <input id="stPickup" placeholder="Ej: Abuela Carmen, Tío Juan" class="w-full border rounded px-3 py-2" />
+        </div>
         <label class="flex items-center gap-2"><input id="stActive" type="checkbox" checked class="rounded" /> Estudiante activo</label>
         <div class="flex justify-end gap-2 mt-3">
-          <button id="closeAddStudent" class="px-4 py-2 border rounded-lg">Cancelar</button>
-          <button id="saveAddStudent" class="px-4 py-2 bg-indigo-600 text-white rounded-lg">Agregar Estudiante</button>
+          <button onclick="document.getElementById('modalAddStudent').classList.add('hidden')" class="px-4 py-2 border rounded-lg">Cancelar</button>
+          <button onclick="saveStudent()" class="px-4 py-2 bg-indigo-600 text-white rounded-lg">Guardar</button>
         </div>
       </div>
     </div>
   </div>
 
+  
+  <script src="js/store.js?v=2"></script>
+  <script src="js/common_ui.js"></script>
   <script>
-    // Init lucide icons
-    document.addEventListener('DOMContentLoaded', ()=>{ 
-      if(window.lucide && typeof lucide.createIcons === 'function') {
-        lucide.createIcons();
-      }
-    });
+    // Lógica para la gráfica de asistencia
+    let attendanceChartInstance = null;
 
-    // Toggle sidebar collapse
-    let isSidebarCollapsed = false;
-    document.getElementById('toggleSidebar')?.addEventListener('click', ()=>{
-      const sb = document.getElementById('sidebar');
-      if(sb) {
-        isSidebarCollapsed = !isSidebarCollapsed;
-        sb.classList.toggle('collapsed', isSidebarCollapsed);
-      }
-    });
+    function initChart() {
+      const ctx = document.getElementById('attendanceChart').getContext('2d');
+      
+      // Datos iniciales (Día)
+      const dataDay = {
+        labels: ['8:00', '9:00', '10:00', '11:00', '12:00', '13:00'],
+        datasets: [{
+          label: 'Asistencia Hoy',
+          data: [15, 20, 24, 24, 22, 18],
+          borderColor: '#4f46e5',
+          backgroundColor: 'rgba(79, 70, 229, 0.1)',
+          fill: true,
+          tension: 0.4
+        }]
+      };
 
-    // Sistema de color eliminado: sidebar usa estilo único
-
-    // Navegación de secciones (activo visual y cierre en móvil)
-    const navButtons = Array.from(document.querySelectorAll('[data-section]'));
-    navButtons.forEach(btn=>{
-      btn.addEventListener('click', ()=>{
-        const target = btn.getAttribute('data-section');
-        // ocultar todas las secciones
-        document.querySelectorAll('.section').forEach(s=> s.classList.add('hidden'));
-        // estado activo visual del botón
-        navButtons.forEach(b=> b.classList.remove('bg-white/20'));
-        btn.classList.add('bg-white/20');
-        // mostrar sección seleccionada
-        const el = document.getElementById(target);
-        if(el) el.classList.remove('hidden');
-        // cerrar sidebar en móvil
-        const sb = document.getElementById('sidebar');
-        if(window.innerWidth < 768 && sb) sb.classList.add('hidden');
+      attendanceChartInstance = new Chart(ctx, {
+        type: 'line',
+        data: dataDay,
+        options: {
+          responsive: true,
+          plugins: { legend: { display: false } },
+          scales: { y: { beginAtZero: true } }
+        }
       });
-    });
-    // estado inicial activo
-    const initialBtn = document.querySelector('[data-section="dashboard"]');
-    if(initialBtn) initialBtn.classList.add('bg-white/20');
+    }
 
-    // Mobile menu
-    document.getElementById('menuBtn')?.addEventListener('click', ()=>{
-      const sb = document.getElementById('sidebar');
-      if(sb) sb.classList.toggle('hidden');
+    function updateChart(period) {
+      if (!attendanceChartInstance) return;
+      
+      // Actualizar estilos de botones
+      // (Simplificado: en una implementación real, cambiar clases activas)
+
+      if (period === 'day') {
+        attendanceChartInstance.data.labels = ['8:00', '9:00', '10:00', '11:00', '12:00', '13:00'];
+        attendanceChartInstance.data.datasets[0].data = [15, 20, 24, 24, 22, 18];
+        attendanceChartInstance.data.datasets[0].label = 'Asistencia Hoy';
+      } else if (period === 'week') {
+        attendanceChartInstance.data.labels = ['Lun', 'Mar', 'Mié', 'Jue', 'Vie'];
+        attendanceChartInstance.data.datasets[0].data = [22, 24, 21, 25, 23];
+        attendanceChartInstance.data.datasets[0].label = 'Asistencia Semana';
+      } else if (period === 'month') {
+        attendanceChartInstance.data.labels = ['Sem 1', 'Sem 2', 'Sem 3', 'Sem 4'];
+        attendanceChartInstance.data.datasets[0].data = [95, 92, 98, 94]; // Promedios o totales
+        attendanceChartInstance.data.datasets[0].label = 'Asistencia Mes';
+      }
+      attendanceChartInstance.update();
+    }
+
+    // Toggle detalles de reportes con animación
+    window.toggleReportDetails = function(btn) {
+      const card = btn.closest('.bg-white');
+      const details = card.querySelector('.report-details');
+      if (details) {
+        details.classList.toggle('open');
+        btn.textContent = details.classList.contains('open') ? 'Ocultar detalles' : 'Ver detalles';
+      }
+    };
+
+    // Lógica de navegación del sidebar
+    function initNavigation() {
+      const navBtns = document.querySelectorAll('.nav-btn');
+      const sections = document.querySelectorAll('.section');
+
+      navBtns.forEach(btn => {
+        btn.addEventListener('click', () => {
+          const sectionId = btn.getAttribute('data-section');
+          
+          // Remover clase activa de todos
+          navBtns.forEach(b => b.classList.remove('bg-white/20'));
+          // Agregar clase activa al clickeado
+          btn.classList.add('bg-white/20');
+
+          // Ocultar todas las secciones
+          sections.forEach(sec => sec.classList.add('hidden'));
+          
+          // Mostrar la sección seleccionada
+          const target = document.getElementById(sectionId);
+          if (target) {
+            target.classList.remove('hidden');
+          }
+        });
+      });
+    }
+
+    // Variable global para la instancia de la gráfica de pagos
+    let paymentsChartInstance = null;
+
+    // Gráfica de Pagos (Pie Chart)
+    function initPaymentsChart() {
+      const ctx = document.getElementById('paymentsChart');
+      if (!ctx) return;
+
+      paymentsChartInstance = new Chart(ctx, {
+        type: 'doughnut',
+        data: {
+          labels: ['Pagados', 'Pendientes'],
+          datasets: [{
+            data: [0, 0], // Se actualizará dinámicamente
+            backgroundColor: ['#10b981', '#f59e0b'], // Verde, Naranja
+            borderWidth: 0,
+            hoverOffset: 4
+          }]
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          plugins: {
+            legend: {
+              position: 'bottom',
+              labels: { usePointStyle: true, boxWidth: 8 }
+            }
+          },
+          cutout: '70%'
+        }
+      });
+    }
+
+    // Base de datos simulada de estudiantes para el perfil
+    const studentsDb = {
+      'María Fernanda Pérez': {
+        room: 'Aula Pequeños A1',
+        start: '15 Feb 2024',
+        allergies: 'Maní (Severa)',
+        pickup: 'Padres y Abuela Carmen',
+        blood: 'O+',
+        p1: { name: 'Ana Pérez', phone: '+1 829-555-0101', email: 'ana@email.com', job: 'Arquitecta', address: 'Calle 1 #23' },
+        p2: { name: 'Juan Pérez', phone: '+1 829-555-0102', email: 'juan@email.com', job: 'Ingeniero', address: 'Calle 1 #23' }
+      },
+      'Javier Alejandro Rodríguez': {
+        room: 'Aula Medianos B1',
+        start: '10 Mar 2024',
+        allergies: 'Ninguna',
+        pickup: 'Solo Padres',
+        blood: 'A+',
+        p1: { name: 'Luisa Rodríguez', phone: '+1 829-555-0201', email: 'luisa@email.com', job: 'Doctora', address: 'Av. Principal #45' },
+        p2: { name: 'Pedro Rodríguez', phone: '+1 829-555-0202', email: 'pedro@email.com', job: 'Abogado', address: 'Av. Principal #45' }
+      },
+      'Ana Sofía González': {
+        room: 'Aula Pequeños A1',
+        start: '01 Abr 2024',
+        allergies: 'Polvo',
+        pickup: 'Padres y Tía Rosa',
+        blood: 'B+',
+        p1: { name: 'Marta González', phone: '+1 829-555-0301', email: 'marta@email.com', job: 'Diseñadora', address: 'Res. Las Palmas' },
+        p2: { name: 'Luis González', phone: '+1 829-555-0302', email: 'luis@email.com', job: 'Comerciante', address: 'Res. Las Palmas' }
+      },
+      'Carlos Eduardo Martínez': {
+        room: 'Aula Grandes C1',
+        start: '20 Ene 2024',
+        allergies: 'Lactosa',
+        pickup: 'Padres',
+        blood: 'O-',
+        p1: { name: 'Elena Martínez', phone: '+1 829-555-0401', email: 'elena@email.com', job: 'Contadora', address: 'Calle Sol #8' },
+        p2: { name: 'Mario Martínez', phone: '+1 829-555-0402', email: 'mario@email.com', job: 'Profesor', address: 'Calle Sol #8' }
+      }
+    };
+
+    // Función para ver perfil de estudiante con datos reales
+    window.viewStudentProfile = function(btn) {
+      // Intentar obtener el nombre desde la fila
+      const row = btn.closest('tr');
+      const nameEl = row.querySelector('.font-medium');
+      const name = nameEl ? nameEl.textContent.trim() : 'María Fernanda Pérez'; // Fallback
+      
+      const data = studentsDb[name] || studentsDb['María Fernanda Pérez']; // Fallback a datos demo si no existe
+
+      // Llenar modal
+      document.getElementById('studentProfileName').textContent = name;
+      document.getElementById('studentRoom').textContent = data.room;
+      document.getElementById('studentStartDate').textContent = data.start;
+      document.getElementById('studentAllergies').textContent = data.allergies;
+      document.getElementById('studentPickup').textContent = data.pickup;
+      document.getElementById('studentBlood').textContent = data.blood;
+
+      // Padres
+      document.getElementById('parent1Name').textContent = data.p1.name;
+      document.getElementById('parent1Phone').textContent = data.p1.phone;
+      document.getElementById('parent1Email').textContent = data.p1.email;
+      document.getElementById('parent1Job').textContent = data.p1.job;
+      document.getElementById('parent1Address').textContent = data.p1.address;
+      
+      document.getElementById('parent2Name').textContent = data.p2.name;
+      document.getElementById('parent2Phone').textContent = data.p2.phone;
+      document.getElementById('parent2Email').textContent = data.p2.email;
+      document.getElementById('parent2Job').textContent = data.p2.job;
+      document.getElementById('parent2Address').textContent = data.p2.address;
+
+      // Mostrar modal
+      document.getElementById('studentProfileModal').classList.remove('hidden');
+    };
+
+    // Cerrar modal perfil
+    document.getElementById('closeStudentProfileModal').addEventListener('click', () => {
+      document.getElementById('studentProfileModal').classList.add('hidden');
+    });
+    document.getElementById('closeStudentProfile').addEventListener('click', () => {
+      document.getElementById('studentProfileModal').classList.add('hidden');
     });
 
-    // Modal maestro
-    const modal = document.getElementById('modal');
-    // When editing a teacher, this holds the row being edited. null means creating new.
-    let currentEditingTeacherRow = null;
-    document.getElementById('addTeacher')?.addEventListener('click', ()=> modal.classList.remove('hidden'));
-    document.getElementById('nuevoMaestroBtn')?.addEventListener('click', ()=> modal.classList.remove('hidden'));
-    document.getElementById('cancelModal')?.addEventListener('click', ()=> {
-      modal.classList.add('hidden');
-      // Limpiar campos
+    // Función para marcar todos presente
+    window.markAllPresent = function() {
+      const selects = document.querySelectorAll('.attendance-select');
+      selects.forEach(sel => sel.value = 'Presente');
+      alert('Se han marcado todos los estudiantes como "Presente". Recuerde guardar los cambios si es necesario.');
+    };
+
+    // Filtrar pagos
+    window.filterPayments = function() {
+      const input = document.getElementById('searchPayment');
+      const filter = input.value.toUpperCase();
+      const table = document.getElementById('paymentsTable');
+      const tr = table.getElementsByTagName('tr');
+
+      for (let i = 0; i < tr.length; i++) {
+        const td = tr[i].getElementsByTagName('td')[0];
+        if (td) {
+          const txtValue = td.textContent || td.innerText;
+          if (txtValue.toUpperCase().indexOf(filter) > -1) {
+            tr.style.display = "";
+          } else {
+            tr.style.display = "none";
+          }
+        }       
+      }
+    };
+
+    // Datos simulados de pagos
+    const paymentsData = [
+      { id: 1, student: 'María Fernanda Pérez', room: 'Pequeños', month: 'Noviembre', amount: 3800, status: 'Pagado' },
+      { id: 2, student: 'Javier Rodríguez', room: 'Medianos', month: 'Noviembre', amount: 3800, status: 'Pendiente' },
+      { id: 3, student: 'Ana Sofía González', room: 'Pequeños', month: 'Noviembre', amount: 5400, status: 'Pagado' },
+      { id: 4, student: 'Carlos Martínez', room: 'Grandes', month: 'Noviembre', amount: 3800, status: 'Pendiente' },
+      { id: 5, student: 'Lucía Méndez', room: 'Medianos', month: 'Octubre', amount: 3800, status: 'Vencido' },
+      { id: 6, student: 'Pedro Alcántara', room: 'Grandes', month: 'Noviembre', amount: 5400, status: 'Pagado' },
+    ];
+
+    // Renderizar tabla de pagos y actualizar estadísticas
+    function renderPaymentsTable() {
+      const tbody = document.getElementById('paymentsTable');
+      if(!tbody) return;
+      tbody.innerHTML = '';
+      
+      let total = 0;
+      let paid = 0;
+      let pending = 0;
+      let amountSum = 0;
+
+      paymentsData.forEach(p => {
+        total++;
+        if(p.status === 'Pagado') paid++;
+        else pending++;
+        amountSum += p.amount;
+
+        const tr = document.createElement('tr');
+        tr.className = 'hover:bg-slate-50 border-b border-slate-100';
+        
+        let statusClass = '';
+        if(p.status === 'Pagado') statusClass = 'bg-green-100 text-green-800';
+        else if(p.status === 'Pendiente') statusClass = 'bg-orange-100 text-orange-800';
+        else statusClass = 'bg-red-100 text-red-800';
+
+        tr.innerHTML = `
+          <td class="py-3 px-2 font-medium">${p.student}</td>
+          <td class="py-3 px-2 text-slate-500">${p.room}</td>
+          <td class="py-3 px-2">${p.month}</td>
+          <td class="py-3 px-2 font-mono">RD$ ${p.amount.toLocaleString()}</td>
+          <td class="py-3 px-2"><span class="px-2 py-1 rounded-full text-xs font-medium ${statusClass}">${p.status}</span></td>
+          <td class="py-3 px-2">
+            <button class="text-slate-400 hover:text-blue-600" title="Ver recibo"><i data-lucide="file-text" class="w-4 h-4"></i></button>
+            ${p.status !== 'Pagado' ? '<button class="text-slate-400 hover:text-green-600 ml-2" title="Registrar pago"><i data-lucide="dollar-sign" class="w-4 h-4"></i></button>' : ''}
+          </td>
+        `;
+        tbody.appendChild(tr);
+      });
+
+      // Actualizar contadores
+      document.getElementById('paymentsTotal').textContent = `Total: ${total}`;
+      document.getElementById('paymentsPagados').textContent = `Pagados: ${paid}`;
+      document.getElementById('paymentsPendientes').textContent = `Pendientes: ${pending}`;
+      document.getElementById('paymentsAmount').textContent = `RD$ ${amountSum.toLocaleString()}`;
+      
+      // Actualizar Gráfica
+      if(paymentsChartInstance) {
+         paymentsChartInstance.data.datasets[0].data = [paid, pending];
+         paymentsChartInstance.update();
+      }
+    }
+
+    // Función para exportar datos del Dashboard
+    window.exportDashboardData = function() {
+      const data = [
+        ['Métrica', 'Valor'],
+        ['Niños Presentes', document.getElementById('ninosPresentes').innerText],
+        ['Maestros Activos', document.getElementById('maestrosActivos').innerText],
+        ['Solicitudes', document.getElementById('solicitudesHoy').innerText]
+      ];
+      let csvContent = "data:text/csv;charset=utf-8," + data.map(e => e.join(",")).join("\n");
+      const encodedUri = encodeURI(csvContent);
+      const link = document.createElement("a");
+      link.setAttribute("href", encodedUri);
+      link.setAttribute("download", "resumen_dashboard.csv");
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+    };
+
+    // --- LÓGICA DE MAESTROS (Mejorada) ---
+    let teachersData = [
+      { id: 1, name: 'Carolina Martínez', email: 'carolina@karpus.com', phone: '+57 300 123 4567', username: 'carolina.m', specialty: 'Preescolar', status: 'Activo' },
+      { id: 2, name: 'Andrés Pérez', email: 'andres@karpus.com', phone: '+57 301 987 6543', username: 'andres.p', specialty: 'Inglés', status: 'Inactivo' }
+    ];
+
+    function renderTeachers() {
+      const tbody = document.getElementById('teachersTable');
+      if(!tbody) return;
+      tbody.innerHTML = '';
+      teachersData.forEach(t => {
+        const tr = document.createElement('tr');
+        tr.className = 'border-b border-slate-100 hover:bg-slate-50';
+        tr.innerHTML = `
+          <td class="py-3 px-2 font-medium">${t.name}</td>
+          <td class="py-3 px-2 text-slate-500">${t.email}</td>
+          <td class="py-3 px-2 text-slate-500">${t.phone}</td>
+          <td class="py-3 px-2"><span class="px-2 py-1 ${t.status === 'Activo' ? 'bg-green-100 text-green-800' : 'bg-yellow-100 text-yellow-800'} rounded-full text-xs">${t.status}</span></td>
+          <td class="py-3 px-2">
+            <button class="text-blue-600 hover:text-blue-800 mr-2" onclick="editTeacher(${t.id})">Editar</button>
+            <button class="text-red-600 hover:text-red-800" onclick="deleteTeacher(${t.id})">Eliminar</button>
+          </td>
+        `;
+        tbody.appendChild(tr);
+      });
+      if(window.lucide) lucide.createIcons();
+    }
+
+    window.openTeacherModal = function() {
+      document.getElementById('tmId').value = '';
       document.getElementById('tmName').value = '';
       document.getElementById('tmPhone').value = '';
       document.getElementById('tmEmail').value = '';
+      document.getElementById('tmUsername').value = '';
+      document.getElementById('tmSpecialty').value = '';
       document.getElementById('tmPassword').value = '';
-      // Clear editing state
-      currentEditingTeacherRow = null;
-      if (modal) delete modal.dataset.editing;
-    });
-
-    document.getElementById('saveModal')?.addEventListener('click', ()=>{
-      const name = document.getElementById('tmName').value.trim();
-      const phone = document.getElementById('tmPhone').value.trim();
-      const email = document.getElementById('tmEmail').value.trim();
-      const password = document.getElementById('tmPassword').value.trim();
-
-      // Validaciones básicas
-      if(!name || !phone || !email) {
-        alert('Por favor complete todos los campos obligatorios (nombre, teléfono, email)');
-        return;
-      }
-
-      if(!email.includes('@')) {
-        alert('Por favor ingrese un correo válido');
-        return;
-      }
-
-      // If we are editing an existing row, update it instead of creating
-      if(currentEditingTeacherRow && currentEditingTeacherRow instanceof HTMLElement) {
-        const cells = currentEditingTeacherRow.querySelectorAll('td');
-        if(cells && cells.length >= 3) {
-          cells[0].textContent = name;
-          cells[1].textContent = email;
-          cells[2].textContent = phone;
-        }
-        // Clear editing state
-        currentEditingTeacherRow = null;
-        if (modal) delete modal.dataset.editing;
-        // Close modal and cleanup
-        modal.classList.add('hidden');
-        document.getElementById('tmName').value = '';
-        document.getElementById('tmPhone').value = '';
-        document.getElementById('tmEmail').value = '';
-        document.getElementById('tmPassword').value = '';
-        alert(`Maestro ${name} actualizado exitosamente.`);
-        return;
-      }
-
-      // Creating a new teacher (password optional for creation flow)
-      if(password.length < 6) {
-        alert('La contraseña debe tener al menos 6 caracteres');
-        return;
-      }
-
-      // Crear fila en la tabla
-      const tr = document.createElement('tr');
-      tr.innerHTML = `
-        <td class="py-2">${name}</td>
-        <td class="py-2">${email}</td>
-        <td class="py-2">${phone}</td>
-        <td class="py-2"><span class="px-2 py-1 bg-green-100 text-green-800 rounded-full text-xs">Activo</span></td>
-        <td class="py-2">
-          <button class="text-blue-600 hover:text-blue-800 mr-2" onclick="editTeacher(this)">Editar</button>
-          <button class="text-red-600 hover:text-red-800" onclick="deleteTeacher(this)">Eliminar</button>
-        </td>
-      `;
-      document.getElementById('teachersTable').appendChild(tr);
-
-      // Limpiar y cerrar modal
-      modal.classList.add('hidden');
-      document.getElementById('tmName').value = '';
-      document.getElementById('tmPhone').value = '';
-      document.getElementById('tmEmail').value = '';
-      document.getElementById('tmPassword').value = '';
-
-      alert(`Maestro ${name} creado exitosamente. Credenciales: ${email} / ${password}`);
-    });
-
-    // Funciones para editar y eliminar maestros
-    window.editTeacher = function(button) {
-      const row = button.closest('tr');
-      const cells = row.querySelectorAll('td');
-      const name = cells[0].textContent;
-      const email = cells[1].textContent;
-      const phone = cells[2].textContent;
-
-      // Llenar el modal con los datos actuales
-      document.getElementById('tmName').value = name;
-      document.getElementById('tmEmail').value = email;
-      document.getElementById('tmPhone').value = phone;
-      document.getElementById('tmPassword').value = '';
-
-      // Set editing state: the global handler for save will detect this and update the row
-      currentEditingTeacherRow = row;
-      if (modal) modal.dataset.editing = 'true';
-
-      // Mostrar modal (re-uses the same modal used for crear)
-      modal.classList.remove('hidden');
+      document.getElementById('teacherModalTitle').innerText = 'Crear Maestro';
+      document.getElementById('teacherModal').classList.remove('hidden');
     };
 
-    window.deleteTeacher = function(button) {
-      const row = button.closest('tr');
-      const teacherName = row.querySelector('td').textContent;
+    window.editTeacher = function(id) {
+      const t = teachersData.find(x => x.id === id);
+      if(!t) return;
+      document.getElementById('tmId').value = t.id;
+      document.getElementById('tmName').value = t.name;
+      document.getElementById('tmPhone').value = t.phone;
+      document.getElementById('tmEmail').value = t.email;
+      document.getElementById('tmUsername').value = t.username || '';
+      document.getElementById('tmSpecialty').value = t.specialty || '';
+      document.getElementById('tmPassword').value = ''; // No mostrar contraseña por seguridad
+      document.getElementById('tmStatus').value = t.status;
       
-      if(confirm(`¿Está seguro de eliminar al maestro ${teacherName}?`)) {
-        row.remove();
-        alert('Maestro eliminado exitosamente');
+      document.getElementById('teacherModalTitle').innerText = 'Editar Maestro';
+      document.getElementById('teacherModal').classList.remove('hidden');
+    };
+
+    window.deleteTeacher = function(id) {
+      if(confirm('¿Está seguro de eliminar este maestro?')) {
+        teachersData = teachersData.filter(x => x.id !== id);
+        renderTeachers();
       }
     };
 
-    // FUNCIONES PARA AULAS
-    // Abrir modal de crear aula
-    document.getElementById('addRoomBtn').addEventListener('click', function() {
-      document.getElementById('roomModalTitle').textContent = 'Crear Aula';
-      document.getElementById('roomModal').classList.remove('hidden');
-      clearRoomModal();
-    });
+    window.saveTeacher = function() {
+      const id = document.getElementById('tmId').value;
+      const name = document.getElementById('tmName').value;
+      const email = document.getElementById('tmEmail').value;
+      const password = document.getElementById('tmPassword').value;
+      
+      if(!name || !email) { alert('Nombre y correo son obligatorios'); return; }
+      if(!id && !password) { alert('La contraseña es obligatoria para nuevos maestros'); return; }
 
-    // Cerrar modal de aula
-    document.getElementById('cancelRoomModal').addEventListener('click', function() {
-      document.getElementById('roomModal').classList.add('hidden');
-      clearRoomModal();
-    });
+      const newData = {
+        id: id ? parseInt(id) : Date.now(),
+        name: name,
+        email: email,
+        phone: document.getElementById('tmPhone').value,
+        username: document.getElementById('tmUsername').value,
+        specialty: document.getElementById('tmSpecialty').value,
+        status: document.getElementById('tmStatus').value
+      };
 
-    // Guardar aula
-    document.getElementById('saveRoomModal').addEventListener('click', function() {
-      const name = document.getElementById('roomName').value.trim();
-      const teacher = document.getElementById('roomTeacher').value;
-      const capacity = document.getElementById('roomCapacity').value;
-      const selectedStudents = Array.from(document.querySelectorAll('#studentsList input[type="checkbox"]:checked'))
-        .map(cb => cb.value);
-      
-      if(!name || !teacher || !capacity) {
-        alert('Por favor complete todos los campos obligatorios');
-        return;
-      }
-      
-      if(capacity < 1 || capacity > 30) {
-        alert('La capacidad debe estar entre 1 y 30 estudiantes');
-        return;
-      }
-      
-      if(selectedStudents.length > capacity) {
-        alert(`No puede asignar más estudiantes (${selectedStudents.length}) que la capacidad del aula (${capacity})`);
-        return;
-      }
-      
-      // Crear fila en la tabla
-      const tr = document.createElement('tr');
-      tr.innerHTML = `
-        <td class="py-2 font-medium">${name}</td>
-        <td class="py-2">${teacher}</td>
-        <td class="py-2">${capacity}</td>
-        <td class="py-2">${selectedStudents.length}/${capacity}</td>
-        <td class="py-2"><span class="px-2 py-1 bg-green-100 text-green-800 rounded-full text-xs">Activa</span></td>
-        <td class="py-2">
-          <button class="text-blue-600 hover:text-blue-800 mr-2" onclick="editRoom(this)">Editar</button>
-          <button class="text-green-600 hover:text-green-800 mr-2" onclick="viewRoomStudents(this)">Ver Estudiantes</button>
-          <button class="text-red-600 hover:text-red-800" onclick="deleteRoom(this)">Eliminar</button>
-        </td>
-      `;
-      tr.dataset.students = JSON.stringify(selectedStudents);
-      document.getElementById('roomsTable').appendChild(tr);
-      
-      // Cerrar modal y limpiar
-      document.getElementById('roomModal').classList.add('hidden');
-      clearRoomModal();
-      
-      alert(`Aula "${name}" creada exitosamente con ${selectedStudents.length} estudiantes asignados`);
-    });
-
-    // Filtro de estudiantes en el modal
-    document.getElementById('studentSearch').addEventListener('input', function() {
-      const searchTerm = this.value.toLowerCase();
-      const studentLabels = document.querySelectorAll('#studentsList label');
-      
-      studentLabels.forEach(label => {
-        const studentName = label.querySelector('span').textContent.toLowerCase();
-        if(studentName.includes(searchTerm)) {
-          label.style.display = 'flex';
-        } else {
-          label.style.display = 'none';
-        }
-      });
-    });
-
-    // Funciones para manejar aulas
-    window.editRoom = function(button) {
-      const row = button.closest('tr');
-      const cells = row.querySelectorAll('td');
-      const name = cells[0].textContent;
-      const teacher = cells[1].textContent;
-      const capacity = cells[2].textContent;
-      const students = JSON.parse(row.dataset.students || '[]');
-      
-      // Llenar el modal con los datos actuales
-      document.getElementById('roomName').value = name;
-      document.getElementById('roomTeacher').value = teacher;
-      document.getElementById('roomCapacity').value = capacity;
-      
-      // Marcar estudiantes seleccionados
-      document.querySelectorAll('#studentsList input[type="checkbox"]').forEach(cb => {
-        cb.checked = students.includes(cb.value);
-      });
-      
-      document.getElementById('roomModalTitle').textContent = 'Editar Aula';
-      document.getElementById('roomModal').classList.remove('hidden');
-    };
-
-    window.viewRoomStudents = function(button) {
-      const row = button.closest('tr');
-      const roomName = row.querySelector('td').textContent;
-      const students = JSON.parse(row.dataset.students || '[]');
-      
-      if(students.length === 0) {
-        alert(`El aula "${roomName}" no tiene estudiantes asignados`);
+      if(id) {
+        const idx = teachersData.findIndex(x => x.id == id);
+        if(idx >= 0) teachersData[idx] = newData;
       } else {
-        alert(`Estudiantes en "${roomName}":\n\n${students.join('\n')}`);
+        teachersData.push(newData);
+        
+        // --- LÓGICA DE LOGIN (Simulación) ---
+        // Guardamos el usuario en localStorage para que pueda "iniciar sesión"
+        // Esto asume que tu sistema de login lee de 'karpus_users' o similar.
+        try {
+          const users = JSON.parse(localStorage.getItem('karpus_users') || '[]');
+          users.push({
+            email: email,
+            password: password,
+            role: 'maestra',
+            name: name
+          });
+          localStorage.setItem('karpus_users', JSON.stringify(users));
+        } catch(e) { console.error('Error guardando usuario local', e); }
       }
-    };
-
-    window.deleteRoom = function(button) {
-      const row = button.closest('tr');
-      const roomName = row.querySelector('td').textContent;
       
-      if(confirm(`¿Está seguro de eliminar el aula "${roomName}"?`)) {
-        row.remove();
-        alert('Aula eliminada exitosamente');
-      }
+      renderTeachers();
+      document.getElementById('teacherModal').classList.add('hidden');
+      
+      // Limpiar formulario
+      document.getElementById('tmId').value = '';
+      ['tmName','tmPhone','tmEmail','tmUsername','tmSpecialty'].forEach(i => document.getElementById(i).value = '');
+      document.getElementById('teacherModalTitle').innerText = 'Crear Maestro';
     };
 
-    function clearRoomModal() {
+    // --- LÓGICA DE AULAS (Ver Estudiantes) ---
+    window.viewRoomStudents = function(btn) {
+      const row = btn.closest('tr');
+      const roomName = row.querySelector('.font-medium').innerText;
+      
+      // Filtrar estudiantes de la base de datos simulada (studentsDb)
+      // Buscamos coincidencias aproximadas en el nombre del aula
+      const studentsInRoom = Object.entries(studentsDb)
+        .filter(([name, data]) => {
+          // Lógica simple: si el nombre del aula contiene "Pequeños" y el dato también, o coincidencia exacta
+          return data.room === roomName || (roomName.includes('Pequeños') && data.room.includes('Pequeños')) || (roomName.includes('Medianos') && data.room.includes('Medianos'));
+        })
+        .map(([name, data]) => ({ name, ...data }));
+
+      const list = document.getElementById('roomStudentsList');
+      list.innerHTML = '';
+      
+      if(studentsInRoom.length === 0) {
+        list.innerHTML = '<div class="text-center py-4 text-slate-500">No hay estudiantes registrados en esta aula.</div>';
+      } else {
+        studentsInRoom.forEach(s => {
+          const div = document.createElement('div');
+          div.className = 'flex items-center justify-between p-3 bg-slate-50 rounded-lg border border-slate-100';
+          div.innerHTML = `
+            <div class="flex items-center gap-3">
+              <div class="w-8 h-8 bg-white rounded-full flex items-center justify-center text-slate-500 shadow-sm"><i data-lucide="user" class="w-4 h-4"></i></div>
+              <div>
+                <p class="text-sm font-medium text-slate-800">${s.name}</p>
+                <p class="text-xs text-slate-500">Recoge: ${s.pickup}</p>
+              </div>
+            </div>
+            <button onclick="document.getElementById('roomStudentsModal').classList.add('hidden'); viewStudentProfile(this)" class="text-xs text-blue-600 hover:underline font-medium">Ver Perfil</button>
+          `;
+          list.appendChild(div);
+        });
+      }
+      
+      document.getElementById('roomStudentsTitle').innerText = `Estudiantes - ${roomName}`;
+      document.getElementById('roomStudentsModal').classList.remove('hidden');
+      if(window.lucide) lucide.createIcons();
+    };
+
+    // --- LÓGICA DE CALIFICACIONES ---
+    const gradesData = [
+      { student: 'María Fernanda Pérez', room: 'Pequeños', math: 95, lang: 92, art: 98 },
+      { student: 'Javier Rodríguez', room: 'Medianos', math: 88, lang: 85, art: 90 },
+      { student: 'Ana Sofía González', room: 'Pequeños', math: 98, lang: 96, art: 100 },
+      { student: 'Carlos Martínez', room: 'Grandes', math: 75, lang: 80, art: 85 },
+      { student: 'Lucía Méndez', room: 'Medianos', math: 90, lang: 92, art: 88 },
+      { student: 'Pedro Alcántara', room: 'Grandes', math: 82, lang: 78, art: 95 }
+    ];
+
+    window.renderGrades = function() {
+      const filter = document.getElementById('gradesFilter').value;
+      const tbody = document.getElementById('gradesTable');
+      if(!tbody) return;
+      tbody.innerHTML = '';
+
+      const filtered = filter === 'all' ? gradesData : gradesData.filter(g => g.room.includes(filter));
+
+      filtered.forEach(g => {
+        const avg = Math.round((g.math + g.lang + g.art) / 3);
+        let statusColor = 'text-green-600';
+        if(avg < 70) statusColor = 'text-red-600';
+        else if(avg < 85) statusColor = 'text-yellow-600';
+
+        const tr = document.createElement('tr');
+        tr.className = 'border-b border-slate-100 hover:bg-slate-50';
+        tr.innerHTML = `
+          <td class="p-3 font-medium">${g.student}</td>
+          <td class="p-3 text-slate-500">${g.room}</td>
+          <td class="p-3">${g.math}</td>
+          <td class="p-3">${g.lang}</td>
+          <td class="p-3">${g.art}</td>
+          <td class="p-3 font-bold ${statusColor}">${avg}</td>
+          <td class="p-3"><span class="px-2 py-1 rounded-full text-xs ${avg >= 70 ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}">${avg >= 70 ? 'Aprobado' : 'Reprobado'}</span></td>
+        `;
+        tbody.appendChild(tr);
+      });
+    };
+
+    // --- SISTEMA DE ALERTAS Y NOTIFICACIONES ---
+    const attendanceHistory = [
+      { name: 'Carlos Ruiz', absences: 4 }, // Alerta
+      { name: 'Ana López', absences: 1 },
+      { name: 'Javier Rodríguez', absences: 3 }, // Alerta
+      { name: 'María Pérez', absences: 0 }
+    ];
+
+    function checkAttendanceAlerts() {
+      const container = document.getElementById('dashboardAlerts');
+      const alerts = attendanceHistory.filter(s => s.absences >= 3);
+      
+      if (alerts.length > 0) {
+        container.classList.remove('hidden');
+        container.innerHTML = `
+          <div class="bg-red-50 border-l-4 border-red-500 p-4 rounded shadow-sm flex items-start gap-3">
+            <i data-lucide="alert-circle" class="text-red-600 w-6 h-6 mt-0.5"></i>
+            <div>
+              <h3 class="font-bold text-red-700">Alertas de Asistencia</h3>
+              <p class="text-sm text-red-600 mb-2">Los siguientes estudiantes tienen 3 o más faltas consecutivas:</p>
+              <ul class="list-disc list-inside text-sm text-red-800">
+                ${alerts.map(s => `<li><strong>${s.name}</strong> (${s.absences} faltas)</li>`).join('')}
+              </ul>
+            </div>
+          </div>
+        `;
+      }
+    }
+
+    // --- LÓGICA DE ESTUDIANTES (Agregar) ---
+    window.openAddStudentModal = function() {
+      // Limpiar campos
+      ['stName','stAge','stSchedule','p1Name','p1Phone','p2Name','p2Phone','stAllergies','stBlood','stPickup'].forEach(id => {
+        document.getElementById(id).value = '';
+      });
+      document.getElementById('modalAddStudent').classList.remove('hidden');
+    };
+
+    window.saveStudent = function() {
+      const name = document.getElementById('stName').value;
+      if(!name) { alert('El nombre es obligatorio'); return; }
+      
+      // Aquí iría la lógica para guardar en backend/localStorage
+      // Simulamos agregarlo a la tabla visualmente o a la DB local
+      alert(`Estudiante ${name} agregado correctamente.`);
+      document.getElementById('modalAddStudent').classList.add('hidden');
+      // Opcional: recargar tabla de estudiantes
+    };
+
+    // --- LÓGICA DE AULAS (Gestión Completa) ---
+    let roomsData = [
+      { id: 1, name: 'Aula Pequeños A1', teacher: 'Carolina Martínez', capacity: 15, students: ['María Fernanda Pérez', 'Ana Sofía González'] },
+      { id: 2, name: 'Aula Medianos B1', teacher: 'Andrés Pérez', capacity: 18, students: ['Javier Rodríguez'] }
+    ];
+
+    function renderRooms() {
+      const tbody = document.getElementById('roomsTable');
+      if(!tbody) return;
+      tbody.innerHTML = '';
+
+      roomsData.forEach(r => {
+        const occupation = r.students.length;
+        const percentage = Math.round((occupation / r.capacity) * 100);
+        let color = 'bg-blue-600';
+        if(percentage > 80) color = 'bg-red-500';
+        else if(percentage > 50) color = 'bg-yellow-500';
+
+        const tr = document.createElement('tr');
+        tr.className = 'border-b border-slate-100 hover:bg-slate-50';
+        tr.innerHTML = `
+          <td class="py-3 px-2 font-medium">${r.name}</td>
+          <td class="py-3 px-2 text-slate-500 hidden md:table-cell">${r.teacher}</td>
+          <td class="py-3 px-2 w-1/4">
+            <div class="flex items-center gap-2">
+              <div class="w-full bg-slate-200 rounded-full h-2.5"><div class="${color} h-2.5 rounded-full" style="width: ${percentage}%"></div></div>
+              <span class="text-xs text-slate-600">${occupation}/${r.capacity}</span>
+            </div>
+          </td>
+          <td class="py-3 px-2 text-center"><span class="px-2 py-1 bg-green-100 text-green-800 rounded-full text-xs">Activa</span></td>
+          <td class="py-3 px-2">
+            <button class="text-blue-600 hover:text-blue-800 mr-2" data-action="edit" data-id="${r.id}">Editar</button>
+            <button class="text-green-600 hover:text-green-800 mr-2" data-action="view" data-id="${r.id}">Ver</button>
+            <button class="text-red-600 hover:text-red-800" data-action="delete" data-id="${r.id}">Eliminar</button>
+          </td>
+        `;
+        tbody.appendChild(tr);
+      });
+      if(window.lucide) lucide.createIcons();
+    }
+
+    // Delegación de eventos para evitar dependencias de funciones globales
+    (function initRoomsDelegation(){
+      const tbody = document.getElementById('roomsTable');
+      if(!tbody || tbody.dataset.delegation === '1') return;
+      tbody.dataset.delegation = '1';
+      tbody.addEventListener('click', (e) => {
+        const btn = e.target.closest('button[data-action]');
+        if(!btn) return;
+        const action = btn.dataset.action;
+        const id = parseInt(btn.dataset.id, 10);
+        if(action === 'edit') {
+          if(typeof window.editRoom === 'function') window.editRoom(id);
+          else alert('Función editar aula no disponible todavía.');
+        } else if(action === 'view') {
+          if(typeof window.viewRoomStudents === 'function') window.viewRoomStudents(btn);
+          else alert('Función ver estudiantes no disponible todavía.');
+        } else if(action === 'delete') {
+          if(typeof window.deleteRoom === 'function') window.deleteRoom(id);
+          else alert('Función eliminar aula no disponible todavía.');
+        }
+      });
+    })();
+
+    window.openRoomModal = function() {
+      document.getElementById('roomId').value = '';
       document.getElementById('roomName').value = '';
       document.getElementById('roomTeacher').value = '';
       document.getElementById('roomCapacity').value = '';
-      document.getElementById('studentSearch').value = '';
-      document.querySelectorAll('#studentsList input[type="checkbox"]').forEach(cb => {
-        cb.checked = false;
-      });
-      document.querySelectorAll('#studentsList label').forEach(label => {
-        label.style.display = 'flex';
-      });
-    }
+      document.getElementById('roomModalTitle').innerText = 'Crear Aula';
+      renderStudentChecklist([]);
+      document.getElementById('roomModal').classList.remove('hidden');
+    };
 
-    // Initialize charts
-    const ctx = document.getElementById('attendanceChart')?.getContext('2d');
-    if(ctx){
-      new Chart(ctx, {
-        type: 'bar',
-        data: {
-          labels: ['Pequeños', 'Medianos', 'Grandes', 'Bebés', 'Especial'],
-          datasets: [
-            {
-              label: 'Asistencia',
-              data: [0.92, 0.89, 0.94, 0.88, 0.91],
-              backgroundColor: '#4CAF50',
-              borderRadius: 6
-            },
-            {
-              label: 'Participación',
-              data: [0.88, 0.85, 0.89, 0.82, 0.87],
-              backgroundColor: '#2196F3',
-              borderRadius: 6
-            }
-          ]
-        },
-        options: { 
-          responsive: true, 
-          scales: {
-            y: { 
-              beginAtZero: true,
-              max: 1,
-              ticks: {
-                callback: value => value * 100 + '%'
-              }
-            }
-          },
-          plugins: {
-            legend: { display: true, position: 'top' }
-          } 
-        }
-      });
-    }
+    window.editRoom = function(id) {
+      const r = roomsData.find(x => x.id === id);
+      if(!r) return;
+      document.getElementById('roomId').value = r.id;
+      document.getElementById('roomName').value = r.name;
+      document.getElementById('roomTeacher').value = r.teacher; // Asegurarse que el value coincida con las opciones del select
+      document.getElementById('roomCapacity').value = r.capacity;
+      document.getElementById('roomModalTitle').innerText = 'Editar Aula';
+      renderStudentChecklist(r.students);
+      document.getElementById('roomModal').classList.remove('hidden');
+    };
 
-    // FUNCIONES PARA REPORTES Y QUEJAS
-    // Alternar detalles de reporte
-    window.toggleReportDetails = function(button) {
-      const reportCard = button.closest('.bg-white');
-      const details = reportCard.querySelector('.report-details');
-      
-      if (details.classList.contains('hidden')) {
-        details.classList.remove('hidden');
-        button.textContent = 'Ocultar detalles';
-      } else {
-        details.classList.add('hidden');
-        button.textContent = 'Ver detalles';
+    window.deleteRoom = function(id) {
+      if(confirm('¿Eliminar esta aula?')) {
+        roomsData = roomsData.filter(x => x.id !== id);
+        renderRooms();
       }
     };
 
-    // Resolver reporte
-    window.resolveReport = function(button) {
-      const reportCard = button.closest('.bg-white');
-      const statusBadge = reportCard.querySelector('.px-2.py-1');
-      const borderColor = reportCard.classList;
+    window.saveRoom = function() {
+      const id = document.getElementById('roomId').value;
+      const name = document.getElementById('roomName').value;
+      const teacher = document.getElementById('roomTeacher').value;
+      const capacity = document.getElementById('roomCapacity').value;
       
-      if (confirm('¿Está seguro de marcar este reporte como resuelto?')) {
-        // Cambiar estado visual
-        statusBadge.className = 'px-2 py-1 bg-green-100 text-green-800 rounded-full text-xs';
-        statusBadge.textContent = 'Resuelto';
-        
-        // Cambiar color del borde
-        borderColor.remove('border-red-500', 'border-yellow-500');
-        borderColor.add('border-green-500');
-        
-        // Cambiar color del título
-        const title = reportCard.querySelector('h3');
-        title.className = 'font-semibold text-green-700';
-        
-        // Agregar información de resolución
-        const details = reportCard.querySelector('.report-details .border-t');
-        const resolutionInfo = document.createElement('div');
-        resolutionInfo.innerHTML = `
-          <h4 class="font-medium mb-2 text-green-700">Resolución:</h4>
-          <p class="text-sm text-green-700 mb-3">
-            Reporte marcado como resuelto por la directora.
-          </p>
-          <p class="text-xs text-slate-500">Resuelto por: Directora • ${new Date().toLocaleDateString('es-ES')} ${new Date().toLocaleTimeString('es-ES', {hour: '2-digit', minute: '2-digit'})}</p>
-        `;
-        details.appendChild(resolutionInfo);
-        
-        // Ocultar botones de acción
-        button.parentElement.style.display = 'none';
-        
-        alert('Reporte marcado como resuelto exitosamente');
-      }
-    };
-
-    // Responder a reporte
-    window.respondReport = function(button) {
-      const reportCard = button.closest('.bg-white');
-      const title = reportCard.querySelector('h3').textContent;
-      
-      const response = prompt(`Escriba su respuesta al reporte: "${title}"`);
-      if (response && response.trim()) {
-        // Agregar respuesta al reporte
-        const details = reportCard.querySelector('.report-details .border-t');
-        const responseDiv = document.createElement('div');
-        responseDiv.innerHTML = `
-          <h4 class="font-medium mb-2 text-blue-700">Respuesta de la Directora:</h4>
-          <p class="text-sm text-blue-700 mb-3">${response}</p>
-          <p class="text-xs text-slate-500">Respondido: ${new Date().toLocaleDateString('es-ES')} ${new Date().toLocaleTimeString('es-ES', {hour: '2-digit', minute: '2-digit'})}</p>
-        `;
-        details.appendChild(responseDiv);
-        
-        alert('Respuesta enviada exitosamente');
-      }
-    };
-
-    // Filtrar reportes
-    document.getElementById('reportFilter')?.addEventListener('change', function() {
-      const filterValue = this.value;
-      const reports = document.querySelectorAll('#reportes .space-y-4 > div');
-      
-      reports.forEach(report => {
-        const statusBadge = report.querySelector('.px-2.py-1');
-        const statusText = statusBadge.textContent.toLowerCase();
-        const fromText = report.querySelector('.text-sm.text-slate-600').textContent.toLowerCase();
-        
-        let shouldShow = true;
-        
-        switch(filterValue) {
-          case 'pending':
-            shouldShow = statusText.includes('pendiente');
-            break;
-          case 'resolved':
-            shouldShow = statusText.includes('resuelto');
-            break;
-          case 'teachers':
-            shouldShow = fromText.includes('maestra') || fromText.includes('maestro');
-            break;
-          case 'parents':
-            shouldShow = fromText.includes('madre') || fromText.includes('padre');
-            break;
-          case 'all':
-          default:
-            shouldShow = true;
-            break;
-        }
-        
-        report.style.display = shouldShow ? 'block' : 'none';
+      // Recoger estudiantes seleccionados
+      const selectedStudents = [];
+      document.querySelectorAll('#roomStudentsChecklist input:checked').forEach(cb => {
+        selectedStudents.push(cb.value);
       });
-    });
 
-    // Actualizar reportes
-    document.getElementById('refreshReports')?.addEventListener('click', function() {
-      // Simular actualización
-      this.textContent = 'Actualizando...';
-      this.disabled = true;
-      
-      setTimeout(() => {
-        this.textContent = 'Actualizar';
-        this.disabled = false;
-        alert('Reportes actualizados (simulado)');
-      }, 1500);
-    });
+      if(!name) { alert('Nombre del aula requerido'); return; }
 
-    // Exportar (simulación)
-    document.getElementById('exportBtn')?.addEventListener('click', ()=> alert('Función de exportar: conectar con backend / generar CSV o PDF.'));
-
-    // Enviar anuncio
-    document.getElementById('sendAnnouncement')?.addEventListener('click', ()=>{
-      const t = document.getElementById('announcementText').value;
-      if(t.trim()==='') return alert('Escribe un anuncio antes.');
-      alert('Anuncio enviado (simulado)');
-      document.getElementById('announcementText').value='';
-    });
-
-    // ==========================
-    // Estudiantes: perfil y tabla
-    // ==========================
-    const studentParentData = {
-      'María Fernanda Pérez': {
-        parent1: { name: 'Ana María Pérez González', phone: '+57 300 123 4567', email: 'ana.perez@email.com', job: 'Ingeniera de Sistemas', address: 'Calle 123 #45-67, Bogotá', emergency: '+57 301 987 6543' },
-        parent2: { name: 'Carlos Eduardo Pérez', phone: '+57 310 456 7890', email: 'carlos.perez@email.com', job: 'Contador Público', address: 'Calle 123 #45-67, Bogotá', emergency: '+57 320 111 2233' },
-        extra: { room: 'Aula Pequeños A1', startDate: '15 de Febrero, 2024', allergies: 'Ninguna conocida', pickup: 'Padres y Abuela Materna' }
-      },
-      'Javier Alejandro Rodríguez': {
-        parent1: { name: 'María Teresa Rodríguez', phone: '+57 302 111 2233', email: 'maria.rodriguez@email.com', job: 'Docente', address: 'Cra 45 #10-20, Bogotá', emergency: '+57 300 987 0011' },
-        parent2: { name: 'Eduardo Rodríguez', phone: '+57 315 555 6677', email: 'edu.rodriguez@email.com', job: 'Técnico Electricista', address: 'Cra 45 #10-20, Bogotá', emergency: '+57 310 222 3344' },
-        extra: { room: 'Aula Pequeños A2', startDate: '10 de Marzo, 2024', allergies: 'Alergia leve al polvo', pickup: 'Padres' }
-      },
-      'Ana Sofía González': {
-        parent1: { name: 'Laura González', phone: '+57 320 000 1122', email: 'laura.gonzalez@email.com', job: 'Arquitecta', address: 'Av. 7 #23-90, Bogotá', emergency: '+57 311 222 3345' },
-        parent2: { name: 'Marco González', phone: '+57 321 777 8899', email: 'marco.gonzalez@email.com', job: 'Diseñador', address: 'Av. 7 #23-90, Bogotá', emergency: '+57 321 555 6677' },
-        extra: { room: 'Aula Pequeños A1', startDate: '1 de Abril, 2024', allergies: 'Intolerancia a lactosa', pickup: 'Padres y Tía' }
-      },
-      'Carlos Eduardo Martínez': {
-        parent1: { name: 'Patricia Martínez', phone: '+57 312 333 4455', email: 'patricia.martinez@email.com', job: 'Odontóloga', address: 'Calle 9 #30-12, Bogotá', emergency: '+57 313 444 5566' },
-        parent2: { name: 'Ricardo Martínez', phone: '+57 314 666 7788', email: 'ricardo.martinez@email.com', job: 'Administrador', address: 'Calle 9 #30-12, Bogotá', emergency: '+57 314 999 0001' },
-        extra: { room: 'Aula Pequeños A3', startDate: '20 de Enero, 2024', allergies: 'Ninguna', pickup: 'Padres' }
-      }
-    };
-
-    function openStudentProfile(name) {
-      const modal = document.getElementById('studentProfileModal');
-      const data = studentParentData[name] || null;
-
-      document.getElementById('studentProfileName').textContent = name;
-
-      // Rellenar datos si existen, de lo contrario valores por defecto
-      const safe = (val, def='No registrado') => (val && String(val).trim()) ? val : def;
-
-      const p1 = data?.parent1 || {};
-      const p2 = data?.parent2 || {};
-      const ex = data?.extra   || {};
-
-      document.getElementById('parent1Name').textContent = safe(p1.name);
-      document.getElementById('parent1Phone').textContent = safe(p1.phone);
-      document.getElementById('parent1Email').textContent = safe(p1.email);
-      document.getElementById('parent1Job').textContent = safe(p1.job);
-      document.getElementById('parent1Address').textContent = safe(p1.address);
-      document.getElementById('parent1Emergency').textContent = safe(p1.emergency);
-
-      document.getElementById('parent2Name').textContent = safe(p2.name);
-      document.getElementById('parent2Phone').textContent = safe(p2.phone);
-      document.getElementById('parent2Email').textContent = safe(p2.email);
-      document.getElementById('parent2Job').textContent = safe(p2.job);
-      document.getElementById('parent2Address').textContent = safe(p2.address);
-      document.getElementById('parent2Emergency').textContent = safe(p2.emergency);
-
-      document.getElementById('studentRoom').textContent = safe(ex.room);
-      document.getElementById('studentStartDate').textContent = safe(ex.startDate);
-      document.getElementById('studentAllergies').textContent = safe(ex.allergies);
-      document.getElementById('studentPickup').textContent = safe(ex.pickup);
-
-      modal.classList.remove('hidden');
-      // Render icons in modal
-      if(window.lucide && typeof lucide.createIcons === 'function') {
-        lucide.createIcons();
-      }
-    }
-
-    window.viewStudentProfile = function(button) {
-      const row = button.closest('tr');
-      const nameEl = row.querySelector('td .font-medium');
-      const name = nameEl ? nameEl.textContent.trim() : 'Estudiante';
-      openStudentProfile(name);
-    };
-
-    // Cerrar modal de perfil
-    document.getElementById('closeStudentProfile')?.addEventListener('click', ()=>{
-      document.getElementById('studentProfileModal').classList.add('hidden');
-    });
-    document.getElementById('closeStudentProfileModal')?.addEventListener('click', ()=>{
-      document.getElementById('studentProfileModal').classList.add('hidden');
-    });
-
-    // Búsqueda de estudiantes por nombre
-    document.getElementById('searchStudent')?.addEventListener('input', function(){
-      const q = this.value.toLowerCase();
-      const rows = document.querySelectorAll('#studentsTable tr');
-      rows.forEach(r => {
-        const name = r.querySelector('.font-medium')?.textContent.toLowerCase() || '';
-        r.style.display = name.includes(q) ? '' : 'none';
-      });
-    });
-
-    // Agregar estudiante: abrir modal del director y manejar creación
-    document.getElementById('addStudentBtn')?.addEventListener('click', ()=>{
-      const modal = document.getElementById('modalAddStudent');
-      if(modal) modal.classList.remove('hidden');
-    });
-
-    document.getElementById('closeAddStudent')?.addEventListener('click', ()=>{
-      const modal = document.getElementById('modalAddStudent');
-      if(modal) modal.classList.add('hidden');
-      clearStudentModal();
-    });
-
-    function clearStudentModal(){
-      ['stName','stAge','stSchedule','p1Name','p1Phone','p2Name','p2Phone'].forEach(id=>{
-        const el = document.getElementById(id);
-        if(!el) return;
-        el.value = '';
-      });
-      const ch = document.getElementById('stActive'); if(ch) ch.checked = true;
-    }
-
-    document.getElementById('saveAddStudent')?.addEventListener('click', ()=>{
-      const name = (document.getElementById('stName')?.value || '').trim();
-      if(!name) { alert('Ingrese el nombre del estudiante'); return; }
-      const age = (document.getElementById('stAge')?.value || '').trim();
-      const schedule = (document.getElementById('stSchedule')?.value || '').trim();
-      const p1Name = (document.getElementById('p1Name')?.value || '').trim();
-      const p1Phone = (document.getElementById('p1Phone')?.value || '').trim();
-      const p2Name = (document.getElementById('p2Name')?.value || '').trim();
-      const p2Phone = (document.getElementById('p2Phone')?.value || '').trim();
-      const active = !!document.getElementById('stActive')?.checked;
-
-      const tr = document.createElement('tr');
-      tr.className = 'hover:bg-slate-50';
-      tr.innerHTML = `
-        <td class="py-4 px-4">
-          <div class="flex items-center gap-3">
-            <div class="w-8 h-8 bg-slate-100 rounded-full flex items-center justify-center">
-              <i data-lucide="user" class="w-4 h-4 text-slate-600"></i>
-            </div>
-            <div>
-              <div class="font-medium text-slate-800">${name}</div>
-              <div class="text-xs text-slate-500">${age? age + ' años' : ''} ${schedule? '• '+schedule : ''}</div>
-            </div>
-          </div>
-        </td>
-        <td class="py-4 px-4 text-sm text-slate-700">
-          ${p1Name? `<div>${p1Name}</div>` : ''} ${p2Name? `<div>${p2Name}</div>` : ''}
-        </td>
-        <td class="py-4 px-4 text-sm text-slate-700">
-          ${p1Phone? `<div>${p1Phone}</div>` : ''} ${p2Phone? `<div>${p2Phone}</div>` : ''}
-        </td>
-        <td class="py-4 px-4 text-center">
-          ${active? `<span class="px-2 py-1 bg-green-100 text-green-800 rounded-full text-xs">Activo</span>` : `<span class="px-2 py-1 bg-slate-100 text-slate-600 rounded-full text-xs">Inactivo</span>`}
-        </td>
-        <td class="py-4 px-4 text-center">
-          <button onclick="viewStudentProfile(this)" class="px-3 py-1 bg-blue-100 text-blue-700 rounded-lg hover:bg-blue-200 text-sm font-medium mr-2">Ver Perfil</button>
-          <button onclick="deleteStudent(this)" class="px-3 py-1 bg-red-100 text-red-700 rounded-lg hover:bg-red-200 text-sm font-medium">Eliminar</button>
-        </td>
-      `;
-
-      // guardar datos básicos de padres para la vista rápida
-      studentParentData[name] = {
-        parent1: { name: p1Name || '', phone: p1Phone || '' },
-        parent2: { name: p2Name || '', phone: p2Phone || '' },
-        extra: { room: '', startDate: '', allergies: '', pickup: '', schedule: schedule || '' }
+      const newData = {
+        id: id ? parseInt(id) : Date.now(),
+        name, teacher, capacity, students: selectedStudents
       };
 
-      document.getElementById('studentsTable').appendChild(tr);
-      if(window.lucide && typeof lucide.createIcons === 'function') lucide.createIcons();
-      document.getElementById('modalAddStudent').classList.add('hidden');
-      clearStudentModal();
-      alert(`Estudiante "${name}" agregado.`);
-    });
-
-    window.deleteStudent = function(button){
-      const row = button.closest('tr');
-      const name = row.querySelector('.font-medium')?.textContent.trim();
-      if(confirm(`Eliminar estudiante ${name}?`)){
-        row.remove();
-        try{ delete studentParentData[name]; }catch(e){}
+      if(id) {
+        const idx = roomsData.findIndex(x => x.id == id);
+        if(idx >= 0) roomsData[idx] = newData;
+      } else {
+        roomsData.push(newData);
       }
+      renderRooms();
+      document.getElementById('roomModal').classList.add('hidden');
     };
 
-    // Ajuste dinámico del offset superior para evitar espacio vacío cuando hay header fijo
-    function adjustMainOffset(){
-      const mainEl = document.querySelector('main');
-      if(!mainEl) return;
-      // buscar primer elemento fijo en top
-      const fixedTop = document.querySelector('.fixed.top-0, header.fixed, .md\\:hidden.fixed, .mobile-fixed-top');
-      if(fixedTop && fixedTop.offsetHeight){
-        mainEl.style.marginTop = fixedTop.offsetHeight + 'px';
-      } else {
-        mainEl.style.marginTop = '';
-      }
+    function renderStudentChecklist(currentStudents = []) {
+      const container = document.getElementById('roomStudentsChecklist');
+      container.innerHTML = '';
+      // Usamos las claves de studentsDb como lista de estudiantes disponibles
+      Object.keys(studentsDb).forEach(stName => {
+        const isChecked = currentStudents.includes(stName) ? 'checked' : '';
+        const div = document.createElement('div');
+        div.innerHTML = `<label class="flex items-center gap-2 text-sm cursor-pointer hover:bg-slate-100 p-1 rounded"><input type="checkbox" value="${stName}" ${isChecked} class="rounded text-blue-600"> <span>${stName}</span></label>`;
+        container.appendChild(div);
+      });
     }
-    window.addEventListener('resize', adjustMainOffset);
-    // also run after icons render / DOM ready
-    setTimeout(adjustMainOffset, 50);
-    document.addEventListener('DOMContentLoaded', adjustMainOffset);
 
-    // asegurar scroll-top al cambiar secciones
-    document.querySelectorAll('[data-section]').forEach(btn => btn.addEventListener('click', ()=>{
-      const mainEl = document.querySelector('main');
-      if(mainEl) mainEl.scrollTo({top:0, behavior:'auto'});
-      try{ window.scrollTo({top:0, behavior:'auto'}); } catch(e){}
-    }));
-
-    // Inicial: mostrar dashboard
-    document.getElementById('dashboard').classList.remove('hidden');
+    document.addEventListener('DOMContentLoaded', () => {
+      initChart();
+      initNavigation();
+      initPaymentsChart();
+      renderPaymentsTable();
+      renderTeachers(); // Renderizar maestros al inicio
+      renderGrades(); // Renderizar calificaciones
+      renderRooms(); // Renderizar aulas
+      checkAttendanceAlerts(); // Verificar alertas
+      if (window.lucide) lucide.createIcons();
+    });
   </script>
-  <script src="js/store.js?v=2"></script>
-  <script src="js/common_ui.js"></script>
 </body>
 </html>

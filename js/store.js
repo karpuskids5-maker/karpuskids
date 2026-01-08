@@ -13,31 +13,42 @@
   }
 
   const defaultState = {
-    classes: ['Pequeños','Medianos','Grandes'],
+    classes: ['1° A - Primaria', '2° B - Primaria', '3 años - Inicial'],
     teacherProfile: { name: 'Ana Pérez', email: 'ana@karpus.edu', phone: '', bio: 'Educadora apasionada con 5 años de experiencia en desarrollo infantil temprano. Mi objetivo es crear un ambiente de aprendizaje divertido y seguro.', avatar: 'https://placehold.co/200x200' },
     directorProfile: { name: 'Karonlyn García', bio: 'Fundadora y CEO de Karpus Kids, dedicada a ofrecer una educación de calidad basada en el amor, el respeto y la creatividad. ¡Bienvenidos a nuestra familia!', avatar: 'img/mundo.jpg' },
     posts: [
-      { id: 1, class: 'Pequeños', teacher: 'Ana Pérez', date: todayStr(), text: 'Actividad de pintura sensorial.', photo: 'https://placehold.co/600x300', video: '', docUrl: '', docType: '', comments: [], reactions: { likes: 2, emoji: { '👍': 1 } } },
-      { id: 2, class: 'Pequeños', teacher: 'Ana Pérez', date: todayStr(), text: 'Canción de vocales grabada.', photo: 'https://placehold.co/600x300', video: '', docUrl: '', docType: '', comments: [], reactions: { likes: 1, emoji: {} } }
+      { id: 1, class: '1° A - Primaria', teacher: 'Ana Pérez', date: todayStr(), text: 'Actividad de pintura sensorial.', photo: 'https://placehold.co/600x300', video: '', docUrl: '', docType: '', comments: [], reactions: { likes: 2, emoji: { '👍': 1 } } },
+      { id: 2, class: '3 años - Inicial', teacher: 'Ana Pérez', date: todayStr(), text: 'Canción de vocales grabada.', photo: 'https://placehold.co/600x300', video: '', docUrl: '', docType: '', comments: [], reactions: { likes: 1, emoji: {} } }
     ],
     tasks: [
-      { id: 1, class: 'Pequeños', title: 'Colorear formas', desc: 'Usar colores primarios.', publish: todayStr(), due: todayStr(), attachments: [], submissions: [], grades: [] },
-      { id: 2, class: 'Pequeños', title: 'Canción de vocales', desc: 'Grabar un video corto.', publish: todayStr(), due: todayStr(), attachments: [], submissions: [], grades: [] }
+      { id: 1, class: '1° A - Primaria', title: 'Colorear formas', desc: 'Usar colores primarios.', publish: todayStr(), due: todayStr(), attachments: [], submissions: [], grades: [] },
+      { id: 2, class: '1° A - Primaria', title: 'Canción de vocales', desc: 'Grabar un video corto.', publish: todayStr(), due: todayStr(), attachments: [], submissions: [], grades: [] }
     ],
     notifications: [
-      { id: 1, class: 'Pequeños', type: 'task', text: 'Nueva tarea publicada', date: todayStr() },
-      { id: 2, class: 'Pequeños', type: 'class', text: 'Nueva publicación en aula', date: todayStr() },
+      { id: 1, class: '1° A - Primaria', type: 'task', text: 'Nueva tarea publicada', date: todayStr() },
+      { id: 2, class: '3 años - Inicial', type: 'class', text: 'Nueva publicación en aula', date: todayStr() },
       { id: 3, class: 'General', type: 'payment', text: 'Pago pendiente', date: todayStr() }
     ],
     attendance: [
-      { id: 1, class: 'Pequeños', date: todayStr(), present: 15, total: 18 }
+      { id: 1, class: '1° A - Primaria', date: todayStr(), present: 15, total: 18 }
     ],
     plans: [
-      { id: 1, title: 'Mejorar lectoescritura', class: 'Pequeños', owner: 'Dirección', actions: 'Rutina de vocales, Lectura guiada', due: todayStr(), status: 'Pendiente' }
+      { id: 1, title: 'Mejorar lectoescritura', class: '1° A - Primaria', owner: 'Dirección', actions: 'Rutina de vocales, Lectura guiada', due: todayStr(), status: 'Pendiente' }
     ],
+    // Configuración administrativa básica
+    config: {
+      cycle: '',
+      tariffs: '',
+      schedule: '',
+      methods: ''
+    },
     payments: [
-      { id: 1, student: 'Andrea Flores', class: 'Pequeños', month: 'Octubre', amount: 120.00, status: 'pagado', dueDate: `${new Date().getFullYear()}-10-30`, paidDate: todayStr(), notes: '' },
-      { id: 2, student: 'Juan Pérez', class: 'Medianos', month: 'Octubre', amount: 120.00, status: 'pendiente', dueDate: `${new Date().getFullYear()}-10-30`, paidDate: '', notes: 'Recordatorio enviado' }
+      { id: 1, student: 'Andrea Flores', class: '1° A - Primaria', month: 'Octubre', amount: 120.00, paidAmount: 120.00, status: 'pagado', dueDate: `${new Date().getFullYear()}-10-30`, paidDate: todayStr(), notes: '' },
+      { id: 2, student: 'Juan Pérez', class: '2° B - Primaria', month: 'Octubre', amount: 120.00, paidAmount: 0, status: 'pendiente', dueDate: `${new Date().getFullYear()}-10-30`, paidDate: '', notes: 'Recordatorio enviado' }
+    ],
+    // Registro de visitas (recepción)
+    visits: [
+      // { id, visitor, student, purpose, inAt, outAt, notes, status }
     ],
     contacts: [
       { id: 'maestra', name: 'Maestra Ana' },
@@ -48,7 +59,7 @@
     chats: [
       { id: 1, participants: ['maestra','directora'], messages: [ { id: 1, from: 'directora', text: 'Hola Ana, ¿cómo van las tareas?', date: todayStr(), status: 'sent', seenAt: '' } ] }
     ],
-    nextId: { posts: 3, tasks: 3, notifications: 4, plans: 2, payments: 3, chats: 2 }
+    nextId: { posts: 3, tasks: 3, notifications: 4, plans: 2, payments: 3, chats: 2, visits: 1 }
   };
 
   function load(){
@@ -62,7 +73,7 @@
         // migración básica de posts y tasks
         const posts = (v1.posts||[]).map(p=>({ ...p, video:'', docUrl:'', docType:'', comments:[], reactions:{ likes:0, emoji:{} } }));
         const state = { ...defaultState, posts, tasks: v1.tasks||defaultState.tasks, notifications: v1.notifications||defaultState.notifications, attendance: v1.attendance||defaultState.attendance, plans: v1.plans||defaultState.plans };
-        localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+        try { localStorage.setItem(STORAGE_KEY, JSON.stringify(state)); } catch(e) {}
         return state;
       }
       return JSON.parse(JSON.stringify(defaultState));
@@ -72,7 +83,7 @@
     }
   }
   function save(state){
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+    try { localStorage.setItem(STORAGE_KEY, JSON.stringify(state)); } catch(e) {}
   }
 
   const state = load();
@@ -89,7 +100,7 @@
     // Posts
     addPost({class: cls, teacher, text, photo, video, docUrl, docType}){
       const id = state.nextId.posts++;
-      const post = { id, class: cls || 'Pequeños', teacher: teacher || 'Maestra', date: todayStr(), text: text||'', photo: photo||'', video: video||'', docUrl: docUrl||'', docType: docType||'', comments: [], reactions: { likes:0, emoji:{} } };
+      const post = { id, class: cls || '1° A - Primaria', teacher: teacher || 'Maestra', date: todayStr(), text: text||'', photo: photo||'', video: video||'', docUrl: docUrl||'', docType: docType||'', comments: [], reactions: { likes:0, emoji:{} } };
       state.posts.unshift(post);
       save(state);
       return post;
@@ -183,9 +194,9 @@
     },
 
     // Payments
-    addPayment({ student, class: cls, month, amount, status, dueDate, paidDate, notes }){
+    addPayment({ student, class: cls, month, amount, status, dueDate, paidDate, notes, paidAmount }){
       const id = state.nextId.payments++;
-      const p = { id, student: student||'Estudiante', class: cls||'Pequeños', month: month||'Mes', amount: Number(amount)||0, status: status||'pendiente', dueDate: dueDate||todayStr(), paidDate: paidDate||'', notes: notes||'' };
+      const p = { id, student: student||'Estudiante', class: cls||'Pequeños', month: month||'Mes', amount: Number(amount)||0, paidAmount: Number(paidAmount)||0, status: status||'pendiente', dueDate: dueDate||todayStr(), paidDate: paidDate||'', notes: notes||'' };
       state.payments.unshift(p);
       save(state);
       return p;
@@ -194,11 +205,23 @@
       const p = state.payments.find(x=>x.id===id);
       if(!p) return null;
       p.status = status;
-      p.paidDate = status==='pagado' ? todayStr() : '';
+      if(status==='pagado') { p.paidAmount = p.amount; p.paidDate = todayStr(); }
+      else { p.paidDate = ''; }
+      save(state);
+      return p;
+    },
+    addPaymentPartial(id, amount){
+      const p = state.payments.find(x=>x.id===id);
+      if(!p) return null;
+      p.paidAmount = Number(p.paidAmount||0) + Number(amount||0);
+      if(p.paidAmount >= p.amount){ p.status = 'pagado'; p.paidDate = todayStr(); }
+      else if(p.paidAmount > 0){ p.status = 'parcial'; }
+      else { p.status = 'pendiente'; }
       save(state);
       return p;
     },
     getPaymentsByClass(cls){ return state.payments.filter(p=> p.class===cls); },
+    getPaymentsPending(){ return state.payments.filter(p=> p.status==='pendiente' || p.status==='parcial'); },
     getPaymentSummary(cls){
       const items = cls ? state.payments.filter(p=>p.class===cls) : state.payments;
       const total = items.length;
@@ -207,6 +230,28 @@
       const amountTotal = items.reduce((sum,p)=> sum + (p.amount||0), 0);
       return { total, pagados, pendientes, amountTotal };
     },
+
+    // Configuración (persistente)
+    getConfig(){ return JSON.parse(JSON.stringify(state.config)); },
+    setConfig(updates){ Object.assign(state.config, updates||{}); save(state); return this.getConfig(); },
+
+    // Visits (Recepción)
+    addVisit({ visitor, student, purpose, notes }){
+      const id = state.nextId.visits++;
+      const v = { id, visitor: visitor||'Visitante', student: student||'', purpose: purpose||'', notes: notes||'', inAt: todayStr(), outAt: '', status: 'en_curso' };
+      state.visits.unshift(v);
+      save(state);
+      return v;
+    },
+    markVisitExit(id){
+      const v = state.visits.find(x=>x.id===id);
+      if(!v) return null;
+      v.outAt = todayStr();
+      v.status = 'finalizada';
+      save(state);
+      return v;
+    },
+    getOpenVisits(){ return state.visits.filter(v=>v.status==='en_curso'); },
 
     // Academic Summary
     getAcademicSummary(){

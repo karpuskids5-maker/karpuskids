@@ -11,12 +11,12 @@ const Auth = (function(){
   function login(email, password){
     const user = USERS.find(u => u.email.toLowerCase() === String(email).toLowerCase() && u.password === String(password));
     if(!user) return null;
-    localStorage.setItem(KEY, JSON.stringify({ email: user.email, role: user.role, name: user.name }));
+    try { localStorage.setItem(KEY, JSON.stringify({ email: user.email, role: user.role, name: user.name })); } catch(e) {}
     return { email: user.email, role: user.role, name: user.name };
   }
 
   function logout(){
-    localStorage.removeItem(KEY);
+    try { localStorage.removeItem(KEY); } catch(e) {}
   }
 
   function currentUser(){
@@ -30,6 +30,19 @@ const Auth = (function(){
     return { ok: user.role === role };
   }
 
+  // Helper: enforce role and redirect to login when mismatched or no user
+  function enforceRole(role){
+    const check = requireRole(role);
+    if(!check.ok){
+      try { logout(); } catch (e) {}
+      if (typeof window !== 'undefined') {
+        window.location.href = 'login.html';
+      }
+      return false;
+    }
+    return true;
+  }
+
   function routeForRole(role){
     switch(role){
       case 'directora': return 'panel_directora.html';
@@ -40,7 +53,7 @@ const Auth = (function(){
     }
   }
 
-  return { login, logout, currentUser, requireRole, routeForRole };
+  return { login, logout, currentUser, requireRole, enforceRole, routeForRole };
 })();
 
 // Expose globally

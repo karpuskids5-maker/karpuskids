@@ -71,6 +71,10 @@ body {
 .section-close:hover { background: rgba(255, 255, 255, 1); }
 
 /* Transiciones del sidebar en móvil */
+#sidebar.mobile-visible { display: block; transform: translateX(0); }
+#sidebar { transition: transform 0.25s ease-in-out; }
+
+/* Animación de sidebar en desuso, se usa display y transform */
 #sidebar.sidebar-mobile { opacity: 0; transform: translateX(-12px); transition: opacity 200ms ease, transform 200ms ease; }
 #sidebar.sidebar-mobile.sidebar-open { opacity: 1; transform: translateX(0); }
 
@@ -80,6 +84,12 @@ body {
 
 /* Overlay transición */
 #sidebarOverlay { transition: opacity 180ms ease; }
+
+/* Estilo para el botón de navegación activo */
+.teams-nav-item.active, .nav-btn.active {
+  background-color: rgba(255, 255, 255, 0.2);
+}
+
 /* ===== Ajustes específicos Panel Padres ===== */
 /* Evitar desbordes horizontales */
 body { overflow-x: hidden; }

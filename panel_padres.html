@@ -10,8 +10,18 @@
   <script src="js/auth.js?v=1"></script>
   <script>
     (function(){
-      const check = Auth.requireRole('padre');
-      if(!check.ok){ window.location.href = 'login.html'; }
+      try {
+        if (typeof Auth === 'undefined') {
+          window.location.href = 'login.html';
+          return;
+        }
+        const check = Auth.requireRole('padre');
+        if (!check || !check.ok) {
+          window.location.href = 'login.html';
+        }
+      } catch (e) {
+        window.location.href = 'login.html';
+      }
     })();
   </script>
   <link href="https://fonts.googleapis.com/css2?family=Nunito:wght@400;600;700&family=Poppins:wght@400;500;600;700&display=swap" rel="stylesheet">
@@ -20,12 +30,12 @@
       theme: {
         extend: {
           colors: {
-            'karpus-green': '#4CAF50',
-            'karpus-blue': '#2196F3',
-            'karpus-pink': '#FF4081',
-            'karpus-orange': '#FF9800',
-            'karpus-blue-soft': '#7AB8FF',
-            'karpus-sky': { light: '#F0F7FF', DEFAULT: '#D6E9FF' }
+            'karpus-green': '#22C55E',
+            'karpus-blue': '#2563EB',
+            'karpus-pink': '#EC4899',
+            'karpus-orange': '#FB923C',
+            'karpus-blue-soft': '#93C5FD',
+            'karpus-sky': { light: '#E0F2FE', DEFAULT: '#D6E9FF' }
           },
           fontFamily: {
             nunito: ['Nunito', 'sans-serif'],
@@ -44,22 +54,37 @@
     }
   </script>
   <style>
+    :root {
+      --color-primary: #2563EB; /* Azul moderno */
+      --color-secondary: #22C55E; /* Verde suave */
+      --color-button: #FB923C; /* Naranja botones */
+      --color-accent: #EC4899; /* Rosa acento */
+      --color-bg: #F1F5F9; /* Fondo gris muy claro */
+      --color-text: #1F2937; /* Texto gris oscuro */
+      --color-sky: #E0F2FE; /* Azul cielo de fondo */
+      --color-yellow: #FACC15; /* Ambar para CTA */
+    }
     body { 
       font-family: 'Nunito', sans-serif; 
-      background-color: #F0F7FF; /* karpus-sky-light */
-      background-image: linear-gradient(to bottom, #F0F7FF, #FFFFFF);
+      color: var(--color-text);
+      background-color: var(--color-sky);
+      background-image: linear-gradient(to bottom, var(--color-sky), #FFFFFF);
     }
     /* Sidebar styles */
-    aside#sidebar { width: 260px; transition: width .25s ease, transform .25s ease; }
+    aside#sidebar { width: 260px; transition: width .25s ease; }
     aside#sidebar.collapsed { width: 72px; }
     aside#sidebar .label { transition: opacity .2s ease; }
     aside#sidebar.collapsed .label { opacity: 0; }
+    
+    /* Hover expand logic (removido para evitar superposición de contenido) */
+    
     /* mobile helper */
     .hidden-mobile { display: none !important; }
     /* color variants */
     .sidebar-blue { background: linear-gradient(135deg,#E3F2FD,#BBDEFB); }
     .sidebar-green { background: linear-gradient(135deg,#E8F8F0,#D0F0E0); }
     .sidebar-pink { background: linear-gradient(135deg,#FFF0F6,#FFE3F0); }
+    .sidebar-sky { background: linear-gradient(180deg, #E0F2FE 0%, #F0F9FF 100%); border-right: 1px solid #BAE6FD; }
     /* Karpus colored letters small */
     .karpus-kids-inline { font-weight: 700; }
     .karpus-kids-inline .k-1 { color: #FF9800; }
@@ -130,26 +155,152 @@
       justify-content: flex-end;
       gap: 0.75rem;
     }
+
+    /* Layout adjustments */
+    #layoutShell { transition: margin-left .25s ease; }
+    #layoutShell.sidebar-collapsed { margin-left: 72px !important; }
+    
+    @media (max-width: 768px) {
+      #layoutShell { margin-left: 0 !important; }
+    }
+
+    /* Botón de colapsar personalizado (Padres) */
+    .toggle-btn-padres {
+      background-color: var(--color-primary);
+      color: white;
+      border: 2px solid #E0F2FE;
+      box-shadow: 0 4px 6px -1px rgba(37, 99, 235, 0.35);
+      transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    }
+    .toggle-btn-padres:hover {
+      background-color: #1D4ED8; /* más profundo */
+      transform: scale(1.1);
+    }
   </style>
-  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <style>
+    /* Animaciones y colores del sidebar (ligeros, no pesados) */
+    .sidebar-btn {
+      position: relative;
+      width: 100%;
+      text-align: left;
+      padding: 12px 16px; /* un poco más grande */
+      border-radius: 12px;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      font-size: 16px;
+      color: var(--color-text);
+      transition: transform .2s ease, background .25s ease, color .25s ease, box-shadow .25s ease;
+      overflow: hidden;
+    }
+    .sidebar-btn::before {
+      content: '';
+      position: absolute;
+      left: 8px;
+      top: 50%;
+      transform: translateY(-50%);
+      width: 6px;
+      height: 6px;
+      border-radius: 9999px;
+      background: transparent;
+      transition: all .25s ease;
+    }
+    .sidebar-btn:hover {
+      transform: translateX(2px);
+      background: linear-gradient(90deg, #f8fafc 0%, #f1f5f9 100%);
+    }
+    .sidebar-btn:hover i { transform: translateX(1px); }
+    .sidebar-btn.active {
+      background: linear-gradient(90deg, #E0F2FE 0%, #EFF6FF 100%);
+      color: var(--color-primary);
+      font-weight: 600;
+      box-shadow: 0 4px 10px rgba(37, 99, 235, 0.10);
+    }
+    .sidebar-btn.active::before {
+      width: 8px;
+      height: 24px;
+      border-radius: 12px;
+      background: var(--color-primary);
+    }
+    /* Colores por sección (barra sutil) */
+    .sidebar-btn[data-section="home"].active::before { background: var(--color-primary); }
+    .sidebar-btn[data-section="live-attendance"].active::before { background: var(--color-secondary); }
+    .sidebar-btn[data-section="class"].active::before { background: var(--color-secondary); }
+    .sidebar-btn[data-section="tasks"].active::before { background: var(--color-button); }
+    .sidebar-btn[data-section="grades"].active::before { background: var(--color-primary); }
+    .sidebar-btn[data-section="notifications"].active::before { background: var(--color-accent); }
+    .sidebar-btn[data-section="profile"].active::before { background: #6b7280; }
+    .sidebar-btn i { flex-shrink: 0; transition: transform .2s ease; }
+    .sidebar-btn span { white-space: nowrap; }
+
+    /* Animación de entrada de secciones */
+    .section-anim { opacity: 0; transform: translateY(8px); transition: opacity .25s ease, transform .25s ease; }
+    .section-anim.section-visible { opacity: 1; transform: translateY(0); }
+  </style>
+  <!-- Chart.js eliminado (no utilizado) -->
   <script src="https://unpkg.com/lucide@latest/dist/umd/lucide.min.js"></script>
 </head>
 <body class="text-slate-800 min-h-screen">
-  <div class="min-h-screen flex flex-col font-nunito">
-    <!-- page wrapper: ensure main content lives inside this container -->
-    <!-- Sidebar eliminado para enfoque en navegación inferior -->
+  <div class="flex min-h-screen font-nunito">
+    <!-- SIDEBAR DESKTOP -->
+    <aside id="sidebar" class="hidden md:flex flex-col w-[260px] sidebar-sky border-r shadow-soft px-4 py-6 fixed inset-y-0 left-0 z-20">
+      <button id="toggleSidebar" class="absolute right-2 top-6 toggle-btn-padres rounded-full w-10 h-10 flex items-center justify-center shadow-lg z-30 hidden md:flex"><i data-lucide="chevron-left" class="w-6 h-6"></i></button>
+      <div class="flex items-center gap-3 mb-8">
+        <img src="img/mundo.jpg" class="w-10 h-10 rounded-xl" />
+        <div class="label">
+          <p class="font-bold text-sm">Karpus Kids</p>
+          <p class="text-xs text-slate-500">Padre / Tutor</p>
+        </div>
+      </div>
+      <nav class="space-y-1">
+        <button data-section="home" class="sidebar-btn text-base">
+          <i data-lucide="home" class="w-6 h-6"></i>
+          <span class="label">Inicio</span>
+        </button>
+        <button data-section="live-attendance" class="sidebar-btn text-base">
+          <i data-lucide="calendar" class="w-6 h-6"></i>
+          <span class="label">Asistencia</span>
+        </button>
+        <button data-section="class" class="sidebar-btn text-base">
+          <i data-lucide="school" class="w-6 h-6"></i>
+          <span class="label">Aula</span>
+        </button>
+        <button data-section="tasks" class="sidebar-btn text-base">
+          <i data-lucide="book-open" class="w-6 h-6"></i>
+          <span class="label">Tareas</span>
+        </button>
+        <button data-section="grades" class="sidebar-btn text-base">
+          <i data-lucide="graduation-cap" class="w-6 h-6"></i>
+          <span class="label">Calificaciones</span>
+        </button>
+        <button data-section="notifications" class="sidebar-btn text-base">
+          <i data-lucide="message-circle" class="w-6 h-6"></i>
+          <span class="label">Mensajes</span>
+        </button>
+        <button data-section="profile" class="sidebar-btn text-base">
+          <i data-lucide="user" class="w-6 h-6"></i>
+          <span class="label">Perfil</span>
+        </button>
+      </nav>
+      <div class="mt-auto text-xs text-slate-400 label">
+        Supervisando a:<br>
+        <strong>Andrea Flores</strong>
+      </div>
+    </aside>
 
+    <!-- CONTENIDO PRINCIPAL -->
+    <div id="layoutShell" class="flex-1 flex flex-col md:ml-[260px]">
     <!-- Mobile header -->
     <div class="md:hidden w-full fixed top-0 left-0 right-0 bg-white/80 backdrop-blur-sm border-b z-10 shadow-lg">
       <header class="px-4 py-2 flex items-center justify-between">
-        <!-- Botón hamburguesa eliminado al no existir sidebar izquierdo -->
+        <button id="menuBtn" class="p-2 -ml-2 rounded-lg text-slate-600 hover:bg-slate-100"><i data-lucide="menu" class="w-6 h-6"></i></button>
         <div class="flex items-center gap-3">
           <div class="w-9 h-9 rounded-2xl bg-karpus-blue flex items-center justify-center shadow-lg">
             <img src="img/mundo.jpg" alt="logo" class="h-6 w-6 rounded" />
           </div>
           <div>
             <h1 class="text-lg font-poppins font-semibold"><span class="karpus-kids-inline"><span class="k-1">K</span><span class="k-2">a</span><span class="k-3">r</span><span class="k-4">p</span><span class="k-5">u</span><span class="k-6">s</span> <span class="k-7">K</span><span class="k-8">i</span><span class="k-9">d</span><span class="k-10">s</span></span></h1>
-            <p class="text-xs text-slate-500">Panel de Padres</p>
+            <p class="text-xs text-slate-500">Supervisando a: Andrea Flores</p>
           </div>
         </div>
         <!-- Menú de Avatar de Usuario -->
@@ -160,8 +311,8 @@
           <!-- Menú desplegable -->
           <div id="avatarDropdown" class="hidden absolute right-0 mt-2 w-48 bg-white rounded-xl shadow-lg border z-20">
             <div class="p-3">
-              <p class="text-sm font-semibold">Andrea Flores</p>
-              <p class="text-xs text-slate-500">Estudiante</p>
+              <p class="text-sm font-semibold">Padre / Tutor</p>
+              <p class="text-xs text-slate-500">Alumno: Andrea Flores</p>
             </div>
             <button id="editProfileBtn" class="w-full text-left px-3 py-2 text-sm text-slate-700 hover:bg-slate-100 rounded-b-xl">Editar Perfil</button>
           </div>
@@ -170,63 +321,68 @@
     </div>
 
     <!-- Content -->
-    <main class="flex-1 pb-20 px-4 space-y-6 md:pt-6 mt-16 md:mt-0">
-    <!-- Home -->
+    <main class="flex-1 px-4 space-y-6 md:pt-6 mt-16 md:mt-0 pb-6">
+    <!-- A. INICIO (Dashboard) -->
     <section id="tab-home" class="space-y-6">
+      <!-- Resumen del día + Próxima clase + Alertas -->
       <div class="modern-card p-4">
-        <div class="flex items-center justify-between mb-3">
-          <h2 class="text-base font-semibold font-poppins text-karpus-purple flex items-center gap-2">
-            <i data-lucide="sparkles" class="text-karpus-purple h-5 w-5"></i>
-            Actividad Reciente
-          </h2>
-          <button class="modern-button modern-button-primary text-xs">
-            <i data-lucide="refresh-cw" class="h-4 w-4"></i>
-            Actualizar
-          </button>
-        </div>
-        
-        <div class="space-y-3">
-          <div class="flex items-center gap-3 p-3 bg-blue-50 rounded-xl">
-            <div class="bg-blue-100 p-2 rounded-lg">
-              <i data-lucide="book-open" class="text-karpus-blue h-5 w-5"></i>
-            </div>
-            <div class="flex-1">
-              <p class="text-sm font-medium">Nueva tarea asignada</p>
-              <p class="text-xs text-slate-500">Proyecto de ciencias - Entrega: 15/06/2023</p>
-            </div>
-            <span class="text-xs text-slate-400">Hace 2h</span>
+        <div class="flex items-center justify-between">
+          <div>
+            <h2 class="text-lg font-bold text-slate-800"></h2>
+            <p class="text-sm text-slate-500"></p>
+            <p class="text-sm text-slate-500">Estudiante: <span class="font-semibold text-karpus-blue">Andrea Flores</span> • Padres: <span class="font-semibold">Juan Pérez</span></p>
           </div>
-          
-          <div class="flex items-center gap-3 p-3 bg-green-50 rounded-xl">
-            <div class="bg-green-100 p-2 rounded-lg">
-              <i data-lucide="award" class="text-karpus-green h-5 w-5"></i>
-            </div>
-            <div class="flex-1">
-              <p class="text-sm font-medium">Logro desbloqueado</p>
-              <p class="text-xs text-slate-500">Participación destacada en clase</p>
-            </div>
-            <span class="text-xs text-slate-400">Ayer</span>
-          </div>
-          
-          <div class="flex items-center gap-3 p-3 bg-purple-50 rounded-xl">
-            <div class="bg-purple-100 p-2 rounded-lg">
-              <i data-lucide="calendar" class="text-karpus-purple h-5 w-5"></i>
-            </div>
-            <div class="flex-1">
-              <p class="text-sm font-medium">Evento próximo</p>
-              <p class="text-xs text-slate-500">Reunión de padres - 20/06/2023</p>
-            </div>
-            <span class="text-xs text-slate-400">En 5 días</span>
+          <div class="text-right space-y-1">
+            <p class="text-xs text-slate-400" id="currentDateDisplay">Hoy</p>
+            <span class="block text-xs px-2 py-1 bg-blue-100 text-blue-700 rounded-full">Curso/Aula: Aula Pequeños</span>
+            <span id="nextClassInfo" class="block text-xs text-slate-600">Próxima clase • Mañana • 8:30 AM</span>
           </div>
         </div>
+        <!-- Alertas y recordatorios (orden: vencidas, pendientes, reconocimiento) -->
+        <div id="dashboardAlerts" class="space-y-3 mt-3"></div>
       </div>
 
-      <div class="space-y-4">
-        <h3 class="text-base font-semibold text-slate-700 px-1 flex items-center gap-2">
-          <i data-lucide="message-circle" class="text-karpus-blue h-5 w-5"></i>
-          Mensajes Generales
+      <!-- Tarjetas de Resumen (con prioridad visual) -->
+  <div class="grid grid-cols-2 gap-3">
+    <div class="bg-white p-3 rounded-2xl border shadow-sm">
+      <div class="flex items-center gap-2 mb-2">
+        <div class="p-1.5 bg-green-100 text-green-600 rounded-lg"><i data-lucide="check-circle" class="w-5 h-5"></i></div>
+        <span class="text-xs font-semibold text-slate-600">Asistencia</span>
+      </div>
+      <p class="text-2xl font-bold text-slate-800" id="dashAttendance">95%</p>
+      <p class="text-[10px] text-slate-400">Este mes</p>
+    </div>
+    <div class="bg-white p-3 rounded-2xl border shadow-sm">
+      <div class="flex items-center gap-2 mb-2">
+        <div class="p-1.5 bg-orange-100 text-orange-600 rounded-lg"><i data-lucide="book" class="w-5 h-5"></i></div>
+        <span class="text-xs font-semibold text-slate-600">Tareas</span>
+      </div>
+      <p class="text-2xl font-bold text-slate-800" id="dashPendingTasks">0</p>
+      <p class="text-[10px] text-slate-400">Pendientes</p>
+    </div>
+  </div>
+
+  <!-- CTA Amarillo: acceso rápido a Actividades -->
+  <div class="mt-3 flex items-center justify-between bg-white p-3 rounded-2xl border shadow-sm">
+    <div class="flex items-center gap-2">
+      <div class="p-1.5 bg-amber-100 text-amber-600 rounded-lg"><i data-lucide="list-checks" class="w-5 h-5"></i></div>
+      <span class="text-sm font-semibold text-slate-700">Actividades pendientes y evidencias</span>
+    </div>
+    <button id="ctaPendingBtn" class="text-sm px-3 py-1 rounded-xl" style="background:#FACC15;color:#1F2937;box-shadow:0 3px 8px rgba(250,204,21,.25)">
+      <i data-lucide="arrow-right" class="w-4 h-4 inline-block align-middle"></i>
+      <span class="align-middle">Ver Actividades</span>
+    </button>
+  </div>
+
+    
+
+      <!-- Actividad Reciente -->
+      <div class="modern-card p-4">
+        <h3 class="text-base font-semibold text-slate-700 mb-2 flex items-center gap-2">
+          <i data-lucide="activity" class="text-karpus-blue h-5 w-5"></i>
+          ⭐ Reconocimiento • Actividad reciente • Últimas entregas • Últimos comentarios
         </h3>
-        <div id="feed" class="space-y-4"></div>
+        <div id="feed" class="space-y-3"></div>
       </div>
     </section>
     
@@ -348,7 +504,7 @@
         </div>
         
         <div class="modern-card-footer flex justify-between">
-          <button class="modern-button bg-slate-100 text-slate-700 text-xs">
+          <button id="requestMeetingBtn" class="modern-button bg-slate-100 text-slate-700 text-xs">
             <i data-lucide="message-square" class="h-4 w-4"></i>
             Solicitar reunión
           </button>
@@ -375,57 +531,126 @@
           </div>
         </div>
 
-        <div class="mt-3">
-          <canvas id="attendanceChart" class="w-full rounded-xl bg-white p-2" height="160"></canvas>
-        </div>
+        <!-- Gráfico de asistencia renderizado por JS (SVG donut) -->
+        <!-- Canvas eliminado: usamos componente SVG propio, sin Chart.js -->
 
         <div class="mt-4 text-sm text-slate-600">
           <p>Selecciona el periodo para ver la asistencia de tu estudiante.</p>
         </div>
+
+        <!-- Calendario Interactivo -->
+        <div class="mt-6 border-t pt-6">
+          <div class="flex items-center justify-between mb-4">
+            <h3 class="text-sm font-semibold text-slate-700">Calendario Mensual</h3>
+            <div class="flex items-center gap-2 bg-slate-50 rounded-lg p-1 border">
+              <button id="calPrevBtn" class="p-1 hover:bg-white rounded shadow-sm transition-all"><i data-lucide="chevron-left" class="w-4 h-4"></i></button>
+              <span id="calMonthLabel" class="text-xs font-bold w-24 text-center text-slate-700 capitalize"></span>
+              <button id="calNextBtn" class="p-1 hover:bg-white rounded shadow-sm transition-all"><i data-lucide="chevron-right" class="w-4 h-4"></i></button>
+            </div>
+          </div>
+          <div class="bg-slate-50/50 rounded-2xl border border-slate-100 p-4">
+            <div class="grid grid-cols-7 gap-1 mb-2 text-center text-[10px] font-bold text-slate-400 uppercase tracking-wider">
+              <div>Dom</div><div>Lun</div><div>Mar</div><div>Mié</div><div>Jue</div><div>Vie</div><div>Sáb</div>
+            </div>
+            <div id="calendarGrid" class="grid grid-cols-7 gap-1 text-sm transition-opacity duration-300 ease-in-out">
+              <!-- Días generados por JS -->
+            </div>
+          </div>
+          <!-- Resumen mensual -->
+          <div class="mt-4 grid grid-cols-2 gap-3">
+            <div class="bg-white p-3 rounded-2xl border shadow-sm">
+              <div class="flex items-center gap-2 mb-1">
+                <div class="p-1.5 bg-green-100 text-green-600 rounded-lg"><i data-lucide="check-circle" class="w-4 h-4"></i></div>
+                <span class="text-xs font-semibold text-slate-600">Asistencias</span>
+              </div>
+              <p id="attendancePresentCount" class="text-xl font-bold text-slate-800">0</p>
+            </div>
+            <div class="bg-white p-3 rounded-2xl border shadow-sm">
+              <div class="flex items-center gap-2 mb-1">
+                <div class="p-1.5 bg-red-100 text-red-600 rounded-lg"><i data-lucide="x-circle" class="w-4 h-4"></i></div>
+                <span class="text-xs font-semibold text-slate-600">Faltas</span>
+              </div>
+              <p id="attendanceAbsentCount" class="text-xl font-bold text-slate-800">0</p>
+            </div>
+          </div>
+        </div>
       </div>
     </section>
 
-    <!-- Aula -->
+    <!-- B. AULA Y CURSO (Comunicación académica) -->
     <section id="tab-class" class="hidden space-y-4">
       <div class="flex items-center justify-between">
-        <h2 class="text-sm font-semibold flex items-center gap-2">
-          <i data-lucide="layout-dashboard" class="w-4 h-4 text-karpus-green"></i>
-          <span>Publicaciones del aula</span>
+        <h2 class="text-base font-semibold flex items-center gap-2">
+          <i data-lucide="layout-dashboard" class="w-5 h-5 text-karpus-green"></i>
+          <span>Muro del Aula</span>
         </h2>
-        <span class="text-xs text-karpus-green">Aula: Pequeños</span>
+        <span class="text-xs px-2 py-1 bg-slate-100 rounded text-slate-500">Solo lectura</span>
       </div>
+      <div class="text-xs text-slate-600">Comunicación académica: anuncios, materiales y notas de la maestra.</div>
       <div id="classFeed" class="space-y-4"></div>
     </section>
 
-    <!-- Tareas -->
+    <!-- C. TAREAS -->
     <section id="tab-tasks" class="hidden space-y-4">
       <div class="flex items-center justify-between">
-        <h2 class="text-sm font-semibold flex items-center gap-2">
-          <i data-lucide="book-check" class="w-4 h-4 text-karpus-orange"></i>
-          <span>Tareas Asignadas</span>
+        <h2 class="text-base font-semibold flex items-center gap-2">
+          <i data-lucide="book-check" class="w-5 h-5 text-karpus-orange"></i>
+          <span>Actividades</span>
         </h2>
-        <select id="classroomSelectParent" class="px-3 py-1 border rounded-xl text-xs">
-          <option value="pequenos">Pequeños</option>
-          <option value="medianos">Medianos</option>
-          <option value="grandes">Grandes</option>
-        </select>
       </div>
+      <p class="text-xs text-slate-600">🎯 Objetivo: Gestionar entregas y responsabilidades.</p>
+      <!-- Filtros de Tareas -->
+      <div class="flex gap-2 overflow-x-auto pb-1">
+        <button class="task-filter-btn active px-3 py-1 rounded-full text-xs font-medium bg-slate-800 text-white" data-filter="all">Todas</button>
+        <button class="task-filter-btn px-3 py-1 rounded-full text-xs font-medium bg-slate-100 text-slate-600" data-filter="pending">Pendientes</button>
+        <button class="task-filter-btn px-3 py-1 rounded-full text-xs font-medium bg-slate-100 text-slate-600" data-filter="submitted">Entregadas</button>
+        <button class="task-filter-btn px-3 py-1 rounded-full text-xs font-medium bg-slate-100 text-slate-600" data-filter="overdue">Vencidas</button>
+      </div>
+      <div class="text-xs text-slate-600">Vista recomendada: Tarjetas o tabla con 📄 Tarea • 📅 Fecha límite • ⏳ Estado. Las entregas se registran a nombre del estudiante.</div>
       <div id="tasksList" class="space-y-4"></div>
     </section>
 
-    <!-- Avisos / Chat privado -->
+    <!-- D. DESARROLLO -->
+    <section id="tab-grades" class="hidden space-y-6">
+      <div class="flex items-center justify-between">
+        <h2 class="text-xl font-bold text-slate-800 flex items-center gap-2">
+          <i data-lucide="graduation-cap" class="w-6 h-6 text-karpus-blue"></i>
+          Desarrollo Infantil
+        </h2>
+        <button id="downloadGradesBtn" class="text-xs px-3 py-2 bg-white border border-slate-200 text-slate-700 rounded-xl flex items-center gap-2 hover:bg-slate-50 hover:text-karpus-blue transition-colors shadow-sm">
+          <i data-lucide="file-down" class="w-4 h-4"></i> Descargar PDF
+        </button>
+      </div>
+      <div class="flex items-center gap-2 text-sm">
+        <span class="text-slate-600">Progreso:</span>
+        <span id="gradesAverageBadge" class="px-2 py-1 rounded-full bg-slate-100 text-slate-700">—</span>
+        <span class="text-xs text-slate-400">Código de color: Rojo &lt; 70 • Verde ≥ 70</span>
+      </div>
+      
+      <div class="bg-white rounded-3xl border shadow-sm overflow-hidden">
+        <table class="w-full text-sm text-left" id="gradesTable">
+          <thead class="bg-slate-50 text-slate-500 font-medium border-b">
+            <tr><th class="p-4">Área / Actividad</th><th class="p-4 text-center">Progreso</th><th class="p-4">Observación</th></tr>
+          </thead>
+          <tbody id="gradesTableBody" class="divide-y divide-slate-100"></tbody>
+        </table>
+      </div>
+    </section>
+
+    <!-- F. MENSAJES / CHAT -->
     <section id="tab-notifications" class="hidden space-y-4">
       <h2 class="text-sm font-semibold flex items-center gap-2">
-        <i data-lucide="message-square" class="w-4 h-4 text-karpus-pink"></i>
-        <span>Chat privado</span>
+        <i data-lucide="message-square" class="w-5 h-5 text-karpus-pink"></i>
+        <span>Mensajes Privados</span>
       </h2>
+      <p class="text-xs text-slate-600">🎯 Objetivo: Comunicación institucional. Chat con Maestra y Administración. 🚫 Nunca con estudiantes. Etiqueta: “Chat institucional”. Historial guardado.</p>
       <div class="grid md:grid-cols-3 gap-4">
         <div class="md:col-span-1 rounded-3xl bg-white p-3 border">
           <input id="contactFilter" class="w-full border rounded-xl px-2 py-1 text-sm" placeholder="Filtrar contacto" />
           <div id="contactList" class="mt-2 space-y-1 max-h-64 overflow-auto"></div>
         </div>
         <div class="md:col-span-2 rounded-3xl bg-white p-3 border flex flex-col">
-          <div id="chatHeader" class="text-sm font-semibold">Chat</div>
+          <div id="chatHeader" class="text-sm font-semibold">Mensajes Privados</div>
           <div id="chatMessages" class="flex-1 mt-2 space-y-2 max-h-64 overflow-auto"></div>
           <div id="typingIndicator" class="text-[11px] text-slate-500"></div>
           <div class="mt-2 flex gap-2 items-center">
@@ -438,60 +663,37 @@
       </div>
     </section>
 
-    <!-- Perfil -->
+    <!-- G. PERFIL -->
     <section id="tab-profile" class="hidden space-y-4">
+      <!-- Datos del Estudiante -->
       <div class="p-4 rounded-3xl bg-white shadow-lg border">
+        <h3 class="text-sm font-semibold text-slate-500 mb-3 uppercase tracking-wider">Datos del Estudiante</h3>
         <div class="flex items-center gap-4">
           <img src="https://placehold.co/200x200" alt="Niño" class="w-16 h-16 rounded-2xl object-cover" />
           <div>
             <h3 class="text-base font-semibold">Andrea Flores</h3>
             <p class="text-sm text-slate-600">3 años • Aula Pequeños</p>
+            <p class="text-xs text-slate-400 mt-1">ID: ST-2024-001</p>
           </div>
         </div>
-        <div class="mt-4 flex items-center gap-3">
-          <button id="openTeacherProfileBtn" class="px-3 py-2 rounded-xl bg-karpus-green text-white text-xs">Ver Maestra</button>
-          <button id="openDirectorProfileBtn" class="px-3 py-2 rounded-xl border text-xs">Ver Directora</button>
-        </div>
       </div>
+      
+      <!-- Datos del Tutor -->
       <div class="p-4 rounded-3xl bg-white shadow-lg border">
-        <div class="flex items-center justify-between">
-          <h4 class="text-sm font-semibold">Pago del mes</h4>
-          <span class="text-xs px-2 py-1 rounded-lg bg-green-100 text-green-700">Pagado</span>
+        <h3 class="text-sm font-semibold text-slate-500 mb-3 uppercase tracking-wider">Datos del Tutor</h3>
+        <div class="space-y-2 text-sm">
+          <p><span class="font-medium">Nombre:</span> Juan Pérez</p>
+          <p><span class="font-medium">Relación:</span> Padre</p>
+          <p><span class="font-medium">Teléfono:</span> +1 829 555 0101</p>
+          <p><span class="font-medium">Email:</span> juan.perez@email.com</p>
         </div>
-        <p class="text-xs text-slate-600 mt-2">Vencimiento: 30 Oct</p>
+        <div class="mt-4 grid grid-cols-2 gap-2">
+          <button class="py-2 border rounded-xl text-xs text-slate-600 hover:bg-slate-50">Editar información</button>
+          <button class="py-2 border rounded-xl text-xs text-slate-600 hover:bg-slate-50">Seguridad de la cuenta</button>
+        </div>
       </div>
     </section>
   </main>
-
-  <!-- Menú inferior -->
-  <nav class="fixed bottom-0 inset-x-0 bg-white/80 backdrop-blur-sm border-t border-slate-200/80">
-    <div class="grid grid-cols-6">
-      <button data-tab="home" class="tab-btn py-3 flex flex-col items-center gap-1 text-karpus-blue rounded-lg">
-        <i data-lucide="home" class="w-6 h-6"></i>
-        <span class="text-[11px]">Inicio</span>
-      </button>
-      <button data-tab="attendance" class="tab-btn py-3 flex flex-col items-center gap-1 text-slate-500 rounded-lg">
-        <i data-lucide="user-check" class="w-6 h-6"></i>
-        <span class="text-[11px]">Asistencia</span>
-      </button>
-      <button data-tab="class" class="tab-btn py-3 flex flex-col items-center gap-1 text-slate-500 rounded-lg">
-        <i data-lucide="globe" class="w-6 h-6"></i>
-        <span class="text-[11px]">Aula</span>
-      </button>
-      <button data-tab="tasks" class="tab-btn py-3 flex flex-col items-center gap-1 text-slate-500 rounded-lg">
-        <i data-lucide="book-open" class="w-6 h-6"></i>
-        <span class="text-[11px]">Tareas</span>
-      </button>
-      <button data-tab="notifications" class="tab-btn py-3 flex flex-col items-center gap-1 text-slate-500 rounded-lg">
-        <i data-lucide="bell" class="w-6 h-6"></i>
-        <span class="text-[11px]">Avisos</span>
-      </button>
-      <button data-tab="profile" class="tab-btn py-3 flex flex-col items-center gap-1 text-slate-500 rounded-lg">
-        <i data-lucide="user" class="w-6 h-6"></i>
-        <span class="text-[11px]">Perfil</span>
-      </button>
-    </div>
-  </nav>
 
   <!-- Modales -->
   <div id="modalStats" class="hidden fixed inset-0 bg-black/30 flex items-end">
@@ -512,17 +714,51 @@
   <div id="modalSubmitTask" class="hidden fixed inset-0 bg-black/30 flex items-end">
     <div class="bg-white w-full rounded-t-3xl p-4 space-y-3">
       <div class="flex justify-between items-center">
-        <h3 class="text-sm font-semibold">Enviar tarea</h3>
+        <h3 class="text-sm font-semibold">Subir evidencia</h3>
         <button id="closeSubmitTask" class="text-slate-500">Cerrar</button>
       </div>
       <div id="submitTaskForm" class="space-y-3">
         <input id="taskComment" type="text" placeholder="Comentario (opcional)" class="w-full px-3 py-2 rounded-xl border" />
         <label class="block text-xs text-slate-600">Adjuntar archivo (foto, video, doc)</label>
         <input id="taskFile" type="file" class="w-full border rounded-xl p-2 text-sm" />
+        <p class="text-xs text-slate-500">Esta entrega se registrará a nombre del estudiante.</p>
         <div class="flex gap-2">
           <p id="taskTitleModal" class="text-sm font-semibold"></p>
         </div>
-        <button id="submitTaskParent" class="w-full px-3 py-2 rounded-xl bg-karpus-orange text-white">Enviar Entrega</button>
+        <div class="text-xs text-slate-600">
+          <p>Enviado por: Andrea Flores</p>
+          <p>Supervisado por: Padre/Tutor</p>
+        </div>
+        <button id="submitTaskParent" class="w-full px-3 py-2 rounded-xl bg-karpus-orange text-white">Enviar Evidencia</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="modalTaskDetail" class="hidden fixed inset-0 bg-black/30 flex items-end">
+    <div class="bg-white w-full rounded-t-3xl p-4 space-y-3">
+      <div class="flex justify-between items-center">
+        <h3 class="text-sm font-semibold">Detalle de actividad</h3>
+        <button id="closeTaskDetail" class="text-slate-500">Cerrar</button>
+      </div>
+      <div class="space-y-3">
+        <div class="bg-white border rounded-2xl p-3">
+          <p class="text-xs text-slate-500">Actividad</p>
+          <p id="taskDetailTitle" class="text-sm font-semibold text-slate-800">—</p>
+        </div>
+        <div class="grid grid-cols-2 gap-3">
+          <div class="bg-white border rounded-2xl p-3">
+            <p class="text-xs text-slate-500">Fecha sugerida</p>
+            <p id="taskDetailDue" class="text-sm font-medium text-slate-800">—</p>
+          </div>
+          <div class="bg-white border rounded-2xl p-3">
+            <p class="text-xs text-slate-500">Estado</p>
+            <span id="taskDetailStatus" class="text-xs px-2 py-1 rounded bg-slate-100 text-slate-700">—</span>
+          </div>
+        </div>
+        <div class="bg-white border rounded-2xl p-3">
+          <p class="text-xs text-slate-500">Observación</p>
+          <p id="taskDetailNote" class="text-sm text-slate-700">—</p>
+        </div>
       </div>
     </div>
   </div>
@@ -561,8 +797,14 @@
 
   <!-- Script -->
   </div>
+  </div>
   <script src="js/store.js?v=2"></script>
   <script src="js/padres_patch.js?v=2"></script>
   <script src="js/common_ui.js"></script>
+  <script>
+    if (window.lucide && typeof lucide.createIcons === 'function') {
+      lucide.createIcons();
+    }
+  </script>
 </body>
 </html>
