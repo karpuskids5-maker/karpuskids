@@ -89,9 +89,10 @@ document.addEventListener('DOMContentLoaded', () => {
   const backToClassesBtn = document.getElementById('backToClasses');
   const currentClassNameLabel = document.getElementById('currentClassName');
 
-  function renderClassesGrid() {
+  async function renderClassesGrid() {
     if(!classesGrid) return;
-    const classes = KarpusStore.getState().classes || [];
+    await (window.KarpusStore?.ready || Promise.resolve());
+    const classes = KarpusStore.getClasses() || [];
     // Mock colors/icons for variety
     const colors = ['bg-orange-100 text-orange-600', 'bg-blue-100 text-blue-600', 'bg-pink-100 text-pink-600', 'bg-green-100 text-green-600'];
     
@@ -180,8 +181,7 @@ document.addEventListener('DOMContentLoaded', () => {
   function renderClassFeed() {
     const feedContainer = document.getElementById('classroomFeed');
     if(!feedContainer || !currentClass) return;
-    
-    const posts = (KarpusStore.getState().posts || []).filter(p => p.class === currentClass);
+    const posts = KarpusStore.getClassPosts(currentClass) || [];
     
     if(posts.length === 0) {
       feedContainer.innerHTML = `
@@ -238,7 +238,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const taskContainer = document.getElementById('taskList');
     if(!taskContainer || !currentClass) return;
 
-    let tasks = (KarpusStore.getState().tasks || []).filter(t => t.class === currentClass);
+    let tasks = KarpusStore.getTasksForClass(currentClass) || [];
     
     // Filter logic (mocked for now as we don't have full student list in store to check all submissions)
     // In a real app, you'd check if all students submitted or if due date passed.
@@ -265,9 +265,9 @@ document.addEventListener('DOMContentLoaded', () => {
     if(window.lucide) lucide.createIcons();
   }
 
-  window.openTaskGrade = function(taskId) {
+  window.openTaskGrade = async function(taskId) {
     // Logic to open grading modal
-    const task = KarpusStore.getState().tasks.find(t => t.id == taskId);
+    const task = await KarpusStore.getTaskById(Number(taskId));
     if(task) {
       const modal = document.getElementById('modalGradeTask');
       const title = document.getElementById('gradeTaskTitle');
@@ -378,12 +378,13 @@ document.addEventListener('DOMContentLoaded', () => {
   });
 
   // --- Tab Logic: Private Chat (Dynamic) ---
-  function renderClassPrivateChat() {
+  async function renderClassPrivateChat() {
     const listContainer = document.getElementById('privateChatList');
     if(!listContainer) return;
 
     // Filtrar contactos que son padres (simulación: id empieza con 'padre_')
-    const parents = KarpusStore.getContacts().filter(c => c.id.startsWith('padre_'));
+    const contacts = await KarpusStore.getContacts();
+    const parents = (contacts||[]).filter(c => c.id.startsWith('padre_'));
 
     listContainer.innerHTML = parents.map(p => `
        <div class="p-3 rounded-xl hover:bg-slate-50 cursor-pointer flex items-center gap-3 transition-colors" onclick="openPrivateChat('${p.id}')">
@@ -403,8 +404,9 @@ document.addEventListener('DOMContentLoaded', () => {
     if(window.lucide) lucide.createIcons();
   }
 
-  window.openPrivateChat = function(contactId) {
-    const contact = KarpusStore.getContacts().find(c => c.id === contactId);
+  window.openPrivateChat = async function(contactId) {
+    const contacts = await KarpusStore.getContacts();
+    const contact = (contacts||[]).find(c => c.id === contactId);
     if(!contact) return;
     
     // Actualizar cabecera del chat
@@ -417,7 +419,7 @@ document.addEventListener('DOMContentLoaded', () => {
     window.currentChatContactId = contactId;
 
     // Cargar mensajes
-    const thread = KarpusStore.getThread(['maestra', contactId]);
+    const thread = await KarpusStore.getThread(['maestra', contactId]);
     const chatArea = document.getElementById('privateChatMessages');
     
     if(chatArea) {
@@ -439,13 +441,13 @@ document.addEventListener('DOMContentLoaded', () => {
   // Listener para enviar mensaje en el chat privado
   const privateChatSendBtn = document.getElementById('privateChatSendBtn');
   if(privateChatSendBtn) {
-      privateChatSendBtn.addEventListener('click', () => {
+      privateChatSendBtn.addEventListener('click', async () => {
           const input = document.getElementById('privateChatInput');
           const text = input.value.trim();
           if(text && window.currentChatContactId) {
-              KarpusStore.sendMessage(['maestra', window.currentChatContactId], { from: 'maestra', text });
+              await KarpusStore.sendMessage(['maestra', window.currentChatContactId], { from: 'maestra', text });
               input.value = '';
-              window.openPrivateChat(window.currentChatContactId); // Refrescar chat
+              await window.openPrivateChat(window.currentChatContactId);
           }
       });
   }
@@ -551,45 +553,9 @@ document.addEventListener('DOMContentLoaded', () => {
   const submitPostBtn = document.getElementById('submitPost');
   if(submitPostBtn) {
     submitPostBtn.addEventListener('click', async () => {
-      if(!currentClass) return;
-      const title = document.getElementById('postTitle').value;
-      const content = document.getElementById('postContent').value;
-      const fileInput = document.getElementById('postFile');
-      
-      if(!content && !title) return alert('Por favor escribe un contenido para la publicación.');
-
-      // Leer archivo si existe
-      let mediaData = null;
-      if(fileInput.files[0]) {
-        mediaData = await new Promise(resolve => {
-          const reader = new FileReader();
-          reader.onload = e => resolve(e.target.result);
-          reader.readAsDataURL(fileInput.files[0]);
-        });
-      }
-
-      // Formatear texto (título en negrita simulada si existe)
-      const text = title ? `${title}\n\n${content}` : content;
-      
-      KarpusStore.addPost({
-        class: currentClass,
-        teacher: 'Ana Pérez',
-        text: text,
-        photo: mediaData && mediaData.startsWith('data:image') ? mediaData : '',
-        video: mediaData && mediaData.startsWith('data:video') ? mediaData : ''
-      });
-
-      // Limpiar y cerrar
-      document.getElementById('postTitle').value = '';
-      document.getElementById('postContent').value = '';
-      fileInput.value = '';
-      
+      alert('Creación de publicaciones aún no disponible con datos reales.');
       const modal = document.getElementById('modalAddPost');
-      if(modal) {
-        modal.classList.remove('active');
-        document.body.classList.remove('no-scroll');
-      }
-      
+      if(modal) { modal.classList.remove('active'); document.body.classList.remove('no-scroll'); }
       renderClassFeed();
     });
   }
@@ -597,41 +563,15 @@ document.addEventListener('DOMContentLoaded', () => {
   const submitTaskBtn = document.getElementById('submitTask');
   if(submitTaskBtn) {
     submitTaskBtn.addEventListener('click', () => {
-      if(!currentClass) return;
-      const title = document.getElementById('taskTitle').value;
-      const desc = document.getElementById('taskDesc').value;
-      const due = document.getElementById('taskDue').value;
-
-      if(!title || !due) return alert('El título y la fecha de entrega son obligatorios.');
-      
-      KarpusStore.addTask({
-        class: currentClass,
-        title: title,
-        desc: desc,
-        due: due,
-        publish: new Date().toISOString().split('T')[0]
-      });
-
-      // Limpiar y cerrar
-      document.getElementById('taskTitle').value = '';
-      document.getElementById('taskDesc').value = '';
-      document.getElementById('taskDue').value = '';
-
+      alert('Creación de tareas aún no disponible con datos reales.');
       const modal = document.getElementById('modalCreateTask');
-      if(modal) {
-        modal.classList.remove('active');
-        document.body.classList.remove('no-scroll');
-      }
-
+      if(modal) { modal.classList.remove('active'); document.body.classList.remove('no-scroll'); }
       renderClassTasks();
-      // Cambiar a la pestaña de tareas para ver la nueva tarea
-      const tasksTab = document.querySelector('[data-tab="tasks"]');
-      if(tasksTab) tasksTab.click();
     });
   }
 
   // --- Initial Render ---
-  renderClassesGrid();
+  (async ()=>{ await (window.KarpusStore?.ready || Promise.resolve()); await renderClassesGrid(); })();
   // Ensure we start at home
   const homeBtn = document.querySelector('[data-section="t-home"]');
   if(homeBtn) {

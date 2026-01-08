@@ -5,7 +5,10 @@
   "type": "module",
   "scripts": {
     "db:init": "node scripts/init-db.js",
-    "db:reset": "node scripts/init-db.js --reset"
+    "db:reset": "node scripts/init-db.js --reset",
+    "api": "node server/api.js",
+    "seed": "node scripts/seed-demo.cjs",
+    "web": "node server/web.js"
   },
   "description": "��#\u0000 \u0000k\u0000a\u0000r\u0000p\u0000u\u0000s\u0000k\u0000i\u0000d\u0000s\u0000\r\u0000 \u0000",
   "main": "index.js",
@@ -21,6 +24,9 @@
   },
   "homepage": "https://github.com/karpuskids5-maker/karpuskids#readme",
   "dependencies": {
-    "better-sqlite3": "^12.5.0"
+    "@supabase/supabase-js": "^2.90.0",
+    "better-sqlite3": "^12.5.0",
+    "cors": "^2.8.5",
+    "express": "^5.2.1"
   }
 }

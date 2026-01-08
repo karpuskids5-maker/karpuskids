@@ -1,4 +1,4 @@
-document.addEventListener('DOMContentLoaded', () => {
+document.addEventListener('DOMContentLoaded', async () => {
   if (window.Auth && !Auth.enforceRole('padre')) return;
   if (!window.KarpusStore) return;
   const CURRENT_PARENT = (window.Auth && Auth.user) ? { id: Auth.user.id || 'padre_demo', name: Auth.user.name || Auth.user.fullName || 'Padre Demo' } : { id: 'padre_demo', name: 'Padre Demo' };
@@ -339,10 +339,10 @@ document.addEventListener('DOMContentLoaded', () => {
   }
 
   // Abrir modal de detalle de tarea
-  function openTaskDetailModal(taskId){
+  async function openTaskDetailModal(taskId){
     const modal = document.getElementById('modalTaskDetail');
     if(!modal) return;
-    const t = KarpusStore.getTaskById(Number(taskId));
+    const t = await KarpusStore.getTaskById(Number(taskId));
     if(!t) return;
     const parentName = CURRENT_PARENT.name;
     const submission = t.submissions.find(s => s.parent === parentName);
@@ -614,13 +614,13 @@ document.addEventListener('DOMContentLoaded', () => {
     modalProfileView.classList.remove('hidden');
   }
 
-  openTeacherProfileBtn?.addEventListener('click', () => {
-    const teacherProfile = KarpusStore.getTeacherProfile();
+  openTeacherProfileBtn?.addEventListener('click', async () => {
+    const teacherProfile = await KarpusStore.getTeacherProfile();
     showProfileModal({ ...teacherProfile, role: 'Maestra' });
   });
 
-  openDirectorProfileBtn?.addEventListener('click', () => {
-    const directorProfile = KarpusStore.getDirectorProfile();
+  openDirectorProfileBtn?.addEventListener('click', async () => {
+    const directorProfile = await KarpusStore.getDirectorProfile();
     showProfileModal({ ...directorProfile, role: 'Directora' });
   });
 
@@ -656,11 +656,11 @@ document.addEventListener('DOMContentLoaded', () => {
     selectedTaskId = null;
   });
   
-  btnSubmit?.addEventListener('click', ()=>{
+  btnSubmit?.addEventListener('click', async ()=>{
     if(!selectedTaskId) return;
     const fileType = fileInput?.value ? fileInput.value.split('.').pop() : 'archivo';
     const comment = commentInput?.value || '';
-    KarpusStore.addTaskSubmission(selectedTaskId, {
+    await KarpusStore.addTaskSubmission(selectedTaskId, {
       parent: 'Juan Pérez',
       fileType,
       date: new Date().toISOString().slice(0,10),
@@ -709,9 +709,9 @@ document.addEventListener('DOMContentLoaded', () => {
   let filteredContacts = [];
   let activeContact = null;
 
-  function loadContacts(){
+  async function loadContacts(){
     try {
-      contacts = (KarpusStore.getContacts()||[]).filter(c => c.id==='maestra' || c.id==='directora');
+      contacts = ((await KarpusStore.getContacts())||[]).filter(c => c.id==='maestra' || c.id==='directora');
       filteredContacts = contacts.slice();
       renderContacts();
       if(chatHeaderEl) chatHeaderEl.textContent = 'Mensajes Privados';
@@ -731,10 +731,10 @@ document.addEventListener('DOMContentLoaded', () => {
     });
   }
 
-  function openChatWith(contact){
+  async function openChatWith(contact){
     activeContact = contact;
     if(chatHeaderEl) chatHeaderEl.textContent = `Mensajes Privados — ${contact.name || contact.id}`;
-    const thread = KarpusStore.getThread([parentId, contact.id]);
+    const thread = await KarpusStore.getThread([parentId, contact.id]);
     renderMessages(thread);
   }
 
@@ -751,11 +751,12 @@ document.addEventListener('DOMContentLoaded', () => {
     chatMessagesEl.scrollTop = chatMessagesEl.scrollHeight;
   }
 
-  chatSendEl?.addEventListener('click', () => {
+  chatSendEl?.addEventListener('click', async () => {
     if(!activeContact || !chatInputEl) return;
     const text = (chatInputEl.value||'').trim();
     if(!text) return;
-    const thread = KarpusStore.sendMessage([parentId, activeContact.id], { from: parentId, text });
+    await KarpusStore.sendMessage([parentId, activeContact.id], { from: parentId, text });
+    const thread = await KarpusStore.getThread([parentId, activeContact.id]);
     chatInputEl.value = '';
     renderMessages(thread);
   });
@@ -820,23 +821,23 @@ document.addEventListener('DOMContentLoaded', () => {
   });
 
   // Listeners para ver perfiles de equipo
-  document.getElementById('viewTeacherProfile')?.addEventListener('click', () => {
-      const teacherProfile = KarpusStore.getTeacherProfile();
+  document.getElementById('viewTeacherProfile')?.addEventListener('click', async () => {
+      const teacherProfile = await KarpusStore.getTeacherProfile();
       showProfileModal({ ...teacherProfile, role: 'Maestra', id: 'maestra' });
   });
-  document.getElementById('viewDirectorProfile')?.addEventListener('click', () => {
-      const directorProfile = KarpusStore.getDirectorProfile();
+  document.getElementById('viewDirectorProfile')?.addEventListener('click', async () => {
+      const directorProfile = await KarpusStore.getDirectorProfile();
       showProfileModal({ ...directorProfile, role: 'Directora', id: 'directora' });
   });
 
-  // Renderizado inicial
+  await (window.KarpusStore?.ready || Promise.resolve());
   renderPosts();
   renderTasks();
   renderDashboard();
   renderGrades();
   renderGeneralFeed();
-  loadContacts();
+  await loadContacts();
   loadParentProfile();
-  showTab('home'); // Mostrar la pestaña de inicio por defecto
+  showTab('home');
 });
  
