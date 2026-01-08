@@ -2,13 +2,13 @@
 
 :root {
   /* Core brand colors (single source of truth) */
-  --karpus-blue: #1e88e5;
-  --karpus-green: #43a047;
-  --karpus-orange: #fb8c00;
-  --karpus-pink: #FF4081;
+  --karpus-blue: #60A5FA;   /* Azul Calma */
+  --karpus-green: #4ADE80;  /* Verde Éxito */
+  --karpus-orange: #FB923C; /* Naranja Pastel */
+  --karpus-pink: #F472B6;   /* Rosa Suave (Brand) */
   --karpus-purple: #7b1fa2;
   --karpus-teal: #00897b;
-  --karpus-yellow: #fdd835;
+  --karpus-yellow: #FACC15; /* Amarillo Suave */
   --teams-purple: #6264a7;
   --teams-dark: #2d2c2c;
 
@@ -24,10 +24,10 @@
   --shadow-sm: 0 2px 4px rgba(0,0,0,0.05);
   --shadow-md: 0 4px 8px rgba(0,0,0,0.1);
   --shadow-lg: 0 8px 16px rgba(0,0,0,0.1);
-  --radius-sm: 4px;
-  --radius-md: 8px;
-  --radius-lg: 12px;
-  --radius-xl: 20px;
+  --radius-sm: 8px;
+  --radius-md: 16px;
+  --radius-lg: 24px;
+  --radius-xl: 32px; /* rounded-3xl */
 }
 
 /* Gradientes profesionales */
@@ -154,7 +154,7 @@ button[disabled] {
 }
 
 .modern-button-primary {
-  background-color: var(--teams-purple);
+  background-color: var(--karpus-pink);
   color: white;
 }
 

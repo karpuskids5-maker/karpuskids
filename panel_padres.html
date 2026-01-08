@@ -6,288 +6,56 @@
   <title>Panel de Padres - Karpus Kids</title>
   <link rel="stylesheet" href="css/theme.css" />
   <link rel="stylesheet" href="css/karpus-modern.css" />
-  <script src="js/auth.js?v=1"></script>
-  <script>
-    (function(){
-      try {
-        if (typeof Auth === 'undefined') {
-          window.location.href = 'login.html';
-          return;
-        }
-        const check = Auth.requireRole('padre');
-        if (!check || !check.ok) {
-          window.location.href = 'login.html';
-        }
-      } catch (e) {
-        window.location.href = 'login.html';
-      }
-    })();
-  </script>
+  <link rel="stylesheet" href="css/layout.css" />
   <link href="https://fonts.googleapis.com/css2?family=Nunito:wght@400;600;700&family=Poppins:wght@400;500;600;700&display=swap" rel="stylesheet">
-  <script>
-    // Configuración de Tailwind: debe estar ANTES del CDN
-    tailwind.config = {
-      theme: {
-        extend: {
-          colors: {
-            'karpus-green': '#22C55E',
-            'karpus-blue': '#2563EB',
-            'karpus-pink': '#EC4899',
-            'karpus-orange': '#FB923C',
-            'karpus-blue-soft': '#93C5FD',
-            'karpus-purple': '#7C3AED',
-            'karpus-teal': '#14B8A6',
-            'karpus-sky': { light: '#E0F2FE', DEFAULT: '#D6E9FF' }
-          },
-          fontFamily: {
-            nunito: ['Nunito', 'sans-serif'],
-            poppins: ['Poppins', 'sans-serif'],
-          },
-          boxShadow: {
-            soft: '0 4px 12px rgba(0, 0, 0, 0.05)'
-          },
-          borderRadius: {
-            xl: '1rem',
-            '2xl': '1.25rem',
-            '3xl': '1.75rem'
-          }
-        }
-      }
-    }
-  </script>
-  <script src="https://cdn.tailwindcss.com"></script>
-  <style>
-    :root {
-      --color-primary: #2563EB; /* Azul moderno */
-      --color-secondary: #22C55E; /* Verde suave */
-      --color-button: #FB923C; /* Naranja botones */
-      --color-accent: #EC4899; /* Rosa acento */
-      --color-bg: #F1F5F9; /* Fondo gris muy claro */
-      --color-text: #1F2937; /* Texto gris oscuro */
-      --color-sky: #E0F2FE; /* Azul cielo de fondo */
-      --color-yellow: #FACC15; /* Ambar para CTA */
-    }
-    body { 
-      font-family: 'Nunito', sans-serif; 
-      color: var(--color-text);
-      background-color: var(--color-sky);
-      background-image: linear-gradient(to bottom, var(--color-sky), #FFFFFF);
-    }
-    /* Sidebar styles */
-    aside#sidebar { width: 260px; transition: width .25s ease; }
-    aside#sidebar.collapsed { width: 72px; }
-    aside#sidebar .label { transition: opacity .2s ease; }
-    aside#sidebar.collapsed .label { opacity: 0; }
-    
-    /* Hover expand logic (removido para evitar superposición de contenido) */
-    
-    /* mobile helper */
-    .hidden-mobile { display: none !important; }
-    /* color variants */
-    .sidebar-blue { background: linear-gradient(135deg,#E3F2FD,#BBDEFB); }
-    .sidebar-green { background: linear-gradient(135deg,#E8F8F0,#D0F0E0); }
-    .sidebar-pink { background: linear-gradient(135deg,#FFF0F6,#FFE3F0); }
-    .sidebar-sky { background: linear-gradient(180deg, #E0F2FE 0%, #F0F9FF 100%); border-right: 1px solid #BAE6FD; }
-    /* Karpus colored letters small */
-    .karpus-kids-inline { font-weight: 700; }
-    .karpus-kids-inline .k-1 { color: #FF9800; }
-    .karpus-kids-inline .k-2 { color: #2196F3; }
-    .karpus-kids-inline .k-3 { color: #E91E63; }
-    .karpus-kids-inline .k-4 { color: #4CAF50; }
-    .karpus-kids-inline .k-5 { color: #FF9800; }
-    .karpus-kids-inline .k-6 { color: #2196F3; }
-    .karpus-kids-inline .k-7 { color: #4CAF50; }
-    .karpus-kids-inline .k-8 { color: #E91E63; }
-    .karpus-kids-inline .k-9 { color: #2196F3; }
-    .karpus-kids-inline .k-10 { color: #FF9800; }
-    
-    /* Estilos para modales más grandes y profesionales */
-    .modal-container {
-      position: fixed;
-      top: 0;
-      left: 0;
-      right: 0;
-      bottom: 0;
-      background-color: rgba(0, 0, 0, 0.5);
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      z-index: 50;
-      opacity: 0;
-      visibility: hidden;
-      transition: opacity 0.3s ease, visibility 0.3s ease;
-    }
-    
-    .modal-container.active {
-      opacity: 1;
-      visibility: visible;
-    }
-    
-    .modal-content {
-      background: white;
-      border-radius: 16px;
-      box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
-      width: 90%;
-      max-width: 800px;
-      max-height: 90vh;
-      overflow-y: auto;
-      transform: scale(0.9);
-      transition: transform 0.3s ease;
-    }
-    
-    .modal-container.active .modal-content {
-      transform: scale(1);
-    }
-    
-    .modal-header {
-      padding: 1.5rem;
-      border-bottom: 1px solid #e5e7eb;
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-    }
-    
-    .modal-body {
-      padding: 1.5rem;
-    }
-    
-    .modal-footer {
-      padding: 1.5rem;
-      border-top: 1px solid #e5e7eb;
-      display: flex;
-      justify-content: flex-end;
-      gap: 0.75rem;
-    }
-
-    /* Layout adjustments */
-    #layoutShell { transition: margin-left .25s ease; }
-    #layoutShell.sidebar-collapsed { margin-left: 72px !important; }
-    
-    @media (max-width: 768px) {
-      #layoutShell { margin-left: 0 !important; }
-    }
-
-    /* Botón de colapsar personalizado (Padres) */
-    .toggle-btn-padres {
-      background-color: var(--color-primary);
-      color: white;
-      border: 2px solid #E0F2FE;
-      box-shadow: 0 4px 6px -1px rgba(37, 99, 235, 0.35);
-      transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-    }
-    .toggle-btn-padres:hover {
-      background-color: #1D4ED8; /* más profundo */
-      transform: scale(1.1);
-    }
-  </style>
-  <style>
-    /* Animaciones y colores del sidebar (ligeros, no pesados) */
-    .sidebar-btn {
-      position: relative;
-      width: 100%;
-      text-align: left;
-      padding: 12px 16px; /* un poco más grande */
-      border-radius: 12px;
-      display: flex;
-      align-items: center;
-      gap: 10px;
-      font-size: 16px;
-      color: var(--color-text);
-      transition: transform .2s ease, background .25s ease, color .25s ease, box-shadow .25s ease;
-      overflow: hidden;
-    }
-    .sidebar-btn::before {
-      content: '';
-      position: absolute;
-      left: 8px;
-      top: 50%;
-      transform: translateY(-50%);
-      width: 6px;
-      height: 6px;
-      border-radius: 9999px;
-      background: transparent;
-      transition: all .25s ease;
-    }
-    .sidebar-btn:hover {
-      transform: translateX(2px);
-      background: linear-gradient(90deg, #f8fafc 0%, #f1f5f9 100%);
-    }
-    .sidebar-btn:hover i { transform: translateX(1px); }
-    .sidebar-btn.active {
-      background: linear-gradient(90deg, #E0F2FE 0%, #EFF6FF 100%);
-      color: var(--color-primary);
-      font-weight: 600;
-      box-shadow: 0 4px 10px rgba(37, 99, 235, 0.10);
-    }
-    .sidebar-btn.active::before {
-      width: 8px;
-      height: 24px;
-      border-radius: 12px;
-      background: var(--color-primary);
-    }
-    /* Colores por sección (barra sutil) */
-    .sidebar-btn[data-section="home"].active::before { background: var(--color-primary); }
-    .sidebar-btn[data-section="live-attendance"].active::before { background: var(--color-secondary); }
-    .sidebar-btn[data-section="class"].active::before { background: var(--color-secondary); }
-    .sidebar-btn[data-section="tasks"].active::before { background: var(--color-button); }
-    .sidebar-btn[data-section="grades"].active::before { background: var(--color-primary); }
-    .sidebar-btn[data-section="notifications"].active::before { background: var(--color-accent); }
-    .sidebar-btn[data-section="profile"].active::before { background: #6b7280; }
-    .sidebar-btn i { flex-shrink: 0; transition: transform .2s ease; }
-    .sidebar-btn span { white-space: nowrap; }
-
-    /* Animación de entrada de secciones */
-    .section-anim { opacity: 0; transform: translateY(8px); transition: opacity .25s ease, transform .25s ease; }
-    .section-anim.section-visible { opacity: 1; transform: translateY(0); }
-  </style>
-  <!-- Chart.js eliminado (no utilizado) -->
+  <link href="./css/karpus-tailwind.css" rel="stylesheet">
   <script src="https://unpkg.com/lucide@latest/dist/umd/lucide.min.js"></script>
 </head>
 <body class="text-slate-800 min-h-screen">
   <div class="flex min-h-screen font-nunito">
     <!-- SIDEBAR DESKTOP -->
-    <aside id="sidebar" class="hidden md:flex flex-col w-[260px] sidebar-sky border-r shadow-soft px-4 py-6 fixed inset-y-0 left-0 z-20">
+    <aside id="sidebar" class="hidden md:flex flex-col w-[260px] sidebar-brand border-r shadow-soft px-4 py-6 fixed inset-y-0 left-0 z-20">
       <button id="toggleSidebar" aria-label="Colapsar sidebar" class="absolute right-2 top-6 toggle-btn-padres rounded-full w-10 h-10 flex items-center justify-center shadow-lg z-30 hidden md:flex"><i data-lucide="chevron-left" class="w-6 h-6"></i></button>
       <div class="flex items-center gap-3 mb-8">
         <img src="img/mundo.jpg" class="w-10 h-10 rounded-xl" />
         <div class="label">
-          <p class="font-bold text-sm">Karpus Kids</p>
-          <p class="text-xs text-slate-500">Padre / Tutor</p>
+          <p class="font-bold text-sm">Karpus</p>
+          <p class="text-xs text-slate-500" id="sidebar-role-label">...</p>
         </div>
       </div>
-      <nav class="space-y-1">
-        <button data-section="home" class="sidebar-btn text-base">
-          <i data-lucide="home" class="w-6 h-6"></i>
+      <nav class="space-y-1" role="navigation" aria-label="Menú principal">
+        <button data-section="home" class="sidebar-btn text-base" aria-current="page">
+          <i data-lucide="layout-grid" class="w-6 h-6" aria-hidden="true"></i>
           <span class="label">Inicio</span>
         </button>
         <button data-section="live-attendance" class="sidebar-btn text-base">
-          <i data-lucide="calendar" class="w-6 h-6"></i>
+          <i data-lucide="calendar-check" class="w-6 h-6" aria-hidden="true"></i>
           <span class="label">Asistencia</span>
         </button>
         <button data-section="class" class="sidebar-btn text-base">
-          <i data-lucide="school" class="w-6 h-6"></i>
+          <i data-lucide="school" class="w-6 h-6" aria-hidden="true"></i>
           <span class="label">Aula</span>
         </button>
         <button data-section="tasks" class="sidebar-btn text-base">
-          <i data-lucide="book-open" class="w-6 h-6"></i>
+          <i data-lucide="clipboard-list" class="w-6 h-6" aria-hidden="true"></i>
           <span class="label">Tareas</span>
         </button>
         <button data-section="grades" class="sidebar-btn text-base">
-          <i data-lucide="graduation-cap" class="w-6 h-6"></i>
+          <i data-lucide="award" class="w-6 h-6" aria-hidden="true"></i>
           <span class="label">Calificaciones</span>
         </button>
         <button data-section="notifications" class="sidebar-btn text-base">
-          <i data-lucide="message-circle" class="w-6 h-6"></i>
+          <i data-lucide="message-circle" class="w-6 h-6" aria-hidden="true"></i>
           <span class="label">Mensajes</span>
         </button>
         <button data-section="profile" class="sidebar-btn text-base">
-          <i data-lucide="user" class="w-6 h-6"></i>
+          <i data-lucide="heart-handshake" class="w-6 h-6" aria-hidden="true"></i>
           <span class="label">Perfil</span>
         </button>
       </nav>
       <div class="mt-auto text-xs text-slate-400 label">
         Supervisando a:<br>
-        <strong>Andrea Flores</strong>
+        <strong id="sidebar-student-name">...</strong>
       </div>
     </aside>
 
@@ -298,24 +66,24 @@
       <header class="px-4 py-2 flex items-center justify-between">
         <button id="menuBtn" aria-label="Abrir menú móvil" class="p-2 -ml-2 rounded-lg text-slate-600 hover:bg-slate-100"><i data-lucide="menu" class="w-6 h-6"></i></button>
         <div class="flex items-center gap-3">
-          <div class="w-9 h-9 rounded-2xl bg-karpus-blue flex items-center justify-center shadow-lg">
+          <div class="w-9 h-9 rounded-2xl bg-karpus-pink flex items-center justify-center shadow-lg">
             <img src="img/mundo.jpg" alt="logo" class="h-6 w-6 rounded" />
           </div>
           <div>
             <h1 class="text-lg font-poppins font-semibold"><span class="karpus-kids-inline"><span class="k-1">K</span><span class="k-2">a</span><span class="k-3">r</span><span class="k-4">p</span><span class="k-5">u</span><span class="k-6">s</span> <span class="k-7">K</span><span class="k-8">i</span><span class="k-9">d</span><span class="k-10">s</span></span></h1>
-            <p class="text-xs text-slate-500">Supervisando a: Andrea Flores</p>
+            <p class="text-xs text-slate-500">Supervisando a: <span id="mobile-student-name">...</span></p>
           </div>
         </div>
         <!-- Menú de Avatar de Usuario -->
         <div class="relative">
           <button id="avatarMenuBtn" aria-label="Abrir menú de avatar">
-            <img src="https://placehold.co/200x200" alt="Avatar del alumno" class="w-9 h-9 rounded-full object-cover border-2 border-karpus-blue-soft">
+            <img id="avatarStudent" src="img/mundo.jpg" alt="Avatar del alumno" class="w-9 h-9 rounded-full object-cover border-2 border-karpus-blue-soft">
           </button>
           <!-- Menú desplegable -->
           <div id="avatarDropdown" class="hidden absolute right-0 mt-2 w-48 bg-white rounded-xl shadow-lg border z-20">
             <div class="p-3">
-              <p class="text-sm font-semibold">Padre / Tutor</p>
-              <p class="text-xs text-slate-500">Alumno: Andrea Flores</p>
+              <p class="text-sm font-semibold" id="dropdown-role">...</p>
+              <p class="text-xs text-slate-500" id="dropdown-student">...</p>
             </div>
             <button id="editProfileBtn" aria-label="Editar perfil" class="w-full text-left px-3 py-2 text-sm text-slate-700 hover:bg-slate-100 rounded-b-xl">Editar Perfil</button>
           </div>
@@ -324,20 +92,20 @@
     </div>
 
     <!-- Content -->
-    <main class="flex-1 px-4 space-y-6 md:pt-6 mt-16 md:mt-0 pb-6">
+    <main class="flex-1 px-4 space-y-6 md:pt-6 mt-16 md:mt-0 pb-6" role="main" id="parent-main">
     <!-- A. INICIO (Dashboard) -->
     <section id="tab-home" class="space-y-6">
       <!-- Resumen del día + Próxima clase + Alertas -->
-      <div class="modern-card p-4">
+      <div class="modern-card p-4 rounded-3xl">
         <div class="flex items-center justify-between">
           <div>
             <h2 class="text-lg font-bold text-slate-800"></h2>
             <p class="text-sm text-slate-500"></p>
-            <p class="text-sm text-slate-500">Estudiante: <span class="font-semibold text-karpus-blue">Andrea Flores</span> • Padres: <span class="font-semibold">Juan Pérez</span></p>
+            <p class="text-sm text-slate-500">Estudiante: <span class="font-semibold text-karpus-blue" id="dash-student-name">—</span> • Padres: <span class="font-semibold" id="dash-guardian-name">—</span></p>
           </div>
           <div class="text-right space-y-1">
             <p class="text-xs text-slate-400" id="currentDateDisplay">Hoy</p>
-            <span class="block text-xs px-2 py-1 bg-blue-100 text-blue-700 rounded-full">Curso/Aula: Aula Pequeños</span>
+            <span class="block text-xs px-2 py-1 bg-blue-100 text-blue-700 rounded-full">Curso/Aula: <span id="dash-classroom">—</span></span>
             <span id="nextClassInfo" class="block text-xs text-slate-600">Próxima clase • Mañana • 8:30 AM</span>
           </div>
         </div>
@@ -347,7 +115,7 @@
 
       <!-- Tarjetas de Resumen (con prioridad visual) -->
   <div class="grid grid-cols-2 gap-3">
-    <div class="bg-white p-3 rounded-2xl border shadow-sm">
+    <div class="bg-white p-3 rounded-3xl border shadow-sm">
       <div class="flex items-center gap-2 mb-2">
         <div class="p-1.5 bg-green-100 text-green-600 rounded-lg"><i data-lucide="check-circle" class="w-5 h-5"></i></div>
         <span class="text-xs font-semibold text-slate-600">Asistencia</span>
@@ -355,9 +123,9 @@
       <p class="text-2xl font-bold text-slate-800" id="dashAttendance">95%</p>
       <p class="text-[10px] text-slate-400">Este mes</p>
     </div>
-    <div class="bg-white p-3 rounded-2xl border shadow-sm">
+    <div class="bg-white p-3 rounded-3xl border shadow-sm">
       <div class="flex items-center gap-2 mb-2">
-        <div class="p-1.5 bg-orange-100 text-orange-600 rounded-lg"><i data-lucide="book" class="w-5 h-5"></i></div>
+        <div class="p-1.5 bg-orange-100 text-orange-600 rounded-lg"><i data-lucide="pencil" class="w-5 h-5"></i></div>
         <span class="text-xs font-semibold text-slate-600">Tareas</span>
       </div>
       <p class="text-2xl font-bold text-slate-800" id="dashPendingTasks">0</p>
@@ -366,7 +134,7 @@
   </div>
 
   <!-- CTA Amarillo: acceso rápido a Actividades -->
-  <div class="mt-3 flex items-center justify-between bg-white p-3 rounded-2xl border shadow-sm">
+  <div class="mt-3 flex items-center justify-between bg-white p-3 rounded-3xl border shadow-sm">
     <div class="flex items-center gap-2">
       <div class="p-1.5 bg-amber-100 text-amber-600 rounded-lg"><i data-lucide="list-checks" class="w-5 h-5"></i></div>
       <span class="text-sm font-semibold text-slate-700">Actividades pendientes y evidencias</span>
@@ -380,9 +148,9 @@
     
 
       <!-- Actividad Reciente -->
-      <div class="modern-card p-4">
+      <div class="modern-card p-4 rounded-3xl">
         <h3 class="text-base font-semibold text-slate-700 mb-2 flex items-center gap-2">
-          <i data-lucide="activity" class="text-karpus-blue h-5 w-5"></i>
+          <i data-lucide="star" class="text-karpus-pink h-5 w-5"></i>
           ⭐ Reconocimiento • Actividad reciente • Últimas entregas • Últimos comentarios
         </h3>
         <div id="feed" class="space-y-3"></div>
@@ -391,7 +159,7 @@
     
     <!-- Plan de Desarrollo Educativo -->
     <section id="tab-development" class="hidden space-y-6">
-      <div class="modern-card p-4">
+      <div class="modern-card p-4 rounded-3xl">
         <div class="modern-card-header flex items-center justify-between">
           <h2 class="text-base font-semibold font-poppins text-karpus-teal flex items-center gap-2">
             <i data-lucide="trending-up" class="text-karpus-teal h-5 w-5"></i>
@@ -521,7 +289,7 @@
 
     <!-- Asistencia (se muestra al pulsar 'Asistencia' en el menú inferior) -->
     <section id="tab-live-attendance" class="hidden space-y-6">
-      <div class="modern-card p-4">
+      <div class="modern-card p-4 rounded-3xl">
         <div class="flex items-center justify-between mb-3">
           <h2 class="text-base font-semibold font-poppins text-karpus-blue flex items-center gap-2">
             <i data-lucide="user-check" class="text-karpus-blue h-5 w-5"></i>
@@ -551,7 +319,7 @@
               <button id="calNextBtn" aria-label="Mes siguiente" class="p-1 hover:bg-white rounded shadow-sm transition-all"><i data-lucide="chevron-right" class="w-4 h-4"></i></button>
             </div>
           </div>
-          <div class="bg-slate-50/50 rounded-2xl border border-slate-100 p-4">
+          <div class="bg-slate-50/50 rounded-3xl border border-slate-100 p-4">
             <div class="grid grid-cols-7 gap-1 mb-2 text-center text-[10px] font-bold text-slate-400 uppercase tracking-wider">
               <div>Dom</div><div>Lun</div><div>Mar</div><div>Mié</div><div>Jue</div><div>Vie</div><div>Sáb</div>
             </div>
@@ -561,7 +329,7 @@
           </div>
           <!-- Resumen mensual -->
           <div class="mt-4 grid grid-cols-2 gap-3">
-            <div class="bg-white p-3 rounded-2xl border shadow-sm">
+            <div class="bg-white p-3 rounded-3xl border shadow-sm">
               <div class="flex items-center gap-2 mb-1">
                 <div class="p-1.5 bg-green-100 text-green-600 rounded-lg"><i data-lucide="check-circle" class="w-4 h-4"></i></div>
                 <span class="text-xs font-semibold text-slate-600">Asistencias</span>
@@ -569,6 +337,7 @@
               <p id="attendancePresentCount" class="text-xl font-bold text-slate-800">0</p>
             </div>
             <div class="bg-white p-3 rounded-2xl border shadow-sm">
+            <div class="bg-white p-3 rounded-3xl border shadow-sm">
               <div class="flex items-center gap-2 mb-1">
                 <div class="p-1.5 bg-red-100 text-red-600 rounded-lg"><i data-lucide="x-circle" class="w-4 h-4"></i></div>
                 <span class="text-xs font-semibold text-slate-600">Faltas</span>
@@ -597,7 +366,7 @@
     <section id="tab-tasks" class="hidden space-y-4">
       <div class="flex items-center justify-between">
         <h2 class="text-base font-semibold flex items-center gap-2">
-          <i data-lucide="book-check" class="w-5 h-5 text-karpus-orange"></i>
+          <i data-lucide="clipboard-list" class="w-5 h-5 text-karpus-orange"></i>
           <span>Actividades</span>
         </h2>
       </div>
@@ -617,7 +386,7 @@
     <section id="tab-grades" class="hidden space-y-6">
       <div class="flex items-center justify-between">
         <h2 class="text-xl font-bold text-slate-800 flex items-center gap-2">
-          <i data-lucide="graduation-cap" class="w-6 h-6 text-karpus-blue"></i>
+          <i data-lucide="award" class="w-6 h-6 text-karpus-blue"></i>
           Desarrollo Infantil
         </h2>
         <button id="downloadGradesBtn" aria-label="Descargar reporte de desarrollo en PDF" class="text-xs px-3 py-2 bg-white border border-slate-200 text-slate-700 rounded-xl flex items-center gap-2 hover:bg-slate-50 hover:text-karpus-blue transition-colors shadow-sm">
@@ -648,11 +417,11 @@
       </h2>
       <p class="text-xs text-slate-600">🎯 Objetivo: Comunicación institucional. Chat con Maestra y Administración. 🚫 Nunca con estudiantes. Etiqueta: “Chat institucional”. Historial guardado.</p>
       <div class="grid md:grid-cols-3 gap-4">
-        <div class="md:col-span-1 rounded-3xl bg-white p-3 border">
+        <div class="md:col-span-1 rounded-3xl bg-white p-3 border shadow-soft">
           <input id="contactFilter" aria-label="Filtrar contacto" class="w-full border rounded-xl px-2 py-1 text-sm" placeholder="Filtrar contacto" />
           <div id="contactList" class="mt-2 space-y-1 max-h-64 overflow-auto"></div>
         </div>
-        <div class="md:col-span-2 rounded-3xl bg-white p-3 border flex flex-col">
+        <div class="md:col-span-2 rounded-3xl bg-white p-3 border shadow-soft flex flex-col">
           <div id="chatHeader" class="text-sm font-semibold">Mensajes Privados</div>
           <div id="chatMessages" class="flex-1 mt-2 space-y-2 max-h-64 overflow-auto"></div>
           <div id="typingIndicator" class="text-[11px] text-slate-500"></div>
@@ -669,26 +438,26 @@
     <!-- G. PERFIL -->
     <section id="tab-profile" class="hidden space-y-4">
       <!-- Datos del Estudiante -->
-      <div class="p-4 rounded-3xl bg-white shadow-lg border">
+      <div class="p-4 rounded-3xl bg-white shadow-soft border">
         <h3 class="text-sm font-semibold text-slate-500 mb-3 uppercase tracking-wider">Datos del Estudiante</h3>
         <div class="flex items-center gap-4">
-          <img src="https://placehold.co/200x200" alt="Foto del estudiante" class="w-16 h-16 rounded-2xl object-cover" />
+          <img id="profileStudentAvatar" src="img/mundo.jpg" alt="Foto del estudiante" class="w-16 h-16 rounded-2xl object-cover" />
           <div>
-            <h3 class="text-base font-semibold">Andrea Flores</h3>
-            <p class="text-sm text-slate-600">3 años • Aula Pequeños</p>
-            <p class="text-xs text-slate-400 mt-1">ID: ST-2024-001</p>
+            <h3 id="profileStudentName" class="text-base font-semibold">—</h3>
+            <p id="profileStudentMeta" class="text-sm text-slate-600">—</p>
+            <p id="profileStudentId" class="text-xs text-slate-400 mt-1">ID: —</p>
           </div>
         </div>
       </div>
       
       <!-- Datos del Tutor -->
-      <div class="p-4 rounded-3xl bg-white shadow-lg border">
+      <div class="p-4 rounded-3xl bg-white shadow-soft border">
         <h3 class="text-sm font-semibold text-slate-500 mb-3 uppercase tracking-wider">Datos del Tutor</h3>
         <div class="space-y-2 text-sm">
-          <p><span class="font-medium">Nombre:</span> Juan Pérez</p>
-          <p><span class="font-medium">Relación:</span> Padre</p>
-          <p><span class="font-medium">Teléfono:</span> +1 829 555 0101</p>
-          <p><span class="font-medium">Email:</span> juan.perez@email.com</p>
+          <p><span class="font-medium">Nombre:</span> <span id="profileGuardianName">—</span></p>
+          <p><span class="font-medium">Relación:</span> <span id="profileGuardianRelation">—</span></p>
+          <p><span class="font-medium">Teléfono:</span> <span id="profileGuardianPhone">—</span></p>
+          <p><span class="font-medium">Email:</span> <span id="profileGuardianEmail">—</span></p>
         </div>
         <div class="mt-4 grid grid-cols-2 gap-2">
           <button class="py-2 border rounded-xl text-xs text-slate-600 hover:bg-slate-50">Editar información</button>
@@ -729,8 +498,8 @@
           <p id="taskTitleModal" class="text-sm font-semibold"></p>
         </div>
         <div class="text-xs text-slate-600">
-          <p>Enviado por: Andrea Flores</p>
-          <p>Supervisado por: Padre/Tutor</p>
+          <p>Enviado por: <span id="modal-submit-student">...</span></p>
+          <p>Supervisado por: <span id="modal-submit-parent">...</span></p>
         </div>
         <button id="submitTaskParent" class="w-full px-3 py-2 rounded-xl bg-karpus-orange text-white">Enviar Evidencia</button>
       </div>
@@ -766,17 +535,6 @@
     </div>
   </div>
 
-  <div id="modalClassInfo" class="hidden fixed inset-0 bg-black/30 flex items-end">
-    <div class="bg-white w-full rounded-t-3xl p-4 space-y-3">
-      <div class="flex justify-between items-center">
-        <h3 class="text-sm font-semibold">Aula Pequeños</h3>
-        <button id="closeClassInfo" class="text-slate-500">Cerrar</button>
-      </div>
-      <p class="text-sm">Niños inscritos: 15</p>
-      <p class="text-sm">Maestra: Sofía Gómez</p>
-    </div>
-  </div>
-
   <div id="modalProfileView" class="hidden fixed inset-0 bg-black/30 flex items-end">
     <div class="bg-white w-full rounded-t-3xl p-4 space-y-3">
       <div class="flex justify-between items-center">
@@ -801,8 +559,7 @@
   <!-- Script -->
   </div>
   </div>
-  <script src="js/store.js?v=2"></script>
-  <script src="js/padres_patch.js?v=2"></script>
+  <script type="module" src="js/padres_patch.js?v=2"></script>
   <script src="js/common_ui.js"></script>
   <script>
     if (window.lucide && typeof lucide.createIcons === 'function') {

@@ -77,16 +77,46 @@
     },
 
     // Attendance
+    async getAttendance(studentId, date) {
+      let qs = [];
+      if (studentId) qs.push(`studentId=${studentId}`);
+      if (date) qs.push(`date=${date}`);
+      const q = qs.length ? '?' + qs.join('&') : '';
+      return await fetchJson(`${API}/attendance${q}`);
+    },
     recordAttendance(){},
 
     // Improvement Plans (compatibilidad con directora_patch)
     getImprovementPlans(){ return []; },
 
+    // Teachers
+    async getTeachers(){ return await fetchJson(`${API}/teachers`); },
+
+    // Students
+    async getStudents(classId){ 
+        const qs = classId ? `?classId=${classId}` : '';
+        return await fetchJson(`${API}/students${qs}`); 
+    },
+    
+    // Rooms (Classrooms)
+    async getRooms(){ return await fetchJson(`${API}/classrooms`); },
+
     // Payments
+    async getPayments(studentId){
+        const qs = studentId ? `?studentId=${studentId}` : '';
+        return await fetchJson(`${API}/payments${qs}`);
+    },
     addPayment(){},
     markPaymentStatus(){},
     addPaymentPartial(){},
-    getPaymentsByClass(){ return []; },
+    async getPaymentsByClass(classId){ 
+       // Fetch all payments and filter (optimization: add API filter later)
+       const payments = await this.getPayments();
+       // Fetch students in class
+       const students = await this.getStudents(classId);
+       const studentIds = new Set(students.map(s => s.id));
+       return payments.filter(p => studentIds.has(p.student_id));
+    },
     getPaymentsPending(){ return []; },
     getPaymentSummary(){ return { total:0, pagados:0, pendientes:0, amountTotal:0 }; },
 
@@ -133,3 +163,4 @@
 
   window.KarpusStore = Store;
 })();
+
