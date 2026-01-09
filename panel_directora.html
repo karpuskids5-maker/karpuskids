@@ -13,14 +13,31 @@
   
   <style>
     /* Sidebar styles */
-    aside#sidebar { width: 280px; transition: width .25s ease, transform .25s ease; }
-    aside#sidebar.collapsed { width: 72px; }
-    aside#sidebar .label { transition: opacity .2s ease; }
-    aside#sidebar.collapsed .label { opacity: 0; }
+    aside#sidebar { 
+      width: 280px; 
+      transition: width 0.3s cubic-bezier(0.4, 0, 0.2, 1); 
+      z-index: 50;
+      overflow: hidden;
+    }
+    aside#sidebar.collapsed { width: 80px; }
     
+    /* Sidebar Content Transitions */
+    aside#sidebar .label { 
+      opacity: 1; 
+      transition: opacity 0.2s ease, transform 0.2s ease; 
+      white-space: nowrap;
+      margin-left: 12px;
+    }
+    aside#sidebar.collapsed .label { opacity: 0; width: 0; margin-left: 0; pointer-events: none; }
+    
+    /* Centrado de iconos cuando está colapsado */
+    aside#sidebar.collapsed .nav-btn { justify-content: center; padding-left: 0; padding-right: 0; }
+    aside#sidebar.collapsed .nav-btn i { margin: 0; }
+
     /* Hover expand logic */
     aside#sidebar.collapsed:hover { width: 280px; }
-    aside#sidebar.collapsed:hover .label { opacity: 1; }
+    aside#sidebar.collapsed:hover .label { opacity: 1; width: auto; margin-left: 12px; pointer-events: auto; }
+    aside#sidebar.collapsed:hover .nav-btn { justify-content: flex-start; padding-left: 1rem; padding-right: 1rem; }
     aside#sidebar.collapsed:hover .badge { opacity: 1; }
     aside#sidebar.collapsed .badge { opacity: 0; transition: opacity .2s; }
 
@@ -149,7 +166,7 @@
 
     /* Layout adjustments */
     #layoutShell { transition: margin-left .25s ease; }
-    #layoutShell.sidebar-collapsed { margin-left: 72px !important; }
+    #layoutShell.sidebar-collapsed { margin-left: 80px !important; }
     
     @media (max-width: 768px) {
       #layoutShell { margin-left: 0 !important; }
@@ -351,23 +368,30 @@
           <h2 class="text-xl font-semibold flex items-center gap-2">
             <i data-lucide="users" class="w-5 h-5 text-slate-600"></i><span>Maestros</span>
           </h2>
-          <div>
+          <div class="flex gap-3">
+            <div class="relative">
+              <i data-lucide="search" class="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400"></i>
+              <input id="searchTeacher" placeholder="Buscar por nombre, tel..." class="pl-9 pr-4 py-2 border rounded-lg text-sm w-64 focus:ring-2 focus:ring-purple-500 outline-none" />
+            </div>
             <button id="btnAddTeacher" class="px-3 py-2 bg-green-600 text-white rounded">Agregar maestro</button>
           </div>
         </div>
-        <div class="bg-white rounded shadow p-4">
-          <table class="w-full text-sm">
-            <thead class="text-slate-500 text-left">
-              <tr>
-                <th class="py-2">Nombre</th>
-                <th class="py-2">Correo</th>
-                <th class="py-2">Teléfono</th>
-                <th class="py-2">Estado</th>
-                <th class="py-2">Acciones</th>
-              </tr>
-            </thead>
-            <tbody id="teachersTable"><!-- Se llena dinámicamente con JS --></tbody>
-          </table>
+        <div class="bg-white rounded-xl shadow-sm border overflow-hidden">
+          <div class="overflow-x-auto">
+            <table class="w-full text-left border-collapse">
+              <thead>
+                <tr class="bg-slate-50 border-b text-xs font-semibold tracking-wide text-slate-500 uppercase">
+                  <th class="px-6 py-4">Maestro</th>
+                  <th class="px-6 py-4">Contacto</th>
+                  <th class="px-6 py-4">Estado</th>
+                  <th class="px-6 py-4 text-right">Acciones</th>
+                </tr>
+              </thead>
+              <tbody id="teachersTable" class="divide-y divide-slate-100 bg-white text-sm">
+                <!-- Se llena dinámicamente con JS -->
+              </tbody>
+            </table>
+          </div>
         </div>
       </section>
 
@@ -1005,6 +1029,7 @@
         <div class="grid grid-cols-2 gap-2">
           <input id="p1Name" placeholder="Padre/Madre 1 (nombre)" class="border rounded px-3 py-2" />
           <input id="p1Phone" placeholder="Teléfono 1" class="border rounded px-3 py-2" />
+          <input id="p1Email" type="email" placeholder="Correo (Usuario de acceso)" class="border rounded px-3 py-2 col-span-2" />
         </div>
         <div class="grid grid-cols-2 gap-2">
           <input id="p2Name" placeholder="Padre/Madre 2 (nombre)" class="border rounded px-3 py-2" />

@@ -112,7 +112,15 @@ function initEventListeners() {
         loadAttendanceAnalytics();
       }
     });
-  });
+  }); // Cierre correcto del forEach de navegación
+
+  // 1.1 Buscador de Maestros en tiempo real
+  const searchTeacherInput = document.getElementById('searchTeacher');
+  if (searchTeacherInput) {
+    searchTeacherInput.addEventListener('input', (e) => {
+      filterTeachers(e.target.value);
+    });
+  }
 
   // 2. Modal de Maestros (Agregar Maestro)
   const btnAddTeacher = document.getElementById('btnAddTeacher');
@@ -123,6 +131,8 @@ function initEventListeners() {
   if (btnAddTeacher && teacherModal) {
     btnAddTeacher.addEventListener('click', () => {
       // Limpiar formulario
+      document.getElementById('teacherModalTitle').textContent = 'Crear Maestro';
+      document.getElementById('tmId').value = ''; // Limpiar ID para modo creación
       document.getElementById('tmName').value = '';
       document.getElementById('tmPhone').value = '';
       document.getElementById('tmEmail').value = '';
@@ -155,7 +165,7 @@ function initEventListeners() {
   if (btnAddStudent && studentModal) {
     btnAddStudent.addEventListener('click', () => {
       // Limpiar formulario
-      const inputs = ['stName', 'stAge', 'stSchedule', 'p1Name', 'p1Phone', 'p2Name', 'p2Phone', 'stAllergies', 'stBlood', 'stPickup'];
+      const inputs = ['stName', 'stAge', 'stSchedule', 'p1Name', 'p1Phone', 'p1Email', 'p2Name', 'p2Phone', 'stAllergies', 'stBlood', 'stPickup'];
       inputs.forEach(id => {
         const el = document.getElementById(id);
         if(el) el.value = '';
@@ -218,34 +228,82 @@ function initEventListeners() {
   if (btnRefreshAtt) btnRefreshAtt.addEventListener('click', loadAttendanceAnalytics);
 }
 
-async function loadTeachers() {
-  const tableBody = document.getElementById('teachersTable');
-  if (!tableBody) return;
+// Variable global para almacenar maestros y filtrar localmente
+let allTeachers = [];
 
+async function loadTeachers() {
   try {
     // Cargar perfiles con rol 'maestra'
     const { data: teachers, error } = await supabase.from('profiles').select('*').eq('role', 'maestra');
     if (error) throw error;
 
-    if (teachers.length === 0) {
-      tableBody.innerHTML = '<tr><td colspan="5" class="text-center py-4 text-slate-500">No hay maestros registrados.</td></tr>';
+    allTeachers = teachers || [];
+    renderTeachers(allTeachers);
+  } catch (error) {
+    console.error(error);
+    const tableBody = document.getElementById('teachersTable');
+    if(tableBody) tableBody.innerHTML = '<tr><td colspan="4" class="text-center py-8 text-red-500">Error de conexión al cargar maestros.</td></tr>';
+  }
+}
+
+function renderTeachers(teachersList) {
+  const tableBody = document.getElementById('teachersTable');
+  if (!tableBody) return;
+
+  if (teachersList.length === 0) {
+      tableBody.innerHTML = '<tr><td colspan="4" class="text-center py-8 text-slate-500">No hay maestros registrados.</td></tr>';
       return;
     }
 
-    tableBody.innerHTML = teachers.map(t => `
-      <tr class="border-b hover:bg-slate-50">
-        <td class="py-3 px-2 font-medium">${t.name}</td>
-        <td class="py-3 px-2 text-slate-600">${t.email || '-'}</td>
-        <td class="py-3 px-2 text-slate-600">-</td>
-        <td class="py-3 px-2"><span class="px-2 py-1 bg-green-100 text-green-700 rounded-full text-xs">Activo</span></td>
-        <td class="py-3 px-2">
-          <button class="text-blue-600 hover:text-blue-800 text-sm">Editar</button>
+    tableBody.innerHTML = teachersList.map(t => {
+      const initial = t.name ? t.name.charAt(0).toUpperCase() : 'M';
+      return `
+      <tr class="hover:bg-slate-50 transition-colors group">
+        <td class="px-6 py-4">
+          <div class="flex items-center gap-3">
+            <div class="w-10 h-10 rounded-full bg-purple-100 text-purple-600 flex items-center justify-center font-bold text-sm shadow-sm border border-purple-200">
+              ${initial}
+            </div>
+            <div>
+              <p class="font-semibold text-slate-800 text-sm">${t.name || 'Sin nombre'}</p>
+              <p class="text-xs text-slate-500">Maestra Titular</p>
+            </div>
+          </div>
+        </td>
+        <td class="px-6 py-4">
+          <div class="flex flex-col gap-1">
+            <span class="text-sm text-slate-700 flex items-center gap-2">
+              <i data-lucide="mail" class="w-3.5 h-3.5 text-slate-400"></i> ${t.email || '-'}
+            </span>
+            <span class="text-xs text-slate-500 flex items-center gap-2">
+              <i data-lucide="phone" class="w-3.5 h-3.5 text-slate-400"></i> ${t.phone || 'Sin teléfono'}
+            </span>
+          </div>
+        </td>
+        <td class="px-6 py-4">
+          <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800 border border-green-200">
+            <span class="w-1.5 h-1.5 bg-green-500 rounded-full mr-1.5"></span>
+            Activo
+          </span>
+        </td>
+        <td class="px-6 py-4 text-right">
+          <div class="flex items-center justify-end gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+            <button onclick="window.openEditTeacher('${t.id}')" class="p-2 hover:bg-slate-100 rounded-lg text-slate-500 hover:text-blue-600 transition-colors" title="Editar">
+              <i data-lucide="edit-3" class="w-4 h-4"></i>
+            </button>
+            <button class="p-2 hover:bg-red-50 rounded-lg text-slate-400 hover:text-red-600 transition-colors" title="Eliminar">
+              <i data-lucide="trash-2" class="w-4 h-4"></i>
+            </button>
+          </div>
         </td>
       </tr>
-    `).join('');
+    `}).join('');
+    
+    if (window.lucide) lucide.createIcons();
+
   } catch (error) {
     console.error(error);
-    tableBody.innerHTML = '<tr><td colspan="5" class="text-center py-4 text-red-500">Error de conexión.</td></tr>';
+    tableBody.innerHTML = '<tr><td colspan="4" class="text-center py-8 text-red-500">Error de conexión al cargar maestros.</td></tr>';
   }
 }
 
@@ -312,8 +370,9 @@ async function saveTeacher() {
     
     document.getElementById('teacherModal').classList.add('hidden');
     loadTeachers(); // Recargar la lista
+  } // <--- ESTA LLAVE FALTABA
 
-  } catch (error) {
+  catch (error) {
     console.error('Error al crear maestro:', error);
     alert('Error al crear maestro: ' + error.message);
   } finally {
@@ -367,23 +426,59 @@ async function loadStudents() {
 async function saveStudent() {
   const fullName = document.getElementById('stName').value;
   const classroomId = document.getElementById('stClassroom').value;
+  const parentName = document.getElementById('p1Name').value;
+  const parentEmail = document.getElementById('p1Email').value;
+  const parentPhone = document.getElementById('p1Phone').value;
 
   if (!fullName) {
     alert('Por favor ingrese el nombre del estudiante.');
     return;
   }
-  
-  const studentData = {
-    name: fullName,
-    classroom_id: classroomId || null,
-    is_active: true
-  };
 
+  if (!parentEmail) {
+    alert('El correo del padre es obligatorio para crear su usuario de acceso.');
+    return;
+  }
+  
   try {
+    // 1. Crear Usuario para el Padre (Auth)
+    // Usamos cliente temporal para no cerrar sesión de directora
+    const tempClient = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
+      auth: { persistSession: false, autoRefreshToken: false, detectSessionInUrl: false }
+    });
+
+    // Contraseña por defecto para el padre
+    const defaultPassword = "karpus" + Math.floor(1000 + Math.random() * 9000);
+
+    const { data: authData, error: authError } = await tempClient.auth.signUp({
+      email: parentEmail,
+      password: defaultPassword,
+      options: {
+        data: {
+          name: parentName || 'Padre/Tutor',
+          role: 'padre' // Importante para el trigger
+        }
+      }
+    });
+
+    if (authError) throw authError;
+    const parentId = authData.user?.id;
+
+    // 2. Insertar Estudiante vinculado al Padre
+    const studentData = {
+      name: fullName,
+      classroom_id: classroomId || null,
+      is_active: true,
+      parent_id: parentId, // Vinculación clave
+      p1_name: parentName,
+      p1_email: parentEmail,
+      p1_phone: parentPhone
+    };
+
     const { error } = await supabase.from('students').insert([studentData]);
     if (error) throw error;
 
-    alert('Estudiante guardado exitosamente.');
+    alert(`Estudiante guardado exitosamente.\n\nUsuario Padre Creado:\nEmail: ${parentEmail}\nContraseña: ${defaultPassword}\n\nPor favor comparta estas credenciales con el padre.`);
     document.getElementById('modalAddStudent').classList.add('hidden');
     loadStudents(); // Recargar
     loadDashboardStats(); // Actualizar contadores

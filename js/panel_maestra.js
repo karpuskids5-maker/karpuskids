@@ -1,6 +1,6 @@
 import { supabase } from './supabase.js';
 
-document.addEventListener('DOMContentLoaded', () => {
+document.addEventListener('DOMContentLoaded', async () => {
   // 1. Verificar Sesión y Cargar Perfil
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) {
@@ -54,9 +54,12 @@ document.addEventListener('DOMContentLoaded', () => {
     sidebarOverlay.addEventListener('click', () => {
        if(sidebar.classList.contains('mobile-visible')) toggleMobileMenu();
     });
-  }
+  }// Inicializar vista por defecto
+  renderClassesGrid();
+  if(window.lucide) lucide.createIcons();
+  // SE ELIMINA EL CIERRE PREMATURO AQUI PARA QUE EL SCOPE ABARQUE TODO EL ARCHIVO
 
-  // --- Navigation Logic ---
+// --- Navigation Logic ---
   const navBtns = document.querySelectorAll('[data-section]');
   const sections = document.querySelectorAll('main .section');
 
@@ -117,7 +120,11 @@ document.addEventListener('DOMContentLoaded', () => {
       .select('*')
       .eq('teacher_id', user.id);
 
-    if (error) console.error('Error cargando aulas:', error);
+    if (error) {
+      console.error('Error cargando aulas:', error);
+      classesGrid.innerHTML = `<div class="col-span-full text-center py-10 text-red-500">Error cargando aulas: ${error.message} (Código: ${error.code || 'N/A'})</div>`;
+      return;
+    }
 
     // Mock colors/icons for variety
     const colors = ['bg-orange-100 text-orange-600', 'bg-blue-100 text-blue-600', 'bg-pink-100 text-pink-600', 'bg-green-100 text-green-600'];
@@ -208,12 +215,24 @@ document.addEventListener('DOMContentLoaded', () => {
   });
 
   // --- Tab Logic: Feed ---
-  function renderClassFeed() {
+  async function renderClassFeed() {
     const feedContainer = document.getElementById('classroomFeed');
     if(!feedContainer || !currentClass) return;
-    const posts = []; // Implementar tabla 'posts' en futuro
     
-    if(posts.length === 0) {
+    // Cargar posts reales
+    const { data: posts, error } = await supabase
+      .from('posts')
+      .select('*, profiles(name)')
+      .eq('classroom_id', currentClass.id)
+      .order('created_at', { ascending: false });
+
+    if (error) {
+      console.error('Error cargando posts:', error);
+      feedContainer.innerHTML = '<p class="text-red-500 text-center">Error al cargar publicaciones.</p>';
+      return;
+    }
+    
+    if(!posts || posts.length === 0) {
       feedContainer.innerHTML = `
         <div class="text-center py-12 bg-slate-50 rounded-3xl border border-dashed">
           <div class="h-16 w-16 bg-white rounded-full flex items-center justify-center mx-auto mb-3 shadow-sm">
@@ -228,19 +247,21 @@ document.addEventListener('DOMContentLoaded', () => {
         <div class="bg-white p-4 rounded-3xl border shadow-sm space-y-3">
           <div class="flex items-center gap-3">
             <div class="h-10 w-10 rounded-full bg-indigo-100 flex items-center justify-center text-indigo-600 font-bold text-sm">
-              ${post.teacher.charAt(0)}
+              ${post.profiles?.name?.charAt(0) || 'M'}
             </div>
             <div>
-              <div class="font-bold text-slate-800">${post.teacher}</div>
-              <div class="text-xs text-slate-500">${post.date}</div>
+              <div class="font-bold text-slate-800">${post.profiles?.name || 'Maestra'}</div>
+              <div class="text-xs text-slate-500">${new Date(post.created_at).toLocaleString()}</div>
             </div>
-            <button class="ml-auto text-slate-400 hover:text-slate-600"><i data-lucide="more-vertical" class="w-4 h-4"></i></button>
           </div>
-          <div class="text-sm text-slate-700 whitespace-pre-line">${post.text}</div>
-          ${post.photo ? `<img src="${post.photo}" class="rounded-2xl w-full h-auto object-cover max-h-80" />` : ''}
-          ${post.video ? `<video src="${post.video}" controls class="rounded-2xl w-full max-h-80"></video>` : ''}
+          <div class="text-sm text-slate-700 whitespace-pre-line">${post.content || ''}</div>
+          
+          ${post.media_url && post.media_type === 'image' ? `<img src="${post.media_url}" class="rounded-2xl w-full h-auto object-cover max-h-80 mt-2 border" />` : ''}
+          ${post.media_url && post.media_type === 'video' ? `<video src="${post.media_url}" controls class="rounded-2xl w-full max-h-80 mt-2 bg-black"></video>` : ''}
+          ${post.media_url && post.media_type === 'document' ? `<a href="${post.media_url}" target="_blank" class="flex items-center gap-3 p-3 bg-slate-50 rounded-xl mt-2 hover:bg-slate-100 border transition-colors"><div class="p-2 bg-white rounded-lg border"><i data-lucide="file-text" class="w-5 h-5 text-blue-600"></i></div><span class="text-sm text-slate-700 font-medium">Ver documento adjunto</span></a>` : ''}
+
           <div class="flex items-center gap-4 pt-2 border-t text-sm text-slate-500">
-             <button class="flex items-center gap-1 hover:text-pink-500"><i data-lucide="heart" class="w-4 h-4"></i> ${post.reactions?.likes || 0}</button>
+             <button class="flex items-center gap-1 hover:text-pink-500"><i data-lucide="heart" class="w-4 h-4"></i> Me gusta</button>
              <button class="flex items-center gap-1 hover:text-blue-500"><i data-lucide="message-circle" class="w-4 h-4"></i> Comentar</button>
           </div>
         </div>
@@ -609,10 +630,72 @@ document.addEventListener('DOMContentLoaded', () => {
   const submitPostBtn = document.getElementById('submitPost');
   if(submitPostBtn) {
     submitPostBtn.addEventListener('click', async () => {
-      alert('Creación de publicaciones aún no disponible con datos reales.');
+      const contentInput = document.getElementById('postContent');
+      const fileInput = document.getElementById('postFile'); // Asegúrate de agregar <input type="file" id="postFile"> en tu HTML
+      
+      const text = contentInput ? contentInput.value.trim() : '';
+      const file = fileInput?.files[0];
+
+      if ((!text && !file) || !currentClass) {
+        alert('Escribe algo o adjunta un archivo para publicar.');
+        return;
+      }
+
+      submitPostBtn.disabled = true;
+      submitPostBtn.textContent = 'Publicando...';
+
+      try {
+        let mediaUrl = null;
+        let mediaType = null;
+
+        // 1. Subir archivo si existe
+        if (file) {
+          const fileExt = file.name.split('.').pop();
+          const fileName = `${Date.now()}_${Math.random().toString(36).substr(2, 9)}.${fileExt}`;
+          const filePath = `${currentClass.id}/${fileName}`;
+
+          const { error: uploadError } = await supabase.storage
+            .from('classroom_media')
+            .upload(filePath, file);
+
+          if (uploadError) throw uploadError;
+
+          const { data: { publicUrl } } = supabase.storage
+            .from('classroom_media')
+            .getPublicUrl(filePath);
+
+          mediaUrl = publicUrl;
+          
+          if (file.type.startsWith('image/')) mediaType = 'image';
+          else if (file.type.startsWith('video/')) mediaType = 'video';
+          else mediaType = 'document';
+        }
+
+        // 2. Crear Post
+        const { error: insertError } = await supabase.from('posts').insert({
+          classroom_id: currentClass.id,
+          teacher_id: user.id,
+          content: text,
+          media_url: mediaUrl,
+          media_type: mediaType
+        });
+
+        if (insertError) throw insertError;
+
+        // 3. Limpiar y recargar
+        if(contentInput) contentInput.value = '';
+        if(fileInput) fileInput.value = '';
       const modal = document.getElementById('modalAddPost');
       if(modal) { modal.classList.remove('active'); document.body.classList.remove('no-scroll'); }
       renderClassFeed();
+
+      } catch (error) {
+        console.error(error);
+        alert('Error al publicar: ' + error.message);
+      } finally {
+        submitPostBtn.disabled = false;
+        submitPostBtn.textContent = 'Publicar';
+      }
     });
   }
 
@@ -667,4 +750,4 @@ document.addEventListener('DOMContentLoaded', () => {
   bindModal(undefined, 'modalGradeTask', ['closeGradeTask']);
 
   if(window.lucide) lucide.createIcons();
-});
+}); // Fin de DOMContentLoaded

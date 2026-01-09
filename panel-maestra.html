@@ -1,1 +1,205 @@
-COR
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Karpus Kids — Panel Maestra</title>
+  <link rel="icon" href="logo/favicon.ico" type="image/x-icon">
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <script src="https://unpkg.com/lucide@latest/dist/umd/lucide.min.js"></script>
+  
+  <style>
+    /* Sidebar styles */
+    aside#sidebar { width: 280px; transition: width .25s ease, transform .25s ease; }
+    aside#sidebar.collapsed { width: 72px; }
+    aside#sidebar .label { transition: opacity .2s ease; }
+    aside#sidebar.collapsed .label { opacity: 0; }
+    
+    /* Hover expand logic */
+    aside#sidebar.collapsed:hover { width: 280px; }
+    aside#sidebar.collapsed:hover .label { opacity: 1; }
+    
+    /* mobile helper */
+    .hidden-mobile { display: none !important; }
+    .sidebar-green { background: linear-gradient(135deg,#E8F8F0,#D0F0E0); }
+    .karpus-kids-inline { font-weight: 700; }
+    .karpus-kids-inline .k-1 { color: #FF9800; }
+    
+    /* Layout adjustments */
+    #layoutShell { transition: margin-left .25s ease; }
+    #layoutShell.sidebar-collapsed { margin-left: 72px !important; }
+    
+    @media (max-width: 768px) {
+      #layoutShell { margin-left: 0 !important; }
+      aside#sidebar { transform: translateX(-100%); }
+      aside#sidebar.mobile-visible { transform: translateX(0); }
+    }
+
+    .section { display: none; }
+    .section:not(.hidden) { display: block; }
+  </style>
+</head>
+<body class="bg-slate-50 text-slate-800 font-nunito">
+  <div class="min-h-screen flex">
+    <!-- SIDEBAR -->
+    <aside id="sidebar" class="sidebar-green p-4 rounded-r-3xl shadow-lg fixed inset-y-0 left-0 z-20">
+      <button id="toggleSidebar" class="absolute -right-3 top-6 bg-white rounded-full p-1 shadow-md border border-slate-100 text-slate-500 hover:text-green-600 hidden md:block">
+        <i data-lucide="chevron-left" id="toggleSidebarIcon" class="w-4 h-4"></i>
+      </button>
+      
+      <div class="flex items-center gap-3 mb-6">
+        <div class="h-12 w-12 rounded-2xl bg-white/40 flex items-center justify-center shadow-lg">
+          <img src="img/mundo.jpg" alt="logo" class="h-10 w-10 rounded-lg object-cover" />
+        </div>
+        <div class="label">
+          <h3 class="font-semibold text-green-900">Karpus Kids</h3>
+          <p class="text-xs text-green-800 text-opacity-80">Panel Maestra</p>
+        </div>
+      </div>
+
+      <nav class="space-y-2 bg-white/30 p-2 rounded-xl mb-4">
+        <button data-section="t-home" class="w-full text-left px-3 py-2 rounded-lg hover:bg-white/40 flex items-center gap-3 text-green-900 transition-colors active" aria-selected="true">
+          <i data-lucide="home" class="w-5 h-5"></i>
+          <span class="label">Mis Clases</span>
+        </button>
+        <button data-section="t-students" class="w-full text-left px-3 py-2 rounded-lg hover:bg-white/40 flex items-center gap-3 text-green-900 transition-colors">
+          <i data-lucide="users" class="w-5 h-5"></i>
+          <span class="label">Alumnos</span>
+        </button>
+        <button data-section="t-attendance" class="w-full text-left px-3 py-2 rounded-lg hover:bg-white/40 flex items-center gap-3 text-green-900 transition-colors">
+          <i data-lucide="calendar-check" class="w-5 h-5"></i>
+          <span class="label">Asistencia</span>
+        </button>
+      </nav>
+
+      <div class="mt-auto pt-4 border-t border-green-200/50">
+        <div class="flex items-center gap-3 px-2">
+          <div class="w-8 h-8 rounded-full bg-green-200 flex items-center justify-center text-green-700 font-bold">M</div>
+          <div class="label overflow-hidden">
+            <h3 class="text-sm font-semibold text-green-900 truncate user-name-display">Maestra</h3>
+            <p class="text-xs text-green-800 truncate user-email-display">maestra@karpus.local</p>
+          </div>
+        </div>
+      </div>
+    </aside>
+
+    <!-- OVERLAY MOBILE -->
+    <div id="sidebarOverlay" class="fixed inset-0 bg-black/20 z-10 hidden md:hidden"></div>
+
+    <!-- MAIN -->
+    <main class="flex-1 p-6 ml-0 md:ml-[280px]" id="layoutShell">
+      <!-- Topbar mobile -->
+      <div class="md:hidden mb-6 flex items-center justify-between">
+        <button id="menuBtn" class="p-2 rounded bg-white shadow text-slate-600"><i data-lucide="menu"></i></button>
+        <h2 class="font-semibold text-slate-700">Panel Maestra</h2>
+        <div class="w-8"></div>
+      </div>
+
+      <!-- SECTION: HOME (Mis Clases) -->
+      <section id="t-home" class="section">
+        <header class="mb-6">
+          <h1 class="text-2xl font-bold text-slate-800">Mis Clases</h1>
+          <p class="text-slate-500">Bienvenida, <span class="user-name-display">Maestra</span></p>
+        </header>
+        
+        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6" id="classesGrid">
+          <!-- Cargando... -->
+          <div class="col-span-full py-12 text-center text-slate-500">Cargando aulas...</div>
+        </div>
+      </section>
+
+      <!-- SECTION: CLASS DETAIL (Detalle de Aula) -->
+      <section id="t-class-detail" class="section hidden">
+        <header class="mb-6 flex items-center gap-4">
+          <button id="backToClasses" class="p-2 hover:bg-slate-100 rounded-full transition-colors text-slate-600">
+            <i data-lucide="arrow-left" class="w-6 h-6"></i>
+          </button>
+          <div>
+            <h1 class="text-2xl font-bold text-slate-800" id="currentClassName">Nombre del Aula</h1>
+            <p class="text-sm text-slate-500">Vista detallada</p>
+          </div>
+        </header>
+
+        <!-- Tabs -->
+        <div class="flex gap-2 mb-6 border-b pb-1 overflow-x-auto">
+          <button class="class-tab-btn active px-4 py-2 rounded-t-lg font-medium bg-green-600 text-white transition-colors" data-tab="feed">
+            Muro
+          </button>
+          <button class="class-tab-btn px-4 py-2 rounded-t-lg font-medium text-slate-600 hover:bg-slate-100 transition-colors" data-tab="students">
+            Estudiantes
+          </button>
+          <button class="class-tab-btn px-4 py-2 rounded-t-lg font-medium text-slate-600 hover:bg-slate-100 transition-colors" data-tab="attendance">
+            Asistencia
+          </button>
+        </div>
+
+        <!-- Tab Contents -->
+        <div id="tab-feed" class="class-tab-content">
+          <div class="bg-white p-6 rounded-2xl shadow-sm text-center text-slate-500">
+            <p>Aquí se mostrarán las publicaciones y anuncios del aula.</p>
+          </div>
+        </div>
+        
+        <div id="tab-students" class="class-tab-content hidden">
+          <div class="bg-white p-6 rounded-2xl shadow-sm">
+            <p class="text-center text-slate-500">Lista de estudiantes del aula seleccionada.</p>
+          </div>
+        </div>
+
+        <div id="tab-attendance" class="class-tab-content hidden">
+           <div class="bg-white p-6 rounded-2xl shadow-sm">
+            <p class="text-center text-slate-500">Control de asistencia para el aula seleccionada.</p>
+          </div>
+        </div>
+      </section>
+
+      <!-- SECTION: STUDENTS (Global) -->
+      <section id="t-students" class="section hidden">
+        <header class="mb-6">
+          <h1 class="text-2xl font-bold text-slate-800">Mis Alumnos</h1>
+        </header>
+        <div class="bg-white rounded-xl shadow-sm overflow-hidden">
+          <div class="p-4 border-b flex gap-4">
+            <input type="text" placeholder="Buscar alumno..." class="border rounded-lg px-4 py-2 w-full max-w-sm">
+          </div>
+          <table class="w-full text-left text-sm">
+            <thead class="bg-slate-50 text-slate-600 font-medium">
+              <tr>
+                <th class="p-4">Nombre</th>
+                <th class="p-4">Edad</th>
+                <th class="p-4">Contacto</th>
+                <th class="p-4 text-right">Acciones</th>
+              </tr>
+            </thead>
+            <tbody id="studentsTableBody">
+              <tr><td colspan="4" class="p-8 text-center text-slate-500">Selecciona una clase para ver alumnos</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      <!-- SECTION: ATTENDANCE -->
+      <section id="t-attendance" class="section hidden">
+        <header class="mb-6 flex justify-between items-center">
+          <h1 class="text-2xl font-bold text-slate-800">Asistencia</h1>
+          <div class="flex gap-2">
+            <input type="date" class="border rounded-lg px-3 py-2 text-sm">
+            <button class="bg-blue-600 text-white px-4 py-2 rounded-lg text-sm hover:bg-blue-700">Guardar</button>
+          </div>
+        </header>
+        <div class="bg-white rounded-xl shadow-sm p-6 text-center text-slate-500">
+          Selecciona una clase para tomar asistencia.
+        </div>
+      </section>
+
+    </main>
+  </div>
+
+  <script type="module" src="js/panel_maestra.js"></script>
+  <script>
+    // Lucide icons fallback
+    if(window.lucide) lucide.createIcons();
+  </script>
+</body>
+</html>

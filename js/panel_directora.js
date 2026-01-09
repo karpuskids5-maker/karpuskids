@@ -26,76 +26,77 @@ document.addEventListener('DOMContentLoaded', ()=>{
 function initDashboardChart(){
   const canvas = document.getElementById('attendanceChart');
   if(!canvas) return;
-  const ctx = canvas.getContext('2d');
-  if(!ctx) return;
-  // Ensure canvas sizing
-  const width = canvas.width || canvas.clientWidth || 600;
-  const height = canvas.height || canvas.clientHeight || 160;
-  if (!canvas.width) canvas.width = width;
-  if (!canvas.height) canvas.height = height;
 
-  // Data
-  const labels = ['8 sem','7 sem','6 sem','5 sem','4 sem','3 sem','2 sem','Últ. semana'];
-  const data = [92,90,88,94,91,89,93,95];
-
-  // Chart area padding
-  const pad = { left: 40, right: 10, top: 10, bottom: 25 };
-  const chartW = width - pad.left - pad.right;
-  const chartH = height - pad.top - pad.bottom;
-
-  // Clear
-  ctx.clearRect(0, 0, width, height);
-  // Axes
-  ctx.strokeStyle = '#e5e7eb';
-  ctx.lineWidth = 1;
-  ctx.beginPath();
-  // Y-axis
-  ctx.moveTo(pad.left, pad.top);
-  ctx.lineTo(pad.left, pad.top + chartH);
-  // X-axis
-  ctx.lineTo(pad.left + chartW, pad.top + chartH);
-  ctx.stroke();
-
-  // Horizontal grid lines (every 20%)
-  ctx.strokeStyle = '#f1f5f9';
-  for(let y=20; y<=100; y+=20){
-    const gy = pad.top + chartH * (1 - y/100);
-    ctx.beginPath();
-    ctx.moveTo(pad.left, gy);
-    ctx.lineTo(pad.left + chartW, gy);
-    ctx.stroke();
+  // Destruir instancia previa si existe (para evitar superposiciones al recargar)
+  if (window.dashboardChartInstance) {
+    window.dashboardChartInstance.destroy();
   }
 
-  // Plot line
-  const stepX = chartW / (data.length - 1);
-  ctx.strokeStyle = '#2196F3';
-  ctx.lineWidth = 2;
-  ctx.beginPath();
-  data.forEach((v, i) => {
-    const x = pad.left + i * stepX;
-    const y = pad.top + chartH * (1 - v/100);
-    if(i === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y);
-  });
-  ctx.stroke();
+  const ctx = canvas.getContext('2d');
+  
+  // Crear degradado para el fondo de la línea
+  const gradient = ctx.createLinearGradient(0, 0, 0, 300);
+  gradient.addColorStop(0, 'rgba(37, 99, 235, 0.2)'); // Azul intenso transparente
+  gradient.addColorStop(1, 'rgba(37, 99, 235, 0)');   // Transparente
 
-  // Draw points
-  ctx.fillStyle = '#2196F3';
-  data.forEach((v, i) => {
-    const x = pad.left + i * stepX;
-    const y = pad.top + chartH * (1 - v/100);
-    ctx.beginPath();
-    ctx.arc(x, y, 3, 0, Math.PI * 2);
-    ctx.fill();
-  });
-
-  // Labels (x)
-  ctx.fillStyle = '#64748b';
-  ctx.font = '10px sans-serif';
-  labels.forEach((lab, i) => {
-    const x = pad.left + i * stepX;
-    const y = pad.top + chartH + 15;
-    ctx.textAlign = 'center';
-    ctx.fillText(lab, x, y);
+  window.dashboardChartInstance = new Chart(ctx, {
+    type: 'line',
+    data: {
+      labels: ['Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb', 'Dom'],
+      datasets: [{
+        label: 'Asistencia (%)',
+        data: [92, 94, 89, 96, 91, 93, 95], // Datos de ejemplo
+        borderColor: '#2563eb', // Blue-600
+        backgroundColor: gradient,
+        borderWidth: 3,
+        pointBackgroundColor: '#ffffff',
+        pointBorderColor: '#2563eb',
+        pointBorderWidth: 2,
+        pointRadius: 4,
+        pointHoverRadius: 6,
+        fill: true,
+        tension: 0.4 // Curva suave (Bezier)
+      }]
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      plugins: {
+        legend: { display: false },
+        tooltip: {
+          backgroundColor: '#1e293b',
+          padding: 12,
+          titleFont: { size: 13, family: "'Nunito', sans-serif" },
+          bodyFont: { size: 13, family: "'Nunito', sans-serif" },
+          displayColors: false,
+          callbacks: {
+            label: (context) => ` ${context.parsed.y}% Asistencia`
+          }
+        }
+      },
+      scales: {
+        y: {
+          beginAtZero: false,
+          min: 80,
+          max: 100,
+          grid: {
+            color: '#f1f5f9',
+            borderDash: [5, 5]
+          },
+          ticks: {
+            font: { size: 11, family: "'Nunito', sans-serif" },
+            color: '#64748b'
+          }
+        },
+        x: {
+          grid: { display: false },
+          ticks: {
+            font: { size: 11, family: "'Nunito', sans-serif" },
+            color: '#64748b'
+          }
+        }
+      }
+    }
   });
 }
 

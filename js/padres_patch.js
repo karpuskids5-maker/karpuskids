@@ -1,3 +1,5 @@
+import { supabase } from './supabase.js';
+
 /**
  * Controlador Principal: Panel de Padres
  * Orquesta la lógica de negocio y conecta Servicios con UI.
@@ -107,7 +109,6 @@ class ParentDashboardApp {
                 await this.loadGrades();
                 break;
             case 'class':
-                // Placeholder for future implementation
                 break;
         }
     }
@@ -296,6 +297,78 @@ class ParentDashboardApp {
         }
     }
 
+    // --- FEED Y COMENTARIOS ---
+    async loadClassFeed() {
+        const container = document.getElementById('classFeed');
+        if (!container) return;
+
+        try {
+            // 1. Obtener el aula del estudiante (simulado o desde perfil real)
+            // En producción: const classId = this.state.currentClassId;
+            // Por ahora buscamos cualquier post para demo o filtramos si tenemos el ID
+            
+            const { data: posts, error } = await supabase
+                .from('posts')
+                .select(`
+                    *,
+                    profiles:teacher_id (name),
+                    comments (
+                        id, content, created_at,
+                        profiles:user_id (name)
+                    )
+                `)
+                .order('created_at', { ascending: false });
+
+            if (error) throw error;
+
+            if (!posts || posts.length === 0) {
+                container.innerHTML = '<div class="text-center py-8 text-slate-500">No hay publicaciones en el muro.</div>';
+                return;
+            }
+
+            container.innerHTML = posts.map(p => {
+                const commentsHtml = p.comments ? p.comments.map(c => `
+                    <div class="bg-slate-50 p-2 rounded-lg text-xs mb-1">
+                        <span class="font-bold text-slate-700">${c.profiles?.name || 'Usuario'}:</span>
+                        <span class="text-slate-600">${c.content}</span>
+                    </div>
+                `).join('') : '';
+
+                return `
+                <div class="bg-white p-4 rounded-3xl border shadow-sm space-y-3">
+                    <div class="flex items-center gap-3">
+                        <div class="h-10 w-10 rounded-full bg-indigo-100 flex items-center justify-center text-indigo-600 font-bold text-sm">
+                            ${p.profiles?.name?.charAt(0) || 'M'}
+                        </div>
+                        <div>
+                            <div class="font-bold text-slate-800">${p.profiles?.name || 'Maestra'}</div>
+                            <div class="text-xs text-slate-500">${new Date(p.created_at).toLocaleDateString()}</div>
+                        </div>
+                    </div>
+                    <p class="text-sm text-slate-700 whitespace-pre-line">${p.content}</p>
+                    
+                    <!-- Sección de Comentarios -->
+                    <div class="pt-3 border-t mt-2">
+                        <div class="space-y-2 mb-3 max-h-40 overflow-y-auto">${commentsHtml}</div>
+                        <div class="flex gap-2">
+                            <input type="text" id="comment-input-${p.id}" placeholder="Escribe un comentario..." class="flex-1 border rounded-full px-3 py-1 text-sm bg-slate-50 focus:bg-white transition-colors">
+                            <button onclick="window.submitComment('${p.id}')" class="p-1.5 bg-blue-600 text-white rounded-full hover:bg-blue-700">
+                                <i data-lucide="send" class="w-4 h-4"></i>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+                `;
+            }).join('');
+
+            if (window.lucide) window.lucide.createIcons();
+
+        } catch (error) {
+            console.error('Error loading feed:', error);
+            container.innerHTML = '<p class="text-red-500 text-sm">Error cargando el muro.</p>';
+        }
+    }
+
     isTaskOverdue(task) {
         if (!task.due) return false;
         const dueDate = new Date(task.due.split('/').reverse().join('-'));
@@ -314,6 +387,28 @@ class ParentDashboardApp {
     static bootstrap() {
         const app = new ParentDashboardApp();
         document.addEventListener('DOMContentLoaded', () => app.init());
+        
+        // Exponer función global para comentar
+        window.submitComment = async (postId) => {
+            const input = document.getElementById(`comment-input-${postId}`);
+            const content = input.value.trim();
+            if (!content) return;
+
+            const { data: { user } } = await supabase.auth.getUser();
+            if (!user) return alert('Debes iniciar sesión');
+
+            const { error } = await supabase.from('comments').insert({
+                post_id: postId,
+                user_id: user.id,
+                content: content
+            });
+
+            if (error) alert('Error al comentar: ' + error.message);
+            else {
+                input.value = '';
+                app.loadClassFeed(); // Recargar para ver el comentario
+            }
+        };
     }
 }
 
