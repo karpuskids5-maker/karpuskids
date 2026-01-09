@@ -30,12 +30,16 @@
           caches.notifications[lvl] = await fetchJson(`${API}/notifications?class=${encodeURIComponent(lvl)}`);
         } catch(e) { /* noop por clase faltante */ }
       }
-    } catch(e){ /* noop global */ }
+    } catch(e){ 
+      console.error("Store preload error", e);
+      caches.error = e;
+    }
   }
   const ready = preload();
 
   const Store = {
     ready,
+    getError() { return caches.error; },
     getClasses(){ return caches.classes || []; },
     getState(){ return {}; },
     reset(){},
@@ -91,6 +95,15 @@
 
     // Teachers
     async getTeachers(){ return await fetchJson(`${API}/teachers`); },
+
+    // Login
+    async login(username, password) {
+      return await fetchJson(`${API}/login`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ username, password })
+      });
+    },
 
     // Students
     async getStudents(classId){ 
@@ -163,4 +176,4 @@
 
   window.KarpusStore = Store;
 })();
-
+

@@ -1,5 +1,24 @@
+import { supabase } from './supabase.js';
+
 document.addEventListener('DOMContentLoaded', () => {
-  try { Auth?.enforceRole?.('maestra'); } catch(e){}
+  // 1. Verificar Sesión y Cargar Perfil
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) {
+    window.location.href = 'login.html';
+    return;
+  }
+
+  // Cargar datos del perfil
+  const { data: profile } = await supabase.from('profiles').select('*').eq('id', user.id).single();
+  
+  // Mostrar nombre y correo en el sidebar/header si existen los elementos
+  const userNameEls = document.querySelectorAll('.user-name-display, .label h3, #sidebar .label h3');
+  const userEmailEls = document.querySelectorAll('.user-email-display');
+  
+  if (profile) {
+    userNameEls.forEach(el => el.textContent = profile.name || 'Maestra');
+    userEmailEls.forEach(el => el.textContent = profile.email || user.email);
+  }
 
   // --- Global State ---
   let currentClass = null;
@@ -91,26 +110,37 @@ document.addEventListener('DOMContentLoaded', () => {
 
   async function renderClassesGrid() {
     if(!classesGrid) return;
-    await (window.KarpusStore?.ready || Promise.resolve());
-    const classes = KarpusStore.getClasses() || [];
+    
+    // Cargar aulas asignadas a esta maestra
+    const { data: classes, error } = await supabase
+      .from('classrooms')
+      .select('*')
+      .eq('teacher_id', user.id);
+
+    if (error) console.error('Error cargando aulas:', error);
+
     // Mock colors/icons for variety
     const colors = ['bg-orange-100 text-orange-600', 'bg-blue-100 text-blue-600', 'bg-pink-100 text-pink-600', 'bg-green-100 text-green-600'];
     
+    if (!classes || classes.length === 0) {
+      classesGrid.innerHTML = '<div class="col-span-full text-center py-10 text-slate-500">No tienes aulas asignadas.</div>';
+      return;
+    }
+
     classesGrid.innerHTML = classes.map((cls, idx) => {
       const colorClass = colors[idx % colors.length];
       return `
-        <div class="bg-white rounded-3xl p-6 border shadow-sm hover:shadow-md transition-all cursor-pointer group" onclick="window.openClass('${cls}')">
+        <div class="bg-white rounded-3xl p-6 border shadow-sm hover:shadow-md transition-all cursor-pointer group" onclick="window.openClass('${cls.id}', '${cls.name}')">
           <div class="flex items-start justify-between mb-4">
             <div class="h-12 w-12 rounded-2xl ${colorClass} flex items-center justify-center">
               <i data-lucide="users" class="w-6 h-6"></i>
             </div>
             <button class="p-2 hover:bg-slate-50 rounded-full text-slate-400"><i data-lucide="more-horizontal" class="w-5 h-5"></i></button>
           </div>
-          <h3 class="text-xl font-bold text-slate-800 mb-1 group-hover:text-karpus-blue transition-colors">${cls}</h3>
-          <p class="text-sm text-slate-500 mb-4">Aula Principal</p>
+          <h3 class="text-xl font-bold text-slate-800 mb-1 group-hover:text-karpus-blue transition-colors">${cls.name}</h3>
+          <p class="text-sm text-slate-500 mb-4">${cls.level || 'Nivel'}</p>
           <div class="flex items-center gap-3 text-sm text-slate-500 border-t pt-4">
-            <span class="flex items-center gap-1"><i data-lucide="user" class="w-4 h-4"></i> 24 Estudiantes</span>
-            <span class="flex items-center gap-1"><i data-lucide="bell" class="w-4 h-4"></i> 2 Avisos</span>
+            <span class="flex items-center gap-1"><i data-lucide="user" class="w-4 h-4"></i> Ver Estudiantes</span>
           </div>
         </div>
       `;
@@ -120,9 +150,9 @@ document.addEventListener('DOMContentLoaded', () => {
   }
 
   // Expose to window for onclick
-  window.openClass = function(className) {
-    currentClass = className;
-    currentClassNameLabel.textContent = className;
+  window.openClass = function(classId, className) {
+    currentClass = { id: classId, name: className };
+    if(currentClassNameLabel) currentClassNameLabel.textContent = className;
     
     // Hide Home, Show Class Detail
     showSection('t-class-detail');
@@ -181,7 +211,7 @@ document.addEventListener('DOMContentLoaded', () => {
   function renderClassFeed() {
     const feedContainer = document.getElementById('classroomFeed');
     if(!feedContainer || !currentClass) return;
-    const posts = KarpusStore.getClassPosts(currentClass) || [];
+    const posts = []; // Implementar tabla 'posts' en futuro
     
     if(posts.length === 0) {
       feedContainer.innerHTML = `
@@ -190,7 +220,7 @@ document.addEventListener('DOMContentLoaded', () => {
             <i data-lucide="message-square" class="w-8 h-8 text-slate-300"></i>
           </div>
           <h3 class="text-slate-600 font-semibold">No hay publicaciones aún</h3>
-          <p class="text-sm text-slate-400">Sé el primero en publicar algo para el aula ${currentClass}.</p>
+          <p class="text-sm text-slate-400">Sé el primero en publicar algo para el aula ${currentClass.name}.</p>
         </div>
       `;
     } else {
@@ -238,7 +268,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const taskContainer = document.getElementById('taskList');
     if(!taskContainer || !currentClass) return;
 
-    let tasks = KarpusStore.getTasksForClass(currentClass) || [];
+    let tasks = []; // Implementar tabla 'tasks' en futuro
     
     // Filter logic (mocked for now as we don't have full student list in store to check all submissions)
     // In a real app, you'd check if all students submitted or if due date passed.
@@ -323,25 +353,34 @@ document.addEventListener('DOMContentLoaded', () => {
   };
 
   // --- Tab Logic: Grades (Mock) ---
-  function renderClassGrades() {
+  async function renderClassGrades() {
     const tbody = document.getElementById('gradesTableBody');
     if(!tbody || !currentClass) return;
 
-    // Mock students for grading view
-    const students = [
-      { name: 'Andrea Flores', deliveries: '5/5', avg: 19, obs: 'Excelente desempeño' },
-      { name: 'Juan Pérez', deliveries: '4/5', avg: 16, obs: 'Mejorando' },
-      { name: 'Sofía López', deliveries: '5/5', avg: 20, obs: 'Sobresaliente' },
-      { name: 'Carlos Ruiz', deliveries: '3/5', avg: 13, obs: 'Faltan entregas' },
-    ];
+    // Cargar estudiantes reales de la base de datos para esta aula
+    const { data: students, error } = await supabase
+      .from('students')
+      .select('*')
+      .eq('classroom_id', currentClass.id);
+
+    if (error) {
+      console.error('Error cargando estudiantes para notas:', error);
+      alert('Error de conexión al cargar estudiantes para notas: ' + error.message);
+      return;
+    }
+
+    if (!students || students.length === 0) {
+      tbody.innerHTML = '<tr><td colspan="5" class="p-4 text-center text-slate-500">No hay estudiantes registrados en esta aula.</td></tr>';
+      return;
+    }
 
     tbody.innerHTML = students.map(s => {
       return `
         <tr class="hover:bg-slate-50">
           <td class="p-4 font-medium text-slate-800">${s.name}</td>
-          <td class="p-4 text-center text-sm text-slate-600">${s.deliveries}</td>
-          <td class="p-4 text-center font-bold ${s.avg < 14 ? 'text-red-500' : 'text-green-600'}">${s.avg}</td>
-          <td class="p-4 text-sm text-slate-500">${s.obs}</td>
+          <td class="p-4 text-center text-sm text-slate-600">-</td>
+          <td class="p-4 text-center font-bold text-slate-600">-</td>
+          <td class="p-4 text-sm text-slate-500">Sin notas registradas</td>
           <td class="p-4 text-right">
             <button class="text-slate-400 hover:text-karpus-blue"><i data-lucide="edit-3" class="w-4 h-4"></i></button>
             <button class="text-slate-400 hover:text-karpus-orange ml-2" title="Reportar comportamiento" onclick="openBehaviorReport('${s.name}')"><i data-lucide="alert-circle" class="w-4 h-4"></i></button>
@@ -382,9 +421,8 @@ document.addEventListener('DOMContentLoaded', () => {
     const listContainer = document.getElementById('privateChatList');
     if(!listContainer) return;
 
-    // Filtrar contactos que son padres (simulación: id empieza con 'padre_')
-    const contacts = await KarpusStore.getContacts();
-    const parents = (contacts||[]).filter(c => c.id.startsWith('padre_'));
+    // Implementar lógica de chat real con tabla 'messages'
+    const parents = []; 
 
     listContainer.innerHTML = parents.map(p => `
        <div class="p-3 rounded-xl hover:bg-slate-50 cursor-pointer flex items-center gap-3 transition-colors" onclick="openPrivateChat('${p.id}')">
@@ -453,25 +491,39 @@ document.addEventListener('DOMContentLoaded', () => {
   }
 
   // --- Tab Logic: Attendance (Mock) ---
-  function renderClassAttendance() {
+  async function renderClassAttendance() {
     const container = document.getElementById('attendanceInterface');
     const dateDisplay = document.querySelector('.today-date-display');
     if(dateDisplay) dateDisplay.textContent = new Date().toLocaleDateString('es-ES', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
     
     if(!container) return;
 
-    // Mock students again
-    const students = ['Andrea Flores', 'Juan Pérez', 'Sofía López', 'Carlos Ruiz', 'Miguel Ángel'];
+    // Cargar estudiantes reales
+    const { data: students, error } = await supabase
+      .from('students')
+      .select('*')
+      .eq('classroom_id', currentClass.id);
+    
+    if (error) {
+      console.error('Error cargando estudiantes para asistencia:', error);
+      alert('Error de conexión al cargar estudiantes para asistencia: ' + error.message);
+      return;
+    }
+
+    if (!students || students.length === 0) {
+      container.innerHTML = '<div class="text-center py-8 text-slate-500">No hay estudiantes para tomar asistencia.</div>';
+      return;
+    }
     
     container.innerHTML = `
       <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3 text-left" id="attendanceList">
-        ${students.map(name => `
-          <div class="flex items-center justify-between p-3 border rounded-xl bg-white shadow-sm student-row" data-student="${name}" data-status="present">
+        ${students.map(s => `
+          <div class="flex items-center justify-between p-3 border rounded-xl bg-white shadow-sm student-row" data-student-id="${s.id}" data-status="present">
             <div class="flex items-center gap-3">
                <div class="h-8 w-8 rounded-full bg-slate-100 flex items-center justify-center text-xs font-bold text-slate-500">
-                 ${name.charAt(0)}
+                 ${s.name.charAt(0)}
                </div>
-               <span class="text-sm font-medium">${name}</span>
+               <span class="text-sm font-medium">${s.name}</span>
             </div>
             <div class="flex gap-1">
                <button class="att-btn p-1 rounded bg-green-100 text-green-600 ring-2 ring-green-500 ring-offset-1" data-type="present" title="Presente"><i data-lucide="check" class="w-4 h-4"></i></button>
@@ -520,29 +572,33 @@ document.addEventListener('DOMContentLoaded', () => {
     // Lógica del botón Guardar
     const saveBtn = document.getElementById('saveAttendanceBtn');
     if(saveBtn) {
-      saveBtn.addEventListener('click', () => {
+      saveBtn.addEventListener('click', async () => {
         const rows = document.querySelectorAll('.student-row');
-        let presentCount = 0;
-        let absentCount = 0;
-        let lateCount = 0;
+        const attendanceData = [];
         
         rows.forEach(r => {
-          const status = r.dataset.status;
-          if(status === 'present') presentCount++;
-          if(status === 'absent') absentCount++;
-          if(status === 'late') lateCount++;
+          attendanceData.push({
+            student_id: r.dataset.studentId,
+            classroom_id: currentClass.id,
+            date: new Date().toISOString().split('T')[0],
+            status: r.dataset.status
+          });
         });
         
-        // Guardar en el store
-        if(window.KarpusStore) {
-           KarpusStore.recordAttendance({
-             class: currentClass,
-             present: presentCount + lateCount, // Tardanza cuenta como asistencia para el resumen
-             total: rows.length
-           });
+        // Guardar en Supabase (upsert para actualizar si ya existe hoy)
+        const { error } = await supabase
+          .from('attendance')
+          .upsert(attendanceData, { onConflict: 'student_id, date' });
+
+        if (error) {
+          console.error('Error al guardar asistencia:', error);
+          alert('Error de conexión al guardar asistencia: ' + error.message);
+        } else {
+          const present = attendanceData.filter(a => a.status === 'present').length;
+          const absent = attendanceData.filter(a => a.status === 'absent').length;
+          const late = attendanceData.filter(a => a.status === 'late').length;
+          alert(`Asistencia guardada.\nPresentes: ${present}, Ausentes: ${absent}, Tardanzas: ${late}`);
         }
-        
-        alert(`Asistencia guardada con éxito.\n\nPresentes: ${presentCount}\nTardanzas: ${lateCount}\nAusentes: ${absentCount}`);
       });
     }
 
@@ -571,7 +627,7 @@ document.addEventListener('DOMContentLoaded', () => {
   }
 
   // --- Initial Render ---
-  (async ()=>{ await (window.KarpusStore?.ready || Promise.resolve()); await renderClassesGrid(); })();
+  renderClassesGrid();
   // Ensure we start at home
   const homeBtn = document.querySelector('[data-section="t-home"]');
   if(homeBtn) {

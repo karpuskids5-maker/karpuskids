@@ -4,9 +4,10 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>Karpus Kids — Panel Director</title>
+  <link rel="icon" href="logo/favicon.ico" type="image/x-icon">
   <script src="https://cdn.tailwindcss.com"></script>
   
-  <script src="js/auth.js?v=1"></script>
+  <!-- <script src="js/auth.js?v=1"></script> REMOVED: Using Supabase Auth -->
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
   <script src="https://unpkg.com/lucide@latest/dist/umd/lucide.min.js"></script>
   
@@ -185,12 +186,10 @@
         <button data-section="maestros" class="nav-btn teams-nav-item text-white hover:bg-white/20" title="Maestros">
           <i data-lucide="users" class="text-karpus-green"></i>
           <span class="label">Maestros</span>
-          <span class="badge">5</span>
         </button>
         <button data-section="estudiantes" class="nav-btn teams-nav-item text-white hover:bg-white/20" title="Estudiantes">
           <i data-lucide="user-check" class="text-karpus-orange"></i>
           <span class="label">Estudiantes</span>
-          <span class="badge">24</span>
         </button>
         <button data-section="aulas" class="nav-btn teams-nav-item text-white hover:bg-white/20" title="Aulas">
           <i data-lucide="home" class="text-karpus-purple"></i>
@@ -215,7 +214,6 @@
         <button data-section="comunicacion" class="nav-btn teams-nav-item text-white hover:bg-white/20" title="Comunicaciones">
           <i data-lucide="message-square" class="text-karpus-blue"></i>
           <span class="label">Comunicaciones</span>
-          <span class="badge">3</span>
         </button>
         <button data-section="configuracion" class="nav-btn teams-nav-item text-white hover:bg-white/20" title="Configuración">
           <i data-lucide="settings" class="text-karpus-gray"></i>
@@ -269,7 +267,7 @@
             </div>
             <div>
               <p class="text-sm">Niños presentes</p>
-              <p id="ninosPresentes" class="text-2xl font-bold">24</p>
+              <p id="ninosPresentes" class="text-2xl font-bold">-</p>
             </div>
           </div>
           <!-- Card 2: Maestros Activos -->
@@ -279,7 +277,7 @@
             </div>
             <div>
               <p class="text-sm">Maestros activos</p>
-              <p id="maestrosActivos" class="text-2xl font-bold">7</p>
+              <p id="maestrosActivos" class="text-2xl font-bold">-</p>
             </div>
           </div>
           <!-- Card 3: Solicitudes -->
@@ -289,7 +287,7 @@
             </div>
             <div>
               <p class="text-sm">Solicitudes hoy</p>
-              <p id="solicitudesHoy" class="text-2xl font-bold">3</p>
+              <p id="solicitudesHoy" class="text-2xl font-bold">-</p>
             </div>
           </div>
           <!-- Card 4: Aulas -->
@@ -299,7 +297,7 @@
             </div>
             <div>
               <p class="text-sm">Aulas ocupadas</p>
-              <p id="aulasOcupadas" class="text-2xl font-bold">5/6</p>
+              <p id="aulasOcupadas" class="text-2xl font-bold">-</p>
             </div>
           </div>
           <!-- Card 5: Eventos (Nuevo) -->
@@ -309,7 +307,7 @@
             </div>
             <div class="flex-1">
               <p class="text-sm font-semibold">Eventos del Mes</p>
-              <p class="text-sm">🎂 Cumpleaños de <span class="font-bold">Ana Sofía</span> (Mañana) • 🎭 Obra de teatro (Viernes 15)</p>
+              <p id="eventsList" class="text-sm text-slate-600">Cargando eventos...</p>
             </div>
           </div>
         </div>
@@ -334,11 +332,7 @@
               <thead class="text-slate-500 text-left">
                 <tr><th>Estudiante</th><th>Aula</th><th>Nota</th></tr>
               </thead>
-              <tbody id="evaluacionesList">
-                <tr><td>María P.</td><td>A1</td><td>Excelente</td></tr>
-                <tr><td>Javier R.</td><td>A2</td><td>Bueno</td></tr>
-                <tr><td>Sofia L.</td><td>A1</td><td>Muy bueno</td></tr>
-              </tbody>
+              <tbody id="evaluacionesList"></tbody>
             </table>
           </div>
         </div>
@@ -346,16 +340,7 @@
         <!-- Log de Actividad Biométrica Reciente -->
         <div class="mt-6 bg-white rounded shadow p-4">
             <h3 class="font-semibold mb-3">Actividad Biométrica Reciente</h3>
-            <div id="biometricLog" class="space-y-2 text-sm max-h-48 overflow-y-auto">
-                <div class="flex justify-between items-center p-2 rounded bg-green-50">
-                    <p><strong>Entrada:</strong> María P. (Aula A1)</p>
-                    <span class="text-xs text-slate-500">8:15 AM</span>
-                </div>
-                <div class="flex justify-between items-center p-2 rounded bg-green-50">
-                    <p><strong>Entrada:</strong> Javier R. (Aula A2)</p>
-                    <span class="text-xs text-slate-500">8:07 AM</span>
-                </div>
-            </div>
+            <div id="biometricLog" class="space-y-2 text-sm max-h-48 overflow-y-auto"></div>
         </div>
 
       </section>
@@ -415,68 +400,7 @@
                 <th class="text-center py-3 px-4 font-medium text-slate-700">Acciones</th>
               </tr>
             </thead>
-            <tbody id="studentsTable" class="divide-y divide-slate-200">
-              <tr class="hover:bg-slate-50">
-                <td class="py-4 px-4">
-                  <div class="flex items-center gap-3">
-                    <div class="w-8 h-8 bg-indigo-100 rounded-full flex items-center justify-center">
-                      <i data-lucide="user" class="w-4 h-4 text-indigo-600"></i>
-                    </div>
-                    <span class="font-medium text-slate-800">María Fernanda Pérez</span>
-                  </div>
-                </td>
-                <td class="py-4 px-4 text-center">
-                  <button class="btn-view-profile px-3 py-1 bg-blue-100 text-blue-700 rounded-lg hover:bg-blue-200 text-sm font-medium">
-                    Ver Perfil
-                  </button>
-                </td>
-              </tr>
-              <tr class="hover:bg-slate-50">
-                <td class="py-4 px-4">
-                  <div class="flex items-center gap-3">
-                    <div class="w-8 h-8 bg-green-100 rounded-full flex items-center justify-center">
-                      <i data-lucide="user" class="w-4 h-4 text-green-600"></i>
-                    </div>
-                    <span class="font-medium text-slate-800">Javier Alejandro Rodríguez</span>
-                  </div>
-                </td>
-                <td class="py-4 px-4 text-center">
-                  <button class="btn-view-profile px-3 py-1 bg-blue-100 text-blue-700 rounded-lg hover:bg-blue-200 text-sm font-medium">
-                    Ver Perfil
-                  </button>
-                </td>
-              </tr>
-              <tr class="hover:bg-slate-50">
-                <td class="py-4 px-4">
-                  <div class="flex items-center gap-3">
-                    <div class="w-8 h-8 bg-purple-100 rounded-full flex items-center justify-center">
-                      <i data-lucide="user" class="w-4 h-4 text-purple-600"></i>
-                    </div>
-                    <span class="font-medium text-slate-800">Ana Sofía González</span>
-                  </div>
-                </td>
-                <td class="py-4 px-4 text-center">
-                  <button class="btn-view-profile px-3 py-1 bg-blue-100 text-blue-700 rounded-lg hover:bg-blue-200 text-sm font-medium">
-                    Ver Perfil
-                  </button>
-                </td>
-              </tr>
-              <tr class="hover:bg-slate-50">
-                <td class="py-4 px-4">
-                  <div class="flex items-center gap-3">
-                    <div class="w-8 h-8 bg-orange-100 rounded-full flex items-center justify-center">
-                      <i data-lucide="user" class="w-4 h-4 text-orange-600"></i>
-                    </div>
-                    <span class="font-medium text-slate-800">Carlos Eduardo Martínez</span>
-                  </div>
-                </td>
-                <td class="py-4 px-4 text-center">
-                  <button class="btn-view-profile px-3 py-1 bg-blue-100 text-blue-700 rounded-lg hover:bg-blue-200 text-sm font-medium">
-                    Ver Perfil
-                  </button>
-                </td>
-              </tr>
-            </tbody>
+            <tbody id="studentsTable" class="divide-y divide-slate-200"></tbody>
           </table>
         </div>
       </section>
@@ -513,26 +437,60 @@
       <section id="asistencia" class="section hidden">
         <div class="flex items-center justify-between mb-4">
           <h2 class="text-xl font-semibold flex items-center gap-2">
-            <i data-lucide="calendar-check" class="w-5 h-5 text-slate-600"></i><span>Control de Asistencia</span>
+            <i data-lucide="pie-chart" class="w-5 h-5 text-slate-600"></i><span>Estadísticas de Asistencia</span>
           </h2>
           <div class="flex gap-2">
-            <input type="date" class="px-3 py-2 border rounded text-sm" value="2024-01-06">
-            <button id="exportAttendance" class="px-3 py-2 border rounded">Exportar</button>
+            <input type="date" id="attendanceDateFilter" class="px-3 py-2 border rounded text-sm">
+            <button id="btnRefreshAttendance" class="px-3 py-2 bg-blue-100 text-blue-700 rounded hover:bg-blue-200 text-sm font-medium">
+              <i data-lucide="refresh-cw" class="w-4 h-4"></i>
+            </button>
           </div>
         </div>
-        <div class="bg-white rounded shadow p-4">
-          <div class="flex justify-between items-center mb-3">
-            <p class="text-sm text-slate-500">Marcar / corregir asistencia del día</p>
-            <button id="btnMarkAllPresent" class="text-sm text-blue-600 hover:underline">Marcar todos presente</button>
+
+        <!-- Resumen de Asistencia -->
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+          <div class="bg-white p-4 rounded shadow border-l-4 border-green-500">
+            <p class="text-sm text-slate-500">Presentes</p>
+            <p id="statPresent" class="text-2xl font-bold text-slate-800">-</p>
           </div>
-          <table class="w-full text-sm">
-            <thead class="text-slate-500 text-left"><tr><th>Estudiante</th><th>Aula</th><th>Estado</th><th>Acciones</th></tr></thead>
-            <tbody id="attendanceListBody">
-              <tr><td>María P.</td><td>A1</td><td><select class="border rounded px-2 py-1 attendance-select"><option value="Presente">Presente</option><option value="Ausente">Ausente</option><option value="Excusa">Excusa Médica</option></select></td><td><button class="text-blue-600 hover:text-blue-800"><i data-lucide="save" class="w-4 h-4"></i></button></td></tr>
-              <tr><td>Javier R.</td><td>A2</td><td><select class="border rounded px-2 py-1 attendance-select"><option value="Presente">Presente</option><option value="Ausente">Ausente</option><option value="Excusa">Excusa Médica</option></select></td><td><button class="text-blue-600 hover:text-blue-800"><i data-lucide="save" class="w-4 h-4"></i></button></td></tr>
-              <tr><td>Ana Sofía G.</td><td>A1</td><td><select class="border rounded px-2 py-1 attendance-select"><option value="Presente">Presente</option><option value="Ausente">Ausente</option><option value="Excusa">Excusa Médica</option></select></td><td><button class="text-blue-600 hover:text-blue-800"><i data-lucide="save" class="w-4 h-4"></i></button></td></tr>
-            </tbody>
-          </table>
+          <div class="bg-white p-4 rounded shadow border-l-4 border-red-500">
+            <p class="text-sm text-slate-500">Ausentes</p>
+            <p id="statAbsent" class="text-2xl font-bold text-slate-800">-</p>
+          </div>
+          <div class="bg-white p-4 rounded shadow border-l-4 border-yellow-500">
+            <p class="text-sm text-slate-500">Tardanzas</p>
+            <p id="statLate" class="text-2xl font-bold text-slate-800">-</p>
+          </div>
+        </div>
+
+        <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          <!-- Gráfico General -->
+          <div class="bg-white rounded shadow p-4">
+            <h3 class="font-semibold mb-4 text-sm text-slate-700">Distribución del Día</h3>
+            <div class="h-64 flex items-center justify-center">
+              <canvas id="attendancePieChart"></canvas>
+            </div>
+          </div>
+          
+          <!-- Tabla por Aulas -->
+          <div class="bg-white rounded shadow p-4">
+            <h3 class="font-semibold mb-4 text-sm text-slate-700">Desglose por Aula</h3>
+            <div class="overflow-y-auto max-h-64">
+              <table class="w-full text-sm">
+                <thead class="text-slate-500 text-left sticky top-0 bg-white">
+                  <tr>
+                    <th class="pb-2">Aula</th>
+                    <th class="pb-2 text-center">Presentes</th>
+                    <th class="pb-2 text-center">Ausentes</th>
+                    <th class="pb-2 text-center">% Asistencia</th>
+                  </tr>
+                </thead>
+                <tbody id="attendanceByRoomBody">
+                  <!-- JS -->
+                </tbody>
+              </table>
+            </div>
+          </div>
         </div>
       </section>
 
@@ -582,131 +540,7 @@
         </div>
         
         <!-- Lista de reportes/quejas -->
-        <div class="space-y-4">
-          <!-- Reporte ejemplo 1 -->
-          <div class="bg-white rounded shadow p-4 border-l-4 border-red-500">
-            <div class="flex items-start justify-between mb-3">
-              <div>
-                <h3 class="font-semibold text-red-700">Queja - Comportamiento en el aula</h3>
-                <p class="text-sm text-slate-600">
-                  <span class="font-medium">De:</span> María González (Madre de Ana López) • 
-                  <span class="font-medium">Fecha:</span> 15 Dic 2024, 10:30 AM
-                </p>
-              </div>
-              <div class="flex gap-2">
-                <span class="px-2 py-1 bg-red-100 text-red-800 rounded-full text-xs">Pendiente</span>
-                <button class="btn-toggle-report text-blue-600 hover:text-blue-800 text-sm">Ver detalles</button>
-              </div>
-            </div>
-            <p class="text-sm text-slate-700 mb-3">
-              Mi hija Ana me comentó que hubo un incidente durante la hora del almuerzo donde otro niño le quitó su comida y la maestra no intervino adecuadamente...
-            </p>
-            <div class="report-details">
-              <div>
-              <div class="border-t pt-3 mt-3">
-                <h4 class="font-medium mb-2">Mensaje completo:</h4>
-                <p class="text-sm text-slate-700 mb-3">
-                  Mi hija Ana me comentó que hubo un incidente durante la hora del almuerzo donde otro niño le quitó su comida y la maestra no intervino adecuadamente. Ana llegó a casa muy triste y sin haber comido bien. Necesito que se tome acción inmediata para resolver esta situación y evitar que se repita.
-                </p>
-                <h4 class="font-medium mb-2">Archivos adjuntos:</h4>
-                <div class="flex gap-2 mb-3">
-                  <div class="flex items-center gap-2 px-3 py-2 bg-slate-100 rounded">
-                    <i data-lucide="image" class="w-4 h-4"></i>
-                    <span class="text-sm">foto_almuerzo.jpg</span>
-                    <button class="text-blue-600 hover:text-blue-800 text-xs">Ver</button>
-                  </div>
-                </div>
-                <div class="flex gap-2">
-                  <button class="btn-resolve-report px-3 py-2 bg-green-600 text-white rounded text-sm">Marcar como Resuelto</button>
-                  <button class="btn-respond-report px-3 py-2 bg-blue-600 text-white rounded text-sm">Responder</button>
-                </div>
-              </div>
-              </div>
-            </div>
-          </div>
-
-          <!-- Reporte ejemplo 2 -->
-          <div class="bg-white rounded shadow p-4 border-l-4 border-yellow-500">
-            <div class="flex items-start justify-between mb-3">
-              <div>
-                <h3 class="font-semibold text-yellow-700">Reporte - Solicitud de material</h3>
-                <p class="text-sm text-slate-600">
-                  <span class="font-medium">De:</span> Carolina Martínez (Maestra Aula A1) • 
-                  <span class="font-medium">Fecha:</span> 14 Dic 2024, 2:15 PM
-                </p>
-              </div>
-              <div class="flex gap-2">
-                <span class="px-2 py-1 bg-yellow-100 text-yellow-800 rounded-full text-xs">En proceso</span>
-                <button class="btn-toggle-report text-blue-600 hover:text-blue-800 text-sm">Ver detalles</button>
-              </div>
-            </div>
-            <p class="text-sm text-slate-700 mb-3">
-              Necesito solicitar material adicional para las actividades de arte. Los niños han mostrado mucho interés y necesitamos más suministros...
-            </p>
-            <div class="report-details">
-              <div>
-              <div class="border-t pt-3 mt-3">
-                <h4 class="font-medium mb-2">Mensaje completo:</h4>
-                <p class="text-sm text-slate-700 mb-3">
-                  Necesito solicitar material adicional para las actividades de arte. Los niños han mostrado mucho interés y necesitamos más suministros como pintura, pinceles, papel de colores y plastilina. Adjunto la lista detallada y algunas fotos de los trabajos que han realizado.
-                </p>
-                <h4 class="font-medium mb-2">Archivos adjuntos:</h4>
-                <div class="flex gap-2 mb-3">
-                  <div class="flex items-center gap-2 px-3 py-2 bg-slate-100 rounded">
-                    <i data-lucide="file-text" class="w-4 h-4"></i>
-                    <span class="text-sm">lista_materiales.pdf</span>
-                    <button class="text-blue-600 hover:text-blue-800 text-xs">Ver</button>
-                  </div>
-                  <div class="flex items-center gap-2 px-3 py-2 bg-slate-100 rounded">
-                    <i data-lucide="image" class="w-4 h-4"></i>
-                    <span class="text-sm">trabajos_arte.jpg</span>
-                    <button class="text-blue-600 hover:text-blue-800 text-xs">Ver</button>
-                  </div>
-                </div>
-                <div class="flex gap-2">
-                  <button class="btn-resolve-report px-3 py-2 bg-green-600 text-white rounded text-sm">Marcar como Resuelto</button>
-                  <button class="btn-respond-report px-3 py-2 bg-blue-600 text-white rounded text-sm">Responder</button>
-                </div>
-              </div>
-              </div>
-            </div>
-          </div>
-
-          <!-- Reporte ejemplo 3 - Resuelto -->
-          <div class="bg-white rounded shadow p-4 border-l-4 border-green-500">
-            <div class="flex items-start justify-between mb-3">
-              <div>
-                <h3 class="font-semibold text-green-700">Queja - Horario de recogida</h3>
-                <p class="text-sm text-slate-600">
-                  <span class="font-medium">De:</span> Carlos Rodríguez (Padre de Luis Rodríguez) • 
-                  <span class="font-medium">Fecha:</span> 12 Dic 2024, 4:45 PM
-                </p>
-              </div>
-              <div class="flex gap-2">
-                <span class="px-2 py-1 bg-green-100 text-green-800 rounded-full text-xs">Resuelto</span>
-                <button class="btn-toggle-report text-blue-600 hover:text-blue-800 text-sm">Ver detalles</button>
-              </div>
-            </div>
-            <p class="text-sm text-slate-700 mb-3">
-              Tengo dificultades con el horario de recogida actual. Mi trabajo termina a las 5:30 PM y necesito flexibilidad...
-            </p>
-            <div class="report-details">
-              <div>
-              <div class="border-t pt-3 mt-3">
-                <h4 class="font-medium mb-2">Mensaje completo:</h4>
-                <p class="text-sm text-slate-700 mb-3">
-                  Tengo dificultades con el horario de recogida actual. Mi trabajo termina a las 5:30 PM y necesito flexibilidad en el horario. ¿Es posible extender el horario hasta las 6:00 PM?
-                </p>
-                <h4 class="font-medium mb-2 text-green-700">Resolución:</h4>
-                <p class="text-sm text-green-700 mb-3">
-                  Se ha aprobado la extensión del horario hasta las 6:00 PM para casos especiales. Se ha actualizado el registro del estudiante.
-                </p>
-                <p class="text-xs text-slate-500">Resuelto por: Directora • 13 Dic 2024, 9:00 AM</p>
-              </div>
-            </div>
-            </div>
-          </div>
-        </div>
+        <div id="reportsList" class="space-y-4"></div>
       </section>
 
       <!-- PAGOS -->
@@ -1161,6 +995,12 @@
             <label class="text-sm text-slate-600 block mb-1">Horario</label>
             <input id="stSchedule" placeholder="08:00-12:00" class="w-full border rounded px-3 py-2" />
           </div>
+          <div class="col-span-2">
+             <label class="text-sm text-slate-600 block mb-1">Aula Asignada</label>
+             <select id="stClassroom" class="w-full border rounded px-3 py-2 bg-white">
+                <option value="">-- Seleccionar Aula --</option>
+             </select>
+          </div>
         </div>
         <div class="grid grid-cols-2 gap-2">
           <input id="p1Name" placeholder="Padre/Madre 1 (nombre)" class="border rounded px-3 py-2" />
@@ -1188,6 +1028,7 @@
   </div>
 
   <script src="js/common_ui.js"></script>
-  <script type="module" src="js/director/app.js"></script>
+  <script type="module" src="app.js"></script>
+  <script src="js/panel_directora.js"></script>
 </body>
 </html>

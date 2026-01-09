@@ -8,14 +8,14 @@ const qsa = s => Array.from(document.querySelectorAll(s));
 // Inicialización del panel Directora
 document.addEventListener('DOMContentLoaded', ()=>{
   // Enforce role without inline script
-  if (window.Auth && !Auth.enforceRole('directora')) return;
+  // if (window.Auth && !Auth.enforceRole('directora')) return; // REMOVED: Using Supabase Auth in app.js
   initDashboardChart();
   attachPaymentsHandlers();
   attachCommunicationsHandlers();
   initNavDirector();
   initStudentController();
-  initTeacherModule();
-  initRoomsModule();
+  // initTeacherModule(); // REMOVED: Managed by app.js (Supabase)
+  // initRoomsModule();   // REMOVED: Managed by app.js (Supabase)
   adjustMainOffset();
   window.addEventListener('resize', adjustMainOffset);
   const dash = document.getElementById('dashboard');
@@ -268,159 +268,72 @@ function initNavDirector(){
 // =============================
 // Estudiantes: perfil, búsqueda y alta
 // =============================
-const studentParentData = {
-  'María Fernanda Pérez': {
-    parent1: { name: 'Ana María Pérez González', phone: '+57 300 123 4567', email: 'ana.perez@email.com', job: 'Ingeniera de Sistemas', address: 'Calle 123 #45-67, Bogotá', emergency: '+57 301 987 6543' },
-    parent2: { name: 'Carlos Eduardo Pérez', phone: '+57 310 456 7890', email: 'carlos.perez@email.com', job: 'Contador Público', address: 'Calle 123 #45-67, Bogotá', emergency: '+57 320 111 2233' },
-    extra: { room: 'Aula Pequeños A1', startDate: '15 de Febrero, 2024', allergies: 'Ninguna conocida', pickup: 'Padres y Abuela Materna' }
-  },
-  'Javier Alejandro Rodríguez': {
-    parent1: { name: 'María Teresa Rodríguez', phone: '+57 302 111 2233', email: 'maria.rodriguez@email.com', job: 'Docente', address: 'Cra 45 #10-20, Bogotá', emergency: '+57 300 987 0011' },
-    parent2: { name: 'Eduardo Rodríguez', phone: '+57 315 555 6677', email: 'edu.rodriguez@email.com', job: 'Técnico Electricista', address: 'Cra 45 #10-20, Bogotá', emergency: '+57 310 222 3344' },
-    extra: { room: 'Aula Pequeños A2', startDate: '10 de Marzo, 2024', allergies: 'Alergia leve al polvo', pickup: 'Padres' }
-  },
-  'Ana Sofía González': {
-    parent1: { name: 'Laura González', phone: '+57 320 000 1122', email: 'laura.gonzalez@email.com', job: 'Arquitecta', address: 'Av. 7 #23-90, Bogotá', emergency: '+57 311 222 3345' },
-    parent2: { name: 'Marco González', phone: '+57 321 777 8899', email: 'marco.gonzalez@email.com', job: 'Diseñador', address: 'Av. 7 #23-90, Bogotá', emergency: '+57 321 555 6677' },
-    extra: { room: 'Aula Pequeños A1', startDate: '1 de Abril, 2024', allergies: 'Intolerancia a lactosa', pickup: 'Padres y Tía' }
-  },
-  'Carlos Eduardo Martínez': {
-    parent1: { name: 'Patricia Martínez', phone: '+57 312 333 4455', email: 'patricia.martinez@email.com', job: 'Odontóloga', address: 'Calle 9 #30-12, Bogotá', emergency: '+57 313 444 5566' },
-    parent2: { name: 'Ricardo Martínez', phone: '+57 314 666 7788', email: 'ricardo.martinez@email.com', job: 'Administrador', address: 'Calle 9 #30-12, Bogotá', emergency: '+57 314 999 0001' },
-    extra: { room: 'Aula Pequeños A3', startDate: '20 de Enero, 2024', allergies: 'Ninguna', pickup: 'Padres' }
-  }
-};
-
 function initStudentController(){
-  // abrir perfil
-  window.viewStudentProfile = function(button){
-    const row = button.closest('tr');
-    const nameEl = row?.querySelector('td .font-medium');
-    const name = nameEl ? nameEl.textContent.trim() : 'Estudiante';
-    openStudentProfile(name);
-  };
-
-  // cerrar perfil
-  const closeSt1 = document.getElementById('closeStudentProfile');
-  if (closeSt1) closeSt1.addEventListener('click', ()=>{
-    const m = document.getElementById('studentProfileModal');
-    if (m) m.classList.add('hidden');
-  });
-  const closeSt2 = document.getElementById('closeStudentProfileModal');
-  if (closeSt2) closeSt2.addEventListener('click', ()=>{
-    const m = document.getElementById('studentProfileModal');
-    if (m) m.classList.add('hidden');
+  // ABRIR PERFIL DE ESTUDIANTE
+  document.getElementById('studentsTable').addEventListener('click', (event) => {
+    const viewButton = event.target.closest('.view-profile-btn');
+    if (viewButton) {
+      const studentId = viewButton.getAttribute('data-student-id');
+      if (studentId) {
+        if (typeof window.openStudentProfile === 'function') {
+          window.openStudentProfile(studentId);
+        } else {
+          console.error('Error: openStudentProfile no está definida en window. Asegúrese de que app.js se ha cargado correctamente.');
+          alert('Error interno: No se pudo abrir el perfil. Función no encontrada.');
+        }
+      }
+    }
   });
 
-  // búsqueda
-  const searchInput = document.getElementById('searchStudent');
-  if (searchInput) searchInput.addEventListener('input', function(){
-    const q = this.value.toLowerCase();
-    qsa('#studentsTable tr').forEach(r => {
-      const name = r.querySelector('.font-medium')?.textContent.toLowerCase() || '';
-      r.style.display = name.includes(q) ? '' : 'none';
+  // CERRAR PERFIL
+  const closeModalButtons = qsa('#closeStudentProfile, #closeStudentProfileModal');
+  closeModalButtons.forEach(btn => {
+    btn.addEventListener('click', () => {
+      qs('#studentProfileModal').classList.add('hidden');
     });
   });
 
-  // agregar estudiante: abrir/cerrar modal
+  // LÓGICA DE BÚSQUEDA
+  const searchInput = document.getElementById('searchStudent');
+  if (searchInput) {
+    searchInput.addEventListener('input', function() {
+      const query = this.value.toLowerCase().trim();
+      qsa('#studentsTable tr').forEach(row => {
+        const name = row.querySelector('.font-medium')?.textContent.toLowerCase() || '';
+        row.style.display = name.includes(query) ? '' : 'none';
+      });
+    });
+  }
+
+  // GESTIÓN DEL MODAL PARA AGREGAR ESTUDIANTE
   const addStudentBtn = document.getElementById('addStudentBtn');
-  if (addStudentBtn) addStudentBtn.addEventListener('click', ()=>{
-    const m = document.getElementById('modalAddStudent');
-    if (m) m.classList.remove('hidden');
-  });
-  const closeAddSt = document.getElementById('closeAddStudent');
-  if (closeAddSt) closeAddSt.addEventListener('click', ()=>{
-    const m = document.getElementById('modalAddStudent');
-    if (m) m.classList.add('hidden');
-    clearStudentModal();
-  });
+  if (addStudentBtn) {
+    addStudentBtn.addEventListener('click', () => {
+      qs('#modalAddStudent').classList.remove('hidden');
+    });
+  }
 
-  // guardar nuevo estudiante
-  const saveAddSt = document.getElementById('saveAddStudent');
-  if (saveAddSt) saveAddSt.addEventListener('click', ()=>{
-    const name = (document.getElementById('stName')?.value || '').trim();
-    if(!name) { alert('Ingrese el nombre del estudiante'); return; }
-    const age = (document.getElementById('stAge')?.value || '').trim();
-    const schedule = (document.getElementById('stSchedule')?.value || '').trim();
-    const p1Name = (document.getElementById('p1Name')?.value || '').trim();
-    const p1Phone = (document.getElementById('p1Phone')?.value || '').trim();
-    const p2Name = (document.getElementById('p2Name')?.value || '').trim();
-    const p2Phone = (document.getElementById('p2Phone')?.value || '').trim();
-    const active = !!document.getElementById('stActive')?.checked;
+  const cancelStudentBtn = document.getElementById('btnCancelStudent');
+  if (cancelStudentBtn) {
+    cancelStudentBtn.addEventListener('click', () => {
+      qs('#modalAddStudent').classList.add('hidden');
+      clearStudentModal();
+    });
+  }
 
-    const tr = document.createElement('tr');
-    tr.className = 'hover:bg-slate-50';
-    tr.innerHTML = `
-      <td class="py-4 px-4">
-        <div class="flex items-center gap-3">
-          <div class="w-8 h-8 bg-slate-100 rounded-full flex items-center justify-center">👤</div>
-          <div>
-            <div class="font-medium text-slate-800">${name}</div>
-            <div class="text-xs text-slate-500">${age? age + ' años' : ''} ${schedule? '• '+schedule : ''}</div>
-          </div>
-        </div>
-      </td>
-      <td class="py-4 px-4 text-center">
-        <button onclick="viewStudentProfile(this)" class="px-3 py-1 bg-blue-100 text-blue-700 rounded-lg hover:bg-blue-200 text-sm font-medium">Ver Perfil</button>
-      </td>
-    `;
-
-    // guardar datos básicos de padres para la vista rápida
-    studentParentData[name] = {
-      parent1: { name: p1Name || '', phone: p1Phone || '' },
-      parent2: { name: p2Name || '', phone: p2Phone || '' },
-      extra: { room: '', startDate: '', allergies: '', pickup: '', schedule: schedule || '' }
-    };
-
-    const stTable = document.getElementById('studentsTable');
-    if (stTable) stTable.appendChild(tr);
-    const m = document.getElementById('modalAddStudent');
-    if (m) m.classList.add('hidden');
-    clearStudentModal();
-    alert(`Estudiante "${name}" agregado.`);
-  });
+  // GUARDAR NUEVO ESTUDIANTE (ya implementado en app.js, no se duplica aquí)
 }
 
 function clearStudentModal(){
-  ['stName','stAge','stSchedule','p1Name','p1Phone','p2Name','p2Phone'].forEach(id=>{
+  ['stName','stAge','stSchedule','p1Name','p1Phone','p2Name','p2Phone', 'stAllergies', 'stBlood', 'stPickup'].forEach(id => {
     const el = document.getElementById(id);
-    if(!el) return;
-    el.value = '';
+    if(el) el.value = '';
   });
-  const ch = document.getElementById('stActive'); if(ch) ch.checked = true;
+  const ch = document.getElementById('stActive'); 
+  if(ch) ch.checked = true;
 }
 
-function openStudentProfile(name){
-  const modal = document.getElementById('studentProfileModal');
-  const data = studentParentData[name] || null;
-  const nameEl = document.getElementById('studentProfileName');
-  if (nameEl) nameEl.textContent = name;
-
-  const safe = (val, def='No registrado') => (val && String(val).trim()) ? val : def;
-  const p1 = data?.parent1 || {};
-  const p2 = data?.parent2 || {};
-  const ex = data?.extra   || {};
-  const p1n = document.getElementById('parent1Name'); if (p1n) p1n.textContent = safe(p1.name);
-  const p1ph = document.getElementById('parent1Phone'); if (p1ph) p1ph.textContent = safe(p1.phone);
-  const p1em = document.getElementById('parent1Email'); if (p1em) p1em.textContent = safe(p1.email);
-  const p1job = document.getElementById('parent1Job'); if (p1job) p1job.textContent = safe(p1.job);
-  const p1addr = document.getElementById('parent1Address'); if (p1addr) p1addr.textContent = safe(p1.address);
-  const p1emer = document.getElementById('parent1Emergency'); if (p1emer) p1emer.textContent = safe(p1.emergency);
-
-  const p2n = document.getElementById('parent2Name'); if (p2n) p2n.textContent = safe(p2.name);
-  const p2ph = document.getElementById('parent2Phone'); if (p2ph) p2ph.textContent = safe(p2.phone);
-  const p2em = document.getElementById('parent2Email'); if (p2em) p2em.textContent = safe(p2.email);
-  const p2job = document.getElementById('parent2Job'); if (p2job) p2job.textContent = safe(p2.job);
-  const p2addr = document.getElementById('parent2Address'); if (p2addr) p2addr.textContent = safe(p2.address);
-  const p2emer = document.getElementById('parent2Emergency'); if (p2emer) p2emer.textContent = safe(p2.emergency);
-
-  const stRoom = document.getElementById('studentRoom'); if (stRoom) stRoom.textContent = safe(ex.room);
-  const stStart = document.getElementById('studentStartDate'); if (stStart) stStart.textContent = safe(ex.startDate);
-  const stAll = document.getElementById('studentAllergies'); if (stAll) stAll.textContent = safe(ex.allergies);
-  const stPick = document.getElementById('studentPickup'); if (stPick) stPick.textContent = safe(ex.pickup);
-
-  if (modal) modal.classList.remove('hidden');
-}
+// La función openStudentProfile se ha movido a app.js para usar la conexión Supabase
 
 // Ajuste dinámico del offset superior para evitar espacio vacío cuando hay header fijo
 function adjustMainOffset(){

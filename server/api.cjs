@@ -1,5 +1,6 @@
 const express = require('express');
 const cors = require('cors');
+try { require('dotenv').config(); } catch(e) {}
 const Database = require('better-sqlite3');
 const { useSupabase, supabase } = require('./dbProvider.cjs');
 
@@ -32,6 +33,21 @@ app.get('/api/classrooms', async (req, res) => {
     }
     const list = rows('SELECT id, name, level FROM classrooms ORDER BY id');
     res.json(list);
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
+app.post('/api/classrooms', async (req, res) => {
+  try {
+    const { name, level } = req.body;
+    if (useSupabase) {
+      const { error } = await supabase.from('classrooms').insert({ name, level });
+      if (error) return res.status(500).json({ error: error.message });
+      return res.json({ ok: true });
+    }
+    run('INSERT INTO classrooms (name, level) VALUES (?, ?)', [name, level]);
+    res.json({ ok: true });
   } catch (e) {
     res.status(500).json({ error: e.message });
   }
@@ -412,6 +428,70 @@ app.get('/api/teachers', async (req, res) => {
   }
 });
 
+app.post('/api/teachers', async (req, res) => {
+  try {
+    const { name, email, phone, specialty, avatar_url, username, password } = req.body;
+    if (useSupabase) {
+      const { error } = await supabase.from('teachers').insert({ name, email, phone, specialty, avatar_url, username, password });
+      if (error) return res.status(500).json({ error: error.message });
+      return res.json({ ok: true });
+    }
+    run('INSERT INTO teachers (name, email, phone, specialty, avatar_url, username, password) VALUES (?, ?, ?, ?, ?, ?, ?)', [name, email, phone, specialty, avatar_url, username, password]);
+    res.json({ ok: true });
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
+// Login endpoint
+app.post('/api/login', async (req, res) => {
+  try {
+    const { username, password } = req.body;
+    
+    if (useSupabase) {
+      const { data: teacher, error } = await supabase
+        .from('teachers')
+        .select('id, name, username')
+        .eq('username', username)
+        .eq('password', password)
+        .limit(1);
+      
+      if (error) return res.status(500).json({ error: error.message });
+      if (!teacher || teacher.length === 0) {
+        return res.status(401).json({ error: 'Credenciales inválidas' });
+      }
+      
+      return res.json({ 
+        success: true, 
+        user: { 
+          id: teacher[0].id, 
+          name: teacher[0].name, 
+          username: teacher[0].username 
+        } 
+      });
+    }
+    
+    // SQLite
+    const teacher = row('SELECT id, name, username FROM teachers WHERE username = ? AND password = ? LIMIT 1', [username, password]);
+    
+    if (!teacher) {
+      return res.status(401).json({ error: 'Credenciales inválidas' });
+    }
+    
+    res.json({ 
+      success: true, 
+      user: { 
+        id: teacher.id, 
+        name: teacher.name, 
+        username: teacher.username 
+      } 
+    });
+    
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
 // Students
 app.get('/api/students', async (req, res) => {
   try {
@@ -431,6 +511,36 @@ app.get('/api/students', async (req, res) => {
     }
     const list = rows(sql, params);
     res.json(list);
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
+app.post('/api/payments', async (req, res) => {
+  try {
+    const { student_id, amount, status, due_date, concept } = req.body;
+    if (useSupabase) {
+      const { error } = await supabase.from('payments').insert({ student_id, amount, status, due_date, concept });
+      if (error) return res.status(500).json({ error: error.message });
+      return res.json({ ok: true });
+    }
+    run('INSERT INTO payments (student_id, amount, status, due_date, concept) VALUES (?, ?, ?, ?, ?)', [student_id, amount, status, due_date, concept]);
+    res.json({ ok: true });
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
+app.post('/api/students', async (req, res) => {
+  try {
+    const { first_name, last_name, classroom_id, avatar_url } = req.body;
+    if (useSupabase) {
+      const { error } = await supabase.from('students').insert({ first_name, last_name, classroom_id, avatar_url });
+      if (error) return res.status(500).json({ error: error.message });
+      return res.json({ ok: true });
+    }
+    run('INSERT INTO students (first_name, last_name, classroom_id, avatar_url) VALUES (?, ?, ?, ?)', [first_name, last_name, classroom_id, avatar_url]);
+    res.json({ ok: true });
   } catch (e) {
     res.status(500).json({ error: e.message });
   }
@@ -484,6 +594,48 @@ app.get('/api/attendance', async (req, res) => {
     }
     const list = rows(sql, params);
     res.json(list);
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
+// Profiles
+app.get('/api/profiles/:role', (req, res) => {
+  const role = req.params.role;
+  if (role === 'teacher') return res.json({ name: 'Ana Pérez', email: 'ana@karpus.edu', bio: 'Educadora apasionada con experiencia en desarrollo infantil.', avatar: 'https://placehold.co/200x200' });
+  if (role === 'director') return res.json({ name: 'Karonlyn García', bio: 'Fundadora de Karpus Kids.', avatar: 'img/mundo.jpg' });
+  res.status(404).json({ error: 'role inválido' });
+});
+
+app.post('/api/attendance', async (req, res) => {
+  try {
+    const { studentId, date, status, notes } = req.body;
+    if (useSupabase) {
+      const { error } = await supabase.from('attendance').upsert({ student_id: studentId, date, status, notes }, { onConflict: 'student_id, date' });
+      if (error) return res.status(500).json({ error: error.message });
+      return res.json({ ok: true });
+    }
+    // SQLite upsert
+    run(`INSERT INTO attendance (student_id, date, status, notes) VALUES (?, ?, ?, ?) 
+         ON CONFLICT(student_id, date) DO UPDATE SET status=excluded.status, notes=excluded.notes`, 
+         [studentId, date, status, notes]);
+    res.json({ ok: true });
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
+app.put('/api/payments/:id', async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { status } = req.body;
+    if (useSupabase) {
+      const { error } = await supabase.from('payments').update({ status }).eq('id', id);
+      if (error) return res.status(500).json({ error: error.message });
+      return res.json({ ok: true });
+    }
+    run('UPDATE payments SET status = ? WHERE id = ?', [status, id]);
+    res.json({ ok: true });
   } catch (e) {
     res.status(500).json({ error: e.message });
   }
