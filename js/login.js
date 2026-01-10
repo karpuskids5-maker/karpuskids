@@ -42,8 +42,17 @@ document.addEventListener('DOMContentLoaded', () => {
         else alert('Rol no reconocido');
 
       } catch (error) {
-        console.error(error);
-        alert('Error de acceso: ' + (error.message || 'Credenciales incorrectas'));
+        console.error('Error en el inicio de sesión:', error);
+        
+        let errorMessage = 'Ocurrió un error inesperado. Por favor, intente de nuevo.';
+        if (error.message.includes('Invalid login credentials')) {
+            errorMessage = 'El correo electrónico o la contraseña son incorrectos. Por favor, verifique sus datos.';
+        } else if (error.message.includes('Email not confirmed')) {
+            errorMessage = 'Su cuenta aún no ha sido confirmada. Por favor, revise su correo electrónico y haga clic en el enlace de confirmación.';
+        }
+        
+        alert(errorMessage + '\n\nDetalle técnico: ' + (error.message || JSON.stringify(error)));
+        
         submitBtn.disabled = false;
         submitBtn.textContent = originalText;
       }

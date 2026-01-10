@@ -222,6 +222,10 @@ DROP POLICY IF EXISTS "Directora gestiona estudiantes" ON public.students;
 CREATE POLICY "Directora gestiona estudiantes" ON public.students FOR ALL USING (
   get_my_role() = 'directora'
 );
+-- Política explícita de inserción para asegurar que el WITH CHECK pase correctamente
+CREATE POLICY "Directora inserta estudiantes" ON public.students FOR INSERT WITH CHECK (
+  get_my_role() = 'directora'
+);
 
 -- Attendance
 DROP POLICY IF EXISTS "Directora ve asistencia" ON public.attendance;
@@ -269,7 +273,9 @@ create table if not exists public.comments (
 
 -- Políticas RLS para posts
 alter table public.posts enable row level security;
+drop policy if exists "Ver posts" on public.posts;
 create policy "Ver posts" on public.posts for select using (true);
+drop policy if exists "Maestras crean posts" on public.posts;
 create policy "Maestras crean posts" on public.posts for insert with check (auth.uid() = teacher_id);
 
 -- 8. STORAGE (Ejecutar manualmente en Dashboard si falla por permisos)
@@ -277,5 +283,7 @@ create policy "Maestras crean posts" on public.posts for insert with check (auth
 -- pero intentamos insertar si la extensión lo permite.
 insert into storage.buckets (id, name, public) values ('classroom_media', 'classroom_media', true) on conflict do nothing;
 
+drop policy if exists "Public Access Media" on storage.objects;
 create policy "Public Access Media" on storage.objects for select using ( bucket_id = 'classroom_media' );
+drop policy if exists "Teachers Upload Media" on storage.objects;
 create policy "Teachers Upload Media" on storage.objects for insert with check ( bucket_id = 'classroom_media' and auth.role() = 'authenticated' );

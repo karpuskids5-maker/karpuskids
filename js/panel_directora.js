@@ -12,7 +12,7 @@ document.addEventListener('DOMContentLoaded', ()=>{
   initDashboardChart();
   attachPaymentsHandlers();
   attachCommunicationsHandlers();
-  initNavDirector();
+  // initNavDirector(); // REMOVED: Managed by app.js
   initStudentController();
   // initTeacherModule(); // REMOVED: Managed by app.js (Supabase)
   // initRoomsModule();   // REMOVED: Managed by app.js (Supabase)
@@ -23,13 +23,19 @@ document.addEventListener('DOMContentLoaded', ()=>{
 });
 
 // --- Chart demo ---
-function initDashboardChart(){
+window.initDashboardChart = function(){
   const canvas = document.getElementById('attendanceChart');
   if(!canvas) return;
 
+  // Asegurar contenedor estable
+  if (canvas.parentElement) {
+    canvas.parentElement.style.position = 'relative';
+    canvas.parentElement.style.height = '260px';
+  }
+
   // Destruir instancia previa si existe (para evitar superposiciones al recargar)
-  if (window.dashboardChartInstance) {
-    window.dashboardChartInstance.destroy();
+  if (window.DirectorState && window.DirectorState.chartInstance) {
+    window.DirectorState.chartInstance.destroy();
   }
 
   const ctx = canvas.getContext('2d');
@@ -39,7 +45,7 @@ function initDashboardChart(){
   gradient.addColorStop(0, 'rgba(37, 99, 235, 0.2)'); // Azul intenso transparente
   gradient.addColorStop(1, 'rgba(37, 99, 235, 0)');   // Transparente
 
-  window.dashboardChartInstance = new Chart(ctx, {
+  const chart = new Chart(ctx, {
     type: 'line',
     data: {
       labels: ['Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb', 'Dom'],
@@ -98,6 +104,9 @@ function initDashboardChart(){
       }
     }
   });
+
+  if (window.DirectorState) window.DirectorState.chartInstance = chart;
+  else window.dashboardChartInstance = chart; // Fallback
 }
 
 // --- Pagos: handlers ---
@@ -249,22 +258,7 @@ adaptTablesToMobile();
 // =============================
 // Navegación lateral de secciones
 // =============================
-function initNavDirector(){
-  const buttons = qsa('#sidebar .nav-btn[data-section]');
-  buttons.forEach(btn => {
-    btn.addEventListener('click', () => {
-      const id = btn.getAttribute('data-section');
-      if (!id) return;
-      // marcar activo
-      buttons.forEach(b => b.classList.toggle('active', b === btn));
-      // show/hide sections
-      qsa('main .section').forEach(s => s.classList.add('hidden'));
-      const target = document.getElementById(id);
-      if (target) target.classList.remove('hidden');
-      try { window.scrollTo({ top: 0, behavior: 'smooth' }); } catch(e){}
-    });
-  });
-}
+// REMOVED: Logic moved to app.js to coordinate with data loading
 
 // =============================
 // Estudiantes: perfil, búsqueda y alta
@@ -330,6 +324,7 @@ function clearStudentModal(){
     const el = document.getElementById(id);
     if(el) el.value = '';
   });
+  document.getElementById('stClassroom').value = '';
   const ch = document.getElementById('stActive'); 
   if(ch) ch.checked = true;
 }

@@ -54,7 +54,14 @@ document.addEventListener('DOMContentLoaded', async () => {
     sidebarOverlay.addEventListener('click', () => {
        if(sidebar.classList.contains('mobile-visible')) toggleMobileMenu();
     });
-  }// Inicializar vista por defecto
+  }
+
+// --- Class Dashboard Logic (New) ---
+  const classesGrid = document.getElementById('classesGrid');
+  const backToClassesBtn = document.getElementById('backToClasses');
+  const currentClassNameLabel = document.getElementById('currentClassName');
+
+  // Inicializar vista por defecto
   renderClassesGrid();
   if(window.lucide) lucide.createIcons();
   // SE ELIMINA EL CIERRE PREMATURO AQUI PARA QUE EL SCOPE ABARQUE TODO EL ARCHIVO
@@ -105,11 +112,6 @@ document.addEventListener('DOMContentLoaded', async () => {
       try { window.scrollTo({ top: 0, behavior: 'smooth' }); } catch(e){}
     });
   });
-
-  // --- Class Dashboard Logic (New) ---
-  const classesGrid = document.getElementById('classesGrid');
-  const backToClassesBtn = document.getElementById('backToClasses');
-  const currentClassNameLabel = document.getElementById('currentClassName');
 
   async function renderClassesGrid() {
     if(!classesGrid) return;
@@ -750,4 +752,4 @@ document.addEventListener('DOMContentLoaded', async () => {
   bindModal(undefined, 'modalGradeTask', ['closeGradeTask']);
 
   if(window.lucide) lucide.createIcons();
-}); // Fin de DOMContentLoaded
+});
