@@ -85,7 +85,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         break;
       case 'aulas':
         if (!window.DirectorState.loaded.aulas) {
-          await loadRooms();
+          await Promise.all([loadRooms(), loadTeachersForFilter()]);
           window.DirectorState.loaded.aulas = true;
         }
         break;

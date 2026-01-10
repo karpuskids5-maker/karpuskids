@@ -51,7 +51,7 @@ document.addEventListener('DOMContentLoaded', () => {
             errorMessage = 'Su cuenta aún no ha sido confirmada. Por favor, revise su correo electrónico y haga clic en el enlace de confirmación.';
         }
         
-        alert(errorMessage + '\n\nDetalle técnico: ' + (error.message || JSON.stringify(error)));
+        alert(errorMessage);
         
         submitBtn.disabled = false;
         submitBtn.textContent = originalText;
