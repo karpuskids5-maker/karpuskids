@@ -5,6 +5,7 @@
  */
  (function(){
   const API = 'http://127.0.0.1:5600/api';
+  let USE_SUPABASE = false;
   const caches = {
     classes: [],
     posts: {}, // by class
@@ -13,9 +14,17 @@
     contacts: [],
   };
   async function fetchJson(url, opts){
-    const res = await fetch(url, opts);
-    if(!res.ok) throw new Error('HTTP '+res.status);
-    return res.json();
+    try {
+      const controller = new AbortController();
+      const id = setTimeout(() => controller.abort(), 5000);
+      const res = await fetch(url, { ...(opts||{}), signal: controller.signal });
+      clearTimeout(id);
+      if(!res.ok) throw new Error('HTTP '+res.status);
+      return res.json();
+    } catch (e) {
+      caches.error = e;
+      throw e;
+    }
   }
   async function preload(){
     try {
@@ -31,8 +40,20 @@
         } catch(e) { /* noop por clase faltante */ }
       }
     } catch(e){ 
-      console.error("Store preload error", e);
       caches.error = e;
+      USE_SUPABASE = !!window.supabase;
+      if (USE_SUPABASE) {
+        try {
+          const sb = window.supabase;
+          const { data: rooms } = await sb.from('classrooms').select('id,name,level').order('id');
+          caches.classes = rooms || [];
+          caches.contacts = [
+            { id: 'maestra', name: 'Maestra Ana' },
+            { id: 'directora', name: 'Directora' }
+          ];
+          // Mantener posts/tasks/notifications vacíos en fallback
+        } catch (se) {}
+      }
     }
   }
   const ready = preload();
@@ -45,8 +66,22 @@
     reset(){},
 
     // Perfil de maestra/directora desde API
-    async getTeacherProfile(){ return await fetchJson(`${API}/profiles/teacher`); },
-    async getDirectorProfile(){ return await fetchJson(`${API}/profiles/director`); },
+    async getTeacherProfile(){ 
+      if (USE_SUPABASE && window.supabase) {
+        const { data } = await window.supabase.from('profiles').select('name,email').eq('role','maestra').limit(1);
+        const p = (data||[])[0] || { name: 'Maestra', email: '' };
+        return p;
+      }
+      return await fetchJson(`${API}/profiles/teacher`);
+    },
+    async getDirectorProfile(){ 
+      if (USE_SUPABASE && window.supabase) {
+        const { data } = await window.supabase.from('profiles').select('name').eq('role','directora').limit(1);
+        const p = (data||[])[0] || { name: 'Directora' };
+        return p;
+      }
+      return await fetchJson(`${API}/profiles/director`);
+    },
     updateTeacherProfile(){ return this.getTeacherProfile(); },
 
     // Posts
@@ -86,6 +121,13 @@
       if (studentId) qs.push(`studentId=${studentId}`);
       if (date) qs.push(`date=${date}`);
       const q = qs.length ? '?' + qs.join('&') : '';
+      if (USE_SUPABASE && window.supabase) {
+        let query = window.supabase.from('attendance').select('*');
+        if (studentId) query = query.eq('student_id', studentId);
+        if (date) query = query.eq('date', date);
+        const { data } = await query;
+        return data || [];
+      }
       return await fetchJson(`${API}/attendance${q}`);
     },
     recordAttendance(){},
@@ -94,7 +136,13 @@
     getImprovementPlans(){ return []; },
 
     // Teachers
-    async getTeachers(){ return await fetchJson(`${API}/teachers`); },
+    async getTeachers(){ 
+      if (USE_SUPABASE && window.supabase) {
+        const { data } = await window.supabase.from('profiles').select('id,name,email,role').eq('role','maestra').order('name');
+        return data || [];
+      }
+      return await fetchJson(`${API}/teachers`); 
+    },
 
     // Login
     async login(username, password) {
@@ -108,15 +156,33 @@
     // Students
     async getStudents(classId){ 
         const qs = classId ? `?classId=${classId}` : '';
+        if (USE_SUPABASE && window.supabase) {
+          let query = window.supabase.from('students').select('*, classrooms(name, level)');
+          if (classId) query = query.eq('classroom_id', classId);
+          const { data } = await query;
+          return data || [];
+        }
         return await fetchJson(`${API}/students${qs}`); 
     },
     
     // Rooms (Classrooms)
-    async getRooms(){ return await fetchJson(`${API}/classrooms`); },
+    async getRooms(){ 
+      if (USE_SUPABASE && window.supabase) {
+        const { data } = await window.supabase.from('classrooms').select('id,name,level').order('id');
+        return data || [];
+      }
+      return await fetchJson(`${API}/classrooms`); 
+    },
 
     // Payments
     async getPayments(studentId){
         const qs = studentId ? `?studentId=${studentId}` : '';
+        if (USE_SUPABASE && window.supabase) {
+            let query = window.supabase.from('payments').select('*, students(name)');
+            if (studentId) query = query.eq('student_id', studentId);
+            const { data } = await query;
+            return data || [];
+        }
         return await fetchJson(`${API}/payments${qs}`);
     },
     addPayment(){},

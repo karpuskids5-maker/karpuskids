@@ -1,416 +1,634 @@
 import { supabase } from './supabase.js';
 
-/**
- * Controlador Principal: Panel de Padres
- * Orquesta la lógica de negocio y conecta Servicios con UI.
- */
-class ParentDashboardApp {
-    constructor() {
-        this.auth = window.Auth;
-        this.data = window.KarpusStore;
-        this.ui = new (function UIManager() {
-            this.showTab = (tabId) => {
-                document.querySelectorAll('.tab-content').forEach(tab => tab.classList.add('hidden'));
-                const tabToShow = document.getElementById(`tab-${tabId}`);
-                if (tabToShow) {
-                    tabToShow.classList.remove('hidden');
-                }
-            };
-            this.render = (elementId, html) => {
-                const element = document.getElementById(elementId);
-                if (element) {
-                    element.innerHTML = html;
-                }
-            };
-            this.renderDonutChart = (containerId, percent, present, absent) => {
-                const container = document.getElementById(containerId);
-                if (!container) return;
-                const size = 120;
-                const strokeWidth = 12;
-                const radius = (size / 2) - (strokeWidth * 2);
-                const circumference = 2 * Math.PI * radius;
-                const offset = circumference - (percent / 100 * circumference);
+// --- 1. HELPERS & UTILS ---
+const Helpers = {
+  toast(msg, type = 'success') {
+    const t = document.createElement('div');
+    const colorClass = type === 'success' ? 'bg-green-500' : (type === 'error' ? 'bg-red-500' : 'bg-blue-500');
+    t.className = `toast-notification ${colorClass} fixed bottom-6 right-6 text-white px-4 py-2 rounded-xl shadow-lg z-50 transition-all duration-300`;
+    t.textContent = msg;
+    document.body.appendChild(t);
+    
+    // Animation
+    setTimeout(() => {
+        t.style.opacity = '0';
+        t.style.transform = 'translateY(20px)';
+        setTimeout(() => t.remove(), 300);
+    }, 3000);
+  },
 
-                container.innerHTML = `
-                    <svg class="w-32 h-32" viewBox="0 0 ${size} ${size}">
-                        <circle class="text-slate-200" stroke-width="${strokeWidth}" stroke="currentColor" fill="transparent" r="${radius}" cx="${size/2}" cy="${size/2}"/>
-                        <circle class="text-karpus-primary" stroke-width="${strokeWidth}" stroke-dasharray="${circumference}" stroke-dashoffset="${offset}" stroke-linecap="round" stroke="currentColor" fill="transparent" r="${radius}" cx="${size/2}" cy="${size/2}" style="transform: rotate(-90deg); transform-origin: 50% 50%;"/>
-                        <text x="50%" y="50%" text-anchor="middle" dy=".3em" class="text-2xl font-bold text-slate-800">${percent}%</text>
-                    </svg>
-                `;
-            };
-        })();
-        
-        this.state = {
-            currentClass: null,
-            studentName: null,
-            filterTask: 'all',
-            userRole: 'Padre / Tutor'
-        };
+  emptyState(message, icon = 'smile') {
+    return `
+      <div class="text-center py-10 text-slate-400">
+        <i data-lucide="${icon}" class="mx-auto mb-3 w-12 h-12 opacity-50"></i>
+        <p>${message}</p>
+      </div>
+    `;
+  },
+
+  skeleton(count = 3, height = 'h-16') {
+    return Array(count).fill(0).map(() => `
+      <div class="animate-pulse bg-slate-100 rounded-xl ${height} w-full mb-2"></div>
+    `).join('');
+  },
+
+  formatDate(dateStr) {
+    if (!dateStr) return '-';
+    return new Date(dateStr).toLocaleDateString('es-ES', { year: 'numeric', month: 'short', day: 'numeric' });
+  },
+
+  validateImage(file) {
+    if (!file) return { valid: false, msg: 'No se seleccionó archivo' };
+    const validTypes = ['image/jpeg', 'image/png', 'image/webp'];
+    if (!validTypes.includes(file.type)) return { valid: false, msg: 'Formato no soportado. Usa JPG, PNG o WebP' };
+    if (file.size > 5 * 1024 * 1024) return { valid: false, msg: 'El archivo excede 5MB' };
+    return { valid: true };
+  },
+
+  renderDonutChart(containerId, percent, colorClass = 'text-karpus-primary') {
+    const container = document.getElementById(containerId);
+    if (!container) return;
+    const size = 120;
+    const strokeWidth = 12;
+    const radius = (size / 2) - (strokeWidth * 2);
+    const circumference = 2 * Math.PI * radius;
+    const offset = circumference - (percent / 100 * circumference);
+
+    container.innerHTML = `
+      <svg class="w-32 h-32" viewBox="0 0 ${size} ${size}">
+        <circle class="text-slate-200" stroke-width="${strokeWidth}" stroke="currentColor" fill="transparent" r="${radius}" cx="${size/2}" cy="${size/2}"/>
+        <circle class="${colorClass}" stroke-width="${strokeWidth}" stroke-dasharray="${circumference}" stroke-dashoffset="${offset}" stroke-linecap="round" stroke="currentColor" fill="transparent" r="${radius}" cx="${size/2}" cy="${size/2}" style="transform: rotate(-90deg); transform-origin: 50% 50%; transition: stroke-dashoffset 0.5s ease;"/>
+        <text x="50%" y="50%" text-anchor="middle" dy=".3em" class="text-2xl font-bold text-slate-800">${percent}%</text>
+      </svg>
+    `;
+  }
+};
+
+// --- 2. APP STATE ---
+const AppState = {
+  user: null,
+  profile: null,
+  students: [],
+  currentStudent: null,
+  currentSection: 'home',
+  currentDate: new Date()
+};
+
+// --- 3. UI CONTROLLER ---
+const UI = {
+  async init() {
+    this.bindEvents();
+    await this.checkSession();
+  },
+
+  async checkSession() {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) {
+      window.location.href = 'login.html';
+      return;
+    }
+    AppState.user = user;
+
+    // Load Profile
+    const { data: profile } = await supabase.from('profiles').select('*').eq('id', user.id).single();
+    AppState.profile = profile;
+
+    // Load Students linked to parent
+    const { data: students } = await supabase.from('students').select('*, classrooms(name)').eq('parent_id', user.id);
+    AppState.students = students || [];
+    if (AppState.students.length > 0) {
+        AppState.currentStudent = AppState.students[0]; // Default to first student
     }
 
-    async init() {
-        // 1. Seguridad
-        if (!this.auth.enforceRole('padre')) return;
-        
-        this.setupEventListeners();
-        
-        await this.loadUserProfile();
-        
-        // Check for store initialization error
-        if (this.data && typeof this.data.getError === 'function') {
-             const err = this.data.getError();
-             if (err) {
-                 console.error('Store init error:', err);
-                 alert('Error de conexión al inicializar datos. Algunas funciones pueden no estar disponibles.');
-             }
-        }
+    this.updateUserUI();
+    this.loadDashboard();
+    
+    // Subscribe to global user notifications
+    this.subscribeToNotifications();
+    
+    // Initial tab
+    this.showSection('home');
+  },
 
-        // 2. Carga inicial de datos
-        await this.loadDashboard();
-        
-        // 3. Navegación inicial
-        this.ui.showTab('home');
-        
-        // 4. Inicializar iconos
-        if (window.lucide) window.lucide.createIcons();
+  subscribeToNotifications() {
+    if (!AppState.user || this.notificationsSubscription) return;
+    try {
+      this.notificationsSubscription = supabase
+        .channel('public:notifications')
+        .on('postgres_changes', {
+          event: 'INSERT',
+          schema: 'public',
+          table: 'notifications',
+          filter: `user_id=eq.${AppState.user.id}`
+        }, payload => {
+          Helpers.toast('Nueva notificación', 'info');
+          this.loadNotifications();
+        })
+        .subscribe();
+    } catch (e) {
+      console.error('Error suscribiendo a notificaciones', e);
     }
+  },
 
-    setupEventListeners() {
-        // Navegación Sidebar
-        document.querySelectorAll('.sidebar-btn').forEach(btn => {
-            btn.addEventListener('click', () => {
-                const section = btn.dataset.section;
-                this.ui.showTab(section);
-                this.handleSectionLoad(section);
-            });
+  updateUserUI() {
+    const userName = AppState.profile?.name || 'Padre/Madre';
+    const studentName = AppState.currentStudent?.name || 'Sin estudiante asignado';
+    const classroomName = AppState.currentStudent?.classrooms?.name || 'Sin aula';
+
+    // Sidebar & Mobile Header
+    const setText = (id, text) => { const el = document.getElementById(id); if(el) el.textContent = text; };
+    
+    setText('sidebar-role-label', 'Padre / Tutor');
+    setText('sidebar-student-name', studentName);
+    setText('mobile-student-name', studentName);
+    setText('dropdown-role', 'Padre / Tutor');
+    setText('dropdown-student', studentName);
+    setText('dash-student-name', studentName);
+    setText('dash-guardian-name', userName);
+    setText('dash-classroom', classroomName);
+    setText('currentDateDisplay', new Date().toLocaleDateString('es-ES', { weekday: 'long', day: 'numeric', month: 'long' }));
+    
+    // Avatar logic could go here if we had avatars in DB
+  },
+
+  bindEvents() {
+    // Navigation
+    document.querySelectorAll('[data-section]').forEach(btn => {
+      btn.addEventListener('click', (e) => {
+        e.preventDefault();
+        const sectionId = btn.dataset.section;
+        this.showSection(sectionId);
+        
+        // Update Sidebar Active State
+        document.querySelectorAll('.sidebar-btn').forEach(b => {
+             b.classList.remove('bg-karpus-blue/10', 'text-karpus-blue'); // Simplified active state class logic
+             if(b.dataset.section === sectionId) b.classList.add('bg-karpus-blue/10', 'text-karpus-blue');
         });
+      });
+    });
 
-        // Filtros de Tareas
-        document.querySelectorAll('.task-filter-btn').forEach(btn => {
-            btn.addEventListener('click', (e) => this.handleTaskFilter(e));
+    // Mobile Menu
+    const menuBtn = document.getElementById('menuBtn');
+    const sidebar = document.getElementById('sidebar');
+    if (menuBtn && sidebar) {
+        menuBtn.addEventListener('click', () => {
+            sidebar.classList.toggle('hidden');
+            sidebar.classList.toggle('flex'); // Ensure flex is toggled for layout
+            // Add overlay if needed, or simple toggle for now
         });
+    }
 
-        // Botón CTA Dashboard
-        document.getElementById('ctaPendingBtn')?.addEventListener('click', () => {
-            this.ui.showTab('tasks');
+    // Task Filters
+    document.querySelectorAll('.task-filter-btn').forEach(btn => {
+        btn.addEventListener('click', (e) => {
+            document.querySelectorAll('.task-filter-btn').forEach(b => b.classList.remove('active', 'bg-slate-800', 'text-white'));
+            document.querySelectorAll('.task-filter-btn').forEach(b => b.classList.add('bg-slate-100', 'text-slate-600'));
+            
+            e.target.classList.remove('bg-slate-100', 'text-slate-600');
+            e.target.classList.add('active', 'bg-slate-800', 'text-white');
+            
+            this.loadTasks(e.target.dataset.filter);
         });
-    }
+    });
+    
+    // Calendar Navigation
+    document.getElementById('calPrevBtn')?.addEventListener('click', () => {
+        AppState.currentDate.setMonth(AppState.currentDate.getMonth() - 1);
+        this.renderCalendar();
+    });
+    document.getElementById('calNextBtn')?.addEventListener('click', () => {
+        AppState.currentDate.setMonth(AppState.currentDate.getMonth() + 1);
+        this.renderCalendar();
+    });
+  },
 
-    async handleSectionLoad(section) {
-        switch(section) {
-            case 'live-attendance':
-                await this.loadAttendance();
-                break;
-            case 'tasks':
-                await this.loadTasks();
-                break;
-            case 'grades':
-                await this.loadGrades();
-                break;
-            case 'class':
-                break;
-        }
-    }
+  showSection(id) {
+    AppState.currentSection = id;
+    
+    // Hide all sections
+    document.querySelectorAll('.section').forEach(s => {
+        s.classList.remove('active');
+        s.style.display = 'none'; // Ensure hidden
+    });
 
-    handleTaskFilter(e) {
-        const target = e.currentTarget;
-        this.state.filterTask = target.dataset.filter;
-
-        document.querySelectorAll('.task-filter-btn').forEach(btn => {
-            btn.classList.remove('active', 'bg-slate-800', 'text-white');
-            btn.classList.add('bg-slate-100', 'text-slate-600');
-        });
-
-        target.classList.add('active', 'bg-slate-800', 'text-white');
-        target.classList.remove('bg-slate-100', 'text-slate-600');
-
-        this.loadTasks();
-    }
-
-    // --- Lógica de Negocio por Sección ---
-
-    async loadUserProfile() {
-        // Simulación de fetch de perfil completo
-        const user = this.auth.currentUser();
-        // En producción: const profile = await this.data.get('profile');
+    // Show target section
+    const target = document.getElementById(`tab-${id}`);
+    if (target) {
+        target.classList.add('active');
+        target.style.display = 'block'; // Ensure visible for animation
         
-        this.state.studentName = user.studentName || 'Estudiante';
-        this.state.currentClass = user.classId || 'pequenos';
+        // Trigger data load
+        if (id === 'home') this.loadDashboard();
+        if (id === 'live-attendance') this.loadAttendance();
+        if (id === 'tasks') this.loadTasks();
+        if (id === 'class') this.loadClassFeed();
+        if (id === 'grades') this.loadGrades();
+        if (id === 'notifications') this.loadNotifications();
+        if (id === 'profile') this.loadProfile();
+    }
+  },
+
+  // --- NOTIFICATIONS ---
+  async loadNotifications() {
+      const list = document.getElementById('systemNotificationsList');
+      if(!list || !AppState.user) return;
+      
+      list.innerHTML = Helpers.skeleton(2, 'h-16');
+      
+      const { data: notifs, error } = await supabase
+          .from('notifications')
+          .select('*')
+          .eq('user_id', AppState.user.id)
+          .order('created_at', { ascending: false })
+          .limit(20);
+
+      if(error) {
+          console.error(error);
+          list.innerHTML = Helpers.emptyState('Error al cargar notificaciones', 'alert-circle');
+          return;
+      }
+      
+      if(!notifs || !notifs.length) {
+          list.innerHTML = Helpers.emptyState('No tienes notificaciones nuevas', 'bell-off');
+          return;
+      }
+      
+      list.innerHTML = notifs.map(n => `
+          <div class="flex gap-3 items-start bg-slate-50 p-3 rounded-xl border border-slate-100 ${n.is_read ? 'opacity-60' : 'bg-white shadow-sm border-blue-100'}">
+              <div class="p-2 rounded-full ${n.type === 'alert' ? 'bg-red-100 text-red-600' : 'bg-blue-100 text-blue-600'}">
+                  <i data-lucide="${n.type === 'alert' ? 'alert-triangle' : 'info'}" class="w-4 h-4"></i>
+              </div>
+              <div class="flex-1">
+                  <div class="flex justify-between items-start">
+                      <h4 class="text-sm font-bold text-slate-800">${n.title}</h4>
+                      <span class="text-[10px] text-slate-400">${Helpers.formatDate(n.created_at)}</span>
+                  </div>
+                  <p class="text-xs text-slate-600 mt-1">${n.message}</p>
+              </div>
+          </div>
+      `).join('');
+      
+      if(window.lucide) lucide.createIcons();
+      
+      // Mark as read (simplified batch update)
+      const unreadIds = notifs.filter(n => !n.is_read).map(n => n.id);
+      if(unreadIds.length > 0) {
+          await supabase.from('notifications').update({ is_read: true }).in('id', unreadIds);
+      }
+  },
+
+  // --- DASHBOARD ---
+  async loadDashboard() {
+    if (!AppState.currentStudent) return;
+
+    try {
+        // Attendance Stats
+        const { data: attendance } = await supabase
+            .from('attendance')
+            .select('status')
+            .eq('student_id', AppState.currentStudent.id);
         
-        // Actualizar UI global
-        const updateText = (id, text) => { const el = document.getElementById(id); if(el) el.textContent = text; };
+        if (attendance) {
+            const total = attendance.length;
+            const present = attendance.filter(a => a.status === 'present' || a.status === 'late').length;
+            const percent = total > 0 ? Math.round((present / total) * 100) : 0;
+            const el = document.getElementById('dashAttendance');
+            if (el) el.textContent = `${percent}%`;
+        }
+
+        // Pending Tasks
+        const { count: pendingCount } = await supabase
+            .from('tasks') // Assuming a tasks table exists or simplified logic
+            .select('*', { count: 'exact', head: true })
+            .eq('classroom_id', AppState.currentStudent.classroom_id); // Simplified: all class tasks
+            // Ideally we check submissions to see if pending. For now just show count of recent tasks?
+            // Or better: implement proper task checking.
         
-        updateText('sidebar-student-name', this.state.studentName);
-        updateText('sidebar-role-label', this.state.userRole);
-        updateText('mobile-student-name', this.state.studentName);
-        updateText('dropdown-role', this.state.userRole);
-        updateText('dropdown-student', this.state.studentName);
-        updateText('modal-submit-student', this.state.studentName);
-        updateText('modal-submit-parent', user.name);
+        const elTasks = document.getElementById('dashPendingTasks');
+        if(elTasks) elTasks.textContent = pendingCount || 0;
+
+        // Feed / Recent Activity (Simplified)
+        this.loadFeedPreview();
+
+    } catch (error) {
+        console.error('Error loading dashboard:', error);
+    }
+  },
+
+  async loadFeedPreview() {
+    const container = document.getElementById('feed');
+    if (!container || !AppState.currentStudent) return;
+
+    const { data: posts } = await supabase
+        .from('posts')
+        .select('*')
+        .eq('classroom_id', AppState.currentStudent.classroom_id)
+        .order('created_at', { ascending: false })
+        .limit(3);
+    
+    if (!posts || !posts.length) {
+        container.innerHTML = Helpers.emptyState('No hay actividad reciente', 'activity');
+        return;
     }
 
-    async loadDashboard() {
-        try {
-            // Actualizar fecha y datos básicos
-            const dateEl = document.getElementById('currentDateDisplay');
-            if (dateEl) dateEl.textContent = new Date().toLocaleDateString('es-ES', { weekday: 'long', day: 'numeric', month: 'long' });
-            
-            document.getElementById('dash-student-name').textContent = this.state.studentName;
-            document.getElementById('dash-guardian-name').textContent = this.auth.currentUser().name;
+    container.innerHTML = posts.map(p => `
+        <div class="flex gap-3 items-start border-b pb-3 last:border-0">
+            <div class="bg-blue-100 p-2 rounded-full"><i data-lucide="message-square" class="w-4 h-4 text-blue-600"></i></div>
+            <div>
+                <p class="text-sm font-medium text-slate-800">${p.title || 'Nueva publicación'}</p>
+                <p class="text-xs text-slate-500 line-clamp-2">${p.content}</p>
+                <span class="text-[10px] text-slate-400">${Helpers.formatDate(p.created_at)}</span>
+            </div>
+        </div>
+    `).join('');
+    if(window.lucide) lucide.createIcons();
+  },
 
-            // Cargar resumen de asistencia
-            const att = await this.data.get('attendance');
-            const percent = Math.round((att.present / att.total) * 100) || 0;
-            document.getElementById('dashAttendance').textContent = `${percent}%`;
+  // --- ATTENDANCE ---
+  async loadAttendance() {
+    this.renderCalendar();
+    // Update stats logic here if needed
+  },
 
-            // Cargar tareas pendientes (contador)
-            const tasks = await this.data.getTasksForClass(this.state.currentClass);
-            const pending = tasks.filter(t => !this.isTaskSubmitted(t)).length;
-            document.getElementById('dashPendingTasks').textContent = pending;
-        } catch (error) {
-            console.error('Error loading dashboard:', error);
-            alert('Error de conexión al cargar el dashboard: ' + error.message);
-        }
+  async renderCalendar() {
+    const grid = document.getElementById('calendarGrid');
+    const label = document.getElementById('calMonthLabel');
+    if (!grid || !AppState.currentStudent) return;
+
+    const year = AppState.currentDate.getFullYear();
+    const month = AppState.currentDate.getMonth();
+    
+    label.textContent = AppState.currentDate.toLocaleDateString('es-ES', { month: 'long', year: 'numeric' });
+    grid.innerHTML = ''; // Clear
+
+    // Get Attendance Data for this month
+    const startStr = new Date(year, month, 1).toISOString().split('T')[0];
+    const endStr = new Date(year, month + 1, 0).toISOString().split('T')[0];
+
+    const { data: attendance } = await supabase
+        .from('attendance')
+        .select('date, status')
+        .eq('student_id', AppState.currentStudent.id)
+        .gte('date', startStr)
+        .lte('date', endStr);
+    
+    const attMap = {};
+    attendance?.forEach(a => attMap[a.date] = a.status);
+
+    // Render Grid
+    const firstDay = new Date(year, month, 1).getDay();
+    const daysInMonth = new Date(year, month + 1, 0).getDate();
+
+    // Empty slots
+    for (let i = 0; i < firstDay; i++) {
+        grid.innerHTML += `<div></div>`;
     }
 
-    async loadAttendance() {
-        try {
-            const att = await this.data.get('attendance');
-            const percent = Math.round((att.present / att.total) * 100) || 0;
-            
-            // Usar el componente de UI para renderizar el gráfico
-            // Creamos un contenedor específico si no existe
-            let chartContainer = document.getElementById('attendance-chart-container');
-            if (!chartContainer) {
-                const section = document.getElementById('tab-live-attendance');
-                chartContainer = document.createElement('div');
-                chartContainer.id = 'attendance-chart-container';
-                chartContainer.className = 'flex justify-center py-4';
-                // Insertar después del header
-                section.querySelector('.modern-card').insertBefore(chartContainer, section.querySelector('.modern-card').children[1]);
-            }
-            
-            this.ui.renderDonutChart('attendance-chart-container', percent, att.present, att.total - att.present);
-        } catch (error) {
-            console.error('Error loading attendance:', error);
-            alert('Error de conexión al cargar asistencia: ' + error.message);
-        }
+    // Days
+    for (let d = 1; d <= daysInMonth; d++) {
+        const dateStr = `${year}-${String(month + 1).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
+        const status = attMap[dateStr];
+        
+        let bgClass = 'bg-white hover:bg-slate-50';
+        let textClass = 'text-slate-700';
+        
+        if (status === 'present') { bgClass = 'bg-green-100'; textClass = 'text-green-700 font-bold'; }
+        else if (status === 'absent') { bgClass = 'bg-red-100'; textClass = 'text-red-700 font-bold'; }
+        else if (status === 'late') { bgClass = 'bg-yellow-100'; textClass = 'text-yellow-700 font-bold'; }
+        
+        grid.innerHTML += `
+            <div class="${bgClass} ${textClass} rounded-lg p-2 text-center text-sm transition-colors flex items-center justify-center aspect-square border border-slate-50">
+                ${d}
+            </div>
+        `;
+    }
+  },
+
+  // --- TASKS ---
+  async loadTasks(filter = 'all') {
+    const list = document.getElementById('tasksList');
+    if (!list || !AppState.currentStudent) return;
+
+    list.innerHTML = Helpers.skeleton(3, 'h-24');
+
+    // Simplified task fetching
+    const { data: tasks } = await supabase
+        .from('tasks')
+        .select('*')
+        .eq('classroom_id', AppState.currentStudent.classroom_id)
+        .order('due_date', { ascending: true });
+
+    if (!tasks || !tasks.length) {
+        list.innerHTML = Helpers.emptyState('No hay tareas asignadas', 'clipboard-list');
+        return;
     }
 
-    async loadTasks() {
-        try {
-            const allTasks = await this.data.getTasksForClass(this.state.currentClass);
-            const container = document.getElementById('tasksList');
+    list.innerHTML = tasks.map(t => `
+        <div class="bg-white p-4 rounded-xl border shadow-sm hover:shadow-md transition-shadow">
+            <div class="flex justify-between items-start">
+                <h4 class="font-bold text-slate-800">${t.title}</h4>
+                <span class="text-xs px-2 py-1 bg-slate-100 rounded text-slate-500">${Helpers.formatDate(t.due_date)}</span>
+            </div>
+            <p class="text-sm text-slate-600 mt-2">${t.description || 'Sin descripción'}</p>
+            <div class="mt-4 flex justify-end">
+                <button class="text-sm px-4 py-2 bg-karpus-orange text-white rounded-lg hover:bg-orange-600 transition-colors">Ver detalle</button>
+            </div>
+        </div>
+    `).join('');
+  },
 
-            const filteredTasks = allTasks.filter(task => {
-                const isSubmitted = this.isTaskSubmitted(task);
-                const isOverdue = this.isTaskOverdue(task);
+  // --- CLASS FEED ---
+  async loadClassFeed() {
+    const container = document.getElementById('classFeed');
+    if (!container || !AppState.currentStudent) return;
+    
+    // Subscribe to realtime if not already
+    this.subscribeToFeed();
 
-                switch (this.state.filterTask) {
-                    case 'pending':
-                        return !isSubmitted && !isOverdue;
-                    case 'submitted':
-                        return isSubmitted;
-                    case 'overdue':
-                        return !isSubmitted && isOverdue;
-                    case 'all':
-                    default:
-                        return true;
-                }
-            });
+    container.innerHTML = Helpers.skeleton(3, 'h-32');
 
-            if (!filteredTasks.length) {
-                this.ui.render('tasksList', '<p class="text-center text-slate-500 py-4">No hay tareas en esta categoría.</p>');
-                return;
-            }
+    const { data: posts, error } = await supabase
+        .from('posts')
+        .select(`
+            *,
+            profiles:teacher_id(name),
+            likes(user_id),
+            comments(
+                id, content, created_at,
+                profiles:user_id(name)
+            )
+        `)
+        .eq('classroom_id', AppState.currentStudent.classroom_id)
+        .order('created_at', { ascending: false });
 
-            const html = filteredTasks.map(t => {
-                const isSubmitted = this.isTaskSubmitted(t);
-                const isOverdue = this.isTaskOverdue(t);
-                
-                let statusClass, statusText, icon, iconBg;
-
-                if (isSubmitted) {
-                    statusClass = 'bg-green-100 text-green-700';
-                    statusText = 'Entregada';
-                    icon = 'check-circle-2';
-                    iconBg = 'bg-green-50 text-green-600';
-                } else if (isOverdue) {
-                    statusClass = 'bg-red-100 text-red-700';
-                    statusText = 'Vencida';
-                    icon = 'alert-triangle';
-                    iconBg = 'bg-red-50 text-red-500';
-                } else {
-                    statusClass = 'bg-yellow-100 text-yellow-800';
-                    statusText = 'Pendiente';
-                    icon = 'pencil';
-                    iconBg = 'bg-orange-50 text-orange-500';
-                }
-                
-                return `
-                    <div class="group p-4 rounded-3xl bg-white border border-slate-100 hover:border-karpus-pink transition-all shadow-sm hover:shadow-md mb-3 relative overflow-hidden">
-                        <div class="absolute top-0 right-0 p-3 opacity-5 group-hover:opacity-10 transition-opacity">
-                            <i data-lucide="clipboard-list" class="w-16 h-16 text-karpus-pink"></i>
-                        </div>
-                        <div class="flex items-start gap-4 relative z-10">
-                            <div class="w-12 h-12 rounded-2xl ${iconBg} flex items-center justify-center flex-shrink-0 transition-transform group-hover:scale-110">
-                                <i data-lucide="${icon}" class="w-6 h-6"></i>
-                            </div>
-                            <div class="flex-1">
-                                <h4 class="text-base font-bold text-slate-800 mb-1">${t.title}</h4>
-                                <div class="flex items-center gap-3 text-xs text-slate-500 mb-3">
-                                    <span class="flex items-center gap-1"><i data-lucide="calendar" class="w-3 h-3"></i> ${t.due}</span>
-                                    <span class="px-2 py-0.5 rounded-full ${statusClass} font-bold text-[10px] uppercase tracking-wide">${statusText}</span>
-                                </div>
-                                <button class="w-full sm:w-auto text-xs font-bold px-4 py-2 rounded-xl border-2 border-slate-100 text-slate-600 hover:border-karpus-pink hover:text-karpus-pink hover:bg-pink-50 transition-colors">
-                                    Ver detalle y entregar
-                                </button>
-                            </div>
-                        </div>
-                    </div>
-                `;
-            }).join('');
-
-            this.ui.render('tasksList', html);
-            if (window.lucide) window.lucide.createIcons();
-        } catch (error) {
-            console.error('Error loading tasks:', error);
-            alert('Error de conexión al cargar tareas: ' + error.message);
-        }
+    if (error) {
+        console.error('Error feed:', error);
+        container.innerHTML = Helpers.emptyState('Error al cargar publicaciones', 'alert-circle');
+        return;
     }
 
-    async loadGrades() {
-        try {
-            const grades = await this.data.get('grades');
-            const html = grades.map(g => `
-                <tr class="hover:bg-slate-50">
-                    <td class="p-4 font-medium text-slate-700">${g.subject}</td>
-                    <td class="p-4 text-center"><span class="px-2 py-1 rounded-lg bg-slate-100 font-bold text-xs">${g.grade}</span></td>
-                    <td class="p-4 text-slate-500 text-xs">${g.comment}</td>
-                </tr>
-            `).join('');
-            this.ui.render('gradesTableBody', html);
-        } catch (error) {
-            console.error('Error loading grades:', error);
-            alert('Error de conexión al cargar calificaciones: ' + error.message);
-        }
+    if (!posts || !posts.length) {
+        container.innerHTML = Helpers.emptyState('No hay publicaciones en el muro', 'layout-dashboard');
+        return;
     }
 
-    // --- FEED Y COMENTARIOS ---
-    async loadClassFeed() {
-        const container = document.getElementById('classFeed');
-        if (!container) return;
+    container.innerHTML = posts.map(p => {
+        // Ordenar comentarios por fecha (antiguos primero)
+        const comments = p.comments || [];
+        comments.sort((a, b) => new Date(a.created_at) - new Date(b.created_at));
 
-        try {
-            // 1. Obtener el aula del estudiante (simulado o desde perfil real)
-            // En producción: const classId = this.state.currentClassId;
-            // Por ahora buscamos cualquier post para demo o filtramos si tenemos el ID
-            
-            const { data: posts, error } = await supabase
-                .from('posts')
-                .select(`
-                    *,
-                    profiles:teacher_id (name),
-                    comments (
-                        id, content, created_at,
-                        profiles:user_id (name)
-                    )
-                `)
-                .order('created_at', { ascending: false });
+        const commentsHTML = comments.map(c => `
+            <div class="text-sm mb-2 bg-slate-50 p-2 rounded-lg">
+                <span class="font-bold text-slate-700 text-xs block">${c.profiles?.name || 'Usuario'}</span>
+                <span class="text-slate-600">${c.content}</span>
+            </div>
+        `).join('');
 
-            if (error) throw error;
+        // Likes Logic
+        const userLiked = p.likes?.some(l => l.user_id === AppState.user.id);
+        const likesCount = p.likes?.length || 0;
+        const likeIconClass = userLiked ? 'fill-red-500 text-red-500' : 'text-slate-400';
 
-            if (!posts || posts.length === 0) {
-                container.innerHTML = '<div class="text-center py-8 text-slate-500">No hay publicaciones en el muro.</div>';
-                return;
-            }
-
-            container.innerHTML = posts.map(p => {
-                const commentsHtml = p.comments ? p.comments.map(c => `
-                    <div class="bg-slate-50 p-2 rounded-lg text-xs mb-1">
-                        <span class="font-bold text-slate-700">${c.profiles?.name || 'Usuario'}:</span>
-                        <span class="text-slate-600">${c.content}</span>
-                    </div>
-                `).join('') : '';
-
-                return `
-                <div class="bg-white p-4 rounded-3xl border shadow-sm space-y-3">
-                    <div class="flex items-center gap-3">
-                        <div class="h-10 w-10 rounded-full bg-indigo-100 flex items-center justify-center text-indigo-600 font-bold text-sm">
-                            ${p.profiles?.name?.charAt(0) || 'M'}
-                        </div>
-                        <div>
-                            <div class="font-bold text-slate-800">${p.profiles?.name || 'Maestra'}</div>
-                            <div class="text-xs text-slate-500">${new Date(p.created_at).toLocaleDateString()}</div>
-                        </div>
-                    </div>
-                    <p class="text-sm text-slate-700 whitespace-pre-line">${p.content}</p>
-                    
-                    <!-- Sección de Comentarios -->
-                    <div class="pt-3 border-t mt-2">
-                        <div class="space-y-2 mb-3 max-h-40 overflow-y-auto">${commentsHtml}</div>
-                        <div class="flex gap-2">
-                            <input type="text" id="comment-input-${p.id}" placeholder="Escribe un comentario..." class="flex-1 border rounded-full px-3 py-1 text-sm bg-slate-50 focus:bg-white transition-colors">
-                            <button onclick="window.submitComment('${p.id}')" class="p-1.5 bg-blue-600 text-white rounded-full hover:bg-blue-700">
-                                <i data-lucide="send" class="w-4 h-4"></i>
-                            </button>
-                        </div>
-                    </div>
+        return `
+        <div class="bg-white p-5 rounded-2xl border shadow-sm mb-6">
+            <div class="flex items-center gap-3 mb-3">
+                <div class="w-10 h-10 bg-green-100 rounded-full flex items-center justify-center text-green-700 font-bold shadow-sm">
+                    ${p.profiles?.name?.charAt(0) || 'M'}
                 </div>
-                `;
-            }).join('');
+                <div>
+                    <h4 class="font-bold text-slate-800">${p.profiles?.name || 'Maestra'}</h4>
+                    <span class="text-xs text-slate-500">${Helpers.formatDate(p.created_at)}</span>
+                </div>
+            </div>
+            <div class="prose prose-sm text-slate-600 mb-3 whitespace-pre-line">
+                ${p.content || ''}
+            </div>
+            ${p.media_url ? `
+                <div class="rounded-xl overflow-hidden border border-slate-100 mb-4">
+                    <img src="${p.media_url}" alt="Imagen adjunta" class="w-full h-auto max-h-96 object-cover bg-slate-50" loading="lazy">
+                </div>
+            ` : ''}
+            
+            <!-- Actions Bar -->
+            <div class="flex items-center gap-4 mb-3 border-t pt-2">
+                <button onclick="window.UI.toggleLike('${p.id}')" class="flex items-center gap-1.5 text-sm font-medium hover:bg-slate-50 p-1.5 rounded-lg transition-colors ${userLiked ? 'text-red-600' : 'text-slate-500'}">
+                    <i data-lucide="heart" class="w-4 h-4 ${likeIconClass}"></i>
+                    <span>${likesCount > 0 ? likesCount : 'Me gusta'}</span>
+                </button>
+            </div>
 
-            if (window.lucide) window.lucide.createIcons();
+            <!-- Comentarios -->
+            <div class="bg-slate-50/50 rounded-xl p-3">
+                <div class="space-y-2 mb-3 max-h-60 overflow-y-auto">
+                    ${commentsHTML}
+                </div>
+                <div class="flex gap-2 items-center">
+                    <input id="comment-input-${p.id}" type="text" placeholder="Escribe un comentario..." 
+                        class="flex-1 border rounded-xl px-3 py-2 text-sm focus:ring-2 focus:ring-blue-100 outline-none bg-white focus:bg-white transition-colors"
+                        onkeypress="if(event.key === 'Enter') window.UI.submitComment('${p.id}')">
+                    <button onclick="window.UI.submitComment('${p.id}')" class="p-2 bg-blue-600 text-white rounded-xl hover:bg-blue-700 transition shadow-sm">
+                        <i data-lucide="send" class="w-4 h-4"></i>
+                    </button>
+                </div>
+            </div>
+        </div>
+    `}).join('');
+    
+    if(window.lucide) lucide.createIcons();
+  },
 
-        } catch (error) {
-            console.error('Error loading feed:', error);
-            container.innerHTML = '<p class="text-red-500 text-sm">Error cargando el muro.</p>';
-        }
-    }
+  subscribeToFeed() {
+      if (!AppState.currentStudent || this.feedSubscription) return;
 
-    isTaskOverdue(task) {
-        if (!task.due) return false;
-        const dueDate = new Date(task.due.split('/').reverse().join('-'));
-        const today = new Date();
-        today.setHours(0, 0, 0, 0);
-        return dueDate < today;
-    }
+      this.feedSubscription = supabase
+        .channel('public:posts')
+        .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'posts', filter: `classroom_id=eq.${AppState.currentStudent.classroom_id}` }, payload => {
+            Helpers.toast('Nueva publicación en el muro', 'info');
+            this.loadClassFeed();
+        })
+        .subscribe();
+  },
 
-    // Helpers
-    isTaskSubmitted(task) {
-        const parentName = this.auth.currentUser().name;
-        return task.submissions?.some(s => s.parent === parentName);
-    }
+  async toggleLike(postId) {
+      if (!AppState.user) return;
+      
+      const { data: existing } = await supabase
+          .from('likes')
+          .select('id')
+          .match({ post_id: postId, user_id: AppState.user.id })
+          .single();
+      
+      if (existing) {
+          await supabase.from('likes').delete().match({ id: existing.id });
+      } else {
+          await supabase.from('likes').insert({ post_id: postId, user_id: AppState.user.id });
+      }
+      // Reload silently or with minimal disruption? For now, full reload is safest to sync count/state
+      this.loadClassFeed();
+  },
 
-    // Inicialización
-    static bootstrap() {
-        const app = new ParentDashboardApp();
-        document.addEventListener('DOMContentLoaded', () => app.init());
-        
-        // Exponer función global para comentar
-        window.submitComment = async (postId) => {
-            const input = document.getElementById(`comment-input-${postId}`);
-            const content = input.value.trim();
-            if (!content) return;
+  async submitComment(postId) {
+      const input = document.getElementById(`comment-input-${postId}`);
+      if(!input) return;
+      
+      const content = input.value.trim();
+      if(!content) return;
+      
+      // Bloquear input mientras envía
+      input.disabled = true;
+      
+      const { error } = await supabase.from('comments').insert({
+          post_id: postId,
+          user_id: AppState.user.id,
+          content: content
+      });
+      
+      if(error) {
+          console.error('Error posting comment:', error);
+          Helpers.toast('Error al enviar comentario', 'error');
+          input.disabled = false;
+      } else {
+          Helpers.toast('Comentario enviado');
+          this.loadClassFeed(); // Recargar para ver el nuevo comentario
+      }
+  },
 
-            const { data: { user } } = await supabase.auth.getUser();
-            if (!user) return alert('Debes iniciar sesión');
+  // --- GRADES ---
+  async loadGrades() {
+    const tbody = document.getElementById('gradesTableBody');
+    if (!tbody) return;
+    tbody.innerHTML = `<tr><td colspan="3" class="p-4">${Helpers.skeleton(3, 'h-10')}</td></tr>`;
+    
+    // Mock grades for now as we might not have a full grades table structure confirmed
+    // Or try to fetch if table exists
+    // For now, render static mock or empty state
+    tbody.innerHTML = `<tr><td colspan="3">${Helpers.emptyState('Reporte de desarrollo no disponible aún', 'bar-chart-2')}</td></tr>`;
+  },
+  
+  // --- PROFILE ---
+  loadProfile() {
+      // Use AppState.user and AppState.profile to fill fields
+      const p = AppState.profile;
+      const s = AppState.currentStudent;
+      
+      const setText = (id, txt) => { const el = document.getElementById(id); if(el) el.textContent = txt || '-'; };
+      
+      if(s) {
+          setText('profileStudentName', s.name);
+          setText('profileStudentId', s.id);
+          setText('profileStudentMeta', s.classrooms?.name);
+      }
+      
+      if(p) {
+          setText('profileGuardianName', p.name);
+          setText('profileGuardianEmail', AppState.user.email);
+          setText('profileGuardianPhone', p.phone || 'No registrado');
+      }
+  }
+};
 
-            const { error } = await supabase.from('comments').insert({
-                post_id: postId,
-                user_id: user.id,
-                content: content
-            });
-
-            if (error) alert('Error al comentar: ' + error.message);
-            else {
-                input.value = '';
-                app.loadClassFeed(); // Recargar para ver el comentario
-            }
-        };
-    }
-}
-
-// Arrancar la aplicación
-ParentDashboardApp.bootstrap();
+// Initialize
+document.addEventListener('DOMContentLoaded', () => {
+    UI.init();
+});
+window.UI = UI; // Exponer UI globalmente para los eventos onclick

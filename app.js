@@ -26,6 +26,73 @@ async function safeExecute(fn, errorMsg = 'Ocurrió un error inesperado') {
   catch (e) { console.error(e); alert(errorMsg + ': ' + (e.message || e)); }
 }
 
+window.AttendanceCache = {
+  ttl: 5 * 60 * 1000,
+  key(k) { return `attendance_cache:${k}`; },
+  get(k) {
+    try {
+      const raw = localStorage.getItem(this.key(k));
+      if (!raw) return null;
+      const obj = JSON.parse(raw);
+      if (!obj || !obj.ts) return null;
+      if (Date.now() - obj.ts > this.ttl) {
+        localStorage.removeItem(this.key(k));
+        return null;
+      }
+      return obj.value;
+    } catch (_) { return null; }
+  },
+  set(k, v) {
+    try {
+      localStorage.setItem(this.key(k), JSON.stringify({ ts: Date.now(), value: v }));
+    } catch (_) {}
+  },
+  invalidateAll() {
+    try {
+      Object.keys(localStorage).forEach(x => { if (x.startsWith('attendance_cache:')) localStorage.removeItem(x); });
+    } catch (_) {}
+  }
+};
+
+// 3. FUNCIÓN PARA CARGAR AULAS
+window.loadRooms = async function(teacherId = null) {
+  await safeExecute(async () => {
+    let query = supabase.from('classrooms').select('*');
+    
+    if (teacherId) {
+      query = query.eq('teacher_id', teacherId);
+    }
+    
+    const { data: rooms, error } = await query.order('name');
+    if (error) throw error;
+
+    const tableBody = document.getElementById('roomsTable');
+    if (!tableBody) return;
+
+    if (rooms.length === 0) {
+      tableBody.innerHTML = '<tr><td colspan="4" class="text-center py-8 text-slate-500">No se encontraron aulas registradas.</td></tr>';
+      return;
+    }
+
+    const { data: teachers } = await supabase.from('profiles').select('id, name').eq('role', 'maestra');
+    const teacherMap = teachers.reduce((acc, t) => ({ ...acc, [t.id]: t.name }), {});
+
+    tableBody.innerHTML = rooms.map(r => `
+      <tr class="hover:bg-slate-50">
+        <td class="py-3 px-4 font-medium text-slate-900">${r.name}</td>
+        <td class="py-3 px-4 text-slate-600">${teacherMap[r.teacher_id] || 'Sin asignar'}</td>
+        <td class="py-3 px-4 text-slate-600">${r.capacity || '-'}</td>
+        <td class="py-3 px-4 text-center">
+          <button class="delete-room-btn px-2 py-1 bg-red-100 text-red-700 rounded hover:bg-red-200 text-xs" data-room-id="${r.id}">
+            Eliminar
+          </button>
+        </td>
+      </tr>
+    `).join('');
+
+  }, 'Error cargando aulas');
+};
+
 document.addEventListener('DOMContentLoaded', async () => {
   // 0. Verificar Sesión y Mostrar Usuario
   const { data: { user } } = await supabase.auth.getUser();
@@ -46,10 +113,14 @@ document.addEventListener('DOMContentLoaded', async () => {
   const sections = document.querySelectorAll('section[id]');
 
   function showSection(sectionId) {
-    sections.forEach(s => s.classList.add('hidden'));
+    sections.forEach(s => {
+      s.classList.remove('active');
+      s.classList.add('hidden');
+    });
     const target = document.getElementById(sectionId);
     if (target) {
       target.classList.remove('hidden');
+      target.classList.add('active');
       window.DirectorState.currentSection = sectionId;
       loadSectionData(sectionId);
     }
@@ -59,15 +130,12 @@ document.addEventListener('DOMContentLoaded', async () => {
     btn.addEventListener('click', () => showSection(btn.dataset.section));
   });
 
-  // Mostrar dashboard por defecto
-  showSection('dashboard');
-
   // 2. CARGAR DATOS SEGÚN SECCIÓN
   async function loadSectionData(section) {
     switch (section) {
       case 'dashboard':
         if (!window.DirectorState.loaded.dashboard) {
-          await Promise.all([loadDashboard(), loadRooms(), loadStudents()]);
+          await Promise.all([loadDashboard(), window.loadRooms(), window.loadStudents()]);
           window.DirectorState.loaded.dashboard = true;
         }
         break;
@@ -79,13 +147,13 @@ document.addEventListener('DOMContentLoaded', async () => {
         break;
       case 'estudiantes':
         if (!window.DirectorState.loaded.estudiantes) {
-          await loadStudents();
+          await Promise.all([loadStudents(), loadStudentFilters()]);
           window.DirectorState.loaded.estudiantes = true;
         }
         break;
       case 'aulas':
         if (!window.DirectorState.loaded.aulas) {
-          await Promise.all([loadRooms(), loadTeachersForFilter()]);
+          await Promise.all([window.loadRooms(), loadTeachersForFilter()]);
           window.DirectorState.loaded.aulas = true;
         }
         break;
@@ -96,6 +164,20 @@ document.addEventListener('DOMContentLoaded', async () => {
         }
         break;
     }
+  }
+
+  // 2.1 CARGAR FILTROS DE ESTUDIANTES
+  async function loadStudentFilters() {
+    await safeExecute(async () => {
+      const { data: classrooms } = await supabase.from('classrooms').select('id, name').order('name');
+      const select = document.getElementById('filterStClassroom');
+      if (select && classrooms) {
+        select.innerHTML = '<option value="">Todas las aulas</option>' + 
+          classrooms.map(c => `<option value="${c.id}">${c.name}</option>`).join('');
+      }
+      
+      document.getElementById('btnApplyStudentFilters')?.addEventListener('click', () => loadStudents(1));
+    }, 'Error cargando filtros');
   }
 
   // 3. FUNCIÓN PARA CARGAR ESTUDIANTES CON PAGINACIÓN
@@ -109,22 +191,40 @@ document.addEventListener('DOMContentLoaded', async () => {
     const to = from + studentsPageSize - 1;
 
     await safeExecute(async () => {
-      // Obtener el total de estudiantes para la paginación
-      const { count, error: countError } = await supabase
+      // Construir Query Base
+      let query = supabase
         .from('students')
-        .select('*', { count: 'exact', head: true });
+        .select('*, classrooms(name)', { count: 'exact' });
 
+      // Aplicar Filtros
+      const name = document.getElementById('filterStName')?.value;
+      if (name) query = query.ilike('name', `%${name}%`);
+
+      const classId = document.getElementById('filterStClassroom')?.value;
+      if (classId) query = query.eq('classroom_id', classId);
+
+      const status = document.getElementById('filterStStatus')?.value;
+      if (status) query = query.eq('is_active', status === 'true');
+
+      const age = document.getElementById('filterStAge')?.value;
+      if (age) {
+        const ageNum = parseInt(age);
+        const today = new Date();
+        // Rango de fechas para la edad: Hoy - (Edad+1) < Nacimiento <= Hoy - Edad
+        const maxDate = new Date(today.getFullYear() - ageNum, today.getMonth(), today.getDate()).toISOString().split('T')[0];
+        const minDate = new Date(today.getFullYear() - ageNum - 1, today.getMonth(), today.getDate()).toISOString().split('T')[0];
+        query = query.lte('birth_date', maxDate).gt('birth_date', minDate);
+      }
+
+      // Ejecutar Query con Paginación
+      const { data: students, count, error } = await query
+        .order('created_at', { ascending: false })
+        .range(from, to);
+
+      const countError = error; // Supabase devuelve error en la misma respuesta
       if (countError) throw countError;
       window.DirectorState.totalStudents = count;
 
-      // Obtener la página actual de estudiantes
-      const { data: students, error } = await supabase
-        .from('students')
-        .select('*')
-        .order('created_at', { ascending: false })
-        .range(from, to);
-        
-      if (error) throw error;
 
       if (students.length === 0 && page === 1) {
         tableBody.innerHTML = '<tr><td colspan="2" class="text-center py-8 text-slate-500">No se encontraron estudiantes registrados.</td></tr>';
@@ -140,6 +240,10 @@ document.addEventListener('DOMContentLoaded', async () => {
                 <i data-lucide="user" class="w-4 h-4 text-indigo-600"></i>
               </div>
               <span class="font-medium text-slate-800">${s.name}</span>
+              <span class="ml-2 text-xs px-2 py-0.5 rounded-full ${s.is_active ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}">
+                ${s.is_active ? 'Activo' : 'Inactivo'}
+              </span>
+              <span class="ml-2 text-xs text-slate-500">${s.classrooms?.name || 'Sin aula'}</span>
             </div>
           </td>
           <td class="py-4 px-4 text-center">
@@ -208,12 +312,19 @@ document.addEventListener('DOMContentLoaded', async () => {
   async function loadDashboard() {
     await safeExecute(async () => {
       const { count: students } = await supabase.from('students').select('*', { count: 'exact', head: true });
-      const { count: teachers } = await supabase.from('teachers').select('*', { count: 'exact', head: true });
-      const { count: rooms } = await supabase.from('rooms').select('*', { count: 'exact', head: true });
+      const { count: teachers } = await supabase.from('profiles').select('*', { count: 'exact', head: true }).eq('role', 'maestra');
+      const { count: rooms } = await supabase.from('classrooms').select('*', { count: 'exact', head: true });
 
-      document.getElementById('totalStudents').textContent = students || 0;
-      document.getElementById('totalTeachers').textContent = teachers || 0;
-      document.getElementById('totalRooms').textContent = rooms || 0;
+      const totalStudentsEl = document.getElementById('ninosPresentes');
+      const totalTeachersEl = document.getElementById('maestrosActivos');
+      const totalRoomsEl = document.getElementById('aulasOcupadas');
+      
+      if (totalStudentsEl) totalStudentsEl.textContent = students || 0;
+      if (totalTeachersEl) totalTeachersEl.textContent = teachers || 0;
+      if (totalRoomsEl) totalRoomsEl.textContent = rooms || 0;
+
+      // Cargar gráficos de asistencia
+      await loadAttendanceCharts();
 
       // Gráfico de pastel para distribución de aulas
       const ctx = document.getElementById('roomsChart')?.getContext('2d');
@@ -233,50 +344,12 @@ document.addEventListener('DOMContentLoaded', async () => {
     }, 'Error cargando dashboard');
   }
 
-  // 6. CARGAR AULAS
-  window.loadRooms = async function(teacherId = null) {
-    await safeExecute(async () => {
-      let query = supabase.from('rooms').select('*');
-      
-      if (teacherId) {
-        query = query.eq('teacher_id', teacherId);
-      }
-      
-      const { data: rooms, error } = await query.order('name');
-      if (error) throw error;
 
-      const tableBody = document.getElementById('roomsTable');
-      if (!tableBody) return;
-
-      if (rooms.length === 0) {
-        tableBody.innerHTML = '<tr><td colspan="4" class="text-center py-8 text-slate-500">No se encontraron aulas registradas.</td></tr>';
-        return;
-      }
-
-      // Obtener información de las maestras para mostrar nombres en lugar de IDs
-      const { data: teachers } = await supabase.from('teachers').select('id, name');
-      const teacherMap = teachers.reduce((acc, t) => ({ ...acc, [t.id]: t.name }), {});
-
-      tableBody.innerHTML = rooms.map(r => `
-        <tr class="hover:bg-slate-50">
-          <td class="py-3 px-4 font-medium text-slate-900">${r.name}</td>
-          <td class="py-3 px-4 text-slate-600">${teacherMap[r.teacher_id] || 'Sin asignar'}</td>
-          <td class="py-3 px-4 text-slate-600">${r.capacity || '-'}</td>
-          <td class="py-3 px-4 text-center">
-            <button class="delete-room-btn px-2 py-1 bg-red-100 text-red-700 rounded hover:bg-red-200 text-xs" data-room-id="${r.id}">
-              Eliminar
-            </button>
-          </td>
-        </tr>
-      `).join('');
-
-    }, 'Error cargando aulas');
-  }
 
   // 7. CARGAR MAESTROS
   async function loadTeachers() {
     await safeExecute(async () => {
-      const { data: teachers, error } = await supabase.from('teachers').select('*').order('name');
+      const { data: teachers, error } = await supabase.from('profiles').select('*').eq('role', 'maestra').order('name');
       if (error) throw error;
 
       const tableBody = document.getElementById('teachersTable');
@@ -302,8 +375,14 @@ document.addEventListener('DOMContentLoaded', async () => {
   async function loadAttendance() {
     await safeExecute(async () => {
       const today = new Date().toISOString().split('T')[0];
-      const { data, error } = await supabase.from('attendance').select('*').eq('date', today);
-      if (error) throw error;
+      const cacheKey = `list:${today}`;
+      let data = AttendanceCache.get(cacheKey);
+      if (!data) {
+        const { data: fresh, error } = await supabase.from('attendance').select('*').eq('date', today);
+        if (error) throw error;
+        data = fresh || [];
+        AttendanceCache.set(cacheKey, data);
+      }
 
       const tableBody = document.getElementById('attendanceTable');
       if (!tableBody) return;
@@ -326,6 +405,142 @@ document.addEventListener('DOMContentLoaded', async () => {
       `).join('');
 
     }, 'Error cargando asistencia');
+  }
+
+  // 8.1. CARGAR MAESTROS PARA FILTRO (FUNCIÓN FALTANTE)
+  async function loadTeachersForFilter() {
+    await safeExecute(async () => {
+      const { data: teachers, error } = await supabase
+        .from('profiles')
+        .select('id, name')
+        .eq('role', 'maestra')
+        .order('name');
+      
+      if (error) throw error;
+
+      // Si hay un select de maestros en el formulario de aulas, llenarlo
+      const teacherSelect = document.getElementById('teacherFilter');
+      if (teacherSelect) {
+        teacherSelect.innerHTML = '<option value="">Todos los maestros</option>' + 
+          teachers.map(t => `<option value="${t.id}">${t.name}</option>`).join('');
+      }
+    }, 'Error cargando maestros para filtro');
+  }
+
+  // 8.2. CARGAR GRÁFICOS DE ASISTENCIA
+  async function loadAttendanceCharts() {
+    await safeExecute(async () => {
+      const canvas = document.getElementById('attendanceChart');
+      if (!canvas) return;
+
+      // Obtener datos de asistencia de los últimos 7 días
+      const endDate = new Date();
+      const startDate = new Date();
+      startDate.setDate(endDate.getDate() - 6);
+
+      const startIso = startDate.toISOString().split('T')[0];
+      const endIso = endDate.toISOString().split('T')[0];
+      const rangeKey = `range:${startIso}:${endIso}`;
+      let attendanceData = AttendanceCache.get(rangeKey);
+      if (!attendanceData) {
+        const { data: fresh, error } = await supabase
+          .from('attendance')
+          .select('date, status')
+          .gte('date', startIso)
+          .lte('date', endIso);
+        if (error) throw error;
+        attendanceData = fresh || [];
+        AttendanceCache.set(rangeKey, attendanceData);
+      }
+
+      // Procesar datos para el gráfico
+      const dailyStats = {};
+      const days = [];
+      const presentData = [];
+      const absentData = [];
+
+      // Inicializar todos los días
+      for (let i = 0; i < 7; i++) {
+        const date = new Date();
+        date.setDate(date.getDate() - (6 - i));
+        const dateStr = date.toISOString().split('T')[0];
+        dailyStats[dateStr] = { present: 0, absent: 0 };
+        days.push(date.toLocaleDateString('es-ES', { weekday: 'short' }));
+      }
+
+      // Contar asistencias por día
+      attendanceData.forEach(record => {
+        if (dailyStats[record.date]) {
+          if (record.status === 'present') {
+            dailyStats[record.date].present++;
+          } else if (record.status === 'absent') {
+            dailyStats[record.date].absent++;
+          }
+        }
+      });
+
+      // Preparar datos para el gráfico
+      Object.values(dailyStats).forEach(stats => {
+        presentData.push(stats.present);
+        absentData.push(stats.absent);
+      });
+
+      // Destruir gráfico existente si hay uno
+      const existingChart = Chart.getChart(canvas);
+      if (existingChart) {
+        existingChart.destroy();
+      }
+      window.attendanceChartInstance = null;
+
+      // Crear nuevo gráfico
+      const ctx = canvas.getContext('2d');
+      window.attendanceChartInstance = new Chart(ctx, {
+        type: 'line',
+        data: {
+          labels: days,
+          datasets: [
+            {
+              label: 'Presentes',
+              data: presentData,
+              borderColor: '#10b981',
+              backgroundColor: 'rgba(16, 185, 129, 0.1)',
+              tension: 0.4,
+              fill: true
+            },
+            {
+              label: 'Ausentes',
+              data: absentData,
+              borderColor: '#ef4444',
+              backgroundColor: 'rgba(239, 68, 68, 0.1)',
+              tension: 0.4,
+              fill: true
+            }
+          ]
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          plugins: {
+            legend: {
+              position: 'top',
+            },
+            title: {
+              display: true,
+              text: 'Asistencia de los últimos 7 días'
+            }
+          },
+          scales: {
+            y: {
+              beginAtZero: true,
+              ticks: {
+                stepSize: 1
+              }
+            }
+          }
+        }
+      });
+
+    }, 'Error cargando gráficos de asistencia');
   }
 
   // 9. MANEJAR ELIMINACIÓN DE AULAS
@@ -401,7 +616,7 @@ document.addEventListener('DOMContentLoaded', async () => {
       if (deleteError) throw deleteError;
 
       alert('Aula eliminada exitosamente.');
-      loadRooms(); // Recargar lista de aulas
+      window.loadRooms(); // Recargar lista de aulas
 
     }, 'Error al eliminar el aula');
   }
@@ -417,4 +632,272 @@ document.addEventListener('DOMContentLoaded', async () => {
       }
     });
   }
+
+  // Mostrar dashboard por defecto (Al final, cuando todo está definido)
+  showSection('dashboard');
+
+  // Event listeners para los botones de período del gráfico
+  document.addEventListener('click', (e) => {
+    if (e.target.matches('[data-chart-period]')) {
+      // Remover clase activa de todos los botones
+      document.querySelectorAll('[data-chart-period]').forEach(btn => {
+        btn.classList.remove('bg-white', 'shadow-sm', 'text-slate-700');
+        btn.classList.add('text-slate-500');
+      });
+      
+      // Agregar clase activa al botón clickeado
+      e.target.classList.add('bg-white', 'shadow-sm', 'text-slate-700');
+      e.target.classList.remove('text-slate-500');
+      
+      // Recargar gráficos con el nuevo período
+      loadAttendanceCharts();
+    }
+  });
+
+  // FUNCIONALIDAD PARA CREAR ASISTENTES
+  const modalCreateAssistant = document.getElementById('modalCreateAssistant');
+  const btnAddAssistant = document.getElementById('btnAddAssistant');
+  const btnCloseAssistantModal = document.getElementById('btnCloseAssistantModal');
+  const btnCancelAssistant = document.getElementById('btnCancelAssistant');
+  const btnGeneratePassword = document.getElementById('btnGeneratePassword');
+  const formCreateAssistant = document.getElementById('formCreateAssistant');
+
+  // Abrir modal
+  if (btnAddAssistant) {
+    btnAddAssistant.addEventListener('click', () => {
+      modalCreateAssistant.classList.add('active');
+    });
+  }
+
+  // Cerrar modal
+  function closeAssistantModal() {
+    modalCreateAssistant.classList.remove('active');
+    formCreateAssistant.reset();
+  }
+
+  if (btnCloseAssistantModal) btnCloseAssistantModal.addEventListener('click', closeAssistantModal);
+  if (btnCancelAssistant) btnCancelAssistant.addEventListener('click', closeAssistantModal);
+
+  // Cerrar modal al hacer clic fuera
+  if (modalCreateAssistant) {
+    modalCreateAssistant.addEventListener('click', (e) => {
+      if (e.target === modalCreateAssistant) {
+        closeAssistantModal();
+      }
+    });
+  }
+
+  // Generar contraseña aleatoria
+  if (btnGeneratePassword) {
+    btnGeneratePassword.addEventListener('click', () => {
+      const password = Math.random().toString(36).slice(-8) + Math.random().toString(36).slice(-8);
+      document.getElementById('assistantPassword').value = password;
+    });
+  }
+
+  // Manejar envío del formulario
+  if (formCreateAssistant) {
+    formCreateAssistant.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      
+      const name = document.getElementById('assistantName').value;
+      const email = document.getElementById('assistantEmail').value;
+      const password = document.getElementById('assistantPassword').value;
+      const phone = document.getElementById('assistantPhone').value;
+      const notes = document.getElementById('assistantNotes').value;
+
+      if (!name || !email || !password) {
+        alert('Por favor complete los campos obligatorios');
+        return;
+      }
+
+      if (password.length < 6) {
+        alert('La contraseña debe tener al menos 6 caracteres');
+        return;
+      }
+
+      try {
+        const { data: existingRows, error: existingError } = await supabase
+          .from('profiles')
+          .select('id')
+          .eq('email', email)
+          .limit(1);
+        if (existingError) throw existingError;
+        if (existingRows && existingRows.length > 0) {
+          alert('El correo ya está registrado');
+          return;
+        }
+
+        // Crear usuario en Supabase Auth
+        const { data: authData, error: authError } = await supabase.auth.signUp({
+          email: email,
+          password: password
+        });
+
+        if (authError) {
+          if ((authError.message || '').toLowerCase().includes('already')) {
+            alert('El correo ya está registrado');
+            return;
+          }
+          throw authError;
+        }
+
+        if (authData.user) {
+          // Crear perfil en la tabla profiles
+          const { error: profileError } = await supabase
+            .from('profiles')
+            .insert([{
+              id: authData.user.id,
+              name: name,
+              email: email,
+              phone: phone || null,
+              role: 'asistente',
+              created_at: new Date().toISOString()
+            }]);
+
+          if (profileError) throw profileError;
+
+          alert('Asistente creado exitosamente');
+          closeAssistantModal();
+          
+          // Recargar la tabla de maestros si está visible
+          if (window.DirectorState.currentSection === 'maestros') {
+            await loadTeachers();
+          }
+        }
+      } catch (error) {
+        console.error('Error creando asistente:', error);
+        alert('Error al crear el asistente: ' + error.message);
+      }
+    });
+  }
+
+  // VALIDACIÓN Y ALTA DE ESTUDIANTE
+  function markFieldError(id, hasError) {
+    const el = document.getElementById(id);
+    if (!el) return;
+    if (hasError) {
+      el.classList.add('border-red-500');
+    } else {
+      el.classList.remove('border-red-500');
+    }
+  }
+
+  async function populateStudentClassrooms() {
+    const select = document.getElementById('stClassroom');
+    if (!select) return;
+    await safeExecute(async () => {
+      const { data: classrooms, error } = await supabase
+        .from('classrooms')
+        .select('id, name')
+        .order('name');
+      if (error) throw error;
+      select.innerHTML = '<option value="">-- Seleccionar Aula --</option>' +
+        (classrooms || []).map(c => `<option value="${c.id}">${c.name}</option>`).join('');
+    }, 'Error cargando aulas');
+  }
+
+  const btnSaveStudent = document.getElementById('btnSaveStudent');
+  if (btnSaveStudent) {
+    // Prepopulate classrooms when opening modal
+    populateStudentClassrooms();
+
+    // Clear error on input
+    ['stName','stClassroom'].forEach(id => {
+      const el = document.getElementById(id);
+      if (el) el.addEventListener('input', () => markFieldError(id, false));
+      if (el) el.addEventListener('change', () => markFieldError(id, false));
+    });
+
+    btnSaveStudent.addEventListener('click', async () => {
+      const name = (document.getElementById('stName')?.value || '').trim();
+      const classroomId = document.getElementById('stClassroom')?.value || '';
+      const isActive = !!document.getElementById('stActive')?.checked;
+
+      const p1Name = (document.getElementById('p1Name')?.value || '').trim();
+      const p1Phone = (document.getElementById('p1Phone')?.value || '').trim();
+      const p1Email = (document.getElementById('p1Email')?.value || '').trim();
+      const p2Name = (document.getElementById('p2Name')?.value || '').trim();
+      const p2Phone = (document.getElementById('p2Phone')?.value || '').trim();
+      const allergies = (document.getElementById('stAllergies')?.value || '').trim();
+      const bloodType = (document.getElementById('stBlood')?.value || '').trim();
+      const pickup = (document.getElementById('stPickup')?.value || '').trim();
+
+      const missing = [];
+      if (!name) missing.push('Nombre del niño');
+      if (!classroomId) missing.push('Aula asignada');
+
+      markFieldError('stName', !name);
+      markFieldError('stClassroom', !classroomId);
+
+      if (missing.length) {
+        alert('Complete los campos obligatorios: ' + missing.join(', '));
+        return;
+      }
+
+      await safeExecute(async () => {
+        const { error } = await supabase.from('students').insert([{
+          name,
+          classroom_id: classroomId,
+          is_active: isActive,
+          p1_name: p1Name || null,
+          p1_phone: p1Phone || null,
+          p1_email: p1Email || null,
+          p2_name: p2Name || null,
+          p2_phone: p2Phone || null,
+          allergies: allergies || null,
+          blood_type: bloodType || null,
+          authorized_pickup: pickup || null
+        }]);
+        if (error) throw error;
+
+        alert('Estudiante creado correctamente');
+        const modal = document.getElementById('modalAddStudent');
+        if (modal) modal.classList.add('hidden');
+        await window.loadStudents(1);
+      }, 'Error al crear estudiante');
+    });
+  }
+
+  // 11. ABRIR PERFIL DE ESTUDIANTE (Global)
+  window.openStudentProfile = async function(studentId) {
+    await safeExecute(async () => {
+      const modal = document.getElementById('studentProfileModal');
+      if (!modal) return;
+
+      modal.classList.remove('hidden');
+      modal.classList.add('flex');
+      document.body.classList.add('no-scroll');
+
+      // Resetear campos visuales
+      const ids = ['studentProfileName', 'studentDOB', 'studentClassroom', 'studentAllergies', 
+                   'parent1Name', 'parent1Phone', 'parent1Email', 'studentRoom', 'studentPickup', 'studentBlood'];
+      ids.forEach(id => { const el = document.getElementById(id); if(el) el.textContent = '...'; });
+
+      // Consultar datos
+      const { data: student, error } = await supabase
+        .from('students')
+        .select(`*, classrooms(name), parent:parent_id(*)`)
+        .eq('id', studentId)
+        .single();
+
+      if (error) throw error;
+
+      const setText = (id, val) => { const el = document.getElementById(id); if(el) el.textContent = val || '-'; };
+
+      setText('studentProfileName', student.name);
+      setText('studentDOB', student.birth_date);
+      setText('studentClassroom', student.classrooms?.name);
+      setText('studentRoom', student.classrooms?.name);
+      setText('studentAllergies', student.allergies);
+      setText('studentPickup', student.authorized_pickup);
+      setText('studentBlood', student.blood_type);
+
+      if (student.parent) {
+        setText('parent1Name', student.parent.name);
+        setText('parent1Phone', student.parent.phone);
+        setText('parent1Email', student.parent.email);
+      }
+    }, 'Error al abrir perfil');
+  };
 });

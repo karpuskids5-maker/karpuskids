@@ -9,18 +9,256 @@ const qsa = s => Array.from(document.querySelectorAll(s));
 document.addEventListener('DOMContentLoaded', ()=>{
   // Enforce role without inline script
   // if (window.Auth && !Auth.enforceRole('directora')) return; // REMOVED: Using Supabase Auth in app.js
-  initDashboardChart();
+  // initDashboardChart(); // REMOVED: Managed by app.js to avoid canvas conflict
   attachPaymentsHandlers();
   attachCommunicationsHandlers();
   // initNavDirector(); // REMOVED: Managed by app.js
   initStudentController();
   // initTeacherModule(); // REMOVED: Managed by app.js (Supabase)
   // initRoomsModule();   // REMOVED: Managed by app.js (Supabase)
+  initAttendanceModule(); // New module for real attendance stats
+  
   adjustMainOffset();
   window.addEventListener('resize', adjustMainOffset);
   const dash = document.getElementById('dashboard');
   if (dash) dash.classList.remove('hidden');
 });
+
+// --- Real Attendance Logic ---
+function initAttendanceModule() {
+    const dateFilter = document.getElementById('attendanceDateFilter');
+    const refreshBtn = document.getElementById('btnRefreshAttendance');
+    
+    // Modal close handler
+    const closeBtn = document.getElementById('closeAttendanceModal');
+    const modal = document.getElementById('attendanceModal');
+    if(closeBtn && modal) {
+        closeBtn.addEventListener('click', () => {
+            modal.classList.add('hidden');
+            modal.classList.remove('flex');
+        });
+    }
+    
+    if(dateFilter) {
+        dateFilter.value = new Date().toISOString().split('T')[0];
+        dateFilter.addEventListener('change', loadAttendanceStats);
+    }
+    
+    if(refreshBtn) {
+        refreshBtn.addEventListener('click', loadAttendanceStats);
+    }
+    
+    // Initial load
+    loadAttendanceStats();
+}
+
+let loadingAttendance = false;
+
+function getAttendanceDate() {
+  const el = document.getElementById('attendanceDateFilter');
+  return el?.value || new Date().toISOString().split('T')[0];
+}
+
+async function getSupabase() {
+  if (window.supabase) return window.supabase;
+  try {
+    const mod = await import('./js/supabase.js');
+    window.supabase = mod.supabase;
+    return mod.supabase;
+  } catch (e) {
+    console.error('Error cargando Supabase:', e);
+    return null;
+  }
+}
+
+async function loadAttendanceStats() {
+    if (loadingAttendance) return;
+    loadingAttendance = true;
+    
+    try {
+      const date = getAttendanceDate();
+      const supabase = await getSupabase();
+      if (!supabase) { console.error('Supabase no está inicializado'); return; }
+
+      const { data: attendanceData, error } = await supabase
+        .from('attendance')
+        .select('status, classroom_id, classroom:classrooms(name)')
+        .eq('date', date);
+        
+    if(error) {
+        console.error('Error fetching attendance stats:', error);
+        return;
+    }
+    
+    // 2. Aggregate Stats
+    let present = 0, absent = 0, late = 0;
+    const byRoom = {};
+    
+    attendanceData.forEach(r => {
+        if(r.status === 'present') present++;
+        if(r.status === 'absent') absent++;
+        if(r.status === 'late') late++;
+        
+        const roomId = r.classroom_id || 'unknown';
+        const roomName = r.classroom?.name || 'Sin Aula';
+        
+        if(!byRoom[roomId]) byRoom[roomId] = { name: roomName, present: 0, absent: 0, late: 0, total: 0 };
+        
+        byRoom[roomId].total++;
+        if(r.status === 'present') byRoom[roomId].present++;
+        if(r.status === 'absent') byRoom[roomId].absent++;
+        if(r.status === 'late') byRoom[roomId].late++;
+    });
+    
+    // 3. Update DOM Stats
+    const set = (id, val) => { const el = document.getElementById(id); if(el) el.textContent = val; };
+    set('statPresent', present);
+    set('statAbsent', absent);
+    set('statLate', late);
+    set('ninosPresentes', present);
+    
+    // 4. Update Room Table
+    const tbody = document.getElementById('attendanceByRoomBody');
+    if(tbody) {
+        if(Object.keys(byRoom).length === 0) {
+            tbody.innerHTML = '<tr><td colspan="4" class="text-center py-4 text-slate-500">No hay registros para esta fecha.</td></tr>';
+        } else {
+            tbody.innerHTML = Object.keys(byRoom).map(roomId => {
+                const stats = byRoom[roomId];
+                const percent = Math.round((stats.present / stats.total) * 100) || 0;
+                return `
+                    <tr onclick="window.openAttendanceDetail('${roomId}', '${stats.name}')" class="cursor-pointer hover:bg-slate-50 transition-colors border-b last:border-0" title="Ver detalle">
+                        <td class="py-3 px-2 font-medium">${stats.name}</td>
+                        <td class="py-3 px-2 text-center text-green-600 font-bold">${stats.present}</td>
+                        <td class="py-3 px-2 text-center text-red-600">${stats.absent}</td>
+                        <td class="py-3 px-2 text-center">
+                            <div class="flex items-center justify-center gap-2">
+                                <span class="text-xs font-bold">${percent}%</span>
+                                <div class="w-16 h-1.5 bg-slate-100 rounded-full overflow-hidden">
+                                    <div class="h-full bg-blue-500" style="width: ${percent}%"></div>
+                                </div>
+                            </div>
+                        </td>
+                    </tr>
+                `;
+            }).join('');
+        }
+    }
+    
+    // 5. Update Pie Chart
+    updatePieChart(present, absent, late);
+    } finally {
+      loadingAttendance = false;
+    }
+}
+
+window.openAttendanceDetail = async (classroomId, classroomName) => {
+    const modal = document.getElementById('attendanceModal');
+    const title = document.getElementById('attModalTitle');
+    const tbody = document.getElementById('attModalBody');
+    const date = getAttendanceDate();
+    
+    if(!modal || !tbody) return;
+    
+    title.textContent = `Asistencia - ${classroomName}`;
+    document.getElementById('attModalDate').textContent = `Fecha: ${date}`;
+    tbody.innerHTML = '<tr><td colspan="3" class="text-center p-4">Cargando...</td></tr>';
+    
+    modal.classList.remove('hidden');
+    modal.classList.add('flex');
+    
+    try {
+        const supabase = await getSupabase();
+        if (!supabase) return;
+
+        // Fetch Students
+        const { data: students, error: stError } = await supabase
+            .from('students')
+            .select('id, name')
+            .eq('classroom_id', classroomId)
+            .eq('is_active', true)
+            .order('name');
+            
+        if(stError) throw stError;
+        
+        // Fetch Attendance
+        const { data: attendance, error: attError } = await supabase
+            .from('attendance')
+            .select('student_id, status, created_at')
+            .eq('classroom_id', classroomId)
+            .eq('date', date);
+            
+        if(attError) throw attError;
+        
+        const attMap = {};
+        attendance.forEach(a => attMap[a.student_id] = a);
+        
+        if(!students.length) {
+            tbody.innerHTML = '<tr><td colspan="3" class="text-center p-4 text-slate-500">No hay estudiantes en esta aula.</td></tr>';
+            return;
+        }
+        
+        tbody.innerHTML = students.map(s => {
+            const att = attMap[s.id];
+            const status = att ? att.status : 'pending';
+            const time = att ? new Date(att.created_at).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'}) : '-';
+            
+            let statusBadge = '';
+            switch(status) {
+                case 'present': statusBadge = '<span class="px-2 py-1 rounded-full text-xs font-bold bg-green-100 text-green-700">Presente</span>'; break;
+                case 'absent': statusBadge = '<span class="px-2 py-1 rounded-full text-xs font-bold bg-red-100 text-red-700">Ausente</span>'; break;
+                case 'late': statusBadge = '<span class="px-2 py-1 rounded-full text-xs font-bold bg-yellow-100 text-yellow-700">Tardanza</span>'; break;
+                default: statusBadge = '<span class="px-2 py-1 rounded-full text-xs font-bold bg-slate-100 text-slate-500">Pendiente</span>';
+            }
+            
+            return `
+            <tr class="hover:bg-slate-50 transition-colors border-b last:border-0">
+                <td class="p-3 font-medium text-slate-800">${s.name}</td>
+                <td class="p-3 text-center">${statusBadge}</td>
+                <td class="p-3 text-center text-slate-500 text-xs">${time}</td>
+            </tr>
+            `;
+        }).join('');
+        
+    } catch(error) {
+        console.error('Error loading detail:', error);
+        tbody.innerHTML = '<tr><td colspan="3" class="text-center p-4 text-red-500">Error al cargar detalle.</td></tr>';
+    }
+};
+
+let attendancePieChartInstance = null;
+function updatePieChart(present, absent, late) {
+    if (typeof Chart === 'undefined') {
+        console.warn('Chart.js no cargado');
+        return;
+    }
+    const canvas = document.getElementById('attendancePieChart');
+    if(!canvas) return;
+    
+    if(attendancePieChartInstance) {
+        attendancePieChartInstance.destroy();
+    }
+    
+    const ctx = canvas.getContext('2d');
+    attendancePieChartInstance = new Chart(ctx, {
+        type: 'doughnut',
+        data: {
+            labels: ['Presentes', 'Ausentes', 'Tardanzas'],
+            datasets: [{
+                data: [present, absent, late],
+                backgroundColor: ['#22c55e', '#ef4444', '#eab308'],
+                borderWidth: 0
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+                legend: { position: 'bottom' }
+            }
+        }
+    });
+}
 
 // --- Chart demo ---
 window.initDashboardChart = function(){
@@ -240,7 +478,7 @@ function filterPosts(){
 window.addEventListener('resize', ()=> adaptTablesToMobile());
 function adaptTablesToMobile(){
   const isMobile = window.innerWidth < 640;
-  qsa('#paymentsTable tr').forEach(tr=>{
+  qsa('#paymentsTable tbody tr').forEach(tr=>{
     if(isMobile){
       tr.style.display = 'block';
       tr.style.borderBottom = '1px solid #eee';
@@ -265,7 +503,8 @@ adaptTablesToMobile();
 // =============================
 function initStudentController(){
   // ABRIR PERFIL DE ESTUDIANTE
-  document.getElementById('studentsTable').addEventListener('click', (event) => {
+  const studentsTable = document.getElementById('studentsTable');
+  if (studentsTable) studentsTable.addEventListener('click', (event) => {
     const viewButton = event.target.closest('.view-profile-btn');
     if (viewButton) {
       const studentId = viewButton.getAttribute('data-student-id');
@@ -284,7 +523,10 @@ function initStudentController(){
   const closeModalButtons = qsa('#closeStudentProfile, #closeStudentProfileModal');
   closeModalButtons.forEach(btn => {
     btn.addEventListener('click', () => {
-      qs('#studentProfileModal').classList.add('hidden');
+      const modal = qs('#studentProfileModal');
+      modal.classList.add('hidden');
+      modal.classList.remove('flex');
+      document.body.classList.remove('no-scroll');
     });
   });
 
@@ -301,7 +543,7 @@ function initStudentController(){
   }
 
   // GESTIÓN DEL MODAL PARA AGREGAR ESTUDIANTE
-  const addStudentBtn = document.getElementById('addStudentBtn');
+  const addStudentBtn = document.getElementById('btnAddStudent');
   if (addStudentBtn) {
     addStudentBtn.addEventListener('click', () => {
       qs('#modalAddStudent').classList.remove('hidden');
@@ -344,6 +586,7 @@ function adjustMainOffset(){
 }
 
 function initTeacherModule(){
+  if (window.USE_LOCAL_DEMO !== true) return;
   const openBtn = document.getElementById('openTeacherModalBtn');
   const modal = document.getElementById('teacherModal');
   const overlay = document.getElementById('teacherModalOverlay');
@@ -423,6 +666,7 @@ function initTeacherModule(){
 }
 
 function initRoomsModule(){
+  if (window.USE_LOCAL_DEMO !== true) return;
   const openBtn = document.getElementById('openRoomModalBtn');
   const modal = document.getElementById('roomModal');
   const overlay = document.getElementById('roomModalOverlay');

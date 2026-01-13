@@ -7,6 +7,7 @@
   <link rel="icon" href="logo/favicon.ico" type="image/x-icon">
   <script src="https://cdn.tailwindcss.com"></script>
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <link rel="stylesheet" href="css/theme.css" />
   <script src="https://unpkg.com/lucide@latest/dist/umd/lucide.min.js"></script>
   
   <style>
@@ -36,8 +37,22 @@
       aside#sidebar.mobile-visible { transform: translateX(0); }
     }
 
-    .section { display: none; }
-    .section:not(.hidden) { display: block; }
+    .section { display: none; opacity: 0; transition: opacity 0.3s ease-in-out; }
+    .section.active { display: block; opacity: 1; animation: fadeIn 0.4s ease-out; }
+    @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+
+    .toast-notification {
+      position: fixed;
+      bottom: 24px;
+      right: 24px;
+      padding: 12px 24px;
+      border-radius: 12px;
+      color: white;
+      font-weight: 500;
+      box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1);
+      z-index: 100;
+      transition: all 0.3s ease;
+    }
   </style>
 </head>
 <body class="bg-slate-50 text-slate-800 font-nunito">
@@ -97,7 +112,7 @@
       </div>
 
       <!-- SECTION: HOME (Mis Clases) -->
-      <section id="t-home" class="section">
+      <section id="t-home" class="section active">
         <header class="mb-6">
           <h1 class="text-2xl font-bold text-slate-800">Mis Clases</h1>
           <p class="text-slate-500">Bienvenida, <span class="user-name-display">Maestra</span></p>
@@ -110,7 +125,7 @@
       </section>
 
       <!-- SECTION: CLASS DETAIL (Detalle de Aula) -->
-      <section id="t-class-detail" class="section hidden">
+      <section id="t-class-detail" class="section">
         <header class="mb-6 flex items-center gap-4">
           <button id="backToClasses" class="p-2 hover:bg-slate-100 rounded-full transition-colors text-slate-600">
             <i data-lucide="arrow-left" class="w-6 h-6"></i>
@@ -128,6 +143,9 @@
           </button>
           <button class="class-tab-btn px-4 py-2 rounded-t-lg font-medium text-slate-600 hover:bg-slate-100 transition-colors" data-tab="students">
             Estudiantes
+          </button>
+          <button class="class-tab-btn px-4 py-2 rounded-t-lg font-medium text-slate-600 hover:bg-slate-100 transition-colors" data-tab="daily-log">
+            Diario
           </button>
           <button class="class-tab-btn px-4 py-2 rounded-t-lg font-medium text-slate-600 hover:bg-slate-100 transition-colors" data-tab="attendance">
             Asistencia
@@ -147,6 +165,12 @@
           </div>
         </div>
 
+        <div id="tab-daily-log" class="class-tab-content hidden">
+          <div class="bg-white p-6 rounded-2xl shadow-sm">
+            <div id="dailyLogContainer">Cargando diario...</div>
+          </div>
+        </div>
+
         <div id="tab-attendance" class="class-tab-content hidden">
            <div class="bg-white p-6 rounded-2xl shadow-sm">
             <p class="text-center text-slate-500">Control de asistencia para el aula seleccionada.</p>
@@ -155,7 +179,7 @@
       </section>
 
       <!-- SECTION: STUDENTS (Global) -->
-      <section id="t-students" class="section hidden">
+      <section id="t-students" class="section">
         <header class="mb-6">
           <h1 class="text-2xl font-bold text-slate-800">Mis Alumnos</h1>
         </header>
@@ -180,7 +204,7 @@
       </section>
 
       <!-- SECTION: ATTENDANCE -->
-      <section id="t-attendance" class="section hidden">
+      <section id="t-attendance" class="section">
         <header class="mb-6 flex justify-between items-center">
           <h1 class="text-2xl font-bold text-slate-800">Asistencia</h1>
           <div class="flex gap-2">
@@ -194,6 +218,115 @@
       </section>
 
     </main>
+  </div>
+
+  <!-- MODAL: Student Profile (Copied from panel_directora.html) -->
+  <div id="studentProfileModal" class="fixed inset-0 bg-black bg-opacity-50 hidden flex items-center justify-center z-50">
+    <div class="bg-white rounded-lg shadow-xl max-w-2xl w-full mx-4 max-h-[90vh] overflow-y-auto">
+      <div class="p-6">
+        <div class="flex items-center justify-between mb-6">
+          <h3 class="text-xl font-semibold text-slate-800">Perfil del Estudiante</h3>
+          <button id="closeStudentProfileModal" class="text-slate-400 hover:text-slate-600">
+            <i data-lucide="x" class="w-6 h-6"></i>
+          </button>
+        </div>
+        
+        <!-- Información del Estudiante -->
+        <div class="mb-6">
+          <div class="flex items-center gap-4 mb-4">
+            <div class="w-16 h-16 bg-indigo-100 rounded-full flex items-center justify-center">
+              <i data-lucide="user" class="w-8 h-8 text-indigo-600"></i>
+            </div>
+            <div>
+              <h4 id="studentProfileName" class="text-lg font-semibold text-slate-800">Nombre del Estudiante</h4>
+              <p class="text-sm text-slate-600">Estudiante activo</p>
+            </div>
+          </div>
+          <div class="grid grid-cols-2 gap-4">
+             <div>
+                <label class="text-sm text-slate-500 block">Fecha de Nacimiento</label>
+                <p id="studentDOB" class="font-medium text-slate-800">-</p>
+             </div>
+             <div>
+                <label class="text-sm text-slate-500 block">Aula</label>
+                <p id="studentClassroom" class="font-medium text-slate-800">-</p>
+             </div>
+          </div>
+        </div>
+
+        <!-- Datos de los Padres -->
+        <div class="space-y-6">
+          <div>
+            <h5 class="text-lg font-medium text-slate-800 mb-4 flex items-center gap-2">
+              <i data-lucide="users" class="w-5 h-5 text-slate-600"></i>
+              Información de los Padres
+            </h5>
+            
+            <!-- Padre/Madre 1 -->
+            <div class="bg-slate-50 rounded-lg p-4 mb-4">
+              <h6 class="font-medium text-slate-800 mb-2">Contacto Principal</h6>
+              <div class="grid grid-cols-2 gap-4">
+                <div>
+                  <label class="text-xs text-slate-500 block">Nombre</label>
+                  <p id="parent1Name" class="text-sm font-medium text-slate-700">-</p>
+                </div>
+                <div>
+                  <label class="text-xs text-slate-500 block">Teléfono</label>
+                  <p id="parent1Phone" class="text-sm font-medium text-slate-700">-</p>
+                </div>
+                <div class="col-span-2">
+                  <label class="text-xs text-slate-500 block">Email</label>
+                  <p id="parent1Email" class="text-sm font-medium text-slate-700">-</p>
+                </div>
+              </div>
+            </div>
+
+            <!-- Padre/Madre 2 -->
+            <div class="bg-slate-50 rounded-lg p-4">
+              <h6 class="font-medium text-slate-800 mb-2">Contacto Secundario</h6>
+              <div class="grid grid-cols-2 gap-4">
+                <div>
+                  <label class="text-xs text-slate-500 block">Nombre</label>
+                  <p id="parent2Name" class="text-sm font-medium text-slate-700">-</p>
+                </div>
+                <div>
+                  <label class="text-xs text-slate-500 block">Teléfono</label>
+                  <p id="parent2Phone" class="text-sm font-medium text-slate-700">-</p>
+                </div>
+              </div>
+            </div>
+          </div>
+          
+          <!-- Información Médica / Adicional -->
+          <div>
+            <h5 class="text-lg font-medium text-slate-800 mb-4 flex items-center gap-2">
+              <i data-lucide="activity" class="w-5 h-5 text-slate-600"></i>
+              Información Médica y Adicional
+            </h5>
+            <div class="grid grid-cols-2 gap-4 bg-blue-50 p-4 rounded-lg border border-blue-100">
+              <div class="col-span-2">
+                <label class="text-sm text-blue-700 block mb-1">Alergias / Condiciones</label>
+                <p id="studentAllergies" class="text-sm font-medium text-blue-800">Ninguna reportada</p>
+              </div>
+              <div class="col-span-2">
+                <label class="text-sm text-blue-700 block mb-1">Autorizado para Recoger</label>
+                <p id="studentPickup" class="text-sm font-medium text-blue-800">-</p>
+              </div>
+              <div>
+                <label class="text-sm text-blue-700 block mb-1">Tipo de Sangre</label>
+                <p id="studentBlood" class="text-sm font-medium text-blue-800">-</p>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="flex justify-end gap-2 mt-6">
+          <button id="closeStudentProfile" class="px-4 py-2 border rounded-lg hover:bg-slate-50">
+            Cerrar
+          </button>
+        </div>
+      </div>
+    </div>
   </div>
 
   <script type="module" src="js/panel_maestra.js"></script>

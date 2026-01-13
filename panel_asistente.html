@@ -1,280 +1,268 @@
 <!DOCTYPE html>
 <html lang="es">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Panel de Asistente (Recepcionista) - Karpus Kids</title>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Karpus Kids — Panel Asistente</title>
+  <link rel="icon" href="assets/img/ui/favicon.ico" type="image/x-icon">
   <script src="https://cdn.tailwindcss.com"></script>
-  <link rel="stylesheet" href="css/theme.css" />
-  <link rel="stylesheet" href="css/karpus-modern.css" />
-  <script src="js/auth.js?v=1"></script>
-  <script>
-    (function(){
-      const check = Auth.requireRole('asistente');
-      if(!check.ok){ window.location.href = 'login.html'; }
-    })();
-  </script>
   <script src="https://unpkg.com/lucide@latest/dist/umd/lucide.min.js"></script>
+  <script>lucide.createIcons();</script>
+  
   <style>
-    aside#sidebar { width: 280px; transition: width .25s ease, transform .25s ease; }
-    aside#sidebar.collapsed { width: 72px; }
-    aside#sidebar .label { transition: opacity .2s ease; }
-    aside#sidebar.collapsed .label { opacity: 0; }
-      top: 0;
-      left: 0;
-      right: 0;
-      bottom: 0;
-      background-color: rgba(0, 0, 0, 0.5);
-      display: flex;
-      align-items: center;
-      justify-content: center;
+    #sidebar { transform: translateX(-100%); transition: transform .3s ease; }
+    #sidebar.show { transform: translateX(0); }
+    @media (min-width: 768px) { #sidebar { transform: translateX(0); } }
+
+    /* Sidebar styles */
+    aside#sidebar { 
+      width: 280px; 
+      transition: width 0.3s cubic-bezier(0.4, 0, 0.2, 1); 
       z-index: 50;
+      overflow: hidden;
+    }
+    aside#sidebar.collapsed { width: 80px; }
+    
+    /* Sidebar Content Transitions */
+    aside#sidebar .label { 
+      opacity: 1; 
+      transition: opacity 0.2s ease, transform 0.2s ease; 
+      white-space: nowrap;
+      margin-left: 12px;
+    }
+    aside#sidebar.collapsed .label { opacity: 0; width: 0; margin-left: 0; pointer-events: none; }
+    
+    /* Centrado de iconos cuando está colapsado */
+    aside#sidebar.collapsed .nav-btn { justify-content: center; padding-left: 0; padding-right: 0; }
+    aside#sidebar.collapsed .nav-btn i { margin: 0; }
+
+    /* Hover expand logic */
+    aside#sidebar.collapsed:hover { width: 280px; }
+    aside#sidebar.collapsed:hover .label { opacity: 1; width: auto; margin-left: 12px; pointer-events: auto; }
+    aside#sidebar.collapsed:hover .nav-btn { justify-content: flex-start; padding-left: 1rem; padding-right: 1rem; }
+
+    /* Tema Asistente (Teal/Turquesa) */
+    .sidebar-teal { background: linear-gradient(135deg, #0f766e, #115e59); }
+    
+    /* Layout adjustments */
+    #layoutShell { transition: margin-left .25s ease; }
+    #layoutShell.sidebar-collapsed { margin-left: 80px !important; }
+    
+    /* View Transitions */
+    .section {
+      display: none;
       opacity: 0;
-      visibility: hidden;
-      transition: opacity 0.3s ease, visibility 0.3s ease;
+      transition: opacity 0.3s ease;
     }
-    
-    .modal-container.active {
+    .section.active {
+      display: block;
       opacity: 1;
-      visibility: visible;
+      animation: fadeIn 0.4s ease-out forwards;
     }
-    
-    .modal-content {
-      background: white;
-      border-radius: 16px;
-      box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
-      width: 90%;
-      max-width: 800px;
-      max-height: 90vh;
-      overflow-y: auto;
-      transform: scale(0.9);
-      transition: transform 0.3s ease;
+    @keyframes fadeIn {
+      from { opacity: 0; transform: translateY(10px); }
+      to { opacity: 1; transform: translateY(0); }
     }
+
+    @media (max-width: 768px) {
+      #layoutShell { margin-left: 0 !important; }
+    }
+    #attendanceModal { backdrop-filter: blur(4px); }
   </style>
 </head>
-<body class="bg-slate-100 min-h-screen">
-  <div class="flex">
-    <!-- Sidebar -->
-    <aside id="sidebar" class="sidebar-blue h-screen p-4 sticky top-0 relative">
-      <div class="flex items-center gap-3 px-2 mb-4">
-        <img src="img/mundo.jpg" class="w-8 h-8 rounded" alt="Karpus">
-        <div>
-          <h1 class="karpus-kids-inline text-sm"><span class="k-1">K</span><span class="k-2">a</span><span class="k-3">r</span><span class="k-4">p</span><span class="k-5">u</span><span class="k-6">s</span> <span class="k-7">K</span><span class="k-8">i</span><span class="k-9">d</span><span class="k-10">s</span></h1>
-          <p class="text-xs text-slate-600">Recepción</p>
+<body class="bg-slate-50 text-slate-800 font-sans">
+  <div class="min-h-screen flex">
+    <!-- SIDEBAR -->
+    <aside id="sidebar" class="sidebar-teal p-4 rounded-r-3xl shadow-lg fixed inset-y-0 left-0 z-10">
+      <button id="toggleSidebar" class="absolute -right-3 top-6 bg-white rounded-full p-1 shadow-md border border-slate-100 text-slate-500 hover:text-teal-600 hidden md:block"><i data-lucide="chevron-left" class="w-4 h-4"></i></button>
+      <div class="flex items-center gap-3 mb-8">
+        <div class="h-10 w-10 rounded-xl bg-white/20 flex items-center justify-center shadow-lg text-white font-bold">
+          K
+        </div>
+        <div class="label">
+          <h3 class="font-semibold text-white">Karpus Kids</h3>
+          <p class="text-xs text-white text-opacity-80">Panel Asistente</p>
         </div>
       </div>
-      <!-- Botón de colapsar/expandir -->
-      <button id="toggleSidebar" aria-label="Colapsar sidebar" class="absolute top-2 right-2 w-10 h-10 rounded-full bg-white shadow-lg flex items-center justify-center text-slate-700 hover:bg-slate-100">
-        <i data-lucide="chevrons-left" class="w-6 h-6"></i>
-      </button>
-      <div class="sidebar-scroll glass rounded-xl p-2 space-y-1 label">
-        <button data-section="inicio" class="w-full text-left px-3 py-2 rounded hover:bg-white/50 flex items-center gap-3"><i data-lucide="home"></i><span class="label">Inicio</span></button>
-        <button data-section="alumnos" class="w-full text-left px-3 py-2 rounded hover:bg-white/50 flex items-center gap-3"><i data-lucide="users"></i><span class="label">Alumnos</span></button>
-        <button data-section="maestros" class="w-full text-left px-3 py-2 rounded hover:bg-white/50 flex items-center gap-3"><i data-lucide="graduation-cap"></i><span class="label">Maestros</span></button>
-        <button data-section="padres" class="w-full text-left px-3 py-2 rounded hover:bg-white/50 flex items-center gap-3"><i data-lucide="user"></i><span class="label">Padres</span></button>
-        <button data-section="aulas" class="w-full text-left px-3 py-2 rounded hover:bg-white/50 flex items-center gap-3"><i data-lucide="school"></i><span class="label">Aulas</span></button>
-        <button data-section="pagos" class="w-full text-left px-3 py-2 rounded hover:bg-white/50 flex items-center gap-3"><i data-lucide="credit-card"></i><span class="label">Pagos</span></button>
-        <button data-section="visitas" class="w-full text-left px-3 py-2 rounded hover:bg-white/50 flex items-center gap-3"><i data-lucide="id-card"></i><span class="label">Visitas</span></button>
-        <button data-section="reportes" class="w-full text-left px-3 py-2 rounded hover:bg-white/50 flex items-center gap-3"><i data-lucide="file-text"></i><span class="label">Reportes</span></button>
-        <button data-section="config" class="w-full text-left px-3 py-2 rounded hover:bg-white/50 flex items-center gap-3"><i data-lucide="settings"></i><span class="label">Configuración</span></button>
-        <a id="logoutLink" href="#" class="w-full text-left px-3 py-2 rounded hover:bg-white/50 flex items-center gap-3"><i data-lucide="log-out"></i><span class="label">Cerrar sesión</span></a>
+
+      <nav class="space-y-2 bg-white/10 p-2 rounded-xl mb-4">
+        <button data-section="dashboard" class="nav-btn w-full flex items-center p-3 rounded-lg text-white hover:bg-white/20 transition-colors">
+          <i data-lucide="layout-dashboard"></i>
+          <span class="label">Resumen</span>
+        </button>
+        <button data-section="estudiantes" class="nav-btn w-full flex items-center p-3 rounded-lg text-white hover:bg-white/20 transition-colors">
+          <i data-lucide="users"></i>
+          <span class="label">Estudiantes</span>
+        </button>
+        <button data-section="asistencia" class="nav-btn w-full flex items-center p-3 rounded-lg text-white hover:bg-white/20 transition-colors">
+          <i data-lucide="calendar-check"></i>
+          <span class="label">Asistencia</span>
+        </button>
+        <button data-section="accesos" class="nav-btn w-full flex items-center p-3 rounded-lg text-white hover:bg-white/20 transition-colors">
+          <i data-lucide="door-open"></i>
+          <span class="label">Accesos</span>
+        </button>
+        <button data-section="pagos" class="nav-btn w-full flex items-center p-3 rounded-lg text-white hover:bg-white/20 transition-colors">
+          <i data-lucide="credit-card"></i>
+          <span class="label">Pagos</span>
+        </button>
+      </nav>
+
+      <div class="mt-auto absolute bottom-6 left-4 right-4 text-xs text-white/80 label">
+        <p>Usuario: <span class="font-medium" id="sidebarUserName">Cargando...</span></p>
+        <button id="btnLogout" class="mt-2 flex items-center gap-2 hover:text-white transition-colors"><i data-lucide="log-out" class="w-3 h-3"></i> Cerrar Sesión</button>
       </div>
     </aside>
 
-    <!-- Main content -->
-    <main id="layoutShell" class="flex-1 p-6 space-y-6 md:ml-[280px]">
-      <div class="flex items-center justify-between mb-4 md:hidden">
-        <h2 class="text-xl font-semibold flex items-center gap-2"><i data-lucide="user"></i><span>Panel del Asistente</span></h2>
+    <!-- MAIN -->
+    <main class="flex-1 p-6 ml-[280px]" id="layoutShell">
+      <!-- Mobile Header -->
+      <div class="md:hidden mb-6 flex items-center justify-between">
         <button id="menuBtn" class="p-2 rounded bg-white shadow"><i data-lucide="menu"></i></button>
+        <h2 class="font-semibold text-teal-700">Panel Asistente</h2>
+        <div class="w-8"></div>
       </div>
 
-      <!-- Inicio (Dashboard administrativo) -->
-      <section id="inicio" class="section">
-        <div class="grid grid-cols-1 md:grid-cols-4 gap-4 mb-2">
-          <div class="p-4 bg-white rounded shadow"><p class="text-sm text-slate-500">Alumnos activos</p><p id="dashStudentsActive" class="text-2xl font-bold">0</p></div>
-          <div class="p-4 bg-white rounded shadow"><p class="text-sm text-slate-500">Pagos pendientes</p><p id="dashPaymentsPending" class="text-2xl font-bold">0</p></div>
-          <div class="p-4 bg-white rounded shadow"><p class="text-sm text-slate-500">Pagos del día</p><p id="dashPaymentsToday" class="text-2xl font-bold">0</p></div>
-          <div class="p-4 bg-white rounded shadow"><p class="text-sm text-slate-500">Aulas activas</p><p id="dashClassesActive" class="text-2xl font-bold">0</p></div>
-        </div>
-        <div id="alertsList" class="space-y-2"></div>
-      </section>
-
-      <!-- Alumnos -->
-      <section id="alumnos" class="section hidden">
-        <div class="flex items-center justify-between mb-2">
-          <h3 class="text-lg font-semibold">Alumnos</h3>
-          <button id="openAddStudent" class="px-3 py-2 bg-indigo-600 text-white rounded">Añadir alumno</button>
-        </div>
-        <div class="bg-white rounded shadow p-4">
-          <div class="flex items-center gap-2 mb-2">
-            <input id="studentSearch" class="border rounded px-2 py-1 text-sm" placeholder="Buscar por nombre" />
-            <select id="studentFilterStatus" class="border rounded px-2 py-1 text-sm"><option value="all">Todos</option><option value="activo">Activo</option><option value="pendiente">Pendiente</option></select>
-            <input id="studentFilterClass" class="border rounded px-2 py-1 text-sm" placeholder="Filtrar por aula" />
+      <!-- SECTIONS -->
+      
+      <!-- DASHBOARD -->
+      <section id="dashboard" class="section">
+        <h1 class="text-2xl font-bold mb-6 text-slate-800">Hola, <span id="welcomeName">Asistente</span> 👋</h1>
+        
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+          <div class="bg-white p-6 rounded-2xl shadow-sm border border-slate-100">
+            <div class="flex items-center gap-4">
+              <div class="p-3 bg-blue-100 text-blue-600 rounded-xl"><i data-lucide="users" class="w-6 h-6"></i></div>
+              <div>
+                <p class="text-sm text-slate-500">Estudiantes Activos</p>
+                <p class="text-2xl font-bold" id="statStudents">-</p>
+              </div>
+            </div>
           </div>
-          <table class="w-full text-sm">
-            <thead class="text-slate-500 text-left"><tr><th>Nombre</th><th>Aula</th><th>Padre</th><th>Estado</th><th>Acciones</th></tr></thead>
-            <tbody id="studentsTable"></tbody>
-          </table>
-        </div>
-      </section>
-
-      <!-- Maestros -->
-      <section id="maestros" class="section hidden">
-        <div class="flex items-center justify-between mb-2">
-          <h3 class="text-lg font-semibold">Maestros</h3>
-          <button id="openAddTeacher" class="px-3 py-2 bg-green-600 text-white rounded">Crear maestra</button>
-        </div>
-        <div class="bg-white rounded shadow p-4">
-          <table class="w-full text-sm">
-            <thead class="text-slate-500 text-left"><tr><th>Nombre</th><th>Correo</th><th>Teléfono</th><th>Aula</th><th>Estado</th><th>Acciones</th></tr></thead>
-            <tbody id="teachersTable"></tbody>
-          </table>
-        </div>
-      </section>
-
-      <!-- Padres -->
-      <section id="padres" class="section hidden">
-        <div class="flex items-center justify-between mb-2">
-          <h3 class="text-lg font-semibold">Padres</h3>
-          <button id="openAddParent" class="px-3 py-2 bg-slate-800 text-white rounded">Añadir padre</button>
-        </div>
-        <div class="bg-white rounded shadow p-4">
-          <div class="flex items-center gap-2 mb-2">
-            <input id="parentSearch" class="border rounded px-2 py-1 text-sm" placeholder="Buscar por nombre" />
-            <select id="parentFilterStatus" class="border rounded px-2 py-1 text-sm"><option value="all">Todos</option><option value="activo">Activo</option><option value="bloqueado">Bloqueado</option></select>
+          <div class="bg-white p-6 rounded-2xl shadow-sm border border-slate-100">
+            <div class="flex items-center gap-4">
+              <div class="p-3 bg-green-100 text-green-600 rounded-xl"><i data-lucide="check-circle" class="w-6 h-6"></i></div>
+              <div>
+                <p class="text-sm text-slate-500">Asistencia Hoy</p>
+                <p class="text-2xl font-bold" id="statAttendance">-</p>
+              </div>
+            </div>
           </div>
-          <table class="w-full text-sm">
-            <thead class="text-slate-500 text-left"><tr><th>Nombre</th><th>Hijos</th><th>Teléfono</th><th>Estado</th><th>Acciones</th></tr></thead>
-            <tbody id="parentsTable"></tbody>
-          </table>
-        </div>
-      </section>
-
-      <!-- Aulas -->
-      <section id="aulas" class="section hidden">
-        <div class="flex items-center justify-between mb-2">
-          <h3 class="text-lg font-semibold">Aulas</h3>
-          <button id="openAddClass" class="px-3 py-2 bg-blue-600 text-white rounded">Crear aula</button>
-        </div>
-        <div class="bg-white rounded shadow p-4">
-          <div class="flex items-center gap-2 mb-2">
-            <input id="classSearch" class="border rounded px-2 py-1 text-sm" placeholder="Buscar por nombre/maestra" />
-          </div>
-          <table class="w-full text-sm">
-            <thead class="text-slate-500 text-left"><tr><th>Nombre</th><th>Maestra</th><th>Alumnos</th><th>Acciones</th></tr></thead>
-            <tbody id="classesTable"></tbody>
-          </table>
-          <!-- Modal asignar alumnos -->
-          <div id="assignModal" class="fixed inset-0 bg-black/40 hidden items-center justify-center">
-            <div class="bg-white rounded shadow p-4 w-full max-w-md">
-              <h4 class="text-lg font-semibold mb-2">Asignar alumnos</h4>
-              <div id="assignList" class="max-h-60 overflow-y-auto border rounded p-2 mb-3"></div>
-              <div class="flex justify-end gap-2">
-                <button id="assignCancel" class="px-3 py-2 rounded border">Cancelar</button>
-                <button id="assignConfirm" class="px-3 py-2 bg-teal-600 text-white rounded">Asignar</button>
+          <div class="bg-white p-6 rounded-2xl shadow-sm border border-slate-100">
+            <div class="flex items-center gap-4">
+              <div class="p-3 bg-orange-100 text-orange-600 rounded-xl"><i data-lucide="alert-circle" class="w-6 h-6"></i></div>
+              <div>
+                <p class="text-sm text-slate-500">Pagos Pendientes</p>
+                <p class="text-2xl font-bold" id="statPayments">-</p>
               </div>
             </div>
           </div>
         </div>
+
+        <div class="bg-white rounded-2xl shadow-sm border border-slate-100 p-6">
+          <h3 class="font-semibold mb-4">Accesos Rápidos</h3>
+          <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
+            <button onclick="document.querySelector('[data-section=estudiantes]').click()" class="p-4 rounded-xl bg-slate-50 hover:bg-slate-100 transition-colors text-center">
+              <i data-lucide="search" class="w-6 h-6 mx-auto mb-2 text-slate-500"></i>
+              <span class="text-sm font-medium">Buscar Alumno</span>
+            </button>
+            <button onclick="document.querySelector('[data-section=pagos]').click()" class="p-4 rounded-xl bg-slate-50 hover:bg-slate-100 transition-colors text-center">
+              <i data-lucide="dollar-sign" class="w-6 h-6 mx-auto mb-2 text-slate-500"></i>
+              <span class="text-sm font-medium">Registrar Pago</span>
+            </button>
+          </div>
+        </div>
       </section>
 
-      <!-- Pagos -->
-      <section id="pagos" class="section hidden">
-        <div class="grid md:grid-cols-2 gap-4">
-          <div class="bg-white rounded shadow p-4">
-            <h3 class="text-lg font-semibold mb-2">Registrar pago</h3>
-            <div class="space-y-2">
-              <input id="payStudent" class="w-full border rounded px-3 py-2" placeholder="Alumno" />
-              <input id="payMonth" class="w-full border rounded px-3 py-2" placeholder="Mes" />
-              <input id="payAmount" type="number" class="w-full border rounded px-3 py-2" placeholder="Monto" />
-              <input id="payPartial" type="number" class="w-full border rounded px-3 py-2" placeholder="Pago parcial (opcional)" />
-              <select id="payMethod" class="w-full border rounded px-3 py-2"><option>Efectivo</option><option>Transferencia</option></select>
-              <input id="payRef" class="w-full border rounded px-3 py-2" placeholder="Referencia" />
-              <input id="payNote" class="w-full border rounded px-3 py-2" placeholder="Observación" />
-              <button id="savePayment" class="px-3 py-2 bg-green-600 text-white rounded">Guardar</button>
+      <!-- ESTUDIANTES -->
+      <section id="estudiantes" class="section">
+        <div class="flex justify-between items-center mb-6">
+          <h2 class="text-xl font-bold">Directorio de Estudiantes</h2>
+          <div class="relative">
+            <i data-lucide="search" class="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400"></i>
+            <input id="searchStudentInput" type="text" placeholder="Buscar..." class="pl-9 pr-4 py-2 border rounded-lg text-sm w-64">
+          </div>
+        </div>
+        <div class="bg-white rounded-xl shadow-sm border overflow-hidden">
+          <table class="w-full text-sm text-left">
+            <thead class="bg-slate-50 text-slate-500 font-medium">
+              <tr>
+                <th class="px-6 py-4">Nombre</th>
+                <th class="px-6 py-4">Aula</th>
+                <th class="px-6 py-4">Padre/Tutor</th>
+                <th class="px-6 py-4">Estado</th>
+              </tr>
+            </thead>
+            <tbody id="studentsTableBody" class="divide-y divide-slate-100">
+              <!-- JS -->
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      <!-- ASISTENCIA -->
+      <section id="asistencia" class="section">
+        <h2 class="text-xl font-bold mb-6">Registro de Asistencia</h2>
+        <div class="bg-white rounded-xl shadow-sm border p-6">
+          <p class="text-slate-500 mb-4">Seleccione un aula para ver la asistencia del día.</p>
+          <div id="attendanceRoomsGrid" class="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <!-- JS -->
+          </div>
+        </div>
+      </section>
+
+      <!-- ACCESOS (Check-in/Check-out) -->
+      <section id="accesos" class="section">
+        <h2 class="text-xl font-bold mb-6">Control de Accesos (Check-in / Check-out)</h2>
+        <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+          <!-- Buscador y Acción -->
+          <div class="lg:col-span-2 bg-white rounded-xl shadow-sm border p-6">
+            <div class="mb-4">
+              <label class="block text-sm font-medium text-slate-700 mb-2">Buscar Estudiante para Registro</label>
+              <div class="relative">
+                <i data-lucide="search" class="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400"></i>
+                <input id="accessSearchInput" type="text" placeholder="Escribe el nombre del estudiante..." class="w-full pl-9 pr-4 py-3 border rounded-xl focus:ring-2 focus:ring-teal-500 outline-none">
+              </div>
             </div>
+            <div id="accessSearchResults" class="space-y-2 mt-4"></div>
           </div>
-          <div class="bg-white rounded shadow p-4">
-            <h3 class="text-lg font-semibold mb-2">Estado de pagos</h3>
-            <div class="flex items-center gap-2 mb-2">
-              <input id="paySearch" class="border rounded px-2 py-1 text-sm" placeholder="Buscar alumno/mes" />
-              <select id="payFilter" class="border rounded px-2 py-1 text-sm"><option value="all">Todos</option><option value="pendiente">Pendiente</option><option value="parcial">Parcial</option><option value="pagado">Pagado</option></select>
-            </div>
-            <table class="w-full text-sm">
-              <thead class="text-slate-500 text-left"><tr><th>Alumno</th><th>Mes</th><th>Estado</th><th>Monto</th><th>Saldo</th><th>Acciones</th></tr></thead>
-              <tbody id="paymentsTable"></tbody>
-            </table>
+          <!-- Historial Reciente -->
+          <div class="bg-white rounded-xl shadow-sm border p-6">
+            <h3 class="font-semibold mb-4 text-slate-700">Últimos Movimientos</h3>
+            <div id="accessRecentLog" class="space-y-3 text-sm"></div>
           </div>
         </div>
       </section>
 
-      <!-- Visitas -->
-      <section id="visitas" class="section hidden">
-        <div class="grid md:grid-cols-2 gap-4">
-          <div class="bg-white rounded shadow p-4">
-            <h3 class="text-lg font-semibold mb-2">Registro de visitas</h3>
-            <div class="space-y-2">
-              <input id="visitVisitor" class="w-full border rounded px-3 py-2" placeholder="Visitante" />
-              <input id="visitStudent" class="w-full border rounded px-3 py-2" placeholder="Alumno (opcional)" />
-              <input id="visitPurpose" class="w-full border rounded px-3 py-2" placeholder="Motivo" />
-              <input id="visitNotes" class="w-full border rounded px-3 py-2" placeholder="Notas (opcional)" />
-              <button id="saveVisit" class="px-3 py-2 bg-teal-600 text-white rounded">Registrar entrada</button>
-            </div>
-          </div>
-          <div class="bg-white rounded shadow p-4">
-            <h3 class="text-lg font-semibold mb-2">Visitas en curso</h3>
-            <table class="w-full text-sm">
-              <thead class="text-slate-500 text-left"><tr><th>Visitante</th><th>Alumno</th><th>Motivo</th><th>Entrada</th><th>Acciones</th></tr></thead>
-              <tbody id="visitsTable"></tbody>
-            </table>
+      <!-- PAGOS -->
+      <section id="pagos" class="section">
+        <div class="flex justify-between items-center mb-6">
+          <h2 class="text-xl font-bold">Gestión de Pagos</h2>
+          <div class="flex gap-2">
+            <button id="btnExportPayments" class="bg-slate-800 text-white px-4 py-2 rounded-lg hover:bg-slate-900 transition-colors text-sm font-medium flex items-center gap-2">
+              <i data-lucide="download" class="w-4 h-4"></i> Exportar Excel
+            </button>
+            <button id="btnNewPayment" class="bg-teal-600 text-white px-4 py-2 rounded-lg hover:bg-teal-700 transition-colors text-sm font-medium flex items-center gap-2">
+              <i data-lucide="plus" class="w-4 h-4"></i> Registrar Pago
+            </button>
           </div>
         </div>
-      </section>
-
-      <!-- Reportes -->
-      <section id="reportes" class="section hidden">
-        <div class="bg-white rounded shadow p-4 space-y-4">
-          <h3 class="text-lg font-semibold">Reportes administrativos</h3>
-          <div class="grid md:grid-cols-2 gap-3">
-            <button id="exportPaymentsCsv" class="px-3 py-2 border rounded">Exportar pagos (CSV)</button>
-            <button id="exportActiveStudentsCsv" class="px-3 py-2 border rounded">Exportar alumnos activos (CSV)</button>
-            <button id="exportPaymentsPdf" class="px-3 py-2 border rounded">Exportar pagos (PDF)</button>
-            <button id="exportActiveStudentsPdf" class="px-3 py-2 border rounded">Exportar alumnos activos (PDF)</button>
-          </div>
-          <p class="text-xs text-slate-500">Exporta CSV o imprime/guarda en PDF.</p>
-        </div>
-      </section>
-
-      <!-- Configuración -->
-      <section id="config" class="section hidden">
-        <div class="bg-white rounded shadow p-4 space-y-3">
-          <h3 class="text-lg font-semibold">Configuración</h3>
-          <div class="grid md:grid-cols-2 gap-3">
-            <input id="cfgCycle" class="border rounded px-3 py-2" placeholder="Ciclo escolar" />
-            <input id="cfgTariffs" class="border rounded px-3 py-2" placeholder="Tarifas" />
-            <input id="cfgSchedule" class="border rounded px-3 py-2" placeholder="Horarios" />
-            <input id="cfgMethods" class="border rounded px-3 py-2" placeholder="Métodos de pago" />
-          </div>
-          <div class="flex justify-end">
-            <button id="saveConfig" class="px-3 py-2 bg-slate-800 text-white rounded">Guardar configuración</button>
-          </div>
-          <p class="text-xs text-slate-500">Sin permisos académicos.</p>
-        </div>
-      </section>
-
-      <!-- Apoyo administrativo -->
-      <section id="apoyo" class="section hidden">
-        <h3 class="text-lg font-semibold mb-4">Apoyo a dirección</h3>
-        <div class="bg-white rounded shadow p-4 space-y-4">
-          <div>
-            <h4 class="font-medium mb-2">Carga de documentos</h4>
-            <input id="adminFile" type="file" class="border rounded px-3 py-2" />
-            <button id="uploadDoc" class="px-3 py-2 bg-blue-600 text-white rounded">Subir</button>
-            <div id="uploadedDocs" class="mt-2 text-sm text-slate-700 space-y-1"></div>
-          </div>
-          <div>
-            <h4 class="font-medium mb-2">Mensajes generales de padres</h4>
-            <div id="parentRequests" class="text-sm space-y-2"></div>
+        <div class="bg-white rounded-2xl shadow-sm border overflow-hidden">
+          <div class="overflow-x-auto">
+          <table class="w-full text-sm text-left">
+            <thead class="bg-slate-50 text-slate-500 font-medium">
+              <tr>
+                <th class="px-6 py-4">Estudiante</th>
+                <th class="px-6 py-4">Monto</th>
+                <th class="px-6 py-4">Fecha</th>
+                <th class="px-6 py-4">Mes Pagado</th>
+                <th class="px-6 py-4">Acciones</th>
+              </tr>
+            </thead>
+            <tbody id="paymentsTableBody" class="divide-y divide-slate-100">
+              <!-- JS -->
+            </tbody>
+          </table>
           </div>
         </div>
       </section>
@@ -282,396 +270,76 @@
     </main>
   </div>
 
-  <!-- Modal: Añadir alumno -->
-  <div id="studentModal" class="fixed inset-0 bg-black/50 hidden items-center justify-center">
-    <div class="bg-white rounded-lg shadow p-4 w-full max-w-lg">
-      <h4 class="font-semibold mb-3">Alumno</h4>
-      <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
-        <div><label class="text-sm">Nombre completo</label><input id="mName" class="w-full border rounded px-3 py-2" /></div>
-        <div><label class="text-sm">Fecha de nacimiento</label><input id="mBirth" type="date" class="w-full border rounded px-3 py-2" /></div>
-        <div><label class="text-sm">Sexo</label><select id="mSex" class="w-full border rounded px-3 py-2"><option>F</option><option>M</option></select></div>
-        <div><label class="text-sm">Documento</label><input id="mDoc" class="w-full border rounded px-3 py-2" /></div>
-        <div><label class="text-sm">Padre / tutor</label><input id="mTutor" class="w-full border rounded px-3 py-2" /></div>
-        <div><label class="text-sm">Teléfono</label><input id="mPhone" class="w-full border rounded px-3 py-2" /></div>
-        <div><label class="text-sm">Aula</label><input id="mClass" class="w-full border rounded px-3 py-2" /></div>
-        <div><label class="text-sm">Estado</label><select id="mStatus" class="w-full border rounded px-3 py-2"><option>activo</option><option>pendiente</option></select></div>
+  <script type="module" src="js/panel_asistente.js"></script>
+
+  <!-- Payment Modal -->
+  <div id="paymentModal" class="fixed inset-0 bg-black/30 z-50 hidden items-center justify-center">
+    <div class="bg-white rounded-2xl shadow-xl p-8 w-full max-w-md">
+      <div class="flex justify-between items-center mb-6">
+        <h3 class="text-lg font-bold">Registrar Nuevo Pago</h3>
+        <button id="closePaymentModal" class="p-1 rounded-full hover:bg-slate-100"><i data-lucide="x"></i></button>
       </div>
-      <div class="flex justify-end gap-2 mt-4">
-        <button id="closeStudentModal" class="px-3 py-2 border rounded">Cancelar</button>
-        <button id="saveStudentModal" class="px-3 py-2 bg-indigo-600 text-white rounded">Guardar</button>
+      <form id="paymentForm">
+        <div class="space-y-4">
+          <div>
+            <label for="studentSelect" class="block text-sm font-medium text-slate-600 mb-1">Estudiante</label>
+            <select id="studentSelect" required class="w-full border-slate-300 rounded-lg shadow-sm focus:border-teal-500 focus:ring-teal-500"></select>
+          </div>
+          <div>
+            <label for="paymentAmount" class="block text-sm font-medium text-slate-600 mb-1">Monto</label>
+            <input type="number" id="paymentAmount" required class="w-full border-slate-300 rounded-lg shadow-sm focus:border-teal-500 focus:ring-teal-500" placeholder="Ej: 1500">
+          </div>
+          <div>
+            <label for="paymentMonth" class="block text-sm font-medium text-slate-600 mb-1">Mes Pagado</label>
+            <select id="paymentMonth" required class="w-full border-slate-300 rounded-lg shadow-sm focus:border-teal-500 focus:ring-teal-500">
+              <option value="Enero">Enero</option>
+              <option value="Febrero">Febrero</option>
+              <option value="Marzo">Marzo</option>
+              <option value="Abril">Abril</option>
+              <option value="Mayo">Mayo</option>
+              <option value="Junio">Junio</option>
+              <option value="Julio">Julio</option>
+              <option value="Agosto">Agosto</option>
+              <option value="Septiembre">Septiembre</option>
+              <option value="Octubre">Octubre</option>
+              <option value="Noviembre">Noviembre</option>
+              <option value="Diciembre">Diciembre</option>
+            </select>
+          </div>
+          <div class="pt-4 flex justify-end gap-3">
+            <button type="button" id="cancelPayment" class="px-4 py-2 rounded-lg bg-slate-100 hover:bg-slate-200 text-sm font-medium">Cancelar</button>
+            <button type="submit" class="px-4 py-2 rounded-lg bg-teal-600 text-white hover:bg-teal-700 text-sm font-medium">Guardar Pago</button>
+          </div>
+        </div>
+      </form>
+    </div>
+  </div>
+  <!-- Attendance Detail Modal -->
+  <div id="attendanceModal" class="fixed inset-0 bg-black/30 z-50 hidden items-center justify-center">
+    <div class="bg-white rounded-2xl shadow-xl p-6 w-full max-w-4xl h-[80vh] flex flex-col">
+      <div class="flex justify-between items-center mb-4">
+        <div>
+          <h3 class="text-lg font-bold" id="attModalTitle">Asistencia - Aula</h3>
+          <p class="text-sm text-slate-500" id="attModalDate">Fecha: Hoy</p>
+        </div>
+        <button id="closeAttendanceModal" class="p-2 rounded-full hover:bg-slate-100"><i data-lucide="x"></i></button>
+      </div>
+      
+      <div class="flex-1 overflow-y-auto">
+        <table class="w-full text-sm text-left border-collapse">
+          <thead class="bg-slate-50 text-slate-500 sticky top-0">
+            <tr>
+              <th class="p-3">Estudiante</th>
+              <th class="p-3 text-center">Estado</th>
+              <th class="p-3 text-center">Hora</th>
+            </tr>
+          </thead>
+          <tbody id="attModalBody" class="divide-y divide-slate-100">
+            <!-- JS -->
+          </tbody>
+        </table>
       </div>
     </div>
   </div>
-
-  <script>
-    document.addEventListener('DOMContentLoaded', ()=>{
-      if(window.lucide && typeof lucide.createIcons === 'function') lucide.createIcons();
-    });
-
-    // Navegación sidebar
-    const sections = ['inicio','alumnos','maestros','padres','aulas','pagos','visitas','reportes','config'];
-    document.querySelectorAll('#sidebar [data-section]').forEach(btn=>{
-      btn.addEventListener('click', ()=>{
-        const target = btn.dataset.section;
-        sections.forEach(id=> document.getElementById(id)?.classList.add('hidden'));
-        document.getElementById(target)?.classList.remove('hidden');
-      });
-    });
-
-    // Logout
-    document.getElementById('logoutLink')?.addEventListener('click', (e)=>{
-      e.preventDefault();
-      Auth.logout();
-      window.location.href = 'login.html';
-    });
-
-    // Datos demo mínimos (operativos, no académicos)
-    const students = [
-      { name:'Andrea Flores', class:'1° A', parent:'Karolina F.', status:'activo' },
-      { name:'Juan Pérez', class:'2° B', parent:'Mario P.', status:'pendiente' }
-    ];
-    const teachers = [
-      { name:'Ana Pérez', email:'ana@karpus.edu', phone:'', class:'1° A', status:'activo' }
-    ];
-    const parents = [
-      { name:'Karolina F.', kids:1, phone:'', status:'activo' }
-    ];
-    const classes = [
-      { name:'1° A', teacher:'Ana Pérez', students:1 }
-    ];
-    // Pagos y visitas ahora persistentes en KarpusStore
-    const Store = window.KarpusStore;
-    function getAllPayments(){ return Store.getState().payments; }
-    function getPendingPayments(){ return Store.getPaymentsPending(); }
-
-    // Dashboard
-    function renderDashboard(){
-      document.getElementById('dashStudentsActive').textContent = students.filter(s=>s.status==='activo').length;
-      const allPays = getAllPayments();
-      document.getElementById('dashPaymentsPending').textContent = allPays.filter(p=>p.status!=='pagado').length;
-      document.getElementById('dashPaymentsToday').textContent = allPays.filter(p=>p.paidDate===new Date().toISOString().slice(0,10)).length;
-      document.getElementById('dashClassesActive').textContent = classes.length;
-
-      // Alertas dinámicas
-      const alertsBox = document.getElementById('alertsList');
-      alertsBox.innerHTML = '';
-      const today = new Date().toISOString().slice(0,10);
-      const overdue = getPendingPayments().filter(p=> (p.dueDate||'') < today);
-      if(overdue.length){
-        const a = document.createElement('div'); a.className = 'p-3 bg-red-50 border-l-4 border-red-600 rounded-r-xl';
-        a.innerHTML = `<p class="text-sm font-semibold text-red-700">Pago vencido</p><p class="text-xs text-red-700">${overdue.length} familia(s) con pagos vencidos. <a href="#" class="underline" data-go="pagos">Ir a pagos</a></p>`;
-        a.querySelector('[data-go]')?.addEventListener('click', (e)=>{ e.preventDefault(); sections.forEach(id=> document.getElementById(id)?.classList.add('hidden')); document.getElementById('pagos').classList.remove('hidden'); });
-        alertsBox.appendChild(a);
-      }
-      const noClass = students.filter(s=> !s.class || !s.class.trim());
-      if(noClass.length){
-        const a = document.createElement('div'); a.className = 'p-3 bg-yellow-50 border-l-4 border-yellow-500 rounded-r-xl';
-        a.innerHTML = `<p class="text-sm font-semibold text-yellow-700">Alumno sin aula</p><p class="text-xs text-yellow-700">${noClass.length} alumno(s) sin aula. <a href="#" class="underline" data-go="aulas">Asignar</a></p>`;
-        a.querySelector('[data-go]')?.addEventListener('click', (e)=>{ e.preventDefault(); sections.forEach(id=> document.getElementById(id)?.classList.add('hidden')); document.getElementById('aulas').classList.remove('hidden'); });
-        alertsBox.appendChild(a);
-      }
-      const unlinked = parents.filter(p=> (p.kids||0)===0);
-      if(unlinked.length){
-        const a = document.createElement('div'); a.className = 'p-3 bg-blue-50 border-l-4 border-blue-600 rounded-r-xl';
-        a.innerHTML = `<p class="text-sm font-semibold text-blue-700">Padre sin vincular</p><p class="text-xs text-blue-700">${unlinked.length} padre(s) sin vincular. <a href="#" class="underline" data-go="padres">Vincular</a></p>`;
-        a.querySelector('[data-go]')?.addEventListener('click', (e)=>{ e.preventDefault(); sections.forEach(id=> document.getElementById(id)?.classList.add('hidden')); document.getElementById('padres').classList.remove('hidden'); });
-        alertsBox.appendChild(a);
-      }
-    }
-
-    // Alumnos
-    function renderStudents(){
-      const tbody = document.getElementById('studentsTable');
-      tbody.innerHTML = '';
-      const q = (document.getElementById('studentSearch')?.value||'').toLowerCase();
-      const fStatus = document.getElementById('studentFilterStatus')?.value||'all';
-      const fClass = (document.getElementById('studentFilterClass')?.value||'').toLowerCase();
-      let data = students.filter(s=> s.name.toLowerCase().includes(q));
-      if(fStatus!=='all') data = data.filter(s=> s.status===fStatus);
-      if(fClass) data = data.filter(s=> (s.class||'').toLowerCase().includes(fClass));
-      data.forEach((s, idx)=>{
-        const tr = document.createElement('tr');
-        tr.innerHTML = `<td>${s.name}</td><td>${s.class}</td><td>${s.parent}</td><td>${s.status}</td>
-          <td>
-            <button class="text-blue-600 mr-2" data-edit="${idx}">Editar</button>
-            <button class="text-red-600" data-del="${idx}">Eliminar</button>
-          </td>`;
-        tr.querySelector('[data-del]')?.addEventListener('click', ()=>{
-          if(confirm('¿Eliminar alumno?')){ students.splice(idx,1); renderStudents(); renderDashboard(); }
-        });
-        tr.querySelector('[data-edit]')?.addEventListener('click', ()=>{
-          document.getElementById('mName').value = s.name;
-          document.getElementById('mBirth').value = '';
-          document.getElementById('mSex').value = 'F';
-          document.getElementById('mDoc').value = '';
-          document.getElementById('mTutor').value = s.parent;
-          document.getElementById('mPhone').value = '';
-          document.getElementById('mClass').value = s.class;
-          document.getElementById('mStatus').value = s.status;
-          document.getElementById('studentModal').classList.remove('hidden');
-        });
-        tbody.appendChild(tr);
-      });
-    }
-    document.getElementById('studentSearch')?.addEventListener('input', renderStudents);
-    document.getElementById('studentFilterStatus')?.addEventListener('change', renderStudents);
-    document.getElementById('studentFilterClass')?.addEventListener('input', renderStudents);
-    document.getElementById('openAddStudent')?.addEventListener('click', ()=>{
-      ['mName','mBirth','mDoc','mTutor','mPhone','mClass'].forEach(id=> document.getElementById(id).value='');
-      document.getElementById('mSex').value='F';
-      document.getElementById('mStatus').value='pendiente';
-      document.getElementById('studentModal').classList.remove('hidden');
-    });
-    document.getElementById('closeStudentModal')?.addEventListener('click', ()=>{
-      document.getElementById('studentModal').classList.add('hidden');
-    });
-    document.getElementById('saveStudentModal')?.addEventListener('click', ()=>{
-      const s = {
-        name: document.getElementById('mName').value.trim(),
-        parent: document.getElementById('mTutor').value.trim(),
-        class: document.getElementById('mClass').value.trim(),
-        status: document.getElementById('mStatus').value.trim()||'pendiente'
-      };
-      if(!s.name) return alert('El nombre es obligatorio');
-      students.push(s);
-      document.getElementById('studentModal').classList.add('hidden');
-      renderStudents(); renderDashboard();
-    });
-
-    // Maestros
-    function renderTeachers(){
-      const tbody = document.getElementById('teachersTable');
-      tbody.innerHTML = '';
-      teachers.forEach((t, idx)=>{
-        const tr = document.createElement('tr');
-        tr.innerHTML = `<td>${t.name}</td><td>${t.email}</td><td>${t.phone}</td><td>${t.class}</td><td>${t.status}</td>
-          <td><button class="text-red-600" data-del="${idx}">Eliminar</button></td>`;
-        tr.querySelector('[data-del]')?.addEventListener('click', ()=>{ teachers.splice(idx,1); renderTeachers(); });
-        tbody.appendChild(tr);
-      });
-    }
-    document.getElementById('openAddTeacher')?.addEventListener('click', ()=>{
-      teachers.push({ name:'Nueva Maestra', email:'', phone:'', class:'', status:'activo' });
-      renderTeachers();
-    });
-
-    // Padres
-    function renderParents(){
-      const tbody = document.getElementById('parentsTable');
-      tbody.innerHTML = '';
-      const q = (document.getElementById('parentSearch')?.value||'').toLowerCase();
-      const fStatus = document.getElementById('parentFilterStatus')?.value||'all';
-      let data = parents.filter(p=> p.name.toLowerCase().includes(q));
-      if(fStatus!=='all') data = data.filter(p=> p.status===fStatus);
-      data.forEach((p, idx)=>{
-        const tr = document.createElement('tr');
-        tr.innerHTML = `<td>${p.name}</td><td>${p.kids}</td><td>${p.phone}</td><td>${p.status}</td>
-          <td>
-            <button class="text-blue-600 mr-2">Vincular hijo</button>
-            <button class="text-orange-600 mr-2">Reset acceso</button>
-            <button class="text-red-600" data-block="${idx}">Bloquear</button>
-          </td>`;
-        tr.querySelector('[data-block]')?.addEventListener('click', ()=>{ p.status='bloqueado'; renderParents(); });
-        tbody.appendChild(tr);
-      });
-    }
-    document.getElementById('parentSearch')?.addEventListener('input', renderParents);
-    document.getElementById('parentFilterStatus')?.addEventListener('change', renderParents);
-    document.getElementById('openAddParent')?.addEventListener('click', ()=>{
-      parents.push({ name:'Nuevo Padre', kids:0, phone:'', status:'activo' }); renderParents();
-    });
-
-    // Aulas
-    function renderClasses(){
-      const tbody = document.getElementById('classesTable');
-      tbody.innerHTML = '';
-      const q = (document.getElementById('classSearch')?.value||'').toLowerCase();
-      const data = classes.filter(c=> `${c.name} ${c.teacher}`.toLowerCase().includes(q));
-      data.forEach((c, idx)=>{
-        const count = students.filter(s=> s.class===c.name).length;
-        const tr = document.createElement('tr');
-        tr.innerHTML = `<td>${c.name}</td><td>${c.teacher}</td><td>${count}</td>
-          <td><button class="text-blue-600" data-assign="${c.name}">Asignar alumnos</button> <button class="text-red-600" data-del="${idx}">Eliminar</button></td>`;
-        tr.querySelector('[data-assign]')?.addEventListener('click', ()=> openAssignModal(c.name));
-        tr.querySelector('[data-del]')?.addEventListener('click', ()=>{ classes.splice(idx,1); renderClasses(); renderDashboard(); });
-        tbody.appendChild(tr);
-      });
-    }
-    document.getElementById('classSearch')?.addEventListener('input', renderClasses);
-    function openAssignModal(className){
-      const modal = document.getElementById('assignModal');
-      const list = document.getElementById('assignList');
-      modal.classList.remove('hidden'); modal.classList.add('flex');
-      list.innerHTML = '';
-      const unassigned = students.map((s, i)=> ({...s, idx: i})).filter(s=> !s.class || !s.class.trim());
-      if(unassigned.length===0){ list.innerHTML = '<p class="text-sm text-slate-600">No hay alumnos sin aula.</p>'; return; }
-      unassigned.forEach((s)=>{
-        const div = document.createElement('div');
-        div.className = 'flex items-center gap-2 py-1';
-        div.innerHTML = `<input type="checkbox" data-index="${s.idx}"><span>${s.name}</span>`;
-        list.appendChild(div);
-      });
-      document.getElementById('assignCancel').onclick = ()=>{ modal.classList.add('hidden'); modal.classList.remove('flex'); };
-      document.getElementById('assignConfirm').onclick = ()=>{
-        const ids = Array.from(list.querySelectorAll('input[type=checkbox]:checked')).map(el=> Number(el.getAttribute('data-index')));
-        students.forEach((s, i)=>{ if(ids.includes(i)) s.class = className; });
-        modal.classList.add('hidden'); modal.classList.remove('flex');
-        renderClasses(); renderStudents(); renderDashboard();
-      };
-    }
-    document.getElementById('openAddClass')?.addEventListener('click', ()=>{
-      classes.push({ name:'Nueva Aula', teacher:'', students:0 }); renderClasses(); renderDashboard();
-    });
-
-    // Pagos
-    function renderPayments(){
-      const tbody = document.getElementById('paymentsTable');
-      tbody.innerHTML = '';
-      const q = (document.getElementById('paySearch')?.value||'').toLowerCase();
-      const filter = document.getElementById('payFilter')?.value||'all';
-      let data = getAllPayments();
-      if(filter!=='all') data = data.filter(p=> p.status===filter);
-      data = data.filter(p=> `${p.student} ${p.month}`.toLowerCase().includes(q));
-      data.forEach((p)=>{
-        const badge = p.status==='pagado' ? '<span class="px-2 py-1 text-xs rounded bg-green-100 text-green-700">Pagado</span>' : p.status==='parcial' ? '<span class="px-2 py-1 text-xs rounded bg-yellow-100 text-yellow-700">Parcial</span>' : '<span class="px-2 py-1 text-xs rounded bg-red-100 text-red-700">Pendiente</span>';
-        const saldo = Math.max(0, Number(p.amount||0) - Number(p.paidAmount||0));
-        const tr = document.createElement('tr');
-        tr.innerHTML = `<td>${p.student}</td><td>${p.month}</td><td>${badge}</td><td>$${Number(p.amount||0).toFixed(2)}</td><td>$${saldo.toFixed(2)}</td>
-          <td>
-            ${p.status!=='pagado' ? `<button class="text-blue-600 mr-2" data-pay="${p.id}">Marcar pagado</button><button class="text-yellow-600" data-partial="${p.id}">Registrar parcial</button>` : ''}
-          </td>`;
-        tr.querySelector('[data-pay]')?.addEventListener('click', ()=>{ Store.markPaymentStatus(p.id, 'pagado'); renderPayments(); renderDashboard(); });
-        tr.querySelector('[data-partial]')?.addEventListener('click', ()=>{
-          const amt = prompt('Monto parcial recibido:', '0');
-          if(amt==null) return; const num = Number(amt||0); if(!(num>0)) return;
-          Store.addPaymentPartial(p.id, num); renderPayments(); renderDashboard();
-        });
-        tbody.appendChild(tr);
-      });
-    }
-    function monthToDueDate(m){
-      const months = ['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'];
-      const idx = months.findIndex(x=> x.toLowerCase() === String(m).toLowerCase());
-      const year = new Date().getFullYear();
-      const lastDay = new Date(year, idx+1, 0).getDate();
-      const pad=n=> String(n).padStart(2,'0');
-      return `${year}-${pad(idx+1)}-${pad(lastDay)}`;
-    }
-    document.getElementById('savePayment')?.addEventListener('click', ()=>{
-      const student = document.getElementById('payStudent').value.trim();
-      const month = document.getElementById('payMonth').value.trim();
-      const amount = Number(document.getElementById('payAmount').value||0);
-      const partial = Number(document.getElementById('payPartial').value||0);
-      const note = document.getElementById('payNote').value.trim();
-      if(!student || !month || !amount) return alert('Completa alumno, mes y monto');
-      const status = partial>0 && partial<amount ? 'parcial' : 'pagado';
-      Store.addPayment({ student, class: '', month, amount, paidAmount: status==='pagado'? amount: partial, status, dueDate: monthToDueDate(month), notes: note });
-      document.getElementById('payStudent').value=''; document.getElementById('payMonth').value=''; document.getElementById('payAmount').value=''; document.getElementById('payPartial').value=''; document.getElementById('payRef').value=''; document.getElementById('payNote').value='';
-      renderPayments(); renderDashboard();
-    });
-    document.getElementById('paySearch')?.addEventListener('input', renderPayments);
-    document.getElementById('payFilter')?.addEventListener('change', renderPayments);
-
-    // Visitas
-    function renderVisits(){
-      const tbody = document.getElementById('visitsTable');
-      if(!tbody) return;
-      tbody.innerHTML = '';
-      const open = Store.getOpenVisits();
-      open.forEach(v=>{
-        const tr = document.createElement('tr');
-        tr.innerHTML = `<td>${v.visitor}</td><td>${v.student||'-'}</td><td>${v.purpose||''}</td><td>${v.enteredAt||''}</td>
-          <td><button class="text-red-600" data-exit="${v.id}">Marcar salida</button></td>`;
-        tr.querySelector('[data-exit]')?.addEventListener('click', ()=>{ Store.markVisitExit(v.id); renderVisits(); });
-        tbody.appendChild(tr);
-      });
-    }
-    document.getElementById('saveVisit')?.addEventListener('click', ()=>{
-      const visitor = document.getElementById('visitVisitor').value.trim();
-      const student = document.getElementById('visitStudent').value.trim();
-      const purpose = document.getElementById('visitPurpose').value.trim();
-      const notes = document.getElementById('visitNotes').value.trim();
-      if(!visitor) return alert('Ingresa el nombre del visitante');
-      Store.addVisit({ visitor, student, purpose, notes });
-      document.getElementById('visitVisitor').value=''; document.getElementById('visitStudent').value=''; document.getElementById('visitPurpose').value=''; document.getElementById('visitNotes').value='';
-      renderVisits();
-    });
-
-    // Configuración persistente
-    function loadConfig(){
-      const { config } = Store.getState();
-      document.getElementById('cfgCycle').value = config.cycle||'';
-      document.getElementById('cfgTariffs').value = config.tariffs||'';
-      document.getElementById('cfgSchedule').value = config.schedule||'';
-      document.getElementById('cfgMethods').value = (config.methods||[]).join(', ');
-    }
-    document.getElementById('saveConfig')?.addEventListener('click', ()=>{
-      const cycle = document.getElementById('cfgCycle').value.trim();
-      const tariffs = document.getElementById('cfgTariffs').value.trim();
-      const schedule = document.getElementById('cfgSchedule').value.trim();
-      const methodsStr = document.getElementById('cfgMethods').value.trim();
-      const methods = methodsStr ? methodsStr.split(',').map(x=>x.trim()).filter(Boolean) : [];
-      Store.setConfig({ cycle, tariffs, schedule, methods });
-      alert('Configuración guardada');
-    });
-
-    // Reportes
-    document.getElementById('exportPaymentsCsv')?.addEventListener('click', ()=>{
-      const pays = getAllPayments();
-      const rows = [['Alumno','Mes','Estado','Monto']].concat(pays.map(p=>[p.student,p.month,p.status,p.amount]));
-      const csv = rows.map(r=> r.map(v=>`"${String(v).replace(/"/g,'""')}"`).join(',')).join('\n');
-      const blob = new Blob([csv], {type:'text/csv'});
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement('a'); a.href = url; a.download = 'pagos.csv'; a.click(); URL.revokeObjectURL(url);
-    });
-    document.getElementById('exportActiveStudentsCsv')?.addEventListener('click', ()=>{
-      const rows = [['Nombre','Aula','Padre','Estado']].concat(students.filter(s=>s.status==='activo').map(s=>[s.name,s.class,s.parent,s.status]));
-      const csv = rows.map(r=> r.map(v=>`"${String(v).replace(/"/g,'""')}"`).join(',')).join('\n');
-      const blob = new Blob([csv], {type:'text/csv'});
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement('a'); a.href = url; a.download = 'alumnos_activos.csv'; a.click(); URL.revokeObjectURL(url);
-    });
-    function printTableAsPdf(title, headers, rows){
-      const win = window.open('', '_blank');
-      const table = `
-        <html><head><title>${title}</title>
-        <style>body{font-family:Arial,sans-serif;padding:16px} table{width:100%;border-collapse:collapse} th,td{border:1px solid #ddd;padding:8px;text-align:left} h1{font-size:18px;margin-bottom:12px}</style>
-        </head><body>
-        <h1>${title}</h1>
-        <table><thead><tr>${headers.map(h=>`<th>${h}</th>`).join('')}</tr></thead>
-        <tbody>${rows.map(r=>`<tr>${r.map(c=>`<td>${c}</td>`).join('')}</tr>`).join('')}</tbody></table>
-        <script>window.print();</script>
-        </body></html>`;
-      win.document.write(table);
-      win.document.close();
-    }
-    document.getElementById('exportPaymentsPdf')?.addEventListener('click', ()=>{
-      const pays = getAllPayments();
-      const rows = pays.map(p=>[p.student,p.month,p.status,`$${Number(p.amount||0).toFixed(2)}`]);
-      printTableAsPdf('Pagos', ['Alumno','Mes','Estado','Monto'], rows);
-    });
-    document.getElementById('exportActiveStudentsPdf')?.addEventListener('click', ()=>{
-      const rows = students.filter(s=>s.status==='activo').map(s=>[s.name,s.class,s.parent,s.status]);
-      printTableAsPdf('Alumnos activos', ['Nombre','Aula','Padre','Estado'], rows);
-    });
-
-    // Init
-    renderDashboard();
-    renderStudents();
-    renderTeachers();
-    renderParents();
-    renderClasses();
-    renderPayments();
-    renderVisits();
-    loadConfig();
-    // Mostrar inicio por defecto
-    sections.forEach(id=> document.getElementById(id)?.classList.add('hidden'));
-    document.getElementById('inicio')?.classList.remove('hidden');
-  </script>
-  <script src="js/common_ui.js"></script>
 </body>
 </html>
-
-
-
-

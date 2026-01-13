@@ -39,6 +39,7 @@ document.addEventListener('DOMContentLoaded', () => {
         if (profile.role === 'directora') window.location.href = 'panel_directora.html';
         else if (profile.role === 'maestra') window.location.href = 'panel-maestra.html'; // Ajustado al nombre real de tu archivo
         else if (profile.role === 'padre') window.location.href = 'panel_padres.html';
+        else if (profile.role === 'asistente') window.location.href = 'panel_asistente.html';
         else alert('Rol no reconocido');
 
       } catch (error) {

@@ -10,6 +10,23 @@
   <link href="https://fonts.googleapis.com/css2?family=Nunito:wght@400;600;700&family=Poppins:wght@400;500;600;700&display=swap" rel="stylesheet">
   <link href="./css/karpus-tailwind.css" rel="stylesheet">
   <script src="https://unpkg.com/lucide@latest/dist/umd/lucide.min.js"></script>
+  <style>
+    /* View Transitions */
+    .section {
+      display: none;
+      opacity: 0;
+      transition: opacity 0.3s ease;
+    }
+    .section.active {
+      display: block;
+      opacity: 1;
+      animation: fadeIn 0.4s ease-out forwards;
+    }
+    @keyframes fadeIn {
+      from { opacity: 0; transform: translateY(10px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+  </style>
 </head>
 <body class="text-slate-800 min-h-screen">
   <div class="flex min-h-screen font-nunito">
@@ -24,31 +41,31 @@
         </div>
       </div>
       <nav class="space-y-1" role="navigation" aria-label="Menú principal">
-        <button data-section="home" class="sidebar-btn text-base" aria-current="page">
+        <button data-section="tab-home" class="sidebar-btn text-base" aria-current="page">
           <i data-lucide="layout-grid" class="w-6 h-6" aria-hidden="true"></i>
           <span class="label">Inicio</span>
         </button>
-        <button data-section="live-attendance" class="sidebar-btn text-base">
+        <button data-section="tab-live-attendance" class="sidebar-btn text-base">
           <i data-lucide="calendar-check" class="w-6 h-6" aria-hidden="true"></i>
           <span class="label">Asistencia</span>
         </button>
-        <button data-section="class" class="sidebar-btn text-base">
+        <button data-section="tab-class" class="sidebar-btn text-base">
           <i data-lucide="school" class="w-6 h-6" aria-hidden="true"></i>
           <span class="label">Aula</span>
         </button>
-        <button data-section="tasks" class="sidebar-btn text-base">
+        <button data-section="tab-tasks" class="sidebar-btn text-base">
           <i data-lucide="clipboard-list" class="w-6 h-6" aria-hidden="true"></i>
           <span class="label">Tareas</span>
         </button>
-        <button data-section="grades" class="sidebar-btn text-base">
+        <button data-section="tab-grades" class="sidebar-btn text-base">
           <i data-lucide="award" class="w-6 h-6" aria-hidden="true"></i>
           <span class="label">Calificaciones</span>
         </button>
-        <button data-section="notifications" class="sidebar-btn text-base">
+        <button data-section="tab-notifications" class="sidebar-btn text-base">
           <i data-lucide="message-circle" class="w-6 h-6" aria-hidden="true"></i>
           <span class="label">Mensajes</span>
         </button>
-        <button data-section="profile" class="sidebar-btn text-base">
+        <button data-section="tab-profile" class="sidebar-btn text-base">
           <i data-lucide="heart-handshake" class="w-6 h-6" aria-hidden="true"></i>
           <span class="label">Perfil</span>
         </button>
@@ -94,7 +111,7 @@
     <!-- Content -->
     <main class="flex-1 px-4 space-y-6 md:pt-6 mt-16 md:mt-0 pb-6" role="main" id="parent-main">
     <!-- A. INICIO (Dashboard) -->
-    <section id="tab-home" class="space-y-6">
+    <section id="tab-home" class="section active space-y-6">
       <!-- Resumen del día + Próxima clase + Alertas -->
       <div class="modern-card p-4 rounded-3xl">
         <div class="flex items-center justify-between">
@@ -145,6 +162,16 @@
     </button>
   </div>
 
+  <!-- Diario de Hoy (Nuevo) -->
+  <div id="dailyLogCard" class="hidden mt-3 bg-white p-4 rounded-3xl border shadow-sm">
+    <h3 class="text-base font-semibold text-slate-700 mb-3 flex items-center gap-2">
+      <i data-lucide="book-open" class="text-karpus-green h-5 w-5"></i>
+      Diario de Hoy
+    </h3>
+    <div id="dailyLogContent" class="grid grid-cols-2 gap-3 text-sm"></div>
+    <p id="dailyLogNotes" class="mt-3 text-sm text-slate-600 italic bg-slate-50 p-2 rounded-lg"></p>
+  </div>
+
     
 
       <!-- Actividad Reciente -->
@@ -158,7 +185,7 @@
     </section>
     
     <!-- Plan de Desarrollo Educativo -->
-    <section id="tab-development" class="hidden space-y-6">
+    <section id="tab-development" class="section space-y-6">
       <div class="modern-card p-4 rounded-3xl">
         <div class="modern-card-header flex items-center justify-between">
           <h2 class="text-base font-semibold font-poppins text-karpus-teal flex items-center gap-2">
@@ -288,7 +315,7 @@
     </section>
 
     <!-- Asistencia (se muestra al pulsar 'Asistencia' en el menú inferior) -->
-    <section id="tab-live-attendance" class="hidden space-y-6">
+    <section id="tab-live-attendance" class="section space-y-6">
       <div class="modern-card p-4 rounded-3xl">
         <div class="flex items-center justify-between mb-3">
           <h2 class="text-base font-semibold font-poppins text-karpus-blue flex items-center gap-2">
@@ -350,7 +377,7 @@
     </section>
 
     <!-- B. AULA Y CURSO (Comunicación académica) -->
-    <section id="tab-class" class="hidden space-y-4">
+    <section id="tab-class" class="section space-y-4">
       <div class="flex items-center justify-between">
         <h2 class="text-base font-semibold flex items-center gap-2">
           <i data-lucide="layout-dashboard" class="w-5 h-5 text-karpus-green"></i>
@@ -363,7 +390,7 @@
     </section>
 
     <!-- C. TAREAS -->
-    <section id="tab-tasks" class="hidden space-y-4">
+    <section id="tab-tasks" class="section space-y-4">
       <div class="flex items-center justify-between">
         <h2 class="text-base font-semibold flex items-center gap-2">
           <i data-lucide="clipboard-list" class="w-5 h-5 text-karpus-orange"></i>
@@ -383,7 +410,7 @@
     </section>
 
     <!-- D. DESARROLLO -->
-    <section id="tab-grades" class="hidden space-y-6">
+    <section id="tab-grades" class="section space-y-6">
       <div class="flex items-center justify-between">
         <h2 class="text-xl font-bold text-slate-800 flex items-center gap-2">
           <i data-lucide="award" class="w-6 h-6 text-karpus-blue"></i>
@@ -409,34 +436,52 @@
       </div>
     </section>
 
-    <!-- F. MENSAJES / CHAT -->
-    <section id="tab-notifications" class="hidden space-y-4">
-      <h2 class="text-sm font-semibold flex items-center gap-2">
-        <i data-lucide="message-square" class="w-5 h-5 text-karpus-pink"></i>
-        <span>Mensajes Privados</span>
-      </h2>
-      <p class="text-xs text-slate-600">🎯 Objetivo: Comunicación institucional. Chat con Maestra y Administración. 🚫 Nunca con estudiantes. Etiqueta: “Chat institucional”. Historial guardado.</p>
-      <div class="grid md:grid-cols-3 gap-4">
-        <div class="md:col-span-1 rounded-3xl bg-white p-3 border shadow-soft">
-          <input id="contactFilter" aria-label="Filtrar contacto" class="w-full border rounded-xl px-2 py-1 text-sm" placeholder="Filtrar contacto" />
-          <div id="contactList" class="mt-2 space-y-1 max-h-64 overflow-auto"></div>
+    <!-- F. NOTIFICACIONES Y MENSAJES -->
+    <section id="tab-notifications" class="section space-y-6">
+      <!-- 1. Notificaciones del Sistema -->
+      <div class="modern-card p-4 rounded-3xl">
+        <h2 class="text-base font-semibold flex items-center gap-2 mb-3">
+          <i data-lucide="bell" class="w-5 h-5 text-karpus-orange"></i>
+          <span>Notificaciones</span>
+        </h2>
+        <div id="systemNotificationsList" class="space-y-3 max-h-60 overflow-y-auto pr-2">
+          <!-- Renderizado por JS -->
         </div>
-        <div class="md:col-span-2 rounded-3xl bg-white p-3 border shadow-soft flex flex-col">
-          <div id="chatHeader" class="text-sm font-semibold">Mensajes Privados</div>
-          <div id="chatMessages" class="flex-1 mt-2 space-y-2 max-h-64 overflow-auto"></div>
-          <div id="typingIndicator" class="text-[11px] text-slate-500"></div>
-          <div class="mt-2 flex gap-2 items-center">
-            <button id="chatEmoji" aria-label="Abrir menú de emojis" class="px-2 py-1 rounded bg-slate-100">😀</button>
-            <input id="chatInput" aria-label="Escribir mensaje" class="flex-1 border rounded-xl px-2 py-1 text-sm" placeholder="Escribe un mensaje" />
-            <button id="chatSend" aria-label="Enviar mensaje" class="text-sm px-3 py-2 rounded-xl bg-karpus-pink text-white">Enviar</button>
+      </div>
+
+      <!-- 2. Mensajería -->
+      <div class="modern-card p-4 rounded-3xl">
+        <h2 class="text-base font-semibold flex items-center gap-2 mb-2">
+          <i data-lucide="message-square" class="w-5 h-5 text-karpus-pink"></i>
+          <span>Mensajes Privados</span>
+        </h2>
+        <p class="text-xs text-slate-600 mb-4">Chat institucional con Maestra y Administración.</p>
+        
+        <div class="grid md:grid-cols-3 gap-4 h-[400px]">
+          <div class="md:col-span-1 border-r pr-2 flex flex-col">
+            <input id="contactFilter" aria-label="Filtrar contacto" class="w-full border rounded-xl px-3 py-2 text-sm mb-3 bg-slate-50" placeholder="Buscar contacto..." />
+            <div id="contactList" class="flex-1 space-y-1 overflow-y-auto"></div>
           </div>
+          <div class="md:col-span-2 flex flex-col pl-2">
+            <div id="chatHeader" class="text-sm font-bold border-b pb-2 mb-2">Selecciona un chat</div>
+            <div id="chatMessages" class="flex-1 space-y-3 overflow-y-auto p-2 bg-slate-50/50 rounded-xl mb-3"></div>
+            <div class="flex gap-2 items-center">
+              <input id="chatInput" class="flex-1 border rounded-xl px-3 py-2 text-sm focus:ring-2 focus:ring-karpus-pink outline-none" placeholder="Escribe un mensaje..." />
+              <button id="chatSend" class="p-2 bg-karpus-pink text-white rounded-xl hover:bg-pink-600 transition shadow-sm">
+                <i data-lucide="send" class="w-4 h-4"></i>
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
           <div id="emojiMenu" class="hidden border rounded p-2"></div>
         </div>
       </div>
     </section>
 
     <!-- G. PERFIL -->
-    <section id="tab-profile" class="hidden space-y-4">
+    <section id="tab-profile" class="section space-y-4">
       <!-- Datos del Estudiante -->
       <div class="p-4 rounded-3xl bg-white shadow-soft border">
         <h3 class="text-sm font-semibold text-slate-500 mb-3 uppercase tracking-wider">Datos del Estudiante</h3>
