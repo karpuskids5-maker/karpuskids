@@ -600,13 +600,38 @@ const UI = {
   // --- GRADES ---
   async loadGrades() {
     const tbody = document.getElementById('gradesTableBody');
-    if (!tbody) return;
+    if (!tbody || !AppState.currentStudent) return;
+
     tbody.innerHTML = `<tr><td colspan="3" class="p-4">${Helpers.skeleton(3, 'h-10')}</td></tr>`;
     
-    // Mock grades for now as we might not have a full grades table structure confirmed
-    // Or try to fetch if table exists
-    // For now, render static mock or empty state
-    tbody.innerHTML = `<tr><td colspan="3">${Helpers.emptyState('Reporte de desarrollo no disponible aún', 'bar-chart-2')}</td></tr>`;
+    const { data: grades, error } = await supabase
+      .from('grades')
+      .select('*')
+      .eq('student_id', AppState.currentStudent.id)
+      .order('recorded_at', { ascending: false });
+
+    if (error) {
+      console.error('Error loading grades:', error);
+      tbody.innerHTML = `<tr><td colspan="3">${Helpers.emptyState('No se pudieron cargar las calificaciones.', 'alert-circle')}</td></tr>`;
+      return;
+    }
+
+    if (!grades || grades.length === 0) {
+      tbody.innerHTML = `<tr><td colspan="3">${Helpers.emptyState('Aún no hay calificaciones registradas.', 'bar-chart-2')}</td></tr>`;
+      return;
+    }
+
+    tbody.innerHTML = grades.map(g => `
+      <tr class="hover:bg-slate-50">
+        <td class="p-4 font-medium text-slate-800">${g.activity_name}</td>
+        <td class="p-4 text-center">
+          <span class="px-2 py-1 text-xs rounded-full ${g.grade >= 70 ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}">
+            ${g.grade || 'N/A'}
+          </span>
+        </td>
+        <td class="p-4 text-slate-600">${g.observation || 'Sin comentarios'}</td>
+      </tr>
+    `).join('');
   },
   
   // --- PROFILE ---
