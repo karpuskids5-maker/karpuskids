@@ -111,8 +111,12 @@ const UI = {
   },
 
   subscribeToNotifications() {
-    if (!AppState.user || this.notificationsSubscription) return;
+    if (!AppState.user) return;
     try {
+      if (this.notificationsSubscription) {
+        supabase.removeChannel(this.notificationsSubscription);
+        this.notificationsSubscription = null;
+      }
       this.notificationsSubscription = supabase
         .channel('public:notifications')
         .on('postgres_changes', {
@@ -282,25 +286,23 @@ const UI = {
     if (!AppState.currentStudent) return;
 
     try {
-        // Attendance Stats
-        const { data: attendance } = await supabase
+        const { data: attendance = [] } = await supabase
             .from('attendance')
             .select('status')
             .eq('student_id', AppState.currentStudent.id);
         
-        if (attendance) {
-            const total = attendance.length;
-            const present = attendance.filter(a => a.status === 'present' || a.status === 'late').length;
-            const percent = total > 0 ? Math.round((present / total) * 100) : 0;
-            const el = document.getElementById('dashAttendance');
-            if (el) el.textContent = `${percent}%`;
-        }
+        const total = attendance.length;
+        const present = attendance.filter(a => a.status === 'present' || a.status === 'late').length;
+        const percent = total ? Math.round((present / total) * 100) : 0;
+        const el = document.getElementById('dashAttendance');
+        if (el) el.textContent = `${percent}%`;
 
         // Pending Tasks
         const { count: pendingCount } = await supabase
             .from('tasks') // Assuming a tasks table exists or simplified logic
             .select('*', { count: 'exact', head: true })
-            .eq('classroom_id', AppState.currentStudent.classroom_id); // Simplified: all class tasks
+            .eq('classroom_id', AppState.currentStudent.classroom_id)
+            .eq('status', 'pending');
             // Ideally we check submissions to see if pending. For now just show count of recent tasks?
             // Or better: implement proper task checking.
         
@@ -310,8 +312,9 @@ const UI = {
         // Feed / Recent Activity (Simplified)
         this.loadFeedPreview();
 
-    } catch (error) {
-        console.error('Error loading dashboard:', error);
+    } catch (err) {
+        console.error('Dashboard error:', err);
+        Helpers.toast('Error cargando dashboard', 'error');
     }
   },
 
@@ -411,29 +414,27 @@ const UI = {
 
     list.innerHTML = Helpers.skeleton(3, 'h-24');
 
-    // Simplified task fetching
-    const { data: tasks } = await supabase
-        .from('tasks')
-        .select('*')
-        .eq('classroom_id', AppState.currentStudent.classroom_id)
-        .order('due_date', { ascending: true });
+    let query = supabase
+      .from('tasks')
+      .select('*')
+      .eq('classroom_id', AppState.currentStudent.classroom_id);
 
-    if (!tasks || !tasks.length) {
-        list.innerHTML = Helpers.emptyState('No hay tareas asignadas', 'clipboard-list');
-        return;
+    if (filter === 'pending') query = query.eq('status', 'pending');
+    if (filter === 'submitted') query = query.eq('status', 'submitted');
+    if (filter === 'overdue') query = query.lt('due_date', new Date().toISOString());
+
+    const { data: tasks } = await query.order('due_date');
+
+    if (!tasks?.length) {
+      list.innerHTML = Helpers.emptyState('No hay tareas', 'clipboard');
+      return;
     }
 
     list.innerHTML = tasks.map(t => `
-        <div class="bg-white p-4 rounded-xl border shadow-sm hover:shadow-md transition-shadow">
-            <div class="flex justify-between items-start">
-                <h4 class="font-bold text-slate-800">${t.title}</h4>
-                <span class="text-xs px-2 py-1 bg-slate-100 rounded text-slate-500">${Helpers.formatDate(t.due_date)}</span>
-            </div>
-            <p class="text-sm text-slate-600 mt-2">${t.description || 'Sin descripción'}</p>
-            <div class="mt-4 flex justify-end">
-                <button class="text-sm px-4 py-2 bg-karpus-orange text-white rounded-lg hover:bg-orange-600 transition-colors">Ver detalle</button>
-            </div>
-        </div>
+      <div class="bg-white p-4 rounded-xl border shadow-sm">
+        <h4 class="font-bold">${t.title}</h4>
+        <p class="text-sm text-slate-600">${t.description || ''}</p>
+      </div>
     `).join('');
   },
 
@@ -538,8 +539,11 @@ const UI = {
   },
 
   subscribeToFeed() {
-      if (!AppState.currentStudent || this.feedSubscription) return;
-
+      if (!AppState.currentStudent) return;
+      if (this.feedSubscription) {
+        supabase.removeChannel(this.feedSubscription);
+        this.feedSubscription = null;
+      }
       this.feedSubscription = supabase
         .channel('public:posts')
         .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'posts', filter: `classroom_id=eq.${AppState.currentStudent.classroom_id}` }, payload => {

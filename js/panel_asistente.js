@@ -61,7 +61,18 @@ const UI = {
     AppState.user = user;
 
     // Load Profile
-    const { data: profile } = await supabase.from('profiles').select('*').eq('id', user.id).single();
+    const { data: profile, error: profileError } = await supabase
+      .from('profiles')
+      .select('*')
+      .eq('id', user.id)
+      .maybeSingle();
+
+    if (!profile || profile.role !== 'asistente') {
+      await supabase.auth.signOut();
+      window.location.href = 'login.html';
+      return;
+    }
+
     AppState.profile = profile;
     this.updateUserUI();
 
@@ -74,7 +85,8 @@ const UI = {
 
   updateUserUI() {
     const name = AppState.profile?.name || 'Asistente';
-    document.getElementById('sidebarUserName').textContent = name;
+    const sideEl = document.getElementById('sidebarUserName');
+    if (sideEl) sideEl.textContent = name;
     const welcome = document.getElementById('welcomeName');
     if(welcome) welcome.textContent = name.split(' ')[0];
   },
@@ -128,6 +140,14 @@ const UI = {
       accessInput.addEventListener('input', (e) => this.handleAccessSearch(e.target.value));
     }
 
+    // --- Quick Actions (Dashboard) ---
+    document.getElementById('btnQuickStudents')?.addEventListener('click', () => {
+        document.querySelector('[data-section="estudiantes"]')?.click();
+    });
+    document.getElementById('btnQuickPayments')?.addEventListener('click', () => {
+        document.querySelector('[data-section="pagos"]')?.click();
+    });
+
     // --- Payment Modal ---
     document.getElementById('btnNewPayment')?.addEventListener('click', () => this.openPaymentModal());
     document.getElementById('closePaymentModal')?.addEventListener('click', () => this.closePaymentModal());
@@ -141,8 +161,8 @@ const UI = {
 
     // --- Attendance Modal ---
     document.getElementById('closeAttendanceModal')?.addEventListener('click', () => {
-        document.getElementById('attendanceModal').classList.add('hidden');
-        document.getElementById('attendanceModal').classList.remove('flex');
+        const m = document.getElementById('attendanceModal');
+        if (m) { m.classList.add('hidden'); m.classList.remove('flex'); }
     });
 
     // Global Delegated Events (for dynamic content)
@@ -156,6 +176,8 @@ const UI = {
             const btn = e.target.closest('.btn-check-out');
             this.registerAccess(btn.dataset.id, 'check_out');
         }
+        if (e.target.id === 'cancelAccessBtn') this.closeAccessModal();
+        if (e.target.id === 'confirmAccessBtn') this.confirmAccessModal();
         // Delete Payment
         if (e.target.closest('.btn-delete-payment')) {
             const btn = e.target.closest('.btn-delete-payment');
@@ -171,18 +193,15 @@ const UI = {
 
   showSection(id) {
     AppState.currentSection = id;
-    document.querySelectorAll('.section').forEach(s => {
-        s.classList.remove('active');
-    });
-    
+    document.querySelectorAll('.section').forEach(s => s.classList.remove('active'));
     const target = document.getElementById(id);
     if (target) {
-        target.classList.add('active');
-        // Trigger data load
-        if (id === 'estudiantes') this.loadStudents();
-        if (id === 'asistencia') this.loadAttendanceRooms();
-        if (id === 'pagos') this.loadPayments();
-        if (id === 'accesos') this.loadAccessLogs();
+      target.classList.add('active');
+      document.getElementById('sidebar')?.classList.remove('show');
+      if (id === 'estudiantes') this.loadStudents();
+      if (id === 'asistencia') this.loadAttendanceRooms();
+      if (id === 'pagos') this.loadPayments();
+      if (id === 'accesos') this.loadAccessLogs();
     }
   },
 
@@ -190,15 +209,10 @@ const UI = {
     const sidebar = document.getElementById('sidebar');
     const shell = document.getElementById('layoutShell');
     const btn = document.getElementById('toggleSidebar');
-    
-    sidebar.classList.toggle('collapsed');
-    shell.classList.toggle('sidebar-collapsed');
-    
-    if(window.lucide) {
-        const icon = sidebar.classList.contains('collapsed') ? 'chevron-right' : 'chevron-left';
-        btn.innerHTML = `<i data-lucide="${icon}" class="w-4 h-4"></i>`;
-        lucide.createIcons();
-    }
+    const collapsed = sidebar.classList.toggle('collapsed');
+    shell.classList.toggle('sidebar-collapsed', collapsed);
+    btn.innerHTML = `<i data-lucide="${collapsed ? 'chevron-right' : 'chevron-left'}" class="w-4 h-4"></i>`;
+    refreshIcons();
   },
 
   // --- DASHBOARD ---
@@ -246,6 +260,7 @@ const UI = {
 
       if (!students.length) {
         tbody.innerHTML = `<tr><td colspan="4">${Helpers.emptyState('No se encontraron estudiantes.')}</td></tr>`;
+        refreshIcons();
         return;
       }
 
@@ -253,8 +268,8 @@ const UI = {
         <tr class="hover:bg-slate-50 transition-colors border-b last:border-0">
           <td class="px-6 py-4 font-medium text-slate-800 flex items-center gap-3">
             <img 
-              src="assets/img/students/${s.photo || 'default-avatar.png'}" 
-              onerror="this.src='assets/img/students/default-avatar.png'" 
+              src="./img/students/${s.photo || 'default-avatar.png'}" 
+              onerror="this.src='./img/students/default-avatar.png'" 
               class="w-10 h-10 rounded-full object-cover border"
               alt="${s.name}"
             />
@@ -269,6 +284,7 @@ const UI = {
           </td>
         </tr>
       `).join('');
+      refreshIcons();
     } catch (error) {
       console.error(error);
       tbody.innerHTML = `<tr><td colspan="4" class="text-center text-red-500 py-4">Error cargando estudiantes</td></tr>`;
@@ -312,28 +328,56 @@ const UI = {
   },
 
   async registerAccess(studentId, action) {
-    let authorizedPerson = null;
     if (action === 'check_out') {
-      // Better UX than prompt? For now prompt is simplest, could be a modal later.
-      authorizedPerson = prompt('¿Quién recoge al estudiante? (Nombre de la persona autorizada)');
-      if (!authorizedPerson) return; // User cancelled
+      this._pendingAccess = { studentId, action };
+      this.openAccessModal();
+      return;
     }
+    await this._insertAccess(studentId, action, null);
+  },
 
+  async _insertAccess(studentId, action, authorizedPerson) {
     const { error } = await supabase.from('access_logs').insert({
       student_id: studentId,
-      action: action,
+      action,
       authorized_person_name: authorizedPerson,
       recorded_by: AppState.user.id
     });
-
     if (error) {
-        Helpers.toast('Error al registrar acceso', 'error');
+      Helpers.toast('Error al registrar acceso', 'error');
     } else {
-        Helpers.toast(`Registro de ${action === 'check_in' ? 'Entrada' : 'Salida'} exitoso.`);
-        document.getElementById('accessSearchInput').value = '';
-        document.getElementById('accessSearchResults').innerHTML = '';
-        this.loadAccessLogs();
+      Helpers.toast(`Registro de ${action === 'check_in' ? 'Entrada' : 'Salida'} exitoso.`);
+      const inp = document.getElementById('accessSearchInput');
+      const res = document.getElementById('accessSearchResults');
+      if (inp) inp.value = '';
+      if (res) res.innerHTML = '';
+      this.loadAccessLogs();
     }
+  },
+
+  openAccessModal() {
+    const modal = document.getElementById('accessModal');
+    if (!modal) return;
+    modal.classList.remove('hidden');
+    modal.classList.add('flex');
+    const input = document.getElementById('accessPersonInput');
+    if (input) input.value = '';
+  },
+  closeAccessModal() {
+    const modal = document.getElementById('accessModal');
+    if (!modal) return;
+    modal.classList.add('hidden');
+    modal.classList.remove('flex');
+    this._pendingAccess = null;
+  },
+  async confirmAccessModal() {
+    const input = document.getElementById('accessPersonInput');
+    const name = input ? input.value.trim() : '';
+    if (!name) { Helpers.toast('Ingrese la persona autorizada', 'error'); return; }
+    const pending = this._pendingAccess;
+    if (!pending) { this.closeAccessModal(); return; }
+    await this._insertAccess(pending.studentId, pending.action, name);
+    this.closeAccessModal();
   },
 
   async loadAccessLogs() {
@@ -346,7 +390,7 @@ const UI = {
     const { data: logs } = await supabase
       .from('access_logs')
       .select('*, students(name)')
-      .order('timestamp', { ascending: false })
+      .order('created_at', { ascending: false })
       .limit(10);
 
     if(!logs || logs.length === 0) {
@@ -358,13 +402,14 @@ const UI = {
       <div class="flex justify-between items-center border-b pb-2 last:border-0">
         <div>
           <p class="font-medium text-slate-800">${log.students?.name || 'Desconocido'}</p>
-          <p class="text-xs text-slate-500">${new Date(log.timestamp).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})} - ${log.authorized_person_name || 'Estudiante'}</p>
+          <p class="text-xs text-slate-500">${new Date(log.created_at).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})} - ${log.authorized_person_name || 'Estudiante'}</p>
         </div>
         <span class="text-xs px-2 py-1 rounded-full font-bold ${log.action === 'check_in' ? 'bg-green-100 text-green-700' : 'bg-orange-100 text-orange-700'}">
           ${log.action === 'check_in' ? 'Entrada' : 'Salida'}
         </span>
       </div>
     `).join('');
+    refreshIcons();
   },
 
   // --- ATTENDANCE ---
@@ -426,6 +471,7 @@ const UI = {
                 </div>
                 `;
             }).join('');
+            refreshIcons();
         } else {
             grid.innerHTML = Helpers.emptyState('No hay aulas registradas.');
         }
@@ -527,8 +573,7 @@ const UI = {
     const select = document.getElementById('studentSelect');
     if (!select) return;
     
-    // Only load if empty or if needed (caching could be added)
-    if(select.children.length > 1) return;
+    
 
     const { data: students, error } = await supabase
       .from('students')
@@ -583,8 +628,9 @@ const UI = {
     try {
       const { data: payments, error } = await supabase
         .from('payments')
-        .select('*, students(name)')
-        .order('created_at', { ascending: false });
+        .select('id, amount, month_paid, created_at, students(name)')
+        .order('created_at', { ascending: false })
+        .limit(100);
 
       if (error) throw error;
 
@@ -606,8 +652,7 @@ const UI = {
           </td>
         </tr>
       `).join('');
-      
-      if (window.lucide) lucide.createIcons();
+      refreshIcons();
     } catch (error) {
       console.error('Error cargando pagos:', error);
       tbody.innerHTML = `<tr><td colspan="5" class="text-center text-red-500 py-4">Error cargando datos</td></tr>`;
@@ -632,6 +677,7 @@ const UI = {
     const tbody = document.getElementById('paymentsTableBody');
     if (!tbody || !tbody.querySelector('tr')) {
       Helpers.toast('No hay datos para exportar', 'error');
+      return;
     }
     const headers = ['Estudiante','Monto','Fecha','Mes Pagado'];
     const lines = [headers.join(',')];
@@ -658,9 +704,14 @@ const UI = {
   }
 };
 
+function refreshIcons() {
+  if (window.lucide) lucide.createIcons();
+}
+
 // Initialize
 document.addEventListener('DOMContentLoaded', () => {
     UI.init();
+    refreshIcons();
 });
 
 // Expose UI for debugging or legacy inline calls if absolutely necessary

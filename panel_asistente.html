@@ -4,10 +4,9 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>Karpus Kids — Panel Asistente</title>
-  <link rel="icon" href="assets/img/ui/favicon.ico" type="image/x-icon">
+  <link rel="icon" href="logo/favicon.ico" type="image/x-icon">
   <script src="https://cdn.tailwindcss.com"></script>
   <script src="https://unpkg.com/lucide@latest/dist/umd/lucide.min.js"></script>
-  <script>lucide.createIcons();</script>
   
   <style>
     #sidebar { transform: translateX(-100%); transition: transform .3s ease; }
@@ -15,6 +14,9 @@
     @media (min-width: 768px) { #sidebar { transform: translateX(0); } }
 
     /* Sidebar styles */
+    #sidebar.collapsed {
+      transform: translateX(0) !important;
+    }
     aside#sidebar { 
       width: 280px; 
       transition: width 0.3s cubic-bezier(0.4, 0, 0.2, 1); 
@@ -46,6 +48,7 @@
     
     /* Layout adjustments */
     #layoutShell { transition: margin-left .25s ease; }
+    @media (min-width: 768px) { #layoutShell { margin-left: 280px; } }
     #layoutShell.sidebar-collapsed { margin-left: 80px !important; }
     
     /* View Transitions */
@@ -67,7 +70,7 @@
     @media (max-width: 768px) {
       #layoutShell { margin-left: 0 !important; }
     }
-    #attendanceModal { backdrop-filter: blur(4px); }
+    #attendanceModal { -webkit-backdrop-filter: blur(4px); backdrop-filter: blur(4px); }
   </style>
 </head>
 <body class="bg-slate-50 text-slate-800 font-sans">
@@ -115,7 +118,7 @@
     </aside>
 
     <!-- MAIN -->
-    <main class="flex-1 p-6 ml-[280px]" id="layoutShell">
+    <main class="flex-1 p-6" id="layoutShell">
       <!-- Mobile Header -->
       <div class="md:hidden mb-6 flex items-center justify-between">
         <button id="menuBtn" class="p-2 rounded bg-white shadow"><i data-lucide="menu"></i></button>
@@ -126,7 +129,7 @@
       <!-- SECTIONS -->
       
       <!-- DASHBOARD -->
-      <section id="dashboard" class="section">
+      <section id="dashboard" class="section active">
         <h1 class="text-2xl font-bold mb-6 text-slate-800">Hola, <span id="welcomeName">Asistente</span> 👋</h1>
         
         <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
@@ -162,11 +165,11 @@
         <div class="bg-white rounded-2xl shadow-sm border border-slate-100 p-6">
           <h3 class="font-semibold mb-4">Accesos Rápidos</h3>
           <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
-            <button onclick="document.querySelector('[data-section=estudiantes]').click()" class="p-4 rounded-xl bg-slate-50 hover:bg-slate-100 transition-colors text-center">
+            <button id="btnQuickStudents" class="p-4 rounded-xl bg-slate-50 hover:bg-slate-100 transition-colors text-center">
               <i data-lucide="search" class="w-6 h-6 mx-auto mb-2 text-slate-500"></i>
               <span class="text-sm font-medium">Buscar Alumno</span>
             </button>
-            <button onclick="document.querySelector('[data-section=pagos]').click()" class="p-4 rounded-xl bg-slate-50 hover:bg-slate-100 transition-colors text-center">
+            <button id="btnQuickPayments" class="p-4 rounded-xl bg-slate-50 hover:bg-slate-100 transition-colors text-center">
               <i data-lucide="dollar-sign" class="w-6 h-6 mx-auto mb-2 text-slate-500"></i>
               <span class="text-sm font-medium">Registrar Pago</span>
             </button>
@@ -218,7 +221,7 @@
           <!-- Buscador y Acción -->
           <div class="lg:col-span-2 bg-white rounded-xl shadow-sm border p-6">
             <div class="mb-4">
-              <label class="block text-sm font-medium text-slate-700 mb-2">Buscar Estudiante para Registro</label>
+              <label for="accessSearchInput" class="block text-sm font-medium text-slate-700 mb-2">Buscar Estudiante para Registro</label>
               <div class="relative">
                 <i data-lucide="search" class="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400"></i>
                 <input id="accessSearchInput" type="text" placeholder="Escribe el nombre del estudiante..." class="w-full pl-9 pr-4 py-3 border rounded-xl focus:ring-2 focus:ring-teal-500 outline-none">
@@ -314,7 +317,7 @@
       </form>
     </div>
   </div>
-  <!-- Attendance Detail Modal -->
+  <!-- Attendance Modal -->
   <div id="attendanceModal" class="fixed inset-0 bg-black/30 z-50 hidden items-center justify-center">
     <div class="bg-white rounded-2xl shadow-xl p-6 w-full max-w-4xl h-[80vh] flex flex-col">
       <div class="flex justify-between items-center mb-4">
@@ -338,6 +341,24 @@
             <!-- JS -->
           </tbody>
         </table>
+      </div>
+    </div>
+  </div>
+
+  <!-- Access Authorization Modal -->
+  <div id="accessModal" class="fixed inset-0 bg-black/30 z-50 hidden items-center justify-center" style="-webkit-backdrop-filter: blur(4px); backdrop-filter: blur(4px);">
+    <div class="bg-white w-full max-w-md rounded-2xl shadow-xl overflow-hidden">
+      <div class="px-6 py-4 border-b">
+        <h3 class="text-lg font-bold text-slate-800">Confirmar salida</h3>
+        <p class="text-sm text-slate-500">Ingrese el nombre de la persona autorizada para recoger</p>
+      </div>
+      <div class="px-6 py-4 space-y-3">
+        <label for="accessPersonInput" class="text-sm text-slate-600">Persona autorizada</label>
+        <input id="accessPersonInput" type="text" class="w-full border rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-teal-500" placeholder="Nombre completo" />
+      </div>
+      <div class="px-6 py-4 bg-slate-50 flex justify-end gap-2">
+        <button id="cancelAccessBtn" class="px-4 py-2 rounded-lg border hover:bg-slate-100">Cancelar</button>
+        <button id="confirmAccessBtn" class="px-4 py-2 rounded-lg bg-teal-600 text-white hover:bg-teal-700">Confirmar</button>
       </div>
     </div>
   </div>

@@ -1,4 +1,4 @@
-import { supabase } from './js/supabase.js';
+import { supabase, createClient, SUPABASE_URL, SUPABASE_ANON_KEY } from './js/supabase.js';
 
 /**
  * Lógica principal del Panel de Directora
@@ -817,6 +817,7 @@ document.addEventListener('DOMContentLoaded', async () => {
       const p1Name = (document.getElementById('p1Name')?.value || '').trim();
       const p1Phone = (document.getElementById('p1Phone')?.value || '').trim();
       const p1Email = (document.getElementById('p1Email')?.value || '').trim();
+      const p1Password = (document.getElementById('p1Password')?.value || '').trim();
       const p2Name = (document.getElementById('p2Name')?.value || '').trim();
       const p2Phone = (document.getElementById('p2Phone')?.value || '').trim();
       const allergies = (document.getElementById('stAllergies')?.value || '').trim();
@@ -836,10 +837,41 @@ document.addEventListener('DOMContentLoaded', async () => {
       }
 
       await safeExecute(async () => {
+        let parentId = null;
+
+        // 1. Crear Usuario Padre si hay email y contraseña
+        if (p1Email && p1Password) {
+          // Usar cliente temporal para no cerrar sesión de directora
+          const tempSupabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
+            auth: { persistSession: false, autoRefreshToken: false, detectSessionInUrl: false }
+          });
+
+          const { data: authData, error: authError } = await tempSupabase.auth.signUp({
+            email: p1Email,
+            password: p1Password
+          });
+          
+          if (authError) throw authError;
+          
+          if (authData.user) {
+            parentId = authData.user.id;
+            // 2. Crear Perfil del Padre
+            const { error: profileError } = await supabase.from('profiles').insert([{
+              id: parentId,
+              name: p1Name || 'Padre/Tutor',
+              email: p1Email,
+              phone: p1Phone,
+              role: 'padre'
+            }]);
+            if (profileError) console.warn('Error creando perfil padre (puede que ya exista):', profileError);
+          }
+        }
+
         const { error } = await supabase.from('students').insert([{
           name,
           classroom_id: classroomId,
           is_active: isActive,
+          parent_id: parentId, // Vincular al padre creado
           p1_name: p1Name || null,
           p1_phone: p1Phone || null,
           p1_email: p1Email || null,
