@@ -43,6 +43,23 @@ aside#sidebar.collapsed .label { opacity: 0; }
 /* Reemplazamos sidebar-sky por el estilo Brand */
 .sidebar-brand { background: linear-gradient(180deg, #FCE7F3 0%, #FFF7FB 100%); border-right: 1px solid #FBCFE8; }
 
+/* NUEVO: Sidebar específico para Panel Padres (Azul) */
+.sidebar-padres {
+  background: linear-gradient(180deg, #2563EB 0%, #1E40AF 100%); /* Azul intenso */
+  color: white;
+}
+.sidebar-padres .nav-btn {
+  color: rgba(255, 255, 255, 0.9);
+}
+.sidebar-padres .nav-btn:hover, .sidebar-padres .nav-btn.active {
+  background-color: #FFFFFF;
+  color: #1E40AF; /* Texto azul al hacer hover */
+  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.2);
+}
+.sidebar-padres .nav-btn:hover i, .sidebar-padres .nav-btn.active i {
+  color: #1E40AF; /* Icono azul al hacer hover */
+}
+
 .karpus-kids-inline { font-weight: 700; }
 .karpus-kids-inline .k-1 { color: #FF9800; }
 .karpus-kids-inline .k-2 { color: #2196F3; }

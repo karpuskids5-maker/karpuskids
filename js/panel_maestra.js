@@ -571,9 +571,14 @@ const UI = {
       <div class="bg-white p-6 rounded-2xl shadow-sm">
         <div class="flex justify-between items-center mb-6">
             <h3 class="font-bold text-slate-700">Asistencia: ${Helpers.formatDate(selectedDate)}</h3>
-            <button id="btnSaveAttendance" class="bg-green-600 text-white px-6 py-2 rounded-xl shadow hover:bg-green-700 transition flex items-center gap-2">
+            <div class="flex gap-2">
+              <button id="btnMarkAllPresent" class="bg-blue-600 text-white px-4 py-2 rounded-xl shadow hover:bg-blue-700 transition flex items-center gap-2">
+                <i data-lucide="check" class="w-4 h-4"></i> Marcar todos presentes
+              </button>
+              <button id="btnSaveAttendance" class="bg-green-600 text-white px-6 py-2 rounded-xl shadow hover:bg-green-700 transition flex items-center gap-2">
                 <i data-lucide="save" class="w-4 h-4"></i> Guardar
-            </button>
+              </button>
+            </div>
         </div>
         <div class="overflow-x-auto">
             <table class="w-full text-left border-collapse">
@@ -630,6 +635,13 @@ const UI = {
     
     // Bind Save Button
     document.getElementById('btnSaveAttendance').addEventListener('click', () => this.saveAttendance());
+    document.getElementById('btnMarkAllPresent').addEventListener('click', () => {
+      document.querySelectorAll('.student-row').forEach(r => { r.dataset.status = 'present'; });
+      document.querySelectorAll('.student-row .status-badge').forEach(b => {
+        b.className = 'status-badge px-3 py-1 rounded-full text-xs font-bold bg-green-100 text-green-700';
+        b.textContent = 'Presente';
+      });
+    });
   },
 
   setAttendance(studentId, status, btn) {
@@ -755,3 +767,24 @@ document.addEventListener('DOMContentLoaded', () => {
         document.body.classList.remove('no-scroll');
     });
 });
+    // Logout
+    const logoutBtn = document.getElementById('logoutBtn');
+    if (logoutBtn) {
+      logoutBtn.addEventListener('click', async () => {
+        try { await supabase.auth.signOut(); } catch(e) {}
+        window.location.href = 'login.html';
+      });
+    }
+    // Seed missing rows as 'pending' for today's date
+    if ((existingAttendance?.length || 0) < students.length) {
+      const existingIds = new Set((existingAttendance||[]).map(a => String(a.student_id)));
+      const toSeed = students.filter(s => !existingIds.has(String(s.id))).map(s => ({
+        student_id: s.id,
+        classroom_id: AppState.currentClass.id,
+        date: selectedDate,
+        status: 'pending'
+      }));
+      if (toSeed.length) {
+        await supabase.from('attendance').upsert(toSeed, { onConflict: 'student_id, date' });
+      }
+    }

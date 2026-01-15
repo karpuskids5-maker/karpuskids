@@ -108,6 +108,12 @@ document.addEventListener('DOMContentLoaded', async () => {
     userNameElements.forEach(el => el.textContent = profile.name || 'Usuario');
   }
 
+  // 0.1 Botón de Cerrar Sesión
+  document.getElementById('btnLogout')?.addEventListener('click', async () => {
+    await supabase.auth.signOut();
+    window.location.href = 'login.html';
+  });
+
   // 1. NAVEGACIÓN ENTRE SECCIONES
   const navButtons = document.querySelectorAll('[data-section]');
   const sections = document.querySelectorAll('section[id]');
@@ -349,26 +355,157 @@ document.addEventListener('DOMContentLoaded', async () => {
   // 7. CARGAR MAESTROS
   async function loadTeachers() {
     await safeExecute(async () => {
-      const { data: teachers, error } = await supabase.from('profiles').select('*').eq('role', 'maestra').order('name');
+      // Cargar Maestros y Asistentes
+      const { data: staff, error } = await supabase
+        .from('profiles')
+        .select('*')
+        .in('role', ['maestra', 'asistente'])
+        .order('name');
+      
       if (error) throw error;
 
-      const tableBody = document.getElementById('teachersTable');
-      if (!tableBody) return;
+      const teachersTable = document.getElementById('teachersTable');
+      const assistantsTable = document.getElementById('assistantsTable');
+      const assistantsContainer = document.getElementById('assistantsContainer');
 
-      if (teachers.length === 0) {
-        tableBody.innerHTML = '<tr><td colspan="3" class="text-center py-8 text-slate-500">No se encontraron maestros registrados.</td></tr>';
-        return;
+      if (teachersTable) teachersTable.innerHTML = '';
+      if (assistantsTable) assistantsTable.innerHTML = '';
+
+      const teachers = staff.filter(p => p.role === 'maestra');
+      const assistants = staff.filter(p => p.role === 'asistente');
+
+      // Renderizar Maestros
+      if (teachersTable) {
+        if (teachers.length === 0) {
+          teachersTable.innerHTML = '<tr><td colspan="4" class="text-center py-8 text-slate-500">No se encontraron maestros registrados.</td></tr>';
+        } else {
+          teachersTable.innerHTML = teachers.map(t => renderStaffRow(t)).join('');
+        }
       }
 
-      tableBody.innerHTML = teachers.map(t => `
-        <tr class="hover:bg-slate-50">
-          <td class="py-3 px-4 font-medium text-slate-900">${t.name}</td>
-          <td class="py-3 px-4 text-slate-600">${t.email}</td>
-          <td class="py-3 px-4 text-slate-600">${t.specialty || '-'}</td>
-        </tr>
-      `).join('');
+      // Renderizar Asistentes
+      if (assistantsContainer && assistantsTable) {
+        if (assistants.length > 0) {
+          assistantsContainer.classList.remove('hidden');
+          assistantsTable.innerHTML = assistants.map(a => renderStaffRow(a)).join('');
+        } else {
+          assistantsContainer.classList.add('hidden');
+        }
+      }
+      
+      if (window.lucide) lucide.createIcons();
 
-    }, 'Error cargando maestros');
+    }, 'Error cargando personal');
+  }
+
+  // Helper para renderizar filas de personal
+  function renderStaffRow(person) {
+    return `
+        <tr class="hover:bg-indigo-50/50 transition-colors cursor-pointer group border-b last:border-0" onclick="window.openTeacherModal('${person.id}')">
+          <td class="py-4 px-6">
+            <div class="flex items-center gap-3">
+              <div class="w-10 h-10 rounded-full bg-slate-100 flex items-center justify-center text-slate-600 font-bold shadow-sm">
+                ${person.name.charAt(0)}
+              </div>
+              <div>
+                <div class="font-semibold text-slate-800">${person.name}</div>
+                <div class="text-xs text-slate-500">${person.role === 'maestra' ? (person.specialty || 'Docente') : 'Asistente'}</div>
+              </div>
+            </div>
+          </td>
+          <td class="py-4 px-6">
+            <div class="text-sm text-slate-600 flex flex-col">
+              <span class="flex items-center gap-1"><i data-lucide="mail" class="w-3 h-3"></i> ${person.email}</span>
+              <span class="flex items-center gap-1 mt-1"><i data-lucide="phone" class="w-3 h-3"></i> ${person.phone || '-'}</span>
+            </div>
+          </td>
+          <td class="py-4 px-6 text-center">
+            <button class="px-3 py-1 rounded-full text-xs font-semibold bg-green-100 text-green-700 border border-green-200 hover:bg-green-200 transition-colors" onclick="event.stopPropagation(); alert('Estado activo')">
+              Activo
+            </button>
+          </td>
+          <td class="py-4 px-6 text-right">
+            <div class="flex justify-end gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+              <button class="p-2 hover:bg-blue-50 text-blue-600 rounded-lg transition-colors" title="Editar" onclick="event.stopPropagation(); window.openTeacherModal('${person.id}')">
+                <i data-lucide="edit-2" class="w-4 h-4"></i>
+              </button>
+              <button class="p-2 hover:bg-red-50 text-red-600 rounded-lg transition-colors" title="Eliminar" onclick="event.stopPropagation(); alert('Función de eliminar pendiente de implementación segura')">
+                <i data-lucide="trash-2" class="w-4 h-4"></i>
+              </button>
+            </div>
+          </td>
+        </tr>
+    `;
+  }
+
+  window.openTeacherModal = async function(id) {
+    const modal = document.getElementById('teacherModal');
+    const title = document.getElementById('teacherModalTitle');
+    const inputId = document.getElementById('tmId');
+    const nameInput = document.getElementById('tmName');
+    const phoneInput = document.getElementById('tmPhone');
+    const emailInput = document.getElementById('tmEmail');
+    const usernameInput = document.getElementById('tmUsername');
+    const specialtyInput = document.getElementById('tmSpecialty');
+    const statusSelect = document.getElementById('tmStatus');
+    if (!modal) return;
+    modal.classList.remove('hidden');
+    title && (title.textContent = 'Editar Usuario');
+    inputId && (inputId.value = id);
+    nameInput && (nameInput.value = '');
+    phoneInput && (phoneInput.value = '');
+    emailInput && (emailInput.value = '');
+    usernameInput && (usernameInput.value = '');
+    specialtyInput && (specialtyInput.value = '');
+    statusSelect && (statusSelect.value = 'Activo');
+    if (window.lucide) lucide.createIcons();
+    try {
+      const { data, error } = await supabase.from('profiles').select('*').eq('id', id).single();
+      if (error) throw error;
+      nameInput && (nameInput.value = data?.name || '');
+      phoneInput && (phoneInput.value = data?.phone || '');
+      emailInput && (emailInput.value = data?.email || '');
+      specialtyInput && (specialtyInput.value = data?.notes || '');
+    } catch (e) {
+      console.error(e);
+    }
+  };
+
+  const btnSaveTeacher = document.getElementById('btnSaveTeacher');
+  if (btnSaveTeacher) {
+    btnSaveTeacher.addEventListener('click', async () => {
+      const inputId = document.getElementById('tmId');
+      const nameInput = document.getElementById('tmName');
+      const phoneInput = document.getElementById('tmPhone');
+      const emailInput = document.getElementById('tmEmail');
+      const specialtyInput = document.getElementById('tmSpecialty');
+      const id = inputId?.value;
+      if (!id) return;
+      try {
+        const updates = {
+          name: nameInput?.value || null,
+          phone: phoneInput?.value || null,
+          email: emailInput?.value || null,
+          notes: specialtyInput?.value || null
+        };
+        const { error } = await supabase.from('profiles').update(updates).eq('id', id);
+        if (error) throw error;
+        const modal = document.getElementById('teacherModal');
+        modal && modal.classList.add('hidden');
+        await loadTeachers();
+      } catch (e) {
+        console.error(e);
+        alert('Error guardando cambios');
+      }
+    });
+  }
+
+  const btnCancelTeacher = document.getElementById('btnCancelTeacher');
+  if (btnCancelTeacher) {
+    btnCancelTeacher.addEventListener('click', () => {
+      const modal = document.getElementById('teacherModal');
+      modal && modal.classList.add('hidden');
+    });
   }
 
   // 8. CARGAR ASISTENCIA
@@ -731,7 +868,8 @@ document.addEventListener('DOMContentLoaded', async () => {
         // Crear usuario en Supabase Auth
         const { data: authData, error: authError } = await supabase.auth.signUp({
           email: email,
-          password: password
+          password: password,
+          options: { data: { role: 'asistente', name: name } }
         });
 
         if (authError) {
@@ -746,14 +884,14 @@ document.addEventListener('DOMContentLoaded', async () => {
           // Crear perfil en la tabla profiles
           const { error: profileError } = await supabase
             .from('profiles')
-            .insert([{
+            .upsert([{
               id: authData.user.id,
               name: name,
               email: email,
               phone: phone || null,
               role: 'asistente',
               created_at: new Date().toISOString()
-            }]);
+            }], { onConflict: 'id' });
 
           if (profileError) throw profileError;
 
@@ -840,30 +978,42 @@ document.addEventListener('DOMContentLoaded', async () => {
         let parentId = null;
 
         // 1. Crear Usuario Padre si hay email y contraseña
-        if (p1Email && p1Password) {
-          // Usar cliente temporal para no cerrar sesión de directora
-          const tempSupabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
-            auth: { persistSession: false, autoRefreshToken: false, detectSessionInUrl: false }
-          });
+        if (p1Email) {
+          // A) Verificar si el padre ya existe en la base de datos
+          const { data: existingParent } = await supabase
+            .from('profiles')
+            .select('id')
+            .eq('email', p1Email)
+            .eq('role', 'padre')
+            .maybeSingle();
 
-          const { data: authData, error: authError } = await tempSupabase.auth.signUp({
-            email: p1Email,
-            password: p1Password
-          });
-          
-          if (authError) throw authError;
-          
-          if (authData.user) {
-            parentId = authData.user.id;
-            // 2. Crear Perfil del Padre
-            const { error: profileError } = await supabase.from('profiles').insert([{
-              id: parentId,
-              name: p1Name || 'Padre/Tutor',
+          if (existingParent) {
+            parentId = existingParent.id;
+          } else if (p1Password) {
+            // B) Si no existe y hay contraseña, crear nuevo usuario
+            const tempSupabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
+              auth: { persistSession: false, autoRefreshToken: false, detectSessionInUrl: false }
+            });
+
+            const { data: authData, error: authError } = await tempSupabase.auth.signUp({
               email: p1Email,
-              phone: p1Phone,
-              role: 'padre'
-            }]);
-            if (profileError) console.warn('Error creando perfil padre (puede que ya exista):', profileError);
+              password: p1Password
+            });
+            
+            if (authError) throw authError;
+            
+            if (authData.user) {
+              parentId = authData.user.id;
+              // Crear Perfil del Padre
+              const { error: profileError } = await supabase.from('profiles').insert([{
+                id: parentId,
+                name: p1Name || 'Padre/Tutor',
+                email: p1Email,
+                phone: p1Phone,
+                role: 'padre'
+              }]);
+              if (profileError) console.warn('Error creando perfil padre:', profileError);
+            }
           }
         }
 

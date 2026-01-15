@@ -240,9 +240,14 @@
       </nav>
 
       <!-- Color sidebar eliminado: se usa estilo único -->
-      <div class="mt-6 text-xs text-white/80">
-        <p>Usuario: <span class="font-medium">Director(a)</span></p>
-        <p class="mt-2">Último acceso: <span class="font-medium">Hoy</span></p>
+      <div class="mt-auto pt-6 border-t border-white/10">
+        <button id="btnLogout" class="nav-btn text-white hover:bg-white/20 w-full group">
+          <i data-lucide="log-out" class="text-white group-hover:text-red-200 transition-colors"></i>
+          <span class="label group-hover:text-red-100 transition-colors">Cerrar Sesión</span>
+        </button>
+        <div class="mt-4 text-xs text-white/60 px-4 label">
+          <p>Usuario: <span class="font-medium text-white">Director(a)</span></p>
+        </div>
       </div>
       </div>
     </aside>
@@ -383,21 +388,48 @@
             </button>
           </div>
         </div>
-        <div class="bg-white rounded-xl shadow-sm border overflow-hidden">
-          <div class="overflow-x-auto">
-            <table class="w-full text-left border-collapse">
-              <thead>
-                <tr class="bg-slate-50 border-b text-xs font-semibold tracking-wide text-slate-500 uppercase">
-                  <th class="px-6 py-4">Maestro</th>
-                  <th class="px-6 py-4">Contacto</th>
-                  <th class="px-6 py-4">Estado</th>
-                  <th class="px-6 py-4 text-right">Acciones</th>
-                </tr>
-              </thead>
-              <tbody id="teachersTable" class="divide-y divide-slate-100 bg-white text-sm">
-                <!-- Se llena dinámicamente con JS -->
-              </tbody>
-            </table>
+        
+        <!-- Tabla de Maestros -->
+        <div class="mb-8">
+          <h3 class="text-lg font-semibold text-slate-700 mb-3 px-1 flex items-center gap-2">
+            <span class="w-2 h-6 bg-indigo-500 rounded-full"></span> Personal Docente
+          </h3>
+          <div class="bg-white rounded-xl shadow-sm border overflow-hidden">
+            <div class="overflow-x-auto">
+              <table class="w-full text-left border-collapse">
+                <thead class="bg-slate-50 border-b">
+                  <tr>
+                    <th class="px-6 py-3 text-xs font-bold text-slate-500 uppercase tracking-wider">Nombre</th>
+                    <th class="px-6 py-3 text-xs font-bold text-slate-500 uppercase tracking-wider">Contacto</th>
+                    <th class="px-6 py-3 text-xs font-bold text-slate-500 uppercase tracking-wider text-center">Estado</th>
+                    <th class="px-6 py-3 text-xs font-bold text-slate-500 uppercase tracking-wider text-right">Acciones</th>
+                  </tr>
+                </thead>
+                <tbody id="teachersTable" class="divide-y divide-slate-100 bg-white text-sm"></tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+
+        <!-- Tabla de Asistentes (Contenedor Aparte) -->
+        <div id="assistantsContainer" class="hidden">
+          <h3 class="text-lg font-semibold text-slate-700 mb-3 px-1 flex items-center gap-2">
+            <span class="w-2 h-6 bg-blue-500 rounded-full"></span> Personal de Apoyo (Asistentes)
+          </h3>
+          <div class="bg-white rounded-xl shadow-sm border overflow-hidden">
+            <div class="overflow-x-auto">
+              <table class="w-full text-left border-collapse">
+                <thead class="bg-slate-50 border-b">
+                  <tr>
+                    <th class="px-6 py-3 text-xs font-bold text-slate-500 uppercase tracking-wider">Nombre</th>
+                    <th class="px-6 py-3 text-xs font-bold text-slate-500 uppercase tracking-wider">Contacto</th>
+                    <th class="px-6 py-3 text-xs font-bold text-slate-500 uppercase tracking-wider text-center">Estado</th>
+                    <th class="px-6 py-3 text-xs font-bold text-slate-500 uppercase tracking-wider text-right">Acciones</th>
+                  </tr>
+                </thead>
+                <tbody id="assistantsTable" class="divide-y divide-slate-100 bg-white text-sm"></tbody>
+              </table>
+            </div>
           </div>
         </div>
       </section>

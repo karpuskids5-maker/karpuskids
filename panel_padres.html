@@ -4,609 +4,329 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Panel de Padres - Karpus Kids</title>
-  <link rel="stylesheet" href="css/theme.css" />
-  <link rel="stylesheet" href="css/karpus-modern.css" />
-  <link rel="stylesheet" href="css/layout.css" />
-  <link href="https://fonts.googleapis.com/css2?family=Nunito:wght@400;600;700&family=Poppins:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="icon" href="./logo/favicon.ico" type="image/x-icon" />
+  <script src="https://cdn.tailwindcss.com"></script>
   <link href="./css/karpus-tailwind.css" rel="stylesheet">
-  <script src="https://unpkg.com/lucide@latest/dist/umd/lucide.min.js"></script>
+  <script src="https://unpkg.com/lucide@0.562.0/dist/umd/lucide.js"></script>
   <style>
-    /* View Transitions */
-    .section {
-      display: none;
-      opacity: 0;
-      transition: opacity 0.3s ease;
-    }
-    .section.active {
-      display: block;
-      opacity: 1;
-      animation: fadeIn 0.4s ease-out forwards;
-    }
-    @keyframes fadeIn {
-      from { opacity: 0; transform: translateY(10px); }
-      to { opacity: 1; transform: translateY(0); }
-    }
+    :root{--color-primary:#3B82F6;--color-hover:#BFDBFE;--color-bg:#F8FAFC;--color-card:#FFFFFF;--color-text:#1E293B;--color-success:#22C55E;--color-warning:#FACC15;--color-error:#EF4444}
+    body{background:var(--color-bg);color:var(--color-text)}
+    .section{display:none;opacity:0;transition:opacity .3s ease}
+    .section.active{display:block;opacity:1}
+    img{max-width:100%;height:auto}
+    #classFeed img,#feed img{max-width:100%;max-height:400px;object-fit:contain;border-radius:12px}
+    aside img,header img{width:40px;height:40px;object-fit:cover}
+    #layoutShell{transition:margin-left .25s ease}
+    #layoutShell.sidebar-collapsed{margin-left:72px!important}
+    @media (max-width:768px){#layoutShell{margin-left:0!important}}
+    /* Sidebar list style */
+    .sidebar-btn{display:flex;align-items:center;gap:.75rem;width:100%;padding:.5rem .75rem;border-radius:.75rem;color:var(--color-text)}
+    .sidebar-btn i{color:var(--color-primary)}
+    .sidebar-btn:hover{background:var(--color-hover)}
+    .sidebar-btn.active{background:var(--color-hover);font-weight:600}
+    /* Collapsible sidebar */
+    #sidebar.collapsed{width:64px}
+    #sidebar.collapsed .label{display:none}
+    #sidebar.collapsed .sidebar-btn{justify-content:center}
+    #sidebar.collapsed .sidebar-btn .label{display:none}
+    #sidebar.collapsed.hover-open{width:260px}
+    #sidebar.collapsed.hover-open .label{display:block}
+    #sidebar.collapsed.hover-open .sidebar-btn{justify-content:flex-start}
+    #sidebar.collapsed.hover-open .sidebar-btn .label{display:inline}
+    /* Karpus colored letters small */
+    .karpus-kids-inline{font-weight:700}
+    .karpus-kids-inline .k-1{color:#FF9800}
+    .karpus-kids-inline .k-2{color:#2196F3}
+    .karpus-kids-inline .k-3{color:#E91E63}
+    .karpus-kids-inline .k-4{color:#4CAF50}
+    .karpus-kids-inline .k-5{color:#FF9800}
+    .karpus-kids-inline .k-6{color:#2196F3}
+    .karpus-kids-inline .k-7{color:#4CAF50}
+    .karpus-kids-inline .k-8{color:#E91E63}
+    .karpus-kids-inline .k-9{color:#2196F3}
+    .karpus-kids-inline .k-10{color:#FF9800}
   </style>
 </head>
 <body class="text-slate-800 min-h-screen">
-  <div class="flex min-h-screen font-nunito">
-    <!-- SIDEBAR DESKTOP -->
-    <aside id="sidebar" class="hidden md:flex flex-col w-[260px] sidebar-brand border-r shadow-soft px-4 py-6 fixed inset-y-0 left-0 z-20">
-      <button id="toggleSidebar" aria-label="Colapsar sidebar" class="absolute right-2 top-6 toggle-btn-padres rounded-full w-10 h-10 flex items-center justify-center shadow-lg z-30 hidden md:flex"><i data-lucide="chevron-left" class="w-6 h-6"></i></button>
+  <div class="flex min-h-screen font-nunito overflow-hidden">
+    <aside id="sidebar" class="hidden md:flex flex-col w-[260px] bg-white border-r shadow-sm px-4 py-6 fixed inset-y-0 left-0 z-20">
+      <button id="toggleSidebar" class="absolute right-2 top-6 bg-white border rounded-full w-8 h-8 flex items-center justify-center shadow-md hidden md:flex"><i data-lucide="chevron-left" class="w-5 h-5"></i></button>
       <div class="flex items-center gap-3 mb-8">
         <img src="img/mundo.jpg" class="w-10 h-10 rounded-xl" />
         <div class="label">
-          <p class="font-bold text-sm">Karpus</p>
-          <p class="text-xs text-slate-500" id="sidebar-role-label">...</p>
+          <p class="text-sm karpus-kids-inline">
+            <span class="k-1">K</span><span class="k-2">a</span><span class="k-3">r</span><span class="k-4">p</span><span class="k-5">u</span><span class="k-6">s</span>
+            <span class="k-7">K</span><span class="k-8">i</span><span class="k-9">d</span><span class="k-10">s</span>
+          </p>
+          <p class="text-xs text-slate-500 role-display">Padre/Tutor</p>
         </div>
       </div>
       <nav class="space-y-1" role="navigation" aria-label="Menú principal">
-        <button data-section="tab-home" class="sidebar-btn text-base" aria-current="page">
-          <i data-lucide="layout-grid" class="w-6 h-6" aria-hidden="true"></i>
-          <span class="label">Inicio</span>
-        </button>
-        <button data-section="tab-live-attendance" class="sidebar-btn text-base">
-          <i data-lucide="calendar-check" class="w-6 h-6" aria-hidden="true"></i>
-          <span class="label">Asistencia</span>
-        </button>
-        <button data-section="tab-class" class="sidebar-btn text-base">
-          <i data-lucide="school" class="w-6 h-6" aria-hidden="true"></i>
-          <span class="label">Aula</span>
-        </button>
-        <button data-section="tab-tasks" class="sidebar-btn text-base">
-          <i data-lucide="clipboard-list" class="w-6 h-6" aria-hidden="true"></i>
-          <span class="label">Tareas</span>
-        </button>
-        <button data-section="tab-grades" class="sidebar-btn text-base">
-          <i data-lucide="award" class="w-6 h-6" aria-hidden="true"></i>
-          <span class="label">Calificaciones</span>
-        </button>
-        <button data-section="tab-notifications" class="sidebar-btn text-base">
-          <i data-lucide="message-circle" class="w-6 h-6" aria-hidden="true"></i>
-          <span class="label">Mensajes</span>
-        </button>
-        <button data-section="tab-profile" class="sidebar-btn text-base">
-          <i data-lucide="heart-handshake" class="w-6 h-6" aria-hidden="true"></i>
-          <span class="label">Perfil</span>
-        </button>
+        <button data-target="home" class="sidebar-btn nav-btn text-base active"><i data-lucide="layout-grid" class="w-6 h-6"></i><span class="label">Inicio</span></button>
+        <button data-target="live-attendance" class="sidebar-btn nav-btn text-base"><i data-lucide="calendar-check" class="w-6 h-6"></i><span class="label">Asistencia</span></button>
+        <button data-target="class" class="sidebar-btn nav-btn text-base"><i data-lucide="school" class="w-6 h-6"></i><span class="label">Aula</span></button>
+        <button data-target="tasks" class="sidebar-btn nav-btn text-base"><i data-lucide="clipboard-list" class="w-6 h-6"></i><span class="label">Tareas</span></button>
+        <button data-target="notifications" class="sidebar-btn nav-btn text-base"><i data-lucide="message-circle" class="w-6 h-6"></i><span class="label">Mensajes</span></button>
+        <button data-target="payments" class="sidebar-btn nav-btn text-base"><i data-lucide="credit-card" class="w-6 h-6"></i><span class="label">Pagos</span></button>
+        <button data-target="profile" class="sidebar-btn nav-btn text-base"><i data-lucide="heart-handshake" class="w-6 h-6"></i><span class="label">Perfil</span></button>
       </nav>
       <div class="mt-auto text-xs text-slate-400 label">
         Supervisando a:<br>
         <strong id="sidebar-student-name">...</strong>
       </div>
     </aside>
-
-    <!-- CONTENIDO PRINCIPAL -->
+    <div id="sidebarOverlay" class="fixed inset-0 bg-black/40 z-10 hidden md:hidden"></div>
     <div id="layoutShell" class="flex-1 flex flex-col md:ml-[260px]">
-    <!-- Mobile header -->
-    <div class="md:hidden w-full fixed top-0 left-0 right-0 bg-white/80 backdrop-blur-sm border-b z-10 shadow-lg">
-      <header class="px-4 py-2 flex items-center justify-between">
-        <button id="menuBtn" aria-label="Abrir menú móvil" class="p-2 -ml-2 rounded-lg text-slate-600 hover:bg-slate-100"><i data-lucide="menu" class="w-6 h-6"></i></button>
-        <div class="flex items-center gap-3">
-          <div class="w-9 h-9 rounded-2xl bg-karpus-pink flex items-center justify-center shadow-lg">
-            <img src="img/mundo.jpg" alt="logo" class="h-6 w-6 rounded" />
-          </div>
-          <div>
-            <h1 class="text-lg font-poppins font-semibold"><span class="karpus-kids-inline"><span class="k-1">K</span><span class="k-2">a</span><span class="k-3">r</span><span class="k-4">p</span><span class="k-5">u</span><span class="k-6">s</span> <span class="k-7">K</span><span class="k-8">i</span><span class="k-9">d</span><span class="k-10">s</span></span></h1>
-            <p class="text-xs text-slate-500">Supervisando a: <span id="mobile-student-name">...</span></p>
-          </div>
-        </div>
-        <!-- Menú de Avatar de Usuario -->
-        <div class="relative">
-          <button id="avatarMenuBtn" aria-label="Abrir menú de avatar">
-            <img id="avatarStudent" src="img/mundo.jpg" alt="Avatar del alumno" class="w-9 h-9 rounded-full object-cover border-2 border-karpus-blue-soft">
-          </button>
-          <!-- Menú desplegable -->
-          <div id="avatarDropdown" class="hidden absolute right-0 mt-2 w-48 bg-white rounded-xl shadow-lg border z-20">
-            <div class="p-3">
-              <p class="text-sm font-semibold" id="dropdown-role">...</p>
-              <p class="text-xs text-slate-500" id="dropdown-student">...</p>
+      <div class="md:hidden w-full fixed top-0 left-0 right-0 bg-white/80 backdrop-blur-sm border-b z-10 shadow-lg">
+        <header class="px-4 py-2 flex items-center justify-between">
+          <button id="menuBtn" class="p-2 -ml-2 rounded-lg text-slate-600 hover:bg-slate-100"><i data-lucide="menu" class="w-6 h-6"></i></button>
+          <div class="flex items-center gap-3">
+            <div class="w-9 h-9 rounded-2xl bg-pink-100 flex items-center justify-center shadow-lg">
+              <img src="img/mundo.jpg" alt="logo" class="h-6 w-6 rounded" />
             </div>
-            <button id="editProfileBtn" aria-label="Editar perfil" class="w-full text-left px-3 py-2 text-sm text-slate-700 hover:bg-slate-100 rounded-b-xl">Editar Perfil</button>
+            <div>
+              <h1 class="text-lg font-semibold karpus-kids-inline">
+                <span class="k-1">K</span><span class="k-2">a</span><span class="k-3">r</span><span class="k-4">p</span><span class="k-5">u</span><span class="k-6">s</span>
+                <span class="k-7">K</span><span class="k-8">i</span><span class="k-9">d</span><span class="k-10">s</span>
+              </h1>
+              <p class="text-xs text-slate-500">Supervisando a: <span id="mobile-student-name">...</span></p>
+            </div>
           </div>
-        </div>
-      </header>
-    </div>
-
-    <!-- Content -->
-    <main class="flex-1 px-4 space-y-6 md:pt-6 mt-16 md:mt-0 pb-6" role="main" id="parent-main">
-    <!-- A. INICIO (Dashboard) -->
-    <section id="tab-home" class="section active space-y-6">
-      <!-- Resumen del día + Próxima clase + Alertas -->
-      <div class="modern-card p-4 rounded-3xl">
-        <div class="flex items-center justify-between">
-          <div>
-            <h2 class="text-lg font-bold text-slate-800"></h2>
-            <p class="text-sm text-slate-500"></p>
-            <p class="text-sm text-slate-500">Estudiante: <span class="font-semibold text-karpus-blue" id="dash-student-name">—</span> • Padres: <span class="font-semibold" id="dash-guardian-name">—</span></p>
-          </div>
-          <div class="text-right space-y-1">
-            <p class="text-xs text-slate-400" id="currentDateDisplay">Hoy</p>
-            <span class="block text-xs px-2 py-1 bg-blue-100 text-blue-700 rounded-full">Curso/Aula: <span id="dash-classroom">—</span></span>
-            <span id="nextClassInfo" class="block text-xs text-slate-600">Próxima clase • Mañana • 8:30 AM</span>
-          </div>
-        </div>
-        <!-- Alertas y recordatorios (orden: vencidas, pendientes, reconocimiento) -->
-        <div id="dashboardAlerts" class="space-y-3 mt-3"></div>
+          <div class="w-8"></div>
+        </header>
       </div>
-
-      <!-- Tarjetas de Resumen (con prioridad visual) -->
-  <div class="grid grid-cols-2 gap-3">
-    <div class="bg-white p-3 rounded-3xl border shadow-sm">
-      <div class="flex items-center gap-2 mb-2">
-        <div class="p-1.5 bg-green-100 text-green-600 rounded-lg"><i data-lucide="check-circle" class="w-5 h-5"></i></div>
-        <span class="text-xs font-semibold text-slate-600">Asistencia</span>
-      </div>
-      <p class="text-2xl font-bold text-slate-800" id="dashAttendance">95%</p>
-      <p class="text-[10px] text-slate-400">Este mes</p>
-    </div>
-    <div class="bg-white p-3 rounded-3xl border shadow-sm">
-      <div class="flex items-center gap-2 mb-2">
-        <div class="p-1.5 bg-orange-100 text-orange-600 rounded-lg"><i data-lucide="pencil" class="w-5 h-5"></i></div>
-        <span class="text-xs font-semibold text-slate-600">Tareas</span>
-      </div>
-      <p class="text-2xl font-bold text-slate-800" id="dashPendingTasks">0</p>
-      <p class="text-[10px] text-slate-400">Pendientes</p>
-    </div>
-  </div>
-
-  <!-- CTA Amarillo: acceso rápido a Actividades -->
-  <div class="mt-3 flex items-center justify-between bg-white p-3 rounded-3xl border shadow-sm">
-    <div class="flex items-center gap-2">
-      <div class="p-1.5 bg-amber-100 text-amber-600 rounded-lg"><i data-lucide="list-checks" class="w-5 h-5"></i></div>
-      <span class="text-sm font-semibold text-slate-700">Actividades pendientes y evidencias</span>
-    </div>
-    <button id="ctaPendingBtn" class="text-sm px-3 py-1 rounded-xl" style="background:#FACC15;color:#1F2937;box-shadow:0 3px 8px rgba(250,204,21,.25)">
-      <i data-lucide="arrow-right" class="w-4 h-4 inline-block align-middle"></i>
-      <span class="align-middle">Ver Actividades</span>
-    </button>
-  </div>
-
-  <!-- Diario de Hoy (Nuevo) -->
-  <div id="dailyLogCard" class="hidden mt-3 bg-white p-4 rounded-3xl border shadow-sm">
-    <h3 class="text-base font-semibold text-slate-700 mb-3 flex items-center gap-2">
-      <i data-lucide="book-open" class="text-karpus-green h-5 w-5"></i>
-      Diario de Hoy
-    </h3>
-    <div id="dailyLogContent" class="grid grid-cols-2 gap-3 text-sm"></div>
-    <p id="dailyLogNotes" class="mt-3 text-sm text-slate-600 italic bg-slate-50 p-2 rounded-lg"></p>
-  </div>
-
-    
-
-      <!-- Actividad Reciente -->
-      <div class="modern-card p-4 rounded-3xl">
-        <h3 class="text-base font-semibold text-slate-700 mb-2 flex items-center gap-2">
-          <i data-lucide="star" class="text-karpus-pink h-5 w-5"></i>
-          ⭐ Reconocimiento • Actividad reciente • Últimas entregas • Últimos comentarios
-        </h3>
-        <div id="feed" class="space-y-3"></div>
-      </div>
-    </section>
-    
-    <!-- Plan de Desarrollo Educativo -->
-    <section id="tab-development" class="section space-y-6">
-      <div class="modern-card p-4 rounded-3xl">
-        <div class="modern-card-header flex items-center justify-between">
-          <h2 class="text-base font-semibold font-poppins text-karpus-teal flex items-center gap-2">
-            <i data-lucide="trending-up" class="text-karpus-teal h-5 w-5"></i>
-            Plan de Desarrollo Educativo
-          </h2>
-          <button class="modern-button modern-button-success text-xs">
-            <i data-lucide="download" class="h-4 w-4"></i>
-            Descargar PDF
-          </button>
-        </div>
-        
-        <div class="modern-card-body">
-          <div class="mb-6">
-            <h3 class="text-sm font-semibold mb-2">Objetivos Trimestrales</h3>
-            <div class="space-y-3">
-              <div class="bg-slate-50 p-3 rounded-xl">
-                <div class="flex justify-between mb-1">
-                  <p class="text-sm font-medium">Lectura comprensiva</p>
-                  <span class="text-xs bg-green-100 text-green-800 px-2 py-0.5 rounded-full">75% completado</span>
-                </div>
-                <div class="w-full bg-slate-200 rounded-full h-2">
-                  <div class="bg-karpus-green h-2 rounded-full" style="width: 75%"></div>
-                </div>
+      <main class="flex-1 px-4 space-y-6 md:pt-6 mt-16 md:mt-0 pb-6" id="parent-main">
+        <section id="home" class="section active space-y-6">
+          <div class="p-4 rounded-3xl bg-white border shadow-sm">
+            <div class="flex items-center justify-between">
+              <div>
+                <h2 class="text-lg font-bold text-slate-800"></h2>
+                <p class="text-sm text-slate-500">Estudiante: <span class="student-name-display font-semibold text-blue-600">—</span> • Padres: <span class="guardian-name-display font-semibold">—</span></p>
               </div>
-              
-              <div class="bg-slate-50 p-3 rounded-xl">
-                <div class="flex justify-between mb-1">
-                  <p class="text-sm font-medium">Matemáticas básicas</p>
-                  <span class="text-xs bg-blue-100 text-blue-800 px-2 py-0.5 rounded-full">90% completado</span>
-                </div>
-                <div class="w-full bg-slate-200 rounded-full h-2">
-                  <div class="bg-karpus-blue h-2 rounded-full" style="width: 90%"></div>
-                </div>
-              </div>
-              
-              <div class="bg-slate-50 p-3 rounded-xl">
-                <div class="flex justify-between mb-1">
-                  <p class="text-sm font-medium">Habilidades sociales</p>
-                  <span class="text-xs bg-orange-100 text-orange-800 px-2 py-0.5 rounded-full">60% completado</span>
-                </div>
-                <div class="w-full bg-slate-200 rounded-full h-2">
-                  <div class="bg-karpus-orange h-2 rounded-full" style="width: 60%"></div>
-                </div>
+              <div class="text-right space-y-1">
+                <p class="text-xs text-slate-400" id="currentDateDisplay">Hoy</p>
+                <span class="block text-xs px-2 py-1 bg-blue-100 text-blue-700 rounded-full">Curso/Aula: <span class="classroom-name-display">—</span></span>
               </div>
             </div>
           </div>
-          
-          <div class="mb-6">
-            <h3 class="text-sm font-semibold mb-2">Áreas de Enfoque</h3>
-            <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
-              <div class="border border-slate-200 p-3 rounded-xl">
-                <div class="flex items-center gap-2 mb-2">
-                  <div class="bg-purple-100 p-1.5 rounded-lg">
-                    <i data-lucide="brain" class="text-karpus-purple h-4 w-4"></i>
-                  </div>
-                  <p class="text-sm font-medium">Desarrollo Cognitivo</p>
-                </div>
-                <p class="text-xs text-slate-600">Enfoque en resolución de problemas y pensamiento crítico mediante actividades lúdicas.</p>
-              </div>
-              
-              <div class="border border-slate-200 p-3 rounded-xl">
-                <div class="flex items-center gap-2 mb-2">
-                  <div class="bg-green-100 p-1.5 rounded-lg">
-                    <i data-lucide="heart-handshake" class="text-karpus-green h-4 w-4"></i>
-                  </div>
-                  <p class="text-sm font-medium">Inteligencia Emocional</p>
-                </div>
-                <p class="text-xs text-slate-600">Desarrollo de habilidades para reconocer y gestionar emociones propias y ajenas.</p>
-              </div>
-              
-              <div class="border border-slate-200 p-3 rounded-xl">
-                <div class="flex items-center gap-2 mb-2">
-                  <div class="bg-blue-100 p-1.5 rounded-lg">
-                    <i data-lucide="users" class="text-karpus-blue h-4 w-4"></i>
-                  </div>
-                  <p class="text-sm font-medium">Habilidades Sociales</p>
-                </div>
-                <p class="text-xs text-slate-600">Fomento de la cooperación, empatía y trabajo en equipo mediante actividades grupales.</p>
-              </div>
-              
-              <div class="border border-slate-200 p-3 rounded-xl">
-                <div class="flex items-center gap-2 mb-2">
-                  <div class="bg-orange-100 p-1.5 rounded-lg">
-                    <i data-lucide="pencil-ruler" class="text-karpus-orange h-4 w-4"></i>
-                  </div>
-                  <p class="text-sm font-medium">Creatividad</p>
-                </div>
-                <p class="text-xs text-slate-600">Estimulación de la expresión artística y pensamiento divergente a través de proyectos creativos.</p>
-              </div>
-            </div>
-          </div>
-          
-          <div>
-            <h3 class="text-sm font-semibold mb-2">Recomendaciones Personalizadas</h3>
-            <div class="bg-karpus-sky p-4 rounded-xl">
-              <p class="text-sm mb-3">Basado en el progreso actual, recomendamos:</p>
-              <ul class="space-y-2 text-xs text-slate-700">
-                <li class="flex items-start gap-2">
-                  <i data-lucide="check-circle" class="text-karpus-green h-4 w-4 flex-shrink-0 mt-0.5"></i>
-                  <span>Dedicar 15 minutos diarios a la lectura compartida para reforzar la comprensión lectora.</span>
-                </li>
-                <li class="flex items-start gap-2">
-                  <i data-lucide="check-circle" class="text-karpus-green h-4 w-4 flex-shrink-0 mt-0.5"></i>
-                  <span>Practicar actividades de socialización en entornos diversos para mejorar habilidades sociales.</span>
-                </li>
-                <li class="flex items-start gap-2">
-                  <i data-lucide="check-circle" class="text-karpus-green h-4 w-4 flex-shrink-0 mt-0.5"></i>
-                  <span>Utilizar juegos matemáticos interactivos para mantener el excelente progreso en esta área.</span>
-                </li>
-              </ul>
-            </div>
-          </div>
-        </div>
-        
-        <div class="modern-card-footer flex justify-between">
-          <button id="requestMeetingBtn" aria-label="Solicitar reunión" class="modern-button bg-slate-100 text-slate-700 text-xs">
-            <i data-lucide="message-square" class="h-4 w-4"></i>
-            Solicitar reunión
-          </button>
-          <button class="modern-button modern-button-primary text-xs">
-            <i data-lucide="calendar-plus" class="h-4 w-4"></i>
-            Agendar seguimiento
-          </button>
-        </div>
-      </div>
-    </section>
-
-    <!-- Asistencia (se muestra al pulsar 'Asistencia' en el menú inferior) -->
-    <section id="tab-live-attendance" class="section space-y-6">
-      <div class="modern-card p-4 rounded-3xl">
-        <div class="flex items-center justify-between mb-3">
-          <h2 class="text-base font-semibold font-poppins text-karpus-blue flex items-center gap-2">
-            <i data-lucide="user-check" class="text-karpus-blue h-5 w-5"></i>
-            Asistencia
-          </h2>
-          <div class="flex items-center gap-2">
-            <button class="period-btn text-xs px-2 py-1 rounded-xl bg-slate-100" data-period="day">Día</button>
-            <button class="period-btn text-xs px-2 py-1 rounded-xl bg-slate-100" data-period="week">Semana</button>
-            <button class="period-btn text-xs px-2 py-1 rounded-xl bg-slate-100" data-period="month">Mes</button>
-          </div>
-        </div>
-
-        <!-- Gráfico de asistencia renderizado por JS (SVG donut) -->
-        <!-- Canvas eliminado: usamos componente SVG propio, sin Chart.js -->
-
-        <div class="mt-4 text-sm text-slate-600">
-          <p>Selecciona el periodo para ver la asistencia de tu estudiante.</p>
-        </div>
-
-        <!-- Calendario Interactivo -->
-        <div class="mt-6 border-t pt-6">
-          <div class="flex items-center justify-between mb-4">
-            <h3 class="text-sm font-semibold text-slate-700">Calendario Mensual</h3>
-            <div class="flex items-center gap-2 bg-slate-50 rounded-lg p-1 border">
-              <button id="calPrevBtn" aria-label="Mes anterior" class="p-1 hover:bg-white rounded shadow-sm transition-all"><i data-lucide="chevron-left" class="w-4 h-4"></i></button>
-              <span id="calMonthLabel" class="text-xs font-bold w-24 text-center text-slate-700 capitalize"></span>
-              <button id="calNextBtn" aria-label="Mes siguiente" class="p-1 hover:bg-white rounded shadow-sm transition-all"><i data-lucide="chevron-right" class="w-4 h-4"></i></button>
-            </div>
-          </div>
-          <div class="bg-slate-50/50 rounded-3xl border border-slate-100 p-4">
-            <div class="grid grid-cols-7 gap-1 mb-2 text-center text-[10px] font-bold text-slate-400 uppercase tracking-wider">
-              <div>Dom</div><div>Lun</div><div>Mar</div><div>Mié</div><div>Jue</div><div>Vie</div><div>Sáb</div>
-            </div>
-            <div id="calendarGrid" class="grid grid-cols-7 gap-1 text-sm transition-opacity duration-300 ease-in-out">
-              <!-- Días generados por JS -->
-            </div>
-          </div>
-          <!-- Resumen mensual -->
-          <div class="mt-4 grid grid-cols-2 gap-3">
+          <div class="grid grid-cols-2 gap-3">
             <div class="bg-white p-3 rounded-3xl border shadow-sm">
-              <div class="flex items-center gap-2 mb-1">
-                <div class="p-1.5 bg-green-100 text-green-600 rounded-lg"><i data-lucide="check-circle" class="w-4 h-4"></i></div>
-                <span class="text-xs font-semibold text-slate-600">Asistencias</span>
-              </div>
-              <p id="attendancePresentCount" class="text-xl font-bold text-slate-800">0</p>
+              <div class="flex items-center gap-2 mb-2"><div class="p-1.5 bg-green-100 text-green-600 rounded-lg"><i data-lucide="check-circle" class="w-5 h-5"></i></div><span class="text-xs font-semibold text-slate-600">Asistencia</span></div>
+              <p class="text-2xl font-bold text-slate-800" id="dashAttendance">0%</p>
             </div>
             <div class="bg-white p-3 rounded-3xl border shadow-sm">
-              <div class="flex items-center gap-2 mb-1">
-                <div class="p-1.5 bg-red-100 text-red-600 rounded-lg"><i data-lucide="x-circle" class="w-4 h-4"></i></div>
-                <span class="text-xs font-semibold text-slate-600">Faltas</span>
+              <div class="flex items-center gap-2 mb-2"><div class="p-1.5 bg-orange-100 text-orange-600 rounded-lg"><i data-lucide="pencil" class="w-5 h-5"></i></div><span class="text-xs font-semibold text-slate-600">Tareas</span></div>
+              <p class="text-2xl font-bold text-slate-800" id="dashPendingTasks">0</p>
+            </div>
+          </div>
+          <div class="mt-3 flex items-center justify-between bg-white p-3 rounded-3xl border shadow-sm">
+            <div class="flex items-center gap-2"><div class="p-1.5 bg-amber-100 text-amber-600 rounded-lg"><i data-lucide="list-checks" class="w-5 h-5"></i></div><span class="text-sm font-semibold text-slate-700">Actividades pendientes y evidencias</span></div>
+            <button id="ctaPendingBtn" class="text-sm px-3 py-1 rounded-xl" style="background:#FACC15;color:#1F2937;box-shadow:0 3px 8px rgba(250,204,21,.25)"><i data-lucide="arrow-right" class="w-4 h-4 inline-block align-middle"></i><span class="align-middle">Ver Actividades</span></button>
+          </div>
+        </section>
+        <section id="live-attendance" class="section space-y-6">
+          <div class="flex items-center justify-between"><h2 class="text-base font-semibold flex items-center gap-2"><i data-lucide="calendar" class="w-5 h-5 text-green-600"></i><span>Calendario</span></h2><div class="flex gap-2"><button id="calPrevBtn" class="px-2 py-1 border rounded">Mes anterior</button><button id="calNextBtn" class="px-2 py-1 border rounded">Mes siguiente</button></div></div>
+          <div id="calendarGrid" class="grid grid-cols-7 gap-2"></div>
+        </section>
+        <section id="class" class="section space-y-4">
+          <div class="flex items-center justify-between"><h2 class="text-base font-semibold flex items-center gap-2"><i data-lucide="layout-dashboard" class="w-5 h-5 text-green-600"></i><span>Muro del Aula</span></h2><span class="text-xs px-2 py-1 bg-slate-100 rounded text-slate-500">Solo lectura</span></div>
+          <div id="classFeed" class="space-y-4"></div>
+        </section>
+        <section id="tasks" class="section space-y-4">
+          <div class="flex items-center justify-between"><h2 class="text-base font-semibold flex items-center gap-2"><i data-lucide="clipboard-list" class="w-5 h-5 text-orange-500"></i><span>Actividades</span></h2></div>
+          <div class="flex gap-2 overflow-x-auto pb-1"><button class="task-filter-btn active px-3 py-1 rounded-full text-xs font-medium bg-slate-800 text-white" data-filter="all">Todas</button><button class="task-filter-btn px-3 py-1 rounded-full text-xs font-medium bg-slate-100 text-slate-600" data-filter="overdue">Vencidas</button></div>
+          <div id="tasksList" class="space-y-4"></div>
+        </section>
+        <section id="notifications" class="section space-y-6">
+          <div class="p-4 rounded-3xl bg-white border shadow-sm"><h2 class="text-base font-semibold flex items-center gap-2"><i data-lucide="bell" class="w-5 h-5 text-blue-600"></i><span>Notificaciones</span></h2></div>
+          <div id="systemNotificationsList" class="space-y-3"></div>
+        </section>
+        <section id="payments" class="section space-y-6">
+          <div class="p-4 rounded-3xl bg-white border shadow-sm"><h2 class="text-base font-semibold flex items-center gap-2"><i data-lucide="credit-card" class="w-5 h-5 text-teal-600"></i><span>Mensualidad</span></h2></div>
+          <div class="bg-white rounded-3xl border shadow-sm p-4">
+            <form id="parentPaymentForm" class="space-y-4">
+              <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <label class="text-xs text-slate-500">Mes</label>
+                  <select id="ppMonth" class="w-full px-3 py-2 rounded-xl border">
+                    <option>Enero</option><option>Febrero</option><option>Marzo</option><option>Abril</option>
+                    <option>Mayo</option><option>Junio</option><option>Julio</option><option>Agosto</option>
+                    <option>Septiembre</option><option>Octubre</option><option>Noviembre</option><option>Diciembre</option>
+                  </select>
+                </div>
+                <div>
+                  <label class="text-xs text-slate-500">Monto</label>
+                  <input id="ppAmount" type="number" class="w-full px-3 py-2 rounded-xl border" placeholder="0" />
+                </div>
+                <div>
+                  <label class="text-xs text-slate-500">Banco</label>
+                  <input id="ppBank" class="w-full px-3 py-2 rounded-xl border" placeholder="Banco" />
+                </div>
+                <div>
+                  <label class="text-xs text-slate-500">Referencia</label>
+                  <input id="ppRef" class="w-full px-3 py-2 rounded-xl border" placeholder="0000000000" />
+                </div>
+                <div>
+                  <label class="text-xs text-slate-500">Fecha de transferencia</label>
+                  <input id="ppDate" type="date" class="w-full px-3 py-2 rounded-xl border" />
+                </div>
+                <div>
+                  <label class="text-xs text-slate-500">Comprobante</label>
+                  <input id="ppEvidence" type="file" accept="image/*" class="w-full px-3 py-2 rounded-xl border" />
+                </div>
               </div>
-              <p id="attendanceAbsentCount" class="text-xl font-bold text-slate-800">0</p>
+              <div class="flex justify-end gap-2">
+                <button type="submit" class="px-4 py-2 rounded-xl bg-teal-600 text-white">Enviar</button>
+              </div>
+            </form>
+            <div class="mt-6">
+              <h3 class="text-sm font-semibold mb-2">Historial</h3>
+              <table class="w-full text-sm text-left">
+                <thead class="bg-slate-50">
+                  <tr><th class="px-3 py-2">Mes</th><th class="px-3 py-2">Monto</th><th class="px-3 py-2">Estado</th><th class="px-3 py-2">Evidencia</th></tr>
+                </thead>
+                <tbody id="parentPaymentsTable" class="divide-y"></tbody>
+              </table>
             </div>
           </div>
-        </div>
-      </div>
-    </section>
+        </section>
+        <section id="profile" class="section space-y-6">
+          <div class="p-4 rounded-3xl bg-white border shadow-sm"><h2 class="text-base font-semibold flex items-center gap-2"><i data-lucide="user" class="w-5 h-5 text-slate-600"></i><span>Perfil</span></h2></div>
+          <div class="bg-white rounded-3xl border shadow-sm p-4 space-y-6">
+            <div class="flex items-center gap-4">
+              <img id="profilePhotoPreview" src="img/mundo.jpg" class="w-20 h-20 rounded-full object-cover border" />
+              <div class="flex-1 grid grid-cols-2 gap-3">
+                <div class="col-span-2">
+                  <label class="text-xs text-slate-500">Subir foto</label>
+                  <input id="profilePhotoUpload" type="file" class="w-full border rounded-xl p-2 text-sm" />
+                </div>
+                <div>
+                  <label class="text-xs text-slate-500">Nombre del Estudiante</label>
+                  <input id="inputStudentName" type="text" class="w-full px-3 py-2 rounded-xl border" placeholder="Nombre" />
+                </div>
+                <div>
+                  <label class="text-xs text-slate-500">Año de Nacimiento</label>
+                  <input id="inputBirthYear" type="number" class="w-full px-3 py-2 rounded-xl border" placeholder="2000" />
+                </div>
+                <div class="col-span-2">
+                  <span class="inline-block text-xs px-2 py-1 bg-green-100 text-green-700 rounded-full">Estudiante activo</span>
+                </div>
+              </div>
+            </div>
 
-    <!-- B. AULA Y CURSO (Comunicación académica) -->
-    <section id="tab-class" class="section space-y-4">
-      <div class="flex items-center justify-between">
-        <h2 class="text-base font-semibold flex items-center gap-2">
-          <i data-lucide="layout-dashboard" class="w-5 h-5 text-karpus-green"></i>
-          <span>Muro del Aula</span>
-        </h2>
-        <span class="text-xs px-2 py-1 bg-slate-100 rounded text-slate-500">Solo lectura</span>
-      </div>
-      <div class="text-xs text-slate-600">Comunicación académica: anuncios, materiales y notas de la maestra.</div>
-      <div id="classFeed" class="space-y-4"></div>
-    </section>
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div class="bg-slate-50 rounded-2xl p-4 border">
+                <p class="text-sm font-semibold">Padre/Madre Principal</p>
+                <div class="grid grid-cols-2 gap-3 mt-3">
+                  <div class="col-span-2">
+                    <label class="text-xs text-slate-500">Nombre Completo</label>
+                    <input id="inputParent1Name" type="text" class="w-full px-3 py-2 rounded-xl border" placeholder="..." />
+                  </div>
+                  <div>
+                    <label class="text-xs text-slate-500">Teléfono</label>
+                    <input id="inputParent1Phone" type="text" class="w-full px-3 py-2 rounded-xl border" placeholder="..." />
+                  </div>
+                  <div>
+                    <label class="text-xs text-slate-500">Correo Electrónico</label>
+                    <input id="inputParent1Email" type="email" class="w-full px-3 py-2 rounded-xl border" placeholder="..." />
+                  </div>
+                  <div>
+                    <label class="text-xs text-slate-500">Ocupación</label>
+                    <input id="inputParent1Occupation" type="text" class="w-full px-3 py-2 rounded-xl border" placeholder="..." />
+                  </div>
+                  <div>
+                    <label class="text-xs text-slate-500">Dirección</label>
+                    <input id="inputParent1Address" type="text" class="w-full px-3 py-2 rounded-xl border" placeholder="..." />
+                  </div>
+                  <div class="col-span-2">
+                    <label class="text-xs text-slate-500">Contacto de Emergencia</label>
+                    <input id="inputParent1Emergency" type="text" class="w-full px-3 py-2 rounded-xl border" placeholder="..." />
+                  </div>
+                </div>
+              </div>
+              <div class="bg-slate-50 rounded-2xl p-4 border">
+                <p class="text-sm font-semibold">Padre/Madre Secundario</p>
+                <div class="grid grid-cols-2 gap-3 mt-3">
+                  <div class="col-span-2">
+                    <label class="text-xs text-slate-500">Nombre Completo</label>
+                    <input id="inputParent2Name" type="text" class="w-full px-3 py-2 rounded-xl border" placeholder="..." />
+                  </div>
+                  <div>
+                    <label class="text-xs text-slate-500">Teléfono</label>
+                    <input id="inputParent2Phone" type="text" class="w-full px-3 py-2 rounded-xl border" placeholder="..." />
+                  </div>
+                  <div>
+                    <label class="text-xs text-slate-500">Correo Electrónico</label>
+                    <input id="inputParent2Email" type="email" class="w-full px-3 py-2 rounded-xl border" placeholder="..." />
+                  </div>
+                  <div>
+                    <label class="text-xs text-slate-500">Ocupación</label>
+                    <input id="inputParent2Occupation" type="text" class="w-full px-3 py-2 rounded-xl border" placeholder="..." />
+                  </div>
+                  <div>
+                    <label class="text-xs text-slate-500">Dirección</label>
+                    <input id="inputParent2Address" type="text" class="w-full px-3 py-2 rounded-xl border" placeholder="..." />
+                  </div>
+                  <div class="col-span-2">
+                    <label class="text-xs text-slate-500">Contacto de Emergencia</label>
+                    <input id="inputParent2Emergency" type="text" class="w-full px-3 py-2 rounded-xl border" placeholder="..." />
+                  </div>
+                </div>
+              </div>
+            </div>
 
-    <!-- C. TAREAS -->
-    <section id="tab-tasks" class="section space-y-4">
-      <div class="flex items-center justify-between">
-        <h2 class="text-base font-semibold flex items-center gap-2">
-          <i data-lucide="clipboard-list" class="w-5 h-5 text-karpus-orange"></i>
-          <span>Actividades</span>
-        </h2>
-      </div>
-      <p class="text-xs text-slate-600">🎯 Objetivo: Gestionar entregas y responsabilidades.</p>
-      <!-- Filtros de Tareas -->
-      <div class="flex gap-2 overflow-x-auto pb-1">
-        <button class="task-filter-btn active px-3 py-1 rounded-full text-xs font-medium bg-slate-800 text-white" data-filter="all">Todas</button>
-        <button class="task-filter-btn px-3 py-1 rounded-full text-xs font-medium bg-slate-100 text-slate-600" data-filter="pending">Pendientes</button>
-        <button class="task-filter-btn px-3 py-1 rounded-full text-xs font-medium bg-slate-100 text-slate-600" data-filter="submitted">Entregadas</button>
-        <button class="task-filter-btn px-3 py-1 rounded-full text-xs font-medium bg-slate-100 text-slate-600" data-filter="overdue">Vencidas</button>
-      </div>
-      <div class="text-xs text-slate-600">Vista recomendada: Tarjetas o tabla con 📄 Tarea • 📅 Fecha límite • ⏳ Estado. Las entregas se registran a nombre del estudiante.</div>
-      <div id="tasksList" class="space-y-4"></div>
-    </section>
+            <div class="bg-slate-50 rounded-2xl p-4 border">
+              <p class="text-sm font-semibold">Información Adicional</p>
+              <div class="grid grid-cols-2 gap-3 mt-3">
+                <div>
+                  <label class="text-xs text-slate-500">Aula Asignada</label>
+                  <input id="inputClassroom" type="text" class="w-full px-3 py-2 rounded-xl border" placeholder="..." />
+                </div>
+                <div>
+                  <label class="text-xs text-slate-500">Fecha de Ingreso</label>
+                  <input id="inputEntryDate" type="text" class="w-full px-3 py-2 rounded-xl border" placeholder="15 de Febrero, 2024" />
+                </div>
+                <div>
+                  <label class="text-xs text-slate-500">Alergias/Condiciones</label>
+                  <input id="inputAllergies" type="text" class="w-full px-3 py-2 rounded-xl border" placeholder="-" />
+                </div>
+                <div>
+                  <label class="text-xs text-slate-500">Autorizado para Recoger</label>
+                  <input id="inputPickup" type="text" class="w-full px-3 py-2 rounded-xl border" placeholder="..." />
+                </div>
+                <div>
+                  <label class="text-xs text-slate-500">Tipo de Sangre</label>
+                  <input id="inputBloodType" type="text" class="w-full px-3 py-2 rounded-xl border" placeholder="O positivo" />
+                </div>
+              </div>
+            </div>
 
-    <!-- D. DESARROLLO -->
-    <section id="tab-grades" class="section space-y-6">
-      <div class="flex items-center justify-between">
-        <h2 class="text-xl font-bold text-slate-800 flex items-center gap-2">
-          <i data-lucide="award" class="w-6 h-6 text-karpus-blue"></i>
-          Desarrollo Infantil
-        </h2>
-        <button id="downloadGradesBtn" aria-label="Descargar reporte de desarrollo en PDF" class="text-xs px-3 py-2 bg-white border border-slate-200 text-slate-700 rounded-xl flex items-center gap-2 hover:bg-slate-50 hover:text-karpus-blue transition-colors shadow-sm">
-          <i data-lucide="file-down" class="w-4 h-4"></i> Descargar PDF
-        </button>
-      </div>
-      <div class="flex items-center gap-2 text-sm">
-        <span class="text-slate-600">Progreso:</span>
-        <span id="gradesAverageBadge" class="px-2 py-1 rounded-full bg-slate-100 text-slate-700">—</span>
-        <span class="text-xs text-slate-400">Código de color: Rojo &lt; 70 • Verde ≥ 70</span>
-      </div>
-      
-      <div class="bg-white rounded-3xl border shadow-sm overflow-hidden">
-        <table class="w-full text-sm text-left" id="gradesTable">
-          <thead class="bg-slate-50 text-slate-500 font-medium border-b">
-            <tr><th class="p-4">Área / Actividad</th><th class="p-4 text-center">Progreso</th><th class="p-4">Observación</th></tr>
-          </thead>
-          <tbody id="gradesTableBody" class="divide-y divide-slate-100"></tbody>
-        </table>
-      </div>
-    </section>
-
-    <!-- F. NOTIFICACIONES Y MENSAJES -->
-    <section id="tab-notifications" class="section space-y-6">
-      <!-- 1. Notificaciones del Sistema -->
-      <div class="modern-card p-4 rounded-3xl">
-        <h2 class="text-base font-semibold flex items-center gap-2 mb-3">
-          <i data-lucide="bell" class="w-5 h-5 text-karpus-orange"></i>
-          <span>Notificaciones</span>
-        </h2>
-        <div id="systemNotificationsList" class="space-y-3 max-h-60 overflow-y-auto pr-2">
-          <!-- Renderizado por JS -->
-        </div>
-      </div>
-
-      <!-- 2. Mensajería -->
-      <div class="modern-card p-4 rounded-3xl">
-        <h2 class="text-base font-semibold flex items-center gap-2 mb-2">
-          <i data-lucide="message-square" class="w-5 h-5 text-karpus-pink"></i>
-          <span>Mensajes Privados</span>
-        </h2>
-        <p class="text-xs text-slate-600 mb-4">Chat institucional con Maestra y Administración.</p>
-        
-        <div class="grid md:grid-cols-3 gap-4 h-[400px]">
-          <div class="md:col-span-1 border-r pr-2 flex flex-col">
-            <input id="contactFilter" aria-label="Filtrar contacto" class="w-full border rounded-xl px-3 py-2 text-sm mb-3 bg-slate-50" placeholder="Buscar contacto..." />
-            <div id="contactList" class="flex-1 space-y-1 overflow-y-auto"></div>
-          </div>
-          <div class="md:col-span-2 flex flex-col pl-2">
-            <div id="chatHeader" class="text-sm font-bold border-b pb-2 mb-2">Selecciona un chat</div>
-            <div id="chatMessages" class="flex-1 space-y-3 overflow-y-auto p-2 bg-slate-50/50 rounded-xl mb-3"></div>
-            <div class="flex gap-2 items-center">
-              <input id="chatInput" class="flex-1 border rounded-xl px-3 py-2 text-sm focus:ring-2 focus:ring-karpus-pink outline-none" placeholder="Escribe un mensaje..." />
-              <button id="chatSend" class="p-2 bg-karpus-pink text-white rounded-xl hover:bg-pink-600 transition shadow-sm">
-                <i data-lucide="send" class="w-4 h-4"></i>
-              </button>
+            <div class="flex justify-end">
+              <button id="saveProfileBtn" class="px-4 py-2 rounded-xl bg-slate-800 text-white">Guardar Perfil</button>
             </div>
           </div>
-        </div>
-      </div>
-    </section>
-    
-
-    <!-- G. PERFIL -->
-    <section id="tab-profile" class="section space-y-4">
-      <!-- Datos del Estudiante -->
-      <div class="p-4 rounded-3xl bg-white shadow-soft border">
-        <h3 class="text-sm font-semibold text-slate-500 mb-3 uppercase tracking-wider">Datos del Estudiante</h3>
-        <div class="flex items-center gap-4">
-          <img id="profileStudentAvatar" src="img/mundo.jpg" alt="Foto del estudiante" class="w-16 h-16 rounded-2xl object-cover" />
-          <div>
-            <h3 id="profileStudentName" class="text-base font-semibold">—</h3>
-            <p id="profileStudentMeta" class="text-sm text-slate-600">—</p>
-            <p id="profileStudentId" class="text-xs text-slate-400 mt-1">ID: —</p>
-          </div>
-        </div>
-      </div>
-      
-      <!-- Datos del Tutor -->
-      <div class="p-4 rounded-3xl bg-white shadow-soft border">
-        <h3 class="text-sm font-semibold text-slate-500 mb-3 uppercase tracking-wider">Datos del Tutor</h3>
-        <div class="space-y-2 text-sm">
-          <p><span class="font-medium">Nombre:</span> <span id="profileGuardianName">—</span></p>
-          <p><span class="font-medium">Relación:</span> <span id="profileGuardianRelation">—</span></p>
-          <p><span class="font-medium">Teléfono:</span> <span id="profileGuardianPhone">—</span></p>
-          <p><span class="font-medium">Email:</span> <span id="profileGuardianEmail">—</span></p>
-        </div>
-        <div class="mt-4 grid grid-cols-2 gap-2">
-          <button class="py-2 border rounded-xl text-xs text-slate-600 hover:bg-slate-50">Editar información</button>
-          <button class="py-2 border rounded-xl text-xs text-slate-600 hover:bg-slate-50">Seguridad de la cuenta</button>
-        </div>
-      </div>
-  </section>
-  <div id="emojiMenu" class="hidden border rounded p-2"></div>
-  </main>
-
-  <!-- Modales -->
-  <div id="modalStats" class="hidden fixed inset-0 bg-black/30 flex items-end">
-    <div class="bg-white w-full rounded-t-3xl p-4 space-y-3">
-      <div class="flex justify-between items-center">
-        <h3 class="text-sm font-semibold">Estadísticas de asistencia</h3>
-        <button id="closeStats" class="text-slate-500">Cerrar</button>
-      </div>
-      <ul class="text-sm text-slate-700">
-        <li>Días asistidos: <span id="daysPresent">18</span></li>
-        <li>Días ausentes: <span id="daysAbsent">2</span></li>
-        <li>Total del mes: <span id="daysTotal">20</span></li>
-        <li>Última asistencia: <span id="lastAttendance">24 Oct</span></li>
-      </ul>
+        </section>
+      </main>
     </div>
   </div>
 
   <div id="modalSubmitTask" class="hidden fixed inset-0 bg-black/30 flex items-end">
     <div class="bg-white w-full rounded-t-3xl p-4 space-y-3">
-      <div class="flex justify-between items-center">
-        <h3 class="text-sm font-semibold">Subir evidencia</h3>
-        <button id="closeSubmitTask" class="text-slate-500">Cerrar</button>
-      </div>
+      <div class="flex justify-between items-center"><h3 class="text-sm font-semibold">Subir evidencia</h3><button id="closeSubmitTask" class="text-slate-500">Cerrar</button></div>
       <div id="submitTaskForm" class="space-y-3">
         <input id="taskComment" type="text" placeholder="Comentario (opcional)" class="w-full px-3 py-2 rounded-xl border" />
-        <label class="block text-xs text-slate-600">Adjuntar archivo (foto, video, doc)</label>
+        <label class="block text-xs text-slate-600">Adjuntar archivo</label>
         <input id="taskFile" type="file" class="w-full border rounded-xl p-2 text-sm" />
-        <p class="text-xs text-slate-500">Esta entrega se registrará a nombre del estudiante.</p>
-        <div class="flex gap-2">
-          <p id="taskTitleModal" class="text-sm font-semibold"></p>
-        </div>
-        <div class="text-xs text-slate-600">
-          <p>Enviado por: <span id="modal-submit-student">...</span></p>
-          <p>Supervisado por: <span id="modal-submit-parent">...</span></p>
-        </div>
-        <button id="submitTaskParent" class="w-full px-3 py-2 rounded-xl bg-karpus-orange text-white">Enviar Evidencia</button>
+        <div class="flex gap-2"><p id="taskTitleModal" class="text-sm font-semibold"></p></div>
+        <div class="text-xs text-slate-600"><p>Enviado por: <span id="modal-submit-student">...</span></p><p>Supervisado por: <span id="modal-submit-parent">...</span></p></div>
+        <button id="submitTaskParent" class="w-full px-3 py-2 rounded-xl bg-orange-500 text-white">Enviar Evidencia</button>
       </div>
     </div>
   </div>
 
-  <div id="modalTaskDetail" class="hidden fixed inset-0 bg-black/30 flex items-end">
-    <div class="bg-white w-full rounded-t-3xl p-4 space-y-3">
-      <div class="flex justify-between items-center">
-        <h3 class="text-sm font-semibold">Detalle de actividad</h3>
-        <button id="closeTaskDetail" class="text-slate-500">Cerrar</button>
-      </div>
-      <div class="space-y-3">
-        <div class="bg-white border rounded-2xl p-3">
-          <p class="text-xs text-slate-500">Actividad</p>
-          <p id="taskDetailTitle" class="text-sm font-semibold text-slate-800">—</p>
-        </div>
-        <div class="grid grid-cols-2 gap-3">
-          <div class="bg-white border rounded-2xl p-3">
-            <p class="text-xs text-slate-500">Fecha sugerida</p>
-            <p id="taskDetailDue" class="text-sm font-medium text-slate-800">—</p>
-          </div>
-          <div class="bg-white border rounded-2xl p-3">
-            <p class="text-xs text-slate-500">Estado</p>
-            <span id="taskDetailStatus" class="text-xs px-2 py-1 rounded bg-slate-100 text-slate-700">—</span>
-          </div>
-        </div>
-        <div class="bg-white border rounded-2xl p-3">
-          <p class="text-xs text-slate-500">Observación</p>
-          <p id="taskDetailNote" class="text-sm text-slate-700">—</p>
-        </div>
-      </div>
-    </div>
-  </div>
-
-  <div id="modalProfileView" class="hidden fixed inset-0 bg-black/30 flex items-end">
-    <div class="bg-white w-full rounded-t-3xl p-4 space-y-3">
-      <div class="flex justify-between items-center">
-        <h3 id="modalProfileTitle" class="text-sm font-semibold">Perfil</h3>
-        <button id="closeProfileView" class="text-slate-500">Cerrar</button>
-      </div>
-      <div class="flex items-center gap-4">
-        <img id="modalProfileAvatar" src="https://placehold.co/200x200" alt="Avatar" class="w-16 h-16 rounded-2xl object-cover" />
-        <div>
-          <h4 id="modalProfileName" class="text-base font-semibold">Nombre</h4>
-          <p id="modalProfileRole" class="text-sm text-slate-600">Rol</p>
-        </div>
-      </div>
-      <p id="modalProfileBio" class="text-sm text-slate-700 pt-3 border-t mt-3"></p>
-      <button id="sendMessageToProfile" class="hidden mt-3 w-full px-3 py-2 rounded-xl bg-karpus-pink text-white text-sm flex items-center justify-center gap-2">
-        <i data-lucide="message-circle" class="w-4 h-4"></i>
-        Enviar Mensaje
-      </button>
-    </div>
-  </div>
-
-  <!-- Script -->
-  </div>
-  </div>
-  <script type="module" src="js/padres_patch.js?v=2"></script>
+  <script type="module" src="js/supabase.js"></script>
   <script src="js/common_ui.js"></script>
-  <script>
-    if (window.lucide && typeof lucide.createIcons === 'function') {
-      lucide.createIcons();
-    }
-  </script>
+  <script src="js/panel_padres.js?v=4"></script>
+  <script>if(window.lucide&&typeof lucide.createIcons==='function'){lucide.createIcons();}</script>
 </body>
 </html>

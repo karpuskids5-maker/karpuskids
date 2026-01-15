@@ -4,9 +4,18 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>Karpus Kids — Panel Asistente</title>
-  <link rel="icon" href="logo/favicon.ico" type="image/x-icon">
+  <link rel="icon" href="./logo/favicon.ico" type="image/x-icon">
   <script src="https://cdn.tailwindcss.com"></script>
-  <script src="https://unpkg.com/lucide@latest/dist/umd/lucide.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/lucide@0.562.0/dist/umd/lucide.min.js"></script>
+  <script>
+    (function(){
+      if(!(window.lucide && typeof lucide.createIcons==='function')){
+        var s=document.createElement('script');
+        s.src='https://unpkg.com/lucide@0.562.0/dist/umd/lucide.min.js';
+        s.async=true;document.head.appendChild(s);
+      }
+    })();
+  </script>
   
   <style>
     #sidebar { transform: translateX(-100%); transition: transform .3s ease; }
@@ -97,9 +106,9 @@
           <i data-lucide="users"></i>
           <span class="label">Estudiantes</span>
         </button>
-        <button data-section="asistencia" class="nav-btn w-full flex items-center p-3 rounded-lg text-white hover:bg-white/20 transition-colors">
-          <i data-lucide="calendar-check"></i>
-          <span class="label">Asistencia</span>
+        <button data-section="maestros" class="nav-btn w-full flex items-center p-3 rounded-lg text-white hover:bg-white/20 transition-colors">
+          <i data-lucide="graduation-cap"></i>
+          <span class="label">Maestros</span>
         </button>
         <button data-section="accesos" class="nav-btn w-full flex items-center p-3 rounded-lg text-white hover:bg-white/20 transition-colors">
           <i data-lucide="door-open"></i>
@@ -203,14 +212,23 @@
         </div>
       </section>
 
-      <!-- ASISTENCIA -->
-      <section id="asistencia" class="section">
-        <h2 class="text-xl font-bold mb-6">Registro de Asistencia</h2>
-        <div class="bg-white rounded-xl shadow-sm border p-6">
-          <p class="text-slate-500 mb-4">Seleccione un aula para ver la asistencia del día.</p>
-          <div id="attendanceRoomsGrid" class="grid grid-cols-1 md:grid-cols-3 gap-4">
-            <!-- JS -->
-          </div>
+      <section id="maestros" class="section">
+        <div class="flex justify-between items-center mb-6">
+          <h2 class="text-xl font-bold">Gestión de Maestros</h2>
+          <button id="btnNewTeacher" class="bg-teal-600 text-white px-4 py-2 rounded-lg hover:bg-teal-700 transition-colors text-sm font-medium flex items-center gap-2"><i data-lucide="plus" class="w-4 h-4"></i>Nuevo</button>
+        </div>
+        <div class="bg-white rounded-2xl shadow-sm border overflow-hidden">
+          <table class="w-full text-sm text-left">
+            <thead class="bg-slate-50 text-slate-500 font-medium">
+              <tr>
+                <th class="px-6 py-4">Nombre</th>
+                <th class="px-6 py-4">Correo</th>
+                <th class="px-6 py-4">Teléfono</th>
+                <th class="px-6 py-4">Acciones</th>
+              </tr>
+            </thead>
+            <tbody id="teachersTableBody" class="divide-y divide-slate-100"></tbody>
+          </table>
         </div>
       </section>
 
@@ -250,6 +268,25 @@
             </button>
           </div>
         </div>
+        <div class="bg-white rounded-2xl shadow-sm border p-4 mb-6">
+          <div class="flex items-center justify-between mb-4">
+            <h3 class="font-semibold">Recordatorios de Pago</h3>
+            <button id="btnSendReminders" class="px-3 py-2 rounded bg-amber-600 text-white text-sm">Enviar ahora</button>
+          </div>
+          <div class="grid grid-cols-1 md:grid-cols-3 gap-3">
+            <div>
+              <label class="text-sm text-slate-600">Día del mes</label>
+              <input id="reminderDay" type="number" min="1" max="28" class="w-full border rounded px-3 py-2" placeholder="5" />
+            </div>
+            <div class="md:col-span-2">
+              <label class="text-sm text-slate-600">Mensaje</label>
+              <input id="reminderMessage" class="w-full border rounded px-3 py-2" placeholder="Recuerde enviar su pago mensual" />
+            </div>
+          </div>
+          <div class="flex justify-end mt-3">
+            <button id="btnSaveReminder" class="px-3 py-2 rounded bg-teal-600 text-white text-sm">Guardar</button>
+          </div>
+        </div>
         <div class="bg-white rounded-2xl shadow-sm border overflow-hidden">
           <div class="overflow-x-auto">
           <table class="w-full text-sm text-left">
@@ -257,8 +294,13 @@
               <tr>
                 <th class="px-6 py-4">Estudiante</th>
                 <th class="px-6 py-4">Monto</th>
+                <th class="px-6 py-4">Método</th>
+                <th class="px-6 py-4">Estado</th>
+                <th class="px-6 py-4">Banco</th>
+                <th class="px-6 py-4">Referencia</th>
                 <th class="px-6 py-4">Fecha</th>
-                <th class="px-6 py-4">Mes Pagado</th>
+                <th class="px-6 py-4">Mes</th>
+                <th class="px-6 py-4">Evidencia</th>
                 <th class="px-6 py-4">Acciones</th>
               </tr>
             </thead>
@@ -308,6 +350,31 @@
               <option value="Noviembre">Noviembre</option>
               <option value="Diciembre">Diciembre</option>
             </select>
+          </div>
+          <div>
+            <label class="block text-sm font-medium text-slate-600 mb-1">Método</label>
+            <select id="paymentMethod" class="w-full border-slate-300 rounded-lg shadow-sm focus:border-teal-500 focus:ring-teal-500">
+              <option value="transferencia">Transferencia</option>
+              <option value="efectivo">Efectivo</option>
+            </select>
+          </div>
+          <div id="transferFields">
+            <div>
+              <label class="block text-sm text-slate-600 mb-1">Banco</label>
+              <input id="paymentBank" class="w-full border-slate-300 rounded-lg shadow-sm" placeholder="Banco">
+            </div>
+            <div>
+              <label class="block text-sm text-slate-600 mb-1">Referencia</label>
+              <input id="paymentRef" class="w-full border-slate-300 rounded-lg shadow-sm" placeholder="0000000000">
+            </div>
+            <div>
+              <label class="block text-sm text-slate-600 mb-1">Fecha de transferencia</label>
+              <input type="date" id="paymentDate" class="w-full border-slate-300 rounded-lg shadow-sm">
+            </div>
+            <div>
+              <label class="block text-sm text-slate-600 mb-1">Evidencia</label>
+              <input type="file" id="paymentEvidence" accept="image/*" class="w-full border-slate-300 rounded-lg shadow-sm">
+            </div>
           </div>
           <div class="pt-4 flex justify-end gap-3">
             <button type="button" id="cancelPayment" class="px-4 py-2 rounded-lg bg-slate-100 hover:bg-slate-200 text-sm font-medium">Cancelar</button>

@@ -199,7 +199,7 @@ const UI = {
       target.classList.add('active');
       document.getElementById('sidebar')?.classList.remove('show');
       if (id === 'estudiantes') this.loadStudents();
-      if (id === 'asistencia') this.loadAttendanceRooms();
+      if (id === 'maestros') this.loadTeachers();
       if (id === 'pagos') this.loadPayments();
       if (id === 'accesos') this.loadAccessLogs();
     }
@@ -268,8 +268,8 @@ const UI = {
         <tr class="hover:bg-slate-50 transition-colors border-b last:border-0">
           <td class="px-6 py-4 font-medium text-slate-800 flex items-center gap-3">
             <img 
-              src="./img/students/${s.photo || 'default-avatar.png'}" 
-              onerror="this.src='./img/students/default-avatar.png'" 
+              src="${s.photo ? './img/students/' + s.photo : './img/mundo.jpg'}" 
+              onerror="this.src='./img/mundo.jpg'" 
               class="w-10 h-10 rounded-full object-cover border"
               alt="${s.name}"
             />
@@ -558,6 +558,13 @@ const UI = {
     modal.classList.remove('hidden');
     modal.classList.add('flex');
     this.loadStudentsIntoSelect();
+    const methodSel = document.getElementById('paymentMethod');
+    const tf = document.getElementById('transferFields');
+    if (methodSel && tf) {
+      const update = ()=>{ tf.style.display = methodSel.value === 'transferencia' ? 'block' : 'none'; };
+      update();
+      methodSel.onchange = update;
+    }
   },
 
   closePaymentModal() {
@@ -597,14 +604,37 @@ const UI = {
     const amount = document.getElementById('paymentAmount').value;
     const month = document.getElementById('paymentMonth').value;
 
+    const method = (document.getElementById('paymentMethod')?.value || 'transferencia');
+    const bank = document.getElementById('paymentBank')?.value || null;
+    const reference = document.getElementById('paymentRef')?.value || null;
+    const transferDate = document.getElementById('paymentDate')?.value || null;
+    const evidence = document.getElementById('paymentEvidence')?.files?.[0] || null;
     if (!studentId || !amount || !month) {
       Helpers.toast('Complete todos los campos', 'error');
       return;
     }
 
     try {
+      let evidenceUrl = null;
+      if (method === 'transferencia' && evidence) {
+        const path = `${studentId}_${Date.now()}_${evidence.name}`;
+        const { error: upErr } = await supabase.storage.from('payments_evidence').upload(path, evidence, { upsert: false });
+        if (upErr) throw upErr;
+        const { data: pub } = await supabase.storage.from('payments_evidence').getPublicUrl(path);
+        evidenceUrl = pub?.publicUrl || null;
+      }
+      const status = method === 'efectivo' ? 'efectivo' : 'pendiente';
       const { error } = await supabase.from('payments').insert({
-        student_id: studentId, amount, month_paid: month, recorded_by: AppState.user.id
+        student_id: studentId,
+        amount,
+        month_paid: month,
+        method,
+        bank,
+        reference,
+        transfer_date: transferDate,
+        evidence_url: evidenceUrl,
+        status,
+        recorded_by: AppState.user.id
       });
 
       if (error) throw error;
@@ -628,7 +658,7 @@ const UI = {
     try {
       const { data: payments, error } = await supabase
         .from('payments')
-        .select('id, amount, month_paid, created_at, students(name)')
+        .select('id, amount, month_paid, created_at, method, status, bank, reference, transfer_date, evidence_url, students(name)')
         .order('created_at', { ascending: false })
         .limit(100);
 
@@ -639,16 +669,29 @@ const UI = {
         return;
       }
 
+      const badge = (st)=>{
+        if(st==='confirmado') return 'bg-green-100 text-green-700';
+        if(st==='rechazado') return 'bg-red-100 text-red-700';
+        if(st==='efectivo') return 'bg-blue-100 text-blue-700';
+        return 'bg-amber-100 text-amber-700';
+      };
       tbody.innerHTML = payments.map(p => `
         <tr class="hover:bg-slate-50 transition-colors border-b last:border-0">
           <td class="px-6 py-4 font-medium text-slate-800">${p.students?.name || 'Desconocido'}</td>
           <td class="px-6 py-4 text-slate-600">$${p.amount}</td>
-          <td class="px-6 py-4 text-slate-600">${new Date(p.created_at).toLocaleDateString()}</td>
+          <td class="px-6 py-4 text-slate-600">${p.method || '-'}</td>
+          <td class="px-6 py-4"><span class="px-2 py-1 rounded-full text-xs font-bold ${badge(p.status)}">${p.status}</span></td>
+          <td class="px-6 py-4 text-slate-600">${p.bank || '-'}</td>
+          <td class="px-6 py-4 text-slate-600">${p.reference || '-'}</td>
+          <td class="px-6 py-4 text-slate-600">${p.transfer_date || '-'}</td>
           <td class="px-6 py-4 text-slate-600">${p.month_paid}</td>
+          <td class="px-6 py-4">${p.evidence_url ? `<a href="${p.evidence_url}" target="_blank" class="text-blue-600">Ver</a>` : '-'}</td>
           <td class="px-6 py-4">
-            <button class="btn-delete-payment text-red-500 hover:text-red-700 transition" data-id="${p.id}" title="Eliminar">
-                <i data-lucide="trash-2" class="w-4 h-4"></i>
-            </button>
+            <div class="flex gap-2">
+              <button class="btn-confirm-payment px-2 py-1 rounded bg-green-100 text-green-700 text-xs" data-id="${p.id}">Confirmar</button>
+              <button class="btn-reject-payment px-2 py-1 rounded bg-red-100 text-red-700 text-xs" data-id="${p.id}">Rechazar</button>
+              <button class="btn-delete-payment text-red-500 hover:text-red-700 transition" data-id="${p.id}" title="Eliminar"><i data-lucide="trash-2" class="w-4 h-4"></i></button>
+            </div>
           </td>
         </tr>
       `).join('');
@@ -657,6 +700,27 @@ const UI = {
       console.error('Error cargando pagos:', error);
       tbody.innerHTML = `<tr><td colspan="5" class="text-center text-red-500 py-4">Error cargando datos</td></tr>`;
     }
+  },
+
+  async saveReminder() {
+    const day = Number(document.getElementById('reminderDay')?.value || '0');
+    const msg = document.getElementById('reminderMessage')?.value || '';
+    if (!day || !msg) { Helpers.toast('Complete recordatorio', 'error'); return; }
+    const { error } = await supabase.from('payment_reminders').insert({ day_of_month: day, message: msg, created_by: AppState.user.id });
+    if (error) { Helpers.toast('Error guardando', 'error'); return; }
+    Helpers.toast('Recordatorio guardado');
+  },
+
+  async sendRemindersNow() {
+    const month = new Date().toISOString().slice(0,7);
+    const { data: students } = await supabase.from('students').select('id, parent_id, name');
+    const { data: payments } = await supabase.from('payments').select('student_id, month_paid');
+    const paidSet = new Set((payments||[]).filter(p=>p.month_paid===month).map(p=>String(p.student_id)));
+    const pendingParents = (students||[]).filter(s=>!paidSet.has(String(s.id)) && s.parent_id);
+    for (const s of pendingParents) {
+      await supabase.rpc('send_notification', { p_user_id: s.parent_id, p_title: 'Recordatorio de pago', p_message: 'Recuerde enviar su pago mensual', p_type: 'alert', p_link: '/panel_padres.html' });
+    }
+    Helpers.toast('Recordatorios enviados');
   },
 
   async deletePayment(id) {
@@ -701,6 +765,22 @@ const UI = {
     a.click();
     a.remove();
     URL.revokeObjectURL(url);
+  },
+
+  async loadTeachers() {
+    const tbody = document.getElementById('teachersTableBody');
+    if (!tbody) return;
+    tbody.innerHTML = `<tr><td colspan="4" class="p-4">${Helpers.skeleton(3, 'h-12')}</td></tr>`;
+    const { data: teachers } = await supabase.from('profiles').select('id,name,email,phone').eq('role','maestra').order('name');
+    if (!teachers || !teachers.length) { tbody.innerHTML = `<tr><td colspan="4">${Helpers.emptyState('No hay maestros')}</td></tr>`; return; }
+    tbody.innerHTML = teachers.map(t=>`
+      <tr class="hover:bg-slate-50 transition-colors border-b last:border-0">
+        <td class="px-6 py-4 font-medium">${t.name}</td>
+        <td class="px-6 py-4">${t.email||'-'}</td>
+        <td class="px-6 py-4">${t.phone||'-'}</td>
+        <td class="px-6 py-4"><button class="px-2 py-1 rounded bg-slate-100 text-slate-700 text-xs">Ver</button></td>
+      </tr>
+    `).join('');
   }
 };
 
@@ -709,10 +789,30 @@ function refreshIcons() {
 }
 
 // Initialize
-document.addEventListener('DOMContentLoaded', () => {
+  document.addEventListener('DOMContentLoaded', () => {
     UI.init();
     refreshIcons();
-});
+    document.getElementById('btnNewPayment')?.addEventListener('click', ()=> UI.openPaymentModal());
+    document.getElementById('closePaymentModal')?.addEventListener('click', ()=> UI.closePaymentModal());
+    document.getElementById('cancelPayment')?.addEventListener('click', ()=> UI.closePaymentModal());
+    document.addEventListener('click', async (e)=>{
+      const cBtn = e.target.closest('.btn-confirm-payment');
+      const rBtn = e.target.closest('.btn-reject-payment');
+      if (cBtn) {
+        const id = cBtn.dataset.id;
+        await supabase.from('payments').update({ status: 'confirmado', validated_by: AppState.user.id }).eq('id', id);
+        UI.loadPayments();
+      }
+      if (rBtn) {
+        const id = rBtn.dataset.id;
+        const reason = prompt('Motivo del rechazo');
+        await supabase.from('payments').update({ status: 'rechazado', validated_by: AppState.user.id, notes: reason || null }).eq('id', id);
+        UI.loadPayments();
+      }
+    });
+    document.getElementById('btnSaveReminder')?.addEventListener('click', ()=> UI.saveReminder());
+    document.getElementById('btnSendReminders')?.addEventListener('click', ()=> UI.sendRemindersNow());
+  });
 
 // Expose UI for debugging or legacy inline calls if absolutely necessary
 window.UI = UI;

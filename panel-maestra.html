@@ -16,10 +16,14 @@
     aside#sidebar.collapsed { width: 72px; }
     aside#sidebar .label { transition: opacity .2s ease; }
     aside#sidebar.collapsed .label { opacity: 0; }
+    /* Icon clarity and size adjustments */
+    aside#sidebar nav i { transition: color .15s ease; filter:none; -webkit-font-smoothing: antialiased; backface-visibility: hidden; }
+    aside#sidebar.collapsed nav i { width: 28px; height: 28px; }
     
     /* Hover expand logic */
     aside#sidebar.collapsed:hover { width: 280px; }
     aside#sidebar.collapsed:hover .label { opacity: 1; }
+    aside#sidebar.collapsed:hover nav i { width: 24px; height: 24px; }
     
     /* mobile helper */
     .hidden-mobile { display: none !important; }
@@ -78,13 +82,9 @@
           <i data-lucide="home" class="w-5 h-5"></i>
           <span class="label">Mis Clases</span>
         </button>
-        <button data-section="t-students" class="w-full text-left px-3 py-2 rounded-lg hover:bg-white/40 flex items-center gap-3 text-green-900 transition-colors">
-          <i data-lucide="users" class="w-5 h-5"></i>
-          <span class="label">Alumnos</span>
-        </button>
-        <button data-section="t-attendance" class="w-full text-left px-3 py-2 rounded-lg hover:bg-white/40 flex items-center gap-3 text-green-900 transition-colors">
-          <i data-lucide="calendar-check" class="w-5 h-5"></i>
-          <span class="label">Asistencia</span>
+        <button id="logoutBtn" class="w-full text-left px-3 py-2 rounded-lg hover:bg-white/40 flex items-center gap-3 text-green-900 transition-colors">
+          <i data-lucide="log-out" class="w-5 h-5"></i>
+          <span class="label">Cerrar sesión</span>
         </button>
       </nav>
 
