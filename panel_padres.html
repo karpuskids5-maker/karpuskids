@@ -10,11 +10,11 @@
   <script src="https://unpkg.com/lucide@latest/dist/umd/lucide.min.js"></script>
   <link rel="icon" href="logo/favicon.ico" type="image/x-icon">
 </head>
-<body class="bg-slate-50 font-nunito text-slate-800">
+<body class="font-nunito text-slate-800 bg-gradient-to-br from-slate-50 via-sky-50 to-white">
 
   <div class="flex min-h-screen relative">
     <!-- SIDEBAR AZUL -->
-    <aside id="sidebar" class="sidebar-padres w-64 fixed inset-y-0 left-0 z-30 transition-all duration-300 flex flex-col shadow-xl">
+    <aside id="sidebar" class="w-64 fixed inset-y-0 left-0 z-30 transition-all duration-300 flex flex-col shadow-xl bg-gradient-to-b from-sky-400 to-blue-500 text-white">
       <div class="p-6 flex items-center gap-3">
         <div class="w-10 h-10 bg-white/20 rounded-xl flex items-center justify-center backdrop-blur-sm">
           <img src="img/mundo.jpg" class="w-8 h-8 rounded-lg object-cover" alt="Logo">
@@ -33,28 +33,28 @@
       </div>
 
       <nav class="flex-1 px-4 space-y-2 overflow-y-auto">
-        <button data-target="home" class="nav-btn active sidebar-btn">
+        <button data-target="home" class="sidebar-btn active">
           <i data-lucide="layout-dashboard" class="w-5 h-5"></i> Inicio
         </button>
-        <button data-target="live-attendance" class="nav-btn sidebar-btn">
+        <button data-target="live-attendance" class="sidebar-btn">
           <i data-lucide="calendar-check" class="w-5 h-5"></i> Asistencia
         </button>
-        <button data-target="tasks" class="nav-btn sidebar-btn">
+        <button data-target="tasks" class="sidebar-btn">
           <i data-lucide="clipboard-list" class="w-5 h-5"></i> Tareas
         </button>
-        <button data-target="class" class="nav-btn sidebar-btn">
+        <button data-target="class" class="sidebar-btn">
           <i data-lucide="users" class="w-5 h-5"></i> Muro de Clase
         </button>
-        <button data-target="grades" class="nav-btn sidebar-btn">
+        <button data-target="grades" class="sidebar-btn">
           <i data-lucide="graduation-cap" class="w-5 h-5"></i> Calificaciones
         </button>
-        <button data-target="payments" class="nav-btn sidebar-btn">
+        <button data-target="payments" class="sidebar-btn">
           <i data-lucide="credit-card" class="w-5 h-5"></i> Pagos
         </button>
-        <button data-target="notifications" class="nav-btn sidebar-btn">
+        <button data-target="notifications" class="sidebar-btn">
           <i data-lucide="bell" class="w-5 h-5"></i> Notificaciones
         </button>
-        <button data-target="profile" class="nav-btn sidebar-btn">
+        <button data-target="profile" class="sidebar-btn">
           <i data-lucide="user-circle" class="w-5 h-5"></i> Mi Perfil
         </button>
       </nav>
@@ -78,7 +78,7 @@
       <!-- Header Escritorio -->
       <header class="flex justify-between items-center mb-8">
         <div>
-          <h2 class="text-2xl font-bold text-slate-800">Hola, <span class="guardian-name-display text-blue-600">Familia</span> 👋</h2>
+          <h2 class="text-2xl font-bold text-slate-700">Hola, <span class="guardian-name-display text-sky-500">Familia</span> 👋</h2>
           <p class="text-slate-500" id="currentDateDisplay">Hoy es...</p>
         </div>
         <div class="flex items-center gap-4">
@@ -97,15 +97,15 @@
         <!-- HOME -->
         <section id="home" class="section active space-y-6">
           <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
-            <div class="bg-white p-6 rounded-2xl shadow-sm border border-slate-100">
+            <div class="bg-white p-6 rounded-2xl shadow-sm border border-slate-100 hover:shadow-md transition">
               <div class="flex items-center gap-4">
-                <div class="p-3 bg-green-100 text-green-600 rounded-xl"><i data-lucide="calendar-check"></i></div>
+                <div class="p-3 bg-sky-100 text-sky-600 rounded-2xl"><i data-lucide="calendar-check"></i></div>
                 <div><p class="text-sm text-slate-500">Asistencia Mensual</p><p class="text-2xl font-bold text-slate-800" id="dashAttendance">0%</p></div>
               </div>
             </div>
-            <div class="bg-white p-6 rounded-2xl shadow-sm border border-slate-100">
+            <div class="bg-white p-6 rounded-2xl shadow-sm border border-slate-100 hover:shadow-md transition">
               <div class="flex items-center gap-4">
-                <div class="p-3 bg-orange-100 text-orange-600 rounded-xl"><i data-lucide="clipboard-list"></i></div>
+                <div class="p-3 bg-emerald-100 text-emerald-600 rounded-2xl"><i data-lucide="clipboard-list"></i></div>
                 <div><p class="text-sm text-slate-500">Tareas Pendientes</p><p class="text-2xl font-bold text-slate-800" id="dashPendingTasks">0</p></div>
               </div>
             </div>
@@ -143,7 +143,7 @@
           <div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
             <!-- Formulario de Pago -->
             <div class="lg:col-span-1">
-              <div class="bg-white p-6 rounded-2xl shadow-sm border border-blue-100 sticky top-4">
+              <div class="bg-white p-6 rounded-2xl shadow-sm border border-sky-100 sticky top-4">
                 <h3 class="font-bold text-lg mb-4 flex items-center gap-2 text-slate-800">
                   <i data-lucide="plus-circle" class="text-blue-600"></i> Registrar Nuevo Pago
                 </h3>
@@ -167,7 +167,7 @@
                     <label class="block text-sm font-medium text-slate-600 mb-1">Comprobante (Foto/PDF)</label>
                     <input type="file" id="paymentFile" accept="image/*,application/pdf" class="w-full text-sm text-slate-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100">
                   </div>
-                  <button type="submit" class="w-full py-3 bg-blue-600 hover:bg-blue-700 text-white rounded-xl font-bold shadow-lg shadow-blue-200 transition-all">
+                  <button type="submit" class="w-full py-3 bg-sky-500 hover:bg-sky-600 text-white rounded-xl font-bold shadow-lg shadow-sky-200 transition-all">
                     Registrar Pago
                   </button>
                 </form>

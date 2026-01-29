@@ -1,18 +1,45 @@
 const Helpers = {
   toast: (m, t = 'success') => {
     const e = document.createElement('div');
-    const c = t === 'success' ? 'bg-[#22C55E]' : (t === 'error' ? 'bg-[#EF4444]' : 'bg-[#3B82F6]');
-    e.className = `fixed bottom-6 right-6 ${c} text-white px-4 py-2 rounded-xl shadow-lg z-50 transition-all`;
-    e.textContent = m;
+    const map = {
+      success: 'bg-emerald-400',
+      error: 'bg-rose-400',
+      info: 'bg-sky-400'
+    };
+    const c = map[t] || map.info;
+    e.className = `fixed bottom-6 right-6 ${c} text-white px-5 py-3 rounded-2xl shadow-xl flex items-center gap-2 z-50 transition-all`;
+    e.innerHTML = `<span class="text-sm font-semibold">${m}</span>`;
     document.body.appendChild(e);
     setTimeout(() => {
       e.style.opacity = '0';
-      e.style.transform = 'translateY(20px)';
+      e.style.transform = 'translateY(16px)';
       setTimeout(() => e.remove(), 300);
-    }, 3000);
+    }, 2800);
   },
-  emptyState: (msg, icon = 'smile') => `<div class="text-center py-10 text-[#1E293B]/50"><i data-lucide="${icon}" class="mx-auto mb-3 w-12 h-12 opacity-50"></i><p>${msg}</p></div>`,
-  skeleton: (n = 3, h = 'h-16') => Array(n).fill(0).map(() => `<div class="animate-pulse bg-[#F8FAFC] rounded-xl ${h} w-full mb-2"></div>`).join('')
+  iconHTML: (icon, cls) => {
+    const emoji = {
+      smile: '🙂',
+      clipboard: '📋',
+      'alert-circle': '⚠️',
+      'layout-dashboard': '🗂️',
+      'graduation-cap': '🎓',
+      'credit-card': '💳',
+      heart: '❤️',
+      'message-circle': '💬'
+    }[icon] || 'ℹ️';
+    if (window.lucide) return `<i data-lucide="${icon}" class="${cls}"></i>`;
+    return `<span class="${cls}">${emoji}</span>`;
+  },
+  emptyState: (msg, icon = 'smile') => `
+    <div class="text-center py-12 text-slate-400">
+      ${Helpers.iconHTML(icon, 'mx-auto mb-4 w-14 h-14 text-sky-300')}
+      <p class="text-sm font-medium">${msg}</p>
+    </div>
+  `,
+  skeleton: (n = 3, h = 'h-16') =>
+    Array(n).fill(0).map(() =>
+      `<div class="animate-pulse bg-sky-100/60 rounded-2xl ${h} w-full mb-3"></div>`
+    ).join('')
 };
 
 const AppState = {
@@ -207,12 +234,10 @@ const UI = {
       const percent = total ? Math.round((present / total) * 100) : 0;
       const da = document.getElementById('dashAttendance');
       if (da) da.textContent = `${percent}%`;
-      
       const ct = await window.supabase.from('tasks')
         .select('*', { count: 'exact', head: true })
         .eq('classroom_id', AppState.currentStudent.classroom_id)
-        .eq('status', 'pending');
-        
+        .gte('due_date', new Date().toISOString());
       const dp = document.getElementById('dashPendingTasks');
       if (dp) dp.textContent = String(ct.count || 0);
     } catch (e) {
@@ -242,11 +267,11 @@ const UI = {
       for (let d = 1; d <= days; d++) {
         const key = new Date(AppState.currentDate.getFullYear(), AppState.currentDate.getMonth(), d).toISOString().split('T')[0];
         const st = map.get(key);
-        let bg = 'bg-[#F8FAFC]', tx = 'text-[#1E293B]';
-        if (st === 'present') bg = 'bg-[#22C55E]/20', tx = 'text-[#22C55E] font-bold';
-        else if (st === 'absent') bg = 'bg-[#EF4444]/20', tx = 'text-[#EF4444] font-bold';
-        else if (st === 'late') bg = 'bg-[#FACC15]/20', tx = 'text-[#FACC15] font-bold';
-        html += `<div class="${bg} ${tx} rounded-lg p-2 text-center text-sm transition-colors flex items-center justify-center aspect-square border">${d}</div>`;
+        let bg = 'bg-sky-50', tx = 'text-slate-600';
+        if (st === 'present') { bg = 'bg-emerald-100'; tx = 'text-emerald-700 font-semibold'; }
+        else if (st === 'absent') { bg = 'bg-rose-100'; tx = 'text-rose-700 font-semibold'; }
+        else if (st === 'late') { bg = 'bg-amber-100'; tx = 'text-amber-700 font-semibold'; }
+        html += `<div class="${bg} ${tx} rounded-lg p-2 text-center text-sm transition-colors flex items-center justify-center aspect-square">${d}</div>`;
       }
       grid.innerHTML = html;
     } catch (e) {
@@ -270,7 +295,7 @@ const UI = {
         list.innerHTML = Helpers.emptyState('No hay tareas', 'clipboard');
         return;
       }
-      list.innerHTML = tasks.map(t => `<div class="card-clean p-4"><h4 class="font-bold text-[#1E293B]">${t.title}</h4><p class="text-sm text-[#1E293B]/70">${t.description || ''}</p><div class="mt-2 flex gap-2"><button class="open-submit-btn px-3 py-1 rounded-xl bg-[#3B82F6] text-white text-xs hover:bg-[#BFDBFE] hover:text-[#1E293B] transition-colors" data-task-id="${t.id}" data-task-title="${t.title}">Subir evidencia</button></div></div>`).join('');
+      list.innerHTML = tasks.map(t => `<div class="card-clean p-4"><h4 class="font-bold text-[#1E293B]">${t.title}</h4><p class="text-sm text-[#1E293B]/70">${t.description || ''}</p><div class="mt-2 flex gap-2"><button class="open-submit-btn px-4 py-2 rounded-xl bg-sky-400 text-white text-xs font-semibold hover:bg-sky-500 transition" data-task-id="${t.id}" data-task-title="${t.title}">Subir evidencia</button></div></div>`).join('');
       
       if (window.lucide) window.lucide.createIcons();
     } catch (e) {
@@ -365,7 +390,7 @@ const UI = {
         return `
           <div class="card-clean p-4 mb-4">
             <div class="flex items-center gap-3 mb-3">
-              <div class="w-10 h-10 bg-blue-100 rounded-full flex items-center justify-center text-blue-700 font-bold">
+              <div class="w-10 h-10 bg-sky-100 rounded-full flex items-center justify-center text-sky-700 font-bold">
                 ${p.profiles?.name?.charAt(0) || 'D'}
               </div>
               <div>
@@ -477,8 +502,8 @@ const UI = {
             <p class="text-xs text-slate-500">${new Date(p.created_at).toLocaleDateString()} • ${p.method}</p>
           </div>
           <span class="px-3 py-1 rounded-full text-xs font-bold ${
-            p.status === 'confirmado' ? 'bg-green-100 text-green-700' : 
-            (p.status === 'rechazado' ? 'bg-red-100 text-red-700' : 'bg-yellow-100 text-yellow-700')
+            p.status === 'confirmado' ? 'bg-emerald-100 text-emerald-700' : 
+            (p.status === 'rechazado' ? 'bg-rose-100 text-rose-700' : 'bg-amber-100 text-amber-700')
           }">
             ${p.status.toUpperCase()}
           </span>

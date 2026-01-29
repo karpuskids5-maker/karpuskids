@@ -43,27 +43,6 @@ aside#sidebar.collapsed .label { opacity: 0; }
 /* Reemplazamos sidebar-sky por el estilo Brand */
 .sidebar-brand { background: linear-gradient(180deg, #FCE7F3 0%, #FFF7FB 100%); border-right: 1px solid #FBCFE8; }
 
-/* NUEVO: Sidebar específico para Panel Padres (Azul) */
-.sidebar-padres {
-  background: linear-gradient(180deg, #2563EB 0%, #1E40AF 100%); /* Azul intenso */
-  color: white;
-}
-.sidebar-padres .nav-btn {
-  color: rgba(255, 255, 255, 0.9);
-}
-.sidebar-padres .nav-btn:hover, .sidebar-padres .nav-btn.active {
-  background: #FFFFFF;
-  color: #1E40AF; /* Texto azul al hacer hover */
-  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.2);
-}
-.sidebar-padres .nav-btn:hover i, .sidebar-padres .nav-btn.active i {
-  color: #1E40AF; /* Icono azul al hacer hover */
-}
-
-.sidebar-padres .nav-btn.active::before {
-  background: #1E40AF;
-}
-
 .karpus-kids-inline { font-weight: 700; }
 .karpus-kids-inline .k-1 { color: #FF9800; }
 .karpus-kids-inline .k-2 { color: #2196F3; }
@@ -102,50 +81,26 @@ aside#sidebar.collapsed .label { opacity: 0; }
 @media (max-width: 768px) { #layoutShell { margin-left: 0 !important; } }
 
 /* Botones */
-.toggle-btn-padres {
-  background-color: var(--color-primary); color: white;
-  border: 2px solid var(--color-primary-soft);
-  box-shadow: 0 4px 6px -1px rgba(236, 72, 153, 0.35);
-  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-}
-.toggle-btn-padres:hover { background-color: #1D4ED8; transform: scale(1.1); }
-
 /* Sidebar Buttons */
 .sidebar-btn {
-  position: relative; width: 100%; text-align: left;
-  padding: 12px 16px; border-radius: 12px;
-  display: flex; align-items: center; gap: 10px;
-  font-size: 16px; color: var(--color-text);
-  transition: transform .2s ease, background .25s ease, color .25s ease;
-  overflow: hidden;
-}
-.sidebar-btn::before {
-  content: ''; position: absolute; left: 8px; top: 50%;
-  transform: translateY(-50%); width: 6px; height: 6px;
-  border-radius: 9999px; background: transparent; transition: all .25s ease;
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  width: 100%;
+  padding: 0.75rem 1rem;
+  border-radius: 0.75rem;
+  color: #eff6ff; /* text-blue-50 */
+  transition: all 0.2s ease;
 }
 .sidebar-btn:hover {
-  transform: translateX(2px);
-  background: linear-gradient(90deg, #f8fafc 0%, #f1f5f9 100%);
+  background-color: rgba(255, 255, 255, 0.2);
 }
 .sidebar-btn.active {
-  background: linear-gradient(90deg, var(--color-primary-soft) 0%, #FFF0F7 100%);
-  color: var(--color-primary); font-weight: 600;
-  box-shadow: 0 4px 10px rgba(244, 114, 182, 0.15);
+  background-color: #ffffff;
+  color: #2563eb; /* text-blue-600 */
+  font-weight: 600;
+  box-shadow: 0 1px 3px 0 rgb(0 0 0 / 0.1), 0 1px 2px -1px rgb(0 0 0 / 0.1);
 }
-.sidebar-btn.active::before {
-  width: 8px; height: 24px; border-radius: 12px;
-  background: var(--color-primary);
-}
-
-/* Colores de sección */
-.sidebar-btn[data-section="home"].active::before { background: var(--color-primary); }
-.sidebar-btn[data-section="live-attendance"].active::before { background: var(--color-success); }
-.sidebar-btn[data-section="class"].active::before { background: var(--color-secondary); }
-.sidebar-btn[data-section="tasks"].active::before { background: var(--color-accent); }
-.sidebar-btn[data-section="grades"].active::before { background: var(--color-primary); }
-.sidebar-btn[data-section="notifications"].active::before { background: var(--color-secondary); }
-.sidebar-btn[data-section="profile"].active::before { background: var(--color-text-light); }
 
 .section-anim { opacity: 0; transform: translateY(8px); transition: opacity .25s ease, transform .25s ease; }
 .section-anim.section-visible { opacity: 1; transform: translateY(0); }
