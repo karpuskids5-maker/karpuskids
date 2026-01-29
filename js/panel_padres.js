@@ -130,12 +130,11 @@ const UI = {
     AppState.currentSection = id;
     document.querySelectorAll('.section').forEach(s => {
       s.classList.remove('active');
-      s.style.display = 'none';
+      // s.style.display = 'none'; // Dejar que CSS maneje la visibilidad para animaciones
     });
     const t = document.getElementById(id);
     if (t) {
       t.classList.add('active');
-      t.style.display = 'block';
       if (id === 'home') this.loadDashboard();
       if (id === 'live-attendance') this.loadAttendance();
       if (id === 'tasks') this.loadTasks();
@@ -143,6 +142,7 @@ const UI = {
       if (id === 'notifications') this.loadNotifications();
       if (id === 'profile') this.populateProfile();
       if (id === 'grades') this.loadGrades();
+      if (id === 'payments') this.loadPayments();
     }
   },
 
@@ -270,7 +270,7 @@ const UI = {
         list.innerHTML = Helpers.emptyState('No hay tareas', 'clipboard');
         return;
       }
-      list.innerHTML = tasks.map(t => `<div class="bg-white p-4 rounded-xl border shadow-sm"><h4 class="font-bold text-[#1E293B]">${t.title}</h4><p class="text-sm text-[#1E293B]/70">${t.description || ''}</p><div class="mt-2 flex gap-2"><button class="open-submit-btn px-3 py-1 rounded-xl bg-[#3B82F6] text-white text-xs hover:bg-[#BFDBFE] hover:text-[#1E293B] transition-colors" data-task-id="${t.id}" data-task-title="${t.title}">Subir evidencia</button></div></div>`).join('');
+      list.innerHTML = tasks.map(t => `<div class="card-clean p-4"><h4 class="font-bold text-[#1E293B]">${t.title}</h4><p class="text-sm text-[#1E293B]/70">${t.description || ''}</p><div class="mt-2 flex gap-2"><button class="open-submit-btn px-3 py-1 rounded-xl bg-[#3B82F6] text-white text-xs hover:bg-[#BFDBFE] hover:text-[#1E293B] transition-colors" data-task-id="${t.id}" data-task-title="${t.title}">Subir evidencia</button></div></div>`).join('');
       
       if (window.lucide) window.lucide.createIcons();
     } catch (e) {
@@ -363,7 +363,7 @@ const UI = {
         const liked = (p.likes || []).some(l => l.user_id === AppState.user?.id);
         
         return `
-          <div class="bg-white rounded-xl p-4 shadow-sm border mb-4">
+          <div class="card-clean p-4 mb-4">
             <div class="flex items-center gap-3 mb-3">
               <div class="w-10 h-10 bg-blue-100 rounded-full flex items-center justify-center text-blue-700 font-bold">
                 ${p.profiles?.name?.charAt(0) || 'D'}
@@ -414,7 +414,7 @@ const UI = {
       }
 
       container.innerHTML = `
-        <div class="bg-white rounded-xl shadow-sm border overflow-hidden">
+        <div class="card-clean overflow-hidden">
           <table class="w-full text-left text-sm">
             <thead class="bg-slate-50 border-b">
               <tr>
@@ -444,6 +444,93 @@ const UI = {
     }
   },
 
+  async loadPayments() {
+    const container = document.getElementById('paymentsHistory');
+    const dateInput = document.getElementById('paymentDate');
+    
+    // Auto-llenar fecha con el día de hoy si está vacío
+    if (dateInput && !dateInput.value) {
+      dateInput.value = new Date().toISOString().split('T')[0];
+    }
+
+    if (!container || !AppState.currentStudent) return;
+    container.innerHTML = Helpers.skeleton(3, 'h-20');
+
+    try {
+      const { data: payments, error } = await window.supabase
+        .from('payments')
+        .select('*')
+        .eq('student_id', AppState.currentStudent.id)
+        .order('created_at', { ascending: false });
+
+      if (error) throw error;
+
+      if (!payments || payments.length === 0) {
+        container.innerHTML = Helpers.emptyState('No hay pagos registrados', 'credit-card');
+        return;
+      }
+
+      container.innerHTML = payments.map(p => `
+        <div class="card-clean p-4 flex justify-between items-center">
+          <div>
+            <p class="font-bold text-slate-800">$${p.amount}</p>
+            <p class="text-xs text-slate-500">${new Date(p.created_at).toLocaleDateString()} • ${p.method}</p>
+          </div>
+          <span class="px-3 py-1 rounded-full text-xs font-bold ${
+            p.status === 'confirmado' ? 'bg-green-100 text-green-700' : 
+            (p.status === 'rechazado' ? 'bg-red-100 text-red-700' : 'bg-yellow-100 text-yellow-700')
+          }">
+            ${p.status.toUpperCase()}
+          </span>
+        </div>
+      `).join('');
+    } catch (e) {
+      container.innerHTML = Helpers.emptyState('Error cargando pagos', 'alert-circle');
+    }
+  },
+
+  async submitPayment() {
+    try {
+      const amount = document.getElementById('paymentAmount')?.value;
+      const date = document.getElementById('paymentDate')?.value;
+      const method = document.getElementById('paymentMethod')?.value;
+      const fileInput = document.getElementById('paymentFile');
+      const file = fileInput?.files?.[0];
+
+      if (!amount || !date) {
+        Helpers.toast('Complete el monto y la fecha', 'error');
+        return;
+      }
+
+      let evidenceUrl = null;
+      if (file) {
+        const path = `payments/${AppState.currentStudent.id}/${Date.now()}_${file.name}`;
+        const { error: upError } = await window.supabase.storage.from('payments_evidence').upload(path, file);
+        if (upError) throw upError;
+        const { data: pub } = window.supabase.storage.from('payments_evidence').getPublicUrl(path);
+        evidenceUrl = pub.publicUrl;
+      }
+
+      const { error } = await window.supabase.from('payments').insert({
+        student_id: AppState.currentStudent.id,
+        amount: amount,
+        transfer_date: date,
+        method: method,
+        evidence_url: evidenceUrl,
+        status: 'pendiente'
+      });
+
+      if (error) throw error;
+
+      Helpers.toast('Pago registrado correctamente', 'success');
+      document.getElementById('paymentForm')?.reset();
+      this.loadPayments(); // Recargar lista
+    } catch (e) {
+      console.error(e);
+      Helpers.toast('Error al registrar pago', 'error');
+    }
+  },
+
   async loadNotifications() {
     const container = document.getElementById('notifications');
     if (!container) return;
@@ -466,7 +553,7 @@ const UI = {
       }
 
       container.innerHTML = `<div class="space-y-3 max-w-3xl mx-auto">` + notifs.map(n => `
-        <div class="bg-white p-4 rounded-xl border shadow-sm flex gap-4 ${n.is_read ? 'opacity-70' : 'border-l-4 border-l-blue-500'}">
+        <div class="card-clean p-4 flex gap-4 ${n.is_read ? 'opacity-70' : 'border-l-4 border-l-blue-500'}">
           <div class="bg-blue-50 w-10 h-10 rounded-full flex items-center justify-center text-blue-600 flex-shrink-0"><i data-lucide="bell" class="w-5 h-5"></i></div>
           <div><h4 class="font-bold text-slate-800">${n.title}</h4><p class="text-sm text-slate-600">${n.message}</p><p class="text-xs text-slate-400 mt-2">${new Date(n.created_at).toLocaleString()}</p></div>
         </div>`).join('') + `</div>`;

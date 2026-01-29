@@ -7,12 +7,23 @@ document.addEventListener('DOMContentLoaded', () => {
     loginForm.addEventListener('submit', async (e) => {
       e.preventDefault();
       
-      const email = document.getElementById('email').value;
+      const email = document.getElementById('email').value.trim();
       const password = document.getElementById('password').value;
       const submitBtn = loginForm.querySelector('button');
       const originalText = submitBtn.textContent;
 
       try {
+        // Validación básica antes de llamar a Supabase
+        const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+        if (!emailRegex.test(email)) {
+          alert('Ingrese un correo válido.');
+          return;
+        }
+        if (!password || password.length < 6) {
+          alert('La contraseña debe tener al menos 6 caracteres.');
+          return;
+        }
+        
         submitBtn.disabled = true;
         submitBtn.textContent = 'Verificando...';
 
@@ -44,16 +55,23 @@ document.addEventListener('DOMContentLoaded', () => {
 
       } catch (error) {
         console.error('Error en el inicio de sesión:', error);
-        
         let errorMessage = 'Ocurrió un error inesperado. Por favor, intente de nuevo.';
-        if (error.message.includes('Invalid login credentials')) {
-            errorMessage = 'El correo electrónico o la contraseña son incorrectos. Por favor, verifique sus datos.';
-        } else if (error.message.includes('Email not confirmed')) {
-            errorMessage = 'Su cuenta aún no ha sido confirmada. Por favor, revise su correo electrónico y haga clic en el enlace de confirmación.';
+        const msg = String(error?.message || '');
+        const name = String(error?.name || '');
+        const isNetwork =
+          name === 'AuthRetryableFetchError' ||
+          msg.includes('Failed to fetch') ||
+          msg.includes('ERR_NAME_NOT_RESOLVED') ||
+          msg.includes('TypeError') ||
+          msg.includes('NetworkError');
+        if (isNetwork) {
+          errorMessage = 'No se pudo conectar al servicio de autenticación. Verifique su conexión a internet y que la configuración de Supabase (URL y clave) sea correcta.';
+        } else if (msg.includes('Invalid login credentials')) {
+          errorMessage = 'El correo electrónico o la contraseña son incorrectos. Por favor, verifique sus datos.';
+        } else if (msg.includes('Email not confirmed')) {
+          errorMessage = 'Su cuenta aún no ha sido confirmada. Por favor, revise su correo electrónico y haga clic en el enlace de confirmación.';
         }
-        
         alert(errorMessage);
-        
         submitBtn.disabled = false;
         submitBtn.textContent = originalText;
       }

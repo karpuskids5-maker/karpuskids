@@ -52,12 +52,16 @@ aside#sidebar.collapsed .label { opacity: 0; }
   color: rgba(255, 255, 255, 0.9);
 }
 .sidebar-padres .nav-btn:hover, .sidebar-padres .nav-btn.active {
-  background-color: #FFFFFF;
+  background: #FFFFFF;
   color: #1E40AF; /* Texto azul al hacer hover */
   box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.2);
 }
 .sidebar-padres .nav-btn:hover i, .sidebar-padres .nav-btn.active i {
   color: #1E40AF; /* Icono azul al hacer hover */
+}
+
+.sidebar-padres .nav-btn.active::before {
+  background: #1E40AF;
 }
 
 .karpus-kids-inline { font-weight: 700; }

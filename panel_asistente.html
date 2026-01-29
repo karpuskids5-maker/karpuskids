@@ -92,7 +92,9 @@
           K
         </div>
         <div class="label">
-          <h3 class="font-semibold text-white">Karpus Kids</h3>
+          <h3 class="font-semibold text-white karpus-kids-inline">
+            <span class="k-1">K</span><span class="k-2">a</span><span class="k-3">r</span><span class="k-4">p</span><span class="k-5">u</span><span class="k-6">s</span> <span class="k-7">K</span><span class="k-8">i</span><span class="k-9">d</span><span class="k-10">s</span>
+          </h3>
           <p class="text-xs text-white text-opacity-80">Panel Asistente</p>
         </div>
       </div>
@@ -142,43 +144,43 @@
         <h1 class="text-2xl font-bold mb-6 text-slate-800">Hola, <span id="welcomeName">Asistente</span> 👋</h1>
         
         <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
-          <div class="bg-white p-6 rounded-2xl shadow-sm border border-slate-100">
+          <div class="bg-white p-6 rounded-2xl shadow-sm border border-slate-100 card-interactive">
             <div class="flex items-center gap-4">
               <div class="p-3 bg-blue-100 text-blue-600 rounded-xl"><i data-lucide="users" class="w-6 h-6"></i></div>
               <div>
                 <p class="text-sm text-slate-500">Estudiantes Activos</p>
-                <p class="text-2xl font-bold" id="statStudents">-</p>
+                <p class="text-3xl font-bold text-blue-800" id="statStudents">-</p>
               </div>
             </div>
           </div>
-          <div class="bg-white p-6 rounded-2xl shadow-sm border border-slate-100">
+          <div class="bg-white p-6 rounded-2xl shadow-sm border border-slate-100 card-interactive">
             <div class="flex items-center gap-4">
               <div class="p-3 bg-green-100 text-green-600 rounded-xl"><i data-lucide="check-circle" class="w-6 h-6"></i></div>
               <div>
                 <p class="text-sm text-slate-500">Asistencia Hoy</p>
-                <p class="text-2xl font-bold" id="statAttendance">-</p>
+                <p class="text-3xl font-bold text-green-800" id="statAttendance">-</p>
               </div>
             </div>
           </div>
-          <div class="bg-white p-6 rounded-2xl shadow-sm border border-slate-100">
+          <div class="bg-white p-6 rounded-2xl shadow-sm border border-slate-100 card-interactive">
             <div class="flex items-center gap-4">
               <div class="p-3 bg-orange-100 text-orange-600 rounded-xl"><i data-lucide="alert-circle" class="w-6 h-6"></i></div>
               <div>
                 <p class="text-sm text-slate-500">Pagos Pendientes</p>
-                <p class="text-2xl font-bold" id="statPayments">-</p>
+                <p class="text-3xl font-bold text-orange-800" id="statPayments">-</p>
               </div>
             </div>
           </div>
         </div>
 
-        <div class="bg-white rounded-2xl shadow-sm border border-slate-100 p-6">
+        <div class="bg-white rounded-2xl shadow-sm border border-slate-100 p-6 card-interactive">
           <h3 class="font-semibold mb-4">Accesos Rápidos</h3>
           <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
-            <button id="btnQuickStudents" class="p-4 rounded-xl bg-slate-50 hover:bg-slate-100 transition-colors text-center">
+            <button id="btnQuickStudents" class="p-4 rounded-xl bg-slate-50 hover:bg-blue-100 hover:text-blue-800 transition-colors text-center group">
               <i data-lucide="search" class="w-6 h-6 mx-auto mb-2 text-slate-500"></i>
               <span class="text-sm font-medium">Buscar Alumno</span>
             </button>
-            <button id="btnQuickPayments" class="p-4 rounded-xl bg-slate-50 hover:bg-slate-100 transition-colors text-center">
+            <button id="btnQuickPayments" class="p-4 rounded-xl bg-slate-50 hover:bg-green-100 hover:text-green-800 transition-colors text-center group">
               <i data-lucide="dollar-sign" class="w-6 h-6 mx-auto mb-2 text-slate-500"></i>
               <span class="text-sm font-medium">Registrar Pago</span>
             </button>
@@ -189,7 +191,9 @@
       <!-- ESTUDIANTES -->
       <section id="estudiantes" class="section">
         <div class="flex justify-between items-center mb-6">
-          <h2 class="text-xl font-bold">Directorio de Estudiantes</h2>
+          <h2 class="text-xl font-bold flex items-center gap-2 text-slate-700">
+            <i data-lucide="users" class="text-slate-500"></i> Directorio de Estudiantes
+          </h2>
           <div class="relative">
             <i data-lucide="search" class="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400"></i>
             <input id="searchStudentInput" type="text" placeholder="Buscar..." class="pl-9 pr-4 py-2 border rounded-lg text-sm w-64">
@@ -214,7 +218,9 @@
 
       <section id="maestros" class="section">
         <div class="flex justify-between items-center mb-6">
-          <h2 class="text-xl font-bold">Gestión de Maestros</h2>
+          <h2 class="text-xl font-bold flex items-center gap-2 text-slate-700">
+            <i data-lucide="graduation-cap" class="text-slate-500"></i> Gestión de Maestros
+          </h2>
           <button id="btnNewTeacher" class="bg-teal-600 text-white px-4 py-2 rounded-lg hover:bg-teal-700 transition-colors text-sm font-medium flex items-center gap-2"><i data-lucide="plus" class="w-4 h-4"></i>Nuevo</button>
         </div>
         <div class="bg-white rounded-2xl shadow-sm border overflow-hidden">
@@ -234,7 +240,9 @@
 
       <!-- ACCESOS (Check-in/Check-out) -->
       <section id="accesos" class="section">
-        <h2 class="text-xl font-bold mb-6">Control de Accesos (Check-in / Check-out)</h2>
+        <h2 class="text-xl font-bold mb-6 flex items-center gap-2 text-slate-700">
+          <i data-lucide="door-open" class="text-slate-500"></i> Control de Accesos (Check-in / Check-out)
+        </h2>
         <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
           <!-- Buscador y Acción -->
           <div class="lg:col-span-2 bg-white rounded-xl shadow-sm border p-6">
@@ -258,8 +266,14 @@
       <!-- PAGOS -->
       <section id="pagos" class="section">
         <div class="flex justify-between items-center mb-6">
-          <h2 class="text-xl font-bold">Gestión de Pagos</h2>
+          <h2 class="text-xl font-bold flex items-center gap-2 text-slate-700">
+            <i data-lucide="credit-card" class="text-slate-500"></i> Gestión de Pagos
+          </h2>
           <div class="flex gap-2">
+            <div class="relative hidden md:block">
+              <i data-lucide="search" class="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400"></i>
+              <input id="searchPaymentInput" type="text" placeholder="Buscar por alumno, monto..." class="pl-9 pr-4 py-2 border rounded-lg text-sm w-64 focus:ring-2 focus:ring-teal-500 outline-none">
+            </div>
             <button id="btnExportPayments" class="bg-slate-800 text-white px-4 py-2 rounded-lg hover:bg-slate-900 transition-colors text-sm font-medium flex items-center gap-2">
               <i data-lucide="download" class="w-4 h-4"></i> Exportar Excel
             </button>
@@ -305,7 +319,15 @@
               </tr>
             </thead>
             <tbody id="paymentsTableBody" class="divide-y divide-slate-100">
-              <!-- JS -->
+              <!-- Ejemplo de fila para guiar implementación JS -->
+              <tr>
+                <td class="px-6 py-4">Juan Pérez</td>
+                <td class="px-6 py-4">$1500.00</td>
+                <td class="px-6 py-4">Transferencia</td>
+                <td class="px-6 py-4"><span class="px-2 py-1 text-xs font-semibold rounded-full bg-yellow-100 text-yellow-800">Pendiente</span></td>
+                <td class="px-6 py-4">-</td>
+                <td class="px-6 py-4">-</td>
+              </tr>
             </tbody>
           </table>
           </div>
@@ -313,6 +335,37 @@
       </section>
 
     </main>
+  </div>
+
+  <!-- Modal Detalle de Pago (Validación) -->
+  <div id="paymentDetailModal" class="fixed inset-0 bg-black/30 z-50 hidden items-center justify-center">
+    <div class="bg-white rounded-2xl shadow-xl p-6 w-full max-w-md">
+      <div class="flex justify-between items-center mb-4">
+        <h3 class="text-lg font-bold text-slate-800">Validación de Pago</h3>
+        <button class="close-modal-btn p-1 rounded-full hover:bg-slate-100"><i data-lucide="x"></i></button>
+      </div>
+      <div class="space-y-3 mb-6">
+        <div class="flex justify-between border-b pb-2">
+          <span class="text-slate-500">Estudiante:</span>
+          <span class="font-medium" id="pdStudent">-</span>
+        </div>
+        <div class="flex justify-between border-b pb-2">
+          <span class="text-slate-500">Monto:</span>
+          <span class="font-bold text-lg" id="pdAmount">-</span>
+        </div>
+        <div class="flex justify-between border-b pb-2">
+          <span class="text-slate-500">Estado actual:</span>
+          <span class="font-bold" id="pdStatus">-</span>
+        </div>
+        <div class="flex justify-between border-b pb-2">
+          <span class="text-slate-500">Referencia:</span>
+          <span class="font-mono text-sm" id="pdRef">-</span>
+        </div>
+      </div>
+      <div id="pdActions" class="flex gap-3 justify-end">
+        <!-- Botones inyectados por JS -->
+      </div>
+    </div>
   </div>
 
   <script type="module" src="js/panel_asistente.js"></script>

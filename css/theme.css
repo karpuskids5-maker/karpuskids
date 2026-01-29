@@ -51,6 +51,28 @@ body {
 .chip-orange{ background:#FFF3E0; color:#EF6C00; }
 .chip-yellow{ background:#FFF9C4; color:#F57F17; }
 /* Utilidad: mostrar sidebar en móvil */
+
+/* Karpus colored letters small */
+.karpus-kids-inline { font-weight: 700; }
+.karpus-kids-inline .k-1 { color: #FF9800; }
+.karpus-kids-inline .k-2 { color: #2196F3; }
+.karpus-kids-inline .k-3 { color: #E91E63; }
+.karpus-kids-inline .k-4 { color: #4CAF50; }
+.karpus-kids-inline .k-5 { color: #FF9800; }
+.karpus-kids-inline .k-6 { color: #2196F3; }
+.karpus-kids-inline .k-7 { color: #4CAF50; }
+.karpus-kids-inline .k-8 { color: #E91E63; }
+.karpus-kids-inline .k-9 { color: #2196F3; }
+.karpus-kids-inline .k-10 { color: #FF9800; }
+
+/* Animaciones y Transiciones Adicionales */
+.card-interactive {
+  transition: transform 0.2s ease-out, box-shadow 0.2s ease-out;
+}
+.card-interactive:hover {
+  transform: translateY(-4px);
+  box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.07), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
+}
 .mobile-visible { display: block !important; }
 
 /* Botón de cierre de sección */

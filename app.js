@@ -102,11 +102,17 @@ document.addEventListener('DOMContentLoaded', async () => {
   }
   
   const { data: profile } = await supabase.from('profiles').select('*').eq('id', user.id).single();
-  if (profile) {
+  if (!profile || profile.role !== 'directora') {
+    try { await supabase.auth.signOut(); } catch (_) {}
+    window.location.href = 'login.html';
+    return;
+  } else {
     // Buscar elementos donde mostrar el nombre (ej: sidebar)
     const userNameElements = document.querySelectorAll('[data-username]');
     userNameElements.forEach(el => el.textContent = profile.name || 'Usuario');
   }
+
+  try { const { subscribeNotifications } = await import('./js/supabase.js'); subscribeNotifications(n=>{ try { const msg = (n.title||'Notificación') + ': ' + (n.message||''); const el = document.getElementById('notifToast'); if (el) { el.textContent = msg; el.classList.remove('hidden'); setTimeout(()=>el.classList.add('hidden'),3000); } } catch(e){} }); } catch(e){}
 
   // 0.1 Botón de Cerrar Sesión
   document.getElementById('btnLogout')?.addEventListener('click', async () => {
@@ -214,12 +220,6 @@ document.addEventListener('DOMContentLoaded', async () => {
 
       const age = document.getElementById('filterStAge')?.value;
       if (age) {
-        const ageNum = parseInt(age);
-        const today = new Date();
-        // Rango de fechas para la edad: Hoy - (Edad+1) < Nacimiento <= Hoy - Edad
-        const maxDate = new Date(today.getFullYear() - ageNum, today.getMonth(), today.getDate()).toISOString().split('T')[0];
-        const minDate = new Date(today.getFullYear() - ageNum - 1, today.getMonth(), today.getDate()).toISOString().split('T')[0];
-        query = query.lte('birth_date', maxDate).gt('birth_date', minDate);
       }
 
       // Ejecutar Query con Paginación

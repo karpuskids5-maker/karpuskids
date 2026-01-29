@@ -1,4 +1,4 @@
-import { supabase } from './supabase.js';
+import { supabase, ensureRole } from './supabase.js';
 
 // --- 1. HELPERS & UTILS ---
 const Helpers = {
@@ -72,16 +72,10 @@ const UI = {
   },
 
   async checkSession() {
-    const { data: { user } } = await supabase.auth.getUser();
-    if (!user) {
-      window.location.href = 'login.html';
-      return;
-    }
-    AppState.user = user;
-
-    // Load Profile
-    const { data: profile } = await supabase.from('profiles').select('*').eq('id', user.id).single();
-    AppState.profile = profile;
+    const auth = await ensureRole('maestra');
+    if (!auth) return;
+    AppState.user = auth.user;
+    AppState.profile = auth.profile;
     this.updateUserProfileUI();
 
     // Initial Load
