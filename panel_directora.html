@@ -543,8 +543,11 @@
           <!-- Gráfico General -->
           <div class="bg-white rounded shadow p-4">
             <h3 class="font-semibold mb-4 text-sm text-slate-700">Distribución del Día</h3>
-            <div class="h-64 flex items-center justify-center">
+            <div class="h-64 flex items-center justify-center relative">
               <canvas id="attendancePieChart"></canvas>
+              <div id="attendanceLoader" class="absolute inset-0 bg-white/80 flex items-center justify-center hidden">
+                <div class="animate-spin rounded-full h-8 w-8 border-b-2 border-indigo-600"></div>
+              </div>
             </div>
           </div>
           
@@ -654,7 +657,7 @@
         </div>
         <div class="mt-6 bg-white rounded shadow p-4">
           <h3 class="font-semibold mb-3">Listado</h3>
-          <table class="w-full text-sm">
+          <table class="w-full text-sm table-mobile">
             <thead class="text-slate-500 text-left">
               <tr><th>Estudiante</th><th>Aula</th><th>Mes</th><th>Monto</th><th>Estado</th><th>Acciones</th></tr>
             </thead>

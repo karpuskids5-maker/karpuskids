@@ -206,6 +206,7 @@ const UI = {
       target.classList.add('active');
       document.getElementById('sidebar')?.classList.remove('show');
       if (id === 'estudiantes') this.loadStudents();
+      if (id === 'asistencia') this.loadAttendanceRooms();
       if (id === 'maestros') this.loadTeachers();
       if (id === 'pagos') { this.loadPayments(); this.loadPaymentReports(); }
       if (id === 'accesos') this.loadAccessLogs();
@@ -624,7 +625,8 @@ const UI = {
     try {
       let evidenceUrl = null;
       if (method === 'transferencia' && evidence) {
-        const path = `${studentId}_${Date.now()}_${evidence.name}`;
+        const safeName = evidence.name.replace(/[^a-zA-Z0-9.]/g, '_');
+        const path = `${studentId}_${Date.now()}_${safeName}`;
         const { error: upErr } = await supabase.storage.from('payments_evidence').upload(path, evidence, { upsert: false });
         if (upErr) throw upErr;
         const { data: pub } = await supabase.storage.from('payments_evidence').getPublicUrl(path);
@@ -633,7 +635,7 @@ const UI = {
       const status = method === 'efectivo' ? 'efectivo' : 'pendiente';
       const { error } = await supabase.from('payments').insert({
         student_id: studentId,
-        amount,
+        amount: Number(amount),
         month_paid: month,
         method,
         bank,
@@ -794,16 +796,21 @@ const UI = {
       Helpers.toast('No hay datos para exportar', 'error');
       return;
     }
-    const headers = ['Estudiante','Monto','Fecha','Mes Pagado'];
+    const headers = ['Estudiante','Monto','Metodo','Estado','Banco','Referencia','Fecha','Mes Pagado'];
     const lines = [headers.join(',')];
     tbody.querySelectorAll('tr').forEach(tr => {
       const tds = tr.querySelectorAll('td');
-      if (tds.length >= 4) {
-        const estudiante = (tds[0].textContent || '').trim().replace(/,/g, ' ');
-        const monto = (tds[1].textContent || '').trim().replace(/,/g, '').replace('$','');
-        const fecha = (tds[2].textContent || '').trim().replace(/,/g, ' ');
-        const mes = (tds[3].textContent || '').trim().replace(/,/g, ' ');
-        lines.push([estudiante, monto, fecha, mes].join(','));
+      if (tds.length >= 8) {
+        lines.push([
+          (tds[0].textContent || '').trim().replace(/,/g, ' '),
+          (tds[1].textContent || '').trim().replace(/,/g, '').replace('$',''),
+          (tds[2].textContent || '').trim().replace(/,/g, ' '),
+          (tds[3].textContent || '').trim().replace(/,/g, ' '),
+          (tds[4].textContent || '').trim().replace(/,/g, ' '),
+          (tds[5].textContent || '').trim().replace(/,/g, ' '),
+          (tds[6].textContent || '').trim().replace(/,/g, ' '),
+          (tds[7].textContent || '').trim().replace(/,/g, ' ')
+        ].join(','));
       }
     });
     const csv = '\uFEFF' + lines.join('\n');
@@ -1002,9 +1009,7 @@ function refreshIcons() {
   document.addEventListener('DOMContentLoaded', () => {
     UI.init();
     refreshIcons();
-    document.getElementById('btnNewPayment')?.addEventListener('click', ()=> UI.openPaymentModal());
-    document.getElementById('closePaymentModal')?.addEventListener('click', ()=> UI.closePaymentModal());
-    document.getElementById('cancelPayment')?.addEventListener('click', ()=> UI.closePaymentModal());
+    // Listeners moved to UI.bindEvents() to avoid duplication
     document.addEventListener('click', async (e)=>{
       const cBtn = e.target.closest('.btn-confirm-payment');
       const rBtn = e.target.closest('.btn-reject-payment');
@@ -1035,6 +1040,7 @@ function refreshIcons() {
         const id = rBtn.dataset.id;
         const reason = prompt('Motivo del rechazo');
         await supabase.from('payments').update({ status: 'rechazado', validated_by: AppState.user.id, notes: reason || null }).eq('id', id);
+        Helpers.toast('Pago rechazado');
         UI.loadPayments();
       }
     });

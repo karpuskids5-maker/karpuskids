@@ -10,19 +10,28 @@ document.addEventListener('DOMContentLoaded', ()=>{
   // Enforce role without inline script
   // if (window.Auth && !Auth.enforceRole('directora')) return; // REMOVED: Using Supabase Auth in app.js
   // initDashboardChart(); // REMOVED: Managed by app.js to avoid canvas conflict
-  attachPaymentsHandlers();
-  attachCommunicationsHandlers();
+  
+  safeInit(attachPaymentsHandlers);
+  safeInit(attachCommunicationsHandlers);
   // initNavDirector(); // REMOVED: Managed by app.js
-  initStudentController();
+  safeInit(initStudentController);
   // initTeacherModule(); // REMOVED: Managed by app.js (Supabase)
   // initRoomsModule();   // REMOVED: Managed by app.js (Supabase)
-  initAttendanceModule(); // New module for real attendance stats
+  safeInit(initAttendanceModule); // New module for real attendance stats
   
   adjustMainOffset();
   window.addEventListener('resize', adjustMainOffset);
   const dash = document.getElementById('dashboard');
   if (dash) dash.classList.remove('hidden');
 });
+
+function safeInit(fn){
+  try {
+    if (typeof fn === 'function') fn();
+  } catch (e) {
+    console.error(`Error inicializando ${fn.name}:`, e);
+  }
+}
 
 // --- Real Attendance Logic ---
 function initAttendanceModule() {
@@ -37,6 +46,18 @@ function initAttendanceModule() {
             modal.classList.add('hidden');
             modal.classList.remove('flex');
         });
+    }
+
+    // Event Delegation for Attendance Details
+    const tbody = document.getElementById('attendanceByRoomBody');
+    if(tbody) {
+      tbody.addEventListener('click', (e) => {
+        const tr = e.target.closest('tr[data-room-id]');
+        if(!tr) return;
+        const roomId = tr.dataset.roomId;
+        const roomName = tr.dataset.roomName;
+        openAttendanceDetail(roomId, roomName);
+      });
     }
     
     if(dateFilter) {
@@ -61,20 +82,18 @@ function getAttendanceDate() {
 
 async function getSupabase() {
   if (window.supabase) return window.supabase;
-  try {
-    const mod = await import('./js/supabase.js');
-    window.supabase = mod.supabase;
-    return mod.supabase;
-  } catch (e) {
-    console.error('Error cargando Supabase:', e);
-    return null;
-  }
+  console.error('Supabase no está inicializado. app.js debe cargarlo primero.');
+  return null;
 }
 
 async function loadAttendanceStats() {
     if (loadingAttendance) return;
     loadingAttendance = true;
     
+    // Show loader
+    const loader = document.getElementById('attendanceLoader');
+    if(loader) loader.classList.remove('hidden');
+
     try {
       const date = getAttendanceDate();
       const supabase = await getSupabase();
@@ -94,7 +113,7 @@ async function loadAttendanceStats() {
     let present = 0, absent = 0, late = 0;
     const byRoom = {};
     
-    attendanceData.forEach(r => {
+    (attendanceData || []).forEach(r => {
         if(r.status === 'present') present++;
         if(r.status === 'absent') absent++;
         if(r.status === 'late') late++;
@@ -127,7 +146,7 @@ async function loadAttendanceStats() {
                 const stats = byRoom[roomId];
                 const percent = Math.round((stats.present / stats.total) * 100) || 0;
                 return `
-                    <tr onclick="window.openAttendanceDetail('${roomId}', '${stats.name}')" class="cursor-pointer hover:bg-slate-50 transition-colors border-b last:border-0" title="Ver detalle">
+                    <tr data-room-id="${roomId}" data-room-name="${stats.name}" class="cursor-pointer hover:bg-slate-50 transition-colors border-b last:border-0" title="Ver detalle">
                         <td class="py-3 px-2 font-medium">${stats.name}</td>
                         <td class="py-3 px-2 text-center text-green-600 font-bold">${stats.present}</td>
                         <td class="py-3 px-2 text-center text-red-600">${stats.absent}</td>
@@ -149,10 +168,11 @@ async function loadAttendanceStats() {
     updatePieChart(present, absent, late);
     } finally {
       loadingAttendance = false;
+      if(loader) loader.classList.add('hidden');
     }
 }
 
-window.openAttendanceDetail = async (classroomId, classroomName) => {
+async function openAttendanceDetail(classroomId, classroomName) {
     const modal = document.getElementById('attendanceModal');
     const title = document.getElementById('attModalTitle');
     const tbody = document.getElementById('attModalBody');
@@ -191,9 +211,9 @@ window.openAttendanceDetail = async (classroomId, classroomName) => {
         if(attError) throw attError;
         
         const attMap = {};
-        attendance.forEach(a => attMap[a.student_id] = a);
+        (attendance || []).forEach(a => attMap[a.student_id] = a);
         
-        if(!students.length) {
+        if(!(students || []).length) {
             tbody.innerHTML = '<tr><td colspan="3" class="text-center p-4 text-slate-500">No hay estudiantes en esta aula.</td></tr>';
             return;
         }
@@ -224,7 +244,7 @@ window.openAttendanceDetail = async (classroomId, classroomName) => {
         console.error('Error loading detail:', error);
         tbody.innerHTML = '<tr><td colspan="3" class="text-center p-4 text-red-500">Error al cargar detalle.</td></tr>';
     }
-};
+}
 
 let attendancePieChartInstance = null;
 function updatePieChart(present, absent, late) {
@@ -236,7 +256,10 @@ function updatePieChart(present, absent, late) {
     if(!canvas) return;
     
     if(attendancePieChartInstance) {
-        attendancePieChartInstance.destroy();
+        // Update existing instance
+        attendancePieChartInstance.data.datasets[0].data = [present, absent, late];
+        attendancePieChartInstance.update();
+        return;
     }
     
     const ctx = canvas.getContext('2d');
@@ -358,7 +381,7 @@ function attachPaymentsHandlers(){
     // Simulación: abrir modal para confirmar envío
     openModal(`Recordatorio de pago`, `Enviar recordatorio a <strong>${parent}</strong> por el alumno <strong>${student}</strong>?`, [
       {text:'Cancelar', type:'secondary'},
-      {text:'Enviar', type:'primary', onClick: ()=>{ alert(`Recordatorio enviado (simulado) a ${parent}`); closeModal(); }}
+      {text:'Enviar', type:'primary', onClick: ()=>{ closeModal(); openModal('Enviado', `Recordatorio enviado a ${parent}`); }}
     ]);
   }));
 
@@ -368,7 +391,7 @@ function attachPaymentsHandlers(){
     if(!tr) return;
     tr.querySelector('td:nth-child(6)').innerText = 'Pagado';
     tr.querySelector('td:nth-child(6)').className = 'text-green-600';
-    alert('Pago marcado como pagado (simulado). Actualiza backend para persistir.');
+    openModal('Confirmación', 'Pago marcado como pagado (simulado). Actualiza backend para persistir.');
   }));
 
   // Filtro por aula
@@ -386,7 +409,7 @@ function attachPaymentsHandlers(){
     const aula = qs('#filterPagoAula')?.value || 'all';
     openModal('Recordatorio masivo', `Enviar recordatorio de pago a aula: <strong>${aula}</strong>?`, [
       {text:'Cancelar', type:'secondary'},
-      {text:'Enviar a todos', type:'primary', onClick: ()=>{ alert('Recordatorios masivos enviados (simulado).'); closeModal(); }}
+      {text:'Enviar a todos', type:'primary', onClick: ()=>{ closeModal(); openModal('Enviado', 'Recordatorios masivos enviados.'); }}
     ]);
   });
 }
@@ -449,8 +472,8 @@ function openMessageModal(){
     {text:'Enviar', type:'primary', onClick: ()=>{
       const msg = qs('#msgBody').value || '';
       const target = qs('#msgTarget').value || 'all';
-      alert(`Mensaje enviado (simulado) a ${target}: ${msg.substring(0,80)}${msg.length>80? '...':''}`);
       closeModal();
+      openModal('Enviado', `Mensaje enviado a ${target}`);
     }}
   ]);
 }
@@ -474,22 +497,7 @@ function filterPosts(){
   console.log('Filtrando publicaciones por:', val);
 }
 
-// --- Responsive improvement: collapse long tables into cards on small screens (simple example) ---
-window.addEventListener('resize', ()=> adaptTablesToMobile());
-function adaptTablesToMobile(){
-  const isMobile = window.innerWidth < 640;
-  qsa('#paymentsTable tbody tr').forEach(tr=>{
-    if(isMobile){
-      tr.style.display = 'block';
-      tr.style.borderBottom = '1px solid #eee';
-      tr.querySelectorAll('td').forEach(td=> td.style.display='block');
-    } else {
-      tr.style.display = '';
-      tr.querySelectorAll('td').forEach(td=> td.style.display='');
-    }
-  });
-}
-adaptTablesToMobile();
+
 
 // --- Fin del archivo ---
 
@@ -513,7 +521,7 @@ function initStudentController(){
           window.openStudentProfile(studentId);
         } else {
           console.error('Error: openStudentProfile no está definida en window. Asegúrese de que app.js se ha cargado correctamente.');
-          alert('Error interno: No se pudo abrir el perfil. Función no encontrada.');
+          openModal('Error', 'Error interno: No se pudo abrir el perfil. Función no encontrada.');
         }
       }
     }

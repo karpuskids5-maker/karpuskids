@@ -55,7 +55,6 @@ document.addEventListener('DOMContentLoaded', async () => {
   const sections = document.querySelectorAll('.section');
   const sidebar = document.getElementById('sidebar');
   const overlay = document.getElementById('sidebarOverlay');
-  const menuBtn = document.getElementById('menuBtn');
 
   function setActiveSection(targetId) {
     // Ocultar todas las secciones
@@ -90,6 +89,9 @@ document.addEventListener('DOMContentLoaded', async () => {
     if (targetBtn) {
       targetBtn.classList.add('active');
     }
+    
+    // Vibración al tocar (UX)
+    if (navigator.vibrate) navigator.vibrate(20);
 
     // En modo "App" (barra inferior), no necesitamos cerrar el sidebar automáticamente
     // ya que siempre debe estar visible abajo.
@@ -108,23 +110,6 @@ document.addEventListener('DOMContentLoaded', async () => {
       setActiveSection('profile');
     });
   }
-
-  // --- 3. Sidebar Móvil ---
-  // NOTA: Con el nuevo diseño de barra inferior, estas funciones de toggle ya no se usan en móvil,
-  // pero se mantienen por si se requiere compatibilidad o para el overlay en desktop si aplica.
-  function openSidebar() {
-    sidebar.classList.remove('-translate-x-full');
-    overlay.classList.remove('hidden');
-  }
-
-  function closeSidebar() {
-    sidebar.classList.add('-translate-x-full');
-    overlay.classList.add('hidden');
-  }
-
-  // Desactivamos los listeners del menú hamburguesa si ya no se usa en el diseño de barra inferior
-  // if (menuBtn) menuBtn.addEventListener('click', openSidebar);
-  // if (overlay) overlay.addEventListener('click', closeSidebar);
 
   // --- 4. Logout ---
   const btnLogout = document.getElementById('btnLogout');
@@ -190,7 +175,7 @@ async function loadDashboard() {
     const classroomId = AppState.student.classroom_id;
     const { count } = await supabase.from('tasks').select('*', { count: 'exact', head: true }).eq('classroom_id', classroomId).gte('due_date', new Date().toISOString());
     const dp = document.getElementById('dashPendingTasks'); if (dp) dp.textContent = String(count || 0);
-  } catch {}
+  } catch (err) { console.error(err); }
 }
 
 async function loadAttendance() {
@@ -238,11 +223,13 @@ async function loadAttendance() {
       const dayNum = filter === 'semana' ? dateObj.getDate() : (i + 1);
       html += `<div class="${bg} ${tx} rounded-lg p-2 text-center text-sm transition-colors flex items-center justify-center aspect-square">${dayNum}</div>`;
     }
-    grid.innerHTML = html;
-    if (pEl) pEl.textContent = String(present);
-    if (lEl) lEl.textContent = String(late);
-    if (aEl) aEl.textContent = String(absent);
-  } catch { grid.innerHTML = Helpers.emptyState('Error cargando asistencia'); }
+    requestAnimationFrame(() => {
+      grid.innerHTML = html;
+      if (pEl) pEl.textContent = String(present);
+      if (lEl) lEl.textContent = String(late);
+      if (aEl) aEl.textContent = String(absent);
+    });
+  } catch (err) { console.error(err); grid.innerHTML = Helpers.emptyState('Error cargando asistencia'); }
 }
 
 document.addEventListener('change', (e) => {
@@ -264,7 +251,7 @@ async function loadTasks() {
     const { data: evidences } = await supabase.from('task_evidences').select('task_id').eq('student_id', s.id);
     const delivered = new Set((evidences || []).map(e => e.task_id));
     if (!tasks || !tasks.length) { list.innerHTML = Helpers.emptyState('No hay tareas'); return; }
-    list.innerHTML = tasks.map(t => {
+    const html = tasks.map(t => {
       const due = t.due_date ? new Date(t.due_date) : null;
       const now = new Date();
       const st = delivered.has(t.id) ? 'Entregada' : (due && due < now ? 'Atrasada' : 'Pendiente');
@@ -285,7 +272,11 @@ async function loadTasks() {
         </div>
       </div>`;
     }).join('');
-  } catch { list.innerHTML = Helpers.emptyState('Error cargando tareas'); }
+    requestAnimationFrame(() => {
+      list.innerHTML = html;
+      if (window.lucide) lucide.createIcons();
+    });
+  } catch (err) { console.error(err); list.innerHTML = Helpers.emptyState('Error cargando tareas'); }
 }
 
 async function loadClassFeed() {
@@ -300,7 +291,7 @@ async function loadClassFeed() {
     if (!posts || !posts.length) { container.innerHTML = Helpers.emptyState('No hay publicaciones'); return; }
     const { data: likes } = await supabase.from('likes').select('post_id,user_id').in('post_id', posts.map(p=>p.id));
     const { data: comments } = await supabase.from('comments').select('post_id,content,created_at, profiles:user_id(name,avatar_url)').in('post_id', posts.map(p=>p.id)).order('created_at', { ascending: true });
-    const { data: { user } } = await supabase.auth.getUser();
+    const user = AppState.user;
     const likeMap = new Map();
     (likes||[]).forEach(l => {
       const arr = likeMap.get(l.post_id) || [];
@@ -313,7 +304,7 @@ async function loadClassFeed() {
       arr.push(c);
       commentMap.set(c.post_id, arr);
     });
-    container.innerHTML = posts.map(p => {
+    const html = posts.map(p => {
       const postLikes = likeMap.get(p.id) || [];
       const youLike = !!postLikes.find(l => l.user_id === user.id);
       const postComments = commentMap.get(p.id) || [];
@@ -355,14 +346,19 @@ async function loadClassFeed() {
         </div>
       </div>`;
     }).join('');
-  } catch { container.innerHTML = Helpers.emptyState('Error cargando muro'); }
+    requestAnimationFrame(() => {
+      container.innerHTML = html;
+      if (window.lucide) lucide.createIcons();
+    });
+  } catch (err) { console.error(err); container.innerHTML = Helpers.emptyState('Error cargando muro'); }
 }
 
 document.addEventListener('click', async (e) => {
   const likeBtn = e.target.closest('[data-action="like"]');
   if (likeBtn) {
     const postId = Number(likeBtn.dataset.post);
-    const { data: { user } } = await supabase.auth.getUser();
+    const user = AppState.user;
+    if (!user) return;
     const { data: existing } = await supabase.from('likes').select('id').eq('post_id', postId).eq('user_id', user.id).limit(1);
     if (existing && existing.length) {
       await supabase.from('likes').delete().eq('id', existing[0].id);
@@ -375,10 +371,11 @@ document.addEventListener('click', async (e) => {
   const commentBtn = e.target.closest('[data-action="comment"]');
   if (commentBtn) {
     const postId = Number(commentBtn.dataset.post);
-    const input = document.querySelector(`[input][data-post-input="${postId}"]`) || document.querySelector(`[data-post-input="${postId}"]`);
+    const input = document.querySelector(`[data-post-input="${postId}"]`);
     const content = input?.value?.trim();
     if (!content) return;
-    const { data: { user } } = await supabase.auth.getUser();
+    const user = AppState.user;
+    if (!user) return;
     await supabase.from('comments').insert({ post_id: postId, user_id: user.id, content });
     input.value = '';
     loadClassFeed();
@@ -399,7 +396,7 @@ async function loadGrades() {
     const avgBySubject = {}; let totalSum = 0, totalCount = 0;
     grades.forEach(g => { if (typeof g.score === 'number') { totalSum += g.score; totalCount += 1; avgBySubject[g.subject] = avgBySubject[g.subject] || { sum: 0, count: 0 }; avgBySubject[g.subject].sum += g.score; avgBySubject[g.subject].count += 1; } });
     const generalAvg = totalCount ? (totalSum / totalCount).toFixed(2) : '-';
-    container.innerHTML = `
+    const html = `
       <div class="card-clean overflow-hidden">
         <table class="w-full text-left text-sm">
           <thead class="bg-slate-50 border-b">
@@ -439,7 +436,11 @@ async function loadGrades() {
         </div>
       </div>
     `;
-  } catch { container.innerHTML = Helpers.emptyState('Error cargando calificaciones'); }
+    requestAnimationFrame(() => {
+      container.innerHTML = html;
+      if (window.lucide) lucide.createIcons();
+    });
+  } catch (err) { console.error(err); container.innerHTML = Helpers.emptyState('Error cargando calificaciones'); }
 }
 
 async function loadPayments() {
@@ -455,7 +456,7 @@ async function loadPayments() {
     const balance = payments.filter(p => p.status === 'confirmado' || p.status === 'efectivo').reduce((acc, p) => acc + Number(p.amount || 0), 0);
     const bEl = document.getElementById('paymentsBalance'); if (bEl) bEl.textContent = `$${balance.toFixed(2)}`;
     const vEl = document.getElementById('paymentsVerification'); if (vEl) { const pending = payments.some(p => p.status === 'pendiente'); vEl.textContent = pending ? 'Pendiente' : 'Completado'; }
-    container.innerHTML = payments.map(p => `
+    const html = payments.map(p => `
       <div class="card-clean p-4 flex justify-between items-center">
         <div>
           <p class="font-bold text-slate-800">$${p.amount}</p>
@@ -470,7 +471,11 @@ async function loadPayments() {
         </div>
       </div>
     `).join('');
-  } catch { container.innerHTML = Helpers.emptyState('Error cargando pagos'); }
+    requestAnimationFrame(() => {
+      container.innerHTML = html;
+      if (window.lucide) lucide.createIcons();
+    });
+  } catch (err) { console.error(err); container.innerHTML = Helpers.emptyState('Error cargando pagos'); }
 }
 
 async function loadNotifications() {
@@ -478,10 +483,10 @@ async function loadNotifications() {
   if (!list) return;
   list.innerHTML = Helpers.skeleton(3, 'h-12');
   try {
-    const { data: { user } } = await supabase.auth.getUser();
+    const user = AppState.user;
     const { data } = await supabase.from('notifications').select('*').eq('user_id', user.id).order('created_at', { ascending: false });
     if (!data || !data.length) { list.innerHTML = Helpers.emptyState('No hay notificaciones'); return; }
-    list.innerHTML = data.map(n => {
+    const html = data.map(n => {
       const typeCls = n.type === 'pago' ? 'bg-emerald-100 text-emerald-700' : (n.type === 'asistencia' ? 'bg-amber-100 text-amber-700' : (n.type === 'academica' ? 'bg-sky-100 text-sky-700' : 'bg-slate-100 text-slate-700'));
       return `<div class="bg-white rounded-xl shadow-sm border border-slate-100 p-4 flex items-start justify-between">
         <div>
@@ -492,7 +497,11 @@ async function loadNotifications() {
         <span class="px-3 py-1 rounded-full text-xs font-bold ${typeCls}">${n.type || 'general'}</span>
       </div>`;
     }).join('');
-  } catch { list.innerHTML = Helpers.emptyState('Error cargando notificaciones'); }
+    requestAnimationFrame(() => {
+      list.innerHTML = html;
+      if (window.lucide) lucide.createIcons();
+    });
+  } catch (err) { console.error(err); list.innerHTML = Helpers.emptyState('Error cargando notificaciones'); }
 }
 
 const FloatingNotifs = {
@@ -502,7 +511,7 @@ const FloatingNotifs = {
 
 async function showFloatingNotifications() {
   try {
-    const { data: { user } } = await supabase.auth.getUser();
+    const user = AppState.user;
     if (!user) return;
     const { data } = await supabase.from('notifications').select('*').eq('user_id', user.id).eq('is_read', false).order('created_at', { ascending: true });
     if (!data || !data.length) return;
@@ -529,7 +538,7 @@ async function showFloatingNotifications() {
         el.style.opacity = '0.9';
       }, 10);
     });
-  } catch {}
+  } catch (err) { console.error(err); }
 }
 
 function populateProfile() {

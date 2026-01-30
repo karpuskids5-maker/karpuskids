@@ -97,66 +97,18 @@ body {
 #sidebar.mobile-visible { display: block; transform: translateX(0); }
 #sidebar { transition: transform 0.25s ease-in-out; }
 
-/* Animación de sidebar en desuso, se usa display y transform */
-#sidebar.sidebar-mobile { opacity: 0; transform: translateX(-12px); transition: opacity 200ms ease, transform 200ms ease; }
-#sidebar.sidebar-mobile.sidebar-open { opacity: 1; transform: translateX(0); }
-
-/* Fade/slide suave de secciones */
-.section-anim { opacity: 0; transform: translateY(6px); transition: opacity 180ms ease, transform 180ms ease; }
-.section-anim.section-visible { opacity: 1; transform: translateY(0); }
-
-/* Overlay transición */
-#sidebarOverlay { transition: opacity 180ms ease; }
-
-/* Estilo para el botón de navegación activo */
-.teams-nav-item.active, .nav-btn.active {
-  background-color: rgba(255, 255, 255, 0.2);
-}
-
-/* ===== Ajustes específicos Panel Padres ===== */
-/* Evitar desbordes horizontales */
-body { overflow-x: hidden; }
-
-/* Alturas base estimadas para header y barra inferior */
-:root {
-  --header-h: 56px; /* h-14 */
-  --bottom-nav-h: 64px; /* h-16 */
-}
-
-/* Secciones a pantalla completa menos header+bottom-nav para evitar scroll global */
-main {
-  min-height: calc(100vh - var(--header-h) - var(--bottom-nav-h));
-  padding-bottom: 0 !important;
-}
-
-/* Secciones del panel padres (ids tab-*) */
-[id^="tab-"] {
-  min-height: calc(100vh - var(--header-h) - var(--bottom-nav-h));
-}
-
-/* Gráfico de asistencia */
-.attendance-chart {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  padding: 12px 0;
-}
-.attendance-inner { text-align: center; }
-.attendance-chart svg { display: block; margin: 0 auto; }
-.attendance-legend { margin-top: 8px; }
-
-/* Estilos para barra de navegación inferior en móvil (Panel Padres - Estilo App) */
-@media (max-width: 768px) {
-  .sidebar-btn {
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    justify-content: center;
-    padding: 0.5rem;
-    border-radius: 0.5rem;
+/* Mobile Tables */
+@media (max-width: 640px) {
+  .table-mobile tr {
+    display: block;
+    border-bottom: 1px solid #e5e7eb;
+    margin-bottom: 0.5rem;
   }
-  .sidebar-btn.active i {
-    transform: scale(1.15);
-    transition: transform 0.2s ease;
+  .table-mobile td {
+    display: block;
+    padding: 0.5rem;
+  }
+  .table-mobile thead {
+    display: none;
   }
 }
