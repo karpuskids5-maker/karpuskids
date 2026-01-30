@@ -246,6 +246,11 @@ create policy "Maestra ve estudiantes de sus aulas" on public.students for selec
 drop policy if exists "Padres ven sus hijos" on public.students;
 create policy "Padres ven sus hijos" on public.students for select using (parent_id = auth.uid());
 
+drop policy if exists "Padres actualizan datos hijo" on public.students;
+create policy "Padres actualizan datos hijo" on public.students for update
+  using (parent_id = auth.uid())
+  with check (parent_id = auth.uid());
+
 -- ATTENDANCE
 drop policy if exists "Directora ve asistencia" on public.attendance;
 create policy "Directora ve asistencia" on public.attendance for select using (
@@ -269,6 +274,10 @@ create policy "Ver posts" on public.posts for select using (true); -- Ajustar se
 
 drop policy if exists "Maestras crean posts" on public.posts;
 create policy "Maestras crean posts" on public.posts for insert with check (auth.uid() = teacher_id);
+
+-- COMMENTS
+drop policy if exists "Authenticated users can comment" on public.comments;
+create policy "Authenticated users can comment" on public.comments for insert with check (auth.role() = 'authenticated');
 
 -- LIKES
 drop policy if exists "Ver likes" on public.likes;
@@ -374,6 +383,12 @@ drop policy if exists "Public Access Payments" on storage.objects;
 create policy "Public Access Payments" on storage.objects for select using ( bucket_id = 'payments_evidence' );
 drop policy if exists "Auth Upload Payments" on storage.objects;
 create policy "Auth Upload Payments" on storage.objects for insert with check ( bucket_id = 'payments_evidence' and auth.role() = 'authenticated' );
+
+insert into storage.buckets (id, name, public) values ('avatars', 'avatars', true) on conflict do nothing;
+drop policy if exists "Public Access Avatars" on storage.objects;
+create policy "Public Access Avatars" on storage.objects for select using ( bucket_id = 'avatars' );
+drop policy if exists "Auth Upload Avatars" on storage.objects;
+create policy "Auth Upload Avatars" on storage.objects for insert with check ( bucket_id = 'avatars' and auth.role() = 'authenticated' );
 
 -- 8. PAYMENTS
 create table if not exists public.payments (

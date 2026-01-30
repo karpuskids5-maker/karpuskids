@@ -7,59 +7,103 @@
   <script src="https://cdn.tailwindcss.com"></script>
   <link rel="stylesheet" href="css/theme.css" />
   <link rel="stylesheet" href="css/layout.css" />
-  <script src="https://unpkg.com/lucide@latest/dist/umd/lucide.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/lucide@latest/dist/umd/lucide.min.js"></script>
   <link rel="icon" href="logo/favicon.ico" type="image/x-icon">
+  <style>
+    .sidebar-btn {
+      width: 100%;
+      text-align: left;
+      padding: 0.75rem 1rem;
+      display: flex;
+      align-items: center;
+      gap: 0.75rem;
+      border-radius: 0.75rem;
+      transition: all 0.2s ease;
+      color: #86efac;
+    }
+    .sidebar-btn:hover { background-color: rgba(255,255,255,0.12); color: #ffffff; }
+    .sidebar-btn.active { background-color: #ffffff; color: #16a34a; font-weight: 700; box-shadow: 0 6px 12px -2px rgba(0,0,0,0.12); }
+  </style>
 </head>
 <body class="font-nunito text-slate-800 bg-gradient-to-br from-slate-50 via-sky-50 to-white">
 
   <div class="flex min-h-screen relative">
-    <!-- SIDEBAR AZUL -->
-    <aside id="sidebar" class="w-64 fixed inset-y-0 left-0 z-30 transition-all duration-300 flex flex-col shadow-xl bg-gradient-to-b from-sky-400 to-blue-500 text-white">
-      <div class="p-6 flex items-center gap-3">
+    <!-- SIDEBAR VERDE -->
+    <aside
+      id="sidebar"
+      class="
+        fixed z-30
+        bottom-0 left-0 right-0 h-16
+        md:inset-y-0 md:left-0 md:h-auto md:w-64
+        flex md:flex-col
+        bg-gradient-to-b from-emerald-400 to-green-500
+        shadow-xl
+        transition-all duration-300
+      "
+    >
+      <div class="p-6 hidden md:flex items-center gap-3">
         <div class="w-10 h-10 bg-white/20 rounded-xl flex items-center justify-center backdrop-blur-sm">
           <img src="img/mundo.jpg" class="w-8 h-8 rounded-lg object-cover" alt="Logo">
         </div>
         <div>
           <h1 class="font-bold text-lg leading-tight text-white">Karpus Kids</h1>
-          <p class="text-xs text-blue-100">Panel Familiar</p>
+          <p class="text-xs text-emerald-100">Panel Familiar</p>
         </div>
       </div>
 
-      <div class="px-4 mb-6">
+      <div class="px-4 mb-6 hidden md:block">
         <div class="bg-white/10 rounded-xl p-3 backdrop-blur-sm border border-white/10">
-          <p class="text-xs text-blue-200 mb-1">Estudiante:</p>
+          <p class="text-xs text-emerald-200 mb-1">Estudiante:</p>
           <div id="sidebar-student-name" class="font-semibold text-white truncate">Cargando...</div>
         </div>
       </div>
 
-      <nav class="flex-1 px-4 space-y-2 overflow-y-auto">
+      <nav
+        class="
+          flex flex-row md:flex-col
+          justify-around md:justify-start
+          items-center md:items-stretch
+          w-full
+          px-2 md:px-4
+          gap-0 md:gap-2
+        "
+      >
         <button data-target="home" class="sidebar-btn active">
-          <i data-lucide="layout-dashboard" class="w-5 h-5"></i> Inicio
+          <i data-lucide="layout-dashboard" class="w-5 h-5"></i>
+          <span class="hidden md:inline">Inicio</span>
         </button>
         <button data-target="live-attendance" class="sidebar-btn">
-          <i data-lucide="calendar-check" class="w-5 h-5"></i> Asistencia
+          <i data-lucide="calendar-check" class="w-5 h-5"></i>
+          <span class="hidden md:inline">Asistencia</span>
         </button>
         <button data-target="tasks" class="sidebar-btn">
-          <i data-lucide="clipboard-list" class="w-5 h-5"></i> Tareas
+          <i data-lucide="clipboard-list" class="w-5 h-5"></i>
+          <span class="hidden md:inline">Tareas</span>
         </button>
         <button data-target="class" class="sidebar-btn">
-          <i data-lucide="users" class="w-5 h-5"></i> Muro de Clase
+          <i data-lucide="users" class="w-5 h-5"></i>
+          <span class="hidden md:inline">Muro de Clase</span>
         </button>
         <button data-target="grades" class="sidebar-btn">
-          <i data-lucide="graduation-cap" class="w-5 h-5"></i> Calificaciones
+          <i data-lucide="graduation-cap" class="w-5 h-5"></i>
+          <span class="hidden md:inline">Calificaciones</span>
         </button>
         <button data-target="payments" class="sidebar-btn">
-          <i data-lucide="credit-card" class="w-5 h-5"></i> Pagos
+          <i data-lucide="credit-card" class="w-5 h-5"></i>
+          <span class="hidden md:inline">Pagos</span>
         </button>
-        <button data-target="notifications" class="sidebar-btn">
-          <i data-lucide="bell" class="w-5 h-5"></i> Notificaciones
+        <button data-target="notifications" class="sidebar-btn relative">
+          <i data-lucide="bell" class="w-5 h-5"></i>
+          <span class="hidden md:inline">Notificaciones</span>
+          <span id="notifBadge" class="hidden absolute top-1 right-3 w-2 h-2 bg-red-500 rounded-full"></span>
         </button>
         <button data-target="profile" class="sidebar-btn">
-          <i data-lucide="user-circle" class="w-5 h-5"></i> Mi Perfil
+          <i data-lucide="user-circle" class="w-5 h-5"></i>
+          <span class="hidden md:inline">Mi Perfil</span>
         </button>
       </nav>
 
-      <div class="p-4 mt-auto">
+      <div class="p-4 mt-auto hidden md:block">
         <button id="btnLogout" class="flex items-center gap-3 text-blue-100 hover:text-white hover:bg-white/10 w-full p-3 rounded-xl transition-all">
           <i data-lucide="log-out" class="w-5 h-5"></i> Cerrar Sesión
         </button>
@@ -67,10 +111,13 @@
     </aside>
 
     <!-- CONTENIDO PRINCIPAL -->
-    <main id="layoutShell" class="flex-1 ml-64 p-4 md:p-8 transition-all duration-300">
+    <main
+      id="layoutShell"
+      class="flex-1 ml-0 md:ml-64 p-4 md:p-8 pb-24 md:pb-8 transition-all duration-300"
+    >
       <!-- Header Móvil -->
       <div class="md:hidden flex items-center justify-between mb-6">
-        <button id="menuBtn" class="p-2 bg-white rounded-lg shadow text-blue-600"><i data-lucide="menu"></i></button>
+        <button id="menuBtn" class="hidden p-2 bg-white rounded-lg shadow text-blue-600"><i data-lucide="menu"></i></button>
         <span class="font-bold text-slate-700">Karpus Kids</span>
         <div class="w-8"></div>
       </div>
@@ -86,7 +133,7 @@
             <p class="text-sm font-bold text-slate-700 student-name-display">Estudiante</p>
             <p class="text-xs text-slate-500 classroom-name-display">Aula</p>
           </div>
-          <div class="w-10 h-10 bg-blue-100 rounded-full flex items-center justify-center text-blue-600 font-bold border-2 border-white shadow-sm">
+          <div id="headerAvatar" class="w-10 h-10 bg-green-100 rounded-full flex items-center justify-center text-green-600 font-bold border-2 border-white shadow-sm cursor-pointer">
             <i data-lucide="user"></i>
           </div>
         </div>
@@ -115,7 +162,38 @@
         <!-- ASISTENCIA -->
         <section id="live-attendance" class="section hidden">
           <h3 class="text-xl font-bold mb-4">Registro de Asistencia</h3>
-          <div class="bg-white p-6 rounded-2xl shadow-sm border">
+          <div class="bg-white p-6 rounded-2xl shadow-sm border space-y-4" id="attendanceContainer">
+            <div class="flex items-center gap-3">
+              <label class="text-xs text-slate-600">Ver por</label>
+              <select id="attendanceFilter" class="px-3 py-2 border rounded-xl bg-slate-50 outline-none focus:ring-2 focus:ring-green-500 text-sm">
+                <option value="mes">Mes</option>
+                <option value="semana">Semana</option>
+              </select>
+            </div>
+            <div class="grid grid-cols-1 sm:grid-cols-4 gap-3">
+              <div class="p-4 rounded-xl bg-emerald-50 text-emerald-700">
+                <p class="text-xs">Presentes</p>
+                <p id="attPresent" class="text-2xl font-bold">0</p>
+              </div>
+              <div class="p-4 rounded-xl bg-amber-50 text-amber-700">
+                <p class="text-xs">Tardanzas</p>
+                <p id="attLate" class="text-2xl font-bold">0</p>
+              </div>
+              <div class="p-4 rounded-xl bg-rose-50 text-rose-700">
+                <p class="text-xs">Ausencias</p>
+                <p id="attAbsent" class="text-2xl font-bold">0</p>
+              </div>
+              <div class="p-4 rounded-xl bg-sky-50 text-slate-700 flex items-center justify-between">
+                <span class="text-xs">Exportar PDF</span>
+                <button id="attendanceExportBtn" class="px-3 py-2 rounded-lg bg-sky-400 text-white text-xs font-semibold hover:bg-sky-500 transition">Exportar</button>
+              </div>
+            </div>
+            <div class="flex items-center gap-3 text-xs">
+              <span class="px-2 py-1 rounded-full bg-emerald-100 text-emerald-700 font-semibold">Presente</span>
+              <span class="px-2 py-1 rounded-full bg-amber-100 text-amber-700 font-semibold">Tardanza</span>
+              <span class="px-2 py-1 rounded-full bg-rose-100 text-rose-700 font-semibold">Ausente</span>
+              <span class="px-2 py-1 rounded-full bg-slate-100 text-slate-600">Excusa</span>
+            </div>
             <div id="calendarGrid" class="grid grid-cols-7 gap-2"></div>
           </div>
         </section>
@@ -177,6 +255,13 @@
             <!-- Historial -->
             <div class="lg:col-span-2">
               <h3 class="font-bold text-lg mb-4 text-slate-800">Historial de Pagos</h3>
+              <div class="bg-white p-4 rounded-2xl shadow-sm border mb-4 flex items-center justify-between">
+                <div>
+                  <p class="text-xs text-slate-500">Balance Actual</p>
+                  <p id="paymentsBalance" class="text-xl font-bold text-slate-800">$0.00</p>
+                </div>
+                <div class="text-xs text-slate-500">Verificación: <span id="paymentsVerification" class="font-semibold">—</span></div>
+              </div>
               <div id="paymentsHistory" class="space-y-3">
                 <!-- Se llena con JS -->
               </div>
@@ -187,16 +272,70 @@
         <!-- NOTIFICACIONES -->
         <section id="notifications" class="section hidden">
           <h3 class="text-xl font-bold mb-4">Notificaciones</h3>
-          <div id="notificationsList"></div>
+          <div id="notificationsList" class="space-y-3"></div>
         </section>
 
         <!-- PERFIL -->
         <section id="profile" class="section hidden">
-          <h3 class="text-xl font-bold mb-4">Perfil del Estudiante</h3>
-          <div class="bg-white p-6 rounded-2xl shadow-sm border">
-            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div><label class="text-xs text-slate-500">Nombre</label><input id="inputStudentName" class="w-full border rounded p-2" readonly></div>
-              <!-- Más campos... -->
+          <h3 class="text-xl font-bold mb-4">Perfil</h3>
+          <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            <!-- Foto del Estudiante -->
+            <div class="bg-white p-6 rounded-2xl shadow-sm border space-y-4">
+              <h4 class="font-bold">Foto del Estudiante</h4>
+              <div class="flex flex-col items-center gap-4">
+                <img id="profileStudentPhoto" class="w-32 h-32 rounded-full object-cover bg-slate-100 border-4 border-white shadow" alt="">
+                <div class="flex gap-2">
+                  <input type="file" id="uploadStudentPhotoInput" accept="image/*" class="hidden">
+                  <button id="btnUploadStudentPhoto" class="px-4 py-2 rounded-lg bg-sky-500 text-white text-sm font-semibold hover:bg-sky-600 transition">Cambiar Foto</button>
+                  <button id="btnSavePhoto" class="px-4 py-2 rounded-lg bg-green-500 text-white text-sm font-semibold hover:bg-green-600 transition hidden">Guardar Foto</button>
+                </div>
+                <p class="text-xs text-slate-400">Formatos: JPG, PNG. Máx 2MB.</p>
+              </div>
+            </div>
+
+            <!-- Datos del Estudiante -->
+            <div class="bg-white p-6 rounded-2xl shadow-sm border space-y-4">
+              <h4 class="font-bold">Datos del Estudiante</h4>
+              <div class="grid grid-cols-1 gap-3">
+                <div><label class="text-xs text-slate-500">Nombre</label><input id="inputStudentName" class="w-full border rounded p-2 bg-slate-50" readonly></div>
+                <div><label class="text-xs text-slate-500">Dirección</label><input id="inputStudentAddress" class="w-full border rounded p-2"></div>
+                <div><label class="text-xs text-slate-500">Fecha de Nacimiento</label><input id="inputStudentBirth" type="date" class="w-full border rounded p-2"></div>
+              </div>
+              <div class="text-right">
+                <button id="btnSaveStudent" class="px-4 py-2 rounded-lg bg-green-500 text-white text-xs font-semibold hover:bg-green-600 transition">Guardar</button>
+              </div>
+            </div>
+            <div class="bg-white p-6 rounded-2xl shadow-sm border space-y-4">
+              <h4 class="font-bold">Padre</h4>
+              <div class="grid grid-cols-3 gap-3">
+                <div><label class="text-xs text-slate-500">Nombre</label><input id="profileFatherName" class="w-full border rounded p-2"></div>
+                <div><label class="text-xs text-slate-500">Teléfono</label><input id="profileFatherPhone" class="w-full border rounded p-2"></div>
+                <div><label class="text-xs text-slate-500">Correo</label><input id="profileFatherEmail" class="w-full border rounded p-2"></div>
+              </div>
+              <h4 class="font-bold">Madre</h4>
+              <div class="grid grid-cols-3 gap-3">
+                <div><label class="text-xs text-slate-500">Nombre</label><input id="profileMotherName" class="w-full border rounded p-2"></div>
+                <div><label class="text-xs text-slate-500">Teléfono</label><input id="profileMotherPhone" class="w-full border rounded p-2"></div>
+                <div><label class="text-xs text-slate-500">Correo</label><input id="profileMotherEmail" class="w-full border rounded p-2"></div>
+              </div>
+              <h4 class="font-bold">Tutor Legal</h4>
+              <div class="grid grid-cols-3 gap-3">
+                <div><label class="text-xs text-slate-500">Nombre</label><input id="profileTutorName" class="w-full border rounded p-2"></div>
+                <div><label class="text-xs text-slate-500">Teléfono</label><input id="profileTutorPhone" class="w-full border rounded p-2"></div>
+                <div><label class="text-xs text-slate-500">Parentesco</label><input id="profileTutorRelation" class="w-full border rounded p-2"></div>
+              </div>
+              <h4 class="font-bold">Persona Autorizada</h4>
+              <div class="flex items-center gap-4">
+                <img id="profilePickupPhoto" class="w-16 h-16 rounded-xl object-cover bg-slate-100" alt="">
+                <div class="grid grid-cols-3 gap-3 flex-1">
+                  <div><label class="text-xs text-slate-500">Nombre</label><input id="profilePickupName" class="w-full border rounded p-2"></div>
+                  <div><label class="text-xs text-slate-500">Teléfono</label><input id="profilePickupPhone" class="w-full border rounded p-2"></div>
+                  <div><label class="text-xs text-slate-500">Parentesco</label><input id="profilePickupRelation" class="w-full border rounded p-2"></div>
+                </div>
+              </div>
+              <div class="text-right">
+                <button id="btnSaveGuardian" class="px-4 py-2 rounded-lg bg-green-500 text-white text-xs font-semibold hover:bg-green-600 transition">Guardar</button>
+              </div>
             </div>
           </div>
         </section>
@@ -207,7 +346,6 @@
     <div id="sidebarOverlay" class="fixed inset-0 bg-black/50 z-20 hidden backdrop-blur-sm"></div>
   </div>
 
-  <script type="module" src="js/supabase.js"></script>
-  <script src="js/panel_padres.js"></script>
+  <script type="module" src="js/panel_padres.js"></script>
 </body>
 </html>

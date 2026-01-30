@@ -19,6 +19,7 @@ body {
 
 /* Accents on white cards */
 .card-white{ background:#fff; border:1px solid #e5e7eb; border-radius: 1rem; }
+.card-clean { background:#fff; border:1px solid #f1f5f9; border-radius: 0.75rem; box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.05); }
 .badge{ display:inline-block; padding:2px 8px; border-radius:10px; font-size:12px; }
 .badge-green{ background: #E8F5E9; color:#2E7D32; }
 .badge-pink{ background: #FCE4EC; color:#C2185B; }
@@ -143,3 +144,19 @@ main {
 .attendance-inner { text-align: center; }
 .attendance-chart svg { display: block; margin: 0 auto; }
 .attendance-legend { margin-top: 8px; }
+
+/* Estilos para barra de navegación inferior en móvil (Panel Padres - Estilo App) */
+@media (max-width: 768px) {
+  .sidebar-btn {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 0.5rem;
+    border-radius: 0.5rem;
+  }
+  .sidebar-btn.active i {
+    transform: scale(1.15);
+    transition: transform 0.2s ease;
+  }
+}

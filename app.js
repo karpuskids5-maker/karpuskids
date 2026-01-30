@@ -76,12 +76,22 @@ window.loadRooms = async function(teacherId = null) {
 
     const { data: teachers } = await supabase.from('profiles').select('id, name').eq('role', 'maestra');
     const teacherMap = teachers.reduce((acc, t) => ({ ...acc, [t.id]: t.name }), {});
+    const counts = await Promise.all(rooms.map(r => 
+      supabase.from('students').select('*', { count: 'exact', head: true }).eq('classroom_id', r.id)
+    ));
+    const countMap = {};
+    counts.forEach((resp, idx) => { countMap[rooms[idx].id] = resp.count || 0; });
 
     tableBody.innerHTML = rooms.map(r => `
       <tr class="hover:bg-slate-50">
         <td class="py-3 px-4 font-medium text-slate-900">${r.name}</td>
         <td class="py-3 px-4 text-slate-600">${teacherMap[r.teacher_id] || 'Sin asignar'}</td>
-        <td class="py-3 px-4 text-slate-600">${r.capacity || '-'}</td>
+        <td class="py-3 px-4 text-slate-600">
+          ${countMap[r.id] || 0} / ${r.capacity || 0}
+          <span class="ml-2 text-xs ${((r.capacity||0) - (countMap[r.id]||0)) > 0 ? 'text-amber-600' : 'text-emerald-600'}">
+            ${((r.capacity||0) - (countMap[r.id]||0)) > 0 ? `Faltan ${Math.max(0, (r.capacity||0) - (countMap[r.id]||0))}` : 'Completo'}
+          </span>
+        </td>
         <td class="py-3 px-4 text-center">
           <button class="delete-room-btn px-2 py-1 bg-red-100 text-red-700 rounded hover:bg-red-200 text-xs" data-room-id="${r.id}">
             Eliminar
@@ -405,10 +415,10 @@ document.addEventListener('DOMContentLoaded', async () => {
           <td class="py-4 px-6">
             <div class="flex items-center gap-3">
               <div class="w-10 h-10 rounded-full bg-slate-100 flex items-center justify-center text-slate-600 font-bold shadow-sm">
-                ${person.name.charAt(0)}
+                ${(person && person.name && person.name.length) ? person.name[0] : 'U'}
               </div>
               <div>
-                <div class="font-semibold text-slate-800">${person.name}</div>
+                <div class="font-semibold text-slate-800">${person?.name || 'Usuario'}</div>
                 <div class="text-xs text-slate-500">${person.role === 'maestra' ? (person.specialty || 'Docente') : 'Asistente'}</div>
               </div>
             </div>
