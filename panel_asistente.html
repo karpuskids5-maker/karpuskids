@@ -6,12 +6,12 @@
   <title>Karpus Kids — Panel Asistente</title>
   <link rel="icon" href="./logo/favicon.ico" type="image/x-icon">
   <script src="https://cdn.tailwindcss.com"></script>
-  <script src="https://cdn.jsdelivr.net/npm/lucide@0.562.0/dist/umd/lucide.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/lucide@latest/dist/umd/lucide.min.js"></script>
   <script>
     (function(){
       if(!(window.lucide && typeof lucide.createIcons==='function')){
         var s=document.createElement('script');
-        s.src='https://unpkg.com/lucide@0.562.0/dist/umd/lucide.min.js';
+        s.src='https://cdn.jsdelivr.net/npm/lucide@latest/dist/umd/lucide.min.js';
         s.async=true;document.head.appendChild(s);
       }
     })();
@@ -194,9 +194,14 @@
           <h2 class="text-xl font-bold flex items-center gap-2 text-slate-700">
             <i data-lucide="users" class="text-slate-500"></i> Directorio de Estudiantes
           </h2>
-          <div class="relative">
-            <i data-lucide="search" class="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400"></i>
-            <input id="searchStudentInput" type="text" placeholder="Buscar..." class="pl-9 pr-4 py-2 border rounded-lg text-sm w-64">
+          <div class="flex gap-2">
+            <div class="relative">
+              <i data-lucide="search" class="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400"></i>
+              <input id="searchStudentInput" type="text" placeholder="Buscar..." class="pl-9 pr-4 py-2 border rounded-lg text-sm w-64">
+            </div>
+            <button id="btnAddStudent" class="bg-teal-600 text-white px-4 py-2 rounded-lg hover:bg-teal-700 transition-colors text-sm font-medium flex items-center gap-2">
+              <i data-lucide="plus" class="w-4 h-4"></i>Nuevo Estudiante
+            </button>
           </div>
         </div>
         <div class="bg-white rounded-xl shadow-sm border overflow-hidden">
@@ -221,7 +226,10 @@
           <h2 class="text-xl font-bold flex items-center gap-2 text-slate-700">
             <i data-lucide="graduation-cap" class="text-slate-500"></i> Gestión de Maestros
           </h2>
-          <button id="btnNewTeacher" class="bg-teal-600 text-white px-4 py-2 rounded-lg hover:bg-teal-700 transition-colors text-sm font-medium flex items-center gap-2"><i data-lucide="plus" class="w-4 h-4"></i>Nuevo</button>
+          <div class="flex gap-2">
+             <div class="relative"><i data-lucide="search" class="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400"></i><input id="searchTeacherInput" placeholder="Buscar..." class="pl-9 pr-4 py-2 border rounded-lg text-sm w-64"></div>
+             <button id="btnAddTeacher" class="bg-teal-600 text-white px-4 py-2 rounded-lg hover:bg-teal-700 transition-colors text-sm font-medium flex items-center gap-2"><i data-lucide="plus" class="w-4 h-4"></i>Nuevo Maestro</button>
+          </div>
         </div>
         <div class="bg-white rounded-2xl shadow-sm border overflow-hidden">
           <table class="w-full text-sm text-left">
@@ -285,20 +293,20 @@
         <div class="bg-white rounded-2xl shadow-sm border p-4 mb-6">
           <div class="flex items-center justify-between mb-4">
             <h3 class="font-semibold">Recordatorios de Pago</h3>
-            <button id="btnSendReminders" class="px-3 py-2 rounded bg-amber-600 text-white text-sm">Enviar ahora</button>
+            <button id="btnSendReminders" class="px-3 py-2 rounded bg-amber-600 text-white text-sm hover:bg-amber-700 transition-colors flex items-center gap-2"><i data-lucide="send" class="w-4 h-4"></i> Enviar recordatorios pendientes</button>
           </div>
           <div class="grid grid-cols-1 md:grid-cols-3 gap-3">
             <div>
               <label class="text-sm text-slate-600">Día del mes</label>
-              <input id="reminderDay" type="number" min="1" max="28" class="w-full border rounded px-3 py-2" placeholder="5" />
+              <input id="reminderDay" type="number" min="1" max="28" class="w-full border rounded px-3 py-2" placeholder="Ej: 5" />
             </div>
             <div class="md:col-span-2">
               <label class="text-sm text-slate-600">Mensaje</label>
-              <input id="reminderMessage" class="w-full border rounded px-3 py-2" placeholder="Recuerde enviar su pago mensual" />
+              <input id="reminderMessage" class="w-full border rounded px-3 py-2" placeholder="Ej: Recuerde enviar su pago mensual para evitar recargos." />
             </div>
           </div>
           <div class="flex justify-end mt-3">
-            <button id="btnSaveReminder" class="px-3 py-2 rounded bg-teal-600 text-white text-sm">Guardar</button>
+            <button id="btnSaveReminder" class="px-3 py-2 rounded bg-teal-600 text-white text-sm hover:bg-teal-700">Guardar Configuración</button>
           </div>
         </div>
         <div class="bg-white rounded-2xl shadow-sm border overflow-hidden">
@@ -335,6 +343,62 @@
       </section>
 
     </main>
+  </div>
+
+  <!-- MODAL: Agregar Estudiante -->
+  <div id="modalAddStudent" class="fixed inset-0 bg-black/40 hidden flex items-center justify-center z-50">
+    <div class="bg-white rounded-lg p-6 w-full max-w-lg overflow-y-auto max-h-[90vh]">
+      <h3 class="font-semibold mb-3 flex items-center gap-2">
+        <i data-lucide="user-plus" class="w-5 h-5 text-teal-600"></i>
+        <span id="modalStudentTitle">Agregar Estudiante</span>
+      </h3>
+      <div class="grid gap-3">
+        <input type="hidden" id="stId">
+        <div>
+          <label class="text-sm text-slate-600 block mb-1">Nombre del niño</label>
+          <input id="stName" placeholder="Ej: Juan Pérez" class="w-full border rounded px-3 py-2 focus:ring-2 focus:ring-teal-500 outline-none" />
+        </div>
+        <div class="grid grid-cols-2 gap-2">
+          <div>
+            <label class="text-sm text-slate-600 block mb-1">Edad</label>
+            <input id="stAge" type="number" min="0" placeholder="Edad" class="w-full border rounded px-3 py-2 focus:ring-2 focus:ring-teal-500 outline-none" />
+          </div>
+          <div>
+            <label class="text-sm text-slate-600 block mb-1">Horario</label>
+            <input id="stSchedule" placeholder="08:00-12:00" class="w-full border rounded px-3 py-2 focus:ring-2 focus:ring-teal-500 outline-none" />
+          </div>
+          <div class="col-span-2">
+             <label class="text-sm text-slate-600 block mb-1">Aula Asignada</label>
+             <select id="stClassroom" class="w-full border rounded px-3 py-2 bg-white focus:ring-2 focus:ring-teal-500 outline-none">
+                <option value="">-- Seleccionar Aula --</option>
+             </select>
+          </div>
+        </div>
+        <div class="grid grid-cols-2 gap-2">
+          <input id="p1Name" placeholder="Padre/Madre 1 (nombre)" class="border rounded px-3 py-2 focus:ring-2 focus:ring-teal-500 outline-none" />
+          <input id="p1Phone" placeholder="Teléfono 1" class="border rounded px-3 py-2 focus:ring-2 focus:ring-teal-500 outline-none" />
+          <input id="p1Email" type="email" placeholder="Correo (Usuario de acceso)" class="border rounded px-3 py-2 focus:ring-2 focus:ring-teal-500 outline-none" />
+          <input id="p1Password" type="text" placeholder="Contraseña de acceso" class="border rounded px-3 py-2 focus:ring-2 focus:ring-teal-500 outline-none" />
+        </div>
+        <div class="grid grid-cols-2 gap-2">
+          <input id="p2Name" placeholder="Padre/Madre 2 (nombre)" class="border rounded px-3 py-2 focus:ring-2 focus:ring-teal-500 outline-none" />
+          <input id="p2Phone" placeholder="Teléfono 2" class="border rounded px-3 py-2 focus:ring-2 focus:ring-teal-500 outline-none" />
+        </div>
+        <div class="grid grid-cols-2 gap-2">
+          <input id="stAllergies" placeholder="Alergias" class="border rounded px-3 py-2 focus:ring-2 focus:ring-teal-500 outline-none" />
+          <input id="stBlood" placeholder="Tipo de Sangre" class="border rounded px-3 py-2 focus:ring-2 focus:ring-teal-500 outline-none" />
+        </div>
+        <div>
+          <label class="text-sm text-slate-600 block mb-1">Personas autorizadas para recoger</label>
+          <input id="stPickup" placeholder="Ej: Abuela Carmen, Tío Juan" class="w-full border rounded px-3 py-2 focus:ring-2 focus:ring-teal-500 outline-none" />
+        </div>
+        <label class="flex items-center gap-2"><input id="stActive" type="checkbox" checked class="rounded text-teal-600 focus:ring-teal-500" /> Estudiante activo</label>
+        <div class="flex justify-end gap-2 mt-3">
+          <button id="btnCancelStudent" class="px-4 py-2 border rounded-lg hover:bg-slate-50">Cancelar</button>
+          <button id="btnSaveStudent" class="px-4 py-2 bg-teal-600 text-white rounded-lg hover:bg-teal-700">Guardar</button>
+        </div>
+      </div>
+    </div>
   </div>
 
   <!-- Modal Detalle de Pago (Validación) -->
@@ -481,6 +545,47 @@
         <button id="confirmAccessBtn" class="px-4 py-2 rounded-lg bg-teal-600 text-white hover:bg-teal-700">Confirmar</button>
       </div>
     </div>
+  </div>
+
+  <!-- Modal Crear/Editar Maestro -->
+  <div id="modalAddTeacher" class="fixed inset-0 bg-black/50 hidden flex items-center justify-center z-50 backdrop-blur-sm p-4">
+    <div class="bg-white rounded-2xl shadow-xl w-full max-w-md">
+      <div class="p-6 border-b flex justify-between items-center">
+        <h3 class="font-bold text-lg text-slate-800 flex items-center gap-2">
+          <i data-lucide="user-plus" class="w-5 h-5 text-teal-600"></i>
+          <span id="teacherModalTitle">Agregar Maestro</span>
+        </h3>
+        <button id="btnCancelTeacher" class="text-slate-400 hover:text-slate-600 transition-colors"><i data-lucide="x" class="w-6 h-6"></i></button>
+      </div>
+      <div class="p-6 space-y-4">
+          <input type="hidden" id="teacherId">
+          <div>
+              <label class="text-sm font-medium text-slate-700 block mb-1">Nombre completo *</label>
+              <input id="teacherName" placeholder="Ej: Carlos Rivas" class="w-full border border-slate-300 rounded-xl px-3 py-2 focus:ring-2 focus:ring-teal-500 outline-none" />
+          </div>
+          <div>
+              <label class="text-sm font-medium text-slate-700 block mb-1">Correo (Usuario) *</label>
+              <input id="teacherEmail" type="email" placeholder="Ej: carlos@karpus.com" class="w-full border border-slate-300 rounded-xl px-3 py-2 focus:ring-2 focus:ring-teal-500 outline-none" />
+          </div>
+          <div>
+              <label class="text-sm font-medium text-slate-700 block mb-1">Contraseña <span id="passHint" class="text-xs font-normal text-slate-400">(Requerida para nuevos)</span></label>
+              <input id="teacherPassword" type="text" placeholder="Mínimo 6 caracteres" class="w-full border border-slate-300 rounded-xl px-3 py-2 focus:ring-2 focus:ring-teal-500 outline-none" />
+          </div>
+          <div>
+              <label class="text-sm font-medium text-slate-700 block mb-1">Teléfono</label>
+              <input id="teacherPhone" placeholder="Ej: 809-555-0000" class="w-full border border-slate-300 rounded-xl px-3 py-2 focus:ring-2 focus:ring-teal-500 outline-none" />
+          </div>
+      </div>
+      <div class="p-6 border-t bg-slate-50 rounded-b-2xl flex justify-end gap-3">
+        <button id="btnCancelTeacherFooter" class="px-5 py-2.5 border border-slate-300 rounded-xl text-slate-700 font-medium hover:bg-white transition-colors">Cancelar</button>
+        <button id="btnSaveTeacher" class="px-5 py-2.5 bg-teal-600 text-white rounded-xl font-bold shadow-lg shadow-teal-200 hover:bg-teal-700 transition-all">Guardar</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Toast Notification -->
+  <div id="toastNotification" class="fixed bottom-6 right-6 bg-slate-800 text-white px-6 py-3 rounded-xl shadow-lg transform transition-all duration-300 translate-y-20 opacity-0 z-50">
+    Notificación
   </div>
 </body>
 </html>

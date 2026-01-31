@@ -8,7 +8,7 @@
   <script src="https://cdn.tailwindcss.com"></script>
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
   <link rel="stylesheet" href="css/theme.css" />
-  <script src="https://unpkg.com/lucide@latest/dist/umd/lucide.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/lucide@latest/dist/umd/lucide.min.js"></script>
   
   <style>
     /* Sidebar styles */
@@ -150,6 +150,9 @@
           <button class="class-tab-btn px-4 py-2 rounded-t-lg font-medium text-slate-600 hover:bg-slate-100 transition-colors" data-tab="attendance">
             Asistencia
           </button>
+          <button class="class-tab-btn px-4 py-2 rounded-t-lg font-medium text-slate-600 hover:bg-slate-100 transition-colors" data-tab="tasks">
+            Tareas
+          </button>
         </div>
 
         <!-- Tab Contents -->
@@ -175,6 +178,10 @@
            <div class="bg-white p-6 rounded-2xl shadow-sm">
             <p class="text-center text-slate-500">Control de asistencia para el aula seleccionada.</p>
           </div>
+        </div>
+
+        <div id="tab-tasks" class="class-tab-content hidden">
+          <!-- Contenido de tareas cargado dinámicamente -->
         </div>
       </section>
 

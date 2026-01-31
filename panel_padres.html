@@ -39,9 +39,10 @@
     
     @media (max-width: 767px) {
       .sidebar-btn {
-        flex: 1;
-        max-width: 48px;
-        height: 48px;
+        flex: 1 1 0;
+        min-width: 56px;
+        min-height: 56px;
+        padding: 0.5rem;
       }
     }
 
@@ -64,7 +65,8 @@
         bg-gradient-to-b from-emerald-400 to-green-500
         shadow-xl
         transition-all duration-300
-        pb-[env(safe-area-inset-bottom)]
+        pt-[env(safe-area-inset-top)]
+        pb-[calc(env(safe-area-inset-bottom)+12px)]
       "
     >
       <div class="p-6 hidden md:flex items-center gap-3">
@@ -89,7 +91,7 @@
           grid grid-cols-4 md:flex
           md:flex-col
           w-full
-          px-2 md:px-4
+          px-2 md:px-4 py-1
           gap-1 md:gap-2
         "
       >
@@ -181,6 +183,19 @@
               </div>
             </div>
           </div>
+
+          <!-- Accesos Rápidos -->
+          <h3 class="text-lg font-bold text-slate-700 mt-2">¿Qué quieres hacer hoy?</h3>
+          <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
+            <button onclick="document.querySelector('[data-target=\'payments\']').click()" class="p-4 bg-white border border-slate-100 rounded-xl shadow-sm hover:shadow-md hover:border-sky-200 transition flex flex-col items-center gap-2 group">
+              <div class="w-10 h-10 rounded-full bg-sky-50 text-sky-600 flex items-center justify-center group-hover:bg-sky-500 group-hover:text-white transition"><i data-lucide="credit-card"></i></div>
+              <span class="text-sm font-semibold text-slate-600">Pagar Mensualidad</span>
+            </button>
+            <button id="btnQuickAbsence" class="p-4 bg-white border border-slate-100 rounded-xl shadow-sm hover:shadow-md hover:border-rose-200 transition flex flex-col items-center gap-2 group">
+              <div class="w-10 h-10 rounded-full bg-rose-50 text-rose-600 flex items-center justify-center group-hover:bg-rose-500 group-hover:text-white transition"><i data-lucide="calendar-x"></i></div>
+              <span class="text-sm font-semibold text-slate-600">Reportar Falta</span>
+            </button>
+          </div>
         </section>
 
         <!-- ASISTENCIA -->
@@ -224,7 +239,13 @@
 
         <!-- TAREAS -->
         <section id="tasks" class="section">
-          <h3 class="text-xl font-bold mb-4">Tareas Asignadas</h3>
+          <div class="flex items-center justify-between mb-4">
+            <h3 class="text-xl font-bold">Tareas Asignadas</h3>
+            <div class="flex bg-slate-100 p-1 rounded-lg">
+              <button class="px-3 py-1 text-xs font-bold rounded-md bg-white shadow text-slate-700 task-filter-btn transition-all" data-filter="pending">Pendientes</button>
+              <button class="px-3 py-1 text-xs font-medium rounded-md text-slate-500 hover:bg-white/50 task-filter-btn transition-all" data-filter="submitted">Entregadas</button>
+            </div>
+          </div>
           <div id="tasksList" class="space-y-4"></div>
         </section>
 
@@ -303,20 +324,6 @@
         <section id="profile" class="section">
           <h3 class="text-xl font-bold mb-4">Perfil</h3>
           <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
-            <!-- Foto del Estudiante -->
-            <div class="bg-white p-6 rounded-2xl shadow-sm border space-y-4">
-              <h4 class="font-bold">Foto del Estudiante</h4>
-              <div class="flex flex-col items-center gap-4">
-                <img id="profileStudentPhoto" class="w-32 h-32 rounded-full object-cover bg-slate-100 border-4 border-white shadow" alt="">
-                <div class="flex gap-2">
-                  <input type="file" id="uploadStudentPhotoInput" accept="image/*" class="hidden">
-                  <button id="btnUploadStudentPhoto" class="px-4 py-2 rounded-lg bg-sky-500 text-white text-sm font-semibold hover:bg-sky-600 transition">Cambiar Foto</button>
-                  <button id="btnSavePhoto" class="px-4 py-2 rounded-lg bg-green-500 text-white text-sm font-semibold hover:bg-green-600 transition hidden">Guardar Foto</button>
-                </div>
-                <p class="text-xs text-slate-400">Formatos: JPG, PNG. Máx 2MB.</p>
-              </div>
-            </div>
-
             <!-- Datos del Estudiante -->
             <div class="bg-white p-6 rounded-2xl shadow-sm border space-y-4">
               <h4 class="font-bold">Datos del Estudiante</h4>
@@ -350,7 +357,6 @@
               </div>
               <h4 class="font-bold">Persona Autorizada</h4>
               <div class="flex items-center gap-4">
-                <img id="profilePickupPhoto" class="w-16 h-16 rounded-xl object-cover bg-slate-100" alt="">
                 <div class="grid grid-cols-3 gap-3 flex-1">
                   <div><label class="text-xs text-slate-500">Nombre</label><input id="profilePickupName" class="w-full border rounded p-2"></div>
                   <div><label class="text-xs text-slate-500">Teléfono</label><input id="profilePickupPhone" class="w-full border rounded p-2"></div>
@@ -368,6 +374,90 @@
 
     <!-- Overlay Móvil -->
     <div id="sidebarOverlay" class="fixed inset-0 bg-black/50 z-20 hidden backdrop-blur-sm"></div>
+  </div>
+
+  <!-- MODAL: Reportar Ausencia (NUEVO) -->
+  <div id="modalAbsence" class="fixed inset-0 bg-black/50 z-50 hidden flex items-center justify-center p-4 backdrop-blur-sm">
+    <div class="bg-white rounded-2xl shadow-xl w-full max-w-md overflow-hidden transform transition-all scale-100">
+      <div class="p-6 border-b border-slate-100 flex justify-between items-center">
+        <h3 class="font-bold text-lg text-slate-800">Reportar Inasistencia</h3>
+        <button id="btnCloseAbsence" class="text-slate-400 hover:text-slate-600"><i data-lucide="x"></i></button>
+      </div>
+      <form id="formAbsence" class="p-6 space-y-4">
+        <div>
+          <label class="block text-sm font-medium text-slate-600 mb-1">Fecha de la falta</label>
+          <input type="date" id="absenceDate" required class="w-full px-3 py-2 border rounded-xl bg-slate-50 outline-none focus:ring-2 focus:ring-rose-500">
+        </div>
+        <div>
+          <label class="block text-sm font-medium text-slate-600 mb-1">Motivo</label>
+          <select id="absenceReason" class="w-full px-3 py-2 border rounded-xl outline-none focus:ring-2 focus:ring-rose-500">
+            <option value="Salud">Enfermedad / Salud</option>
+            <option value="Personal">Motivos Personales</option>
+            <option value="Viaje">Viaje Familiar</option>
+            <option value="Otro">Otro</option>
+          </select>
+        </div>
+        <div>
+          <label class="block text-sm font-medium text-slate-600 mb-1">Detalles (Opcional)</label>
+          <textarea id="absenceNote" rows="3" class="w-full px-3 py-2 border rounded-xl outline-none focus:ring-2 focus:ring-rose-500" placeholder="Breve descripción..."></textarea>
+        </div>
+        <div class="pt-2">
+          <button type="submit" class="w-full py-3 bg-rose-500 hover:bg-rose-600 text-white rounded-xl font-bold shadow-lg shadow-rose-200 transition-all">
+            Enviar Reporte
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- MODAL: Detalle de Tarea y Entrega (NUEVO) -->
+  <div id="modalTaskDetail" class="fixed inset-0 bg-black/50 z-50 hidden flex items-center justify-center p-4 backdrop-blur-sm">
+    <div class="bg-white rounded-2xl shadow-xl w-full max-w-lg overflow-hidden flex flex-col max-h-[90vh]">
+      <div class="p-6 border-b border-slate-100 flex justify-between items-center">
+        <h3 id="taskDetailTitle" class="font-bold text-lg text-slate-800">Detalle de Tarea</h3>
+        <button id="btnCloseTaskDetail" class="text-slate-400 hover:text-slate-600"><i data-lucide="x"></i></button>
+      </div>
+      <div class="p-6 overflow-y-auto space-y-4 flex-1">
+        <div class="flex justify-between items-start">
+          <div>
+            <span id="taskDetailStatus" class="px-2 py-1 rounded text-xs font-bold bg-slate-100 text-slate-600">Pendiente</span>
+            <p id="taskDetailDate" class="text-sm text-slate-500 mt-2">Vence: -</p>
+          </div>
+        </div>
+        <p id="taskDetailDesc" class="text-slate-700 text-sm leading-relaxed bg-slate-50 p-4 rounded-xl"></p>
+        
+        <div class="border-t border-slate-100 pt-4 mt-4">
+          <h4 class="font-bold text-slate-800 mb-3">Tu Entrega</h4>
+          
+          <!-- Formulario de subida -->
+          <div id="uploadSection" class="space-y-3">
+            <div class="border-2 border-dashed border-slate-200 rounded-xl p-6 text-center hover:bg-slate-50 transition cursor-pointer relative group">
+              <input type="file" id="taskFileInput" accept="image/*,application/pdf" class="absolute inset-0 opacity-0 cursor-pointer z-10">
+              <i data-lucide="upload-cloud" class="mx-auto w-8 h-8 text-sky-400 mb-2 group-hover:scale-110 transition-transform"></i>
+              <p class="text-sm text-slate-600 font-medium">Toca para subir evidencia</p>
+              <p id="fileNameDisplay" class="text-xs text-sky-600 font-bold mt-2 min-h-[1rem]"></p>
+            </div>
+            <textarea id="taskCommentInput" rows="2" class="w-full border rounded-xl px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-sky-500" placeholder="Comentario opcional..."></textarea>
+            <button id="btnSubmitTask" class="w-full py-3 bg-sky-500 hover:bg-sky-600 text-white rounded-xl font-bold shadow-lg shadow-sky-200 transition-all">Enviar Tarea</button>
+          </div>
+
+          <!-- Vista de tarea ya entregada -->
+          <div id="evidenceSection" class="hidden bg-emerald-50 rounded-xl p-4 border border-emerald-100">
+            <div class="flex items-center gap-3 mb-2">
+              <div class="w-8 h-8 rounded-full bg-emerald-100 text-emerald-600 flex items-center justify-center"><i data-lucide="check"></i></div>
+              <div>
+                <p class="text-sm font-bold text-emerald-800">Tarea Entregada</p>
+                <p id="evidenceDate" class="text-xs text-emerald-600">Fecha: -</p>
+              </div>
+            </div>
+            <p id="evidenceComment" class="text-sm text-slate-600 mb-2 italic"></p>
+            <a id="evidenceLink" href="#" target="_blank" class="text-xs text-sky-600 font-bold underline flex items-center gap-1 hover:text-sky-800">
+              <i data-lucide="external-link" class="w-3 h-3"></i> Ver archivo adjunto
+            </a>
+          </div>
+        </div>
+      </div>
+    </div>
   </div>
 
   <script type="module" src="js/panel_padres.js"></script>

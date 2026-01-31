@@ -3,7 +3,8 @@ import { supabase } from './supabase.js';
 const AppState = {
   user: null,
   profile: null,
-  student: null
+  student: null,
+  tasks: [] // Almacén local de tareas para acceso rápido
 };
 
 const Helpers = {
@@ -23,6 +24,7 @@ const Helpers = {
 document.addEventListener('DOMContentLoaded', async () => {
   // Inicializar iconos Lucide
   if (window.lucide) lucide.createIcons();
+  if ('serviceWorker' in navigator) { try { await navigator.serviceWorker.register('./sw.js'); } catch(e){} }
 
   // --- 1. Verificación de Sesión ---
   const { data: { user } } = await supabase.auth.getUser();
@@ -129,7 +131,89 @@ document.addEventListener('DOMContentLoaded', async () => {
   }
   
   setActiveSection('home');
+  
+  // Inicializar módulo de ausencias
+  initAbsenceModule();
+
+  // Lógica visual para filtros de tareas
+  const taskFilters = document.querySelectorAll('.task-filter-btn');
+  taskFilters.forEach(btn => {
+    btn.addEventListener('click', (e) => {
+      // Reset estilos visuales
+      taskFilters.forEach(b => {
+        b.classList.remove('bg-white', 'shadow', 'text-slate-700', 'font-bold');
+        b.classList.add('text-slate-500', 'font-medium');
+      });
+      // Activar botón actual
+      e.target.classList.remove('text-slate-500', 'font-medium');
+      e.target.classList.add('bg-white', 'shadow', 'text-slate-700', 'font-bold');
+      
+      // Recargar tareas con el filtro seleccionado
+      const filter = e.target.dataset.filter; // 'pending' o 'submitted'
+      loadTasks(filter);
+    });
+  });
+
+  // Inicializar módulo de entrega de tareas
+  initTaskSubmissionModule();
 });
+
+function initAbsenceModule() {
+  const btnQuick = document.getElementById('btnQuickAbsence');
+  const modal = document.getElementById('modalAbsence');
+  const btnClose = document.getElementById('btnCloseAbsence');
+  const form = document.getElementById('formAbsence');
+
+  // Abrir Modal
+  if (btnQuick) {
+    btnQuick.addEventListener('click', () => {
+      const today = new Date().toISOString().split('T')[0];
+      const dateInput = document.getElementById('absenceDate');
+      if (dateInput) dateInput.value = today;
+      modal.classList.remove('hidden');
+    });
+  }
+
+  // Cerrar Modal
+  if (btnClose) {
+    btnClose.addEventListener('click', () => modal.classList.add('hidden'));
+  }
+
+  // Enviar Formulario
+  if (form) {
+    form.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const date = document.getElementById('absenceDate').value;
+      const reason = document.getElementById('absenceReason').value;
+      const note = document.getElementById('absenceNote').value;
+      
+      if (!AppState.student?.id) {
+        Helpers.toast('Error: No se identificó al estudiante', 'error');
+        return;
+      }
+
+      try {
+        // Insertar en la tabla de solicitudes (asegúrate de crear la tabla 'attendance_requests' en Supabase)
+        const { error } = await supabase.from('attendance_requests').insert({
+          student_id: AppState.student.id,
+          date: date,
+          reason: reason,
+          note: note,
+          status: 'pending'
+        });
+
+        if (error) throw error;
+        
+        Helpers.toast(`Reporte enviado para el día ${date}`, 'success');
+        modal.classList.add('hidden');
+        form.reset();
+      } catch (err) {
+        console.error(err);
+        Helpers.toast('Error al enviar el reporte', 'error');
+      }
+    });
+  }
+}
 
 async function loadStudentData() {
   const { data, error } = await supabase
@@ -238,7 +322,7 @@ document.addEventListener('change', (e) => {
   }
 });
 
-async function loadTasks() {
+async function loadTasks(filter = 'pending') {
   const list = document.getElementById('tasksList');
   if (!list) return;
   list.innerHTML = Helpers.skeleton(3, 'h-24');
@@ -248,16 +332,27 @@ async function loadTasks() {
 
     const subject = s.classrooms?.level || 'General';
     const { data: tasks } = await supabase.from('tasks').select('*').eq('classroom_id', s.classroom_id).order('due_date');
+    AppState.tasks = tasks || []; // Guardar en estado global
     const { data: evidences } = await supabase.from('task_evidences').select('task_id').eq('student_id', s.id);
     const delivered = new Set((evidences || []).map(e => e.task_id));
-    if (!tasks || !tasks.length) { list.innerHTML = Helpers.emptyState('No hay tareas'); return; }
-    const html = tasks.map(t => {
+    
+    // Filtrar tareas según la selección
+    const filteredTasks = (tasks || []).filter(t => {
+      const isDelivered = delivered.has(t.id);
+      if (filter === 'pending') return !isDelivered;
+      if (filter === 'submitted') return isDelivered;
+      return true;
+    });
+
+    if (!filteredTasks.length) { list.innerHTML = Helpers.emptyState(filter === 'pending' ? '¡Todo al día! No hay tareas pendientes.' : 'No hay tareas entregadas aún.'); return; }
+    
+    const html = filteredTasks.map(t => {
       const due = t.due_date ? new Date(t.due_date) : null;
       const now = new Date();
       const st = delivered.has(t.id) ? 'Entregada' : (due && due < now ? 'Atrasada' : 'Pendiente');
       const stCls = st === 'Entregada' ? 'bg-emerald-100 text-emerald-700' : (st === 'Atrasada' ? 'bg-rose-100 text-rose-700' : 'bg-amber-100 text-amber-700');
       const dueTxt = due ? due.toLocaleDateString() : '-';
-      return `<div class="card-clean p-4">
+      return `<div class="bg-white border border-slate-100 rounded-2xl p-4 shadow-sm hover:shadow-lg transition-transform duration-200 will-change-transform hover:scale-[1.02] active:scale-95">
         <div class="flex justify-between items-start">
           <div>
             <h4 class="font-bold text-[#1E293B]">${t.title}</h4>
@@ -268,7 +363,7 @@ async function loadTasks() {
         <p class="text-sm text-[#1E293B]/70 mt-2">${t.description || ''}</p>
         <div class="mt-2 text-xs text-slate-500">Entrega: ${dueTxt}</div>
         <div class="mt-3 flex gap-2">
-          <button class="px-4 py-2 rounded-xl bg-sky-400 text-white text-xs font-semibold hover:bg-sky-500 transition">Ver detalle</button>
+          <button class="px-4 py-2 rounded-xl bg-sky-400 text-white text-xs font-semibold hover:bg-sky-500 transition btn-view-task" data-id="${t.id}">Ver detalle / Entregar</button>
         </div>
       </div>`;
     }).join('');
@@ -546,9 +641,6 @@ function populateProfile() {
   if (!s) return;
 
   const setVal = (id, val) => { const el = document.getElementById(id); if (el) el.value = val || ''; };
-  const setImg = (id, url) => { const el = document.getElementById(id); if (el) el.src = url || ''; };
-  
-  setImg('profileStudentPhoto', s.avatar_url || '');
   setVal('inputStudentName', s.name || '');
   setVal('inputStudentBirth', s.start_date || '');
   setVal('inputStudentAddress', s.p1_address || '');
@@ -561,54 +653,12 @@ function populateProfile() {
   setVal('profileTutorName', s.tutor_name || '');
   setVal('profileTutorPhone', s.tutor_phone || '');
   setVal('profileTutorRelation', s.tutor_relation || '');
-  setImg('profilePickupPhoto', s.pickup_photo || '');
   setVal('profilePickupName', s.pickup_person_name || '');
   setVal('profilePickupPhone', s.pickup_person_phone || '');
   setVal('profilePickupRelation', s.pickup_person_relation || '');
 }
 
 document.addEventListener('click', async (e) => {
-  if (e.target && e.target.id === 'btnUploadStudentPhoto') {
-    document.getElementById('uploadStudentPhotoInput')?.click();
-  }
-  
-  if (e.target && e.target.id === 'btnSavePhoto') {
-    const fileInput = document.getElementById('uploadStudentPhotoInput');
-    const file = fileInput?.files[0];
-    if (!file || !AppState.student) return;
-    
-    try {
-      e.target.disabled = true;
-      e.target.textContent = 'Subiendo...';
-      const ext = file.name.split('.').pop();
-      const fileName = `${AppState.student.id}/avatar.${ext}`;
-      
-      const { error: uploadError } = await supabase.storage
-        .from('avatars')
-        .upload(fileName, file, { upsert: true });
-        
-      if (uploadError) throw uploadError;
-      
-      const { data: { publicUrl } } = supabase.storage.from('avatars').getPublicUrl(fileName);
-      
-      const { error: updateError } = await supabase
-        .from('students')
-        .update({ avatar_url: publicUrl })
-        .eq('id', AppState.student.id);
-        
-      if (updateError) throw updateError;
-      
-      Helpers.toast('Foto actualizada correctamente', 'success');
-      document.getElementById('profileStudentPhoto').src = publicUrl;
-      e.target.classList.add('hidden');
-    } catch (err) {
-      console.error(err);
-      Helpers.toast('Error al subir foto', 'error');
-    } finally {
-      e.target.disabled = false;
-      e.target.textContent = 'Guardar Foto';
-    }
-  }
 
   if (e.target && e.target.id === 'btnSaveStudent') {
     const updates = {
@@ -641,19 +691,136 @@ document.addEventListener('click', async (e) => {
   }
 });
 
-document.getElementById('uploadStudentPhotoInput')?.addEventListener('change', (e) => {
-  if (e.target.files && e.target.files[0]) {
-    const reader = new FileReader();
-    reader.onload = (ev) => {
-      document.getElementById('profileStudentPhoto').src = ev.target.result;
-      document.getElementById('btnSavePhoto').classList.remove('hidden');
-    };
-    reader.readAsDataURL(e.target.files[0]);
-  }
-});
-
 function printReceipt(id) {
   const w = window.open('', '_blank'); if (!w) return;
   w.document.write(`<html><head><title>Recibo</title><style>body{font-family: Nunito, sans-serif;padding:20px}</style></head><body><h3>Recibo de Pago</h3><p>ID: ${id}</p></body></html>`);
   w.document.close(); w.focus(); w.print(); w.close();
+}
+
+// --- MÓDULO DE ENTREGA DE TAREAS ---
+function initTaskSubmissionModule() {
+  const modal = document.getElementById('modalTaskDetail');
+  const btnClose = document.getElementById('btnCloseTaskDetail');
+  const fileInput = document.getElementById('taskFileInput');
+  const fileNameDisplay = document.getElementById('fileNameDisplay');
+  const btnSubmit = document.getElementById('btnSubmitTask');
+  let currentTaskId = null;
+
+  // Cerrar modal
+  if (btnClose) btnClose.addEventListener('click', () => modal.classList.add('hidden'));
+
+  // Listener delegado para abrir modal desde la lista
+  document.getElementById('tasksList')?.addEventListener('click', (e) => {
+    if (e.target.classList.contains('btn-view-task')) {
+      const id = e.target.dataset.id;
+      openTaskDetail(id);
+    }
+  });
+
+  // Mostrar nombre del archivo seleccionado
+  if (fileInput) {
+    fileInput.addEventListener('change', (e) => {
+      const file = e.target.files[0];
+      fileNameDisplay.textContent = file ? `Archivo: ${file.name}` : '';
+      fileNameDisplay.classList.remove('hidden');
+    });
+  }
+
+  // Enviar tarea
+  if (btnSubmit) {
+    btnSubmit.addEventListener('click', async () => {
+      const file = fileInput.files[0];
+      const comment = document.getElementById('taskCommentInput').value;
+
+      if (!file) {
+        Helpers.toast('Por favor selecciona un archivo', 'info');
+        return;
+      }
+
+      try {
+        btnSubmit.disabled = true;
+        btnSubmit.textContent = 'Subiendo...';
+
+        // 1. Subir archivo a Storage (Bucket: classroom_media)
+        const fileExt = file.name.split('.').pop();
+        const fileName = `homeworks/${AppState.student.id}_${currentTaskId}_${Date.now()}.${fileExt}`;
+        
+        const { error: uploadError } = await supabase.storage
+          .from('classroom_media')
+          .upload(fileName, file);
+
+        if (uploadError) throw uploadError;
+
+        const { data: { publicUrl } } = supabase.storage
+          .from('classroom_media')
+          .getPublicUrl(fileName);
+
+        // 2. Guardar registro en BD
+        const { error: dbError } = await supabase.from('task_evidences').insert({
+          task_id: currentTaskId,
+          student_id: AppState.student.id,
+          parent_id: AppState.user.id,
+          file_url: publicUrl,
+          comment: comment,
+          status: 'submitted'
+        });
+
+        if (dbError) throw dbError;
+
+        Helpers.toast('Tarea entregada con éxito', 'success');
+        modal.classList.add('hidden');
+        loadTasks(); // Recargar lista
+
+      } catch (err) {
+        console.error(err);
+        Helpers.toast('Error al entregar la tarea', 'error');
+      } finally {
+        btnSubmit.disabled = false;
+        btnSubmit.textContent = 'Enviar Tarea';
+      }
+    });
+  }
+
+  async function openTaskDetail(id) {
+    currentTaskId = id;
+    const task = AppState.tasks.find(t => t.id == id);
+    if (!task) return;
+
+    // Llenar datos básicos
+    document.getElementById('taskDetailTitle').textContent = task.title;
+    document.getElementById('taskDetailDesc').textContent = task.description || 'Sin descripción';
+    document.getElementById('taskDetailDate').textContent = task.due_date ? `Vence: ${new Date(task.due_date).toLocaleDateString()}` : 'Sin fecha límite';
+
+    // Verificar si ya entregó
+    const { data: evidence } = await supabase.from('task_evidences')
+      .select('*')
+      .eq('task_id', id)
+      .eq('student_id', AppState.student.id)
+      .maybeSingle();
+
+    const uploadSec = document.getElementById('uploadSection');
+    const evidenceSec = document.getElementById('evidenceSection');
+    
+    // Resetear formulario
+    if (fileInput) fileInput.value = '';
+    if (fileNameDisplay) fileNameDisplay.textContent = '';
+    document.getElementById('taskCommentInput').value = '';
+
+    if (evidence) {
+      uploadSec.classList.add('hidden');
+      evidenceSec.classList.remove('hidden');
+      document.getElementById('evidenceDate').textContent = `Entregado el: ${new Date(evidence.created_at).toLocaleString()}`;
+      document.getElementById('evidenceComment').textContent = evidence.comment ? `"${evidence.comment}"` : '';
+      document.getElementById('evidenceLink').href = evidence.file_url;
+      document.getElementById('taskDetailStatus').textContent = 'Entregada';
+      document.getElementById('taskDetailStatus').className = 'px-2 py-1 rounded text-xs font-bold bg-emerald-100 text-emerald-700';
+    } else {
+      uploadSec.classList.remove('hidden');
+      evidenceSec.classList.add('hidden');
+      document.getElementById('taskDetailStatus').textContent = 'Pendiente';
+      document.getElementById('taskDetailStatus').className = 'px-2 py-1 rounded text-xs font-bold bg-slate-100 text-slate-600';
+    }
+
+    modal.classList.remove('hidden');
+  }
 }

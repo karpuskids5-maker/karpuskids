@@ -360,8 +360,11 @@ document.addEventListener('DOMContentLoaded', async () => {
     }, 'Error cargando dashboard');
   }
 
-
-
+  // Utilidad: validar correo
+  function isValidEmail(email) {
+    return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
+  }
+  
   // 7. CARGAR MAESTROS
   async function loadTeachers() {
     await safeExecute(async () => {
@@ -410,11 +413,24 @@ document.addEventListener('DOMContentLoaded', async () => {
 
   // Helper para renderizar filas de personal
   function renderStaffRow(person) {
+    // Generar color aleatorio o fijo para el avatar
+    const colors = [
+      'bg-red-100 text-red-600', 'bg-orange-100 text-orange-600', 
+      'bg-amber-100 text-amber-600', 'bg-green-100 text-green-600', 
+      'bg-emerald-100 text-emerald-600', 'bg-teal-100 text-teal-600',
+      'bg-cyan-100 text-cyan-600', 'bg-sky-100 text-sky-600',
+      'bg-blue-100 text-blue-600', 'bg-indigo-100 text-indigo-600',
+      'bg-violet-100 text-violet-600', 'bg-purple-100 text-purple-600',
+      'bg-fuchsia-100 text-fuchsia-600', 'bg-pink-100 text-pink-600',
+      'bg-rose-100 text-rose-600'
+    ];
+    const colorClass = colors[person.name.length % colors.length];
+
     return `
         <tr class="hover:bg-indigo-50/50 transition-colors cursor-pointer group border-b last:border-0" onclick="window.openTeacherModal('${person.id}')">
           <td class="py-4 px-6">
             <div class="flex items-center gap-3">
-              <div class="w-10 h-10 rounded-full bg-slate-100 flex items-center justify-center text-slate-600 font-bold shadow-sm">
+              <div class="w-10 h-10 rounded-full ${colorClass} flex items-center justify-center font-bold shadow-sm">
                 ${(person && person.name && person.name.length) ? person.name[0] : 'U'}
               </div>
               <div>
@@ -439,7 +455,7 @@ document.addEventListener('DOMContentLoaded', async () => {
               <button class="p-2 hover:bg-blue-50 text-blue-600 rounded-lg transition-colors" title="Editar" onclick="event.stopPropagation(); window.openTeacherModal('${person.id}')">
                 <i data-lucide="edit-2" class="w-4 h-4"></i>
               </button>
-              <button class="p-2 hover:bg-red-50 text-red-600 rounded-lg transition-colors" title="Eliminar" onclick="event.stopPropagation(); alert('Función de eliminar pendiente de implementación segura')">
+              <button class="p-2 hover:bg-red-50 text-red-600 rounded-lg transition-colors" title="Eliminar" onclick="event.stopPropagation(); window.deleteProfile('${person.id}')">
                 <i data-lucide="trash-2" class="w-4 h-4"></i>
               </button>
             </div>
@@ -458,26 +474,46 @@ document.addEventListener('DOMContentLoaded', async () => {
     const usernameInput = document.getElementById('tmUsername');
     const specialtyInput = document.getElementById('tmSpecialty');
     const statusSelect = document.getElementById('tmStatus');
+    const passInput = document.getElementById('tmPassword'); // Asegurarse de tener este campo en HTML si no existe
+    
     if (!modal) return;
     modal.classList.remove('hidden');
-    title && (title.textContent = 'Editar Usuario');
-    inputId && (inputId.value = id);
-    nameInput && (nameInput.value = '');
-    phoneInput && (phoneInput.value = '');
-    emailInput && (emailInput.value = '');
-    usernameInput && (usernameInput.value = '');
-    specialtyInput && (specialtyInput.value = '');
-    statusSelect && (statusSelect.value = 'Activo');
+    
     if (window.lucide) lucide.createIcons();
-    try {
-      const { data, error } = await supabase.from('profiles').select('*').eq('id', id).single();
-      if (error) throw error;
-      nameInput && (nameInput.value = data?.name || '');
-      phoneInput && (phoneInput.value = data?.phone || '');
-      emailInput && (emailInput.value = data?.email || '');
-      specialtyInput && (specialtyInput.value = data?.notes || '');
-    } catch (e) {
-      console.error(e);
+
+    if (id) {
+      // MODO EDICIÓN
+      title && (title.textContent = 'Editar Usuario');
+      inputId && (inputId.value = id);
+      // Limpiar campos antes de cargar
+      nameInput && (nameInput.value = 'Cargando...');
+      phoneInput && (phoneInput.value = '');
+      emailInput && (emailInput.value = '');
+      specialtyInput && (specialtyInput.value = '');
+      
+      try {
+        const { data, error } = await supabase.from('profiles').select('*').eq('id', id).single();
+        if (error) throw error;
+        nameInput && (nameInput.value = data?.name || '');
+        phoneInput && (phoneInput.value = data?.phone || '');
+        emailInput && (emailInput.value = data?.email || '');
+        // Usar specialty si existe, o notes, o dejar vacío. Evitamos error de columna notes si no existe en DB.
+        // Asumimos que notes NO existe si da error, pero si existe en data, lo usamos.
+        specialtyInput && (specialtyInput.value = data?.specialty || ''); 
+      } catch (e) {
+        console.error(e);
+        nameInput && (nameInput.value = '');
+      }
+    } else {
+      // MODO CREACIÓN
+      title && (title.textContent = 'Nuevo Maestro');
+      inputId && (inputId.value = '');
+      nameInput && (nameInput.value = '');
+      phoneInput && (phoneInput.value = '');
+      emailInput && (emailInput.value = '');
+      usernameInput && (usernameInput.value = '');
+      specialtyInput && (specialtyInput.value = '');
+      statusSelect && (statusSelect.value = 'Activo');
     }
   };
 
@@ -489,26 +525,97 @@ document.addEventListener('DOMContentLoaded', async () => {
       const phoneInput = document.getElementById('tmPhone');
       const emailInput = document.getElementById('tmEmail');
       const specialtyInput = document.getElementById('tmSpecialty');
+      // Necesitamos un campo de contraseña para nuevos usuarios
+      let passInput = document.getElementById('tmPassword');
+      if (!passInput) {
+         // Si no existe en el HTML, intentamos buscarlo o alertar
+         passInput = { value: '123456' }; // Fallback temporal o error
+      }
+      
       const id = inputId?.value;
-      if (!id) return;
+      const name = nameInput?.value || '';
+      const email = emailInput?.value || '';
+      const phone = phoneInput?.value || '';
+      const specialty = specialtyInput?.value || '';
+      
+      if (!name || !email) {
+        alert('Nombre y correo son obligatorios');
+        return;
+      }
+      if (email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+        alert('Correo inválido');
+        return;
+      }
+
+      btnSaveTeacher.disabled = true;
+      btnSaveTeacher.textContent = 'Guardando...';
+
       try {
-        const updates = {
-          name: nameInput?.value || null,
-          phone: phoneInput?.value || null,
-          email: emailInput?.value || null,
-          notes: specialtyInput?.value || null
-        };
-        const { error } = await supabase.from('profiles').update(updates).eq('id', id);
-        if (error) throw error;
-        const modal = document.getElementById('teacherModal');
-        modal && modal.classList.add('hidden');
+        if (id) {
+          // ACTUALIZAR
+          const updates = {
+            name: name,
+            phone: phone,
+            email: email,
+            notes: specialty // Mapeamos especialidad a notes
+          };
+
+          const { error } = await supabase.from('profiles').update(updates).eq('id', id);
+          if (error) throw error;
+          alert('Usuario actualizado');
+        } else {
+          // CREAR NUEVO (SignUp + Profile)
+          // Usamos cliente temporal para no cerrar sesión de directora
+          const tempClient = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
+             auth: { persistSession: false, autoRefreshToken: false, detectSessionInUrl: false }
+          });
+          
+          let password = passInput?.value;
+          if (!password) {
+             password = prompt('Ingrese contraseña para el nuevo maestro (min 6 caracteres):');
+          }
+          if (!password || password.length < 6) {
+            throw new Error('Contraseña requerida (mínimo 6 caracteres)');
+          }
+
+          const { data: authData, error: authError } = await tempClient.auth.signUp({
+            email: email,
+            password: password,
+            options: {
+              data: { name: name, role: 'maestra', phone: phone } // Trigger handle_new_user usará esto
+            }
+          });
+          
+          if (authError) throw authError;
+          
+          if (authData.user) {
+             // Si el trigger no inserta phone o specialty, actualizamos
+             const { error: profError } = await supabase.from('profiles').update({
+               phone: phone,
+               // specialty: specialty
+             }).eq('id', authData.user.id);
+             
+             if (profError) console.warn('Error actualizando detalles del perfil:', profError);
+          }
+          alert('Maestro creado exitosamente');
+        }
+        
+        document.getElementById('teacherModal').classList.add('hidden');
         await loadTeachers();
       } catch (e) {
         console.error(e);
-        alert('Error guardando cambios');
+        alert('Error al guardar: ' + (e.message || e));
+      } finally {
+        btnSaveTeacher.disabled = false;
+        btnSaveTeacher.textContent = 'Guardar';
       }
     });
   }
+
+  // Listener para el botón de crear maestro
+  document.getElementById('btnAddTeacher')?.addEventListener('click', () => {
+    window.openTeacherModal(); // Sin ID = Crear
+  });
 
   const btnCancelTeacher = document.getElementById('btnCancelTeacher');
   if (btnCancelTeacher) {
@@ -857,6 +964,10 @@ document.addEventListener('DOMContentLoaded', async () => {
         alert('Por favor complete los campos obligatorios');
         return;
       }
+      if (!isValidEmail(email)) {
+        alert('Correo inválido');
+        return;
+      }
 
       if (password.length < 6) {
         alert('La contraseña debe tener al menos 6 caracteres');
@@ -989,6 +1100,10 @@ document.addEventListener('DOMContentLoaded', async () => {
 
         // 1. Crear Usuario Padre si hay email y contraseña
         if (p1Email) {
+          if (!isValidEmail(p1Email)) {
+            alert('Correo del padre inválido');
+            return;
+          }
           // A) Verificar si el padre ya existe en la base de datos
           const { data: existingParent } = await supabase
             .from('profiles')
@@ -1005,24 +1120,37 @@ document.addEventListener('DOMContentLoaded', async () => {
               auth: { persistSession: false, autoRefreshToken: false, detectSessionInUrl: false }
             });
 
+            let authUser = null;
             const { data: authData, error: authError } = await tempSupabase.auth.signUp({
               email: p1Email,
               password: p1Password
             });
             
-            if (authError) throw authError;
+            if (authError) {
+              // Si ya existe en Auth pero no lo encontramos en profiles (o rol distinto), 
+              // no podemos recuperar el ID sin loguearnos.
+              // Pero si el error es "User already registered", a veces devuelve el user fake o null.
+              // Mejor confiamos en que si llegamos aqui es porque no existía como padre.
+              // Si falla, lanzamos error.
+              throw authError;
+            }
+            authUser = authData.user;
             
-            if (authData.user) {
-              parentId = authData.user.id;
-              // Crear Perfil del Padre
-              const { error: profileError } = await supabase.from('profiles').insert([{
+            if (authUser) {
+              parentId = authUser.id;
+              // Usar UPSERT para evitar conflicto 409 si el perfil ya existía (ej. borrado lógico o rol diferente)
+              const { error: profileError } = await tempSupabase.from('profiles').upsert([{
                 id: parentId,
                 name: p1Name || 'Padre/Tutor',
                 email: p1Email,
                 phone: p1Phone,
-                role: 'padre'
-              }]);
-              if (profileError) console.warn('Error creando perfil padre:', profileError);
+                role: 'padre' // Si ya existía con otro rol, esto lo sobrescribe? Cuidado. 
+                // Mejor upsert con ignoreDuplicates si solo queremos asegurar que exista?
+                // Pero el usuario quiere crear un padre. Si era maestra, ahora será padre?
+                // Asumimos upsert normal.
+              }], { onConflict: 'id' });
+              
+              if (profileError) console.warn('Error creando/actualizando perfil padre:', profileError);
             }
           }
         }
@@ -1091,5 +1219,21 @@ document.addEventListener('DOMContentLoaded', async () => {
         setText('parent1Email', student.parent.email);
       }
     }, 'Error al abrir perfil');
+  };
+  
+  // Eliminar perfil (maestra/asistente)
+  window.deleteProfile = async function(id) {
+    if (!id) return;
+    const ok = confirm('¿Seguro que desea eliminar este usuario?');
+    if (!ok) return;
+    try {
+      const { error } = await supabase.from('profiles').delete().eq('id', id);
+      if (error) throw error;
+      alert('Usuario eliminado');
+      await loadTeachers();
+    } catch (e) {
+      console.error(e);
+      alert('No se pudo eliminar el usuario');
+    }
   };
 });

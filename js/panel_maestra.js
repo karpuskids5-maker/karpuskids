@@ -1,4 +1,4 @@
-import { supabase, ensureRole } from './supabase.js';
+import { supabase, ensureRole, sendPush } from './supabase.js';
 
 // --- 1. HELPERS & UTILS ---
 const Helpers = {
@@ -41,6 +41,11 @@ const Helpers = {
   formatDate(dateStr) {
     if (!dateStr) return '-';
     return new Date(dateStr).toLocaleDateString('es-ES', { year: 'numeric', month: 'long', day: 'numeric' });
+  },
+
+  escapeHTML(str) {
+    if (!str) return '';
+    return str.replace(/[&<>"']/g, m => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#039;' }[m]));
   }
 };
 
@@ -135,6 +140,12 @@ const UI = {
         document.querySelector('[data-section="t-home"]')?.click();
     });
 
+    // Logout (Movido aquí correctamente)
+    document.getElementById('logoutBtn')?.addEventListener('click', async () => {
+        try { await supabase.auth.signOut(); } catch(e){}
+        window.location.href = 'login.html';
+    });
+
     // Class Tabs
     document.querySelectorAll('.class-tab-btn').forEach(btn => {
       btn.addEventListener('click', () => {
@@ -150,6 +161,18 @@ const UI = {
             const id = classCard.dataset.id;
             const name = classCard.dataset.name;
             this.openClass({ id, name });
+        }
+
+        // View Student Profile (Delegación)
+        if (e.target.closest('.btn-view-profile')) {
+            const btn = e.target.closest('.btn-view-profile');
+            this.openStudentProfile(btn.dataset.id);
+        }
+
+        // Daily Log Student Select (Delegación)
+        if (e.target.closest('.btn-log-student')) {
+            const btn = e.target.closest('.btn-log-student');
+            this.openDailyLogModal(btn.dataset.id, btn.dataset.name);
         }
     });
     
@@ -246,7 +269,11 @@ const UI = {
   },
 
   async openClassById(id) {
-      const { data: cls } = await supabase.from('classrooms').select('*').eq('id', id).single();
+      const { data: cls, error } = await supabase.from('classrooms').select('*').eq('id', id).single();
+      if (error) {
+          Helpers.toast('Clase no encontrada', 'error');
+          return;
+      }
       if(cls) this.openClass(cls);
   },
 
@@ -254,8 +281,12 @@ const UI = {
     AppState.setCurrentClass(cls);
     document.getElementById('currentClassName').textContent = cls.name;
     
+    // UX: Desactivar botón home visualmente
+    document.querySelector('[data-section="t-home"]')?.classList.remove('active');
+    
     this.showSection('t-class-detail');
     this.showTab('feed'); // Default tab
+    window.scrollTo({ top: 0 });
   },
 
   // --- TAB LOGIC ---
@@ -282,12 +313,18 @@ const UI = {
     if(tabName === 'students') this.renderStudents();
     if(tabName === 'daily-log') this.renderDailyLog();
     if(tabName === 'attendance') this.renderAttendance();
+    if(tabName === 'tasks') this.renderTasks();
   },
 
   // --- RENDERERS ---
   async renderFeed() {
     const tab = document.getElementById('tab-feed');
     if(!tab) return;
+
+    if (!AppState.currentClass?.id) {
+        tab.innerHTML = Helpers.emptyState('Seleccione una clase primero', 'alert-circle');
+        return;
+    }
     
     // Skeleton
     tab.innerHTML = Helpers.skeleton(1); 
@@ -309,10 +346,10 @@ const UI = {
             <div class="flex justify-between items-center mt-3 pt-2 border-t border-slate-50">
                 <div class="flex gap-2">
                     <label for="fileInput" class="cursor-pointer flex items-center gap-2 text-slate-500 hover:text-green-600 hover:bg-green-50 px-3 py-2 rounded-lg transition text-sm font-medium select-none">
-                        <i data-lucide="image" class="w-4 h-4"></i>
-                        <span>Foto</span>
+                        <i data-lucide="paperclip" class="w-4 h-4"></i>
+                        <span>Foto/Video</span>
                     </label>
-                    <input type="file" id="fileInput" accept="image/*" class="hidden">
+                    <input type="file" id="fileInput" accept="image/*,video/*,application/pdf" class="hidden">
                 </div>
                 <button id="btnSubmitPost" class="bg-green-600 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-green-700 transition flex items-center gap-2 shadow-sm shadow-green-200">
                     <span>Publicar</span>
@@ -352,10 +389,14 @@ const UI = {
                     <div class="text-xs text-slate-500">${Helpers.formatDate(p.created_at)}</div>
                 </div>
             </div>
-            <p class="text-slate-700 text-sm mb-3 whitespace-pre-line">${p.content || ''}</p>
-            ${p.media_url ? `
+            <p class="text-slate-700 text-sm mb-3 whitespace-pre-line">${Helpers.escapeHTML(p.content || '')}</p>
+            ${p.media_type === 'image' ? `
                 <div class="rounded-xl overflow-hidden border border-slate-100 mt-2">
                     <img src="${p.media_url}" alt="Imagen adjunta" class="w-full h-auto max-h-96 object-cover bg-slate-50" loading="lazy">
+                </div>
+            ` : p.media_type === 'video' ? `
+                <div class="rounded-xl overflow-hidden border border-slate-100 mt-2">
+                    <video src="${p.media_url}" controls class="w-full h-auto max-h-96 bg-black"></video>
                 </div>
             ` : ''}
         </div>
@@ -400,6 +441,11 @@ const UI = {
 
     const content = contentInput.value.trim();
     const file = fileInput?.files[0];
+
+    if (!AppState.currentClass?.id) {
+        Helpers.toast('Error: Clase no seleccionada', 'error');
+        return;
+    }
 
     if(!content && !file) {
         Helpers.toast('Escribe algo o sube una foto', 'info');
@@ -447,6 +493,15 @@ const UI = {
         if(error) throw error;
 
         Helpers.toast('Publicado correctamente', 'success');
+        
+        // Fix: Reactivar botón y limpiar
+        btnSubmit.disabled = false;
+        btnSubmit.innerHTML = `<span>Publicar</span><i data-lucide="send" class="w-4 h-4"></i>`;
+        contentInput.value = '';
+        if (fileInput) fileInput.value = '';
+        document.getElementById('previewContainer').classList.add('hidden');
+        if (window.lucide) lucide.createIcons();
+
         this.renderFeed(); // Recargar feed
 
     } catch (error) {
@@ -462,6 +517,11 @@ const UI = {
 
   async renderStudents() {
     const tab = document.getElementById('tab-students');
+    if (!AppState.currentClass?.id) {
+        tab.innerHTML = Helpers.emptyState('Seleccione una clase primero');
+        return;
+    }
+
     tab.innerHTML = Helpers.skeleton(2);
 
     const { data: students, error } = await supabase
@@ -470,7 +530,12 @@ const UI = {
         .eq('classroom_id', AppState.currentClass.id)
         .order('name');
     
-    if(error || !students.length) {
+    if (error) {
+        tab.innerHTML = Helpers.emptyState('Error cargando estudiantes: ' + error.message, 'alert-circle');
+        return;
+    }
+
+    if (!students || !students.length) {
         tab.innerHTML = Helpers.emptyState('No hay estudiantes en esta clase.', 'users');
         return;
     }
@@ -502,6 +567,10 @@ const UI = {
 
   async renderDailyLog() {
       const tab = document.getElementById('tab-daily-log');
+      if (!AppState.currentClass?.id) {
+          tab.innerHTML = Helpers.emptyState('Seleccione una clase primero');
+          return;
+      }
       // Interfaz colorida para el diario
       tab.innerHTML = `
         <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -557,6 +626,27 @@ const UI = {
         .select('*')
         .eq('classroom_id', AppState.currentClass.id)
         .eq('date', selectedDate);
+
+    // --- LÓGICA DE SEMBRADO (SEEDING) ---
+    // Si hay estudiantes sin registro para hoy, crearlos como 'pending'
+    if ((existingAttendance?.length || 0) < students.length) {
+        const existingIds = new Set((existingAttendance || []).map(a => String(a.student_id)));
+        const toSeed = students
+            .filter(s => !existingIds.has(String(s.id)))
+            .map(s => ({
+                student_id: s.id,
+                classroom_id: AppState.currentClass.id,
+                date: selectedDate,
+                status: 'pending'
+            }));
+
+        if (toSeed.length) {
+            await supabase.from('attendance').upsert(toSeed, { onConflict: 'student_id,date' });
+            // Actualizar lista local para reflejar cambios
+            if(existingAttendance) existingAttendance.push(...toSeed);
+        }
+    }
+    // -------------------------------------
         
     const statusMap = {};
     existingAttendance?.forEach(a => statusMap[a.student_id] = a.status);
@@ -681,7 +771,7 @@ const UI = {
 
       Helpers.toast('Guardando asistencia...', 'info');
       
-      const { error } = await supabase.from('attendance').upsert(upsertData, { onConflict: 'student_id, date' });
+      const { error } = await supabase.from('attendance').upsert(upsertData, { onConflict: 'student_id,classroom_id,date' });
       
       if(error) {
           Helpers.toast('Error al guardar asistencia', 'error');
@@ -691,6 +781,247 @@ const UI = {
       }
   },
 
+  // --- TASKS MODULE ---
+  async renderTasks() {
+    const tab = document.getElementById('tab-tasks');
+    if(!tab) return;
+    if (!AppState.currentClass?.id) {
+        tab.innerHTML = Helpers.emptyState('Seleccione una clase primero');
+        return;
+    }
+    
+    tab.innerHTML = `
+      <div id="tasksViewContainer">
+        <div class="flex justify-between items-center mb-6">
+          <h3 class="font-bold text-slate-700 text-xl">Tareas del Aula</h3>
+          <button id="btnNewTask" class="bg-pink-500 text-white px-4 py-2 rounded-xl shadow hover:bg-pink-600 transition flex items-center gap-2 font-bold">
+            <i data-lucide="plus" class="w-5 h-5"></i> Nueva Tarea
+          </button>
+        </div>
+
+        <!-- Formulario Nueva Tarea -->
+        <div id="newTaskForm" class="hidden bg-white p-6 rounded-2xl border border-pink-100 shadow-sm mb-6 relative">
+          <button id="btnCloseTaskForm" class="absolute top-4 right-4 text-slate-400 hover:text-slate-600"><i data-lucide="x"></i></button>
+          <h4 class="font-bold text-pink-600 mb-4">Crear Nueva Tarea</h4>
+          <div class="space-y-4">
+            <div>
+              <label class="block text-sm font-bold text-slate-600 mb-1">Título</label>
+              <input type="text" id="taskTitle" class="w-full border rounded-xl px-3 py-2 outline-none focus:ring-2 focus:ring-pink-400" placeholder="Ej: Dibujo de la familia">
+            </div>
+            <div>
+              <label class="block text-sm font-bold text-slate-600 mb-1">Descripción</label>
+              <textarea id="taskDesc" rows="3" class="w-full border rounded-xl px-3 py-2 outline-none focus:ring-2 focus:ring-pink-400" placeholder="Instrucciones para los padres..."></textarea>
+            </div>
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div>
+                <label class="block text-sm font-bold text-slate-600 mb-1">Fecha de Entrega</label>
+                <input type="date" id="taskDate" class="w-full border rounded-xl px-3 py-2 outline-none focus:ring-2 focus:ring-pink-400">
+              </div>
+              <div>
+                <label class="block text-sm font-bold text-slate-600 mb-1">Adjunto (Foto/PDF/Video)</label>
+                <input type="file" id="taskFile" accept="image/*,video/*,application/pdf" class="w-full text-sm text-slate-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-pink-50 file:text-pink-700 hover:file:bg-pink-100">
+              </div>
+            </div>
+            <div class="pt-2">
+              <button id="btnSaveTask" class="w-full py-3 bg-pink-500 hover:bg-pink-600 text-white rounded-xl font-bold shadow-lg shadow-pink-200 transition">Publicar Tarea</button>
+            </div>
+          </div>
+        </div>
+
+        <!-- Lista de Tareas -->
+        <div id="tasksListContainer" class="grid grid-cols-1 md:grid-cols-2 gap-4">
+          ${Helpers.skeleton(2)}
+        </div>
+      </div>
+      
+      <!-- Contenedor Detalle (Entregas) -->
+      <div id="taskDetailContainer" class="hidden"></div>
+    `;
+    
+    if(window.lucide) lucide.createIcons();
+
+    document.getElementById('btnNewTask').onclick = () => {
+      document.getElementById('newTaskForm').classList.remove('hidden');
+      document.getElementById('btnNewTask').classList.add('hidden');
+    };
+    document.getElementById('btnCloseTaskForm').onclick = () => {
+      document.getElementById('newTaskForm').classList.add('hidden');
+      document.getElementById('btnNewTask').classList.remove('hidden');
+    };
+    document.getElementById('btnSaveTask').onclick = () => this.createTask();
+
+    this.loadTasksList();
+  },
+
+  async loadTasksList() {
+    const container = document.getElementById('tasksListContainer');
+    if(!container) return;
+
+    const { data: tasks, error } = await supabase
+      .from('tasks')
+      .select('*')
+      .eq('classroom_id', AppState.currentClass.id)
+      .order('created_at', { ascending: false });
+
+    if(error || !tasks.length) {
+      container.innerHTML = `<div class="col-span-full">${Helpers.emptyState('No hay tareas asignadas', 'clipboard-list')}</div>`;
+      return;
+    }
+
+    container.innerHTML = tasks.map(t => `
+      <div class="bg-white p-5 rounded-2xl border border-slate-100 shadow-sm hover:shadow-md transition group relative overflow-hidden">
+        <div class="absolute top-0 left-0 w-1 h-full bg-pink-400"></div>
+        <div class="flex justify-between items-start mb-2 pl-3">
+          <h4 class="font-bold text-slate-800 text-lg group-hover:text-pink-600 transition">${t.title}</h4>
+          <span class="text-xs font-bold bg-slate-100 text-slate-500 px-2 py-1 rounded-lg">
+            Vence: ${Helpers.formatDate(t.due_date)}
+          </span>
+        </div>
+        <p class="text-slate-600 text-sm mb-4 pl-3 line-clamp-2">${t.description || 'Sin descripción'}</p>
+        <div class="flex items-center justify-between mt-auto pl-3">
+          <button class="bg-pink-50 text-pink-600 px-4 py-2 rounded-lg font-bold text-sm hover:bg-pink-100 transition flex items-center gap-2" onclick="UI.openTaskDetail('${t.id}')">
+            <i data-lucide="eye" class="w-4 h-4"></i> Ver Entregas
+          </button>
+          ${t.file_url ? `<a href="${t.file_url}" target="_blank" class="text-slate-400 hover:text-blue-500" title="Ver adjunto"><i data-lucide="paperclip" class="w-5 h-5"></i></a>` : ''}
+        </div>
+      </div>
+    `).join('');
+    
+    if(window.lucide) lucide.createIcons();
+  },
+
+  async createTask() {
+    const title = document.getElementById('taskTitle').value;
+    const desc = document.getElementById('taskDesc').value;
+    const date = document.getElementById('taskDate').value;
+    const file = document.getElementById('taskFile').files[0];
+    const btn = document.getElementById('btnSaveTask');
+
+    if(!title || !date) { Helpers.toast('Título y fecha requeridos', 'error'); return; }
+
+    btn.disabled = true;
+    btn.textContent = 'Publicando...';
+
+    try {
+      let fileUrl = null;
+      if(file) {
+        const safeName = file.name.replace(/[^a-zA-Z0-9.]/g, '_');
+        const fileName = `tasks/${AppState.currentClass.id}_${Date.now()}_${safeName}`;
+        const { error: upErr } = await supabase.storage.from('classroom_media').upload(fileName, file);
+        if(upErr) throw upErr;
+        const { data } = supabase.storage.from('classroom_media').getPublicUrl(fileName);
+        fileUrl = data.publicUrl;
+      }
+
+      const { error } = await supabase.from('tasks').insert({
+        classroom_id: AppState.currentClass.id,
+        title,
+        description: desc,
+        due_date: date,
+        file_url: fileUrl
+      });
+
+      if(error) throw error;
+      Helpers.toast('Tarea publicada con éxito');
+      
+      // Fix: Reset form
+      document.getElementById('taskTitle').value = '';
+      document.getElementById('taskDesc').value = '';
+      document.getElementById('taskDate').value = '';
+      document.getElementById('taskFile').value = '';
+
+      document.getElementById('newTaskForm').classList.add('hidden');
+      document.getElementById('btnNewTask').classList.remove('hidden');
+      this.loadTasksList();
+    } catch(e) {
+      console.error(e);
+      Helpers.toast('Error al crear tarea', 'error');
+    } finally {
+      btn.disabled = false;
+      btn.textContent = 'Publicar Tarea';
+    }
+  },
+
+  async openTaskDetail(taskId) {
+    const viewContainer = document.getElementById('tasksViewContainer');
+    const detailContainer = document.getElementById('taskDetailContainer');
+    
+    viewContainer.classList.add('hidden');
+    detailContainer.classList.remove('hidden');
+    detailContainer.innerHTML = Helpers.skeleton(1);
+
+    const { data: task } = await supabase.from('tasks').select('*').eq('id', taskId).single();
+    const { data: students } = await supabase.from('students').select('id, name').eq('classroom_id', AppState.currentClass.id).order('name');
+    const { data: evidences } = await supabase.from('task_evidences').select('*').eq('task_id', taskId);
+
+    const evidenceMap = {};
+    evidences?.forEach(e => evidenceMap[e.student_id] = e);
+
+    detailContainer.innerHTML = `
+      <div class="mb-6">
+        <button class="text-slate-500 hover:text-slate-800 flex items-center gap-1 mb-4 font-bold" onclick="document.getElementById('taskDetailContainer').classList.add('hidden'); document.getElementById('tasksViewContainer').classList.remove('hidden');">
+          <i data-lucide="arrow-left" class="w-4 h-4"></i> Volver
+        </button>
+        <h3 class="text-2xl font-bold text-slate-800">${task.title}</h3>
+        <p class="text-slate-500 text-sm">Vence: ${Helpers.formatDate(task.due_date)}</p>
+      </div>
+
+      <div class="bg-white rounded-2xl border shadow-sm overflow-hidden">
+        <table class="w-full text-left">
+          <thead class="bg-slate-50 text-slate-600 text-xs uppercase font-bold">
+            <tr><th class="p-4">Estudiante</th><th class="p-4 text-center">Estado</th><th class="p-4 text-center">Evidencia</th><th class="p-4 text-center">Calificación</th></tr>
+          </thead>
+          <tbody class="divide-y divide-slate-100">
+            ${students.map(s => {
+              const ev = evidenceMap[s.id];
+              const status = ev ? 'Entregado' : 'Pendiente';
+              const grade = ev?.grade_letter || null;
+              const stars = Number(ev?.stars) || 0;
+              return `
+                <tr class="hover:bg-slate-50">
+                  <td class="p-4 font-medium text-slate-700">${s.name}</td>
+                  <td class="p-4 text-center"><span class="px-2 py-1 rounded-full text-xs font-bold ${ev ? 'bg-green-100 text-green-700' : 'bg-slate-100 text-slate-500'}">${status}</span></td>
+                  <td class="p-4 text-center">${ev?.file_url ? `<a href="${ev.file_url}" target="_blank" class="text-blue-600 font-bold underline text-xs">Ver Archivo</a>` : '-'}</td>
+                  <td class="p-4 text-center">
+                    ${ev ? `
+                      <div class="flex flex-col items-center gap-2">
+                        <div class="flex justify-center gap-1">${['A','B','C','D'].map(g => `<button onclick="UI.gradeTask('${ev.id}', '${g}', this)" class="w-8 h-8 rounded-lg font-bold text-xs transition ${grade === g ? 'bg-pink-500 text-white shadow-md' : 'bg-slate-100 text-slate-500 hover:bg-pink-100 hover:text-pink-600'}">${g}</button>`).join('')}</div>
+                        <div class="flex justify-center gap-1">
+                          ${[1,2,3,4,5].map(n => `
+                            <button title="${n} estrellas" onclick="UI.gradeStars('${ev.id}', ${n}, this)" class="p-1 ${n <= stars ? 'text-yellow-500' : 'text-slate-300'}">
+                              <i data-lucide="star" class="w-4 h-4"></i>
+                            </button>
+                          `).join('')}
+                        </div>
+                      </div>
+                    ` : '<span class="text-xs text-slate-300">Sin entrega</span>'}
+                  </td>
+                </tr>`;
+            }).join('')}
+          </tbody>
+        </table>
+      </div>`;
+    if(window.lucide) lucide.createIcons();
+  },
+
+  async gradeTask(evidenceId, grade, btn) {
+    // UI Optimista
+    Array.from(btn.parentElement.children).forEach(b => b.className = 'w-8 h-8 rounded-lg font-bold text-xs transition bg-slate-100 text-slate-500 hover:bg-pink-100 hover:text-pink-600');
+    btn.className = 'w-8 h-8 rounded-lg font-bold text-xs transition bg-pink-500 text-white shadow-md';
+    
+    const { error } = await supabase.from('task_evidences').update({ grade_letter: grade, status: 'graded' }).eq('id', evidenceId);
+    if(!error) Helpers.toast(`Calificado con ${grade}`);
+  },
+
+  async gradeStars(evidenceId, stars, btn) {
+    const parent = btn.parentElement;
+    Array.from(parent.children).forEach((b, idx) => {
+      const isActive = idx < stars;
+      b.className = `p-1 ${isActive ? 'text-yellow-500' : 'text-slate-300'}`;
+    });
+    const { error } = await supabase.from('task_evidences').update({ stars: stars, status: 'graded' }).eq('id', evidenceId);
+    if(!error) Helpers.toast(`${stars} estrella(s) asignadas`);
+  },
   // --- STUDENT PROFILE MODAL ---
   async openStudentProfile(studentId) {
     const modal = document.getElementById('studentProfileModal');
@@ -761,24 +1092,3 @@ document.addEventListener('DOMContentLoaded', () => {
         document.body.classList.remove('no-scroll');
     });
 });
-    // Logout
-    const logoutBtn = document.getElementById('logoutBtn');
-    if (logoutBtn) {
-      logoutBtn.addEventListener('click', async () => {
-        try { await supabase.auth.signOut(); } catch(e) {}
-        window.location.href = 'login.html';
-      });
-    }
-    // Seed missing rows as 'pending' for today's date
-    if ((existingAttendance?.length || 0) < students.length) {
-      const existingIds = new Set((existingAttendance||[]).map(a => String(a.student_id)));
-      const toSeed = students.filter(s => !existingIds.has(String(s.id))).map(s => ({
-        student_id: s.id,
-        classroom_id: AppState.currentClass.id,
-        date: selectedDate,
-        status: 'pending'
-      }));
-      if (toSeed.length) {
-        await supabase.from('attendance').upsert(toSeed, { onConflict: 'student_id, date' });
-      }
-    }

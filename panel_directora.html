@@ -10,7 +10,16 @@
   
   <!-- <script src="js/auth.js?v=1"></script> REMOVED: Using Supabase Auth -->
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-  <script src="https://unpkg.com/lucide@latest/dist/umd/lucide.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/lucide@latest/dist/umd/lucide.min.js"></script>
+  <script>
+    (function(){
+      if(!(window.lucide && typeof lucide.createIcons==='function')){
+        var s=document.createElement('script');
+        s.src='https://cdn.jsdelivr.net/npm/lucide@latest/dist/umd/lucide.min.js';
+        s.async=true;document.head.appendChild(s);
+      }
+    })();
+  </script>
   
   <style>
     /* Sidebar styles */
@@ -178,6 +187,28 @@
     .chip-blue { background-color: #dbeafe; color: #1e40af; }
     .chip-green { background-color: #dcfce7; color: #166534; }
     .chip-orange { background-color: #ffedd5; color: #9a3412; }
+
+    /* Child Theme Cards */
+    .child-card {
+      background-color: white;
+      border-radius: 16px;
+      padding: 1rem;
+      position: relative;
+      box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+      transition: transform 0.2s;
+      border: 1px solid #f1f5f9;
+      border-top-width: 6px;
+    }
+    .child-card:hover { transform: translateY(-3px); }
+    .child-card.crayon { border-top-color: #ef4444; } /* Rojo */
+    .child-card.ruler { border-top-color: #eab308; background-image: repeating-linear-gradient(90deg, transparent, transparent 19px, #fefce8 20px); } /* Amarillo */
+    .child-card.notebook { border-top-color: #3b82f6; background-image: linear-gradient(#f0f9ff 1px, transparent 1px); background-size: 100% 24px; } /* Azul */
+    .child-card.toy { border-top-color: #22c55e; border-radius: 24px; border-style: dashed; } /* Verde */
+    
+    .child-card-header { display: flex; align-items: center; gap: 0.5rem; margin-bottom: 0.5rem; }
+    .child-card-icon { font-size: 1.5rem; }
+    .child-card-body { font-size: 0.9rem; color: #475569; margin-bottom: 1rem; }
+    .child-card-footer { display: flex; justify-content: flex-end; }
   </style>
 </head>
 <body class="bg-slate-50 text-slate-800 font-nunito">
@@ -260,7 +291,7 @@
         <h2 class="font-semibold">Panel Director</h2>
         <div class="flex items-center gap-2">
           <button class="p-2 rounded bg-white shadow"><i data-lucide="bell" class="lucide"></i></button>
-          <img src="img/mundo.jpg" class="rounded-full w-9 h-9 object-cover" alt="avatar">
+          <div id="directorAvatarTop" class="h-9 w-9 rounded-full bg-gradient-to-br from-purple-500 to-pink-500 text-white flex items-center justify-center font-bold shadow border-2 border-white">D</div>
         </div>
       </div>
 
@@ -593,7 +624,13 @@
         <div class="bg-white rounded shadow p-4">
           <table class="w-full text-sm">
             <thead class="text-slate-500 text-left bg-slate-50">
-              <tr><th class="p-3">Estudiante</th><th class="p-3">Aula</th><th class="p-3">Matemáticas</th><th class="p-3">Lenguaje</th><th class="p-3">Arte</th><th class="p-3">Promedio</th><th class="p-3">Estado</th></tr>
+              <tr>
+                <th class="p-3">Estudiante</th>
+                <th class="p-3">Aula</th>
+                <th class="p-3">Calificación</th>
+                <th class="p-3">Promedio</th>
+                <th class="p-3">Estado</th>
+              </tr>
             </thead>
             <tbody id="gradesTable"><!-- Llenado por JS --></tbody>
           </table>
@@ -619,7 +656,34 @@
         </div>
         
         <!-- Lista de reportes/quejas -->
-        <div id="reportsList" class="space-y-4"></div>
+        <div id="reportsList" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 p-2">
+          <!-- Ejemplo de tarjeta (se eliminará al cargar dinámicos) -->
+          <div class="child-card notebook">
+            <div class="child-card-header">
+              <span class="child-card-icon">📓</span>
+              <div class="font-bold text-slate-700">Nota de Padre</div>
+            </div>
+            <div class="child-card-body">
+              "Hola directora, mi hijo Juan olvidó su suéter ayer..."
+            </div>
+            <div class="child-card-footer">
+              <button class="px-3 py-1 bg-blue-100 text-blue-700 rounded-lg text-xs font-bold hover:bg-blue-200">Responder</button>
+            </div>
+          </div>
+          
+          <div class="child-card crayon">
+             <div class="child-card-header">
+              <span class="child-card-icon">🖍️</span>
+              <div class="font-bold text-slate-700">Inquietud</div>
+            </div>
+            <div class="child-card-body">
+              "Quisiera saber sobre la reunión de mañana."
+            </div>
+            <div class="child-card-footer">
+              <button class="px-3 py-1 bg-red-100 text-red-700 rounded-lg text-xs font-bold hover:bg-red-200">Responder</button>
+            </div>
+          </div>
+        </div>
       </section>
 
       <!-- PAGOS -->

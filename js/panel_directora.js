@@ -4,6 +4,15 @@
 // --- Utilidades ---
 const qs = s => document.querySelector(s);
 const qsa = s => Array.from(document.querySelectorAll(s));
+const escapeHTML = (str = '') => {
+  return str.replace(/[&<>'"]/g, tag => ({
+      '&': '&amp;',
+      '<': '&lt;',
+      '>': '&gt;',
+      "'": '&#39;',
+      '"': '&quot;'
+  }[tag]));
+};
 
 // Inicialización del panel Directora
 document.addEventListener('DOMContentLoaded', ()=>{
@@ -13,6 +22,8 @@ document.addEventListener('DOMContentLoaded', ()=>{
   
   safeInit(attachPaymentsHandlers);
   safeInit(attachCommunicationsHandlers);
+  safeInit(attachGradesHandlers);
+  safeInit(attachReportsHandlers);
   // initNavDirector(); // REMOVED: Managed by app.js
   safeInit(initStudentController);
   // initTeacherModule(); // REMOVED: Managed by app.js (Supabase)
@@ -42,31 +53,31 @@ function initAttendanceModule() {
     const closeBtn = document.getElementById('closeAttendanceModal');
     const modal = document.getElementById('attendanceModal');
     if(closeBtn && modal) {
-        closeBtn.addEventListener('click', () => {
+        closeBtn.onclick = () => {
             modal.classList.add('hidden');
             modal.classList.remove('flex');
-        });
+        };
     }
 
     // Event Delegation for Attendance Details
     const tbody = document.getElementById('attendanceByRoomBody');
     if(tbody) {
-      tbody.addEventListener('click', (e) => {
+      tbody.onclick = (e) => {
         const tr = e.target.closest('tr[data-room-id]');
         if(!tr) return;
         const roomId = tr.dataset.roomId;
         const roomName = tr.dataset.roomName;
         openAttendanceDetail(roomId, roomName);
-      });
+      };
     }
     
     if(dateFilter) {
-        dateFilter.value = new Date().toISOString().split('T')[0];
-        dateFilter.addEventListener('change', loadAttendanceStats);
+        dateFilter.value = new Date().toLocaleDateString('sv-SE');
+        dateFilter.onchange = loadAttendanceStats;
     }
     
     if(refreshBtn) {
-        refreshBtn.addEventListener('click', loadAttendanceStats);
+        refreshBtn.onclick = loadAttendanceStats;
     }
     
     // Initial load
@@ -77,7 +88,7 @@ let loadingAttendance = false;
 
 function getAttendanceDate() {
   const el = document.getElementById('attendanceDateFilter');
-  return el?.value || new Date().toISOString().split('T')[0];
+  return el?.value || new Date().toLocaleDateString('sv-SE');
 }
 
 async function getSupabase() {
@@ -372,47 +383,314 @@ window.initDashboardChart = function(){
 
 // --- Pagos: handlers ---
 function attachPaymentsHandlers(){
-  // Recordatorio individual
-  qsa('.sendReminder').forEach(btn=> btn.addEventListener('click', (e)=>{
-    const tr = e.target.closest('tr');
-    if(!tr) return;
-    const student = tr.children[0].innerText;
-    const parent = tr.children[1].innerText;
-    // Simulación: abrir modal para confirmar envío
-    openModal(`Recordatorio de pago`, `Enviar recordatorio a <strong>${parent}</strong> por el alumno <strong>${student}</strong>?`, [
-      {text:'Cancelar', type:'secondary'},
-      {text:'Enviar', type:'primary', onClick: ()=>{ closeModal(); openModal('Enviado', `Recordatorio enviado a ${parent}`); }}
-    ]);
-  }));
+  // Cargar pagos al inicio
+  loadPayments();
 
-  // Marcar pagado
-  qsa('.markPaid').forEach(btn=> btn.addEventListener('click', (e)=>{
-    const tr = e.target.closest('tr');
-    if(!tr) return;
-    tr.querySelector('td:nth-child(6)').innerText = 'Pagado';
-    tr.querySelector('td:nth-child(6)').className = 'text-green-600';
-    openModal('Confirmación', 'Pago marcado como pagado (simulado). Actualiza backend para persistir.');
-  }));
-
-  // Filtro por aula
-  const filtroAula = qs('#filterPagoAula');
-  if (filtroAula) filtroAula.addEventListener('change', (e)=>{
-    const val = e.target.value;
-    qsa('#paymentsTable tr').forEach(tr=>{
-      if(val==='all' || tr.dataset.aula===val) tr.style.display=''; else tr.style.display='none';
+  // Event Delegation para la tabla de pagos
+  const table = document.getElementById('paymentsTable');
+  if (table) {
+    table.addEventListener('click', async (e) => {
+      // Botón Marcar Pagado
+      const payBtn = e.target.closest('.approve-payment-btn');
+      if (payBtn) {
+        const id = payBtn.dataset.id;
+        await approvePayment(id);
+      }
+      
+      // Botón Recordatorio
+      const remBtn = e.target.closest('.send-reminder-btn');
+      if (remBtn) {
+        const parentId = remBtn.dataset.parentId;
+        const studentName = remBtn.dataset.studentName;
+        await sendPaymentReminder(parentId, studentName);
+      }
     });
-  });
+  }
+
+  // Filtros
+  const filtroAula = document.getElementById('paymentsClassFilter');
+  if (filtroAula) filtroAula.addEventListener('change', loadPayments);
 
   // Recordatorio masivo
-  const batchBtn = qs('#sendBatchReminder');
-  if (batchBtn) batchBtn.addEventListener('click', ()=>{
-    const aula = qs('#filterPagoAula')?.value || 'all';
-    openModal('Recordatorio masivo', `Enviar recordatorio de pago a aula: <strong>${aula}</strong>?`, [
-      {text:'Cancelar', type:'secondary'},
-      {text:'Enviar a todos', type:'primary', onClick: ()=>{ closeModal(); openModal('Enviado', 'Recordatorios masivos enviados.'); }}
-    ]);
-  });
+  const batchBtn = document.getElementById('btnRecordatorioMasivo');
+  if (batchBtn) batchBtn.addEventListener('click', sendReminderToAllParents);
 }
+
+// =============================== 
+// PAGOS CON SUPABASE 
+// ===============================
+async function loadPayments() {
+  const supabase = await getSupabase();
+  if (!supabase) return;
+
+  const tbody = document.getElementById('paymentsTable');
+  if (!tbody) return;
+
+  tbody.innerHTML = '<tr><td colspan="6" class="text-center p-4">Cargando pagos...</td></tr>';
+
+  // Obtener filtro
+  const aulaId = document.getElementById('paymentsClassFilter')?.value || 'all';
+
+  try {
+    let query = supabase
+      .from('payments')
+      .select(`
+        id, amount, concept, status, due_date,
+        student:students (
+          id, name, classroom_id,
+          classroom:classrooms(name),
+          parent:profiles!inner(id, name, email, phone)
+        )
+      `)
+      .order('due_date', { ascending: false });
+
+    // Nota: El filtrado por classroom_id anidado es complejo en una sola query si no es !inner
+    // Si queremos filtrar por aula:
+    if (aulaId !== 'all') {
+      // Opción A: Filtrar en cliente (más fácil si son pocos datos)
+      // Opción B: Usar !inner en students y eq('student.classroom_id', aulaId)
+      // Usaremos filtrado cliente por simplicidad inicial, o query compleja si hay muchos datos.
+    }
+
+    const { data, error } = await query;
+    
+    if (error) throw error;
+
+    let pagos = data || [];
+    
+    // Filtrado cliente por aula
+    if (aulaId !== 'all') {
+      pagos = pagos.filter(p => p.student?.classroom_id == aulaId);
+    }
+
+    if (pagos.length === 0) {
+      tbody.innerHTML = '<tr><td colspan="6" class="text-center p-4 text-slate-500">No hay pagos registrados.</td></tr>';
+      return;
+    }
+
+    tbody.innerHTML = pagos.map(p => {
+      const isPaid = p.status === 'paid';
+      // Lógica de estado
+      let statusColor = 'bg-yellow-100 text-yellow-800';
+      let statusText = 'Pendiente';
+      
+      if (isPaid) {
+        statusColor = 'bg-green-100 text-green-800';
+        statusText = 'Pagado';
+      } else {
+        const isOverdue = p.due_date && new Date(p.due_date) < new Date();
+        if (isOverdue) {
+          statusColor = 'bg-red-100 text-red-800';
+          statusText = 'Vencido';
+        }
+      }
+
+      return `
+        <tr class="border-b hover:bg-slate-50 transition-colors">
+          <td class="p-3">
+            <div class="font-bold text-slate-700">${p.student?.name || 'S/N'}</div>
+            <div class="text-xs text-slate-500">${p.student?.classroom?.name || 'Aula ?'}</div>
+          </td>
+          <td class="p-3 text-sm text-slate-600">
+            ${p.student?.parent?.name || 'S/P'}
+          </td>
+          <td class="p-3 text-right font-mono text-slate-700">
+            $${parseFloat(p.amount).toFixed(2)}
+          </td>
+          <td class="p-3 text-center text-sm">
+            ${p.concept}
+            <div class="text-xs text-slate-400">${p.due_date || ''}</div>
+          </td>
+          <td class="p-3 text-center">
+            <span class="px-2 py-1 rounded-full text-xs font-bold ${statusColor}">
+              ${statusText}
+            </span>
+          </td>
+          <td class="p-3 text-center">
+            ${!isPaid ? `
+              <div class="flex justify-center gap-2">
+                <button class="p-1.5 bg-green-50 text-green-600 rounded hover:bg-green-100 approve-payment-btn" data-id="${p.id}" title="Marcar como Pagado">
+                  <i data-lucide="check" class="w-4 h-4"></i>
+                </button>
+                <button class="p-1.5 bg-blue-50 text-blue-600 rounded hover:bg-blue-100 send-reminder-btn" data-parent-id="${p.student?.parent?.id}" data-student-name="${p.student?.name}" title="Enviar Recordatorio">
+                  <i data-lucide="bell" class="w-4 h-4"></i>
+                </button>
+              </div>
+            ` : '<span class="text-xs text-slate-400">Completado</span>'}
+          </td>
+        </tr>
+      `;
+    }).join('');
+    
+    if (window.lucide) lucide.createIcons();
+
+  } catch (e) {
+    console.error('Error cargando pagos:', e);
+    tbody.innerHTML = `<tr><td colspan="6" class="text-center p-4 text-red-500">Error: ${e.message}</td></tr>`;
+  }
+}
+
+async function approvePayment(id) {
+  if (!confirm('¿Confirmar pago recibido?')) return;
+  
+  const supabase = await getSupabase();
+  const { error } = await supabase.from('payments').update({
+    status: 'paid',
+    paid_date: new Date().toISOString()
+  }).eq('id', id);
+
+  if (error) {
+    alert('Error actualizando pago: ' + error.message);
+  } else {
+    loadPayments(); // Recargar tabla
+    loadFinanceReport(); // Actualizar reporte financiero si existe
+  }
+}
+
+async function sendPaymentReminder(parentId, studentName) {
+  // Simulación o implementación real de notificación
+  // Aquí podríamos insertar en la tabla notifications si existiera
+  openModal('Enviando...', `Enviando recordatorio por ${studentName}...`);
+  
+  try {
+    const supabase = await getSupabase();
+    // Ejemplo: Insertar notificación
+    const { error } = await supabase.from('notifications').insert([{
+      user_id: parentId,
+      title: 'Recordatorio de Pago',
+      message: `Se le recuerda realizar el pago pendiente de ${studentName}.`,
+      type: 'payment_reminder',
+      is_read: false
+    }]);
+
+    if (error) throw error;
+    
+    closeModal();
+    openModal('Éxito', 'Recordatorio enviado correctamente.');
+  } catch (e) {
+    closeModal();
+    alert('Error enviando recordatorio: ' + e.message);
+  }
+}
+
+async function sendReminderToAllParents() {
+  if (!confirm('¿Enviar recordatorio a TODOS los padres con deuda?')) return;
+  
+  openModal('Procesando', 'Enviando recordatorios masivos...');
+  
+  try {
+    const supabase = await getSupabase();
+    // 1. Obtener pagos pendientes
+    const { data: debts, error } = await supabase
+      .from('payments')
+      .select('student_id, student:students(parent_id)')
+      .eq('status', 'pending');
+      
+    if (error) throw error;
+    
+    // 2. Extraer IDs de padres únicos
+    const parentIds = [...new Set(debts.map(d => d.student?.parent_id).filter(Boolean))];
+    
+    if (parentIds.length === 0) {
+      closeModal();
+      alert('No hay deudas pendientes.');
+      return;
+    }
+
+    // 3. Crear notificaciones (batch)
+    const notifs = parentIds.map(pid => ({
+      user_id: pid,
+      title: 'Aviso de Pago',
+      message: 'Estimado padre, tiene pagos pendientes. Por favor revise su estado de cuenta.',
+      type: 'payment_reminder'
+    }));
+
+    const { error: insError } = await supabase.from('notifications').insert(notifs);
+    if (insError) throw insError;
+
+    closeModal();
+    openModal('Completado', `Se enviaron ${parentIds.length} recordatorios.`);
+
+  } catch (e) {
+    closeModal();
+    alert('Error: ' + e.message);
+  }
+}
+
+// ===============================
+// CALIFICACIONES (GRADES)
+// ===============================
+
+// Guardar nota (llamada desde celdas editables o modal)
+async function saveGrade(studentId, subject, period, score, classroomId) {
+  const supabase = await getSupabase();
+  
+  // Upsert: busca por student_id + subject + period (necesitaríamos constraint unique)
+  // O borramos y creamos. O buscamos ID.
+  // Supongamos que queremos guardar el registro.
+  
+  const { error } = await supabase.from('grades').upsert({
+    student_id: studentId,
+    classroom_id: classroomId, // Opcional si lo tenemos
+    subject: subject,
+    period: period,
+    score: parseFloat(score)
+  }, { onConflict: 'student_id, subject, period' }); // Requiere índice único en DB
+
+  if (error) {
+    console.error('Error guardando nota:', error);
+    return false;
+  }
+  return true;
+}
+
+async function loadStudentGrades(studentId) {
+  // Implementación para ver notas de un alumno específico
+  const supabase = await getSupabase();
+  const { data, error } = await supabase
+    .from('grades')
+    .select('*')
+    .eq('student_id', studentId);
+    
+  return data || [];
+}
+
+// ===============================
+// REPORTE FINANCIERO
+// ===============================
+async function loadFinanceReport() {
+  const supabase = await getSupabase();
+  if (!supabase) return;
+
+  const { data, error } = await supabase
+    .from('payments')
+    .select('amount, status');
+
+  if (error) return;
+
+  let totalEsperado = 0;
+  let totalRecaudado = 0;
+  let pendientes = 0;
+
+  data.forEach(p => {
+    const m = parseFloat(p.amount) || 0;
+    totalEsperado += m;
+    if (p.status === 'paid') totalRecaudado += m;
+    else pendientes += m;
+  });
+
+  // Actualizar DOM si existen elementos
+  const elTotal = document.getElementById('finTotal');
+  const elRecaudado = document.getElementById('finRecaudado');
+  const elPendiente = document.getElementById('finPendiente');
+
+  if (elTotal) elTotal.textContent = `$${totalEsperado.toFixed(2)}`;
+  if (elRecaudado) elRecaudado.textContent = `$${totalRecaudado.toFixed(2)}`;
+  if (elPendiente) elPendiente.textContent = `$${pendientes.toFixed(2)}`;
+}
+
+// Inicializar reporte al cargar (opcional)
+// loadFinanceReport(); // Se puede llamar en init o al abrir pestaña reportes
 
 // --- Comunicaciones / publicaciones ---
 function attachCommunicationsHandlers(){
@@ -486,7 +764,7 @@ function addPostToList(post){
   const container = qs('#postsList');
   const el = document.createElement('div');
   el.className = 'p-3 border rounded';
-  el.innerHTML = `<div class="flex items-center justify-between"><strong>${title}</strong><span class="text-xs text-slate-500">${when}</span></div><p class="text-sm text-slate-600 mt-1">${body}</p><div class="mt-2 flex gap-2 text-xs"><button class="px-2 py-1 border rounded">Ver</button><button class="px-2 py-1 border rounded">Compartir</button></div>`;
+  el.innerHTML = `<div class="flex items-center justify-between"><strong>${escapeHTML(title)}</strong><span class="text-xs text-slate-500">${escapeHTML(when)}</span></div><p class="text-sm text-slate-600 mt-1">${escapeHTML(body)}</p><div class="mt-2 flex gap-2 text-xs"><button class="px-2 py-1 border rounded">Ver</button><button class="px-2 py-1 border rounded">Compartir</button></div>`;
   container.prepend(el);
 }
 
@@ -506,26 +784,199 @@ function filterPosts(){
 // =============================
 // REMOVED: Logic moved to app.js to coordinate with data loading
 
+// ===============================
+// VISTA DE CALIFICACIONES (Director)
+// ===============================
+function attachGradesHandlers() {
+  loadGradesView();
+}
+
+async function loadGradesView() {
+  const tbody = document.getElementById('gradesTable');
+  if (!tbody) return;
+
+  tbody.innerHTML = '<tr><td colspan="5" class="text-center p-4">Cargando calificaciones...</td></tr>';
+
+  const supabase = await getSupabase();
+  if (!supabase) return;
+
+  try {
+    const { data: students, error: stError } = await supabase
+      .from('students')
+      .select('id, name, classroom:classrooms(name)')
+      .eq('is_active', true)
+      .order('name');
+      
+    if (stError) throw stError;
+    
+    const { data: grades, error: grError } = await supabase
+      .from('grades')
+      .select('student_id, score, created_at');
+      
+    if (grError) throw grError;
+
+    // Calculate averages
+    const averages = {}; 
+    const lastScores = {};
+    (grades || []).forEach(g => {
+      const sid = g.student_id;
+      const scoreNum = parseFloat(g.score) || 0;
+      const ts = g.created_at ? new Date(g.created_at).getTime() : 0;
+      if (!averages[sid]) averages[sid] = { sum: 0, count: 0 };
+      averages[sid].sum += scoreNum;
+      averages[sid].count++;
+      if (!lastScores[sid] || ts > lastScores[sid].ts) lastScores[sid] = { score: scoreNum, ts };
+    });
+
+    if (students.length === 0) {
+      tbody.innerHTML = '<tr><td colspan="5" class="text-center p-4 text-slate-500">No hay estudiantes activos.</td></tr>';
+      return;
+    }
+
+    tbody.innerHTML = students.map(s => {
+      const stats = averages[s.id] || { sum: 0, count: 0 };
+      const avg = stats.count > 0 ? (stats.sum / stats.count).toFixed(1) : '-';
+      
+      // Determine status/color based on average (example logic)
+      let statusHtml = '<span class="text-slate-400">-</span>';
+      if (avg !== '-') {
+        const numAvg = parseFloat(avg);
+        if (numAvg >= 90) statusHtml = '<span class="text-green-600 font-bold">Excelente</span>';
+        else if (numAvg >= 80) statusHtml = '<span class="text-blue-600 font-bold">Bueno</span>';
+        else if (numAvg >= 70) statusHtml = '<span class="text-yellow-600 font-bold">Regular</span>';
+        else statusHtml = '<span class="text-red-600 font-bold">Reprobado</span>';
+      }
+
+      const last = lastScores[s.id]?.score;
+      return `
+        <tr class="border-b hover:bg-slate-50">
+          <td class="p-3 font-medium text-slate-700">${s.name}</td>
+          <td class="p-3 text-slate-600">${s.classroom?.name || 'Sin Aula'}</td>
+          <td class="p-3 text-center">${last != null ? Number(last).toFixed(1) : '-'}</td> 
+          <td class="p-3 text-center font-bold text-slate-800">${avg}</td>
+          <td class="p-3 text-center text-sm">${statusHtml}</td>
+        </tr>
+      `;
+    }).join('');
+
+  } catch (e) {
+    console.error('Error loading grades view:', e);
+    tbody.innerHTML = `<tr><td colspan="5" class="text-center p-4 text-red-500">Error: ${e.message}</td></tr>`;
+  }
+}
+
+// ===============================
+// REPORTES E INQUIETUDES (Child Theme Cards)
+// ===============================
+function attachReportsHandlers() {
+  loadInquiries();
+  const refreshBtn = document.getElementById('refreshReports');
+  if (refreshBtn) refreshBtn.addEventListener('click', loadInquiries);
+}
+
+async function loadInquiries() {
+  const container = document.getElementById('reportsList');
+  if (!container) return;
+  
+  container.innerHTML = '<div class="col-span-3 text-center p-4">Cargando reportes...</div>';
+
+  const supabase = await getSupabase();
+  if (!supabase) return;
+
+  try {
+    const { data, error } = await supabase
+      .from('inquiries')
+      .select(`
+        id, message, created_at, status, subject,
+        parent:profiles(name, email, phone)
+      `)
+      .order('created_at', { ascending: false });
+
+    if (error) throw error;
+
+    if (!data || data.length === 0) {
+      container.innerHTML = '<div class="col-span-3 text-center p-8 text-slate-500">No hay reportes o inquietudes pendientes.</div>';
+      return;
+    }
+
+    const styles = ['crayon', 'ruler', 'notebook', 'toy'];
+    const icons = {'crayon': '🖍️', 'ruler': '📏', 'notebook': '📓', 'toy': '🧸'};
+
+    container.innerHTML = data.map((item, index) => {
+      const styleClass = styles[index % styles.length];
+      const icon = icons[styleClass];
+      const date = new Date(item.created_at).toLocaleDateString();
+      const parentName = item.parent?.name || 'Padre';
+
+      return `
+        <div class="child-card ${styleClass}">
+          <div class="child-card-header">
+            <span class="child-card-icon">${icon}</span>
+            <div>
+              <div class="font-bold text-slate-700">${item.subject || 'Inquietud'}</div>
+              <div class="text-xs text-slate-500">${parentName} • ${date}</div>
+            </div>
+          </div>
+          <div class="child-card-body">
+            "${escapeHTML(item.message)}"
+          </div>
+          <div class="child-card-footer">
+            ${item.status === 'pending' 
+              ? `<button onclick="replyInquiry(${item.id})" class="px-3 py-1 bg-blue-100 text-blue-700 rounded-lg text-xs font-bold hover:bg-blue-200">Responder</button>`
+              : `<span class="px-2 py-1 bg-green-100 text-green-700 rounded text-xs font-bold">Resuelto</span>`
+            }
+          </div>
+        </div>
+      `;
+    }).join('');
+
+  } catch (e) {
+    console.error('Error loading inquiries:', e);
+    container.innerHTML = `<div class="col-span-3 text-center p-4 text-red-500">Error: ${e.message}</div>`;
+  }
+}
+
+window.replyInquiry = async function(id) {
+  const reply = prompt('Escribe tu respuesta para el padre:');
+  if (!reply) return;
+
+  const supabase = await getSupabase();
+  const { error } = await supabase.from('inquiries').update({
+    response: reply,
+    status: 'resolved',
+    responded_at: new Date().toISOString()
+  }).eq('id', id);
+
+  if (error) {
+    alert('Error al responder: ' + error.message);
+  } else {
+    alert('Respuesta enviada.');
+    loadInquiries();
+  }
+};
+
 // =============================
 // Estudiantes: perfil, búsqueda y alta
 // =============================
 function initStudentController(){
   // ABRIR PERFIL DE ESTUDIANTE
   const studentsTable = document.getElementById('studentsTable');
-  if (studentsTable) studentsTable.addEventListener('click', (event) => {
-    const viewButton = event.target.closest('.view-profile-btn');
-    if (viewButton) {
-      const studentId = viewButton.getAttribute('data-student-id');
-      if (studentId) {
-        if (typeof window.openStudentProfile === 'function') {
-          window.openStudentProfile(studentId);
-        } else {
-          console.error('Error: openStudentProfile no está definida en window. Asegúrese de que app.js se ha cargado correctamente.');
-          openModal('Error', 'Error interno: No se pudo abrir el perfil. Función no encontrada.');
+  if (studentsTable) {
+    studentsTable.addEventListener('click', (event) => {
+      const viewButton = event.target.closest('.view-profile-btn');
+      if (viewButton) {
+        const studentId = viewButton.getAttribute('data-student-id');
+        if (studentId) {
+          if (typeof window.openStudentProfile === 'function') {
+            window.openStudentProfile(studentId);
+          } else {
+            console.error('Error: openStudentProfile no está definida en window. Asegúrese de que app.js se ha cargado correctamente.');
+            openModal('Error', 'Error interno: No se pudo abrir el perfil. Función no encontrada.');
+          }
         }
       }
-    }
-  });
+    });
+  }
 
   // CERRAR PERFIL
   const closeModalButtons = qsa('#closeStudentProfile, #closeStudentProfileModal');

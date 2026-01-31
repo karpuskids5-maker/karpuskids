@@ -1,4 +1,4 @@
-import { supabase } from './supabase.js';
+import { supabase, createClient, SUPABASE_URL, SUPABASE_ANON_KEY } from './supabase.js';
 
 // --- 1. HELPERS & UTILS ---
 const Helpers = {
@@ -35,6 +35,10 @@ const Helpers = {
   formatDate(dateStr) {
     if (!dateStr) return '-';
     return new Date(dateStr).toLocaleDateString('es-ES', { year: 'numeric', month: 'short', day: 'numeric' });
+  },
+
+  isValidEmail(email) {
+    return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
   }
 };
 
@@ -136,6 +140,13 @@ const UI = {
       });
     }
 
+    // --- Teacher Management ---
+    document.getElementById('searchTeacherInput')?.addEventListener('input', (e) => this.loadTeachers(e.target.value));
+    document.getElementById('btnAddTeacher')?.addEventListener('click', () => this.openTeacherModal());
+    document.getElementById('btnCancelTeacher')?.addEventListener('click', () => this.closeTeacherModal());
+    document.getElementById('btnCancelTeacherFooter')?.addEventListener('click', () => this.closeTeacherModal());
+    document.getElementById('btnSaveTeacher')?.addEventListener('click', () => this.saveTeacher());
+
     // --- Access Control Logic ---
     const accessInput = document.getElementById('accessSearchInput');
     if (accessInput) {
@@ -149,6 +160,19 @@ const UI = {
     document.getElementById('btnQuickPayments')?.addEventListener('click', () => {
         document.querySelector('[data-section="pagos"]')?.click();
     });
+    
+    // --- Add Student Logic ---
+    document.getElementById('btnAddStudent')?.addEventListener('click', () => this.openAddStudentModal());
+    document.getElementById('btnCancelStudent')?.addEventListener('click', () => this.closeAddStudentModal());
+    document.getElementById('btnCancelStudentFooter')?.addEventListener('click', () => this.closeAddStudentModal());
+    document.getElementById('btnSaveStudent')?.addEventListener('click', () => this.saveStudent());
+
+    // --- Teacher Management ---
+    document.getElementById('searchTeacherInput')?.addEventListener('input', (e) => this.loadTeachers(e.target.value));
+    document.getElementById('btnAddTeacher')?.addEventListener('click', () => this.openTeacherModal());
+    document.getElementById('btnCancelTeacher')?.addEventListener('click', () => this.closeTeacherModal());
+    document.getElementById('btnCancelTeacherFooter')?.addEventListener('click', () => this.closeTeacherModal());
+    document.getElementById('btnSaveTeacher')?.addEventListener('click', () => this.saveTeacher());
 
     // --- Search Payments ---
     document.getElementById('searchPaymentInput')?.addEventListener('input', (e) => {
@@ -165,6 +189,10 @@ const UI = {
     if (paymentForm) {
       paymentForm.addEventListener('submit', (e) => this.handlePaymentSubmit(e));
     }
+
+    // --- Reminder Logic ---
+    document.getElementById('btnSaveReminder')?.addEventListener('click', () => this.saveReminder());
+    document.getElementById('btnSendReminders')?.addEventListener('click', () => this.sendRemindersNow());
 
     // --- Attendance Modal ---
     document.getElementById('closeAttendanceModal')?.addEventListener('click', () => {
@@ -195,6 +223,16 @@ const UI = {
             const card = e.target.closest('.card-attendance-room');
             this.openAttendanceDetail(card.dataset.id, card.dataset.name);
         }
+        // Edit Student
+        if (e.target.closest('.btn-edit-student')) {
+            const btn = e.target.closest('.btn-edit-student');
+            this.openEditStudentModal(btn.dataset.id);
+        }
+        // Edit Teacher
+        if (e.target.closest('.btn-edit-teacher')) {
+            const btn = e.target.closest('.btn-edit-teacher');
+            this.openTeacherModal(btn.dataset.id);
+        }
     });
   },
 
@@ -208,7 +246,7 @@ const UI = {
       if (id === 'estudiantes') this.loadStudents();
       if (id === 'asistencia') this.loadAttendanceRooms();
       if (id === 'maestros') this.loadTeachers();
-      if (id === 'pagos') { this.loadPayments(); this.loadPaymentReports(); }
+      if (id === 'pagos') { this.loadPayments(); this.loadPaymentReports(); this.loadReminderConfig(); }
       if (id === 'accesos') this.loadAccessLogs();
     }
   },
@@ -290,12 +328,190 @@ const UI = {
               ${s.is_active ? 'Activo' : 'Inactivo'}
             </span>
           </td>
+          <td class="px-6 py-4 text-right">
+            <button class="btn-edit-student p-2 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-lg transition-colors" data-id="${s.id}" title="Editar">
+              <i data-lucide="edit-2" class="w-4 h-4"></i>
+            </button>
+          </td>
         </tr>
       `).join('');
       refreshIcons();
     } catch (error) {
       console.error(error);
       tbody.innerHTML = `<tr><td colspan="4" class="text-center text-red-500 py-4">Error cargando estudiantes</td></tr>`;
+    }
+  },
+
+  // --- ADD STUDENT MODAL ---
+  async openAddStudentModal() {
+    const modal = document.getElementById('modalAddStudent');
+    if (!modal) return;
+    modal.classList.remove('hidden');
+    modal.classList.add('flex');
+    
+    // Reset for Create Mode
+    document.getElementById('stId').value = '';
+    document.getElementById('modalStudentTitle').textContent = 'Agregar Estudiante';
+    this.loadClassroomsIntoSelect();
+  },
+
+  closeAddStudentModal() {
+    const modal = document.getElementById('modalAddStudent');
+    if (modal) {
+        modal.classList.add('hidden');
+        modal.classList.remove('flex');
+        // Clear fields
+        const ids = ['stId', 'stName', 'stAge', 'stSchedule', 'stClassroom', 'p1Name', 'p1Phone', 'p1Email', 'p1Password', 'p2Name', 'p2Phone', 'stAllergies', 'stBlood', 'stPickup'];
+        ids.forEach(id => { const el = document.getElementById(id); if(el) el.value = ''; });
+        const ch = document.getElementById('stActive'); if(ch) ch.checked = true;
+    }
+  },
+
+  async openEditStudentModal(id) {
+    const modal = document.getElementById('modalAddStudent');
+    if (!modal) return;
+
+    try {
+        const { data: s, error } = await supabase.from('students').select('*').eq('id', id).single();
+        if (error) throw error;
+
+        // Populate fields
+        document.getElementById('stId').value = s.id;
+        document.getElementById('stName').value = s.name || '';
+        document.getElementById('stAge').value = ''; // Age is not in schema provided, skipping or custom logic
+        document.getElementById('stSchedule').value = ''; // Schedule not in schema
+        document.getElementById('p1Name').value = s.p1_name || '';
+        document.getElementById('p1Phone').value = s.p1_phone || '';
+        document.getElementById('p1Email').value = s.p1_email || '';
+        document.getElementById('p1Password').value = ''; // Password never shown
+        document.getElementById('p2Name').value = s.p2_name || '';
+        document.getElementById('p2Phone').value = s.p2_phone || '';
+        document.getElementById('stAllergies').value = s.allergies || '';
+        document.getElementById('stBlood').value = s.blood_type || '';
+        document.getElementById('stPickup').value = s.authorized_pickup || '';
+        document.getElementById('stActive').checked = s.is_active;
+
+        document.getElementById('modalStudentTitle').textContent = 'Editar Estudiante';
+        
+        await this.loadClassroomsIntoSelect();
+        document.getElementById('stClassroom').value = s.classroom_id || '';
+
+        modal.classList.remove('hidden');
+        modal.classList.add('flex');
+    } catch (e) {
+        console.error(e);
+        Helpers.toast('Error al cargar datos del estudiante', 'error');
+    }
+  },
+
+  async loadClassroomsIntoSelect() {
+    const select = document.getElementById('stClassroom');
+    if (!select) return;
+    const { data: rooms } = await supabase.from('classrooms').select('id, name').order('name');
+    select.innerHTML = '<option value="">-- Seleccionar Aula --</option>' + 
+        (rooms || []).map(r => `<option value="${r.id}">${r.name}</option>`).join('');
+  },
+
+  async saveStudent() {
+    const btn = document.getElementById('btnSaveStudent');
+    const originalText = btn.textContent;
+    btn.disabled = true;
+    btn.textContent = 'Guardando...';
+
+    try {
+        const id = document.getElementById('stId')?.value;
+        const name = document.getElementById('stName')?.value.trim();
+        const classroomId = document.getElementById('stClassroom')?.value;
+        const isActive = document.getElementById('stActive')?.checked;
+        
+        // Parent Data
+        const p1Name = document.getElementById('p1Name')?.value.trim();
+        const p1Phone = document.getElementById('p1Phone')?.value.trim();
+        const p1Email = document.getElementById('p1Email')?.value.trim();
+        const p1Password = document.getElementById('p1Password')?.value.trim();
+        const p2Name = document.getElementById('p2Name')?.value.trim();
+        const p2Phone = document.getElementById('p2Phone')?.value.trim();
+        
+        // Extra Data
+        const allergies = document.getElementById('stAllergies')?.value.trim();
+        const blood = document.getElementById('stBlood')?.value.trim();
+        const pickup = document.getElementById('stPickup')?.value.trim();
+
+        if (!name) throw new Error('El nombre del estudiante es obligatorio');
+        if (!classroomId) throw new Error('Debe asignar un aula');
+
+        let parentId = null;
+
+        // 1. Create/Link Parent User
+        if (p1Email && !id) { // Only create parent on insert or if logic permits
+            if (!Helpers.isValidEmail(p1Email)) throw new Error('Correo electrónico inválido');
+            
+            // Check existing profile
+            const { data: existing } = await supabase.from('profiles').select('id').eq('email', p1Email).maybeSingle();
+            
+            if (existing) {
+                parentId = existing.id;
+            } else if (p1Password) {
+                // Create new auth user using temp client to avoid logging out assistant
+                const tempClient = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
+                    auth: { persistSession: false, autoRefreshToken: false, detectSessionInUrl: false }
+                });
+                const { data: authData, error: authError } = await tempClient.auth.signUp({
+                    email: p1Email,
+                    password: p1Password
+                });
+                if (authError) throw authError;
+                if (authData.user) {
+                    parentId = authData.user.id;
+                    // Create profile entry
+                    await supabase.from('profiles').insert({
+                        id: parentId,
+                        email: p1Email,
+                        name: p1Name || 'Padre/Madre',
+                        phone: p1Phone,
+                        role: 'padre'
+                    });
+                }
+            }
+        }
+
+        // 2. Prepare Data
+        const studentData = {
+            name,
+            classroom_id: classroomId,
+            is_active: isActive,
+            parent_id: parentId,
+            p1_name: p1Name,
+            p1_phone: p1Phone,
+            p1_email: p1Email,
+            p2_name: p2Name,
+            p2_phone: p2Phone,
+            allergies: allergies,
+            blood_type: blood,
+            authorized_pickup: pickup
+        };
+
+        let error;
+        if (id) {
+            // Update
+            ({ error } = await supabase.from('students').update(studentData).eq('id', id));
+        } else {
+            // Insert
+            ({ error } = await supabase.from('students').insert(studentData));
+        }
+
+        if (error) throw error;
+
+        Helpers.toast(id ? 'Estudiante actualizado' : 'Estudiante creado exitosamente');
+        this.closeAddStudentModal();
+        this.loadStudents(); // Refresh list
+
+    } catch (e) {
+        console.error(e);
+        Helpers.toast(e.message || 'Error al guardar', 'error');
+    } finally {
+        btn.disabled = false;
+        btn.textContent = originalText;
     }
   },
 
@@ -825,20 +1041,116 @@ const UI = {
     URL.revokeObjectURL(url);
   },
 
-  async loadTeachers() {
+  async loadTeachers(searchTerm = '') {
     const tbody = document.getElementById('teachersTableBody');
     if (!tbody) return;
     tbody.innerHTML = `<tr><td colspan="4" class="p-4">${Helpers.skeleton(3, 'h-12')}</td></tr>`;
-    const { data: teachers } = await supabase.from('profiles').select('id,name,email,phone').eq('role','maestra').order('name');
+    
+    let query = supabase.from('profiles').select('id,name,email,phone').eq('role','maestra').order('name');
+    if(searchTerm) query = query.ilike('name', `%${searchTerm}%`);
+
+    const { data: teachers } = await query;
+
     if (!teachers || !teachers.length) { tbody.innerHTML = `<tr><td colspan="4">${Helpers.emptyState('No hay maestros')}</td></tr>`; return; }
     tbody.innerHTML = teachers.map(t=>`
       <tr class="hover:bg-slate-50 transition-colors border-b last:border-0">
         <td class="px-6 py-4 font-medium">${t.name}</td>
         <td class="px-6 py-4">${t.email||'-'}</td>
         <td class="px-6 py-4">${t.phone||'-'}</td>
-        <td class="px-6 py-4"><button class="px-2 py-1 rounded bg-slate-100 text-slate-700 text-xs">Ver</button></td>
+        <td class="px-6 py-4">
+            <button class="btn-edit-teacher px-2 py-1 rounded bg-slate-100 text-slate-700 text-xs hover:bg-teal-100 hover:text-teal-700 transition" data-id="${t.id}">
+                <i data-lucide="edit-2" class="w-3 h-3 inline mr-1"></i>Editar
+            </button>
+        </td>
       </tr>
     `).join('');
+    refreshIcons();
+  },
+
+  async openTeacherModal(id = null) {
+    const modal = document.getElementById('modalAddTeacher');
+    if (!modal) return;
+    
+    // Reset fields
+    document.getElementById('teacherId').value = '';
+    document.getElementById('teacherName').value = '';
+    document.getElementById('teacherEmail').value = '';
+    document.getElementById('teacherPassword').value = '';
+    document.getElementById('teacherPhone').value = '';
+    document.getElementById('teacherModalTitle').textContent = 'Agregar Maestro';
+    document.getElementById('passHint').textContent = '(Requerida para nuevos)';
+
+    if (id) {
+        // Edit Mode
+        document.getElementById('teacherModalTitle').textContent = 'Editar Maestro';
+        document.getElementById('passHint').textContent = '(Dejar en blanco para mantener)';
+        const { data: t } = await supabase.from('profiles').select('*').eq('id', id).single();
+        if (t) {
+            document.getElementById('teacherId').value = t.id;
+            document.getElementById('teacherName').value = t.name;
+            document.getElementById('teacherEmail').value = t.email;
+            document.getElementById('teacherPhone').value = t.phone;
+        }
+    }
+
+    modal.classList.remove('hidden');
+    modal.classList.add('flex');
+  },
+
+  closeTeacherModal() {
+    const modal = document.getElementById('modalAddTeacher');
+    if (modal) {
+        modal.classList.add('hidden');
+        modal.classList.remove('flex');
+    }
+  },
+
+  async saveTeacher() {
+    const id = document.getElementById('teacherId').value;
+    const name = document.getElementById('teacherName').value;
+    const email = document.getElementById('teacherEmail').value;
+    const password = document.getElementById('teacherPassword').value;
+    const phone = document.getElementById('teacherPhone').value;
+
+    if (!name || !email) { Helpers.toast('Nombre y correo son obligatorios', 'error'); return; }
+
+    const btn = document.getElementById('btnSaveTeacher');
+    btn.disabled = true;
+    btn.textContent = 'Guardando...';
+
+    try {
+        if (id) {
+            // Update existing
+            const { error } = await supabase.from('profiles').update({ name, phone, email }).eq('id', id);
+            if (error) throw error;
+            Helpers.toast('Maestro actualizado');
+        } else {
+            // Create new
+            if (!password || password.length < 6) throw new Error('Contraseña requerida (min 6 caracteres)');
+            
+            // Use temp client to avoid logging out assistant
+            const tempClient = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, { auth: { persistSession: false } });
+            const { data: authData, error: authError } = await tempClient.auth.signUp({ email, password });
+            
+            if (authError) throw authError;
+            if (authData.user) {
+                const { error: profError } = await supabase.from('profiles').insert({
+                    id: authData.user.id,
+                    name, email, phone, role: 'maestra'
+                });
+                if (profError) throw profError;
+                Helpers.toast('Maestro creado exitosamente');
+            }
+        }
+        this.closeTeacherModal();
+        this.loadTeachers();
+    } catch (e) {
+        console.error(e);
+        Helpers.toast(e.message || 'Error al guardar', 'error');
+    } finally {
+        btn.disabled = false;
+        btn.textContent = 'Guardar';
+    }
   }
   ,
 
@@ -996,6 +1308,14 @@ const UI = {
     a.click();
     a.remove();
     URL.revokeObjectURL(url);
+  },
+
+  async loadReminderConfig() {
+    const { data } = await supabase.from('payment_reminders').select('*').limit(1).maybeSingle();
+    if (data) {
+        document.getElementById('reminderDay').value = data.day_of_month || '';
+        document.getElementById('reminderMessage').value = data.message || '';
+    }
   }
 };
 
@@ -1047,6 +1367,11 @@ function refreshIcons() {
     document.getElementById('btnSaveReminder')?.addEventListener('click', ()=> UI.saveReminder());
     document.getElementById('btnSendReminders')?.addEventListener('click', ()=> UI.sendRemindersNow());
   });
+
+document.addEventListener('DOMContentLoaded', () => {
+  // ... (resto del DOMContentLoaded)
+  document.getElementById('btnExportPaymentReports')?.addEventListener('click', () => UI.exportPaymentReportsCSV());
+});
 
 // Expose UI for debugging or legacy inline calls if absolutely necessary
 window.UI = UI;
