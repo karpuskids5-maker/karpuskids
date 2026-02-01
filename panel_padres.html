@@ -39,16 +39,36 @@
     
     @media (max-width: 767px) {
       .sidebar-btn {
-        flex: 1 1 0;
-        min-width: 56px;
+        flex: 0 0 auto;
+        width: 70px;
         min-height: 56px;
         padding: 0.5rem;
+        flex-direction: column;
+        font-size: 0.65rem;
+      }
+      .sidebar-btn span {
+        display: block;
+        margin-top: 2px;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        max-width: 100%;
       }
     }
 
     .section { display: none; }
     .section.active { display: block; animation: fadeIn 0.2s ease; }
     @keyframes fadeIn { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: translateY(0); } }
+    
+    /* Hide scrollbar for Chrome, Safari and Opera */
+    .no-scrollbar::-webkit-scrollbar {
+      display: none;
+    }
+    /* Hide scrollbar for IE, Edge and Firefox */
+    .no-scrollbar {
+      -ms-overflow-style: none;  /* IE and Edge */
+      scrollbar-width: none;  /* Firefox */
+    }
   </style>
 </head>
 <body class="font-nunito text-slate-800 bg-gradient-to-br from-slate-50 via-sky-50 to-white">
@@ -88,7 +108,7 @@
 
       <nav
         class="
-          grid grid-cols-4 md:flex
+          flex overflow-x-auto no-scrollbar
           md:flex-col
           w-full
           px-2 md:px-4 py-1
@@ -182,6 +202,12 @@
                 <div><p class="text-sm text-slate-500">Tareas Pendientes</p><p class="text-2xl font-bold text-slate-800" id="dashPendingTasks">0</p></div>
               </div>
             </div>
+            <div class="bg-white p-6 rounded-2xl shadow-sm border border-slate-100 hover:shadow-md transition">
+              <div class="flex items-center gap-4">
+                <div class="p-3 bg-pink-100 text-pink-600 rounded-2xl"><i data-lucide="check-circle-2"></i></div>
+                <div><p class="text-sm text-slate-500">Tareas Entregadas</p><p class="text-2xl font-bold text-slate-800" id="dashDeliveredTasks">0</p></div>
+              </div>
+            </div>
           </div>
 
           <!-- Accesos Rápidos -->
@@ -246,6 +272,7 @@
               <button class="px-3 py-1 text-xs font-medium rounded-md text-slate-500 hover:bg-white/50 task-filter-btn transition-all" data-filter="submitted">Entregadas</button>
             </div>
           </div>
+          <div id="tasksSummary" class="mb-4 text-xs text-slate-600"></div>
           <div id="tasksList" class="space-y-4"></div>
         </section>
 
@@ -326,7 +353,18 @@
           <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
             <!-- Datos del Estudiante -->
             <div class="bg-white p-6 rounded-2xl shadow-sm border space-y-4">
-              <h4 class="font-bold">Datos del Estudiante</h4>
+              <h4 class="font-bold flex justify-between items-center">
+                Datos del Estudiante
+                <div class="relative group">
+                  <div id="studentAvatarPreview" class="w-16 h-16 rounded-full bg-slate-100 overflow-hidden border-2 border-white shadow-sm flex items-center justify-center">
+                    <i data-lucide="user" class="text-slate-400 w-8 h-8"></i>
+                  </div>
+                  <label for="studentAvatarInput" class="absolute bottom-0 right-0 bg-sky-500 text-white p-2 rounded-full cursor-pointer hover:bg-sky-600 shadow-md z-10">
+                    <i data-lucide="camera" class="w-4 h-4"></i>
+                  </label>
+                  <input type="file" id="studentAvatarInput" accept="image/*" class="hidden">
+                </div>
+              </h4>
               <div class="grid grid-cols-1 gap-3">
                 <div><label class="text-xs text-slate-500">Nombre</label><input id="inputStudentName" class="w-full border rounded p-2 bg-slate-50" readonly></div>
                 <div><label class="text-xs text-slate-500">Dirección</label><input id="inputStudentAddress" class="w-full border rounded p-2"></div>
@@ -424,6 +462,7 @@
             <p id="taskDetailDate" class="text-sm text-slate-500 mt-2">Vence: -</p>
           </div>
         </div>
+        <div id="taskDetailPreview"></div>
         <p id="taskDetailDesc" class="text-slate-700 text-sm leading-relaxed bg-slate-50 p-4 rounded-xl"></p>
         
         <div class="border-t border-slate-100 pt-4 mt-4">

@@ -834,8 +834,26 @@ const UI = {
         </div>
       </div>
       
-      <!-- Contenedor Detalle (Entregas) -->
-      <div id="taskDetailContainer" class="hidden"></div>
+      <!-- Modal Detalle de Tarea -->
+      <div id="taskDetailModal" class="fixed inset-0 bg-black/50 hidden items-center justify-center z-50 p-4">
+        <div class="bg-white rounded-2xl shadow-xl w-full max-w-5xl overflow-hidden max-h-[92vh] flex flex-col">
+          <div class="p-4 border-b flex items-center justify-between">
+            <div>
+              <h3 id="taskModalTitle" class="font-bold text-xl text-slate-800"></h3>
+              <p id="taskModalDue" class="text-xs text-slate-500"></p>
+            </div>
+            <button id="btnCloseTaskModal" class="text-slate-400 hover:text-slate-600 p-2 rounded"><i data-lucide="x"></i></button>
+          </div>
+          <div class="p-4 overflow-auto">
+            <table class="w-full text-left">
+              <thead class="bg-slate-50 text-slate-600 text-xs uppercase font-bold">
+                <tr><th class="p-3">Estudiante</th><th class="p-3 text-center">Estado</th><th class="p-3 text-center">Evidencia</th><th class="p-3 text-center">Calificación</th></tr>
+              </thead>
+              <tbody id="taskModalBody" class="divide-y divide-slate-100"></tbody>
+            </table>
+          </div>
+        </div>
+      </div>
     `;
     
     if(window.lucide) lucide.createIcons();
@@ -943,12 +961,12 @@ const UI = {
   },
 
   async openTaskDetail(taskId) {
-    const viewContainer = document.getElementById('tasksViewContainer');
-    const detailContainer = document.getElementById('taskDetailContainer');
-    
-    viewContainer.classList.add('hidden');
-    detailContainer.classList.remove('hidden');
-    detailContainer.innerHTML = Helpers.skeleton(1);
+    const modal = document.getElementById('taskDetailModal');
+    const bodyEl = document.getElementById('taskModalBody');
+    const titleEl = document.getElementById('taskModalTitle');
+    const dueEl = document.getElementById('taskModalDue');
+    if(!modal || !bodyEl) return;
+    bodyEl.innerHTML = `<tr><td colspan="4" class="p-4">${Helpers.skeleton(1)}</td></tr>`;
 
     const { data: task } = await supabase.from('tasks').select('*').eq('id', taskId).single();
     const { data: students } = await supabase.from('students').select('id, name').eq('classroom_id', AppState.currentClass.id).order('name');
@@ -957,51 +975,41 @@ const UI = {
     const evidenceMap = {};
     evidences?.forEach(e => evidenceMap[e.student_id] = e);
 
-    detailContainer.innerHTML = `
-      <div class="mb-6">
-        <button class="text-slate-500 hover:text-slate-800 flex items-center gap-1 mb-4 font-bold" onclick="document.getElementById('taskDetailContainer').classList.add('hidden'); document.getElementById('tasksViewContainer').classList.remove('hidden');">
-          <i data-lucide="arrow-left" class="w-4 h-4"></i> Volver
-        </button>
-        <h3 class="text-2xl font-bold text-slate-800">${task.title}</h3>
-        <p class="text-slate-500 text-sm">Vence: ${Helpers.formatDate(task.due_date)}</p>
-      </div>
-
-      <div class="bg-white rounded-2xl border shadow-sm overflow-hidden">
-        <table class="w-full text-left">
-          <thead class="bg-slate-50 text-slate-600 text-xs uppercase font-bold">
-            <tr><th class="p-4">Estudiante</th><th class="p-4 text-center">Estado</th><th class="p-4 text-center">Evidencia</th><th class="p-4 text-center">Calificación</th></tr>
-          </thead>
-          <tbody class="divide-y divide-slate-100">
-            ${students.map(s => {
-              const ev = evidenceMap[s.id];
-              const status = ev ? 'Entregado' : 'Pendiente';
-              const grade = ev?.grade_letter || null;
-              const stars = Number(ev?.stars) || 0;
-              return `
-                <tr class="hover:bg-slate-50">
-                  <td class="p-4 font-medium text-slate-700">${s.name}</td>
-                  <td class="p-4 text-center"><span class="px-2 py-1 rounded-full text-xs font-bold ${ev ? 'bg-green-100 text-green-700' : 'bg-slate-100 text-slate-500'}">${status}</span></td>
-                  <td class="p-4 text-center">${ev?.file_url ? `<a href="${ev.file_url}" target="_blank" class="text-blue-600 font-bold underline text-xs">Ver Archivo</a>` : '-'}</td>
-                  <td class="p-4 text-center">
-                    ${ev ? `
-                      <div class="flex flex-col items-center gap-2">
-                        <div class="flex justify-center gap-1">${['A','B','C','D'].map(g => `<button onclick="UI.gradeTask('${ev.id}', '${g}', this)" class="w-8 h-8 rounded-lg font-bold text-xs transition ${grade === g ? 'bg-pink-500 text-white shadow-md' : 'bg-slate-100 text-slate-500 hover:bg-pink-100 hover:text-pink-600'}">${g}</button>`).join('')}</div>
-                        <div class="flex justify-center gap-1">
-                          ${[1,2,3,4,5].map(n => `
-                            <button title="${n} estrellas" onclick="UI.gradeStars('${ev.id}', ${n}, this)" class="p-1 ${n <= stars ? 'text-yellow-500' : 'text-slate-300'}">
-                              <i data-lucide="star" class="w-4 h-4"></i>
-                            </button>
-                          `).join('')}
-                        </div>
-                      </div>
-                    ` : '<span class="text-xs text-slate-300">Sin entrega</span>'}
-                  </td>
-                </tr>`;
-            }).join('')}
-          </tbody>
-        </table>
-      </div>`;
+    titleEl.textContent = task.title;
+    dueEl.textContent = `Vence: ${Helpers.formatDate(task.due_date)}`;
+    bodyEl.innerHTML = students.map(s => {
+      const ev = evidenceMap[s.id];
+      const status = ev ? 'Entregado' : 'Pendiente';
+      const grade = ev?.grade_letter || null;
+      const stars = Number(ev?.stars) || 0;
+      return `
+        <tr class="hover:bg-slate-50">
+          <td class="p-3 font-medium text-slate-700">${s.name}</td>
+          <td class="p-3 text-center"><span class="px-2 py-1 rounded-full text-xs font-bold ${ev ? 'bg-green-100 text-green-700' : 'bg-slate-100 text-slate-500'}">${status}</span></td>
+          <td class="p-3 text-center">${ev?.file_url ? `<a href="${ev.file_url}" target="_blank" class="text-blue-600 font-bold underline text-xs">Ver Archivo</a>` : '-'}</td>
+          <td class="p-3 text-center">
+            ${ev ? `
+              <div class="flex flex-col items-center gap-2">
+                <div class="flex justify-center gap-1">${['A','B','C','D'].map(g => `<button onclick="UI.gradeTask('${ev.id}', '${g}', this)" class="w-8 h-8 rounded-lg font-bold text-xs transition ${grade === g ? 'bg-pink-500 text-white shadow-md' : 'bg-slate-100 text-slate-500 hover:bg-pink-100 hover:text-pink-600'}">${g}</button>`).join('')}</div>
+                <div class="flex justify-center gap-1">
+                  ${[1,2,3,4,5].map(n => `
+                    <button title="${n} estrellas" onclick="UI.gradeStars('${ev.id}', ${n}, this)" class="p-1 ${n <= stars ? 'text-yellow-500' : 'text-slate-300'}">
+                      <i data-lucide="star" class="w-4 h-4"></i>
+                    </button>
+                  `).join('')}
+                </div>
+              </div>
+            ` : '<span class="text-xs text-slate-300">Sin entrega</span>'}
+          </td>
+        </tr>`;
+    }).join('');
     if(window.lucide) lucide.createIcons();
+    modal.classList.remove('hidden');
+    modal.classList.add('flex');
+    document.getElementById('btnCloseTaskModal')?.addEventListener('click', () => {
+      modal.classList.add('hidden');
+      modal.classList.remove('flex');
+    });
   },
 
   async gradeTask(evidenceId, grade, btn) {

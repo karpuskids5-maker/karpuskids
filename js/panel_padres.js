@@ -4,7 +4,7 @@ const AppState = {
   user: null,
   profile: null,
   student: null,
-  tasks: [] // Almacén local de tareas para acceso rápido
+  tasks: []
 };
 
 const Helpers = {
@@ -22,62 +22,30 @@ const Helpers = {
 };
 
 document.addEventListener('DOMContentLoaded', async () => {
-  // Inicializar iconos Lucide
   if (window.lucide) lucide.createIcons();
   if ('serviceWorker' in navigator) { try { await navigator.serviceWorker.register('./sw.js'); } catch(e){} }
 
-  // --- 1. Verificación de Sesión ---
   const { data: { user } } = await supabase.auth.getUser();
-  
-  if (!user) {
-    window.location.href = 'login.html';
-    return;
-  }
+  if (!user) { window.location.href = 'login.html'; return; }
   AppState.user = user;
 
-  // Obtener perfil del padre
-  const { data: profile } = await supabase
-    .from('profiles')
-    .select('*')
-    .eq('id', user.id)
-    .single();
-
+  const { data: profile } = await supabase.from('profiles').select('*').eq('id', user.id).single();
   if (profile) {
-    // Actualizar nombre en la UI
-    document.querySelectorAll('.guardian-name-display').forEach(el => {
-      el.textContent = profile.name || 'Familia';
-    });
-    
-    // Cargar datos del estudiante asociado
+    document.querySelectorAll('.guardian-name-display').forEach(el => el.textContent = profile.name || 'Familia');
     await loadStudentData();
   }
 
-  // --- 2. Navegación Sidebar ---
   const navButtons = document.querySelectorAll('[data-target]');
   const sections = document.querySelectorAll('.section');
-  const sidebar = document.getElementById('sidebar');
-  const overlay = document.getElementById('sidebarOverlay');
-
+  
   function setActiveSection(targetId) {
-    // Ocultar todas las secciones
-    sections.forEach(sec => {
-      sec.classList.add('hidden');
-      sec.classList.remove('active');
-    });
-
-    // Desactivar todos los botones
-    navButtons.forEach(btn => {
-      btn.classList.remove('active');
-    });
-
-    // Mostrar sección seleccionada
+    sections.forEach(sec => { sec.classList.add('hidden'); sec.classList.remove('active'); });
+    navButtons.forEach(btn => btn.classList.remove('active'));
+    
     const targetSection = document.getElementById(targetId);
-    if (targetSection) {
-      targetSection.classList.remove('hidden');
-      targetSection.classList.add('active');
-    }
+    if (targetSection) { targetSection.classList.remove('hidden'); targetSection.classList.add('active'); }
+    
     if (targetId === 'home') loadDashboard();
-    if (targetId === 'home') showFloatingNotifications();
     if (targetId === 'live-attendance') loadAttendance();
     if (targetId === 'tasks') loadTasks();
     if (targetId === 'class') loadClassFeed();
@@ -86,76 +54,37 @@ document.addEventListener('DOMContentLoaded', async () => {
     if (targetId === 'notifications') loadNotifications();
     if (targetId === 'profile') populateProfile();
 
-    // Activar botón seleccionado
     const targetBtn = document.querySelector(`button[data-target="${targetId}"]`);
-    if (targetBtn) {
-      targetBtn.classList.add('active');
-    }
-    
-    // Vibración al tocar (UX)
+    if (targetBtn) targetBtn.classList.add('active');
     if (navigator.vibrate) navigator.vibrate(20);
-
-    // En modo "App" (barra inferior), no necesitamos cerrar el sidebar automáticamente
-    // ya que siempre debe estar visible abajo.
   }
 
-  navButtons.forEach(btn => {
-    btn.addEventListener('click', () => {
-      const target = btn.dataset.target;
-      setActiveSection(target);
-    });
-  });
-
+  navButtons.forEach(btn => btn.addEventListener('click', () => setActiveSection(btn.dataset.target)));
+  
   const headerAvatar = document.getElementById('headerAvatar');
-  if (headerAvatar) {
-    headerAvatar.addEventListener('click', () => {
-      setActiveSection('profile');
-    });
-  }
-
-  // --- 4. Logout ---
+  if (headerAvatar) headerAvatar.addEventListener('click', () => setActiveSection('profile'));
+  
   const btnLogout = document.getElementById('btnLogout');
-  if (btnLogout) {
-    btnLogout.addEventListener('click', async () => {
-      await supabase.auth.signOut();
-      window.location.href = 'login.html';
-    });
-  }
+  if (btnLogout) btnLogout.addEventListener('click', async () => { await supabase.auth.signOut(); window.location.href = 'login.html'; });
 
-  // --- 5. Fecha Actual ---
   const dateDisplay = document.getElementById('currentDateDisplay');
-  if (dateDisplay) {
-    const options = { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' };
-    const today = new Date();
-    dateDisplay.textContent = today.toLocaleDateString('es-ES', options);
-  }
+  if (dateDisplay) dateDisplay.textContent = new Date().toLocaleDateString('es-ES', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
   
   setActiveSection('home');
-  
-  // Inicializar módulo de ausencias
   initAbsenceModule();
-
-  // Lógica visual para filtros de tareas
+  
   const taskFilters = document.querySelectorAll('.task-filter-btn');
   taskFilters.forEach(btn => {
     btn.addEventListener('click', (e) => {
-      // Reset estilos visuales
-      taskFilters.forEach(b => {
-        b.classList.remove('bg-white', 'shadow', 'text-slate-700', 'font-bold');
-        b.classList.add('text-slate-500', 'font-medium');
-      });
-      // Activar botón actual
-      e.target.classList.remove('text-slate-500', 'font-medium');
-      e.target.classList.add('bg-white', 'shadow', 'text-slate-700', 'font-bold');
-      
-      // Recargar tareas con el filtro seleccionado
-      const filter = e.target.dataset.filter; // 'pending' o 'submitted'
-      loadTasks(filter);
+      taskFilters.forEach(b => { b.classList.remove('bg-white', 'shadow', 'text-slate-700', 'font-bold'); b.classList.add('text-slate-500', 'font-medium'); });
+      e.target.classList.remove('text-slate-500', 'font-medium'); e.target.classList.add('bg-white', 'shadow', 'text-slate-700', 'font-bold');
+      loadTasks(e.target.dataset.filter);
     });
   });
 
-  // Inicializar módulo de entrega de tareas
   initTaskSubmissionModule();
+  setupProfilePhotoUpload();
+  initNotifications();
 });
 
 function initAbsenceModule() {
@@ -164,83 +93,45 @@ function initAbsenceModule() {
   const btnClose = document.getElementById('btnCloseAbsence');
   const form = document.getElementById('formAbsence');
 
-  // Abrir Modal
-  if (btnQuick) {
-    btnQuick.addEventListener('click', () => {
-      const today = new Date().toISOString().split('T')[0];
-      const dateInput = document.getElementById('absenceDate');
-      if (dateInput) dateInput.value = today;
-      modal.classList.remove('hidden');
-    });
-  }
+  if (btnQuick) btnQuick.addEventListener('click', () => {
+    const today = new Date().toISOString().split('T')[0];
+    const dateInput = document.getElementById('absenceDate');
+    if (dateInput) dateInput.value = today;
+    modal.classList.remove('hidden');
+  });
 
-  // Cerrar Modal
-  if (btnClose) {
-    btnClose.addEventListener('click', () => modal.classList.add('hidden'));
-  }
+  if (btnClose) btnClose.addEventListener('click', () => modal.classList.add('hidden'));
 
-  // Enviar Formulario
-  if (form) {
-    form.addEventListener('submit', async (e) => {
-      e.preventDefault();
-      const date = document.getElementById('absenceDate').value;
-      const reason = document.getElementById('absenceReason').value;
-      const note = document.getElementById('absenceNote').value;
-      
-      if (!AppState.student?.id) {
-        Helpers.toast('Error: No se identificó al estudiante', 'error');
-        return;
-      }
+  if (form) form.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const date = document.getElementById('absenceDate').value;
+    const reason = document.getElementById('absenceReason').value;
+    const note = document.getElementById('absenceNote').value;
+    
+    if (!AppState.student?.id) { Helpers.toast('Error: No se identificó al estudiante', 'error'); return; }
 
-      try {
-        // Insertar en la tabla de solicitudes (asegúrate de crear la tabla 'attendance_requests' en Supabase)
-        const { error } = await supabase.from('attendance_requests').insert({
-          student_id: AppState.student.id,
-          date: date,
-          reason: reason,
-          note: note,
-          status: 'pending'
-        });
-
-        if (error) throw error;
-        
-        Helpers.toast(`Reporte enviado para el día ${date}`, 'success');
-        modal.classList.add('hidden');
-        form.reset();
-      } catch (err) {
-        console.error(err);
-        Helpers.toast('Error al enviar el reporte', 'error');
-      }
-    });
-  }
+    try {
+      const { error } = await supabase.from('attendance_requests').insert({
+        student_id: AppState.student.id, date, reason, note, status: 'pending'
+      });
+      if (error) throw error;
+      Helpers.toast(`Reporte enviado para el día ${date}`, 'success');
+      modal.classList.add('hidden'); form.reset();
+    } catch (err) { console.error(err); Helpers.toast('Error al enviar el reporte', 'error'); }
+  });
 }
 
 async function loadStudentData() {
-  const { data, error } = await supabase
-    .from('students')
-    .select('*, classrooms(name,level)')
-    .eq('parent_id', AppState.user.id)
-    .single();
-
+  const { data, error } = await supabase.from('students').select('*, classrooms(name,level)').eq('parent_id', AppState.user.id).limit(1).maybeSingle();
   if (error || !data) {
     Helpers.toast('No hay estudiante vinculado', 'info');
     document.querySelectorAll('.student-name-display').forEach(el => el.textContent = 'No asignado');
     return;
   }
-
   AppState.student = data;
-
-  document.querySelectorAll('.student-name-display')
-    .forEach(el => el.textContent = data.name);
-
-  document.querySelectorAll('.classroom-name-display')
-    .forEach(el => el.textContent =
-      `${data.classrooms?.name || 'Sin aula'} • ${data.classrooms?.level || ''}`
-    );
-
-  const sb = document.getElementById('sidebar-student-name');
-  if (sb) sb.textContent = data.name;
-
+  document.querySelectorAll('.student-name-display').forEach(el => el.textContent = data.name);
+  document.querySelectorAll('.classroom-name-display').forEach(el => el.textContent = `${data.classrooms?.name || 'Sin aula'} • ${data.classrooms?.level || ''}`);
+  const sb = document.getElementById('sidebar-student-name'); if (sb) sb.textContent = data.name;
   loadDashboard();
 }
 
@@ -253,49 +144,40 @@ async function loadDashboard() {
     const total = (att || []).length;
     const present = (att || []).filter(a => a.status === 'present' || a.status === 'late').length;
     const percent = total ? Math.round((present / total) * 100) : 0;
-    const da = document.getElementById('dashAttendance');
-    if (da) da.textContent = `${percent}%`;
+    const da = document.getElementById('dashAttendance'); if (da) da.textContent = `${percent}%`;
     
     const classroomId = AppState.student.classroom_id;
-    const { count } = await supabase.from('tasks').select('*', { count: 'exact', head: true }).eq('classroom_id', classroomId).gte('due_date', new Date().toISOString());
-    const dp = document.getElementById('dashPendingTasks'); if (dp) dp.textContent = String(count || 0);
+    const { count: pendingCount } = await supabase.from('tasks').select('*', { count: 'exact', head: true }).eq('classroom_id', classroomId).gte('due_date', new Date().toISOString());
+    const { count: deliveredCount } = await supabase.from('task_evidences').select('*', { count: 'exact', head: true }).eq('student_id', sid);
+
+    const dp = document.getElementById('dashPendingTasks'); if (dp) dp.textContent = String(pendingCount || 0);
+    const dd = document.getElementById('dashDeliveredTasks'); if (dd) dd.textContent = String(deliveredCount || 0);
   } catch (err) { console.error(err); }
 }
 
 async function loadAttendance() {
   const grid = document.getElementById('calendarGrid');
-  const pEl = document.getElementById('attPresent');
-  const lEl = document.getElementById('attLate');
-  const aEl = document.getElementById('attAbsent');
   if (!grid) return;
   grid.innerHTML = Helpers.skeleton(5, 'h-10');
   try {
     const sid = AppState.student?.id;
     if (!sid) { grid.innerHTML = Helpers.emptyState('Sin datos'); return; }
-
     const current = new Date();
     const filter = document.getElementById('attendanceFilter')?.value || 'mes';
     let start, end;
     if (filter === 'semana') {
       const day = current.getDay();
       const diffToMonday = (day + 6) % 7;
-      start = new Date(current);
-      start.setDate(current.getDate() - diffToMonday);
-      end = new Date(start);
-      end.setDate(start.getDate() + 6);
+      start = new Date(current); start.setDate(current.getDate() - diffToMonday);
+      end = new Date(start); end.setDate(start.getDate() + 6);
     } else {
       start = new Date(current.getFullYear(), current.getMonth(), 1);
       end = new Date(current.getFullYear(), current.getMonth() + 1, 0);
     }
-    const { data } = await supabase.from('attendance')
-      .select('date,status')
-      .eq('student_id', sid)
-      .gte('date', start.toISOString().split('T')[0])
-      .lte('date', end.toISOString().split('T')[0]);
+    const { data } = await supabase.from('attendance').select('date,status').eq('student_id', sid).gte('date', start.toISOString().split('T')[0]).lte('date', end.toISOString().split('T')[0]);
     const map = new Map((data || []).map(a => [a.date, a.status]));
     const days = filter === 'semana' ? 7 : end.getDate();
-    let present = 0, late = 0, absent = 0;
-    let html = '';
+    let present = 0, late = 0, absent = 0, html = '';
     for (let i = 0; i < days; i++) {
       const dateObj = filter === 'semana' ? new Date(start.getFullYear(), start.getMonth(), start.getDate() + i) : new Date(current.getFullYear(), current.getMonth(), i + 1);
       const key = dateObj.toISOString().split('T')[0];
@@ -304,23 +186,15 @@ async function loadAttendance() {
       if (st === 'present') { bg = 'bg-emerald-100'; tx = 'text-emerald-700 font-semibold'; present++; }
       else if (st === 'absent') { bg = 'bg-rose-100'; tx = 'text-rose-700 font-semibold'; absent++; }
       else if (st === 'late') { bg = 'bg-amber-100'; tx = 'text-amber-700 font-semibold'; late++; }
-      const dayNum = filter === 'semana' ? dateObj.getDate() : (i + 1);
-      html += `<div class="${bg} ${tx} rounded-lg p-2 text-center text-sm transition-colors flex items-center justify-center aspect-square">${dayNum}</div>`;
+      html += `<div class="${bg} ${tx} rounded-lg p-2 text-center text-sm aspect-square flex items-center justify-center">${filter === 'semana' ? dateObj.getDate() : (i + 1)}</div>`;
     }
-    requestAnimationFrame(() => {
-      grid.innerHTML = html;
-      if (pEl) pEl.textContent = String(present);
-      if (lEl) lEl.textContent = String(late);
-      if (aEl) aEl.textContent = String(absent);
-    });
+    grid.innerHTML = html;
+    document.getElementById('attPresent').textContent = String(present);
+    document.getElementById('attLate').textContent = String(late);
+    document.getElementById('attAbsent').textContent = String(absent);
   } catch (err) { console.error(err); grid.innerHTML = Helpers.emptyState('Error cargando asistencia'); }
 }
-
-document.addEventListener('change', (e) => {
-  if (e.target && e.target.id === 'attendanceFilter') {
-    loadAttendance();
-  }
-});
+document.addEventListener('change', (e) => { if (e.target?.id === 'attendanceFilter') loadAttendance(); });
 
 async function loadTasks(filter = 'pending') {
   const list = document.getElementById('tasksList');
@@ -329,48 +203,41 @@ async function loadTasks(filter = 'pending') {
   try {
     const s = AppState.student;
     if (!s) { list.innerHTML = Helpers.emptyState('Sin tareas'); return; }
-
-    const subject = s.classrooms?.level || 'General';
     const { data: tasks } = await supabase.from('tasks').select('*').eq('classroom_id', s.classroom_id).order('due_date');
-    AppState.tasks = tasks || []; // Guardar en estado global
-    const { data: evidences } = await supabase.from('task_evidences').select('task_id').eq('student_id', s.id);
-    const delivered = new Set((evidences || []).map(e => e.task_id));
+    AppState.tasks = tasks || [];
+    const { data: evidences } = await supabase.from('task_evidences').select('*').eq('student_id', s.id);
+    const evidenceMap = new Map((evidences || []).map(e => [e.task_id, e]));
     
-    // Filtrar tareas según la selección
     const filteredTasks = (tasks || []).filter(t => {
-      const isDelivered = delivered.has(t.id);
-      if (filter === 'pending') return !isDelivered;
-      if (filter === 'submitted') return isDelivered;
-      return true;
+      const isDelivered = evidenceMap.has(t.id);
+      return filter === 'pending' ? !isDelivered : isDelivered;
     });
 
-    if (!filteredTasks.length) { list.innerHTML = Helpers.emptyState(filter === 'pending' ? '¡Todo al día! No hay tareas pendientes.' : 'No hay tareas entregadas aún.'); return; }
+    if (!filteredTasks.length) { list.innerHTML = Helpers.emptyState(filter === 'pending' ? '¡Todo al día!' : 'No hay entregas.'); return; }
     
-    const html = filteredTasks.map(t => {
+    list.innerHTML = filteredTasks.map(t => {
       const due = t.due_date ? new Date(t.due_date) : null;
-      const now = new Date();
-      const st = delivered.has(t.id) ? 'Entregada' : (due && due < now ? 'Atrasada' : 'Pendiente');
+      const ev = evidenceMap.get(t.id);
+      const st = ev ? 'Entregada' : (due && due < new Date() ? 'Atrasada' : 'Pendiente');
       const stCls = st === 'Entregada' ? 'bg-emerald-100 text-emerald-700' : (st === 'Atrasada' ? 'bg-rose-100 text-rose-700' : 'bg-amber-100 text-amber-700');
-      const dueTxt = due ? due.toLocaleDateString() : '-';
-      return `<div class="bg-white border border-slate-100 rounded-2xl p-4 shadow-sm hover:shadow-lg transition-transform duration-200 will-change-transform hover:scale-[1.02] active:scale-95">
+      const grade = ev?.grade_letter ? `<span class="bg-pink-100 text-pink-700 px-2 py-1 rounded text-xs font-bold">${ev.grade_letter}</span>` : '';
+      const stars = ev?.stars ? `<div class="flex">${[1,2,3,4,5].map(n => `<i data-lucide="star" class="w-3 h-3 ${n<=ev.stars?'text-yellow-500':'text-slate-300'}"></i>`).join('')}</div>` : '';
+      
+      return `
+      <div class="bg-white border border-slate-100 rounded-2xl p-4 shadow-sm hover:shadow-lg transition">
         <div class="flex justify-between items-start">
-          <div>
-            <h4 class="font-bold text-[#1E293B]">${t.title}</h4>
-            <p class="text-xs text-slate-500">${subject}</p>
-          </div>
+          <div><h4 class="font-bold text-slate-800">${t.title}</h4><p class="text-xs text-slate-500">${s.classrooms?.level || ''}</p></div>
           <span class="px-3 py-1 rounded-full text-xs font-bold ${stCls}">${st}</span>
         </div>
-        <p class="text-sm text-[#1E293B]/70 mt-2">${t.description || ''}</p>
-        <div class="mt-2 text-xs text-slate-500">Entrega: ${dueTxt}</div>
-        <div class="mt-3 flex gap-2">
-          <button class="px-4 py-2 rounded-xl bg-sky-400 text-white text-xs font-semibold hover:bg-sky-500 transition btn-view-task" data-id="${t.id}">Ver detalle / Entregar</button>
+        <p class="text-sm text-slate-600 mt-2">${t.description || ''}</p>
+        <div class="mt-2 text-xs text-slate-500">Entrega: ${due ? due.toLocaleDateString() : '-'}</div>
+        <div class="mt-3 flex items-center justify-between">
+          <button class="px-4 py-2 bg-sky-400 text-white rounded-xl text-xs font-bold hover:bg-sky-500 transition" onclick="openTaskDetail('${t.id}')">Ver / Entregar</button>
+          <div class="flex gap-2 items-center">${grade}${stars}</div>
         </div>
       </div>`;
     }).join('');
-    requestAnimationFrame(() => {
-      list.innerHTML = html;
-      if (window.lucide) lucide.createIcons();
-    });
+    if (window.lucide) lucide.createIcons();
   } catch (err) { console.error(err); list.innerHTML = Helpers.emptyState('Error cargando tareas'); }
 }
 
@@ -379,448 +246,191 @@ async function loadClassFeed() {
   if (!container) return;
   container.innerHTML = Helpers.skeleton(3, 'h-32');
   try {
-    const classroomId = AppState.student?.classroom_id;
-    if (!classroomId) { container.innerHTML = Helpers.emptyState('Sin aula asignada'); return; }
-
-    const { data: posts } = await supabase.from('posts').select('*, profiles:teacher_id(name,avatar_url)').eq('classroom_id', classroomId).order('created_at', { ascending: false });
-    if (!posts || !posts.length) { container.innerHTML = Helpers.emptyState('No hay publicaciones'); return; }
-    const { data: likes } = await supabase.from('likes').select('post_id,user_id').in('post_id', posts.map(p=>p.id));
-    const { data: comments } = await supabase.from('comments').select('post_id,content,created_at, profiles:user_id(name,avatar_url)').in('post_id', posts.map(p=>p.id)).order('created_at', { ascending: true });
-    const user = AppState.user;
-    const likeMap = new Map();
-    (likes||[]).forEach(l => {
-      const arr = likeMap.get(l.post_id) || [];
-      arr.push(l);
-      likeMap.set(l.post_id, arr);
-    });
-    const commentMap = new Map();
-    (comments||[]).forEach(c => {
-      const arr = commentMap.get(c.post_id) || [];
-      arr.push(c);
-      commentMap.set(c.post_id, arr);
-    });
-    const html = posts.map(p => {
-      const postLikes = likeMap.get(p.id) || [];
-      const youLike = !!postLikes.find(l => l.user_id === user.id);
-      const postComments = commentMap.get(p.id) || [];
-      const avatarEl = p.profiles?.avatar_url ? `<img src="${p.profiles.avatar_url}" class="w-10 h-10 rounded-full object-cover" alt="${p.profiles?.name||''}" onerror="this.src='img/mundo.jpg'">` : `<div class="w-10 h-10 bg-sky-100 rounded-full flex items-center justify-center text-sky-700 font-bold">${p.profiles?.name?.charAt(0) || 'D'}</div>`;
-      return `
-      <div class="bg-white rounded-xl shadow-sm border border-slate-100 p-4 mb-4" data-post="${p.id}">
-        <div class="flex items-center gap-3 mb-4">
-          <div class="relative">
-            ${avatarEl}
-            <div class="absolute -bottom-1 -right-1 bg-green-500 w-3 h-3 rounded-full border-2 border-white"></div>
-          </div>
-          <div>
-            <p class="font-bold text-slate-800 text-sm">${p.profiles?.name || 'Docente'}</p>
-            <p class="text-xs text-slate-500">${new Date(p.created_at).toLocaleDateString()} • Muro de Clase</p>
-          </div>
+    const cid = AppState.student?.classroom_id;
+    if (!cid) { container.innerHTML = Helpers.emptyState('Sin aula asignada'); return; }
+    const { data: posts } = await supabase.from('posts').select('*, profiles:teacher_id(name,avatar_url)').eq('classroom_id', cid).order('created_at', { ascending: false });
+    if (!posts?.length) { container.innerHTML = Helpers.emptyState('No hay publicaciones'); return; }
+    
+    container.innerHTML = posts.map(p => `
+      <div class="bg-white p-4 rounded-xl shadow-sm border border-slate-100 mb-4">
+        <div class="flex items-center gap-3 mb-3">
+          <div class="w-10 h-10 bg-green-100 rounded-full flex items-center justify-center text-green-700 font-bold">${p.profiles?.name?.charAt(0) || 'D'}</div>
+          <div><p class="font-bold text-slate-800 text-sm">${p.profiles?.name || 'Docente'}</p><p class="text-xs text-slate-500">${new Date(p.created_at).toLocaleDateString()}</p></div>
         </div>
-        <p class="text-sm text-slate-700 mb-4 leading-relaxed">${p.content || ''}</p>
-        ${p.media_url ? `<div class="mb-4 rounded-xl overflow-hidden border border-slate-100"><img src="${p.media_url}" class="w-full object-cover max-h-80" alt="Media"></div>` : ''}
-        <div class="flex items-center justify-between pt-3 border-t border-slate-50">
-          <button class="flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors ${youLike ? 'bg-pink-50 text-pink-600' : 'hover:bg-slate-50 text-slate-600'}" data-action="like" data-post="${p.id}">
-            <i data-lucide="heart" class="w-4 h-4 ${youLike ? 'fill-current' : ''}"></i> ${postLikes.length} Likes
-          </button>
-          <span class="text-xs text-slate-500 flex items-center gap-1"><i data-lucide="message-circle" class="w-4 h-4"></i> ${postComments.length} comentarios</span>
-        </div>
-        <div class="mt-3 space-y-2">
-          ${postComments.slice(-3).map(c => `
-            <div class="flex items-start gap-2">
-              ${c.profiles?.avatar_url ? `<img src="${c.profiles.avatar_url}" class="w-8 h-8 rounded-full object-cover" onerror="this.src='img/mundo.jpg'">` : `<div class="w-8 h-8 bg-slate-100 rounded-full flex items-center justify-center text-slate-600 text-xs">${c.profiles?.name?.charAt(0) || 'P'}</div>`}
-              <div class="bg-slate-50 rounded-xl px-3 py-2">
-                <p class="text-xs font-semibold text-slate-700">${c.profiles?.name || 'Padre'}</p>
-                <p class="text-sm text-slate-700">${c.content}</p>
-              </div>
-            </div>
-          `).join('')}
-          <div class="flex items-center gap-2">
-            <input type="text" class="flex-1 border rounded-xl px-3 py-2 text-sm" placeholder="Escribe un comentario..." data-post-input="${p.id}">
-            <button class="px-3 py-2 rounded-xl bg-sky-500 text-white text-xs font-semibold" data-action="comment" data-post="${p.id}">Comentar</button>
-          </div>
-        </div>
-      </div>`;
-    }).join('');
-    requestAnimationFrame(() => {
-      container.innerHTML = html;
-      if (window.lucide) lucide.createIcons();
-    });
+        <p class="text-sm text-slate-700 mb-3">${p.content || ''}</p>
+        ${p.media_url ? `<img src="${p.media_url}" class="w-full rounded-xl mb-3 object-cover max-h-64">` : ''}
+      </div>
+    `).join('');
   } catch (err) { console.error(err); container.innerHTML = Helpers.emptyState('Error cargando muro'); }
 }
 
-document.addEventListener('click', async (e) => {
-  const likeBtn = e.target.closest('[data-action="like"]');
-  if (likeBtn) {
-    const postId = Number(likeBtn.dataset.post);
-    const user = AppState.user;
-    if (!user) return;
-    const { data: existing } = await supabase.from('likes').select('id').eq('post_id', postId).eq('user_id', user.id).limit(1);
-    if (existing && existing.length) {
-      await supabase.from('likes').delete().eq('id', existing[0].id);
-    } else {
-      await supabase.from('likes').insert({ post_id: postId, user_id: user.id });
-    }
-    loadClassFeed();
-    return;
-  }
-  const commentBtn = e.target.closest('[data-action="comment"]');
-  if (commentBtn) {
-    const postId = Number(commentBtn.dataset.post);
-    const input = document.querySelector(`[data-post-input="${postId}"]`);
-    const content = input?.value?.trim();
-    if (!content) return;
-    const user = AppState.user;
-    if (!user) return;
-    await supabase.from('comments').insert({ post_id: postId, user_id: user.id, content });
-    input.value = '';
-    loadClassFeed();
-    return;
-  }
-});
-
 async function loadGrades() {
-  const container = document.getElementById('gradesContent');
-  if (!container) return;
-  container.innerHTML = Helpers.skeleton(3, 'h-16');
+  const c = document.getElementById('gradesList');
+  if (!c) return;
+  c.innerHTML = Helpers.skeleton(2);
   try {
     const sid = AppState.student?.id;
-    if (!sid) { container.innerHTML = Helpers.emptyState('Sin datos'); return; }
-
-    const { data: grades } = await supabase.from('grades').select('*, profiles:teacher_id(name)').eq('student_id', sid).order('created_at', { ascending: false });
-    if (!grades || !grades.length) { container.innerHTML = Helpers.emptyState('No hay calificaciones'); return; }
-    const avgBySubject = {}; let totalSum = 0, totalCount = 0;
-    grades.forEach(g => { if (typeof g.score === 'number') { totalSum += g.score; totalCount += 1; avgBySubject[g.subject] = avgBySubject[g.subject] || { sum: 0, count: 0 }; avgBySubject[g.subject].sum += g.score; avgBySubject[g.subject].count += 1; } });
-    const generalAvg = totalCount ? (totalSum / totalCount).toFixed(2) : '-';
-    const html = `
-      <div class="card-clean overflow-hidden">
-        <table class="w-full text-left text-sm">
-          <thead class="bg-slate-50 border-b">
-            <tr>
-              <th class="px-4 py-3 font-semibold text-slate-600">Materia</th>
-              <th class="px-4 py-3 font-semibold text-slate-600">Periodo</th>
-              <th class="px-4 py-3 font-semibold text-slate-600">Nota</th>
-              <th class="px-4 py-3 font-semibold text-slate-600">Maestro</th>
-              <th class="px-4 py-3 font-semibold text-slate-600">Fecha</th>
-              <th class="px-4 py-3 font-semibold text-slate-600">Observación</th>
-            </tr>
-          </thead>
-          <tbody class="divide-y divide-slate-100">
-            ${grades.map(g => `
-              <tr class="hover:bg-slate-50">
-                <td class="px-4 py-3 font-medium text-slate-800">${g.subject}</td>
-                <td class="px-4 py-3 text-slate-600">${g.period || '-'}</td>
-                <td class="px-4 py-3 font-bold ${g.score >= 70 ? 'text-green-600' : 'text-red-600'}">${g.score}</td>
-                <td class="px-4 py-3 text-slate-600">${g.profiles?.name || '-'}</td>
-                <td class="px-4 py-3 text-slate-500 text-xs">${new Date(g.created_at).toLocaleDateString()}</td>
-                <td class="px-4 py-3 text-slate-600">${g.teacher_comment || '-'}</td>
-              </tr>
-            `).join('')}
-          </tbody>
-        </table>
+    const { data: grades } = await supabase.from('task_evidences').select('*, tasks(title)').eq('student_id', sid).not('grade_letter', 'is', null);
+    if (!grades?.length) { c.innerHTML = Helpers.emptyState('Aún no hay calificaciones'); return; }
+    c.innerHTML = grades.map(g => `
+      <div class="flex items-center justify-between p-4 bg-white rounded-xl border border-slate-100 mb-2">
+        <div><h4 class="font-bold text-slate-700">${g.tasks?.title || 'Tarea'}</h4><p class="text-xs text-slate-500">${new Date(g.created_at).toLocaleDateString()}</p></div>
+        <div class="text-right"><span class="text-lg font-bold text-pink-500">${g.grade_letter}</span><div class="flex">${[1,2,3,4,5].map(n => `<i data-lucide="star" class="w-3 h-3 ${n<=g.stars?'text-yellow-500':'text-slate-200'}"></i>`).join('')}</div></div>
       </div>
-      <div class="mt-4 grid grid-cols-1 md:grid-cols-2 gap-3">
-        <div class="p-4 rounded-xl bg-sky-50">
-          <p class="text-xs text-slate-600">Promedio General</p>
-          <p class="text-xl font-bold text-slate-800">${generalAvg}</p>
-        </div>
-        <div class="p-4 rounded-xl bg-slate-50">
-          <p class="text-xs text-slate-600 mb-2">Promedio por Materia</p>
-          <div class="grid grid-cols-2 gap-2">
-            ${Object.entries(avgBySubject).map(([s,v]) => `<div class="bg-white border rounded-lg p-2 text-xs flex items-center justify-between"><span class="text-slate-600">${s}</span><span class="font-bold text-slate-800">${(v.sum / v.count).toFixed(2)}</span></div>`).join('')}
-          </div>
-        </div>
-      </div>
-    `;
-    requestAnimationFrame(() => {
-      container.innerHTML = html;
-      if (window.lucide) lucide.createIcons();
-    });
-  } catch (err) { console.error(err); container.innerHTML = Helpers.emptyState('Error cargando calificaciones'); }
+    `).join('');
+    if (window.lucide) lucide.createIcons();
+  } catch (e) { c.innerHTML = Helpers.emptyState('Error'); }
 }
 
 async function loadPayments() {
-  const container = document.getElementById('paymentsHistory');
-  if (!container) return;
-  container.innerHTML = Helpers.skeleton(3, 'h-20');
-  try {
-    const sid = AppState.student?.id;
-    if (!sid) { container.innerHTML = Helpers.emptyState('Sin datos'); return; }
-
-    const { data: payments } = await supabase.from('payments').select('*').eq('student_id', sid).order('created_at', { ascending: false });
-    if (!payments || !payments.length) { container.innerHTML = Helpers.emptyState('No hay pagos'); return; }
-    const balance = payments.filter(p => p.status === 'confirmado' || p.status === 'efectivo').reduce((acc, p) => acc + Number(p.amount || 0), 0);
-    const bEl = document.getElementById('paymentsBalance'); if (bEl) bEl.textContent = `$${balance.toFixed(2)}`;
-    const vEl = document.getElementById('paymentsVerification'); if (vEl) { const pending = payments.some(p => p.status === 'pendiente'); vEl.textContent = pending ? 'Pendiente' : 'Completado'; }
-    const html = payments.map(p => `
-      <div class="card-clean p-4 flex justify-between items-center">
-        <div>
-          <p class="font-bold text-slate-800">$${p.amount}</p>
-          <p class="text-xs text-slate-500">${new Date(p.created_at).toLocaleDateString()} • ${p.method}</p>
-        </div>
-        <span class="px-3 py-1 rounded-full text-xs font-bold ${
-          p.status === 'confirmado' ? 'bg-emerald-100 text-emerald-700' : 
-          (p.status === 'rechazado' ? 'bg-rose-100 text-rose-700' : 'bg-amber-100 text-amber-700')
-        }">${p.status.toUpperCase()}</span>
-        <div class="text-right">
-          ${p.evidence_url ? `<a href="${p.evidence_url}" target="_blank" class="text-xs text-sky-600 underline">Comprobante</a>` : `<button class="text-xs text-sky-600 underline" onclick="printReceipt(${p.id})">Generar recibo</button>`}
-        </div>
-      </div>
-    `).join('');
-    requestAnimationFrame(() => {
-      container.innerHTML = html;
-      if (window.lucide) lucide.createIcons();
-    });
-  } catch (err) { console.error(err); container.innerHTML = Helpers.emptyState('Error cargando pagos'); }
+  const c = document.getElementById('paymentsList');
+  if(c) c.innerHTML = Helpers.emptyState('Módulo de pagos próximamente');
 }
 
 async function loadNotifications() {
-  const list = document.getElementById('notificationsList');
-  if (!list) return;
-  list.innerHTML = Helpers.skeleton(3, 'h-12');
-  try {
-    const user = AppState.user;
-    const { data } = await supabase.from('notifications').select('*').eq('user_id', user.id).order('created_at', { ascending: false });
-    if (!data || !data.length) { list.innerHTML = Helpers.emptyState('No hay notificaciones'); return; }
-    const html = data.map(n => {
-      const typeCls = n.type === 'pago' ? 'bg-emerald-100 text-emerald-700' : (n.type === 'asistencia' ? 'bg-amber-100 text-amber-700' : (n.type === 'academica' ? 'bg-sky-100 text-sky-700' : 'bg-slate-100 text-slate-700'));
-      return `<div class="bg-white rounded-xl shadow-sm border border-slate-100 p-4 flex items-start justify-between">
-        <div>
-          <p class="font-semibold text-slate-800">${n.title}</p>
-          <p class="text-sm text-slate-600">${n.message}</p>
-          <p class="text-xs text-slate-500 mt-1">${new Date(n.created_at).toLocaleString()}</p>
-        </div>
-        <span class="px-3 py-1 rounded-full text-xs font-bold ${typeCls}">${n.type || 'general'}</span>
-      </div>`;
-    }).join('');
-    requestAnimationFrame(() => {
-      list.innerHTML = html;
-      if (window.lucide) lucide.createIcons();
-    });
-  } catch (err) { console.error(err); list.innerHTML = Helpers.emptyState('Error cargando notificaciones'); }
+  const c = document.getElementById('notifList');
+  if(c) c.innerHTML = Helpers.emptyState('No hay notificaciones nuevas');
 }
 
-const FloatingNotifs = {
-  rendered: new Set(),
-  container: null
-};
-
-async function showFloatingNotifications() {
-  try {
-    const user = AppState.user;
-    if (!user) return;
-    const { data } = await supabase.from('notifications').select('*').eq('user_id', user.id).eq('is_read', false).order('created_at', { ascending: true });
-    if (!data || !data.length) return;
-    if (!FloatingNotifs.container) {
-      const c = document.createElement('div');
-      c.className = 'fixed bottom-24 right-6 md:bottom-6 md:right-6 flex flex-col gap-2 z-50';
-      document.body.appendChild(c);
-      FloatingNotifs.container = c;
-    }
-    data.forEach(n => {
-      if (FloatingNotifs.rendered.has(n.id)) return;
-      FloatingNotifs.rendered.add(n.id);
-      const el = document.createElement('div');
-      el.className = 'bg-white/95 backdrop-blur-sm border border-slate-200 shadow-xl rounded-2xl p-4 max-w-xs';
-      const typeCls = n.type === 'pago' ? 'text-emerald-600' : (n.type === 'asistencia' ? 'text-amber-600' : (n.type === 'academica' ? 'text-sky-600' : 'text-slate-600'));
-      el.innerHTML = `<p class="text-sm font-bold ${typeCls}">${n.title}</p><p class="text-sm text-slate-700">${n.message}</p><p class="text-xs text-slate-400 mt-1">${new Date(n.created_at).toLocaleString()}</p>`;
-      el.addEventListener('click', async () => {
-        await supabase.from('notifications').update({ is_read: true }).eq('id', n.id);
-        el.remove();
-        FloatingNotifs.rendered.delete(n.id);
-      });
-      FloatingNotifs.container.appendChild(el);
-      setTimeout(() => {
-        el.style.opacity = '0.9';
-      }, 10);
-    });
-  } catch (err) { console.error(err); }
-}
-
-function populateProfile() {
+async function populateProfile() {
+  if (!AppState.student) return;
   const s = AppState.student;
-  if (!s) return;
-
-  const setVal = (id, val) => { const el = document.getElementById(id); if (el) el.value = val || ''; };
-  setVal('inputStudentName', s.name || '');
-  setVal('inputStudentBirth', s.start_date || '');
-  setVal('inputStudentAddress', s.p1_address || '');
-  setVal('profileFatherName', s.p1_name || '');
-  setVal('profileFatherPhone', s.p1_phone || '');
-  setVal('profileFatherEmail', s.p1_email || '');
-  setVal('profileMotherName', s.p2_name || '');
-  setVal('profileMotherPhone', s.p2_phone || '');
-  setVal('profileMotherEmail', s.p2_email || '');
-  setVal('profileTutorName', s.tutor_name || '');
-  setVal('profileTutorPhone', s.tutor_phone || '');
-  setVal('profileTutorRelation', s.tutor_relation || '');
-  setVal('profilePickupName', s.pickup_person_name || '');
-  setVal('profilePickupPhone', s.pickup_person_phone || '');
-  setVal('profilePickupRelation', s.pickup_person_relation || '');
+  const setText = (id, val) => { const el = document.getElementById(id); if (el) el.textContent = val || '-'; };
+  setText('profileStudentName', s.name);
+  setText('profileStudentClass', s.classrooms?.name);
+  
+  // Mostrar foto si existe
+  const preview = document.getElementById('studentAvatarPreview');
+  if (preview && s.avatar_url) {
+    preview.innerHTML = `<img src="${s.avatar_url}" class="w-full h-full object-cover">`;
+  }
 }
 
-document.addEventListener('click', async (e) => {
+let currentTaskId = null;
 
-  if (e.target && e.target.id === 'btnSaveStudent') {
-    const updates = {
-      p1_address: document.getElementById('inputStudentAddress')?.value,
-      start_date: document.getElementById('inputStudentBirth')?.value
-    };
-    const { error } = await supabase.from('students').update(updates).eq('id', AppState.student.id);
-    if (error) Helpers.toast('Error al guardar', 'error');
-    else Helpers.toast('Datos del estudiante guardados', 'success');
-  }
-
-  if (e.target && e.target.id === 'btnSaveGuardian') {
-    const updates = {
-      p1_name: document.getElementById('profileFatherName')?.value,
-      p1_phone: document.getElementById('profileFatherPhone')?.value,
-      p1_email: document.getElementById('profileFatherEmail')?.value,
-      p2_name: document.getElementById('profileMotherName')?.value,
-      p2_phone: document.getElementById('profileMotherPhone')?.value,
-      p2_email: document.getElementById('profileMotherEmail')?.value,
-      tutor_name: document.getElementById('profileTutorName')?.value,
-      tutor_phone: document.getElementById('profileTutorPhone')?.value,
-      tutor_relation: document.getElementById('profileTutorRelation')?.value,
-      pickup_person_name: document.getElementById('profilePickupName')?.value,
-      pickup_person_phone: document.getElementById('profilePickupPhone')?.value,
-      pickup_person_relation: document.getElementById('profilePickupRelation')?.value
-    };
-    const { error } = await supabase.from('students').update(updates).eq('id', AppState.student.id);
-    if (error) Helpers.toast('Error al guardar', 'error');
-    else Helpers.toast('Datos del perfil guardados', 'success');
-  }
-});
-
-function printReceipt(id) {
-  const w = window.open('', '_blank'); if (!w) return;
-  w.document.write(`<html><head><title>Recibo</title><style>body{font-family: Nunito, sans-serif;padding:20px}</style></head><body><h3>Recibo de Pago</h3><p>ID: ${id}</p></body></html>`);
-  w.document.close(); w.focus(); w.print(); w.close();
-}
-
-// --- MÓDULO DE ENTREGA DE TAREAS ---
 function initTaskSubmissionModule() {
-  const modal = document.getElementById('modalTaskDetail');
+  const modal = document.getElementById('taskDetailModal');
   const btnClose = document.getElementById('btnCloseTaskDetail');
+  const btnSubmit = document.getElementById('btnSubmitTask');
   const fileInput = document.getElementById('taskFileInput');
   const fileNameDisplay = document.getElementById('fileNameDisplay');
-  const btnSubmit = document.getElementById('btnSubmitTask');
-  let currentTaskId = null;
-
-  // Cerrar modal
+  
   if (btnClose) btnClose.addEventListener('click', () => modal.classList.add('hidden'));
-
-  // Listener delegado para abrir modal desde la lista
-  document.getElementById('tasksList')?.addEventListener('click', (e) => {
-    if (e.target.classList.contains('btn-view-task')) {
-      const id = e.target.dataset.id;
-      openTaskDetail(id);
-    }
+  if (fileInput) fileInput.addEventListener('change', (e) => {
+    if (e.target.files[0]) fileNameDisplay.textContent = e.target.files[0].name;
   });
 
-  // Mostrar nombre del archivo seleccionado
-  if (fileInput) {
-    fileInput.addEventListener('change', (e) => {
-      const file = e.target.files[0];
-      fileNameDisplay.textContent = file ? `Archivo: ${file.name}` : '';
-      fileNameDisplay.classList.remove('hidden');
-    });
-  }
-
-  // Enviar tarea
-  if (btnSubmit) {
-    btnSubmit.addEventListener('click', async () => {
-      const file = fileInput.files[0];
-      const comment = document.getElementById('taskCommentInput').value;
-
-      if (!file) {
-        Helpers.toast('Por favor selecciona un archivo', 'info');
-        return;
-      }
-
-      try {
-        btnSubmit.disabled = true;
-        btnSubmit.textContent = 'Subiendo...';
-
-        // 1. Subir archivo a Storage (Bucket: classroom_media)
-        const fileExt = file.name.split('.').pop();
-        const fileName = `homeworks/${AppState.student.id}_${currentTaskId}_${Date.now()}.${fileExt}`;
-        
-        const { error: uploadError } = await supabase.storage
-          .from('classroom_media')
-          .upload(fileName, file);
-
-        if (uploadError) throw uploadError;
-
-        const { data: { publicUrl } } = supabase.storage
-          .from('classroom_media')
-          .getPublicUrl(fileName);
-
-        // 2. Guardar registro en BD
-        const { error: dbError } = await supabase.from('task_evidences').insert({
-          task_id: currentTaskId,
-          student_id: AppState.student.id,
-          parent_id: AppState.user.id,
-          file_url: publicUrl,
-          comment: comment,
-          status: 'submitted'
-        });
-
-        if (dbError) throw dbError;
-
-        Helpers.toast('Tarea entregada con éxito', 'success');
-        modal.classList.add('hidden');
-        loadTasks(); // Recargar lista
-
-      } catch (err) {
-        console.error(err);
-        Helpers.toast('Error al entregar la tarea', 'error');
-      } finally {
-        btnSubmit.disabled = false;
-        btnSubmit.textContent = 'Enviar Tarea';
-      }
-    });
-  }
-
-  async function openTaskDetail(id) {
-    currentTaskId = id;
-    const task = AppState.tasks.find(t => t.id == id);
-    if (!task) return;
-
-    // Llenar datos básicos
-    document.getElementById('taskDetailTitle').textContent = task.title;
-    document.getElementById('taskDetailDesc').textContent = task.description || 'Sin descripción';
-    document.getElementById('taskDetailDate').textContent = task.due_date ? `Vence: ${new Date(task.due_date).toLocaleDateString()}` : 'Sin fecha límite';
-
-    // Verificar si ya entregó
-    const { data: evidence } = await supabase.from('task_evidences')
-      .select('*')
-      .eq('task_id', id)
-      .eq('student_id', AppState.student.id)
-      .maybeSingle();
-
-    const uploadSec = document.getElementById('uploadSection');
-    const evidenceSec = document.getElementById('evidenceSection');
+  if (btnSubmit) btnSubmit.addEventListener('click', async () => {
+    const file = fileInput.files[0];
+    const comment = document.getElementById('taskCommentInput').value;
     
-    // Resetear formulario
-    if (fileInput) fileInput.value = '';
-    if (fileNameDisplay) fileNameDisplay.textContent = '';
+    if (!file && !comment) { Helpers.toast('Adjunta un archivo o escribe un comentario', 'info'); return; }
+    
+    btnSubmit.disabled = true;
+    btnSubmit.textContent = 'Enviando...';
+    
+    try {
+      let fileUrl = null;
+      if (file) {
+        const ext = file.name.split('.').pop();
+        const fileName = `submissions/${AppState.student.id}_${currentTaskId}_${Date.now()}.${ext}`;
+        const { error: upErr } = await supabase.storage.from('classroom_media').upload(fileName, file);
+        if (upErr) throw upErr;
+        const { data } = supabase.storage.from('classroom_media').getPublicUrl(fileName);
+        fileUrl = data.publicUrl;
+      }
+      
+      const { error } = await supabase.from('task_evidences').insert({
+        task_id: currentTaskId,
+        student_id: AppState.student.id,
+        file_url: fileUrl,
+        comment: comment,
+        status: 'submitted'
+      });
+      
+      if (error) throw error;
+      
+      Helpers.toast('Tarea entregada', 'success');
+      showCompleteAnimation();
+      modal.classList.add('hidden');
+      loadTasks();
+      loadDashboard();
+      
+    } catch (e) { console.error(e); Helpers.toast('Error al entregar', 'error'); } 
+    finally { btnSubmit.disabled = false; btnSubmit.textContent = 'Enviar Tarea'; }
+  });
+}
+
+window.openTaskDetail = async (id) => {
+  currentTaskId = id;
+  const modal = document.getElementById('taskDetailModal');
+  const task = AppState.tasks.find(t => t.id == id);
+  if (!task || !modal) return;
+  
+  document.getElementById('taskDetailTitle').textContent = task.title;
+  document.getElementById('taskDetailDesc').textContent = task.description;
+  
+  const { data: ev } = await supabase.from('task_evidences').select('*').eq('task_id', id).eq('student_id', AppState.student.id).maybeSingle();
+  
+  const uploadSec = document.getElementById('uploadSection');
+  const evidenceSec = document.getElementById('evidenceSection');
+  
+  if (ev) {
+    uploadSec.classList.add('hidden');
+    evidenceSec.classList.remove('hidden');
+    document.getElementById('evidenceDate').textContent = new Date(ev.created_at).toLocaleDateString();
+    document.getElementById('evidenceLink').href = ev.file_url || '#';
+  } else {
+    uploadSec.classList.remove('hidden');
+    evidenceSec.classList.add('hidden');
+    document.getElementById('taskFileInput').value = '';
+    document.getElementById('fileNameDisplay').textContent = '';
     document.getElementById('taskCommentInput').value = '';
-
-    if (evidence) {
-      uploadSec.classList.add('hidden');
-      evidenceSec.classList.remove('hidden');
-      document.getElementById('evidenceDate').textContent = `Entregado el: ${new Date(evidence.created_at).toLocaleString()}`;
-      document.getElementById('evidenceComment').textContent = evidence.comment ? `"${evidence.comment}"` : '';
-      document.getElementById('evidenceLink').href = evidence.file_url;
-      document.getElementById('taskDetailStatus').textContent = 'Entregada';
-      document.getElementById('taskDetailStatus').className = 'px-2 py-1 rounded text-xs font-bold bg-emerald-100 text-emerald-700';
-    } else {
-      uploadSec.classList.remove('hidden');
-      evidenceSec.classList.add('hidden');
-      document.getElementById('taskDetailStatus').textContent = 'Pendiente';
-      document.getElementById('taskDetailStatus').className = 'px-2 py-1 rounded text-xs font-bold bg-slate-100 text-slate-600';
-    }
-
-    modal.classList.remove('hidden');
   }
+  
+  modal.classList.remove('hidden');
+};
+
+function showCompleteAnimation() {
+  const el = document.createElement('div');
+  el.className = 'fixed inset-0 z-[60] flex items-center justify-center bg-black/20 backdrop-blur-sm';
+  el.innerHTML = `<div class="bg-white p-6 rounded-3xl shadow-2xl animate-bounce flex flex-col items-center"><div class="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center text-green-600 mb-2"><i data-lucide="check" class="w-8 h-8"></i></div><h3 class="font-bold text-xl text-slate-800">¡Tarea Enviada!</h3><p class="text-slate-500">Sigue así 🌟</p></div>`;
+  document.body.appendChild(el);
+  if (window.lucide) lucide.createIcons();
+  setTimeout(() => el.remove(), 2000);
+}
+
+function setupProfilePhotoUpload() {
+  const input = document.getElementById('studentAvatarInput');
+  const preview = document.getElementById('studentAvatarPreview');
+  if (!input || !preview) return;
+  
+  input.addEventListener('change', async (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+    const oldHtml = preview.innerHTML;
+    preview.innerHTML = `<div class="animate-spin rounded-full h-6 w-6 border-b-2 border-sky-500"></div>`;
+    try {
+      if (!AppState.student?.id) throw new Error('No hay estudiante');
+      const ext = file.name.split('.').pop();
+      const fileName = `avatars/${AppState.student.id}_${Date.now()}.${ext}`;
+      const { error } = await supabase.storage.from('classroom_media').upload(fileName, file, { upsert: true });
+      if (error) throw error;
+      const { data: { publicUrl } } = supabase.storage.from('classroom_media').getPublicUrl(fileName);
+      await supabase.from('students').update({ avatar_url: publicUrl }).eq('id', AppState.student.id);
+      preview.innerHTML = `<img src="${publicUrl}" class="w-full h-full object-cover">`;
+      Helpers.toast('Foto actualizada', 'success');
+      AppState.student.avatar_url = publicUrl;
+    } catch (e) { console.error(e); Helpers.toast('Error al subir', 'error'); preview.innerHTML = oldHtml; }
+  });
+}
+
+function initNotifications() {
+  if ('Notification' in window && Notification.permission !== 'granted') Notification.requestPermission();
+  if (!AppState.student?.classroom_id) return;
+  supabase.channel('tasks-notif').on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'tasks', filter: `classroom_id=eq.${AppState.student.classroom_id}` }, (payload) => {
+    Helpers.toast(`Nueva tarea: ${payload.new.title}`, 'info');
+    if (Notification.permission === 'granted') new Notification('Nueva Tarea', { body: payload.new.title, icon: '/logo/favicon.ico' });
+    loadTasks(); loadDashboard();
+  }).subscribe();
 }

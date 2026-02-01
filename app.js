@@ -384,8 +384,9 @@ document.addEventListener('DOMContentLoaded', async () => {
       if (teachersTable) teachersTable.innerHTML = '';
       if (assistantsTable) assistantsTable.innerHTML = '';
 
-      const teachers = staff.filter(p => p.role === 'maestra');
-      const assistants = staff.filter(p => p.role === 'asistente');
+      const staffArr = staff || [];
+      const teachers = staffArr.filter(p => p.role === 'maestra');
+      const assistants = staffArr.filter(p => p.role === 'asistente');
 
       // Renderizar Maestros
       if (teachersTable) {
@@ -424,7 +425,8 @@ document.addEventListener('DOMContentLoaded', async () => {
       'bg-fuchsia-100 text-fuchsia-600', 'bg-pink-100 text-pink-600',
       'bg-rose-100 text-rose-600'
     ];
-    const colorClass = colors[person.name.length % colors.length];
+    const nameLen = (person && person.name && person.name.length) ? person.name.length : 1;
+    const colorClass = colors[nameLen % colors.length];
 
     return `
         <tr class="hover:bg-indigo-50/50 transition-colors cursor-pointer group border-b last:border-0" onclick="window.openTeacherModal('${person.id}')">
@@ -556,8 +558,7 @@ document.addEventListener('DOMContentLoaded', async () => {
           const updates = {
             name: name,
             phone: phone,
-            email: email,
-            notes: specialty // Mapeamos especialidad a notes
+            email: email
           };
 
           const { error } = await supabase.from('profiles').update(updates).eq('id', id);

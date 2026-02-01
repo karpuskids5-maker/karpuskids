@@ -55,6 +55,7 @@ const UI = {
   init() {
     this.bindEvents();
     this.checkSession();
+    this.injectChildTheme(); // Inyectar estilos infantiles
   },
 
   async checkSession() {
@@ -108,6 +109,10 @@ const UI = {
         // Update Sidebar Active State
         document.querySelectorAll('[data-section]').forEach(b => b.classList.remove('bg-white/20', 'active'));
         btn.classList.add('bg-white/20', 'active');
+        
+        // Ocultar botón de accesos si existe en el DOM
+        const accessBtn = document.querySelector('[data-section="accesos"]');
+        if(accessBtn) accessBtn.style.display = 'none';
       });
     });
 
@@ -147,11 +152,6 @@ const UI = {
     document.getElementById('btnCancelTeacherFooter')?.addEventListener('click', () => this.closeTeacherModal());
     document.getElementById('btnSaveTeacher')?.addEventListener('click', () => this.saveTeacher());
 
-    // --- Access Control Logic ---
-    const accessInput = document.getElementById('accessSearchInput');
-    if (accessInput) {
-      accessInput.addEventListener('input', (e) => this.handleAccessSearch(e.target.value));
-    }
 
     // --- Quick Actions (Dashboard) ---
     document.getElementById('btnQuickStudents')?.addEventListener('click', () => {
@@ -202,25 +202,14 @@ const UI = {
 
     // Global Delegated Events (for dynamic content)
     document.addEventListener('click', (e) => {
-        // Access Buttons
-        if (e.target.closest('.btn-check-in')) {
-            const btn = e.target.closest('.btn-check-in');
-            this.registerAccess(btn.dataset.id, 'check_in');
-        }
-        if (e.target.closest('.btn-check-out')) {
-            const btn = e.target.closest('.btn-check-out');
-            this.registerAccess(btn.dataset.id, 'check_out');
-        }
-        if (e.target.id === 'cancelAccessBtn') this.closeAccessModal();
-        if (e.target.id === 'confirmAccessBtn') this.confirmAccessModal();
         // Delete Payment
         if (e.target.closest('.btn-delete-payment')) {
             const btn = e.target.closest('.btn-delete-payment');
             this.deletePayment(btn.dataset.id);
         }
         // Attendance Detail
-        if (e.target.closest('.card-attendance-room')) {
-            const card = e.target.closest('.card-attendance-room');
+        if (e.target.closest('.child-card')) {
+            const card = e.target.closest('.child-card');
             this.openAttendanceDetail(card.dataset.id, card.dataset.name);
         }
         // Edit Student
@@ -247,7 +236,6 @@ const UI = {
       if (id === 'asistencia') this.loadAttendanceRooms();
       if (id === 'maestros') this.loadTeachers();
       if (id === 'pagos') { this.loadPayments(); this.loadPaymentReports(); this.loadReminderConfig(); }
-      if (id === 'accesos') this.loadAccessLogs();
     }
   },
 
@@ -259,6 +247,30 @@ const UI = {
     shell.classList.toggle('sidebar-collapsed', collapsed);
     btn.innerHTML = `<i data-lucide="${collapsed ? 'chevron-right' : 'chevron-left'}" class="w-4 h-4"></i>`;
     refreshIcons();
+  },
+
+  // --- ESTILOS INFANTILES (Inyectados) ---
+  injectChildTheme() {
+    // Ocultar botón de accesos inmediatamente
+    const accessBtn = document.querySelector('[data-section="accesos"]');
+    if(accessBtn) accessBtn.style.display = 'none';
+
+    const style = document.createElement('style');
+    style.innerHTML = `
+      /* Tarjetas Temáticas */
+      .child-card { background: white; border-radius: 20px; padding: 1.25rem; position: relative; box-shadow: 0 8px 15px -3px rgba(0,0,0,0.1); transition: all 0.3s cubic-bezier(0.34, 1.56, 0.64, 1); border: 2px solid #f0fdf4; border-top-width: 8px; cursor: pointer; }
+      .child-card:hover { transform: translateY(-5px) scale(1.02); box-shadow: 0 12px 20px -3px rgba(0,0,0,0.15); }
+      
+      .child-card.crayon { border-top-color: #ef4444; }
+      .child-card.ruler { border-top-color: #eab308; background-image: repeating-linear-gradient(90deg, transparent, transparent 19px, #fefce8 20px); }
+      .child-card.notebook { border-top-color: #3b82f6; background-image: linear-gradient(#f0f9ff 1px, transparent 1px); background-size: 100% 24px; }
+      .child-card.toy { border-top-color: #22c55e; border-radius: 24px; border-style: dashed; border-width: 2px; border-top-width: 2px; border-color: #22c55e; background-color: #f0fdf4; }
+      
+      .child-card-header { display: flex; align-items: center; gap: 0.75rem; margin-bottom: 0.75rem; }
+      .child-card-icon { font-size: 2rem; filter: drop-shadow(0 2px 2px rgba(0,0,0,0.1)); }
+      .child-card-body { font-size: 0.95rem; color: #475569; }
+    `;
+    document.head.appendChild(style);
   },
 
   // --- DASHBOARD ---
@@ -515,127 +527,6 @@ const UI = {
     }
   },
 
-  // --- ACCESS CONTROL ---
-  async handleAccessSearch(term) {
-    const container = document.getElementById('accessSearchResults');
-    if (!container) return;
-    
-    if (term.length < 2) { 
-        container.innerHTML = ''; 
-        return; 
-    }
-
-    const { data: students } = await supabase
-      .from('students')
-      .select('id, name, classrooms(name), authorized_pickup')
-      .ilike('name', `%${term}%`)
-      .limit(5);
-
-    if(!students || students.length === 0) {
-        container.innerHTML = '<div class="text-slate-500 text-sm text-center py-2">No encontrado</div>';
-        return;
-    }
-
-    container.innerHTML = students.map(s => `
-      <div class="flex items-center justify-between p-4 border rounded-xl bg-slate-50 shadow-sm">
-        <div>
-          <p class="font-bold text-slate-800">${s.name}</p>
-          <p class="text-xs text-slate-500">${s.classrooms?.name || 'Sin aula'}</p>
-          <p class="text-xs text-slate-400 mt-1">Autorizados: ${s.authorized_pickup || 'No especificado'}</p>
-        </div>
-        <div class="flex gap-2">
-          <button data-id="${s.id}" class="btn-check-in px-3 py-2 bg-green-100 text-green-700 rounded-lg hover:bg-green-200 text-sm font-medium transition">Entrada</button>
-          <button data-id="${s.id}" class="btn-check-out px-3 py-2 bg-orange-100 text-orange-700 rounded-lg hover:bg-orange-200 text-sm font-medium transition">Salida</button>
-        </div>
-      </div>
-    `).join('');
-  },
-
-  async registerAccess(studentId, action) {
-    if (action === 'check_out') {
-      this._pendingAccess = { studentId, action };
-      this.openAccessModal();
-      return;
-    }
-    await this._insertAccess(studentId, action, null);
-  },
-
-  async _insertAccess(studentId, action, authorizedPerson) {
-    const { error } = await supabase.from('access_logs').insert({
-      student_id: studentId,
-      action,
-      authorized_person_name: authorizedPerson,
-      recorded_by: AppState.user.id
-    });
-    if (error) {
-      Helpers.toast('Error al registrar acceso', 'error');
-    } else {
-      Helpers.toast(`Registro de ${action === 'check_in' ? 'Entrada' : 'Salida'} exitoso.`);
-      const inp = document.getElementById('accessSearchInput');
-      const res = document.getElementById('accessSearchResults');
-      if (inp) inp.value = '';
-      if (res) res.innerHTML = '';
-      this.loadAccessLogs();
-    }
-  },
-
-  openAccessModal() {
-    const modal = document.getElementById('accessModal');
-    if (!modal) return;
-    modal.classList.remove('hidden');
-    modal.classList.add('flex');
-    const input = document.getElementById('accessPersonInput');
-    if (input) input.value = '';
-  },
-  closeAccessModal() {
-    const modal = document.getElementById('accessModal');
-    if (!modal) return;
-    modal.classList.add('hidden');
-    modal.classList.remove('flex');
-    this._pendingAccess = null;
-  },
-  async confirmAccessModal() {
-    const input = document.getElementById('accessPersonInput');
-    const name = input ? input.value.trim() : '';
-    if (!name) { Helpers.toast('Ingrese la persona autorizada', 'error'); return; }
-    const pending = this._pendingAccess;
-    if (!pending) { this.closeAccessModal(); return; }
-    await this._insertAccess(pending.studentId, pending.action, name);
-    this.closeAccessModal();
-  },
-
-  async loadAccessLogs() {
-    const container = document.getElementById('accessRecentLog');
-    if (!container) return;
-    
-    // Simple loader
-    container.innerHTML = Helpers.skeleton(3, 'h-10');
-
-    const { data: logs } = await supabase
-      .from('access_logs')
-      .select('*, students(name)')
-      .order('created_at', { ascending: false })
-      .limit(10);
-
-    if(!logs || logs.length === 0) {
-        container.innerHTML = Helpers.emptyState('No hay movimientos recientes', 'clock');
-        return;
-    }
-
-    container.innerHTML = logs.map(log => `
-      <div class="flex justify-between items-center border-b pb-2 last:border-0">
-        <div>
-          <p class="font-medium text-slate-800">${log.students?.name || 'Desconocido'}</p>
-          <p class="text-xs text-slate-500">${new Date(log.created_at).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})} - ${log.authorized_person_name || 'Estudiante'}</p>
-        </div>
-        <span class="text-xs px-2 py-1 rounded-full font-bold ${log.action === 'check_in' ? 'bg-green-100 text-green-700' : 'bg-orange-100 text-orange-700'}">
-          ${log.action === 'check_in' ? 'Entrada' : 'Salida'}
-        </span>
-      </div>
-    `).join('');
-    refreshIcons();
-  },
-
   // --- ATTENDANCE ---
   async loadAttendanceRooms() {
     const grid = document.getElementById('attendanceRoomsGrid');
@@ -664,33 +555,33 @@ const UI = {
             if (a.status === 'late') stats[a.classroom_id].late++;
         });
 
+        const styles = ['crayon', 'ruler', 'notebook', 'toy'];
+        const icons = {'crayon': '🖍️', 'ruler': '📏', 'notebook': '📓', 'toy': '🧸'};
+
         if (rooms && rooms.length > 0) {
-            grid.innerHTML = rooms.map(r => {
+            grid.innerHTML = rooms.map((r, index) => {
                 const s = stats[r.id] || { present: 0, absent: 0, late: 0, total: 0 };
+                const styleClass = styles[index % styles.length];
+                const icon = icons[styleClass];
+                
                 return `
-                <div data-id="${r.id}" data-name="${r.name}" 
-                     class="card-attendance-room p-4 border rounded-xl hover:shadow-md transition-shadow cursor-pointer bg-white group">
-                    <div class="flex justify-between items-start mb-3">
-                        <h4 class="font-bold text-slate-700 group-hover:text-teal-600 transition-colors">${r.name}</h4>
-                        <span class="text-xs font-mono bg-slate-100 px-2 py-1 rounded text-slate-500">${Helpers.formatDate(today)}</span>
+                <div data-id="${r.id}" data-name="${r.name}" class="child-card ${styleClass}">
+                    <div class="child-card-header">
+                        <span class="child-card-icon">${icon}</span>
+                        <div>
+                            <h4 class="font-bold text-slate-700 text-lg">${r.name}</h4>
+                            <span class="text-xs font-bold text-slate-400">${Helpers.formatDate(today)}</span>
+                        </div>
                     </div>
                     
-                    <div class="grid grid-cols-3 gap-2 text-center">
-                        <div class="bg-green-50 p-2 rounded-lg">
-                            <p class="text-xs text-green-600 font-bold">Presentes</p>
-                            <p class="text-lg font-bold text-green-700">${s.present}</p>
+                    <div class="child-card-body">
+                        <div class="flex justify-between items-center bg-white/50 p-2 rounded-lg mb-1">
+                            <span class="text-green-600 font-bold">Presentes:</span>
+                            <span class="text-xl font-black text-green-700">${s.present}</span>
                         </div>
-                        <div class="bg-red-50 p-2 rounded-lg">
-                            <p class="text-xs text-red-600 font-bold">Ausentes</p>
-                            <p class="text-lg font-bold text-red-700">${s.absent}</p>
+                        <div class="flex gap-2 text-xs text-slate-500 justify-end">
+                            <span>Ausentes: <b>${s.absent}</b></span> • <span>Tardanzas: <b>${s.late}</b></span>
                         </div>
-                        <div class="bg-yellow-50 p-2 rounded-lg">
-                            <p class="text-xs text-yellow-600 font-bold">Tardanzas</p>
-                            <p class="text-lg font-bold text-yellow-700">${s.late}</p>
-                        </div>
-                    </div>
-                    <div class="mt-3 text-center">
-                        <span class="text-xs text-teal-600 font-medium group-hover:underline">Ver detalle &rarr;</span>
                     </div>
                 </div>
                 `;
@@ -1375,3 +1266,4 @@ document.addEventListener('DOMContentLoaded', () => {
 
 // Expose UI for debugging or legacy inline calls if absolutely necessary
 window.UI = UI;
+

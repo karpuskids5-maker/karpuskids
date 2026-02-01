@@ -896,6 +896,8 @@ async function loadInquiries() {
 
     if (!data || data.length === 0) {
       container.innerHTML = '<div class="col-span-3 text-center p-8 text-slate-500">No hay reportes o inquietudes pendientes.</div>';
+      const alertBox = document.getElementById('dashboardAlerts');
+      if (alertBox) alertBox.classList.add('hidden');
       return;
     }
 
@@ -929,6 +931,29 @@ async function loadInquiries() {
         </div>
       `;
     }).join('');
+
+    // Mostrar alerta en dashboard si hay pendientes
+    const pendingCount = data.filter(d => d.status === 'pending').length;
+    const alertBox = document.getElementById('dashboardAlerts');
+    if (alertBox) {
+      if (pendingCount > 0) {
+        alertBox.classList.remove('hidden');
+        alertBox.innerHTML = `
+          <div class="bg-orange-100 text-orange-800 rounded-2xl p-4 shadow flex items-center gap-3">
+            <i data-lucide="alert-triangle" class="w-6 h-6"></i>
+            <div>
+              <div class="font-bold">Avisos e inquietudes pendientes</div>
+              <div class="text-sm">Tienes ${pendingCount} mensaje(s) de padres por revisar</div>
+            </div>
+            <button id="refreshReports" class="ml-auto px-3 py-2 bg-orange-500 text-white rounded hover:bg-orange-600">Actualizar</button>
+          </div>
+        `;
+        if (window.lucide) lucide.createIcons();
+        document.getElementById('refreshReports')?.addEventListener('click', loadInquiries);
+      } else {
+        alertBox.classList.add('hidden');
+      }
+    }
 
   } catch (e) {
     console.error('Error loading inquiries:', e);
