@@ -59,8 +59,9 @@ const UI = {
   },
 
   async checkSession() {
-    const { data: { user } } = await supabase.auth.getUser();
-    if (!user) {
+    const { data: { user }, error: authError } = await supabase.auth.getUser();
+    if (authError || !user) {
+      console.error('Error de sesión:', authError);
       window.location.href = 'login.html';
       return;
     }
@@ -69,11 +70,14 @@ const UI = {
     // Load Profile
     const { data: profile, error: profileError } = await supabase
       .from('profiles')
-      .select('*')
+      .select('id, role, name, email')
       .eq('id', user.id)
       .maybeSingle();
 
+    if (profileError) console.error('Error cargando perfil:', profileError);
+
     if (!profile || profile.role !== 'asistente') {
+      console.warn('Rol incorrecto o perfil no encontrado:', profile);
       await supabase.auth.signOut();
       window.location.href = 'login.html';
       return;
@@ -1257,13 +1261,8 @@ function refreshIcons() {
     });
     document.getElementById('btnSaveReminder')?.addEventListener('click', ()=> UI.saveReminder());
     document.getElementById('btnSendReminders')?.addEventListener('click', ()=> UI.sendRemindersNow());
-  });
-
-document.addEventListener('DOMContentLoaded', () => {
-  // ... (resto del DOMContentLoaded)
-  document.getElementById('btnExportPaymentReports')?.addEventListener('click', () => UI.exportPaymentReportsCSV());
+    document.getElementById('btnExportPaymentReports')?.addEventListener('click', () => UI.exportPaymentReportsCSV());
 });
 
 // Expose UI for debugging or legacy inline calls if absolutely necessary
 window.UI = UI;
-

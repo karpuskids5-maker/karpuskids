@@ -147,7 +147,7 @@ async function loadDashboard() {
     const da = document.getElementById('dashAttendance'); if (da) da.textContent = `${percent}%`;
     
     const classroomId = AppState.student.classroom_id;
-    const { count: pendingCount } = await supabase.from('tasks').select('*', { count: 'exact', head: true }).eq('classroom_id', classroomId).gte('due_date', new Date().toISOString());
+    const { count: pendingCount } = await supabase.from('tasks').select('*', { count: 'exact', head: true }).eq('classroom_id', classroomId).gte('due_date', new Date().toISOString().split('T')[0]);
     const { count: deliveredCount } = await supabase.from('task_evidences').select('*', { count: 'exact', head: true }).eq('student_id', sid);
 
     const dp = document.getElementById('dashPendingTasks'); if (dp) dp.textContent = String(pendingCount || 0);

@@ -79,14 +79,14 @@
       id="sidebar"
       class="
         fixed z-30
-        bottom-0 left-0 right-0 h-16
+        bottom-0 left-0 right-0 h-auto min-h-[4.5rem]
         md:inset-y-0 md:left-0 md:h-auto md:w-64
         flex md:flex-col
         bg-gradient-to-b from-emerald-400 to-green-500
         shadow-xl
         transition-all duration-300
         pt-[env(safe-area-inset-top)]
-        pb-[calc(env(safe-area-inset-bottom)+12px)]
+        pb-[calc(env(safe-area-inset-bottom)+8px)]
       "
     >
       <div class="p-6 hidden md:flex items-center gap-3">
@@ -111,8 +111,9 @@
           flex overflow-x-auto no-scrollbar
           md:flex-col
           w-full
-          px-2 md:px-4 py-1
-          gap-1 md:gap-2
+          px-2 md:px-4 py-2
+          gap-2 md:gap-2
+          justify-between md:justify-start
         "
       >
         <button data-target="home" class="sidebar-btn active flex flex-col md:flex-row justify-center md:justify-start items-center">
@@ -353,18 +354,18 @@
           <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
             <!-- Datos del Estudiante -->
             <div class="bg-white p-6 rounded-2xl shadow-sm border space-y-4">
-              <h4 class="font-bold flex justify-between items-center">
-                Datos del Estudiante
+              <div class="flex justify-between items-center mb-4">
+                <h4 class="font-bold">Datos del Estudiante</h4>
                 <div class="relative group">
                   <div id="studentAvatarPreview" class="w-16 h-16 rounded-full bg-slate-100 overflow-hidden border-2 border-white shadow-sm flex items-center justify-center">
                     <i data-lucide="user" class="text-slate-400 w-8 h-8"></i>
                   </div>
-                  <label for="studentAvatarInput" class="absolute bottom-0 right-0 bg-sky-500 text-white p-2 rounded-full cursor-pointer hover:bg-sky-600 shadow-md z-10">
+                  <label for="studentAvatarInput" class="absolute bottom-0 right-0 bg-sky-500 text-white p-2 rounded-full cursor-pointer hover:bg-sky-600 shadow-md z-10 flex items-center justify-center">
                     <i data-lucide="camera" class="w-4 h-4"></i>
                   </label>
                   <input type="file" id="studentAvatarInput" accept="image/*" class="hidden">
                 </div>
-              </h4>
+              </div>
               <div class="grid grid-cols-1 gap-3">
                 <div><label class="text-xs text-slate-500">Nombre</label><input id="inputStudentName" class="w-full border rounded p-2 bg-slate-50" readonly></div>
                 <div><label class="text-xs text-slate-500">Dirección</label><input id="inputStudentAddress" class="w-full border rounded p-2"></div>
