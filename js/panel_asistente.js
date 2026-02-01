@@ -76,10 +76,14 @@ const UI = {
 
     if (profileError) console.error('Error cargando perfil:', profileError);
 
-    if (!profile || profile.role !== 'asistente') {
+    const role = profile?.role?.toLowerCase();
+    if (!profile || (role !== 'asistente' && role !== 'directora')) {
       console.warn('Rol incorrecto o perfil no encontrado:', profile);
-      await supabase.auth.signOut();
-      window.location.href = 'login.html';
+      Helpers.toast('Acceso denegado: Rol no autorizado (' + (profile?.role || 'sin rol') + ')', 'error');
+      setTimeout(async () => {
+        await supabase.auth.signOut();
+        window.location.href = 'login.html';
+      }, 2000);
       return;
     }
 

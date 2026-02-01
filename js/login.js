@@ -46,11 +46,12 @@ document.addEventListener('DOMContentLoaded', () => {
 
         // 3. Redirección según rol
         localStorage.setItem('karpus_user', JSON.stringify(profile));
+        const role = (profile.role || '').toLowerCase();
         
-        if (profile.role === 'directora') window.location.href = 'panel_directora.html';
-        else if (profile.role === 'maestra') window.location.href = 'panel-maestra.html'; // Ajustado al nombre real de tu archivo
-        else if (profile.role === 'padre') window.location.href = 'panel_padres.html';
-        else if (profile.role === 'asistente') window.location.href = 'panel_asistente.html';
+        if (role === 'directora') window.location.href = 'panel_directora.html';
+        else if (role === 'maestra') window.location.href = 'panel-maestra.html'; 
+        else if (role === 'padre') window.location.href = 'panel_padres.html';
+        else if (role === 'asistente') window.location.href = 'panel_asistente.html';
         else alert('Rol no reconocido');
 
       } catch (error) {

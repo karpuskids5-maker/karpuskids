@@ -242,7 +242,14 @@ const UI = {
       return;
     }
 
-    grid.innerHTML = classes.map(cls => this.renderClassCard(cls)).join('');
+    // Enrich classes with counts
+    const enrichedClasses = await Promise.all(classes.map(async (cls) => {
+        const { count: tasksCount } = await supabase.from('tasks').select('*', { count: 'exact', head: true }).eq('classroom_id', cls.id);
+        const { count: studentsCount } = await supabase.from('students').select('*', { count: 'exact', head: true }).eq('classroom_id', cls.id);
+        return { ...cls, tasksCount, studentsCount };
+    }));
+
+    grid.innerHTML = enrichedClasses.map(cls => this.renderClassCard(cls)).join('');
     if(window.lucide) lucide.createIcons();
   },
 
@@ -250,10 +257,6 @@ const UI = {
     // Random color assignment based on ID char or index could be better, but random for now is ok or strict list
     const colors = ['bg-orange-100 text-orange-600', 'bg-blue-100 text-blue-600', 'bg-pink-100 text-pink-600', 'bg-green-100 text-green-600'];
     const colorClass = colors[String(cls.id).charCodeAt(0) % colors.length];
-
-    // --- METRICS ---
-    const { count: tasksCount } = await supabase.from('tasks').select('*', { count: 'exact', head: true }).eq('classroom_id', cls.id);
-    const { count: studentsCount } = await supabase.from('students').select('*', { count: 'exact', head: true }).eq('classroom_id', cls.id);
 
     return `
       <div class="class-card bg-white rounded-3xl p-6 border shadow-sm hover:shadow-md hover:scale-[1.02] transition-all cursor-pointer group" 
@@ -270,8 +273,8 @@ const UI = {
         <p class="text-sm text-slate-500 mb-4">${cls.shift || 'Turno Mañana'}</p>
         
         <div class="flex items-center gap-3 text-xs text-slate-500 border-t pt-3">
-            <div class="flex items-center gap-1"><i data-lucide="user" class="w-3 h-3"></i> ${studentsCount || 0} Alumnos</div>
-            <div class="flex items-center gap-1"><i data-lucide="clipboard-list" class="w-3 h-3"></i> ${tasksCount || 0} Tareas</div>
+            <div class="flex items-center gap-1"><i data-lucide="user" class="w-3 h-3"></i> ${cls.studentsCount || 0} Alumnos</div>
+            <div class="flex items-center gap-1"><i data-lucide="clipboard-list" class="w-3 h-3"></i> ${cls.tasksCount || 0} Tareas</div>
         </div>
       </div>
     `;
