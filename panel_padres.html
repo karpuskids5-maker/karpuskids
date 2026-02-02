@@ -3,185 +3,151 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
-  <meta name="theme-color" content="#22c55e">
+  <meta name="theme-color" content="#0ea5e9">
   <link rel="manifest" href="manifest.json">
   <title>Karpus Kids - Panel de Padres</title>
+  
+  <!-- Preconectar recursos externos -->
+  <link rel="preconnect" href="https://cdn.tailwindcss.com">
+  <link rel="preconnect" href="https://cdn.jsdelivr.net">
+   
+  
+   
+  <!-- Meta tags mejoradas -->
+  <meta name="description" content="Panel de padres - Karpus Kids. Gestiona asistencia, tareas, calificaciones y más.">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="default">
+   
+  <!-- Open Graph -->
+  <meta property="og:title" content="Karpus Kids - Panel de Padres">
+  <meta property="og:description" content="Gestiona la educación de tu hijo con facilidad">
+  <meta property="og:image" content="/logo/favicon.ico">
+
   <script src="https://cdn.tailwindcss.com"></script>
   <link rel="stylesheet" href="css/theme.css" />
   <link rel="stylesheet" href="css/layout.css" />
-  <script src="https://cdn.jsdelivr.net/npm/lucide@latest/dist/umd/lucide.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/lucide@latest/dist/umd/lucide.min.js" crossorigin="anonymous"></script>
   <link rel="icon" href="logo/favicon.ico" type="image/x-icon">
-  <style>
-    body {
-      overscroll-behavior: none;
-    }
-    .sidebar-btn {
-      padding: 0.75rem;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      gap: 0.5rem;
-      border-radius: 0.75rem;
-      transition: all 0.2s ease;
-      color: #86efac;
-    }
-    .sidebar-btn:hover { background-color: rgba(255,255,255,0.12); color: #ffffff; }
-    .sidebar-btn.active { background-color: #ffffff; color: #16a34a; font-weight: 700; box-shadow: 0 6px 12px -2px rgba(0,0,0,0.12); }
-
-    /* Desktop */
-    @media (min-width: 768px) {
-      .sidebar-btn {
-        width: 100%;
-        justify-content: flex-start;
-        padding: 0.75rem 1rem;
-      }
-    }
-    
-    @media (max-width: 767px) {
-      .sidebar-btn {
-        flex: 0 0 auto;
-        width: 70px;
-        min-height: 56px;
-        padding: 0.5rem;
-        flex-direction: column;
-        font-size: 0.65rem;
-      }
-      .sidebar-btn span {
-        display: block;
-        margin-top: 2px;
-        white-space: nowrap;
-        overflow: hidden;
-        text-overflow: ellipsis;
-        max-width: 100%;
-      }
-    }
-
-    .section { display: none; }
-    .section.active { display: block; animation: fadeIn 0.2s ease; }
-    @keyframes fadeIn { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: translateY(0); } }
-    
-    /* Hide scrollbar for Chrome, Safari and Opera */
-    .no-scrollbar::-webkit-scrollbar {
-      display: none;
-    }
-    /* Hide scrollbar for IE, Edge and Firefox */
-    .no-scrollbar {
-      -ms-overflow-style: none;  /* IE and Edge */
-      scrollbar-width: none;  /* Firefox */
-    }
-  </style>
 </head>
-<body class="font-nunito text-slate-800 bg-gradient-to-br from-slate-50 via-sky-50 to-white">
+<body 
+  class="font-nunito text-slate-800 bg-gradient-to-br from-slate-50 via-sky-50 to-white"
+  aria-label="Panel de padres Karpus Kids"
+>
 
   <div class="flex min-h-screen relative">
-    <!-- SIDEBAR VERDE -->
+    <!-- SIDEBAR MOCHILA (Verde/Turquesa) -->
     <aside
       id="sidebar"
       class="
         fixed z-30
         bottom-0 left-0 right-0 h-auto min-h-[4.5rem]
-        md:inset-y-0 md:left-0 md:h-auto md:w-64
+        md:inset-y-4 md:left-4 md:h-auto md:w-64
         flex md:flex-col
-        bg-gradient-to-b from-emerald-400 to-green-500
-        shadow-xl
         transition-all duration-300
         pt-[env(safe-area-inset-top)]
         pb-[calc(env(safe-area-inset-bottom)+8px)]
+        sidebar-backpack
       "
     >
-      <div class="p-6 hidden md:flex items-center gap-3">
-        <div class="w-10 h-10 bg-white/20 rounded-xl flex items-center justify-center backdrop-blur-sm">
-          <img src="img/mundo.jpg" class="w-8 h-8 rounded-lg object-cover" alt="Logo">
+      <!-- Logo Parche -->
+      <div class="hidden md:flex flex-col items-center justify-center pt-6 pb-4 bg-sky-100 rounded-2xl mx-4 text-slate-900">
+        <div class="w-20 h-20 bg-white rounded-full border-4 border-dashed border-green-200 flex items-center justify-center shadow-lg mb-2">
+           <img src="img/mundo.jpg" class="w-14 h-14 rounded-full object-cover" alt="Logo">
         </div>
-        <div>
-          <h1 class="font-bold text-lg leading-tight text-white">Karpus Kids</h1>
-          <p class="text-xs text-emerald-100">Panel Familiar</p>
-        </div>
+        <h1 class="font-black text-xl tracking-tight">Karpus Kids</h1>
+        <p class="text-xs font-bold uppercase tracking-widest opacity-90">Panel Familiar</p>
       </div>
 
       <div class="px-4 mb-6 hidden md:block">
-        <div class="bg-white/10 rounded-xl p-3 backdrop-blur-sm border border-white/10">
-          <p class="text-xs text-emerald-200 mb-1">Estudiante:</p>
-          <div id="sidebar-student-name" class="font-semibold text-white truncate">Cargando...</div>
+        <div class="student-pocket">
+          <p class="text-[10px] text-sky-100 font-bold uppercase tracking-widest mb-1 flex items-center gap-1">
+            <i data-lucide="user" class="w-3 h-3"></i> Estudiante
+          </p>
+          <div id="sidebar-student-name" class="font-bold text-white text-lg truncate leading-none">Cargando...</div>
         </div>
       </div>
 
       <nav
-        class="
-          flex overflow-x-auto no-scrollbar
-          md:flex-col
-          w-full
-          px-2 md:px-4 py-2
-          gap-2 md:gap-2
-          justify-between md:justify-start
-        "
+        class="sidebar-nav flex overflow-x-auto no-scrollbar md:flex-col w-full px-2 md:px-4 py-2 gap-2 md:gap-3 justify-start md:justify-start"
+        role="navigation" 
+        aria-label="Navegación principal"
       >
-        <button data-target="home" class="sidebar-btn active flex flex-col md:flex-row justify-center md:justify-start items-center">
-          <i data-lucide="layout-dashboard" class="w-5 h-5"></i>
+        <button data-target="home" class="sidebar-btn btn-home active flex flex-col md:flex-row justify-center md:justify-start items-center group" aria-label="Inicio" aria-current="page">
+          <i data-lucide="home" class="w-6 h-6"></i>
           <span class="hidden md:inline">Inicio</span>
         </button>
-        <button data-target="live-attendance" class="sidebar-btn flex flex-col md:flex-row justify-center md:justify-start items-center">
-          <i data-lucide="calendar-check" class="w-5 h-5"></i>
+        <button data-target="live-attendance" class="sidebar-btn btn-attendance flex flex-col md:flex-row justify-center md:justify-start items-center group" aria-label="Asistencia">
+          <i data-lucide="calendar-days" class="w-6 h-6"></i>
           <span class="hidden md:inline">Asistencia</span>
         </button>
-        <button data-target="tasks" class="sidebar-btn flex flex-col md:flex-row justify-center md:justify-start items-center">
-          <i data-lucide="clipboard-list" class="w-5 h-5"></i>
+        <button data-target="tasks" class="sidebar-btn btn-tasks flex flex-col md:flex-row justify-center md:justify-start items-center group" aria-label="Tareas">
+          <i data-lucide="book" class="w-6 h-6"></i>
           <span class="hidden md:inline">Tareas</span>
         </button>
-        <button data-target="class" class="sidebar-btn flex flex-col md:flex-row justify-center md:justify-start items-center">
-          <i data-lucide="users" class="w-5 h-5"></i>
-          <span class="hidden md:inline">Muro de Clase</span>
+        <button data-target="class" class="sidebar-btn btn-class flex flex-col md:flex-row justify-center md:justify-start items-center group" aria-label="Muro">
+          <i data-lucide="palette" class="w-6 h-6"></i>
+          <span class="hidden md:inline">Muro</span>
         </button>
-        <button data-target="grades" class="sidebar-btn flex flex-col md:flex-row justify-center md:justify-start items-center">
-          <i data-lucide="graduation-cap" class="w-5 h-5"></i>
+        <button data-target="grades" class="sidebar-btn btn-grades flex flex-col md:flex-row justify-center md:justify-start items-center group" aria-label="Calificaciones">
+          <i data-lucide="star" class="w-6 h-6"></i>
           <span class="hidden md:inline">Calificaciones</span>
         </button>
-        <button data-target="payments" class="sidebar-btn flex flex-col md:flex-row justify-center md:justify-start items-center">
-          <i data-lucide="credit-card" class="w-5 h-5"></i>
+        <button data-target="payments" class="sidebar-btn btn-payments flex flex-col md:flex-row justify-center md:justify-start items-center group" aria-label="Pagos">
+          <i data-lucide="credit-card" class="w-6 h-6"></i>
           <span class="hidden md:inline">Pagos</span>
         </button>
-        <button data-target="notifications" class="sidebar-btn relative flex flex-col md:flex-row justify-center md:justify-start items-center">
-          <i data-lucide="bell" class="w-5 h-5"></i>
+        <button data-target="notifications" class="sidebar-btn btn-notifications relative flex flex-col md:flex-row justify-center md:justify-start items-center" aria-label="Notificaciones">
+          <i data-lucide="bell" class="w-6 h-6"></i>
           <span class="hidden md:inline">Notificaciones</span>
-          <span id="notifBadge" class="hidden absolute top-1 right-3 w-2 h-2 bg-red-500 rounded-full"></span>
+          <span id="notifBadge" class="hidden absolute top-1 right-3 w-2 h-2 bg-rose-500 rounded-full border-2 border-white" aria-label="Tienes notificaciones nuevas"></span>
         </button>
-        <button data-target="profile" class="sidebar-btn flex flex-col md:flex-row justify-center md:justify-start items-center">
-          <i data-lucide="user-circle" class="w-5 h-5"></i>
+        <button data-target="profile" class="sidebar-btn btn-profile flex flex-col md:flex-row justify-center md:justify-start items-center" aria-label="Mi Perfil">
+          <i data-lucide="user-circle" class="w-6 h-6"></i>
           <span class="hidden md:inline">Mi Perfil</span>
         </button>
       </nav>
 
-      <div class="p-4 mt-auto hidden md:block">
-        <button id="btnLogout" class="flex items-center gap-3 text-blue-100 hover:text-white hover:bg-white/10 w-full p-3 rounded-xl transition-all">
-          <i data-lucide="log-out" class="w-5 h-5"></i> Cerrar Sesión
+      <div class="p-4 mt-auto hidden md:block border-t border-white/20">
+        <button id="btnLogout" class="flex items-center gap-3 w-full p-3 rounded-xl transition-all font-bold text-sm bg-rose-100 text-red-700 hover:bg-rose-200">
+          <i data-lucide="log-out" class="w-5 h-5 text-red-600"></i> Cerrar Sesión
         </button>
       </div>
+      <div class="hidden md:block backpack-bottom"></div>
     </aside>
 
     <!-- CONTENIDO PRINCIPAL -->
     <main
       id="layoutShell"
-      class="flex-1 ml-0 md:ml-64 p-4 md:p-8 pb-24 md:pb-8 transition-all duration-300"
+      class="flex-1 ml-0 md:ml-[18rem] p-4 md:p-8 pb-24 md:pb-8 transition-all duration-300"
+      role="main"
     >
       <!-- Header Móvil -->
       <div class="md:hidden flex items-center justify-between mb-6">
-        <span class="font-bold text-slate-700">Karpus Kids</span>
+        <span class="font-black text-slate-700 text-lg tracking-tight flex items-center gap-2">
+           <span class="text-2xl">🧸</span> Karpus Kids
+        </span>
         <div class="w-8"></div>
       </div>
 
       <!-- Header Escritorio -->
-      <header class="flex justify-between items-center mb-8">
+      <header class="flex justify-between items-center mb-8" role="banner">
         <div>
-          <h2 class="text-2xl font-bold text-slate-700">Hola, <span class="guardian-name-display text-sky-500">Familia</span> 👋</h2>
-          <p class="text-slate-500" id="currentDateDisplay">Hoy es...</p>
+          <h1 class="text-2xl font-bold text-slate-700 sr-only">Karpus Kids - Panel de Padres</h1>
+          <h2 class="text-3xl font-black text-slate-700 tracking-tight flex items-center gap-2">
+             🧸 Hola, <span class="guardian-name-display text-sky-500 underline decoration-sky-200 decoration-4 underline-offset-4">Familia</span>!
+          </h2>
+          <p class="text-slate-500 font-medium mt-1 ml-1" id="currentDateDisplay" aria-live="polite">Hoy es...</p>
+          <button id="btnRefreshData" class="mt-3 ml-1 text-xs flex items-center gap-1 text-slate-400 hover:text-sky-600 transition-colors font-bold uppercase tracking-wider">
+            <i data-lucide="refresh-cw" class="w-3 h-3"></i> Actualizar mochila
+          </button>
         </div>
         <div class="flex items-center gap-4">
           <div class="hidden md:block text-right">
-            <p class="text-sm font-bold text-slate-700 student-name-display">Estudiante</p>
-            <p class="text-xs text-slate-500 classroom-name-display">Aula</p>
+            <p class="text-sm font-black text-slate-700 student-name-display">Estudiante</p>
+            <p class="text-xs text-slate-500 font-bold text-emerald-600 classroom-name-display bg-emerald-50 px-2 py-1 rounded-full inline-block mt-1">Cargando aula...</p>
           </div>
-          <div id="headerAvatar" class="w-10 h-10 bg-green-100 rounded-full flex items-center justify-center text-green-600 font-bold border-2 border-white shadow-sm cursor-pointer">
-            <i data-lucide="user"></i>
+          <div id="headerAvatar" class="w-12 h-12 bg-emerald-100 rounded-full flex items-center justify-center text-emerald-600 font-bold border-4 border-white shadow-lg cursor-pointer transform hover:scale-110 transition-transform" role="button" aria-label="Menú de usuario" tabindex="0">
+            <i data-lucide="user" class="w-6 h-6"></i>
           </div>
         </div>
       </header>
@@ -189,39 +155,50 @@
       <!-- SECCIONES -->
       <div id="contentArea">
         <!-- HOME -->
-        <section id="home" class="section active space-y-6 block">
-          <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
-            <div class="bg-white p-6 rounded-2xl shadow-sm border border-slate-100 hover:shadow-md transition">
-              <div class="flex items-center gap-4">
-                <div class="p-3 bg-sky-100 text-sky-600 rounded-2xl"><i data-lucide="calendar-check"></i></div>
-                <div><p class="text-sm text-slate-500">Asistencia Mensual</p><p class="text-2xl font-bold text-slate-800" id="dashAttendance">0%</p></div>
-              </div>
-            </div>
-            <div class="bg-white p-6 rounded-2xl shadow-sm border border-slate-100 hover:shadow-md transition">
-              <div class="flex items-center gap-4">
-                <div class="p-3 bg-emerald-100 text-emerald-600 rounded-2xl"><i data-lucide="clipboard-list"></i></div>
-                <div><p class="text-sm text-slate-500">Tareas Pendientes</p><p class="text-2xl font-bold text-slate-800" id="dashPendingTasks">0</p></div>
-              </div>
-            </div>
-            <div class="bg-white p-6 rounded-2xl shadow-sm border border-slate-100 hover:shadow-md transition">
-              <div class="flex items-center gap-4">
-                <div class="p-3 bg-pink-100 text-pink-600 rounded-2xl"><i data-lucide="check-circle-2"></i></div>
-                <div><p class="text-sm text-slate-500">Tareas Entregadas</p><p class="text-2xl font-bold text-slate-800" id="dashDeliveredTasks">0</p></div>
-              </div>
+        <section id="home" class="section active space-y-8 block">
+          <!-- Dashboard Grid -->
+          <div id="dashboardGrid" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            <!-- Cargando dashboard... -->
+            <div class="col-span-full text-center py-12">
+              <div class="animate-spin rounded-full h-12 w-12 border-b-2 border-sky-500 mx-auto mb-4"></div>
+              <p class="text-slate-400 font-bold animate-pulse">Cargando tu mochila...</p>
             </div>
           </div>
 
           <!-- Accesos Rápidos -->
-          <h3 class="text-lg font-bold text-slate-700 mt-2">¿Qué quieres hacer hoy?</h3>
-          <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
-            <button onclick="document.querySelector('[data-target=\'payments\']').click()" class="p-4 bg-white border border-slate-100 rounded-xl shadow-sm hover:shadow-md hover:border-sky-200 transition flex flex-col items-center gap-2 group">
-              <div class="w-10 h-10 rounded-full bg-sky-50 text-sky-600 flex items-center justify-center group-hover:bg-sky-500 group-hover:text-white transition"><i data-lucide="credit-card"></i></div>
-              <span class="text-sm font-semibold text-slate-600">Pagar Mensualidad</span>
-            </button>
-            <button id="btnQuickAbsence" class="p-4 bg-white border border-slate-100 rounded-xl shadow-sm hover:shadow-md hover:border-rose-200 transition flex flex-col items-center gap-2 group">
-              <div class="w-10 h-10 rounded-full bg-rose-50 text-rose-600 flex items-center justify-center group-hover:bg-rose-500 group-hover:text-white transition"><i data-lucide="calendar-x"></i></div>
-              <span class="text-sm font-semibold text-slate-600">Reportar Falta</span>
-            </button>
+          <div>
+            <h3 class="text-xl font-black text-slate-800 mb-4 tracking-tight flex items-center gap-2">
+              <span class="text-2xl">🚀</span> ¿Qué quieres hacer hoy?
+            </h3>
+            <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
+              <button onclick="document.querySelector('[data-target=\'payments\']').click()" class="p-4 bg-white border-2 border-slate-100 rounded-2xl shadow-sm hover:shadow-lg hover:border-sky-200 hover:-translate-y-1 transition-all flex flex-col items-center gap-2 group">
+                <div class="w-12 h-12 rounded-full bg-sky-50 text-sky-600 flex items-center justify-center group-hover:bg-sky-500 group-hover:text-white transition-colors shadow-inner">
+                  <i data-lucide="credit-card" class="w-6 h-6"></i>
+                </div>
+                <span class="text-sm font-bold text-slate-600 group-hover:text-sky-600 transition-colors">Pagar Mensualidad</span>
+              </button>
+              
+              <button id="btnQuickAbsence" class="p-4 bg-white border-2 border-slate-100 rounded-2xl shadow-sm hover:shadow-lg hover:border-rose-200 hover:-translate-y-1 transition-all flex flex-col items-center gap-2 group">
+                <div class="w-12 h-12 rounded-full bg-rose-50 text-rose-600 flex items-center justify-center group-hover:bg-rose-500 group-hover:text-white transition-colors shadow-inner">
+                  <i data-lucide="calendar-x" class="w-6 h-6"></i>
+                </div>
+                <span class="text-sm font-bold text-slate-600 group-hover:text-rose-600 transition-colors">Reportar Falta</span>
+              </button>
+
+              <button onclick="document.querySelector('[data-target=\'tasks\']').click()" class="p-4 bg-white border-2 border-slate-100 rounded-2xl shadow-sm hover:shadow-lg hover:border-amber-200 hover:-translate-y-1 transition-all flex flex-col items-center gap-2 group">
+                <div class="w-12 h-12 rounded-full bg-amber-50 text-amber-600 flex items-center justify-center group-hover:bg-amber-500 group-hover:text-white transition-colors shadow-inner">
+                  <i data-lucide="book-open" class="w-6 h-6"></i>
+                </div>
+                <span class="text-sm font-bold text-slate-600 group-hover:text-amber-600 transition-colors">Ver Tareas</span>
+              </button>
+
+              <button onclick="window.print()" class="p-4 bg-white border-2 border-slate-100 rounded-2xl shadow-sm hover:shadow-lg hover:border-emerald-200 hover:-translate-y-1 transition-all flex flex-col items-center gap-2 group">
+                <div class="w-12 h-12 rounded-full bg-emerald-50 text-emerald-600 flex items-center justify-center group-hover:bg-emerald-500 group-hover:text-white transition-colors shadow-inner">
+                  <i data-lucide="printer" class="w-6 h-6"></i>
+                </div>
+                <span class="text-sm font-bold text-slate-600 group-hover:text-emerald-600 transition-colors">Imprimir Reporte</span>
+              </button>
+            </div>
           </div>
         </section>
 
@@ -249,10 +226,6 @@
                 <p class="text-xs">Ausencias</p>
                 <p id="attAbsent" class="text-2xl font-bold">0</p>
               </div>
-              <div class="p-4 rounded-xl bg-sky-50 text-slate-700 flex items-center justify-between">
-                <span class="text-xs">Exportar PDF</span>
-                <button id="attendanceExportBtn" class="px-3 py-2 rounded-lg bg-sky-400 text-white text-xs font-semibold hover:bg-sky-500 transition">Exportar</button>
-              </div>
             </div>
             <div class="flex items-center gap-3 text-xs">
               <span class="px-2 py-1 rounded-full bg-emerald-100 text-emerald-700 font-semibold">Presente</span>
@@ -267,13 +240,16 @@
         <!-- TAREAS -->
         <section id="tasks" class="section">
           <div class="flex items-center justify-between mb-4">
-            <h3 class="text-xl font-bold">Tareas Asignadas</h3>
-            <div class="flex bg-slate-100 p-1 rounded-lg">
-              <button class="px-3 py-1 text-xs font-bold rounded-md bg-white shadow text-slate-700 task-filter-btn transition-all" data-filter="pending">Pendientes</button>
-              <button class="px-3 py-1 text-xs font-medium rounded-md text-slate-500 hover:bg-white/50 task-filter-btn transition-all" data-filter="submitted">Entregadas</button>
+            <h3 class="text-xl font-black text-slate-800 tracking-tight flex items-center gap-2">
+              <span class="text-2xl">📚</span> Tareas Asignadas
+            </h3>
+            <div class="flex bg-slate-100 p-1 rounded-xl">
+              <button class="px-4 py-2 text-xs font-bold rounded-lg bg-white shadow-sm text-slate-700 task-filter-btn transition-all" data-filter="pending">Pendientes</button>
+              <button class="px-4 py-2 text-xs font-medium rounded-lg text-slate-500 hover:bg-white/50 task-filter-btn transition-all" data-filter="overdue">Vencidas</button>
+              <button class="px-4 py-2 text-xs font-medium rounded-lg text-slate-500 hover:bg-white/50 task-filter-btn transition-all" data-filter="submitted">Entregadas</button>
             </div>
           </div>
-          <div id="tasksSummary" class="mb-4 text-xs text-slate-600"></div>
+          <div id="tasksSummary" class="mb-4 text-xs text-slate-600 font-bold bg-blue-50 p-3 rounded-lg border border-blue-100 inline-block"></div>
           <div id="tasksList" class="space-y-4"></div>
         </section>
 
@@ -286,6 +262,9 @@
         <!-- CALIFICACIONES -->
         <section id="grades" class="section">
           <h3 class="text-xl font-bold mb-4">Historial de Calificaciones</h3>
+          <div class="mb-4 text-right no-print">
+            <button id="btnDownloadReport" class="px-4 py-2 bg-slate-800 text-white rounded-lg text-sm hover:bg-slate-900 flex items-center gap-2 ml-auto"><i data-lucide="file-down" class="w-4 h-4"></i> Descargar Reporte PDF</button>
+          </div>
           <div id="gradesContent"></div>
         </section>
 
@@ -345,6 +324,12 @@
         <!-- NOTIFICACIONES -->
         <section id="notifications" class="section">
           <h3 class="text-xl font-bold mb-4">Notificaciones</h3>
+          <div id="notification-prompt" class="hidden bg-sky-50 p-4 rounded-xl mb-4 border border-sky-100">
+            <div class="flex items-center justify-between">
+              <p class="text-sm text-sky-800 font-medium">Habilita las notificaciones para recibir alertas de nuevas tareas y anuncios.</p>
+              <button id="enable-notifications-btn" class="px-4 py-2 bg-sky-500 text-white text-sm font-bold rounded-lg hover:bg-sky-600 transition-colors">Habilitar</button>
+            </div>
+          </div>
           <div id="notificationsList" class="space-y-3"></div>
         </section>
 
@@ -372,7 +357,7 @@
                 <div><label class="text-xs text-slate-500">Fecha de Nacimiento</label><input id="inputStudentBirth" type="date" class="w-full border rounded p-2"></div>
               </div>
               <div class="text-right">
-                <button id="btnSaveStudent" class="px-4 py-2 rounded-lg bg-green-500 text-white text-xs font-semibold hover:bg-green-600 transition">Guardar</button>
+                <button id="btnSaveStudentProfile" class="px-4 py-2 rounded-lg bg-green-500 text-white text-xs font-semibold hover:bg-green-600 transition">Guardar</button>
               </div>
             </div>
             <div class="bg-white p-6 rounded-2xl shadow-sm border space-y-4">
@@ -402,104 +387,126 @@
                   <div><label class="text-xs text-slate-500">Parentesco</label><input id="profilePickupRelation" class="w-full border rounded p-2"></div>
                 </div>
               </div>
-              <div class="text-right">
-                <button id="btnSaveGuardian" class="px-4 py-2 rounded-lg bg-green-500 text-white text-xs font-semibold hover:bg-green-600 transition">Guardar</button>
-              </div>
             </div>
           </div>
         </section>
       </div>
-    </main>
 
-    <!-- Overlay Móvil -->
-    <div id="sidebarOverlay" class="fixed inset-0 bg-black/50 z-20 hidden backdrop-blur-sm"></div>
-  </div>
-
-  <!-- MODAL: Reportar Ausencia (NUEVO) -->
-  <div id="modalAbsence" class="fixed inset-0 bg-black/50 z-50 hidden flex items-center justify-center p-4 backdrop-blur-sm">
-    <div class="bg-white rounded-2xl shadow-xl w-full max-w-md overflow-hidden transform transition-all scale-100">
-      <div class="p-6 border-b border-slate-100 flex justify-between items-center">
-        <h3 class="font-bold text-lg text-slate-800">Reportar Inasistencia</h3>
-        <button id="btnCloseAbsence" class="text-slate-400 hover:text-slate-600"><i data-lucide="x"></i></button>
-      </div>
-      <form id="formAbsence" class="p-6 space-y-4">
-        <div>
-          <label class="block text-sm font-medium text-slate-600 mb-1">Fecha de la falta</label>
-          <input type="date" id="absenceDate" required class="w-full px-3 py-2 border rounded-xl bg-slate-50 outline-none focus:ring-2 focus:ring-rose-500">
-        </div>
-        <div>
-          <label class="block text-sm font-medium text-slate-600 mb-1">Motivo</label>
-          <select id="absenceReason" class="w-full px-3 py-2 border rounded-xl outline-none focus:ring-2 focus:ring-rose-500">
-            <option value="Salud">Enfermedad / Salud</option>
-            <option value="Personal">Motivos Personales</option>
-            <option value="Viaje">Viaje Familiar</option>
-            <option value="Otro">Otro</option>
-          </select>
-        </div>
-        <div>
-          <label class="block text-sm font-medium text-slate-600 mb-1">Detalles (Opcional)</label>
-          <textarea id="absenceNote" rows="3" class="w-full px-3 py-2 border rounded-xl outline-none focus:ring-2 focus:ring-rose-500" placeholder="Breve descripción..."></textarea>
-        </div>
-        <div class="pt-2">
-          <button type="submit" class="w-full py-3 bg-rose-500 hover:bg-rose-600 text-white rounded-xl font-bold shadow-lg shadow-rose-200 transition-all">
-            Enviar Reporte
-          </button>
-        </div>
-      </form>
-    </div>
-  </div>
-
-  <!-- MODAL: Detalle de Tarea y Entrega (NUEVO) -->
-  <div id="modalTaskDetail" class="fixed inset-0 bg-black/50 z-50 hidden flex items-center justify-center p-4 backdrop-blur-sm">
-    <div class="bg-white rounded-2xl shadow-xl w-full max-w-lg overflow-hidden flex flex-col max-h-[90vh]">
-      <div class="p-6 border-b border-slate-100 flex justify-between items-center">
-        <h3 id="taskDetailTitle" class="font-bold text-lg text-slate-800">Detalle de Tarea</h3>
-        <button id="btnCloseTaskDetail" class="text-slate-400 hover:text-slate-600"><i data-lucide="x"></i></button>
-      </div>
-      <div class="p-6 overflow-y-auto space-y-4 flex-1">
-        <div class="flex justify-between items-start">
-          <div>
-            <span id="taskDetailStatus" class="px-2 py-1 rounded text-xs font-bold bg-slate-100 text-slate-600">Pendiente</span>
-            <p id="taskDetailDate" class="text-sm text-slate-500 mt-2">Vence: -</p>
-          </div>
-        </div>
-        <div id="taskDetailPreview"></div>
-        <p id="taskDetailDesc" class="text-slate-700 text-sm leading-relaxed bg-slate-50 p-4 rounded-xl"></p>
-        
-        <div class="border-t border-slate-100 pt-4 mt-4">
-          <h4 class="font-bold text-slate-800 mb-3">Tu Entrega</h4>
-          
-          <!-- Formulario de subida -->
-          <div id="uploadSection" class="space-y-3">
-            <div class="border-2 border-dashed border-slate-200 rounded-xl p-6 text-center hover:bg-slate-50 transition cursor-pointer relative group">
-              <input type="file" id="taskFileInput" accept="image/*,application/pdf" class="absolute inset-0 opacity-0 cursor-pointer z-10">
-              <i data-lucide="upload-cloud" class="mx-auto w-8 h-8 text-sky-400 mb-2 group-hover:scale-110 transition-transform"></i>
-              <p class="text-sm text-slate-600 font-medium">Toca para subir evidencia</p>
-              <p id="fileNameDisplay" class="text-xs text-sky-600 font-bold mt-2 min-h-[1rem]"></p>
+      <!-- MODALS -->
+      <div id="modalAbsence" class="fixed inset-0 z-50 hidden items-center justify-center bg-black/50 backdrop-blur-sm" role="dialog" aria-modal="true">
+        <div class="bg-white p-6 rounded-2xl w-full max-w-md shadow-2xl m-4 animate-bounce-in">
+          <h3 class="text-xl font-bold mb-4 flex items-center gap-2">
+             <i data-lucide="calendar-x" class="text-rose-500"></i> Reportar Ausencia
+          </h3>
+          <form id="formAbsence" class="space-y-4">
+            <div>
+              <label class="block text-sm font-bold text-slate-700 mb-1">Fecha</label>
+              <input type="date" id="absenceDate" class="w-full p-3 border-2 border-slate-200 rounded-xl outline-none focus:border-rose-400 transition-colors" required>
             </div>
-            <textarea id="taskCommentInput" rows="2" class="w-full border rounded-xl px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-sky-500" placeholder="Comentario opcional..."></textarea>
-            <button id="btnSubmitTask" class="w-full py-3 bg-sky-500 hover:bg-sky-600 text-white rounded-xl font-bold shadow-lg shadow-sky-200 transition-all">Enviar Tarea</button>
-          </div>
+            <div>
+              <label class="block text-sm font-bold text-slate-700 mb-1">Motivo</label>
+              <select id="absenceReason" class="w-full p-3 border-2 border-slate-200 rounded-xl outline-none focus:border-rose-400 transition-colors" required>
+                <option value="">Selecciona un motivo...</option>
+                <option value="Enfermedad">Enfermedad</option>
+                <option value="Cita Médica">Cita Médica</option>
+                <option value="Emergencia Familiar">Emergencia Familiar</option>
+                <option value="Viaje">Viaje</option>
+                <option value="Otro">Otro</option>
+              </select>
+            </div>
+            <div>
+              <label class="block text-sm font-bold text-slate-700 mb-1">Nota adicional</label>
+              <textarea id="absenceNote" class="w-full p-3 border-2 border-slate-200 rounded-xl outline-none focus:border-rose-400 transition-colors" rows="3" placeholder="Detalles opcionales..."></textarea>
+            </div>
+            <div class="flex justify-end gap-3 mt-6">
+              <button type="button" class="px-5 py-2.5 rounded-xl font-bold text-slate-500 hover:bg-slate-100 transition-colors" data-close-modal>Cancelar</button>
+              <button type="submit" class="px-5 py-2.5 rounded-xl font-bold bg-rose-500 text-white hover:bg-rose-600 shadow-lg shadow-rose-200 transition-all hover:-translate-y-1">Enviar Reporte</button>
+            </div>
+          </form>
+        </div>
+      </div>
 
-          <!-- Vista de tarea ya entregada -->
-          <div id="evidenceSection" class="hidden bg-emerald-50 rounded-xl p-4 border border-emerald-100">
-            <div class="flex items-center gap-3 mb-2">
-              <div class="w-8 h-8 rounded-full bg-emerald-100 text-emerald-600 flex items-center justify-center"><i data-lucide="check"></i></div>
-              <div>
-                <p class="text-sm font-bold text-emerald-800">Tarea Entregada</p>
-                <p id="evidenceDate" class="text-xs text-emerald-600">Fecha: -</p>
+      <!-- MODAL DETALLE TAREA -->
+      <div id="modalTaskDetail" class="fixed inset-0 z-50 hidden items-center justify-center bg-black/50 backdrop-blur-sm modal" role="dialog" aria-modal="true">
+          <div class="bg-white w-full max-w-2xl m-4 rounded-3xl shadow-2xl overflow-hidden flex flex-col max-h-[90vh]">
+              <!-- Header Modal -->
+              <div class="p-6 bg-slate-50 border-b flex justify-between items-start">
+                  <div>
+                      <h3 id="taskDetailTitle" class="text-2xl font-black text-slate-800 leading-tight">Título de la Tarea</h3>
+                      <p id="taskDetailDate" class="text-sm text-slate-500 font-bold mt-1 flex items-center gap-1">
+                          <i data-lucide="calendar" class="w-3 h-3"></i> Vence: --/--/----
+                      </p>
+                  </div>
+                  <button id="btnCloseTaskDetail" class="p-2 hover:bg-slate-200 rounded-full transition-colors">
+                      <i data-lucide="x" class="w-6 h-6 text-slate-400"></i>
+                  </button>
               </div>
-            </div>
-            <p id="evidenceComment" class="text-sm text-slate-600 mb-2 italic"></p>
-            <a id="evidenceLink" href="#" target="_blank" class="text-xs text-sky-600 font-bold underline flex items-center gap-1 hover:text-sky-800">
-              <i data-lucide="external-link" class="w-3 h-3"></i> Ver archivo adjunto
-            </a>
-          </div>
-        </div>
-      </div>
-    </div>
-  </div>
 
+              <!-- Content Modal (Scrollable) -->
+              <div class="p-6 overflow-y-auto custom-scrollbar flex-1">
+                  <div class="prose prose-slate max-w-none mb-8">
+                      <h4 class="font-bold text-sm text-slate-400 uppercase tracking-wider mb-2">Instrucciones</h4>
+                      <p id="taskDetailDesc" class="text-slate-700 leading-relaxed">Descripción detallada de la tarea...</p>
+                  </div>
+
+                  <!-- Área de Entrega -->
+                  <div id="uploadSection" class="bg-blue-50 rounded-2xl p-6 border-2 border-dashed border-blue-200">
+                      <h4 class="font-bold text-blue-800 mb-4 flex items-center gap-2">
+                          <i data-lucide="upload-cloud" class="w-5 h-5"></i> Entregar Tarea
+                      </h4>
+                      
+                      <div class="space-y-4">
+                          <!-- Input Archivo -->
+                          <div class="relative group cursor-pointer">
+                              <input type="file" id="taskFileInput" class="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10">
+                              <div class="bg-white p-4 rounded-xl border border-blue-100 shadow-sm group-hover:border-blue-300 transition-all flex items-center justify-center gap-3">
+                                  <div class="p-2 bg-blue-100 text-blue-600 rounded-lg">
+                                      <i data-lucide="file-up" class="w-5 h-5"></i>
+                                  </div>
+                                  <span id="fileNameDisplay" class="text-sm font-medium text-slate-600 group-hover:text-blue-600">Seleccionar archivo (PDF, IMG, DOCX)</span>
+                              </div>
+                          </div>
+
+                          <!-- Comentario -->
+                          <div>
+                              <textarea id="taskCommentInput" rows="3" class="w-full p-4 rounded-xl border border-blue-100 focus:border-blue-400 outline-none text-sm resize-none" placeholder="Escribe un comentario para el profesor..."></textarea>
+                          </div>
+
+                          <button id="btnSubmitTask" class="w-full py-3 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-xl shadow-lg shadow-blue-200 transition-all hover:-translate-y-1">
+                              Enviar Tarea
+                          </button>
+                      </div>
+                  </div>
+
+                  <!-- Estado Entregado (Oculto por defecto) -->
+                  <div id="evidenceSection" class="hidden bg-emerald-50 rounded-2xl p-6 border border-emerald-100 text-center">
+                      <div class="w-16 h-16 bg-emerald-100 text-emerald-600 rounded-full flex items-center justify-center mx-auto mb-3 shadow-inner">
+                          <i data-lucide="check-circle-2" class="w-8 h-8"></i>
+                      </div>
+                      <h4 class="font-bold text-emerald-800 text-lg">¡Tarea Entregada!</h4>
+                      <p id="evidenceDate" class="text-xs text-emerald-600 font-medium mb-4">Enviado el: --/--/----</p>
+                      
+                      <div class="text-left bg-white p-4 rounded-xl border border-emerald-100 shadow-sm mb-4">
+                          <p class="text-xs text-slate-400 font-bold uppercase mb-1">Tu comentario:</p>
+                          <p id="evidenceComment" class="text-slate-600 text-sm italic">"--"</p>
+                      </div>
+
+                      <a id="evidenceLink" href="#" target="_blank" class="inline-flex items-center gap-2 text-emerald-600 font-bold text-sm hover:underline">
+                          <i data-lucide="download"></i> Ver archivo adjunto
+                      </a>
+                  </div>
+              </div>
+          </div>
+      </div>
+      
+      <!-- Botón Scroll Top -->
+      <button id="scrollTopBtn" class="fixed bottom-24 right-6 md:bottom-8 z-40 p-3 bg-slate-800 text-white rounded-full shadow-xl hover:bg-slate-900 transition-all hidden" aria-label="Volver arriba">
+        <i data-lucide="arrow-up" class="w-5 h-5"></i>
+      </button>
+
+    </main>
+  </div>
+  
   <script type="module" src="js/panel_padres.js"></script>
 </body>
 </html>

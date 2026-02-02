@@ -1,4 +1,4 @@
-import { supabase, ensureRole, sendPush } from './supabase.js';
+import { supabase } from './supabase.js';
 
 // --- 1. HELPERS & UTILS ---
 const Helpers = {
@@ -77,10 +77,34 @@ const UI = {
   },
 
   async checkSession() {
-    const auth = await ensureRole('maestra');
-    if (!auth) return;
-    AppState.user = auth.user;
-    AppState.profile = auth.profile;
+    const { data: { user } } = await supabase.auth.getUser();
+    
+    if (!user) {
+      window.location.href = 'login.html';
+      return;
+    }
+
+    const { data: profile } = await supabase
+      .from('profiles')
+      .select('id, role, name, email')
+      .eq('id', user.id)
+      .maybeSingle();
+
+    if (!profile) {
+      await supabase.auth.signOut();
+      window.location.href = 'login.html';
+      return;
+    }
+
+    if (profile.role !== 'maestra' && profile.role !== 'directora') {
+       if (profile.role === 'padre') window.location.href = 'panel_padres.html';
+       else if (profile.role === 'directora') window.location.href = 'panel_directora.html';
+       else window.location.href = 'login.html';
+       return;
+    }
+    
+    AppState.user = user;
+    AppState.profile = profile;
     this.updateUserProfileUI();
 
     // Initial Load
@@ -174,6 +198,11 @@ const UI = {
             const btn = e.target.closest('.btn-log-student');
             this.openDailyLogModal(btn.dataset.id, btn.dataset.name);
         }
+
+        // Post Submit (Delegación para evitar memory leaks)
+        if (e.target.closest('#btnSubmitPost')) {
+            this.createPost();
+        }
     });
     
     // Setup Modal Closers (Generic)
@@ -248,6 +277,12 @@ const UI = {
         const { count: studentsCount } = await supabase.from('students').select('*', { count: 'exact', head: true }).eq('classroom_id', cls.id);
         return { ...cls, tasksCount, studentsCount };
     }));
+    
+    // Update Dashboard Stats
+    document.getElementById('statClasses').textContent = enrichedClasses.length;
+    document.getElementById('statStudents').textContent = enrichedClasses.reduce((acc, c) => acc + (c.studentsCount||0), 0);
+    document.getElementById('statTasks').textContent = enrichedClasses.reduce((acc, c) => acc + (c.tasksCount||0), 0);
+    // Attendance stat requires separate query, keeping placeholder or fetching
 
     grid.innerHTML = enrichedClasses.map(cls => this.renderClassCard(cls)).join('');
     if(window.lucide) lucide.createIcons();
@@ -255,26 +290,31 @@ const UI = {
 
   renderClassCard(cls) {
     // Random color assignment based on ID char or index could be better, but random for now is ok or strict list
-    const colors = ['bg-orange-100 text-orange-600', 'bg-blue-100 text-blue-600', 'bg-pink-100 text-pink-600', 'bg-green-100 text-green-600'];
-    const colorClass = colors[String(cls.id).charCodeAt(0) % colors.length];
+    const themes = [
+      { border: 'border-orange-400', bg: 'bg-orange-50', icon: 'text-orange-500' },
+      { border: 'border-blue-400', bg: 'bg-blue-50', icon: 'text-blue-500' },
+      { border: 'border-pink-400', bg: 'bg-pink-50', icon: 'text-pink-500' },
+      { border: 'border-green-400', bg: 'bg-green-50', icon: 'text-green-500' }
+    ];
+    const theme = themes[String(cls.id).charCodeAt(0) % themes.length];
 
     return `
-      <div class="class-card bg-white rounded-3xl p-6 border shadow-sm hover:shadow-md hover:scale-[1.02] transition-all cursor-pointer group" 
-           data-id="${cls.id}" data-name="${cls.name}">
-        <div class="flex items-start justify-between mb-4">
-          <div class="h-12 w-12 rounded-2xl ${colorClass} flex items-center justify-center">
-            <i data-lucide="users" class="w-6 h-6"></i>
-          </div>
-          <span class="bg-slate-100 text-slate-600 text-xs px-2 py-1 rounded-lg font-bold group-hover:bg-slate-200 transition-colors">
-            ${cls.level || 'General'}
-          </span>
+      <div class="class-card bg-white rounded-3xl p-0 border-2 ${theme.border} border-b-[8px] shadow-sm hover:shadow-lg hover:-translate-y-1 transition-all cursor-pointer group overflow-hidden" 
+           data-id="${cls.id}" data-name="${Helpers.escapeHTML(cls.name)}">
+        <div class="h-4 w-full ${theme.bg} opacity-50 flex gap-1 px-2 pt-1">
+           <!-- Fake studs -->
+           ${Array(6).fill('<div class="w-6 h-2 bg-black/10 rounded-t"></div>').join('')}
         </div>
-        <h3 class="font-bold text-lg text-slate-800 mb-1 group-hover:text-green-700 transition-colors">${cls.name}</h3>
-        <p class="text-sm text-slate-500 mb-4">${cls.shift || 'Turno Mañana'}</p>
-        
-        <div class="flex items-center gap-3 text-xs text-slate-500 border-t pt-3">
-            <div class="flex items-center gap-1"><i data-lucide="user" class="w-3 h-3"></i> ${cls.studentsCount || 0} Alumnos</div>
-            <div class="flex items-center gap-1"><i data-lucide="clipboard-list" class="w-3 h-3"></i> ${cls.tasksCount || 0} Tareas</div>
+        <div class="p-6">
+            <div class="flex justify-between items-start mb-2">
+                <h3 class="font-black text-xl text-slate-800 group-hover:text-green-600 transition-colors">${Helpers.escapeHTML(cls.name)}</h3>
+                <i data-lucide="blocks" class="${theme.icon} w-8 h-8"></i>
+            </div>
+            <p class="text-sm text-slate-500 font-bold mb-4">${Helpers.escapeHTML(cls.level || 'General')} • ${cls.studentsCount || 0} Alumnos</p>
+            <div class="w-full bg-slate-100 rounded-full h-2 overflow-hidden">
+                <div class="bg-green-400 h-full" style="width: 75%"></div>
+            </div>
+            <p class="text-xs text-slate-400 mt-1 text-right">Progreso del día</p>
         </div>
       </div>
     `;
@@ -292,6 +332,16 @@ const UI = {
   openClass(cls) {
     AppState.setCurrentClass(cls);
     document.getElementById('currentClassName').textContent = cls.name;
+    
+    // ✔ Mostrar contador de alumnos y tareas
+    let metaEl = document.getElementById('currentClassMeta');
+    if (!metaEl) {
+        metaEl = document.createElement('div');
+        metaEl.id = 'currentClassMeta';
+        metaEl.className = 'text-sm text-slate-500 mt-1 font-medium';
+        document.getElementById('currentClassName').parentNode.appendChild(metaEl);
+    }
+    metaEl.innerHTML = `${cls.studentsCount || 0} alumnos • ${cls.tasksCount || 0} tareas`;
     
     // UX: Desactivar botón home visualmente
     document.querySelector('[data-section="t-home"]')?.classList.remove('active');
@@ -376,7 +426,7 @@ const UI = {
 
     this.setupPostInputEvents();
 
-    document.getElementById('btnSubmitPost').addEventListener('click', () => this.createPost());
+    // Listener delegado en bindEvents
 
     const { data: posts, error } = await supabase
       .from('posts')
@@ -391,27 +441,32 @@ const UI = {
 
     // Render posts (simplified for brevity, can be expanded)
     const postsHTML = posts.map(p => `
+        ${(() => {
+            const safeMedia = p.media_url ? encodeURI(p.media_url) : '';
+            return `
         <div class="bg-white p-4 rounded-2xl border shadow-sm mb-4">
             <div class="flex items-center gap-3 mb-3">
                 <div class="w-10 h-10 bg-green-100 rounded-full flex items-center justify-center text-green-700 font-bold shadow-sm">
-                    ${p.profiles?.name?.charAt(0) || 'M'}
+                    ${Helpers.escapeHTML(p.profiles?.name?.charAt(0) || 'M')}
                 </div>
                 <div>
-                    <div class="font-bold text-sm text-slate-800">${p.profiles?.name || 'Maestra'}</div>
+                    <div class="font-bold text-sm text-slate-800">${Helpers.escapeHTML(p.profiles?.name || 'Maestra')}</div>
                     <div class="text-xs text-slate-500">${Helpers.formatDate(p.created_at)}</div>
                 </div>
             </div>
             <p class="text-slate-700 text-sm mb-3 whitespace-pre-line">${Helpers.escapeHTML(p.content || '')}</p>
             ${p.media_type === 'image' ? `
                 <div class="rounded-xl overflow-hidden border border-slate-100 mt-2">
-                    <img src="${p.media_url}" alt="Imagen adjunta" class="w-full h-auto max-h-96 object-cover bg-slate-50" loading="lazy">
+                    <img src="${safeMedia}" alt="Imagen adjunta" class="w-full h-auto max-h-96 object-cover bg-slate-50" loading="lazy">
                 </div>
             ` : p.media_type === 'video' ? `
                 <div class="rounded-xl overflow-hidden border border-slate-100 mt-2">
-                    <video src="${p.media_url}" controls class="w-full h-auto max-h-96 bg-black"></video>
+                    <video src="${safeMedia}" controls class="w-full h-auto max-h-96 bg-black"></video>
                 </div>
             ` : ''}
         </div>
+            `;
+        })()}
     `).join('');
     
     document.getElementById('feedPostsContainer').innerHTML = postsHTML;
@@ -454,6 +509,12 @@ const UI = {
     const content = contentInput.value.trim();
     const file = fileInput?.files[0];
 
+    // 3️⃣ btnSubmitPost puede ser null
+    if(!btnSubmit) return;
+    
+    // ✔ Evitar doble click al publicar post
+    if(btnSubmit.disabled) return;
+
     if (!AppState.currentClass?.id) {
         Helpers.toast('Error: Clase no seleccionada', 'error');
         return;
@@ -462,6 +523,12 @@ const UI = {
     if(!content && !file) {
         Helpers.toast('Escribe algo o sube una foto', 'info');
         return;
+    }
+
+    // ✔ Limitar tamaño de archivos
+    if (file && file.size > 10 * 1024 * 1024) {
+       Helpers.toast('Archivo máximo 10MB', 'error');
+       return;
     }
 
     // UI Loading state
@@ -485,7 +552,7 @@ const UI = {
 
             if (uploadError) throw uploadError;
 
-            const { data: { publicUrl } } = supabase.storage
+            const { data: { publicUrl } } = await supabase.storage
                 .from('classroom_media')
                 .getPublicUrl(fileName);
                 
@@ -512,6 +579,10 @@ const UI = {
         contentInput.value = '';
         if (fileInput) fileInput.value = '';
         document.getElementById('previewContainer').classList.add('hidden');
+        // 5️⃣ Falta resetear preview al publicar post
+        const imgPreview = document.getElementById('imgPreview');
+        if(imgPreview) imgPreview.src = '';
+        
         if (window.lucide) lucide.createIcons();
 
         this.renderFeed(); // Recargar feed
@@ -556,18 +627,18 @@ const UI = {
     const iconColors = ['text-orange-600 bg-orange-100', 'text-blue-600 bg-blue-100', 'text-pink-600 bg-pink-100', 'text-purple-600 bg-purple-100'];
 
     tab.innerHTML = `
-      <div class="bg-white p-4 rounded-2xl shadow-sm">
-        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+      <div class="notebook-paper p-6 bg-white rounded-r-xl shadow-sm min-h-[400px]">
+        <h3 class="font-bold text-xl text-slate-700 mb-6 flex items-center gap-2"><i data-lucide="users" class="text-red-500"></i> Lista de Clase</h3>
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
           ${students.map((s, index) => `
-            <div class="flex items-center gap-3 p-3 border rounded-xl hover:shadow-md transition group relative ${cardColors[index % cardColors.length]}">
-              <div class="w-10 h-10 rounded-full flex items-center justify-center font-bold text-lg ${iconColors[index % iconColors.length]}">
-                ${(s.name || '?').charAt(0)}
+            <div class="flex items-center gap-4 p-3 border-b border-blue-100 hover:bg-blue-50/50 transition rounded-lg group">
+              <div class="w-12 h-12 rounded-full flex items-center justify-center font-black text-xl shadow-sm ${iconColors[index % iconColors.length]} transform group-hover:scale-110 transition-transform">
+                ${Helpers.escapeHTML((s.name || '?').charAt(0))}
               </div>
-              <div class="flex-1 min-w-0">
-                <div class="font-semibold text-sm text-slate-800 truncate">${s.name || 'Sin nombre'}</div>
-                <div class="text-xs text-slate-500">ID: ${String(s.id).substring(0,8)}</div>
-                <button onclick="window.UI.openStudentProfile('${s.id}')" class="text-blue-600 hover:text-green-600 text-xs font-medium mt-1 flex items-center gap-1 cursor-pointer">
-                   <i data-lucide="eye" class="w-3 h-3"></i> Ver Perfil
+              <div class="flex-1">
+                <div class="font-bold text-slate-700 text-lg" style="font-family: 'Comic Sans MS', cursive, sans-serif">${Helpers.escapeHTML(s.name || 'Sin nombre')}</div>
+                <button onclick="window.UI.openStudentProfile('${s.id}')" class="text-slate-400 hover:text-blue-500 text-xs font-bold uppercase tracking-wider flex items-center gap-1 mt-1">
+                   VER PERFIL <i data-lucide="arrow-right" class="w-3 h-3"></i>
                 </button>
               </div>
             </div>
@@ -653,7 +724,7 @@ const UI = {
             }));
 
         if (toSeed.length) {
-            await supabase.from('attendance').upsert(toSeed, { onConflict: 'student_id,date' });
+            await supabase.from('attendance').upsert(toSeed, { onConflict: 'student_id,classroom_id,date' });
             // Actualizar lista local para reflejar cambios
             if(existingAttendance) existingAttendance.push(...toSeed);
         }
@@ -690,7 +761,7 @@ const UI = {
                         const status = statusMap[s.id] || 'pending';
                         return `
                         <tr class="student-row hover:bg-slate-50 transition-colors" data-id="${s.id}" data-status="${status}">
-                            <td class="p-4 font-medium text-slate-700">${s.name}</td>
+                            <td class="p-4 font-medium text-slate-700">${Helpers.escapeHTML(s.name)}</td>
                             <td class="p-4 text-center">
                                 <span class="status-badge px-3 py-1 rounded-full text-xs font-bold 
                                     ${status === 'present' ? 'bg-green-100 text-green-700' : 
@@ -705,15 +776,15 @@ const UI = {
                             <td class="p-4 text-center">
                                 <div class="flex items-center justify-center gap-2">
                                     <button class="att-btn p-2 rounded-lg hover:bg-green-50 text-slate-400 hover:text-green-600 transition" 
-                                            onclick="UI.setAttendance('${s.id}', 'present', this)" title="Presente">
+                                            onclick="UI.setAttendance('${s.id}', 'present', this)" title="Presente" aria-label="Marcar presente">
                                         <i data-lucide="check-circle" class="w-5 h-5"></i>
                                     </button>
                                     <button class="att-btn p-2 rounded-lg hover:bg-red-50 text-slate-400 hover:text-red-600 transition" 
-                                            onclick="UI.setAttendance('${s.id}', 'absent', this)" title="Ausente">
+                                            onclick="UI.setAttendance('${s.id}', 'absent', this)" title="Ausente" aria-label="Marcar ausente">
                                         <i data-lucide="x-circle" class="w-5 h-5"></i>
                                     </button>
                                     <button class="att-btn p-2 rounded-lg hover:bg-yellow-50 text-slate-400 hover:text-yellow-600 transition" 
-                                            onclick="UI.setAttendance('${s.id}', 'late', this)" title="Tardanza">
+                                            onclick="UI.setAttendance('${s.id}', 'late', this)" title="Tardanza" aria-label="Marcar tardanza">
                                         <i data-lucide="clock" class="w-5 h-5"></i>
                                     </button>
                                 </div>
@@ -780,6 +851,9 @@ const UI = {
           Helpers.toast('No hay cambios para guardar', 'info');
           return;
       }
+
+      // ✔ Feedback visual cuando se guarda asistencia
+      Helpers.toast('Sincronizando con servidor...', 'info');
 
       Helpers.toast('Guardando asistencia...', 'info');
       
@@ -874,9 +948,15 @@ const UI = {
       document.getElementById('newTaskForm').classList.remove('hidden');
       document.getElementById('btnNewTask').classList.add('hidden');
     };
+    
+    // ✔ Confirmación al cerrar formulario tarea
     document.getElementById('btnCloseTaskForm').onclick = () => {
-      document.getElementById('newTaskForm').classList.add('hidden');
-      document.getElementById('btnNewTask').classList.remove('hidden');
+        const t = document.getElementById('taskTitle').value;
+        const d = document.getElementById('taskDesc').value;
+        if ((t || d) && !confirm('¿Descartar esta tarea?')) return;
+        
+        document.getElementById('newTaskForm').classList.add('hidden');
+        document.getElementById('btnNewTask').classList.remove('hidden');
     };
     document.getElementById('btnSaveTask').onclick = () => this.createTask();
 
@@ -893,13 +973,14 @@ const UI = {
       .eq('classroom_id', AppState.currentClass.id)
       .order('created_at', { ascending: false });
 
-    if(error || !tasks.length) {
+    // 4️⃣ Error silencioso cuando no existe tasks
+    if(error || !tasks || tasks.length === 0) {
       container.innerHTML = `<div class="col-span-full">${Helpers.emptyState('No hay tareas asignadas', 'clipboard-list')}</div>`;
       return;
     }
 
     container.innerHTML = tasks.map(t => `
-      <div class="bg-white p-5 rounded-2xl border border-slate-100 shadow-sm hover:shadow-md transition group relative overflow-hidden">
+      <div class="notebook-bg p-5 rounded-2xl shadow-sm hover:shadow-md transition group relative overflow-hidden">
         <div class="absolute top-0 left-0 w-1 h-full bg-pink-400"></div>
         <div class="flex justify-between items-start mb-2 pl-3">
           <h4 class="font-bold text-slate-800 text-lg group-hover:text-pink-600 transition">${t.title}</h4>
@@ -929,6 +1010,15 @@ const UI = {
 
     if(!title || !date) { Helpers.toast('Título y fecha requeridos', 'error'); return; }
 
+    const selectedDate = new Date(date);
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+
+    if (selectedDate < today) {
+      Helpers.toast('La fecha debe ser hoy o futura', 'error');
+      return;
+    }
+
     btn.disabled = true;
     btn.textContent = 'Publicando...';
 
@@ -939,7 +1029,7 @@ const UI = {
         const fileName = `tasks/${AppState.currentClass.id}_${Date.now()}_${safeName}`;
         const { error: upErr } = await supabase.storage.from('classroom_media').upload(fileName, file);
         if(upErr) throw upErr;
-        const { data } = supabase.storage.from('classroom_media').getPublicUrl(fileName);
+        const { data } = await supabase.storage.from('classroom_media').getPublicUrl(fileName);
         fileUrl = data.publicUrl;
       }
 
@@ -996,7 +1086,7 @@ const UI = {
       const stars = Number(ev?.stars) || 0;
       return `
         <tr class="hover:bg-slate-50">
-          <td class="p-3 font-medium text-slate-700">${s.name}</td>
+          <td class="p-3 font-medium text-slate-700">${Helpers.escapeHTML(s.name)}</td>
           <td class="p-3 text-center"><span class="px-2 py-1 rounded-full text-xs font-bold ${ev ? 'bg-green-100 text-green-700' : 'bg-slate-100 text-slate-500'}">${status}</span></td>
           <td class="p-3 text-center">${ev?.file_url ? `<a href="${ev.file_url}" target="_blank" class="text-blue-600 font-bold underline text-xs">Ver Archivo</a>` : '-'}</td>
           <td class="p-3 text-center">
@@ -1018,6 +1108,8 @@ const UI = {
     if(window.lucide) lucide.createIcons();
     modal.classList.remove('hidden');
     modal.classList.add('flex');
+    document.getElementById('btnCloseTaskModal')?.focus(); // Accessibility: Focus Management
+
     document.getElementById('btnCloseTaskModal')?.addEventListener('click', () => {
       modal.classList.add('hidden');
       modal.classList.remove('flex');
@@ -1050,6 +1142,7 @@ const UI = {
     modal.classList.remove('hidden');
     modal.classList.add('flex');
     document.body.classList.add('no-scroll');
+    document.getElementById('closeStudentProfileModal')?.focus(); // Accessibility: Focus Management
 
     // Fill with loading state or clear
     ['studentProfileName', 'studentDOB', 'studentClassroom', 'studentAllergies', 

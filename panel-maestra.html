@@ -12,7 +12,7 @@
   
   <style>
     /* Sidebar styles */
-    aside#sidebar { width: 280px; transition: width .25s ease, transform .25s ease; }
+    aside#sidebar { width: 280px; transition: width .3s cubic-bezier(0.34, 1.56, 0.64, 1); }
     aside#sidebar.collapsed { width: 72px; }
     aside#sidebar .label { transition: opacity .2s ease; }
     aside#sidebar.collapsed .label { opacity: 0; }
@@ -27,7 +27,6 @@
     
     /* mobile helper */
     .hidden-mobile { display: none !important; }
-    .sidebar-green { background: linear-gradient(135deg,#E8F8F0,#D0F0E0); }
     .karpus-kids-inline { font-weight: 700; }
     .karpus-kids-inline .k-1 { color: #FF9800; }
     
@@ -57,12 +56,76 @@
       z-index: 100;
       transition: all 0.3s ease;
     }
+
+    /* --- ESTILOS PANEL MAESTRA INFANTIL (PROMPT) --- */
+    
+    /* 🎒 Sidebar Mochila */
+    .sidebar-backpack {
+      background: linear-gradient(180deg, #4ade80 0%, #22c55e 100%);
+      border-right: 4px solid #15803d; /* Costura */
+      border-top-right-radius: 40px;
+      border-bottom-right-radius: 40px;
+      box-shadow: 5px 0 25px rgba(21, 128, 61, 0.2);
+      position: relative;
+    }
+    .sidebar-backpack::after { /* Detalle de costura */
+      content: ''; position: absolute; top: 20px; bottom: 20px; right: 10px;
+      border-right: 2px dashed rgba(255,255,255,0.4); pointer-events: none;
+    }
+
+    /* 🧸 Botones de Juguete */
+    .nav-btn-toy {
+      background: rgba(255,255,255,0.2); color: #064e3b;
+      border-radius: 9999px; /* Pill shape */
+      padding: 12px 20px; margin-bottom: 10px;
+      font-weight: 700; border: 2px solid transparent;
+      transition: all 0.2s cubic-bezier(0.34, 1.56, 0.64, 1);
+      display: flex; align-items: center; gap: 12px;
+    }
+    .nav-btn-toy:hover { background: white; transform: scale(1.05); color: #16a34a; box-shadow: 0 4px 0 rgba(0,0,0,0.1); }
+    .nav-btn-toy.active {
+      background: #fef08a; /* Yellow */
+      color: #854d0e;
+      border-bottom: 4px solid #facc15;
+      transform: translateY(-2px);
+    }
+    .nav-btn-toy.active:active { transform: translateY(0); border-bottom-width: 0; }
+
+    /* 🧱 Tarjetas Bloques (Stats) */
+    .stat-block {
+      border-radius: 24px; padding: 1.5rem; color: white;
+      position: relative; overflow: hidden;
+      box-shadow: 0 10px 15px -3px rgba(0,0,0,0.1);
+      transition: transform 0.3s; border-bottom: 6px solid rgba(0,0,0,0.2);
+    }
+    .stat-block:hover { transform: translateY(-6px); }
+    .stat-block i { opacity: 0.8; transform: rotate(-10deg); position: absolute; right: -10px; bottom: -10px; width: 80px; height: 80px; }
+    .sb-blue { background: #60a5fa; }
+    .sb-green { background: #4ade80; }
+    .sb-orange { background: #fb923c; }
+    .sb-purple { background: #a78bfa; }
+
+    /* 📒 Estilo Cuaderno (Listas) */
+    .notebook-paper {
+      background-color: #fff;
+      background-image: linear-gradient(#e5e7eb 1px, transparent 1px);
+      background-size: 100% 2rem;
+      border-left: 4px solid #ef4444; /* Margen rojo */
+      padding-left: 2rem;
+      box-shadow: 2px 2px 15px rgba(0,0,0,0.05);
+      border-radius: 8px;
+      position: relative;
+    }
+    .notebook-paper::before { /* Espiral */
+      content: ""; position: absolute; left: -12px; top: 0; bottom: 0; width: 20px;
+      background: radial-gradient(circle, #334155 30%, transparent 40%); background-size: 100% 2rem;
+    }
   </style>
 </head>
 <body class="bg-slate-50 text-slate-800 font-nunito">
   <div class="min-h-screen flex">
     <!-- SIDEBAR -->
-    <aside id="sidebar" class="sidebar-green p-4 rounded-r-3xl shadow-lg fixed inset-y-0 left-0 z-20">
+    <aside id="sidebar" class="sidebar-backpack p-4 fixed inset-y-0 left-0 z-20">
       <button id="toggleSidebar" class="absolute -right-3 top-6 bg-white rounded-full p-1 shadow-md border border-slate-100 text-slate-500 hover:text-green-600 hidden md:block">
         <i data-lucide="chevron-left" id="toggleSidebarIcon" class="w-4 h-4"></i>
       </button>
@@ -72,28 +135,28 @@
           <img src="img/mundo.jpg" alt="logo" class="h-10 w-10 rounded-lg object-cover" />
         </div>
         <div class="label">
-          <h3 class="font-semibold text-green-900">Karpus Kids</h3>
-          <p class="text-xs text-green-800 text-opacity-80">Panel Maestra</p>
+          <h3 class="font-black text-white text-lg tracking-tight">Karpus Kids</h3>
+          <p class="text-xs text-green-100 font-bold">Panel Maestra</p>
         </div>
       </div>
 
-      <nav class="space-y-2 bg-white/30 p-2 rounded-xl mb-4">
-        <button data-section="t-home" class="w-full text-left px-3 py-2 rounded-lg hover:bg-white/40 flex items-center gap-3 text-green-900 transition-colors active" aria-selected="true">
+      <nav class="space-y-2 p-2 mb-4">
+        <button data-section="t-home" class="nav-btn-toy w-full active" aria-selected="true">
           <i data-lucide="home" class="w-5 h-5"></i>
           <span class="label">Mis Clases</span>
         </button>
-        <button id="logoutBtn" class="w-full text-left px-3 py-2 rounded-lg hover:bg-white/40 flex items-center gap-3 text-green-900 transition-colors">
+        <button id="logoutBtn" class="nav-btn-toy w-full">
           <i data-lucide="log-out" class="w-5 h-5"></i>
           <span class="label">Cerrar sesión</span>
         </button>
       </nav>
 
-      <div class="mt-auto pt-4 border-t border-green-200/50">
+      <div class="mt-auto pt-4 border-t border-white/20">
         <div class="flex items-center gap-3 px-2">
-          <div class="w-8 h-8 rounded-full bg-green-200 flex items-center justify-center text-green-700 font-bold">M</div>
+          <div class="w-10 h-10 rounded-full bg-white flex items-center justify-center text-green-600 font-black shadow-md border-2 border-green-200">M</div>
           <div class="label overflow-hidden">
-            <h3 class="text-sm font-semibold text-green-900 truncate user-name-display">Maestra</h3>
-            <p class="text-xs text-green-800 truncate user-email-display">maestra@karpus.local</p>
+            <h3 class="text-sm font-bold text-white truncate user-name-display">Maestra</h3>
+            <p class="text-xs text-green-100 truncate user-email-display">maestra@karpus.local</p>
           </div>
         </div>
       </div>
@@ -114,9 +177,35 @@
       <!-- SECTION: HOME (Mis Clases) -->
       <section id="t-home" class="section active">
         <header class="mb-6">
-          <h1 class="text-2xl font-bold text-slate-800">Mis Clases</h1>
-          <p class="text-slate-500">Bienvenida, <span class="user-name-display">Maestra</span></p>
+          <h1 class="text-3xl font-black text-slate-800 flex items-center gap-2">
+            <span>🧑‍🏫</span> Hola, <span class="user-name-display text-green-600">Maestra</span>!
+          </h1>
+          <p class="text-slate-500 font-medium">¡Listo para un día lleno de aprendizaje!</p>
         </header>
+
+        <!-- Top Cards (Bloques) -->
+        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
+          <div class="stat-block sb-blue">
+            <h3 class="text-3xl font-black" id="statClasses">-</h3>
+            <p class="font-bold text-blue-100">Mis Clases</p>
+            <i data-lucide="library"></i>
+          </div>
+          <div class="stat-block sb-green">
+            <h3 class="text-3xl font-black" id="statStudents">-</h3>
+            <p class="font-bold text-green-100">Total Alumnos</p>
+            <i data-lucide="users"></i>
+          </div>
+          <div class="stat-block sb-orange">
+            <h3 class="text-3xl font-black" id="statTasks">-</h3>
+            <p class="font-bold text-orange-100">Tareas Activas</p>
+            <i data-lucide="clipboard-list"></i>
+          </div>
+          <div class="stat-block sb-purple">
+            <h3 class="text-3xl font-black" id="statAttendance">-</h3>
+            <p class="font-bold text-purple-100">Asistencia Hoy</p>
+            <i data-lucide="calendar-check"></i>
+          </div>
+        </div>
         
         <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6" id="classesGrid">
           <!-- Cargando... -->

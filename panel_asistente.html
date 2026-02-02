@@ -6,6 +6,7 @@
   <title>Karpus Kids — Panel Asistente</title>
   <link rel="icon" href="./logo/favicon.ico" type="image/x-icon">
   <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/lucide@latest/dist/umd/lucide.min.js"></script>
   <script>
     (function(){
@@ -282,6 +283,9 @@
               <i data-lucide="search" class="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400"></i>
               <input id="searchPaymentInput" type="text" placeholder="Buscar por alumno, monto..." class="pl-9 pr-4 py-2 border rounded-lg text-sm w-64 focus:ring-2 focus:ring-teal-500 outline-none">
             </div>
+            <select id="paymentMonthFilter" class="border rounded-lg px-3 py-2 text-sm bg-white focus:ring-2 focus:ring-teal-500 outline-none">
+              <!-- Opciones de meses pobladas por JS -->
+            </select>
             <button id="btnExportPayments" class="bg-slate-800 text-white px-4 py-2 rounded-lg hover:bg-slate-900 transition-colors text-sm font-medium flex items-center gap-2">
               <i data-lucide="download" class="w-4 h-4"></i> Exportar Excel
             </button>
@@ -290,6 +294,14 @@
             </button>
           </div>
         </div>
+
+        <div class="bg-white rounded-2xl shadow-sm border p-6 mb-6">
+          <h3 class="font-bold text-lg mb-4 text-slate-700">Ingresos por Mes (Anual)</h3>
+          <div class="relative h-64 w-full">
+            <canvas id="incomeChart"></canvas>
+          </div>
+        </div>
+
         <div class="bg-white rounded-2xl shadow-sm border p-4 mb-6">
           <div class="flex items-center justify-between mb-4">
             <h3 class="font-semibold">Recordatorios de Pago</h3>

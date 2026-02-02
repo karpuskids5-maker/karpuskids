@@ -55,6 +55,7 @@ const UI = {
   init() {
     this.bindEvents();
     this.checkSession();
+    this.populateMonthFilter();
     this.injectChildTheme(); // Inyectar estilos infantiles
   },
 
@@ -189,7 +190,7 @@ const UI = {
 
     // --- Payment Modal ---
     document.getElementById('btnNewPayment')?.addEventListener('click', () => this.openPaymentModal());
-    document.getElementById('closePaymentModal')?.addEventListener('click', () => this.closePaymentModal());
+    document.querySelectorAll('#closePaymentModal, #cancelPayment').forEach(el => el?.addEventListener('click', () => this.closePaymentModal()));
     document.getElementById('cancelPayment')?.addEventListener('click', () => this.closePaymentModal());
     document.getElementById('btnExportPayments')?.addEventListener('click', () => this.exportPaymentsToCSV());
     
@@ -210,6 +211,11 @@ const UI = {
 
     // Global Delegated Events (for dynamic content)
     document.addEventListener('click', (e) => {
+        // Register Payment for specific student (from table)
+        if (e.target.closest('.btn-register-payment')) {
+            const btn = e.target.closest('.btn-register-payment');
+            this.openPaymentModal(btn.dataset.studentId);
+        }
         // Delete Payment
         if (e.target.closest('.btn-delete-payment')) {
             const btn = e.target.closest('.btn-delete-payment');
@@ -243,7 +249,7 @@ const UI = {
       if (id === 'estudiantes') this.loadStudents();
       if (id === 'asistencia') this.loadAttendanceRooms();
       if (id === 'maestros') this.loadTeachers();
-      if (id === 'pagos') { this.loadPayments(); this.loadPaymentReports(); this.loadReminderConfig(); }
+      if (id === 'pagos') { this.loadPayments(); this.loadPaymentReports(); this.loadReminderConfig(); this.loadIncomeChart(); }
     }
   },
 
@@ -255,6 +261,16 @@ const UI = {
     shell.classList.toggle('sidebar-collapsed', collapsed);
     btn.innerHTML = `<i data-lucide="${collapsed ? 'chevron-right' : 'chevron-left'}" class="w-4 h-4"></i>`;
     refreshIcons();
+  },
+
+  populateMonthFilter() {
+    const select = document.getElementById('paymentMonthFilter');
+    if (!select) return;
+    const months = ["Enero", "Febrero", "Marzo", "Abril", "Mayo", "Junio", "Julio", "Agosto", "Septiembre", "Octubre", "Noviembre", "Diciembre"];
+    const currentMonthName = months[new Date().getMonth()];
+    select.innerHTML = months.map(m => 
+      `<option value="${m}" ${m === currentMonthName ? 'selected' : ''}>${m}</option>`
+    ).join('');
   },
 
   // --- ESTILOS INFANTILES (Inyectados) ---
@@ -675,12 +691,12 @@ const UI = {
   },
 
   // --- PAYMENTS ---
-  openPaymentModal() {
+  openPaymentModal(preSelectedStudentId = null) {
     const modal = document.getElementById('paymentModal');
     if(!modal) return;
     modal.classList.remove('hidden');
     modal.classList.add('flex');
-    this.loadStudentsIntoSelect();
+    this.loadStudentsIntoSelect(preSelectedStudentId);
     const methodSel = document.getElementById('paymentMethod');
     const tf = document.getElementById('transferFields');
     if (methodSel && tf) {
@@ -699,11 +715,9 @@ const UI = {
     }
   },
 
-  async loadStudentsIntoSelect() {
+  async loadStudentsIntoSelect(preSelectedId = null) {
     const select = document.getElementById('studentSelect');
     if (!select) return;
-    
-    
 
     const { data: students, error } = await supabase
       .from('students')
@@ -718,6 +732,8 @@ const UI = {
 
     select.innerHTML = '<option value="" disabled selected>Seleccione un estudiante</option>' +
       students.map(s => `<option value="${s.id}">${s.name}</option>`).join('');
+      
+    if (preSelectedId) select.value = preSelectedId;
   },
 
   async handlePaymentSubmit(e) {
@@ -780,30 +796,52 @@ const UI = {
     tbody.innerHTML = `<tr><td colspan="10" class="p-4">${Helpers.skeleton(3, 'h-12')}</td></tr>`;
 
     try {
-      const { data: payments, error } = await supabase
+      const selectedMonth = document.getElementById('paymentMonthFilter')?.value || new Date().toLocaleString('es-ES', { month: 'long' });
+
+      // 1. Obtener todos los estudiantes activos
+      const { data: students, error: stError } = await supabase
+        .from('students')
+        .select('id, name, parent_id')
+        .eq('is_active', true)
+        .order('name');
+      
+      if (stError) throw stError;
+
+      // 2. Obtener pagos del mes actual
+      const { data: payments, error: payError } = await supabase
         .from('payments')
         .select(`
-          id,
-          amount,
-          month_paid,
-          created_at,
-          method,
-          status,
-          bank,
-          reference,
-          transfer_date,
-          evidence_url,
-          students (
-            name,
-            parent_id
-          )
+          id, amount, month_paid, created_at, method, status, bank, reference, transfer_date, evidence_url, student_id
         `)
-        .order('created_at', { ascending: false })
-        .limit(100);
+        .eq('month_paid', selectedMonth);
 
-      if (error) throw error;
+      if (payError) throw payError;
 
-      AppState.paymentsData = payments || [];
+      // 3. Mapear pagos
+      const paymentMap = {};
+      (payments || []).forEach(p => {
+        if (!paymentMap[p.student_id] || p.status === 'confirmado') {
+          paymentMap[p.student_id] = p;
+        }
+      });
+
+      // 4. Construir lista final
+      const displayList = [];
+      students.forEach(st => {
+        const pay = paymentMap[st.id];
+        
+        // Si ya pagó y está confirmado, NO mostrar
+        if (pay && pay.status === 'confirmado') return;
+
+        if (pay) {
+          displayList.push({ ...pay, students: { name: st.name, parent_id: st.parent_id } });
+        } else {
+          // Fila virtual para pendiente
+          displayList.push({ id: null, student_id: st.id, amount: 0, month_paid: selectedMonth, method: '-', status: 'sin_pago', bank: '-', reference: '-', transfer_date: '-', evidence_url: null, students: { name: st.name, parent_id: st.parent_id } });
+        }
+      });
+
+      AppState.paymentsData = displayList;
       this.renderPaymentsTable(AppState.paymentsData);
 
     } catch (error) {
@@ -816,8 +854,8 @@ const UI = {
     const tbody = document.getElementById('paymentsTableBody');
     if (!tbody) return;
 
-    if (!payments || payments.length === 0) {
-      tbody.innerHTML = `<tr><td colspan="10">${Helpers.emptyState('No hay pagos registrados')}</td></tr>`;
+    if (!payments || !payments.length) {
+      tbody.innerHTML = `<tr><td colspan="10">${Helpers.emptyState('Todos los estudiantes están al día')}</td></tr>`;
       return;
     }
 
@@ -825,17 +863,21 @@ const UI = {
       if (st === 'confirmado') return 'bg-green-100 text-green-700';
       if (st === 'rechazado') return 'bg-red-100 text-red-700';
       if (st === 'efectivo') return 'bg-blue-100 text-blue-700';
+      if (st === 'sin_pago') return 'bg-slate-100 text-slate-500';
       return 'bg-amber-100 text-amber-700';
     };
 
-    tbody.innerHTML = payments.map(p => `
+    tbody.innerHTML = payments.map(p => {
+      const isVirtual = !p.id;
+      const statusLabel = p.status === 'sin_pago' ? 'Pendiente' : p.status;
+      return `
       <tr class="hover:bg-slate-50 border-b">
         <td class="px-4 py-2 font-medium">${p.students?.name || '—'}</td>
-        <td class="px-4 py-2">$${p.amount}</td>
+        <td class="px-4 py-2">${isVirtual ? '-' : '$'+p.amount}</td>
         <td class="px-4 py-2">${p.method || '-'}</td>
         <td class="px-4 py-2">
           <span class="px-2 py-1 rounded-full text-xs font-bold ${badge(p.status)}">
-            ${p.status}
+            ${statusLabel}
           </span>
         </td>
         <td class="px-4 py-2">${p.bank || '-'}</td>
@@ -846,14 +888,20 @@ const UI = {
           ${p.evidence_url ? `<a href="${p.evidence_url}" target="_blank" class="text-blue-600">Ver</a>` : '-'}
         </td>
         <td class="px-4 py-2 flex gap-2">
+          ${!isVirtual ? `
           <button class="btn-confirm-payment text-xs bg-green-100 px-2 py-1 rounded" data-id="${p.id}">Confirmar</button>
           <button class="btn-reject-payment text-xs bg-red-100 px-2 py-1 rounded" data-id="${p.id}">Rechazar</button>
           <button class="btn-delete-payment text-red-500" data-id="${p.id}">
             <i data-lucide="trash-2" class="w-4 h-4"></i>
           </button>
+          ` : `
+          <button class="btn-register-payment text-xs bg-teal-100 text-teal-700 px-3 py-1 rounded hover:bg-teal-200 font-medium" data-student-id="${p.student_id}">
+            Registrar
+          </button>
+          `}
         </td>
       </tr>
-    `).join('');
+    `}).join('');
 
     refreshIcons();
   },
@@ -863,7 +911,7 @@ const UI = {
 
     const filtered = AppState.paymentsData.filter(p =>
       (p.students?.name || '').toLowerCase().includes(lower) ||
-      String(p.amount).includes(lower) ||
+      String(p.amount || '').includes(lower) ||
       (p.reference || '').toLowerCase().includes(lower) ||
       (p.month_paid || '').toLowerCase().includes(lower)
     );
@@ -880,15 +928,48 @@ const UI = {
   },
 
   async sendRemindersNow() {
-    const month = new Date().toISOString().slice(0,7);
-    const { data: students } = await supabase.from('students').select('id, parent_id, name');
-    const { data: payments } = await supabase.from('payments').select('student_id, month_paid');
-    const paidSet = new Set((payments||[]).filter(p=>p.month_paid===month).map(p=>String(p.student_id)));
-    const pendingParents = (students||[]).filter(s=>!paidSet.has(String(s.id)) && s.parent_id);
-    for (const s of pendingParents) {
-      await supabase.rpc('send_notification', { p_user_id: s.parent_id, p_title: 'Recordatorio de pago', p_message: 'Recuerde enviar su pago mensual', p_type: 'alert', p_link: '/panel_padres.html' });
+    const pendingStudents = AppState.paymentsData.filter(p => p.status === 'sin_pago');
+    
+    if (pendingStudents.length === 0) {
+        Helpers.toast('No hay estudiantes con pagos pendientes en la lista actual.', 'info');
+        return;
     }
-    Helpers.toast('Recordatorios enviados');
+
+    const parentIds = [...new Set(pendingStudents.map(p => p.students?.parent_id).filter(Boolean))];
+
+    if (!confirm(`¿Enviar recordatorio de pago a ${parentIds.length} padre(s)?`)) {
+        return;
+    }
+
+    Helpers.toast(`Enviando ${parentIds.length} recordatorios...`, 'info');
+    let successCount = 0;
+    let errorCount = 0;
+
+    const reminderMessage = document.getElementById('reminderMessage')?.value || 'Recuerde realizar su pago mensual.';
+    const selectedMonth = document.getElementById('paymentMonthFilter')?.value;
+
+    for (const parentId of parentIds) {
+        try {
+            const { error } = await supabase.rpc('send_notification', {
+                p_user_id: parentId,
+                p_title: `Recordatorio de Pago (${selectedMonth})`,
+                p_message: reminderMessage,
+                p_type: 'payment_reminder',
+                p_link: '/panel_padres.html'
+            });
+            if (error) throw error;
+            successCount++;
+        } catch (e) {
+            console.error(`Error enviando notificación a ${parentId}:`, e);
+            errorCount++;
+        }
+    }
+
+    if (errorCount > 0) {
+        Helpers.toast(`Se enviaron ${successCount} recordatorios. ${errorCount} fallaron.`, 'error');
+    } else {
+        Helpers.toast(`${successCount} recordatorios enviados exitosamente.`, 'success');
+    }
   },
 
   async deletePayment(id) {
@@ -1214,6 +1295,58 @@ const UI = {
     if (data) {
         document.getElementById('reminderDay').value = data.day_of_month || '';
         document.getElementById('reminderMessage').value = data.message || '';
+    }
+  },
+
+  async loadIncomeChart() {
+    const ctx = document.getElementById('incomeChart');
+    if (!ctx) return;
+
+    // Destruir gráfico previo si existe para evitar superposiciones
+    if (window.incomeChartInstance) {
+        window.incomeChartInstance.destroy();
+    }
+
+    try {
+      const { data: payments, error } = await supabase
+        .from('payments')
+        .select('amount, month_paid, status');
+
+      if (error) throw error;
+
+      const months = ["Enero", "Febrero", "Marzo", "Abril", "Mayo", "Junio", "Julio", "Agosto", "Septiembre", "Octubre", "Noviembre", "Diciembre"];
+      const confirmedData = new Array(12).fill(0);
+      const pendingData = new Array(12).fill(0);
+
+      (payments || []).forEach(p => {
+        const idx = months.indexOf(p.month_paid);
+        if (idx !== -1) {
+          const amount = Number(p.amount) || 0;
+          if (p.status === 'confirmado' || p.status === 'paid') {
+             confirmedData[idx] += amount;
+          } else if (p.status !== 'rechazado') {
+             pendingData[idx] += amount;
+          }
+        }
+      });
+
+      window.incomeChartInstance = new Chart(ctx, {
+        type: 'bar',
+        data: {
+          labels: months,
+          datasets: [
+            { label: 'Confirmado', data: confirmedData, backgroundColor: '#0d9488', borderRadius: 4 },
+            { label: 'Pendiente', data: pendingData, backgroundColor: '#cbd5e1', borderRadius: 4 }
+          ]
+        },
+        options: {
+          responsive: true, maintainAspectRatio: false,
+          scales: { y: { beginAtZero: true }, x: { grid: { display: false } } },
+          plugins: { legend: { position: 'bottom' } }
+        }
+      });
+    } catch (e) {
+      console.error('Error loading chart:', e);
     }
   }
 };

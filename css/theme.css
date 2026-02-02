@@ -15,6 +15,7 @@ body {
   font-family: 'Nunito', sans-serif;
   background-color: #f5f7fb;
   transition: all 0.3s ease;
+  overscroll-behavior: none;
 }
 
 /* Accents on white cards */
@@ -51,7 +52,6 @@ body {
 .chip-blue{ background:#E3F2FD; color:#1565C0; }
 .chip-orange{ background:#FFF3E0; color:#EF6C00; }
 .chip-yellow{ background:#FFF9C4; color:#F57F17; }
-/* Utilidad: mostrar sidebar en móvil */
 
 /* Karpus colored letters small */
 .karpus-kids-inline { font-weight: 700; }
@@ -111,4 +111,215 @@ body {
   .table-mobile thead {
     display: none;
   }
+}
+
+/* Hide scrollbar */
+.no-scrollbar::-webkit-scrollbar { display: none; }
+.no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+
+/* Section visibility */
+.section { display: none; }
+.section.active { display: block; animation: fadeIn 0.2s ease; }
+@keyframes fadeIn { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: translateY(0); } }
+
+/* --- ESTILOS INFANTILES (REDISEÑO) --- */
+
+/* 1. SIDEBAR → ESTILO MOCHILA ESCOLAR */
+#sidebar {
+  background: linear-gradient(180deg, #ECFEFF 0%, #E0F2FE 50%, #BAE6FD 100%);
+  box-shadow: 4px 0 24px rgba(14,165,233,0.25);
+  border-right: 4px solid #7DD3FC;
+}
+
+.sidebar-btn {
+  padding: 0.75rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  border-radius: 1rem;
+  font-size: 0.95rem;
+  transition: all 0.25s cubic-bezier(0.34, 1.56, 0.64, 1); /* Bounce effect */
+  color: #e0f2fe; /* Sky-100 */
+  font-weight: 700;
+  border: 2px solid transparent;
+  margin-bottom: 0.5rem;
+}
+
+.sidebar-btn:hover {
+  background: #A7F3D0;
+  transform: translateX(6px) scale(1.02);
+  color: #064E3B;
+}
+
+.sidebar-btn.active {
+  background: #4ADE80;
+  color: #064E3B;
+  transform: translateX(8px);
+  border-left: 6px solid #22C55E;
+  box-shadow: inset 0 0 0 2px #BAE6FD, 0 4px 12px rgba(0,0,0,0.1);
+}
+
+/* Colores por Sección (Active State) */
+.sidebar-btn[data-target="home"].active { color: #16a34a; /* Green */ }
+.sidebar-btn[data-target="tasks"].active { color: #2563eb; /* Blue */ }
+.sidebar-btn[data-target="class"].active { color: #7c3aed; /* Purple (Muro) */ }
+.sidebar-btn[data-target="live-attendance"].active { color: #db2777; /* Pink */ }
+.sidebar-btn[data-target="grades"].active { color: #ea580c; /* Orange */ }
+.sidebar-btn[data-target="payments"].active { color: #15803d; /* Dark Green */ }
+.sidebar-btn[data-target="profile"].active { color: #0ea5e9; /* Sky */ }
+
+/* Iconos del sidebar */
+.sidebar-btn i {
+  stroke-width: 2.5px;
+  filter: drop-shadow(0 2px 2px rgba(0,0,0,0.1));
+  transition: transform .2s ease;
+}
+.sidebar-btn:hover i { transform: scale(1.2) rotate(-3deg); }
+
+/* Desktop Sidebar Tweaks */
+@media (min-width: 768px) {
+  .sidebar-btn {
+    width: 100%;
+    justify-content: flex-start;
+    padding: 0.75rem 1rem;
+  }
+}
+
+/* Mobile Sidebar Tweaks */
+@media (max-width: 767px) {
+  .sidebar-btn {
+    flex: 0 0 auto;
+    width: 70px;
+    min-height: 56px;
+    padding: 0.5rem;
+    flex-direction: column;
+    font-size: 0.65rem;
+    margin-bottom: 0;
+  }
+  .sidebar-btn:hover { transform: translateY(-4px); }
+  .sidebar-btn.active { transform: translateY(-6px); }
+  .sidebar-btn span {
+    display: block;
+    margin-top: 2px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    max-width: 100%;
+  }
+}
+
+/* Bolsillo del estudiante */
+.student-pocket {
+  background: rgba(255, 255, 255, 0.15);
+  border: 2px dashed rgba(255, 255, 255, 0.4);
+  border-radius: 1.5rem;
+  padding: 1rem;
+  margin-bottom: 1.5rem;
+  backdrop-filter: blur(4px);
+  transition: transform 0.3s ease;
+}
+.student-pocket:hover {
+  transform: rotate(1deg) scale(1.02);
+  background: rgba(255, 255, 255, 0.25);
+}
+
+/* 2. TARJETA DE INICIO → BLOQUES DE JUGUETE */
+.toy-card {
+  background-color: white;
+  border-radius: 1.75rem;
+  padding: 1.2rem;
+  box-shadow: 0 8px 18px rgba(0,0,0,0.08);
+  transition: transform 0.25s ease;
+  position: relative;
+  border: 1px solid #f1f5f9;
+  overflow: hidden;
+}
+.toy-card:hover {
+  transform: translateY(-4px) rotate(-1deg);
+}
+/* Variantes de color para Toy Cards */
+.toy-card.green { border-bottom: 4px solid #22c55e; }
+.toy-card.rose { border-bottom: 4px solid #f43f5e; }
+.toy-card.amber { border-bottom: 4px solid #f59e0b; }
+.toy-card.blue { border-bottom: 4px solid #3b82f6; }
+.toy-card.purple { border-bottom: 4px solid #8b5cf6; }
+.toy-card.emerald { border-bottom: 4px solid #10b981; }
+.toy-card.orange { border-bottom: 4px solid #f97316; }
+.toy-card.slate { border-bottom: 4px solid #64748b; }
+
+/* 3. SECCIÓN TAREAS → ESTILO CUADERNO */
+.notebook-task {
+  background: repeating-linear-gradient(
+    white,
+    white 28px,
+    #cfe5ff 29px
+  );
+  border-left: 6px solid #fb7185;
+  border-radius: 1rem;
+  padding: 1rem 1rem 1rem 2.5rem;
+  box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+  position: relative;
+  margin-bottom: 1rem;
+  transition: transform 0.2s;
+  border-right: 1px solid #e2e8f0;
+  border-bottom: 1px solid #e2e8f0;
+}
+.notebook-task::before {
+  content: '';
+  position: absolute;
+  left: 1.5rem;
+  top: 0;
+  bottom: 0;
+  width: 2px;
+  background-color: #fb7185;
+  opacity: 0.5;
+}
+.notebook-task:hover {
+  transform: scale(1.01);
+  box-shadow: 0 4px 12px rgba(0,0,0,0.08);
+}
+
+/* 4. TAREAS ENTREGADAS → LEGO / BLOQUES */
+.lego-task {
+  background: linear-gradient(145deg, #60a5fa, #93c5fd);
+  border-radius: 1.5rem;
+  position: relative;
+  color: white;
+  padding: 1.5rem;
+  margin-top: 16px;
+  box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+  border: 2px solid #3b82f6;
+}
+.lego-task::before {
+  content: "";
+  width: 40px;
+  height: 8px;
+  background: #bfdbfe;
+  position: absolute;
+  top: -8px;
+  left: 20px;
+  border-radius: 4px 4px 0 0;
+  box-shadow: 50px 0 0 #bfdbfe, 100px 0 0 #bfdbfe; /* Studs */
+}
+.lego-task h3, .lego-task p, .lego-task span {
+  color: white !important;
+  text-shadow: 0 1px 2px rgba(0,0,0,0.1);
+}
+
+/* 5. ANIMACIONES INFANTILES */
+.bounce { transition: transform 0.3s cubic-bezier(0.34, 1.56, 0.64, 1); }
+.bounce:hover {
+  animation: bounce 0.5s infinite alternate;
+}
+@keyframes bounce {
+  0% { transform: translateY(0); }
+  100% { transform: translateY(-6px); }
+}
+
+/* Estilos para impresión (Reporte PDF) */
+@media print {
+  #sidebar, header, .no-print, #scrollTopBtn { display: none !important; }
+  #layoutShell { margin: 0 !important; padding: 0 !important; }
+  body { background: white; }
 }

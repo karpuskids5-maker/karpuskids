@@ -1,47 +1,52 @@
 :root {
-  /* BRAND: Rosa Suave Educativo */
-  --color-primary: #F472B6;       /* Rose 400 */
-  --color-primary-hover: #EC4899; /* Rose 500 */
-  --color-primary-soft: #FCE7F3;  /* Rose 100 */
-  
+  /* BRAND KARPUS KIDS (Verde Educativo) */
+  --color-primary: #22c55e;        /* emerald-500 */
+  --color-primary-hover: #16a34a;  /* emerald-600 */
+  --color-primary-soft: #dcfce7;   /* emerald-100 */
+
   /* SECUNDARIOS */
-  --color-secondary: #60A5FA;     /* Blue 400 */
-  --color-secondary-soft: #DBEAFE;
-  --color-success: #4ADE80;       /* Green 400 */
-  --color-success-soft: #DCFCE7;
-  --color-warning: #FACC15;       /* Yellow 400 */
-  --color-warning-soft: #FEF9C3;
-  --color-accent: #FB923C;        /* Orange 400 */
-  --color-accent-soft: #FFEDD5;
+  --color-secondary: #38bdf8;      /* sky-400 */
+  --color-secondary-hover: #0ea5e9;
+  --color-secondary-soft: #e0f2fe;
+
+  --color-success: #22c55e;
+  --color-success-soft: #dcfce7;
+
+  --color-warning: #facc15;
+  --color-warning-soft: #fef9c3;
+
+  --color-danger: #f43f5e;
+  --color-danger-soft: #ffe4e6;
+
+  --color-accent: #a78bfa;         /* violet-400 */
+  --color-accent-soft: #ede9fe;
 
   /* NEUTROS */
   --color-text: #334155;
-  --color-text-light: #64748B;
-  --color-bg: #FFF7FB;            /* Fondo Rosado Muy Suave */
-  --color-card: #FFFFFF;
-  --color-border: #F1F5F9;
+  --color-text-light: #64748b;
+  --color-bg: #f8fafc;
+  --color-card: #ffffff;
+  --color-border: #e2e8f0;
 }
 
 body { 
-  font-family: 'Nunito', sans-serif; 
+  font-family: 'Nunito', system-ui, -apple-system, BlinkMacSystemFont, sans-serif;
   color: var(--color-text);
-  background-color: var(--color-bg);
-  background-image: linear-gradient(to bottom, var(--color-primary-soft), #FFFFFF);
+  background:
+    radial-gradient(circle at top, #ecfeff, transparent 60%),
+    linear-gradient(to bottom, #f0fdf4, #ffffff);
 }
 
 /* Sidebar styles */
-aside#sidebar { width: 260px; transition: width .25s ease; }
+aside#sidebar { width: 280px; transition: width .25s ease; }
 aside#sidebar.collapsed { width: 72px; }
 aside#sidebar .label { transition: opacity .2s ease; }
 aside#sidebar.collapsed .label { opacity: 0; }
 
 .hidden-mobile { display: none !important; }
 
-.sidebar-blue { background: linear-gradient(135deg,#E3F2FD,#BBDEFB); }
-.sidebar-green { background: linear-gradient(135deg,#E8F8F0,#D0F0E0); }
-.sidebar-pink { background: linear-gradient(135deg,#FFF0F6,#FFE3F0); }
-/* Reemplazamos sidebar-sky por el estilo Brand */
-.sidebar-brand { background: linear-gradient(180deg, #FCE7F3 0%, #FFF7FB 100%); border-right: 1px solid #FBCFE8; }
+/* --- ESTILO MOCHILA (Sidebar) --- */
+/* Consolidado: solo se usa .sidebar-backpack en aside#sidebar */
 
 .karpus-kids-inline { font-weight: 700; }
 .karpus-kids-inline .k-1 { color: #FF9800; }
@@ -65,10 +70,14 @@ aside#sidebar.collapsed .label { opacity: 0; }
 }
 .modal-container.active { opacity: 1; visibility: visible; }
 .modal-content {
-  background: var(--color-card); border-radius: 1.5rem; /* rounded-3xl */
-  box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.1);
-  width: 90%; max-width: 800px; max-height: 90vh;
-  overflow-y: auto; transform: scale(0.9); transition: transform 0.3s ease;
+  background: var(--color-card);
+  border-radius: 1.25rem;
+  width: 95%;
+  max-width: 720px;
+  max-height: 90vh;
+  overflow-y: auto;
+  box-shadow: 0 20px 40px rgba(0,0,0,.18);
+  transform: scale(0.9); transition: transform 0.3s ease;
 }
 .modal-container.active .modal-content { transform: scale(1); }
 .modal-header { padding: 1.5rem; border-bottom: 1px solid #e5e7eb; display: flex; justify-content: space-between; }
@@ -82,25 +91,227 @@ aside#sidebar.collapsed .label { opacity: 0; }
 
 /* Botones */
 /* Sidebar Buttons */
-.sidebar-btn {
-  display: flex;
-  align-items: center;
-  gap: 0.75rem;
-  width: 100%;
-  padding: 0.75rem 1rem;
-  border-radius: 0.75rem;
-  color: #eff6ff; /* text-blue-50 */
-  transition: all 0.2s ease;
+/* ===== CORRECCIÓN SIDEBAR MÓVIL ===== */
+@media (max-width: 767px) {
+  /* NAV CON SCROLL HORIZONTAL FUNCIONAL */
+  nav.sidebar-nav {
+    display: flex !important;
+    overflow-x: auto !important;
+    -webkit-overflow-scrolling: touch !important; /* Scroll suave iOS */
+    scrollbar-width: thin !important; /* Firefox */
+    scrollbar-color: rgba(255,255,255,0.3) transparent !important;
+    padding: 8px 0 !important;
+    gap: 0 !important; /* Eliminar gap para mejor scroll */
+  }
+  
+  /* Personalizar scrollbar visible */
+  nav.sidebar-nav::-webkit-scrollbar {
+    height: 6px;
+    display: block !important;
+  }
+  
+  nav.sidebar-nav::-webkit-scrollbar-thumb {
+    background-color: rgba(255,255,255,0.4);
+    border-radius: 3px;
+  }
+  
+  nav.sidebar-nav::-webkit-scrollbar-track {
+    background-color: transparent;
+  }
+  
+  /* BOTONES CON ANCHO FIJO Y ESPACIADO */
+  .sidebar-btn {
+    flex: 0 0 auto !important;
+    width: 72px !important; /* Ancho consistente */
+    min-width: 72px !important;
+    min-height: 64px !important;
+    padding: 8px 4px !important;
+    flex-direction: column !important;
+    font-size: 0.625rem !important; /* 10px */
+    justify-content: center !important;
+    gap: 0 !important;
+  }
+  
+  .sidebar-btn i {
+    margin-bottom: 2px !important;
+  }
+  
+  .sidebar-btn span {
+    display: block !important;
+    text-align: center !important;
+    white-space: nowrap !important;
+    overflow: hidden !important;
+    text-overflow: ellipsis !important;
+    line-height: 1.2 !important;
+  }
+  
+  /* Indicador visual de scroll */
+  nav.sidebar-nav::before,
+  nav.sidebar-nav::after {
+    content: '';
+    position: sticky;
+    width: 16px;
+    height: 100%;
+    top: 0;
+    z-index: 10;
+  }
+  
+  nav.sidebar-nav::before {
+    left: 0;
+    background: linear-gradient(to right, #16a34a 40%, transparent 100%);
+  }
+  
+  nav.sidebar-nav::after {
+    right: 0;
+    background: linear-gradient(to left, #16a34a 40%, transparent 100%);
+  }
 }
-.sidebar-btn:hover {
-  background-color: rgba(255, 255, 255, 0.2);
+
+/* Desktop - Mantener como está */
+@media (min-width: 768px) {
+  nav.sidebar-nav {
+    flex-direction: column !important;
+    overflow-x: hidden !important;
+    overflow-y: auto !important;
+    padding: 8px 8px !important;
+    gap: 4px !important;
+  }
+  
+  .sidebar-btn {
+    width: 100% !important;
+    justify-content: flex-start;
+    padding: 12px 20px !important;
+    font-size: 1rem !important;
+    display: flex !important;
+    align-items: center !important;
+    gap: 1rem !important;
+    border-radius: 9999px !important; /* Pill shape */
+    color: #064e3b; /* Verde oscuro */
+    background-color: rgba(255, 255, 255, 0.2);
+    transition: all 0.3s cubic-bezier(0.34, 1.56, 0.64, 1) !important; /* Rebote */
+    border: 2px solid transparent;
+    font-weight: 700;
+  }
+  
+  .sidebar-btn:hover {
+    background-color: white;
+    transform: scale(1.05);
+    box-shadow: 0 4px 10px rgba(0,0,0,0.1);
+    color: #059669;
+  }
+
+  .sidebar-btn.active {
+    background: #ecfdf5; /* Verde muy claro */
+    color: #15803d;
+    border-left: 6px solid #22c55e; /* Borde grueso */
+    box-shadow: 0 2px 5px rgba(0,0,0,0.05);
+  }
+  
+  .sidebar-btn.active::before {
+    display: none; /* Removemos el indicador anterior */
+  }
+
+  .sidebar-btn i {
+    margin-right: 0 !important;
+    margin-bottom: 0 !important;
+  }
+  
+  .sidebar-btn span {
+    display: inline !important;
+    text-align: left !important;
+  }
 }
-.sidebar-btn.active {
-  background-color: #ffffff;
-  color: #2563eb; /* text-blue-600 */
-  font-weight: 600;
-  box-shadow: 0 1px 3px 0 rgb(0 0 0 / 0.1), 0 1px 2px -1px rgb(0 0 0 / 0.1);
-}
+
 
 .section-anim { opacity: 0; transform: translateY(8px); transition: opacity .25s ease, transform .25s ease; }
 .section-anim.section-visible { opacity: 1; transform: translateY(0); }
+
+/* Componentes Generales */
+.card {
+  background: var(--color-card);
+  border-radius: 1.25rem;
+  border: 1px solid var(--color-border);
+  box-shadow: 0 4px 12px rgba(0,0,0,.05);
+}
+
+.btn {
+  padding: .6rem 1rem;
+  border-radius: .75rem;
+  font-weight: 600;
+  transition: all .2s ease;
+}
+
+.btn-primary {
+  background: var(--color-primary);
+  color: white;
+}
+
+.btn-primary:hover {
+  background: var(--color-primary-hover);
+  transform: translateY(-1px);
+}
+
+.btn-outline {
+  border: 1px solid var(--color-border);
+  background: white;
+}
+
+.btn-outline:hover {
+  background: #f8fafc;
+}
+
+/* Micro-animaciones */
+button, .child-card, .card {
+  transition: transform .2s ease, box-shadow .2s ease;
+}
+
+button:hover {
+  transform: translateY(-1px);
+}
+
+.child-card:hover {
+  box-shadow: 0 12px 24px rgba(0,0,0,.08);
+}
+
+aside#sidebar.sidebar-backpack {
+  background: #ECFEFF;
+  border-right: 4px solid #67E8F9;
+  border-top-right-radius: 40px;
+  border-bottom-right-radius: 40px;
+  box-shadow: 5px 0 25px rgba(14, 165, 233, 0.20);
+  color: #475569;
+}
+aside#sidebar.sidebar-backpack .sidebar-btn {
+  background-color: #FFFFFF;
+  color: #475569;
+  border-radius: 9999px;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.05);
+  transition: all 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+aside#sidebar.sidebar-backpack .sidebar-btn:hover {
+  background-color: #A7F3D0;
+  transform: scale(1.05);
+}
+aside#sidebar.sidebar-backpack .sidebar-btn.active {
+  background-color: #4ADE80;
+  color: #064E3B;
+  border-left: 6px solid #22C55E;
+}
+.sidebar-btn.btn-home { color: #2563eb; }
+.sidebar-btn.btn-attendance { color: #16a34a; }
+.sidebar-btn.btn-tasks { color: #f59e0b; }
+.sidebar-btn.btn-class { color: #7c3aed; }
+.sidebar-btn.btn-grades { color: #ea580c; }
+.sidebar-btn.btn-payments { color: #14b8a6; }
+.sidebar-btn.btn-notifications { color: #f43f5e; }
+.sidebar-btn.btn-profile { color: #475569; }
+.backpack-bottom {
+  position: relative;
+  height: 28px;
+  margin: 12px;
+  border-radius: 16px;
+  background:
+    radial-gradient(circle, #86efac 55%, transparent 56%) 20px -6px/40px 12px repeat-x,
+    linear-gradient(145deg, #4ade80, #22c55e);
+  box-shadow: inset 0 -8px 0 rgba(0,0,0,0.15);
+}
