@@ -125,10 +125,25 @@ body {
 /* --- ESTILOS INFANTILES (REDISEÑO) --- */
 
 /* 1. SIDEBAR → ESTILO MOCHILA ESCOLAR */
-#sidebar {
-  background: linear-gradient(180deg, #ECFEFF 0%, #E0F2FE 50%, #BAE6FD 100%);
-  box-shadow: 4px 0 24px rgba(14,165,233,0.25);
-  border-right: 4px solid #7DD3FC;
+body.panel-padre-body #sidebar {
+  background: linear-gradient(180deg, #4ade80 0%, #2dd4bf 100%);
+  box-shadow: 4px 0 24px rgba(20,184,166,0.25);
+  border-right: 4px solid #14b8a6;
+}
+body.panel-maestra-body #sidebar {
+  background: linear-gradient(180deg, #ffb703 0%, #fb8500 100%);
+  box-shadow: 4px 0 24px rgba(217,119,6,0.25);
+  border-right: 4px solid #d97706;
+}
+body.panel-directora-body #sidebar {
+  background: linear-gradient(180deg, #7c3aed 0%, #4f46e5 100%);
+  box-shadow: 4px 0 24px rgba(79,70,229,0.25);
+  border-right: 4px solid #6d28d9;
+}
+body.panel-asistente-body #sidebar {
+  background: linear-gradient(180deg, #0f766e 0%, #115e59 100%);
+  box-shadow: 4px 0 24px rgba(17,94,89,0.25);
+  border-right: 4px solid #0d9488;
 }
 
 .sidebar-btn {
@@ -153,7 +168,7 @@ body {
 }
 
 .sidebar-btn.active {
-  background: #4ADE80;
+  background: #0b7934;
   color: #064E3B;
   transform: translateX(8px);
   border-left: 6px solid #22C55E;

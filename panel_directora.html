@@ -211,10 +211,10 @@
     .child-card-footer { display: flex; justify-content: flex-end; }
   </style>
 </head>
-<body class="bg-slate-50 text-slate-800 font-nunito">
+<body class="bg-slate-50 text-slate-800 font-nunito panel-directora-body">
   <div class="min-h-screen flex">
     <!-- SIDEBAR -->
-    <aside id="sidebar" class="hidden md:block sidebar-purple p-4 rounded-r-3xl shadow-lg fixed inset-y-0 left-0 z-10">
+    <aside id="sidebar" class="hidden md:block bg-gradient-to-b from-violet-600 to-indigo-700 border-r-4 border-violet-400 p-4 rounded-r-3xl shadow-2xl fixed inset-y-0 left-0 z-10">
       <button id="toggleSidebar" class="absolute -right-3 top-6 bg-white rounded-full p-1 shadow-md border border-slate-100 text-slate-500 hover:text-purple-600 hidden md:block"><i data-lucide="chevron-left" class="w-4 h-4"></i></button>
       <div class="flex items-center gap-3 mb-6">
         <div class="h-12 w-12 rounded-2xl bg-white/20 flex items-center justify-center shadow-lg">
@@ -226,8 +226,8 @@
         </div>
       </div>
 
-      <div class="sidebar-scroll">
-      <nav class="space-y-2 teams-nav bg-white/10 p-2 rounded-xl mb-4">
+      <div class="sidebar-scroll relative z-10">
+      <nav class="space-y-2 teams-nav bg-white/10 p-2 rounded-xl mb-4 backdrop-blur-sm">
         <button data-section="dashboard" class="nav-btn teams-nav-item text-white hover:bg-white/20" title="Dashboard">
           <i data-lucide="grid" class="text-karpus-blue"></i>
           <span class="label">Dashboard</span>
@@ -271,7 +271,7 @@
       </nav>
 
       <!-- Color sidebar eliminado: se usa estilo único -->
-      <div class="mt-auto pt-6 border-t border-white/10">
+      <div class="mt-auto pt-6 border-t border-white/10 relative z-10">
         <button id="btnLogout" class="nav-btn text-white hover:bg-white/20 w-full group">
           <i data-lucide="log-out" class="text-white group-hover:text-red-200 transition-colors"></i>
           <span class="label group-hover:text-red-100 transition-colors">Cerrar Sesión</span>
@@ -280,6 +280,11 @@
           <p>Usuario: <span class="font-medium text-white">Director(a)</span></p>
         </div>
       </div>
+      </div>
+
+      <!-- Icono Grande Decorativo (Libro/Escuela) -->
+      <div class="absolute bottom-4 right-4 opacity-10 pointer-events-none transform rotate-6">
+        <i data-lucide="book-open" class="w-40 h-40 text-white"></i>
       </div>
     </aside>
 

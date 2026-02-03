@@ -480,6 +480,14 @@ function updateStudentUI(student) {
   
   const sidebarName = document.getElementById('sidebar-student-name');
   if (sidebarName) sidebarName.textContent = displayName;
+
+  const avatarUrl = student?.avatar_url || 'img/mundo.jpg';
+  const sidebarAvatar = document.getElementById('sidebarAvatar');
+  if (sidebarAvatar) sidebarAvatar.src = avatarUrl;
+  const preview = document.getElementById('studentAvatarPreview');
+  if (preview) preview.innerHTML = `<img src="${avatarUrl}" class="w-full h-full object-cover">`;
+  const headerAvatar = document.getElementById('headerAvatar');
+  if (headerAvatar) headerAvatar.innerHTML = `<img src="${avatarUrl}" alt="Avatar" class="w-12 h-12 rounded-full object-cover border-4 border-white">`;
 }
 
 // ===== TAREAS CON DELEGACIÓN DE EVENTOS =====
@@ -1004,6 +1012,14 @@ function setupProfilePhotoUpload() {
       const preview = document.getElementById('studentAvatarPreview');
       if (preview) {
         preview.innerHTML = `<img src="${publicUrl}" class="w-full h-full object-cover">`;
+      }
+      const sidebarAvatar = document.getElementById('sidebarAvatar');
+      if (sidebarAvatar) {
+        sidebarAvatar.src = publicUrl;
+      }
+      const headerAvatar = document.getElementById('headerAvatar');
+      if (headerAvatar) {
+        headerAvatar.innerHTML = `<img src="${publicUrl}" alt="Avatar" class="w-12 h-12 rounded-full object-cover border-4 border-white">`;
       }
       
     } catch (err) {
@@ -1687,12 +1703,12 @@ async function saveGuardianProfile() {
   if(!student) return;
   
   const updates = {
-    p1_name: document.getElementById('profileFatherName').value,
-    p1_phone: document.getElementById('profileFatherPhone').value,
-    p1_email: document.getElementById('profileFatherEmail').value,
-    p2_name: document.getElementById('profileMotherName').value,
-    p2_phone: document.getElementById('profileMotherPhone').value,
-    authorized_pickup: document.getElementById('profilePickupName').value
+    p1_name: document.getElementById('profileFatherName').value.trim() || null,
+    p1_phone: document.getElementById('profileFatherPhone').value.trim() || null,
+    p1_email: document.getElementById('profileFatherEmail').value.trim() || null,
+    p2_name: document.getElementById('profileMotherName').value.trim() || null,
+    p2_phone: document.getElementById('profileMotherPhone').value.trim() || null,
+    authorized_pickup: document.getElementById('profilePickupName').value.trim() || null
   };
   
   const { error } = await supabase.from(TABLES.STUDENTS).update(updates).eq('id', student.id);

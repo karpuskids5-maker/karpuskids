@@ -83,24 +83,24 @@
     #attendanceModal { -webkit-backdrop-filter: blur(4px); backdrop-filter: blur(4px); }
   </style>
 </head>
-<body class="bg-slate-50 text-slate-800 font-sans">
+<body class="bg-slate-50 text-slate-800 font-sans panel-asistente-body">
   <div class="min-h-screen flex">
     <!-- SIDEBAR -->
-    <aside id="sidebar" class="sidebar-teal p-4 rounded-r-3xl shadow-lg fixed inset-y-0 left-0 z-10">
+    <aside id="sidebar" class="bg-gradient-to-b from-teal-500 to-emerald-600 border-r-4 border-teal-300 p-4 rounded-r-3xl shadow-2xl fixed inset-y-0 left-0 z-10">
       <button id="toggleSidebar" class="absolute -right-3 top-6 bg-white rounded-full p-1 shadow-md border border-slate-100 text-slate-500 hover:text-teal-600 hidden md:block"><i data-lucide="chevron-left" class="w-4 h-4"></i></button>
       <div class="flex items-center gap-3 mb-8">
-        <div class="h-10 w-10 rounded-xl bg-white/20 flex items-center justify-center shadow-lg text-white font-bold">
+        <div class="h-10 w-10 rounded-xl bg-white flex items-center justify-center shadow-lg text-teal-600 font-bold">
           K
         </div>
         <div class="label">
-          <h3 class="font-semibold text-white karpus-kids-inline">
+          <h3 class="font-semibold text-white karpus-kids-inline drop-shadow-md">
             <span class="k-1">K</span><span class="k-2">a</span><span class="k-3">r</span><span class="k-4">p</span><span class="k-5">u</span><span class="k-6">s</span> <span class="k-7">K</span><span class="k-8">i</span><span class="k-9">d</span><span class="k-10">s</span>
           </h3>
           <p class="text-xs text-white text-opacity-80">Panel Asistente</p>
         </div>
       </div>
 
-      <nav class="space-y-2 bg-white/10 p-2 rounded-xl mb-4">
+      <nav class="space-y-2 bg-white/10 p-2 rounded-xl mb-4 backdrop-blur-sm relative z-10">
         <button data-section="dashboard" class="nav-btn w-full flex items-center p-3 rounded-lg text-white hover:bg-white/20 transition-colors">
           <i data-lucide="layout-dashboard"></i>
           <span class="label">Resumen</span>
@@ -123,9 +123,14 @@
         </button>
       </nav>
 
-      <div class="mt-auto absolute bottom-6 left-4 right-4 text-xs text-white/80 label">
+      <div class="mt-auto absolute bottom-6 left-4 right-4 text-xs text-white/80 label relative z-10">
         <p>Usuario: <span class="font-medium" id="sidebarUserName">Cargando...</span></p>
         <button id="btnLogout" class="mt-2 flex items-center gap-2 hover:text-white transition-colors"><i data-lucide="log-out" class="w-3 h-3"></i> Cerrar Sesión</button>
+      </div>
+
+      <!-- Icono Grande Decorativo (Rompecabezas) -->
+      <div class="absolute bottom-4 right-4 opacity-20 pointer-events-none transform -rotate-6">
+        <i data-lucide="puzzle" class="w-32 h-32 text-white"></i>
       </div>
     </aside>
 

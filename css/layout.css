@@ -1,7 +1,7 @@
 :root {
   /* BRAND KARPUS KIDS (Verde Educativo) */
-  --color-primary: #22c55e;        /* emerald-500 */
-  --color-primary-hover: #16a34a;  /* emerald-600 */
+  --color-primary: #023b17;        /* emerald-500 */
+  --color-primary-hover: #277242;  /* emerald-600 */
   --color-primary-soft: #dcfce7;   /* emerald-100 */
 
   /* SECUNDARIOS */
@@ -9,7 +9,7 @@
   --color-secondary-hover: #0ea5e9;
   --color-secondary-soft: #e0f2fe;
 
-  --color-success: #22c55e;
+  --color-success: #06737d;
   --color-success-soft: #dcfce7;
 
   --color-warning: #facc15;
@@ -274,11 +274,9 @@ button:hover {
 }
 
 aside#sidebar.sidebar-backpack {
-  background: #ECFEFF;
-  border-right: 4px solid #67E8F9;
   border-top-right-radius: 40px;
   border-bottom-right-radius: 40px;
-  box-shadow: 5px 0 25px rgba(14, 165, 233, 0.20);
+  box-shadow: 5px 0 25px rgba(0, 0, 0, 0.08);
   color: #475569;
 }
 aside#sidebar.sidebar-backpack .sidebar-btn {

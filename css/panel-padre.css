@@ -1,0 +1,23 @@
+/* Panel Padre overrides */
+/* Marca Karpus en el sidebar con letras de colores */
+.sidebar-brand .karpus-kids-inline { font-weight: 800; letter-spacing: 0.5px; }
+.sidebar-brand .k-1 { color: #FF9800; }
+.sidebar-brand .k-2 { color: #2196F3; }
+.sidebar-brand .k-3 { color: #E91E63; }
+.sidebar-brand .k-4 { color: #4CAF50; }
+.sidebar-brand .k-5 { color: #FF9800; }
+.sidebar-brand .k-6 { color: #2196F3; }
+.sidebar-brand .k-7 { color: #4CAF50; }
+.sidebar-brand .k-8 { color: #E91E63; }
+.sidebar-brand .k-9 { color: #2196F3; }
+.sidebar-brand .k-10 { color: #FF9800; }
+
+/* Botones del sidebar: respetar color por sección */
+.sidebar-btn.btn-home { color: #2563eb; }
+.sidebar-btn.btn-attendance { color: #16a34a; }
+.sidebar-btn.btn-tasks { color: #f59e0b; }
+.sidebar-btn.btn-class { color: #7c3aed; }
+.sidebar-btn.btn-grades { color: #ea580c; }
+.sidebar-btn.btn-payments { color: #14b8a6; }
+.sidebar-btn.btn-notifications { color: #f43f5e; }
+.sidebar-btn.btn-profile { color: #475569; }

@@ -61,11 +61,11 @@
     
     /* 🎒 Sidebar Mochila */
     .sidebar-backpack {
-      background: linear-gradient(180deg, #4ade80 0%, #22c55e 100%);
-      border-right: 4px solid #15803d; /* Costura */
+      background: linear-gradient(180deg, #ffb703 0%, #fb8500 100%);
+      border-right: 4px solid #d97706;
       border-top-right-radius: 40px;
       border-bottom-right-radius: 40px;
-      box-shadow: 5px 0 25px rgba(21, 128, 61, 0.2);
+      box-shadow: 5px 0 25px rgba(217, 119, 6, 0.2);
       position: relative;
     }
     .sidebar-backpack::after { /* Detalle de costura */
@@ -75,14 +75,14 @@
 
     /* 🧸 Botones de Juguete */
     .nav-btn-toy {
-      background: rgba(255,255,255,0.2); color: #064e3b;
+      background: rgba(255,255,255,0.2); color: #7c2d12;
       border-radius: 9999px; /* Pill shape */
       padding: 12px 20px; margin-bottom: 10px;
       font-weight: 700; border: 2px solid transparent;
       transition: all 0.2s cubic-bezier(0.34, 1.56, 0.64, 1);
       display: flex; align-items: center; gap: 12px;
     }
-    .nav-btn-toy:hover { background: white; transform: scale(1.05); color: #16a34a; box-shadow: 0 4px 0 rgba(0,0,0,0.1); }
+    .nav-btn-toy:hover { background: white; transform: scale(1.05); color: #ea580c; box-shadow: 0 4px 0 rgba(0,0,0,0.1); }
     .nav-btn-toy.active {
       background: #fef08a; /* Yellow */
       color: #854d0e;
@@ -122,43 +122,48 @@
     }
   </style>
 </head>
-<body class="bg-slate-50 text-slate-800 font-nunito">
+<body class="bg-slate-50 text-slate-800 font-nunito panel-maestra-body">
   <div class="min-h-screen flex">
     <!-- SIDEBAR -->
-    <aside id="sidebar" class="sidebar-backpack p-4 fixed inset-y-0 left-0 z-20">
-      <button id="toggleSidebar" class="absolute -right-3 top-6 bg-white rounded-full p-1 shadow-md border border-slate-100 text-slate-500 hover:text-green-600 hidden md:block">
+    <aside id="sidebar" class="bg-gradient-to-b from-pink-500 to-rose-600 shadow-2xl border-r-4 border-pink-300 p-4 fixed inset-y-0 left-0 z-20 rounded-r-3xl">
+      <button id="toggleSidebar" class="absolute -right-3 top-6 bg-white rounded-full p-1 shadow-md border border-slate-100 text-slate-500 hover:text-orange-600 hidden md:block">
         <i data-lucide="chevron-left" id="toggleSidebarIcon" class="w-4 h-4"></i>
       </button>
       
       <div class="flex items-center gap-3 mb-6">
-        <div class="h-12 w-12 rounded-2xl bg-white/40 flex items-center justify-center shadow-lg">
+        <div class="h-12 w-12 rounded-2xl bg-white flex items-center justify-center shadow-lg">
           <img src="img/mundo.jpg" alt="logo" class="h-10 w-10 rounded-lg object-cover" />
         </div>
         <div class="label">
-          <h3 class="font-black text-white text-lg tracking-tight">Karpus Kids</h3>
-          <p class="text-xs text-green-100 font-bold">Panel Maestra</p>
+          <h3 class="font-black text-white text-lg tracking-tight drop-shadow-md">Karpus Kids</h3>
+          <p class="text-xs text-pink-100 font-bold">Panel Maestra</p>
         </div>
       </div>
 
-      <nav class="space-y-2 p-2 mb-4">
-        <button data-section="t-home" class="nav-btn-toy w-full active" aria-selected="true">
+      <nav class="space-y-2 p-2 mb-4 relative z-10">
+        <button data-section="t-home" class="nav-btn-toy w-full active text-pink-700" aria-selected="true">
           <i data-lucide="home" class="w-5 h-5"></i>
           <span class="label">Mis Clases</span>
         </button>
-        <button id="logoutBtn" class="nav-btn-toy w-full">
+        <button id="logoutBtn" class="nav-btn-toy w-full text-pink-700">
           <i data-lucide="log-out" class="w-5 h-5"></i>
           <span class="label">Cerrar sesión</span>
         </button>
       </nav>
 
-      <div class="mt-auto pt-4 border-t border-white/20">
+      <div class="mt-auto pt-4 border-t border-white/20 relative z-10">
         <div class="flex items-center gap-3 px-2">
-          <div class="w-10 h-10 rounded-full bg-white flex items-center justify-center text-green-600 font-black shadow-md border-2 border-green-200">M</div>
+          <div class="w-10 h-10 rounded-full bg-white flex items-center justify-center text-pink-600 font-black shadow-md border-2 border-pink-200">M</div>
           <div class="label overflow-hidden">
             <h3 class="text-sm font-bold text-white truncate user-name-display">Maestra</h3>
-            <p class="text-xs text-green-100 truncate user-email-display">maestra@karpus.local</p>
+            <p class="text-xs text-pink-100 truncate user-email-display">maestra@karpus.local</p>
           </div>
         </div>
+      </div>
+
+      <!-- Icono Grande Decorativo (Lápiz) -->
+      <div class="absolute bottom-4 right-4 opacity-20 pointer-events-none transform -rotate-12">
+        <i data-lucide="pencil" class="w-32 h-32 text-white"></i>
       </div>
     </aside>
 

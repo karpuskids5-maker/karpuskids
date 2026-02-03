@@ -1,153 +1,238 @@
 <!DOCTYPE html>
 <html lang="es">
 <head>
-  <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Karpus Kids — Panel Maestra</title>
+<meta charset="UTF-8">
+<title>Informe - Panel Padre</title>
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
 
-  <link rel="icon" href="logo/favicon.ico" type="image/x-icon">
+<style>
+/* -------------------
+   RESET
+------------------- */
+*{
+  margin:0;
+  padding:0;
+  box-sizing:border-box;
+  font-family: Arial, sans-serif;
+}
 
-  <!-- Tailwind -->
-  <script src="https://cdn.tailwindcss.com"></script>
+/* -------------------
+   CONTENEDOR GENERAL
+------------------- */
+body{
+  background:#eaf4ff;
+}
 
-  <!-- Fuente Nunito -->
-  <link href="https://fonts.googleapis.com/css2?family=Nunito:wght@400;600;700;800&display=swap" rel="stylesheet">
+.app{
+  display:flex;
+  min-height:100vh;
+}
 
-  <!-- Chart & Icons -->
-  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-  <script src="https://unpkg.com/lucide@latest/dist/umd/lucide.min.js"></script>
+/* -------------------
+   SIDEBAR MOCHILA
+------------------- */
+.sidebar{
+  width:240px;
+  background:linear-gradient(180deg,#ffb703,#fb8500);
+  border-radius:30px;
+  margin:15px;
+  padding:20px;
+  box-shadow:0 10px 20px rgba(0,0,0,.25);
+  position:relative;
+}
 
-  <style>
-    body { font-family: 'Nunito', sans-serif; }
+/* Asa de mochila */
+.sidebar::before{
+  content:"";
+  position:absolute;
+  top:-25px;
+  left:60px;
+  width:120px;
+  height:40px;
+  background:#d97706;
+  border-radius:50px 50px 0 0;
+}
 
-    aside#sidebar {
-      width: 280px;
-      transition: width .25s ease, transform .25s ease;
-    }
-    aside#sidebar.collapsed { width: 72px; }
-    aside#sidebar .label { transition: opacity .2s ease; }
-    aside#sidebar.collapsed .label { opacity: 0; }
-    aside#sidebar.collapsed:hover { width: 280px; }
-    aside#sidebar.collapsed:hover .label { opacity: 1; }
+/* Logo */
+.logo{
+  text-align:center;
+  font-size:22px;
+  font-weight:bold;
+  color:#fff;
+  margin-bottom:30px;
+}
 
-    .sidebar-green {
-      background: linear-gradient(135deg,#E8F8F0,#D0F0E0);
-    }
+/* Menú */
+.menu a{
+  display:block;
+  background:#ffd166;
+  padding:12px;
+  margin-bottom:12px;
+  border-radius:12px;
+  color:#333;
+  text-decoration:none;
+  font-weight:bold;
+  transition:.3s;
+}
 
-    #layoutShell {
-      transition: margin-left .25s ease;
-      margin-left: 280px;
-    }
-    #layoutShell.sidebar-collapsed { margin-left: 72px; }
+.menu a:hover{
+  background:#ffe8a3;
+}
 
-    @media (max-width: 768px) {
-      #layoutShell { margin-left: 0 !important; }
-      aside#sidebar { transform: translateX(-100%); }
-      aside#sidebar.mobile-visible { transform: translateX(0); }
-    }
+/* -------------------
+   PANEL PRINCIPAL
+------------------- */
+.main{
+  flex:1;
+  margin:15px;
+  border-radius:30px;
+  overflow:hidden;
+  box-shadow:0 10px 20px rgba(0,0,0,.25);
+  background:#fff;
+}
 
-    .section { display: none; }
-    .section.active { display: block; }
-  </style>
+/* CIELO */
+.sky{
+  height:40%;
+  background:linear-gradient(#90dbff,#cceeff);
+  padding:25px;
+}
+
+/* PASTO */
+.land{
+  height:60%;
+  background:linear-gradient(#7ae582,#3bb273);
+  padding:25px;
+}
+
+/* TITULOS */
+h1,h2{
+  color:#023047;
+  margin-bottom:10px;
+}
+
+/* -------------------
+   TARJETAS
+------------------- */
+.cards{
+  display:grid;
+  grid-template-columns:repeat(auto-fit,minmax(220px,1fr));
+  gap:20px;
+}
+
+.card{
+  background:#ffffff;
+  padding:18px;
+  border-radius:20px;
+  box-shadow:0 5px 12px rgba(0,0,0,.2);
+}
+
+.card h3{
+  margin-bottom:8px;
+}
+
+/* COLORES POR TARJETA */
+.azul{border-left:8px solid #2196f3;}
+.verde{border-left:8px solid #4caf50;}
+.amarillo{border-left:8px solid #ffb703;}
+.rosado{border-left:8px solid #ff6f91;}
+
+/* -------------------
+   TEXTO INFORME
+------------------- */
+p{
+  line-height:1.6;
+  color:#333;
+}
+
+ul{
+  padding-left:20px;
+}
+</style>
 </head>
 
-<body class="bg-slate-50 text-slate-800">
-<div class="min-h-screen flex">
+<body>
+
+<div class="app">
 
   <!-- SIDEBAR -->
-  <aside id="sidebar" class="sidebar-green p-4 rounded-r-3xl shadow-lg fixed inset-y-0 left-0 z-20">
-    <button id="toggleSidebar"
-      class="absolute -right-3 top-6 bg-white rounded-full p-1 shadow-md border text-slate-500 hover:text-green-600 hidden md:block">
-      <i data-lucide="chevron-left" id="toggleSidebarIcon" class="w-4 h-4"></i>
-    </button>
+  <aside class="sidebar">
+    <div class="logo">Panel Padre</div>
 
-    <div class="flex items-center gap-3 mb-6">
-      <div class="h-12 w-12 rounded-2xl bg-white/40 flex items-center justify-center shadow-lg">
-        <img src="img/mundo.jpg" class="h-10 w-10 rounded-lg object-cover" alt="logo">
-      </div>
-      <div class="label">
-        <h3 class="font-bold text-green-900">Karpus Kids</h3>
-        <p class="text-xs text-green-800">Panel Maestra</p>
-      </div>
-    </div>
-
-    <nav class="space-y-2 bg-white/30 p-2 rounded-xl mb-4">
-      <button data-section="t-home"
-        class="nav-btn w-full flex items-center gap-3 px-3 py-2 rounded-lg bg-white/40 text-green-900"
-        aria-selected="true">
-        <i data-lucide="home"></i><span class="label">Mis Clases</span>
-      </button>
-
-      <button data-section="t-students"
-        class="nav-btn w-full flex items-center gap-3 px-3 py-2 rounded-lg hover:bg-white/40 text-green-900">
-        <i data-lucide="users"></i><span class="label">Alumnos</span>
-      </button>
-
-      <button data-section="t-attendance"
-        class="nav-btn w-full flex items-center gap-3 px-3 py-2 rounded-lg hover:bg-white/40 text-green-900">
-        <i data-lucide="calendar-check"></i><span class="label">Asistencia</span>
-      </button>
+    <nav class="menu">
+      <a href="#">Inicio</a>
+      <a href="#">Asistencia</a>
+      <a href="#">Calificaciones</a>
+      <a href="#">Pagos</a>
+      <a href="#">Mensajes</a>
+      <a href="#">Perfil</a>
     </nav>
-
-    <div class="mt-auto pt-4 border-t border-green-200/50">
-      <div class="flex items-center gap-3 px-2">
-        <div class="w-8 h-8 rounded-full bg-green-200 flex items-center justify-center font-bold text-green-700">
-          M
-        </div>
-        <div class="label">
-          <p class="text-sm font-semibold user-name-display">Maestra</p>
-          <p class="text-xs text-green-800 user-email-display">maestra@karpus.local</p>
-        </div>
-      </div>
-    </div>
   </aside>
 
-  <!-- OVERLAY MOBILE -->
-  <div id="sidebarOverlay" class="fixed inset-0 bg-black/30 z-10 hidden"></div>
+  <!-- CONTENIDO -->
+  <main class="main">
 
-  <!-- MAIN -->
-  <main id="layoutShell" class="flex-1 p-6">
-
-    <!-- Mobile topbar -->
-    <div class="md:hidden flex justify-between mb-6">
-      <button id="menuBtn" class="p-2 bg-white rounded shadow">
-        <i data-lucide="menu"></i>
-      </button>
-      <h2 class="font-bold">Panel Maestra</h2>
-      <div></div>
-    </div>
-
-    <!-- HOME -->
-    <section id="t-home" class="section active">
-      <h1 class="text-2xl font-bold mb-1">Mis Clases</h1>
-      <p class="text-slate-500 mb-6">Bienvenida, <span class="user-name-display">Maestra</span></p>
-      <div id="classesGrid" class="grid md:grid-cols-3 gap-6">
-        <div class="col-span-full text-center text-slate-500 py-10">Cargando aulas…</div>
-      </div>
+    <!-- CIELO -->
+    <section class="sky">
+      <h1>Informe del Panel Padre</h1>
+      <p>
+        Este informe describe el diseño, estructura y funcionalidades del Panel Padre,
+        el cual permitirá a los padres dar seguimiento al desempeño académico,
+        pagos y comunicación escolar de sus hijos.
+      </p>
     </section>
 
-    <!-- STUDENTS -->
-    <section id="t-students" class="section">
-      <h1 class="text-2xl font-bold mb-6">Mis Alumnos</h1>
-      <div class="bg-white rounded-xl shadow p-4 text-center text-slate-500">
-        Selecciona una clase para ver alumnos
-      </div>
-    </section>
+    <!-- PASTO -->
+    <section class="land">
 
-    <!-- ATTENDANCE -->
-    <section id="t-attendance" class="section">
-      <h1 class="text-2xl font-bold mb-6">Asistencia</h1>
-      <div class="bg-white rounded-xl shadow p-6 text-center text-slate-500">
-        Selecciona una clase para tomar asistencia
+      <h2>Características Principales</h2>
+
+      <div class="cards">
+
+        <div class="card azul">
+          <h3>Seguimiento Académico</h3>
+          <p>
+            Visualización de calificaciones, materias y progreso del estudiante.
+          </p>
+        </div>
+
+        <div class="card verde">
+          <h3>Asistencia</h3>
+          <p>
+            Registro de días presentes, ausentes y tardanzas.
+          </p>
+        </div>
+
+        <div class="card amarillo">
+          <h3>Pagos</h3>
+          <p>
+            Control de pagos realizados, pendientes y método utilizado.
+          </p>
+        </div>
+
+        <div class="card rosado">
+          <h3>Mensajes</h3>
+          <p>
+            Comunicación directa con la institución y docentes.
+          </p>
+        </div>
+
       </div>
+
+      <br>
+
+      <h2>Conclusión</h2>
+      <p>
+        El Panel Padre facilita la supervisión educativa,
+        fortalece la comunicación y promueve la participación
+        activa de los padres en la educación de sus hijos.
+      </p>
+
     </section>
 
   </main>
+
 </div>
 
-<script type="module" src="js/panel_maestra.js"></script>
-<script>
-  lucide.createIcons();
-</script>
 </body>
 </html>
