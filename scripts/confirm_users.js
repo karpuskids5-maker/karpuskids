@@ -34,6 +34,13 @@ async function confirmUsers() {
       }
 
       const user = users.find(u => u.email === email);
+      const role = email.split('@')[0];
+      const defaultName = {
+        maestra: 'Maestra',
+        directora: 'Directora',
+        padre: 'Padre',
+        asistente: 'Asistente'
+      }[role] || 'Usuario';
 
       if (!user) {
         console.log(`Usuario ${email} no encontrado. Intentando crearlo...`);
@@ -49,6 +56,15 @@ async function confirmUsers() {
           console.error(`Error creando ${email}: ${createError.message}`);
         } else {
           console.log(`Usuario ${email} creado y confirmado.`);
+          // Ensure profile exists
+          try {
+            await supabase.from('profiles').upsert({
+              id: newUser.user.id,
+              email,
+              role,
+              name: defaultName
+            }, { onConflict: 'id' });
+          } catch(e) { console.warn('No se pudo crear perfil para', email, e?.message || e); }
         }
       } else {
         if (user.email_confirmed_at) {
@@ -66,6 +82,15 @@ async function confirmUsers() {
                 console.log(`Usuario ${email} confirmado exitosamente.`);
             }
         }
+        // Ensure profile exists/updated
+        try {
+          await supabase.from('profiles').upsert({
+            id: user.id,
+            email,
+            role,
+            name: defaultName
+          }, { onConflict: 'id' });
+        } catch(e) { console.warn('No se pudo asegurar perfil para', email, e?.message || e); }
       }
 
     } catch (e) {

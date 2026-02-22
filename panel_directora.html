@@ -229,43 +229,43 @@
       <div class="sidebar-scroll relative z-10">
       <nav class="space-y-2 teams-nav bg-white/10 p-2 rounded-xl mb-4 backdrop-blur-sm">
         <button data-section="dashboard" class="nav-btn teams-nav-item text-white hover:bg-white/20" title="Dashboard">
-          <i data-lucide="grid" class="text-karpus-blue"></i>
+          <i data-lucide="grid" class="text-blue-400"></i>
           <span class="label">Dashboard</span>
         </button>
         <button data-section="maestros" class="nav-btn teams-nav-item text-white hover:bg-white/20" title="Maestros">
-          <i data-lucide="users" class="text-karpus-green"></i>
+          <i data-lucide="users" class="text-green-400"></i>
           <span class="label">Maestros</span>
         </button>
         <button data-section="estudiantes" class="nav-btn teams-nav-item text-white hover:bg-white/20" title="Estudiantes">
-          <i data-lucide="user-check" class="text-karpus-orange"></i>
+          <i data-lucide="user-check" class="text-orange-400"></i>
           <span class="label">Estudiantes</span>
         </button>
         <button data-section="aulas" class="nav-btn teams-nav-item text-white hover:bg-white/20" title="Aulas">
-          <i data-lucide="home" class="text-karpus-purple"></i>
+          <i data-lucide="home" class="text-purple-400"></i>
           <span class="label">Aulas</span>
         </button>
         <button data-section="asistencia" class="nav-btn teams-nav-item text-white hover:bg-white/20" title="Asistencia">
-          <i data-lucide="calendar" class="text-karpus-pink"></i>
+          <i data-lucide="calendar" class="text-pink-400"></i>
           <span class="label">Asistencia</span>
         </button>
         <button data-section="calificaciones" class="nav-btn teams-nav-item text-white hover:bg-white/20" title="Calificaciones">
-          <i data-lucide="graduation-cap" class="text-karpus-teal"></i>
+          <i data-lucide="graduation-cap" class="text-teal-400"></i>
           <span class="label">Calificaciones</span>
         </button>
         <button data-section="reportes" class="nav-btn teams-nav-item text-white hover:bg-white/20" title="Reportes">
-          <i data-lucide="file-text" class="text-karpus-indigo"></i>
+          <i data-lucide="file-text" class="text-indigo-400"></i>
           <span class="label">Reportes</span>
         </button>
         <button data-section="pagos" class="nav-btn teams-nav-item text-white hover:bg-white/20" title="Pagos">
-          <i data-lucide="credit-card" class="text-karpus-yellow"></i>
+          <i data-lucide="credit-card" class="text-yellow-400"></i>
           <span class="label">Pagos</span>
         </button>
         <button data-section="comunicacion" class="nav-btn teams-nav-item text-white hover:bg-white/20" title="Comunicaciones">
-          <i data-lucide="message-square" class="text-karpus-blue"></i>
+          <i data-lucide="message-square" class="text-blue-400"></i>
           <span class="label">Comunicaciones</span>
         </button>
         <button data-section="configuracion" class="nav-btn teams-nav-item text-white hover:bg-white/20" title="Configuración">
-          <i data-lucide="settings" class="text-karpus-gray"></i>
+          <i data-lucide="settings" class="text-slate-400"></i>
           <span class="label">Configuración</span>
         </button>
       </nav>
@@ -302,114 +302,163 @@
 
       <!-- SECTIONS -->
       <section id="dashboard" class="section">
-        <div class="flex items-center justify-between mb-6">
-          <div class="flex items-center gap-3">
-            <i data-lucide="layout-dashboard" class="w-7 h-7 text-blue-600"></i>
-            <h1 class="text-2xl font-bold">Resumen general</h1>
-            <p class="text-sm text-slate-500">Visión rápida de la estancia</p>
+        <!-- Header con Filtros Globales -->
+        <div class="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-8">
+          <div>
+            <h1 class="text-3xl font-bold text-slate-800 tracking-tight">Panel General</h1>
+            <p class="text-slate-500 font-medium">Resumen administrativo de la estancia</p>
           </div>
-          <div class="flex items-center gap-3">
-            <button id="btnExportDashboard" class="px-3 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 transition-colors flex items-center gap-2"><i data-lucide="download" class="w-4 h-4"></i> Exportar datos</button>
+          <div class="flex gap-3 bg-white p-1.5 rounded-xl shadow-sm border border-slate-100">
+            <select id="globalMonthFilter" class="bg-transparent text-sm font-semibold text-slate-600 outline-none px-3 py-1.5 rounded-lg hover:bg-slate-50 cursor-pointer">
+              <option value="current">Este Mes</option>
+              <option value="last">Mes Pasado</option>
+            </select>
+            <div class="w-px bg-slate-200 my-1"></div>
+            <button id="btnRefreshDashboard" class="p-2 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors" title="Actualizar">
+              <i data-lucide="refresh-cw" class="w-4 h-4"></i>
+            </button>
           </div>
         </div>
 
         <!-- ALERTAS AUTOMÁTICAS (Notificaciones) -->
         <div id="dashboardAlerts" class="mb-6 hidden"></div>
 
-        <!-- cards -->
-        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
-          <!-- Card 1: Niños Presentes -->
-          <div class="p-4 bg-blue-100 text-blue-800 rounded-2xl shadow flex items-center gap-4">
-            <div class="bg-blue-500 text-white p-3 rounded-xl">
-              <i data-lucide="smile" class="w-8 h-8"></i>
+        <!-- BLOQUE 1: KPIs (Tarjetas Pastel) -->
+        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-4 mb-8">
+          <!-- Estudiantes -->
+          <div class="bg-blue-50 p-5 rounded-3xl border border-blue-100 shadow-sm hover:shadow-md transition-all duration-300 group">
+            <div class="flex justify-between items-start mb-2">
+              <div class="p-2 bg-white rounded-2xl text-blue-500 shadow-sm group-hover:scale-110 transition-transform"><i data-lucide="users" class="w-6 h-6"></i></div>
+              <span class="text-xs font-bold text-blue-400 bg-white px-2 py-1 rounded-full">Total</span>
             </div>
-            <div>
-              <p class="text-sm">Niños presentes</p>
-              <p id="ninosPresentes" class="text-2xl font-bold">-</p>
-            </div>
+            <p class="text-3xl font-black text-slate-800 mb-1" id="kpiStudents">-</p>
+            <p class="text-xs text-blue-600 font-medium">Estudiantes activos</p>
           </div>
-          <!-- Card 2: Maestros Activos -->
-          <div class="p-4 bg-green-100 text-green-800 rounded-2xl shadow flex items-center gap-4">
-            <div class="bg-green-500 text-white p-3 rounded-xl">
-              <i data-lucide="user-check" class="w-8 h-8"></i>
+
+          <!-- Docentes -->
+          <div class="bg-purple-50 p-5 rounded-3xl border border-purple-100 shadow-sm hover:shadow-md transition-all duration-300 group">
+            <div class="flex justify-between items-start mb-2">
+              <div class="p-2 bg-white rounded-2xl text-purple-500 shadow-sm group-hover:scale-110 transition-transform"><i data-lucide="graduation-cap" class="w-6 h-6"></i></div>
             </div>
-            <div>
-              <p class="text-sm">Maestros activos</p>
-              <p id="maestrosActivos" class="text-2xl font-bold">-</p>
-            </div>
+            <p class="text-3xl font-black text-slate-800 mb-1" id="kpiTeachers">-</p>
+            <p class="text-xs text-purple-600 font-medium">Docentes</p>
           </div>
-          <!-- Card 3: Solicitudes -->
-          <div class="p-4 bg-orange-100 text-orange-800 rounded-2xl shadow flex items-center gap-4">
-            <div class="bg-orange-500 text-white p-3 rounded-xl">
-              <i data-lucide="inbox" class="w-8 h-8"></i>
+
+          <!-- Aulas -->
+          <div class="bg-indigo-50 p-5 rounded-3xl border border-indigo-100 shadow-sm hover:shadow-md transition-all duration-300 group">
+            <div class="flex justify-between items-start mb-2">
+              <div class="p-2 bg-white rounded-2xl text-indigo-500 shadow-sm group-hover:scale-110 transition-transform"><i data-lucide="home" class="w-6 h-6"></i></div>
             </div>
-            <div>
-              <p class="text-sm">Solicitudes hoy</p>
-              <p id="solicitudesHoy" class="text-2xl font-bold">-</p>
-            </div>
+            <p class="text-3xl font-black text-slate-800 mb-1" id="kpiClassrooms">-</p>
+            <p class="text-xs text-indigo-600 font-medium">Aulas activas</p>
           </div>
-          <!-- Card 4: Aulas -->
-          <div class="p-4 bg-purple-100 text-purple-800 rounded-2xl shadow flex items-center gap-4">
-            <div class="bg-purple-500 text-white p-3 rounded-xl">
-              <i data-lucide="home" class="w-8 h-8"></i>
+
+          <!-- Asistencia -->
+          <div class="bg-emerald-50 p-5 rounded-3xl border border-emerald-100 shadow-sm hover:shadow-md transition-all duration-300 group">
+            <div class="flex justify-between items-start mb-2">
+              <div class="p-2 bg-white rounded-2xl text-emerald-500 shadow-sm group-hover:scale-110 transition-transform"><i data-lucide="user-check" class="w-6 h-6"></i></div>
+              <span class="text-xs font-bold text-emerald-500 bg-white px-2 py-1 rounded-full">Hoy</span>
             </div>
-            <div>
-              <p class="text-sm">Aulas ocupadas</p>
-              <p id="aulasOcupadas" class="text-2xl font-bold">-</p>
-            </div>
+            <p class="text-3xl font-black text-slate-800 mb-1" id="kpiAttendance">-</p>
+            <p class="text-xs text-emerald-600 font-medium">Niños presentes</p>
           </div>
-          <!-- Card 5: Eventos (Nuevo) -->
-          <div class="p-4 bg-pink-100 text-pink-800 rounded-2xl shadow flex items-center gap-4 sm:col-span-2 lg:col-span-4">
-            <div class="bg-pink-500 text-white p-3 rounded-xl">
-              <i data-lucide="calendar-heart" class="w-8 h-8"></i>
+
+          <!-- Pagos Pendientes -->
+          <div class="bg-amber-50 p-5 rounded-3xl border border-amber-100 shadow-sm hover:shadow-md transition-all duration-300 group">
+            <div class="flex justify-between items-start mb-2">
+              <div class="p-2 bg-white rounded-2xl text-amber-500 shadow-sm group-hover:scale-110 transition-transform"><i data-lucide="alert-circle" class="w-6 h-6"></i></div>
             </div>
-            <div class="flex-1">
-              <p class="text-sm font-semibold">Eventos del Mes</p>
-              <p id="eventsList" class="text-sm text-slate-600">Cargando eventos...</p>
+            <p class="text-xl font-black text-slate-800 mb-1 truncate" id="kpiPendingMoney">$0</p>
+            <p class="text-xs text-amber-600 font-medium">Por cobrar</p>
+          </div>
+
+          <!-- Incidencias -->
+          <div class="bg-rose-50 p-5 rounded-3xl border border-rose-100 shadow-sm hover:shadow-md transition-all duration-300 group">
+            <div class="flex justify-between items-start mb-2">
+              <div class="p-2 bg-white rounded-2xl text-rose-500 shadow-sm group-hover:scale-110 transition-transform"><i data-lucide="message-square-warning" class="w-6 h-6"></i></div>
             </div>
+            <p class="text-3xl font-black text-slate-800 mb-1" id="kpiIncidents">-</p>
+            <p class="text-xs text-rose-600 font-medium">Incidencias</p>
           </div>
         </div>
 
-        <!-- charts + tabla resumen -->
-        <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
-          <div class="col-span-2 bg-white rounded shadow p-4">
-            <div class="flex items-center justify-between mb-3">
-              <h3 class="font-semibold">Estadísticas de Asistencia</h3>
-              <div class="flex bg-slate-100 rounded-lg p-1 gap-1">
-                <button data-chart-period="day" class="chart-period-btn px-3 py-1 text-xs rounded-md bg-white shadow-sm text-slate-700 font-medium transition-all hover:bg-white/80">Día</button>
-                <button data-chart-period="week" class="chart-period-btn px-3 py-1 text-xs rounded-md text-slate-500 hover:bg-white hover:shadow-sm transition-all">Semana</button>
-                <button data-chart-period="month" class="chart-period-btn px-3 py-1 text-xs rounded-md text-slate-500 hover:bg-white hover:shadow-sm transition-all">Mes</button>
+        <!-- BLOQUE 2 & 3: Gráficas Modernas -->
+        <div class="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-8">
+          <!-- Gráfica Principal (Area Chart) -->
+          <div class="col-span-2 bg-white rounded-3xl shadow-sm border border-slate-100 p-6">
+            <div class="flex items-center justify-between mb-6">
+              <div>
+                <h3 class="font-bold text-lg text-slate-800">Tendencia de Asistencia</h3>
+                <p class="text-xs text-slate-400">Últimos 7 días</p>
               </div>
+              <span class="bg-green-50 text-green-600 text-xs font-bold px-3 py-1 rounded-full flex items-center gap-1">
+                <i data-lucide="trending-up" class="w-3 h-3"></i> Estable
+              </span>
             </div>
-            <div class="relative h-64 w-full">
+            <div class="relative h-72 w-full">
               <canvas id="attendanceChart"></canvas>
             </div>
           </div>
 
-          <div class="bg-white rounded shadow p-4">
-            <h3 class="font-semibold mb-3">Últimas evaluaciones</h3>
-            <table class="w-full text-sm">
-              <thead class="text-slate-500 text-left">
-                <tr><th>Estudiante</th><th>Aula</th><th>Nota</th></tr>
+          <!-- Gráfica Secundaria (Donut - Finanzas) -->
+          <div class="bg-white rounded-3xl shadow-sm border border-slate-100 p-6">
+            <h3 class="font-bold text-lg text-slate-800 mb-2">Estado Financiero</h3>
+            <p class="text-xs text-slate-400 mb-6">Recaudación del mes actual</p>
+            <div class="relative h-56 w-full flex items-center justify-center">
+              <canvas id="financialDonutChart"></canvas>
+              <!-- Centro del Donut -->
+              <div class="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
+                <span class="text-xs text-slate-400 font-medium">Total</span>
+                <span class="text-xl font-black text-slate-800" id="donutTotalLabel">0%</span>
+              </div>
+            </div>
+            <div class="mt-6 space-y-2">
+              <div class="flex justify-between text-sm">
+                <span class="flex items-center gap-2 text-slate-600"><span class="w-3 h-3 rounded-full bg-emerald-400"></span>Pagado</span>
+                <span class="font-bold text-slate-800" id="finPaidLabel">$0</span>
+              </div>
+              <div class="flex justify-between text-sm">
+                <span class="flex items-center gap-2 text-slate-600"><span class="w-3 h-3 rounded-full bg-amber-400"></span>Pendiente</span>
+                <span class="font-bold text-slate-800" id="finPendingLabel">$0</span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- BLOQUE 4: Reporte Financiero Detallado (Tabla) -->
+        <div class="bg-white rounded-3xl shadow-sm border border-slate-100 p-6">
+          <div class="flex items-center justify-between mb-6">
+            <h3 class="font-bold text-lg text-slate-800 flex items-center gap-2">
+              <i data-lucide="coins" class="w-5 h-5 text-amber-500"></i>
+              Desglose Financiero por Aula
+            </h3>
+            <button class="text-sm text-blue-600 font-bold hover:underline">Ver reporte completo</button>
+          </div>
+          <div class="overflow-x-auto">
+            <table class="w-full text-left border-collapse">
+              <thead>
+                <tr class="text-xs text-slate-400 uppercase border-b border-slate-100">
+                  <th class="py-3 font-bold">Aula</th>
+                  <th class="py-3 font-bold text-right">Esperado</th>
+                  <th class="py-3 font-bold text-right">Recaudado</th>
+                  <th class="py-3 font-bold text-right">Pendiente</th>
+                  <th class="py-3 font-bold text-center">Progreso</th>
+                </tr>
               </thead>
-              <tbody id="evaluacionesList"></tbody>
+              <tbody id="financialReportBody" class="text-sm text-slate-600">
+                <!-- JS -->
+              </tbody>
             </table>
           </div>
         </div>
 
-        <!-- Log de Actividad Biométrica Reciente -->
-        <div class="mt-6 bg-white rounded shadow p-4">
-            <h3 class="font-semibold mb-3">Actividad Biométrica Reciente</h3>
-            <div id="biometricLog" class="space-y-2 text-sm max-h-48 overflow-y-auto"></div>
-        </div>
-
         <!-- Quejas y avisos de padres -->
-        <div class="mt-6">
+        <div class="mt-8">
           <h3 class="text-xl font-semibold mb-3 flex items-center gap-2">
             <i data-lucide="message-square-warning" class="w-6 h-6 text-orange-600"></i>
             Quejas y avisos de padres
           </h3>
-          <div id="reportsList" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4"></div>
+          <div id="dashboardReportsList" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4"></div>
         </div>
 
       </section>
@@ -709,11 +758,20 @@
           <div class="flex items-center gap-2">
             <input id="searchPayment" placeholder="Buscar alumno..." class="px-3 py-2 border rounded text-sm hidden md:block">
             <select id="paymentsClassFilter" class="px-3 py-2 border rounded">
-              <option value="Pequeños">Pequeños</option>
-              <option value="Medianos">Medianos</option>
-              <option value="Grandes">Grandes</option>
+              <option value="all">Todas las aulas</option>
             </select>
-            <button id="btnRecordatorioMasivo" class="btn btn-pink">Recordatorio masivo</button>
+            <select id="paymentsMonthFilter" class="px-3 py-2 border rounded">
+              <option value="all">Todos los meses</option>
+              <option>Enero</option><option>Febrero</option><option>Marzo</option><option>Abril</option>
+              <option>Mayo</option><option>Junio</option><option>Julio</option><option>Agosto</option>
+              <option>Septiembre</option><option>Octubre</option><option>Noviembre</option><option>Diciembre</option>
+            </select>
+            <select id="paymentsMethodFilter" class="px-3 py-2 border rounded">
+              <option value="all">Todos los métodos</option>
+              <option value="transferencia">Transferencia</option>
+              <option value="efectivo">Efectivo</option>
+            </select>
+            <button id="btnRecordatorioMasivo" class="bg-pink-600 text-white hover:bg-pink-700 px-3 py-2 rounded text-sm font-medium">Recordatorio masivo</button>
             <button id="btnNuevoPago" class="px-3 py-2 bg-green-600 text-white rounded hover:bg-green-700 text-sm">Registrar pago</button>
           </div>
         </div>
@@ -724,13 +782,21 @@
               <span id="paymentsTotal" class="chip chip-blue">Total: 0</span>
               <span id="paymentsPagados" class="chip chip-green">Pagados: 0</span>
               <span id="paymentsPendientes" class="chip chip-orange">Pendientes: 0</span>
+              <span id="paymentsCash" class="chip chip-purple">Efectivo: 0</span>
+              <span id="paymentsTransfers" class="chip chip-indigo">Transferencias: 0</span>
+              <span id="paymentsOverdue" class="chip chip-red">Vencidos: 0</span>
             </div>
             <canvas id="paymentsChart" height="120" class="mt-4"></canvas>
+            <canvas id="paymentsByMonthChart" height="140" class="mt-4"></canvas>
           </div>
           <div class="bg-white rounded shadow p-4">
             <h3 class="font-semibold mb-3">Importe</h3>
             <p id="paymentsAmount" class="text-lg font-semibold">$0.00</p>
             <p class="text-xs text-slate-500">Suma de importes en la clase seleccionada.</p>
+            <div class="mt-3">
+              <p class="text-xs text-slate-500">Recaudado este mes</p>
+              <p id="paymentsMonthAmount" class="text-lg font-semibold">$0.00</p>
+            </div>
           </div>
         </div>
         <div class="mt-6 bg-white rounded shadow p-4">
@@ -779,7 +845,7 @@
                 <div class="mt-2 flex gap-2 items-center">
                   <button id="chatEmoji" class="px-2 py-1 rounded bg-slate-100">😀</button>
                   <input id="chatInput" class="flex-1 border rounded-xl px-2 py-1 text-sm" placeholder="Escribe un mensaje" />
-                  <button id="chatSend" class="text-sm px-3 py-2 rounded-xl bg-karpus-pink text-white">Enviar</button>
+                  <button id="chatSend" class="text-sm px-3 py-2 rounded-xl bg-pink-600 text-white hover:bg-pink-700">Enviar</button>
                 </div>
                 <div id="emojiMenu" class="hidden border rounded p-2"></div>
               </div>
@@ -968,8 +1034,6 @@
           <label class="text-sm text-slate-600 block mb-1">Maestro Asignado</label>
           <select id="roomTeacher" class="w-full border rounded px-3 py-2">
             <option value="">Seleccionar maestro...</option>
-            <option value="Carolina Martínez">Carolina Martínez</option>
-            <option value="Andrés Pérez">Andrés Pérez</option>
           </select>
         </div>
         <div>
@@ -1173,6 +1237,10 @@
           <input id="stAllergies" placeholder="Alergias" class="border rounded px-3 py-2" />
           <input id="stBlood" placeholder="Tipo de Sangre" class="border rounded px-3 py-2" />
         </div>
+        <div class="grid grid-cols-2 gap-2">
+          <input id="stMonthlyFee" type="number" step="0.01" placeholder="Monto mensual" class="border rounded px-3 py-2" />
+          <input id="stDueDay" type="number" min="1" max="31" placeholder="Día de vencimiento" class="border rounded px-3 py-2" />
+        </div>
         <div>
           <label class="text-sm text-slate-600 block mb-1">Personas autorizadas para recoger</label>
           <input id="stPickup" placeholder="Ej: Abuela Carmen, Tío Juan" class="w-full border rounded px-3 py-2" />
@@ -1188,7 +1256,7 @@
 
   <script src="js/common_ui.js"></script>
   <script type="module" src="app.js"></script>
-  <script src="js/panel_directora.js"></script>
+  <script src="js/panel_directora.js?v=2"></script>
   <!-- Attendance Detail Modal (Director) -->
   <div id="attendanceModal" class="fixed inset-0 bg-black/30 z-50 hidden items-center justify-center">
     <div class="bg-white rounded-2xl shadow-xl p-6 w-full max-w-4xl h-[80vh] flex flex-col">
@@ -1218,11 +1286,11 @@
   </div>
 
 <!-- Modal para Crear Asistente -->
-<div id="modalCreateAssistant" class="modal-container">
+<div id="modalCreateAssistant" class="modal-container" role="dialog" aria-modal="true" aria-labelledby="assistantModalTitle">
   <div class="modal-content">
     <div class="modal-header">
-      <h3 class="text-lg font-semibold">Crear Usuario Asistente</h3>
-      <button id="btnCloseAssistantModal" class="text-slate-400 hover:text-slate-600">
+      <h3 id="assistantModalTitle" class="text-lg font-semibold">Crear Usuario Asistente</h3>
+      <button type="button" id="btnCloseAssistantModal" class="text-slate-400 hover:text-slate-600">
         <i data-lucide="x" class="w-5 h-5"></i>
       </button>
     </div>
@@ -1239,7 +1307,7 @@
         <div>
           <label class="block text-sm font-medium text-slate-700 mb-1">Contraseña temporal</label>
           <div class="flex gap-2">
-            <input type="text" id="assistantPassword" required class="flex-1 px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none" placeholder="Mínimo 6 caracteres">
+            <input type="password" id="assistantPassword" required minlength="6" class="flex-1 px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none" placeholder="Mínimo 6 caracteres">
             <button type="button" id="btnGeneratePassword" class="px-3 py-2 bg-slate-100 text-slate-700 rounded-lg hover:bg-slate-200 flex items-center gap-2">
               <i data-lucide="refresh-cw" class="w-4 h-4"></i>
               Generar

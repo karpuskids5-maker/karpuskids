@@ -72,7 +72,7 @@ function initAttendanceModule() {
     }
     
     if(dateFilter) {
-        dateFilter.value = new Date().toLocaleDateString('sv-SE');
+        dateFilter.value = new Date().toISOString().split('T')[0];
         dateFilter.onchange = loadAttendanceStats;
     }
     
@@ -88,7 +88,7 @@ let loadingAttendance = false;
 
 function getAttendanceDate() {
   const el = document.getElementById('attendanceDateFilter');
-  return el?.value || new Date().toLocaleDateString('sv-SE');
+  return el?.value || new Date().toISOString().split('T')[0];
 }
 
 async function getSupabase() {
@@ -115,68 +115,68 @@ async function loadAttendanceStats() {
         .select('status, classroom_id, classroom:classrooms(name)')
         .eq('date', date);
         
-    if(error) {
-        console.error('Error fetching attendance stats:', error);
-        return;
-    }
-    
-    // 2. Aggregate Stats
-    let present = 0, absent = 0, late = 0;
-    const byRoom = {};
-    
-    (attendanceData || []).forEach(r => {
-        if(r.status === 'present') present++;
-        if(r.status === 'absent') absent++;
-        if(r.status === 'late') late++;
-        
-        const roomId = r.classroom_id || 'unknown';
-        const roomName = r.classroom?.name || 'Sin Aula';
-        
-        if(!byRoom[roomId]) byRoom[roomId] = { name: roomName, present: 0, absent: 0, late: 0, total: 0 };
-        
-        byRoom[roomId].total++;
-        if(r.status === 'present') byRoom[roomId].present++;
-        if(r.status === 'absent') byRoom[roomId].absent++;
-        if(r.status === 'late') byRoom[roomId].late++;
-    });
-    
-    // 3. Update DOM Stats
-    const set = (id, val) => { const el = document.getElementById(id); if(el) el.textContent = val; };
-    set('statPresent', present);
-    set('statAbsent', absent);
-    set('statLate', late);
-    set('ninosPresentes', present);
-    
-    // 4. Update Room Table
-    const tbody = document.getElementById('attendanceByRoomBody');
-    if(tbody) {
-        if(Object.keys(byRoom).length === 0) {
-            tbody.innerHTML = '<tr><td colspan="4" class="text-center py-4 text-slate-500">No hay registros para esta fecha.</td></tr>';
-        } else {
-            tbody.innerHTML = Object.keys(byRoom).map(roomId => {
-                const stats = byRoom[roomId];
-                const percent = Math.round((stats.present / stats.total) * 100) || 0;
-                return `
-                    <tr data-room-id="${roomId}" data-room-name="${stats.name}" class="cursor-pointer hover:bg-slate-50 transition-colors border-b last:border-0" title="Ver detalle">
-                        <td class="py-3 px-2 font-medium">${stats.name}</td>
-                        <td class="py-3 px-2 text-center text-green-600 font-bold">${stats.present}</td>
-                        <td class="py-3 px-2 text-center text-red-600">${stats.absent}</td>
-                        <td class="py-3 px-2 text-center">
-                            <div class="flex items-center justify-center gap-2">
-                                <span class="text-xs font-bold">${percent}%</span>
-                                <div class="w-16 h-1.5 bg-slate-100 rounded-full overflow-hidden">
-                                    <div class="h-full bg-blue-500" style="width: ${percent}%"></div>
-                                </div>
-                            </div>
-                        </td>
-                    </tr>
-                `;
-            }).join('');
-        }
-    }
-    
-    // 5. Update Pie Chart
-    updatePieChart(present, absent, late);
+      if(error) {
+          console.error('Error fetching attendance stats:', error);
+          return;
+      }
+      
+      // 2. Aggregate Stats
+      let present = 0, absent = 0, late = 0;
+      const byRoom = {};
+      
+      (attendanceData || []).forEach(r => {
+          if(r.status === 'present') present++;
+          if(r.status === 'absent') absent++;
+          if(r.status === 'late') late++;
+          
+          const roomId = r.classroom_id || 'unknown';
+          const roomName = r.classroom?.name || 'Sin Aula';
+          
+          if(!byRoom[roomId]) byRoom[roomId] = { name: roomName, present: 0, absent: 0, late: 0, total: 0 };
+          
+          byRoom[roomId].total++;
+          if(r.status === 'present') byRoom[roomId].present++;
+          if(r.status === 'absent') byRoom[roomId].absent++;
+          if(r.status === 'late') byRoom[roomId].late++;
+      });
+      
+      // 3. Update DOM Stats
+      const set = (id, val) => { const el = document.getElementById(id); if(el) el.textContent = val; };
+      set('statPresent', present);
+      set('statAbsent', absent);
+      set('statLate', late);
+      set('ninosPresentes', present);
+      
+      // 4. Update Room Table
+      const tbody = document.getElementById('attendanceByRoomBody');
+      if(tbody) {
+          if(Object.keys(byRoom).length === 0) {
+              tbody.innerHTML = '<tr><td colspan="4" class="text-center py-4 text-slate-500">No hay registros para esta fecha.</td></tr>';
+          } else {
+              tbody.innerHTML = Object.keys(byRoom).map(roomId => {
+                  const stats = byRoom[roomId];
+                  const percent = Math.round((stats.present / stats.total) * 100) || 0;
+                  return `
+                      <tr data-room-id="${roomId}" data-room-name="${stats.name}" class="cursor-pointer hover:bg-slate-50 transition-colors border-b last:border-0" title="Ver detalle">
+                          <td class="py-3 px-2 font-medium">${stats.name}</td>
+                          <td class="py-3 px-2 text-center text-green-600 font-bold">${stats.present}</td>
+                          <td class="py-3 px-2 text-center text-red-600">${stats.absent}</td>
+                          <td class="py-3 px-2 text-center">
+                              <div class="flex items-center justify-center gap-2">
+                                  <span class="text-xs font-bold">${percent}%</span>
+                                  <div class="w-16 h-1.5 bg-slate-100 rounded-full overflow-hidden">
+                                      <div class="h-full bg-blue-500" style="width: ${percent}%"></div>
+                                  </div>
+                              </div>
+                          </td>
+                      </tr>
+                  `;
+              }).join('');
+          }
+      }
+      
+      // 5. Update Pie Chart
+      updatePieChart(present, absent, late);
     } finally {
       loadingAttendance = false;
       if(loader) loader.classList.add('hidden');
@@ -410,6 +410,10 @@ function attachPaymentsHandlers(){
   // Filtros
   const filtroAula = document.getElementById('paymentsClassFilter');
   if (filtroAula) filtroAula.addEventListener('change', loadPayments);
+  const filtroMes = document.getElementById('paymentsMonthFilter');
+  if (filtroMes) filtroMes.addEventListener('change', loadPayments);
+  const filtroMetodo = document.getElementById('paymentsMethodFilter');
+  if (filtroMetodo) filtroMetodo.addEventListener('change', loadPayments);
 
   // Recordatorio masivo
   const batchBtn = document.getElementById('btnRecordatorioMasivo');
@@ -430,19 +434,21 @@ async function loadPayments() {
 
   // Obtener filtro
   const aulaId = document.getElementById('paymentsClassFilter')?.value || 'all';
+  const monthFilter = document.getElementById('paymentsMonthFilter')?.value || 'all';
+  const methodFilter = document.getElementById('paymentsMethodFilter')?.value || 'all';
 
   try {
     let query = supabase
       .from('payments')
       .select(`
-        id, amount, concept, status, due_date,
+        id, amount, month_paid, status, created_at, method, bank, reference, evidence_url,
         student:students (
           id, name, classroom_id,
           classroom:classrooms(name),
           parent:profiles!inner(id, name, email, phone)
         )
       `)
-      .order('due_date', { ascending: false });
+      .order('created_at', { ascending: false });
 
     // Nota: El filtrado por classroom_id anidado es complejo en una sola query si no es !inner
     // Si queremos filtrar por aula:
@@ -458,9 +464,15 @@ async function loadPayments() {
 
     let pagos = data || [];
     
-    // Filtrado cliente por aula
-    if (aulaId !== 'all') {
-      pagos = pagos.filter(p => p.student?.classroom_id == aulaId);
+    // Filtrado cliente por aula (por nombre de aula)
+    if (aulaId && aulaId !== 'all') {
+      pagos = pagos.filter(p => (p.student?.classroom?.name || '') === aulaId);
+    }
+    if (monthFilter && monthFilter !== 'all') {
+      pagos = pagos.filter(p => (p.month_paid || '').toLowerCase().includes(monthFilter.toLowerCase()));
+    }
+    if (methodFilter && methodFilter !== 'all') {
+      pagos = pagos.filter(p => (p.method || '') === methodFilter);
     }
 
     if (pagos.length === 0) {
@@ -469,7 +481,7 @@ async function loadPayments() {
     }
 
     tbody.innerHTML = pagos.map(p => {
-      const isPaid = p.status === 'paid';
+      const isPaid = (p.status === 'paid' || p.status === 'efectivo');
       // Lógica de estado
       let statusColor = 'bg-yellow-100 text-yellow-800';
       let statusText = 'Pendiente';
@@ -477,30 +489,17 @@ async function loadPayments() {
       if (isPaid) {
         statusColor = 'bg-green-100 text-green-800';
         statusText = 'Pagado';
-      } else {
-        const isOverdue = p.due_date && new Date(p.due_date) < new Date();
-        if (isOverdue) {
-          statusColor = 'bg-red-100 text-red-800';
-          statusText = 'Vencido';
-        }
       }
 
       return `
         <tr class="border-b hover:bg-slate-50 transition-colors">
           <td class="p-3">
             <div class="font-bold text-slate-700">${p.student?.name || 'S/N'}</div>
-            <div class="text-xs text-slate-500">${p.student?.classroom?.name || 'Aula ?'}</div>
+            <div class="text-xs text-slate-500">${p.student?.parent?.name || ''}</div>
           </td>
-          <td class="p-3 text-sm text-slate-600">
-            ${p.student?.parent?.name || 'S/P'}
-          </td>
-          <td class="p-3 text-right font-mono text-slate-700">
-            $${parseFloat(p.amount).toFixed(2)}
-          </td>
-          <td class="p-3 text-center text-sm">
-            ${p.concept}
-            <div class="text-xs text-slate-400">${p.due_date || ''}</div>
-          </td>
+          <td class="p-3 text-sm text-slate-600">${p.student?.classroom?.name || 'Aula ?'}</td>
+          <td class="p-3 text-sm text-slate-700">${p.month_paid || '-'}</td>
+          <td class="p-3 text-right font-mono text-slate-700">$${parseFloat(p.amount).toFixed(2)}</td>
           <td class="p-3 text-center">
             <span class="px-2 py-1 rounded-full text-xs font-bold ${statusColor}">
               ${statusText}
@@ -522,6 +521,9 @@ async function loadPayments() {
       `;
     }).join('');
     
+    updatePaymentStatsAndChart(pagos);
+    updatePaymentsByMonthChart(pagos);
+    
     if (window.lucide) lucide.createIcons();
 
   } catch (e) {
@@ -530,6 +532,116 @@ async function loadPayments() {
   }
 }
 
+// --- Funciones auxiliares de Pagos (Gráficos y Stats) ---
+function updatePaymentStatsAndChart(pagos) {
+  // 1. Calcular totales
+  const totalCount = pagos.length;
+  const paidCount = pagos.filter(p => (p.status === 'paid' || p.status === 'efectivo')).length;
+  const pendingCount = pagos.filter(p => p.status === 'pending').length;
+  const totalAmount = pagos.reduce((sum, p) => sum + (parseFloat(p.amount) || 0), 0);
+  const cashCount = pagos.filter(p => p.method === 'efectivo').length;
+  const transfersCount = pagos.filter(p => p.method === 'transferencia').length;
+  const now = new Date();
+  const months = ['enero','febrero','marzo','abril','mayo','junio','julio','agosto','septiembre','octubre','noviembre','diciembre'];
+  const currentMonthName = months[now.getMonth()];
+  const monthAmount = pagos
+    .filter(p => (p.month_paid || '').toLowerCase() === currentMonthName)
+    .reduce((sum, p) => sum + (parseFloat(p.amount) || 0), 0);
+  const todayDay = now.getDate();
+  const overdueCount = pagos.filter(p => {
+    const isPending = p.status === 'pending';
+    const isThisMonth = (p.month_paid || '').toLowerCase() === currentMonthName;
+    const due = Number(p.student?.due_day) || null;
+    return isPending && isThisMonth && due && todayDay > due;
+  }).length;
+
+  // 2. Actualizar UI de Chips y Monto
+  const set = (id, txt) => { const el = document.getElementById(id); if(el) el.textContent = txt; };
+  set('paymentsTotal', `Total: ${totalCount}`);
+  set('paymentsPagados', `Pagados: ${paidCount}`);
+  set('paymentsPendientes', `Pendientes: ${pendingCount}`);
+  set('paymentsAmount', `$${totalAmount.toFixed(2)}`);
+  set('paymentsCash', `Efectivo: ${cashCount}`);
+  set('paymentsTransfers', `Transferencias: ${transfersCount}`);
+  set('paymentsOverdue', `Vencidos: ${overdueCount}`);
+  const monthEl = document.getElementById('paymentsMonthAmount');
+  if (monthEl) monthEl.textContent = `$${monthAmount.toFixed(2)}`;
+
+  // 3. Actualizar Gráfico
+  updatePaymentChart(paidCount, pendingCount);
+}
+
+let paymentChartInstance = null;
+function updatePaymentChart(paid, pending) {
+  if (typeof Chart === 'undefined') return;
+  
+  const canvas = document.getElementById('paymentsChart');
+  if (!canvas) return;
+
+  if (paymentChartInstance) {
+    paymentChartInstance.data.datasets[0].data = [paid, pending];
+    paymentChartInstance.update();
+    return;
+  }
+
+  const ctx = canvas.getContext('2d');
+  paymentChartInstance = new Chart(ctx, {
+    type: 'doughnut',
+    data: {
+      labels: ['Pagados', 'Pendientes'],
+      datasets: [{
+        data: [paid, pending],
+        backgroundColor: ['#22c55e', '#f97316'],
+        borderWidth: 0
+      }]
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      plugins: {
+        legend: { position: 'right' }
+      },
+      cutout: '70%'
+    }
+  });
+}
+
+let paymentsByMonthChart = null;
+function updatePaymentsByMonthChart(pagos) {
+  if (typeof Chart === 'undefined') return;
+  const canvas = document.getElementById('paymentsByMonthChart');
+  if (!canvas) return;
+  const labels = ['Ene','Feb','Mar','Abr','May','Jun','Jul','Ago','Sep','Oct','Nov','Dic'];
+  const map = new Array(12).fill(0);
+  pagos.forEach(p => {
+    const m = (p.month_paid || '').toLowerCase();
+    const idx = ['enero','febrero','marzo','abril','mayo','junio','julio','agosto','septiembre','octubre','noviembre','diciembre'].indexOf(m);
+    if (idx >= 0) map[idx] += parseFloat(p.amount) || 0;
+  });
+  if (paymentsByMonthChart) {
+    paymentsByMonthChart.data.datasets[0].data = map;
+    paymentsByMonthChart.update();
+    return;
+  }
+  const ctx = canvas.getContext('2d');
+  paymentsByMonthChart = new Chart(ctx, {
+    type: 'bar',
+    data: {
+      labels,
+      datasets: [{
+        label: 'Importe por mes',
+        data: map,
+        backgroundColor: '#3b82f6'
+      }]
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      scales: { y: { beginAtZero: true } },
+      plugins: { legend: { display: false } }
+    }
+  });
+}
 async function approvePayment(id) {
   if (!confirm('¿Confirmar pago recibido?')) return;
   
@@ -1013,6 +1125,57 @@ function initStudentController(){
       document.body.classList.remove('no-scroll');
     });
   });
+  
+  // EDITAR PERFIL DESDE PERFIL MODAL
+  const editBtn = document.getElementById('editStudentProfile');
+  if (editBtn) {
+    editBtn.addEventListener('click', async () => {
+      const supabase = await getSupabase();
+      if (!supabase) return;
+      const profileModal = qs('#studentProfileModal');
+      const id = profileModal?.dataset?.studentId;
+      if (!id) {
+        openModal('Aviso', 'No se pudo identificar el estudiante para editar.');
+        return;
+      }
+      try {
+        const { data: s, error } = await supabase.from('students').select('*').eq('id', id).single();
+        if (error) throw error;
+        // Abrir modal de edición/creación
+        const modal = qs('#modalAddStudent');
+        if (!modal) return;
+        modal.classList.remove('hidden');
+        // Poblar campos
+        const setVal = (id, val) => { const el = document.getElementById(id); if (el) el.value = val || ''; };
+        setVal('stName', s.name);
+        setVal('stAge', ''); // no en esquema
+        setVal('stSchedule', ''); // no en esquema
+        setVal('p1Name', s.p1_name);
+        setVal('p1Phone', s.p1_phone);
+        setVal('p1Email', s.p1_email);
+        setVal('p1Password', ''); // no mostrar
+        setVal('p2Name', s.p2_name);
+        setVal('p2Phone', s.p2_phone);
+        setVal('stAllergies', s.allergies);
+        setVal('stBlood', s.blood_type);
+        setVal('stMonthlyFee', s.monthly_fee);
+        setVal('stDueDay', s.due_day);
+        setVal('stPickup', s.authorized_pickup);
+        const activeChk = document.getElementById('stActive');
+        if (activeChk) activeChk.checked = !!s.is_active;
+        // Aulas
+        const sel = document.getElementById('stClassroom');
+        if (sel) {
+          const { data: rooms } = await supabase.from('classrooms').select('id,name').order('name');
+          sel.innerHTML = '<option value="">-- Seleccionar Aula --</option>' + (rooms||[]).map(r=>`<option value="${r.id}">${r.name}</option>`).join('');
+          sel.value = s.classroom_id || '';
+        }
+      } catch (e) {
+        console.error(e);
+        openModal('Error', e.message || 'No se pudo abrir la edición');
+      }
+    });
+  }
 
   // LÓGICA DE BÚSQUEDA
   const searchInput = document.getElementById('searchStudent');

@@ -18,6 +18,37 @@ body {
   overscroll-behavior: none;
 }
 
+/* Panel Padres: cabecera cielo con nubes suaves */
+.header-kids {
+  background:
+    radial-gradient(ellipse at top left, rgba(227,242,253,0.7), transparent 60%),
+    radial-gradient(ellipse at top right, rgba(227,242,253,0.6), transparent 60%);
+  border-radius: 1.25rem;
+  padding: 1rem;
+}
+
+/* Panel Padres: césped decorativo en el fondo */
+.bushes {
+  position: absolute;
+  left: 0; right: 0;
+  bottom: 0;
+  height: 60px;
+  background:
+    radial-gradient(circle at 10% 50%, #c6f6d5 15px, transparent 16px),
+    radial-gradient(circle at 25% 55%, #a7f3d0 18px, transparent 19px),
+    radial-gradient(circle at 40% 48%, #a7f3d0 16px, transparent 17px),
+    radial-gradient(circle at 55% 50%, #86efac 20px, transparent 21px),
+    radial-gradient(circle at 70% 52%, #86efac 16px, transparent 17px),
+    radial-gradient(circle at 85% 50%, #c6f6d5 18px, transparent 19px);
+  opacity: .6;
+  pointer-events: none;
+}
+
+/* Etiqueta de tutor (pill) en sidebar */
+.parent-tag {
+  backdrop-filter: blur(4px);
+}
+
 /* Accents on white cards */
 .card-white{ background:#fff; border:1px solid #e5e7eb; border-radius: 1rem; }
 .card-clean { background:#fff; border:1px solid #f1f5f9; border-radius: 0.75rem; box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.05); }
@@ -338,3 +369,90 @@ body.panel-asistente-body #sidebar {
   #layoutShell { margin: 0 !important; padding: 0 !important; }
   body { background: white; }
 }
+
+/* --- ESTILOS TARJETAS DE ESTUDIANTE (PASTEL) --- */
+.student-card-pastel {
+  border-radius: 1.5rem; /* 24px */
+  padding: 1.5rem; /* 24px */
+  text-align: center;
+  transition: all 0.3s ease;
+  position: relative;
+  border: 1px solid rgba(0,0,0,0.05);
+  box-shadow: 0 4px 6px -1px rgba(0,0,0,0.05), 0 2px 4px -1px rgba(0,0,0,0.03);
+}
+.student-card-pastel:hover {
+  transform: translateY(-6px);
+  box-shadow: 0 10px 15px -3px rgba(0,0,0,0.1), 0 4px 6px -2px rgba(0,0,0,0.05);
+}
+.student-card-avatar {
+  width: 80px;
+  height: 80px;
+  border-radius: 9999px;
+  margin: 0 auto 1rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 2.25rem; /* 36px */
+  font-weight: 900; /* black */
+  color: white;
+  text-shadow: 0 2px 4px rgba(0,0,0,0.1);
+  border: 4px solid white;
+  box-shadow: 0 0 0 4px var(--pastel-color, #ccc);
+}
+.student-card-name {
+  font-size: 1.125rem; /* 18px */
+  font-weight: 700; /* bold */
+  color: #1e293b; /* slate-800 */
+  margin-bottom: 0.25rem;
+}
+.student-card-meta {
+  font-size: 0.75rem; /* 12px */
+  color: #64748b; /* slate-500 */
+  margin-bottom: 1rem;
+}
+.student-card-button {
+  width: 100%;
+  padding: 0.75rem 1rem;
+  border-radius: 0.75rem; /* 12px */
+  font-weight: 600; /* semibold */
+  color: white;
+  background-color: var(--pastel-color, #94a3b8);
+  transition: background-color 0.2s;
+  box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+}
+.student-card-button:hover {
+  background-color: var(--pastel-color-dark, #64748b);
+}
+
+/* Color Variants */
+.student-card-pastel.pastel-blue { --pastel-color: #7dd3fc; --pastel-color-dark: #38bdf8; background-color: #f0f9ff; } /* sky-300, sky-50 */
+.student-card-pastel.pastel-green { --pastel-color: #86efac; --pastel-color-dark: #4ade80; background-color: #f0fdf4; } /* green-300, green-50 */
+.student-card-pastel.pastel-pink { --pastel-color: #f9a8d4; --pastel-color-dark: #f472b6; background-color: #fdf2f8; } /* pink-300, pink-50 */
+.student-card-pastel.pastel-yellow { --pastel-color: #fde047; --pastel-color-dark: #facc15; background-color: #fefce8; } /* yellow-300, yellow-50 */
+.student-card-pastel.pastel-purple { --pastel-color: #c4b5fd; --pastel-color-dark: #a78bfa; background-color: #f5f3ff; } /* violet-300, violet-50 */
+
+.student-card-pastel.pastel-blue .student-card-avatar { background-color: #38bdf8; }
+.student-card-pastel.pastel-green .student-card-avatar { background-color: #4ade80; }
+.student-card-pastel.pastel-pink .student-card-avatar { background-color: #f472b6; }
+.student-card-pastel.pastel-yellow .student-card-avatar { background-color: #facc15; }
+.student-card-pastel.pastel-purple .student-card-avatar { background-color: #a78bfa; }
+
+/* --- ESTILOS FICHA ESCOLAR (MODAL PERFIL) --- */
+.school-record-card { background-color: #f8fafc; border-radius: 1.5rem; box-shadow: 0 20px 25px -5px rgba(0,0,0,0.1), 0 10px 10px -5px rgba(0,0,0,0.04); border: 1px solid #e2e8f0; overflow: hidden; }
+.record-header { background-color: white; padding: 1.5rem; display: flex; align-items: center; gap: 1.5rem; border-bottom: 1px solid #e2e8f0; position: relative; }
+.record-photo { width: 80px; height: 80px; border-radius: 9999px; background-color: #e0e7ff; color: #4338ca; display: flex; align-items: center; justify-content: center; flex-shrink: 0; border: 4px solid white; box-shadow: 0 0 0 1px #c7d2fe; }
+.record-title { font-size: 1.5rem; font-weight: 800; color: #1e293b; line-height: 1.2; }
+.record-subtitle { font-size: 0.875rem; font-weight: 600; color: #4f46e5; margin-top: 0.25rem; }
+.record-close-btn { position: absolute; top: 1rem; right: 1rem; padding: 0.5rem; border-radius: 9999px; color: #94a3b8; background-color: transparent; transition: all 0.2s; }
+.record-close-btn:hover { background-color: #f1f5f9; color: #475569; transform: rotate(90deg); }
+.record-body { padding: 1.5rem; overflow-y: auto; display: flex; flex-direction: column; gap: 1.5rem; }
+.record-section { background-color: white; padding: 1.25rem; border-radius: 1rem; border: 1px solid #e2e8f0; }
+.record-section-title { display: flex; align-items: center; gap: 0.75rem; font-size: 1rem; font-weight: 700; color: #334155; margin-bottom: 1.25rem; padding-bottom: 0.75rem; border-bottom: 1px dashed #e2e8f0; }
+.record-section-title i { width: 20px; height: 20px; color: #64748b; }
+.record-subsection { background-color: #f8fafc; padding: 1rem; border-radius: 0.75rem; border: 1px solid #f1f5f9; }
+.record-subsection-title { font-weight: 600; color: #475569; font-size: 0.875rem; margin-bottom: 0.75rem; }
+.record-grid { display: grid; grid-template-columns: repeat(1, minmax(0, 1fr)); gap: 1rem; }
+@media (min-width: 640px) { .record-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+.record-item label { display: block; font-size: 0.75rem; font-weight: 500; color: #64748b; margin-bottom: 0.25rem; }
+.record-item p { font-size: 0.875rem; font-weight: 600; color: #1e293b; }
+.record-footer { padding: 1rem 1.5rem; background-color: white; border-top: 1px solid #e2e8f0; display: flex; justify-content: flex-end; }

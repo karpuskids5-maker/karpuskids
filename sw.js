@@ -13,10 +13,14 @@ self.addEventListener('fetch',e=>{
     caches.match(e.request).then(res=>{
       if(res)return res;
       return fetch(e.request).then(r=>{
-        if(r&&r.type==='basic'){
-          const copy=r.clone();
-          caches.open(CACHE_NAME).then(c=>c.put(e.request,copy));
-        }
+        // Solo cachear respuestas completas 200 (no parciales 206) y mismas origen
+        try{
+          const isRange = e.request.headers && e.request.headers.get && e.request.headers.get('range');
+          if(r && r.type==='basic' && r.ok && r.status===200 && !isRange){
+            const copy=r.clone();
+            caches.open(CACHE_NAME).then(c=>c.put(e.request,copy)).catch(()=>{});
+          }
+        }catch(_){}
         return r;
       }).catch(()=>caches.match('/panel_padres.html'))
     })

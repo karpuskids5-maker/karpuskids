@@ -425,3 +425,62 @@ drop policy if exists "Usuarios marcan leida" on public.notifications;
 create policy "Usuarios marcan leida" on public.notifications for update using (
   auth.uid() = user_id
 );
+
+
+-- 1. RPC: Reporte Financiero Mensual por Aula (Optimizado para gráficas)
+create or replace function public.get_monthly_financial_report_by_classroom(p_month text)
+returns table (
+  classroom_name text,
+  total_expected numeric,
+  total_paid numeric,
+  total_pending numeric
+)
+language plpgsql
+security definer
+as $$
+begin
+  return query
+  select 
+    c.name as classroom_name,
+    coalesce(sum(p.amount), 0) as total_expected,
+    coalesce(sum(case when p.status = 'paid' or p.status = 'efectivo' then p.amount else 0 end), 0) as total_paid,
+    coalesce(sum(case when p.status = 'pending' then p.amount else 0 end), 0) as total_pending
+  from classrooms c
+  left join students s on s.classroom_id = c.id
+  left join payments p on p.student_id = s.id and p.month_paid = p_month
+  group by c.name
+  order by c.name;
+end;
+$$;
+
+-- 2. RPC: KPIs del Dashboard (Todos los contadores en una sola llamada)
+create or replace function public.get_dashboard_kpis()
+returns jsonb
+language plpgsql
+security definer
+as $$
+declare
+  v_total_students int;
+  v_total_teachers int;
+  v_active_classrooms int;
+  v_attendance_today int;
+  v_pending_payments numeric;
+  v_active_incidents int;
+begin
+  select count(*) into v_total_students from students where is_active = true;
+  select count(*) into v_total_teachers from profiles where role = 'maestra';
+  select count(*) into v_active_classrooms from classrooms;
+  select count(*) into v_attendance_today from attendance where date = current_date and status = 'present';
+  select coalesce(sum(amount), 0) into v_pending_payments from payments where status = 'pending';
+  select count(*) into v_active_incidents from inquiries where status = 'pending';
+
+  return jsonb_build_object(
+    'total_students', v_total_students,
+    'total_teachers', v_total_teachers,
+    'active_classrooms', v_active_classrooms,
+    'attendance_today', v_attendance_today,
+    'pending_payments', v_pending_payments,
+    'active_incidents', v_active_incidents
+  );
+end;
+$$;

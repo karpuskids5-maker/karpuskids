@@ -1,5 +1,4 @@
 
-
 import { supabase } from './supabase.js';
 
 // ===== CONSTANTES ESTÁNDAR =====
@@ -238,8 +237,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   setupScrollToTop();
 
   // ✅ Listeners para perfil y reportes
-  document.getElementById('btnSaveStudentProfile')?.addEventListener('click', saveStudentProfile);
-  document.getElementById('btnSaveGuardianProfile')?.addEventListener('click', saveGuardianProfile);
+  document.getElementById('btnSaveChanges')?.addEventListener('click', saveAllProfile);
   document.getElementById('btnDownloadReport')?.addEventListener('click', () => window.print());
   
   // ✅ Botón de refresco manual
@@ -250,6 +248,34 @@ document.addEventListener('DOMContentLoaded', async () => {
   
   // ✅ Cargar sección inicial
   setActiveSection('home');
+  loadDashboard();
+  
+  // Acciones principales
+  document.getElementById('btnPayTuition')?.addEventListener('click', async (e) => {
+    e.preventDefault();
+    setActiveSection('payments');
+    const userState = AppState.get('user');
+    const email = userState && userState.email;
+    if (!email) {
+      Helpers.toast('No se encontró un correo asociado a tu cuenta.', 'error');
+      return;
+    }
+    const student = AppState.get('student');
+    const studentName = student ? `${student.first_name || ''} ${student.last_name || ''}`.trim() : '';
+    const subject = studentName ? `Información de pago de ${studentName}` : 'Información de pago de mensualidad';
+    const text = 'Te enviamos la información de tu pago de mensualidad desde el panel de Karpus.';
+    try {
+      const res = await fetch('http://127.0.0.1:5600/api/parents/email', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ to: email, subject, text })
+      });
+      if (!res.ok) throw new Error('HTTP ' + res.status);
+      Helpers.toast('Se envió un correo con la información de pago.', 'success');
+    } catch (err) {
+      Helpers.toast('No se pudo enviar el correo de pago.', 'error');
+    }
+  });
 });
 
 // ===== NAVEGACIÓN Y GESTIÓN DE SECCIONES =====
@@ -325,11 +351,11 @@ function loadSectionData(sectionId) {
     home: loadDashboard,
     'live-attendance': loadAttendance,
     tasks: loadTasks,
-    class: loadClassFeed,
     grades: loadGrades,
-    payments: loadPayments,
-    notifications: loadNotifications,
-    profile: populateProfile
+    class: loadClassFeed,
+    payments: () => loadPayments(),
+    notifications: async () => { await loadNotifications(); setupChatHandlers(); },
+    profile: async () => { await populateProfile(); }
   };
   
   const loader = loaders[sectionId];
@@ -354,6 +380,104 @@ function loadSectionData(sectionId) {
   }
 }
 
+async function submitPaymentProof(e) {
+  e.preventDefault();
+  const student = AppState.get('student');
+  if (!student) return;
+  const file = document.getElementById('paymentFileInput').files[0];
+  const amount = parseFloat(document.getElementById('paymentAmount').value || '0');
+  const month_paid = document.getElementById('paymentMonth').value.trim();
+  const method = document.getElementById('paymentMethod').value;
+  if (!file || !amount || !month_paid) {
+    Helpers.toast('Completa todos los campos', 'error');
+    return;
+  }
+  try {
+    const ext = file.name.split('.').pop();
+    const name = `transfer_${student.id}_${Date.now()}.${ext}`;
+    const { error: upErr } = await supabase.storage.from('classroom_media').upload(`payments/${name}`, file);
+    if (upErr) throw upErr;
+    const { data: { publicUrl } } = supabase.storage.from('classroom_media').getPublicUrl(`payments/${name}`);
+    const { error } = await supabase.from('payments').insert({
+      student_id: student.id,
+      amount,
+      month_paid,
+      method,
+      proof_url: publicUrl,
+      status: 'pendiente'
+    });
+    if (error) throw error;
+    Helpers.toast('Comprobante enviado', 'success');
+    loadPayments();
+    document.getElementById('paymentForm').reset();
+  } catch (err) {
+    console.error(err);
+    Helpers.toast('Error enviando comprobante', 'error');
+  }
+}
+
+function setupChatHandlers() {
+  const btnDir = document.getElementById('btnSendDirector');
+  const btnTea = document.getElementById('btnSendTeacher');
+  if (btnDir) btnDir.onclick = () => sendChatMessage('director');
+  if (btnTea) btnTea.onclick = () => sendChatMessage('maestra');
+}
+
+async function loadChat(role) {
+  const student = AppState.get('student');
+  if (!student) return;
+  const listId = role === 'director' ? 'chatDirectorList' : 'chatTeacherList';
+  const list = document.getElementById(listId);
+  if (!list) return;
+  list.innerHTML = '<div class="text-center text-xs text-slate-400 py-2">Cargando...</div>';
+  try {
+    const { data } = await supabase
+      .from('messages')
+      .select('content, created_at, from:profiles(name)')
+      .eq('student_id', student.id)
+      .eq('to_role', role)
+      .order('created_at', { ascending: true });
+    list.innerHTML = (data || []).map(m => `
+      <div class="flex gap-2 text-sm">
+        <div class="font-bold text-slate-700">${escapeHtml(m.from?.name || 'Usuario')}:</div>
+        <div class="text-slate-600">${escapeHtml(m.content)}</div>
+      </div>
+    `).join('') || '<div class="text-center text-xs text-slate-400 py-2">Sin mensajes</div>';
+  } catch (e) {
+    list.innerHTML = '<div class="text-center text-xs text-slate-400 py-2">Error cargando chat</div>';
+  }
+}
+
+async function sendChatMessage(role) {
+  const inputId = role === 'director' ? 'chatDirectorInput' : 'chatTeacherInput';
+  const input = document.getElementById(inputId);
+  const text = input?.value.trim();
+  if (!text) return;
+  try {
+    const user = AppState.get('user');
+    const student = AppState.get('student');
+    const { error } = await supabase.from('messages').insert({
+      student_id: student.id,
+      from_id: user.id,
+      to_role: role,
+      content: text
+    });
+    if (!error) {
+      input.value = '';
+      loadChat(role);
+      Helpers.toast('Mensaje enviado', 'success');
+    }
+  } catch (e) {
+    Helpers.toast('No se pudo enviar', 'error');
+  }
+}
+
+document.addEventListener('DOMContentLoaded', () => {
+  const form = document.getElementById('paymentForm');
+  if (form) form.addEventListener('submit', submitPaymentProof);
+  loadChat('director');
+  loadChat('maestra');
+});
 // ===== CIERRE DE SESIÓN SEGURO =====
 async function handleLogout() {
   try {
@@ -486,8 +610,8 @@ function updateStudentUI(student) {
   if (sidebarAvatar) sidebarAvatar.src = avatarUrl;
   const preview = document.getElementById('studentAvatarPreview');
   if (preview) preview.innerHTML = `<img src="${avatarUrl}" class="w-full h-full object-cover">`;
-  const headerAvatar = document.getElementById('headerAvatar');
-  if (headerAvatar) headerAvatar.innerHTML = `<img src="${avatarUrl}" alt="Avatar" class="w-12 h-12 rounded-full object-cover border-4 border-white">`;
+  const headerAvatar = document.getElementById('headerStudentAvatar');
+  if (headerAvatar) headerAvatar.innerHTML = `<img src="${avatarUrl}" alt="Avatar" class="w-full h-full object-cover">`;
 }
 
 // ===== TAREAS CON DELEGACIÓN DE EVENTOS =====
@@ -577,7 +701,7 @@ function renderTaskCard(task, evidenceMap) {
   // ✅ 3. TAREAS ENTREGADAS → LEGO / BLOQUES
   if (isDelivered) {
     return `
-    <article class="lego-task group transition-transform hover:-translate-y-1" aria-labelledby="task-title-${task.id}">
+    <article class="notebook-card group transition-transform hover:-translate-y-1 p-4 rounded-xl" aria-labelledby="task-title-${task.id}">
       <div class="flex flex-col sm:flex-row sm:justify-between sm:items-start gap-3 relative z-10">
         <div>
           <h3 id="task-title-${task.id}" class="font-bold text-lg text-white drop-shadow-sm">${escapeHtml(task.title)}</h3>
@@ -621,7 +745,7 @@ function renderTaskCard(task, evidenceMap) {
   const dateColor = isOverdue ? 'text-rose-600 font-bold' : 'text-slate-500';
 
   return `
-  <article class="notebook-task group" aria-labelledby="task-title-${task.id}">
+  <article class="notebook-card group p-4 rounded-xl" aria-labelledby="task-title-${task.id}">
     <div class="flex flex-col sm:flex-row sm:justify-between sm:items-start gap-3">
       <div>
         <h3 id="task-title-${task.id}" class="font-bold text-slate-800 text-lg group-hover:text-blue-600 transition-colors" style="font-family: 'Comic Sans MS', 'Chalkboard SE', sans-serif;">${escapeHtml(task.title)}</h3>
@@ -792,6 +916,7 @@ async function submitTask(taskId) {
       if (dbError) throw dbError;
 
       Helpers.toast('Tarea enviada con éxito', 'success');
+      triggerConfetti(); // 🎉 Animación de celebración
       document.getElementById('modalTaskDetail').classList.add('hidden');
       document.getElementById('modalTaskDetail').classList.remove('flex');
       loadTasks(document.querySelector('.task-filter-btn.font-bold')?.dataset.filter || 'pending');
@@ -802,6 +927,15 @@ async function submitTask(taskId) {
        btn.disabled = false;
        btn.textContent = originalText;
     }
+}
+
+// ✅ Animación de Confeti
+function triggerConfetti() {
+  if (typeof confetti === 'function') {
+    confetti({ particleCount: 100, spread: 70, origin: { y: 0.6 } });
+    setTimeout(() => confetti({ particleCount: 50, angle: 60, spread: 55, origin: { x: 0 } }), 250);
+    setTimeout(() => confetti({ particleCount: 50, angle: 120, spread: 55, origin: { x: 1 } }), 400);
+  }
 }
 
 // ===== MEJORAS ADICIONALES CLAVE =====
@@ -1017,9 +1151,9 @@ function setupProfilePhotoUpload() {
       if (sidebarAvatar) {
         sidebarAvatar.src = publicUrl;
       }
-      const headerAvatar = document.getElementById('headerAvatar');
+      const headerAvatar = document.getElementById('headerStudentAvatar');
       if (headerAvatar) {
-        headerAvatar.innerHTML = `<img src="${publicUrl}" alt="Avatar" class="w-12 h-12 rounded-full object-cover border-4 border-white">`;
+        headerAvatar.innerHTML = `<img src="${publicUrl}" alt="Avatar" class="w-full h-full object-cover">`;
       }
       
     } catch (err) {
@@ -1042,17 +1176,13 @@ async function loadDashboard() {
     const today = new Date().toISOString().split('T')[0];
 
     // ✅ Solicitudes en paralelo para rendimiento
-    const [attRes, pendingRes, deliveredRes, gradesRes, paymentsRes] = await Promise.all([
+    const [attRes, pendingRes, deliveredRes] = await Promise.all([
         // 1. Asistencia HOY
         supabase.from(TABLES.ATTENDANCE).select('status').eq('student_id', student.id).eq('date', today).maybeSingle(),
         // 2. Tareas Pendientes (> hoy)
         supabase.from(TABLES.TASKS).select('*', { count: 'exact', head: true }).eq('classroom_id', student.classroom_id).gt('due_date', new Date().toISOString()),
         // 3. Tareas Entregadas
-        supabase.from(TABLES.TASK_EVIDENCES).select('*', { count: 'exact', head: true }).eq('student_id', student.id),
-        // 4. Calificaciones (para promedio)
-        supabase.from(TABLES.GRADES).select('score').eq('student_id', student.id),
-        // 5. Pagos (para estado)
-        supabase.from('payments').select('status, created_at').eq('student_id', student.id).order('created_at', { ascending: false }).limit(1)
+        supabase.from(TABLES.TASK_EVIDENCES).select('*', { count: 'exact', head: true }).eq('student_id', student.id)
     ]);
 
     // ✅ Procesamiento de datos
@@ -1060,32 +1190,21 @@ async function loadDashboard() {
     // Asistencia
     const attStatus = attRes.data?.status;
     let attText = 'Sin registro';
-    let attTheme = 'slate';
-    if (attStatus === 'present') { attText = 'Presente'; attTheme = 'green'; }
-    else if (attStatus === 'absent') { attText = 'Ausente'; attTheme = 'rose'; }
-    else if (attStatus === 'late') { attText = 'Tardanza'; attTheme = 'amber'; }
+    let attTheme = 'card-slate';
+    if (attStatus === 'present') { attText = 'Presente'; attTheme = 'card-green'; }
+    else if (attStatus === 'absent') { attText = 'Ausente'; attTheme = 'card-red'; }
+    else if (attStatus === 'late') { attText = 'Tardanza'; attTheme = 'card-yellow'; }
     
-    // Promedio
-    const grades = gradesRes.data || [];
-    const avg = grades.length > 0 
-        ? (grades.reduce((sum, g) => sum + Number(g.score), 0) / grades.length).toFixed(1) 
-        : '-';
+    // Promedio y pagos removidos del dashboard por requerimiento
 
-    // Pagos
-    const lastPayment = paymentsRes.data?.[0];
-    const paymentStatus = lastPayment?.status === 'confirmado' ? 'Al día' : (lastPayment ? 'Pendiente' : 'Sin pagos');
-    const paymentTheme = lastPayment?.status === 'confirmado' ? 'emerald' : 'orange';
-
-    // ✅ Mapeo de Temas Seguro
+    // ✅ Mapeo de Temas Seguro (Tarjetas Blancas con Iconos de Color)
     const themeMap = {
-        green:   { bg: 'bg-emerald-100', text: 'text-emerald-600', decoration: 'bg-emerald-50' },
-        rose:    { bg: 'bg-rose-100',    text: 'text-rose-600',    decoration: 'bg-rose-50' },
-        amber:   { bg: 'bg-amber-100',   text: 'text-amber-600',   decoration: 'bg-amber-50' },
-        blue:    { bg: 'bg-blue-100',    text: 'text-blue-600',    decoration: 'bg-blue-50' },
-        purple:  { bg: 'bg-violet-100',  text: 'text-violet-600',  decoration: 'bg-violet-50' },
-        emerald: { bg: 'bg-emerald-100', text: 'text-emerald-600', decoration: 'bg-emerald-50' },
-        orange:  { bg: 'bg-orange-100',  text: 'text-orange-600',  decoration: 'bg-orange-50' },
-        slate:   { bg: 'bg-slate-100',   text: 'text-slate-600',   decoration: 'bg-slate-50' }
+        'card-green':  { iconBg: 'bg-emerald-100', iconText: 'text-emerald-600', border: 'border-emerald-400', decoration: 'bg-emerald-50' },
+        'card-red':    { iconBg: 'bg-rose-100',    iconText: 'text-rose-600',    border: 'border-rose-400',    decoration: 'bg-rose-50' },
+        'card-yellow': { iconBg: 'bg-amber-100',   iconText: 'text-amber-600',   border: 'border-amber-400',   decoration: 'bg-amber-50' },
+        'card-blue':   { iconBg: 'bg-blue-100',    iconText: 'text-blue-600',    border: 'border-blue-400',    decoration: 'bg-blue-50' },
+        'card-purple': { iconBg: 'bg-violet-100',  iconText: 'text-violet-600',  border: 'border-violet-400',  decoration: 'bg-violet-50' },
+        'card-slate':  { iconBg: 'bg-slate-100',   iconText: 'text-slate-600',   border: 'border-slate-400',   decoration: 'bg-slate-50' }
     };
 
     // ✅ Configuración de Tarjetas
@@ -1101,54 +1220,39 @@ async function loadDashboard() {
             title: 'Tareas Pendientes',
             value: pendingRes.count || 0,
             icon: 'clipboard-list',
-            theme: 'blue',
+            theme: 'card-red', // Rojo solicitado
             sub: 'Por entregar'
         },
         {
             title: 'Tareas Entregadas',
             value: deliveredRes.count || 0,
             icon: 'check-circle-2',
-            theme: 'purple',
+            theme: 'card-yellow', // Amarillo solicitado
             sub: 'Total enviado'
-        },
-        {
-            title: 'Promedio General',
-            value: avg,
-            icon: 'graduation-cap',
-            theme: 'amber',
-            sub: 'Calificación actual'
-        },
-        {
-            title: 'Estado de Pagos',
-            value: paymentStatus,
-            icon: 'wallet',
-            theme: paymentTheme,
-            sub: lastPayment ? `Último: ${new Date(lastPayment.created_at).toLocaleDateString()}` : '—'
         }
     ];
 
     // ✅ Renderizado
     container.innerHTML = cards.map(card => {
-        const t = themeMap[card.theme] || themeMap.slate;
+        const t = themeMap[card.theme] || themeMap['card-slate'];
         
         return `
-        <div class="toy-card ${card.theme} group cursor-default relative overflow-hidden">
-            <div class="flex justify-between items-start mb-4 relative z-10">
-                <div class="p-3 rounded-2xl ${t.bg} ${t.text} shadow-sm transform group-hover:scale-110 transition-transform duration-300">
+        <div class="card-base dashboard-card bg-white group cursor-default relative overflow-hidden border-b-4 ${t.border}">
+            <div class="flex justify-between items-start mb-4 relative z-10 px-1">
+                <div class="p-3 rounded-2xl ${t.iconBg} ${t.iconText} shadow-sm transform group-hover:scale-110 transition-transform duration-300">
                     <i data-lucide="${card.icon}" class="w-8 h-8"></i>
                 </div>
                 <div class="text-right">
-                    <span class="text-3xl font-black text-slate-700 tracking-tighter drop-shadow-sm group-hover:${t.text} transition-colors">${card.value}</span>
+                    <span class="text-4xl font-black text-slate-800 tracking-tighter drop-shadow-sm">${card.value}</span>
                 </div>
             </div>
             <div class="relative z-10">
                 <h3 class="text-lg font-bold text-slate-800 leading-tight">${card.title}</h3>
-                <p class="text-xs text-slate-400 font-bold uppercase tracking-widest mt-1">${card.sub}</p>
+                <p class="text-[10px] text-slate-500 font-bold uppercase tracking-widest mt-1">${card.sub}</p>
             </div>
             
-            <!-- Decoración de Fondo (Studs) -->
-            <div class="absolute -bottom-6 -right-6 w-24 h-24 ${t.decoration} rounded-full opacity-50 group-hover:scale-150 transition-transform duration-500"></div>
-            <div class="absolute top-1/2 left-1/2 w-full h-full ${t.decoration} opacity-0 group-hover:opacity-10 transition-opacity duration-300 rounded-full blur-2xl"></div>
+            <!-- Decoración de Fondo -->
+            <div class="absolute -bottom-6 -right-6 w-24 h-24 ${t.decoration} rounded-full opacity-40 group-hover:scale-150 transition-transform duration-500"></div>
         </div>
         `;
     }).join('');
@@ -1497,7 +1601,7 @@ async function loadGrades() {
           `).join('');
 
           return `
-            <div class="toy-card ${theme.name} flex flex-col justify-between h-full group hover:z-10">
+            <div class="card-base progress-card flex flex-col justify-between h-full group hover:z-10">
               <div>
                 <div class="flex justify-between items-start mb-4">
                   <div class="p-3 rounded-2xl ${theme.bg} ${theme.text} shadow-sm transform group-hover:scale-110 transition-transform">
@@ -1541,6 +1645,11 @@ async function loadPayments() {
   container.innerHTML = Helpers.skeleton(3, 'h-20');
   const student = AppState.get('student');
   if (!student) return;
+  
+  const feeEl = document.getElementById('paymentsMonthlyFee');
+  if (feeEl) feeEl.textContent = `$${((student.monthly_fee || 0)).toFixed(2)}`;
+  const dueEl = document.getElementById('paymentsDueDay');
+  if (dueEl) dueEl.textContent = student.due_day ? String(student.due_day) : '-';
 
   const year = new Date().getFullYear();
 
@@ -1664,8 +1773,9 @@ async function populateProfile() {
   };
   
   setVal('inputStudentName', student.name);
-  setVal('inputStudentAddress', ''); // No en schema
   setVal('inputStudentBirth', student.birth_date);
+  setVal('inputStudentBlood', student.blood_type);
+  setVal('inputStudentAllergy', student.allergies);
   
   setVal('profileFatherName', student.p1_name);
   setVal('profileFatherPhone', student.p1_phone);
@@ -1673,6 +1783,7 @@ async function populateProfile() {
   
   setVal('profileMotherName', student.p2_name);
   setVal('profileMotherPhone', student.p2_phone);
+  setVal('profileMotherEmail', student.p2_email); // Nuevo campo
   
   setVal('profilePickupName', student.authorized_pickup);
   
@@ -1680,42 +1791,44 @@ async function populateProfile() {
   if(window.lucide) lucide.createIcons();
 }
 
-// ✅ Funciones para guardar perfil
-async function saveStudentProfile() {
+// ✅ Función unificada para guardar perfil
+async function saveAllProfile() {
   const student = AppState.get('student');
   if(!student) return;
   
-  const birthDate = document.getElementById('inputStudentBirth').value;
-  const updates = {
-    name: document.getElementById('inputStudentName').value,
-    birth_date: birthDate || null, // Enviar null si está vacío para evitar error 400
-    // address no está en schema students, quizás en p1_address
-  };
-  
-  const { error } = await supabase.from(TABLES.STUDENTS).update(updates).eq('id', student.id);
-  
-  if(error) Helpers.toast('Error al guardar datos', 'error');
-  else Helpers.toast('Datos del estudiante actualizados', 'success');
-}
+  const btn = document.getElementById('btnSaveChanges');
+  const originalText = btn.textContent;
+  btn.disabled = true;
+  btn.textContent = 'Guardando...';
 
-async function saveGuardianProfile() {
-  const student = AppState.get('student');
-  if(!student) return;
+  const birthDate = document.getElementById('inputStudentBirth').value;
   
   const updates = {
+    // Estudiante
+    name: document.getElementById('inputStudentName').value,
+    birth_date: birthDate || null,
+    blood_type: document.getElementById('inputStudentBlood')?.value.trim() || null,
+    allergies: document.getElementById('inputStudentAllergy')?.value.trim() || null,
+    // Padres
     p1_name: document.getElementById('profileFatherName').value.trim() || null,
     p1_phone: document.getElementById('profileFatherPhone').value.trim() || null,
     p1_email: document.getElementById('profileFatherEmail').value.trim() || null,
     p2_name: document.getElementById('profileMotherName').value.trim() || null,
     p2_phone: document.getElementById('profileMotherPhone').value.trim() || null,
+    p2_email: document.getElementById('profileMotherEmail').value.trim() || null,
     authorized_pickup: document.getElementById('profilePickupName').value.trim() || null
   };
   
   const { error } = await supabase.from(TABLES.STUDENTS).update(updates).eq('id', student.id);
   
-  if(error) Helpers.toast('Error al guardar datos', 'error');
-  else {
-    Helpers.toast('Información familiar actualizada', 'success');
+  if(error) {
+    Helpers.toast('Error al guardar datos', 'error');
+  } else {
+    Helpers.toast('Perfil actualizado correctamente', 'success');
     loadStudentData(); // Recargar para actualizar estado local
   }
+  
+  btn.disabled = false;
+  btn.textContent = originalText;
+  if(window.lucide) lucide.createIcons();
 }

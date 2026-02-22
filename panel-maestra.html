@@ -322,13 +322,119 @@
   </div>
 
   <!-- MODAL: Student Profile (Copied from panel_directora.html) -->
-  <div id="studentProfileModal" class="fixed inset-0 bg-black bg-opacity-50 hidden flex items-center justify-center z-50">
-    <div class="bg-white rounded-lg shadow-xl max-w-2xl w-full mx-4 max-h-[90vh] overflow-y-auto">
-      <div class="p-6">
-        <div class="flex items-center justify-between mb-6">
-          <h3 class="text-xl font-semibold text-slate-800">Perfil del Estudiante</h3>
-          <button id="closeStudentProfileModal" class="text-slate-400 hover:text-slate-600">
-            <i data-lucide="x" class="w-6 h-6"></i>
+  <div id="studentProfileModal" class="fixed inset-0 bg-black/60 hidden items-center justify-center z-50 p-4 backdrop-blur-sm">
+    <!-- Ficha Escolar -->
+    <div class="school-record-card w-full max-w-2xl max-h-[90vh] flex flex-col">
+      <!-- Encabezado de la Ficha -->
+      <div class="record-header">
+        <div class="record-photo">
+          <!-- La foto se puede poner con JS o dejar un ícono -->
+          <i data-lucide="user" class="w-12 h-12"></i>
+        </div>
+        <div class="flex-1">
+          <h3 id="studentProfileName" class="record-title">Nombre del Estudiante</h3>
+          <p id="studentClassroom" class="record-subtitle">Aula Asignada</p>
+        </div>
+        <button id="closeStudentProfileModal" class="record-close-btn">
+          <i data-lucide="x" class="w-5 h-5"></i>
+        </button>
+      </div>
+
+      <!-- Cuerpo de la Ficha (con scroll) -->
+      <div class="record-body">
+        <!-- Sección Datos Personales -->
+        <div class="record-section">
+          <h4 class="record-section-title">
+            <i data-lucide="clipboard-user"></i>
+            <span>Datos Personales</span>
+          </h4>
+          <div class="record-grid">
+            <div class="record-item">
+              <label>Fecha de Nacimiento</label>
+              <p id="studentDOB">-</p>
+            </div>
+            <div class="record-item">
+              <label>Tipo de Sangre</label>
+              <p id="studentBlood">-</p>
+            </div>
+          </div>
+        </div>
+
+        <!-- Sección Información de Contacto -->
+        <div class="record-section">
+          <h4 class="record-section-title">
+            <i data-lucide="users"></i>
+            <span>Información de Contacto (Padres)</span>
+          </h4>
+          <!-- Contacto 1 -->
+          <div class="record-subsection">
+            <h5 class="record-subsection-title">Contacto Principal</h5>
+            <div class="record-grid">
+              <div class="record-item">
+                <label>Nombre</label>
+                <p id="parent1Name">-</p>
+              </div>
+              <div class="record-item">
+                <label>Teléfono</label>
+                <p id="parent1Phone">-</p>
+              </div>
+              <div class="record-item col-span-2">
+                <label>Email</label>
+                <p id="parent1Email">-</p>
+              </div>
+            </div>
+          </div>
+          <!-- Contacto 2 -->
+          <div class="record-subsection mt-4">
+            <h5 class="record-subsection-title">Contacto Secundario</h5>
+            <div class="record-grid">
+              <div class="record-item">
+                <label>Nombre</label>
+                <p id="parent2Name">-</p>
+              </div>
+              <div class="record-item">
+                <label>Teléfono</label>
+                <p id="parent2Phone">-</p>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Sección Médica y Autorizaciones -->
+        <div class="record-section">
+          <h4 class="record-section-title">
+            <i data-lucide="shield-plus"></i>
+            <span>Información Médica y Autorizaciones</span>
+          </h4>
+          <div class="record-grid">
+            <div class="record-item col-span-2">
+              <label>Alergias / Condiciones Médicas</label>
+              <p id="studentAllergies" class="text-amber-700 font-semibold">Ninguna reportada</p>
+            </div>
+            <div class="record-item col-span-2">
+              <label>Personas Autorizadas para Recoger</label>
+              <p id="studentPickup">-</p>
+            </div>
+          </div>
+        </div>
+      </div>
+      
+      <!-- Pie de la Ficha -->
+      <div class="record-footer">
+        <button id="closeStudentProfile" class="px-5 py-2 border rounded-lg text-sm font-semibold hover:bg-slate-50 transition-colors">
+          Cerrar
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <script type="module" src="js/panel_maestra.js"></script>
+  <script>
+    // Lucide icons fallback
+    if(window.lucide) lucide.createIcons();
+  </script>
+</body>
+</html>
           </button>
         </div>
         

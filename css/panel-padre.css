@@ -1,23 +1,297 @@
 /* Panel Padre overrides */
 /* Marca Karpus en el sidebar con letras de colores */
-.sidebar-brand .karpus-kids-inline { font-weight: 800; letter-spacing: 0.5px; }
-.sidebar-brand .k-1 { color: #FF9800; }
-.sidebar-brand .k-2 { color: #2196F3; }
-.sidebar-brand .k-3 { color: #E91E63; }
-.sidebar-brand .k-4 { color: #4CAF50; }
-.sidebar-brand .k-5 { color: #FF9800; }
-.sidebar-brand .k-6 { color: #2196F3; }
-.sidebar-brand .k-7 { color: #4CAF50; }
-.sidebar-brand .k-8 { color: #E91E63; }
-.sidebar-brand .k-9 { color: #2196F3; }
-.sidebar-brand .k-10 { color: #FF9800; }
+:root {
+  --primary-green: #10b981; /* Emerald 500 */
+  --primary-green-dark: #047857; /* Emerald 700 */
+}
 
-/* Botones del sidebar: respetar color por sección */
-.sidebar-btn.btn-home { color: #2563eb; }
-.sidebar-btn.btn-attendance { color: #16a34a; }
-.sidebar-btn.btn-tasks { color: #f59e0b; }
-.sidebar-btn.btn-class { color: #7c3aed; }
-.sidebar-btn.btn-grades { color: #ea580c; }
-.sidebar-btn.btn-payments { color: #14b8a6; }
-.sidebar-btn.btn-notifications { color: #f43f5e; }
-.sidebar-btn.btn-profile { color: #475569; }
+/* Karpus colored letters small */
+.karpus-kids-inline { font-weight: 700; }
+.karpus-kids-inline .k-1 { color: #FF9800; }
+.karpus-kids-inline .k-2 { color: #2196F3; }
+.karpus-kids-inline .k-3 { color: #E91E63; }
+.karpus-kids-inline .k-4 { color: #4CAF50; }
+.karpus-kids-inline .k-5 { color: #FF9800; }
+.karpus-kids-inline .k-6 { color: #2196F3; }
+.karpus-kids-inline .k-7 { color: #4CAF50; }
+.karpus-kids-inline .k-8 { color: #E91E63; }
+.karpus-kids-inline .k-9 { color: #2196F3; }
+.karpus-kids-inline .k-10 { color: #FF9800; }
+
+
+/* ——— Panel Padre: estilo general del sidebar mochila ——— */
+body.panel-padre-body #sidebar {
+  background: linear-gradient(180deg, #4ade80 0%, #2dd4bf 100%);
+  box-shadow: 4px 0 24px rgba(20,184,166,0.25);
+  border-right: 4px solid #14b8a6;
+  /* Asegurar que el contenido sea accesible */
+  display: flex;
+  flex-direction: column;
+  max-height: 100vh;
+}
+
+/* Botón base del sidebar (Renombrado/Unificado a sidebar-node para coincidir con HTML) */
+.sidebar-node {
+  padding: 0.75rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  border-radius: 1rem;
+  font-size: 0.95rem;
+  transition: all 0.25s cubic-bezier(0.34, 1.56, 0.64, 1);
+  color: #e0f2fe;
+  font-weight: 700;
+  border: 2px solid transparent;
+  margin-bottom: 0.5rem;
+}
+.sidebar-node:hover {
+  background: rgba(255, 255, 255, 0.9);
+  transform: translateX(6px) scale(1.02);
+  box-shadow: 0 4px 12px rgba(0,0,0,0.05);
+}
+.sidebar-node.active {
+  background: #ffffff;
+  transform: translateX(8px);
+  box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+}
+
+/* Colores específicos para botones del sidebar */
+.sidebar-node.node-home { color: #f0f9ff; }
+.sidebar-node.node-home:hover, .sidebar-node.node-home.active { color: #0ea5e9; border-left: 4px solid #0ea5e9; background: #f0f9ff; }
+
+.sidebar-node.node-attendance { color: #f0fdf4; }
+.sidebar-node.node-attendance:hover, .sidebar-node.node-attendance.active { color: #16a34a; border-left: 4px solid #16a34a; background: #f0fdf4; }
+
+.sidebar-node.node-tasks { color: #fffbeb; }
+.sidebar-node.node-tasks:hover, .sidebar-node.node-tasks.active { color: #f59e0b; border-left: 4px solid #f59e0b; background: #fffbeb; }
+
+.sidebar-node.node-class { color: #f5f3ff; }
+.sidebar-node.node-class:hover, .sidebar-node.node-class.active { color: #8b5cf6; border-left: 4px solid #8b5cf6; background: #f5f3ff; }
+
+.sidebar-node.node-grades { color: #fff1f2; }
+.sidebar-node.node-grades:hover, .sidebar-node.node-grades.active { color: #f43f5e; border-left: 4px solid #f43f5e; background: #fff1f2; }
+
+.sidebar-node.node-payments { color: #f0fdfa; }
+.sidebar-node.node-payments:hover, .sidebar-node.node-payments.active { color: #0d9488; border-left: 4px solid #0d9488; background: #f0fdfa; }
+
+.sidebar-node.node-notifications { color: #fff7ed; }
+.sidebar-node.node-notifications:hover, .sidebar-node.node-notifications.active { color: #ea580c; border-left: 4px solid #ea580c; background: #fff7ed; }
+
+.sidebar-node.node-profile { color: #f8fafc; }
+.sidebar-node.node-profile:hover, .sidebar-node.node-profile.active { color: #475569; border-left: 4px solid #475569; background: #f8fafc; }
+
+.sidebar-node i {
+  stroke-width: 2.5px;
+  filter: drop-shadow(0 2px 2px rgba(0,0,0,0.1));
+  transition: transform .2s ease;
+}
+.sidebar-node:hover i { transform: scale(1.2) rotate(-3deg); }
+
+/* Desktop */
+@media (min-width: 768px) {
+  .sidebar-node {
+    width: 100%;
+    justify-content: flex-start;
+    padding: 0.75rem 1rem;
+    margin-bottom: 0.25rem;
+  }
+}
+
+/* Mobile nav con scroll horizontal cuidado */
+@media (max-width: 767px) {
+  nav.sidebar-nav {
+    display: flex !important;
+    overflow-x: auto !important;
+    -webkit-overflow-scrolling: touch !important;
+    scrollbar-width: thin !important;
+    scrollbar-color: rgba(255,255,255,0.3) transparent !important;
+    padding: 8px 0 !important;
+    gap: 0 !important;
+  }
+  nav.sidebar-nav::-webkit-scrollbar { height: 6px; display: block !important; }
+  nav.sidebar-nav::-webkit-scrollbar-thumb { background-color: rgba(255,255,255,0.4); border-radius: 3px; }
+  nav.sidebar-nav::-webkit-scrollbar-track { background-color: transparent; }
+
+  .sidebar-node {
+    flex: 0 0 auto;
+    width: 70px;
+    min-height: 56px;
+    padding: 0.5rem;
+    flex-direction: column;
+    font-size: 0.65rem;
+    margin-bottom: 0;
+  }
+  .sidebar-node:hover { transform: translateY(-4px); }
+  .sidebar-node.active { transform: translateY(-6px); }
+  .sidebar-node span {
+    display: block;
+    margin-top: 2px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    max-width: 100%;
+  }
+}
+
+/* Ocultar scrollbar utilitario */
+.no-scrollbar::-webkit-scrollbar { display: none; }
+.no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+
+/* Visibilidad de secciones */
+.section { display: none; }
+.section.active { display: block; animation: fadeIn 0.2s ease; }
+@keyframes fadeIn { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: translateY(0); } }
+
+/* Bolsillo del estudiante y etiqueta del tutor */
+.student-pocket {
+  background: rgba(255, 255, 255, 0.15);
+  border: 2px dashed rgba(255, 255, 255, 0.4);
+  border-radius: 1.5rem;
+  padding: 1rem;
+  backdrop-filter: blur(4px);
+  transition: transform 0.3s ease;
+}
+.student-pocket:hover { transform: rotate(1deg) scale(1.02); background: rgba(255, 255, 255, 0.25); }
+.parent-tag { backdrop-filter: blur(4px); }
+
+/* Cabecera cielo y césped decorativo */
+.header-kids {
+  background:
+    radial-gradient(ellipse at top left, rgba(227,242,253,0.7), transparent 60%),
+    radial-gradient(ellipse at top right, rgba(227,242,253,0.6), transparent 60%);
+  border-radius: 1.25rem;
+  padding: 1rem;
+}
+.bushes {
+  position: absolute; left: 0; right: 0; bottom: 0;
+  height: 60px;
+  background:
+    radial-gradient(circle at 10% 50%, #c6f6d5 15px, transparent 16px),
+    radial-gradient(circle at 25% 55%, #a7f3d0 18px, transparent 19px),
+    radial-gradient(circle at 40% 48%, #a7f3d0 16px, transparent 17px),
+    radial-gradient(circle at 55% 50%, #86efac 20px, transparent 21px),
+    radial-gradient(circle at 70% 52%, #86efac 16px, transparent 17px),
+    radial-gradient(circle at 85% 50%, #c6f6d5 18px, transparent 19px);
+  opacity: .6; pointer-events: none;
+}
+
+/* --- Nuevas Tarjetas de Dashboard (Profesionales y Coloridas) --- */
+.dashboard-card {
+  background-color: white;
+  border-radius: 1.25rem;
+  padding: 1.5rem 1.25rem;
+  box-shadow: 0 8px 20px -4px rgba(0,0,0,0.15);
+  transition: all 0.3s ease;
+}
+.dashboard-card:hover { transform: translateY(-5px); box-shadow: 0 15px 30px -5px rgba(0,0,0,0.2); }
+
+/* Gradientes para Dashboard (Legacy support if needed, but cards are white now) */
+.gradient-emerald { background: linear-gradient(135deg, #10b981 0%, #059669 100%); }
+.gradient-rose { background: linear-gradient(135deg, #f43f5e 0%, #e11d48 100%); }
+.gradient-amber { background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%); }
+.gradient-blue { background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%); }
+.gradient-purple { background: linear-gradient(135deg, #8b5cf6 0%, #7c3aed 100%); }
+.gradient-slate { background: linear-gradient(135deg, #64748b 0%, #475569 100%); }
+
+/* ——— LEGO Cards ——— */
+.lego-card {
+  background-color: white;
+  border-radius: 1.5rem;
+  padding: 1rem 1rem 1.2rem 1rem;
+  box-shadow: 0 10px 20px rgba(0,0,0,0.08);
+  border: 2px solid #e2e8f0;
+  border-bottom-width: 8px;
+  position: relative;
+  overflow: hidden;
+  transition: transform .25s ease, box-shadow .25s ease;
+}
+.lego-card:hover { transform: translateY(-4px); box-shadow: 0 16px 32px rgba(0,0,0,0.12); }
+.lego-studs {
+  height: 16px;
+  width: 100%;
+  display: flex;
+  gap: 6px;
+  opacity: .65;
+  padding: 0 8px;
+}
+.lego-studs::before,
+.lego-studs::after {
+  content: '';
+  display: block;
+}
+.lego-card .lego-studs > div,
+.lego-studs > div {
+  width: 28px; height: 10px; border-radius: 8px 8px 0 0;
+  background: rgba(0,0,0,0.08);
+}
+.lego-green { border-bottom-color: #22c55e; }
+.lego-rose { border-bottom-color: #f43f5e; }
+.lego-amber { border-bottom-color: #f59e0b; }
+.lego-blue { border-bottom-color: #3b82f6; }
+.lego-purple { border-bottom-color: #8b5cf6; }
+.lego-emerald { border-bottom-color: #10b981; }
+.lego-orange { border-bottom-color: #f97316; }
+.lego-slate { border-bottom-color: #64748b; }
+
+/* ——— LEGO Panel (contenedores secciones) ——— */
+.lego-panel {
+  position: relative;
+  background: white;
+  border-radius: 1.5rem;
+  border: 2px solid #e2e8f0;
+  box-shadow: 0 8px 18px rgba(0,0,0,0.06);
+}
+.lego-panel::before {
+  content: '';
+  position: absolute;
+  top: 0; left: 0; right: 0;
+  height: 20px;
+  background:
+    radial-gradient(circle at 12px 10px, rgba(0,0,0,0.08) 10px, transparent 11px),
+    radial-gradient(circle at 52px 10px, rgba(0,0,0,0.08) 10px, transparent 11px),
+    radial-gradient(circle at 92px 10px, rgba(0,0,0,0.08) 10px, transparent 11px),
+    radial-gradient(circle at 132px 10px, rgba(0,0,0,0.08) 10px, transparent 11px);
+  border-radius: 1.5rem 1.5rem 0 0;
+  opacity: .7;
+}
+
+/* ——— Fondo y Tema Verde Predominante ——— */
+body.panel-padre-body {
+  background:
+    radial-gradient(circle at 20% -10%, #d1fae5 0%, transparent 40%), /* Emerald tint */
+    radial-gradient(circle at 90% 10%, #ecfccb 0%, transparent 42%), /* Lime tint */
+    linear-gradient(135deg, #f0fdf4 0%, #ffffff 100%);
+}
+
+/* Botones Importantes (Verde Predominante) */
+.btn-primary, .btn-action {
+  background-color: var(--primary-green);
+  color: white;
+  border-radius: 1rem;
+  font-weight: 800;
+  box-shadow: 0 4px 10px rgba(16, 185, 129, 0.3);
+  transition: all 0.2s ease;
+}
+.btn-primary:hover, .btn-action:hover {
+  background-color: var(--primary-green-dark);
+  transform: translateY(-2px);
+  box-shadow: 0 6px 15px rgba(16, 185, 129, 0.4);
+}
+
+/* Contenedor Blanco para Asistencia */
+.attendance-container {
+  background: white;
+  border-radius: 1.5rem;
+  padding: 1.5rem;
+  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05);
+  border: 1px solid #f1f5f9;
+}
+
+/* Contenedor Blanco Genérico (para Tareas y Perfil) */
+.white-container {
+  background-color: white;
+  border-radius: 1.5rem;
+  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05);
+  border: 1px solid #f1f5f9;
+}

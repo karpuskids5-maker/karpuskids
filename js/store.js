@@ -240,6 +240,14 @@
     isTyping(){ return false; }
   };
 
+  Store.sendParentEmail = function(to, payload){
+    return fetchJson(`${API}/parents/email`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ to, subject: payload.subject, html: payload.html, text: payload.text })
+    });
+  };
+
   window.KarpusStore = Store;
 })();
 

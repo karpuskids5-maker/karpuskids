@@ -96,6 +96,9 @@ window.loadRooms = async function(teacherId = null) {
           <button class="delete-room-btn px-2 py-1 bg-red-100 text-red-700 rounded hover:bg-red-200 text-xs" data-room-id="${r.id}">
             Eliminar
           </button>
+          <button class="edit-room-btn px-2 py-1 bg-blue-100 text-blue-700 rounded hover:bg-blue-200 text-xs ml-2" data-room-id="${r.id}">
+            Editar
+          </button>
         </td>
       </tr>
     `).join('');
@@ -129,6 +132,9 @@ document.addEventListener('DOMContentLoaded', async () => {
     await supabase.auth.signOut();
     window.location.href = 'login.html';
   });
+
+  // Inicializar gestión de aulas
+  initRoomManagement();
 
   // 1. NAVEGACIÓN ENTRE SECCIONES
   const navButtons = document.querySelectorAll('[data-section]');
@@ -327,36 +333,57 @@ document.addEventListener('DOMContentLoaded', async () => {
   // 5. CARGAR DASHBOARD
   async function loadDashboard() {
     await safeExecute(async () => {
-      const { count: students } = await supabase.from('students').select('*', { count: 'exact', head: true });
-      const { count: teachers } = await supabase.from('profiles').select('*', { count: 'exact', head: true }).eq('role', 'maestra');
-      const { count: rooms } = await supabase.from('classrooms').select('*', { count: 'exact', head: true });
+      // 1. Cargar KPIs usando RPC optimizado
+      const { data: kpis, error: kpiError } = await supabase.rpc('get_dashboard_kpis');
+      if (kpiError) throw kpiError;
 
-      const totalStudentsEl = document.getElementById('ninosPresentes');
-      const totalTeachersEl = document.getElementById('maestrosActivos');
-      const totalRoomsEl = document.getElementById('aulasOcupadas');
+      // Actualizar DOM con animación simple
+      const animateValue = (id, val, prefix = '') => {
+        const el = document.getElementById(id);
+        if (el) el.textContent = prefix + (val || 0);
+      };
+
+      animateValue('kpiStudents', kpis.total_students);
+      animateValue('kpiTeachers', kpis.total_teachers);
+      animateValue('kpiClassrooms', kpis.active_classrooms);
+      animateValue('kpiAttendance', kpis.attendance_today);
+      animateValue('kpiPendingMoney', kpis.pending_payments, '$');
+      animateValue('kpiIncidents', kpis.active_incidents);
+
+      // 2. Cargar Reporte Financiero por Aula (RPC)
+      const currentMonth = new Date().toLocaleString('es-ES', { month: 'long' }); // "enero", "febrero"...
+      // Asegurar capitalización correcta si la DB lo requiere (ej: "Enero")
+      const monthCap = currentMonth.charAt(0).toUpperCase() + currentMonth.slice(1);
       
-      if (totalStudentsEl) totalStudentsEl.textContent = students || 0;
-      if (totalTeachersEl) totalTeachersEl.textContent = teachers || 0;
-      if (totalRoomsEl) totalRoomsEl.textContent = rooms || 0;
-
-      // Cargar gráficos de asistencia
-      await loadAttendanceCharts();
-
-      // Gráfico de pastel para distribución de aulas
-      const ctx = document.getElementById('roomsChart')?.getContext('2d');
-      if (ctx) {
-        new Chart(ctx, {
-          type: 'doughnut',
-          data: {
-            labels: ['Aulas Activas', 'Cupos Disponibles'],
-            datasets: [{
-              data: [rooms || 0, Math.max(0, 20 - (rooms || 0))],
-              backgroundColor: ['#4f46e5', '#e5e7eb']
-            }]
-          },
-          options: { responsive: true, maintainAspectRatio: false }
-        });
+      const { data: finReport, error: finError } = await supabase.rpc('get_monthly_financial_report_by_classroom', { p_month: monthCap });
+      
+      if (!finError && finReport) {
+        const tbody = document.getElementById('financialReportBody');
+        if (tbody) {
+          tbody.innerHTML = finReport.map(r => {
+            const percent = r.total_expected > 0 ? Math.round((r.total_paid / r.total_expected) * 100) : 0;
+            return `
+              <tr class="border-b border-slate-50 hover:bg-slate-50 transition-colors">
+                <td class="py-3 font-medium text-slate-700">${r.classroom_name}</td>
+                <td class="py-3 text-right text-slate-500">$${r.total_expected}</td>
+                <td class="py-3 text-right text-emerald-600 font-bold">$${r.total_paid}</td>
+                <td class="py-3 text-right text-amber-600">$${r.total_pending}</td>
+                <td class="py-3 px-2">
+                  <div class="w-full bg-slate-100 rounded-full h-2 overflow-hidden">
+                    <div class="bg-blue-500 h-full rounded-full" style="width: ${percent}%"></div>
+                  </div>
+                </td>
+              </tr>
+            `;
+          }).join('');
+        }
       }
+
+      // 3. Inicializar Gráficas Modernas (Delegar a panel_directora.js si existe, o hacerlo aquí)
+      if (window.initDashboardCharts) {
+        window.initDashboardCharts(kpis, finReport);
+      }
+
     }, 'Error cargando dashboard');
   }
 
@@ -885,6 +912,11 @@ document.addEventListener('DOMContentLoaded', async () => {
         const roomId = deleteButton.dataset.roomId;
         handleDeleteRoom(roomId);
       }
+      const editButton = e.target.closest('.edit-room-btn');
+      if (editButton) {
+        const roomId = editButton.dataset.roomId;
+        openRoomModal(roomId);
+      }
     });
   }
 
@@ -916,6 +948,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   const btnCancelAssistant = document.getElementById('btnCancelAssistant');
   const btnGeneratePassword = document.getElementById('btnGeneratePassword');
   const formCreateAssistant = document.getElementById('formCreateAssistant');
+  const btnSaveAssistant = document.getElementById('btnSaveAssistant');
 
   // Abrir modal
   if (btnAddAssistant) {
@@ -946,7 +979,9 @@ document.addEventListener('DOMContentLoaded', async () => {
   if (btnGeneratePassword) {
     btnGeneratePassword.addEventListener('click', () => {
       const password = Math.random().toString(36).slice(-8) + Math.random().toString(36).slice(-8);
-      document.getElementById('assistantPassword').value = password;
+      passInput.value = password;
+      passInput.type = 'text'; // Mostrar temporalmente
+      setTimeout(() => passInput.type = 'password', 3000); // Ocultar después de 3s
     });
   }
 
@@ -974,6 +1009,11 @@ document.addEventListener('DOMContentLoaded', async () => {
         alert('La contraseña debe tener al menos 6 caracteres');
         return;
       }
+
+      // Bloquear botón
+      const originalText = btnSaveAssistant.textContent;
+      btnSaveAssistant.disabled = true;
+      btnSaveAssistant.innerHTML = '<i class="animate-spin" data-lucide="loader"></i> Creando...';
 
       try {
         const { data: existingRows, error: existingError } = await supabase
@@ -1028,6 +1068,10 @@ document.addEventListener('DOMContentLoaded', async () => {
       } catch (error) {
         console.error('Error creando asistente:', error);
         alert('Error al crear el asistente: ' + error.message);
+      } finally {
+        // Restaurar botón
+        btnSaveAssistant.disabled = false;
+        btnSaveAssistant.textContent = originalText;
       }
     });
   }
@@ -1083,6 +1127,8 @@ document.addEventListener('DOMContentLoaded', async () => {
       const allergies = (document.getElementById('stAllergies')?.value || '').trim();
       const bloodType = (document.getElementById('stBlood')?.value || '').trim();
       const pickup = (document.getElementById('stPickup')?.value || '').trim();
+      const monthlyFee = parseFloat(document.getElementById('stMonthlyFee')?.value || '0');
+      const dueDay = parseInt(document.getElementById('stDueDay')?.value || '0', 10);
 
       const missing = [];
       if (!name) missing.push('Nombre del niño');
@@ -1189,6 +1235,7 @@ document.addEventListener('DOMContentLoaded', async () => {
       modal.classList.remove('hidden');
       modal.classList.add('flex');
       document.body.classList.add('no-scroll');
+      modal.dataset.studentId = String(studentId);
 
       // Resetear campos visuales
       const ids = ['studentProfileName', 'studentDOB', 'studentClassroom', 'studentAllergies', 
@@ -1237,4 +1284,107 @@ document.addEventListener('DOMContentLoaded', async () => {
       alert('No se pudo eliminar el usuario');
     }
   };
+
+  // 12. GESTIÓN DE AULAS (Crear/Editar)
+  function initRoomManagement() {
+    const btnAdd = document.getElementById('btnAddRoom');
+    const btnSave = document.getElementById('btnSaveRoom');
+    const btnCancel = document.getElementById('btnCancelRoom');
+    const modal = document.getElementById('roomModal');
+    
+    if (btnAdd) {
+      btnAdd.addEventListener('click', () => openRoomModal());
+    }
+    
+    if (btnCancel) {
+      btnCancel.addEventListener('click', () => {
+        modal.classList.add('hidden');
+      });
+    }
+    
+    if (btnSave) {
+      btnSave.addEventListener('click', saveRoom);
+    }
+  }
+
+  async function openRoomModal(roomId = null) {
+    const modal = document.getElementById('roomModal');
+    const title = document.getElementById('roomModalTitle');
+    const nameInput = document.getElementById('roomName');
+    const capacityInput = document.getElementById('roomCapacity');
+    const teacherSelect = document.getElementById('roomTeacher');
+    const idInput = document.getElementById('roomId');
+    
+    if (!modal) return;
+
+    // Populate teachers
+    await safeExecute(async () => {
+       const { data: teachers } = await supabase.from('profiles').select('id, name').eq('role', 'maestra').order('name');
+       if (teacherSelect) {
+           teacherSelect.innerHTML = '<option value="">Seleccionar maestro...</option>' + 
+              (teachers || []).map(t => `<option value="${t.id}">${t.name}</option>`).join('');
+       }
+    }, 'Error cargando maestros');
+
+    if (roomId) {
+       title.textContent = 'Editar Aula';
+       idInput.value = roomId;
+       const { data: room } = await supabase.from('classrooms').select('*').eq('id', roomId).single();
+       if (room) {
+          nameInput.value = room.name || '';
+          capacityInput.value = room.capacity || '';
+          teacherSelect.value = room.teacher_id || '';
+       }
+    } else {
+       title.textContent = 'Nueva Aula';
+       idInput.value = '';
+       nameInput.value = '';
+       capacityInput.value = '';
+       teacherSelect.value = '';
+    }
+    
+    modal.classList.remove('hidden');
+  }
+
+  async function saveRoom() {
+    const id = document.getElementById('roomId').value;
+    const name = document.getElementById('roomName').value;
+    const capacity = document.getElementById('roomCapacity').value;
+    const teacherId = document.getElementById('roomTeacher').value;
+    const btnSave = document.getElementById('btnSaveRoom');
+    
+    if (!name) { alert('El nombre es obligatorio'); return; }
+    
+    btnSave.disabled = true;
+    btnSave.textContent = 'Guardando...';
+
+    const payload = {
+        name,
+        capacity: capacity ? parseInt(capacity) : null,
+        teacher_id: teacherId || null
+    };
+    
+    try {
+        let error;
+        if (id) {
+            const { error: err } = await supabase.from('classrooms').update(payload).eq('id', id);
+            error = err;
+        } else {
+            const { error: err } = await supabase.from('classrooms').insert([payload]);
+            error = err;
+        }
+        
+        if (error) throw error;
+        
+        alert('Aula guardada correctamente');
+        document.getElementById('roomModal').classList.add('hidden');
+        window.loadRooms();
+    } catch (e) {
+        console.error(e);
+        alert('Error al guardar aula: ' + e.message);
+    } finally {
+        btnSave.disabled = false;
+        btnSave.textContent = 'Guardar';
+    }
+  }
 });

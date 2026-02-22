@@ -3,6 +3,7 @@ const cors = require('cors');
 try { require('dotenv').config(); } catch(e) {}
 const Database = require('better-sqlite3');
 const { useSupabase, supabase } = require('./dbProvider.cjs');
+const https = require('https');
 
 const app = express();
 app.use(cors());
@@ -18,6 +19,51 @@ function row(sql, params = []) {
 }
 function run(sql, params = []) {
   return db.prepare(sql).run(...params);
+}
+
+function sendResendEmail({ to, subject, html, text }) {
+  return new Promise((resolve, reject) => {
+    const apiKey = process.env.RESEND_API_KEY;
+    if (!apiKey) return reject(new Error('RESEND_API_KEY no configurada'));
+    const from = process.env.RESEND_FROM || 'Karpus <onboarding@resend.dev>';
+    const payload = JSON.stringify({
+      from,
+      to: Array.isArray(to) ? to : [to],
+      subject,
+      html,
+      text
+    });
+    const options = {
+      hostname: 'api.resend.com',
+      path: '/emails',
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${apiKey}`,
+        'Content-Type': 'application/json',
+        'Content-Length': Buffer.byteLength(payload)
+      }
+    };
+    const req = https.request(options, res => {
+      let body = '';
+      res.on('data', chunk => {
+        body += chunk;
+      });
+      res.on('end', () => {
+        if (res.statusCode >= 200 && res.statusCode < 300) {
+          try {
+            resolve(JSON.parse(body));
+          } catch {
+            resolve({ ok: true });
+          }
+        } else {
+          reject(new Error(`Resend error ${res.statusCode}: ${body}`));
+        }
+      });
+    });
+    req.on('error', reject);
+    req.write(payload);
+    req.end();
+  });
 }
 
 // Classrooms
@@ -599,6 +645,28 @@ app.get('/api/attendance', async (req, res) => {
   }
 });
 
+// Admin: actualizar credenciales de usuario (email/contraseña) en Supabase Auth
+app.post('/api/admin/update-user', async (req, res) => {
+  try {
+    const { id, email, password } = req.body || {};
+    if (!id) return res.status(400).json({ error: 'Falta id de usuario' });
+    if (!useSupabase || !supabase || !supabase.auth || !supabase.auth.admin) {
+      return res.status(500).json({ error: 'Supabase admin no disponible' });
+    }
+    const payload = {};
+    if (email) payload.email = email;
+    if (password) payload.password = password;
+    if (Object.keys(payload).length === 0) {
+      return res.json({ ok: true, skipped: true });
+    }
+    const { error } = await supabase.auth.admin.updateUserById(id, payload);
+    if (error) return res.status(500).json({ error: error.message });
+    return res.json({ ok: true });
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
 // Profiles
 app.get('/api/profiles/:role', (req, res) => {
   const role = req.params.role;
@@ -636,6 +704,19 @@ app.put('/api/payments/:id', async (req, res) => {
     }
     run('UPDATE payments SET status = ? WHERE id = ?', [status, id]);
     res.json({ ok: true });
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
+app.post('/api/parents/email', async (req, res) => {
+  try {
+    const { to, subject, html, text } = req.body || {};
+    if (!to || !subject) {
+      return res.status(400).json({ error: 'to y subject requeridos' });
+    }
+    const result = await sendResendEmail({ to, subject, html, text });
+    res.json({ ok: true, result });
   } catch (e) {
     res.status(500).json({ error: e.message });
   }

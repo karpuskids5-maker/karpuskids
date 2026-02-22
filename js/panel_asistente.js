@@ -153,6 +153,10 @@ const UI = {
         this.loadStudents(e.target.value);
       });
     }
+    const noClassChk = document.getElementById('filterNoClassroom');
+    if (noClassChk) {
+      noClassChk.addEventListener('change', () => this.loadStudents(document.getElementById('searchStudentInput')?.value || ''));
+    }
 
     // --- Teacher Management ---
     document.getElementById('searchTeacherInput')?.addEventListener('input', (e) => this.loadTeachers(e.target.value));
@@ -237,6 +241,27 @@ const UI = {
             this.openTeacherModal(btn.dataset.id);
         }
     });
+    document.getElementById('btnAddRoom')?.addEventListener('click', () => this.openRoomModal());
+    document.getElementById('btnSaveRoom')?.addEventListener('click', () => this.saveRoom());
+    document.getElementById('btnCancelRoom')?.addEventListener('click', () => this.closeRoomModal());
+    document.getElementById('filterRoomByTeacher')?.addEventListener('change', () => this.loadRooms());
+    document.getElementById('btnCloseRoomStudents')?.addEventListener('click', () => this.closeRoomStudentsModal());
+    document.getElementById('btnCloseRoomStudentsX')?.addEventListener('click', () => this.closeRoomStudentsModal());
+    const roomsTable = document.getElementById('roomsTable');
+    if (roomsTable) {
+      roomsTable.addEventListener('click', (e) => {
+        const editBtn = e.target.closest('.btn-room-edit');
+        const viewBtn = e.target.closest('.btn-room-students');
+        if (editBtn) {
+          const id = editBtn.dataset.id;
+          this.openRoomModal(id);
+        } else if (viewBtn) {
+          const id = viewBtn.dataset.id;
+          const name = viewBtn.dataset.name;
+          this.openRoomStudentsModal(id, name);
+        }
+      });
+    }
   },
 
   showSection(id) {
@@ -249,6 +274,7 @@ const UI = {
       if (id === 'estudiantes') this.loadStudents();
       if (id === 'asistencia') this.loadAttendanceRooms();
       if (id === 'maestros') this.loadTeachers();
+      if (id === 'aulas') { this.loadRoomTeachersIntoSelect(); this.loadRooms(); }
       if (id === 'pagos') { this.loadPayments(); this.loadPaymentReports(); this.loadReminderConfig(); this.loadIncomeChart(); }
     }
   },
@@ -336,6 +362,10 @@ const UI = {
       if (searchTerm) {
         query = query.ilike('name', `%${searchTerm}%`);
       }
+      const onlyNoClass = document.getElementById('filterNoClassroom')?.checked;
+      if (onlyNoClass) {
+        query = query.is('classroom_id', null);
+      }
 
       const { data: students, error } = await query;
       if (error) throw error;
@@ -378,6 +408,156 @@ const UI = {
     }
   },
 
+  // --- ROOMS ---
+  async loadRooms() {
+    const table = document.getElementById('roomsTable');
+    if (!table) return;
+    table.innerHTML = `<tr><td colspan="5" class="p-4">${Helpers.skeleton(3, 'h-12')}</td></tr>`;
+    try {
+      const { data: rooms } = await supabase.from('classrooms').select('id,name,capacity,teacher_id, teacher:teacher_id(name)').order('name');
+      const { data: students } = await supabase.from('students').select('id,classroom_id');
+      const occ = {};
+      (students || []).forEach(s => { const cid = s.classroom_id || 0; occ[cid] = (occ[cid] || 0) + 1; });
+      const teacherFilter = document.getElementById('filterRoomByTeacher')?.value || 'all';
+      const filtered = (rooms || []).filter(r => teacherFilter === 'all' ? true : r.teacher_id === teacherFilter);
+      table.innerHTML = filtered.length ? filtered.map(r => `
+        <tr>
+          <td class="py-3 px-4 font-medium text-slate-800">${r.name}</td>
+          <td class="py-3 px-4 hidden md:table-cell">${r.teacher?.name || '-'}</td>
+          <td class="py-3 px-4">${occ[r.id] || 0}/${r.capacity || '-'}</td>
+          <td class="py-3 px-4 text-center"><span class="px-2 py-1 text-xs rounded-full bg-green-100 text-green-700">Activa</span></td>
+          <td class="py-3 px-4 text-right">
+            <button class="btn-room-students px-3 py-1 text-sm rounded border mr-2" data-id="${r.id}" data-name="${r.name}">Ver estudiantes</button>
+            <button class="btn-room-edit px-3 py-1 text-sm rounded border" data-id="${r.id}">Editar</button>
+          </td>
+        </tr>
+      `).join('') : `<tr><td colspan="5">${Helpers.emptyState('No hay aulas registradas')}</td></tr>`;
+      if (window.lucide) lucide.createIcons();
+    } catch (e) {
+      console.error(e);
+      table.innerHTML = `<tr><td colspan="5" class="text-center text-red-500 py-4">Error cargando aulas</td></tr>`;
+    }
+  },
+
+  async openRoomModal(id = null) {
+    const modal = document.getElementById('roomModal');
+    if (!modal) return;
+    document.getElementById('roomId').value = id || '';
+    document.getElementById('roomName').value = '';
+    document.getElementById('roomCapacity').value = '';
+    await this.loadRoomTeachersIntoSelect();
+    await this.loadRoomStudentsChecklist(null);
+    if (id) {
+      const { data: r } = await supabase.from('classrooms').select('*').eq('id', id).single();
+      if (r) {
+        document.getElementById('roomName').value = r.name || '';
+        document.getElementById('roomCapacity').value = r.capacity || '';
+        document.getElementById('roomTeacher').value = r.teacher_id || '';
+        await this.loadRoomStudentsChecklist(r.id);
+      }
+      document.getElementById('roomModalTitle').textContent = 'Editar Aula';
+    } else {
+      document.getElementById('roomModalTitle').textContent = 'Nueva Aula';
+    }
+    modal.classList.remove('hidden');
+    modal.classList.add('flex');
+  },
+
+  closeRoomModal() {
+    const modal = document.getElementById('roomModal');
+    if (!modal) return;
+    modal.classList.add('hidden');
+    modal.classList.remove('flex');
+  },
+
+  async loadRoomTeachersIntoSelect() {
+    const sel = document.getElementById('roomTeacher');
+    if (!sel) return;
+    const { data: teachers } = await supabase.from('profiles').select('id,name').eq('role','maestra').order('name');
+    sel.innerHTML = `<option value="">Seleccionar maestro...</option>` + (teachers||[]).map(t => `<option value="${t.id}">${t.name}</option>`).join('');
+  },
+
+  async loadRoomStudentsChecklist(roomId) {
+    const wrap = document.getElementById('roomStudentsChecklist');
+    if (!wrap) return;
+    wrap.innerHTML = Helpers.skeleton(4, 'h-6');
+    const { data: studs } = await supabase.from('students').select('id,name,classroom_id').order('name');
+    const items = (studs||[]).map(s => {
+      const checked = roomId && s.classroom_id === roomId ? 'checked' : '';
+      return `<label class="flex items-center gap-2 text-sm"><input type="checkbox" class="roomStudentChk" value="${s.id}" ${checked}> <span>${s.name}</span></label>`;
+    }).join('');
+    wrap.innerHTML = items || Helpers.emptyState('No hay estudiantes');
+  },
+
+  async saveRoom() {
+    const btn = document.getElementById('btnSaveRoom');
+    if (!btn) return;
+    const original = btn.textContent;
+    btn.disabled = true;
+    btn.textContent = 'Guardando...';
+    try {
+      const id = document.getElementById('roomId').value || null;
+      const name = document.getElementById('roomName').value.trim();
+      const capacity = parseInt(document.getElementById('roomCapacity').value || '0', 10);
+      const teacherId = document.getElementById('roomTeacher').value || null;
+      if (!name) throw new Error('Nombre de aula requerido');
+      let roomId = id;
+      if (id) {
+        const { error } = await supabase.from('classrooms').update({ name, capacity, teacher_id: teacherId || null }).eq('id', id);
+        if (error) throw error;
+      } else {
+        const { data, error } = await supabase.from('classrooms').insert({ name, capacity, teacher_id: teacherId || null }).select('id').single();
+        if (error) throw error;
+        roomId = data?.id;
+      }
+      const selected = Array.from(document.querySelectorAll('.roomStudentChk')).filter(ch => ch.checked).map(ch => parseInt(ch.value,10));
+      if (roomId && selected.length >= 0) {
+        const { data: current } = await supabase.from('students').select('id').eq('classroom_id', roomId);
+        const currentIds = new Set((current||[]).map(s => s.id));
+        const selectedIds = new Set(selected);
+        const toAdd = selected.filter(id => !currentIds.has(id));
+        const toRemove = Array.from(currentIds).filter(id => !selectedIds.has(id));
+        for (const sid of toAdd) {
+          await supabase.from('students').update({ classroom_id: roomId }).eq('id', sid);
+        }
+        for (const sid of toRemove) {
+          await supabase.from('students').update({ classroom_id: null }).eq('id', sid);
+        }
+      }
+      Helpers.toast(id ? 'Aula actualizada' : 'Aula creada');
+      this.closeRoomModal();
+      this.loadRooms();
+      this.loadStudents(document.getElementById('searchStudentInput')?.value || '');
+    } catch (e) {
+      console.error(e);
+      Helpers.toast(e.message || 'Error guardando aula', 'error');
+    } finally {
+      btn.disabled = false;
+      btn.textContent = original;
+    }
+  },
+
+  openRoomStudentsModal(roomId, roomName) {
+    const modal = document.getElementById('roomStudentsModal');
+    const title = document.getElementById('roomStudentsTitle');
+    const list = document.getElementById('roomStudentsList');
+    if (!modal || !list) return;
+    title.textContent = `Estudiantes - ${roomName}`;
+    list.innerHTML = Helpers.skeleton(4, 'h-6');
+    supabase.from('students').select('id,name').eq('classroom_id', roomId).order('name').then(({ data }) => {
+      list.innerHTML = (data||[]).map(s => `<div class="flex items-center justify-between p-2 border rounded"><span>${s.name}</span></div>`).join('') || Helpers.emptyState('Sin estudiantes');
+    }).catch(() => { list.innerHTML = Helpers.emptyState('Error'); });
+    modal.classList.remove('hidden');
+    modal.classList.add('flex');
+  },
+
+  closeRoomStudentsModal() {
+    const modal = document.getElementById('roomStudentsModal');
+    if (!modal) return;
+    modal.classList.add('hidden');
+    modal.classList.remove('flex');
+  },
+
   // --- ADD STUDENT MODAL ---
   async openAddStudentModal() {
     const modal = document.getElementById('modalAddStudent');
@@ -413,6 +593,7 @@ const UI = {
 
         // Populate fields
         document.getElementById('stId').value = s.id;
+        const pidEl = document.getElementById('stParentId'); if (pidEl) pidEl.value = s.parent_id || '';
         document.getElementById('stName').value = s.name || '';
         document.getElementById('stAge').value = ''; // Age is not in schema provided, skipping or custom logic
         document.getElementById('stSchedule').value = ''; // Schedule not in schema
@@ -456,6 +637,7 @@ const UI = {
 
     try {
         const id = document.getElementById('stId')?.value;
+        let parentId = document.getElementById('stParentId')?.value || null;
         const name = document.getElementById('stName')?.value.trim();
         const classroomId = document.getElementById('stClassroom')?.value;
         const isActive = document.getElementById('stActive')?.checked;
@@ -476,7 +658,7 @@ const UI = {
         if (!name) throw new Error('El nombre del estudiante es obligatorio');
         if (!classroomId) throw new Error('Debe asignar un aula');
 
-        let parentId = null;
+        // parentId puede venir del formulario o crearse si se registra tutor
 
         // 1. Create/Link Parent User
         if (p1Email && !id) { // Only create parent on insert or if logic permits
@@ -531,6 +713,27 @@ const UI = {
         if (id) {
             // Update
             ({ error } = await supabase.from('students').update(studentData).eq('id', id));
+            // Update linked parent profile and auth if provided
+            try {
+              if (parentId && (p1Email || p1Name || p1Phone)) {
+                await supabase.from('profiles').update({
+                  email: p1Email || undefined,
+                  name: p1Name || undefined,
+                  phone: p1Phone || undefined
+                }).eq('id', parentId);
+                if ((p1Password && p1Password.length >= 6) || (p1Email && p1Email.length)) {
+                  await fetch('/api/admin/update-user', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                      id: parentId,
+                      email: p1Email || undefined,
+                      password: (p1Password && p1Password.length >= 6) ? p1Password : undefined
+                    })
+                  });
+                }
+              }
+            } catch(e) { console.warn('No se pudo actualizar credenciales del tutor', e); }
         } else {
             // Insert
             ({ error } = await supabase.from('students').insert(studentData));
@@ -1101,6 +1304,20 @@ const UI = {
     try {
         if (id) {
             // Update existing
+            // Actualizar credenciales en Supabase Auth si corresponde
+            try {
+              if ((password && password.length >= 6) || (email && email.length)) {
+                await fetch('/api/admin/update-user', {
+                  method: 'POST',
+                  headers: { 'Content-Type': 'application/json' },
+                  body: JSON.stringify({
+                    id,
+                    email: email || undefined,
+                    password: (password && password.length >= 6) ? password : undefined
+                  })
+                });
+              }
+            } catch(e) { console.warn('Fallo actualización admin de usuario', e); }
             const { error } = await supabase.from('profiles').update({ name, phone, email }).eq('id', id);
             if (error) throw error;
             Helpers.toast('Maestro actualizado');

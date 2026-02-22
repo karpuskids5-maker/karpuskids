@@ -601,51 +601,46 @@ const UI = {
   async renderStudents() {
     const tab = document.getElementById('tab-students');
     if (!AppState.currentClass?.id) {
-        tab.innerHTML = Helpers.emptyState('Seleccione una clase primero');
-        return;
+      tab.innerHTML = Helpers.emptyState('Seleccione una clase primero');
+      return;
     }
 
-    tab.innerHTML = Helpers.skeleton(2);
+    tab.innerHTML = Helpers.skeleton(4);
 
     const { data: students, error } = await supabase
-        .from('students')
-        .select('*')
-        .eq('classroom_id', AppState.currentClass.id)
-        .order('name');
-    
+      .from('students')
+      .select('*')
+      .eq('classroom_id', AppState.currentClass.id)
+      .order('name');
+
     if (error) {
-        tab.innerHTML = Helpers.emptyState('Error cargando estudiantes: ' + error.message, 'alert-circle');
-        return;
+      tab.innerHTML = Helpers.emptyState('Error cargando estudiantes: ' + error.message, 'alert-circle');
+      return;
     }
 
     if (!students || !students.length) {
-        tab.innerHTML = Helpers.emptyState('No hay estudiantes en esta clase.', 'users');
-        return;
+      tab.innerHTML = Helpers.emptyState('No hay estudiantes en esta clase.', 'users');
+      return;
     }
 
-    const cardColors = ['bg-orange-50 border-orange-100', 'bg-blue-50 border-blue-100', 'bg-pink-50 border-pink-100', 'bg-purple-50 border-purple-100'];
-    const iconColors = ['text-orange-600 bg-orange-100', 'text-blue-600 bg-blue-100', 'text-pink-600 bg-pink-100', 'text-purple-600 bg-purple-100'];
+    // Pastel color variants
+    const pastelColors = ['pastel-blue', 'pastel-green', 'pastel-pink', 'pastel-yellow', 'pastel-purple'];
 
     tab.innerHTML = `
-      <div class="notebook-paper p-6 bg-white rounded-r-xl shadow-sm min-h-[400px]">
-        <h3 class="font-bold text-xl text-slate-700 mb-6 flex items-center gap-2"><i data-lucide="users" class="text-red-500"></i> Lista de Clase</h3>
-        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+      <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-5">
           ${students.map((s, index) => `
-            <div class="flex items-center gap-4 p-3 border-b border-blue-100 hover:bg-blue-50/50 transition rounded-lg group">
-              <div class="w-12 h-12 rounded-full flex items-center justify-center font-black text-xl shadow-sm ${iconColors[index % iconColors.length]} transform group-hover:scale-110 transition-transform">
-                ${Helpers.escapeHTML((s.name || '?').charAt(0))}
-              </div>
-              <div class="flex-1">
-                <div class="font-bold text-slate-700 text-lg" style="font-family: 'Comic Sans MS', cursive, sans-serif">${Helpers.escapeHTML(s.name || 'Sin nombre')}</div>
-                <button onclick="window.UI.openStudentProfile('${s.id}')" class="text-slate-400 hover:text-blue-500 text-xs font-bold uppercase tracking-wider flex items-center gap-1 mt-1">
-                   VER PERFIL <i data-lucide="arrow-right" class="w-3 h-3"></i>
-                </button>
-              </div>
+          <div class="student-card-pastel ${pastelColors[index % pastelColors.length]}">
+            <div class="student-card-avatar">${Helpers.escapeHTML((s.name || '?').charAt(0))}</div>
+            <h4 class="student-card-name">${Helpers.escapeHTML(s.name || 'Sin nombre')}</h4>
+            <p class="student-card-meta">ID: ${s.id}</p>
+            <button onclick="window.UI.openStudentProfile('${s.id}')" class="student-card-button">
+               Ver Ficha
+            </button>
             </div>
           `).join('')}
         </div>
-      </div>`;
-    if(window.lucide) lucide.createIcons();
+      `;
+    if (window.lucide) lucide.createIcons();
   },
 
   async renderDailyLog() {
@@ -1143,18 +1138,24 @@ const UI = {
     modal.classList.add('flex');
     document.body.classList.add('no-scroll');
     document.getElementById('closeStudentProfileModal')?.focus(); // Accessibility: Focus Management
-
-    // Fill with loading state or clear
-    ['studentProfileName', 'studentDOB', 'studentClassroom', 'studentAllergies', 
-     'parent1Name', 'parent1Phone', 'parent1Email'].forEach(id => {
+    // Reset fields
+    const ids = ['studentProfileName', 'studentDOB', 'studentClassroom', 'studentAllergies',
+      'parent1Name', 'parent1Phone', 'parent1Email', 'parent2Name', 'parent2Phone',
+      'studentBlood', 'studentPickup'];
+    ids.forEach(id => {
          const el = document.getElementById(id);
-         if(el) el.textContent = '...';
+         if(el) el.textContent = 'Cargando...';
     });
 
     try {
+        // Query for student, their classroom, and their main parent contact
         const { data: student, error } = await supabase
           .from('students')
-          .select(`*, parent:parent_id(*)`)
+          .select(`
+            *,
+            classrooms(name),
+            parent:parent_id(name, phone, email)
+          `)
           .eq('id', studentId)
           .single();
           
@@ -1162,23 +1163,39 @@ const UI = {
         
         const setText = (id, val) => { const el = document.getElementById(id); if(el) el.textContent = val || '-'; };
         
+        // Student Info
         setText('studentProfileName', student.name);
-        setText('studentDOB', student.birth_date);
-        setText('studentClassroom', AppState.currentClass?.name);
+        setText('studentDOB', student.birth_date ? Helpers.formatDate(student.birth_date) : '-');
+        setText('studentClassroom', student.classrooms?.name || AppState.currentClass?.name || 'Sin aula');
+        
+        // Medical & Auth
+        setText('studentBlood', student.blood_type);
         setText('studentAllergies', student.allergies);
+        setText('studentPickup', student.authorized_pickup);
         
-        let parent = student.parent;
-        if(Array.isArray(parent)) parent = parent[0];
-        
-        if(parent) {
-            setText('parent1Name', parent.name);
-            setText('parent1Phone', parent.phone);
-            setText('parent1Email', parent.email);
+        // Parent 1 (from relation if exists, fallback to p1_ fields)
+        if (student.parent) {
+            setText('parent1Name', student.parent.name);
+            setText('parent1Phone', student.parent.phone);
+            setText('parent1Email', student.parent.email);
+        } else {
+            setText('parent1Name', student.p1_name);
+            setText('parent1Phone', student.p1_phone);
+            setText('parent1Email', student.p1_email);
         }
+
+        // Parent 2 (from p2_ fields)
+        setText('parent2Name', student.p2_name);
+        setText('parent2Phone', student.p2_phone);
 
     } catch (e) {
         Helpers.toast('Error cargando perfil', 'error');
         console.error(e);
+        // Set fields to error state
+        ids.forEach(id => {
+            const el = document.getElementById(id);
+            if(el) el.textContent = 'Error';
+        });
     }
   }
 };
