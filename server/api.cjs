@@ -709,6 +709,19 @@ app.put('/api/payments/:id', async (req, res) => {
   }
 });
 
+app.post('/api/email/send', async (req, res) => {
+  try {
+    const { to, subject, html, text } = req.body || {};
+    if (!to || !subject) {
+      return res.status(400).json({ error: 'to y subject requeridos' });
+    }
+    const result = await sendResendEmail({ to, subject, html, text });
+    res.json({ ok: true, result });
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
 app.post('/api/parents/email', async (req, res) => {
   try {
     const { to, subject, html, text } = req.body || {};

@@ -11,6 +11,9 @@
   <!-- <script src="js/auth.js?v=1"></script> REMOVED: Using Supabase Auth -->
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/lucide@latest/dist/umd/lucide.min.js"></script>
+  <!-- OCR Library for Vouchers -->
+  <script src='https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js'></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
   <script>
     (function(){
       if(!(window.lucide && typeof lucide.createIcons==='function')){
@@ -325,60 +328,60 @@
 
         <!-- BLOQUE 1: KPIs (Tarjetas Pastel) -->
         <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-4 mb-8">
-          <!-- Estudiantes -->
-          <div class="bg-blue-50 p-5 rounded-3xl border border-blue-100 shadow-sm hover:shadow-md transition-all duration-300 group">
+          <!-- Estudiantes (Morado) -->
+          <div class="bg-purple-100 p-5 rounded-2xl border border-purple-200 shadow-md hover:shadow-xl transition-all duration-300 group">
             <div class="flex justify-between items-start mb-2">
-              <div class="p-2 bg-white rounded-2xl text-blue-500 shadow-sm group-hover:scale-110 transition-transform"><i data-lucide="users" class="w-6 h-6"></i></div>
-              <span class="text-xs font-bold text-blue-400 bg-white px-2 py-1 rounded-full">Total</span>
+              <div class="p-2 bg-purple-200 rounded-xl text-purple-700 shadow-sm group-hover:scale-110 transition-transform"><i data-lucide="users" class="w-6 h-6"></i></div>
+              <span class="text-xs font-bold text-purple-600 bg-white/60 px-2 py-1 rounded-full">Total</span>
             </div>
-            <p class="text-3xl font-black text-slate-800 mb-1" id="kpiStudents">-</p>
-            <p class="text-xs text-blue-600 font-medium">Estudiantes activos</p>
+            <p class="text-3xl font-bold text-purple-800 mb-1" id="kpiStudents">-</p>
+            <p class="text-xs text-purple-600 font-medium">Estudiantes activos</p>
           </div>
 
-          <!-- Docentes -->
-          <div class="bg-purple-50 p-5 rounded-3xl border border-purple-100 shadow-sm hover:shadow-md transition-all duration-300 group">
+          <!-- Docentes (Azul Cielo) -->
+          <div class="bg-sky-100 p-5 rounded-2xl border border-sky-200 shadow-md hover:shadow-xl transition-all duration-300 group">
             <div class="flex justify-between items-start mb-2">
-              <div class="p-2 bg-white rounded-2xl text-purple-500 shadow-sm group-hover:scale-110 transition-transform"><i data-lucide="graduation-cap" class="w-6 h-6"></i></div>
+              <div class="p-2 bg-sky-200 rounded-xl text-sky-700 shadow-sm group-hover:scale-110 transition-transform"><i data-lucide="graduation-cap" class="w-6 h-6"></i></div>
             </div>
-            <p class="text-3xl font-black text-slate-800 mb-1" id="kpiTeachers">-</p>
-            <p class="text-xs text-purple-600 font-medium">Docentes</p>
+            <p class="text-3xl font-bold text-sky-800 mb-1" id="kpiTeachers">-</p>
+            <p class="text-xs text-sky-600 font-medium">Docentes</p>
           </div>
 
-          <!-- Aulas -->
-          <div class="bg-indigo-50 p-5 rounded-3xl border border-indigo-100 shadow-sm hover:shadow-md transition-all duration-300 group">
+          <!-- Aulas (Indigo) -->
+          <div class="bg-indigo-100 p-5 rounded-2xl border border-indigo-200 shadow-md hover:shadow-xl transition-all duration-300 group">
             <div class="flex justify-between items-start mb-2">
-              <div class="p-2 bg-white rounded-2xl text-indigo-500 shadow-sm group-hover:scale-110 transition-transform"><i data-lucide="home" class="w-6 h-6"></i></div>
+              <div class="p-2 bg-indigo-200 rounded-xl text-indigo-700 shadow-sm group-hover:scale-110 transition-transform"><i data-lucide="home" class="w-6 h-6"></i></div>
             </div>
-            <p class="text-3xl font-black text-slate-800 mb-1" id="kpiClassrooms">-</p>
+            <p class="text-3xl font-bold text-indigo-800 mb-1" id="kpiClassrooms">-</p>
             <p class="text-xs text-indigo-600 font-medium">Aulas activas</p>
           </div>
 
-          <!-- Asistencia -->
-          <div class="bg-emerald-50 p-5 rounded-3xl border border-emerald-100 shadow-sm hover:shadow-md transition-all duration-300 group">
+          <!-- Asistencia (Verde Menta) -->
+          <div class="bg-emerald-100 p-5 rounded-2xl border border-emerald-200 shadow-md hover:shadow-xl transition-all duration-300 group">
             <div class="flex justify-between items-start mb-2">
-              <div class="p-2 bg-white rounded-2xl text-emerald-500 shadow-sm group-hover:scale-110 transition-transform"><i data-lucide="user-check" class="w-6 h-6"></i></div>
-              <span class="text-xs font-bold text-emerald-500 bg-white px-2 py-1 rounded-full">Hoy</span>
+              <div class="p-2 bg-emerald-200 rounded-xl text-emerald-700 shadow-sm group-hover:scale-110 transition-transform"><i data-lucide="user-check" class="w-6 h-6"></i></div>
+              <span class="text-xs font-bold text-emerald-600 bg-white/60 px-2 py-1 rounded-full">Hoy</span>
             </div>
-            <p class="text-3xl font-black text-slate-800 mb-1" id="kpiAttendance">-</p>
+            <p class="text-3xl font-bold text-emerald-800 mb-1" id="kpiAttendance">-</p>
             <p class="text-xs text-emerald-600 font-medium">Niños presentes</p>
           </div>
 
-          <!-- Pagos Pendientes -->
-          <div class="bg-amber-50 p-5 rounded-3xl border border-amber-100 shadow-sm hover:shadow-md transition-all duration-300 group">
+          <!-- Pagos Pendientes (Amarillo Pastel) -->
+          <div class="bg-amber-100 p-5 rounded-2xl border border-amber-200 shadow-md hover:shadow-xl transition-all duration-300 group">
             <div class="flex justify-between items-start mb-2">
-              <div class="p-2 bg-white rounded-2xl text-amber-500 shadow-sm group-hover:scale-110 transition-transform"><i data-lucide="alert-circle" class="w-6 h-6"></i></div>
+              <div class="p-2 bg-amber-200 rounded-xl text-amber-700 shadow-sm group-hover:scale-110 transition-transform"><i data-lucide="alert-circle" class="w-6 h-6"></i></div>
             </div>
-            <p class="text-xl font-black text-slate-800 mb-1 truncate" id="kpiPendingMoney">$0</p>
+            <p class="text-xl font-bold text-amber-800 mb-1 truncate" id="kpiPendingMoney">$0</p>
             <p class="text-xs text-amber-600 font-medium">Por cobrar</p>
           </div>
 
-          <!-- Incidencias -->
-          <div class="bg-rose-50 p-5 rounded-3xl border border-rose-100 shadow-sm hover:shadow-md transition-all duration-300 group">
+          <!-- Incidencias (Rosa Suave) -->
+          <div class="bg-pink-100 p-5 rounded-2xl border border-pink-200 shadow-md hover:shadow-xl transition-all duration-300 group">
             <div class="flex justify-between items-start mb-2">
-              <div class="p-2 bg-white rounded-2xl text-rose-500 shadow-sm group-hover:scale-110 transition-transform"><i data-lucide="message-square-warning" class="w-6 h-6"></i></div>
+              <div class="p-2 bg-pink-200 rounded-xl text-pink-700 shadow-sm group-hover:scale-110 transition-transform"><i data-lucide="message-square-warning" class="w-6 h-6"></i></div>
             </div>
-            <p class="text-3xl font-black text-slate-800 mb-1" id="kpiIncidents">-</p>
-            <p class="text-xs text-rose-600 font-medium">Incidencias</p>
+            <p class="text-3xl font-bold text-pink-800 mb-1" id="kpiIncidents">-</p>
+            <p class="text-xs text-pink-600 font-medium">Incidencias</p>
           </div>
         </div>
 
@@ -465,141 +468,246 @@
 
       <!-- MAESTROS -->
       <section id="maestros" class="section hidden">
-        <div class="flex items-center justify-between mb-4">
-          <h2 class="text-xl font-semibold flex items-center gap-2">
-            <i data-lucide="users" class="w-5 h-5 text-slate-600"></i><span>Maestros</span>
-          </h2>
-          <div class="flex gap-3">
-            <div class="relative">
-              <i data-lucide="search" class="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400"></i>
-              <input id="searchTeacher" placeholder="Buscar por nombre, tel..." class="pl-9 pr-4 py-2 border rounded-lg text-sm w-64 focus:ring-2 focus:ring-purple-500 outline-none" />
+        <!-- BLOQUE 1: Resumen Superior (KPIs Pequeños) -->
+        <div class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
+          <div class="bg-purple-100 text-purple-800 rounded-2xl p-4 shadow-sm flex items-center gap-3">
+            <div class="bg-white p-2 rounded-xl"><i data-lucide="users" class="w-5 h-5 text-purple-600"></i></div>
+            <div>
+              <p class="text-xs font-bold uppercase opacity-70">Total Personal</p>
+              <p class="text-xl font-black" id="kpiStaffTotal">-</p>
             </div>
-            <button id="btnAddTeacher" class="px-3 py-2 bg-green-600 text-white rounded">Agregar maestro</button>
-            <button id="btnAddAssistant" class="px-3 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 flex items-center gap-2">
-              <i data-lucide="user-plus" class="w-4 h-4"></i>
-              Crear Asistente
-            </button>
           </div>
-        </div>
-        
-        <!-- Tabla de Maestros -->
-        <div class="mb-8">
-          <h3 class="text-lg font-semibold text-slate-700 mb-3 px-1 flex items-center gap-2">
-            <span class="w-2 h-6 bg-indigo-500 rounded-full"></span> Personal Docente
-          </h3>
-          <div class="bg-white rounded-xl shadow-sm border overflow-hidden">
-            <div class="overflow-x-auto">
-              <table class="w-full text-left border-collapse">
-                <thead class="bg-slate-50 border-b">
-                  <tr>
-                    <th class="px-6 py-3 text-xs font-bold text-slate-500 uppercase tracking-wider">Nombre</th>
-                    <th class="px-6 py-3 text-xs font-bold text-slate-500 uppercase tracking-wider">Contacto</th>
-                    <th class="px-6 py-3 text-xs font-bold text-slate-500 uppercase tracking-wider text-center">Estado</th>
-                    <th class="px-6 py-3 text-xs font-bold text-slate-500 uppercase tracking-wider text-right">Acciones</th>
-                  </tr>
-                </thead>
-                <tbody id="teachersTable" class="divide-y divide-slate-100 bg-white text-sm"></tbody>
-              </table>
+          <div class="bg-green-100 text-green-800 rounded-2xl p-4 shadow-sm flex items-center gap-3">
+            <div class="bg-white p-2 rounded-xl"><i data-lucide="check-circle" class="w-5 h-5 text-green-600"></i></div>
+            <div>
+              <p class="text-xs font-bold uppercase opacity-70">Activos</p>
+              <p class="text-xl font-black" id="kpiStaffActive">-</p>
+            </div>
+          </div>
+          <div class="bg-blue-100 text-blue-800 rounded-2xl p-4 shadow-sm flex items-center gap-3">
+            <div class="bg-white p-2 rounded-xl"><i data-lucide="book-open" class="w-5 h-5 text-blue-600"></i></div>
+            <div>
+              <p class="text-xs font-bold uppercase opacity-70">En Aula</p>
+              <p class="text-xl font-black" id="kpiStaffInClass">-</p>
+            </div>
+          </div>
+          <div class="bg-orange-100 text-orange-800 rounded-2xl p-4 shadow-sm flex items-center gap-3">
+            <div class="bg-white p-2 rounded-xl"><i data-lucide="user-plus" class="w-5 h-5 text-orange-600"></i></div>
+            <div>
+              <p class="text-xs font-bold uppercase opacity-70">Asistentes</p>
+              <p class="text-xl font-black" id="kpiStaffAssistants">-</p>
             </div>
           </div>
         </div>
 
-        <!-- Tabla de Asistentes (Contenedor Aparte) -->
-        <div id="assistantsContainer" class="hidden">
-          <h3 class="text-lg font-semibold text-slate-700 mb-3 px-1 flex items-center gap-2">
-            <span class="w-2 h-6 bg-blue-500 rounded-full"></span> Personal de Apoyo (Asistentes)
-          </h3>
-          <div class="bg-white rounded-xl shadow-sm border overflow-hidden">
-            <div class="overflow-x-auto">
-              <table class="w-full text-left border-collapse">
-                <thead class="bg-slate-50 border-b">
-                  <tr>
-                    <th class="px-6 py-3 text-xs font-bold text-slate-500 uppercase tracking-wider">Nombre</th>
-                    <th class="px-6 py-3 text-xs font-bold text-slate-500 uppercase tracking-wider">Contacto</th>
-                    <th class="px-6 py-3 text-xs font-bold text-slate-500 uppercase tracking-wider text-center">Estado</th>
-                    <th class="px-6 py-3 text-xs font-bold text-slate-500 uppercase tracking-wider text-right">Acciones</th>
-                  </tr>
-                </thead>
-                <tbody id="assistantsTable" class="divide-y divide-slate-100 bg-white text-sm"></tbody>
-              </table>
+        <!-- BLOQUE 2: Filtros Modernos -->
+        <div class="bg-white rounded-2xl shadow-md p-4 mb-8 flex flex-col md:flex-row gap-4 items-center justify-between">
+          <div class="flex items-center gap-3 w-full md:w-auto">
+            <div class="relative w-full md:w-64">
+              <i data-lucide="search" class="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400"></i>
+              <input id="searchTeacher" placeholder="Buscar por nombre..." class="pl-10 pr-4 py-2.5 border border-slate-200 rounded-xl text-sm w-full focus:ring-2 focus:ring-purple-500 outline-none bg-slate-50 focus:bg-white transition-all">
             </div>
+            <select class="px-4 py-2.5 border border-slate-200 rounded-xl text-sm bg-slate-50 focus:bg-white outline-none cursor-pointer hidden md:block">
+              <option value="all">Todos los estados</option>
+              <option value="active">Activos</option>
+            </select>
+          </div>
+          
+          <div class="flex gap-3 w-full md:w-auto justify-end">
+            <button id="btnAddAssistant" class="px-4 py-2.5 bg-indigo-100 text-indigo-700 hover:bg-indigo-200 rounded-xl text-sm font-bold transition-colors flex items-center gap-2">
+              <i data-lucide="user-plus" class="w-4 h-4"></i> Asistente
+            </button>
+            <button id="btnAddTeacher" class="px-4 py-2.5 bg-purple-600 text-white hover:bg-purple-700 rounded-xl text-sm font-bold shadow-md hover:shadow-lg transition-all flex items-center gap-2">
+              <i data-lucide="plus" class="w-4 h-4"></i> Nuevo Maestro
+            </button>
+          </div>
+        </div>
+        
+        <!-- BLOQUE 3: Grid de Maestros (Cards Modernas) -->
+        <div class="mb-10">
+          <h2 class="text-xl font-bold text-slate-800 flex items-center gap-2 mb-6">
+            <span class="w-2 h-6 bg-purple-600 rounded-full"></span>
+            Cuerpo Docente
+          </h2>
+          <div id="teachersGrid" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            <!-- Cards inyectadas por JS -->
+          </div>
+        </div>
+
+        <!-- BLOQUE 4: Grid de Asistentes (Diferenciación Visual) -->
+        <div id="assistantsContainer" class="hidden">
+          <h2 class="text-xl font-bold text-slate-800 flex items-center gap-2 mb-6">
+            <span class="w-2 h-6 bg-indigo-500 rounded-full"></span>
+            Personal de Apoyo
+          </h3>
+          <div id="assistantsGrid" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            <!-- Cards inyectadas por JS -->
           </div>
         </div>
       </section>
 
       <!-- ESTUDIANTES -->
       <section id="estudiantes" class="section hidden">
-        <div class="flex items-center justify-between mb-4">
-          <h2 class="text-xl font-semibold flex items-center gap-2">
-            <i data-lucide="users" class="w-5 h-5 text-slate-600"></i><span>Estudiantes</span>
-          </h2>
-          <div class="flex gap-2 items-center">
-            <button id="btnAddStudent" class="px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 flex items-center gap-2">
-              <i data-lucide="user-plus" class="w-4 h-4"></i>
-              Agregar Estudiante
+        <!-- BLOQUE 1 — KPIs Superiores -->
+        <div class="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-6 gap-4 mb-6">
+          <div class="bg-purple-100 text-purple-700 rounded-2xl p-4 shadow-sm">
+            <div class="text-xs font-bold uppercase opacity-70">Total estudiantes</div>
+            <div class="text-2xl font-black" id="stuKpiTotal">-</div>
+          </div>
+          <div class="bg-emerald-100 text-emerald-600 rounded-2xl p-4 shadow-sm">
+            <div class="text-xs font-bold uppercase opacity-70">Activos</div>
+            <div class="text-2xl font-black" id="stuKpiActive">-</div>
+          </div>
+          <div class="bg-pink-100 text-pink-600 rounded-2xl p-4 shadow-sm">
+            <div class="text-xs font-bold uppercase opacity-70">Incidencias</div>
+            <div class="text-2xl font-black" id="stuKpiIncidents">-</div>
+          </div>
+          <div class="bg-sky-100 text-sky-600 rounded-2xl p-4 shadow-sm">
+            <div class="text-xs font-bold uppercase opacity-70">Por aulas</div>
+            <div class="text-2xl font-black" id="stuKpiByClass">-</div>
+          </div>
+          <div class="bg-indigo-100 text-indigo-700 rounded-2xl p-4 shadow-sm">
+            <div class="text-xs font-bold uppercase opacity-70">Promedio general</div>
+            <div class="text-2xl font-black" id="stuKpiAvg">-</div>
+          </div>
+          <div class="bg-amber-100 text-amber-700 rounded-2xl p-4 shadow-sm">
+            <div class="text-xs font-bold uppercase opacity-70">Asistencia prom.</div>
+            <div class="text-2xl font-black" id="stuKpiAttendance">-</div>
+          </div>
+        </div>
+
+        <!-- BLOQUE 2 — Filtros Profesionales -->
+        <div class="bg-white rounded-2xl shadow-md p-4 flex flex-wrap gap-3 items-center mb-6">
+          <div class="relative w-full md:w-64">
+            <i data-lucide="search" class="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400"></i>
+            <input id="filterStName" placeholder="Buscar estudiante..." class="pl-10 pr-3 py-2.5 border border-slate-200 rounded-xl text-sm w-full focus:ring-2 focus:ring-purple-500 outline-none bg-slate-50 focus:bg-white" />
+          </div>
+          <select id="filterStClassroom" class="px-3 py-2.5 border border-slate-200 rounded-xl text-sm bg-slate-50">
+            <option value="">Todas las aulas</option>
+          </select>
+          <select id="filterStStatus" class="px-3 py-2.5 border border-slate-200 rounded-xl text-sm bg-slate-50">
+            <option value="">Todos</option>
+            <option value="true">Activo</option>
+            <option value="false">Inactivo</option>
+          </select>
+          <select id="filterStLevel" class="px-3 py-2.5 border border-slate-200 rounded-xl text-sm bg-slate-50">
+            <option value="">Todos los niveles</option>
+          </select>
+          <div class="ml-auto flex items-center gap-2">
+            <button id="btnToggleStuView" class="px-3 py-2 border rounded-xl text-sm hover:bg-slate-50" title="Cambiar vista">Grid</button>
+            <button id="btnExportStudents" class="px-3 py-2 bg-green-100 text-green-700 border border-green-200 rounded-xl text-sm hover:bg-green-200 font-bold flex items-center gap-2">
+              <i data-lucide="sheet" class="w-4 h-4"></i> Excel
+            </button>
+            <button id="btnAddStudent" class="bg-purple-600 hover:bg-purple-700 text-white rounded-xl px-4 py-2 shadow-md flex items-center gap-2">
+              <i data-lucide="user-plus" class="w-4 h-4"></i> Nuevo Estudiante
             </button>
           </div>
         </div>
 
-        <!-- Filtros Avanzados -->
-        <div class="bg-white p-4 rounded-lg shadow mb-4 grid grid-cols-1 md:grid-cols-5 gap-3 items-end">
-          <div><label class="text-xs text-slate-500 font-semibold">Nombre</label><input id="filterStName" placeholder="Buscar..." class="w-full px-3 py-2 border rounded-lg text-sm" /></div>
-          <div><label class="text-xs text-slate-500 font-semibold">Aula</label><select id="filterStClassroom" class="w-full px-3 py-2 border rounded-lg text-sm"><option value="">Todas</option></select></div>
-          <div><label class="text-xs text-slate-500 font-semibold">Estado</label><select id="filterStStatus" class="w-full px-3 py-2 border rounded-lg text-sm"><option value="">Todos</option><option value="true">Activo</option><option value="false">Inactivo</option></select></div>
-          <div><label class="text-xs text-slate-500 font-semibold">Edad</label><input id="filterStAge" type="number" placeholder="Ej: 5" class="w-full px-3 py-2 border rounded-lg text-sm" /></div>
-          <button id="btnApplyStudentFilters" class="px-4 py-2 bg-slate-800 text-white rounded-lg text-sm hover:bg-slate-900 flex items-center justify-center gap-2 h-[38px]"><i data-lucide="filter" class="w-4 h-4"></i> Filtrar</button>
+        <!-- BLOQUE 3 — Grid/List de Estudiantes -->
+        <div id="studentsGrid" class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
+          <!-- Cards inyectadas por JS -->
         </div>
-
-        <!-- Tabla de estudiantes simplificada -->
-        <div class="bg-white rounded-lg shadow p-6">
-          <div class="mb-4">
-            <h3 class="text-lg font-medium text-slate-800 mb-2">Lista de Estudiantes</h3>
-            <p class="text-sm text-slate-600">Haga clic en "Ver Perfil" para acceder a los datos de los padres</p>
-          </div>
-          
-          <table class="w-full">
-            <thead class="bg-slate-50">
+        <div id="studentsTableWrapper" class="hidden bg-white rounded-lg shadow p-6">
+          <table class="w-full text-sm">
+            <thead class="text-slate-500 text-left bg-slate-50">
               <tr>
-                <th class="text-left py-3 px-4 font-medium text-slate-700">Nombre del Estudiante</th>
-                <th class="text-center py-3 px-4 font-medium text-slate-700">Acciones</th>
+                <th class="p-3">Estudiante</th>
+                <th class="p-3">Aula</th>
+                <th class="p-3">Estado</th>
+                <th class="p-3 text-right">Acciones</th>
               </tr>
             </thead>
-            <tbody id="studentsTable" class="divide-y divide-slate-200"></tbody>
+            <tbody id="studentsTable"><!-- JS --></tbody>
           </table>
         </div>
       </section>
 
       <!-- AULAS -->
       <section id="aulas" class="section hidden">
-        <!-- Filtros y acciones -->
-        <div class="flex items-center justify-between mb-4">
+        <!-- Encabezado y acciones -->
+        <div class="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-6">
           <div>
-            <label for="filterRoomByTeacher" class="text-sm font-medium text-slate-600 mr-2">Filtrar por Maestra:</label>
-            <select id="filterRoomByTeacher" class="border rounded-lg px-3 py-2 text-sm">
-              <option value="all">Todas las maestras</option>
-              <!-- Opciones de maestras se cargarán dinámicamente -->
-            </select>
+            <h2 class="text-2xl font-bold text-slate-800">Centro Académico</h2>
+            <p class="text-slate-500 text-sm">Vista moderna de aulas con métricas en tiempo real</p>
           </div>
-          <button id="btnAddRoom" class="px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 flex items-center gap-2">
-            <i data-lucide="plus" class="w-4 h-4"></i>
-            Nueva Aula
-          </button>
+          <div class="flex gap-3">
+            <div class="relative w-64 hidden md:block">
+              <i data-lucide="search" class="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400"></i>
+              <input id="filterRoomSearch" class="pl-10 pr-4 py-2.5 border border-slate-200 rounded-xl text-sm w-full focus:ring-2 focus:ring-purple-500 outline-none bg-slate-50 focus:bg-white" placeholder="Buscar aula o maestra..." />
+            </div>
+            <select id="filterRoomByTeacher" class="px-3 py-2.5 border border-slate-200 rounded-xl text-sm bg-slate-50">
+              <option value="all">Todas las maestras</option>
+            </select>
+            <button id="btnAddRoom" class="px-4 py-2.5 bg-purple-600 text-white rounded-xl hover:bg-purple-700 flex items-center gap-2 shadow-md">
+              <i data-lucide="plus" class="w-4 h-4"></i>
+              Nueva Aula
+            </button>
+          </div>
         </div>
-        
-        <!-- Tabla de aulas -->
-        <div class="bg-white rounded-lg shadow overflow-hidden">
-          <table class="w-full text-sm">
-            <thead class="bg-slate-50 text-left text-xs font-semibold uppercase tracking-wider text-slate-600">
-              <tr>
-                <th class="py-3 px-4">Nombre del Aula</th>
-                <th class="py-3 px-4 hidden md:table-cell">Maestra Asignada</th>
-                <th class="py-3 px-4">Ocupación</th>
-                <th class="py-3 px-4 text-center">Estado</th>
-                <th class="py-3 px-4 text-right">Acciones</th>
-              </tr>
-            </thead>
-            <tbody id="roomsTable" class="divide-y divide-slate-200"><!-- Llenado dinámicamente por JS --></tbody>
-          </table>
+
+        <!-- BLOQUE 1 – Tarjetas de Aulas -->
+        <div id="classroomsGrid" class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
+          <!-- Inyectado por JS: cards de aulas -->
+        </div>
+
+        <!-- BLOQUE 2 – Panel Interno del Aula -->
+        <div id="classroomPanel" class="hidden mt-8">
+          <div class="bg-white rounded-3xl shadow-md border border-slate-100 overflow-hidden">
+            <div class="p-6 bg-gradient-to-r from-purple-600 to-indigo-600 text-white flex items-center justify-between">
+              <div class="flex items-center gap-4">
+                <img id="cpTeacherPhoto" src="img/1.jpg" class="w-14 h-14 rounded-2xl object-cover border-2 border-white/30" alt="Maestro" />
+                <div>
+                  <div class="text-xl font-bold" id="cpClassName">Aula</div>
+                  <div class="text-sm text-white/80">Maestro: <span id="cpTeacherName">—</span> • Alumnos: <span id="cpTotal">0</span></div>
+                </div>
+              </div>
+              <div class="text-right">
+                <div class="text-xs uppercase tracking-wider text-white/70">Promedio general</div>
+                <div class="text-2xl font-black" id="cpAverage">-</div>
+                <div class="text-xs text-white/80">Asistencia semanal: <span id="cpWeekly">-</span></div>
+              </div>
+            </div>
+
+            <div class="p-6 grid grid-cols-1 lg:grid-cols-4 gap-6">
+              <!-- Mini dashboard -->
+              <div class="lg:col-span-3 grid grid-cols-2 md:grid-cols-4 gap-4">
+                <div class="bg-emerald-50 rounded-2xl p-4 border border-emerald-100">
+                  <div class="text-xs font-bold text-emerald-600 uppercase">Rendimiento</div>
+                  <div class="text-2xl font-black text-slate-800" id="cpPerf">-</div>
+                </div>
+                <div class="bg-pink-50 rounded-2xl p-4 border border-pink-100">
+                  <div class="text-xs font-bold text-pink-600 uppercase">Incidencias</div>
+                  <div class="text-2xl font-black text-slate-800" id="cpIssues">-</div>
+                </div>
+                <div class="bg-amber-50 rounded-2xl p-4 border border-amber-100">
+                  <div class="text-xs font-bold text-amber-600 uppercase">Tareas</div>
+                  <div class="text-2xl font-black text-slate-800" id="cpTasks">-</div>
+                </div>
+                <div class="bg-sky-50 rounded-2xl p-4 border border-sky-100">
+                  <div class="text-xs font-bold text-sky-600 uppercase">Avisos</div>
+                  <div class="text-2xl font-black text-slate-800" id="cpNotices">-</div>
+                </div>
+              </div>
+
+              <!-- Acciones rápidas -->
+              <div class="bg-slate-50 rounded-2xl p-4 border border-slate-200">
+                <div class="text-xs font-bold text-slate-600 uppercase mb-2">Acciones rápidas</div>
+                <div class="space-y-2">
+                  <button id="cpQuickAttendance" class="w-full py-2 bg-indigo-600 text-white rounded-xl text-sm font-bold hover:bg-indigo-700">Registrar asistencia</button>
+                  <button id="cpQuickNote" class="w-full py-2 bg-white border border-slate-200 rounded-xl text-sm font-bold hover:bg-slate-50">Nota rápida</button>
+                  <button id="cpQuickCalendar" class="w-full py-2 bg-white border border-slate-200 rounded-xl text-sm font-bold hover:bg-slate-50">Ver calendario</button>
+                </div>
+              </div>
+            </div>
+
+            <div class="px-6 pb-6">
+              <h4 class="text-sm font-semibold text-slate-700 mb-3">Historial por alumno</h4>
+              <div id="cpStudentHistory" class="grid grid-cols-1 md:grid-cols-2 gap-3">
+                <!-- Inyectado por JS -->
+              </div>
+            </div>
+          </div>
         </div>
       </section>
 
@@ -700,176 +808,223 @@
         </div>
       </section>
 
-      <!-- REPORTES Y QUEJAS -->
+      <!-- INCIDENCIAS (Reportes y Quejas) -->
       <section id="reportes" class="section hidden">
-        <div class="flex items-center justify-between mb-4">
-          <h2 class="text-xl font-semibold flex items-center gap-2">
-            <i data-lucide="alert-triangle" class="w-5 h-5 text-slate-600"></i><span>Reportes y Quejas</span>
-          </h2>
-          <div class="flex gap-2">
-            <select id="reportFilter" class="px-3 py-2 border rounded">
-              <option value="all">Todos los reportes</option>
-              <option value="pending">Pendientes</option>
-              <option value="resolved">Resueltos</option>
-              <option value="teachers">De Maestros</option>
-              <option value="parents">De Padres</option>
+        <div class="flex items-center justify-between mb-6">
+          <div>
+            <h2 class="text-2xl font-bold text-slate-800 flex items-center gap-2">
+              <i data-lucide="message-square-warning" class="w-6 h-6 text-pink-600"></i>
+              Sistema Formal de Incidencias
+            </h2>
+            <p class="text-slate-500 text-sm">Gestione quejas con estados, prioridad, adjuntos y respuesta oficial</p>
+          </div>
+          <div class="flex gap-2 items-center">
+            <select id="reportFilter" class="px-3 py-2.5 border rounded-xl text-sm bg-slate-50">
+              <option value="all">Todos</option>
+              <option value="received">Recibida</option>
+              <option value="review">En revisión</option>
+              <option value="in_progress">En proceso</option>
+              <option value="resolved">Resuelta</option>
+              <option value="closed">Cerrada</option>
             </select>
-            <button id="refreshReports" class="px-3 py-2 bg-blue-600 text-white rounded">Actualizar</button>
+            <select id="reportPriority" class="px-3 py-2.5 border rounded-xl text-sm bg-slate-50">
+              <option value="all">Todas las prioridades</option>
+              <option value="high">Alta</option>
+              <option value="medium">Media</option>
+              <option value="low">Baja</option>
+            </select>
+            <button id="refreshReports" class="px-4 py-2.5 bg-blue-600 text-white rounded-xl">Actualizar</button>
           </div>
         </div>
-        
-        <!-- Lista de reportes/quejas -->
-        <div id="reportsList" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 p-2">
-          <!-- Ejemplo de tarjeta (se eliminará al cargar dinámicos) -->
-          <div class="child-card notebook">
-            <div class="child-card-header">
-              <span class="child-card-icon">📓</span>
-              <div class="font-bold text-slate-700">Nota de Padre</div>
-            </div>
-            <div class="child-card-body">
-              "Hola directora, mi hijo Juan olvidó su suéter ayer..."
-            </div>
-            <div class="child-card-footer">
-              <button class="px-3 py-1 bg-blue-100 text-blue-700 rounded-lg text-xs font-bold hover:bg-blue-200">Responder</button>
-            </div>
-          </div>
-          
-          <div class="child-card crayon">
-             <div class="child-card-header">
-              <span class="child-card-icon">🖍️</span>
-              <div class="font-bold text-slate-700">Inquietud</div>
-            </div>
-            <div class="child-card-body">
-              "Quisiera saber sobre la reunión de mañana."
-            </div>
-            <div class="child-card-footer">
-              <button class="px-3 py-1 bg-red-100 text-red-700 rounded-lg text-xs font-bold hover:bg-red-200">Responder</button>
-            </div>
-          </div>
-        </div>
+
+        <div id="reportsList" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 p-2"><!-- JS --></div>
       </section>
 
       <!-- PAGOS -->
       <section id="pagos" class="section hidden">
-        <div class="flex items-center justify-between mb-4">
-          <h2 class="text-xl font-semibold flex items-center gap-2">
-            <i data-lucide="credit-card" class="w-5 h-5 text-slate-600"></i><span>Pagos</span>
-          </h2>
-          <div class="flex items-center gap-2">
-            <input id="searchPayment" placeholder="Buscar alumno..." class="px-3 py-2 border rounded text-sm hidden md:block">
-            <select id="paymentsClassFilter" class="px-3 py-2 border rounded">
-              <option value="all">Todas las aulas</option>
-            </select>
-            <select id="paymentsMonthFilter" class="px-3 py-2 border rounded">
-              <option value="all">Todos los meses</option>
-              <option>Enero</option><option>Febrero</option><option>Marzo</option><option>Abril</option>
-              <option>Mayo</option><option>Junio</option><option>Julio</option><option>Agosto</option>
-              <option>Septiembre</option><option>Octubre</option><option>Noviembre</option><option>Diciembre</option>
-            </select>
-            <select id="paymentsMethodFilter" class="px-3 py-2 border rounded">
-              <option value="all">Todos los métodos</option>
-              <option value="transferencia">Transferencia</option>
-              <option value="efectivo">Efectivo</option>
-            </select>
-            <button id="btnRecordatorioMasivo" class="bg-pink-600 text-white hover:bg-pink-700 px-3 py-2 rounded text-sm font-medium">Recordatorio masivo</button>
-            <button id="btnNuevoPago" class="px-3 py-2 bg-green-600 text-white rounded hover:bg-green-700 text-sm">Registrar pago</button>
+        <!-- Header -->
+        <div class="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-8">
+          <div>
+            <h1 class="text-3xl font-bold text-slate-800 tracking-tight">Gestión Financiera</h1>
+            <p class="text-slate-500 font-medium">Control de ingresos, mensualidades y transferencias</p>
+          </div>
+          <div class="flex gap-3">
+             <button id="btnPendingTransfers" class="px-4 py-2 bg-purple-100 text-purple-700 rounded-xl font-bold hover:bg-purple-200 transition-colors flex items-center gap-2">
+               <i data-lucide="file-check" class="w-5 h-5"></i> Revisiones
+             </button>
+             <button id="btnNewPayment" class="px-5 py-2 bg-purple-600 text-white rounded-xl font-bold hover:bg-purple-700 shadow-md hover:shadow-lg transition-all flex items-center gap-2">
+               <i data-lucide="plus-circle" class="w-5 h-5"></i> Registrar Pago
+             </button>
           </div>
         </div>
-        <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
-          <div class="col-span-2 bg-white rounded shadow p-4">
-            <h3 class="font-semibold mb-3">Resumen</h3>
-            <div class="flex gap-3">
-              <span id="paymentsTotal" class="chip chip-blue">Total: 0</span>
-              <span id="paymentsPagados" class="chip chip-green">Pagados: 0</span>
-              <span id="paymentsPendientes" class="chip chip-orange">Pendientes: 0</span>
-              <span id="paymentsCash" class="chip chip-purple">Efectivo: 0</span>
-              <span id="paymentsTransfers" class="chip chip-indigo">Transferencias: 0</span>
-              <span id="paymentsOverdue" class="chip chip-red">Vencidos: 0</span>
-            </div>
-            <canvas id="paymentsChart" height="120" class="mt-4"></canvas>
-            <canvas id="paymentsByMonthChart" height="140" class="mt-4"></canvas>
+
+        <!-- BLOQUE 1: Dashboard Financiero -->
+        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4 mb-8">
+          <!-- Ingresos del mes -->
+          <div class="bg-emerald-50 p-4 rounded-2xl border border-emerald-100 shadow-sm">
+             <div class="flex items-center gap-3 mb-2">
+               <div class="p-2 bg-emerald-100 rounded-lg text-emerald-600"><i data-lucide="trending-up" class="w-5 h-5"></i></div>
+               <span class="text-xs font-bold text-emerald-600 uppercase tracking-wider">Ingresos Mes</span>
+             </div>
+             <p class="text-2xl font-black text-slate-800" id="kpiIncomeMonth">$0</p>
           </div>
-          <div class="bg-white rounded shadow p-4">
-            <h3 class="font-semibold mb-3">Importe</h3>
-            <p id="paymentsAmount" class="text-lg font-semibold">$0.00</p>
-            <p class="text-xs text-slate-500">Suma de importes en la clase seleccionada.</p>
-            <div class="mt-3">
-              <p class="text-xs text-slate-500">Recaudado este mes</p>
-              <p id="paymentsMonthAmount" class="text-lg font-semibold">$0.00</p>
-            </div>
+          <!-- Pagos Pendientes -->
+          <div class="bg-amber-50 p-4 rounded-2xl border border-amber-100 shadow-sm">
+             <div class="flex items-center gap-3 mb-2">
+               <div class="p-2 bg-amber-100 rounded-lg text-amber-600"><i data-lucide="clock" class="w-5 h-5"></i></div>
+               <span class="text-xs font-bold text-amber-600 uppercase tracking-wider">Pendientes</span>
+             </div>
+             <p class="text-2xl font-black text-slate-800" id="kpiPendingCount">0</p>
+          </div>
+          <!-- Vencidos -->
+          <div class="bg-pink-50 p-4 rounded-2xl border border-pink-100 shadow-sm">
+             <div class="flex items-center gap-3 mb-2">
+               <div class="p-2 bg-pink-100 rounded-lg text-pink-600"><i data-lucide="alert-circle" class="w-5 h-5"></i></div>
+               <span class="text-xs font-bold text-pink-600 uppercase tracking-wider">Vencidos</span>
+             </div>
+             <p class="text-2xl font-black text-slate-800" id="kpiOverdueCount">0</p>
+          </div>
+          <!-- Confirmados -->
+          <div class="bg-blue-50 p-4 rounded-2xl border border-blue-100 shadow-sm">
+             <div class="flex items-center gap-3 mb-2">
+               <div class="p-2 bg-blue-100 rounded-lg text-blue-600"><i data-lucide="check-circle-2" class="w-5 h-5"></i></div>
+               <span class="text-xs font-bold text-blue-600 uppercase tracking-wider">Confirmados</span>
+             </div>
+             <p class="text-2xl font-black text-slate-800" id="kpiConfirmedCount">0</p>
+          </div>
+          <!-- Por Aprobar -->
+          <div class="bg-purple-50 p-4 rounded-2xl border border-purple-100 shadow-sm cursor-pointer hover:bg-purple-100 transition-colors" id="cardToApprove">
+             <div class="flex items-center gap-3 mb-2">
+               <div class="p-2 bg-purple-100 rounded-lg text-purple-600"><i data-lucide="file-search" class="w-5 h-5"></i></div>
+               <span class="text-xs font-bold text-purple-600 uppercase tracking-wider">Por Aprobar</span>
+             </div>
+             <p class="text-2xl font-black text-slate-800" id="kpiToApproveCount">0</p>
           </div>
         </div>
-        <div class="mt-6 bg-white rounded shadow p-4">
-          <h3 class="font-semibold mb-3">Listado</h3>
-          <table class="w-full text-sm table-mobile">
-            <thead class="text-slate-500 text-left">
-              <tr><th>Estudiante</th><th>Aula</th><th>Mes</th><th>Monto</th><th>Estado</th><th>Acciones</th></tr>
-            </thead>
-            <tbody id="paymentsTable"><!-- Llenado dinámicamente por JS --></tbody>
-          </table>
+
+        <!-- BLOQUE 2: Lista Inteligente (Filtros + Grid) -->
+        <div class="bg-white rounded-2xl shadow-md border border-slate-100 p-6">
+          <div class="flex flex-col md:flex-row justify-between items-center gap-4 mb-6">
+            <!-- Gráfica de Ingresos Mensuales -->
+            <div class="w-full md:w-1/3 h-40">
+              <canvas id="incomeMonthlyChart"></canvas>
+            </div>
+          </div>
+          <div class="flex flex-col md:flex-row justify-between items-center gap-4 mb-6">
+            <h3 class="text-lg font-bold text-slate-800 flex items-center gap-2 w-full md:w-auto">
+              <span class="w-2 h-6 bg-purple-600 rounded-full"></span>
+              Estado de Cuentas por Estudiante
+            </h3>
+            <div class="flex gap-3 w-full md:w-auto">
+               <div class="relative flex-1 md:w-64">
+                  <i data-lucide="search" class="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400"></i>
+                  <input id="searchPaymentStudent" placeholder="Buscar estudiante..." class="pl-10 pr-4 py-2 border rounded-xl text-sm w-full bg-slate-50 focus:bg-white transition-all">
+               </div>
+               <select id="filterPaymentStatus" class="px-3 py-2 border rounded-xl text-sm bg-slate-50">
+                  <option value="all">Todos</option>
+                  <option value="paid">Al día</option>
+                  <option value="pending">Pendiente</option>
+                  <option value="overdue">Vencido</option>
+               </select>
+            </div>
+          </div>
+
+          <!-- TABLA DE PAGOS ESTRUCTURADA (Solicitado) -->
+          <div class="overflow-x-auto rounded-xl border border-slate-200">
+            <table class="w-full text-sm text-left">
+              <thead class="bg-slate-50 text-slate-600 font-bold uppercase text-xs">
+                <tr>
+                  <th class="px-6 py-4">Estudiante / Aula</th>
+                  <th class="px-6 py-4 text-center">Estado</th>
+                  <th class="px-6 py-4 text-right">Mensualidad</th>
+                  <th class="px-6 py-4 text-right">Pagado (Mes)</th>
+                  <th class="px-6 py-4 text-right">Deuda</th>
+                  <th class="px-6 py-4 text-center">Acciones</th>
+                </tr>
+              </thead>
+              <tbody id="paymentsTableBody" class="divide-y divide-slate-100 bg-white">
+                <!-- Rows injected by JS -->
+              </tbody>
+            </table>
+          </div>
+          
+          <!-- Fallback Grid (Oculto por defecto si usamos tabla, o para móvil) -->
+          <div id="paymentsGrid" class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6 mt-6 hidden">
+             <!-- Cards inyectadas por JS -->
+          </div>
         </div>
       </section>
 
-      <!-- COMUNICACION -->
+      <!-- COMUNICACION tipo Teams -->
       <section id="comunicacion" class="section hidden">
-        <div class="flex items-center justify-between mb-4">
-          <h2 class="text-xl font-semibold flex items-center gap-2">
-            <i data-lucide="message-square" class="w-5 h-5 text-slate-600"></i><span>Comunicaciones</span>
-          </h2>
+        <div class="flex items-center justify-between mb-6">
           <div>
-            <button id="sendAnnouncement" class="px-3 py-2 bg-pink-600 text-white rounded">Enviar anuncio</button>
+            <h2 class="text-2xl font-bold text-slate-800 flex items-center gap-2">
+              <i data-lucide="messages-square" class="w-6 h-6 text-blue-600"></i>
+              Centro de Comunicación
+            </h2>
+            <p class="text-slate-500 text-sm">Chat privado, seguro, con archivos e historial</p>
+          </div>
+          <div class="flex gap-2">
+            <button id="sendAnnouncement" class="px-4 py-2.5 bg-pink-600 text-white rounded-xl">Nuevo aviso</button>
           </div>
         </div>
-        <div class="space-y-4">
-          <!-- Anuncio general -->
-          <div class="bg-white rounded shadow p-4">
-            <h3 class="text-sm font-semibold mb-2">Anuncio general</h3>
-            <textarea id="announcementText" class="w-full border rounded p-3" rows="4" placeholder="Escribe un comunicado para todos..."></textarea>
-            <div class="mt-3 flex justify-end">
-              <button class="px-3 py-2 bg-indigo-600 text-white rounded">Enviar a todos</button>
-            </div>
-          </div>
-          
-          <!-- Chat privado -->
-          <div class="bg-white rounded shadow p-4">
-            <h3 class="text-sm font-semibold mb-2">Mensajes privados</h3>
-            <div class="grid md:grid-cols-3 gap-3">
-              <div class="md:col-span-1 rounded-3xl bg-white p-3 border">
-                <input id="contactFilter" class="w-full border rounded-xl px-2 py-1 text-sm" placeholder="Filtrar contacto" />
-                <div id="contactList" class="mt-2 space-y-1 max-h-64 overflow-auto"></div>
+
+        <div class="grid grid-cols-12 gap-4 h-[70vh]">
+          <!-- Columna 1: Lista de Conversaciones -->
+          <aside class="col-span-12 md:col-span-3 bg-white border-r border-slate-200 rounded-2xl overflow-hidden flex flex-col">
+            <div class="p-3 border-b flex gap-2 items-center">
+              <div class="relative flex-1">
+                <i data-lucide="search" class="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400"></i>
+                <input id="chatSearch" placeholder="Buscar usuario..." class="pl-9 pr-3 py-2.5 w-full bg-slate-50 border rounded-xl text-sm" />
               </div>
-              <div class="md:col-span-2 rounded-3xl bg-white p-3 border flex flex-col">
-                <div id="chatHeader" class="text-sm font-semibold">Chat</div>
-                <div id="chatMessages" class="flex-1 mt-2 space-y-2 max-h-64 overflow-auto"></div>
-                <div id="typingIndicator" class="text-[11px] text-slate-500"></div>
-                <div class="mt-2 flex gap-2 items-center">
-                  <button id="chatEmoji" class="px-2 py-1 rounded bg-slate-100">😀</button>
-                  <input id="chatInput" class="flex-1 border rounded-xl px-2 py-1 text-sm" placeholder="Escribe un mensaje" />
-                  <button id="chatSend" class="text-sm px-3 py-2 rounded-xl bg-pink-600 text-white hover:bg-pink-700">Enviar</button>
+              <select id="chatRoleFilter" class="px-2.5 py-2 border rounded-xl text-sm bg-slate-50">
+                <option value="all">Todos</option>
+                <option value="parent">Padres</option>
+                <option value="teacher">Maestros</option>
+                <option value="assistant">Asistentes</option>
+              </select>
+            </div>
+            <div id="chatList" class="flex-1 overflow-auto divide-y"></div>
+          </aside>
+
+          <!-- Columna 2: Conversación -->
+          <section class="col-span-12 md:col-span-6 bg-white rounded-2xl border border-slate-200 flex flex-col">
+            <header id="chatHeader" class="p-4 border-b flex items-center justify-between">
+              <div class="flex items-center gap-3">
+                <img id="chatUserPhoto" src="img/2.jpg" class="w-9 h-9 rounded-full object-cover" />
+                <div>
+                  <div id="chatUserName" class="font-semibold">Selecciona un chat</div>
+                  <div id="chatUserMeta" class="text-xs text-slate-500">—</div>
                 </div>
-                <div id="emojiMenu" class="hidden border rounded p-2"></div>
               </div>
+              <div class="text-xs text-slate-500" id="chatSeen">—</div>
+            </header>
+            <div id="chatMessages" class="flex-1 p-4 overflow-auto space-y-2 bg-slate-50"></div>
+            <footer class="p-3 border-t flex items-center gap-2">
+              <input type="file" id="chatFile" class="hidden" />
+              <button id="btnAttach" class="px-2 py-2 rounded bg-slate-100" title="Adjuntar archivo"><i data-lucide="paperclip" class="w-4 h-4"></i></button>
+              <button id="btnPhoto" class="px-2 py-2 rounded bg-slate-100" title="Foto"><i data-lucide="image" class="w-4 h-4"></i></button>
+              <div class="relative flex-1">
+                <input id="chatInput" class="w-full border rounded-xl px-3 py-2 text-sm" placeholder="Escribe un mensaje..." />
+                <div id="replyPreview" class="hidden absolute -top-10 left-0 right-0 bg-white border rounded-lg p-2 text-xs text-slate-600">Respondiendo a: <span id="replyText">—</span></div>
+              </div>
+              <button id="chatSend" class="px-4 py-2 bg-purple-600 text-white rounded-xl">Enviar</button>
+            </footer>
+          </section>
+
+          <!-- Columna 3: Información del Usuario -->
+          <aside class="col-span-12 md:col-span-3 bg-white rounded-2xl border border-slate-200 p-4">
+            <h4 class="text-sm font-semibold mb-3">Información</h4>
+            <div class="space-y-2 text-sm">
+              <div>Rol: <span id="infoRole" class="font-semibold">—</span></div>
+              <div>Teléfono: <a id="infoPhone" href="#" class="text-blue-600">—</a></div>
+              <div>Grupo: <span id="infoGroup">—</span></div>
+              <div>Estado: <span id="infoStatus" class="px-2 py-0.5 rounded-full text-xs bg-slate-100">—</span></div>
             </div>
-          </div>
-          
-          <!-- Notificaciones -->
-          <div class="bg-white rounded shadow p-4">
-            <h3 class="text-sm font-semibold mb-2">Notificaciones programadas</h3>
-            <div class="space-y-2">
-              <div class="flex gap-3">
-                <input type="datetime-local" class="border rounded px-3 py-2 flex-1">
-                <select class="border rounded px-3 py-2">
-                  <option value="all">Todos</option>
-                  <option value="teachers">Maestros</option>
-                  <option value="parents">Padres</option>
-                </select>
-              </div>
-              <textarea class="w-full border rounded p-3" rows="2" placeholder="Texto de la notificación..."></textarea>
-              <div class="flex justify-end">
-                <button class="px-3 py-2 bg-green-600 text-white rounded">Programar</button>
-              </div>
-            </div>
-          </div>
+            <h4 class="text-sm font-semibold mt-5 mb-2">Historial</h4>
+            <div id="infoHistory" class="text-xs text-slate-600 space-y-1 max-h-52 overflow-auto"></div>
+          </aside>
         </div>
       </section>
 
@@ -1195,61 +1350,106 @@
     </div>
   </div>
 
-  <!-- MODAL: Agregar Estudiante (Director) -->
+  <!-- MODAL: Crear/Editar Estudiante (Profesional) -->
   <div id="modalAddStudent" class="fixed inset-0 bg-black/40 hidden flex items-center justify-center z-50">
-    <div class="bg-white rounded-lg p-6 w-full max-w-lg">
-      <h3 class="font-semibold mb-3 flex items-center gap-2">
-        <i data-lucide="user-plus" class="w-5 h-5"></i>
-        Agregar Estudiante
+    <div class="bg-white rounded-2xl shadow-2xl w-full max-w-3xl p-6">
+      <h3 class="text-xl font-bold text-slate-800 flex items-center gap-2 mb-4">
+        <span class="w-2 h-6 bg-purple-600 rounded-full"></span> Crear Estudiante
       </h3>
-      <div class="grid gap-3">
+
+      <!-- Foto + Matrícula -->
+      <div class="flex items-center gap-4 mb-4">
+        <div class="relative w-20 h-20 rounded-full bg-purple-50 flex items-center justify-center overflow-hidden border-2 border-purple-100">
+          <img id="stPhotoPreview" class="w-full h-full object-cover hidden" alt="preview" />
+          <i data-lucide="user" class="w-8 h-8 text-purple-600" id="stPhotoIcon"></i>
+          <input type="file" id="stPhotoInput" accept="image/*" class="absolute inset-0 opacity-0 cursor-pointer" />
+        </div>
+        <div class="text-sm text-slate-600">
+          Matrícula: <span id="stEnrollment" class="font-bold text-slate-800">—</span>
+          <button id="btnGenEnrollment" class="ml-2 text-purple-600 text-sm hover:underline">Generar</button>
+        </div>
+      </div>
+
+      <!-- Información Personal -->
+      <div class="border-t border-slate-200 pt-4 grid grid-cols-1 md:grid-cols-2 gap-3">
         <div>
-          <label class="text-sm text-slate-600 block mb-1">Nombre del niño</label>
-          <input id="stName" placeholder="Ej: Juan Pérez" class="w-full border rounded px-3 py-2" />
-        </div>
-        <div class="grid grid-cols-2 gap-2">
-          <div>
-            <label class="text-sm text-slate-600 block mb-1">Edad</label>
-            <input id="stAge" type="number" min="0" placeholder="Edad" class="w-full border rounded px-3 py-2" />
-          </div>
-          <div>
-            <label class="text-sm text-slate-600 block mb-1">Horario</label>
-            <input id="stSchedule" placeholder="08:00-12:00" class="w-full border rounded px-3 py-2" />
-          </div>
-          <div class="col-span-2">
-             <label class="text-sm text-slate-600 block mb-1">Aula Asignada</label>
-             <select id="stClassroom" class="w-full border rounded px-3 py-2 bg-white">
-                <option value="">-- Seleccionar Aula --</option>
-             </select>
-          </div>
-        </div>
-        <div class="grid grid-cols-2 gap-2">
-          <input id="p1Name" placeholder="Padre/Madre 1 (nombre)" class="border rounded px-3 py-2" />
-          <input id="p1Phone" placeholder="Teléfono 1" class="border rounded px-3 py-2" />
-          <input id="p1Email" type="email" placeholder="Correo (Usuario de acceso)" class="border rounded px-3 py-2" />
-          <input id="p1Password" type="text" placeholder="Contraseña de acceso" class="border rounded px-3 py-2" />
-        </div>
-        <div class="grid grid-cols-2 gap-2">
-          <input id="p2Name" placeholder="Padre/Madre 2 (nombre)" class="border rounded px-3 py-2" />
-          <input id="p2Phone" placeholder="Teléfono 2" class="border rounded px-3 py-2" />
-        </div>
-        <div class="grid grid-cols-2 gap-2">
-          <input id="stAllergies" placeholder="Alergias" class="border rounded px-3 py-2" />
-          <input id="stBlood" placeholder="Tipo de Sangre" class="border rounded px-3 py-2" />
-        </div>
-        <div class="grid grid-cols-2 gap-2">
-          <input id="stMonthlyFee" type="number" step="0.01" placeholder="Monto mensual" class="border rounded px-3 py-2" />
-          <input id="stDueDay" type="number" min="1" max="31" placeholder="Día de vencimiento" class="border rounded px-3 py-2" />
+          <label class="text-sm text-slate-600 block mb-1">Nombre completo</label>
+          <input id="stName" class="w-full border rounded px-3 py-2" placeholder="Ej: Juan Pérez" />
         </div>
         <div>
-          <label class="text-sm text-slate-600 block mb-1">Personas autorizadas para recoger</label>
-          <input id="stPickup" placeholder="Ej: Abuela Carmen, Tío Juan" class="w-full border rounded px-3 py-2" />
+          <label class="text-sm text-slate-600 block mb-1">Edad</label>
+          <input id="stAge" type="number" min="0" class="w-full border rounded px-3 py-2" placeholder="Ej: 5" />
         </div>
-        <label class="flex items-center gap-2"><input id="stActive" type="checkbox" checked class="rounded" /> Estudiante activo</label>
-        <div class="flex justify-end gap-2 mt-3">
-          <button id="btnCancelStudent" class="px-4 py-2 border rounded-lg">Cancelar</button>
-          <button id="btnSaveStudent" class="px-4 py-2 bg-indigo-600 text-white rounded-lg">Guardar</button>
+        <div>
+          <label class="text-sm text-slate-600 block mb-1">Horario</label>
+          <input id="stSchedule" class="w-full border rounded px-3 py-2" placeholder="08:00-12:00" />
         </div>
+        <div>
+          <label class="text-sm text-slate-600 block mb-1">Aula</label>
+          <select id="stClassroom" class="w-full border rounded px-3 py-2 bg-white"><option value="">-- Seleccionar Aula --</option></select>
+        </div>
+      </div>
+
+      <!-- Información Académica / Padres -->
+      <div class="border-t border-slate-200 pt-4 grid grid-cols-1 md:grid-cols-2 gap-3">
+        <div>
+          <label class="text-sm text-slate-600 block mb-1">Padre/Madre 1</label>
+          <input id="p1Name" class="w-full border rounded px-3 py-2" placeholder="Nombre" />
+        </div>
+        <div>
+          <label class="text-sm text-slate-600 block mb-1">Teléfono</label>
+          <input id="p1Phone" class="w-full border rounded px-3 py-2" placeholder="Teléfono" />
+        </div>
+        <div>
+          <label class="text-sm text-slate-600 block mb-1">Correo (usuario)</label>
+          <input id="p1Email" type="email" class="w-full border rounded px-3 py-2" placeholder="Correo" />
+        </div>
+        <div>
+          <label class="text-sm text-slate-600 block mb-1">Contraseña</label>
+          <input id="p1Password" type="text" class="w-full border rounded px-3 py-2" placeholder="Autogenerada opcional" />
+        </div>
+        <div>
+          <label class="text-sm text-slate-600 block mb-1">Padre/Madre 2</label>
+          <input id="p2Name" class="w-full border rounded px-3 py-2" placeholder="Nombre" />
+        </div>
+        <div>
+          <label class="text-sm text-slate-600 block mb-1">Teléfono 2</label>
+          <input id="p2Phone" class="w-full border rounded px-3 py-2" placeholder="Teléfono 2" />
+        </div>
+      </div>
+
+      <!-- Salud y Pago -->
+      <div class="border-t border-slate-200 pt-4 grid grid-cols-1 md:grid-cols-2 gap-3">
+        <div>
+          <label class="text-sm text-slate-600 block mb-1">Alergias</label>
+          <input id="stAllergies" class="w-full border rounded px-3 py-2" placeholder="Alergias" />
+        </div>
+        <div>
+          <label class="text-sm text-slate-600 block mb-1">Tipo Sangre</label>
+          <input id="stBlood" class="w-full border rounded px-3 py-2" placeholder="O+" />
+        </div>
+        <div>
+          <label class="text-sm text-slate-600 block mb-1">Mensualidad</label>
+          <input id="stMonthlyFee" type="number" step="0.01" class="w-full border rounded px-3 py-2" placeholder="0.00" />
+        </div>
+        <div>
+          <label class="text-sm text-slate-600 block mb-1">Día de vencimiento</label>
+          <input id="stDueDay" type="number" min="1" max="31" class="w-full border rounded px-3 py-2" placeholder="5" />
+        </div>
+      </div>
+
+      <!-- Autorizados para recoger -->
+      <div class="border-t border-slate-200 pt-4">
+        <label class="text-sm text-slate-600 block mb-1">Autorizados para recoger</label>
+        <input id="stPickup" class="w-full border rounded px-3 py-2" placeholder="Ej: Abuela Carmen, Tío Juan" />
+        <label class="mt-2 flex items-center gap-2"><input id="stActive" type="checkbox" checked class="rounded" /> Estudiante activo</label>
+      </div>
+
+      <div class="flex justify-end gap-2 mt-5">
+        <button id="btnCancelStudent" class="px-4 py-2 border rounded-xl">Cancelar</button>
+        <button id="btnSaveStudent" class="bg-purple-600 hover:bg-purple-700 text-white rounded-xl px-6 py-2 shadow-md flex items-center gap-2">
+          <i data-lucide="save" class="w-4 h-4"></i> Guardar
+        </button>
       </div>
     </div>
   </div>
@@ -1330,6 +1530,121 @@
         <i data-lucide="save" class="w-4 h-4"></i>
         Crear Asistente
       </button>
+    </div>
+  </div>
+</div>
+
+<!-- Modal Registrar Pago Manual -->
+<div id="modalPayment" class="fixed inset-0 bg-black/40 hidden flex items-center justify-center z-50">
+  <div class="bg-white rounded-2xl shadow-xl p-6 w-full max-w-lg">
+    <h3 class="text-xl font-bold text-slate-800 mb-4 flex items-center gap-2">
+      <i data-lucide="credit-card" class="w-6 h-6 text-purple-600"></i> Registrar Pago
+    </h3>
+    <div class="grid gap-4">
+      <div>
+        <label class="text-sm font-bold text-slate-700 block mb-1">Estudiante</label>
+        <select id="payStudentSelect" class="w-full border rounded-xl px-3 py-2.5 bg-slate-50 focus:bg-white outline-none">
+          <option value="">Seleccionar...</option>
+        </select>
+      </div>
+      <div class="grid grid-cols-2 gap-4">
+        <div>
+          <label class="text-sm font-bold text-slate-700 block mb-1">Monto</label>
+          <input id="payAmount" type="number" step="0.01" class="w-full border rounded-xl px-3 py-2.5" placeholder="0.00">
+        </div>
+        <div>
+          <label class="text-sm font-bold text-slate-700 block mb-1">Método</label>
+          <select id="payMethod" class="w-full border rounded-xl px-3 py-2.5">
+            <option value="efectivo">Efectivo</option>
+            <option value="transferencia">Transferencia</option>
+            <option value="tarjeta">Tarjeta</option>
+          </select>
+        </div>
+      </div>
+      <div>
+        <label class="text-sm font-bold text-slate-700 block mb-1">Concepto / Mes</label>
+        <input id="payConcept" type="text" class="w-full border rounded-xl px-3 py-2.5" placeholder="Ej: Mensualidad Marzo">
+      </div>
+      <div class="flex justify-end gap-3 mt-4">
+        <button id="btnCancelPayment" class="px-4 py-2 text-slate-600 font-bold hover:bg-slate-100 rounded-xl">Cancelar</button>
+        <button id="btnSavePayment" class="px-6 py-2 bg-purple-600 text-white font-bold rounded-xl hover:bg-purple-700 shadow-md">Guardar Pago</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Modal Revisión Transferencias -->
+<div id="modalReviewTransfer" class="fixed inset-0 bg-black/40 hidden flex items-center justify-center z-50">
+  <div class="bg-white rounded-2xl shadow-xl w-full max-w-4xl h-[85vh] flex flex-col md:flex-row overflow-hidden">
+    <!-- Lado Izquierdo: Imagen -->
+    <div class="w-full md:w-1/2 bg-slate-900 flex items-center justify-center relative p-4">
+      <img id="reviewImage" src="" class="max-w-full max-h-full object-contain rounded-lg shadow-lg">
+      <div class="absolute top-4 left-4 bg-black/50 text-white px-3 py-1 rounded-full text-xs backdrop-blur-sm">Comprobante Original</div>
+    </div>
+    <!-- Lado Derecho: Datos y Acciones -->
+    <div class="w-full md:w-1/2 p-6 flex flex-col bg-white">
+      <h3 class="text-xl font-bold text-slate-800 mb-1">Revisión de Transferencia</h3>
+      <p class="text-sm text-slate-500 mb-6">Verifique los datos detectados vs el comprobante.</p>
+      
+      <div class="space-y-4 flex-1 overflow-y-auto">
+        <div class="p-4 bg-purple-50 rounded-xl border border-purple-100">
+          <p class="text-xs font-bold text-purple-600 uppercase mb-1">Análisis Automático (IA)</p>
+          <div class="flex justify-between items-center">
+             <span class="text-slate-600 text-sm">Monto Detectado:</span>
+             <span class="text-xl font-black text-slate-800" id="reviewDetectedAmount">$0.00</span>
+          </div>
+          <div class="mt-2 flex items-center gap-2 text-xs text-slate-500" id="ocrContainer">
+             <i data-lucide="scan-line" class="w-4 h-4"></i> <span id="reviewOcrStatus">Escaneando texto...</span>
+          </div>
+        </div>
+
+        <div>
+          <label class="text-xs font-bold text-slate-500 uppercase block mb-1">Estudiante</label>
+          <p class="text-lg font-bold text-slate-800" id="reviewStudentName">-</p>
+        </div>
+        
+        <div class="grid grid-cols-2 gap-4">
+           <div>
+             <label class="text-xs font-bold text-slate-500 uppercase block mb-1">Monto Reportado</label>
+             <p class="text-lg font-bold text-slate-800" id="reviewReportedAmount">-</p>
+           </div>
+           <div>
+             <label class="text-xs font-bold text-slate-500 uppercase block mb-1">Fecha</label>
+             <p class="text-lg font-bold text-slate-800" id="reviewDate">-</p>
+           </div>
+        </div>
+      </div>
+
+      <div class="mt-6 pt-6 border-t border-slate-100 grid grid-cols-2 gap-3">
+        <button id="btnRejectTransfer" class="py-3 border-2 border-red-100 text-red-600 font-bold rounded-xl hover:bg-red-50 transition-colors">Rechazar</button>
+        <button id="btnApproveTransfer" class="py-3 bg-green-600 text-white font-bold rounded-xl hover:bg-green-700 shadow-md transition-colors">Aprobar Pago</button>
+      </div>
+      <button id="btnCloseReview" class="mt-3 text-center text-slate-400 text-sm hover:text-slate-600">Cancelar revisión</button>
+    </div>
+  </div>
+</div>
+
+<!-- MODAL: Detalle de Reporte/Incidencia -->
+<div id="inquiryDetailModal" class="fixed inset-0 bg-black/40 hidden flex items-center justify-center z-50 p-4">
+  <div class="bg-white rounded-2xl shadow-2xl w-full max-w-2xl max-h-[90vh] overflow-y-auto flex flex-col">
+    <div class="p-6 border-b border-slate-100 flex justify-between items-start">
+      <div>
+        <h3 class="text-xl font-bold text-slate-800" id="inqDetailSubject">Asunto</h3>
+        <p class="text-sm text-slate-500 mt-1" id="inqDetailMeta">Fecha • Padre</p>
+      </div>
+      <button id="btnCloseInquiryDetail" class="p-2 text-slate-400 hover:text-slate-600 hover:bg-slate-50 rounded-full transition-colors"><i data-lucide="x"></i></button>
+    </div>
+    
+    <div class="p-6 space-y-6">
+      <div class="bg-slate-50 p-4 rounded-xl text-slate-700 whitespace-pre-wrap leading-relaxed border border-slate-100" id="inqDetailMessage"></div>
+      
+      <div id="inqDetailAttachment" class="hidden">
+        <p class="text-xs font-bold text-slate-500 uppercase mb-3 flex items-center gap-2"><i data-lucide="paperclip" class="w-3 h-3"></i> Archivo Adjunto</p>
+        <div class="rounded-xl overflow-hidden border border-slate-200 bg-slate-100">
+          <img id="inqDetailImage" src="" class="w-full h-auto max-h-96 object-contain mx-auto" alt="Adjunto" />
+        </div>
+        <a id="inqDetailLink" href="#" target="_blank" class="inline-flex items-center gap-2 mt-3 text-blue-600 text-sm font-bold hover:underline"><i data-lucide="external-link" class="w-4 h-4"></i> Abrir original</a>
+      </div>
     </div>
   </div>
 </div>

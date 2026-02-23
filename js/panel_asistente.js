@@ -50,6 +50,21 @@ const AppState = {
   paymentsData: [] // Almacén local para búsqueda en tiempo real
 };
 
+async function sendEmail(to, subject, html, text) {
+  try {
+    const res = await fetch('http://127.0.0.1:5600/api/email/send', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ to, subject, html, text })
+    });
+    if (!res.ok) {
+      console.error('Error HTTP enviando correo', res.status);
+    }
+  } catch (e) {
+    console.error('Error enviando correo', e);
+  }
+}
+
 // --- 3. UI CONTROLLER ---
 const UI = {
   init() {
@@ -1132,46 +1147,98 @@ const UI = {
 
   async sendRemindersNow() {
     const pendingStudents = AppState.paymentsData.filter(p => p.status === 'sin_pago');
-    
     if (pendingStudents.length === 0) {
-        Helpers.toast('No hay estudiantes con pagos pendientes en la lista actual.', 'info');
-        return;
+      Helpers.toast('No hay estudiantes con pagos pendientes en la lista actual.', 'info');
+      return;
     }
-
     const parentIds = [...new Set(pendingStudents.map(p => p.students?.parent_id).filter(Boolean))];
-
-    if (!confirm(`¿Enviar recordatorio de pago a ${parentIds.length} padre(s)?`)) {
-        return;
+    if (!parentIds.length) {
+      Helpers.toast('No se encontraron padres asociados para enviar recordatorios.', 'info');
+      return;
     }
-
+    if (!confirm(`¿Enviar recordatorio de pago a ${parentIds.length} padre(s)?`)) {
+      return;
+    }
     Helpers.toast(`Enviando ${parentIds.length} recordatorios...`, 'info');
     let successCount = 0;
     let errorCount = 0;
-
     const reminderMessage = document.getElementById('reminderMessage')?.value || 'Recuerde realizar su pago mensual.';
     const selectedMonth = document.getElementById('paymentMonthFilter')?.value;
-
+    const baseUrl = window.location.origin || '';
+    const parentLink = `${baseUrl}/panel_padres.html#payments`;
     for (const parentId of parentIds) {
-        try {
-            const { error } = await supabase.rpc('send_notification', {
-                p_user_id: parentId,
-                p_title: `Recordatorio de Pago (${selectedMonth})`,
-                p_message: reminderMessage,
-                p_type: 'payment_reminder',
-                p_link: '/panel_padres.html'
-            });
-            if (error) throw error;
-            successCount++;
-        } catch (e) {
-            console.error(`Error enviando notificación a ${parentId}:`, e);
-            errorCount++;
-        }
+      try {
+        const { error } = await supabase.rpc('send_notification', {
+          p_user_id: parentId,
+          p_title: `Recordatorio de Pago (${selectedMonth})`,
+          p_message: reminderMessage,
+          p_type: 'payment_reminder',
+          p_link: '/panel_padres.html'
+        });
+        if (error) throw error;
+        successCount++;
+      } catch (e) {
+        console.error(`Error enviando notificación a ${parentId}:`, e);
+        errorCount++;
+      }
     }
-
+    try {
+      const { data: parents } = await supabase
+        .from('profiles')
+        .select('id, email, name')
+        .in('id', parentIds);
+      if (parents && parents.length) {
+        for (const p of parents) {
+          if (!p.email) continue;
+          const subject = `Recordatorio de pago (${selectedMonth})`;
+          const html = `
+            <div style="font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; color:#0f172a;">
+              <h2 style="color:#eab308;">Recordatorio de pago mensual</h2>
+              <p>Hola ${p.name || 'familia'}, este es un recordatorio amistoso de que el pago de la mensualidad${selectedMonth ? ` correspondiente a ${selectedMonth}` : ''} está pendiente.</p>
+              <p>${reminderMessage}</p>
+              <p style="margin:24px 0;">
+                <a href="${parentLink}" style="display:inline-block;padding:10px 18px;background:#f97316;color:#ffffff;border-radius:999px;text-decoration:none;font-weight:600;">
+                  Revisar y realizar mi pago
+                </a>
+              </p>
+              <p style="font-size:12px;color:#64748b;">Si el botón no funciona, copia y pega esta dirección en tu navegador: ${parentLink}</p>
+            </div>
+          `;
+          const text = `Recordatorio de pago${selectedMonth ? ` (${selectedMonth})` : ''}. ${reminderMessage} Puedes revisar tu estado de cuenta y realizar el pago en: ${parentLink}`;
+          await sendEmail(p.email, subject, html, text);
+        }
+      }
+      const { data: staff } = await supabase
+        .from('profiles')
+        .select('email, role')
+        .in('role', ['maestra', 'asistente', 'directora']);
+      const staffRecipients = (staff || []).filter(u => u.email);
+      if (staffRecipients.length) {
+        const subjectStaff = `Se enviaron recordatorios de pago a ${parentIds.length} familia(s)`;
+        const htmlStaff = `
+          <div style="font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; color:#0f172a;">
+            <h2 style="color:#0ea5e9;">Recordatorios de pago enviados</h2>
+            <p>Se han enviado recordatorios de pago a ${parentIds.length} familia(s) con mensualidades pendientes${selectedMonth ? ` del mes de ${selectedMonth}` : ''}.</p>
+            <p>Pueden revisar los pagos pendientes y el seguimiento desde su panel administrativo.</p>
+            <p style="margin:24px 0;">
+              <a href="${baseUrl}/panel_asistente.html#payments" style="display:inline-block;padding:10px 18px;background:#0ea5e9;color:#ffffff;border-radius:999px;text-decoration:none;font-weight:600;">
+                Abrir panel de pagos
+              </a>
+            </p>
+          </div>
+        `;
+        const textStaff = `Se enviaron recordatorios de pago a ${parentIds.length} familia(s) con mensualidades pendientes${selectedMonth ? ` (${selectedMonth})` : ''}. Revisen el detalle en el panel administrativo.`;
+        for (const person of staffRecipients) {
+          await sendEmail(person.email, subjectStaff, htmlStaff, textStaff);
+        }
+      }
+    } catch (e) {
+      console.error('Error enviando correos de recordatorio de pago', e);
+    }
     if (errorCount > 0) {
-        Helpers.toast(`Se enviaron ${successCount} recordatorios. ${errorCount} fallaron.`, 'error');
+      Helpers.toast(`Se enviaron ${successCount} recordatorios internos. ${errorCount} fallaron.`, 'error');
     } else {
-        Helpers.toast(`${successCount} recordatorios enviados exitosamente.`, 'success');
+      Helpers.toast(`${successCount} recordatorios internos enviados exitosamente.`, 'success');
     }
   },
 
@@ -1585,12 +1652,9 @@ function refreshIcons() {
       if (cBtn) {
         const id = cBtn.dataset.id;
         const payment = AppState.paymentsData.find(p => p.id == id);
-        
         const { error } = await supabase.from('payments').update({ status: 'confirmado', validated_by: AppState.user.id }).eq('id', id);
-        
         if (!error) {
           Helpers.toast('Pago confirmado');
-          // Enviar notificación al padre si existe
           if (payment && payment.students?.parent_id) {
             await supabase.rpc('send_notification', {
               p_user_id: payment.students.parent_id,
@@ -1599,6 +1663,106 @@ function refreshIcons() {
               p_type: 'info',
               p_link: 'panel_padres.html'
             });
+            try {
+              const baseUrl = window.location.origin || '';
+              const parentLink = `${baseUrl}/panel_padres.html#payments`;
+              const { data: parent } = await supabase
+                .from('profiles')
+                .select('email, name')
+                .eq('id', payment.students.parent_id)
+                .maybeSingle();
+              if (parent && parent.email) {
+                const subjectParent = `Pago confirmado (${payment.month_paid})`;
+                const htmlParent = `
+                  <div style="font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; color:#0f172a;">
+                    <h2 style="color:#16a34a;">Tu pago ha sido confirmado</h2>
+                    <p>Hola ${parent.name || 'familia'},</p>
+                    <p>Confirmamos tu pago de $${payment.amount} correspondiente a ${payment.month_paid}.</p>
+                    <p>Gracias por mantenerte al día con la colegiatura.</p>
+                    <p style="margin:24px 0;">
+                      <a href="${parentLink}" style="display:inline-block;padding:10px 18px;background:#22c55e;color:#ffffff;border-radius:999px;text-decoration:none;font-weight:600;">
+                        Ver historial de pagos
+                      </a>
+                    </p>
+                    <p style="font-size:12px;color:#64748b;">Si el botón no funciona, copia y pega esta dirección en tu navegador: ${parentLink}</p>
+                  </div>
+                `;
+                const textParent = `Tu pago de $${payment.amount} correspondiente a ${payment.month_paid} ha sido confirmado. Puedes ver el historial en: ${parentLink}`;
+                await sendEmail(parent.email, subjectParent, htmlParent, textParent);
+              }
+              const studentId = payment.student_id;
+              let classroomId = null;
+              let studentName = '';
+              if (studentId) {
+                const { data: st } = await supabase
+                  .from('students')
+                  .select('id, name, classroom_id')
+                  .eq('id', studentId)
+                  .maybeSingle();
+                if (st) {
+                  classroomId = st.classroom_id;
+                  studentName = st.name || '';
+                }
+              }
+              let teacherEmail = null;
+              let classroomName = '';
+              if (classroomId) {
+                const { data: classroom } = await supabase
+                  .from('classrooms')
+                  .select('name, teacher_id')
+                  .eq('id', classroomId)
+                  .maybeSingle();
+                if (classroom) {
+                  classroomName = classroom.name || '';
+                  if (classroom.teacher_id) {
+                    const { data: teacher } = await supabase
+                      .from('profiles')
+                      .select('email, name')
+                      .eq('id', classroom.teacher_id)
+                      .maybeSingle();
+                    teacherEmail = teacher && teacher.email ? teacher.email : null;
+                  }
+                }
+              }
+              const { data: staff } = await supabase
+                .from('profiles')
+                .select('email, role')
+                .in('role', ['asistente', 'directora']);
+              const assistantEmails = (staff || [])
+                .filter(p => p.role === 'asistente' && p.email)
+                .map(p => p.email);
+              const directorEmails = (staff || [])
+                .filter(p => p.role === 'directora' && p.email)
+                .map(p => p.email);
+              const subjectStaff = `Pago confirmado${studentName ? ` - ${studentName}` : ''} (${payment.month_paid})`;
+              const commonHtmlStaff = (roleLabel, link) => `
+                <div style="font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; color:#0f172a;">
+                  <h2 style="color:#0ea5e9;">Pago confirmado</h2>
+                  <p>Se ha confirmado un pago${studentName ? ` para ${studentName}` : ''}${classroomName ? ` del aula ${classroomName}` : ''}.</p>
+                  <p><strong>Mes:</strong> ${payment.month_paid}<br><strong>Monto:</strong> $${payment.amount}</p>
+                  <p>Pueden revisar el detalle desde su panel de ${roleLabel}.</p>
+                  <p style="margin:24px 0;">
+                    <a href="${link}" style="display:inline-block;padding:10px 18px;background:#0ea5e9;color:#ffffff;border-radius:999px;text-decoration:none;font-weight:600;">
+                      Ver pagos confirmados
+                    </a>
+                  </p>
+                </div>
+              `;
+              const textStaff = `Se confirmó un pago${studentName ? ` para ${studentName}` : ''} del mes ${payment.month_paid} por $${payment.amount}. Revisen el detalle en el panel administrativo.`;
+              if (teacherEmail) {
+                const subjectTeacher = `Pago confirmado en tu grupo (${payment.month_paid})`;
+                const htmlTeacher = commonHtmlStaff('maestra', `${baseUrl}/panel-maestra.html`);
+                await sendEmail(teacherEmail, subjectTeacher, htmlTeacher, textStaff);
+              }
+              for (const email of assistantEmails) {
+                await sendEmail(email, subjectStaff, commonHtmlStaff('asistente', `${baseUrl}/panel_asistente.html#payments`), textStaff);
+              }
+              for (const email of directorEmails) {
+                await sendEmail(email, subjectStaff, commonHtmlStaff('directora', `${baseUrl}/panel_directora.html#payments`), textStaff);
+              }
+            } catch (err) {
+              console.error('Error enviando correos de pago confirmado', err);
+            }
           }
           UI.loadPayments();
         } else {

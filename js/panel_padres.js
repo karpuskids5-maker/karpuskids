@@ -100,6 +100,21 @@ class SafeAppState {
 }
 const AppState = new SafeAppState();
 
+async function sendEmail(to, subject, html, text) {
+  try {
+    const res = await fetch('http://127.0.0.1:5600/api/email/send', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ to, subject, html, text })
+    });
+    if (!res.ok) {
+      console.error('Error HTTP enviando correo', res.status);
+    }
+  } catch (e) {
+    console.error('Error enviando correo', e);
+  }
+}
+
 // ===== MEJORAS PARA SIDEBAR MÓVIL ===== 
 function setupSidebarMobile() { 
   const nav = document.querySelector('nav.sidebar-nav'); 
@@ -355,7 +370,8 @@ function loadSectionData(sectionId) {
     class: loadClassFeed,
     payments: () => loadPayments(),
     notifications: async () => { await loadNotifications(); setupChatHandlers(); },
-    profile: async () => { await populateProfile(); }
+    profile: async () => { await populateProfile(); },
+    videocall: initVideoCall
   };
   
   const loader = loaders[sectionId];
@@ -377,6 +393,100 @@ function loadSectionData(sectionId) {
     }).finally(() => {
       if(refreshBtn) refreshBtn.classList.remove('animate-spin');
     });
+  }
+}
+
+async function notifyPaymentSubmittedEmail(student, amount, month_paid, method) {
+  try {
+    const user = AppState.get('user');
+    const profile = AppState.get('profile');
+    const parentEmail = user && user.email;
+    const parentName = profile && profile.name ? profile.name : 'Familia Karpus';
+    const studentName = student && student.name ? student.name : '';
+    const classroomId = student && student.classroom_id;
+    const baseUrl = window.location.origin || '';
+    const parentLink = `${baseUrl}/panel_padres.html#payments`;
+    const assistantLink = `${baseUrl}/panel_asistente.html`;
+    const directorLink = `${baseUrl}/panel_directora.html`;
+    const monthLabel = month_paid || '';
+    if (parentEmail) {
+      const subjectParent = `Comprobante de pago recibido (${monthLabel})`;
+      const htmlParent = `
+        <div style="font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; color:#0f172a;">
+          <h2 style="color:#16a34a;">Hemos recibido tu comprobante de pago</h2>
+          <p>Hola ${escapeHtml(parentName)},</p>
+          <p>Registramos un comprobante de pago para ${escapeHtml(studentName || 'tu hija o hijo')}.</p>
+          <p><strong>Mes:</strong> ${escapeHtml(monthLabel)}<br><strong>Monto reportado:</strong> $${amount.toFixed(2)}<br><strong>Método:</strong> ${escapeHtml(method)}</p>
+          <p>El equipo de Karpus revisará el comprobante y te avisará cuando el pago sea confirmado.</p>
+          <p style="margin:24px 0;">
+            <a href="${parentLink}" style="display:inline-block;padding:10px 18px;background:#4f46e5;color:#ffffff;border-radius:999px;text-decoration:none;font-weight:600;">
+              Ver estado de mis pagos
+            </a>
+          </p>
+          <p style="font-size:12px;color:#64748b;">Si el botón no funciona, copia y pega esta dirección en tu navegador: ${parentLink}</p>
+        </div>
+      `;
+      const textParent = `Hemos recibido tu comprobante de pago de ${monthLabel} por $${amount.toFixed(2)}. Revisaremos tu pago y podrás ver el estado en tu panel: ${parentLink}`;
+      await sendEmail(parentEmail, subjectParent, htmlParent, textParent);
+    }
+    let classroomName = '';
+    let teacherEmail = null;
+    if (classroomId) {
+      const { data: classroom } = await supabase
+        .from('classrooms')
+        .select('name, teacher_id')
+        .eq('id', classroomId)
+        .maybeSingle();
+      if (classroom) {
+        classroomName = classroom.name || '';
+        if (classroom.teacher_id) {
+          const { data: teacher } = await supabase
+            .from('profiles')
+            .select('email, name')
+            .eq('id', classroom.teacher_id)
+            .maybeSingle();
+          teacherEmail = teacher && teacher.email ? teacher.email : null;
+        }
+      }
+    }
+    const { data: staff } = await supabase
+      .from('profiles')
+      .select('email, role')
+      .in('role', ['asistente', 'directora']);
+    const assistantEmails = (staff || [])
+      .filter(p => p.role === 'asistente' && p.email)
+      .map(p => p.email);
+    const directorEmails = (staff || [])
+      .filter(p => p.role === 'directora' && p.email)
+      .map(p => p.email);
+    const subjectStaff = `Nuevo comprobante de pago enviado (${monthLabel})`;
+    const commonHtmlStaff = (roleLabel, link) => `
+      <div style="font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; color:#0f172a;">
+        <h2 style="color:#0f172a;">Nuevo comprobante de pago recibido</h2>
+        <p>Se ha registrado un nuevo comprobante de pago${studentName ? ` para ${escapeHtml(studentName)}` : ''}${classroomName ? ` del aula ${escapeHtml(classroomName)}` : ''}.</p>
+        <p><strong>Mes:</strong> ${escapeHtml(monthLabel)}<br><strong>Monto reportado:</strong> $${amount.toFixed(2)}<br><strong>Método:</strong> ${escapeHtml(method)}</p>
+        <p>Ingresa a tu panel de ${roleLabel} para revisar y validar el pago.</p>
+        <p style="margin:24px 0;">
+          <a href="${link}" style="display:inline-block;padding:10px 18px;background:#0ea5e9;color:#ffffff;border-radius:999px;text-decoration:none;font-weight:600;">
+            Revisar pagos pendientes
+          </a>
+        </p>
+      </div>
+    `;
+    const textStaff = `Se registró un comprobante de pago${studentName ? ` para ${studentName}` : ''} del mes ${monthLabel} por $${amount.toFixed(2)}. Revisa los pagos pendientes en tu panel.`;
+    if (teacherEmail) {
+      const subjectTeacher = `Tu grupo tiene un nuevo comprobante de pago (${monthLabel})`;
+      const htmlTeacher = commonHtmlStaff('maestra', `${baseUrl}/panel-maestra.html`);
+      await sendEmail(teacherEmail, subjectTeacher, htmlTeacher, textStaff);
+    }
+    for (const email of assistantEmails) {
+      await sendEmail(email, subjectStaff, commonHtmlStaff('asistente', assistantLink), textStaff);
+    }
+    for (const email of directorEmails) {
+      await sendEmail(email, subjectStaff, commonHtmlStaff('directora', directorLink), textStaff);
+    }
+  } catch (e) {
+    console.error('Error enviando correos de comprobante de pago', e);
   }
 }
 
@@ -408,6 +518,7 @@ async function submitPaymentProof(e) {
     });
     if (error) throw error;
     Helpers.toast('Comprobante enviado', 'success');
+    await notifyPaymentSubmittedEmail(student, amount, month_paid, method);
     loadPayments();
     document.getElementById('paymentForm').reset();
   } catch (err) {
@@ -579,6 +690,7 @@ async function loadStudentData() {
     // ✅ Iniciar servicios que dependen del estudiante
     initNotifications();
     initFeedRealtime();
+    initLiveClassListener(student.classroom_id);
   } catch (err) {
     console.error('Error cargando datos del estudiante:', err);
     Helpers.toast('Error al cargar información del estudiante', 'error');
@@ -612,6 +724,39 @@ function updateStudentUI(student) {
   if (preview) preview.innerHTML = `<img src="${avatarUrl}" class="w-full h-full object-cover">`;
   const headerAvatar = document.getElementById('headerStudentAvatar');
   if (headerAvatar) headerAvatar.innerHTML = `<img src="${avatarUrl}" alt="Avatar" class="w-full h-full object-cover">`;
+}
+
+// ===== LISTENER CLASE EN VIVO (BADGE) =====
+async function initLiveClassListener(classroomId) {
+    const btn = document.querySelector('button[data-target="videocall"]');
+    if(!btn) return;
+
+    const checkStatus = async () => {
+        const { data } = await supabase.from('classrooms').select('is_live').eq('id', classroomId).single();
+        updateBadge(data?.is_live);
+    };
+
+    const updateBadge = (isLive) => {
+        const existingBadge = btn.querySelector('.live-badge');
+        if (isLive) {
+            if (!existingBadge) {
+                btn.innerHTML += `<span class="live-badge ml-2 flex h-3 w-3 relative"><span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75"></span><span class="relative inline-flex rounded-full h-3 w-3 bg-red-500"></span></span>`;
+            }
+        } else {
+            if (existingBadge) existingBadge.remove();
+        }
+    };
+
+    // Check inicial
+    checkStatus();
+
+    // Suscripción a cambios
+    supabase.channel('classroom_live_' + classroomId)
+        .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'classrooms', filter: `id=eq.${classroomId}` }, (payload) => {
+            updateBadge(payload.new.is_live);
+            if(payload.new.is_live) Helpers.toast('¡La clase ha comenzado!', 'info');
+        })
+        .subscribe();
 }
 
 // ===== TAREAS CON DELEGACIÓN DE EVENTOS =====
@@ -1831,4 +1976,38 @@ async function saveAllProfile() {
   btn.disabled = false;
   btn.textContent = originalText;
   if(window.lucide) lucide.createIcons();
+}
+
+// ===== VIDEOLLAMADA =====
+async function initVideoCall() {
+  const container = document.getElementById('meet');
+  if (!container) return;
+  container.innerHTML = '';
+
+  const student = AppState.get('student');
+  if (!student?.classroom_id) {
+    container.innerHTML = Helpers.emptyState('No tienes aula asignada para videollamadas');
+    return;
+  }
+
+  if (typeof JitsiMeetExternalAPI === 'undefined') {
+    container.innerHTML = Helpers.emptyState('Error: Librería de video no cargada', 'video-off');
+    return;
+  }
+
+  if (window.jitsiInstance) window.jitsiInstance.dispose();
+
+  const domain = "meet.jit.si";
+  const options = {
+    roomName: "KarpusKids_" + student.classroom_id,
+    width: "100%",
+    height: 600,
+    parentNode: container,
+    lang: 'es',
+    userInfo: {
+      displayName: AppState.get('profile')?.name || 'Padre/Madre'
+    },
+    configOverwrite: { startWithAudioMuted: true, startWithVideoMuted: true }
+  };
+  window.jitsiInstance = new JitsiMeetExternalAPI(domain, options);
 }

@@ -56,6 +56,11 @@ const AppState = {
   currentClass: null,
   currentTab: 'feed',
   
+  dailySummary: {
+    present: 0,
+    absent: 0,
+    incidents: 0
+  },
   // Cache simple
   studentsCache: {}, 
   
@@ -74,6 +79,15 @@ const UI = {
   init() {
     this.bindEvents();
     this.checkSession();
+    
+    this.initNotifications(); // ✅ Activar notificaciones push
+
+    // 12. Optimización Técnica: Visibility Change
+    document.addEventListener('visibilitychange', () => {
+      if (!document.hidden && AppState.currentClass) {
+        this.loadClasses(); // Recargar datos frescos
+      }
+    });
   },
 
   async checkSession() {
@@ -96,11 +110,18 @@ const UI = {
       return;
     }
 
-    if (profile.role !== 'maestra' && profile.role !== 'directora') {
-       if (profile.role === 'padre') window.location.href = 'panel_padres.html';
-       else if (profile.role === 'directora') window.location.href = 'panel_directora.html';
-       else window.location.href = 'login.html';
-       return;
+    // 1. Corrección Validación de Rol
+    if (profile.role === 'padre') {
+      window.location.href = 'panel_padres.html';
+      return;
+    }
+    if (profile.role === 'directora') {
+      window.location.href = 'panel_directora.html';
+      return;
+    }
+    if (profile.role !== 'maestra') {
+      window.location.href = 'login.html';
+      return;
     }
     
     AppState.user = user;
@@ -118,10 +139,13 @@ const UI = {
   },
 
   updateUserProfileUI() {
-    const name = AppState.profile?.name || 'Maestra';
+    const name = AppState.profile?.name || 'Maestra Allamna';
     const email = AppState.profile?.email || AppState.user.email;
+    const avatar = AppState.profile?.avatar_url;
     document.querySelectorAll('.user-name-display').forEach(el => el.textContent = name);
     document.querySelectorAll('.user-email-display').forEach(el => el.textContent = email);
+    document.querySelectorAll('.user-initial').forEach(el => el.textContent = name.charAt(0));
+    if(avatar) document.querySelectorAll('#profileAvatar').forEach(el => el.src = avatar);
   },
 
   bindEvents() {
@@ -203,6 +227,37 @@ const UI = {
         if (e.target.closest('#btnSubmitPost')) {
             this.createPost();
         }
+        
+        // 3. Delegación de eventos para Asistencia (Eliminado onclick inline)
+        const attBtn = e.target.closest('.att-btn');
+        if (attBtn) {
+            const row = attBtn.closest('tr');
+            const status = attBtn.dataset.status;
+            if (row && status) {
+                this.setAttendance(row.dataset.id, status);
+            }
+        }
+
+        // Daily Routine Toggles
+        const routineBtn = e.target.closest('.routine-toggle');
+        if (routineBtn) {
+            this.toggleRoutineOption(routineBtn);
+        }
+
+        // Incident Button in Profile
+        if (e.target.closest('#btnRegisterIncident')) {
+            const modal = document.getElementById('studentProfileModal');
+            // Asumimos que el ID del estudiante está guardado en el modal o accesible
+            // Para simplificar, usaremos un atributo data en el modal si es posible, o variable global temporal
+            // Mejor: obtenerlo del contexto actual si está abierto
+            // Implementación simple:
+            this.openIncidentModal();
+        }
+
+        // Gallery Upload Listener (Delegado o directo si el elemento es estático en HTML, pero aquí lo vinculamos dinámicamente si es necesario)
+        // Como galleryUploadInput está en el HTML estático (modificado arriba), podemos usar change directo si existiera al inicio,
+        // pero como está dentro de un tab que podría recargarse, mejor delegación o binding en render.
+        // Usaremos binding directo en renderGallery o un listener global change.
     });
     
     // Setup Modal Closers (Generic)
@@ -216,6 +271,27 @@ const UI = {
            }
         });
     });
+
+    // Incident Modal Actions
+    document.getElementById('btnCancelIncident')?.addEventListener('click', () => {
+        document.getElementById('incidentModal').classList.add('hidden');
+        document.getElementById('incidentModal').classList.remove('flex');
+    });
+    document.getElementById('btnSaveIncident')?.addEventListener('click', () => this.saveIncident());
+
+    // Gallery Input Change
+    document.getElementById('galleryUploadInput')?.addEventListener('change', (e) => {
+        this.handleGalleryUpload(e.target.files);
+    });
+
+    // Profile Events
+    document.getElementById('profileAvatarInput')?.addEventListener('change', (e) => {
+        this.handleAvatarUpload(e.target.files[0]);
+    });
+    
+    document.getElementById('profileForm')?.addEventListener('submit', (e) => {
+        this.saveProfile(e);
+    });
   },
 
   showSection(id) {
@@ -224,6 +300,10 @@ const UI = {
     if (target) {
         target.classList.add('active');
         window.scrollTo({ top: 0, behavior: 'smooth' });
+        
+        if (id === 't-profile') {
+            this.renderProfile();
+        }
     }
   },
 
@@ -244,7 +324,7 @@ const UI = {
   toggleMobileSidebar() {
     const sidebar = document.getElementById('sidebar');
     const overlay = document.getElementById('sidebarOverlay');
-    sidebar.classList.toggle('mobile-visible');
+    sidebar.classList.toggle('-translate-x-full'); // Tailwind toggle
     overlay.classList.toggle('hidden');
     document.body.classList.toggle('no-scroll');
   },
@@ -263,6 +343,7 @@ const UI = {
 
     if (error) {
       grid.innerHTML = Helpers.emptyState(`Error: ${error.message}`, 'alert-circle');
+      Helpers.toast('Error cargando clases', 'error'); // 4. Manejo de errores
       return;
     }
 
@@ -273,16 +354,24 @@ const UI = {
 
     // Enrich classes with counts
     const enrichedClasses = await Promise.all(classes.map(async (cls) => {
-        const { count: tasksCount } = await supabase.from('tasks').select('*', { count: 'exact', head: true }).eq('classroom_id', cls.id);
-        const { count: studentsCount } = await supabase.from('students').select('*', { count: 'exact', head: true }).eq('classroom_id', cls.id);
+        const { count: tasksCount, error: tErr } = await supabase.from('tasks').select('*', { count: 'exact', head: true }).eq('classroom_id', cls.id);
+        const { count: studentsCount, error: sErr } = await supabase.from('students').select('*', { count: 'exact', head: true }).eq('classroom_id', cls.id);
+        if(tErr || sErr) console.warn('Error counting stats');
         return { ...cls, tasksCount, studentsCount };
     }));
     
-    // Update Dashboard Stats
+    // 7. Dashboard Diario Inteligente (Stats Globales)
+    const today = new Date().toISOString().split('T')[0];
+    const { count: presentCount } = await supabase.from('attendance').select('*', { count: 'exact', head: true }).eq('date', today).eq('status', 'present');
+    const { count: incidentCount } = await supabase.from('incidents').select('*', { count: 'exact', head: true }).gte('reported_at', today);
+    
+    AppState.dailySummary.present = presentCount || 0;
+    AppState.dailySummary.incidents = incidentCount || 0;
+
     document.getElementById('statClasses').textContent = enrichedClasses.length;
     document.getElementById('statStudents').textContent = enrichedClasses.reduce((acc, c) => acc + (c.studentsCount||0), 0);
-    document.getElementById('statTasks').textContent = enrichedClasses.reduce((acc, c) => acc + (c.tasksCount||0), 0);
-    // Attendance stat requires separate query, keeping placeholder or fetching
+    document.getElementById('statIncidents').textContent = AppState.dailySummary.incidents;
+    document.getElementById('statPresent').textContent = AppState.dailySummary.present;
 
     grid.innerHTML = enrichedClasses.map(cls => this.renderClassCard(cls)).join('');
     if(window.lucide) lucide.createIcons();
@@ -354,28 +443,31 @@ const UI = {
   // --- TAB LOGIC ---
   showTab(tabName) {
     AppState.currentTab = tabName;
-    
+
     // Update Buttons
     document.querySelectorAll('.class-tab-btn').forEach(btn => {
-        if(btn.dataset.tab === tabName) {
-            btn.classList.add('active', 'bg-green-600', 'text-white');
-            btn.classList.remove('text-slate-600', 'hover:bg-slate-100');
-        } else {
-            btn.classList.remove('active', 'bg-green-600', 'text-white');
-            btn.classList.add('text-slate-600', 'hover:bg-slate-100');
-        }
+      if (btn.dataset.tab === tabName) {
+        btn.classList.add('active', 'bg-orange-600', 'text-white');
+        btn.classList.remove('text-slate-600', 'hover:bg-slate-100');
+      } else {
+        btn.classList.remove('active', 'bg-orange-600', 'text-white');
+        btn.classList.add('text-slate-600', 'hover:bg-slate-100');
+      }
     });
 
     // Show Content
     document.querySelectorAll('.class-tab-content').forEach(c => c.classList.add('hidden'));
-    document.getElementById(`tab-${tabName}`)?.classList.remove('hidden');
+    const activeTab = document.getElementById(`tab-${tabName}`);
+    if (activeTab) activeTab.classList.remove('hidden');
 
     // Load Data
-    if(tabName === 'feed') this.renderFeed();
-    if(tabName === 'students') this.renderStudents();
-    if(tabName === 'daily-log') this.renderDailyLog();
-    if(tabName === 'attendance') this.renderAttendance();
-    if(tabName === 'tasks') this.renderTasks();
+    if (tabName === 'feed') this.renderFeed();
+    if (tabName === 'students') this.renderStudents();
+    if (tabName === 'daily-routine') this.renderDailyRoutine();
+    if (tabName === 'attendance') this.renderAttendance();
+    if (tabName === 'tasks') this.renderTasks?.();
+    if (tabName === 'gallery') this.renderGallery?.();
+    if (tabName === 'videocall') this.initVideoCall?.();
   },
 
   // --- RENDERERS ---
@@ -413,7 +505,7 @@ const UI = {
                     </label>
                     <input type="file" id="fileInput" accept="image/*,video/*,application/pdf" class="hidden">
                 </div>
-                <button id="btnSubmitPost" class="bg-green-600 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-green-700 transition flex items-center gap-2 shadow-sm shadow-green-200">
+                <button id="btnSubmitPost" class="bg-orange-600 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-orange-700 transition flex items-center gap-2 shadow-sm shadow-orange-200">
                     <span>Publicar</span>
                     <i data-lucide="send" class="w-4 h-4"></i>
                 </button>
@@ -643,43 +735,124 @@ const UI = {
     if (window.lucide) lucide.createIcons();
   },
 
-  async renderDailyLog() {
-      const tab = document.getElementById('tab-daily-log');
+  // 3. NUEVA FUNCIÓN: Rutina del Día
+  async renderDailyRoutine() {
+      const tab = document.getElementById('tab-daily-routine');
       if (!AppState.currentClass?.id) {
           tab.innerHTML = Helpers.emptyState('Seleccione una clase primero');
           return;
       }
-      // Interfaz colorida para el diario
+      
+      tab.innerHTML = Helpers.skeleton(3);
+      
+      const today = new Date().toISOString().split('T')[0];
+      
+      // Fetch students and existing logs
+      const { data: students } = await supabase.from('students').select('id, name').eq('classroom_id', AppState.currentClass.id).order('name');
+      const { data: logs } = await supabase.from('daily_logs').select('*').eq('classroom_id', AppState.currentClass.id).eq('date', today);
+      
+      const logMap = {};
+      logs?.forEach(l => logMap[l.student_id] = l);
+
+      if (!students?.length) {
+          tab.innerHTML = Helpers.emptyState('No hay estudiantes.');
+          return;
+      }
+
+      const renderOptions = (type, currentVal, studentId) => {
+          const options = {
+              mood: [
+                  {val: 'feliz', icon: '😊', label: 'Feliz'},
+                  {val: 'tranquilo', icon: '😐', label: 'Tranquilo'},
+                  {val: 'triste', icon: '😢', label: 'Triste'},
+                  {val: 'enojado', icon: '😠', label: 'Enojado'}
+              ],
+              food: [
+                  {val: 'todo', icon: '🍽️', label: 'Todo'},
+                  {val: 'mitad', icon: '🥣', label: 'Mitad'},
+                  {val: 'poco', icon: '🤏', label: 'Poco'},
+                  {val: 'nada', icon: '❌', label: 'Nada'}
+              ],
+              nap: [
+                  {val: 'si', icon: '😴', label: 'Durmió'},
+                  {val: 'no', icon: '👀', label: 'No durmió'}
+              ]
+          };
+          
+          return options[type].map(opt => `
+              <button class="routine-toggle px-2 py-1 rounded-lg border text-xs flex items-center gap-1 transition-all ${currentVal === opt.val ? 'bg-blue-100 border-blue-300 text-blue-700 font-bold ring-1 ring-blue-300' : 'bg-white border-slate-200 text-slate-600 hover:bg-slate-50'}"
+                      data-type="${type}" data-val="${opt.val}" data-student="${studentId}">
+                  <span>${opt.icon}</span> <span class="hidden sm:inline">${opt.label}</span>
+              </button>
+          `).join('');
+      };
+
       tab.innerHTML = `
-        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div class="bg-gradient-to-br from-yellow-50 to-orange-50 p-5 rounded-3xl border border-orange-100 shadow-sm">
-                <h3 class="font-bold text-orange-800 mb-3 flex items-center gap-2"><i data-lucide="smile" class="w-5 h-5"></i> Estado de Ánimo</h3>
-                <div class="grid grid-cols-2 gap-2">
-                    <button class="p-2 bg-white rounded-xl border border-orange-100 text-sm hover:bg-orange-100 transition">😊 Feliz</button>
-                    <button class="p-2 bg-white rounded-xl border border-orange-100 text-sm hover:bg-orange-100 transition">😐 Tranquilo</button>
-                    <button class="p-2 bg-white rounded-xl border border-orange-100 text-sm hover:bg-orange-100 transition">😢 Triste</button>
-                    <button class="p-2 bg-white rounded-xl border border-orange-100 text-sm hover:bg-orange-100 transition">😠 Enojado</button>
+        <div class="space-y-4">
+            ${students.map(s => {
+                const log = logMap[s.id] || {};
+                return `
+                <div class="bg-white p-4 rounded-2xl border border-slate-100 shadow-sm flex flex-col md:flex-row md:items-center gap-4">
+                    <div class="w-40 shrink-0 font-bold text-slate-700 truncate">${Helpers.escapeHTML(s.name)}</div>
+                    
+                    <div class="flex-1 grid grid-cols-1 sm:grid-cols-3 gap-4">
+                        <div class="flex flex-col gap-1">
+                            <span class="text-[10px] uppercase font-bold text-slate-400">Ánimo</span>
+                            <div class="flex flex-wrap gap-1">${renderOptions('mood', log.mood, s.id)}</div>
+                        </div>
+                        <div class="flex flex-col gap-1">
+                            <span class="text-[10px] uppercase font-bold text-slate-400">Comida</span>
+                            <div class="flex flex-wrap gap-1">${renderOptions('food', log.food, s.id)}</div>
+                        </div>
+                        <div class="flex flex-col gap-1">
+                            <span class="text-[10px] uppercase font-bold text-slate-400">Siesta</span>
+                            <div class="flex flex-wrap gap-1">${renderOptions('nap', log.nap, s.id)}</div>
+                        </div>
+                    </div>
                 </div>
-            </div>
-            <div class="bg-gradient-to-br from-blue-50 to-indigo-50 p-5 rounded-3xl border border-blue-100 shadow-sm">
-                <h3 class="font-bold text-blue-800 mb-3 flex items-center gap-2"><i data-lucide="utensils" class="w-5 h-5"></i> Alimentación</h3>
-                <div class="grid grid-cols-2 gap-2">
-                    <button class="p-2 bg-white rounded-xl border border-blue-100 text-sm hover:bg-blue-100 transition">🍽️ Todo</button>
-                    <button class="p-2 bg-white rounded-xl border border-blue-100 text-sm hover:bg-blue-100 transition">🥣 La mitad</button>
-                    <button class="p-2 bg-white rounded-xl border border-blue-100 text-sm hover:bg-blue-100 transition">🤏 Poco</button>
-                    <button class="p-2 bg-white rounded-xl border border-blue-100 text-sm hover:bg-blue-100 transition">❌ Nada</button>
-                </div>
-            </div>
-        </div>
-        <div class="mt-4 text-center text-slate-400 text-sm italic">
-            Seleccione un estudiante para registrar su diario (Funcionalidad completa próximamente)
+                `;
+            }).join('')}
         </div>
       `;
       if(window.lucide) lucide.createIcons();
   },
 
+  // 4. UX: Auto-Guardado
+  async toggleRoutineOption(btn) {
+      const type = btn.dataset.type;
+      const val = btn.dataset.val;
+      const studentId = btn.dataset.student;
+      const today = new Date().toISOString().split('T')[0];
+
+      // UI Update Optimistic
+      const siblings = btn.parentElement.querySelectorAll('.routine-toggle');
+      siblings.forEach(b => b.className = 'routine-toggle px-2 py-1 rounded-lg border text-xs flex items-center gap-1 transition-all bg-white border-slate-200 text-slate-600 hover:bg-slate-50');
+      btn.className = 'routine-toggle px-2 py-1 rounded-lg border text-xs flex items-center gap-1 transition-all bg-blue-100 border-blue-300 text-blue-700 font-bold ring-1 ring-blue-300';
+
+      // Upsert to DB
+      const payload = {
+          student_id: studentId,
+          classroom_id: AppState.currentClass.id,
+          date: today,
+          [type]: val
+      };
+      
+      // Check if exists to update or insert (Supabase upsert handles this with unique constraint)
+      // Assuming unique constraint on (student_id, date)
+      const { error } = await supabase.from('daily_logs').upsert(payload, { onConflict: 'student_id,date' });
+      
+      if(error) {
+          console.error(error);
+          Helpers.toast('Error al guardar', 'error');
+      }
+  },
+
   async renderAttendance() {
     const tab = document.getElementById('tab-attendance');
+    if (!AppState.currentClass?.id) {
+        if(tab) tab.innerHTML = Helpers.emptyState('Seleccione una clase primero');
+        return;
+    }
     const todayStr = new Date().toISOString().split('T')[0];
     
     tab.innerHTML = Helpers.skeleton(3);
@@ -732,7 +905,7 @@ const UI = {
     tab.innerHTML = `
       <div class="bg-white p-6 rounded-2xl shadow-sm">
         <div class="flex justify-between items-center mb-6">
-            <h3 class="font-bold text-slate-700">Asistencia: ${Helpers.formatDate(selectedDate)}</h3>
+            <h3 class="font-bold text-slate-700 flex items-center gap-2"><i data-lucide="calendar"></i> ${Helpers.formatDate(selectedDate)}</h3>
             <div class="flex gap-2">
               <button id="btnMarkAllPresent" class="bg-blue-600 text-white px-4 py-2 rounded-xl shadow hover:bg-blue-700 transition flex items-center gap-2">
                 <i data-lucide="check" class="w-4 h-4"></i> Marcar todos presentes
@@ -771,15 +944,15 @@ const UI = {
                             <td class="p-4 text-center">
                                 <div class="flex items-center justify-center gap-2">
                                     <button class="att-btn p-2 rounded-lg hover:bg-green-50 text-slate-400 hover:text-green-600 transition" 
-                                            onclick="UI.setAttendance('${s.id}', 'present', this)" title="Presente" aria-label="Marcar presente">
+                                            data-status="present" title="Presente" aria-label="Marcar presente">
                                         <i data-lucide="check-circle" class="w-5 h-5"></i>
                                     </button>
                                     <button class="att-btn p-2 rounded-lg hover:bg-red-50 text-slate-400 hover:text-red-600 transition" 
-                                            onclick="UI.setAttendance('${s.id}', 'absent', this)" title="Ausente" aria-label="Marcar ausente">
+                                            data-status="absent" title="Ausente" aria-label="Marcar ausente">
                                         <i data-lucide="x-circle" class="w-5 h-5"></i>
                                     </button>
                                     <button class="att-btn p-2 rounded-lg hover:bg-yellow-50 text-slate-400 hover:text-yellow-600 transition" 
-                                            onclick="UI.setAttendance('${s.id}', 'late', this)" title="Tardanza" aria-label="Marcar tardanza">
+                                            data-status="late" title="Tardanza" aria-label="Marcar tardanza">
                                         <i data-lucide="clock" class="w-5 h-5"></i>
                                     </button>
                                 </div>
@@ -806,7 +979,7 @@ const UI = {
     });
   },
 
-  setAttendance(studentId, status, btn) {
+  setAttendance(studentId, status) {
       const row = document.querySelector(`tr[data-id="${studentId}"]`);
       if(!row) return;
       
@@ -825,6 +998,10 @@ const UI = {
   },
 
   async saveAttendance() {
+      if (!AppState.currentClass?.id) {
+          Helpers.toast('Seleccione una clase', 'error');
+          return;
+      }
       const rows = document.querySelectorAll('.student-row');
       const upsertData = [];
       const date = new Date().toISOString().split('T')[0];
@@ -847,10 +1024,8 @@ const UI = {
           return;
       }
 
-      // ✔ Feedback visual cuando se guarda asistencia
-      Helpers.toast('Sincronizando con servidor...', 'info');
-
-      Helpers.toast('Guardando asistencia...', 'info');
+      // 2. Attendance: doble toast innecesario (Corregido)
+      Helpers.toast('Guardando asistencia...', 'info'); // Solo uno
       
       const { error } = await supabase.from('attendance').upsert(upsertData, { onConflict: 'student_id,classroom_id,date' });
       
@@ -1015,7 +1190,8 @@ const UI = {
     }
 
     btn.disabled = true;
-    btn.textContent = 'Publicando...';
+    const originalHTML = btn.innerHTML;
+    btn.innerHTML = '<span>Publicando...</span>';
 
     try {
       let fileUrl = null;
@@ -1053,7 +1229,7 @@ const UI = {
       Helpers.toast('Error al crear tarea', 'error');
     } finally {
       btn.disabled = false;
-      btn.textContent = 'Publicar Tarea';
+      btn.innerHTML = originalHTML;
     }
   },
 
@@ -1105,10 +1281,13 @@ const UI = {
     modal.classList.add('flex');
     document.getElementById('btnCloseTaskModal')?.focus(); // Accessibility: Focus Management
 
-    document.getElementById('btnCloseTaskModal')?.addEventListener('click', () => {
-      modal.classList.add('hidden');
-      modal.classList.remove('flex');
-    });
+    const closeBtn = document.getElementById('btnCloseTaskModal');
+    if (closeBtn) {
+        closeBtn.onclick = () => {
+            modal.classList.add('hidden');
+            modal.classList.remove('flex');
+        };
+    }
   },
 
   async gradeTask(evidenceId, grade, btn) {
@@ -1117,7 +1296,11 @@ const UI = {
     btn.className = 'w-8 h-8 rounded-lg font-bold text-xs transition bg-pink-500 text-white shadow-md';
     
     const { error } = await supabase.from('task_evidences').update({ grade_letter: grade, status: 'graded' }).eq('id', evidenceId);
-    if(!error) Helpers.toast(`Calificado con ${grade}`);
+    if(error) {
+        Helpers.toast('Error al guardar calificación', 'error');
+        return;
+    }
+    Helpers.toast(`Calificado con ${grade}`);
   },
 
   async gradeStars(evidenceId, stars, btn) {
@@ -1129,6 +1312,89 @@ const UI = {
     const { error } = await supabase.from('task_evidences').update({ stars: stars, status: 'graded' }).eq('id', evidenceId);
     if(!error) Helpers.toast(`${stars} estrella(s) asignadas`);
   },
+
+  // 5. NUEVA FUNCIÓN: Galería del Día
+  async renderGallery() {
+      const tab = document.getElementById('tab-gallery');
+      const grid = document.getElementById('galleryGrid');
+      
+      if (!AppState.currentClass?.id) {
+          if(grid) grid.innerHTML = Helpers.emptyState('Seleccione una clase primero');
+          return;
+      }
+      
+      if(grid) grid.innerHTML = Helpers.skeleton(4, 'h-48');
+
+      const today = new Date().toISOString().split('T')[0];
+
+      // Fetch gallery items
+      const { data: photos, error } = await supabase
+          .from('classroom_gallery')
+          .select('*')
+          .eq('classroom_id', AppState.currentClass.id)
+          .eq('date', today)
+          .order('created_at', { ascending: false });
+
+      if (error) {
+          console.error(error);
+          if(grid) grid.innerHTML = Helpers.emptyState('Error cargando galería', 'alert-circle');
+          return;
+      }
+
+      if (!photos || photos.length === 0) {
+          if(grid) grid.innerHTML = `<div class="col-span-full">${Helpers.emptyState('No hay fotos hoy. ¡Sube algunas!', 'camera')}</div>`;
+          return;
+      }
+
+      if(grid) {
+          grid.innerHTML = photos.map(p => `
+            <div class="group relative aspect-square bg-slate-100 rounded-xl overflow-hidden shadow-sm border border-slate-100">
+                <img src="${p.image_url}" class="w-full h-full object-cover transition-transform duration-500 group-hover:scale-110" loading="lazy">
+                <div class="absolute inset-0 bg-black/0 group-hover:bg-black/20 transition-colors"></div>
+            </div>
+          `).join('');
+      }
+      
+      if(window.lucide) lucide.createIcons();
+  },
+
+  async handleGalleryUpload(files) {
+      if (!files || files.length === 0) return;
+      if (!AppState.currentClass?.id) { Helpers.toast('Selecciona una clase', 'error'); return; }
+
+      Helpers.toast(`Subiendo ${files.length} foto(s)...`, 'info');
+      const today = new Date().toISOString().split('T')[0];
+      let uploadedCount = 0;
+
+      for (const file of files) {
+          try {
+              const fileExt = file.name.split('.').pop();
+              const fileName = `gallery/${AppState.currentClass.id}/${today}/${Date.now()}_${Math.random().toString(36).substring(7)}.${fileExt}`;
+
+              const { error: upErr } = await supabase.storage.from('classroom_media').upload(fileName, file);
+              if (upErr) throw upErr;
+
+              const pub = supabase.storage.from('classroom_media').getPublicUrl(fileName);
+              const publicUrl = pub.data?.publicUrl;
+              if (!publicUrl) throw new Error('No se pudo obtener URL pública');
+
+              await supabase.from('classroom_gallery').insert({
+                  classroom_id: AppState.currentClass.id,
+                  date: today,
+                  image_url: publicUrl,
+                  caption: ''
+              });
+              uploadedCount++;
+          } catch (e) {
+              console.error('Error subiendo foto:', e);
+          }
+      }
+
+      Helpers.toast(`${uploadedCount} fotos subidas correctamente`, 'success');
+      this.renderGallery(); // Recargar grid
+      document.getElementById('galleryUploadInput').value = ''; // Limpiar input
+  },
+
   // --- STUDENT PROFILE MODAL ---
   async openStudentProfile(studentId) {
     const modal = document.getElementById('studentProfileModal');
@@ -1138,6 +1404,10 @@ const UI = {
     modal.classList.add('flex');
     document.body.classList.add('no-scroll');
     document.getElementById('closeStudentProfileModal')?.focus(); // Accessibility: Focus Management
+    
+    // Store ID for incident reporting
+    document.getElementById('incidentStudentId').value = studentId;
+
     // Reset fields
     const ids = ['studentProfileName', 'studentDOB', 'studentClassroom', 'studentAllergies',
       'parent1Name', 'parent1Phone', 'parent1Email', 'parent2Name', 'parent2Phone',
@@ -1196,6 +1466,291 @@ const UI = {
             const el = document.getElementById(id);
             if(el) el.textContent = 'Error';
         });
+    }
+  },
+
+  // 6. FUNCIÓN CRÍTICA: Registro de Incidentes
+  openIncidentModal() {
+      const modal = document.getElementById('incidentModal');
+      modal.classList.remove('hidden');
+      modal.classList.add('flex');
+  },
+
+  async saveIncident() {
+      if (!AppState.user?.id) {
+          Helpers.toast('Sesión inválida', 'error');
+          return;
+      }
+      const studentId = document.getElementById('incidentStudentId').value;
+      const severity = document.getElementById('incidentSeverity').value;
+      const desc = document.getElementById('incidentDesc').value;
+      
+      if(!desc) { Helpers.toast('Descripción requerida', 'error'); return; }
+
+      const { error } = await supabase.from('incidents').insert({
+          student_id: studentId,
+          classroom_id: AppState.currentClass.id,
+          severity,
+          description: desc,
+          reported_at: new Date().toISOString(),
+          teacher_id: AppState.user.id // 8. Seguridad: Validar ownership
+      });
+
+      if(error) {
+          Helpers.toast('Error al registrar', 'error');
+      } else {
+          Helpers.toast('Incidente registrado', 'success');
+          document.getElementById('incidentModal').classList.add('hidden');
+          document.getElementById('incidentModal').classList.remove('flex');
+          document.getElementById('incidentDesc').value = '';
+      }
+  },
+
+  // 7. VIDEO CALL (Jitsi)
+  initVideoCall() {
+    const container = document.getElementById('meet');
+    if (!container) return;
+    container.innerHTML = ''; // Clear previous instance
+
+    if (typeof JitsiMeetExternalAPI === 'undefined') {
+      container.innerHTML = Helpers.emptyState('Error cargando sistema de video', 'video-off');
+      return;
+    }
+
+    // 1. Marcar clase como EN VIVO
+    supabase.from('classrooms').update({ is_live: true }).eq('id', AppState.currentClass.id).then();
+
+    if (window.jitsiInstance) window.jitsiInstance.dispose();
+
+    // 2. Construir Layout (Video + Chat)
+    container.innerHTML = `
+      <div class="flex flex-col lg:flex-row gap-4 h-[600px]">
+         <div id="jitsi-container" class="flex-1 bg-black rounded-xl overflow-hidden shadow-inner"></div>
+         
+         <div class="w-full lg:w-80 bg-white border border-slate-200 rounded-xl flex flex-col shadow-sm">
+            <div class="p-3 border-b bg-slate-50 rounded-t-xl flex justify-between items-center">
+              <span class="font-bold text-slate-700 text-sm">Chat de Clase</span>
+              <span class="flex h-2 w-2 relative">
+                <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75"></span>
+                <span class="relative inline-flex rounded-full h-2 w-2 bg-green-500"></span>
+              </span>
+            </div>
+            <div id="chat-messages" class="flex-1 overflow-y-auto p-3 space-y-3 bg-slate-50/50">
+               <div class="text-center text-xs text-slate-400 mt-4">Iniciando chat...</div>
+            </div>
+            <div class="p-2 border-t bg-white rounded-b-xl flex gap-2">
+               <input id="chat-input" class="flex-1 border border-slate-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-orange-500 outline-none" placeholder="Escribe un mensaje..." autocomplete="off">
+               <button id="chat-send" class="bg-orange-600 hover:bg-orange-700 text-white rounded-lg p-2 transition-colors"><i data-lucide="send" class="w-4 h-4"></i></button>
+            </div>
+         </div>
+      </div>
+      <div class="mt-4 flex justify-end">
+         <button id="btnEndClass" class="bg-red-600 hover:bg-red-700 text-white px-6 py-2 rounded-xl font-bold shadow-lg shadow-red-200 transition flex items-center gap-2">
+            <i data-lucide="phone-off" class="w-4 h-4"></i> Terminar Clase
+         </button>
+      </div>
+    `;
+    if(window.lucide) lucide.createIcons();
+
+    // 3. Iniciar Jitsi
+    const domain = "meet.jit.si";
+    const options = {
+      roomName: "KarpusKids_" + (AppState.currentClass?.id || 'General'),
+      width: "100%",
+      height: "100%",
+      parentNode: document.getElementById('jitsi-container'),
+      lang: 'es',
+      userInfo: {
+        displayName: AppState.profile?.name || 'Maestra'
+      }
+    };
+    window.jitsiInstance = new JitsiMeetExternalAPI(domain, options);
+
+    // 4. Lógica del Chat
+    this.initChatLogic(AppState.currentClass.id);
+
+    // 5. Botón Terminar
+    document.getElementById('btnEndClass').onclick = async () => {
+        if(confirm('¿Finalizar la clase en vivo?')) {
+            await supabase.from('classrooms').update({ is_live: false }).eq('id', AppState.currentClass.id);
+            if (window.jitsiInstance) window.jitsiInstance.dispose();
+            container.innerHTML = Helpers.emptyState('Clase finalizada', 'video-off');
+        }
+    };
+  },
+
+  async initChatLogic(classroomId) {
+      const chatContainer = document.getElementById('chat-messages');
+      const input = document.getElementById('chat-input');
+      const btn = document.getElementById('chat-send');
+      
+      // Cargar mensajes previos
+      const { data: msgs } = await supabase
+          .from('classroom_chat')
+          .select('message, created_at, profiles(name)')
+          .eq('classroom_id', classroomId)
+          .order('created_at', { ascending: false })
+          .limit(50);
+      
+      chatContainer.innerHTML = '';
+      (msgs || []).reverse().forEach(m => appendMessage(m));
+      scrollToBottom();
+
+      // Suscripción Realtime
+      const channel = supabase.channel('room_chat_' + classroomId)
+          .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'classroom_chat', filter: `classroom_id=eq.${classroomId}` }, async (payload) => {
+              const { data: user } = await supabase.from('profiles').select('name').eq('id', payload.new.user_id).single();
+              appendMessage({ ...payload.new, profiles: user });
+              scrollToBottom();
+          })
+          .subscribe();
+
+      // Enviar mensaje
+      const sendMessage = async () => {
+          const text = input.value.trim();
+          if(!text) return;
+          input.value = '';
+          await supabase.from('classroom_chat').insert({ classroom_id: classroomId, user_id: AppState.user.id, message: text });
+      };
+
+      btn.onclick = sendMessage;
+      input.onkeypress = (e) => { if(e.key === 'Enter') sendMessage(); };
+
+      function appendMessage(m) {
+          const isMe = m.user_id === AppState.user.id; // Note: user_id might not be in payload.new directly if not selected, but for local echo logic or fetch it works.
+          const name = m.profiles?.name || 'Usuario';
+          const time = new Date(m.created_at).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'});
+          
+          chatContainer.innerHTML += `
+              <div class="flex flex-col mb-2 ${name === (AppState.profile?.name) ? 'items-end' : 'items-start'}">
+                  <div class="text-[10px] text-slate-400 mb-0.5 px-1">${name} • ${time}</div>
+                  <div class="px-3 py-2 rounded-xl text-sm max-w-[85%] ${name === (AppState.profile?.name) ? 'bg-orange-100 text-orange-900 rounded-tr-none' : 'bg-white border border-slate-200 text-slate-700 rounded-tl-none shadow-sm'}">
+                      ${Helpers.escapeHTML(m.message)}
+                  </div>
+              </div>
+          `;
+      }
+      function scrollToBottom() { chatContainer.scrollTop = chatContainer.scrollHeight; }
+  },
+
+  // 9. PERFIL DOCENTE
+  async renderProfile() {
+      const { data: profile, error } = await supabase.from('profiles').select('*').eq('id', AppState.user.id).single();
+      if(error) { console.error(error); return; }
+      
+      AppState.profile = profile; // Update state
+      
+      const setVal = (id, val) => { const el = document.getElementById(id); if(el) el.value = val || ''; };
+      
+      setVal('profName', profile.name);
+      setVal('profPhone', profile.phone);
+      setVal('profEmail', profile.email);
+      setVal('profBio', profile.bio || profile.notes); // Fallback to notes if bio empty
+      
+      const avatarEl = document.getElementById('profileAvatar');
+      if(avatarEl && profile.avatar_url) avatarEl.src = profile.avatar_url;
+      
+      this.updateUserProfileUI();
+  },
+
+  async saveProfile(e) {
+      e.preventDefault();
+      const btn = document.getElementById('btnSaveProfile');
+      const originalText = btn.innerHTML;
+      btn.disabled = true;
+      btn.innerHTML = '<i data-lucide="loader-2" class="animate-spin"></i> Guardando...';
+      if(window.lucide) lucide.createIcons();
+
+      const updates = {
+          name: document.getElementById('profName').value,
+          phone: document.getElementById('profPhone').value,
+          bio: document.getElementById('profBio').value,
+          // updated_at: new Date().toISOString() // Supabase handles this usually, or add if column exists
+      };
+
+      const { error } = await supabase.from('profiles').update(updates).eq('id', AppState.user.id);
+
+      if(error) {
+          Helpers.toast('Error al guardar perfil', 'error');
+      } else {
+          Helpers.toast('Perfil actualizado', 'success');
+          AppState.profile = { ...AppState.profile, ...updates };
+          this.updateUserProfileUI();
+      }
+      
+      btn.disabled = false;
+      btn.innerHTML = originalText;
+      if(window.lucide) lucide.createIcons();
+  },
+
+  async handleAvatarUpload(file) {
+      if(!file) return;
+      
+      Helpers.toast('Subiendo imagen...', 'info');
+      
+      try {
+          const fileExt = file.name.split('.').pop();
+          const fileName = `avatars/${AppState.user.id}_${Date.now()}.${fileExt}`;
+          
+          const { error: upErr } = await supabase.storage.from('classroom_media').upload(fileName, file);
+          if(upErr) throw upErr;
+          
+          const { data: { publicUrl } } = supabase.storage.from('classroom_media').getPublicUrl(fileName);
+          
+          const { error: updateErr } = await supabase.from('profiles').update({ avatar_url: publicUrl }).eq('id', AppState.user.id);
+          if(updateErr) throw updateErr;
+          
+          document.getElementById('profileAvatar').src = publicUrl;
+          AppState.profile.avatar_url = publicUrl;
+          this.updateUserProfileUI();
+          Helpers.toast('Avatar actualizado', 'success');
+          
+      } catch(e) {
+          console.error(e);
+          Helpers.toast('Error al subir imagen', 'error');
+      }
+  },
+
+  // 8. NOTIFICACIONES PUSH (REALTIME)
+  initNotifications() {
+    if (!("Notification" in window)) return;
+
+    // Solicitar permiso si no se tiene
+    if (Notification.permission === "default") {
+      Notification.requestPermission();
+    }
+
+    // Suscribirse a eventos relevantes (ej: nuevos mensajes, incidentes críticos)
+    const channel = supabase.channel('teacher_notifications')
+      .on(
+        'postgres_changes',
+        { event: 'INSERT', schema: 'public', table: 'classroom_chat' },
+        (payload) => {
+          // Solo notificar si no es mi propio mensaje
+          if (payload.new.user_id !== AppState.user?.id) {
+             this.showBrowserNotification('Nuevo mensaje en el aula', payload.new.message);
+          }
+        }
+      )
+      .on(
+        'postgres_changes',
+        { event: 'INSERT', schema: 'public', table: 'incidents' },
+        (payload) => {
+           this.showBrowserNotification('Nuevo Incidente Registrado', payload.new.description);
+        }
+      )
+      .subscribe();
+  },
+
+  showBrowserNotification(title, body) {
+    if (Notification.permission === "granted") {
+      new Notification("Karpus Kids - Maestra", {
+        body: body,
+        icon: 'logo/favicon.ico',
+        vibrate: [200, 100, 200]
+      });
+    } else {
+      Helpers.toast(title, 'info'); // Fallback a toast
     }
   }
 };

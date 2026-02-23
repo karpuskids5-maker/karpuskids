@@ -20,6 +20,15 @@ window.DirectorState = {
   }
 };
 
+// Helper Debounce
+function debounce(func, wait) {
+  let timeout;
+  return function(...args) {
+    clearTimeout(timeout);
+    timeout = setTimeout(() => func.apply(this, args), wait);
+  };
+}
+
 // 2. HELPER PARA MANEJO DE ERRORES
 async function safeExecute(fn, errorMsg = 'Ocurrió un error inesperado') {
   try { await fn(); } 
@@ -125,6 +134,14 @@ document.addEventListener('DOMContentLoaded', async () => {
     userNameElements.forEach(el => el.textContent = profile.name || 'Usuario');
   }
 
+  // Listener para filtro de mes global en Dashboard
+  document.getElementById('globalMonthFilter')?.addEventListener('change', () => {
+    loadDashboard();
+  });
+  document.getElementById('btnRefreshDashboard')?.addEventListener('click', () => {
+    loadDashboard();
+  });
+
   try { const { subscribeNotifications } = await import('./js/supabase.js'); subscribeNotifications(n=>{ try { const msg = (n.title||'Notificación') + ': ' + (n.message||''); const el = document.getElementById('notifToast'); if (el) { el.textContent = msg; el.classList.remove('hidden'); setTimeout(()=>el.classList.add('hidden'),3000); } } catch(e){} }); } catch(e){}
 
   // 0.1 Botón de Cerrar Sesión
@@ -205,12 +222,27 @@ document.addEventListener('DOMContentLoaded', async () => {
       }
       
       document.getElementById('btnApplyStudentFilters')?.addEventListener('click', () => loadStudents(1));
+      
+      // Listeners en tiempo real para filtros
+      const nameInput = document.getElementById('filterStName');
+      if (nameInput) nameInput.addEventListener('input', debounce(() => loadStudents(1), 500));
+
+      const classSelect = document.getElementById('filterStClassroom');
+      if (classSelect) classSelect.addEventListener('change', () => loadStudents(1));
+
+      const statusSelect = document.getElementById('filterStStatus');
+      if (statusSelect) statusSelect.addEventListener('change', () => loadStudents(1));
+
+      const levelSelect = document.getElementById('filterStLevel');
+      if (levelSelect) levelSelect.addEventListener('change', () => loadStudents(1));
+
     }, 'Error cargando filtros');
   }
 
   // 3. FUNCIÓN PARA CARGAR ESTUDIANTES CON PAGINACIÓN
   window.loadStudents = async function(page = 1) {
     const tableBody = document.getElementById('studentsTable');
+    const gridContainer = document.getElementById('studentsGrid'); // Support for Grid View
     if (!tableBody) return;
 
     window.DirectorState.studentsPage = page;
@@ -250,10 +282,12 @@ document.addEventListener('DOMContentLoaded', async () => {
 
       if (students.length === 0 && page === 1) {
         tableBody.innerHTML = '<tr><td colspan="2" class="text-center py-8 text-slate-500">No se encontraron estudiantes registrados.</td></tr>';
+        if(gridContainer) gridContainer.innerHTML = '<div class="col-span-full text-center py-8 text-slate-500">No se encontraron estudiantes.</div>';
         renderPaginationControls(); // Renderiza controles vacíos
         return;
       }
 
+      // Render Table
       tableBody.innerHTML = students.map(s => `
         <tr class="hover:bg-slate-50">
           <td class="py-4 px-4">
@@ -275,6 +309,42 @@ document.addEventListener('DOMContentLoaded', async () => {
           </td>
         </tr>
       `).join('');
+
+      // Render Grid (Cards)
+      if (gridContainer) {
+        const colors = ['bg-blue-50 border-blue-100', 'bg-pink-50 border-pink-100', 'bg-purple-50 border-purple-100', 'bg-orange-50 border-orange-100', 'bg-green-50 border-green-100'];
+        
+        gridContainer.innerHTML = students.map((s, index) => {
+          const colorClass = colors[index % colors.length];
+          const avatar = s.avatar_url || `https://ui-avatars.com/api/?name=${encodeURIComponent(s.name)}&background=random&color=fff`;
+          
+          return `
+          <div class="${colorClass} border-2 rounded-3xl p-5 shadow-sm hover:shadow-xl transition-all duration-300 group relative flex flex-col items-center text-center">
+            <div class="absolute top-4 right-4">
+               <span class="text-[10px] font-black px-2 py-1 rounded-full ${s.is_active ? 'bg-green-200 text-green-700' : 'bg-red-200 text-red-700'} uppercase tracking-wider">
+                 ${s.is_active ? 'Activo' : 'Inactivo'}
+               </span>
+            </div>
+            
+            <div class="w-20 h-20 rounded-full border-4 border-white shadow-md overflow-hidden mb-3">
+              <img src="${avatar}" class="w-full h-full object-cover" alt="${s.name}">
+            </div>
+            
+            <h4 class="font-black text-slate-800 text-lg mb-1">${s.name}</h4>
+            <p class="text-xs font-bold text-slate-500 uppercase tracking-wide mb-4">${s.classrooms?.name || 'Sin Aula'}</p>
+            
+            <div class="flex gap-2 w-full mt-auto">
+              <button class="view-profile-btn flex-1 py-2 bg-white text-slate-600 rounded-xl font-bold text-xs shadow-sm hover:bg-slate-50 transition-colors flex items-center justify-center gap-2" data-student-id="${s.id}">
+                <i data-lucide="eye" class="w-4 h-4"></i> Perfil
+              </button>
+              <button class="edit-student-btn flex-1 py-2 bg-indigo-600 text-white rounded-xl font-bold text-xs shadow-md hover:bg-indigo-700 transition-colors flex items-center justify-center gap-2" data-student-id="${s.id}">
+                <i data-lucide="edit" class="w-4 h-4"></i> Editar
+              </button>
+            </div>
+          </div>
+        `}).join('');
+      }
+
       if (window.lucide) lucide.createIcons();
       
       renderPaginationControls();
@@ -333,8 +403,15 @@ document.addEventListener('DOMContentLoaded', async () => {
   // 5. CARGAR DASHBOARD
   async function loadDashboard() {
     await safeExecute(async () => {
-      // 1. Cargar KPIs usando RPC optimizado
-      const { data: kpis, error: kpiError } = await supabase.rpc('get_dashboard_kpis');
+      // Calcular mes actual para filtros
+      const filterVal = document.getElementById('globalMonthFilter')?.value || 'current';
+      const date = new Date();
+      if (filterVal === 'last') date.setMonth(date.getMonth() - 1);
+      const currentMonth = date.toLocaleString('es-ES', { month: 'long' });
+      const monthCap = currentMonth.charAt(0).toUpperCase() + currentMonth.slice(1);
+
+      // 1. Cargar KPIs usando RPC optimizado CON PARÁMETRO
+      const { data: kpis, error: kpiError } = await supabase.rpc('get_dashboard_kpis', { p_month: monthCap });
       if (kpiError) throw kpiError;
 
       // Actualizar DOM con animación simple
@@ -351,9 +428,6 @@ document.addEventListener('DOMContentLoaded', async () => {
       animateValue('kpiIncidents', kpis.active_incidents);
 
       // 2. Cargar Reporte Financiero por Aula (RPC)
-      const currentMonth = new Date().toLocaleString('es-ES', { month: 'long' }); // "enero", "febrero"...
-      // Asegurar capitalización correcta si la DB lo requiere (ej: "Enero")
-      const monthCap = currentMonth.charAt(0).toUpperCase() + currentMonth.slice(1);
       
       const { data: finReport, error: finError } = await supabase.rpc('get_monthly_financial_report_by_classroom', { p_month: monthCap });
       
@@ -370,7 +444,7 @@ document.addEventListener('DOMContentLoaded', async () => {
                 <td class="py-3 text-right text-amber-600">$${r.total_pending}</td>
                 <td class="py-3 px-2">
                   <div class="w-full bg-slate-100 rounded-full h-2 overflow-hidden">
-                    <div class="bg-blue-500 h-full rounded-full" style="width: ${percent}%"></div>
+                    <div class="bg-purple-500 h-full rounded-full" style="width: ${percent}%"></div>
                   </div>
                 </td>
               </tr>
@@ -403,32 +477,40 @@ document.addEventListener('DOMContentLoaded', async () => {
         .order('name');
       
       if (error) throw error;
-
-      const teachersTable = document.getElementById('teachersTable');
-      const assistantsTable = document.getElementById('assistantsTable');
+      
+      // Contenedores Grid
+      const teachersGrid = document.getElementById('teachersGrid');
+      const assistantsGrid = document.getElementById('assistantsGrid');
       const assistantsContainer = document.getElementById('assistantsContainer');
 
-      if (teachersTable) teachersTable.innerHTML = '';
-      if (assistantsTable) assistantsTable.innerHTML = '';
+      if (teachersGrid) teachersGrid.innerHTML = '';
+      if (assistantsGrid) assistantsGrid.innerHTML = '';
 
       const staffArr = staff || [];
       const teachers = staffArr.filter(p => p.role === 'maestra');
       const assistants = staffArr.filter(p => p.role === 'asistente');
 
+      // Actualizar KPIs de la sección
+      const setKpi = (id, val) => { const el = document.getElementById(id); if(el) el.textContent = val; };
+      setKpi('kpiStaffTotal', staffArr.length);
+      setKpi('kpiStaffActive', staffArr.length); // Simulado, agregar campo is_active si existe
+      setKpi('kpiStaffInClass', teachers.length);
+      setKpi('kpiStaffAssistants', assistants.length);
+
       // Renderizar Maestros
-      if (teachersTable) {
+      if (teachersGrid) {
         if (teachers.length === 0) {
-          teachersTable.innerHTML = '<tr><td colspan="4" class="text-center py-8 text-slate-500">No se encontraron maestros registrados.</td></tr>';
+          teachersGrid.innerHTML = '<div class="col-span-full text-center py-12 text-slate-400">No se encontraron maestros registrados.</div>';
         } else {
-          teachersTable.innerHTML = teachers.map(t => renderStaffRow(t)).join('');
+          teachersGrid.innerHTML = teachers.map(t => renderStaffCard(t, 'teacher')).join('');
         }
       }
 
       // Renderizar Asistentes
-      if (assistantsContainer && assistantsTable) {
+      if (assistantsContainer && assistantsGrid) {
         if (assistants.length > 0) {
           assistantsContainer.classList.remove('hidden');
-          assistantsTable.innerHTML = assistants.map(a => renderStaffRow(a)).join('');
+          assistantsGrid.innerHTML = assistants.map(a => renderStaffCard(a, 'assistant')).join('');
         } else {
           assistantsContainer.classList.add('hidden');
         }
@@ -439,57 +521,51 @@ document.addEventListener('DOMContentLoaded', async () => {
     }, 'Error cargando personal');
   }
 
-  // Helper para renderizar filas de personal
-  function renderStaffRow(person) {
-    // Generar color aleatorio o fijo para el avatar
-    const colors = [
-      'bg-red-100 text-red-600', 'bg-orange-100 text-orange-600', 
-      'bg-amber-100 text-amber-600', 'bg-green-100 text-green-600', 
-      'bg-emerald-100 text-emerald-600', 'bg-teal-100 text-teal-600',
-      'bg-cyan-100 text-cyan-600', 'bg-sky-100 text-sky-600',
-      'bg-blue-100 text-blue-600', 'bg-indigo-100 text-indigo-600',
-      'bg-violet-100 text-violet-600', 'bg-purple-100 text-purple-600',
-      'bg-fuchsia-100 text-fuchsia-600', 'bg-pink-100 text-pink-600',
-      'bg-rose-100 text-rose-600'
-    ];
-    const nameLen = (person && person.name && person.name.length) ? person.name.length : 1;
-    const colorClass = colors[nameLen % colors.length];
+  // Helper para renderizar CARDS de personal
+  function renderStaffCard(person, type) {
+    const isTeacher = type === 'teacher';
+    
+    // Estilos diferenciados
+    const cardBg = isTeacher ? 'bg-white' : 'bg-indigo-50/50 border border-indigo-100';
+    const avatarBg = isTeacher ? 'bg-purple-100 text-purple-600' : 'bg-indigo-100 text-indigo-600';
+    const badgeBg = isTeacher ? 'bg-emerald-100 text-emerald-700' : 'bg-blue-100 text-blue-700';
+    const roleLabel = isTeacher ? (person.specialty || 'Docente Titular') : 'Apoyo / Asistente';
 
     return `
-        <tr class="hover:bg-indigo-50/50 transition-colors cursor-pointer group border-b last:border-0" onclick="window.openTeacherModal('${person.id}')">
-          <td class="py-4 px-6">
-            <div class="flex items-center gap-3">
-              <div class="w-10 h-10 rounded-full ${colorClass} flex items-center justify-center font-bold shadow-sm">
-                ${(person && person.name && person.name.length) ? person.name[0] : 'U'}
-              </div>
-              <div>
-                <div class="font-semibold text-slate-800">${person?.name || 'Usuario'}</div>
-                <div class="text-xs text-slate-500">${person.role === 'maestra' ? (person.specialty || 'Docente') : 'Asistente'}</div>
-              </div>
+      <div class="${cardBg} rounded-2xl shadow-sm hover:shadow-xl transition-all duration-300 p-6 group relative overflow-hidden">
+        <div class="flex items-start justify-between mb-4">
+          <div class="flex items-center gap-4">
+            <div class="w-14 h-14 ${avatarBg} rounded-2xl flex items-center justify-center shadow-sm group-hover:scale-110 transition-transform">
+              <i data-lucide="user" class="w-7 h-7"></i>
             </div>
-          </td>
-          <td class="py-4 px-6">
-            <div class="text-sm text-slate-600 flex flex-col">
-              <span class="flex items-center gap-1"><i data-lucide="mail" class="w-3 h-3"></i> ${person.email}</span>
-              <span class="flex items-center gap-1 mt-1"><i data-lucide="phone" class="w-3 h-3"></i> ${person.phone || '-'}</span>
+            <div>
+              <h4 class="font-bold text-slate-800 text-lg leading-tight">${person.name || 'Sin Nombre'}</h4>
+              <p class="text-xs font-medium text-slate-500 mt-1">${roleLabel}</p>
             </div>
-          </td>
-          <td class="py-4 px-6 text-center">
-            <button class="px-3 py-1 rounded-full text-xs font-semibold bg-green-100 text-green-700 border border-green-200 hover:bg-green-200 transition-colors" onclick="event.stopPropagation(); alert('Estado activo')">
-              Activo
-            </button>
-          </td>
-          <td class="py-4 px-6 text-right">
-            <div class="flex justify-end gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
-              <button class="p-2 hover:bg-blue-50 text-blue-600 rounded-lg transition-colors" title="Editar" onclick="event.stopPropagation(); window.openTeacherModal('${person.id}')">
-                <i data-lucide="edit-2" class="w-4 h-4"></i>
-              </button>
-              <button class="p-2 hover:bg-red-50 text-red-600 rounded-lg transition-colors" title="Eliminar" onclick="event.stopPropagation(); window.deleteProfile('${person.id}')">
-                <i data-lucide="trash-2" class="w-4 h-4"></i>
-              </button>
-            </div>
-          </td>
-        </tr>
+          </div>
+          <span class="${badgeBg} text-[10px] font-bold px-2 py-1 rounded-full uppercase tracking-wider">Activo</span>
+        </div>
+
+        <div class="space-y-2 mb-6">
+          <div class="flex items-center gap-2 text-sm text-slate-600">
+            <i data-lucide="mail" class="w-4 h-4 text-slate-400"></i>
+            <span class="truncate">${person.email}</span>
+          </div>
+          <div class="flex items-center gap-2 text-sm text-slate-600">
+            <i data-lucide="phone" class="w-4 h-4 text-slate-400"></i>
+            <span>${person.phone || 'Sin teléfono'}</span>
+          </div>
+        </div>
+
+        <div class="pt-4 border-t border-slate-100 flex gap-2">
+          <button onclick="window.openTeacherModal('${person.id}')" class="flex-1 py-2 bg-slate-50 hover:bg-purple-50 text-slate-600 hover:text-purple-700 rounded-xl text-sm font-bold transition-colors flex items-center justify-center gap-2">
+            <i data-lucide="edit-2" class="w-4 h-4"></i> Editar
+          </button>
+          <button onclick="window.deleteProfile('${person.id}')" class="p-2 bg-slate-50 hover:bg-red-50 text-slate-400 hover:text-red-600 rounded-xl transition-colors" title="Eliminar">
+            <i data-lucide="trash-2" class="w-4 h-4"></i>
+          </button>
+        </div>
+      </div>
     `;
   }
 
