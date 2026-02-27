@@ -1,4 +1,9 @@
-import { supabase, createClient, SUPABASE_URL, SUPABASE_ANON_KEY } from './js/supabase.js';
+import { supabase, createClient, SUPABASE_URL, SUPABASE_ANON_KEY, initOneSignal } from './js/supabase.js';
+
+// ... (rest of imports)
+
+// Inicialización de OneSignal
+try { initOneSignal(); } catch(e) { console.error("Error OneSignal:", e); }
 
 /**
  * Lógica principal del Panel de Directora

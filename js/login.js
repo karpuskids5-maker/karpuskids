@@ -1,6 +1,9 @@
-import { supabase } from "./supabase.js";
+import { supabase, initOneSignal } from "./supabase.js";
 
 document.addEventListener('DOMContentLoaded', () => {
+  // Inicializar OneSignal si ya hay sesión (por ejemplo si vuelve del panel)
+  try { initOneSignal(); } catch(e) {}
+  
   const loginForm = document.getElementById('loginForm');
   
   if (loginForm) {
@@ -44,7 +47,10 @@ document.addEventListener('DOMContentLoaded', () => {
 
         if (profileError) throw profileError;
 
-        // 3. Redirección según rol
+        // 3. Inicializar OneSignal inmediatamente al loguearse para capturar el ID
+        try { await initOneSignal(); } catch(e) { console.warn("OneSignal Login Error:", e); }
+
+        // 4. Redirección según rol
         localStorage.setItem('karpus_user', JSON.stringify(profile));
         const role = (profile.role || '').toLowerCase();
         

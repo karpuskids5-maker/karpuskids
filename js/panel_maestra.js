@@ -1,4 +1,4 @@
-import { supabase } from './supabase.js';
+import { supabase, initOneSignal } from './supabase.js';
 
 // --- 1. HELPERS & UTILS ---
 const Helpers = {
@@ -1214,6 +1214,25 @@ const UI = {
 
       if(error) throw error;
       Helpers.toast('Tarea publicada con éxito');
+
+      // Notificar a los padres del aula
+      try {
+        const { data: students } = await supabase
+          .from('students')
+          .select('parent_id')
+          .eq('classroom_id', AppState.currentClass.id);
+        
+        const parentIds = [...new Set(students.map(s => s.parent_id).filter(Boolean))];
+        for (const pid of parentIds) {
+          await window.sendPush({
+            user_id: pid,
+            title: 'Nueva Tarea Asignada 📝',
+            message: `Se ha publicado una nueva tarea: "${title}". Fecha de entrega: ${Helpers.formatDate(date)}`,
+            type: 'info',
+            link: '/panel_padres.html#tasks'
+          });
+        }
+      } catch (e) { console.error('Error notificando tarea:', e); }
       
       // Fix: Reset form
       document.getElementById('taskTitle').value = '';
@@ -1255,24 +1274,47 @@ const UI = {
       const status = ev ? 'Entregado' : 'Pendiente';
       const grade = ev?.grade_letter || null;
       const stars = Number(ev?.stars) || 0;
+      
+      // UI de Calificación Mejorada
+      const gradingUI = ev ? `
+        <div class="flex flex-col items-center gap-2">
+          <!-- Selector de Nota (A, B, C) -->
+          <div class="flex bg-slate-100 p-1 rounded-lg">
+            ${['A','B','C'].map(g => {
+              const isActive = grade === g;
+              const activeClass = g === 'A' ? 'bg-green-500 text-white' : (g === 'B' ? 'bg-blue-500 text-white' : 'bg-orange-500 text-white');
+              return `<button onclick="UI.gradeTask('${ev.id}', '${g}', this)" 
+                class="w-8 h-8 rounded-md font-bold text-xs transition-all ${isActive ? activeClass + ' shadow-md scale-105' : 'text-slate-400 hover:bg-white hover:text-slate-600'}">
+                ${g}
+              </button>`;
+            }).join('')}
+          </div>
+          <!-- Selector de Estrellas -->
+          <div class="flex gap-1">
+            ${[1,2,3,4,5].map(n => `
+              <button title="${n} estrellas" onclick="UI.gradeStars('${ev.id}', ${n}, this)" class="transition-transform hover:scale-110 focus:outline-none">
+                <i data-lucide="star" class="w-5 h-5 ${n <= stars ? 'text-yellow-400 fill-yellow-400' : 'text-slate-200 fill-slate-100'}"></i>
+              </button>
+            `).join('')}
+          </div>
+        </div>
+      ` : `<span class="text-xs text-slate-400 italic bg-slate-50 px-2 py-1 rounded">Sin entrega</span>`;
+
       return `
-        <tr class="hover:bg-slate-50">
-          <td class="p-3 font-medium text-slate-700">${Helpers.escapeHTML(s.name)}</td>
-          <td class="p-3 text-center"><span class="px-2 py-1 rounded-full text-xs font-bold ${ev ? 'bg-green-100 text-green-700' : 'bg-slate-100 text-slate-500'}">${status}</span></td>
-          <td class="p-3 text-center">${ev?.file_url ? `<a href="${ev.file_url}" target="_blank" class="text-blue-600 font-bold underline text-xs">Ver Archivo</a>` : '-'}</td>
+        <tr class="hover:bg-slate-50 border-b last:border-0 transition-colors">
+          <td class="p-4 font-medium text-slate-700">
+            ${Helpers.escapeHTML(s.name)}
+          </td>
+          <td class="p-4 text-center">
+            <span class="px-3 py-1 rounded-full text-xs font-bold ${ev ? 'bg-green-100 text-green-700' : 'bg-slate-100 text-slate-500'}">
+              ${status}
+            </span>
+          </td>
+          <td class="p-4 text-center">
+            ${ev?.file_url ? `<a href="${ev.file_url}" target="_blank" class="inline-flex items-center gap-1 text-blue-600 font-bold text-xs hover:underline bg-blue-50 px-3 py-1.5 rounded-lg transition-colors"><i data-lucide="file-text" class="w-3 h-3"></i> Ver Tarea</a>` : '<span class="text-slate-300">-</span>'}
+          </td>
           <td class="p-3 text-center">
-            ${ev ? `
-              <div class="flex flex-col items-center gap-2">
-                <div class="flex justify-center gap-1">${['A','B','C','D'].map(g => `<button onclick="UI.gradeTask('${ev.id}', '${g}', this)" class="w-8 h-8 rounded-lg font-bold text-xs transition ${grade === g ? 'bg-pink-500 text-white shadow-md' : 'bg-slate-100 text-slate-500 hover:bg-pink-100 hover:text-pink-600'}">${g}</button>`).join('')}</div>
-                <div class="flex justify-center gap-1">
-                  ${[1,2,3,4,5].map(n => `
-                    <button title="${n} estrellas" onclick="UI.gradeStars('${ev.id}', ${n}, this)" class="p-1 ${n <= stars ? 'text-yellow-500' : 'text-slate-300'}">
-                      <i data-lucide="star" class="w-4 h-4"></i>
-                    </button>
-                  `).join('')}
-                </div>
-              </div>
-            ` : '<span class="text-xs text-slate-300">Sin entrega</span>'}
+            ${gradingUI}
           </td>
         </tr>`;
     }).join('');
@@ -1292,8 +1334,11 @@ const UI = {
 
   async gradeTask(evidenceId, grade, btn) {
     // UI Optimista
-    Array.from(btn.parentElement.children).forEach(b => b.className = 'w-8 h-8 rounded-lg font-bold text-xs transition bg-slate-100 text-slate-500 hover:bg-pink-100 hover:text-pink-600');
-    btn.className = 'w-8 h-8 rounded-lg font-bold text-xs transition bg-pink-500 text-white shadow-md';
+    Array.from(btn.parentElement.children).forEach(b => {
+        b.className = 'w-8 h-8 rounded-md font-bold text-xs transition-all text-slate-400 hover:bg-white hover:text-slate-600';
+    });
+    const activeClass = grade === 'A' ? 'bg-green-500 text-white' : (grade === 'B' ? 'bg-blue-500 text-white' : 'bg-orange-500 text-white');
+    btn.className = `w-8 h-8 rounded-md font-bold text-xs transition-all ${activeClass} shadow-md scale-105`;
     
     const { error } = await supabase.from('task_evidences').update({ grade_letter: grade, status: 'graded' }).eq('id', evidenceId);
     if(error) {
@@ -1301,13 +1346,32 @@ const UI = {
         return;
     }
     Helpers.toast(`Calificado con ${grade}`);
+
+    // Notificar al padre sobre la calificación
+    try {
+      const { data: evidence } = await supabase
+        .from('task_evidences')
+        .select('student:students(parent_id, name), task:tasks(title)')
+        .eq('id', evidenceId)
+        .single();
+      
+      if (evidence?.student?.parent_id) {
+        await window.sendPush({
+          user_id: evidence.student.parent_id,
+          title: 'Tarea Calificada ⭐',
+          message: `La tarea "${evidence.task.title}" de ${evidence.student.name} ha sido calificada con "${grade}".`,
+          type: 'info',
+          link: '/panel_padres.html#tasks'
+        });
+      }
+    } catch (e) { console.error('Error notificando calificación:', e); }
   },
 
   async gradeStars(evidenceId, stars, btn) {
     const parent = btn.parentElement;
     Array.from(parent.children).forEach((b, idx) => {
       const isActive = idx < stars;
-      b.className = `p-1 ${isActive ? 'text-yellow-500' : 'text-slate-300'}`;
+      b.querySelector('i').className = `w-5 h-5 ${isActive ? 'text-yellow-400 fill-yellow-400' : 'text-slate-200 fill-slate-100'}`;
     });
     const { error } = await supabase.from('task_evidences').update({ stars: stars, status: 'graded' }).eq('id', evidenceId);
     if(!error) Helpers.toast(`${stars} estrella(s) asignadas`);
@@ -1500,6 +1564,27 @@ const UI = {
           Helpers.toast('Error al registrar', 'error');
       } else {
           Helpers.toast('Incidente registrado', 'success');
+
+          // Notificar a la directora y asistentes
+          try {
+            const { data: staff } = await supabase
+              .from('profiles')
+              .select('id')
+              .in('role', ['directora', 'asistente']);
+            
+            const { data: student } = await supabase.from('students').select('name').eq('id', studentId).single();
+            
+            for (const s of (staff || [])) {
+              await window.sendPush({
+                user_id: s.id,
+                title: 'Nuevo Incidente Reportado ⚠️',
+                message: `Se ha registrado un incidente de nivel "${severity}" para ${student?.name || 'un estudiante'}.`,
+                type: 'alert',
+                link: '/panel_directora.html#reportes'
+              });
+            }
+          } catch (e) { console.error('Error notificando incidente:', e); }
+
           document.getElementById('incidentModal').classList.add('hidden');
           document.getElementById('incidentModal').classList.remove('flex');
           document.getElementById('incidentDesc').value = '';
@@ -1507,13 +1592,26 @@ const UI = {
   },
 
   // 7. VIDEO CALL (Jitsi)
-  initVideoCall() {
+  async initVideoCall() {
     const container = document.getElementById('meet');
     if (!container) return;
     container.innerHTML = ''; // Clear previous instance
 
     if (typeof JitsiMeetExternalAPI === 'undefined') {
       container.innerHTML = Helpers.emptyState('Error cargando sistema de video', 'video-off');
+      return;
+    }
+
+    // Pre-verificación de permisos para evitar errores en consola y UI rota
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
+      stream.getTracks().forEach(track => track.stop()); // Cerrar stream inmediatamente, solo era prueba
+    } catch (err) {
+      console.warn('Permisos de medios denegados:', err);
+      container.innerHTML = Helpers.emptyState(
+        'No se pudo acceder a la cámara o micrófono. Por favor, permite el acceso en tu navegador.', 
+        'camera-off'
+      );
       return;
     }
 
@@ -1760,6 +1858,7 @@ window.UI = UI;
 
 // Initialize
 document.addEventListener('DOMContentLoaded', () => {
+    try { initOneSignal(); } catch(e) {}
     UI.init();
     
     // Explicit Modal Close Logic for Profile

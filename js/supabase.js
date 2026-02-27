@@ -49,5 +49,58 @@ export async function sendPush(payload) {
   if (error) throw error;
   return data;
 }
+if (!window.sendPush) window.sendPush = sendPush;
+
+export async function initOneSignal() {
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) return;
+
+  const ONESIGNAL_APP_ID = "47ce2d1e-152e-4ea7-9ddc-8e2142992989";
+  
+  if (!window.OneSignal) {
+    const script = document.createElement('script');
+    script.src = "https://cdn.onesignal.com/sdks/web/v16/OneSignal.JS";
+    script.async = true;
+    document.head.appendChild(script);
+  }
+
+  window.OneSignal = window.OneSignal || [];
+  OneSignal.push(async function() {
+    await OneSignal.init({
+      appId: ONESIGNAL_APP_ID,
+      safari_web_id: "web.onesignal.auto.10425e70-6593-4a12-8758-69279093e878", // Opcional si se requiere Safari
+      allowLocalhostAsSecureOrigin: true,
+      notifyButton: {
+        enable: false, // Usaremos el slidedown para mayor profesionalismo
+      },
+      promptOptions: {
+        slidedown: {
+          enabled: true,
+          autoPrompt: true,
+          timeDelay: 5, // Aparece tras 5 segundos
+          pageViews: 1,
+          actionMessage: "¿Deseas recibir notificaciones sobre tareas, pagos y avisos de Karpus Kids?",
+          acceptButtonText: "Sí, recibir",
+          cancelButtonText: "Ahora no",
+          categories: {
+            tags: [
+              { tag: "user_type", label: "Tipo de Usuario" }
+            ]
+          }
+        }
+      }
+    });
+
+    // Vincular al usuario de Supabase con OneSignal
+    await OneSignal.login(user.id);
+    
+    // Obtener el perfil para taguear al usuario
+    const { data: profile } = await supabase.from('profiles').select('role').eq('id', user.id).maybeSingle();
+    if (profile) {
+      OneSignal.User.addTag("role", profile.role);
+    }
+  });
+}
+if (!window.initOneSignal) window.initOneSignal = initOneSignal;
 
 export { createClient, SUPABASE_URL, SUPABASE_ANON_KEY };

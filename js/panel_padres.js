@@ -1,5 +1,5 @@
 
-import { supabase } from './supabase.js';
+import { supabase, initOneSignal } from './supabase.js';
 
 // ===== CONSTANTES ESTÁNDAR =====
 const TABLES = {
@@ -252,45 +252,32 @@ document.addEventListener('DOMContentLoaded', async () => {
   setupScrollToTop();
 
   // ✅ Listeners para perfil y reportes
-  document.getElementById('btnSaveChanges')?.addEventListener('click', saveAllProfile);
-  document.getElementById('btnDownloadReport')?.addEventListener('click', () => window.print());
+  const btnSave = document.getElementById('btnSaveChanges');
+  if (btnSave) {
+    btnSave.onclick = saveAllProfile;
+  }
   
   // ✅ Botón de refresco manual
-  document.getElementById('btnRefreshData')?.addEventListener('click', () => {
-    const activeSection = document.querySelector('.section.active')?.id || 'home';
-    loadSectionData(activeSection);
-  });
+  const btnRefresh = document.getElementById('btnRefreshData');
+  if (btnRefresh) {
+    btnRefresh.onclick = () => {
+      const activeSection = document.querySelector('.section.active')?.id || 'home';
+      loadSectionData(activeSection);
+    };
+  }
   
   // ✅ Cargar sección inicial
   setActiveSection('home');
   loadDashboard();
   
   // Acciones principales
-  document.getElementById('btnPayTuition')?.addEventListener('click', async (e) => {
-    e.preventDefault();
-    setActiveSection('payments');
-    const userState = AppState.get('user');
-    const email = userState && userState.email;
-    if (!email) {
-      Helpers.toast('No se encontró un correo asociado a tu cuenta.', 'error');
-      return;
-    }
-    const student = AppState.get('student');
-    const studentName = student ? `${student.first_name || ''} ${student.last_name || ''}`.trim() : '';
-    const subject = studentName ? `Información de pago de ${studentName}` : 'Información de pago de mensualidad';
-    const text = 'Te enviamos la información de tu pago de mensualidad desde el panel de Karpus.';
-    try {
-      const res = await fetch('http://127.0.0.1:5600/api/parents/email', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ to: email, subject, text })
-      });
-      if (!res.ok) throw new Error('HTTP ' + res.status);
-      Helpers.toast('Se envió un correo con la información de pago.', 'success');
-    } catch (err) {
-      Helpers.toast('No se pudo enviar el correo de pago.', 'error');
-    }
-  });
+  const btnPay = document.getElementById('btnPayTuition');
+  if (btnPay) {
+    btnPay.onclick = (e) => {
+      e.preventDefault();
+      setActiveSection('payments');
+    };
+  }
 });
 
 // ===== NAVEGACIÓN Y GESTIÓN DE SECCIONES =====
@@ -301,24 +288,31 @@ function setupNavigation() {
   const btnLogout = document.getElementById('btnLogout');
 
   // ✅ Delegación de eventos para navegación
-  document.addEventListener('click', (e) => {
-    const targetBtn = e.target.closest('button[data-target]');
-    if (targetBtn) {
-      e.preventDefault();
-      setActiveSection(targetBtn.dataset.target);
-    }
-  });
+  const navArea = document.getElementById('sidebar');
+  if (navArea) {
+    navArea.onclick = (e) => {
+      const targetBtn = e.target.closest('button[data-target]');
+      if (targetBtn) {
+        e.preventDefault();
+        setActiveSection(targetBtn.dataset.target);
+      }
+    };
+  }
 
   if (headerAvatar) {
-    headerAvatar.addEventListener('click', (e) => {
+    headerAvatar.onclick = (e) => {
       e.stopPropagation();
       setActiveSection('profile');
-    });
+    };
   }
 
   if (btnLogout) {
-    btnLogout.addEventListener('click', handleLogout);
+    btnLogout.onclick = handleLogout;
   }
+
+  // ✅ Prevenir múltiples escuchas globales
+  if (window.navigationInitialized) return;
+  window.navigationInitialized = true;
 
   // ✅ Función centralizada de cambio de sección
   window.setActiveSection = (targetId) => {
@@ -368,8 +362,8 @@ function loadSectionData(sectionId) {
     tasks: loadTasks,
     grades: loadGrades,
     class: loadClassFeed,
-    payments: () => loadPayments(),
-    notifications: async () => { await loadNotifications(); setupChatHandlers(); },
+    payments: () => { loadPayments(); initPaymentForm(); },
+    notifications: async () => { await loadNotifications(); setupChatHandlers(); loadChat('director'); loadChat('maestra'); },
     profile: async () => { await populateProfile(); },
     videocall: initVideoCall
   };
@@ -583,12 +577,15 @@ async function sendChatMessage(role) {
   }
 }
 
-document.addEventListener('DOMContentLoaded', () => {
+// Inicialización de pagos y chat movida a loadSectionData para evitar duplicidad de listeners
+function initPaymentForm() {
   const form = document.getElementById('paymentForm');
-  if (form) form.addEventListener('submit', submitPaymentProof);
-  loadChat('director');
-  loadChat('maestra');
-});
+  if (form && !form.dataset.initialized) {
+    form.addEventListener('submit', submitPaymentProof);
+    form.dataset.initialized = 'true';
+  }
+}
+
 // ===== CIERRE DE SESIÓN SEGURO =====
 async function handleLogout() {
   try {
@@ -843,8 +840,14 @@ function renderTaskCard(task, evidenceMap) {
   const evidence = evidenceMap.get(task.id);
   const isDelivered = !!evidence;
 
-  // ✅ 3. TAREAS ENTREGADAS → LEGO / BLOQUES
+  // ✅ 3. TAREAS ENTREGADAS
   if (isDelivered) {
+    // Configuración de color según nota
+    let gradeColor = 'bg-slate-500';
+    if (evidence.grade_letter === 'A') gradeColor = 'bg-green-500';
+    else if (evidence.grade_letter === 'B') gradeColor = 'bg-blue-500';
+    else if (evidence.grade_letter === 'C') gradeColor = 'bg-orange-500';
+
     return `
     <article class="notebook-card group transition-transform hover:-translate-y-1 p-4 rounded-xl" aria-labelledby="task-title-${task.id}">
       <div class="flex flex-col sm:flex-row sm:justify-between sm:items-start gap-3 relative z-10">
@@ -853,8 +856,12 @@ function renderTaskCard(task, evidenceMap) {
           <p class="text-xs text-blue-100 mt-1">${escapeHtml(task.classrooms?.level || '')}</p>
         </div>
         <div class="flex items-center gap-2">
-           <span class="bg-white/20 text-white text-xs font-bold px-2 py-1 rounded backdrop-blur-sm">Entregada</span>
-           ${evidence.grade_letter ? `<span class="bg-yellow-400 text-yellow-900 text-xs font-bold px-2 py-1 rounded shadow-sm">Nota: ${escapeHtml(evidence.grade_letter)}</span>` : ''}
+           ${evidence.grade_letter 
+             ? `<div class="flex items-center bg-white rounded-lg px-2 py-1 shadow-sm gap-2">
+                  <span class="text-xs font-bold text-slate-500 uppercase">Nota</span>
+                  <span class="${gradeColor} text-white text-sm font-black px-2 rounded shadow-sm">${escapeHtml(evidence.grade_letter)}</span>
+                </div>` 
+             : '<span class="bg-white/20 text-white text-xs font-bold px-2 py-1 rounded backdrop-blur-sm">En revisión</span>'}
         </div>
       </div>
       
@@ -874,10 +881,10 @@ function renderTaskCard(task, evidenceMap) {
       </div>
       
       ${evidence.stars ? `
-      <div class="absolute -bottom-2 -right-2 bg-white p-1 rounded-full shadow-lg rotate-12 transform scale-75 sm:scale-100">
-        <div class="flex gap-1">
+      <div class="absolute -bottom-3 -right-2 bg-white px-3 py-1.5 rounded-full shadow-xl rotate-6 transform scale-90 sm:scale-100 border-2 border-yellow-100">
+        <div class="flex gap-0.5">
           ${[...Array(5)].map((_, i) => 
-            `<i data-lucide="star" class="w-4 h-4 ${i < evidence.stars ? 'text-yellow-400 fill-current' : 'text-slate-200'}"></i>`
+            `<i data-lucide="star" class="w-5 h-5 ${i < evidence.stars ? 'text-yellow-400 fill-yellow-400 drop-shadow-sm' : 'text-slate-200 fill-slate-100'}"></i>`
           ).join('')}
         </div>
       </div>` : ''}
@@ -1196,6 +1203,10 @@ function initNotifications() {
 //    - Filtros de asistencia
 //    - Eventos globales con delegación
 function setupGlobalListeners() {
+  // ✅ Prevenir múltiples escuchas globales
+  if (window.globalListenersInitialized) return;
+  window.globalListenersInitialized = true;
+
   // Filtro de asistencia con debounce simple
   let attendanceTimeout;
   document.getElementById('attendanceFilter')?.addEventListener('change', (e) => {
@@ -1208,7 +1219,7 @@ function setupGlobalListeners() {
   window.addEventListener('online', () => Helpers.toast('Conexión restaurada', 'success'));
 
   // ✅ Listener para filtros de tareas
-  document.addEventListener('click', (e) => {
+  document.getElementById('tasks')?.addEventListener('click', (e) => {
     if (e.target.classList.contains('task-filter-btn')) {
       // Actualizar estilos botones
       document.querySelectorAll('.task-filter-btn').forEach(btn => {
@@ -1221,7 +1232,7 @@ function setupGlobalListeners() {
       loadTasks(e.target.dataset.filter);
     }
     
-    // ✅ Listener único para detalles de tarea (movido desde loadTasks)
+    // ✅ Listener único para detalles de tarea
     const taskDetailBtn = e.target.closest('.js-task-detail-btn');
     if (taskDetailBtn) {
       openTaskDetail(taskDetailBtn.dataset.taskId);

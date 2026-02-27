@@ -14,6 +14,24 @@ const escapeHTML = (str = '') => {
   }[tag]));
 };
 
+const Helpers = {
+  toast: (msg, type='success') => {
+      const t = document.createElement('div');
+      t.className = `fixed bottom-4 right-4 px-4 py-2 rounded shadow text-white z-50 ${type==='error'?'bg-red-500':'bg-green-500'}`;
+      t.textContent = msg;
+      document.body.appendChild(t);
+      setTimeout(()=>t.remove(), 3000);
+  },
+  emptyState: (msg) => `<div class="text-center py-8 text-slate-400">${msg}</div>`,
+  skeleton: (cols=10) => `<tr class="animate-pulse"><td colspan="${cols}" class="p-4 bg-slate-50 h-12"></td></tr>`
+};
+
+async function sendEmail(to, subject, html, text) {
+  try {
+    await fetch('http://127.0.0.1:5600/api/email/send', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ to, subject, html, text }) });
+  } catch (e) { console.error('Error enviando correo', e); }
+}
+
 // Inicialización del panel Directora
 document.addEventListener('DOMContentLoaded', ()=>{
   // Enforce role without inline script
@@ -404,6 +422,35 @@ function attachPaymentsHandlers(){
   document.getElementById('btnApproveTransfer')?.addEventListener('click', () => processTransferDecision('approve'));
   document.getElementById('btnRejectTransfer')?.addEventListener('click', () => processTransferDecision('reject'));
   document.getElementById('btnExportFinancialPDF')?.addEventListener('click', exportFinancialReportPDF);
+
+  // Recordatorios y Filtros
+  document.getElementById('btnSaveReminder')?.addEventListener('click', saveReminder);
+  document.getElementById('btnSendReminders')?.addEventListener('click', sendRemindersNow);
+  document.getElementById('paymentMonthFilter')?.addEventListener('change', () => loadPayments());
+
+  // Delegación de eventos para la tabla de pagos
+  const tbody = document.getElementById('paymentsTableBody');
+  if (tbody) {
+    tbody.addEventListener('click', async (e) => {
+      const btnRegister = e.target.closest('.btn-register-payment');
+      const btnConfirm = e.target.closest('.btn-confirm-payment');
+      const btnReject = e.target.closest('.btn-reject-payment');
+      const btnDelete = e.target.closest('.btn-delete-payment');
+
+      if (btnRegister) {
+        openPaymentModal(btnRegister.dataset.studentId);
+      }
+      if (btnConfirm) {
+        await processPaymentAction(btnConfirm.dataset.id, 'confirmado');
+      }
+      if (btnReject) {
+        await processPaymentAction(btnReject.dataset.id, 'rechazado');
+      }
+      if (btnDelete) {
+        await deletePayment(btnDelete.dataset.id);
+      }
+    });
+  }
 }
 
 function toggleModal(id, show) {
@@ -422,6 +469,25 @@ function debounce(func, wait) {
   };
 }
 
+async function processPaymentAction(id, status) {
+  const supabase = await getSupabase();
+  const { data: { user } } = await supabase.auth.getUser();
+  
+  const updates = { status, validated_by: user?.id };
+  if (status === 'rechazado') {
+    const reason = prompt('Motivo del rechazo:');
+    if (reason) updates.notes = reason;
+  }
+
+  const { error } = await supabase.from('payments').update(updates).eq('id', id);
+  if (!error) {
+    Helpers.toast(`Pago ${status}`);
+    loadPayments();
+  } else {
+    Helpers.toast('Error al actualizar', 'error');
+  }
+}
+
 // =============================== 
 // PAGOS CON SUPABASE (NUEVA ESTRUCTURA)
 // ===============================
@@ -432,67 +498,72 @@ async function loadPayments(forceFilter = null) {
   const tbody = document.getElementById('paymentsTableBody');
   if (!tbody) return;
   
-  tbody.innerHTML = '<tr><td colspan="6" class="text-center py-12 text-slate-400">Cargando información financiera...</td></tr>';
+  tbody.innerHTML = Helpers.skeleton(10);
 
   try {
-    // 1. Cargar Estudiantes y sus Pagos
-    const { data: students, error } = await supabase
+    const selectedMonth = document.getElementById('paymentMonthFilter')?.value || new Date().toLocaleString('es-ES', { month: 'long' });
+    const capitalizedMonth = selectedMonth.charAt(0).toUpperCase() + selectedMonth.slice(1);
+
+    // 1. Cargar Estudiantes
+    const { data: students, error: stError } = await supabase
       .from('students')
-      .select(`
-        id, name, monthly_fee, due_day, classroom:classrooms(name),
-        parent:profiles!parent_id(name, email),
-        payments(*)
-      `)
+      .select('id, name, parent_id, monthly_fee')
       .eq('is_active', true)
       .order('name');
 
-    if (error) throw error;
+    if (stError) throw stError;
 
-    // 2. Procesar Datos y Calcular KPIs
-    const currentMonth = new Date().toLocaleString('es-ES', { month: 'long' });
-    const currentMonthCap = currentMonth.charAt(0).toUpperCase() + currentMonth.slice(1);
+    // 2. Cargar Pagos del Mes
+    const { data: payments, error: payError } = await supabase
+      .from('payments')
+      .select('*')
+      .ilike('month_paid', `%${selectedMonth}%`); // Flexible match
+
+    if (payError) throw payError;
+
+    // 3. Mapear pagos
+    const paymentMap = {};
+    (payments || []).forEach(p => {
+      // Priorizar pagos confirmados si hay múltiples intentos
+      if (!paymentMap[p.student_id] || p.status === 'confirmado') {
+        paymentMap[p.student_id] = p;
+      }
+    });
     
+    // KPIs
     let kpiIncome = 0;
     let kpiPending = 0;
     let kpiOverdue = 0;
     let kpiConfirmed = 0;
     let kpiToApprove = 0;
 
-    const processedData = students.map(s => {
-      // Filtrar pagos del mes actual
-      const monthPayments = (s.payments || []).filter(p => 
-        (p.month_paid || '').toLowerCase().includes(currentMonth.toLowerCase())
-      );
+    const displayData = students.map(s => {
+      const pay = paymentMap[s.id];
+      const isPaid = pay && (pay.status === 'confirmado' || pay.status === 'paid' || pay.status === 'efectivo');
+      const isPendingReview = pay && pay.status === 'pendiente';
       
-      const paidAmount = monthPayments
-        .filter(p => p.status === 'paid' || p.status === 'efectivo' || p.status === 'confirmado')
-        .reduce((sum, p) => sum + Number(p.amount), 0);
+      if (isPaid) { kpiConfirmed++; kpiIncome += Number(pay.amount); }
+      else if (isPendingReview) { kpiToApprove++; }
+      else { kpiPending++; kpiOverdue++; } // Asumiendo vencido si no hay pago
 
-      const pendingTransfers = (s.payments || []).filter(p => p.status === 'pendiente' && p.evidence_url);
-      
-      // Estado del estudiante
-      let status = 'pending';
-      const fee = Number(s.monthly_fee) || 0;
-      const dueDay = s.due_day || 5;
-      const today = new Date().getDate();
-
-      if (paidAmount >= fee && fee > 0) status = 'paid';
-      else if (today > dueDay && paidAmount < fee) status = 'overdue';
-      
-      // Actualizar KPIs Globales
-      if (status === 'paid') kpiConfirmed++;
-      if (status === 'pending') kpiPending++;
-      if (status === 'overdue') kpiOverdue++;
-      kpiIncome += paidAmount;
-      kpiToApprove += pendingTransfers.length;
-
-      return {
-        ...s,
-        status,
-        paidAmount,
-        pendingTransfers,
-        lastPayment: (s.payments || []).sort((a,b) => new Date(b.created_at) - new Date(a.created_at))[0]
-      };
+      if (pay) {
+        return { ...pay, student_name: s.name, is_virtual: false };
+      } else {
+        return { 
+          id: null, 
+          student_id: s.id, 
+          student_name: s.name, 
+          amount: 0, 
+          month_paid: capitalizedMonth, 
+          method: '-', 
+          status: 'Pendiente', 
+          bank: '-', 
+          reference: '-', 
+          created_at: null, 
+          evidence_url: null,
+          is_virtual: true 
+        };
+      }
     });
 
     // 3. Renderizar KPIs
@@ -505,82 +576,67 @@ async function loadPayments(forceFilter = null) {
 
     loadIncomeChart(); // Cargar gráfica mensual
 
-    // 4. Filtrar Grid
-    let displayData = processedData;
+    // 4. Filtrar y Renderizar Tabla
     const searchTerm = document.getElementById('searchPaymentStudent')?.value.toLowerCase();
-    const statusFilter = forceFilter || document.getElementById('filterPaymentStatus')?.value;
+    let filteredData = displayData;
 
     if (searchTerm) {
-      displayData = displayData.filter(s => s.name.toLowerCase().includes(searchTerm));
-    }
-    if (statusFilter && statusFilter !== 'all') {
-      if (statusFilter === 'pending') {
-        // Si filtro es pending, mostrar los que tienen transferencias por aprobar O deuda
-        displayData = displayData.filter(s => s.pendingTransfers.length > 0 || s.status === 'pending');
-      } else {
-        displayData = displayData.filter(s => s.status === statusFilter);
-      }
+      filteredData = displayData.filter(p => p.student_name.toLowerCase().includes(searchTerm));
     }
 
-    // 5. Renderizar Grid
-    if (displayData.length === 0) {
-      tbody.innerHTML = '<tr><td colspan="6" class="text-center py-12 text-slate-400">No se encontraron registros.</td></tr>';
+    if (filteredData.length === 0) {
+      tbody.innerHTML = '<tr><td colspan="10" class="text-center py-12 text-slate-400">No se encontraron registros.</td></tr>';
       return;
     }
 
-    tbody.innerHTML = displayData.map(s => {
-      const badgeClass = {
-        paid: 'bg-emerald-100 text-emerald-700',
-        pending: 'bg-amber-100 text-amber-700',
-        overdue: 'bg-pink-100 text-pink-700'
-      }[s.status];
+    tbody.innerHTML = filteredData.map(p => {
+      const badgeClass = (st) => {
+        if (st === 'confirmado' || st === 'paid') return 'bg-emerald-100 text-emerald-700';
+        if (st === 'pendiente') return 'bg-amber-100 text-amber-700';
+        if (st === 'rechazado') return 'bg-red-100 text-red-700';
+        return 'bg-slate-100 text-slate-500';
+      };
       
-      const statusLabel = {
-        paid: 'Al día',
-        pending: 'Pendiente',
-        overdue: 'Vencido'
-      }[s.status];
-
-      const hasReview = s.pendingTransfers.length > 0;
+      const dateStr = p.created_at ? new Date(p.created_at).toLocaleDateString() : '-';
+      const amountStr = p.is_virtual ? '-' : `$${p.amount}`;
 
       return `
-        <div class="bg-white rounded-2xl p-5 border border-slate-100 shadow-sm hover:shadow-md transition-all relative overflow-hidden group">
-          ${hasReview ? `<div class="absolute top-0 right-0 bg-purple-600 text-white text-[10px] font-bold px-2 py-1 rounded-bl-xl z-10">Revisión</div>` : ''}
-          
-          <div class="flex justify-between items-start mb-3">
-            <div>
-              <h4 class="font-bold text-slate-800 text-lg">${s.name}</h4>
-              <p class="text-xs text-slate-500">${s.classroom?.name || 'Sin Aula'}</p>
+        <tr class="hover:bg-slate-50 border-b last:border-0 transition-colors">
+          <td class="px-4 py-3 font-medium text-slate-800">${p.student_name}</td>
+          <td class="px-4 py-3">${amountStr}</td>
+          <td class="px-4 py-3">${p.method || '-'}</td>
+          <td class="px-4 py-3">
+            <span class="${badgeClass(p.status)} px-2 py-1 rounded-full text-xs font-bold uppercase">
+              ${p.status}
+            </span>
+          </td>
+          <td class="px-4 py-3">${p.bank || '-'}</td>
+          <td class="px-4 py-3 text-xs font-mono">${p.reference || '-'}</td>
+          <td class="px-4 py-3 text-sm">${dateStr}</td>
+          <td class="px-4 py-3">${p.month_paid}</td>
+          <td class="px-4 py-3 text-center">
+            ${p.evidence_url ? `<a href="${p.evidence_url}" target="_blank" class="text-blue-600 hover:underline text-xs font-bold">Ver</a>` : '-'}
+          </td>
+          <td class="px-4 py-3">
+            <div class="flex gap-1 justify-end">
+              ${p.is_virtual ? `
+                <button class="btn-register-payment bg-teal-100 text-teal-700 hover:bg-teal-200 px-3 py-1 rounded text-xs font-bold" data-student-id="${p.student_id}">
+                  Registrar
+                </button>
+              ` : `
+                <button class="btn-confirm-payment bg-green-100 text-green-700 hover:bg-green-200 p-1.5 rounded" title="Confirmar" data-id="${p.id}">
+                  <i data-lucide="check" class="w-4 h-4"></i>
+                </button>
+                <button class="btn-reject-payment bg-amber-100 text-amber-700 hover:bg-amber-200 p-1.5 rounded" title="Rechazar" data-id="${p.id}">
+                  <i data-lucide="x" class="w-4 h-4"></i>
+                </button>
+                <button class="btn-delete-payment bg-red-50 text-red-600 hover:bg-red-100 p-1.5 rounded" title="Eliminar" data-id="${p.id}">
+                  <i data-lucide="trash-2" class="w-4 h-4"></i>
+                </button>
+              `}
             </div>
-            <span class="${badgeClass} text-xs font-bold px-3 py-1 rounded-full uppercase tracking-wider">${statusLabel}</span>
-          </div>
-
-          <div class="space-y-2 mb-4">
-            <div class="flex justify-between text-sm">
-              <span class="text-slate-500">Mensualidad:</span>
-              <span class="font-bold text-slate-700">$${s.monthly_fee || 0}</span>
-            </div>
-            <div class="flex justify-between text-sm">
-              <span class="text-slate-500">Pagado (Mes):</span>
-              <span class="font-bold ${s.paidAmount >= s.monthly_fee ? 'text-emerald-600' : 'text-slate-700'}">$${s.paidAmount}</span>
-            </div>
-            <div class="w-full bg-slate-100 rounded-full h-1.5 mt-2">
-              <div class="h-1.5 rounded-full ${s.status === 'paid' ? 'bg-emerald-500' : 'bg-amber-400'}" style="width: ${Math.min(100, (s.paidAmount / (s.monthly_fee||1))*100)}%"></div>
-            </div>
-          </div>
-
-          <div class="flex gap-2 mt-4 pt-4 border-t border-slate-50">
-            ${hasReview ? `
-              <button onclick="openReviewModal('${s.pendingTransfers[0].id}')" class="flex-1 py-2 bg-purple-100 text-purple-700 hover:bg-purple-200 rounded-xl text-sm font-bold transition-colors flex items-center justify-center gap-2">
-                <i data-lucide="eye" class="w-4 h-4"></i> Revisar
-              </button>
-            ` : `
-              <button onclick="sendPaymentReminder('${s.parent?.id}', '${s.name}')" class="flex-1 py-2 border border-slate-200 text-slate-600 hover:bg-slate-50 rounded-xl text-sm font-bold transition-colors">
-                Recordar
-              </button>
-            `}
-          </div>
-        </div>
+          </td>
+        </tr>
       `;
     }).join('');
 
@@ -589,15 +645,13 @@ async function loadPayments(forceFilter = null) {
   } catch (e) {
     console.error('Error cargando pagos:', e);
     tbody.innerHTML = `
-      <tr>
-        <td colspan="6" class="text-center py-12 text-red-500">Error cargando datos: ${e.message}</td>
-      </tr>
+      <tr><td colspan="10" class="text-center py-12 text-red-500">Error cargando datos: ${e.message}</td></tr>
     `;
   }
 }
 
 // --- Lógica de Registro Manual ---
-async function openPaymentModal() {
+async function openPaymentModal(preSelectedStudentId = null) {
   const select = document.getElementById('payStudentSelect');
   if(!select) return;
   
@@ -608,6 +662,7 @@ async function openPaymentModal() {
   select.innerHTML = '<option value="">Seleccionar...</option>' + 
     (students || []).map(s => `<option value="${s.id}">${s.name}</option>`).join('');
     
+  if (preSelectedStudentId) select.value = preSelectedStudentId;
   toggleModal('modalPayment', true);
 }
 
@@ -624,12 +679,15 @@ async function savePayment() {
   
   try {
     const supabase = await getSupabase();
+    const { data: { user } } = await supabase.auth.getUser();
+    
     const { error } = await supabase.from('payments').insert({
       student_id: studentId,
       amount: parseFloat(amount),
       method,
       month_paid: concept, // Usamos concept como month_paid para simplificar
-      status: 'paid', // Pago manual es directo pagado
+      status: 'confirmado', // Pago manual es directo confirmado
+      validated_by: user?.id,
       created_at: new Date().toISOString()
     });
     
@@ -637,12 +695,20 @@ async function savePayment() {
     
     toggleModal('modalPayment', false);
     loadPayments();
-    alert('Pago registrado correctamente');
+    Helpers.toast('Pago registrado correctamente');
   } catch(e) {
-    alert('Error: ' + e.message);
+    Helpers.toast('Error: ' + e.message, 'error');
   } finally {
     btn.disabled = false; btn.textContent = 'Guardar Pago';
   }
+}
+
+async function deletePayment(id) {
+  if (!confirm('¿Eliminar este pago permanentemente?')) return;
+  const supabase = await getSupabase();
+  const { error } = await supabase.from('payments').delete().eq('id', id);
+  if (error) Helpers.toast('Error al eliminar', 'error');
+  else { Helpers.toast('Pago eliminado'); loadPayments(); }
 }
 
 // --- Lógica de Revisión de Transferencias ---
@@ -760,22 +826,16 @@ async function processTransferDecision(decision) {
 }
 
 async function sendPaymentReminder(parentId, studentName) {
-  // Simulación o implementación real de notificación
-  // Aquí podríamos insertar en la tabla notifications si existiera
   openModal('Enviando...', `Enviando recordatorio por ${studentName}...`);
   
   try {
-    const supabase = await getSupabase();
-    // Ejemplo: Insertar notificación
-    const { error } = await supabase.from('notifications').insert([{
+    await window.sendPush({
       user_id: parentId,
       title: 'Recordatorio de Pago',
       message: `Se le recuerda realizar el pago pendiente de ${studentName}.`,
       type: 'payment_reminder',
-      is_read: false
-    }]);
-
-    if (error) throw error;
+      link: '/panel_padres.html'
+    });
     
     closeModal();
     openModal('Éxito', 'Recordatorio enviado correctamente.');
@@ -809,24 +869,66 @@ async function sendReminderToAllParents() {
       return;
     }
 
-    // 3. Crear notificaciones (batch)
-    const notifs = parentIds.map(pid => ({
-      user_id: pid,
-      title: 'Aviso de Pago',
-      message: 'Estimado padre, tiene pagos pendientes. Por favor revise su estado de cuenta.',
-      type: 'payment_reminder'
-    }));
-
-    const { error: insError } = await supabase.from('notifications').insert(notifs);
-    if (insError) throw insError;
+    // 3. Enviar notificaciones una por una (OneSignal soporta batch pero sendPush es simple)
+    let successCount = 0;
+    for (const pid of parentIds) {
+      try {
+        await window.sendPush({
+          user_id: pid,
+          title: 'Aviso de Pago',
+          message: 'Estimado padre, tiene pagos pendientes. Por favor revise su estado de cuenta.',
+          type: 'payment_reminder',
+          link: '/panel_padres.html'
+        });
+        successCount++;
+      } catch (err) {
+        console.error(`Error enviando a ${pid}:`, err);
+      }
+    }
 
     closeModal();
-    openModal('Completado', `Se enviaron ${parentIds.length} recordatorios.`);
+    openModal('Completado', `Se enviaron ${successCount} recordatorios.`);
 
   } catch (e) {
     closeModal();
     alert('Error: ' + e.message);
   }
+}
+
+// --- Recordatorios (Sistema Asistente) ---
+async function saveReminder() {
+  const day = Number(document.getElementById('reminderDay')?.value || '0');
+  const msg = document.getElementById('reminderMessage')?.value || '';
+  if (!day || !msg) { Helpers.toast('Complete recordatorio', 'error'); return; }
+  const supabase = await getSupabase();
+  const { data: { user } } = await supabase.auth.getUser();
+  const { error } = await supabase.from('payment_reminders').insert({ day_of_month: day, message: msg, created_by: user.id });
+  if (error) { Helpers.toast('Error guardando', 'error'); return; }
+  Helpers.toast('Recordatorio guardado');
+}
+
+async function sendRemindersNow() {
+  if (!confirm('¿Enviar recordatorios a todos los padres con deuda?')) return;
+  Helpers.toast('Enviando recordatorios...', 'info');
+  
+  const supabase = await getSupabase();
+  const selectedMonth = document.getElementById('paymentMonthFilter')?.value || 'Mes Actual';
+  const msg = document.getElementById('reminderMessage')?.value || 'Recuerde realizar su pago.';
+
+  // Obtener deudores
+  const { data: payments } = await supabase.from('payments').select('student_id').eq('month_paid', selectedMonth).in('status', ['confirmado', 'paid', 'efectivo']);
+  const paidIds = (payments || []).map(p => p.student_id);
+  
+  const { data: students } = await supabase.from('students').select('id, p1_email, name').eq('is_active', true);
+  const debtors = students.filter(s => !paidIds.includes(s.id) && s.p1_email);
+
+  let count = 0;
+  for (const s of debtors) {
+    const html = `<p>Estimada familia de <b>${s.name}</b>,</p><p>${msg}</p><p>Mes: ${selectedMonth}</p>`;
+    await sendEmail(s.p1_email, `Recordatorio de Pago - ${selectedMonth}`, html, `${msg} - ${selectedMonth}`);
+    count++;
+  }
+  Helpers.toast(`Enviados ${count} correos.`);
 }
 
 // ===============================
@@ -1022,23 +1124,25 @@ async function loadIncomeChart() {
 
   const { data, error } = await supabase
     .from('payments')
-    .select('amount, created_at, status')
-    .eq('status', 'paid');
+    .select('amount, month_paid, status');
 
   if (error) return;
 
-  const months = {};
-  
-  data.forEach(p => {
-    const date = new Date(p.created_at);
-    const month = date.toLocaleString('es-ES', { month: 'short' });
-    
-    if (!months[month]) months[month] = 0;
-    months[month] += parseFloat(p.amount);
-  });
+  const months = ["Enero", "Febrero", "Marzo", "Abril", "Mayo", "Junio", "Julio", "Agosto", "Septiembre", "Octubre", "Noviembre", "Diciembre"];
+  const confirmedData = new Array(12).fill(0);
+  const pendingData = new Array(12).fill(0);
 
-  const labels = Object.keys(months);
-  const values = Object.values(months);
+  (data || []).forEach(p => {
+    const idx = months.indexOf(p.month_paid);
+    if (idx !== -1) {
+      const amount = Number(p.amount) || 0;
+      if (p.status === 'confirmado' || p.status === 'paid' || p.status === 'efectivo') {
+         confirmedData[idx] += amount;
+      } else if (p.status !== 'rechazado') {
+         pendingData[idx] += amount;
+      }
+    }
+  });
 
   const ctx = document.getElementById('incomeMonthlyChart');
   if (!ctx) return;
@@ -1048,19 +1152,17 @@ async function loadIncomeChart() {
   incomeChartInstance = new Chart(ctx, {
     type: 'bar',
     data: {
-      labels,
-      datasets: [{
-        label: 'Ingresos Mensuales',
-        data: values,
-        backgroundColor: '#6366f1',
-        borderRadius: 4
-      }]
+      labels: months,
+      datasets: [
+        { label: 'Confirmado', data: confirmedData, backgroundColor: '#0d9488', borderRadius: 4 },
+        { label: 'Pendiente', data: pendingData, backgroundColor: '#cbd5e1', borderRadius: 4 }
+      ]
     },
     options: {
       responsive: true,
       maintainAspectRatio: false,
-      plugins: { legend: { display: false } },
-      scales: { y: { beginAtZero: true } }
+      scales: { y: { beginAtZero: true }, x: { grid: { display: false } } },
+      plugins: { legend: { position: 'bottom' } }
     }
   });
 }

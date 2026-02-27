@@ -7,12 +7,6 @@
   <link rel="manifest" href="manifest.json">
   <title>Karpus Kids - Panel de Padres</title>
   
-  <!-- Preconectar recursos externos -->
-  <link rel="preconnect" href="https://cdn.tailwindcss.com">
-  <link rel="preconnect" href="https://cdn.jsdelivr.net">
-   
-  
-   
   <!-- Meta tags mejoradas -->
   <meta name="description" content="Panel de padres - Karpus Kids. Gestiona asistencia, tareas, calificaciones y más.">
   <meta name="mobile-web-app-capable" content="yes">
@@ -237,12 +231,14 @@
         
         <!-- Acciones Rápidas (Botones Grandes) -->
         <div class="grid grid-cols-2 gap-4 md:gap-6">
-          <button id="btnPayTuition" class="card-base patio-card flex flex-col items-center justify-center gap-3 hover:bg-white group border-2 border-form">
+          <button id="btnPayTuition" class="card-base patio-card flex flex-col items-center justify-center gap-3 hover:bg-white group border-2 border-slate-100">
+            <div class="w-14 h-14 bg-emerald-100 text-emerald-600 rounded-2xl flex items-center justify-center transition-transform group-hover:scale-110">
               <i data-lucide="piggy-bank" class="w-7 h-7"></i>
             </div>
             <span class="font-bold text-slate-700">Pagar Mensualidad</span>
           </button>
-          <button 
+          <button id="btnQuickAbsence" class="card-base patio-card flex flex-col items-center justify-center gap-3 hover:bg-white group border-2 border-slate-100">
+            <div class="w-14 h-14 bg-rose-100 text-rose-600 rounded-2xl flex items-center justify-center transition-transform group-hover:scale-110">
               <i data-lucide="thermometer" class="w-7 h-7"></i>
             </div>
             <span class="font-bold text-slate-700">Reportar Falta</span>
@@ -252,8 +248,6 @@
 
       <!-- SECCIONES -->
       <div id="contentArea">
-        <!-- HOME removido -->
-
         <!-- ASISTENCIA -->
         <section id="live-attendance" class="section hidden">
           <h3 class="text-2xl font-black text-slate-800 mb-6">Control de Acceso</h3>
@@ -636,5 +630,11 @@
   </div>
   
   <script type="module" src="js/panel_padres.js"></script>
+  <script type="module">
+    import { initOneSignal } from './js/supabase.js';
+    document.addEventListener('DOMContentLoaded', () => {
+      try { initOneSignal(); } catch(e) { console.warn("OneSignal loading skipped (no user or error)"); }
+    });
+  </script>
 </body>
 </html>

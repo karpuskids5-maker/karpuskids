@@ -1,4 +1,4 @@
-import { supabase, createClient, SUPABASE_URL, SUPABASE_ANON_KEY } from './supabase.js';
+import { supabase, createClient, SUPABASE_URL, SUPABASE_ANON_KEY, sendPush } from './supabase.js';
 
 // --- 1. HELPERS & UTILS ---
 const Helpers = {
@@ -256,6 +256,10 @@ const UI = {
             this.openTeacherModal(btn.dataset.id);
         }
     });
+    
+    // Profile Form
+    document.getElementById('profileForm')?.addEventListener('submit', (e) => this.saveProfile(e));
+
     document.getElementById('btnAddRoom')?.addEventListener('click', () => this.openRoomModal());
     document.getElementById('btnSaveRoom')?.addEventListener('click', () => this.saveRoom());
     document.getElementById('btnCancelRoom')?.addEventListener('click', () => this.closeRoomModal());
@@ -291,6 +295,7 @@ const UI = {
       if (id === 'maestros') this.loadTeachers();
       if (id === 'aulas') { this.loadRoomTeachersIntoSelect(); this.loadRooms(); }
       if (id === 'pagos') { this.loadPayments(); this.loadPaymentReports(); this.loadReminderConfig(); this.loadIncomeChart(); }
+      if (id === 'perfil') this.loadProfile();
     }
   },
 
@@ -1168,14 +1173,13 @@ const UI = {
     const parentLink = `${baseUrl}/panel_padres.html#payments`;
     for (const parentId of parentIds) {
       try {
-        const { error } = await supabase.rpc('send_notification', {
-          p_user_id: parentId,
-          p_title: `Recordatorio de Pago (${selectedMonth})`,
-          p_message: reminderMessage,
-          p_type: 'payment_reminder',
-          p_link: '/panel_padres.html'
+        await sendPush({
+          user_id: parentId,
+          title: `Recordatorio de Pago (${selectedMonth})`,
+          message: reminderMessage,
+          type: 'payment_reminder',
+          link: '/panel_padres.html'
         });
-        if (error) throw error;
         successCount++;
       } catch (e) {
         console.error(`Error enviando notificación a ${parentId}:`, e);
@@ -1632,6 +1636,60 @@ const UI = {
     } catch (e) {
       console.error('Error loading chart:', e);
     }
+  },
+
+  // --- PERFIL ---
+  async loadProfile() {
+    try {
+      const { data: profile, error } = await supabase.from('profiles').select('*').eq('id', AppState.user.id).single();
+      if (error) throw error;
+      
+      if (profile) {
+        AppState.profile = profile;
+        const setVal = (id, val) => { const el = document.getElementById(id); if(el) el.value = val || ''; };
+        
+        setVal('profileName', profile.name);
+        setVal('profilePhone', profile.phone);
+        setVal('profileEmail', profile.email);
+        setVal('profileBio', profile.bio || '');
+        
+        this.updateUserUI();
+      }
+    } catch (e) {
+      console.error('Error cargando perfil:', e);
+      Helpers.toast('Error al cargar datos del perfil', 'error');
+    }
+  },
+
+  async saveProfile(e) {
+    e.preventDefault();
+    const btn = e.target.querySelector('button[type="submit"]');
+    const originalText = btn.innerHTML;
+    btn.disabled = true;
+    btn.innerHTML = '<i class="animate-spin" data-lucide="loader-2"></i> Guardando...';
+    refreshIcons();
+
+    try {
+      const updates = {
+        name: document.getElementById('profileName').value,
+        phone: document.getElementById('profilePhone').value,
+        bio: document.getElementById('profileBio').value
+      };
+
+      const { error } = await supabase.from('profiles').update(updates).eq('id', AppState.user.id);
+      if (error) throw error;
+
+      AppState.profile = { ...AppState.profile, ...updates };
+      this.updateUserUI();
+      Helpers.toast('Perfil actualizado correctamente');
+    } catch (e) {
+      console.error(e);
+      Helpers.toast('Error al guardar perfil', 'error');
+    } finally {
+      btn.disabled = false;
+      btn.innerHTML = originalText;
+      refreshIcons();
+    }
   }
 };
 
@@ -1643,6 +1701,7 @@ function refreshIcons() {
 
 // Initialize
   document.addEventListener('DOMContentLoaded', () => {
+    try { initOneSignal(); } catch(e) {}
     UI.init();
     refreshIcons();
     // Listeners moved to UI.bindEvents() to avoid duplication
@@ -1656,12 +1715,12 @@ function refreshIcons() {
         if (!error) {
           Helpers.toast('Pago confirmado');
           if (payment && payment.students?.parent_id) {
-            await supabase.rpc('send_notification', {
-              p_user_id: payment.students.parent_id,
-              p_title: 'Pago Confirmado',
-              p_message: `Su pago de $${payment.amount} correspondiente a ${payment.month_paid} ha sido validado exitosamente.`,
-              p_type: 'info',
-              p_link: 'panel_padres.html'
+            await sendPush({
+              user_id: payment.students.parent_id,
+              title: 'Pago Confirmado',
+              message: `Su pago de $${payment.amount} correspondiente a ${payment.month_paid} ha sido validado exitosamente.`,
+              type: 'info',
+              link: '/panel_padres.html'
             });
             try {
               const baseUrl = window.location.origin || '';

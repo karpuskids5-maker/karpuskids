@@ -6,90 +6,81 @@ document.addEventListener('DOMContentLoaded', () => {
 
   function isMobile() { return window.innerWidth < 768; }
 
-  // Overlay para cerrar tocando fuera en móvil
+  // Crear Overlay si no existe
   let overlay = document.getElementById('sidebarOverlay');
   if (!overlay) {
     overlay = document.createElement('div');
     overlay.id = 'sidebarOverlay';
-    overlay.style.position = 'fixed';
-    overlay.style.inset = '0';
-    overlay.style.background = 'rgba(0,0,0,0.35)';
-    overlay.style.zIndex = '9';
-    overlay.style.display = 'none';
+    overlay.className = 'fixed inset-0 bg-black/50 z-40 hidden transition-opacity duration-300 backdrop-blur-sm';
     document.body.appendChild(overlay);
   }
-  function showOverlay(show) { overlay.style.display = show ? 'block' : 'none'; }
 
-  function openSidebarMobile() {
-    if (!sidebar) return;
-    sidebar.classList.remove('hidden');
-    sidebar.classList.add('mobile-visible');
-    showOverlay(true);
-    menuBtn?.setAttribute('aria-expanded', 'true');
-  }
-
-  function closeSidebarMobile() {
-    if (!sidebar) return;
-    if (sidebar.classList.contains('mobile-visible')) {
-      sidebar.classList.add('hidden');
+  // --- LÓGICA DE ESTADO ---
+  
+  function initSidebarState() {
+    if (isMobile()) {
+      // Móvil: Siempre expandido internamente, pero oculto por transform
+      sidebar.classList.remove('collapsed');
+      layoutShell.classList.remove('sidebar-collapsed');
       sidebar.classList.remove('mobile-visible');
+      overlay.classList.add('hidden');
+    } else {
+      // Escritorio: Recuperar estado
+      const isCollapsed = localStorage.getItem('sidebarCollapsed') === 'true';
+      toggleDesktopSidebar(isCollapsed);
+      // Limpiar estados móviles
+      sidebar.classList.remove('mobile-visible');
+      overlay.classList.add('hidden');
+      document.body.style.overflow = '';
     }
-    showOverlay(false);
-    menuBtn?.setAttribute('aria-expanded', 'false');
   }
 
-  // Toggle con botón hamburguesa
-  menuBtn?.setAttribute('aria-controls', 'sidebar');
-  menuBtn?.setAttribute('aria-expanded', 'false');
+  function toggleDesktopSidebar(forceCollapse = null) {
+    const shouldCollapse = forceCollapse !== null ? forceCollapse : !sidebar.classList.contains('collapsed');
+    
+    sidebar.classList.toggle('collapsed', shouldCollapse);
+    layoutShell.classList.toggle('sidebar-collapsed', shouldCollapse);
+    
+    // Guardar preferencia solo si es acción del usuario
+    if (forceCollapse === null) {
+      localStorage.setItem('sidebarCollapsed', shouldCollapse);
+    }
+  }
 
+  // --- EVENT LISTENERS ---
+
+  // Botón Hamburguesa (Móvil)
   menuBtn?.addEventListener('click', () => {
-    if (!sidebar) return;
-    if (isMobile()) {
-      if (sidebar.classList.contains('mobile-visible')) {
-        closeSidebarMobile();
-      } else {
-        openSidebarMobile();
-      }
-    } else {
-      // Escritorio: colapsar/expandir sin depender de CSS externo
-      const collapsed = sidebar.classList.toggle('collapsed');
-      // Ajuste visual mínimo por JS para ancho
-      sidebar.style.width = collapsed ? '72px' : '';
-      if (layoutShell) layoutShell.classList.toggle('sidebar-collapsed', collapsed);
-      try { localStorage.setItem('sidebarCollapsed', collapsed); } catch(e){}
-      menuBtn?.setAttribute('aria-expanded', collapsed ? 'false' : 'true');
-    }
+    const isVisible = sidebar.classList.toggle('mobile-visible');
+    overlay.classList.toggle('hidden', !isVisible);
+    document.body.style.overflow = isVisible ? 'hidden' : ''; // Bloquear scroll
   });
 
-  // Botón dentro del sidebar para colapsar en desktop
+  // Botón Colapsar (Escritorio)
   toggleSidebarBtn?.addEventListener('click', () => {
-    if (!sidebar) return;
-    const collapsed = sidebar.classList.toggle('collapsed');
-    sidebar.style.width = collapsed ? '72px' : '';
-    if (layoutShell) layoutShell.classList.toggle('sidebar-collapsed', collapsed);
-    try { localStorage.setItem('sidebarCollapsed', collapsed); } catch(e){}
+    toggleDesktopSidebar();
   });
 
-  overlay.addEventListener('click', () => closeSidebarMobile());
+  // Cerrar al tocar fuera (Móvil)
+  overlay.addEventListener('click', () => {
+    sidebar.classList.remove('mobile-visible');
+    overlay.classList.add('hidden');
+    document.body.style.overflow = '';
+  });
 
-  function handleResize() {
-    if (!sidebar) return;
-    if (isMobile()) {
-      // Oculto por defecto en móvil
-      closeSidebarMobile();
-    } else {
-      showOverlay(false);
-      sidebar.classList.remove('mobile-visible');
-      const saved = localStorage.getItem('sidebarCollapsed');
-      const collapsed = saved === 'true';
-      sidebar.classList.toggle('collapsed', collapsed);
-      sidebar.style.width = collapsed ? '72px' : '';
-      if (layoutShell) layoutShell.classList.toggle('sidebar-collapsed', collapsed);
-      menuBtn?.setAttribute('aria-expanded', collapsed ? 'false' : 'true');
+  // Manejar cambio de tamaño de ventana
+  window.addEventListener('resize', () => {
+    // Solo reiniciar si cambiamos entre móvil y escritorio
+    const wasMobile = sidebar.classList.contains('mobile-check'); // Flag temporal
+    if (isMobile() !== wasMobile) {
+      initSidebarState();
+      sidebar.classList.toggle('mobile-check', isMobile());
     }
-  }
-  handleResize();
-  window.addEventListener('resize', handleResize);
+  });
+
+  // Inicialización
+  sidebar.classList.toggle('mobile-check', isMobile());
+  initSidebarState();
 
   // Navegación genérica: sólo si la página NO tiene navegación dedicada
   const dedicatedNavPresent = document.querySelector('.teams-nav-item[data-section], .nav-button[data-section], .nav-btn[data-section]');
@@ -111,10 +102,11 @@ document.addEventListener('DOMContentLoaded', () => {
         if (isMobile()) {
           try { window.scrollTo({ top: 0, behavior: 'smooth' }); } catch(e) { window.scrollTo(0, 0); }
         }
-        if (sidebar?.classList.contains('mobile-visible')) {
-          closeSidebarMobile();
-          const ov = document.getElementById('sidebarOverlay');
-          if (ov) ov.style.display = 'none';
+        // Cerrar sidebar en móvil al navegar
+        if (isMobile()) {
+          sidebar.classList.remove('mobile-visible');
+          overlay.classList.add('hidden');
+          document.body.style.overflow = '';
         }
       });
     });
