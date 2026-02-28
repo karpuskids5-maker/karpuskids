@@ -72,6 +72,7 @@ const UI = {
     this.checkSession();
     this.populateMonthFilter();
     this.injectChildTheme(); // Inyectar estilos infantiles
+    this.initAccessControl();
   },
 
   async checkSession() {
@@ -1690,6 +1691,162 @@ const UI = {
       btn.innerHTML = originalText;
       refreshIcons();
     }
+  },
+
+  // --- ACCESS CONTROL (Check-in / Check-out) ---
+  initAccessControl() {
+    const searchInput = document.getElementById('accessSearchInput');
+    const resultsContainer = document.getElementById('accessSearchResults');
+    
+    if (searchInput) {
+      searchInput.addEventListener('input', Helpers.debounce(async (e) => {
+        const term = e.target.value.trim();
+        if (term.length < 2) {
+          resultsContainer.innerHTML = '';
+          return;
+        }
+        
+        resultsContainer.innerHTML = Helpers.skeleton(1, 'h-16');
+        
+        const { data: students, error } = await supabase
+          .from('students')
+          .select('id, name, classroom_id, classrooms(name), avatar_url')
+          .ilike('name', `%${term}%`)
+          .limit(5);
+          
+        if (error) {
+          console.error(error);
+          resultsContainer.innerHTML = '<p class="text-red-500 text-sm">Error al buscar</p>';
+          return;
+        }
+        
+        if (!students || !students.length) {
+          resultsContainer.innerHTML = '<p class="text-slate-500 text-sm">No se encontraron estudiantes</p>';
+          return;
+        }
+        
+        resultsContainer.innerHTML = students.map(s => `
+          <div class="flex items-center justify-between p-3 bg-slate-50 rounded-lg border hover:bg-slate-100 transition-colors">
+            <div class="flex items-center gap-3">
+              <div class="w-10 h-10 rounded-full bg-teal-100 flex items-center justify-center text-teal-700 font-bold overflow-hidden">
+                ${s.avatar_url ? `<img src="${s.avatar_url}" class="w-full h-full object-cover">` : s.name.charAt(0)}
+              </div>
+              <div>
+                <p class="font-medium text-slate-800">${s.name}</p>
+                <p class="text-xs text-slate-500">${s.classrooms?.name || 'Sin aula'}</p>
+              </div>
+            </div>
+            <div class="flex gap-2">
+              <button onclick="UI.registerAccess(${s.id}, 'check-in')" class="px-3 py-1 bg-green-100 text-green-700 rounded-md text-sm font-medium hover:bg-green-200 border border-green-200 flex items-center gap-1">
+                <i data-lucide="log-in" class="w-3 h-3"></i> Entrada
+              </button>
+              <button onclick="UI.registerAccess(${s.id}, 'check-out')" class="px-3 py-1 bg-red-100 text-red-700 rounded-md text-sm font-medium hover:bg-red-200 border border-red-200 flex items-center gap-1">
+                <i data-lucide="log-out" class="w-3 h-3"></i> Salida
+              </button>
+            </div>
+          </div>
+        `).join('');
+        
+        refreshIcons();
+      }, 300));
+    }
+    
+    this.loadAccessHistory();
+  },
+
+  async registerAccess(studentId, type) {
+    const today = new Date().toISOString().split('T')[0];
+    
+    try {
+      if (type === 'check-in') {
+         // Buscar si ya tiene asistencia hoy
+         const { data: existing } = await supabase.from('attendance')
+           .select('id')
+           .eq('student_id', studentId)
+           .eq('date', today)
+           .maybeSingle();
+           
+         if (existing) {
+           Helpers.toast('El estudiante ya tiene asistencia registrada hoy', 'info');
+           return;
+         }
+         
+         // Obtener classroom_id del estudiante
+         const { data: student } = await supabase.from('students').select('classroom_id').eq('id', studentId).single();
+         
+         if (!student) throw new Error('Estudiante no encontrado');
+
+         const { error } = await supabase.from('attendance').insert({
+           student_id: studentId,
+           classroom_id: student.classroom_id, // Puede ser null
+           date: today,
+           status: 'present'
+         });
+         
+         if (error) throw error;
+         Helpers.toast('Entrada registrada correctamente');
+      } else {
+         // Para salida, solo notificamos
+         Helpers.toast('Salida registrada (Simulado - No se guarda en DB)');
+      }
+      
+      this.loadAccessHistory();
+      
+      const input = document.getElementById('accessSearchInput');
+      const results = document.getElementById('accessSearchResults');
+      if(input) input.value = '';
+      if(results) results.innerHTML = '';
+      
+    } catch (e) {
+      console.error(e);
+      Helpers.toast('Error al registrar acceso', 'error');
+    }
+  },
+  
+  async loadAccessHistory() {
+    const container = document.getElementById('accessRecentLog');
+    if (!container) return;
+    
+    const today = new Date().toISOString().split('T')[0];
+    
+    // Cargar asistencias de hoy (solo check-in/presente por ahora)
+    const { data: logs, error } = await supabase
+      .from('attendance')
+      .select('created_at, status, students(name, avatar_url)')
+      .eq('date', today)
+      .order('created_at', { ascending: false })
+      .limit(10);
+      
+    if (error) {
+      console.error(error);
+      return;
+    }
+    
+    if (!logs || !logs.length) {
+      container.innerHTML = '<p class="text-slate-400 text-center py-4 text-sm">Sin actividad reciente hoy</p>';
+      return;
+    }
+    
+    container.innerHTML = logs.map(log => `
+      <div class="flex items-center gap-3 p-3 border-b last:border-0 bg-slate-50/50 rounded-lg mb-1">
+        <div class="w-8 h-8 rounded-full bg-white border flex items-center justify-center text-slate-400 overflow-hidden shadow-sm">
+          ${log.students?.avatar_url ? `<img src="${log.students.avatar_url}" class="w-full h-full object-cover">` : '<i data-lucide="user" class="w-4 h-4"></i>'}
+        </div>
+        <div class="flex-1">
+          <p class="text-sm font-bold text-slate-800">${log.students?.name}</p>
+          <div class="flex items-center gap-2 text-xs text-slate-500">
+             <span>${new Date(log.created_at).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}</span>
+             <span>•</span>
+             <span class="${log.status === 'present' ? 'text-green-600' : 'text-red-600'} font-medium">
+               ${log.status === 'present' ? 'Entrada' : 'Ausente'}
+             </span>
+          </div>
+        </div>
+        <div class="w-2 h-2 rounded-full ${log.status === 'present' ? 'bg-green-500' : 'bg-red-500'}"></div>
+      </div>
+    `).join('');
+    
+    refreshIcons();
   }
 };
 

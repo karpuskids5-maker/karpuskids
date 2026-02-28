@@ -407,6 +407,7 @@ function attachPaymentsHandlers(){
   // Botones principales
   document.getElementById('btnNewPayment')?.addEventListener('click', openPaymentModal);
   document.getElementById('btnPendingTransfers')?.addEventListener('click', () => loadPayments('pending'));
+  document.getElementById('btnGenerateCharges')?.addEventListener('click', generateMonthlyCharges);
   document.getElementById('cardToApprove')?.addEventListener('click', () => loadPayments('pending'));
 
   // Filtros
@@ -427,6 +428,7 @@ function attachPaymentsHandlers(){
   document.getElementById('btnSaveReminder')?.addEventListener('click', saveReminder);
   document.getElementById('btnSendReminders')?.addEventListener('click', sendRemindersNow);
   document.getElementById('paymentMonthFilter')?.addEventListener('change', () => loadPayments());
+  document.getElementById('filterPaymentYear')?.addEventListener('change', () => loadPayments());
 
   // Delegación de eventos para la tabla de pagos
   const tbody = document.getElementById('paymentsTableBody');
@@ -436,6 +438,7 @@ function attachPaymentsHandlers(){
       const btnConfirm = e.target.closest('.btn-confirm-payment');
       const btnReject = e.target.closest('.btn-reject-payment');
       const btnDelete = e.target.closest('.btn-delete-payment');
+      const btnRemind = e.target.closest('.btn-remind-payment');
 
       if (btnRegister) {
         openPaymentModal(btnRegister.dataset.studentId);
@@ -448,6 +451,9 @@ function attachPaymentsHandlers(){
       }
       if (btnDelete) {
         await deletePayment(btnDelete.dataset.id);
+      }
+      if (btnRemind) {
+        await sendPaymentReminder(btnRemind.dataset.parentId, btnRemind.dataset.studentName);
       }
     });
   }
@@ -503,11 +509,12 @@ async function loadPayments(forceFilter = null) {
   try {
     const selectedMonth = document.getElementById('paymentMonthFilter')?.value || new Date().toLocaleString('es-ES', { month: 'long' });
     const capitalizedMonth = selectedMonth.charAt(0).toUpperCase() + selectedMonth.slice(1);
+    const selectedYear = document.getElementById('filterPaymentYear')?.value || new Date().getFullYear();
 
     // 1. Cargar Estudiantes
     const { data: students, error: stError } = await supabase
       .from('students')
-      .select('id, name, parent_id, monthly_fee')
+      .select('*, classrooms(name)')
       .eq('is_active', true)
       .order('name');
 
@@ -517,7 +524,9 @@ async function loadPayments(forceFilter = null) {
     const { data: payments, error: payError } = await supabase
       .from('payments')
       .select('*')
-      .ilike('month_paid', `%${selectedMonth}%`); // Flexible match
+      .ilike('month_paid', `%${selectedMonth}%`) // Flexible match
+      .gte('created_at', `${selectedYear}-01-01T00:00:00`)
+      .lte('created_at', `${selectedYear}-12-31T23:59:59`);
 
     if (payError) throw payError;
 
@@ -541,22 +550,32 @@ async function loadPayments(forceFilter = null) {
       const pay = paymentMap[s.id];
       const isPaid = pay && (pay.status === 'confirmado' || pay.status === 'paid' || pay.status === 'efectivo');
       const isPendingReview = pay && pay.status === 'pendiente';
-      
+      const isGeneratedPending = pay && pay.status === 'pending'; // Generado por sistema
+
       if (isPaid) { kpiConfirmed++; kpiIncome += Number(pay.amount); }
       else if (isPendingReview) { kpiToApprove++; }
-      else { kpiPending++; kpiOverdue++; } // Asumiendo vencido si no hay pago
+      else { kpiPending++; } // Asumiendo vencido si no hay pago
+
+      const studentInfo = {
+        student_name: s.name,
+        classroom_name: s.classrooms?.name || 'Sin Aula',
+        parent_id: s.parent_id,
+        monthly_fee: s.monthly_fee || 0
+      };
 
       if (pay) {
-        return { ...pay, student_name: s.name, is_virtual: false };
+        return { ...pay, ...studentInfo, is_virtual: false, monthly_fee: studentInfo.monthly_fee };
       } else {
+        // Registro virtual para mostrar en tabla aunque no exista en BD
+        kpiOverdue++;
         return { 
           id: null, 
           student_id: s.id, 
-          student_name: s.name, 
+          ...studentInfo,
           amount: 0, 
           month_paid: capitalizedMonth, 
           method: '-', 
-          status: 'Pendiente', 
+          status: 'no_generado', 
           bank: '-', 
           reference: '-', 
           created_at: null, 
@@ -593,37 +612,53 @@ async function loadPayments(forceFilter = null) {
       const badgeClass = (st) => {
         if (st === 'confirmado' || st === 'paid') return 'bg-emerald-100 text-emerald-700';
         if (st === 'pendiente') return 'bg-amber-100 text-amber-700';
+        if (st === 'pending') return 'bg-orange-100 text-orange-700'; // Deuda generada
         if (st === 'rechazado') return 'bg-red-100 text-red-700';
+        if (st === 'no_generado') return 'bg-slate-100 text-slate-500';
         return 'bg-slate-100 text-slate-500';
       };
       
-      const dateStr = p.created_at ? new Date(p.created_at).toLocaleDateString() : '-';
-      const amountStr = p.is_virtual ? '-' : `$${p.amount}`;
+      const statusLabel = (st) => {
+         if (st === 'no_generado') return 'Sin Cargo';
+         if (st === 'pending') return 'Por Pagar';
+         return st;
+      }
+      
+      const feeStr = `$${Number(p.monthly_fee || 0).toLocaleString('en-US', { minimumFractionDigits: 2 })}`;
+      const paidStr = `$${Number(p.amount || 0).toLocaleString('en-US', { minimumFractionDigits: 2 })}`;
+      const dueDateStr = p.due_date ? new Date(p.due_date).toLocaleDateString() : '-';
+      // Deuda es la mensualidad si no está pagado
+      const debtStr = (p.status === 'confirmado' || p.status === 'paid' || p.status === 'efectivo') ? '$0.00' : `<span class="text-red-600 font-bold">${feeStr}</span>`;
 
       return `
         <tr class="hover:bg-slate-50 border-b last:border-0 transition-colors">
-          <td class="px-4 py-3 font-medium text-slate-800">${p.student_name}</td>
-          <td class="px-4 py-3">${amountStr}</td>
-          <td class="px-4 py-3">${p.method || '-'}</td>
+          <td class="px-4 py-3 font-medium text-slate-800">
+            <div class="flex flex-col">
+              <span>${p.student_name}</span>
+              <span class="text-[10px] text-slate-400 uppercase tracking-tighter">${p.classroom_name || 'Sin Aula'}</span>
+            </div>
+          </td>
           <td class="px-4 py-3">
-            <span class="${badgeClass(p.status)} px-2 py-1 rounded-full text-xs font-bold uppercase">
-              ${p.status}
+            <span class="${badgeClass(p.status)} px-2 py-1 rounded-full text-xs font-bold uppercase whitespace-nowrap">
+              ${statusLabel(p.status)}
             </span>
           </td>
-          <td class="px-4 py-3">${p.bank || '-'}</td>
-          <td class="px-4 py-3 text-xs font-mono">${p.reference || '-'}</td>
-          <td class="px-4 py-3 text-sm">${dateStr}</td>
-          <td class="px-4 py-3">${p.month_paid}</td>
-          <td class="px-4 py-3 text-center">
-            ${p.evidence_url ? `<a href="${p.evidence_url}" target="_blank" class="text-blue-600 hover:underline text-xs font-bold">Ver</a>` : '-'}
-          </td>
+          <td class="px-4 py-3 text-right text-slate-500 font-mono">${feeStr}</td>
+          <td class="px-4 py-3 text-right font-medium font-mono">${(p.status === 'confirmado' || p.status === 'paid' || p.status === 'efectivo') ? paidStr : '$0.00'}</td>
+          <td class="px-4 py-3 text-xs text-slate-500">${dueDateStr}</td>
+          <td class="px-4 py-3 text-right font-mono">${debtStr}</td>
           <td class="px-4 py-3">
             <div class="flex gap-1 justify-end">
-              ${p.is_virtual ? `
+              ${(p.status === 'no_generado' || p.status === 'pending') ? `
                 <button class="btn-register-payment bg-teal-100 text-teal-700 hover:bg-teal-200 px-3 py-1 rounded text-xs font-bold" data-student-id="${p.student_id}">
                   Registrar
                 </button>
+                ${p.status === 'pending' ? `
+                <button class="btn-remind-payment bg-indigo-100 text-indigo-700 hover:bg-indigo-200 p-1.5 rounded" title="Enviar Recordatorio" data-parent-id="${p.parent_id}" data-student-name="${p.student_name}">
+                  <i data-lucide="bell" class="w-4 h-4"></i>
+                </button>` : ''}
               ` : `
+                ${p.evidence_url ? `<a href="${p.evidence_url}" target="_blank" class="bg-blue-50 text-blue-600 p-1.5 rounded hover:bg-blue-100" title="Ver Comprobante"><i data-lucide="image" class="w-4 h-4"></i></a>` : ''}
                 <button class="btn-confirm-payment bg-green-100 text-green-700 hover:bg-green-200 p-1.5 rounded" title="Confirmar" data-id="${p.id}">
                   <i data-lucide="check" class="w-4 h-4"></i>
                 </button>
@@ -650,6 +685,59 @@ async function loadPayments(forceFilter = null) {
   }
 }
 
+// --- Generar Cuotas Masivas ---
+async function generateMonthlyCharges() {
+  const month = document.getElementById('paymentMonthFilter')?.value;
+  const year = document.getElementById('filterPaymentYear')?.value;
+  
+  if (!confirm(`¿Generar cargos de mensualidad para ${month} ${year} a todos los estudiantes activos?`)) return;
+  
+  const btn = document.getElementById('btnGenerateCharges');
+  btn.disabled = true; btn.innerHTML = '<i data-lucide="loader" class="animate-spin w-4 h-4"></i> Procesando...';
+  if(window.lucide) lucide.createIcons();
+
+  try {
+    const supabase = await getSupabase();
+    
+    // 1. Obtener estudiantes activos
+    const { data: students } = await supabase.from('students').select('*').eq('is_active', true);
+    
+    // 2. Verificar pagos existentes para este mes/año
+    const { data: existing } = await supabase.from('payments')
+      .select('student_id')
+      .ilike('month_paid', `%${month}%`)
+      .gte('created_at', `${year}-01-01`)
+      .lte('created_at', `${year}-12-31`);
+      
+    const existingIds = new Set(existing.map(p => p.student_id));
+    
+    // 3. Filtrar quienes faltan
+    const toCreate = students.filter(s => !existingIds.has(s.id)).map(s => ({
+      student_id: s.id,
+      amount: s.monthly_fee || 0,
+      month_paid: `${month} ${year}`,
+      status: 'pending', // Estado "Por Pagar"
+      method: 'sistema',
+      due_date: `${year}-${new Date().getMonth() + 1}-${String(s.due_day || 5).padStart(2,'0')}` // Fecha vencimiento
+    }));
+    
+    if (toCreate.length > 0) {
+      const { error } = await supabase.from('payments').insert(toCreate);
+      if (error) throw error;
+      Helpers.toast(`Se generaron ${toCreate.length} cargos exitosamente.`);
+    } else {
+      Helpers.toast('Todos los estudiantes ya tienen cargo para este mes.', 'info');
+    }
+    loadPayments();
+  } catch(e) {
+    console.error(e);
+    Helpers.toast('Error generando cargos: ' + e.message, 'error');
+  } finally {
+    btn.disabled = false; btn.innerHTML = '<i data-lucide="layers" class="w-5 h-5"></i> Generar Cuotas';
+    if(window.lucide) lucide.createIcons();
+  }
+}
+
 // --- Lógica de Registro Manual ---
 async function openPaymentModal(preSelectedStudentId = null) {
   const select = document.getElementById('payStudentSelect');
@@ -671,6 +759,7 @@ async function savePayment() {
   const amount = document.getElementById('payAmount').value;
   const method = document.getElementById('payMethod').value;
   const concept = document.getElementById('payConcept').value;
+  const year = document.getElementById('filterPaymentYear')?.value || new Date().getFullYear();
   
   if(!studentId || !amount || !concept) { alert('Complete los campos'); return; }
   
@@ -685,7 +774,7 @@ async function savePayment() {
       student_id: studentId,
       amount: parseFloat(amount),
       method,
-      month_paid: concept, // Usamos concept como month_paid para simplificar
+      month_paid: `${concept} ${year}`, // Normalizar con año
       status: 'confirmado', // Pago manual es directo confirmado
       validated_by: user?.id,
       created_at: new Date().toISOString()
@@ -1149,20 +1238,69 @@ async function loadIncomeChart() {
 
   if (incomeChartInstance) incomeChartInstance.destroy();
 
+  // Crear gradientes para un look moderno
+  const gradientConfirmed = ctx.getContext('2d').createLinearGradient(0, 0, 0, 400);
+  gradientConfirmed.addColorStop(0, '#10b981'); // Emerald 500
+  gradientConfirmed.addColorStop(1, '#059669'); // Emerald 600
+
+  const gradientPending = ctx.getContext('2d').createLinearGradient(0, 0, 0, 400);
+  gradientPending.addColorStop(0, '#94a3b8'); // Slate 400
+  gradientPending.addColorStop(1, '#64748b'); // Slate 500
+
   incomeChartInstance = new Chart(ctx, {
     type: 'bar',
     data: {
       labels: months,
       datasets: [
-        { label: 'Confirmado', data: confirmedData, backgroundColor: '#0d9488', borderRadius: 4 },
-        { label: 'Pendiente', data: pendingData, backgroundColor: '#cbd5e1', borderRadius: 4 }
+        { 
+          label: 'Confirmado', 
+          data: confirmedData, 
+          backgroundColor: gradientConfirmed, 
+          borderRadius: 6,
+          borderSkipped: false,
+          barPercentage: 0.6,
+          categoryPercentage: 0.8
+        },
+        { 
+          label: 'Pendiente', 
+          data: pendingData, 
+          backgroundColor: '#e2e8f0', 
+          borderRadius: 6,
+          borderSkipped: false,
+          barPercentage: 0.6,
+          categoryPercentage: 0.8
+        }
       ]
     },
     options: {
       responsive: true,
       maintainAspectRatio: false,
-      scales: { y: { beginAtZero: true }, x: { grid: { display: false } } },
-      plugins: { legend: { position: 'bottom' } }
+      scales: { 
+        y: { 
+          beginAtZero: true,
+          grid: { color: '#f1f5f9', borderDash: [5, 5] },
+          ticks: { font: { family: "'Nunito', sans-serif" }, color: '#64748b' }
+        }, 
+        x: { 
+          grid: { display: false },
+          ticks: { font: { family: "'Nunito', sans-serif" }, color: '#64748b' }
+        } 
+      },
+      plugins: { 
+        legend: { position: 'top', align: 'end', labels: { usePointStyle: true, boxWidth: 8 } },
+        tooltip: {
+          backgroundColor: '#1e293b',
+          padding: 12,
+          titleFont: { size: 13, family: "'Nunito', sans-serif" },
+          bodyFont: { size: 13, family: "'Nunito', sans-serif" },
+          cornerRadius: 8,
+          displayColors: true
+        }
+      },
+      interaction: {
+        mode: 'index',
+        intersect: false,
+      },
     }
   });
 }
@@ -1634,6 +1772,13 @@ function initStudentController(){
         
         const modal = document.getElementById('modalAddStudent');
         if (!modal) return;
+        
+        // Reset/Poblar ID y Título
+        const idInput = document.getElementById('stId');
+        if (idInput) idInput.value = id;
+        const titleEl = document.getElementById('stModalTitle');
+        if (titleEl) titleEl.textContent = 'Editar Estudiante';
+
         modal.classList.remove('hidden');
         
         // Poblar campos
@@ -1669,6 +1814,10 @@ function initStudentController(){
   const addStudentBtn = document.getElementById('btnAddStudent');
   if (addStudentBtn) {
     addStudentBtn.addEventListener('click', () => {
+      const idInput = document.getElementById('stId');
+      if (idInput) idInput.value = '';
+      const titleEl = document.getElementById('stModalTitle');
+      if (titleEl) titleEl.textContent = 'Crear Estudiante';
       qs('#modalAddStudent').classList.remove('hidden');
     });
   }
@@ -1688,7 +1837,7 @@ function initStudentController(){
       const supabase = await getSupabase();
       const { data: students } = await supabase
         .from('students')
-        .select('id, name, classrooms(name), p1_name, p1_email, p1_phone, is_active, monthly_fee, due_day')
+        .select('*, classrooms(name)')
         .order('name');
       
       if (!students || !students.length) { alert('No hay datos para exportar'); return; }

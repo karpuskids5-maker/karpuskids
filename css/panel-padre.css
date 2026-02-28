@@ -21,9 +21,9 @@
 
 /* ——— Panel Padre: estilo general del sidebar mochila ——— */
 body.panel-padre-body #sidebar {
-  background: linear-gradient(180deg, #4ade80 0%, #2dd4bf 100%);
-  box-shadow: 4px 0 24px rgba(20,184,166,0.25);
-  border-right: 4px solid #14b8a6;
+  background: #10b981; /* Emerald 500 */
+  box-shadow: 4px 0 24px rgba(16, 185, 129, 0.2);
+  border-right: 4px solid #059669; /* Emerald 600 */
   /* Asegurar que el contenido sea accesible */
   display: flex;
   flex-direction: column;

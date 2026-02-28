@@ -27,6 +27,44 @@
   <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.6.0/dist/confetti.browser.min.js"></script>
   
   <style>
+    /* --- MEJORAS DE CARGA Y TRANSICIONES --- */
+    #initial-loading {
+      position: fixed;
+      inset: 0;
+      background: white;
+      z-index: 9999;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      transition: opacity 0.5s ease, visibility 0.5s;
+    }
+    
+    .section {
+      transition: opacity 0.3s ease, transform 0.3s ease;
+    }
+    .section.hidden {
+      display: none;
+      opacity: 0;
+      transform: translateY(10px);
+    }
+    .section:not(.hidden) {
+      display: block;
+      opacity: 1;
+      transform: translateY(0);
+    }
+
+    /* Skeletons Mejorados */
+    @keyframes shimmer {
+      0% { background-position: -200% 0; }
+      100% { background-position: 200% 0; }
+    }
+    .skeleton-shimmer {
+      background: linear-gradient(90deg, #f1f5f9 25%, #e2e8f0 50%, #f1f5f9 75%);
+      background-size: 200% 100%;
+      animation: shimmer 1.5s infinite;
+    }
+
     /* --- TEMA INFANTIL MODERNO: "MUNDO DE EXPLORACIÓN" --- */
     :root {
       --color-bg: #F0F7FF;
@@ -35,10 +73,11 @@
     }
 
     body {
-      font-family: var(--font-main);
-      background-color: var(--color-bg);
-      background-image: radial-gradient(#E0E7FF 2px, transparent 2px);
-      background-size: 24px 24px;
+      font-family: 'Nunito', sans-serif;
+      background-color: #f8fafc;
+      overflow-x: hidden;
+      color: #1e293b;
+      min-height: 100vh;
     }
 
     /* Animaciones de "Plenitud" (Respiración y Flote) */
@@ -93,6 +132,17 @@
 </head>
 <body class="text-slate-700 panel-padre-body overflow-x-hidden" aria-label="Panel de padres Karpus Kids">
 
+  <!-- Overlay de Carga Inicial -->
+  <div id="initial-loading">
+    <div class="relative">
+      <div class="w-20 h-20 border-4 border-sky-100 border-t-sky-500 rounded-full animate-spin"></div>
+      <div class="absolute inset-0 flex items-center justify-center">
+        <span class="text-2xl animate-bounce">🎒</span>
+      </div>
+    </div>
+    <p class="mt-4 font-bold text-slate-400 animate-pulse">Preparando la mochila...</p>
+  </div>
+
   <div class="flex min-h-screen relative app app-panel-padre">
     <!-- SIDEBAR MOCHILA (Verde/Turquesa) -->
     <aside
@@ -122,7 +172,7 @@
       </div>
 
       <div class="px-4 mb-6 hidden md:block">
-        <div class="bg-gradient-to-r from-amber-200 to-orange-100 rounded-2xl p-4 shadow-sm transform rotate-1 hover:rotate-0 transition-transform duration-300">
+        <div class="bg-amber-100 rounded-2xl p-4 shadow-sm transform rotate-1 hover:rotate-0 transition-transform duration-300 border-2 border-amber-200">
           <p class="text-[10px] text-amber-800 font-bold uppercase tracking-widest mb-1 flex items-center gap-1">
             <i data-lucide="star" class="w-3 h-3 fill-amber-600 text-amber-600"></i> Estudiante
           </p>
@@ -155,10 +205,10 @@
           <i data-lucide="bar-chart-3" class="w-6 h-6"></i>
           <span class="hidden md:inline">Calificaciones</span>
         </button>
-        <button data-target="payments" class="sidebar-node node-payments" aria-label="Pagos">
-          <i data-lucide="credit-card" class="w-6 h-6"></i>
-          <span class="hidden md:inline">Pagos</span>
-        </button>
+        <button data-target="payments" class="sidebar-node node-payments hidden" aria-label="Pagos">
+        <i data-lucide="credit-card" class="w-6 h-6"></i>
+        <span class="hidden md:inline">Pagos</span>
+      </button>
         <button data-target="notifications" class="sidebar-node node-notifications" aria-label="Avisos">
           <i data-lucide="bell" class="w-6 h-6"></i>
           <span class="hidden md:inline">Avisos</span>
@@ -202,7 +252,7 @@
         <div>
           <h1 class="text-2xl font-bold text-slate-700 sr-only">Karpus Kids - Panel de Padres</h1>
           <h2 class="text-4xl font-black text-slate-800 tracking-tight flex items-center gap-3">
-             <span class="animate-bounce">👋</span> Hola, <span class="guardian-name-display text-transparent bg-clip-text bg-gradient-to-r from-sky-500 to-teal-500">Familia</span>!
+             <span class="animate-bounce">👋</span> Hola, <span class="guardian-name-display text-sky-600">Familia</span>!
           </h2>
           <p class="text-slate-400 font-bold text-lg mt-2 ml-1" id="currentDateDisplay" aria-live="polite">Hoy es un gran día para aprender</p>
         </div>
@@ -230,7 +280,11 @@
         </div>
         
         <!-- Acciones Rápidas (Botones Grandes) -->
-        <div class="grid grid-cols-2 gap-4 md:gap-6">
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-4 md:gap-6">
+          <div id="nextTaskWidget" class="md:col-span-2">
+            <!-- Widget de Próxima Tarea cargado por JS -->
+            <div class="animate-pulse bg-slate-100 h-24 rounded-3xl"></div>
+          </div>
           <button id="btnPayTuition" class="card-base patio-card flex flex-col items-center justify-center gap-3 hover:bg-white group border-2 border-slate-100">
             <div class="w-14 h-14 bg-emerald-100 text-emerald-600 rounded-2xl flex items-center justify-center transition-transform group-hover:scale-110">
               <i data-lucide="piggy-bank" class="w-7 h-7"></i>

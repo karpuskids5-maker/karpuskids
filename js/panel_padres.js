@@ -1332,13 +1332,15 @@ async function loadDashboard() {
     const today = new Date().toISOString().split('T')[0];
 
     // ✅ Solicitudes en paralelo para rendimiento
-    const [attRes, pendingRes, deliveredRes] = await Promise.all([
+    const [attRes, pendingRes, deliveredRes, debtRes] = await Promise.all([
         // 1. Asistencia HOY
         supabase.from(TABLES.ATTENDANCE).select('status').eq('student_id', student.id).eq('date', today).maybeSingle(),
         // 2. Tareas Pendientes (> hoy)
         supabase.from(TABLES.TASKS).select('*', { count: 'exact', head: true }).eq('classroom_id', student.classroom_id).gt('due_date', new Date().toISOString()),
         // 3. Tareas Entregadas
-        supabase.from(TABLES.TASK_EVIDENCES).select('*', { count: 'exact', head: true }).eq('student_id', student.id)
+        supabase.from(TABLES.TASK_EVIDENCES).select('*', { count: 'exact', head: true }).eq('student_id', student.id),
+        // 4. Deuda Total
+        supabase.rpc('get_student_total_debt', { p_student_id: student.id })
     ]);
 
     // ✅ Procesamiento de datos
@@ -1351,7 +1353,7 @@ async function loadDashboard() {
     else if (attStatus === 'absent') { attText = 'Ausente'; attTheme = 'card-red'; }
     else if (attStatus === 'late') { attText = 'Tardanza'; attTheme = 'card-yellow'; }
     
-    // Promedio y pagos removidos del dashboard por requerimiento
+    const totalDebt = debtRes.data || 0;
 
     // ✅ Mapeo de Temas Seguro (Tarjetas Blancas con Iconos de Color)
     const themeMap = {
@@ -1385,6 +1387,13 @@ async function loadDashboard() {
             icon: 'check-circle-2',
             theme: 'card-yellow', // Amarillo solicitado
             sub: 'Total enviado'
+        },
+        {
+            title: 'Estado de Cuenta',
+            value: totalDebt > 0 ? `$${totalDebt}` : 'Al día',
+            icon: 'credit-card',
+            theme: totalDebt > 0 ? 'card-red' : 'card-green',
+            sub: totalDebt > 0 ? 'Pago pendiente' : 'Sin deudas'
         }
     ];
 
@@ -1943,6 +1952,11 @@ async function populateProfile() {
   
   setVal('profilePickupName', student.authorized_pickup);
   
+  setVal('tutor1Name', student.t1_name);
+  setVal('tutor1Phone', student.t1_phone);
+  setVal('tutor2Name', student.t2_name);
+  setVal('tutor2Phone', student.t2_phone);
+  
   // ✅ Refrescar iconos después de llenar datos
   if(window.lucide) lucide.createIcons();
 }
@@ -1972,7 +1986,11 @@ async function saveAllProfile() {
     p2_name: document.getElementById('profileMotherName').value.trim() || null,
     p2_phone: document.getElementById('profileMotherPhone').value.trim() || null,
     p2_email: document.getElementById('profileMotherEmail').value.trim() || null,
-    authorized_pickup: document.getElementById('profilePickupName').value.trim() || null
+    authorized_pickup: document.getElementById('profilePickupName').value.trim() || null,
+    t1_name: document.getElementById('tutor1Name')?.value.trim() || null,
+    t1_phone: document.getElementById('tutor1Phone')?.value.trim() || null,
+    t2_name: document.getElementById('tutor2Name')?.value.trim() || null,
+    t2_phone: document.getElementById('tutor2Phone')?.value.trim() || null
   };
   
   const { error } = await supabase.from(TABLES.STUDENTS).update(updates).eq('id', student.id);
@@ -1980,8 +1998,26 @@ async function saveAllProfile() {
   if(error) {
     Helpers.toast('Error al guardar datos', 'error');
   } else {
+    // ✅ Mejora: También actualizar el nombre en el perfil del usuario para el saludo
+    const newName = updates.p1_name || updates.p2_name || updates.name;
+    if (newName) {
+      await supabase.from(TABLES.PROFILES).update({ name: newName }).eq('id', AppState.get('user').id);
+      
+      // Actualizar estado local del perfil
+      const profile = AppState.get('profile');
+      if (profile) {
+        profile.name = newName;
+        AppState.set('profile', profile);
+        
+        // Actualizar saludo inmediatamente
+        document.querySelectorAll('.guardian-name-display').forEach(el => {
+          el.textContent = escapeHtml(newName);
+        });
+      }
+    }
+
     Helpers.toast('Perfil actualizado correctamente', 'success');
-    loadStudentData(); // Recargar para actualizar estado local
+    await loadStudentData(); // Recargar para actualizar resto de UI
   }
   
   btn.disabled = false;

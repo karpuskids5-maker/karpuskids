@@ -646,12 +646,24 @@
           </div>
         </div>
 
-        <!-- BLOQUE 1 – Tarjetas de Aulas -->
-        <div id="classroomsGrid" class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
-          <!-- Inyectado por JS: cards de aulas -->
+        <!-- BLOQUE 1 – Tabla de Aulas -->
+        <div class="bg-white rounded-3xl shadow-sm border border-slate-100 overflow-hidden mb-8">
+          <table class="w-full text-sm">
+            <thead class="bg-slate-50 text-left text-xs font-bold uppercase tracking-wider text-slate-600">
+              <tr>
+                <th class="py-4 px-6">Nombre del Aula</th>
+                <th class="py-4 px-6">Maestra Asignada</th>
+                <th class="py-4 px-6">Ocupación / Capacidad</th>
+                <th class="py-4 px-6 text-center">Acciones</th>
+              </tr>
+            </thead>
+            <tbody id="roomsTable" class="divide-y divide-slate-100">
+              <!-- Inyectado por JS -->
+            </tbody>
+          </table>
         </div>
 
-        <!-- BLOQUE 2 – Panel Interno del Aula -->
+        <!-- BLOQUE 2 – Panel Interno del Aula (Opcional, mantenido para detalle) -->
         <div id="classroomPanel" class="hidden mt-8">
           <div class="bg-white rounded-3xl shadow-md border border-slate-100 overflow-hidden">
             <div class="p-6 bg-gradient-to-r from-purple-600 to-indigo-600 text-white flex items-center justify-between">
@@ -849,6 +861,9 @@
             <p class="text-slate-500 font-medium">Control de ingresos, mensualidades y transferencias</p>
           </div>
           <div class="flex gap-3">
+             <button id="btnGenerateCharges" class="px-4 py-2 bg-indigo-100 text-indigo-700 rounded-xl font-bold hover:bg-indigo-200 transition-colors flex items-center gap-2">
+               <i data-lucide="layers" class="w-5 h-5"></i> Generar Cuotas
+             </button>
              <button id="btnPendingTransfers" class="px-4 py-2 bg-purple-100 text-purple-700 rounded-xl font-bold hover:bg-purple-200 transition-colors flex items-center gap-2">
                <i data-lucide="file-check" class="w-5 h-5"></i> Revisiones
              </button>
@@ -915,11 +930,16 @@
               <span class="w-2 h-6 bg-purple-600 rounded-full"></span>
               Estado de Cuentas por Estudiante
             </h3>
-            <div class="flex gap-3 w-full md:w-auto">
+            <div class="flex flex-wrap gap-3 w-full md:w-auto">
                <div class="relative flex-1 md:w-64">
                   <i data-lucide="search" class="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400"></i>
                   <input id="searchPaymentStudent" placeholder="Buscar estudiante..." class="pl-10 pr-4 py-2 border rounded-xl text-sm w-full bg-slate-50 focus:bg-white transition-all">
                </div>
+               <select id="filterPaymentYear" class="px-3 py-2 border rounded-xl text-sm bg-slate-50 font-bold text-slate-700">
+                  <option value="2024">2024</option>
+                  <option value="2025" selected>2025</option>
+                  <option value="2026">2026</option>
+               </select>
                <select id="filterPaymentStatus" class="px-3 py-2 border rounded-xl text-sm bg-slate-50">
                   <option value="all">Todos</option>
                   <option value="paid">Al día</option>
@@ -935,9 +955,10 @@
               <thead class="bg-slate-50 text-slate-600 font-bold uppercase text-xs">
                 <tr>
                   <th class="px-6 py-4">Estudiante / Aula</th>
-                  <th class="px-6 py-4 text-center">Estado</th>
+                  <th class="px-6 py-4">Estado</th>
                   <th class="px-6 py-4 text-right">Mensualidad</th>
-                  <th class="px-6 py-4 text-right">Pagado (Mes)</th>
+                  <th class="px-6 py-4 text-right">Pagado</th>
+                  <th class="px-6 py-4">Vencimiento</th>
                   <th class="px-6 py-4 text-right">Deuda</th>
                   <th class="px-6 py-4 text-center">Acciones</th>
                 </tr>
@@ -1353,8 +1374,9 @@
   <!-- MODAL: Crear/Editar Estudiante (Profesional) -->
   <div id="modalAddStudent" class="fixed inset-0 bg-black/40 hidden flex items-center justify-center z-50">
     <div class="bg-white rounded-2xl shadow-2xl w-full max-w-3xl p-6">
+      <input type="hidden" id="stId" />
       <h3 class="text-xl font-bold text-slate-800 flex items-center gap-2 mb-4">
-        <span class="w-2 h-6 bg-purple-600 rounded-full"></span> Crear Estudiante
+        <span class="w-2 h-6 bg-purple-600 rounded-full"></span> <span id="stModalTitle">Crear Estudiante</span>
       </h3>
 
       <!-- Foto + Matrícula -->
@@ -1456,7 +1478,7 @@
 
   <script src="js/common_ui.js"></script>
   <script type="module" src="app.js"></script>
-  <script src="js/panel_directora.js?v=2"></script>
+  <script src="js/panel_directora.js?v=3"></script>
   <!-- Attendance Detail Modal (Director) -->
   <div id="attendanceModal" class="fixed inset-0 bg-black/30 z-50 hidden items-center justify-center">
     <div class="bg-white rounded-2xl shadow-xl p-6 w-full max-w-4xl h-[80vh] flex flex-col">

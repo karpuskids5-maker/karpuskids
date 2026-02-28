@@ -117,6 +117,23 @@
       animation: float-soft 5s ease-in-out infinite;
     }
 
+    @keyframes float-block {
+      0%,100% { transform: translateY(0); }
+      50% { transform: translateY(-15px); }
+    }
+
+    .block {
+      position: absolute;
+      font-size: 40px;
+      opacity: 0.15;
+      animation: float-block 6s ease-in-out infinite;
+    }
+
+    .block1 { top: 15%; left: 8%; }
+    .block2 { bottom: 20%; right: 10%; animation-delay: 2s; }
+    .block3 { top: 40%; right: 20%; animation-delay: 4s; }
+
+
     
     /* Botones flotantes */
     .floating-btn {
@@ -400,7 +417,7 @@ Tranquilidad en tu bolsillo.</p>
   <section id="galeria-fotos" class="py-20 bg-white overflow-hidden">
     <h2 class="text-4xl md:text-5xl font-bold text-center mb-8 text-rose-500" data-aos="fade-up">Galería de Fotos</h2>
     <div class="container mx-auto px-4">
-      <div class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
+      <div class="grid grid-cols-1 md:grid-cols-3 gap-8">
         <!-- Imágenes en Grid -->
         <div class="aspect-square overflow-hidden rounded-xl shadow-md hover:shadow-xl transition-all duration-300 transform hover:scale-105" data-aos="fade-up">
           <img src="img/2.jpg" loading="lazy" class="w-full h-full object-cover cursor-pointer lightbox-thumb" alt="Niños jugando en piscina de pelotas" data-caption="Niños jugando">
@@ -420,9 +437,6 @@ Tranquilidad en tu bolsillo.</p>
         <div class="aspect-square overflow-hidden rounded-xl shadow-md hover:shadow-xl transition-all duration-300 transform hover:scale-105" data-aos="fade-up" data-aos-delay="100">
           <img src="img/7.jpg" loading="lazy" class="w-full h-full object-cover cursor-pointer lightbox-thumb" alt="Niño jugando con aros" data-caption="Desarrollo motriz">
         </div>
-        <div class="aspect-square overflow-hidden rounded-xl shadow-md hover:shadow-xl transition-all duration-300 transform hover:scale-105" data-aos="fade-up" data-aos-delay="200">
-          <img src="img/8.jpg" loading="lazy" class="w-full h-full object-cover cursor-pointer lightbox-thumb" alt="Diversión en la piscina de pelotas" data-caption="Diversión segura">
-        </div>
       </div>
     </div>
   </section>
@@ -436,9 +450,9 @@ Tranquilidad en tu bolsillo.</p>
         <!-- Video 1 -->
         <div class="bg-white rounded-xl shadow-lg overflow-hidden w-full sm:w-72 transform transition-transform duration-300 hover:scale-105" data-aos="fade-up" data-aos-delay="100">
           <div @click="videoModal = true; videoSrc = 'img/14.mp4'" class="relative cursor-pointer group">
-            <video muted loop playsinline preload="metadata" class="h-56 w-full object-cover" src="img/14.mp4" loading="lazy" alt="Video de actividades recreativas"></video>
+            <video muted loop playsinline autoplay class="aspect-video w-full object-cover" src="img/14.mp4" alt="Video de actividades recreativas"></video>
             <div class="absolute inset-0 bg-black/30 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
-              <i class="bi bi-play-circle-fill text-white text-5xl"></i>
+              <i class="bi bi-volume-up-fill text-white text-5xl"></i>
             </div>
           </div>
           <div class="p-4 text-center">
@@ -449,9 +463,9 @@ Tranquilidad en tu bolsillo.</p>
         <!-- Video 2 -->
         <div class="bg-white rounded-xl shadow-lg overflow-hidden w-full sm:w-72 transform transition-transform duration-300 hover:scale-105" data-aos="fade-up" data-aos-delay="200">
           <div @click="videoModal = true; videoSrc = 'img/karpus invitacion.mp4'" class="relative cursor-pointer group">
-            <video muted loop playsinline preload="metadata" class="h-56 w-full object-cover" src="img/karpus invitacion.mp4" loading="lazy" alt="Video invitación a Karpus Kids"></video>
+            <video muted loop playsinline autoplay class="aspect-video w-full object-cover" src="img/karpus invitacion.mp4" alt="Video invitación a Karpus Kids"></video>
             <div class="absolute inset-0 bg-black/30 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
-              <i class="bi bi-play-circle-fill text-white text-5xl"></i>
+              <i class="bi bi-volume-up-fill text-white text-5xl"></i>
             </div>
           </div>
           <div class="p-4 text-center">
@@ -461,10 +475,10 @@ Tranquilidad en tu bolsillo.</p>
         </div>
         <!-- Video 3 -->
         <div class="bg-white rounded-xl shadow-lg overflow-hidden w-full sm:w-72 transform transition-transform duration-300 hover:scale-105" data-aos="fade-up" data-aos-delay="300">
-          <div @click="videoModal = true; videoSrc = 'img/13.mp4'" class="relative cursor-pointer group">
-            <video muted loop playsinline preload="metadata" class="h-56 w-full object-cover" src="img/13.mp4" loading="lazy" alt="Video de aprendizaje creativo"></video>
+          <div @click="videoModal = true; videoSrc = 'img/video karpus kids.mp4'" class="relative cursor-pointer group">
+            <video muted loop playsinline autoplay preload="auto" class="aspect-video w-full object-cover" src="img/video karpus kids.mp4" alt="Video de aprendizaje creativo"></video>
             <div class="absolute inset-0 bg-black/30 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
-              <i class="bi bi-play-circle-fill text-white text-5xl"></i>
+              <i class="bi bi-volume-up-fill text-white text-5xl"></i>
             </div>
           </div>
           <div class="p-4 text-center">
@@ -597,9 +611,9 @@ Invertir en la educación y seguridad de tu hijo hoy, es asegurar su futuro mañ
 
   <!-- CTA Final (Muy Fuerte) -->
   <section class="py-24 bg-gradient-to-b from-pink-50 to-white text-center relative overflow-hidden">
-    <img src="img/familia.png"
-       class="absolute left-10 bottom-0 w-40 opacity-20 float-soft"
-       alt="Familia feliz" loading="lazy">
+    <div class="block block1 text-blue-500 font-bold">A</div>
+    <div class="block block2 text-orange-500 font-bold">1</div>
+    <div class="block block3 text-green-500">🎨</div>
     <div class="max-w-4xl mx-auto relative z-10">
       <h2 class="text-4xl font-bold mb-6 text-gray-800">
         ¿Listo para formar parte de la familia Karpus Kids?

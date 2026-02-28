@@ -69,12 +69,16 @@ window.AttendanceCache = {
 };
 
 // 3. FUNCIÓN PARA CARGAR AULAS
-window.loadRooms = async function(teacherId = null) {
+window.loadRooms = async function(teacherId = null, searchTerm = '') {
   await safeExecute(async () => {
     let query = supabase.from('classrooms').select('*');
     
-    if (teacherId) {
+    if (teacherId && teacherId !== 'all') {
       query = query.eq('teacher_id', teacherId);
+    }
+
+    if (searchTerm) {
+      query = query.ilike('name', `%${searchTerm}%`);
     }
     
     const { data: rooms, error } = await query.order('name');
@@ -90,32 +94,54 @@ window.loadRooms = async function(teacherId = null) {
 
     const { data: teachers } = await supabase.from('profiles').select('id, name').eq('role', 'maestra');
     const teacherMap = teachers.reduce((acc, t) => ({ ...acc, [t.id]: t.name }), {});
+    
+    // Contar estudiantes por aula
     const counts = await Promise.all(rooms.map(r => 
       supabase.from('students').select('*', { count: 'exact', head: true }).eq('classroom_id', r.id)
     ));
     const countMap = {};
     counts.forEach((resp, idx) => { countMap[rooms[idx].id] = resp.count || 0; });
 
-    tableBody.innerHTML = rooms.map(r => `
-      <tr class="hover:bg-slate-50">
-        <td class="py-3 px-4 font-medium text-slate-900">${r.name}</td>
-        <td class="py-3 px-4 text-slate-600">${teacherMap[r.teacher_id] || 'Sin asignar'}</td>
-        <td class="py-3 px-4 text-slate-600">
-          ${countMap[r.id] || 0} / ${r.capacity || 0}
-          <span class="ml-2 text-xs ${((r.capacity||0) - (countMap[r.id]||0)) > 0 ? 'text-amber-600' : 'text-emerald-600'}">
-            ${((r.capacity||0) - (countMap[r.id]||0)) > 0 ? `Faltan ${Math.max(0, (r.capacity||0) - (countMap[r.id]||0))}` : 'Completo'}
-          </span>
-        </td>
-        <td class="py-3 px-4 text-center">
-          <button class="delete-room-btn px-2 py-1 bg-red-100 text-red-700 rounded hover:bg-red-200 text-xs" data-room-id="${r.id}">
-            Eliminar
-          </button>
-          <button class="edit-room-btn px-2 py-1 bg-blue-100 text-blue-700 rounded hover:bg-blue-200 text-xs ml-2" data-room-id="${r.id}">
-            Editar
-          </button>
-        </td>
-      </tr>
-    `).join('');
+    tableBody.innerHTML = rooms.map(r => {
+      const current = countMap[r.id] || 0;
+      const capacity = r.capacity || 0;
+      const isFull = capacity > 0 && current >= capacity;
+      
+      return `
+        <tr class="hover:bg-slate-50 border-b last:border-0 transition-colors">
+          <td class="py-4 px-6 font-bold text-slate-800">${r.name}</td>
+          <td class="py-4 px-6 text-slate-600 font-medium">
+             <div class="flex items-center gap-2">
+               <div class="w-8 h-8 bg-purple-100 text-purple-600 rounded-lg flex items-center justify-center"><i data-lucide="user" class="w-4 h-4"></i></div>
+               ${teacherMap[r.teacher_id] || '<span class="text-slate-400 italic">Sin asignar</span>'}
+             </div>
+          </td>
+          <td class="py-4 px-6">
+             <div class="flex flex-col gap-1">
+               <div class="flex justify-between text-xs font-bold mb-1">
+                 <span class="${isFull ? 'text-red-500' : 'text-emerald-600'}">${current} / ${capacity}</span>
+                 <span class="text-slate-400">${Math.round((current/capacity)*100) || 0}%</span>
+               </div>
+               <div class="w-full bg-slate-100 rounded-full h-2">
+                 <div class="h-full rounded-full ${isFull ? 'bg-red-500' : 'bg-emerald-500'}" style="width: ${Math.min(100, (current/capacity)*100) || 0}%"></div>
+               </div>
+             </div>
+          </td>
+          <td class="py-4 px-6 text-center">
+            <div class="flex justify-center gap-2">
+              <button class="edit-room-btn p-2 bg-indigo-50 text-indigo-600 rounded-xl hover:bg-indigo-100 transition-colors" data-room-id="${r.id}" title="Editar">
+                <i data-lucide="edit-3" class="w-4 h-4"></i>
+              </button>
+              <button class="delete-room-btn p-2 bg-pink-50 text-pink-600 rounded-xl hover:bg-pink-100 transition-colors" data-room-id="${r.id}" title="Eliminar">
+                <i data-lucide="trash-2" class="w-4 h-4"></i>
+              </button>
+            </div>
+          </td>
+        </tr>
+      `;
+    }).join('');
+
+    if (window.lucide) lucide.createIcons();
 
   }, 'Error cargando aulas');
 };
@@ -197,7 +223,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         break;
       case 'estudiantes':
         if (!window.DirectorState.loaded.estudiantes) {
-          await Promise.all([loadStudents(), loadStudentFilters()]);
+          await Promise.all([window.loadStudents(), loadStudentFilters()]);
           window.DirectorState.loaded.estudiantes = true;
         }
         break;
@@ -345,6 +371,9 @@ document.addEventListener('DOMContentLoaded', async () => {
               <button class="edit-student-btn flex-1 py-2 bg-indigo-600 text-white rounded-xl font-bold text-xs shadow-md hover:bg-indigo-700 transition-colors flex items-center justify-center gap-2" data-student-id="${s.id}">
                 <i data-lucide="edit" class="w-4 h-4"></i> Editar
               </button>
+              <button class="delete-student-btn p-2 bg-red-50 text-red-600 hover:bg-red-100 rounded-xl transition-colors" title="Eliminar Estudiante" data-student-id="${s.id}">
+                <i data-lucide="trash-2" class="w-4 h-4"></i>
+              </button>
             </div>
           </div>
         `}).join('');
@@ -356,6 +385,24 @@ document.addEventListener('DOMContentLoaded', async () => {
 
     }, 'Error cargando estudiantes');
   }
+
+  // Función para eliminar estudiante
+  window.deleteStudent = async function(studentId) {
+    const confirmDelete = confirm('¿Está seguro de que desea eliminar este estudiante? Esta acción es irreversible.');
+    if (!confirmDelete) return;
+
+    await safeExecute(async () => {
+      const { error } = await supabase
+        .from('students')
+        .delete()
+        .eq('id', studentId);
+
+      if (error) throw error;
+
+      alert('Estudiante eliminado exitosamente.');
+      window.loadStudents(window.DirectorState.studentsPage); // Recargar la lista de estudiantes
+    }, 'Error al eliminar estudiante');
+  };
 
   // 4. FUNCIÓN PARA RENDERIZAR CONTROLES DE PAGINACIÓN
   function renderPaginationControls() {
@@ -404,6 +451,16 @@ document.addEventListener('DOMContentLoaded', async () => {
       }
     });
   }
+
+  // Event listener para los botones de eliminar estudiante (delegación)
+  document.addEventListener('click', async (e) => {
+    if (e.target.closest('.delete-student-btn')) {
+      const studentId = e.target.closest('.delete-student-btn').dataset.studentId;
+      if (studentId) {
+        await window.deleteStudent(studentId);
+      }
+    }
+  });
 
   // 5. CARGAR DASHBOARD
   async function loadDashboard() {
@@ -770,7 +827,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     }, 'Error cargando asistencia');
   }
 
-  // 8.1. CARGAR MAESTROS PARA FILTRO (FUNCIÓN FALTANTE)
+  // 8.1. CARGAR MAESTROS PARA FILTRO
   async function loadTeachersForFilter() {
     await safeExecute(async () => {
       const { data: teachers, error } = await supabase
@@ -781,11 +838,18 @@ document.addEventListener('DOMContentLoaded', async () => {
       
       if (error) throw error;
 
-      // Si hay un select de maestros en el formulario de aulas, llenarlo
+      // Select en el panel de aulas (Directora)
+      const roomSelect = document.getElementById('filterRoomByTeacher');
+      if (roomSelect) {
+        roomSelect.innerHTML = '<option value="all">Todas las maestras</option>' + 
+          (teachers || []).map(t => `<option value="${t.id}">${t.name}</option>`).join('');
+      }
+
+      // Select genérico (usado en otros lugares)
       const teacherSelect = document.getElementById('teacherFilter');
       if (teacherSelect) {
         teacherSelect.innerHTML = '<option value="">Todos los maestros</option>' + 
-          teachers.map(t => `<option value="${t.id}">${t.name}</option>`).join('');
+          (teachers || []).map(t => `<option value="${t.id}">${t.name}</option>`).join('');
       }
     }, 'Error cargando maestros para filtro');
   }
@@ -1195,6 +1259,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     });
 
     btnSaveStudent.addEventListener('click', async () => {
+      const studentId = document.getElementById('stId')?.value;
       const name = (document.getElementById('stName')?.value || '').trim();
       const classroomId = document.getElementById('stClassroom')?.value || '';
       const isActive = !!document.getElementById('stActive')?.checked;
@@ -1226,13 +1291,12 @@ document.addEventListener('DOMContentLoaded', async () => {
       await safeExecute(async () => {
         let parentId = null;
 
-        // 1. Crear Usuario Padre si hay email y contraseña
+        // 1. Crear/Vincular Usuario Padre
         if (p1Email) {
           if (!isValidEmail(p1Email)) {
             alert('Correo del padre inválido');
             return;
           }
-          // A) Verificar si el padre ya existe en la base de datos
           const { data: existingParent } = await supabase
             .from('profiles')
             .select('id')
@@ -1243,51 +1307,34 @@ document.addEventListener('DOMContentLoaded', async () => {
           if (existingParent) {
             parentId = existingParent.id;
           } else if (p1Password) {
-            // B) Si no existe y hay contraseña, crear nuevo usuario
             const tempSupabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
               auth: { persistSession: false, autoRefreshToken: false, detectSessionInUrl: false }
             });
 
-            let authUser = null;
             const { data: authData, error: authError } = await tempSupabase.auth.signUp({
               email: p1Email,
               password: p1Password
             });
             
-            if (authError) {
-              // Si ya existe en Auth pero no lo encontramos en profiles (o rol distinto), 
-              // no podemos recuperar el ID sin loguearnos.
-              // Pero si el error es "User already registered", a veces devuelve el user fake o null.
-              // Mejor confiamos en que si llegamos aqui es porque no existía como padre.
-              // Si falla, lanzamos error.
-              throw authError;
-            }
-            authUser = authData.user;
-            
-            if (authUser) {
-              parentId = authUser.id;
-              // Usar UPSERT para evitar conflicto 409 si el perfil ya existía (ej. borrado lógico o rol diferente)
-              const { error: profileError } = await tempSupabase.from('profiles').upsert([{
+            if (authError) throw authError;
+            if (authData.user) {
+              parentId = authData.user.id;
+              await tempSupabase.from('profiles').upsert([{
                 id: parentId,
                 name: p1Name || 'Padre/Tutor',
                 email: p1Email,
                 phone: p1Phone,
-                role: 'padre' // Si ya existía con otro rol, esto lo sobrescribe? Cuidado. 
-                // Mejor upsert con ignoreDuplicates si solo queremos asegurar que exista?
-                // Pero el usuario quiere crear un padre. Si era maestra, ahora será padre?
-                // Asumimos upsert normal.
+                role: 'padre'
               }], { onConflict: 'id' });
-              
-              if (profileError) console.warn('Error creando/actualizando perfil padre:', profileError);
             }
           }
         }
 
-        const { error } = await supabase.from('students').insert([{
+        const studentData = {
           name,
           classroom_id: classroomId,
           is_active: isActive,
-          parent_id: parentId, // Vincular al padre creado
+          parent_id: parentId,
           p1_name: p1Name || null,
           p1_phone: p1Phone || null,
           p1_email: p1Email || null,
@@ -1295,15 +1342,27 @@ document.addEventListener('DOMContentLoaded', async () => {
           p2_phone: p2Phone || null,
           allergies: allergies || null,
           blood_type: bloodType || null,
-          authorized_pickup: pickup || null
-        }]);
-        if (error) throw error;
+          authorized_pickup: pickup || null,
+          monthly_fee: monthlyFee,
+          due_day: dueDay
+        };
 
-        alert('Estudiante creado correctamente');
+        let result;
+        if (studentId) {
+          // ACTUALIZAR
+          result = await supabase.from('students').update(studentData).eq('id', studentId);
+        } else {
+          // INSERTAR
+          result = await supabase.from('students').insert([studentData]);
+        }
+
+        if (result.error) throw result.error;
+
+        alert(studentId ? 'Estudiante actualizado correctamente' : 'Estudiante creado correctamente');
         const modal = document.getElementById('modalAddStudent');
         if (modal) modal.classList.add('hidden');
-        await window.loadStudents(1);
-      }, 'Error al crear estudiante');
+        if (window.loadStudents) await window.loadStudents(1);
+      }, studentId ? 'Error al actualizar estudiante' : 'Error al crear estudiante');
     });
   }
 
@@ -1372,6 +1431,8 @@ document.addEventListener('DOMContentLoaded', async () => {
     const btnSave = document.getElementById('btnSaveRoom');
     const btnCancel = document.getElementById('btnCancelRoom');
     const modal = document.getElementById('roomModal');
+    const filterTeacher = document.getElementById('filterRoomByTeacher');
+    const filterSearch = document.getElementById('filterRoomSearch');
     
     if (btnAdd) {
       btnAdd.addEventListener('click', () => openRoomModal());
@@ -1385,6 +1446,19 @@ document.addEventListener('DOMContentLoaded', async () => {
     
     if (btnSave) {
       btnSave.addEventListener('click', saveRoom);
+    }
+
+    if (filterTeacher) {
+      filterTeacher.addEventListener('change', () => {
+        const val = filterTeacher.value === 'all' ? null : filterTeacher.value;
+        window.loadRooms(val);
+      });
+    }
+
+    if (filterSearch) {
+      filterSearch.addEventListener('input', debounce(() => {
+        window.loadRooms(filterTeacher?.value === 'all' ? null : filterTeacher?.value, filterSearch.value);
+      }, 500));
     }
   }
 

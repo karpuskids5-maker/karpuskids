@@ -34,14 +34,30 @@ export async function ensureRole(requiredRole) {
 export async function subscribeNotifications(onNotif) {
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) return null;
-  const channel = supabase
-    .channel('notif_' + user.id)
-    .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'notifications', filter: `user_id=eq.${user.id}` }, (payload) => {
+  
+  try {
+    const channel = supabase.channel('notif_' + user.id);
+    if (!channel) {
+      console.warn('No se pudo crear el canal de notificaciones');
+      return null;
+    }
+    
+    channel.on('postgres_changes', { 
+      event: 'INSERT', 
+      schema: 'public', 
+      table: 'notifications', 
+      filter: `user_id=eq.${user.id}` 
+    }, (payload) => {
       const n = payload.new;
       if (onNotif) onNotif(n);
     })
     .subscribe();
-  return channel;
+    
+    return channel;
+  } catch (err) {
+    console.error('Error al suscribir notificaciones:', err);
+    return null;
+  }
 }
 
 export async function sendPush(payload) {
@@ -59,7 +75,7 @@ export async function initOneSignal() {
   
   if (!window.OneSignal) {
     const script = document.createElement('script');
-    script.src = "https://cdn.onesignal.com/sdks/web/v16/OneSignal.JS";
+    script.src = "https://cdn.onesignal.com/sdks/web/v16/OneSignalSDK.page.js";
     script.async = true;
     document.head.appendChild(script);
   }
