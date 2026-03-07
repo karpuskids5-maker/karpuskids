@@ -9,6 +9,10 @@
   <link rel="stylesheet" href="css/theme.css" />
   
   <!-- <script src="js/auth.js?v=1"></script> REMOVED: Using Supabase Auth -->
+  <!-- OneSignal SDK Fix -->
+  <script src="https://cdn.onesignal.com/sdks/web/v16/OneSignalSDK.page.js" defer></script>
+  <script>window.OneSignalDeferred = window.OneSignalDeferred || [];</script>
+
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/lucide@latest/dist/umd/lucide.min.js"></script>
   <!-- OCR Library for Vouchers -->
@@ -870,6 +874,9 @@
              <button id="btnNewPayment" class="px-5 py-2 bg-purple-600 text-white rounded-xl font-bold hover:bg-purple-700 shadow-md hover:shadow-lg transition-all flex items-center gap-2">
                <i data-lucide="plus-circle" class="w-5 h-5"></i> Registrar Pago
              </button>
+             <button id="btnSendWeeklySummary" class="px-5 py-2 bg-green-600 text-white rounded-xl font-bold hover:bg-green-700 shadow-md hover:shadow-lg transition-all flex items-center gap-2">
+               <i data-lucide="mail" class="w-5 h-5"></i> Resumen Semanal
+             </button>
           </div>
         </div>
 
@@ -1006,7 +1013,7 @@
                 <option value="assistant">Asistentes</option>
               </select>
             </div>
-            <div id="chatList" class="flex-1 overflow-auto divide-y"></div>
+            <div id="chatList" class="flex-1 overflow-auto divide-y custom-scrollbar"></div>
           </aside>
 
           <!-- Columna 2: Conversación -->
@@ -1477,8 +1484,11 @@
   </div>
 
   <script src="js/common_ui.js"></script>
+  <script type="module" src="js/panel_directora.js?v=3"></script>
   <script type="module" src="app.js"></script>
-  <script src="js/panel_directora.js?v=3"></script>
+  <script>
+    if(window.lucide) lucide.createIcons();
+  </script>
   <!-- Attendance Detail Modal (Director) -->
   <div id="attendanceModal" class="fixed inset-0 bg-black/30 z-50 hidden items-center justify-center">
     <div class="bg-white rounded-2xl shadow-xl p-6 w-full max-w-4xl h-[80vh] flex flex-col">
@@ -1639,7 +1649,10 @@
 
       <div class="mt-6 pt-6 border-t border-slate-100 grid grid-cols-2 gap-3">
         <button id="btnRejectTransfer" class="py-3 border-2 border-red-100 text-red-600 font-bold rounded-xl hover:bg-red-50 transition-colors">Rechazar</button>
-        <button id="btnApproveTransfer" class="py-3 bg-green-600 text-white font-bold rounded-xl hover:bg-green-700 shadow-md transition-colors">Aprobar Pago</button>
+        <button id="btnApproveTransfer" class="py-3 bg-green-600 text-white font-bold rounded-xl hover:bg-green-700 shadow-md transition-colors flex justify-center items-center gap-2">
+          <span>Aprobar Pago</span>
+          <i data-lucide="send" class="w-4 h-4 hidden" id="approveMailIcon"></i>
+        </button>
       </div>
       <button id="btnCloseReview" class="mt-3 text-center text-slate-400 text-sm hover:text-slate-600">Cancelar revisión</button>
     </div>

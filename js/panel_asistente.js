@@ -1,4 +1,4 @@
-import { supabase, createClient, SUPABASE_URL, SUPABASE_ANON_KEY, sendPush } from './supabase.js';
+import { supabase, createClient, SUPABASE_URL, SUPABASE_ANON_KEY, sendPush, sendEmail } from './supabase.js';
 
 // --- 1. HELPERS & UTILS ---
 const Helpers = {
@@ -744,7 +744,7 @@ const UI = {
                   phone: p1Phone || undefined
                 }).eq('id', parentId);
                 if ((p1Password && p1Password.length >= 6) || (p1Email && p1Email.length)) {
-                  await fetch('/api/admin/update-user', {
+                  const res = await fetch('http://127.0.0.1:5600/api/admin/update-user', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({
@@ -753,12 +753,34 @@ const UI = {
                       password: (p1Password && p1Password.length >= 6) ? p1Password : undefined
                     })
                   });
+                  if (!res.ok) console.warn('Fallo actualización admin de tutor', res.status);
                 }
               }
             } catch(e) { console.warn('No se pudo actualizar credenciales del tutor', e); }
         } else {
             // Insert
             ({ error } = await supabase.from('students').insert(studentData));
+
+            // Si es un nuevo estudiante y se creó un padre, enviar bienvenida (Resend)
+            if (!error && p1Email && p1Password) {
+              const html = `
+                <div style="font-family: sans-serif; max-width: 600px; margin: auto; padding: 20px; border: 1px solid #fdf4ff; border-radius: 10px;">
+                  <h2 style="color: #c026d3;">¡Bienvenidos a la Familia Karpus Kids! 🧸</h2>
+                  <p>Hola <b>${p1Name || 'familia'}</b>,</p>
+                  <p>Es un gusto darles la bienvenida a nuestra estancia. Se ha creado tu cuenta de acceso para el Panel de Padres.</p>
+                  <div style="background: #fdf4ff; padding: 15px; border-radius: 8px; margin: 15px 0;">
+                    <p><b>Estudiante:</b> ${name}</p>
+                    <p><b>Usuario (Email):</b> ${p1Email}</p>
+                    <p><b>Contraseña Temporal:</b> ${p1Password}</p>
+                  </div>
+                  <p>Desde el panel podrás ver la asistencia, fotos de las actividades y realizar tus pagos.</p>
+                  <p>Acceso: <a href="${window.location.origin}/login.html" style="color: #c026d3; font-weight: bold;">Entrar al Panel</a></p>
+                  <hr style="border: none; border-top: 1px solid #fdf4ff; margin: 20px 0;">
+                  <p style="font-size: 12px; color: #666;">Karpus Kids - Calidez y Desarrollo</p>
+                </div>
+              `;
+              await sendEmail(p1Email, `Bienvenidos a Karpus Kids - Credenciales de Acceso`, html);
+            }
         }
 
         if (error) throw error;
@@ -1171,80 +1193,55 @@ const UI = {
     let errorCount = 0;
     const reminderMessage = document.getElementById('reminderMessage')?.value || 'Recuerde realizar su pago mensual.';
     const selectedMonth = document.getElementById('paymentMonthFilter')?.value;
-    const baseUrl = window.location.origin || '';
-    const parentLink = `${baseUrl}/panel_padres.html#payments`;
-    for (const parentId of parentIds) {
-      try {
-        await sendPush({
-          user_id: parentId,
-          title: `Recordatorio de Pago (${selectedMonth})`,
-          message: reminderMessage,
-          type: 'payment_reminder',
-          link: '/panel_padres.html'
-        });
-        successCount++;
-      } catch (e) {
-        console.error(`Error enviando notificación a ${parentId}:`, e);
-        errorCount++;
-      }
-    }
+
     try {
       const { data: parents } = await supabase
         .from('profiles')
         .select('id, email, name')
         .in('id', parentIds);
+      
       if (parents && parents.length) {
         for (const p of parents) {
           if (!p.email) continue;
-          const subject = `Recordatorio de pago (${selectedMonth})`;
+          
+          const subject = `Recordatorio de Pago: Mensualidad ${selectedMonth}`;
           const html = `
-            <div style="font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; color:#0f172a;">
-              <h2 style="color:#eab308;">Recordatorio de pago mensual</h2>
-              <p>Hola ${p.name || 'familia'}, este es un recordatorio amistoso de que el pago de la mensualidad${selectedMonth ? ` correspondiente a ${selectedMonth}` : ''} está pendiente.</p>
-              <p>${reminderMessage}</p>
-              <p style="margin:24px 0;">
-                <a href="${parentLink}" style="display:inline-block;padding:10px 18px;background:#f97316;color:#ffffff;border-radius:999px;text-decoration:none;font-weight:600;">
-                  Revisar y realizar mi pago
-                </a>
-              </p>
-              <p style="font-size:12px;color:#64748b;">Si el botón no funciona, copia y pega esta dirección en tu navegador: ${parentLink}</p>
+            <div style="font-family: sans-serif; max-width: 600px; margin: auto; padding: 20px; border: 1px solid #ffedd5; border-radius: 10px;">
+              <h2 style="color: #ea580c;">Recordatorio de Pago 📅</h2>
+              <p>Hola <b>${p.name || 'familia'}</b>,</p>
+              <p>Te enviamos este recordatorio amistoso sobre la mensualidad correspondiente al mes de <b>${selectedMonth}</b>.</p>
+              <div style="background: #fff7ed; padding: 15px; border-radius: 8px; margin: 15px 0; border-left: 4px solid #ea580c;">
+                <p style="margin: 0; color: #9a3412;"><b>Mensaje:</b> ${reminderMessage}</p>
+              </div>
+              <p>Puedes realizar tu pago a través del panel de padres o en las oficinas de la estancia.</p>
+              <p>Si ya realizaste tu pago, por favor ignora este mensaje o envíanos tu comprobante.</p>
+              <hr style="border: none; border-top: 1px solid #ffedd5; margin: 20px 0;">
+              <p style="font-size: 12px; color: #666;">Karpus Kids - Administración</p>
             </div>
           `;
-          const text = `Recordatorio de pago${selectedMonth ? ` (${selectedMonth})` : ''}. ${reminderMessage} Puedes revisar tu estado de cuenta y realizar el pago en: ${parentLink}`;
-          await sendEmail(p.email, subject, html, text);
-        }
-      }
-      const { data: staff } = await supabase
-        .from('profiles')
-        .select('email, role')
-        .in('role', ['maestra', 'asistente', 'directora']);
-      const staffRecipients = (staff || []).filter(u => u.email);
-      if (staffRecipients.length) {
-        const subjectStaff = `Se enviaron recordatorios de pago a ${parentIds.length} familia(s)`;
-        const htmlStaff = `
-          <div style="font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; color:#0f172a;">
-            <h2 style="color:#0ea5e9;">Recordatorios de pago enviados</h2>
-            <p>Se han enviado recordatorios de pago a ${parentIds.length} familia(s) con mensualidades pendientes${selectedMonth ? ` del mes de ${selectedMonth}` : ''}.</p>
-            <p>Pueden revisar los pagos pendientes y el seguimiento desde su panel administrativo.</p>
-            <p style="margin:24px 0;">
-              <a href="${baseUrl}/panel_asistente.html#payments" style="display:inline-block;padding:10px 18px;background:#0ea5e9;color:#ffffff;border-radius:999px;text-decoration:none;font-weight:600;">
-                Abrir panel de pagos
-              </a>
-            </p>
-          </div>
-        `;
-        const textStaff = `Se enviaron recordatorios de pago a ${parentIds.length} familia(s) con mensualidades pendientes${selectedMonth ? ` (${selectedMonth})` : ''}. Revisen el detalle en el panel administrativo.`;
-        for (const person of staffRecipients) {
-          await sendEmail(person.email, subjectStaff, htmlStaff, textStaff);
+          await sendEmail(p.email, subject, html);
+          
+          // También enviar notificación Push
+          await sendPush({
+            user_id: p.id,
+            title: `Recordatorio de Pago (${selectedMonth})`,
+            message: reminderMessage,
+            type: 'payment_reminder',
+            link: '/panel_padres.html'
+          });
+          
+          successCount++;
         }
       }
     } catch (e) {
-      console.error('Error enviando correos de recordatorio de pago', e);
+      console.error('Error enviando recordatorios', e);
+      errorCount++;
     }
+    
     if (errorCount > 0) {
-      Helpers.toast(`Se enviaron ${successCount} recordatorios internos. ${errorCount} fallaron.`, 'error');
+      Helpers.toast(`Se enviaron ${successCount} recordatorios. Hubo errores.`, 'error');
     } else {
-      Helpers.toast(`${successCount} recordatorios internos enviados exitosamente.`, 'success');
+      Helpers.toast(`${successCount} recordatorios enviados exitosamente.`, 'success');
     }
   },
 
@@ -1410,6 +1407,24 @@ const UI = {
                 });
                 if (profError) throw profError;
                 Helpers.toast('Maestro creado exitosamente');
+
+                // Notificación por correo de bienvenida (Resend)
+                const html = `
+                  <div style="font-family: sans-serif; max-width: 600px; margin: auto; padding: 20px; border: 1px solid #e0f2fe; border-radius: 10px;">
+                    <h2 style="color: #0369a1;">¡Bienvenida al Equipo de Karpus Kids! 🍎</h2>
+                    <p>Hola <b>${name}</b>,</p>
+                    <p>Estamos emocionados de tenerte con nosotros. Se ha creado tu cuenta de acceso al Panel de Maestra.</p>
+                    <div style="background: #f0f9ff; padding: 15px; border-radius: 8px; margin: 15px 0;">
+                      <p><b>Usuario (Email):</b> ${email}</p>
+                      <p><b>Contraseña Temporal:</b> ${password}</p>
+                    </div>
+                    <p>Puedes acceder desde aquí: <a href="${window.location.origin}/login.html" style="color: #0369a1; font-weight: bold;">Iniciar Sesión</a></p>
+                    <p><i>Te recomendamos cambiar tu contraseña una vez que hayas ingresado por primera vez.</i></p>
+                    <hr style="border: none; border-top: 1px solid #e0f2fe; margin: 20px 0;">
+                    <p style="font-size: 12px; color: #666;">Karpus Kids - Administración</p>
+                  </div>
+                `;
+                await sendEmail(email, `Bienvenida a Karpus Kids - Tus Credenciales de Acceso`, html);
             }
         }
         this.closeTeacherModal();
@@ -1772,14 +1787,17 @@ const UI = {
            return;
          }
          
-         // Obtener classroom_id del estudiante
-         const { data: student } = await supabase.from('students').select('classroom_id').eq('id', studentId).single();
+         // Obtener datos del estudiante y padre
+         const { data: student } = await supabase.from('students')
+           .select('name, classroom_id, p1_email, p1_name')
+           .eq('id', studentId)
+           .single();
          
          if (!student) throw new Error('Estudiante no encontrado');
 
          const { error } = await supabase.from('attendance').insert({
            student_id: studentId,
-           classroom_id: student.classroom_id, // Puede ser null
+           classroom_id: student.classroom_id,
            date: today,
            status: 'present',
            check_in: new Date().toISOString()
@@ -1787,10 +1805,26 @@ const UI = {
          
          if (error) throw error;
          Helpers.toast('Entrada registrada correctamente');
+
+         // Notificación por correo (Resend)
+         if (student.p1_email) {
+           const time = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+           const html = `
+             <div style="font-family: sans-serif; max-width: 600px; margin: auto; padding: 20px; border: 1px solid #eee; border-radius: 10px;">
+               <h2 style="color: #0d9488;">Notificación de Llegada</h2>
+               <p>Hola <b>${student.p1_name || 'familia'}</b>,</p>
+               <p>Te informamos que <b>${student.name}</b> ha ingresado a Karpus Kids hoy a las <b>${time}</b>.</p>
+               <p>¡Que tenga un excelente día de aprendizaje!</p>
+               <hr style="border: none; border-top: 1px solid #eee; margin: 20px 0;">
+               <p style="font-size: 12px; color: #666;">Karpus Kids - Seguridad y Confianza</p>
+             </div>
+           `;
+           await sendEmail(student.p1_email, `Aviso de Entrada: ${student.name} ha llegado`, html);
+         }
       } else {
          // Registro de Salida (Check-out)
          const { data: existing, error: fetchError } = await supabase.from('attendance')
-           .select('id, check_out')
+           .select('id, check_out, student:students(name, p1_email, p1_name)')
            .eq('student_id', studentId)
            .eq('date', today)
            .maybeSingle();
@@ -1813,6 +1847,22 @@ const UI = {
          
          if (error) throw error;
          Helpers.toast('Salida registrada correctamente');
+
+         // Notificación por correo (Resend)
+         if (existing.student?.p1_email) {
+           const time = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+           const html = `
+             <div style="font-family: sans-serif; max-width: 600px; margin: auto; padding: 20px; border: 1px solid #eee; border-radius: 10px;">
+               <h2 style="color: #ef4444;">Notificación de Salida</h2>
+               <p>Hola <b>${existing.student.p1_name || 'familia'}</b>,</p>
+               <p>Te informamos que <b>${existing.student.name}</b> ha sido retirado de Karpus Kids hoy a las <b>${time}</b>.</p>
+               <p>¡Gracias por confiar en nosotros!</p>
+               <hr style="border: none; border-top: 1px solid #eee; margin: 20px 0;">
+               <p style="font-size: 12px; color: #666;">Karpus Kids - Seguridad y Confianza</p>
+             </div>
+           `;
+           await sendEmail(existing.student.p1_email, `Aviso de Salida: ${existing.student.name} ha sido retirado`, html);
+         }
       }
       
       this.loadAccessHistory();

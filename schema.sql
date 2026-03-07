@@ -196,6 +196,7 @@ create table if not exists public.incidents (
   classroom_id bigint references public.classrooms(id) on delete cascade,
   teacher_id uuid references public.profiles(id),
   severity text check (severity in ('leve', 'media', 'alta')),
+  status text default 'received' check (status in ('received', 'review', 'resolved', 'archived')),
   description text,
   reported_at timestamp with time zone default timezone('utc'::text, now()) not null,
   created_at timestamp with time zone default timezone('utc'::text, now()) not null

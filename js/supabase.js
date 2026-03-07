@@ -60,6 +60,23 @@ export async function subscribeNotifications(onNotif) {
   }
 }
 
+export async function sendEmail(to, subject, html, text) {
+  try {
+    const res = await fetch('http://127.0.0.1:5600/api/email/send', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ to, subject, html, text })
+    });
+    if (!res.ok) {
+      console.error('Error HTTP enviando correo', res.status);
+    }
+    return await res.json();
+  } catch (e) {
+    console.error('Error enviando correo', e);
+  }
+}
+if (!window.sendEmail) window.sendEmail = sendEmail;
+
 export async function sendPush(payload) {
   const { data, error } = await supabase.functions.invoke('send-push', { body: payload });
   if (error) throw error;
@@ -73,47 +90,72 @@ export async function initOneSignal() {
 
   const ONESIGNAL_APP_ID = "47ce2d1e-152e-4ea7-9ddc-8e2142992989";
   
-  if (!window.OneSignal) {
+  // 1. Cargar el script de OneSignal si no existe
+  if (!document.getElementById('onesignal-sdk')) {
     const script = document.createElement('script');
+    script.id = 'onesignal-sdk';
     script.src = "https://cdn.onesignal.com/sdks/web/v16/OneSignalSDK.page.js";
-    script.async = true;
+    script.defer = true;
     document.head.appendChild(script);
   }
 
   window.OneSignal = window.OneSignal || [];
-  OneSignal.push(async function() {
-    await OneSignal.init({
-      appId: ONESIGNAL_APP_ID,
-      safari_web_id: "web.onesignal.auto.10425e70-6593-4a12-8758-69279093e878", // Opcional si se requiere Safari
-      allowLocalhostAsSecureOrigin: true,
-      notifyButton: {
-        enable: false, // Usaremos el slidedown para mayor profesionalismo
-      },
-      promptOptions: {
-        slidedown: {
-          enabled: true,
-          autoPrompt: true,
-          timeDelay: 5, // Aparece tras 5 segundos
-          pageViews: 1,
-          actionMessage: "¿Deseas recibir notificaciones sobre tareas, pagos y avisos de Karpus Kids?",
-          acceptButtonText: "Sí, recibir",
-          cancelButtonText: "Ahora no",
-          categories: {
-            tags: [
-              { tag: "user_type", label: "Tipo de Usuario" }
-            ]
+  window.OneSignalDeferred = window.OneSignalDeferred || [];
+  
+  // 2. Inicialización profesional
+  OneSignalDeferred.push(async function(OneSignal) {
+    try {
+      const isLocal = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
+      
+      await OneSignal.init({
+        appId: ONESIGNAL_APP_ID,
+        // safari_web_id: "web.onesignal.auto.10425e70-6593-4a12-8758-69279093e878", // Descomentar si se configura
+        allowLocalhostAsSecureOrigin: true,
+        notifyButton: {
+          enable: false,
+        },
+        // welcomeNotification desactivado para evitar spam al recargar
+        promptOptions: {
+          slidedown: {
+            enabled: true,
+            autoPrompt: true,
+            timeDelay: 10,
+            pageViews: 1,
+            actionMessage: "¿Deseas recibir notificaciones sobre tareas, pagos y avisos de Karpus Kids?",
+            acceptButtonText: "Sí, recibir",
+            cancelButtonText: "Ahora no"
+          }
+        }
+      });
+
+      // 3. Sincronización Profesional de Usuario (External ID)
+      // En v16 se usa .login() para asociar el ID de Supabase
+      await OneSignal.login(user.id);
+      
+      // 4. Tagueo por roles para envíos segmentados
+      const { data: profile } = await supabase.from('profiles').select('role, name').eq('id', user.id).maybeSingle();
+      if (profile) {
+        OneSignal.User.addTag("role", profile.role);
+        OneSignal.User.addTag("user_name", profile.name);
+        
+        // Si es padre, taguear con los IDs de sus hijos para notificaciones específicas
+        if (profile.role === 'padre') {
+          const { data: children } = await supabase.from('students').select('id').eq('parent_id', user.id);
+          if (children && children.length > 0) {
+            const childrenIds = children.map(c => c.id).join(',');
+            OneSignal.User.addTag("children_ids", childrenIds);
           }
         }
       }
-    });
 
-    // Vincular al usuario de Supabase con OneSignal
-    await OneSignal.login(user.id);
-    
-    // Obtener el perfil para taguear al usuario
-    const { data: profile } = await supabase.from('profiles').select('role').eq('id', user.id).maybeSingle();
-    if (profile) {
-      OneSignal.User.addTag("role", profile.role);
+      console.log("OneSignal: Inicialización exitosa para usuario", user.id);
+    } catch (e) {
+      // Manejo silencioso en desarrollo para evitar ruidos en consola
+      if (e.message.includes('Can only be used on')) {
+        console.warn("OneSignal: SDK restringido al dominio de producción. Ignorando en entorno local.");
+      } else {
+        console.error("OneSignal Error:", e);
+      }
     }
   });
 }

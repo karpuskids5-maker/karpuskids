@@ -7,6 +7,9 @@
   <script src="https://cdn.tailwindcss.com"></script>
   <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css" rel="stylesheet">
   <link rel="icon" href="logo/favicon.ico" sizes="any">
+  <!-- OneSignal SDK Fix -->
+  <script src="https://cdn.onesignal.com/sdks/web/v16/OneSignalSDK.page.js" defer></script>
+  <script>window.OneSignalDeferred = window.OneSignalDeferred || [];</script>
 </head>
 <body class="min-h-screen bg-slate-50 flex items-center justify-center">
   <div class="w-full max-w-md bg-white rounded-2xl shadow p-6">
@@ -26,7 +29,7 @@
         <input id="password" type="password" placeholder="••••••" class="w-full border rounded px-3 py-2" required />
       </div>
       <div class="text-xs text-slate-500">
-        Usuarios demo: directora@karpus.local, maestra@karpus.local, camilolopez@gmail.com, (contraseña: 123456)
+      
       </div>
       <button class="w-full px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700">Ingresar</button>
     </form>

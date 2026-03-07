@@ -1,4 +1,4 @@
-import { supabase, initOneSignal } from './supabase.js';
+import { supabase, initOneSignal, sendEmail } from './supabase.js';
 
 // --- 1. HELPERS & UTILS ---
 const Helpers = {
@@ -172,11 +172,15 @@ const UI = {
         btn.classList.add('bg-white/20', 'active');
         btn.setAttribute('aria-selected', 'true');
 
+        // Close mobile sidebar if open
+        const sidebar = document.getElementById('sidebar');
+        if (sidebar && sidebar.classList.contains('mobile-visible')) {
+            this.toggleMobileSidebar();
+        }
+
         // Reset class if going home
         if (sectionId === 't-home') {
           AppState.setCurrentClass(null);
-          // Optional: Reload classes to refresh
-          // this.loadClasses();
         }
       });
     });
@@ -318,12 +322,14 @@ const UI = {
   toggleSidebar() {
     const sidebar = document.getElementById('sidebar');
     const shell = document.getElementById('layoutShell');
+    if (!sidebar || !shell) return;
+
     sidebar.classList.toggle('collapsed');
     shell.classList.toggle('sidebar-collapsed');
     
     const iconEl = document.getElementById('toggleSidebarIcon');
-    if(iconEl && window.lucide){
-        const next = sidebar.classList.contains('collapsed') ? 'chevrons-right' : 'chevrons-left';
+    if (iconEl && window.lucide) {
+        const next = sidebar.classList.contains('collapsed') ? 'chevrons-right' : 'chevron-left';
         iconEl.setAttribute('data-lucide', next);
         lucide.createIcons();
     }
@@ -332,9 +338,12 @@ const UI = {
   toggleMobileSidebar() {
     const sidebar = document.getElementById('sidebar');
     const overlay = document.getElementById('sidebarOverlay');
-    sidebar.classList.toggle('-translate-x-full'); // Tailwind toggle
+    if (!sidebar || !overlay) return;
+
+    sidebar.classList.toggle('mobile-visible');
+    sidebar.classList.toggle('-translate-x-full');
     overlay.classList.toggle('hidden');
-    document.body.classList.toggle('no-scroll');
+    document.body.classList.toggle('overflow-hidden');
   },
 
   // --- CLASSES LOGIC ---
@@ -1599,19 +1608,38 @@ const UI = {
       
       if(!desc) { Helpers.toast('Descripción requerida', 'error'); return; }
 
-      const { error } = await supabase.from('incidents').insert({
+      const { data: incident, error } = await supabase.from('incidents').insert({
           student_id: studentId,
           classroom_id: AppState.currentClass.id,
           severity,
           description: desc,
           reported_at: new Date().toISOString(),
-          teacher_id: AppState.user.id // 8. Seguridad: Validar ownership
-      });
+          teacher_id: AppState.user.id
+      }).select('*, student:students(name, p1_email, p1_name)').single();
 
       if(error) {
           Helpers.toast('Error al registrar', 'error');
       } else {
           Helpers.toast('Incidente registrado', 'success');
+
+          // Notificación por correo a los padres (Resend)
+          if (incident.student?.p1_email) {
+            const html = `
+              <div style="font-family: sans-serif; max-width: 600px; margin: auto; padding: 20px; border: 1px solid #fee2e2; border-radius: 10px;">
+                <h2 style="color: #dc2626;">Reporte de Incidencia ⚠️</h2>
+                <p>Hola <b>${incident.student.p1_name || 'familia'}</b>,</p>
+                <p>Te informamos que se ha registrado una incidencia relacionada con <b>${incident.student.name}</b>:</p>
+                <div style="background: #fef2f2; padding: 15px; border-radius: 8px; margin: 15px 0;">
+                  <p><b>Nivel de Gravedad:</b> <span style="text-transform: uppercase; font-weight: bold;">${severity}</span></p>
+                  <p><b>Descripción:</b> ${desc}</p>
+                </div>
+                <p>La maestra está al tanto y ha tomado las medidas necesarias. Si tienes alguna duda, puedes contactarnos a través del chat del panel.</p>
+                <hr style="border: none; border-top: 1px solid #fee2e2; margin: 20px 0;">
+                <p style="font-size: 12px; color: #666;">Karpus Kids - Cuidado y Atención</p>
+              </div>
+            `;
+            await sendEmail(incident.student.p1_email, `Aviso Importante: Reporte de Incidencia - ${incident.student.name}`, html);
+          }
 
           // Notificar a la directora y asistentes
           try {
@@ -1620,13 +1648,11 @@ const UI = {
               .select('id')
               .in('role', ['directora', 'asistente']);
             
-            const { data: student } = await supabase.from('students').select('name').eq('id', studentId).single();
-            
             for (const s of (staff || [])) {
               await window.sendPush({
                 user_id: s.id,
                 title: 'Nuevo Incidente Reportado ⚠️',
-                message: `Se ha registrado un incidente de nivel "${severity}" para ${student?.name || 'un estudiante'}.`,
+                message: `Se ha registrado un incidente de nivel "${severity}" para ${incident.student?.name || 'un estudiante'}.`,
                 type: 'alert',
                 link: '/panel_directora.html#reportes'
               });
