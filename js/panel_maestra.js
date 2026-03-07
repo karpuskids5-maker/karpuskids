@@ -149,6 +149,14 @@ const UI = {
   },
 
   bindEvents() {
+    // Routine Toggles (Delegated)
+    document.addEventListener('click', (e) => {
+        const btn = e.target.closest('.routine-toggle');
+        if (btn) {
+            this.toggleRoutineOption(btn);
+        }
+    });
+
     // Navigation (Sidebar)
     document.querySelectorAll('[data-section]').forEach(btn => {
       btn.addEventListener('click', (e) => {
@@ -767,13 +775,13 @@ const UI = {
                   {val: 'triste', icon: '😢', label: 'Triste'},
                   {val: 'enojado', icon: '😠', label: 'Enojado'}
               ],
-              food: [
+              eating: [
                   {val: 'todo', icon: '🍽️', label: 'Todo'},
                   {val: 'mitad', icon: '🥣', label: 'Mitad'},
                   {val: 'poco', icon: '🤏', label: 'Poco'},
                   {val: 'nada', icon: '❌', label: 'Nada'}
               ],
-              nap: [
+              sleeping: [
                   {val: 'si', icon: '😴', label: 'Durmió'},
                   {val: 'no', icon: '👀', label: 'No durmió'}
               ]
@@ -792,22 +800,32 @@ const UI = {
             ${students.map(s => {
                 const log = logMap[s.id] || {};
                 return `
-                <div class="bg-white p-4 rounded-2xl border border-slate-100 shadow-sm flex flex-col md:flex-row md:items-center gap-4">
-                    <div class="w-40 shrink-0 font-bold text-slate-700 truncate">${Helpers.escapeHTML(s.name)}</div>
+                <div class="bg-white p-4 rounded-2xl border border-slate-100 shadow-sm flex flex-col gap-4">
+                    <div class="flex justify-between items-center">
+                        <div class="font-bold text-slate-700 truncate">${Helpers.escapeHTML(s.name)}</div>
+                        <div class="text-[10px] text-slate-400 font-mono">ID: ${s.id}</div>
+                    </div>
                     
-                    <div class="flex-1 grid grid-cols-1 sm:grid-cols-3 gap-4">
+                    <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
                         <div class="flex flex-col gap-1">
                             <span class="text-[10px] uppercase font-bold text-slate-400">Ánimo</span>
                             <div class="flex flex-wrap gap-1">${renderOptions('mood', log.mood, s.id)}</div>
                         </div>
                         <div class="flex flex-col gap-1">
                             <span class="text-[10px] uppercase font-bold text-slate-400">Comida</span>
-                            <div class="flex flex-wrap gap-1">${renderOptions('food', log.food, s.id)}</div>
+                            <div class="flex flex-wrap gap-1">${renderOptions('eating', log.eating || log.food, s.id)}</div>
                         </div>
                         <div class="flex flex-col gap-1">
                             <span class="text-[10px] uppercase font-bold text-slate-400">Siesta</span>
-                            <div class="flex flex-wrap gap-1">${renderOptions('nap', log.nap, s.id)}</div>
+                            <div class="flex flex-wrap gap-1">${renderOptions('sleeping', log.sleeping || log.nap, s.id)}</div>
                         </div>
+                    </div>
+
+                    <div class="flex flex-col gap-1">
+                        <span class="text-[10px] uppercase font-bold text-slate-400">Notas / Observaciones</span>
+                        <textarea class="routine-notes w-full p-2 text-sm border border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-400 outline-none transition-all" 
+                                  placeholder="Escribe algo sobre el día de ${s.name.split(' ')[0]}..."
+                                  data-student="${s.id}" rows="1">${log.notes || ''}</textarea>
                     </div>
                 </div>
                 `;
@@ -815,6 +833,36 @@ const UI = {
         </div>
       `;
       if(window.lucide) lucide.createIcons();
+
+      // Bind notes auto-save
+      tab.querySelectorAll('.routine-notes').forEach(textarea => {
+          textarea.addEventListener('blur', (e) => this.saveRoutineNotes(e.target));
+          textarea.addEventListener('input', (e) => {
+              e.target.style.height = 'auto';
+              e.target.style.height = e.target.scrollHeight + 'px';
+          });
+      });
+  },
+
+  async saveRoutineNotes(textarea) {
+      const studentId = textarea.dataset.student;
+      const val = textarea.value.trim();
+      const today = new Date().toISOString().split('T')[0];
+
+      const payload = {
+          student_id: studentId,
+          classroom_id: AppState.currentClass.id,
+          date: today,
+          notes: val
+      };
+
+      const { error } = await supabase.from('daily_logs').upsert(payload, { onConflict: 'student_id,date' });
+      if(error) {
+          console.error(error);
+          Helpers.toast('Error al guardar nota', 'error');
+      } else {
+          Helpers.toast('Nota guardada');
+      }
   },
 
   // 4. UX: Auto-Guardado

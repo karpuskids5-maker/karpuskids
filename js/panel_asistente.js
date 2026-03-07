@@ -369,6 +369,7 @@ const UI = {
 
   // --- STUDENTS ---
   async loadStudents(searchTerm = '') {
+    window.loadStudents = (term) => this.loadStudents(term);
     const tbody = document.getElementById('studentsTableBody');
     if (!tbody) return;
     
@@ -1780,14 +1781,38 @@ const UI = {
            student_id: studentId,
            classroom_id: student.classroom_id, // Puede ser null
            date: today,
-           status: 'present'
+           status: 'present',
+           check_in: new Date().toISOString()
          });
          
          if (error) throw error;
          Helpers.toast('Entrada registrada correctamente');
       } else {
-         // Para salida, solo notificamos
-         Helpers.toast('Salida registrada (Simulado - No se guarda en DB)');
+         // Registro de Salida (Check-out)
+         const { data: existing, error: fetchError } = await supabase.from('attendance')
+           .select('id, check_out')
+           .eq('student_id', studentId)
+           .eq('date', today)
+           .maybeSingle();
+           
+         if (fetchError) throw fetchError;
+         
+         if (!existing) {
+           Helpers.toast('No se puede registrar salida sin una entrada previa hoy', 'error');
+           return;
+         }
+         
+         if (existing.check_out) {
+           Helpers.toast('Ya se registró la salida de este estudiante hoy', 'info');
+           return;
+         }
+
+         const { error } = await supabase.from('attendance')
+           .update({ check_out: new Date().toISOString() })
+           .eq('id', existing.id);
+         
+         if (error) throw error;
+         Helpers.toast('Salida registrada correctamente');
       }
       
       this.loadAccessHistory();
@@ -1809,10 +1834,10 @@ const UI = {
     
     const today = new Date().toISOString().split('T')[0];
     
-    // Cargar asistencias de hoy (solo check-in/presente por ahora)
+    // Cargar asistencias de hoy (ordenadas por última actualización)
     const { data: logs, error } = await supabase
       .from('attendance')
-      .select('created_at, status, students(name, avatar_url)')
+      .select('check_in, check_out, status, students(name, avatar_url)')
       .eq('date', today)
       .order('created_at', { ascending: false })
       .limit(10);
@@ -1827,24 +1852,25 @@ const UI = {
       return;
     }
     
-    container.innerHTML = logs.map(log => `
+    container.innerHTML = logs.map(log => {
+      const checkInTime = log.check_in ? new Date(log.check_in).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'}) : null;
+      const checkOutTime = log.check_out ? new Date(log.check_out).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'}) : null;
+      
+      return `
       <div class="flex items-center gap-3 p-3 border-b last:border-0 bg-slate-50/50 rounded-lg mb-1">
         <div class="w-8 h-8 rounded-full bg-white border flex items-center justify-center text-slate-400 overflow-hidden shadow-sm">
           ${log.students?.avatar_url ? `<img src="${log.students.avatar_url}" class="w-full h-full object-cover">` : '<i data-lucide="user" class="w-4 h-4"></i>'}
         </div>
         <div class="flex-1">
           <p class="text-sm font-bold text-slate-800">${log.students?.name}</p>
-          <div class="flex items-center gap-2 text-xs text-slate-500">
-             <span>${new Date(log.created_at).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}</span>
-             <span>•</span>
-             <span class="${log.status === 'present' ? 'text-green-600' : 'text-red-600'} font-medium">
-               ${log.status === 'present' ? 'Entrada' : 'Ausente'}
-             </span>
+          <div class="flex flex-col gap-0.5 text-[10px] text-slate-500">
+             ${checkInTime ? `<span class="flex items-center gap-1"><i data-lucide="log-in" class="w-2.5 h-2.5 text-green-500"></i> Entrada: ${checkInTime}</span>` : ''}
+             ${checkOutTime ? `<span class="flex items-center gap-1"><i data-lucide="log-out" class="w-2.5 h-2.5 text-red-500"></i> Salida: ${checkOutTime}</span>` : ''}
           </div>
         </div>
-        <div class="w-2 h-2 rounded-full ${log.status === 'present' ? 'bg-green-500' : 'bg-red-500'}"></div>
+        <div class="w-2 h-2 rounded-full ${log.check_out ? 'bg-red-500' : (log.check_in ? 'bg-green-500' : 'bg-slate-300')}"></div>
       </div>
-    `).join('');
+    `}).join('');
     
     refreshIcons();
   }

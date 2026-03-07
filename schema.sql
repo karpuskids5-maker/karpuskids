@@ -71,6 +71,8 @@ create table if not exists public.attendance (
   classroom_id bigint references public.classrooms(id),
   date date default current_date,
   status text check (status in ('present', 'absent', 'late')),
+  check_in timestamp with time zone,
+  check_out timestamp with time zone,
   created_at timestamp with time zone default timezone('utc'::text, now()) not null,
   unique(student_id, date)
 );
@@ -208,6 +210,10 @@ create table if not exists public.daily_logs (
   mood text,
   food text,
   nap text,
+  eating text,    -- Nueva columna (para compatibilidad)
+  sleeping text,  -- Nueva columna (para compatibilidad)
+  activities text, -- Nueva columna (para compatibilidad)
+  notes text,     -- Nueva columna (para compatibilidad)
   created_at timestamp with time zone default timezone('utc'::text, now()) not null,
   unique(student_id, date)
 );

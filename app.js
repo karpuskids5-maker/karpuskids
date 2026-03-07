@@ -252,20 +252,20 @@ document.addEventListener('DOMContentLoaded', async () => {
           classrooms.map(c => `<option value="${c.id}">${c.name}</option>`).join('');
       }
       
-      document.getElementById('btnApplyStudentFilters')?.addEventListener('click', () => loadStudents(1));
+      document.getElementById('btnApplyStudentFilters')?.addEventListener('click', () => window.loadStudents(1));
       
       // Listeners en tiempo real para filtros
       const nameInput = document.getElementById('filterStName');
-      if (nameInput) nameInput.addEventListener('input', debounce(() => loadStudents(1), 500));
+      if (nameInput) nameInput.addEventListener('input', debounce(() => window.loadStudents(1), 500));
 
       const classSelect = document.getElementById('filterStClassroom');
-      if (classSelect) classSelect.addEventListener('change', () => loadStudents(1));
+      if (classSelect) classSelect.addEventListener('change', () => window.loadStudents(1));
 
       const statusSelect = document.getElementById('filterStStatus');
-      if (statusSelect) statusSelect.addEventListener('change', () => loadStudents(1));
+      if (statusSelect) statusSelect.addEventListener('change', () => window.loadStudents(1));
 
       const levelSelect = document.getElementById('filterStLevel');
-      if (levelSelect) levelSelect.addEventListener('change', () => loadStudents(1));
+      if (levelSelect) levelSelect.addEventListener('change', () => window.loadStudents(1));
 
     }, 'Error cargando filtros');
   }
@@ -439,7 +439,7 @@ document.addEventListener('DOMContentLoaded', async () => {
 
     document.getElementById('prevPageBtn')?.addEventListener('click', () => {
       if (window.DirectorState.studentsPage > 1) {
-        loadStudents(window.DirectorState.studentsPage - 1);
+        window.loadStudents(window.DirectorState.studentsPage - 1);
       }
     });
 
@@ -447,7 +447,7 @@ document.addEventListener('DOMContentLoaded', async () => {
       const { studentsPage, studentsPageSize, totalStudents } = window.DirectorState;
       const totalPages = Math.ceil(totalStudents / studentsPageSize);
       if (studentsPage < totalPages) {
-        loadStudents(window.DirectorState.studentsPage + 1);
+        window.loadStudents(window.DirectorState.studentsPage + 1);
       }
     });
   }
