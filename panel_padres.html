@@ -22,6 +22,7 @@
   <script src="https://cdn.onesignal.com/sdks/web/v16/OneSignalSDK.page.js" defer></script>
   <script>window.OneSignalDeferred = window.OneSignalDeferred || [];</script>
 
+  <script src="https://meet.jit.si/external_api.js"></script>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Quicksand:wght@400;600;700&family=Nunito:wght@400;600;700;800&display=swap" rel="stylesheet">
@@ -193,29 +194,13 @@
           <i data-lucide="home" class="w-6 h-6"></i>
           <span class="hidden md:inline">Inicio</span>
         </button>
-        <button data-target="live-attendance" class="sidebar-node node-attendance" aria-label="Asistencia">
-          <i data-lucide="calendar-check" class="w-6 h-6"></i>
-          <span class="hidden md:inline">Asistencia</span>
+        <button data-target="class" class="sidebar-node node-class" aria-label="Muro">
+          <i data-lucide="school" class="w-6 h-6"></i>
+          <span class="hidden md:inline">Muro</span>
         </button>
         <button data-target="tasks" class="sidebar-node node-tasks" aria-label="Tareas">
           <i data-lucide="book" class="w-6 h-6"></i>
           <span class="hidden md:inline">Tareas</span>
-        </button>
-        <button data-target="class" class="sidebar-node node-class" aria-label="Clases">
-          <i data-lucide="school" class="w-6 h-6"></i>
-          <span class="hidden md:inline">Clases</span>
-        </button>
-        <button data-target="grades" class="sidebar-node node-grades" aria-label="Calificaciones">
-          <i data-lucide="bar-chart-3" class="w-6 h-6"></i>
-          <span class="hidden md:inline">Calificaciones</span>
-        </button>
-        <button data-target="payments" class="sidebar-node node-payments hidden" aria-label="Pagos">
-        <i data-lucide="credit-card" class="w-6 h-6"></i>
-        <span class="hidden md:inline">Pagos</span>
-      </button>
-        <button data-target="notifications" class="sidebar-node node-notifications" aria-label="Avisos">
-          <i data-lucide="bell" class="w-6 h-6"></i>
-          <span class="hidden md:inline">Avisos</span>
         </button>
         <button data-target="profile" class="sidebar-node node-profile" aria-label="Perfil">
           <i data-lucide="user-circle" class="w-6 h-6"></i>
@@ -277,31 +262,12 @@
       </header>
       
       <!-- DASHBOARD INFANTIL -->
-      <section id="home" class="section active">
+      <section id="home" class="section">
         <!-- Grid de Widgets "Bento" -->
-        <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8" id="dashboardGrid">
+        <div class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 mb-8" id="dashboardGrid">
            <!-- Se llenará con JS usando .patio-card -->
         </div>
         
-        <!-- Acciones Rápidas (Botones Grandes) -->
-        <div class="grid grid-cols-1 md:grid-cols-2 gap-4 md:gap-6">
-          <div id="nextTaskWidget" class="md:col-span-2">
-            <!-- Widget de Próxima Tarea cargado por JS -->
-            <div class="animate-pulse bg-slate-100 h-24 rounded-3xl"></div>
-          </div>
-          <button id="btnPayTuition" class="card-base patio-card flex flex-col items-center justify-center gap-3 hover:bg-white group border-2 border-slate-100">
-            <div class="w-14 h-14 bg-emerald-100 text-emerald-600 rounded-2xl flex items-center justify-center transition-transform group-hover:scale-110">
-              <i data-lucide="piggy-bank" class="w-7 h-7"></i>
-            </div>
-            <span class="font-bold text-slate-700">Pagar Mensualidad</span>
-          </button>
-          <button id="btnQuickAbsence" class="card-base patio-card flex flex-col items-center justify-center gap-3 hover:bg-white group border-2 border-slate-100">
-            <div class="w-14 h-14 bg-rose-100 text-rose-600 rounded-2xl flex items-center justify-center transition-transform group-hover:scale-110">
-              <i data-lucide="thermometer" class="w-7 h-7"></i>
-            </div>
-            <span class="font-bold text-slate-700">Reportar Falta</span>
-          </button>
-        </div>
       </section>
 
       <!-- SECCIONES -->
@@ -341,8 +307,18 @@
           </div>
         </section>
 
+        <!-- VIDEOLLAMADA -->
+        <section id="videocall" class="section hidden">
+          <div class="card-base p-6 h-[80vh] flex flex-col bg-slate-900 rounded-3xl overflow-hidden shadow-2xl">
+            <h3 class="text-xl font-black text-white mb-4 flex items-center gap-2 px-2">
+              <i data-lucide="video" class="text-rose-500"></i> Aula Virtual en Vivo
+            </h3>
+            <div id="meet" class="flex-1 bg-slate-800 rounded-2xl overflow-hidden border border-slate-700"></div>
+          </div>
+        </section>
+
         <!-- TAREAS -->
-        <section id="tasks" class="section">
+        <section id="tasks" class="section hidden">
           <div class="flex items-center justify-between mb-4">
             <h3 class="text-2xl font-black text-slate-800 tracking-tight flex items-center gap-2 text-campus-title">
               <span class="text-3xl">🎒</span> Mochila de Tareas
@@ -435,7 +411,7 @@
 
                   <div>
                     <label class="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1">Comprobante</label>
-                    <input type="file" id="paymentFileInput" accept="image/*" class="w-full text-sm text-slate-500 file:mr-4 file:py-2.5 file:px-4 file:rounded-xl file:border-0 file:text-xs file:font-bold file:bg-green-100 file:text-green-700 hover:file:bg-green-200 transition-all cursor-pointer" required>
+                    <input type="file" id="paymentFileInput" accept="image/png,image/jpeg,image/webp" capture="environment" class="w-full text-sm text-slate-500 file:mr-4 file:py-2.5 file:px-4 file:rounded-xl file:border-0 file:text-xs file:font-bold file:bg-green-100 file:text-green-700 hover:file:bg-green-200 transition-all cursor-pointer" required>
                   </div>
 
                   <button id="btnSubmitPayment" type="submit" class="w-full py-3.5 rounded-2xl font-bold bg-green-500 text-white hover:bg-green-600 shadow-lg shadow-green-200 transition-all active:scale-95 flex items-center justify-center gap-2 mt-2">
@@ -480,7 +456,7 @@
                 </div>
                 <div id="chatDirectorList" class="space-y-3 max-h-60 overflow-y-auto mb-3"></div>
                 <div class="flex gap-2">
-                  <input id="chatDirectorInput" class="flex-1 border-none rounded-2xl px-4 py-3 text-sm bg-slate-100 focus:bg-white focus:ring-2 focus:ring-indigo-400 outline-none" placeholder="Escribe aquí...">
+                  <input id="chatDirectorInput" aria-label="Mensaje para la directora" class="flex-1 border-none rounded-2xl px-4 py-3 text-sm bg-slate-100 focus:bg-white focus:ring-2 focus:ring-indigo-400 outline-none" placeholder="Escribe aquí...">
                   <button id="btnSendDirector" class="bg-indigo-500 text-white px-4 rounded-2xl hover:bg-indigo-600 shadow-md"><i data-lucide="send" class="w-4 h-4"></i></button>
                 </div>
               </div>
@@ -494,7 +470,7 @@
                 </div>
                 <div id="chatTeacherList" class="space-y-3 max-h-60 overflow-y-auto mb-3"></div>
                 <div class="flex gap-2">
-                  <input id="chatTeacherInput" class="flex-1 border-none rounded-2xl px-4 py-3 text-sm bg-slate-100 focus:bg-white focus:ring-2 focus:ring-rose-400 outline-none" placeholder="Escribe aquí...">
+                  <input id="chatTeacherInput" aria-label="Mensaje para la maestra" class="flex-1 border-none rounded-2xl px-4 py-3 text-sm bg-slate-100 focus:bg-white focus:ring-2 focus:ring-rose-400 outline-none" placeholder="Escribe aquí...">
                   <button id="btnSendTeacher" class="bg-rose-500 text-white px-4 rounded-2xl hover:bg-rose-600 shadow-md"><i data-lucide="send" class="w-4 h-4"></i></button>
                 </div>
               </div>
@@ -688,10 +664,43 @@
   </div>
   
   <script type="module" src="js/panel_padres.js"></script>
-  <script type="module">
-    import { initOneSignal } from './js/supabase.js';
-    document.addEventListener('DOMContentLoaded', () => {
-      try { initOneSignal(); } catch(e) { console.warn("OneSignal loading skipped (no user or error)"); }
+  <script>
+    // Inicialización de Iconos y Loader
+    document.addEventListener("DOMContentLoaded", () => {
+      if (window.lucide) {
+        lucide.createIcons();
+      }
+    });
+
+    window.addEventListener("load", () => {
+      const loader = document.getElementById("initial-loading");
+      if(loader){
+        loader.style.opacity = "0";
+        setTimeout(()=>loader.remove(), 500);
+      }
+    });
+
+    // Registro de Service Worker para PWA
+    if ("serviceWorker" in navigator) {
+      navigator.serviceWorker.register("/sw.js")
+        .then(() => console.log("Service Worker registrado"))
+        .catch(err => console.log("SW error", err));
+    }
+
+    // Navegación SPA de respaldo (si JS principal falla o para botones simples)
+    document.querySelectorAll("[data-target]").forEach(btn => {
+      btn.addEventListener("click", () => {
+        const target = btn.dataset.target;
+        const targetSection = document.getElementById(target);
+        
+        if(targetSection){
+          document.querySelectorAll(".section").forEach(sec => sec.classList.add("hidden"));
+          targetSection.classList.remove("hidden");
+          
+          document.querySelectorAll(".sidebar-node").forEach(n => n.classList.remove("active"));
+          if(btn.classList.contains('sidebar-node')) btn.classList.add("active");
+        }
+      });
     });
   </script>
 </body>

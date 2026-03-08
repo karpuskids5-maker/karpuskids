@@ -1,4 +1,4 @@
-import { supabase, createClient, SUPABASE_URL, SUPABASE_ANON_KEY, sendPush, sendEmail } from './supabase.js';
+import { supabase, createClient, SUPABASE_URL, SUPABASE_ANON_KEY, sendPush, sendEmail, emitEvent } from './supabase.js';
 
 // --- 1. HELPERS & UTILS ---
 const Helpers = {
@@ -52,9 +52,13 @@ const AppState = {
 
 async function sendEmail(to, subject, html, text) {
   try {
-    const res = await fetch('http://127.0.0.1:5600/api/email/send', {
+    const { data: { session } } = await supabase.auth.getSession();
+    const res = await fetch('https://wwnfonkvemimwiqjpkij.supabase.co/functions/v1/send-email', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: { 
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${session?.access_token || ''}`
+      },
       body: JSON.stringify({ to, subject, html, text })
     });
     if (!res.ok) {
@@ -66,6 +70,20 @@ async function sendEmail(to, subject, html, text) {
 }
 
 // --- 3. UI CONTROLLER ---
+function setActiveSection(targetId) {
+  document.querySelectorAll('.section').forEach(sec => {
+    sec.classList.remove('active');
+    sec.classList.add('hidden');
+  });
+
+  const target = document.getElementById(targetId);
+  if (target) {
+    target.classList.remove('hidden');
+    target.classList.add('active');
+  }
+}
+window.setActiveSection = setActiveSection;
+
 const UI = {
   init() {
     this.bindEvents();
@@ -73,6 +91,7 @@ const UI = {
     this.populateMonthFilter();
     this.injectChildTheme(); // Inyectar estilos infantiles
     this.initAccessControl();
+    this.initVideoCallFab(); // ✅ Botón de videollamada
   },
 
   async checkSession() {
@@ -121,6 +140,61 @@ const UI = {
     if (sideEl) sideEl.textContent = name;
     const welcome = document.getElementById('welcomeName');
     if(welcome) welcome.textContent = name.split(' ')[0];
+  },
+
+  // --- VIDEOLLAMADA ASISTENTE ---
+  initVideoCallFab() {
+    // Botón Flotante
+    const fab = document.createElement('button');
+    fab.className = 'fixed bottom-6 right-20 w-12 h-12 bg-indigo-600 hover:bg-indigo-700 text-white rounded-full shadow-xl flex items-center justify-center z-50 transition-transform hover:scale-110';
+    fab.innerHTML = '<svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m22 8-6 4 6 4V8Z"/><rect x="2" y="6" width="14" height="12" rx="2" ry="2"/></svg>';
+    fab.title = "Reunión Rápida";
+    fab.onclick = () => this.openAssistantMeeting();
+    document.body.appendChild(fab);
+
+    // Modal Container
+    const modal = document.createElement('div');
+    modal.id = 'assistantVideoModal';
+    modal.className = 'fixed inset-0 bg-black/80 hidden items-center justify-center z-[100] p-4 backdrop-blur-sm';
+    modal.innerHTML = `
+      <div class="bg-white w-full max-w-5xl h-[80vh] rounded-2xl overflow-hidden flex flex-col relative">
+        <button id="closeAsstVideo" class="absolute top-4 right-4 z-10 bg-red-500 text-white p-2 rounded-full hover:bg-red-600 shadow-md">
+          <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+        </button>
+        <div id="jitsi-asst-container" class="w-full h-full bg-slate-900"></div>
+      </div>
+    `;
+    document.body.appendChild(modal);
+    document.getElementById('closeAsstVideo').onclick = () => {
+        modal.classList.add('hidden');
+        modal.classList.remove('flex');
+        if(window.jitsiAsstApi) { window.jitsiAsstApi.dispose(); window.jitsiAsstApi = null; }
+    };
+  },
+
+  openAssistantMeeting() {
+    const modal = document.getElementById('assistantVideoModal');
+    modal.classList.remove('hidden');
+    modal.classList.add('flex');
+
+    if (!window.JitsiMeetExternalAPI) {
+        const script = document.createElement('script');
+        script.src = 'https://meet.jit.si/external_api.js';
+        script.onload = () => this.launchJitsi();
+        document.head.appendChild(script);
+    } else {
+        this.launchJitsi();
+    }
+  },
+
+  launchJitsi() {
+    if(window.jitsiAsstApi) window.jitsiAsstApi.dispose();
+    window.jitsiAsstApi = new JitsiMeetExternalAPI("meet.jit.si", {
+        roomName: "KarpusKids_Recepcion",
+        width: "100%", height: "100%",
+        parentNode: document.getElementById('jitsi-asst-container'),
+        userInfo: { displayName: AppState.profile?.name || 'Asistente' }
+    });
   },
 
   bindEvents() {
@@ -347,14 +421,17 @@ const UI = {
   // --- DASHBOARD ---
   async loadDashboardStats() {
     try {
+      const today = new Date();
+      today.setHours(0,0,0,0);
+      const todayISO = today.toISOString().split('T')[0];
+
       // Students
       const { count: studentsCount } = await supabase.from('students').select('*', { count: 'exact', head: true }).eq('is_active', true);
       const statStudents = document.getElementById('statStudents');
       if(statStudents) statStudents.textContent = studentsCount || 0;
 
       // Attendance
-      const today = new Date().toISOString().split('T')[0];
-      const { count: attendanceCount } = await supabase.from('attendance').select('*', { count: 'exact', head: true }).eq('date', today).eq('status', 'present');
+      const { count: attendanceCount } = await supabase.from('attendance').select('*', { count: 'exact', head: true }).eq('date', todayISO).eq('status', 'present');
       const statAttendance = document.getElementById('statAttendance');
       if(statAttendance) statAttendance.textContent = attendanceCount || 0;
 
@@ -1003,12 +1080,25 @@ const UI = {
     try {
       let evidenceUrl = null;
       if (method === 'transferencia' && evidence) {
+        // 6. Validación de tipo de archivo (Seguridad)
+        const allowed = ['image/jpeg', 'image/png', 'image/webp', 'application/pdf'];
+        if (!allowed.includes(evidence.type)) {
+          Helpers.toast('Formato no permitido (Solo JPG, PNG, WEBP o PDF)', 'error');
+          return;
+        }
+
         const safeName = evidence.name.replace(/[^a-zA-Z0-9.]/g, '_');
         const path = `${studentId}_${Date.now()}_${safeName}`;
         const { error: upErr } = await supabase.storage.from('payments_evidence').upload(path, evidence, { upsert: false });
         if (upErr) throw upErr;
-        const { data: pub } = await supabase.storage.from('payments_evidence').getPublicUrl(path);
-        evidenceUrl = pub?.publicUrl || null;
+        
+        // 7. Uso de URL Firmada para mayor seguridad (Privacidad)
+        const { data: signed, error: signErr } = await supabase.storage
+          .from('payments_evidence')
+          .createSignedUrl(path, 60 * 60 * 24 * 7); // 7 días
+        
+        if (signErr) throw signErr;
+        evidenceUrl = signed?.signedUrl || null;
       }
       const status = method === 'efectivo' ? 'efectivo' : 'pendiente';
       const { error } = await supabase.from('payments').insert({
@@ -1027,6 +1117,16 @@ const UI = {
       if (error) throw error;
 
       Helpers.toast('Pago registrado correctamente');
+      
+      // Emitir evento de recibo subido
+      emitEvent('payment.receipt_uploaded', {
+        student_id: studentId,
+        amount: amount,
+        month: month,
+        method: method,
+        evidence_url: evidenceUrl
+      });
+
       this.closePaymentModal();
       this.loadPayments();
 
@@ -1201,8 +1301,8 @@ const UI = {
         .in('id', parentIds);
       
       if (parents && parents.length) {
-        for (const p of parents) {
-          if (!p.email) continue;
+        const reminderPromises = parents.map(async (p) => {
+          if (!p.email) return;
           
           const subject = `Recordatorio de Pago: Mensualidad ${selectedMonth}`;
           const html = `
@@ -1219,19 +1319,21 @@ const UI = {
               <p style="font-size: 12px; color: #666;">Karpus Kids - Administración</p>
             </div>
           `;
-          await sendEmail(p.email, subject, html);
           
-          // También enviar notificación Push
-          await sendPush({
+          const emailP = sendEmail(p.email, subject, html);
+          const pushP = sendPush({
             user_id: p.id,
             title: `Recordatorio de Pago (${selectedMonth})`,
             message: reminderMessage,
             type: 'payment_reminder',
             link: '/panel_padres.html'
           });
-          
+
+          await Promise.allSettled([emailP, pushP]);
           successCount++;
-        }
+        });
+
+        await Promise.all(reminderPromises);
       }
     } catch (e) {
       console.error('Error enviando recordatorios', e);
@@ -1771,7 +1873,9 @@ const UI = {
   },
 
   async registerAccess(studentId, type) {
-    const today = new Date().toISOString().split('T')[0];
+    const today = new Date();
+    today.setHours(0,0,0,0);
+    const todayISO = today.toISOString().split('T')[0];
     
     try {
       if (type === 'check-in') {
@@ -1779,7 +1883,7 @@ const UI = {
          const { data: existing } = await supabase.from('attendance')
            .select('id')
            .eq('student_id', studentId)
-           .eq('date', today)
+           .eq('date', todayISO)
            .maybeSingle();
            
          if (existing) {
@@ -1798,7 +1902,7 @@ const UI = {
          const { error } = await supabase.from('attendance').insert({
            student_id: studentId,
            classroom_id: student.classroom_id,
-           date: today,
+           date: todayISO,
            status: 'present',
            check_in: new Date().toISOString()
          });
@@ -1806,27 +1910,19 @@ const UI = {
          if (error) throw error;
          Helpers.toast('Entrada registrada correctamente');
 
-         // Notificación por correo (Resend)
-         if (student.p1_email) {
-           const time = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-           const html = `
-             <div style="font-family: sans-serif; max-width: 600px; margin: auto; padding: 20px; border: 1px solid #eee; border-radius: 10px;">
-               <h2 style="color: #0d9488;">Notificación de Llegada</h2>
-               <p>Hola <b>${student.p1_name || 'familia'}</b>,</p>
-               <p>Te informamos que <b>${student.name}</b> ha ingresado a Karpus Kids hoy a las <b>${time}</b>.</p>
-               <p>¡Que tenga un excelente día de aprendizaje!</p>
-               <hr style="border: none; border-top: 1px solid #eee; margin: 20px 0;">
-               <p style="font-size: 12px; color: #666;">Karpus Kids - Seguridad y Confianza</p>
-             </div>
-           `;
-           await sendEmail(student.p1_email, `Aviso de Entrada: ${student.name} ha llegado`, html);
-         }
+         // 10. Arquitectura por Eventos: Emitir evento de entrada
+         emitEvent('attendance.checkin', {
+           student_id: studentId,
+           student_name: student.name,
+           parent_email: student.p1_email,
+           time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+         });
       } else {
          // Registro de Salida (Check-out)
          const { data: existing, error: fetchError } = await supabase.from('attendance')
            .select('id, check_out, student:students(name, p1_email, p1_name)')
            .eq('student_id', studentId)
-           .eq('date', today)
+           .eq('date', todayISO)
            .maybeSingle();
            
          if (fetchError) throw fetchError;
@@ -1848,21 +1944,13 @@ const UI = {
          if (error) throw error;
          Helpers.toast('Salida registrada correctamente');
 
-         // Notificación por correo (Resend)
-         if (existing.student?.p1_email) {
-           const time = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-           const html = `
-             <div style="font-family: sans-serif; max-width: 600px; margin: auto; padding: 20px; border: 1px solid #eee; border-radius: 10px;">
-               <h2 style="color: #ef4444;">Notificación de Salida</h2>
-               <p>Hola <b>${existing.student.p1_name || 'familia'}</b>,</p>
-               <p>Te informamos que <b>${existing.student.name}</b> ha sido retirado de Karpus Kids hoy a las <b>${time}</b>.</p>
-               <p>¡Gracias por confiar en nosotros!</p>
-               <hr style="border: none; border-top: 1px solid #eee; margin: 20px 0;">
-               <p style="font-size: 12px; color: #666;">Karpus Kids - Seguridad y Confianza</p>
-             </div>
-           `;
-           await sendEmail(existing.student.p1_email, `Aviso de Salida: ${existing.student.name} ha sido retirado`, html);
-         }
+         // 10. Arquitectura por Eventos: Emitir evento de salida
+         emitEvent('attendance.checkout', {
+           student_id: studentId,
+           student_name: existing.student.name,
+           parent_email: existing.student.p1_email,
+           time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+         });
       }
       
       this.loadAccessHistory();
@@ -1882,13 +1970,15 @@ const UI = {
     const container = document.getElementById('accessRecentLog');
     if (!container) return;
     
-    const today = new Date().toISOString().split('T')[0];
+    const today = new Date();
+    today.setHours(0,0,0,0);
+    const todayISO = today.toISOString().split('T')[0];
     
     // Cargar asistencias de hoy (ordenadas por última actualización)
     const { data: logs, error } = await supabase
       .from('attendance')
       .select('check_in, check_out, status, students(name, avatar_url)')
-      .eq('date', today)
+      .eq('date', todayISO)
       .order('created_at', { ascending: false })
       .limit(10);
       
@@ -1946,114 +2036,59 @@ function refreshIcons() {
         const payment = AppState.paymentsData.find(p => p.id == id);
         const { error } = await supabase.from('payments').update({ status: 'confirmado', validated_by: AppState.user.id }).eq('id', id);
         if (!error) {
-          Helpers.toast('Pago confirmado');
-          if (payment && payment.students?.parent_id) {
-            await sendPush({
-              user_id: payment.students.parent_id,
-              title: 'Pago Confirmado',
-              message: `Su pago de $${payment.amount} correspondiente a ${payment.month_paid} ha sido validado exitosamente.`,
-              type: 'info',
-              link: '/panel_padres.html'
-            });
+            Helpers.toast('Pago confirmado');
+            
             try {
-              const baseUrl = window.location.origin || '';
-              const parentLink = `${baseUrl}/panel_padres.html#payments`;
-              const { data: parent } = await supabase
-                .from('profiles')
-                .select('email, name')
-                .eq('id', payment.students.parent_id)
-                .maybeSingle();
-              if (parent && parent.email) {
-                const subjectParent = `Pago confirmado (${payment.month_paid})`;
-                const htmlParent = `
-                  <div style="font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; color:#0f172a;">
-                    <h2 style="color:#16a34a;">Tu pago ha sido confirmado</h2>
-                    <p>Hola ${parent.name || 'familia'},</p>
-                    <p>Confirmamos tu pago de $${payment.amount} correspondiente a ${payment.month_paid}.</p>
-                    <p>Gracias por mantenerte al día con la colegiatura.</p>
-                    <p style="margin:24px 0;">
-                      <a href="${parentLink}" style="display:inline-block;padding:10px 18px;background:#22c55e;color:#ffffff;border-radius:999px;text-decoration:none;font-weight:600;">
-                        Ver historial de pagos
-                      </a>
-                    </p>
-                    <p style="font-size:12px;color:#64748b;">Si el botón no funciona, copia y pega esta dirección en tu navegador: ${parentLink}</p>
-                  </div>
-                `;
-                const textParent = `Tu pago de $${payment.amount} correspondiente a ${payment.month_paid} ha sido confirmado. Puedes ver el historial en: ${parentLink}`;
-                await sendEmail(parent.email, subjectParent, htmlParent, textParent);
-              }
               const studentId = payment.student_id;
               let classroomId = null;
               let studentName = '';
+              let parentEmail = '';
               if (studentId) {
                 const { data: st } = await supabase
                   .from('students')
-                  .select('id, name, classroom_id')
+                  .select('id, name, classroom_id, p1_email')
                   .eq('id', studentId)
                   .maybeSingle();
                 if (st) {
                   classroomId = st.classroom_id;
                   studentName = st.name || '';
+                  parentEmail = st.p1_email || '';
                 }
               }
-              let teacherEmail = null;
-              let classroomName = '';
-              if (classroomId) {
-                const { data: classroom } = await supabase
-                  .from('classrooms')
-                  .select('name, teacher_id')
-                  .eq('id', classroomId)
-                  .maybeSingle();
-                if (classroom) {
-                  classroomName = classroom.name || '';
-                  if (classroom.teacher_id) {
-                    const { data: teacher } = await supabase
-                      .from('profiles')
-                      .select('email, name')
-                      .eq('id', classroom.teacher_id)
-                      .maybeSingle();
-                    teacherEmail = teacher && teacher.email ? teacher.email : null;
-                  }
-                }
+
+              // 10. Arquitectura por Eventos: Emitir evento de pago aprobado
+              emitEvent('payment.approved', {
+                payment_id: payment.id,
+                student_id: payment.student_id,
+                student_name: studentName,
+                amount: payment.amount,
+                month: payment.month_paid,
+                parent_email: parentEmail
+              });
+
+              if (payment && payment.students?.parent_id) {
+                await sendPush({
+                  user_id: payment.students.parent_id,
+                  title: 'Pago Confirmado',
+                  message: `Su pago de $${payment.amount} correspondiente a ${payment.month_paid} ha sido validado exitosamente.`,
+                  type: 'info',
+                  link: '/panel_padres.html'
+                });
               }
-              const { data: staff } = await supabase
-                .from('profiles')
-                .select('email, role')
-                .in('role', ['asistente', 'directora']);
-              const assistantEmails = (staff || [])
-                .filter(p => p.role === 'asistente' && p.email)
-                .map(p => p.email);
-              const directorEmails = (staff || [])
-                .filter(p => p.role === 'directora' && p.email)
-                .map(p => p.email);
-              const subjectStaff = `Pago confirmado${studentName ? ` - ${studentName}` : ''} (${payment.month_paid})`;
-              const commonHtmlStaff = (roleLabel, link) => `
-                <div style="font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; color:#0f172a;">
-                  <h2 style="color:#0ea5e9;">Pago confirmado</h2>
-                  <p>Se ha confirmado un pago${studentName ? ` para ${studentName}` : ''}${classroomName ? ` del aula ${classroomName}` : ''}.</p>
-                  <p><strong>Mes:</strong> ${payment.month_paid}<br><strong>Monto:</strong> $${payment.amount}</p>
-                  <p>Pueden revisar el detalle desde su panel de ${roleLabel}.</p>
-                  <p style="margin:24px 0;">
-                    <a href="${link}" style="display:inline-block;padding:10px 18px;background:#0ea5e9;color:#ffffff;border-radius:999px;text-decoration:none;font-weight:600;">
-                      Ver pagos confirmados
-                    </a>
-                  </p>
-                </div>
-              `;
-              const textStaff = `Se confirmó un pago${studentName ? ` para ${studentName}` : ''} del mes ${payment.month_paid} por $${payment.amount}. Revisen el detalle en el panel administrativo.`;
-              if (teacherEmail) {
-                const subjectTeacher = `Pago confirmado en tu grupo (${payment.month_paid})`;
-                const htmlTeacher = commonHtmlStaff('maestra', `${baseUrl}/panel-maestra.html`);
-                await sendEmail(teacherEmail, subjectTeacher, htmlTeacher, textStaff);
+              
+              // Los correos se manejan ahora a través de emitEvent('payment.approved') en el servidor
+              // Pero mantenemos las notificaciones push locales por ahora si es necesario
+              
+              /* 
+              // Bloque antiguo de correos manuales comentado para evitar duplicidad con Edge Function
+              try {
+                const baseUrl = window.location.origin || '';
+                ...
               }
-              for (const email of assistantEmails) {
-                await sendEmail(email, subjectStaff, commonHtmlStaff('asistente', `${baseUrl}/panel_asistente.html#payments`), textStaff);
-              }
-              for (const email of directorEmails) {
-                await sendEmail(email, subjectStaff, commonHtmlStaff('directora', `${baseUrl}/panel_directora.html#payments`), textStaff);
-              }
+              */
+              
             } catch (err) {
-              console.error('Error enviando correos de pago confirmado', err);
+              console.error('Error procesando notificaciones de pago confirmado', err);
             }
           }
           UI.loadPayments();

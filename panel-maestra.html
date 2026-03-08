@@ -281,9 +281,6 @@
           <button class="class-tab-btn px-4 py-2 rounded-t-lg font-medium text-slate-600 hover:bg-slate-100 transition-colors" data-tab="tasks">
             Tareas
           </button>
-          <button class="class-tab-btn px-4 py-2 rounded-t-lg font-medium text-slate-600 hover:bg-slate-100 transition-colors" data-tab="gallery">
-            Galería
-          </button>
           <button class="class-tab-btn px-4 py-2 rounded-t-lg font-medium text-slate-600 hover:bg-slate-100 transition-colors" data-tab="videocall">
             Clase en Vivo
           </button>
@@ -314,21 +311,6 @@
 
         <div id="tab-tasks" class="class-tab-content hidden">
           <!-- Contenido de tareas cargado dinámicamente -->
-        </div>
-
-        <div id="tab-gallery" class="class-tab-content hidden">
-          <div class="bg-white p-6 rounded-2xl shadow-sm">
-            <div class="flex justify-between items-center mb-6">
-              <h3 class="font-bold text-slate-700 text-xl flex items-center gap-2"><i data-lucide="image" class="text-orange-500"></i> Galería del Día</h3>
-              <label class="bg-orange-600 text-white px-4 py-2 rounded-xl shadow hover:bg-orange-700 transition flex items-center gap-2 font-bold cursor-pointer active:scale-95">
-                <i data-lucide="upload-cloud" class="w-5 h-5"></i> Subir Fotos
-                <input type="file" id="galleryUploadInput" multiple accept="image/*" class="hidden">
-              </label>
-            </div>
-            <div id="galleryGrid" class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
-              <!-- Las fotos se cargarán aquí -->
-            </div>
-          </div>
         </div>
 
         <div id="tab-videocall" class="class-tab-content hidden">

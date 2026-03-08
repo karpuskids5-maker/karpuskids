@@ -595,6 +595,23 @@ begin
 end;
 $$;
 
+-- 1.15 Tabla de Eventos del Sistema (Arquitectura Event-Driven)
+create table if not exists public.system_events (
+  id uuid default gen_random_uuid() primary key,
+  type text not null,
+  payload jsonb,
+  status text default 'pending',
+  created_at timestamp with time zone default timezone('utc'::text, now()) not null,
+  processed_at timestamp with time zone
+);
+
+-- RLS para system_events
+alter table public.system_events enable row level security;
+create policy "Solo staff puede ver eventos" on public.system_events
+  for select using (auth.uid() in (select id from profiles where role in ('directora', 'asistente')));
+create policy "Cualquier autenticado puede insertar eventos" on public.system_events
+  for insert with check (auth.role() = 'authenticated');
+
 -- 4. TRIGGER: Notificar al padre sobre nuevo cargo
 create or replace function public.notify_parent_on_new_charge()
 returns trigger

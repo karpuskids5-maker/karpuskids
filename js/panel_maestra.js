@@ -1,4 +1,4 @@
-import { supabase, initOneSignal, sendEmail } from './supabase.js';
+import { supabase, initOneSignal, sendEmail, emitEvent } from './supabase.js';
 
 // --- 1. HELPERS & UTILS ---
 const Helpers = {
@@ -61,6 +61,7 @@ const AppState = {
     absent: 0,
     incidents: 0
   },
+  realtimeChannel: null,
   // Cache simple
   studentsCache: {}, 
   
@@ -70,6 +71,10 @@ const AppState = {
       Helpers.saveLastClass(cls.id);
     } else {
       localStorage.removeItem('karpus_last_class');
+      if (this.realtimeChannel) {
+          supabase.removeChannel(this.realtimeChannel);
+          this.realtimeChannel = null;
+      }
     }
   }
 };
@@ -291,11 +296,6 @@ const UI = {
     });
     document.getElementById('btnSaveIncident')?.addEventListener('click', () => this.saveIncident());
 
-    // Gallery Input Change
-    document.getElementById('galleryUploadInput')?.addEventListener('change', (e) => {
-        this.handleGalleryUpload(e.target.files);
-    });
-
     // Profile Events
     document.getElementById('profileAvatarInput')?.addEventListener('change', (e) => {
         this.handleAvatarUpload(e.target.files[0]);
@@ -483,7 +483,6 @@ const UI = {
     if (tabName === 'daily-routine') this.renderDailyRoutine();
     if (tabName === 'attendance') this.renderAttendance();
     if (tabName === 'tasks') this.renderTasks?.();
-    if (tabName === 'gallery') this.renderGallery?.();
     if (tabName === 'videocall') this.initVideoCall?.();
   },
 
@@ -666,7 +665,7 @@ const UI = {
                 .getPublicUrl(fileName);
                 
             mediaUrl = publicUrl;
-            mediaType = 'image';
+            mediaType = file.type.startsWith("video") ? "video" : "image";
         }
 
         // 2. Insertar Post
@@ -762,11 +761,13 @@ const UI = {
       
       tab.innerHTML = Helpers.skeleton(3);
       
-      const today = new Date().toISOString().split('T')[0];
+      const today = new Date();
+      today.setHours(0,0,0,0);
+      const todayISO = today.toISOString().split('T')[0];
       
       // Fetch students and existing logs
       const { data: students } = await supabase.from('students').select('id, name').eq('classroom_id', AppState.currentClass.id).order('name');
-      const { data: logs } = await supabase.from('daily_logs').select('*').eq('classroom_id', AppState.currentClass.id).eq('date', today);
+      const { data: logs } = await supabase.from('daily_logs').select('*').eq('classroom_id', AppState.currentClass.id).eq('date', todayISO);
       
       const logMap = {};
       logs?.forEach(l => logMap[l.student_id] = l);
@@ -856,12 +857,14 @@ const UI = {
   async saveRoutineNotes(textarea) {
       const studentId = textarea.dataset.student;
       const val = textarea.value.trim();
-      const today = new Date().toISOString().split('T')[0];
+      const today = new Date();
+      today.setHours(0,0,0,0);
+      const todayISO = today.toISOString().split('T')[0];
 
       const payload = {
           student_id: studentId,
           classroom_id: AppState.currentClass.id,
-          date: today,
+          date: todayISO,
           notes: val
       };
 
@@ -879,7 +882,9 @@ const UI = {
       const type = btn.dataset.type;
       const val = btn.dataset.val;
       const studentId = btn.dataset.student;
-      const today = new Date().toISOString().split('T')[0];
+      const today = new Date();
+      today.setHours(0,0,0,0);
+      const todayISO = today.toISOString().split('T')[0];
 
       // UI Update Optimistic
       const siblings = btn.parentElement.querySelectorAll('.routine-toggle');
@@ -890,7 +895,7 @@ const UI = {
       const payload = {
           student_id: studentId,
           classroom_id: AppState.currentClass.id,
-          date: today,
+          date: todayISO,
           [type]: val
       };
       
@@ -1434,88 +1439,6 @@ const UI = {
     if(!error) Helpers.toast(`${stars} estrella(s) asignadas`);
   },
 
-  // 5. NUEVA FUNCIÓN: Galería del Día
-  async renderGallery() {
-      const tab = document.getElementById('tab-gallery');
-      const grid = document.getElementById('galleryGrid');
-      
-      if (!AppState.currentClass?.id) {
-          if(grid) grid.innerHTML = Helpers.emptyState('Seleccione una clase primero');
-          return;
-      }
-      
-      if(grid) grid.innerHTML = Helpers.skeleton(4, 'h-48');
-
-      const today = new Date().toISOString().split('T')[0];
-
-      // Fetch gallery items
-      const { data: photos, error } = await supabase
-          .from('classroom_gallery')
-          .select('*')
-          .eq('classroom_id', AppState.currentClass.id)
-          .eq('date', today)
-          .order('created_at', { ascending: false });
-
-      if (error) {
-          console.error(error);
-          if(grid) grid.innerHTML = Helpers.emptyState('Error cargando galería', 'alert-circle');
-          return;
-      }
-
-      if (!photos || photos.length === 0) {
-          if(grid) grid.innerHTML = `<div class="col-span-full">${Helpers.emptyState('No hay fotos hoy. ¡Sube algunas!', 'camera')}</div>`;
-          return;
-      }
-
-      if(grid) {
-          grid.innerHTML = photos.map(p => `
-            <div class="group relative aspect-square bg-slate-100 rounded-xl overflow-hidden shadow-sm border border-slate-100">
-                <img src="${p.image_url}" class="w-full h-full object-cover transition-transform duration-500 group-hover:scale-110" loading="lazy">
-                <div class="absolute inset-0 bg-black/0 group-hover:bg-black/20 transition-colors"></div>
-            </div>
-          `).join('');
-      }
-      
-      if(window.lucide) lucide.createIcons();
-  },
-
-  async handleGalleryUpload(files) {
-      if (!files || files.length === 0) return;
-      if (!AppState.currentClass?.id) { Helpers.toast('Selecciona una clase', 'error'); return; }
-
-      Helpers.toast(`Subiendo ${files.length} foto(s)...`, 'info');
-      const today = new Date().toISOString().split('T')[0];
-      let uploadedCount = 0;
-
-      for (const file of files) {
-          try {
-              const fileExt = file.name.split('.').pop();
-              const fileName = `gallery/${AppState.currentClass.id}/${today}/${Date.now()}_${Math.random().toString(36).substring(7)}.${fileExt}`;
-
-              const { error: upErr } = await supabase.storage.from('classroom_media').upload(fileName, file);
-              if (upErr) throw upErr;
-
-              const pub = supabase.storage.from('classroom_media').getPublicUrl(fileName);
-              const publicUrl = pub.data?.publicUrl;
-              if (!publicUrl) throw new Error('No se pudo obtener URL pública');
-
-              await supabase.from('classroom_gallery').insert({
-                  classroom_id: AppState.currentClass.id,
-                  date: today,
-                  image_url: publicUrl,
-                  caption: ''
-              });
-              uploadedCount++;
-          } catch (e) {
-              console.error('Error subiendo foto:', e);
-          }
-      }
-
-      Helpers.toast(`${uploadedCount} fotos subidas correctamente`, 'success');
-      this.renderGallery(); // Recargar grid
-      document.getElementById('galleryUploadInput').value = ''; // Limpiar input
-  },
-
   // --- STUDENT PROFILE MODAL ---
   async openStudentProfile(studentId) {
     const modal = document.getElementById('studentProfileModal');
@@ -1618,31 +1541,29 @@ const UI = {
       }).select('*, student:students(name, p1_email, p1_name)').single();
 
       if(error) {
-          Helpers.toast('Error al registrar', 'error');
-      } else {
-          Helpers.toast('Incidente registrado', 'success');
+              Helpers.toast('Error al registrar', 'error');
+          } else {
+              Helpers.toast('Incidente registrado', 'success');
 
-          // Notificación por correo a los padres (Resend)
-          if (incident.student?.p1_email) {
-            const html = `
-              <div style="font-family: sans-serif; max-width: 600px; margin: auto; padding: 20px; border: 1px solid #fee2e2; border-radius: 10px;">
-                <h2 style="color: #dc2626;">Reporte de Incidencia ⚠️</h2>
-                <p>Hola <b>${incident.student.p1_name || 'familia'}</b>,</p>
-                <p>Te informamos que se ha registrado una incidencia relacionada con <b>${incident.student.name}</b>:</p>
-                <div style="background: #fef2f2; padding: 15px; border-radius: 8px; margin: 15px 0;">
-                  <p><b>Nivel de Gravedad:</b> <span style="text-transform: uppercase; font-weight: bold;">${severity}</span></p>
-                  <p><b>Descripción:</b> ${desc}</p>
-                </div>
-                <p>La maestra está al tanto y ha tomado las medidas necesarias. Si tienes alguna duda, puedes contactarnos a través del chat del panel.</p>
-                <hr style="border: none; border-top: 1px solid #fee2e2; margin: 20px 0;">
-                <p style="font-size: 12px; color: #666;">Karpus Kids - Cuidado y Atención</p>
-              </div>
-            `;
-            await sendEmail(incident.student.p1_email, `Aviso Importante: Reporte de Incidencia - ${incident.student.name}`, html);
-          }
+              // 10. Arquitectura por Eventos: Emitir evento de incidente reportado
+              emitEvent('incident.reported', {
+                incident_id: incident.id,
+                student_id: studentId,
+                student_name: incident.student?.name,
+                severity: severity,
+                description: desc,
+                parent_email: incident.student?.p1_email
+              });
 
-          // Notificar a la directora y asistentes
-          try {
+              // Notificación por correo a los padres (Resend) - Se maneja ahora en Edge Function
+              /*
+              if (incident.student?.p1_email) {
+                ...
+              }
+              */
+
+              // Notificar a la directora y asistentes
+              try {
             const { data: staff } = await supabase
               .from('profiles')
               .select('id')
@@ -1769,6 +1690,10 @@ const UI = {
       scrollToBottom();
 
       // Suscripción Realtime
+      if (AppState.realtimeChannel) {
+          supabase.removeChannel(AppState.realtimeChannel);
+      }
+
       const channel = supabase.channel('room_chat_' + classroomId)
           .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'classroom_chat', filter: `classroom_id=eq.${classroomId}` }, async (payload) => {
               const { data: user } = await supabase.from('profiles').select('name').eq('id', payload.new.user_id).single();
@@ -1776,6 +1701,8 @@ const UI = {
               scrollToBottom();
           })
           .subscribe();
+      
+      AppState.realtimeChannel = channel;
 
       // Enviar mensaje
       const sendMessage = async () => {

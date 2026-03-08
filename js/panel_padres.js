@@ -77,7 +77,7 @@ const Helpers = {
 // ===== ESTADO CON CONTROL DE ACCESO =====
 class SafeAppState {
   constructor() {
-    this._state = { user: null, profile: null, student: null, tasks: [], realtimeChannel: null, feedChannel: null };
+    this._state = { user: null, profile: null, student: null, tasks: [], realtimeChannel: null, feedChannel: null, liveChannel: null };
   }
   
   get(key) { return this._state[key]; }
@@ -94,17 +94,39 @@ class SafeAppState {
     if (this._state.feedChannel) {
       supabase.removeChannel(this._state.feedChannel);
     }
-    
-    this._state = { user: null, profile: null, student: null, tasks: [], realtimeChannel: null, feedChannel: null };
+    if (this._state.liveChannel) {
+      supabase.removeChannel(this._state.liveChannel);
+    }
+    this._state = { user: null, profile: null, student: null, tasks: [], realtimeChannel: null, feedChannel: null, liveChannel: null };
   }
 }
 const AppState = new SafeAppState();
 
+// ✅ 2. CACHE GLOBAL (Optimización)
+const GlobalCache = {
+  store: {},
+  set(key, data) {
+    this.store[key] = { data, time: Date.now() };
+  },
+  get(key, maxAge = 60000) { // 1 minuto por defecto
+    const item = this.store[key];
+    if (!item) return null;
+    if (Date.now() - item.time > maxAge) { delete this.store[key]; return null; }
+    return item.data;
+  },
+  clear(key) { if(key) delete this.store[key]; else this.store = {}; }
+};
+
 async function sendEmail(to, subject, html, text) {
   try {
-    const res = await fetch('http://127.0.0.1:5600/api/email/send', {
+    const { data: { session } } = await supabase.auth.getSession();
+    // Usar Edge Function de Supabase
+    const res = await fetch('https://wwnfonkvemimwiqjpkij.supabase.co/functions/v1/send-email', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: { 
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${session?.access_token || ''}`
+      },
       body: JSON.stringify({ to, subject, html, text })
     });
     if (!res.ok) {
@@ -207,6 +229,9 @@ document.addEventListener('DOMContentLoaded', async () => {
   }
   AppState.set('user', user);
 
+  // ✅ Iniciar OneSignal con el usuario ya cargado (Evita error de Lock)
+  try { initOneSignal(user); } catch(e) { console.warn("OneSignal init error:", e); }
+
   // ✅ Cargar perfil con manejo de errores robusto
   try {
     const { data: profile, error } = await supabase
@@ -262,10 +287,18 @@ document.addEventListener('DOMContentLoaded', async () => {
   if (btnRefresh) {
     btnRefresh.onclick = () => {
       const activeSection = document.querySelector('.section.active')?.id || 'home';
-      loadSectionData(activeSection);
+      // Limpiar cache y estado de carga para forzar recarga
+      loadedSections.delete(activeSection);
+      if(activeSection === 'tasks') { GlobalCache.clear('tasks'); GlobalCache.clear('evidences'); }
+      if(activeSection === 'live-attendance') GlobalCache.clear('attendance');
+      if(activeSection === 'payments') GlobalCache.clear('payments');
+      if(activeSection === 'grades') GlobalCache.clear('grades');
+      
+      loadSectionData(activeSection, true);
     };
   }
   
+  // ✅ 1. LAZY LOAD (Inicialización)
   // ✅ Cargar sección inicial
   setActiveSection('home');
   loadDashboard();
@@ -280,6 +313,42 @@ document.addEventListener('DOMContentLoaded', async () => {
   }
 });
 
+// ✅ Función centralizada de cambio de sección (Movida fuera de setupNavigation)
+window.setActiveSection = (targetId) => {
+  const sections = document.querySelectorAll('.section');
+  const navButtons = document.querySelectorAll('[data-target]');
+
+  // Ocultar todas las secciones
+  sections.forEach(sec => {
+    sec.classList.add('hidden');
+    sec.classList.remove('active');
+    sec.setAttribute('aria-hidden', 'true');
+  });
+  
+  // Remover estado activo de botones
+  navButtons.forEach(btn => btn.classList.remove('active', 'font-bold'));
+  
+  // Mostrar sección objetivo
+  const targetSection = document.getElementById(targetId);
+  if (targetSection) {
+    targetSection.classList.remove('hidden');
+    targetSection.classList.add('active');
+    targetSection.setAttribute('aria-hidden', 'false');
+    
+    // Cargar datos específicos de la sección
+    loadSectionData(targetId);
+  }
+  
+  // Actualizar botón activo
+  const activeBtn = document.querySelector(`button[data-target="${targetId}"]`);
+  if (activeBtn) {
+    activeBtn.classList.add('active', 'font-bold');
+    activeBtn.setAttribute('aria-current', 'page');
+  } else {
+    navButtons.forEach(btn => btn.removeAttribute('aria-current'));
+  }
+};
+
 // ===== NAVEGACIÓN Y GESTIÓN DE SECCIONES =====
 function setupNavigation() {
   const navButtons = document.querySelectorAll('[data-target]');
@@ -288,16 +357,15 @@ function setupNavigation() {
   const btnLogout = document.getElementById('btnLogout');
 
   // ✅ Delegación de eventos para navegación
-  const navArea = document.getElementById('sidebar');
-  if (navArea) {
-    navArea.onclick = (e) => {
-      const targetBtn = e.target.closest('button[data-target]');
-      if (targetBtn) {
-        e.preventDefault();
-        setActiveSection(targetBtn.dataset.target);
-      }
-    };
-  }
+  document.addEventListener('click', (e) => {
+    const targetBtn = e.target.closest('[data-target]');
+    if (targetBtn) {
+      // Si está dentro de un modal o componente específico que maneja su propia lógica, ignorar si es necesario
+      // Pero para navegación principal:
+      e.preventDefault();
+      setActiveSection(targetBtn.dataset.target);
+    }
+  });
 
   if (headerAvatar) {
     headerAvatar.onclick = (e) => {
@@ -313,40 +381,10 @@ function setupNavigation() {
   // ✅ Prevenir múltiples escuchas globales
   if (window.navigationInitialized) return;
   window.navigationInitialized = true;
-
-  // ✅ Función centralizada de cambio de sección
-  window.setActiveSection = (targetId) => {
-    // Ocultar todas las secciones
-    sections.forEach(sec => {
-      sec.classList.add('hidden');
-      sec.classList.remove('active');
-      sec.setAttribute('aria-hidden', 'true');
-    });
-    
-    // Remover estado activo de botones
-    navButtons.forEach(btn => btn.classList.remove('active', 'font-bold'));
-    
-    // Mostrar sección objetivo
-    const targetSection = document.getElementById(targetId);
-    if (targetSection) {
-      targetSection.classList.remove('hidden');
-      targetSection.classList.add('active');
-      targetSection.setAttribute('aria-hidden', 'false');
-      
-      // Cargar datos específicos de la sección
-      loadSectionData(targetId);
-    }
-    
-    // Actualizar botón activo
-    const activeBtn = document.querySelector(`button[data-target="${targetId}"]`);
-    if (activeBtn) {
-      activeBtn.classList.add('active', 'font-bold');
-      activeBtn.setAttribute('aria-current', 'page');
-    } else {
-      navButtons.forEach(btn => btn.removeAttribute('aria-current'));
-    }
-  };
 }
+
+// ✅ 1. LAZY LOAD (Set de control)
+const loadedSections = new Set();
 
 // ✅ Manejo global de errores no capturados (Safety Net)
 window.addEventListener('unhandledrejection', event => {
@@ -355,7 +393,7 @@ window.addEventListener('unhandledrejection', event => {
 });
 
 // ✅ Carga diferida de datos por sección
-function loadSectionData(sectionId) {
+function loadSectionData(sectionId, forceRefresh = false) {
   const loaders = {
     home: loadDashboard,
     'live-attendance': loadAttendance,
@@ -376,6 +414,11 @@ function loadSectionData(sectionId) {
   }
   
   if (loader && typeof loader === 'function') {
+    // ✅ 1. LAZY LOAD (Verificación)
+    if (!forceRefresh && loadedSections.has(sectionId)) {
+      return;
+    }
+
     // Mostrar indicador de carga en el botón de refresco si existe
     const refreshBtn = document.getElementById('btnRefreshData');
     if(refreshBtn) refreshBtn.classList.add('animate-spin');
@@ -385,6 +428,7 @@ function loadSectionData(sectionId) {
       console.error(`Error cargando sección ${sectionId}:`, err);
       Helpers.toast(`Error al cargar ${sectionId}`, 'error');
     }).finally(() => {
+      loadedSections.add(sectionId);
       if(refreshBtn) refreshBtn.classList.remove('animate-spin');
     });
   }
@@ -473,12 +517,12 @@ async function notifyPaymentSubmittedEmail(student, amount, month_paid, method) 
       const htmlTeacher = commonHtmlStaff('maestra', `${baseUrl}/panel-maestra.html`);
       await sendEmail(teacherEmail, subjectTeacher, htmlTeacher, textStaff);
     }
-    for (const email of assistantEmails) {
-      await sendEmail(email, subjectStaff, commonHtmlStaff('asistente', assistantLink), textStaff);
-    }
-    for (const email of directorEmails) {
-      await sendEmail(email, subjectStaff, commonHtmlStaff('directora', directorLink), textStaff);
-    }
+    await Promise.all(assistantEmails.map(email => 
+      sendEmail(email, subjectStaff, commonHtmlStaff('asistente', assistantLink), textStaff)
+    ));
+    await Promise.all(directorEmails.map(email => 
+      sendEmail(email, subjectStaff, commonHtmlStaff('directora', directorLink), textStaff)
+    ));
   } catch (e) {
     console.error('Error enviando correos de comprobante de pago', e);
   }
@@ -496,18 +540,26 @@ async function submitPaymentProof(e) {
     Helpers.toast('Completa todos los campos', 'error');
     return;
   }
+  
+  // ✅ Validación de tipo de archivo
+  const allowed = ['image/jpeg','image/png','image/webp'];
+  if(!allowed.includes(file.type)){
+    Helpers.toast('Formato no permitido (solo JPG, PNG, WEBP)', 'error');
+    return;
+  }
+
   try {
     const ext = file.name.split('.').pop();
-    const name = `transfer_${student.id}_${Date.now()}.${ext}`;
+    const name = `payments/${student.id}_${Date.now()}.${ext}`;
     const { error: upErr } = await supabase.storage.from('classroom_media').upload(`payments/${name}`, file);
     if (upErr) throw upErr;
-    const { data: { publicUrl } } = supabase.storage.from('classroom_media').getPublicUrl(`payments/${name}`);
+    const { data } = await supabase.storage.from('classroom_media').createSignedUrl(`payments/${name}`, 31536000); // 1 año
     const { error } = await supabase.from('payments').insert({
       student_id: student.id,
       amount,
       month_paid,
       method,
-      proof_url: publicUrl,
+      proof_url: data?.signedUrl,
       status: 'pendiente'
     });
     if (error) throw error;
@@ -748,12 +800,14 @@ async function initLiveClassListener(classroomId) {
     checkStatus();
 
     // Suscripción a cambios
-    supabase.channel('classroom_live_' + classroomId)
+    const channel = supabase.channel('classroom_live_' + classroomId)
         .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'classrooms', filter: `id=eq.${classroomId}` }, (payload) => {
             updateBadge(payload.new.is_live);
             if(payload.new.is_live) Helpers.toast('¡La clase ha comenzado!', 'info');
         })
         .subscribe();
+        
+    AppState.set('liveChannel', channel);
 }
 
 // ===== TAREAS CON DELEGACIÓN DE EVENTOS =====
@@ -772,28 +826,37 @@ async function loadTasks(filter = 'pending') {
       return;
     }
     
-    // ✅ Cargar tareas y evidencias en paralelo
-    const [tasksRes, evidencesRes] = await Promise.all([
-      supabase
-        .from(TABLES.TASKS)
-        .select('*')
-        .eq('classroom_id', student.classroom_id)
-        .order('due_date', { ascending: true }),
-      supabase
-        .from(TABLES.TASK_EVIDENCES)
-        .select('*')
-        .eq('student_id', student.id)
-    ]);
-    
-    if (tasksRes.error || evidencesRes.error) {
-      throw new Error(tasksRes.error?.message || evidencesRes.error?.message);
+    // ✅ 2. CACHE GLOBAL (Uso en Tareas)
+    let tasksData = GlobalCache.get('tasks');
+    let evidencesData = GlobalCache.get('evidences');
+
+    if (!tasksData || !evidencesData) {
+      const [tasksRes, evidencesRes] = await Promise.all([
+        supabase
+          .from(TABLES.TASKS)
+          .select('*')
+          .eq('classroom_id', student.classroom_id)
+          .order('due_date', { ascending: true }),
+        supabase
+          .from(TABLES.TASK_EVIDENCES)
+          .select('*')
+          .eq('student_id', student.id)
+      ]);
+
+      if (tasksRes.error || evidencesRes.error) throw new Error('Error fetching data');
+      
+      tasksData = tasksRes.data || [];
+      evidencesData = evidencesRes.data || [];
+      
+      GlobalCache.set('tasks', tasksData);
+      GlobalCache.set('evidences', evidencesData);
     }
     
-    AppState.set('tasks', tasksRes.data || []);
-    const evidenceMap = new Map((evidencesRes.data || []).map(e => [e.task_id, e]));
+    AppState.set('tasks', tasksData);
+    const evidenceMap = new Map(evidencesData.map(e => [e.task_id, e]));
     
     // ✅ Filtrado con función pura
-    const filteredTasks = filterTasks(tasksRes.data, evidenceMap, filter);
+    const filteredTasks = filterTasks(tasksData, evidenceMap, filter);
     
     if (filteredTasks.length === 0) {
       container.innerHTML = Helpers.emptyState(
@@ -817,10 +880,13 @@ async function loadTasks(filter = 'pending') {
 
 // ✅ Funciones puras para lógica de negocio
 function filterTasks(tasks, evidenceMap, filter) {
+  const today = new Date();
+  today.setHours(0,0,0,0);
+
   return (tasks || []).filter(task => {
     const isDelivered = evidenceMap.has(task.id);
     const dueDate = task.due_date ? new Date(task.due_date) : null;
-    const isOverdue = !isDelivered && dueDate && dueDate < new Date();
+    const isOverdue = !isDelivered && dueDate && dueDate < today;
 
     if (filter === 'submitted') return isDelivered;
     if (filter === 'overdue') return isOverdue;
@@ -1026,12 +1092,12 @@ async function submitTask(taskId) {
     
     // ✅ Validación de archivo
     if (file) {
-      const allowed = ['pdf','jpg','jpeg','png','docx'];
-      const ext = file.name.split('.').pop().toLowerCase();
-      if (!allowed.includes(ext)) {
-        Helpers.toast('Formato no permitido (solo PDF, Imágenes, DOCX)', 'error');
+      const allowedTypes = ['application/pdf', 'image/jpeg', 'image/png', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'];
+      if (!allowedTypes.includes(file.type)) {
+        Helpers.toast('Tipo de archivo no permitido', 'error');
         return;
       }
+      
       if (file.size > 5 * 1024 * 1024) {
         Helpers.toast('El archivo no debe superar 5MB', 'error');
         return;
@@ -1052,8 +1118,8 @@ async function submitTask(taskId) {
          const { error: upError } = await supabase.storage.from(STORAGE_BUCKETS.CLASSROOM_MEDIA).upload(path, file);
          if (upError) throw upError;
          
-         const { data: { publicUrl } } = supabase.storage.from(STORAGE_BUCKETS.CLASSROOM_MEDIA).getPublicUrl(path);
-         fileUrl = publicUrl;
+         const { data } = await supabase.storage.from(STORAGE_BUCKETS.CLASSROOM_MEDIA).createSignedUrl(path, 31536000);
+         fileUrl = data?.signedUrl;
       }
 
       const { error: dbError } = await supabase.from(TABLES.TASK_EVIDENCES).insert({
@@ -1135,6 +1201,7 @@ function initNotifications() {
   const notifPrompt = document.getElementById('notification-prompt');
   const enableBtn = document.getElementById('enable-notifications-btn');
 
+  // ✅ 3. REALTIME INTELIGENTE
   const subscribeToRealtime = () => {
     if (AppState.get('realtimeChannel')) return; // Evitar suscripciones múltiples
 
@@ -1151,6 +1218,14 @@ function initNotifications() {
         (payload) => {
           const title = payload.new.title || 'Nueva tarea';
           Helpers.toast(`Nueva tarea: ${escapeHtml(title)}`, 'info');
+          
+          // Actualizar Cache y Estado sin recargar todo
+          const cachedTasks = GlobalCache.get('tasks');
+          if (cachedTasks) {
+             cachedTasks.push(payload.new);
+             GlobalCache.set('tasks', cachedTasks);
+             AppState.set('tasks', cachedTasks);
+          }
 
           if (Notification.permission === 'granted') {
             new Notification('Nueva Tarea', {
@@ -1160,7 +1235,11 @@ function initNotifications() {
             });
           }
 
-          if (document.getElementById('tasks')?.classList.contains('active')) loadTasks();
+          // Actualizar UI inteligentemente
+          if (document.getElementById('tasks')?.classList.contains('active')) {
+             const activeFilter = document.querySelector('.task-filter-btn.font-bold')?.dataset.filter || 'pending';
+             loadTasks(activeFilter); // Usará el cache actualizado
+          }
           if (document.getElementById('home')?.classList.contains('active')) loadDashboard();
         }
       )
@@ -1266,6 +1345,12 @@ function setupProfilePhotoUpload() {
       Helpers.toast('La imagen no debe superar 2MB', 'error');
       return;
     }
+    
+    const allowed = ['image/jpeg','image/png','image/webp'];
+    if(!allowed.includes(file.type)){
+      Helpers.toast('Formato de imagen no permitido', 'error');
+      return;
+    }
 
     Helpers.toast('Subiendo foto...', 'info');
     
@@ -1365,35 +1450,63 @@ async function loadDashboard() {
         'card-slate':  { iconBg: 'bg-slate-100',   iconText: 'text-slate-600',   border: 'border-slate-400',   decoration: 'bg-slate-50' }
     };
 
-    // ✅ Configuración de Tarjetas
+    // ✅ Configuración de Tarjetas (Reorganización solicitada)
     const cards = [
         {
-            title: 'Asistencia Hoy',
-            value: attText,
-            icon: 'user-check',
-            theme: attTheme,
-            sub: new Date().toLocaleDateString('es-ES', { weekday: 'long' })
+            title: 'Asistencia',
+            icon: 'calendar-check',
+            target: 'live-attendance',
+            theme: 'card-green',
+            value: attText // Mostrar estado actual
         },
         {
-            title: 'Tareas Pendientes',
-            value: pendingRes.count || 0,
-            icon: 'clipboard-list',
-            theme: 'card-red', // Rojo solicitado
-            sub: 'Por entregar'
-        },
-        {
-            title: 'Tareas Entregadas',
-            value: deliveredRes.count || 0,
-            icon: 'check-circle-2',
-            theme: 'card-yellow', // Amarillo solicitado
-            sub: 'Total enviado'
-        },
-        {
-            title: 'Estado de Cuenta',
-            value: totalDebt > 0 ? `$${totalDebt}` : 'Al día',
+            title: 'Pagos',
             icon: 'credit-card',
-            theme: totalDebt > 0 ? 'card-red' : 'card-green',
-            sub: totalDebt > 0 ? 'Pago pendiente' : 'Sin deudas'
+            target: 'payments',
+            theme: 'card-yellow',
+            value: totalDebt > 0 ? `$${totalDebt}` : 'Al día'
+        },
+        {
+            title: 'Calificaciones',
+            icon: 'graduation-cap',
+            target: 'grades',
+            theme: 'card-blue',
+            value: 'Ver'
+        },
+        {
+            title: 'Avisos',
+            icon: 'bell',
+            target: 'notifications',
+            theme: 'card-purple',
+            value: 'Revisar'
+        },
+        {
+            title: 'Chat',
+            icon: 'message-circle',
+            target: 'notifications', // Chat está en notificaciones
+            theme: 'card-slate',
+            value: 'Mensajes'
+        },
+        {
+            title: 'Aula Virtual',
+            icon: 'video',
+            target: 'videocall',
+            theme: 'card-rose',
+            value: 'Entrar'
+        },
+        {
+            title: 'Horario',
+            icon: 'clock',
+            target: 'class', // Muro/Clases
+            theme: 'card-red',
+            value: 'Ver'
+        },
+        {
+            title: 'Actividades',
+            icon: 'star',
+            target: 'class',
+            theme: 'card-yellow',
+            value: 'Explorar'
         }
     ];
 
@@ -1402,22 +1515,12 @@ async function loadDashboard() {
         const t = themeMap[card.theme] || themeMap['card-slate'];
         
         return `
-        <div class="card-base dashboard-card bg-white group cursor-default relative overflow-hidden border-b-4 ${t.border}">
-            <div class="flex justify-between items-start mb-4 relative z-10 px-1">
-                <div class="p-3 rounded-2xl ${t.iconBg} ${t.iconText} shadow-sm transform group-hover:scale-110 transition-transform duration-300">
-                    <i data-lucide="${card.icon}" class="w-8 h-8"></i>
-                </div>
-                <div class="text-right">
-                    <span class="text-4xl font-black text-slate-800 tracking-tighter drop-shadow-sm">${card.value}</span>
-                </div>
+        <div data-target="${card.target}" class="bubble-card p-5 flex flex-col items-center justify-center gap-3 cursor-pointer hover:shadow-lg active:scale-95 transition-all group relative overflow-hidden">
+            <div class="p-4 rounded-full ${t.iconBg} ${t.iconText} mb-1 group-hover:scale-110 transition-transform duration-300">
+                <i data-lucide="${card.icon}" class="w-8 h-8"></i>
             </div>
-            <div class="relative z-10">
-                <h3 class="text-lg font-bold text-slate-800 leading-tight">${card.title}</h3>
-                <p class="text-[10px] text-slate-500 font-bold uppercase tracking-widest mt-1">${card.sub}</p>
-            </div>
-            
-            <!-- Decoración de Fondo -->
-            <div class="absolute -bottom-6 -right-6 w-24 h-24 ${t.decoration} rounded-full opacity-40 group-hover:scale-150 transition-transform duration-500"></div>
+            <h3 class="font-bold text-slate-700 text-lg">${card.title}</h3>
+            <span class="text-xs font-bold text-slate-400 uppercase tracking-wider bg-slate-50 px-2 py-1 rounded-lg">${card.value}</span>
         </div>
         `;
     }).join('');
@@ -1440,12 +1543,21 @@ async function loadAttendance() {
   if (!student) return;
 
   try {
-    const { data } = await supabase
-      .from(TABLES.ATTENDANCE)
-      .select('date, status')
-      .eq('student_id', student.id)
-      .order('date', { ascending: false })
-      .limit(60); // Últimos 2 meses aprox
+    // ✅ 2. CACHE GLOBAL (Uso en Asistencia)
+    let data = GlobalCache.get('attendance');
+    
+    if (!data) {
+      const { data: freshData, error } = await supabase
+        .from(TABLES.ATTENDANCE)
+        .select('date, status')
+        .eq('student_id', student.id)
+        .order('date', { ascending: false })
+        .limit(60);
+      
+      if (error) throw error;
+      data = freshData || [];
+      GlobalCache.set('attendance', data);
+    }
     
     renderCalendar(data || []);
     updateAttendanceStats(data || []);
@@ -1471,9 +1583,10 @@ function renderCalendar(attendanceData) {
   const attMap = {};
   attendanceData.forEach(a => attMap[a.date] = a.status);
 
+  let html = '';
   // Días vacíos previos
   for (let i = 0; i < firstDay; i++) {
-    container.innerHTML += `<div class="h-10"></div>`;
+    html += `<div class="h-10"></div>`;
   }
 
   // Días del mes
@@ -1486,12 +1599,13 @@ function renderCalendar(attendanceData) {
     else if (status === 'absent') colorClass = 'bg-rose-100 text-rose-600';
     else if (status === 'late') colorClass = 'bg-amber-100 text-amber-600';
 
-    container.innerHTML += `
+    html += `
       <div class="h-10 flex items-center justify-center rounded-lg ${colorClass} text-sm transition-all">
         ${day}
       </div>
     `;
   }
+  container.innerHTML = html;
 }
 
 function updateAttendanceStats(data) {
@@ -1537,7 +1651,10 @@ async function loadClassFeed() {
       const likeCount = p.likes?.[0]?.count || 0;
       const commentCount = p.comments?.[0]?.count || 0;
       // ✅ Protección XSS en media
-      const safeMedia = encodeURI(p.media_url || '');
+      let safeMedia = '';
+      if (p.media_url && (p.media_url.startsWith('https://') || p.media_url.startsWith('http://'))) {
+          safeMedia = encodeURI(p.media_url);
+      }
       
       return `
       <div class="bg-white p-5 rounded-2xl shadow-sm border border-slate-100 mb-4" id="post-${p.id}">
@@ -1611,8 +1728,12 @@ function initFeedRealtime() {
          const listEl = document.getElementById(`comments-list-${newComment.post_id}`);
          if(listEl && listEl.offsetParent !== null) { // Si es visible
             // Obtener nombre del usuario
-            const { data: user } = await supabase.from(TABLES.PROFILES).select('name').eq('id', newComment.user_id).single();
-            const name = user?.name || 'Usuario';
+            let name = newComment.user_name || 'Usuario';
+            if (!newComment.user_name) {
+                // Fallback si no viene en payload
+                const { data: user } = await supabase.from(TABLES.PROFILES).select('name').eq('id', newComment.user_id).single();
+                name = user?.name || 'Usuario';
+            }
             
             const div = document.createElement('div');
             div.className = 'flex gap-2 text-sm animate-fade-in';
@@ -1677,13 +1798,15 @@ window.toggleLike = async (postId) => {
     if (error && error.code === '23505') { // Unique violation
        await supabase.from(TABLES.LIKES).delete().eq('post_id', postId).eq('user_id', user.id);
        Helpers.toast('Like removido', 'info');
+       // ✅ Fix counter
+       const countSpan = document.querySelector(`#post-${postId} button i[data-lucide="heart"] + span`);
+       if(countSpan) countSpan.textContent = Math.max(0, parseInt(countSpan.textContent || '0') - 1);
     } else if (!error) {
        Helpers.toast('¡Te gusta esto!', 'success');
+       // ✅ Fix counter
+       const countSpan = document.querySelector(`#post-${postId} button i[data-lucide="heart"] + span`);
+       if(countSpan) countSpan.textContent = parseInt(countSpan.textContent || '0') + 1;
     }
-    
-    // ✅ Optimistic UI: Actualizar contador sin recargar todo
-    const countSpan = document.querySelector(`#post-${postId} button i[data-lucide="heart"] + span`);
-    if(countSpan) countSpan.textContent = parseInt(countSpan.textContent || '0') + 1;
     
   } catch(e) { console.error(e); }
 };
@@ -1695,9 +1818,11 @@ window.sendComment = async (postId) => {
   
   try {
     const user = AppState.get('user');
+    const profile = AppState.get('profile');
     const { error } = await supabase.from(TABLES.COMMENTS).insert({
       post_id: postId,
       user_id: user.id,
+      user_name: profile?.name, // ✅ Optimización
       content: text
     });
     
@@ -1719,12 +1844,19 @@ async function loadGrades() {
   if (!student) return;
 
   try {
-    const { data: grades, error } = await supabase
-      .from(TABLES.GRADES)
-      .select('*')
-      .eq('student_id', student.id);
+    // ✅ 2. CACHE GLOBAL (Uso en Calificaciones)
+    let grades = GlobalCache.get('grades');
+    
+    if (!grades) {
+      const { data, error } = await supabase
+        .from(TABLES.GRADES)
+        .select('*')
+        .eq('student_id', student.id);
 
-    if (error) throw error;
+      if (error) throw error;
+      grades = data || [];
+      GlobalCache.set('grades', grades);
+    }
 
     if (!grades || !grades.length) {
       container.innerHTML = Helpers.emptyState('No hay calificaciones aún');
@@ -1819,14 +1951,21 @@ async function loadPayments() {
   const year = new Date().getFullYear();
 
   try {
-    const { data: payments, error } = await supabase
-      .from('payments')
-      .select('*')
-      .eq('student_id', student.id)
-      .gte('created_at', `${year}-01-01`) // ✅ Filtrar por año actual
-      .order('created_at', { ascending: false });
+    // ✅ 2. CACHE GLOBAL (Uso en Pagos)
+    let payments = GlobalCache.get('payments');
 
-    if (error) throw error;
+    if (!payments) {
+      const { data, error } = await supabase
+        .from('payments')
+        .select('*')
+        .eq('student_id', student.id)
+        .gte('created_at', `${year}-01-01`)
+        .order('created_at', { ascending: false });
+
+      if (error) throw error;
+      payments = data || [];
+      GlobalCache.set('payments', payments);
+    }
 
     if (!payments || !payments.length) {
       container.innerHTML = Helpers.emptyState('No hay historial de pagos');

@@ -45,6 +45,7 @@ document.addEventListener('DOMContentLoaded', ()=>{
   // initRoomsModule();   // REMOVED: Managed by app.js (Supabase)
   safeInit(initAttendanceModule); // Real attendance stats
   
+  safeInit(initDirectorVideoCall); // ✅ Módulo de Videollamada
   adjustMainOffset();
   window.addEventListener('resize', adjustMainOffset);
   const dash = document.getElementById('dashboard');
@@ -58,6 +59,76 @@ function safeInit(fn){
     console.error(`Error inicializando ${fn.name}:`, e);
   }
 }
+
+// --- MÓDULO DE VIDEOLLAMADA (Directora) ---
+function initDirectorVideoCall() {
+  // 1. Inyectar Botón Flotante
+  const fab = document.createElement('button');
+  fab.className = 'fixed bottom-6 right-6 w-14 h-14 bg-rose-600 hover:bg-rose-700 text-white rounded-full shadow-2xl flex items-center justify-center z-50 transition-transform hover:scale-110';
+  fab.innerHTML = '<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m22 8-6 4 6 4V8Z"/><rect x="2" y="6" width="14" height="12" rx="2" ry="2"/></svg>';
+  fab.title = "Iniciar Reunión";
+  fab.onclick = openDirectorMeeting;
+  document.body.appendChild(fab);
+
+  // 2. Inyectar Modal de Video (si no existe)
+  if (!document.getElementById('videoModal')) {
+    const modal = document.createElement('div');
+    modal.id = 'videoModal';
+    modal.className = 'fixed inset-0 bg-slate-900/90 hidden items-center justify-center z-[100] backdrop-blur-sm p-4';
+    modal.innerHTML = `
+      <div class="bg-white w-full max-w-6xl h-[85vh] rounded-3xl overflow-hidden flex flex-col relative shadow-2xl">
+        <div class="bg-slate-900 p-4 flex justify-between items-center">
+           <h3 class="text-white font-bold flex items-center gap-2"><span class="w-3 h-3 bg-red-500 rounded-full animate-pulse"></span> Sala de Dirección</h3>
+           <button id="closeVideoModal" class="bg-slate-700 text-white p-2 rounded-full hover:bg-red-600 transition-colors">
+             <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+           </button>
+        </div>
+        <div id="jitsi-director-container" class="flex-1 bg-black"></div>
+      </div>
+    `;
+    document.body.appendChild(modal);
+    
+    document.getElementById('closeVideoModal').onclick = () => {
+      modal.classList.add('hidden');
+      modal.classList.remove('flex');
+      if (window.jitsiDirectorApi) {
+        window.jitsiDirectorApi.dispose();
+        window.jitsiDirectorApi = null;
+      }
+    };
+  }
+}
+
+window.openDirectorMeeting = function() {
+  const modal = document.getElementById('videoModal');
+  modal.classList.remove('hidden');
+  modal.classList.add('flex');
+  
+  // Cargar script Jitsi dinámicamente si no está
+  if (!window.JitsiMeetExternalAPI) {
+    const script = document.createElement('script');
+    script.src = 'https://meet.jit.si/external_api.js';
+    script.onload = launchJitsi;
+    document.head.appendChild(script);
+  } else {
+    launchJitsi();
+  }
+
+  function launchJitsi() {
+    if (window.jitsiDirectorApi) window.jitsiDirectorApi.dispose();
+    const domain = "meet.jit.si";
+    const options = {
+      roomName: "KarpusKids_Direccion_General",
+      width: "100%",
+      height: "100%",
+      parentNode: document.getElementById('jitsi-director-container'),
+      lang: 'es',
+      userInfo: { displayName: 'Directora' },
+      configOverwrite: { startWithAudioMuted: false, startWithVideoMuted: false }
+    };
+    window.jitsiDirectorApi = new JitsiMeetExternalAPI(domain, options);
+  }
+};
 
 // --- Real Attendance Logic ---
 function initAttendanceModule() {

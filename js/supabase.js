@@ -62,9 +62,13 @@ export async function subscribeNotifications(onNotif) {
 
 export async function sendEmail(to, subject, html, text) {
   try {
-    const res = await fetch('http://127.0.0.1:5600/api/email/send', {
+    const { data: { session } } = await supabase.auth.getSession();
+    const res = await fetch('https://wwnfonkvemimwiqjpkij.supabase.co/functions/v1/send-email', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: { 
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${session?.access_token || ''}`
+      },
       body: JSON.stringify({ to, subject, html, text })
     });
     if (!res.ok) {
@@ -84,8 +88,35 @@ export async function sendPush(payload) {
 }
 if (!window.sendPush) window.sendPush = sendPush;
 
-export async function initOneSignal() {
-  const { data: { user } } = await supabase.auth.getUser();
+export async function emitEvent(type, data) {
+  try {
+    const { data: { session } } = await supabase.auth.getSession();
+    const res = await fetch(`${SUPABASE_URL}/functions/v1/process-event`, {
+      method: 'POST',
+      headers: { 
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${session?.access_token || ''}`
+      },
+      body: JSON.stringify({ type, data })
+    });
+    if (!res.ok) {
+      console.error('Error emitiendo evento', res.status);
+    }
+    return await res.json();
+  } catch (e) {
+    console.error('Error emitiendo evento', e);
+  }
+}
+if (!window.emitEvent) window.emitEvent = emitEvent;
+
+export async function initOneSignal(currentUser = null) {
+  let user = currentUser;
+  
+  // Si no se pasa usuario, intentar obtenerlo (fallback)
+  if (!user) {
+    const { data } = await supabase.auth.getUser();
+    user = data?.user;
+  }
   if (!user) return;
 
   const ONESIGNAL_APP_ID = "47ce2d1e-152e-4ea7-9ddc-8e2142992989";
@@ -105,8 +136,6 @@ export async function initOneSignal() {
   // 2. Inicialización profesional
   OneSignalDeferred.push(async function(OneSignal) {
     try {
-      const isLocal = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
-      
       await OneSignal.init({
         appId: ONESIGNAL_APP_ID,
         // safari_web_id: "web.onesignal.auto.10425e70-6593-4a12-8758-69279093e878", // Descomentar si se configura
