@@ -91,6 +91,9 @@
       50% { transform: translateY(-6px); }
       100% { transform: translateY(0px); }
     }
+    @keyframes float-delayed { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-10px); } }
+    .animate-float-delayed { animation: float-delayed 5s ease-in-out infinite; animation-delay: 1s; }
+
     .animate-float { animation: float 4s ease-in-out infinite; }
     
     @keyframes breathe {
@@ -135,7 +138,13 @@
     }
   </style>
 </head>
-<body class="text-slate-700 panel-padre-body overflow-x-hidden" aria-label="Panel de padres Karpus Kids">
+<body class="text-slate-700 panel-padre-body overflow-x-hidden min-h-screen bg-gradient-to-br from-sky-300 via-indigo-200 to-purple-200 relative" aria-label="Panel de padres Karpus Kids">
+
+  <!-- Elementos Decorativos de Fondo (Igual que Login) -->
+  <div class="fixed top-10 left-10 text-6xl opacity-60 animate-float select-none z-0 pointer-events-none">☁️</div>
+  <div class="fixed bottom-20 right-10 text-6xl opacity-60 animate-float-delayed select-none z-0 pointer-events-none">🌈</div>
+  <div class="fixed top-1/3 right-20 text-4xl opacity-40 animate-pulse select-none z-0 pointer-events-none">⭐</div>
+  <div class="fixed bottom-10 left-1/4 text-5xl opacity-50 animate-bounce select-none z-0 pointer-events-none" style="animation-duration: 3s;">🎈</div>
 
   <!-- Overlay de Carga Inicial -->
   <div id="initial-loading">
@@ -148,7 +157,7 @@
     <p class="mt-4 font-bold text-slate-400 animate-pulse">Preparando la mochila...</p>
   </div>
 
-  <div class="flex min-h-screen relative app app-panel-padre">
+  <div class="flex min-h-screen relative app app-panel-padre z-10">
     <!-- SIDEBAR MOCHILA (Verde/Turquesa) -->
     <aside
       id="sidebar"
@@ -228,10 +237,13 @@
     >
       <!-- Header Móvil -->
       <div class="md:hidden flex items-center justify-between mb-6">
-        <span class="font-black text-slate-700 text-xl tracking-tight flex items-center gap-2">
-           <span class="text-3xl animate-breathe">🎈</span> Karpus Kids
+        <span class="font-black text-slate-800 text-xl tracking-tight flex items-center gap-2">
+           <span class="text-3xl animate-breathe">🎈</span> 
+           <span class="karpus-kids-inline">
+            <span class="k-1">K</span><span class="k-2">a</span><span class="k-3">r</span><span class="k-4">p</span><span class="k-5">u</span><span class="k-6">s</span> <span class="k-7">K</span><span class="k-8">i</span><span class="k-9">d</span><span class="k-10">s</span>
+           </span>
         </span>
-        <div id="headerAvatarMobile" class="w-10 h-10 bg-sky-100 rounded-full flex items-center justify-center text-sky-600 font-bold border-2 border-white shadow-md">
+        <div id="headerAvatarMobile" class="w-10 h-10 bg-sky-100 rounded-full flex items-center justify-center text-sky-600 font-bold border-2 border-white shadow-md overflow-hidden">
             <i data-lucide="user" class="w-5 h-5"></i>
         </div>
       </div>

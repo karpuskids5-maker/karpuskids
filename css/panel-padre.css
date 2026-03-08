@@ -260,8 +260,6 @@ body.panel-padre-body #sidebar {
 
 /* ——— Fondo y Tema Verde Predominante ——— */
 body.panel-padre-body {
-  background-color: #f8fafc; /* Slate 50 */
-  background-image: radial-gradient(at 0% 0%, rgba(224, 242, 254, 0.4) 0px, transparent 50%), radial-gradient(at 100% 0%, rgba(240, 253, 244, 0.4) 0px, transparent 50%);
 }
 
 /* Botones Importantes (Verde Predominante) */

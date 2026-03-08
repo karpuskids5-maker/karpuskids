@@ -121,6 +121,19 @@
       border-radius: 8px;
       position: relative;
     }
+
+    /* 📱 Responsividad Móvil: Tablas */
+    @media (max-width: 640px) {
+      .table-responsive {
+        display: block;
+        width: 100%;
+        overflow-x: auto;
+        -webkit-overflow-scrolling: touch;
+      }
+      .table-responsive table {
+        min-width: 600px; /* Asegurar que la tabla no se colapse */
+      }
+    }
     .notebook-paper::before { /* Espiral */
       content: ""; position: absolute; left: -12px; top: 0; bottom: 0; width: 20px;
       background: radial-gradient(circle, #334155 30%, transparent 40%); background-size: 100% 2rem;
@@ -328,7 +341,7 @@
         <header class="mb-6">
           <h1 class="text-2xl font-bold text-slate-800">Mis Alumnos</h1>
         </header>
-        <div class="bg-white rounded-xl shadow-sm overflow-hidden">
+        <div class="bg-white rounded-xl shadow-sm table-responsive">
           <div class="p-4 border-b flex gap-4">
             <input type="text" placeholder="Buscar alumno..." class="border rounded-lg px-4 py-2 w-full max-w-sm">
           </div>

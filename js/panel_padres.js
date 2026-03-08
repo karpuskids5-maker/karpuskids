@@ -783,6 +783,9 @@ function updateStudentUI(student) {
   if (preview) preview.innerHTML = `<img src="${avatarUrl}" class="w-full h-full object-cover">`;
   const headerAvatar = document.getElementById('headerStudentAvatar');
   if (headerAvatar) headerAvatar.innerHTML = `<img src="${avatarUrl}" alt="Avatar" class="w-full h-full object-cover">`;
+
+  const mobileAvatar = document.getElementById('headerAvatarMobile');
+  if (mobileAvatar) mobileAvatar.innerHTML = `<img src="${avatarUrl}" alt="Avatar" class="w-full h-full object-cover">`;
 }
 
 // ===== LISTENER CLASE EN VIVO (BADGE) =====
@@ -1664,7 +1667,7 @@ async function loadClassFeed() {
   try {
     const { data: posts, error } = await supabase
       .from(TABLES.POSTS)
-      .select('*, teacher:profiles(name), likes(count), comments(count)')
+      .select('*, teacher:profiles(name, avatar_url), likes(count), comments(count)')
       .eq('classroom_id', student.classroom_id)
       .order('created_at', { ascending: false });
 
@@ -1676,7 +1679,10 @@ async function loadClassFeed() {
     }
 
     container.innerHTML = posts.map(p => {
-      const teacherName = p.teacher?.name || 'Maestra/o';
+      // Manejo robusto de datos del maestro (objeto o array)
+      const teacherObj = Array.isArray(p.teacher) ? p.teacher[0] : p.teacher;
+      const teacherName = teacherObj?.name || 'Maestra/o';
+      const teacherAvatar = teacherObj?.avatar_url;
       const likeCount = p.likes?.length ? p.likes[0].count : 0;
       const commentCount = p.comments?.length ? p.comments[0].count : 0;
       // ✅ Protección XSS en media
@@ -1692,8 +1698,11 @@ async function loadClassFeed() {
       return `
       <div class="bg-white p-5 rounded-2xl shadow-sm border border-slate-100 mb-4" id="post-${p.id}">
         <div class="flex items-center gap-3 mb-3">
-          <div class="w-10 h-10 bg-indigo-100 rounded-full flex items-center justify-center font-bold text-indigo-600">
-            ${teacherName.charAt(0)}
+          <div class="w-10 h-10 rounded-full bg-indigo-100 border border-indigo-50 overflow-hidden flex items-center justify-center flex-shrink-0">
+            ${teacherAvatar 
+              ? `<img src="${teacherAvatar}" class="w-full h-full object-cover" alt="${escapeHtml(teacherName)}">` 
+              : `<span class="font-bold text-indigo-600">${teacherName.charAt(0)}</span>`
+            }
           </div>
           <div>
             <p class="font-bold text-slate-800">${escapeHtml(teacherName)}</p>
@@ -1766,7 +1775,8 @@ function initFeedRealtime() {
          const listEl = document.getElementById(`comments-list-${newComment.post_id}`);
          if(listEl && listEl.offsetParent !== null) { // Si es visible
             // Obtener nombre del usuario
-            let name = newComment.user_name || 'Usuario';
+            // Intentar usar user_name si viene en el payload, sino buscar en perfiles
+            let name = newComment.user_name || 'Yo'; 
             if (!newComment.user_name) {
                 // Fallback si no viene en payload
                 const { data: user } = await supabase.from(TABLES.PROFILES).select('name').eq('id', newComment.user_id).single();
@@ -1810,12 +1820,14 @@ window.toggleCommentSection = async (postId) => {
     if (!comments || !comments.length) {
       list.innerHTML = '<p class="text-xs text-slate-400 text-center py-2">Sé el primero en comentar</p>';
     } else {
-      list.innerHTML = comments.map(c => `
+      list.innerHTML = comments.map(c => {
+        const uName = Array.isArray(c.user) ? c.user[0]?.name : c.user?.name;
+        return `
         <div class="flex gap-2 text-sm">
-          <div class="font-bold text-slate-700 whitespace-nowrap">${escapeHtml(c.user?.name || 'Usuario')}:</div>
+          <div class="font-bold text-slate-700 whitespace-nowrap">${escapeHtml(uName || 'Usuario')}:</div>
           <div class="text-slate-600">${escapeHtml(c.content)}</div>
         </div>
-      `).join('');
+      `}).join('');
     }
     list.scrollTop = list.scrollHeight;
   } else {
@@ -1860,7 +1872,7 @@ window.sendComment = async (postId) => {
     const { error } = await supabase.from(TABLES.COMMENTS).insert({
       post_id: postId,
       user_id: user.id,
-      user_name: profile?.name, // ✅ Optimización
+      // user_name: profile?.name, // ❌ ELIMINADO: Causa error 400 si la columna no existe en la BD
       content: text
     });
     
@@ -2158,26 +2170,29 @@ async function saveAllProfile() {
   btn.disabled = true;
   btn.textContent = 'Guardando...';
 
-  const birthDate = document.getElementById('inputStudentBirth').value;
+  // Helper seguro para obtener valores (evita crash si el elemento no existe)
+  const getVal = (id) => document.getElementById(id)?.value?.trim() || null;
+
+  const birthDate = getVal('inputStudentBirth');
   
   const updates = {
     // Estudiante
-    name: document.getElementById('inputStudentName').value,
+    name: getVal('inputStudentName'),
     birth_date: birthDate || null,
-    blood_type: document.getElementById('inputStudentBlood')?.value.trim() || null,
-    allergies: document.getElementById('inputStudentAllergy')?.value.trim() || null,
+    blood_type: getVal('inputStudentBlood'),
+    allergies: getVal('inputStudentAllergy'),
     // Padres
-    p1_name: document.getElementById('profileFatherName').value.trim() || null,
-    p1_phone: document.getElementById('profileFatherPhone').value.trim() || null,
-    p1_email: document.getElementById('profileFatherEmail').value.trim() || null,
-    p2_name: document.getElementById('profileMotherName').value.trim() || null,
-    p2_phone: document.getElementById('profileMotherPhone').value.trim() || null,
-    p2_email: document.getElementById('profileMotherEmail').value.trim() || null,
-    authorized_pickup: document.getElementById('profilePickupName').value.trim() || null,
-    t1_name: document.getElementById('tutor1Name')?.value.trim() || null,
-    t1_phone: document.getElementById('tutor1Phone')?.value.trim() || null,
-    t2_name: document.getElementById('tutor2Name')?.value.trim() || null,
-    t2_phone: document.getElementById('tutor2Phone')?.value.trim() || null
+    p1_name: getVal('profileFatherName'),
+    p1_phone: getVal('profileFatherPhone'),
+    p1_email: getVal('profileFatherEmail'),
+    p2_name: getVal('profileMotherName'),
+    p2_phone: getVal('profileMotherPhone'),
+    p2_email: getVal('profileMotherEmail'),
+    authorized_pickup: getVal('profilePickupName'),
+    t1_name: getVal('tutor1Name'),
+    t1_phone: getVal('tutor1Phone'),
+    t2_name: getVal('tutor2Name'),
+    t2_phone: getVal('tutor2Phone')
   };
   
   const { error } = await supabase.from(TABLES.STUDENTS).update(updates).eq('id', student.id);
@@ -2233,7 +2248,7 @@ async function initVideoCall() {
 
   const domain = "meet.jit.si";
   const options = {
-    roomName: `KarpusKids_${student.classroom_id}_${new Date().getFullYear()}`,
+    roomName: "KarpusKids_" + (student.classroom_id || 'General').substring(0, 8),
     width: "100%",
     height: 600,
     parentNode: container,
@@ -2241,7 +2256,18 @@ async function initVideoCall() {
     userInfo: {
       displayName: AppState.get('profile')?.name || 'Padre/Madre'
     },
-    configOverwrite: { startWithAudioMuted: true, startWithVideoMuted: true }
+    configOverwrite: { 
+      startWithAudioMuted: true, 
+      startWithVideoMuted: true,
+      prejoinPageEnabled: false,
+      enableLobby: false,
+      defaultLanguage: 'es'
+    },
+    interfaceConfigOverwrite: {
+      SHOW_JITSI_WATERMARK: false,
+      SHOW_WATERMARK_FOR_GUESTS: false,
+      MOBILE_APP_PROMO: false
+    }
   };
   window.jitsiInstance = new JitsiMeetExternalAPI(domain, options);
 }

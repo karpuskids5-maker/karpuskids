@@ -124,7 +124,18 @@ window.openDirectorMeeting = function() {
       parentNode: document.getElementById('jitsi-director-container'),
       lang: 'es',
       userInfo: { displayName: 'Directora' },
-      configOverwrite: { startWithAudioMuted: false, startWithVideoMuted: false }
+      configOverwrite: { 
+          startWithAudioMuted: false, 
+          startWithVideoMuted: false,
+          prejoinPageEnabled: false,
+          enableLobby: false,
+          defaultLanguage: 'es'
+      },
+      interfaceConfigOverwrite: {
+          SHOW_JITSI_WATERMARK: false,
+          SHOW_WATERMARK_FOR_GUESTS: false,
+          MOBILE_APP_PROMO: false
+      }
     };
     window.jitsiDirectorApi = new JitsiMeetExternalAPI(domain, options);
   }

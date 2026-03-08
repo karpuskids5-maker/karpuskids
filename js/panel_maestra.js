@@ -1004,7 +1004,7 @@ const UI = {
               </button>
             </div>
         </div>
-        <div class="overflow-x-auto">
+        <div class="table-responsive overflow-x-auto">
             <table class="w-full text-left border-collapse">
                 <thead class="bg-gradient-to-r from-green-50 to-emerald-50 text-green-800 text-xs uppercase font-bold tracking-wider">
                     <tr>
@@ -1087,17 +1087,25 @@ const UI = {
 
   async saveAttendance() {
       if (!AppState.currentClass?.id) {
-          Helpers.toast('Seleccione una clase', 'error');
+          Helpers.toast('Seleccione una clase primero', 'error');
           return;
       }
+      
       const rows = document.querySelectorAll('.student-row');
+      if (rows.length === 0) {
+          Helpers.toast('No hay estudiantes en esta clase', 'info');
+          return;
+      }
+
       const upsertData = [];
-      const date = new Date().toISOString().split('T')[0];
+      // Usar fecha local YYYY-MM-DD para evitar desfases de zona horaria
+      const now = new Date();
+      const date = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
       
       rows.forEach(r => {
           const studentId = r.dataset.id;
           const status = r.dataset.status;
-          if(status && status !== 'pending') {
+          if(studentId && status && status !== 'pending') {
               upsertData.push({
                   student_id: studentId,
                   classroom_id: AppState.currentClass.id,
@@ -1108,20 +1116,26 @@ const UI = {
       });
 
       if(upsertData.length === 0) {
-          Helpers.toast('No hay cambios para guardar', 'info');
+          Helpers.toast('Por favor, marque la asistencia de al menos un estudiante', 'info');
           return;
       }
 
-      // 2. Attendance: doble toast innecesario (Corregido)
-      Helpers.toast('Guardando asistencia...', 'info'); // Solo uno
+      Helpers.toast('Guardando asistencia...', 'info');
       
-      const { error } = await supabase.from('attendance').upsert(upsertData, { onConflict: 'student_id,classroom_id,date' });
-      
-      if(error) {
-          Helpers.toast('Error al guardar asistencia', 'error');
-          console.error(error);
-      } else {
+      try {
+          const { error } = await supabase.from('attendance').upsert(upsertData, { 
+              onConflict: 'student_id,date' 
+          });
+          
+          if(error) throw error;
           Helpers.toast('Asistencia guardada correctamente', 'success');
+          
+          // Actualizar resumen diario si es necesario
+          if (this.loadDashboardStats) this.loadDashboardStats();
+          
+      } catch (error) {
+          console.error('Error guardando asistencia:', error);
+          Helpers.toast('Error al guardar: ' + (error.message || 'Fallo de red'), 'error');
       }
   },
 
@@ -1706,13 +1720,38 @@ const UI = {
     // 3. Iniciar Jitsi
     const domain = "meet.jit.si";
     const options = {
-      roomName: "KarpusKids_" + (AppState.currentClass?.id || 'General'),
+      roomName: "KarpusKids_" + (AppState.currentClass?.id || 'General').substring(0, 8),
       width: "100%",
       height: "100%",
       parentNode: document.getElementById('jitsi-container'),
       lang: 'es',
       userInfo: {
         displayName: AppState.profile?.name || 'Maestra'
+      },
+      configOverwrite: {
+        startWithAudioMuted: true,
+        startWithVideoMuted: true,
+        prejoinPageEnabled: false,
+        disableSettings: false,
+        requireDisplayName: false,
+        enableLobby: false,
+        defaultLanguage: 'es',
+        enableClosePage: false,
+        toolbarButtons: [
+           'microphone', 'camera', 'closedcaptions', 'desktop', 'fullscreen',
+           'fodeviceselection', 'hangup', 'profile', 'chat', 'recording',
+           'livestreaming', 'etherpad', 'sharedvideo', 'settings', 'raisehand',
+           'videoquality', 'filmstrip', 'invite', 'feedback', 'stats', 'shortcuts',
+           'tileview', 'videobackgroundblur', 'download', 'help', 'mute-everyone',
+           'security'
+        ],
+      },
+      interfaceConfigOverwrite: {
+        SHOW_JITSI_WATERMARK: false,
+        SHOW_WATERMARK_FOR_GUESTS: false,
+        DEFAULT_BACKGROUND: '#0f172a',
+        MOBILE_APP_PROMO: false,
+        TOOLBAR_ALWAYS_VISIBLE: false
       }
     };
     window.jitsiInstance = new JitsiMeetExternalAPI(domain, options);
