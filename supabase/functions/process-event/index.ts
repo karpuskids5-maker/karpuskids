@@ -1,4 +1,3 @@
-import { serve } from "https://deno.land/std@0.168.0/http/server.ts"
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2"
 import { Resend } from "https://esm.sh/resend@1.0.0"
 
@@ -12,9 +11,10 @@ const supabase = createClient(SUPABASE_URL!, SUPABASE_SERVICE_ROLE_KEY!)
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+  'Access-Control-Allow-Methods': 'POST, OPTIONS',
 }
 
-serve(async (req) => {
+Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response('ok', { headers: corsHeaders })
   }
@@ -47,6 +47,9 @@ serve(async (req) => {
       case 'payment.receipt_uploaded':
         responseData = await handleReceiptUploaded(data)
         break
+      case 'task.created':
+        responseData = await handleTaskCreated(data)
+        break
       default:
         throw new Error(`Evento no soportado: ${type}`)
     }
@@ -64,6 +67,7 @@ serve(async (req) => {
     })
 
   } catch (error) {
+    console.error("Error in process-event:", error)
     return new Response(JSON.stringify({ error: error.message }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       status: 400,
@@ -154,15 +158,8 @@ async function handleIncident(data: any) {
 }
 
 async function handleReceiptUploaded(data: any) {
-  // Notificar a administración que un padre subió un comprobante
   const { student_id, amount, month } = data
-  
-  // Obtener correos de staff
-  const { data: staff } = await supabase
-    .from('profiles')
-    .select('email')
-    .in('role', ['directora', 'asistente'])
-
+  const { data: staff } = await supabase.from('profiles').select('email').in('role', ['directora', 'asistente'])
   const emails = staff?.map(s => s.email).filter(Boolean) || []
 
   if (emails.length > 0) {
@@ -173,6 +170,40 @@ async function handleReceiptUploaded(data: any) {
       html: `<p>Se ha subido un nuevo comprobante de pago por <b>$${amount}</b> para el mes de <b>${month}</b>.</p><p>Por favor, revise el panel administrativo para validar.</p>`
     })
   }
+  return { success: true }
+}
 
+async function handleTaskCreated(data: any) {
+  const { classroom_id, title, due_date } = data
+  
+  // Obtener correos de padres de ese aula
+  const { data: parents } = await supabase
+    .from('students')
+    .select('p1_email, p1_name')
+    .eq('classroom_id', classroom_id)
+    .not('p1_email', 'is', null)
+
+  const emailPromises = (parents || []).map(p => {
+    const html = `
+      <div style="font-family: sans-serif; max-width: 600px; margin: auto; padding: 20px; border: 1px solid #eee; border-radius: 10px;">
+        <h2 style="color: #6366f1;">Nueva Tarea Asignada 📝</h2>
+        <p>Hola <b>${p.p1_name || 'familia'}</b>,</p>
+        <p>Se ha publicado una nueva tarea en el aula: <b>"${title}"</b>.</p>
+        <p><b>Fecha de Entrega:</b> ${due_date}</p>
+        <br>
+        <a href="https://karpuskids.com/panel_padres.html#tasks" style="display: inline-block; padding: 12px 20px; background: #6366f1; color: white; text-decoration: none; border-radius: 8px; font-weight: bold;">Ver Tarea</a>
+        <hr style="border: none; border-top: 1px solid #eee; margin: 20px 0;">
+        <p style="font-size: 12px; color: #666;">Karpus Kids - Educación y Cuidado</p>
+      </div>
+    `
+    return resend.emails.send({
+      from: 'Karpus Kids <tareas@karpuskids.com>',
+      to: p.p1_email,
+      subject: `Nueva Tarea: ${title}`,
+      html: html
+    })
+  })
+
+  await Promise.allSettled(emailPromises)
   return { success: true }
 }

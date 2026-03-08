@@ -133,17 +133,23 @@ export async function initOneSignal(currentUser = null) {
   window.OneSignal = window.OneSignal || [];
   window.OneSignalDeferred = window.OneSignalDeferred || [];
   
+  // Evitar múltiples inicializaciones
+  if (window.OneSignalInitialized) return;
+  window.OneSignalInitialized = true;
+
   // 2. Inicialización profesional
   OneSignalDeferred.push(async function(OneSignal) {
     try {
+      // Verificar si ya está inicializado para evitar 400 errors de re-suscripción
+      if (OneSignal.initialized) {
+        await OneSignal.login(user.id);
+        return;
+      }
+
       await OneSignal.init({
         appId: ONESIGNAL_APP_ID,
-        // safari_web_id: "web.onesignal.auto.10425e70-6593-4a12-8758-69279093e878", // Descomentar si se configura
         allowLocalhostAsSecureOrigin: true,
-        notifyButton: {
-          enable: false,
-        },
-        // welcomeNotification desactivado para evitar spam al recargar
+        notifyButton: { enable: false },
         promptOptions: {
           slidedown: {
             enabled: true,

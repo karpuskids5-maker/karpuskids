@@ -1,28 +1,44 @@
-import { serve } from "https://deno.land/std@0.177.0/http/server.ts"
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2"
 
-serve(async (req) => {
+const corsHeaders = {
+  'Access-Control-Allow-Origin': '*',
+  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+  'Access-Control-Allow-Methods': 'POST, OPTIONS',
+}
+
+Deno.serve(async (req) => {
+  // Manejo de CORS (Preflight)
+  if (req.method === 'OPTIONS') {
+    return new Response('ok', { headers: corsHeaders })
+  }
+
   try {
     const url = Deno.env.get("SUPABASE_URL")
     const key = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")
     const onesignalAppId = Deno.env.get("ONESIGNAL_APP_ID")
     const onesignalApiKey = Deno.env.get("ONESIGNAL_REST_API_KEY")
 
-    if (!url || !key) return new Response(JSON.stringify({ error: "Configuración de Supabase faltante" }), { status: 500 })
+    if (!url || !key) {
+      return new Response(JSON.stringify({ error: "Configuración de Supabase faltante" }), { 
+        status: 500, 
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
+      })
+    }
     
     const supabase = createClient(url, key, { auth: { persistSession: false } })
 
     const body = await req.json()
-    const user_id = body.user_id
-    const title = body.title
-    const message = body.message
-    const type = body.type || "info"
-    const link = body.link || null
+    const { user_id, title, message, type = "info", link = null } = body
 
-    if (!user_id || !title || !message) return new Response(JSON.stringify({ error: "Faltan datos obligatorios (user_id, title, message)" }), { status: 400 })
+    if (!user_id || !title || !message) {
+      return new Response(JSON.stringify({ error: "Faltan datos obligatorios (user_id, title, message)" }), { 
+        status: 400, 
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
+      })
+    }
 
     // 1. Guardar en la base de datos (Notificación interna)
-    const { error: rpcError } = await supabase.rpc("send_notification", { 
+    const { data: rpcResult, error: rpcError } = await supabase.rpc("send_notification", { 
       p_user_id: user_id, 
       p_title: title, 
       p_message: message, 
@@ -36,7 +52,7 @@ serve(async (req) => {
     let onesignalStatus = "not_configured"
     if (onesignalAppId && onesignalApiKey) {
       try {
-        const response = await fetch("https://onesignal.com/api/v1/notifications", {
+        const osResponse = await fetch("https://onesignal.com/api/v1/notifications", {
           method: "POST",
           headers: {
             "Content-Type": "application/json; charset=utf-8",
@@ -52,9 +68,10 @@ serve(async (req) => {
             small_icon: "ic_stat_onesignal_default"
           })
         })
-        const onesignalResult = await response.json()
-        onesignalStatus = response.ok ? "sent" : "failed"
-        if (!response.ok) console.error("Error OneSignal:", onesignalResult)
+        
+        const osResult = await osResponse.json()
+        onesignalStatus = osResponse.ok ? "sent" : "failed"
+        if (!osResponse.ok) console.error("Error OneSignal:", osResult)
       } catch (e) {
         console.error("Error llamando a OneSignal:", e)
         onesignalStatus = "error"
@@ -65,9 +82,16 @@ serve(async (req) => {
       ok: true, 
       internal_notif: !rpcError,
       onesignal: onesignalStatus 
-    }), { status: 200 })
+    }), { 
+      status: 200, 
+      headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
+    })
 
   } catch (e) {
-    return new Response(JSON.stringify({ error: String(e) }), { status: 500 })
+    console.error("Critical Error in send-push:", e)
+    return new Response(JSON.stringify({ error: String(e) }), { 
+      status: 500, 
+      headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
+    })
   }
 })

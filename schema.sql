@@ -666,6 +666,29 @@ begin
 end;
 $$;
 
+-- 5. RPC: Enviar Notificación Interna
+-- Esta función es llamada por la Edge Function send-push
+CREATE OR REPLACE FUNCTION public.send_notification(
+  p_user_id uuid,
+  p_title text,
+  p_message text,
+  p_type text DEFAULT 'info',
+  p_link text DEFAULT NULL
+)
+RETURNS boolean
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public
+AS $$
+BEGIN
+  INSERT INTO public.notifications (user_id, title, message, type, link)
+  VALUES (p_user_id, p_title, p_message, p_type, p_link);
+  RETURN true;
+EXCEPTION WHEN OTHERS THEN
+  RETURN false;
+END;
+$$;
+
 
 -- Actualización de la función RPC para aceptar filtro de mes
 create or replace function public.get_dashboard_kpis(p_month text)

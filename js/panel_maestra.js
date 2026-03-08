@@ -144,7 +144,7 @@ const UI = {
   },
 
   updateUserProfileUI() {
-    const name = AppState.profile?.name || 'Maestra Allamna';
+    const name = AppState.profile?.name || 'Maestra';
     const email = AppState.profile?.email || AppState.user.email;
     const avatar = AppState.profile?.avatar_url;
     document.querySelectorAll('.user-name-display').forEach(el => el.textContent = name);
@@ -251,7 +251,7 @@ const UI = {
             const row = attBtn.closest('tr');
             const status = attBtn.dataset.status;
             if (row && status) {
-                this.setAttendance(row.dataset.id, status);
+                this.setAttendance(row, status);
             }
         }
 
@@ -287,6 +287,18 @@ const UI = {
                document.body.classList.remove('no-scroll');
            }
         });
+    });
+
+    // Accesibilidad: Cerrar modales con ESC
+    document.addEventListener('keydown', (e) => {
+        if (e.key === 'Escape') {
+            const openModal = document.querySelector('.fixed:not(.hidden)');
+            if (openModal) {
+                openModal.classList.add('hidden');
+                openModal.classList.remove('flex');
+                document.body.classList.remove('no-scroll');
+            }
+        }
     });
 
     // Incident Modal Actions
@@ -371,10 +383,16 @@ const UI = {
 
     // Enrich classes with counts
     const enrichedClasses = await Promise.all(classes.map(async (cls) => {
-        const { count: tasksCount, error: tErr } = await supabase.from('tasks').select('*', { count: 'exact', head: true }).eq('classroom_id', cls.id);
-        const { count: studentsCount, error: sErr } = await supabase.from('students').select('*', { count: 'exact', head: true }).eq('classroom_id', cls.id);
-        if(tErr || sErr) console.warn('Error counting stats');
-        return { ...cls, tasksCount, studentsCount };
+        try {
+            const { count: tasksCount, error: tErr } = await supabase.from('tasks').select('*', { count: 'exact', head: true }).eq('classroom_id', cls.id);
+            const { count: studentsCount, error: sErr } = await supabase.from('students').select('*', { count: 'exact', head: true }).eq('classroom_id', cls.id);
+            if(tErr) console.error('Error counting tasks:', tErr);
+            if(sErr) console.error('Error counting students:', sErr);
+            return { ...cls, tasksCount: tasksCount || 0, studentsCount: studentsCount || 0 };
+        } catch (e) {
+            console.error('Error enriching class stats:', e);
+            return { ...cls, tasksCount: 0, studentsCount: 0 };
+        }
     }));
     
     // 7. Dashboard Diario Inteligente (Stats Globales)
@@ -436,6 +454,7 @@ const UI = {
   },
 
   openClass(cls) {
+    if (!cls || !cls.id) return;
     AppState.setCurrentClass(cls);
     document.getElementById('currentClassName').textContent = cls.name;
     
@@ -698,8 +717,8 @@ const UI = {
     } catch (error) {
         console.error('Error creando post:', error);
         Helpers.toast('Error al publicar: ' + (error.message || 'Error desconocido'), 'error');
-        
-        // Reset button
+    } finally {
+        // Reset button state
         btnSubmit.disabled = false;
         btnSubmit.innerHTML = `<span>Publicar</span><i data-lucide="send" class="w-4 h-4"></i>`;
         if(window.lucide) lucide.createIcons();
@@ -887,7 +906,10 @@ const UI = {
       const todayISO = today.toISOString().split('T')[0];
 
       // UI Update Optimistic
-      const siblings = btn.parentElement.querySelectorAll('.routine-toggle');
+      const container = btn.parentElement;
+      if(!container) return;
+      
+      const siblings = container.querySelectorAll('.routine-toggle');
       siblings.forEach(b => b.className = 'routine-toggle px-2 py-1 rounded-lg border text-xs flex items-center gap-1 transition-all bg-white border-slate-200 text-slate-600 hover:bg-slate-50');
       btn.className = 'routine-toggle px-2 py-1 rounded-lg border text-xs flex items-center gap-1 transition-all bg-blue-100 border-blue-300 text-blue-700 font-bold ring-1 ring-blue-300';
 
@@ -911,8 +933,9 @@ const UI = {
 
   async renderAttendance() {
     const tab = document.getElementById('tab-attendance');
+    if(!tab) return;
     if (!AppState.currentClass?.id) {
-        if(tab) tab.innerHTML = Helpers.emptyState('Seleccione una clase primero');
+        tab.innerHTML = Helpers.emptyState('Seleccione una clase primero');
         return;
     }
     const todayStr = new Date().toISOString().split('T')[0];
@@ -1041,8 +1064,7 @@ const UI = {
     });
   },
 
-  setAttendance(studentId, status) {
-      const row = document.querySelector(`tr[data-id="${studentId}"]`);
+  setAttendance(row, status) {
       if(!row) return;
       
       row.dataset.status = status;
@@ -1056,7 +1078,7 @@ const UI = {
           'bg-slate-100 text-slate-500'}`;
       
       const labels = { present: 'Presente', absent: 'Ausente', late: 'Tardanza' };
-      badge.textContent = labels[status];
+      badge.textContent = labels[status] || 'Pendiente';
   },
 
   async saveAttendance() {
@@ -1197,7 +1219,7 @@ const UI = {
 
   async loadTasksList() {
     const container = document.getElementById('tasksListContainer');
-    if(!container) return;
+    if(!container || !AppState.currentClass?.id) return;
 
     const { data: tasks, error } = await supabase
       .from('tasks')
@@ -1215,12 +1237,12 @@ const UI = {
       <div class="notebook-bg p-5 rounded-2xl shadow-sm hover:shadow-md transition group relative overflow-hidden">
         <div class="absolute top-0 left-0 w-1 h-full bg-pink-400"></div>
         <div class="flex justify-between items-start mb-2 pl-3">
-          <h4 class="font-bold text-slate-800 text-lg group-hover:text-pink-600 transition">${t.title}</h4>
+          <h4 class="font-bold text-slate-800 text-lg group-hover:text-pink-600 transition">${Helpers.escapeHTML(t.title)}</h4>
           <span class="text-xs font-bold bg-slate-100 text-slate-500 px-2 py-1 rounded-lg">
             Vence: ${Helpers.formatDate(t.due_date)}
           </span>
         </div>
-        <p class="text-slate-600 text-sm mb-4 pl-3 line-clamp-2">${t.description || 'Sin descripción'}</p>
+        <p class="text-slate-600 text-sm mb-4 pl-3 line-clamp-2">${Helpers.escapeHTML(t.description || 'Sin descripción')}</p>
         <div class="flex items-center justify-between mt-auto pl-3">
           <button class="bg-pink-50 text-pink-600 px-4 py-2 rounded-lg font-bold text-sm hover:bg-pink-100 transition flex items-center gap-2" onclick="UI.openTaskDetail('${t.id}')">
             <i data-lucide="eye" class="w-4 h-4"></i> Ver Entregas
@@ -1284,16 +1306,24 @@ const UI = {
           .select('parent_id')
           .eq('classroom_id', AppState.currentClass.id);
         
-        const parentIds = [...new Set(students.map(s => s.parent_id).filter(Boolean))];
-        for (const pid of parentIds) {
-          await window.sendPush({
+        const parentIds = [...new Set((students || []).map(s => s.parent_id).filter(Boolean))];
+        
+        await Promise.all(parentIds.map(pid => 
+          window.sendPush({
             user_id: pid,
             title: 'Nueva Tarea Asignada 📝',
             message: `Se ha publicado una nueva tarea: "${title}". Fecha de entrega: ${Helpers.formatDate(date)}`,
             type: 'info',
             link: '/panel_padres.html#tasks'
-          });
-        }
+          })
+        ));
+
+        // Emitir evento para correos
+        emitEvent('task.created', {
+          classroom_id: AppState.currentClass.id,
+          title: title,
+          due_date: Helpers.formatDate(date)
+        });
       } catch (e) { console.error('Error notificando tarea:', e); }
       
       // Fix: Reset form
@@ -1301,6 +1331,7 @@ const UI = {
       document.getElementById('taskDesc').value = '';
       document.getElementById('taskDate').value = '';
       document.getElementById('taskFile').value = '';
+      document.getElementById('taskTitle').focus(); // UX focus
 
       document.getElementById('newTaskForm').classList.add('hidden');
       document.getElementById('btnNewTask').classList.remove('hidden');
@@ -1322,7 +1353,9 @@ const UI = {
     if(!modal || !bodyEl) return;
     bodyEl.innerHTML = `<tr><td colspan="4" class="p-4">${Helpers.skeleton(1)}</td></tr>`;
 
-    const { data: task } = await supabase.from('tasks').select('*').eq('id', taskId).single();
+    const { data: task, error } = await supabase.from('tasks').select('*').eq('id', taskId).single();
+    if(error || !task){ Helpers.toast('Error cargando tarea','error'); return; }
+    
     const { data: students } = await supabase.from('students').select('id, name').eq('classroom_id', AppState.currentClass.id).order('name');
     const { data: evidences } = await supabase.from('task_evidences').select('*').eq('task_id', taskId);
 
@@ -1395,8 +1428,11 @@ const UI = {
   },
 
   async gradeTask(evidenceId, grade, btn) {
+    const parent = btn.parentElement;
+    if(!parent) return;
+    
     // UI Optimista
-    Array.from(btn.parentElement.children).forEach(b => {
+    Array.from(parent.children).forEach(b => {
         b.className = 'w-8 h-8 rounded-md font-bold text-xs transition-all text-slate-400 hover:bg-white hover:text-slate-600';
     });
     const activeClass = grade === 'A' ? 'bg-green-500 text-white' : (grade === 'B' ? 'bg-blue-500 text-white' : 'bg-orange-500 text-white');
@@ -1436,7 +1472,8 @@ const UI = {
       b.querySelector('i').className = `w-5 h-5 ${isActive ? 'text-yellow-400 fill-yellow-400' : 'text-slate-200 fill-slate-100'}`;
     });
     const { error } = await supabase.from('task_evidences').update({ stars: stars, status: 'graded' }).eq('id', evidenceId);
-    if(!error) Helpers.toast(`${stars} estrella(s) asignadas`);
+    if(error){ Helpers.toast('Error guardando estrellas','error'); return; }
+    Helpers.toast(`${stars} estrella(s) asignadas`);
   },
 
   // --- STUDENT PROFILE MODAL ---
@@ -1592,6 +1629,11 @@ const UI = {
     if (!container) return;
     container.innerHTML = ''; // Clear previous instance
 
+    if(!navigator.mediaDevices){
+      container.innerHTML = Helpers.emptyState('Tu navegador no soporta videollamadas','video-off');
+      return;
+    }
+
     if (typeof JitsiMeetExternalAPI === 'undefined') {
       container.innerHTML = Helpers.emptyState('Error cargando sistema de video', 'video-off');
       return;
@@ -1716,14 +1758,14 @@ const UI = {
       input.onkeypress = (e) => { if(e.key === 'Enter') sendMessage(); };
 
       function appendMessage(m) {
-          const isMe = m.user_id === AppState.user.id; // Note: user_id might not be in payload.new directly if not selected, but for local echo logic or fetch it works.
+          const isMe = m.user_id === AppState.user.id; 
           const name = m.profiles?.name || 'Usuario';
           const time = new Date(m.created_at).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'});
           
           chatContainer.innerHTML += `
-              <div class="flex flex-col mb-2 ${name === (AppState.profile?.name) ? 'items-end' : 'items-start'}">
+              <div class="flex flex-col mb-2 ${isMe ? 'items-end' : 'items-start'}">
                   <div class="text-[10px] text-slate-400 mb-0.5 px-1">${name} • ${time}</div>
-                  <div class="px-3 py-2 rounded-xl text-sm max-w-[85%] ${name === (AppState.profile?.name) ? 'bg-orange-100 text-orange-900 rounded-tr-none' : 'bg-white border border-slate-200 text-slate-700 rounded-tl-none shadow-sm'}">
+                  <div class="px-3 py-2 rounded-xl text-sm max-w-[85%] ${isMe ? 'bg-orange-100 text-orange-900 rounded-tr-none' : 'bg-white border border-slate-200 text-slate-700 rounded-tl-none shadow-sm'}">
                       ${Helpers.escapeHTML(m.message)}
                   </div>
               </div>
@@ -1854,10 +1896,10 @@ const UI = {
   }
 };
 
-// Expose UI to window for inline onclicks (backward compatibility or specific generated HTML)
+// Expose UI global para eventos inline
 window.UI = UI;
 
-// Initialize
+// Inicializar aplicación
 document.addEventListener('DOMContentLoaded', () => {
     try { initOneSignal(); } catch(e) {}
     UI.init();
@@ -1865,15 +1907,19 @@ document.addEventListener('DOMContentLoaded', () => {
     // Explicit Modal Close Logic for Profile
     document.getElementById('closeStudentProfile')?.addEventListener('click', () => {
         const m = document.getElementById('studentProfileModal');
-        m.classList.add('hidden');
-        m.classList.remove('flex');
-        document.body.classList.remove('no-scroll');
+        if (m) {
+            m.classList.add('hidden');
+            m.classList.remove('flex');
+            document.body.classList.remove('no-scroll');
+        }
     });
     
     document.getElementById('closeStudentProfileModal')?.addEventListener('click', () => {
         const m = document.getElementById('studentProfileModal');
-        m.classList.add('hidden');
-        m.classList.remove('flex');
-        document.body.classList.remove('no-scroll');
+        if (m) {
+            m.classList.add('hidden');
+            m.classList.remove('flex');
+            document.body.classList.remove('no-scroll');
+        }
     });
 });

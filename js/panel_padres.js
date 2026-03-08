@@ -424,13 +424,20 @@ function loadSectionData(sectionId, forceRefresh = false) {
     if(refreshBtn) refreshBtn.classList.add('animate-spin');
 
     // ✅ Manejo de errores centralizado en cada loader
-    loader().catch(err => {
-      console.error(`Error cargando sección ${sectionId}:`, err);
-      Helpers.toast(`Error al cargar ${sectionId}`, 'error');
-    }).finally(() => {
+    const result = loader();
+    if (result instanceof Promise) {
+      result.catch(err => {
+        console.error(`Error cargando sección ${sectionId}:`, err);
+        Helpers.toast(`Error al cargar ${sectionId}`, 'error');
+      }).finally(() => {
+        loadedSections.add(sectionId);
+        if(refreshBtn) refreshBtn.classList.remove('animate-spin');
+      });
+    } else {
+      // Si no es una promesa, marcar como cargada inmediatamente
       loadedSections.add(sectionId);
       if(refreshBtn) refreshBtn.classList.remove('animate-spin');
-    });
+    }
   }
 }
 
