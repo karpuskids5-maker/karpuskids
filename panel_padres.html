@@ -336,7 +336,7 @@
               <span class="text-3xl">🎒</span> Mochila de Tareas
             </h3>
             <div class="flex bg-white p-1 rounded-full shadow-sm border">
-              <button class="px-4 py-2 text-xs font-bold rounded-full bg-sky-100 text-sky-700 task-filter-btn transition-all" data-filter="pending">Por hacer</button>
+              <button class="px-4 py-2 text-xs font-bold rounded-full bg-emerald-100 text-emerald-700 task-filter-btn transition-all" data-filter="pending">Por hacer</button>
               <button class="px-4 py-2 text-xs font-medium rounded-full text-slate-500 hover:bg-slate-50 task-filter-btn transition-all" data-filter="overdue">Tarde</button>
               <button class="px-4 py-2 text-xs font-medium rounded-full text-slate-500 hover:bg-slate-50 task-filter-btn transition-all" data-filter="submitted">Listas</button>
             </div>
@@ -359,9 +359,11 @@
 
         <!-- CALIFICACIONES -->
         <section id="grades" class="section hidden">
-          <div class="card-base progress-card p-8 text-center">
-            <h3 class="text-2xl font-black text-slate-800 tracking-tight mb-2 text-campus-title">Tablero de Progreso</h3>
-            <div id="gradesContent"></div>
+          <div class="card-base progress-card p-6 md:p-8 min-h-[80vh]">
+            <h3 class="text-2xl font-black text-slate-800 tracking-tight mb-6 flex items-center gap-2 text-campus-title">
+               <span class="text-3xl">🏆</span> Tablero de Progreso
+            </h3>
+            <div id="gradesContent" class="flex flex-col items-center w-full"></div>
           </div>
         </section>
 

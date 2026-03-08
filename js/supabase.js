@@ -84,17 +84,22 @@ if (!window.sendEmail) window.sendEmail = sendEmail;
 export async function sendPush(payload) {
   try {
     const { data: { session } } = await supabase.auth.getSession();
+    if (!session) {
+      console.warn('No hay sesión activa para enviar notificaciones push');
+      return null;
+    }
+
     const { data, error } = await supabase.functions.invoke('send-push', { 
       body: payload,
-      headers: {
-        'Authorization': `Bearer ${session?.access_token || ''}`
-      }
+      // No incluimos el header manualmente para dejar que el SDK use el de la sesión actual
     });
+    
     if (error) throw error;
     return data;
   } catch (e) {
     console.error('Error enviando push:', e);
-    throw e;
+    // No relanzamos el error para evitar que rompa el flujo principal (ej. calificar tarea)
+    return null;
   }
 }
 if (!window.sendPush) window.sendPush = sendPush;

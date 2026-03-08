@@ -883,6 +883,13 @@ async function loadTasks(filter = 'pending') {
     container.innerHTML = filteredTasks.map(task => renderTaskCard(task, evidenceMap)).join('');
     container.setAttribute('aria-busy', 'false');
     
+    // ✅ Actualizar resumen de tareas
+    const summary = document.getElementById('tasksSummary');
+    if (summary) {
+      const pendingCount = filterTasks(tasksData, evidenceMap, 'pending').length;
+      summary.textContent = pendingCount > 0 ? `Tienes ${pendingCount} tareas pendientes` : '¡Estás al día!';
+    }
+    
     if (window.lucide) lucide.createIcons();
   } catch (err) {
     console.error('Error cargando tareas:', err);
@@ -919,89 +926,103 @@ function renderTaskCard(task, evidenceMap) {
   const evidence = evidenceMap.get(task.id);
   const isDelivered = !!evidence;
 
-  // ✅ 3. TAREAS ENTREGADAS
+  // ✅ 1. TAREAS ENTREGADAS (Listas) - DISEÑO MODERNO ESMERALDA
   if (isDelivered) {
-    // Configuración de color según nota
-    let gradeColor = 'bg-slate-500';
-    if (evidence.grade_letter === 'A') gradeColor = 'bg-green-500';
-    else if (evidence.grade_letter === 'B') gradeColor = 'bg-blue-500';
-    else if (evidence.grade_letter === 'C') gradeColor = 'bg-orange-500';
+    let gradeColor = 'bg-slate-400';
+    let gradeLabel = 'En revisión';
+    
+    if (evidence.grade_letter === 'A') { gradeColor = 'bg-emerald-500'; gradeLabel = 'Excelente'; }
+    else if (evidence.grade_letter === 'B') { gradeColor = 'bg-sky-500'; gradeLabel = 'Muy Bien'; }
+    else if (evidence.grade_letter === 'C') { gradeColor = 'bg-amber-500'; gradeLabel = 'Regular'; }
 
     return `
-    <article class="notebook-card group transition-transform hover:-translate-y-1 p-4 rounded-xl" aria-labelledby="task-title-${task.id}">
-      <div class="flex flex-col sm:flex-row sm:justify-between sm:items-start gap-3 relative z-10">
-        <div>
-          <h3 id="task-title-${task.id}" class="font-bold text-lg text-white drop-shadow-sm">${escapeHtml(task.title)}</h3>
-          <p class="text-xs text-blue-100 mt-1">${escapeHtml(task.classrooms?.level || '')}</p>
+    <article class="relative bg-emerald-50/50 border border-emerald-100 p-5 rounded-2xl transition-all hover:shadow-md group overflow-hidden" aria-labelledby="task-title-${task.id}">
+      <div class="absolute top-0 right-0 w-24 h-24 -mr-8 -mt-8 bg-emerald-100/50 rounded-full blur-2xl"></div>
+      
+      <div class="flex justify-between items-start gap-3 relative z-10">
+        <div class="flex-1">
+          <div class="flex items-center gap-2 mb-1">
+            <span class="px-2 py-0.5 bg-emerald-100 text-emerald-700 text-[10px] font-bold rounded-full uppercase tracking-wider">Completada</span>
+            <span class="text-[10px] text-slate-400 font-medium">${escapeHtml(task.classrooms?.level || '')}</span>
+          </div>
+          <h3 id="task-title-${task.id}" class="font-bold text-slate-800 text-lg leading-tight group-hover:text-emerald-700 transition-colors">${escapeHtml(task.title)}</h3>
         </div>
-        <div class="flex items-center gap-2">
+        
+        <div class="flex flex-col items-end gap-2">
            ${evidence.grade_letter 
-             ? `<div class="flex items-center bg-white rounded-lg px-2 py-1 shadow-sm gap-2">
-                  <span class="text-xs font-bold text-slate-500 uppercase">Nota</span>
-                  <span class="${gradeColor} text-white text-sm font-black px-2 rounded shadow-sm">${escapeHtml(evidence.grade_letter)}</span>
+             ? `<div class="flex items-center bg-white border border-emerald-100 rounded-xl p-1 shadow-sm pr-3 gap-2">
+                  <div class="${gradeColor} w-8 h-8 rounded-lg flex items-center justify-center text-white font-black shadow-sm text-lg">${escapeHtml(evidence.grade_letter)}</div>
+                  <div class="flex flex-col">
+                    <span class="text-[9px] uppercase font-bold text-slate-400 leading-none">Calificación</span>
+                    <span class="text-[11px] font-bold text-slate-600 leading-none mt-1">${gradeLabel}</span>
+                  </div>
                 </div>` 
-             : '<span class="bg-white/20 text-white text-xs font-bold px-2 py-1 rounded backdrop-blur-sm">En revisión</span>'}
+             : '<span class="bg-white border border-emerald-100 text-emerald-600 text-[10px] font-bold px-3 py-1.5 rounded-full shadow-sm flex items-center gap-1"><i data-lucide="clock" class="w-3 h-3"></i> En revisión</span>'}
         </div>
       </div>
       
-      <p class="text-sm text-blue-50 mt-3 font-medium opacity-90">${escapeHtml(task.description || 'Sin descripción')}</p>
+      <p class="text-sm text-slate-600 mt-3 line-clamp-2 relative z-10">${escapeHtml(task.description || 'Sin descripción')}</p>
       
-      <div class="mt-4 flex items-center justify-between">
-        <div class="text-xs text-blue-100 flex items-center gap-1">
-          <i data-lucide="calendar" class="w-3 h-3"></i> 
-          Enviado: ${new Date(evidence.created_at).toLocaleDateString('es-ES')}
+      <div class="mt-5 flex items-center justify-between border-t border-emerald-100 pt-4 relative z-10">
+        <div class="flex flex-col">
+          <span class="text-[10px] uppercase font-bold text-slate-400 tracking-tight">Fecha de entrega</span>
+          <span class="text-xs text-slate-600 font-medium">${new Date(evidence.created_at).toLocaleDateString('es-ES', { day: 'numeric', month: 'short', year: 'numeric' })}</span>
         </div>
         <button 
-          class="js-task-detail-btn px-4 py-2 bg-white text-blue-600 rounded-xl font-bold text-sm shadow-sm hover:bg-blue-50 transition-colors"
+          class="js-task-detail-btn px-5 py-2 bg-white border border-emerald-200 text-emerald-700 rounded-xl font-bold text-xs shadow-sm hover:bg-emerald-50 hover:border-emerald-300 transition-all active:scale-95"
           data-task-id="${task.id}"
         >
-          Ver Detalles
+          Ver mi entrega
         </button>
       </div>
       
       ${evidence.stars ? `
-      <div class="absolute -bottom-3 -right-2 bg-white px-3 py-1.5 rounded-full shadow-xl rotate-6 transform scale-90 sm:scale-100 border-2 border-yellow-100">
-        <div class="flex gap-0.5">
-          ${[...Array(5)].map((_, i) => 
-            `<i data-lucide="star" class="w-5 h-5 ${i < evidence.stars ? 'text-yellow-400 fill-yellow-400 drop-shadow-sm' : 'text-slate-200 fill-slate-100'}"></i>`
-          ).join('')}
-        </div>
+      <div class="mt-3 flex gap-0.5 justify-center bg-white/50 py-1 rounded-full border border-emerald-50">
+        ${[...Array(5)].map((_, i) => 
+          `<i data-lucide="star" class="w-4 h-4 ${i < evidence.stars ? 'text-yellow-400 fill-yellow-400' : 'text-slate-200 fill-slate-100'}"></i>`
+        ).join('')}
       </div>` : ''}
     </article>`;
   }
 
-  // ✅ 2. SECCIÓN TAREAS → ESTILO CUADERNO (Pendientes)
+  // ✅ 2. TAREAS PENDIENTES - DISEÑO MODERNO MINIMALISTA
   const isOverdue = dueDate && dueDate < new Date();
-  const statusColor = isOverdue ? 'text-rose-600' : 'text-slate-500';
-  const dateColor = isOverdue ? 'text-rose-600 font-bold' : 'text-slate-500';
+  const statusBg = isOverdue ? 'bg-rose-50 border-rose-100' : 'bg-white border-slate-100';
+  const accentColor = isOverdue ? 'rose' : 'blue';
 
   return `
-  <article class="notebook-card group p-4 rounded-xl" aria-labelledby="task-title-${task.id}">
-    <div class="flex flex-col sm:flex-row sm:justify-between sm:items-start gap-3">
-      <div>
-        <h3 id="task-title-${task.id}" class="font-bold text-slate-800 text-lg group-hover:text-blue-600 transition-colors" style="font-family: 'Comic Sans MS', 'Chalkboard SE', sans-serif;">${escapeHtml(task.title)}</h3>
-        <p class="text-xs ${statusColor} mt-1 flex items-center gap-1">
-           ${isOverdue ? '<i data-lucide="alert-circle" class="w-3 h-3"></i> Atrasada' : 'Pendiente'} 
-           • ${escapeHtml(task.classrooms?.level || '')}
-        </p>
+  <article class="${statusBg} border p-5 rounded-2xl transition-all hover:shadow-lg group relative overflow-hidden" aria-labelledby="task-title-${task.id}">
+    ${isOverdue ? '<div class="absolute top-0 left-0 w-1 h-full bg-rose-500"></div>' : ''}
+    
+    <div class="flex justify-between items-start gap-3">
+      <div class="flex-1">
+        <div class="flex items-center gap-2 mb-1">
+          <span class="px-2 py-0.5 ${isOverdue ? 'bg-rose-100 text-rose-700' : 'bg-blue-100 text-blue-700'} text-[10px] font-bold rounded-full uppercase tracking-wider">
+            ${isOverdue ? 'Atrasada' : 'Pendiente'}
+          </span>
+          <span class="text-[10px] text-slate-400 font-medium">${escapeHtml(task.classrooms?.level || '')}</span>
+        </div>
+        <h3 id="task-title-${task.id}" class="font-bold text-slate-800 text-lg leading-tight group-hover:text-${accentColor}-600 transition-colors">${escapeHtml(task.title)}</h3>
       </div>
-      <div class="hidden sm:block">
-        <span class="text-2xl opacity-20 group-hover:opacity-100 transition-opacity">✏️</span>
+      <div class="bg-slate-50 w-10 h-10 rounded-xl flex items-center justify-center text-xl group-hover:scale-110 transition-transform">
+        ${isOverdue ? '⚠️' : '📝'}
       </div>
     </div>
     
-    <p class="text-sm text-slate-700 mt-2 leading-relaxed" style="font-family: 'Comic Sans MS', 'Chalkboard SE', sans-serif;">${escapeHtml(task.description || 'Sin descripción')}</p>
+    <p class="text-sm text-slate-600 mt-3 line-clamp-3">${escapeHtml(task.description || 'Sin descripción')}</p>
     
-    <div class="mt-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 border-t border-blue-100/50 pt-3">
-      <div class="text-xs ${dateColor} flex items-center gap-1">
-        <i data-lucide="clock" class="w-3 h-3"></i>
-        Vence: ${dueDate ? dueDate.toLocaleDateString('es-ES', { weekday: 'short', day: 'numeric', month: 'short' }) : 'Sin fecha'}
+    <div class="mt-5 flex items-center justify-between border-t border-slate-50 pt-4">
+      <div class="flex flex-col">
+        <span class="text-[10px] uppercase font-bold text-slate-400 tracking-tight">Vence el</span>
+        <span class="text-xs ${isOverdue ? 'text-rose-600 font-bold' : 'text-slate-600 font-medium'}">
+          ${dueDate ? dueDate.toLocaleDateString('es-ES', { weekday: 'short', day: 'numeric', month: 'short' }) : 'Sin fecha'}
+        </span>
       </div>
       <button 
-        class="js-task-detail-btn w-full sm:w-auto px-5 py-2 bg-blue-500 hover:bg-blue-600 text-white rounded-lg font-bold text-sm shadow-md hover:shadow-lg transition-all transform hover:-translate-y-0.5"
+        class="js-task-detail-btn px-6 py-2.5 ${isOverdue ? 'bg-rose-600 hover:bg-rose-700 shadow-rose-100' : 'bg-blue-600 hover:bg-blue-700 shadow-blue-100'} text-white rounded-xl font-bold text-xs shadow-lg transition-all active:scale-95"
         data-task-id="${task.id}"
       >
-        Hacer Tarea
+        ${isOverdue ? 'Hacer ahora' : 'Realizar tarea'}
       </button>
     </div>
   </article>`;
@@ -1152,22 +1173,37 @@ async function submitTask(taskId) {
          fileUrl = data?.signedUrl;
       }
 
-      const { error: dbError } = await supabase.from(TABLES.TASK_EVIDENCES).insert({
-         task_id: taskId,
-         student_id: student.id,
-         parent_id: user.id,
-         comment: comment || null,
-         file_url: fileUrl,
-         status: 'submitted'
-      });
+    // 1. Guardar Evidencia
+    const { error: dbError } = await supabase.from(TABLES.TASK_EVIDENCES).insert({
+       task_id: taskId,
+       student_id: student.id,
+       parent_id: user.id,
+       comment: comment || null,
+       file_url: fileUrl,
+       status: 'submitted'
+    });
 
-      if (dbError) throw dbError;
+    if (dbError) throw dbError;
 
-      Helpers.toast('Tarea enviada con éxito', 'success');
-      triggerConfetti(); // 🎉 Animación de celebración
-      document.getElementById('modalTaskDetail').classList.add('hidden');
-      document.getElementById('modalTaskDetail').classList.remove('flex');
-      loadTasks(document.querySelector('.task-filter-btn.font-bold')?.dataset.filter || 'pending');
+    // 2. Limpiar cache local para forzar recarga
+    GlobalCache.clear('evidences');
+    GlobalCache.clear('tasks');
+
+    Helpers.toast('Tarea enviada con éxito', 'success');
+    triggerConfetti(); // 🎉 Animación de celebración
+    
+    // 3. Cerrar modal y recargar lista
+    document.getElementById('modalTaskDetail').classList.add('hidden');
+    document.getElementById('modalTaskDetail').classList.remove('flex');
+    
+    // Cambiar filtro a 'submitted' para que el padre vea su tarea enviada
+    const submittedBtn = document.querySelector('.task-filter-btn[data-filter="submitted"]');
+    if (submittedBtn) {
+        document.querySelectorAll('.task-filter-btn').forEach(b => b.className = 'px-4 py-2 text-xs font-medium rounded-full text-slate-500 hover:bg-slate-50 task-filter-btn transition-all');
+        submittedBtn.className = 'px-4 py-2 text-xs font-bold rounded-full bg-emerald-100 text-emerald-700 task-filter-btn transition-all';
+    }
+    
+    loadTasks('submitted');
     } catch (e) {
        console.error('Error enviando tarea:', e);
        Helpers.toast('Error al enviar tarea', 'error');
@@ -1329,16 +1365,17 @@ function setupGlobalListeners() {
 
   // ✅ Listener para filtros de tareas
   document.getElementById('tasks')?.addEventListener('click', (e) => {
-    if (e.target.classList.contains('task-filter-btn')) {
-      // Actualizar estilos botones
+    const filterBtn = e.target.closest('.task-filter-btn');
+    if (filterBtn) {
+      // Actualizar estilos botones con indicador VERDE (Emerald)
       document.querySelectorAll('.task-filter-btn').forEach(btn => {
-        btn.classList.remove('bg-white', 'shadow', 'text-slate-700', 'font-bold');
+        btn.classList.remove('bg-emerald-100', 'text-emerald-700', 'font-bold', 'shadow-sm');
         btn.classList.add('text-slate-500', 'font-medium');
       });
-      e.target.classList.add('bg-white', 'shadow', 'text-slate-700', 'font-bold');
-      e.target.classList.remove('text-slate-500');
+      filterBtn.classList.remove('text-slate-500', 'font-medium');
+      filterBtn.classList.add('bg-emerald-100', 'text-emerald-700', 'font-bold', 'shadow-sm');
       
-      loadTasks(e.target.dataset.filter);
+      loadTasks(filterBtn.dataset.filter);
     }
     
     // ✅ Listener único para detalles de tarea
@@ -1667,7 +1704,7 @@ async function loadClassFeed() {
   try {
     const { data: posts, error } = await supabase
       .from(TABLES.POSTS)
-      .select('*, teacher:profiles(name, avatar_url), likes(count), comments(count)')
+      .select('*, teacher:teacher_id(name, avatar_url), likes(count), comments(count)')
       .eq('classroom_id', student.classroom_id)
       .order('created_at', { ascending: false });
 
@@ -1774,14 +1811,9 @@ function initFeedRealtime() {
          // 2. Si la sección está abierta, agregar el comentario
          const listEl = document.getElementById(`comments-list-${newComment.post_id}`);
          if(listEl && listEl.offsetParent !== null) { // Si es visible
-            // Obtener nombre del usuario
-            // Intentar usar user_name si viene en el payload, sino buscar en perfiles
-            let name = newComment.user_name || 'Yo'; 
-            if (!newComment.user_name) {
-                // Fallback si no viene en payload
-                const { data: user } = await supabase.from(TABLES.PROFILES).select('name').eq('id', newComment.user_id).single();
-                name = user?.name || 'Usuario';
-            }
+            // Obtener nombre del usuario desde perfiles
+            const { data: user } = await supabase.from(TABLES.PROFILES).select('name').eq('id', newComment.user_id).single();
+            const name = user?.name || 'Usuario';
             
             const div = document.createElement('div');
             div.className = 'flex gap-2 text-sm animate-fade-in';
@@ -1894,91 +1926,107 @@ async function loadGrades() {
   if (!student) return;
 
   try {
-    // ✅ 2. CACHE GLOBAL (Uso en Calificaciones)
-    let grades = GlobalCache.get('grades');
+    // 1. Obtener tareas calificadas (Evidencias con nota)
+    const { data: taskGrades, error: tErr } = await supabase
+      .from(TABLES.TASK_EVIDENCES)
+      .select('*, tasks(title, due_date)')
+      .eq('student_id', student.id)
+      .not('grade_letter', 'is', null)
+      .order('created_at', { ascending: false });
+
+    if (tErr) throw tErr;
+
+    // 2. Calcular Promedio General
+    const letterMap = { 'A': 100, 'B': 85, 'C': 70, 'D': 60, 'F': 50 };
+    let totalScore = 0;
+    let count = 0;
     
-    if (!grades) {
-      const { data, error } = await supabase
-        .from(TABLES.GRADES)
-        .select('*')
-        .eq('student_id', student.id);
-
-      if (error) throw error;
-      grades = data || [];
-      GlobalCache.set('grades', grades);
-    }
-
-    if (!grades || !grades.length) {
-      container.innerHTML = Helpers.emptyState('No hay calificaciones aún');
-      return;
-    }
-
-    // Agrupar por materia
-    const subjects = {};
-    grades.forEach(g => {
-      const subject = g.subject || 'General';
-      if (!subjects[subject]) subjects[subject] = { periods: {}, total: 0, count: 0 };
-      subjects[g.subject].periods[g.period] = Number(g.score);
-      subjects[g.subject].total += Number(g.score);
-      subjects[g.subject].count++;
+    const processedTasks = (taskGrades || []).map(t => {
+        const score = letterMap[t.grade_letter] || 0;
+        totalScore += score;
+        count++;
+        return { ...t, score };
     });
-
-    // Colores disponibles para las tarjetas
-    const themes = [
-      { name: 'green', bg: 'bg-emerald-100', text: 'text-emerald-600', border: 'border-emerald-200' },
-      { name: 'rose', bg: 'bg-rose-100', text: 'text-rose-600', border: 'border-rose-200' },
-      { name: 'amber', bg: 'bg-amber-100', text: 'text-amber-600', border: 'border-amber-200' },
-      { name: 'blue', bg: 'bg-blue-100', text: 'text-blue-600', border: 'border-blue-200' },
-      { name: 'purple', bg: 'bg-violet-100', text: 'text-violet-600', border: 'border-violet-200' }
-    ];
-
-    container.innerHTML = `
-      <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
-        ${Object.keys(subjects).map((subject, index) => {
-          const data = subjects[subject];
-          const avg = data.count > 0 ? (data.total / data.count).toFixed(0) : '-';
-          const theme = themes[index % themes.length];
-          const icon = 'book-open';
-
-          // Periodos como pequeños bloques
-          const periodBlocks = Object.entries(data.periods).sort().map(([p, score]) => `
-            <div class="flex flex-col items-center bg-slate-50 p-2 rounded-xl border border-slate-100 shadow-sm">
-              <span class="text-[10px] text-slate-400 uppercase font-bold tracking-wider">${p}</span>
-              <span class="text-sm font-black text-slate-700">${score}</span>
-            </div>
-          `).join('');
-
-          return `
-            <div class="card-base progress-card flex flex-col justify-between h-full group hover:z-10">
-              <div>
-                <div class="flex justify-between items-start mb-4">
-                  <div class="p-3 rounded-2xl ${theme.bg} ${theme.text} shadow-sm transform group-hover:scale-110 transition-transform">
-                    <i data-lucide="${icon}" class="w-6 h-6"></i>
-                  </div>
-                  <div class="text-right">
-                    <span class="text-4xl font-black text-slate-800 tracking-tighter drop-shadow-sm">${avg}</span>
-                    <p class="text-[10px] text-slate-400 font-bold uppercase tracking-widest">Promedio</p>
-                  </div>
-                </div>
-                <h3 class="text-lg font-bold text-slate-800 mb-4 leading-tight">${escapeHtml(subject)}</h3>
-              </div>
-              
-              <div class="grid grid-cols-4 gap-2 mt-auto pt-4 border-t border-slate-100 border-dashed">
-                ${periodBlocks}
-              </div>
-            </div>
-          `;
-        }).join('')}
-      </div>
-      <div class="mt-8 text-center">
-        <button onclick="window.print()" class="inline-flex items-center gap-2 px-6 py-3 bg-slate-800 text-white rounded-xl font-bold hover:bg-slate-700 transition-colors shadow-lg hover:shadow-xl transform hover:-translate-y-1">
-          <i data-lucide="printer" class="w-4 h-4"></i>
-          Imprimir Reporte Oficial
-        </button>
+    
+    const average = count > 0 ? Math.round(totalScore / count) : 0;
+    
+    // 3. Renderizar
+    let html = '';
+    
+    // Gráfico Circular de Progreso
+    const radius = 50;
+    const circumference = 2 * Math.PI * radius;
+    const offset = circumference - (average / 100) * circumference;
+    const colorClass = average >= 90 ? 'text-emerald-500' : (average >= 80 ? 'text-blue-500' : (average >= 70 ? 'text-yellow-500' : 'text-rose-500'));
+    
+    html += `
+      <div class="flex flex-col items-center justify-center mb-10">
+        <div class="relative w-48 h-48">
+          <!-- Fondo del círculo -->
+          <svg class="w-full h-full transform -rotate-90" viewBox="0 0 120 120">
+            <circle cx="60" cy="60" r="${radius}" fill="none" stroke="#f1f5f9" stroke-width="10" />
+            <!-- Progreso -->
+            <circle cx="60" cy="60" r="${radius}" fill="none" stroke="currentColor" stroke-width="10" 
+              stroke-dasharray="${circumference}" stroke-dashoffset="${offset}" 
+              class="${colorClass} transition-all duration-1000 ease-out drop-shadow-md" stroke-linecap="round" />
+          </svg>
+          <!-- Texto Central -->
+          <div class="absolute inset-0 flex flex-col items-center justify-center">
+            <span class="text-5xl font-black text-slate-800 tracking-tighter">${average}</span>
+            <span class="text-xs font-bold text-slate-400 uppercase tracking-widest mt-1">Promedio</span>
+          </div>
+        </div>
+        <div class="mt-4 text-center">
+            <h4 class="text-lg font-bold text-slate-700">Rendimiento General</h4>
+            <p class="text-sm text-slate-500">Basado en ${count} tareas evaluadas</p>
+        </div>
       </div>
     `;
     
+    // Lista de Tareas
+    if (processedTasks.length > 0) {
+        html += `<div class="space-y-4 w-full max-w-3xl mx-auto">`;
+        html += `<h5 class="font-bold text-slate-600 text-sm uppercase tracking-wider mb-2 px-2">Desglose de Tareas</h5>`;
+        
+        html += processedTasks.map(t => {
+            const tColor = t.grade_letter === 'A' ? 'bg-emerald-100 text-emerald-700 border-emerald-200' : 
+                           (t.grade_letter === 'B' ? 'bg-blue-100 text-blue-700 border-blue-200' : 
+                           'bg-amber-100 text-amber-700 border-amber-200');
+            
+            return `
+              <div class="flex items-center justify-between p-4 bg-white border border-slate-100 rounded-2xl shadow-sm hover:shadow-md transition-all group">
+                <div class="flex items-center gap-4 overflow-hidden">
+                  <div class="w-12 h-12 rounded-xl ${tColor} border flex-shrink-0 flex items-center justify-center font-black text-xl shadow-sm group-hover:scale-110 transition-transform">
+                    ${t.grade_letter}
+                  </div>
+                  <div class="min-w-0">
+                    <h4 class="font-bold text-slate-700 truncate text-sm md:text-base">${escapeHtml(t.tasks?.title || 'Tarea')}</h4>
+                    <p class="text-xs text-slate-400 font-medium">${new Date(t.created_at).toLocaleDateString('es-ES', { day: 'numeric', month: 'long' })}</p>
+                  </div>
+                </div>
+                <div class="flex items-center gap-1 pl-2">
+                   ${t.stars ? Array(t.stars).fill('<i data-lucide="star" class="w-4 h-4 text-yellow-400 fill-yellow-400"></i>').join('') : ''}
+                </div>
+              </div>
+            `;
+        }).join('');
+        html += `</div>`;
+    } else {
+        html += Helpers.emptyState('Aún no hay tareas calificadas para mostrar el progreso.');
+    }
+
+    container.innerHTML = html;
+    
     if (window.lucide) lucide.createIcons();
+
+    // Animación simple del círculo (re-trigger reflow)
+    const circle = container.querySelector('circle.transition-all');
+    if(circle) {
+        circle.style.strokeDashoffset = circumference;
+        setTimeout(() => {
+            circle.style.strokeDashoffset = offset;
+        }, 100);
+    }
 
   } catch (err) {
     console.error('Error cargando notas:', err);
@@ -2136,7 +2184,6 @@ async function populateProfile() {
   };
   
   setVal('inputStudentName', student.name);
-  setVal('inputStudentBirth', student.birth_date);
   setVal('inputStudentBlood', student.blood_type);
   setVal('inputStudentAllergy', student.allergies);
   
@@ -2146,14 +2193,9 @@ async function populateProfile() {
   
   setVal('profileMotherName', student.p2_name);
   setVal('profileMotherPhone', student.p2_phone);
-  setVal('profileMotherEmail', student.p2_email); // Nuevo campo
+  setVal('profileMotherEmail', student.p2_email);
   
   setVal('profilePickupName', student.authorized_pickup);
-  
-  setVal('tutor1Name', student.t1_name);
-  setVal('tutor1Phone', student.t1_phone);
-  setVal('tutor2Name', student.t2_name);
-  setVal('tutor2Phone', student.t2_phone);
   
   // ✅ Refrescar iconos después de llenar datos
   if(window.lucide) lucide.createIcons();
@@ -2178,7 +2220,6 @@ async function saveAllProfile() {
   const updates = {
     // Estudiante
     name: getVal('inputStudentName'),
-    birth_date: birthDate || null,
     blood_type: getVal('inputStudentBlood'),
     allergies: getVal('inputStudentAllergy'),
     // Padres
@@ -2188,11 +2229,7 @@ async function saveAllProfile() {
     p2_name: getVal('profileMotherName'),
     p2_phone: getVal('profileMotherPhone'),
     p2_email: getVal('profileMotherEmail'),
-    authorized_pickup: getVal('profilePickupName'),
-    t1_name: getVal('tutor1Name'),
-    t1_phone: getVal('tutor1Phone'),
-    t2_name: getVal('tutor2Name'),
-    t2_phone: getVal('tutor2Phone')
+    authorized_pickup: getVal('profilePickupName')
   };
   
   const { error } = await supabase.from(TABLES.STUDENTS).update(updates).eq('id', student.id);

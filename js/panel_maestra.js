@@ -1388,6 +1388,13 @@ const UI = {
       const grade = ev?.grade_letter || null;
       const stars = Number(ev?.stars) || 0;
       
+      // Comentario del padre (Si existe)
+      const parentComment = ev?.comment ? `
+        <div class="mt-2 p-2 bg-blue-50 rounded-lg border border-blue-100 text-[11px] text-blue-700 italic">
+          <span class="font-bold block uppercase text-[9px] mb-1">Nota del padre:</span>
+          "${Helpers.escapeHTML(ev.comment)}"
+        </div>` : '';
+
       // UI de Calificación Mejorada
       const gradingUI = ev ? `
         <div class="flex flex-col items-center gap-2">
@@ -1415,8 +1422,9 @@ const UI = {
 
       return `
         <tr class="hover:bg-slate-50 border-b last:border-0 transition-colors">
-          <td class="p-4 font-medium text-slate-700">
-            ${Helpers.escapeHTML(s.name)}
+          <td class="p-4">
+            <div class="font-medium text-slate-700">${Helpers.escapeHTML(s.name)}</div>
+            ${parentComment}
           </td>
           <td class="p-4 text-center">
             <span class="px-3 py-1 rounded-full text-xs font-bold ${ev ? 'bg-green-100 text-green-700' : 'bg-slate-100 text-slate-500'}">
@@ -1465,22 +1473,34 @@ const UI = {
 
     // Notificar al padre sobre la calificación
     try {
-      const { data: evidence } = await supabase
+      const { data: evidence, error: evErr } = await supabase
         .from('task_evidences')
-        .select('student:students(parent_id, name), task:tasks(title)')
+        .select(`
+          id,
+          students(parent_id, name),
+          tasks(title)
+        `)
         .eq('id', evidenceId)
         .single();
       
-      if (evidence?.student?.parent_id) {
+      if (evErr) throw evErr;
+
+      const parentId = evidence?.students?.parent_id;
+      const studentName = evidence?.students?.name;
+      const taskTitle = evidence?.tasks?.title;
+
+      if (parentId && taskTitle) {
         await window.sendPush({
-          user_id: evidence.student.parent_id,
+          user_id: parentId,
           title: 'Tarea Calificada ⭐',
-          message: `La tarea "${evidence.task.title}" de ${evidence.student.name} ha sido calificada con "${grade}".`,
+          message: `La tarea "${taskTitle}" de ${studentName || 'tu hijo/a'} ha sido calificada con "${grade}".`,
           type: 'info',
           link: '/panel_padres.html#tasks'
         });
       }
-    } catch (e) { console.error('Error notificando calificación:', e); }
+    } catch (e) { 
+      console.warn('No se pudo enviar la notificación push, pero la tarea fue calificada:', e);
+    }
   },
 
   async gradeStars(evidenceId, stars, btn) {
