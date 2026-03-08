@@ -82,9 +82,20 @@ export async function sendEmail(to, subject, html, text) {
 if (!window.sendEmail) window.sendEmail = sendEmail;
 
 export async function sendPush(payload) {
-  const { data, error } = await supabase.functions.invoke('send-push', { body: payload });
-  if (error) throw error;
-  return data;
+  try {
+    const { data: { session } } = await supabase.auth.getSession();
+    const { data, error } = await supabase.functions.invoke('send-push', { 
+      body: payload,
+      headers: {
+        'Authorization': `Bearer ${session?.access_token || ''}`
+      }
+    });
+    if (error) throw error;
+    return data;
+  } catch (e) {
+    console.error('Error enviando push:', e);
+    throw e;
+  }
 }
 if (!window.sendPush) window.sendPush = sendPush;
 

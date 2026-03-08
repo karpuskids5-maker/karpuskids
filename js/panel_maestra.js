@@ -757,7 +757,11 @@ const UI = {
       <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-5">
           ${students.map((s, index) => `
           <div class="student-card-pastel ${pastelColors[index % pastelColors.length]}">
-            <div class="student-card-avatar">${Helpers.escapeHTML((s.name || '?').charAt(0))}</div>
+            <div class="student-card-avatar overflow-hidden flex items-center justify-center">
+               ${s.avatar_url 
+                 ? `<img src="${s.avatar_url}" class="w-full h-full object-cover" alt="${s.name}">` 
+                 : Helpers.escapeHTML((s.name || '?').charAt(0))}
+            </div>
             <h4 class="student-card-name">${Helpers.escapeHTML(s.name || 'Sin nombre')}</h4>
             <p class="student-card-meta">ID: ${s.id}</p>
             <button onclick="window.UI.openStudentProfile('${s.id}')" class="student-card-button">
@@ -1134,36 +1138,36 @@ const UI = {
       <div id="tasksViewContainer">
         <div class="flex justify-between items-center mb-6">
           <h3 class="font-bold text-slate-700 text-xl">Tareas del Aula</h3>
-          <button id="btnNewTask" class="bg-pink-500 text-white px-4 py-2 rounded-xl shadow hover:bg-pink-600 transition flex items-center gap-2 font-bold">
+          <button id="btnNewTask" class="bg-orange-500 text-white px-4 py-2 rounded-xl shadow hover:bg-orange-600 transition flex items-center gap-2 font-bold">
             <i data-lucide="plus" class="w-5 h-5"></i> Nueva Tarea
           </button>
         </div>
 
         <!-- Formulario Nueva Tarea -->
-        <div id="newTaskForm" class="hidden bg-white p-6 rounded-2xl border border-pink-100 shadow-sm mb-6 relative">
+        <div id="newTaskForm" class="hidden bg-white p-6 rounded-2xl border border-orange-100 shadow-sm mb-6 relative">
           <button id="btnCloseTaskForm" class="absolute top-4 right-4 text-slate-400 hover:text-slate-600"><i data-lucide="x"></i></button>
-          <h4 class="font-bold text-pink-600 mb-4">Crear Nueva Tarea</h4>
+          <h4 class="font-bold text-orange-600 mb-4">Crear Nueva Tarea</h4>
           <div class="space-y-4">
             <div>
               <label class="block text-sm font-bold text-slate-600 mb-1">Título</label>
-              <input type="text" id="taskTitle" class="w-full border rounded-xl px-3 py-2 outline-none focus:ring-2 focus:ring-pink-400" placeholder="Ej: Dibujo de la familia">
+              <input type="text" id="taskTitle" class="w-full border rounded-xl px-3 py-2 outline-none focus:ring-2 focus:ring-orange-400" placeholder="Ej: Dibujo de la familia">
             </div>
             <div>
               <label class="block text-sm font-bold text-slate-600 mb-1">Descripción</label>
-              <textarea id="taskDesc" rows="3" class="w-full border rounded-xl px-3 py-2 outline-none focus:ring-2 focus:ring-pink-400" placeholder="Instrucciones para los padres..."></textarea>
+              <textarea id="taskDesc" rows="3" class="w-full border rounded-xl px-3 py-2 outline-none focus:ring-2 focus:ring-orange-400" placeholder="Instrucciones para los padres..."></textarea>
             </div>
             <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>
                 <label class="block text-sm font-bold text-slate-600 mb-1">Fecha de Entrega</label>
-                <input type="date" id="taskDate" class="w-full border rounded-xl px-3 py-2 outline-none focus:ring-2 focus:ring-pink-400">
+                <input type="date" id="taskDate" class="w-full border rounded-xl px-3 py-2 outline-none focus:ring-2 focus:ring-orange-400">
               </div>
               <div>
                 <label class="block text-sm font-bold text-slate-600 mb-1">Adjunto (Foto/PDF/Video)</label>
-                <input type="file" id="taskFile" accept="image/*,video/*,application/pdf" class="w-full text-sm text-slate-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-pink-50 file:text-pink-700 hover:file:bg-pink-100">
+                <input type="file" id="taskFile" accept="image/*,video/*,application/pdf" class="w-full text-sm text-slate-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-orange-50 file:text-orange-700 hover:file:bg-orange-100">
               </div>
             </div>
             <div class="pt-2">
-              <button id="btnSaveTask" class="w-full py-3 bg-pink-500 hover:bg-pink-600 text-white rounded-xl font-bold shadow-lg shadow-pink-200 transition">Publicar Tarea</button>
+              <button id="btnSaveTask" class="w-full py-3 bg-orange-500 hover:bg-orange-600 text-white rounded-xl font-bold shadow-lg shadow-orange-200 transition">Publicar Tarea</button>
             </div>
           </div>
         </div>
@@ -1235,16 +1239,16 @@ const UI = {
 
     container.innerHTML = tasks.map(t => `
       <div class="notebook-bg p-5 rounded-2xl shadow-sm hover:shadow-md transition group relative overflow-hidden">
-        <div class="absolute top-0 left-0 w-1 h-full bg-pink-400"></div>
+        <div class="absolute top-0 left-0 w-1 h-full bg-orange-400"></div>
         <div class="flex justify-between items-start mb-2 pl-3">
-          <h4 class="font-bold text-slate-800 text-lg group-hover:text-pink-600 transition">${Helpers.escapeHTML(t.title)}</h4>
+          <h4 class="font-bold text-slate-800 text-lg group-hover:text-orange-600 transition">${Helpers.escapeHTML(t.title)}</h4>
           <span class="text-xs font-bold bg-slate-100 text-slate-500 px-2 py-1 rounded-lg">
             Vence: ${Helpers.formatDate(t.due_date)}
           </span>
         </div>
         <p class="text-slate-600 text-sm mb-4 pl-3 line-clamp-2">${Helpers.escapeHTML(t.description || 'Sin descripción')}</p>
         <div class="flex items-center justify-between mt-auto pl-3">
-          <button class="bg-pink-50 text-pink-600 px-4 py-2 rounded-lg font-bold text-sm hover:bg-pink-100 transition flex items-center gap-2" onclick="UI.openTaskDetail('${t.id}')">
+          <button class="bg-orange-50 text-orange-600 px-4 py-2 rounded-lg font-bold text-sm hover:bg-orange-100 transition flex items-center gap-2" onclick="UI.openTaskDetail('${t.id}')">
             <i data-lucide="eye" class="w-4 h-4"></i> Ver Entregas
           </button>
           ${t.file_url ? `<a href="${t.file_url}" target="_blank" class="text-slate-400 hover:text-blue-500" title="Ver adjunto"><i data-lucide="paperclip" class="w-5 h-5"></i></a>` : ''}
@@ -1497,6 +1501,13 @@ const UI = {
          const el = document.getElementById(id);
          if(el) el.textContent = 'Cargando...';
     });
+    
+    // Reset Avatar
+    const avatarEl = document.getElementById('studentProfileAvatarContainer') || document.querySelector('#studentProfileModal .record-photo');
+    if (avatarEl) {
+        avatarEl.innerHTML = '<i data-lucide="user" class="w-12 h-12"></i>';
+        if(window.lucide) lucide.createIcons();
+    }
 
     try {
         // Query for student, their classroom, and their main parent contact
@@ -1538,6 +1549,11 @@ const UI = {
         // Parent 2 (from p2_ fields)
         setText('parent2Name', student.p2_name);
         setText('parent2Phone', student.p2_phone);
+        
+        // Set Avatar
+        if (avatarEl && student.avatar_url) {
+            avatarEl.innerHTML = `<img src="${student.avatar_url}" class="w-full h-full object-cover" alt="${student.name}">`;
+        }
 
     } catch (e) {
         Helpers.toast('Error cargando perfil', 'error');

@@ -1381,6 +1381,13 @@ document.addEventListener('DOMContentLoaded', async () => {
       const ids = ['studentProfileName', 'studentDOB', 'studentClassroom', 'studentAllergies', 
                    'parent1Name', 'parent1Phone', 'parent1Email', 'studentRoom', 'studentPickup', 'studentBlood'];
       ids.forEach(id => { const el = document.getElementById(id); if(el) el.textContent = '...'; });
+      
+      // Reset Avatar
+      const avatarContainer = document.getElementById('studentProfileAvatarContainer');
+      if (avatarContainer) {
+          avatarContainer.innerHTML = '<i data-lucide="user" class="w-8 h-8 text-indigo-600"></i>';
+          if(window.lucide) lucide.createIcons();
+      }
 
       // Consultar datos
       const { data: student, error } = await supabase
@@ -1405,6 +1412,11 @@ document.addEventListener('DOMContentLoaded', async () => {
         setText('parent1Name', student.parent.name);
         setText('parent1Phone', student.parent.phone);
         setText('parent1Email', student.parent.email);
+      }
+      
+      // Set Avatar if exists
+      if (avatarContainer && student.avatar_url) {
+          avatarContainer.innerHTML = `<img src="${student.avatar_url}" class="w-full h-full object-cover" alt="${student.name}">`;
       }
     }, 'Error al abrir perfil');
   };

@@ -668,6 +668,7 @@ $$;
 
 -- 5. RPC: Enviar Notificación Interna
 -- Esta función es llamada por la Edge Function send-push
+DROP FUNCTION IF EXISTS public.send_notification(uuid, text, text, text, text);
 CREATE OR REPLACE FUNCTION public.send_notification(
   p_user_id uuid,
   p_title text,
