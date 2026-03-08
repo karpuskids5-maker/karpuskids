@@ -3,43 +3,169 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Login - Karpus Kids</title>
+  <title>Acceso - Karpus Kids</title>
   <script src="https://cdn.tailwindcss.com"></script>
-  <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Nunito:wght@400;700;900&display=swap" rel="stylesheet">
   <link rel="icon" href="logo/favicon.ico" sizes="any">
   <!-- OneSignal SDK Fix -->
   <script src="https://cdn.onesignal.com/sdks/web/v16/OneSignalSDK.page.js" defer></script>
   <script>window.OneSignalDeferred = window.OneSignalDeferred || [];</script>
+  
+  <style>
+    body { font-family: 'Nunito', sans-serif; }
+    
+    /* Animaciones de Fondo */
+    @keyframes float { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-15px); } }
+    .animate-float { animation: float 4s ease-in-out infinite; }
+    
+    @keyframes float-delayed { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-10px); } }
+    .animate-float-delayed { animation: float-delayed 5s ease-in-out infinite; animation-delay: 1s; }
+    
+    @keyframes popIn { 0% { opacity: 0; transform: scale(0.9) translateY(20px); } 100% { opacity: 1; transform: scale(1) translateY(0); } }
+    .animate-pop { animation: popIn 0.6s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards; }
+
+    @keyframes cardEnter { 0% {opacity:0; transform:translateY(40px);} 100% {opacity:1; transform:translateY(0);} }
+    .card-enter { animation: cardEnter .7s ease; }
+
+    /* Fondo animado de nubes */
+    .bg-clouds {
+      background-image: radial-gradient(circle at 20% 20%, rgba(255,255,255,0.4) 0%, transparent 20%),
+                        radial-gradient(circle at 80% 80%, rgba(255,255,255,0.4) 0%, transparent 20%);
+    }
+
+    /* Estilo de letras de colores para Karpus Kids */
+    .karpus-kids-inline { font-weight: 900; } /* Coincide con font-black de Tailwind */
+    .karpus-kids-inline .k-1 { color: #FF9800; }
+    .karpus-kids-inline .k-2 { color: #2196F3; }
+    .karpus-kids-inline .k-3 { color: #E91E63; }
+    .karpus-kids-inline .k-4 { color: #4CAF50; }
+    .karpus-kids-inline .k-5 { color: #FF9800; }
+    .karpus-kids-inline .k-6 { color: #2196F3; }
+    .karpus-kids-inline .k-7 { color: #4CAF50; }
+    .karpus-kids-inline .k-8 { color: #E91E63; }
+    .karpus-kids-inline .k-9 { color: #2196F3; }
+    .karpus-kids-inline .k-10 { color: #FF9800; }
+  </style>
 </head>
-<body class="min-h-screen bg-slate-50 flex items-center justify-center">
-  <div class="w-full max-w-md bg-white rounded-2xl shadow p-6">
-    <div class="text-center mb-6">
-      <img src="img/mundo.jpg" alt="Karpus" class="h-12 mx-auto mb-2 bg-white rounded" />
-      <h1 class="text-2xl font-bold">Acceso al Panel</h1>
-      <p class="text-sm text-slate-600">Ingresa con tu correo y contraseña</p>
+<body class="min-h-screen bg-gradient-to-br from-sky-300 via-indigo-200 to-purple-200 flex items-center justify-center p-4 overflow-hidden relative">
+
+  <!-- Elementos Decorativos de Fondo -->
+  <div class="absolute top-10 left-10 text-6xl opacity-60 animate-float select-none">☁️</div>
+  <div class="absolute bottom-20 right-10 text-6xl opacity-60 animate-float-delayed select-none">🌈</div>
+  <div class="absolute top-1/3 right-20 text-4xl opacity-40 animate-pulse select-none">⭐</div>
+  <div class="absolute bottom-10 left-1/4 text-5xl opacity-50 animate-bounce select-none" style="animation-duration: 3s;">🎈</div>
+
+  <div class="w-full max-w-5xl grid grid-cols-1 md:grid-cols-2 gap-8 items-center relative z-10">
+    
+    <!-- Ilustración Lateral (Solo Desktop) -->
+    <div class="hidden md:flex flex-col items-center text-center animate-pop">
+       <div class="relative">
+         <div class="absolute inset-0 bg-white/30 rounded-full blur-xl transform scale-110"></div>
+         <img src="img/mundo.jpg" class="w-56 h-56 rounded-full shadow-2xl border-8 border-white mb-6 animate-float relative z-10 object-cover" alt="Mundo Karpus">
+         <div class="absolute -bottom-4 -right-4 text-6xl animate-bounce" style="animation-duration: 2s;">🚀</div>
+       </div>
+       <h2 class="text-4xl font-black text-white drop-shadow-md mb-2 tracking-tight">¡La aventura de aprender comienza aquí! 🚀</h2>
+       <p class="text-xl text-white font-bold drop-shadow-sm bg-white/10 px-4 py-1 rounded-full">Donde cada día es un nuevo descubrimiento.</p>
     </div>
 
-    <form id="loginForm" class="space-y-4">
-      <div>
-        <label class="text-sm text-slate-600 block mb-1">Correo</label>
-        <input id="email" type="email" placeholder="usuario@karpus.local" class="w-full border rounded px-3 py-2" required />
-      </div>
-      <div>
-        <label class="text-sm text-slate-600 block mb-1">Contraseña</label>
-        <input id="password" type="password" placeholder="••••••" class="w-full border rounded px-3 py-2" required />
-      </div>
-      <div class="text-xs text-slate-500">
-      
-      </div>
-      <button class="w-full px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700">Ingresar</button>
-    </form>
+    <!-- Tarjeta de Login -->
+    <div class="card-enter bg-white/90 backdrop-blur-md rounded-[2.5rem] shadow-2xl p-8 border-4 border-white animate-pop w-full max-w-md mx-auto relative overflow-hidden">
+      <!-- Decoración superior -->
+      <div class="absolute top-0 left-0 w-full h-2 bg-gradient-to-r from-pink-400 via-purple-400 to-sky-400"></div>
 
-    <div class="mt-4 text-center">
-      <a href="index.html" class="text-sm text-slate-600 hover:text-slate-800"><i class="bi bi-house-door"></i> Ir al sitio</a>
+      <div class="text-center mb-6">
+        <div class="relative flex justify-center">
+          <div class="absolute w-20 h-20 bg-yellow-300 blur-2xl opacity-40 rounded-full"></div>
+          <div class="text-7xl mb-2 animate-float relative">🦉</div>
+        </div>
+        <h1 class="text-3xl font-black text-slate-800 tracking-tight karpus-kids-inline">
+          <span class="k-1">K</span><span class="k-2">a</span><span class="k-3">r</span><span class="k-4">p</span><span class="k-5">u</span><span class="k-6">s</span> <span class="k-7">K</span><span class="k-8">i</span><span class="k-9">d</span><span class="k-10">s</span>
+        </h1>
+        <p class="text-slate-500 font-bold text-sm uppercase tracking-wider mt-1">Acceso Padres y Maestros</p>
+        <p class="text-xs text-slate-400 mt-1">Conecta con el aprendizaje de tus estudiantes</p>
+      </div>
+
+      <form id="loginForm" class="space-y-5">
+        <div class="group">
+          <label class="block text-sm font-bold text-slate-600 mb-1 ml-1">Correo Electrónico</label>
+          <div class="relative">
+            <span class="absolute left-4 top-3.5 text-slate-400">📧</span>
+            <input id="email" type="email" placeholder="usuario@karpus.local" 
+              class="w-full pl-11 pr-4 py-3 rounded-2xl border-2 border-slate-100 bg-slate-50 focus:bg-white focus:border-sky-400 focus:ring-4 focus:ring-sky-100 outline-none transition-all font-bold text-slate-700" required />
+          </div>
+        </div>
+        
+        <div class="group">
+          <label class="block text-sm font-bold text-slate-600 mb-1 ml-1">Contraseña</label>
+          <div class="relative">
+            <span class="absolute left-4 top-3.5 text-slate-400">🔒</span>
+            <input id="password" type="password" placeholder="••••••" 
+              class="w-full pl-11 pr-4 py-3 rounded-2xl border-2 border-slate-100 bg-slate-50 focus:bg-white focus:border-purple-400 focus:ring-4 focus:ring-purple-100 outline-none transition-all font-bold text-slate-700" required />
+          </div>
+        </div>
+
+        <button class="w-full py-4 bg-gradient-to-r from-blue-500 via-indigo-500 to-purple-600 text-white rounded-2xl font-black text-lg shadow-lg transform transition hover:scale-[1.03] hover:shadow-xl active:scale-95 flex items-center justify-center gap-2 group">
+          Ingresar al Panel
+          <span class="group-hover:translate-x-1 transition-transform">🚀</span>
+        </button>
+      </form>
+
+      <!-- Botón Instalar App (Oculto por defecto) -->
+      <button id="installAppBtn" class="hidden mt-4 w-full py-3 bg-gradient-to-r from-emerald-400 via-green-500 to-teal-500 text-white rounded-2xl font-bold shadow-lg hover:scale-105 transition flex items-center justify-center gap-2">
+        📲 Instalar Karpus Kids
+      </button>
+
+      <p class="text-center text-xs text-slate-400 mt-2">
+        Acceso seguro para padres y maestros
+      </p>
+
+      <div class="mt-8 text-center border-t border-slate-100 pt-4">
+        <a href="index.html" class="inline-flex items-center gap-2 text-sm font-bold text-slate-400 hover:text-sky-500 transition-colors">
+          <span>🏠</span> Volver al sitio web
+        </a>
+      </div>
     </div>
   </div>
 
   <!-- Importante: type="module" para poder usar import/export -->
   <script type="module" src="js/login.js"></script>
+
+  <!-- Lógica PWA -->
+  <script>
+    let deferredPrompt;
+    const installBtn = document.getElementById('installAppBtn');
+
+    // 1. Detectar si es instalable (Android/Desktop)
+    window.addEventListener('beforeinstallprompt', (e) => {
+      e.preventDefault();
+      deferredPrompt = e;
+      installBtn.classList.remove('hidden');
+      console.log('Karpus Kids: App lista para instalar');
+    });
+
+    // 2. Acción del botón
+    installBtn.addEventListener('click', async () => {
+      if (deferredPrompt) {
+        deferredPrompt.prompt();
+        const { outcome } = await deferredPrompt.userChoice;
+        console.log(`Resultado instalación: ${outcome}`);
+        if (outcome === 'accepted') {
+            installBtn.classList.add('hidden');
+        }
+        deferredPrompt = null;
+      }
+    });
+
+    // 3. Detectar si ya fue instalada exitosamente
+    window.addEventListener('appinstalled', () => {
+      installBtn.classList.add('hidden');
+      console.log('Karpus Kids: App instalada');
+    });
+
+    // 4. Ocultar si ya está en modo standalone (App abierta)
+    if (window.matchMedia('(display-mode: standalone)').matches) {
+      installBtn.classList.add('hidden');
+    }
+  </script>
 </body>
 </html>

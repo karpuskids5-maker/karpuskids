@@ -1,10 +1,11 @@
 {
-  "name": "Karpus Kids - Padres",
-  "short_name": "KarpusPadres",
-  "start_url": "/panel_padres.html",
+  "name": "Karpus Kids",
+  "short_name": "Karpus",
+  "start_url": "index.html",
   "display": "standalone",
-  "background_color": "#ffffff",
-  "theme_color": "#22c55e",
+  "orientation": "portrait",
+  "background_color": "#F0F9FF",
+  "theme_color": "#0f766e",
   "icons": [
     {
       "src": "img/mundo.jpg",
@@ -18,5 +19,7 @@
       "type": "image/jpeg",
       "purpose": "any maskable"
     }
-  ]
+  ],
+  "categories": ["education", "family"],
+  "lang": "es"
 }

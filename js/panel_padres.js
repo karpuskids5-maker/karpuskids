@@ -757,8 +757,11 @@ async function loadStudentData() {
 // ✅ Separación de lógica UI/estado
 function updateStudentUI(student) {
   const displayName = student?.name ? escapeHtml(student.name) : 'No asignado';
-  const classroomInfo = student?.classrooms 
-    ? `${escapeHtml(student.classrooms.name)} • ${escapeHtml(student.classrooms.level || '')}`
+  
+  // Fix: Manejar si classrooms es array o objeto
+  const cls = Array.isArray(student?.classrooms) ? student.classrooms[0] : student?.classrooms;
+  const classroomInfo = cls 
+    ? `${escapeHtml(cls.name)} • ${escapeHtml(cls.level || '')}`
     : 'Sin aula asignada';
   
   document.querySelectorAll('.student-name-display').forEach(el => {
@@ -1095,6 +1098,11 @@ async function submitTask(taskId) {
     const student = AppState.get('student');
     const user = AppState.get('user');
     
+    if(!student || !user){
+      Helpers.toast('Sesión inválida', 'error');
+      return;
+    }
+    
     if(!file && !comment) { Helpers.toast('Añade un archivo o comentario', 'info'); return; }
     
     // ✅ Validación de archivo
@@ -1105,6 +1113,14 @@ async function submitTask(taskId) {
         return;
       }
       
+      const allowedExt = ['pdf','jpg','jpeg','png','docx'];
+      const ext = file.name.split('.').pop().toLowerCase();
+
+      if(!allowedExt.includes(ext)){
+        Helpers.toast('Extensión no permitida', 'error');
+        return;
+      }
+      
       if (file.size > 5 * 1024 * 1024) {
         Helpers.toast('El archivo no debe superar 5MB', 'error');
         return;
@@ -1112,6 +1128,10 @@ async function submitTask(taskId) {
     }
     
     const btn = document.getElementById('btnSubmitTask');
+    if(!btn){
+      console.warn('Submit button not found');
+      return;
+    }
     const originalText = btn.textContent;
     btn.disabled = true;
     btn.textContent = 'Enviando...';
@@ -1428,9 +1448,9 @@ async function loadDashboard() {
         // 1. Asistencia HOY
         supabase.from(TABLES.ATTENDANCE).select('status').eq('student_id', student.id).eq('date', today).maybeSingle(),
         // 2. Tareas Pendientes (> hoy)
-        supabase.from(TABLES.TASKS).select('*', { count: 'exact', head: true }).eq('classroom_id', student.classroom_id).gt('due_date', new Date().toISOString()),
+        supabase.from(TABLES.TASKS).select('id', { count: 'exact', head: true }).eq('classroom_id', student.classroom_id).gte('due_date', today),
         // 3. Tareas Entregadas
-        supabase.from(TABLES.TASK_EVIDENCES).select('*', { count: 'exact', head: true }).eq('student_id', student.id),
+        supabase.from(TABLES.TASK_EVIDENCES).select('id', { count: 'exact', head: true }).eq('student_id', student.id),
         // 4. Deuda Total
         supabase.rpc('get_student_total_debt', { p_student_id: student.id })
     ]);
@@ -1454,7 +1474,8 @@ async function loadDashboard() {
         'card-yellow': { iconBg: 'bg-amber-100',   iconText: 'text-amber-600',   border: 'border-amber-400',   decoration: 'bg-amber-50' },
         'card-blue':   { iconBg: 'bg-blue-100',    iconText: 'text-blue-600',    border: 'border-blue-400',    decoration: 'bg-blue-50' },
         'card-purple': { iconBg: 'bg-violet-100',  iconText: 'text-violet-600',  border: 'border-violet-400',  decoration: 'bg-violet-50' },
-        'card-slate':  { iconBg: 'bg-slate-100',   iconText: 'text-slate-600',   border: 'border-slate-400',   decoration: 'bg-slate-50' }
+        'card-slate':  { iconBg: 'bg-slate-100',   iconText: 'text-slate-600',   border: 'border-slate-400',   decoration: 'bg-slate-50' },
+        'card-rose':   { iconBg: 'bg-rose-100',    iconText: 'text-rose-600',    border: 'border-rose-400',    decoration: 'bg-rose-50' }
     };
 
     // ✅ Configuración de Tarjetas (Reorganización solicitada)
@@ -1583,7 +1604,8 @@ function renderCalendar(attendanceData) {
   const year = today.getFullYear();
   const month = today.getMonth();
   
-  const firstDay = new Date(year, month, 1).getDay();
+  let firstDay = new Date(year, month, 1).getDay();
+  firstDay = firstDay === 0 ? 6 : firstDay - 1;
   const daysInMonth = new Date(year, month + 1, 0).getDate();
   
   // Map de fechas a estados
@@ -1655,12 +1677,16 @@ async function loadClassFeed() {
 
     container.innerHTML = posts.map(p => {
       const teacherName = p.teacher?.name || 'Maestra/o';
-      const likeCount = p.likes?.[0]?.count || 0;
-      const commentCount = p.comments?.[0]?.count || 0;
+      const likeCount = p.likes?.length ? p.likes[0].count : 0;
+      const commentCount = p.comments?.length ? p.comments[0].count : 0;
       // ✅ Protección XSS en media
       let safeMedia = '';
       if (p.media_url && (p.media_url.startsWith('https://') || p.media_url.startsWith('http://'))) {
-          safeMedia = encodeURI(p.media_url);
+          const safeTypes = ['jpg','jpeg','png','webp','mp4'];
+          const ext = p.media_url.split('.').pop().toLowerCase().split('?')[0];
+          if(safeTypes.includes(ext)){
+             safeMedia = encodeURI(p.media_url);
+          }
       }
       
       return `
@@ -1688,7 +1714,7 @@ async function loadClassFeed() {
         <div class="flex items-center gap-4 mt-4 pt-3 border-t border-slate-50">
           <button class="flex items-center gap-2 text-slate-500 hover:text-pink-500 transition-colors text-sm" onclick="toggleLike('${p.id}')">
             <i data-lucide="heart" class="w-4 h-4"></i>
-            <span>${likeCount}</span>
+            <span id="like-count-${p.id}">${likeCount}</span>
           </button>
           <button class="flex items-center gap-2 text-slate-500 hover:text-blue-500 transition-colors text-sm" onclick="toggleCommentSection('${p.id}')">
             <i data-lucide="message-circle" class="w-4 h-4"></i>
@@ -1718,6 +1744,11 @@ async function loadClassFeed() {
 
 // ✅ Sistema de Comentarios en Tiempo Real
 function initFeedRealtime() {
+  const old = AppState.get('feedChannel');
+  if(old){
+   supabase.removeChannel(old);
+  }
+
   const channel = supabase.channel('public:comments')
     .on('postgres_changes', { event: 'INSERT', schema: 'public', table: TABLES.COMMENTS }, async (payload) => {
        const newComment = payload.new;
@@ -1806,12 +1837,12 @@ window.toggleLike = async (postId) => {
        await supabase.from(TABLES.LIKES).delete().eq('post_id', postId).eq('user_id', user.id);
        Helpers.toast('Like removido', 'info');
        // ✅ Fix counter
-       const countSpan = document.querySelector(`#post-${postId} button i[data-lucide="heart"] + span`);
+       const countSpan = document.getElementById(`like-count-${postId}`);
        if(countSpan) countSpan.textContent = Math.max(0, parseInt(countSpan.textContent || '0') - 1);
     } else if (!error) {
        Helpers.toast('¡Te gusta esto!', 'success');
        // ✅ Fix counter
-       const countSpan = document.querySelector(`#post-${postId} button i[data-lucide="heart"] + span`);
+       const countSpan = document.getElementById(`like-count-${postId}`);
        if(countSpan) countSpan.textContent = parseInt(countSpan.textContent || '0') + 1;
     }
     
@@ -1873,7 +1904,8 @@ async function loadGrades() {
     // Agrupar por materia
     const subjects = {};
     grades.forEach(g => {
-      if (!subjects[g.subject]) subjects[g.subject] = { periods: {}, total: 0, count: 0 };
+      const subject = g.subject || 'General';
+      if (!subjects[subject]) subjects[subject] = { periods: {}, total: 0, count: 0 };
       subjects[g.subject].periods[g.period] = Number(g.score);
       subjects[g.subject].total += Number(g.score);
       subjects[g.subject].count++;
@@ -1984,6 +2016,14 @@ async function loadPayments() {
         const isConfirmed = p.status === 'confirmado';
         const isRejected = p.status === 'rechazado';
         
+        const statusLabel = {
+          confirmado: 'Confirmado',
+          pendiente: 'Pendiente',
+          rechazado: 'Rechazado',
+          paid: 'Pagado',
+          efectivo: 'Efectivo'
+        }[p.status] || p.status;
+
         // Estilos según estado
         let theme = { 
           bg: 'bg-white', 
@@ -2035,7 +2075,7 @@ async function loadPayments() {
            <div class="flex-1 min-w-0 z-10">
              <div class="flex justify-between items-center mb-1">
                <h4 class="font-black text-slate-800 text-lg tracking-tight">$${p.amount}</h4>
-               <span class="text-[10px] font-bold px-2 py-1 rounded-full uppercase tracking-wider ${theme.badgeBg} ${theme.badgeText}">${p.status}</span>
+               <span class="text-[10px] font-bold px-2 py-1 rounded-full uppercase tracking-wider ${theme.badgeBg} ${theme.badgeText}">${statusLabel}</span>
              </div>
              <p class="text-xs text-slate-500 font-bold capitalize flex items-center gap-1 opacity-80">
                <i data-lucide="calendar" class="w-3 h-3"></i> ${p.month_paid || 'Pago'} • ${p.method}
@@ -2113,6 +2153,7 @@ async function saveAllProfile() {
   if(!student) return;
   
   const btn = document.getElementById('btnSaveChanges');
+  if(!btn) return;
   const originalText = btn.textContent;
   btn.disabled = true;
   btn.textContent = 'Guardando...';
@@ -2192,7 +2233,7 @@ async function initVideoCall() {
 
   const domain = "meet.jit.si";
   const options = {
-    roomName: "KarpusKids_" + student.classroom_id,
+    roomName: `KarpusKids_${student.classroom_id}_${new Date().getFullYear()}`,
     width: "100%",
     height: 600,
     parentNode: container,

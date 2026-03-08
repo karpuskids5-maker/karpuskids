@@ -197,8 +197,8 @@ export async function initOneSignal(currentUser = null) {
       console.log("OneSignal: Inicialización exitosa para usuario", user.id);
     } catch (e) {
       // Manejo silencioso en desarrollo para evitar ruidos en consola
-      if (e.message.includes('Can only be used on')) {
-        console.warn("OneSignal: SDK restringido al dominio de producción. Ignorando en entorno local.");
+      if (e.message.includes('Can only be used on') || e.message.includes('Service Worker')) {
+        console.warn("OneSignal: Notificaciones desactivadas. Para probarlas, usa http://localhost o un dominio HTTPS.");
       } else {
         console.error("OneSignal Error:", e);
       }
