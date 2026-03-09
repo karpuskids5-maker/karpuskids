@@ -718,7 +718,6 @@ function updateStudentUI(student) {
   // Fix: Manejar si classrooms es array o objeto
   const cls = Array.isArray(student?.classrooms) ? student.classrooms[0] : student?.classrooms;
   const classroomInfo = cls 
-    ? `${escapeHtml(cls.name)} • ${escapeHtml(cls.level || '')}`
     ? (cls.level ? `${escapeHtml(cls.name)} • ${escapeHtml(cls.level)}` : escapeHtml(cls.name))
     : 'Sin aula asignada';
   

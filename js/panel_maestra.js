@@ -981,7 +981,7 @@ const UI = {
             }));
 
         if (toSeed.length) {
-            await supabase.from('attendance').upsert(toSeed, { onConflict: 'student_id,classroom_id,date' });
+            await supabase.from('attendance').upsert(toSeed, { onConflict: 'student_id,date' });
             // Actualizar lista local para reflejar cambios
             if(existingAttendance) existingAttendance.push(...toSeed);
         }
@@ -1129,6 +1129,40 @@ const UI = {
           
           if(error) throw error;
           Helpers.toast('Asistencia guardada correctamente', 'success');
+          
+          // --- NOTIFICACIONES A PADRES ---
+          const { data: studentsInfo } = await supabase
+            .from('students')
+            .select('id, name, parent_id')
+            .in('id', upsertData.map(u => u.student_id));
+
+          const parentIds = [...new Set(studentsInfo?.map(s => s.parent_id).filter(Boolean) || [])];
+          
+          // Enviar push individualmente para que sea más personalizable
+          for (const item of upsertData) {
+              const student = studentsInfo?.find(s => s.id === item.student_id);
+              if (student?.parent_id) {
+                  const isEntry = item.status === 'present' || item.status === 'late';
+                  if (isEntry) {
+                      // Solo notificar llegadas/tardanzas
+                      window.sendPush({
+                          user_id: student.parent_id,
+                          title: item.status === 'present' ? '¡Llegada al Aula! 👋' : 'Aviso de Tardanza 🕒',
+                          message: `${student.name} ha registrado su entrada al aula hoy.`,
+                          type: 'info'
+                      });
+                      
+                      // Emitir evento para correos si es necesario
+                      if (typeof emitEvent === 'function') {
+                          emitEvent('attendance.checkin', {
+                              student_name: student.name,
+                              time: new Date().toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' }),
+                              parent_email: null // El backend lo buscará
+                          });
+                      }
+                  }
+              }
+          }
           
           // Actualizar resumen diario si es necesario
           if (this.loadDashboardStats) this.loadDashboardStats();

@@ -368,6 +368,16 @@ create policy "Maestra ve sus aulas" on public.classrooms for select using (
   teacher_id = auth.uid() OR get_my_role() in ('directora', 'asistente')
 );
 
+-- ✅ NUEVA POLÍTICA: Permitir a los padres ver el aula de sus hijos
+drop policy if exists "Padres ven aula de sus hijos" on public.classrooms;
+create policy "Padres ven aula de sus hijos" on public.classrooms for select using (
+  exists (
+    select 1 from public.students s
+    where s.classroom_id = public.classrooms.id
+    and s.parent_id = auth.uid()
+  )
+);
+
 -- STUDENTS
 drop policy if exists "Directora y Asistente gestionan estudiantes" on public.students;
 create policy "Directora y Asistente gestionan estudiantes" on public.students for all using (

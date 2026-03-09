@@ -184,16 +184,13 @@ export async function initOneSignal(currentUser = null) {
       });
 
       // 3. Sincronización de Usuario (External ID)
-      // Evitar login si ya está vinculado (previene error 409)
       try {
-        const currentExternalId = await OneSignal.User.getExternalId();
-        if (currentExternalId !== user.id) {
-          await OneSignal.login(user.id);
-        }
+        // En v16, login() es el método oficial para establecer el externalId
+        // Evitamos errores de re-login innecesarios
+        await OneSignal.login(user.id);
       } catch (loginErr) {
-        // Silenciar conflictos 409 o errores de estado
-        if (!loginErr.message?.includes('409') && !loginErr.message?.includes('conflict')) {
-          console.warn("OneSignal Login Status:", loginErr.message);
+        if (!loginErr.message?.includes('409')) {
+          console.warn("OneSignal Sync Status:", loginErr.message);
         }
       }
       
