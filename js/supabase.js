@@ -156,15 +156,19 @@ export async function initOneSignal(currentUser = null) {
   // 2. Inicialización profesional
   OneSignalDeferred.push(async function(OneSignal) {
     try {
-      // Verificar si ya está inicializado para evitar 400 errors de re-suscripción
+      // Sincronizar ID si ya está inicializado
       if (OneSignal.initialized) {
-        await OneSignal.login(user.id);
+        if (OneSignal.User.externalId !== user.id) {
+          await OneSignal.login(user.id);
+        }
         return;
       }
 
       await OneSignal.init({
         appId: ONESIGNAL_APP_ID,
         allowLocalhostAsSecureOrigin: true,
+        serviceWorkerParam: { scope: "/" },
+        serviceWorkerPath: "OneSignalSDKWorker.js",
         notifyButton: { enable: false },
         promptOptions: {
           slidedown: {
@@ -179,34 +183,42 @@ export async function initOneSignal(currentUser = null) {
         }
       });
 
-      // 3. Sincronización Profesional de Usuario (External ID)
-      // En v16 se usa .login() para asociar el ID de Supabase
-      await OneSignal.login(user.id);
+      // 3. Sincronización de Usuario (External ID)
+      // Evitar login si ya está vinculado (previene error 409)
+      try {
+        const currentExternalId = await OneSignal.User.getExternalId();
+        if (currentExternalId !== user.id) {
+          await OneSignal.login(user.id);
+        }
+      } catch (loginErr) {
+        // Silenciar conflictos 409 o errores de estado
+        if (!loginErr.message?.includes('409') && !loginErr.message?.includes('conflict')) {
+          console.warn("OneSignal Login Status:", loginErr.message);
+        }
+      }
       
-      // 4. Tagueo por roles para envíos segmentados
+      // 4. Tagueo por roles
       const { data: profile } = await supabase.from('profiles').select('role, name').eq('id', user.id).maybeSingle();
       if (profile) {
         OneSignal.User.addTag("role", profile.role);
         OneSignal.User.addTag("user_name", profile.name);
         
-        // Si es padre, taguear con los IDs de sus hijos para notificaciones específicas
         if (profile.role === 'padre') {
           const { data: children } = await supabase.from('students').select('id').eq('parent_id', user.id);
           if (children && children.length > 0) {
-            const childrenIds = children.map(c => c.id).join(',');
-            OneSignal.User.addTag("children_ids", childrenIds);
+            OneSignal.User.addTag("children_ids", children.map(c => c.id).join(','));
           }
         }
       }
 
-      console.log("OneSignal: Inicialización exitosa para usuario", user.id);
+      console.log("OneSignal: Inicialización exitosa");
     } catch (e) {
-      // Manejo profesional de errores comunes en entornos locales o sin Service Worker
       const msg = e.message || '';
-      if (msg.includes('Can only be used on') || msg.includes('Service Worker') || msg.includes('not available')) {
-        console.warn("OneSignal: Notificaciones no disponibles en este entorno (requiere HTTPS o localhost seguro).");
+      // Silenciar errores comunes de comunicación SW en desarrollo
+      if (msg.includes('Can only be used on') || msg.includes('Service Worker') || msg.includes('not available') || msg.includes('postMessage')) {
+        console.warn("OneSignal: Estado de SW pendiente o limitado por entorno local.");
       } else {
-        console.error("OneSignal Error Crítico:", e);
+        console.error("OneSignal Error:", e);
       }
     }
   });

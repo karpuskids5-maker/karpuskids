@@ -12,7 +12,8 @@ const TABLES = {
   POSTS: 'posts',
   LIKES: 'likes',
   COMMENTS: 'comments',
-  GRADES: 'grades'
+  GRADES: 'grades',
+  MESSAGES: 'messages'
 };
 const STORAGE_BUCKETS = { CLASSROOM_MEDIA: 'classroom_media' };
 const DATE_FORMAT = { locale: 'es-ES', options: { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' } };
@@ -20,11 +21,12 @@ const TOAST_DURATION = 2800;
 const MODAL_CLOSE_KEYS = ['Escape', 'Esc'];
 
 // ===== UTILIDADES SEGURAS =====
+const escapeHtmlMap = {
+  '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
+};
 const escapeHtml = (str) => {
   if (typeof str !== 'string') return '';
-  return str.replace(/[&<>"']/g, m => ({
-    '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
-  })[m]);
+  return str.replace(/[&<>"']/g, m => escapeHtmlMap[m]);
 };
 
 const Helpers = {
@@ -77,7 +79,12 @@ const Helpers = {
 // ===== ESTADO CON CONTROL DE ACCESO =====
 class SafeAppState {
   constructor() {
-    this._state = { user: null, profile: null, student: null, tasks: [], realtimeChannel: null, feedChannel: null, liveChannel: null };
+    this._state = { 
+      user: null, profile: null, student: null, tasks: [], 
+      globalChannel: null, feedChannel: null, liveChannel: null,
+      chatChannel: null, currentChatUser: null,
+      feedPage: 0, feedHasMore: true
+    };
   }
   
   get(key) { return this._state[key]; }
@@ -87,17 +94,23 @@ class SafeAppState {
   }
   
   reset() {
-    // ✅ CORRECCIÓN: Limpiar canales ANTES de borrar el estado
-    if (this._state.realtimeChannel) {
-      supabase.removeChannel(this._state.realtimeChannel);
-    }
-    if (this._state.feedChannel) {
-      supabase.removeChannel(this._state.feedChannel);
-    }
-    if (this._state.liveChannel) {
-      supabase.removeChannel(this._state.liveChannel);
-    }
-    this._state = { user: null, profile: null, student: null, tasks: [], realtimeChannel: null, feedChannel: null, liveChannel: null };
+    const channels = [
+      this._state.globalChannel,
+      this._state.feedChannel,
+      this._state.liveChannel,
+      this._state.chatChannel
+    ];
+
+    channels.forEach(c => {
+      if(c) supabase.removeChannel(c);
+    });
+
+    this._state = { 
+      user: null, profile: null, student: null, tasks: [], 
+      globalChannel: null, feedChannel: null, liveChannel: null,
+      chatChannel: null, currentChatUser: null,
+      feedPage: 0, feedHasMore: true
+    };
   }
 }
 const AppState = new SafeAppState();
@@ -105,7 +118,12 @@ const AppState = new SafeAppState();
 // ✅ 2. CACHE GLOBAL (Optimización)
 const GlobalCache = {
   store: {},
+  maxItems: 50,
   set(key, data) {
+    if (Object.keys(this.store).length > this.maxItems) {
+      const oldest = Object.keys(this.store)[0];
+      delete this.store[oldest];
+    }
     this.store[key] = { data, time: Date.now() };
   },
   get(key, maxAge = 60000) { // 1 minuto por defecto
@@ -141,6 +159,8 @@ async function sendEmail(to, subject, html, text) {
 function setupSidebarMobile() { 
   const nav = document.querySelector('nav.sidebar-nav'); 
   if (!nav) return; 
+  
+  nav.style.scrollBehavior = "smooth";
   
   // Detectar si hay scroll horizontal 
   const checkScroll = () => { 
@@ -248,7 +268,7 @@ document.addEventListener('DOMContentLoaded', async () => {
       el.textContent = profile?.name ? escapeHtml(profile.name) : 'Familia';
     });
     
-    await loadStudentData();
+    loadStudentData();
   } catch (err) {
     console.error('Error cargando perfil:', err);
     Helpers.toast('Error al cargar tu información', 'error');
@@ -358,12 +378,11 @@ function setupNavigation() {
 
   // ✅ Delegación de eventos para navegación
   document.addEventListener('click', (e) => {
-    const targetBtn = e.target.closest('[data-target]');
-    if (targetBtn) {
-      // Si está dentro de un modal o componente específico que maneja su propia lógica, ignorar si es necesario
-      // Pero para navegación principal:
+    const btn = e.target.closest('[data-target]');
+    if (!btn) return;
+    if (btn.dataset.target) {
       e.preventDefault();
-      setActiveSection(targetBtn.dataset.target);
+      setActiveSection(btn.dataset.target);
     }
   });
 
@@ -393,7 +412,7 @@ window.addEventListener('unhandledrejection', event => {
 });
 
 // ✅ Carga diferida de datos por sección
-function loadSectionData(sectionId, forceRefresh = false) {
+async function loadSectionData(sectionId, forceRefresh = false) {
   const loaders = {
     home: loadDashboard,
     'live-attendance': loadAttendance,
@@ -401,7 +420,7 @@ function loadSectionData(sectionId, forceRefresh = false) {
     grades: loadGrades,
     class: loadClassFeed,
     payments: () => { loadPayments(); initPaymentForm(); },
-    notifications: async () => { await loadNotifications(); setupChatHandlers(); loadChat('director'); loadChat('maestra'); },
+    notifications: async () => { await initChatSystem(); },
     profile: async () => { await populateProfile(); },
     videocall: initVideoCall
   };
@@ -413,31 +432,19 @@ function loadSectionData(sectionId, forceRefresh = false) {
     return;
   }
   
-  if (loader && typeof loader === 'function') {
-    // ✅ 1. LAZY LOAD (Verificación)
-    if (!forceRefresh && loadedSections.has(sectionId)) {
-      return;
-    }
+  if (!forceRefresh && loadedSections.has(sectionId)) return;
 
-    // Mostrar indicador de carga en el botón de refresco si existe
-    const refreshBtn = document.getElementById('btnRefreshData');
-    if(refreshBtn) refreshBtn.classList.add('animate-spin');
+  const refreshBtn = document.getElementById('btnRefreshData');
+  if(refreshBtn) refreshBtn.classList.add('animate-spin');
 
-    // ✅ Manejo de errores centralizado en cada loader
-    const result = loader();
-    if (result instanceof Promise) {
-      result.catch(err => {
-        console.error(`Error cargando sección ${sectionId}:`, err);
-        Helpers.toast(`Error al cargar ${sectionId}`, 'error');
-      }).finally(() => {
-        loadedSections.add(sectionId);
-        if(refreshBtn) refreshBtn.classList.remove('animate-spin');
-      });
-    } else {
-      // Si no es una promesa, marcar como cargada inmediatamente
-      loadedSections.add(sectionId);
-      if(refreshBtn) refreshBtn.classList.remove('animate-spin');
-    }
+  try {
+    await loader();
+    loadedSections.add(sectionId);
+  } catch (err) {
+    console.error(`Error cargando sección ${sectionId}:`, err);
+    Helpers.toast(`Error al cargar ${sectionId}`, 'error');
+  } finally {
+    if(refreshBtn) refreshBtn.classList.remove('animate-spin');
   }
 }
 
@@ -557,7 +564,7 @@ async function submitPaymentProof(e) {
 
   try {
     const ext = file.name.split('.').pop();
-    const name = `payments/${student.id}_${Date.now()}.${ext}`;
+    const name = `${student.id}_${Date.now()}.${ext}`;
     const { error: upErr } = await supabase.storage.from('classroom_media').upload(`payments/${name}`, file);
     if (upErr) throw upErr;
     const { data } = await supabase.storage.from('classroom_media').createSignedUrl(`payments/${name}`, 31536000); // 1 año
@@ -577,62 +584,6 @@ async function submitPaymentProof(e) {
   } catch (err) {
     console.error(err);
     Helpers.toast('Error enviando comprobante', 'error');
-  }
-}
-
-function setupChatHandlers() {
-  const btnDir = document.getElementById('btnSendDirector');
-  const btnTea = document.getElementById('btnSendTeacher');
-  if (btnDir) btnDir.onclick = () => sendChatMessage('director');
-  if (btnTea) btnTea.onclick = () => sendChatMessage('maestra');
-}
-
-async function loadChat(role) {
-  const student = AppState.get('student');
-  if (!student) return;
-  const listId = role === 'director' ? 'chatDirectorList' : 'chatTeacherList';
-  const list = document.getElementById(listId);
-  if (!list) return;
-  list.innerHTML = '<div class="text-center text-xs text-slate-400 py-2">Cargando...</div>';
-  try {
-    const { data } = await supabase
-      .from('messages')
-      .select('content, created_at, from:profiles(name)')
-      .eq('student_id', student.id)
-      .eq('to_role', role)
-      .order('created_at', { ascending: true });
-    list.innerHTML = (data || []).map(m => `
-      <div class="flex gap-2 text-sm">
-        <div class="font-bold text-slate-700">${escapeHtml(m.from?.name || 'Usuario')}:</div>
-        <div class="text-slate-600">${escapeHtml(m.content)}</div>
-      </div>
-    `).join('') || '<div class="text-center text-xs text-slate-400 py-2">Sin mensajes</div>';
-  } catch (e) {
-    list.innerHTML = '<div class="text-center text-xs text-slate-400 py-2">Error cargando chat</div>';
-  }
-}
-
-async function sendChatMessage(role) {
-  const inputId = role === 'director' ? 'chatDirectorInput' : 'chatTeacherInput';
-  const input = document.getElementById(inputId);
-  const text = input?.value.trim();
-  if (!text) return;
-  try {
-    const user = AppState.get('user');
-    const student = AppState.get('student');
-    const { error } = await supabase.from('messages').insert({
-      student_id: student.id,
-      from_id: user.id,
-      to_role: role,
-      content: text
-    });
-    if (!error) {
-      input.value = '';
-      loadChat(role);
-      Helpers.toast('Mensaje enviado', 'success');
-    }
-  } catch (e) {
-    Helpers.toast('No se pudo enviar', 'error');
   }
 }
 
@@ -722,17 +673,23 @@ function initAbsenceModule() {
 // ===== CARGA DE DATOS DEL ESTUDIANTE =====
 async function loadStudentData() {
   try {
-    const { data: student, error } = await supabase
-      .from(TABLES.STUDENTS)
-      .select(`
-        *,
-        classrooms(name, level)
-      `)
-      .eq('parent_id', AppState.get('user').id)
-      .limit(1)
-      .maybeSingle();
-    
-    if (error) throw error;
+    let student = GlobalCache.get("student");
+
+    if (!student) {
+      const { data, error } = await supabase
+        .from(TABLES.STUDENTS)
+        .select(`
+          *,
+          classrooms(name, level, teacher_id)
+        `)
+        .eq('parent_id', AppState.get('user').id)
+        .limit(1)
+        .maybeSingle();
+      
+      if (error) throw error;
+      student = data;
+      if (student) GlobalCache.set("student", student, 300000); // 5 min cache
+    }
     
     if (!student) {
       Helpers.toast('No hay estudiante vinculado a tu cuenta', 'info');
@@ -744,7 +701,7 @@ async function loadStudentData() {
     updateStudentUI(student);
     
     // ✅ Iniciar servicios que dependen del estudiante
-    initNotifications();
+    initGlobalRealtime();
     initFeedRealtime();
     initLiveClassListener(student.classroom_id);
   } catch (err) {
@@ -762,6 +719,7 @@ function updateStudentUI(student) {
   const cls = Array.isArray(student?.classrooms) ? student.classrooms[0] : student?.classrooms;
   const classroomInfo = cls 
     ? `${escapeHtml(cls.name)} • ${escapeHtml(cls.level || '')}`
+    ? (cls.level ? `${escapeHtml(cls.name)} • ${escapeHtml(cls.level)}` : escapeHtml(cls.name))
     : 'Sin aula asignada';
   
   document.querySelectorAll('.student-name-display').forEach(el => {
@@ -1256,12 +1214,13 @@ function closeModal(modal) {
   // Restaurar enfoque al botón que abrió el modal (mejora UX)
 }
 
-// ✅ initNotifications(): 
+// ✅ initGlobalRealtime(): 
 //    - Almacena channel en AppState para limpieza
 //    - Valida permisos antes de suscribir
 //    - Desuscribe en logout
-function initNotifications() {
+function initGlobalRealtime() {
   const classroomId = AppState.get('student')?.classroom_id;
+  const studentId = AppState.get('student')?.id;
   if (!classroomId) return;
 
   const notifPrompt = document.getElementById('notification-prompt');
@@ -1269,49 +1228,92 @@ function initNotifications() {
 
   // ✅ 3. REALTIME INTELIGENTE
   const subscribeToRealtime = () => {
-    if (AppState.get('realtimeChannel')) return; // Evitar suscripciones múltiples
+    if (AppState.get('globalChannel')) return; // Evitar suscripciones múltiples
 
     const channel = supabase
-      .channel('tasks-notif')
+      .channel('global-realtime')
+      // 1. TAREAS (Nuevas y Actualizaciones)
       .on(
         'postgres_changes',
         {
-          event: 'INSERT',
+          event: '*', // INSERT, UPDATE, DELETE
           schema: 'public',
           table: TABLES.TASKS,
           filter: `classroom_id=eq.${classroomId}`
         },
         (payload) => {
-          const title = payload.new.title || 'Nueva tarea';
-          Helpers.toast(`Nueva tarea: ${escapeHtml(title)}`, 'info');
+          if (payload.eventType === 'INSERT') {
+             const title = payload.new.title || 'Nueva tarea';
+             Helpers.toast(`Nueva tarea: ${escapeHtml(title)}`, 'info');
+             if (Notification.permission === 'granted') {
+                new Notification('Nueva Tarea', { body: escapeHtml(title), icon: '/logo/favicon.ico' });
+             }
+          }
           
-          // Actualizar Cache y Estado sin recargar todo
-          const cachedTasks = GlobalCache.get('tasks');
-          if (cachedTasks) {
-             cachedTasks.push(payload.new);
-             GlobalCache.set('tasks', cachedTasks);
-             AppState.set('tasks', cachedTasks);
-          }
-
-          if (Notification.permission === 'granted') {
-            new Notification('Nueva Tarea', {
-              body: escapeHtml(title),
-              icon: '/logo/favicon.ico',
-              requireInteraction: false
-            });
-          }
-
-          // Actualizar UI inteligentemente
+          // Invalidar cache y recargar si estamos en la vista
+          GlobalCache.clear('tasks');
           if (document.getElementById('tasks')?.classList.contains('active')) {
              const activeFilter = document.querySelector('.task-filter-btn.font-bold')?.dataset.filter || 'pending';
-             loadTasks(activeFilter); // Usará el cache actualizado
+             loadTasks(activeFilter);
           }
           if (document.getElementById('home')?.classList.contains('active')) loadDashboard();
         }
       )
+      // 2. EVIDENCIAS / CALIFICACIONES
+      .on(
+        'postgres_changes',
+        {
+          event: 'UPDATE',
+          schema: 'public',
+          table: TABLES.TASK_EVIDENCES,
+          filter: `student_id=eq.${studentId}`
+        },
+        (payload) => {
+           if (payload.new.grade_letter) {
+               Helpers.toast(`¡Tarea calificada! Nota: ${payload.new.grade_letter}`, 'success');
+           }
+           GlobalCache.clear('evidences');
+           GlobalCache.clear('grades');
+           
+           // Actualizar vistas relevantes
+           if (document.getElementById('tasks')?.classList.contains('active')) loadTasks();
+           if (document.getElementById('grades')?.classList.contains('active')) loadGrades();
+           if (document.getElementById('home')?.classList.contains('active')) loadDashboard();
+        }
+      )
+      // 3. ASISTENCIA
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: TABLES.ATTENDANCE,
+          filter: `student_id=eq.${studentId}`
+        },
+        () => {
+           GlobalCache.clear('attendance');
+           if (document.getElementById('live-attendance')?.classList.contains('active')) loadAttendance();
+           if (document.getElementById('home')?.classList.contains('active')) loadDashboard();
+        }
+      )
+      // 4. PAGOS
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: TABLES.PAYMENTS,
+          filter: `student_id=eq.${studentId}`
+        },
+        () => {
+           GlobalCache.clear('payments');
+           if (document.getElementById('payments')?.classList.contains('active')) loadPayments();
+           if (document.getElementById('home')?.classList.contains('active')) loadDashboard();
+        }
+      )
       .subscribe();
 
-    AppState.set('realtimeChannel', channel);
+    AppState.set('globalChannel', channel);
   };
 
   if ('Notification' in window) {
@@ -1382,6 +1384,22 @@ function setupGlobalListeners() {
     const taskDetailBtn = e.target.closest('.js-task-detail-btn');
     if (taskDetailBtn) {
       openTaskDetail(taskDetailBtn.dataset.taskId);
+    }
+  });
+
+  // ✅ 7. Mejora UX: Enviar comentario con ENTER
+  document.addEventListener('keypress', (e) => {
+    if (e.key === 'Enter' && e.target.id?.startsWith('comment-input-')) {
+      const postId = e.target.id.replace('comment-input-', '');
+      sendComment(postId);
+    }
+  });
+
+  // ✅ Listener para Chat (Enviar con Enter)
+  document.addEventListener('keypress', (e) => {
+    if (e.key === 'Enter' && !e.shiftKey && e.target.id === 'messageInput') {
+      e.preventDefault();
+      sendChatMessage();
     }
   });
 }
@@ -1601,6 +1619,102 @@ async function loadDashboard() {
   }
 }
 
+// ✅ Helper para generar HTML de Post (Reutilizable)
+function createPostHTML(p, index = 0) {
+  // Manejo robusto de datos del maestro
+  const teacherObj = Array.isArray(p.teacher) ? p.teacher[0] : p.teacher;
+  // Fallback a columnas planas (trigger) si el objeto teacher no está disponible
+  const tName = teacherObj?.name || p.teacher_name || 'Maestra/o';
+  const teacherAvatar = teacherObj?.avatar_url || p.teacher_avatar;
+  
+  const postDate = new Date(p.created_at);
+  const isNew = (Date.now() - postDate.getTime()) < 3600000;
+  
+  const reactionCounts = {};
+  if (p.likes && Array.isArray(p.likes)) {
+    p.likes.forEach(l => {
+      const type = l.reaction_type || 'like';
+      reactionCounts[type] = (reactionCounts[type] || 0) + 1;
+    });
+  }
+  
+  const myReaction = Array.isArray(p.likes) ? p.likes.find(l => l.user_id === AppState.get('user').id)?.reaction_type : null;
+  
+  let commentCount = 0;
+  if (Array.isArray(p.comments)) {
+      if (p.comments[0] && p.comments[0].count !== undefined) commentCount = p.comments[0].count;
+      else commentCount = p.comments.length;
+  }
+  
+  let safeMedia = '';
+  if (p.media_url && (p.media_url.startsWith('https://') || p.media_url.startsWith('http://'))) {
+      const safeTypes = ['jpg','jpeg','png','webp','mp4'];
+      const ext = p.media_url.split('.').pop().toLowerCase().split('?')[0];
+      if(safeTypes.includes(ext)){
+         safeMedia = encodeURI(p.media_url);
+      }
+  }
+
+  // Optimización de carga de imágenes (LCP)
+  // Las 2 primeras publicaciones cargan inmediato, el resto diferido
+  const imgLoading = index < 2 ? 'eager' : 'lazy';
+  const imgPriority = index < 2 ? 'high' : 'auto';
+
+  return `
+  <div class="bg-white p-5 rounded-2xl shadow-sm border border-slate-100 mb-4 animate-fade-in" id="post-${p.id}">
+    <div class="flex items-center gap-3 mb-3">
+      <div class="w-10 h-10 rounded-full bg-indigo-100 border border-indigo-50 overflow-hidden flex items-center justify-center flex-shrink-0">
+        ${teacherAvatar 
+          ? `<img src="${teacherAvatar}" class="w-full h-full object-cover" alt="${escapeHtml(tName)}">` 
+          : `<span class="font-bold text-indigo-600">${tName.charAt(0)}</span>`
+        }
+      </div>
+      <div>
+        <p class="font-bold text-slate-800">${escapeHtml(tName)}</p>
+        <div class="flex items-center gap-2">
+          <p class="text-xs text-slate-500">${postDate.toLocaleDateString()} ${postDate.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}</p>
+          ${isNew ? '<span class="bg-blue-100 text-blue-700 text-[10px] font-bold px-2 py-0.5 rounded-full animate-pulse">NUEVO</span>' : ''}
+        </div>
+      </div>
+    </div>
+    <p class="text-slate-700 text-sm leading-relaxed mb-3">${escapeHtml(p.content)}</p>
+    ${p.media_url ? `
+      <div class="rounded-xl overflow-hidden border border-slate-100">
+        ${p.media_type === 'video' 
+          ? `<video src="${safeMedia}" controls class="w-full max-h-80 bg-black"></video>`
+          : `<img src="${safeMedia}" class="w-full object-cover max-h-80" loading="${imgLoading}" fetchpriority="${imgPriority}" decoding="async">`
+        }
+      </div>
+    ` : ''}
+    
+    <div class="flex gap-4 text-xs text-slate-400 mb-2 mt-3 px-1" id="reaction-summary-${p.id}">
+        ${renderReactionSummary(reactionCounts)}
+        <span class="flex items-center gap-1">💬 <span id="comment-count-${p.id}">${commentCount}</span></span>
+    </div>
+
+    <div class="flex items-center gap-4 pt-2 border-t border-slate-50">
+      <div class="flex gap-1 bg-slate-50 rounded-full p-1" id="reaction-buttons-${p.id}">
+         <button onclick="toggleReaction('${p.id}', 'like')" class="p-2 rounded-full hover:bg-white hover:shadow-sm transition-all ${myReaction === 'like' ? 'bg-blue-100 ring-2 ring-blue-200' : ''}" title="Me gusta">👍</button>
+         <button onclick="toggleReaction('${p.id}', 'love')" class="p-2 rounded-full hover:bg-white hover:shadow-sm transition-all ${myReaction === 'love' ? 'bg-pink-100 ring-2 ring-pink-200' : ''}" title="Me encanta">❤️</button>
+         <button onclick="toggleReaction('${p.id}', 'haha')" class="p-2 rounded-full hover:bg-white hover:shadow-sm transition-all ${myReaction === 'haha' ? 'bg-yellow-100 ring-2 ring-yellow-200' : ''}" title="Me divierte">😂</button>
+      </div>
+
+      <button class="flex items-center gap-2 text-slate-500 hover:text-blue-500 hover:bg-blue-50 transition-colors text-sm py-2 px-3 rounded-lg ml-auto" onclick="toggleCommentSection('${p.id}')">
+        <i data-lucide="message-circle" class="w-5 h-5"></i>
+        <span>Comentar</span>
+      </button>
+    </div>
+
+    <div id="comments-section-${p.id}" class="hidden mt-3 pt-3 border-t border-slate-100 bg-slate-50/50 rounded-xl p-3">
+      <div id="comments-list-${p.id}" class="space-y-3 mb-3 max-h-60 overflow-y-auto pr-1"></div>
+      <div class="flex gap-2 items-center">
+        <input type="text" id="comment-input-${p.id}" class="flex-1 border rounded-xl px-3 py-2 text-sm bg-white focus:ring-2 focus:ring-blue-500 outline-none transition-all" placeholder="Escribe un comentario...">
+        <button onclick="sendComment('${p.id}')" class="bg-blue-600 text-white p-2 rounded-xl hover:bg-blue-700 transition-colors shadow-sm"><i data-lucide="send" class="w-4 h-4"></i></button>
+      </div>
+    </div>
+  </div>`;
+}
+
 async function loadAttendance() {
   const container = document.getElementById('calendarGrid');
   if (!container) return;
@@ -1690,7 +1804,7 @@ function updateAttendanceStats(data) {
     set('attLate', l);
 }
 
-async function loadClassFeed() {
+async function loadClassFeed(reset = true) {
   const container = document.getElementById('classFeed');
   if (!container) return;
   
@@ -1704,7 +1818,7 @@ async function loadClassFeed() {
   try {
     const { data: posts, error } = await supabase
       .from(TABLES.POSTS)
-      .select('*, teacher:teacher_id(name, avatar_url), likes(count), comments(count)')
+      .select('*, teacher:teacher_id(name, avatar_url), likes(id,user_id), comments(count)')
       .eq('classroom_id', student.classroom_id)
       .order('created_at', { ascending: false });
 
@@ -1715,77 +1829,50 @@ async function loadClassFeed() {
       return;
     }
 
-    container.innerHTML = posts.map(p => {
-      // Manejo robusto de datos del maestro (objeto o array)
-      const teacherObj = Array.isArray(p.teacher) ? p.teacher[0] : p.teacher;
-      const teacherName = teacherObj?.name || 'Maestra/o';
-      const teacherAvatar = teacherObj?.avatar_url;
-      const likeCount = p.likes?.length ? p.likes[0].count : 0;
-      const commentCount = p.comments?.length ? p.comments[0].count : 0;
-      // ✅ Protección XSS en media
-      let safeMedia = '';
-      if (p.media_url && (p.media_url.startsWith('https://') || p.media_url.startsWith('http://'))) {
-          const safeTypes = ['jpg','jpeg','png','webp','mp4'];
-          const ext = p.media_url.split('.').pop().toLowerCase().split('?')[0];
-          if(safeTypes.includes(ext)){
-             safeMedia = encodeURI(p.media_url);
-          }
-      }
-      
-      return `
-      <div class="bg-white p-5 rounded-2xl shadow-sm border border-slate-100 mb-4" id="post-${p.id}">
-        <div class="flex items-center gap-3 mb-3">
-          <div class="w-10 h-10 rounded-full bg-indigo-100 border border-indigo-50 overflow-hidden flex items-center justify-center flex-shrink-0">
-            ${teacherAvatar 
-              ? `<img src="${teacherAvatar}" class="w-full h-full object-cover" alt="${escapeHtml(teacherName)}">` 
-              : `<span class="font-bold text-indigo-600">${teacherName.charAt(0)}</span>`
-            }
-          </div>
-          <div>
-            <p class="font-bold text-slate-800">${escapeHtml(teacherName)}</p>
-            <p class="text-xs text-slate-500">${new Date(p.created_at).toLocaleDateString()}</p>
-          </div>
-        </div>
-        <p class="text-slate-700 text-sm leading-relaxed mb-3">${escapeHtml(p.content)}</p>
-        ${p.media_url ? `
-          <div class="rounded-xl overflow-hidden border border-slate-100">
-            ${p.media_type === 'video' 
-              ? `<video src="${safeMedia}" controls class="w-full max-h-80 bg-black"></video>`
-              : `<img src="${safeMedia}" class="w-full object-cover max-h-80" loading="lazy">`
-            }
-          </div>
-        ` : ''}
-        
-        <!-- Botones de Acción -->
-        <div class="flex items-center gap-4 mt-4 pt-3 border-t border-slate-50">
-          <button class="flex items-center gap-2 text-slate-500 hover:text-pink-500 transition-colors text-sm" onclick="toggleLike('${p.id}')">
-            <i data-lucide="heart" class="w-4 h-4"></i>
-            <span id="like-count-${p.id}">${likeCount}</span>
-          </button>
-          <button class="flex items-center gap-2 text-slate-500 hover:text-blue-500 transition-colors text-sm" onclick="toggleCommentSection('${p.id}')">
-            <i data-lucide="message-circle" class="w-4 h-4"></i>
-            <span id="comment-count-${p.id}">${commentCount}</span> Comentarios
-          </button>
-        </div>
+    const html = posts.map((p, i) => createPostHTML(p, i)).join('');
+    
+    if (reset) {
+        container.innerHTML = html;
+    } else {
+        // Remover botón anterior si existe
+        const oldBtn = document.getElementById('btnLoadMoreFeed');
+        if(oldBtn) oldBtn.remove();
+        container.insertAdjacentHTML('beforeend', html);
+    }
 
-        <!-- Sección de Comentarios (Oculta por defecto) -->
-        <div id="comments-section-${p.id}" class="hidden mt-4 pt-4 border-t border-slate-100">
-          <div id="comments-list-${p.id}" class="space-y-3 mb-4 max-h-60 overflow-y-auto"></div>
-          
-          <div class="flex gap-2 items-center">
-            <input type="text" id="comment-input-${p.id}" class="flex-1 border rounded-xl px-3 py-2 text-sm bg-slate-50 focus:bg-white focus:ring-2 focus:ring-blue-500 outline-none transition-all" placeholder="Escribe un comentario...">
-            <button onclick="sendComment('${p.id}')" class="bg-blue-600 text-white p-2 rounded-xl hover:bg-blue-700 transition-colors"><i data-lucide="send" class="w-4 h-4"></i></button>
-          </div>
-        </div>
-      </div>
-    `}).join('');
+    // Botón Ver Más
+    if (AppState.get('feedHasMore')) {
+        const btnHtml = `
+            <div class="text-center mt-4">
+                <button id="btnLoadMoreFeed" class="px-5 py-2 bg-white border border-slate-200 text-slate-600 rounded-full text-sm font-bold hover:bg-slate-50 transition-colors shadow-sm">
+                    Ver más publicaciones
+                </button>
+            </div>
+        `;
+        container.insertAdjacentHTML('beforeend', btnHtml);
+        document.getElementById('btnLoadMoreFeed').onclick = () => {
+            AppState.set('feedPage', page + 1);
+            loadClassFeed(false);
+        };
+    }
     
     if(window.lucide) lucide.createIcons();
     
   } catch (err) {
     console.error(err);
-    container.innerHTML = Helpers.emptyState('Error cargando el muro');
+    if (reset) container.innerHTML = Helpers.emptyState('Error cargando el muro');
   }
+}
+
+// Helper para renderizar resumen de reacciones
+function renderReactionSummary(counts) {
+  let html = '';
+  if (counts['like']) html += `<span class="flex items-center gap-1 bg-blue-50 text-blue-600 px-2 py-0.5 rounded-full">👍 ${counts['like']}</span>`;
+  if (counts['love']) html += `<span class="flex items-center gap-1 bg-pink-50 text-pink-600 px-2 py-0.5 rounded-full">❤️ ${counts['love']}</span>`;
+  if (counts['haha']) html += `<span class="flex items-center gap-1 bg-yellow-50 text-yellow-600 px-2 py-0.5 rounded-full">😂 ${counts['haha']}</span>`;
+  
+  if (!html) return '<span class="text-slate-300 italic">Sé el primero en reaccionar</span>'; 
+  return `<div class="flex gap-2">${html}</div>`;
 }
 
 // ✅ Sistema de Comentarios en Tiempo Real
@@ -1794,10 +1881,26 @@ function initFeedRealtime() {
   if(old){
    supabase.removeChannel(old);
   }
+  
+  const student = AppState.get('student');
+  if (!student?.classroom_id) return;
 
-  const channel = supabase.channel('public:comments')
+  const channel = supabase.channel('public:feed')
+    // 0. Nuevas Publicaciones
+    .on('postgres_changes', { event: 'INSERT', schema: 'public', table: TABLES.POSTS, filter: `classroom_id=eq.${student.classroom_id}` }, payload => {
+        const container = document.getElementById('classFeed');
+        if (container) {
+            // Insertar al principio
+            const html = createPostHTML(payload.new);
+            container.insertAdjacentHTML('afterbegin', html);
+            if(window.lucide) lucide.createIcons();
+        }
+    })
     .on('postgres_changes', { event: 'INSERT', schema: 'public', table: TABLES.COMMENTS }, async (payload) => {
        const newComment = payload.new;
+       // Ignorar si es mi propio comentario (ya agregado optimísticamente)
+       if (newComment.user_id === AppState.get('user').id) return;
+
        const postEl = document.getElementById(`post-${newComment.post_id}`);
        
        if(postEl) {
@@ -1811,23 +1914,38 @@ function initFeedRealtime() {
          // 2. Si la sección está abierta, agregar el comentario
          const listEl = document.getElementById(`comments-list-${newComment.post_id}`);
          if(listEl && listEl.offsetParent !== null) { // Si es visible
-            // Obtener nombre del usuario desde perfiles
-            const { data: user } = await supabase.from(TABLES.PROFILES).select('name').eq('id', newComment.user_id).single();
-            const name = user?.name || 'Usuario';
+            // 2. Optimización: Usar nombre de la tabla comments si existe, o fallback
+            const name = newComment.user_name || 'Usuario';
             
             const div = document.createElement('div');
-            div.className = 'flex gap-2 text-sm animate-fade-in';
+            div.className = 'flex gap-2 text-sm animate-fade-in mb-2';
+            // 6. Mejora visual del comentario (Burbuja)
             div.innerHTML = `
-              <div class="font-bold text-slate-700 whitespace-nowrap">${escapeHtml(name)}:</div>
-              <div class="text-slate-600">${escapeHtml(newComment.content)}</div>
+              <div class="w-8 h-8 rounded-full bg-slate-200 flex items-center justify-center text-xs font-bold text-slate-500 flex-shrink-0">
+                ${escapeHtml(name.charAt(0))}
+              </div>
+              <div class="bg-white p-3 rounded-2xl rounded-tl-none shadow-sm border border-slate-100">
+                <div class="font-bold text-slate-700 text-xs mb-1">${escapeHtml(name)}</div>
+                <div class="text-slate-600 leading-snug">${escapeHtml(newComment.content)}</div>
+              </div>
             `;
             // Indicador visual
-            postEl.classList.add('ring-2','ring-blue-400');
-            setTimeout(()=>postEl.classList.remove('ring-2','ring-blue-400'),1500);
             listEl.appendChild(div);
             listEl.scrollTop = listEl.scrollHeight;
          }
        }
+    })
+    // 1. Reacciones en tiempo real (INSERT, UPDATE, DELETE)
+    .on('postgres_changes', { event: '*', schema: 'public', table: TABLES.LIKES }, async (payload) => {
+        // Actualización local de contadores sin fetch masivo si es posible, 
+        // pero para consistencia usamos updatePostReactionsUI solo si NO soy yo (yo actualizo optimista)
+        const postId = payload.new?.post_id || payload.old?.post_id;
+        if (!postId) return;
+        
+        const myId = AppState.get('user').id;
+        if ((payload.new?.user_id === myId) || (payload.old?.user_id === myId)) return;
+
+        updatePostReactionsUI(postId);
     })
     .subscribe();
     
@@ -1845,19 +1963,30 @@ window.toggleCommentSection = async (postId) => {
     
     const { data: comments } = await supabase
       .from(TABLES.COMMENTS)
-      .select('content, created_at, user:profiles(name)')
+      .select('id, user_id, content, created_at, user_name, user:profiles(name)')
       .eq('post_id', postId)
       .order('created_at', { ascending: true });
       
     if (!comments || !comments.length) {
       list.innerHTML = '<p class="text-xs text-slate-400 text-center py-2">Sé el primero en comentar</p>';
     } else {
+      const currentUserId = AppState.get('user')?.id;
       list.innerHTML = comments.map(c => {
-        const uName = Array.isArray(c.user) ? c.user[0]?.name : c.user?.name;
+        // Preferir user_name guardado, fallback a relación
+        const uName = c.user_name || (Array.isArray(c.user) ? c.user[0]?.name : c.user?.name) || 'Usuario';
+        const isMine = c.user_id === currentUserId;
         return `
-        <div class="flex gap-2 text-sm">
-          <div class="font-bold text-slate-700 whitespace-nowrap">${escapeHtml(uName || 'Usuario')}:</div>
-          <div class="text-slate-600">${escapeHtml(c.content)}</div>
+        <div class="flex gap-2 text-sm mb-2">
+          <div class="w-8 h-8 rounded-full bg-slate-200 flex items-center justify-center text-xs font-bold text-slate-500 flex-shrink-0">
+            ${escapeHtml(uName.charAt(0))}
+          </div>
+          <div class="bg-white p-3 rounded-2xl rounded-tl-none shadow-sm border border-slate-100 relative group min-w-[120px]">
+            <div class="font-bold text-slate-700 text-xs mb-1 flex justify-between items-center gap-2">
+                <span>${escapeHtml(uName)}</span>
+                ${isMine ? `<button onclick="deleteComment('${c.id}', '${postId}')" class="text-slate-300 hover:text-red-500 transition-colors" title="Eliminar"><i data-lucide="trash-2" class="w-3 h-3"></i></button>` : ''}
+            </div>
+            <div class="text-slate-600 leading-snug">${escapeHtml(c.content)}</div>
+          </div>
         </div>
       `}).join('');
     }
@@ -1867,28 +1996,80 @@ window.toggleCommentSection = async (postId) => {
   }
 };
 
-// ✅ Funciones globales para el muro (Like/Comentar)
-window.toggleLike = async (postId) => {
+// Función auxiliar para actualizar UI de reacciones en tiempo real
+async function updatePostReactionsUI(postId) {
+  // Esta función hace fetch, pero ahora está optimizada para llamarse menos frecuentemente
+  const { data: reactions } = await supabase
+    .from(TABLES.LIKES)
+    .select('id')
+    .eq('post_id', postId);
+    
+  if (reactions) {
+    const counts = reactions.reduce((acc, r) => {
+      const type = r.reaction_type || 'like';
+      acc[type] = (acc[type] || 0) + 1;
+      return acc;
+    }, {});
+    
+    const summaryEl = document.getElementById(`reaction-summary-${postId}`);
+    const commentCountEl = document.getElementById(`comment-count-${postId}`);
+    const commentCount = commentCountEl ? commentCountEl.textContent : '0';
+
+    if (summaryEl) {
+      summaryEl.innerHTML = renderReactionSummary(counts) + 
+        `<span class="flex items-center gap-1 ml-4">💬 <span id="comment-count-${postId}">${commentCount}</span></span>`;
+    }
+  }
+}
+
+// ✅ Funciones globales para el muro (Reacciones/Comentar)
+window.toggleReaction = async (postId, type) => {
   try {
     const user = AppState.get('user');
     if(!user) return;
     
-    // Verificar si ya dio like (simplificado: intentar insertar, si falla es que ya existe -> borrar)
-    // Idealmente consultar primero, pero para UX rápida:
-    const { error } = await supabase.from(TABLES.LIKES).insert({ post_id: postId, user_id: user.id });
-    
-    if (error && error.code === '23505') { // Unique violation
-       await supabase.from(TABLES.LIKES).delete().eq('post_id', postId).eq('user_id', user.id);
-       Helpers.toast('Like removido', 'info');
-       // ✅ Fix counter
-       const countSpan = document.getElementById(`like-count-${postId}`);
-       if(countSpan) countSpan.textContent = Math.max(0, parseInt(countSpan.textContent || '0') - 1);
-    } else if (!error) {
-       Helpers.toast('¡Te gusta esto!', 'success');
-       // ✅ Fix counter
-       const countSpan = document.getElementById(`like-count-${postId}`);
-       if(countSpan) countSpan.textContent = parseInt(countSpan.textContent || '0') + 1;
+    // Verificar estado actual
+    const { data: existing } = await supabase
+        .from(TABLES.LIKES)
+        .select('id, reaction_type')
+        .eq('post_id', postId)
+        .eq('user_id', user.id)
+        .maybeSingle();
+
+    // UI Optimista (Feedback inmediato en botones)
+    const btnContainer = document.getElementById(`reaction-buttons-${postId}`);
+    if (btnContainer) {
+       const buttons = btnContainer.querySelectorAll('button');
+       buttons.forEach(b => {
+          b.className = 'p-2 rounded-full hover:bg-white hover:shadow-sm transition-all'; // Reset
+          if (b.getAttribute('onclick').includes(`'${type}'`)) {
+             // Si es el que clicamos y no lo estamos quitando (lógica abajo), lo activamos
+             // Pero como es asíncrono, mejor esperar o hacer lógica compleja.
+             // Para simplicidad visual inmediata:
+             if (!existing || existing.reaction_type !== type) {
+                const color = type === 'like' ? 'bg-blue-100 ring-2 ring-blue-200' : (type === 'love' ? 'bg-pink-100 ring-2 ring-pink-200' : 'bg-yellow-100 ring-2 ring-yellow-200');
+                b.className = `p-2 rounded-full hover:bg-white hover:shadow-sm transition-all ${color}`;
+             }
+          }
+       });
     }
+    
+    if (existing) {
+       if (existing.reaction_type === type) {
+         // Si es la misma reacción, quitarla (toggle off)
+         await supabase.from(TABLES.LIKES).delete().eq('id', existing.id);
+       } else {
+         // Si es diferente, actualizarla
+         await supabase.from(TABLES.LIKES).update({ reaction_type: type }).eq('id', existing.id);
+       }
+    } else {
+       // INSERT
+       await supabase.from(TABLES.LIKES).insert({ post_id: postId, user_id: user.id, reaction_type: type });
+       triggerConfetti(); // 🎉
+    }
+    
+    // Actualizar UI inmediatamente (Fetch para asegurar consistencia tras mi acción)
+    updatePostReactionsUI(postId);
     
   } catch(e) { console.error(e); }
 };
@@ -1898,22 +2079,68 @@ window.sendComment = async (postId) => {
   const text = input.value.trim();
   if(!text) return;
   
+  // UI Optimista
+  const user = AppState.get('user');
+  const profile = AppState.get('profile');
+  const userName = profile?.name || 'Yo';
+  const list = document.getElementById(`comments-list-${postId}`);
+  
+  // Renderizar inmediatamente
+  if(list) {
+      const tempId = 'temp-' + Date.now();
+      const div = document.createElement('div');
+      div.id = tempId;
+      div.className = 'flex gap-2 text-sm mb-2 opacity-50'; // Opacidad hasta confirmar
+      div.innerHTML = `
+          <div class="w-8 h-8 rounded-full bg-slate-200 flex items-center justify-center text-xs font-bold text-slate-500 flex-shrink-0">${escapeHtml(userName.charAt(0))}</div>
+          <div class="bg-white p-3 rounded-2xl rounded-tl-none shadow-sm border border-slate-100">
+            <div class="font-bold text-slate-700 text-xs mb-1">${escapeHtml(userName)}</div>
+            <div class="text-slate-600 leading-snug">${escapeHtml(text)}</div>
+          </div>`;
+      list.appendChild(div);
+      list.scrollTop = list.scrollHeight;
+      
+      // Actualizar contador visualmente
+      const countEl = document.getElementById(`comment-count-${postId}`);
+      if(countEl) countEl.textContent = (parseInt(countEl.textContent)||0) + 1;
+  }
+  
+  input.value = '';
+
   try {
-    const user = AppState.get('user');
-    const profile = AppState.get('profile');
     const { error } = await supabase.from(TABLES.COMMENTS).insert({
       post_id: postId,
       user_id: user.id,
-      // user_name: profile?.name, // ❌ ELIMINADO: Causa error 400 si la columna no existe en la BD
+      // 2. Guardar nombre para optimización (Requiere update en schema.sql)
+      user_name: profile?.name || 'Padre/Madre', 
       content: text
     });
     
     if(error) throw error;
-    Helpers.toast('Comentario enviado', 'success');
-    input.value = ''; // El realtime actualizará la UI
+    
+    // Confirmar visualmente (quitar opacidad)
+    const tempEl = list?.lastElementChild;
+    if(tempEl) tempEl.classList.remove('opacity-50');
+    
   } catch(e) {
     Helpers.toast('Error al comentar', 'error');
+    // Revertir UI
+    const countEl = document.getElementById(`comment-count-${postId}`);
+    if(countEl) countEl.textContent = Math.max(0, (parseInt(countEl.textContent)||0) - 1);
+    if(list?.lastElementChild) list.lastElementChild.remove();
+    input.value = text;
   }
+};
+
+window.deleteComment = async (commentId, postId) => {
+  if(!confirm('¿Eliminar comentario?')) return;
+  try {
+    const { error } = await supabase.from(TABLES.COMMENTS).delete().eq('id', commentId);
+    if(error) throw error;
+    Helpers.toast('Comentario eliminado', 'info');
+    // UI se actualiza sola por realtime, pero forzamos recarga por si acaso
+    toggleCommentSection(postId); toggleCommentSection(postId); 
+  } catch(e) { Helpers.toast('Error al eliminar', 'error'); }
 };
 
 async function loadGrades() {
@@ -2166,12 +2393,177 @@ async function loadPayments() {
   }
 }
 
-async function loadNotifications() {
+async function initChatSystem() {
   const container = document.getElementById('notificationsList');
   if (!container) return;
   
-  // Simulación o implementación real si existe tabla notifications
-  container.innerHTML = Helpers.emptyState('No tienes notificaciones nuevas');
+  container.innerHTML = `
+    <div class="flex flex-col md:flex-row h-[600px] bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
+      <!-- Sidebar Contactos -->
+      <div class="w-full md:w-1/3 border-r border-slate-100 bg-slate-50 flex flex-col">
+         <div class="p-4 border-b border-slate-200 font-bold text-slate-700 flex justify-between items-center">
+            <span>Mensajes</span>
+            <span class="text-xs bg-blue-100 text-blue-700 px-2 py-1 rounded-full">Privado</span>
+         </div>
+         <div id="chatContactsList" class="flex-1 overflow-y-auto p-2 space-y-2">
+            ${Helpers.skeleton(2, 'h-16')}
+         </div>
+      </div>
+      
+      <!-- Area Chat -->
+      <div class="flex-1 flex flex-col bg-white relative">
+         <div id="chatHeader" class="p-4 border-b border-slate-100 flex items-center gap-3 bg-white z-10 hidden">
+            <div id="chatHeaderAvatar" class="w-10 h-10 rounded-full bg-slate-200 overflow-hidden flex items-center justify-center font-bold text-slate-500"></div>
+            <div>
+               <div id="chatHeaderName" class="font-bold text-slate-800"></div>
+               <div id="chatHeaderRole" class="text-xs text-slate-500 capitalize"></div>
+            </div>
+         </div>
+         
+         <div id="chatMessages" class="flex-1 overflow-y-auto p-4 space-y-3 bg-slate-50/30 scroll-smooth">
+            <div class="h-full flex flex-col items-center justify-center text-slate-400">
+               <i data-lucide="message-square" class="w-12 h-12 mb-2 opacity-20"></i>
+               <p>Selecciona un contacto para chatear</p>
+            </div>
+         </div>
+         
+         <div id="chatInputArea" class="p-3 border-t border-slate-100 bg-white hidden">
+            <div class="flex gap-2 items-end">
+               <textarea id="messageInput" rows="1" class="flex-1 bg-slate-100 border-0 rounded-xl px-4 py-3 focus:ring-2 focus:ring-blue-500 resize-none outline-none transition-all" placeholder="Escribe un mensaje..."></textarea>
+               <button onclick="sendChatMessage()" class="bg-blue-600 text-white p-3 rounded-xl hover:bg-blue-700 transition-colors shadow-sm active:scale-95">
+                  <i data-lucide="send" class="w-5 h-5"></i>
+               </button>
+            </div>
+            <div class="text-[10px] text-slate-400 mt-1 px-2">Presiona Enter para enviar</div>
+         </div>
+      </div>
+    </div>
+  `;
+  
+  if(window.lucide) lucide.createIcons();
+  await loadChatContacts();
+}
+
+async function loadChatContacts() {
+  const list = document.getElementById('chatContactsList');
+  if(!list) return;
+  
+  const student = AppState.get('student');
+  const contacts = [];
+
+  // 1. Maestra
+  // Fix: Manejar si classrooms es array o objeto
+  const cls = Array.isArray(student?.classrooms) ? student.classrooms[0] : student?.classrooms;
+  if (cls?.teacher_id) {
+     const { data: teacher } = await supabase.from(TABLES.PROFILES).select('id, name, avatar_url').eq('id', cls.teacher_id).single();
+     if(teacher) contacts.push({ ...teacher, role: 'Maestra titular' });
+  }
+
+  // 2. Directora
+  const { data: directors } = await supabase.from(TABLES.PROFILES).select('id, name, avatar_url').eq('role', 'directora').limit(1);
+  if(directors && directors.length) contacts.push({ ...directors[0], role: 'Dirección' });
+
+  list.innerHTML = contacts.map(c => `
+    <div onclick="selectChat('${c.id}', '${escapeHtml(c.name)}', '${c.role}', '${c.avatar_url || ''}')" 
+         class="flex items-center gap-3 p-3 rounded-xl hover:bg-white hover:shadow-sm cursor-pointer transition-all border border-transparent hover:border-slate-100 group">
+       <div class="w-10 h-10 rounded-full bg-indigo-100 text-indigo-600 flex items-center justify-center font-bold overflow-hidden border border-indigo-50">
+          ${c.avatar_url ? `<img src="${c.avatar_url}" class="w-full h-full object-cover">` : c.name.charAt(0)}
+       </div>
+       <div>
+          <div class="font-bold text-slate-700 text-sm group-hover:text-blue-600 transition-colors">${escapeHtml(c.name)}</div>
+          <div class="text-xs text-slate-400">${c.role}</div>
+       </div>
+    </div>
+  `).join('');
+}
+
+window.selectChat = async (userId, name, role, avatar) => {
+  AppState.set('currentChatUser', userId);
+  
+  // UI Update
+  document.getElementById('chatHeader').classList.remove('hidden');
+  document.getElementById('chatInputArea').classList.remove('hidden');
+  document.getElementById('chatHeaderName').textContent = name;
+  document.getElementById('chatHeaderRole').textContent = role;
+  
+  const avatarEl = document.getElementById('chatHeaderAvatar');
+  avatarEl.innerHTML = avatar ? `<img src="${avatar}" class="w-full h-full object-cover">` : name.charAt(0);
+
+  // Load Messages
+  const container = document.getElementById('chatMessages');
+  container.innerHTML = '<div class="flex justify-center py-4"><div class="animate-spin rounded-full h-6 w-6 border-b-2 border-blue-600"></div></div>';
+  
+  const myId = AppState.get('user').id;
+  
+  const { data: msgs } = await supabase
+    .from(TABLES.MESSAGES)
+    .select('*')
+    .or(`and(sender_id.eq.${myId},receiver_id.eq.${userId}),and(sender_id.eq.${userId},receiver_id.eq.${myId})`)
+    .order('created_at', { ascending: true });
+    
+  container.innerHTML = '';
+  (msgs || []).forEach(renderMessage);
+  container.scrollTop = container.scrollHeight;
+
+  // Realtime Subscription
+  const oldChannel = AppState.get('chatChannel');
+  if(oldChannel) supabase.removeChannel(oldChannel);
+
+  const channel = supabase.channel('chat_room')
+    .on('postgres_changes', { event: 'INSERT', schema: 'public', table: TABLES.MESSAGES }, payload => {
+       const m = payload.new;
+       if ((m.sender_id === myId && m.receiver_id === userId) || (m.sender_id === userId && m.receiver_id === myId)) {
+          renderMessage(m);
+          container.scrollTop = container.scrollHeight;
+       }
+    })
+    .subscribe();
+    
+  AppState.set('chatChannel', channel);
+};
+
+window.sendChatMessage = async () => {
+  const input = document.getElementById('messageInput');
+  const content = input.value.trim();
+  const receiverId = AppState.get('currentChatUser');
+  
+  if(!content || !receiverId) return;
+  
+  input.disabled = true;
+
+  const { error } = await supabase.from(TABLES.MESSAGES).insert({
+    sender_id: AppState.get('user').id,
+    receiver_id: receiverId,
+    content: content
+  });
+  
+  input.disabled = false;
+
+  if(error) {
+     console.error(error);
+     Helpers.toast('Error al enviar mensaje', 'error');
+  } else {
+     input.value = '';
+     input.focus();
+  }
+};
+
+function renderMessage(msg) {
+  const container = document.getElementById("chatMessages");
+  const isMine = msg.sender_id === AppState.get('user').id;
+  const time = new Date(msg.created_at).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'});
+
+  const bubble = document.createElement("div");
+  bubble.className = isMine ? "flex justify-end mb-3 animate-fade-in" : "flex justify-start mb-3 animate-fade-in";
+
+  bubble.innerHTML = `
+    <div class="max-w-[80%] px-4 py-2 rounded-2xl text-sm shadow-sm ${isMine ? "bg-blue-600 text-white rounded-tr-none" : "bg-white border border-slate-200 text-slate-700 rounded-tl-none"}">
+      <div>${escapeHtml(msg.content)}</div>
+      <div class="text-[10px] ${isMine ? "text-blue-200" : "text-slate-400"} mt-1 text-right">${time}</div>
+    </div>
+  `;
+
+  container.appendChild(bubble);
 }
 
 async function populateProfile() {

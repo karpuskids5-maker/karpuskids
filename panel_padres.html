@@ -694,12 +694,12 @@
       }
     });
 
-    // Registro de Service Worker para PWA
+    /* Registro de Service Worker para PWA (Desactivado: Manejado por OneSignal)
     if ("serviceWorker" in navigator) {
       navigator.serviceWorker.register("/sw.js")
         .then(() => console.log("Service Worker registrado"))
         .catch(err => console.log("SW error", err));
-    }
+    } */
 
     // Navegación SPA de respaldo (si JS principal falla o para botones simples)
     document.querySelectorAll("[data-target]").forEach(btn => {

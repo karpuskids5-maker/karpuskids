@@ -1693,23 +1693,26 @@ async function loadGradesView() {
       
     if (stError) throw stError;
     
-    const { data: grades, error: grError } = await supabase
-      .from('grades')
-      .select('student_id, score, created_at');
+    // UNIFICACIÓN: Usar task_evidences en lugar de la tabla grades vacía
+    const { data: evidences, error: evError } = await supabase
+      .from('task_evidences')
+      .select('student_id, grade_letter, created_at')
+      .not('grade_letter', 'is', null);
       
-    if (grError) throw grError;
+    if (evError) throw evError;
 
+    const letterMap = { 'A': 100, 'B': 85, 'C': 70, 'D': 60, 'F': 50 };
     // Calculate averages
     const averages = {}; 
     const lastScores = {};
-    (grades || []).forEach(g => {
-      const sid = g.student_id;
-      const scoreNum = parseFloat(g.score) || 0;
-      const ts = g.created_at ? new Date(g.created_at).getTime() : 0;
+    (evidences || []).forEach(e => {
+      const sid = e.student_id;
+      const scoreNum = letterMap[e.grade_letter] || 0;
+      const ts = e.created_at ? new Date(e.created_at).getTime() : 0;
       if (!averages[sid]) averages[sid] = { sum: 0, count: 0 };
       averages[sid].sum += scoreNum;
       averages[sid].count++;
-      if (!lastScores[sid] || ts > lastScores[sid].ts) lastScores[sid] = { score: scoreNum, ts };
+      if (!lastScores[sid] || ts > lastScores[sid].ts) lastScores[sid] = { letter: e.grade_letter, ts };
     });
     if (!students || students.length === 0) {
       tbody.innerHTML = '<tr><td colspan="5" class="text-center p-4 text-slate-500">No hay estudiantes activos.</td></tr>';
@@ -1718,7 +1721,7 @@ async function loadGradesView() {
 
     tbody.innerHTML = students.map(s => {
       const stats = averages[s.id] || { sum: 0, count: 0 };
-      const avg = stats.count > 0 ? (stats.sum / stats.count).toFixed(1) : '-';
+      const avg = stats.count > 0 ? Math.round(stats.sum / stats.count) : '-';
       
       // Determine status/color based on average (example logic)
       let statusHtml = '<span class="text-slate-400">-</span>';
@@ -1730,12 +1733,12 @@ async function loadGradesView() {
         else statusHtml = '<span class="text-red-600 font-bold">Reprobado</span>';
       }
 
-      const last = lastScores[s.id]?.score;
+      const last = lastScores[s.id]?.letter || '-';
       return `
         <tr class="border-b hover:bg-slate-50">
           <td class="p-3 font-medium text-slate-700">${s.name}</td>
           <td class="p-3 text-slate-600">${s.classroom?.name || 'Sin Aula'}</td>
-          <td class="p-3 text-center">${last != null ? Number(last).toFixed(1) : '-'}</td> 
+          <td class="p-3 text-center">${last}</td> 
           <td class="p-3 text-center font-bold text-slate-800">${avg}</td>
           <td class="p-3 text-center text-sm">${statusHtml}</td>
         </tr>
