@@ -566,12 +566,26 @@ const UI = {
         return;
     }
 
-    // Render posts (simplified for brevity, can be expanded)
-    const postsHTML = posts.map(p => `
-        ${(() => {
-            const safeMedia = p.media_url ? encodeURI(p.media_url) : '';
-            return `
-        <div class="bg-white p-4 rounded-2xl border shadow-sm mb-4">
+    // 1. Cargar Reacciones y Comentarios para cada Post
+    const postsHTML = await Promise.all(posts.map(async p => {
+        const safeMedia = p.media_url ? encodeURI(p.media_url) : '';
+        
+        // Cargar reacciones
+        const { data: likes } = await supabase.from('likes').select('reaction_type').eq('post_id', p.id);
+        const reactionCounts = (likes || []).reduce((acc, l) => {
+            const type = l.reaction_type || 'like';
+            acc[type] = (acc[type] || 0) + 1;
+            return acc;
+        }, {});
+
+        // Cargar conteo de comentarios
+        const { count: commentCount } = await supabase.from('comments').select('*', { count: 'exact', head: true }).eq('post_id', p.id);
+
+        // Mi reacción
+        const myReaction = (likes || []).find(l => l.user_id === AppState.user.id)?.reaction_type;
+
+        return `
+        <div class="bg-white p-5 rounded-2xl border shadow-sm mb-4 animate-fade-in" id="post-${p.id}">
             <div class="flex items-center gap-3 mb-3">
                 <div class="w-10 h-10 bg-green-100 rounded-full flex items-center justify-center text-green-700 font-bold shadow-sm">
                     ${Helpers.escapeHTML(p.profiles?.name?.charAt(0) || 'M')}
@@ -591,12 +605,40 @@ const UI = {
                     <video src="${safeMedia}" controls class="w-full h-auto max-h-96 bg-black"></video>
                 </div>
             ` : ''}
+
+            <!-- Resumen de Reacciones -->
+            <div class="flex gap-4 text-xs text-slate-400 mb-2 mt-4 px-1" id="reaction-summary-${p.id}">
+                ${this.renderReactionSummary(reactionCounts)}
+                <span class="flex items-center gap-1">💬 <span id="comment-count-${p.id}">${commentCount || 0}</span></span>
+            </div>
+
+            <!-- Botones de Acción -->
+            <div class="flex items-center gap-4 pt-2 border-t border-slate-50">
+                <div class="flex gap-1 bg-slate-50 rounded-full p-1" id="reaction-buttons-${p.id}">
+                    <button onclick="UI.toggleReaction('${p.id}', 'like')" class="p-2 rounded-full hover:bg-white hover:shadow-sm transition-all ${myReaction === 'like' ? 'bg-blue-100 ring-2 ring-blue-200' : ''}" title="Me gusta">👍</button>
+                    <button onclick="UI.toggleReaction('${p.id}', 'love')" class="p-2 rounded-full hover:bg-white hover:shadow-sm transition-all ${myReaction === 'love' ? 'bg-pink-100 ring-2 ring-pink-200' : ''}" title="Me encanta">❤️</button>
+                    <button onclick="UI.toggleReaction('${p.id}', 'haha')" class="p-2 rounded-full hover:bg-white hover:shadow-sm transition-all ${myReaction === 'haha' ? 'bg-yellow-100 ring-2 ring-yellow-200' : ''}" title="Me divierte">😂</button>
+                </div>
+
+                <button class="flex items-center gap-2 text-slate-500 hover:text-blue-500 hover:bg-blue-50 transition-colors text-sm py-2 px-3 rounded-lg ml-auto" onclick="UI.toggleCommentSection('${p.id}')">
+                    <i data-lucide="message-circle" class="w-5 h-5"></i>
+                    <span>Comentar</span>
+                </button>
+            </div>
+
+            <!-- Sección de Comentarios -->
+            <div id="comments-section-${p.id}" class="hidden mt-3 pt-3 border-t border-slate-100 bg-slate-50/50 rounded-xl p-3">
+                <div id="comments-list-${p.id}" class="space-y-3 mb-3 max-h-60 overflow-y-auto pr-1"></div>
+                <div class="flex gap-2 items-center">
+                    <input type="text" id="comment-input-${p.id}" class="flex-1 border rounded-xl px-3 py-2 text-sm bg-white focus:ring-2 focus:ring-blue-500 outline-none transition-all" placeholder="Escribe un comentario...">
+                    <button onclick="UI.sendComment('${p.id}')" class="bg-blue-600 text-white p-2 rounded-xl hover:bg-blue-700 transition-colors shadow-sm"><i data-lucide="send" class="w-4 h-4"></i></button>
+                </div>
+            </div>
         </div>
-            `;
-        })()}
-    `).join('');
+        `;
+    }));
     
-    document.getElementById('feedPostsContainer').innerHTML = postsHTML;
+    document.getElementById('feedPostsContainer').innerHTML = postsHTML.join('');
   },
 
   setupPostInputEvents() {
@@ -725,6 +767,97 @@ const UI = {
     }
   },
 
+  // ✅ FUNCIONES PARA EL MURO (REACCIONES Y COMENTARIOS)
+  renderReactionSummary(counts) {
+    let html = '';
+    if (counts['like']) html += `<span class="flex items-center gap-1 bg-blue-50 text-blue-600 px-2 py-0.5 rounded-full">👍 ${counts['like']}</span>`;
+    if (counts['love']) html += `<span class="flex items-center gap-1 bg-pink-50 text-pink-600 px-2 py-0.5 rounded-full">❤️ ${counts['love']}</span>`;
+    if (counts['haha']) html += `<span class="flex items-center gap-1 bg-yellow-50 text-yellow-600 px-2 py-0.5 rounded-full">😂 ${counts['haha']}</span>`;
+    
+    if (!html) return '<span class="text-slate-300 italic">Sé el primero en reaccionar</span>'; 
+    return `<div class="flex gap-2">${html}</div>`;
+  },
+
+  async toggleReaction(postId, type) {
+    try {
+        const { data: existing } = await supabase
+            .from('likes')
+            .select('id, reaction_type')
+            .eq('post_id', postId)
+            .eq('user_id', AppState.user.id)
+            .maybeSingle();
+
+        if (existing) {
+            if (existing.reaction_type === type) {
+                await supabase.from('likes').delete().eq('id', existing.id);
+            } else {
+                await supabase.from('likes').update({ reaction_type: type }).eq('id', existing.id);
+            }
+        } else {
+            await supabase.from('likes').insert({
+                post_id: postId,
+                user_id: AppState.user.id,
+                reaction_type: type
+            });
+        }
+        this.renderFeed(); // Recargar para ver cambios
+    } catch (e) { console.error(e); }
+  },
+
+  async toggleCommentSection(postId) {
+    const section = document.getElementById(`comments-section-${postId}`);
+    const list = document.getElementById(`comments-list-${postId}`);
+    
+    if (section.classList.contains('hidden')) {
+        section.classList.remove('hidden');
+        list.innerHTML = `<div class="flex justify-center p-4"><i data-lucide="loader-2" class="w-5 h-5 animate-spin text-slate-400"></i></div>`;
+        if(window.lucide) lucide.createIcons();
+
+        const { data: comments } = await supabase
+            .from('comments')
+            .select('*, profiles:user_id(name)')
+            .eq('post_id', postId)
+            .order('created_at', { ascending: true });
+
+        list.innerHTML = (comments || []).map(c => `
+            <div class="flex gap-2 text-sm">
+                <div class="w-8 h-8 rounded-full bg-slate-200 flex items-center justify-center text-xs font-bold text-slate-500 flex-shrink-0">
+                    ${(c.profiles?.name || 'U').charAt(0)}
+                </div>
+                <div class="bg-white p-3 rounded-2xl rounded-tl-none shadow-sm border border-slate-100 flex-1">
+                    <div class="font-bold text-slate-700 text-xs mb-1">${Helpers.escapeHTML(c.profiles?.name || 'Usuario')}</div>
+                    <div class="text-slate-600 leading-snug">${Helpers.escapeHTML(c.content)}</div>
+                </div>
+            </div>
+        `).join('') || `<p class="text-center text-slate-400 text-xs py-4">Sin comentarios aún</p>`;
+        
+        list.scrollTop = list.scrollHeight;
+        if(window.lucide) lucide.createIcons();
+    } else {
+        section.classList.add('hidden');
+    }
+  },
+
+  async sendComment(postId) {
+    const input = document.getElementById(`comment-input-${postId}`);
+    const content = input.value.trim();
+    if (!content) return;
+
+    try {
+        const { error } = await supabase.from('comments').insert({
+            post_id: postId,
+            user_id: AppState.user.id,
+            content: content
+        });
+        if (error) throw error;
+        input.value = '';
+        this.toggleCommentSection(postId); // Recargar comentarios
+        // Actualizar contador
+        const countEl = document.getElementById(`comment-count-${postId}`);
+        if(countEl) countEl.textContent = parseInt(countEl.textContent) + 1;
+    } catch (e) { Helpers.toast('Error al comentar', 'error'); }
+  },
+
   async renderStudents() {
     const tab = document.getElementById('tab-students');
     if (!AppState.currentClass?.id) {
@@ -808,13 +941,13 @@ const UI = {
                   {val: 'triste', icon: '😢', label: 'Triste'},
                   {val: 'enojado', icon: '😠', label: 'Enojado'}
               ],
-              eating: [
+              food: [
                   {val: 'todo', icon: '🍽️', label: 'Todo'},
                   {val: 'mitad', icon: '🥣', label: 'Mitad'},
                   {val: 'poco', icon: '🤏', label: 'Poco'},
                   {val: 'nada', icon: '❌', label: 'Nada'}
               ],
-              sleeping: [
+              nap: [
                   {val: 'si', icon: '😴', label: 'Durmió'},
                   {val: 'no', icon: '👀', label: 'No durmió'}
               ]
@@ -846,11 +979,11 @@ const UI = {
                         </div>
                         <div class="flex flex-col gap-1">
                             <span class="text-[10px] uppercase font-bold text-slate-400">Comida</span>
-                            <div class="flex flex-wrap gap-1">${renderOptions('eating', log.eating || log.food, s.id)}</div>
+                            <div class="flex flex-wrap gap-1">${renderOptions('food', log.food || log.eating, s.id)}</div>
                         </div>
                         <div class="flex flex-col gap-1">
                             <span class="text-[10px] uppercase font-bold text-slate-400">Siesta</span>
-                            <div class="flex flex-wrap gap-1">${renderOptions('sleeping', log.sleeping || log.nap, s.id)}</div>
+                            <div class="flex flex-wrap gap-1">${renderOptions('nap', log.nap || log.sleeping, s.id)}</div>
                         </div>
                     </div>
 
@@ -1523,14 +1656,17 @@ const UI = {
       const studentName = evidence?.students?.name;
       const taskTitle = evidence?.tasks?.title;
 
+      console.log('Notificando calificación:', { parentId, taskTitle, grade });
+
       if (parentId && taskTitle) {
-        await window.sendPush({
+        const pushResult = await window.sendPush({
           user_id: parentId,
           title: 'Tarea Calificada ⭐',
           message: `La tarea "${taskTitle}" de ${studentName || 'tu hijo/a'} ha sido calificada con "${grade}".`,
           type: 'info',
           link: '/panel_padres.html#tasks'
         });
+        console.log('Resultado push:', pushResult);
       }
     } catch (e) { 
       console.warn('No se pudo enviar la notificación push, pero la tarea fue calificada:', e);

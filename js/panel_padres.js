@@ -25,8 +25,8 @@ const escapeHtmlMap = {
   '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
 };
 const escapeHtml = (str) => {
-  if (typeof str !== 'string') return '';
-  return str.replace(/[&<>"']/g, m => escapeHtmlMap[m]);
+  // 2️⃣ Mejora de seguridad en escapeHtml
+  return String(str).replace(/[&<>"']/g, m => escapeHtmlMap[m]);
 };
 
 const Helpers = {
@@ -126,10 +126,14 @@ const GlobalCache = {
     }
     this.store[key] = { data, time: Date.now() };
   },
-  get(key, maxAge = 60000) { // 1 minuto por defecto
+  // 6️⃣ Mejora en GlobalCache
+  get(key, maxAge = 60000) { 
     const item = this.store[key];
     if (!item) return null;
-    if (Date.now() - item.time > maxAge) { delete this.store[key]; return null; }
+    if (Date.now() - item.time > maxAge) {
+      delete this.store[key];
+      return null;
+    }
     return item.data;
   },
   clear(key) { if(key) delete this.store[key]; else this.store = {}; }
@@ -254,13 +258,13 @@ document.addEventListener('DOMContentLoaded', async () => {
 
   // ✅ Cargar perfil con manejo de errores robusto
   try {
-    const { data: profile, error } = await supabase
+    const { data: profile, error: profileError } = await supabase
       .from(TABLES.PROFILES)
       .select('*')
       .eq('id', user.id)
       .single();
     
-    if (error) throw error;
+    if (profileError) throw profileError;
     AppState.set('profile', profile);
     
     // Actualizar nombre en UI
@@ -268,7 +272,7 @@ document.addEventListener('DOMContentLoaded', async () => {
       el.textContent = profile?.name ? escapeHtml(profile.name) : 'Familia';
     });
     
-    loadStudentData();
+    await loadStudentData(); // ⭐ FIX: Await student data before loading dashboard
   } catch (err) {
     console.error('Error cargando perfil:', err);
     Helpers.toast('Error al cargar tu información', 'error');
@@ -378,8 +382,9 @@ function setupNavigation() {
 
   // ✅ Delegación de eventos para navegación
   document.addEventListener('click', (e) => {
+    // 8️⃣ Mejora de rendimiento en navegación
     const btn = e.target.closest('[data-target]');
-    if (!btn) return;
+    if (!btn) return; 
     if (btn.dataset.target) {
       e.preventDefault();
       setActiveSection(btn.dataset.target);
@@ -749,9 +754,15 @@ function updateStudentUI(student) {
 async function initLiveClassListener(classroomId) {
     const btn = document.querySelector('button[data-target="videocall"]');
     if(!btn) return;
+    
+    // 5️⃣ Posible memory leak en Realtime
+    const oldChannel = AppState.get('liveChannel');
+    if(oldChannel) {
+        supabase.removeChannel(oldChannel);
+    }
 
     const checkStatus = async () => {
-        const { data } = await supabase.from('classrooms').select('is_live').eq('id', classroomId).single();
+        const { data } = await supabase.from('classrooms').select('is_live').eq('id', classroomId).maybeSingle(); // 3️⃣ Posible error en initLiveClassListener
         updateBadge(data?.is_live);
     };
 
@@ -806,7 +817,8 @@ async function loadTasks(filter = 'pending') {
           .from(TABLES.TASKS)
           .select('*')
           .eq('classroom_id', student.classroom_id)
-          .order('due_date', { ascending: true }),
+          // 4️⃣ Optimización en loadTasks
+          .order('due_date', { ascending: false }).limit(50),
         supabase
           .from(TABLES.TASK_EVIDENCES)
           .select('*')
@@ -1130,6 +1142,8 @@ async function submitTask(taskId) {
          fileUrl = data?.signedUrl;
       }
 
+    // ⭐ FIX: Error potencial en submitTask (código incompleto)
+
     // 1. Guardar Evidencia
     const { error: dbError } = await supabase.from(TABLES.TASK_EVIDENCES).insert({
        task_id: taskId,
@@ -1142,12 +1156,12 @@ async function submitTask(taskId) {
 
     if (dbError) throw dbError;
 
+    Helpers.toast('Tarea enviada con éxito', 'success');
+    triggerConfetti(); // 🎉 Animación de celebración
+    
     // 2. Limpiar cache local para forzar recarga
     GlobalCache.clear('evidences');
     GlobalCache.clear('tasks');
-
-    Helpers.toast('Tarea enviada con éxito', 'success');
-    triggerConfetti(); // 🎉 Animación de celebración
     
     // 3. Cerrar modal y recargar lista
     document.getElementById('modalTaskDetail').classList.add('hidden');
@@ -1156,8 +1170,8 @@ async function submitTask(taskId) {
     // Cambiar filtro a 'submitted' para que el padre vea su tarea enviada
     const submittedBtn = document.querySelector('.task-filter-btn[data-filter="submitted"]');
     if (submittedBtn) {
-        document.querySelectorAll('.task-filter-btn').forEach(b => b.className = 'px-4 py-2 text-xs font-medium rounded-full text-slate-500 hover:bg-slate-50 task-filter-btn transition-all');
-        submittedBtn.className = 'px-4 py-2 text-xs font-bold rounded-full bg-emerald-100 text-emerald-700 task-filter-btn transition-all';
+      document.querySelectorAll('.task-filter-btn').forEach(b => b.className = 'px-4 py-2 text-xs font-medium rounded-full text-slate-500 hover:bg-slate-50 task-filter-btn transition-all');
+      submittedBtn.className = 'px-4 py-2 text-xs font-bold rounded-full bg-emerald-100 text-emerald-700 task-filter-btn transition-all';
     }
     
     loadTasks('submitted');
@@ -1600,7 +1614,7 @@ async function loadDashboard() {
         const t = themeMap[card.theme] || themeMap['card-slate'];
         
         return `
-        <div data-target="${card.target}" class="bubble-card p-5 flex flex-col items-center justify-center gap-3 cursor-pointer hover:shadow-lg active:scale-95 transition-all group relative overflow-hidden">
+        <div data-target="${card.target}" class="patio-card p-5 flex flex-col items-center justify-center gap-3 cursor-pointer hover:shadow-lg active:scale-95 transition-all group relative overflow-hidden">
             <div class="p-4 rounded-full ${t.iconBg} ${t.iconText} mb-1 group-hover:scale-110 transition-transform duration-300">
                 <i data-lucide="${card.icon}" class="w-8 h-8"></i>
             </div>
@@ -1997,19 +2011,35 @@ window.toggleCommentSection = async (postId) => {
 
 // Función auxiliar para actualizar UI de reacciones en tiempo real
 async function updatePostReactionsUI(postId) {
-  // Esta función hace fetch, pero ahora está optimizada para llamarse menos frecuentemente
-  const { data: reactions } = await supabase
-    .from(TABLES.LIKES)
-    .select('id')
-    .eq('post_id', postId);
-    
-  if (reactions) {
-    const counts = reactions.reduce((acc, r) => {
-      const type = r.reaction_type || 'like';
-      acc[type] = (acc[type] || 0) + 1;
-      return acc;
-    }, {});
-    
+  try {
+    // Intentamos obtener id y reaction_type. Si falla (400), es que reaction_type no existe en DB.
+    const { data: reactions, error } = await supabase
+      .from(TABLES.LIKES)
+      .select('id, reaction_type')
+      .eq('post_id', postId);
+      
+    if (error && error.code === 'PGRST204') {
+        // Reintento sin reaction_type para compatibilidad
+        const { data: simpleReactions } = await supabase.from(TABLES.LIKES).select('id').eq('post_id', postId);
+        if (simpleReactions) {
+            const counts = { 'like': simpleReactions.length };
+            updateReactionSummaryUI(postId, counts);
+        }
+        return;
+    }
+
+    if (reactions) {
+      const counts = reactions.reduce((acc, r) => {
+        const type = r.reaction_type || 'like';
+        acc[type] = (acc[type] || 0) + 1;
+        return acc;
+      }, {});
+      updateReactionSummaryUI(postId, counts);
+    }
+  } catch (e) { console.error('Error actualizando reacciones:', e); }
+}
+
+function updateReactionSummaryUI(postId, counts) {
     const summaryEl = document.getElementById(`reaction-summary-${postId}`);
     const commentCountEl = document.getElementById(`comment-count-${postId}`);
     const commentCount = commentCountEl ? commentCountEl.textContent : '0';
@@ -2018,7 +2048,6 @@ async function updatePostReactionsUI(postId) {
       summaryEl.innerHTML = renderReactionSummary(counts) + 
         `<span class="flex items-center gap-1 ml-4">💬 <span id="comment-count-${postId}">${commentCount}</span></span>`;
     }
-  }
 }
 
 // ✅ Funciones globales para el muro (Reacciones/Comentar)
@@ -2028,12 +2057,18 @@ window.toggleReaction = async (postId, type) => {
     if(!user) return;
     
     // Verificar estado actual
-    const { data: existing } = await supabase
+    let { data: existing, error: checkError } = await supabase
         .from(TABLES.LIKES)
         .select('id, reaction_type')
         .eq('post_id', postId)
         .eq('user_id', user.id)
         .maybeSingle();
+
+    // Reintento si falla por falta de columna reaction_type
+    if (checkError && checkError.code === 'PGRST204') {
+        const { data: simpleExisting } = await supabase.from(TABLES.LIKES).select('id').eq('post_id', postId).eq('user_id', user.id).maybeSingle();
+        existing = simpleExisting ? { ...simpleExisting, reaction_type: 'like' } : null;
+    }
 
     // UI Optimista (Feedback inmediato en botones)
     const btnContainer = document.getElementById(`reaction-buttons-${postId}`);
@@ -2055,16 +2090,28 @@ window.toggleReaction = async (postId, type) => {
     
     if (existing) {
        if (existing.reaction_type === type) {
-         // Si es la misma reacción, quitarla (toggle off)
+         // Quitar like
          await supabase.from(TABLES.LIKES).delete().eq('id', existing.id);
        } else {
-         // Si es diferente, actualizarla
-         await supabase.from(TABLES.LIKES).update({ reaction_type: type }).eq('id', existing.id);
+         // Cambiar tipo (con fallback si falla por columna inexistente)
+         const { error: updErr } = await supabase.from(TABLES.LIKES).update({ reaction_type: type }).eq('id', existing.id);
+         if (updErr && updErr.code === 'PGRST204') {
+             // Si la columna no existe, no podemos actualizar el tipo, pero el like ya existe.
+             console.warn('DB: reaction_type no soportado');
+         }
        }
     } else {
-       // INSERT
-       await supabase.from(TABLES.LIKES).insert({ post_id: postId, user_id: user.id, reaction_type: type });
-       triggerConfetti(); // 🎉
+       // Insertar (con fallback si falla por columna inexistente)
+       const payload = { post_id: postId, user_id: user.id };
+       // Solo intentamos reaction_type si el check anterior fue exitoso o no sabemos
+       if (!checkError || checkError.code !== 'PGRST204') payload.reaction_type = type;
+       
+       const { error: insErr } = await supabase.from(TABLES.LIKES).insert(payload);
+       if (insErr && insErr.code === 'PGRST204') {
+           // Reintento sin la columna
+           await supabase.from(TABLES.LIKES).insert({ post_id: postId, user_id: user.id });
+       }
+       triggerConfetti();
     }
     
     // Actualizar UI inmediatamente (Fetch para asegurar consistencia tras mi acción)

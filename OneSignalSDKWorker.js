@@ -1,13 +1,14 @@
-// OneSignal Service Worker + Karpus Kids PWA Logic
-importScripts("https://cdn.onesignal.com/sdks/web/v16/OneSignalSDK.sw.js");
-
-// Manejador de mensajes obligatorio al inicio (evita advertencias de Chrome)
+// 1. Manejador de mensajes obligatorio al inicio absoluto (evita advertencias de Chrome/ServiceWorker)
 self.addEventListener('message', event => {
   if (event.data && event.data.type === 'SKIP_WAITING') {
     self.skipWaiting();
   }
 });
 
+// 2. Importar OneSignal Service Worker
+importScripts("https://cdn.onesignal.com/sdks/web/v16/OneSignalSDK.sw.js");
+
+// 3. Karpus Kids PWA Logic
 const CACHE_NAME = 'karpus-pwa-v2';
 const ASSETS = [
   '/',
@@ -21,7 +22,7 @@ const ASSETS = [
   '/img/mundo.jpg'
 ];
 
-// 1. Caching Logic (from sw.js)
+// Caching Logic (from sw.js)
 self.addEventListener('install', e => {
   e.waitUntil(
     caches.open(CACHE_NAME)
