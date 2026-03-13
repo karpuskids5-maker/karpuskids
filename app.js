@@ -1283,6 +1283,12 @@ document.addEventListener('DOMContentLoaded', async () => {
       markFieldError('stName', !name);
       markFieldError('stClassroom', !classroomId);
 
+      // ✅ Validación para asegurar que un nuevo estudiante siempre tenga un padre asignado
+      if (!studentId && !p1Email) {
+        alert('Es obligatorio asignar un padre/tutor (email) al crear un nuevo estudiante.');
+        return;
+      }
+
       if (missing.length) {
         alert('Complete los campos obligatorios: ' + missing.join(', '));
         return;

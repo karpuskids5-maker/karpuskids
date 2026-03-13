@@ -24,7 +24,7 @@ const MODAL_CLOSE_KEYS = ['Escape', 'Esc'];
 const escapeHtmlMap = {
   '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
 };
-const escapeHtml = (str) => {
+const escapeHtml = (str = '') => {
   // 2️⃣ Mejora de seguridad en escapeHtml
   return String(str).replace(/[&<>"']/g, m => escapeHtmlMap[m]);
 };
@@ -93,7 +93,7 @@ class SafeAppState {
     else console.warn(`AppState: Clave inválida ${key}`);
   }
   
-  reset() {
+  async reset() {
     const channels = [
       this._state.globalChannel,
       this._state.feedChannel,
@@ -101,9 +101,9 @@ class SafeAppState {
       this._state.chatChannel
     ];
 
-    channels.forEach(c => {
-      if(c) supabase.removeChannel(c);
-    });
+    for (const c of channels) {
+      if(c) await supabase.removeChannel(c);
+    }
 
     this._state = { 
       user: null, profile: null, student: null, tasks: [], 
@@ -119,21 +119,27 @@ const AppState = new SafeAppState();
 const GlobalCache = {
   store: {},
   maxItems: 50,
-  set(key, data) {
+  set(key, data, ttl = 60000) { 
     if (Object.keys(this.store).length > this.maxItems) {
       const oldest = Object.keys(this.store)[0];
       delete this.store[oldest];
     }
-    this.store[key] = { data, time: Date.now() };
+    this.store[key] = { 
+      data, 
+      time: Date.now(), 
+      ttl 
+    }; 
   },
   // 6️⃣ Mejora en GlobalCache
-  get(key, maxAge = 60000) { 
+  get(key) { 
     const item = this.store[key];
     if (!item) return null;
-    if (Date.now() - item.time > maxAge) {
+
+    if (Date.now() - item.time > item.ttl) { 
       delete this.store[key];
       return null;
     }
+
     return item.data;
   },
   clear(key) { if(key) delete this.store[key]; else this.store = {}; }
@@ -142,6 +148,10 @@ const GlobalCache = {
 async function sendEmail(to, subject, html, text) {
   try {
     const { data: { session } } = await supabase.auth.getSession();
+    if (!session) {
+      console.warn("No hay sesión activa para enviar el correo");
+      return;
+    }
     // Usar Edge Function de Supabase
     const res = await fetch('https://wwnfonkvemimwiqjpkij.supabase.co/functions/v1/send-email', {
       method: 'POST',
@@ -187,8 +197,17 @@ function setupSidebarMobile() {
   // Smooth scroll para botones 
   nav.addEventListener('wheel', (e) => { 
     if (window.innerWidth <= 767) { 
-      e.preventDefault(); 
-      nav.scrollLeft += e.deltaY; 
+      // 11️⃣ Solo interceptar si el movimiento horizontal es dominante o si queremos forzarlo
+      if(Math.abs(e.deltaX) > Math.abs(e.deltaY)){
+        e.preventDefault(); 
+        nav.scrollLeft += e.deltaX; 
+      } else if (Math.abs(e.deltaY) > 0) {
+        // Permitir scroll vertical si el usuario mueve la rueda hacia arriba/abajo
+        // Pero en móviles esto es raro, suele ser touch.
+        // Si queremos que la rueda mueva el nav horizontalmente:
+        e.preventDefault();
+        nav.scrollLeft += e.deltaY;
+      }
     } 
   }, { passive: false }); 
   
@@ -366,6 +385,7 @@ window.setActiveSection = (targetId) => {
   // Actualizar botón activo
   const activeBtn = document.querySelector(`button[data-target="${targetId}"]`);
   if (activeBtn) {
+    navButtons.forEach(btn => btn.removeAttribute('aria-current'));
     activeBtn.classList.add('active', 'font-bold');
     activeBtn.setAttribute('aria-current', 'page');
   } else {
@@ -457,6 +477,7 @@ async function notifyPaymentSubmittedEmail(student, amount, month_paid, method) 
   try {
     const user = AppState.get('user');
     const profile = AppState.get('profile');
+    const safeAmount = Number(amount) || 0; 
     const parentEmail = user && user.email;
     const parentName = profile && profile.name ? profile.name : 'Familia Karpus';
     const studentName = student && student.name ? student.name : '';
@@ -473,7 +494,7 @@ async function notifyPaymentSubmittedEmail(student, amount, month_paid, method) 
           <h2 style="color:#16a34a;">Hemos recibido tu comprobante de pago</h2>
           <p>Hola ${escapeHtml(parentName)},</p>
           <p>Registramos un comprobante de pago para ${escapeHtml(studentName || 'tu hija o hijo')}.</p>
-          <p><strong>Mes:</strong> ${escapeHtml(monthLabel)}<br><strong>Monto reportado:</strong> $${amount.toFixed(2)}<br><strong>Método:</strong> ${escapeHtml(method)}</p>
+          <p><strong>Mes:</strong> ${escapeHtml(monthLabel)}<br><strong>Monto reportado:</strong> $${safeAmount.toFixed(2)}<br><strong>Método:</strong> ${escapeHtml(method)}</p>
           <p>El equipo de Karpus revisará el comprobante y te avisará cuando el pago sea confirmado.</p>
           <p style="margin:24px 0;">
             <a href="${parentLink}" style="display:inline-block;padding:10px 18px;background:#4f46e5;color:#ffffff;border-radius:999px;text-decoration:none;font-weight:600;">
@@ -483,7 +504,7 @@ async function notifyPaymentSubmittedEmail(student, amount, month_paid, method) 
           <p style="font-size:12px;color:#64748b;">Si el botón no funciona, copia y pega esta dirección en tu navegador: ${parentLink}</p>
         </div>
       `;
-      const textParent = `Hemos recibido tu comprobante de pago de ${monthLabel} por $${amount.toFixed(2)}. Revisaremos tu pago y podrás ver el estado en tu panel: ${parentLink}`;
+      const textParent = `Hemos recibido tu comprobante de pago de ${monthLabel} por $${safeAmount.toFixed(2)}. Revisaremos tu pago y podrás ver el estado en tu panel: ${parentLink}`;
       await sendEmail(parentEmail, subjectParent, htmlParent, textParent);
     }
     let classroomName = '';
@@ -559,6 +580,10 @@ async function submitPaymentProof(e) {
     Helpers.toast('Completa todos los campos', 'error');
     return;
   }
+  if(file.size > 5 * 1024 * 1024){ 
+   Helpers.toast('Archivo demasiado grande (máx 5MB)', 'error'); 
+   return; 
+ }
   
   // ✅ Validación de tipo de archivo
   const allowed = ['image/jpeg','image/png','image/webp'];
@@ -568,7 +593,7 @@ async function submitPaymentProof(e) {
   }
 
   try {
-    const ext = file.name.split('.').pop();
+    const ext = file.name.split('.').pop().toLowerCase().replace(/[^a-z0-9]/g, '');
     const name = `${student.id}_${Date.now()}.${ext}`;
     const { error: upErr } = await supabase.storage.from('classroom_media').upload(`payments/${name}`, file);
     if (upErr) throw upErr;
@@ -605,7 +630,7 @@ function initPaymentForm() {
 async function handleLogout() {
   try {
     // ✅ Limpiar estado y suscripciones ANTES de cerrar sesión
-    AppState.reset();
+    await AppState.reset();
     
     await supabase.auth.signOut();
     window.location.href = 'login.html';
@@ -758,11 +783,12 @@ async function initLiveClassListener(classroomId) {
     // 5️⃣ Posible memory leak en Realtime
     const oldChannel = AppState.get('liveChannel');
     if(oldChannel) {
-        supabase.removeChannel(oldChannel);
+        await supabase.removeChannel(oldChannel);
     }
 
     const checkStatus = async () => {
-        const { data } = await supabase.from('classrooms').select('is_live').eq('id', classroomId).maybeSingle(); // 3️⃣ Posible error en initLiveClassListener
+        if (!classroomId) return;
+        const { data } = await supabase.from('classrooms').select('is_live').eq('id', classroomId).maybeSingle();
         updateBadge(data?.is_live);
     };
 
@@ -817,8 +843,8 @@ async function loadTasks(filter = 'pending') {
           .from(TABLES.TASKS)
           .select('*')
           .eq('classroom_id', student.classroom_id)
-          // 4️⃣ Optimización en loadTasks
-          .order('due_date', { ascending: false }).limit(50),
+          // 8️⃣ Optimización: Paginación básica
+          .order('due_date', { ascending: false }).range(0, 49),
         supabase
           .from(TABLES.TASK_EVIDENCES)
           .select('*')
@@ -870,7 +896,8 @@ async function loadTasks(filter = 'pending') {
 // ✅ Funciones puras para lógica de negocio
 function filterTasks(tasks, evidenceMap, filter) {
   const today = new Date();
-  today.setHours(0,0,0,0);
+  // 9️⃣ Comparación segura: Incluir todo el día actual antes de marcar como atrasada
+  today.setHours(23, 59, 59, 999);
 
   return (tasks || []).filter(task => {
     const isDelivered = evidenceMap.has(task.id);
@@ -1653,11 +1680,7 @@ function createPostHTML(p, index = 0) {
   
   const myReaction = Array.isArray(p.likes) ? p.likes.find(l => l.user_id === AppState.get('user').id)?.reaction_type : null;
   
-  let commentCount = 0;
-  if (Array.isArray(p.comments)) {
-      if (p.comments[0] && p.comments[0].count !== undefined) commentCount = p.comments[0].count;
-      else commentCount = p.comments.length;
-  }
+  const commentCount = Array.isArray(p.comments) ? p.comments.length : 0;
   
   let safeMedia = '';
   if (p.media_url && (p.media_url.startsWith('https://') || p.media_url.startsWith('http://'))) {
@@ -1707,9 +1730,9 @@ function createPostHTML(p, index = 0) {
 
     <div class="flex items-center gap-4 pt-2 border-t border-slate-50">
       <div class="flex gap-1 bg-slate-50 rounded-full p-1" id="reaction-buttons-${p.id}">
-         <button onclick="toggleReaction('${p.id}', 'like')" class="p-2 rounded-full hover:bg-white hover:shadow-sm transition-all ${myReaction === 'like' ? 'bg-blue-100 ring-2 ring-blue-200' : ''}" title="Me gusta">👍</button>
-         <button onclick="toggleReaction('${p.id}', 'love')" class="p-2 rounded-full hover:bg-white hover:shadow-sm transition-all ${myReaction === 'love' ? 'bg-pink-100 ring-2 ring-pink-200' : ''}" title="Me encanta">❤️</button>
-         <button onclick="toggleReaction('${p.id}', 'haha')" class="p-2 rounded-full hover:bg-white hover:shadow-sm transition-all ${myReaction === 'haha' ? 'bg-yellow-100 ring-2 ring-yellow-200' : ''}" title="Me divierte">😂</button>
+         <button data-type="like" onclick="toggleReaction('${p.id}', 'like')" class="p-2 rounded-full hover:bg-white hover:shadow-sm transition-all ${myReaction === 'like' ? 'bg-blue-100 ring-2 ring-blue-200' : ''}" title="Me gusta">👍</button>
+         <button data-type="love" onclick="toggleReaction('${p.id}', 'love')" class="p-2 rounded-full hover:bg-white hover:shadow-sm transition-all ${myReaction === 'love' ? 'bg-pink-100 ring-2 ring-pink-200' : ''}" title="Me encanta">❤️</button>
+         <button data-type="haha" onclick="toggleReaction('${p.id}', 'haha')" class="p-2 rounded-full hover:bg-white hover:shadow-sm transition-all ${myReaction === 'haha' ? 'bg-yellow-100 ring-2 ring-yellow-200' : ''}" title="Me divierte">😂</button>
       </div>
 
       <button class="flex items-center gap-2 text-slate-500 hover:text-blue-500 hover:bg-blue-50 transition-colors text-sm py-2 px-3 rounded-lg ml-auto" onclick="toggleCommentSection('${p.id}')">
@@ -1719,7 +1742,9 @@ function createPostHTML(p, index = 0) {
     </div>
 
     <div id="comments-section-${p.id}" class="hidden mt-3 pt-3 border-t border-slate-100 bg-slate-50/50 rounded-xl p-3">
-      <div id="comments-list-${p.id}" class="space-y-3 mb-3 max-h-60 overflow-y-auto pr-1"></div>
+      <div id="comments-list-${p.id}" class="space-y-3 mb-3 max-h-60 overflow-y-auto pr-1">
+        ${(p.comments && p.comments.length > 0) ? p.comments.map(renderComment).join('') : '<p class="text-xs text-slate-400 text-center py-2">Sé el primero en comentar</p>'}
+      </div>
       <div class="flex gap-2 items-center">
         <input type="text" id="comment-input-${p.id}" class="flex-1 border rounded-xl px-3 py-2 text-sm bg-white focus:ring-2 focus:ring-blue-500 outline-none transition-all" placeholder="Escribe un comentario...">
         <button onclick="sendComment('${p.id}')" class="bg-blue-600 text-white p-2 rounded-xl hover:bg-blue-700 transition-colors shadow-sm"><i data-lucide="send" class="w-4 h-4"></i></button>
@@ -1831,7 +1856,12 @@ async function loadClassFeed(reset = true) {
   try {
     const { data: posts, error } = await supabase
       .from(TABLES.POSTS)
-      .select('*, teacher:teacher_id(name, avatar_url), likes(id,user_id), comments(count)')
+      .select(`
+        *, 
+        teacher:teacher_id(name, avatar_url), 
+        likes(*), 
+        comments(*, user:profiles(name, avatar_url))
+      `)
       .eq('classroom_id', student.classroom_id)
       .order('created_at', { ascending: false });
 
@@ -1889,10 +1919,10 @@ function renderReactionSummary(counts) {
 }
 
 // ✅ Sistema de Comentarios en Tiempo Real
-function initFeedRealtime() {
+async function initFeedRealtime() {
   const old = AppState.get('feedChannel');
   if(old){
-   supabase.removeChannel(old);
+   await supabase.removeChannel(old);
   }
   
   const student = AppState.get('student');
@@ -1929,13 +1959,14 @@ function initFeedRealtime() {
          if(listEl && listEl.offsetParent !== null) { // Si es visible
             // 2. Optimización: Usar nombre de la tabla comments si existe, o fallback
             const name = newComment.user_name || 'Usuario';
+            const initial = name ? name.charAt(0) : '?';
             
             const div = document.createElement('div');
             div.className = 'flex gap-2 text-sm animate-fade-in mb-2';
             // 6. Mejora visual del comentario (Burbuja)
             div.innerHTML = `
               <div class="w-8 h-8 rounded-full bg-slate-200 flex items-center justify-center text-xs font-bold text-slate-500 flex-shrink-0">
-                ${escapeHtml(name.charAt(0))}
+                ${escapeHtml(initial)}
               </div>
               <div class="bg-white p-3 rounded-2xl rounded-tl-none shadow-sm border border-slate-100">
                 <div class="font-bold text-slate-700 text-xs mb-1">${escapeHtml(name)}</div>
@@ -1965,66 +1996,75 @@ function initFeedRealtime() {
   AppState.set('feedChannel', channel);
 }
 
-window.toggleCommentSection = async (postId) => {
-  const section = document.getElementById(`comments-section-${postId}`);
-  const list = document.getElementById(`comments-list-${postId}`);
+function renderComment(c) {
+  const currentUserId = AppState.get('user')?.id;
+  // Preferir user_name guardado, fallback a relación
+  const uName = c.user_name || (Array.isArray(c.user) ? c.user[0]?.name : c.user?.name) || 'Usuario';
+  const isMine = c.user_id === currentUserId;
+  const initial = uName ? uName.charAt(0) : '?';
   
-  if (section.classList.contains('hidden')) {
-    section.classList.remove('hidden');
-    // Cargar comentarios
-    list.innerHTML = '<p class="text-xs text-slate-400 text-center py-2">Cargando...</p>';
-    
-    const { data: comments } = await supabase
-      .from(TABLES.COMMENTS)
-      .select('id, user_id, content, created_at, user_name, user:profiles(name)')
-      .eq('post_id', postId)
-      .order('created_at', { ascending: true });
-      
-    if (!comments || !comments.length) {
-      list.innerHTML = '<p class="text-xs text-slate-400 text-center py-2">Sé el primero en comentar</p>';
-    } else {
-      const currentUserId = AppState.get('user')?.id;
-      list.innerHTML = comments.map(c => {
-        // Preferir user_name guardado, fallback a relación
-        const uName = c.user_name || (Array.isArray(c.user) ? c.user[0]?.name : c.user?.name) || 'Usuario';
-        const isMine = c.user_id === currentUserId;
-        return `
-        <div class="flex gap-2 text-sm mb-2">
-          <div class="w-8 h-8 rounded-full bg-slate-200 flex items-center justify-center text-xs font-bold text-slate-500 flex-shrink-0">
-            ${escapeHtml(uName.charAt(0))}
-          </div>
-          <div class="bg-white p-3 rounded-2xl rounded-tl-none shadow-sm border border-slate-100 relative group min-w-[120px]">
-            <div class="font-bold text-slate-700 text-xs mb-1 flex justify-between items-center gap-2">
-                <span>${escapeHtml(uName)}</span>
-                ${isMine ? `<button onclick="deleteComment('${c.id}', '${postId}')" class="text-slate-300 hover:text-red-500 transition-colors" title="Eliminar"><i data-lucide="trash-2" class="w-3 h-3"></i></button>` : ''}
-            </div>
-            <div class="text-slate-600 leading-snug">${escapeHtml(c.content)}</div>
-          </div>
+  return `
+    <div class="flex gap-2 text-sm mb-2">
+      <div class="w-8 h-8 rounded-full bg-slate-200 flex items-center justify-center text-xs font-bold text-slate-500 flex-shrink-0">
+        ${escapeHtml(initial)}
+      </div>
+      <div class="bg-white p-3 rounded-2xl rounded-tl-none shadow-sm border border-slate-100 relative group min-w-[120px]">
+        <div class="font-bold text-slate-700 text-xs mb-1 flex justify-between items-center gap-2">
+            <span>${escapeHtml(uName)}</span>
+            ${isMine ? `<button onclick="deleteComment('${c.id}', '${c.post_id}')" class="text-slate-300 hover:text-red-500 transition-colors" title="Eliminar"><i data-lucide="trash-2" class="w-3 h-3"></i></button>` : ''}
         </div>
-      `}).join('');
-    }
-    list.scrollTop = list.scrollHeight;
-  } else {
-    section.classList.add('hidden');
+        <div class="text-slate-600 leading-snug">${escapeHtml(c.content)}</div>
+      </div>
+    </div>
+  `;
+}
+
+async function reloadComments(postId) {
+  const list = document.getElementById(`comments-list-${postId}`);
+  if (!list) return;
+
+  const { data: comments, error } = await supabase
+    .from(TABLES.COMMENTS)
+    .select('id, user_id, content, created_at, user_name, post_id, user:profiles(name)')
+    .eq('post_id', postId)
+    .order('created_at', { ascending: true });
+
+  if (error) {
+    console.error('Error reloading comments:', error);
+    return;
   }
+
+  if (!comments || !comments.length) {
+    list.innerHTML = '<p class="text-xs text-slate-400 text-center py-2">Sé el primero en comentar</p>';
+  } else {
+    list.innerHTML = comments.map(renderComment).join('');
+    if(window.lucide) lucide.createIcons();
+  }
+  list.scrollTop = list.scrollHeight;
+}
+
+window.toggleCommentSection = (postId) => {
+  const section = document.getElementById(`comments-section-${postId}`);
+  if (!section) return;
+
+  section.classList.toggle('hidden');
+  // Scroll to bottom if opening
+  if (!section.classList.contains('hidden')) section.querySelector(`#comments-list-${postId}`).scrollTop = section.querySelector(`#comments-list-${postId}`).scrollHeight;
 };
 
 // Función auxiliar para actualizar UI de reacciones en tiempo real
 async function updatePostReactionsUI(postId) {
   try {
-    // Intentamos obtener id y reaction_type. Si falla (400), es que reaction_type no existe en DB.
+    // 3️⃣ Optimización: Solo traer la columna necesaria. 
+    // Para una optimización real en grandes volúmenes, se recomienda un RPC "get_reaction_counts(post_id)".
     const { data: reactions, error } = await supabase
       .from(TABLES.LIKES)
-      .select('id, reaction_type')
+      .select('reaction_type')
       .eq('post_id', postId);
       
     if (error && error.code === 'PGRST204') {
-        // Reintento sin reaction_type para compatibilidad
-        const { data: simpleReactions } = await supabase.from(TABLES.LIKES).select('id').eq('post_id', postId);
-        if (simpleReactions) {
-            const counts = { 'like': simpleReactions.length };
-            updateReactionSummaryUI(postId, counts);
-        }
+        const { count } = await supabase.from(TABLES.LIKES).select('*', { count: 'exact', head: true }).eq('post_id', postId);
+        updateReactionSummaryUI(postId, { 'like': count || 0 });
         return;
     }
 
@@ -2070,16 +2110,13 @@ window.toggleReaction = async (postId, type) => {
         existing = simpleExisting ? { ...simpleExisting, reaction_type: 'like' } : null;
     }
 
-    // UI Optimista (Feedback inmediato en botones)
+    // UI Optimista (Feedback inmediato en botones usando data-type)
     const btnContainer = document.getElementById(`reaction-buttons-${postId}`);
     if (btnContainer) {
        const buttons = btnContainer.querySelectorAll('button');
        buttons.forEach(b => {
           b.className = 'p-2 rounded-full hover:bg-white hover:shadow-sm transition-all'; // Reset
-          if (b.getAttribute('onclick').includes(`'${type}'`)) {
-             // Si es el que clicamos y no lo estamos quitando (lógica abajo), lo activamos
-             // Pero como es asíncrono, mejor esperar o hacer lógica compleja.
-             // Para simplicidad visual inmediata:
+          if (b.dataset.type === type) {
              if (!existing || existing.reaction_type !== type) {
                 const color = type === 'like' ? 'bg-blue-100 ring-2 ring-blue-200' : (type === 'love' ? 'bg-pink-100 ring-2 ring-pink-200' : 'bg-yellow-100 ring-2 ring-yellow-200');
                 b.className = `p-2 rounded-full hover:bg-white hover:shadow-sm transition-all ${color}`;
@@ -2129,16 +2166,17 @@ window.sendComment = async (postId) => {
   const user = AppState.get('user');
   const profile = AppState.get('profile');
   const userName = profile?.name || 'Yo';
+  const initial = userName ? userName.charAt(0) : '?';
   const list = document.getElementById(`comments-list-${postId}`);
+  const tempId = 'temp-' + Date.now();
   
   // Renderizar inmediatamente
   if(list) {
-      const tempId = 'temp-' + Date.now();
       const div = document.createElement('div');
       div.id = tempId;
       div.className = 'flex gap-2 text-sm mb-2 opacity-50'; // Opacidad hasta confirmar
       div.innerHTML = `
-          <div class="w-8 h-8 rounded-full bg-slate-200 flex items-center justify-center text-xs font-bold text-slate-500 flex-shrink-0">${escapeHtml(userName.charAt(0))}</div>
+          <div class="w-8 h-8 rounded-full bg-slate-200 flex items-center justify-center text-xs font-bold text-slate-500 flex-shrink-0">${escapeHtml(initial)}</div>
           <div class="bg-white p-3 rounded-2xl rounded-tl-none shadow-sm border border-slate-100">
             <div class="font-bold text-slate-700 text-xs mb-1">${escapeHtml(userName)}</div>
             <div class="text-slate-600 leading-snug">${escapeHtml(text)}</div>
@@ -2164,8 +2202,8 @@ window.sendComment = async (postId) => {
     
     if(error) throw error;
     
-    // Confirmar visualmente (quitar opacidad)
-    const tempEl = list?.lastElementChild;
+    // Confirmar visualmente (quitar opacidad) usando el ID específico
+    const tempEl = document.getElementById(tempId);
     if(tempEl) tempEl.classList.remove('opacity-50');
     
   } catch(e) {
@@ -2173,7 +2211,8 @@ window.sendComment = async (postId) => {
     // Revertir UI
     const countEl = document.getElementById(`comment-count-${postId}`);
     if(countEl) countEl.textContent = Math.max(0, (parseInt(countEl.textContent)||0) - 1);
-    if(list?.lastElementChild) list.lastElementChild.remove();
+    const tempEl = document.getElementById(tempId);
+    if(tempEl) tempEl.remove();
     input.value = text;
   }
 };
@@ -2185,7 +2224,7 @@ window.deleteComment = async (commentId, postId) => {
     if(error) throw error;
     Helpers.toast('Comentario eliminado', 'info');
     // UI se actualiza sola por realtime, pero forzamos recarga por si acaso
-    toggleCommentSection(postId); toggleCommentSection(postId); 
+    await reloadComments(postId);
   } catch(e) { Helpers.toast('Error al eliminar', 'error'); }
 };
 
@@ -2524,22 +2563,31 @@ async function loadChatContacts() {
 }
 
 window.selectChat = async (userId, name, role, avatar) => {
+  const myId = AppState.get('user')?.id;
+  if(!myId) {
+    Helpers.toast('Inicia sesión para chatear', 'info');
+    return;
+  }
+
   AppState.set('currentChatUser', userId);
   
   // UI Update
-  document.getElementById('chatHeader').classList.remove('hidden');
-  document.getElementById('chatInputArea').classList.remove('hidden');
-  document.getElementById('chatHeaderName').textContent = name;
-  document.getElementById('chatHeaderRole').textContent = role;
+  const header = document.getElementById('chatHeader');
+  const inputArea = document.getElementById('chatInputArea');
+  if(header) header.classList.remove('hidden');
+  if(inputArea) inputArea.classList.remove('hidden');
+
+  const headerName = document.getElementById('chatHeaderName');
+  if(headerName) headerName.textContent = name;
+  const headerRole = document.getElementById('chatHeaderRole');
+  if(headerRole) headerRole.textContent = role;
   
   const avatarEl = document.getElementById('chatHeaderAvatar');
-  avatarEl.innerHTML = avatar ? `<img src="${avatar}" class="w-full h-full object-cover">` : name.charAt(0);
+  if(avatarEl) avatarEl.innerHTML = avatar ? `<img src="${avatar}" class="w-full h-full object-cover">` : name.charAt(0);
 
   // Load Messages
   const container = document.getElementById('chatMessages');
-  container.innerHTML = '<div class="flex justify-center py-4"><div class="animate-spin rounded-full h-6 w-6 border-b-2 border-blue-600"></div></div>';
-  
-  const myId = AppState.get('user').id;
+  if(container) container.innerHTML = '<div class="flex justify-center py-4"><div class="animate-spin rounded-full h-6 w-6 border-b-2 border-blue-600"></div></div>';
   
   const { data: msgs } = await supabase
     .from(TABLES.MESSAGES)
@@ -2547,20 +2595,28 @@ window.selectChat = async (userId, name, role, avatar) => {
     .or(`and(sender_id.eq.${myId},receiver_id.eq.${userId}),and(sender_id.eq.${userId},receiver_id.eq.${myId})`)
     .order('created_at', { ascending: true });
     
-  container.innerHTML = '';
-  (msgs || []).forEach(renderMessage);
-  container.scrollTop = container.scrollHeight;
+  if(container) {
+    container.innerHTML = '';
+    (msgs || []).forEach(renderMessage);
+    container.scrollTop = container.scrollHeight;
+  }
 
   // Realtime Subscription
   const oldChannel = AppState.get('chatChannel');
-  if(oldChannel) supabase.removeChannel(oldChannel);
+  if(oldChannel) await supabase.removeChannel(oldChannel);
 
-  const channel = supabase.channel('chat_room')
-    .on('postgres_changes', { event: 'INSERT', schema: 'public', table: TABLES.MESSAGES }, payload => {
+  // 9️⃣ Mejor solución: Filtrar por mi ID para escala
+  const channel = supabase.channel('chat_room_' + myId)
+    .on('postgres_changes', { 
+        event: 'INSERT', 
+        schema: 'public', 
+        table: TABLES.MESSAGES,
+        filter: `receiver_id=eq.${myId}` 
+    }, payload => {
        const m = payload.new;
-       if ((m.sender_id === myId && m.receiver_id === userId) || (m.sender_id === userId && m.receiver_id === myId)) {
+       if (m.sender_id === userId) {
           renderMessage(m);
-          container.scrollTop = container.scrollHeight;
+          if(container) container.scrollTop = container.scrollHeight;
        }
     })
     .subscribe();
@@ -2570,27 +2626,40 @@ window.selectChat = async (userId, name, role, avatar) => {
 
 window.sendChatMessage = async () => {
   const input = document.getElementById('messageInput');
+  if(!input) return;
+
   const content = input.value.trim();
   const receiverId = AppState.get('currentChatUser');
+  const myId = AppState.get('user')?.id;
   
-  if(!content || !receiverId) return;
+  if(!content || !receiverId || !myId) return;
   
+  // 11️⃣ Renderizar mensaje optimista
+  renderMessage({
+    sender_id: myId,
+    content: content,
+    created_at: new Date().toISOString()
+  });
+  
+  const container = document.getElementById('chatMessages');
+  if(container) container.scrollTop = container.scrollHeight;
+
+  input.value = '';
   input.disabled = true;
 
   const { error } = await supabase.from(TABLES.MESSAGES).insert({
-    sender_id: AppState.get('user').id,
+    sender_id: myId,
     receiver_id: receiverId,
     content: content
   });
   
   input.disabled = false;
+  input.focus();
 
   if(error) {
      console.error(error);
      Helpers.toast('Error al enviar mensaje', 'error');
-  } else {
-     input.value = '';
-     input.focus();
+     // Podrías marcar el mensaje como fallido en la UI aquí
   }
 };
 
@@ -2621,19 +2690,20 @@ async function populateProfile() {
     if (el) el.value = val || '';
   };
   
-  setVal('inputStudentName', student.name);
-  setVal('inputStudentBlood', student.blood_type);
-  setVal('inputStudentAllergy', student.allergies);
+  setVal('inputStudentName', student?.name);
+  setVal('inputStudentBlood', student?.blood_type);
+  setVal('inputStudentAllergy', student?.allergies);
+  setVal('inputStudentBirth', student?.birth_date);
   
-  setVal('profileFatherName', student.p1_name);
-  setVal('profileFatherPhone', student.p1_phone);
-  setVal('profileFatherEmail', student.p1_email);
+  setVal('profileFatherName', student?.p1_name);
+  setVal('profileFatherPhone', student?.p1_phone);
+  setVal('profileFatherEmail', student?.p1_email);
   
-  setVal('profileMotherName', student.p2_name);
-  setVal('profileMotherPhone', student.p2_phone);
-  setVal('profileMotherEmail', student.p2_email);
+  setVal('profileMotherName', student?.p2_name);
+  setVal('profileMotherPhone', student?.p2_phone);
+  setVal('profileMotherEmail', student?.p2_email);
   
-  setVal('profilePickupName', student.authorized_pickup);
+  setVal('profilePickupName', student?.authorized_pickup);
   
   // ✅ Refrescar iconos después de llenar datos
   if(window.lucide) lucide.createIcons();
@@ -2660,6 +2730,7 @@ async function saveAllProfile() {
     name: getVal('inputStudentName'),
     blood_type: getVal('inputStudentBlood'),
     allergies: getVal('inputStudentAllergy'),
+    birth_date: birthDate,
     // Padres
     p1_name: getVal('profileFatherName'),
     p1_phone: getVal('profileFatherPhone'),
@@ -2719,7 +2790,10 @@ async function initVideoCall() {
     return;
   }
 
-  if (window.jitsiInstance) window.jitsiInstance.dispose();
+  if (window.jitsiInstance) {
+    window.jitsiInstance.dispose();
+    window.jitsiInstance = null;
+  }
 
   const domain = "meet.jit.si";
   const options = {

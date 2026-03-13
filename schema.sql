@@ -127,9 +127,13 @@ language plpgsql
 security definer
 as $$
 begin
-  select name, avatar_url into new.teacher_name, new.teacher_avatar
-  from public.profiles
-  where id = new.teacher_id;
+  if new.teacher_id is not null then
+    select name, avatar_url
+    into new.teacher_name, new.teacher_avatar
+    from public.profiles
+    where id = new.teacher_id;
+  end if;
+
   return new;
 end;
 $$;
@@ -290,14 +294,14 @@ alter table public.classroom_gallery enable row level security;
 -- -----------------------------------------------------------------------------
 
 -- Función segura para obtener rol (evita recursión)
-CREATE OR REPLACE FUNCTION public.get_my_role()
+create or replace function public.get_my_role()
 RETURNS text
 LANGUAGE sql
 SECURITY DEFINER
 SET search_path = public
 STABLE
 AS $$
-  SELECT role FROM public.profiles WHERE id = auth.uid();
+  select role from profiles where id = auth.uid() limit 1;
 $$;
 
 -- Función para manejar nuevos usuarios (Trigger Auth)
@@ -317,6 +321,12 @@ begin
   return new;
 end;
 $$;
+
+-- Trigger para la función anterior
+drop trigger if exists on_auth_user_created on auth.users;
+create trigger on_auth_user_created
+  after insert on auth.users
+  for each row execute procedure public.handle_new_user();
 
 -- 4. POLÍTICAS DE ACCESO (RLS)
 -- -----------------------------------------------------------------------------
@@ -371,10 +381,8 @@ create policy "Maestra ve sus aulas" on public.classrooms for select using (
 -- ✅ NUEVA POLÍTICA: Permitir a los padres ver el aula de sus hijos
 drop policy if exists "Padres ven aula de sus hijos" on public.classrooms;
 create policy "Padres ven aula de sus hijos" on public.classrooms for select using (
-  exists (
-    select 1 from public.students s
-    where s.classroom_id = public.classrooms.id
-    and s.parent_id = auth.uid()
+  id in (
+    select classroom_id from public.students where parent_id = auth.uid() and classroom_id is not null
   )
 );
 
@@ -477,14 +485,45 @@ create policy "Maestras califican evidencias" on public.task_evidences for updat
 
 -- POSTS & COMMENTS
 drop policy if exists "Ver posts" on public.posts;
-create policy "Ver posts" on public.posts for select using (true); -- Ajustar según privacidad deseada
+create policy "Ver posts" on public.posts
+for select using (
+  exists (
+    select 1 from classrooms c
+    where c.id = posts.classroom_id
+    and (
+      c.teacher_id = auth.uid()
+      or exists (
+        select 1 from students s
+        where s.classroom_id = c.id
+        and s.parent_id = auth.uid()
+      )
+    )
+  )
+);
 
 drop policy if exists "Maestras crean posts" on public.posts;
 create policy "Maestras crean posts" on public.posts for insert with check (auth.uid() = teacher_id);
 
 -- COMMENTS
-drop policy if exists "Authenticated users can comment" on public.comments;
-create policy "Authenticated users can comment" on public.comments for insert with check (auth.role() = 'authenticated');
+drop policy if exists "Usuarios comentan en publicaciones visibles" on public.comments;
+create policy "Usuarios comentan en publicaciones visibles" -- Nombre corregido en el drop
+on public.comments
+for insert
+with check (
+  exists (
+    select 1 from posts p
+    join classrooms c on c.id = p.classroom_id
+    where p.id = comments.post_id
+    and (
+      c.teacher_id = auth.uid()
+      or exists (
+        select 1 from students s
+        where s.classroom_id = c.id
+        and s.parent_id = auth.uid()
+      )
+    )
+  )
+);
 
 drop policy if exists "Usuarios eliminan sus comentarios" on public.comments;
 create policy "Usuarios eliminan sus comentarios" on public.comments for delete using (auth.uid() = user_id);
@@ -494,8 +533,27 @@ create policy "Usuarios eliminan sus comentarios" on public.comments for delete 
 drop policy if exists "Ver likes" on public.likes;
 create policy "Ver likes" on public.likes for select using (true);
 
-drop policy if exists "Padres pueden dar like" on public.likes;
-create policy "Padres pueden dar like" on public.likes for insert with check (auth.uid() = user_id);
+drop policy if exists "Usuarios reaccionan a posts visibles" on public.likes;
+create policy "Usuarios reaccionan a posts visibles"
+on public.likes
+for insert
+with check (
+  auth.uid() = user_id
+  and exists (
+    select 1
+    from posts p
+    join classrooms c on c.id = p.classroom_id
+    where p.id = likes.post_id
+    and (
+      c.teacher_id = auth.uid()
+      or exists (
+        select 1 from students s
+        where s.classroom_id = c.id
+        and s.parent_id = auth.uid()
+      )
+    )
+  )
+);
 
 drop policy if exists "Padres pueden quitar like" on public.likes;
 create policy "Padres pueden quitar like" on public.likes for delete using (auth.uid() = user_id);
@@ -506,6 +564,14 @@ create policy "Usuarios ven sus mensajes" on public.messages for select using (a
 
 drop policy if exists "Usuarios envian mensajes" on public.messages;
 create policy "Usuarios envian mensajes" on public.messages for insert with check (auth.uid() = sender_id);
+
+drop policy if exists "Usuarios actualizan mensajes" on public.messages;
+create policy "Usuarios actualizan mensajes"
+on public.messages
+for update
+using (
+  auth.uid() = receiver_id
+);
 
 
 -- PAYMENTS
@@ -529,6 +595,12 @@ drop policy if exists "Usuarios ven sus notificaciones" on public.notifications;
 create policy "Usuarios ven sus notificaciones" on public.notifications for select using (
   auth.uid() = user_id
 );
+
+drop policy if exists "Sistema crea notificaciones" on public.notifications;
+create policy "Sistema crea notificaciones"
+on public.notifications
+for insert
+with check (auth.role() = 'authenticated');
 
 -- 1.11 Inquietudes (Inquiries - Comunicación Padres-Directora)
 create table if not exists public.inquiries (
@@ -673,9 +745,18 @@ create table if not exists public.system_events (
 
 -- RLS para system_events
 alter table public.system_events enable row level security;
-drop policy if exists "Solo staff puede ver eventos" on public.system_events;
-create policy "Solo staff puede ver eventos" on public.system_events
-  for select using (auth.uid() in (select id from profiles where role in ('directora', 'asistente')));
+drop policy if exists "Staff ve eventos" on public.system_events;
+create policy "Staff ve eventos"
+on public.system_events
+for select
+using (
+  exists (
+    select 1
+    from profiles
+    where id = auth.uid()
+    and role in ('directora','asistente','maestra')
+  )
+);
 drop policy if exists "Cualquier autenticado puede insertar eventos" on public.system_events;
 create policy "Cualquier autenticado puede insertar eventos" on public.system_events
   for insert with check (auth.role() = 'authenticated');
@@ -801,3 +882,14 @@ begin
   );
 end;
 $$;
+
+-- 6. ÍNDICES PARA MEJORA DE RENDIMIENTO
+-- -----------------------------------------------------------------------------
+create index if not exists idx_students_parent on public.students(parent_id);
+create index if not exists idx_students_classroom on public.students(classroom_id);
+create index if not exists idx_posts_classroom on public.posts(classroom_id);
+create index if not exists idx_comments_post on public.comments(post_id);
+create index if not exists idx_likes_post on public.likes(post_id);
+create index if not exists idx_messages_sender on public.messages(sender_id);
+create index if not exists idx_messages_receiver on public.messages(receiver_id);
+create index if not exists idx_payments_student on public.payments(student_id);
