@@ -218,10 +218,10 @@ export async function initOneSignal(currentUser = null) {
     } catch (e) {
       const msg = e.message || '';
       // Silenciar errores comunes de comunicación SW en desarrollo
-      if (msg.includes('Can only be used on') || msg.includes('Service Worker') || msg.includes('not available') || msg.includes('postMessage')) {
-        console.warn("OneSignal: Estado de SW pendiente o limitado por entorno local.");
+      if (msg.includes('Can only be used on') || msg.includes('Service Worker') || msg.includes('not available') || msg.includes('postMessage') || msg.includes('pending')) {
+        // Silencio en consola para no confundir al usuario
       } else {
-        console.error("OneSignal Error:", e);
+        console.warn("OneSignal Status:", msg);
       }
     }
   });

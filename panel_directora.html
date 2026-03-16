@@ -993,66 +993,62 @@
             </h2>
             <p class="text-slate-500 text-sm">Chat privado, seguro, con archivos e historial</p>
           </div>
-          <div class="flex gap-2">
-            <button id="sendAnnouncement" class="px-4 py-2.5 bg-pink-600 text-white rounded-xl">Nuevo aviso</button>
-          </div>
         </div>
 
-        <div class="grid grid-cols-12 gap-4 h-[70vh]">
-          <!-- Columna 1: Lista de Conversaciones -->
-          <aside class="col-span-12 md:col-span-3 bg-white border-r border-slate-200 rounded-2xl overflow-hidden flex flex-col">
-            <div class="p-3 border-b flex gap-2 items-center">
-              <div class="relative flex-1">
+        <div class="flex flex-col md:flex-row h-[calc(100vh-220px)] bg-white rounded-3xl shadow-xl border border-slate-200 overflow-hidden">
+          <!-- Sidebar Contactos -->
+          <div class="w-full md:w-80 border-r border-slate-100 bg-slate-50 flex flex-col">
+            <div class="p-4 border-b border-slate-200 space-y-3">
+              <div class="relative">
                 <i data-lucide="search" class="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400"></i>
-                <input id="chatSearch" placeholder="Buscar usuario..." class="pl-9 pr-3 py-2.5 w-full bg-slate-50 border rounded-xl text-sm" />
+                <input id="chatSearchInput" type="text" class="w-full pl-9 pr-4 py-2 bg-white border border-slate-200 rounded-xl text-sm focus:ring-2 focus:ring-blue-500 outline-none transition-all" placeholder="Buscar usuario...">
               </div>
-              <select id="chatRoleFilter" class="px-2.5 py-2 border rounded-xl text-sm bg-slate-50">
-                <option value="all">Todos</option>
-                <option value="parent">Padres</option>
+              <select id="chatRoleFilter" class="w-full px-3 py-2 bg-white border border-slate-200 rounded-xl text-xs font-bold text-slate-500 outline-none">
+                <option value="all">Todos los roles</option>
                 <option value="teacher">Maestros</option>
+                <option value="parent">Padres</option>
                 <option value="assistant">Asistentes</option>
               </select>
             </div>
-            <div id="chatList" class="flex-1 overflow-auto divide-y custom-scrollbar"></div>
-          </aside>
+            <div id="chatContactsList" class="flex-1 overflow-y-auto p-2 space-y-1 custom-scrollbar">
+              <!-- Cargado por JS -->
+              <div class="p-4 text-center text-slate-400 text-sm">Cargando contactos...</div>
+            </div>
+          </div>
 
-          <!-- Columna 2: Conversación -->
-          <section class="col-span-12 md:col-span-6 bg-white rounded-2xl border border-slate-200 flex flex-col">
-            <header id="chatHeader" class="p-4 border-b flex items-center justify-between">
+          <!-- Área de Chat -->
+          <div id="chatMainArea" class="flex-1 flex flex-col bg-white relative">
+            <!-- Header Chat Seleccionado -->
+            <div id="chatActiveHeader" class="p-4 border-b border-slate-100 flex items-center justify-between bg-white z-10 hidden">
               <div class="flex items-center gap-3">
-                <img id="chatUserPhoto" src="img/2.jpg" class="w-9 h-9 rounded-full object-cover" />
+                <div id="chatActiveAvatar" class="w-10 h-10 rounded-full bg-blue-100 text-blue-600 flex items-center justify-center font-bold overflow-hidden border border-blue-50"></div>
                 <div>
-                  <div id="chatUserName" class="font-semibold">Selecciona un chat</div>
-                  <div id="chatUserMeta" class="text-xs text-slate-500">—</div>
+                  <div id="chatActiveName" class="font-bold text-slate-800"></div>
+                  <div id="chatActiveMeta" class="text-[10px] font-bold uppercase tracking-wider text-slate-400"></div>
                 </div>
               </div>
-              <div class="text-xs text-slate-500" id="chatSeen">—</div>
-            </header>
-            <div id="chatMessages" class="flex-1 p-4 overflow-auto space-y-2 bg-slate-50"></div>
-            <footer class="p-3 border-t flex items-center gap-2">
-              <input type="file" id="chatFile" class="hidden" />
-              <button id="btnAttach" class="px-2 py-2 rounded bg-slate-100" title="Adjuntar archivo"><i data-lucide="paperclip" class="w-4 h-4"></i></button>
-              <button id="btnPhoto" class="px-2 py-2 rounded bg-slate-100" title="Foto"><i data-lucide="image" class="w-4 h-4"></i></button>
-              <div class="relative flex-1">
-                <input id="chatInput" class="w-full border rounded-xl px-3 py-2 text-sm" placeholder="Escribe un mensaje..." />
-                <div id="replyPreview" class="hidden absolute -top-10 left-0 right-0 bg-white border rounded-lg p-2 text-xs text-slate-600">Respondiendo a: <span id="replyText">—</span></div>
-              </div>
-              <button id="chatSend" class="px-4 py-2 bg-purple-600 text-white rounded-xl">Enviar</button>
-            </footer>
-          </section>
-
-          <!-- Columna 3: Información del Usuario -->
-          <aside class="col-span-12 md:col-span-3 bg-white rounded-2xl border border-slate-200 p-4">
-            <h4 class="text-sm font-semibold mb-3">Información</h4>
-            <div class="space-y-2 text-sm">
-              <div>Rol: <span id="infoRole" class="font-semibold">—</span></div>
-              <div>Teléfono: <a id="infoPhone" href="#" class="text-blue-600">—</a></div>
-              <div>Grupo: <span id="infoGroup">—</span></div>
-              <div>Estado: <span id="infoStatus" class="px-2 py-0.5 rounded-full text-xs bg-slate-100">—</span></div>
             </div>
-            <h4 class="text-sm font-semibold mt-5 mb-2">Historial</h4>
-            <div id="infoHistory" class="text-xs text-slate-600 space-y-1 max-h-52 overflow-auto"></div>
-          </aside>
+
+            <!-- Mensajes -->
+            <div id="chatMessagesContainer" class="flex-1 overflow-y-auto p-4 space-y-4 bg-slate-50/30 custom-scrollbar flex flex-col">
+              <div class="h-full flex flex-col items-center justify-center text-slate-400 opacity-40">
+                <i data-lucide="messages-square" class="w-16 h-16 mb-4"></i>
+                <p class="font-medium">Selecciona una conversación</p>
+              </div>
+            </div>
+
+            <!-- Input Area -->
+            <div id="chatInputArea" class="p-4 border-t border-slate-100 bg-white hidden">
+              <div class="flex gap-3 items-end">
+                <div class="flex-1 relative">
+                  <textarea id="chatMessageInput" rows="1" class="w-full bg-slate-100 border-0 rounded-2xl px-4 py-3 focus:ring-2 focus:ring-blue-500 resize-none outline-none transition-all text-sm" placeholder="Escribe un mensaje..."></textarea>
+                </div>
+                <button id="btnSendChatMessage" class="bg-blue-600 text-white p-3.5 rounded-2xl hover:bg-blue-700 transition-all shadow-lg shadow-blue-200 active:scale-95 flex-shrink-0">
+                  <i data-lucide="send" class="w-5 h-5"></i>
+                </button>
+              </div>
+            </div>
+          </div>
         </div>
       </section>
 
@@ -1684,5 +1680,6 @@
   </div>
 </div>
 
+<script src="js/pwa-install.js" defer></script>
 </body>
 </html>

@@ -21,10 +21,11 @@
 
 /* ——— Panel Padre: estilo general del sidebar mochila ——— */
 body.panel-padre-body #sidebar {
-  background: linear-gradient(180deg, #059669 0%, #047857 100%); /* Emerald 600 to 700 */
-  box-shadow: 4px 0 24px rgba(0,0,0,0.05);
-  border-right: 1px solid rgba(255,255,255,0.1);
-  /* Asegurar que el contenido sea accesible */
+  background: rgba(255, 255, 255, 0.8);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  box-shadow: 10px 0 40px rgba(0,0,0,0.04);
+  border-right: 1px solid rgba(255,255,255,0.4);
   display: flex;
   flex-direction: column;
   max-height: 100vh;
@@ -32,61 +33,72 @@ body.panel-padre-body #sidebar {
 
 /* Botón base del sidebar (Renombrado/Unificado a sidebar-node para coincidir con HTML) */
 .sidebar-node {
-  padding: 0.75rem;
+  padding: 0.85rem 1.25rem;
   display: flex;
   align-items: center;
   justify-content: center;
-  gap: 0.5rem;
-  border-radius: 1rem;
+  gap: 0.75rem;
+  border-radius: 1.25rem;
   font-size: 0.95rem;
-  transition: all 0.25s cubic-bezier(0.34, 1.56, 0.64, 1);
-  color: #e0f2fe;
+  transition: all 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+  color: #64748b; /* Slate 500 */
   font-weight: 700;
   border: 2px solid transparent;
   margin-bottom: 0.5rem;
+  position: relative;
+  overflow: hidden;
 }
+
+.sidebar-node::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 50%;
+  transform: translateY(-50%) translateX(-100%);
+  width: 4px;
+  height: 60%;
+  border-radius: 0 4px 4px 0;
+  transition: transform 0.3s ease;
+}
+
 .sidebar-node:hover {
-  background: rgba(255, 255, 255, 0.9);
-  transform: translateX(6px) scale(1.02);
-  box-shadow: 0 4px 12px rgba(0,0,0,0.05);
+  background: white;
+  color: #0ea5e9; /* Sky 500 */
+  transform: translateX(4px);
+  box-shadow: 0 4px 15px rgba(0,0,0,0.03);
 }
+
 .sidebar-node.active {
-  background: #ffffff;
-  transform: translateX(8px);
-  box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+  background: white;
+  color: #0ea5e9;
+  box-shadow: 0 10px 25px rgba(14, 165, 233, 0.1);
+  transform: translateX(6px);
 }
 
-/* Colores específicos para botones del sidebar */
-.sidebar-node.node-home { color: #f0f9ff; }
-.sidebar-node.node-home:hover, .sidebar-node.node-home.active { color: #0ea5e9; border-left: 4px solid #0ea5e9; background: #f0f9ff; }
+.sidebar-node.active::before {
+  transform: translateY(-50%) translateX(0);
+  background: #0ea5e9;
+}
 
-.sidebar-node.node-attendance { color: #f0fdf4; }
-.sidebar-node.node-attendance:hover, .sidebar-node.node-attendance.active { color: #16a34a; border-left: 4px solid #16a34a; background: #f0fdf4; }
+/* Colores específicos para botones del sidebar al estar activos/hover */
+.sidebar-node.node-home.active, .sidebar-node.node-home:hover { color: #0ea5e9; }
+.sidebar-node.node-home.active::before { background: #0ea5e9; }
 
-.sidebar-node.node-tasks { color: #fffbeb; }
-.sidebar-node.node-tasks:hover, .sidebar-node.node-tasks.active { color: #f59e0b; border-left: 4px solid #f59e0b; background: #fffbeb; }
+.sidebar-node.node-class.active, .sidebar-node.node-class:hover { color: #8b5cf6; }
+.sidebar-node.node-class.active::before { background: #8b5cf6; }
 
-.sidebar-node.node-class { color: #f5f3ff; }
-.sidebar-node.node-class:hover, .sidebar-node.node-class.active { color: #8b5cf6; border-left: 4px solid #8b5cf6; background: #f5f3ff; }
+.sidebar-node.node-tasks.active, .sidebar-node.node-tasks:hover { color: #f59e0b; }
+.sidebar-node.node-tasks.active::before { background: #f59e0b; }
 
-.sidebar-node.node-grades { color: #fff1f2; }
-.sidebar-node.node-grades:hover, .sidebar-node.node-grades.active { color: #f43f5e; border-left: 4px solid #f43f5e; background: #fff1f2; }
-
-.sidebar-node.node-payments { color: #f0fdfa; }
-.sidebar-node.node-payments:hover, .sidebar-node.node-payments.active { color: #0d9488; border-left: 4px solid #0d9488; background: #f0fdfa; }
-
-.sidebar-node.node-notifications { color: #fff7ed; }
-.sidebar-node.node-notifications:hover, .sidebar-node.node-notifications.active { color: #ea580c; border-left: 4px solid #ea580c; background: #fff7ed; }
-
-.sidebar-node.node-profile { color: #f8fafc; }
-.sidebar-node.node-profile:hover, .sidebar-node.node-profile.active { color: #475569; border-left: 4px solid #475569; background: #f8fafc; }
+.sidebar-node.node-profile.active, .sidebar-node.node-profile:hover { color: #6366f1; }
+.sidebar-node.node-profile.active::before { background: #6366f1; }
 
 .sidebar-node i {
-  stroke-width: 2.5px;
-  filter: drop-shadow(0 2px 2px rgba(0,0,0,0.1));
-  transition: transform .2s ease;
+  stroke-width: 2.2px;
+  transition: transform .3s ease;
 }
-.sidebar-node:hover i { transform: scale(1.2) rotate(-3deg); }
+.sidebar-node:hover i { transform: scale(1.1); }
+
 
 /* Desktop */
 @media (min-width: 768px) {
@@ -119,21 +131,31 @@ body.panel-padre-body #sidebar {
     flex-direction: column;
     align-items: center;
     justify-content: center;
-    gap: 2px;
-    padding: 10px;
-    border-radius: 16px;
-    font-size: 11px;
-    font-weight: 700;
-    color: #64748b;
+    gap: 4px;
+    padding: 12px 16px;
+    border-radius: 1.25rem;
+    font-size: 10px;
+    font-weight: 800;
+    color: #94a3b8; /* Slate 400 */
     width: auto;
-    min-width: 60px;
+    min-width: 75px;
+    background: transparent;
+    border: none;
+    box-shadow: none;
+    transform: none;
   }
   .sidebar-node.active {
-    background: #0ea5e9;
-    color: white;
-    box-shadow: 0 4px 12px rgba(14, 165, 233, 0.3);
-    transform: translateY(-2px);
+    background: white;
+    color: #0ea5e9;
+    box-shadow: 0 8px 20px rgba(14, 165, 233, 0.15);
+    transform: translateY(-4px);
   }
+  .sidebar-node::before { display: none; }
+  
+  /* Eliminar efectos de hover en móvil que pueden causar parpadeos */
+  .sidebar-node:hover { transform: none; background: transparent; }
+  .sidebar-node.active:hover { transform: translateY(-4px); background: white; }
+
 }
 
 /* Ocultar scrollbar utilitario */

@@ -62,6 +62,7 @@ const AppState = {
     incidents: 0
   },
   realtimeChannel: null,
+  notificationChannel: null,
   // Cache simple
   studentsCache: {}, 
   
@@ -154,14 +155,6 @@ const UI = {
   },
 
   bindEvents() {
-    // Routine Toggles (Delegated)
-    document.addEventListener('click', (e) => {
-        const btn = e.target.closest('.routine-toggle');
-        if (btn) {
-            this.toggleRoutineOption(btn);
-        }
-    });
-
     // Navigation (Sidebar)
     document.querySelectorAll('[data-section]').forEach(btn => {
       btn.addEventListener('click', (e) => {
@@ -453,7 +446,7 @@ const UI = {
       if(cls) this.openClass(cls);
   },
 
-  openClass(cls) {
+  async openClass(cls) {
     if (!cls || !cls.id) return;
     AppState.setCurrentClass(cls);
     document.getElementById('currentClassName').textContent = cls.name;
@@ -466,6 +459,20 @@ const UI = {
         metaEl.className = 'text-sm text-slate-500 mt-1 font-medium';
         document.getElementById('currentClassName').parentNode.appendChild(metaEl);
     }
+    
+    // Fix: Cargar contadores reales si no vienen en el objeto (clic desde tarjeta)
+    if (cls.studentsCount === undefined || cls.tasksCount === undefined) {
+        metaEl.innerHTML = `<span class="animate-pulse text-slate-400">Cargando datos...</span>`;
+        try {
+            const [s, t] = await Promise.all([
+                supabase.from('students').select('*', { count: 'exact', head: true }).eq('classroom_id', cls.id),
+                supabase.from('tasks').select('*', { count: 'exact', head: true }).eq('classroom_id', cls.id)
+            ]);
+            cls.studentsCount = s.count || 0;
+            cls.tasksCount = t.count || 0;
+            AppState.currentClass = cls; // Actualizar referencia en estado
+        } catch (e) { console.error("Error counts", e); }
+    }
     metaEl.innerHTML = `${cls.studentsCount || 0} alumnos • ${cls.tasksCount || 0} tareas`;
     
     // UX: Desactivar botón home visualmente
@@ -473,7 +480,7 @@ const UI = {
     
     this.showSection('t-class-detail');
     this.showTab('feed'); // Default tab
-    window.scrollTo({ top: 0 });
+    window.scrollTo({ top: 0, behavior: 'smooth' });
   },
 
   // --- TAB LOGIC ---
@@ -566,23 +573,29 @@ const UI = {
         return;
     }
 
-    // 1. Cargar Reacciones y Comentarios para cada Post
+    // 1. Optimización: Cargar Reacciones en Batch (Item 6 y 1)
+    const postIds = posts.map(p => p.id);
+    const { data: allLikes } = await supabase
+        .from('likes')
+        .select('post_id, reaction_type, user_id')
+        .in('post_id', postIds);
+
     const postsHTML = await Promise.all(posts.map(async p => {
         const safeMedia = p.media_url ? encodeURI(p.media_url) : '';
         
-        // Cargar reacciones
-        const { data: likes } = await supabase.from('likes').select('reaction_type').eq('post_id', p.id);
-        const reactionCounts = (likes || []).reduce((acc, l) => {
+        // Filtrar likes del batch en memoria
+        const likes = (allLikes || []).filter(l => l.post_id === p.id);
+        const reactionCounts = likes.reduce((acc, l) => {
             const type = l.reaction_type || 'like';
             acc[type] = (acc[type] || 0) + 1;
             return acc;
         }, {});
 
-        // Cargar conteo de comentarios
-        const { count: commentCount } = await supabase.from('comments').select('*', { count: 'exact', head: true }).eq('post_id', p.id);
-
         // Mi reacción
-        const myReaction = (likes || []).find(l => l.user_id === AppState.user.id)?.reaction_type;
+        const myReaction = likes.find(l => l.user_id === AppState.user.id)?.reaction_type;
+
+        // Cargar conteo de comentarios (aún individual por limitación de API simple, pero optimizado con head:true)
+        const { count: commentCount } = await supabase.from('comments').select('*', { count: 'exact', head: true }).eq('post_id', p.id);
 
         return `
         <div class="bg-white p-5 rounded-2xl border shadow-sm mb-4 animate-fade-in" id="post-${p.id}">
@@ -747,8 +760,11 @@ const UI = {
         btnSubmit.innerHTML = `<span>Publicar</span><i data-lucide="send" class="w-4 h-4"></i>`;
         contentInput.value = '';
         if (fileInput) fileInput.value = '';
-        document.getElementById('previewContainer').classList.add('hidden');
-        // 5️⃣ Falta resetear preview al publicar post
+        
+        // Item 7: Corrección limpieza de preview
+        const preview = document.getElementById('previewContainer');
+        if(preview) preview.classList.add('hidden');
+        
         const imgPreview = document.getElementById('imgPreview');
         if(imgPreview) imgPreview.src = '';
         
@@ -808,6 +824,8 @@ const UI = {
     const section = document.getElementById(`comments-section-${postId}`);
     const list = document.getElementById(`comments-list-${postId}`);
     
+    if(!section || !list) return; // Item 2: Validación
+    
     if (section.classList.contains('hidden')) {
         section.classList.remove('hidden');
         list.innerHTML = `<div class="flex justify-center p-4"><i data-lucide="loader-2" class="w-5 h-5 animate-spin text-slate-400"></i></div>`;
@@ -851,7 +869,12 @@ const UI = {
         });
         if (error) throw error;
         input.value = '';
-        this.toggleCommentSection(postId); // Recargar comentarios
+        
+        // Item 3: Recargar comentarios correctamente
+        const section = document.getElementById(`comments-section-${postId}`);
+        if (!section.classList.contains('hidden')) await this.toggleCommentSection(postId); // Cerrar
+        await this.toggleCommentSection(postId); // Abrir (fetch fresco)
+
         // Actualizar contador
         const countEl = document.getElementById(`comment-count-${postId}`);
         if(countEl) countEl.textContent = parseInt(countEl.textContent) + 1;
@@ -1011,6 +1034,7 @@ const UI = {
   },
 
   async saveRoutineNotes(textarea) {
+      if(!AppState.currentClass?.id) return; // Item 4: Validación de clase
       const studentId = textarea.dataset.student;
       const val = textarea.value.trim();
       const today = new Date();
@@ -1046,6 +1070,7 @@ const UI = {
       const container = btn.parentElement;
       if(!container) return;
       
+      const oldClasses = btn.className; // Item 5: Guardar estado previo
       const siblings = container.querySelectorAll('.routine-toggle');
       siblings.forEach(b => b.className = 'routine-toggle px-2 py-1 rounded-lg border text-xs flex items-center gap-1 transition-all bg-white border-slate-200 text-slate-600 hover:bg-slate-50');
       btn.className = 'routine-toggle px-2 py-1 rounded-lg border text-xs flex items-center gap-1 transition-all bg-blue-100 border-blue-300 text-blue-700 font-bold ring-1 ring-blue-300';
@@ -1065,6 +1090,7 @@ const UI = {
       if(error) {
           console.error(error);
           Helpers.toast('Error al guardar', 'error');
+          btn.className = oldClasses; // Item 5: Restaurar en error
       }
   },
 
@@ -1079,11 +1105,18 @@ const UI = {
     
     tab.innerHTML = Helpers.skeleton(3);
 
-    const { data: students } = await supabase
+    // 2️⃣ Manejo de error en carga de estudiantes
+    const { data: students, error } = await supabase
       .from('students')
       .select('*')
       .eq('classroom_id', AppState.currentClass.id)
       .order('name');
+
+    if(error){
+       console.error(error);
+       tab.innerHTML = Helpers.emptyState('Error cargando estudiantes');
+       return;
+    }
       
     if(!students?.length) {
         tab.innerHTML = Helpers.emptyState('No hay estudiantes para tomar lista.');
@@ -1236,7 +1269,8 @@ const UI = {
       const date = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
       
       rows.forEach(r => {
-          const studentId = r.dataset.id;
+          // 1️⃣ Fix crítico: Asegurar tipo string/valido para ID
+          const studentId = r.dataset.id ? String(r.dataset.id) : null;
           const status = r.dataset.status;
           if(studentId && status && status !== 'pending') {
               upsertData.push({
@@ -1412,8 +1446,13 @@ const UI = {
       .eq('classroom_id', AppState.currentClass.id)
       .order('created_at', { ascending: false });
 
-    // 4️⃣ Error silencioso cuando no existe tasks
-    if(error || !tasks || tasks.length === 0) {
+    // 4️⃣ Error silencioso cuando no existe tasks -> Fix: Separar errores de estado vacío
+    if(error) {
+      console.error(error);
+      container.innerHTML = `<div class="col-span-full">${Helpers.emptyState('Error cargando tareas', 'alert-circle')}</div>`;
+      return;
+    }
+    if(!tasks || tasks.length === 0) {
       container.innerHTML = `<div class="col-span-full">${Helpers.emptyState('No hay tareas asignadas', 'clipboard-list')}</div>`;
       return;
     }
@@ -1432,7 +1471,8 @@ const UI = {
           <button class="bg-orange-50 text-orange-600 px-4 py-2 rounded-lg font-bold text-sm hover:bg-orange-100 transition flex items-center gap-2" onclick="UI.openTaskDetail('${t.id}')">
             <i data-lucide="eye" class="w-4 h-4"></i> Ver Entregas
           </button>
-          ${t.file_url ? `<a href="${t.file_url}" target="_blank" class="text-slate-400 hover:text-blue-500" title="Ver adjunto"><i data-lucide="paperclip" class="w-5 h-5"></i></a>` : ''}
+          <!-- 7️⃣ Seguridad: noopener noreferrer -->
+          ${t.file_url ? `<a href="${t.file_url}" target="_blank" rel="noopener noreferrer" class="text-slate-400 hover:text-blue-500" title="Ver adjunto"><i data-lucide="paperclip" class="w-5 h-5"></i></a>` : ''}
         </div>
       </div>
     `).join('');
@@ -1455,6 +1495,12 @@ const UI = {
 
     if (selectedDate < today) {
       Helpers.toast('La fecha debe ser hoy o futura', 'error');
+      return;
+    }
+
+    // 5️⃣ Límite de tamaño de archivo (10MB)
+    if (file && file.size > 10 * 1024 * 1024) {
+      Helpers.toast('Archivo demasiado grande (máx 10MB)', 'error');
       return;
     }
 
@@ -1541,8 +1587,11 @@ const UI = {
     const { data: task, error } = await supabase.from('tasks').select('*').eq('id', taskId).single();
     if(error || !task){ Helpers.toast('Error cargando tarea','error'); return; }
     
-    const { data: students } = await supabase.from('students').select('id, name').eq('classroom_id', AppState.currentClass.id).order('name');
-    const { data: evidences } = await supabase.from('task_evidences').select('*').eq('task_id', taskId);
+    // 9️⃣ Optimización: Consultas en paralelo
+    const [{ data: students }, { data: evidences }] = await Promise.all([
+        supabase.from('students').select('id, name').eq('classroom_id', AppState.currentClass.id).order('name'),
+        supabase.from('task_evidences').select('*').eq('task_id', taskId)
+    ]);
 
     const evidenceMap = {};
     evidences?.forEach(e => evidenceMap[e.student_id] = e);
@@ -1564,7 +1613,7 @@ const UI = {
 
       // UI de Calificación Mejorada
       const gradingUI = ev ? `
-        <div class="flex flex-col items-center gap-2">
+        <div class="flex flex-col items-center gap-2 grade-container">
           <!-- Selector de Nota (A, B, C) -->
           <div class="flex bg-slate-100 p-1 rounded-lg">
             ${['A','B','C'].map(g => {
@@ -1621,7 +1670,8 @@ const UI = {
   },
 
   async gradeTask(evidenceId, grade, btn) {
-    const parent = btn.parentElement;
+    // 8️⃣ Robustez: Usar closest en lugar de parentElement
+    const parent = btn.closest('.grade-container');
     if(!parent) return;
     
     // UI Optimista
@@ -1792,7 +1842,7 @@ const UI = {
           student_id: studentId,
           classroom_id: AppState.currentClass.id,
           severity,
-          description: desc,
+          description: Helpers.escapeHTML(desc), // 15️⃣ Fix: Sanitizar
           reported_at: new Date().toISOString(),
           teacher_id: AppState.user.id
       }).select('*, student:students(name, p1_email, p1_name)').single();
@@ -1873,7 +1923,8 @@ const UI = {
     }
 
     // 1. Marcar clase como EN VIVO
-    supabase.from('classrooms').update({ is_live: true }).eq('id', AppState.currentClass.id).then();
+    // 12️⃣ Fix: Await update
+    await supabase.from('classrooms').update({ is_live: true }).eq('id', AppState.currentClass.id);
 
     if (window.jitsiInstance) window.jitsiInstance.dispose();
 
@@ -1999,22 +2050,32 @@ const UI = {
           await supabase.from('classroom_chat').insert({ classroom_id: classroomId, user_id: AppState.user.id, message: text });
       };
 
+      // 13️⃣ Fix: Keydown listener anti-spam
       btn.onclick = sendMessage;
-      input.onkeypress = (e) => { if(e.key === 'Enter') sendMessage(); };
+      input.addEventListener('keydown', (e) => {
+         if(e.key === 'Enter' && !e.shiftKey) {
+             e.preventDefault();
+             sendMessage();
+         }
+      });
+      // Remove old onkeypress
+      input.onkeypress = null;
 
       function appendMessage(m) {
           const isMe = m.user_id === AppState.user.id; 
           const name = m.profiles?.name || 'Usuario';
           const time = new Date(m.created_at).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'});
           
-          chatContainer.innerHTML += `
-              <div class="flex flex-col mb-2 ${isMe ? 'items-end' : 'items-start'}">
-                  <div class="text-[10px] text-slate-400 mb-0.5 px-1">${name} • ${time}</div>
-                  <div class="px-3 py-2 rounded-xl text-sm max-w-[85%] ${isMe ? 'bg-orange-100 text-orange-900 rounded-tr-none' : 'bg-white border border-slate-200 text-slate-700 rounded-tl-none shadow-sm'}">
-                      ${Helpers.escapeHTML(m.message)}
-                  </div>
+          // 11️⃣ Fix: createElement
+          const div = document.createElement('div');
+          div.className = `flex flex-col mb-2 ${isMe ? 'items-end' : 'items-start'}`;
+          div.innerHTML = `
+              <div class="text-[10px] text-slate-400 mb-0.5 px-1">${name} • ${time}</div>
+              <div class="px-3 py-2 rounded-xl text-sm max-w-[85%] ${isMe ? 'bg-orange-100 text-orange-900 rounded-tr-none' : 'bg-white border border-slate-200 text-slate-700 rounded-tl-none shadow-sm'}">
+                  ${Helpers.escapeHTML(m.message)}
               </div>
           `;
+          chatContainer.appendChild(div);
       }
       function scrollToBottom() { chatContainer.scrollTop = chatContainer.scrollHeight; }
   },
@@ -2075,7 +2136,8 @@ const UI = {
       Helpers.toast('Subiendo imagen...', 'info');
       
       try {
-          const fileExt = file.name.split('.').pop();
+          // 14️⃣ Fix: Extensión segura
+          const fileExt = file.name.includes('.') ? file.name.split('.').pop() : 'jpg';
           const fileName = `avatars/${AppState.user.id}_${Date.now()}.${fileExt}`;
           
           const { error: upErr } = await supabase.storage.from('classroom_media').upload(fileName, file);
@@ -2106,6 +2168,9 @@ const UI = {
       Notification.requestPermission();
     }
 
+    // 16️⃣ Fix: Guardar canal para limpieza
+    if (AppState.notificationChannel) supabase.removeChannel(AppState.notificationChannel);
+
     // Suscribirse a eventos relevantes (ej: nuevos mensajes, incidentes críticos)
     const channel = supabase.channel('teacher_notifications')
       .on(
@@ -2126,6 +2191,8 @@ const UI = {
         }
       )
       .subscribe();
+
+    AppState.notificationChannel = channel;
   },
 
   showBrowserNotification(title, body) {
@@ -2167,4 +2234,11 @@ document.addEventListener('DOMContentLoaded', () => {
             document.body.classList.remove('no-scroll');
         }
     });
+    
+    // Item 9: Exponer UI explícitamente (ya estaba, pero aseguramos)
+    window.UI = UI;
 });
+
+// Item 10: Error Boundary Global
+window.addEventListener('error', (e) => { console.error("Global Error:", e.error); });
+window.addEventListener('unhandledrejection', (e) => { console.error("Promise Error:", e.reason); });

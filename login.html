@@ -130,42 +130,7 @@
   <!-- Importante: type="module" para poder usar import/export -->
   <script type="module" src="js/login.js"></script>
 
-  <!-- Lógica PWA -->
-  <script>
-    let deferredPrompt;
-    const installBtn = document.getElementById('installAppBtn');
-
-    // 1. Detectar si es instalable (Android/Desktop)
-    window.addEventListener('beforeinstallprompt', (e) => {
-      e.preventDefault();
-      deferredPrompt = e;
-      installBtn.classList.remove('hidden');
-      console.log('Karpus Kids: App lista para instalar');
-    });
-
-    // 2. Acción del botón
-    installBtn.addEventListener('click', async () => {
-      if (deferredPrompt) {
-        deferredPrompt.prompt();
-        const { outcome } = await deferredPrompt.userChoice;
-        console.log(`Resultado instalación: ${outcome}`);
-        if (outcome === 'accepted') {
-            installBtn.classList.add('hidden');
-        }
-        deferredPrompt = null;
-      }
-    });
-
-    // 3. Detectar si ya fue instalada exitosamente
-    window.addEventListener('appinstalled', () => {
-      installBtn.classList.add('hidden');
-      console.log('Karpus Kids: App instalada');
-    });
-
-    // 4. Ocultar si ya está en modo standalone (App abierta)
-    if (window.matchMedia('(display-mode: standalone)').matches) {
-      installBtn.classList.add('hidden');
-    }
-  </script>
+  <!-- Lógica PWA Profesional -->
+  <script src="js/pwa-install.js" defer></script>
 </body>
 </html>

@@ -1619,20 +1619,6 @@ async function loadDashboard() {
             target: 'videocall',
             theme: 'card-rose',
             value: 'Entrar'
-        },
-        {
-            title: 'Horario',
-            icon: 'clock',
-            target: 'class', // Muro/Clases
-            theme: 'card-red',
-            value: 'Ver'
-        },
-        {
-            title: 'Actividades',
-            icon: 'star',
-            target: 'class',
-            theme: 'card-yellow',
-            value: 'Explorar'
         }
     ];
 
@@ -2795,9 +2781,10 @@ async function initVideoCall() {
     window.jitsiInstance = null;
   }
 
+  const roomId = student.classroom_id ? String(student.classroom_id).substring(0, 8) : 'General';
   const domain = "meet.jit.si";
   const options = {
-    roomName: "KarpusKids_" + (student.classroom_id || 'General').substring(0, 8),
+    roomName: "KarpusKids_" + roomId,
     width: "100%",
     height: 600,
     parentNode: container,

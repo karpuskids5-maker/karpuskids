@@ -34,7 +34,6 @@ document.addEventListener('DOMContentLoaded', ()=>{
   // initDashboardChart(); // REMOVED: Managed by app.js to avoid canvas conflict
   
   safeInit(attachPaymentsHandlers);
-  safeInit(attachCommunicationsHandlers); // legacy simple posts
   safeInit(initTeamsComms); // Teams-like UI
   safeInit(attachGradesHandlers);
   safeInit(attachReportsHandlers);
@@ -46,6 +45,7 @@ document.addEventListener('DOMContentLoaded', ()=>{
   safeInit(initAttendanceModule); // Real attendance stats
   
   safeInit(initDirectorVideoCall); // ✅ Módulo de Videollamada
+  safeInit(initDirectorWall); // 🚀 Nuevo Muro Global
   adjustMainOffset();
   window.addEventListener('resize', adjustMainOffset);
   const dash = document.getElementById('dashboard');
@@ -1268,223 +1268,285 @@ async function loadFinanceReport() {
 // Inicializar reporte al cargar (opcional)
 // loadFinanceReport(); // Se puede llamar en init o al abrir pestaña reportes
 
-// --- Comunicaciones / publicaciones ---
-function attachCommunicationsHandlers(){
-  const newPostBtn = qs('#newPostBtn');
-  if (newPostBtn) newPostBtn.addEventListener('click', ()=> openPostModal());
-  const newMsgBtn = qs('#newMessageBtn');
-  if (newMsgBtn) newMsgBtn.addEventListener('click', ()=> openMessageModal());
-  const filterPub = qs('#filterPubAula');
-  if (filterPub) filterPub.addEventListener('change', ()=> filterPosts());
-}
-
-function openPostModal(){
-  const body = `
-    <div class="grid gap-3">
-      <input id="postTitle" placeholder="Título" class="border rounded px-3 py-2" />
-      <textarea id="postBody" placeholder="Descripción" class="border rounded px-3 py-2" rows="4"></textarea>
-      <label class="text-sm">Adjuntar archivo (foto/video/pdf/doc/excel)</label>
-      <input id="postFile" type="file" class="border rounded px-2 py-1" />
-      <label class="text-sm">Enviar a:</label>
-      <select id="postTarget" class="border rounded px-2 py-1">
-        <option value="all">Todos los padres</option>
-        <option value="A1">Aula A1</option>
-        <option value="A2">Aula A2</option>
-      </select>
-    </div>
-  `;
-  openModal('Crear publicación', body, [
-    {text:'Cancelar', type:'secondary'},
-    {text:'Publicar', type:'primary', onClick: ()=>{
-      // tomar datos (simulado)
-      const title = qs('#postTitle').value || 'Sin título';
-      const body = qs('#postBody').value || '';
-      const target = qs('#postTarget').value || 'all';
-      // Agregar a lista local
-      addPostToList({title, body, target, when:'Ahora'});
-      closeModal();
-    }}
-  ]);
-}
-
-function openMessageModal(){
-  const body = `
-    <div class="grid gap-3">
-      <textarea id="msgBody" placeholder="Escribe tu mensaje..." class="border rounded px-3 py-2" rows="4"></textarea>
-      <label class="text-sm">Enviar a:</label>
-      <select id="msgTarget" class="border rounded px-2 py-1">
-        <option value="all">Todos los padres</option>
-        <option value="A1">Aula A1</option>
-        <option value="A2">Aula A2</option>
-        <option value="parent1">Padre Rosa P.</option>
-        <option value="parent2">Padre Carlos R.</option>
-      </select>
-    </div>
-  `;
-  openModal('Nuevo mensaje', body, [
-    {text:'Cancelar', type:'secondary'},
-    {text:'Enviar', type:'primary', onClick: ()=>{
-      const msg = qs('#msgBody').value || '';
-      const target = qs('#msgTarget').value || 'all';
-      closeModal();
-      openModal('Enviado', `Mensaje enviado a ${target}`);
-    }}
-  ]);
-}
-
-function addPostToList(post){
-  const container = qs('#postsList');
+// --- 1️⃣ MURO GLOBAL (DIRECTORA) ---
+async function initDirectorWall() {
+  const container = document.getElementById('directorWallContainer'); // Necesitas agregar este div en tu HTML
   if (!container) return;
 
-  const title = post?.title || 'Sin título';
-  const body = post?.body || '';
-  const when = post?.when || '';
-  
-  const el = document.createElement('div');
-  el.className = 'p-3 border rounded-lg bg-white shadow-sm hover:shadow transition';
-  el.innerHTML = `
-    <div class="flex items-center justify-between"><strong class="text-slate-700">${escapeHTML(title)}</strong><span class="text-xs text-slate-500">${escapeHTML(when)}</span></div>
-    <p class="text-sm text-slate-600 mt-1">${escapeHTML(body)}</p>
-    <div class="mt-2 flex gap-2 text-xs"><button class="px-3 py-1 bg-slate-100 hover:bg-slate-200 rounded transition">Ver</button><button class="px-3 py-1 bg-purple-100 hover:bg-purple-200 text-purple-700 rounded transition">Compartir</button></div>
-  `;
-  container.prepend(el);
-}
+  container.innerHTML = '<div class="text-center p-8"><div class="animate-spin rounded-full h-8 w-8 border-b-2 border-purple-600 mx-auto"></div><p class="mt-2 text-slate-500">Cargando Muro Global...</p></div>';
 
-function filterPosts(){
-  const val = qs('#filterPubAula')?.value || 'all';
-  // Demo: no etiquetas en posts, pero aquí iría la lógica para mostrar u ocultar
-  // Para ahora, sólo mostramos un mensaje de filtro aplicado
-  console.log('Filtrando publicaciones por:', val);
-}
+  const supabase = await getSupabase();
+  if (!supabase) return;
 
-// --- Teams Comms (Chat) ---
-window.initTeamsComms = async function() {
-  const chatInput = document.getElementById('chatInput');
-  const chatSend = document.getElementById('chatSend');
-  const chatList = document.getElementById('chatList');
-  const searchInput = document.getElementById('chatSearch');
-  const roleFilter = document.getElementById('chatRoleFilter');
-  let activeChatUser = null;
+  try {
+    // Obtener posts de TODAS las aulas (la nueva policy lo permite)
+    const { data: posts, error } = await supabase
+      .from('posts')
+      .select(`
+        *, 
+        classrooms(name),
+        likes(count),
+        comments(count)
+      `)
+      .order('created_at', { ascending: false })
+      .limit(20);
 
-  // Función para scroll automático al fondo del chat
-  function scrollToBottom() {
-    const container = document.getElementById('chatMessages');
-    if (container) {
-      container.scrollTop = container.scrollHeight;
+    if (error) throw error;
+
+    if (!posts || posts.length === 0) {
+      container.innerHTML = Helpers.emptyState('No hay publicaciones recientes en ninguna aula.');
+      return;
     }
-  }
 
-  // 1. Cargar Usuarios para el Sidebar
+    container.innerHTML = posts.map(p => `
+      <div class="bg-white p-5 rounded-2xl shadow-sm border border-slate-100 mb-4 hover:shadow-md transition-shadow">
+        <div class="flex justify-between items-start mb-3">
+          <div class="flex items-center gap-3">
+             <div class="w-10 h-10 rounded-full bg-purple-100 flex items-center justify-center text-purple-600 font-bold overflow-hidden">
+                ${p.teacher_avatar ? `<img src="${p.teacher_avatar}" class="w-full h-full object-cover">` : (p.teacher_name ? p.teacher_name.charAt(0) : 'M')}
+             </div>
+             <div>
+                <div class="font-bold text-slate-800">${escapeHTML(p.teacher_name || 'Maestra')}</div>
+                <div class="text-xs text-slate-500">${new Date(p.created_at).toLocaleString()} • <span class="text-purple-600 font-bold">${p.classrooms?.name || 'Aula'}</span></div>
+             </div>
+          </div>
+        </div>
+        <div class="text-slate-700 mb-3 whitespace-pre-wrap">${escapeHTML(p.content)}</div>
+        ${p.media_url ? `<div class="rounded-xl overflow-hidden mb-3 border border-slate-100"><img src="${p.media_url}" class="w-full max-h-64 object-cover"></div>` : ''}
+        <div class="flex items-center gap-4 text-xs text-slate-500 border-t pt-3">
+           <span class="flex items-center gap-1"><i data-lucide="heart" class="w-4 h-4"></i> ${p.likes[0]?.count || 0} Likes</span>
+           <span class="flex items-center gap-1"><i data-lucide="message-circle" class="w-4 h-4"></i> ${p.comments[0]?.count || 0} Comentarios</span>
+        </div>
+      </div>
+    `).join('');
+    
+    if (window.lucide) lucide.createIcons();
+
+  } catch (err) {
+    console.error('Error cargando muro global:', err);
+    container.innerHTML = Helpers.emptyState('Error cargando publicaciones.');
+  }
+}
+
+// --- 2️⃣ CHAT PROFESIONAL UNIFICADO ---
+window.initTeamsComms = async function() {
+  const listContainer = document.getElementById('chatContactsList');
+  if (!listContainer) return;
+
+  const chatInput = document.getElementById('chatMessageInput');
+  const chatSend = document.getElementById('btnSendChatMessage');
+  const searchInput = document.getElementById('chatSearchInput');
+  const roleFilter = document.getElementById('chatRoleFilter');
+
+  // Variables de estado local para el chat (Directora no usa AppState global igual que maestra)
+  let allContacts = [];
+  let currentChatUser = null;
+  let chatChannel = null;
+
+  // 1. Cargar Usuarios
   async function loadChatUsers() {
-    if (!chatList) return;
-    chatList.innerHTML = '<div class="p-4 text-center text-slate-400 text-xs">Cargando usuarios...</div>';
+    listContainer.innerHTML = Helpers.skeleton(4);
     
     const supabase = await getSupabase();
     const { data: { user: currentUser } } = await supabase.auth.getUser();
 
+    // Obtener todos los perfiles excepto el mío
     let query = supabase.from('profiles').select('*').neq('id', currentUser.id);
     
-    if (roleFilter && roleFilter.value !== 'all') {
-      query = query.eq('role', roleFilter.value);
-    }
-    if (searchInput && searchInput.value) {
-      query = query.ilike('name', `%${searchInput.value}%`);
+    const roleVal = roleFilter?.value;
+    if (roleVal && roleVal !== 'all') {
+      query = query.eq('role', roleVal);
     }
 
     const { data: users, error } = await query.order('name');
     
     if (error) {
-      chatList.innerHTML = '<div class="p-4 text-center text-red-400 text-xs">Error cargando lista</div>';
+      listContainer.innerHTML = Helpers.emptyState('Error al cargar contactos');
       return;
     }
 
-    chatList.innerHTML = users.map(u => `
-      <div class="p-3 hover:bg-slate-50 cursor-pointer flex items-center gap-3 transition-colors border-b border-slate-50 group" onclick="window.openChat('${u.id}', '${escapeHTML(u.name)}', '${u.role}', '${u.avatar_url || ''}')">
-        <div class="w-10 h-10 rounded-full bg-slate-200 overflow-hidden flex-shrink-0 border border-slate-200 group-hover:border-purple-300 transition-colors">
-           ${u.avatar_url ? `<img src="${u.avatar_url}" class="w-full h-full object-cover">` : `<div class="w-full h-full flex items-center justify-center text-slate-500 font-bold">${u.name.charAt(0)}</div>`}
+    // Enriquecer con info de aula si son padres
+    const parentIds = users.filter(u => u.role === 'parent').map(u => u.id);
+    let studentMap = {};
+    if (parentIds.length > 0) {
+      const { data: students } = await supabase
+        .from('students')
+        .select('parent_id, name, classrooms(name)')
+        .in('parent_id', parentIds);
+      
+      students?.forEach(s => {
+        if (!studentMap[s.parent_id]) {
+          studentMap[s.parent_id] = { studentName: s.name, classroomName: s.classrooms?.name || 'Aula' };
+        }
+      });
+    }
+
+    allContacts = users.map(u => ({
+      id: u.id,
+      name: u.name,
+      avatar: u.avatar_url,
+      role: u.role === 'teacher' ? 'Maestro/a' : (u.role === 'parent' ? 'Padre/Madre' : 'Asistente'),
+      meta: u.role === 'parent' ? `Aula: ${studentMap[u.id]?.classroomName || '---'} (${studentMap[u.id]?.studentName || '---'})` : 'Personal Karpus'
+    }));
+
+    renderContacts(allContacts);
+  }
+
+  function renderContacts(contacts) {
+    const q = searchInput?.value.toLowerCase() || '';
+    const filtered = contacts.filter(c => 
+      c.name.toLowerCase().includes(q) || 
+      c.meta.toLowerCase().includes(q) ||
+      c.role.toLowerCase().includes(q)
+    );
+
+    if (filtered.length === 0) {
+      listContainer.innerHTML = Helpers.emptyState('No se encontraron contactos');
+      return;
+    }
+
+    listContainer.innerHTML = filtered.map(c => `
+      <div onclick="window.selectDirectorChat('${c.id}', '${escapeHTML(c.name)}', '${c.role}', '${c.meta}', '${c.avatar || ''}')" 
+           class="flex items-center gap-3 p-3 rounded-2xl hover:bg-white hover:shadow-sm cursor-pointer transition-all border border-transparent hover:border-slate-100 group">
+        <div class="w-11 h-11 rounded-full bg-blue-100 text-blue-600 flex items-center justify-center font-bold overflow-hidden border border-blue-50 flex-shrink-0">
+          ${c.avatar ? `<img src="${c.avatar}" class="w-full h-full object-cover">` : c.name.charAt(0)}
         </div>
-        <div class="flex-1 min-w-0">
-          <h4 class="font-bold text-slate-700 text-sm truncate group-hover:text-purple-700">${escapeHTML(u.name)}</h4>
-          <p class="text-xs text-slate-500 truncate capitalize">${u.role}</p>
+        <div class="min-w-0 flex-1">
+          <div class="font-bold text-slate-700 text-sm truncate group-hover:text-blue-600 transition-colors">${escapeHTML(c.name)}</div>
+          <div class="text-[10px] text-slate-400 font-bold uppercase truncate">${c.role}</div>
+          <div class="text-[10px] text-slate-500 truncate mt-0.5">${c.meta}</div>
         </div>
       </div>
     `).join('');
   }
 
-  // 2. Abrir Chat
-  window.openChat = async (userId, name, role, avatar) => {
-    activeChatUser = userId;
-    document.getElementById('chatUserName').textContent = name;
-    document.getElementById('chatUserMeta').textContent = role;
-    const img = document.getElementById('chatUserPhoto');
-    if (img) img.src = avatar || 'img/mundo.jpg';
+  // 2. Seleccionar Chat
+  window.selectDirectorChat = async (userId, name, role, meta, avatar) => {
+    const supabase = await getSupabase();
+    const { data: { user: currentUser } } = await supabase.auth.getUser();
+    currentChatUser = userId;
+
+    // UI Updates
+    document.getElementById('chatActiveHeader').classList.remove('hidden');
+    document.getElementById('chatInputArea').classList.remove('hidden');
+    document.getElementById('chatActiveName').textContent = name;
+    document.getElementById('chatActiveMeta').textContent = `${role} • ${meta}`;
     
-    // Cargar mensajes (Simulado por ahora, conectar a tabla 'messages' si existe)
-    const container = document.getElementById('chatMessages');
-    container.innerHTML = '<div class="text-center text-xs text-slate-400 py-4">Iniciando conversación segura...</div>';
-    
-    // Aquí iría la carga real de mensajes:
-    // const { data } = await supabase.from('messages').select('*').or(`from_id.eq.${userId},to_id.eq.${userId}`)...
-    
-    // Scroll al abrir (con pequeño delay para asegurar renderizado)
-    setTimeout(scrollToBottom, 100);
+    const avatarEl = document.getElementById('chatActiveAvatar');
+    avatarEl.innerHTML = avatar ? `<img src="${avatar}" class="w-full h-full object-cover">` : name.charAt(0);
+
+    const msgContainer = document.getElementById('chatMessagesContainer');
+    msgContainer.innerHTML = `<div class="flex-1 flex items-center justify-center"><i data-lucide="loader-2" class="w-8 h-8 animate-spin text-blue-400"></i></div>`;
+    if(window.lucide) lucide.createIcons();
+
+    // Cargar historial
+    const { data: msgs, error } = await supabase
+      .from('messages')
+      .select('*')
+      .or(`and(sender_id.eq.${currentUser.id},receiver_id.eq.${userId}),and(sender_id.eq.${userId},receiver_id.eq.${currentUser.id})`)
+      .order('created_at', { ascending: true });
+
+    msgContainer.innerHTML = '';
+    if (msgs && msgs.length > 0) {
+      msgs.forEach(m => appendMessage(m, currentUser.id));
+    } else {
+      msgContainer.innerHTML = `
+        <div class="flex-1 flex flex-col items-center justify-center text-slate-400 opacity-60">
+          <i data-lucide="sparkles" class="w-12 h-12 mb-3 text-blue-300"></i>
+          <p class="text-sm">¡Inicia la conversación con ${name}!</p>
+        </div>
+      `;
+      if(window.lucide) lucide.createIcons();
+    }
+    msgContainer.scrollTop = msgContainer.scrollHeight;
+
+    // Realtime Subscription
+    if (chatChannel) supabase.removeChannel(chatChannel);
+
+    chatChannel = supabase.channel(`chat_dir_${currentUser.id}_${userId}`)
+      .on('postgres_changes', { 
+        event: 'INSERT', 
+        schema: 'public', 
+        table: 'messages',
+        filter: `receiver_id=eq.${currentUser.id}` 
+      }, payload => {
+        if (payload.new.sender_id === userId) {
+          if (msgContainer.querySelector('.opacity-60')) msgContainer.innerHTML = '';
+          appendMessage(payload.new, currentUser.id);
+          msgContainer.scrollTop = msgContainer.scrollHeight;
+        }
+      })
+      .subscribe();
   };
 
-  // 3. Enviar Mensaje
-  if (chatSend && chatInput) {
-    chatSend.onclick = async () => {
-      const text = chatInput.value.trim();
-      if (!text || !activeChatUser) return;
-      
-      // UI Optimista
-      const container = document.getElementById('chatMessages');
-      if (container) {
-        const div = document.createElement('div');
-        div.className = 'flex justify-end mb-2 animate-fade-in';
-        div.innerHTML = `<div class="bg-purple-600 text-white p-3 rounded-l-xl rounded-tr-xl max-w-[80%] text-sm shadow-sm">${escapeHTML(text)}</div>`;
-        container.appendChild(div);
-        scrollToBottom();
-      }
-      chatInput.value = '';
+  function appendMessage(msg, myId) {
+    const container = document.getElementById('chatMessagesContainer');
+    const isMine = msg.sender_id === myId;
+    const time = new Date(msg.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
 
-      // Enviar a Supabase (Tabla messages o inquiries)
-      try {
-        const supabase = await getSupabase();
-        const { data: { user } } = await supabase.auth.getUser();
-        
-        // Asumiendo tabla 'messages' genérica o 'inquiries' para padres
-        // Para este ejemplo usamos una estructura genérica
-        /*
-        await supabase.from('messages').insert({
-          from_id: user.id,
-          to_id: activeChatUser,
-          content: text
-        });
-        */
-       
-       // Enviar Push al destinatario
-       await sendPush({
-         user_id: activeChatUser,
-         title: 'Nuevo mensaje de Dirección',
-         message: text,
-         type: 'chat'
-       });
-
-      } catch (e) {
-        console.error("Error enviando mensaje", e);
-      }
-    };
-    
-    chatInput.addEventListener('keypress', (e) => {
-      if (e.key === 'Enter') chatSend.click();
-    });
+    const div = document.createElement('div');
+    div.className = `flex ${isMine ? 'justify-end' : 'justify-start'} animate-fade-in`;
+    div.innerHTML = `
+      <div class="max-w-[85%] md:max-w-[70%] group">
+        <div class="px-4 py-2.5 rounded-2xl text-sm shadow-sm ${
+          isMine 
+            ? 'bg-blue-600 text-white rounded-tr-none' 
+            : 'bg-white border border-slate-200 text-slate-700 rounded-tl-none'
+        }">
+          <div class="whitespace-pre-wrap break-words">${escapeHTML(msg.content)}</div>
+          <div class="text-[9px] ${isMine ? 'text-blue-200' : 'text-slate-400'} mt-1 text-right font-bold uppercase tracking-tighter">
+            ${time}
+          </div>
+        </div>
+      </div>
+    `;
+    container.appendChild(div);
   }
 
-  // Listeners de filtros
-  if (searchInput) searchInput.addEventListener('input', debounce(loadChatUsers, 500));
-  if (roleFilter) roleFilter.addEventListener('change', loadChatUsers);
+  // 3. Enviar Mensaje
+  async function sendChatMessage() {
+    const text = chatInput.value.trim();
+    if (!text || !currentChatUser) return;
+    
+    const supabase = await getSupabase();
+    const { data: { user: currentUser } } = await supabase.auth.getUser();
+    
+    // UI Optimista
+    const msgContainer = document.getElementById('chatMessagesContainer');
+    if (msgContainer.querySelector('.opacity-60')) msgContainer.innerHTML = '';
+    appendMessage({ content: text, sender_id: currentUser.id, created_at: new Date().toISOString() }, currentUser.id);
+    msgContainer.scrollTop = msgContainer.scrollHeight;
+    
+    chatInput.value = '';
+    chatInput.style.height = 'auto';
 
-  // Carga inicial
+    try {
+      await supabase.from('messages').insert({
+        sender_id: currentUser.id,
+        receiver_id: currentChatUser,
+        content: text
+      });
+       
+      sendPush({
+        user_id: currentChatUser,
+        title: 'Nuevo mensaje de Dirección',
+        message: text,
+        type: 'chat'
+      });
+    } catch (e) { console.error(e); }
+  }
+
+  // Eventos
+  chatSend?.addEventListener('click', sendChatMessage);
+  chatInput?.addEventListener('keypress', (e) => {
+    if (e.key === 'Enter' && !e.shiftKey) {
+      e.preventDefault();
+      sendChatMessage();
+    }
+  });
+  searchInput?.addEventListener('input', () => renderContacts(allContacts));
+  roleFilter?.addEventListener('change', loadChatUsers);
+
   loadChatUsers();
 };
 
