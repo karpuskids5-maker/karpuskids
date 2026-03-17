@@ -189,6 +189,10 @@
           <i data-lucide="graduation-cap"></i>
           <span class="label">Maestros</span>
         </button>
+        <button data-section="muro" class="nav-btn w-full flex items-center p-3 rounded-lg text-white hover:bg-white/20 transition-colors">
+          <i data-lucide="layout"></i>
+          <span class="label">Muro Escolar</span>
+        </button>
         <button data-section="aulas" class="nav-btn w-full flex items-center p-3 rounded-lg text-white hover:bg-white/20 transition-colors">
           <i data-lucide="home"></i>
           <span class="label">Aulas</span>
@@ -544,6 +548,21 @@
               </tr>
             </tbody>
           </table>
+          </div>
+        </div>
+      </section>
+
+      <!-- MURO ESCOLAR UNIFICADO -->
+      <section id="muro" class="section hidden">
+        <header class="mb-6">
+          <h1 class="text-3xl font-black text-slate-800">Muro Escolar</h1>
+          <p class="text-slate-500 font-medium">Visualiza todas las publicaciones, reacciones y comentarios de las maestras.</p>
+        </header>
+
+        <div class="max-w-4xl mx-auto">
+          <div id="muroPostsContainer" class="space-y-6">
+            <!-- Cargado por JS -->
+            <div class="py-12 text-center text-slate-400">Cargando publicaciones...</div>
           </div>
         </div>
       </section>

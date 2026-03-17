@@ -45,7 +45,7 @@ document.addEventListener('DOMContentLoaded', ()=>{
   safeInit(initAttendanceModule); // Real attendance stats
   
   safeInit(initDirectorVideoCall); // ✅ Módulo de Videollamada
-  safeInit(initDirectorWall); // 🚀 Nuevo Muro Global
+  safeInit(initGlobalWall); // 🚀 Nuevo Muro Global Unificado
   adjustMainOffset();
   window.addEventListener('resize', adjustMainOffset);
   const dash = document.getElementById('dashboard');
@@ -926,7 +926,9 @@ window.openReviewModal = async function(paymentId) {
     if(error) throw error;
     
     const imageUrl = p.evidence_url || p.proof_url;
-    img.src = imageUrl; 
+    // 4️⃣ Fix: Validar URL segura (Supabase o Blob)
+    img.src = (imageUrl && (imageUrl.startsWith('http') || imageUrl.startsWith('blob:'))) ? imageUrl : '';
+
     document.getElementById('reviewStudentName').textContent = p.student?.name;
     document.getElementById('reviewReportedAmount').textContent = `$${p.amount}`;
     document.getElementById('reviewDate').textContent = new Date(p.created_at).toLocaleDateString();
@@ -1268,18 +1270,23 @@ async function loadFinanceReport() {
 // Inicializar reporte al cargar (opcional)
 // loadFinanceReport(); // Se puede llamar en init o al abrir pestaña reportes
 
-// --- 1️⃣ MURO GLOBAL (DIRECTORA) ---
-async function initDirectorWall() {
-  const container = document.getElementById('directorWallContainer'); // Necesitas agregar este div en tu HTML
+// --- 1️⃣ MURO GLOBAL UNIFICADO (DIRECTORA) ---
+async function initGlobalWall() {
+  const container = document.getElementById('muroPostsContainer');
   if (!container) return;
 
-  container.innerHTML = '<div class="text-center p-8"><div class="animate-spin rounded-full h-8 w-8 border-b-2 border-purple-600 mx-auto"></div><p class="mt-2 text-slate-500">Cargando Muro Global...</p></div>';
+  container.innerHTML = `
+    <div class="py-12 text-center">
+      <div class="animate-spin rounded-full h-10 w-10 border-b-2 border-orange-500 mx-auto"></div>
+      <p class="mt-4 text-slate-500 font-medium">Cargando todas las publicaciones...</p>
+    </div>
+  `;
 
   const supabase = await getSupabase();
   if (!supabase) return;
 
   try {
-    // Obtener posts de TODAS las aulas (la nueva policy lo permite)
+    // Obtener posts con información de aula, likes y comentarios
     const { data: posts, error } = await supabase
       .from('posts')
       .select(`
@@ -1288,43 +1295,77 @@ async function initDirectorWall() {
         likes(count),
         comments(count)
       `)
-      .order('created_at', { ascending: false })
-      .limit(20);
+      .order('created_at', { ascending: false });
 
     if (error) throw error;
 
     if (!posts || posts.length === 0) {
-      container.innerHTML = Helpers.emptyState('No hay publicaciones recientes en ninguna aula.');
+      container.innerHTML = `
+        <div class="py-20 text-center bg-white rounded-3xl border border-dashed border-slate-200">
+          <i data-lucide="layout" class="w-16 h-16 text-slate-200 mx-auto mb-4"></i>
+          <p class="text-slate-500 font-bold">No hay publicaciones en el muro aún.</p>
+        </div>
+      `;
+      if (window.lucide) lucide.createIcons();
       return;
     }
 
-    container.innerHTML = posts.map(p => `
-      <div class="bg-white p-5 rounded-2xl shadow-sm border border-slate-100 mb-4 hover:shadow-md transition-shadow">
-        <div class="flex justify-between items-start mb-3">
-          <div class="flex items-center gap-3">
-             <div class="w-10 h-10 rounded-full bg-purple-100 flex items-center justify-center text-purple-600 font-bold overflow-hidden">
-                ${p.teacher_avatar ? `<img src="${p.teacher_avatar}" class="w-full h-full object-cover">` : (p.teacher_name ? p.teacher_name.charAt(0) : 'M')}
-             </div>
-             <div>
-                <div class="font-bold text-slate-800">${escapeHTML(p.teacher_name || 'Maestra')}</div>
-                <div class="text-xs text-slate-500">${new Date(p.created_at).toLocaleString()} • <span class="text-purple-600 font-bold">${p.classrooms?.name || 'Aula'}</span></div>
-             </div>
+    container.innerHTML = posts.map(p => {
+      const date = new Date(p.created_at).toLocaleString('es-ES', { 
+        day: '2-digit', month: 'long', hour: '2-digit', minute: '2-digit' 
+      });
+      
+      return `
+        <div class="bg-white rounded-3xl shadow-sm border border-slate-100 overflow-hidden hover:shadow-md transition-all duration-300">
+          <div class="p-5">
+            <div class="flex justify-between items-start mb-4">
+              <div class="flex items-center gap-3">
+                <div class="w-12 h-12 rounded-2xl bg-orange-100 text-orange-600 flex items-center justify-center font-bold text-xl shadow-sm overflow-hidden border border-orange-50">
+                  ${p.teacher_avatar ? `<img src="${p.teacher_avatar}" class="w-full h-full object-cover">` : (p.teacher_name ? p.teacher_name.charAt(0) : 'M')}
+                </div>
+                <div>
+                  <div class="font-black text-slate-800 leading-tight">${escapeHTML(p.teacher_name || 'Maestra')}</div>
+                  <div class="text-[10px] font-bold uppercase tracking-wider text-slate-400 mt-0.5">
+                    ${date} • <span class="text-orange-500">${escapeHTML(p.classrooms?.name || 'Aula')}</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div class="text-slate-700 leading-relaxed mb-4 whitespace-pre-wrap">${escapeHTML(p.content)}</div>
+
+            ${p.media_url ? `
+              <div class="rounded-2xl overflow-hidden border border-slate-100 mb-4 bg-slate-50">
+                <img src="${p.media_url}" class="w-full max-h-[400px] object-contain mx-auto" loading="lazy">
+              </div>
+            ` : ''}
+
+            <div class="flex items-center gap-6 pt-4 border-t border-slate-50">
+              <div class="flex items-center gap-2 text-slate-500 font-bold text-xs">
+                <i data-lucide="heart" class="w-4 h-4 text-rose-500 fill-rose-500/10"></i>
+                <span>${p.likes[0]?.count || 0} Reacciones</span>
+              </div>
+              <div class="flex items-center gap-2 text-slate-500 font-bold text-xs">
+                <i data-lucide="message-circle" class="w-4 h-4 text-sky-500 fill-sky-500/10"></i>
+                <span>${p.comments[0]?.count || 0} Comentarios</span>
+              </div>
+            </div>
           </div>
         </div>
-        <div class="text-slate-700 mb-3 whitespace-pre-wrap">${escapeHTML(p.content)}</div>
-        ${p.media_url ? `<div class="rounded-xl overflow-hidden mb-3 border border-slate-100"><img src="${p.media_url}" class="w-full max-h-64 object-cover"></div>` : ''}
-        <div class="flex items-center gap-4 text-xs text-slate-500 border-t pt-3">
-           <span class="flex items-center gap-1"><i data-lucide="heart" class="w-4 h-4"></i> ${p.likes[0]?.count || 0} Likes</span>
-           <span class="flex items-center gap-1"><i data-lucide="message-circle" class="w-4 h-4"></i> ${p.comments[0]?.count || 0} Comentarios</span>
-        </div>
-      </div>
-    `).join('');
-    
+      `;
+    }).join('');
+
     if (window.lucide) lucide.createIcons();
 
   } catch (err) {
-    console.error('Error cargando muro global:', err);
-    container.innerHTML = Helpers.emptyState('Error cargando publicaciones.');
+    console.error('Error initGlobalWall:', err);
+    container.innerHTML = `
+      <div class="py-12 text-center bg-rose-50 text-rose-600 rounded-2xl border border-rose-100">
+        <i data-lucide="alert-circle" class="w-10 h-10 mx-auto mb-2"></i>
+        <p class="font-bold">Error al cargar el muro escolar</p>
+      </div>
+    `;
+    if (window.lucide) lucide.createIcons();
   }
 }
 
@@ -1544,6 +1585,18 @@ window.initTeamsComms = async function() {
       sendChatMessage();
     }
   });
+
+  // 2️⃣ y 3️⃣ Fix: Auto-expand textarea y Disable empty
+  if(chatInput) {
+      chatInput.addEventListener('input', () => {
+          chatInput.style.height = 'auto';
+          chatInput.style.height = (chatInput.scrollHeight) + 'px';
+          if(chatSend) chatSend.disabled = !chatInput.value.trim();
+      });
+      // Initialize state
+      if(chatSend) chatSend.disabled = !chatInput.value.trim();
+  }
+
   searchInput?.addEventListener('input', () => renderContacts(allContacts));
   roleFilter?.addEventListener('change', loadChatUsers);
 

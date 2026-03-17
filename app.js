@@ -1251,6 +1251,95 @@ document.addEventListener('DOMContentLoaded', async () => {
     // Prepopulate classrooms when opening modal
     populateStudentClassrooms();
 
+    // --- INICIO: VALIDACIONES EN TIEMPO REAL (MEJORAS PANEL DIRECTORA) ---
+    const setupRealtimeValidation = () => {
+      // 1. Validación de Nombres (Letras, espacios, puntos, comas para pickup)
+      const nameFields = ['stName', 'p1Name', 'p2Name', 'stPickup'];
+      nameFields.forEach(id => {
+        const el = document.getElementById(id);
+        if (el) {
+          el.addEventListener('input', (e) => {
+            // Permitir letras, espacios, tildes, puntos y comas
+            const clean = e.target.value.replace(/[^a-zA-ZáéíóúÁÉÍÓÚñÑ\s\.,]/g, '');
+            if (e.target.value !== clean) e.target.value = clean;
+          });
+        }
+      });
+
+      // 2. Validación de Teléfonos (Números, +, -, espacios)
+      const phoneFields = ['p1Phone', 'p2Phone'];
+      phoneFields.forEach(id => {
+        const el = document.getElementById(id);
+        if (el) {
+          el.addEventListener('input', (e) => {
+            const clean = e.target.value.replace(/[^0-9+\s\-]/g, '');
+            if (e.target.value !== clean) e.target.value = clean;
+          });
+        }
+      });
+
+      // 3. Validación de Correo (Duplicidad y Formato)
+      const emailEl = document.getElementById('p1Email');
+      if (emailEl) {
+        // Crear contenedor de feedback si no existe
+        let feedback = document.getElementById('p1EmailFeedback');
+        if (!feedback) {
+          feedback = document.createElement('p');
+          feedback.id = 'p1EmailFeedback';
+          feedback.className = 'text-xs mt-1 font-medium transition-colors h-4';
+          emailEl.parentNode.appendChild(feedback);
+        }
+
+        const checkEmail = async () => {
+          const val = emailEl.value.trim();
+          feedback.textContent = '';
+          emailEl.classList.remove('border-red-500', 'border-blue-500', 'border-green-500');
+          feedback.className = 'text-xs mt-1 font-medium transition-colors h-4';
+
+          if (!val) return;
+
+          // Validar formato
+          if (!isValidEmail(val)) {
+            feedback.textContent = '❌ Formato de correo inválido.';
+            feedback.classList.add('text-red-500');
+            emailEl.classList.add('border-red-500');
+            return;
+          }
+
+          // Validar existencia en DB (Feedback automático)
+          try {
+            const { data } = await supabase.from('profiles').select('role, name').eq('email', val).maybeSingle();
+            if (data) {
+              if (data.role === 'padre') {
+                feedback.textContent = `ℹ️ Usuario existente: ${data.name}. Se vinculará a este estudiante.`;
+                feedback.classList.add('text-blue-600');
+                emailEl.classList.add('border-blue-500');
+              } else {
+                feedback.textContent = `⛔ Correo registrado como ${data.role}. No se puede usar.`;
+                feedback.classList.add('text-red-500');
+                emailEl.classList.add('border-red-500');
+              }
+            } else {
+              feedback.textContent = '✅ Correo disponible para nuevo registro.';
+              feedback.classList.add('text-green-600');
+              emailEl.classList.add('border-green-500');
+            }
+          } catch (e) { console.error(e); }
+        };
+
+        emailEl.addEventListener('blur', checkEmail);
+        // Limpiar error al editar
+        emailEl.addEventListener('input', () => {
+           if(emailEl.classList.contains('border-red-500')) {
+             emailEl.classList.remove('border-red-500');
+             feedback.textContent = '';
+           }
+        });
+      }
+    };
+    setupRealtimeValidation();
+    // --- FIN VALIDACIONES ---
+
     // Clear error on input
     ['stName','stClassroom'].forEach(id => {
       const el = document.getElementById(id);
@@ -1286,6 +1375,13 @@ document.addEventListener('DOMContentLoaded', async () => {
       // ✅ Validación para asegurar que un nuevo estudiante siempre tenga un padre asignado
       if (!studentId && !p1Email) {
         alert('Es obligatorio asignar un padre/tutor (email) al crear un nuevo estudiante.');
+        return;
+      }
+
+      // Validar si hay error de correo visible antes de enviar
+      const emailFb = document.getElementById('p1EmailFeedback');
+      if (emailFb && emailFb.classList.contains('text-red-500')) {
+        alert('Por favor, corrija los errores en el correo electrónico antes de guardar.');
         return;
       }
 

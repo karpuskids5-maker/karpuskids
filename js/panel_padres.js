@@ -712,7 +712,7 @@ async function loadStudentData() {
           *,
           classrooms(name, level, teacher_id)
         `)
-        .eq('parent_id', AppState.get('user').id)
+        .eq('parent_id', AppState.get('user')?.id)
         .limit(1)
         .maybeSingle();
       
@@ -1652,6 +1652,7 @@ function createPostHTML(p, index = 0) {
   // Fallback a columnas planas (trigger) si el objeto teacher no está disponible
   const tName = teacherObj?.name || p.teacher_name || 'Maestra/o';
   const teacherAvatar = teacherObj?.avatar_url || p.teacher_avatar;
+  const tRole = teacherObj?.role === 'maestra' ? 'Maestra' : (teacherObj?.role || 'Docente');
   
   const postDate = new Date(p.created_at);
   const isNew = (Date.now() - postDate.getTime()) < 3600000;
@@ -1664,7 +1665,7 @@ function createPostHTML(p, index = 0) {
     });
   }
   
-  const myReaction = Array.isArray(p.likes) ? p.likes.find(l => l.user_id === AppState.get('user').id)?.reaction_type : null;
+  const myReaction = (p.likes && Array.isArray(p.likes)) ? p.likes.find(l => l.user_id === AppState.get('user')?.id)?.reaction_type : null;
   
   const commentCount = Array.isArray(p.comments) ? p.comments.length : 0;
   
@@ -1692,7 +1693,7 @@ function createPostHTML(p, index = 0) {
         }
       </div>
       <div>
-        <p class="font-bold text-slate-800">${escapeHtml(tName)}</p>
+        <p class="font-bold text-slate-800 flex items-center gap-2">${escapeHtml(tName)} <span class="text-[10px] bg-indigo-50 text-indigo-600 px-2 py-0.5 rounded-full uppercase tracking-wider">${tRole}</span></p>
         <div class="flex items-center gap-2">
           <p class="text-xs text-slate-500">${postDate.toLocaleDateString()} ${postDate.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}</p>
           ${isNew ? '<span class="bg-blue-100 text-blue-700 text-[10px] font-bold px-2 py-0.5 rounded-full animate-pulse">NUEVO</span>' : ''}
@@ -1729,7 +1730,7 @@ function createPostHTML(p, index = 0) {
 
     <div id="comments-section-${p.id}" class="hidden mt-3 pt-3 border-t border-slate-100 bg-slate-50/50 rounded-xl p-3">
       <div id="comments-list-${p.id}" class="space-y-3 mb-3 max-h-60 overflow-y-auto pr-1">
-        ${(p.comments && p.comments.length > 0) ? p.comments.map(renderComment).join('') : '<p class="text-xs text-slate-400 text-center py-2">Sé el primero en comentar</p>'}
+        ${(p.comments && p.comments.length > 0) ? p.comments.sort((a,b)=>new Date(a.created_at)-new Date(b.created_at)).map(renderComment).join('') : '<p class="text-xs text-slate-400 text-center py-2">Sé el primero en comentar</p>'}
       </div>
       <div class="flex gap-2 items-center">
         <input type="text" id="comment-input-${p.id}" class="flex-1 border rounded-xl px-3 py-2 text-sm bg-white focus:ring-2 focus:ring-blue-500 outline-none transition-all" placeholder="Escribe un comentario...">
@@ -1844,9 +1845,9 @@ async function loadClassFeed(reset = true) {
       .from(TABLES.POSTS)
       .select(`
         *, 
-        teacher:teacher_id(name, avatar_url), 
+        teacher:teacher_id(name, avatar_url, role), 
         likes(*), 
-        comments(*, user:profiles(name, avatar_url))
+        comments(*, user:profiles(name, avatar_url, role))
       `)
       .eq('classroom_id', student.classroom_id)
       .order('created_at', { ascending: false });
@@ -1880,7 +1881,8 @@ async function loadClassFeed(reset = true) {
         `;
         container.insertAdjacentHTML('beforeend', btnHtml);
         document.getElementById('btnLoadMoreFeed').onclick = () => {
-            AppState.set('feedPage', page + 1);
+            const currentPage = AppState.get('feedPage') || 0;
+            AppState.set('feedPage', currentPage + 1);
             loadClassFeed(false);
         };
     }
@@ -1928,7 +1930,8 @@ async function initFeedRealtime() {
     .on('postgres_changes', { event: 'INSERT', schema: 'public', table: TABLES.COMMENTS }, async (payload) => {
        const newComment = payload.new;
        // Ignorar si es mi propio comentario (ya agregado optimísticamente)
-       if (newComment.user_id === AppState.get('user').id) return;
+       const myId = AppState.get('user')?.id;
+       if (myId && newComment.user_id === myId) return;
 
        const postEl = document.getElementById(`post-${newComment.post_id}`);
        
@@ -1972,8 +1975,8 @@ async function initFeedRealtime() {
         const postId = payload.new?.post_id || payload.old?.post_id;
         if (!postId) return;
         
-        const myId = AppState.get('user').id;
-        if ((payload.new?.user_id === myId) || (payload.old?.user_id === myId)) return;
+        const myId = AppState.get('user')?.id;
+        if (myId && ((payload.new?.user_id === myId) || (payload.old?.user_id === myId))) return;
 
         updatePostReactionsUI(postId);
     })
@@ -1985,18 +1988,23 @@ async function initFeedRealtime() {
 function renderComment(c) {
   const currentUserId = AppState.get('user')?.id;
   // Preferir user_name guardado, fallback a relación
-  const uName = c.user_name || (Array.isArray(c.user) ? c.user[0]?.name : c.user?.name) || 'Usuario';
+  const userObj = Array.isArray(c.user) ? c.user[0] : c.user;
+  const uName = c.user_name || userObj?.name || 'Usuario';
+  const uAvatar = userObj?.avatar_url;
+  const uRole = userObj?.role === 'padre' ? 'Familia' : (userObj?.role === 'maestra' ? 'Maestra' : (userObj?.role === 'directora' ? 'Directora' : 'Usuario'));
+  
   const isMine = c.user_id === currentUserId;
   const initial = uName ? uName.charAt(0) : '?';
+  const time = new Date(c.created_at).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'});
   
   return `
     <div class="flex gap-2 text-sm mb-2">
-      <div class="w-8 h-8 rounded-full bg-slate-200 flex items-center justify-center text-xs font-bold text-slate-500 flex-shrink-0">
-        ${escapeHtml(initial)}
+      <div class="w-8 h-8 rounded-full bg-slate-200 flex items-center justify-center text-xs font-bold text-slate-500 flex-shrink-0 overflow-hidden">
+        ${uAvatar ? `<img src="${uAvatar}" class="w-full h-full object-cover">` : escapeHtml(initial)}
       </div>
       <div class="bg-white p-3 rounded-2xl rounded-tl-none shadow-sm border border-slate-100 relative group min-w-[120px]">
-        <div class="font-bold text-slate-700 text-xs mb-1 flex justify-between items-center gap-2">
-            <span>${escapeHtml(uName)}</span>
+        <div class="font-bold text-slate-700 text-xs mb-1 flex justify-between items-start gap-2">
+            <div class="flex flex-col"><span class="leading-none">${escapeHtml(uName)}</span><span class="text-[9px] text-slate-400 font-normal uppercase mt-0.5">${uRole}</span></div>
             ${isMine ? `<button onclick="deleteComment('${c.id}', '${c.post_id}')" class="text-slate-300 hover:text-red-500 transition-colors" title="Eliminar"><i data-lucide="trash-2" class="w-3 h-3"></i></button>` : ''}
         </div>
         <div class="text-slate-600 leading-snug">${escapeHtml(c.content)}</div>
@@ -2591,8 +2599,8 @@ window.selectChat = async (userId, name, role, avatar) => {
   const oldChannel = AppState.get('chatChannel');
   if(oldChannel) await supabase.removeChannel(oldChannel);
 
-  // 9️⃣ Mejor solución: Filtrar por mi ID para escala
-  const channel = supabase.channel('chat_room_' + myId)
+  // Escuchar mensajes entrantes para mí de forma global
+  const channel = supabase.channel('chat_realtime_' + myId)
     .on('postgres_changes', { 
         event: 'INSERT', 
         schema: 'public', 
@@ -2600,9 +2608,13 @@ window.selectChat = async (userId, name, role, avatar) => {
         filter: `receiver_id=eq.${myId}` 
     }, payload => {
        const m = payload.new;
+       // Solo añadir si el mensaje es del contacto actualmente seleccionado
        if (m.sender_id === userId) {
           renderMessage(m);
           if(container) container.scrollTop = container.scrollHeight;
+       } else {
+          // Si es de otro contacto, mostrar notificación
+          Helpers.toast(`Nuevo mensaje de un contacto`, 'info');
        }
     })
     .subscribe();
@@ -2651,7 +2663,7 @@ window.sendChatMessage = async () => {
 
 function renderMessage(msg) {
   const container = document.getElementById("chatMessages");
-  const isMine = msg.sender_id === AppState.get('user').id;
+  const isMine = msg.sender_id === AppState.get('user')?.id;
   const time = new Date(msg.created_at).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'});
 
   const bubble = document.createElement("div");
@@ -2735,7 +2747,7 @@ async function saveAllProfile() {
     // ✅ Mejora: También actualizar el nombre en el perfil del usuario para el saludo
     const newName = updates.p1_name || updates.p2_name || updates.name;
     if (newName) {
-      await supabase.from(TABLES.PROFILES).update({ name: newName }).eq('id', AppState.get('user').id);
+      await supabase.from(TABLES.PROFILES).update({ name: newName }).eq('id', AppState.get('user')?.id);
       
       // Actualizar estado local del perfil
       const profile = AppState.get('profile');

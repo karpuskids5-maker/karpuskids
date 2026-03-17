@@ -55,6 +55,9 @@ const AppState = {
   profile: null,
   currentClass: null,
   currentTab: 'feed',
+  currentChatUser: null,
+  chatChannel: null,
+  allChatContacts: [], 
   
   dailySummary: {
     present: 0,
@@ -204,6 +207,22 @@ const UI = {
         window.location.href = 'login.html';
     });
 
+    // Chat Events
+    document.getElementById('chatSearchInput')?.addEventListener('input', (e) => {
+        this.filterChatContacts(e.target.value);
+    });
+
+    document.getElementById('btnSendChatMessage')?.addEventListener('click', () => {
+        this.sendChatMessage();
+    });
+
+    document.getElementById('chatMessageInput')?.addEventListener('keypress', (e) => {
+        if (e.key === 'Enter' && !e.shiftKey) {
+            e.preventDefault();
+            this.sendChatMessage();
+        }
+    });
+
     // Class Tabs
     document.querySelectorAll('.class-tab-btn').forEach(btn => {
       btn.addEventListener('click', () => {
@@ -318,6 +337,9 @@ const UI = {
         target.classList.add('active');
         window.scrollTo({ top: 0, behavior: 'smooth' });
         
+        if (id === 't-chat') {
+            this.initChatModule();
+        }
         if (id === 't-profile') {
             this.renderProfile();
         }
@@ -377,13 +399,12 @@ const UI = {
     // Enrich classes with counts
     const enrichedClasses = await Promise.all(classes.map(async (cls) => {
         try {
-            const { count: tasksCount, error: tErr } = await supabase.from('tasks').select('*', { count: 'exact', head: true }).eq('classroom_id', cls.id);
-            const { count: studentsCount, error: sErr } = await supabase.from('students').select('*', { count: 'exact', head: true }).eq('classroom_id', cls.id);
-            if(tErr) console.error('Error counting tasks:', tErr);
-            if(sErr) console.error('Error counting students:', sErr);
-            return { ...cls, tasksCount: tasksCount || 0, studentsCount: studentsCount || 0 };
+            const [tRes, sRes] = await Promise.all([
+                supabase.from('tasks').select('*', { count: 'exact', head: true }).eq('classroom_id', cls.id),
+                supabase.from('students').select('*', { count: 'exact', head: true }).eq('classroom_id', cls.id)
+            ]);
+            return { ...cls, tasksCount: tRes.count || 0, studentsCount: sRes.count || 0 };
         } catch (e) {
-            console.error('Error enriching class stats:', e);
             return { ...cls, tasksCount: 0, studentsCount: 0 };
         }
     }));
@@ -558,7 +579,12 @@ const UI = {
     
     if(window.lucide) lucide.createIcons();
 
+    // Ensure inputs are ready
     this.setupPostInputEvents();
+
+    // Limpiar contenedor antes de cargar
+    const container = document.getElementById('feedPostsContainer');
+    container.innerHTML = Helpers.skeleton(2);
 
     // Listener delegado en bindEvents
 
@@ -569,21 +595,26 @@ const UI = {
       .order('created_at', { ascending: false });
 
     if(error || !posts || posts.length === 0) {
-        document.getElementById('feedPostsContainer').innerHTML = Helpers.emptyState('No hay publicaciones aún.', 'message-square');
+        container.innerHTML = Helpers.emptyState('No hay publicaciones aún.', 'message-square');
         return;
     }
 
-    // 1. Optimización: Cargar Reacciones en Batch (Item 6 y 1)
-    const postIds = posts.map(p => p.id);
-    const { data: allLikes } = await supabase
-        .from('likes')
-        .select('post_id, reaction_type, user_id')
-        .in('post_id', postIds);
+    // 1. Optimización: Cargar Reacciones en Batch
+    const postIds = posts.map(p => p.id).filter(id => id !== undefined && id !== null);
+    
+    let allLikes = [];
+    if (postIds.length > 0) {
+        const { data, error: likesError } = await supabase
+            .from('likes')
+            .select('post_id,reaction_type,user_id')
+            .in('post_id', postIds);
+        
+        if(likesError) console.error("Error loading likes:", likesError);
+        else allLikes = data || [];
+    }
 
     const postsHTML = await Promise.all(posts.map(async p => {
-        const safeMedia = p.media_url ? encodeURI(p.media_url) : '';
-        
-        // Filtrar likes del batch en memoria
+        // Filter likes from batch in memory
         const likes = (allLikes || []).filter(l => l.post_id === p.id);
         const reactionCounts = likes.reduce((acc, l) => {
             const type = l.reaction_type || 'like';
@@ -597,40 +628,57 @@ const UI = {
         // Cargar conteo de comentarios (aún individual por limitación de API simple, pero optimizado con head:true)
         const { count: commentCount } = await supabase.from('comments').select('*', { count: 'exact', head: true }).eq('post_id', p.id);
 
-        return `
+        return this.getPostHTML(p, myReaction, reactionCounts, commentCount || 0);
+    }));
+    
+    container.innerHTML = postsHTML.join('');
+  },
+
+  getPostHTML(p, myReaction, reactionCounts, commentCount) {
+      const safeMedia = p.media_url ? encodeURI(p.media_url) : '';
+      const teacherName = p.profiles?.name || p.teacher_name || 'Maestra'; 
+      const initial = teacherName.charAt(0);
+
+      return `
         <div class="bg-white p-5 rounded-2xl border shadow-sm mb-4 animate-fade-in" id="post-${p.id}">
             <div class="flex items-center gap-3 mb-3">
                 <div class="w-10 h-10 bg-green-100 rounded-full flex items-center justify-center text-green-700 font-bold shadow-sm">
-                    ${Helpers.escapeHTML(p.profiles?.name?.charAt(0) || 'M')}
+                    ${Helpers.escapeHTML(initial)}
                 </div>
                 <div>
-                    <div class="font-bold text-sm text-slate-800">${Helpers.escapeHTML(p.profiles?.name || 'Maestra')}</div>
+                    <div class="font-bold text-sm text-slate-800">${Helpers.escapeHTML(teacherName)}</div>
                     <div class="text-xs text-slate-500">${Helpers.formatDate(p.created_at)}</div>
                 </div>
             </div>
             <p class="text-slate-700 text-sm mb-3 whitespace-pre-line">${Helpers.escapeHTML(p.content || '')}</p>
             ${p.media_type === 'image' ? `
                 <div class="rounded-xl overflow-hidden border border-slate-100 mt-2">
-                    <img src="${safeMedia}" alt="Imagen adjunta" class="w-full h-auto max-h-96 object-cover bg-slate-50" loading="lazy">
+                    <img src="${safeMedia}" alt="Imagen adjunta" class="w-full h-auto max-h-96 object-cover bg-slate-50" onclick="window.open('${safeMedia}', '_blank')">
                 </div>
             ` : p.media_type === 'video' ? `
                 <div class="rounded-xl overflow-hidden border border-slate-100 mt-2">
                     <video src="${safeMedia}" controls class="w-full h-auto max-h-96 bg-black"></video>
+                </div>
+            ` : p.media_url ? `
+                <div class="mt-2">
+                    <a href="${safeMedia}" target="_blank" rel="noopener noreferrer" class="flex items-center gap-2 p-3 bg-slate-50 rounded-xl border border-slate-200 text-blue-600 hover:bg-blue-50 transition-colors">
+                        <i data-lucide="file-text" class="w-5 h-5"></i> <span>Ver archivo adjunto</span>
+                    </a>
                 </div>
             ` : ''}
 
             <!-- Resumen de Reacciones -->
             <div class="flex gap-4 text-xs text-slate-400 mb-2 mt-4 px-1" id="reaction-summary-${p.id}">
                 ${this.renderReactionSummary(reactionCounts)}
-                <span class="flex items-center gap-1">💬 <span id="comment-count-${p.id}">${commentCount || 0}</span></span>
+                <span class="flex items-center gap-1">💬 <span id="comment-count-${p.id}">${commentCount}</span></span>
             </div>
 
             <!-- Botones de Acción -->
             <div class="flex items-center gap-4 pt-2 border-t border-slate-50">
                 <div class="flex gap-1 bg-slate-50 rounded-full p-1" id="reaction-buttons-${p.id}">
-                    <button onclick="UI.toggleReaction('${p.id}', 'like')" class="p-2 rounded-full hover:bg-white hover:shadow-sm transition-all ${myReaction === 'like' ? 'bg-blue-100 ring-2 ring-blue-200' : ''}" title="Me gusta">👍</button>
-                    <button onclick="UI.toggleReaction('${p.id}', 'love')" class="p-2 rounded-full hover:bg-white hover:shadow-sm transition-all ${myReaction === 'love' ? 'bg-pink-100 ring-2 ring-pink-200' : ''}" title="Me encanta">❤️</button>
-                    <button onclick="UI.toggleReaction('${p.id}', 'haha')" class="p-2 rounded-full hover:bg-white hover:shadow-sm transition-all ${myReaction === 'haha' ? 'bg-yellow-100 ring-2 ring-yellow-200' : ''}" title="Me divierte">😂</button>
+                    <button onclick="UI.toggleReaction('${p.id}', 'like')" class="reaction-btn p-2 rounded-full hover:bg-white hover:shadow-sm transition-all ${myReaction === 'like' ? 'bg-blue-100 ring-2 ring-blue-200' : ''}" data-type="like" title="Me gusta">👍</button>
+                    <button onclick="UI.toggleReaction('${p.id}', 'love')" class="reaction-btn p-2 rounded-full hover:bg-white hover:shadow-sm transition-all ${myReaction === 'love' ? 'bg-pink-100 ring-2 ring-pink-200' : ''}" data-type="love" title="Me encanta">❤️</button>
+                    <button onclick="UI.toggleReaction('${p.id}', 'haha')" class="reaction-btn p-2 rounded-full hover:bg-white hover:shadow-sm transition-all ${myReaction === 'haha' ? 'bg-yellow-100 ring-2 ring-yellow-200' : ''}" data-type="haha" title="Me divierte">😂</button>
                 </div>
 
                 <button class="flex items-center gap-2 text-slate-500 hover:text-blue-500 hover:bg-blue-50 transition-colors text-sm py-2 px-3 rounded-lg ml-auto" onclick="UI.toggleCommentSection('${p.id}')">
@@ -648,10 +696,33 @@ const UI = {
                 </div>
             </div>
         </div>
-        `;
-    }));
+      `;
+  },
+
+  handleFileSelect(e) {
+    const file = e.target.files[0];
+    const previewContainer = document.getElementById('previewContainer');
+    const imgPreview = document.getElementById('imgPreview');
     
-    document.getElementById('feedPostsContainer').innerHTML = postsHTML.join('');
+    if (!file) return;
+
+    if (previewContainer) previewContainer.classList.remove('hidden');
+
+    if (file.type.startsWith('image/')) {
+        const reader = new FileReader();
+        reader.onload = (evt) => {
+            if(imgPreview) {
+                imgPreview.src = evt.target.result;
+                imgPreview.style.display = 'block';
+            }
+        };
+        reader.readAsDataURL(file);
+    } else {
+        if(imgPreview) {
+            imgPreview.style.display = 'none';
+            imgPreview.src = '';
+        }
+    }
   },
 
   setupPostInputEvents() {
@@ -661,17 +732,7 @@ const UI = {
     const btnRemoveImg = document.getElementById('btnRemoveImg');
 
     if(fileInput) {
-        fileInput.addEventListener('change', (e) => {
-            const file = e.target.files[0];
-            if (file) {
-                const reader = new FileReader();
-                reader.onload = (evt) => {
-                    imgPreview.src = evt.target.result;
-                    previewContainer.classList.remove('hidden');
-                };
-                reader.readAsDataURL(file);
-            }
-        });
+        fileInput.onchange = (e) => this.handleFileSelect(e);
     }
 
     if(btnRemoveImg) {
@@ -679,6 +740,7 @@ const UI = {
             fileInput.value = '';
             previewContainer.classList.add('hidden');
             imgPreview.src = '';
+            imgPreview.style.display = 'block';
         });
     }
   },
@@ -707,7 +769,13 @@ const UI = {
         return;
     }
 
-    // ✔ Limitar tamaño de archivos
+    // Validate MIME type
+    const allowedTypes = ['image/', 'video/', 'application/pdf'];
+    if(file && !allowedTypes.some(t => file.type.startsWith(t))){
+        Helpers.toast("Tipo de archivo no permitido","error");
+        return;
+    }
+
     if (file && file.size > 10 * 1024 * 1024) {
        Helpers.toast('Archivo máximo 10MB', 'error');
        return;
@@ -724,7 +792,8 @@ const UI = {
 
         // 1. Subir imagen si existe
         if (file) {
-            const fileExt = file.name.split('.').pop();
+            // Safe extension
+            const fileExt = file.name.includes('.') ? file.name.split('.').pop() : 'jpg';
             // Ruta: classroom_id / timestamp_random.ext
             const fileName = `${AppState.currentClass.id}/${Date.now()}_${Math.random().toString(36).substring(7)}.${fileExt}`;
             
@@ -743,13 +812,13 @@ const UI = {
         }
 
         // 2. Insertar Post
-        const { error } = await supabase.from('posts').insert({
+        const { data: newPost, error } = await supabase.from('posts').insert({
             classroom_id: AppState.currentClass.id,
             teacher_id: AppState.user.id,
             content: content,
             media_url: mediaUrl,
             media_type: mediaType
-        });
+        }).select('*, profiles:teacher_id(name)').single();
 
         if(error) throw error;
 
@@ -770,7 +839,7 @@ const UI = {
         
         if (window.lucide) lucide.createIcons();
 
-        this.renderFeed(); // Recargar feed
+        this.prependPost(newPost);
 
     } catch (error) {
         console.error('Error creando post:', error);
@@ -781,6 +850,18 @@ const UI = {
         btnSubmit.innerHTML = `<span>Publicar</span><i data-lucide="send" class="w-4 h-4"></i>`;
         if(window.lucide) lucide.createIcons();
     }
+  },
+
+  prependPost(post) {
+      const container = document.getElementById('feedPostsContainer');
+      if (!container) return;
+      
+      // Remove empty state if present
+      if (container.querySelector('[role="status"]')) container.innerHTML = '';
+
+      const html = this.getPostHTML(post, null, {}, 0);
+      container.insertAdjacentHTML('afterbegin', html);
+      if(window.lucide) lucide.createIcons();
   },
 
   // ✅ FUNCIONES PARA EL MURO (REACCIONES Y COMENTARIOS)
@@ -816,8 +897,45 @@ const UI = {
                 reaction_type: type
             });
         }
-        this.renderFeed(); // Recargar para ver cambios
+        this.updatePostReactions(postId);
     } catch (e) { console.error(e); }
+  },
+
+  async updatePostReactions(postId) {
+      const { data: likes } = await supabase.from('likes').select('reaction_type, user_id').eq('post_id', postId);
+      const counts = (likes || []).reduce((acc, l) => {
+          acc[l.reaction_type] = (acc[l.reaction_type] || 0) + 1;
+          return acc;
+      }, {});
+      
+      const myReaction = (likes || []).find(l => l.user_id === AppState.user.id)?.reaction_type;
+      
+      // Update Summary
+      const summaryEl = document.getElementById(`reaction-summary-${postId}`);
+      const countEl = document.getElementById(`comment-count-${postId}`);
+      const commentCount = countEl ? countEl.textContent : '0';
+      
+      if(summaryEl) {
+          summaryEl.innerHTML = `
+            ${this.renderReactionSummary(counts)}
+            <span class="flex items-center gap-1">💬 <span id="comment-count-${postId}">${commentCount}</span></span>
+          `;
+      }
+      
+      // Update Buttons
+      const btnContainer = document.getElementById(`reaction-buttons-${postId}`);
+      if(btnContainer) {
+          const types = ['like', 'love', 'haha'];
+          const emojis = { like: '👍', love: '❤️', haha: '😂' };
+          const titles = { like: 'Me gusta', love: 'Me encanta', haha: 'Me divierte' };
+          
+          btnContainer.innerHTML = types.map(t => {
+              const activeClass = myReaction === t 
+                ? (t === 'like' ? 'bg-blue-100 ring-2 ring-blue-200' : (t === 'love' ? 'bg-pink-100 ring-2 ring-pink-200' : 'bg-yellow-100 ring-2 ring-yellow-200'))
+                : '';
+              return `<button onclick="UI.toggleReaction('${postId}', '${t}')" class="reaction-btn p-2 rounded-full hover:bg-white hover:shadow-sm transition-all ${activeClass}" data-type="${t}" title="${titles[t]}">${emojis[t]}</button>`;
+          }).join('');
+      }
   },
 
   async toggleCommentSection(postId) {
@@ -833,14 +951,16 @@ const UI = {
 
         const { data: comments } = await supabase
             .from('comments')
-            .select('*, profiles:user_id(name)')
+            .select('*, profiles:user_id(name, avatar_url)')
             .eq('post_id', postId)
             .order('created_at', { ascending: true });
 
         list.innerHTML = (comments || []).map(c => `
             <div class="flex gap-2 text-sm">
-                <div class="w-8 h-8 rounded-full bg-slate-200 flex items-center justify-center text-xs font-bold text-slate-500 flex-shrink-0">
-                    ${(c.profiles?.name || 'U').charAt(0)}
+                <div class="w-8 h-8 rounded-full bg-slate-200 flex items-center justify-center text-xs font-bold text-slate-500 flex-shrink-0 overflow-hidden">
+                    ${c.profiles?.avatar_url 
+                        ? `<img src="${encodeURI(c.profiles.avatar_url)}" class="w-full h-full object-cover">` 
+                        : (c.profiles?.name || 'U').charAt(0)}
                 </div>
                 <div class="bg-white p-3 rounded-2xl rounded-tl-none shadow-sm border border-slate-100 flex-1">
                     <div class="font-bold text-slate-700 text-xs mb-1">${Helpers.escapeHTML(c.profiles?.name || 'Usuario')}</div>
@@ -865,15 +985,16 @@ const UI = {
         const { error } = await supabase.from('comments').insert({
             post_id: postId,
             user_id: AppState.user.id,
-            content: content
+            content: Helpers.escapeHTML(content)
         });
         if (error) throw error;
         input.value = '';
         
-        // Item 3: Recargar comentarios correctamente
         const section = document.getElementById(`comments-section-${postId}`);
-        if (!section.classList.contains('hidden')) await this.toggleCommentSection(postId); // Cerrar
-        await this.toggleCommentSection(postId); // Abrir (fetch fresco)
+        if (section && !section.classList.contains('hidden')) {
+            await this.toggleCommentSection(postId); // Cerrar
+            await this.toggleCommentSection(postId); // Abrir (fetch fresco)
+        }
 
         // Actualizar contador
         const countEl = document.getElementById(`comment-count-${postId}`);
@@ -915,7 +1036,7 @@ const UI = {
           <div class="student-card-pastel ${pastelColors[index % pastelColors.length]}">
             <div class="student-card-avatar overflow-hidden flex items-center justify-center">
                ${s.avatar_url 
-                 ? `<img src="${s.avatar_url}" class="w-full h-full object-cover" alt="${s.name}">` 
+                 ? `<img src="${encodeURI(s.avatar_url)}" class="w-full h-full object-cover" alt="${s.name}">`
                  : Helpers.escapeHTML((s.name || '?').charAt(0))}
             </div>
             <h4 class="student-card-name">${Helpers.escapeHTML(s.name || 'Sin nombre')}</h4>
@@ -1034,7 +1155,7 @@ const UI = {
   },
 
   async saveRoutineNotes(textarea) {
-      if(!AppState.currentClass?.id) return; // Item 4: Validación de clase
+      if(!AppState.currentClass?.id) return;
       const studentId = textarea.dataset.student;
       const val = textarea.value.trim();
       const today = new Date();
@@ -1070,7 +1191,7 @@ const UI = {
       const container = btn.parentElement;
       if(!container) return;
       
-      const oldClasses = btn.className; // Item 5: Guardar estado previo
+      const oldClasses = btn.className;
       const siblings = container.querySelectorAll('.routine-toggle');
       siblings.forEach(b => b.className = 'routine-toggle px-2 py-1 rounded-lg border text-xs flex items-center gap-1 transition-all bg-white border-slate-200 text-slate-600 hover:bg-slate-50');
       btn.className = 'routine-toggle px-2 py-1 rounded-lg border text-xs flex items-center gap-1 transition-all bg-blue-100 border-blue-300 text-blue-700 font-bold ring-1 ring-blue-300';
@@ -1090,7 +1211,7 @@ const UI = {
       if(error) {
           console.error(error);
           Helpers.toast('Error al guardar', 'error');
-          btn.className = oldClasses; // Item 5: Restaurar en error
+          btn.className = oldClasses;
       }
   },
 
@@ -1105,7 +1226,6 @@ const UI = {
     
     tab.innerHTML = Helpers.skeleton(3);
 
-    // 2️⃣ Manejo de error en carga de estudiantes
     const { data: students, error } = await supabase
       .from('students')
       .select('*')
@@ -1269,7 +1389,6 @@ const UI = {
       const date = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
       
       rows.forEach(r => {
-          // 1️⃣ Fix crítico: Asegurar tipo string/valido para ID
           const studentId = r.dataset.id ? String(r.dataset.id) : null;
           const status = r.dataset.status;
           if(studentId && status && status !== 'pending') {
@@ -1446,7 +1565,6 @@ const UI = {
       .eq('classroom_id', AppState.currentClass.id)
       .order('created_at', { ascending: false });
 
-    // 4️⃣ Error silencioso cuando no existe tasks -> Fix: Separar errores de estado vacío
     if(error) {
       console.error(error);
       container.innerHTML = `<div class="col-span-full">${Helpers.emptyState('Error cargando tareas', 'alert-circle')}</div>`;
@@ -1471,7 +1589,6 @@ const UI = {
           <button class="bg-orange-50 text-orange-600 px-4 py-2 rounded-lg font-bold text-sm hover:bg-orange-100 transition flex items-center gap-2" onclick="UI.openTaskDetail('${t.id}')">
             <i data-lucide="eye" class="w-4 h-4"></i> Ver Entregas
           </button>
-          <!-- 7️⃣ Seguridad: noopener noreferrer -->
           ${t.file_url ? `<a href="${t.file_url}" target="_blank" rel="noopener noreferrer" class="text-slate-400 hover:text-blue-500" title="Ver adjunto"><i data-lucide="paperclip" class="w-5 h-5"></i></a>` : ''}
         </div>
       </div>
@@ -1498,7 +1615,6 @@ const UI = {
       return;
     }
 
-    // 5️⃣ Límite de tamaño de archivo (10MB)
     if (file && file.size > 10 * 1024 * 1024) {
       Helpers.toast('Archivo demasiado grande (máx 10MB)', 'error');
       return;
@@ -1587,7 +1703,6 @@ const UI = {
     const { data: task, error } = await supabase.from('tasks').select('*').eq('id', taskId).single();
     if(error || !task){ Helpers.toast('Error cargando tarea','error'); return; }
     
-    // 9️⃣ Optimización: Consultas en paralelo
     const [{ data: students }, { data: evidences }] = await Promise.all([
         supabase.from('students').select('id, name').eq('classroom_id', AppState.currentClass.id).order('name'),
         supabase.from('task_evidences').select('*').eq('task_id', taskId)
@@ -1670,7 +1785,6 @@ const UI = {
   },
 
   async gradeTask(evidenceId, grade, btn) {
-    // 8️⃣ Robustez: Usar closest en lugar de parentElement
     const parent = btn.closest('.grade-container');
     if(!parent) return;
     
@@ -1842,7 +1956,7 @@ const UI = {
           student_id: studentId,
           classroom_id: AppState.currentClass.id,
           severity,
-          description: Helpers.escapeHTML(desc), // 15️⃣ Fix: Sanitizar
+          description: Helpers.escapeHTML(desc),
           reported_at: new Date().toISOString(),
           teacher_id: AppState.user.id
       }).select('*, student:students(name, p1_email, p1_name)').single();
@@ -1893,6 +2007,282 @@ const UI = {
       }
   },
 
+  // --- 💬 CHAT UNIFICADO LOGIC ---
+  async initChatModule() {
+    // Asegurar que el scroll del chat funcione bien en móviles
+    const chatContainer = document.getElementById('chatMessagesContainer');
+    if (chatContainer) {
+      chatContainer.classList.add('overscroll-contain');
+    }
+
+    const listContainer = document.getElementById('chatContactsList');
+    if (!listContainer) return;
+
+    listContainer.innerHTML = Helpers.skeleton(4);
+
+    try {
+      // 1. Obtener mis aulas
+      const { data: classrooms } = await supabase
+        .from('classrooms')
+        .select('id, name')
+        .eq('teacher_id', AppState.user.id);
+
+      if (!classrooms || classrooms.length === 0) {
+        listContainer.innerHTML = Helpers.emptyState('No tienes aulas asignadas para chatear.');
+        return;
+      }
+
+      const classroomIds = classrooms.map(c => c.id);
+
+      // 2. Obtener padres de esas aulas
+      const { data: students, error } = await supabase
+        .from('students')
+        .select('parent_id, name, classrooms(name)')
+        .in('classroom_id', classroomIds)
+        .not('parent_id', 'is', null);
+
+      if (error) throw error;
+
+      // 3. Obtener perfiles de esos padres
+      const parentIds = [...new Set(students.map(s => s.parent_id))];
+      const { data: parents } = await supabase
+        .from('profiles')
+        .select('id, name, avatar_url')
+        .in('id', parentIds);
+
+      // 4. Agregar a la Directora
+      const { data: directors } = await supabase
+        .from('profiles')
+        .select('id, name, avatar_url')
+        .eq('role', 'directora');
+
+      // 5. Mapear contactos
+      const contacts = [];
+      
+      // Agregar Directora primero
+      if (directors) {
+        directors.forEach(d => {
+          contacts.push({
+            id: d.id,
+            name: d.name,
+            avatar: d.avatar_url,
+            role: 'Dirección',
+            meta: 'Administración Global'
+          });
+        });
+      }
+
+      // Mapear padres con su información de aula
+      const parentMap = {};
+      students.forEach(s => {
+        if (!parentMap[s.parent_id]) {
+          parentMap[s.parent_id] = {
+            id: s.parent_id,
+            studentName: s.name,
+            classroomName: s.classrooms?.name || 'Aula'
+          };
+        }
+      });
+
+      parents?.forEach(p => {
+        const info = parentMap[p.id];
+        contacts.push({
+          id: p.id,
+          name: p.name,
+          avatar: p.avatar_url,
+          role: 'Padre/Madre',
+          meta: `Aula: ${info.classroomName} (${info.studentName})`
+        });
+      });
+
+      AppState.allChatContacts = contacts;
+      this.renderChatContacts(contacts);
+
+    } catch (err) {
+      console.error('Error initChatModule:', err);
+      listContainer.innerHTML = Helpers.emptyState('Error al cargar contactos');
+    }
+  },
+
+  renderChatContacts(contacts) {
+    const listContainer = document.getElementById('chatContactsList');
+    if (!listContainer) return;
+
+    if (!contacts.length) {
+      listContainer.innerHTML = Helpers.emptyState('No se encontraron contactos');
+      return;
+    }
+
+    listContainer.innerHTML = contacts.map(c => `
+      <div onclick="UI.selectChat('${c.id}', '${Helpers.escapeHTML(c.name)}', '${c.role}', '${c.meta}', '${c.avatar || ''}')" 
+           class="flex items-center gap-3 p-3 rounded-2xl hover:bg-white hover:shadow-sm cursor-pointer transition-all border border-transparent hover:border-slate-100 group">
+        <div class="w-11 h-11 rounded-full bg-orange-100 text-orange-600 flex items-center justify-center font-bold overflow-hidden border border-orange-50 flex-shrink-0">
+          ${c.avatar ? `<img src="${c.avatar}" class="w-full h-full object-cover">` : c.name.charAt(0)}
+        </div>
+        <div class="min-w-0 flex-1">
+          <div class="font-bold text-slate-700 text-sm truncate group-hover:text-orange-600 transition-colors">${Helpers.escapeHTML(c.name)}</div>
+          <div class="text-[10px] text-slate-400 font-bold uppercase truncate">${c.role}</div>
+          <div class="text-[10px] text-slate-500 truncate mt-0.5">${c.meta}</div>
+        </div>
+      </div>
+    `).join('');
+  },
+
+  filterChatContacts(query) {
+    const q = query.toLowerCase();
+    const filtered = AppState.allChatContacts.filter(c => 
+      c.name.toLowerCase().includes(q) || 
+      c.meta.toLowerCase().includes(q) ||
+      c.role.toLowerCase().includes(q)
+    );
+    this.renderChatContacts(filtered);
+  },
+
+  async selectChat(userId, name, role, meta, avatar) {
+    const myId = AppState.user.id;
+    AppState.currentChatUser = userId;
+
+    // UI Updates
+    document.getElementById('chatActiveHeader').classList.remove('hidden');
+    document.getElementById('chatInputArea').classList.remove('hidden');
+    document.getElementById('chatActiveName').textContent = name;
+    document.getElementById('chatActiveMeta').textContent = `${role} • ${meta}`;
+    
+    const avatarEl = document.getElementById('chatActiveAvatar');
+    avatarEl.innerHTML = avatar ? `<img src="${avatar}" class="w-full h-full object-cover">` : name.charAt(0);
+
+    const msgContainer = document.getElementById('chatMessagesContainer');
+    msgContainer.innerHTML = `<div class="flex-1 flex items-center justify-center"><i data-lucide="loader-2" class="w-8 h-8 animate-spin text-orange-400"></i></div>`;
+    if(window.lucide) lucide.createIcons();
+
+    // 1. Cargar historial
+    const { data: msgs, error } = await supabase
+      .from('messages')
+      .select('*')
+      .or(`and(sender_id.eq.${myId},receiver_id.eq.${userId}),and(sender_id.eq.${userId},receiver_id.eq.${myId})`)
+      .order('created_at', { ascending: true });
+
+    if (error) {
+      msgContainer.innerHTML = Helpers.emptyState('Error al cargar mensajes');
+      return;
+    }
+
+    msgContainer.innerHTML = '';
+    if (msgs && msgs.length > 0) {
+      msgs.forEach(m => this.appendChatMessage(m));
+    } else {
+      msgContainer.innerHTML = `
+        <div class="flex-1 flex flex-col items-center justify-center text-slate-400 opacity-60">
+          <i data-lucide="sparkles" class="w-12 h-12 mb-3 text-orange-300"></i>
+          <p class="text-sm">¡Comienza una nueva conversación!</p>
+        </div>
+      `;
+      if(window.lucide) lucide.createIcons();
+    }
+    this.scrollChatToBottom();
+
+    // 2. Realtime Subscription
+    if (AppState.chatChannel) {
+      supabase.removeChannel(AppState.chatChannel);
+    }
+
+    // Escuchar mensajes entrantes para mí
+    const channel = supabase.channel(`chat_realtime_${myId}`)
+      .on('postgres_changes', { 
+        event: 'INSERT', 
+        schema: 'public', 
+        table: 'messages',
+        filter: `receiver_id=eq.${myId}` 
+      }, payload => {
+        const m = payload.new;
+        // Solo añadir si el mensaje es del contacto actualmente seleccionado
+        if (m.sender_id === userId) {
+          if (msgContainer.querySelector('.opacity-60')) msgContainer.innerHTML = '';
+          this.appendChatMessage(m);
+          this.scrollChatToBottom();
+        } else {
+          // Si es de otro contacto, podríamos mostrar una notificación o badge
+          Helpers.toast(`Nuevo mensaje de un contacto`, 'info');
+        }
+      })
+      .subscribe();
+
+    AppState.chatChannel = channel;
+  },
+
+  async sendChatMessage() {
+    const input = document.getElementById('chatMessageInput');
+    const content = input.value.trim();
+    const receiverId = AppState.currentChatUser;
+    const myId = AppState.user.id;
+
+    if (!content || !receiverId) return;
+
+    // UI Optimista
+    const msgContainer = document.getElementById('chatMessagesContainer');
+    if (msgContainer.querySelector('.opacity-60')) msgContainer.innerHTML = '';
+    
+    const tempMsg = {
+      sender_id: myId,
+      content: content,
+      created_at: new Date().toISOString()
+    };
+    this.appendChatMessage(tempMsg);
+    this.scrollChatToBottom();
+
+    input.value = '';
+    input.style.height = 'auto';
+
+    try {
+      const { error } = await supabase.from('messages').insert({
+        sender_id: myId,
+        receiver_id: receiverId,
+        content: content
+      });
+
+      if (error) throw error;
+
+    } catch (err) {
+      console.error('Error enviando mensaje:', err);
+      Helpers.toast('Error al enviar mensaje', 'error');
+    }
+  },
+
+  appendChatMessage(msg) {
+    const container = document.getElementById('chatMessagesContainer');
+    if (!container) return;
+
+    const isMine = msg.sender_id === AppState.user.id;
+    const time = new Date(msg.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+
+    const div = document.createElement('div');
+    div.className = `flex ${isMine ? 'justify-end' : 'justify-start'} animate-fade-in`;
+    
+    div.innerHTML = `
+      <div class="max-w-[85%] md:max-w-[70%] group">
+        <div class="px-4 py-2.5 rounded-2xl text-sm shadow-sm ${
+          isMine 
+            ? 'bg-orange-600 text-white rounded-tr-none' 
+            : 'bg-white border border-slate-200 text-slate-700 rounded-tl-none'
+        }">
+          <div class="whitespace-pre-wrap break-words">${Helpers.escapeHTML(msg.content)}</div>
+          <div class="text-[9px] ${isMine ? 'text-orange-200' : 'text-slate-400'} mt-1 text-right font-bold uppercase tracking-tighter">
+            ${time}
+          </div>
+        </div>
+      </div>
+    `;
+
+    container.appendChild(div);
+  },
+
+  scrollChatToBottom() {
+    const container = document.getElementById('chatMessagesContainer');
+    if (container) {
+      container.scrollTop = container.scrollHeight;
+    }
+  },
+
   // 7. VIDEO CALL (Jitsi)
   async initVideoCall() {
     const container = document.getElementById('meet');
@@ -1923,7 +2313,6 @@ const UI = {
     }
 
     // 1. Marcar clase como EN VIVO
-    // 12️⃣ Fix: Await update
     await supabase.from('classrooms').update({ is_live: true }).eq('id', AppState.currentClass.id);
 
     if (window.jitsiInstance) window.jitsiInstance.dispose();
@@ -2050,7 +2439,6 @@ const UI = {
           await supabase.from('classroom_chat').insert({ classroom_id: classroomId, user_id: AppState.user.id, message: text });
       };
 
-      // 13️⃣ Fix: Keydown listener anti-spam
       btn.onclick = sendMessage;
       input.addEventListener('keydown', (e) => {
          if(e.key === 'Enter' && !e.shiftKey) {
@@ -2066,7 +2454,6 @@ const UI = {
           const name = m.profiles?.name || 'Usuario';
           const time = new Date(m.created_at).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'});
           
-          // 11️⃣ Fix: createElement
           const div = document.createElement('div');
           div.className = `flex flex-col mb-2 ${isMe ? 'items-end' : 'items-start'}`;
           div.innerHTML = `
@@ -2136,7 +2523,6 @@ const UI = {
       Helpers.toast('Subiendo imagen...', 'info');
       
       try {
-          // 14️⃣ Fix: Extensión segura
           const fileExt = file.name.includes('.') ? file.name.split('.').pop() : 'jpg';
           const fileName = `avatars/${AppState.user.id}_${Date.now()}.${fileExt}`;
           
@@ -2168,7 +2554,6 @@ const UI = {
       Notification.requestPermission();
     }
 
-    // 16️⃣ Fix: Guardar canal para limpieza
     if (AppState.notificationChannel) supabase.removeChannel(AppState.notificationChannel);
 
     // Suscribirse a eventos relevantes (ej: nuevos mensajes, incidentes críticos)
@@ -2235,10 +2620,8 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     });
     
-    // Item 9: Exponer UI explícitamente (ya estaba, pero aseguramos)
     window.UI = UI;
 });
 
-// Item 10: Error Boundary Global
 window.addEventListener('error', (e) => { console.error("Global Error:", e.error); });
 window.addEventListener('unhandledrejection', (e) => { console.error("Promise Error:", e.reason); });

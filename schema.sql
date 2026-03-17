@@ -390,6 +390,11 @@ create policy "Directora y Asistente ven todos los perfiles" on public.profiles 
   get_my_role() in ('directora', 'asistente')
 );
 
+-- Allow authenticated users to view basic profile info (needed for social feed avatars/names)
+create policy "Ver perfiles basicos" on public.profiles for select using (
+  auth.role() = 'authenticated'
+);
+
 -- Permitir que cualquiera (padres) vea los perfiles del staff (para saber quién publica)
 drop policy if exists "Ver perfiles de staff" on public.profiles;
 create policy "Ver perfiles de staff" on public.profiles for select using (

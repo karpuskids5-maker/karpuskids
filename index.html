@@ -221,6 +221,29 @@
     }
     
   </style>
+  <style>
+    /* Correcciones de Responsividad */
+    @media (max-width: 768px) {
+      .container { px-4; }
+      h1 { font-size: 2.5rem !important; line-height: 1.1; }
+      .hero-section { padding-top: 4rem; padding-bottom: 4rem; }
+      .nav-links { display: none; } /* Ocultar nav links en móvil si no hay menu hamburguesa */
+      .grid-cols-3 { grid-template-columns: 1fr !important; }
+      .grid-cols-2 { grid-template-columns: 1fr !important; }
+      img { max-width: 100%; height: auto; }
+    }
+    
+    /* Asegurar que el body no tenga scroll horizontal */
+    body {
+      overflow-x: hidden;
+      width: 100%;
+    }
+    
+    /* Mejora de tarjetas en móvil */
+    .card {
+      margin-bottom: 1.5rem;
+    }
+  </style>
 </head>
 <body class="bg-white text-gray-800">
   <!-- Header Fijo -->
