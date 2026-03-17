@@ -1896,12 +1896,14 @@ const UI = {
 
   window.renderCommentHTML = (c) => {
     const userObj = Array.isArray(c.user) ? c.user[0] : c.user;
-    let name = c.user_name || userObj?.name || 'Usuario';
+    let name = 'Usuario';
     
-    // Si es un padre, mostrar el nombre del niño
+    // Si es un padre, mostrar EXCLUSIVAMENTE el nombre del niño
     const studentName = Array.isArray(c.students) ? c.students[0]?.name : c.students?.name;
     if (userObj?.role === 'padre' && studentName) {
-      name = `Familia de ${studentName}`;
+      name = studentName;
+    } else if (userObj?.role === 'maestra' || userObj?.role === 'directora' || userObj?.role === 'asistente') {
+      name = userObj?.name || 'Personal';
     }
 
     const avatar = userObj?.avatar_url;

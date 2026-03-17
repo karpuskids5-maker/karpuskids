@@ -1847,7 +1847,7 @@ async function loadClassFeed(reset = true) {
         *, 
         teacher:teacher_id(name, avatar_url, role), 
         likes(*), 
-        comments(*, user:profiles(name, avatar_url, role))
+        comments(*, user:profiles(name, avatar_url, role), students:user_id(name))
       `)
       .eq('classroom_id', student.classroom_id)
       .order('created_at', { ascending: false });
@@ -1989,12 +1989,14 @@ function renderComment(c) {
   const currentUserId = AppState.get('user')?.id;
   // Preferir user_name guardado, fallback a relación
   const userObj = Array.isArray(c.user) ? c.user[0] : c.user;
-  let uName = c.user_name || userObj?.name || 'Usuario';
+  let uName = 'Usuario';
   
-  // Si es un padre, mostrar el nombre del niño
+  // Si es un padre, mostrar EXCLUSIVAMENTE el nombre del niño
   const studentName = Array.isArray(c.students) ? c.students[0]?.name : c.students?.name;
   if (userObj?.role === 'padre' && studentName) {
-    uName = `Familia de ${studentName}`;
+    uName = studentName;
+  } else if (userObj?.role === 'maestra' || userObj?.role === 'directora' || userObj?.role === 'asistente') {
+    uName = userObj?.name || 'Personal';
   }
 
   const uAvatar = userObj?.avatar_url;

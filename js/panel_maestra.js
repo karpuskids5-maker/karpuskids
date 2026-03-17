@@ -965,12 +965,14 @@ const UI = {
         if (error) throw error;
 
         list.innerHTML = (comments || []).map(c => {
-            let name = c.profiles?.name || c.user_name || 'Usuario';
+            let name = 'Usuario';
             
-            // Si es un padre, mostrar el nombre del niño
+            // Si es un padre, mostrar EXCLUSIVAMENTE el nombre del niño
             const studentName = Array.isArray(c.students) ? c.students[0]?.name : c.students?.name;
             if (c.profiles?.role === 'padre' && studentName) {
-                name = `Familia de ${studentName}`;
+                name = studentName;
+            } else if (c.profiles?.role === 'maestra' || c.profiles?.role === 'directora' || c.profiles?.role === 'asistente') {
+                name = c.profiles?.name || 'Personal';
             }
 
             const avatar = c.profiles?.avatar_url;
@@ -1482,6 +1484,7 @@ const UI = {
           
           // Actualizar resumen diario si es necesario
           if (this.loadDashboardStats) this.loadDashboardStats();
+          if (this.loadClasses) this.loadClasses(); // Forzar recarga de contadores en tarjetas
           
       } catch (error) {
           console.error('Error guardando asistencia:', error);
