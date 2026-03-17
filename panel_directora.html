@@ -6,6 +6,7 @@
   <title>Karpus Kids — Panel Director</title>
   <meta name="robots" content="noindex,nofollow">
   <link rel="icon" href="logo/favicon.ico" type="image/x-icon">
+  <link rel="manifest" href="manifest.json">
   <script src="https://cdn.tailwindcss.com"></script>
   <link rel="stylesheet" href="css/theme.css" />
   
@@ -15,15 +16,15 @@
   <script>window.OneSignalDeferred = window.OneSignalDeferred || [];</script>
 
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-  <script src="https://cdn.jsdelivr.net/npm/lucide@latest/dist/umd/lucide.min.js"></script>
+  <script src="https://unpkg.com/lucide@latest"></script>
   <!-- OCR Library for Vouchers -->
   <script src='https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js'></script>
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
   <script>
     (function(){
       if(!(window.lucide && typeof lucide.createIcons==='function')){
         var s=document.createElement('script');
-        s.src='https://cdn.jsdelivr.net/npm/lucide@latest/dist/umd/lucide.min.js';
+        s.src='https://unpkg.com/lucide@latest';
         s.async=true;document.head.appendChild(s);
       }
     })();

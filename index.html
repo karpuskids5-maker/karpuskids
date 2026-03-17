@@ -4,7 +4,6 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Karpus Kids - Estancia Infantil</title>
-  <link rel="icon" href="logo/favicon.ico" type="image/x-icon">
   <meta name="description" content="Karpus Kids: Estancia infantil segura y amorosa en Santo Domingo. Cuidado experto, educación integral, supervisión constante y app exclusiva para padres. ¡Agenda tu visita hoy!">
   
   <!-- Tailwind CSS -->
@@ -138,7 +137,7 @@
     /* Botones flotantes */
     .floating-btn {
       position: fixed;
-      bottom: 20px;
+      bottom: 15px;
       z-index: 9999;
       width: 56px;
       height: 56px;
@@ -155,8 +154,8 @@
     
     .floating-btn:hover { transform: scale(1.1); }
     
-    .btn-ws { background-color: #25D366; right: 90px; }
-    .btn-ig { background-color: #E4405F; right: 20px; }
+    .btn-ws { background-color: #25D366; right: 80px; }
+    .btn-ig { background-color: #E4405F; right: 15px; }
     
     /* Video de fondo */
     .video-bg {
@@ -222,15 +221,40 @@
     
   </style>
   <style>
+    html, body {
+      max-width: 100%;
+      overflow-x: hidden;
+    }
+    * {
+      box-sizing: border-box;
+    }
     /* Correcciones de Responsividad */
     @media (max-width: 768px) {
-      .container { px-4; }
+      .container {
+        padding-left: 1rem;
+        padding-right: 1rem;
+      }
       h1 { font-size: 2.5rem !important; line-height: 1.1; }
       .hero-section { padding-top: 4rem; padding-bottom: 4rem; }
       .nav-links { display: none; } /* Ocultar nav links en móvil si no hay menu hamburguesa */
       .grid-cols-3 { grid-template-columns: 1fr !important; }
       .grid-cols-2 { grid-template-columns: 1fr !important; }
       img { max-width: 100%; height: auto; }
+      
+      /* Desactivar animaciones pesadas en móvil */
+      .animate-pulse,
+      .animate-subtle-pulse,
+      .hero-bg-animate {
+        animation: none !important;
+      }
+
+      /* Botones full width en móvil */
+      .hero-cta-btn, .modal-btn, section a.inline-block {
+        width: 100%;
+        display: block;
+        text-align: center;
+        margin-bottom: 0.5rem;
+      }
     }
     
     /* Asegurar que el body no tenga scroll horizontal */
@@ -247,27 +271,64 @@
 </head>
 <body class="bg-white text-gray-800">
   <!-- Header Fijo -->
-  <header x-data="{ open: false }" class="fixed top-4 inset-x-4 z-50 transition-all duration-300">
-    <div class="bg-white/90 backdrop-blur-md rounded-2xl shadow-lg border border-white/20 container mx-auto px-6 py-3 flex justify-between items-center">
+  <header x-data="{ open: false }" class="fixed top-0 left-0 w-full z-50 px-2 pt-2">
+    
+    <div class="w-full max-w-7xl mx-auto bg-white/90 backdrop-blur-md rounded-2xl shadow-lg border border-white/20 px-4 py-3 flex justify-between items-center">
+      
       <!-- Logo -->
-      <a href="#" class="flex items-center gap-2 group" loading="lazy">
-        <img src="img/mundo.jpg" alt="Logo de Karpus Kids Estancia Infantil" class="h-10 w-10 rounded-full object-cover shadow-sm group-hover:scale-110 transition-transform">
-        <span class="hidden sm:block text-lg karpus-kids-inline"><span class="k-1">K</span><span class="k-2">a</span><span class="k-3">r</span><span class="k-4">p</span><span class="k-5">u</span><span class="k-6">s</span> <span class="k-7">K</span><span class="k-8">i</span><span class="k-9">d</span><span class="k-10">s</span></span>
+      <a href="#" class="flex items-center gap-2 group">
+        <img src="img/mundo.jpg" alt="Logo" class="h-10 w-10 rounded-full object-cover">
+        <span class="hidden sm:block text-lg font-bold">Karpus Kids</span>
       </a>
+
       <!-- Nav Desktop -->
-      <nav class="hidden md:flex items-center gap-8 font-medium text-slate-600">
-        <a href="#nosotros" class="hover:text-orange-500 transition-colors">Nosotros</a>
-        <a href="#galeria-fotos" class="hover:text-pink-500 transition-colors">Galería</a>
-        <a href="#precios" class="hover:text-blue-500 transition-colors">Servicios</a>
-        <a href="#footer" class="hover:text-green-500 transition-colors">Contacto</a>
+      <nav class="hidden md:flex items-center gap-6 font-medium text-slate-600">
+        <a href="#nosotros" class="hover:text-orange-500">Nosotros</a>
+        <a href="#galeria-fotos" class="hover:text-pink-500">Galería</a>
+        <a href="#precios" class="hover:text-blue-500">Servicios</a>
+        <a href="#footer" class="hover:text-green-500">Contacto</a>
       </nav>
+
       <!-- CTA & Mobile Toggle -->
-      <div class="flex items-center gap-3">
-          <a href="login.html" class="hidden md:inline-flex bg-gradient-to-r from-orange-400 to-pink-500 text-white px-5 py-2 rounded-full font-bold text-sm shadow-md hover:shadow-lg hover:scale-105 transition-all">
-            Acceso Padres
-          </a>
-          <button @click="open = !open" class="md:hidden text-slate-600 p-2 rounded-lg hover:bg-slate-100">
-            <i class="bi bi-list text-2xl"></i>
+      <div class="flex items-center gap-2">
+        
+        <!-- CTA Desktop -->
+        <a href="login.html" class="hidden md:inline-flex bg-gradient-to-r from-orange-400 to-pink-500 text-white px-4 py-2 rounded-full text-sm font-bold">
+          Acceso
+        </a>
+
+        <!-- Botón Hamburguesa -->
+        <button @click="open = !open" class="md:hidden p-2 text-slate-700">
+          <i class="bi bi-list text-3xl"></i>
+        </button>
+
+      </div>
+    </div>
+
+    <!-- Menú móvil -->
+    <div x-show="open"
+         @click.away="open = false"
+         x-transition
+         class="md:hidden mt-2 mx-2 bg-white rounded-2xl shadow-xl overflow-hidden">
+
+      <div class="flex flex-col text-center font-medium text-slate-600">
+        <a href="#nosotros" @click="open = false" class="py-3 hover:bg-orange-50">Nosotros</a>
+        <a href="#galeria-fotos" @click="open = false" class="py-3 hover:bg-pink-50">Galería</a>
+        <a href="#precios" @click="open = false" class="py-3 hover:bg-blue-50">Servicios</a>
+        <a href="#footer" @click="open = false" class="py-3 hover:bg-green-50">Contacto</a>
+        <a href="login.html" class="py-3 bg-gray-100">Acceso Padres</a>
+      </div>
+
+    </div>
+  </header>
+
+  <!-- Hero con Video -->
+  <section class="relative min-h-screen flex items-center justify-center text-center overflow-hidden pt-24">
+    <img src="/img/karpus.jpg"
+       class="absolute inset-0 w-full h-full object-cover hero-bg-animate"
+       alt="Niños felices en Karpus Kids" loading="lazy">
+    <div class="absolute inset-0 bg-gradient-to-b from-black/60 via-black/40 to-black/70"></div>
+    <div x-data="{ contactModal: false }" class="relative z-10 p-8 text-white max-w-4xl mx-auto" data-aos="fade-up">
           </button>
       </div>
     </div>
@@ -308,8 +369,8 @@ En Karpus Kids cuidamos lo que más amas… como si fuera nuestro.
 ✔ Cupos limitados • ✔ Supervisión constante • ✔ App exclusiva para padres
 </p>
       <div class="flex justify-center items-center gap-4">
-        <a href="https://wa.me/18298038484?text=¡Hola! Me interesa inscribir a mi pequeño en Karpus Kids" target="_blank" class="bg-pink-500 text-white font-bold px-8 py-4 rounded-full shadow-lg hover:bg-pink-600 transition transform hover:scale-105 border-2 border-pink-400 animate-pulse">Inscribir Ahora</a>
-        <a href="#nosotros" class="bg-transparent border-2 border-white text-white font-bold px-8 py-4 rounded-full shadow-lg hover:bg-white hover:text-gray-900 transition transform hover:scale-105">Conocer Más</a>
+        <a href="https://wa.me/18298038484?text=¡Hola! Me interesa inscribir a mi pequeño en Karpus Kids" target="_blank" class="bg-pink-500 text-white font-bold px-8 py-4 rounded-full shadow-lg hover:bg-pink-600 transition transform hover:scale-105 border-2 border-pink-400 animate-pulse hero-cta-btn">INSCRIBE A TU HIJO HOY</a>
+        <a href="#nosotros" class="bg-transparent border-2 border-white text-white font-bold px-8 py-4 rounded-full shadow-lg hover:bg-white hover:text-gray-900 transition transform hover:scale-105 hero-cta-btn">Conocer Más</a>
       </div>
       <p class="mt-6 text-sm text-gray-200">
         Más de 120 familias confían en nosotros cada año ❤️
@@ -320,17 +381,17 @@ En Karpus Kids cuidamos lo que más amas… como si fuera nuestro.
           <h3 class="text-2xl font-bold mb-4 text-blue-600">¡Contáctanos!</h3>
           <p class="text-sm mb-6">¡Hola! Estamos aquí para ayudarte. ¿Cómo podemos asistirte hoy?</p>
           <div class="space-y-4">
-            <a href="https://wa.me/18298038484?text=¡Hola! Me interesa inscribir a mi pequeño en Karpus Kids" target="_blank" class="block w-full text-center bg-green-500 text-white font-bold px-6 py-3 rounded-lg hover:bg-green-600 transition">
+            <a href="https://wa.me/18298038484?text=¡Hola! Me interesa inscribir a mi pequeño en Karpus Kids" target="_blank" class="modal-btn block w-full text-center bg-green-500 text-white font-bold px-6 py-3 rounded-lg hover:bg-green-600 transition">
               <i class="bi bi-whatsapp mr-2"></i>Inscribir a mi Pequeño
             </a>
-            <a href="https://wa.me/18298038484?text=¡Hola! Me gustaría obtener más información sobre Karpus Kids" target="_blank" class="block w-full text-center bg-blue-500 text-white font-bold px-6 py-3 rounded-lg hover:bg-blue-600 transition">
+            <a href="https://wa.me/18298038484?text=¡Hola! Me gustaría obtener más información sobre Karpus Kids" target="_blank" class="modal-btn block w-full text-center bg-blue-500 text-white font-bold px-6 py-3 rounded-lg hover:bg-blue-600 transition">
               <i class="bi bi-info-circle mr-2"></i>Solicitar Información
             </a>
-            <a href="https://wa.me/18298038484?text=¡Hola! Me gustaría contactarlos sobre Karpus Kids" target="_blank" class="block w-full text-center bg-pink-500 text-white font-bold px-6 py-3 rounded-lg hover:bg-pink-600 transition">
+            <a href="https://wa.me/18298038484?text=¡Hola! Me gustaría contactarlos sobre Karpus Kids" target="_blank" class="modal-btn block w-full text-center bg-pink-500 text-white font-bold px-6 py-3 rounded-lg hover:bg-pink-600 transition">
               <i class="bi bi-chat-dots mr-2"></i>Contactar por WhatsApp
             </a>
           </div>
-          <button type="button" @click="contactModal = false" class="mt-6 w-full px-6 py-2 text-gray-600 hover:text-gray-800">Cerrar</button>
+          <button type="button" @click="contactModal = false" class="mt-6 w-full px-6 py-2 text-gray-600 hover:text-gray-800 modal-btn">Cerrar</button>
         </div>
       </div>
 
@@ -473,7 +534,7 @@ Tranquilidad en tu bolsillo.</p>
         <!-- Video 1 -->
         <div class="bg-white rounded-xl shadow-lg overflow-hidden w-full sm:w-72 transform transition-transform duration-300 hover:scale-105" data-aos="fade-up" data-aos-delay="100">
           <div @click="videoModal = true; videoSrc = 'img/14.mp4'" class="relative cursor-pointer group">
-            <video muted loop playsinline autoplay class="aspect-video w-full object-cover" src="img/14.mp4" alt="Video de actividades recreativas"></video>
+            <video muted loop playsinline preload="metadata" class="aspect-video w-full object-cover" src="img/14.mp4" alt="Video de actividades recreativas"></video>
             <div class="absolute inset-0 bg-black/30 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
               <i class="bi bi-volume-up-fill text-white text-5xl"></i>
             </div>
@@ -486,7 +547,7 @@ Tranquilidad en tu bolsillo.</p>
         <!-- Video 2 -->
         <div class="bg-white rounded-xl shadow-lg overflow-hidden w-full sm:w-72 transform transition-transform duration-300 hover:scale-105" data-aos="fade-up" data-aos-delay="200">
           <div @click="videoModal = true; videoSrc = 'img/karpus invitacion.mp4'" class="relative cursor-pointer group">
-            <video muted loop playsinline autoplay class="aspect-video w-full object-cover" src="img/karpus invitacion.mp4" alt="Video invitación a Karpus Kids"></video>
+            <video muted loop playsinline preload="metadata" class="aspect-video w-full object-cover" src="img/karpus invitacion.mp4" alt="Video invitación a Karpus Kids"></video>
             <div class="absolute inset-0 bg-black/30 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
               <i class="bi bi-volume-up-fill text-white text-5xl"></i>
             </div>
@@ -499,7 +560,7 @@ Tranquilidad en tu bolsillo.</p>
         <!-- Video 3 -->
         <div class="bg-white rounded-xl shadow-lg overflow-hidden w-full sm:w-72 transform transition-transform duration-300 hover:scale-105" data-aos="fade-up" data-aos-delay="300">
           <div @click="videoModal = true; videoSrc = 'img/video karpus kids.mp4'" class="relative cursor-pointer group">
-            <video muted loop playsinline autoplay preload="auto" class="aspect-video w-full object-cover" src="img/video karpus kids.mp4" alt="Video de aprendizaje creativo"></video>
+            <video muted loop playsinline preload="metadata" class="aspect-video w-full object-cover" src="img/video karpus kids.mp4" alt="Video de aprendizaje creativo"></video>
             <div class="absolute inset-0 bg-black/30 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
               <i class="bi bi-volume-up-fill text-white text-5xl"></i>
             </div>
@@ -626,7 +687,7 @@ Invertir en la educación y seguridad de tu hijo hoy, es asegurar su futuro mañ
       </div>
     </div>
     <div class="text-center mt-12" data-aos="fade-up">
-      <a href="https://wa.me/18298038484?text=¡Hola! Me interesa inscribir a mi pequeño en Karpus Kids" target="_blank" class="bg-white text-blue-800 font-bold px-8 py-3 rounded-full shadow-lg hover:bg-blue-100 transition transform hover:scale-105 inline-block">
+      <a href="https://wa.me/18298038484?text=¡Hola! Me interesa inscribir a mi pequeño en Karpus Kids" target="_blank" class="bg-white text-blue-800 font-bold px-8 py-3 rounded-full shadow-lg hover:bg-blue-100 transition transform hover:scale-105 inline-block hero-cta-btn">
         Inscribir Ahora
       </a>
     </div>
@@ -643,7 +704,7 @@ Invertir en la educación y seguridad de tu hijo hoy, es asegurar su futuro mañ
       </h2>
       <p class="text-xl text-gray-600 mb-8">No dejes pasar la oportunidad de brindarle a tu hijo el mejor cuidado y educación.</p>
       <a href="https://wa.me/18298038484?text=¡Hola! Quiero agendar una visita a Karpus Kids" target="_blank"
-       class="inline-block bg-pink-500 text-white font-bold px-10 py-4 rounded-full text-lg btn-glow hover:scale-105 transition">
+       class="inline-block bg-pink-500 text-white font-bold px-10 py-4 rounded-full text-lg btn-glow hover:scale-105 transition hero-cta-btn">
         Agenda una visita hoy mismo
       </a>
     </div>
@@ -676,7 +737,7 @@ Invertir en la educación y seguridad de tu hijo hoy, es asegurar su futuro mañ
   </footer>
   
   <!-- Botones flotantes -->
-  <a href="https://wa.me/18298038424" target="_blank" class="floating-btn btn-ws"><i class="bi bi-whatsapp"></i></a>
+  <a href="https://wa.me/18298038484" target="_blank" class="floating-btn btn-ws"><i class="bi bi-whatsapp"></i></a>
   <a href="https://www.instagram.com/karpus_kids/" target="_blank" class="floating-btn btn-ig"><i class="bi bi-instagram"></i></a>
   
   <!-- Lightbox modal para galería de imágenes -->

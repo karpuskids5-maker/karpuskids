@@ -689,9 +689,9 @@ const UI = {
 
             <!-- Sección de Comentarios -->
             <div id="comments-section-${p.id}" class="hidden mt-3 pt-3 border-t border-slate-100 bg-slate-50/50 rounded-xl p-3">
-                <div id="comments-list-${p.id}" class="space-y-3 mb-3 max-h-60 overflow-y-auto pr-1"></div>
+                <div id="comments-list-${p.id}" class="space-y-3 mb-3 max-h-60 overflow-y-auto pr-1 overscroll-contain"></div>
                 <div class="flex gap-2 items-center">
-                    <input type="text" id="comment-input-${p.id}" class="flex-1 border rounded-xl px-3 py-2 text-sm bg-white focus:ring-2 focus:ring-blue-500 outline-none transition-all" placeholder="Escribe un comentario...">
+                    <input type="text" id="comment-input-${p.id}" class="flex-1 border rounded-xl px-3 py-2 text-sm bg-white focus:ring-2 focus:ring-blue-500 outline-none transition-all" placeholder="Escribe un comentario..." onkeypress="if(event.key==='Enter') UI.sendComment('${p.id}')">
                     <button onclick="UI.sendComment('${p.id}')" class="bg-blue-600 text-white p-2 rounded-xl hover:bg-blue-700 transition-colors shadow-sm"><i data-lucide="send" class="w-4 h-4"></i></button>
                 </div>
             </div>
@@ -940,39 +940,60 @@ const UI = {
 
   async toggleCommentSection(postId) {
     const section = document.getElementById(`comments-section-${postId}`);
-    const list = document.getElementById(`comments-list-${postId}`);
+    if(!section) return;
     
-    if(!section || !list) return; // Item 2: Validación
-    
-    if (section.classList.contains('hidden')) {
-        section.classList.remove('hidden');
-        list.innerHTML = `<div class="flex justify-center p-4"><i data-lucide="loader-2" class="w-5 h-5 animate-spin text-slate-400"></i></div>`;
-        if(window.lucide) lucide.createIcons();
+    section.classList.toggle('hidden');
+    if (!section.classList.contains('hidden')) {
+        await this.reloadComments(postId);
+    }
+  },
 
-        const { data: comments } = await supabase
+  async reloadComments(postId) {
+    const list = document.getElementById(`comments-list-${postId}`);
+    if(!list) return;
+
+    list.innerHTML = `<div class="flex justify-center p-4"><i data-lucide="loader-2" class="w-5 h-5 animate-spin text-slate-400"></i></div>`;
+    if(window.lucide) lucide.createIcons();
+
+    try {
+        const { data: comments, error } = await supabase
             .from('comments')
-            .select('*, profiles:user_id(name, avatar_url)')
+            .select('*, profiles(name, avatar_url, role), students:user_id(name)')
             .eq('post_id', postId)
             .order('created_at', { ascending: true });
 
-        list.innerHTML = (comments || []).map(c => `
-            <div class="flex gap-2 text-sm">
-                <div class="w-8 h-8 rounded-full bg-slate-200 flex items-center justify-center text-xs font-bold text-slate-500 flex-shrink-0 overflow-hidden">
-                    ${c.profiles?.avatar_url 
-                        ? `<img src="${encodeURI(c.profiles.avatar_url)}" class="w-full h-full object-cover">` 
-                        : (c.profiles?.name || 'U').charAt(0)}
+        if (error) throw error;
+
+        list.innerHTML = (comments || []).map(c => {
+            let name = c.profiles?.name || c.user_name || 'Usuario';
+            
+            // Si es un padre, mostrar el nombre del niño
+            const studentName = Array.isArray(c.students) ? c.students[0]?.name : c.students?.name;
+            if (c.profiles?.role === 'padre' && studentName) {
+                name = `Familia de ${studentName}`;
+            }
+
+            const avatar = c.profiles?.avatar_url;
+            return `
+                <div class="flex gap-2 text-sm mb-2">
+                    <div class="w-8 h-8 rounded-full bg-slate-200 flex items-center justify-center text-xs font-bold text-slate-500 flex-shrink-0 overflow-hidden">
+                        ${avatar 
+                            ? `<img src="${encodeURI(avatar)}" class="w-full h-full object-cover">` 
+                            : name.charAt(0)}
+                    </div>
+                    <div class="bg-white p-3 rounded-2xl rounded-tl-none shadow-sm border border-slate-100 flex-1">
+                        <div class="font-bold text-slate-700 text-xs mb-1">${Helpers.escapeHTML(name)}</div>
+                        <div class="text-slate-600 leading-snug">${Helpers.escapeHTML(c.content)}</div>
+                    </div>
                 </div>
-                <div class="bg-white p-3 rounded-2xl rounded-tl-none shadow-sm border border-slate-100 flex-1">
-                    <div class="font-bold text-slate-700 text-xs mb-1">${Helpers.escapeHTML(c.profiles?.name || 'Usuario')}</div>
-                    <div class="text-slate-600 leading-snug">${Helpers.escapeHTML(c.content)}</div>
-                </div>
-            </div>
-        `).join('') || `<p class="text-center text-slate-400 text-xs py-4">Sin comentarios aún</p>`;
+            `;
+        }).join('') || `<p class="text-center text-slate-400 text-xs py-4 italic">Sin comentarios aún. ¡Sé el primero!</p>`;
         
         list.scrollTop = list.scrollHeight;
         if(window.lucide) lucide.createIcons();
-    } else {
-        section.classList.add('hidden');
+    } catch (err) {
+        console.error('Error reloadComments:', err);
+        list.innerHTML = `<p class="text-center text-red-400 text-xs py-4">Error al cargar comentarios</p>`;
     }
   },
 
@@ -985,21 +1006,30 @@ const UI = {
         const { error } = await supabase.from('comments').insert({
             post_id: postId,
             user_id: AppState.user.id,
-            content: Helpers.escapeHTML(content)
+            content: content
         });
         if (error) throw error;
         input.value = '';
         
+        // Refrescar lista de comentarios si la sección está abierta
         const section = document.getElementById(`comments-section-${postId}`);
         if (section && !section.classList.contains('hidden')) {
-            await this.toggleCommentSection(postId); // Cerrar
-            await this.toggleCommentSection(postId); // Abrir (fetch fresco)
+            await this.reloadComments(postId);
+        } else if (section) {
+            // Si está cerrada, la abrimos para mostrar el nuevo comentario
+            section.classList.remove('hidden');
+            await this.reloadComments(postId);
         }
 
-        // Actualizar contador
+        // Actualizar contador visual
         const countEl = document.getElementById(`comment-count-${postId}`);
-        if(countEl) countEl.textContent = parseInt(countEl.textContent) + 1;
-    } catch (e) { Helpers.toast('Error al comentar', 'error'); }
+        if(countEl) countEl.textContent = parseInt(countEl.textContent || 0) + 1;
+        
+        Helpers.toast('Comentario enviado', 'success');
+    } catch (e) { 
+        console.error('Error sendComment:', e);
+        Helpers.toast('Error al comentar', 'error'); 
+    }
   },
 
   async renderStudents() {
@@ -2037,29 +2067,22 @@ const UI = {
       // 2. Obtener padres de esas aulas
       const { data: students, error } = await supabase
         .from('students')
-        .select('parent_id, name, classrooms(name)')
+        .select('parent_id, name, classrooms(name), profiles:parent_id(avatar_url)')
         .in('classroom_id', classroomIds)
         .not('parent_id', 'is', null);
 
       if (error) throw error;
 
-      // 3. Obtener perfiles de esos padres
-      const parentIds = [...new Set(students.map(s => s.parent_id))];
-      const { data: parents } = await supabase
-        .from('profiles')
-        .select('id, name, avatar_url')
-        .in('id', parentIds);
-
-      // 4. Agregar a la Directora
+      // 3. Ya no necesitamos cargar perfiles de padres por separado si lo traemos en el join anterior
+      // Pero para mantener compatibilidad con el resto del código, mapeamos los contactos:
+      const contacts = [];
+      
+      // Agregar Directora primero
       const { data: directors } = await supabase
         .from('profiles')
         .select('id, name, avatar_url')
         .eq('role', 'directora');
 
-      // 5. Mapear contactos
-      const contacts = [];
-      
-      // Agregar Directora primero
       if (directors) {
         directors.forEach(d => {
           contacts.push({
@@ -2072,27 +2095,19 @@ const UI = {
         });
       }
 
-      // Mapear padres con su información de aula
-      const parentMap = {};
+      // Mapear padres usando el nombre del estudiante
+      const seenParents = new Set();
       students.forEach(s => {
-        if (!parentMap[s.parent_id]) {
-          parentMap[s.parent_id] = {
+        if (!seenParents.has(s.parent_id)) {
+          seenParents.add(s.parent_id);
+          contacts.push({
             id: s.parent_id,
-            studentName: s.name,
-            classroomName: s.classrooms?.name || 'Aula'
-          };
+            name: `Familia de ${s.name}`,
+            avatar: s.profiles?.avatar_url,
+            role: 'Padre/Madre',
+            meta: `Aula: ${s.classrooms?.name || 'Aula'}`
+          });
         }
-      });
-
-      parents?.forEach(p => {
-        const info = parentMap[p.id];
-        contacts.push({
-          id: p.id,
-          name: p.name,
-          avatar: p.avatar_url,
-          role: 'Padre/Madre',
-          meta: `Aula: ${info.classroomName} (${info.studentName})`
-        });
       });
 
       AppState.allChatContacts = contacts;

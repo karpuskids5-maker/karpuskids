@@ -1729,11 +1729,11 @@ function createPostHTML(p, index = 0) {
     </div>
 
     <div id="comments-section-${p.id}" class="hidden mt-3 pt-3 border-t border-slate-100 bg-slate-50/50 rounded-xl p-3">
-      <div id="comments-list-${p.id}" class="space-y-3 mb-3 max-h-60 overflow-y-auto pr-1">
+      <div id="comments-list-${p.id}" class="space-y-3 mb-3 max-h-60 overflow-y-auto pr-1 overscroll-contain">
         ${(p.comments && p.comments.length > 0) ? p.comments.sort((a,b)=>new Date(a.created_at)-new Date(b.created_at)).map(renderComment).join('') : '<p class="text-xs text-slate-400 text-center py-2">Sé el primero en comentar</p>'}
       </div>
       <div class="flex gap-2 items-center">
-        <input type="text" id="comment-input-${p.id}" class="flex-1 border rounded-xl px-3 py-2 text-sm bg-white focus:ring-2 focus:ring-blue-500 outline-none transition-all" placeholder="Escribe un comentario...">
+        <input type="text" id="comment-input-${p.id}" class="flex-1 border rounded-xl px-3 py-2 text-sm bg-white focus:ring-2 focus:ring-blue-500 outline-none transition-all" placeholder="Escribe un comentario..." onkeypress="if(event.key==='Enter') sendComment('${p.id}')">
         <button onclick="sendComment('${p.id}')" class="bg-blue-600 text-white p-2 rounded-xl hover:bg-blue-700 transition-colors shadow-sm"><i data-lucide="send" class="w-4 h-4"></i></button>
       </div>
     </div>
@@ -1989,7 +1989,14 @@ function renderComment(c) {
   const currentUserId = AppState.get('user')?.id;
   // Preferir user_name guardado, fallback a relación
   const userObj = Array.isArray(c.user) ? c.user[0] : c.user;
-  const uName = c.user_name || userObj?.name || 'Usuario';
+  let uName = c.user_name || userObj?.name || 'Usuario';
+  
+  // Si es un padre, mostrar el nombre del niño
+  const studentName = Array.isArray(c.students) ? c.students[0]?.name : c.students?.name;
+  if (userObj?.role === 'padre' && studentName) {
+    uName = `Familia de ${studentName}`;
+  }
+
   const uAvatar = userObj?.avatar_url;
   const uRole = userObj?.role === 'padre' ? 'Familia' : (userObj?.role === 'maestra' ? 'Maestra' : (userObj?.role === 'directora' ? 'Directora' : 'Usuario'));
   
@@ -2005,7 +2012,6 @@ function renderComment(c) {
       <div class="bg-white p-3 rounded-2xl rounded-tl-none shadow-sm border border-slate-100 relative group min-w-[120px]">
         <div class="font-bold text-slate-700 text-xs mb-1 flex justify-between items-start gap-2">
             <div class="flex flex-col"><span class="leading-none">${escapeHtml(uName)}</span><span class="text-[9px] text-slate-400 font-normal uppercase mt-0.5">${uRole}</span></div>
-            ${isMine ? `<button onclick="deleteComment('${c.id}', '${c.post_id}')" class="text-slate-300 hover:text-red-500 transition-colors" title="Eliminar"><i data-lucide="trash-2" class="w-3 h-3"></i></button>` : ''}
         </div>
         <div class="text-slate-600 leading-snug">${escapeHtml(c.content)}</div>
       </div>
@@ -2019,7 +2025,7 @@ async function reloadComments(postId) {
 
   const { data: comments, error } = await supabase
     .from(TABLES.COMMENTS)
-    .select('id, user_id, content, created_at, user_name, post_id, user:profiles(name)')
+    .select('id, user_id, content, created_at, user_name, post_id, user:profiles(name, role, avatar_url), students:user_id(name)')
     .eq('post_id', postId)
     .order('created_at', { ascending: true });
 
@@ -2037,14 +2043,53 @@ async function reloadComments(postId) {
   list.scrollTop = list.scrollHeight;
 }
 
-window.toggleCommentSection = (postId) => {
+window.toggleCommentSection = async (postId) => {
   const section = document.getElementById(`comments-section-${postId}`);
   if (!section) return;
 
   section.classList.toggle('hidden');
-  // Scroll to bottom if opening
-  if (!section.classList.contains('hidden')) section.querySelector(`#comments-list-${postId}`).scrollTop = section.querySelector(`#comments-list-${postId}`).scrollHeight;
+  if (!section.classList.contains('hidden')) {
+      await reloadComments(postId);
+  }
 };
+
+async function sendComment(postId) {
+  const input = document.getElementById(`comment-input-${postId}`);
+  const content = input?.value.trim();
+  if (!content) return;
+
+  const myId = AppState.get('user')?.id;
+  if (!myId) return;
+
+  try {
+    const { error } = await supabase.from(TABLES.COMMENTS).insert({
+      post_id: postId,
+      user_id: myId,
+      content: content
+    });
+
+    if (error) throw error;
+    input.value = '';
+
+    // Refrescar lista de comentarios
+    const section = document.getElementById(`comments-section-${postId}`);
+    if (section && section.classList.contains('hidden')) {
+      section.classList.remove('hidden');
+    }
+    await reloadComments(postId);
+
+    // Actualizar contador visual
+    const countEl = document.getElementById(`comment-count-${postId}`);
+    if(countEl) countEl.textContent = parseInt(countEl.textContent || 0) + 1;
+    
+    Helpers.toast('Comentario enviado', 'success');
+  } catch (err) {
+    console.error('Error sendComment:', err);
+    Helpers.toast('Error al comentar', 'error');
+  }
+}
+
+window.sendComment = sendComment;
 
 // Función auxiliar para actualizar UI de reacciones en tiempo real
 async function updatePostReactionsUI(postId) {
@@ -2477,9 +2522,9 @@ async function initChatSystem() {
   if (!container) return;
   
   container.innerHTML = `
-    <div class="flex flex-col md:flex-row h-[600px] bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
+    <div class="flex flex-col md:flex-row h-[70vh] bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
       <!-- Sidebar Contactos -->
-      <div class="w-full md:w-1/3 border-r border-slate-100 bg-slate-50 flex flex-col">
+      <div class="w-full md:w-1/3 border-r border-slate-100 bg-slate-50 flex flex-col md:h-full max-h-[200px] md:max-h-none">
          <div class="p-4 border-b border-slate-200 font-bold text-slate-700 flex justify-between items-center">
             <span>Mensajes</span>
             <span class="text-xs bg-blue-100 text-blue-700 px-2 py-1 rounded-full">Privado</span>
@@ -2490,7 +2535,7 @@ async function initChatSystem() {
       </div>
       
       <!-- Area Chat -->
-      <div class="flex-1 flex flex-col bg-white relative">
+      <div class="flex-1 flex flex-col bg-white relative h-full">
          <div id="chatHeader" class="p-4 border-b border-slate-100 flex items-center gap-3 bg-white z-10 hidden">
             <div id="chatHeaderAvatar" class="w-10 h-10 rounded-full bg-slate-200 overflow-hidden flex items-center justify-center font-bold text-slate-500"></div>
             <div>
@@ -2499,14 +2544,14 @@ async function initChatSystem() {
             </div>
          </div>
          
-         <div id="chatMessages" class="flex-1 overflow-y-auto p-4 space-y-3 bg-slate-50/30 scroll-smooth">
+         <div id="chatMessages" class="flex-1 overflow-y-auto p-4 space-y-3 bg-slate-50/30 scroll-smooth overscroll-contain">
             <div class="h-full flex flex-col items-center justify-center text-slate-400">
                <i data-lucide="message-square" class="w-12 h-12 mb-2 opacity-20"></i>
                <p>Selecciona un contacto para chatear</p>
             </div>
          </div>
          
-         <div id="chatInputArea" class="p-3 border-t border-slate-100 bg-white hidden">
+         <div id="chatInputArea" class="p-3 border-t border-slate-100 bg-white hidden mt-auto">
             <div class="flex gap-2 items-end">
                <textarea id="messageInput" rows="1" class="flex-1 bg-slate-100 border-0 rounded-xl px-4 py-3 focus:ring-2 focus:ring-blue-500 resize-none outline-none transition-all" placeholder="Escribe un mensaje..."></textarea>
                <button onclick="sendChatMessage()" class="bg-blue-600 text-white p-3 rounded-xl hover:bg-blue-700 transition-colors shadow-sm active:scale-95">
@@ -2541,6 +2586,27 @@ async function loadChatContacts() {
   // 2. Directora
   const { data: directors } = await supabase.from(TABLES.PROFILES).select('id, name, avatar_url').eq('role', 'directora').limit(1);
   if(directors && directors.length) contacts.push({ ...directors[0], role: 'Dirección' });
+
+  // 3. Otros Padres (Identificados por su hijo)
+  if (cls?.id) {
+    const { data: classmates } = await supabase
+      .from(TABLES.STUDENTS)
+      .select('parent_id, name, profiles:parent_id(avatar_url)')
+      .eq('classroom_id', cls.id)
+      .not('parent_id', 'is', null)
+      .neq('parent_id', AppState.get('user')?.id);
+
+    if (classmates) {
+      classmates.forEach(c => {
+        contacts.push({
+          id: c.parent_id,
+          name: `Familia de ${c.name}`,
+          avatar_url: c.profiles?.avatar_url,
+          role: 'Padre/Madre'
+        });
+      });
+    }
+  }
 
   list.innerHTML = contacts.map(c => `
     <div onclick="selectChat('${c.id}', '${escapeHtml(c.name)}', '${c.role}', '${c.avatar_url || ''}')" 

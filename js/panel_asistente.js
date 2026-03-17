@@ -1779,6 +1779,7 @@ const UI = {
         .select(`
           *, 
           classrooms(name),
+          teacher:teacher_id(name, avatar_url),
           likes(count),
           comments(count)
         `)
@@ -1796,16 +1797,20 @@ const UI = {
           day: '2-digit', month: 'long', hour: '2-digit', minute: '2-digit' 
         });
         
+        // Corregir obtención de nombre y avatar de maestra
+        const tName = p.teacher?.name || p.teacher_name || 'Maestra';
+        const tAvatar = p.teacher?.avatar_url || p.teacher_avatar;
+
         return `
           <div class="bg-white rounded-3xl shadow-sm border border-slate-100 overflow-hidden hover:shadow-md transition-all duration-300 mb-6">
             <div class="p-5">
               <div class="flex justify-between items-start mb-4">
                 <div class="flex items-center gap-3">
                   <div class="w-12 h-12 rounded-2xl bg-orange-100 text-orange-600 flex items-center justify-center font-bold text-xl shadow-sm overflow-hidden border border-orange-50">
-                    ${p.teacher_avatar ? `<img src="${p.teacher_avatar}" class="w-full h-full object-cover">` : (p.teacher_name ? p.teacher_name.charAt(0) : 'M')}
+                    ${tAvatar ? `<img src="${tAvatar}" class="w-full h-full object-cover">` : tName.charAt(0)}
                   </div>
                   <div>
-                    <div class="font-black text-slate-800 leading-tight">${p.teacher_name || 'Maestra'}</div>
+                    <div class="font-black text-slate-800 leading-tight">${tName}</div>
                     <div class="text-[10px] font-bold uppercase tracking-wider text-slate-400 mt-0.5">
                       ${date} • <span class="text-orange-500">${p.classrooms?.name || 'Aula'}</span>
                     </div>
@@ -1830,6 +1835,20 @@ const UI = {
                   <i data-lucide="message-circle" class="w-4 h-4 text-sky-500 fill-sky-500/10"></i>
                   <span>${p.comments[0]?.count || 0} Comentarios</span>
                 </div>
+                <button onclick="toggleCommentSection('${p.id}')" class="ml-auto text-sky-600 text-xs font-bold hover:underline">
+                  Ver/Comentar
+                </button>
+              </div>
+
+              <!-- Sección Comentarios (Oculta) -->
+              <div id="comments-section-${p.id}" class="hidden mt-4 pt-4 border-t border-slate-100 bg-slate-50/50 -mx-5 px-5 pb-5">
+                <div id="comments-list-${p.id}" class="space-y-3 mb-3 max-h-60 overflow-y-auto pr-1 overscroll-contain">
+                   <p class="text-xs text-slate-400 text-center py-2 italic">Cargando comentarios...</p>
+                </div>
+                <div class="flex gap-2">
+                  <input type="text" id="comment-input-${p.id}" class="flex-1 px-3 py-2 text-sm border rounded-xl outline-none focus:ring-2 focus:ring-sky-500" placeholder="Escribe un comentario..." onkeypress="if(event.key==='Enter') sendAssistantComment('${p.id}')">
+                  <button onclick="sendAssistantComment('${p.id}')" class="bg-sky-600 text-white p-2 rounded-xl hover:bg-sky-700 transition-colors"><i data-lucide="send" class="w-4 h-4"></i></button>
+                </div>
               </div>
             </div>
           </div>
@@ -1843,6 +1862,126 @@ const UI = {
       container.innerHTML = Helpers.emptyState('Error al cargar el muro escolar', 'alert-circle');
     }
   },
+
+  // --- Helpers para Comentarios en Panel Asistente ---
+  window.toggleCommentSection = async (id) => {
+    const el = document.getElementById(`comments-section-${id}`);
+    if(el) {
+      el.classList.toggle('hidden');
+      if(!el.classList.contains('hidden')) {
+         await window.reloadAssistantComments(id);
+      }
+    }
+  };
+
+  window.reloadAssistantComments = async (postId) => {
+    const list = document.getElementById(`comments-list-${postId}`);
+    if(!list) return;
+
+    const { data: comments, error } = await supabase
+      .from('comments')
+      .select('id, content, created_at, user_id, user_name, user:profiles(name, avatar_url, role), students:user_id(name)')
+      .eq('post_id', postId)
+      .order('created_at', { ascending: true });
+
+    if(error) {
+      console.error('Error reloading comments:', error);
+      return;
+    }
+
+    list.innerHTML = (comments || []).map(c => window.renderCommentHTML(c)).join('') || '<p class="text-xs text-slate-400 text-center italic py-2">Sin comentarios aún.</p>';
+    list.scrollTop = list.scrollHeight;
+    refreshIcons();
+  };
+
+  window.renderCommentHTML = (c) => {
+    const userObj = Array.isArray(c.user) ? c.user[0] : c.user;
+    let name = c.user_name || userObj?.name || 'Usuario';
+    
+    // Si es un padre, mostrar el nombre del niño
+    const studentName = Array.isArray(c.students) ? c.students[0]?.name : c.students?.name;
+    if (userObj?.role === 'padre' && studentName) {
+      name = `Familia de ${studentName}`;
+    }
+
+    const avatar = userObj?.avatar_url;
+    const role = userObj?.role === 'padre' ? 'Padre/Madre' : (userObj?.role === 'maestra' ? 'Maestra' : (userObj?.role === 'directora' ? 'Directora' : 'Personal'));
+    const time = new Date(c.created_at).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'});
+
+    return `
+      <div class="flex gap-2 text-sm mb-2 group">
+        <div class="w-8 h-8 rounded-full bg-white border border-slate-200 flex items-center justify-center font-bold text-slate-500 flex-shrink-0 overflow-hidden shadow-sm">
+          ${avatar ? `<img src="${avatar}" class="w-full h-full object-cover">` : name.charAt(0)}
+        </div>
+        <div class="bg-white p-3 rounded-2xl rounded-tl-none shadow-sm border border-slate-200 flex-1 relative">
+          <div class="flex justify-between items-start">
+             <span class="font-bold text-slate-700 text-xs">${name} <span class="text-[10px] text-slate-400 font-normal uppercase ml-1">${role}</span></span>
+             <div class="flex items-center gap-2">
+               <span class="text-[10px] text-slate-400">${time}</span>
+               <button onclick="deleteComment('${c.id}', '${c.post_id}')" class="text-slate-300 hover:text-red-500 transition-colors opacity-0 group-hover:opacity-100" title="Eliminar Comentario">
+                 <i data-lucide="trash-2" class="w-3 h-3"></i>
+               </button>
+             </div>
+          </div>
+          <p class="text-slate-600 mt-1 leading-snug">${c.content}</p>
+        </div>
+      </div>
+    `;
+  };
+
+  window.deleteComment = async (commentId, postId) => {
+    if (!confirm('¿Estás seguro de que deseas eliminar este comentario?')) return;
+
+    try {
+      const { error } = await supabase.from('comments').delete().eq('id', commentId);
+      if (error) throw error;
+
+      await window.reloadAssistantComments(postId);
+
+      const countEl = document.querySelector(`#post-${postId} [data-lucide="message-circle"] + span`);
+      if (countEl) {
+        const current = parseInt(countEl.textContent || 0);
+        countEl.textContent = `${Math.max(0, current - 1)} Comentarios`;
+      }
+    } catch (err) {
+      console.error('Error deleteComment:', err);
+      Helpers.toast('No se pudo eliminar el comentario', 'error');
+    }
+  };
+
+  window.sendAssistantComment = async (postId) => {
+    const input = document.getElementById(`comment-input-${postId}`);
+    const content = input?.value.trim();
+    if (!content) return;
+
+    try {
+      const { error } = await supabase.from('comments').insert({
+        post_id: postId,
+        user_id: AppState.user.id,
+        content: content
+      });
+
+      if (error) throw error;
+      input.value = '';
+      
+      const section = document.getElementById(`comments-section-${postId}`);
+      if (section && section.classList.contains('hidden')) {
+        section.classList.remove('hidden');
+      }
+      
+      await window.reloadAssistantComments(postId);
+      
+      const countEl = document.querySelector(`#post-${postId} [data-lucide="message-circle"] + span`);
+      if(countEl) {
+         const current = parseInt(countEl.textContent || 0);
+         countEl.textContent = `${current + 1} Comentarios`;
+      }
+      
+    } catch (err) {
+      console.error('Error sendAssistantComment:', err);
+      Helpers.toast('Error al enviar comentario', 'error');
+    }
+  };
 
   // --- PERFIL ---
   async loadProfile() {
