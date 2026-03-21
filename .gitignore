@@ -1,0 +1,4 @@
+node_modules/
+*.log
+verification_index.png
+verify_index.py
