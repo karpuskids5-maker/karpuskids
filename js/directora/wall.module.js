@@ -16,6 +16,9 @@ export const WallModule = {
     // Forzar color de acento y rol
     options.accentColor = options.accentColor || 'orange';
     
+    // Asignar _appState ANTES de llamar al shared init
+    this._appState = appState;
+    
     // Llamar al init del módulo compartido
     await SharedWallModule.init.call(this, containerId, options, appState);
     
@@ -35,7 +38,7 @@ export const WallModule = {
             <p class="text-xs text-white/70 font-bold uppercase tracking-widest">Muro Escolar</p>
           </div>
         </div>
-        <button onclick="closeGlobalModal()" class="w-10 h-10 flex items-center justify-center rounded-xl bg-white/10 hover:bg-white/20 transition-colors">
+        <button onclick="App.ui.closeModal()" class="w-10 h-10 flex items-center justify-center rounded-xl bg-white/10 hover:bg-white/20 transition-colors">
           <i data-lucide="x" class="w-6 h-6"></i>
         </button>
       </div>
@@ -69,7 +72,7 @@ export const WallModule = {
       </div>
 
       <div class="p-6 border-t bg-slate-50 rounded-b-3xl flex justify-end gap-3">
-        <button onclick="closeGlobalModal()" class="px-8 py-3 text-slate-500 font-black text-xs uppercase hover:bg-slate-50 rounded-2xl transition-all">Cancelar</button>
+        <button onclick="App.ui.closeModal()" class="px-8 py-3 text-slate-500 font-black text-xs uppercase hover:bg-slate-50 rounded-2xl transition-all">Cancelar</button>
         <button id="btnSubmitPost" onclick="WallModule.submitNewPost()" class="px-10 py-3 bg-gradient-to-r from-purple-600 to-indigo-600 text-white rounded-2xl font-black text-xs uppercase shadow-lg shadow-purple-200 hover:shadow-purple-300 hover:-translate-y-0.5 transition-all active:scale-95">Publicar Ahora</button>
       </div>
     `;
@@ -162,7 +165,7 @@ export const WallModule = {
       if (error) throw error;
 
       Helpers.toast('Publicación compartida correctamente', 'success');
-      window.closeGlobalModal();
+      App.ui.closeModal();
       await this.loadPosts();
     } catch (err) {
       console.error(err);

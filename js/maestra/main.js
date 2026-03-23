@@ -65,7 +65,10 @@ document.addEventListener('DOMContentLoaded', async () => {
   AppState.set('profile', auth.profile);
 
   // 🔔 Inicializar Notificaciones Push
-  try { initOneSignal(auth.user); } catch(e) { console.error("OneSignal init error:", e); }
+  // 🔥 FIX: Solo inicializar si estamos en producción para evitar error de dominio
+  if (window.location.hostname === 'karpuskids.com') {
+    try { initOneSignal(auth.user); } catch(e) { console.warn("OneSignal ignored (dev mode):", e); }
+  }
 
   // Identidad
   const teacherName = auth.profile?.full_name || auth.profile?.name || 'Maestra';
@@ -210,9 +213,6 @@ document.addEventListener('DOMContentLoaded', async () => {
     _submitNewPost: submitNewPost
   });
 
-  // Compatibilidad legacy
-  Object.assign(window, window.App);
-  
   // 🔥 EXPOSICIÓN GLOBAL DE MÓDULOS (CRUCIAL PARA EL MURO)
   window.WallModule = WallModule;
 
@@ -649,7 +649,7 @@ async function saveRoutineLog(studentId) {
       date: new Date().toISOString().split('T')[0],
       mood: mood,
       food: food,
-      sleeping: sleep,
+      sleeping: sleep, // api.js lo convertirá a 'nap'
       notes: note // Usar 'notes' para alinearse con DB
     };
 

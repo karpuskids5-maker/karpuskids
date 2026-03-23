@@ -119,16 +119,20 @@ export const WallModule = {
   },
 
   async loadPosts(container, append = false) {
-    // 🛡️ Fix: Si 'container' es un número (ej: 1 desde main.js), ignorarlo y usar el ID configurado
-    if (typeof container === 'number') {
+    // 🛡️ Fix: Si 'container' es un string (ID), convertirlo a elemento DOM
+    if (typeof container === 'string') {
+      container = document.getElementById(container);
+    }
+    // Si no se pasó container o no es válido, usar el ID configurado
+    if (!container) {
       container = document.getElementById(this._containerId);
     }
     
     if (this._isLoading || (!this._hasMore && append)) return;
     this._isLoading = true;
 
-    if (!container) container = document.getElementById(this._containerId);
     if (!container) {
+      console.warn('WallModule: No container found to load posts.');
       this._isLoading = false;
       return;
     }

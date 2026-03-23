@@ -141,8 +141,18 @@ export const MaestraApi = {
     
     // Si el usuario envió notes, nos aseguramos que se llame notes en la DB.
     // Si en un futuro quieres usar 'activities', puedes añadir la columna a la DB.
-    if (payload.activities && !payload.notes) {
+    if (cleanPayload.activities) {
+      if (!cleanPayload.notes) {
       cleanPayload.notes = payload.activities;
+      }
+      // 🔥 FIX: Eliminar columna origen para evitar error 400 si no existe en DB
+      delete cleanPayload.activities;
+    }
+
+    // 🔥 FIX: Mapear 'sleeping' (JS) a 'nap' (DB) para evitar error 400
+    if (cleanPayload.sleeping) {
+      if (!cleanPayload.nap) cleanPayload.nap = cleanPayload.sleeping;
+      delete cleanPayload.sleeping; 
     }
 
     const { data: existing, error: findError } = await supabase

@@ -13,7 +13,7 @@ function logError(context, error) {
 /**
  * Agrega un tiempo límite a cualquier promesa
  */
-async function withTimeout(promise, ms = 10000) {
+async function withTimeout(promise, ms = 20000) {
   const timeout = new Promise((_, reject) =>
     setTimeout(() => reject(new Error(`Timeout tras ${ms}ms`)), ms)
   );
@@ -126,7 +126,9 @@ export const DirectorApi = {
 
   async getStudents() {
     return await queryBuilder(
-      supabase.from(TABLES.STUDENTS).select('*, classrooms(name)').order('name'),
+      supabase.from(TABLES.STUDENTS)
+        .select('id, name, matricula, is_active, p1_name, p1_phone, p1_email, classroom_id, avatar_url, classrooms:classroom_id(name)')
+        .order('name'),
       'getStudents'
     );
   },

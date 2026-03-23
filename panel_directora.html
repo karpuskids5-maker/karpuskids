@@ -98,6 +98,14 @@
       align-items: center;
       justify-content: center;
       z-index: 9999;
+      opacity: 0;
+      visibility: hidden;
+      transition: all 0.3s ease;
+    }
+    
+    .modal-container.active {
+      opacity: 1;
+      visibility: visible;
     }
     
     .modal-container.hidden {
@@ -218,6 +226,18 @@
     .child-card-icon { font-size: 1.5rem; }
     .child-card-body { font-size: 0.9rem; color: #475569; margin-bottom: 1rem; }
     .child-card-footer { display: flex; justify-content: flex-end; }
+
+    /* --- CORRECCIÓN SOLICITADA: BOTÓN GESTIÓN MORADO --- */
+    /* Fuerza el color morado en botones oscuros dentro del grid de maestros */
+    #teachersGrid button.bg-slate-900,
+    #teachersGrid button.bg-black,
+    #teachersGrid button.bg-gray-800 {
+      background-color: #7c3aed !important; /* purple-600 */
+      border-color: #7c3aed !important;
+    }
+    #teachersGrid button:hover {
+      background-color: #6d28d9 !important; /* purple-700 */
+    }
   </style>
 </head>
 <body class="bg-slate-50 text-slate-800 font-nunito panel-directora-body">
@@ -497,7 +517,7 @@
             <button id="btnAddAssistant" class="px-4 py-2.5 bg-indigo-100 text-indigo-700 hover:bg-indigo-200 rounded-xl text-sm font-bold transition-colors flex items-center gap-2">
               <i data-lucide="user-plus" class="w-4 h-4"></i> Asistente
             </button>
-<button onclick="window.App?.teachers?.openCreateModal()" class="px-4 py-2.5 bg-purple-600 text-white hover:bg-purple-700 rounded-xl text-sm font-bold shadow-md hover:shadow-lg transition-all flex items-center gap-2">
+<button onclick="App.teachers.openModal()" class="px-4 py-2.5 bg-purple-600 text-white hover:bg-purple-700 rounded-xl text-sm font-bold shadow-md hover:shadow-lg transition-all flex items-center gap-2">
               <i data-lucide="plus" class="w-4 h-4"></i> Nuevo Maestro
             </button>
           </div>
@@ -1146,7 +1166,7 @@
             <h1 class="text-3xl font-black text-slate-800">🎭 Muro Escolar</h1>
             <p class="text-slate-500 font-medium">Comunicación y actualizaciones de la comunidad educativa</p>
           </div>
-          <button id="btnNewPost" onclick="WallModule.openNewPostModal()" class="px-4 py-2 bg-orange-600 text-white rounded-lg hover:bg-orange-700 transition-colors flex items-center gap-2 font-medium shadow-sm">
+          <button id="btnNewPost" onclick="App.wall.openNewPostModal()" class="px-4 py-2 bg-orange-600 text-white rounded-lg hover:bg-orange-700 transition-colors flex items-center gap-2 font-medium shadow-sm">
             <i data-lucide="plus" class="w-5 h-5"></i> Nuevo Post
           </button>
         </header>
@@ -1254,7 +1274,97 @@
   </div>
 
   <!-- Contenedor Único de Modales -->
-  <div id="globalModalContainer" class="modal-container hidden items-center justify-center z-50 fixed inset-0 bg-black/50 backdrop-blur-sm"></div>
+  <div id="globalModalContainer" class="fixed inset-0 bg-black/50 backdrop-blur-sm z-[9999] items-center justify-center p-4" style="display:none;"></div>
+
+  <!-- MODAL MAESTRO (CORREGIDO) -->
+  <div id="modalTeacher" class="fixed inset-0 bg-black/50 hidden flex items-center justify-center z-50 backdrop-blur-sm p-4">
+    <div class="bg-white rounded-2xl shadow-2xl w-full max-w-lg transform transition-all scale-100">
+      <!-- Header Morado -->
+      <div class="bg-purple-600 p-6 rounded-t-2xl flex justify-between items-center text-white">
+        <h3 class="font-bold text-xl flex items-center gap-2">
+          <i data-lucide="user-plus" class="w-6 h-6"></i>
+          <span id="teacherModalTitle">Gestión de Maestro</span>
+        </h3>
+        <button onclick="document.getElementById('modalTeacher').classList.add('hidden')" class="text-purple-200 hover:text-white transition-colors">
+          <i data-lucide="x" class="w-6 h-6"></i>
+        </button>
+      </div>
+      
+      <div class="p-6 space-y-4">
+        <input type="hidden" id="teacherId">
+        <div>
+          <label class="block text-sm font-bold text-slate-700 mb-1">Nombre Completo</label>
+          <input id="teacherName" type="text" placeholder="Ej: Lic. María Pérez" class="w-full border border-slate-300 rounded-xl px-4 py-3 focus:ring-2 focus:ring-purple-500 outline-none transition-all">
+        </div>
+        <div class="grid grid-cols-2 gap-4">
+          <div>
+            <label class="block text-sm font-bold text-slate-700 mb-1">Correo (Usuario)</label>
+            <input id="teacherEmail" type="email" placeholder="usuario@karpus.com" class="w-full border border-slate-300 rounded-xl px-4 py-3 focus:ring-2 focus:ring-purple-500 outline-none transition-all">
+          </div>
+          <div>
+             <label class="block text-sm font-bold text-slate-700 mb-1">Teléfono</label>
+             <input id="teacherPhone" type="tel" placeholder="809-000-0000" class="w-full border border-slate-300 rounded-xl px-4 py-3 focus:ring-2 focus:ring-purple-500 outline-none transition-all">
+          </div>
+        </div>
+        <div>
+          <label class="block text-sm font-bold text-slate-700 mb-1">Contraseña</label>
+          <input id="teacherPassword" type="text" placeholder="Mínimo 6 caracteres" class="w-full border border-slate-300 rounded-xl px-4 py-3 focus:ring-2 focus:ring-purple-500 outline-none transition-all">
+          <p class="text-xs text-slate-400 mt-1">* Dejar vacío si no se desea cambiar.</p>
+        </div>
+      </div>
+
+      <div class="p-6 border-t bg-slate-50 rounded-b-2xl flex justify-end gap-3">
+        <button onclick="document.getElementById('modalTeacher').classList.add('hidden')" class="px-6 py-2.5 border border-slate-300 text-slate-600 font-bold rounded-xl hover:bg-white transition-colors">Cancelar</button>
+        <button id="btnSaveTeacher" class="px-6 py-2.5 bg-purple-600 text-white font-bold rounded-xl hover:bg-purple-700 shadow-lg shadow-purple-200 transition-all">Guardar Maestro</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- MODAL ESTUDIANTE (CORREGIDO) -->
+  <div id="modalStudent" class="fixed inset-0 bg-black/50 hidden flex items-center justify-center z-50 backdrop-blur-sm p-4">
+    <div class="bg-white rounded-2xl shadow-2xl w-full max-w-2xl transform transition-all scale-100 max-h-[90vh] overflow-y-auto custom-scrollbar">
+      <!-- Header Naranja/Gradient -->
+      <div class="bg-gradient-to-r from-orange-500 to-pink-500 p-6 flex justify-between items-center text-white sticky top-0 z-10">
+        <h3 class="font-bold text-xl flex items-center gap-2">
+          <i data-lucide="backpack" class="w-6 h-6"></i>
+          <span id="studentModalTitle">Expediente Estudiante</span>
+        </h3>
+        <button onclick="document.getElementById('modalStudent').classList.add('hidden')" class="text-orange-100 hover:text-white transition-colors">
+          <i data-lucide="x" class="w-6 h-6"></i>
+        </button>
+      </div>
+
+      <div class="p-6 space-y-5">
+        <input type="hidden" id="studentId">
+        
+        <!-- Datos del Niño -->
+        <div class="bg-orange-50 p-4 rounded-xl border border-orange-100">
+          <h4 class="text-orange-800 font-bold mb-3 flex items-center gap-2"><i data-lucide="smile" class="w-4 h-4"></i> Datos del Alumno</h4>
+          <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <input id="stName" placeholder="Nombre Completo" class="border p-2 rounded-lg">
+            <input id="stAge" type="number" placeholder="Edad" class="border p-2 rounded-lg">
+            <select id="stClassroom" class="border p-2 rounded-lg bg-white"><option value="">Seleccionar Aula...</option></select>
+            <select id="stStatus" class="border p-2 rounded-lg bg-white"><option value="active">Activo</option><option value="inactive">Inactivo</option></select>
+          </div>
+        </div>
+
+        <!-- Datos de los Padres -->
+        <div class="bg-blue-50 p-4 rounded-xl border border-blue-100">
+          <h4 class="text-blue-800 font-bold mb-3 flex items-center gap-2"><i data-lucide="users" class="w-4 h-4"></i> Datos Familiares</h4>
+          <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+             <input id="stParentName" placeholder="Nombre del Padre/Tutor" class="border p-2 rounded-lg w-full md:col-span-2">
+             <input id="stParentEmail" placeholder="Correo (Login)" class="border p-2 rounded-lg">
+             <input id="stParentPhone" placeholder="Teléfono" class="border p-2 rounded-lg">
+          </div>
+        </div>
+        
+        <div class="flex justify-end pt-4 gap-3">
+           <button onclick="document.getElementById('modalStudent').classList.add('hidden')" class="px-6 py-2 rounded-xl border font-bold text-slate-500">Cerrar</button>
+           <button id="btnSaveStudent" class="px-6 py-2 rounded-xl bg-orange-600 text-white font-bold hover:bg-orange-700 shadow-lg">Guardar Ficha</button>
+        </div>
+      </div>
+    </div>
+  </div>
 
   <!-- Scripts optimizados -->
   <script>
