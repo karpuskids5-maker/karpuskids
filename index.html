@@ -23,6 +23,9 @@
   
   <!-- Alpine.js para interactividad -->
   <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>
+  <script>
+    document.addEventListener('alpine:init', () => {});
+  </script>
 
   <!-- Favicon -->
   <link rel="icon" href="logo/favicon.ico" sizes="any">
@@ -306,7 +309,7 @@
     </div>
 
     <!-- Menú móvil -->
-    <div x-show="open"
+    <div x-show="open" x-cloak
          @click.away="open = false"
          x-transition
          class="md:hidden mt-2 mx-2 bg-white rounded-2xl shadow-xl overflow-hidden">
@@ -319,35 +322,6 @@
         <a href="login.html" class="py-3 bg-gray-100">Acceso Padres</a>
       </div>
 
-    </div>
-  </header>
-
-  <!-- Hero con Video -->
-  <section class="relative min-h-screen flex items-center justify-center text-center overflow-hidden pt-24">
-    <img src="/img/karpus.jpg"
-       class="absolute inset-0 w-full h-full object-cover hero-bg-animate"
-       alt="Niños felices en Karpus Kids" loading="lazy">
-    <div class="absolute inset-0 bg-gradient-to-b from-black/60 via-black/40 to-black/70"></div>
-    <div x-data="{ contactModal: false }" class="relative z-10 p-8 text-white max-w-4xl mx-auto" data-aos="fade-up">
-          </button>
-      </div>
-    </div>
-    <!-- Menú Móvil -->
-    <div x-show="open" @click.away="open = false" 
-         x-transition:enter="transition ease-out duration-200"
-         x-transition:enter-start="opacity-0 -translate-y-2"
-         x-transition:enter-end="opacity-100 translate-y-0"
-         x-transition:leave="transition ease-in duration-150"
-         x-transition:leave-start="opacity-100 translate-y-0"
-         x-transition:leave-end="opacity-0 -translate-y-2"
-         class="md:hidden absolute top-full left-0 right-0 mt-2 bg-white rounded-2xl shadow-xl border border-slate-100 overflow-hidden">
-      <div class="flex flex-col p-4 gap-2 text-center font-medium text-slate-600">
-        <a href="#nosotros" @click="open = false" class="py-3 hover:bg-orange-50 hover:text-orange-500 rounded-xl transition-colors">Nosotros</a>
-        <a href="#galeria-fotos" @click="open = false" class="py-3 hover:bg-pink-50 hover:text-pink-500 rounded-xl transition-colors">Galería</a>
-        <a href="#precios" @click="open = false" class="py-3 hover:bg-blue-50 hover:text-blue-500 rounded-xl transition-colors">Servicios</a>
-        <a href="#footer" @click="open = false" class="py-3 hover:bg-green-50 hover:text-green-500 rounded-xl transition-colors">Contacto</a>
-        <a href="login.html" class="py-3 bg-slate-100 text-slate-800 rounded-xl mt-2">Acceso Padres</a>
-      </div>
     </div>
   </header>
 

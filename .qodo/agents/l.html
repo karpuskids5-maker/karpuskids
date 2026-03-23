@@ -31,38 +31,37 @@ const escapeHtml = (str = '') => {
 
 const Helpers = {
   // ✅ TOAST MEJORADO: stacking, accesibilidad, remoción segura
-  toast: ((() => {
+  toast: (() => {
     let toastCount = 0;
     return (message, type = 'success') => {
       const toastId = `toast-${Date.now()}-${toastCount++}`;
       const map = { success: 'bg-emerald-500', error: 'bg-rose-500', info: 'bg-sky-500' };
       const color = map[type] || map.info;
-      
+
       const toast = document.createElement('div');
       toast.id = toastId;
       toast.setAttribute('role', 'alert');
       toast.setAttribute('aria-live', 'polite');
       toast.className = `fixed bottom-6 right-6 ${color} text-white px-5 py-3 rounded-xl shadow-lg flex items-center gap-2 z-[100] transition-all opacity-0 translate-y-2`;
       toast.innerHTML = `<span class="text-sm font-medium">${escapeHtml(message)}</span>`;
-      
+
       document.body.appendChild(toast);
-      
-      // Animación de entrada
+
       requestAnimationFrame(() => {
         toast.classList.remove('opacity-0', 'translate-y-2');
         toast.classList.add('opacity-100', 'translate-y-0');
       });
 
-      // Animación de salida
       setTimeout(() => {
         toast.classList.add('opacity-0', 'translate-y-2');
         toast.classList.remove('opacity-100', 'translate-y-0');
         setTimeout(() => {
-          if (document.getElementById(toastId)) document.body.removeChild(toast);
+          // eliminar de forma segura
+          if (toast && toast.parentNode) toast.parentNode.removeChild(toast);
         }, 300);
       }, TOAST_DURATION);
     };
-  })()),
+  })(),
   
   emptyState: (msg) => 
     `<div class="text-center py-12 text-slate-400" role="status" aria-label="Sin contenido">
@@ -82,15 +81,18 @@ class SafeAppState {
     this._state = { 
       user: null, profile: null, student: null, tasks: [], 
       globalChannel: null, feedChannel: null, liveChannel: null,
-      chatChannel: null, currentChatUser: null,
+      chatChannel: null, currentChatUser: null, isClassLive: false,
+      chatChannel: null, currentChatUser: null, isClassLive: false,
       feedPage: 0, feedHasMore: true
     };
   }
   
   get(key) { return this._state[key]; }
-  set(key, value) { 
-    if (key in this._state) this._state[key] = value; 
-    else console.warn(`AppState: Clave inválida ${key}`);
+  set(key, value) {
+    if (!(key in this._state)) {
+      throw new Error(`AppState: Clave inválida "${key}"`);
+    }
+    this._state[key] = value;
   }
   
   async reset() {
@@ -108,7 +110,7 @@ class SafeAppState {
     this._state = { 
       user: null, profile: null, student: null, tasks: [], 
       globalChannel: null, feedChannel: null, liveChannel: null,
-      chatChannel: null, currentChatUser: null,
+      chatChannel: null, attendanceChannel: null, currentChatUser: null, isClassLive: false,
       feedPage: 0, feedHasMore: true
     };
   }
@@ -119,16 +121,16 @@ const AppState = new SafeAppState();
 const GlobalCache = {
   store: {},
   maxItems: 50,
-  set(key, data, ttl = 60000) { 
-    if (Object.keys(this.store).length > this.maxItems) {
-      const oldest = Object.keys(this.store)[0];
-      delete this.store[oldest];
+  set(key, data, ttl = 60000) {
+    if (Object.keys(this.store).length >= this.maxItems) {
+      const oldestKey = Object.entries(this.store).sort((a, b) => a[1].time - b[1].time)[0]?.[0];
+      if (oldestKey) delete this.store[oldestKey];
     }
-    this.store[key] = { 
-      data, 
-      time: Date.now(), 
-      ttl 
-    }; 
+    this.store[key] = {
+      data,
+      time: Date.now(),
+      ttl
+    };
   },
   // 6️⃣ Mejora en GlobalCache
   get(key) { 
@@ -155,14 +157,16 @@ async function sendEmail(to, subject, html, text) {
     // Usar Edge Function de Supabase
     const res = await fetch('https://wwnfonkvemimwiqjpkij.supabase.co/functions/v1/send-email', {
       method: 'POST',
-      headers: { 
+      headers: {
         'Content-Type': 'application/json',
         'Authorization': `Bearer ${session?.access_token || ''}`
       },
       body: JSON.stringify({ to, subject, html, text })
     });
+
+    const result = await res.json().catch(() => null);
     if (!res.ok) {
-      console.error('Error HTTP enviando correo', res.status);
+      console.error('Error enviando correo:', res.status, result);
     }
   } catch (e) {
     console.error('Error enviando correo', e);
@@ -195,20 +199,12 @@ function setupSidebarMobile() {
   nav.addEventListener('scroll', checkScroll); // Actualizar al hacer scroll
   
   // Smooth scroll para botones 
-  nav.addEventListener('wheel', (e) => { 
-    if (window.innerWidth <= 767) { 
-      // 11️⃣ Solo interceptar si el movimiento horizontal es dominante o si queremos forzarlo
-      if(Math.abs(e.deltaX) > Math.abs(e.deltaY)){
-        e.preventDefault(); 
-        nav.scrollLeft += e.deltaX; 
-      } else if (Math.abs(e.deltaY) > 0) {
-        // Permitir scroll vertical si el usuario mueve la rueda hacia arriba/abajo
-        // Pero en móviles esto es raro, suele ser touch.
-        // Si queremos que la rueda mueva el nav horizontalmente:
-        e.preventDefault();
-        nav.scrollLeft += e.deltaY;
-      }
-    } 
+  nav.addEventListener('wheel', (e) => {
+    if (window.innerWidth > 767) return; // No interferir en desktop
+    if (Math.abs(e.deltaX) > Math.abs(e.deltaY)) {
+      e.preventDefault();
+      nav.scrollLeft += e.deltaX;
+    }
   }, { passive: false }); 
   
   // Indicadores táctiles para iOS 
@@ -264,12 +260,13 @@ document.addEventListener('DOMContentLoaded', async () => {
   }
 
   // ✅ Verificación de autenticación con redirección SEGURA
-  const { data: { user }, error: authError } = await supabase.auth.getUser();
-  if (authError || !user) {
-    console.error('Error de autenticación:', authError?.message || 'Usuario no autenticado');
+  const { data, error: authError } = await supabase.auth.getSession();
+  if (authError || !data?.session?.user) {
+    console.error('Error de autenticación o sesión inválida:', authError?.message || 'Usuario no autenticado');
     window.location.href = 'login.html';
     return;
   }
+  const user = data.session.user;
   AppState.set('user', user);
 
   // ✅ Iniciar OneSignal con el usuario ya cargado (Evita error de Lock)
@@ -291,7 +288,11 @@ document.addEventListener('DOMContentLoaded', async () => {
       el.textContent = profile?.name ? escapeHtml(profile.name) : 'Familia';
     });
     
-    await loadStudentData(); // ⭐ FIX: Await student data before loading dashboard
+    try {
+      await loadStudentData(); // ⭐ FIX: Await student data before loading dashboard
+    } catch (e) {
+      console.error('loadStudentData error:', e);
+    }
   } catch (err) {
     console.error('Error cargando perfil:', err);
     Helpers.toast('Error al cargar tu información', 'error');
@@ -373,14 +374,15 @@ window.setActiveSection = (targetId) => {
   
   // Mostrar sección objetivo
   const targetSection = document.getElementById(targetId);
-  if (targetSection) {
-    targetSection.classList.remove('hidden');
-    targetSection.classList.add('active');
-    targetSection.setAttribute('aria-hidden', 'false');
-    
-    // Cargar datos específicos de la sección
-    loadSectionData(targetId);
+  if (!targetSection) {
+    console.warn(`Sección no encontrada: ${targetId}`);
+    return;
   }
+  targetSection.classList.remove('hidden');
+  targetSection.classList.add('active');
+  targetSection.setAttribute('aria-hidden', 'false');
+  // Cargar datos específicos de la sección
+  loadSectionData(targetId);
   
   // Actualizar botón activo
   const activeBtn = document.querySelector(`button[data-target="${targetId}"]`);
@@ -733,7 +735,7 @@ async function loadStudentData() {
     // ✅ Iniciar servicios que dependen del estudiante
     initGlobalRealtime();
     initFeedRealtime();
-    initLiveClassListener(student.classroom_id);
+    await initLiveClassListener(student.classroom_id); // ✅ FIX: Esperar verificación de clase en vivo
   } catch (err) {
     console.error('Error cargando datos del estudiante:', err);
     Helpers.toast('Error al cargar información del estudiante', 'error');
@@ -754,6 +756,11 @@ function updateStudentUI(student) {
   document.querySelectorAll('.student-name-display').forEach(el => {
     el.textContent = displayName;
     el.setAttribute('aria-label', `Estudiante: ${displayName}`);
+  });
+
+  // Forzar que el saludo principal muestre el nombre del estudiante
+  document.querySelectorAll('.guardian-name-display').forEach(el => {
+    el.textContent = displayName;
   });
   
   document.querySelectorAll('.classroom-name-display').forEach(el => {
@@ -777,45 +784,101 @@ function updateStudentUI(student) {
 
 // ===== LISTENER CLASE EN VIVO (BADGE) =====
 async function initLiveClassListener(classroomId) {
+    return new Promise((resolve) => {
+        const updateLiveStatus = (isLive) => {
+            // Guardar estado global
+            AppState.set('isClassLive', isLive);
+
+            // 1. Actualizar Botón Sidebar
+            const btn = document.querySelector('button[data-target="videocall"]');
+            if (btn) {
+                if (isLive) {
+                    btn.classList.remove('hidden');
+                    btn.classList.add('flex');
+                } else {
+                    btn.classList.add('hidden');
+                }
+            }
+            
+            // 2. Actualizar Tarjeta Dashboard (si existe)
+            const dashboardCard = document.querySelector('.patio-card[data-target="videocall"]');
+            if (dashboardCard) {
+                if (isLive) {
+                    dashboardCard.classList.remove('hidden');
+                    dashboardCard.classList.add('flex', 'ring-4', 'ring-rose-200');
+                } else {
+                    dashboardCard.classList.add('hidden');
+                    dashboardCard.classList.remove('flex', 'ring-4', 'ring-rose-200');
+                }
+            }
+        };
+
+        // Limpiar suscripción anterior
+        const oldChannel = AppState.get('liveChannel');
+        if(oldChannel) supabase.removeChannel(oldChannel);
+
+        // Check inicial
+        const checkStatus = async () => {
+            if (!classroomId) { resolve(); return; }
+            try {
+                const { data, error } = await supabase.from('classrooms').select('is_live').eq('id', classroomId).maybeSingle();
+                if (error) console.warn("Live status check failed (non-critical):", error.message);
+                const isLive = !!data?.is_live;
+                updateLiveStatus(isLive);
+            } catch (err) {
+                console.error("Live status error:", err);
+            } finally {
+                resolve(); // ✅ Resolver siempre para no bloquear la carga
+            }
+        };
+
+        checkStatus();
+
+        // Suscripción a cambios en tiempo real
+        const channel = supabase.channel('classroom_live_' + classroomId)
+            .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'classrooms', filter: `id=eq.${classroomId}` }, (payload) => {
+                const isLive = payload.new.is_live;
+                updateLiveStatus(isLive);
+                if(isLive) Helpers.toast('¡La clase ha comenzado!', 'info');
+            })
+            .subscribe();
+            
+        AppState.set('liveChannel', channel);
+    });
+}
+
+/* Código anterior eliminado para reemplazo limpio:
     const btn = document.querySelector('button[data-target="videocall"]');
-    if(!btn) return;
-    
-    // 5️⃣ Posible memory leak en Realtime
     const oldChannel = AppState.get('liveChannel');
-    if(oldChannel) {
-        await supabase.removeChannel(oldChannel);
-    }
-
-    const checkStatus = async () => {
-        if (!classroomId) return;
-        const { data } = await supabase.from('classrooms').select('is_live').eq('id', classroomId).maybeSingle();
-        updateBadge(data?.is_live);
-    };
-
-    const updateBadge = (isLive) => {
-        const existingBadge = btn.querySelector('.live-badge');
+    if(oldChannel) { await supabase.removeChannel(oldChannel); }
+    const checkStatus = async () => { ... };
+    const updateLiveStatus = (isLive) => {
         if (isLive) {
-            if (!existingBadge) {
-                btn.innerHTML += `<span class="live-badge ml-2 flex h-3 w-3 relative"><span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75"></span><span class="relative inline-flex rounded-full h-3 w-3 bg-red-500"></span></span>`;
+            if(btn) {
+                btn.classList.remove('hidden');
+                btn.classList.add('flex'); // Asegurar display flex
             }
         } else {
-            if (existingBadge) existingBadge.remove();
+            if(btn) btn.classList.add('hidden');
         }
+        const dashboardCard = document.querySelector('[data-target="videocall"].patio-card');
+        if (dashboardCard) {
+            if (isLive) {
+                dashboardCard.classList.remove('hidden');
+                dashboardCard.classList.add('flex');
+                dashboardCard.classList.add('ring-4', 'ring-rose-200');
+            } else {
+                dashboardCard.classList.remove('flex');
+                dashboardCard.classList.add('hidden');
+                dashboardCard.classList.remove('ring-4', 'ring-rose-200');
+            }
+        }
+        AppState.set('isClassLive', isLive);
     };
-
-    // Check inicial
     checkStatus();
-
-    // Suscripción a cambios
     const channel = supabase.channel('classroom_live_' + classroomId)
-        .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'classrooms', filter: `id=eq.${classroomId}` }, (payload) => {
-            updateBadge(payload.new.is_live);
-            if(payload.new.is_live) Helpers.toast('¡La clase ha comenzado!', 'info');
-        })
-        .subscribe();
-        
-    AppState.set('liveChannel', channel);
-}
+    ...
+*/
 
 // ===== TAREAS CON DELEGACIÓN DE EVENTOS =====
 async function loadTasks(filter = 'pending') {
@@ -1026,7 +1089,11 @@ function renderTaskCard(task, evidenceMap) {
 
 function getStatusLabel(task, evidence, dueDate) {
   if (evidence) return 'Entregada';
-  if (dueDate && dueDate < new Date()) return 'Atrasada';
+  if (dueDate) {
+    const due = new Date(dueDate);
+    const now = new Date();
+    if (due < now) return 'Atrasada';
+  }
   return 'Pendiente';
 }
 
@@ -1094,7 +1161,9 @@ async function openTaskDetail(taskId) {
         // Configurar botón de envío
         const btnSubmit = document.getElementById('btnSubmitTask');
         if (btnSubmit) {
-          btnSubmit.onclick = () => submitTask(taskId);
+          const newBtn = btnSubmit.cloneNode(true);
+          btnSubmit.parentNode.replaceChild(newBtn, btnSubmit);
+          newBtn.onclick = () => submitTask(taskId);
         }
     }
 
@@ -1127,6 +1196,10 @@ async function submitTask(taskId) {
     
     // ✅ Validación de archivo
     if (file) {
+      if (!file.type) {
+        Helpers.toast('Archivo inválido o corrupto', 'error');
+        return;
+      }
       const allowedTypes = ['application/pdf', 'image/jpeg', 'image/png', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'];
       if (!allowedTypes.includes(file.type)) {
         Helpers.toast('Tipo de archivo no permitido', 'error');
@@ -1165,8 +1238,9 @@ async function submitTask(taskId) {
          const { error: upError } = await supabase.storage.from(STORAGE_BUCKETS.CLASSROOM_MEDIA).upload(path, file);
          if (upError) throw upError;
          
-         const { data } = await supabase.storage.from(STORAGE_BUCKETS.CLASSROOM_MEDIA).createSignedUrl(path, 31536000);
-         fileUrl = data?.signedUrl;
+         const { data, error: urlError } = await supabase.storage.from(STORAGE_BUCKETS.CLASSROOM_MEDIA).createSignedUrl(path, 31536000);
+         if (urlError || !data?.signedUrl) throw urlError || new Error('No se pudo generar URL del archivo');
+         fileUrl = data.signedUrl;
       }
 
     // ⭐ FIX: Error potencial en submitTask (código incompleto)
@@ -1240,17 +1314,21 @@ function setupModalAccessibility(modal) {
   closeBtn?.addEventListener('click', () => closeModal(modal));
   document.addEventListener('keydown', handleEscape);
   modal.addEventListener('click', handleClickOutside);
-  
-  // Cleanup al destruir (ej: logout)
-  return () => {
+
+  // Cleanup logic
+  modal._cleanup = () => {
     document.removeEventListener('keydown', handleEscape);
     modal.removeEventListener('click', handleClickOutside);
   };
+  
+  // Cleanup al destruir (ej: logout)
+  return modal._cleanup;
 }
 
 function closeModal(modal) {
   modal.classList.add('hidden');
   modal.removeAttribute('aria-modal');
+  if (modal._cleanup) modal._cleanup();
   // Restaurar enfoque al botón que abrió el modal (mejora UX)
 }
 
@@ -1269,6 +1347,25 @@ function initGlobalRealtime() {
   // ✅ 3. REALTIME INTELIGENTE
   const subscribeToRealtime = () => {
     if (AppState.get('globalChannel')) return; // Evitar suscripciones múltiples
+
+    // ✅ Listener para actualizaciones de asistencia desde el panel de la maestra
+    try {
+      const attendanceChannel = supabase.channel('karpus-global-updates');
+      attendanceChannel.on('broadcast', { event: 'attendance_updated' }, (message) => {
+        console.log('Parent Panel: Received attendance update!', message.payload);
+        GlobalCache.clear('attendance');
+        
+        // Si el dashboard está activo, recárgalo para ver el estado actualizado.
+        if (document.getElementById('home')?.classList.contains('active')) {
+          loadDashboard();
+        }
+        // Si la sección de asistencia está activa, recárgala.
+        if (document.getElementById('live-attendance')?.classList.contains('active')) {
+          loadAttendance();
+        }
+      }).subscribe();
+      AppState.set('attendanceChannel', attendanceChannel);
+    } catch(e) { console.error("Error subscribing to attendance updates:", e); }
 
     const channel = supabase
       .channel('global-realtime')
@@ -1318,21 +1415,6 @@ function initGlobalRealtime() {
            // Actualizar vistas relevantes
            if (document.getElementById('tasks')?.classList.contains('active')) loadTasks();
            if (document.getElementById('grades')?.classList.contains('active')) loadGrades();
-           if (document.getElementById('home')?.classList.contains('active')) loadDashboard();
-        }
-      )
-      // 3. ASISTENCIA
-      .on(
-        'postgres_changes',
-        {
-          event: '*',
-          schema: 'public',
-          table: TABLES.ATTENDANCE,
-          filter: `student_id=eq.${studentId}`
-        },
-        () => {
-           GlobalCache.clear('attendance');
-           if (document.getElementById('live-attendance')?.classList.contains('active')) loadAttendance();
            if (document.getElementById('home')?.classList.contains('active')) loadDashboard();
         }
       )
@@ -1539,7 +1621,9 @@ async function loadDashboard() {
   if (!student) return;
   
   try {
-    const today = new Date().toISOString().split('T')[0];
+    // ✅ FIX: Usar fecha local YYYY-MM-DD para coincidir con el registro de la maestra
+    const now = new Date();
+    const today = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
 
     // ✅ Solicitudes en paralelo para rendimiento
     const [attRes, pendingRes, deliveredRes, debtRes] = await Promise.all([
@@ -1564,6 +1648,7 @@ async function loadDashboard() {
     else if (attStatus === 'late') { attText = 'Tardanza'; attTheme = 'card-yellow'; }
     
     const totalDebt = debtRes.data || 0;
+    const formatMoney = (n) => new Intl.NumberFormat('es-DO', { style: 'currency', currency: 'DOP' }).format(n);
 
     // ✅ Mapeo de Temas Seguro (Tarjetas Blancas con Iconos de Color)
     const themeMap = {
@@ -1575,6 +1660,9 @@ async function loadDashboard() {
         'card-slate':  { iconBg: 'bg-slate-100',   iconText: 'text-slate-600',   border: 'border-slate-400',   decoration: 'bg-slate-50' },
         'card-rose':   { iconBg: 'bg-rose-100',    iconText: 'text-rose-600',    border: 'border-rose-400',    decoration: 'bg-rose-50' }
     };
+
+    // Estado de clase en vivo (cacheado o default false)
+    const isLive = AppState.get('isClassLive') || false;
 
     // ✅ Configuración de Tarjetas (Reorganización solicitada)
     const cards = [
@@ -1590,7 +1678,7 @@ async function loadDashboard() {
             icon: 'credit-card',
             target: 'payments',
             theme: 'card-yellow',
-            value: totalDebt > 0 ? `$${totalDebt}` : 'Al día'
+            value: totalDebt > 0 ? formatMoney(totalDebt) : 'Al día'
         },
         {
             title: 'Calificaciones',
@@ -1618,7 +1706,8 @@ async function loadDashboard() {
             icon: 'video',
             target: 'videocall',
             theme: 'card-rose',
-            value: 'Entrar'
+            value: 'Entrar',
+            hidden: !isLive // Propiedad especial para ocultar si no hay clase
         }
     ];
 
@@ -1626,15 +1715,15 @@ async function loadDashboard() {
     container.innerHTML = cards.map(card => {
         const t = themeMap[card.theme] || themeMap['card-slate'];
         
+        const displayClass = card.hidden ? 'hidden' : 'flex'; // Ocultar por defecto si no es live
         return `
-        <div data-target="${card.target}" class="patio-card p-5 flex flex-col items-center justify-center gap-3 cursor-pointer hover:shadow-lg active:scale-95 transition-all group relative overflow-hidden">
+        <div data-target="${card.target}" class="patio-card p-5 ${displayClass} flex-col items-center justify-center gap-3 cursor-pointer hover:shadow-lg active:scale-95 transition-all group relative overflow-hidden ${card.hidden ? '' : (isLive && card.target === 'videocall' ? 'ring-4 ring-rose-200' : '')}">
             <div class="p-4 rounded-full ${t.iconBg} ${t.iconText} mb-1 group-hover:scale-110 transition-transform duration-300">
                 <i data-lucide="${card.icon}" class="w-8 h-8"></i>
             </div>
             <h3 class="font-bold text-slate-700 text-lg">${card.title}</h3>
             <span class="text-xs font-bold text-slate-400 uppercase tracking-wider bg-slate-50 px-2 py-1 rounded-lg">${card.value}</span>
         </div>
-        `;
     }).join('');
 
     if (window.lucide) lucide.createIcons();
@@ -1651,7 +1740,8 @@ function createPostHTML(p, index = 0) {
   const teacherObj = Array.isArray(p.teacher) ? p.teacher[0] : p.teacher;
   // Fallback a columnas planas (trigger) si el objeto teacher no está disponible
   const tName = teacherObj?.name || p.teacher_name || 'Maestra/o';
-  const teacherAvatar = teacherObj?.avatar_url || p.teacher_avatar;
+  let teacherAvatar = teacherObj?.avatar_url || p.teacher_avatar;
+  teacherAvatar = (teacherAvatar && teacherAvatar.startsWith('http')) ? teacherAvatar : '';
   const tRole = teacherObj?.role === 'maestra' ? 'Maestra' : (teacherObj?.role || 'Docente');
   
   const postDate = new Date(p.created_at);
@@ -1748,6 +1838,8 @@ async function loadAttendance() {
   
   const student = AppState.get('student');
   if (!student) return;
+  
+  const filter = document.getElementById('attendanceFilter')?.value || 'mes';
 
   try {
     // ✅ 2. CACHE GLOBAL (Uso en Asistencia)
@@ -1763,33 +1855,75 @@ async function loadAttendance() {
       
       if (error) throw error;
       data = freshData || [];
-      GlobalCache.set('attendance', data);
+      GlobalCache.set('attendance', data, 30000);
     }
     
-    renderCalendar(data || []);
-    updateAttendanceStats(data || []);
+    // ✅ FIX: Detectar la fecha más reciente de los datos para centrar el calendario
+    // Esto soluciona el problema si tus datos son de 2026 pero estás en 2025
+    let referenceDate = new Date();
+    if (data && data.length > 0) {
+        const lastRecord = data[0]; // Asumiendo orden descendente por fecha
+        if (lastRecord.date) {
+            const [y, m, d] = lastRecord.date.split('-').map(Number);
+            referenceDate = new Date(y, m - 1, d);
+        }
+    }
+
+    // Filtrado Lógico para Estadísticas
+    const now = referenceDate; // Usar fecha de referencia en lugar de hoy real
+    let filteredData = data || [];
+
+    if (filter === 'semana') {
+        // Últimos 7 días
+        const oneWeekAgo = new Date();
+        oneWeekAgo.setDate(now.getDate() - 7);
+        oneWeekAgo.setHours(0,0,0,0);
+        
+        filteredData = filteredData.filter(d => {
+            // Parseo seguro de fecha local (YYYY-MM-DD)
+            const [y, m, day] = d.date.split('-').map(Number);
+            const dDate = new Date(y, m - 1, day);
+            return dDate >= oneWeekAgo;
+        });
+    } else {
+        // Mes actual (Por defecto)
+        const currentMonth = now.getMonth();
+        const currentYear = now.getFullYear();
+        filteredData = filteredData.filter(d => {
+            const [y, m, day] = d.date.split('-').map(Number);
+            return y === currentYear && (m - 1) === currentMonth;
+        });
+    }
+
+    renderCalendar(data || [], now); // Pasar fecha de referencia al calendario
+    // ✅ FIX: Asegurar que las estadísticas se actualicen con los datos filtrados
+    updateAttendanceStats(filteredData); 
   } catch (err) {
     console.error('Error asistencia:', err);
     container.innerHTML = Helpers.emptyState('Error al cargar asistencia');
   }
 }
 
-function renderCalendar(attendanceData) {
+function renderCalendar(attendanceData, referenceDate) {
   const container = document.getElementById('calendarGrid');
   if(!container) return;
   container.innerHTML = '';
 
-  const today = new Date();
+  const today = referenceDate || new Date();
   const year = today.getFullYear();
   const month = today.getMonth();
   
   let firstDay = new Date(year, month, 1).getDay();
   firstDay = firstDay === 0 ? 6 : firstDay - 1;
   const daysInMonth = new Date(year, month + 1, 0).getDate();
+  const todayDate = new Date().toISOString().split('T')[0];
   
   // Map de fechas a estados
   const attMap = {};
-  attendanceData.forEach(a => attMap[a.date] = a.status);
+  attendanceData.forEach(a => {
+      // Asegurar coincidencia exacta de strings
+      if(a.date) attMap[a.date] = a.status;
+  });
 
   let html = '';
   // Días vacíos previos
@@ -1800,12 +1934,15 @@ function renderCalendar(attendanceData) {
   // Días del mes
   for (let day = 1; day <= daysInMonth; day++) {
     const dateStr = `${year}-${String(month + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
-    const status = attMap[dateStr];
+    const status = attMap[dateStr]; // Buscar coincidencia directa YYYY-MM-DD
+    const isToday = dateStr === todayDate;
     
     let colorClass = 'bg-slate-50 text-slate-400'; // Default
-    if (status === 'present') colorClass = 'bg-green-500 text-white font-bold shadow-md transform scale-105'; // Verde Intenso
-    else if (status === 'absent') colorClass = 'bg-rose-100 text-rose-600';
+    // ✅ FIX: Estilos condicionales más robustos
+    if (status === 'present') colorClass = 'bg-emerald-500 text-white font-bold shadow-md transform scale-105 ring-2 ring-emerald-200'; 
+    else if (status === 'absent') colorClass = 'bg-rose-100 text-rose-600 font-bold';
     else if (status === 'late') colorClass = 'bg-amber-100 text-amber-600';
+    if (isToday) colorClass += ' ring-2 ring-blue-400';
 
     html += `
       <div class="h-10 flex items-center justify-center rounded-lg ${colorClass} text-sm transition-all">
@@ -1859,7 +1996,8 @@ async function loadClassFeed(reset = true) {
       return;
     }
 
-    const html = posts.map((p, i) => createPostHTML(p, i)).join('');
+    const chunk = posts.slice(0, 10);
+    const html = chunk.map((p, i) => createPostHTML(p, i)).join('');
     
     if (reset) {
         container.innerHTML = html;
@@ -1928,6 +2066,7 @@ async function initFeedRealtime() {
         }
     })
     .on('postgres_changes', { event: 'INSERT', schema: 'public', table: TABLES.COMMENTS }, async (payload) => {
+       if (!payload.new) return;
        const newComment = payload.new;
        // Ignorar si es mi propio comentario (ya agregado optimísticamente)
        const myId = AppState.get('user')?.id;
@@ -1946,12 +2085,14 @@ async function initFeedRealtime() {
          // 2. Si la sección está abierta, agregar el comentario
          const listEl = document.getElementById(`comments-list-${newComment.post_id}`);
          if(listEl && listEl.offsetParent !== null) { // Si es visible
+            if (document.getElementById(`comment-${newComment.id}`)) return;
             // 2. Optimización: Usar nombre de la tabla comments si existe, o fallback
             const name = newComment.user_name || 'Usuario';
             const initial = name ? name.charAt(0) : '?';
             
             const div = document.createElement('div');
             div.className = 'flex gap-2 text-sm animate-fade-in mb-2';
+            div.id = `comment-${newComment.id}`;
             // 6. Mejora visual del comentario (Burbuja)
             div.innerHTML = `
               <div class="w-8 h-8 rounded-full bg-slate-200 flex items-center justify-center text-xs font-bold text-slate-500 flex-shrink-0">
@@ -1989,12 +2130,14 @@ function renderComment(c) {
   const currentUserId = AppState.get('user')?.id;
   // Preferir user_name guardado, fallback a relación
   const userObj = Array.isArray(c.user) ? c.user[0] : c.user;
-  let uName = 'Usuario';
+  // ✅ FIX: Priorizar nombre guardado (que será el del estudiante)
+  let uName = c.user_name || 'Usuario';
   
   // Si es un padre, mostrar EXCLUSIVAMENTE el nombre del niño
   const studentName = Array.isArray(c.students) ? c.students[0]?.name : c.students?.name;
-  if (userObj?.role === 'padre' && studentName) {
-    uName = studentName;
+  if (userObj?.role === 'padre') {
+    // Si el join trajo el nombre del estudiante, usarlo. Si no, quedarse con user_name (que guardamos como estudiante)
+    if (studentName) uName = studentName;
   } else if (userObj?.role === 'maestra' || userObj?.role === 'directora' || userObj?.role === 'asistente') {
     uName = userObj?.name || 'Personal';
   }
@@ -2206,7 +2349,10 @@ window.sendComment = async (postId) => {
   // UI Optimista
   const user = AppState.get('user');
   const profile = AppState.get('profile');
-  const userName = profile?.name || 'Yo';
+  const student = AppState.get('student');
+  
+  // ✅ FIX: Usar nombre del estudiante para la UI optimista
+  const userName = student?.name || profile?.name || 'Yo';
   const initial = userName ? userName.charAt(0) : '?';
   const list = document.getElementById(`comments-list-${postId}`);
   const tempId = 'temp-' + Date.now();
@@ -2237,7 +2383,8 @@ window.sendComment = async (postId) => {
       post_id: postId,
       user_id: user.id,
       // 2. Guardar nombre para optimización (Requiere update en schema.sql)
-      user_name: profile?.name || 'Padre/Madre', 
+      // ✅ FIX: Guardar nombre del estudiante permanentemente en el comentario
+      user_name: student?.name || profile?.name || 'Padre/Madre', 
       content: text
     });
     
@@ -2697,6 +2844,7 @@ window.sendChatMessage = async () => {
   const content = input.value.trim();
   const receiverId = AppState.get('currentChatUser');
   const myId = AppState.get('user')?.id;
+  const student = AppState.get('student'); // Obtener estudiante para contexto
   
   if(!content || !receiverId || !myId) return;
   
@@ -2704,6 +2852,7 @@ window.sendChatMessage = async () => {
   renderMessage({
     sender_id: myId,
     content: content,
+    // Aunque no se muestra, mantenemos consistencia interna
     created_at: new Date().toISOString()
   });
   
@@ -2813,20 +2962,16 @@ async function saveAllProfile() {
     Helpers.toast('Error al guardar datos', 'error');
   } else {
     // ✅ Mejora: También actualizar el nombre en el perfil del usuario para el saludo
-    const newName = updates.p1_name || updates.p2_name || updates.name;
-    if (newName) {
-      await supabase.from(TABLES.PROFILES).update({ name: newName }).eq('id', AppState.get('user')?.id);
+    const parentName = updates.p1_name || updates.p2_name;
+    if (parentName) {
+      // Actualizar perfil del padre en segundo plano sin cambiar el saludo visual (que debe ser del estudiante)
+      supabase.from(TABLES.PROFILES).update({ name: parentName }).eq('id', AppState.get('user')?.id).then(() => {});
       
       // Actualizar estado local del perfil
       const profile = AppState.get('profile');
       if (profile) {
-        profile.name = newName;
+        profile.name = parentName;
         AppState.set('profile', profile);
-        
-        // Actualizar saludo inmediatamente
-        document.querySelectorAll('.guardian-name-display').forEach(el => {
-          el.textContent = escapeHtml(newName);
-        });
       }
     }
 

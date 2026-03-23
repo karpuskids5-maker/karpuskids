@@ -10,25 +10,15 @@
   <script src="https://cdn.tailwindcss.com"></script>
   <link rel="stylesheet" href="css/theme.css" />
   
-  <!-- <script src="js/auth.js?v=1"></script> REMOVED: Using Supabase Auth -->
   <!-- OneSignal SDK Fix -->
   <script src="https://cdn.onesignal.com/sdks/web/v16/OneSignalSDK.page.js" defer></script>
   <script>window.OneSignalDeferred = window.OneSignalDeferred || [];</script>
 
-  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-  <script src="https://unpkg.com/lucide@latest"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js" defer></script>
+  <script src="https://cdn.jsdelivr.net/npm/lucide/dist/umd/lucide.js" defer></script>
   <!-- OCR Library for Vouchers -->
-  <script src='https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js'></script>
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
-  <script>
-    (function(){
-      if(!(window.lucide && typeof lucide.createIcons==='function')){
-        var s=document.createElement('script');
-        s.src='https://unpkg.com/lucide@latest';
-        s.async=true;document.head.appendChild(s);
-      }
-    })();
-  </script>
+  <script src='https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js' defer></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js" crossorigin="anonymous" referrerpolicy="no-referrer" defer></script>
   
   <style>
     /* Sidebar styles */
@@ -59,6 +49,20 @@
     aside#sidebar.collapsed:hover .nav-btn { justify-content: flex-start; padding-left: 1rem; padding-right: 1rem; }
     aside#sidebar.collapsed:hover .badge { opacity: 1; }
     aside#sidebar.collapsed .badge { opacity: 0; transition: opacity .2s; }
+
+    /* --- LOADER INICIAL --- */
+    #initial-loading {
+      position: fixed; inset: 0; z-index: 9999;
+      background: #f8fafc;
+      display: flex; flex-direction: column; align-items: center; justify-content: center;
+      transition: opacity 0.5s ease, visibility 0.5s;
+    }
+    .loader-spin {
+      width: 50px; height: 50px; border: 4px solid #e2e8f0;
+      border-top-color: #7c3aed; border-radius: 50%;
+      animation: spin 1s linear infinite;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
 
     /* mobile helper */
     .hidden-mobile { display: none !important; }
@@ -93,15 +97,11 @@
       display: flex;
       align-items: center;
       justify-content: center;
-      z-index: 50;
-      opacity: 0;
-      visibility: hidden;
-      transition: opacity 0.3s ease, visibility 0.3s ease;
+      z-index: 9999;
     }
     
-    .modal-container.active {
-      opacity: 1;
-      visibility: visible;
+    .modal-container.hidden {
+      display: none !important;
     }
     
     .modal-content {
@@ -112,12 +112,6 @@
       max-width: 800px;
       max-height: 90vh;
       overflow-y: auto;
-      transform: scale(0.9);
-      transition: transform 0.3s ease;
-    }
-    
-    .modal-container.active .modal-content {
-      transform: scale(1);
     }
     
     .modal-header {
@@ -183,6 +177,12 @@
       overflow: hidden;
     }
 
+    /* Mobile Sidebar Overlay */
+    @media (max-width: 767px) {
+      aside#sidebar { transform: translateX(-100%); }
+      aside#sidebar.mobile-visible { transform: translateX(0); }
+    }
+
     /* Layout adjustments */
     #layoutShell { transition: margin-left .25s ease; }
     #layoutShell.sidebar-collapsed { margin-left: 80px !important; }
@@ -221,9 +221,19 @@
   </style>
 </head>
 <body class="bg-slate-50 text-slate-800 font-nunito panel-directora-body">
+  
+  <!-- LOADER -->
+  <div id="initial-loading">
+    <div class="loader-spin mb-4"></div>
+    <h2 class="text-xl font-bold text-slate-700 animate-pulse">Karpus Kids</h2>
+    <p class="text-sm text-slate-400">Cargando panel de dirección...</p>
+  </div>
+
   <div class="min-h-screen flex">
+    <!-- OVERLAY MOBILE -->
+    <div id="sidebarOverlay" class="fixed inset-0 bg-black/50 z-40 hidden md:hidden backdrop-blur-sm transition-opacity"></div>
     <!-- SIDEBAR -->
-    <aside id="sidebar" class="hidden md:block bg-gradient-to-b from-violet-600 to-indigo-700 border-r-4 border-violet-400 p-4 rounded-r-3xl shadow-2xl fixed inset-y-0 left-0 z-10">
+    <aside id="sidebar" class="bg-gradient-to-b from-violet-600 to-indigo-700 border-r-4 border-violet-400 p-4 rounded-r-3xl shadow-2xl fixed inset-y-0 left-0 z-50 w-72 transition-transform duration-300 md:translate-x-0 -translate-x-full">
       <button id="toggleSidebar" class="absolute -right-3 top-6 bg-white rounded-full p-1 shadow-md border border-slate-100 text-slate-500 hover:text-purple-600 hidden md:block"><i data-lucide="chevron-left" class="w-4 h-4"></i></button>
       <div class="flex items-center gap-3 mb-6">
         <div class="h-12 w-12 rounded-2xl bg-white/20 flex items-center justify-center shadow-lg">
@@ -236,6 +246,19 @@
       </div>
 
       <div class="sidebar-scroll relative z-10">
+        <div class="px-4 mb-4 flex items-center gap-3">
+          <div id="sidebarAvatar" class="w-10 h-10 rounded-xl bg-white/20 overflow-hidden shadow-inner flex items-center justify-center font-black text-white relative group cursor-pointer">
+            <img id="profileAvatar" src="img/mundo.jpg" alt="Avatar" class="w-full h-full object-cover transition-opacity group-hover:opacity-50">
+            <div class="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
+              <i data-lucide="camera" class="w-5 h-5 text-white"></i>
+            </div>
+            <input type="file" id="avatarInput" accept="image/*" class="hidden">
+          </div>
+          <div class="label">
+            <p class="text-[10px] font-black uppercase text-white/50 tracking-tighter">Director(a)</p>
+            <p id="sidebarName" class="text-xs font-bold text-white truncate w-32">Cargando...</p>
+          </div>
+        </div>
       <nav class="space-y-2 teams-nav bg-white/10 p-2 rounded-xl mb-4 backdrop-blur-sm">
         <button data-section="dashboard" class="nav-btn teams-nav-item text-white hover:bg-white/20" title="Dashboard">
           <i data-lucide="grid" class="text-blue-400"></i>
@@ -261,21 +284,9 @@
           <i data-lucide="graduation-cap" class="text-teal-400"></i>
           <span class="label">Calificaciones</span>
         </button>
-        <button data-section="reportes" class="nav-btn teams-nav-item text-white hover:bg-white/20" title="Reportes">
-          <i data-lucide="file-text" class="text-indigo-400"></i>
-          <span class="label">Reportes</span>
-        </button>
         <button data-section="pagos" class="nav-btn teams-nav-item text-white hover:bg-white/20" title="Pagos">
           <i data-lucide="credit-card" class="text-yellow-400"></i>
           <span class="label">Pagos</span>
-        </button>
-        <button data-section="comunicacion" class="nav-btn teams-nav-item text-white hover:bg-white/20" title="Comunicaciones">
-          <i data-lucide="message-square" class="text-blue-400"></i>
-          <span class="label">Comunicaciones</span>
-        </button>
-        <button data-section="muro" class="nav-btn teams-nav-item text-white hover:bg-white/20" title="Muro Escolar">
-          <i data-lucide="layout" class="text-orange-400"></i>
-          <span class="label">Muro Escolar</span>
         </button>
         <button data-section="configuracion" class="nav-btn teams-nav-item text-white hover:bg-white/20" title="Configuración">
           <i data-lucide="settings" class="text-slate-400"></i>
@@ -302,10 +313,10 @@
     </aside>
 
     <!-- MAIN -->
-    <main class="flex-1 p-6 ml-[280px]" id="layoutShell">
+    <main class="flex-1 p-6 md:ml-[280px]" id="layoutShell">
       <!-- Topbar mobile -->
       <div class="md:hidden mb-4 flex items-center justify-between">
-        <button id="menuBtn" class="p-2 rounded bg-white shadow" aria-label="Menú"><i data-lucide="menu" class="lucide"></i></button>
+        <button id="menuBtn" class="p-2 rounded bg-white shadow" aria-label="Abrir menú" role="button"><i data-lucide="menu" class="lucide"></i></button>
         <h2 class="font-semibold">Panel Director</h2>
         <div class="flex items-center gap-2">
           <button class="p-2 rounded bg-white shadow" aria-label="Notificaciones"><i data-lucide="bell" class="lucide"></i></button>
@@ -314,7 +325,7 @@
       </div>
 
       <!-- SECTIONS -->
-      <section id="dashboard" class="section">
+      <section id="dashboard" class="section active">
         <!-- Header con Filtros Globales -->
         <div class="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-8">
           <div>
@@ -322,11 +333,6 @@
             <p class="text-slate-500 font-medium">Resumen administrativo de la estancia</p>
           </div>
           <div class="flex gap-3 bg-white p-1.5 rounded-xl shadow-sm border border-slate-100">
-            <select id="globalMonthFilter" class="bg-transparent text-sm font-semibold text-slate-600 outline-none px-3 py-1.5 rounded-lg hover:bg-slate-50 cursor-pointer">
-              <option value="current">Este Mes</option>
-              <option value="last">Mes Pasado</option>
-            </select>
-            <div class="w-px bg-slate-200 my-1"></div>
             <button id="btnRefreshDashboard" class="p-2 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors" title="Actualizar">
               <i data-lucide="refresh-cw" class="w-4 h-4"></i>
             </button>
@@ -336,10 +342,13 @@
         <!-- ALERTAS AUTOMÁTICAS (Notificaciones) -->
         <div id="dashboardAlerts" class="mb-6 hidden"></div>
 
+<!-- TOAST CONTAINER -->
+<div id="toast-container" class="fixed top-5 right-5 z-[70] flex flex-col gap-2 pointer-events-none"></div>
+
         <!-- BLOQUE 1: KPIs (Tarjetas Pastel) -->
         <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-4 mb-8">
           <!-- Estudiantes (Morado) -->
-          <div class="bg-purple-100 p-5 rounded-2xl border border-purple-200 shadow-md hover:shadow-xl transition-all duration-300 group">
+          <div class="bg-purple-100 p-5 rounded-2xl border border-purple-200 shadow-md hover:shadow-md hover:-translate-y-1 transition-all duration-300 group">
             <div class="flex justify-between items-start mb-2">
               <div class="p-2 bg-purple-200 rounded-xl text-purple-700 shadow-sm group-hover:scale-110 transition-transform"><i data-lucide="users" class="w-6 h-6"></i></div>
               <span class="text-xs font-bold text-purple-600 bg-white/60 px-2 py-1 rounded-full">Total</span>
@@ -349,7 +358,7 @@
           </div>
 
           <!-- Docentes (Azul Cielo) -->
-          <div class="bg-sky-100 p-5 rounded-2xl border border-sky-200 shadow-md hover:shadow-xl transition-all duration-300 group">
+          <div class="bg-sky-100 p-5 rounded-2xl border border-sky-200 shadow-md hover:shadow-md hover:-translate-y-1 transition-all duration-300 group">
             <div class="flex justify-between items-start mb-2">
               <div class="p-2 bg-sky-200 rounded-xl text-sky-700 shadow-sm group-hover:scale-110 transition-transform"><i data-lucide="graduation-cap" class="w-6 h-6"></i></div>
             </div>
@@ -358,7 +367,7 @@
           </div>
 
           <!-- Aulas (Indigo) -->
-          <div class="bg-indigo-100 p-5 rounded-2xl border border-indigo-200 shadow-md hover:shadow-xl transition-all duration-300 group">
+          <div class="bg-indigo-100 p-5 rounded-2xl border border-indigo-200 shadow-md hover:shadow-md hover:-translate-y-1 transition-all duration-300 group">
             <div class="flex justify-between items-start mb-2">
               <div class="p-2 bg-indigo-200 rounded-xl text-indigo-700 shadow-sm group-hover:scale-110 transition-transform"><i data-lucide="home" class="w-6 h-6"></i></div>
             </div>
@@ -367,7 +376,7 @@
           </div>
 
           <!-- Asistencia (Verde Menta) -->
-          <div class="bg-emerald-100 p-5 rounded-2xl border border-emerald-200 shadow-md hover:shadow-xl transition-all duration-300 group">
+          <div class="bg-emerald-100 p-5 rounded-2xl border border-emerald-200 shadow-md hover:shadow-md hover:-translate-y-1 transition-all duration-300 group">
             <div class="flex justify-between items-start mb-2">
               <div class="p-2 bg-emerald-200 rounded-xl text-emerald-700 shadow-sm group-hover:scale-110 transition-transform"><i data-lucide="user-check" class="w-6 h-6"></i></div>
               <span class="text-xs font-bold text-emerald-600 bg-white/60 px-2 py-1 rounded-full">Hoy</span>
@@ -377,7 +386,7 @@
           </div>
 
           <!-- Pagos Pendientes (Amarillo Pastel) -->
-          <div class="bg-amber-100 p-5 rounded-2xl border border-amber-200 shadow-md hover:shadow-xl transition-all duration-300 group">
+          <div class="bg-amber-100 p-5 rounded-2xl border border-amber-200 shadow-md hover:shadow-md hover:-translate-y-1 transition-all duration-300 group">
             <div class="flex justify-between items-start mb-2">
               <div class="p-2 bg-amber-200 rounded-xl text-amber-700 shadow-sm group-hover:scale-110 transition-transform"><i data-lucide="alert-circle" class="w-6 h-6"></i></div>
             </div>
@@ -386,7 +395,7 @@
           </div>
 
           <!-- Incidencias (Rosa Suave) -->
-          <div class="bg-pink-100 p-5 rounded-2xl border border-pink-200 shadow-md hover:shadow-xl transition-all duration-300 group">
+          <div class="bg-pink-100 p-5 rounded-2xl border border-pink-200 shadow-md hover:shadow-md hover:-translate-y-1 transition-all duration-300 group">
             <div class="flex justify-between items-start mb-2">
               <div class="p-2 bg-pink-200 rounded-xl text-pink-700 shadow-sm group-hover:scale-110 transition-transform"><i data-lucide="message-square-warning" class="w-6 h-6"></i></div>
             </div>
@@ -395,83 +404,44 @@
           </div>
         </div>
 
-        <!-- BLOQUE 2 & 3: Gráficas Modernas -->
-        <div class="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-8">
-          <!-- Gráfica Principal (Area Chart) -->
-          <div class="col-span-2 bg-white rounded-3xl shadow-sm border border-slate-100 p-6">
-            <div class="flex items-center justify-between mb-6">
-              <div>
-                <h3 class="font-bold text-lg text-slate-800">Tendencia de Asistencia</h3>
-                <p class="text-xs text-slate-400">Últimos 7 días</p>
-              </div>
-              <span class="bg-green-50 text-green-600 text-xs font-bold px-3 py-1 rounded-full flex items-center gap-1">
-                <i data-lucide="trending-up" class="w-3 h-3"></i> Estable
-              </span>
+        <!-- BLOQUE 2: Accesos Directos (NUEVO) -->
+        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+          <!-- Reportes -->
+          <div id="cardReportes" data-action="go-section" data-section="reportes" class="bg-white p-6 rounded-3xl shadow-sm border border-slate-100 hover:shadow-md hover:-translate-y-1 active:scale-95 transition-all duration-300 text-left group cursor-pointer">
+            <div class="w-14 h-14 bg-indigo-50 rounded-2xl flex items-center justify-center mb-4 group-hover:bg-indigo-600 transition-colors">
+              <i data-lucide="file-text" class="w-7 h-7 text-indigo-600 group-hover:text-white transition-colors"></i>
             </div>
-            <div class="relative h-72 w-full">
-              <canvas id="attendanceChart"></canvas>
-            </div>
+            <h3 class="font-black text-slate-800 text-lg">Reportes</h3>
+            <p class="text-slate-500 text-xs mt-1">Gestión de incidencias y quejas de padres.</p>
           </div>
 
-          <!-- Gráfica Secundaria (Donut - Finanzas) -->
-          <div class="bg-white rounded-3xl shadow-sm border border-slate-100 p-6">
-            <h3 class="font-bold text-lg text-slate-800 mb-2">Estado Financiero</h3>
-            <p class="text-xs text-slate-400 mb-6">Recaudación del mes actual</p>
-            <div class="relative h-56 w-full flex items-center justify-center">
-              <canvas id="financialDonutChart"></canvas>
-              <!-- Centro del Donut -->
-              <div class="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
-                <span class="text-xs text-slate-400 font-medium">Total</span>
-                <span class="text-xl font-black text-slate-800" id="donutTotalLabel">0%</span>
-              </div>
+          <!-- Videoconferencia -->
+          <!-- CORREGIDO: Redirige a la sección videoconferencia -->
+          <div id="cardVideoconferencia" data-action="go-section" data-section="videoconferencia" class="bg-white p-6 rounded-3xl shadow-sm border border-slate-100 hover:shadow-md hover:-translate-y-1 active:scale-95 transition-all duration-300 text-left group cursor-pointer">
+            <div class="w-14 h-14 bg-rose-50 rounded-2xl flex items-center justify-center mb-4 group-hover:bg-rose-600 transition-colors">
+              <i data-lucide="video" class="w-7 h-7 text-rose-600 group-hover:text-white transition-colors"></i>
             </div>
-            <div class="mt-6 space-y-2">
-              <div class="flex justify-between text-sm">
-                <span class="flex items-center gap-2 text-slate-600"><span class="w-3 h-3 rounded-full bg-emerald-400"></span>Pagado</span>
-                <span class="font-bold text-slate-800" id="finPaidLabel">$0</span>
-              </div>
-              <div class="flex justify-between text-sm">
-                <span class="flex items-center gap-2 text-slate-600"><span class="w-3 h-3 rounded-full bg-amber-400"></span>Pendiente</span>
-                <span class="font-bold text-slate-800" id="finPendingLabel">$0</span>
-              </div>
+            <h3 class="font-black text-slate-800 text-lg">Videoconferencia</h3>
+            <p class="text-slate-500 text-xs mt-1">Inicia clases en vivo para las aulas.</p>
+          </div>
+
+          <!-- Comunicaciones -->
+          <div id="cardComunicaciones" data-action="go-section" data-section="comunicacion" class="bg-white p-6 rounded-3xl shadow-sm border border-slate-100 hover:shadow-md hover:-translate-y-1 active:scale-95 transition-all duration-300 text-left group cursor-pointer">
+            <div class="w-14 h-14 bg-blue-50 rounded-2xl flex items-center justify-center mb-4 group-hover:bg-blue-600 transition-colors">
+              <i data-lucide="message-square" class="w-7 h-7 text-blue-600 group-hover:text-white transition-colors"></i>
             </div>
+            <h3 class="font-black text-slate-800 text-lg">Comunicaciones</h3>
+            <p class="text-slate-500 text-xs mt-1">Centro de mensajes con los padres.</p>
           </div>
-        </div>
 
-        <!-- BLOQUE 4: Reporte Financiero Detallado (Tabla) -->
-        <div class="bg-white rounded-3xl shadow-sm border border-slate-100 p-6">
-          <div class="flex items-center justify-between mb-6">
-            <h3 class="font-bold text-lg text-slate-800 flex items-center gap-2">
-              <i data-lucide="coins" class="w-5 h-5 text-amber-500"></i>
-              Desglose Financiero por Aula
-            </h3>
-            <button class="text-sm text-blue-600 font-bold hover:underline">Ver reporte completo</button>
+          <!-- Muro Escolar -->
+          <div id="cardMuro" data-action="go-section" data-section="muro" class="bg-white p-6 rounded-3xl shadow-sm border border-slate-100 hover:shadow-md hover:-translate-y-1 active:scale-95 transition-all duration-300 text-left group cursor-pointer">
+            <div class="w-14 h-14 bg-orange-50 rounded-2xl flex items-center justify-center mb-4 group-hover:bg-orange-600 transition-colors">
+              <i data-lucide="layout" class="w-7 h-7 text-orange-600 group-hover:text-white transition-colors"></i>
+            </div>
+            <h3 class="font-black text-slate-800 text-lg">Muro Escolar</h3>
+            <p class="text-slate-500 text-xs mt-1">Publicaciones generales para la estancia.</p>
           </div>
-          <div class="overflow-x-auto">
-            <table class="w-full text-left border-collapse">
-              <thead>
-                <tr class="text-xs text-slate-400 uppercase border-b border-slate-100">
-                  <th class="py-3 font-bold">Aula</th>
-                  <th class="py-3 font-bold text-right">Esperado</th>
-                  <th class="py-3 font-bold text-right">Recaudado</th>
-                  <th class="py-3 font-bold text-right">Pendiente</th>
-                  <th class="py-3 font-bold text-center">Progreso</th>
-                </tr>
-              </thead>
-              <tbody id="financialReportBody" class="text-sm text-slate-600">
-                <!-- JS -->
-              </tbody>
-            </table>
-          </div>
-        </div>
-
-        <!-- Quejas y avisos de padres -->
-        <div class="mt-8">
-          <h3 class="text-xl font-semibold mb-3 flex items-center gap-2">
-            <i data-lucide="message-square-warning" class="w-6 h-6 text-orange-600"></i>
-            Quejas y avisos de padres
-          </h3>
-          <div id="dashboardReportsList" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4"></div>
         </div>
 
       </section>
@@ -527,7 +497,7 @@
             <button id="btnAddAssistant" class="px-4 py-2.5 bg-indigo-100 text-indigo-700 hover:bg-indigo-200 rounded-xl text-sm font-bold transition-colors flex items-center gap-2">
               <i data-lucide="user-plus" class="w-4 h-4"></i> Asistente
             </button>
-            <button id="btnAddTeacher" class="px-4 py-2.5 bg-purple-600 text-white hover:bg-purple-700 rounded-xl text-sm font-bold shadow-md hover:shadow-lg transition-all flex items-center gap-2">
+<button onclick="window.App?.teachers?.openCreateModal()" class="px-4 py-2.5 bg-purple-600 text-white hover:bg-purple-700 rounded-xl text-sm font-bold shadow-md hover:shadow-lg transition-all flex items-center gap-2">
               <i data-lucide="plus" class="w-4 h-4"></i> Nuevo Maestro
             </button>
           </div>
@@ -549,10 +519,38 @@
           <h2 class="text-xl font-bold text-slate-800 flex items-center gap-2 mb-6">
             <span class="w-2 h-6 bg-indigo-500 rounded-full"></span>
             Personal de Apoyo
-          </h3>
+          </h2>
           <div id="assistantsGrid" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
             <!-- Cards inyectadas por JS -->
           </div>
+        </div>
+        
+        <!-- Estado Vacío (Helper Visual) -->
+        <div id="teachersEmptyState" class="hidden text-center py-12">
+          <div class="w-16 h-16 bg-slate-100 rounded-full flex items-center justify-center mx-auto mb-3">
+            <i data-lucide="users" class="w-8 h-8 text-slate-400"></i>
+          </div>
+          <h3 class="text-slate-600 font-bold">No hay personal registrado</h3>
+          <p class="text-slate-400 text-sm">Comienza agregando maestros o asistentes.</p>
+        </div>
+      </section>
+
+      <!-- VIDEOCONFERENCIA (NUEVA SECCIÓN) -->
+      <section id="videoconferencia" class="section hidden">
+        <div class="flex items-center justify-between mb-6">
+          <div>
+            <h2 class="text-2xl font-bold text-slate-800 flex items-center gap-2">
+              <i data-lucide="video" class="w-6 h-6 text-rose-600"></i>
+              Sala de Videoconferencias
+            </h2>
+            <p class="text-slate-500 text-sm">Inicie reuniones virtuales para aulas específicas</p>
+          </div>
+        </div>
+        <div class="bg-white rounded-3xl shadow-sm border border-slate-100 p-12 text-center">
+          <div class="w-20 h-20 bg-rose-50 rounded-full flex items-center justify-center mx-auto mb-4"><i data-lucide="camera" class="w-10 h-10 text-rose-500"></i></div>
+          <h3 class="text-xl font-bold text-slate-800 mb-2">Módulo de Clases en Vivo</h3>
+          <p class="text-slate-500 mb-6 max-w-md mx-auto">Seleccione un aula desde la sección "Aulas" para iniciar una transmisión específica para ese grupo.</p>
+          <button onclick="App.navigation.goTo('aulas')" class="px-6 py-3 bg-rose-600 text-white rounded-xl font-bold hover:bg-rose-700 transition-colors">Ir a Aulas</button>
         </div>
       </section>
 
@@ -799,34 +797,88 @@
 
       <!-- CALIFICACIONES -->
       <section id="calificaciones" class="section hidden">
-        <div class="flex items-center justify-between mb-4">
-          <h2 class="text-xl font-semibold flex items-center gap-2">
-            <i data-lucide="graduation-cap" class="w-5 h-5 text-slate-600"></i><span>Calificaciones</span>
-          </h2>
-          <div class="flex gap-2">
-            <select id="gradesFilter" class="px-3 py-2 border rounded text-sm">
-              <option value="all">Todas las aulas</option>
-              <option value="Pequeños">Pequeños</option>
-              <option value="Medianos">Medianos</option>
-              <option value="Grandes">Grandes</option>
-            </select>
-            <button id="btnExportGrades" class="px-3 py-2 border rounded hover:bg-slate-50 text-sm">Exportar</button>
+        <!-- Header -->
+        <div class="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-8">
+          <div>
+            <h1 class="text-3xl font-bold text-slate-800 tracking-tight">Centro de Calificaciones</h1>
+            <p class="text-slate-500 font-medium">Seguimiento del progreso académico de los estudiantes.</p>
+          </div>
+          <button id="btnExportGrades" class="px-6 py-3 bg-emerald-600 text-white rounded-xl font-black text-sm uppercase tracking-wider hover:bg-emerald-700 shadow-lg shadow-emerald-200 transition-all flex items-center gap-2 active:scale-95">
+            <i data-lucide="sheet" class="w-5 h-5"></i> Exportar a Excel
+          </button>
+        </div>
+
+        <!-- KPIs de Calificaciones -->
+        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
+          <div class="bg-blue-50 p-4 rounded-2xl border border-blue-100 shadow-sm">
+             <div class="flex items-center gap-3 mb-2">
+               <div class="p-2 bg-blue-100 rounded-lg text-blue-600"><i data-lucide="award" class="w-5 h-5"></i></div>
+               <span class="text-xs font-bold text-blue-600 uppercase tracking-wider">Promedio General</span>
+             </div>
+             <p class="text-2xl font-black text-slate-800" id="kpiAvgGrade">N/A</p>
+          </div>
+          <div class="bg-green-50 p-4 rounded-2xl border border-green-100 shadow-sm">
+             <div class="flex items-center gap-3 mb-2">
+               <div class="p-2 bg-green-100 rounded-lg text-green-600"><i data-lucide="trending-up" class="w-5 h-5"></i></div>
+               <span class="text-xs font-bold text-green-600 uppercase tracking-wider">Tasa Aprobación</span>
+             </div>
+             <p class="text-2xl font-black text-slate-800" id="kpiApprovalRate">N/A</p>
+          </div>
+          <div class="bg-yellow-50 p-4 rounded-2xl border border-yellow-100 shadow-sm">
+             <div class="flex items-center gap-3 mb-2">
+               <div class="p-2 bg-yellow-100 rounded-lg text-yellow-600"><i data-lucide="flag" class="w-5 h-5"></i></div>
+               <span class="text-xs font-bold text-yellow-600 uppercase tracking-wider">Necesitan Apoyo</span>
+             </div>
+             <p class="text-2xl font-black text-slate-800" id="kpiNeedsSupport">0</p>
+          </div>
+          <div class="bg-red-50 p-4 rounded-2xl border border-red-100 shadow-sm">
+             <div class="flex items-center gap-3 mb-2">
+               <div class="p-2 bg-red-100 rounded-lg text-red-600"><i data-lucide="alert-triangle" class="w-5 h-5"></i></div>
+               <span class="text-xs font-bold text-red-600 uppercase tracking-wider">Calificaciones Bajas</span>
+             </div>
+             <p class="text-2xl font-black text-slate-800" id="kpiLowGrades">0</p>
           </div>
         </div>
-        
-        <div class="bg-white rounded shadow p-4">
-          <table class="w-full text-sm">
-            <thead class="text-slate-500 text-left bg-slate-50">
-              <tr>
-                <th class="p-3">Estudiante</th>
-                <th class="p-3">Aula</th>
-                <th class="p-3">Calificación</th>
-                <th class="p-3">Promedio</th>
-                <th class="p-3">Estado</th>
-              </tr>
-            </thead>
-            <tbody id="gradesTable"><!-- Llenado por JS --></tbody>
-          </table>
+
+        <!-- Tabla Principal -->
+        <div class="bg-white rounded-2xl shadow-md border border-slate-100 p-6">
+          <div class="flex flex-col md:flex-row justify-between items-center gap-4 mb-6">
+            <h3 class="text-lg font-bold text-slate-800 flex items-center gap-2 w-full md:w-auto">
+              <span class="w-2 h-6 bg-blue-600 rounded-full"></span>
+              Registros de Calificaciones
+            </h3>
+            <div class="flex flex-wrap gap-3 w-full md:w-auto">
+               <div class="relative flex-1 md:w-64">
+                  <i data-lucide="search" class="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400"></i>
+                  <input id="searchGradeStudent" placeholder="Buscar por estudiante..." class="pl-10 pr-4 py-2 border rounded-xl text-sm w-full bg-slate-50 focus:bg-white transition-all">
+               </div>
+               <select id="gradesFilterClassroom" class="px-3 py-2 border rounded-xl text-sm bg-slate-50 font-bold text-slate-700">
+                  <option value="all">Todas las aulas</option>
+                  <!-- Opciones cargadas por JS -->
+               </select>
+               <select id="gradesFilterSubject" class="px-3 py-2 border rounded-xl text-sm bg-slate-50">
+                  <option value="all">Todas las materias</option>
+                  <!-- Opciones cargadas por JS -->
+               </select>
+            </div>
+          </div>
+
+          <div class="overflow-x-auto rounded-2xl border border-slate-200">
+            <table class="w-full text-sm text-left">
+              <thead class="bg-slate-50 text-slate-500 font-black uppercase text-[10px] tracking-wider">
+                <tr>
+                  <th class="px-6 py-4">Estudiante</th>
+                  <th class="px-6 py-4 text-center">Promedio</th>
+                  <th class="px-6 py-4 text-center">Nivel</th>
+                  <th class="px-6 py-4 text-center">Estado</th>
+                  <th class="px-6 py-4 text-center">Acciones</th>
+                </tr>
+              </thead>
+              <tbody id="gradesTableBody" class="divide-y divide-slate-100 bg-white">
+                <!-- Filas inyectadas por JS -->
+              </tbody>
+            </table>
+          </div>
         </div>
       </section>
 
@@ -839,23 +891,6 @@
               Sistema Formal de Incidencias
             </h2>
             <p class="text-slate-500 text-sm">Gestione quejas con estados, prioridad, adjuntos y respuesta oficial</p>
-          </div>
-          <div class="flex gap-2 items-center">
-            <select id="reportFilter" class="px-3 py-2.5 border rounded-xl text-sm bg-slate-50">
-              <option value="all">Todos</option>
-              <option value="received">Recibida</option>
-              <option value="review">En revisión</option>
-              <option value="in_progress">En proceso</option>
-              <option value="resolved">Resuelta</option>
-              <option value="closed">Cerrada</option>
-            </select>
-            <select id="reportPriority" class="px-3 py-2.5 border rounded-xl text-sm bg-slate-50">
-              <option value="all">Todas las prioridades</option>
-              <option value="high">Alta</option>
-              <option value="medium">Media</option>
-              <option value="low">Baja</option>
-            </select>
-            <button id="refreshReports" class="px-4 py-2.5 bg-blue-600 text-white rounded-xl">Actualizar</button>
           </div>
         </div>
 
@@ -870,24 +905,15 @@
             <h1 class="text-3xl font-bold text-slate-800 tracking-tight">Gestión Financiera</h1>
             <p class="text-slate-500 font-medium">Control de ingresos, mensualidades y transferencias</p>
           </div>
-          <div class="flex gap-3">
-             <button id="btnGenerateCharges" class="px-4 py-2 bg-indigo-100 text-indigo-700 rounded-xl font-bold hover:bg-indigo-200 transition-colors flex items-center gap-2">
-               <i data-lucide="layers" class="w-5 h-5"></i> Generar Cuotas
-             </button>
-             <button id="btnPendingTransfers" class="px-4 py-2 bg-purple-100 text-purple-700 rounded-xl font-bold hover:bg-purple-200 transition-colors flex items-center gap-2">
-               <i data-lucide="file-check" class="w-5 h-5"></i> Revisiones
-             </button>
-             <button id="btnNewPayment" class="px-5 py-2 bg-purple-600 text-white rounded-xl font-bold hover:bg-purple-700 shadow-md hover:shadow-lg transition-all flex items-center gap-2">
-               <i data-lucide="plus-circle" class="w-5 h-5"></i> Registrar Pago
-             </button>
-             <button id="btnSendWeeklySummary" class="px-5 py-2 bg-green-600 text-white rounded-xl font-bold hover:bg-green-700 shadow-md hover:shadow-lg transition-all flex items-center gap-2">
-               <i data-lucide="mail" class="w-5 h-5"></i> Resumen Semanal
-             </button>
+          <div>
+            <button id="btnNewPayment" class="px-6 py-3 bg-indigo-600 text-white rounded-xl font-black text-sm uppercase tracking-wider hover:bg-indigo-700 shadow-lg shadow-indigo-200 transition-all flex items-center gap-2 active:scale-95">
+              <i data-lucide="plus-circle" class="w-5 h-5"></i> Registrar Pago
+            </button>
           </div>
         </div>
 
-        <!-- BLOQUE 1: Dashboard Financiero -->
-        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4 mb-8">
+        <!-- BLOQUE 1: KPIs Interactivos -->
+        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
           <!-- Ingresos del mes -->
           <div class="bg-emerald-50 p-4 rounded-2xl border border-emerald-100 shadow-sm">
              <div class="flex items-center gap-3 mb-2">
@@ -897,82 +923,142 @@
              <p class="text-2xl font-black text-slate-800" id="kpiIncomeMonth">$0</p>
           </div>
           <!-- Pagos Pendientes -->
-          <div class="bg-amber-50 p-4 rounded-2xl border border-amber-100 shadow-sm">
+          <div onclick="App.payments.filterBy('pending')" class="bg-slate-50 p-4 rounded-2xl border border-slate-200 shadow-sm cursor-pointer hover:bg-white hover:shadow-md transition-all group">
              <div class="flex items-center gap-3 mb-2">
-               <div class="p-2 bg-amber-100 rounded-lg text-amber-600"><i data-lucide="clock" class="w-5 h-5"></i></div>
-               <span class="text-xs font-bold text-amber-600 uppercase tracking-wider">Pendientes</span>
+               <div class="p-2 bg-slate-200 rounded-lg text-slate-600 group-hover:bg-slate-300"><i data-lucide="clock" class="w-5 h-5"></i></div>
+               <span class="text-xs font-bold text-slate-500 uppercase tracking-wider">Pendientes</span>
              </div>
              <p class="text-2xl font-black text-slate-800" id="kpiPendingCount">0</p>
           </div>
-          <!-- Vencidos -->
-          <div class="bg-pink-50 p-4 rounded-2xl border border-pink-100 shadow-sm">
+          <!-- En Revisión (Transferencias) -->
+          <div onclick="App.payments.filterBy('review')" class="bg-amber-50 p-4 rounded-2xl border border-amber-100 shadow-sm cursor-pointer hover:shadow-md transition-all group">
              <div class="flex items-center gap-3 mb-2">
-               <div class="p-2 bg-pink-100 rounded-lg text-pink-600"><i data-lucide="alert-circle" class="w-5 h-5"></i></div>
-               <span class="text-xs font-bold text-pink-600 uppercase tracking-wider">Vencidos</span>
+               <div class="p-2 bg-amber-100 rounded-lg text-amber-600 group-hover:bg-amber-200"><i data-lucide="file-search" class="w-5 h-5"></i></div>
+               <span class="text-xs font-bold text-amber-600 uppercase tracking-wider">En Revisión</span>
+             </div>
+             <p class="text-2xl font-black text-slate-800" id="kpiReviewCount">0</p>
+          </div>
+          <!-- Vencidos -->
+          <div onclick="App.payments.filterBy('overdue')" class="bg-rose-50 p-4 rounded-2xl border border-rose-100 shadow-sm cursor-pointer hover:shadow-md transition-all group">
+             <div class="flex items-center gap-3 mb-2">
+               <div class="p-2 bg-rose-100 rounded-lg text-rose-600 group-hover:bg-rose-200"><i data-lucide="alert-triangle" class="w-5 h-5"></i></div>
+               <span class="text-xs font-bold text-rose-600 uppercase tracking-wider">Vencidos</span>
              </div>
              <p class="text-2xl font-black text-slate-800" id="kpiOverdueCount">0</p>
           </div>
-          <!-- Confirmados -->
-          <div class="bg-blue-50 p-4 rounded-2xl border border-blue-100 shadow-sm">
-             <div class="flex items-center gap-3 mb-2">
-               <div class="p-2 bg-blue-100 rounded-lg text-blue-600"><i data-lucide="check-circle-2" class="w-5 h-5"></i></div>
-               <span class="text-xs font-bold text-blue-600 uppercase tracking-wider">Confirmados</span>
-             </div>
-             <p class="text-2xl font-black text-slate-800" id="kpiConfirmedCount">0</p>
+        </div>
+
+        <!-- BLOQUE 2: Gráfico y Configuración (Separado de la tabla) -->
+        <div class="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-8">
+          <!-- Gráfico Financiero -->
+          <div class="lg:col-span-2 bg-white rounded-3xl shadow-sm border border-slate-100 p-6">
+            <div class="flex flex-wrap items-center justify-between gap-4 mb-6">
+              <h3 class="font-bold text-slate-800">Análisis Financiero</h3>
+              <div class="flex gap-2">
+                <select id="chartYear" class="px-3 py-1.5 bg-slate-50 border-none rounded-lg text-xs font-bold text-slate-600 outline-none">
+                  <option value="2025">2025</option>
+                  <option value="2026">2026</option>
+                </select>
+                <select id="chartMonth" class="px-3 py-1.5 bg-slate-50 border-none rounded-lg text-xs font-bold text-slate-600 outline-none">
+                  <option value="all">Todo el año</option>
+                  <option value="1">Enero</option>
+                  <!-- JS llenará esto -->
+                </select>
+              </div>
+            </div>
+            <div class="h-64 w-full">
+              <canvas id="financialChart"></canvas>
+            </div>
           </div>
-          <!-- Por Aprobar -->
-          <div class="bg-purple-50 p-4 rounded-2xl border border-purple-100 shadow-sm cursor-pointer hover:bg-purple-100 transition-colors" id="cardToApprove">
-             <div class="flex items-center gap-3 mb-2">
-               <div class="p-2 bg-purple-100 rounded-lg text-purple-600"><i data-lucide="file-search" class="w-5 h-5"></i></div>
-               <span class="text-xs font-bold text-purple-600 uppercase tracking-wider">Por Aprobar</span>
-             </div>
-             <p class="text-2xl font-black text-slate-800" id="kpiToApproveCount">0</p>
+
+          <!-- Configuración de Ciclo de Pagos -->
+          <div class="bg-slate-50 rounded-3xl border border-slate-200 p-6 flex flex-col justify-center">
+            <h3 class="font-bold text-slate-800 mb-4 flex items-center gap-2">
+              <i data-lucide="settings-2" class="w-5 h-5 text-indigo-600"></i> Configuración de Cobro
+            </h3>
+            <div class="space-y-4">
+              <div>
+                <label class="block text-xs font-bold text-slate-500 uppercase mb-1">Día Generación Automática</label>
+                <div class="flex items-center gap-2">
+                  <input type="number" id="confGenDay" min="1" max="28" value="25" class="w-full px-3 py-2 border rounded-xl text-sm font-bold bg-white outline-none focus:ring-2 focus:ring-indigo-500">
+                  <span class="text-xs text-slate-400 font-medium">del mes anterior</span>
+                </div>
+              </div>
+              <div>
+                <label class="block text-xs font-bold text-slate-500 uppercase mb-1">Día Límite de Pago</label>
+                <div class="flex items-center gap-2">
+                  <input type="number" id="confDueDay" min="1" max="28" value="5" class="w-full px-3 py-2 border rounded-xl text-sm font-bold bg-white outline-none focus:ring-2 focus:ring-indigo-500">
+                  <span class="text-xs text-slate-400 font-medium">del mes actual</span>
+                </div>
+              </div>
+              <button id="btnSaveConfig" class="w-full py-2.5 bg-indigo-600 text-white rounded-xl font-bold text-xs uppercase tracking-wide hover:bg-indigo-700 transition-all shadow-md mt-2">
+                Guardar Configuración
+              </button>
+              <button id="btnGeneratePaymentsNow" class="w-full py-2.5 bg-emerald-500 text-white rounded-xl font-bold text-xs uppercase tracking-wide hover:bg-emerald-600 transition-all shadow-md mt-1 flex items-center justify-center gap-2">
+                <i data-lucide="play-circle" class="w-4 h-4"></i> Generar pagos ahora
+              </button>
+            </div>
+            <p class="text-[10px] text-slate-400 mt-4 text-center leading-tight">
+              El sistema generará los cobros y aplicará estados de vencimiento automáticamente según estos días.
+            </p>
           </div>
         </div>
 
-        <!-- BLOQUE 2: Lista Inteligente (Filtros + Grid) -->
+        <!-- BLOQUE 3: Tabla Principal -->
         <div class="bg-white rounded-2xl shadow-md border border-slate-100 p-6">
           <div class="flex flex-col md:flex-row justify-between items-center gap-4 mb-6">
-            <!-- Gráfica de Ingresos Mensuales -->
-            <div class="w-full md:w-1/3 h-40">
-              <canvas id="incomeMonthlyChart"></canvas>
-            </div>
-          </div>
-          <div class="flex flex-col md:flex-row justify-between items-center gap-4 mb-6">
             <h3 class="text-lg font-bold text-slate-800 flex items-center gap-2 w-full md:w-auto">
-              <span class="w-2 h-6 bg-purple-600 rounded-full"></span>
-              Estado de Cuentas por Estudiante
+              <span class="w-2 h-6 bg-indigo-600 rounded-full"></span>
+              Control de Pagos
             </h3>
             <div class="flex flex-wrap gap-3 w-full md:w-auto">
                <div class="relative flex-1 md:w-64">
                   <i data-lucide="search" class="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400"></i>
-                  <input id="searchPaymentStudent" placeholder="Buscar estudiante..." class="pl-10 pr-4 py-2 border rounded-xl text-sm w-full bg-slate-50 focus:bg-white transition-all">
+                  <input id="searchPaymentStudent" placeholder="Buscar por nombre..." class="pl-10 pr-4 py-2 border rounded-xl text-sm w-full bg-slate-50 focus:bg-white transition-all">
                </div>
-               <select id="filterPaymentYear" class="px-3 py-2 border rounded-xl text-sm bg-slate-50 font-bold text-slate-700">
-                  <option value="2024">2024</option>
-                  <option value="2025" selected>2025</option>
-                  <option value="2026">2026</option>
-               </select>
+               <div class="flex gap-2">
+                 <select id="filterPaymentMonth" class="px-3 py-2 border rounded-xl text-sm bg-slate-50 font-bold text-slate-700">
+                    <option value="01">Enero</option>
+                    <option value="02">Febrero</option>
+                    <option value="03">Marzo</option>
+                    <option value="04">Abril</option>
+                    <option value="05">Mayo</option>
+                    <option value="06">Junio</option>
+                    <option value="07">Julio</option>
+                    <option value="08">Agosto</option>
+                    <option value="09">Septiembre</option>
+                    <option value="10">Octubre</option>
+                    <option value="11">Noviembre</option>
+                    <option value="12">Diciembre</option>
+                 </select>
+                 <select id="filterPaymentYear" class="px-3 py-2 border rounded-xl text-sm bg-slate-50 font-bold text-slate-700">
+                    <option value="2024">2024</option>
+                    <option value="2025" selected>2025</option>
+                    <option value="2026">2026</option>
+                 </select>
+               </div>
                <select id="filterPaymentStatus" class="px-3 py-2 border rounded-xl text-sm bg-slate-50">
-                  <option value="all">Todos</option>
-                  <option value="paid">Al día</option>
+                  <option value="all">Todos los estados</option>
+                  <option value="paid">Aprobados</option>
                   <option value="pending">Pendiente</option>
+                  <option value="review">En Revisión</option>
                   <option value="overdue">Vencido</option>
                </select>
             </div>
           </div>
 
           <!-- TABLA DE PAGOS ESTRUCTURADA (Solicitado) -->
-          <div class="overflow-x-auto rounded-xl border border-slate-200">
+          <div class="overflow-x-auto rounded-2xl border border-slate-200">
             <table class="w-full text-sm text-left">
-              <thead class="bg-slate-50 text-slate-600 font-bold uppercase text-xs">
+              <thead class="bg-slate-50 text-slate-500 font-black uppercase text-[10px] tracking-wider">
                 <tr>
-                  <th class="px-6 py-4">Estudiante / Aula</th>
-                  <th class="px-6 py-4">Estado</th>
-                  <th class="px-6 py-4 text-right">Mensualidad</th>
-                  <th class="px-6 py-4 text-right">Pagado</th>
-                  <th class="px-6 py-4">Vencimiento</th>
-                  <th class="px-6 py-4 text-right">Deuda</th>
+                  <th class="px-6 py-4">Estudiante</th>
+                  <th class="px-6 py-4 text-center">Estado</th>
+                  <th class="px-6 py-4 text-right">Monto</th>
+                  <th class="px-6 py-4">Método</th>
+                  <th class="px-6 py-4">Banco / Ref</th>
+                  <th class="px-6 py-4">Fecha</th>
+                  <th class="px-6 py-4 text-center">Vauche</th>
                   <th class="px-6 py-4 text-center">Acciones</th>
                 </tr>
               </thead>
@@ -980,11 +1066,6 @@
                 <!-- Rows injected by JS -->
               </tbody>
             </table>
-          </div>
-          
-          <!-- Fallback Grid (Oculto por defecto si usamos tabla, o para móvil) -->
-          <div id="paymentsGrid" class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6 mt-6 hidden">
-             <!-- Cards inyectadas por JS -->
           </div>
         </div>
       </section>
@@ -1060,15 +1141,38 @@
 
       <!-- MURO ESCOLAR UNIFICADO -->
       <section id="muro" class="section hidden">
-        <header class="mb-6">
-          <h1 class="text-3xl font-black text-slate-800">Muro Escolar</h1>
-          <p class="text-slate-500 font-medium">Supervisa todas las publicaciones, reacciones y comentarios de las maestras.</p>
+        <header class="mb-6 flex items-center justify-between">
+          <div>
+            <h1 class="text-3xl font-black text-slate-800">🎭 Muro Escolar</h1>
+            <p class="text-slate-500 font-medium">Comunicación y actualizaciones de la comunidad educativa</p>
+          </div>
+          <button id="btnNewPost" onclick="WallModule.openNewPostModal()" class="px-4 py-2 bg-orange-600 text-white rounded-lg hover:bg-orange-700 transition-colors flex items-center gap-2 font-medium shadow-sm">
+            <i data-lucide="plus" class="w-5 h-5"></i> Nuevo Post
+          </button>
         </header>
 
-        <div class="max-w-4xl mx-auto">
-          <div id="muroPostsContainer" class="space-y-6">
+        <div class="max-w-5xl mx-auto">
+          <!-- Búsqueda -->
+          <div class="mb-6 flex items-center gap-2">
+            <input type="text" id="wallSearch" placeholder="Buscar posts..." class="flex-1 px-4 py-2 border border-slate-300 rounded-lg focus:outline-none focus:border-orange-600">
+            <select id="wallClassroomFilter" class="px-4 py-2 border border-slate-300 rounded-lg focus:outline-none focus:border-orange-600">
+              <option value="">Todas las aulas</option>
+              <!-- Opciones cargadas por JS -->
+            </select>
+            <button class="px-4 py-2 bg-slate-100 hover:bg-slate-200 rounded-lg transition-colors">
+              <i data-lucide="search" class="w-5 h-5 text-slate-600"></i>
+            </button>
+          </div>
+
+          <!-- Grid de posts -->
+          <div id="muroPostsContainer" class="grid grid-cols-1 gap-6">
             <!-- Cargado por JS -->
-            <div class="py-12 text-center text-slate-400">Cargando publicaciones...</div>
+            <div class="col-span-1 py-12 text-center">
+              <div class="animate-pulse">
+                <i data-lucide="loader" class="w-8 h-8 mx-auto text-orange-400 animate-spin mb-2"></i>
+                <p class="text-slate-400">Cargando publicaciones...</p>
+              </div>
+            </div>
           </div>
         </div>
       </section>
@@ -1088,15 +1192,15 @@
               <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
                   <label class="block text-sm font-medium text-slate-700 mb-1">Nombre Completo</label>
-                  <input id="confDirName" type="text" class="w-full border rounded px-3 py-2 focus:ring-2 focus:ring-purple-500 outline-none" value="Karonlyn García">
+                  <input id="confDirName" type="text" class="w-full border rounded px-3 py-2 focus:ring-2 focus:ring-purple-500 outline-none" placeholder="Cargando...">
                 </div>
                 <div>
                   <label class="block text-sm font-medium text-slate-700 mb-1">Título / Cargo</label>
-                  <input id="confDirTitle" type="text" class="w-full border rounded px-3 py-2 focus:ring-2 focus:ring-purple-500 outline-none" value="Directora General">
+                  <input id="confDirTitle" type="text" class="w-full border rounded px-3 py-2 focus:ring-2 focus:ring-purple-500 outline-none" placeholder="Cargando...">
                 </div>
                 <div class="md:col-span-2">
                   <label class="block text-sm font-medium text-slate-700 mb-1">Presentación / Biografía</label>
-                  <textarea id="confDirBio" rows="4" class="w-full border rounded px-3 py-2 focus:ring-2 focus:ring-purple-500 outline-none" placeholder="Escribe una breve presentación...">Fundadora y CEO, apasionada por la educación y el bienestar infantil. Con una visión clara y un corazón dedicado...</textarea>
+                  <textarea id="confDirBio" rows="4" class="w-full border rounded px-3 py-2 focus:ring-2 focus:ring-purple-500 outline-none" placeholder="Escribe una breve presentación..."></textarea>
                   <p class="text-xs text-slate-500 mt-1">Esta información será visible en el perfil público para padres y maestros.</p>
                 </div>
               </div>
@@ -1107,15 +1211,15 @@
               <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
                   <label class="block text-sm font-medium text-slate-700 mb-1">Teléfono Institucional</label>
-                  <input id="confPhone" type="tel" class="w-full border rounded px-3 py-2 focus:ring-2 focus:ring-purple-500 outline-none" value="+1 (829) 803-8424">
+                  <input id="confPhone" type="tel" class="w-full border rounded px-3 py-2 focus:ring-2 focus:ring-purple-500 outline-none" placeholder="+1 (000) 000-0000">
                 </div>
                 <div>
                   <label class="block text-sm font-medium text-slate-700 mb-1">Correo de Contacto</label>
-                  <input id="confEmail" type="email" class="w-full border rounded px-3 py-2 focus:ring-2 focus:ring-purple-500 outline-none" value="info@karpuskids.com">
+                  <input id="confEmail" type="email" class="w-full border rounded px-3 py-2 focus:ring-2 focus:ring-purple-500 outline-none" placeholder="contacto@ejemplo.com">
                 </div>
                 <div class="md:col-span-2">
                   <label class="block text-sm font-medium text-slate-700 mb-1">Dirección Física</label>
-                  <input id="confAddress" type="text" class="w-full border rounded px-3 py-2 focus:ring-2 focus:ring-purple-500 outline-none" value="Calle Principal #123, Santo Domingo">
+                  <input id="confAddress" type="text" class="w-full border rounded px-3 py-2 focus:ring-2 focus:ring-purple-500 outline-none" placeholder="Dirección de la estancia">
                 </div>
               </div>
             </div>
@@ -1126,11 +1230,12 @@
             <div class="bg-white rounded shadow p-6 text-center">
               <h3 class="text-sm font-semibold mb-4">Foto de Perfil</h3>
               <div class="relative w-32 h-32 mx-auto mb-4 group">
-                <img src="img/mundo.jpg" alt="Avatar" class="w-full h-full object-cover rounded-full border-4 border-slate-100 shadow-sm group-hover:opacity-90 transition-opacity" loading="lazy">
-                <button class="absolute bottom-0 right-0 bg-purple-600 text-white p-2 rounded-full shadow hover:bg-purple-700 transition-colors" title="Cambiar foto" aria-label="Cambiar foto de perfil">
+                <img id="profileAvatar" src="img/mundo.jpg" alt="Avatar" class="w-full h-full object-cover rounded-full border-4 border-slate-100 shadow-sm group-hover:opacity-90 transition-opacity" loading="lazy">
+                <button onclick="document.getElementById('avatarInput').click()" class="absolute bottom-0 right-0 bg-purple-600 text-white p-2 rounded-full shadow hover:bg-purple-700 transition-colors" title="Cambiar foto" aria-label="Cambiar foto de perfil">
                   <i data-lucide="camera" class="w-4 h-4"></i>
                 </button>
               </div>
+              <input type="file" id="avatarInput" accept="image/*" class="hidden">
               <p class="text-xs text-slate-500 mb-4">JPG, PNG o WEBP. Máx 2MB.</p>
             </div>
 
@@ -1148,562 +1253,30 @@
     </main>
   </div>
 
-  <!-- MODAL: Crear/Editar Maestro -->
-  <div id="teacherModal" class="fixed inset-0 bg-black/40 hidden flex items-center justify-center z-50">
-    <div class="bg-white rounded-lg p-6 w-full max-w-md">
-      <h3 class="font-semibold mb-3 flex items-center gap-2">
-        <i data-lucide="user-cog" class="w-5 h-5"></i>
-        <span id="teacherModalTitle">Crear Maestro</span>
-      </h3>
-      <input type="hidden" id="tmId">
-      <div class="grid gap-3">
-        <div>
-          <label class="text-sm text-slate-600 block mb-1">Nombre completo</label>
-          <input id="tmName" placeholder="Ej: María González" class="w-full border rounded px-3 py-2" />
-        </div>
-        <div>
-          <label class="text-sm text-slate-600 block mb-1">Teléfono</label>
-          <input id="tmPhone" type="tel" pattern="[0-9+ ]{7,15}" placeholder="Ej: +57 300 123 4567" class="w-full border rounded px-3 py-2" />
-        </div>
-        <div>
-          <label class="text-sm text-slate-600 block mb-1">Correo electrónico</label>
-          <input id="tmEmail" type="email" placeholder="Ej: maria@karpus.com" class="w-full border rounded px-3 py-2" />
-        </div>
-        <div class="grid grid-cols-2 gap-3">
-          <div>
-            <label class="text-sm text-slate-600 block mb-1">Usuario</label>
-            <input id="tmUsername" placeholder="Ej: maria.g" class="w-full border rounded px-3 py-2" />
-          </div>
-          <div>
-            <label class="text-sm text-slate-600 block mb-1">Especialidad</label>
-            <input id="tmSpecialty" placeholder="Ej: Inglés" class="w-full border rounded px-3 py-2" />
-          </div>
-        </div>
-        <div>
-          <label class="text-sm text-slate-600 block mb-1">Contraseña</label>
-          <input id="tmPassword" type="password" placeholder="••••••" class="w-full border rounded px-3 py-2" />
-        </div>
-        <div>
-          <label class="text-sm text-slate-600 block mb-1">Estado</label>
-          <select id="tmStatus" class="w-full border rounded px-3 py-2">
-            <option value="Activo">Activo</option>
-            <option value="Inactivo">Inactivo</option>
-          </select>
-        </div>
-        <div class="flex justify-end gap-2 mt-3">
-          <button id="btnCancelTeacher" class="px-4 py-2 border rounded-lg hover:bg-slate-50">Cancelar</button>
-          <button id="btnSaveTeacher" class="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700">Guardar</button>
-        </div>
-      </div>
-    </div>
-  </div>
-
-  <!-- MODAL: Ver Estudiantes de Aula -->
-  <div id="roomStudentsModal" class="fixed inset-0 bg-black/40 hidden items-center justify-center z-50">
-    <div class="bg-white rounded-lg p-6 w-full max-w-md">
-      <div class="flex justify-between items-center mb-4">
-        <h3 class="font-semibold flex items-center gap-2">
-          <i data-lucide="users" class="w-5 h-5 text-slate-600"></i>
-          <span id="roomStudentsTitle">Estudiantes</span>
-        </h3>
-        <button id="btnCloseRoomStudentsX" class="text-slate-400 hover:text-slate-600" aria-label="Cerrar"><i data-lucide="x" class="w-5 h-5"></i></button>
-      </div>
-      <div id="roomStudentsList" class="space-y-2 max-h-80 overflow-y-auto">
-        <!-- Lista dinámica -->
-      </div>
-      <div class="flex justify-end mt-4">
-        <button id="btnCloseRoomStudents" class="px-4 py-2 bg-slate-100 text-slate-700 rounded-lg hover:bg-slate-200">Cerrar</button>
-      </div>
-    </div>
-  </div>
-
-  <!-- MODAL: Crear/Editar Aula -->
-  <div id="roomModal" class="fixed inset-0 bg-black/40 hidden flex items-center justify-center z-50">
-    <div class="bg-white rounded-lg p-6 w-full max-w-lg">
-      <h3 class="font-semibold mb-3 flex items-center gap-2">
-        <i data-lucide="home" class="w-5 h-5"></i>
-        <span id="roomModalTitle">Gestionar Aula</span>
-      </h3>
-      <input type="hidden" id="roomId">
-      <div class="grid gap-3">
-        <div>
-          <label class="text-sm text-slate-600 block mb-1">Nombre del Aula</label>
-          <input id="roomName" placeholder="Ej: Aula Pequeños A1" class="w-full border rounded px-3 py-2" />
-        </div>
-        <div>
-          <label class="text-sm text-slate-600 block mb-1">Maestro Asignado</label>
-          <select id="roomTeacher" class="w-full border rounded px-3 py-2">
-            <option value="">Seleccionar maestro...</option>
-          </select>
-        </div>
-        <div>
-          <label class="text-sm text-slate-600 block mb-1">Capacidad Máxima</label>
-          <input id="roomCapacity" type="number" min="1" max="30" placeholder="Ej: 15" class="w-full border rounded px-3 py-2" />
-        </div>
-        <div>
-          <label class="text-sm text-slate-600 block mb-1">Estudiantes Asignados</label>
-          <div class="border rounded px-3 py-2 max-h-40 overflow-y-auto bg-slate-50">
-            <div id="roomStudentsChecklist" class="space-y-1 p-1">
-              <!-- Lista dinámica de estudiantes con checkboxes -->
-            </div>
-          </div>
-          <p class="text-xs text-slate-500 mt-1">Selecciona los estudiantes que pertenecerán a esta aula</p>
-        </div>
-        <div class="flex justify-end gap-2 mt-3">
-          <button id="btnCancelRoom" class="px-4 py-2 border rounded-lg hover:bg-slate-50">Cancelar</button>
-          <button id="btnSaveRoom" class="px-4 py-2 bg-yellow-600 text-white rounded-lg hover:bg-yellow-700">Guardar</button>
-        </div>
-      </div>
-    </div>
-  </div>
-
-  <!-- Modal Perfil del Estudiante -->
-  <div id="studentProfileModal" class="fixed inset-0 bg-black bg-opacity-50 hidden flex items-center justify-center z-50">
-    <div class="bg-white rounded-lg shadow-xl max-w-2xl w-full mx-4 max-h-[90vh] overflow-y-auto">
-      <div class="p-6">
-        <div class="flex items-center justify-between mb-6">
-          <h3 class="text-xl font-semibold text-slate-800">Perfil del Estudiante</h3>
-          <button id="closeStudentProfileModal" class="text-slate-400 hover:text-slate-600" aria-label="Cerrar perfil">
-            <i data-lucide="x" class="w-6 h-6"></i>
-          </button>
-        </div>
-        
-        <!-- Información del Estudiante -->
-        <div class="mb-6">
-          <div class="flex items-center gap-4 mb-4">
-            <div id="studentProfileAvatarContainer" class="w-16 h-16 bg-indigo-100 rounded-full flex items-center justify-center overflow-hidden">
-              <i data-lucide="user" class="w-8 h-8 text-indigo-600"></i>
-            </div>
-            <div>
-              <h4 id="studentProfileName" class="text-lg font-semibold text-slate-800">Nombre del Estudiante</h4>
-              <p class="text-sm text-slate-600">Estudiante activo</p>
-            </div>
-          </div>
-        </div>
-
-        <!-- Datos de los Padres -->
-        <div class="space-y-6">
-          <div>
-            <h5 class="text-lg font-medium text-slate-800 mb-4 flex items-center gap-2">
-              <i data-lucide="users" class="w-5 h-5 text-slate-600"></i>
-              Información de los Padres
-            </h5>
-            
-            <!-- Padre/Madre 1 -->
-            <div class="bg-slate-50 rounded-lg p-4 mb-4">
-              <h6 class="font-medium text-slate-700 mb-3">Padre/Madre Principal</h6>
-              <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div>
-                  <label class="text-sm text-slate-600 block mb-1">Nombre Completo</label>
-                  <p id="parent1Name" class="text-sm font-medium text-slate-800">Ana María Pérez González</p>
-                </div>
-                <div>
-                  <label class="text-sm text-slate-600 block mb-1">Teléfono</label>
-                  <p id="parent1Phone" class="text-sm font-medium text-slate-800">-</p>
-                </div>
-                <div>
-                  <label class="text-sm text-slate-600 block mb-1">Correo Electrónico</label>
-                  <p id="parent1Email" class="text-sm font-medium text-slate-800">ana.perez@email.com</p>
-                </div>
-                <div>
-                  <label class="text-sm text-slate-600 block mb-1">Ocupación</label>
-                  <p id="parent1Job" class="text-sm font-medium text-slate-800">Ingeniera de Sistemas</p>
-                </div>
-                <div>
-                  <label class="text-sm text-slate-600 block mb-1">Dirección</label>
-                  <p id="parent1Address" class="text-sm font-medium text-slate-800">Calle 123 #45-67, Bogotá</p>
-                </div>
-                <div>
-                  <label class="text-sm text-slate-600 block mb-1">Contacto de Emergencia</label>
-                  <p id="parent1Emergency" class="text-sm font-medium text-slate-800">+57 301 987 6543</p>
-                </div>
-              </div>
-            </div>
-
-            <!-- Padre/Madre 2 -->
-            <div class="bg-slate-50 rounded-lg p-4">
-              <h6 class="font-medium text-slate-700 mb-3">Padre/Madre Secundario</h6>
-              <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div>
-                  <label class="text-sm text-slate-600 block mb-1">Nombre Completo</label>
-                  <p id="parent2Name" class="text-sm font-medium text-slate-800">Carlos Eduardo Pérez</p>
-                </div>
-                <div>
-                  <label class="text-sm text-slate-600 block mb-1">Teléfono</label>
-                  <p id="parent2Phone" class="text-sm font-medium text-slate-800">-</p>
-                </div>
-                <div>
-                  <label class="text-sm text-slate-600 block mb-1">Correo Electrónico</label>
-                  <p id="parent2Email" class="text-sm font-medium text-slate-800">carlos.perez@email.com</p>
-                </div>
-                <div>
-                  <label class="text-sm text-slate-600 block mb-1">Ocupación</label>
-                  <p id="parent2Job" class="text-sm font-medium text-slate-800">Contador Público</p>
-                </div>
-                <div>
-                  <label class="text-sm text-slate-600 block mb-1">Dirección</label>
-                  <p id="parent2Address" class="text-sm font-medium text-slate-800">Calle 123 #45-67, Bogotá</p>
-                </div>
-                <div>
-                  <label class="text-sm text-slate-600 block mb-1">Contacto de Emergencia</label>
-                  <p id="parent2Emergency" class="text-sm font-medium text-slate-800">+57 320 111 2233</p>
-                </div>
-              </div>
-            </div>
-          </div>
-
-          <!-- Información Adicional -->
-          <div class="bg-blue-50 rounded-lg p-4">
-            <h6 class="font-medium text-blue-800 mb-3 flex items-center gap-2">
-              <i data-lucide="info" class="w-4 h-4"></i>
-              Información Adicional
-            </h6>
-            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div>
-                <label class="text-sm text-blue-700 block mb-1">Aula Asignada</label>
-                <p id="studentRoom" class="text-sm font-medium text-blue-800">Aula Pequeños A1</p>
-              </div>
-              <div>
-                <label class="text-sm text-blue-700 block mb-1">Fecha de Ingreso</label>
-                <p id="studentStartDate" class="text-sm font-medium text-blue-800">15 de Febrero, 2024</p>
-              </div>
-              <div>
-                <label class="text-sm text-blue-700 block mb-1">Alergias/Condiciones</label>
-                <p id="studentAllergies" class="text-sm font-medium text-blue-800">Ninguna conocida</p>
-              </div>
-              <div>
-                <label class="text-sm text-blue-700 block mb-1">Autorizado para Recoger</label>
-                <p id="studentPickup" class="text-sm font-medium text-blue-800">Padres y Abuela Materna</p>
-              </div>
-              <div>
-                <label class="text-sm text-blue-700 block mb-1">Tipo de Sangre</label>
-                <p id="studentBlood" class="text-sm font-medium text-blue-800">O+</p>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        <div class="flex justify-end gap-2 mt-6">
-          <button id="editStudentProfile" class="px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700">
-            Editar Información
-          </button>
-          <button id="closeStudentProfile" class="px-4 py-2 border rounded-lg hover:bg-slate-50">
-            Cerrar
-          </button>
-        </div>
-      </div>
-    </div>
-  </div>
-
-  <!-- MODAL: Crear/Editar Estudiante (Profesional) -->
-  <div id="modalAddStudent" class="fixed inset-0 bg-black/40 hidden flex items-center justify-center z-50">
-    <div class="bg-white rounded-2xl shadow-2xl w-full max-w-3xl p-6">
-      <input type="hidden" id="stId" />
-      <h3 class="text-xl font-bold text-slate-800 flex items-center gap-2 mb-4">
-        <span class="w-2 h-6 bg-purple-600 rounded-full"></span> <span id="stModalTitle">Crear Estudiante</span>
-      </h3>
-
-      <!-- Foto + Matrícula -->
-      <div class="flex items-center gap-4 mb-4">
-        <div class="relative w-20 h-20 rounded-full bg-purple-50 flex items-center justify-center overflow-hidden border-2 border-purple-100">
-          <img id="stPhotoPreview" class="w-full h-full object-cover hidden" alt="preview" />
-          <i data-lucide="user" class="w-8 h-8 text-purple-600" id="stPhotoIcon"></i>
-          <input type="file" id="stPhotoInput" accept="image/*" class="absolute inset-0 opacity-0 cursor-pointer" />
-        </div>
-        <div class="text-sm text-slate-600">
-          Matrícula: <span id="stEnrollment" class="font-bold text-slate-800">—</span>
-          <button id="btnGenEnrollment" class="ml-2 text-purple-600 text-sm hover:underline">Generar</button>
-        </div>
-      </div>
-
-      <!-- Información Personal -->
-      <div class="border-t border-slate-200 pt-4 grid grid-cols-1 md:grid-cols-2 gap-3">
-        <div>
-          <label class="text-sm text-slate-600 block mb-1">Nombre completo</label>
-          <input id="stName" class="w-full border rounded px-3 py-2" placeholder="Ej: Juan Pérez" />
-        </div>
-        <div>
-          <label class="text-sm text-slate-600 block mb-1">Edad</label>
-          <input id="stAge" type="number" min="0" class="w-full border rounded px-3 py-2" placeholder="Ej: 5" />
-        </div>
-        <div>
-          <label class="text-sm text-slate-600 block mb-1">Horario</label>
-          <input id="stSchedule" class="w-full border rounded px-3 py-2" placeholder="08:00-12:00" />
-        </div>
-        <div>
-          <label class="text-sm text-slate-600 block mb-1">Aula</label>
-          <select id="stClassroom" class="w-full border rounded px-3 py-2 bg-white"><option value="">-- Seleccionar Aula --</option></select>
-        </div>
-      </div>
-
-      <!-- Información Académica / Padres -->
-      <div class="border-t border-slate-200 pt-4 grid grid-cols-1 md:grid-cols-2 gap-3">
-        <div>
-          <label class="text-sm text-slate-600 block mb-1">Padre/Madre 1</label>
-          <input id="p1Name" class="w-full border rounded px-3 py-2" placeholder="Nombre" />
-        </div>
-        <div>
-          <label class="text-sm text-slate-600 block mb-1">Teléfono</label>
-          <input id="p1Phone" pattern="[0-9+ ]{7,15}" class="w-full border rounded px-3 py-2" placeholder="Teléfono" />
-        </div>
-        <div>
-          <label class="text-sm text-slate-600 block mb-1">Correo (usuario)</label>
-          <input id="p1Email" type="email" class="w-full border rounded px-3 py-2" placeholder="Correo" />
-        </div>
-        <div>
-          <label class="text-sm text-slate-600 block mb-1">Contraseña</label>
-          <input id="p1Password" type="text" class="w-full border rounded px-3 py-2" placeholder="Autogenerada opcional" />
-        </div>
-        <div>
-          <label class="text-sm text-slate-600 block mb-1">Padre/Madre 2</label>
-          <input id="p2Name" class="w-full border rounded px-3 py-2" placeholder="Nombre" />
-        </div>
-        <div>
-          <label class="text-sm text-slate-600 block mb-1">Teléfono 2</label>
-          <input id="p2Phone" pattern="[0-9+ ]{7,15}" class="w-full border rounded px-3 py-2" placeholder="Teléfono 2" />
-        </div>
-      </div>
-
-      <!-- Salud y Pago -->
-      <div class="border-t border-slate-200 pt-4 grid grid-cols-1 md:grid-cols-2 gap-3">
-        <div>
-          <label class="text-sm text-slate-600 block mb-1">Alergias</label>
-          <input id="stAllergies" class="w-full border rounded px-3 py-2" placeholder="Alergias" />
-        </div>
-        <div>
-          <label class="text-sm text-slate-600 block mb-1">Tipo Sangre</label>
-          <input id="stBlood" class="w-full border rounded px-3 py-2" placeholder="O+" />
-        </div>
-        <div>
-          <label class="text-sm text-slate-600 block mb-1">Mensualidad</label>
-          <input id="stMonthlyFee" type="number" step="0.01" class="w-full border rounded px-3 py-2" placeholder="0.00" />
-        </div>
-        <div>
-          <label class="text-sm text-slate-600 block mb-1">Día de vencimiento</label>
-          <input id="stDueDay" type="number" min="1" max="31" class="w-full border rounded px-3 py-2" placeholder="5" />
-        </div>
-      </div>
-
-      <!-- Autorizados para recoger -->
-      <div class="border-t border-slate-200 pt-4">
-        <label class="text-sm text-slate-600 block mb-1">Autorizados para recoger</label>
-        <input id="stPickup" class="w-full border rounded px-3 py-2" placeholder="Ej: Abuela Carmen, Tío Juan" />
-        <label class="mt-2 flex items-center gap-2"><input id="stActive" type="checkbox" checked class="rounded" /> Estudiante activo</label>
-      </div>
-
-      <div class="flex justify-end gap-2 mt-5">
-        <button id="btnCancelStudent" class="px-4 py-2 border rounded-xl">Cancelar</button>
-        <button id="btnSaveStudent" class="bg-purple-600 hover:bg-purple-700 text-white rounded-xl px-6 py-2 shadow-md flex items-center gap-2">
-          <i data-lucide="save" class="w-4 h-4"></i> Guardar
-        </button>
-      </div>
-    </div>
-  </div>
+  <!-- Contenedor Único de Modales -->
+  <div id="globalModalContainer" class="modal-container hidden items-center justify-center z-50 fixed inset-0 bg-black/50 backdrop-blur-sm"></div>
 
   <!-- Scripts optimizados -->
-  <script type="module" src="app.js"></script>
-  <script type="module" src="js/panel_directora.js?v=3"></script>
+  <script>
+    // Ocultar loader al cargar
+    window.addEventListener('load', () => {
+      const loader = document.getElementById('initial-loading');
+      if(loader) {
+        loader.style.opacity = '0';
+        setTimeout(() => loader.remove(), 500);
+      }
+    });
+  </script>
+  <!-- Core App Module -->
+  <script type="module" src="js/directora/main.js"></script>
+  <!-- Safe Event Handlers (XSS Protection) -->
+  <script defer src="js/directora/event-handlers.js"></script>
   <script defer src="js/common_ui.js"></script>
   <script>
     document.addEventListener("DOMContentLoaded", () => {
       if(window.lucide) lucide.createIcons();
     });
   </script>
-  <!-- Attendance Detail Modal (Director) -->
-  <div id="attendanceModal" class="fixed inset-0 bg-black/30 z-50 hidden items-center justify-center">
-    <div class="bg-white rounded-2xl shadow-xl p-6 w-full max-w-4xl h-[80vh] flex flex-col">
-      <div class="flex justify-between items-center mb-4">
-        <div>
-          <h3 class="text-lg font-bold" id="attModalTitle">Asistencia - Aula</h3>
-          <p class="text-sm text-slate-500" id="attModalDate">Fecha: Hoy</p>
-        </div>
-        <button id="closeAttendanceModal" class="p-2 rounded-full hover:bg-slate-100"><i data-lucide="x"></i></button>
-      </div>
-      
-      <div class="flex-1 overflow-y-auto">
-        <table class="w-full text-sm text-left border-collapse">
-          <thead class="bg-slate-50 text-slate-500 sticky top-0">
-            <tr>
-              <th class="p-3">Estudiante</th>
-              <th class="p-3 text-center">Estado</th>
-              <th class="p-3 text-center">Hora</th>
-            </tr>
-          </thead>
-          <tbody id="attModalBody" class="divide-y divide-slate-100">
-            <!-- JS -->
-          </tbody>
-        </table>
-      </div>
-    </div>
-  </div>
-
-<!-- Modal para Crear Asistente -->
-<div id="modalCreateAssistant" class="modal-container" role="dialog" aria-modal="true" aria-labelledby="assistantModalTitle">
-  <div class="modal-content">
-    <div class="modal-header">
-      <h3 id="assistantModalTitle" class="text-lg font-semibold">Crear Usuario Asistente</h3>
-      <button type="button" id="btnCloseAssistantModal" class="text-slate-400 hover:text-slate-600" aria-label="Cerrar modal">
-        <i data-lucide="x" class="w-5 h-5"></i>
-      </button>
-    </div>
-    <div class="modal-body">
-      <form id="formCreateAssistant" class="space-y-4">
-        <div>
-          <label class="block text-sm font-medium text-slate-700 mb-1">Nombre completo</label>
-          <input type="text" id="assistantName" required class="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none" placeholder="Ej: María García">
-        </div>
-        <div>
-          <label class="block text-sm font-medium text-slate-700 mb-1">Correo electrónico</label>
-          <input type="email" id="assistantEmail" required class="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none" placeholder="Ej: maria@karpus.com">
-        </div>
-        <div>
-          <label class="block text-sm font-medium text-slate-700 mb-1">Contraseña temporal</label>
-          <div class="flex gap-2">
-            <input type="password" id="assistantPassword" required minlength="6" class="flex-1 px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none" placeholder="Mínimo 6 caracteres">
-            <button type="button" id="btnGeneratePassword" class="px-3 py-2 bg-slate-100 text-slate-700 rounded-lg hover:bg-slate-200 flex items-center gap-2">
-              <i data-lucide="refresh-cw" class="w-4 h-4"></i>
-              Generar
-            </button>
-          </div>
-        </div>
-        <div>
-          <label class="block text-sm font-medium text-slate-700 mb-1">Teléfono (opcional)</label>
-          <input type="tel" id="assistantPhone" pattern="[0-9+ ]{7,15}" class="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none" placeholder="Ej: +1234567890">
-        </div>
-        <div>
-          <label class="block text-sm font-medium text-slate-700 mb-1">Notas adicionales</label>
-          <textarea id="assistantNotes" rows="3" class="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none" placeholder="Información adicional sobre el asistente..."></textarea>
-        </div>
-      </form>
-    </div>
-    <div class="modal-footer">
-      <button type="button" id="btnCancelAssistant" class="px-4 py-2 text-slate-600 hover:text-slate-800">Cancelar</button>
-      <button type="submit" form="formCreateAssistant" id="btnSaveAssistant" class="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 flex items-center gap-2">
-        <i data-lucide="save" class="w-4 h-4"></i>
-        Crear Asistente
-      </button>
-    </div>
-  </div>
-</div>
-
-<!-- Modal Registrar Pago Manual -->
-<div id="modalPayment" class="fixed inset-0 bg-black/40 hidden flex items-center justify-center z-50">
-  <div class="bg-white rounded-2xl shadow-xl p-6 w-full max-w-lg">
-    <h3 class="text-xl font-bold text-slate-800 mb-4 flex items-center gap-2">
-      <i data-lucide="credit-card" class="w-6 h-6 text-purple-600"></i> Registrar Pago
-    </h3>
-    <div class="grid gap-4">
-      <div>
-        <label class="text-sm font-bold text-slate-700 block mb-1">Estudiante</label>
-        <select id="payStudentSelect" class="w-full border rounded-xl px-3 py-2.5 bg-slate-50 focus:bg-white outline-none">
-          <option value="">Seleccionar...</option>
-        </select>
-      </div>
-      <div class="grid grid-cols-2 gap-4">
-        <div>
-          <label class="text-sm font-bold text-slate-700 block mb-1">Monto</label>
-          <input id="payAmount" type="number" step="0.01" class="w-full border rounded-xl px-3 py-2.5" placeholder="0.00">
-        </div>
-        <div>
-          <label class="text-sm font-bold text-slate-700 block mb-1">Método</label>
-          <select id="payMethod" class="w-full border rounded-xl px-3 py-2.5">
-            <option value="efectivo">Efectivo</option>
-            <option value="transferencia">Transferencia</option>
-            <option value="tarjeta">Tarjeta</option>
-          </select>
-        </div>
-      </div>
-      <div>
-        <label class="text-sm font-bold text-slate-700 block mb-1">Concepto / Mes</label>
-        <input id="payConcept" type="text" class="w-full border rounded-xl px-3 py-2.5" placeholder="Ej: Mensualidad Marzo">
-      </div>
-      <div class="flex justify-end gap-3 mt-4">
-        <button id="btnCancelPayment" class="px-4 py-2 text-slate-600 font-bold hover:bg-slate-100 rounded-xl">Cancelar</button>
-        <button id="btnSavePayment" class="px-6 py-2 bg-purple-600 text-white font-bold rounded-xl hover:bg-purple-700 shadow-md">Guardar Pago</button>
-      </div>
-    </div>
-  </div>
-</div>
-
-<!-- Modal Revisión Transferencias -->
-<div id="modalReviewTransfer" class="fixed inset-0 bg-black/40 hidden flex items-center justify-center z-50">
-  <div class="bg-white rounded-2xl shadow-xl w-full max-w-4xl h-[85vh] flex flex-col md:flex-row overflow-hidden">
-    <!-- Lado Izquierdo: Imagen -->
-    <div class="w-full md:w-1/2 bg-slate-900 flex items-center justify-center relative p-4">
-      <img id="reviewImage" src="" class="max-w-full max-h-full object-contain rounded-lg shadow-lg">
-      <div class="absolute top-4 left-4 bg-black/50 text-white px-3 py-1 rounded-full text-xs backdrop-blur-sm">Comprobante Original</div>
-    </div>
-    <!-- Lado Derecho: Datos y Acciones -->
-    <div class="w-full md:w-1/2 p-6 flex flex-col bg-white">
-      <h3 class="text-xl font-bold text-slate-800 mb-1">Revisión de Transferencia</h3>
-      <p class="text-sm text-slate-500 mb-6">Verifique los datos detectados vs el comprobante.</p>
-      
-      <div class="space-y-4 flex-1 overflow-y-auto">
-        <div class="p-4 bg-purple-50 rounded-xl border border-purple-100">
-          <p class="text-xs font-bold text-purple-600 uppercase mb-1">Análisis Automático (IA)</p>
-          <div class="flex justify-between items-center">
-             <span class="text-slate-600 text-sm">Monto Detectado:</span>
-             <span class="text-xl font-black text-slate-800" id="reviewDetectedAmount">$0.00</span>
-          </div>
-          <div class="mt-2 flex items-center gap-2 text-xs text-slate-500" id="ocrContainer">
-             <i data-lucide="scan-line" class="w-4 h-4"></i> <span id="reviewOcrStatus">Escaneando texto...</span>
-          </div>
-        </div>
-
-        <div>
-          <label class="text-xs font-bold text-slate-500 uppercase block mb-1">Estudiante</label>
-          <p class="text-lg font-bold text-slate-800" id="reviewStudentName">-</p>
-        </div>
-        
-        <div class="grid grid-cols-2 gap-4">
-           <div>
-             <label class="text-xs font-bold text-slate-500 uppercase block mb-1">Monto Reportado</label>
-             <p class="text-lg font-bold text-slate-800" id="reviewReportedAmount">-</p>
-           </div>
-           <div>
-             <label class="text-xs font-bold text-slate-500 uppercase block mb-1">Fecha</label>
-             <p class="text-lg font-bold text-slate-800" id="reviewDate">-</p>
-           </div>
-        </div>
-      </div>
-
-      <div class="mt-6 pt-6 border-t border-slate-100 grid grid-cols-2 gap-3">
-        <button id="btnRejectTransfer" class="py-3 border-2 border-red-100 text-red-600 font-bold rounded-xl hover:bg-red-50 transition-colors">Rechazar</button>
-        <button id="btnApproveTransfer" class="py-3 bg-green-600 text-white font-bold rounded-xl hover:bg-green-700 shadow-md transition-colors flex justify-center items-center gap-2">
-          <span>Aprobar Pago</span>
-          <i data-lucide="send" class="w-4 h-4 hidden" id="approveMailIcon"></i>
-        </button>
-      </div>
-      <button id="btnCloseReview" class="mt-3 text-center text-slate-400 text-sm hover:text-slate-600">Cancelar revisión</button>
-    </div>
-  </div>
-</div>
-
-<!-- MODAL: Detalle de Reporte/Incidencia -->
-<div id="inquiryDetailModal" class="fixed inset-0 bg-black/40 hidden flex items-center justify-center z-50 p-4">
-  <div class="bg-white rounded-2xl shadow-2xl w-full max-w-2xl max-h-[90vh] overflow-y-auto flex flex-col">
-    <div class="p-6 border-b border-slate-100 flex justify-between items-start">
-      <div>
-        <h3 class="text-xl font-bold text-slate-800" id="inqDetailSubject">Asunto</h3>
-        <p class="text-sm text-slate-500 mt-1" id="inqDetailMeta">Fecha • Padre</p>
-      </div>
-      <button id="btnCloseInquiryDetail" class="p-2 text-slate-400 hover:text-slate-600 hover:bg-slate-50 rounded-full transition-colors" aria-label="Cerrar detalle"><i data-lucide="x"></i></button>
-    </div>
-    
-    <div class="p-6 space-y-6">
-      <div class="bg-slate-50 p-4 rounded-xl text-slate-700 whitespace-pre-wrap leading-relaxed border border-slate-100" id="inqDetailMessage"></div>
-      
-      <div id="inqDetailAttachment" class="hidden">
-        <p class="text-xs font-bold text-slate-500 uppercase mb-3 flex items-center gap-2"><i data-lucide="paperclip" class="w-3 h-3"></i> Archivo Adjunto</p>
-        <div class="rounded-xl overflow-hidden border border-slate-200 bg-slate-100">
-          <img id="inqDetailImage" src="" class="w-full h-auto max-h-96 object-contain mx-auto" alt="Adjunto" />
-        </div>
-        <a id="inqDetailLink" href="#" target="_blank" class="inline-flex items-center gap-2 mt-3 text-blue-600 text-sm font-bold hover:underline"><i data-lucide="external-link" class="w-4 h-4"></i> Abrir original</a>
-      </div>
-    </div>
-  </div>
-</div>
-
 <script src="js/pwa-install.js" defer></script>
 </body>
 </html>

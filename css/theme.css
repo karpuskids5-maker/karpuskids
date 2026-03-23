@@ -456,3 +456,40 @@ body.panel-asistente-body #sidebar {
 .record-item label { display: block; font-size: 0.75rem; font-weight: 500; color: #64748b; margin-bottom: 0.25rem; }
 .record-item p { font-size: 0.875rem; font-weight: 600; color: #1e293b; }
 .record-footer { padding: 1rem 1.5rem; background-color: white; border-top: 1px solid #e2e8f0; display: flex; justify-content: flex-end; }
+
+/* --- ESTILOS MODAL GLOBAL --- */
+#globalModalContainer { position: fixed; inset: 0; display: flex; align-items: center; justify-content: center; z-index: 50; }
+.modal-overlay { position: fixed; inset: 0; background-color: rgba(0,0,0,0.5); display: flex; align-items: center; justify-content: center; }
+.modal-content { background-color: white; border-radius: 1rem; box-shadow: 0 25px 50px -12px rgba(0,0,0,0.25); max-width: 42rem; width: 90%; max-height: 90vh; overflow: hidden; display: flex; flex-direction: column; animation: slideInUp 0.3s ease-out; }
+@keyframes slideInUp { from { transform: translateY(2rem); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
+.modal-header { padding: 1.5rem; border-bottom: 1px solid #e2e8f0; display: flex; justify-content: space-between; align-items: center; background-color: #ffffff; }
+.modal-header h2 { font-size: 1.5rem; font-weight: 700; color: #1e293b; display: flex; align-items: center; gap: 0.5rem; }
+.modal-header h2 i { width: 24px; height: 24px; }
+.close-modal-btn { background-color: transparent; border: none; cursor: pointer; color: #94a3b8; transition: all 0.2s; padding: 0.5rem; }
+.close-modal-btn:hover { background-color: #f1f5f9; color: #475569; transform: rotate(90deg); }
+.close-modal-btn i { width: 20px; height: 20px; }
+.modal-body { padding: 1.5rem; overflow-y: auto; flex: 1; }
+.modal-body .space-y-4 > div + div { margin-top: 1rem; }
+.modal-body label { display: block; font-size: 0.875rem; font-weight: 600; color: #334155; margin-bottom: 0.5rem; }
+.modal-body input, .modal-body textarea { width: 100%; padding: 0.75rem; border: 1px solid #cbd5e1; border-radius: 0.5rem; font-size: 0.875rem; transition: all 0.2s; }
+.modal-body input:focus, .modal-body textarea:focus { outline: none; border-color: #ea580c; box-shadow: 0 0 0 3px rgba(234, 88, 12, 0.1); }
+.modal-footer { padding: 1rem 1.5rem; background-color: #f8fafc; border-top: 1px solid #e2e8f0; display: flex; justify-content: flex-end; gap: 1rem; }
+.btn-primary { padding: 0.75rem 1.5rem; background-color: #ea580c; color: white; border: none; border-radius: 0.5rem; font-weight: 600; cursor: pointer; transition: all 0.2s; }
+.btn-primary:hover { background-color: #c2410c; }
+.btn-primary:disabled { background-color: #cbd5e1; cursor: not-allowed; }
+.btn-secondary { padding: 0.75rem 1.5rem; background-color: #e2e8f0; color: #1e293b; border: none; border-radius: 0.5rem; font-weight: 600; cursor: pointer; transition: all 0.2s; }
+.btn-secondary:hover { background-color: #cbd5e1; }
+
+/* --- ESTILOS WALL MODULE --- */
+.post-card { transition: all 0.3s ease; }
+.post-card:hover { box-shadow: 0 20px 25px -5px rgba(0,0,0,0.1); }
+.post-card .likes-count, .post-card .comments-count { font-weight: 700; margin-left: 0.25rem; }
+.post-card .like-btn, .post-card .comments-btn { border: none; background: none; cursor: pointer; transition: all 0.2s; color: #64748b; }
+.post-card .like-btn:hover { color: #ea4335; }
+.post-card .comments-btn:hover { color: #3b82f6; }
+.post-card .like-btn.scale-110 { transform: scale(1.1); }
+.comments-section { background-color: #f8fafc; }
+.comments-list { max-height: 400px; overflow-y: auto; }
+.comment-input { width: 100%; padding: 0.75rem; border: 1px solid #cbd5e1; border-radius: 0.5rem; font-size: 0.875rem; }
+.comment-input:focus { outline: none; border-color: #ea580c; box-shadow: 0 0 0 3px rgba(234, 88, 12, 0.1); }
+

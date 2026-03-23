@@ -1,5 +1,25 @@
 const CACHE_NAME='karpus-pwa-v1';
-const ASSETS=['/','/panel_padres.html','/js/panel_padres.js','/css/theme.css','/logo/favicon.ico'];
+const ASSETS=[
+  './',
+  'login.html',
+  'panel_padres.html',
+  'css/panel-padre.css',
+  'js/login.js',
+  'js/supabase.js',
+  'js/pwa-install.js',
+  'js/padre/main.js',
+  'js/padre/appState.js',
+  'js/padre/helpers.js',
+  'js/padre/attendance.js',
+  'js/padre/feed.js',
+  'js/padre/tasks.js',
+  'js/padre/payments.js',
+  'js/padre/chat.js',
+  'js/padre/grades.js',
+  'js/padre/profile.js',
+  'logo/favicon.ico',
+  'img/mundo.jpg'
+];
 self.addEventListener('install',e=>{e.waitUntil(caches.open(CACHE_NAME).then(c=>c.addAll(ASSETS)).then(()=>self.skipWaiting()))});
 self.addEventListener('activate',e=>{e.waitUntil(caches.keys().then(keys=>Promise.all(keys.map(k=>k!==CACHE_NAME?caches.delete(k):Promise.resolve()))).then(()=>self.clients.claim()))});
 self.addEventListener('fetch',e=>{

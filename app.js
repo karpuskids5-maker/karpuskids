@@ -1,4 +1,7 @@
 import { supabase, createClient, SUPABASE_URL, SUPABASE_ANON_KEY, initOneSignal } from './js/supabase.js';
+import { ChatModule } from './js/shared/chat.js';
+import { WallModule } from './js/directora/wall.module.js'; // 🔥 Usar módulo específico
+import { VideoCallModule } from './js/shared/videocall.js'; // 🔥 Nuevo Módulo
 
 // ... (rest of imports)
 
@@ -21,7 +24,17 @@ window.DirectorState = {
     maestros: false,
     estudiantes: false,
     aulas: false,
-    asistencia: false
+    asistencia: false,
+    chat: false
+  }
+};
+
+// 🔥 Adaptador de Estado para Módulos Compartidos (Muro)
+const DirectorAppState = {
+  get(key) {
+    if (key === 'user') return window.currentUser;
+    if (key === 'profile') return window.currentProfile;
+    return null;
   }
 };
 
@@ -160,10 +173,40 @@ document.addEventListener('DOMContentLoaded', async () => {
     window.location.href = 'login.html';
     return;
   } else {
+    // Guardar para uso global (AppState)
+    window.currentUser = user;
+    window.currentProfile = profile;
+
     // Buscar elementos donde mostrar el nombre (ej: sidebar)
     const userNameElements = document.querySelectorAll('[data-username]');
     userNameElements.forEach(el => el.textContent = profile.name || 'Usuario');
   }
+
+  // 🔥 EXPOSICIÓN GLOBAL (Para que funcione el Muro si lo usas)
+  window.WallModule = WallModule;
+  
+  // Inicializar Muro si estamos en esa sección o al cargar
+  if (document.getElementById('muroPostsContainer')) {
+    WallModule.init('muroPostsContainer', { accentColor: 'purple' }, DirectorAppState);
+  }
+
+  // ✅ Listener de Real-Time para Asistencia (Refresco Automático)
+  // Se suscribe a eventos globales para actualizar el dashboard de la directora.
+  try {
+    const channel = supabase.channel('karpus-global-updates');
+    channel.on('broadcast', { event: 'attendance_updated' }, (message) => {
+      console.log('Director Panel: Received attendance update!', message.payload);
+      AttendanceCache.invalidateAll(); // Limpiar cache de asistencia
+      
+      // Recargar dashboard y sección de asistencia si están visibles
+      if (window.DirectorState.currentSection === 'dashboard') {
+        loadDashboard();
+      }
+      if (window.DirectorState.currentSection === 'asistencia') {
+        loadAttendance();
+      }
+    }).subscribe();
+  } catch(e) { console.error("Error subscribing to global updates:", e); }
 
   // Listener para filtro de mes global en Dashboard
   document.getElementById('globalMonthFilter')?.addEventListener('change', () => {
@@ -237,6 +280,24 @@ document.addEventListener('DOMContentLoaded', async () => {
         if (!window.DirectorState.loaded.asistencia) {
           await loadAttendance();
           window.DirectorState.loaded.asistencia = true;
+        }
+        break;
+      case 'muro':
+        // Recargar posts al entrar
+        if(WallModule && WallModule.loadPosts) WallModule.loadPosts();
+        break;
+      case 'videoconferencia':
+        if (!window.DirectorState.loaded.videoconferencia) {
+           // Inicializar módulo de videollamadas
+           await initDirectorVideoCalls();
+           window.DirectorState.loaded.videoconferencia = true;
+        }
+        break;
+      case 'chat':
+        // Inicializar chat si la sección existe
+        if (!window.DirectorState.loaded.chat) {
+           await initDirectorChat();
+           window.DirectorState.loaded.chat = true;
         }
         break;
     }
@@ -461,6 +522,35 @@ document.addEventListener('DOMContentLoaded', async () => {
       }
     }
   });
+
+  // 4.1 INICIALIZAR GRÁFICOS DASHBOARD
+  window.initDashboardCharts = (kpis, finReport) => {
+    const ctx = document.getElementById('financialChart');
+    if (!ctx) return;
+    
+    // Destruir anterior si existe
+    if (window.finChartInstance) window.finChartInstance.destroy();
+
+    const labels = finReport ? finReport.map(r => r.classroom_name) : [];
+    const paid = finReport ? finReport.map(r => r.total_paid) : [];
+    const pending = finReport ? finReport.map(r => r.total_pending) : [];
+
+    window.finChartInstance = new Chart(ctx, {
+      type: 'bar',
+      data: {
+        labels: labels,
+        datasets: [
+          { label: 'Cobrado', data: paid, backgroundColor: '#10b981', borderRadius: 4 },
+          { label: 'Pendiente', data: pending, backgroundColor: '#f59e0b', borderRadius: 4 }
+        ]
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        scales: { x: { stacked: true }, y: { stacked: true } }
+      }
+    });
+  };
 
   // 5. CARGAR DASHBOARD
   async function loadDashboard() {
