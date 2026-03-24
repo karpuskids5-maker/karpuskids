@@ -342,7 +342,6 @@ alter table public.payments add column if not exists transfer_date date;
 alter table public.payments add column if not exists proof_url text;
 alter table public.payments add column if not exists evidence_url text; -- Alias for compatibility
 alter table public.payments add column if not exists due_date date;
-alter table public.payments add column if not exists paid_date timestamp with time zone; -- 🔥 FIX: Missing paid_date column
 
 -- Ensure monthly_fee exists in students
 alter table public.students add column if not exists monthly_fee numeric default 0;

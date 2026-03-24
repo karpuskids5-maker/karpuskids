@@ -10,12 +10,37 @@ export const PaymentsModule = {
   _financialChart: null,
 
   async init() {
-    const refreshBtn = document.getElementById('refreshPayments');
-    if (refreshBtn) refreshBtn.onclick = () => this.loadPayments();
-    
     const filter = document.getElementById('paymentMonthFilter');
     if (filter) {
       filter.onchange = () => this.loadPayments();
+    }
+
+    // ✅ MEJORA: Delegación de eventos para acciones en la tabla
+    const tbody = document.getElementById('paymentsTableBody');
+    if (tbody) {
+      tbody.addEventListener('click', (e) => {
+        const button = e.target.closest('button[data-action]');
+        if (!button) return;
+
+        const { action } = button.dataset;
+        const id = button.dataset.id;
+        const studentId = button.dataset.studentId;
+
+        switch (action) {
+          case 'confirm':
+            this.confirmPayment(id);
+            break;
+          case 'reject':
+            this.rejectPayment(id);
+            break;
+          case 'delete':
+            this.deletePayment(id);
+            break;
+          case 'register':
+            this.openModal(studentId);
+            break;
+        }
+      });
     }
 
     const btnOpen = document.getElementById('btnOpenPaymentModal');
@@ -192,11 +217,11 @@ export const PaymentsModule = {
           </td>
           <td class="px-4 py-2 flex gap-2">
             ${!isVirtual ? `
-              <button onclick="window.confirmPayment('${p.id}')" class="bg-emerald-50 text-emerald-600 p-1.5 rounded-lg hover:bg-emerald-100" title="Confirmar"><i data-lucide="check" class="w-4 h-4"></i></button>
-              <button onclick="window.rejectPayment('${p.id}')" class="bg-rose-50 text-rose-600 p-1.5 rounded-lg hover:bg-rose-100" title="Rechazar"><i data-lucide="x" class="w-4 h-4"></i></button>
-              <button onclick="window.deletePayment('${p.id}')" class="text-slate-300 hover:text-rose-500 p-1.5" title="Eliminar"><i data-lucide="trash-2" class="w-4 h-4"></i></button>
+              <button data-action="confirm" data-id="${p.id}" class="bg-emerald-50 text-emerald-600 p-1.5 rounded-lg hover:bg-emerald-100" title="Confirmar"><i data-lucide="check" class="w-4 h-4 pointer-events-none"></i></button>
+              <button data-action="reject" data-id="${p.id}" class="bg-rose-50 text-rose-600 p-1.5 rounded-lg hover:bg-rose-100" title="Rechazar"><i data-lucide="x" class="w-4 h-4 pointer-events-none"></i></button>
+              <button data-action="delete" data-id="${p.id}" class="text-slate-300 hover:text-rose-500 p-1.5" title="Eliminar"><i data-lucide="trash-2" class="w-4 h-4 pointer-events-none"></i></button>
             ` : `
-              <button onclick="window.registerPayment('${p.student_id}')" class="bg-sky-50 text-sky-600 px-3 py-1 rounded-lg hover:bg-sky-100 font-bold text-[10px] uppercase">
+              <button data-action="register" data-student-id="${p.student_id}" class="bg-sky-50 text-sky-600 px-3 py-1 rounded-lg hover:bg-sky-100 font-bold text-[10px] uppercase">
                 Registrar
               </button>
             `}
@@ -275,5 +300,42 @@ export const PaymentsModule = {
     } finally {
       btn.disabled = false;
     }
+  },
+
+  // ✅ MEJORA: Lógica de negocio encapsulada en el módulo
+  async confirmPayment(id) {
+    if (!id) return;
+    const { data: { user } } = await supabase.auth.getUser();
+    const { error } = await supabase.from('payments').update({ status: 'confirmado', validated_by: user.id }).eq('id', id);
+    if (!error) {
+      Helpers.toast('Pago confirmado');
+      this.loadPayments();
+    } else {
+      Helpers.toast('Error al confirmar', 'error');
+    }
+  },
+
+  async rejectPayment(id) {
+    if (!id) return;
+    // ✅ MEJORA UX: Usar un modal en lugar de un prompt
+    const reason = prompt('Motivo del rechazo (opcional):');
+    if (reason === null) return; // El usuario canceló el prompt
+
+    const { data: { user } } = await supabase.auth.getUser();
+    const { error } = await supabase.from('payments').update({ status: 'rechazado', validated_by: user.id, notes: reason || null }).eq('id', id);
+    if (!error) {
+      Helpers.toast('Pago rechazado');
+      this.loadPayments();
+    } else {
+      Helpers.toast('Error al rechazar', 'error');
+    }
+  },
+
+  async deletePayment(id) {
+    if (!id || !confirm('¿Seguro que desea eliminar este registro de pago?')) return;
+    const { error } = await supabase.from('payments').delete().eq('id', id);
+    if (!error) Helpers.toast('Pago eliminado');
+    else Helpers.toast('Error al eliminar', 'error');
+    this.loadPayments();
   }
 };

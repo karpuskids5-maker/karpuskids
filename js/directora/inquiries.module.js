@@ -1,6 +1,6 @@
 import { DirectorApi } from './api.js';
 import { Helpers } from '../shared/helpers.js';
-import { DirectorUI } from './ui.module.js';
+import { UI } from './ui.module.js';
 
 export const InquiriesModule = {
   _allInquiries: [],
@@ -16,7 +16,7 @@ export const InquiriesModule = {
       if (res?.error) throw new Error(res.error);
 
       this._allInquiries = inquiries;
-      container.innerHTML = inquiries.map((item, idx) => DirectorUI.renderInquiryCard(item, idx)).join('');
+      container.innerHTML = inquiries.map((item, idx) => UI.renderInquiryCard(item, idx)).join('');
       if (window.lucide) lucide.createIcons();
     } catch (e) {
       console.error('Error initReports:', e);
@@ -37,7 +37,7 @@ export const InquiriesModule = {
       return;
     }
     
-    container.innerHTML = filtered.map((item, idx) => DirectorUI.renderInquiryCard(item, idx)).join('');
+    container.innerHTML = filtered.map((item, idx) => UI.renderInquiryCard(item, idx)).join('');
     if (window.lucide) lucide.createIcons();
     
     const btns = document.querySelectorAll('#reportsFilters button');
@@ -67,7 +67,8 @@ export const InquiriesModule = {
           <div><label class="text-[10px] font-black text-slate-400 uppercase">Mensaje</label><p class="text-sm bg-slate-50 p-4 rounded-2xl text-slate-600 border border-slate-100">${Helpers.escapeHTML(item.message)}</p></div>
           ${item.attachment_url ? `<div><label class="text-[10px] font-black text-slate-400 uppercase">Adjunto</label><img src="${item.attachment_url}" class="w-full rounded-2xl mt-2 border border-slate-100 shadow-sm"></div>` : ''}
         </div>
-        <div class="modal-footer p-6 bg-slate-50 rounded-b-3xl border-t border-slate-100 flex justify-end">
+        <div class="modal-footer p-6 bg-slate-50 rounded-b-3xl border-t border-slate-100 flex justify-end gap-3">
+          <button onclick="App.inquiries.reply('${item.id}')" class="px-8 py-2.5 bg-indigo-600 text-white rounded-xl font-bold hover:bg-indigo-700 transition-all shadow-md">Responder</button>
           <button onclick="App.ui.closeModal()" class="px-8 py-2.5 bg-white border border-slate-200 rounded-xl font-bold text-slate-600 hover:bg-slate-100 transition-all">Cerrar</button>
         </div>`;
       window.openGlobalModal(modalHTML);

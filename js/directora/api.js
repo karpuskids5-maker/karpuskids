@@ -85,7 +85,7 @@ export const DirectorApi = {
     let query = supabase
       .from(TABLES.TASK_EVIDENCES)
       // Traemos tarea, aula Y maestra (anidado)
-      .select('*, student:student_id(name, avatar_url, classroom_id), task:task_id(title, classroom:classroom_id(name, teacher:teacher_id(name)))')
+      .select('*, student:student_id(name, avatar_url, classroom_id, classrooms:classroom_id(name)), task:task_id(title, classroom:classroom_id(name, teacher:teacher_id(name)))')
       .order('created_at', { ascending: false });
 
     // Filtrado en cliente para simplificar queries complejas

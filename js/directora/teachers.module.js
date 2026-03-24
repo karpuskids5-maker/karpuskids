@@ -1,6 +1,6 @@
 import { DirectorApi } from './api.js';
 import { Helpers } from '../shared/helpers.js';
-import { UIHelpers, DirectorUI } from './ui.module.js';
+import { UI } from './ui.module.js';
 import { AppState } from './state.js';
 import { supabase, createClient, SUPABASE_URL, SUPABASE_ANON_KEY } from '../shared/supabase.js';
 
@@ -41,7 +41,7 @@ export const TeachersModule = {
         container.innerHTML = '<div class="col-span-3 text-center p-8 text-slate-500">No hay maestras.</div>';
         return;
       }
-      container.innerHTML = normalized.map(t => DirectorUI.renderTeacherCard(t)).join('');
+      container.innerHTML = normalized.map(t => UI.renderTeacherCard(t)).join('');
       if (window.lucide) lucide.createIcons();
     } catch (e) {
       console.error('Error initTeachersSection:', e);
@@ -66,7 +66,7 @@ export const TeachersModule = {
     if (!payload.name || payload.name.length < 3) return Helpers.toast('Nombre inválido (min 3 caracteres)', 'warning');
     if (!payload.email) return Helpers.toast('Correo requerido', 'warning');
     
-    UIHelpers.setLoading(true);
+    UI.setLoading(true);
     try {
       let res;
       if (id) {
@@ -96,13 +96,13 @@ export const TeachersModule = {
       if (error) throw new Error(error);
       
       Helpers.toast(id ? 'Maestra actualizada' : 'Maestra creada', 'success');
-      UIHelpers.closeModal();
+      UI.closeModal();
       this.init();
     } catch (e) {
       console.error('Error saveTeacher:', e);
       Helpers.toast('Error al guardar: ' + (e.message || e), 'error');
     } finally {
-      UIHelpers.setLoading(false);
+      UI.setLoading(false);
     }
   },
 

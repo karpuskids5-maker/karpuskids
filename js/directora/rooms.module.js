@@ -1,6 +1,6 @@
 import { DirectorApi } from './api.js';
 import { Helpers } from '../shared/helpers.js';
-import { UIHelpers, DirectorUI } from './ui.module.js';
+import { UI } from './ui.module.js';
 import { supabase } from '../shared/supabase.js';
 
 export const RoomsModule = {
@@ -17,7 +17,7 @@ export const RoomsModule = {
         container.innerHTML = '<tr><td colspan="4" class="text-center py-8 text-slate-500">No hay aulas.</td></tr>';
         return;
       }
-      container.innerHTML = classrooms.map(r => DirectorUI.renderClassroomRow(r)).join('');
+      container.innerHTML = classrooms.map(r => UI.renderClassroomRow(r)).join('');
       if (window.lucide) lucide.createIcons();
     } catch (e) {
       console.error('Error initClassroomsSection:', e);

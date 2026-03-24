@@ -8,31 +8,58 @@ const ACTIONS = {
   'btn-student-edit': (id) => window.App?.students?.edit?.(id),
   'btn-student-delete': (id) => window.App?.students?.delete?.(id),
   'btn-teacher-edit': (id) => window.App?.teachers?.edit?.(id),
-  'btn-modal-close': () => window.UIHelpers?.closeModal?.()
+  'btn-modal-close': () => window.App?.ui?.closeModal?.(),
+  'btn-logout': () => window.supabase?.auth?.signOut()?.then(() => window.location.href = 'index.html')
 };
 
 // 🎯 Delegación optimizada
 document.addEventListener('click', e => {
-  const target = e.target.closest('[class*="btn-"]');
-  if (!target) return;
+  // 1. Manejo de Secciones (Navegación)
+  const navTarget = e.target.closest('[data-section]');
+  if (navTarget) {
+    const section = navTarget.dataset.section;
+    window.App?.navigation?.goTo(section);
+    return;
+  }
 
-  // Buscar clase válida
-  const actionClass = Object.keys(ACTIONS).find(cls =>
-    target.classList.contains(cls)
-  );
+  // 2. Manejo de Acciones por Clase
+  const actionTarget = e.target.closest('[class*="btn-"]');
+  if (actionTarget) {
+    const actionClass = Object.keys(ACTIONS).find(cls =>
+      actionTarget.classList.contains(cls)
+    );
 
-  if (!actionClass) return;
+    if (actionClass) {
+      try {
+        const id = actionTarget.dataset?.id;
+        ACTIONS[actionClass](id);
+      } catch (err) {
+        console.error(`Error ejecutando acción: ${actionClass}`, err);
+      }
+      return;
+    }
+  }
 
-  try {
-    const id = target.dataset?.id;
-    ACTIONS[actionClass](id);
-  } catch (err) {
-    console.error(`Error ejecutando acción: ${actionClass}`, err);
+  // 3. Manejo de Acciones Genéricas (data-action)
+  const genericTarget = e.target.closest('[data-action]');
+  if (genericTarget) {
+    const action = genericTarget.dataset.action;
+    const id = genericTarget.dataset.id;
+    
+    switch(action) {
+      case 'go-section':
+        window.App?.navigation?.goTo(genericTarget.dataset.section);
+        break;
+      case 'refresh-dashboard':
+        window.App?.ui?.setLoading(true);
+        // Recargar datos...
+        break;
+    }
   }
 });
 
 // Safe localStorage helpers
-const SafeStorage = {
+export const SafeStorage = {
   get(key, fallback = null) {
     try {
       const item = localStorage.getItem(key);
@@ -71,3 +98,6 @@ const SafeStorage = {
     }
   }
 };
+
+// Expose globally for backward compatibility
+window.SafeStorage = SafeStorage;

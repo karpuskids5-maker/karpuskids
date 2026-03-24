@@ -1,6 +1,6 @@
 import { DirectorApi } from './api.js';
 import { Helpers } from '../shared/helpers.js';
-import { UIHelpers } from './ui.module.js';
+import { UI } from './ui.module.js';
 import { AppState } from './state.js';
 
 export const PaymentsModule = {
@@ -121,7 +121,7 @@ export const PaymentsModule = {
 
     if (!studentId || !amount || amount <= 0) return Helpers.toast('Faltan datos para registrar el pago', 'warning');
 
-    UIHelpers.setLoading(true, '#modalPayment');
+    UI.setLoading(true, '#modalPayment');
     try {
       const now = new Date();
       const payload = {
@@ -140,7 +140,7 @@ export const PaymentsModule = {
       if (error) throw error;
 
       Helpers.toast('Pago registrado correctamente', 'success');
-      UIHelpers.closeModal();
+      UI.closeModal();
       await this.loadPayments();
 
       if (payment?.id) {
@@ -153,7 +153,7 @@ export const PaymentsModule = {
       console.error(e);
       Helpers.toast('Error al guardar pago', 'error');
     } finally {
-      UIHelpers.setLoading(false, '#modalPayment');
+      UI.setLoading(false, '#modalPayment');
     }
   },
 

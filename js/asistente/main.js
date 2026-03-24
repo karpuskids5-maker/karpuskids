@@ -32,27 +32,32 @@ document.addEventListener('DOMContentLoaded', async () => {
   // 1. Verificar Rol
   const auth = await ensureRole(['asistente', 'admin', 'directora']);
   if (!auth) return;
-
+  
   AppState.set('user', auth.user);
   AppState.set('profile', auth.profile);
-
-  // 2. Inicializar Módulos
-  await initDashboard();
-  await PaymentsModule.init();
-  if(AccessModule.init) AccessModule.init();
-  await TeachersModule.init();
-  initNavigation();
+  
+  // 2. Inicializar módulos ligeros y navegación
+  // La navegación ahora se encargará de la carga perezosa (lazy loading) de las secciones.
   WallModule.init('muroPostsContainer', { accentColor: 'teal' }, AppState);
-  await initAssistantChat();
-  try { initOneSignal(auth.user); } catch(e) {}
-  initProfile();
+  
+  // ✅ FIX OneSignal: Solo inicializar en el dominio correcto para evitar errores de consola
+  if (window.location.hostname === 'karpuskids.com' || window.location.hostname === 'localhost') {
+    try { initOneSignal(auth.user); } catch(e) {
+      console.warn('⚠️ OneSignal error:', e);
+    }
+  } else {
+    console.log('ℹ️ OneSignal skipping: restricted domain');
+  }
+  
+  initNavigation(); // Esto cargará el dashboard y configurará los listeners
 
   // 3. Estandarizar funciones globales en objeto App (Senior Level)
+  // Se mantienen las que son llamadas por módulos que aún usan `onclick`
   Object.assign(window.App, {
     _registerAccess: (sid, type) => AccessModule.register(sid, type),
-    _confirmPayment: (id) => confirmPayment(id),
-    _rejectPayment: (id) => rejectPayment(id),
-    _deletePayment: (id) => deletePayment(id),
+    _confirmPayment: (id) => PaymentsModule.confirmPayment(id),
+    _rejectPayment: (id) => PaymentsModule.rejectPayment(id),
+    _deletePayment: (id) => PaymentsModule.deletePayment(id),
     _registerPayment: (sid) => PaymentsModule.openModal(sid),
     _openTeacherModal: (id) => TeachersModule.openModal(id),
     _toggleCommentSection: (id) => WallModule.toggleCommentSection(id),
@@ -61,10 +66,10 @@ document.addEventListener('DOMContentLoaded', async () => {
     _toggleLike: (pid) => WallModule.toggleLike(pid),
     _selectChatContact: (uid, name, role) => selectAssistantChat(uid, name, role)
   });
-
+  
   // Mantener compatibilidad temporal para onclick en HTML que no use App.
   Object.assign(window, window.App);
-
+  
   // 🔥 EXPOSICIÓN GLOBAL DE MÓDULOS
   window.WallModule = WallModule;
 
@@ -76,17 +81,20 @@ document.addEventListener('DOMContentLoaded', async () => {
  */
 async function initDashboard() {
   try {
-    const [students, rooms] = await Promise.all([
+    const [studentsRes, roomsRes, paymentsRes] = await Promise.all([
       supabase.from('students').select('*', { count: 'exact', head: true }).eq('is_active', true),
-      supabase.from('classrooms').select('*', { count: 'exact', head: true })
+      supabase.from('classrooms').select('*', { count: 'exact', head: true }),
+      supabase.from('payments').select('id', { count: 'exact', head: true }).in('status', ['pending', 'review'])
     ]);
 
     const setTxt = (id, val) => { const el = document.getElementById(id); if(el) el.textContent = val; };
-    setTxt('dashboardActiveStudents', students.count || 0);
-    setTxt('dashboardRooms', rooms.count || 0);
+    setTxt('statStudents', studentsRes.count || 0);
+    setTxt('statAttendance', 0); // Placeholder, AccessModule debería actualizar esto
+    setTxt('statPayments', paymentsRes.count || 0);
+    setTxt('welcomeName', AppState.get('profile')?.name?.split(' ')[0] || 'Asistente');
     
     // Cargar gráfico de ingresos (mismo que directora pero en el dashboard del asistente)
-    PaymentsModule.loadIncomeChart();
+    if(PaymentsModule.loadIncomeChart) PaymentsModule.loadIncomeChart();
   } catch (e) {
     console.error(e);
   }
@@ -95,24 +103,113 @@ async function initDashboard() {
 /**
  * Navegación lateral
  */
+const loadedSections = new Set();
+
 function initNavigation() {
   const navLinks = document.querySelectorAll('[data-section]');
   const sections = document.querySelectorAll('section[id]');
 
+  const showSection = async (target) => {
+    // 1. Limpiar clases activas en botones de navegación
+    navLinks.forEach(l => {
+      l.classList.remove('bg-white/20', 'bg-teal-50', 'text-teal-600', 'active');
+      // Si el botón está en el sidebar y no es el activo, restaurar su estilo original de texto blanco
+      if (!l.classList.contains('active')) {
+        l.classList.add('text-white');
+      }
+    });
+
+    const activeLink = document.querySelector(`[data-section="${target}"]`);
+    if (activeLink) {
+      activeLink.classList.add('bg-white/20', 'active');
+      activeLink.classList.remove('text-white');
+    }
+    
+    // 2. Manejo de visibilidad de secciones (ESCENARIO)
+    sections.forEach(s => {
+      s.classList.add('hidden');
+      s.classList.remove('active');
+    });
+
+    const sectionEl = document.getElementById(target);
+    if (sectionEl) {
+      sectionEl.classList.remove('hidden');
+      sectionEl.classList.add('active'); 
+      console.log(`🎯 Mostrando escenario: ${target}`);
+    } else {
+      console.error(`❌ Sección no encontrada: ${target}`);
+    }
+    
+    AppState.set('currentSection', target);
+
+    // 3. Cerrar sidebar en móvil automáticamente al cambiar de sección
+    const sidebar = document.getElementById('sidebar');
+    if (sidebar && window.innerWidth < 768) {
+      sidebar.classList.remove('mobile-visible');
+    }
+
+    // ✅ --- LÓGICA DE CARGA PEREZOSA (LAZY LOADING) ---
+    if (!loadedSections.has(target)) {
+      console.log(`🚀 Cargando sección por primera vez: ${target}`);
+      switch (target) {
+        case 'pagos':
+          await PaymentsModule.init();
+          break;
+        case 'accesos':
+          if (AccessModule.init) AccessModule.init();
+          break;
+        case 'maestros':
+          await TeachersModule.init();
+          break;
+        case 'muro':
+          WallModule.loadPosts();
+          break;
+        case 'chat':
+          await initAssistantChat();
+          break;
+        case 'perfil':
+          initProfile();
+          break;
+      }
+      loadedSections.add(target);
+    }
+  };
+
   navLinks.forEach(link => {
     link.addEventListener('click', (e) => {
       e.preventDefault();
-      const target = link.dataset.section;
-      
-      navLinks.forEach(l => l.classList.remove('bg-teal-50', 'text-teal-600', 'active'));
-      link.classList.add('bg-teal-50', 'text-teal-600', 'active');
-      
-      sections.forEach(s => s.classList.add('hidden'));
-      document.getElementById(target)?.classList.remove('hidden');
-      
-      AppState.set('currentSection', target);
+      showSection(link.dataset.section);
     });
   });
+
+  // Carga inicial del dashboard
+  initDashboard().then(() => loadedSections.add('dashboard'));
+  showSection('dashboard');
+
+  // 4. Configurar botones de menú móvil y colapsar sidebar
+  const menuBtn = document.getElementById('menuBtn');
+  const sidebar = document.getElementById('sidebar');
+  const toggleSidebar = document.getElementById('toggleSidebar');
+  const layoutShell = document.getElementById('layoutShell');
+
+  if (menuBtn && sidebar) {
+    menuBtn.addEventListener('click', () => {
+      sidebar.classList.toggle('mobile-visible');
+    });
+  }
+
+  if (toggleSidebar && sidebar && layoutShell) {
+    toggleSidebar.addEventListener('click', () => {
+      sidebar.classList.toggle('collapsed');
+      layoutShell.classList.toggle('sidebar-collapsed');
+      
+      const icon = toggleSidebar.querySelector('i');
+      if (icon) {
+        // Lucide handle rotation via CSS, but we can force update
+        if (window.lucide) lucide.createIcons();
+      }
+    });
+  }
 }
 
 
@@ -122,7 +219,10 @@ function initNavigation() {
  */
 async function initProfile() {
   const profile = AppState.get('profile');
-  if (!profile) return;
+  if (!profile) {
+    console.warn('⚠️ Profile not loaded');
+    return;
+  }
   
   const setVal = (id, val) => { const el = document.getElementById(id); if(el) el.value = val || ''; };
   setVal('profileName', profile.name);
@@ -147,39 +247,6 @@ async function initProfile() {
 }
 
 // --- Funciones Globales de Ventana ---
-
-async function confirmPayment(id) {
-  const { data: { user } } = await supabase.auth.getUser();
-  const { error } = await supabase.from('payments').update({ status: 'confirmado', validated_by: user.id }).eq('id', id);
-  if (!error) {
-    Helpers.toast('Pago confirmado');
-    PaymentsModule.loadPayments();
-  }
-}
-
-async function rejectPayment(id) {
-  const reason = prompt('Motivo del rechazo:');
-  const { data: { user } } = await supabase.auth.getUser();
-  const { error } = await supabase.from('payments').update({ status: 'rechazado', validated_by: user.id, notes: reason || null }).eq('id', id);
-  if (!error) {
-    Helpers.toast('Pago rechazado');
-    PaymentsModule.loadPayments();
-  }
-}
-
-async function deletePayment(id) {
-  if (!confirm('¿Seguro que desea eliminar este pago?')) return;
-  const { error } = await supabase.from('payments').delete().eq('id', id);
-  if (!error) {
-    Helpers.toast('Pago eliminado');
-    PaymentsModule.loadPayments();
-  }
-}
-
-async function toggleCommentSection(id) {
-  const el = document.getElementById(`comments-section-${id}`);
-  if (el) el.classList.toggle('hidden');
-}
 
 async function deleteComment(cid, pid) {
   if (!confirm('¿Eliminar comentario?')) return;
@@ -227,10 +294,11 @@ async function initAssistantChat() {
     const btnSend = document.getElementById('btnSendChatMessage');
     const inputMsg = document.getElementById('chatMessageInput');
     
-    if (btnSend && inputMsg) {
+    if (btnSend && inputMsg && !btnSend.dataset.bound) {
       const newBtn = btnSend.cloneNode(true);
       btnSend.parentNode.replaceChild(newBtn, btnSend);
       
+      newBtn.dataset.bound = 'true';
       newBtn.addEventListener('click', () => sendAssistantMessage());
       inputMsg.addEventListener('keypress', (e) => {
         if (e.key === 'Enter' && !e.shiftKey) {
@@ -258,7 +326,13 @@ async function loadChatContacts(searchTerm = '', unreadMap = {}) {
     query = query.ilike('name', `%${searchTerm}%`);
   }
 
-  const { data: profiles } = await query.limit(50);
+  const { data: profiles, error } = await query.limit(50);
+
+  if (error) {
+    console.error('❌ Chat contacts error:', error);
+    container.innerHTML = `<div class="p-4 text-center text-red-500 text-sm">Error cargando contactos.</div>`;
+    return;
+  }
   
   if (!profiles || profiles.length === 0) {
     container.innerHTML = `<div class="p-4 text-center text-slate-400 text-sm">No hay contactos.</div>`;
@@ -303,17 +377,59 @@ async function selectAssistantChat(userId, name, role) {
   if(inputArea) inputArea.classList.remove('hidden');
   if(msgs) msgs.innerHTML = '<div class="flex justify-center p-4"><div class="animate-spin w-6 h-6 border-2 border-teal-500 rounded-full border-t-transparent"></div></div>';
 
-  const { messages, conversationId } = await ChatModule.loadConversation(userId);
-  activeConversationId = conversationId;
-  
-  // Renderizar mensajes (reutilizando lógica simple)
-  // ... (implementación de render similar a directora)
+  try {
+    const { messages, conversationId } = await ChatModule.loadConversation(userId);
+    activeConversationId = conversationId;
+    
+    // Renderizar mensajes (reutilizando lógica simple)
+    const profile = AppState.get('profile');
+    if (!messages || messages.length === 0) {
+        msgs.innerHTML = '<div class="h-full flex flex-col items-center justify-center text-slate-400 text-sm"><p>No hay mensajes aún.</p><p>Escribe el primero.</p></div>';
+    } else {
+        msgs.innerHTML = messages.map(m => {
+            const isMe = m.sender_id === profile.id;
+            return `
+                <div class="flex ${isMe ? 'justify-end' : 'justify-start'}">
+                    <div class="max-w-[75%] rounded-2xl p-3 text-sm ${isMe ? 'bg-teal-600 text-white rounded-tr-none' : 'bg-slate-100 text-slate-700 rounded-tl-none'}">
+                        <p>${Helpers.escapeHTML(m.content)}</p>
+                        <p class="text-[10px] opacity-70 mt-1 text-right">${new Date(m.created_at).toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'})}</p>
+                    </div>
+                </div>
+            `;
+        }).join('');
+    }
+    msgs.scrollTop = msgs.scrollHeight;
+
+    // Suscripción
+    ChatModule.subscribeToConversation(conversationId, (newMsg) => {
+        const isMe = newMsg.sender_id === profile.id;
+        const html = `
+            <div class="flex ${isMe ? 'justify-end' : 'justify-start'}">
+                <div class="max-w-[75%] rounded-2xl p-3 text-sm ${isMe ? 'bg-teal-600 text-white rounded-tr-none' : 'bg-slate-100 text-slate-700 rounded-tl-none'}">
+                    <p>${Helpers.escapeHTML(newMsg.content)}</p>
+                    <p class="text-[10px] opacity-70 mt-1 text-right">${new Date(newMsg.created_at).toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'})}</p>
+                </div>
+            </div>
+        `;
+        msgs.insertAdjacentHTML('beforeend', html);
+        msgs.scrollTop = msgs.scrollHeight;
+    });
+
+  } catch (e) {
+    console.error('❌ Chat load error:', e);
+    msgs.innerHTML = `<div class="p-4 text-center text-red-500 text-sm">Error cargando chat</div>`;
+  }
 }
 
 async function sendAssistantMessage() {
   const input = document.getElementById('chatMessageInput');
   const text = input?.value.trim();
   if (!text || !activeChatUserId) return;
-  input.value = '';
-  await ChatModule.sendMessage(AppState.get('user').id, activeChatUserId, text, activeConversationId);
+  try {
+    input.value = '';
+    await ChatModule.sendMessage(AppState.get('user').id, activeChatUserId, text, activeConversationId);
+  } catch (e) {
+    console.error('❌ Send message error:', e);
+    Helpers.toast('Error enviando mensaje', 'error');
+  }
 }

@@ -1,6 +1,6 @@
 import { DirectorApi } from './api.js';
 import { Helpers } from '../shared/helpers.js';
-import { UIHelpers, DirectorUI } from './ui.module.js';
+import { UI } from './ui.module.js';
 import { AppState } from './state.js';
 
 export const StudentsModule = {
@@ -63,7 +63,7 @@ export const StudentsModule = {
         container.innerHTML = '<div class="col-span-3 text-center p-8 text-slate-500">No hay estudiantes.</div>';
         return;
       }
-      container.innerHTML = students.map(s => DirectorUI.renderStudentCard(s)).join('');
+      container.innerHTML = students.map(s => UI.renderStudentCard(s)).join('');
       if (window.lucide) lucide.createIcons();
     } catch (e) {
       console.error(e);
@@ -78,7 +78,7 @@ export const StudentsModule = {
     if (!payload.name || payload.name.trim().length < 3) return Helpers.toast('Nombre inválido (min 3 caracteres)', 'warning');
     if (!payload.p1_name || !payload.p1_phone || !payload.p1_email) return Helpers.toast('Datos del padre/madre 1 incompletos', 'warning');
     
-    UIHelpers.setLoading(true);
+    UI.setLoading(true);
     try {
       const res = id 
         ? await DirectorApi.updateStudent(id, payload)
@@ -88,13 +88,13 @@ export const StudentsModule = {
       if (error) throw new Error(error);
       
       Helpers.toast(id ? 'Estudiante actualizado' : 'Estudiante creado', 'success');
-      UIHelpers.closeModal();
+      UI.closeModal();
       this.init();
     } catch (e) {
       console.error('Error saveStudent:', e);
       Helpers.toast('Error al guardar: ' + (e.message || e), 'error');
     } finally {
-      UIHelpers.setLoading(false);
+      UI.setLoading(false);
     }
   },
 

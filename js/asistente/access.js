@@ -2,6 +2,8 @@ import { supabase, emitEvent } from '../shared/supabase.js'; // supabase para b�
 import { Helpers } from '../shared/helpers.js';
 import { AssistantApi } from './api.js';
 
+let isProcessing = false; // 🔥 FIX PRO: Bloqueo de doble ejecución
+
 /**
  * Módulo de Control de Acceso para Asistente (Check-in / Check-out)
  */
@@ -22,7 +24,10 @@ export const AccessModule = {
         
         const { data: students, error } = await supabase
           .from('students')
-          .select('id, name, classroom_id, classrooms(name), avatar_url')
+          .select(`
+            id, name, classroom_id, avatar_url,
+            classroom:classroom_id (name)
+          `)
           .ilike('name', `%${term}%`)
           .limit(5);
           
@@ -44,14 +49,14 @@ export const AccessModule = {
               </div>
               <div>
                 <p class="font-bold text-slate-700 text-sm">${Helpers.escapeHTML(s.name)}</p>
-                <p class="text-[10px] font-bold uppercase text-slate-400 tracking-wider">${s.classrooms?.name || 'Sin aula'}</p>
+                <p class="text-[10px] font-bold uppercase text-slate-400 tracking-wider">${s.classroom?.name || 'Sin aula'}</p>
               </div>
             </div>
             <div class="flex gap-2">
-              <button onclick="window.registerAccess(${s.id}, 'check-in')" class="px-3 py-1.5 bg-emerald-50 text-emerald-600 rounded-xl text-[10px] font-black uppercase hover:bg-emerald-100 border border-emerald-100 flex items-center gap-1 transition-all">
+              <button onclick="window.App.registerAccess(${s.id}, 'check-in')" class="px-3 py-1.5 bg-emerald-50 text-emerald-600 rounded-xl text-[10px] font-black uppercase hover:bg-emerald-100 border border-emerald-100 flex items-center gap-1 transition-all">
                 <i data-lucide="log-in" class="w-3 h-3"></i> Entrada
               </button>
-              <button onclick="window.registerAccess(${s.id}, 'check-out')" class="px-3 py-1.5 bg-rose-50 text-rose-600 rounded-xl text-[10px] font-black uppercase hover:bg-rose-100 border border-rose-100 flex items-center gap-1 transition-all">
+              <button onclick="window.App.registerAccess(${s.id}, 'check-out')" class="px-3 py-1.5 bg-rose-50 text-rose-600 rounded-xl text-[10px] font-black uppercase hover:bg-rose-100 border border-rose-100 flex items-center gap-1 transition-all">
                 <i data-lucide="log-out" class="w-3 h-3"></i> Salida
               </button>
             </div>
@@ -66,9 +71,16 @@ export const AccessModule = {
   },
 
   async register(studentId, type) {
+    // 🔥 MEJORA PRO: Evitar doble clic rápido
+    if (isProcessing) return;
+    isProcessing = true;
+
     const today = new Date().toISOString().split('T')[0];
     
     try {
+      // 💡 MEJORA UX: Feedback inmediato
+      Helpers.toast(type === 'check-in' ? 'Registrando entrada...' : 'Registrando salida...', 'info');
+
       if (type === 'check-in') {
          const existing = await AssistantApi.getAttendanceStatus(studentId, today);
            
@@ -77,12 +89,14 @@ export const AccessModule = {
            return;
          }
          
-         // Obtener info básica para el evento (podría moverse a API también, pero es una búsqueda simple)
-         const { data: student } = await supabase.from('students').select('name, classroom_id, p1_email, p1_name').eq('id', studentId).single();
-         if (!student) throw new Error('Estudiante no encontrado');
+         // 💣 FIX PRO: Validación de error y existencia
+         const { data: student, error } = await supabase
+           .from('students').select('name, classroom_id, p1_email, p1_name').eq('id', studentId).single();
+         
+         if (error || !student) throw new Error('Estudiante no encontrado');
          
          await AssistantApi.checkIn(studentId, student.classroom_id, today);
-         Helpers.toast('Entrada registrada');
+         Helpers.toast('Entrada registrada', 'success');
 
          emitEvent('attendance.checkin', {
            student_id: studentId,
@@ -105,17 +119,19 @@ export const AccessModule = {
          }
 
          await AssistantApi.checkOut(existing.id);
-         Helpers.toast('Salida registrada');
+         Helpers.toast('Salida registrada', 'success');
 
          emitEvent('attendance.checkout', {
            student_id: studentId,
-           student_name: existing.student.name,
-           parent_email: existing.student.p1_email,
+           student_name: existing.student?.name,
+           parent_email: existing.student?.p1_email,
            time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
          });
       }
       
-      this.loadHistory();
+      // ⚠️ FIX: Esperar a que termine para ver el cambio
+      await this.loadHistory();
+      
       const input = document.getElementById('accessSearchInput');
       const results = document.getElementById('accessSearchResults');
       if(input) input.value = '';
@@ -124,6 +140,8 @@ export const AccessModule = {
     } catch (e) {
       console.error(e);
       Helpers.toast('Error al registrar acceso', 'error');
+    } finally {
+      isProcessing = false;
     }
   },
   
@@ -146,10 +164,10 @@ export const AccessModule = {
         return `
           <div class="flex items-center gap-3 p-3 bg-white rounded-2xl border border-slate-50 shadow-sm mb-2 hover:shadow-md transition-all">
             <div class="w-8 h-8 rounded-full bg-slate-50 border border-slate-100 flex items-center justify-center text-slate-400 overflow-hidden shadow-sm">
-              ${log.students?.avatar_url ? `<img src="${log.students.avatar_url}" class="w-full h-full object-cover">` : '<i data-lucide="user" class="w-4 h-4"></i>'}
+              ${log.student?.avatar_url ? `<img src="${log.student.avatar_url}" class="w-full h-full object-cover">` : '<i data-lucide="user" class="w-4 h-4"></i>'}
             </div>
             <div class="flex-1">
-              <p class="text-xs font-black text-slate-700 leading-tight">${Helpers.escapeHTML(log.students?.name)}</p>
+              <p class="text-xs font-black text-slate-700 leading-tight">${Helpers.escapeHTML(log.student?.name)}</p>
               <div class="flex gap-2 text-[8px] font-bold uppercase tracking-tighter text-slate-400 mt-0.5">
                  ${checkInTime ? `<span class="flex items-center gap-0.5"><i data-lucide="log-in" class="w-2 h-2 text-emerald-500"></i> EN: ${checkInTime}</span>` : ''}
                  ${checkOutTime ? `<span class="flex items-center gap-0.5"><i data-lucide="log-out" class="w-2 h-2 text-rose-500"></i> SAL: ${checkOutTime}</span>` : ''}

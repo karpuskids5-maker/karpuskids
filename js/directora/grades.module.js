@@ -4,16 +4,17 @@ import { AppState } from './state.js';
 
 export const GradesModule = {
   async init() {
-    const container = document.getElementById('gradesTableBody');
-    if (!container) return;
-    container.innerHTML = '<tr><td colspan="5" class="text-center py-8"><div class="animate-spin rounded-full h-8 w-8 border-b-2 border-indigo-600 mx-auto"></div></td></tr>';
+    const tableBody = document.getElementById('gradesTableBody');
+    if (!tableBody) return;
+    tableBody.innerHTML = '<tr><td colspan="5" class="text-center py-8"><div class="animate-spin rounded-full h-8 w-8 border-b-2 border-indigo-600 mx-auto"></div></td></tr>';
     
     try {
       const { data: grades, error } = await DirectorApi.getTaskGrades();
       if (error) throw error;
 
       if (!grades?.length) {
-        container.innerHTML = '<tr><td colspan="5" class="text-center py-12 text-slate-400">No hay calificaciones registradas.</td></tr>';
+        tableBody.innerHTML = '<tr><td colspan="5" class="text-center py-12 text-slate-400">No hay calificaciones registradas.</td></tr>';
+        this.updateKPIs([]);
         return;
       }
 
@@ -24,7 +25,7 @@ export const GradesModule = {
         if (!studentGrades[g.student_id]) {
           studentGrades[g.student_id] = {
             name: g.student.name,
-            classroom: g.student.task?.classroom?.name || 'Sin Aula',
+            classroom: g.task?.classroom?.name || g.student.classrooms?.name || 'Sin Aula',
             total: 0,
             count: 0,
             tasks: []
@@ -45,9 +46,13 @@ export const GradesModule = {
         studentGrades[g.student_id].tasks.push(g);
       });
 
-      container.innerHTML = Object.values(studentGrades).map(s => {
+      const studentList = Object.values(studentGrades);
+      
+      // Renderizar Tabla
+      tableBody.innerHTML = studentList.map(s => {
         const avg = s.count > 0 ? (s.total / s.count).toFixed(1) : '—';
-        const colorClass = avg >= 9 ? 'text-emerald-600 bg-emerald-50' : avg >= 7 ? 'text-amber-600 bg-amber-50' : 'text-rose-600 bg-rose-50';
+        const avgNum = parseFloat(avg) || 0;
+        const colorClass = avgNum >= 9 ? 'text-emerald-600 bg-emerald-50' : avgNum >= 7 ? 'text-amber-600 bg-amber-50' : 'text-rose-600 bg-rose-50';
         const taskLabels = s.tasks.slice(0, 3).map(t => `<span class="px-2 py-0.5 bg-slate-100 rounded text-[9px] font-bold text-slate-600 truncate max-w-[80px] inline-block">${Helpers.escapeHTML(t.task?.title || 'Tarea')}</span>`).join('');
         
         return `
@@ -69,10 +74,48 @@ export const GradesModule = {
           </tr>`;
       }).join('');
 
+      // Actualizar KPIs
+      this.updateKPIs(studentList);
+
       if (window.lucide) lucide.createIcons();
     } catch (e) {
       console.error('Error loading grades:', e);
-      container.innerHTML = '<tr><td colspan="5" class="text-center py-8 text-red-500">Error al cargar calificaciones.</td></tr>';
+      tableBody.innerHTML = '<tr><td colspan="5" class="text-center py-8 text-red-500">Error al cargar calificaciones.</td></tr>';
     }
+  },
+
+  updateKPIs(studentList) {
+    const setTxt = (id, val) => { const el = document.getElementById(id); if (el) el.textContent = val; };
+    
+    if (!studentList || studentList.length === 0) {
+      setTxt('kpiAvgGrade', 'N/A');
+      setTxt('kpiApprovalRate', 'N/A');
+      setTxt('kpiNeedsSupport', '0');
+      setTxt('kpiLowGrades', '0');
+      return;
+    }
+
+    const totalStudents = studentList.length;
+    let sumAvgs = 0;
+    let approvedCount = 0;
+    let needsSupportCount = 0;
+    let lowGradesCount = 0;
+
+    studentList.forEach(s => {
+      const avg = s.count > 0 ? s.total / s.count : 0;
+      sumAvgs += avg;
+      
+      if (avg >= 7) approvedCount++;
+      if (avg > 0 && avg < 7.5) needsSupportCount++;
+      if (avg > 0 && avg < 6) lowGradesCount++;
+    });
+
+    const totalAvg = (sumAvgs / totalStudents).toFixed(1);
+    const approvalRate = Math.round((approvedCount / totalStudents) * 100);
+
+    setTxt('kpiAvgGrade', totalAvg);
+    setTxt('kpiApprovalRate', `${approvalRate}%`);
+    setTxt('kpiNeedsSupport', needsSupportCount);
+    setTxt('kpiLowGrades', lowGradesCount);
   }
 };

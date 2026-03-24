@@ -3,7 +3,7 @@ import { Helpers } from '../shared/helpers.js';
 /**
  * 🎨 UI HELPERS & COMPONENTS
  */
-export const UIHelpers = {
+const UIHelpers = {
   setLoading(isLoading, containerSelector = '#globalModalContainer', btnSelector = null) {
     const container = document.querySelector(containerSelector);
     if (!container) return;
@@ -59,7 +59,22 @@ export const UIHelpers = {
 /**
  * 🏛️ DIRECTOR UI COMPONENTS
  */
-export const DirectorUI = {
+const DirectorUI = {
+  renderDashboard(data) {
+    const setTxt = (id, val) => { const el = document.getElementById(id); if (el) el.textContent = val; };
+    
+    // KPIs
+    setTxt('kpiStudents', data.students.totalStudents);
+    setTxt('kpiTeachers', data.kpis.total_teachers || 0);
+    setTxt('kpiClassrooms', data.classrooms.length);
+    setTxt('kpiAttendance', data.attendance.today.present);
+    setTxt('kpiPendingMoney', `$${data.payments.summary.total_pending || 0}`);
+    setTxt('kpiIncidents', data.inquiries.count);
+    
+    // Si hay más elementos que actualizar, se agregan aquí
+    if (window.lucide) lucide.createIcons();
+  },
+
   renderStudentCard(s) {
     const avatar = s.avatar_url 
       ? `<img src="${s.avatar_url}" class="w-full h-full object-cover">` 
@@ -91,8 +106,8 @@ export const DirectorUI = {
           </div>
           
           <div class="flex gap-2 w-full">
-            <button onclick="App.students.edit('${s.id}')" class="flex-1 py-3 bg-slate-800 text-white rounded-2xl font-black text-[10px] uppercase tracking-wider hover:bg-slate-900 transition-all active:scale-95 shadow-lg shadow-slate-200">Editar</button>
-            <button onclick="App.students.delete('${s.id}')" class="w-12 h-12 flex items-center justify-center bg-rose-50 text-rose-500 rounded-2xl hover:bg-rose-500 hover:text-white transition-all active:scale-95 border border-rose-100">
+            <button data-id="${s.id}" class="btn-student-edit flex-1 py-3 bg-slate-800 text-white rounded-2xl font-black text-[10px] uppercase tracking-wider hover:bg-slate-900 transition-all active:scale-95 shadow-lg shadow-slate-200">Editar</button>
+            <button data-id="${s.id}" class="btn-student-delete w-12 h-12 flex items-center justify-center bg-rose-50 text-rose-500 rounded-2xl hover:bg-rose-500 hover:text-white transition-all active:scale-95 border border-rose-100">
               <i data-lucide="trash-2" class="w-5 h-5"></i>
             </button>
           </div>
@@ -103,124 +118,100 @@ export const DirectorUI = {
   renderTeacherCard(t) {
     const avatar = t.avatar_url 
       ? `<img src="${t.avatar_url}" class="w-full h-full object-cover">` 
-      : `<div class="w-full h-full flex items-center justify-center text-xl font-black text-rose-600 bg-rose-50">${(t.name || '?').charAt(0)}</div>`;
-
-    const roleLabel = t.role === 'asistente' ? 'Auxiliar' : 'Titular';
-    const roleClass = t.role === 'asistente' ? 'bg-amber-100 text-amber-600' : 'bg-rose-100 text-rose-600';
+      : `<div class="w-full h-full flex items-center justify-center text-xl font-black text-indigo-600 bg-indigo-50">${(t.name || '?').charAt(0)}</div>`;
     
-    // 🔥 FIX: Obtener nombre del aula correctamente
-    const classroomName = t.classroom_id ? (t.classrooms?.name || 'Aula Asignada') : 'Sin Aula';
-
     return `
-      <div class="bg-white rounded-[2.5rem] p-6 border-2 border-slate-100 hover:border-rose-200 transition-all hover:shadow-xl hover:shadow-rose-100/50 group relative overflow-hidden">
-        <div class="absolute top-4 right-4 z-10">
-          <span class="px-3 py-1 rounded-full text-[9px] font-black uppercase ${roleClass} shadow-sm border border-white/50">${roleLabel}</span>
+      <div class="bg-white rounded-3xl p-6 border border-slate-100 hover:shadow-xl transition-all group">
+        <div class="flex items-center gap-4 mb-6">
+          <div class="w-16 h-16 rounded-2xl bg-indigo-50 text-indigo-600 flex items-center justify-center font-bold text-2xl overflow-hidden shadow-inner">
+            ${avatar}
+          </div>
+          <div class="min-w-0">
+            <h3 class="font-black text-slate-800 text-lg truncate">${Helpers.escapeHTML(t.name)}</h3>
+            <p class="text-[10px] font-black uppercase tracking-widest text-indigo-500">${t.role}</p>
+          </div>
         </div>
-        
-        <div class="relative flex flex-col items-center text-center mt-2">
-          <div class="w-24 h-24 rounded-[2.2rem] p-1.5 bg-gradient-to-tr from-rose-500 to-pink-500 mb-4 shadow-lg shadow-rose-200 group-hover:-rotate-3 transition-transform">
-            <div class="w-full h-full rounded-[1.8rem] bg-white overflow-hidden border-4 border-white">
-              ${avatar}
-            </div>
+        <div class="space-y-2 mb-6">
+          <div class="flex items-center gap-2 text-xs text-slate-500">
+            <i data-lucide="mail" class="w-3.5 h-3.5"></i> ${t.email}
           </div>
-          
-          <h3 class="text-lg font-black text-slate-800 leading-tight mb-1 group-hover:text-rose-600 transition-colors">${Helpers.escapeHTML(t.name)}</h3>
-          <p class="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-6 flex items-center gap-1.5">
-            <i data-lucide="home" class="w-3 h-3"></i> ${classroomName}
-          </p>
-          
-          <div class="flex gap-2 w-full">
-            <button onclick="App.teachers.edit('${t.id}')" class="flex-1 py-3 bg-slate-800 text-white rounded-2xl font-black text-[10px] uppercase tracking-wider hover:bg-slate-900 transition-all active:scale-95 shadow-lg shadow-slate-200">Gestionar</button>
-            <a href="tel:${t.phone || ''}" class="w-12 h-12 flex items-center justify-center bg-emerald-50 text-emerald-600 rounded-2xl hover:bg-emerald-500 hover:text-white transition-all active:scale-95 border border-emerald-100">
-              <i data-lucide="phone" class="w-5 h-5"></i>
-            </a>
+          <div class="flex items-center gap-2 text-xs text-slate-500">
+            <i data-lucide="phone" class="w-3.5 h-3.5"></i> ${t.phone || 'No asignado'}
           </div>
+          <div class="flex items-center gap-2 text-xs text-slate-500">
+            <i data-lucide="home" class="w-3.5 h-3.5"></i> ${t.classrooms?.name || 'Sin aula'}
+          </div>
+        </div>
+        <div class="flex gap-2">
+          <button data-id="${t.id}" class="btn-teacher-edit flex-1 py-2.5 bg-slate-900 text-white rounded-xl text-[10px] font-black uppercase hover:bg-indigo-600 transition-all">Gestionar</button>
         </div>
       </div>`;
   },
 
   renderClassroomRow(r) {
-    const percent = r.max_capacity ? Math.round((r.current_capacity / r.max_capacity) * 100) : 0;
-    const colorClass = percent >= 90 ? 'bg-rose-500' : percent >= 70 ? 'bg-amber-500' : 'bg-emerald-500';
-    
+    const occupancy = r.student_count || 0;
+    const capacity = r.capacity || 20;
+    const percent = Math.round((occupancy / capacity) * 100);
+    const progressColor = percent > 90 ? 'bg-rose-500' : percent > 70 ? 'bg-amber-500' : 'bg-emerald-500';
+
     return `
-      <tr class="hover:bg-slate-50/80 transition-colors group border-b border-slate-50">
-        <td class="px-6 py-4">
+      <tr class="hover:bg-slate-50 transition-colors">
+        <td class="py-4 px-6">
+          <div class="font-bold text-slate-800">${Helpers.escapeHTML(r.name)}</div>
+          <div class="text-[10px] text-slate-400 font-bold uppercase tracking-wider">${r.level || 'General'}</div>
+        </td>
+        <td class="py-4 px-6">
           <div class="flex items-center gap-3">
-            <div class="w-10 h-10 rounded-xl bg-indigo-50 text-indigo-600 flex items-center justify-center font-black">
-              <i data-lucide="home" class="w-5 h-5"></i>
+            <div class="w-8 h-8 rounded-lg bg-indigo-50 text-indigo-600 flex items-center justify-center text-xs font-bold">
+              ${(r.profiles?.name || '?').charAt(0)}
             </div>
-            <div>
-              <div class="font-black text-slate-800 text-sm group-hover:text-indigo-600 transition-colors">${Helpers.escapeHTML(r.name)}</div>
-              <div class="text-[10px] font-bold text-slate-400 uppercase tracking-tighter">Capacidad: ${r.max_capacity || '∞'}</div>
-            </div>
+            <div class="text-sm font-medium text-slate-600">${Helpers.escapeHTML(r.profiles?.name || 'Sin asignar')}</div>
           </div>
         </td>
-        <td class="px-6 py-4">
-          <div class="flex items-center gap-3">
-            <div class="w-8 h-8 rounded-lg bg-slate-100 text-slate-500 flex items-center justify-center">
-              <i data-lucide="user" class="w-4 h-4"></i>
+        <td class="py-4 px-6">
+          <div class="flex items-center gap-4">
+            <div class="flex-1 bg-slate-100 rounded-full h-2 overflow-hidden max-w-[100px]">
+              <div class="${progressColor} h-full rounded-full" style="width: ${percent}%"></div>
             </div>
-            <div>
-              <div class="text-xs font-bold text-slate-700">${Helpers.escapeHTML(r.teacher?.name || 'Sin Maestra')}</div>
-              <div class="text-[9px] font-black text-slate-400 uppercase tracking-tighter">Responsable</div>
-            </div>
+            <span class="text-xs font-bold text-slate-500">${occupancy}/${capacity}</span>
           </div>
         </td>
-        <td class="px-6 py-4">
-          <div class="max-w-[120px]">
-            <div class="flex justify-between items-center mb-1.5">
-              <span class="text-[10px] font-black text-slate-500 uppercase">${r.current_capacity} / ${r.max_capacity || 0}</span>
-              <span class="text-[10px] font-black ${percent >= 90 ? 'text-rose-600' : 'text-slate-400'}">${percent}%</span>
-            </div>
-            <div class="w-full h-2 bg-slate-100 rounded-full overflow-hidden p-0.5">
-              <div class="h-full ${colorClass} rounded-full transition-all duration-1000" style="width: ${percent}%"></div>
-            </div>
-          </div>
-        </td>
-        <td class="px-6 py-4 text-right">
-          <div class="flex justify-end gap-2">
-            <button onclick="App.rooms.openModal('${r.id}')" class="p-2.5 bg-white border border-slate-200 text-slate-600 rounded-xl hover:bg-slate-50 hover:border-slate-300 transition-all shadow-sm active:scale-95">
-              <i data-lucide="edit-3" class="w-4 h-4"></i>
-            </button>
-            <button class="p-2.5 bg-white border border-slate-200 text-rose-500 rounded-xl hover:bg-rose-50 hover:border-rose-200 transition-all shadow-sm active:scale-95">
-              <i data-lucide="trash-2" class="w-4 h-4"></i>
-            </button>
-          </div>
+        <td class="py-4 px-6 text-center">
+          <button onclick="App.rooms.openModal('${r.id}')" class="p-2 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-lg transition-all">
+            <i data-lucide="edit-3" class="w-4 h-4"></i>
+          </button>
         </td>
       </tr>`;
   },
 
   renderInquiryCard(item, idx) {
-    const statusMap = {
-      pending: { label: 'Pendiente', class: 'bg-amber-100 text-amber-700' },
-      resolved: { label: 'Resuelto', class: 'bg-emerald-100 text-emerald-700' },
-      closed: { label: 'Cerrado', class: 'bg-slate-100 text-slate-500' },
-      in_progress: { label: 'En Proceso', class: 'bg-blue-100 text-blue-700' }
-    };
-    const status = statusMap[item.status] || { label: item.status, class: 'bg-slate-100 text-slate-700' };
-    
+    const statusColor = {
+      'pending': 'bg-amber-100 text-amber-700 border-amber-200',
+      'in_progress': 'bg-blue-100 text-blue-700 border-blue-200',
+      'resolved': 'bg-emerald-100 text-emerald-700 border-emerald-200',
+      'closed': 'bg-slate-100 text-slate-700 border-slate-200'
+    }[item.status] || 'bg-slate-100 text-slate-700';
+
     return `
-      <div class="bg-white p-6 rounded-[2rem] border-2 border-slate-50 hover:border-indigo-100 hover:shadow-xl transition-all group">
+      <div class="bg-white p-6 rounded-3xl shadow-sm border border-slate-100 hover:shadow-md transition-all">
         <div class="flex justify-between items-start mb-4">
-          <span class="px-3 py-1 rounded-full text-[9px] font-black uppercase ${status.class}">${status.label}</span>
+          <span class="text-[10px] font-black uppercase px-2.5 py-1 rounded-full border ${statusColor}">${item.status}</span>
           <span class="text-[10px] font-bold text-slate-400">${new Date(item.created_at).toLocaleDateString()}</span>
         </div>
-        <h4 class="font-black text-slate-800 mb-2 group-hover:text-indigo-600 transition-colors">${Helpers.escapeHTML(item.subject)}</h4>
-        <p class="text-xs text-slate-500 line-clamp-2 mb-4 leading-relaxed">${Helpers.escapeHTML(item.message)}</p>
-        
-        <div class="flex items-center gap-3 pt-4 border-t border-slate-50 mt-auto">
-          <div class="w-8 h-8 rounded-full bg-slate-100 flex items-center justify-center text-[10px] font-bold text-slate-500">
-            ${(item.parent?.name || 'P').charAt(0)}
+        <h3 class="font-bold text-slate-800 mb-1 truncate">${Helpers.escapeHTML(item.subject)}</h3>
+        <p class="text-xs text-slate-500 mb-4 line-clamp-2">${Helpers.escapeHTML(item.message)}</p>
+        <div class="flex items-center justify-between pt-4 border-t border-slate-50">
+          <div class="flex items-center gap-2">
+            <div class="w-8 h-8 rounded-full bg-slate-100 flex items-center justify-center text-xs font-bold text-slate-600">
+              ${(item.parent?.name || '?').charAt(0)}
+            </div>
+            <div class="text-[10px] font-bold text-slate-600">${Helpers.escapeHTML(item.parent?.name || 'Padre')}</div>
           </div>
-          <div class="flex-1 min-w-0">
-            <div class="text-[11px] font-bold text-slate-700 truncate">${Helpers.escapeHTML(item.parent?.name || 'Padre')}</div>
-            <div class="text-[9px] font-black text-slate-400 uppercase tracking-tighter">${item.parent?.email || ''}</div>
-          </div>
-          <button onclick="App.inquiries.openDetail('${item.id}')" class="p-2 bg-indigo-50 text-indigo-600 rounded-xl hover:bg-indigo-600 hover:text-white transition-all">
-            <i data-lucide="eye" class="w-4 h-4"></i>
-          </button>
+          <button data-id="${item.id}" class="btn-inquiry-detail text-indigo-600 hover:text-indigo-800 font-bold text-xs">Ver Detalle</button>
         </div>
       </div>`;
   }
 };
+
+export const UI = { ...UIHelpers, ...DirectorUI };
+export { UIHelpers, DirectorUI };

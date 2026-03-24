@@ -65,14 +65,20 @@ export const AssistantApi = {
         check_in,
         check_out,
         status,
-        students(name, avatar_url)
+        student:student_id (
+          name,
+          avatar_url
+        )
       `)
       .gte('created_at', `${today}T00:00:00`)
       .lte('created_at', `${today}T23:59:59`)
-      .order('created_at', { ascending: false, foreignTable: '' })
+      .order('created_at', { ascending: false })
       .limit(10);
 
-    if (error) throw error;
+    if (error) {
+      console.error('❌ [AssistantApi.getTodayAttendance]', error.message, error.details);
+      throw new Error('Error cargando asistencia');
+    }
     return data || [];
   },
 
@@ -82,7 +88,13 @@ export const AssistantApi = {
   async getAttendanceStatus(studentId, date) {
     const { data, error } = await supabase
       .from(TABLES.ATTENDANCE)
-      .select('id, check_out, student:students(name, p1_email, p1_name)')
+      .select(`
+        id, 
+        check_out, 
+        student:student_id (
+          name, p1_email, p1_name
+        )
+      `)
       .eq('student_id', studentId)
       .eq('date', date)
       .maybeSingle();

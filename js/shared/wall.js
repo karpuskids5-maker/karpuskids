@@ -157,7 +157,7 @@ export const WallModule = {
         .select(`
           id, content, image_url, media_url, media_type, created_at,
           classroom:classrooms(name),
-          teacher:teacher_id(name, avatar_url),
+          teacher:profiles!posts_teacher_id_fkey(name, avatar_url),
           likes(user_id),
           comments(count)
         `)
