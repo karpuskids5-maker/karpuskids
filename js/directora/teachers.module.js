@@ -12,16 +12,23 @@ export const TeachersModule = {
     try {
       const { data: teachers, error } = await supabase
         .from('profiles')
-        .select('*, classrooms(id, name)')
+        .select('*, classrooms!classrooms_teacher_id_fkey(id, name)')
         .in('role', ['maestra', 'asistente'])
         .order('name');
 
-      if (error) throw new Error(error);
+      if (error) throw new Error(error.message || error);
 
-      const total = teachers.length;
-      const active = teachers.filter(t => t.is_active !== false).length;
-      const assistants = teachers.filter(t => t.role === 'asistente').length;
-      const inClass = teachers.filter(t => t.classroom_id || (t.classrooms && t.classrooms.length > 0)).length;
+      // Normalizar: agregar classroom_id y classroom name desde el join
+      const normalized = (teachers || []).map(t => ({
+        ...t,
+        classroom_id: t.classrooms?.[0]?.id || t.classrooms?.id || null,
+        classrooms: t.classrooms?.[0] || t.classrooms || null
+      }));
+
+      const total = normalized.length;
+      const active = normalized.filter(t => t.is_active !== false).length;
+      const assistants = normalized.filter(t => t.role === 'asistente').length;
+      const inClass = normalized.filter(t => t.classrooms).length;
 
       const setTxt = (id, val) => { const el = document.getElementById(id); if(el) el.textContent = val; };
       setTxt('kpiStaffTotal', total);
@@ -29,12 +36,12 @@ export const TeachersModule = {
       setTxt('kpiStaffInClass', inClass); 
       setTxt('kpiStaffAssistants', assistants);
 
-      AppState.set('teachers', teachers);
-      if (!teachers?.length) {
+      AppState.set('teachers', normalized);
+      if (!normalized.length) {
         container.innerHTML = '<div class="col-span-3 text-center p-8 text-slate-500">No hay maestras.</div>';
         return;
       }
-      container.innerHTML = teachers.map(t => DirectorUI.renderTeacherCard(t)).join('');
+      container.innerHTML = normalized.map(t => DirectorUI.renderTeacherCard(t)).join('');
       if (window.lucide) lucide.createIcons();
     } catch (e) {
       console.error('Error initTeachersSection:', e);
@@ -44,12 +51,13 @@ export const TeachersModule = {
 
   async save() {
     const id = document.getElementById('tId')?.value;
+    const classroom_id = document.getElementById('tClassroom')?.value || null;
     const payload = {
       name: (document.getElementById('tName').value || '').trim(),
       phone: (document.getElementById('tPhone').value || '').trim(),
       email: (document.getElementById('tEmail').value || '').trim(),
       role: document.getElementById('tRole').value,
-      classroom_id: document.getElementById('tClassroom').value || null,
+      classroom_id, // será separado en updateTeacher
       is_active: document.getElementById('tActive').checked
     };
     
@@ -78,6 +86,7 @@ export const TeachersModule = {
         
         if (authError) throw authError;
         if (authData.user) {
+           // Para nuevo usuario, actualizar perfil y asignar aula
            await DirectorApi.updateTeacher(authData.user.id, payload);
            res = { data: authData.user, error: null };
         }
@@ -185,10 +194,11 @@ export const TeachersModule = {
         setVal('tPhone', teacher.phone);
         setVal('tEmail', teacher.email);
         setVal('tRole', teacher.role);
-        const classId = teacher.classroom_id || (Array.isArray(teacher.classrooms) ? teacher.classrooms[0]?.id : teacher.classrooms?.id);
+        // classroom_id viene normalizado desde el join classrooms!classrooms_teacher_id_fkey
+        const classId = teacher.classroom_id || teacher.classrooms?.id;
         setVal('tClassroom', classId);
         const checkActive = document.getElementById('tActive');
-        if(checkActive) checkActive.checked = teacher.is_active;
+        if(checkActive) checkActive.checked = teacher.is_active !== false;
       }
     }
     if (window.lucide) lucide.createIcons();

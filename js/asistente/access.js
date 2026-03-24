@@ -1,5 +1,6 @@
-import { supabase, emitEvent } from '../shared/supabase.js';
+import { supabase, emitEvent } from '../shared/supabase.js'; // supabase para búsqueda, emitEvent para logs
 import { Helpers } from '../shared/helpers.js';
+import { AssistantApi } from './api.js';
 
 /**
  * Módulo de Control de Acceso para Asistente (Check-in / Check-out)
@@ -69,33 +70,18 @@ export const AccessModule = {
     
     try {
       if (type === 'check-in') {
-         const { data: existing } = await supabase.from('attendance')
-           .select('id')
-           .eq('student_id', studentId)
-           .eq('date', today)
-           .maybeSingle();
+         const existing = await AssistantApi.getAttendanceStatus(studentId, today);
            
          if (existing) {
            Helpers.toast('Ya tiene asistencia hoy', 'info');
            return;
          }
          
-         const { data: student } = await supabase.from('students')
-           .select('name, classroom_id, p1_email, p1_name')
-           .eq('id', studentId)
-           .single();
-         
+         // Obtener info básica para el evento (podría moverse a API también, pero es una búsqueda simple)
+         const { data: student } = await supabase.from('students').select('name, classroom_id, p1_email, p1_name').eq('id', studentId).single();
          if (!student) throw new Error('Estudiante no encontrado');
-
-         const { error } = await supabase.from('attendance').insert({
-           student_id: studentId,
-           classroom_id: student.classroom_id,
-           date: today,
-           status: 'present',
-           check_in: new Date().toISOString()
-         });
          
-         if (error) throw error;
+         await AssistantApi.checkIn(studentId, student.classroom_id, today);
          Helpers.toast('Entrada registrada');
 
          emitEvent('attendance.checkin', {
@@ -106,11 +92,7 @@ export const AccessModule = {
          });
       } else {
          // Registro de Salida (Check-out)
-         const { data: existing } = await supabase.from('attendance')
-           .select('id, check_out, student:students(name, p1_email, p1_name)')
-           .eq('student_id', studentId)
-           .eq('date', today)
-           .maybeSingle();
+         const existing = await AssistantApi.getAttendanceStatus(studentId, today);
            
          if (!existing) {
            Helpers.toast('Sin entrada registrada hoy', 'error');
@@ -122,11 +104,7 @@ export const AccessModule = {
            return;
          }
 
-         const { error } = await supabase.from('attendance')
-           .update({ check_out: new Date().toISOString() })
-           .eq('id', existing.id);
-         
-         if (error) throw error;
+         await AssistantApi.checkOut(existing.id);
          Helpers.toast('Salida registrada');
 
          emitEvent('attendance.checkout', {
@@ -153,43 +131,42 @@ export const AccessModule = {
     const container = document.getElementById('accessRecentLog');
     if (!container) return;
     
-    const today = new Date().toISOString().split('T')[0];
-    
-    const { data: logs, error } = await supabase
-      .from('attendance')
-      .select('check_in, check_out, status, students(name, avatar_url)')
-      .eq('date', today)
-      .order('created_at', { ascending: false })
-      .limit(10);
+    try {
+      const logs = await AssistantApi.getTodayAttendance();
       
-    if (error) return;
-    
-    if (!logs?.length) {
-      container.innerHTML = '<p class="text-slate-400 text-center py-4 text-xs font-bold uppercase opacity-40">Sin actividad hoy</p>';
-      return;
-    }
-    
-    container.innerHTML = logs.map(log => {
-      const checkInTime = log.check_in ? new Date(log.check_in).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'}) : null;
-      const checkOutTime = log.check_out ? new Date(log.check_out).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'}) : null;
+      if (!logs?.length) {
+        container.innerHTML = '<p class="text-slate-400 text-center py-4 text-xs font-bold uppercase opacity-40">Sin actividad hoy</p>';
+        return;
+      }
       
-      return `
-        <div class="flex items-center gap-3 p-3 bg-white rounded-2xl border border-slate-50 shadow-sm mb-2 hover:shadow-md transition-all">
-          <div class="w-8 h-8 rounded-full bg-slate-50 border border-slate-100 flex items-center justify-center text-slate-400 overflow-hidden shadow-sm">
-            ${log.students?.avatar_url ? `<img src="${log.students.avatar_url}" class="w-full h-full object-cover">` : '<i data-lucide="user" class="w-4 h-4"></i>'}
-          </div>
-          <div class="flex-1">
-            <p class="text-xs font-black text-slate-700 leading-tight">${Helpers.escapeHTML(log.students?.name)}</p>
-            <div class="flex gap-2 text-[8px] font-bold uppercase tracking-tighter text-slate-400 mt-0.5">
-               ${checkInTime ? `<span class="flex items-center gap-0.5"><i data-lucide="log-in" class="w-2 h-2 text-emerald-500"></i> EN: ${checkInTime}</span>` : ''}
-               ${checkOutTime ? `<span class="flex items-center gap-0.5"><i data-lucide="log-out" class="w-2 h-2 text-rose-500"></i> SAL: ${checkOutTime}</span>` : ''}
+      container.innerHTML = logs.map(log => {
+        const checkInTime = log.check_in ? new Date(log.check_in).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'}) : null;
+        const checkOutTime = log.check_out ? new Date(log.check_out).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'}) : null;
+        
+        return `
+          <div class="flex items-center gap-3 p-3 bg-white rounded-2xl border border-slate-50 shadow-sm mb-2 hover:shadow-md transition-all">
+            <div class="w-8 h-8 rounded-full bg-slate-50 border border-slate-100 flex items-center justify-center text-slate-400 overflow-hidden shadow-sm">
+              ${log.students?.avatar_url ? `<img src="${log.students.avatar_url}" class="w-full h-full object-cover">` : '<i data-lucide="user" class="w-4 h-4"></i>'}
             </div>
+            <div class="flex-1">
+              <p class="text-xs font-black text-slate-700 leading-tight">${Helpers.escapeHTML(log.students?.name)}</p>
+              <div class="flex gap-2 text-[8px] font-bold uppercase tracking-tighter text-slate-400 mt-0.5">
+                 ${checkInTime ? `<span class="flex items-center gap-0.5"><i data-lucide="log-in" class="w-2 h-2 text-emerald-500"></i> EN: ${checkInTime}</span>` : ''}
+                 ${checkOutTime ? `<span class="flex items-center gap-0.5"><i data-lucide="log-out" class="w-2 h-2 text-rose-500"></i> SAL: ${checkOutTime}</span>` : ''}
+              </div>
+            </div>
+            <div class="w-1.5 h-1.5 rounded-full ${log.check_out ? 'bg-rose-500' : (log.check_in ? 'bg-emerald-500' : 'bg-slate-300')}"></div>
           </div>
-          <div class="w-1.5 h-1.5 rounded-full ${log.check_out ? 'bg-rose-500' : (log.check_in ? 'bg-emerald-500' : 'bg-slate-300')}"></div>
-        </div>
-      `;
-    }).join('');
-    
-    if (window.lucide) lucide.createIcons();
+        `;
+      }).join('');
+      
+      if (window.lucide) lucide.createIcons();
+    } catch (e) {
+      console.error('Error cargando historial:', e);
+      container.innerHTML = `<div class="text-center py-4 text-rose-500 text-xs font-bold">
+        Error de sincronización.
+        <br><span class="opacity-75 font-normal text-[10px]">${e.message || 'Verifica la consola'}</span>
+      </div>`;
+    }
   }
 };

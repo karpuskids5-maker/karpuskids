@@ -7,6 +7,8 @@ import { AppState } from './state.js';
  * Módulo de Pagos para Asistente
  */
 export const PaymentsModule = {
+  _financialChart: null,
+
   async init() {
     const refreshBtn = document.getElementById('refreshPayments');
     if (refreshBtn) refreshBtn.onclick = () => this.loadPayments();
@@ -23,6 +25,68 @@ export const PaymentsModule = {
     if (form) form.onsubmit = (e) => this.handleSubmit(e);
 
     await this.loadPayments();
+    await this.loadIncomeChart();
+  },
+
+  async loadIncomeChart() {
+    const canvas = document.getElementById('incomeChart');
+    if (!canvas || !window.Chart) return;
+
+    try {
+      const year = new Date().getFullYear();
+      const { data: payments, error } = await supabase
+        .from('payments')
+        .select('amount, created_at, status')
+        .in('status', ['confirmado', 'paid', 'efectivo'])
+        .gte('created_at', `${year}-01-01`)
+        .lte('created_at', `${year}-12-31`);
+
+      if (error) throw error;
+
+      const labels = ['Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun', 'Jul', 'Ago', 'Sep', 'Oct', 'Nov', 'Dic'];
+      const dataValues = new Array(12).fill(0);
+
+      payments?.forEach(p => {
+        const date = new Date(p.created_at);
+        if (date.getFullYear() === year) {
+          dataValues[date.getMonth()] += (p.amount || 0);
+        }
+      });
+
+      if (this._financialChart) this._financialChart.destroy();
+      this._financialChart = new Chart(canvas, {
+        type: 'bar',
+        data: {
+          labels,
+          datasets: [{
+            label: 'Ingresos ($)',
+            data: dataValues,
+            backgroundColor: 'rgba(13, 148, 136, 0.2)',
+            borderColor: 'rgb(13, 148, 136)',
+            borderWidth: 2,
+            borderRadius: 8
+          }]
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          scales: {
+            y: {
+              beginAtZero: true,
+              grid: { display: false }
+            },
+            x: {
+              grid: { display: false }
+            }
+          },
+          plugins: {
+            legend: { display: false }
+          }
+        }
+      });
+    } catch (e) {
+      console.error('Error loadIncomeChart:', e);
+    }
   },
 
   async loadPayments() {

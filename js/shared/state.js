@@ -170,6 +170,20 @@ export class SafeAppState {
     }
   }
 
+  // 📦 Métodos directos de caché (Compatibilidad GlobalCache)
+  setCache(key, value, ttl = 5 * 60 * 1000) {
+    this._cache[key] = value;
+    this._cacheTTL[key] = Date.now() + ttl;
+  }
+
+  getCache(key) {
+    const now = Date.now();
+    if (this._cache[key] !== undefined && this._cacheTTL[key] > now) {
+      return this._cache[key];
+    }
+    return null;
+  }
+
   /**
    * 🗑️ Invalidar caché específico
    */

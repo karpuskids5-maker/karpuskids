@@ -283,7 +283,7 @@ export const PaymentsModule = {
       const labels = ['Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun', 'Jul', 'Ago', 'Sep', 'Oct', 'Nov', 'Dic'];
       const dataValues = new Array(12).fill(0);
       payments?.forEach(p => {
-        const date = new Date(p.paid_date || p.created_at);
+        const date = new Date(p.created_at);
         if (date.getFullYear() == year) dataValues[date.getMonth()] += (p.amount || 0);
       });
 

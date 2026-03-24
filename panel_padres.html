@@ -23,11 +23,11 @@
   <script>window.OneSignalDeferred = window.OneSignalDeferred || [];</script>
 
   <script src="https://meet.jit.si/external_api.js" defer></script>
+  <script src="https://unpkg.com/lucide@latest/dist/umd/lucide.js"></script>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Quicksand:wght@400;600;700&family=Nunito:wght@400;600;700;800&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="css/panel-padre.css" />
-  <script src="https://cdn.jsdelivr.net/npm/lucide@latest/dist/umd/lucide.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
   <link rel="icon" href="logo/favicon.ico" type="image/x-icon">
   <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.6.0/dist/confetti.browser.min.js"></script>
@@ -49,14 +49,12 @@
     }
     
     .section {
-      transition: opacity 0.3s ease, transform 0.3s ease;
-    }
-    .section.hidden {
       display: none;
       opacity: 0;
       transform: translateY(10px);
+      transition: opacity 0.3s ease, transform 0.3s ease;
     }
-    .section:not(.hidden) {
+    .section.active {
       display: block;
       opacity: 1;
       transform: translateY(0);
@@ -171,7 +169,7 @@
         flex md:flex-col
         transition-all duration-300
         pt-[env(safe-area-inset-top)]
-        pb-[calc(env(safe-area-inset-bottom)+8px)]
+        pb-[calc(env(safe-area-inset-bottom)+8px)] 
         border border-white/40
       "
     >
@@ -190,7 +188,7 @@
       </div>
 
       <!-- Card Estudiante -->
-      <div class="px-6 mb-8 hidden md:block">
+      <div class="px-6 mb-8 hidden md:block"> 
         <div class="bg-white/60 backdrop-blur-sm rounded-3xl p-5 shadow-sm border border-white transition-all duration-300 hover:shadow-md group">
           <p class="text-[10px] text-slate-400 font-bold uppercase tracking-widest mb-2 flex items-center gap-1.5">
             <i data-lucide="sparkles" class="w-3.5 h-3.5 text-amber-400 group-hover:animate-pulse"></i> Mi Pequeño/a
@@ -216,6 +214,10 @@
         <button type="button" data-target="tasks" class="sidebar-node node-tasks" aria-label="Tareas">
           <i data-lucide="backpack" class="w-5 h-5 text-amber-500"></i>
           <span class="hidden md:inline">Tarea</span>
+        </button>
+        <button type="button" data-target="grades" class="sidebar-node node-grades" aria-label="Calificaciones">
+          <i data-lucide="award" class="w-5 h-5 text-emerald-500"></i>
+          <span class="hidden md:inline">Notas</span>
         </button>
         <button type="button" data-target="profile" class="sidebar-node node-profile" aria-label="Perfil">
           <i data-lucide="user" class="w-5 h-5 text-indigo-500"></i>
@@ -285,59 +287,13 @@
       
       <!-- DASHBOARD INFANTIL -->
       <section id="home" class="section">
-        <!-- Grid de Widgets "Bento" -->
-        <div class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 mb-8" id="dashboardGrid">
-           <!-- Se llenará con JS usando .patio-card -->
+        <!-- tarjetas principales -->
+        <div id="dashboardGrid" 
+             class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 mb-8">
         </div>
 
-        <!-- NUEVO: TARJETA DE RESUMEN DIARIO (Inserción para visualización) -->
-        <div class="patio-card p-6 mb-8 bg-gradient-to-br from-white to-slate-50 border border-slate-100 relative overflow-hidden group">
-            <!-- Decoración de fondo -->
-            <div class="absolute top-0 right-0 w-24 h-24 bg-yellow-100 rounded-full -mr-10 -mt-10 opacity-50 group-hover:scale-110 transition-transform duration-700"></div>
-            
-            <div class="relative z-10">
-                <h3 class="font-black text-slate-800 text-lg mb-4 flex items-center gap-2">
-                    <span class="bg-orange-100 text-orange-600 p-1.5 rounded-lg"><i data-lucide="clipboard-list" class="w-5 h-5"></i></span>
-                    Resumen del Día
-                </h3>
-
-                <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
-                    <!-- 1. Ánimo -->
-                    <div class="bg-white p-4 rounded-2xl shadow-sm border border-slate-100 flex items-center gap-3">
-                        <div class="w-10 h-10 rounded-full bg-emerald-100 flex items-center justify-center text-xl shadow-inner">
-                            😃 <!-- Icono Dinámico -->
-                        </div>
-                        <div>
-                            <p class="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Mañana</p>
-                            <p class="font-bold text-slate-700 leading-none">Feliz</p>
-                        </div>
-                    </div>
-
-                    <!-- 2. Comida -->
-                    <div class="bg-white p-4 rounded-2xl shadow-sm border border-slate-100 flex items-center gap-3">
-                        <div class="w-10 h-10 rounded-full bg-blue-100 flex items-center justify-center text-xl shadow-inner">
-                            🍽️
-                        </div>
-                        <div>
-                            <p class="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Comida</p>
-                            <p class="font-bold text-slate-700 leading-none">Comió Todo</p>
-                        </div>
-                    </div>
-
-                    <!-- 3. Sueño -->
-                    <div class="bg-white p-4 rounded-2xl shadow-sm border border-slate-100 flex items-center gap-3">
-                        <div class="w-10 h-10 rounded-full bg-indigo-100 flex items-center justify-center text-xl shadow-inner">
-                            😴
-                        </div>
-                        <div>
-                            <p class="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Siesta</p>
-                            <p class="font-bold text-slate-700 leading-none">Sí durmió</p>
-                        </div>
-                    </div>
-                </div>
-            </div>
-        </div>
-        
+        <!-- resumen del día DINÁMICO -->
+        <div id="dailySummaryCard"></div>
       </section>
 
       <!-- SECCIONES -->
@@ -825,7 +781,9 @@
     </main>
   </div>
   
+  <!-- Script Principal del Padre -->
   <script type="module" src="js/padre/main.js"></script>
+  
   <!-- Lógica PWA Profesional -->
   <script src="js/pwa-install.js" defer></script>
   <script>

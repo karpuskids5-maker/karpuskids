@@ -127,7 +127,7 @@ export const DirectorApi = {
   async getStudents() {
     return await queryBuilder(
       supabase.from(TABLES.STUDENTS)
-        .select('id, name, matricula, is_active, p1_name, p1_phone, p1_email, classroom_id, avatar_url, classrooms:classroom_id(name)')
+        .select('id, name, is_active, p1_name, p1_phone, p1_email, classroom_id, avatar_url, classrooms:classroom_id(name)')
         .order('name'),
       'getStudents'
     );
@@ -164,7 +164,10 @@ export const DirectorApi = {
 
   async getTeachers() {
     return await queryBuilder(
-      supabase.from(TABLES.PROFILES).select('*').eq('role', 'maestra').order('name'),
+      supabase.from(TABLES.PROFILES)
+        .select('*, classrooms!classrooms_teacher_id_fkey(id, name)')
+        .in('role', ['maestra', 'asistente'])
+        .order('name'),
       'getTeachers'
     );
   },
@@ -177,10 +180,25 @@ export const DirectorApi = {
   },
 
   async updateTeacher(id, payload) {
-    return await queryBuilder(
-      supabase.from(TABLES.PROFILES).update(payload).eq('id', id).select().single(),
+    // profiles no tiene classroom_id - la asignación de aula se hace en classrooms.teacher_id
+    const { classroom_id, ...profilePayload } = payload;
+    
+    const result = await queryBuilder(
+      supabase.from(TABLES.PROFILES).update(profilePayload).eq('id', id).select().single(),
       'updateTeacher'
     );
+    
+    // Si hay classroom_id, actualizar la asignación en classrooms
+    if (classroom_id !== undefined) {
+      // Primero quitar al maestro de cualquier aula anterior
+      await supabase.from(TABLES.CLASSROOMS).update({ teacher_id: null }).eq('teacher_id', id);
+      // Luego asignar al nuevo aula si se especificó
+      if (classroom_id) {
+        await supabase.from(TABLES.CLASSROOMS).update({ teacher_id: id }).eq('id', classroom_id);
+      }
+    }
+    
+    return result;
   },
 
   async createManualPayment(data) {
@@ -228,7 +246,7 @@ export const DirectorApi = {
     const targetDate = date || new Date().toISOString().split('T')[0];
     return await queryBuilder(
       supabase.from(TABLES.ATTENDANCE)
-        .select('*, students(name, classroom_id, p1_email, p2_email), classrooms(name)')
+        .select('*, student:student_id(name, classroom_id, p1_email, p2_email), classroom:classroom_id(name)')
         .eq('date', targetDate)
         .order('classroom_id', { ascending: true }),
       'getAttendanceByDate'
@@ -238,7 +256,7 @@ export const DirectorApi = {
   async getPaymentById(id) {
     return await queryBuilder(
       supabase.from(TABLES.PAYMENTS)
-        .select('*, students:student_id(name, classroom_id, p1_email, p2_email, p1_name, p2_name, classrooms:classroom_id(name))')
+        .select('id, student_id, amount, concept, status, due_date, created_at, method, bank, reference, month_paid, evidence_url, students:student_id(name, classroom_id, p1_email, p2_email, p1_name, p2_name, classrooms:classroom_id(name))')
         .eq('id', id)
         .single(),
       'getPaymentById'
@@ -255,7 +273,7 @@ export const DirectorApi = {
   async getPayments(filters = {}) {
     let query = supabase
       .from(TABLES.PAYMENTS)
-      .select('*, students:student_id(name, classroom_id, p1_email, p2_email, classrooms:classroom_id(name))')
+      .select('id, student_id, amount, concept, status, due_date, created_at, method, bank, reference, month_paid, evidence_url, students:student_id(name, classroom_id, p1_email, p2_email, classrooms:classroom_id(name))')
       .order('due_date', { ascending: true });
 
     if (filters.status && filters.status !== 'all') query = query.eq('status', filters.status);
@@ -346,8 +364,46 @@ export const DirectorApi = {
   },
 
   async sendMessage(senderId, receiverId, content) {
+    // Buscar conversación existente entre los dos usuarios
+    const { data: existing } = await supabase
+      .from('conversation_participants')
+      .select('conversation_id')
+      .eq('user_id', senderId);
+    
+    let conversationId = null;
+    
+    if (existing?.length) {
+      // Buscar si alguna de esas conversaciones también tiene al receptor
+      const convIds = existing.map(e => e.conversation_id);
+      const { data: shared } = await supabase
+        .from('conversation_participants')
+        .select('conversation_id')
+        .eq('user_id', receiverId)
+        .in('conversation_id', convIds);
+      
+      if (shared?.length) conversationId = shared[0].conversation_id;
+    }
+    
+    // Si no existe, crear nueva conversación
+    if (!conversationId) {
+      const { data: conv, error: convErr } = await supabase
+        .from('conversations')
+        .insert({ type: 'private' })
+        .select()
+        .single();
+      
+      if (convErr) return { data: null, error: convErr.message };
+      conversationId = conv.id;
+      
+      // Agregar participantes
+      await supabase.from('conversation_participants').insert([
+        { conversation_id: conversationId, user_id: senderId },
+        { conversation_id: conversationId, user_id: receiverId }
+      ]);
+    }
+    
     return await queryBuilder(
-      supabase.from(TABLES.MESSAGES).insert([{ sender_id: senderId, receiver_id: receiverId, content }]).select().single(),
+      supabase.from(TABLES.MESSAGES).insert([{ conversation_id: conversationId, sender_id: senderId, content }]).select().single(),
       'sendMessage'
     );
   },

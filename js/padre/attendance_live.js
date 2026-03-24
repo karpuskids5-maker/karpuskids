@@ -1,4 +1,4 @@
-import { supabase } from '../supabase.js';
+import { supabase } from '../shared/supabase.js';
 import { AppState } from './appState.js';
 import { Helpers } from './helpers.js';
 

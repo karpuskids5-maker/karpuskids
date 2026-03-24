@@ -1,193 +1,304 @@
-import { supabase } from '../supabase.js';
-import { AppState, TABLES, GlobalCache, STORAGE_BUCKETS } from './appState.js';
-import { Helpers, escapeHtml, triggerConfetti } from './helpers.js';
+import { supabase } from '../shared/supabase.js';
+import { AppState, TABLES, CacheKeys } from './appState.js';
+import { Helpers, escapeHtml } from './helpers.js';
 
-export async function loadTasks(filter = 'pending') {
-  const container = document.getElementById('tasksList');
-  if (!container) return;
+/**
+ * 🎒 MÓDULO DE TAREAS (PADRES)
+ */
+export const TasksModule = {
+  _studentId: null,
 
-  container.innerHTML = Helpers.skeleton(3, 'h-24');
-  container.setAttribute('aria-busy', 'true');
-
-  try {
-    const student = AppState.get('student');
-    if (!student?.classroom_id) {
-      container.innerHTML = Helpers.emptyState('No hay aula asignada');
-      return;
+  /**
+   * Inicializa el módulo
+   */
+  async init(studentId) {
+    if (!studentId) return;
+    this._studentId = studentId;
+    
+    // Delegación de eventos para filtros
+    const filtersContainer = document.querySelector('.task-filters-container') || document.querySelector('#tasks .flex.bg-white.p-1.rounded-full.shadow-sm.border');
+    if (filtersContainer && !filtersContainer._initialized) {
+      Helpers.delegate(filtersContainer, 'button', 'click', (e, btn) => {
+        const filter = btn.dataset.filter || 'pending';
+        this.loadTasks(filter);
+        
+        // Actualizar UI de botones
+        filtersContainer.querySelectorAll('button').forEach(b => {
+          b.classList.toggle('bg-emerald-100', b === btn);
+          b.classList.toggle('text-emerald-700', b === btn);
+          b.classList.toggle('text-slate-500', b !== btn);
+          b.classList.toggle('font-bold', b === btn);
+        });
+      });
+      filtersContainer._initialized = true;
     }
 
-    let tasksData = GlobalCache.get('tasks');
-    let evidencesData = GlobalCache.get('evidences');
+    // Delegación para acciones de tareas (Enviar/Ver)
+    const list = document.getElementById('tasksList');
+    if (list && !list._initialized) {
+      Helpers.delegate(list, '[data-action="submit"]', 'click', (e, btn) => {
+        this.openSubmitModal(btn.dataset.id);
+      });
+      Helpers.delegate(list, '[data-action="view"]', 'click', (e, btn) => {
+        this.viewEvidence(btn.dataset.id);
+      });
+      list._initialized = true;
+    }
 
-    if (!tasksData || !evidencesData) {
+    await this.loadTasks('pending');
+  },
+
+  /**
+   * Abre modal para enviar tarea
+   */
+  async openSubmitModal(taskId) {
+    try {
+      const { data: task, error } = await supabase.from(TABLES.TASKS).select('*').eq('id', taskId).single();
+      if (error) throw error;
+
+      const modal = document.getElementById('modalTaskDetail');
+      if (!modal) return;
+
+      document.getElementById('taskDetailTitle').textContent = task.title;
+      document.getElementById('taskDetailDate').innerHTML = `<i data-lucide="calendar" class="w-3 h-3"></i> Vence: ${Helpers.formatDate(task.due_date)}`;
+      document.getElementById('taskDetailDesc').textContent = task.description || 'Sin descripción.';
+      
+      // Reset form
+      document.getElementById('uploadSection').classList.remove('hidden');
+      document.getElementById('evidenceSection').classList.add('hidden');
+      document.getElementById('taskFileInput').value = '';
+      document.getElementById('fileNameDisplay').textContent = 'Toca para subir tu tarea';
+      document.getElementById('taskCommentInput').value = '';
+      
+      // Store current task ID in modal for submit
+      modal.dataset.currentTaskId = taskId;
+
+      modal.classList.remove('hidden');
+      modal.classList.add('flex');
+      if (window.lucide) lucide.createIcons();
+
+      // Setup close and submit listeners once
+      if (!modal._initialized) {
+        document.getElementById('btnCloseTaskDetail').onclick = () => modal.classList.add('hidden');
+        document.getElementById('btnSubmitTask').onclick = () => this.submitTask();
+        
+        document.getElementById('taskFileInput').onchange = (e) => {
+          const file = e.target.files[0];
+          if (file) {
+            document.getElementById('fileNameDisplay').textContent = file.name;
+          }
+        };
+        modal._initialized = true;
+      }
+    } catch (e) {
+      console.error('Error openSubmitModal:', e);
+      Helpers.toast('Error al abrir detalle de tarea', 'error');
+    }
+  },
+
+  /**
+   * Envía la evidencia de la tarea
+   */
+  async submitTask() {
+    const modal = document.getElementById('modalTaskDetail');
+    const taskId = modal.dataset.currentTaskId;
+    const student = AppState.get('currentStudent');
+    const user = AppState.get('user');
+
+    const fileInput = document.getElementById('taskFileInput');
+    const file = fileInput.files[0];
+    const comment = document.getElementById('taskCommentInput').value.trim();
+
+    if (!file) return Helpers.toast('Debes adjuntar un archivo', 'warning');
+
+    // 🛡️ Validación de tamaño (Máx 5MB)
+    if (file.size > 5 * 1024 * 1024) return Helpers.toast('El archivo es muy grande (máx 5MB)', 'error');
+
+    try {
+      AppState.set('loading', true);
+      Helpers.toast('Enviando misión...', 'info');
+
+      const ext = file.name.split('.').pop().toLowerCase();
+      const path = `evidences/${student.id}_${taskId}_${Date.now()}.${ext}`;
+
+      const { error: upErr } = await supabase.storage.from('classroom_media').upload(path, file);
+      if (upErr) throw upErr;
+
+      const { data: { publicUrl } } = supabase.storage.from('classroom_media').getPublicUrl(path);
+
+      const { error } = await supabase.from(TABLES.TASK_EVIDENCES).insert({
+        task_id: taskId,
+        student_id: student.id,
+        parent_id: user.id,
+        file_url: publicUrl,
+        comment,
+        status: 'submitted'
+      });
+
+      if (error) throw error;
+
+      Helpers.toast('¡Misión cumplida! Tarea enviada', 'success');
+      modal.classList.add('hidden');
+      await this.loadTasks('pending');
+
+    } catch (e) {
+      console.error('Submit task error:', e);
+      Helpers.toast('Error al enviar tarea', 'error');
+    } finally {
+      AppState.set('loading', false);
+    }
+  },
+
+  /**
+   * Ver evidencia ya enviada
+   */
+  async viewEvidence(taskId) {
+    try {
+      const student = AppState.get('currentStudent');
+      const { data: evidence, error } = await supabase
+        .from(TABLES.TASK_EVIDENCES)
+        .select('*, task:task_id(*)')
+        .eq('task_id', taskId)
+        .eq('student_id', student.id)
+        .single();
+
+      if (error) throw error;
+
+      const modal = document.getElementById('modalTaskDetail');
+      if (!modal) return;
+
+      document.getElementById('taskDetailTitle').textContent = evidence.task.title;
+      document.getElementById('taskDetailDate').innerHTML = `<i data-lucide="calendar" class="w-3 h-3"></i> Entregada: ${Helpers.formatDate(evidence.created_at)}`;
+      document.getElementById('taskDetailDesc').textContent = evidence.task.description || 'Sin descripción.';
+
+      // Show evidence section
+      document.getElementById('uploadSection').classList.add('hidden');
+      document.getElementById('evidenceSection').classList.remove('hidden');
+      
+      document.getElementById('evidenceDate').textContent = `Enviado el: ${Helpers.formatDate(evidence.created_at)}`;
+      document.getElementById('evidenceComment').textContent = evidence.comment || "Sin comentario";
+      document.getElementById('evidenceLink').href = evidence.file_url;
+
+      modal.classList.remove('hidden');
+      modal.classList.add('flex');
+      if (window.lucide) lucide.createIcons();
+
+      if (!modal._initialized) {
+        document.getElementById('btnCloseTaskDetail').onclick = () => modal.classList.add('hidden');
+        modal._initialized = true;
+      }
+    } catch (e) {
+      console.error('Error viewEvidence:', e);
+      Helpers.toast('Error al ver entrega', 'error');
+    }
+  },
+
+  /**
+   * Carga tareas y evidencias
+   */
+  async loadTasks(filter = 'pending') {
+    const container = document.getElementById('tasksList');
+    if (!container) return;
+
+    container.innerHTML = Helpers.skeleton(3, 'h-32');
+
+    try {
+      const student = AppState.get('currentStudent');
+      if (!student?.classroom_id) {
+        container.innerHTML = Helpers.emptyState('Sin aula asignada', '🎒');
+        return;
+      }
+
+      // Obtener tareas y evidencias en paralelo
       const [tasksRes, evidencesRes] = await Promise.all([
-        supabase
-          .from(TABLES.TASKS)
-          .select('*')
-          .eq('classroom_id', student.classroom_id)
-          .order('due_date', { ascending: false })
-          .range(0, 49),
-
-        supabase
-          .from(TABLES.TASK_EVIDENCES)
-          .select('*')
-          .eq('student_id', student.id)
+        supabase.from(TABLES.TASKS).select('*').eq('classroom_id', student.classroom_id).order('due_date', { ascending: false }),
+        supabase.from(TABLES.TASK_EVIDENCES).select('*').eq('student_id', student.id)
       ]);
 
       if (tasksRes.error) throw tasksRes.error;
       if (evidencesRes.error) throw evidencesRes.error;
 
-      tasksData = tasksRes.data || [];
-      evidencesData = evidencesRes.data || [];
+      const tasks = tasksRes.data || [];
+      const evidences = evidencesRes.data || [];
+      const evidenceMap = new Map(evidences.map(e => [e.task_id, e]));
 
-      GlobalCache.set('tasks', tasksData);
-      GlobalCache.set('evidences', evidencesData);
+      // Filtrar
+      const filtered = this.filterTasks(tasks, evidenceMap, filter);
+
+      if (!filtered.length) {
+        container.innerHTML = Helpers.emptyState(
+          filter === 'pending' ? '¡Todo al día! No hay tareas pendientes' : 'No hay tareas en esta categoría',
+          filter === 'pending' ? '🎉' : '🎒'
+        );
+        return;
+      }
+
+      container.innerHTML = filtered.map(t => this.renderTaskCard(t, evidenceMap.get(t.id))).join('');
+      if (window.lucide) lucide.createIcons();
+
+    } catch (err) {
+      console.error('Error loadTasks:', err);
+      container.innerHTML = Helpers.emptyState('Error al cargar tareas', '❌');
     }
+  },
 
-    const evidenceMap = new Map(evidencesData.map(e => [e.task_id, e]));
-    const filteredTasks = filterTasks(tasksData, evidenceMap, filter);
+  /**
+   * Filtra tareas según estado
+   */
+  filterTasks(tasks, evidenceMap, filter) {
+    const now = new Date();
+    return tasks.filter(t => {
+      const isDelivered = evidenceMap.has(t.id);
+      const isOverdue = !isDelivered && t.due_date && new Date(t.due_date) < now;
 
-    if (!filteredTasks.length) {
-      container.innerHTML = Helpers.emptyState(
-        filter === 'pending'
-          ? '¡Todo al día! No hay tareas pendientes'
-          : 'No hay tareas en esta categoría'
-      );
-      return;
+      if (filter === 'submitted') return isDelivered;
+      if (filter === 'overdue') return isOverdue;
+      if (filter === 'pending') return !isDelivered && !isOverdue;
+      return true;
+    });
+  },
+
+  /**
+   * Renderiza una tarea
+   */
+  renderTaskCard(t, evidence) {
+    const isDelivered = !!evidence;
+    const dueDate = t.due_date ? new Date(t.due_date) : null;
+    const isOverdue = !isDelivered && dueDate && dueDate < new Date();
+
+    let statusBadge = '';
+    if (isDelivered) {
+      statusBadge = `<span class="px-3 py-1 bg-emerald-100 text-emerald-700 text-[9px] font-black uppercase rounded-full">Entregada</span>`;
+    } else if (isOverdue) {
+      statusBadge = `<span class="px-3 py-1 bg-rose-100 text-rose-700 text-[9px] font-black uppercase rounded-full">Vencida</span>`;
+    } else {
+      statusBadge = `<span class="px-3 py-1 bg-blue-100 text-blue-700 text-[9px] font-black uppercase rounded-full">Pendiente</span>`;
     }
-
-    container.innerHTML = filteredTasks
-      .map(task => renderTaskCard(task, evidenceMap))
-      .join('');
-
-    const summary = document.getElementById('tasksSummary');
-    if (summary) {
-      const pendingCount = filterTasks(tasksData, evidenceMap, 'pending').length;
-      summary.textContent = pendingCount > 0
-        ? `Tienes ${pendingCount} tareas pendientes`
-        : '¡Estás al día!';
-    }
-
-    if (window.lucide) lucide.createIcons();
-
-  } catch (err) {
-    console.error('Error cargando tareas:', err);
-    container.innerHTML = Helpers.emptyState('Error al cargar tareas');
-  } finally {
-    container.setAttribute('aria-busy', 'false');
-  }
-}
-
-function filterTasks(tasks, evidenceMap, filter) {
-  const endOfToday = new Date();
-  endOfToday.setHours(23, 59, 59, 999);
-
-  return tasks.filter(task => {
-    const isDelivered = evidenceMap.has(task.id);
-    const dueDate = task.due_date ? new Date(task.due_date) : null;
-    const isOverdue = !isDelivered && dueDate && dueDate < endOfToday;
-
-    if (filter === 'submitted') return isDelivered;
-    if (filter === 'overdue') return isOverdue;
-    if (filter === 'pending') return !isDelivered && !isOverdue;
-
-    return true;
-  });
-}
-
-function renderTaskCard(task, evidenceMap) {
-  const evidence = evidenceMap.get(task.id);
-  const isDelivered = !!evidence;
-
-  const classroom = Array.isArray(task.classrooms)
-    ? task.classrooms[0]
-    : task.classrooms;
-
-  if (isDelivered) {
-    const gradeMap = {
-      A: { color: 'bg-emerald-500', label: 'Excelente' },
-      B: { color: 'bg-sky-500', label: 'Muy bien' },
-      C: { color: 'bg-amber-500', label: 'Regular' }
-    };
-
-    const grade = gradeMap[evidence.grade_letter] || {
-      color: 'bg-slate-400',
-      label: 'En revisión'
-    };
 
     return `
-    <article class="bg-emerald-50 border border-emerald-100 p-5 rounded-2xl">
-      <h3 class="font-bold">${escapeHtml(task.title)}</h3>
-      <p class="text-sm">${escapeHtml(task.description || '')}</p>
-
-      <div class="mt-3 flex justify-between items-center">
-        <span class="text-xs text-slate-500">
-          ${new Date(evidence.created_at).toLocaleDateString()}
-        </span>
-
-        <div class="flex items-center gap-2">
-          <div class="${grade.color} text-white px-2 py-1 rounded">
-            ${escapeHtml(evidence.grade_letter || '')}
+      <div class="bg-white p-6 rounded-[2.5rem] border-2 border-slate-50 mb-4 hover:shadow-lg transition-all group animate-fade-in">
+        <div class="flex justify-between items-start mb-4">
+          <div class="flex items-center gap-3">
+            <div class="w-12 h-12 rounded-2xl bg-indigo-50 text-indigo-600 flex items-center justify-center text-xl shadow-inner group-hover:scale-110 transition-transform">
+              ${isDelivered ? '✅' : '📝'}
+            </div>
+            <div>
+              <h4 class="font-black text-slate-800 text-sm leading-tight">${escapeHtml(t.title)}</h4>
+              <p class="text-[10px] font-bold text-slate-400 uppercase tracking-widest mt-1">Vence: ${Helpers.formatDate(t.due_date)}</p>
+            </div>
           </div>
-          <span class="text-xs">${grade.label}</span>
+          ${statusBadge}
+        </div>
+        
+        <p class="text-xs text-slate-500 leading-relaxed line-clamp-2 mb-6">${escapeHtml(t.description || 'Sin descripción detallada.')}</p>
+        
+        <div class="flex gap-2">
+          ${isDelivered 
+            ? `<button data-action="view" data-id="${t.id}" class="flex-1 py-3 bg-slate-100 text-slate-600 rounded-2xl font-black text-[10px] uppercase tracking-widest hover:bg-slate-200 transition-all">Ver Entrega</button>`
+            : `<button data-action="submit" data-id="${t.id}" class="flex-1 py-3 bg-indigo-600 text-white rounded-2xl font-black text-[10px] uppercase tracking-widest hover:bg-indigo-700 shadow-lg shadow-indigo-100 transition-all">Enviar Tarea</button>`
+          }
         </div>
       </div>
-
-      <button 
-        class="js-task-detail-btn mt-3 text-xs text-blue-600"
-        data-task-id="${task.id}">
-        Ver detalle
-      </button>
-    </article>`;
+    `;
   }
-
-  return `
-  <article class="bg-white border p-5 rounded-2xl">
-    <h3 class="font-bold">${escapeHtml(task.title)}</h3>
-    <p class="text-sm">${escapeHtml(task.description || '')}</p>
-
-    <button 
-      class="js-task-detail-btn mt-3 bg-blue-600 text-white px-4 py-2 rounded"
-      data-task-id="${task.id}">
-      Realizar tarea
-    </button>
-  </article>`;
-}
-
-export async function openTaskDetail(taskId) {
-  const modal = document.getElementById('modalTaskDetail');
-  if (!modal) return;
-
-  modal.classList.remove('hidden');
-  modal.classList.add('flex');
-
-  try {
-    const { data: task, error } = await supabase
-      .from(TABLES.TASKS)
-      .select('*')
-      .eq('id', taskId)
-      .single();
-
-    if (error) throw error;
-
-    document.getElementById('taskDetailTitle').textContent = task.title;
-    document.getElementById('taskDetailDesc').textContent =
-      task.description || '';
-
-  } catch (e) {
-    console.error(e);
-    Helpers.toast('Error al cargar tarea', 'error');
-  }
-}
-
-export function initTaskSubmissionModule() {
-  const fileInput = document.getElementById('taskFileInput');
-  const nameDisplay = document.getElementById('fileNameDisplay');
-
-  if (fileInput && nameDisplay) {
-    fileInput.addEventListener('change', e => {
-      const file = e.target.files[0];
-      nameDisplay.textContent = file ? file.name : '';
-    });
-  }
-}
+};

@@ -1,527 +1,164 @@
-import { supabase } from '../supabase.js';
-import { AppState } from './appState.js';
+import { supabase } from '../shared/supabase.js';
+import { AppState, TABLES, CacheKeys } from './appState.js';
+import { Helpers, escapeHtml } from './helpers.js';
 
-// attendance.js
-// Módulo para carga/filtrado/visualización de asistencia con cache IndexedDB y realtime Supabase
-
-/* Usage:
-import Attendance from './padre/attendance.js';
-await Attendance.init({ studentId, onRenderCalendar, onStatsUpdate });
-await Attendance.loadAttendance({ filter: 'week' | 'month' });
-*/
-
-const DB_NAME = 'karpus_cache_v1';
-const STORE_ATTENDANCE = 'attendance';
-const CACHE_TTL = 1000 * 60 * 5; // 5 minutos por seguridad
-
-// --- IndexedDB simple promise wrapper ---
-function openDb() {
-  return new Promise((resolve, reject) => {
-    const req = indexedDB.open(DB_NAME, 1);
-    req.onupgradeneeded = (e) => {
-      const db = e.target.result;
-      if (!db.objectStoreNames.contains(STORE_ATTENDANCE)) {
-        db.createObjectStore(STORE_ATTENDANCE, { keyPath: 'cacheKey' });
-      }
-    };
-    req.onsuccess = () => resolve(req.result);
-    req.onerror = () => reject(req.error);
-  });
-}
-
-async function idbPut(cacheKey, value) {
-  try {
-    const db = await openDb();
-    return new Promise((resolve, reject) => {
-      const tx = db.transaction(STORE_ATTENDANCE, 'readwrite');
-      const store = tx.objectStore(STORE_ATTENDANCE);
-      store.put({ cacheKey, value, ts: Date.now() });
-      tx.oncomplete = () => resolve();
-      tx.onerror = () => reject(tx.error || new Error('IDB put error'));
-    });
-  } catch (e) {
-    console.debug('IDB put failed', e);
-  }
-}
-
-async function idbGet(cacheKey) {
-  try {
-    const db = await openDb();
-    return new Promise((resolve, reject) => {
-      const tx = db.transaction(STORE_ATTENDANCE, 'readonly');
-      const store = tx.objectStore(STORE_ATTENDANCE);
-      const req = store.get(cacheKey);
-      req.onsuccess = () => resolve(req.result ? req.result.value : null);
-      req.onerror = () => reject(req.error);
-    });
-  } catch (e) {
-    console.debug('IDB get failed', e);
-    return null;
-  }
-}
-
-function dateDiffDays(a, b) {
-  const da = new Date(a.getFullYear(), a.getMonth(), a.getDate());
-  const db = new Date(b.getFullYear(), b.getMonth(), b.getDate());
-  return Math.round((da - db) / (24 * 3600 * 1000));
-}
-
-// --- Utils fecha sin timezone ---
-function toISODateLocal(d) {
-  // returns YYYY-MM-DD for local date
-  const yyyy = d.getFullYear();
-  const mm = String(d.getMonth() + 1).padStart(2, '0');
-  const dd = String(d.getDate()).padStart(2, '0');
-  return `${yyyy}-${mm}-${dd}`;
-}
-
-function parseISODateNoTZ(str) {
-  // Parse 'YYYY-MM-DD' as local date start
-  const [y, m, d] = String(str).split('-').map(Number);
-  if (!y || !m || !d) return null;
-  return new Date(y, m - 1, d);
-}
-
-// --- Attendance module ---
-const Attendance = {
+/**
+ * 📅 MÓDULO DE ASISTENCIA (PADRES)
+ */
+export const AttendanceModule = {
   _studentId: null,
-  _cacheKey: null,
-  _lastLoadTs: 0,
-  _attendance: [], // array of {id, student_id, date, status, created_at}
-  _realtimeChannel: null,
-  _opts: {},
-  _currentFilter: 'week',
-  _renderTimeout: null,
+  _attendance: [],
 
-  async init({ studentId, onRenderCalendar, onStatsUpdate, useRealtime = true }) {
-    if (!studentId) throw new Error('Attendance.init: studentId required');
-    this._studentId = String(studentId);
-    this._cacheKey = `attendance_${this._studentId}`;
-    this._opts.onRenderCalendar = onRenderCalendar || function(){};
-    this._opts.onStatsUpdate = onStatsUpdate || function(){};
-    this._opts.useRealtime = useRealtime;
-
-    if (useRealtime) this._initRealtime();
-
-    return this;
-  },
-
-  async _initRealtime() {
-    try {
-      if (this._realtimeChannel) {
-        await supabase.removeChannel(this._realtimeChannel);
-        this._realtimeChannel = null;
-      }
-
-      const channel = supabase
-        .channel(`attendance_student_${this._studentId}`)
-        .on('postgres_changes', {
-          event: '*',
-          schema: 'public',
-          table: 'attendance',
-          filter: `student_id=eq.${this._studentId}`
-        }, (payload) => {
-          if (!payload) return;
-          console.log('⚡ Realtime attendance:', payload);
-
-          if (payload.eventType === 'INSERT') {
-            this._onRemoteInsert(payload.new);
-          } else if (payload.eventType === 'UPDATE') {
-            this._onRemoteUpdate(payload.new);
-          } else if (payload.eventType === 'DELETE') {
-            this._onRemoteDelete(payload.old);
-          }
-
-          // 🔥 CLAVE: sincronizar con AppState
-          AppState.set('attendanceUpdated', Date.now());
-        })
-        .subscribe((status) => {
-          console.log('📡 Realtime status:', status);
-        });
-
-      this._realtimeChannel = channel;
-
-    } catch (e) {
-      console.warn('Realtime init failed', e);
-    }
-  },
-
-  _onRemoteInsert(row) {
-    // avoid duplicates
-    if (!row || String(row.student_id) !== this._studentId) return;
-    const exists = this._attendance.some(r => r.id === row.id);
-    if (exists) return;
-    this._attendance.push(row);
-    this._attendance.sort((a,b)=> b.date.localeCompare(a.date));
-    this._persistCache();
-    this._applyRender(this._currentFilter); // fuerza actualización visual
-  },
-  _onRemoteUpdate(row) {
-    if (!row || String(row.student_id) !== this._studentId) return;
-    const idx = this._attendance.findIndex(r => String(r.id) === String(row.id));
-    if (idx === -1) {
-      this._attendance.push(row);
-    } else {
-      this._attendance[idx] = row;
-    }
-    this._attendance.sort((a,b)=> b.date.localeCompare(a.date));
-    this._persistCache();
-    this._applyRender(this._currentFilter); // fuerza actualización visual
-  },
-  _onRemoteDelete(oldRow) {
-    if (!oldRow || String(oldRow.student_id) !== this._studentId) return;
-    this._attendance = this._attendance.filter(r => String(r.id) !== String(oldRow.id));
-    this._persistCache();
-    this._applyRender(this._currentFilter); // fuerza actualización visual
-  },
-
-  async _persistCache() {
-    try { await idbPut(this._cacheKey, { ts: Date.now(), data: this._attendance }); }
-    catch(e){ console.debug('cache persist err', e); }
-  },
-
-  async loadAttendance({ forceRefresh = false, filter = 'week' } = {}) {
-    // flow:
-    // 1) try cache (if not too old) -> use it as fallback
-    // 2) try supabase query -> if success replace and persist
-    // 3) if supabase fails and cache present use cache
-
-    if (!this._studentId) throw new Error('loadAttendance: init first');
-
-    this._currentFilter = filter;
-
-    const now = Date.now();
-    const cache = await idbGet(this._cacheKey);
-    if (cache && cache.ts && !forceRefresh && (now - cache.ts) < CACHE_TTL) {
-      console.debug('[attendance] using cache');
-      this._attendance = cache.data || [];
-      this._lastLoadTs = cache.ts;
-      this._applyRender(filter);
-      // still continue to refresh in background if TTL approaching
-    }
-
-    // Query Supabase
-    try {
-      // Ensure date ordering desc
-      const { data, error } = await supabase
-        .from('attendance')
-        .select('id, student_id, date, status, created_at')
-        .eq('student_id', this._studentId)
-        .order('date', { ascending: false });
-
-      if (error) throw error;
-      if (!Array.isArray(data)) throw new Error('Invalid attendance response');
-
-      const normalizeDate = (date) => {
-        try {
-          return new Date(date).toISOString().split('T')[0];
-        } catch {
-          return null;
-        }
+  /**
+   * Inicializa el módulo
+   */
+  async init(studentId) {
+    if (!studentId) return;
+    this._studentId = studentId;
+    
+    // Configurar filtro de asistencia
+    const filter = document.getElementById('attendanceFilter');
+    if (filter && !filter._initialized) {
+      filter.onchange = (e) => {
+        const now = new Date();
+        this.loadAttendance(now.getFullYear(), now.getMonth() + 1); // For now simple refresh
       };
-
-      // Validate rows and normalize dates to YYYY-MM-DD strings
-      const cleaned = data.map(r => {
-        return {
-          id: r.id,
-          student_id: String(r.student_id),
-          date: typeof r.date === 'string' ? r.date : null, // NO tocar la fecha, ya viene correcta desde Supabase
-          status: r.status,
-          created_at: r.created_at
-        };
-      }).filter(r => {
-        if (!r || !r.date) return false;
-
-        if (String(r.student_id) !== String(this._studentId)) {
-          console.warn('⚠️ student_id mismatch', r.student_id, this._studentId);
-          return false;
-        }
-
-        return true;
-      });
-
-      // Sort desc by date (safeguard)
-      cleaned.sort((a,b)=> b.date.localeCompare(a.date));
-
-      this._attendance = cleaned;
-      this._lastLoadTs = Date.now();
-      await this._persistCache();
-
-      this._applyRender(filter);
-
-      return this._attendance;
-
-    } catch (err) {
-      console.error('[attendance] load error', err);
-      if (this._attendance && this._attendance.length) {
-        console.debug('[attendance] using stale cache due to error');
-        this._applyRender(filter);
-        return this._attendance;
-      }
-      throw err; // bubble up if nothing to show
-    }
-  },
-
-  _applyRender(filter = 'week') {
-    const activeFilter = filter || this._currentFilter || 'week';
-
-    if (this._renderTimeout) clearTimeout(this._renderTimeout);
-
-    this._renderTimeout = setTimeout(() => {
-      const { days, stats } = this.renderCalendarData({
-        attendanceList: this._attendance,
-        filter: activeFilter
-      });
-
-      console.log('📊 Stats:', stats);
-      console.log('📅 Days:', days);
-
-      try { this._opts.onStatsUpdate(stats); } catch(e){ console.warn(e); }
-      try { this._opts.onRenderCalendar(days, stats); } catch(e){ console.warn(e); }
-      
-      // Update dashboard cards if we are in dashboard
-      if (window.loadDashboard) window.loadDashboard();
-    }, 50);
-  },
-
-  computeStats(attList = this._attendance, { filter = 'week' } = {}) {
-    // derive reference date = SIEMPRE hoy (nunca el último registro)
-    let refDate = new Date();
-
-    let startDate, endDate;
-    endDate = new Date(refDate.getFullYear(), refDate.getMonth(), refDate.getDate());
-    if (filter === 'month') {
-      startDate = new Date(endDate.getFullYear(), endDate.getMonth(), 1);
-    } else {
-      // week -> last 7 days including endDate
-      startDate = new Date(endDate);
-      startDate.setDate(endDate.getDate() - 6);
+      filter._initialized = true;
     }
 
-    // filter attendance between startDate..endDate inclusive
-    const counts = { present: 0, absent: 0, late: 0, total: 0 };
-    const byDate = {}; // map YYYY-MM-DD -> status array
-
-    attList.forEach(r => {
-      const d = parseISODateNoTZ(r.date);
-      if (!d) return;
-      if (d < startDate || d > endDate) return;
-      const key = toISODateLocal(d);
-      if (!byDate[key]) byDate[key] = [];
-      byDate[key].push(r.status);
-      counts.total += 1;
-      if (r.status === 'present') counts.present +=1;
-      else if (r.status === 'absent') counts.absent +=1;
-      else if (r.status === 'late') counts.late +=1;
-    });
-
-    return { counts, byDate, startDate, endDate, refDate };
+    const now = new Date();
+    await this.loadAttendance(now.getFullYear(), now.getMonth() + 1);
   },
 
-  // Render calendar helper: returns structure for rendering
-  renderCalendarData({ attendanceList = this._attendance, filter = 'week' } = {}) {
-    // Use computeStats to get start/end
-    const stats = this.computeStats(attendanceList, { filter });
-    const days = [];
-    const { startDate, endDate, byDate } = stats;
-
-    // ensure iterate day by day from startDate to endDate
-    for (let d = new Date(startDate); d <= endDate; d.setDate(d.getDate()+1)) {
-      const key = toISODateLocal(d);
-      const statuses = byDate[key] || [];
-      // choose summary status: if any absent -> absent; else if any late -> late; else if any present -> present; else null
-      let summary = null;
-      if (statuses.includes('absent')) summary = 'absent';
-      else if (statuses.includes('late')) summary = 'late';
-      else if (statuses.includes('present')) summary = 'present';
-
-      days.push({ date: key, status: summary });
-    }
-
-    return { days, stats };
-  },
-
-  // Convenience wrapper to compute UI-ready calendar and stats and call callbacks
-  async update({ forceRefresh = false, filter = 'week' } = {}) {
-    await this.loadAttendance({ forceRefresh, filter });
-  },
-
-  async destroy() {
-    try {
-      if (this._realtimeChannel) {
-        await supabase.removeChannel(this._realtimeChannel);
-        this._realtimeChannel = null;
-        console.log('🧹 Realtime cerrado');
-      }
-    } catch (e) {
-      console.warn('Destroy error', e);
-    }
-  },
-
-  // detect invalid student id heuristics
-  async validateStudentId() {
-    if (!this._studentId) return false;
+  /**
+   * Carga historial de asistencia
+   */
+  async loadAttendance(year, month) {
+    const container = document.getElementById('attendanceHistoryList'); // Reusing a common ID pattern or checking HTML
+    const calendar = document.getElementById('calendarGrid'); // Corrected from panel_padres.html
+    
+    // Check if we need to update stats too
+    const statsPresent = document.getElementById('attPresent');
+    const statsLate = document.getElementById('attLate');
+    const statsAbsent = document.getElementById('attAbsent');
+    
+    if (calendar) calendar.innerHTML = `<div class="col-span-7 h-48 flex items-center justify-center"><div class="animate-spin rounded-full h-8 w-8 border-b-2 border-indigo-600"></div></div>`;
 
     try {
-      const { data, error } = await supabase
-        .from('students')
-        .select('id')
-        .eq('id', this._studentId)
-        .limit(1)
-        .maybeSingle();
-
-      if (error) throw error;
+      const cacheKey = CacheKeys.attendance(this._studentId, month, year);
+      let data = AppState.getCache(cacheKey);
 
       if (!data) {
-        console.error('❌ student_id no existe:', this._studentId);
-        return false;
+        const startDate = `${year}-${String(month).padStart(2, '0')}-01`;
+        const lastDay = new Date(year, month, 0).getDate();
+        const endDate = `${year}-${String(month).padStart(2, '0')}-${lastDay}`;
+
+        const { data: freshData, error } = await supabase
+          .from('attendance')
+          .select('*')
+          .eq('student_id', this._studentId)
+          .gte('date', startDate)
+          .lte('date', endDate)
+          .order('date', { ascending: false });
+        
+        if (error) throw error;
+        data = freshData || [];
+        AppState.setCache(cacheKey, data, 300000); // 5 min cache
       }
 
-      console.log('✅ student_id válido');
-      return true;
+      this._attendance = data;
+      
+      // Update stats
+      if (statsPresent) statsPresent.textContent = data.filter(a => a.status === 'present').length;
+      if (statsLate) statsLate.textContent = data.filter(a => a.status === 'late').length;
+      if (statsAbsent) statsAbsent.textContent = data.filter(a => a.status === 'absent').length;
 
-    } catch (e) {
-      console.warn('validateStudentId error', e);
-      return false;
+      this.renderCalendar(year, month);
+      // If we have a list container, render it
+      // this.renderList(data);
+
+    } catch (err) {
+      console.error('Error loadAttendance:', err);
     }
-  }
-};
+  },
 
-/**
- * Función puente para compatibilidad con main.js
- */
-export async function loadAttendance(opts = {}) {
-  const student = AppState.get('student');
-  if (!student) return;
+  /**
+   * Renderiza calendario visual
+   */
+  renderCalendar(year, month) {
+    const container = document.getElementById('calendarGrid');
+    if (!container) return;
 
-  if (!Attendance._studentId) {
-    await Attendance.init({
-      studentId: student.id,
-      onStatsUpdate: (stats) => {
-        document.getElementById('attPresent').textContent = stats.counts.present;
-        document.getElementById('attLate').textContent = stats.counts.late;
-        document.getElementById('attAbsent').textContent = stats.counts.absent;
-      },
-      onRenderCalendar: (days, stats) => {
-        const grid = document.getElementById('calendarGrid');
-        if (!grid) return;
-        
-        // Actualizar stats directamente
-        if (stats) {
-          document.getElementById('attPresent').textContent = stats.counts.present;
-          document.getElementById('attLate').textContent = stats.counts.late;
-          document.getElementById('attAbsent').textContent = stats.counts.absent;
-        }
-
-        const filter = document.getElementById('attendanceFilter')?.value || 'semana';
-        
-        let html = '';
-        
-        // Si es vista de mes, añadir espacios vacíos al inicio
-        if (filter === 'mes' && days.length > 0) {
-          const firstDate = new Date(days[0].date + 'T00:00:00');
-          const dayOfWeek = firstDate.getDay(); // 0 = Dom, 1 = Lun...
-          for (let i = 0; i < dayOfWeek; i++) {
-            html += `<div class="aspect-square opacity-0"></div>`;
-          }
-        }
-
-        html += days.map(d => {
-          let color = 'bg-slate-50 text-slate-300 border border-slate-100';
-          let icon = '';
-          
-          if (d.status === 'present') {
-            color = 'bg-emerald-500 text-white shadow-lg shadow-emerald-100 ring-2 ring-emerald-200';
-            icon = '<i data-lucide="check" class="w-2 h-2 absolute top-1 right-1"></i>';
-          }
-          else if (d.status === 'absent') {
-            color = 'bg-rose-500 text-white shadow-lg shadow-rose-100';
-          }
-          else if (d.status === 'late') {
-            color = 'bg-amber-500 text-white shadow-lg shadow-amber-100';
-          }
-          // Soporte para días pasados sin registro (considerar como presente o neutral según lógica escolar)
-          else if (new Date(d.date + 'T00:00:00') < new Date(toISODateLocal(new Date()) + 'T00:00:00')) {
-            // Si el día ya pasó y no hay registro, a veces se muestra como presente por defecto o neutral
-            // En este caso lo dejamos como neutral pero con mejor contraste
-            color = 'bg-slate-100 text-slate-400 border border-slate-200';
-          }
-          
-          const todayStr = toISODateLocal(new Date());
-          const isToday = d.date === todayStr;
-          const dayNum = parseInt(d.date.split('-')[2]);
-          
-          return `
-            <div class="aspect-square flex flex-col items-center justify-center rounded-2xl text-xs font-black relative transition-all hover:scale-110 ${color} ${isToday ? 'ring-4 ring-sky-400 z-10' : ''}" title="${d.date}">
-              ${dayNum}
-              ${icon}
-              ${isToday ? '<span class="absolute -bottom-1 w-1 h-1 bg-white rounded-full"></span>' : ''}
-            </div>
-          `;
-        }).join('');
-
-        grid.innerHTML = html;
-        if (window.lucide) lucide.createIcons();
-      }
+    const daysInMonth = new Date(year, month, 0).getDate();
+    const firstDay = new Date(year, month - 1, 1).getDay();
+    
+    // Map existing attendance by day
+    const attMap = new Map();
+    this._attendance.forEach(a => {
+      const d = new Date(a.date).getUTCDate(); // Use UTC to avoid timezone shifts
+      attMap.set(d, a.status);
     });
-  }
 
-  const filter = document.getElementById('attendanceFilter')?.value === 'mes' ? 'month' : 'week';
-  return await Attendance.loadAttendance({ ...opts, filter });
-}
+    let html = '';
 
-/**
- * Inicializa el modal de reporte de ausencias
- */
-export function initAbsenceModule() {
-  const form = document.getElementById('formAbsence');
-  const modal = document.getElementById('modalAbsence');
-  if (!form || !modal) return;
+    // Espacios vacíos para el inicio del mes
+    for (let i = 0; i < firstDay; i++) {
+      html += `<div class="aspect-square"></div>`;
+    }
 
-  // Botones de cierre
-  const closeBtns = modal.querySelectorAll('[data-close-modal]');
-  closeBtns.forEach(btn => btn.onclick = () => {
-    modal.classList.add('hidden');
-    modal.classList.remove('flex');
-  });
+    // Días del mes
+    for (let d = 1; d <= daysInMonth; d++) {
+      const status = attMap.get(d);
+      let classes = "aspect-square flex items-center justify-center rounded-2xl text-xs font-bold transition-all ";
+      
+      if (status === 'present') classes += "bg-emerald-100 text-emerald-700 border-2 border-emerald-200";
+      else if (status === 'absent') classes += "bg-rose-100 text-rose-700 border-2 border-rose-200";
+      else if (status === 'late') classes += "bg-amber-100 text-amber-700 border-2 border-amber-200";
+      else classes += "bg-slate-50 text-slate-400 hover:bg-slate-100 border-2 border-transparent";
 
-  form.onsubmit = async (e) => {
-    e.preventDefault();
-    const date = document.getElementById('absenceDate').value;
-    const reason = document.getElementById('absenceReason').value;
-    const note = document.getElementById('absenceNote').value;
+      const isToday = new Date().getUTCDate() === d && new Date().getUTCMonth() + 1 === month;
+      if (isToday) classes += " ring-2 ring-indigo-500 ring-offset-2";
 
-    if (!date || !reason) {
-      alert('Por favor complete los campos obligatorios');
+      html += `<div class="${classes}">${d}</div>`;
+    }
+
+    container.innerHTML = html;
+  },
+
+  /**
+   * Renderiza lista de eventos
+   */
+  renderList(data) {
+    const container = document.getElementById('attendanceHistoryList');
+    if (!container) return;
+
+    if (!data.length) {
+      container.innerHTML = Helpers.emptyState('Sin registros este mes', '📅');
       return;
     }
 
-    try {
-      const studentId = Attendance._studentId;
-      if (!studentId) throw new Error('No hay estudiante cargado');
+    const statusMap = {
+      present: { label: 'Presente', class: 'text-emerald-600 bg-emerald-50' },
+      absent: { label: 'Ausente', class: 'text-rose-600 bg-rose-50' },
+      late: { label: 'Tarde', class: 'text-amber-600 bg-amber-50' }
+    };
 
-      const { error } = await supabase
-        .from('attendance_requests')
-        .insert([{
-          student_id: studentId,
-          date,
-          reason,
-          note,
-          status: 'pending',
-          type: 'absence'
-        }]);
-
-      if (error) throw error;
-
-      alert('¡Ausencia reportada con éxito!');
-      modal.classList.add('hidden');
-      modal.classList.remove('flex');
-      form.reset();
-    } catch (err) {
-      console.error('Error reporting absence:', err);
-      alert('Error al enviar el reporte. Por favor intente de nuevo.');
-    }
-  };
-}
-
-export default Attendance;
+    container.innerHTML = data.map(a => {
+      const status = statusMap[a.status] || { label: a.status, class: 'bg-slate-50' };
+      return `
+        <div class="flex items-center justify-between p-4 bg-white rounded-2xl border-2 border-slate-50 mb-3 animate-fade-in">
+          <div class="flex items-center gap-3">
+            <div class="w-10 h-10 rounded-xl bg-slate-50 flex items-center justify-center text-sm font-black text-slate-400">
+              ${new Date(a.date).getDate()}
+            </div>
+            <div>
+              <p class="text-sm font-black text-slate-800">${Helpers.formatDate(a.date)}</p>
+              <p class="text-[10px] font-bold text-slate-400 uppercase tracking-widest">${a.check_in ? `Ingreso: ${a.check_in}` : 'Sin hora'}</p>
+            </div>
+          </div>
+          <span class="px-3 py-1 rounded-full text-[9px] font-black uppercase tracking-tighter ${status.class}">${status.label}</span>
+        </div>
+      `;
+    }).join('');
+  }
+};

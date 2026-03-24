@@ -1,5 +1,5 @@
 import { ensureRole, supabase, initOneSignal } from '../shared/supabase.js';
-import { AppState } from '../shared/state.js';
+import { AppState } from './state.js';
 import { AssistantApi } from './api.js';
 import { PaymentsModule } from './payments.js';
 import { AccessModule } from './access.js';

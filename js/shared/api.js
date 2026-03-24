@@ -208,7 +208,7 @@ export const Api = {
       // 2. Deuda real acumulada (Tabla payments)
       handle(db(TABLES.PAYMENTS).select('*').eq('student_id', studentId).in('status', ['pending', 'overdue']).order('due_date', { ascending: true }), 'getPendingPayments'),
       // 3. Historial de pagos
-      handle(db(TABLES.PAYMENTS).select('*').eq('student_id', studentId).eq('status', 'paid').order('paid_date', { ascending: false }).limit(5), 'getPaymentHistory')
+      handle(db(TABLES.PAYMENTS).select('*').eq('student_id', studentId).eq('status', 'paid').order('created_at', { ascending: false }).limit(5), 'getPaymentHistory')
     ]);
 
     const totalDebt = (pendingPayments || []).reduce((sum, p) => sum + Number(p.amount || 0), 0);
@@ -226,7 +226,7 @@ export const Api = {
   async getStudentGrades(studentId) {
     const [tasks, reports] = await Promise.all([
       handle(
-        db(TABLES.TASK_EVIDENCES).select('*, task:tasks(title)').eq('student_id', studentId).not('grade_letter', 'is', null).order('created_at', { ascending: false }), 
+        db(TABLES.TASK_EVIDENCES).select('*, task:task_id(title)').eq('student_id', studentId).not('grade_letter', 'is', null).order('created_at', { ascending: false }), 
         'getTaskGrades'
       ),
       handle(db(TABLES.GRADES).select('*').eq('student_id', studentId).order('period', { ascending: true }), 'getReportGrades')
