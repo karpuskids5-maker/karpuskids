@@ -29,16 +29,15 @@
 
   <!-- Favicon -->
   <link rel="icon" href="logo/favicon.ico" sizes="any">
-  <link rel="icon" href="logo/favicon.svg" type="image/svg+xml">
   <link rel="apple-touch-icon" href="logo/apple-touch-icon.png">
   
   <style>
     :root {
       /* Paleta de colores oficial de Karpus Kids */
-      --verde: 76, 175, 80;   /* #4CAF50 */
-      --azul: 33, 150, 243;    /* #2196F3 */
-      --rosa: 233, 30, 99;     /* #E91E63 */
-      --naranja: 255, 152, 0;  /* #FF9800 */
+      --verde: 124, 252, 0;   /* #7CFC00 */
+      --azul: 0, 206, 209;    /* #00CED1 */
+      --rosa: 255, 105, 180;   /* #FF69B4 */
+      --naranja: 255, 140, 0;  /* #FF8C00 */
     }
     
     body {
@@ -72,16 +71,16 @@
     .karpus-kids-inline {
       font-weight: 700;
     }
-    .karpus-kids-inline .k-1 { color: #FF9800; }
-    .karpus-kids-inline .k-2 { color: #2196F3; }
-    .karpus-kids-inline .k-3 { color: #E91E63; }
-    .karpus-kids-inline .k-4 { color: #4CAF50; }
-    .karpus-kids-inline .k-5 { color: #FF9800; }
-    .karpus-kids-inline .k-6 { color: #2196F3; }
-    .karpus-kids-inline .k-7 { color: #4CAF50; }
-    .karpus-kids-inline .k-8 { color: #E91E63; }
-    .karpus-kids-inline .k-9 { color: #2196F3; }
-    .karpus-kids-inline .k-10 { color: #FF9800; }
+    .karpus-kids-inline .k-1 { color: #FF8C00; }
+    .karpus-kids-inline .k-2 { color: #00CED1; }
+    .karpus-kids-inline .k-3 { color: #FF69B4; }
+    .karpus-kids-inline .k-4 { color: #7CFC00; }
+    .karpus-kids-inline .k-5 { color: #FF8C00; }
+    .karpus-kids-inline .k-6 { color: #00CED1; }
+    .karpus-kids-inline .k-7 { color: #7CFC00; }
+    .karpus-kids-inline .k-8 { color: #FF69B4; }
+    .karpus-kids-inline .k-9 { color: #00CED1; }
+    .karpus-kids-inline .k-10 { color: #FF8C00; }
 
     @keyframes float-up-down {
       0%, 100% { transform: translateY(0); }
@@ -296,7 +295,7 @@
       <div class="flex items-center gap-2">
         
         <!-- CTA Desktop -->
-        <a href="login.html" class="hidden md:inline-flex bg-gradient-to-r from-orange-400 to-pink-500 text-white px-4 py-2 rounded-full text-sm font-bold">
+        <a href="login.html" class="hidden md:inline-flex text-white px-4 py-2 rounded-full text-sm font-bold" style="background: linear-gradient(to right, rgb(var(--naranja)), rgb(var(--rosa)));">
           Acceso
         </a>
 
@@ -327,7 +326,7 @@
 
   <!-- Hero con Video -->
   <section class="relative min-h-screen flex items-center justify-center text-center overflow-hidden">
-    <img src="/img/karpus.jpg"
+    <img src="img/karpus.jpg"
        class="absolute inset-0 w-full h-full object-cover hero-bg-animate"
        alt="Niños felices en Karpus Kids" loading="lazy">
     <div class="absolute inset-0 bg-gradient-to-b from-black/60 via-black/40 to-black/70"></div>
@@ -337,13 +336,13 @@
       </h1>
       <p class="text-xl font-light max-w-2xl mx-auto mb-10">
         Tu hijo merece un lugar seguro donde aprenda, se divierta y esté protegido mientras tú trabajas con tranquilidad.  
-En Karpus Kids cuidamos lo que más amas… como si fuera nuestro.
+<br>En Karpus Kids cuidamos lo que más amas… como si fuera nuestro.
       </p>
       <p class="text-lg text-pink-300 font-semibold">
 ✔ Cupos limitados • ✔ Supervisión constante • ✔ App exclusiva para padres
 </p>
       <div class="flex justify-center items-center gap-4">
-        <a href="https://wa.me/18298038484?text=¡Hola! Me interesa inscribir a mi pequeño en Karpus Kids" target="_blank" class="bg-pink-500 text-white font-bold px-8 py-4 rounded-full shadow-lg hover:bg-pink-600 transition transform hover:scale-105 border-2 border-pink-400 animate-pulse hero-cta-btn">INSCRIBE A TU HIJO HOY</a>
+        <a href="https://wa.me/18298038484?text=¡Hola! Me interesa inscribir a mi pequeño en Karpus Kids" target="_blank" class="text-white font-bold px-8 py-4 rounded-full shadow-lg transition transform hover:scale-105 border-2 animate-pulse hero-cta-btn" style="background-color: rgb(var(--rosa)); border-color: rgb(var(--rosa));">INSCRIBE A TU HIJO HOY</a>
         <a href="#nosotros" class="bg-transparent border-2 border-white text-white font-bold px-8 py-4 rounded-full shadow-lg hover:bg-white hover:text-gray-900 transition transform hover:scale-105 hero-cta-btn">Conocer Más</a>
       </div>
       <p class="mt-6 text-sm text-gray-200">
@@ -440,7 +439,7 @@ Tranquilidad en tu bolsillo.</p>
           Combinamos aprendizaje, juego y valores para que los más pequeños crezcan seguros, felices y llenos de confianza. Nuestro equipo de profesionales cuida cada detalle, desde el entorno educativo hasta las actividades diarias.
         </p>
         <div class="pt-4">
-          <a href="https://wa.me/18298038484?text=¡Hola! Me gustaría conocer más sobre Karpus Kids" target="_blank" class="bg-pink-500 text-white font-bold px-6 py-2 rounded-full shadow-lg hover:bg-pink-600 transition inline-block">
+          <a href="https://wa.me/18298038484?text=¡Hola! Me gustaría conocer más sobre Karpus Kids" target="_blank" class="text-white font-bold px-6 py-2 rounded-full shadow-lg transition inline-block hover:brightness-110" style="background-color: rgb(var(--rosa));">
             ¡Quiero más Información!
           </a>
         </div>
@@ -678,7 +677,7 @@ Invertir en la educación y seguridad de tu hijo hoy, es asegurar su futuro mañ
       </h2>
       <p class="text-xl text-gray-600 mb-8">No dejes pasar la oportunidad de brindarle a tu hijo el mejor cuidado y educación.</p>
       <a href="https://wa.me/18298038484?text=¡Hola! Quiero agendar una visita a Karpus Kids" target="_blank"
-       class="inline-block bg-pink-500 text-white font-bold px-10 py-4 rounded-full text-lg btn-glow hover:scale-105 transition hero-cta-btn">
+       class="inline-block text-white font-bold px-10 py-4 rounded-full text-lg btn-glow hover:scale-105 transition hero-cta-btn" style="background-color: rgb(var(--rosa));">
         Agenda una visita hoy mismo
       </a>
     </div>
@@ -696,7 +695,7 @@ Invertir en la educación y seguridad de tu hijo hoy, es asegurar su futuro mañ
       <!-- Contacto -->
       <div data-aos="fade-up" data-aos-delay="100">
         <h3 class="text-xl font-bold mb-4">Contáctanos</h3>
-        <p class="mb-2"><i class="bi bi-telephone-fill mr-2"></i> +1 (829) 803-8424</p>
+        <p class="mb-2"><i class="bi bi-telephone-fill mr-2"></i> +1 (829) 803-8484</p>
         <p class="mb-2"><i class="bi bi-instagram mr-2"></i> <a href="https://www.instagram.com/karpus_kids/" target="_blank" class="text-slate-400 hover:text-white hover:underline">@karpus_kids</a></p>
         <p class="mb-2"><i class="bi bi-envelope-fill mr-2"></i> info@karpuskids.com</p>
         <h3 class="text-xl font-bold mb-4 mt-6">Horario</h3>
