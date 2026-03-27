@@ -68,7 +68,11 @@ export const DashboardService = {
       const kpis = {
         total: 0,
         active: 0,
-        revenue: 0,
+        teachers: 0,
+        classrooms: 0,
+        attendance_today: 0,
+        pending_amount: 0,
+        inquiries: 0,
         ...(kpisRes?.data || {})
       };
 
@@ -101,7 +105,8 @@ export const DashboardService = {
         payments: {
           pending: payments,
           summary: {
-            total_pending: financialSummarySafe.total_pending,
+            // Usar kpis.pending_amount que viene de queries directas confiables
+            total_pending: kpis.pending_amount || financialSummarySafe.total_pending,
             total_paid: financialSummarySafe.total_paid,
             percentagePaid:
               financialSummarySafe.total_invoiced > 0
@@ -111,7 +116,7 @@ export const DashboardService = {
         },
         inquiries: {
           active: inquiries,
-          count: inquiries.length
+          count: kpis.inquiries || inquiries.length
         },
         attendance: {
           today: {

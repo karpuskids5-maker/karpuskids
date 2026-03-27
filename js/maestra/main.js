@@ -1209,6 +1209,8 @@ function initNavigation() {
     if (cleanId === 'attendance') initAttendance();
     if (cleanId === 'daily-routine') initRoutine();
     if (cleanId === 'tasks') initTasks();
+    if (cleanId === 'grades') initGrades();
+    if (cleanId === 'chat') initChat();
   };
 
   navButtons.forEach(btn => {
@@ -1423,10 +1425,10 @@ async function initChat() {
 
     // Listener para enviar mensaje
     const btnSend = document.getElementById('btnSendChatMessage');
-    const inputMsg = document.getElementById('messageInput');
+    const inputMsg = document.getElementById('chatMessageInput');
     
     if (btnSend && inputMsg) {
-      // Remover listeners anteriores para evitar duplicados (clonando el nodo es una técnica rápida)
+      // Remover listeners anteriores para evitar duplicados
       const newBtn = btnSend.cloneNode(true);
       btnSend.parentNode.replaceChild(newBtn, btnSend);
       
@@ -1449,20 +1451,31 @@ async function selectChatContact(userId, name, meta) {
   activeConversationId = null; // Resetear al cambiar de contacto
   
   // UI Updates
-  document.getElementById('chatActiveHeader').classList.remove('hidden');
-  document.getElementById('chatActiveHeader').classList.add('flex');
-  document.getElementById('chatActiveName').textContent = name;
-  document.getElementById('chatActiveMeta').textContent = meta;
-  document.getElementById('chatActiveAvatar').innerHTML = name.charAt(0);
+  const header = document.getElementById('chatActiveHeader');
+  if (header) {
+    header.classList.remove('hidden');
+    header.classList.add('flex');
+  }
   
-  const messagesContainer = document.getElementById('chatMessages');
-  messagesContainer.innerHTML = '<div class="flex justify-center p-4"><div class="animate-spin w-6 h-6 border-2 border-blue-500 rounded-full border-t-transparent"></div></div>';
+  const nameEl = document.getElementById('chatActiveName');
+  if (nameEl) nameEl.textContent = name;
+  
+  const metaEl = document.getElementById('chatActiveMeta');
+  if (metaEl) metaEl.textContent = meta;
+  
+  const avatarEl = document.getElementById('chatActiveAvatar');
+  if (avatarEl) avatarEl.innerHTML = name.charAt(0);
+
+  const inputArea = document.getElementById('chatInputArea');
+  if (inputArea) inputArea.classList.remove('hidden');
+  
+  const messagesContainer = document.getElementById('chatMessagesContainer');
+  if (messagesContainer) {
+    messagesContainer.innerHTML = '<div class="flex justify-center p-4"><div class="animate-spin w-6 h-6 border-2 border-orange-500 rounded-full border-t-transparent"></div></div>';
+  }
 
   // Cargar Historial
   await loadChatMessages(userId);
-  
-  // Suscribirse a nuevos mensajes
-  // La suscripción se hace dentro de loadChatMessages una vez que tenemos el ID de conversación
 }
 
 /**
@@ -1471,7 +1484,8 @@ async function selectChatContact(userId, name, meta) {
  */
 async function loadChatMessages(otherUserId) {
   const user = AppState.get('user');
-  const container = document.getElementById('chatMessages');
+  const container = document.getElementById('chatMessagesContainer');
+  if (!container) return;
   let messages = [];
   
   try {
@@ -1491,7 +1505,7 @@ async function loadChatMessages(otherUserId) {
     
     // Si llegamos aquí, no hay conversación previa
     activeConversationId = null; 
-    container.innerHTML = '<div class="text-center text-xs text-slate-400 mt-4">Inicio de la conversación</div>';
+    container.innerHTML = '<div class="text-center text-xs text-slate-400 mt-4 italic">Inicio de la conversación. Di hola 👋</div>';
 
   } catch (err) {
     console.error("Error cargando chat:", err);
@@ -1502,9 +1516,10 @@ async function loadChatMessages(otherUserId) {
 }
 
 function renderMessages(messages, myId) {
-  const container = document.getElementById('chatMessages');
+  const container = document.getElementById('chatMessagesContainer');
+  if (!container) return;
   if (!messages.length) {
-    container.innerHTML = '<div class="text-center text-xs text-slate-400 mt-4">No hay mensajes previos.</div>';
+    container.innerHTML = '<div class="text-center text-xs text-slate-400 mt-4 italic">Inicio de la conversación. Di hola 👋</div>';
     return;
   }
 
@@ -1512,7 +1527,7 @@ function renderMessages(messages, myId) {
     const isMe = m.sender_id === myId;
     return `
       <div class="flex ${isMe ? 'justify-end' : 'justify-start'} mb-2">
-        <div class="max-w-[80%] px-4 py-2 rounded-2xl text-sm ${isMe ? 'bg-blue-600 text-white rounded-br-none' : 'bg-white border border-slate-100 text-slate-700 rounded-bl-none shadow-sm'}">
+        <div class="max-w-[80%] px-4 py-2.5 rounded-2xl text-sm ${isMe ? 'bg-orange-600 text-white rounded-br-none shadow-md shadow-orange-100' : 'bg-white border border-slate-100 text-slate-700 rounded-bl-none shadow-sm'}">
           ${safeEscapeHTML(m.content)}
         </div>
       </div>
@@ -1524,7 +1539,7 @@ function renderMessages(messages, myId) {
 
 async function sendChatMessage() {
   if (!activeChatUserId) return;
-  const input = document.getElementById('messageInput');
+  const input = document.getElementById('chatMessageInput');
   const text = input.value.trim();
   if (!text) return;
 
@@ -1533,10 +1548,8 @@ async function sendChatMessage() {
   // Limpiar input optimista
   input.value = '';
   input.disabled = true;
-  // UX: Foco se restaura al final
   
   try {
-    // 🔥 USO UNIFICADO DE CHATMODULE
     const { message, conversationId } = await ChatModule.sendMessage(
       user.id,
       activeChatUserId,
@@ -1549,8 +1562,8 @@ async function sendChatMessage() {
       subscribeToChat(activeConversationId);
     }
 
-    // (Opcional) UI Optimista (aunque el realtime lo hará también)
-    // renderSingleMessage(text, true); 
+    // Recargar para ver el mensaje enviado
+    await loadChatMessages(activeChatUserId);
   
   } catch (err) {
     console.error('Error enviando mensaje:', err);
@@ -1645,5 +1658,107 @@ async function submitNewPost() {
     safeToast('Error al publicar', 'error');
     btn.disabled = false;
     btn.innerHTML = 'PUBLICAR';
+  }
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// 📊 SISTEMA DE CALIFICACIONES — PANEL MAESTRA
+// ═══════════════════════════════════════════════════════════════════════════
+
+function scoreFromEvidence(g) {
+  if (g.stars != null && g.stars > 0) return Number(g.stars);
+  const map = { A: 5, B: 4, C: 3, D: 2, E: 1 };
+  return map[g.grade_letter] || 0;
+}
+
+function getLevelLabel(score) {
+  if (score >= 4.5) return { label: 'Excelente',     cls: 'bg-emerald-100 text-emerald-700' };
+  if (score >= 3.5) return { label: 'Bueno',          cls: 'bg-blue-100 text-blue-700' };
+  if (score >= 2.5) return { label: 'En proceso',     cls: 'bg-amber-100 text-amber-700' };
+  return              { label: 'Requiere apoyo', cls: 'bg-rose-100 text-rose-700' };
+}
+
+async function initGrades() {
+  const classroom = AppState.get('classroom');
+  const container = document.getElementById('t-grades-inner') || document.getElementById('t-grades');
+  if (!container || !classroom) return;
+
+  container.innerHTML =
+    '<div class="flex justify-between items-center mb-6">' +
+      '<h3 class="text-2xl font-black text-slate-800">📊 Calificaciones del Aula</h3>' +
+    '</div>' +
+    '<div id="gradesContent" class="space-y-4">' +
+      '<div class="text-center py-8"><div class="animate-spin rounded-full h-8 w-8 border-b-2 border-orange-600 mx-auto"></div></div>' +
+    '</div>';
+
+  if (window.lucide) window.lucide.createIcons();
+
+  try {
+    const students = AppState.get('students') || [];
+
+    // Cargar todas las evidencias del aula
+    const { data: evidences, error } = await supabase
+      .from('task_evidences')
+      .select('stars, grade_letter, student_id, task_id, task:task_id(title, classroom_id)')
+      .in('student_id', students.map(s => s.id));
+
+    if (error) throw error;
+
+    // Filtrar solo las del aula actual
+    const filtered = (evidences || []).filter(e => e.task?.classroom_id == classroom.id);
+
+    // Agrupar por estudiante
+    const byStudent = {};
+    filtered.forEach(g => {
+      const score = scoreFromEvidence(g);
+      if (!score) return;
+      const sid = g.student_id;
+      if (!byStudent[sid]) byStudent[sid] = { total: 0, count: 0, tasks: [] };
+      byStudent[sid].total += score;
+      byStudent[sid].count++;
+      byStudent[sid].tasks.push(g);
+    });
+
+    const content = document.getElementById('gradesContent');
+    if (!content) return;
+
+    if (!students.length) {
+      content.innerHTML = '<div class="text-center py-12 text-slate-400">No hay estudiantes en esta aula.</div>';
+      return;
+    }
+
+    content.innerHTML =
+      '<div class="bg-white rounded-2xl shadow-sm border border-slate-100 overflow-hidden">' +
+        '<table class="w-full text-sm text-left">' +
+          '<thead class="bg-slate-50 text-slate-500 font-black uppercase text-[10px] tracking-wider">' +
+            '<tr>' +
+              '<th class="px-5 py-4">Estudiante</th>' +
+              '<th class="px-5 py-4 text-center">Promedio</th>' +
+              '<th class="px-5 py-4 text-center">Nivel</th>' +
+              '<th class="px-5 py-4 text-center">Tareas Calificadas</th>' +
+            '</tr>' +
+          '</thead>' +
+          '<tbody class="divide-y divide-slate-100">' +
+            students.map(s => {
+              const data = byStudent[s.id];
+              const avg = data && data.count > 0 ? data.total / data.count : 0;
+              const level = getLevelLabel(avg);
+              const colorCls = avg >= 3.5 ? 'bg-emerald-50 text-emerald-700' : avg >= 2.5 ? 'bg-amber-50 text-amber-700' : avg > 0 ? 'bg-rose-50 text-rose-700' : 'bg-slate-50 text-slate-400';
+              return '<tr class="hover:bg-slate-50 transition-colors">' +
+                '<td class="px-5 py-3.5"><div class="flex items-center gap-3"><div class="w-8 h-8 rounded-xl bg-orange-50 text-orange-600 flex items-center justify-center font-black text-sm">' + s.name.charAt(0) + '</div><div class="font-bold text-slate-800 text-sm">' + safeEscapeHTML(s.name) + '</div></div></td>' +
+                '<td class="px-5 py-3.5 text-center"><span class="px-3 py-1 rounded-lg ' + colorCls + ' font-black text-sm">' + (avg > 0 ? avg.toFixed(1) : '-') + '</span></td>' +
+                '<td class="px-5 py-3.5 text-center"><span class="px-2 py-1 rounded-full text-[10px] font-black uppercase ' + (avg > 0 ? level.cls : 'bg-slate-100 text-slate-400') + '">' + (avg > 0 ? level.label : 'Sin datos') + '</span></td>' +
+                '<td class="px-5 py-3.5 text-center text-sm font-bold text-slate-600">' + (data?.count || 0) + '</td>' +
+              '</tr>';
+            }).join('') +
+          '</tbody>' +
+        '</table>' +
+      '</div>';
+
+    if (window.lucide) window.lucide.createIcons();
+  } catch (e) {
+    console.error('[initGrades]', e);
+    const content = document.getElementById('gradesContent');
+    if (content) content.innerHTML = '<div class="text-center py-8 text-rose-500 font-bold">Error al cargar calificaciones.</div>';
   }
 }

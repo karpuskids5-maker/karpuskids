@@ -5,26 +5,18 @@ import { AppState } from './state.js';
 import { supabase, createClient, SUPABASE_URL, SUPABASE_ANON_KEY } from '../shared/supabase.js';
 
 export const TeachersModule = {
-  async init() {
-    const container = document.getElementById('teachersGrid');
+  async init(renderTargetId = 'teachersTableBody') {
+    const container = document.getElementById(renderTargetId);
     if (!container) return;
-    container.innerHTML = '<div class="col-span-3 text-center p-8"><div class="animate-spin rounded-full h-8 w-8 border-b-2 border-purple-600 mx-auto"></div></div>';
+
+    const loadingHtml = '<tr><td colspan="5" class="text-center py-8">Cargando...</td></tr>';
+    container.innerHTML = loadingHtml;
+
     try {
-      const { data: teachers, error } = await supabase
-        .from('profiles')
-        .select('*, classrooms!classrooms_teacher_id_fkey(id, name)')
-        .in('role', ['maestra', 'asistente'])
-        .order('name');
+      const { data: teachers, error } = await DirectorApi.getTeachers();
+      if (error) throw new Error(error);
 
-      if (error) throw new Error(error.message || error);
-
-      // Normalizar: agregar classroom_id y classroom name desde el join
-      const normalized = (teachers || []).map(t => ({
-        ...t,
-        classroom_id: t.classrooms?.[0]?.id || t.classrooms?.id || null,
-        classrooms: t.classrooms?.[0] || t.classrooms || null
-      }));
-
+      const normalized = teachers || [];
       const total = normalized.length;
       const active = normalized.filter(t => t.is_active !== false).length;
       const assistants = normalized.filter(t => t.role === 'asistente').length;
@@ -37,16 +29,49 @@ export const TeachersModule = {
       setTxt('kpiStaffAssistants', assistants);
 
       AppState.set('teachers', normalized);
-      if (!normalized.length) {
-        container.innerHTML = '<div class="col-span-3 text-center p-8 text-slate-500">No hay maestras.</div>';
-        return;
+      this.render(normalized, renderTargetId);
+
+      // BUSCADOR EN TIEMPO REAL
+      const searchInput = document.getElementById('searchTeacher');
+      if (searchInput) {
+        searchInput.addEventListener('input', (e) => {
+          const term = e.target.value.toLowerCase();
+          const allStaff = AppState.get('teachers') || [];
+          const filtered = allStaff.filter(t => 
+            t.name.toLowerCase().includes(term) || 
+            t.email.toLowerCase().includes(term) ||
+            (t.classrooms?.name || '').toLowerCase().includes(term)
+          );
+          this.render(filtered);
+        });
       }
-      container.innerHTML = normalized.map(t => UI.renderTeacherCard(t)).join('');
+
       if (window.lucide) lucide.createIcons();
     } catch (e) {
       console.error('Error initTeachersSection:', e);
       container.innerHTML = '<div class="col-span-3 text-center p-8 text-red-500">Error al cargar.</div>';
     }
+  },
+
+  render(staff, renderTargetId = 'teachersTableBody') {
+    const container = document.getElementById(renderTargetId);
+    if (!container) return;
+
+    if (!staff.length) {
+      container.innerHTML = '<tr><td colspan="5" class="text-center py-8 text-slate-500">No hay personal que coincida.</td></tr>';
+      return;
+    }
+    container.innerHTML = staff.map(t => `
+        <tr>
+          <td>${Helpers.escapeHTML(t.name)}</td>
+          <td>${t.email}</td>
+          <td>${t.classrooms?.name || 'Sin Aula'}</td>
+          <td class="capitalize">${t.role}</td>
+          <td class="text-right">
+            <button onclick="App.teachers.openModal('${t.id}')" class="btn-action btn-edit">Gestionar</button>
+          </td>
+        </tr>`).join('');
+    if (window.lucide) lucide.createIcons();
   },
 
   async save() {

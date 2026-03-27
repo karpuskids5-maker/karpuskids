@@ -16,7 +16,13 @@ export const ChatModule = {
     document.getElementById('btnSendChatMessage')?.addEventListener('click', () => this.sendChatMessage());
     document.getElementById('chatMessageInput')?.addEventListener('keydown', e => (e.key === 'Enter' && !e.shiftKey) && (e.preventDefault(), this.sendChatMessage()));
     document.getElementById('chatSearchInput')?.addEventListener('input', () => this.renderContacts());
-    document.getElementById('chatRoleFilter')?.addEventListener('change', () => this.loadChatUsers());
+    
+    // Botón Atrás para móvil
+    document.getElementById('chatBackBtn')?.addEventListener('click', () => {
+      document.getElementById('chatAppContainer')?.classList.remove('show-chat');
+      this.unsubscribe();
+    });
+
     // Exponer select globalmente para los onclick inline del HTML
     window._chatSelect = (userId, name, role, meta, avatar) => this.selectChat(userId, name, role, meta, avatar);
     await this.loadChatUsers();
@@ -69,15 +75,22 @@ export const ChatModule = {
     const filtered = this.allContacts.filter(c => c.name.toLowerCase().includes(q) || c.meta.toLowerCase().includes(q));
     if (filtered.length === 0) { listContainer.innerHTML = Helpers.emptyState('No se encontraron contactos'); return; }
     listContainer.innerHTML = filtered.map(c => `
-      <div onclick="App.chat.selectChat('${c.id}', '${Helpers.escapeHTML(c.name)}', '${c.role}', '${Helpers.escapeHTML(c.meta)}', '${c.avatar || ''}')" class="flex items-center gap-3 p-3 rounded-2xl hover:bg-white hover:shadow-sm cursor-pointer transition-all border border-transparent hover:border-slate-100 group">
-        <div class="w-11 h-11 rounded-full bg-blue-100 text-blue-600 flex items-center justify-center font-bold overflow-hidden border border-blue-50 shrink-0">
+      <div onclick="App.chat.selectChat('${c.id}', '${Helpers.escapeHTML(c.name)}', '${c.role}', '${Helpers.escapeHTML(c.meta)}', '${c.avatar || ''}')" 
+           class="flex items-center gap-3 p-3 rounded-2xl hover:bg-slate-100 cursor-pointer transition-all group">
+        <div class="w-12 h-12 rounded-full bg-slate-200 flex items-center justify-center font-bold text-slate-500 overflow-hidden shrink-0">
           ${c.avatar ? `<img src="${c.avatar}" class="w-full h-full object-cover">` : c.name.charAt(0)}
         </div>
-        <div class="min-w-0 flex-1"><div class="font-bold text-slate-700 text-sm truncate group-hover:text-blue-600">${Helpers.escapeHTML(c.name)}</div><div class="text-[10px] text-slate-400 font-bold uppercase truncate">${c.role}</div><div class="text-[10px] text-slate-500 truncate mt-0.5">${c.meta}</div></div>
+        <div class="min-w-0 flex-1">
+          <div class="font-bold text-slate-800 text-sm truncate">${Helpers.escapeHTML(c.name)}</div>
+          <div class="text-xs text-slate-500 truncate">${c.role}</div>
+        </div>
       </div>`).join('');
   },
 
   async selectChat(userId, name, role, meta, avatar) {
+    // Activar vista de chat en móvil
+    document.getElementById('chatAppContainer')?.classList.add('show-chat');
+
     const { data: { user: currentUser } } = await supabase.auth.getUser();
     this.currentChatUser = userId;
     document.getElementById('chatActiveHeader')?.classList.remove('hidden');
@@ -126,7 +139,10 @@ export const ChatModule = {
     const safeContent = Helpers.escapeHTML(msg.content || '');
     const div = document.createElement('div');
     div.className = `flex ${isMine ? 'justify-end' : 'justify-start'} animate-fade-in`;
-    div.innerHTML = `<div class="max-w-[85%] md:max-w-[70%] group"><div class="px-4 py-2.5 rounded-2xl text-xs shadow-sm ${isMine ? 'bg-blue-600 text-white rounded-tr-none' : 'bg-white border border-slate-200 text-slate-700 rounded-tl-none'}"><div class="whitespace-pre-wrap break-words">${safeContent}</div><div class="text-[9px] ${isMine ? 'text-blue-200' : 'text-slate-400'} mt-1 text-right font-bold uppercase">${time}</div></div></div>`;
+    div.innerHTML = `<div class="msg-bubble ${isMine ? 'msg-me' : 'msg-them'}">
+        <div class="whitespace-pre-wrap break-words">${safeContent}</div>
+        <div class="text-[9px] ${isMine ? 'text-blue-100' : 'text-slate-500'} mt-1 text-right opacity-70">${time}</div>
+      </div>`;
     container.appendChild(div);
   },
  

@@ -14,7 +14,24 @@ export const PaymentsModule = {
   async init(studentId) {
     if (!studentId) return;
     this._studentId = studentId;
-    
+
+    // Mostrar config financiera (monto mensual + día vencimiento)
+    const config = AppState.get('financeConfig');
+    if (config) {
+      const feeEl = document.getElementById('paymentsMonthlyFee');
+      const dueEl = document.getElementById('paymentsDueDay');
+      if (feeEl) feeEl.textContent = Helpers.formatCurrency(config.monthly_fee || 0);
+      if (dueEl) dueEl.textContent = config.due_day || '-';
+
+      // Calcular próxima fecha de vencimiento
+      const now = new Date();
+      const dueDay = config.due_day || 5;
+      let dueDate = new Date(now.getFullYear(), now.getMonth(), dueDay);
+      if (dueDate < now) dueDate = new Date(now.getFullYear(), now.getMonth() + 1, dueDay);
+      const dueDateEl = document.getElementById('paymentsDueDate');
+      if (dueDateEl) dueDateEl.textContent = dueDate.toLocaleDateString('es-ES', { day: 'numeric', month: 'long', year: 'numeric' });
+    }
+
     // Configurar listeners de formulario (una sola vez)
     const form = document.getElementById('paymentForm');
     if (form && !form._initialized) {

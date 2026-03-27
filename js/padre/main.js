@@ -72,6 +72,12 @@ document.addEventListener('DOMContentLoaded', async () => {
       initLiveClassListener(currentStudent.classroom_id);
     }
 
+    // 7. Listener Cerrar Sesión
+    document.getElementById('btnLogout')?.addEventListener('click', async () => {
+      const { error } = await supabase.auth.signOut();
+      if (!error) window.location.href = 'login.html';
+    });
+
     console.log('🚀 Karpus Parent Panel Ready');
   } catch (err) {
     console.error('Init Error:', err);
@@ -89,12 +95,19 @@ async function refreshDashboard() {
   if (!student) return;
 
   try {
-    // Carga paralela de datos para el Home
-    const [finance, academic, logs] = await Promise.all([
+    // Carga paralela — allSettled para que un fallo no bloquee todo
+    const [financeRes, academicRes, logsRes] = await Promise.allSettled([
       Api.getStudentFinancialStatus(student.id),
       Api.getStudentGrades(student.id),
       Api.getDailyLog(student.id, new Date().toISOString().split('T')[0])
     ]);
+
+    const finance  = financeRes.status  === 'fulfilled' ? financeRes.value  : null;
+    const academic = academicRes.status === 'fulfilled' ? academicRes.value : null;
+    const logs     = logsRes.status     === 'fulfilled' ? logsRes.value     : null;
+
+    // Guardar config financiera en estado para usarla en pagos
+    if (finance?.config) AppState.set('financeConfig', finance.config);
 
     renderHomeCards(student, { finance, academic });
     renderDailySummary(logs);
@@ -115,10 +128,10 @@ function renderHomeCards(student, data) {
   const debt = finance?.debt?.total || 0;
 
   const cards = [
-    { id: 'attendance', title: 'Asistencia', value: 'Hoy', sub: 'Ver reporte', icon: '📅', color: 'bg-emerald-50 text-emerald-600', target: 'live-attendance' },
-    { id: 'tasks', title: 'Tareas', value: academic?.evidences?.length || 0, sub: 'Entregadas', icon: '🎒', color: 'bg-blue-50 text-blue-600', target: 'tasks' },
-    { id: 'payments', title: 'Pagos', value: Helpers.formatCurrency(debt), sub: debt > 0 ? 'Pendiente' : 'Al día', icon: '💳', color: debt > 0 ? 'bg-rose-50 text-rose-600' : 'bg-teal-50 text-teal-600', target: 'payments' },
-    { id: 'chat', title: 'Mensajes', value: 'Chat', sub: 'Con maestros', icon: '💬', color: 'bg-indigo-50 text-indigo-600', target: 'notifications' }
+    { id: 'attendance', title: 'Asistencia', value: 'Hoy', sub: 'Ver reporte', icon: '📅', color: 'bg-green-50 text-green-600', target: 'live-attendance' },
+    { id: 'chat', title: 'Chat', value: 'Mensajes', sub: 'Personal', icon: '💬', color: 'bg-blue-50 text-blue-600', target: 'notifications' },
+    { id: 'videocall', title: 'Videollamada', value: AppState.get('isClassLive') ? '🔴 En vivo' : 'Aula Virtual', sub: 'Unirse', icon: '🎥', color: AppState.get('isClassLive') ? 'bg-rose-50 text-rose-600 ring-2 ring-rose-300 animate-pulse' : 'bg-purple-50 text-purple-600', target: 'videocall' },
+    { id: 'payments', title: 'Pagos', value: Helpers.formatCurrency(debt), sub: debt > 0 ? 'Pendiente' : 'Al día', icon: '💳', color: debt > 0 ? 'bg-rose-50 text-rose-600' : 'bg-teal-50 text-teal-600', target: 'payments' }
   ];
 
   grid.innerHTML = cards.map(c => `
@@ -148,7 +161,7 @@ function renderDailySummary(log) {
     return;
   }
 
-  const moodMap = { feliz: '😃', normal: '😐', triste: '😢', inquieto: '😫' };
+  const moodMap = { feliz: '😃', normal: '😐', triste: '😢', inquieto: '😫', bien: '😊' };
   
   container.innerHTML = `
     <div class="patio-card p-6 bg-gradient-to-br from-white to-slate-50 border border-slate-100 relative overflow-hidden group animate-fade-in">
@@ -160,8 +173,8 @@ function renderDailySummary(log) {
         </h3>
         <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
           <div class="bg-white p-4 rounded-2xl shadow-sm border border-slate-100 flex items-center gap-3">
-            <div class="w-12 h-12 rounded-full bg-emerald-50 flex items-center justify-center text-2xl shadow-inner">${moodMap[log.mood?.toLowerCase()] || '✨'}</div>
-            <div><p class="text-[10px] font-black text-slate-400 uppercase tracking-wider">Ánimo</p><p class="font-bold text-slate-700 capitalize">${log.mood || 'Bien'}</p></div>
+            <div class="w-12 h-12 rounded-full bg-emerald-50 flex items-center justify-center text-2xl shadow-inner">${moodMap[log.mood?.toLowerCase()] || moodMap[log.status?.toLowerCase()] || '✨'}</div>
+            <div><p class="text-[10px] font-black text-slate-400 uppercase tracking-wider">Ánimo</p><p class="font-bold text-slate-700 capitalize">${log.mood || log.status || 'Bien'}</p></div>
           </div>
           <div class="bg-white p-4 rounded-2xl shadow-sm border border-slate-100 flex items-center gap-3">
             <div class="w-12 h-12 rounded-full bg-blue-50 flex items-center justify-center text-2xl shadow-inner">🍽️</div>
@@ -172,6 +185,12 @@ function renderDailySummary(log) {
             <div><p class="text-[10px] font-black text-slate-400 uppercase tracking-wider">Siesta</p><p class="font-bold text-slate-700">${log.nap || log.sleeping || 'No registrada'}</p></div>
           </div>
         </div>
+        ${log.observations || log.notes ? `
+          <div class="mt-4 p-4 bg-orange-50/50 rounded-2xl border border-orange-100">
+            <p class="text-[10px] font-black text-orange-400 uppercase tracking-wider mb-1">Observaciones</p>
+            <p class="text-sm text-slate-600 italic">"${log.observations || log.notes}"</p>
+          </div>
+        ` : ''}
       </div>
     </div>`;
   

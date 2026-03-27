@@ -3,72 +3,276 @@ import { Helpers } from '../shared/helpers.js';
 import { UI } from './ui.module.js';
 import { AppState } from './state.js';
 
-export const StudentsModule = {
-  async init() {
-    const container = document.getElementById('studentsGrid');
-    if (!container) return;
-    container.innerHTML = '<div class="col-span-3 text-center p-8"><div class="animate-spin rounded-full h-8 w-8 border-b-2 border-purple-600 mx-auto"></div></div>';
-    try {
-      const { data: students, error } = await DirectorApi.getStudents();
-      if (error) throw new Error(error);
+// Vista activa: 'table' | 'grid'
+let _view = 'table';
 
-      // 1. CARGA DE KPIs REALES (Estudiantes)
-      const total = students.length;
-      const active = students.filter(s => s.is_active).length;
-      
-      // Obtener datos globales del dashboard para complementar
+function avg(arr) {
+  const valid = arr.filter(v => v != null && !isNaN(v));
+  if (!valid.length) return '—';
+  return (valid.reduce((a, b) => a + Number(b), 0) / valid.length).toFixed(1);
+}
+
+export const StudentsModule = {
+
+  async init() {
+    try {
+      // 1. Obtener datos de estudiantes
+      const { data: students, error } = await DirectorApi.getStudents();
+      if (error) throw error;
+
+      AppState.set('students', students || []);
+
+      // 2. Obtener datos globales del dashboard para KPIs complementarios
       let dashboardData = AppState.get('dashboardData');
+      if (!dashboardData) {
+        const { DashboardService } = await import('./dashboard.service.js');
+        dashboardData = await DashboardService.getFullData();
+      }
+      
       const kpis = dashboardData?.kpis || {};
       const attToday = dashboardData?.attendance?.today || { present: 0, late: 0, total: 0 };
 
+      // 3. Actualizar tarjetas KPI
       const setTxt = (id, val) => { const el = document.getElementById(id); if(el) el.textContent = val; };
       
-      setTxt('stuKpiTotal', total);
-      setTxt('stuKpiActive', active);
-      setTxt('stuKpiIncidents', kpis.inquiries || 0);
-      setTxt('stuKpiByClass', dashboardData?.classrooms?.length || 0);
-      setTxt('stuKpiAvg', '9.2'); 
+      setTxt('totalStudents', students.length);
+      setTxt('activeStudents', students.filter(s => s.is_active || s.status === 'activo').length);
+      setTxt('incidents', kpis.inquiries || 0);
       
+      // Aulas con estudiantes asignados
+      const classroomsWithStudents = new Set(students.map(s => s.classroom_id).filter(Boolean)).size;
+      setTxt('classroomsCount', classroomsWithStudents);
+      
+      // Promedio y Asistencia (Valores reales calculados o mock si no existen columnas)
+      const grades = students.map(s => s.average_grade).filter(v => v != null && !isNaN(v));
+      setTxt('avgGrade', grades.length ? avg(grades) : '0.0');
+
       const attPct = attToday.total > 0 ? Math.round(((attToday.present + attToday.late) / attToday.total) * 100) : 0;
-      setTxt('stuKpiAttendance', `${attPct}%`);
+      setTxt('avgAttendance', attPct + '%');
 
-      AppState.set('students', students || []);
+      // 4. Renderizar vista actual
+      const tableWrapper = document.getElementById('studentsTableWrapper');
+      const gridWrapper = document.getElementById('studentsGrid');
       
-      // Conectar botón de exportar
+      if (_view === 'grid') {
+        tableWrapper?.classList.add('hidden');
+        gridWrapper?.classList.remove('hidden');
+      } else {
+        tableWrapper?.classList.remove('hidden');
+        gridWrapper?.classList.add('hidden');
+      }
+      this.render(students);
+
+      // Filtros
+      const searchInput = document.getElementById('searchStudent');
+      if (searchInput && !searchInput._bound) {
+        searchInput._bound = true;
+        searchInput.addEventListener('input', () => this.applyFilters());
+      }
+
+      const filterClassroom = document.getElementById('filterClassroom');
+      if (filterClassroom && !filterClassroom._bound) {
+        filterClassroom._bound = true;
+        // Poblar opciones de aulas
+        const { data: rooms } = await DirectorApi.getClassrooms();
+        if (rooms) {
+          // Limpiar antes de poblar (excepto la opción "Todas")
+          filterClassroom.innerHTML = '<option value="all">Todas las aulas</option>';
+          rooms.forEach(r => {
+            const o = document.createElement('option');
+            o.value = r.id; o.textContent = r.name;
+            filterClassroom.appendChild(o);
+          });
+        }
+        filterClassroom.addEventListener('change', () => this.applyFilters());
+      }
+
+      const filterStatus = document.getElementById('filterStStatus');
+      if (filterStatus && !filterStatus._bound) {
+        filterStatus._bound = true;
+        filterStatus.addEventListener('change', () => this.applyFilters());
+      }
+
+      const filterLevel = document.getElementById('filterLevel');
+      if (filterLevel && !filterLevel._bound) {
+        filterLevel._bound = true;
+        // Poblar niveles únicos de los estudiantes
+        const levels = [...new Set(students.map(s => s.level).filter(Boolean))];
+        if (levels.length) {
+          filterLevel.innerHTML = '<option value="all">Todos los niveles</option>';
+          levels.forEach(l => {
+            const o = document.createElement('option');
+            o.value = l; o.textContent = l;
+            filterLevel.appendChild(o);
+          });
+        }
+        filterLevel.addEventListener('change', () => this.applyFilters());
+      }
+
+      const btnToggleView = document.getElementById('btnToggleStuView');
+      if (btnToggleView && !btnToggleView._bound) {
+        btnToggleView._bound = true;
+        btnToggleView.onclick = () => {
+          _view = _view === 'grid' ? 'table' : 'grid';
+          btnToggleView.textContent = _view === 'grid' ? 'Tabla' : 'Grid';
+          
+          const tableWrapper = document.getElementById('studentsTableWrapper');
+          const gridWrapper = document.getElementById('studentsGrid');
+          
+          if (_view === 'grid') {
+            tableWrapper?.classList.add('hidden');
+            gridWrapper?.classList.remove('hidden');
+          } else {
+            tableWrapper?.classList.remove('hidden');
+            gridWrapper?.classList.add('hidden');
+          }
+          this.render(AppState.get('students') || []);
+        };
+      }
+
       const btnExport = document.getElementById('btnExportStudents');
-      if (btnExport) {
-        const newBtn = btnExport.cloneNode(true);
-        btnExport.parentNode.replaceChild(newBtn, btnExport);
-        newBtn.addEventListener('click', async () => {
-           Helpers.toast('Generando lista de estudiantes...', 'info');
-           const list = AppState.get('students') || [];
-           if (!list.length) return Helpers.toast('No hay estudiantes visibles', 'warning');
-
-           const exportData = list.map(s => ({
-             Matricula: s.matricula || '',
-             Nombre: s.name,
-             Aula: s.classrooms?.name || 'Sin Aula',
-             Estado: s.is_active ? 'Activo' : 'Inactivo',
-             Tutor1: s.p1_name || '',
-             Telefono1: s.p1_phone || '',
-             Email1: s.p1_email || '',
-             Alergias: s.allergies || ''
-           }));
-
-           Helpers.exportToCSV(exportData, `Estudiantes_Karpus_${new Date().toISOString().slice(0,10)}.csv`);
-        });
+      if (btnExport && !btnExport._bound) {
+        btnExport._bound = true;
+        btnExport.onclick = () => {
+          Helpers.toast('Generando lista...', 'info');
+          Helpers.exportToCSV(AppState.get('students') || [], 'Estudiantes.csv');
+        };
       }
 
-      if (!students?.length) {
-        container.innerHTML = '<div class="col-span-3 text-center p-8 text-slate-500">No hay estudiantes.</div>';
-        return;
+      const btnAdd = document.getElementById('btnAddStudent');
+      if (btnAdd && !btnAdd._bound) {
+        btnAdd._bound = true;
+        btnAdd.onclick = () => this.openModal();
       }
-      container.innerHTML = students.map(s => UI.renderStudentCard(s)).join('');
+
       if (window.lucide) lucide.createIcons();
     } catch (e) {
       console.error(e);
       container.innerHTML = '<div class="col-span-3 text-center p-8 text-red-500">Error al cargar.</div>';
     }
+  },
+
+  render(students) {
+    const tableContainer = document.getElementById('studentsTable');
+    const gridContainer = document.getElementById('studentsGrid');
+    
+    if (!students?.length) {
+      if (tableContainer) tableContainer.innerHTML = '<tr><td colspan="6" class="text-center py-8 text-slate-500">No hay estudiantes.</td></tr>';
+      if (gridContainer) gridContainer.innerHTML = '<div class="col-span-3 text-center py-8 text-slate-500">No hay estudiantes.</div>';
+      return;
+    }
+
+    // Render Table
+    if (tableContainer) {
+      tableContainer.innerHTML = students.map(s => `
+        <tr class="hover:bg-slate-50 transition-colors border-b border-slate-100">
+          <td class="p-4">
+            <div class="flex items-center gap-3">
+              <div class="w-10 h-10 rounded-xl bg-purple-100 flex items-center justify-center text-sm font-black text-purple-600">
+                ${(s.name || '?').charAt(0)}
+              </div>
+              <div>
+                <div class="font-bold text-slate-800">${Helpers.escapeHTML(s.name)}</div>
+                <div class="text-[10px] text-slate-400 font-black uppercase tracking-widest">${s.matricula || 'SIN MATRÍCULA'}</div>
+              </div>
+            </div>
+          </td>
+          <td class="p-4 text-sm font-medium text-slate-600">
+            ${s.classrooms?.name || '<span class="text-slate-300 italic">No asignada</span>'}
+          </td>
+          <td class="p-4 text-right">
+            <div class="flex justify-end gap-2">
+              <button onclick="App.students.openModal('${s.id}')" class="w-9 h-9 flex items-center justify-center bg-indigo-50 text-indigo-600 hover:bg-indigo-600 hover:text-white rounded-xl transition-all shadow-sm" title="Editar">
+                <i data-lucide="edit-3" class="w-4 h-4"></i>
+              </button>
+              <button onclick="App.students.delete('${s.id}')" class="w-9 h-9 flex items-center justify-center bg-rose-50 text-rose-600 hover:bg-rose-600 hover:text-white rounded-xl transition-all shadow-sm" title="Eliminar">
+                <i data-lucide="trash-2" class="w-4 h-4"></i>
+              </button>
+            </div>
+          </td>
+        </tr>`).join('');
+    }
+
+    // Render Grid
+    if (gridContainer) {
+      gridContainer.innerHTML = students.map(s => `
+        <div class="bg-white rounded-3xl p-6 border border-slate-100 shadow-sm hover:shadow-md transition-all group relative overflow-hidden">
+          <div class="absolute top-0 right-0 w-24 h-24 bg-purple-50 rounded-bl-[4rem] -mr-8 -mt-8 transition-transform group-hover:scale-110"></div>
+          
+          <div class="flex items-start gap-4 mb-4 relative">
+            <div class="w-16 h-16 rounded-2xl bg-gradient-to-br from-purple-500 to-indigo-600 flex items-center justify-center text-2xl shadow-lg shadow-purple-100">
+              👶
+            </div>
+            <div class="flex-1">
+              <h3 class="font-black text-slate-800 text-lg leading-tight mb-1">${Helpers.escapeHTML(s.name)}</h3>
+              <p class="text-xs font-bold text-slate-400 uppercase tracking-widest flex items-center gap-1">
+                <i data-lucide="home" class="w-3 h-3"></i> ${s.classrooms?.name || 'Sin Aula'}
+              </p>
+            </div>
+            <div class="flex flex-col gap-1">
+               <span class="px-2 py-1 rounded-lg text-[10px] font-black uppercase tracking-tighter ${s.is_active ? 'bg-emerald-100 text-emerald-700' : 'bg-rose-100 text-rose-700'}">
+                 ${s.is_active ? 'Activo' : 'Inactivo'}
+               </span>
+            </div>
+          </div>
+
+          <div class="grid grid-cols-2 gap-3 mb-6 relative">
+            <div class="bg-slate-50 p-3 rounded-2xl">
+              <p class="text-[10px] font-black text-slate-400 uppercase mb-1">Promedio</p>
+              <p class="text-xl font-black text-indigo-600">${s.average_grade || '—'}</p>
+            </div>
+            <div class="bg-slate-50 p-3 rounded-2xl">
+              <p class="text-[10px] font-black text-slate-400 uppercase mb-1">Asistencia</p>
+              <p class="text-xl font-black text-emerald-600">${s.attendance || 0}%</p>
+            </div>
+          </div>
+
+          <div class="flex items-center justify-between pt-4 border-t border-slate-50">
+            <div class="flex -space-x-2">
+               <div class="w-8 h-8 rounded-full border-2 border-white bg-blue-100 flex items-center justify-center text-[10px]" title="Padre: ${Helpers.escapeHTML(s.p1_name || 'N/A')}">👤</div>
+            </div>
+            <div class="flex gap-2">
+              <button onclick="App.students.openModal('${s.id}')" class="p-2.5 bg-slate-100 text-slate-600 hover:bg-purple-600 hover:text-white rounded-xl transition-all">
+                <i data-lucide="edit-3" class="w-4 h-4"></i>
+              </button>
+              <button onclick="App.students.delete('${s.id}')" class="p-2.5 bg-slate-100 text-slate-600 hover:bg-rose-600 hover:text-white rounded-xl transition-all">
+                <i data-lucide="trash-2" class="w-4 h-4"></i>
+              </button>
+            </div>
+          </div>
+        </div>`).join('');
+    }
+
+    if (window.lucide) lucide.createIcons();
+  },
+
+  applyFilters() {
+    const term = document.getElementById('searchStudent')?.value.toLowerCase() || '';
+    const classroomId = document.getElementById('filterClassroom')?.value || 'all';
+    const status = document.getElementById('filterStStatus')?.value || '';
+    const level = document.getElementById('filterLevel')?.value || 'all';
+
+    const all = AppState.get('students') || [];
+    const filtered = all.filter(s => {
+      const matchSearch = s.name.toLowerCase().includes(term) || 
+                         (s.classrooms?.name || '').toLowerCase().includes(term) ||
+                         (s.p1_name || '').toLowerCase().includes(term);
+      
+      const matchClassroom = classroomId === 'all' || String(s.classroom_id) === classroomId;
+      
+      let matchStatus = true;
+      if (status === 'activo' || status === 'true') {
+        matchStatus = s.is_active === true || s.status === 'activo';
+      } else if (status === 'inactivo' || status === 'false') {
+        matchStatus = s.is_active === false || s.status === 'inactivo';
+      }
+
+      const matchLevel = level === 'all' || s.level === level;
+
+      return matchSearch && matchClassroom && matchStatus && matchLevel;
+    });
+
+    this.render(filtered);
   },
 
   async save() {
@@ -292,7 +496,7 @@ export const StudentsModule = {
                 <div><label class="${labelClass}">Día Vencimiento</label><input id="dueDay" placeholder="5" type="number" min="1" max="31" class="${inputClass} bg-white"></div>
               </div>
             </div>
-          </div>
+        </div>
       </div>
       
       <div class="modal-footer bg-white p-6 rounded-b-3xl border-t border-slate-100 flex justify-end gap-3">
@@ -300,7 +504,7 @@ export const StudentsModule = {
         <button onclick="App.students.save()" class="px-10 py-3 bg-gradient-to-r from-purple-600 to-indigo-600 text-white rounded-2xl font-black text-xs uppercase shadow-lg shadow-purple-200 hover:shadow-purple-300 hover:-translate-y-0.5 transition-all active:scale-95">Guardar Estudiante</button>
       </div>`;
       
-    window.openGlobalModal(modalHTML);
+    window.openGlobalModal(modalHTML, true);
     
     // Cargar aulas en el select
     try {

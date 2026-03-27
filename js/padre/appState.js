@@ -14,6 +14,7 @@ export const AppState = new SafeAppState({
   isClassLive: false,
   liveChannel: null,
   currentSection: 'home',
+  financeConfig: null,
   loading: false,
   error: null
 });

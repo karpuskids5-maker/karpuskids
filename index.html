@@ -237,7 +237,10 @@
         padding-left: 1rem;
         padding-right: 1rem;
       }
-      h1 { font-size: 2.5rem !important; line-height: 1.1; }
+      /* Ajuste de tamaño del logo multicolor para que no se corte en móvil */
+      .karpus-kids-colored span {
+        font-size: 3.5rem !important;
+      }
       .hero-section { padding-top: 4rem; padding-bottom: 4rem; }
       .nav-links { display: none; } /* Ocultar nav links en móvil si no hay menu hamburguesa */
       .grid-cols-3 { grid-template-columns: 1fr !important; }
@@ -274,9 +277,9 @@
 </head>
 <body class="bg-white text-gray-800">
   <!-- Header Fijo -->
-  <header x-data="{ open: false }" class="fixed top-0 left-0 w-full z-50 px-2 pt-2">
+  <header x-data="{ open: false }" class="fixed top-0 left-0 w-full z-[60] px-2 pt-2">
     
-    <div class="w-full max-w-7xl mx-auto bg-white/90 backdrop-blur-md rounded-2xl shadow-lg border border-white/20 px-4 py-3 flex justify-between items-center">
+    <div class="w-full max-w-7xl mx-auto bg-white/90 backdrop-blur-md rounded-2xl shadow-lg border border-white/20 px-4 py-3 flex justify-between items-center transition-all" :class="{ 'bg-white shadow-none': open }">
       
       <!-- Logo -->
       <a href="#" class="flex items-center gap-2 group">
@@ -309,19 +312,29 @@
     </div>
 
     <!-- Menú móvil -->
-    <div x-show="open" x-cloak
-         @click.away="open = false"
-         x-transition
-         class="md:hidden mt-2 mx-2 bg-white rounded-2xl shadow-xl overflow-hidden">
-
-      <div class="flex flex-col text-center font-medium text-slate-600">
-        <a href="#nosotros" @click="open = false" class="py-3 hover:bg-orange-50">Nosotros</a>
-        <a href="#galeria-fotos" @click="open = false" class="py-3 hover:bg-pink-50">Galería</a>
-        <a href="#precios" @click="open = false" class="py-3 hover:bg-blue-50">Servicios</a>
-        <a href="#footer" @click="open = false" class="py-3 hover:bg-green-50">Contacto</a>
-        <a href="login.html" class="py-3 bg-gray-100">Acceso Padres</a>
+    <div x-show="open" 
+         x-transition:enter="transition ease-out duration-300"
+         x-transition:enter-start="opacity-0 scale-95 translate-y-[-20px]"
+         x-transition:enter-end="opacity-100 scale-100 translate-y-0"
+         x-transition:leave="transition ease-in duration-200"
+         x-transition:leave-start="opacity-100 scale-100 translate-y-0"
+         x-transition:leave-end="opacity-0 scale-95 translate-y-[-20px]"
+         x-cloak
+         class="md:hidden fixed inset-0 z-[-1] bg-slate-900/60 backdrop-blur-md flex items-center justify-center p-6">
+      
+      <div @click.away="open = false" class="w-full bg-white rounded-[3rem] shadow-2xl overflow-hidden border-8 border-white">
+        <div class="flex flex-col text-center font-black text-slate-700 text-2xl py-8">
+          <a href="#nosotros" @click="open = false" class="py-6 hover:text-orange-500 transition-colors">Nosotros</a>
+          <a href="#galeria-fotos" @click="open = false" class="py-6 hover:text-pink-500 transition-colors">Galería</a>
+          <a href="#precios" @click="open = false" class="py-6 hover:text-blue-500 transition-colors">Servicios</a>
+          <a href="#footer" @click="open = false" class="py-6 hover:text-green-500 transition-colors">Contacto</a>
+          <div class="px-8 mt-4">
+            <a href="login.html" class="block w-full bg-gradient-to-r from-orange-400 to-pink-500 text-white py-5 rounded-[2rem] shadow-xl text-xl">
+              Acceso Padres 🚀
+            </a>
+          </div>
+        </div>
       </div>
-
     </div>
   </header>
 
@@ -332,7 +345,7 @@
        alt="Niños felices en Karpus Kids" loading="lazy">
     <div class="absolute inset-0 bg-gradient-to-b from-black/60 via-black/40 to-black/70"></div>
     <div x-data="{ contactModal: false }" class="relative z-10 p-8 text-white max-w-4xl mx-auto" data-aos="fade-up">
-      <h1 class="karpus-kids-colored mb-4 text-5xl md:text-7xl" style="font-size: 5.5rem;">
+      <h1 class="karpus-kids-colored mb-4 text-5xl md:text-8xl">
         <span class="k-1">K</span><span class="k-2">A</span><span class="k-3">R</span><span class="k-4">P</span><span class="k-5">U</span><span class="k-6">S</span>&nbsp;<span class="k-7">K</span><span class="k-8">I</span><span class="k-9">D</span><span class="k-10">S</span>
       </h1>
       <p class="text-xl font-light max-w-2xl mx-auto mb-10">

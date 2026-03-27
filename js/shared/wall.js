@@ -367,19 +367,23 @@ export const WallModule = {
     const input = document.getElementById(`comment-input-${postId}`);
     const content = input?.value.trim();
     if (!content) return;
-    
-    const user = this._appState?.get('user');
+
+    const user    = this._appState?.get('user');
     const profile = this._appState?.get('profile');
-    
+
+    if (!user) return;
+
+    // Siempre usar profile.name — la columna name de profiles
+    const authorName = profile?.name || 'Usuario';
+
     try {
       await supabase.from('comments').insert({
-        post_id: postId,
-        user_id: user.id,
-        user_name: profile?.name || 'Usuario',
+        post_id:   postId,
+        user_id:   user.id,
+        user_name: authorName,   // guardado como respaldo, pero el join siempre tiene prioridad
         content
       });
       input.value = '';
-      // Recargar comentarios
       const comments = await this._fetchComments(postId);
       this.renderComments(postId, comments);
     } catch (err) {
@@ -398,12 +402,75 @@ export const WallModule = {
   },
 
   async _fetchComments(postId) {
-    const { data } = await supabase
+    // Traer comentarios con join a profiles (name) y también a students (para padres)
+    const { data, error } = await supabase
       .from('comments')
-      .select('id, content, user_name, created_at, user_id, user:profiles(name, avatar_url, role)')
+      .select(`
+        id, content, user_name, created_at, user_id,
+        profile:profiles!comments_user_id_fkey(name, avatar_url, role)
+      `)
       .eq('post_id', postId)
       .order('created_at', { ascending: true });
+
+    if (error) {
+      const { data: fallback } = await supabase
+        .from('comments')
+        .select('id, content, user_name, created_at, user_id')
+        .eq('post_id', postId)
+        .order('created_at', { ascending: true });
+      return fallback || [];
+    }
+
+    // Para comentarios de padres, buscar el nombre del estudiante hijo
+    const parentComments = (data || []).filter(c => {
+      const p = Array.isArray(c.profile) ? c.profile[0] : c.profile;
+      return p?.role === 'padre';
+    });
+
+    if (parentComments.length) {
+      const parentIds = [...new Set(parentComments.map(c => c.user_id))];
+      const { data: students } = await supabase
+        .from('students')
+        .select('parent_id, name')
+        .in('parent_id', parentIds);
+
+      // Mapa parent_id → nombre del estudiante
+      const studentByParent = {};
+      (students || []).forEach(s => { studentByParent[s.parent_id] = s.name; });
+
+      // Inyectar nombre del estudiante en los comentarios de padres
+      return (data || []).map(c => {
+        const p = Array.isArray(c.profile) ? c.profile[0] : c.profile;
+        if (p?.role === 'padre' && studentByParent[c.user_id]) {
+          return { ...c, _studentName: studentByParent[c.user_id] };
+        }
+        return c;
+      });
+    }
+
     return data || [];
+  },
+
+  // Resuelve el nombre a mostrar en un comentario:
+  // - Padre → nombre del estudiante hijo (no el nombre del padre)
+  // - Maestra/Directora/Asistente → profile.name de profiles
+  _resolveCommentName(c) {
+    const profile = Array.isArray(c.profile) ? c.profile[0] : (c.profile || null);
+    const userJoin = Array.isArray(c.user) ? c.user[0] : (c.user || null);
+    const joined   = profile || userJoin;
+
+    // Si es padre y tenemos el nombre del estudiante, usarlo
+    if (joined?.role === 'padre' && c._studentName) {
+      return {
+        name:   c._studentName,
+        avatar: null   // el avatar del padre no aplica para el estudiante
+      };
+    }
+
+    return {
+      name:   joined?.name || c.user_name || 'Usuario',
+      avatar: (joined?.avatar_url && joined.avatar_url.startsWith('http')) ? joined.avatar_url : null
+    };
   },
 
   renderComments(postId, comments) {
@@ -416,18 +483,14 @@ export const WallModule = {
     }
 
     container.innerHTML = comments.map(c => {
-      // Obtener datos reales del perfil (unificado)
-      const profile = Array.isArray(c.user) ? c.user[0] : c.user;
-      const displayName = profile?.name || c.user_name || 'Usuario';
-      let avatarUrl = profile?.avatar_url || '';
-      if (avatarUrl && !avatarUrl.startsWith('http')) avatarUrl = ''; // Validación básica
+      const { name: displayName, avatar: avatarUrl } = this._resolveCommentName(c);
 
       return `
       <div class="flex gap-2 text-xs">
         <div class="w-6 h-6 rounded-full bg-slate-200 flex items-center justify-center font-bold text-[9px] text-slate-500 overflow-hidden border border-white shrink-0">
-          ${avatarUrl 
-            ? `<img src="${avatarUrl}" class="w-full h-full object-cover">` 
-            : displayName.charAt(0)}
+          ${avatarUrl
+            ? `<img src="${avatarUrl}" class="w-full h-full object-cover" onerror="this.parentElement.textContent='${displayName.charAt(0)}'">` 
+            : displayName.charAt(0).toUpperCase()}
         </div>
         <div class="bg-white p-2 rounded-xl rounded-tl-none border border-slate-100 shadow-sm flex-1">
           <div class="flex justify-between">

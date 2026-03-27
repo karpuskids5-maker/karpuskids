@@ -1,341 +1,425 @@
-import { supabase, sendPush, sendEmail, emitEvent } from '../shared/supabase.js';
-import { Api } from '../shared/api.js';
+import { supabase } from '../shared/supabase.js';
 import { Helpers } from '../shared/helpers.js';
 import { AppState } from './state.js';
 
-/**
- * Módulo de Pagos para Asistente
- */
+const MONTH_NAMES_ES = [
+  'enero','febrero','marzo','abril','mayo','junio',
+  'julio','agosto','septiembre','octubre','noviembre','diciembre'
+];
+const MONTH_LABELS = [
+  'Enero','Febrero','Marzo','Abril','Mayo','Junio',
+  'Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'
+];
+
+// ── Helpers internos ──────────────────────────────────────────────────────────
+function openGlobalModal(html) {
+  const c = document.getElementById('globalModalContainer');
+  if (!c) return;
+  c.innerHTML = '<div class="bg-white rounded-3xl shadow-2xl w-full max-w-2xl max-h-[90vh] overflow-y-auto">' + html + '</div>';
+  c.style.display = 'flex';
+  c.style.alignItems = 'center';
+  c.style.justifyContent = 'center';
+  c.style.zIndex = '9999';
+  if (window.lucide) lucide.createIcons();
+}
+
+function closeGlobalModal() {
+  const c = document.getElementById('globalModalContainer');
+  if (c) { c.style.display = 'none'; c.innerHTML = ''; }
+}
+
+function calcStatus(p) {
+  if (p.status === 'paid' || p.status === 'confirmado') return 'paid';
+  if (p.status === 'review' || (p.status === 'pending' && p.method === 'transferencia')) return 'review';
+  const today = new Date(); today.setHours(0, 0, 0, 0);
+  const due = p.due_date ? new Date(p.due_date + 'T00:00:00') : null;
+  if (!due) return 'pending';
+  return today > due ? 'overdue' : 'pending';
+}
+
 export const PaymentsModule = {
   _financialChart: null,
+  settings: { due_day: 5, generation_day: 25 },
 
   async init() {
-    const filter = document.getElementById('paymentMonthFilter');
-    if (filter) {
-      filter.onchange = () => this.loadPayments();
-    }
+    this._initPeriodSelectors();
+    await this._loadSettings();
 
-    // ✅ MEJORA: Delegación de eventos para acciones en la tabla
-    const tbody = document.getElementById('paymentsTableBody');
-    if (tbody) {
-      tbody.addEventListener('click', (e) => {
-        const button = e.target.closest('button[data-action]');
-        if (!button) return;
-
-        const { action } = button.dataset;
-        const id = button.dataset.id;
-        const studentId = button.dataset.studentId;
-
-        switch (action) {
-          case 'confirm':
-            this.confirmPayment(id);
-            break;
-          case 'reject':
-            this.rejectPayment(id);
-            break;
-          case 'delete':
-            this.deletePayment(id);
-            break;
-          case 'register':
-            this.openModal(studentId);
-            break;
-        }
-      });
-    }
-
-    const btnOpen = document.getElementById('btnOpenPaymentModal');
-    if (btnOpen) btnOpen.onclick = () => this.openModal();
-
-    const form = document.getElementById('paymentForm');
-    if (form) form.onsubmit = (e) => this.handleSubmit(e);
+    document.getElementById('filterPaymentMonth')?.addEventListener('change', () => this.loadPayments());
+    document.getElementById('filterPaymentYear')?.addEventListener('change', () => this.loadPayments());
+    document.getElementById('filterPaymentStatus')?.addEventListener('change', () => this.loadPayments());
+    document.getElementById('searchPaymentStudent')?.addEventListener('input', () => this.loadPayments());
+    document.getElementById('btnNewPayment')?.addEventListener('click', () => this.openPaymentModal());
+    document.getElementById('btnGeneratePayments')?.addEventListener('click', () => this.runCycle());
+    document.getElementById('btnRefreshPayments')?.addEventListener('click', () => this.loadPayments());
 
     await this.loadPayments();
-    await this.loadIncomeChart();
+    this.loadIncomeChart();
+  },
+
+  _initPeriodSelectors() {
+    const now = new Date();
+    const m = String(now.getMonth() + 1).padStart(2, '0');
+    const y = String(now.getFullYear());
+    const ms = document.getElementById('filterPaymentMonth');
+    const ys = document.getElementById('filterPaymentYear');
+    if (ms) ms.value = m;
+    if (ys) ys.value = y;
+  },
+
+  async _loadSettings() {
+    try {
+      const { data } = await supabase.from('school_settings').select('*').eq('id', 1).single();
+      if (data) {
+        this.settings.generation_day = data.generation_day || 25;
+        this.settings.due_day = data.due_day || 5;
+      }
+    } catch (e) { /* silencioso */ }
+  },
+
+  filterBy(status) {
+    const sel = document.getElementById('filterPaymentStatus');
+    if (sel) { sel.value = status; this.loadPayments(); }
+  },
+
+  async loadPayments() {
+    const container = document.getElementById('paymentsTableBody');
+    if (!container) return;
+
+    container.innerHTML =
+      '<tr><td colspan="8" class="text-center py-10">' +
+        '<div class="animate-spin rounded-full h-8 w-8 border-b-2 border-teal-600 mx-auto mb-2"></div>' +
+        '<p class="text-xs text-slate-400">Cargando pagos...</p>' +
+      '</td></tr>';
+
+    this.loadStats();
+
+    try {
+      const monthVal    = document.getElementById('filterPaymentMonth')?.value;
+      const yearVal     = document.getElementById('filterPaymentYear')?.value;
+      const statusFilter = document.getElementById('filterPaymentStatus')?.value;
+      const search      = document.getElementById('searchPaymentStudent')?.value?.trim();
+
+      // Filtrar por month_paid (nombre en español) igual que directora
+      const monthIndex = monthVal ? parseInt(monthVal, 10) - 1 : new Date().getMonth();
+      const monthName  = MONTH_NAMES_ES[monthIndex];
+
+      let query = supabase
+        .from('payments')
+        .select('id, student_id, amount, concept, status, due_date, created_at, paid_date, method, bank, reference, month_paid, evidence_url, students:student_id(name, classroom_id, classrooms:classroom_id(name))')
+        .ilike('month_paid', monthName)
+        .order('due_date', { ascending: true });
+
+      if (statusFilter && statusFilter !== 'all') {
+        query = query.eq('status', statusFilter);
+      }
+
+      const { data: payments, error } = await query;
+      if (error) throw error;
+
+      // Filtro búsqueda en cliente
+      let list = payments || [];
+      if (search) {
+        const q = search.toLowerCase();
+        list = list.filter(p => p.students?.name?.toLowerCase().includes(q));
+      }
+
+      AppState.set('paymentsData', list);
+
+      if (!list.length) {
+        const label = MONTH_LABELS[monthIndex];
+        container.innerHTML =
+          '<tr><td colspan="8" class="text-center py-16">' +
+            '<div class="flex flex-col items-center gap-3">' +
+              '<div class="w-14 h-14 bg-slate-100 rounded-full flex items-center justify-center">' +
+                '<i data-lucide="inbox" class="w-7 h-7 text-slate-400"></i>' +
+              '</div>' +
+              '<p class="font-bold text-slate-500">Sin registros para ' + label + ' ' + (yearVal || '') + '</p>' +
+              '<p class="text-xs text-slate-400 max-w-xs text-center">Usa "Generar pagos" para crear las cuotas del mes.</p>' +
+            '</div>' +
+          '</td></tr>';
+        if (window.lucide) lucide.createIcons();
+        return;
+      }
+
+      const priority = { overdue: 1, pending: 2, review: 3, paid: 4 };
+      list.sort((a, b) => (priority[calcStatus(a)] || 99) - (priority[calcStatus(b)] || 99));
+
+      container.innerHTML = list.map(p => this._renderRow(p)).join('');
+      if (window.lucide) lucide.createIcons();
+
+    } catch (e) {
+      console.error('[PaymentsModule] loadPayments:', e);
+      container.innerHTML =
+        '<tr><td colspan="8" class="text-center py-8 text-rose-500 font-bold text-sm">Error al cargar pagos.</td></tr>';
+    }
+  },
+
+  _renderRow(p) {
+    const statusKey = calcStatus(p);
+    const statusMap = {
+      paid:    { label: 'Aprobado',    cls: 'bg-emerald-100 text-emerald-700', icon: 'check-circle' },
+      pending: { label: 'Pendiente',   cls: 'bg-amber-100 text-amber-700',     icon: 'clock' },
+      review:  { label: 'En Revision', cls: 'bg-blue-100 text-blue-700',       icon: 'file-search' },
+      overdue: { label: 'Vencido',     cls: 'bg-rose-100 text-rose-700',       icon: 'alert-triangle' }
+    };
+    const st      = statusMap[statusKey] || { label: p.status, cls: 'bg-slate-100 text-slate-700', icon: 'help-circle' };
+    const student = p.students || { name: 'Desconocido', classrooms: { name: '-' } };
+    const isPending  = statusKey !== 'paid';
+    const dueDateStr = p.due_date ? new Date(p.due_date + 'T00:00:00').toLocaleDateString('es-ES') : '-';
+    const amountFmt  = Number(p.amount || 0).toLocaleString('es-ES', { style: 'currency', currency: 'USD', minimumFractionDigits: 2 });
+
+    let urgencyBadge = '';
+    if (p.due_date && isPending) {
+      const today = new Date(); today.setHours(0, 0, 0, 0);
+      const diff  = Math.round((new Date(p.due_date + 'T00:00:00') - today) / 86400000);
+      if (diff < 0)
+        urgencyBadge = '<span class="ml-1 text-[9px] font-black text-rose-600 bg-rose-50 border border-rose-200 px-1.5 py-0.5 rounded-full">' + Math.abs(diff) + 'd vencido</span>';
+      else if (diff === 0)
+        urgencyBadge = '<span class="ml-1 text-[9px] font-black text-orange-600 bg-orange-50 border border-orange-200 px-1.5 py-0.5 rounded-full">vence hoy</span>';
+      else if (diff <= 5)
+        urgencyBadge = '<span class="ml-1 text-[9px] font-black text-amber-600 bg-amber-50 border border-amber-200 px-1.5 py-0.5 rounded-full">vence en ' + diff + 'd</span>';
+    }
+
+    return (
+      '<tr class="hover:bg-slate-50 border-b border-slate-100 transition-colors' + (statusKey === 'overdue' ? ' bg-rose-50/20' : '') + '">' +
+        '<td class="px-5 py-3.5">' +
+          '<div class="flex items-center gap-3">' +
+            '<div class="w-8 h-8 rounded-xl bg-teal-50 text-teal-600 flex items-center justify-center font-black text-sm flex-shrink-0">' +
+              Helpers.escapeHTML((student.name || '?').charAt(0).toUpperCase()) +
+            '</div>' +
+            '<div>' +
+              '<div class="font-bold text-slate-800 text-sm">' + Helpers.escapeHTML(student.name || '-') + '</div>' +
+              '<div class="text-[10px] text-slate-400 font-bold uppercase">' + (student.classrooms?.name || 'Sin aula') + '</div>' +
+            '</div>' +
+          '</div>' +
+        '</td>' +
+        '<td class="px-5 py-3.5 text-center">' +
+          '<span class="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[10px] font-black uppercase ' + st.cls + '">' +
+            '<i data-lucide="' + st.icon + '" class="w-3 h-3"></i>' + st.label +
+          '</span>' +
+        '</td>' +
+        '<td class="px-5 py-3.5 text-right">' +
+          '<div class="font-black text-slate-800 text-base">' + amountFmt + '</div>' +
+          (isPending ? '<div class="flex items-center justify-end gap-1 mt-0.5"><span class="text-[10px] text-slate-400 font-bold">pendiente</span>' + urgencyBadge + '</div>' : '') +
+        '</td>' +
+        '<td class="px-5 py-3.5">' +
+          '<span class="text-[10px] font-black uppercase text-slate-500 bg-slate-100 px-2 py-0.5 rounded-md">' + (p.method || '-') + '</span>' +
+        '</td>' +
+        '<td class="px-5 py-3.5">' +
+          '<div class="text-[11px] font-bold text-slate-700">' + (p.paid_date ? new Date(p.paid_date).toLocaleDateString('es-ES') : dueDateStr) + '</div>' +
+          '<div class="text-[9px] text-slate-400 font-bold uppercase">' + (p.paid_date ? 'Pagado' : 'Vence') + '</div>' +
+        '</td>' +
+        '<td class="px-5 py-3.5 text-center">' +
+          (p.evidence_url
+            ? '<a href="' + p.evidence_url + '" target="_blank" rel="noopener noreferrer" class="inline-flex items-center gap-1 text-sky-600 hover:text-sky-800 text-xs font-bold uppercase"><i data-lucide="external-link" class="w-3 h-3"></i>Ver</a>'
+            : '<span class="text-slate-300 text-xs">-</span>') +
+        '</td>' +
+        '<td class="px-5 py-3.5 text-center">' +
+          '<div class="flex justify-center gap-1.5">' +
+            (isPending
+              ? '<button onclick="App.payments.markPaid(\'' + p.id + '\')" class="p-1.5 bg-emerald-50 text-emerald-600 rounded-lg hover:bg-emerald-100 transition-colors" title="Aprobar"><i data-lucide="check" class="w-4 h-4"></i></button>'
+              : '') +
+            (statusKey === 'review'
+              ? '<button onclick="App.payments.rejectPayment(\'' + p.id + '\')" class="p-1.5 bg-rose-50 text-rose-500 rounded-lg hover:bg-rose-100 transition-colors" title="Rechazar"><i data-lucide="x" class="w-4 h-4"></i></button>'
+              : '') +
+            '<button onclick="App.payments.deletePayment(\'' + p.id + '\')" class="p-1.5 bg-slate-50 text-slate-400 rounded-lg hover:bg-rose-50 hover:text-rose-500 transition-colors" title="Eliminar"><i data-lucide="trash-2" class="w-4 h-4"></i></button>' +
+          '</div>' +
+        '</td>' +
+      '</tr>'
+    );
+  },
+
+  async loadStats() {
+    try {
+      const now = new Date();
+      const monthStart = now.getFullYear() + '-' + String(now.getMonth() + 1).padStart(2, '0') + '-01T00:00:00.000Z';
+      const [incomeRes, pendingRes, overdueRes, reviewRes] = await Promise.all([
+        supabase.from('payments').select('amount').eq('status', 'paid').gte('created_at', monthStart),
+        supabase.from('payments').select('*', { count: 'exact', head: true }).eq('status', 'pending'),
+        supabase.from('payments').select('*', { count: 'exact', head: true }).eq('status', 'overdue'),
+        supabase.from('payments').select('*', { count: 'exact', head: true }).in('status', ['review', 'pending']).eq('method', 'transferencia')
+      ]);
+      const income = (incomeRes.data || []).reduce((s, p) => s + Number(p.amount || 0), 0);
+      const set = (id, v) => { const el = document.getElementById(id); if (el) el.textContent = v; };
+      set('kpiIncomeMonth', '$' + income.toLocaleString('es-ES', { minimumFractionDigits: 2 }));
+      set('kpiPendingCount', pendingRes.count || 0);
+      set('kpiOverdueCount', overdueRes.count || 0);
+      set('kpiReviewCount',  reviewRes.count || 0);
+    } catch (e) { console.error(e); }
   },
 
   async loadIncomeChart() {
     const canvas = document.getElementById('incomeChart');
     if (!canvas || !window.Chart) return;
-
     try {
       const year = new Date().getFullYear();
-      const { data: payments, error } = await supabase
-        .from('payments')
-        .select('amount, created_at, status')
-        .in('status', ['confirmado', 'paid', 'efectivo'])
-        .gte('created_at', `${year}-01-01`)
-        .lte('created_at', `${year}-12-31`);
-
-      if (error) throw error;
-
-      const labels = ['Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun', 'Jul', 'Ago', 'Sep', 'Oct', 'Nov', 'Dic'];
-      const dataValues = new Array(12).fill(0);
-
-      payments?.forEach(p => {
-        const date = new Date(p.created_at);
-        if (date.getFullYear() === year) {
-          dataValues[date.getMonth()] += (p.amount || 0);
-        }
-      });
-
+      const { data: payments } = await supabase
+        .from('payments').select('amount, created_at').eq('status', 'paid')
+        .gte('created_at', year + '-01-01').lte('created_at', year + '-12-31');
+      const labels = ['Ene','Feb','Mar','Abr','May','Jun','Jul','Ago','Sep','Oct','Nov','Dic'];
+      const vals = new Array(12).fill(0);
+      (payments || []).forEach(p => { const d = new Date(p.created_at); vals[d.getMonth()] += Number(p.amount || 0); });
       if (this._financialChart) this._financialChart.destroy();
       this._financialChart = new Chart(canvas, {
         type: 'bar',
-        data: {
-          labels,
-          datasets: [{
-            label: 'Ingresos ($)',
-            data: dataValues,
-            backgroundColor: 'rgba(13, 148, 136, 0.2)',
-            borderColor: 'rgb(13, 148, 136)',
-            borderWidth: 2,
-            borderRadius: 8
-          }]
-        },
-        options: {
-          responsive: true,
-          maintainAspectRatio: false,
-          scales: {
-            y: {
-              beginAtZero: true,
-              grid: { display: false }
-            },
-            x: {
-              grid: { display: false }
-            }
-          },
-          plugins: {
-            legend: { display: false }
-          }
-        }
+        data: { labels, datasets: [{ label: 'Ingresos ($)', data: vals, backgroundColor: 'rgba(13,148,136,0.15)', borderColor: 'rgb(13,148,136)', borderWidth: 2, borderRadius: 6 }] },
+        options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } }, scales: { y: { beginAtZero: true, grid: { color: 'rgba(0,0,0,0.04)' } }, x: { grid: { display: false } } } }
       });
-    } catch (e) {
-      console.error('Error loadIncomeChart:', e);
-    }
+    } catch (e) { console.error(e); }
   },
 
-  async loadPayments() {
-    const tbody = document.getElementById('paymentsTableBody');
-    if (!tbody) return;
+  async openPaymentModal(prefillStudentId = null) {
+    const ic = 'w-full px-4 py-2.5 border-2 border-slate-100 rounded-2xl outline-none focus:ring-4 focus:ring-teal-100 focus:border-teal-400 bg-slate-50/50 transition-all text-sm font-medium';
+    const lc = 'block text-[11px] font-black text-slate-400 uppercase tracking-wider mb-1.5 ml-1';
+    const now = new Date();
+    const dueMonth = now.getMonth() + 1;
+    const dueYear  = dueMonth > 11 ? now.getFullYear() + 1 : now.getFullYear();
+    const defaultDue = new Date(dueYear, dueMonth > 11 ? 0 : dueMonth, this.settings.due_day).toISOString().split('T')[0];
+    const monthOptions = MONTH_NAMES_ES.map((m, i) =>
+      '<option value="' + m + '"' + (i === now.getMonth() ? ' selected' : '') + '>' + MONTH_LABELS[i] + '</option>'
+    ).join('');
 
-    tbody.innerHTML = `<tr><td colspan="10" class="p-4">${Helpers.skeleton(3, 'h-12')}</td></tr>`;
+    openGlobalModal(
+      '<div class="bg-gradient-to-r from-teal-600 to-emerald-600 text-white p-6 rounded-t-3xl flex items-center justify-between">' +
+        '<div class="flex items-center gap-3">' +
+          '<div class="w-12 h-12 bg-white/20 rounded-2xl flex items-center justify-center text-2xl">💰</div>' +
+          '<div><h3 class="text-xl font-black">Registrar Pago</h3><p class="text-xs text-white/70 font-bold uppercase tracking-widest">Cobro Manual</p></div>' +
+        '</div>' +
+        '<button onclick="App.payments.closeModal()" class="w-10 h-10 flex items-center justify-center rounded-xl bg-white/10 hover:bg-white/20"><i data-lucide="x" class="w-6 h-6"></i></button>' +
+      '</div>' +
+      '<div class="p-6 bg-slate-50/30" id="modalPaymentBody">' +
+        '<div class="grid grid-cols-1 md:grid-cols-2 gap-4">' +
+          '<div class="md:col-span-2"><label class="' + lc + '">Estudiante</label>' +
+            '<select id="payStudentSelect" class="' + ic + '"><option value="">-- Seleccionar --</option></select></div>' +
+          '<div><label class="' + lc + '">Monto ($)</label>' +
+            '<input id="payAmount" type="number" step="0.01" min="0" class="' + ic + '" placeholder="0.00"></div>' +
+          '<div><label class="' + lc + '">Concepto</label>' +
+            '<input id="payConcept" type="text" class="' + ic + '" value="Mensualidad"></div>' +
+          '<div><label class="' + lc + '">Mes que se cobra</label>' +
+            '<select id="payMonthPaid" class="' + ic + '">' + monthOptions + '</select></div>' +
+          '<div><label class="' + lc + '">Fecha Limite de Pago</label>' +
+            '<input id="payDueDate" type="date" class="' + ic + '" value="' + defaultDue + '"></div>' +
+          '<div><label class="' + lc + '">Metodo de Pago</label>' +
+            '<select id="payMethod" class="' + ic + '">' +
+              '<option value="efectivo">Efectivo</option>' +
+              '<option value="transferencia">Transferencia</option>' +
+              '<option value="tarjeta">Tarjeta</option>' +
+            '</select></div>' +
+          '<div><label class="' + lc + '">Estado</label>' +
+            '<select id="payStatus" class="' + ic + '">' +
+              '<option value="paid">Pagado</option>' +
+              '<option value="pending">Pendiente</option>' +
+            '</select></div>' +
+        '</div>' +
+      '</div>' +
+      '<div class="bg-white p-5 rounded-b-3xl border-t border-slate-100 flex justify-end gap-3">' +
+        '<button onclick="App.payments.closeModal()" class="px-6 py-2.5 text-slate-500 font-black text-xs uppercase hover:bg-slate-50 rounded-2xl">Cancelar</button>' +
+        '<button id="btnSavePaymentAction" class="px-8 py-2.5 bg-gradient-to-r from-teal-600 to-emerald-600 text-white rounded-2xl font-black text-xs uppercase shadow-lg">Registrar Pago</button>' +
+      '</div>'
+    );
 
     try {
-      const selectedMonth = document.getElementById('paymentMonthFilter')?.value || 
-                          new Date().toLocaleString('es-ES', { month: 'long' });
+      const { data: students } = await supabase.from('students').select('id, name, classrooms:classroom_id(name)').eq('is_active', true).order('name');
+      const sel = document.getElementById('payStudentSelect');
+      if (sel && students) {
+        students.forEach(s => {
+          const o = document.createElement('option');
+          o.value = s.id;
+          o.textContent = s.name + ' (' + (s.classrooms?.name || 'Sin aula') + ')';
+          if (prefillStudentId && String(s.id) === String(prefillStudentId)) o.selected = true;
+          sel.appendChild(o);
+        });
+      }
+    } catch (e) { console.error(e); }
 
-      // Obtener estudiantes y sus pagos del mes
-      const [students, payments] = await Promise.all([
-        supabase.from('students').select('id, name, parent_id').eq('is_active', true).order('name'),
-        supabase.from('payments').select('*').eq('month_paid', selectedMonth)
-      ]);
-
-      if (students.error) throw students.error;
-      if (payments.error) throw payments.error;
-
-      // Mapear pagos (un pago por estudiante por mes)
-      const paymentMap = {};
-      (payments.data || []).forEach(p => {
-        if (!paymentMap[p.student_id] || p.status === 'confirmado') {
-          paymentMap[p.student_id] = p;
-        }
-      });
-
-      // Construir lista de deudores y pagos
-      const displayList = (students.data || []).map(st => {
-        const pay = paymentMap[st.id];
-        if (pay && pay.status === 'confirmado') return null; // Ocultar si ya pagó y está confirmado
-
-        if (pay) {
-          return { ...pay, students: { name: st.name, parent_id: st.parent_id } };
-        } else {
-          // Fila virtual para pendiente (sin registro en DB aún)
-          return { 
-            id: null, 
-            student_id: st.id, 
-            amount: 0, 
-            month_paid: selectedMonth, 
-            method: '-', 
-            status: 'sin_pago', 
-            bank: '-', 
-            reference: '-', 
-            transfer_date: '-', 
-            evidence_url: null, 
-            students: { name: st.name, parent_id: st.parent_id } 
-          };
-        }
-      }).filter(Boolean);
-
-      AppState.set('paymentsData', displayList);
-      this.renderTable(displayList);
-
-    } catch (e) {
-      console.error(e);
-      tbody.innerHTML = `<tr><td colspan="10" class="text-center text-rose-500 py-4 font-bold text-sm">Error cargando pagos</td></tr>`;
-    }
-  },
-
-  renderTable(payments) {
-    const tbody = document.getElementById('paymentsTableBody');
-    if (!tbody) return;
-
-    if (!payments || !payments.length) {
-      tbody.innerHTML = `<tr><td colspan="10">${Helpers.emptyState('Todos los estudiantes están al día')}</td></tr>`;
-      return;
-    }
-
-    const badgeClass = (status) => {
-      const map = {
-        confirmado: 'bg-green-100 text-green-700',
-        rechazado: 'bg-red-100 text-red-700',
-        efectivo: 'bg-blue-100 text-blue-700',
-        sin_pago: 'bg-slate-100 text-slate-500'
-      };
-      return map[status] || 'bg-amber-100 text-amber-700';
-    };
-
-    tbody.innerHTML = payments.map(p => {
-      const isVirtual = !p.id;
-      const statusLabel = p.status === 'sin_pago' ? 'Pendiente' : p.status;
-      
-      return `
-        <tr class="hover:bg-slate-50 border-b border-slate-50 transition-colors">
-          <td class="px-4 py-2 font-bold text-slate-700 text-sm">${p.students?.name || '—'}</td>
-          <td class="px-4 py-2 text-slate-600 text-sm">${isVirtual ? '-' : '$'+p.amount}</td>
-          <td class="px-4 py-2 text-slate-500 text-[10px] font-bold uppercase">${p.method || '-'}</td>
-          <td class="px-4 py-2">
-            <span class="px-2 py-0.5 rounded-full text-[10px] font-black uppercase ${badgeClass(p.status)}">
-              ${statusLabel}
-            </span>
-          </td>
-          <td class="px-4 py-2 text-slate-500 text-[10px]">${p.bank || '-'}</td>
-          <td class="px-4 py-2 text-slate-500 text-[10px]">${p.reference || '-'}</td>
-          <td class="px-4 py-2 text-slate-500 text-[10px]">${p.transfer_date || '-'}</td>
-          <td class="px-4 py-2 text-slate-500 text-[10px] font-bold">${p.month_paid}</td>
-          <td class="px-4 py-2">
-            ${p.evidence_url ? `<a href="${p.evidence_url}" target="_blank" class="text-sky-600 font-bold text-[10px] uppercase hover:underline">Ver</a>` : '-'}
-          </td>
-          <td class="px-4 py-2 flex gap-2">
-            ${!isVirtual ? `
-              <button data-action="confirm" data-id="${p.id}" class="bg-emerald-50 text-emerald-600 p-1.5 rounded-lg hover:bg-emerald-100" title="Confirmar"><i data-lucide="check" class="w-4 h-4 pointer-events-none"></i></button>
-              <button data-action="reject" data-id="${p.id}" class="bg-rose-50 text-rose-600 p-1.5 rounded-lg hover:bg-rose-100" title="Rechazar"><i data-lucide="x" class="w-4 h-4 pointer-events-none"></i></button>
-              <button data-action="delete" data-id="${p.id}" class="text-slate-300 hover:text-rose-500 p-1.5" title="Eliminar"><i data-lucide="trash-2" class="w-4 h-4 pointer-events-none"></i></button>
-            ` : `
-              <button data-action="register" data-student-id="${p.student_id}" class="bg-sky-50 text-sky-600 px-3 py-1 rounded-lg hover:bg-sky-100 font-bold text-[10px] uppercase">
-                Registrar
-              </button>
-            `}
-          </td>
-        </tr>
-      `;
-    }).join('');
-
+    document.getElementById('btnSavePaymentAction')?.addEventListener('click', () => this.saveManualPayment());
     if (window.lucide) lucide.createIcons();
   },
 
-  async openModal(studentId = null) {
-    const modal = document.getElementById('paymentModal');
-    if (!modal) return;
-    
-    modal.classList.remove('hidden');
-    modal.classList.add('flex');
-    
-    const select = document.getElementById('studentSelect');
-    if (select) {
-      const students = await Api.getStudents();
-      select.innerHTML = '<option value="" disabled selected>Seleccione un estudiante</option>' +
-        students.map(s => `<option value="${s.id}">${s.name}</option>`).join('');
-      if (studentId) select.value = studentId;
-    }
-    
-    const methodSel = document.getElementById('paymentMethod');
-    const tf = document.getElementById('transferFields');
-    if (methodSel && tf) {
-      methodSel.onchange = () => {
-        tf.style.display = methodSel.value === 'transferencia' ? 'block' : 'none';
-      };
-    }
-  },
+  closeModal() { closeGlobalModal(); },
 
-  async handleSubmit(e) {
-    e.preventDefault();
-    const btn = e.target.querySelector('button[type="submit"]');
-    btn.disabled = true;
+  async saveManualPayment() {
+    const studentId = document.getElementById('payStudentSelect')?.value;
+    const amount    = parseFloat(document.getElementById('payAmount')?.value || 0);
+    const concept   = document.getElementById('payConcept')?.value?.trim() || 'Mensualidad';
+    const monthPaid = document.getElementById('payMonthPaid')?.value;
+    const dueDate   = document.getElementById('payDueDate')?.value;
+    const method    = document.getElementById('payMethod')?.value || 'efectivo';
+    const status    = document.getElementById('payStatus')?.value || 'paid';
+    const paidDate  = status === 'paid' ? new Date().toISOString() : null;
+    const user      = AppState.get('user');
+
+    if (!studentId) return Helpers.toast('Selecciona un estudiante', 'warning');
+    if (!amount || amount <= 0) return Helpers.toast('Ingresa un monto valido', 'warning');
+
+    const btn = document.getElementById('btnSavePaymentAction');
+    if (btn) { btn.disabled = true; btn.textContent = 'Guardando...'; }
 
     try {
-      const studentId = document.getElementById('studentSelect').value;
-      const amount = document.getElementById('paymentAmount').value;
-      const month = document.getElementById('paymentMonth').value;
-      const method = document.getElementById('paymentMethod').value;
-      const evidence = document.getElementById('paymentEvidence')?.files?.[0];
-
-      let evidenceUrl = null;
-      if (method === 'transferencia' && evidence) {
-        const path = `${studentId}_${Date.now()}_${evidence.name}`;
-        const { error: upErr } = await supabase.storage.from('payments_evidence').upload(path, evidence);
-        if (upErr) throw upErr;
-        
-        const { data: signed } = await supabase.storage.from('payments_evidence').createSignedUrl(path, 60 * 60 * 24 * 7);
-        evidenceUrl = signed?.signedUrl;
-      }
-
       const { error } = await supabase.from('payments').insert({
-        student_id: studentId,
-        amount: Number(amount),
-        month_paid: month,
-        method,
-        evidence_url: evidenceUrl,
-        status: method === 'efectivo' ? 'efectivo' : 'pendiente',
-        recorded_by: AppState.get('user').id
+        student_id: studentId, amount, concept, method, status,
+        month_paid: monthPaid,
+        due_date:   dueDate || null,
+        paid_date:  paidDate,
+        recorded_by: user?.id || null,
+        created_at: new Date().toISOString()
       });
-
       if (error) throw error;
-      
-      Helpers.toast('Pago registrado correctamente');
-      document.getElementById('paymentModal').classList.add('hidden');
+      Helpers.toast('Pago registrado correctamente', 'success');
+      closeGlobalModal();
       await this.loadPayments();
-    } catch (err) {
-      console.error(err);
-      Helpers.toast('Error al registrar pago', 'error');
+    } catch (e) {
+      console.error(e);
+      Helpers.toast('Error al guardar: ' + e.message, 'error');
     } finally {
-      btn.disabled = false;
+      if (btn) { btn.disabled = false; btn.textContent = 'Registrar Pago'; }
     }
   },
 
-  // ✅ MEJORA: Lógica de negocio encapsulada en el módulo
-  async confirmPayment(id) {
-    if (!id) return;
-    const { data: { user } } = await supabase.auth.getUser();
-    const { error } = await supabase.from('payments').update({ status: 'confirmado', validated_by: user.id }).eq('id', id);
-    if (!error) {
-      Helpers.toast('Pago confirmado');
-      this.loadPayments();
-    } else {
-      Helpers.toast('Error al confirmar', 'error');
-    }
+  async markPaid(id) {
+    try {
+      const { error } = await supabase.from('payments').update({ status: 'paid', paid_date: new Date().toISOString() }).eq('id', id);
+      if (error) throw error;
+      Helpers.toast('Pago aprobado', 'success');
+      await this.loadPayments();
+    } catch (e) { Helpers.toast('Error al aprobar pago', 'error'); }
   },
 
   async rejectPayment(id) {
-    if (!id) return;
-    // ✅ MEJORA UX: Usar un modal en lugar de un prompt
     const reason = prompt('Motivo del rechazo (opcional):');
-    if (reason === null) return; // El usuario canceló el prompt
-
-    const { data: { user } } = await supabase.auth.getUser();
-    const { error } = await supabase.from('payments').update({ status: 'rechazado', validated_by: user.id, notes: reason || null }).eq('id', id);
-    if (!error) {
-      Helpers.toast('Pago rechazado');
-      this.loadPayments();
-    } else {
-      Helpers.toast('Error al rechazar', 'error');
-    }
+    if (reason === null) return;
+    try {
+      const user = AppState.get('user');
+      const { error } = await supabase.from('payments').update({ status: 'rechazado', validated_by: user?.id, notes: reason || null }).eq('id', id);
+      if (error) throw error;
+      Helpers.toast('Pago rechazado', 'success');
+      await this.loadPayments();
+    } catch (e) { Helpers.toast('Error al rechazar', 'error'); }
   },
 
   async deletePayment(id) {
-    if (!id || !confirm('¿Seguro que desea eliminar este registro de pago?')) return;
-    const { error } = await supabase.from('payments').delete().eq('id', id);
-    if (!error) Helpers.toast('Pago eliminado');
-    else Helpers.toast('Error al eliminar', 'error');
-    this.loadPayments();
+    if (!confirm('¿Eliminar este registro de pago?')) return;
+    try {
+      const { error } = await supabase.from('payments').delete().eq('id', id);
+      if (error) throw error;
+      Helpers.toast('Pago eliminado', 'success');
+      await this.loadPayments();
+    } catch (e) { Helpers.toast('Error al eliminar', 'error'); }
+  },
+
+  async runCycle() {
+    if (!confirm('¿Ejecutar ciclo de pagos?\n\nEsto generara cuotas del proximo mes y marcara como vencidos los pagos atrasados.')) return;
+    try {
+      Helpers.toast('Ejecutando ciclo de pagos...', 'info');
+      const { data, error } = await supabase.rpc('run_payment_cycle');
+      if (error) throw error;
+      const result = typeof data === 'string' ? JSON.parse(data) : (data || {});
+      Helpers.toast('Ciclo completado: ' + (result.generated || 0) + ' generados, ' + (result.expired || 0) + ' vencidos', 'success');
+      await this.loadPayments();
+    } catch (e) {
+      console.error(e);
+      Helpers.toast('Error en ciclo: ' + e.message, 'error');
+    }
   }
 };

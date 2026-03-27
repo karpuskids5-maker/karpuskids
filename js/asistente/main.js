@@ -8,13 +8,21 @@ import { Helpers } from '../shared/helpers.js';
 import { WallModule } from '../shared/wall.js';
 import { ChatModule } from '../shared/chat.js';
 
-// 🚀 Definir objeto App globalmente (Nivel Senior) para evitar ReferenceError
+// 🚀 Definir objeto App globalmente para evitar ReferenceError en onclicks del HTML
 window.App = {
+  payments: {
+    markPaid:      (id)  => PaymentsModule.markPaid(id),
+    rejectPayment: (id)  => PaymentsModule.rejectPayment(id),
+    deletePayment: (id)  => PaymentsModule.deletePayment(id),
+    openModal:     (sid) => PaymentsModule.openPaymentModal(sid),
+    closeModal:    ()    => PaymentsModule.closeModal(),
+    filterBy:      (s)   => PaymentsModule.filterBy(s)
+  },
   registerAccess: (sid, type) => window.App._registerAccess(sid, type),
-  confirmPayment: (id) => window.App._confirmPayment(id),
-  rejectPayment: (id) => window.App._rejectPayment(id),
-  deletePayment: (id) => window.App._deletePayment(id),
-  registerPayment: (sid) => window.App._registerPayment(sid),
+  confirmPayment: (id) => PaymentsModule.markPaid(id),
+  rejectPayment:  (id) => PaymentsModule.rejectPayment(id),
+  deletePayment:  (id) => PaymentsModule.deletePayment(id),
+  registerPayment:(sid) => PaymentsModule.openPaymentModal(sid),
   openTeacherModal: (id) => window.App._openTeacherModal(id),
   toggleCommentSection: (id) => window.App._toggleCommentSection(id),
   deleteComment: (cid, pid) => window.App._deleteComment(cid, pid),
@@ -160,6 +168,12 @@ function initNavigation() {
           break;
         case 'maestros':
           await TeachersModule.init();
+          break;
+        case 'estudiantes':
+          await loadAsistenteStudents();
+          break;
+        case 'aulas':
+          await loadAsistenteRooms();
           break;
         case 'muro':
           WallModule.loadPosts();
@@ -431,5 +445,105 @@ async function sendAssistantMessage() {
   } catch (e) {
     console.error('❌ Send message error:', e);
     Helpers.toast('Error enviando mensaje', 'error');
+  }
+}
+
+// ── Estudiantes (Asistente) ───────────────────────────────────────────────────
+async function loadAsistenteStudents() {
+  const tbody = document.getElementById('studentsTableBody');
+  if (!tbody) return;
+  tbody.innerHTML = '<tr><td colspan="4" class="text-center py-8"><div class="animate-spin rounded-full h-6 w-6 border-b-2 border-teal-600 mx-auto"></div></td></tr>';
+
+  try {
+    const { data: students, error } = await supabase
+      .from('students')
+      .select('id, name, is_active, p1_name, p1_phone, classroom_id, classrooms:classroom_id(name)')
+      .order('name');
+    if (error) throw error;
+
+    if (!students?.length) {
+      tbody.innerHTML = '<tr><td colspan="4" class="text-center py-8 text-slate-400">No hay estudiantes registrados.</td></tr>';
+      return;
+    }
+
+    tbody.innerHTML = students.map(s => `
+      <tr class="hover:bg-slate-50 border-b border-slate-100 transition-colors">
+        <td class="px-6 py-3 font-bold text-slate-800 text-sm">${Helpers.escapeHTML(s.name)}</td>
+        <td class="px-6 py-3 text-slate-500 text-sm">${s.classrooms?.name || 'Sin Aula'}</td>
+        <td class="px-6 py-3 text-slate-500 text-sm">${s.p1_name || 'N/A'}</td>
+        <td class="px-6 py-3">
+          <span class="px-2 py-1 rounded-full text-[10px] font-bold ${s.is_active ? 'bg-emerald-100 text-emerald-700' : 'bg-rose-100 text-rose-700'}">
+            ${s.is_active ? 'Activo' : 'Inactivo'}
+          </span>
+        </td>
+      </tr>`).join('');
+
+    // Buscador
+    const search = document.getElementById('searchStudentInput');
+    if (search && !search._bound) {
+      search._bound = true;
+      search.addEventListener('input', (e) => {
+        const q = e.target.value.toLowerCase();
+        tbody.querySelectorAll('tr').forEach(row => {
+          row.style.display = row.textContent.toLowerCase().includes(q) ? '' : 'none';
+        });
+      });
+    }
+
+    if (window.lucide) lucide.createIcons();
+  } catch (e) {
+    console.error('[loadAsistenteStudents]', e);
+    tbody.innerHTML = '<tr><td colspan="4" class="text-center py-8 text-rose-500 font-bold text-sm">Error al cargar estudiantes.</td></tr>';
+  }
+}
+
+// ── Aulas (Asistente) ─────────────────────────────────────────────────────────
+async function loadAsistenteRooms() {
+  const tbody = document.getElementById('roomsTable');
+  if (!tbody) return;
+  tbody.innerHTML = '<tr><td colspan="5" class="text-center py-8"><div class="animate-spin rounded-full h-6 w-6 border-b-2 border-teal-600 mx-auto"></div></td></tr>';
+
+  try {
+    const { data: rooms, error } = await supabase
+      .from('classrooms')
+      .select('id, name, level, capacity, teacher:teacher_id(name), students(count)')
+      .order('name');
+    if (error) throw error;
+
+    if (!rooms?.length) {
+      tbody.innerHTML = '<tr><td colspan="5" class="text-center py-8 text-slate-400">No hay aulas registradas.</td></tr>';
+      return;
+    }
+
+    tbody.innerHTML = rooms.map(r => {
+      const count = r.students?.[0]?.count || 0;
+      const cap   = r.capacity || 20;
+      const pct   = Math.round((count / cap) * 100);
+      const barColor = pct > 90 ? 'bg-rose-500' : pct > 70 ? 'bg-amber-500' : 'bg-emerald-500';
+      return `
+        <tr class="hover:bg-slate-50 border-b border-slate-100 transition-colors">
+          <td class="px-4 py-3 font-bold text-slate-800 text-sm">${Helpers.escapeHTML(r.name)}</td>
+          <td class="px-4 py-3 text-slate-500 text-sm hidden md:table-cell">${r.teacher?.name || 'Sin asignar'}</td>
+          <td class="px-4 py-3">
+            <div class="flex items-center gap-2">
+              <div class="flex-1 bg-slate-100 rounded-full h-2 max-w-[80px]">
+                <div class="${barColor} h-full rounded-full" style="width:${pct}%"></div>
+              </div>
+              <span class="text-xs font-bold text-slate-500">${count}/${cap}</span>
+            </div>
+          </td>
+          <td class="px-4 py-3 text-center">
+            <span class="px-2 py-1 rounded-full text-[10px] font-bold ${pct < 100 ? 'bg-emerald-100 text-emerald-700' : 'bg-rose-100 text-rose-700'}">
+              ${pct < 100 ? 'Disponible' : 'Llena'}
+            </span>
+          </td>
+          <td class="px-4 py-3 text-right text-slate-400 text-xs">${r.level || 'General'}</td>
+        </tr>`;
+    }).join('');
+
+    if (window.lucide) lucide.createIcons();
+  } catch (e) {
+    console.error('[loadAsistenteRooms]', e);
+    tbody.innerHTML = '<tr><td colspan="5" class="text-center py-8 text-rose-500 font-bold text-sm">Error al cargar aulas.</td></tr>';
   }
 }

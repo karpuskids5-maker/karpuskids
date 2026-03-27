@@ -124,20 +124,76 @@ export const FeedModule = {
             <i data-lucide="heart" class="w-4 h-4 ${isLiked ? 'fill-current' : ''}"></i>
             ${(p.likes || []).length} Me gusta
           </button>
-          <button data-action="comment" data-post-id="${p.id}" class="flex items-center gap-2 text-xs font-black uppercase tracking-tighter text-slate-400 hover:text-indigo-600 transition-all">
+          <button data-action="comment" data-post-id="${p.id}" class="flex items-center gap-2 text-xs font-black uppercase tracking-tighter text-slate-400 hover:text-blue-600 transition-all">
             <i data-lucide="message-circle" class="w-4 h-4"></i>
             ${(p.comments || []).length} Comentarios
           </button>
+        </div>
+
+        <div id="comments-section-${p.id}" class="hidden mt-4 pt-4 border-t border-slate-50 bg-slate-50/50 -mx-5 px-5 pb-2">
+          <div id="comments-list-${p.id}" class="space-y-3 mb-3 max-h-48 overflow-y-auto">
+            ${(p.comments || []).length === 0
+              ? '<p class="text-center text-[10px] text-slate-400 italic py-2">Sé el primero en comentar.</p>'
+              : (p.comments || []).map(c => {
+                  const cName = c.user?.name || 'Usuario';
+                  return `<div class="flex gap-2 text-xs"><div class="w-6 h-6 rounded-full bg-blue-100 text-blue-600 flex items-center justify-center font-bold text-[9px] shrink-0">${cName.charAt(0)}</div><div class="bg-white p-2 rounded-xl rounded-tl-none border border-slate-100 flex-1"><span class="font-bold text-slate-700">${escapeHtml(cName)}</span><p class="text-slate-600 mt-0.5">${escapeHtml(c.content)}</p></div></div>`;
+                }).join('')
+            }
+          </div>
+          <div class="flex gap-2">
+            <input type="text" id="comment-input-${p.id}" class="flex-1 px-3 py-2 text-xs border border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-400 outline-none" placeholder="Escribe un comentario..." onkeypress="if(event.key==='Enter') App.feed.sendComment('${p.id}')">
+            <button onclick="App.feed.sendComment('${p.id}')" class="p-2 bg-blue-600 text-white rounded-xl hover:bg-blue-700 transition-colors"><i data-lucide="send" class="w-4 h-4"></i></button>
+          </div>
         </div>
       </div>
     `;
   },
 
   /**
-   * Muestra comentarios (Placeholder por ahora o implementar modal)
+   * Muestra/oculta sección de comentarios usando WallModule compartido
    */
   showComments(postId) {
-    Helpers.toast('Comentarios en desarrollo 🚀', 'info');
+    // Usar WallModule si está disponible (compartido con directora/maestra)
+    if (window.WallModule?.toggleCommentSection) {
+      window.WallModule.toggleCommentSection(postId);
+      return;
+    }
+    // Fallback: toggle inline
+    const section = document.getElementById(`comments-section-${postId}`);
+    if (section) section.classList.toggle('hidden');
+  },
+
+  /**
+   * Envía un comentario en un post
+   */
+  async sendComment(postId) {
+    const input = document.getElementById(`comment-input-${postId}`);
+    const content = input?.value.trim();
+    if (!content) return;
+
+    const user    = AppState.get('user');
+    const profile = AppState.get('profile');
+    const student = AppState.get('currentStudent');
+    if (!user) return;
+
+    // Para padres: mostrar nombre del estudiante (no del padre)
+    const authorName = student?.name || profile?.name || 'Padre';
+
+    try {
+      const { error } = await supabase.from('comments').insert({
+        post_id:   postId,
+        user_id:   user.id,
+        user_name: authorName,
+        content
+      });
+      if (error) throw error;
+      input.value = '';
+      // Recargar posts para mostrar el nuevo comentario
+      await this.loadPosts();
+    } catch (err) {
+      console.error('Error enviando comentario:', err);
+      Helpers.toast('Error al enviar comentario', 'error');
+    }
   },
 
   /**

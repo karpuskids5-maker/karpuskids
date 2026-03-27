@@ -31,7 +31,7 @@ export const RoomsModule = {
     const capacity = document.getElementById('roomCapacity')?.value;
     const teacher_id = document.getElementById('roomTeacher')?.value || null;
     if (!name) return Helpers.toast('El nombre del aula es requerido', 'warning');
-    UIHelpers.setLoading(true);
+    UI.setLoading(true);
     try {
       const payload = { name, capacity: capacity ? parseInt(capacity) : null, teacher_id };
       let error;
@@ -42,13 +42,13 @@ export const RoomsModule = {
       }
       if (error) throw error;
       Helpers.toast(id ? 'Aula actualizada' : 'Aula creada', 'success');
-      UIHelpers.closeModal();
+      UI.closeModal();
       await this.init();
     } catch (e) {
       console.error('Error saveRoom:', e);
       Helpers.toast('Error al guardar aula: ' + e.message, 'error');
     } finally {
-      UIHelpers.setLoading(false);
+      UI.setLoading(false);
     }
   },
 

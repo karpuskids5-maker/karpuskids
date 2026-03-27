@@ -125,6 +125,57 @@ export const ChatModule = {
     }
   },
 
+  /**
+   * Obtiene la lista de conversaciones/chats según el rol del usuario
+   */
+  async getChatList() {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) return [];
+
+    const { data: profile } = await supabase.from('profiles').select('role').eq('id', user.id).single();
+    const role = profile?.role || 'padre';
+
+    // 1. Query base de conversaciones
+    let query = supabase
+      .from('conversations')
+      .select(`
+        id, 
+        type, 
+        classroom_id, 
+        classrooms(name),
+        conversation_participants(
+          user_id, 
+          profiles(id, name, role, avatar_url)
+        )
+      `);
+
+    // RLS ya filtra para maestra/padre, pero Directora puede ver todo.
+    const { data: conversations, error } = await query.order('updated_at', { ascending: false });
+    if (error) throw error;
+
+    // 2. Normalizar para UI tipo Messenger
+    return conversations.map(c => {
+      if (c.type === 'classroom') {
+        return {
+          conversationId: c.id,
+          name: `Grupo: ${c.classrooms?.name || 'Aula'}`,
+          meta: 'Chat del salón',
+          avatar: null,
+          type: 'classroom'
+        };
+      } else {
+        const other = c.conversation_participants.find(p => p.user_id !== user.id);
+        return {
+          conversationId: c.id,
+          name: other?.profiles?.name || 'Usuario',
+          meta: other?.profiles?.role || '',
+          avatar: other?.profiles?.avatar_url,
+          type: 'direct_message',
+          otherUserId: other?.profiles?.id
+        };
+      }
+    });
+  },
   async init() {
     // Placeholder para inicialización si se requiere en el futuro
   }

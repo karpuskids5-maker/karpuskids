@@ -38,7 +38,7 @@
     #initial-loading {
       position: fixed;
       inset: 0;
-      background: white;
+      background: linear-gradient(to bottom right, #bae6fd, #e0e7ff);
       z-index: 9999;
       display: flex;
       flex-direction: column;
@@ -73,14 +73,13 @@
 
     /* --- TEMA INFANTIL MODERNO: "MUNDO DE EXPLORACIÓN" --- */
     :root {
-      --color-bg: #F0F7FF;
+      --color-bg: transparent;
       --color-card: #FFFFFF;
       --font-main: 'Quicksand', sans-serif;
     }
 
     body {
-      font-family: 'Nunito', sans-serif;
-      background-color: #f8fafc;
+      font-family: 'Quicksand', sans-serif;
       overflow-x: hidden;
       color: #1e293b;
       min-height: 100vh;
@@ -95,7 +94,7 @@
     @keyframes float-delayed { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-10px); } }
     .animate-float-delayed { animation: float-delayed 5s ease-in-out infinite; animation-delay: 1s; }
 
-    .animate-float { animation: float 4s ease-in-out infinite; }
+    .animate-float { animation: float 6s ease-in-out infinite; }
     
     @keyframes breathe {
       0%, 100% { transform: scale(1); }
@@ -109,13 +108,39 @@
 
     /* Tarjetas "Burbuja" */
     .patio-card {
-      background: white;
+      background: rgba(255, 255, 255, 0.7);
+      backdrop-filter: blur(12px);
+      -webkit-backdrop-filter: blur(12px);
       border-radius: 2rem; /* Super redondeado */
-      box-shadow: 0 10px 30px -10px rgba(14, 165, 233, 0.15);
-      border: 2px solid #F0F9FF;
+      box-shadow: 0 8px 32px 0 rgba(31, 38, 135, 0.07);
+      border: 1px solid rgba(255, 255, 255, 0.4);
       transition: all 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
     }
     .patio-card:active { transform: scale(0.98); }
+    .patio-card:hover { 
+      background: rgba(255, 255, 255, 0.9);
+      transform: translateY(-5px);
+      border-color: rgba(255, 255, 255, 0.8);
+    }
+
+    /* Sidebar Refinado */
+    #sidebar {
+      background: rgba(255, 255, 255, 0.4) !important;
+      backdrop-filter: blur(20px);
+      -webkit-backdrop-filter: blur(20px);
+      border: 1px solid rgba(255, 255, 255, 0.5) !important;
+    }
+
+    .sidebar-node {
+      border-radius: 1.2rem;
+      transition: all 0.3s ease;
+      color: #64748b;
+    }
+    .sidebar-node.active {
+      background: white !important;
+      color: #0ea5e9 !important;
+      box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.05);
+    }
 
     /* Botones de Navegación Móvil */
     .nav-pill {
@@ -184,14 +209,14 @@
             <span class="k-7">K</span><span class="k-8">i</span><span class="k-9">d</span><span class="k-10">s</span>
           </span>
         </h1>
-        <p class="text-[10px] font-extrabold uppercase tracking-[0.2em] text-indigo-400 mt-2 bg-indigo-50/50 px-4 py-1.5 rounded-full border border-indigo-100/50">Panel Familiar</p>
+        <p class="text-[10px] font-extrabold uppercase tracking-[0.2em] text-indigo-500 mt-2 bg-white/50 px-4 py-1.5 rounded-full border border-white/50">Panel Familiar</p>
       </div>
 
       <!-- Card Estudiante -->
       <div class="px-6 mb-8 hidden md:block"> 
-        <div class="bg-white/60 backdrop-blur-sm rounded-3xl p-5 shadow-sm border border-white transition-all duration-300 hover:shadow-md group">
+        <div class="bg-white/40 rounded-3xl p-5 border border-white/60 transition-all duration-300 hover:bg-white/60 group">
           <p class="text-[10px] text-slate-400 font-bold uppercase tracking-widest mb-2 flex items-center gap-1.5">
-            <i data-lucide="sparkles" class="w-3.5 h-3.5 text-amber-400 group-hover:animate-pulse"></i> Mi Pequeño/a
+            <i data-lucide="sparkles" class="w-3.5 h-3.5 text-amber-500 group-hover:animate-pulse"></i> Estudiante
           </p>
           <div id="sidebar-student-name" class="font-extrabold text-slate-700 text-lg truncate leading-tight">Cargando...</div>
         </div>
@@ -202,36 +227,31 @@
         role="navigation" 
         aria-label="Navegación principal"
       >
+        <!-- Inicio -->
         <button type="button" data-target="home" class="sidebar-node node-home active" aria-label="Inicio">
           <i data-lucide="layout-dashboard" class="w-5 h-5 text-sky-500"></i>
           <span class="hidden md:inline">Inicio</span>
         </button>
-       
+        <!-- Muro 🔵 Azul -->
         <button type="button" data-target="class" class="sidebar-node node-class" aria-label="Muro">
-          <i data-lucide="message-square" class="w-5 h-5 text-violet-500"></i>
+          <i data-lucide="message-square" class="w-5 h-5 text-blue-500"></i>
           <span class="hidden md:inline">Muro</span>
         </button>
+        <!-- Tareas 🎒 Naranja -->
         <button type="button" data-target="tasks" class="sidebar-node node-tasks" aria-label="Tareas">
-          <i data-lucide="backpack" class="w-5 h-5 text-amber-500"></i>
-          <span class="hidden md:inline">Tarea</span>
+          <i data-lucide="backpack" class="w-5 h-5 text-orange-500"></i>
+          <span class="hidden md:inline">Tareas</span>
         </button>
-        <button type="button" data-target="grades" class="sidebar-node node-grades" aria-label="Calificaciones">
-          <i data-lucide="award" class="w-5 h-5 text-emerald-500"></i>
-          <span class="hidden md:inline">Notas</span>
-        </button>
+        <!-- Perfil 🟣 Púrpura -->
         <button type="button" data-target="profile" class="sidebar-node node-profile" aria-label="Perfil">
-          <i data-lucide="user" class="w-5 h-5 text-indigo-500"></i>
+          <i data-lucide="user" class="w-5 h-5 text-purple-500"></i>
           <span class="hidden md:inline">Mi Perfil</span>
-        </button>
-        <button type="button" data-target="videocall" class="sidebar-node node-videocall hidden transition-all duration-300 animate-pulse bg-rose-50 text-rose-600 border border-rose-200" aria-label="Aula Virtual">
-          <i data-lucide="video" class="w-5 h-5 text-rose-500"></i>
-          <span class="hidden md:inline font-bold">En Vivo 🔴</span>
         </button>
       </nav>
 
-      <div class="p-6 mt-auto hidden md:block relative z-10">
-        <button type="button" id="btnLogout" class="flex items-center justify-center gap-3 w-full p-4 rounded-2xl transition-all font-bold text-sm bg-rose-50/50 text-rose-500 hover:bg-rose-500 hover:text-white border border-rose-100/50">
-          <i data-lucide="log-out" class="w-4 h-4"></i> Cerrar Sesión
+      <div class="p-4 md:p-6 mt-auto relative z-10">
+        <button type="button" id="btnLogout" class="flex items-center justify-center gap-2 md:gap-3 w-full p-3 md:p-4 rounded-2xl transition-all font-bold text-xs md:text-sm bg-rose-50/50 text-rose-500 hover:bg-rose-500 hover:text-white border border-rose-100/50">
+          <i data-lucide="log-out" class="w-4 h-4"></i> <span class="hidden md:inline">Cerrar Sesión</span>
         </button>
       </div>
       
@@ -668,33 +688,60 @@
 
       <!-- MODALS -->
       <div id="modalAbsence" tabindex="-1" class="fixed inset-0 z-50 hidden items-center justify-center bg-slate-900/40 backdrop-blur-md" role="dialog" aria-modal="true">
-        <div class="bg-white p-8 rounded-[2rem] w-full max-w-md shadow-2xl m-4 transform transition-all">
-          <h3 class="text-xl font-bold mb-4 flex items-center gap-2">
-             <i data-lucide="calendar-x" class="text-rose-500"></i> Reportar Ausencia
-          </h3>
-          <form id="formAbsence" class="space-y-4">
-            <div>
-              <label class="block text-sm font-bold text-slate-700 mb-1">Fecha</label>
-              <input type="date" id="absenceDate" class="w-full p-4 bg-slate-50 border-none rounded-2xl outline-none focus:ring-2 focus:ring-rose-300 transition-all" required>
+        <div class="bg-white rounded-[2.5rem] w-full max-w-md shadow-2xl m-4 transform transition-all overflow-hidden flex flex-col max-h-[90vh]">
+          <!-- Cabecera Visual Amigable -->
+          <div class="bg-gradient-to-r from-emerald-400 to-green-600 p-8 text-white relative">
+            <button type="button" class="absolute top-4 right-4 p-2 bg-white/20 rounded-full hover:bg-white/30 transition-colors" data-close-modal>
+              <i data-lucide="x" class="w-5 h-5"></i>
+            </button>
+            <div class="w-16 h-16 bg-white/20 rounded-2xl flex items-center justify-center mb-4 backdrop-blur-sm">
+              <i data-lucide="calendar-x" class="w-10 h-10"></i>
             </div>
-            <div>
-              <label class="block text-sm font-bold text-slate-700 mb-1">Motivo</label>
-              <select id="absenceReason" class="w-full p-4 bg-slate-50 border-none rounded-2xl outline-none focus:ring-2 focus:ring-rose-300 transition-all" required>
-                <option value="">Selecciona un motivo...</option>
-                <option value="Enfermedad">Enfermedad</option>
-                <option value="Cita Médica">Cita Médica</option>
-                <option value="Emergencia Familiar">Emergencia Familiar</option>
-                <option value="Viaje">Viaje</option>
-                <option value="Otro">Otro</option>
-              </select>
+            <h3 class="text-2xl font-black">Aviso de Ausencia</h3>
+            <p class="text-emerald-50 text-sm font-medium opacity-90">Cuéntanos por qué tu pequeño no vendrá hoy</p>
+          </div>
+
+          <form id="formAbsence" class="p-8 space-y-6 overflow-y-auto no-scrollbar">
+            <!-- Selector de Fecha -->
+            <div class="space-y-2">
+              <label class="block text-xs font-black text-slate-400 uppercase tracking-widest ml-1">¿Para qué día?</label>
+              <div class="relative">
+                <i data-lucide="calendar" class="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-emerald-500"></i>
+                <input type="date" id="absenceDate" class="w-full pl-12 pr-4 py-4 bg-slate-50 border-2 border-slate-50 rounded-2xl outline-none focus:border-emerald-400 focus:bg-white transition-all font-bold text-slate-700" required>
+              </div>
             </div>
-            <div>
-              <label class="block text-sm font-bold text-slate-700 mb-1">Nota adicional</label>
-              <textarea id="absenceNote" class="w-full p-4 bg-slate-50 border-none rounded-2xl outline-none focus:ring-2 focus:ring-rose-300 transition-all" rows="3" placeholder="Detalles opcionales..."></textarea>
+
+            <!-- Selector Visual de Motivos -->
+            <div class="space-y-3">
+              <label class="block text-xs font-black text-slate-400 uppercase tracking-widest ml-1">Selecciona el motivo</label>
+              <div class="grid grid-cols-2 gap-3" id="reasonPicker">
+                <button type="button" data-value="Enfermedad" class="reason-btn p-4 rounded-2xl border-2 border-slate-50 bg-slate-50 text-slate-600 font-bold text-sm transition-all hover:border-emerald-200 flex flex-col items-center gap-2 group">
+                  <span class="text-2xl transition-transform group-hover:scale-110">🤒</span> Enfermedad
+                </button>
+                <button type="button" data-value="Cita Médica" class="reason-btn p-4 rounded-2xl border-2 border-slate-50 bg-slate-50 text-slate-600 font-bold text-sm transition-all hover:border-emerald-200 flex flex-col items-center gap-2 group">
+                  <span class="text-2xl transition-transform group-hover:scale-110">🏥</span> Cita Médica
+                </button>
+                <button type="button" data-value="Viaje" class="reason-btn p-4 rounded-2xl border-2 border-slate-50 bg-slate-50 text-slate-600 font-bold text-sm transition-all hover:border-emerald-200 flex flex-col items-center gap-2 group">
+                  <span class="text-2xl transition-transform group-hover:scale-110">✈️</span> Viaje
+                </button>
+                <button type="button" data-value="Otro" class="reason-btn p-4 rounded-2xl border-2 border-slate-50 bg-slate-50 text-slate-600 font-bold text-sm transition-all hover:border-emerald-200 flex flex-col items-center gap-2 group">
+                  <span class="text-2xl transition-transform group-hover:scale-110">✨</span> Otro
+                </button>
+              </div>
+              <input type="hidden" id="absenceReason" required>
             </div>
-            <div class="flex justify-end gap-3 mt-6">
-              <button type="button" class="px-6 py-3 rounded-2xl font-bold text-slate-500 hover:bg-slate-100 transition-colors" data-close-modal>Cancelar</button>
-              <button type="submit" class="px-6 py-3 rounded-2xl font-bold bg-rose-500 text-white hover:bg-rose-600 shadow-lg shadow-rose-200 transition-transform active:scale-95">Enviar Reporte</button>
+
+            <!-- Área de Texto -->
+            <div class="space-y-2">
+              <label class="block text-xs font-black text-slate-400 uppercase tracking-widest ml-1">Nota adicional (Opcional)</label>
+              <textarea id="absenceNote" class="w-full p-4 bg-slate-50 border-2 border-slate-50 rounded-2xl outline-none focus:border-emerald-400 focus:bg-white transition-all text-sm font-medium text-slate-600 resize-none" rows="3" placeholder="Escribe aquí algún detalle extra..."></textarea>
+            </div>
+
+            <!-- Botón de Envío Dinámico -->
+            <div class="pt-4">
+              <button type="submit" class="btn-main w-full py-4 text-lg shadow-xl shadow-emerald-100 flex items-center justify-center gap-2">
+                <i data-lucide="send" class="w-5 h-5"></i> Enviar a la Maestra
+              </button>
             </div>
           </form>
         </div>

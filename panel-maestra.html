@@ -13,7 +13,7 @@
   <script src="https://cdn.onesignal.com/sdks/web/v16/OneSignalSDK.page.js" defer></script>
   <script>window.OneSignalDeferred = window.OneSignalDeferred || [];</script>
 
-  <script src="https://unpkg.com/lucide@latest"></script>
+  <script src="https://unpkg.com/lucide@1.7.0/dist/umd/lucide.min.js"></script>
   
   <style>
     /* Sidebar styles */
@@ -47,16 +47,30 @@
     @media (max-width: 640px) {
       .nav-btn-toy { padding: 10px 14px; gap: 8px; font-size: 14px; }
       .nav-btn-toy i { width: 18px; height: 18px; }
-      .class-tab-btn { flex: 1; min-width: 0; padding: 8px 4px; font-size: 11px; text-align: center; }
+      .class-tab-btn { 
+        flex: none; 
+        min-width: auto; 
+        padding: 10px 16px; 
+        font-size: 14px; 
+        white-space: nowrap;
+      }
       .grid-cols-2, .grid-cols-3, .grid-cols-4 { grid-template-columns: 1fr; }
       .stat-block { padding: 12px; }
       .stat-block h3 { font-size: 12px; }
       .stat-block .value { font-size: 20px; }
       
+      .notebook-paper { padding-left: 1.25rem; border-left-width: 3px; }
+
       /* Ajuste de botones de acción en posts */
       .post-actions { flex-wrap: wrap; gap: 8px; }
       .post-actions button { flex: 1; min-width: 100px; justify-content: center; }
     }
+
+    /* Ocultar scrollbar pero permitir scroll en pestañas de aula */
+    .tabs-scroll-container {
+      scrollbar-width: none;
+    }
+    .tabs-scroll-container::-webkit-scrollbar { display: none; }
 
     .section { display: none; opacity: 0; transition: opacity 0.3s ease-in-out; }
     .section.active { display: block; opacity: 1; animation: fadeIn 0.4s ease-out; }
@@ -214,6 +228,10 @@
           <i data-lucide="message-square" class="w-5 h-5"></i>
           <span class="label">Chat</span>
         </button>
+        <button data-section="t-grades" class="nav-btn-toy w-full">
+          <i data-lucide="graduation-cap" class="w-5 h-5"></i>
+          <span class="label">Calificaciones</span>
+        </button>
         <button data-section="t-profile" class="nav-btn-toy w-full">
           <i data-lucide="user-circle" class="w-5 h-5"></i>
           <span class="label">Mi Perfil</span>
@@ -287,18 +305,18 @@
           <button id="backToClasses" class="p-2 hover:bg-slate-100 rounded-full transition-colors text-slate-600">
             <i data-lucide="arrow-left" class="w-6 h-6"></i>
           </button>
-          <div>
-            <h1 class="text-2xl font-bold text-slate-800" id="currentClassName">Nombre del Aula</h1>
+          <div class="min-w-0">
+            <h1 class="text-xl md:text-2xl font-bold text-slate-800 truncate" id="currentClassName">Nombre del Aula</h1>
             <p class="text-sm text-slate-500">Vista detallada</p>
           </div>
           <div class="ml-auto flex gap-2">
-            <button id="btnGenerateReport" onclick="document.getElementById('dailyReportModal').classList.remove('hidden'); document.getElementById('dailyReportModal').classList.add('flex');" class="hidden md:flex items-center gap-2 px-4 py-2 bg-orange-100 border border-orange-200 rounded-lg text-sm font-bold text-orange-700 hover:bg-orange-200 transition-colors"><i data-lucide="clipboard-list" class="w-4 h-4"></i> Reporte de Rutina</button>
+            <button id="btnGenerateReport" onclick="document.getElementById('dailyReportModal').classList.remove('hidden'); document.getElementById('dailyReportModal').classList.add('flex');" class="hidden sm:flex items-center gap-2 px-4 py-2 bg-orange-100 border border-orange-200 rounded-lg text-sm font-bold text-orange-700 hover:bg-orange-200 transition-colors"><i data-lucide="clipboard-list" class="w-4 h-4"></i> <span class="hidden lg:inline">Reporte de Rutina</span></button>
             <button id="btnParentView" class="hidden md:flex items-center gap-2 px-4 py-2 bg-white border border-slate-200 rounded-lg text-sm font-bold text-slate-600 hover:bg-slate-50"><i data-lucide="eye" class="w-4 h-4"></i> Vista Padre</button>
           </div>
         </header>
 
         <!-- Tabs -->
-        <div class="flex gap-2 mb-6 border-b pb-1 overflow-x-auto">
+        <div class="flex gap-2 mb-6 border-b pb-1 overflow-x-auto tabs-scroll-container">
           <button class="class-tab-btn active px-4 py-2 rounded-t-lg font-medium bg-orange-600 text-white transition-colors" data-tab="feed">
             Muro
           </button>
@@ -402,6 +420,11 @@
         <div class="bg-white rounded-xl shadow-sm p-6 text-center text-slate-500">
           Selecciona una clase para tomar asistencia.
         </div>
+      </section>
+
+      <!-- SECTION: CALIFICACIONES -->
+      <section id="t-grades" class="section">
+        <div id="t-grades-inner"></div>
       </section>
 
       <!-- SECTION: CHAT UNIFICADO -->

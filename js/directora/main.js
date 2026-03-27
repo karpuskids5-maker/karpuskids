@@ -2,8 +2,7 @@ import { ensureRole, supabase, initOneSignal } from '../shared/supabase.js';
 import { AppState } from './state.js';
 import { Helpers } from '../shared/helpers.js';
 import { WallModule } from './wall.module.js';
-import { DashboardService } from '../directora/dashboard.service.js';
-import { VideoCallModule } from '../shared/videocall.js';
+import { DashboardService } from './dashboard.service.js';
 import { UIHelpers, DirectorUI } from './ui.module.js';
 import { StudentsModule } from './students.module.js';
 import { TeachersModule } from './teachers.module.js';
@@ -37,13 +36,15 @@ window.App = {
 
 window.WallModule = WallModule;
 
-window.openGlobalModal = function(html) {
+window.openGlobalModal = function(html, wide = false) {
   const container = document.getElementById('globalModalContainer');
   if (!container) return;
-  container.innerHTML = `<div class="bg-white rounded-3xl shadow-2xl w-full max-w-2xl max-h-[90vh] overflow-y-auto">${html}</div>`;
+  const maxW = wide ? 'max-w-4xl' : 'max-w-2xl';
+  container.innerHTML = `<div class="bg-white rounded-3xl shadow-2xl w-full ${maxW} max-h-[92vh] overflow-y-auto mx-3 my-4">${html}</div>`;
   container.style.display = 'flex';
-  container.style.alignItems = 'center';
+  container.style.alignItems = 'flex-start';
   container.style.justifyContent = 'center';
+  container.style.paddingTop = '4vh';
   container.style.zIndex = '9999';
   if (window.lucide) lucide.createIcons();
 };
@@ -73,8 +74,8 @@ export function goToSection(sectionId) {
         break;
       case 'maestros': TeachersModule.init(); break;
       case 'estudiantes': StudentsModule.init(); break;
-      case 'aulas': RoomsModule.init(); break;
-      case 'asistencia': AttendanceModule.init(); break;
+      case 'aulas': RoomsModule.init(); break; // No hay cambios en aulas
+      case 'asistencia': AttendanceModule.init(); break; // No hay cambios en asistencia
       case 'calificaciones': GradesModule.init(); break;
       case 'pagos': PaymentsModule.init(); break;
       case 'comunicacion': ChatModule.init(); break;
@@ -155,6 +156,11 @@ document.addEventListener('DOMContentLoaded', async () => {
 
     // 5. Iniciar Dashboard por defecto
     goToSection('dashboard');
+
+    // 5b. Botón refresh dashboard
+    document.getElementById('btnRefreshDashboard')?.addEventListener('click', () => {
+      DashboardService.getFullData(true).then(data => DirectorUI.renderDashboard(data));
+    });
 
     // 6. Configurar Logout
     document.getElementById('btnLogout')?.addEventListener('click', async () => {
