@@ -34,6 +34,71 @@
   <link rel="preload" href="https://fonts.googleapis.com/css2?family=Quicksand:wght@400;600;700&family=Nunito:wght@400;600;700;800&display=swap" as="style">
   
   <style>
+    :root {
+      /* NOTAS */
+      --notas: #22C55E;
+      --notas-soft: rgba(34, 197, 94, 0.15);
+
+      /* ASISTENCIA */
+      --asistencia: #16A34A;
+      --asistencia-soft: rgba(22, 163, 74, 0.15);
+
+      /* TAREAS */
+      --tareas: #F59E0B;
+      --tareas-soft: rgba(245, 158, 11, 0.15);
+
+      /* MURO */
+      --muro: #3B82F6;
+      --muro-soft: rgba(59, 130, 246, 0.15);
+
+      /* VIDEO */
+      --video: #EF4444;
+      --video-soft: rgba(239, 68, 68, 0.15);
+
+      /* PERFIL */
+      --perfil: #4ADE80;
+      --perfil-soft: rgba(74, 222, 128, 0.15);
+
+      /* PAGOS */
+      --pagos: #10B981;
+      --pagos-soft: rgba(16, 185, 129, 0.15);
+
+      --main-color: #0ea5e9;
+      --soft-color: rgba(14, 165, 233, 0.1);
+    }
+
+    body.home { --main-color: #0ea5e9; --soft-color: rgba(14, 165, 233, 0.1); }
+    body.grades { --main-color: var(--notas); --soft-color: var(--notas-soft); }
+    body.live-attendance { --main-color: var(--asistencia); --soft-color: var(--asistencia-soft); }
+    body.tasks { --main-color: var(--tareas); --soft-color: var(--tareas-soft); }
+    body.class { --main-color: var(--muro); --soft-color: var(--muro-soft); }
+    body.videocall { --main-color: var(--video); --soft-color: var(--video-soft); }
+    body.profile { --main-color: var(--perfil); --soft-color: var(--perfil-soft); }
+    body.payments { --main-color: var(--pagos); --soft-color: var(--pagos-soft); }
+
+    .btn-main {
+      background: var(--main-color);
+      color: white;
+      border: none;
+      padding: 12px 18px;
+      border-radius: 12px;
+      font-weight: 600;
+      transition: all 0.3s ease;
+    }
+    .btn-main:hover {
+      filter: brightness(0.9);
+      transform: translateY(-2px);
+    }
+    .icon-main { color: var(--main-color); }
+    .icon-box { background: var(--soft-color); color: var(--main-color); padding: 10px; border-radius: 10px; }
+    .card-highlight { border-left: 5px solid var(--main-color); background: rgba(255, 255, 255, 0.8); }
+    
+    .sidebar-node.active {
+      background: var(--soft-color) !important;
+      color: var(--main-color) !important;
+      box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.05);
+    }
+
     /* --- MEJORAS DE CARGA Y TRANSICIONES --- */
     #initial-loading {
       position: fixed;
@@ -438,7 +503,7 @@
 
         <!-- MURO -->
         <section id="class" class="section hidden">
-          <div class="card-base classroom-card min-h-[80vh]">
+          <div class="bg-white rounded-3xl shadow-sm p-6 border border-slate-100 min-h-[80vh]">
             <h3 class="text-2xl font-black text-slate-800 tracking-tight mb-6 flex items-center gap-2 text-campus-title">
               <i data-lucide="school" class="text-blue-500"></i> Salón de Clases
             </h3>
@@ -448,7 +513,7 @@
 
         <!-- CALIFICACIONES -->
         <section id="grades" class="section hidden">
-          <div class="card-base progress-card p-6 md:p-8 min-h-[80vh]">
+          <div class="bg-white rounded-3xl shadow-sm p-6 md:p-8 min-h-[80vh] border border-slate-100">
             <h3 class="text-2xl font-black text-slate-800 tracking-tight mb-6 flex items-center gap-2 text-campus-title">
                <span class="text-3xl">🏆</span> Tablero de Progreso
             </h3>
@@ -480,7 +545,7 @@
             <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
               
               <!-- Tarjeta de Solicitud (Formulario) -->
-              <div class="card-base payment-card lg:col-span-1 h-fit">
+              <div class="bg-white rounded-3xl shadow-sm p-6 border border-slate-100 lg:col-span-1 h-fit">
                 <div class="card-header border-b border-green-100 pb-3 mb-4">
                   <h4 class="font-bold text-lg text-slate-700 flex items-center gap-2">
                     <i data-lucide="wallet" class="w-5 h-5 text-green-500"></i> Registrar Pago

@@ -129,6 +129,7 @@ function renderHomeCards(student, data) {
 
   const cards = [
     { id: 'attendance', title: 'Asistencia', value: 'Hoy', sub: 'Ver reporte', icon: '📅', color: 'bg-green-50 text-green-600', target: 'live-attendance' },
+    { id: 'grades', title: 'Notas', value: academic?.evidences?.length || 0, sub: 'Calificaciones', icon: '🏆', color: 'bg-emerald-50 text-emerald-600', target: 'grades' },
     { id: 'chat', title: 'Chat', value: 'Mensajes', sub: 'Personal', icon: '💬', color: 'bg-blue-50 text-blue-600', target: 'notifications' },
     { id: 'videocall', title: 'Videollamada', value: AppState.get('isClassLive') ? '🔴 En vivo' : 'Aula Virtual', sub: 'Unirse', icon: '🎥', color: AppState.get('isClassLive') ? 'bg-rose-50 text-rose-600 ring-2 ring-rose-300 animate-pulse' : 'bg-purple-50 text-purple-600', target: 'videocall' },
     { id: 'payments', title: 'Pagos', value: Helpers.formatCurrency(debt), sub: debt > 0 ? 'Pendiente' : 'Al día', icon: '💳', color: debt > 0 ? 'bg-rose-50 text-rose-600' : 'bg-teal-50 text-teal-600', target: 'payments' }
@@ -203,7 +204,10 @@ function renderDailySummary(log) {
 export function navigateTo(targetId) {
   if (!targetId) return;
 
-  // 1. Manejo de Clases Active/Hidden
+  // 1. Manejo de Clases Active/Hidden y Clases de Body Dinámicas
+  document.body.className = document.body.className.replace(/\b(home|grades|live-attendance|tasks|class|videocall|profile|payments)\b/g, '').trim();
+  document.body.classList.add(targetId);
+
   document.querySelectorAll('.section').forEach(sec => {
     sec.classList.add('hidden');
     sec.classList.remove('active');
