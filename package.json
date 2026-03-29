@@ -30,7 +30,8 @@
     "@supabase/supabase-js": "^2.90.0",
     "better-sqlite3": "^12.5.0",
     "cors": "^2.8.5",
-    "express": "^5.2.1"
+    "express": "^5.2.1",
+    "playwright": "^1.58.2"
   },
   "devDependencies": {
     "@tailwindcss/postcss": "^4.1.18",
