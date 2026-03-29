@@ -1,4 +1,5 @@
 import { supabase, createClient, SUPABASE_URL, SUPABASE_ANON_KEY, initOneSignal } from './js/supabase.js';
+import { supabase, createClient, SUPABASE_URL, SUPABASE_ANON_KEY, initOneSignal, updateTermsAcceptance } from './js/supabase.js';
 import { ChatModule } from './js/shared/chat.js';
 import { WallModule } from './js/directora/wall.module.js'; // 🔥 Usar módulo específico
 import { VideoCallModule } from './js/shared/videocall.js'; // 🔥 Nuevo Módulo
@@ -180,6 +181,31 @@ document.addEventListener('DOMContentLoaded', async () => {
     // Buscar elementos donde mostrar el nombre (ej: sidebar)
     const userNameElements = document.querySelectorAll('[data-username]');
     userNameElements.forEach(el => el.textContent = profile.name || 'Usuario');
+  }
+
+  // ✅ VERIFICACIÓN DE TÉRMINOS Y CONDICIONES
+  if (!profile.accepted_terms) {
+    const modalHtml = `
+      <div id="termsModal" class="fixed inset-0 bg-slate-900/80 backdrop-blur-md z-[9999] flex items-center justify-center p-4">
+        <div class="bg-white rounded-3xl max-w-2xl w-full shadow-2xl overflow-hidden flex flex-col max-h-[90vh]">
+          <div class="p-6 bg-indigo-600 text-white font-bold text-xl">Políticas de Seguridad y Privacidad - Karpus Kids</div>
+          <div class="p-8 overflow-y-auto text-slate-600 leading-relaxed space-y-4 text-sm">
+            <p><strong>Bienvenido a Karpus Kids.</strong> Para continuar usando la plataforma como ${profile.role}, debe aceptar nuestras condiciones:</p>
+            <p>1. <strong>Privacidad:</strong> Los datos de los estudiantes son confidenciales y solo para uso educativo.</p>
+            <p>2. <strong>Seguridad:</strong> Se prohíbe compartir credenciales de acceso con terceros.</p>
+            <p>3. <strong>Uso de Imagen:</strong> El contenido multimedia en el Muro Escolar es propiedad de la institución.</p>
+            <p>Al hacer clic en "Aceptar", usted confirma que ha leído y acepta cumplir con estas normas.</p>
+          </div>
+          <div class="p-6 border-t bg-slate-50 flex justify-end gap-3">
+            <button id="btnRejectTerms" class="px-6 py-2 text-slate-500 font-bold">Cerrar Sesión</button>
+            <button id="btnAcceptTerms" class="px-8 py-2 bg-indigo-600 text-white rounded-xl font-bold shadow-lg shadow-indigo-200">Aceptar y Continuar</button>
+          </div>
+        </div>
+      </div>`;
+    document.body.insertAdjacentHTML('beforeend', modalHtml);
+    
+    document.getElementById('btnRejectTerms').onclick = async () => { await supabase.auth.signOut(); window.location.reload(); };
+    document.getElementById('btnAcceptTerms').onclick = async () => { await updateTermsAcceptance(); document.getElementById('termsModal').remove(); };
   }
 
   // 🔥 EXPOSICIÓN GLOBAL (Para que funcione el Muro si lo usas)

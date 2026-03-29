@@ -91,7 +91,9 @@ export async function sendPush(payload) {
 
     const { data, error } = await supabase.functions.invoke('send-push', { 
       body: payload,
-      // No incluimos el header manualmente para dejar que el SDK use el de la sesión actual
+      headers: {
+        'Authorization': `Bearer ${session.access_token}`
+      }
     });
     
     if (error) throw error;
@@ -229,3 +231,27 @@ export async function initOneSignal(currentUser = null) {
 if (!window.initOneSignal) window.initOneSignal = initOneSignal;
 
 export { createClient, SUPABASE_URL, SUPABASE_ANON_KEY };
+
+// Función para actualizar el estado de aceptación de términos del usuario actual
+export async function updateTermsAcceptance() {
+  try {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) {
+      console.error("No user logged in to accept terms.");
+      return false;
+    }
+
+    const { error } = await supabase
+      .from('profiles')
+      .update({ accepted_terms: true, accepted_terms_at: new Date().toISOString() })
+      .eq('id', user.id);
+
+    if (error) throw error;
+    console.log("Terms accepted successfully.");
+    return true;
+  } catch (e) {
+    console.error("Error accepting terms:", e);
+    alert("Error al aceptar los términos: " + (e.message || e));
+    return false;
+  }
+}

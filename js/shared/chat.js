@@ -22,6 +22,44 @@ export const ChatModule = {
   },
 
   /**
+   * Carga los contactos para el padre (Restringido a Maestra y Directora)
+   */
+  async loadPadreContacts(studentId) {
+    try {
+      // 1. Obtener Maestra del Aula
+      const { data: student } = await supabase
+        .from('students')
+        .select('classroom_id, classrooms(teacher_id)')
+        .eq('id', studentId)
+        .single();
+      
+      const teacherId = student?.classrooms?.teacher_id;
+
+      // 2. Consultar Maestra y Directivos
+      const [teacherRes, staffRes] = await Promise.all([
+        teacherId ? supabase.from('profiles').select('id, name, avatar_url, role').eq('id', teacherId).single() : Promise.resolve({ data: null }),
+        supabase.from('profiles').select('id, name, avatar_url, role').in('role', ['directora', 'asistente']).order('name')
+      ]);
+
+      const contacts = [];
+      if (teacherRes.data) {
+        contacts.push({ ...teacherRes.data, roleLabel: 'Maestra Titular' });
+      }
+      
+      (staffRes.data || []).forEach(s => {
+        if (s.id !== teacherId) {
+          contacts.push({ ...s, roleLabel: s.role === 'directora' ? 'Directora' : 'Administración' });
+        }
+      });
+
+      return contacts;
+    } catch (err) {
+      console.error('[ChatModule] Error loadPadreContacts:', err);
+      return [];
+    }
+  },
+
+  /**
    * Carga la conversación privada con otro usuario.
    * Retorna: { messages: [], conversationId: number | null }
    */
@@ -43,46 +81,44 @@ export const ChatModule = {
    * Envía un mensaje. 
    * 🔥 Lógica Inteligente: Si no existe conversación, la crea automáticamente junto con los participantes.
    */
-  async sendMessage(senderId, receiverId, content, knownConversationId = null) {
-    let conversationId = knownConversationId;
+  async sendMessage(senderId, receiverId, content, conversationId = null) {
+    try {
+      let activeConvId = conversationId;
 
-    // 1. Si no tenemos ID, creamos la estructura de conversación
-    if (!conversationId) {
-      // A. Crear Conversación
-      const { data: conv, error: convErr } = await supabase
-        .from('conversations')
-        .insert({ type: 'private' })
-        .select('id')
+      // 1. Si no hay conversationId, buscar una existente o crearla
+      if (!activeConvId) {
+        // Buscar conversación privada existente entre estos dos usuarios usando RPC para evitar sintaxis compleja de filtros cruzados
+        const { data: convId } = await supabase.rpc('find_or_create_private_conversation', {
+          p_user1: senderId,
+          p_user2: receiverId
+        });
+
+        if (convId) {
+          activeConvId = convId;
+        } else {
+          throw new Error('No se pudo crear o encontrar la conversación');
+        }
+      }
+
+      // 2. Insertar el mensaje
+      const { data: message, error: msgError } = await supabase
+        .from('messages')
+        .insert({
+          conversation_id: activeConvId,
+          sender_id: senderId,
+          content: content.trim(),
+          is_read: false
+        })
+        .select()
         .single();
-      
-      if (convErr) throw convErr;
-      conversationId = conv.id;
 
-      // B. Asignar Participantes
-      const { error: partErr } = await supabase
-        .from('conversation_participants')
-        .insert([
-          { conversation_id: conversationId, user_id: senderId },
-          { conversation_id: conversationId, user_id: receiverId }
-        ]);
-      
-      if (partErr) throw partErr;
+      if (msgError) throw msgError;
+
+      return { message, conversationId: activeConvId };
+    } catch (err) {
+      console.error('[ChatModule] Error enviando mensaje:', err);
+      throw err;
     }
-
-    // 2. Insertar Mensaje
-    const { data: msg, error: msgErr } = await supabase
-      .from('messages')
-      .insert({
-        conversation_id: conversationId,
-        sender_id: senderId,
-        content: content.trim()
-      })
-      .select()
-      .single();
-
-    if (msgErr) throw msgErr;
-
-    return { message: msg, conversationId };
   },
 
   /**

@@ -315,25 +315,25 @@
           </div>
         </header>
 
-        <!-- Tabs -->
-        <div class="flex gap-2 mb-6 border-b pb-1 overflow-x-auto tabs-scroll-container">
-          <button class="class-tab-btn active px-4 py-2 rounded-t-lg font-medium bg-orange-600 text-white transition-colors" data-tab="feed">
-            Muro
+        <!-- Tabs — scroll horizontal en móvil, sin desbordamiento -->
+        <div class="flex gap-1 mb-6 border-b pb-1 overflow-x-auto tabs-scroll-container -mx-4 px-4 md:mx-0 md:px-0">
+          <button class="class-tab-btn active flex-shrink-0 px-3 py-2 rounded-t-lg font-bold text-xs md:text-sm bg-orange-600 text-white transition-colors" data-tab="feed">
+            <span class="flex items-center gap-1"><i data-lucide="layout" class="w-3.5 h-3.5 md:hidden"></i><span>Muro</span></span>
           </button>
-          <button class="class-tab-btn px-4 py-2 rounded-t-lg font-medium text-slate-600 hover:bg-slate-100 transition-colors" data-tab="daily-routine">
-            Rutina
+          <button class="class-tab-btn flex-shrink-0 px-3 py-2 rounded-t-lg font-bold text-xs md:text-sm text-slate-600 hover:bg-slate-100 transition-colors" data-tab="daily-routine">
+            <span class="flex items-center gap-1"><i data-lucide="clipboard-list" class="w-3.5 h-3.5 md:hidden"></i><span>Rutina</span></span>
           </button>
-          <button class="class-tab-btn px-4 py-2 rounded-t-lg font-medium text-slate-600 hover:bg-slate-100 transition-colors" data-tab="students">
-            Estudiantes
+          <button class="class-tab-btn flex-shrink-0 px-3 py-2 rounded-t-lg font-bold text-xs md:text-sm text-slate-600 hover:bg-slate-100 transition-colors" data-tab="students">
+            <span class="flex items-center gap-1"><i data-lucide="users" class="w-3.5 h-3.5 md:hidden"></i><span>Alumnos</span></span>
           </button>
-          <button class="class-tab-btn px-4 py-2 rounded-t-lg font-medium text-slate-600 hover:bg-slate-100 transition-colors" data-tab="attendance">
-            Asistencia
+          <button class="class-tab-btn flex-shrink-0 px-3 py-2 rounded-t-lg font-bold text-xs md:text-sm text-slate-600 hover:bg-slate-100 transition-colors" data-tab="attendance">
+            <span class="flex items-center gap-1"><i data-lucide="calendar-check" class="w-3.5 h-3.5 md:hidden"></i><span>Asistencia</span></span>
           </button>
-          <button class="class-tab-btn px-4 py-2 rounded-t-lg font-medium text-slate-600 hover:bg-slate-100 transition-colors" data-tab="tasks">
-            Tareas
+          <button class="class-tab-btn flex-shrink-0 px-3 py-2 rounded-t-lg font-bold text-xs md:text-sm text-slate-600 hover:bg-slate-100 transition-colors" data-tab="tasks">
+            <span class="flex items-center gap-1"><i data-lucide="backpack" class="w-3.5 h-3.5 md:hidden"></i><span>Tareas</span></span>
           </button>
-          <button class="class-tab-btn px-4 py-2 rounded-t-lg font-medium text-slate-600 hover:bg-slate-100 transition-colors" data-tab="videocall">
-            Clase en Vivo
+          <button class="class-tab-btn flex-shrink-0 px-3 py-2 rounded-t-lg font-bold text-xs md:text-sm text-slate-600 hover:bg-slate-100 transition-colors" data-tab="videocall">
+            <span class="flex items-center gap-1"><i data-lucide="video" class="w-3.5 h-3.5 md:hidden"></i><span class="hidden md:inline">Clase en Vivo</span><span class="md:hidden">Video</span></span>
           </button>
         </div>
 

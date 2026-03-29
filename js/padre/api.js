@@ -35,17 +35,21 @@ export const Api = {
    * 💰 Estado financiero completo
    */
   async getStudentFinancialStatus(studentId) {
-    const [student, pendingPayments, history] = await Promise.all([
+    const [student, allPending, history] = await Promise.all([
       handle(supabase.from(TABLES.STUDENTS).select('monthly_fee, due_day').eq('id', studentId).single(), 'getStudentFee'),
       handle(supabase.from(TABLES.PAYMENTS).select('*').eq('student_id', studentId).in('status', ['pending', 'overdue']).order('due_date', { ascending: true }), 'getPendingPayments'),
       handle(supabase.from(TABLES.PAYMENTS).select('*').eq('student_id', studentId).eq('status', 'paid').order('created_at', { ascending: false }).limit(5), 'getPaymentHistory')
     ]);
 
-    const totalDebt = (pendingPayments || []).reduce((sum, p) => sum + Number(p.amount || 0), 0);
+    // Filtrar: si hay un pago con evidencia, ese mes está "en revisión" y no cuenta como deuda exigible
+    // pero si hay un cargo sin evidencia para el mismo mes, ese es el que cuenta si no hay abono.
+    // Lógica PRO: Solo sumamos los que NO tienen evidencia (son cargos puros)
+    const trueDebt = (allPending || []).filter(p => !p.evidence_url && !p.proof_url);
+    const totalDebt = trueDebt.reduce((sum, p) => sum + Number(p.amount || 0), 0);
 
     return {
       config: { monthly_fee: student?.monthly_fee || 0, due_day: student?.due_day || 5 },
-      debt: { total: totalDebt, items: pendingPayments || [] },
+      debt: { total: totalDebt, items: allPending || [] }, // Enviamos todos para que la UI decida qué mostrar
       history: history || []
     };
   },

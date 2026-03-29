@@ -18,7 +18,7 @@
   <meta property="og:image" content="logo/favicon.ico">
 
   <script src="https://cdn.tailwindcss.com"></script>
-  <!-- OneSignal SDK Fix -->
+  <!-- OneSignal SDK -->
   <script src="https://cdn.onesignal.com/sdks/web/v16/OneSignalSDK.page.js" defer></script>
   <script>window.OneSignalDeferred = window.OneSignalDeferred || [];</script>
 
@@ -36,35 +36,35 @@
   <style>
     :root {
       /* NOTAS */
-      --notas: #22C55E;
-      --notas-soft: rgba(34, 197, 94, 0.15);
+      --notas: #10B981; /* Emerald 500 */
+      --notas-soft: rgba(16, 185, 129, 0.15);
 
       /* ASISTENCIA */
-      --asistencia: #16A34A;
-      --asistencia-soft: rgba(22, 163, 74, 0.15);
+      --asistencia: #10B981; /* Emerald 500 */
+      --asistencia-soft: rgba(5, 150, 105, 0.15);
 
       /* TAREAS */
-      --tareas: #F59E0B;
-      --tareas-soft: rgba(245, 158, 11, 0.15);
+      --tareas: #F59E0B; /* Amber 500 (Naranja más suave) */
+      --tareas-soft: rgba(249, 115, 22, 0.15);
 
       /* MURO */
-      --muro: #3B82F6;
+      --muro: #3B82F6; /* Blue 500 */
       --muro-soft: rgba(59, 130, 246, 0.15);
 
       /* VIDEO */
-      --video: #EF4444;
-      --video-soft: rgba(239, 68, 68, 0.15);
+      --video: #10B981; /* Clase en vivo ahora es verde para invitar a entrar */
+      --video-soft: rgba(244, 63, 94, 0.15);
 
       /* PERFIL */
-      --perfil: #4ADE80;
-      --perfil-soft: rgba(74, 222, 128, 0.15);
+      --perfil: #10B981; /* Emerald 500 */
+      --perfil-soft: rgba(16, 185, 129, 0.15);
 
       /* PAGOS */
-      --pagos: #10B981;
-      --pagos-soft: rgba(16, 185, 129, 0.15);
+      --pagos: #059669; /* Emerald 600 */
+      --pagos-soft: rgba(5, 150, 105, 0.15);
 
-      --main-color: #0ea5e9;
-      --soft-color: rgba(14, 165, 233, 0.1);
+      --main-color: #10B981; /* Emerald 500 */
+      --soft-color: rgba(16, 185, 129, 0.1);
     }
 
     body.home { --main-color: #0ea5e9; --soft-color: rgba(14, 165, 233, 0.1); }
@@ -137,7 +137,7 @@
     }
 
     /* --- TEMA INFANTIL MODERNO: "MUNDO DE EXPLORACIÓN" --- */
-    :root {
+    :root { /* Re-definición de variables para el tema principal */
       --color-bg: transparent;
       --color-card: #FFFFFF;
       --font-main: 'Quicksand', sans-serif;
@@ -175,7 +175,7 @@
     .patio-card {
       background: rgba(255, 255, 255, 0.7);
       backdrop-filter: blur(12px);
-      -webkit-backdrop-filter: blur(12px);
+      -webkit-backdrop-filter: blur(12px); /* Para compatibilidad con Safari */
       border-radius: 2rem; /* Super redondeado */
       box-shadow: 0 8px 32px 0 rgba(31, 38, 135, 0.07);
       border: 1px solid rgba(255, 255, 255, 0.4);
@@ -188,31 +188,42 @@
       border-color: rgba(255, 255, 255, 0.8);
     }
 
-    /* Sidebar Refinado */
+    /* Sidebar Estilo Mochila Verde */
     #sidebar {
-      background: rgba(255, 255, 255, 0.4) !important;
-      backdrop-filter: blur(20px);
-      -webkit-backdrop-filter: blur(20px);
-      border: 1px solid rgba(255, 255, 255, 0.5) !important;
+      background: linear-gradient(180deg, #10B981 0%, #059669 100%) !important;
+      border-right: 4px solid #047857 !important;
+      border-top-right-radius: 40px;
+      border-bottom-right-radius: 40px;
+      box-shadow: 5px 0 25px rgba(5, 150, 105, 0.2);
+      color: white;
+    }
+    
+    #sidebar::after {
+      content: ''; position: absolute; top: 20px; bottom: 20px; right: 10px;
+      border-right: 2px dashed rgba(255,255,255,0.3); pointer-events: none;
     }
 
     .sidebar-node {
-      border-radius: 1.2rem;
-      transition: all 0.3s ease;
-      color: #64748b;
+      background: rgba(255,255,255,0.15);
+      color: white !important;
+      border-radius: 14px;
+      margin-bottom: 8px;
+      transition: all .25s ease;
     }
     .sidebar-node.active {
       background: white !important;
-      color: #0ea5e9 !important;
-      box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.05);
+      color: #059669 !important;
+      transform: translateX(6px);
     }
+    
+    .sidebar-node i { color: inherit !important; }
 
     /* Botones de Navegación Móvil */
     .nav-pill {
       border-radius: 1.5rem;
       transition: all 0.3s ease;
     }
-    .nav-pill.active {
+    .nav-pill.active { /* No se usa en este HTML, pero se mantiene por si acaso */
       background: #0EA5E9; /* Sky 500 */
       color: white;
       box-shadow: 0 8px 20px -4px rgba(14, 165, 233, 0.4);
@@ -229,23 +240,17 @@
     }
   </style>
 </head>
-<body class="text-slate-700 panel-padre-body overflow-x-hidden min-h-screen bg-gradient-to-br from-sky-300 via-indigo-200 to-purple-200 relative" aria-label="Panel de padres Karpus Kids">
-
-  <!-- Elementos Decorativos de Fondo (Igual que Login) -->
-  <div class="fixed top-10 left-10 text-6xl opacity-60 animate-float select-none z-0 pointer-events-none">☁️</div>
-  <div class="fixed bottom-20 right-10 text-6xl opacity-60 animate-float-delayed select-none z-0 pointer-events-none">🌈</div>
-  <div class="fixed top-1/3 right-20 text-4xl opacity-40 animate-pulse select-none z-0 pointer-events-none">⭐</div>
-  <div class="fixed bottom-10 left-1/4 text-5xl opacity-50 animate-bounce select-none z-0 pointer-events-none" style="animation-duration: 3s;">🎈</div>
+<body class="text-slate-700 panel-padre-body overflow-x-hidden min-h-screen" style="background:#f1f5f9;" aria-label="Panel de padres Karpus Kids">
 
   <!-- Overlay de Carga Inicial -->
-  <div id="initial-loading">
+  <div id="initial-loading" style="background:linear-gradient(135deg,#dcfce7,#f0fdf4);">
     <div class="relative">
-      <div class="w-20 h-20 border-4 border-sky-100 border-t-sky-500 rounded-full animate-spin"></div>
+      <div class="w-20 h-20 border-4 border-green-100 border-t-green-500 rounded-full animate-spin"></div>
       <div class="absolute inset-0 flex items-center justify-center">
         <span class="text-2xl animate-bounce">🎒</span>
       </div>
     </div>
-    <p class="mt-4 font-bold text-slate-400 animate-pulse">Preparando la mochila...</p>
+    <p class="mt-4 font-bold text-green-700 animate-pulse">Preparando la mochila...</p>
   </div>
 
   <div class="flex min-h-screen relative app app-panel-padre z-10">
@@ -265,7 +270,7 @@
     >
       <!-- Logo y Branding -->
       <div class="hidden md:flex flex-col items-center justify-center pt-10 pb-6 mx-4 mb-4">
-        <div class="w-20 h-20 bg-gradient-to-tr from-sky-100 to-indigo-50 rounded-3xl flex items-center justify-center shadow-inner mb-4 animate-float rotate-3">
+        <div class="w-20 h-20 bg-gradient-to-tr from-emerald-100 to-teal-50 rounded-3xl flex items-center justify-center shadow-inner mb-4 animate-float rotate-3">
            <img id="sidebarAvatar" src="img/mundo.jpg" class="w-12 h-12 rounded-2xl object-cover shadow-sm" alt="Logo" loading="lazy" decoding="async">
         </div>
         <h1 class="font-black text-2xl tracking-tight text-slate-800">
@@ -274,14 +279,14 @@
             <span class="k-7">K</span><span class="k-8">i</span><span class="k-9">d</span><span class="k-10">s</span>
           </span>
         </h1>
-        <p class="text-[10px] font-extrabold uppercase tracking-[0.2em] text-indigo-500 mt-2 bg-white/50 px-4 py-1.5 rounded-full border border-white/50">Panel Familiar</p>
+        <p class="text-[10px] font-extrabold uppercase tracking-[0.2em] text-emerald-500 mt-2 bg-white/50 px-4 py-1.5 rounded-full border border-white/50">Panel Familiar</p>
       </div>
 
       <!-- Card Estudiante -->
       <div class="px-6 mb-8 hidden md:block"> 
-        <div class="bg-white/40 rounded-3xl p-5 border border-white/60 transition-all duration-300 hover:bg-white/60 group">
+        <div class="bg-emerald-50/40 rounded-3xl p-5 border border-emerald-100/50 transition-all duration-300 hover:bg-emerald-50/60 group">
           <p class="text-[10px] text-slate-400 font-bold uppercase tracking-widest mb-2 flex items-center gap-1.5">
-            <i data-lucide="sparkles" class="w-3.5 h-3.5 text-amber-500 group-hover:animate-pulse"></i> Estudiante
+            <i data-lucide="sparkles" class="w-3.5 h-3.5 text-emerald-500 group-hover:animate-pulse"></i> Estudiante
           </p>
           <div id="sidebar-student-name" class="font-extrabold text-slate-700 text-lg truncate leading-tight">Cargando...</div>
         </div>
@@ -293,22 +298,22 @@
         aria-label="Navegación principal"
       >
         <!-- Inicio -->
-        <button type="button" data-target="home" class="sidebar-node node-home active" aria-label="Inicio">
-          <i data-lucide="layout-dashboard" class="w-5 h-5 text-sky-500"></i>
+        <button type="button" data-target="home" class="sidebar-node node-home active text-slate-600 hover:bg-emerald-50 hover:text-emerald-700" aria-label="Inicio">
+          <i data-lucide="layout-dashboard" class="w-5 h-5 text-emerald-500"></i>
           <span class="hidden md:inline">Inicio</span>
         </button>
         <!-- Muro 🔵 Azul -->
-        <button type="button" data-target="class" class="sidebar-node node-class" aria-label="Muro">
+        <button type="button" data-target="class" class="sidebar-node node-class text-slate-600 hover:bg-emerald-50 hover:text-emerald-700" aria-label="Muro">
           <i data-lucide="message-square" class="w-5 h-5 text-blue-500"></i>
           <span class="hidden md:inline">Muro</span>
         </button>
         <!-- Tareas 🎒 Naranja -->
-        <button type="button" data-target="tasks" class="sidebar-node node-tasks" aria-label="Tareas">
+        <button type="button" data-target="tasks" class="sidebar-node node-tasks text-slate-600 hover:bg-emerald-50 hover:text-emerald-700" aria-label="Tareas">
           <i data-lucide="backpack" class="w-5 h-5 text-orange-500"></i>
           <span class="hidden md:inline">Tareas</span>
         </button>
         <!-- Perfil 🟣 Púrpura -->
-        <button type="button" data-target="profile" class="sidebar-node node-profile" aria-label="Perfil">
+        <button type="button" data-target="profile" class="sidebar-node node-profile text-slate-600 hover:bg-emerald-50 hover:text-emerald-700" aria-label="Perfil">
           <i data-lucide="user" class="w-5 h-5 text-purple-500"></i>
           <span class="hidden md:inline">Mi Perfil</span>
         </button>
@@ -316,7 +321,7 @@
 
       <div class="p-4 md:p-6 mt-auto relative z-10">
         <button type="button" id="btnLogout" class="flex items-center justify-center gap-2 md:gap-3 w-full p-3 md:p-4 rounded-2xl transition-all font-bold text-xs md:text-sm bg-rose-50/50 text-rose-500 hover:bg-rose-500 hover:text-white border border-rose-100/50">
-          <i data-lucide="log-out" class="w-4 h-4"></i> <span class="hidden md:inline">Cerrar Sesión</span>
+          <i data-lucide="log-out" class="w-4 h-4 text-rose-500 group-hover:text-white"></i> <span class="hidden md:inline">Cerrar Sesión</span>
         </button>
       </div>
       
@@ -348,19 +353,17 @@
       <!-- Header Escritorio -->
       <header class="hidden md:flex justify-between items-center mb-10" role="banner">
         <div>
-          <h1 class="text-2xl font-bold text-slate-700 sr-only">Karpus Kids - Panel de Padres</h1>
+          <h1 class="text-2xl font-bold text-slate-700 sr-only">Karpus Kids - Panel de Padres</h1> <!-- Screen reader only -->
           <h2 class="text-4xl font-black text-slate-800 tracking-tight flex items-center gap-3">
-             <span class="animate-bounce">👋</span> Hola, <span class="guardian-name-display text-sky-600">Familia</span>!
+             <span class="animate-bounce">👋</span> Hola, <span class="guardian-name-display text-emerald-600">Familia</span>!
           </h2>
           <p class="text-slate-400 font-bold text-lg mt-2 ml-1" id="currentDateDisplay" aria-live="polite">Hoy es un gran día para aprender</p>
         </div>
         <div class="flex items-center gap-4">
-          <button type="button" id="btnRefreshData" class="p-3 rounded-full bg-white shadow-sm hover:shadow-md text-slate-400 hover:text-sky-500 transition-all">
-            <i data-lucide="refresh-cw" class="w-5 h-5"></i>
-          </button>
+          <!-- Botón de refresco eliminado según solicitud -->
           <div class="hidden md:flex items-center gap-3 text-right">
             <div>
-              <p class="text-sm font-black text-slate-700 student-name-display">Estudiante</p>
+              <p class="text-sm font-black text-slate-700 student-name-display">Cargando...</p>
               <p class="text-xs font-bold text-emerald-600 classroom-name-display bg-emerald-50 border border-emerald-100 px-3 py-0.5 rounded-full inline-block mt-1">Cargando aula...</p>
             </div>
             <div id="headerStudentAvatar" class="w-12 h-12 rounded-full bg-white border-2 border-slate-100 overflow-hidden shadow-sm">
@@ -373,14 +376,14 @@
       <!-- DASHBOARD INFANTIL -->
       <section id="home" class="section">
         <!-- tarjetas principales -->
-        <div id="dashboardGrid" 
-             class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 mb-8">
+        <div id="dashboardGrid" class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4 mb-8">
+           <!-- JS will inject better cards here -->
         </div>
 
         <!-- resumen del día DINÁMICO -->
         <div id="dailySummaryCard"></div>
       </section>
-
+      
       <!-- SECCIONES -->
       <div id="contentArea">
         <!-- ASISTENCIA -->
@@ -388,7 +391,7 @@
           <div class="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-8">
             <div>
               <h3 class="text-3xl font-black text-slate-800 tracking-tight flex items-center gap-3">
-                <span class="text-4xl">📅</span> Registro de Asistencia
+                <span class="text-4xl text-emerald-500">📅</span> Registro de Asistencia
               </h3>
               <p class="text-slate-400 font-bold text-sm mt-1">Monitorea la puntualidad y asistencia diaria</p>
             </div>
@@ -486,7 +489,7 @@
         <!-- TAREAS -->
         <section id="tasks" class="section hidden">
           <div class="flex items-center justify-between mb-4">
-            <h3 class="text-2xl font-black text-slate-800 tracking-tight flex items-center gap-2 text-campus-title">
+            <h3 class="text-2xl font-black text-slate-800 tracking-tight flex items-center gap-2">
               <span class="text-3xl">🎒</span> Mochila de Tareas
             </h3>
             <div class="flex bg-white p-1 rounded-full shadow-sm border">
@@ -504,7 +507,7 @@
         <!-- MURO -->
         <section id="class" class="section hidden">
           <div class="bg-white rounded-3xl shadow-sm p-6 border border-slate-100 min-h-[80vh]">
-            <h3 class="text-2xl font-black text-slate-800 tracking-tight mb-6 flex items-center gap-2 text-campus-title">
+            <h3 class="text-2xl font-black text-slate-800 tracking-tight mb-6 flex items-center gap-2">
               <i data-lucide="school" class="text-blue-500"></i> Salón de Clases
             </h3>
             <div id="classFeed"></div>
@@ -514,7 +517,7 @@
         <!-- CALIFICACIONES -->
         <section id="grades" class="section hidden">
           <div class="bg-white rounded-3xl shadow-sm p-6 md:p-8 min-h-[80vh] border border-slate-100">
-            <h3 class="text-2xl font-black text-slate-800 tracking-tight mb-6 flex items-center gap-2 text-campus-title">
+            <h3 class="text-2xl font-black text-slate-800 tracking-tight mb-6 flex items-center gap-2">
                <span class="text-3xl">🏆</span> Tablero de Progreso
             </h3>
             <div id="gradesContent" class="flex flex-col items-center w-full"></div>
@@ -526,7 +529,7 @@
           <div class="flex flex-col gap-6">
             <!-- Header -->
             <div class="flex items-center justify-between">
-              <h3 class="text-2xl font-black text-slate-800 tracking-tight flex items-center gap-2 text-campus-title">
+              <h3 class="text-2xl font-black text-slate-800 tracking-tight flex items-center gap-2">
                 <i data-lucide="credit-card" class="text-green-600"></i> Oficina de Pagos
               </h3>
             <div class="flex items-center gap-2">
@@ -546,7 +549,7 @@
               
               <!-- Tarjeta de Solicitud (Formulario) -->
               <div class="bg-white rounded-3xl shadow-sm p-6 border border-slate-100 lg:col-span-1 h-fit">
-                <div class="card-header border-b border-green-100 pb-3 mb-4">
+                <div class="card-header border-b border-emerald-100 pb-3 mb-4">
                   <h4 class="font-bold text-lg text-slate-700 flex items-center gap-2">
                     <i data-lucide="wallet" class="w-5 h-5 text-green-500"></i> Registrar Pago
                   </h4>
@@ -557,29 +560,44 @@
                     <label class="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1">Monto</label>
                     <div class="relative">
                       <span class="absolute left-4 top-3.5 text-slate-400 font-bold">$</span>
-                      <input type="number" step="0.01" id="paymentAmount" class="w-full pl-8 p-3 border-none rounded-2xl bg-slate-50 focus:bg-white focus:ring-2 focus:ring-green-400 outline-none transition-all font-bold text-slate-700" placeholder="0.00" required>
+                      <input type="number" step="0.01" id="paymentAmount" class="w-full pl-8 p-3 border-none rounded-2xl bg-slate-50 focus:bg-white focus:ring-2 focus:ring-emerald-400 outline-none transition-all font-bold text-slate-700" placeholder="0.00" required>
                     </div>
                   </div>
                   
                   <div>
                     <label class="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1">Mes Correspondiente</label>
-                    <input type="text" id="paymentMonth" class="w-full p-3 border-none rounded-2xl bg-slate-50 focus:bg-white focus:ring-2 focus:ring-green-400 outline-none transition-all font-medium text-slate-700" placeholder="Ej: Marzo" required>
+                    <select id="paymentMonth" class="w-full p-3 border-none rounded-2xl bg-slate-50 focus:bg-white focus:ring-2 focus:ring-green-400 outline-none transition-all font-medium text-slate-700" required>
+                      <option value="">Seleccionar mes...</option>
+                      <option value="Enero">Enero</option> <!-- Se mantiene el select para automatización -->
+                      <option value="Febrero">Febrero</option>
+                      <option value="Marzo">Marzo</option>
+                      <option value="Abril">Abril</option>
+                      <option value="Mayo">Mayo</option>
+                      <option value="Junio">Junio</option>
+                      <option value="Julio">Julio</option>
+                      <option value="Agosto">Agosto</option>
+                      <option value="Septiembre">Septiembre</option>
+                      <option value="Octubre">Octubre</option>
+                      <option value="Noviembre">Noviembre</option>
+                      <option value="Diciembre">Diciembre</option>
+                    </select>
                   </div>
 
                   <div>
                     <label class="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1">Método</label>
-                    <div class="w-full p-3 border border-green-100 rounded-2xl bg-green-50/50 text-green-700 font-bold flex items-center gap-2">
+                    <div class="w-full p-3 border border-green-100 rounded-2xl bg-green-50/50 text-green-700 font-bold flex items-center gap-2 shadow-sm">
                       <div class="w-8 h-8 rounded-full bg-green-100 flex items-center justify-center">
-                        <i data-lucide="arrow-right-left" class="w-4 h-4"></i>
+                        <i data-lucide="arrow-right-left" class="w-4 h-4"></i> <!-- Icono de transferencia -->
                       </div>
-                      <span>Transferencia</span>
+                      <span>Transferencia Bancaria</span>
                     </div>
                     <input type="hidden" id="paymentMethod" value="transferencia">
                   </div>
 
                   <div>
                     <label class="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1">Comprobante</label>
-                    <input type="file" id="paymentFileInput" accept="image/png,image/jpeg,image/webp" capture="environment" class="w-full text-sm text-slate-500 file:mr-4 file:py-2.5 file:px-4 file:rounded-xl file:border-0 file:text-xs file:font-bold file:bg-green-100 file:text-green-700 hover:file:bg-green-200 transition-all cursor-pointer" required>
+                    <input type="file" id="paymentFileInput" accept="image/png,image/jpeg,image/webp" class="w-full text-sm text-slate-500 file:mr-4 file:py-2.5 file:px-4 file:rounded-xl file:border-0 file:text-xs file:font-black file:bg-emerald-600 file:text-white hover:file:bg-emerald-700 transition-all cursor-pointer shadow-md" required>
+                    <p class="text-[10px] text-slate-400 mt-1 italic ml-1">Puedes tomar una foto o seleccionar una de tu galería.</p>
                   </div>
 
                   <button id="btnSubmitPayment" type="submit" class="w-full py-3.5 rounded-2xl font-bold bg-green-500 text-white hover:bg-green-600 shadow-lg shadow-green-200 transition-all active:scale-95 flex items-center justify-center gap-2 mt-2">
@@ -590,7 +608,7 @@
 
               <!-- Contenedor Historial -->
               <div class="card-base bg-white border border-slate-100 lg:col-span-2 flex flex-col">
-                <div class="card-header border-b border-slate-50 pb-3 mb-4">
+                <div class="card-header border-b border-slate-100 pb-3 mb-4">
                   <h4 class="font-bold text-lg text-slate-700 flex items-center gap-2">
                     <i data-lucide="history" class="w-5 h-5 text-slate-400"></i> Historial de Pagos
                   </h4>
@@ -598,7 +616,13 @@
                 <div class="space-y-3 flex-1 overflow-y-auto custom-scrollbar pr-1" id="paymentsHistory">
                    <!-- JS will populate this -->
                 </div>
-              </div>
+                <div class="space-y-3 flex-1 overflow-y-auto custom-scrollbar pr-1" id="paymentsHistory" aria-live="polite">
+                   <!-- SKELETON LOADING PARA AUTOMATIZACIÓN -->
+                   <div class="animate-pulse flex flex-col gap-3">
+                     <div class="h-16 bg-slate-100 rounded-2xl w-full"></div>
+                     <div class="h-16 bg-slate-100 rounded-2xl w-full"></div>
+                   </div>
+                </div>
 
             </div>
           </div>
@@ -607,7 +631,7 @@
         <!-- CHAT / AVISOS -->
         <section id="notifications" class="section hidden">
           <div class="card-base notice-card">
-            <h3 class="text-2xl font-black text-slate-800 tracking-tight mb-4 flex items-center gap-2 text-campus-title">
+            <h3 class="text-2xl font-black text-slate-800 tracking-tight mb-4 flex items-center gap-2">
               <i data-lucide="message-circle" class="text-blue-500"></i> Chat con el personal
             </h3>
 
@@ -683,69 +707,92 @@
 
         <!-- PERFIL -->
         <section id="profile" class="section hidden">
-          <div class="card-base id-card p-8 space-y-8 bg-white rounded-3xl shadow-sm border border-slate-100">
-            <h3 class="text-2xl font-black text-slate-800 tracking-tight flex items-center gap-2 text-campus-title">
-              <i data-lucide="user-circle" class="text-slate-500"></i> Carnet Escolar
-            </h3>
-            <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
-              <div class="space-y-3">
-                <div class="w-32 h-32 mx-auto rounded-full bg-sky-100 border-8 border-sky-50 shadow-inner overflow-hidden" id="studentAvatarPreview"></div>
-                <label for="studentAvatarInput" class="block w-full py-2 px-4 bg-emerald-500 hover:bg-emerald-600 text-white font-bold rounded-xl text-center cursor-pointer transition-colors shadow-md" role="button">
-                  <i data-lucide="camera" class="w-4 h-4 inline-block mr-1"></i> Subir Foto
+          <div class="bg-white rounded-[2.5rem] shadow-sm border border-slate-100 overflow-hidden min-h-[80vh] flex flex-col">
+            <!-- Header Perfil -->
+            <div class="p-8 bg-gradient-to-r from-emerald-50 to-teal-50 border-b border-emerald-100 flex flex-col md:flex-row items-center gap-8">
+              <div class="relative group"> <!-- Contenedor para avatar y botón de cámara -->
+                <div class="w-32 h-32 md:w-40 md:h-40 rounded-[2.5rem] bg-white shadow-xl shadow-emerald-100/50 border-4 border-white overflow-hidden flex items-center justify-center" id="profileAvatarDisplay">
+                  <!-- JS content -->
+                  <div class="w-full h-full flex items-center justify-center text-emerald-300">
+                    <i data-lucide="user" class="w-16 h-16"></i>
+                  </div>
+                </div>
+                <label for="studentAvatarInput" class="absolute -bottom-2 -right-2 w-12 h-12 bg-emerald-500 text-white rounded-2xl flex items-center justify-center cursor-pointer shadow-lg hover:bg-emerald-600 transition-all hover:scale-110 active:scale-95 border-4 border-white">
+                  <i data-lucide="camera" class="w-5 h-5"></i> <!-- Icono de cámara -->
+                  <input type="file" id="studentAvatarInput" class="hidden" accept="image/*">
                 </label>
-                <input type="file" id="studentAvatarInput" accept="image/*" class="hidden">
               </div>
-              <div class="md:col-span-2 grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div>
-                  <label class="block text-xs font-bold text-slate-600 mb-1">Nombre del Estudiante</label>
-                  <input type="text" id="inputStudentName" class="w-full p-3 border-none rounded-2xl bg-slate-100 focus:bg-white focus:ring-2 focus:ring-sky-400 outline-none">
-                </div>
-                <div>
-                  <label class="block text-xs font-bold text-slate-600 mb-1">Fecha de Nacimiento</label>
-                  <input type="date" id="inputStudentBirth" class="w-full p-3 border-none rounded-2xl bg-slate-100 focus:bg-white focus:ring-2 focus:ring-sky-400 outline-none">
-                </div>
-                <div>
-                  <label class="block text-xs font-bold text-slate-600 mb-1">Tipo de Sangre</label>
-                  <input type="text" id="inputStudentBlood" class="w-full p-3 border-none rounded-2xl bg-slate-100 focus:bg-white focus:ring-2 focus:ring-sky-400 outline-none" placeholder="O+, A-, etc.">
-                </div>
-                <div>
-                  <label class="block text-xs font-bold text-slate-600 mb-1">Alergias/Condiciones</label>
-                  <input type="text" id="inputStudentAllergy" class="w-full p-3 border-none rounded-2xl bg-slate-100 focus:bg-white focus:ring-2 focus:ring-sky-400 outline-none" placeholder="Alergias o condiciones">
-                </div>
+              <div class="text-center md:text-left">
+                <h3 class="text-3xl font-black text-slate-800 mb-2 student-name-display">Cargando...</h3>
+                <p class="text-sm font-bold text-emerald-600 uppercase tracking-widest flex items-center justify-center md:justify-start gap-2">
+                  <i data-lucide="school" class="w-4 h-4"></i> <span class="classroom-name-display">Grado y Sección</span>
+                </p>
               </div>
             </div>
-            <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
-              <div class="space-y-4">
-                <h4 class="font-black">Padre</h4>
-                <input type="text" id="profileFatherName" class="w-full p-3 border-none rounded-2xl bg-slate-100" placeholder="Nombre">
-                <input type="tel" id="profileFatherPhone" class="w-full p-3 border-none rounded-2xl bg-slate-100" placeholder="Teléfono">
-                <input type="email" id="profileFatherEmail" class="w-full p-3 border-none rounded-2xl bg-slate-100" placeholder="Email">
+
+            <!-- Formulario Perfil -->
+            <div class="p-8 md:p-10 flex-1">
+              <div class="grid grid-cols-1 lg:grid-cols-2 gap-10">
+                <!-- Datos del Estudiante -->
+                <div class="space-y-6">
+                  <h4 class="text-[11px] font-black text-slate-400 uppercase tracking-[0.2em] mb-4 flex items-center gap-2">
+                    <span class="w-6 h-px bg-slate-200"></span> Datos del Estudiante
+                  </h4>
+                  <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div class="space-y-1.5">
+                      <label class="text-[10px] font-black text-slate-500 uppercase ml-1">Nombre Completo</label>
+                      <input id="inputStudentName" type="text" class="w-full px-5 py-3.5 bg-slate-50 border border-slate-100 rounded-2xl text-sm font-bold text-slate-700 outline-none focus:ring-4 focus:ring-emerald-100 focus:border-emerald-400 transition-all" aria-label="Nombre completo del estudiante">
+                    </div>
+                    <div class="space-y-1.5">
+                      <label class="text-[10px] font-black text-slate-500 uppercase ml-1">Tipo de Sangre</label>
+                      <input id="inputStudentBlood" type="text" class="w-full px-5 py-3.5 bg-slate-50 border border-slate-100 rounded-2xl text-sm font-bold text-slate-700 outline-none focus:ring-4 focus:ring-emerald-100 focus:border-emerald-400 transition-all" placeholder="Ej: O+" aria-label="Tipo de sangre del estudiante">
+                    </div>
+                  </div>
+                  <div class="space-y-1.5">
+                    <label class="text-[10px] font-black text-slate-500 uppercase ml-1">Alergias o Condiciones</label>
+                    <textarea id="inputStudentAllergy" rows="3" class="w-full px-5 py-3.5 bg-slate-50 border border-slate-100 rounded-2xl text-sm font-bold text-slate-700 outline-none focus:ring-4 focus:ring-emerald-100 focus:border-emerald-400 transition-all resize-none" placeholder="Indique si requiere cuidados especiales" aria-label="Alergias o condiciones médicas del estudiante"></textarea>
+                  </div>
+                </div>
+
+                <!-- Contactos de Emergencia -->
+                <div class="space-y-6">
+                  <h4 class="text-[11px] font-black text-slate-400 uppercase tracking-[0.2em] mb-4 flex items-center gap-2"> <!-- Título de la sección -->
+                    <span class="w-6 h-px bg-slate-200"></span> Contactos y Padres
+                  </h4>
+                  <div class="space-y-4">
+                    <div class="p-5 bg-emerald-50/30 rounded-3xl border border-emerald-100/50 space-y-4"> <!-- Tarjeta para Padre/Tutor 1 -->
+                      <div class="flex items-center gap-3 mb-2">
+                        <div class="w-8 h-8 bg-emerald-100 text-emerald-600 rounded-xl flex items-center justify-center font-black text-xs">P1</div>
+                        <span class="text-xs font-black text-slate-600 uppercase">Padre o Tutor 1</span>
+                      </div>
+                      <input id="profileFatherName" type="text" placeholder="Nombre" class="w-full px-4 py-3 bg-white border border-emerald-100 rounded-xl text-sm font-bold text-slate-700 outline-none focus:ring-4 focus:ring-emerald-100 transition-all">
+                      <div class="grid grid-cols-2 gap-3">
+                        <input id="profileFatherPhone" type="tel" placeholder="Teléfono" class="w-full px-4 py-3 bg-white border border-emerald-100 rounded-xl text-sm font-bold text-slate-700 outline-none focus:ring-4 focus:ring-emerald-100 transition-all">
+                        <input id="profileFatherEmail" type="email" placeholder="Email" class="w-full px-4 py-3 bg-white border border-emerald-100 rounded-xl text-sm font-bold text-slate-700 outline-none focus:ring-4 focus:ring-emerald-100 transition-all" readonly> <!-- Email del padre es readonly -->
+                      </div>
+                    </div>
+
+                    <div class="p-5 bg-blue-50/30 rounded-3xl border border-blue-100/50 space-y-4"> <!-- Tarjeta para Padre/Tutor 2 -->
+                      <div class="flex items-center gap-3 mb-2">
+                        <div class="w-8 h-8 bg-blue-100 text-blue-600 rounded-xl flex items-center justify-center font-black text-xs">P2</div>
+                        <span class="text-xs font-black text-slate-600 uppercase">Padre o Tutor 2</span>
+                      </div>
+                      <input id="profileMotherName" type="text" placeholder="Nombre" class="w-full px-4 py-3 bg-white border border-blue-100 rounded-xl text-sm font-bold text-slate-700 outline-none focus:ring-4 focus:ring-blue-100 transition-all">
+                      <div class="grid grid-cols-2 gap-3">
+                        <input id="profileMotherPhone" type="tel" placeholder="Teléfono" class="w-full px-4 py-3 bg-white border border-blue-100 rounded-xl text-sm font-bold text-slate-700 outline-none focus:ring-4 focus:ring-blue-100 transition-all">
+                        <input id="profileMotherEmail" type="email" placeholder="Email" class="w-full px-4 py-3 bg-white border border-blue-100 rounded-xl text-sm font-bold text-slate-700 outline-none focus:ring-4 focus:ring-blue-100 transition-all" readonly> <!-- Email del padre es readonly -->
+                      </div>
+                    </div>
+                  </div>
+                </div>
               </div>
-              <div class="space-y-4">
-                <h4 class="font-black">Madre</h4>
-                <input type="text" id="profileMotherName" class="w-full p-3 border-none rounded-2xl bg-slate-100" placeholder="Nombre">
-                <input type="tel" id="profileMotherPhone" class="w-full p-3 border-none rounded-2xl bg-slate-100" placeholder="Teléfono">
-                <input type="email" id="profileMotherEmail" class="w-full p-3 border-none rounded-2xl bg-slate-100" placeholder="Email para notificaciones">
+
+              <!-- Botón Guardar -->
+              <div class="mt-12 pt-8 border-t border-slate-100 flex justify-center md:justify-end">
+                <button id="btnSaveChanges" class="btn-main px-12 py-4 text-sm uppercase tracking-widest flex items-center gap-3 shadow-lg shadow-emerald-100">
+                  <i data-lucide="save" class="w-5 h-5"></i> Guardar Perfil Estudiantil
+                </button>
               </div>
-              <div class="space-y-4">
-                <h4 class="font-black">Encargado de Retiro</h4>
-                <input type="text" id="profilePickupName" class="w-full p-3 border-none rounded-2xl bg-slate-100" placeholder="Nombre">
-              </div>
-            </div>
-            <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
-              <div class="space-y-4">
-                <h4 class="font-black">Tutor 1</h4>
-                <input type="text" id="tutor1Name" class="w-full p-3 border-none rounded-2xl bg-slate-100" placeholder="Nombre">
-                <input type="tel" id="tutor1Phone" class="w-full p-3 border-none rounded-2xl bg-slate-100" placeholder="Teléfono">
-              </div>
-              <div class="space-y-4">
-                <h4 class="font-black">Tutor 2</h4>
-                <input type="text" id="tutor2Name" class="w-full p-3 border-none rounded-2xl bg-slate-100" placeholder="Nombre">
-                <input type="tel" id="tutor2Phone" class="w-full p-3 border-none rounded-2xl bg-slate-100" placeholder="Teléfono">
-              </div>
-            </div>
-            <div class="flex justify-end gap-3">
-              <button type="button" id="btnSaveChanges" class="px-8 py-3 rounded-2xl font-bold bg-emerald-500 text-white hover:bg-emerald-600 shadow-lg shadow-emerald-200 transition-transform active:scale-95 flex items-center gap-2"><i data-lucide="save" class="w-5 h-5"></i> Guardar Cambios</button>
             </div>
           </div>
         </section>
@@ -757,7 +804,7 @@
           <!-- Cabecera Visual Amigable -->
           <div class="bg-gradient-to-r from-emerald-400 to-green-600 p-8 text-white relative">
             <button type="button" class="absolute top-4 right-4 p-2 bg-white/20 rounded-full hover:bg-white/30 transition-colors" data-close-modal>
-              <i data-lucide="x" class="w-5 h-5"></i>
+              <i data-lucide="x" class="w-5 h-5"></i> <!-- Icono de cerrar -->
             </button>
             <div class="w-16 h-16 bg-white/20 rounded-2xl flex items-center justify-center mb-4 backdrop-blur-sm">
               <i data-lucide="calendar-x" class="w-10 h-10"></i>
@@ -771,7 +818,7 @@
             <div class="space-y-2">
               <label class="block text-xs font-black text-slate-400 uppercase tracking-widest ml-1">¿Para qué día?</label>
               <div class="relative">
-                <i data-lucide="calendar" class="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-emerald-500"></i>
+                <i data-lucide="calendar" class="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-emerald-500"></i> <!-- Icono de calendario -->
                 <input type="date" id="absenceDate" class="w-full pl-12 pr-4 py-4 bg-slate-50 border-2 border-slate-50 rounded-2xl outline-none focus:border-emerald-400 focus:bg-white transition-all font-bold text-slate-700" required>
               </div>
             </div>
@@ -779,19 +826,19 @@
             <!-- Selector Visual de Motivos -->
             <div class="space-y-3">
               <label class="block text-xs font-black text-slate-400 uppercase tracking-widest ml-1">Selecciona el motivo</label>
-              <div class="grid grid-cols-2 gap-3" id="reasonPicker">
+              <div class="grid grid-cols-2 gap-3" id="reasonPicker"> <!-- Contenedor de botones de motivo -->
                 <button type="button" data-value="Enfermedad" class="reason-btn p-4 rounded-2xl border-2 border-slate-50 bg-slate-50 text-slate-600 font-bold text-sm transition-all hover:border-emerald-200 flex flex-col items-center gap-2 group">
                   <span class="text-2xl transition-transform group-hover:scale-110">🤒</span> Enfermedad
                 </button>
                 <button type="button" data-value="Cita Médica" class="reason-btn p-4 rounded-2xl border-2 border-slate-50 bg-slate-50 text-slate-600 font-bold text-sm transition-all hover:border-emerald-200 flex flex-col items-center gap-2 group">
                   <span class="text-2xl transition-transform group-hover:scale-110">🏥</span> Cita Médica
                 </button>
-                <button type="button" data-value="Viaje" class="reason-btn p-4 rounded-2xl border-2 border-slate-50 bg-slate-50 text-slate-600 font-bold text-sm transition-all hover:border-emerald-200 flex flex-col items-center gap-2 group">
+                <button type="button" data-value="Viaje" class="reason-btn p-4 rounded-2xl border-2 border-slate-50 bg-slate-50 text-slate-600 font-bold text-sm transition-all hover:border-emerald-200 flex flex-col items-center gap-2 group"> <!-- Botón de motivo "Viaje" -->
                   <span class="text-2xl transition-transform group-hover:scale-110">✈️</span> Viaje
                 </button>
                 <button type="button" data-value="Otro" class="reason-btn p-4 rounded-2xl border-2 border-slate-50 bg-slate-50 text-slate-600 font-bold text-sm transition-all hover:border-emerald-200 flex flex-col items-center gap-2 group">
                   <span class="text-2xl transition-transform group-hover:scale-110">✨</span> Otro
-                </button>
+                </button> <!-- Botón de motivo "Otro" -->
               </div>
               <input type="hidden" id="absenceReason" required>
             </div>
@@ -804,7 +851,7 @@
 
             <!-- Botón de Envío Dinámico -->
             <div class="pt-4">
-              <button type="submit" class="btn-main w-full py-4 text-lg shadow-xl shadow-emerald-100 flex items-center justify-center gap-2">
+              <button type="submit" class="btn-main w-full py-4 text-lg shadow-xl shadow-emerald-100 flex items-center justify-center gap-2"> <!-- Botón principal de envío -->
                 <i data-lucide="send" class="w-5 h-5"></i> Enviar a la Maestra
               </button>
             </div>
@@ -818,7 +865,7 @@
               <!-- Header Modal -->
               <div class="p-6 bg-slate-50 border-b flex justify-between items-start">
                   <div>
-                      <h3 id="taskDetailTitle" class="text-2xl font-black text-slate-800 leading-tight">Título de la Tarea</h3>
+                      <h3 id="taskDetailTitle" class="text-2xl font-black text-slate-800 leading-tight">Título de la Tarea</h3> <!-- Título de la tarea -->
                       <p id="taskDetailDate" class="text-sm text-slate-500 font-bold mt-1 flex items-center gap-1">
                           <i data-lucide="calendar" class="w-3 h-3"></i> Vence: --/--/----
                       </p>
@@ -832,7 +879,7 @@
               <div class="p-6 overflow-y-auto custom-scrollbar flex-1">
                   <div class="prose prose-slate max-w-none mb-8">
                       <h4 class="font-bold text-sm text-slate-400 uppercase tracking-wider mb-2">Instrucciones</h4>
-                      <p id="taskDetailDesc" class="text-slate-700 leading-relaxed">Descripción detallada de la tarea...</p>
+                      <p id="taskDetailDesc" class="text-slate-700 leading-relaxed">Descripción detallada de la tarea...</p> <!-- Descripción de la tarea -->
                   </div>
 
                   <!-- Área de Entrega -->
@@ -845,7 +892,7 @@
                           <!-- Input Archivo -->
                           <div class="relative group cursor-pointer">
                               <input type="file" id="taskFileInput" class="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10" accept="image/*,video/*,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document">
-                              <div class="bg-white p-4 rounded-2xl border border-sky-100 shadow-sm group-hover:border-sky-300 transition-all flex items-center justify-center gap-3">
+                              <div class="bg-white p-4 rounded-2xl border border-sky-100 shadow-sm group-hover:border-sky-300 transition-all flex items-center justify-center gap-3"> <!-- Área para subir archivo -->
                                   <div class="p-2 bg-sky-100 text-sky-600 rounded-xl">
                                       <i data-lucide="file-up" class="w-5 h-5"></i>
                                   </div>
@@ -855,7 +902,7 @@
 
                           <!-- Comentario -->
                           <div>
-                              <textarea id="taskCommentInput" rows="3" class="w-full p-4 rounded-2xl border-none bg-white focus:ring-2 focus:ring-sky-300 outline-none text-sm resize-none" placeholder="Escribe un comentario para la maestra..."></textarea>
+                              <textarea id="taskCommentInput" rows="3" class="w-full p-4 rounded-2xl border-none bg-white focus:ring-2 focus:ring-sky-300 outline-none text-sm resize-none" placeholder="Escribe un comentario para la maestra..."></textarea> <!-- Campo de comentario -->
                           </div>
 
                           <button type="button" id="btnSubmitTask" class="w-full py-3 bg-sky-500 hover:bg-sky-600 text-white font-bold rounded-2xl shadow-lg shadow-sky-200 transition-transform active:scale-95">
@@ -866,7 +913,7 @@
 
                   <!-- Estado Entregado (Oculto por defecto) -->
                   <div id="evidenceSection" class="hidden bg-emerald-50 rounded-2xl p-6 border border-emerald-100 text-center">
-                      <div class="w-16 h-16 bg-emerald-100 text-emerald-600 rounded-full flex items-center justify-center mx-auto mb-3 shadow-inner">
+                      <div class="w-16 h-16 bg-emerald-100 text-emerald-600 rounded-full flex items-center justify-center mx-auto mb-3 shadow-inner"> <!-- Icono de tarea entregada -->
                           <i data-lucide="check-circle-2" class="w-8 h-8"></i>
                       </div>
                       <h4 class="font-bold text-emerald-800 text-lg">¡Tarea Entregada!</h4>
@@ -874,7 +921,7 @@
                       
                       <div class="text-left bg-white p-4 rounded-xl border border-emerald-100 shadow-sm mb-4">
                           <p class="text-xs text-slate-400 font-bold uppercase mb-1">Tu comentario:</p>
-                          <p id="evidenceComment" class="text-slate-600 text-sm italic">"--"</p>
+                          <p id="evidenceComment" class="text-slate-600 text-sm italic">"--"</p> <!-- Comentario del padre -->
                       </div>
 
                       <a id="evidenceLink" href="#" target="_blank" class="inline-flex items-center gap-2 text-emerald-600 font-bold text-sm hover:underline">

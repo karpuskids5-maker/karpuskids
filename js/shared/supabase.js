@@ -84,17 +84,28 @@ export async function sendEmail(to, subject, html, text) {
 }
 
 /**
- * Enviar notificación push
+ * Enviar notificación push vía Edge Function
  */
 export async function sendPush(payload) {
   try {
+    const { data: { session } } = await supabase.auth.getSession();
+    if (!session) {
+      console.warn('[sendPush] No hay sesión activa');
+      return null;
+    }
+
     const { data, error } = await supabase.functions.invoke('send-push', { 
-      body: payload
+      body: payload,
+      headers: {
+        'Authorization': `Bearer ${session.access_token}`
+      }
     });
+
     if (error) throw error;
     return data;
   } catch (e) {
     console.error('Error enviando push:', e);
+    // No relanzamos para no romper el flujo principal
     return null;
   }
 }

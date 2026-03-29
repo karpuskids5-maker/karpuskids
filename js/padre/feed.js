@@ -201,14 +201,24 @@ export const FeedModule = {
    */
   initRealtime() {
     if (this._channel) supabase.removeChannel(this._channel);
-    
+
     this._channel = supabase
       .channel(`feed_${this._classroomId}`)
-      .on('postgres_changes', { 
-        event: '*', 
-        schema: 'public', 
+      .on('postgres_changes', {
+        event: 'INSERT',
+        schema: 'public',
         table: 'posts',
-        filter: `classroom_id=eq.${this._classroomId}` 
+        filter: `classroom_id=eq.${this._classroomId}`
+      }, (payload) => {
+        // Notificación push al padre cuando la maestra publica
+        Helpers.toast('\uD83D\uDCE2 Nueva publicaci\u00F3n en el muro del aula', 'info');
+        this.loadPosts();
+      })
+      .on('postgres_changes', {
+        event: 'UPDATE',
+        schema: 'public',
+        table: 'posts',
+        filter: `classroom_id=eq.${this._classroomId}`
       }, () => this.loadPosts())
       .subscribe();
   },

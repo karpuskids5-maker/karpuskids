@@ -5,6 +5,8 @@ import { Helpers, escapeHtml } from './helpers.js';
 /**
  * 📬 MÓDULO DE CHAT (PADRES)
  */
+import { ChatModule as SharedChatModule } from '../shared/chat.js';
+
 export const ChatModule = {
   _contacts: [],
   _activeContact: null,
@@ -42,28 +44,15 @@ export const ChatModule = {
    */
   async loadContacts() {
     const list = document.getElementById('chatContactsList');
+    if (!list) return;
     list.innerHTML = Helpers.skeleton(4, 'h-16');
 
     try {
       const student = AppState.get('currentStudent');
-      const teacherId = student?.classrooms?.teacher_id;
+      if (!student) return;
 
-      // Consultar Maestra del aula y Directivos
-      const [teacherRes, staffRes] = await Promise.all([
-        teacherId ? supabase.from(TABLES.PROFILES).select('id, name, avatar_url, role').eq('id', teacherId).single() : Promise.resolve({ data: null }),
-        supabase.from(TABLES.PROFILES).select('id, name, avatar_url, role').in('role', ['directora', 'asistente']).order('name')
-      ]);
-
-      const contacts = [];
-      if (teacherRes.data) contacts.push({ ...teacherRes.data, roleLabel: 'Maestra Titular' });
-      
-      (staffRes.data || []).forEach(s => {
-        if (s.id !== teacherId) {
-          contacts.push({ ...s, roleLabel: s.role === 'directora' ? 'Directora' : 'Administración' });
-        }
-      });
-
-      this._contacts = contacts;
+      // Usar ChatModule unificado para cargar contactos restringidos
+      this._contacts = await SharedChatModule.loadPadreContacts(student.id);
       this.renderContacts();
 
     } catch (err) {

@@ -64,11 +64,11 @@ export const Helpers = {
     </div>`,
 
   /**
-   * Skeleton loader
+   * Skeleton loader mejorado con Shimmer
    */
   skeleton: (count = 3, height = 'h-24') => 
     Array.from({ length: count }, () => `
-      <div class="animate-pulse bg-slate-100 rounded-3xl ${height} w-full mb-4"></div>
+      <div class="skeleton-shimmer bg-slate-100 rounded-3xl ${height} w-full mb-4 opacity-50"></div>
     `).join(''),
 
   /**

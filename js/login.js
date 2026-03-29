@@ -9,7 +9,15 @@ document.addEventListener('DOMContentLoaded', () => {
   if (loginForm) {
     loginForm.addEventListener('submit', async (e) => {
       e.preventDefault();
-      
+
+      // Validar aceptación de términos
+      const acceptTerms = document.getElementById('acceptTerms');
+      if (acceptTerms && !acceptTerms.checked) {
+        alert('Debes aceptar la Política de Privacidad y los Términos de Uso para continuar.');
+        acceptTerms.focus();
+        return;
+      }
+
       const email = document.getElementById('email').value.trim();
       const password = document.getElementById('password').value;
       const submitBtn = loginForm.querySelector('button');

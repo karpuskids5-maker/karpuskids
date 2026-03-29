@@ -276,26 +276,28 @@ export const TasksModule = {
     }
 
     return `
-      <div class="bg-white p-6 rounded-[2.5rem] border-2 border-slate-50 mb-4 hover:shadow-lg transition-all group animate-fade-in">
-        <div class="flex justify-between items-start mb-4">
+      <div class="bg-white p-5 rounded-2xl border-2 border-slate-100 mb-4 hover:shadow-lg hover:border-green-200 transition-all group">
+        <div class="flex justify-between items-start mb-3">
           <div class="flex items-center gap-3">
-            <div class="w-12 h-12 rounded-2xl bg-indigo-50 text-indigo-600 flex items-center justify-center text-xl shadow-inner group-hover:scale-110 transition-transform">
-              ${isDelivered ? '✅' : '📝'}
+            <div class="w-11 h-11 rounded-xl ${isDelivered ? 'bg-green-100 text-green-700' : 'bg-amber-50 text-amber-600'} flex items-center justify-center text-xl shadow-sm group-hover:scale-110 transition-transform">
+              ${isDelivered ? '\u2705' : '\uD83D\uDCDD'}
             </div>
             <div>
               <h4 class="font-black text-slate-800 text-sm leading-tight">${escapeHtml(t.title)}</h4>
-              <p class="text-[10px] font-bold text-slate-400 uppercase tracking-widest mt-1">Vence: ${Helpers.formatDate(t.due_date)}</p>
+              <p class="text-[10px] font-bold text-slate-400 uppercase tracking-widest mt-0.5">Vence: ${Helpers.formatDate(t.due_date)}</p>
             </div>
           </div>
           ${statusBadge}
         </div>
         
-        <p class="text-xs text-slate-500 leading-relaxed line-clamp-2 mb-6">${escapeHtml(t.description || 'Sin descripción detallada.')}</p>
+        ${t.file_url ? `<div class="mb-3 rounded-xl overflow-hidden border border-slate-100"><img src="${t.file_url}" class="w-full max-h-40 object-cover" loading="lazy" alt="Imagen de tarea"></div>` : ''}
+        
+        <p class="text-xs text-slate-500 leading-relaxed line-clamp-2 mb-4">${escapeHtml(t.description || 'Sin descripción detallada.')}</p>
         
         <div class="flex gap-2">
           ${isDelivered 
-            ? `<button data-action="view" data-id="${t.id}" class="flex-1 py-3 bg-slate-100 text-slate-600 rounded-2xl font-black text-[10px] uppercase tracking-widest hover:bg-slate-200 transition-all">Ver Entrega</button>`
-            : `<button data-action="submit" data-id="${t.id}" class="flex-1 py-3 bg-indigo-600 text-white rounded-2xl font-black text-[10px] uppercase tracking-widest hover:bg-indigo-700 shadow-lg shadow-indigo-100 transition-all">Enviar Tarea</button>`
+            ? `<button data-action="view" data-id="${t.id}" class="flex-1 py-2.5 bg-green-50 text-green-700 border border-green-200 rounded-xl font-black text-[10px] uppercase tracking-widest hover:bg-green-100 transition-all">\u2705 Ver Entrega</button>`
+            : `<button data-action="submit" data-id="${t.id}" class="flex-1 py-2.5 bg-green-500 text-white rounded-xl font-black text-[10px] uppercase tracking-widest hover:bg-green-600 shadow-md shadow-green-200 transition-all">\uD83D\uDE80 Enviar Tarea</button>`
           }
         </div>
       </div>

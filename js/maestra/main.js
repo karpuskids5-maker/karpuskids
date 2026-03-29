@@ -4,6 +4,7 @@ import { MaestraApi } from './api.js';
 import { Helpers } from '../shared/helpers.js';
 import { WallModule } from '../shared/wall.js';
 import { ChatModule } from '../shared/chat.js';
+import { VideoCallModule } from '../shared/videocall.js';
 
 /**
  * 🚀 ARQUITECTURA SENIOR: Definición Global del Objeto App
@@ -56,7 +57,15 @@ const safeEscapeHTML = (str = '') => {
  * Inicialización principal
  */
 document.addEventListener('DOMContentLoaded', async () => {
-  console.log('🎒 Karpus Maestra Module Starting...');
+  // Logout
+    document.getElementById('logoutBtn')?.addEventListener('click', async () => {
+      if (confirm('¿Cerrar sesión?')) {
+        await supabase.auth.signOut();
+        window.location.href = 'login.html';
+      }
+    });
+
+    console.log('🎒 Karpus Maestra Module Starting...');
   
   const auth = await ensureRole(['maestra', 'admin']);
   if (!auth) return;
@@ -124,19 +133,22 @@ document.addEventListener('DOMContentLoaded', async () => {
         const updates = {
           name: profName.value,
           phone: profPhone.value,
-          bio: profBio.value
+          bio: profBio.value,
+          updated_at: new Date().toISOString()
         };
         const { error } = await supabase.from('profiles').update(updates).eq('id', auth.user.id);
         if (error) throw error;
         
         // Actualizar estado local
-        AppState.set('profile', { ...auth.profile, ...updates });
+        const oldProfile = AppState.get('profile') || {};
+        AppState.set('profile', { ...oldProfile, ...updates });
         
         safeToast('Perfil actualizado correctamente');
-        // Recargar la página para reflejar cambios
+        // Recargar la página para reflejar cambios en sidebar y UI
         setTimeout(() => location.reload(), 1000);
       } catch (err) {
-        safeToast('Error al guardar perfil', 'error');
+        console.error('Error saving profile:', err);
+        safeToast('Error al guardar perfil. Revisa tu conexión.', 'error');
         btn.disabled = false;
         btn.innerHTML = '<i data-lucide="save" class="w-5 h-5"></i> Guardar Cambios';
       }
@@ -250,6 +262,34 @@ document.addEventListener('DOMContentLoaded', async () => {
     await initNavigation();
     await initChat(); // Inicializar sistema de chat
     initRealtimeUpdates(classroom.id);
+
+    // ── Botón hamburguesa móvil ──────────────────────────────────────────────
+    const menuBtn = document.getElementById('menuBtn');
+    const sidebar  = document.getElementById('sidebar');
+    const overlay  = document.getElementById('sidebarOverlay');
+
+    if (menuBtn && sidebar) {
+      menuBtn.addEventListener('click', () => {
+        sidebar.classList.toggle('mobile-visible');
+        if (overlay) overlay.classList.toggle('hidden');
+      });
+    }
+    if (overlay) {
+      overlay.addEventListener('click', () => {
+        sidebar.classList.remove('mobile-visible');
+        overlay.classList.add('hidden');
+      });
+    }
+
+    // ── Botón colapsar sidebar desktop ───────────────────────────────────────
+    const toggleBtn  = document.getElementById('toggleSidebar');
+    const layoutShell = document.getElementById('layoutShell');
+    if (toggleBtn && sidebar && layoutShell) {
+      toggleBtn.addEventListener('click', () => {
+        sidebar.classList.toggle('collapsed');
+        layoutShell.classList.toggle('sidebar-collapsed');
+      });
+    }
     
     WallModule.init('muroPostsContainer', { 
       accentColor: 'orange',
@@ -452,6 +492,18 @@ async function markAllPresent() {
       safeToast(`Se registraron ${results.length - failures.length} asistencias, ${failures.length} fallaron`, 'warning');
     } else {
       safeToast('Asistencia masiva completada');
+      
+      // Notificar a todos los padres (Notificaciones Push)
+      students.forEach(s => {
+        if (s.parent_id) {
+          sendPush({
+            user_id: s.parent_id,
+            title: 'Asistencia Karpus',
+            message: `${s.name} ha sido marcado como Presente hoy.`,
+            link: 'panel_padres.html#attendance'
+          }).catch(err => console.warn(`Error notificando a ${s.name}:`, err));
+        }
+      });
     }
 
     await initAttendance();
@@ -485,6 +537,17 @@ async function registerAttendance(studentId, status) {
       date: today, 
       status 
     });
+    
+    // Notificar al padre si tiene usuario asignado
+    const student = (AppState.get('students') || []).find(s => s.id === studentId);
+    if (student?.parent_id) {
+      sendPush({
+        user_id: student.parent_id,
+        title: 'Asistencia Karpus',
+        message: `${student.name} ha sido marcado como ${status === 'present' ? 'Presente' : 'Ausente'} hoy.`,
+        link: 'panel_padres.html#attendance'
+      }).catch(err => console.warn(`Error notificando a ${student.name}:`, err));
+    }
     
     safeToast(`Asistencia: ${status === 'present' ? 'Presente' : 'Falta'}`);
   } catch (e) {
@@ -546,7 +609,7 @@ async function initRoutine() {
                     <div class="flex gap-2">
                       ${['feliz', 'normal', 'triste', 'enojado'].map(m => `
                         <button onclick="App.updateRoutineField('${s.id}', 'mood', '${m}')" 
-                          class="flex-1 py-2 rounded-xl text-lg border-2 transition-all ${log.mood === m ? 'bg-orange-500 border-orange-500 scale-105 shadow-lg' : 'bg-slate-50 border-slate-50 hover:border-orange-200'}">
+                          class="flex-1 py-2 rounded-xl text-lg border-2 transition-all ${log.mood === m ? 'bg-orange-500 border-orange-500 scale-105 shadow-lg text-white' : 'bg-slate-50 border-slate-50 hover:border-orange-200'}">
                           ${m === 'feliz' ? '😊' : m === 'normal' ? '😐' : m === 'triste' ? '😢' : '😠'}
                         </button>
                       `).join('')}
@@ -557,33 +620,37 @@ async function initRoutine() {
                   <div class="grid grid-cols-2 gap-3">
                     <div>
                       <label class="text-[10px] font-black text-slate-400 uppercase mb-2 block tracking-tighter">¿Cómo comió?</label>
-                      <select onchange="App.updateRoutineField('${s.id}', 'food', this.value)" 
+                      <select id="food-${s.id}" onchange="App.updateRoutineField('${s.id}', 'food', this.value)" 
                         class="w-full p-2 bg-slate-50 rounded-xl text-xs font-bold outline-none border-2 border-transparent focus:border-orange-500">
                         <option value="">Seleccionar</option>
-                        <option value="todo" ${log.food === 'todo' ? 'selected' : ''}>😋 Todo</option>
-                        <option value="poco" ${log.food === 'poco' ? 'selected' : ''}>😕 Poco</option>
-                        <option value="nada" ${log.food === 'nada' ? 'selected' : ''}>🚫 Nada</option>
+                        <option value="todo" ${log.food === 'todo' || log.eating === 'todo' ? 'selected' : ''}>😋 Todo</option>
+                        <option value="poco" ${log.food === 'poco' || log.eating === 'poco' ? 'selected' : ''}>😕 Poco</option>
+                        <option value="nada" ${log.food === 'nada' || log.eating === 'nada' ? 'selected' : ''}>🚫 Nada</option>
                       </select>
                     </div>
                     <div>
                       <label class="text-[10px] font-black text-slate-400 uppercase mb-2 block tracking-tighter">¿Durmió siesta?</label>
-                      <select onchange="App.updateRoutineField('${s.id}', 'sleep', this.value)" 
+                      <select id="sleep-${s.id}" onchange="App.updateRoutineField('${s.id}', 'sleep', this.value)" 
                         class="w-full p-2 bg-slate-50 rounded-xl text-xs font-bold outline-none border-2 border-transparent focus:border-orange-500">
                         <option value="">Seleccionar</option>
-                        <option value="si" ${log.sleep === 'si' ? 'selected' : ''}>😴 Sí</option>
-                        <option value="no" ${log.sleep === 'no' ? 'selected' : ''}>🚫 No</option>
+                        <option value="si" ${log.sleep === 'si' || log.sleeping === 'si' || log.nap === 'si' ? 'selected' : ''}>😴 Sí</option>
+                        <option value="no" ${log.sleep === 'no' || log.sleeping === 'no' || log.nap === 'no' ? 'selected' : ''}>🚫 No</option>
                       </select>
                     </div>
                   </div>
 
                   <!-- Notas Adicionales -->
                   <div>
+                    <label class="text-[10px] font-black text-slate-400 uppercase mb-2 block tracking-tighter">Observaciones / Actividades</label>
                     <textarea id="note-${s.id}" class="w-full p-3 bg-slate-50 rounded-2xl text-xs outline-none border-2 border-transparent focus:border-orange-500 resize-none" rows="2" placeholder="Notas adicionales...">${safeEscapeHTML(log.notes || log.activities || '')}</textarea>
                   </div>
 
                   <button id="btn-save-log-${s.id}" onclick="App.saveRoutineLog('${s.id}')" 
-                    class="w-full py-3 bg-slate-900 text-white rounded-2xl text-[10px] font-black uppercase tracking-widest hover:bg-orange-600 transition-all shadow-lg">
-                    Guardar Reporte Completo
+                    data-mood="${log.mood || 'normal'}"
+                    data-food="${log.food || log.eating || ''}"
+                    data-sleep="${log.sleep || log.sleeping || log.nap || ''}"
+                    class="w-full py-3 bg-slate-900 text-white rounded-2xl text-[10px] font-black uppercase tracking-widest hover:bg-orange-600 transition-all shadow-lg flex items-center justify-center gap-2">
+                    <i data-lucide="save" class="w-4 h-4"></i> Guardar Reporte Completo
                   </button>
                 </div>
               </div>
@@ -632,13 +699,14 @@ async function saveRoutineLog(studentId) {
   const note = document.getElementById(`note-${studentId}`)?.value;
   if (!btn) return;
 
+  // Obtener valores actualizados de los datasets o selectores
   const mood = btn.dataset.mood || 'normal';
-  const food = btn.dataset.food || 'todo';
-  const sleep = btn.dataset.sleep || 'no';
+  const food = btn.dataset.food || document.getElementById(`food-${studentId}`)?.value || '';
+  const sleep = btn.dataset.sleep || document.getElementById(`sleep-${studentId}`)?.value || '';
 
   btn.disabled = true;
-  const originalText = btn.textContent;
-  btn.innerHTML = '<i data-lucide="loader" class="w-4 h-4 animate-spin mx-auto"></i>';
+  const originalContent = btn.innerHTML;
+  btn.innerHTML = '<i data-lucide="loader" class="w-4 h-4 animate-spin"></i> Guardando...';
   if (window.lucide) window.lucide.createIcons();
 
   try {
@@ -649,18 +717,34 @@ async function saveRoutineLog(studentId) {
       date: new Date().toISOString().split('T')[0],
       mood: mood,
       food: food,
-      sleeping: sleep, // api.js lo convertirá a 'nap'
-      notes: note // Usar 'notes' para alinearse con DB
+      eating: food,    // Unificar campos
+      nap: sleep,      // Unificar campos
+      sleeping: sleep, // Unificar campos
+      notes: note,
+      activities: note // Unificar campos
     };
 
     await MaestraApi.upsertDailyLog(payload);
     safeToast('Reporte guardado con éxito', 'success');
+
+    // Notificar al padre (Notificación Push)
+    const student = (AppState.get('students') || []).find(s => s.id == studentId);
+    if (student?.parent_id) {
+      sendPush({
+        user_id: student.parent_id,
+        title: 'Reporte de Rutina 📝',
+        message: `La maestra ha actualizado el reporte diario de ${student.name}.`,
+        link: 'panel_padres.html#daily-routine'
+      }).catch(err => console.warn('Error notificando rutina:', err));
+    }
+
   } catch (err) {
     console.error('Error saving routine:', err);
     safeToast('Error al guardar reporte', 'error');
   } finally {
     btn.disabled = false;
-    btn.textContent = originalText;
+    btn.innerHTML = originalContent;
+    if (window.lucide) window.lucide.createIcons();
   }
 }
 
@@ -1008,6 +1092,18 @@ async function submitGrade(taskId, studentId) {
 
   try {
     await MaestraApi.gradeTask(taskId, studentId, grade, parseInt(stars), feedback); // Pasar retroalimentación
+    
+    // Notificar al padre si tiene usuario asignado (Notificación Push)
+    const student = (AppState.get('students') || []).find(s => s.id === studentId);
+    if (student?.parent_id) {
+      sendPush({
+        user_id: student.parent_id,
+        title: 'Tarea Calificada 🏆',
+        message: `La maestra ha calificado una tarea de ${student.name}. Nota: ${grade}`,
+        link: 'panel_padres.html#grades'
+      }).catch(err => console.warn(`Error notificando calificación a ${student.name}:`, err));
+    }
+    
     safeToast('Calificación guardada y notificada al padre.');
     // Feedback visual en la tarjeta del alumno dentro del modal
     const el = document.getElementById(`feedback-${studentId}`);
@@ -1158,17 +1254,37 @@ function registerIncidentModal(studentId) {
     if(window.lucide) window.lucide.createIcons();
     
     try {
-      await MaestraApi.registerIncident({
+      const payload = {
         student_id: student.id,
         classroom_id: AppState.get('classroom').id,
         teacher_id: AppState.get('user').id,
         severity: document.getElementById('incSeverity').value,
         description: document.getElementById('incDesc').value
-      });
-      safeToast('Incidente reportado a dirección');
+      };
+
+      await MaestraApi.registerIncident(payload);
+      safeToast('Incidente reportado correctamente');
       Modal.close(modalId);
+
+      // Notificar al padre (Notificación Push)
+      if (student.parent_id) {
+        sendPush({
+          user_id: student.parent_id,
+          title: 'Aviso de Incidente ⚠️',
+          message: `Se ha registrado un reporte de conducta sobre ${student.name}. Por favor revisa la sección de incidentes.`,
+          link: 'panel_padres.html#incidents'
+        }).catch(err => console.warn('Error notificando incidente:', err));
+      }
+
+      // Actualizar contador de incidentes en el dashboard
+      const statEl = document.getElementById('statIncidents');
+      if (statEl) {
+        const current = parseInt(statEl.textContent || '0', 10);
+        statEl.textContent = current + 1;
+      }
     } catch (err) {
-      safeToast('Error al reportar', 'error');
+      console.error('Error reporting incident:', err);
+      safeToast('Error al reportar incidente. Revisa tu conexión.', 'error');
       btn.disabled = false;
       btn.innerHTML = '<i data-lucide="send" class="w-4 h-4"></i> Enviar Reporte';
       if(window.lucide) window.lucide.createIcons();
@@ -1341,24 +1457,39 @@ window.App.scheduleClassMeeting = async () => {
 };
 
 async function startJitsi() {
-   const classroom = AppState.get('classroom');
-   const container = document.getElementById('meet');
-   if (!container || !classroom) return;
- 
-   // Usar VideoCallModule para iniciar "Instant Meeting"
-   const meeting = await VideoCallModule.scheduleMeeting({
-       title: `Clase en Vivo: ${classroom.name}`,
-       startTime: new Date().toISOString(),
-       type: 'classroom',
-       targetId: classroom.id,
-       hostId: AppState.get('user').id
-   });
+  const classroom = AppState.get('classroom');
+  const container = document.getElementById('meet');
+  if (!container || !classroom) return;
 
-   await VideoCallModule.startMeeting(meeting.id);
-   
-   // Renderizar Jitsi en el contenedor
-   VideoCallModule.joinMeeting(meeting, 'meet', AppState.get('profile'));
- }
+  const btn = document.querySelector('[onclick*="startJitsi"]');
+  if (btn) { btn.disabled = true; btn.textContent = 'Iniciando...'; }
+
+  try {
+    // 1. Crear reunión y notificar padres automáticamente
+    const meeting = await VideoCallModule.scheduleMeeting({
+      title:      `Clase en Vivo: ${classroom.name}`,
+      start_time: new Date().toISOString(),
+      type:       'classroom',
+      target_id:  classroom.id,
+      host_id:    AppState.get('user').id
+    });
+
+    // 2. Marcar como en vivo en la tabla classrooms (para que el padre lo vea)
+    await supabase.from('classrooms').update({ is_live: true }).eq('id', classroom.id);
+
+    // 3. Iniciar la reunión
+    await VideoCallModule.startMeeting(meeting.id);
+
+    // 4. Renderizar Jitsi
+    VideoCallModule.joinMeeting(meeting, 'meet', AppState.get('profile'));
+
+    safeToast('¡Clase iniciada! Los padres han sido notificados 🎥', 'success');
+  } catch (e) {
+    console.error('startJitsi error:', e);
+    safeToast('Error al iniciar la clase: ' + e.message, 'error');
+    if (btn) { btn.disabled = false; btn.innerHTML = '<i data-lucide="radio"></i> Iniciar Clase Ahora'; }
+  }
+}
 
 /**
  * 💬 SISTEMA DE CHAT MAESTRA

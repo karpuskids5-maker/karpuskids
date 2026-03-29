@@ -1,226 +1,285 @@
-/* =========================
-   🎨 VARIABLES GLOBALES
-========================= */
+/* ============================================================
+   🌿 PANEL PADRE — VERDE PROFESIONAL
+   Verde principal: #22c55e | Verde profundo: #166534
+   Verde borde: #14532d | Fondo: #f1f5f9
+   Contenedores: blanco | Botones: verde + texto blanco
+============================================================ */
+
+/* ── Variables ─────────────────────────────────────────── */
 :root {
-  --primary-green: #10b981;
-  --primary-green-dark: #047857;
-
-  --color-sky: #0ea5e9;
-  --color-purple: #8b5cf6;
-  --color-amber: #f59e0b;
-  --color-indigo: #6366f1;
-
-  --text-muted: #64748b;
-  --text-light: #94a3b8;
-
-  --border-light: #e2e8f0;
-  --bg-white: #ffffff;
-
-  --shadow-sm: 0 4px 10px rgba(0,0,0,0.05);
-  --shadow-md: 0 10px 25px rgba(0,0,0,0.1);
-  --shadow-lg: 0 15px 30px rgba(0,0,0,0.15);
-
-  --transition: all 0.3s ease;
+  --green:        #22c55e;
+  --green-deep:   #166534;
+  --green-border: #14532d;
+  --green-light:  #dcfce7;
+  --green-soft:   #f0fdf4;
+  --bg:           #f1f5f9;
+  --card:         #ffffff;
+  --shadow-sm:    0 2px 8px rgba(34,197,94,0.10);
+  --shadow-md:    0 6px 20px rgba(34,197,94,0.14);
+  --shadow-lg:    0 12px 32px rgba(34,197,94,0.18);
+  --radius:       1.5rem;
+  --transition:   all 0.25s cubic-bezier(0.4,0,0.2,1);
 }
 
-/* =========================
-   🧸 KARPUS LOGO
-========================= */
-.karpus-kids-inline { font-weight: 700; }
+/* ── Reset / Base ──────────────────────────────────────── */
+body.panel-padre-body {
+  background: var(--bg) !important;
+  font-family: 'Quicksand', 'Nunito', sans-serif;
+  color: #1e293b;
+  min-height: 100vh;
+  overflow-x: hidden;
+}
 
-.karpus-kids-inline .k-1,
-.karpus-kids-inline .k-5,
-.karpus-kids-inline .k-10 { color: #FF9800; }
+/* Eliminar fondo gradiente del body */
+body.panel-padre-body::before,
+body.panel-padre-body::after { display: none !important; }
 
-.karpus-kids-inline .k-2,
-.karpus-kids-inline .k-6,
-.karpus-kids-inline .k-9 { color: #2196F3; }
+/* Ocultar elementos decorativos de fondo */
+body.panel-padre-body > .fixed.top-10,
+body.panel-padre-body > .fixed.bottom-20,
+body.panel-padre-body > .fixed.top-1\/3,
+body.panel-padre-body > .fixed.bottom-10 { display: none !important; }
 
-.karpus-kids-inline .k-3,
-.karpus-kids-inline .k-8 { color: #E91E63; }
+/* ── Karpus Logo ───────────────────────────────────────── */
+.karpus-kids-inline { font-weight: 800; }
+.karpus-kids-inline .k-1,.karpus-kids-inline .k-5,.karpus-kids-inline .k-10 { color: #f59e0b; }
+.karpus-kids-inline .k-2,.karpus-kids-inline .k-6,.karpus-kids-inline .k-9  { color: #3b82f6; }
+.karpus-kids-inline .k-3,.karpus-kids-inline .k-8                            { color: #ec4899; }
+.karpus-kids-inline .k-4,.karpus-kids-inline .k-7                            { color: #22c55e; }
 
-.karpus-kids-inline .k-4,
-.karpus-kids-inline .k-7 { color: #4CAF50; }
+/* ── Loader ────────────────────────────────────────────── */
+#initial-loading {
+  background: linear-gradient(135deg, #dcfce7, #f0fdf4) !important;
+}
 
-/* =========================
-   📚 SIDEBAR
-========================= */
+/* ── SIDEBAR — Mochila Verde ───────────────────────────── */
 body.panel-padre-body #sidebar {
-  background: rgba(255,255,255,0.85);
-  backdrop-filter: blur(12px);
-  box-shadow: 10px 0 30px rgba(0,0,0,0.05);
-  border-right: 1px solid rgba(255,255,255,0.4);
-  display: flex;
-  flex-direction: column;
-  max-height: 100vh;
+  background: linear-gradient(180deg, #22c55e 0%, #166534 100%) !important;
+  border-right: 4px solid #14532d !important;
+  border-top-right-radius: 2.5rem;
+  border-bottom-right-radius: 2.5rem;
+  box-shadow: 5px 0 30px rgba(22,101,52,0.25) !important;
+  border-top: none !important;
+  border-bottom: none !important;
+  border-left: none !important;
 }
 
-/* Botones */
+/* Costura lateral */
+body.panel-padre-body #sidebar::after {
+  content: '';
+  position: absolute;
+  right: 10px; top: 20px; bottom: 20px;
+  border-right: 2px dashed rgba(255,255,255,0.35);
+  pointer-events: none;
+  z-index: 0;
+}
+
+/* Logo area */
+body.panel-padre-body #sidebar .karpus-kids-inline .k-1,
+body.panel-padre-body #sidebar .karpus-kids-inline .k-2,
+body.panel-padre-body #sidebar .karpus-kids-inline .k-3,
+body.panel-padre-body #sidebar .karpus-kids-inline .k-4,
+body.panel-padre-body #sidebar .karpus-kids-inline .k-5,
+body.panel-padre-body #sidebar .karpus-kids-inline .k-6,
+body.panel-padre-body #sidebar .karpus-kids-inline .k-7,
+body.panel-padre-body #sidebar .karpus-kids-inline .k-8,
+body.panel-padre-body #sidebar .karpus-kids-inline .k-9,
+body.panel-padre-body #sidebar .karpus-kids-inline .k-10 { color: white !important; }
+
+body.panel-padre-body #sidebar h1,
+body.panel-padre-body #sidebar p,
+body.panel-padre-body #sidebar .text-slate-400,
+body.panel-padre-body #sidebar .text-slate-700 { color: rgba(255,255,255,0.85) !important; }
+
+/* Card estudiante en sidebar */
+body.panel-padre-body #sidebar .bg-emerald-50\/40,
+body.panel-padre-body #sidebar .bg-white\/40 {
+  background: rgba(255,255,255,0.15) !important;
+  border-color: rgba(255,255,255,0.25) !important;
+}
+body.panel-padre-body #sidebar #sidebar-student-name { color: white !important; }
+
+/* ── Botones Sidebar ───────────────────────────────────── */
 .sidebar-node {
-  padding: 0.8rem 1.2rem;
   display: flex;
   align-items: center;
-  gap: 0.7rem;
-  border-radius: 1.2rem;
-  font-size: 0.95rem;
-  color: var(--text-muted);
+  gap: 0.65rem;
+  padding: 0.75rem 1rem;
+  border-radius: 0.875rem;
   font-weight: 700;
-  border: 2px solid transparent;
-  margin-bottom: 0.4rem;
+  font-size: 0.9rem;
+  color: rgba(255,255,255,0.85) !important;
+  background: rgba(255,255,255,0.12) !important;
+  border: 1.5px solid transparent;
+  margin-bottom: 0.3rem;
   transition: var(--transition);
+  cursor: pointer;
   position: relative;
 }
 
-/* Indicador lateral */
-.sidebar-node::before {
-  content: '';
-  position: absolute;
-  left: 0;
-  top: 50%;
-  transform: translateY(-50%) translateX(-100%);
-  width: 4px;
-  height: 60%;
-  border-radius: 0 4px 4px 0;
-  transition: var(--transition);
-}
+.sidebar-node i { color: white !important; }
 
-/* Hover */
 .sidebar-node:hover {
-  background: var(--bg-white);
-  color: var(--color-sky);
-  transform: translateX(4px);
-  box-shadow: var(--shadow-sm);
+  background: rgba(255,255,255,0.22) !important;
+  transform: translateX(3px);
 }
 
-/* Activo */
 .sidebar-node.active {
-  background: var(--bg-white);
-  color: var(--color-sky);
-  box-shadow: var(--shadow-md);
-  transform: translateX(6px);
-}
-
-.sidebar-node.active::before {
-  transform: translateY(-50%) translateX(0);
-  background: var(--color-sky);
-}
-
-/* Colores por sección */
-.node-class.active { color: var(--color-purple); }
-.node-class.active::before { background: var(--color-purple); }
-
-.node-tasks.active { color: var(--color-amber); }
-.node-tasks.active::before { background: var(--color-amber); }
-
-.node-profile.active { color: var(--color-indigo); }
-.node-profile.active::before { background: var(--color-indigo); }
-
-/* Iconos */
-.sidebar-node i {
-  stroke-width: 2.2px;
-  transition: transform 0.2s ease;
-}
-.sidebar-node:hover i { transform: scale(1.1); }
-
-/* =========================
-   📱 MOBILE NAV FIX
-========================= */
-@media (max-width: 767px) {
-  nav.sidebar-nav {
-    display: flex;
-    overflow-x: auto;
-    -webkit-overflow-scrolling: touch;
-    padding: 8px 0;
-  }
-
-  .sidebar-node {
-    flex: 0 0 auto;
-    flex-direction: column;
-    font-size: 10px;
-    font-weight: 800;
-    color: var(--text-light);
-    min-width: 75px;
-    background: transparent;
-    box-shadow: none;
-    transform: none;
-  }
-
-  .sidebar-node:hover {
-    transform: none;
-    background: transparent;
-  }
-
-  .sidebar-node.active {
-    background: white;
-    transform: translateY(-4px);
-    box-shadow: var(--shadow-md);
-  }
-
-  .sidebar-node::before { display: none; }
-}
-
-/* =========================
-   🧩 CARDS
-========================= */
-.dashboard-card {
-  background: white;
-  border-radius: 1.5rem;
-  padding: 1.25rem;
-  box-shadow: var(--shadow-sm);
-  border: 1px solid #f1f5f9;
-  transition: var(--transition);
-}
-
-.dashboard-card:hover {
-  transform: translateY(-5px);
-  box-shadow: var(--shadow-lg);
-}
-
-/* =========================
-   🧱 LEGO CARDS FIX
-========================= */
-.lego-card {
-  background: white;
-  border-radius: 1.5rem;
-  padding: 1rem;
-  box-shadow: var(--shadow-md);
-  border: 2px solid var(--border-light);
-  border-bottom-width: 8px;
-  transition: var(--transition);
-}
-
-.lego-card:hover {
-  transform: translateY(-4px);
-}
-
-/* =========================
-   🟢 BOTONES
-========================= */
-.btn-primary, .btn-action {
-  background-color: var(--primary-green);
-  color: white;
-  border-radius: 1rem;
+  background: white !important;
+  color: var(--green-deep) !important;
   font-weight: 800;
-  box-shadow: 0 4px 10px rgba(16,185,129,0.3);
+  transform: translateX(6px);
+  box-shadow: 0 4px 16px rgba(0,0,0,0.15);
+}
+.sidebar-node.active i { color: var(--green-deep) !important; }
+
+/* Botón logout */
+body.panel-padre-body #btnLogout {
+  background: rgba(255,255,255,0.12) !important;
+  color: rgba(255,255,255,0.85) !important;
+  border: 1.5px solid rgba(255,255,255,0.25) !important;
+  border-radius: 0.875rem;
+  font-weight: 700;
   transition: var(--transition);
 }
-
-.btn-primary:hover {
-  background-color: var(--primary-green-dark);
-  transform: translateY(-2px);
+body.panel-padre-body #btnLogout:hover {
+  background: rgba(239,68,68,0.85) !important;
+  color: white !important;
 }
 
-/* =========================
-   📊 GRID
-========================= */
+/* ── Mobile nav ────────────────────────────────────────── */
+@media (max-width: 767px) {
+  body.panel-padre-body #sidebar {
+    border-radius: 2rem !important;
+    border-right: none !important;
+    border-bottom: 3px solid #14532d !important;
+  }
+  .sidebar-node {
+    flex-direction: column;
+    font-size: 9px;
+    min-width: 64px;
+    padding: 8px 6px;
+    text-align: center;
+    transform: none !important;
+  }
+  .sidebar-node:hover { transform: translateY(-2px) !important; }
+  .sidebar-node.active {
+    transform: translateY(-4px) !important;
+    box-shadow: 0 6px 16px rgba(0,0,0,0.2);
+  }
+}
+
+/* ── Contenido principal ───────────────────────────────── */
+#layoutShell { background: transparent; }
+
+/* ── Tarjetas / Contenedores ───────────────────────────── */
+.patio-card {
+  background: var(--card) !important;
+  border-radius: var(--radius);
+  border: 1.5px solid #e2e8f0;
+  box-shadow: var(--shadow-sm);
+  transition: var(--transition);
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+}
+.patio-card:hover {
+  box-shadow: var(--shadow-md);
+  transform: translateY(-3px);
+  border-color: var(--green-light);
+}
+.patio-card:active { transform: scale(0.98); }
+
+.card-base {
+  background: var(--card);
+  border-radius: var(--radius);
+  border: 1.5px solid #e2e8f0;
+  box-shadow: var(--shadow-sm);
+  padding: 1.5rem;
+}
+
+/* Secciones con fondo blanco */
+body.panel-padre-body section .bg-white {
+  box-shadow: var(--shadow-sm);
+  border: 1.5px solid #e2e8f0;
+}
+
+/* ── Botones principales ───────────────────────────────── */
+body.panel-padre-body button[type="submit"],
+body.panel-padre-body #btnSubmitPayment,
+body.panel-padre-body #btnSaveChanges,
+body.panel-padre-body #btnSubmitTask,
+body.panel-padre-body .btn-green {
+  background: var(--green) !important;
+  color: #ffffff !important;
+  border: none !important;
+  border-radius: 0.875rem;
+  font-weight: 800;
+  box-shadow: 0 4px 14px rgba(34,197,94,0.35);
+  transition: var(--transition);
+}
+body.panel-padre-body button[type="submit"]:hover,
+body.panel-padre-body #btnSubmitPayment:hover,
+body.panel-padre-body #btnSaveChanges:hover,
+body.panel-padre-body #btnSubmitTask:hover,
+body.panel-padre-body .btn-green:hover {
+  background: var(--green-deep) !important;
+  box-shadow: 0 6px 20px rgba(22,101,52,0.4);
+  transform: translateY(-1px);
+}
+
+/* Botón reportar ausencia */
+body.panel-padre-body .bg-rose-500 { background: #ef4444 !important; }
+
+/* ── Grid Dashboard ────────────────────────────────────── */
 #dashboardGrid {
   display: grid;
   grid-template-columns: repeat(2, 1fr);
-  gap: 1rem;
+  gap: 0.875rem;
+}
+@media (min-width: 640px)  { #dashboardGrid { grid-template-columns: repeat(3, 1fr); } }
+@media (min-width: 1024px) { #dashboardGrid { grid-template-columns: repeat(5, 1fr); } }
+
+/* ── Inputs ────────────────────────────────────────────── */
+body.panel-padre-body input:focus,
+body.panel-padre-body textarea:focus,
+body.panel-padre-body select:focus {
+  outline: none !important;
+  box-shadow: 0 0 0 2px var(--green) !important;
+  border-color: var(--green) !important;
 }
 
-@media (min-width: 640px) {
-  #dashboardGrid {
-    grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
-  }
+/* ── Scrollbar ─────────────────────────────────────────── */
+.no-scrollbar::-webkit-scrollbar { display: none; }
+.no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+
+/* ── Animaciones ───────────────────────────────────────── */
+@keyframes float        { 0%,100%{transform:translateY(0)} 50%{transform:translateY(-6px)} }
+@keyframes float-delayed{ 0%,100%{transform:translateY(0)} 50%{transform:translateY(-10px)} }
+@keyframes breathe      { 0%,100%{transform:scale(1)} 50%{transform:scale(1.02)} }
+@keyframes shimmer      { 0%{background-position:-200% 0} 100%{background-position:200% 0} }
+
+.animate-float         { animation: float 6s ease-in-out infinite; }
+.animate-float-delayed { animation: float-delayed 5s ease-in-out infinite; animation-delay:1s; }
+.animate-breathe       { animation: breathe 3s ease-in-out infinite; }
+
+.skeleton-shimmer {
+  background: linear-gradient(90deg, #f0fdf4 25%, #dcfce7 50%, #f0fdf4 75%);
+  background-size: 200% 100%;
+  animation: shimmer 1.5s infinite;
 }
+
+/* ── Sección Asistencia ────────────────────────────────── */
+#calendarGrid .present-day {
+  background: var(--green) !important;
+  color: white !important;
+  box-shadow: 0 4px 12px rgba(34,197,94,0.4);
+}
+
+/* ── Sección Pagos ─────────────────────────────────────── */
+#paymentsHistory .payment-card {
+  border-left: 4px solid var(--green);
+}
+
+/* ── Header ────────────────────────────────────────────── */
+body.panel-padre-body .guardian-name-display,
+body.panel-padre-body .text-emerald-600 { color: var(--green-deep) !important; }

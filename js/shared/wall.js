@@ -368,26 +368,39 @@ export const WallModule = {
     const content = input?.value.trim();
     if (!content) return;
 
-    const user    = this._appState?.get('user');
+    const user = this._appState?.get('user');
     const profile = this._appState?.get('profile');
 
     if (!user) return;
 
-    // Siempre usar profile.name — la columna name de profiles
-    const authorName = profile?.name || 'Usuario';
-
     try {
-      await supabase.from('comments').insert({
-        post_id:   postId,
-        user_id:   user.id,
-        user_name: authorName,   // guardado como respaldo, pero el join siempre tiene prioridad
-        content
-      });
+      // 1. Si es un padre, necesitamos el nombre del estudiante para el registro del comentario
+      // aunque guardemos el user_id del padre en la tabla.
+      let userName = 'Usuario';
+      
+      if (profile?.role === 'padre') {
+        const { data: student } = await supabase.from('students').select('name').eq('parent_id', user.id).maybeSingle();
+        userName = student?.name || profile.name || 'Padre';
+      } else {
+        userName = profile?.name || 'Personal';
+      }
+
+      const { error } = await supabase
+        .from('comments')
+        .insert({
+          post_id: postId,
+          user_id: user.id,
+          user_name: userName, // Guardamos el nombre resuelto (estudiante o personal)
+          content: content
+        });
+
+      if (error) throw error;
+
       input.value = '';
       const comments = await this._fetchComments(postId);
       this.renderComments(postId, comments);
     } catch (err) {
-      console.error('Error enviando comentario', err);
+      console.error('[WallModule] Error sendComment:', err);
     }
   },
 
@@ -413,12 +426,8 @@ export const WallModule = {
       .order('created_at', { ascending: true });
 
     if (error) {
-      const { data: fallback } = await supabase
-        .from('comments')
-        .select('id, content, user_name, created_at, user_id')
-        .eq('post_id', postId)
-        .order('created_at', { ascending: true });
-      return fallback || [];
+      console.error('Error fetching comments:', error);
+      return [];
     }
 
     // Para comentarios de padres, buscar el nombre del estudiante hijo
@@ -456,11 +465,9 @@ export const WallModule = {
   // - Maestra/Directora/Asistente → profile.name de profiles
   _resolveCommentName(c) {
     const profile = Array.isArray(c.profile) ? c.profile[0] : (c.profile || null);
-    const userJoin = Array.isArray(c.user) ? c.user[0] : (c.user || null);
-    const joined   = profile || userJoin;
-
+    
     // Si es padre y tenemos el nombre del estudiante, usarlo
-    if (joined?.role === 'padre' && c._studentName) {
+    if (profile?.role === 'padre' && c._studentName) {
       return {
         name:   c._studentName,
         avatar: null   // el avatar del padre no aplica para el estudiante
@@ -468,8 +475,8 @@ export const WallModule = {
     }
 
     return {
-      name:   joined?.name || c.user_name || 'Usuario',
-      avatar: (joined?.avatar_url && joined.avatar_url.startsWith('http')) ? joined.avatar_url : null
+      name:   profile?.name || c.user_name || 'Usuario',
+      avatar: (profile?.avatar_url && profile.avatar_url.startsWith('http')) ? profile.avatar_url : null
     };
   },
 
