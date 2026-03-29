@@ -6,9 +6,9 @@
   <title>Karpus Kids — Panel Maestra</title>
   <link rel="icon" href="logo/favicon.ico" type="image/x-icon">
   <link rel="manifest" href="manifest.json">
-  <script src="https://cdn.tailwindcss.com"></script>
-  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
   <link rel="stylesheet" href="css/theme.css" />
+  <link rel="stylesheet" href="css/karpus-tailwind.css" />
+  <!-- script src="https://cdn.tailwindcss.com" (removido para prod) -->
   <!-- OneSignal SDK Fix -->
   <script src="https://cdn.onesignal.com/sdks/web/v16/OneSignalSDK.page.js" defer></script>
   <script>window.OneSignalDeferred = window.OneSignalDeferred || [];</script>
@@ -224,9 +224,10 @@
           <i data-lucide="home" class="w-5 h-5"></i>
           <span class="label">Mis Clases</span>
         </button>
-        <button data-section="t-chat" class="nav-btn-toy w-full">
+        <button data-section="t-chat" class="nav-btn-toy w-full relative">
           <i data-lucide="message-square" class="w-5 h-5"></i>
           <span class="label">Chat</span>
+          <span id="badge-chat-maestra" class="hidden absolute -top-1 -right-1 w-4 h-4 bg-rose-500 text-white text-[9px] font-black rounded-full flex items-center justify-center shadow-sm">0</span>
         </button>
         <button data-section="t-grades" class="nav-btn-toy w-full">
           <i data-lucide="graduation-cap" class="w-5 h-5"></i>
@@ -689,6 +690,11 @@
         
         <!-- 1. Estado Emocional (Mañana) -->
         <div class="space-y-3">
+          <label class="block text-sm font-black text-slate-700 uppercase tracking-wide mb-2">👤 Alumno a Reportar</label>
+          <select id="reportStudentSelect" class="w-full p-3 bg-slate-50 border-2 border-slate-100 rounded-xl mb-4 font-bold outline-none focus:border-orange-400">
+            <option value="">Cargando alumnos...</option>
+          </select>
+          
           <label class="block text-sm font-black text-slate-700 uppercase tracking-wide">☀️ En la mañana (Ánimo)</label>
           <div class="grid grid-cols-4 gap-2">
             <label class="cursor-pointer group">
@@ -871,6 +877,7 @@
 
     <!-- Core App Module -->
     <script type="module" src="js/maestra/main.js"></script>
+    <script nomodule>alert("Navegador obsoleto, por favor actualiza.");</script>
     <script src="https://meet.jit.si/external_api.js"></script>
   <script>
     // Lucide icons fallback

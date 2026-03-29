@@ -7,6 +7,9 @@ import { TeachersModule } from './teachers.js';
 import { Helpers } from '../shared/helpers.js';
 import { WallModule } from '../shared/wall.js';
 import { ChatModule } from '../shared/chat.js';
+import { StudentsModule } from './modules/students.js';
+import { RoomsModule } from './modules/rooms.js';
+import { DashboardModule } from './modules/dashboard.js';
 
 // 🚀 Definir objeto App globalmente para evitar ReferenceError en onclicks del HTML
 window.App = {
@@ -28,7 +31,9 @@ window.App = {
   deleteComment: (cid, pid) => window.App._deleteComment(cid, pid),
   sendComment: (pid) => window.App._sendComment(pid),
   toggleLike: (pid) => window.App._toggleLike(pid),
-  selectChatContact: (uid, name, role) => window.App._selectChatContact(uid, name, role)
+  selectChatContact: (uid, name, role) => window.App._selectChatContact(uid, name, role),
+  students: StudentsModule,
+  rooms: RoomsModule
 };
 
 /**
@@ -88,24 +93,7 @@ document.addEventListener('DOMContentLoaded', async () => {
  * Carga inicial del dashboard de asistente
  */
 async function initDashboard() {
-  try {
-    const [studentsRes, roomsRes, paymentsRes] = await Promise.all([
-      supabase.from('students').select('*', { count: 'exact', head: true }).eq('is_active', true),
-      supabase.from('classrooms').select('*', { count: 'exact', head: true }),
-      supabase.from('payments').select('id', { count: 'exact', head: true }).in('status', ['pending', 'review'])
-    ]);
-
-    const setTxt = (id, val) => { const el = document.getElementById(id); if(el) el.textContent = val; };
-    setTxt('statStudents', studentsRes.count || 0);
-    setTxt('statAttendance', 0); // Placeholder, AccessModule debería actualizar esto
-    setTxt('statPayments', paymentsRes.count || 0);
-    setTxt('welcomeName', AppState.get('profile')?.name?.split(' ')[0] || 'Asistente');
-    
-    // Cargar gráfico de ingresos (mismo que directora pero en el dashboard del asistente)
-    if(PaymentsModule.loadIncomeChart) PaymentsModule.loadIncomeChart();
-  } catch (e) {
-    console.error(e);
-  }
+  // Obsoleto, delegado a DashboardModule
 }
 
 /**
@@ -170,10 +158,10 @@ function initNavigation() {
           await TeachersModule.init();
           break;
         case 'estudiantes':
-          await loadAsistenteStudents();
+          await StudentsModule.init();
           break;
         case 'aulas':
-          await loadAsistenteRooms();
+          await RoomsModule.init();
           break;
         case 'muro':
           WallModule.loadPosts();
@@ -197,7 +185,7 @@ function initNavigation() {
   });
 
   // Carga inicial del dashboard
-  initDashboard().then(() => loadedSections.add('dashboard'));
+  DashboardModule.init().then(() => loadedSections.add('dashboard'));
   showSection('dashboard');
 
   // 4. Configurar botones de menú móvil y colapsar sidebar

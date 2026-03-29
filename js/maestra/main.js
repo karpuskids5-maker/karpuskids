@@ -6,6 +6,21 @@ import { WallModule } from '../shared/wall.js';
 import { ChatModule } from '../shared/chat.js';
 import { VideoCallModule } from '../shared/videocall.js';
 
+import * as Attendance from './modules/attendance.js';
+import * as Routine from './modules/routine.js';
+import * as Tasks from './modules/tasks.js';
+import * as Students from './modules/students.js';
+import * as ChatApp from './modules/chat_app.js';
+import * as UI from './modules/ui.js';
+
+window.safeToast = UI.safeToast;
+const { safeToast, safeEscapeHTML, Modal } = UI;
+const { initAttendance, markAllPresent, registerAttendance } = Attendance;
+const { initRoutine, updateRoutineField, saveRoutineLog, openNewRoutineModal } = Routine;
+const { initTasks, openEditTaskModal, deleteTask, openNewTaskModal, viewTaskSubmissions, submitGrade } = Tasks;
+const { openStudentProfile, registerIncidentModal } = Students;
+const { initChat, selectChatContact } = ChatApp;
+
 /**
  * 🚀 ARQUITECTURA SENIOR: Definición Global del Objeto App
  * Evita errores de "App is not defined" y centraliza la lógica.
@@ -32,7 +47,7 @@ window.App = {
 };
 
 // ✅ Helpers robustos
-const safeToast = (message, type = 'success') => {
+const obsolete_safeToast = (message, type = 'success') => {
   if (!message) return;
   try {
     if (Helpers && typeof Helpers.toast === 'function') {
@@ -44,7 +59,7 @@ const safeToast = (message, type = 'success') => {
   }
 };
 
-const safeEscapeHTML = (str = '') => {
+const obsolete_safeEscapeHTML = (str = '') => {
   try {
     if (Helpers && typeof Helpers.escapeHTML === 'function') {
       return Helpers.escapeHTML(str);
@@ -205,25 +220,47 @@ document.addEventListener('DOMContentLoaded', async () => {
   }
 
   // Mapeo de funciones reales al objeto global App (MOVIDO ARRIBA para evitar ReferenceError)
+  
   Object.assign(window.App, {
-    _registerAttendance: registerAttendance,
-    _markAllPresent: markAllPresent,
-    _openStudentProfile: openStudentProfile,
+    // UI Helpers
+    safeToast: UI.safeToast,
+    safeEscapeHTML: UI.safeEscapeHTML,
+    Modal: UI.Modal,
+
+    // Attendance
+    registerAttendance: Attendance.registerAttendance,
+    markAllPresent: Attendance.markAllPresent,
+    initAttendance: Attendance.initAttendance,
+
+    // Routine
+    initRoutine: Routine.initRoutine,
+    updateRoutineField: Routine.updateRoutineField,
+    saveRoutineLog: Routine.saveRoutineLog,
+    openNewRoutineModal: Routine.openNewRoutineModal,
+
+    // Tasks
+    initTasks: Tasks.initTasks,
+    openEditTaskModal: Tasks.openEditTaskModal,
+    deleteTask: Tasks.deleteTask,
+    openNewTaskModal: Tasks.openNewTaskModal,
+    viewTaskSubmissions: Tasks.viewTaskSubmissions,
+    submitGrade: Tasks.submitGrade,
+
+    // Students
+    openStudentProfile: Students.openStudentProfile,
+    registerIncidentModal: Students.registerIncidentModal,
+
+    // Chat
+    initChat: ChatApp.initChat,
+    selectChatContact: ChatApp.selectChatContact,
+
+    // Fallbacks to old ones not ported yet
     _showClassroomDetail: showClassroomDetail,
-    _registerIncidentModal: registerIncidentModal,
-    _openEditTaskModal: openEditTaskModal,
-    _deleteTask: deleteTask,
-    _openNewTaskModal: openNewTaskModal,
-    _viewTaskSubmissions: viewTaskSubmissions,
-    _saveRoutineLog: saveRoutineLog,
-    _submitGrade: submitGrade,
-    _openNewRoutineModal: openNewRoutineModal,
     _startJitsi: startJitsi,
-    _updateRoutineField: updateRoutineField,
-    _selectChatContact: selectChatContact,
     _openNewPostModal: openNewPostModal,
     _submitNewPost: submitNewPost
   });
+
 
   // 🔥 EXPOSICIÓN GLOBAL DE MÓDULOS (CRUCIAL PARA EL MURO)
   window.WallModule = WallModule;
@@ -241,8 +278,10 @@ document.addEventListener('DOMContentLoaded', async () => {
       .from('classrooms')
       .select('*')
       .eq('teacher_id', auth.user.id)
+      .order('name')
+      .limit(1)
       .maybeSingle();
-      
+
     if (error) throw error;
     if (!classroom) {
       safeToast('No tienes un aula asignada.', 'warning');
@@ -260,8 +299,11 @@ document.addEventListener('DOMContentLoaded', async () => {
     await initDashboard();
     await initAttendance();
     await initNavigation();
-    await initChat(); // Inicializar sistema de chat
+    await initChat();
     initRealtimeUpdates(classroom.id);
+
+    // Badge mensajes no leídos
+    loadMaestraUnreadBadge(auth.user.id);
 
     // ── Botón hamburguesa móvil ──────────────────────────────────────────────
     const menuBtn = document.getElementById('menuBtn');
@@ -416,7 +458,7 @@ async function initDashboard() {
 /**
  * 📅 Asistencia
  */
-async function initAttendance() {
+async function obsolete_initAttendance() {
   const classroom = AppState.get('classroom');
   const students = AppState.get('students') || [];
   const today = new Date().toISOString().split('T')[0];
@@ -462,7 +504,7 @@ async function initAttendance() {
   }
 }
 
-async function markAllPresent() {
+async function obsolete_markAllPresent() {
   const students = AppState.get('students') || [];
   const classroom = AppState.get('classroom');
   const today = new Date().toISOString().split('T')[0];
@@ -513,7 +555,7 @@ async function markAllPresent() {
   }
 }
 
-async function registerAttendance(studentId, status) {
+async function obsolete_registerAttendance(studentId, status) {
   const classroom = AppState.get('classroom');
   const today = new Date().toISOString().split('T')[0];
   if (!studentId || !status) return;
@@ -561,7 +603,7 @@ async function registerAttendance(studentId, status) {
 /**
  * 🍱 Rutina Diaria
  */
-async function initRoutine() {
+async function obsolete_initRoutine() {
   const classroom = AppState.get('classroom');
   const container = document.getElementById('tab-daily-routine');
   if (!container) return;
@@ -669,7 +711,7 @@ async function initRoutine() {
 /**
  * 🍱 Rutina Diaria - Lógica Profesional
  */
-async function updateRoutineField(studentId, field, value) {
+async function obsolete_updateRoutineField(studentId, field, value) {
   const saveBtn = document.getElementById(`btn-save-log-${studentId}`);
   if (!saveBtn) return;
 
@@ -694,7 +736,7 @@ async function updateRoutineField(studentId, field, value) {
   }
 }
 
-async function saveRoutineLog(studentId) {
+async function obsolete_saveRoutineLog(studentId) {
   const btn = document.getElementById(`btn-save-log-${studentId}`);
   const note = document.getElementById(`note-${studentId}`)?.value;
   if (!btn) return;
@@ -751,7 +793,7 @@ async function saveRoutineLog(studentId) {
 /**
  * 📝 Tareas
  */
-async function initTasks() {
+async function obsolete_initTasks() {
   const classroom = AppState.get('classroom');
   const container = document.getElementById('tab-tasks');
   if (!container) return;
@@ -814,7 +856,7 @@ async function initTasks() {
   }
 }
 
-async function openEditTaskModal(taskId) {
+async function obsolete_openEditTaskModal(taskId) {
   try {
     const { data: task, error } = await supabase.from('tasks').select('*').eq('id', taskId).single();
     if (error) throw error;
@@ -826,7 +868,7 @@ async function openEditTaskModal(taskId) {
   }
 }
 
-async function deleteTask(taskId) {
+async function obsolete_deleteTask(taskId) {
   if (!confirm('¿Estás segura de que quieres eliminar esta tarea? Esta acción no se puede deshacer.')) {
     return;
   }
@@ -840,7 +882,7 @@ async function deleteTask(taskId) {
   }
 }
 
-async function openNewTaskModal(taskToEdit = null) {
+async function obsolete_openNewTaskModal(taskToEdit = null) {
   const isEditing = taskToEdit !== null;
   const modalId = 'newTaskModal';
   const modalTitle = isEditing ? 'Editar Tarea' : 'Asignar Nueva Tarea';
@@ -1003,7 +1045,7 @@ async function openNewTaskModal(taskToEdit = null) {
   };
 }
 
-async function viewTaskSubmissions(taskId) {
+async function obsolete_viewTaskSubmissions(taskId) {
   const students = AppState.get('students') || [];
   const modalId = 'taskSubmissionsModal';
   try {
@@ -1083,7 +1125,7 @@ async function viewTaskSubmissions(taskId) {
   }
 }
 
-async function submitGrade(taskId, studentId) {
+async function obsolete_submitGrade(taskId, studentId) {
   const grade = document.getElementById(`grade-${studentId}`)?.value;
   const stars = document.getElementById(`stars-${studentId}`)?.value;
   const feedback = document.getElementById(`feedback-${studentId}`)?.value; // Obtener retroalimentación
@@ -1121,7 +1163,7 @@ async function submitGrade(taskId, studentId) {
 /**
  * 🛠️ Modales (Centralizado PRO)
  */
-const Modal = {
+const obsolete_Modal = {
   open(id, content) {
     document.getElementById(id)?.remove();
     const modal = document.createElement('div');
@@ -1140,11 +1182,11 @@ const Modal = {
 window.Modal = Modal;
 
 // Función de compatibilidad temporal (si se usa en otros archivos o HTML legacy)
-function createOrGetModal(id, content) {
+function obsolete_createOrGetModal(id, content) {
   Modal.open(id, content);
 }
 
-function openStudentProfile(studentId) {
+function obsolete_openStudentProfile(studentId) {
   const student = AppState.get('students').find(s => s.id == studentId);
   if (!student) return safeToast('Estudiante no encontrado', 'error');
   
@@ -1201,7 +1243,7 @@ function openStudentProfile(studentId) {
   Modal.open(modalId, content);
 }
 
-function registerIncidentModal(studentId) {
+function obsolete_registerIncidentModal(studentId) {
   const student = AppState.get('students').find(s => s.id == studentId);
   if (!student) return safeToast('Estudiante no encontrado', 'error');
   
@@ -1292,7 +1334,7 @@ function registerIncidentModal(studentId) {
   };
 }
 
-function openNewRoutineModal() {
+function obsolete_openNewRoutineModal() {
   safeToast('Usa "Guardar Reporte" en cada tarjeta para registrar la rutina.', 'info');
 }
 
@@ -1497,7 +1539,7 @@ async function startJitsi() {
 let activeChatUserId = null;
 let activeConversationId = null; // Guardamos el ID de la conversación activa
 
-async function initChat() {
+async function obsolete_initChat() {
   const container = document.getElementById('chatContactsList');
   if (!container) return;
 
@@ -1577,7 +1619,7 @@ async function initChat() {
   }
 }
 
-async function selectChatContact(userId, name, meta) {
+async function obsolete_selectChatContact(userId, name, meta) {
   activeChatUserId = userId;
   activeConversationId = null; // Resetear al cambiar de contacto
   
@@ -1613,7 +1655,7 @@ async function selectChatContact(userId, name, meta) {
  * Busca o inicializa la conversación (sin crearla en DB hasta enviar mensaje, 
  * pero buscamos si ya existe para cargar historial)
  */
-async function loadChatMessages(otherUserId) {
+async function obsolete_loadChatMessages(otherUserId) {
   const user = AppState.get('user');
   const container = document.getElementById('chatMessagesContainer');
   if (!container) return;
@@ -1646,7 +1688,7 @@ async function loadChatMessages(otherUserId) {
   renderMessages(messages, user.id);
 }
 
-function renderMessages(messages, myId) {
+function obsolete_renderMessages(messages, myId) {
   const container = document.getElementById('chatMessagesContainer');
   if (!container) return;
   if (!messages.length) {
@@ -1668,7 +1710,7 @@ function renderMessages(messages, myId) {
   container.scrollTop = container.scrollHeight;
 }
 
-async function sendChatMessage() {
+async function obsolete_sendChatMessage() {
   if (!activeChatUserId) return;
   const input = document.getElementById('chatMessageInput');
   const text = input.value.trim();
@@ -1705,7 +1747,7 @@ async function sendChatMessage() {
   }
 }
 
-async function subscribeToChat(conversationId) {
+async function obsolete_subscribeToChat(conversationId) {
   if (!conversationId) return;
   
   // Usar suscripción del módulo compartido
@@ -1892,4 +1934,37 @@ async function initGrades() {
     const content = document.getElementById('gradesContent');
     if (content) content.innerHTML = '<div class="text-center py-8 text-rose-500 font-bold">Error al cargar calificaciones.</div>';
   }
+}
+
+// ── Badge mensajes no leídos (maestra) ───────────────────────────────────────
+async function loadMaestraUnreadBadge(userId) {
+  try {
+    const since = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
+    const { count, error } = await supabase
+      .from('messages')
+      .select('*', { count: 'exact', head: true })
+      .eq('receiver_id', userId)
+      .gte('created_at', since);
+
+    if (error) return;
+
+    const badge = document.getElementById('badge-chat-maestra');
+    if (!badge) return;
+    if (count && count > 0) {
+      badge.textContent = count > 9 ? '9+' : String(count);
+      badge.classList.remove('hidden');
+      badge.classList.add('flex');
+    } else {
+      badge.classList.add('hidden');
+      badge.classList.remove('flex');
+    }
+
+    if (!window._maestraUnreadChannel) {
+      window._maestraUnreadChannel = supabase.channel('maestra_unread_' + userId)
+        .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'messages', filter: 'receiver_id=eq.' + userId }, () => {
+          loadMaestraUnreadBadge(userId);
+        })
+        .subscribe();
+    }
+  } catch (_) {}
 }

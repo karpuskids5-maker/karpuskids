@@ -36,8 +36,12 @@ export const DashboardService = {
       const year = new Date().getFullYear();
       const month = new Date().getMonth() + 1;
 
+      // Usar mes en formato texto para el RPC get_dashboard_kpis
+      const monthName = new Intl.DateTimeFormat('es-ES', { month: 'long' }).format(new Date());
+      const formattedMonth = monthName.charAt(0).toUpperCase() + monthName.slice(1);
+
       const results = await Promise.allSettled([
-        DirectorApi.getDashboardKPIs(),
+        DirectorApi.getDashboardKPIs(formattedMonth),
         DirectorApi.getStudents(),
         DirectorApi.getClassroomsWithOccupancy(),
         DirectorApi.getPayments({ status: 'pending', year }),
@@ -71,7 +75,7 @@ export const DashboardService = {
         teachers: 0,
         classrooms: 0,
         attendance_today: 0,
-        pending_amount: 0,
+        pending_payments: 0,
         inquiries: 0,
         ...(kpisRes?.data || {})
       };
@@ -105,8 +109,8 @@ export const DashboardService = {
         payments: {
           pending: payments,
           summary: {
-            // Usar kpis.pending_amount que viene de queries directas confiables
-            total_pending: kpis.pending_amount || financialSummarySafe.total_pending,
+            // Usar kpis.pending_payments que viene de queries directas confiables
+            total_pending: kpis.pending_payments || financialSummarySafe.total_pending,
             total_paid: financialSummarySafe.total_paid,
             percentagePaid:
               financialSummarySafe.total_invoiced > 0
@@ -165,6 +169,7 @@ export const DashboardService = {
    */
   invalidateCache() {
     this.lastFetch = null;
+    AppState.set('dashboardData', null); // Limpiar estado global para forzar skeletons si es necesario
     console.log('🔄 Caché de dashboard invalidado');
     this.notifyListeners(); // 🔔 Avisar a la UI que debe recargar
   },

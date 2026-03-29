@@ -135,7 +135,8 @@ export const FeedModule = {
             ${(p.comments || []).length === 0
               ? '<p class="text-center text-[10px] text-slate-400 italic py-2">Sé el primero en comentar.</p>'
               : (p.comments || []).map(c => {
-                  const cName = c.user?.name || 'Usuario';
+                  // Priorizar c.user_name que es donde guardamos el nombre del estudiante/maestra al insertar
+                  const cName = c.user_name || c.user?.name || 'Usuario';
                   return `<div class="flex gap-2 text-xs"><div class="w-6 h-6 rounded-full bg-blue-100 text-blue-600 flex items-center justify-center font-bold text-[9px] shrink-0">${cName.charAt(0)}</div><div class="bg-white p-2 rounded-xl rounded-tl-none border border-slate-100 flex-1"><span class="font-bold text-slate-700">${escapeHtml(cName)}</span><p class="text-slate-600 mt-0.5">${escapeHtml(c.content)}</p></div></div>`;
                 }).join('')
             }
@@ -172,23 +173,25 @@ export const FeedModule = {
     if (!content) return;
 
     const user    = AppState.get('user');
-    const profile = AppState.get('profile');
     const student = AppState.get('currentStudent');
     if (!user) return;
 
     // Para padres: mostrar nombre del estudiante (no del padre)
-    const authorName = student?.name || profile?.name || 'Padre';
+    // El estudiante ya está cargado en el AppState del panel padre
+    const authorName = student?.name || 'Padre';
 
     try {
       const { error } = await supabase.from('comments').insert({
         post_id:   postId,
         user_id:   user.id,
-        user_name: authorName,
+        user_name: authorName, // Guardamos el nombre del estudiante directamente en user_name
         content
       });
       if (error) throw error;
       input.value = '';
-      // Recargar posts para mostrar el nuevo comentario
+      
+      // Feedback inmediato y recarga
+      Helpers.toast('Comentario enviado como ' + authorName, 'success');
       await this.loadPosts();
     } catch (err) {
       console.error('Error enviando comentario:', err);

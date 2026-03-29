@@ -1,36 +1,28 @@
 import { createClient } from "https://cdn.jsdelivr.net/npm/@supabase/supabase-js/+esm";
 
 export { createClient };
-export const SUPABASE_URL = "https://wwnfonkvemimwiqjpkij.supabase.co";
+export const SUPABASE_URL      = "https://wwnfonkvemimwiqjpkij.supabase.co";
 export const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Ind3bmZvbmt2ZW1pbXdpcWpwa2lqIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Njc4MzY0MzUsImV4cCI6MjA4MzQxMjQzNX0.n5VW-3U0r2nRlwC8pDstQLowu9MZ3aWHMzXVVNFQaDo";
 
-/**
- * Cliente centralizado de Supabase
- */
 export const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
   auth: {
     detectSessionInUrl: false,
-    persistSession: true,
-    autoRefreshToken: true,
-    storageKey: 'karpus_auth_token_v2'
+    persistSession:     true,
+    autoRefreshToken:   true,
+    storageKey:         'karpus_auth_token_v2'
   }
 });
 
-/**
- * Asegura que el usuario tenga el rol correcto antes de proceder
- */
+// ── Autenticación ─────────────────────────────────────────────────────────────
 export async function ensureRole(requiredRoles) {
   const roles = Array.isArray(requiredRoles) ? requiredRoles : [requiredRoles];
-  const { data: { user }, error: authError } = await supabase.auth.getUser();
-  
-  if (authError || !user) {
-    window.location.href = 'login.html';
-    return null;
-  }
+  const { data: { user }, error } = await supabase.auth.getUser();
+
+  if (error || !user) { window.location.href = 'login.html'; return null; }
 
   const { data: profile } = await supabase
     .from('profiles')
-    .select('id, role, name, email')
+    .select('id, role, name, email, avatar_url, phone, bio, title, address')
     .eq('id', user.id)
     .maybeSingle();
 
@@ -43,97 +35,112 @@ export async function ensureRole(requiredRoles) {
   return { user, profile };
 }
 
-/**
- * Suscripción a notificaciones del sistema
- */
+// ── Notificaciones internas (realtime) ────────────────────────────────────────
 export async function subscribeNotifications(userId, onNotif) {
   if (!userId) return null;
-  
-  const channel = supabase.channel(`notif_${userId}`)
-    .on('postgres_changes', { 
-      event: 'INSERT', 
-      schema: 'public', 
-      table: 'notifications', 
-      filter: `user_id=eq.${userId}` 
-    }, (payload) => {
+  return supabase.channel('notif_' + userId)
+    .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'notifications', filter: 'user_id=eq.' + userId }, (payload) => {
       if (onNotif) onNotif(payload.new);
     })
     .subscribe();
-    
-  return channel;
 }
 
-/**
- * Enviar correo vía Edge Function
- */
+// ── Email via Resend (Edge Function send-email) ───────────────────────────────
 export async function sendEmail(to, subject, html, text) {
   try {
     const { data: { session } } = await supabase.auth.getSession();
-    const res = await fetch(`${SUPABASE_URL}/functions/v1/send-email`, {
-      method: 'POST',
-      headers: { 
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${session?.access_token || ''}`
+    // En local el CORS puede fallar — silencioso
+    const res = await fetch(SUPABASE_URL + '/functions/v1/send-email', {
+      method:  'POST',
+      headers: {
+        'Content-Type':  'application/json',
+        'Authorization': 'Bearer ' + (session?.access_token || SUPABASE_ANON_KEY)
       },
       body: JSON.stringify({ to, subject, html, text })
     });
-    return await res.json();
-  } catch (e) {
-    console.error('Error enviando correo:', e);
-  }
-}
-
-/**
- * Enviar notificación push vía Edge Function
- */
-export async function sendPush(payload) {
-  try {
-    const { data: { session } } = await supabase.auth.getSession();
-    if (!session) {
-      console.warn('[sendPush] No hay sesión activa');
+    if (!res.ok) {
+      console.warn('[sendEmail] HTTP ' + res.status);
       return null;
     }
-
-    const { data, error } = await supabase.functions.invoke('send-push', { 
-      body: payload,
-      headers: {
-        'Authorization': `Bearer ${session.access_token}`
-      }
-    });
-
-    if (error) throw error;
-    return data;
+    return await res.json();
   } catch (e) {
-    console.error('Error enviando push:', e);
-    // No relanzamos para no romper el flujo principal
+    console.warn('[sendEmail] Error (silencioso en local):', e.message);
     return null;
   }
 }
 
-/**
- * Emitir evento al sistema de procesamiento
- */
-export async function emitEvent(type, data) {
+// ── Push via OneSignal (Edge Function send-push) ──────────────────────────────
+export async function sendPush(payload) {
   try {
     const { data: { session } } = await supabase.auth.getSession();
-    const res = await fetch(`${SUPABASE_URL}/functions/v1/process-event`, {
-      method: 'POST',
-      headers: { 
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${session?.access_token || ''}`
-      },
-      body: JSON.stringify({ type, data })
+    if (!session) return null;
+
+    const { data, error } = await supabase.functions.invoke('send-push', {
+      body: payload,
+      headers: { 'Authorization': 'Bearer ' + session.access_token }
     });
-    return await res.json();
+
+    if (error) { console.warn('[sendPush] Error:', error.message); return null; }
+    return data;
   } catch (e) {
-    console.error('Error emitiendo evento:', e);
+    console.warn('[sendPush] Error (silencioso):', e.message);
+    return null;
   }
 }
 
+// ── Eventos del sistema (process-event) ──────────────────────────────────────
+export async function emitEvent(type, data) {
+  try {
+    const { data: { session } } = await supabase.auth.getSession();
+    const res = await fetch(SUPABASE_URL + '/functions/v1/process-event', {
+      method:  'POST',
+      headers: {
+        'Content-Type':  'application/json',
+        'Authorization': 'Bearer ' + (session?.access_token || SUPABASE_ANON_KEY)
+      },
+      body: JSON.stringify({ type, data })
+    });
+    if (!res.ok) { console.warn('[emitEvent] HTTP ' + res.status); return null; }
+    return await res.json();
+  } catch (e) {
+    console.warn('[emitEvent] Error:', e.message);
+    return null;
+  }
+}
+
+// ── Helpers de eventos específicos ───────────────────────────────────────────
+
+/** Notificar pago aprobado al padre */
+export async function notifyPaymentApproved(paymentId, parentEmail, studentName, amount, month) {
+  return Promise.all([
+    sendPush({ user_id: parentEmail, title: 'Pago Aprobado ✅', message: 'Tu pago de ' + amount + ' para ' + month + ' fue aprobado.', type: 'payment', link: '/panel_padres.html' }),
+    emitEvent('payment.approved', { payment_id: paymentId, parent_email: parentEmail, student_name: studentName, amount, month })
+  ]);
+}
+
+/** Notificar entrada/salida al padre */
+export async function notifyAttendance(parentEmail, studentName, type, time) {
+  return emitEvent('attendance.' + type, { parent_email: parentEmail, student_name: studentName, time });
+}
+
+/** Notificar incidente al padre */
+export async function notifyIncident(parentEmail, studentName, severity, description) {
+  return emitEvent('incident.reported', { parent_email: parentEmail, student_name: studentName, severity, description });
+}
+
+/** Notificar nueva tarea a los padres del aula */
+export async function notifyTaskCreated(classroomId, title, dueDate) {
+  return emitEvent('task.created', { classroom_id: classroomId, title, due_date: dueDate });
+}
+
+/** Notificar comprobante subido al staff */
+export async function notifyReceiptUploaded(studentId, amount, month) {
+  return emitEvent('payment.receipt_uploaded', { student_id: studentId, amount, month });
+}
+
+// ── OneSignal ─────────────────────────────────────────────────────────────────
 export async function initOneSignal(currentUser = null) {
   let user = currentUser;
-  
-  // Si no se pasa usuario, intentar obtenerlo (fallback)
   if (!user) {
     const { data } = await supabase.auth.getUser();
     user = data?.user;
@@ -141,49 +148,44 @@ export async function initOneSignal(currentUser = null) {
   if (!user) return;
 
   const ONESIGNAL_APP_ID = "47ce2d1e-152e-4ea7-9ddc-8e2142992989";
-  
-  // 1. Cargar el script de OneSignal si no existe
+
   if (!document.getElementById('onesignal-sdk')) {
-    const script = document.createElement('script');
-    script.id = 'onesignal-sdk';
-    script.src = "https://cdn.onesignal.com/sdks/web/v16/OneSignalSDK.page.js";
-    script.defer = true;
-    document.head.appendChild(script);
+    const s = document.createElement('script');
+    s.id = 'onesignal-sdk';
+    s.src = "https://cdn.onesignal.com/sdks/web/v16/OneSignalSDK.page.js";
+    s.defer = true;
+    document.head.appendChild(s);
   }
 
   window.OneSignal = window.OneSignal || [];
   window.OneSignalDeferred = window.OneSignalDeferred || [];
-  
-  // Evitar múltiples inicializaciones
+
   if (window.OneSignalInitialized) return;
   window.OneSignalInitialized = true;
 
-  // 2. Inicialización profesional
   OneSignalDeferred.push(async function(OneSignal) {
     try {
-      // Solo inicializar si estamos en el dominio permitido o es localhost
-      const isLocal = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
-      const isCorrectDomain = window.location.hostname === 'karpuskids.com' || window.location.hostname.endsWith('.karpuskids.com');
-      
-      if (!isLocal && !isCorrectDomain) {
-        console.warn("OneSignal: Domain mismatch, skipping initialization.");
-        return;
-      }
+      const host = window.location.hostname;
+      const isLocal   = host === 'localhost' || host === '127.0.0.1';
+      const isProd    = host === 'karpuskids.com' || host.endsWith('.karpuskids.com');
+      if (!isLocal && !isProd) { console.warn('[OneSignal] Dominio no permitido, omitiendo.'); return; }
 
       await OneSignal.init({
         appId: ONESIGNAL_APP_ID,
         allowLocalhostAsSecureOrigin: true,
-        serviceWorkerParam: { scope: "/" },
-        serviceWorkerPath: "OneSignalSDKWorker.js",
-        notifyButton: { enable: false },
+        serviceWorkerParam: { scope: '/' },
+        serviceWorkerPath: 'OneSignalSDKWorker.js',
+        notifyButton: { enable: false }
       });
 
-      // Login del usuario
-      if (OneSignal.User.externalId !== user.id) {
+      // Vincular usuario externo para targeting por user_id
+      if (OneSignal.User?.externalId !== user.id) {
         await OneSignal.login(user.id);
       }
+
+      console.log('[OneSignal] Inicializado para usuario:', user.id);
     } catch (e) {
-      console.warn("OneSignal Status:", e);
+      console.warn('[OneSignal] Error de inicialización:', e.message || e);
     }
   });
 }

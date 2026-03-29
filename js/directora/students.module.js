@@ -147,8 +147,9 @@ export const StudentsModule = {
 
       if (window.lucide) lucide.createIcons();
     } catch (e) {
-      console.error(e);
-      container.innerHTML = '<div class="col-span-3 text-center p-8 text-red-500">Error al cargar.</div>';
+      console.error('[StudentsModule] init error:', e);
+      const container = document.getElementById('studentsTable') || document.getElementById('studentsGrid');
+      if (container) container.innerHTML = '<div class="col-span-3 text-center p-8 text-red-500">Error al cargar estudiantes.</div>';
     }
   },
 
@@ -505,6 +506,27 @@ export const StudentsModule = {
       </div>`;
       
     window.openGlobalModal(modalHTML, true);
+
+    // Generar matrícula automática
+    window.generateMatricula = () => {
+      const el = document.getElementById('stMatricula');
+      if (el) el.value = 'KK-' + new Date().getFullYear() + '-' + String(Math.floor(Math.random() * 9000) + 1000);
+    };
+
+    // Handler de avatar
+    const avatarFile = document.getElementById('stAvatarFile');
+    const avatarPreview = document.getElementById('stAvatarPreview');
+    if (avatarFile && avatarPreview) {
+      avatarFile.onchange = (e) => {
+        const file = e.target.files[0];
+        if (!file) return;
+        const reader = new FileReader();
+        reader.onload = (ev) => {
+          avatarPreview.innerHTML = '<img src="' + ev.target.result + '" class="w-full h-full object-cover">';
+        };
+        reader.readAsDataURL(file);
+      };
+    }
     
     // Cargar aulas en el select
     try {

@@ -98,8 +98,16 @@ export const DirectorApi = {
   },
 
   // --- DASHBOARD & KPIs ---
-  async getDashboardKPIs() {
+  async getDashboardKPIs(monthText = '') {
     try {
+      // Intentar usar el RPC si existe
+      const { data: rpcData, error: rpcError } = await supabase.rpc('get_dashboard_kpis', { p_month: monthText || '%' });
+      
+      if (!rpcError && rpcData) {
+        return { data: rpcData, error: null };
+      }
+
+      // Fallback manual si el RPC falla o no está disponible
       const today = new Date().toISOString().split('T')[0];
       const results = await Promise.allSettled([
         supabase.from('students').select('*', { count: 'exact', head: true }).eq('is_active', true),
@@ -123,7 +131,7 @@ export const DirectorApi = {
           teachers:    teachersRes.count    || 0,
           classrooms:  classroomsRes.count  || 0,
           attendance_today: attendanceRes.count || 0,
-          pending_amount:   pendingAmount,
+          pending_payments:   pendingAmount, // Ajustado a pending_payments para consistencia con RPC
           inquiries:   inquiriesRes.count   || 0
         },
         error: null
@@ -349,14 +357,42 @@ export const DirectorApi = {
   },
 
   async sendPaymentReceipt(paymentId) {
-    // Silencioso si no hay email configurado
     try {
       const { data: p } = await this.getPaymentById(paymentId);
       if (!p) return;
       const emails = [p.students?.p1_email, p.students?.p2_email].filter(Boolean);
       if (!emails.length) return;
-      // Notificación básica — se puede expandir con sendEmail
-      console.log('[sendPaymentReceipt] Recibo para:', emails);
-    } catch (e) { /* silencioso */ }
+
+      const { sendEmail } = await import('../shared/supabase.js');
+      const html = `
+        <div style="font-family: sans-serif; max-width: 600px; margin: auto; padding: 30px; border: 1px solid #f0f0f0; border-radius: 20px;">
+          <h2 style="color: #16a34a; text-align: center;">Recibo de Pago — Karpus Kids ✅</h2>
+          <p>Hola,</p>
+          <p>Se ha confirmado el pago de colegiatura para el estudiante <b>${p.students?.name}</b>.</p>
+          
+          <div style="background: #f9fafb; padding: 20px; border-radius: 15px; margin: 25px 0;">
+            <table style="width: 100%; border-collapse: collapse;">
+              <tr><td style="color: #6b7280; padding: 5px 0;">Concepto:</td><td style="text-align: right; font-weight: bold;">${p.month_paid || 'Colegiatura'}</td></tr>
+              <tr><td style="color: #6b7280; padding: 5px 0;">Monto:</td><td style="text-align: right; font-weight: bold;">$${Number(p.amount).toFixed(2)}</td></tr>
+              <tr><td style="color: #6b7280; padding: 5px 0;">Método:</td><td style="text-align: right; font-weight: bold; text-transform: capitalize;">${p.method || 'Transferencia'}</td></tr>
+              <tr><td style="color: #6b7280; padding: 5px 0;">Fecha:</td><td style="text-align: right; font-weight: bold;">${new Date().toLocaleDateString()}</td></tr>
+            </table>
+          </div>
+
+          <p style="font-size: 14px; color: #4b5563; text-align: center;">Gracias por tu puntualidad y compromiso con la educación de tu hijo.</p>
+          <div style="text-align: center; margin-top: 30px;">
+             <a href="https://karpuskids.com/panel_padres.html" style="background: #16a34a; color: white; padding: 12px 25px; text-decoration: none; border-radius: 10px; font-weight: bold; font-size: 14px;">Abrir Panel de Padres</a>
+          </div>
+          <hr style="border: none; border-top: 1px solid #f0f0f0; margin: 30px 0;">
+          <p style="font-size: 11px; color: #9ca3af; text-align: center;">Karpus Kids System — Este es un correo automático, por favor no respondas.</p>
+        </div>
+      `;
+
+      await sendEmail(emails, `Recibo de Pago: ${p.month_paid} — ${p.students?.name}`, html);
+      return true;
+    } catch (e) { 
+      console.error('[sendPaymentReceipt] Error:', e);
+      return false; 
+    }
   }
 };

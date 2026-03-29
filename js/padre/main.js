@@ -57,17 +57,24 @@ document.addEventListener('DOMContentLoaded', async () => {
     if (grid)    grid.innerHTML    = Helpers.skeleton(5, 'h-28');
     if (summary) summary.innerHTML = Helpers.skeleton(1, 'h-40');
 
-    // Carga paralela sin bloquear UI
-    refreshDashboard();
+    // Carga paralela sin bloquear UI — await para que las tarjetas aparezcan en el primer render
+    await refreshDashboard();
 
     if (currentStudent?.classroom_id) {
       initLiveClassListener(currentStudent.classroom_id);
     }
 
-    document.getElementById('btnLogout')?.addEventListener('click', async () => {
+    // Logout — ambos botones (móvil y desktop)
+    const logoutHandler = async () => {
       await supabase.auth.signOut();
       window.location.href = 'login.html';
-    });
+    };
+    document.getElementById('btnLogout')?.addEventListener('click', logoutHandler);
+    document.getElementById('btnLogoutDesktop')?.addEventListener('click', logoutHandler);
+
+    // Badge de mensajes no leídos
+    loadUnreadBadge();
+    initMessageBadgeRealtime();
 
   } catch (err) {
     console.error('Init Error:', err);
@@ -290,13 +297,54 @@ function setupNavigation() {
 }
 
 function setupGlobalListeners() {
+  // Solo actualizar header cuando cambia el estudiante — NO navegar a home (ya se hizo en init)
   AppState.subscribe('currentStudent', (student) => {
     if (student) {
       updateHeaderProfile(AppState.get('profile'), student);
       if (student.classroom_id) initLiveClassListener(student.classroom_id);
-      navigateTo('home');
     }
   });
+}
+
+// ── Badge mensajes no leídos ──────────────────────────────────────────────────
+async function loadUnreadBadge() {
+  try {
+    const user = AppState.get('user');
+    if (!user) return;
+
+    // Mensajes recibidos en las últimas 24h (is_read no existe en la tabla)
+    const since = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
+    const { count, error } = await supabase
+      .from('messages')
+      .select('*', { count: 'exact', head: true })
+      .eq('receiver_id', user.id)
+      .gte('created_at', since);
+
+    if (error) return; // Silencioso si falla
+
+    const badge = document.getElementById('badge-muro');
+    if (!badge) return;
+
+    if (count && count > 0) {
+      badge.textContent = count > 9 ? '9+' : String(count);
+      badge.classList.remove('hidden');
+      badge.classList.add('flex');
+    } else {
+      badge.classList.add('hidden');
+      badge.classList.remove('flex');
+    }
+  } catch (_) {}
+}
+
+// Actualizar badge en tiempo real cuando llega un mensaje
+function initMessageBadgeRealtime() {
+  const user = AppState.get('user');
+  if (!user) return;
+  supabase.channel('unread_badge_' + user.id)
+    .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'messages', filter: 'receiver_id=eq.' + user.id }, () => {
+      loadUnreadBadge();
+    })
+    .subscribe();
 }
 
 function updateHeaderProfile(profile, student) {

@@ -22,7 +22,9 @@ export const ProfileModule = {
 
     // Estudiante
     set('inputStudentName', student.name);
-    set('inputStudentBirth', student.start_date); // Usando start_date como placeholder o si hay birth_date
+    // Fecha de cumpleaños — usar birth_date si existe, sino start_date
+    const birthDate = student.birth_date || student.start_date;
+    set('inputStudentBirth', birthDate ? birthDate.split('T')[0] : '');
     set('inputStudentBlood', student.blood_type);
     set('inputStudentAllergy', student.allergies);
     set('profilePickupName', student.authorized_pickup);

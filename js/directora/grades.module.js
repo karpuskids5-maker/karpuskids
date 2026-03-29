@@ -35,8 +35,26 @@ export const GradesModule = {
       this._currentPeriodId = e.target.value || null;
       this.loadGrades();
     });
-    document.getElementById('searchGradeStudent')?.addEventListener('input', () => this.applyFilters());
-    document.getElementById('gradesFilterClassroom')?.addEventListener('change', () => this.applyFilters());
+    
+    const searchInput = document.getElementById('searchGradeStudent');
+    if (searchInput && !searchInput._bound) {
+      searchInput._bound = true;
+      searchInput.addEventListener('input', () => this.applyFilters());
+    }
+
+    const classFilter = document.getElementById('gradesFilterClassroom');
+    if (classFilter && !classFilter._bound) {
+      classFilter._bound = true;
+      classFilter.addEventListener('change', () => this.applyFilters());
+      
+      // Poblar opciones de aulas en el filtro de calificaciones si están disponibles
+      const { data: rooms } = await DirectorApi.getClassrooms();
+      if (rooms) {
+        classFilter.innerHTML = '<option value="all">Todas las aulas</option>' +
+          rooms.map(r => `<option value="${r.id}">${Helpers.escapeHTML(r.name)}</option>`).join('');
+      }
+    }
+
     document.getElementById('btnClosePeriod')?.addEventListener('click', () => this._closePeriod());
     document.getElementById('btnNewPeriod')?.addEventListener('click', () => this._openPeriodModal());
     document.getElementById('btnExportGrades')?.addEventListener('click', () => this._exportGrades());
@@ -58,6 +76,10 @@ export const GradesModule = {
       if (active) {
         sel.value = active.id;
         this._currentPeriodId = String(active.id);
+      } else if (this._periods.length > 0) {
+        // Si no hay ninguno activo/abierto, seleccionar el más reciente por defecto
+        sel.value = this._periods[0].id;
+        this._currentPeriodId = String(this._periods[0].id);
       }
       
       const btnClose = document.getElementById('btnClosePeriod');
@@ -72,11 +94,15 @@ export const GradesModule = {
     tableBody.innerHTML = '<tr><td colspan="4" class="text-center py-12"><div class="animate-spin rounded-full h-10 w-10 border-b-2 border-indigo-600 mx-auto"></div><p class="mt-4 text-xs font-bold text-slate-400 uppercase tracking-widest">Calculando promedios...</p></td></tr>';
     
     try {
+      // 1. Obtener todos los estudiantes activos
+      const { data: students, error: sError } = await DirectorApi.getStudents();
+      if (sError) throw sError;
+
+      // 2. Obtener evidencias calificadas
       let query = supabase
         .from('task_evidences')
         .select(`
           id, stars, grade_letter, status, comment, file_url, created_at, student_id,
-          students:student_id(id, name, classroom_id, classrooms:classroom_id(name)),
           tasks:task_id(id, title, created_at)
         `)
         .eq('status', 'graded')
@@ -93,23 +119,25 @@ export const GradesModule = {
       const { data: evidences, error } = await query;
       if (error) throw error;
 
-      // Agrupar por estudiante
+      // 3. Inicializar mapa con TODOS los estudiantes para asegurar que aparezcan aunque no tengan notas
       const grouped = {};
-      (evidences || []).forEach(ev => {
-        const score = scoreFromEvidence(ev);
-        if (score === 0 && !ev.grade_letter && ev.stars == null) return; // Ignorar si no hay nota válida
+      (students || []).forEach(s => {
+        grouped[s.id] = {
+          sid: s.id,
+          name: s.name,
+          classroom: s.classrooms?.name || 'Sin aula',
+          classroom_id: s.classroom_id,
+          evidences: []
+        };
+      });
 
+      // 4. Poblar evidencias en los estudiantes correspondientes
+      (evidences || []).forEach(ev => {
         const sid = ev.student_id;
-        if (!grouped[sid]) {
-          grouped[sid] = {
-            sid,
-            name: ev.students?.name || 'Estudiante',
-            classroom: ev.students?.classrooms?.name || 'Sin aula',
-            classroom_id: ev.students?.classroom_id,
-            evidences: []
-          };
+        if (grouped[sid]) {
+          const score = scoreFromEvidence(ev);
+          grouped[sid].evidences.push({ ...ev, score });
         }
-        grouped[sid].evidences.push({ ...ev, score });
       });
 
       // Procesar datos finales
@@ -408,6 +436,20 @@ export const GradesModule = {
 
   _exportGrades() {
     if (!this._allData.length) return Helpers.toast('No hay datos para exportar', 'warning');
+    
+    const periodName = document.getElementById('gradesFilterPeriod')?.options[document.getElementById('gradesFilterPeriod')?.selectedIndex]?.text || 'Reporte';
+
+    // 1. Preguntar formato (Simple Confirm para elegir)
+    const choice = confirm('¿Deseas exportar en formato PDF?\n\n(Aceptar para PDF, Cancelar para CSV)');
+    
+    if (choice) {
+      this._exportToPDF(periodName);
+    } else {
+      this._exportToCSV();
+    }
+  },
+
+  _exportToCSV() {
     const csv = ['Estudiante,Aula,Promedio,Nivel,Tareas Calificadas'];
     this._allData.forEach(s => {
       const level = getLevel(s.avg);
@@ -421,5 +463,53 @@ export const GradesModule = {
     a.download = `calificaciones_${new Date().toISOString().split('T')[0]}.csv`;
     a.click();
     URL.revokeObjectURL(url);
+  },
+
+  _exportToPDF(periodName) {
+    try {
+      const { jsPDF } = window.jspdf;
+      const doc = new jsPDF();
+
+      // Header
+      doc.setFontSize(20);
+      doc.setTextColor(79, 70, 229); // Indigo 600
+      doc.text('Karpus Kids — Reporte de Calificaciones', 14, 22);
+      
+      doc.setFontSize(12);
+      doc.setTextColor(100);
+      doc.text(`Periodo: ${periodName}`, 14, 32);
+      doc.text(`Fecha: ${new Date().toLocaleDateString()}`, 14, 38);
+
+      const tableData = this._allData.map(s => {
+        const level = getLevel(s.avg);
+        return [
+          s.name,
+          s.classroom,
+          s.avg.toFixed(1),
+          level.label,
+          s.evidences.length
+        ];
+      });
+
+      doc.autoTable({
+        startY: 45,
+        head: [['Estudiante', 'Aula', 'Promedio', 'Nivel', 'Tareas']],
+        body: tableData,
+        theme: 'grid',
+        headStyles: { fillStyle: 'indigo', fillColor: [79, 70, 229] },
+        styles: { fontSize: 9, font: 'helvetica' },
+        columnStyles: {
+          2: { halign: 'center', fontStyle: 'bold' },
+          3: { halign: 'center' },
+          4: { halign: 'center' }
+        }
+      });
+
+      doc.save(`reporte_calificaciones_${new Date().toISOString().split('T')[0]}.pdf`);
+      Helpers.toast('PDF generado correctamente', 'success');
+    } catch (err) {
+      console.error('Error generando PDF:', err);
+      Helpers.toast('Error al generar PDF. Asegúrate de que las librerías cargaron correctamente.', 'error');
+    }
   }
 };

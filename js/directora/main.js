@@ -6,7 +6,7 @@ import { DashboardService } from './dashboard.service.js';
 import { UIHelpers, DirectorUI } from './ui.module.js';
 import { StudentsModule } from './students.module.js';
 import { TeachersModule } from './teachers.module.js';
-import { PaymentsModule } from './payments.module.js';
+import { PaymentsModule } from './payments_clean.js';
 import { GradesModule } from './grades.module.js';
 import { AttendanceModule } from './attendance.module.js';
 import { ChatModule } from './chat.module.js';
@@ -159,8 +159,12 @@ document.addEventListener('DOMContentLoaded', async () => {
 
     // 5b. Botón refresh dashboard
     document.getElementById('btnRefreshDashboard')?.addEventListener('click', () => {
+      DashboardService.invalidateCache();
       DashboardService.getFullData(true).then(data => DirectorUI.renderDashboard(data));
     });
+
+    // 5c. Badge de mensajes no leídos (directora)
+    loadUnreadMessageBadge(auth.user.id);
 
     // 6. Configurar Logout
     document.getElementById('btnLogout')?.addEventListener('click', async () => {
@@ -193,3 +197,40 @@ document.addEventListener('DOMContentLoaded', async () => {
     window.location.href = 'index.html';
   }
 });
+
+// ── Badge mensajes no leídos (directora) ─────────────────────────────────────
+async function loadUnreadMessageBadge(userId) {
+  try {
+    // Contar mensajes recibidos en las últimas 24h como proxy de "no leídos"
+    // (is_read no existe en la tabla — usar created_at como alternativa)
+    const since = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
+    const { count, error } = await supabase
+      .from('messages')
+      .select('*', { count: 'exact', head: true })
+      .eq('receiver_id', userId)
+      .gte('created_at', since);
+
+    if (error) return; // Silencioso si falla
+
+    const card = document.getElementById('cardComunicaciones');
+    if (card && count > 0) {
+      let badge = card.querySelector('.msg-badge');
+      if (!badge) {
+        badge = document.createElement('span');
+        badge.className = 'msg-badge absolute -top-2 -right-2 w-5 h-5 bg-rose-500 text-white text-[9px] font-black rounded-full flex items-center justify-center shadow-sm z-10';
+        card.style.position = 'relative';
+        card.appendChild(badge);
+      }
+      badge.textContent = count > 9 ? '9+' : String(count);
+    }
+
+    // Suscripción realtime — solo una vez
+    if (!window._dirUnreadChannel) {
+      window._dirUnreadChannel = supabase.channel('dir_unread_' + userId)
+        .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'messages', filter: 'receiver_id=eq.' + userId }, () => {
+          loadUnreadMessageBadge(userId);
+        })
+        .subscribe();
+    }
+  } catch (_) {}
+}
