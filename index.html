@@ -296,16 +296,17 @@
       </nav>
 
       <!-- CTA & Mobile Toggle -->
-      <div class="flex items-center gap-2">
+      <div class="flex items-center gap-2 shrink-0">
         
-        <!-- CTA Desktop -->
-        <a href="login.html" class="hidden md:inline-flex bg-gradient-to-r from-orange-400 to-pink-500 text-white px-4 py-2 rounded-full text-sm font-bold">
-          Acceso
+        <!-- CTA Desktop only -->
+        <a href="login.html" class="hidden md:inline-flex items-center gap-1.5 bg-gradient-to-r from-orange-400 to-pink-500 text-white px-4 py-2 rounded-full text-sm font-bold shadow-sm hover:shadow-md transition-all">
+          <i class="bi bi-person-circle"></i> Acceso
         </a>
 
-        <!-- Botón Hamburguesa -->
-        <button @click="open = !open" class="md:hidden p-2 text-slate-700">
-          <i class="bi bi-list text-3xl"></i>
+        <!-- Hamburger — mobile only, always visible, never overlaps -->
+        <button @click="open = !open" aria-label="Menú"
+          class="md:hidden flex items-center justify-center w-10 h-10 rounded-xl bg-slate-100 text-slate-700 hover:bg-orange-100 hover:text-orange-600 transition-colors">
+          <i class="bi bi-list text-2xl leading-none"></i>
         </button>
 
       </div>

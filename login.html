@@ -30,6 +30,75 @@
   <div class="fixed top-0 left-0 w-72 h-72 bg-green-200 rounded-full opacity-30 blur-3xl -translate-x-1/2 -translate-y-1/2 pointer-events-none"></div>
   <div class="fixed bottom-0 right-0 w-96 h-96 bg-emerald-200 rounded-full opacity-30 blur-3xl translate-x-1/3 translate-y-1/3 pointer-events-none"></div>
 
+  <!-- PWA Install Banner — Ad-style, shows for ALL devices -->
+  <div id="pwaBanner" class="hidden fixed inset-0 z-[9999] flex items-end justify-center p-4 pb-6 bg-black/40 backdrop-blur-sm">
+    <div id="pwaBannerInner"
+      class="w-full max-w-md bg-gradient-to-br from-green-600 via-emerald-500 to-teal-500 rounded-3xl shadow-2xl overflow-hidden border-2 border-white/30"
+      style="animation: bannerSlide .5s cubic-bezier(0.34,1.56,0.64,1) both">
+
+      <!-- Top decoration -->
+      <div class="relative px-6 pt-6 pb-4 text-center">
+        <div class="absolute top-3 right-3">
+          <button id="pwaBannerDismiss"
+            class="w-7 h-7 bg-white/20 hover:bg-white/30 rounded-full flex items-center justify-center text-white text-sm font-black transition-all">✕</button>
+        </div>
+        <!-- Animated icon -->
+        <div class="inline-flex items-center justify-center w-20 h-20 bg-white/20 rounded-3xl mb-3 shadow-lg"
+          style="animation: iconBounce 1.5s ease-in-out infinite">
+          <span class="text-4xl">📲</span>
+        </div>
+        <h2 class="text-white font-black text-xl leading-tight mb-1">¡Descarga Karpus Kids!</h2>
+        <p class="text-white/85 text-sm font-semibold leading-snug">
+          Accede al panel de tu hijo en segundos,<br>recibe notificaciones al instante y sin abrir el navegador.
+        </p>
+      </div>
+
+      <!-- Benefits row -->
+      <div class="flex justify-around px-4 pb-4 gap-2">
+        <div class="flex flex-col items-center gap-1 bg-white/15 rounded-2xl px-3 py-2.5 flex-1">
+          <span class="text-xl">🔔</span>
+          <span class="text-white text-[10px] font-black uppercase tracking-wide text-center">Notificaciones</span>
+        </div>
+        <div class="flex flex-col items-center gap-1 bg-white/15 rounded-2xl px-3 py-2.5 flex-1">
+          <span class="text-xl">⚡</span>
+          <span class="text-white text-[10px] font-black uppercase tracking-wide text-center">Acceso rápido</span>
+        </div>
+        <div class="flex flex-col items-center gap-1 bg-white/15 rounded-2xl px-3 py-2.5 flex-1">
+          <span class="text-xl">🔒</span>
+          <span class="text-white text-[10px] font-black uppercase tracking-wide text-center">100% Seguro</span>
+        </div>
+      </div>
+
+      <!-- CTA buttons -->
+      <div class="px-5 pb-6 space-y-2.5">
+        <!-- Android/Desktop: native install -->
+        <button id="pwaBannerInstall"
+          class="w-full py-3.5 bg-white text-green-700 rounded-2xl font-black text-sm uppercase tracking-wider shadow-lg hover:bg-green-50 active:scale-95 transition-all flex items-center justify-center gap-2">
+          <span>📥</span> Instalar App Gratis
+        </button>
+        <!-- iOS instructions (shown only on iOS) -->
+        <div id="iosInstructions" class="hidden w-full py-3 bg-white/20 rounded-2xl text-center">
+          <p class="text-white text-xs font-bold">En iPhone: toca <strong>📤 Compartir</strong> → <strong>"Añadir a inicio"</strong></p>
+        </div>
+        <button id="pwaBannerDismiss2"
+          class="w-full py-2.5 text-white/70 text-xs font-bold hover:text-white transition-colors">
+          Ya tengo la app instalada · No mostrar de nuevo
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <style>
+    @keyframes bannerSlide {
+      from { opacity:0; transform:translateY(60px) scale(0.92); }
+      to   { opacity:1; transform:translateY(0)    scale(1); }
+    }
+    @keyframes iconBounce {
+      0%,100% { transform: translateY(0) rotate(-3deg); }
+      50%     { transform: translateY(-8px) rotate(3deg); }
+    }
+  </style>
+
   <div class="w-full max-w-sm relative z-10">
 
     <!-- Logo + Brand -->
@@ -121,6 +190,71 @@
       const pwd = document.getElementById('password');
       pwd.type = pwd.type === 'password' ? 'text' : 'password';
     });
+
+    // PWA Banner — shows on ALL devices (Android, iOS, Desktop)
+    // Always shows unless: already installed, or user dismissed recently
+    (function () {
+      const KEY = 'karpus-pwa-v2';
+      const isInstalled = () =>
+        window.matchMedia('(display-mode: standalone)').matches ||
+        window.navigator.standalone === true ||
+        document.referrer.includes('android-app://');
+
+      const stored = localStorage.getItem(KEY);
+      const snoozed = stored && stored !== 'installed' && Date.now() < parseInt(stored, 10);
+      if (isInstalled() || snoozed || stored === 'installed') return;
+
+      const banner = document.getElementById('pwaBanner');
+      const isIOS  = /iphone|ipad|ipod/i.test(navigator.userAgent) && !window.MSStream;
+      let deferredPrompt = null;
+
+      // iOS: show instructions, hide install button
+      if (isIOS) {
+        document.getElementById('pwaBannerInstall')?.classList.add('hidden');
+        document.getElementById('iosInstructions')?.classList.remove('hidden');
+      }
+
+      // Capture native install prompt (Android + Desktop Chrome/Edge)
+      window.addEventListener('beforeinstallprompt', (e) => {
+        e.preventDefault();
+        deferredPrompt = e;
+      });
+
+      // Always show after 1.5s — no dependency on beforeinstallprompt
+      setTimeout(() => banner?.classList.remove('hidden'), 1500);
+
+      // Install button
+      document.getElementById('pwaBannerInstall')?.addEventListener('click', async () => {
+        if (deferredPrompt) {
+          deferredPrompt.prompt();
+          const { outcome } = await deferredPrompt.userChoice;
+          deferredPrompt = null;
+          if (outcome === 'accepted') {
+            localStorage.setItem(KEY, 'installed');
+            banner?.classList.add('hidden');
+          }
+        } else {
+          // Desktop without prompt: guide user
+          alert('Para instalar en Chrome/Edge:\n\nHaz clic en el ícono ⊕ en la barra de direcciones,\no en el menú ⋮ → "Instalar Karpus Kids".');
+        }
+      });
+
+      const dismiss = (snooze) => {
+        banner?.classList.add('hidden');
+        localStorage.setItem(KEY, snooze ? String(Date.now() + 7 * 24 * 60 * 60 * 1000) : 'installed');
+      };
+
+      document.getElementById('pwaBannerDismiss')?.addEventListener('click',  () => dismiss(true));
+      document.getElementById('pwaBannerDismiss2')?.addEventListener('click', () => dismiss(false));
+
+      // Tap backdrop to dismiss
+      banner?.addEventListener('click', (e) => { if (e.target === banner) dismiss(true); });
+
+      window.addEventListener('appinstalled', () => {
+        banner?.classList.add('hidden');
+        localStorage.setItem(KEY, 'installed');
+      });
+    })();
   </script>
 </body>
 </html>
