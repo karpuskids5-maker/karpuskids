@@ -115,15 +115,24 @@ export async function sendEmail(to, subject, html, text) {
 export async function sendPush(payload) {
   try {
     const { data: { session } } = await supabase.auth.getSession();
-    if (!session) return null;
-
-    const { data, error } = await supabase.functions.invoke('send-push', {
-      body: payload,
-      headers: { 'Authorization': 'Bearer ' + session.access_token }
+    // Use fetch directly with the anon key — avoids JWT verification issues
+    // The Edge Function uses service role internally, so anon key is sufficient for auth header
+    const res = await fetch(SUPABASE_URL + '/functions/v1/send-push', {
+      method: 'POST',
+      headers: {
+        'Content-Type':  'application/json',
+        'Authorization': 'Bearer ' + (session?.access_token || SUPABASE_ANON_KEY),
+        'apikey': SUPABASE_ANON_KEY
+      },
+      body: JSON.stringify(payload)
     });
 
-    if (error) { console.warn('[sendPush] Error:', error.message); return null; }
-    return data;
+    if (!res.ok) {
+      const errText = await res.text().catch(() => res.status);
+      console.warn('[sendPush] HTTP ' + res.status + ':', errText);
+      return null;
+    }
+    return await res.json();
   } catch (e) {
     console.warn('[sendPush] Error (silencioso):', e.message);
     return null;

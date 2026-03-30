@@ -1824,6 +1824,21 @@ async function submitNewPost() {
     safeToast('Publicado correctamente', 'success');
     Modal.close('newPostModal');
     WallModule.loadPosts(document.getElementById('muroPostsContainer'));
+
+    // Notify parents of this classroom
+    const students = AppState.get('students') || [];
+    const classroom = AppState.get('classroom');
+    students.forEach(s => {
+      if (s.parent_id) {
+        sendPush({
+          user_id: s.parent_id,
+          title: '📢 Nueva publicación en el muro',
+          message: `La maestra publicó en el muro de ${classroom?.name || 'tu aula'}.`,
+          type: 'post',
+          link: 'panel_padres.html'
+        }).catch(() => {});
+      }
+    });
   } catch (e) {
     console.error(e);
     safeToast('Error al publicar', 'error');

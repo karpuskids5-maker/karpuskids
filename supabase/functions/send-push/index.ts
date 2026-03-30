@@ -1,40 +1,43 @@
-import { createClient } from "https://esm.sh/@supabase/supabase-js@2"
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
-const corsHeaders = {
-  'Access-Control-Allow-Origin': '*',
+const cors = {
+  'Access-Control-Allow-Origin':  '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
   'Access-Control-Allow-Methods': 'POST, OPTIONS',
-}
+};
+
+const json = (data: unknown, status = 200) =>
+  new Response(JSON.stringify(data), {
+    status,
+    headers: { ...cors, 'Content-Type': 'application/json' },
+  });
 
 Deno.serve(async (req) => {
-  if (req.method === 'OPTIONS') {
-    return new Response('ok', { headers: corsHeaders })
-  }
+  if (req.method === 'OPTIONS') return new Response('ok', { headers: cors });
 
   try {
-    const url            = Deno.env.get("SUPABASE_URL")
-    const key            = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")
-    const onesignalAppId = Deno.env.get("ONESIGNAL_APP_ID")
-    const onesignalKey   = Deno.env.get("ONESIGNAL_REST_API_KEY")
+    const SUPABASE_URL      = Deno.env.get('SUPABASE_URL') ?? '';
+    const SERVICE_ROLE_KEY  = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '';
+    const ONESIGNAL_APP_ID  = Deno.env.get('ONESIGNAL_APP_ID') ?? '';
+    const ONESIGNAL_KEY     = Deno.env.get('ONESIGNAL_REST_API_KEY') ?? '';
 
-    if (!url || !key) {
-      return new Response(JSON.stringify({ error: "Configuración de Supabase faltante" }), {
-        status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' }
-      })
+    if (!SUPABASE_URL || !SERVICE_ROLE_KEY) {
+      return json({ error: 'Missing Supabase env vars' }, 500);
     }
 
-    const supabase = createClient(url, key, { auth: { persistSession: false } })
-    const body = await req.json()
-    const { user_id, title, message, type = "info", link = null } = body
+    // Use service role to bypass RLS when saving notifications
+    const supabase = createClient(SUPABASE_URL, SERVICE_ROLE_KEY, {
+      auth: { persistSession: false }
+    });
+
+    const body = await req.json();
+    const { user_id, title, message, type = 'info', link = null } = body;
 
     if (!user_id || !title || !message) {
-      return new Response(JSON.stringify({ error: "Faltan campos: user_id, title, message" }), {
-        status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' }
-      })
+      return json({ error: 'Missing required fields: user_id, title, message' }, 400);
     }
 
-    // 1. Guardar notificación interna en la tabla notifications directamente
-    // (más confiable que el RPC que puede no existir)
+    // 1. Save internal notification (always, even if OneSignal fails)
     const { error: insertError } = await supabase.from('notifications').insert({
       user_id,
       title,
@@ -43,64 +46,60 @@ Deno.serve(async (req) => {
       link,
       is_read: false,
       created_at: new Date().toISOString()
-    })
+    });
 
     if (insertError) {
-      // Intentar con RPC como fallback
-      const { error: rpcError } = await supabase.rpc('send_notification', {
-        p_user_id: user_id, p_title: title, p_message: message, p_type: type, p_link: link
-      })
-      if (rpcError) console.warn('[send-push] No se pudo guardar notificación interna:', rpcError.message)
+      console.warn('[send-push] Could not save notification:', insertError.message);
     }
 
-    // 2. Enviar via OneSignal
-    let onesignalStatus = "not_configured"
-    if (onesignalAppId && onesignalKey) {
+    // 2. Send via OneSignal
+    let onesignalStatus = 'not_configured';
+
+    if (ONESIGNAL_APP_ID && ONESIGNAL_KEY) {
       try {
         const fullLink = link
-          ? (link.startsWith('http') ? link : 'https://karpuskids.com' + link)
-          : 'https://karpuskids.com/'
+          ? (link.startsWith('http') ? link : 'https://karpuskids.com/' + link.replace(/^\//, ''))
+          : 'https://karpuskids.com/';
 
-        const osRes = await fetch("https://onesignal.com/api/v1/notifications", {
-          method: "POST",
+        const osRes = await fetch('https://onesignal.com/api/v1/notifications', {
+          method: 'POST',
           headers: {
-            "Content-Type": "application/json; charset=utf-8",
-            "Authorization": `Basic ${onesignalKey}`
+            'Content-Type': 'application/json; charset=utf-8',
+            'Authorization': `Basic ${ONESIGNAL_KEY}`
           },
           body: JSON.stringify({
-            app_id: onesignalAppId,
-            include_external_user_ids: [user_id],
-            headings:  { en: title,   es: title },
-            contents:  { en: message, es: message },
+            app_id: ONESIGNAL_APP_ID,
+            include_external_user_ids: [String(user_id)],
+            channel_for_external_user_ids: 'push',
+            headings: { en: title,   es: title },
+            contents: { en: message, es: message },
             url: fullLink,
-            android_accent_color: "FF22C55E",
-            small_icon: "ic_stat_onesignal_default",
-            // Datos adicionales para el cliente
+            android_accent_color: 'FF22C55E',
             data: { type, link }
           })
-        })
+        });
 
-        const osResult = await osRes.json()
-        onesignalStatus = osRes.ok ? "sent" : "failed"
-        if (!osRes.ok) console.error('[send-push] OneSignal error:', JSON.stringify(osResult))
+        const osResult = await osRes.json();
+        onesignalStatus = osRes.ok ? 'sent' : 'failed';
+        if (!osRes.ok) console.error('[send-push] OneSignal error:', JSON.stringify(osResult));
+        else console.log('[send-push] OneSignal sent to:', user_id, '| id:', osResult.id);
+
       } catch (e) {
-        console.error('[send-push] OneSignal exception:', e.message)
-        onesignalStatus = "error"
+        const msg = e instanceof Error ? e.message : String(e);
+        console.error('[send-push] OneSignal exception:', msg);
+        onesignalStatus = 'error';
       }
     }
 
-    return new Response(JSON.stringify({
+    return json({
       ok: true,
       notification_saved: !insertError,
       onesignal: onesignalStatus
-    }), {
-      status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' }
-    })
+    });
 
   } catch (e) {
-    console.error('[send-push] Critical error:', e)
-    return new Response(JSON.stringify({ error: String(e) }), {
-      status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' }
-    })
+    const msg = e instanceof Error ? e.message : String(e);
+    console.error('[send-push] Critical error:', msg);
+    return json({ error: msg }, 500);
   }
-})
+});

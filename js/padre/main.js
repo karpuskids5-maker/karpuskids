@@ -84,6 +84,9 @@ document.addEventListener('DOMContentLoaded', async () => {
     loadUnreadBadge();
     initMessageBadgeRealtime();
 
+    // Realtime: actualizar rutina diaria cuando la maestra la guarda
+    _initDailyLogRealtime(currentStudent.id);
+
   } catch (err) {
     console.error('Init Error:', err);
     Helpers.toast('Error al iniciar el panel', 'error');
@@ -377,6 +380,24 @@ function updateHeaderProfile(profile, student) {
   }
 
   if (window.lucide) lucide.createIcons();
+}
+
+function _initDailyLogRealtime(studentId) {
+  if (window._dailyLogChannel) return;
+  window._dailyLogChannel = supabase
+    .channel('daily_log_' + studentId)
+    .on('postgres_changes', {
+      event: '*',
+      schema: 'public',
+      table: 'daily_logs',
+      filter: 'student_id=eq.' + studentId
+    }, async () => {
+      // Reload daily summary when maestra updates the log
+      const today = new Date().toISOString().split('T')[0];
+      const log = await Api.getDailyLog(studentId, today);
+      renderDailySummary(log);
+    })
+    .subscribe();
 }
 
 async function checkActiveMeetings() {
