@@ -48,7 +48,8 @@ export const DashboardService = {
         DirectorApi.getInquiries({ status: 'all' }),
         DirectorApi.getAttendanceByDate(today),
         DirectorApi.getAttendanceLast7Days(),
-        DirectorApi.getFinancialSummary(year, month)
+        DirectorApi.getFinancialSummary(year, month),
+        DirectorApi.getTeachers()
       ]);
 
       const [
@@ -59,7 +60,8 @@ export const DashboardService = {
         inquiriesRes,
         attendanceTodayRes,
         attendanceTrendRes,
-        financialSummaryRes
+        financialSummaryRes,
+        teachersRes
       ] = results.map((r, i) => {
         if (r.status === 'rejected') {
           console.error(`❌ Error en request ${i}:`, r.reason);
@@ -68,7 +70,10 @@ export const DashboardService = {
         return r.value;
       });
 
-      // 🔒 SAFE DATA
+      // 🔒 SAFE DATA — si el RPC devuelve 0 para students, usar el count real de la query
+      const realStudentCount = studentsRes?.data?.length ?? 0;
+      const realTeacherCount = teachersRes?.data?.length ?? 0;
+      const realClassroomCount = classroomsRes?.data?.length ?? 0;
       const kpis = {
         total: 0,
         active: 0,
@@ -79,6 +84,11 @@ export const DashboardService = {
         inquiries: 0,
         ...(kpisRes?.data || {})
       };
+      // Corregir si el RPC devolvió 0 pero tenemos datos reales
+      if (!kpis.total && realStudentCount > 0)       kpis.total      = realStudentCount;
+      if (!kpis.active && realStudentCount > 0)      kpis.active     = realStudentCount;
+      if (!kpis.teachers && realTeacherCount > 0)    kpis.teachers   = realTeacherCount;
+      if (!kpis.classrooms && realClassroomCount > 0) kpis.classrooms = realClassroomCount;
 
       const students = (studentsRes?.data || []).slice(0, 10);
       const classrooms = classroomsRes?.data || [];
@@ -100,10 +110,11 @@ export const DashboardService = {
 
       const dashboardData = {
         kpis,
+        teacherCount: realTeacherCount,
         students: {
           recent: students,
-          totalStudents: kpis.total,
-          activeStudents: kpis.active
+          totalStudents: kpis.total || kpis.active || realStudentCount,
+          activeStudents: kpis.active || kpis.total || realStudentCount
         },
         classrooms,
         payments: {

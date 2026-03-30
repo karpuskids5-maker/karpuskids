@@ -106,6 +106,7 @@ export const ChatModule = {
         .insert({
           conversation_id: activeConvId,
           sender_id: senderId,
+          receiver_id: receiverId,   // keep for NOT NULL compat until migration runs
           content: content.trim(),
           is_read: false
         })

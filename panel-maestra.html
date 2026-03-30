@@ -7,12 +7,10 @@
   <link rel="icon" href="logo/favicon.ico" type="image/x-icon">
   <link rel="manifest" href="manifest.json">
   <link rel="stylesheet" href="css/theme.css" />
-  <link rel="stylesheet" href="css/karpus-tailwind.css" />
-  <!-- script src="https://cdn.tailwindcss.com" (removido para prod) -->
+  <script src="https://cdn.tailwindcss.com"></script>
   <!-- OneSignal SDK Fix -->
   <script src="https://cdn.onesignal.com/sdks/web/v16/OneSignalSDK.page.js" defer></script>
   <script>window.OneSignalDeferred = window.OneSignalDeferred || [];</script>
-
   <script src="https://unpkg.com/lucide@1.7.0/dist/umd/lucide.min.js"></script>
   
   <style>
@@ -126,7 +124,6 @@
       color: #C2410C;
     }
 
-    /* 🧱 Tarjetas Bloques (Stats) */
     .stat-block {
       border-radius: 24px; padding: 1.5rem; color: white;
       position: relative; overflow: hidden;
@@ -135,10 +132,10 @@
     }
     .stat-block:hover { transform: translateY(-6px); }
     .stat-block i { opacity: 0.8; transform: rotate(-10deg); position: absolute; right: -10px; bottom: -10px; width: 80px; height: 80px; }
-    .sb-blue { background: linear-gradient(135deg, #1E3A8A, #1E40AF); }
-    .sb-green { background: #4ade80; }
+    .sb-blue   { background: linear-gradient(135deg, #1E3A8A, #1E40AF); }
+    .sb-green  { background: linear-gradient(135deg, #16a34a, #15803d); }
     .sb-orange { background: linear-gradient(135deg, #F97316, #C2410C); }
-    .sb-purple { background: #a78bfa; }
+    .sb-purple { background: linear-gradient(135deg, #7c3aed, #6d28d9); }
 
     /* 📒 Estilo Cuaderno (Listas) */
     .notebook-paper {
@@ -191,20 +188,20 @@
 <body class="bg-slate-50 text-slate-800 font-nunito panel-maestra-body">
   <div class="min-h-screen flex">
     <!-- SIDEBAR -->
-    <aside id="sidebar" class="bg-gradient-to-b from-orange-500 to-orange-700 shadow-2xl border-r-4 border-orange-300 p-4 fixed inset-y-0 left-0 z-50 rounded-r-3xl transform -translate-x-full md:translate-x-0 transition-transform duration-300 w-72">
+    <aside id="sidebar" class="bg-gradient-to-b from-orange-500 to-orange-700 shadow-2xl border-r-4 border-orange-300 p-4 fixed inset-y-0 left-0 z-50 rounded-r-3xl transition-transform duration-300">
       <button id="toggleSidebar" class="absolute -right-3 top-6 bg-white rounded-full p-1 shadow-md border border-slate-100 text-slate-500 hover:text-orange-600 hidden md:block">
         <i data-lucide="chevron-left" id="toggleSidebarIcon" class="w-4 h-4"></i>
       </button>
       
       <div class="flex items-center gap-3 mb-6">
-        <div class="h-12 w-12 rounded-2xl bg-white flex items-center justify-center shadow-lg">
-          <img src="img/mundo.jpg" alt="logo" class="h-10 w-10 rounded-lg object-cover" />
+        <div class="h-12 w-12 rounded-2xl bg-white flex items-center justify-center shadow-lg overflow-hidden shrink-0 border border-orange-200">
+          <img src="img/mundo.jpg" alt="logo" loading="eager" class="w-full h-full object-contain p-1.5" />
         </div>
-        <div class="label">
-          <h3 class="font-black text-white text-lg tracking-tight drop-shadow-md karpus-kids-inline">
+        <div class="label overflow-hidden">
+          <h3 class="font-black text-white text-lg tracking-tight drop-shadow-md karpus-kids-inline whitespace-nowrap">
             <span class="k-1">K</span><span class="k-2">a</span><span class="k-3">r</span><span class="k-4">p</span><span class="k-5">u</span><span class="k-6">s</span> <span class="k-7">K</span><span class="k-8">i</span><span class="k-9">d</span><span class="k-10">s</span>
           </h3>
-          <p class="text-xs text-orange-100 font-bold">Panel Maestra</p>
+          <p class="text-xs text-orange-100 font-bold truncate">Panel Maestra</p>
         </div>
       </div>
 
@@ -253,7 +250,7 @@
     <div id="sidebarOverlay" class="fixed inset-0 bg-black/50 z-40 hidden md:hidden backdrop-blur-sm transition-opacity"></div>
 
     <!-- MAIN -->
-    <main class="flex-1 p-4 md:p-6 ml-0 md:ml-72 transition-all duration-300" id="layoutShell">
+    <main class="flex-1 p-4 md:p-6 transition-all duration-300" id="layoutShell">
       <!-- Topbar mobile -->
       <div class="md:hidden mb-6 flex items-center justify-between">
         <button id="menuBtn" class="p-2 rounded bg-white shadow text-slate-600"><i data-lucide="menu"></i></button>
@@ -279,17 +276,17 @@
           </div>
           <div class="stat-block sb-green">
             <h3 class="text-3xl font-black" id="statStudents">-</h3>
-            <p class="font-bold text-green-100">Total Alumnos</p>
+            <p class="font-bold text-white/80">Total Alumnos</p>
             <i data-lucide="users"></i>
           </div>
           <div class="stat-block sb-orange">
             <h3 class="text-3xl font-black" id="statIncidents">-</h3>
-            <p class="font-bold text-orange-100">Incidentes Hoy</p>
+            <p class="font-bold text-white/80">Incidentes Hoy</p>
             <i data-lucide="alert-circle"></i>
           </div>
           <div class="stat-block sb-purple">
             <h3 class="text-3xl font-black" id="statPresent">-</h3>
-            <p class="font-bold text-purple-100">Asistencia Hoy</p>
+            <p class="font-bold text-white/80">Asistencia Hoy</p>
             <i data-lucide="calendar-check"></i>
           </div>
         </div>
@@ -302,39 +299,41 @@
 
       <!-- SECTION: CLASS DETAIL (Detalle de Aula) -->
       <section id="t-class-detail" class="section">
-        <header class="mb-6 flex items-center gap-4">
-          <button id="backToClasses" class="p-2 hover:bg-slate-100 rounded-full transition-colors text-slate-600">
+        <header class="mb-4 flex items-center gap-4">
+          <button id="backToClasses" class="p-2 hover:bg-slate-100 rounded-full transition-colors text-slate-600 shrink-0">
             <i data-lucide="arrow-left" class="w-6 h-6"></i>
           </button>
-          <div class="min-w-0">
+          <div class="min-w-0 flex-1">
             <h1 class="text-xl md:text-2xl font-bold text-slate-800 truncate" id="currentClassName">Nombre del Aula</h1>
             <p class="text-sm text-slate-500">Vista detallada</p>
           </div>
-          <div class="ml-auto flex gap-2">
-            <button id="btnGenerateReport" onclick="document.getElementById('dailyReportModal').classList.remove('hidden'); document.getElementById('dailyReportModal').classList.add('flex');" class="hidden sm:flex items-center gap-2 px-4 py-2 bg-orange-100 border border-orange-200 rounded-lg text-sm font-bold text-orange-700 hover:bg-orange-200 transition-colors"><i data-lucide="clipboard-list" class="w-4 h-4"></i> <span class="hidden lg:inline">Reporte de Rutina</span></button>
-            <button id="btnParentView" class="hidden md:flex items-center gap-2 px-4 py-2 bg-white border border-slate-200 rounded-lg text-sm font-bold text-slate-600 hover:bg-slate-50"><i data-lucide="eye" class="w-4 h-4"></i> Vista Padre</button>
+          <div class="flex gap-2 shrink-0">
+            <button id="btnGenerateReport" onclick="document.getElementById('dailyReportModal').classList.remove('hidden'); document.getElementById('dailyReportModal').classList.add('flex');" class="flex items-center gap-2 px-4 py-2 bg-orange-100 border border-orange-200 rounded-xl text-sm font-bold text-orange-700 hover:bg-orange-200 transition-colors">
+              <i data-lucide="clipboard-list" class="w-4 h-4"></i>
+              <span class="hidden sm:inline">Reporte</span>
+            </button>
           </div>
         </header>
 
-        <!-- Tabs — scroll horizontal en móvil, sin desbordamiento -->
-        <div class="flex gap-1 mb-6 border-b pb-1 overflow-x-auto tabs-scroll-container -mx-4 px-4 md:mx-0 md:px-0">
-          <button class="class-tab-btn active flex-shrink-0 px-3 py-2 rounded-t-lg font-bold text-xs md:text-sm bg-orange-600 text-white transition-colors" data-tab="feed">
-            <span class="flex items-center gap-1"><i data-lucide="layout" class="w-3.5 h-3.5 md:hidden"></i><span>Muro</span></span>
+        <!-- Tabs — scroll horizontal en móvil -->
+        <div class="flex gap-1 mb-4 border-b border-slate-200 overflow-x-auto -mx-4 px-4 md:mx-0 md:px-0" style="scrollbar-width:none">
+          <button class="class-tab-btn active shrink-0 px-4 py-2.5 rounded-t-xl font-black text-xs uppercase tracking-wider bg-orange-600 text-white transition-colors" data-tab="feed">
+            <i data-lucide="layout" class="w-3.5 h-3.5 inline mr-1"></i>Muro
           </button>
-          <button class="class-tab-btn flex-shrink-0 px-3 py-2 rounded-t-lg font-bold text-xs md:text-sm text-slate-600 hover:bg-slate-100 transition-colors" data-tab="daily-routine">
-            <span class="flex items-center gap-1"><i data-lucide="clipboard-list" class="w-3.5 h-3.5 md:hidden"></i><span>Rutina</span></span>
+          <button class="class-tab-btn shrink-0 px-4 py-2.5 rounded-t-xl font-black text-xs uppercase tracking-wider text-slate-500 hover:bg-slate-100 transition-colors" data-tab="daily-routine">
+            <i data-lucide="clipboard-list" class="w-3.5 h-3.5 inline mr-1"></i>Rutina
           </button>
-          <button class="class-tab-btn flex-shrink-0 px-3 py-2 rounded-t-lg font-bold text-xs md:text-sm text-slate-600 hover:bg-slate-100 transition-colors" data-tab="students">
-            <span class="flex items-center gap-1"><i data-lucide="users" class="w-3.5 h-3.5 md:hidden"></i><span>Alumnos</span></span>
+          <button class="class-tab-btn shrink-0 px-4 py-2.5 rounded-t-xl font-black text-xs uppercase tracking-wider text-slate-500 hover:bg-slate-100 transition-colors" data-tab="students">
+            <i data-lucide="users" class="w-3.5 h-3.5 inline mr-1"></i>Alumnos
           </button>
-          <button class="class-tab-btn flex-shrink-0 px-3 py-2 rounded-t-lg font-bold text-xs md:text-sm text-slate-600 hover:bg-slate-100 transition-colors" data-tab="attendance">
-            <span class="flex items-center gap-1"><i data-lucide="calendar-check" class="w-3.5 h-3.5 md:hidden"></i><span>Asistencia</span></span>
+          <button class="class-tab-btn shrink-0 px-4 py-2.5 rounded-t-xl font-black text-xs uppercase tracking-wider text-slate-500 hover:bg-slate-100 transition-colors" data-tab="attendance">
+            <i data-lucide="calendar-check" class="w-3.5 h-3.5 inline mr-1"></i>Asistencia
           </button>
-          <button class="class-tab-btn flex-shrink-0 px-3 py-2 rounded-t-lg font-bold text-xs md:text-sm text-slate-600 hover:bg-slate-100 transition-colors" data-tab="tasks">
-            <span class="flex items-center gap-1"><i data-lucide="backpack" class="w-3.5 h-3.5 md:hidden"></i><span>Tareas</span></span>
+          <button class="class-tab-btn shrink-0 px-4 py-2.5 rounded-t-xl font-black text-xs uppercase tracking-wider text-slate-500 hover:bg-slate-100 transition-colors" data-tab="tasks">
+            <i data-lucide="backpack" class="w-3.5 h-3.5 inline mr-1"></i>Tareas
           </button>
-          <button class="class-tab-btn flex-shrink-0 px-3 py-2 rounded-t-lg font-bold text-xs md:text-sm text-slate-600 hover:bg-slate-100 transition-colors" data-tab="videocall">
-            <span class="flex items-center gap-1"><i data-lucide="video" class="w-3.5 h-3.5 md:hidden"></i><span class="hidden md:inline">Clase en Vivo</span><span class="md:hidden">Video</span></span>
+          <button class="class-tab-btn shrink-0 px-4 py-2.5 rounded-t-xl font-black text-xs uppercase tracking-wider text-slate-500 hover:bg-slate-100 transition-colors" data-tab="videocall">
+            <i data-lucide="video" class="w-3.5 h-3.5 inline mr-1"></i>Video
           </button>
         </div>
 
@@ -342,44 +341,32 @@
         <div id="tab-feed" class="class-tab-content">
           <div id="muroPostsContainer" class="space-y-6">
             <div class="bg-white p-6 rounded-2xl shadow-sm text-center text-slate-500">
-              <p>Aquí se mostrarán las publicaciones y anuncios del aula.</p>
+              <p>Aquí se mostrarán las publicaciones del aula.</p>
             </div>
           </div>
-        </div>
-        
-        <div id="tab-daily-routine" class="class-tab-content hidden">
-          <!-- Rutina Diaria -->
         </div>
 
+        <div id="tab-daily-routine" class="class-tab-content hidden"></div>
+
         <div id="tab-students" class="class-tab-content hidden">
-          <div id="classroomStudentsGrid" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            <div class="bg-white p-6 rounded-2xl shadow-sm col-span-full">
-              <p class="text-center text-slate-500">Lista de estudiantes del aula seleccionada.</p>
-            </div>
-          </div>
+          <div id="classroomStudentsGrid" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5"></div>
         </div>
 
         <div id="tab-attendance" class="class-tab-content hidden">
-           <div id="attendanceList" class="space-y-3">
-             <div class="bg-white p-6 rounded-2xl shadow-sm">
-              <p class="text-center text-slate-500">Control de asistencia para el aula seleccionada.</p>
-            </div>
-          </div>
+          <div id="attendanceList" class="space-y-3"></div>
         </div>
 
         <div id="tab-tasks" class="class-tab-content hidden">
           <div id="tasksHeader"></div>
-          <div id="tasksListContainer" class="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <!-- Tareas -->
-          </div>
+          <div id="tasksListContainer" class="grid grid-cols-1 md:grid-cols-2 gap-4"></div>
         </div>
 
         <div id="tab-videocall" class="class-tab-content hidden">
-          <div class="bg-white rounded-2xl shadow p-4">
+          <div class="bg-white rounded-2xl shadow-sm border border-slate-100 p-4">
             <h3 class="font-bold text-lg mb-4 text-orange-600 flex items-center gap-2">
-              <i data-lucide="video"></i> Aula Virtual
+              <i data-lucide="video" class="w-5 h-5"></i> Aula Virtual
             </h3>
-            <div id="meet" class="w-full bg-slate-100 rounded-2xl overflow-hidden" style="min-height: 500px;"></div>
+            <div id="meet" class="w-full bg-slate-100 rounded-2xl overflow-hidden" style="min-height:520px;"></div>
           </div>
         </div>
       </section>
@@ -565,7 +552,7 @@
   <!-- MODAL: Student Profile (Copied from panel_directora.html) -->
   <div id="studentProfileModal" class="fixed inset-0 bg-black/60 hidden items-center justify-center z-50 p-4 backdrop-blur-sm">
     <!-- Ficha Escolar -->
-    <div class="school-record-card w-full max-w-2xl max-h-[90vh] flex flex-col">
+    <div class="school-record-card w-full max-w-3xl max-h-[92vh] flex flex-col overflow-y-auto">
       <!-- Encabezado de la Ficha -->
       <div class="record-header">
         <div class="record-photo">

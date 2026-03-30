@@ -51,14 +51,22 @@ document.addEventListener('DOMContentLoaded', async () => {
     setupNavigation();
     setupGlobalListeners();
 
+    // Activar sección home inmediatamente
+    document.querySelectorAll('.section').forEach(s => s.classList.add('hidden'));
+    const homeSection = document.getElementById('home');
+    if (homeSection) {
+      homeSection.classList.remove('hidden');
+      homeSection.classList.add('active');
+    }
+
     // Mostrar skeletons inmediatamente
     const grid    = document.getElementById('dashboardGrid');
     const summary = document.getElementById('dailySummaryCard');
     if (grid)    grid.innerHTML    = Helpers.skeleton(5, 'h-28');
     if (summary) summary.innerHTML = Helpers.skeleton(1, 'h-40');
 
-    // Carga paralela sin bloquear UI — await para que las tarjetas aparezcan en el primer render
-    await refreshDashboard();
+    // Carga paralela — no bloquea UI
+    refreshDashboard();
 
     if (currentStudent?.classroom_id) {
       initLiveClassListener(currentStudent.classroom_id);
@@ -273,8 +281,7 @@ export function navigateTo(targetId) {
 
     const student = AppState.get('currentStudent');
     switch (targetId) {
-      case 'home':            refreshDashboard(); break;
-      case 'payments':        PaymentsModule.init(student?.id); break;
+      case 'home':            refreshDashboard(); break;      case 'payments':        PaymentsModule.init(student?.id); break;
       case 'tasks':           TasksModule.init(student?.id); break;
       case 'live-attendance': AttendanceModule.init(student?.id); break;
       case 'notifications':   ChatModule.init(); break;
@@ -312,38 +319,38 @@ async function loadUnreadBadge() {
     const user = AppState.get('user');
     if (!user) return;
 
-    // Mensajes recibidos en las últimas 24h (is_read no existe en la tabla)
-    const since = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
-    const { count, error } = await supabase
-      .from('messages')
-      .select('*', { count: 'exact', head: true })
-      .eq('receiver_id', user.id)
-      .gte('created_at', since);
-
-    if (error) return; // Silencioso si falla
+    let total = 0;
+    const { data, error } = await supabase.rpc('get_unread_counts');
+    if (!error && data) {
+      total = Object.values(data).reduce((a, b) => a + Number(b), 0);
+    }
+    // Si el RPC falla, mostrar 0 silenciosamente
 
     const badge = document.getElementById('badge-muro');
     if (!badge) return;
 
-    if (count && count > 0) {
-      badge.textContent = count > 9 ? '9+' : String(count);
+    if (total > 0) {
+      badge.textContent = total > 99 ? '99+' : String(total);
       badge.classList.remove('hidden');
       badge.classList.add('flex');
     } else {
       badge.classList.add('hidden');
       badge.classList.remove('flex');
     }
-  } catch (_) {}
+  } catch (_) { /* silencioso */ }
 }
 
-// Actualizar badge en tiempo real cuando llega un mensaje
+// Actualizar badge en tiempo real cuando llega un mensaje nuevo
 function initMessageBadgeRealtime() {
   const user = AppState.get('user');
-  if (!user) return;
-  supabase.channel('unread_badge_' + user.id)
-    .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'messages', filter: 'receiver_id=eq.' + user.id }, () => {
-      loadUnreadBadge();
-    })
+  if (!user || window._padreUnreadChannel) return;
+  window._padreUnreadChannel = supabase
+    .channel('padre_unread_' + user.id)
+    .on('postgres_changes', {
+      event: 'INSERT',
+      schema: 'public',
+      table: 'messages'
+    }, () => { loadUnreadBadge(); })
     .subscribe();
 }
 

@@ -41,27 +41,27 @@ export const RoomsModule = {
         const pct   = Math.round((count / cap) * 100);
         const barColor = pct > 90 ? 'bg-rose-500' : pct > 70 ? 'bg-amber-500' : 'bg-emerald-500';
         
-        return \`
-          <tr class="hover:bg-slate-50 border-b border-slate-100 transition-colors cursor-pointer" onclick="window.App.rooms.openModal('\${r.id}')">
-            <td class="px-4 py-3 font-bold text-slate-800 text-sm">\${Helpers.escapeHTML(r.name)}</td>
-            <td class="px-4 py-3 text-slate-500 text-sm hidden md:table-cell">\${r.teacher?.name || 'Sin asignar'}</td>
+        return `
+          <tr class="hover:bg-slate-50 border-b border-slate-100 transition-colors cursor-pointer" onclick="window.App.rooms.openModal('${r.id}')">
+            <td class="px-4 py-3 font-bold text-slate-800 text-sm">${Helpers.escapeHTML(r.name)}</td>
+            <td class="px-4 py-3 text-slate-500 text-sm hidden md:table-cell">${r.teacher?.name || 'Sin asignar'}</td>
             <td class="px-4 py-3">
               <div class="flex items-center gap-2">
                 <div class="flex-1 bg-slate-100 rounded-full h-2 max-w-[80px]">
-                  <div class="\${barColor} h-full rounded-full" style="width:\${Math.min(pct, 100)}%"></div>
+                  <div class="${barColor} h-full rounded-full" style="width:${Math.min(pct, 100)}%"></div>
                 </div>
-                <span class="text-xs font-bold text-slate-500">\${count}/\${cap}</span>
+                <span class="text-xs font-bold text-slate-500">${count}/${cap}</span>
               </div>
             </td>
             <td class="px-4 py-3 text-center">
-              <span class="px-2 py-1 rounded-full text-[10px] font-bold \${pct < 100 ? 'bg-emerald-100 text-emerald-700' : 'bg-rose-100 text-rose-700'}">
-                \${pct < 100 ? 'Disponible' : 'Llena'}
+              <span class="px-2 py-1 rounded-full text-[10px] font-bold ${pct < 100 ? 'bg-emerald-100 text-emerald-700' : 'bg-rose-100 text-rose-700'}">
+                ${pct < 100 ? 'Disponible' : 'Llena'}
               </span>
             </td>
-            <td class="px-4 py-3 text-right text-slate-400 text-xs text-teal-600 hover:underline">
+            <td class="px-4 py-3 text-right text-teal-600 hover:underline text-xs">
               Editar
             </td>
-          </tr>\`;
+          </tr>`;
       }).join('');
       
     } catch (e) {
@@ -126,7 +126,7 @@ export const RoomsModule = {
     try {
       const { data, error } = await supabase.from('profiles').select('id, name').eq('role', 'maestra').order('name');
       if (!error && data) {
-        select.innerHTML = '<option value="">-- Sin asignar --</option>' + data.map(t => \`<option value="\${t.id}">\${t.name}</option>\`).join('');
+        select.innerHTML = '<option value="">-- Sin asignar --</option>' + data.map(t => `<option value="${t.id}">${t.name}</option>`).join('');
       }
     } catch (e) {}
   },

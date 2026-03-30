@@ -1,5 +1,4 @@
-import { supabase, createClient, SUPABASE_URL, SUPABASE_ANON_KEY, initOneSignal } from './js/supabase.js';
-import { supabase, createClient, SUPABASE_URL, SUPABASE_ANON_KEY, initOneSignal, updateTermsAcceptance } from './js/supabase.js';
+import { supabase, createClient, SUPABASE_URL, SUPABASE_ANON_KEY, initOneSignal } from './js/shared/supabase.js';
 import { ChatModule } from './js/shared/chat.js';
 import { WallModule } from './js/directora/wall.module.js'; // 🔥 Usar módulo específico
 import { VideoCallModule } from './js/shared/videocall.js'; // 🔥 Nuevo Módulo

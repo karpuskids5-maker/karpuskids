@@ -1,6 +1,7 @@
 import { supabase } from '../shared/supabase.js';
 import { Helpers } from '../shared/helpers.js';
 import { AppState } from './state.js';
+import { sendEmail } from '../shared/supabase.js';
 
 const MONTH_NAMES_ES = [
   'enero','febrero','marzo','abril','mayo','junio',
@@ -46,12 +47,33 @@ export const PaymentsModule = {
     await this._loadSettings();
 
     document.getElementById('filterPaymentMonth')?.addEventListener('change', () => this.loadPayments());
-    document.getElementById('filterPaymentYear')?.addEventListener('change', () => this.loadPayments());
+    document.getElementById('filterPaymentYear')?.addEventListener('change',  () => this.loadPayments());
     document.getElementById('filterPaymentStatus')?.addEventListener('change', () => this.loadPayments());
     document.getElementById('searchPaymentStudent')?.addEventListener('input', () => this.loadPayments());
-    document.getElementById('btnNewPayment')?.addEventListener('click', () => this.openPaymentModal());
-    document.getElementById('btnGeneratePayments')?.addEventListener('click', () => this.runCycle());
-    document.getElementById('btnRefreshPayments')?.addEventListener('click', () => this.loadPayments());
+    document.getElementById('btnNewPayment')?.addEventListener('click',        () => this.openPaymentModal());
+    document.getElementById('btnGeneratePayments')?.addEventListener('click',  () => this.runCycle());
+    document.getElementById('btnRefreshPayments')?.addEventListener('click',   () => this.loadPayments());
+
+    // Status pill buttons
+    document.getElementById('statusPills')?.addEventListener('click', (e) => {
+      const pill = e.target.closest('[data-status]');
+      if (!pill) return;
+      const status = pill.dataset.status;
+      // Update hidden select
+      const sel = document.getElementById('filterPaymentStatus');
+      if (sel) sel.value = status;
+      // Update pill styles
+      document.querySelectorAll('.status-pill').forEach(p => {
+        p.classList.remove('bg-teal-600', 'text-white', 'active-pill');
+        p.classList.add('bg-slate-100', 'text-slate-500');
+      });
+      pill.classList.remove('bg-slate-100', 'text-slate-500');
+      pill.classList.add('bg-teal-600', 'text-white', 'active-pill');
+      this.loadPayments();
+    });
+
+    // Chart year selector
+    document.getElementById('chartYear')?.addEventListener('change', () => this.loadIncomeChart());
 
     await this.loadPayments();
     this.loadIncomeChart();
@@ -79,15 +101,25 @@ export const PaymentsModule = {
 
   filterBy(status) {
     const sel = document.getElementById('filterPaymentStatus');
-    if (sel) { sel.value = status; this.loadPayments(); }
+    if (sel) sel.value = status;
+    // Sync pill UI
+    document.querySelectorAll('.status-pill').forEach(p => {
+      const isActive = p.dataset.status === status;
+      p.classList.toggle('bg-teal-600', isActive);
+      p.classList.toggle('text-white',  isActive);
+      p.classList.toggle('active-pill', isActive);
+      p.classList.toggle('bg-slate-100', !isActive);
+      p.classList.toggle('text-slate-500', !isActive);
+    });
+    this.loadPayments();
   },
 
   async loadPayments() {
     const container = document.getElementById('paymentsTableBody');
     if (!container) return;
 
-    container.innerHTML =
-      '<tr><td colspan="8" class="text-center py-10">' +
+      container.innerHTML =
+      '<tr><td colspan="7" class="text-center py-10">' +
         '<div class="animate-spin rounded-full h-8 w-8 border-b-2 border-teal-600 mx-auto mb-2"></div>' +
         '<p class="text-xs text-slate-400">Cargando pagos...</p>' +
       '</td></tr>';
@@ -129,7 +161,7 @@ export const PaymentsModule = {
       if (!list.length) {
         const label = MONTH_LABELS[monthIndex];
         container.innerHTML =
-          '<tr><td colspan="8" class="text-center py-16">' +
+          '<tr><td colspan="7" class="text-center py-16">' +
             '<div class="flex flex-col items-center gap-3">' +
               '<div class="w-14 h-14 bg-slate-100 rounded-full flex items-center justify-center">' +
                 '<i data-lucide="inbox" class="w-7 h-7 text-slate-400"></i>' +
@@ -151,7 +183,7 @@ export const PaymentsModule = {
     } catch (e) {
       console.error('[PaymentsModule] loadPayments:', e);
       container.innerHTML =
-        '<tr><td colspan="8" class="text-center py-8 text-rose-500 font-bold text-sm">Error al cargar pagos.</td></tr>';
+        '<tr><td colspan="7" class="text-center py-8 text-rose-500 font-bold text-sm">Error al cargar pagos.</td></tr>';
     }
   },
 
@@ -250,23 +282,75 @@ export const PaymentsModule = {
   },
 
   async loadIncomeChart() {
-    const canvas = document.getElementById('incomeChart');
+    const canvas = document.getElementById('paymentsIncomeChart');
     if (!canvas || !window.Chart) return;
     try {
-      const year = new Date().getFullYear();
+      const year = document.getElementById('chartYear')?.value || new Date().getFullYear();
       const { data: payments } = await supabase
-        .from('payments').select('amount, created_at').eq('status', 'paid')
+        .from('payments').select('amount, status, created_at')
         .gte('created_at', year + '-01-01').lte('created_at', year + '-12-31');
+
       const labels = ['Ene','Feb','Mar','Abr','May','Jun','Jul','Ago','Sep','Oct','Nov','Dic'];
-      const vals = new Array(12).fill(0);
-      (payments || []).forEach(p => { const d = new Date(p.created_at); vals[d.getMonth()] += Number(p.amount || 0); });
+      const paid    = new Array(12).fill(0);
+      const pending = new Array(12).fill(0);
+
+      (payments || []).forEach(p => {
+        const m = new Date(p.created_at).getMonth();
+        if (p.status === 'paid') paid[m] += Number(p.amount || 0);
+        else pending[m] += Number(p.amount || 0);
+      });
+
       if (this._financialChart) this._financialChart.destroy();
       this._financialChart = new Chart(canvas, {
         type: 'bar',
-        data: { labels, datasets: [{ label: 'Ingresos ($)', data: vals, backgroundColor: 'rgba(13,148,136,0.15)', borderColor: 'rgb(13,148,136)', borderWidth: 2, borderRadius: 6 }] },
-        options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } }, scales: { y: { beginAtZero: true, grid: { color: 'rgba(0,0,0,0.04)' } }, x: { grid: { display: false } } } }
+        data: {
+          labels,
+          datasets: [
+            {
+              label: 'Cobrado',
+              data: paid,
+              backgroundColor: 'rgba(13,148,136,0.85)',
+              borderRadius: 6,
+              borderSkipped: false
+            },
+            {
+              label: 'Pendiente',
+              data: pending,
+              backgroundColor: 'rgba(251,191,36,0.6)',
+              borderRadius: 6,
+              borderSkipped: false
+            }
+          ]
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          interaction: { mode: 'index', intersect: false },
+          plugins: {
+            legend: {
+              position: 'top',
+              labels: { font: { size: 11, weight: 'bold' }, padding: 12, usePointStyle: true }
+            },
+            tooltip: {
+              callbacks: {
+                label: (ctx) => ' ' + ctx.dataset.label + ': $' + Number(ctx.raw).toLocaleString('es-ES', { minimumFractionDigits: 2 })
+              }
+            }
+          },
+          scales: {
+            x: { grid: { display: false }, ticks: { font: { size: 10, weight: 'bold' } } },
+            y: {
+              beginAtZero: true,
+              grid: { color: 'rgba(0,0,0,0.04)' },
+              ticks: {
+                font: { size: 10 },
+                callback: (v) => '$' + Number(v).toLocaleString('es-ES')
+              }
+            }
+          }
+        }
       });
-    } catch (e) { console.error(e); }
+    } catch (e) { console.error('[loadIncomeChart]', e); }
   },
 
   async openPaymentModal(prefillStudentId = null) {
@@ -320,7 +404,7 @@ export const PaymentsModule = {
     );
 
     try {
-      const { data: students } = await supabase.from('students').select('id, name, classrooms:classroom_id(name)').eq('is_active', true).order('name');
+      const { data: students } = await supabase.from('students').select('id, name, classrooms:classroom_id(name)').order('name');
       const sel = document.getElementById('payStudentSelect');
       if (sel && students) {
         students.forEach(s => {
@@ -383,7 +467,66 @@ export const PaymentsModule = {
       if (error) throw error;
       Helpers.toast('Pago aprobado', 'success');
       await this.loadPayments();
+      // Send receipt email silently
+      this._sendReceipt(id).catch(() => {});
     } catch (e) { Helpers.toast('Error al aprobar pago', 'error'); }
+  },
+
+  async _sendReceipt(paymentId) {
+    try {
+      const { data: p } = await supabase
+        .from('payments')
+        .select('*, students:student_id(name, p1_email, p2_email, classrooms:classroom_id(name))')
+        .eq('id', paymentId).single();
+      if (!p) return;
+
+      const emails = [p.students?.p1_email, p.students?.p2_email].filter(e => e && e.includes('@'));
+      if (!emails.length) return;
+
+      const studentName = p.students?.name || 'Estudiante';
+      const amount  = Number(p.amount || 0).toLocaleString('es-ES', { style: 'currency', currency: 'USD', minimumFractionDigits: 2 });
+      const month   = p.month_paid || 'Colegiatura';
+      const method  = (p.method || 'efectivo').charAt(0).toUpperCase() + (p.method || 'efectivo').slice(1);
+      const dateStr = new Date().toLocaleDateString('es-ES', { day: 'numeric', month: 'long', year: 'numeric' });
+
+      const rows = [
+        ['Estudiante', studentName],
+        ['Concepto',   month],
+        ['Monto',      amount],
+        ['Método',     method],
+        ['Fecha',      dateStr]
+      ].map(([l, v], i) => {
+        const b = i < 4 ? 'border-bottom:1px solid #d1fae5;' : '';
+        const vs = l === 'Monto'
+          ? 'text-align:right;font-weight:800;color:#16a34a;font-size:16px;padding:6px 0;' + b
+          : 'text-align:right;font-weight:700;color:#111827;padding:6px 0;' + b;
+        return '<tr><td style="color:#6b7280;padding:6px 0;' + b + '">' + l + '</td><td style="' + vs + '">' + v + '</td></tr>';
+      }).join('');
+
+      const html = '<!DOCTYPE html><html><body style="margin:0;padding:0;background:#f8fafc;font-family:Arial,sans-serif;">' +
+        '<div style="max-width:560px;margin:32px auto;background:#fff;border-radius:16px;overflow:hidden;box-shadow:0 4px 24px rgba(0,0,0,0.08);">' +
+          '<div style="background:linear-gradient(135deg,#16a34a,#15803d);padding:32px 40px;text-align:center;">' +
+            '<h1 style="margin:0;color:#fff;font-size:22px;font-weight:800;">✅ Pago Confirmado</h1>' +
+            '<p style="margin:8px 0 0;color:rgba(255,255,255,0.85);font-size:14px;">Karpus Kids — Recibo de Pago</p>' +
+          '</div>' +
+          '<div style="padding:32px 40px;">' +
+            '<p style="margin:0 0 24px;color:#374151;font-size:15px;">Se ha confirmado el pago de colegiatura para <strong>' + studentName + '</strong>.</p>' +
+            '<div style="background:#f0fdf4;border:1px solid #bbf7d0;border-radius:12px;padding:20px 24px;margin-bottom:24px;">' +
+              '<table style="width:100%;border-collapse:collapse;font-size:14px;">' + rows + '</table>' +
+            '</div>' +
+            '<div style="text-align:center;">' +
+              '<a href="https://karpuskids.com/panel_padres.html" style="display:inline-block;background:#16a34a;color:#fff;padding:12px 28px;border-radius:8px;font-weight:700;font-size:14px;text-decoration:none;">Ver mi Panel →</a>' +
+            '</div>' +
+          '</div>' +
+          '<div style="background:#f9fafb;border-top:1px solid #f0f0f0;padding:16px 40px;text-align:center;">' +
+            '<p style="margin:0;font-size:11px;color:#9ca3af;">Karpus Kids · Correo automático, por favor no respondas.</p>' +
+          '</div>' +
+        '</div></body></html>';
+
+      await sendEmail(emails, 'Recibo de Pago — ' + month + ' · ' + studentName, html);
+    } catch (e) {
+      console.warn('[Asistente] sendReceipt error:', e);
+    }
   },
 
   async rejectPayment(id) {

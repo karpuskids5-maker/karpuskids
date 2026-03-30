@@ -289,9 +289,9 @@ document.addEventListener('DOMContentLoaded', async () => {
     }
     
     AppState.set('classroom', classroom);
-    
-    // Forzar el ID del aula si el perfil lo tiene
-    if (auth.profile.classroom_id && classroom.id !== auth.profile.classroom_id) {
+
+    // Forzar el ID del aula si el perfil lo tiene (con null check)
+    if (auth.profile?.classroom_id && classroom.id !== auth.profile.classroom_id) {
       console.log('Using profile classroom_id');
     }
 
@@ -1710,18 +1710,18 @@ function obsolete_renderMessages(messages, myId) {
   container.scrollTop = container.scrollHeight;
 }
 
-async function obsolete_sendChatMessage() {
+async function sendChatMessage() {
   if (!activeChatUserId) return;
   const input = document.getElementById('chatMessageInput');
-  const text = input.value.trim();
+  const text = input?.value.trim();
   if (!text) return;
 
   const user = AppState.get('user');
-  
-  // Limpiar input optimista
+  if (!user) return;
+
   input.value = '';
   input.disabled = true;
-  
+
   try {
     const { message, conversationId } = await ChatModule.sendMessage(
       user.id,
@@ -1732,12 +1732,10 @@ async function obsolete_sendChatMessage() {
 
     if (!activeConversationId && conversationId) {
       activeConversationId = conversationId;
-      subscribeToChat(activeConversationId);
     }
 
-    // Recargar para ver el mensaje enviado
     await loadChatMessages(activeChatUserId);
-  
+
   } catch (err) {
     console.error('Error enviando mensaje:', err);
     safeToast('Error al enviar mensaje', 'error');
@@ -1939,19 +1937,18 @@ async function initGrades() {
 // ── Badge mensajes no leídos (maestra) ───────────────────────────────────────
 async function loadMaestraUnreadBadge(userId) {
   try {
-    const since = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
-    const { count, error } = await supabase
-      .from('messages')
-      .select('*', { count: 'exact', head: true })
-      .eq('receiver_id', userId)
-      .gte('created_at', since);
+    let total = 0;
 
-    if (error) return;
+    const { data, error } = await supabase.rpc('get_unread_counts');
+    if (!error && data) {
+      total = Object.values(data).reduce((a, b) => a + Number(b), 0);
+    }
+    // Si el RPC falla, mostrar 0 silenciosamente
 
     const badge = document.getElementById('badge-chat-maestra');
     if (!badge) return;
-    if (count && count > 0) {
-      badge.textContent = count > 9 ? '9+' : String(count);
+    if (total > 0) {
+      badge.textContent = total > 9 ? '9+' : String(total);
       badge.classList.remove('hidden');
       badge.classList.add('flex');
     } else {
@@ -1961,7 +1958,7 @@ async function loadMaestraUnreadBadge(userId) {
 
     if (!window._maestraUnreadChannel) {
       window._maestraUnreadChannel = supabase.channel('maestra_unread_' + userId)
-        .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'messages', filter: 'receiver_id=eq.' + userId }, () => {
+        .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'messages' }, () => {
           loadMaestraUnreadBadge(userId);
         })
         .subscribe();

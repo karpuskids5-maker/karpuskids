@@ -81,7 +81,28 @@ export const PaymentsModule = {
       const { data, error } = await q;
       if (error) throw error;
 
-      let list = data || [];
+      // 1. DEDUPLICACIÓN INTELIGENTE:
+      // Si hay varios registros para el mismo estudiante y mes, priorizamos el que tiene evidencia
+      // o el que está en un estado más avanzado (paid > review > pending).
+      const uniqueMap = new Map();
+      (data || []).forEach(p => {
+        const key = `${p.student_id}-${(p.month_paid || '').toLowerCase()}`;
+        const existing = uniqueMap.get(key);
+        
+        if (!existing) {
+          uniqueMap.set(key, p);
+        } else {
+          const statusPriority = { paid: 4, review: 3, pending: 2, overdue: 1 };
+          const pScore = (statusPriority[p.status] || 0) + (p.evidence_url ? 10 : 0);
+          const eScore = (statusPriority[existing.status] || 0) + (existing.evidence_url ? 10 : 0);
+          
+          if (pScore > eScore) {
+            uniqueMap.set(key, p);
+          }
+        }
+      });
+
+      let list = Array.from(uniqueMap.values());
       if (sq) {
         const s = sq.toLowerCase();
         list = list.filter(p => p.students?.name?.toLowerCase().includes(s));

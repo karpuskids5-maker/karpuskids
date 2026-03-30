@@ -496,7 +496,7 @@ export const GradesModule = {
         head: [['Estudiante', 'Aula', 'Promedio', 'Nivel', 'Tareas']],
         body: tableData,
         theme: 'grid',
-        headStyles: { fillStyle: 'indigo', fillColor: [79, 70, 229] },
+        headStyles: { fillColor: [79, 70, 229], textColor: 255, fontStyle: 'bold' },
         styles: { fontSize: 9, font: 'helvetica' },
         columnStyles: {
           2: { halign: 'center', fontStyle: 'bold' },

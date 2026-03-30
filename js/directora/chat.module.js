@@ -1,169 +1,245 @@
 import { DirectorApi } from './api.js';
 import { Helpers } from '../shared/helpers.js';
 import { supabase, sendPush } from '../shared/supabase.js';
+import { ChatModule as SharedChat } from '../shared/chat.js';
 
 export const ChatModule = {
-  currentChatUser: null,
-  chatChannel: null,
-  allContacts: [],
-
-  scrollToBottom() {
-    const el = document.getElementById('chatMessagesContainer');
-    if (el) el.scrollTop = el.scrollHeight;
-  },
+  _currentUserId: null,
+  _activeContactId: null,
+  _conversationId: null,
+  _channel: null,
+  _allContacts: [],
 
   async init() {
-    document.getElementById('btnSendChatMessage')?.addEventListener('click', () => this.sendChatMessage());
-    document.getElementById('chatMessageInput')?.addEventListener('keydown', e => (e.key === 'Enter' && !e.shiftKey) && (e.preventDefault(), this.sendChatMessage()));
-    document.getElementById('chatSearchInput')?.addEventListener('input', () => this.renderContacts());
-    
-    // Botón Atrás para móvil
-    document.getElementById('chatBackBtn')?.addEventListener('click', () => {
-      document.getElementById('chatAppContainer')?.classList.remove('show-chat');
-      this.unsubscribe();
-    });
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) return;
+    this._currentUserId = user.id;
 
-    // Exponer select globalmente para los onclick inline del HTML
-    window._chatSelect = (userId, name, role, meta, avatar) => this.selectChat(userId, name, role, meta, avatar);
-    await this.loadChatUsers();
-  },
-
-  async loadChatUsers() {
-    const listContainer = document.getElementById('chatContactsList');
-    if (!listContainer) return;
-    listContainer.innerHTML = Helpers.skeleton(4);
-    const { data: { user: currentUser } } = await supabase.auth.getUser();
-    const roleVal = document.getElementById('chatRoleFilter')?.value;
-    const { data: users, error } = await DirectorApi.getChatUsers(currentUser.id, roleVal);
-    if (error) throw new Error(error);
-
-    const parentIds = (users || []).filter(u => u.role === 'padre').map(u => u.id);
-    let studentMap = {};
-    if (parentIds.length > 0) {
-        const { data: students, error: sError } = await DirectorApi.getStudentsByParentIds(parentIds);
-        if (!sError) {
-          students?.forEach(s => !studentMap[s.parent_id] && (studentMap[s.parent_id] = { studentName: s.name, classroomName: s.classrooms?.name || 'Aula' }));
-        }
+    // Bind send button + enter key — once only
+    const sendBtn = document.getElementById('btnSendChatMessage');
+    const input   = document.getElementById('chatMessageInput');
+    if (sendBtn && !sendBtn._bound) {
+      sendBtn._bound = true;
+      sendBtn.addEventListener('click', () => this.sendMessage());
+      input?.addEventListener('keydown', e => {
+        if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); this.sendMessage(); }
+      });
     }
 
-    this.allContacts = (users || []).map(u => {
-      const studentInfo = studentMap[u.id];
-      const studentName = studentInfo?.studentName;
-      const profileName = u.name || u.full_name || u.p1_name || 'Usuario';
-
-      return {
-        id: u.id,
-        name: u.role === 'padre' && studentName ? studentName : profileName,
-        avatar: u.avatar_url,
-        role: { maestra: 'Maestra', padre: 'Padre/Madre', asistente: 'Asistente' }[u.role] || u.role,
-        meta: u.role === 'padre'
-          ? `Estudiante: ${studentName || 'N/A'} • Aula: ${studentInfo?.classroomName || 'Sin asignar'} (${profileName})`
-          : 'Personal Karpus'
-      };
+    document.getElementById('chatSearchInput')?.addEventListener('input', () => this._renderContacts());
+    document.getElementById('chatRoleFilter')?.addEventListener('change', () => this._loadContacts());
+    document.getElementById('chatBackBtn')?.addEventListener('click', () => {
+      document.getElementById('chatAppContainer')?.classList.remove('show-chat');
+      this._unsubscribe();
     });
-    this.renderContacts();
+
+    // Expose for inline onclick
+    window._chatSelect = (id) => this.selectChat(id);
+
+    await this._loadContacts();
   },
 
-  select(userId, name, role, meta, avatar) {
-    return this.selectChat(userId, name, role, meta, avatar);
+  async _loadContacts() {
+    const list = document.getElementById('chatContactsList');
+    if (!list) return;
+    list.innerHTML = Helpers.skeleton(4);
+
+    try {
+      const roleVal = document.getElementById('chatRoleFilter')?.value || '';
+      const { data: users, error } = await DirectorApi.getChatUsers(this._currentUserId, roleVal || null);
+      if (error) throw error;
+
+      // Enrich padres with student name
+      const parentIds = (users || []).filter(u => u.role === 'padre').map(u => u.id);
+      let studentMap = {};
+      if (parentIds.length) {
+        const { data: students } = await DirectorApi.getStudentsByParentIds(parentIds);
+        (students || []).forEach(s => {
+          if (!studentMap[s.parent_id]) studentMap[s.parent_id] = { studentName: s.name, classroomName: s.classrooms?.name || '' };
+        });
+      }
+
+      this._allContacts = (users || []).map(u => {
+        const si = studentMap[u.id];
+        const displayName = (u.role === 'padre' && si?.studentName) ? si.studentName : (u.name || 'Usuario');
+        return {
+          id: u.id,
+          name: displayName,
+          avatar: u.avatar_url,
+          roleLabel: { maestra: 'Maestra', padre: 'Padre/Madre', asistente: 'Asistente', directora: 'Directora' }[u.role] || u.role,
+          meta: u.role === 'padre'
+            ? `Padre de ${si?.studentName || 'N/A'} · ${si?.classroomName || 'Sin aula'}`
+            : 'Personal Karpus'
+        };
+      });
+
+      this._renderContacts();
+    } catch (e) {
+      console.error('[ChatModule] loadContacts:', e);
+      list.innerHTML = Helpers.emptyState('Error al cargar contactos');
+    }
   },
 
-  renderContacts() {
-    const listContainer = document.getElementById('chatContactsList');
-    if (!listContainer) return;
-    const q = document.getElementById('chatSearchInput')?.value.toLowerCase() || '';
-    const filtered = this.allContacts.filter(c => c.name.toLowerCase().includes(q) || c.meta.toLowerCase().includes(q));
-    if (filtered.length === 0) { listContainer.innerHTML = Helpers.emptyState('No se encontraron contactos'); return; }
-    listContainer.innerHTML = filtered.map(c => `
-      <div onclick="App.chat.selectChat('${c.id}', '${Helpers.escapeHTML(c.name)}', '${c.role}', '${Helpers.escapeHTML(c.meta)}', '${c.avatar || ''}')" 
-           class="flex items-center gap-3 p-3 rounded-2xl hover:bg-slate-100 cursor-pointer transition-all group">
-        <div class="w-12 h-12 rounded-full bg-slate-200 flex items-center justify-center font-bold text-slate-500 overflow-hidden shrink-0">
+  _renderContacts() {
+    const list = document.getElementById('chatContactsList');
+    if (!list) return;
+    const q = (document.getElementById('chatSearchInput')?.value || '').toLowerCase();
+    const filtered = this._allContacts.filter(c =>
+      c.name.toLowerCase().includes(q) || c.meta.toLowerCase().includes(q)
+    );
+
+    if (!filtered.length) { list.innerHTML = Helpers.emptyState('Sin contactos'); return; }
+
+    list.innerHTML = filtered.map(c => `
+      <div data-contact-id="${c.id}" class="flex items-center gap-3 p-3 rounded-2xl hover:bg-slate-100 cursor-pointer transition-all group">
+        <div class="w-11 h-11 rounded-full bg-slate-200 flex items-center justify-center font-bold text-slate-500 overflow-hidden shrink-0">
           ${c.avatar ? `<img src="${c.avatar}" class="w-full h-full object-cover">` : c.name.charAt(0)}
         </div>
         <div class="min-w-0 flex-1">
           <div class="font-bold text-slate-800 text-sm truncate">${Helpers.escapeHTML(c.name)}</div>
-          <div class="text-xs text-slate-500 truncate">${c.role}</div>
+          <div class="text-[10px] text-slate-400 font-bold uppercase truncate">${c.roleLabel}</div>
         </div>
       </div>`).join('');
+
+    // Delegate click
+    if (!list._bound) {
+      list._bound = true;
+      list.addEventListener('click', e => {
+        const el = e.target.closest('[data-contact-id]');
+        if (el) this.selectChat(el.dataset.contactId);
+      });
+    }
   },
 
-  async selectChat(userId, name, role, meta, avatar) {
-    // Activar vista de chat en móvil
+  async selectChat(contactId) {
+    const contact = this._allContacts.find(c => c.id === contactId);
+    if (!contact) return;
+
+    this._activeContactId = contactId;
+    this._conversationId  = null;
+
+    // Mobile: show chat panel
     document.getElementById('chatAppContainer')?.classList.add('show-chat');
 
-    const { data: { user: currentUser } } = await supabase.auth.getUser();
-    this.currentChatUser = userId;
-    document.getElementById('chatActiveHeader')?.classList.remove('hidden');
-    document.getElementById('chatInputArea')?.classList.remove('hidden');
-    const nameEl = document.getElementById('chatActiveName'); if(nameEl) nameEl.textContent = name;
-    const metaEl = document.getElementById('chatActiveMeta'); if(metaEl) metaEl.textContent = `${role} • ${meta}`;
-    const avatarEl = document.getElementById('chatActiveAvatar'); if(avatarEl) avatarEl.innerHTML = avatar ? `<img src="${avatar}" class="w-full h-full object-cover">` : name.charAt(0);
-    const msgContainer = document.getElementById('chatMessagesContainer');
-    if(msgContainer) msgContainer.innerHTML = `<div class="flex-1 flex items-center justify-center"><i data-lucide="loader-2" class="w-8 h-8 animate-spin text-blue-400"></i></div>`;
-    if (window.lucide) lucide.createIcons();
-    
-    const { data: msgs, error } = await DirectorApi.getChatHistory(userId);
-    if (error) throw new Error(error);
+    // Update header
+    const nameEl   = document.getElementById('chatActiveName');
+    const metaEl   = document.getElementById('chatActiveMeta');
+    const avatarEl = document.getElementById('chatActiveAvatar');
+    const headerEl = document.getElementById('chatActiveHeader');
+    const inputEl  = document.getElementById('chatInputArea');
 
-    if(msgContainer) {
-      msgContainer.innerHTML = '';
-      if (msgs && msgs.length > 0) msgs.forEach(m => this.appendMessage(m, currentUser.id)); 
-      else { msgContainer.innerHTML = `<div class="flex-1 flex flex-col items-center justify-center text-slate-400 opacity-60"><i data-lucide="sparkles" class="w-12 h-12 mb-3 text-blue-300"></i><p class="text-sm">Inicia la conversación con ${name}</p></div>`; if (window.lucide) lucide.createIcons(); }
-    }
-    this.scrollToBottom();
-    
-    if (this.chatChannel) {
-      supabase.removeChannel(this.chatChannel);
-      this.chatChannel = null;
-    }
-    
-    this.chatChannel = supabase.channel(`chat_dir_${currentUser.id}_${userId}`)
-      .on('postgres_changes', { 
-        event: 'INSERT', 
-        schema: 'public', 
-        table: 'messages',
-        filter: `sender_id=eq.${userId}`
-      }, payload => { 
-        const msg = payload.new;
-        if (msgContainer?.querySelector('.opacity-60')) msgContainer.innerHTML = ''; 
-        this.appendMessage(msg, currentUser.id); 
-        this.scrollToBottom();
-      }).subscribe();
+    if (nameEl)   nameEl.textContent   = contact.name;
+    if (metaEl)   metaEl.textContent   = contact.roleLabel + ' · ' + contact.meta;
+    if (avatarEl) avatarEl.innerHTML   = contact.avatar
+      ? `<img src="${contact.avatar}" class="w-full h-full object-cover">`
+      : contact.name.charAt(0);
+    headerEl?.classList.remove('hidden');
+    inputEl?.classList.remove('hidden');
+
+    await this._loadMessages();
+    this._subscribeRealtime();
   },
 
-  appendMessage(msg, myId) {
+  async _loadMessages() {
     const container = document.getElementById('chatMessagesContainer');
-    if(!container) return;
-    const isMine = msg.sender_id === myId;
-    const time = new Date(msg.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-    const safeContent = Helpers.escapeHTML(msg.content || '');
-    const div = document.createElement('div');
-    div.className = `flex ${isMine ? 'justify-end' : 'justify-start'} animate-fade-in`;
+    if (!container) return;
+    container.innerHTML = '<div class="flex-1 flex items-center justify-center"><div class="w-8 h-8 border-2 border-blue-400 border-t-transparent rounded-full animate-spin"></div></div>';
+
+    try {
+      const { messages, conversationId } = await SharedChat.loadConversation(this._activeContactId);
+      this._conversationId = conversationId;
+
+      container.innerHTML = '';
+      if (!messages.length) {
+        container.innerHTML = '<div class="flex-1 flex flex-col items-center justify-center text-slate-400 opacity-60 gap-2"><i data-lucide="message-circle" class="w-10 h-10 text-blue-300"></i><p class="text-sm">Inicia la conversación</p></div>';
+        if (window.lucide) lucide.createIcons();
+        return;
+      }
+
+      messages.forEach(m => this._appendMessage(m));
+      this._scrollToBottom();
+    } catch (e) {
+      console.error('[ChatModule] loadMessages:', e);
+      if (container) container.innerHTML = '<div class="p-4 text-center text-rose-500 text-sm font-bold">Error al cargar mensajes.</div>';
+    }
+  },
+
+  _appendMessage(msg) {
+    const container = document.getElementById('chatMessagesContainer');
+    if (!container) return;
+    const isMine = msg.sender_id === this._currentUserId;
+    const time   = new Date(msg.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+    const div    = document.createElement('div');
+    div.className = `flex ${isMine ? 'justify-end' : 'justify-start'} mb-2`;
     div.innerHTML = `<div class="msg-bubble ${isMine ? 'msg-me' : 'msg-them'}">
-        <div class="whitespace-pre-wrap break-words">${safeContent}</div>
-        <div class="text-[9px] ${isMine ? 'text-blue-100' : 'text-slate-500'} mt-1 text-right opacity-70">${time}</div>
-      </div>`;
+      <div class="whitespace-pre-wrap break-words">${Helpers.escapeHTML(msg.content || '')}</div>
+      <div class="text-[9px] ${isMine ? 'text-blue-100' : 'text-slate-400'} mt-1 text-right opacity-80">${time}</div>
+    </div>`;
     container.appendChild(div);
   },
- 
-  async sendChatMessage() {
+
+  async sendMessage() {
     const input = document.getElementById('chatMessageInput');
-    const text = input?.value.trim();
-    if (!text || !this.currentChatUser) return;
-    
-    const { data: { user: currentUser } } = await supabase.auth.getUser();
-    this.appendMessage({ content: text, sender_id: currentUser.id, created_at: new Date().toISOString() }, currentUser.id);
-    this.scrollToBottom();
-    input.value = ''; 
-    
+    const text  = input?.value.trim();
+    if (!text || !this._activeContactId || !this._currentUserId) return;
+
+    input.value = '';
+    input.disabled = true;
+
+    // Optimistic append
+    this._appendMessage({ content: text, sender_id: this._currentUserId, created_at: new Date().toISOString() });
+    this._scrollToBottom();
+
     try {
-      const { error } = await DirectorApi.sendMessage(currentUser.id, this.currentChatUser, text);
-      if (error) throw new Error(error);
-      sendPush({ user_id: this.currentChatUser, title: 'Nuevo mensaje de Dirección', message: text, type: 'chat' });
-    } catch (e) { 
-      console.error(e); 
+      const { conversationId } = await SharedChat.sendMessage(
+        this._currentUserId,
+        this._activeContactId,
+        text,
+        this._conversationId
+      );
+
+      if (!this._conversationId && conversationId) {
+        this._conversationId = conversationId;
+        this._subscribeRealtime();
+      }
+
+      // Push notification (silent fail)
+      sendPush({ user_id: this._activeContactId, title: 'Nuevo mensaje de Dirección', message: text, type: 'chat' }).catch(() => {});
+    } catch (e) {
+      console.error('[ChatModule] sendMessage:', e);
       Helpers.toast('Error al enviar mensaje', 'error');
+      // Remove optimistic message
       document.getElementById('chatMessagesContainer')?.lastChild?.remove();
+    } finally {
+      input.disabled = false;
+      input.focus();
     }
+  },
+
+  _subscribeRealtime() {
+    this._unsubscribe();
+    if (!this._conversationId) return;
+
+    this._channel = SharedChat.subscribeToConversation(
+      this._conversationId,
+      (newMsg) => {
+        if (newMsg.sender_id !== this._currentUserId) {
+          this._appendMessage(newMsg);
+          this._scrollToBottom();
+        }
+      }
+    );
+  },
+
+  _unsubscribe() {
+    if (this._channel) {
+      supabase.removeChannel(this._channel);
+      this._channel = null;
+    }
+  },
+
+  _scrollToBottom() {
+    const el = document.getElementById('chatMessagesContainer');
+    if (el) el.scrollTop = el.scrollHeight;
   }
 };

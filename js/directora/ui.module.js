@@ -34,10 +34,12 @@ const DirectorUI = {
     const set = (id, val) => { const el = document.getElementById(id); if (el) el.textContent = val; };
     const kpis = data?.kpis || {};
 
-    set('kpiStudents',   kpis.active     ?? kpis.total ?? 0);
-    set('kpiTeachers',   kpis.teachers   ?? 0);
-    set('kpiClassrooms', kpis.classrooms ?? (data?.classrooms?.length ?? 0));
-    set('kpiAttendance', data?.attendance?.today?.present ?? 0);
+    // Usar total como fallback cuando active es 0 (RPC puede devolver 0 si no usa is_active)
+    const studentCount = (kpis.active > 0 ? kpis.active : null) ?? kpis.total ?? 0;
+    set('kpiStudents',   studentCount);
+    set('kpiTeachers',   kpis.teachers   > 0 ? kpis.teachers   : (data?.teacherCount ?? 0));
+    set('kpiClassrooms', kpis.classrooms > 0 ? kpis.classrooms : (data?.classrooms?.length ?? 0));
+    set('kpiAttendance', data?.attendance?.today?.present ?? kpis.attendance_today ?? 0);
 
     const pending = data?.payments?.summary?.total_pending ?? kpis.pending_amount ?? 0;
     set('kpiPendingMoney', '$' + Number(pending).toLocaleString('es-ES', { minimumFractionDigits: 2 }));

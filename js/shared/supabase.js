@@ -13,26 +13,68 @@ export const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
   }
 });
 
+export const TERMS_VERSION = '1.0';
+
 // ── Autenticación ─────────────────────────────────────────────────────────────
 export async function ensureRole(requiredRoles) {
   const roles = Array.isArray(requiredRoles) ? requiredRoles : [requiredRoles];
-  const { data: { user }, error } = await supabase.auth.getUser();
+  
+  // Usar getSession() primero (más rápido)
+  const { data: { session }, error: sessionError } = await supabase.auth.getSession();
+  if (sessionError || !session?.user) { 
+    console.warn('[ensureRole] No session found');
+    window.location.href = 'login.html'; 
+    return null; 
+  }
 
-  if (error || !user) { window.location.href = 'login.html'; return null; }
+  const user = session.user;
 
-  const { data: profile } = await supabase
-    .from('profiles')
-    .select('id, role, name, email, avatar_url, phone, bio, title, address')
-    .eq('id', user.id)
-    .maybeSingle();
+  // Obtener perfil y aceptación de términos en paralelo
+  const [profileRes, termsRes] = await Promise.all([
+    supabase.from('profiles').select('id, role, name, email, avatar_url, phone, bio').eq('id', user.id).maybeSingle(),
+    supabase.from('terms_acceptance').select('user_id').eq('user_id', user.id).eq('terms_version', TERMS_VERSION).maybeSingle()
+  ]);
 
-  if (!profile || !roles.includes(profile.role?.toLowerCase())) {
+  if (profileRes.error) console.error('[ensureRole] Profile error:', profileRes.error);
+  if (termsRes.error) console.error('[ensureRole] Terms error:', termsRes.error);
+
+  const profile = profileRes.data;
+  const terms   = termsRes.data;
+
+  // 1. Si el perfil no existe, intentar crearlo automáticamente
+  let resolvedProfile = profile;
+  if (!profile && !profileRes.error) {
+    console.warn('[ensureRole] Profile not found, creating basic profile for:', user.id);
+    const { data: newProfile } = await supabase.from('profiles').insert({
+      id:    user.id,
+      email: user.email,
+      name:  user.user_metadata?.name || user.email?.split('@')[0] || 'Usuario',
+      role:  user.user_metadata?.role || 'padre'
+    }).select('id, role, name, email, avatar_url, phone, bio').single();
+    resolvedProfile = newProfile;
+  }
+
+  if (!resolvedProfile) {
+    console.warn('[ensureRole] Could not resolve profile for user:', user.id);
+    // No redirigir — dejar que el panel maneje el estado sin perfil
+  }
+
+  if (resolvedProfile && !roles.includes(resolvedProfile.role?.toLowerCase())) {
+    console.warn('[ensureRole] Role mismatch. User has:', resolvedProfile.role, 'Expected one of:', roles);
     await supabase.auth.signOut();
-    window.location.href = 'login.html';
+    window.location.href = 'login.html?error=role';
     return null;
   }
 
-  return { user, profile };
+  // 2. Verificar aceptación de términos (solo si es panel real, no login)
+  // Si termsRes.error existe (ej: tabla no existe), permitimos pasar para no bloquear la app
+  if (!terms && !termsRes.error && !window.location.pathname.includes('login.html')) {
+    console.warn('[ensureRole] Terms not accepted yet');
+    window.location.href = 'login.html?reason=terms';
+    return null;
+  }
+
+  return { user, profile: resolvedProfile };
 }
 
 // ── Notificaciones internas (realtime) ────────────────────────────────────────
@@ -146,6 +188,12 @@ export async function initOneSignal(currentUser = null) {
     user = data?.user;
   }
   if (!user) return;
+
+  // No inicializar OneSignal si no estamos en el dominio de producción
+  if (window.location.hostname !== 'karpuskids.com' && window.location.hostname !== 'www.karpuskids.com') {
+    console.info('[OneSignal] Omitiendo inicialización en entorno local/desarrollo');
+    return;
+  }
 
   const ONESIGNAL_APP_ID = "47ce2d1e-152e-4ea7-9ddc-8e2142992989";
 

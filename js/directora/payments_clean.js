@@ -82,6 +82,14 @@ export const PaymentsModule = {
       if (error) throw error;
 
       let list = data || [];
+      // Deduplicar: por student_id+month_paid, conservar el registro más reciente (mayor id)
+      const dedupMap = new Map();
+      for (const p of list) {
+        const key = (p.student_id || '') + '|' + (p.month_paid || '') + '|' + (p.status || '');
+        const existing = dedupMap.get(key);
+        if (!existing || p.id > existing.id) dedupMap.set(key, p);
+      }
+      list = Array.from(dedupMap.values());
       if (sq) {
         const s = sq.toLowerCase();
         list = list.filter(p => p.students?.name?.toLowerCase().includes(s));
@@ -266,6 +274,8 @@ export const PaymentsModule = {
       await supabase.from('payments').update({ status: 'paid', paid_date: new Date().toISOString() }).eq('id', id);
       Helpers.toast('Pago aprobado', 'success');
       await this.loadPayments();
+      // Send receipt email silently
+      try { await DirectorApi.sendPaymentReceipt(id); } catch (_) {}
     } catch (_) { Helpers.toast('Error al aprobar pago', 'error'); }
   },
 

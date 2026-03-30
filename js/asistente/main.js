@@ -48,6 +48,19 @@ document.addEventListener('DOMContentLoaded', async () => {
   
   AppState.set('user', auth.user);
   AppState.set('profile', auth.profile);
+
+  // Sidebar profile
+  const profile = auth.profile;
+  const nameEl = document.getElementById('sidebarUserName');
+  if (nameEl) nameEl.textContent = profile?.name || 'Asistente';
+  const avatarEl = document.getElementById('sidebarAvatar');
+  if (avatarEl && profile?.avatar_url) avatarEl.src = profile.avatar_url;
+
+  // Logout
+  document.getElementById('btnLogout')?.addEventListener('click', async () => {
+    await supabase.auth.signOut();
+    window.location.href = 'login.html';
+  });
   
   // 2. Inicializar módulos ligeros y navegación
   // La navegación ahora se encargará de la carga perezosa (lazy loading) de las secciones.

@@ -803,7 +803,7 @@ Invertir en la educación y seguridad de tu hijo hoy, es asegurar su futuro mañ
     })();
   </script>
   <script type="module">
-    import { initOneSignal } from './js/supabase.js';
+    import { initOneSignal } from './js/shared/supabase.js';
     document.addEventListener('DOMContentLoaded', () => {
       try { initOneSignal(); } catch(e) { console.warn("OneSignal loading skipped (no user or error)"); }
     });

@@ -104,35 +104,42 @@ export const DirectorApi = {
       const { data: rpcData, error: rpcError } = await supabase.rpc('get_dashboard_kpis', { p_month: monthText || '%' });
       
       if (!rpcError && rpcData) {
-        return { data: rpcData, error: null };
+        // Asegurar que los nombres de campos coincidan con lo que espera el DashboardService
+        return { 
+          data: {
+            ...rpcData,
+            pending_payments: rpcData.pending_amount || rpcData.pending_payments || 0
+          }, 
+          error: null 
+        };
       }
 
       // Fallback manual si el RPC falla o no está disponible
       const today = new Date().toISOString().split('T')[0];
       const results = await Promise.allSettled([
-        supabase.from('students').select('*', { count: 'exact', head: true }).eq('is_active', true),
-        supabase.from('students').select('*', { count: 'exact', head: true }),
-        supabase.from('profiles').select('*', { count: 'exact', head: true }).in('role', ['maestra', 'asistente']),
-        supabase.from('classrooms').select('*', { count: 'exact', head: true }),
-        supabase.from('attendance').select('*', { count: 'exact', head: true }).eq('date', today).in('status', ['present', 'late']),
+        supabase.from('students').select('id', { count: 'exact', head: true }),
+        supabase.from('profiles').select('id', { count: 'exact', head: true }).in('role', ['maestra', 'asistente']),
+        supabase.from('classrooms').select('id', { count: 'exact', head: true }),
+        supabase.from('attendance').select('id', { count: 'exact', head: true }).eq('date', today).in('status', ['present', 'late', 'presente', 'tarde']),
         supabase.from('payments').select('amount').eq('status', 'pending'),
-        supabase.from('inquiries').select('*', { count: 'exact', head: true }).not('status', 'in', '("resolved","closed")')
+        supabase.from('inquiries').select('id', { count: 'exact', head: true }).not('status', 'in', '("resolved","closed")')
       ]);
 
       const get = (r) => r.status === 'fulfilled' ? r.value : { count: 0, data: [] };
-      const [activeRes, totalRes, teachersRes, classroomsRes, attendanceRes, pendingPayRes, inquiriesRes] = results.map(get);
+      const [totalRes, teachersRes, classroomsRes, attendanceRes, pendingPayRes, inquiriesRes] = results.map(get);
 
       const pendingAmount = (pendingPayRes.data || []).reduce((s, p) => s + Number(p.amount || 0), 0);
+      const totalStudents = totalRes.count || 0;
 
       return {
         data: {
-          active:      activeRes.count      || 0,
-          total:       totalRes.count       || 0,
-          teachers:    teachersRes.count    || 0,
-          classrooms:  classroomsRes.count  || 0,
-          attendance_today: attendanceRes.count || 0,
-          pending_payments:   pendingAmount, // Ajustado a pending_payments para consistencia con RPC
-          inquiries:   inquiriesRes.count   || 0
+          active:           totalStudents,
+          total:            totalStudents,
+          teachers:         teachersRes.count    || 0,
+          classrooms:       classroomsRes.count  || 0,
+          attendance_today: attendanceRes.count  || 0,
+          pending_payments: pendingAmount,
+          inquiries:        inquiriesRes.count   || 0
         },
         error: null
       };
@@ -357,42 +364,67 @@ export const DirectorApi = {
   },
 
   async sendPaymentReceipt(paymentId) {
-    try {
-      const { data: p } = await this.getPaymentById(paymentId);
-      if (!p) return;
-      const emails = [p.students?.p1_email, p.students?.p2_email].filter(Boolean);
-      if (!emails.length) return;
+      try {
+        const { data: p, error } = await this.getPaymentById(paymentId);
+        if (error || !p) { console.warn('[sendPaymentReceipt] Payment not found:', paymentId); return false; }
 
-      const { sendEmail } = await import('../shared/supabase.js');
-      const html = `
-        <div style="font-family: sans-serif; max-width: 600px; margin: auto; padding: 30px; border: 1px solid #f0f0f0; border-radius: 20px;">
-          <h2 style="color: #16a34a; text-align: center;">Recibo de Pago — Karpus Kids ✅</h2>
-          <p>Hola,</p>
-          <p>Se ha confirmado el pago de colegiatura para el estudiante <b>${p.students?.name}</b>.</p>
-          
-          <div style="background: #f9fafb; padding: 20px; border-radius: 15px; margin: 25px 0;">
-            <table style="width: 100%; border-collapse: collapse;">
-              <tr><td style="color: #6b7280; padding: 5px 0;">Concepto:</td><td style="text-align: right; font-weight: bold;">${p.month_paid || 'Colegiatura'}</td></tr>
-              <tr><td style="color: #6b7280; padding: 5px 0;">Monto:</td><td style="text-align: right; font-weight: bold;">$${Number(p.amount).toFixed(2)}</td></tr>
-              <tr><td style="color: #6b7280; padding: 5px 0;">Método:</td><td style="text-align: right; font-weight: bold; text-transform: capitalize;">${p.method || 'Transferencia'}</td></tr>
-              <tr><td style="color: #6b7280; padding: 5px 0;">Fecha:</td><td style="text-align: right; font-weight: bold;">${new Date().toLocaleDateString()}</td></tr>
-            </table>
-          </div>
+        const emails = [p.students?.p1_email, p.students?.p2_email].filter(e => e && e.includes('@'));
+        if (!emails.length) { console.warn('[sendPaymentReceipt] No valid emails for payment:', paymentId); return false; }
 
-          <p style="font-size: 14px; color: #4b5563; text-align: center;">Gracias por tu puntualidad y compromiso con la educación de tu hijo.</p>
-          <div style="text-align: center; margin-top: 30px;">
-             <a href="https://karpuskids.com/panel_padres.html" style="background: #16a34a; color: white; padding: 12px 25px; text-decoration: none; border-radius: 10px; font-weight: bold; font-size: 14px;">Abrir Panel de Padres</a>
-          </div>
-          <hr style="border: none; border-top: 1px solid #f0f0f0; margin: 30px 0;">
-          <p style="font-size: 11px; color: #9ca3af; text-align: center;">Karpus Kids System — Este es un correo automático, por favor no respondas.</p>
-        </div>
-      `;
+        const studentName = p.students?.name || 'Estudiante';
+        const amount  = Number(p.amount || 0).toLocaleString('es-ES', { style: 'currency', currency: 'USD', minimumFractionDigits: 2 });
+        const month   = p.month_paid || 'Colegiatura';
+        const method  = (p.method || 'efectivo').charAt(0).toUpperCase() + (p.method || 'efectivo').slice(1);
+        const dateStr = new Date().toLocaleDateString('es-ES', { day: 'numeric', month: 'long', year: 'numeric' });
+        const classroom = p.students?.classrooms?.name || '';
 
-      await sendEmail(emails, `Recibo de Pago: ${p.month_paid} — ${p.students?.name}`, html);
-      return true;
-    } catch (e) { 
-      console.error('[sendPaymentReceipt] Error:', e);
-      return false; 
+        const rows = [
+          ['Estudiante', studentName],
+          ['Concepto',   month],
+          ['Monto',      amount],
+          ['Método',     method],
+          ['Fecha',      dateStr]
+        ].map(([label, value], i) => {
+          const border = i < 4 ? 'border-bottom:1px solid #d1fae5;' : '';
+          const valueStyle = label === 'Monto'
+            ? 'text-align:right;font-weight:800;color:#16a34a;font-size:16px;padding:6px 0;' + border
+            : 'text-align:right;font-weight:700;color:#111827;padding:6px 0;' + border;
+          return '<tr><td style="color:#6b7280;padding:6px 0;' + border + '">' + label + '</td>' +
+                 '<td style="' + valueStyle + '">' + value + '</td></tr>';
+        }).join('');
+
+        const classroomLine = classroom ? ' (' + classroom + ')' : '';
+
+        const html = '<!DOCTYPE html><html lang="es"><head><meta charset="UTF-8"></head>' +
+          '<body style="margin:0;padding:0;background:#f8fafc;font-family:Arial,sans-serif;">' +
+          '<div style="max-width:560px;margin:32px auto;background:#fff;border-radius:16px;overflow:hidden;box-shadow:0 4px 24px rgba(0,0,0,0.08);">' +
+            '<div style="background:linear-gradient(135deg,#16a34a,#15803d);padding:32px 40px;text-align:center;">' +
+              '<h1 style="margin:0;color:#fff;font-size:22px;font-weight:800;">✅ Pago Confirmado</h1>' +
+              '<p style="margin:8px 0 0;color:rgba(255,255,255,0.85);font-size:14px;">Karpus Kids — Recibo de Pago</p>' +
+            '</div>' +
+            '<div style="padding:32px 40px;">' +
+              '<p style="margin:0 0 8px;color:#374151;font-size:15px;">Hola,</p>' +
+              '<p style="margin:0 0 24px;color:#374151;font-size:15px;">Se ha confirmado el pago de colegiatura para <strong>' + studentName + '</strong>' + classroomLine + '.</p>' +
+              '<div style="background:#f0fdf4;border:1px solid #bbf7d0;border-radius:12px;padding:20px 24px;margin-bottom:24px;">' +
+                '<table style="width:100%;border-collapse:collapse;font-size:14px;">' + rows + '</table>' +
+              '</div>' +
+              '<p style="margin:0 0 24px;color:#6b7280;font-size:13px;text-align:center;">Gracias por tu puntualidad y compromiso con la educación de tu hijo/a.</p>' +
+              '<div style="text-align:center;">' +
+                '<a href="https://karpuskids.com/panel_padres.html" style="display:inline-block;background:#16a34a;color:#fff;padding:12px 28px;border-radius:8px;font-weight:700;font-size:14px;text-decoration:none;">Ver mi Panel →</a>' +
+              '</div>' +
+            '</div>' +
+            '<div style="background:#f9fafb;border-top:1px solid #f0f0f0;padding:16px 40px;text-align:center;">' +
+              '<p style="margin:0;font-size:11px;color:#9ca3af;">Karpus Kids · Correo automático, por favor no respondas.</p>' +
+            '</div>' +
+          '</div></body></html>';
+
+        const { sendEmail } = await import('../shared/supabase.js');
+        const result = await sendEmail(emails, 'Recibo de Pago — ' + month + ' · ' + studentName, html);
+        if (result) console.log('[sendPaymentReceipt] Sent to:', emails);
+        return !!result;
+      } catch (e) {
+        console.error('[sendPaymentReceipt] Error:', e);
+        return false;
+      }
     }
-  }
 };

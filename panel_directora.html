@@ -67,6 +67,9 @@
     .btn-action { padding: 6px; border-radius: 6px; font-size: 12px; font-weight: 600; }
     .btn-edit { color: #4f46e5; background: #eef2ff; }
     .btn-delete { color: #e11d48; background: #fff1f2; }
+    /* Attendance tabs */
+    [data-att-mode] { transition: all .2s ease; }
+    [data-att-mode].active-att-tab { background: white; color: #4f46e5; font-weight: 900; box-shadow: 0 1px 4px rgba(0,0,0,.08); }
 
     @media (max-width: 768px) {
       aside#sidebar { transform: translateX(-100%); z-index: 50; }
@@ -226,12 +229,14 @@
     <aside id="sidebar" class="bg-gradient-to-b from-violet-600 to-indigo-700 border-r-4 border-violet-400 p-4 rounded-r-3xl shadow-2xl fixed inset-y-0 left-0 z-50 w-72 transition-transform duration-300 md:translate-x-0 -translate-x-full">
       <button id="toggleSidebar" class="absolute -right-3 top-6 bg-white rounded-full p-1 shadow-md border border-slate-100 text-slate-500 hover:text-purple-600 hidden md:block"><i data-lucide="chevron-left" class="w-4 h-4"></i></button>
       <div class="flex items-center gap-3 mb-6">
-        <div class="h-12 w-12 rounded-2xl bg-white/20 flex items-center justify-center shadow-lg">
-          <img src="img/mundo.jpg" alt="logo" class="h-10 w-10 rounded-lg object-cover" loading="lazy" />
+        <div class="h-12 w-12 rounded-2xl bg-white/20 flex items-center justify-center shadow-lg overflow-hidden shrink-0 border border-white/10">
+          <img src="img/mundo.jpg" alt="logo" class="w-full h-full object-contain p-1.5" loading="lazy" />
         </div>
-        <div class="label">
-          <h3 class="font-semibold text-white"><span class="karpus-kids-inline"><span class="k-1">K</span><span class="k-2">a</span><span class="k-3">r</span><span class="k-4">p</span><span class="k-5">u</span><span class="k-6">s</span> <span class="k-7">K</span><span class="k-8">i</span><span class="k-9">d</span><span class="k-10">s</span></span></h3>
-          <p class="text-xs text-white text-opacity-80">Panel - Director(a)</p>
+        <div class="label overflow-hidden">
+          <h3 class="font-black text-white text-lg tracking-tight karpus-kids-inline whitespace-nowrap">
+            <span class="k-1">K</span><span class="k-2">a</span><span class="k-3">r</span><span class="k-4">p</span><span class="k-5">u</span><span class="k-6">s</span> <span class="k-7">K</span><span class="k-8">i</span><span class="k-9">d</span><span class="k-10">s</span>
+          </h3>
+          <p class="text-xs text-white/70 font-bold truncate">Panel Directora</p>
         </div>
       </div>
 
@@ -717,66 +722,133 @@
 
       <!-- ASISTENCIA -->
       <section id="asistencia" class="section hidden">
-        <div class="flex items-center justify-between mb-4">
-          <h2 class="text-xl font-semibold flex items-center gap-2">
-            <i data-lucide="pie-chart" class="w-5 h-5 text-slate-600"></i><span>Estadísticas de Asistencia</span>
-          </h2>
-          <div class="flex gap-2">
-            <input type="date" id="attendanceDateFilter" class="px-3 py-2 border rounded text-sm">
-            <button id="btnRefreshAttendance" class="px-3 py-2 bg-blue-100 text-blue-700 rounded hover:bg-blue-200 text-sm font-medium">
+
+        <!-- Header -->
+        <div class="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-6">
+          <div>
+            <h1 class="text-2xl font-black text-slate-800 tracking-tight flex items-center gap-2">
+              <span class="w-9 h-9 bg-indigo-100 text-indigo-600 rounded-xl flex items-center justify-center"><i data-lucide="calendar-check" class="w-5 h-5"></i></span>
+              Control de Asistencia
+            </h1>
+            <p class="text-slate-400 text-sm font-medium mt-0.5">Seguimiento diario y por periodo de todos los estudiantes</p>
+          </div>
+          <div class="flex items-center gap-2">
+            <div id="attSpinner" class="hidden w-5 h-5 border-2 border-indigo-600 border-t-transparent rounded-full animate-spin"></div>
+            <button id="btnAttRefresh" class="p-2.5 bg-white border border-slate-200 text-slate-500 rounded-xl hover:bg-slate-50 hover:text-indigo-600 transition-all shadow-sm" title="Actualizar">
               <i data-lucide="refresh-cw" class="w-4 h-4"></i>
+            </button>
+            <button id="btnAttExport" class="flex items-center gap-2 px-4 py-2.5 bg-emerald-600 text-white rounded-xl font-black text-xs uppercase tracking-wider hover:bg-emerald-700 shadow-sm transition-all">
+              <i data-lucide="download" class="w-4 h-4"></i> Exportar CSV
             </button>
           </div>
         </div>
 
-        <!-- Resumen de Asistencia -->
-        <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
-          <div class="bg-white p-4 rounded shadow border-l-4 border-green-500">
-            <p class="text-sm text-slate-500">Presentes</p>
-            <p id="statPresent" class="text-2xl font-bold text-slate-800">-</p>
-          </div>
-          <div class="bg-white p-4 rounded shadow border-l-4 border-red-500">
-            <p class="text-sm text-slate-500">Ausentes</p>
-            <p id="statAbsent" class="text-2xl font-bold text-slate-800">-</p>
-          </div>
-          <div class="bg-white p-4 rounded shadow border-l-4 border-yellow-500">
-            <p class="text-sm text-slate-500">Tardanzas</p>
-            <p id="statLate" class="text-2xl font-bold text-slate-800">-</p>
+        <!-- Mode Tabs -->
+        <div class="flex gap-1 bg-slate-100 p-1 rounded-xl w-fit mb-6">
+          <button data-att-mode="day" class="active-att-tab px-5 py-2 rounded-lg text-xs font-black uppercase tracking-wider transition-all">
+            <i data-lucide="calendar" class="w-3.5 h-3.5 inline mr-1"></i>Por Día
+          </button>
+          <button data-att-mode="range" class="px-5 py-2 rounded-lg text-xs font-black uppercase tracking-wider transition-all text-slate-500 hover:text-slate-700">
+            <i data-lucide="calendar-range" class="w-3.5 h-3.5 inline mr-1"></i>Por Periodo
+          </button>
+        </div>
+
+        <!-- Day picker -->
+        <div id="attPanelDay" class="mb-5">
+          <div class="flex items-center gap-3 flex-wrap">
+            <label class="text-xs font-black text-slate-400 uppercase tracking-wider">Fecha</label>
+            <input type="date" id="attDateSingle" class="px-4 py-2 border-2 border-slate-100 rounded-xl text-sm font-bold bg-white focus:border-indigo-400 focus:ring-4 focus:ring-indigo-50 outline-none transition-all">
           </div>
         </div>
 
-        <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
-          <!-- Gráfico General -->
-          <div class="bg-white rounded shadow p-4">
-            <h3 class="font-semibold mb-4 text-sm text-slate-700">Distribución del Día</h3>
-            <div class="h-64 flex items-center justify-center relative">
-              <canvas id="attendancePieChart"></canvas>
-              <div id="attendanceLoader" class="absolute inset-0 bg-white/80 flex items-center justify-center hidden">
-                <div class="animate-spin rounded-full h-8 w-8 border-b-2 border-indigo-600"></div>
-              </div>
-            </div>
+        <!-- Range picker -->
+        <div id="attPanelRange" class="hidden mb-5">
+          <div class="flex items-center gap-3 flex-wrap">
+            <label class="text-xs font-black text-slate-400 uppercase tracking-wider">Desde</label>
+            <input type="date" id="attDateFrom" class="px-4 py-2 border-2 border-slate-100 rounded-xl text-sm font-bold bg-white focus:border-indigo-400 focus:ring-4 focus:ring-indigo-50 outline-none transition-all">
+            <label class="text-xs font-black text-slate-400 uppercase tracking-wider">Hasta</label>
+            <input type="date" id="attDateTo"   class="px-4 py-2 border-2 border-slate-100 rounded-xl text-sm font-bold bg-white focus:border-indigo-400 focus:ring-4 focus:ring-indigo-50 outline-none transition-all">
           </div>
-          
-          <!-- Tabla por Aulas -->
-          <div class="bg-white rounded shadow p-4">
-            <h3 class="font-semibold mb-4 text-sm text-slate-700">Desglose por Aula</h3>
-            <div class="overflow-y-auto max-h-64">
-              <table class="w-full text-sm">
-                <thead class="text-slate-500 text-left sticky top-0 bg-white">
-                  <tr>
-                    <th class="pb-2">Aula</th>
-                    <th class="pb-2 text-center">Presentes</th>
-                    <th class="pb-2 text-center">Ausentes</th>
-                    <th class="pb-2 text-center">% Asistencia</th>
-                  </tr>
-                </thead>
-                <tbody id="attendanceByRoomBody">
-                  <!-- JS -->
-                </tbody>
-              </table>
+        </div>
+
+        <!-- KPI Cards -->
+        <div class="grid grid-cols-2 md:grid-cols-5 gap-3 mb-6">
+          <div class="bg-white rounded-2xl p-4 border border-slate-100 shadow-sm">
+            <p class="text-[10px] font-black text-slate-400 uppercase tracking-wider mb-1">Total</p>
+            <p class="text-2xl font-black text-slate-800" id="attKpiTotal">—</p>
+          </div>
+          <div class="bg-emerald-50 rounded-2xl p-4 border border-emerald-100 shadow-sm">
+            <p class="text-[10px] font-black text-emerald-500 uppercase tracking-wider mb-1">Presentes</p>
+            <p class="text-2xl font-black text-emerald-700" id="attKpiPresent">—</p>
+          </div>
+          <div class="bg-rose-50 rounded-2xl p-4 border border-rose-100 shadow-sm">
+            <p class="text-[10px] font-black text-rose-500 uppercase tracking-wider mb-1">Ausentes</p>
+            <p class="text-2xl font-black text-rose-700" id="attKpiAbsent">—</p>
+          </div>
+          <div class="bg-amber-50 rounded-2xl p-4 border border-amber-100 shadow-sm">
+            <p class="text-[10px] font-black text-amber-500 uppercase tracking-wider mb-1">Tardanzas</p>
+            <p class="text-2xl font-black text-amber-700" id="attKpiLate">—</p>
+          </div>
+          <div class="bg-indigo-50 rounded-2xl p-4 border border-indigo-100 shadow-sm col-span-2 md:col-span-1">
+            <p class="text-[10px] font-black text-indigo-500 uppercase tracking-wider mb-1">Tasa Asistencia</p>
+            <p class="text-2xl font-black text-indigo-700" id="attKpiRate">—</p>
+            <div class="mt-2 h-1.5 bg-indigo-100 rounded-full overflow-hidden">
+              <div id="attRateBar" class="h-full bg-indigo-500 rounded-full transition-all duration-500" style="width:0%"></div>
             </div>
           </div>
         </div>
+
+        <!-- Charts + Table layout -->
+        <div class="grid grid-cols-1 lg:grid-cols-3 gap-5 mb-5">
+          <!-- Donut -->
+          <div class="bg-white rounded-2xl p-5 border border-slate-100 shadow-sm">
+            <h3 class="text-xs font-black text-slate-500 uppercase tracking-wider mb-4">Distribución</h3>
+            <div class="h-52"><canvas id="attDonutChart"></canvas></div>
+          </div>
+          <!-- Bar por aula (solo rango) -->
+          <div id="attBarWrap" class="hidden bg-white rounded-2xl p-5 border border-slate-100 shadow-sm lg:col-span-2">
+            <h3 class="text-xs font-black text-slate-500 uppercase tracking-wider mb-4">Asistencia por Aula</h3>
+            <div class="h-52"><canvas id="attBarChart"></canvas></div>
+          </div>
+        </div>
+
+        <!-- Filters row -->
+        <div class="bg-white rounded-2xl border border-slate-100 shadow-sm overflow-hidden">
+          <div class="flex flex-wrap gap-3 p-4 border-b border-slate-100">
+            <div class="flex-1 min-w-[180px] relative">
+              <i data-lucide="search" class="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400"></i>
+              <input id="attSearch" type="text" placeholder="Buscar estudiante..." class="w-full pl-9 pr-4 py-2 border-2 border-slate-100 rounded-xl text-sm font-medium bg-slate-50 focus:border-indigo-400 focus:ring-4 focus:ring-indigo-50 outline-none transition-all">
+            </div>
+            <select id="attFilterRoom" class="px-4 py-2 border-2 border-slate-100 rounded-xl text-sm font-bold bg-slate-50 focus:border-indigo-400 outline-none transition-all">
+              <option value="">Todas las aulas</option>
+            </select>
+            <select id="attFilterStatus" class="px-4 py-2 border-2 border-slate-100 rounded-xl text-sm font-bold bg-slate-50 focus:border-indigo-400 outline-none transition-all">
+              <option value="">Todos los estados</option>
+              <option value="present">Presente</option>
+              <option value="absent">Ausente</option>
+              <option value="late">Tardanza</option>
+            </select>
+          </div>
+
+          <!-- Table -->
+          <div class="overflow-x-auto">
+            <table class="w-full">
+              <thead>
+                <tr class="bg-slate-50 border-b border-slate-100">
+                  <th class="px-5 py-3 text-left text-[10px] font-black text-slate-400 uppercase tracking-wider">Estudiante</th>
+                  <th class="px-5 py-3 text-center text-[10px] font-black text-slate-400 uppercase tracking-wider">Estado</th>
+                  <th class="px-5 py-3 text-center text-[10px] font-black text-slate-400 uppercase tracking-wider">Fecha</th>
+                  <th class="px-5 py-3 text-center text-[10px] font-black text-slate-400 uppercase tracking-wider">Entrada</th>
+                  <th class="px-5 py-3 text-center text-[10px] font-black text-slate-400 uppercase tracking-wider">Salida</th>
+                </tr>
+              </thead>
+              <tbody id="attTableBody">
+                <tr><td colspan="6" class="text-center py-10 text-slate-400 text-sm">Cargando...</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+
       </section>
 
       <!-- CALIFICACIONES -->

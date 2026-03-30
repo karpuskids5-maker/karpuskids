@@ -41,17 +41,17 @@ export const StudentsModule = {
         return;
       }
 
-      tbody.innerHTML = students.map(s => \`
-        <tr class="hover:bg-slate-50 border-b border-slate-100 transition-colors cursor-pointer" onclick="window.App.students.openModal('\${s.id}')">
-          <td class="px-6 py-3 font-bold text-slate-800 text-sm">\${Helpers.escapeHTML(s.name)}</td>
-          <td class="px-6 py-3 text-slate-500 text-sm">\${s.classrooms?.name || 'Sin Aula'}</td>
-          <td class="px-6 py-3 text-slate-500 text-sm">\${Helpers.escapeHTML(s.p1_name || 'N/A')}</td>
+      tbody.innerHTML = students.map(s => `
+        <tr class="hover:bg-slate-50 border-b border-slate-100 transition-colors cursor-pointer" onclick="window.App.students.openModal('${s.id}')">
+          <td class="px-6 py-3 font-bold text-slate-800 text-sm">${Helpers.escapeHTML(s.name)}</td>
+          <td class="px-6 py-3 text-slate-500 text-sm">${s.classrooms?.name || 'Sin Aula'}</td>
+          <td class="px-6 py-3 text-slate-500 text-sm">${Helpers.escapeHTML(s.p1_name || 'N/A')}</td>
           <td class="px-6 py-3">
-            <span class="px-2 py-1 rounded-full text-[10px] font-bold \${s.is_active ? 'bg-emerald-100 text-emerald-700' : 'bg-rose-100 text-rose-700'}">
-              \${s.is_active ? 'Activo' : 'Inactivo'}
+            <span class="px-2 py-1 rounded-full text-[10px] font-bold ${s.is_active ? 'bg-emerald-100 text-emerald-700' : 'bg-rose-100 text-rose-700'}">
+              ${s.is_active ? 'Activo' : 'Inactivo'}
             </span>
           </td>
-        </tr>\`).join('');
+        </tr>`).join('');
 
       // Buscador
       const search = document.getElementById('searchStudentInput');
@@ -147,7 +147,7 @@ export const StudentsModule = {
     try {
       const { data, error } = await supabase.from('classrooms').select('id, name').order('name');
       if (!error && data) {
-        select.innerHTML = '<option value="">-- Sin Aula --</option>' + data.map(c => \`<option value="\${c.id}">\${c.name}</option>\`).join('');
+        select.innerHTML = '<option value="">-- Sin Aula --</option>' + data.map(c => `<option value="${c.id}">${c.name}</option>`).join('');
       }
     } catch(e) {}
   },

@@ -105,10 +105,70 @@
 
       </div>
 
-      <div class="mt-10 pt-6 border-t border-slate-100 text-center">
-        <a href="terminos-uso.html" class="text-green-600 hover:text-green-800 font-bold text-sm">Ver Términos de Uso →</a>
+      <div class="mt-10 pt-6 border-t border-slate-100">
+        <!-- Accept Terms Button — shown when user is logged in but hasn't accepted -->
+        <div id="acceptSection" class="hidden mb-6 p-5 bg-green-50 border-2 border-green-200 rounded-2xl">
+          <p class="text-sm font-bold text-green-800 mb-4 text-center">
+            ✅ He leído y entendido la Política de Privacidad y los Términos de Uso de Karpus Kids.
+          </p>
+          <button id="btnAcceptTerms"
+            class="w-full py-3 bg-green-600 hover:bg-green-700 text-white font-black rounded-xl shadow-md transition-all active:scale-95 flex items-center justify-center gap-2">
+            <span>✓</span> Aceptar y Continuar al Panel
+          </button>
+          <p id="acceptMsg" class="text-xs text-green-600 font-bold text-center mt-2 hidden">Guardando...</p>
+        </div>
+        <div class="text-center">
+          <a href="terminos-uso.html" class="text-green-600 hover:text-green-800 font-bold text-sm">Ver Términos de Uso →</a>
+        </div>
       </div>
     </div>
   </div>
-</body>
-</html>
+
+  <script type="module">
+    import { supabase, TERMS_VERSION } from './js/shared/supabase.js';
+
+    (async () => {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session?.user) return; // Not logged in — just reading
+
+      // Check if already accepted
+      const { data: existing } = await supabase
+        .from('terms_acceptance')
+        .select('user_id')
+        .eq('user_id', session.user.id)
+        .eq('terms_version', TERMS_VERSION)
+        .maybeSingle();
+
+      if (existing) return; // Already accepted — no button needed
+
+      // Show accept button
+      document.getElementById('acceptSection')?.classList.remove('hidden');
+
+      document.getElementById('btnAcceptTerms')?.addEventListener('click', async () => {
+        const btn = document.getElementById('btnAcceptTerms');
+        const msg = document.getElementById('acceptMsg');
+        btn.disabled = true;
+        if (msg) msg.classList.remove('hidden');
+
+        try {
+          await supabase.from('terms_acceptance').upsert({
+            user_id:       session.user.id,
+            terms_version: TERMS_VERSION,
+            accepted_at:   new Date().toISOString()
+          }, { onConflict: 'user_id,terms_version' });
+
+          localStorage.setItem('karpus_terms_accepted_' + TERMS_VERSION, 'true');
+
+          // Redirect to correct panel
+          const { data: profile } = await supabase
+            .from('profiles').select('role').eq('id', session.user.id).maybeSingle();
+          const routes = { directora:'panel_directora.html', maestra:'panel-maestra.html', padre:'panel_padres.html', asistente:'panel_asistente.html' };
+          window.location.href = routes[profile?.role] || 'login.html';
+        } catch (e) {
+          console.error(e);
+          if (msg) { msg.textContent = 'Error al guardar. Intenta de nuevo.'; msg.classList.remove('hidden'); }
+          btn.disabled = false;
+        }
+      });
+    })();
+  </script>

@@ -198,39 +198,35 @@ document.addEventListener('DOMContentLoaded', async () => {
   }
 });
 
-// ── Badge mensajes no leídos (directora) ─────────────────────────────────────
+/**
+ * 📩 Notificaciones de Mensajes No Leídos
+ */
 async function loadUnreadMessageBadge(userId) {
+  if (!userId) return;
   try {
-    // Contar mensajes recibidos en las últimas 24h como proxy de "no leídos"
-    // (is_read no existe en la tabla — usar created_at como alternativa)
-    const since = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
-    const { count, error } = await supabase
-      .from('messages')
-      .select('*', { count: 'exact', head: true })
-      .eq('receiver_id', userId)
-      .gte('created_at', since);
+    let total = 0;
 
-    if (error) return; // Silencioso si falla
-
-    const card = document.getElementById('cardComunicaciones');
-    if (card && count > 0) {
-      let badge = card.querySelector('.msg-badge');
-      if (!badge) {
-        badge = document.createElement('span');
-        badge.className = 'msg-badge absolute -top-2 -right-2 w-5 h-5 bg-rose-500 text-white text-[9px] font-black rounded-full flex items-center justify-center shadow-sm z-10';
-        card.style.position = 'relative';
-        card.appendChild(badge);
-      }
-      badge.textContent = count > 9 ? '9+' : String(count);
+    // Intentar RPC primero
+    const { data, error } = await supabase.rpc('get_unread_counts');
+    if (!error && data) {
+      total = Object.values(data).reduce((a, b) => a + Number(b), 0);
     }
+    // Si el RPC falla, simplemente mostrar 0 — no hacer fallback a tablas que pueden no existir
 
-    // Suscripción realtime — solo una vez
-    if (!window._dirUnreadChannel) {
-      window._dirUnreadChannel = supabase.channel('dir_unread_' + userId)
-        .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'messages', filter: 'receiver_id=eq.' + userId }, () => {
-          loadUnreadMessageBadge(userId);
-        })
-        .subscribe();
+    updateBadgeUI(total);
+  } catch (_) {
+    updateBadgeUI(0);
+  }
+}
+
+function updateBadgeUI(total) {
+  const badge = document.getElementById('unreadMessagesBadge');
+  if (badge) {
+    if (total > 0) {
+      badge.textContent = total > 99 ? '99+' : total;
+      badge.classList.remove('hidden');
+    } else {
+      badge.classList.add('hidden');
     }
-  } catch (_) {}
+  }
 }
