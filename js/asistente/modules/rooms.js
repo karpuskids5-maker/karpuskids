@@ -115,27 +115,35 @@ export const RoomsModule = {
     list.innerHTML = '<div class="text-[10px] text-slate-400 p-2">Cargando...</div>';
 
     try {
-      // Students with no classroom OR already in this room
+      // Load ALL students — filter client-side to show unassigned + those in this room
       const { data: students } = await supabase
         .from('students')
         .select('id, name, classroom_id')
-        .or(roomId ? `classroom_id.is.null,classroom_id.eq.${roomId}` : 'classroom_id.is.null')
         .order('name');
 
       if (!students?.length) {
-        list.innerHTML = '<div class="text-[10px] text-slate-400 p-2 italic">No hay estudiantes sin aula.</div>';
+        list.innerHTML = '<div class="text-[10px] text-slate-400 p-2 italic">No hay estudiantes registrados.</div>';
         return;
       }
 
-      list.innerHTML = students.map(s => {
-        const checked = s.classroom_id && String(s.classroom_id) === String(roomId) ? 'checked' : '';
+      const rid = roomId ? String(roomId) : null;
+      // Show: students with no classroom OR students already in this room
+      const visible = students.filter(s =>
+        !s.classroom_id || (rid && String(s.classroom_id) === rid)
+      );
+
+      if (!visible.length) {
+        list.innerHTML = '<div class="text-[10px] text-slate-400 p-2 italic">Todos los estudiantes ya tienen aula asignada.</div>';
+        return;
+      }
+
+      list.innerHTML = visible.map(s => {
+        const inThisRoom = rid && String(s.classroom_id) === rid;
         return `<label class="flex items-center gap-2 py-1.5 cursor-pointer hover:bg-slate-100 px-1 rounded-lg">
-          <input type="checkbox" value="${s.id}" ${checked}
+          <input type="checkbox" value="${s.id}" ${inThisRoom ? 'checked' : ''}
             class="room-student-check w-4 h-4 rounded accent-teal-600">
           <span class="text-sm font-medium text-slate-700">${Helpers.escapeHTML(s.name)}</span>
-          ${s.classroom_id && String(s.classroom_id) === String(roomId)
-            ? '<span class="text-[9px] bg-teal-100 text-teal-700 px-1.5 py-0.5 rounded-full font-bold ml-auto">En esta aula</span>'
-            : ''}
+          ${inThisRoom ? '<span class="text-[9px] bg-teal-100 text-teal-700 px-1.5 py-0.5 rounded-full font-bold ml-auto">En esta aula</span>' : ''}
         </label>`;
       }).join('');
     } catch (e) {

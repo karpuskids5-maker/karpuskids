@@ -337,96 +337,99 @@
 
       <!-- ESTUDIANTES -->
       <section id="estudiantes" class="section">
-        <div class="flex justify-between items-center mb-6">
-          <h2 class="text-xl font-bold flex items-center gap-2 text-slate-700">
-            <i data-lucide="users" class="text-slate-500"></i> Directorio de Estudiantes
+        <!-- Header -->
+        <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-5">
+          <h2 class="text-xl font-black text-slate-800 flex items-center gap-2">
+            <span class="w-8 h-8 bg-teal-100 text-teal-600 rounded-xl flex items-center justify-center shrink-0"><i data-lucide="users" class="w-4 h-4"></i></span>
+            Directorio de Estudiantes
           </h2>
-          <div class="flex gap-2 items-center">
-            <div class="relative">
+          <div class="flex gap-2 flex-wrap">
+            <div class="relative flex-1 min-w-[140px]">
               <i data-lucide="search" class="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400"></i>
-              <input id="searchStudentInput" type="text" placeholder="Buscar..." class="pl-9 pr-4 py-2 border rounded-lg text-sm w-64">
+              <input id="searchStudentInput" type="text" placeholder="Buscar..." class="w-full pl-9 pr-4 py-2 border-2 border-slate-100 rounded-xl text-sm bg-slate-50 focus:border-teal-400 outline-none transition-all">
             </div>
-            <label class="flex items-center gap-2 text-sm text-slate-600">
-              <input id="filterNoClassroom" type="checkbox" class="rounded">
-              Solo sin aula
-            </label>
-            <button id="btnAddStudent" class="bg-teal-600 text-white px-4 py-2 rounded-lg hover:bg-teal-700 transition-colors text-sm font-medium flex items-center gap-2">
-              <i data-lucide="plus" class="w-4 h-4"></i>Nuevo Estudiante
+            <button id="btnAddStudent" class="flex items-center gap-2 px-4 py-2 bg-teal-600 hover:bg-teal-700 text-white rounded-xl text-sm font-black transition-all active:scale-95 shadow-sm shrink-0">
+              <i data-lucide="plus" class="w-4 h-4"></i><span class="hidden sm:inline">Nuevo</span> Estudiante
             </button>
           </div>
         </div>
+        <!-- Table — scrollable on mobile -->
         <div class="bg-white rounded-2xl shadow-sm border border-slate-100 overflow-hidden">
-          <table class="w-full text-sm text-left">
-            <thead class="bg-slate-50 text-slate-600 font-bold uppercase text-xs tracking-wider">
-              <tr>
-                <th class="px-6 py-4">Nombre</th>
-                <th class="px-6 py-4">Aula</th>
-                <th class="px-6 py-4">Padre/Tutor</th>
-                <th class="px-6 py-4">Estado</th>
-              </tr>
-            </thead>
-            <tbody id="studentsTableBody" class="divide-y divide-slate-100">
-              <!-- JS -->
-            </tbody>
-          </table>
+          <div class="overflow-x-auto">
+            <table class="w-full text-sm min-w-[500px]">
+              <thead class="bg-slate-50 border-b border-slate-100">
+                <tr>
+                  <th class="px-4 py-3 text-left text-[10px] font-black text-slate-400 uppercase tracking-wider">Nombre</th>
+                  <th class="px-4 py-3 text-left text-[10px] font-black text-slate-400 uppercase tracking-wider hidden sm:table-cell">Aula</th>
+                  <th class="px-4 py-3 text-left text-[10px] font-black text-slate-400 uppercase tracking-wider hidden md:table-cell">Padre/Tutor</th>
+                  <th class="px-4 py-3 text-left text-[10px] font-black text-slate-400 uppercase tracking-wider">Estado</th>
+                </tr>
+              </thead>
+              <tbody id="studentsTableBody" class="divide-y divide-slate-50"></tbody>
+            </table>
+          </div>
         </div>
       </section>
 
       <!-- AULAS -->
       <section id="aulas" class="section">
-        <div class="flex items-center justify-between mb-6">
-          <h2 class="text-xl font-bold flex items-center gap-2 text-slate-700">
-            <i data-lucide="home" class="text-slate-500"></i> Gestión de Aulas
+        <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-5">
+          <h2 class="text-xl font-black text-slate-800 flex items-center gap-2">
+            <span class="w-8 h-8 bg-indigo-100 text-indigo-600 rounded-xl flex items-center justify-center shrink-0"><i data-lucide="home" class="w-4 h-4"></i></span>
+            Gestión de Aulas
           </h2>
-          <div class="flex items-center gap-3">
-            <label for="filterRoomByTeacher" class="text-sm font-medium text-slate-600">Filtrar por Maestra:</label>
-            <select id="filterRoomByTeacher" class="border rounded-lg px-3 py-2 text-sm">
-              <option value="all">Todas las maestras</option>
-            </select>
-            <button id="btnAddRoom" class="px-4 py-2 bg-teal-600 text-white rounded-lg hover:bg-teal-700 flex items-center gap-2 shadow-md">
-              <i data-lucide="plus" class="w-4 h-4"></i>
-              Nueva Aula
-            </button>
-          </div>
+          <button id="btnAddRoom" onclick="window.App.rooms.openModal()" class="flex items-center gap-2 px-4 py-2 bg-teal-600 hover:bg-teal-700 text-white rounded-xl text-sm font-black transition-all active:scale-95 shadow-sm shrink-0">
+            <i data-lucide="plus" class="w-4 h-4"></i> Nueva Aula
+          </button>
         </div>
         <div class="bg-white rounded-2xl shadow-sm border border-slate-100 overflow-hidden">
-          <table class="w-full text-sm">
-            <thead class="bg-slate-50 text-left text-xs font-bold uppercase tracking-wider text-slate-600">
-              <tr>
-                <th class="py-3 px-4">Nombre del Aula</th>
-                <th class="py-3 px-4 hidden md:table-cell">Maestra Asignada</th>
-                <th class="py-3 px-4">Ocupación</th>
-                <th class="py-3 px-4 text-center">Estado</th>
-                <th class="py-3 px-4 text-right">Acciones</th>
-              </tr>
-            </thead>
-            <tbody id="roomsTable" class="divide-y divide-slate-200"></tbody>
-          </table>
+          <div class="overflow-x-auto">
+            <table class="w-full text-sm min-w-[400px]">
+              <thead class="bg-slate-50 border-b border-slate-100">
+                <tr>
+                  <th class="px-4 py-3 text-left text-[10px] font-black text-slate-400 uppercase tracking-wider">Aula</th>
+                  <th class="px-4 py-3 text-left text-[10px] font-black text-slate-400 uppercase tracking-wider hidden md:table-cell">Maestra</th>
+                  <th class="px-4 py-3 text-left text-[10px] font-black text-slate-400 uppercase tracking-wider">Ocupación</th>
+                  <th class="px-4 py-3 text-center text-[10px] font-black text-slate-400 uppercase tracking-wider hidden sm:table-cell">Estado</th>
+                  <th class="px-4 py-3 text-right text-[10px] font-black text-slate-400 uppercase tracking-wider">Acción</th>
+                </tr>
+              </thead>
+              <tbody id="roomsTable" class="divide-y divide-slate-50"></tbody>
+            </table>
+          </div>
         </div>
       </section>
 
       <section id="maestros" class="section">
-        <div class="flex justify-between items-center mb-6">
-          <h2 class="text-xl font-bold flex items-center gap-2 text-slate-700">
-            <i data-lucide="graduation-cap" class="text-slate-500"></i> Gestión de Maestros
+        <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-5">
+          <h2 class="text-xl font-black text-slate-800 flex items-center gap-2">
+            <span class="w-8 h-8 bg-rose-100 text-rose-600 rounded-xl flex items-center justify-center shrink-0"><i data-lucide="graduation-cap" class="w-4 h-4"></i></span>
+            Gestión de Maestros
           </h2>
-          <div class="flex gap-2">
-             <div class="relative"><i data-lucide="search" class="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400"></i><input id="searchTeacherInput" placeholder="Buscar..." class="pl-9 pr-4 py-2 border rounded-lg text-sm w-64"></div>
-             <button id="btnAddTeacher" class="bg-teal-600 text-white px-4 py-2 rounded-lg hover:bg-teal-700 transition-colors text-sm font-medium flex items-center gap-2"><i data-lucide="plus" class="w-4 h-4"></i>Nuevo Maestro</button>
+          <div class="flex gap-2 flex-wrap">
+            <div class="relative flex-1 min-w-[140px]">
+              <i data-lucide="search" class="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400"></i>
+              <input id="searchTeacherInput" placeholder="Buscar..." class="w-full pl-9 pr-4 py-2 border-2 border-slate-100 rounded-xl text-sm bg-slate-50 focus:border-teal-400 outline-none transition-all">
+            </div>
+            <button id="btnAddTeacher" class="flex items-center gap-2 px-4 py-2 bg-teal-600 hover:bg-teal-700 text-white rounded-xl text-sm font-black transition-all active:scale-95 shadow-sm shrink-0">
+              <i data-lucide="plus" class="w-4 h-4"></i><span class="hidden sm:inline">Nuevo</span> Maestro
+            </button>
           </div>
         </div>
         <div class="bg-white rounded-2xl shadow-sm border border-slate-100 overflow-hidden">
-          <table class="w-full text-sm text-left">
-            <thead class="bg-slate-50 text-slate-600 font-bold uppercase text-xs tracking-wider">
-              <tr>
-                <th class="px-6 py-4">Nombre</th>
-                <th class="px-6 py-4">Correo</th>
-                <th class="px-6 py-4">Teléfono</th>
-                <th class="px-6 py-4">Acciones</th>
-              </tr>
-            </thead>
-            <tbody id="teachersTableBody" class="divide-y divide-slate-100"></tbody>
-          </table>
+          <div class="overflow-x-auto">
+            <table class="w-full text-sm min-w-[400px]">
+              <thead class="bg-slate-50 border-b border-slate-100">
+                <tr>
+                  <th class="px-4 py-3 text-left text-[10px] font-black text-slate-400 uppercase tracking-wider">Nombre</th>
+                  <th class="px-4 py-3 text-left text-[10px] font-black text-slate-400 uppercase tracking-wider hidden sm:table-cell">Correo</th>
+                  <th class="px-4 py-3 text-left text-[10px] font-black text-slate-400 uppercase tracking-wider hidden md:table-cell">Teléfono</th>
+                  <th class="px-4 py-3 text-left text-[10px] font-black text-slate-400 uppercase tracking-wider">Acciones</th>
+                </tr>
+              </thead>
+              <tbody id="teachersTableBody" class="divide-y divide-slate-50"></tbody>
+            </table>
+          </div>
         </div>
       </section>
 

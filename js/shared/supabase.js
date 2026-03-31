@@ -231,10 +231,11 @@ export async function initOneSignal(currentUser = null) {
           allowLocalhostAsSecureOrigin: true,
           serviceWorkerParam: { scope: '/' },
           serviceWorkerPath: 'OneSignalSDKWorker.js',
-          notifyButton: { enable: false }
+          notifyButton: { enable: false },
+          welcomeNotification: { disable: false }
         });
 
-        // ✅ Pedir permiso de forma proactiva si es necesario
+        // ✅ Pedir permiso de forma proactiva si es necesario (v16 compatible)
         try {
           if (OneSignal.Notifications.permissionNative === 'default') {
             console.log('[OneSignal] Solicitando permisos de notificación...');

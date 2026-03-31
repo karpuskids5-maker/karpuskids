@@ -104,7 +104,7 @@ export const TeachersModule = {
 
       <div class="bg-white p-5 rounded-b-3xl border-t border-slate-100 flex justify-end gap-3">
         <button onclick="window._closeAsistenteModal()" class="px-6 py-2.5 text-slate-500 font-black text-xs uppercase hover:bg-slate-50 rounded-2xl transition-all">Cancelar</button>
-        <button id="btnSaveTeacherModal" class="px-8 py-2.5 bg-gradient-to-r from-teal-600 to-emerald-600 text-white rounded-2xl font-black text-xs uppercase shadow-lg hover:-translate-y-0.5 transition-all active:scale-95">Guardar Personal</button>
+        <button onclick="window._saveTeacherNow()" class="px-8 py-2.5 bg-gradient-to-r from-teal-600 to-emerald-600 text-white rounded-2xl font-black text-xs uppercase shadow-lg hover:-translate-y-0.5 transition-all active:scale-95" id="btnSaveTeacherModal">Guardar Personal</button>
       </div>`;
 
     const gc = document.getElementById('globalModalContainer');
@@ -145,7 +145,7 @@ export const TeachersModule = {
       } catch (_) {}
     }
 
-    document.getElementById('btnSaveTeacherModal')?.addEventListener('click', () => this.saveTeacher());
+    window._saveTeacherNow = () => this.saveTeacher();
     if (window.lucide) window.lucide.createIcons();
   },
 
