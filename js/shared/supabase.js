@@ -90,8 +90,12 @@ export async function subscribeNotifications(userId, onNotif) {
 // ── Email via Resend (Edge Function send-email) ───────────────────────────────
 export async function sendEmail(to, subject, html, text) {
   try {
+    // ✅ FIX: Usamos el anon key explícitamente para evitar problemas de JWT expirado
     const { data, error } = await supabase.functions.invoke('send-email', {
-      body: { to, subject, html, text }
+      body: { to, subject, html, text },
+      headers: {
+        'Authorization': `Bearer ${SUPABASE_ANON_KEY}`
+      }
     });
     
     if (error) {
@@ -108,10 +112,13 @@ export async function sendEmail(to, subject, html, text) {
 // ── Push via OneSignal (Edge Function send-push) ──────────────────────────────
 export async function sendPush(payload) {
   try {
-    // 🔥 FIX: Usamos supabase.functions.invoke que maneja automáticamente 
-    // la autenticación (JWT) y el apikey correcto.
+    // ✅ FIX: Usamos el anon key explícitamente para evitar problemas de JWT expirado
+    // Esto asegura que la Edge Function siempre reciba un token válido del proyecto.
     const { data, error } = await supabase.functions.invoke('send-push', {
-      body: payload
+      body: payload,
+      headers: {
+        'Authorization': `Bearer ${SUPABASE_ANON_KEY}`
+      }
     });
 
     if (error) {
@@ -128,8 +135,12 @@ export async function sendPush(payload) {
 // ── Eventos del sistema (process-event) ──────────────────────────────────────
 export async function emitEvent(type, data) {
   try {
+    // ✅ FIX: Usamos el anon key explícitamente para evitar problemas de JWT expirado
     const { data: resData, error } = await supabase.functions.invoke('process-event', {
-      body: { type, data }
+      body: { type, data },
+      headers: {
+        'Authorization': `Bearer ${SUPABASE_ANON_KEY}`
+      }
     });
     
     if (error) {
@@ -185,10 +196,11 @@ export async function initOneSignal(currentUser = null) {
 
     // No inicializar OneSignal si no estamos en el dominio de producción
     const host = window.location.hostname;
+    const isLocal = host === 'localhost' || host === '127.0.0.1';
     const isProd = host === 'karpuskids.com' || host === 'www.karpuskids.com' || host.endsWith('.karpuskids.com');
     
-    if (!isProd) {
-      console.info('[OneSignal] Omitiendo inicialización en entorno local/desarrollo:', host);
+    if (!isProd && !isLocal) {
+      console.info('[OneSignal] Omitiendo inicialización en dominio no permitido:', host);
       return;
     }
 
@@ -221,6 +233,16 @@ export async function initOneSignal(currentUser = null) {
           serviceWorkerPath: 'OneSignalSDKWorker.js',
           notifyButton: { enable: false }
         });
+
+        // ✅ Pedir permiso de forma proactiva si es necesario
+        try {
+          if (OneSignal.Notifications.permissionNative === 'default') {
+            console.log('[OneSignal] Solicitando permisos de notificación...');
+            await OneSignal.Notifications.requestPermission();
+          }
+        } catch (permErr) {
+          console.warn('[OneSignal] No se pudo solicitar permiso:', permErr.message);
+        }
 
         // Vincular usuario externo para targeting por user_id
         // Usamos try/catch específico para el login por si falla IndexedDB
