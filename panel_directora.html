@@ -9,6 +9,7 @@
   <link rel="manifest" href="manifest.json">
   <script src="https://cdn.tailwindcss.com"></script>
   <link rel="stylesheet" href="css/theme.css" />
+  <link rel="stylesheet" href="css/layout.css" />
   
   <!-- OneSignal SDK Fix -->
   <script src="https://cdn.onesignal.com/sdks/web/v16/OneSignalSDK.page.js" defer></script>
@@ -341,7 +342,7 @@
 <div id="toast-container" class="fixed top-5 right-5 z-[70] flex flex-col gap-2 pointer-events-none"></div>
 
         <!-- BLOQUE 1: KPIs (Tarjetas Pastel) -->
-        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-4 mb-8">
+        <div class="kpi-grid mb-8">
           <!-- Estudiantes (Morado) -->
           <div class="bg-purple-100 p-5 rounded-2xl border border-purple-200 shadow-md hover:shadow-md hover:-translate-y-1 transition-all duration-300 group">
             <div class="flex justify-between items-start mb-2">

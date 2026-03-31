@@ -389,9 +389,16 @@ function initMessageBadgeRealtime() {
 function updateHeaderProfile(profile, student) {
   const studentName = student?.name || 'Estudiante';
 
-  // Sidebar — nombre del estudiante
+  // Sidebar — nombre + avatar del estudiante
   const sidebarName = document.getElementById('sidebar-student-name');
   if (sidebarName) sidebarName.textContent = studentName;
+
+  const sidebarAvatar = document.getElementById('sidebarStudentAvatar');
+  if (sidebarAvatar) {
+    sidebarAvatar.innerHTML = student?.avatar_url
+      ? '<img src="' + student.avatar_url + '" class="w-full h-full object-cover">'
+      : '<span class="text-sm font-black text-emerald-700">' + studentName.charAt(0) + '</span>';
+  }
 
   document.querySelectorAll('.guardian-name-display').forEach(el => el.textContent = studentName);
   document.querySelectorAll('.student-name-display').forEach(el => el.textContent = studentName);
@@ -399,23 +406,25 @@ function updateHeaderProfile(profile, student) {
     el.textContent = student?.classrooms?.name || 'Sin aula';
   });
 
+  // Desktop header avatar
   const avatarContainer = document.getElementById('headerStudentAvatar');
   if (avatarContainer) {
-    if (student?.avatar_url) {
-      avatarContainer.innerHTML =
-        '<img src="' + student.avatar_url + '" ' +
-        'class="w-full h-full object-cover" ' +
-        'onerror="this.style.display=\'none\';this.nextElementSibling.style.display=\'flex\'">' +
-        '<span class="w-full h-full flex items-center justify-center text-lg font-black text-green-700" style="display:none">' +
-        studentName.charAt(0) + '</span>';
-    } else {
-      avatarContainer.innerHTML =
-        '<span class="text-lg font-black text-green-700">' + studentName.charAt(0) + '</span>';
-    }
+    avatarContainer.innerHTML = student?.avatar_url
+      ? '<img src="' + student.avatar_url + '" class="w-full h-full object-cover" onerror="this.parentElement.innerHTML=\'<span class=\\\"text-lg font-black text-green-700\\\">' + studentName.charAt(0) + '</span>\'">'
+      : '<span class="text-lg font-black text-green-700">' + studentName.charAt(0) + '</span>';
+  }
+
+  // Mobile header avatar
+  const mobileAvatar = document.getElementById('headerAvatarMobile');
+  if (mobileAvatar) {
+    mobileAvatar.innerHTML = student?.avatar_url
+      ? '<img src="' + student.avatar_url + '" class="w-full h-full object-cover">'
+      : '<span class="text-sm font-black text-sky-700">' + studentName.charAt(0) + '</span>';
   }
 
   if (window.lucide) lucide.createIcons();
 }
+
 
 function _initDailyLogRealtime(studentId) {
   if (window._dailyLogChannel) return;

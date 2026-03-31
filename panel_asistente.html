@@ -11,6 +11,7 @@
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
   <link rel="manifest" href="manifest.json">
   <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="stylesheet" href="css/layout.css" />
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
   <!-- OneSignal SDK Fix -->
   <script src="https://cdn.onesignal.com/sdks/web/v16/OneSignalSDK.page.js" defer></script>
@@ -232,7 +233,7 @@
     <main class="flex-1 p-6" id="layoutShell">
 
       <!-- Overlay mobile -->
-      <div id="sidebarOverlay" class="fixed inset-0 bg-black/50 z-40 hidden md:hidden backdrop-blur-sm"></div>
+      <div id="sidebarOverlay"></div>
 
       <!-- Mobile Header -->
       <div class="md:hidden mb-6 flex items-center justify-between">
@@ -355,8 +356,8 @@
         </div>
         <!-- Table — scrollable on mobile -->
         <div class="bg-white rounded-2xl shadow-sm border border-slate-100 overflow-hidden">
-          <div class="overflow-x-auto">
-            <table class="w-full text-sm min-w-[500px]">
+          <div class="responsive-panel">
+            <table class="table-responsive">
               <thead class="bg-slate-50 border-b border-slate-100">
                 <tr>
                   <th class="px-4 py-3 text-left text-[10px] font-black text-slate-400 uppercase tracking-wider">Nombre</th>

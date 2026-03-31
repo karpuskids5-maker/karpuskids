@@ -231,16 +231,19 @@ export async function openNewTaskModal(taskToEdit = null) {
         const students = AppState.get('students') || [];
         const classroomName = AppState.get('classroom').name;
         
-        const notificationPromises = students
-          .filter(student => student.parent_id)
-          .map(student => sendPush({
-              user_id: student.parent_id,
-              title: `Nueva Tarea en ${classroomName}`,
-              message: `Se ha asignado la tarea: "${payload.title}"`,
-              link: 'panel_padres.html#tasks'
-          }));
-        
-        await Promise.allSettled(notificationPromises);
+        // Fire-and-forget — don't block UI on push delivery
+        students
+          .filter(s => s.parent_id)
+          .forEach(s => {
+            sendPush({
+              user_id: s.parent_id,
+              title:   `📚 Nueva Tarea — ${classroomName}`,
+              message: `Se asignó: "${payload.title}". Entrega: ${payload.due_date}`,
+              type:    'task',
+              link:    'panel_padres.html'
+            }).catch(err => console.warn('[Task push] Error para', s.name, err));
+          });
+
         safeToast('Tarea asignada y padres notificados');
       }
 

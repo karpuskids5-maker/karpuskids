@@ -7,6 +7,7 @@
   <link rel="icon" href="logo/favicon.ico" type="image/x-icon">
   <link rel="manifest" href="manifest.json">
   <link rel="stylesheet" href="css/theme.css" />
+  <link rel="stylesheet" href="css/layout.css" />
   <script src="https://cdn.tailwindcss.com"></script>
   <!-- OneSignal SDK Fix -->
   <script src="https://cdn.onesignal.com/sdks/web/v16/OneSignalSDK.page.js" defer></script>
@@ -373,7 +374,7 @@
         <div id="tab-daily-routine" class="class-tab-content hidden"></div>
 
         <div id="tab-students" class="class-tab-content hidden">
-          <div id="classroomStudentsGrid" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5"></div>
+          <div id="classroomStudentsGrid" class="responsive-grid"></div>
         </div>
 
         <div id="tab-attendance" class="class-tab-content hidden">

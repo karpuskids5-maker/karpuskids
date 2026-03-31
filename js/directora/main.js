@@ -41,11 +41,7 @@ window.openGlobalModal = function(html, wide = false) {
   if (!container) return;
   const maxW = wide ? 'max-w-4xl' : 'max-w-2xl';
   container.innerHTML = `<div class="bg-white rounded-3xl shadow-2xl w-full ${maxW} max-h-[92vh] overflow-y-auto mx-3 my-4">${html}</div>`;
-  container.style.display = 'flex';
-  container.style.alignItems = 'flex-start';
-  container.style.justifyContent = 'center';
-  container.style.paddingTop = '4vh';
-  container.style.zIndex = '9999';
+  container.style.cssText = 'display:flex;align-items:flex-start;justify-content:center;padding-top:4vh;position:fixed;inset:0;background:rgba(0,0,0,0.5);backdrop-filter:blur(4px);z-index:var(--z-modal,100);overflow-y:auto;';
   if (window.lucide) lucide.createIcons();
 };
 

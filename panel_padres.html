@@ -28,6 +28,7 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Quicksand:wght@400;600;700&family=Nunito:wght@400;600;700;800&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="css/panel-padre.css" />
+  <link rel="stylesheet" href="css/layout.css" />
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
   <link rel="icon" href="logo/favicon.ico" type="image/x-icon">
   <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.6.0/dist/confetti.browser.min.js"></script>
@@ -288,7 +289,12 @@
           <p class="text-[10px] text-slate-400 font-bold uppercase tracking-widest mb-2 flex items-center gap-1.5">
             <i data-lucide="sparkles" class="w-3.5 h-3.5 text-emerald-500 group-hover:animate-pulse"></i> Estudiante
           </p>
-          <div id="sidebar-student-name" class="font-extrabold text-slate-700 text-lg truncate leading-tight">Cargando...</div>
+          <div class="flex items-center gap-3">
+            <div id="sidebarStudentAvatar" class="w-10 h-10 rounded-full bg-emerald-100 border border-emerald-200 overflow-hidden shrink-0 flex items-center justify-center">
+              <i data-lucide="user" class="w-5 h-5 text-emerald-500"></i>
+            </div>
+            <div id="sidebar-student-name" class="font-extrabold text-slate-700 text-sm lg:text-base truncate leading-tight">Cargando...</div>
+          </div>
         </div>
       </div>
       
@@ -344,7 +350,7 @@
     <!-- CONTENIDO PRINCIPAL -->
     <main
       id="layoutShell"
-      class="flex-1 ml-0 md:ml-[20rem] p-4 md:p-10 pb-32 md:pb-10 transition-all duration-300"
+      class="flex-1 ml-0 md:ml-72 lg:ml-[20rem] p-4 md:p-6 lg:p-10 pb-32 md:pb-10 transition-all duration-300"
       role="main"
     >
       <!-- Header Móvil -->
@@ -355,30 +361,26 @@
             <span class="k-1">K</span><span class="k-2">a</span><span class="k-3">r</span><span class="k-4">p</span><span class="k-5">u</span><span class="k-6">s</span> <span class="k-7">K</span><span class="k-8">i</span><span class="k-9">d</span><span class="k-10">s</span>
            </span>
         </span>
-        <div id="headerAvatarMobile" class="w-10 h-10 bg-sky-100 rounded-full flex items-center justify-center text-sky-600 font-bold border-2 border-white shadow-md overflow-hidden">
+        <div id="headerAvatarMobile" class="w-10 h-10 bg-sky-100 rounded-full flex items-center justify-center text-sky-600 font-bold border-2 border-white shadow-md overflow-hidden shrink-0">
             <i data-lucide="user" class="w-5 h-5"></i>
         </div>
       </div>
 
-      <!-- Header Escritorio -->
       <header class="hidden md:flex justify-between items-center mb-10" role="banner">
-        <div>
-          <h1 class="text-2xl font-bold text-slate-700 sr-only">Karpus Kids - Panel de Padres</h1> <!-- Screen reader only -->
-          <h2 class="text-4xl font-black text-slate-800 tracking-tight flex items-center gap-3">
-             <span class="animate-bounce">👋</span> Hola, <span class="guardian-name-display text-emerald-600">Familia</span>!
+        <div class="min-w-0 flex-1">
+          <h1 class="text-2xl font-bold text-slate-700 sr-only">Karpus Kids - Panel de Padres</h1>
+          <h2 class="text-2xl lg:text-4xl font-black text-slate-800 tracking-tight flex items-center gap-3 truncate">
+             <span class="animate-bounce shrink-0">👋</span> Hola, <span class="guardian-name-display text-emerald-600 truncate">Familia</span>!
           </h2>
-          <p class="text-slate-400 font-bold text-lg mt-2 ml-1" id="currentDateDisplay" aria-live="polite">Hoy es un gran día para aprender</p>
+          <p class="text-slate-400 font-bold text-sm lg:text-lg mt-2 ml-1" id="currentDateDisplay" aria-live="polite">Hoy es un gran día para aprender</p>
         </div>
-        <div class="flex items-center gap-4">
-          <!-- Botón de refresco eliminado según solicitud -->
-          <div class="flex items-center gap-3 text-right">
-            <div class="hidden md:block">
-              <p class="text-sm font-black text-slate-700 student-name-display">Cargando...</p>
-              <p class="text-xs font-bold text-emerald-600 classroom-name-display bg-emerald-50 border border-emerald-100 px-3 py-0.5 rounded-full inline-block mt-1">Cargando aula...</p>
-            </div>
-            <div id="headerStudentAvatar" class="w-12 h-12 rounded-full bg-emerald-100 border-2 border-emerald-200 overflow-hidden shadow-sm flex items-center justify-center shrink-0">
-              <!-- Img injected by JS -->
-            </div>
+        <div class="flex items-center gap-3 shrink-0 ml-4">
+          <div class="hidden lg:block text-right">
+            <p class="text-sm font-black text-slate-700 student-name-display">Cargando...</p>
+            <p class="text-xs font-bold text-emerald-600 classroom-name-display bg-emerald-50 border border-emerald-100 px-3 py-0.5 rounded-full inline-block mt-1">Cargando aula...</p>
+          </div>
+          <div id="headerStudentAvatar" class="w-10 h-10 lg:w-12 lg:h-12 rounded-full bg-emerald-100 border-2 border-emerald-200 overflow-hidden shadow-sm flex items-center justify-center shrink-0">
+            <!-- Img injected by JS -->
           </div>
         </div>
       </header>
