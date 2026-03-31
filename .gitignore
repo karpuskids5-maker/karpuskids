@@ -1,0 +1,4 @@
+node_modules/
+*.log
+verification/
+data/karpus.db
