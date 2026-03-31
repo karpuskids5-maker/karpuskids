@@ -19,6 +19,8 @@ Deno.serve(async (req) => {
   try {
     const SUPABASE_URL  = Deno.env.get('SUPABASE_URL')              ?? '';
     const SERVICE_KEY   = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '';
+    // ✅ FIX: usar ANON_KEY para invocar otras Edge Functions (SERVICE_KEY causa 401)
+    const ANON_KEY      = Deno.env.get('SUPABASE_ANON_KEY')         ?? '';
     const RESEND_KEY    = Deno.env.get('RESEND_API_KEY')            ?? '';
     const FROM_EMAIL    = Deno.env.get('FROM_EMAIL')                ?? 'Karpus Kids <avisos@karpuskids.com>';
 
@@ -27,10 +29,24 @@ Deno.serve(async (req) => {
     const supabase = createClient(SUPABASE_URL, SERVICE_KEY, { auth: { persistSession: false } });
     const resend   = RESEND_KEY ? new Resend(RESEND_KEY) : null;
 
+    // ✅ FIX: usar ANON_KEY si está disponible, si no usar SERVICE_KEY como fallback
+    const pushAuthKey = ANON_KEY || SERVICE_KEY;
+
     const { type, data } = await req.json();
     if (!type) return json({ error: 'Missing event type' }, 400);
 
     console.log('[process-event] type:', type, '| data keys:', Object.keys(data || {}));
+
+    // Helper para enviar push usando la función send-push
+    const sendPushToUser = (user_id: string, title: string, message: string, pushType = 'info', link = 'panel_padres.html') =>
+      fetch(`${SUPABASE_URL}/functions/v1/send-push`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${pushAuthKey}`
+        },
+        body: JSON.stringify({ user_id, title, message, type: pushType, link })
+      });
 
     let result: Record<string, unknown> = {};
 
@@ -41,14 +57,12 @@ Deno.serve(async (req) => {
         const { data: students } = await supabase
           .from('students')
           .select('p1_email, p1_name, parent_id')
-          .eq('classroom_id', classroom_id)
-          .not('p1_email', 'is', null);
+          .eq('classroom_id', classroom_id);
 
         const emails: Promise<unknown>[] = [];
         const pushes: Promise<unknown>[] = [];
 
         for (const s of students ?? []) {
-          // Email
           if (resend && s.p1_email) {
             emails.push(resend.emails.send({
               from: FROM_EMAIL,
@@ -62,13 +76,14 @@ Deno.serve(async (req) => {
               </div>`
             }));
           }
-          // Push
           if (s.parent_id) {
-            pushes.push(fetch(`${SUPABASE_URL}/functions/v1/send-push`, {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${SERVICE_KEY}` },
-              body: JSON.stringify({ user_id: s.parent_id, title: `📚 Nueva Tarea — ${title}`, message: `Entrega: ${due_date}`, type: 'task', link: 'panel_padres.html' })
-            }));
+            pushes.push(sendPushToUser(
+              s.parent_id,
+              `📚 Nueva Tarea — ${title}`,
+              `Entrega: ${due_date}`,
+              'task',
+              'panel_padres.html'
+            ));
           }
         }
 
@@ -89,11 +104,13 @@ Deno.serve(async (req) => {
 
         for (const s of students ?? []) {
           if (s.parent_id) {
-            pushes.push(fetch(`${SUPABASE_URL}/functions/v1/send-push`, {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${SERVICE_KEY}` },
-              body: JSON.stringify({ user_id: s.parent_id, title: '📢 Nueva publicación en el muro', message: `${teacher_name || 'La maestra'} publicó: "${(content_preview || '').slice(0, 60)}"`, type: 'post', link: 'panel_padres.html' })
-            }));
+            pushes.push(sendPushToUser(
+              s.parent_id,
+              '📢 Nueva publicación en el muro',
+              `${teacher_name || 'La maestra'} publicó: "${(content_preview || '').slice(0, 60)}"`,
+              'post',
+              'panel_padres.html'
+            ));
           }
           if (resend && s.p1_email) {
             emails.push(resend.emails.send({
@@ -115,10 +132,28 @@ Deno.serve(async (req) => {
         break;
       }
 
+      case 'attendance.marked': {
+        const { parent_id, student_name, status } = data;
+        if (parent_id) {
+          const emoji = status === 'present' ? '🟢' : status === 'absent' ? '🔴' : '🟡';
+          const label = status === 'present' ? 'Presente' : status === 'absent' ? 'Ausente' : 'Tardanza';
+          await sendPushToUser(
+            parent_id,
+            `${emoji} Asistencia — ${student_name}`,
+            `${student_name} fue marcado como ${label} hoy.`,
+            'attendance',
+            'panel_padres.html'
+          );
+        }
+        result = { sent: !!parent_id };
+        break;
+      }
+
       case 'payment.approved': {
-        const { parent_email, student_name, amount, month, payment_id } = data;
+        const { parent_email, parent_id, student_name, amount, month, payment_id } = data;
+        const tasks: Promise<unknown>[] = [];
         if (resend && parent_email) {
-          await resend.emails.send({
+          tasks.push(resend.emails.send({
             from: FROM_EMAIL,
             to:   parent_email,
             subject: `✅ Pago Confirmado — ${month}`,
@@ -128,8 +163,18 @@ Deno.serve(async (req) => {
               <p><b>ID:</b> ${payment_id}</p>
               <a href="https://karpuskids.com/panel_padres.html" style="display:inline-block;padding:12px 20px;background:#16a34a;color:white;text-decoration:none;border-radius:8px;font-weight:bold">Ver Panel</a>
             </div>`
-          });
+          }));
         }
+        if (parent_id) {
+          tasks.push(sendPushToUser(
+            parent_id,
+            '✅ Pago Confirmado',
+            `Tu pago de ${amount} para ${month} fue aprobado.`,
+            'payment',
+            'panel_padres.html'
+          ));
+        }
+        await Promise.allSettled(tasks);
         result = { sent: true };
         break;
       }
@@ -171,7 +216,7 @@ Deno.serve(async (req) => {
       case 'payment.receipt_uploaded': {
         const { student_id, amount, month } = data;
         const { data: staff } = await supabase.from('profiles').select('email').in('role', ['directora', 'asistente']);
-        const emails = (staff ?? []).map(s => s.email).filter(Boolean) as string[];
+        const emails = (staff ?? []).map((s: { email: string }) => s.email).filter(Boolean) as string[];
         if (resend && emails.length) {
           await resend.emails.send({
             from: FROM_EMAIL, to: emails,

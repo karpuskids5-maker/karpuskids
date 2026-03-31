@@ -1837,7 +1837,6 @@ async function submitNewPost() {
     const teacherName = AppState.get('profile')?.name || 'La maestra';
 
     // Push with visual feedback
-    import('./modules/notify-feedback.js').catch(() => {});
     const { notifyParents: _np } = await import('../shared/notify-feedback.js').catch(() => ({ notifyParents: null }));
     if (_np) {
       _np({

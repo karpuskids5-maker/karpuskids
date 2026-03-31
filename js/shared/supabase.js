@@ -248,7 +248,8 @@ export async function initOneSignal(currentUser = null) {
         // Vincular usuario externo para targeting por user_id
         // Usamos try/catch específico para el login por si falla IndexedDB
         try {
-          if (OneSignal.User?.externalId !== user.id) {
+          const currentExtId = await OneSignal.User?.getExternalId?.();
+          if (currentExtId !== user.id) {
             await OneSignal.login(user.id);
           }
         } catch (loginErr) {
