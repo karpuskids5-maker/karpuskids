@@ -114,11 +114,26 @@
     
     /* --- MOBILE (< 768px) --- */
     @media (max-width: 767px) {
-      aside#sidebar { width: 280px; transform: translateX(-100%); }
+      aside#sidebar { width: 280px; transform: translateX(-100%); overflow-y: auto; }
       aside#sidebar.mobile-visible { transform: translateX(0); box-shadow: 5px 0 25px rgba(0,0,0,0.3); }
       
       #layoutShell { margin-left: 0 !important; width: 100%; }
-      #toggleSidebar { display: none !important; } /* Ocultar botón colapsar en móvil */
+      #toggleSidebar { display: none !important; }
+
+      /* Header compacto en móvil: avatar pequeño + texto en fila */
+      #sidebarHeader {
+        flex-direction: row !important;
+        align-items: center !important;
+        gap: 0.75rem !important;
+        padding-top: 0.75rem !important;
+        margin-bottom: 0.75rem !important;
+      }
+      #sidebarAvatarContainer { width: 2.75rem !important; height: 2.75rem !important; border-width: 2px !important; flex-shrink: 0; }
+      #sidebarHeader .label { text-align: left !important; }
+      #sidebarHeader .label h4 { font-size: 0.875rem !important; margin-bottom: 0 !important; }
+      #sidebarHeader .label p { display: none !important; }
+      #sidebarHeader .label .h-px { display: none !important; }
+      #sidebarHeader .label h3 { font-size: 0.875rem !important; }
     }
 
     /* Tema Asistente (Teal/Turquesa) */
@@ -155,10 +170,10 @@
       </button>
       
       <!-- Header Sidebar: Avatar + Nombre + Logo Texto -->
-      <div class="flex flex-col items-center gap-4 mb-6 pt-6">
+      <div id="sidebarHeader" class="flex flex-col items-center gap-4 mb-6 pt-6">
         <!-- Avatar -->
         <div class="relative group">
-           <div id="sidebarAvatarContainer" class="rounded-full border-4 border-white/30 shadow-lg overflow-hidden transition-all duration-300 group-hover:scale-105">
+           <div id="sidebarAvatarContainer" class="w-16 h-16 rounded-full border-4 border-white/30 shadow-lg overflow-hidden transition-all duration-300 group-hover:scale-105">
              <img id="sidebarAvatar" src="img/1.jpg" class="w-full h-full object-cover">
            </div>
            <div class="absolute bottom-0 right-0 w-4 h-4 bg-green-400 border-2 border-white rounded-full"></div>

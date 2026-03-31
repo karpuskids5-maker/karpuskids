@@ -1836,20 +1836,21 @@ async function submitNewPost() {
     const classroom = AppState.get('classroom');
     const teacherName = AppState.get('profile')?.name || 'La maestra';
 
-    // 1. Push (direct, fast)
-    students.forEach(s => {
-      if (s.parent_id) {
-        sendPush({
-          user_id: s.parent_id,
-          title: '📢 Nueva publicación en el muro',
-          message: `${teacherName} publicó en el muro de ${classroom?.name || 'tu aula'}.`,
-          type: 'post',
-          link: 'panel_padres.html'
-        }).catch(() => {});
-      }
-    });
+    // Push with visual feedback
+    import('./modules/notify-feedback.js').catch(() => {});
+    const { notifyParents: _np } = await import('../shared/notify-feedback.js').catch(() => ({ notifyParents: null }));
+    if (_np) {
+      _np({
+        students,
+        title:   '📢 Nueva publicación en el muro',
+        message: `${teacherName} publicó en el muro de ${classroom?.name || 'tu aula'}.`,
+        type:    'post',
+        link:    'panel_padres.html',
+        label:   content.slice(0, 40)
+      });
+    }
 
-    // 2. Email via process-event
+    // Email via process-event
     emitEvent('post.created', {
       classroom_id:    classroom?.id,
       teacher_name:    teacherName,
@@ -1930,8 +1931,8 @@ async function initGrades() {
     }
 
     content.innerHTML =
-      '<div class="bg-white rounded-2xl shadow-sm border border-slate-100 overflow-hidden">' +
-        '<table class="w-full text-sm text-left">' +
+      '<div class="responsive-panel">' +
+        '<table class="table-responsive text-sm text-left">' +
           '<thead class="bg-slate-50 text-slate-500 font-black uppercase text-[10px] tracking-wider">' +
             '<tr>' +
               '<th class="px-5 py-4">Estudiante</th>' +

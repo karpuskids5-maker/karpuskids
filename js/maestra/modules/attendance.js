@@ -2,6 +2,7 @@ import { supabase, sendPush } from '../../shared/supabase.js';
 import { AppState } from '../state.js';
 import { MaestraApi } from '../api.js';
 import { safeToast, safeEscapeHTML, Modal } from './ui.js';
+import { notifyParents, showNotifyFeedback } from '../../shared/notify-feedback.js';
 
 /**
  * 📅 Asistencia
@@ -101,15 +102,14 @@ export async function markAllPresent() {
       } else {
         safeToast('Asistencia masiva completada');
         
-        students.forEach(s => {
-          if (s.parent_id) {
-            sendPush({
-              user_id: s.parent_id,
-              title: 'Asistencia Karpus',
-              message: `${s.name} ha sido marcado como Presente hoy.`,
-              link: 'panel_padres.html#attendance'
-            }).catch(err => console.warn(`Error notificando a ${s.name}:`, err));
-          }
+        // Push with visual feedback
+        notifyParents({
+          students,
+          title:   'Asistencia Karpus ✅',
+          message: 'Tu hijo/a fue marcado como Presente hoy.',
+          type:    'attendance',
+          link:    'panel_padres.html',
+          label:   'Asistencia del día'
         });
       }
 
@@ -162,12 +162,15 @@ export async function registerAttendance(studentId, status) {
     
     const student = (AppState.get('students') || []).find(s => s.id === studentId);
     if (student?.parent_id) {
+      const { sendPush } = await import('../../shared/supabase.js');
       sendPush({
         user_id: student.parent_id,
         title: 'Asistencia Karpus',
         message: `${student.name} ha sido marcado como ${statusLiteral} hoy.`,
         link: 'panel_padres.html#attendance'
-      }).catch(err => console.warn(`Error notificando: `, err));
+      }).then(res => {
+        if (res?.ok !== false) showNotifyFeedback({ sent: 1, type: 'attendance', label: student.name });
+      }).catch(() => {});
     }
     
     safeToast(`Asistencia: ${statusLiteral}`);

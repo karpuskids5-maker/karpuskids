@@ -73,6 +73,20 @@ export async function initChat() {
       </div>`;
     }).join('');
 
+    // Wire search filter
+    const searchInput = document.getElementById('chatSearchInput');
+    if (searchInput && !searchInput._chatBound) {
+      searchInput._chatBound = true;
+      searchInput.addEventListener('input', () => {
+        const q = searchInput.value.toLowerCase().trim();
+        container.querySelectorAll('[onclick*="selectChatContact"]').forEach(el => {
+          const name = el.querySelector('.font-bold')?.textContent?.toLowerCase() || '';
+          const meta = el.querySelector('.text-\\[10px\\]')?.textContent?.toLowerCase() || '';
+          el.style.display = (!q || name.includes(q) || meta.includes(q)) ? '' : 'none';
+        });
+      });
+    }
+
     const btnSend = document.getElementById('btnSendChatMessage');
     const inputMsg = document.getElementById('chatMessageInput');
     
@@ -98,6 +112,15 @@ export async function selectChatContact(userId, name, meta) {
   activeChatUserId = userId;
   activeConversationId = null;
   
+  // Mobile: hide list, show conversation
+  const listPanel = document.getElementById('chatListPanel');
+  const convPanel = document.getElementById('chatConversationPanel');
+  if (listPanel && convPanel) {
+    listPanel.classList.add('hidden');
+    convPanel.classList.remove('hidden');
+    convPanel.classList.add('flex');
+  }
+
   const header = document.getElementById('chatActiveHeader');
   if (header) {
     header.classList.remove('hidden');
@@ -122,6 +145,19 @@ export async function selectChatContact(userId, name, meta) {
   }
 
   await loadChatMessages(userId);
+
+  // Back button — return to list on mobile
+  const backBtn = document.getElementById('chatBackBtn');
+  if (backBtn && !backBtn._bound) {
+    backBtn._bound = true;
+    backBtn.addEventListener('click', () => {
+      if (listPanel && convPanel) {
+        convPanel.classList.add('hidden');
+        convPanel.classList.remove('flex');
+        listPanel.classList.remove('hidden');
+      }
+    });
+  }
 }
 
 async function loadChatMessages(otherUserId) {

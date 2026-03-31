@@ -275,8 +275,14 @@ export const PaymentsModule = {
       await supabase.from('payments').update({ status: 'paid', paid_date: new Date().toISOString() }).eq('id', id);
       Helpers.toast('Pago aprobado', 'success');
       await this.loadPayments();
-      // Send receipt email silently
-      try { await DirectorApi.sendPaymentReceipt(id); } catch (_) {}
+      // Send receipt email + show feedback
+      DirectorApi.sendPaymentReceipt(id).then(ok => {
+        if (ok) {
+          import('../shared/notify-feedback.js').then(m =>
+            m.showNotifyFeedback({ sent: 1, type: 'payment', label: 'Recibo enviado al padre' })
+          ).catch(() => {});
+        }
+      }).catch(() => {});
     } catch (_) { Helpers.toast('Error al aprobar pago', 'error'); }
   },
 
