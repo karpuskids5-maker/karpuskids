@@ -1,65 +1,28 @@
-/* Karpus Kids — Global Layout System */
-:root {
-  --sidebar-width: 280px;
-  --sidebar-collapsed-width: 80px;
-  --mobile-nav-height: 64px;
-  --z-overlay: 40;
-  --z-sidebar: 50;
-  --z-modal: 100;
-  --z-toast: 200;
-}
+/* Karpus Kids — Global Layout Utilities */
 
-html, body { overflow-x: hidden; max-width: 100%; }
+/* Prevent horizontal scroll without blocking vertical */
+html {
+  overflow-x: clip; /* clip is better than hidden — doesn't create scroll context */
+}
+body {
+  overflow-x: hidden;
+  max-width: 100%;
+}
 *, *::before, *::after { box-sizing: border-box; }
 
-/* Layout Shell */
-#layoutShell {
-  margin-left: var(--sidebar-width);
-  min-height: 100vh;
-  transition: margin-left 0.3s ease;
-  padding: 1.5rem;
-}
-#layoutShell.sidebar-collapsed { margin-left: var(--sidebar-collapsed-width); }
-
-@media (max-width: 767px) {
-  #layoutShell {
-    margin-left: 0 !important;
-    padding: 1rem;
-  }
-}
-
-/* Sidebar */
-aside#sidebar {
-  width: var(--sidebar-width);
-  position: fixed;
-  top: 0; bottom: 0; left: 0;
-  z-index: var(--z-sidebar);
-  overflow-y: auto;
-  overflow-x: hidden;
-  transition: width 0.3s ease, transform 0.3s ease;
-}
-aside#sidebar.collapsed { width: var(--sidebar-collapsed-width); }
-
-@media (min-width: 768px) {
-  aside#sidebar { transform: translateX(0) !important; }
-  aside#sidebar.collapsed:hover { width: var(--sidebar-width); }
-}
-@media (max-width: 767px) {
-  aside#sidebar { width: var(--sidebar-width) !important; transform: translateX(-100%); }
-  aside#sidebar.mobile-visible { transform: translateX(0); box-shadow: 8px 0 32px rgba(0,0,0,0.25); }
-}
-
-/* Overlay */
+/* Sidebar overlay — shared across all staff panels */
 #sidebarOverlay {
-  position: fixed; inset: 0;
-  background: rgba(0,0,0,0.5);
-  z-index: var(--z-overlay);
-  display: none;
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.5);
+  z-index: 45;
   backdrop-filter: blur(2px);
+  -webkit-backdrop-filter: blur(2px);
+  cursor: pointer;
 }
-#sidebarOverlay.active { display: block; }
+/* Panels use either .hidden (Tailwind) or .active to show/hide */
 
-/* Responsive table wrapper */
+/* Responsive table wrapper — scroll inside, never on body */
 .responsive-panel {
   width: 100%;
   overflow-x: auto;
@@ -98,14 +61,6 @@ aside#sidebar.collapsed { width: var(--sidebar-collapsed-width); }
   background-size: 800px 100%;
   animation: karpus-shimmer 1.4s infinite linear;
   border-radius: 0.5rem;
-}
-
-/* Sidebar label collapse */
-aside#sidebar.collapsed .sidebar-label {
-  opacity: 0; visibility: hidden; width: 0; overflow: hidden;
-}
-aside#sidebar.collapsed:hover .sidebar-label {
-  opacity: 1; visibility: visible; width: auto;
 }
 
 /* Mobile full-width buttons */

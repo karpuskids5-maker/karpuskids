@@ -1,207 +1,198 @@
-import { createClient } from "https://esm.sh/@supabase/supabase-js@2"
-import { Resend } from "https://esm.sh/resend@1.0.0"
-import { corsHeaders } from "../_shared/cors.ts"
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { Resend } from "https://esm.sh/resend@2.1.0";
 
-const RESEND_API_KEY = Deno.env.get('RESEND_API_KEY')
-const SUPABASE_URL = Deno.env.get('SUPABASE_URL')
-const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')
+const CORS = {
+  'Access-Control-Allow-Origin':  '*',
+  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+  'Access-Control-Allow-Methods': 'POST, OPTIONS',
+};
 
-const resend = new Resend(RESEND_API_KEY)
-const supabase = createClient(SUPABASE_URL!, SUPABASE_SERVICE_ROLE_KEY!)
+const json = (data: unknown, status = 200) =>
+  new Response(JSON.stringify(data), {
+    status,
+    headers: { ...CORS, 'Content-Type': 'application/json' },
+  });
 
 Deno.serve(async (req) => {
-  if (req.method === 'OPTIONS') {
-    return new Response('ok', { 
-      status: 200, 
-      headers: corsHeaders 
-    })
-  }
+  if (req.method === 'OPTIONS') return new Response('ok', { headers: CORS });
 
   try {
-    const { type, data } = await req.json()
+    const SUPABASE_URL  = Deno.env.get('SUPABASE_URL')              ?? '';
+    const SERVICE_KEY   = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '';
+    const RESEND_KEY    = Deno.env.get('RESEND_API_KEY')            ?? '';
+    const FROM_EMAIL    = Deno.env.get('FROM_EMAIL')                ?? 'Karpus Kids <avisos@karpuskids.com>';
 
-    // 1. Log the event
-    await supabase.from('system_events').insert({
-      type,
-      payload: data,
-      status: 'processing'
-    })
+    if (!SUPABASE_URL || !SERVICE_KEY) return json({ error: 'Missing env vars' }, 500);
 
-    let responseData = {}
+    const supabase = createClient(SUPABASE_URL, SERVICE_KEY, { auth: { persistSession: false } });
+    const resend   = RESEND_KEY ? new Resend(RESEND_KEY) : null;
+
+    const { type, data } = await req.json();
+    if (!type) return json({ error: 'Missing event type' }, 400);
+
+    console.log('[process-event] type:', type, '| data keys:', Object.keys(data || {}));
+
+    let result: Record<string, unknown> = {};
 
     switch (type) {
-      case 'payment.approved':
-        responseData = await handlePaymentApproved(data)
-        break
+
+      case 'task.created': {
+        const { classroom_id, title, due_date } = data;
+        const { data: students } = await supabase
+          .from('students')
+          .select('p1_email, p1_name, parent_id')
+          .eq('classroom_id', classroom_id)
+          .not('p1_email', 'is', null);
+
+        const emails: Promise<unknown>[] = [];
+        const pushes: Promise<unknown>[] = [];
+
+        for (const s of students ?? []) {
+          // Email
+          if (resend && s.p1_email) {
+            emails.push(resend.emails.send({
+              from: FROM_EMAIL,
+              to:   s.p1_email,
+              subject: `📚 Nueva Tarea: ${title}`,
+              html: `<div style="font-family:sans-serif;max-width:600px;margin:auto;padding:20px">
+                <h2 style="color:#6366f1">Nueva Tarea Asignada 📝</h2>
+                <p>Hola <b>${s.p1_name || 'familia'}</b>,</p>
+                <p>Se asignó la tarea <b>"${title}"</b>. Fecha de entrega: <b>${due_date}</b>.</p>
+                <a href="https://karpuskids.com/panel_padres.html" style="display:inline-block;padding:12px 20px;background:#6366f1;color:white;text-decoration:none;border-radius:8px;font-weight:bold">Ver Tarea</a>
+              </div>`
+            }));
+          }
+          // Push
+          if (s.parent_id) {
+            pushes.push(fetch(`${SUPABASE_URL}/functions/v1/send-push`, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${SERVICE_KEY}` },
+              body: JSON.stringify({ user_id: s.parent_id, title: `📚 Nueva Tarea — ${title}`, message: `Entrega: ${due_date}`, type: 'task', link: 'panel_padres.html' })
+            }));
+          }
+        }
+
+        await Promise.allSettled([...emails, ...pushes]);
+        result = { sent_emails: emails.length, sent_pushes: pushes.length };
+        break;
+      }
+
+      case 'post.created': {
+        const { classroom_id, teacher_name, content_preview } = data;
+        const { data: students } = await supabase
+          .from('students')
+          .select('p1_email, p1_name, parent_id')
+          .eq('classroom_id', classroom_id);
+
+        const pushes: Promise<unknown>[] = [];
+        const emails: Promise<unknown>[] = [];
+
+        for (const s of students ?? []) {
+          if (s.parent_id) {
+            pushes.push(fetch(`${SUPABASE_URL}/functions/v1/send-push`, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${SERVICE_KEY}` },
+              body: JSON.stringify({ user_id: s.parent_id, title: '📢 Nueva publicación en el muro', message: `${teacher_name || 'La maestra'} publicó: "${(content_preview || '').slice(0, 60)}"`, type: 'post', link: 'panel_padres.html' })
+            }));
+          }
+          if (resend && s.p1_email) {
+            emails.push(resend.emails.send({
+              from: FROM_EMAIL,
+              to:   s.p1_email,
+              subject: '📢 Nueva publicación en el muro de Karpus Kids',
+              html: `<div style="font-family:sans-serif;max-width:600px;margin:auto;padding:20px">
+                <h2 style="color:#f97316">Nueva Publicación 📢</h2>
+                <p>Hola <b>${s.p1_name || 'familia'}</b>,</p>
+                <p>${teacher_name || 'La maestra'} publicó algo nuevo en el muro del aula.</p>
+                <a href="https://karpuskids.com/panel_padres.html" style="display:inline-block;padding:12px 20px;background:#f97316;color:white;text-decoration:none;border-radius:8px;font-weight:bold">Ver Publicación</a>
+              </div>`
+            }));
+          }
+        }
+
+        await Promise.allSettled([...pushes, ...emails]);
+        result = { sent_pushes: pushes.length, sent_emails: emails.length };
+        break;
+      }
+
+      case 'payment.approved': {
+        const { parent_email, student_name, amount, month, payment_id } = data;
+        if (resend && parent_email) {
+          await resend.emails.send({
+            from: FROM_EMAIL,
+            to:   parent_email,
+            subject: `✅ Pago Confirmado — ${month}`,
+            html: `<div style="font-family:sans-serif;max-width:600px;margin:auto;padding:20px">
+              <h2 style="color:#16a34a">¡Pago Confirmado! ✅</h2>
+              <p>El pago de <b>${amount}</b> para <b>${month}</b> del estudiante <b>${student_name}</b> fue aprobado.</p>
+              <p><b>ID:</b> ${payment_id}</p>
+              <a href="https://karpuskids.com/panel_padres.html" style="display:inline-block;padding:12px 20px;background:#16a34a;color:white;text-decoration:none;border-radius:8px;font-weight:bold">Ver Panel</a>
+            </div>`
+          });
+        }
+        result = { sent: true };
+        break;
+      }
+
+      case 'incident.reported': {
+        const { parent_email, student_name, severity, description } = data;
+        if (resend && parent_email) {
+          await resend.emails.send({
+            from: FROM_EMAIL,
+            to:   parent_email,
+            subject: `⚠️ Reporte de Incidencia — ${student_name}`,
+            html: `<div style="font-family:sans-serif;max-width:600px;margin:auto;padding:20px;border:1px solid #fee2e2;border-radius:10px">
+              <h2 style="color:#dc2626">Reporte de Incidencia ⚠️</h2>
+              <p><b>Gravedad:</b> ${severity}</p>
+              <p><b>Descripción:</b> ${description}</p>
+            </div>`
+          });
+        }
+        result = { sent: true };
+        break;
+      }
+
       case 'attendance.checkin':
-        responseData = await handleAttendance(data, 'entrada')
-        break
-      case 'attendance.checkout':
-        responseData = await handleAttendance(data, 'salida')
-        break
-      case 'incident.reported':
-        responseData = await handleIncident(data)
-        break
-      case 'payment.receipt_uploaded':
-        responseData = await handleReceiptUploaded(data)
-        break
-      case 'task.created':
-        responseData = await handleTaskCreated(data)
-        break
+      case 'attendance.checkout': {
+        const { parent_email, student_name, time } = data;
+        const isEntry = type === 'attendance.checkin';
+        if (resend && parent_email) {
+          await resend.emails.send({
+            from: FROM_EMAIL,
+            to:   parent_email,
+            subject: `${isEntry ? '🟢 Entrada' : '🔴 Salida'}: ${student_name}`,
+            html: `<p><b>${student_name}</b> registró su ${isEntry ? 'entrada' : 'salida'} a las <b>${time}</b>.</p>`
+          });
+        }
+        result = { sent: true };
+        break;
+      }
+
+      case 'payment.receipt_uploaded': {
+        const { student_id, amount, month } = data;
+        const { data: staff } = await supabase.from('profiles').select('email').in('role', ['directora', 'asistente']);
+        const emails = (staff ?? []).map(s => s.email).filter(Boolean) as string[];
+        if (resend && emails.length) {
+          await resend.emails.send({
+            from: FROM_EMAIL, to: emails,
+            subject: `💳 Nuevo comprobante subido — Estudiante ${student_id}`,
+            html: `<p>Se subió un comprobante de <b>${amount}</b> para <b>${month}</b>. Revisa el panel para validar.</p>`
+          });
+        }
+        result = { notified: emails.length };
+        break;
+      }
+
       default:
-        throw new Error(`Evento no soportado: ${type}`)
+        console.warn('[process-event] Unhandled type:', type);
+        result = { skipped: true, type };
     }
 
-    // 2. Update event status
-    await supabase.from('system_events')
-      .update({ status: 'completed', processed_at: new Date().toISOString() })
-      .eq('type', type)
-      .order('created_at', { ascending: false })
-      .limit(1)
+    return json({ ok: true, type, ...result });
 
-    return new Response(JSON.stringify(responseData), {
-      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-      status: 200,
-    })
-
-  } catch (error) {
-    console.error("Error in process-event:", error)
-    return new Response(JSON.stringify({ error: error.message }), {
-      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-      status: 400,
-    })
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : String(e);
+    console.error('[process-event] Fatal:', msg);
+    return json({ error: msg }, 500);
   }
-})
-
-async function handlePaymentApproved(data: any) {
-  const { parent_email, student_name, amount, month, payment_id } = data
-  
-  const html = `
-    <div style="font-family: sans-serif; max-width: 600px; margin: auto; padding: 20px; border: 1px solid #eee; border-radius: 10px;">
-      <h2 style="color: #16a34a;">¡Pago Confirmado! ✅</h2>
-      <p>Hola,</p>
-      <p>Confirmamos que el pago de <b>$${amount}</b> correspondiente a <b>${month}</b> para el estudiante <b>${student_name}</b> ha sido aprobado con éxito.</p>
-      <div style="background: #f0fdf4; padding: 15px; border-radius: 8px; margin: 20px 0; border-left: 4px solid #16a34a;">
-        <p style="margin: 0;"><b>ID de Pago:</b> ${payment_id}</p>
-        <p style="margin: 0;"><b>Monto:</b> $${amount}</p>
-        <p style="margin: 0;"><b>Mes:</b> ${month}</p>
-      </div>
-      <p>Gracias por tu puntualidad y apoyo a Karpus Kids.</p>
-      <a href="https://karpuskids.com/panel_padres.html" style="display: inline-block; padding: 12px 20px; background: #16a34a; color: white; text-decoration: none; border-radius: 8px; font-weight: bold;">Abrir Panel de Padres</a>
-      <hr style="border: none; border-top: 1px solid #eee; margin: 20px 0;">
-      <p style="font-size: 12px; color: #666;">Karpus Kids - Calidez y Desarrollo</p>
-    </div>
-  `
-
-  await resend.emails.send({
-    from: 'Karpus Kids <avisos@karpuskids.com>',
-    to: parent_email,
-    subject: `Recibo de Pago Aprobado - ${month}`,
-    html: html
-  })
-
-  return { success: true }
-}
-
-async function handleAttendance(data: any, type: string) {
-  const { parent_email, student_name, time } = data
-  const isEntry = type === 'entrada'
-  const color = isEntry ? '#0d9488' : '#ef4444'
-
-  const html = `
-    <div style="font-family: sans-serif; max-width: 600px; margin: auto; padding: 20px; border: 1px solid #eee; border-radius: 10px;">
-      <h2 style="color: ${color};">Notificación de ${type === 'entrada' ? 'Llegada' : 'Salida'}</h2>
-      <p>Te informamos que <b>${student_name}</b> ha registrado su <b>${type}</b> a Karpus Kids hoy a las <b>${time}</b>.</p>
-      <p>${isEntry ? '¡Que tenga un excelente día de aprendizaje!' : '¡Gracias por confiar en nosotros!'}</p>
-      <hr style="border: none; border-top: 1px solid #eee; margin: 20px 0;">
-      <p style="font-size: 12px; color: #666;">Karpus Kids - Seguridad y Confianza</p>
-    </div>
-  `
-
-  await resend.emails.send({
-    from: 'Karpus Kids <seguridad@karpuskids.com>',
-    to: parent_email,
-    subject: `Aviso de ${isEntry ? 'Entrada' : 'Salida'}: ${student_name}`,
-    html: html
-  })
-
-  return { success: true }
-}
-
-async function handleIncident(data: any) {
-  const { parent_email, student_name, severity, description } = data
-  
-  const html = `
-    <div style="font-family: sans-serif; max-width: 600px; margin: auto; padding: 20px; border: 1px solid #fee2e2; border-radius: 10px;">
-      <h2 style="color: #dc2626;">Reporte de Incidencia ⚠️</h2>
-      <p>Te informamos que se ha registrado una incidencia relacionada con <b>${student_name}</b>:</p>
-      <div style="background: #fef2f2; padding: 15px; border-radius: 8px; margin: 15px 0;">
-        <p><b>Nivel de Gravedad:</b> <span style="text-transform: uppercase; font-weight: bold;">${severity}</span></p>
-        <p><b>Descripción:</b> ${description}</p>
-      </div>
-      <p>La maestra está al tanto y ha tomado las medidas necesarias. Si tienes alguna duda, puedes contactarnos a través del chat del panel.</p>
-      <hr style="border: none; border-top: 1px solid #fee2e2; margin: 20px 0;">
-      <p style="font-size: 12px; color: #666;">Karpus Kids - Cuidado y Atención</p>
-    </div>
-  `
-
-  await resend.emails.send({
-    from: 'Karpus Kids <atencion@karpuskids.com>',
-    to: parent_email,
-    subject: `Aviso Importante: Reporte de Incidencia - ${student_name}`,
-    html: html
-  })
-
-  return { success: true }
-}
-
-async function handleReceiptUploaded(data: any) {
-  const { student_id, amount, month } = data
-  const { data: staff } = await supabase.from('profiles').select('email').in('role', ['directora', 'asistente'])
-  const emails = staff?.map(s => s.email).filter(Boolean) || []
-
-  if (emails.length > 0) {
-    await resend.emails.send({
-      from: 'Karpus Kids System <sistema@karpuskids.com>',
-      to: emails as string[],
-      subject: `Nuevo Comprobante de Pago Subido - Estudiante ID: ${student_id}`,
-      html: `<p>Se ha subido un nuevo comprobante de pago por <b>$${amount}</b> para el mes de <b>${month}</b>.</p><p>Por favor, revise el panel administrativo para validar.</p>`
-    })
-  }
-  return { success: true }
-}
-
-async function handleTaskCreated(data: any) {
-  const { classroom_id, title, due_date } = data
-  
-  // Obtener correos de padres de ese aula
-  const { data: parents } = await supabase
-    .from('students')
-    .select('p1_email, p1_name')
-    .eq('classroom_id', classroom_id)
-    .not('p1_email', 'is', null)
-
-  const emailPromises = (parents || []).map(p => {
-    const html = `
-      <div style="font-family: sans-serif; max-width: 600px; margin: auto; padding: 20px; border: 1px solid #eee; border-radius: 10px;">
-        <h2 style="color: #6366f1;">Nueva Tarea Asignada 📝</h2>
-        <p>Hola <b>${p.p1_name || 'familia'}</b>,</p>
-        <p>Se ha publicado una nueva tarea en el aula: <b>"${title}"</b>.</p>
-        <p><b>Fecha de Entrega:</b> ${due_date}</p>
-        <br>
-        <a href="https://karpuskids.com/panel_padres.html#tasks" style="display: inline-block; padding: 12px 20px; background: #6366f1; color: white; text-decoration: none; border-radius: 8px; font-weight: bold;">Ver Tarea</a>
-        <hr style="border: none; border-top: 1px solid #eee; margin: 20px 0;">
-        <p style="font-size: 12px; color: #666;">Karpus Kids - Educación y Cuidado</p>
-      </div>
-    `
-    return resend.emails.send({
-      from: 'Karpus Kids <tareas@karpuskids.com>',
-      to: p.p1_email,
-      subject: `Nueva Tarea: ${title}`,
-      html: html
-    })
-  })
-
-  await Promise.allSettled(emailPromises)
-  return { success: true }
-}
+});

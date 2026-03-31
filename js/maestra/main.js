@@ -1834,17 +1834,27 @@ async function submitNewPost() {
     // Notify parents of this classroom
     const students = AppState.get('students') || [];
     const classroom = AppState.get('classroom');
+    const teacherName = AppState.get('profile')?.name || 'La maestra';
+
+    // 1. Push (direct, fast)
     students.forEach(s => {
       if (s.parent_id) {
         sendPush({
           user_id: s.parent_id,
           title: '📢 Nueva publicación en el muro',
-          message: `La maestra publicó en el muro de ${classroom?.name || 'tu aula'}.`,
+          message: `${teacherName} publicó en el muro de ${classroom?.name || 'tu aula'}.`,
           type: 'post',
           link: 'panel_padres.html'
         }).catch(() => {});
       }
     });
+
+    // 2. Email via process-event
+    emitEvent('post.created', {
+      classroom_id:    classroom?.id,
+      teacher_name:    teacherName,
+      content_preview: content.slice(0, 80)
+    }).catch(() => {});
   } catch (e) {
     console.error(e);
     safeToast('Error al publicar', 'error');

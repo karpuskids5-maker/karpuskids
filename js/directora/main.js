@@ -95,7 +95,8 @@ export function goToSection(sectionId) {
   // Cerrar sidebar en móvil si está abierto
   const sidebar = document.getElementById('sidebar');
   if (sidebar && window.innerWidth < 768) {
-    sidebar.classList.add('-translate-x-full');
+    sidebar.classList.remove('mobile-visible');
+    document.getElementById('sidebarOverlay')?.classList.add('hidden');
   }
 }
 
@@ -177,6 +178,24 @@ document.addEventListener('DOMContentLoaded', async () => {
       await supabase.auth.signOut();
       window.location.href = 'index.html';
     });
+
+    // 7. Mobile sidebar hamburger
+    const menuBtn = document.getElementById('menuBtn');
+    const sidebar  = document.getElementById('sidebar');
+    const overlay  = document.getElementById('sidebarOverlay');
+
+    if (menuBtn && sidebar) {
+      menuBtn.addEventListener('click', () => {
+        sidebar.classList.toggle('mobile-visible');
+        if (overlay) overlay.classList.toggle('hidden');
+      });
+    }
+    if (overlay) {
+      overlay.addEventListener('click', () => {
+        sidebar.classList.remove('mobile-visible');
+        overlay.classList.add('hidden');
+      });
+    }
 
     // 7. Configurar guardado de perfil
     document.getElementById('btnSaveMainConfig')?.addEventListener('click', async () => {

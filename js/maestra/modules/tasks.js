@@ -1,4 +1,4 @@
-import { supabase, sendPush } from '../../shared/supabase.js';
+import { supabase, sendPush, emitEvent } from '../../shared/supabase.js';
 import { AppState } from '../state.js';
 import { MaestraApi } from '../api.js';
 import { safeToast, safeEscapeHTML, Modal } from './ui.js';
@@ -231,18 +231,23 @@ export async function openNewTaskModal(taskToEdit = null) {
         const students = AppState.get('students') || [];
         const classroomName = AppState.get('classroom').name;
         
-        // Fire-and-forget — don't block UI on push delivery
-        students
-          .filter(s => s.parent_id)
-          .forEach(s => {
-            sendPush({
-              user_id: s.parent_id,
-              title:   `📚 Nueva Tarea — ${classroomName}`,
-              message: `Se asignó: "${payload.title}". Entrega: ${payload.due_date}`,
-              type:    'task',
-              link:    'panel_padres.html'
-            }).catch(err => console.warn('[Task push] Error para', s.name, err));
-          });
+        // 1. Push (fast, direct to each parent)
+        students.filter(s => s.parent_id).forEach(s => {
+          sendPush({
+            user_id: s.parent_id,
+            title:   `📚 Nueva Tarea — ${classroomName}`,
+            message: `"${payload.title}" · Entrega: ${payload.due_date}`,
+            type:    'task',
+            link:    'panel_padres.html'
+          }).catch(() => {});
+        });
+
+        // 2. Email via process-event (sends to all parents with p1_email)
+        emitEvent('task.created', {
+          classroom_id: payload.classroom_id,
+          title:        payload.title,
+          due_date:     payload.due_date
+        }).catch(() => {});
 
         safeToast('Tarea asignada y padres notificados');
       }
