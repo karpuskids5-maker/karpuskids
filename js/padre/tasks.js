@@ -177,7 +177,11 @@ export const TasksModule = {
       
       document.getElementById('evidenceDate').textContent = `Enviado el: ${Helpers.formatDate(evidence.created_at)}`;
       document.getElementById('evidenceComment').textContent = evidence.comment || "Sin comentario";
-      document.getElementById('evidenceLink').href = evidence.file_url;
+      const evidenceLink = document.getElementById('evidenceLink');
+      if (evidenceLink) {
+        evidenceLink.href = '#';
+        evidenceLink.onclick = (e) => { e.preventDefault(); window.openLightbox(evidence.file_url, 'image'); };
+      }
 
       modal.classList.remove('hidden');
       modal.classList.add('flex');
@@ -290,7 +294,7 @@ export const TasksModule = {
           ${statusBadge}
         </div>
         
-        ${t.file_url ? `<div class="mb-3 rounded-xl overflow-hidden border border-slate-100"><img src="${t.file_url}" class="w-full max-h-40 object-cover" loading="lazy" alt="Imagen de tarea"></div>` : ''}
+        ${t.file_url ? `<div class="mb-3 rounded-xl overflow-hidden border border-slate-100 cursor-zoom-in" onclick="window.openLightbox('${t.file_url}','image')"><img src="${t.file_url}" class="w-full max-h-48 object-contain bg-slate-50" loading="lazy" alt="Imagen de tarea" data-no-lightbox></div>` : ''}
         
         <p class="text-xs text-slate-500 leading-relaxed line-clamp-2 mb-4">${escapeHtml(t.description || 'Sin descripción detallada.')}</p>
         

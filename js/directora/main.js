@@ -83,7 +83,7 @@ export function goToSection(sectionId) {
         WallModule.init('muroPostsContainer', { accentColor: 'orange' }, AppState); 
         break;
       case 'reportes': InquiriesModule.init(); break;
-      case 'configuracion': loadProfile(); break;
+      case 'configuracion': loadProfile(); import('../shared/notify-permission.js').then(m => m.NotifyPermission.requestIfNeeded()); break;
     }
   }
 
@@ -149,7 +149,17 @@ document.addEventListener('DOMContentLoaded', async () => {
     AppState.set('profile', auth.profile);
 
     // 3. Inicializar OneSignal
-    initOneSignal();
+    // ✅ FIX: Solo inicializar en el dominio correcto para evitar errores de consola
+    const host = window.location.hostname;
+    const isProd = host === 'karpuskids.com' || host === 'www.karpuskids.com' || host.endsWith('.karpuskids.com') || host === 'localhost';
+    
+    if (isProd) {
+      try { initOneSignal(auth.user); } catch(e) {
+        console.warn('⚠️ OneSignal error:', e);
+      }
+    } else {
+      console.log('ℹ️ OneSignal skipping: restricted domain');
+    }
 
     // 4. Cargar Perfil Inicial
     loadProfile();

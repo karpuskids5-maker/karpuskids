@@ -105,10 +105,41 @@ export const RoomsModule = {
     modal.classList.remove('hidden');
     modal.classList.add('flex');
     
-    // Cargar lista de estudiantes (para asignar masivamente, omitido del guardado simple, futuro scope)
+    // Load unassigned students checklist
+    await this._loadStudentsChecklist(roomId);
+  },
+
+  async _loadStudentsChecklist(roomId) {
     const list = document.getElementById('roomStudentsChecklist');
-    if (list) {
-      list.innerHTML = '<div class="text-[10px] text-slate-400 p-2 italic">Solo disponible para edición futura. Use vista individual.</div>';
+    if (!list) return;
+    list.innerHTML = '<div class="text-[10px] text-slate-400 p-2">Cargando...</div>';
+
+    try {
+      // Students with no classroom OR already in this room
+      const { data: students } = await supabase
+        .from('students')
+        .select('id, name, classroom_id')
+        .or(roomId ? `classroom_id.is.null,classroom_id.eq.${roomId}` : 'classroom_id.is.null')
+        .order('name');
+
+      if (!students?.length) {
+        list.innerHTML = '<div class="text-[10px] text-slate-400 p-2 italic">No hay estudiantes sin aula.</div>';
+        return;
+      }
+
+      list.innerHTML = students.map(s => {
+        const checked = s.classroom_id && String(s.classroom_id) === String(roomId) ? 'checked' : '';
+        return `<label class="flex items-center gap-2 py-1.5 cursor-pointer hover:bg-slate-100 px-1 rounded-lg">
+          <input type="checkbox" value="${s.id}" ${checked}
+            class="room-student-check w-4 h-4 rounded accent-teal-600">
+          <span class="text-sm font-medium text-slate-700">${Helpers.escapeHTML(s.name)}</span>
+          ${s.classroom_id && String(s.classroom_id) === String(roomId)
+            ? '<span class="text-[9px] bg-teal-100 text-teal-700 px-1.5 py-0.5 rounded-full font-bold ml-auto">En esta aula</span>'
+            : ''}
+        </label>`;
+      }).join('');
+    } catch (e) {
+      list.innerHTML = '<div class="text-[10px] text-rose-400 p-2">Error cargando estudiantes.</div>';
     }
   },
 
@@ -155,22 +186,32 @@ export const RoomsModule = {
     };
 
     try {
+      let savedId = id;
       if (id) {
-        payload.updated_at = new Date().toISOString();
         const { error } = await supabase.from('classrooms').update(payload).eq('id', id);
         if (error) throw error;
         Helpers.toast('Aula actualizada correctamente');
       } else {
-        const { error } = await supabase.from('classrooms').insert([payload]);
+        const { data: newRoom, error } = await supabase.from('classrooms').insert([payload]).select('id').single();
         if (error) throw error;
+        savedId = newRoom?.id;
         Helpers.toast('Aula creada correctamente');
+      }
+
+      // Assign checked students to this room
+      const checks = document.querySelectorAll('.room-student-check');
+      if (checks.length && savedId) {
+        const toAssign   = [...checks].filter(c => c.checked).map(c => c.value);
+        const toUnassign = [...checks].filter(c => !c.checked).map(c => c.value);
+        if (toAssign.length)   await supabase.from('students').update({ classroom_id: savedId }).in('id', toAssign);
+        if (toUnassign.length) await supabase.from('students').update({ classroom_id: null }).in('id', toUnassign);
       }
 
       this.closeModal();
       await this.loadRooms();
     } catch (e) {
       console.error(e);
-      Helpers.toast('Error al guardar aula', 'error');
+      Helpers.toast('Error al guardar aula: ' + (e.message || e), 'error');
     } finally {
       this.resetBtn(btn);
     }

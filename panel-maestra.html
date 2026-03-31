@@ -315,26 +315,50 @@
           </div>
         </header>
 
-        <!-- Tabs — scroll horizontal en móvil -->
-        <div class="flex gap-1 mb-4 border-b border-slate-200 overflow-x-auto -mx-4 px-4 md:mx-0 md:px-0" style="scrollbar-width:none">
-          <button class="class-tab-btn active shrink-0 px-4 py-2.5 rounded-t-xl font-black text-xs uppercase tracking-wider bg-orange-600 text-white transition-colors" data-tab="feed">
-            <i data-lucide="layout" class="w-3.5 h-3.5 inline mr-1"></i>Muro
-          </button>
-          <button class="class-tab-btn shrink-0 px-4 py-2.5 rounded-t-xl font-black text-xs uppercase tracking-wider text-slate-500 hover:bg-slate-100 transition-colors" data-tab="daily-routine">
-            <i data-lucide="clipboard-list" class="w-3.5 h-3.5 inline mr-1"></i>Rutina
-          </button>
-          <button class="class-tab-btn shrink-0 px-4 py-2.5 rounded-t-xl font-black text-xs uppercase tracking-wider text-slate-500 hover:bg-slate-100 transition-colors" data-tab="students">
-            <i data-lucide="users" class="w-3.5 h-3.5 inline mr-1"></i>Alumnos
-          </button>
-          <button class="class-tab-btn shrink-0 px-4 py-2.5 rounded-t-xl font-black text-xs uppercase tracking-wider text-slate-500 hover:bg-slate-100 transition-colors" data-tab="attendance">
-            <i data-lucide="calendar-check" class="w-3.5 h-3.5 inline mr-1"></i>Asistencia
-          </button>
-          <button class="class-tab-btn shrink-0 px-4 py-2.5 rounded-t-xl font-black text-xs uppercase tracking-wider text-slate-500 hover:bg-slate-100 transition-colors" data-tab="tasks">
-            <i data-lucide="backpack" class="w-3.5 h-3.5 inline mr-1"></i>Tareas
-          </button>
-          <button class="class-tab-btn shrink-0 px-4 py-2.5 rounded-t-xl font-black text-xs uppercase tracking-wider text-slate-500 hover:bg-slate-100 transition-colors" data-tab="videocall">
-            <i data-lucide="video" class="w-3.5 h-3.5 inline mr-1"></i>Video
-          </button>
+        <!-- Tabs — compact grid on mobile, horizontal on desktop -->
+        <div class="mb-4">
+          <!-- Mobile: 3x2 grid -->
+          <div class="grid grid-cols-3 gap-2 md:hidden">
+            <button class="class-tab-btn active flex flex-col items-center gap-1 py-2.5 px-2 rounded-2xl font-black text-[10px] uppercase tracking-wider bg-orange-600 text-white transition-all" data-tab="feed">
+              <i data-lucide="layout" class="w-4 h-4"></i><span>Muro</span>
+            </button>
+            <button class="class-tab-btn flex flex-col items-center gap-1 py-2.5 px-2 rounded-2xl font-black text-[10px] uppercase tracking-wider bg-slate-100 text-slate-600 hover:bg-orange-50 hover:text-orange-600 transition-all" data-tab="daily-routine">
+              <i data-lucide="clipboard-list" class="w-4 h-4"></i><span>Rutina</span>
+            </button>
+            <button class="class-tab-btn flex flex-col items-center gap-1 py-2.5 px-2 rounded-2xl font-black text-[10px] uppercase tracking-wider bg-slate-100 text-slate-600 hover:bg-orange-50 hover:text-orange-600 transition-all" data-tab="students">
+              <i data-lucide="users" class="w-4 h-4"></i><span>Alumnos</span>
+            </button>
+            <button class="class-tab-btn flex flex-col items-center gap-1 py-2.5 px-2 rounded-2xl font-black text-[10px] uppercase tracking-wider bg-slate-100 text-slate-600 hover:bg-orange-50 hover:text-orange-600 transition-all" data-tab="attendance">
+              <i data-lucide="calendar-check" class="w-4 h-4"></i><span>Asistencia</span>
+            </button>
+            <button class="class-tab-btn flex flex-col items-center gap-1 py-2.5 px-2 rounded-2xl font-black text-[10px] uppercase tracking-wider bg-slate-100 text-slate-600 hover:bg-orange-50 hover:text-orange-600 transition-all" data-tab="tasks">
+              <i data-lucide="backpack" class="w-4 h-4"></i><span>Tareas</span>
+            </button>
+            <button class="class-tab-btn flex flex-col items-center gap-1 py-2.5 px-2 rounded-2xl font-black text-[10px] uppercase tracking-wider bg-slate-100 text-slate-600 hover:bg-orange-50 hover:text-orange-600 transition-all" data-tab="videocall">
+              <i data-lucide="video" class="w-4 h-4"></i><span>Video</span>
+            </button>
+          </div>
+          <!-- Desktop: horizontal tabs -->
+          <div class="hidden md:flex gap-1 border-b border-slate-200 overflow-x-auto" style="scrollbar-width:none">
+            <button class="class-tab-btn active shrink-0 px-4 py-2.5 rounded-t-xl font-black text-xs uppercase tracking-wider bg-orange-600 text-white transition-colors" data-tab="feed">
+              <i data-lucide="layout" class="w-3.5 h-3.5 inline mr-1"></i>Muro
+            </button>
+            <button class="class-tab-btn shrink-0 px-4 py-2.5 rounded-t-xl font-black text-xs uppercase tracking-wider text-slate-500 hover:bg-slate-100 transition-colors" data-tab="daily-routine">
+              <i data-lucide="clipboard-list" class="w-3.5 h-3.5 inline mr-1"></i>Rutina
+            </button>
+            <button class="class-tab-btn shrink-0 px-4 py-2.5 rounded-t-xl font-black text-xs uppercase tracking-wider text-slate-500 hover:bg-slate-100 transition-colors" data-tab="students">
+              <i data-lucide="users" class="w-3.5 h-3.5 inline mr-1"></i>Alumnos
+            </button>
+            <button class="class-tab-btn shrink-0 px-4 py-2.5 rounded-t-xl font-black text-xs uppercase tracking-wider text-slate-500 hover:bg-slate-100 transition-colors" data-tab="attendance">
+              <i data-lucide="calendar-check" class="w-3.5 h-3.5 inline mr-1"></i>Asistencia
+            </button>
+            <button class="class-tab-btn shrink-0 px-4 py-2.5 rounded-t-xl font-black text-xs uppercase tracking-wider text-slate-500 hover:bg-slate-100 transition-colors" data-tab="tasks">
+              <i data-lucide="backpack" class="w-3.5 h-3.5 inline mr-1"></i>Tareas
+            </button>
+            <button class="class-tab-btn shrink-0 px-4 py-2.5 rounded-t-xl font-black text-xs uppercase tracking-wider text-slate-500 hover:bg-slate-100 transition-colors" data-tab="videocall">
+              <i data-lucide="video" class="w-3.5 h-3.5 inline mr-1"></i>Video
+            </button>
+          </div>
         </div>
 
         <!-- Tab Contents -->
@@ -475,6 +499,7 @@
 
       <!-- SECTION: PROFILE -->
       <section id="t-profile" class="section">
+        <div id="notifPermissionSlot"></div>
         <header class="mb-6">
           <h1 class="text-2xl font-bold text-slate-800">Mi Perfil Docente</h1>
           <p class="text-slate-500">Gestiona tu información personal y presentación.</p>
@@ -864,6 +889,8 @@
 
     <!-- Core App Module -->
     <script type="module" src="js/maestra/main.js"></script>
+    <script src="js/shared/lightbox.js" defer></script>
+    <script src="js/shared/confirm-dialog.js" defer></script>
     <script nomodule>alert("Navegador obsoleto, por favor actualiza.");</script>
     <script src="https://meet.jit.si/external_api.js"></script>
   <script>

@@ -107,32 +107,58 @@ export const PaymentsModule = {
       overdue:    { label: 'Vencido',     cls: 'bg-rose-100 text-rose-700', icon: 'alert-triangle' }
     };
 
+    const isPaid = ['paid', 'confirmado', 'validado'].includes(p.status?.toLowerCase());
     const status = statusMap[p.status?.toLowerCase()] || { label: p.status || '-', cls: 'bg-slate-100 text-slate-600', icon: 'info' };
+    
+    // Cálculo de Mora usando Helpers
     const amount = Number(p.amount || 0);
+    const moraBreakdown = p.due_date && !isPaid ? Helpers.getMoraBreakdown(p.due_date + 'T00:00:00') : null;
+    const currentMora = moraBreakdown ? moraBreakdown.total : 0;
+    const totalToPay = amount + currentMora;
+
     const methodIcon = p.method === 'transferencia' ? '🏦' : '💵';
 
     return `
-      <div class="bg-white p-5 rounded-3xl border border-slate-100 shadow-sm hover:shadow-lg transition-all mb-4 group">
+      <div class="bg-white p-5 rounded-3xl border border-slate-100 shadow-sm hover:shadow-lg transition-all mb-4 group ${moraBreakdown?.total > 0 ? 'border-l-4 border-l-rose-500' : ''}">
         <div class="flex justify-between items-center">
           <div class="flex items-center gap-4">
-            <div class="w-12 h-12 rounded-2xl ${hasEvidence ? 'bg-blue-50 text-blue-600' : 'bg-amber-50 text-amber-600'} flex items-center justify-center text-xl shadow-inner group-hover:scale-110 transition-transform">
-              ${methodIcon}
+            <div class="w-12 h-12 rounded-2xl ${hasEvidence ? 'bg-blue-50 text-blue-600' : (moraBreakdown?.total > 0 ? 'bg-rose-50 text-rose-600' : 'bg-amber-50 text-amber-600')} flex items-center justify-center text-xl shadow-inner group-hover:scale-110 transition-transform">
+              ${moraBreakdown?.total > 0 ? '⚠️' : methodIcon}
             </div>
             <div>
               <p class="font-black text-slate-800 text-base leading-tight">${escapeHtml(p.month_paid || 'Colegiatura')}</p>
               <p class="text-[10px] font-bold text-slate-400 uppercase tracking-widest mt-1">
                 ${Helpers.formatDate(p.created_at)} • ${escapeHtml(p.method || 'Generado por Sistema')}
               </p>
+              ${p.due_date && !isPaid ? `
+                <p class="text-[9px] font-black uppercase tracking-widest mt-1 ${moraBreakdown?.total > 0 ? 'text-rose-500' : 'text-slate-400'}">
+                  Vence: ${new Date(p.due_date + 'T00:00:00').toLocaleDateString('es-DO')}
+                </p>
+              ` : ''}
             </div>
           </div>
           <div class="text-right">
-            <p class="font-black text-slate-900 text-lg leading-none mb-2">${Helpers.formatCurrency(amount)}</p>
+            <p class="font-black text-slate-900 text-lg leading-none mb-2">${Helpers.formatCurrency(isPaid ? amount : totalToPay)}</p>
             <span class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[9px] font-black uppercase tracking-tighter ${status.cls}">
               <i data-lucide="${status.icon}" class="w-3 h-3"></i>
               ${status.label}
             </span>
           </div>
         </div>
+        
+        ${moraBreakdown?.total > 0 ? `
+          <div class="mt-3 p-3 bg-rose-50 rounded-2xl border border-rose-100">
+            <div class="flex justify-between items-center">
+              <span class="text-[10px] font-black text-rose-700 uppercase tracking-widest">Recargo por Mora (${moraBreakdown.formattedText})</span>
+              <span class="text-xs font-black text-rose-700">+${Helpers.formatCurrency(currentMora)}</span>
+            </div>
+            <div class="flex justify-between items-center mt-1 pt-1 border-t border-rose-200/50">
+              <span class="text-[10px] font-black text-slate-500 uppercase">Monto Base</span>
+              <span class="text-xs font-bold text-slate-500">${Helpers.formatCurrency(amount)}</span>
+            </div>
+          </div>
+        ` : ''}
+
         ${hasEvidence ? `
           <div class="mt-4 pt-4 border-t border-slate-50 flex justify-between items-center">
             <p class="text-[10px] font-bold text-slate-400 italic">Comprobante enviado. Esperando validación.</p>

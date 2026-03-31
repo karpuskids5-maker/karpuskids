@@ -11,6 +11,7 @@ import { FeedModule }      from './feed.js';
 import { ProfileModule }   from './profile.js';
 import { GradesModule }    from './grades.js';
 import { initLiveClassListener } from './attendance_live.js';
+import { NotifyPermission } from '../shared/notify-permission.js';
 
 window.App = {
   feed: FeedModule, payments: PaymentsModule, tasks: TasksModule,
@@ -28,7 +29,17 @@ document.addEventListener('DOMContentLoaded', async () => {
     AppState.set('user', auth.user);
     AppState.set('profile', auth.profile);
 
-    try { await initOneSignal(auth.user); } catch (_) {}
+    // ✅ FIX OneSignal: Solo inicializar en el dominio correcto para evitar errores de consola
+    const host = window.location.hostname;
+    const isProd = host === 'karpuskids.com' || host === 'www.karpuskids.com' || host.endsWith('.karpuskids.com') || host === 'localhost';
+    
+    if (isProd) {
+      try { await initOneSignal(auth.user); } catch(e) {
+        console.warn('⚠️ OneSignal error:', e);
+      }
+    } else {
+      console.log('ℹ️ OneSignal skipping: restricted domain');
+    }
 
     const { data: students, error } = await supabase
       .from('students')
@@ -100,7 +111,18 @@ async function refreshDashboard() {
   const student = AppState.get('currentStudent');
   if (!student) return;
 
-  const today = new Date().toISOString().split('T')[0];
+  // Use local date (not UTC) to match what the maestra saves
+  const now   = new Date();
+  const today = now.getFullYear() + '-' +
+    String(now.getMonth() + 1).padStart(2, '0') + '-' +
+    String(now.getDate()).padStart(2, '0');
+
+  // Also try yesterday in case of timezone mismatch
+  const yesterday = new Date(now);
+  yesterday.setDate(yesterday.getDate() - 1);
+  const yd = yesterday.getFullYear() + '-' +
+    String(yesterday.getMonth() + 1).padStart(2, '0') + '-' +
+    String(yesterday.getDate()).padStart(2, '0');
 
   // Carga paralela — allSettled para que un fallo no bloquee el resto
   const [financeRes, academicRes, logsRes, todayAttRes] = await Promise.allSettled([
@@ -112,8 +134,13 @@ async function refreshDashboard() {
 
   const finance  = financeRes.status  === 'fulfilled' ? financeRes.value  : null;
   const academic = academicRes.status === 'fulfilled' ? academicRes.value : null;
-  const logs     = logsRes.status     === 'fulfilled' ? logsRes.value     : null;
+  let   logs     = logsRes.status     === 'fulfilled' ? logsRes.value     : null;
   const todayAtt = todayAttRes.status === 'fulfilled' ? todayAttRes.value?.data : null;
+
+  // Fallback: if today's log is null, try yesterday (timezone mismatch)
+  if (!logs) {
+    try { logs = await Api.getDailyLog(student.id, yd); } catch (_) {}
+  }
 
   if (finance?.config) AppState.set('financeConfig', finance.config);
   AppState.set('todayAttendance', todayAtt?.status || null);
@@ -284,13 +311,15 @@ export function navigateTo(targetId) {
 
     const student = AppState.get('currentStudent');
     switch (targetId) {
-      case 'home':            refreshDashboard(); break;      case 'payments':        PaymentsModule.init(student?.id); break;
+      case 'home':            refreshDashboard(); break;
+      case 'payments':        PaymentsModule.init(student?.id); break;
       case 'tasks':           TasksModule.init(student?.id); break;
       case 'live-attendance': AttendanceModule.init(student?.id); break;
       case 'notifications':   ChatModule.init(); break;
       case 'class':           FeedModule.init(student?.classroom_id); break;
-      case 'profile':         ProfileModule.init(); break;
+      case 'profile':         ProfileModule.init(); NotifyPermission.requestIfNeeded(); break;
       case 'grades':          GradesModule.init(student?.id); break;
+      case 'videocall':       checkActiveMeetings(); break;
     }
   }
 
@@ -373,9 +402,15 @@ function updateHeaderProfile(profile, student) {
   const avatarContainer = document.getElementById('headerStudentAvatar');
   if (avatarContainer) {
     if (student?.avatar_url) {
-      avatarContainer.innerHTML = '<img src="' + student.avatar_url + '" class="w-full h-full object-cover">';
+      avatarContainer.innerHTML =
+        '<img src="' + student.avatar_url + '" ' +
+        'class="w-full h-full object-cover" ' +
+        'onerror="this.style.display=\'none\';this.nextElementSibling.style.display=\'flex\'">' +
+        '<span class="w-full h-full flex items-center justify-center text-lg font-black text-green-700" style="display:none">' +
+        studentName.charAt(0) + '</span>';
     } else {
-      avatarContainer.innerHTML = '<span class="text-lg font-black text-green-700">' + studentName.charAt(0) + '</span>';
+      avatarContainer.innerHTML =
+        '<span class="text-lg font-black text-green-700">' + studentName.charAt(0) + '</span>';
     }
   }
 
@@ -389,13 +424,19 @@ function _initDailyLogRealtime(studentId) {
     .on('postgres_changes', {
       event: '*',
       schema: 'public',
-      table: 'daily_logs',
-      filter: 'student_id=eq.' + studentId
-    }, async () => {
-      // Reload daily summary when maestra updates the log
-      const today = new Date().toISOString().split('T')[0];
-      const log = await Api.getDailyLog(studentId, today);
-      renderDailySummary(log);
+      table: 'daily_logs'
+      // No filter here — filter client-side to avoid bigint cast issues
+    }, async (payload) => {
+      if (String(payload.new?.student_id) !== String(studentId) &&
+          String(payload.old?.student_id) !== String(studentId)) return;
+      const now = new Date();
+      const today = now.getFullYear() + '-' +
+        String(now.getMonth() + 1).padStart(2, '0') + '-' +
+        String(now.getDate()).padStart(2, '0');
+      try {
+        const log = await Api.getDailyLog(studentId, today);
+        renderDailySummary(log);
+      } catch (_) {}
     })
     .subscribe();
 }

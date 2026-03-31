@@ -2,6 +2,7 @@ import { DirectorApi } from './api.js';
 import { Helpers } from '../shared/helpers.js';
 import { UI } from './ui.module.js';
 import { AppState } from './state.js';
+import { supabase, createClient, SUPABASE_URL, SUPABASE_ANON_KEY } from '../shared/supabase.js';
 
 // Vista activa: 'table' | 'grid'
 let _view = 'table';
@@ -279,18 +280,77 @@ export const StudentsModule = {
   async save() {
     const id = document.getElementById('stId')?.value;
     const payload = this.getFormData();
+    
+    // Capturar datos de Auth para nuevo estudiante
+    const emailUser = document.getElementById('stEmailUser')?.value?.trim();
+    const password = document.getElementById('stPassword')?.value?.trim();
 
     if (!payload.name || payload.name.trim().length < 3) return Helpers.toast('Nombre inválido (min 3 caracteres)', 'warning');
     if (!payload.p1_name || !payload.p1_phone || !payload.p1_email) return Helpers.toast('Datos del padre/madre 1 incompletos', 'warning');
     
     UI.setLoading(true);
     try {
-      const res = id 
-        ? await DirectorApi.updateStudent(id, payload)
-        : await DirectorApi.createStudent(payload);
+      let res;
+      if (id) {
+        res = await DirectorApi.updateStudent(id, payload);
+      } else {
+        // Create auth user if email+password provided
+        if (emailUser && password) {
+          const tempClient = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
+            auth: { persistSession: false, autoRefreshToken: false, detectSessionInUrl: false }
+          });
+
+          const { data: authData, error: authError } = await tempClient.auth.signUp({
+            email: emailUser,
+            password: password,
+            options: { data: { name: payload.p1_name, role: 'padre', phone: payload.p1_phone } }
+          });
+
+          let parentId = null;
+
+          if (authError) {
+            // User already exists — look up their profile by email
+            if (authError.message?.toLowerCase().includes('already registered') ||
+                authError.status === 422) {
+              const { data: existing } = await supabase
+                .from('profiles')
+                .select('id')
+                .eq('email', emailUser)
+                .maybeSingle();
+              if (existing?.id) {
+                parentId = existing.id;
+                Helpers.toast('Usuario ya existe — vinculando al estudiante', 'info');
+              } else {
+                throw new Error('El correo ya está registrado pero no tiene perfil. Contacta al administrador.');
+              }
+            } else {
+              throw authError;
+            }
+          } else if (authData?.user) {
+            parentId = authData.user.id;
+          }
+
+          if (parentId) {
+            payload.parent_id = parentId;
+            // Upsert profile to ensure role is set correctly
+            await supabase.from('profiles').upsert({
+              id:    parentId,
+              name:  payload.p1_name,
+              email: emailUser,
+              phone: payload.p1_phone,
+              role:  'padre'
+            }, { onConflict: 'id' });
+          }
+        }
+        
+        res = await DirectorApi.createStudent(payload);
+      }
       
       const { error } = res || {};
-      if (error) throw new Error(error);
+      if (error) {
+        const msg = typeof error === 'string' ? error : (error.message || error.details || JSON.stringify(error));
+        throw new Error(msg);
+      }
       
       Helpers.toast(id ? 'Estudiante actualizado' : 'Estudiante creado', 'success');
       UI.closeModal();
@@ -304,7 +364,11 @@ export const StudentsModule = {
   },
 
   async delete(id) {
-    if (!confirm('¿Seguro que desea eliminar a este estudiante?')) return;
+    const confirmFn = window._karpusConfirmDelete;
+    const ok = confirmFn
+      ? await confirmFn('¿Eliminar estudiante?', 'Esta acción no se puede deshacer. Se perderán todos los datos del estudiante.')
+      : confirm('¿Seguro que desea eliminar a este estudiante?');
+    if (!ok) return;
     try {
       const res = await DirectorApi.deleteStudent(id);
       const { error } = res || {};
@@ -318,26 +382,30 @@ export const StudentsModule = {
   },
 
   getFormData() {
+    const v = (id) => document.getElementById(id)?.value?.trim() || null;
+    const n = (id, def = null) => { const val = parseFloat(document.getElementById(id)?.value); return isNaN(val) ? def : val; };
+    const i = (id, def = 5) => { const val = parseInt(document.getElementById(id)?.value); return isNaN(val) ? def : val; };
+
     return {
-      name: document.getElementById('stName')?.value,
-      classroom_id: document.getElementById('stClassroom')?.value || null,
-      start_date: document.getElementById('stJoinedDate')?.value || new Date().toISOString().split('T')[0],
-      is_active: document.getElementById('active')?.checked,
-      blood_type: document.getElementById('bloodType')?.value,
-      allergies: document.getElementById('allergies')?.value,
-      authorized_pickup: document.getElementById('authorized')?.value,
-      p1_name: document.getElementById('p1Name')?.value,
-      p1_phone: document.getElementById('p1Phone')?.value,
-      p1_job: document.getElementById('p1Profession')?.value,
-      p1_address: document.getElementById('p1Address')?.value,
-      p1_emergency_contact: document.getElementById('p1Emergency')?.value,
-      p1_email: document.getElementById('stEmailNotif')?.value,
-      p2_name: document.getElementById('p2Name')?.value,
-      p2_phone: document.getElementById('p2Phone')?.value,
-      p2_job: document.getElementById('p2Profession')?.value,
-      p2_address: document.getElementById('p2Address')?.value,
-      monthly_fee: parseFloat(document.getElementById('monthlyFee')?.value || 0),
-      due_day: parseInt(document.getElementById('dueDay')?.value || 5)
+      name:                 v('stName'),
+      classroom_id:         v('stClassroom') || null,
+      start_date:           v('stJoinedDate') || new Date().toISOString().split('T')[0],
+      is_active:            document.getElementById('active')?.checked ?? true,
+      blood_type:           v('bloodType'),
+      allergies:            v('allergies'),
+      authorized_pickup:    v('authorized'),
+      p1_name:              v('p1Name'),
+      p1_phone:             v('p1Phone'),
+      p1_job:               v('p1Profession'),
+      p1_address:           v('p1Address'),
+      p1_emergency_contact: v('p1Emergency'),
+      p1_email:             v('stEmailNotif'),
+      p2_name:              v('p2Name'),
+      p2_phone:             v('p2Phone'),
+      p2_job:               v('p2Profession'),
+      p2_address:           v('p2Address'),
+      monthly_fee:          n('monthlyFee', 0),
+      due_day:              i('dueDay', 5)
     };
   },
 

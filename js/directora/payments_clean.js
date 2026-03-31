@@ -113,12 +113,13 @@ export const PaymentsModule = {
   },
 
   _st(p) {
-    if (p.status === 'paid') return 'paid';
-    if (p.status === 'review' || (p.status === 'pending' && p.method === 'transferencia')) return 'review';
-    const t = new Date(); t.setHours(0, 0, 0, 0);
-    const d = p.due_date ? new Date(p.due_date + 'T00:00:00') : null;
-    if (!d) return 'pending';
-    return t > d ? 'overdue' : 'pending';
+    const s = (p.status || '').toLowerCase();
+    if (s === 'paid' || s === 'pagado' || s === 'confirmado') return 'paid';
+    if (s === 'review' || s === 'revision' || s === 'en revision') return 'review';
+    if (s === 'overdue' || s === 'vencido') return 'overdue';
+    // transferencia sin aprobar → review
+    if ((s === 'pending' || s === 'pendiente') && p.method === 'transferencia') return 'review';
+    return 'pending';
   },
 
   _row(p) {

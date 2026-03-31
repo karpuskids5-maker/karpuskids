@@ -104,21 +104,17 @@ export const Helpers = {
  */
 export async function sendEmail(to, subject, html) {
   try {
-    const { data: { session } } = await supabase.auth.getSession();
-    if (!session) throw new Error('Sesión expirada');
-
-    const res = await fetch(`${import.meta.env?.VITE_SUPABASE_URL || ''}/functions/v1/send-email`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        Authorization: `Bearer ${session.access_token}`
-      },
-      body: JSON.stringify({ to, subject, html })
+    const { data, error } = await supabase.functions.invoke('send-email', {
+      body: { to, subject, html }
     });
 
-    return res.ok;
+    if (error) {
+      console.error('Email error:', error);
+      return false;
+    }
+    return true;
   } catch (e) {
-    console.error('Email error:', e);
+    console.error('Email catch error:', e);
     return false;
   }
 }

@@ -191,10 +191,10 @@ export const DirectorApi = {
       const formattedMonth = month.charAt(0).toUpperCase() + month.slice(1);
       
       const [incomeRes, pendingRes, overdueRes, reviewRes] = await Promise.all([
-        supabase.from('payments').select('amount').eq('status', 'paid').ilike('month_paid', formattedMonth),
-        supabase.from('payments').select('id', { count: 'exact', head: true }).eq('status', 'pending'),
-        supabase.from('payments').select('id', { count: 'exact', head: true }).eq('status', 'overdue'),
-        supabase.from('payments').select('id', { count: 'exact', head: true }).eq('status', 'review')
+        supabase.from('payments').select('amount').in('status', ['paid', 'pagado', 'confirmado']).ilike('month_paid', formattedMonth),
+        supabase.from('payments').select('id', { count: 'exact', head: true }).in('status', ['pending', 'pendiente']),
+        supabase.from('payments').select('id', { count: 'exact', head: true }).in('status', ['overdue', 'vencido']),
+        supabase.from('payments').select('id', { count: 'exact', head: true }).in('status', ['review', 'revision', 'en revision'])
       ]);
 
       const income = (incomeRes.data || []).reduce((sum, p) => sum + Number(p.amount), 0);
@@ -202,9 +202,9 @@ export const DirectorApi = {
       return {
         data: {
           incomeMonth: income,
-          pending: pendingRes.count || 0,
-          overdue: overdueRes.count || 0,
-          toApprove: reviewRes.count || 0
+          pending:   pendingRes.count  || 0,
+          overdue:   overdueRes.count  || 0,
+          toApprove: reviewRes.count   || 0
         },
         error: null
       };
@@ -306,7 +306,9 @@ export const DirectorApi = {
     } catch (e) { return logError('getStudents', e); }
   },
   async createStudent(data) {
-    return await supabase.from(TABLES.STUDENTS).insert(data);
+    try {
+      return await supabase.from(TABLES.STUDENTS).insert(data).select().single();
+    } catch (e) { return logError('createStudent', e); }
   },
   async updateStudent(id, data) {
     return await supabase.from(TABLES.STUDENTS).update(data).eq('id', id);

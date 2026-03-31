@@ -696,6 +696,89 @@ export const Helpers = {
 
     link.click();
 
+  },
+
+
+  /**
+   * 💰 Cálculo de Mora (Reglas Exactas)
+   * Del día 1 al 6: RD$50 por día
+   * Día 7: Se convierte en RD$500
+   * Después del día 7: +RD$50 por día
+   * Cada 7 días (bloque): +RD$500
+   * Fórmula: (bloques_7 * 500) + (dias_restantes * 50)
+   */
+  calculateMora(dueDate) {
+
+    if (!dueDate) return 0;
+
+    const today = new Date();
+
+    const limit = new Date(dueDate);
+
+
+    // Diferencia en milisegundos
+
+    const diff = today - limit;
+
+
+    // Convertir a días (floor para días completos de atraso)
+
+    const daysLate = Math.floor(diff / (1000 * 60 * 60 * 24));
+
+
+    if (daysLate <= 0) return 0;
+
+
+    const blocks = Math.floor(daysLate / 7);
+
+    const remainingDays = daysLate % 7;
+
+
+    const totalMora = (blocks * 500) + (remainingDays * 50);
+
+
+    return totalMora;
+
+  },
+
+
+  /**
+   * 💰 Desglose de Mora para UI
+   */
+  getMoraBreakdown(dueDate) {
+
+    const total = Helpers.calculateMora(dueDate);
+
+    if (total === 0) return null;
+
+
+    const today = new Date();
+
+    const limit = new Date(dueDate);
+
+    const daysLate = Math.floor((today - limit) / (1000 * 60 * 60 * 24));
+
+
+    const weeks = Math.floor(daysLate / 7);
+
+    const days = daysLate % 7;
+
+
+    let text = '';
+
+    if (weeks > 0) text += `${weeks} sem `;
+
+    if (days > 0) text += `${days} días`;
+
+
+    return {
+      total,
+      daysLate,
+      weeks,
+      remainingDays: days,
+      formattedText: text.trim()
+    };
+
   }
 
 };

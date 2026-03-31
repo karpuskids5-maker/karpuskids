@@ -270,19 +270,25 @@ export const WallModule = {
       if (p.is_video) {
         mediaHtml = `
           <div class="rounded-2xl overflow-hidden border border-slate-100 mb-4 bg-black">
-            <video src="${p.display_media_url}" controls class="w-full max-h-[400px] mx-auto"></video>
+            <video src="${p.display_media_url}" controls playsinline class="w-full max-h-[500px] mx-auto"></video>
           </div>`;
       } else {
         mediaHtml = `
-          <div class="rounded-2xl overflow-hidden border border-slate-100 mb-4 bg-slate-50 cursor-pointer" onclick="window.open('${p.display_media_url}', '_blank')">
-            <img src="${p.display_media_url}" class="w-full max-h-[400px] object-cover mx-auto" loading="lazy" alt="Post media">
+          <div class="rounded-2xl overflow-hidden border border-slate-100 mb-4 bg-slate-50 cursor-zoom-in"
+               onclick="window.openLightbox('${p.display_media_url}','image')">
+            <img src="${p.display_media_url}"
+                 class="w-full max-h-[480px] object-contain mx-auto"
+                 loading="lazy" alt="Post media" data-no-lightbox>
           </div>`;
       }
     }
 
     const profile = this._appState?.get('profile');
     const isDirectora = profile?.role === 'directora';
-    const canComment = ['directora', 'maestra', 'padre'].includes(profile?.role);
+    const isMaestra   = profile?.role === 'maestra';
+    const isAsistente = profile?.role === 'asistente';
+    const canDelete   = isDirectora || isMaestra || isAsistente;
+    const canComment  = ['directora', 'maestra', 'padre'].includes(profile?.role);
 
     return `
       <div class="bg-white rounded-3xl shadow-sm border border-slate-100 overflow-hidden mb-6" id="post-${p.id}">
@@ -299,8 +305,8 @@ export const WallModule = {
                 </div>
               </div>
             </div>
-            ${isDirectora ? `
-              <button onclick="WallModule.deletePost('${p.id}')" class="text-slate-300 hover:text-red-500 transition-colors"><i data-lucide="trash-2" class="w-4 h-4"></i></button>
+            ${canDelete ? `
+              <button onclick="WallModule.deletePost('${p.id}')" class="text-slate-300 hover:text-red-500 transition-colors p-1 rounded-lg hover:bg-red-50" title="Eliminar publicación"><i data-lucide="trash-2" class="w-4 h-4"></i></button>
             ` : ''}
           </div>
 

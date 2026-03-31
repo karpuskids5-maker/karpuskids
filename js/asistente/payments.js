@@ -30,12 +30,12 @@ function closeGlobalModal() {
 }
 
 function calcStatus(p) {
-  if (p.status === 'paid' || p.status === 'confirmado') return 'paid';
-  if (p.status === 'review' || (p.status === 'pending' && p.method === 'transferencia')) return 'review';
-  const today = new Date(); today.setHours(0, 0, 0, 0);
-  const due = p.due_date ? new Date(p.due_date + 'T00:00:00') : null;
-  if (!due) return 'pending';
-  return today > due ? 'overdue' : 'pending';
+  const s = (p.status || '').toLowerCase();
+  if (s === 'paid' || s === 'pagado' || s === 'confirmado') return 'paid';
+  if (s === 'review' || s === 'revision' || s === 'en revision' ||
+      (s === 'pending' || s === 'pendiente') && p.method === 'transferencia') return 'review';
+  if (s === 'overdue' || s === 'vencido') return 'overdue';
+  return 'pending'; // pending, pendiente, or anything else
 }
 
 export const PaymentsModule = {
@@ -266,18 +266,24 @@ export const PaymentsModule = {
     try {
       const now = new Date();
       const monthStart = now.getFullYear() + '-' + String(now.getMonth() + 1).padStart(2, '0') + '-01T00:00:00.000Z';
+
       const [incomeRes, pendingRes, overdueRes, reviewRes] = await Promise.all([
-        supabase.from('payments').select('amount').eq('status', 'paid').gte('created_at', monthStart),
-        supabase.from('payments').select('*', { count: 'exact', head: true }).eq('status', 'pending'),
-        supabase.from('payments').select('*', { count: 'exact', head: true }).eq('status', 'overdue'),
-        supabase.from('payments').select('*', { count: 'exact', head: true }).in('status', ['review', 'pending']).eq('method', 'transferencia')
+        // Paid: both English and Spanish
+        supabase.from('payments').select('amount').in('status', ['paid', 'pagado', 'confirmado']).gte('created_at', monthStart),
+        // Pending: both English and Spanish
+        supabase.from('payments').select('*', { count: 'exact', head: true }).in('status', ['pending', 'pendiente']),
+        // Overdue: both
+        supabase.from('payments').select('*', { count: 'exact', head: true }).in('status', ['overdue', 'vencido']),
+        // Review: both
+        supabase.from('payments').select('*', { count: 'exact', head: true }).in('status', ['review', 'revision', 'en revision'])
       ]);
+
       const income = (incomeRes.data || []).reduce((s, p) => s + Number(p.amount || 0), 0);
       const set = (id, v) => { const el = document.getElementById(id); if (el) el.textContent = v; };
       set('kpiIncomeMonth', '$' + income.toLocaleString('es-ES', { minimumFractionDigits: 2 }));
       set('kpiPendingCount', pendingRes.count || 0);
       set('kpiOverdueCount', overdueRes.count || 0);
-      set('kpiReviewCount',  reviewRes.count || 0);
+      set('kpiReviewCount',  reviewRes.count  || 0);
     } catch (e) { console.error(e); }
   },
 
@@ -296,7 +302,8 @@ export const PaymentsModule = {
 
       (payments || []).forEach(p => {
         const m = new Date(p.created_at).getMonth();
-        if (p.status === 'paid') paid[m] += Number(p.amount || 0);
+        const s = (p.status || '').toLowerCase();
+        if (s === 'paid' || s === 'pagado' || s === 'confirmado') paid[m] += Number(p.amount || 0);
         else pending[m] += Number(p.amount || 0);
       });
 

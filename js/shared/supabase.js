@@ -90,23 +90,17 @@ export async function subscribeNotifications(userId, onNotif) {
 // ── Email via Resend (Edge Function send-email) ───────────────────────────────
 export async function sendEmail(to, subject, html, text) {
   try {
-    const { data: { session } } = await supabase.auth.getSession();
-    // En local el CORS puede fallar — silencioso
-    const res = await fetch(SUPABASE_URL + '/functions/v1/send-email', {
-      method:  'POST',
-      headers: {
-        'Content-Type':  'application/json',
-        'Authorization': 'Bearer ' + (session?.access_token || SUPABASE_ANON_KEY)
-      },
-      body: JSON.stringify({ to, subject, html, text })
+    const { data, error } = await supabase.functions.invoke('send-email', {
+      body: { to, subject, html, text }
     });
-    if (!res.ok) {
-      console.warn('[sendEmail] HTTP ' + res.status);
+    
+    if (error) {
+      console.warn('[sendEmail] Function error:', error);
       return null;
     }
-    return await res.json();
+    return data;
   } catch (e) {
-    console.warn('[sendEmail] Error (silencioso en local):', e.message);
+    console.warn('[sendEmail] Catch error (silencioso en local):', e.message);
     return null;
   }
 }
@@ -114,27 +108,19 @@ export async function sendEmail(to, subject, html, text) {
 // ── Push via OneSignal (Edge Function send-push) ──────────────────────────────
 export async function sendPush(payload) {
   try {
-    const { data: { session } } = await supabase.auth.getSession();
-    // Use fetch directly with the anon key — avoids JWT verification issues
-    // The Edge Function uses service role internally, so anon key is sufficient for auth header
-    const res = await fetch(SUPABASE_URL + '/functions/v1/send-push', {
-      method: 'POST',
-      headers: {
-        'Content-Type':  'application/json',
-        'Authorization': 'Bearer ' + (session?.access_token || SUPABASE_ANON_KEY),
-        'apikey': SUPABASE_ANON_KEY
-      },
-      body: JSON.stringify(payload)
+    // 🔥 FIX: Usamos supabase.functions.invoke que maneja automáticamente 
+    // la autenticación (JWT) y el apikey correcto.
+    const { data, error } = await supabase.functions.invoke('send-push', {
+      body: payload
     });
 
-    if (!res.ok) {
-      const errText = await res.text().catch(() => res.status);
-      console.warn('[sendPush] HTTP ' + res.status + ':', errText);
+    if (error) {
+      console.warn('[sendPush] Function error:', error);
       return null;
     }
-    return await res.json();
+    return data;
   } catch (e) {
-    console.warn('[sendPush] Error (silencioso):', e.message);
+    console.warn('[sendPush] Catch error (silencioso):', e.message);
     return null;
   }
 }
@@ -142,19 +128,17 @@ export async function sendPush(payload) {
 // ── Eventos del sistema (process-event) ──────────────────────────────────────
 export async function emitEvent(type, data) {
   try {
-    const { data: { session } } = await supabase.auth.getSession();
-    const res = await fetch(SUPABASE_URL + '/functions/v1/process-event', {
-      method:  'POST',
-      headers: {
-        'Content-Type':  'application/json',
-        'Authorization': 'Bearer ' + (session?.access_token || SUPABASE_ANON_KEY)
-      },
-      body: JSON.stringify({ type, data })
+    const { data: resData, error } = await supabase.functions.invoke('process-event', {
+      body: { type, data }
     });
-    if (!res.ok) { console.warn('[emitEvent] HTTP ' + res.status); return null; }
-    return await res.json();
+    
+    if (error) {
+      console.warn('[emitEvent] Function error:', error);
+      return null;
+    }
+    return resData;
   } catch (e) {
-    console.warn('[emitEvent] Error:', e.message);
+    console.warn('[emitEvent] Catch error:', e.message);
     return null;
   }
 }
@@ -191,58 +175,70 @@ export async function notifyReceiptUploaded(studentId, amount, month) {
 
 // ── OneSignal ─────────────────────────────────────────────────────────────────
 export async function initOneSignal(currentUser = null) {
-  let user = currentUser;
-  if (!user) {
-    const { data } = await supabase.auth.getUser();
-    user = data?.user;
-  }
-  if (!user) return;
-
-  // No inicializar OneSignal si no estamos en el dominio de producción
-  if (window.location.hostname !== 'karpuskids.com' && window.location.hostname !== 'www.karpuskids.com') {
-    console.info('[OneSignal] Omitiendo inicialización en entorno local/desarrollo');
-    return;
-  }
-
-  const ONESIGNAL_APP_ID = "47ce2d1e-152e-4ea7-9ddc-8e2142992989";
-
-  if (!document.getElementById('onesignal-sdk')) {
-    const s = document.createElement('script');
-    s.id = 'onesignal-sdk';
-    s.src = "https://cdn.onesignal.com/sdks/web/v16/OneSignalSDK.page.js";
-    s.defer = true;
-    document.head.appendChild(s);
-  }
-
-  window.OneSignal = window.OneSignal || [];
-  window.OneSignalDeferred = window.OneSignalDeferred || [];
-
-  if (window.OneSignalInitialized) return;
-  window.OneSignalInitialized = true;
-
-  OneSignalDeferred.push(async function(OneSignal) {
-    try {
-      const host = window.location.hostname;
-      const isLocal   = host === 'localhost' || host === '127.0.0.1';
-      const isProd    = host === 'karpuskids.com' || host.endsWith('.karpuskids.com');
-      if (!isLocal && !isProd) { console.warn('[OneSignal] Dominio no permitido, omitiendo.'); return; }
-
-      await OneSignal.init({
-        appId: ONESIGNAL_APP_ID,
-        allowLocalhostAsSecureOrigin: true,
-        serviceWorkerParam: { scope: '/' },
-        serviceWorkerPath: 'OneSignalSDKWorker.js',
-        notifyButton: { enable: false }
-      });
-
-      // Vincular usuario externo para targeting por user_id
-      if (OneSignal.User?.externalId !== user.id) {
-        await OneSignal.login(user.id);
-      }
-
-      console.log('[OneSignal] Inicializado para usuario:', user.id);
-    } catch (e) {
-      console.warn('[OneSignal] Error de inicialización:', e.message || e);
+  try {
+    let user = currentUser;
+    if (!user) {
+      const { data } = await supabase.auth.getUser();
+      user = data?.user;
     }
-  });
+    if (!user) return;
+
+    // No inicializar OneSignal si no estamos en el dominio de producción
+    const host = window.location.hostname;
+    const isProd = host === 'karpuskids.com' || host === 'www.karpuskids.com' || host.endsWith('.karpuskids.com');
+    
+    if (!isProd) {
+      console.info('[OneSignal] Omitiendo inicialización en entorno local/desarrollo:', host);
+      return;
+    }
+
+    const ONESIGNAL_APP_ID = "47ce2d1e-152e-4ea7-9ddc-8e2142992989";
+
+    if (!document.getElementById('onesignal-sdk')) {
+      const s = document.createElement('script');
+      s.id = 'onesignal-sdk';
+      s.src = "https://cdn.onesignal.com/sdks/web/v16/OneSignalSDK.page.js";
+      s.defer = true;
+      document.head.appendChild(s);
+    }
+
+    window.OneSignalDeferred = window.OneSignalDeferred || [];
+
+    if (window.OneSignalInitialized) return;
+    window.OneSignalInitialized = true;
+
+    window.OneSignalDeferred.push(async function(OneSignal) {
+      try {
+        // Verificar si ya está inicializado para evitar errores
+        if (typeof OneSignal.isInitialized === 'function' && OneSignal.isInitialized()) {
+          return;
+        }
+
+        await OneSignal.init({
+          appId: ONESIGNAL_APP_ID,
+          allowLocalhostAsSecureOrigin: true,
+          serviceWorkerParam: { scope: '/' },
+          serviceWorkerPath: 'OneSignalSDKWorker.js',
+          notifyButton: { enable: false }
+        });
+
+        // Vincular usuario externo para targeting por user_id
+        // Usamos try/catch específico para el login por si falla IndexedDB
+        try {
+          if (OneSignal.User?.externalId !== user.id) {
+            await OneSignal.login(user.id);
+          }
+        } catch (loginErr) {
+          console.warn('[OneSignal] No se pudo vincular el externalId (posible error de IndexedDB):', loginErr.message);
+        }
+
+        console.log('[OneSignal] Inicializado para usuario:', user.id);
+      } catch (e) {
+        // Este catch maneja el error de "IndexedDB unavailable" o "Internal error opening backing store"
+        console.warn('[OneSignal] Error durante la inicialización diferida:', e.message || e);
+      }
+    });
+  } catch (globalErr) {
+    console.warn('[OneSignal] Error global en initOneSignal:', globalErr.message);
+  }
 }

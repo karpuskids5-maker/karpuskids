@@ -89,9 +89,12 @@ document.addEventListener('DOMContentLoaded', async () => {
   AppState.set('profile', auth.profile);
 
   // 🔔 Inicializar Notificaciones Push
-  // 🔥 FIX: Solo inicializar si estamos en producción para evitar error de dominio
-  if (window.location.hostname === 'karpuskids.com') {
-    try { initOneSignal(auth.user); } catch(e) { console.warn("OneSignal ignored (dev mode):", e); }
+  // 🔥 FIX: Permitir subdominios como www. y otros para la inicialización
+  const host = window.location.hostname;
+  const isProd = host === 'karpuskids.com' || host === 'www.karpuskids.com' || host.endsWith('.karpuskids.com');
+  
+  if (isProd) {
+    try { initOneSignal(auth.user); } catch(e) { console.warn("OneSignal ignored:", e); }
   }
 
   // Identidad
@@ -1369,6 +1372,9 @@ function initNavigation() {
     if (cleanId === 'tasks') initTasks();
     if (cleanId === 'grades') initGrades();
     if (cleanId === 'chat') initChat();
+    if (cleanId === 'profile') {
+      import('../shared/notify-permission.js').then(m => m.NotifyPermission.requestIfNeeded());
+    }
   };
 
   navButtons.forEach(btn => {
@@ -1425,33 +1431,33 @@ function initNavigation() {
  * 📑 Inicializar Tabs Internas de Aula
  */
 function initClassTabs() {
-  const tabBtns = document.querySelectorAll('.class-tab-btn');
+  const tabBtns     = document.querySelectorAll('.class-tab-btn');
   const tabContents = document.querySelectorAll('.class-tab-content');
 
   tabBtns.forEach(btn => {
     btn.onclick = () => {
       const targetTab = btn.dataset.tab;
-      
-      // UI de botones
+
+      // Reset ALL tab buttons (both mobile grid and desktop row)
       tabBtns.forEach(b => {
         b.classList.remove('active', 'bg-orange-600', 'text-white');
-        b.classList.add('text-slate-600', 'hover:bg-slate-100');
+        b.classList.add('bg-slate-100', 'text-slate-600');
       });
+      // Activate clicked button
       btn.classList.add('active', 'bg-orange-600', 'text-white');
-      btn.classList.remove('text-slate-600', 'hover:bg-slate-100');
+      btn.classList.remove('bg-slate-100', 'text-slate-600', 'text-slate-500');
 
-      // UI de contenidos
+      // Show correct content
       tabContents.forEach(c => c.classList.add('hidden'));
-      const targetContent = document.getElementById(`tab-${targetTab}`);
-      if (targetContent) targetContent.classList.remove('hidden');
+      document.getElementById(`tab-${targetTab}`)?.classList.remove('hidden');
 
-      // Cargar data específica
-      if (targetTab === 'feed') WallModule.loadPosts();
+      // Load data
+      if (targetTab === 'feed')          WallModule.loadPosts();
       if (targetTab === 'daily-routine') initRoutine();
-      if (targetTab === 'students') initDashboard(); // Reutiliza el grid de estudiantes
-      if (targetTab === 'attendance') initAttendance();
-      if (targetTab === 'tasks') initTasks();
-      if (targetTab === 'videocall') initVideocall();
+      if (targetTab === 'students')      initDashboard();
+      if (targetTab === 'attendance')    initAttendance();
+      if (targetTab === 'tasks')         initTasks();
+      if (targetTab === 'videocall')     initVideocall();
     };
   });
 }

@@ -11,51 +11,67 @@ export async function initChat() {
 
   try {
     const unreadMap = await ChatModule.getUnreadCounts();
-    const students = AppState.get('students') || [];
+    const students  = AppState.get('students') || [];
+    const user      = AppState.get('user');
+
+    // Build parent contacts from students
     const parentsMap = new Map();
-    
     students.forEach(s => {
       if (s.parent_id) {
         if (!parentsMap.has(s.parent_id)) {
-          parentsMap.set(s.parent_id, {
-            id: s.parent_id,
-            name: s.name,
-            childName: s.name,
-            avatar: s.avatar_url || null
-          });
+          parentsMap.set(s.parent_id, { id: s.parent_id, name: s.name, childName: s.name, avatar: s.avatar_url || null, roleLabel: 'Padre/Madre' });
         } else {
           const p = parentsMap.get(s.parent_id);
-          if (!p.childName.includes(s.name)) {
-            p.childName += `, ${s.name}`;
-          }
+          if (!p.childName.includes(s.name)) p.childName += `, ${s.name}`;
         }
       }
     });
 
-    const contacts = Array.from(parentsMap.values());
+    // Also load directora and asistente profiles
+    const { data: staff } = await import('../../shared/supabase.js').then(m =>
+      m.supabase.from('profiles')
+        .select('id, name, avatar_url, role')
+        .in('role', ['directora', 'asistente'])
+        .neq('id', user?.id || '')
+        .order('name')
+    );
 
-    if (contacts.length === 0) {
-      container.innerHTML = `<div class="p-4 text-center text-slate-400 text-sm">No hay padres registrados aún.</div>`;
+    const staffContacts = (staff || []).map(s => ({
+      id: s.id,
+      name: s.name || s.role,
+      childName: null,
+      avatar: s.avatar_url || null,
+      roleLabel: s.role === 'directora' ? 'Directora' : 'Asistente'
+    }));
+
+    const allContacts = [...staffContacts, ...Array.from(parentsMap.values())];
+
+    if (!allContacts.length) {
+      container.innerHTML = '<div class="p-4 text-center text-slate-400 text-sm">No hay contactos disponibles.</div>';
       return;
     }
 
-    container.innerHTML = contacts.map(c => {
+    container.innerHTML = allContacts.map(c => {
       const unread = unreadMap[c.id] || 0;
+      const label  = c.childName ? `Padre de: ${safeEscapeHTML(c.childName)}` : c.roleLabel;
+      const bgColor = c.roleLabel === 'Directora' ? 'bg-indigo-100 text-indigo-600' :
+                      c.roleLabel === 'Asistente' ? 'bg-teal-100 text-teal-600' :
+                      'bg-orange-100 text-orange-600';
       return `
-      <div onclick="App.selectChatContact('${c.id}', '${safeEscapeHTML(c.name)}', '${safeEscapeHTML(c.childName)}')" 
+      <div onclick="App.selectChatContact('${c.id}', '${safeEscapeHTML(c.name)}', '${safeEscapeHTML(label)}')"
            class="p-3 hover:bg-slate-50 rounded-xl cursor-pointer transition-colors flex items-center gap-3 border-b border-slate-50 last:border-0 relative">
         <div class="relative">
-          <div class="w-10 h-10 rounded-full bg-blue-100 text-blue-600 flex items-center justify-center font-bold">
-            ${c.name.charAt(0)}
+          <div class="w-10 h-10 rounded-full ${bgColor} flex items-center justify-center font-bold overflow-hidden">
+            ${c.avatar ? `<img src="${c.avatar}" class="w-full h-full object-cover">` : c.name.charAt(0)}
           </div>
           ${unread > 0 ? `<div class="absolute -top-1 -right-1 bg-red-500 text-white text-[10px] font-bold px-1.5 py-0.5 rounded-full shadow-sm animate-pulse">${unread}</div>` : ''}
         </div>
         <div class="min-w-0">
           <div class="font-bold text-slate-700 text-sm truncate">${safeEscapeHTML(c.name)}</div>
-          <div class="text-[10px] text-slate-400 truncate">Hijo/a: ${safeEscapeHTML(c.childName)}</div>
+          <div class="text-[10px] text-slate-400 truncate">${label}</div>
         </div>
-      </div>
-    `}).join('');
+      </div>`;
+    }).join('');
 
     const btnSend = document.getElementById('btnSendChatMessage');
     const inputMsg = document.getElementById('chatMessageInput');

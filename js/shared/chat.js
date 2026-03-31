@@ -61,20 +61,29 @@ export const ChatModule = {
 
   /**
    * Carga la conversación privada con otro usuario.
-   * Retorna: { messages: [], conversationId: number | null }
+   * También permite cargar por conversationId directamente (Auditoría)
    */
-  async loadConversation(otherUserId) {
-    const { data, error } = await supabase.rpc('get_direct_messages', {
-      p_other_user_id: otherUserId
-    });
+  async loadConversation(otherUserId, conversationId = null) {
+    if (conversationId) {
+      // Modo Auditoría o acceso directo por ID
+      const { data: messages, error } = await supabase
+        .from('messages')
+        .select('*')
+        .eq('conversation_id', conversationId)
+        .order('created_at', { ascending: true });
 
-    if (error) throw error;
-
-    const messages = data || [];
-    // Si hay mensajes, extraemos el ID de conversación del primero
-    const conversationId = messages.length > 0 ? messages[0].conversation_id : null;
-
-    return { messages, conversationId };
+      if (error) throw error;
+      return { messages: messages || [], conversationId };
+    } else {
+      // Modo normal: buscar por ID de usuario destino
+      const { data, error } = await supabase.rpc('get_direct_messages', {
+        p_other_user_id: otherUserId
+      });
+      if (error) throw error;
+      const messages = data || [];
+      const foundConvId = messages.length > 0 ? messages[0].conversation_id : null;
+      return { messages, conversationId: foundConvId };
+    }
   },
 
   /**
@@ -156,6 +165,18 @@ export const ChatModule = {
   async markAsRead(conversationId) {
     if (!conversationId) return;
     try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return;
+
+      // 🛡️ Verificación de Auditoría:
+      // Solo intentamos marcar como leído si somos participantes del chat.
+      const { data: isParticipant } = await supabase.rpc('user_is_participant', {
+        p_conversation_id: conversationId,
+        p_user_id: user.id
+      });
+
+      if (!isParticipant) return;
+
       await supabase.rpc('mark_conversation_read', { p_conversation_id: conversationId });
     } catch (e) {
       console.warn('Error marcando leído:', e);
@@ -193,23 +214,26 @@ export const ChatModule = {
     // 2. Normalizar para UI tipo Messenger
     return conversations.map(c => {
       if (c.type === 'classroom') {
-        return {
-          conversationId: c.id,
-          name: `Grupo: ${c.classrooms?.name || 'Aula'}`,
-          meta: 'Chat del salón',
-          avatar: null,
-          type: 'classroom'
-        };
+        return { conversationId: c.id, name: `Grupo: ${c.classrooms?.name || 'Aula'}`, meta: 'Chat del salón', avatar: null, type: 'classroom' };
       } else {
+        // Detectar si soy participante
+        const isMeParticipant = c.conversation_participants.some(p => p.user_id === user.id);
+        
+        if (!isMeParticipant && role === 'directora') {
+          // Formato Auditoría: mostrar quién habla con quién
+          const p1 = c.conversation_participants[0]?.profiles?.name || 'Usuario A';
+          const p2 = c.conversation_participants[1]?.profiles?.name || 'Usuario B';
+          return {
+            conversationId: c.id,
+            name: `${p1} ↔ ${p2}`,
+            meta: 'Supervisión de chat',
+            avatar: null,
+            type: 'audit'
+          };
+        }
+
         const other = c.conversation_participants.find(p => p.user_id !== user.id);
-        return {
-          conversationId: c.id,
-          name: other?.profiles?.name || 'Usuario',
-          meta: other?.profiles?.role || '',
-          avatar: other?.profiles?.avatar_url,
-          type: 'direct_message',
-          otherUserId: other?.profiles?.id
-        };
+        return { conversationId: c.id, name: other?.profiles?.name || 'Usuario', meta: other?.profiles?.role || '', avatar: other?.profiles?.avatar_url, type: 'direct_message', otherUserId: other?.profiles?.id };
       }
     });
   },

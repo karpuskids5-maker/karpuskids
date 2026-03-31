@@ -7,6 +7,7 @@ export const RoomsModule = {
   async init() {
     const container = document.getElementById('roomsTable');
     if (!container) return;
+
     container.innerHTML = '<tr><td colspan="4" class="text-center py-8">Cargando...</td></tr>';
     try {
       const res = await DirectorApi.getClassroomsWithOccupancy();
@@ -43,7 +44,7 @@ export const RoomsModule = {
       if (error) throw error;
       Helpers.toast(id ? 'Aula actualizada' : 'Aula creada', 'success');
       UI.closeModal();
-      await this.init();
+      await RoomsModule.init();
     } catch (e) {
       console.error('Error saveRoom:', e);
       Helpers.toast('Error al guardar aula: ' + e.message, 'error');

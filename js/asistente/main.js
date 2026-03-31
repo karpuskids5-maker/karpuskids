@@ -33,7 +33,11 @@ window.App = {
   toggleLike: (pid) => window.App._toggleLike(pid),
   selectChatContact: (uid, name, role) => window.App._selectChatContact(uid, name, role),
   students: StudentsModule,
-  rooms: RoomsModule
+  rooms: RoomsModule,
+  teachers: {
+    openModal:     (id)         => TeachersModule.openModal(id),
+    deleteTeacher: (id, name)   => TeachersModule.deleteTeacher(id, name)
+  }
 };
 
 /**
@@ -48,6 +52,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   
   AppState.set('user', auth.user);
   AppState.set('profile', auth.profile);
+  console.log('👤 Assistant Role Verified:', auth.profile?.role);
 
   // Sidebar profile
   const profile = auth.profile;
@@ -98,6 +103,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   
   // 🔥 EXPOSICIÓN GLOBAL DE MÓDULOS
   window.WallModule = WallModule;
+  window.openTeacherModal = (id) => TeachersModule.openModal(id);
 
   if (window.lucide) window.lucide.createIcons();
 });
@@ -185,6 +191,7 @@ function initNavigation() {
           break;
         case 'perfil':
           initProfile();
+          import('../shared/notify-permission.js').then(m => m.NotifyPermission.requestIfNeeded());
           break;
       }
       loadedSections.add(target);
@@ -203,8 +210,8 @@ function initNavigation() {
   showSection('dashboard');
 
   // 4. Configurar botones de menú móvil y colapsar sidebar
-  const menuBtn = document.getElementById('menuBtn');
-  const sidebar = document.getElementById('sidebar');
+  const menuBtn     = document.getElementById('menuBtn');
+  const sidebar     = document.getElementById('sidebar');
   const toggleSidebar = document.getElementById('toggleSidebar');
   const layoutShell = document.getElementById('layoutShell');
 

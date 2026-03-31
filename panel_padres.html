@@ -371,12 +371,12 @@
         </div>
         <div class="flex items-center gap-4">
           <!-- Botón de refresco eliminado según solicitud -->
-          <div class="hidden md:flex items-center gap-3 text-right">
-            <div>
+          <div class="flex items-center gap-3 text-right">
+            <div class="hidden md:block">
               <p class="text-sm font-black text-slate-700 student-name-display">Cargando...</p>
               <p class="text-xs font-bold text-emerald-600 classroom-name-display bg-emerald-50 border border-emerald-100 px-3 py-0.5 rounded-full inline-block mt-1">Cargando aula...</p>
             </div>
-            <div id="headerStudentAvatar" class="w-12 h-12 rounded-full bg-white border-2 border-slate-100 overflow-hidden shadow-sm">
+            <div id="headerStudentAvatar" class="w-12 h-12 rounded-full bg-emerald-100 border-2 border-emerald-200 overflow-hidden shadow-sm flex items-center justify-center shrink-0">
               <!-- Img injected by JS -->
             </div>
           </div>
@@ -717,6 +717,7 @@
 
         <!-- PERFIL -->
         <section id="profile" class="section hidden">
+          <div id="notifPermissionSlot"></div>
           <div class="bg-white rounded-[2.5rem] shadow-sm border border-slate-100 overflow-hidden min-h-[80vh] flex flex-col">
             <!-- Header Perfil -->
             <div class="p-8 bg-gradient-to-r from-emerald-50 to-teal-50 border-b border-emerald-100 flex flex-col md:flex-row items-center gap-8">
@@ -952,6 +953,8 @@
   
   <!-- Script Principal del Padre -->
   <script type="module" src="js/padre/main.js"></script>
+  <script src="js/shared/lightbox.js" defer></script>
+  <script src="js/shared/confirm-dialog.js" defer></script>
   
   <!-- Lógica PWA Profesional -->
   <script src="js/pwa-install.js" defer></script>
