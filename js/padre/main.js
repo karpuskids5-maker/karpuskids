@@ -152,8 +152,35 @@ async function refreshDashboard() {
   renderHomeCards(student, { finance, academic, todayAtt: todayAtt?.status });
   renderDailySummary(logs);
 
+  // 🚨 Banner de deuda vencida
+  _updateDebtBanner(finance);
+
   // checkActiveMeetings en background — no bloquea las tarjetas
   checkActiveMeetings().catch(() => {});
+}
+
+// ── Banner de deuda vencida ───────────────────────────────────────────────────
+function _updateDebtBanner(finance) {
+  const banner  = document.getElementById('debtBanner');
+  const msgEl   = document.getElementById('debtBannerMsg');
+  if (!banner) return;
+
+  const debt    = finance?.debt?.total || 0;
+  const items   = finance?.debt?.items || [];
+  const overdue = items.filter(p => {
+    const s = (p.status || '').toLowerCase();
+    return s === 'overdue' || s === 'vencido';
+  });
+
+  if (overdue.length > 0 || debt > 0) {
+    banner.classList.remove('hidden');
+    const total = Helpers.formatCurrency(debt);
+    if (msgEl) msgEl.textContent = overdue.length > 0
+      ? `Tienes ${overdue.length} pago(s) vencido(s) · Total: ${total}`
+      : `Saldo pendiente: ${total}. Evita recargos pagando a tiempo.`;
+  } else {
+    banner.classList.add('hidden');
+  }
 }
 
 // ── Tarjetas del Dashboard ────────────────────────────────────────────────────

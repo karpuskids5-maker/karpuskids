@@ -219,6 +219,17 @@ document.addEventListener('DOMContentLoaded', async () => {
     // 🔴 Sistema de badges por sección
     BadgeSystem.init(auth.user.id);
 
+    // 💳 Realtime: alertar cuando un padre sube un comprobante
+    import('./payment-service.js').then(({ PaymentService }) => {
+      PaymentService.subscribeToNewVouchers((p) => {
+        const name   = p.students?.name || 'Un padre';
+        const amount = '$' + Number(p.amount || 0).toLocaleString('es-ES', { minimumFractionDigits: 2 });
+        Helpers.toast(`💳 Nuevo comprobante: ${name} · ${amount}`, 'info', 8000);
+        // Actualizar badge de pagos
+        BadgeSystem.set('pagos', 1);
+      });
+    }).catch(() => {});
+
     // 6. Configurar Logout
     document.getElementById('btnLogout')?.addEventListener('click', async () => {
       await supabase.auth.signOut();

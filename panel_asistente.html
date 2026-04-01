@@ -13,9 +13,6 @@
   <script src="https://cdn.tailwindcss.com"></script>
   <link rel="stylesheet" href="css/layout.css" />
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-  <!-- OneSignal SDK Fix -->
-  <script src="https://cdn.onesignal.com/sdks/web/v16/OneSignalSDK.page.js" defer></script>
-  <script>window.OneSignalDeferred = window.OneSignalDeferred || [];</script>
 
   <script src="https://cdn.jsdelivr.net/npm/lucide@latest/dist/umd/lucide.min.js"></script>
   <script>
@@ -553,6 +550,13 @@
             <button id="btnNewPayment" class="flex items-center gap-2 px-4 py-2.5 bg-teal-600 hover:bg-teal-700 text-white rounded-xl font-black text-xs uppercase tracking-wider shadow-sm transition-all active:scale-95">
               <i data-lucide="plus-circle" class="w-4 h-4"></i> Registrar Pago
             </button>
+          </div>
+        </div>
+
+        <!-- 🔍 COLA DE VERIFICACIÓN — Comprobantes pendientes -->
+        <div class="bg-amber-50 border border-amber-200 rounded-2xl p-4 mb-6">
+          <div id="payment-queue-container">
+            <div class="flex justify-center py-4"><div class="animate-spin w-6 h-6 border-2 border-amber-500 rounded-full border-t-transparent"></div></div>
           </div>
         </div>
 

@@ -178,6 +178,10 @@ function initNavigation() {
       switch (target) {
         case 'pagos':
           await PaymentsModule.init();
+          // Iniciar cola de verificación
+          import('../shared/payment-queue.js').then(m =>
+            m.PaymentQueue.init('payment-queue-container')
+          ).catch(() => {});
           break;
         case 'accesos':
           if (AccessModule.init) AccessModule.init();

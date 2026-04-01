@@ -200,7 +200,8 @@ export async function initOneSignal(currentUser = null) {
     const isIndexedDBAvailable = await new Promise(resolve => {
       try {
         if (!window.indexedDB) return resolve(false);
-        const req = indexedDB.open('_karpus_idb_test');
+        // Intentar una operación real para confirmar acceso (algunos navegadores bloquean el open)
+        const req = indexedDB.open('_karpus_idb_test', 1);
         req.onsuccess = () => { req.result.close(); resolve(true); };
         req.onerror   = () => resolve(false);
         req.onblocked = () => resolve(false);
@@ -214,14 +215,23 @@ export async function initOneSignal(currentUser = null) {
     }
 
     // 🛡️ FIX: Silenciar errores internos de OneSignal si fallan promesas nativas
-    window.addEventListener('unhandledrejection', function(event) {
-      if (event.reason && (event.reason.message?.includes('indexedDB') || event.reason.name === 'UnknownError')) {
-        event.preventDefault(); // Evitar error ruidoso en consola
+    // Este handler debe estar activo ANTES de cargar el script
+    const idbErrorHandler = function(event) {
+      if (event.reason && (
+        event.reason.message?.toLowerCase().includes('indexeddb') || 
+        event.reason.name === 'UnknownError' ||
+        event.reason.message?.toLowerCase().includes('backing store')
+      )) {
+        console.warn('[OneSignal] Error de almacenamiento silenciado (incógnito):', event.reason.message);
+        event.preventDefault();
+        event.stopPropagation();
       }
-    });
+    };
+    window.addEventListener('unhandledrejection', idbErrorHandler);
 
     const ONESIGNAL_APP_ID = "47ce2d1e-152e-4ea7-9ddc-8e2142992989";
 
+    // Inyectar script dinámicamente solo si pasó la prueba de IndexedDB
     if (!document.getElementById('onesignal-sdk')) {
       const s = document.createElement('script');
       s.id = 'onesignal-sdk';
@@ -256,25 +266,20 @@ export async function initOneSignal(currentUser = null) {
 
         // Vincular usuario — con guard completo contra IndexedDB y Conflictos de Identidad
         try {
-          // El error 409 (Conflict) ocurre si intentas vincular una identidad que ya existe.
-          // En v16, login() maneja la sesión del usuario.
           if (OneSignal.User?.externalId !== user.id) {
             console.log('[OneSignal] Vinculando usuario:', user.id);
             await OneSignal.login(user.id);
           }
           console.log('[OneSignal] Inicializado para usuario:', user.id);
         } catch (loginErr) {
-          // El error 409 es común si el usuario ya estaba logueado o hay conflicto de IDs.
-          // Lo tratamos como éxito parcial ya que la suscripción suele estar activa.
           if (loginErr?.message?.includes('409') || loginErr?.status === 409) {
-            console.info('[OneSignal] Usuario ya vinculado (409 Conflict) — continuando.');
+            console.info('[OneSignal] Usuario ya vinculado (409 Conflict).');
           } else {
-            console.info('[OneSignal] login() omitido o fallido:', loginErr?.message ?? loginErr);
+            console.info('[OneSignal] login() omitido:', loginErr?.message ?? loginErr);
           }
         }
 
       } catch (e) {
-        // Captura cualquier crash interno del SDK
         console.info('[OneSignal] SDK error (no crítico):', e?.message ?? e);
       }
     });
