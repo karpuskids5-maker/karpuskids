@@ -12,6 +12,7 @@ import { ProfileModule }   from './profile.js';
 import { GradesModule }    from './grades.js';
 import { initLiveClassListener } from './attendance_live.js';
 import { NotifyPermission } from '../shared/notify-permission.js';
+import { BadgeSystem } from '../shared/badges.js';
 
 window.App = {
   feed: FeedModule, payments: PaymentsModule, tasks: TasksModule,
@@ -94,6 +95,9 @@ document.addEventListener('DOMContentLoaded', async () => {
     // Badge de mensajes no leídos
     loadUnreadBadge();
     initMessageBadgeRealtime();
+
+    // 🔴 Sistema de badges por sección
+    BadgeSystem.init(auth.user.id);
 
     // Realtime: actualizar rutina diaria cuando la maestra la guarda
     _initDailyLogRealtime(currentStudent.id);
@@ -233,7 +237,8 @@ function renderHomeCards(student, data) {
   ];
 
   grid.innerHTML = cards.map(c =>
-    '<div class="bg-white rounded-2xl p-4 border-2 ' + c.color + ' shadow-sm hover:shadow-lg hover:-translate-y-1 transition-all cursor-pointer group" data-target="' + c.target + '">' +
+    '<div class="bg-white rounded-2xl p-4 border-2 ' + c.color + ' shadow-sm hover:shadow-lg hover:-translate-y-1 transition-all cursor-pointer group relative" data-target="' + c.target + '">' +
+      '<span id="badge-card-' + c.target + '" class="hidden absolute -top-1.5 -right-1.5 min-w-[18px] h-[18px] bg-rose-500 text-white text-[9px] font-black rounded-full flex items-center justify-center shadow px-1 z-10">0</span>' +
       '<div class="flex justify-between items-start mb-3">' +
         '<div class="w-11 h-11 rounded-xl ' + c.iconBg + ' flex items-center justify-center text-xl shadow-sm group-hover:scale-110 transition-transform">' + c.icon + '</div>' +
         '<i data-lucide="chevron-right" class="w-4 h-4 text-slate-300 group-hover:text-slate-500 transition-colors mt-1"></i>' +
@@ -308,6 +313,12 @@ export function navigateTo(targetId) {
     target.classList.remove('hidden');
     target.classList.add('active');
     AppState.set('currentSection', targetId);
+
+    // 🔴 Marcar badges como leídos al entrar a la sección
+    BadgeSystem.mark(targetId);
+    // También limpiar badge de la tarjeta del dashboard
+    const cardBadge = document.getElementById('badge-card-' + targetId);
+    if (cardBadge) { cardBadge.classList.add('hidden'); cardBadge.classList.remove('flex'); }
 
     const student = AppState.get('currentStudent');
     switch (targetId) {

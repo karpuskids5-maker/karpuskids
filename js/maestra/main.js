@@ -5,6 +5,7 @@ import { Helpers } from '../shared/helpers.js';
 import { WallModule } from '../shared/wall.js';
 import { ChatModule } from '../shared/chat.js';
 import { VideoCallModule } from '../shared/videocall.js';
+import { BadgeSystem } from '../shared/badges.js';
 
 import * as Attendance from './modules/attendance.js';
 import * as Routine from './modules/routine.js';
@@ -308,23 +309,44 @@ document.addEventListener('DOMContentLoaded', async () => {
     // Badge mensajes no leídos
     loadMaestraUnreadBadge(auth.user.id);
 
+    // 🔴 Sistema de badges por sección
+    BadgeSystem.init(auth.user.id);
+
     // ── Botón hamburguesa móvil ──────────────────────────────────────────────
     const menuBtn = document.getElementById('menuBtn');
     const sidebar  = document.getElementById('sidebar');
     const overlay  = document.getElementById('sidebarOverlay');
 
     if (menuBtn && sidebar) {
-      menuBtn.addEventListener('click', () => {
+      menuBtn.addEventListener('click', (e) => {
+        e.stopPropagation();
         sidebar.classList.toggle('mobile-visible');
-        if (overlay) overlay.classList.toggle('hidden');
+        if (overlay) {
+          overlay.classList.toggle('hidden');
+          overlay.classList.toggle('visible');
+        }
       });
     }
     if (overlay) {
       overlay.addEventListener('click', () => {
         sidebar.classList.remove('mobile-visible');
         overlay.classList.add('hidden');
+        overlay.classList.remove('visible');
       });
     }
+
+    // Cerrar sidebar al hacer click en un link (móvil)
+    sidebar.querySelectorAll('button[data-section]').forEach(btn => {
+      btn.addEventListener('click', () => {
+        if (window.innerWidth <= 768) {
+          sidebar.classList.remove('mobile-visible');
+          if (overlay) {
+            overlay.classList.add('hidden');
+            overlay.classList.remove('visible');
+          }
+        }
+      });
+    });
 
     // ── Botón colapsar sidebar desktop ───────────────────────────────────────
     const toggleBtn  = document.getElementById('toggleSidebar');
@@ -1375,6 +1397,9 @@ function initNavigation() {
     if (cleanId === 'profile') {
       import('../shared/notify-permission.js').then(m => m.NotifyPermission.requestIfNeeded());
     }
+
+    // 🔴 Marcar badge como leído al entrar a la sección
+    BadgeSystem.mark(fullId);
   };
 
   navButtons.forEach(btn => {
@@ -1410,6 +1435,9 @@ function initNavigation() {
    if (nameEl) nameEl.textContent = classroom.name;
 
   // 2. Cambiar a la sección de detalle
+  const layoutShell = document.getElementById('layoutShell');
+  if (layoutShell) layoutShell.scrollTop = 0;
+
   if (window.App.setActiveSection) {
     window.App.setActiveSection('t-class-detail');
   } else {
@@ -1930,8 +1958,8 @@ async function initGrades() {
     }
 
     content.innerHTML =
-      '<div class="responsive-panel">' +
-        '<table class="table-responsive text-sm text-left">' +
+      '<div class="w-full overflow-x-auto rounded-3xl border border-slate-100 shadow-sm bg-white">' +
+        '<table class="w-full text-sm text-left min-w-[640px]">' +
           '<thead class="bg-slate-50 text-slate-500 font-black uppercase text-[10px] tracking-wider">' +
             '<tr>' +
               '<th class="px-5 py-4">Estudiante</th>' +

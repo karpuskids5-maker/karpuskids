@@ -116,9 +116,8 @@ export async function selectChatContact(userId, name, meta) {
   const listPanel = document.getElementById('chatListPanel');
   const convPanel = document.getElementById('chatConversationPanel');
   if (listPanel && convPanel) {
-    listPanel.classList.add('chat-hidden');
-    convPanel.classList.remove('chat-hidden');
-    convPanel.classList.add('flex');
+    listPanel.classList.add('hidden');
+    convPanel.classList.add('active');
   }
 
   const header = document.getElementById('chatActiveHeader');
@@ -148,13 +147,15 @@ export async function selectChatContact(userId, name, meta) {
 
   // Back button — return to list on mobile
   const backBtn = document.getElementById('chatBackBtn');
-  if (backBtn && !backBtn._bound) {
-    backBtn._bound = true;
-    backBtn.addEventListener('click', () => {
+  if (backBtn) {
+    // Siempre remover el listener anterior si existe para evitar duplicados
+    const newBackBtn = backBtn.cloneNode(true);
+    backBtn.parentNode.replaceChild(newBackBtn, backBtn);
+    
+    newBackBtn.addEventListener('click', () => {
       if (listPanel && convPanel) {
-        convPanel.classList.add('chat-hidden');
-        convPanel.classList.remove('flex');
-        listPanel.classList.remove('chat-hidden');
+        convPanel.classList.remove('active');
+        listPanel.classList.remove('hidden');
       }
     });
   }

@@ -12,6 +12,13 @@ import { AttendanceModule } from './attendance.module.js';
 import { ChatModule } from './chat.module.js';
 import { InquiriesModule } from './inquiries.module.js';
 import { RoomsModule } from './rooms.module.js';
+const debounce = (fn, delay) => {
+  let timeout;
+  return (...args) => {
+    clearTimeout(timeout);
+    timeout = setTimeout(() => fn(...args), delay);
+  };
+};
 
 window.App = {
   navigation: { goTo: goToSection },
@@ -23,7 +30,13 @@ window.App = {
   grades: GradesModule,
   ui: { ...UIHelpers, ...DirectorUI },
   inquiries: InquiriesModule,
-  chat: ChatModule,
+  chat: {
+    ...ChatModule,
+    toggleMobileView: (show) => {
+      const container = document.getElementById('chatAppContainer');
+      if (container) container.classList.toggle('show-chat', show);
+    }
+  },
   wall: {
     toggleCommentSection: (pid) => WallModule.toggleCommentSection(pid),
     sendComment: (pid) => WallModule.sendComment(pid),
@@ -64,14 +77,11 @@ export function goToSection(sectionId) {
     AppState.set('currentSection', sectionId);
     
     // 2. Carga bajo demanda por módulo
-    switch(sectionId) {
-      case 'dashboard': 
-        DashboardService.getFullData(true).then(data => DirectorUI.renderDashboard(data)); 
-        break;
+    switch (sectionId) {
       case 'maestros': TeachersModule.init(); break;
       case 'estudiantes': StudentsModule.init(); break;
-      case 'aulas': RoomsModule.init(); break; // No hay cambios en aulas
-      case 'asistencia': AttendanceModule.init(); break; // No hay cambios en asistencia
+      case 'aulas': RoomsModule.init(); break;
+      case 'asistencia': AttendanceModule.init(); break;
       case 'calificaciones': GradesModule.init(); break;
       case 'pagos': PaymentsModule.init(); break;
       case 'comunicacion': ChatModule.init(); break;
@@ -94,9 +104,10 @@ export function goToSection(sectionId) {
 
   // Cerrar sidebar en móvil si está abierto
   const sidebar = document.getElementById('sidebar');
+  const overlay = document.getElementById('sidebarOverlay');
   if (sidebar && window.innerWidth < 768) {
     sidebar.classList.remove('mobile-visible');
-    document.getElementById('sidebarOverlay')?.classList.add('hidden');
+    overlay?.classList.add('hidden');
   }
 }
 
@@ -164,10 +175,34 @@ document.addEventListener('DOMContentLoaded', async () => {
     // 5. Iniciar Dashboard por defecto
     goToSection('dashboard');
 
-    // 5b. Botón refresh dashboard
-    document.getElementById('btnRefreshDashboard')?.addEventListener('click', () => {
-      DashboardService.invalidateCache();
-      DashboardService.getFullData(true).then(data => DirectorUI.renderDashboard(data));
+    // 5b. Buscadores en tiempo real (Debounced)
+    const setupSearch = (id, module) => {
+      const el = document.getElementById(id);
+      if (!el) return;
+
+      el.addEventListener('input', debounce((e) => {
+        const value = e.target.value.toLowerCase();
+        if (window.App[module] && window.App[module].filter) {
+          window.App[module].filter(value);
+        }
+      }, 300));
+    };
+
+    setupSearch('searchTeacher', 'teachers');
+    setupSearch('searchStudent', 'students');
+    setupSearch('searchGradeStudent', 'grades');
+    setupSearch('searchPaymentStudent', 'payments');
+    setupSearch('wallSearch', 'wall');
+    setupSearch('chatSearchInput', 'chat');
+
+    // 5c. Interacciones de Chat en Móvil
+    document.getElementById('chatBackBtn')?.addEventListener('click', () => {
+      window.App.chat.toggleMobileView(false);
+    });
+    document.getElementById('chatContactsList')?.addEventListener('click', (e) => {
+      if (e.target.closest('.chat-contact-item') || e.target.closest('[onclick*="chat.select"]')) {
+        window.App.chat.toggleMobileView(true);
+      }
     });
 
     // 5c. Badge de mensajes no leídos (directora)
@@ -181,21 +216,19 @@ document.addEventListener('DOMContentLoaded', async () => {
 
     // 7. Mobile sidebar hamburger
     const menuBtn = document.getElementById('menuBtn');
-    const sidebar  = document.getElementById('sidebar');
-    const overlay  = document.getElementById('sidebarOverlay');
+    const sidebar = document.getElementById('sidebar');
+    const overlay = document.getElementById('sidebarOverlay');
 
     if (menuBtn && sidebar) {
       menuBtn.addEventListener('click', () => {
         sidebar.classList.toggle('mobile-visible');
-        if (overlay) overlay.classList.toggle('hidden');
+        overlay?.classList.toggle('hidden');
       });
     }
-    if (overlay) {
-      overlay.addEventListener('click', () => {
-        sidebar.classList.remove('mobile-visible');
-        overlay.classList.add('hidden');
-      });
-    }
+    overlay?.addEventListener('click', () => {
+      sidebar.classList.remove('mobile-visible');
+      overlay.classList.add('hidden');
+    });
 
     // 7. Configurar guardado de perfil
     document.getElementById('btnSaveMainConfig')?.addEventListener('click', async () => {

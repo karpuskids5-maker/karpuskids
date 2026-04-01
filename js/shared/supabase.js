@@ -219,9 +219,27 @@ export async function initOneSignal(currentUser = null) {
     if (window.OneSignalInitialized) return;
     window.OneSignalInitialized = true;
 
+    // ✅ FIX: Verificar IndexedDB disponible ANTES de inicializar OneSignal
+    // En algunos navegadores móviles (modo privado, iOS WebView) IndexedDB falla
+    const isIndexedDBAvailable = await new Promise(resolve => {
+      try {
+        const req = indexedDB.open('_karpus_idb_test');
+        req.onsuccess = () => { req.result.close(); resolve(true); };
+        req.onerror  = () => resolve(false);
+        req.onblocked = () => resolve(false);
+        // Timeout de seguridad
+        setTimeout(() => resolve(false), 1500);
+      } catch (_) { resolve(false); }
+    });
+
+    if (!isIndexedDBAvailable) {
+      console.info('[OneSignal] IndexedDB no disponible — notificaciones push desactivadas en este dispositivo.');
+      window.OneSignalInitialized = false; // permitir reintento si se recarga
+      return;
+    }
+
     window.OneSignalDeferred.push(async function(OneSignal) {
       try {
-        // Verificar si ya está inicializado para evitar errores
         if (typeof OneSignal.isInitialized === 'function' && OneSignal.isInitialized()) {
           return;
         }
@@ -235,31 +253,28 @@ export async function initOneSignal(currentUser = null) {
           welcomeNotification: { disable: false }
         });
 
-        // ✅ Pedir permiso de forma proactiva si es necesario (v16 compatible)
+        // Pedir permiso si aún no se ha dado
         try {
-          if (OneSignal.Notifications.permissionNative === 'default') {
-            console.log('[OneSignal] Solicitando permisos de notificación...');
+          if (OneSignal.Notifications?.permissionNative === 'default') {
             await OneSignal.Notifications.requestPermission();
           }
-        } catch (permErr) {
-          console.warn('[OneSignal] No se pudo solicitar permiso:', permErr.message);
-        }
+        } catch (_) { /* silencioso */ }
 
-        // Vincular usuario externo para targeting por user_id
-        // Usamos try/catch específico para el login por si falla IndexedDB
+        // Vincular usuario — con guard completo contra IndexedDB
         try {
           const currentExtId = await OneSignal.User?.getExternalId?.();
           if (currentExtId !== user.id) {
             await OneSignal.login(user.id);
           }
+          console.log('[OneSignal] Inicializado para usuario:', user.id);
         } catch (loginErr) {
-          console.warn('[OneSignal] No se pudo vincular el externalId (posible error de IndexedDB):', loginErr.message);
+          // Error esperado en algunos dispositivos — no es crítico
+          console.info('[OneSignal] login() omitido:', loginErr?.message ?? loginErr);
         }
 
-        console.log('[OneSignal] Inicializado para usuario:', user.id);
       } catch (e) {
-        // Este catch maneja el error de "IndexedDB unavailable" o "Internal error opening backing store"
-        console.warn('[OneSignal] Error durante la inicialización diferida:', e.message || e);
+        // Captura cualquier crash interno del SDK (IndexedDB, Qe, etc.)
+        console.info('[OneSignal] SDK error (no crítico):', e?.message ?? e);
       }
     });
   } catch (globalErr) {

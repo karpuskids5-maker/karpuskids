@@ -10,6 +10,7 @@ import { ChatModule } from '../shared/chat.js';
 import { StudentsModule } from './modules/students.js';
 import { RoomsModule } from './modules/rooms.js';
 import { DashboardModule } from './modules/dashboard.js';
+import { BadgeSystem } from '../shared/badges.js';
 
 // 🚀 Definir objeto App globalmente para evitar ReferenceError en onclicks del HTML
 window.App = {
@@ -53,6 +54,9 @@ document.addEventListener('DOMContentLoaded', async () => {
   AppState.set('user', auth.user);
   AppState.set('profile', auth.profile);
   console.log('👤 Assistant Role Verified:', auth.profile?.role);
+
+  // 🔴 Sistema de badges por sección
+  BadgeSystem.init(auth.user.id);
 
   // Sidebar profile
   const profile = auth.profile;
@@ -156,6 +160,9 @@ function initNavigation() {
     }
     
     AppState.set('currentSection', target);
+
+    // 🔴 Marcar badge como leído al entrar a la sección
+    BadgeSystem.mark(target);
 
     // 3. Cerrar sidebar en móvil automáticamente al cambiar de sección
     const sidebar = document.getElementById('sidebar');

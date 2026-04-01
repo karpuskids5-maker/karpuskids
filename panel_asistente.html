@@ -197,17 +197,20 @@
           <i data-lucide="layout-dashboard" class="w-5 h-5 shrink-0"></i>
           <span class="label">Resumen</span>
         </button>
-        <button data-section="estudiantes" class="nav-btn w-full flex items-center gap-3 p-3 rounded-lg text-white hover:bg-white/20 transition-colors">
+        <button data-section="estudiantes" class="nav-btn w-full flex items-center gap-3 p-3 rounded-lg text-white hover:bg-white/20 transition-colors relative">
           <i data-lucide="users" class="w-5 h-5 shrink-0"></i>
           <span class="label">Estudiantes</span>
+          <span id="badge-estudiantes" class="hidden absolute top-1 right-1 min-w-[16px] h-4 bg-rose-500 text-white text-[9px] font-black rounded-full flex items-center justify-center px-1 shadow">0</span>
         </button>
-        <button data-section="maestros" class="nav-btn w-full flex items-center gap-3 p-3 rounded-lg text-white hover:bg-white/20 transition-colors">
+        <button data-section="maestros" class="nav-btn w-full flex items-center gap-3 p-3 rounded-lg text-white hover:bg-white/20 transition-colors relative">
           <i data-lucide="graduation-cap" class="w-5 h-5 shrink-0"></i>
           <span class="label">Maestros</span>
+          <span id="badge-maestros" class="hidden absolute top-1 right-1 min-w-[16px] h-4 bg-rose-500 text-white text-[9px] font-black rounded-full flex items-center justify-center px-1 shadow">0</span>
         </button>
-        <button data-section="muro" class="nav-btn w-full flex items-center gap-3 p-3 rounded-lg text-white hover:bg-white/20 transition-colors">
+        <button data-section="muro" class="nav-btn w-full flex items-center gap-3 p-3 rounded-lg text-white hover:bg-white/20 transition-colors relative">
           <i data-lucide="layout" class="w-5 h-5 shrink-0"></i>
           <span class="label">Muro Escolar</span>
+          <span id="badge-muro" class="hidden absolute top-1 right-1 min-w-[16px] h-4 bg-rose-500 text-white text-[9px] font-black rounded-full flex items-center justify-center px-1 shadow">0</span>
         </button>
         <button data-section="aulas" class="nav-btn w-full flex items-center gap-3 p-3 rounded-lg text-white hover:bg-white/20 transition-colors">
           <i data-lucide="home" class="w-5 h-5 shrink-0"></i>
@@ -217,13 +220,15 @@
           <i data-lucide="door-open" class="w-5 h-5 shrink-0"></i>
           <span class="label">Accesos</span>
         </button>
-        <button data-section="pagos" class="nav-btn w-full flex items-center gap-3 p-3 rounded-lg text-white hover:bg-white/20 transition-colors">
+        <button data-section="pagos" class="nav-btn w-full flex items-center gap-3 p-3 rounded-lg text-white hover:bg-white/20 transition-colors relative">
           <i data-lucide="credit-card" class="w-5 h-5 shrink-0"></i>
           <span class="label">Pagos</span>
+          <span id="badge-pagos" class="hidden absolute top-1 right-1 min-w-[16px] h-4 bg-rose-500 text-white text-[9px] font-black rounded-full flex items-center justify-center px-1 shadow">0</span>
         </button>
-        <button data-section="chat" class="nav-btn w-full flex items-center gap-3 p-3 rounded-lg text-white hover:bg-white/20 transition-colors">
+        <button data-section="chat" class="nav-btn w-full flex items-center gap-3 p-3 rounded-lg text-white hover:bg-white/20 transition-colors relative">
           <i data-lucide="message-square" class="w-5 h-5 shrink-0"></i>
           <span class="label">Chat</span>
+          <span id="badge-chat" class="hidden absolute top-1 right-1 min-w-[16px] h-4 bg-rose-500 text-white text-[9px] font-black rounded-full flex items-center justify-center px-1 shadow">0</span>
         </button>
         <button data-section="perfil" class="nav-btn w-full flex items-center gap-3 p-3 rounded-lg text-white hover:bg-white/20 transition-colors">
           <i data-lucide="user-circle" class="w-5 h-5 shrink-0"></i>
