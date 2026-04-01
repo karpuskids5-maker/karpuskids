@@ -185,6 +185,10 @@ export const GradesModule = {
 
     tableBody.innerHTML = filtered.map(s => {
       const level = getLevel(s.avg);
+      const taskCount = s.evidences.length;
+      const rateBar = taskCount > 0 ? Math.min(100, Math.round((s.avg / 5) * 100)) : 0;
+      const barColor = rateBar >= 80 ? 'bg-emerald-500' : rateBar >= 60 ? 'bg-amber-500' : 'bg-rose-500';
+
       return `
         <tr class="hover:bg-slate-50 border-b border-slate-100 transition-all cursor-pointer group" 
             ondblclick="App.grades.openStudentDetail('${s.sid}')">
@@ -200,9 +204,14 @@ export const GradesModule = {
             </div>
           </td>
           <td class="px-6 py-4 text-center">
-            <span class="px-3 py-1.5 rounded-xl bg-slate-100 text-slate-700 font-black text-sm border border-slate-200">
-              ${s.avg.toFixed(1)}
-            </span>
+            <div class="flex flex-col items-center gap-1">
+              <span class="px-3 py-1.5 rounded-xl bg-slate-100 text-slate-700 font-black text-sm border border-slate-200">
+                ${s.avg.toFixed(1)}
+              </span>
+              <div class="w-16 bg-slate-100 rounded-full h-1 overflow-hidden">
+                <div class="${barColor} h-full rounded-full" style="width:${rateBar}%"></div>
+              </div>
+            </div>
           </td>
           <td class="px-6 py-4 text-center">
             <span class="px-3 py-1 rounded-full text-[10px] font-black uppercase shadow-sm ${level.cls}">
@@ -210,13 +219,15 @@ export const GradesModule = {
             </span>
           </td>
           <td class="px-6 py-4">
-             <div class="flex items-center gap-2">
-                <div class="w-2 h-2 rounded-full bg-indigo-400"></div>
-                <div>
-                   <div class="text-xs font-bold text-slate-700 truncate max-w-[200px]">${Helpers.escapeHTML(s.lastTask?.tasks?.title || 'Sin tareas')}</div>
-                   <div class="text-[9px] text-slate-400 font-bold uppercase">${s.lastTask ? new Date(s.lastTask.created_at).toLocaleDateString() : '—'}</div>
-                </div>
-             </div>
+            <div class="flex items-center gap-3">
+              <span class="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[10px] font-black bg-indigo-50 text-indigo-600 border border-indigo-100 shrink-0">
+                <i data-lucide="file-check" class="w-3 h-3"></i>${taskCount} tarea${taskCount !== 1 ? 's' : ''}
+              </span>
+              <div class="min-w-0">
+                <div class="text-xs font-bold text-slate-700 truncate max-w-[160px]">${Helpers.escapeHTML(s.lastTask?.tasks?.title || 'Sin tareas')}</div>
+                <div class="text-[9px] text-slate-400 font-bold uppercase">${s.lastTask ? new Date(s.lastTask.created_at).toLocaleDateString() : '—'}</div>
+              </div>
+            </div>
           </td>
         </tr>`;
     }).join('');

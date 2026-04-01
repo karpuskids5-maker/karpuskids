@@ -272,11 +272,13 @@ export async function initOneSignal(currentUser = null) {
           }
           console.log('[OneSignal] Inicializado para usuario:', user.id);
         } catch (loginErr) {
-          if (loginErr?.message?.includes('409') || loginErr?.status === 409) {
-            console.info('[OneSignal] Usuario ya vinculado (409 Conflict).');
-          } else {
-            console.info('[OneSignal] login() omitido:', loginErr?.message ?? loginErr);
+          const errMsg = loginErr?.message?.toLowerCase() || "";
+          if (errMsg.includes('409') || loginErr?.status === 409 || errMsg.includes('conflict')) {
+            // El error 409 es un conflicto de identidad esperado si ya existe el alias.
+            // No lo reportamos como error ya que el usuario queda vinculado de todos modos.
+            return; 
           }
+          console.info('[OneSignal] login() omitido:', loginErr?.message ?? loginErr);
         }
 
       } catch (e) {

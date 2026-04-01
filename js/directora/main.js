@@ -220,15 +220,8 @@ document.addEventListener('DOMContentLoaded', async () => {
     BadgeSystem.init(auth.user.id);
 
     // 💳 Realtime: alertar cuando un padre sube un comprobante
-    import('./payment-service.js').then(({ PaymentService }) => {
-      PaymentService.subscribeToNewVouchers((p) => {
-        const name   = p.students?.name || 'Un padre';
-        const amount = '$' + Number(p.amount || 0).toLocaleString('es-ES', { minimumFractionDigits: 2 });
-        Helpers.toast(`💳 Nuevo comprobante: ${name} · ${amount}`, 'info', 8000);
-        // Actualizar badge de pagos
-        BadgeSystem.set('pagos', 1);
-      });
-    }).catch(() => {});
+    // Se eliminó la importación de payment-service.js (404)
+    // El monitoreo de pagos se maneja ahora dentro del PaymentsModule o vía Supabase directamente si es necesario.
 
     // 6. Configurar Logout
     document.getElementById('btnLogout')?.addEventListener('click', async () => {
@@ -242,31 +235,32 @@ document.addEventListener('DOMContentLoaded', async () => {
     const overlay = document.getElementById('sidebarOverlay');
 
     const openSidebar = () => {
-      sidebar?.classList.add('mobile-visible');
-      if (overlay) { overlay.style.display = 'block'; }
+      if (sidebar) sidebar.style.transform = 'translateX(0)';
+      if (overlay) { 
+        overlay.style.display = 'block';
+        setTimeout(() => overlay.style.opacity = '1', 10);
+      }
     };
     const closeSidebar = () => {
-      sidebar?.classList.remove('mobile-visible');
-      if (overlay) { overlay.style.display = 'none'; }
+      if (sidebar) sidebar.style.transform = 'translateX(-100%)';
+      if (overlay) {
+        overlay.style.opacity = '0';
+        setTimeout(() => overlay.style.display = 'none', 300);
+      }
     };
 
     menuBtn?.addEventListener('click', (e) => {
       e.stopPropagation();
-      if (sidebar?.classList.contains('mobile-visible')) {
-        closeSidebar();
-      } else {
-        openSidebar();
-      }
+      openSidebar();
     });
 
     overlay?.addEventListener('click', closeSidebar);
 
-    // Cerrar al hacer clic fuera del sidebar en móvil
-    document.addEventListener('click', (e) => {
-      if (window.innerWidth >= 768) return;
-      if (!sidebar?.contains(e.target) && !menuBtn?.contains(e.target)) {
-        closeSidebar();
-      }
+    // Cerrar sidebar al hacer click en cualquier link (móvil)
+    sidebar?.querySelectorAll('.nav-btn').forEach(btn => {
+      btn.addEventListener('click', () => {
+        if (window.innerWidth <= 768) closeSidebar();
+      });
     });
 
     // 7. Configurar guardado de perfil

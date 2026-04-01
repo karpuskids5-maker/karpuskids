@@ -150,6 +150,29 @@ export const AttendanceModule = {
       return;
     }
 
+    // ✅ MEJORA: En modo rango, agrupar por estudiante y mostrar conteos
+    if (this._mode === 'range') {
+      this._renderTableGrouped(tbody, rows);
+    } else {
+      this._renderTableFlat(tbody, rows);
+    }
+
+    if (window.lucide) lucide.createIcons();
+  },
+
+  /** Vista por día — una fila por registro (comportamiento original) */
+  _renderTableFlat(tbody, rows) {
+    // Restaurar headers para vista plana
+    const head = document.getElementById('attTableHead');
+    if (head) {
+      head.innerHTML = `<tr class="bg-slate-50 border-b border-slate-100">
+        <th class="px-5 py-3 text-left text-[10px] font-black text-slate-400 uppercase tracking-wider">Estudiante</th>
+        <th class="px-5 py-3 text-center text-[10px] font-black text-slate-400 uppercase tracking-wider">Estado</th>
+        <th class="px-5 py-3 text-center text-[10px] font-black text-slate-400 uppercase tracking-wider">Fecha</th>
+        <th class="px-5 py-3 text-center text-[10px] font-black text-slate-400 uppercase tracking-wider">Entrada</th>
+        <th class="px-5 py-3 text-center text-[10px] font-black text-slate-400 uppercase tracking-wider">Salida</th>
+      </tr>`;
+    }
     tbody.innerHTML = rows.map(r => {
       const s   = STATUS[norm(r.status)] || STATUS.absent;
       const ini = r.student?.name?.charAt(0)?.toUpperCase() || '?';
@@ -179,8 +202,84 @@ export const AttendanceModule = {
         <td class="px-5 py-3.5 text-center text-[11px] font-bold text-slate-600">${checkOut}</td>
       </tr>`;
     }).join('');
+  },
 
-    if (window.lucide) lucide.createIcons();
+  /** Vista por periodo — UNA fila por estudiante con conteos de presentes/ausentes/tardanzas */
+  _renderTableGrouped(tbody, rows) {
+    // Actualizar headers para vista agrupada
+    const head = document.getElementById('attTableHead');
+    if (head) {
+      head.innerHTML = `<tr class="bg-slate-50 border-b border-slate-100">
+        <th class="px-5 py-3 text-left text-[10px] font-black text-slate-400 uppercase tracking-wider">Estudiante</th>
+        <th class="px-5 py-3 text-center text-[10px] font-black text-slate-400 uppercase tracking-wider">Presentes</th>
+        <th class="px-5 py-3 text-center text-[10px] font-black text-slate-400 uppercase tracking-wider">Ausencias / Tardanzas</th>
+        <th class="px-5 py-3 text-center text-[10px] font-black text-slate-400 uppercase tracking-wider">Asistencia %</th>
+        <th class="px-5 py-3 text-center text-[10px] font-black text-slate-400 uppercase tracking-wider">Último registro</th>
+      </tr>`;
+    }
+    const map = new Map();
+    rows.forEach(r => {
+      const sid = r.student?.id || r.student_id || 'unknown';
+      if (!map.has(sid)) {
+        map.set(sid, {
+          student:  r.student,
+          classroom: r.classroom,
+          present: 0, absent: 0, late: 0, total: 0,
+          lastDate: r.date
+        });
+      }
+      const g = map.get(sid);
+      const k = norm(r.status);
+      if (['present','presente'].includes(k))   g.present++;
+      else if (['absent','ausente'].includes(k)) g.absent++;
+      else if (['late','tarde'].includes(k))     g.late++;
+      g.total++;
+      if (r.date > g.lastDate) g.lastDate = r.date;
+    });
+
+    const grouped = Array.from(map.values())
+      .sort((a, b) => b.present - a.present); // ordenar por más presentes
+
+    tbody.innerHTML = grouped.map(g => {
+      const ini  = g.student?.name?.charAt(0)?.toUpperCase() || '?';
+      const rate = g.total > 0 ? Math.round((g.present / g.total) * 100) : 0;
+      const barColor = rate >= 80 ? 'bg-emerald-500' : rate >= 60 ? 'bg-amber-500' : 'bg-rose-500';
+      const lastStr  = g.lastDate ? new Date(g.lastDate + 'T00:00:00').toLocaleDateString('es-ES', { day: 'numeric', month: 'short' }) : '—';
+
+      return `<tr class="hover:bg-slate-50 border-b border-slate-100 transition-colors">
+        <td class="px-5 py-3.5">
+          <div class="flex items-center gap-3">
+            <div class="w-9 h-9 rounded-xl bg-indigo-50 text-indigo-600 flex items-center justify-center font-black text-sm shrink-0 overflow-hidden">
+              ${g.student?.avatar_url ? `<img src="${g.student.avatar_url}" class="w-full h-full object-cover">` : ini}
+            </div>
+            <div>
+              <div class="font-bold text-slate-800 text-sm">${Helpers.escapeHTML(g.student?.name || '—')}</div>
+              <div class="text-[10px] text-slate-400 font-bold uppercase">${Helpers.escapeHTML(g.classroom?.name || '—')}</div>
+            </div>
+          </div>
+        </td>
+        <td class="px-5 py-3.5 text-center">
+          <span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[10px] font-black bg-emerald-100 text-emerald-700">
+            <i data-lucide="check-circle" class="w-3 h-3"></i>${g.present}
+          </span>
+        </td>
+        <td class="px-5 py-3.5 text-center">
+          <div class="flex items-center justify-center gap-2">
+            <span class="text-[10px] font-black text-rose-600 bg-rose-50 px-2 py-0.5 rounded-full">${g.absent} aus</span>
+            <span class="text-[10px] font-black text-amber-600 bg-amber-50 px-2 py-0.5 rounded-full">${g.late} tard</span>
+          </div>
+        </td>
+        <td class="px-5 py-3.5">
+          <div class="flex items-center gap-2">
+            <div class="flex-1 bg-slate-100 rounded-full h-1.5 overflow-hidden max-w-[80px]">
+              <div class="${barColor} h-full rounded-full" style="width:${rate}%"></div>
+            </div>
+            <span class="text-[10px] font-black text-slate-600">${rate}%</span>
+          </div>
+        </td>
+        <td class="px-5 py-3.5 text-center text-[11px] font-bold text-slate-500">${lastStr}</td>
+      </tr>`;
+    }).join('');
   },
 
   _renderCharts() {
