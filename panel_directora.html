@@ -89,13 +89,17 @@
     }
 
     /* ═══════════════════════════════════════════════
-       SECCIONES — fade-in, sin bloqueos
+       SECCIONES — ocultas por defecto, visibles con .active
     ═══════════════════════════════════════════════ */
     .section {
-      height: auto;
-      overflow-y: auto;
+      display: none;          /* oculto por defecto */
+      overflow: visible;
     }
-    .section.active { animation: fadeInDir 0.3s ease-out; }
+    .section.active {
+      display: block;         /* visible solo cuando activo */
+      animation: fadeInDir 0.3s ease-out;
+    }
+    /* Tailwind .hidden refuerza display:none — compatible */
     @keyframes fadeInDir { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
 
     /* ═══════════════════════════════════════════════
@@ -226,8 +230,15 @@
        MOBILE SIDEBAR
     ═══════════════════════════════════════════════ */
     @media (max-width: 767px) {
-      aside#sidebar { transform: translateX(-100%); }
-      aside#sidebar.mobile-visible { transform: translateX(0); box-shadow: 8px 0 32px rgba(0,0,0,0.25); }
+      aside#sidebar {
+        transform: translateX(-100%);
+        transition: transform 0.3s ease;
+        will-change: transform;
+      }
+      aside#sidebar.mobile-visible {
+        transform: translateX(0) !important;
+        box-shadow: 8px 0 32px rgba(0,0,0,0.25);
+      }
     }
 
     /* ═══════════════════════════════════════════════
@@ -314,7 +325,7 @@
     <!-- OVERLAY MOBILE -->
     <div id="sidebarOverlay" class="fixed inset-0 bg-black/50 z-40 backdrop-blur-sm transition-opacity" style="display:none;"></div>
     <!-- SIDEBAR -->
-    <aside id="sidebar" class="bg-gradient-to-b from-violet-600 to-indigo-700 border-r-4 border-violet-400 p-4 rounded-r-3xl shadow-2xl fixed inset-y-0 left-0 z-50 w-72 transition-transform duration-300">
+    <aside id="sidebar" class="bg-gradient-to-b from-violet-600 to-indigo-700 border-r-4 border-violet-400 p-4 rounded-r-3xl shadow-2xl fixed inset-y-0 left-0 z-50 w-72">
       <button id="toggleSidebar" class="absolute -right-3 top-6 bg-white rounded-full p-1 shadow-md border border-slate-100 text-slate-500 hover:text-purple-600 hidden md:block"><i data-lucide="chevron-left" class="w-4 h-4"></i></button>
       <div class="flex items-center gap-3 mb-6">
         <div class="h-12 w-12 rounded-2xl bg-white/20 flex items-center justify-center shadow-lg overflow-hidden shrink-0 border border-white/10">
@@ -529,7 +540,7 @@
       </section>
 
       <!-- MAESTROS -->
-      <section id="maestros" class="section hidden pt-14 md:pt-0">
+      <section id="maestros" class="section pt-14 md:pt-0">
         <!-- BLOQUE 1: Resumen Superior (KPIs Pequeños) -->
         <div class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
           <div class="bg-purple-100 text-purple-800 rounded-2xl p-4 shadow-sm flex items-center gap-3">
@@ -613,7 +624,7 @@
       </section>
 
       <!-- VIDEOCONFERENCIA (NUEVA SECCIÓN) -->
-      <section id="videoconferencia" class="section hidden pt-14 md:pt-0">
+      <section id="videoconferencia" class="section pt-14 md:pt-0">
         <div class="flex items-center justify-between mb-6">
           <div>
             <h2 class="text-2xl font-bold text-slate-800 flex items-center gap-2">
@@ -632,7 +643,7 @@
       </section>
 
       <!-- ESTUDIANTES -->
-      <section id="estudiantes" class="section hidden pt-14 md:pt-0">
+      <section id="estudiantes" class="section pt-14 md:pt-0">
         <!-- BLOQUE 1 — KPIs Superiores -->
         <div class="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-6 gap-4 mb-6">
           <div class="bg-purple-100 text-purple-700 rounded-2xl p-4 shadow-sm">
@@ -708,7 +719,7 @@
       </section>
 
       <!-- AULAS -->
-      <section id="aulas" class="section hidden pt-14 md:pt-0">
+      <section id="aulas" class="section pt-14 md:pt-0">
         <!-- Encabezado y acciones -->
         <div class="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-6">
           <div>
@@ -808,7 +819,7 @@
       </section>
 
       <!-- ASISTENCIA -->
-      <section id="asistencia" class="section hidden pt-14 md:pt-0">
+      <section id="asistencia" class="section pt-14 md:pt-0">
 
         <!-- Header -->
         <div class="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-6">
@@ -936,7 +947,7 @@
       </section>
 
       <!-- CALIFICACIONES -->
-      <section id="calificaciones" class="section hidden pt-14 md:pt-0">
+      <section id="calificaciones" class="section pt-14 md:pt-0">
         <!-- Header -->
         <div class="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-8">
           <div>
@@ -1017,7 +1028,7 @@
       </section>
 
       <!-- INCIDENCIAS (Reportes y Quejas) -->
-      <section id="reportes" class="section hidden pt-14 md:pt-0">
+      <section id="reportes" class="section pt-14 md:pt-0">
         <div class="flex items-center justify-between mb-6">
           <div>
             <h2 class="text-2xl font-bold text-slate-800 flex items-center gap-2">
@@ -1032,7 +1043,7 @@
       </section>
 
       <!-- PAGOS -->
-      <section id="pagos" class="section hidden pt-14 md:pt-0">
+      <section id="pagos" class="section pt-14 md:pt-0">
         <!-- Header -->
         <div class="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-8">
           <div>
@@ -1205,7 +1216,7 @@
       </section>
 
       <!-- COMUNICACION tipo Teams -->
-      <section id="comunicacion" class="section hidden pt-14 md:pt-0">
+      <section id="comunicacion" class="section pt-14 md:pt-0">
         <div class="flex items-center justify-between mb-6">
           <div>
             <h2 class="text-2xl font-bold text-slate-800 flex items-center gap-2">
@@ -1262,7 +1273,7 @@
       </section>
 
       <!-- MURO ESCOLAR UNIFICADO -->
-      <section id="muro" class="section hidden pt-14 md:pt-0">
+      <section id="muro" class="section pt-14 md:pt-0">
         <header class="mb-6 flex items-center justify-between">
           <div>
             <h1 class="text-3xl font-black text-slate-800">🎭 Muro Escolar</h1>
@@ -1300,7 +1311,7 @@
       </section>
 
       <!-- CONFIGURACIÓN -->
-      <section id="configuracion" class="section hidden pt-14 md:pt-0">
+      <section id="configuracion" class="section pt-14 md:pt-0">
         <div id="notifPermissionSlot"></div>
         <div class="flex items-center gap-3 mb-6">
           <i data-lucide="settings" class="w-7 h-7 text-slate-600"></i>

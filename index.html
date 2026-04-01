@@ -29,7 +29,7 @@
 
   <!-- Favicon -->
   <link rel="icon" href="logo/favicon.ico" sizes="any">
-  <link rel="icon" href="logo/favicon.svg" type="image/svg+xml">
+
   <link rel="apple-touch-icon" href="logo/apple-touch-icon.png">
   
   <style>
@@ -268,6 +268,12 @@
       overflow-x: hidden;
       width: 100%;
     }
+
+    /* Header — nunca desborda */
+    header { overflow-x: hidden; }
+
+    /* Menú lateral — transición suave */
+    [x-cloak] { display: none !important; }
     
     /* Mejora de tarjetas en móvil */
     .card {
@@ -277,76 +283,108 @@
 </head>
 <body class="bg-white text-gray-800">
   <!-- Header Fijo -->
-  <header x-data="{ open: false }" class="fixed top-0 left-0 w-full z-[60] px-2 pt-2">
-    
-    <div class="w-full max-w-7xl mx-auto bg-white/90 backdrop-blur-md rounded-2xl shadow-lg border border-white/20 px-4 py-3 flex justify-between items-center transition-all" :class="{ 'bg-white shadow-none': open }">
-      
-      <!-- Logo -->
-      <a href="#" class="flex items-center gap-2 group">
-        <img src="img/mundo.jpg" alt="Logo" class="h-10 w-10 rounded-full object-cover">
-        <span class="hidden sm:block text-lg font-bold">Karpus Kids</span>
-      </a>
+  <header x-data="{ open: false }" class="fixed top-0 left-0 w-full z-[60] px-2 pt-2" style="overflow-x:hidden;">
 
-      <!-- Nav Desktop -->
-      <nav class="hidden md:flex items-center gap-6 font-medium text-slate-600">
-        <a href="#nosotros" class="hover:text-orange-500">Nosotros</a>
-        <a href="#galeria-fotos" class="hover:text-pink-500">Galería</a>
-        <a href="#precios" class="hover:text-blue-500">Servicios</a>
-        <a href="#footer" class="hover:text-green-500">Contacto</a>
-      </nav>
+    <div class="w-full max-w-7xl mx-auto">
+      <div class="flex items-center justify-between bg-white/90 backdrop-blur-md rounded-2xl shadow-lg border border-white/20 px-3 py-2 sm:px-4 sm:py-3 gap-2">
 
-      <!-- CTA & Mobile Toggle -->
-      <div class="flex items-center gap-2 shrink-0">
-        
-        <!-- CTA Desktop only — hidden on mobile always -->
-        <a href="login.html" class="hidden md:inline-flex items-center gap-1.5 bg-gradient-to-r from-orange-400 to-pink-500 text-white px-4 py-2 rounded-full text-sm font-bold shadow-sm hover:shadow-md transition-all">
-          <i class="bi bi-person-circle"></i> Acceso
+        <!-- Logo -->
+        <a href="#" class="flex items-center gap-2 min-w-0 shrink-0">
+          <img src="img/mundo.jpg" alt="Logo" class="h-9 w-9 sm:h-10 sm:w-10 rounded-full object-cover shrink-0">
+          <span class="hidden sm:block text-sm sm:text-lg font-bold truncate">Karpus Kids</span>
         </a>
 
-        <!-- Hamburger — mobile only -->
-        <button @click="open = !open" aria-label="Menú"
-          class="md:hidden flex items-center justify-center w-10 h-10 rounded-xl bg-slate-100 text-slate-700 hover:bg-orange-100 hover:text-orange-600 transition-colors relative z-[110]">
-          <i class="bi bi-list text-2xl leading-none"></i>
-        </button>
+        <!-- Nav Desktop -->
+        <nav class="hidden md:flex items-center gap-6 font-medium text-slate-600 text-sm">
+          <a href="#nosotros" class="hover:text-orange-500 whitespace-nowrap">Nosotros</a>
+          <a href="#galeria-fotos" class="hover:text-pink-500 whitespace-nowrap">Galería</a>
+          <a href="#precios" class="hover:text-blue-500 whitespace-nowrap">Servicios</a>
+          <a href="#footer" class="hover:text-green-500 whitespace-nowrap">Contacto</a>
+        </nav>
 
+        <!-- Derecha: CTA + Hamburger -->
+        <div class="flex items-center gap-2 shrink-0">
+
+          <!-- Botón Acceso — solo desktop -->
+          <a href="login.html"
+             class="hidden md:inline-flex items-center gap-1.5 bg-gradient-to-r from-orange-400 to-pink-500 text-white px-3 py-1.5 rounded-full text-xs sm:text-sm font-bold whitespace-nowrap shadow-sm hover:shadow-md transition-all">
+            <i class="bi bi-person-circle"></i> Acceso
+          </a>
+
+          <!-- Hamburger — solo móvil -->
+          <button @click="open = !open" aria-label="Abrir menú"
+            class="md:hidden flex items-center justify-center w-9 h-9 rounded-xl bg-slate-100 text-slate-700 hover:bg-orange-100 hover:text-orange-600 transition-colors active:scale-95 z-[110] relative">
+            <i class="bi bi-list text-xl leading-none" x-show="!open"></i>
+            <i class="bi bi-x-lg text-base leading-none" x-show="open" x-cloak></i>
+          </button>
+
+        </div>
       </div>
     </div>
 
-    <!-- Menú móvil -->
-    <div x-show="open" 
-         x-transition:enter="transition ease-out duration-300"
-         x-transition:enter-start="opacity-0 translate-y-[-20px]"
-         x-transition:enter-end="opacity-100 translate-y-0"
-         x-transition:leave="transition ease-in duration-200"
-         x-transition:leave-start="opacity-100 translate-y-0"
-         x-transition:leave-end="opacity-0 translate-y-[-20px]"
+    <!-- Overlay -->
+    <div x-show="open"
+         x-transition:enter="transition ease-out duration-200"
+         x-transition:enter-start="opacity-0"
+         x-transition:enter-end="opacity-100"
+         x-transition:leave="transition ease-in duration-150"
+         x-transition:leave-start="opacity-100"
+         x-transition:leave-end="opacity-0"
          x-cloak
-         class="md:hidden fixed inset-0 z-[100] bg-slate-900/60 backdrop-blur-md flex items-center justify-center p-4">
-      
-      <div @click.away="open = false" 
-           class="w-[90vw] max-w-[340px] bg-white rounded-[2rem] shadow-2xl overflow-hidden border-2 border-white relative flex flex-col">
-        
-        <!-- Close button -->
-        <button @click="open = false" class="absolute top-4 right-4 w-9 h-9 flex items-center justify-center rounded-full bg-slate-100 text-slate-500 hover:bg-slate-200 transition-colors z-10">
+         @click="open = false"
+         class="fixed inset-0 bg-black/50 z-[100]"
+         style="pointer-events:auto;">
+    </div>
+
+    <!-- Menú lateral (slide desde la derecha) -->
+    <div x-show="open"
+         x-transition:enter="transition ease-out duration-300"
+         x-transition:enter-start="opacity-0 translate-x-full"
+         x-transition:enter-end="opacity-100 translate-x-0"
+         x-transition:leave="transition ease-in duration-200"
+         x-transition:leave-start="opacity-100 translate-x-0"
+         x-transition:leave-end="opacity-0 translate-x-full"
+         x-cloak
+         class="fixed top-0 right-0 h-full w-[85%] max-w-sm bg-white z-[110] shadow-2xl flex flex-col">
+
+      <!-- Header del menú -->
+      <div class="flex items-center justify-between px-5 py-4 border-b border-slate-100">
+        <div class="flex items-center gap-2">
+          <img src="img/mundo.jpg" alt="Logo" class="h-8 w-8 rounded-full object-cover">
+          <span class="font-bold text-slate-800">Karpus Kids</span>
+        </div>
+        <button @click="open = false"
+          class="w-8 h-8 flex items-center justify-center rounded-full bg-slate-100 text-slate-500 hover:bg-slate-200 transition-colors">
           <i class="bi bi-x-lg text-sm"></i>
         </button>
-
-        <!-- contenido scrollable -->
-        <div class="flex flex-col text-center font-black text-slate-700 text-lg py-8 px-6 gap-2 overflow-y-auto max-h-[60vh]">
-          <a href="#nosotros" @click="open = false" class="py-3 hover:text-orange-500 transition-colors">Nosotros</a>
-          <a href="#galeria-fotos" @click="open = false" class="py-3 hover:text-pink-500 transition-colors">Galería</a>
-          <a href="#precios" @click="open = false" class="py-3 hover:text-blue-500 transition-colors">Servicios</a>
-          <a href="#footer" @click="open = false" class="py-3 hover:text-green-500 transition-colors">Contacto</a>
-        </div>
-
-        <!-- botón fijo abajo -->
-        <div class="p-6 pt-0">
-          <a href="login.html" class="block w-full bg-gradient-to-r from-orange-400 to-pink-500 text-white py-3.5 rounded-2xl shadow-xl text-base flex items-center justify-center gap-2 active:scale-95 transition-transform">
-            <i class="bi bi-person-circle"></i> Acceso Padres 🚀
-          </a>
-        </div>
       </div>
+
+      <!-- Links -->
+      <nav class="flex flex-col px-5 py-4 gap-1 flex-1">
+        <a href="#nosotros"    @click="open=false" class="flex items-center gap-3 py-3 px-3 rounded-xl font-semibold text-slate-700 hover:bg-orange-50 hover:text-orange-600 transition-colors">
+          <i class="bi bi-people text-lg text-orange-400"></i> Nosotros
+        </a>
+        <a href="#galeria-fotos" @click="open=false" class="flex items-center gap-3 py-3 px-3 rounded-xl font-semibold text-slate-700 hover:bg-pink-50 hover:text-pink-600 transition-colors">
+          <i class="bi bi-images text-lg text-pink-400"></i> Galería
+        </a>
+        <a href="#precios"    @click="open=false" class="flex items-center gap-3 py-3 px-3 rounded-xl font-semibold text-slate-700 hover:bg-blue-50 hover:text-blue-600 transition-colors">
+          <i class="bi bi-star text-lg text-blue-400"></i> Servicios
+        </a>
+        <a href="#footer"     @click="open=false" class="flex items-center gap-3 py-3 px-3 rounded-xl font-semibold text-slate-700 hover:bg-green-50 hover:text-green-600 transition-colors">
+          <i class="bi bi-envelope text-lg text-green-400"></i> Contacto
+        </a>
+      </nav>
+
+      <!-- Botón Acceso abajo -->
+      <div class="p-5 border-t border-slate-100">
+        <a href="login.html"
+           class="flex items-center justify-center gap-2 w-full bg-gradient-to-r from-orange-400 to-pink-500 text-white py-3.5 rounded-2xl font-bold text-base shadow-lg active:scale-95 transition-transform">
+          <i class="bi bi-person-circle text-lg"></i> Acceso Padres 🚀
+        </a>
+      </div>
+
     </div>
+
   </header>
 
   <!-- Hero con Video -->

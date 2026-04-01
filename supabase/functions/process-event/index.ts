@@ -29,28 +29,32 @@ Deno.serve(async (req) => {
     const supabase = createClient(SUPABASE_URL, SERVICE_KEY, { auth: { persistSession: false } });
     const resend   = RESEND_KEY ? new Resend(RESEND_KEY) : null;
 
-    // ✅ FIX: usar ANON_KEY si está disponible, si no usar SERVICE_KEY como fallback
-    const pushAuthKey = ANON_KEY || SERVICE_KEY;
-
     const { type, data } = await req.json();
     if (!type) return json({ error: 'Missing event type' }, 400);
 
     console.log('[process-event] type:', type, '| data keys:', Object.keys(data || {}));
 
-    // ✅ FIX: Usar la URL interna del proyecto para invocar send-push
-    // Esto evita problemas de red externa y es más rápido.
-    const internalUrl = SUPABASE_URL.replace('https://', 'http://');
-
     // Helper para enviar push usando la función send-push
-    const sendPushToUser = (user_id: string, title: string, message: string, pushType = 'info', link = 'panel_padres.html') =>
-      fetch(`${internalUrl}/functions/v1/send-push`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${pushAuthKey}`
-        },
-        body: JSON.stringify({ user_id, title, message, type: pushType, link })
-      });
+    const sendPushToUser = async (user_id: string, title: string, message: string, pushType = 'info', link = 'panel_padres.html') => {
+      try {
+        const res = await fetch(`${SUPABASE_URL}/functions/v1/send-push`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${SERVICE_KEY}`
+          },
+          body: JSON.stringify({ user_id, title, message, type: pushType, link })
+        });
+        if (!res.ok) {
+          const err = await res.text();
+          console.warn(`[process-event] send-push failed for user ${user_id}:`, res.status, err);
+        }
+        return res;
+      } catch (e) {
+        console.error(`[process-event] send-push exception for user ${user_id}:`, e);
+        return null;
+      }
+    };
 
     let result: Record<string, unknown> = {};
 

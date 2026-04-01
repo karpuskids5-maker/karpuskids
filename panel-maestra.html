@@ -62,18 +62,13 @@
     }
 
     /* ═══════════════════════════════════════════════
-       SECCIONES — scroll natural, sin bloqueos
+       SECCIONES — ocultas por defecto, visibles con .active
     ═══════════════════════════════════════════════ */
-    .section { display: none; opacity: 0; flex: 1; }
+    .section { display: none; opacity: 0; }
     .section.active {
-      display: flex;
-      flex-direction: column;
+      display: block;
       opacity: 1;
       animation: fadeIn 0.35s ease-out;
-      /* ✅ FIX: nunca overflow hidden en secciones */
-      overflow-y: auto;
-      overflow-x: hidden;
-      -webkit-overflow-scrolling: touch;
     }
     @keyframes fadeIn { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
 
@@ -366,7 +361,7 @@
     </aside>
 
     <!-- OVERLAY MOBILE -->
-    <div id="sidebarOverlay" class="fixed inset-0 bg-black/50 z-40 hidden md:hidden backdrop-blur-sm transition-opacity"></div>
+    <div id="sidebarOverlay" class="fixed inset-0 bg-black/50 z-40 backdrop-blur-sm transition-opacity" style="display:none;"></div>
 
     <!-- Hamburger — FIXED so it never scrolls away on mobile -->
     <button id="menuBtn"

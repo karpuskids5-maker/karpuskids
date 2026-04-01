@@ -90,12 +90,8 @@ export async function subscribeNotifications(userId, onNotif) {
 // ── Email via Resend (Edge Function send-email) ───────────────────────────────
 export async function sendEmail(to, subject, html, text) {
   try {
-    // ✅ FIX: Usamos el anon key explícitamente para evitar problemas de JWT expirado
     const { data, error } = await supabase.functions.invoke('send-email', {
-      body: { to, subject, html, text },
-      headers: {
-        'Authorization': `Bearer ${SUPABASE_ANON_KEY}`
-      }
+      body: { to, subject, html, text }
     });
     
     if (error) {
@@ -112,19 +108,15 @@ export async function sendEmail(to, subject, html, text) {
 // ── Push via OneSignal (Edge Function send-push) ──────────────────────────────
 export async function sendPush(payload) {
   try {
-    // ✅ FIX: Usamos el anon key explícitamente para evitar problemas de JWT expirado
-    // Esto asegura que la Edge Function siempre reciba un token válido del proyecto.
     const { data, error } = await supabase.functions.invoke('send-push', {
-      body: payload,
-      headers: {
-        'Authorization': `Bearer ${SUPABASE_ANON_KEY}`
-      }
+      body: payload
     });
 
     if (error) {
       console.warn('[sendPush] Function error:', error);
       return null;
     }
+    console.log('[sendPush] Success:', data);
     return data;
   } catch (e) {
     console.warn('[sendPush] Catch error (silencioso):', e.message);
@@ -135,12 +127,8 @@ export async function sendPush(payload) {
 // ── Eventos del sistema (process-event) ──────────────────────────────────────
 export async function emitEvent(type, data) {
   try {
-    // ✅ FIX: Usamos el anon key explícitamente para evitar problemas de JWT expirado
     const { data: resData, error } = await supabase.functions.invoke('process-event', {
-      body: { type, data },
-      headers: {
-        'Authorization': `Bearer ${SUPABASE_ANON_KEY}`
-      }
+      body: { type, data }
     });
     
     if (error) {

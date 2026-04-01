@@ -1,5 +1,7 @@
 import { supabase } from './supabase.js';
 import { Helpers } from './helpers.js';
+import { optimizeImageUrl, thumbnailUrl, activateLazyImages } from './media.js';
+import { Skeletons } from './prefetch.js';
 
 /**
  * Módulo de Muro Global Mejorado
@@ -35,17 +37,16 @@ export const WallModule = {
     }
   },
 
-  async _getPublicImageUrl(imagePath) {
+  async _getPublicImageUrl(imagePath, opts = {}) {
     if (!imagePath) return null;
-    if (/^https?:\/\//i.test(imagePath)) return imagePath;
+    if (/^https?:\/\//i.test(imagePath)) return optimizeImageUrl(imagePath, opts);
 
     const cleanPath = imagePath.replace(/^posts\//, '').replace(/^karpus-uploads\//, '').replace(/^avatars\//, '');
-    
     try {
       const isAvatar = imagePath.includes('avatar');
       const bucket = isAvatar ? 'karpus-uploads' : 'posts';
       const { data } = supabase.storage.from(bucket).getPublicUrl(isAvatar ? `avatars/${cleanPath}` : cleanPath);
-      return data?.publicUrl;
+      return optimizeImageUrl(data?.publicUrl, opts);
     } catch (err) {
       console.warn('Error resolviendo imagen:', err);
       return null;

@@ -65,15 +65,13 @@ window.openGlobalModal = function(html, wide = false) {
 export function goToSection(sectionId) {
   if (!sectionId) return;
 
-  // 1. Manejo de Clases Active/Hidden
+  // Ocultar todas las secciones — solo con CSS class, sin Tailwind hidden
   document.querySelectorAll('.section').forEach(sec => {
-    sec.classList.add('hidden');
     sec.classList.remove('active');
   });
 
   const target = document.getElementById(sectionId);
   if (target) {
-    target.classList.remove('hidden');
     target.classList.add('active');
     AppState.set('currentSection', sectionId);
     

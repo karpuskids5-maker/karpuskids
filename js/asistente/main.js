@@ -168,7 +168,8 @@ function initNavigation() {
     const sidebar = document.getElementById('sidebar');
     if (sidebar && window.innerWidth < 768) {
       sidebar.classList.remove('mobile-visible');
-      document.getElementById('sidebarOverlay')?.classList.remove('active');
+      const ov = document.getElementById('sidebarOverlay');
+      if (ov) ov.style.display = 'none';
     }
 
     // ✅ --- LÓGICA DE CARGA PEREZOSA (LAZY LOADING) ---
@@ -223,10 +224,16 @@ function initNavigation() {
   const layoutShell = document.getElementById('layoutShell');
 
   if (menuBtn && sidebar) {
-    menuBtn.addEventListener('click', () => {
-      sidebar.classList.toggle('mobile-visible');
+    menuBtn.addEventListener('click', (e) => {
+      e.stopPropagation();
       const overlay = document.getElementById('sidebarOverlay');
-      if (overlay) overlay.classList.toggle('active', sidebar.classList.contains('mobile-visible'));
+      if (sidebar.classList.contains('mobile-visible')) {
+        sidebar.classList.remove('mobile-visible');
+        if (overlay) overlay.style.display = 'none';
+      } else {
+        sidebar.classList.add('mobile-visible');
+        if (overlay) overlay.style.display = 'block';
+      }
     });
   }
 
@@ -234,7 +241,7 @@ function initNavigation() {
   if (overlay) {
     overlay.addEventListener('click', () => {
       sidebar?.classList.remove('mobile-visible');
-      overlay.classList.remove('active');
+      overlay.style.display = 'none';
     });
   }
 
