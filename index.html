@@ -29,16 +29,15 @@
 
   <!-- Favicon -->
   <link rel="icon" href="logo/favicon.ico" sizes="any">
-  <link rel="icon" href="logo/favicon.svg" type="image/svg+xml">
   <link rel="apple-touch-icon" href="logo/apple-touch-icon.png">
   
   <style>
     :root {
       /* Paleta de colores oficial de Karpus Kids */
-      --verde: 76, 175, 80;   /* #4CAF50 */
-      --azul: 33, 150, 243;    /* #2196F3 */
-      --rosa: 233, 30, 99;     /* #E91E63 */
-      --naranja: 255, 152, 0;  /* #FF9800 */
+      --verde: 124, 252, 0;   /* #7CFC00 */
+      --azul: 0, 206, 209;    /* #00CED1 */
+      --rosa: 255, 105, 180;  /* #FF69B4 */
+      --naranja: 255, 140, 0; /* #FF8C00 */
     }
     
     body {
@@ -54,7 +53,6 @@
       display: inline-block;
       font-weight: 800;
       text-shadow: 2px 2px 10px rgba(0,0,0,0.5);
-      font-size: 3rem;
     }
     
     .k-1 { color: rgb(var(--naranja)); }
@@ -72,16 +70,16 @@
     .karpus-kids-inline {
       font-weight: 700;
     }
-    .karpus-kids-inline .k-1 { color: #FF9800; }
-    .karpus-kids-inline .k-2 { color: #2196F3; }
-    .karpus-kids-inline .k-3 { color: #E91E63; }
-    .karpus-kids-inline .k-4 { color: #4CAF50; }
-    .karpus-kids-inline .k-5 { color: #FF9800; }
-    .karpus-kids-inline .k-6 { color: #2196F3; }
-    .karpus-kids-inline .k-7 { color: #4CAF50; }
-    .karpus-kids-inline .k-8 { color: #E91E63; }
-    .karpus-kids-inline .k-9 { color: #2196F3; }
-    .karpus-kids-inline .k-10 { color: #FF9800; }
+    .karpus-kids-inline .k-1 { color: #FF8C00; }
+    .karpus-kids-inline .k-2 { color: #00CED1; }
+    .karpus-kids-inline .k-3 { color: #FF69B4; }
+    .karpus-kids-inline .k-4 { color: #7CFC00; }
+    .karpus-kids-inline .k-5 { color: #FF8C00; }
+    .karpus-kids-inline .k-6 { color: #00CED1; }
+    .karpus-kids-inline .k-7 { color: #7CFC00; }
+    .karpus-kids-inline .k-8 { color: #FF69B4; }
+    .karpus-kids-inline .k-9 { color: #00CED1; }
+    .karpus-kids-inline .k-10 { color: #FF8C00; }
 
     @keyframes float-up-down {
       0%, 100% { transform: translateY(0); }
@@ -238,9 +236,6 @@
         padding-right: 1rem;
       }
       /* Ajuste de tamaño del logo multicolor para que no se corte en móvil */
-      .karpus-kids-colored span {
-        font-size: 3.5rem !important;
-      }
       .hero-section { padding-top: 4rem; padding-bottom: 4rem; }
       .nav-links { display: none; } /* Ocultar nav links en móvil si no hay menu hamburguesa */
       .grid-cols-3 { grid-template-columns: 1fr !important; }
@@ -277,7 +272,7 @@
 </head>
 <body class="bg-white text-gray-800">
   <!-- Header Fijo -->
-  <header x-data="{ open: false }" class="fixed top-0 left-0 w-full z-[60] px-2 pt-2">
+  <header x-data="{ open: false }" class="fixed top-0 left-0 w-full z-[70] px-2 pt-2">
     
     <div class="w-full max-w-7xl mx-auto bg-white/90 backdrop-blur-md rounded-2xl shadow-lg border border-white/20 px-4 py-3 flex justify-between items-center transition-all" :class="{ 'bg-white shadow-none': open }">
       
@@ -332,7 +327,7 @@
         </button>
 
         <!-- contenido scrollable -->
-        <div class="flex flex-col text-center font-black text-slate-700 text-lg py-8 px-6 gap-2 overflow-y-auto max-h-[60vh]">
+        <div class="flex flex-col text-center font-black text-slate-700 text-lg py-8 px-6 gap-2 overflow-y-auto max-h-[90vh]">
           <a href="#nosotros" @click="open = false" class="py-3 hover:text-orange-500 transition-colors">Nosotros</a>
           <a href="#galeria-fotos" @click="open = false" class="py-3 hover:text-pink-500 transition-colors">Galería</a>
           <a href="#precios" @click="open = false" class="py-3 hover:text-blue-500 transition-colors">Servicios</a>
@@ -351,13 +346,22 @@
 
   <!-- Hero con Video -->
   <section class="relative min-h-screen flex items-center justify-center text-center overflow-hidden">
-    <img src="/img/karpus.jpg"
+    <video autoplay muted loop playsinline poster="img/karpus.jpg" class="video-bg">
+      <source src="img/14.mp4" type="video/mp4">
+    </video>
+    <img src="img/karpus.jpg"
        class="absolute inset-0 w-full h-full object-cover hero-bg-animate"
        alt="Niños felices en Karpus Kids" loading="lazy">
     <div class="absolute inset-0 bg-gradient-to-b from-black/60 via-black/40 to-black/70"></div>
     <div x-data="{ contactModal: false }" class="relative z-10 p-8 text-white max-w-4xl mx-auto" data-aos="fade-up">
-      <h1 class="karpus-kids-colored mb-4 text-5xl md:text-8xl">
-        <span class="k-1">K</span><span class="k-2">A</span><span class="k-3">R</span><span class="k-4">P</span><span class="k-5">U</span><span class="k-6">S</span>&nbsp;<span class="k-7">K</span><span class="k-8">I</span><span class="k-9">D</span><span class="k-10">S</span>
+      <h1 class="karpus-kids-colored mb-4 text-5xl md:text-8xl flex flex-wrap justify-center">
+        <span class="whitespace-nowrap">
+          <span class="k-1">K</span><span class="k-2">A</span><span class="k-3">R</span><span class="k-4">P</span><span class="k-5">U</span><span class="k-6">S</span>
+        </span>
+        &nbsp;
+        <span class="whitespace-nowrap">
+          <span class="k-7">K</span><span class="k-8">I</span><span class="k-9">D</span><span class="k-10">S</span>
+        </span>
       </h1>
       <p class="text-xl font-light max-w-2xl mx-auto mb-10">
         Tu hijo merece un lugar seguro donde aprenda, se divierta y esté protegido mientras tú trabajas con tranquilidad.  
@@ -720,7 +724,7 @@ Invertir en la educación y seguridad de tu hijo hoy, es asegurar su futuro mañ
       <!-- Contacto -->
       <div data-aos="fade-up" data-aos-delay="100">
         <h3 class="text-xl font-bold mb-4">Contáctanos</h3>
-        <p class="mb-2"><i class="bi bi-telephone-fill mr-2"></i> +1 (829) 803-8424</p>
+        <p class="mb-2"><i class="bi bi-telephone-fill mr-2"></i> +1 (829) 803-8484</p>
         <p class="mb-2"><i class="bi bi-instagram mr-2"></i> <a href="https://www.instagram.com/karpus_kids/" target="_blank" class="text-slate-400 hover:text-white hover:underline">@karpus_kids</a></p>
         <p class="mb-2"><i class="bi bi-envelope-fill mr-2"></i> info@karpuskids.com</p>
         <h3 class="text-xl font-bold mb-4 mt-6">Horario</h3>
