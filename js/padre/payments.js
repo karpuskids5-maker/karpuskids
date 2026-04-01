@@ -1,258 +1,345 @@
+/**
+ * 💳 Panel Padre — Módulo de Pagos
+ */
 import { supabase } from '../shared/supabase.js';
 import { AppState, TABLES } from './appState.js';
 import { Helpers, escapeHtml } from './helpers.js';
+import { calcMora, getMoraBreakdown, normalizeStatus, daysUntilDue } from '../shared/payment-service.js';
 
 export const PaymentsModule = {
   _studentId: null,
+  _payments:  [],
 
   async init(studentId) {
     if (!studentId) return;
     this._studentId = studentId;
-
-    // Config financiera
-    const config = AppState.get('financeConfig');
-    if (config) {
-      const feeEl  = document.getElementById('paymentsMonthlyFee');
-      const dueEl  = document.getElementById('paymentsDueDay');
-      const dateEl = document.getElementById('paymentsDueDate');
-      if (feeEl)  feeEl.textContent = Helpers.formatCurrency(config.monthly_fee || 0);
-      if (dueEl)  dueEl.textContent = config.due_day || '-';
-      if (dateEl) {
-        const now    = new Date();
-        const dueDay = config.due_day || 5;
-        let dueDate  = new Date(now.getFullYear(), now.getMonth(), dueDay);
-        if (dueDate <= now) dueDate = new Date(now.getFullYear(), now.getMonth() + 1, dueDay);
-        dateEl.textContent = dueDate.toLocaleDateString('es-ES', { day: 'numeric', month: 'long', year: 'numeric' });
-      }
-    }
-
-    // Registrar form UNA sola vez — resetear flag si el form fue reemplazado
     const form = document.getElementById('paymentForm');
-    if (form) {
-      // Siempre reasignar para evitar handlers duplicados
-      form.onsubmit = (e) => this.submitPaymentProof(e);
-    }
-
+    if (form) form.onsubmit = (e) => this.submitPaymentProof(e);
     await this.loadPayments();
   },
 
   async loadPayments() {
     const container = document.getElementById('paymentsHistory');
     if (!container) return;
-    container.innerHTML = Helpers.skeleton(3, 'h-20');
+    container.innerHTML = Helpers.skeleton(3, 'h-24');
     try {
       const { data, error } = await supabase
         .from(TABLES.PAYMENTS)
-        .select('*') // Traemos todo para mayor contexto
+        .select('id,student_id,amount,concept,status,due_date,created_at,paid_date,method,month_paid,evidence_url,notes,mora_condoned,excuse_text,excuse_approved')
         .eq('student_id', this._studentId)
         .order('created_at', { ascending: false });
-
       if (error) throw error;
 
-      // Deduplicar inteligentemente por mes
-      // Si para un mismo mes hay un pago con evidencia y otro sin ella (cargo), priorizamos el de evidencia.
+      // Deduplicar por mes
       const monthMap = new Map();
-      (data || []).forEach(p => {
-        const month = (p.month_paid || 'Varios').toLowerCase();
-        const existing = monthMap.get(month);
-        
-        // Si no existe, lo añadimos
-        if (!existing) {
-          monthMap.set(month, p);
-        } else {
-          // Si ya existe, decidimos si el nuevo es "mejor"
-          // Un pago con evidencia es mejor que un cargo puro
-          const hasEvidence = p.evidence_url || p.proof_url;
-          const existingHasEvidence = existing.evidence_url || existing.proof_url;
-          
-          if (hasEvidence && !existingHasEvidence) {
-            monthMap.set(month, p);
-          } else if (hasEvidence && existingHasEvidence) {
-            // Si ambos tienen evidencia, nos quedamos con el más reciente
-            if (new Date(p.created_at) > new Date(existing.created_at)) {
-              monthMap.set(month, p);
-            }
-          }
-          // Si ninguno tiene evidencia, nos quedamos con el más reciente (o el de mayor monto si fuera necesario)
-        }
-      });
+      for (const p of data || []) {
+        const key = (p.month_paid || 'varios').toLowerCase();
+        const ex  = monthMap.get(key);
+        if (!ex) { monthMap.set(key, p); continue; }
+        if (p.evidence_url && !ex.evidence_url) { monthMap.set(key, p); continue; }
+        if (new Date(p.created_at) > new Date(ex.created_at)) monthMap.set(key, p);
+      }
+      this._payments = Array.from(monthMap.values())
+        .sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
 
-      const payments = Array.from(monthMap.values()).sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
-
-      if (!payments.length) {
-        container.innerHTML = Helpers.emptyState('No hay registros de pagos', '💳');
+      if (!this._payments.length) {
+        container.innerHTML = Helpers.emptyState('No hay registros de pagos', 'credit-card');
         return;
       }
-      container.innerHTML = payments.map(p => this.renderPaymentCard(p)).join('');
+      this._renderAlertBanner(this._payments);
+      container.innerHTML = this._payments.map(p => this._renderCard(p)).join('');
+      if (window.lucide) lucide.createIcons();
     } catch (err) {
-      console.error('Error loadPayments:', err);
-      container.innerHTML = Helpers.emptyState('Error al cargar pagos', '❌');
+      console.error('[PaymentsModule]', err);
+      container.innerHTML = Helpers.emptyState('Error al cargar pagos', 'alert-triangle');
     }
   },
 
-  renderPaymentCard(p) {
-    const hasEvidence = p.evidence_url || p.proof_url;
-    
-    // Mapeo dinámico de estados con lógica de "En Revisión"
-    const statusMap = {
-      paid:       { label: 'Aprobado',    cls: 'bg-emerald-100 text-emerald-700', icon: 'check-circle' },
-      confirmado: { label: 'Aprobado',    cls: 'bg-emerald-100 text-emerald-700', icon: 'check-circle' },
-      validado:   { label: 'Aprobado',    cls: 'bg-emerald-100 text-emerald-700', icon: 'check-circle' },
-      pending:    { 
-        label: hasEvidence ? 'En Revisión' : 'Pendiente de Pago', 
-        cls: hasEvidence ? 'bg-blue-100 text-blue-700' : 'bg-amber-100 text-amber-700',
-        icon: hasEvidence ? 'clock' : 'alert-circle'
-      },
-      review:     { label: 'En Revisión', cls: 'bg-blue-100 text-blue-700', icon: 'clock' },
-      overdue:    { label: 'Vencido',     cls: 'bg-rose-100 text-rose-700', icon: 'alert-triangle' }
+  _renderAlertBanner(payments) {
+    const banner = document.getElementById('paymentAlertBanner');
+    if (!banner) return;
+    const urgent = payments
+      .filter(p => !['paid','pagado','confirmado'].includes((p.status||'').toLowerCase()))
+      .map(p => ({ ...p, days: daysUntilDue(p.due_date) }))
+      .filter(p => p.days !== null)
+      .sort((a, b) => a.days - b.days)[0];
+
+    if (!urgent) { banner.classList.add('hidden'); return; }
+    const days   = urgent.days;
+    const amount = Helpers.formatCurrency(Number(urgent.amount || 0));
+    const month  = urgent.month_paid || 'tu mensualidad';
+    let cfg;
+
+    if (days < 0) {
+      const mora = calcMora(urgent.due_date, urgent.mora_condoned, urgent.status === 'excused');
+      cfg = {
+        bg: 'bg-gradient-to-r from-rose-500 to-red-600',
+        icon: '🚨',
+        title: `Pago vencido — ${month}`,
+        msg: mora > 0
+          ? `${Math.abs(days)} días de retraso. Mora: ${Helpers.formatCurrency(mora)}`
+          : `${Math.abs(days)} días de retraso. Paga cuanto antes.`,
+        btn: 'Pagar ahora', btnCls: 'bg-white text-rose-600'
+      };
+    } else if (days === 0) {
+      cfg = {
+        bg: 'bg-gradient-to-r from-orange-500 to-amber-500',
+        icon: '⏰',
+        title: `¡Hoy vence tu pago! — ${month}`,
+        msg: `Último día para pagar ${amount} sin recargo.`,
+        btn: 'Enviar comprobante', btnCls: 'bg-white text-orange-600'
+      };
+    } else if (days <= 3) {
+      cfg = {
+        bg: 'bg-gradient-to-r from-amber-400 to-yellow-500',
+        icon: '📅',
+        title: `Vence en ${days} día${days > 1 ? 's' : ''} — ${month}`,
+        msg: `Paga ${amount} antes del ${new Date(urgent.due_date + 'T00:00:00').toLocaleDateString('es-DO', { day: 'numeric', month: 'long' })} para evitar recargos.`,
+        btn: 'Pagar a tiempo', btnCls: 'bg-white text-amber-700'
+      };
+    } else if (days <= 7) {
+      cfg = {
+        bg: 'bg-gradient-to-r from-blue-500 to-indigo-500',
+        icon: '💡',
+        title: `Recordatorio — ${month}`,
+        msg: `Tu pago de ${amount} vence en ${days} días.`,
+        btn: 'Ver detalles', btnCls: 'bg-white text-blue-700'
+      };
+    } else {
+      banner.classList.add('hidden');
+      return;
+    }
+
+    banner.classList.remove('hidden');
+    banner.innerHTML = `
+      <div class="${cfg.bg} rounded-2xl px-5 py-4 flex items-center gap-3 shadow-lg">
+        <div class="text-2xl shrink-0">${cfg.icon}</div>
+        <div class="flex-1 min-w-0">
+          <p class="font-black text-white text-sm">${cfg.title}</p>
+          <p class="text-white/80 text-xs font-medium mt-0.5">${cfg.msg}</p>
+        </div>
+        <button onclick="document.getElementById('paymentForm')?.scrollIntoView({behavior:'smooth'})"
+          class="${cfg.btnCls} font-black text-xs px-4 py-2 rounded-xl shrink-0 active:scale-95 transition-transform whitespace-nowrap">
+          ${cfg.btn}
+        </button>
+      </div>`;
+  },
+
+  _renderCard(p) {
+    const status    = normalizeStatus(p);
+    const isPaid    = status === 'paid';
+    const isExcused = status === 'excused';
+    const amount    = Number(p.amount || 0);
+    const mora      = isPaid ? 0 : calcMora(p.due_date, p.mora_condoned, isExcused);
+    const moraInfo  = isPaid ? null : getMoraBreakdown(p.due_date, p.mora_condoned, isExcused);
+    const total     = amount + mora;
+    const days      = daysUntilDue(p.due_date);
+
+    const SC = {
+      paid:      { label: 'Aprobado',       cls: 'bg-emerald-100 text-emerald-700', icon: 'check-circle',   border: '' },
+      review:    { label: 'En Revisión',    cls: 'bg-blue-100 text-blue-700',       icon: 'clock',          border: '' },
+      overdue:   { label: 'Vencido',        cls: 'bg-rose-100 text-rose-700',       icon: 'alert-triangle', border: 'border-l-4 border-l-rose-500' },
+      excused:   { label: 'Excusa enviada', cls: 'bg-violet-100 text-violet-700',   icon: 'message-square', border: 'border-l-4 border-l-violet-400' },
+      rechazado: { label: 'Rechazado',      cls: 'bg-rose-100 text-rose-700',       icon: 'x-circle',       border: 'border-l-4 border-l-rose-400' },
+      pending:   { label: 'Pendiente',      cls: 'bg-amber-100 text-amber-700',     icon: 'alert-circle',   border: '' }
     };
+    const sc = SC[status] || SC.pending;
 
-    const isPaid = ['paid', 'confirmado', 'validado'].includes(p.status?.toLowerCase());
-    const status = statusMap[p.status?.toLowerCase()] || { label: p.status || '-', cls: 'bg-slate-100 text-slate-600', icon: 'info' };
-    
-    // Cálculo de Mora usando Helpers
-    const amount = Number(p.amount || 0);
-    const moraBreakdown = p.due_date && !isPaid ? Helpers.getMoraBreakdown(p.due_date + 'T00:00:00') : null;
-    const currentMora = moraBreakdown ? moraBreakdown.total : 0;
-    const totalToPay = amount + currentMora;
+    let urgencyBadge = '';
+    if (!isPaid && days !== null) {
+      if (days < 0)        urgencyBadge = `<span class="text-[9px] font-black text-rose-600 bg-rose-50 border border-rose-200 px-1.5 py-0.5 rounded-full">${Math.abs(days)}d vencido</span>`;
+      else if (days === 0) urgencyBadge = `<span class="text-[9px] font-black text-orange-600 bg-orange-50 border border-orange-200 px-1.5 py-0.5 rounded-full">vence hoy</span>`;
+      else if (days <= 3)  urgencyBadge = `<span class="text-[9px] font-black text-amber-600 bg-amber-50 border border-amber-200 px-1.5 py-0.5 rounded-full">vence en ${days}d</span>`;
+    }
 
-    const methodIcon = p.method === 'transferencia' ? '🏦' : '💵';
+    const canSendExcuse = (status === 'overdue' || (days !== null && days < 0)) && !p.excuse_text;
 
     return `
-      <div class="bg-white p-5 rounded-3xl border border-slate-100 shadow-sm hover:shadow-lg transition-all mb-4 group ${moraBreakdown?.total > 0 ? 'border-l-4 border-l-rose-500' : ''}">
-        <div class="flex justify-between items-center">
-          <div class="flex items-center gap-4">
-            <div class="w-12 h-12 rounded-2xl ${hasEvidence ? 'bg-blue-50 text-blue-600' : (moraBreakdown?.total > 0 ? 'bg-rose-50 text-rose-600' : 'bg-amber-50 text-amber-600')} flex items-center justify-center text-xl shadow-inner group-hover:scale-110 transition-transform">
-              ${moraBreakdown?.total > 0 ? '⚠️' : methodIcon}
+      <div class="bg-white rounded-3xl border border-slate-100 shadow-sm hover:shadow-md transition-all mb-4 overflow-hidden ${sc.border}">
+        <div class="p-5">
+          <div class="flex justify-between items-start gap-3">
+            <div class="flex items-center gap-3 min-w-0">
+              <div class="w-11 h-11 rounded-2xl ${mora > 0 ? 'bg-rose-50 text-rose-500' : (isPaid ? 'bg-emerald-50 text-emerald-600' : 'bg-amber-50 text-amber-600')} flex items-center justify-center text-xl shrink-0">
+                ${mora > 0 ? '⚠️' : (isPaid ? '✅' : (p.method === 'transferencia' ? '🏦' : '💵'))}
+              </div>
+              <div class="min-w-0">
+                <p class="font-black text-slate-800 text-sm truncate">${escapeHtml(p.month_paid || 'Colegiatura')}</p>
+                <div class="flex items-center gap-1.5 mt-0.5 flex-wrap">
+                  <span class="text-[9px] font-bold text-slate-400 uppercase">${Helpers.formatDate(p.created_at)}</span>
+                  ${urgencyBadge}
+                </div>
+                ${p.due_date && !isPaid ? `<p class="text-[9px] font-black uppercase mt-0.5 ${mora > 0 ? 'text-rose-500' : 'text-slate-400'}">Vence: ${new Date(p.due_date + 'T00:00:00').toLocaleDateString('es-DO')}</p>` : ''}
+              </div>
             </div>
-            <div>
-              <p class="font-black text-slate-800 text-base leading-tight">${escapeHtml(p.month_paid || 'Colegiatura')}</p>
-              <p class="text-[10px] font-bold text-slate-400 uppercase tracking-widest mt-1">
-                ${Helpers.formatDate(p.created_at)} • ${escapeHtml(p.method || 'Generado por Sistema')}
-              </p>
-              ${p.due_date && !isPaid ? `
-                <p class="text-[9px] font-black uppercase tracking-widest mt-1 ${moraBreakdown?.total > 0 ? 'text-rose-500' : 'text-slate-400'}">
-                  Vence: ${new Date(p.due_date + 'T00:00:00').toLocaleDateString('es-DO')}
-                </p>
-              ` : ''}
+            <div class="text-right shrink-0">
+              <p class="font-black text-slate-900 text-lg leading-none">${Helpers.formatCurrency(isPaid ? amount : total)}</p>
+              <span class="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[9px] font-black uppercase mt-1 ${sc.cls}">
+                <i data-lucide="${sc.icon}" class="w-3 h-3"></i>${sc.label}
+              </span>
             </div>
           </div>
-          <div class="text-right">
-            <p class="font-black text-slate-900 text-lg leading-none mb-2">${Helpers.formatCurrency(isPaid ? amount : totalToPay)}</p>
-            <span class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[9px] font-black uppercase tracking-tighter ${status.cls}">
-              <i data-lucide="${status.icon}" class="w-3 h-3"></i>
-              ${status.label}
-            </span>
-          </div>
-        </div>
-        
-        ${moraBreakdown?.total > 0 ? `
+
+          ${moraInfo ? `
           <div class="mt-3 p-3 bg-rose-50 rounded-2xl border border-rose-100">
             <div class="flex justify-between items-center">
-              <span class="text-[10px] font-black text-rose-700 uppercase tracking-widest">Recargo por Mora (${moraBreakdown.formattedText})</span>
-              <span class="text-xs font-black text-rose-700">+${Helpers.formatCurrency(currentMora)}</span>
+              <span class="text-[10px] font-black text-rose-700 uppercase">Recargo por mora (${moraInfo.formattedText})</span>
+              <span class="text-xs font-black text-rose-700">+${Helpers.formatCurrency(mora)}</span>
             </div>
             <div class="flex justify-between items-center mt-1 pt-1 border-t border-rose-200/50">
-              <span class="text-[10px] font-black text-slate-500 uppercase">Monto Base</span>
+              <span class="text-[10px] font-black text-slate-500 uppercase">Monto base</span>
               <span class="text-xs font-bold text-slate-500">${Helpers.formatCurrency(amount)}</span>
             </div>
-          </div>
-        ` : ''}
+          </div>` : ''}
 
-        ${hasEvidence ? `
-          <div class="mt-4 pt-4 border-t border-slate-50 flex justify-between items-center">
+          ${p.mora_condoned && !isPaid ? `
+          <div class="mt-3 p-3 bg-violet-50 rounded-2xl border border-violet-100 flex items-center gap-2">
+            <span class="text-base">🎁</span>
+            <span class="text-[10px] font-black text-violet-700">Mora condonada por la dirección</span>
+          </div>` : ''}
+
+          ${status === 'excused' ? `
+          <div class="mt-3 p-3 bg-violet-50 rounded-2xl border border-violet-100">
+            <p class="text-[10px] font-black text-violet-700 uppercase mb-1">Tu excusa:</p>
+            <p class="text-xs text-violet-800 italic">"${escapeHtml(p.excuse_text || '')}"</p>
+            ${p.excuse_approved === null  ? `<p class="text-[9px] font-black text-violet-500 mt-1 uppercase">⏳ Pendiente de revisión</p>` : ''}
+            ${p.excuse_approved === true  ? `<p class="text-[9px] font-black text-emerald-600 mt-1 uppercase">✅ Aprobada — mora suspendida</p>` : ''}
+            ${p.excuse_approved === false ? `<p class="text-[9px] font-black text-rose-600 mt-1 uppercase">❌ Rechazada${p.notes ? ': ' + escapeHtml(p.notes) : ''}</p>` : ''}
+          </div>` : ''}
+
+          ${p.evidence_url && !isPaid ? `
+          <div class="mt-3 pt-3 border-t border-slate-50 flex justify-between items-center">
             <p class="text-[10px] font-bold text-slate-400 italic">Comprobante enviado. Esperando validación.</p>
-            <a href="${p.evidence_url || p.proof_url}" target="_blank" class="text-[10px] font-black text-blue-600 hover:underline flex items-center gap-1">
-              Ver adjunto <i data-lucide="external-link" class="w-3 h-3"></i>
-            </a>
-          </div>
-        ` : ''}
-      </div>
-    `;
+            <a href="${p.evidence_url}" target="_blank" class="text-[10px] font-black text-blue-600 hover:underline flex items-center gap-1">Ver <i data-lucide="external-link" class="w-3 h-3"></i></a>
+          </div>` : ''}
+
+          ${canSendExcuse ? `
+          <div class="mt-3 pt-3 border-t border-slate-100">
+            <button onclick="window.PaymentsModule._openExcuseModal('${p.id}','${escapeHtml(p.month_paid||'')}')"
+              class="w-full flex items-center justify-center gap-2 py-2.5 bg-violet-50 hover:bg-violet-100 text-violet-700 rounded-xl font-black text-xs uppercase transition-colors active:scale-95">
+              <i data-lucide="message-square" class="w-4 h-4"></i>Enviar excusa de pago tardío
+            </button>
+          </div>` : ''}
+        </div>
+      </div>`;
+  },
+
+  _openExcuseModal(paymentId, month) {
+    document.getElementById('excuseModal')?.remove();
+    const modal = document.createElement('div');
+    modal.id = 'excuseModal';
+    modal.className = 'fixed inset-0 bg-black/50 z-[9999] flex items-end sm:items-center justify-center p-4';
+    modal.innerHTML = `
+      <div class="bg-white rounded-3xl shadow-2xl w-full max-w-md overflow-hidden">
+        <div class="bg-gradient-to-r from-violet-600 to-purple-600 p-5 text-white">
+          <h3 class="font-black text-lg">📝 Excusa de pago tardío</h3>
+          <p class="text-violet-100 text-xs font-medium mt-0.5">Mes: ${escapeHtml(month)}</p>
+        </div>
+        <div class="p-5 space-y-3">
+          <p class="text-sm text-slate-600 leading-relaxed">Explica el motivo. La dirección revisará y podrá suspender el recargo por mora.</p>
+          <textarea id="excuseText" rows="4"
+            class="w-full px-4 py-3 border-2 border-slate-100 rounded-2xl text-sm focus:border-violet-400 focus:ring-4 focus:ring-violet-50 outline-none resize-none transition-all"
+            placeholder="Ej: Tuve un imprevisto económico. Pagaré el día 15..."></textarea>
+          <p class="text-[10px] text-slate-400 font-bold uppercase">Mínimo 20 caracteres</p>
+        </div>
+        <div class="px-5 pb-5 flex gap-3">
+          <button onclick="document.getElementById('excuseModal').remove()"
+            class="flex-1 py-3 border-2 border-slate-100 text-slate-500 font-black text-xs uppercase rounded-2xl">Cancelar</button>
+          <button id="btnSendExcuse"
+            class="flex-1 py-3 bg-violet-600 hover:bg-violet-700 text-white font-black text-xs uppercase rounded-2xl shadow-lg active:scale-95 transition-all">Enviar excusa</button>
+        </div>
+      </div>`;
+    document.body.appendChild(modal);
+
+    document.getElementById('btnSendExcuse')?.addEventListener('click', async () => {
+      const text = document.getElementById('excuseText')?.value?.trim();
+      if (!text || text.length < 20) { Helpers.toast('Escribe al menos 20 caracteres', 'warning'); return; }
+      const btn = document.getElementById('btnSendExcuse');
+      if (btn) { btn.disabled = true; btn.textContent = 'Enviando...'; }
+      try {
+        const { PaymentService } = await import('../shared/payment-service.js');
+        await PaymentService.submitExcuse(paymentId, text);
+        modal.remove();
+        Helpers.toast('✅ Excusa enviada. La dirección la revisará pronto.', 'success');
+        await this.loadPayments();
+      } catch (e) {
+        Helpers.toast('Error: ' + e.message, 'error');
+        if (btn) { btn.disabled = false; btn.textContent = 'Enviar excusa'; }
+      }
+    });
   },
 
   async submitPaymentProof(e) {
     e.preventDefault();
     const student = AppState.get('currentStudent');
     if (!student) return;
-
     const fileInput = document.getElementById('paymentFileInput');
-    const file      = fileInput?.files[0];
-    const amount    = parseFloat(document.getElementById('paymentAmount')?.value || '0');
-    const monthEl   = document.getElementById('paymentMonth');
-    const month     = monthEl?.value?.trim();
-    const method    = document.getElementById('paymentMethod')?.value || 'transferencia';
+    const file   = fileInput?.files[0];
+    const amount = parseFloat(document.getElementById('paymentAmount')?.value || '0');
+    const month  = document.getElementById('paymentMonth')?.value?.trim();
+    const method = document.getElementById('paymentMethod')?.value || 'transferencia';
 
     if (!file)   { Helpers.toast('Adjunta el comprobante', 'warning'); return; }
     if (!amount) { Helpers.toast('Ingresa el monto', 'warning'); return; }
     if (!month)  { Helpers.toast('Selecciona el mes', 'warning'); return; }
     if (file.size > 5 * 1024 * 1024) { Helpers.toast('Archivo muy grande (max 5MB)', 'error'); return; }
-
-    const allowed = ['image/jpeg', 'image/png', 'image/webp', 'application/pdf'];
-    if (!allowed.includes(file.type)) { Helpers.toast('Formato no permitido (JPG, PNG, PDF)', 'error'); return; }
+    if (!['image/jpeg','image/png','image/webp','application/pdf'].includes(file.type)) {
+      Helpers.toast('Formato no permitido (JPG, PNG, PDF)', 'error'); return;
+    }
 
     const btn = document.getElementById('btnSubmitPayment');
     if (btn) { btn.disabled = true; btn.textContent = 'Enviando...'; }
-
     try {
       Helpers.toast('Subiendo comprobante...', 'info');
-      const ext      = file.name.split('.').pop().toLowerCase();
-      const fileName = 'payments/' + student.id + '_' + Date.now() + '.' + ext;
-
-      // Comprimir imagen antes de subir si es imagen (max 800px, calidad 0.8)
+      const ext  = file.name.split('.').pop().toLowerCase();
+      const path = `payments/${student.id}_${Date.now()}.${ext}`;
       let uploadFile = file;
       if (file.type.startsWith('image/')) {
-        try {
-          uploadFile = await this._compressImage(file, 800, 0.8);
-        } catch (_) { uploadFile = file; } // fallback al original si falla
+        try { uploadFile = await this._compressImage(file, 800, 0.8); } catch (_) {}
       }
-
-      const { error: upErr } = await supabase.storage.from('classroom_media').upload(fileName, uploadFile);
+      const { error: upErr } = await supabase.storage.from('classroom_media').upload(path, uploadFile);
       if (upErr) throw upErr;
+      const { data: { publicUrl } } = supabase.storage.from('classroom_media').getPublicUrl(path);
 
-      const { data: { publicUrl } } = supabase.storage.from('classroom_media').getPublicUrl(fileName);
-
-      const { error } = await supabase.from(TABLES.PAYMENTS).insert({
-        student_id:   student.id,
-        amount,
-        month_paid:   month,
-        method,
-        evidence_url: publicUrl,
-        status:       'pending',
-        created_at:   new Date().toISOString()
-      });
-      if (error) throw error;
-
-      // Confirmación visual clara
+      const existing = this._payments.find(p =>
+        (p.month_paid||'').toLowerCase() === month.toLowerCase() &&
+        !['paid','pagado','confirmado'].includes((p.status||'').toLowerCase())
+      );
+      if (existing) {
+        const { error } = await supabase.from(TABLES.PAYMENTS)
+          .update({ evidence_url: publicUrl, status: 'review', method }).eq('id', existing.id);
+        if (error) throw error;
+      } else {
+        const { error } = await supabase.from(TABLES.PAYMENTS).insert({
+          student_id: student.id, amount, month_paid: month,
+          method, evidence_url: publicUrl, status: 'review',
+          created_at: new Date().toISOString()
+        });
+        if (error) throw error;
+      }
       this._showSuccessConfirmation(amount, month);
       e.target.reset();
       await this.loadPayments();
-
-      // Email completamente silencioso — no bloquea, no lanza error en consola
-      setTimeout(() => {
-        supabase.auth.getSession().then(({ data: { session } }) => {
-          if (!session) return;
-          const url = (supabase.supabaseUrl || '') + '/functions/v1/send-email';
-          fetch(url, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + session.access_token },
-            body: JSON.stringify({ to: 'admin@karpuskids.com', subject: 'Nuevo Pago: ' + student.name, html: 'Pago de ' + Helpers.formatCurrency(amount) })
-          }).catch(() => {});
-        }).catch(() => {});
-      }, 2000);
-
     } catch (err) {
-      console.error('Upload Error:', err);
-      Helpers.toast('Error al enviar el pago: ' + (err.message || ''), 'error');
+      console.error('[submitPaymentProof]', err);
+      Helpers.toast('Error al enviar: ' + (err.message || ''), 'error');
     } finally {
       if (btn) { btn.disabled = false; btn.textContent = 'Enviar Comprobante'; }
     }
-  }
-};
+  },
 
-// Métodos adicionales inyectados en PaymentsModule
-Object.assign(PaymentsModule, {
-  _compressImage(file, maxWidth = 800, quality = 0.8) {
+  _showSuccessConfirmation(amount, month) {
+    const container = document.getElementById('paymentsHistory');
+    if (!container) return;
+    const el = document.createElement('div');
+    el.className = 'bg-emerald-50 border-2 border-emerald-200 rounded-2xl p-4 mb-4 flex items-center gap-3';
+    el.innerHTML = `<div class="w-10 h-10 bg-emerald-500 rounded-xl flex items-center justify-center text-white text-xl shrink-0">✅</div>
+      <div><p class="font-black text-emerald-800 text-sm">Comprobante enviado correctamente</p>
+      <p class="text-[10px] font-bold text-emerald-600 uppercase">${Helpers.formatCurrency(amount)} · ${month} · En revisión</p></div>`;
+    container.insertBefore(el, container.firstChild);
+    setTimeout(() => { el.style.opacity='0'; el.style.transition='opacity 0.4s'; setTimeout(()=>el.remove(),400); }, 8000);
+  },
+
+  _compressImage(file, maxWidth=800, quality=0.8) {
     return new Promise((resolve, reject) => {
       const img = new Image();
       const url = URL.createObjectURL(file);
@@ -264,27 +351,14 @@ Object.assign(PaymentsModule, {
         canvas.width = w; canvas.height = h;
         canvas.getContext('2d').drawImage(img, 0, 0, w, h);
         canvas.toBlob(
-          blob => blob ? resolve(new File([blob], file.name, { type: 'image/jpeg' })) : reject(new Error('Compresion fallida')),
+          blob => blob ? resolve(new File([blob], file.name, {type:'image/jpeg'})) : reject(new Error('Compresión fallida')),
           'image/jpeg', quality
         );
       };
       img.onerror = reject;
       img.src = url;
     });
-  },
-
-  _showSuccessConfirmation(amount, month) {
-    const container = document.getElementById('paymentsHistory');
-    if (!container) return;
-    const banner = document.createElement('div');
-    banner.className = 'bg-green-50 border-2 border-green-200 rounded-2xl p-4 mb-4 flex items-center gap-3';
-    banner.innerHTML =
-      '<div class="w-10 h-10 bg-green-500 rounded-xl flex items-center justify-center text-white text-xl flex-shrink-0">\u2705</div>' +
-      '<div>' +
-        '<p class="font-black text-green-800 text-sm">Comprobante enviado correctamente</p>' +
-        '<p class="text-[10px] font-bold text-green-600 uppercase">' + Helpers.formatCurrency(amount) + ' \u2022 ' + month + ' \u2022 En revisi\u00F3n</p>' +
-      '</div>';
-    container.insertBefore(banner, container.firstChild);
-    setTimeout(() => banner.remove(), 8000);
   }
-});
+};
+
+window.PaymentsModule = PaymentsModule;

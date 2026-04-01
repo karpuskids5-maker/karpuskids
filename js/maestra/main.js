@@ -1854,30 +1854,15 @@ async function submitNewPost() {
     Modal.close('newPostModal');
     WallModule.loadPosts(document.getElementById('muroPostsContainer'));
 
-    // Notify parents of this classroom
-    const students = AppState.get('students') || [];
+    // Notify parents of this classroom (via background event)
     const classroom = AppState.get('classroom');
     const teacherName = AppState.get('profile')?.name || 'La maestra';
 
-    // Push with visual feedback
-    const { notifyParents: _np } = await import('../shared/notify-feedback.js').catch(() => ({ notifyParents: null }));
-    if (_np) {
-      _np({
-        students,
-        title:   '📢 Nueva publicación en el muro',
-        message: `${teacherName} publicó en el muro de ${classroom?.name || 'tu aula'}.`,
-        type:    'post',
-        link:    'panel_padres.html',
-        label:   content.slice(0, 40)
-      });
-    }
-
-    // Email via process-event
     emitEvent('post.created', {
       classroom_id:    classroom?.id,
       teacher_name:    teacherName,
       content_preview: content.slice(0, 80)
-    }).catch(() => {});
+    }).catch(err => console.warn('[post.created] event failed:', err));
   } catch (e) {
     console.error(e);
     safeToast('Error al publicar', 'error');

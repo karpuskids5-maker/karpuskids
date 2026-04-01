@@ -1,0 +1,8 @@
+[functions.send-push]
+verify_jwt = false
+
+[functions.process-event]
+verify_jwt = true
+
+[functions.send-email]
+verify_jwt = true
