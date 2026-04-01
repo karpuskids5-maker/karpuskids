@@ -246,6 +246,7 @@ export async function initOneSignal(currentUser = null) {
 
     window.OneSignalDeferred.push(async function(OneSignal) {
       try {
+        // Verificar si ya está inicializado para evitar errores
         if (typeof OneSignal.isInitialized === 'function' && OneSignal.isInitialized()) {
           return;
         }
@@ -259,6 +260,10 @@ export async function initOneSignal(currentUser = null) {
           welcomeNotification: { disable: false }
         });
 
+        // ✅ Esperar un momento a que el SDK esté realmente listo antes de login()
+        // Esto ayuda a evitar el error 'Unrecognized operation: login-user' o '400'
+        await new Promise(r => setTimeout(r, 500));
+
         // Pedir permiso si aún no se ha dado
         try {
           if (OneSignal.Notifications?.permissionNative === 'default') {
@@ -268,7 +273,8 @@ export async function initOneSignal(currentUser = null) {
 
         // Vincular usuario — con guard completo contra IndexedDB y Conflictos de Identidad
         try {
-          if (OneSignal.User?.externalId !== user.id) {
+          const currentExtId = await OneSignal.User?.getExternalId?.();
+          if (currentExtId !== user.id) {
             console.log('[OneSignal] Vinculando usuario:', user.id);
             await OneSignal.login(user.id);
           }
@@ -277,7 +283,6 @@ export async function initOneSignal(currentUser = null) {
           const errMsg = loginErr?.message?.toLowerCase() || "";
           if (errMsg.includes('409') || loginErr?.status === 409 || errMsg.includes('conflict')) {
             // El error 409 es un conflicto de identidad esperado si ya existe el alias.
-            // No lo reportamos como error ya que el usuario queda vinculado de todos modos.
             return; 
           }
           console.info('[OneSignal] login() omitido:', loginErr?.message ?? loginErr);
