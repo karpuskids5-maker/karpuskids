@@ -256,36 +256,41 @@ export async function initOneSignal(currentUser = null) {
           allowLocalhostAsSecureOrigin: true,
           serviceWorkerParam: { scope: '/' },
           serviceWorkerPath: 'OneSignalSDKWorker.js',
+          serviceWorkerUpdaterPath: 'OneSignalSDKUpdaterWorker.js', // ✅ Requerido para PWA
           notifyButton: { enable: false },
           welcomeNotification: { disable: false }
         });
 
         // ✅ Esperar un momento a que el SDK esté realmente listo antes de login()
-        // Esto ayuda a evitar el error 'Unrecognized operation: login-user' o '400'
-        await new Promise(r => setTimeout(r, 500));
+        await new Promise(r => setTimeout(r, 1000));
 
-        // Pedir permiso si aún no se ha dado
+        // Pedir permiso de forma proactiva
         try {
           if (OneSignal.Notifications?.permissionNative === 'default') {
             await OneSignal.Notifications.requestPermission();
           }
         } catch (_) { /* silencioso */ }
 
-        // Vincular usuario — con guard completo contra IndexedDB y Conflictos de Identidad
+        // Vincular usuario y asegurar suscripción activa (Opt-In)
         try {
           const currentExtId = await OneSignal.User?.getExternalId?.();
           if (currentExtId !== user.id) {
             console.log('[OneSignal] Vinculando usuario:', user.id);
             await OneSignal.login(user.id);
           }
-          console.log('[OneSignal] Inicializado para usuario:', user.id);
+          
+          // ✅ Forzar suscripción activa en móvil si el permiso está dado
+          if (OneSignal.Notifications.permission && OneSignal.User.PushSubscription.optedIn === false) {
+            await OneSignal.User.PushSubscription.optIn();
+          }
+
+          console.log('[OneSignal] Inicializado y suscrito para:', user.id);
         } catch (loginErr) {
           const errMsg = loginErr?.message?.toLowerCase() || "";
           if (errMsg.includes('409') || loginErr?.status === 409 || errMsg.includes('conflict')) {
-            // El error 409 es un conflicto de identidad esperado si ya existe el alias.
             return; 
           }
-          console.info('[OneSignal] login() omitido:', loginErr?.message ?? loginErr);
+          console.info('[OneSignal] login/optIn omitido:', loginErr?.message ?? loginErr);
         }
 
       } catch (e) {

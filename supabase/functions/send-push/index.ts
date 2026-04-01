@@ -66,7 +66,7 @@ Deno.serve(async (req) => {
           body: JSON.stringify({
             app_id:                          ONESIGNAL_APP_ID,
             include_external_user_ids:       [String(user_id)],
-            channel_for_external_user_ids:   'push',
+            channel_for_external_user_ids:   "push", // ✅ Asegurar canal push
             headings:  { en: title,   es: title },
             contents:  { en: message, es: message },
             url:       fullLink,
