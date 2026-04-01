@@ -90,8 +90,12 @@ export async function subscribeNotifications(userId, onNotif) {
 // ── Email via Resend (Edge Function send-email) ───────────────────────────────
 export async function sendEmail(to, subject, html, text) {
   try {
+    // 🛡️ FIX: Usar headers explícitos para asegurar la autorización
     const { data, error } = await supabase.functions.invoke('send-email', {
-      body: { to, subject, html, text }
+      body: { to, subject, html, text },
+      headers: {
+        'Authorization': `Bearer ${SUPABASE_ANON_KEY}`
+      }
     });
     
     if (error) {
@@ -108,8 +112,12 @@ export async function sendEmail(to, subject, html, text) {
 // ── Push via OneSignal (Edge Function send-push) ──────────────────────────────
 export async function sendPush(payload) {
   try {
+    // 🛡️ FIX: Usar headers explícitos para asegurar la autorización
     const { data, error } = await supabase.functions.invoke('send-push', {
-      body: payload
+      body: payload,
+      headers: {
+        'Authorization': `Bearer ${SUPABASE_ANON_KEY}`
+      }
     });
 
     if (error) {
@@ -127,8 +135,12 @@ export async function sendPush(payload) {
 // ── Eventos del sistema (process-event) ──────────────────────────────────────
 export async function emitEvent(type, data) {
   try {
+    // 🛡️ FIX: Usar headers explícitos para asegurar la autorización
     const { data: resData, error } = await supabase.functions.invoke('process-event', {
-      body: { type, data }
+      body: { type, data },
+      headers: {
+        'Authorization': `Bearer ${SUPABASE_ANON_KEY}`
+      }
     });
     
     if (error) {
