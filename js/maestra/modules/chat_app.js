@@ -116,8 +116,8 @@ export async function selectChatContact(userId, name, meta) {
   const listPanel = document.getElementById('chatListPanel');
   const convPanel = document.getElementById('chatConversationPanel');
   if (listPanel && convPanel) {
-    listPanel.classList.add('hidden');
-    convPanel.classList.remove('hidden');
+    listPanel.classList.add('chat-hidden');
+    convPanel.classList.remove('chat-hidden');
     convPanel.classList.add('flex');
   }
 
@@ -152,9 +152,9 @@ export async function selectChatContact(userId, name, meta) {
     backBtn._bound = true;
     backBtn.addEventListener('click', () => {
       if (listPanel && convPanel) {
-        convPanel.classList.add('hidden');
+        convPanel.classList.add('chat-hidden');
         convPanel.classList.remove('flex');
-        listPanel.classList.remove('hidden');
+        listPanel.classList.remove('chat-hidden');
       }
     });
   }

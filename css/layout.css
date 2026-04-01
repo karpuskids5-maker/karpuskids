@@ -2,13 +2,25 @@
 
 /* Prevent horizontal scroll without blocking vertical */
 html {
-  overflow-x: clip; /* clip is better than hidden — doesn't create scroll context */
+  overflow-x: clip;
+  /* ✅ FIX: nunca bloquear scroll vertical */
+  overflow-y: auto;
 }
 body {
   overflow-x: hidden;
+  overflow-y: auto;   /* ✅ FIX: scroll vertical siempre libre */
   max-width: 100%;
 }
 *, *::before, *::after { box-sizing: border-box; }
+
+/* ✅ FIX: Ningún contenedor padre debe tener overflow:hidden que bloquee scroll */
+.panel-maestra-body,
+.panel-directora-body,
+.panel-asistente-body,
+.panel-padre-body {
+  overflow-y: auto;
+  min-height: 100dvh;
+}
 
 /* Sidebar overlay — shared across all staff panels */
 #sidebarOverlay {
