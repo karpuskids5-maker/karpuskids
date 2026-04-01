@@ -37,21 +37,24 @@ Deno.serve(async (req) => {
     // Helper para enviar push usando la función send-push
     const sendPushToUser = async (user_id: string, title: string, message: string, pushType = 'info', link = 'panel_padres.html') => {
       try {
+        // 🔥 FIX: Asegurar que se use la Service Key para llamadas entre funciones internas
         const res = await fetch(`${SUPABASE_URL}/functions/v1/send-push`, {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
-            'Authorization': `Bearer ${SERVICE_KEY}`
+            'Authorization': `Bearer ${SERVICE_KEY}`, // Usar siempre SERVICE_KEY internamente
+            'apikey': SERVICE_KEY
           },
           body: JSON.stringify({ user_id, title, message, type: pushType, link })
         });
+        
         if (!res.ok) {
-          const err = await res.text();
-          console.warn(`[process-event] send-push failed for user ${user_id}:`, res.status, err);
+          const errText = await res.text();
+          console.warn(`[process-event] send-push 401/error for ${user_id}:`, res.status, errText);
         }
         return res;
       } catch (e) {
-        console.error(`[process-event] send-push exception for user ${user_id}:`, e);
+        console.error(`[process-event] send-push exception for ${user_id}:`, e);
         return null;
       }
     };
