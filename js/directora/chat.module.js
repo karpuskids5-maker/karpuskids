@@ -2,6 +2,7 @@ import { DirectorApi } from './api.js';
 import { Helpers } from '../shared/helpers.js';
 import { supabase, sendPush } from '../shared/supabase.js';
 import { ChatModule as SharedChat } from '../shared/chat.js';
+import { ScrollModule } from '../shared/scroll.module.js';
 
 export const ChatModule = {
   _currentUserId: null,

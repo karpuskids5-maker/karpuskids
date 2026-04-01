@@ -1,4 +1,7 @@
 import { supabase } from './supabase.js';
+import { ScrollModule } from './scroll.module.js';
+
+const MSG_PAGE_SIZE = 20;
 
 /**
  * 💬 ChatModule: Cerebro unificado de mensajería
@@ -6,6 +9,8 @@ import { supabase } from './supabase.js';
  */
 export const ChatModule = {
   _activeSubscription: null,
+  // Paginación por conversación: { [convId]: { page, hasMore, loading } }
+  _pagination: {},
 
   /**
    * Obtiene un mapa de mensajes no leídos por remitente { userId: count }
@@ -60,30 +65,70 @@ export const ChatModule = {
   },
 
   /**
-   * Carga la conversación privada con otro usuario.
-   * También permite cargar por conversationId directamente (Auditoría)
+   * Carga la conversación privada con otro usuario — PAGINADA (últimos 20 mensajes).
+   * @param {string}  otherUserId
+   * @param {string}  conversationId  — si ya se conoce
+   * @param {boolean} loadMore        — true = cargar página anterior (scroll arriba)
    */
-  async loadConversation(otherUserId, conversationId = null) {
+  async loadConversation(otherUserId, conversationId = null, loadMore = false) {
     if (conversationId) {
-      // Modo Auditoría o acceso directo por ID
-      const { data: messages, error } = await supabase
-        .from('messages')
-        .select('*')
-        .eq('conversation_id', conversationId)
-        .order('created_at', { ascending: true });
+      // Modo paginado por conversationId
+      const state = this._getPagState(conversationId);
+      if (loadMore && !state.hasMore) return { messages: [], conversationId };
+      if (state.loading) return { messages: [], conversationId };
+      state.loading = true;
 
-      if (error) throw error;
-      return { messages: messages || [], conversationId };
+      try {
+        const from = state.page * MSG_PAGE_SIZE;
+        const to   = from + MSG_PAGE_SIZE - 1;
+
+        const { data: messages, error } = await supabase
+          .from('messages')
+          .select('*')
+          .eq('conversation_id', conversationId)
+          .order('created_at', { ascending: false })  // más recientes primero
+          .range(from, to);
+
+        if (error) throw error;
+
+        const ordered = (messages || []).reverse(); // invertir para mostrar cronológico
+        state.page++;
+        state.hasMore = (messages || []).length === MSG_PAGE_SIZE;
+        return { messages: ordered, conversationId, hasMore: state.hasMore };
+      } finally {
+        state.loading = false;
+      }
     } else {
-      // Modo normal: buscar por ID de usuario destino
+      // Modo normal: buscar por ID de usuario destino via RPC
       const { data, error } = await supabase.rpc('get_direct_messages', {
         p_other_user_id: otherUserId
       });
       if (error) throw error;
-      const messages = data || [];
+
+      const messages = (data || []).slice(-MSG_PAGE_SIZE); // solo últimos 20
       const foundConvId = messages.length > 0 ? messages[0].conversation_id : null;
-      return { messages, conversationId: foundConvId };
+
+      if (foundConvId) {
+        const state = this._getPagState(foundConvId);
+        state.page = 1; // ya cargamos la primera página
+        state.hasMore = (data || []).length >= MSG_PAGE_SIZE;
+      }
+
+      return { messages, conversationId: foundConvId, hasMore: false };
     }
+  },
+
+  /** Obtiene o crea el estado de paginación para una conversación */
+  _getPagState(convId) {
+    if (!this._pagination[convId]) {
+      this._pagination[convId] = { page: 0, hasMore: true, loading: false };
+    }
+    return this._pagination[convId];
+  },
+
+  /** Resetea la paginación de una conversación (al abrir un chat nuevo) */
+  resetPagination(convId) {
+    if (convId) delete this._pagination[convId];
   },
 
   /**

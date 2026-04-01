@@ -204,6 +204,34 @@ export async function initOneSignal(currentUser = null) {
       return;
     }
 
+    if (window.OneSignalInitialized) return;
+    window.OneSignalInitialized = true;
+
+    // 🛡️ FIX: Verificar IndexedDB disponible ANTES de inyectar el script
+    // OneSignal v16 intenta abrir IndexedDB apenas se carga, si falla lanza error incapturable.
+    const isIndexedDBAvailable = await new Promise(resolve => {
+      try {
+        if (!window.indexedDB) return resolve(false);
+        const req = indexedDB.open('_karpus_idb_test');
+        req.onsuccess = () => { req.result.close(); resolve(true); };
+        req.onerror   = () => resolve(false);
+        req.onblocked = () => resolve(false);
+        setTimeout(() => resolve(false), 2000);
+      } catch (_) { resolve(false); }
+    });
+
+    if (!isIndexedDBAvailable) {
+      console.info('[OneSignal] IndexedDB no disponible (modo incógnito/privado) — omitiendo carga del SDK.');
+      return;
+    }
+
+    // 🛡️ FIX: Silenciar errores internos de OneSignal si fallan promesas nativas
+    window.addEventListener('unhandledrejection', function(event) {
+      if (event.reason && (event.reason.message?.includes('indexedDB') || event.reason.name === 'UnknownError')) {
+        event.preventDefault(); // Evitar error ruidoso en consola
+      }
+    });
+
     const ONESIGNAL_APP_ID = "47ce2d1e-152e-4ea7-9ddc-8e2142992989";
 
     if (!document.getElementById('onesignal-sdk')) {
@@ -215,28 +243,6 @@ export async function initOneSignal(currentUser = null) {
     }
 
     window.OneSignalDeferred = window.OneSignalDeferred || [];
-
-    if (window.OneSignalInitialized) return;
-    window.OneSignalInitialized = true;
-
-    // ✅ FIX: Verificar IndexedDB disponible ANTES de inicializar OneSignal
-    // En algunos navegadores móviles (modo privado, iOS WebView) IndexedDB falla
-    const isIndexedDBAvailable = await new Promise(resolve => {
-      try {
-        const req = indexedDB.open('_karpus_idb_test');
-        req.onsuccess = () => { req.result.close(); resolve(true); };
-        req.onerror  = () => resolve(false);
-        req.onblocked = () => resolve(false);
-        // Timeout de seguridad
-        setTimeout(() => resolve(false), 1500);
-      } catch (_) { resolve(false); }
-    });
-
-    if (!isIndexedDBAvailable) {
-      console.info('[OneSignal] IndexedDB no disponible — notificaciones push desactivadas en este dispositivo.');
-      window.OneSignalInitialized = false; // permitir reintento si se recarga
-      return;
-    }
 
     window.OneSignalDeferred.push(async function(OneSignal) {
       try {
@@ -273,7 +279,7 @@ export async function initOneSignal(currentUser = null) {
         }
 
       } catch (e) {
-        // Captura cualquier crash interno del SDK (IndexedDB, Qe, etc.)
+        // Captura cualquier crash interno del SDK
         console.info('[OneSignal] SDK error (no crítico):', e?.message ?? e);
       }
     });
