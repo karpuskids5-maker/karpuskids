@@ -10,6 +10,7 @@ export const ChatModule = {
   _conversationId: null,
   _channel: null,
   _allContacts: [],
+  _topScrollDestroy: null,
 
   async init() {
     const { data: { user } } = await supabase.auth.getUser();
@@ -147,6 +148,9 @@ export const ChatModule = {
     container.innerHTML = '<div class="flex-1 flex items-center justify-center"><div class="w-8 h-8 border-2 border-blue-400 border-t-transparent rounded-full animate-spin"></div></div>';
 
     try {
+      // Reset paginación al abrir un chat nuevo
+      SharedChat.resetPagination(this._conversationId);
+
       const { messages, conversationId } = await SharedChat.loadConversation(this._activeContactId);
       this._conversationId = conversationId;
 
@@ -159,24 +163,50 @@ export const ChatModule = {
 
       messages.forEach(m => this._appendMessage(m));
       this._scrollToBottom();
+
+      // Top-scroll para cargar mensajes anteriores
+      if (this._topScrollDestroy) this._topScrollDestroy();
+      const { destroy } = ScrollModule.topScroll({
+        container,
+        loadFn: async () => {
+          if (!this._conversationId) return;
+          const { messages: older } = await SharedChat.loadConversation(
+            this._activeContactId, this._conversationId, true
+          );
+          if (older.length) {
+            const frag = document.createDocumentFragment();
+            const tmp = document.createElement('div');
+            older.forEach(m => {
+              tmp.innerHTML = this._buildBubble(m);
+              while (tmp.firstChild) frag.appendChild(tmp.firstChild);
+            });
+            container.insertBefore(frag, container.firstChild);
+          }
+        }
+      });
+      this._topScrollDestroy = destroy;
+
     } catch (e) {
       console.error('[ChatModule] loadMessages:', e);
       if (container) container.innerHTML = '<div class="p-4 text-center text-rose-500 text-sm font-bold">Error al cargar mensajes.</div>';
     }
   },
 
+  _buildBubble(msg) {
+    const isMine = msg.sender_id === this._currentUserId;
+    const time   = new Date(msg.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+    return `<div class="flex ${isMine ? 'justify-end' : 'justify-start'} mb-2">
+      <div class="msg-bubble ${isMine ? 'msg-me' : 'msg-them'}">
+        <div class="whitespace-pre-wrap break-words">${Helpers.escapeHTML(msg.content || '')}</div>
+        <div class="text-[9px] ${isMine ? 'text-blue-100' : 'text-slate-400'} mt-1 text-right opacity-80">${time}</div>
+      </div>
+    </div>`;
+  },
+
   _appendMessage(msg) {
     const container = document.getElementById('chatMessagesContainer');
     if (!container) return;
-    const isMine = msg.sender_id === this._currentUserId;
-    const time   = new Date(msg.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-    const div    = document.createElement('div');
-    div.className = `flex ${isMine ? 'justify-end' : 'justify-start'} mb-2`;
-    div.innerHTML = `<div class="msg-bubble ${isMine ? 'msg-me' : 'msg-them'}">
-      <div class="whitespace-pre-wrap break-words">${Helpers.escapeHTML(msg.content || '')}</div>
-      <div class="text-[9px] ${isMine ? 'text-blue-100' : 'text-slate-400'} mt-1 text-right opacity-80">${time}</div>
-    </div>`;
-    container.appendChild(div);
+    container.insertAdjacentHTML('beforeend', this._buildBubble(msg));
   },
 
   async sendMessage() {
@@ -189,7 +219,7 @@ export const ChatModule = {
 
     // Optimistic append
     this._appendMessage({ content: text, sender_id: this._currentUserId, created_at: new Date().toISOString() });
-    this._scrollToBottom();
+    ScrollModule.scrollToBottom(document.getElementById('chatMessagesContainer'), true);
 
     try {
       const { conversationId } = await SharedChat.sendMessage(
@@ -226,7 +256,7 @@ export const ChatModule = {
       (newMsg) => {
         if (newMsg.sender_id !== this._currentUserId) {
           this._appendMessage(newMsg);
-          this._scrollToBottom();
+          ScrollModule.scrollToBottom(document.getElementById('chatMessagesContainer'), true);
         }
       }
     );
@@ -240,7 +270,6 @@ export const ChatModule = {
   },
 
   _scrollToBottom() {
-    const el = document.getElementById('chatMessagesContainer');
-    if (el) el.scrollTop = el.scrollHeight;
+    ScrollModule.scrollToBottom(document.getElementById('chatMessagesContainer'));
   }
 };

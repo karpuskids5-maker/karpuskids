@@ -12,6 +12,7 @@ import { AttendanceModule } from './attendance.module.js';
 import { ChatModule } from './chat.module.js';
 import { InquiriesModule } from './inquiries.module.js';
 import { RoomsModule } from './rooms.module.js';
+import { BadgeSystem } from '../shared/badges.js';
 const debounce = (fn, delay) => {
   let timeout;
   return (...args) => {
@@ -78,6 +79,9 @@ export function goToSection(sectionId) {
     
     // 2. Carga bajo demanda por módulo
     switch (sectionId) {
+      case 'dashboard':
+        DashboardService.getFullData(true).then(data => DirectorUI.renderDashboard(data));
+        break;
       case 'maestros': TeachersModule.init(); break;
       case 'estudiantes': StudentsModule.init(); break;
       case 'aulas': RoomsModule.init(); break;
@@ -85,12 +89,18 @@ export function goToSection(sectionId) {
       case 'calificaciones': GradesModule.init(); break;
       case 'pagos': PaymentsModule.init(); break;
       case 'comunicacion': ChatModule.init(); break;
-      case 'muro': 
-        WallModule.init('muroPostsContainer', { accentColor: 'orange' }, AppState); 
+      case 'muro':
+        WallModule.init('muroPostsContainer', { accentColor: 'orange' }, AppState);
         break;
       case 'reportes': InquiriesModule.init(); break;
-      case 'configuracion': loadProfile(); import('../shared/notify-permission.js').then(m => m.NotifyPermission.requestIfNeeded()); break;
+      case 'configuracion':
+        loadProfile();
+        import('../shared/notify-permission.js').then(m => m.NotifyPermission.requestIfNeeded());
+        break;
     }
+
+    // 🔴 Marcar badge como leído al entrar
+    BadgeSystem.mark(sectionId);
   }
 
   // 3. Actualizar Botones Nav
@@ -107,7 +117,7 @@ export function goToSection(sectionId) {
   const overlay = document.getElementById('sidebarOverlay');
   if (sidebar && window.innerWidth < 768) {
     sidebar.classList.remove('mobile-visible');
-    overlay?.classList.add('hidden');
+    if (overlay) { overlay.style.display = 'none'; }
   }
 }
 
@@ -208,6 +218,9 @@ document.addEventListener('DOMContentLoaded', async () => {
     // 5c. Badge de mensajes no leídos (directora)
     loadUnreadMessageBadge(auth.user.id);
 
+    // 🔴 Sistema de badges por sección
+    BadgeSystem.init(auth.user.id);
+
     // 6. Configurar Logout
     document.getElementById('btnLogout')?.addEventListener('click', async () => {
       await supabase.auth.signOut();
@@ -219,15 +232,32 @@ document.addEventListener('DOMContentLoaded', async () => {
     const sidebar = document.getElementById('sidebar');
     const overlay = document.getElementById('sidebarOverlay');
 
-    if (menuBtn && sidebar) {
-      menuBtn.addEventListener('click', () => {
-        sidebar.classList.toggle('mobile-visible');
-        overlay?.classList.toggle('hidden');
-      });
-    }
-    overlay?.addEventListener('click', () => {
-      sidebar.classList.remove('mobile-visible');
-      overlay.classList.add('hidden');
+    const openSidebar = () => {
+      sidebar?.classList.add('mobile-visible');
+      if (overlay) { overlay.style.display = 'block'; }
+    };
+    const closeSidebar = () => {
+      sidebar?.classList.remove('mobile-visible');
+      if (overlay) { overlay.style.display = 'none'; }
+    };
+
+    menuBtn?.addEventListener('click', (e) => {
+      e.stopPropagation();
+      if (sidebar?.classList.contains('mobile-visible')) {
+        closeSidebar();
+      } else {
+        openSidebar();
+      }
+    });
+
+    overlay?.addEventListener('click', closeSidebar);
+
+    // Cerrar al hacer clic fuera del sidebar en móvil
+    document.addEventListener('click', (e) => {
+      if (window.innerWidth >= 768) return;
+      if (!sidebar?.contains(e.target) && !menuBtn?.contains(e.target)) {
+        closeSidebar();
+      }
     });
 
     // 7. Configurar guardado de perfil

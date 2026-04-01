@@ -2,12 +2,14 @@ import { supabase } from '../shared/supabase.js';
 import { AppState } from './appState.js';
 import { Helpers, escapeHtml } from './helpers.js';
 import { ChatModule as SharedChatModule } from '../shared/chat.js';
+import { ScrollModule } from '../shared/scroll.module.js';
 
 export const ChatModule = {
   _contacts: [],
   _activeContact: null,
   _conversationId: null,
   _channel: null,
+  _topScrollDestroy: null,
 
   async init() {
     const list = document.getElementById('chatContactsList');
@@ -99,35 +101,60 @@ export const ChatModule = {
     this.initRealtime();
   },
 
-  async loadMessages() {
+  async loadMessages(loadMore = false) {
     const container = document.getElementById('chatMessages');
     if (!container) return;
-    container.innerHTML = '<div class="h-full flex items-center justify-center"><div class="animate-spin rounded-full h-8 w-8 border-b-2 border-green-600"></div></div>';
+
+    if (!loadMore) {
+      container.innerHTML = '<div class="h-full flex items-center justify-center"><div class="animate-spin rounded-full h-8 w-8 border-b-2 border-green-600"></div></div>';
+      SharedChatModule.resetPagination(this._conversationId);
+    }
 
     try {
-      const { messages, conversationId } = await SharedChatModule.loadConversation(this._activeContact.id);
+      const { messages, conversationId, hasMore } = await SharedChatModule.loadConversation(
+        this._activeContact.id, this._conversationId, loadMore
+      );
       this._conversationId = conversationId;
 
-      container.innerHTML = '';
-      if (!messages.length) {
-        container.innerHTML = '<div class="h-full flex flex-col items-center justify-center text-slate-400 text-sm"><p>No hay mensajes aun.</p><p class="text-xs mt-1">Escribe el primero.</p></div>';
-        return;
+      if (!loadMore) {
+        container.innerHTML = '';
+        if (!messages.length) {
+          container.innerHTML = '<div class="h-full flex flex-col items-center justify-center text-slate-400 text-sm"><p>No hay mensajes aun.</p><p class="text-xs mt-1">Escribe el primero.</p></div>';
+          return;
+        }
       }
 
       const user = AppState.get('user');
-      messages.forEach(m => this._appendMessage(m, user?.id));
-      this._scrollToBottom();
+      if (loadMore) {
+        // Insertar al principio
+        const frag = document.createDocumentFragment();
+        messages.forEach(m => {
+          const div = this._buildBubble(m, user?.id);
+          frag.appendChild(div);
+        });
+        container.insertBefore(frag, container.firstChild);
+      } else {
+        messages.forEach(m => container.appendChild(this._buildBubble(m, user?.id)));
+        ScrollModule.scrollToBottom(container);
+
+        // Activar top-scroll para cargar más
+        if (this._topScrollDestroy) this._topScrollDestroy();
+        if (hasMore !== false) {
+          const { destroy } = ScrollModule.topScroll({
+            container,
+            loadFn: () => this.loadMessages(true)
+          });
+          this._topScrollDestroy = destroy;
+        }
+      }
 
     } catch (err) {
       console.error('[ChatModule] loadMessages error:', err);
-      const container2 = document.getElementById('chatMessages');
-      if (container2) container2.innerHTML = '<div class="p-4 text-center text-rose-500 text-sm">Error al cargar mensajes.</div>';
+      if (!loadMore) container.innerHTML = '<div class="p-4 text-center text-rose-500 text-sm">Error al cargar mensajes.</div>';
     }
   },
 
-  _appendMessage(m, myId) {
-    const container = document.getElementById('chatMessages');
-    if (!container) return;
+  _buildBubble(m, myId) {
     const isMine = m.sender_id === myId;
     const div = document.createElement('div');
     div.className = 'flex ' + (isMine ? 'justify-end' : 'justify-start') + ' mb-3';
@@ -140,7 +167,13 @@ export const ChatModule = {
           new Date(m.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) +
         '</p>' +
       '</div>';
-    container.appendChild(div);
+    return div;
+  },
+
+  _appendMessage(m, myId) {
+    const container = document.getElementById('chatMessages');
+    if (!container) return;
+    container.appendChild(this._buildBubble(m, myId));
   },
 
   async sendMessage() {
@@ -155,26 +188,25 @@ export const ChatModule = {
     input.value = '';
     input.disabled = true;
 
-    try {
-      // Usar SharedChatModule que maneja conversation_id correctamente
-      const { conversationId } = await SharedChatModule.sendMessage(
-        user.id,
-        this._activeContact.id,
-        content,
-        this._conversationId
-      );
+    // Optimistic append
+    const container = document.getElementById('chatMessages');
+    if (container) {
+      container.appendChild(this._buildBubble({ sender_id: user.id, content, created_at: new Date().toISOString() }, user.id));
+      ScrollModule.scrollToBottom(container, true);
+    }
 
+    try {
+      const { conversationId } = await SharedChatModule.sendMessage(
+        user.id, this._activeContact.id, content, this._conversationId
+      );
       if (!this._conversationId && conversationId) {
         this._conversationId = conversationId;
-        this.initRealtime(); // Suscribirse a la nueva conversación
+        this.initRealtime();
       }
-
-      // Recargar mensajes para mostrar el enviado
-      await this.loadMessages();
-
     } catch (err) {
       console.error('[ChatModule] sendMessage error:', err);
       Helpers.toast('Error al enviar mensaje', 'error');
+      container?.lastElementChild?.remove(); // revertir optimistic
     } finally {
       input.disabled = false;
       input.focus();
@@ -182,26 +214,24 @@ export const ChatModule = {
   },
 
   initRealtime() {
-    if (this._channel) {
-      supabase.removeChannel(this._channel);
-      this._channel = null;
-    }
+    if (this._channel) { supabase.removeChannel(this._channel); this._channel = null; }
     if (!this._conversationId) return;
-
     const user = AppState.get('user');
     this._channel = SharedChatModule.subscribeToConversation(
       this._conversationId,
       (newMsg) => {
         if (newMsg.sender_id !== user?.id) {
-          this._appendMessage(newMsg, user?.id);
-          this._scrollToBottom();
+          const container = document.getElementById('chatMessages');
+          if (container) {
+            container.appendChild(this._buildBubble(newMsg, user?.id));
+            ScrollModule.scrollToBottom(container, true);
+          }
         }
       }
     );
   },
 
   _scrollToBottom() {
-    const el = document.getElementById('chatMessages');
-    if (el) el.scrollTop = el.scrollHeight;
+    ScrollModule.scrollToBottom(document.getElementById('chatMessages'));
   }
 };

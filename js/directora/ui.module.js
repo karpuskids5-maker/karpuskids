@@ -11,10 +11,16 @@ const UIHelpers = {
       loader.innerHTML = '<div class="flex flex-col items-center gap-3"><div class="w-12 h-12 border-4 border-indigo-100 border-t-indigo-600 rounded-full animate-spin"></div><span class="text-[10px] font-black text-indigo-600 uppercase tracking-widest animate-pulse">Procesando...</span></div>';
       container.style.position = 'relative';
       container.appendChild(loader);
-      if (btnSelector) { const btn = document.querySelector(btnSelector); if (btn) { btn.disabled = true; btn.classList.add('opacity-50', 'cursor-not-allowed'); } }
+      if (btnSelector) {
+        const btn = document.querySelector(btnSelector);
+        if (btn) { btn.disabled = true; btn.classList.add('opacity-50', 'cursor-not-allowed'); }
+      }
     } else {
       document.getElementById('ui-loading-overlay')?.remove();
-      if (btnSelector) { const btn = document.querySelector(btnSelector); if (btn) { btn.disabled = false; btn.classList.remove('opacity-50', 'cursor-not-allowed'); } }
+      if (btnSelector) {
+        const btn = document.querySelector(btnSelector);
+        if (btn) { btn.disabled = false; btn.classList.remove('opacity-50', 'cursor-not-allowed'); }
+      }
     }
   },
 
@@ -30,19 +36,35 @@ const UIHelpers = {
 };
 
 const DirectorUI = {
+  /**
+   * Renderiza los KPI cards del dashboard
+   */
   renderDashboard(data) {
-    const set = (id, val) => { const el = document.getElementById(id); if (el) el.textContent = val; };
+    const set = (id, val) => {
+      const el = document.getElementById(id);
+      if (el) el.textContent = val;
+    };
+
     const kpis = data?.kpis || {};
 
-    // Usar total como fallback cuando active es 0 (RPC puede devolver 0 si no usa is_active)
+    // Estudiantes activos — usar total como fallback si active es 0
     const studentCount = (kpis.active > 0 ? kpis.active : null) ?? kpis.total ?? 0;
-    set('kpiStudents',   studentCount);
-    set('kpiTeachers',   kpis.teachers   > 0 ? kpis.teachers   : (data?.teacherCount ?? 0));
+    set('kpiStudents', studentCount);
+
+    // Docentes
+    set('kpiTeachers', kpis.teachers > 0 ? kpis.teachers : (data?.teacherCount ?? 0));
+
+    // Aulas activas
     set('kpiClassrooms', kpis.classrooms > 0 ? kpis.classrooms : (data?.classrooms?.length ?? 0));
+
+    // Niños presentes hoy
     set('kpiAttendance', data?.attendance?.today?.present ?? kpis.attendance_today ?? 0);
 
+    // Por cobrar
     const pending = data?.payments?.summary?.total_pending ?? kpis.pending_amount ?? 0;
     set('kpiPendingMoney', '$' + Number(pending).toLocaleString('es-ES', { minimumFractionDigits: 2 }));
+
+    // Incidencias
     set('kpiIncidents', data?.inquiries?.count ?? kpis.inquiries ?? 0);
 
     if (window.lucide) lucide.createIcons();

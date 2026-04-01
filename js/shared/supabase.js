@@ -266,16 +266,23 @@ export async function initOneSignal(currentUser = null) {
           }
         } catch (_) { /* silencioso */ }
 
-        // Vincular usuario — con guard completo contra IndexedDB
+        // Vincular usuario — con guard completo contra IndexedDB y Conflictos de Identidad
         try {
-          const currentExtId = await OneSignal.User?.getExternalId?.();
-          if (currentExtId !== user.id) {
+          // El error 409 (Conflict) ocurre si intentas vincular una identidad que ya existe.
+          // En v16, login() maneja la sesión del usuario.
+          if (OneSignal.User?.externalId !== user.id) {
+            console.log('[OneSignal] Vinculando usuario:', user.id);
             await OneSignal.login(user.id);
           }
           console.log('[OneSignal] Inicializado para usuario:', user.id);
         } catch (loginErr) {
-          // Error esperado en algunos dispositivos — no es crítico
-          console.info('[OneSignal] login() omitido:', loginErr?.message ?? loginErr);
+          // El error 409 es común si el usuario ya estaba logueado o hay conflicto de IDs.
+          // Lo tratamos como éxito parcial ya que la suscripción suele estar activa.
+          if (loginErr?.message?.includes('409') || loginErr?.status === 409) {
+            console.info('[OneSignal] Usuario ya vinculado (409 Conflict) — continuando.');
+          } else {
+            console.info('[OneSignal] login() omitido o fallido:', loginErr?.message ?? loginErr);
+          }
         }
 
       } catch (e) {

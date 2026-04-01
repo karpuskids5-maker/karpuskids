@@ -37,9 +37,13 @@ Deno.serve(async (req) => {
 
     console.log('[process-event] type:', type, '| data keys:', Object.keys(data || {}));
 
+    // ✅ FIX: Usar la URL interna del proyecto para invocar send-push
+    // Esto evita problemas de red externa y es más rápido.
+    const internalUrl = SUPABASE_URL.replace('https://', 'http://');
+
     // Helper para enviar push usando la función send-push
     const sendPushToUser = (user_id: string, title: string, message: string, pushType = 'info', link = 'panel_padres.html') =>
-      fetch(`${SUPABASE_URL}/functions/v1/send-push`, {
+      fetch(`${internalUrl}/functions/v1/send-push`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
