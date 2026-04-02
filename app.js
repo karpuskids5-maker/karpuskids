@@ -1438,6 +1438,8 @@ document.addEventListener('DOMContentLoaded', async () => {
   if (btnSaveStudent) {
     // Prepopulate classrooms when opening modal
 
+    populateStudentClassrooms();
+    
     // --- INICIO: VALIDACIONES EN TIEMPO REAL (MEJORAS PANEL DIRECTORA) ---
     const setupRealtimeValidation = () => {
       // 1. Validación de Nombres (Letras, espacios, puntos, comas para pickup)

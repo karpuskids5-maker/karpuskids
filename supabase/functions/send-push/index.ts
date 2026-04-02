@@ -12,8 +12,8 @@ const json = (data: unknown, status = 200) =>
     headers: { ...CORS, 'Content-Type': 'application/json' },
   });
 
-/** Enviar notificación a OneSignal con un payload dado */
-async function sendToOneSignal(appId: string, key: string, payload: Record<string, unknown>) {
+/** Enviar notificación a OneSignal */
+async function osNotify(appId: string, key: string, payload: Record<string, unknown>) {
   const res = await fetch('https://onesignal.com/api/v1/notifications', {
     method: 'POST',
     headers: {
@@ -24,6 +24,27 @@ async function sendToOneSignal(appId: string, key: string, payload: Record<strin
   });
   const result = await res.json();
   return { ok: res.ok, result };
+}
+
+/**
+ * Buscar player_ids de un usuario en OneSignal por external_user_id.
+ * Usa la API v1 de OneSignal para obtener los dispositivos del usuario.
+ */
+async function getPlayerIdsByExternalId(appId: string, key: string, externalUserId: string): Promise<string[]> {
+  try {
+    const res = await fetch(
+      `https://onesignal.com/api/v1/players?app_id=${appId}&limit=50`,
+      { headers: { 'Authorization': `Basic ${key}` } }
+    );
+    if (!res.ok) return [];
+    const data = await res.json();
+    const players = (data.players || []) as Array<{ id: string; external_user_id?: string }>;
+    return players
+      .filter(p => p.external_user_id === externalUserId)
+      .map(p => p.id);
+  } catch (_) {
+    return [];
+  }
 }
 
 Deno.serve(async (req) => {
@@ -55,12 +76,9 @@ Deno.serve(async (req) => {
     if (dbErr) console.warn('[send-push] DB insert error:', dbErr.message);
 
     // 2. OneSignal push
-    let onesignalStatus = 'not_configured';
-    let onesignalDetail = '';
-
     if (!ONESIGNAL_APP_ID || !ONESIGNAL_KEY) {
-      console.warn('[send-push] OneSignal no configurado — faltan env vars');
-      return json({ ok: true, notification_saved: !dbErr, onesignal: onesignalStatus });
+      console.warn('[send-push] OneSignal no configurado');
+      return json({ ok: true, notification_saved: !dbErr, onesignal: 'not_configured' });
     }
 
     const fullLink = link
@@ -68,10 +86,10 @@ Deno.serve(async (req) => {
       : 'https://karpuskids.com/';
 
     const basePayload = {
-      app_id:    ONESIGNAL_APP_ID,
-      headings:  { en: title,   es: title },
-      contents:  { en: message, es: message },
-      url:       fullLink,
+      app_id:               ONESIGNAL_APP_ID,
+      headings:             { en: title, es: title },
+      contents:             { en: message, es: message },
+      url:                  fullLink,
       android_accent_color: 'FF22C55E',
       ios_sound:            'default',
       ios_badge_type:       'Increase',
@@ -81,72 +99,82 @@ Deno.serve(async (req) => {
       data:                 { type, link }
     };
 
+    let onesignalStatus = 'pending';
+    let onesignalDetail = '';
+
     try {
-      // Intento 1: por external_user_id (el método principal)
+      // ── Intento 1: external_user_id (método estándar) ──────────────────────
       console.log('[send-push] Intento 1 — external_user_id:', user_id);
-      const { ok: ok1, result: r1 } = await sendToOneSignal(ONESIGNAL_APP_ID, ONESIGNAL_KEY, {
+      const { ok: ok1, result: r1 } = await osNotify(ONESIGNAL_APP_ID, ONESIGNAL_KEY, {
         ...basePayload,
         include_external_user_ids:     [String(user_id)],
         channel_for_external_user_ids: 'push'
       });
 
-      if (!ok1) {
-        onesignalStatus = 'failed';
-        onesignalDetail = JSON.stringify(r1);
-        console.error('[send-push] OneSignal error (intento 1):', onesignalDetail);
-      } else if ((r1.recipients ?? 0) > 0) {
-        // ✅ Entregado correctamente
+      if (ok1 && (r1.recipients ?? 0) > 0) {
         onesignalStatus = 'sent';
         onesignalDetail = `id=${r1.id} recipients=${r1.recipients}`;
         console.log('[send-push] ✅ Enviado | id:', r1.id, '| recipients:', r1.recipients);
-      } else {
-        // 0 recipients — el usuario no tiene external_user_id registrado en OneSignal
-        // Intento 2: buscar player_id guardado en profiles
-        console.warn('[send-push] 0 recipients para external_user_id:', user_id, '| errors:', r1.errors);
+        return json({ ok: true, notification_saved: !dbErr, onesignal: onesignalStatus, detail: onesignalDetail });
+      }
 
-        const { data: profile } = await supabase
-          .from('profiles')
-          .select('onesignal_player_id')
-          .eq('id', user_id)
-          .maybeSingle();
+      // ── Intento 2: buscar player_ids por external_user_id en OneSignal API ─
+      console.warn('[send-push] 0 recipients para external_user_id:', user_id, '| errors:', r1.errors);
+      console.log('[send-push] Intento 2 — buscando player_ids en OneSignal...');
 
-        const playerId = profile?.onesignal_player_id;
+      const playerIds = await getPlayerIdsByExternalId(ONESIGNAL_APP_ID, ONESIGNAL_KEY, String(user_id));
 
-        if (playerId) {
-          console.log('[send-push] Intento 2 — player_id:', playerId);
-          const { ok: ok2, result: r2 } = await sendToOneSignal(ONESIGNAL_APP_ID, ONESIGNAL_KEY, {
-            ...basePayload,
-            include_player_ids: [playerId]
-          });
+      if (playerIds.length > 0) {
+        console.log('[send-push] Intento 2 — player_ids encontrados:', playerIds);
+        const { ok: ok2, result: r2 } = await osNotify(ONESIGNAL_APP_ID, ONESIGNAL_KEY, {
+          ...basePayload,
+          include_player_ids: playerIds
+        });
 
-          if (ok2 && (r2.recipients ?? 0) > 0) {
-            onesignalStatus = 'sent_via_player_id';
-            onesignalDetail = `id=${r2.id} recipients=${r2.recipients}`;
-            console.log('[send-push] ✅ Enviado via player_id | id:', r2.id);
-          } else {
-            onesignalStatus = 'no_subscribers';
-            onesignalDetail = `player_id=${playerId} errors=${JSON.stringify(r2.errors)}`;
-            console.warn('[send-push] ⚠️ Sin suscriptores activos para user:', user_id);
-          }
-        } else {
-          onesignalStatus = 'no_subscribers';
-          onesignalDetail = `El usuario ${user_id} no tiene dispositivos suscritos ni player_id guardado. Errors: ${JSON.stringify(r1.errors)}`;
-          console.warn('[send-push] ⚠️ Sin player_id en profiles para user:', user_id);
-          console.warn('[send-push] ℹ️ El usuario debe abrir la app y aceptar notificaciones push.');
+        if (ok2 && (r2.recipients ?? 0) > 0) {
+          onesignalStatus = 'sent_via_player_id';
+          onesignalDetail = `id=${r2.id} recipients=${r2.recipients} players=${playerIds.join(',')}`;
+          console.log('[send-push] ✅ Enviado via player_id | id:', r2.id);
+          return json({ ok: true, notification_saved: !dbErr, onesignal: onesignalStatus, detail: onesignalDetail });
+        }
+        onesignalDetail = `player_ids=${playerIds} errors=${JSON.stringify(r2.errors)}`;
+      }
+
+      // ── Intento 3: player_id guardado en profiles ──────────────────────────
+      const { data: profile } = await supabase
+        .from('profiles')
+        .select('onesignal_player_id')
+        .eq('id', user_id)
+        .maybeSingle();
+
+      const savedPlayerId = profile?.onesignal_player_id;
+      if (savedPlayerId && !playerIds.includes(savedPlayerId)) {
+        console.log('[send-push] Intento 3 — player_id de profiles:', savedPlayerId);
+        const { ok: ok3, result: r3 } = await osNotify(ONESIGNAL_APP_ID, ONESIGNAL_KEY, {
+          ...basePayload,
+          include_player_ids: [savedPlayerId]
+        });
+
+        if (ok3 && (r3.recipients ?? 0) > 0) {
+          onesignalStatus = 'sent_via_saved_player_id';
+          onesignalDetail = `id=${r3.id} recipients=${r3.recipients}`;
+          console.log('[send-push] ✅ Enviado via saved player_id | id:', r3.id);
+          return json({ ok: true, notification_saved: !dbErr, onesignal: onesignalStatus, detail: onesignalDetail });
         }
       }
+
+      // Sin suscriptores activos
+      onesignalStatus = 'no_subscribers';
+      onesignalDetail = `user_id=${user_id} — El usuario debe abrir la app y aceptar notificaciones push.`;
+      console.warn('[send-push] ⚠️', onesignalDetail);
+
     } catch (e) {
       onesignalStatus = 'error';
       onesignalDetail = e instanceof Error ? e.message : String(e);
-      console.error('[send-push] OneSignal exception:', onesignalDetail);
+      console.error('[send-push] Exception:', onesignalDetail);
     }
 
-    return json({
-      ok: true,
-      notification_saved: !dbErr,
-      onesignal: onesignalStatus,
-      detail: onesignalDetail
-    });
+    return json({ ok: true, notification_saved: !dbErr, onesignal: onesignalStatus, detail: onesignalDetail });
 
   } catch (e) {
     const msg = e instanceof Error ? e.message : String(e);

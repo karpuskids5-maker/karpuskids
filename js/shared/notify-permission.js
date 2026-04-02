@@ -31,13 +31,42 @@ export const NotifyPermission = {
    */
   requestIfNeeded(containerId = 'notifPermissionSlot') {
     // Already granted or permanently denied — nothing to do
-    if (this.isGranted() || this.isDenied()) return;
-    // User dismissed recently
-    if (this._wasDismissed()) return;
+    if (this.isDenied()) return;
     // Browser doesn't support notifications
     if (!('Notification' in window)) return;
 
+    // Si ya está concedido, verificar que OneSignal esté vinculado
+    if (this.isGranted()) {
+      this._ensureOneSignalLinked();
+      return;
+    }
+
+    // User dismissed recently
+    if (this._wasDismissed()) return;
+
     this._render(containerId);
+  },
+
+  /** Si el permiso ya está dado, asegurar que OneSignal esté vinculado */
+  async _ensureOneSignalLinked() {
+    try {
+      if (!window.OneSignal) return;
+      const { supabase } = await import('./supabase.js');
+      const { data } = await supabase.auth.getUser();
+      const userId = data?.user?.id;
+      if (!userId) return;
+
+      const currentExtId = await window.OneSignal.User?.getExternalId?.();
+      if (currentExtId !== userId) {
+        console.log('[NotifyPermission] Re-vinculando OneSignal para:', userId);
+        await window.OneSignal.login(userId).catch(() => {});
+      }
+      await window.OneSignal.User?.PushSubscription?.optIn?.().catch(() => {});
+      const subId = window.OneSignal.User?.PushSubscription?.id;
+      if (subId) {
+        supabase.from('profiles').update({ onesignal_player_id: subId }).eq('id', userId).then(() => {}).catch(() => {});
+      }
+    } catch (_) { /* silencioso */ }
   },
 
   _render(containerId) {

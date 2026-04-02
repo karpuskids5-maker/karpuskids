@@ -99,6 +99,9 @@ document.addEventListener('DOMContentLoaded', async () => {
     // 🔴 Sistema de badges por sección
     BadgeSystem.init(auth.user.id);
 
+    // 🔔 Pedir permiso de notificaciones al cargar (con delay para no interrumpir)
+    setTimeout(() => NotifyPermission.requestIfNeeded('notifPermissionSlot'), 3000);
+
     // Realtime: actualizar rutina diaria cuando la maestra la guarda
     _initDailyLogRealtime(currentStudent.id);
 

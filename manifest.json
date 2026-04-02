@@ -1,7 +1,9 @@
 {
-"name": "Karpus Kids",
+  "name": "Karpus Kids",
   "short_name": "Karpus",
-  "start_url": "index.html",
+  "description": "Panel educativo Karpus Kids — Padres, Maestras y Dirección",
+  "start_url": "/panel_padres.html",
+  "scope": "/",
   "display": "standalone",
   "orientation": "portrait",
   "background_color": "#F0F9FF",
@@ -9,18 +11,25 @@
   "gcm_sender_id": "482941778795",
   "icons": [
     {
-      "src": "img/mundo.jpg",
+      "src": "logo/android-chrome-192x192.png",
       "sizes": "192x192",
-      "type": "image/jpeg",
+      "type": "image/png",
       "purpose": "any maskable"
     },
     {
-      "src": "img/mundo.jpg",
+      "src": "logo/android-chrome-512x512.png",
       "sizes": "512x512",
-      "type": "image/jpeg",
+      "type": "image/png",
       "purpose": "any maskable"
+    },
+    {
+      "src": "logo/apple-touch-icon.png",
+      "sizes": "180x180",
+      "type": "image/png",
+      "purpose": "any"
     }
   ],
   "categories": ["education", "family"],
-  "lang": "es"
+  "lang": "es",
+  "prefer_related_applications": false
 }

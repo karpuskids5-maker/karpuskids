@@ -302,13 +302,13 @@ export async function initOneSignal(currentUser = null) {
           const subId = OneSignal.User?.PushSubscription?.id;
           console.log('[OneSignal] ✅ Listo para:', user.id, '| SubID:', subId || 'pendiente');
 
-          // Guardar player_id en profiles como fallback para targeting
+          // Intentar guardar player_id en profiles (silencioso si la columna no existe)
           if (subId) {
             supabase.from('profiles')
               .update({ onesignal_player_id: subId })
               .eq('id', user.id)
               .then(() => {})
-              .catch(() => {}); // silencioso si la columna no existe aún
+              .catch(() => {});
           }
 
         } catch (loginErr) {
