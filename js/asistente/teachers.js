@@ -146,6 +146,8 @@ export const TeachersModule = {
     }
 
     window._saveTeacherNow = () => this.saveTeacher();
+    // Exponer globalmente para los onclick del HTML
+    window.openTeacherModal = (id) => this.openModal(id);
     if (window.lucide) window.lucide.createIcons();
   },
 
@@ -166,7 +168,7 @@ export const TeachersModule = {
 
     try {
       if (id) {
-        const { error } = await supabase.from('profiles').update({ name, phone, email, role }).eq('id', id);
+        const { error } = await supabase.from('profiles').update({ name, phone, email, role, is_active: isActive }).eq('id', id);
         if (error) throw error;
         // Update classroom assignment
         await supabase.from('classrooms').update({ teacher_id: null }).eq('teacher_id', id);

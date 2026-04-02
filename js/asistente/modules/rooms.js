@@ -14,8 +14,9 @@ export const RoomsModule = {
     const btnSave = document.getElementById('btnSaveRoom');
     if (btnSave) btnSave.onclick = () => this.saveRoom();
 
-    const btnCancel = document.getElementById('btnCancelRoom');
-    if (btnCancel) btnCancel.onclick = () => this.closeModal();
+    const close = () => this.closeModal();
+    document.getElementById('btnCancelRoom')?.addEventListener('click', close);
+    document.getElementById('btnCancelRoom2')?.addEventListener('click', close);
   },
 
   async loadRooms() {
@@ -104,8 +105,6 @@ export const RoomsModule = {
 
     modal.classList.remove('hidden');
     modal.classList.add('flex');
-    
-    // Load unassigned students checklist
     await this._loadStudentsChecklist(roomId);
   },
 

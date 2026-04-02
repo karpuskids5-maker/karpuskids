@@ -175,38 +175,50 @@ function initNavigation() {
     // ✅ --- LÓGICA DE CARGA PEREZOSA (LAZY LOADING) ---
     if (!loadedSections.has(target)) {
       console.log(`🚀 Cargando sección por primera vez: ${target}`);
-      switch (target) {
-        case 'pagos':
-          await PaymentsModule.init();
-          // Iniciar cola de verificación
-          import('../shared/payment-queue.js').then(m =>
-            m.PaymentQueue.init('payment-queue-container')
-          ).catch(() => {});
-          break;
-        case 'accesos':
-          if (AccessModule.init) AccessModule.init();
-          break;
-        case 'maestros':
-          await TeachersModule.init();
-          break;
-        case 'estudiantes':
-          await StudentsModule.init();
-          break;
-        case 'aulas':
-          await RoomsModule.init();
-          break;
-        case 'muro':
-          WallModule.loadPosts();
-          break;
-        case 'chat':
-          await initAssistantChat();
-          break;
-        case 'perfil':
-          initProfile();
-          import('../shared/notify-permission.js').then(m => m.NotifyPermission.requestIfNeeded());
-          break;
+      try {
+        switch (target) {
+          case 'pagos':
+            await PaymentsModule.init();
+            import('../shared/payment-queue.js').then(m =>
+              m.PaymentQueue.init('payment-queue-container')
+            ).catch(() => {});
+            break;
+          case 'accesos':
+            if (AccessModule.init) AccessModule.init();
+            break;
+          case 'maestros':
+            await TeachersModule.init();
+            break;
+          case 'estudiantes':
+            await StudentsModule.init();
+            break;
+          case 'aulas':
+            await RoomsModule.init();
+            break;
+          case 'muro':
+            WallModule.loadPosts();
+            break;
+          case 'chat':
+            await initAssistantChat();
+            break;
+          case 'perfil':
+            initProfile();
+            import('../shared/notify-permission.js').then(m => m.NotifyPermission.requestIfNeeded());
+            break;
+        }
+        loadedSections.add(target);
+      } catch (err) {
+        console.error(`[Asistente] Error cargando sección ${target}:`, err);
+        Helpers.toast(`Error al cargar ${target}`, 'error');
       }
-      loadedSections.add(target);
+    } else {
+      // Re-cargar datos frescos al volver a una sección ya visitada
+      switch (target) {
+        case 'maestros':   TeachersModule.loadTeachers?.(); break;
+        case 'estudiantes': StudentsModule.loadStudents?.(); break;
+        case 'aulas':      RoomsModule.loadRooms?.(); break;
+        case 'pagos':      PaymentsModule.loadPayments?.(); break;
+      }
     }
   };
 
