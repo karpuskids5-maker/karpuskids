@@ -1,6 +1,7 @@
 import { supabase } from '../shared/supabase.js';
 import { AppState, TABLES } from './appState.js';
 import { Helpers, escapeHtml } from './helpers.js';
+import { ImageLoader } from '../shared/image-loader.js';
 
 /**
  * 📱 MÓDULO DE MURO (FEED)
@@ -81,6 +82,7 @@ export const FeedModule = {
 
     container.innerHTML = posts.map(p => this.createPostHTML(p)).join('');
     if (window.lucide) lucide.createIcons();
+    ImageLoader.observe(container);
   },
 
   /**
@@ -95,9 +97,9 @@ export const FeedModule = {
     let mediaHTML = '';
     if (p.media_url) {
       const isVideo = p.media_url.match(/\.(mp4|webm|ogg)$/i);
-      mediaHTML = isVideo 
-        ? `<video src="${p.media_url}" controls class="w-full rounded-2xl mb-4 max-h-80 object-cover"></video>`
-        : `<img src="${p.media_url}" class="w-full rounded-2xl mb-4 max-h-80 object-cover shadow-sm">`;
+      mediaHTML = isVideo
+        ? ImageLoader.video(p.media_url, '', { cls: 'w-full rounded-2xl mb-4 max-h-80 object-cover' })
+        : `<div class="cursor-zoom-in" onclick="window.openLightbox && window.openLightbox('${p.media_url}','image')">${ImageLoader.img(p.media_url, { cls: 'w-full rounded-2xl mb-4 max-h-80 object-cover shadow-sm', fallback: 'img/mundo.jpg' })}</div>`;
     }
 
     return `
@@ -105,7 +107,7 @@ export const FeedModule = {
         <div class="flex items-center justify-between mb-4">
           <div class="flex items-center gap-3">
             <div class="w-11 h-11 rounded-full bg-orange-100 flex items-center justify-center font-bold text-orange-600 overflow-hidden border border-orange-50">
-              ${teacher.avatar_url ? `<img src="${teacher.avatar_url}" class="w-full h-full object-cover">` : teacher.name.charAt(0)}
+              ${teacher.avatar_url ? ImageLoader.img(teacher.avatar_url, { cls: 'w-full h-full object-cover', fallback: 'img/mundo.jpg' }) : teacher.name.charAt(0)}
             </div>
             <div>
               <p class="font-black text-slate-800 text-sm leading-tight">${escapeHtml(teacher.name)}</p>

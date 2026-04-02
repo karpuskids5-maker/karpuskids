@@ -1,137 +1,237 @@
 /**
- * Karpus Kids — PrefetchModule
- * Prefetching de datos al hover + persistencia de borradores + skeletons precisos
+ * ⚡ Karpus Kids — Prefetch System
+ *
+ * CONCEPTO:
+ * Mientras el usuario ve el skeleton de carga de una sección,
+ * en paralelo consultamos la DB y pre-cargamos todas las imágenes/videos
+ * en el caché del browser. Cuando el usuario llega a la sección,
+ * las imágenes ya están listas → aparecen instantáneamente.
+ *
+ * USO:
+ *   // En el init del panel, después de autenticar:
+ *   Prefetch.start(classroomId, userId);
+ *
+ *   // En cada módulo, antes de renderizar:
+ *   await Prefetch.ready('muro');   // espera a que las imágenes del muro estén listas
  */
 
-const _cache = new Map();
-const _pending = new Set();
-const DRAFT_PREFIX = 'karpus_draft_';
+import { supabase } from './supabase.js';
 
-// ─── Prefetching ──────────────────────────────────────────────────────────────
+// ── Caché de promesas por sección ─────────────────────────────────────────────
+const _cache = new Map();   // sectionKey → Promise<void>
+const _done  = new Set();   // secciones ya pre-cargadas
 
-export function registerPrefetch(sectionId, loadFn) {
-  const selectors = [
-    `[data-section="${sectionId}"]`,
-    `[data-target="${sectionId}"]`
-  ];
-  selectors.forEach(sel => {
-    document.querySelectorAll(sel).forEach(btn => {
-      btn.addEventListener('mouseenter', () => _prefetch(sectionId, loadFn), { passive: true });
-      btn.addEventListener('touchstart', () => _prefetch(sectionId, loadFn), { passive: true });
+export const Prefetch = {
+
+  /**
+   * Inicia la pre-carga de todas las secciones en paralelo.
+   * Llamar una sola vez al iniciar el panel, después de autenticar.
+   *
+   * @param {object} ctx — { classroomId, userId, studentId, role }
+   */
+  start(ctx = {}) {
+    const { classroomId, userId, studentId, role } = ctx;
+
+    // Pre-cargar en paralelo — silencioso si falla
+    if (classroomId) {
+      _cache.set('muro',   this._prefetchMuro(classroomId));
+      _cache.set('tareas', this._prefetchTareas(classroomId));
+    }
+    if (userId) {
+      _cache.set('avatares', this._prefetchAvatares(userId, role));
+    }
+    if (studentId) {
+      _cache.set('evidencias', this._prefetchEvidencias(studentId));
+    }
+
+    console.log('[Prefetch] Iniciado para:', ctx);
+  },
+
+  /**
+   * Espera a que la pre-carga de una sección esté lista.
+   * Si ya terminó, resuelve inmediatamente.
+   * Si no hay pre-carga para esa sección, resuelve inmediatamente.
+   */
+  async ready(section) {
+    if (_done.has(section)) return;
+    const p = _cache.get(section);
+    if (p) {
+      try { await p; } catch (_) {}
+    }
+  },
+
+  // ── Pre-cargadores por sección ──────────────────────────────────────────
+
+  async _prefetchMuro(classroomId) {
+    try {
+      const { data: posts } = await supabase
+        .from('posts')
+        .select('media_url, image_url, teacher:teacher_id(avatar_url)')
+        .eq('classroom_id', classroomId)
+        .order('created_at', { ascending: false })
+        .limit(10);
+
+      const urls = [];
+      for (const p of posts || []) {
+        const media = p.media_url || p.image_url;
+        if (media) urls.push(media);
+        if (p.teacher?.avatar_url) urls.push(p.teacher.avatar_url);
+      }
+
+      await this._preloadImages(urls);
+      _done.add('muro');
+      console.log('[Prefetch] Muro listo —', urls.length, 'recursos');
+    } catch (e) {
+      console.warn('[Prefetch] muro error:', e.message);
+    }
+  },
+
+  async _prefetchTareas(classroomId) {
+    try {
+      const { data: tasks } = await supabase
+        .from('tasks')
+        .select('id')
+        .eq('classroom_id', classroomId)
+        .order('created_at', { ascending: false })
+        .limit(10);
+
+      const taskIds = (tasks || []).map(t => t.id);
+      if (!taskIds.length) { _done.add('tareas'); return; }
+
+      const { data: evidences } = await supabase
+        .from('task_evidences')
+        .select('file_url, student:student_id(avatar_url)')
+        .in('task_id', taskIds)
+        .limit(30);
+
+      const urls = [];
+      for (const e of evidences || []) {
+        if (e.file_url) urls.push(e.file_url);
+        if (e.student?.avatar_url) urls.push(e.student.avatar_url);
+      }
+
+      await this._preloadImages(urls);
+      _done.add('tareas');
+      console.log('[Prefetch] Tareas listo —', urls.length, 'recursos');
+    } catch (e) {
+      console.warn('[Prefetch] tareas error:', e.message);
+    }
+  },
+
+  async _prefetchAvatares(userId, role) {
+    try {
+      // Cargar avatares de contactos del chat según el rol
+      let query = supabase.from('profiles').select('avatar_url').not('avatar_url', 'is', null);
+
+      if (role === 'padre') {
+        query = query.in('role', ['maestra', 'directora', 'asistente']);
+      } else if (role === 'maestra') {
+        query = query.in('role', ['directora', 'asistente', 'padre']);
+      } else {
+        query = query.in('role', ['maestra', 'padre', 'asistente', 'directora']);
+      }
+
+      const { data: profiles } = await query.limit(30);
+      const urls = (profiles || []).map(p => p.avatar_url).filter(Boolean);
+      await this._preloadImages(urls);
+      _done.add('avatares');
+      console.log('[Prefetch] Avatares listo —', urls.length, 'recursos');
+    } catch (e) {
+      console.warn('[Prefetch] avatares error:', e.message);
+    }
+  },
+
+  async _prefetchEvidencias(studentId) {
+    try {
+      const { data: evidences } = await supabase
+        .from('task_evidences')
+        .select('file_url')
+        .eq('student_id', studentId)
+        .not('file_url', 'is', null)
+        .order('created_at', { ascending: false })
+        .limit(20);
+
+      const urls = (evidences || []).map(e => e.file_url).filter(Boolean);
+      await this._preloadImages(urls);
+      _done.add('evidencias');
+      console.log('[Prefetch] Evidencias listo —', urls.length, 'recursos');
+    } catch (e) {
+      console.warn('[Prefetch] evidencias error:', e.message);
+    }
+  },
+
+  // ── Motor de pre-carga ────────────────────────────────────────────────────
+
+  /**
+   * Pre-carga un array de URLs en el caché del browser.
+   * Usa <link rel="prefetch"> para imágenes y fetch() para videos.
+   * No bloquea — resuelve cuando todas terminan (o fallan).
+   */
+  _preloadImages(urls) {
+    if (!urls.length) return Promise.resolve();
+
+    const unique = [...new Set(urls.filter(Boolean))];
+
+    const promises = unique.map(url => {
+      // Detectar si es video
+      const isVideo = /\.(mp4|mov|webm|ogg)(\?|$)/i.test(url);
+
+      if (isVideo) {
+        // Para videos: solo pre-cargar el primer chunk con fetch range
+        return fetch(url, {
+          method: 'GET',
+          headers: { Range: 'bytes=0-65535' }, // primeros 64KB
+          cache: 'force-cache'
+        }).catch(() => {});
+      } else {
+        // Para imágenes: crear un Image() que el browser cachea automáticamente
+        return new Promise(resolve => {
+          const img = new Image();
+          img.onload  = resolve;
+          img.onerror = resolve; // silencioso si falla
+          img.src = url;
+        });
+      }
     });
-  });
-}
 
-async function _prefetch(sectionId, loadFn) {
-  if (_cache.has(sectionId) || _pending.has(sectionId)) return;
-  _pending.add(sectionId);
-  try {
-    const data = await loadFn();
-    _cache.set(sectionId, { data, ts: Date.now() });
-  } catch (e) {
-    console.warn('[Prefetch]', sectionId, e.message);
-  } finally {
-    _pending.delete(sectionId);
+    return Promise.allSettled(promises);
   }
-}
+};
 
-export function getPrefetched(sectionId, maxAgeMs = 120000) {
-  const entry = _cache.get(sectionId);
-  if (!entry) return null;
-  if (Date.now() - entry.ts > maxAgeMs) { _cache.delete(sectionId); return null; }
-  return entry.data;
-}
-
-export function invalidatePrefetch(sectionId) { _cache.delete(sectionId); }
-export function invalidateAll() { _cache.clear(); }
-
-// ─── Borradores ───────────────────────────────────────────────────────────────
-
-export function saveDraft(key, value) {
-  try {
-    value?.trim()
-      ? localStorage.setItem(DRAFT_PREFIX + key, value)
-      : localStorage.removeItem(DRAFT_PREFIX + key);
-  } catch (_) {}
-}
-
-export function getDraft(key) {
-  try { return localStorage.getItem(DRAFT_PREFIX + key) || ''; } catch (_) { return ''; }
-}
-
-export function clearDraft(key) {
-  try { localStorage.removeItem(DRAFT_PREFIX + key); } catch (_) {}
-}
-
-export function bindDraft(input, key) {
-  if (!input) return { destroy: () => {} };
-  const saved = getDraft(key);
-  if (saved) { input.value = saved; input.dispatchEvent(new Event('input', { bubbles: true })); }
-  let t;
-  const handler = () => { clearTimeout(t); t = setTimeout(() => saveDraft(key, input.value), 500); };
-  input.addEventListener('input', handler);
-  return { destroy: () => { input.removeEventListener('input', handler); clearTimeout(t); } };
-}
-
-// ─── Skeletons precisos ───────────────────────────────────────────────────────
-
+// ── Skeletons reutilizables ───────────────────────────────────────────────────
 export const Skeletons = {
-  kpiCard: () => `<div class="bg-white rounded-2xl p-5 border border-slate-100 animate-pulse">
-    <div class="flex justify-between items-start mb-3">
-      <div class="w-10 h-10 bg-slate-200 rounded-xl"></div>
-      <div class="w-12 h-5 bg-slate-100 rounded-full"></div>
-    </div>
-    <div class="w-16 h-8 bg-slate-200 rounded-lg mb-1"></div>
-    <div class="w-24 h-3 bg-slate-100 rounded-full"></div>
-  </div>`,
+  /** Post del muro con imagen */
+  post: () => `
+    <div class="bg-white rounded-3xl shadow-sm border border-slate-100 overflow-hidden mb-6 animate-pulse">
+      <div class="p-5">
+        <div class="flex items-center gap-3 mb-4">
+          <div class="w-10 h-10 rounded-full bg-slate-200"></div>
+          <div class="flex-1 space-y-2">
+            <div class="h-3 bg-slate-200 rounded-full w-1/3"></div>
+            <div class="h-2 bg-slate-100 rounded-full w-1/4"></div>
+          </div>
+        </div>
+        <div class="space-y-2 mb-4">
+          <div class="h-3 bg-slate-200 rounded-full w-full"></div>
+          <div class="h-3 bg-slate-200 rounded-full w-4/5"></div>
+        </div>
+        <div class="h-48 bg-slate-200 rounded-2xl"></div>
+      </div>
+    </div>`,
 
-  tableRow: (cols = 4) => `<tr class="animate-pulse">${
-    Array.from({ length: cols }).map((_, i) =>
-      `<td class="px-5 py-4"><div class="h-4 bg-slate-100 rounded-full ${i === 0 ? 'w-32' : i === cols - 1 ? 'w-16 ml-auto' : 'w-24'}"></div>${i === 0 ? '<div class="h-3 bg-slate-50 rounded-full w-20 mt-1.5"></div>' : ''}</td>`
-    ).join('')
-  }</tr>`,
+  /** Tarjeta de tarea */
+  task: () => `
+    <div class="bg-white rounded-2xl border border-slate-100 p-5 animate-pulse">
+      <div class="flex items-start gap-3">
+        <div class="w-10 h-10 rounded-xl bg-slate-200 shrink-0"></div>
+        <div class="flex-1 space-y-2">
+          <div class="h-3 bg-slate-200 rounded-full w-2/3"></div>
+          <div class="h-2 bg-slate-100 rounded-full w-1/2"></div>
+          <div class="h-24 bg-slate-100 rounded-xl mt-3"></div>
+        </div>
+      </div>
+    </div>`,
 
-  wallPost: () => `<div class="bg-white rounded-3xl p-5 border border-slate-100 mb-4 animate-pulse">
-    <div class="flex items-center gap-3 mb-4">
-      <div class="w-10 h-10 bg-slate-200 rounded-full shrink-0"></div>
-      <div class="flex-1"><div class="h-4 bg-slate-200 rounded-full w-32 mb-1.5"></div><div class="h-3 bg-slate-100 rounded-full w-20"></div></div>
-    </div>
-    <div class="space-y-2 mb-4">
-      <div class="h-4 bg-slate-100 rounded-full w-full"></div>
-      <div class="h-4 bg-slate-100 rounded-full w-4/5"></div>
-      <div class="h-4 bg-slate-100 rounded-full w-3/5"></div>
-    </div>
-    <div class="h-48 bg-slate-100 rounded-2xl mb-4"></div>
-    <div class="flex gap-4 pt-3 border-t border-slate-50">
-      <div class="h-4 bg-slate-100 rounded-full w-16"></div>
-      <div class="h-4 bg-slate-100 rounded-full w-20"></div>
-    </div>
-  </div>`,
-
-  chatContact: () => `<div class="flex items-center gap-3 p-3 animate-pulse">
-    <div class="w-10 h-10 bg-slate-200 rounded-full shrink-0"></div>
-    <div class="flex-1 min-w-0">
-      <div class="h-4 bg-slate-200 rounded-full w-28 mb-1.5"></div>
-      <div class="h-3 bg-slate-100 rounded-full w-20"></div>
-    </div>
-  </div>`,
-
-  chatBubble: (mine = false) => `<div class="flex ${mine ? 'justify-end' : 'justify-start'} mb-2 animate-pulse">
-    <div class="h-9 ${mine ? 'bg-blue-100' : 'bg-slate-100'} rounded-2xl ${mine ? 'w-40' : 'w-48'}"></div>
-  </div>`,
-
-  studentCard: () => `<div class="bg-white rounded-2xl p-5 border border-slate-100 animate-pulse">
-    <div class="flex items-center gap-3 mb-4">
-      <div class="w-12 h-12 bg-slate-200 rounded-xl shrink-0"></div>
-      <div class="flex-1"><div class="h-4 bg-slate-200 rounded-full w-28 mb-1.5"></div><div class="h-3 bg-slate-100 rounded-full w-16"></div></div>
-    </div>
-    <div class="grid grid-cols-2 gap-2">
-      <div class="h-8 bg-slate-100 rounded-xl"></div>
-      <div class="h-8 bg-slate-100 rounded-xl"></div>
-    </div>
-  </div>`,
-
-  render(type, count = 3) {
-    return Array.from({ length: count }).map(() => this[type]?.() || '').join('');
-  }
+  /** Lista de n skeletons */
+  list: (n = 3, type = 'post') => Array.from({ length: n }, () => Skeletons[type]?.() || '').join('')
 };

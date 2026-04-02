@@ -13,6 +13,7 @@ import { ChatModule } from './chat.module.js';
 import { InquiriesModule } from './inquiries.module.js';
 import { RoomsModule } from './rooms.module.js';
 import { BadgeSystem } from '../shared/badges.js';
+import { ImageLoader } from '../shared/image-loader.js';
 const debounce = (fn, delay) => {
   let timeout;
   return (...args) => {

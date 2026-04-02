@@ -83,6 +83,15 @@ export const ChatModule = {
     this._activeContact = contact;
     this._conversationId = null;
 
+    // Mobile: ocultar lista, mostrar conversación
+    const listPanel = document.getElementById('chatListPanel');
+    const convPanel = document.getElementById('chatConversationPanel');
+    if (listPanel && convPanel) {
+      listPanel.classList.add('chat-hidden');
+      convPanel.classList.remove('chat-hidden');
+      convPanel.classList.add('flex');
+    }
+
     // Actualizar header
     const headerName   = document.getElementById('chatActiveName');
     const headerMeta   = document.getElementById('chatActiveMeta');
@@ -94,8 +103,21 @@ export const ChatModule = {
     if (headerAvatar) headerAvatar.innerHTML   = contact.avatar_url
       ? '<img src="' + contact.avatar_url + '" class="w-full h-full object-cover">'
       : contact.name.charAt(0);
-    if (headerArea)  headerArea.classList.remove('hidden');
-    // El área de input siempre está visible en panel_padres.html
+    if (headerArea) { headerArea.classList.remove('hidden'); headerArea.classList.add('flex'); }
+
+    // Back button
+    const backBtn = document.getElementById('chatBackBtn');
+    if (backBtn) {
+      const newBack = backBtn.cloneNode(true);
+      backBtn.parentNode.replaceChild(newBack, backBtn);
+      newBack.addEventListener('click', () => {
+        if (listPanel && convPanel) {
+          convPanel.classList.add('chat-hidden');
+          convPanel.classList.remove('flex');
+          listPanel.classList.remove('chat-hidden');
+        }
+      });
+    }
 
     await this.loadMessages();
     this.initRealtime();

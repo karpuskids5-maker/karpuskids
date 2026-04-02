@@ -6,6 +6,7 @@ import { WallModule } from '../shared/wall.js';
 import { ChatModule } from '../shared/chat.js';
 import { VideoCallModule } from '../shared/videocall.js';
 import { BadgeSystem } from '../shared/badges.js';
+import { ImageLoader } from '../shared/image-loader.js';
 
 import * as Attendance from './modules/attendance.js';
 import * as Routine from './modules/routine.js';

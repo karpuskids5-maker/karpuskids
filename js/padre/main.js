@@ -13,6 +13,8 @@ import { GradesModule }    from './grades.js';
 import { initLiveClassListener } from './attendance_live.js';
 import { NotifyPermission } from '../shared/notify-permission.js';
 import { BadgeSystem } from '../shared/badges.js';
+import { ImageLoader } from '../shared/image-loader.js';
+import { Prefetch } from '../shared/prefetch.js';
 
 window.App = {
   feed: FeedModule, payments: PaymentsModule, tasks: TasksModule,

@@ -1,5 +1,6 @@
 import { supabase } from './supabase.js';
 import { Helpers } from './helpers.js';
+import { ImageLoader } from './image-loader.js';
 import { optimizeImageUrl, thumbnailUrl, activateLazyImages } from './media.js';
 import { Skeletons } from './prefetch.js';
 
@@ -187,6 +188,9 @@ export const WallModule = {
       if (append) container.insertAdjacentHTML('beforeend', html);
       else container.innerHTML = html;
 
+      // Activar lazy loading en las nuevas imágenes
+      ImageLoader.observe(container);
+
       // Paginación
       if (posts.length < this._pageSize) {
         this._hasMore = false;
@@ -197,6 +201,8 @@ export const WallModule = {
       }
 
       if (window.lucide) lucide.createIcons();
+      // Activar lazy loading en imágenes recién inyectadas
+      ImageLoader.observe(container);
     } catch (err) {
       console.error('Error loadPosts:', err);
       if (!append) container.innerHTML = Helpers.emptyState('Error al cargar el muro', 'alert-triangle');
@@ -265,21 +271,23 @@ export const WallModule = {
     const date = this._relativeTimeFromNow(p.created_at);
     const accent = this._options.accentColor || 'indigo';
     
-    // Lógica de Renderizado Multimedia
+    // Lógica de Renderizado Multimedia con lazy loading
     let mediaHtml = '';
     if (p.display_media_url) {
       if (p.is_video) {
         mediaHtml = `
           <div class="rounded-2xl overflow-hidden border border-slate-100 mb-4 bg-black">
-            <video src="${p.display_media_url}" controls playsinline class="w-full max-h-[500px] mx-auto"></video>
+            ${ImageLoader.video(p.display_media_url, '', { cls: 'w-full max-h-[500px] mx-auto' })}
           </div>`;
       } else {
         mediaHtml = `
           <div class="rounded-2xl overflow-hidden border border-slate-100 mb-4 bg-slate-50 cursor-zoom-in"
                onclick="window.openLightbox('${p.display_media_url}','image')">
-            <img src="${p.display_media_url}"
-                 class="w-full max-h-[480px] object-contain mx-auto"
-                 loading="lazy" alt="Post media" data-no-lightbox>
+            ${ImageLoader.img(p.display_media_url, {
+              alt: 'Post media',
+              cls: 'w-full max-h-[480px] object-contain mx-auto',
+              fallback: 'img/mundo.jpg'
+            })}
           </div>`;
       }
     }
@@ -297,7 +305,9 @@ export const WallModule = {
           <div class="flex justify-between items-start mb-4">
             <div class="flex items-center gap-3">
               <div class="w-10 h-10 rounded-full bg-${accent}-100 flex items-center justify-center overflow-hidden">
-                ${p.teacher_avatar ? `<img src="${p.teacher_avatar}" class="w-full h-full object-cover">` : `<i data-lucide="user" class="w-5 h-5 text-${accent}-600"></i>`}
+                ${p.teacher_avatar
+                  ? ImageLoader.img(p.teacher_avatar, { cls: 'w-full h-full object-cover', fallback: 'img/mundo.jpg' })
+                  : `<i data-lucide="user" class="w-5 h-5 text-${accent}-600"></i>`}
               </div>
               <div>
                 <div class="font-bold text-slate-800 text-sm">${Helpers.escapeHTML(p.teacher_name)}</div>
@@ -503,7 +513,7 @@ export const WallModule = {
       <div class="flex gap-2 text-xs">
         <div class="w-6 h-6 rounded-full bg-slate-200 flex items-center justify-center font-bold text-[9px] text-slate-500 overflow-hidden border border-white shrink-0">
           ${avatarUrl
-            ? `<img src="${avatarUrl}" class="w-full h-full object-cover" onerror="this.parentElement.textContent='${displayName.charAt(0)}'">` 
+            ? ImageLoader.img(avatarUrl, { cls: 'w-full h-full object-cover', fallback: '' })
             : displayName.charAt(0).toUpperCase()}
         </div>
         <div class="bg-white p-2 rounded-xl rounded-tl-none border border-slate-100 shadow-sm flex-1">
@@ -515,6 +525,9 @@ export const WallModule = {
         </div>
       </div>
     `}).join('');
+
+    // Activar lazy loading en avatares de comentarios
+    ImageLoader.observe(container);
   },
 
   async deletePost(postId) {

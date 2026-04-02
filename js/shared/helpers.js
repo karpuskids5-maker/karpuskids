@@ -414,56 +414,28 @@ export const Helpers = {
 
 
   /**
-   * 🖼️ avatar fallback
+   * 🖼️ avatar fallback — con lazy loading
    */
-  avatar(
-    url,
-    name = ''
-  ) {
-
+  avatar(url, name = '') {
     if (url) {
-
-      return `
-        <img
-          src="${url}"
-          class="w-full h-full object-cover"
-        >
-      `;
-
+      // Usar data-src para lazy loading via ImageLoader
+      return `<img
+        src="data:image/jpeg;base64,/9j/4AAQSkZJRgABAQAAAQABAAD/2wBDAAgGBgcGBQgHBwcJCQgKDBQNDAsLDBkSEw8UHRofHh0aHBwgJC4nICIsIxwcKDcpLDAxNDQ0Hyc5PTgyPC4zNDL/wAARCAABAAEDASIAAhEBAxEB/8QAFAABAAAAAAAAAAAAAAAAAAAACf/EABQQAQAAAAAAAAAAAAAAAAAAAAD/xAAUAQEAAAAAAAAAAAAAAAAAAAAA/8QAFBEBAAAAAAAAAAAAAAAAAAAAAP/aAAwDAQACEQMRAD8AJQAB/9k="
+        data-src="${url}"
+        data-fallback="img/mundo.jpg"
+        class="karpus-img karpus-img-loading w-full h-full object-cover"
+        loading="lazy"
+        decoding="async">`;
     }
-
-    const letter =
-      name
-        ?.charAt(0)
-        ?.toUpperCase() || '?';
-
-    return `
-
-      <div class="
-
-        w-full
-        h-full
-
-        bg-indigo-100
-
-        flex
-        items-center
-        justify-center
-
-        text-indigo-600
-
-        font-black
+    const letter = name?.charAt(0)?.toUpperCase() || '?';
+    return `<div class="w-full h-full bg-indigo-100 flex items-center justify-center text-indigo-600 font-black">${letter}</div>`;
+  },
 
       ">
 
         ${letter}
 
       </div>
-
-    `;
-
-  },
-
 
   /**
    * ⏳ debounce pro

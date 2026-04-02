@@ -11,6 +11,7 @@ import { StudentsModule } from './modules/students.js';
 import { RoomsModule } from './modules/rooms.js';
 import { DashboardModule } from './modules/dashboard.js';
 import { BadgeSystem } from '../shared/badges.js';
+import { ImageLoader } from '../shared/image-loader.js';
 
 // 🚀 Definir objeto App globalmente para evitar ReferenceError en onclicks del HTML
 window.App = {
@@ -233,12 +234,39 @@ function initNavigation() {
   DashboardModule.init().then(() => loadedSections.add('dashboard'));
   showSection('dashboard');
 
-  // La gestión del sidebar móvil y de escritorio ahora se maneja en common_ui.js
-  // Asegúrate de que common_ui.js esté cargado en tu HTML para el panel de asistente.
-  // Si necesitas un botón para colapsar/expandir el sidebar en escritorio,
-  // common_ui.js ya lo maneja con el elemento #toggleSidebar.
-  // Si necesitas un botón para abrir/cerrar el sidebar en móvil,
-  // common_ui.js ya lo maneja con el elemento #menuBtn.
+  // ── Hamburger móvil ──────────────────────────────────────────────────────
+  const menuBtn = document.getElementById('menuBtn');
+  const sidebar  = document.getElementById('sidebar');
+  const overlay  = document.getElementById('sidebarOverlay');
+
+  const _openSidebar = () => {
+    sidebar?.classList.add('mobile-visible');
+    if (overlay) overlay.style.display = 'block';
+  };
+  const _closeSidebar = () => {
+    sidebar?.classList.remove('mobile-visible');
+    if (overlay) overlay.style.display = 'none';
+  };
+
+  if (menuBtn) {
+    menuBtn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      sidebar?.classList.contains('mobile-visible') ? _closeSidebar() : _openSidebar();
+    });
+  }
+  if (overlay) {
+    overlay.addEventListener('click', _closeSidebar);
+  }
+
+  // ── Colapsar sidebar desktop ─────────────────────────────────────────────
+  const toggleBtn   = document.getElementById('toggleSidebar');
+  const layoutShell = document.getElementById('layoutShell');
+  if (toggleBtn && sidebar && layoutShell) {
+    toggleBtn.addEventListener('click', () => {
+      sidebar.classList.toggle('collapsed');
+      layoutShell.classList.toggle('sidebar-collapsed');
+    });
+  }
 }
 
 
@@ -391,62 +419,79 @@ async function loadChatContacts(searchTerm = '', unreadMap = {}) {
 async function selectAssistantChat(userId, name, role) {
   activeChatUserId = userId;
   activeConversationId = null;
-  
+
+  // Mobile: ocultar lista, mostrar conversación
+  const listPanel = document.getElementById('chatListPanel');
+  const convPanel = document.getElementById('chatConversationPanel');
+  if (listPanel && convPanel) {
+    listPanel.classList.add('chat-hidden');
+    convPanel.classList.remove('chat-hidden');
+    convPanel.classList.add('flex');
+  }
+
   const header = document.getElementById('chatActiveHeader');
   const inputArea = document.getElementById('chatInputArea');
   const msgs = document.getElementById('chatMessagesContainer');
 
-  if(header) {
+  if (header) {
     header.classList.remove('hidden');
     header.classList.add('flex');
     document.getElementById('chatActiveName').textContent = name;
     document.getElementById('chatActiveMeta').textContent = role;
     document.getElementById('chatActiveAvatar').innerHTML = name.charAt(0);
   }
-  if(inputArea) inputArea.classList.remove('hidden');
-  if(msgs) msgs.innerHTML = '<div class="flex justify-center p-4"><div class="animate-spin w-6 h-6 border-2 border-teal-500 rounded-full border-t-transparent"></div></div>';
+  if (inputArea) inputArea.classList.remove('hidden');
+  if (msgs) msgs.innerHTML = '<div class="flex justify-center p-4"><div class="animate-spin w-6 h-6 border-2 border-teal-500 rounded-full border-t-transparent"></div></div>';
+
+  // Back button
+  const backBtn = document.getElementById('chatBackBtn');
+  if (backBtn) {
+    const newBack = backBtn.cloneNode(true);
+    backBtn.parentNode.replaceChild(newBack, backBtn);
+    newBack.addEventListener('click', () => {
+      if (listPanel && convPanel) {
+        convPanel.classList.add('chat-hidden');
+        convPanel.classList.remove('flex');
+        listPanel.classList.remove('chat-hidden');
+      }
+    });
+  }
 
   try {
     const { messages, conversationId } = await ChatModule.loadConversation(userId);
     activeConversationId = conversationId;
-    
-    // Renderizar mensajes (reutilizando lógica simple)
-    const profile = AppState.get('profile');
-    if (!messages || messages.length === 0) {
-        msgs.innerHTML = '<div class="h-full flex flex-col items-center justify-center text-slate-400 text-sm"><p>No hay mensajes aún.</p><p>Escribe el primero.</p></div>';
-    } else {
-        msgs.innerHTML = messages.map(m => {
-            const isMe = m.sender_id === profile.id;
-            return `
-                <div class="flex ${isMe ? 'justify-end' : 'justify-start'}">
-                    <div class="max-w-[75%] rounded-2xl p-3 text-sm ${isMe ? 'bg-teal-600 text-white rounded-tr-none' : 'bg-slate-100 text-slate-700 rounded-tl-none'}">
-                        <p>${Helpers.escapeHTML(m.content)}</p>
-                        <p class="text-[10px] opacity-70 mt-1 text-right">${new Date(m.created_at).toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'})}</p>
-                    </div>
-                </div>
-            `;
-        }).join('');
-    }
-    msgs.scrollTop = msgs.scrollHeight;
 
-    // Suscripción
+    const profile = AppState.get('profile');
+    const myId = profile?.id;
+
+    const buildBubble = (m) => {
+      const isMe = m.sender_id === myId;
+      return `<div class="flex ${isMe ? 'justify-end' : 'justify-start'} mb-2">
+        <div class="max-w-[80%] px-4 py-2.5 rounded-2xl text-sm ${isMe
+          ? 'bg-teal-600 text-white rounded-br-none shadow-md'
+          : 'bg-white border border-slate-100 text-slate-700 rounded-bl-none shadow-sm'}">
+          <p class="whitespace-pre-wrap">${Helpers.escapeHTML(m.content)}</p>
+          <p class="text-[9px] ${isMe ? 'text-teal-200' : 'text-slate-400'} mt-1 text-right">${new Date(m.created_at).toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'})}</p>
+        </div>
+      </div>`;
+    };
+
+    if (!messages || messages.length === 0) {
+      msgs.innerHTML = '<div class="flex-1 flex flex-col items-center justify-center text-slate-400 text-sm py-12"><p>No hay mensajes aún.</p><p class="text-xs mt-1">Escribe el primero 👋</p></div>';
+    } else {
+      msgs.innerHTML = messages.map(buildBubble).join('');
+      import('../shared/scroll.module.js').then(({ ScrollModule }) => ScrollModule.scrollToBottom(msgs));
+    }
+
+    // Suscripción realtime
     ChatModule.subscribeToConversation(conversationId, (newMsg) => {
-        const isMe = newMsg.sender_id === profile.id;
-        const html = `
-            <div class="flex ${isMe ? 'justify-end' : 'justify-start'}">
-                <div class="max-w-[75%] rounded-2xl p-3 text-sm ${isMe ? 'bg-teal-600 text-white rounded-tr-none' : 'bg-slate-100 text-slate-700 rounded-tl-none'}">
-                    <p>${Helpers.escapeHTML(newMsg.content)}</p>
-                    <p class="text-[10px] opacity-70 mt-1 text-right">${new Date(newMsg.created_at).toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'})}</p>
-                </div>
-            </div>
-        `;
-        msgs.insertAdjacentHTML('beforeend', html);
-        msgs.scrollTop = msgs.scrollHeight;
+      msgs.insertAdjacentHTML('beforeend', buildBubble(newMsg));
+      import('../shared/scroll.module.js').then(({ ScrollModule }) => ScrollModule.scrollToBottom(msgs, true));
     });
 
   } catch (e) {
     console.error('❌ Chat load error:', e);
-    msgs.innerHTML = `<div class="p-4 text-center text-red-500 text-sm">Error cargando chat</div>`;
+    msgs.innerHTML = '<div class="p-4 text-center text-red-500 text-sm">Error cargando chat</div>';
   }
 }
 
