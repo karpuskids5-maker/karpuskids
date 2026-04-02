@@ -106,22 +106,7 @@ export const PaymentQueue = {
           </button>` : ''}
         </div>` : ''}
 
-        ${p.excuse_text ? `
-        <div class="px-4 py-3 bg-violet-50 border-b border-violet-100">
-          <p class="text-[10px] font-black text-violet-700 uppercase mb-1">📝 Excusa del padre:</p>
-          <p class="text-xs text-violet-800 italic">"${Helpers.escapeHTML(p.excuse_text)}"</p>
-          ${p.excuse_approved === null ? `
-          <div class="flex gap-2 mt-2">
-            <button onclick="PaymentQueue.approveExcuse('${p.id}')"
-              class="flex-1 py-1.5 bg-emerald-600 text-white rounded-lg text-[10px] font-black uppercase hover:bg-emerald-700 transition-colors">
-              ✅ Aprobar excusa
-            </button>
-            <button onclick="PaymentQueue.rejectExcuse('${p.id}')"
-              class="flex-1 py-1.5 bg-rose-50 text-rose-600 rounded-lg text-[10px] font-black uppercase hover:bg-rose-100 transition-colors">
-              ❌ Rechazar
-            </button>
-          </div>` : `<p class="text-[9px] font-black mt-1 ${p.excuse_approved ? 'text-emerald-600' : 'text-rose-600'}">${p.excuse_approved ? '✅ Excusa aprobada' : '❌ Excusa rechazada'}</p>`}
-        </div>` : ''}
+        ${p.excuse_text ? `` : ''}
 
         <div id="ocr-result-${p.id}" class="hidden px-4 py-3 bg-blue-50 border-b border-blue-100 text-xs font-mono text-blue-800"></div>
         <div id="dup-alert-${p.id}" class="hidden px-4 py-3 bg-rose-50 border-b border-rose-200 text-xs font-bold text-rose-700 flex items-center gap-2">

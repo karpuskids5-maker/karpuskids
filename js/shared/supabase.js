@@ -252,10 +252,6 @@ export async function initOneSignal(currentUser = null) {
 
     window.OneSignalDeferred.push(async function(OneSignal) {
       try {
-        const isPWA = window.matchMedia('(display-mode: standalone)').matches || window.navigator.standalone;
-        console.log('[OneSignal] PWA Mode:', isPWA ? 'YES' : 'NO');
-
-        // Verificar si ya está inicializado para evitar errores
         if (typeof OneSignal.isInitialized === 'function' && OneSignal.isInitialized()) {
           return;
         }
@@ -265,42 +261,60 @@ export async function initOneSignal(currentUser = null) {
           allowLocalhostAsSecureOrigin: true,
           serviceWorkerParam: { scope: '/' },
           serviceWorkerPath: 'OneSignalSDKWorker.js',
-          serviceWorkerUpdaterPath: 'OneSignalSDKUpdaterWorker.js', // ✅ Requerido para PWA
           notifyButton: { enable: false },
           welcomeNotification: { disable: false }
         });
 
-        // ✅ Esperar un momento a que el SDK esté realmente listo antes de login()
-        await new Promise(r => setTimeout(r, 1000));
+        // Esperar a que el SDK esté listo
+        await new Promise(r => setTimeout(r, 800));
 
-        // Pedir permiso de forma proactiva
+        // Pedir permiso solo si no se ha dado aún
         try {
-          if (OneSignal.Notifications?.permissionNative === 'default') {
-            await OneSignal.Notifications.requestPermission();
+          const perm = OneSignal.Notifications?.permissionNative;
+          if (perm === 'default') {
+            // En móvil el permiso debe pedirse desde un gesto — lo diferimos al perfil
+            // Solo pedimos automáticamente en desktop
+            const isMobile = /Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
+            if (!isMobile) {
+              await OneSignal.Notifications.requestPermission();
+            }
           }
         } catch (_) { /* silencioso */ }
 
-        // Vincular usuario y asegurar suscripción activa (Opt-In)
+        // Vincular usuario externo
         try {
           const currentExtId = await OneSignal.User?.getExternalId?.();
           if (currentExtId !== user.id) {
             console.log('[OneSignal] Vinculando usuario:', user.id);
             await OneSignal.login(user.id);
-          }
-          
-          // ✅ Forzar suscripción activa en móvil si el permiso está dado
-          if (OneSignal.Notifications.permission && OneSignal.User.PushSubscription.optedIn === false) {
-            await OneSignal.User.PushSubscription.optIn();
+            await new Promise(r => setTimeout(r, 500));
           }
 
-          const subId = await OneSignal.User.PushSubscription.id;
-          console.log('[OneSignal] Inicializado para:', user.id, '| SubID:', subId || 'no-sub');
-        } catch (loginErr) {
-          const errMsg = loginErr?.message?.toLowerCase() || "";
-          if (errMsg.includes('409') || loginErr?.status === 409 || errMsg.includes('conflict')) {
-            return; 
+          // Activar suscripción push si el permiso está concedido
+          try {
+            const hasPermission = OneSignal.Notifications?.permission === true;
+            const isOptedIn     = OneSignal.User?.PushSubscription?.optedIn;
+            if (hasPermission && isOptedIn === false) {
+              await OneSignal.User.PushSubscription.optIn();
+            }
+          } catch (_) { /* silencioso */ }
+
+          const subId = OneSignal.User?.PushSubscription?.id;
+          console.log('[OneSignal] ✅ Listo para:', user.id, '| SubID:', subId || 'pendiente');
+
+          // Guardar player_id en profiles como fallback para targeting
+          if (subId) {
+            supabase.from('profiles')
+              .update({ onesignal_player_id: subId })
+              .eq('id', user.id)
+              .then(() => {})
+              .catch(() => {}); // silencioso si la columna no existe aún
           }
-          console.info('[OneSignal] login/optIn omitido:', loginErr?.message ?? loginErr);
+
+        } catch (loginErr) {
+          const msg = loginErr?.message?.toLowerCase() ?? '';
+          if (msg.includes('409') || loginErr?.status === 409 || msg.includes('conflict')) return;
+          console.info('[OneSignal] login omitido:', loginErr?.message ?? loginErr);
         }
 
       } catch (e) {

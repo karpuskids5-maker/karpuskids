@@ -113,29 +113,4 @@ document.addEventListener('DOMContentLoaded', () => {
   }
 
   // Botón de cierre para cada sección
-  const sections = document.querySelectorAll('section.section, main section');
-  sections.forEach(sec => {
-    if (sec.querySelector('.section-close')) return;
-    const btn = document.createElement('button');
-    btn.className = 'section-close';
-    btn.type = 'button';
-    btn.setAttribute('aria-label', 'Cerrar sección');
-    btn.textContent = '×';
-    btn.style.position = 'absolute';
-    btn.style.top = '0.5rem';
-    btn.style.right = '0.5rem';
-    btn.style.background = '#e5e7eb';
-    btn.style.borderRadius = '0.5rem';
-    btn.style.padding = '0.25rem 0.5rem';
-    btn.addEventListener('click', () => {
-      try { window.Auth?.logout(); } catch(e){}
-      if (typeof window !== 'undefined') {
-        window.location.href = 'login.html';
-      }
-    });
-    if (!getComputedStyle(sec).position || getComputedStyle(sec).position === 'static') {
-      sec.style.position = 'relative';
-    }
-    sec.appendChild(btn);
-  });
-});
+  

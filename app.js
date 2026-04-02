@@ -538,6 +538,67 @@ document.addEventListener('DOMContentLoaded', async () => {
     });
   }
 
+  // 11. ABRIR MODAL DE ESTUDIANTE (Creación/Edición)
+  window.openStudentModal = async function(studentId = null) {
+    const modal = document.getElementById('modalAddStudent'); // Asumiendo este es el ID del modal
+    if (!modal) return;
+
+    // 1. Cargar aulas cada vez que se abre el modal
+    await populateStudentClassrooms();
+
+    // 2. Resetear campos del formulario
+    document.getElementById('stId').value = '';
+    document.getElementById('stName').value = '';
+    document.getElementById('stClassroom').value = '';
+    document.getElementById('stActive').checked = true;
+    document.getElementById('p1Name').value = '';
+    document.getElementById('p1Phone').value = '';
+    document.getElementById('p1Email').value = '';
+    document.getElementById('p1Password').value = ''; // Contraseña solo para nuevos padres
+    document.getElementById('p2Name').value = '';
+    document.getElementById('p2Phone').value = '';
+    document.getElementById('stAllergies').value = '';
+    document.getElementById('stBlood').value = '';
+    document.getElementById('stPickup').value = '';
+    document.getElementById('stMonthlyFee').value = '';
+    document.getElementById('stDueDay').value = '';
+
+    // Limpiar cualquier resaltado de error previo
+    ['stName', 'stClassroom', 'p1Email'].forEach(id => markFieldError(id, false));
+    const emailFb = document.getElementById('p1EmailFeedback');
+    if (emailFb) {
+        emailFb.textContent = '';
+        emailFb.classList.remove('text-red-500', 'text-blue-600', 'text-green-600');
+    }
+
+    if (studentId) {
+        // Modo Edición: Cargar datos del estudiante y rellenar formulario
+        const { data: student, error } = await supabase
+            .from('students')
+            .select('*')
+            .eq('id', studentId)
+            .single();
+        if (error) throw error;
+
+        document.getElementById('stId').value = student.id;
+        document.getElementById('stName').value = student.name;
+        document.getElementById('stClassroom').value = student.classroom_id;
+        document.getElementById('stActive').checked = student.is_active;
+        document.getElementById('p1Name').value = student.p1_name;
+        document.getElementById('p1Phone').value = student.p1_phone;
+        document.getElementById('p1Email').value = student.p1_email;
+        document.getElementById('p2Name').value = student.p2_name;
+        document.getElementById('p2Phone').value = student.p2_phone;
+        document.getElementById('stAllergies').value = student.allergies;
+        document.getElementById('stBlood').value = student.blood_type;
+        document.getElementById('stPickup').value = student.authorized_pickup;
+        document.getElementById('stMonthlyFee').value = student.monthly_fee;
+        document.getElementById('stDueDay').value = student.due_day;
+    }
+
+    modal.classList.remove('hidden');
+  };
+
   // Event listener para los botones de eliminar estudiante (delegación)
   document.addEventListener('click', async (e) => {
     if (e.target.closest('.delete-student-btn')) {
@@ -546,6 +607,18 @@ document.addEventListener('DOMContentLoaded', async () => {
         await window.deleteStudent(studentId);
       }
     }
+    // Listener para el botón de editar estudiante
+    if (e.target.closest('.edit-student-btn')) {
+      const studentId = e.target.closest('.edit-student-btn').dataset.studentId;
+      if (studentId) {
+        await window.openStudentModal(studentId);
+      }
+    }
+  });
+
+  // Listener para el botón de añadir nuevo estudiante
+  document.getElementById('btnAddStudent')?.addEventListener('click', () => {
+    window.openStudentModal(); // Abre el modal para crear un nuevo estudiante
   });
 
   // 4.1 INICIALIZAR GRÁFICOS DASHBOARD
@@ -1364,7 +1437,6 @@ document.addEventListener('DOMContentLoaded', async () => {
   const btnSaveStudent = document.getElementById('btnSaveStudent');
   if (btnSaveStudent) {
     // Prepopulate classrooms when opening modal
-    populateStudentClassrooms();
 
     // --- INICIO: VALIDACIONES EN TIEMPO REAL (MEJORAS PANEL DIRECTORA) ---
     const setupRealtimeValidation = () => {
@@ -1583,61 +1655,6 @@ document.addEventListener('DOMContentLoaded', async () => {
     });
   }
 
-  // 11. ABRIR PERFIL DE ESTUDIANTE (Global)
-  window.openStudentProfile = async function(studentId) {
-    await safeExecute(async () => {
-      const modal = document.getElementById('studentProfileModal');
-      if (!modal) return;
-
-      modal.classList.remove('hidden');
-      modal.classList.add('flex');
-      document.body.classList.add('no-scroll');
-      modal.dataset.studentId = String(studentId);
-
-      // Resetear campos visuales
-      const ids = ['studentProfileName', 'studentDOB', 'studentClassroom', 'studentAllergies', 
-                   'parent1Name', 'parent1Phone', 'parent1Email', 'studentRoom', 'studentPickup', 'studentBlood'];
-      ids.forEach(id => { const el = document.getElementById(id); if(el) el.textContent = '...'; });
-      
-      // Reset Avatar
-      const avatarContainer = document.getElementById('studentProfileAvatarContainer');
-      if (avatarContainer) {
-          avatarContainer.innerHTML = '<i data-lucide="user" class="w-8 h-8 text-indigo-600"></i>';
-          if(window.lucide) lucide.createIcons();
-      }
-
-      // Consultar datos
-      const { data: student, error } = await supabase
-        .from('students')
-        .select(`*, classrooms(name), parent:parent_id(*)`)
-        .eq('id', studentId)
-        .single();
-
-      if (error) throw error;
-
-      const setText = (id, val) => { const el = document.getElementById(id); if(el) el.textContent = val || '-'; };
-
-      setText('studentProfileName', student.name);
-      setText('studentDOB', student.birth_date);
-      setText('studentClassroom', student.classrooms?.name);
-      setText('studentRoom', student.classrooms?.name);
-      setText('studentAllergies', student.allergies);
-      setText('studentPickup', student.authorized_pickup);
-      setText('studentBlood', student.blood_type);
-
-      if (student.parent) {
-        setText('parent1Name', student.parent.name);
-        setText('parent1Phone', student.parent.phone);
-        setText('parent1Email', student.parent.email);
-      }
-      
-      // Set Avatar if exists
-      if (avatarContainer && student.avatar_url) {
-          avatarContainer.innerHTML = `<img src="${student.avatar_url}" class="w-full h-full object-cover" alt="${student.name}">`;
-      }
-    }, 'Error al abrir perfil');
-  };
-  
   // Eliminar perfil (maestra/asistente)
   window.deleteProfile = async function(id) {
     if (!id) return;

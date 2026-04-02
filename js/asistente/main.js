@@ -221,46 +221,12 @@ function initNavigation() {
   DashboardModule.init().then(() => loadedSections.add('dashboard'));
   showSection('dashboard');
 
-  // 4. Configurar botones de menú móvil y colapsar sidebar
-  const menuBtn     = document.getElementById('menuBtn');
-  const sidebar     = document.getElementById('sidebar');
-  const toggleSidebar = document.getElementById('toggleSidebar');
-  const layoutShell = document.getElementById('layoutShell');
-
-  if (menuBtn && sidebar) {
-    menuBtn.addEventListener('click', (e) => {
-      e.stopPropagation();
-      const overlay = document.getElementById('sidebarOverlay');
-      if (sidebar.classList.contains('mobile-visible')) {
-        sidebar.classList.remove('mobile-visible');
-        if (overlay) overlay.style.display = 'none';
-      } else {
-        sidebar.classList.add('mobile-visible');
-        if (overlay) overlay.style.display = 'block';
-      }
-    });
-  }
-
-  const overlay = document.getElementById('sidebarOverlay');
-  if (overlay) {
-    overlay.addEventListener('click', () => {
-      sidebar?.classList.remove('mobile-visible');
-      overlay.style.display = 'none';
-    });
-  }
-
-  if (toggleSidebar && sidebar && layoutShell) {
-    toggleSidebar.addEventListener('click', () => {
-      sidebar.classList.toggle('collapsed');
-      layoutShell.classList.toggle('sidebar-collapsed');
-      
-      const icon = toggleSidebar.querySelector('i');
-      if (icon) {
-        // Lucide handle rotation via CSS, but we can force update
-        if (window.lucide) lucide.createIcons();
-      }
-    });
-  }
+  // La gestión del sidebar móvil y de escritorio ahora se maneja en common_ui.js
+  // Asegúrate de que common_ui.js esté cargado en tu HTML para el panel de asistente.
+  // Si necesitas un botón para colapsar/expandir el sidebar en escritorio,
+  // common_ui.js ya lo maneja con el elemento #toggleSidebar.
+  // Si necesitas un botón para abrir/cerrar el sidebar en móvil,
+  // common_ui.js ya lo maneja con el elemento #menuBtn.
 }
 
 

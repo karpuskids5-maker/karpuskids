@@ -1,5 +1,5 @@
 /**
- * 💳 Panel Padre — Módulo de Pagos
+ * 💳 Panel Padre — Módulo de Pagos (limpio, sin columnas inexistentes)
  */
 import { supabase } from '../shared/supabase.js';
 import { AppState, TABLES } from './appState.js';
@@ -71,7 +71,7 @@ export const PaymentsModule = {
     let cfg;
 
     if (days < 0) {
-      const mora = calcMora(urgent.due_date, urgent.mora_condoned, urgent.status === 'excused');
+      const mora = calcMora(urgent.due_date);
       cfg = {
         bg: 'bg-gradient-to-r from-rose-500 to-red-600',
         icon: '🚨',
@@ -126,22 +126,20 @@ export const PaymentsModule = {
   },
 
   _renderCard(p) {
-    const status    = normalizeStatus(p);
-    const isPaid    = status === 'paid';
-    const isExcused = status === 'excused';
-    const amount    = Number(p.amount || 0);
-    const mora      = isPaid ? 0 : calcMora(p.due_date, p.mora_condoned, isExcused);
-    const moraInfo  = isPaid ? null : getMoraBreakdown(p.due_date, p.mora_condoned, isExcused);
-    const total     = amount + mora;
-    const days      = daysUntilDue(p.due_date);
+    const status   = normalizeStatus(p);
+    const isPaid   = status === 'paid';
+    const amount   = Number(p.amount || 0);
+    const mora     = isPaid ? 0 : calcMora(p.due_date);
+    const moraInfo = isPaid ? null : getMoraBreakdown(p.due_date);
+    const total    = amount + mora;
+    const days     = daysUntilDue(p.due_date);
 
     const SC = {
-      paid:      { label: 'Aprobado',       cls: 'bg-emerald-100 text-emerald-700', icon: 'check-circle',   border: '' },
-      review:    { label: 'En Revisión',    cls: 'bg-blue-100 text-blue-700',       icon: 'clock',          border: '' },
-      overdue:   { label: 'Vencido',        cls: 'bg-rose-100 text-rose-700',       icon: 'alert-triangle', border: 'border-l-4 border-l-rose-500' },
-      excused:   { label: 'Excusa enviada', cls: 'bg-violet-100 text-violet-700',   icon: 'message-square', border: 'border-l-4 border-l-violet-400' },
-      rechazado: { label: 'Rechazado',      cls: 'bg-rose-100 text-rose-700',       icon: 'x-circle',       border: 'border-l-4 border-l-rose-400' },
-      pending:   { label: 'Pendiente',      cls: 'bg-amber-100 text-amber-700',     icon: 'alert-circle',   border: '' }
+      paid:      { label: 'Aprobado',    cls: 'bg-emerald-100 text-emerald-700', icon: 'check-circle',   border: '' },
+      review:    { label: 'En Revisión', cls: 'bg-blue-100 text-blue-700',       icon: 'clock',          border: '' },
+      overdue:   { label: 'Vencido',     cls: 'bg-rose-100 text-rose-700',       icon: 'alert-triangle', border: 'border-l-4 border-l-rose-500' },
+      rechazado: { label: 'Rechazado',   cls: 'bg-rose-100 text-rose-700',       icon: 'x-circle',       border: 'border-l-4 border-l-rose-400' },
+      pending:   { label: 'Pendiente',   cls: 'bg-amber-100 text-amber-700',     icon: 'alert-circle',   border: '' }
     };
     const sc = SC[status] || SC.pending;
 
@@ -151,8 +149,6 @@ export const PaymentsModule = {
       else if (days === 0) urgencyBadge = `<span class="text-[9px] font-black text-orange-600 bg-orange-50 border border-orange-200 px-1.5 py-0.5 rounded-full">vence hoy</span>`;
       else if (days <= 3)  urgencyBadge = `<span class="text-[9px] font-black text-amber-600 bg-amber-50 border border-amber-200 px-1.5 py-0.5 rounded-full">vence en ${days}d</span>`;
     }
-
-    const canSendExcuse = (status === 'overdue' || (days !== null && days < 0)) && !p.excuse_text;
 
     return `
       <div class="bg-white rounded-3xl border border-slate-100 shadow-sm hover:shadow-md transition-all mb-4 overflow-hidden ${sc.border}">
@@ -191,81 +187,13 @@ export const PaymentsModule = {
             </div>
           </div>` : ''}
 
-          ${p.mora_condoned && !isPaid ? `
-          <div class="mt-3 p-3 bg-violet-50 rounded-2xl border border-violet-100 flex items-center gap-2">
-            <span class="text-base">🎁</span>
-            <span class="text-[10px] font-black text-violet-700">Mora condonada por la dirección</span>
-          </div>` : ''}
-
-          ${status === 'excused' ? `
-          <div class="mt-3 p-3 bg-violet-50 rounded-2xl border border-violet-100">
-            <p class="text-[10px] font-black text-violet-700 uppercase mb-1">Tu excusa:</p>
-            <p class="text-xs text-violet-800 italic">"${escapeHtml(p.excuse_text || '')}"</p>
-            ${p.excuse_approved === null  ? `<p class="text-[9px] font-black text-violet-500 mt-1 uppercase">⏳ Pendiente de revisión</p>` : ''}
-            ${p.excuse_approved === true  ? `<p class="text-[9px] font-black text-emerald-600 mt-1 uppercase">✅ Aprobada — mora suspendida</p>` : ''}
-            ${p.excuse_approved === false ? `<p class="text-[9px] font-black text-rose-600 mt-1 uppercase">❌ Rechazada${p.notes ? ': ' + escapeHtml(p.notes) : ''}</p>` : ''}
-          </div>` : ''}
-
           ${p.evidence_url && !isPaid ? `
           <div class="mt-3 pt-3 border-t border-slate-50 flex justify-between items-center">
             <p class="text-[10px] font-bold text-slate-400 italic">Comprobante enviado. Esperando validación.</p>
             <a href="${p.evidence_url}" target="_blank" class="text-[10px] font-black text-blue-600 hover:underline flex items-center gap-1">Ver <i data-lucide="external-link" class="w-3 h-3"></i></a>
           </div>` : ''}
-
-          ${canSendExcuse ? `
-          <div class="mt-3 pt-3 border-t border-slate-100">
-            <button onclick="window.PaymentsModule._openExcuseModal('${p.id}','${escapeHtml(p.month_paid||'')}')"
-              class="w-full flex items-center justify-center gap-2 py-2.5 bg-violet-50 hover:bg-violet-100 text-violet-700 rounded-xl font-black text-xs uppercase transition-colors active:scale-95">
-              <i data-lucide="message-square" class="w-4 h-4"></i>Enviar excusa de pago tardío
-            </button>
-          </div>` : ''}
         </div>
       </div>`;
-  },
-
-  _openExcuseModal(paymentId, month) {
-    document.getElementById('excuseModal')?.remove();
-    const modal = document.createElement('div');
-    modal.id = 'excuseModal';
-    modal.className = 'fixed inset-0 bg-black/50 z-[9999] flex items-end sm:items-center justify-center p-4';
-    modal.innerHTML = `
-      <div class="bg-white rounded-3xl shadow-2xl w-full max-w-md overflow-hidden">
-        <div class="bg-gradient-to-r from-violet-600 to-purple-600 p-5 text-white">
-          <h3 class="font-black text-lg">📝 Excusa de pago tardío</h3>
-          <p class="text-violet-100 text-xs font-medium mt-0.5">Mes: ${escapeHtml(month)}</p>
-        </div>
-        <div class="p-5 space-y-3">
-          <p class="text-sm text-slate-600 leading-relaxed">Explica el motivo. La dirección revisará y podrá suspender el recargo por mora.</p>
-          <textarea id="excuseText" rows="4"
-            class="w-full px-4 py-3 border-2 border-slate-100 rounded-2xl text-sm focus:border-violet-400 focus:ring-4 focus:ring-violet-50 outline-none resize-none transition-all"
-            placeholder="Ej: Tuve un imprevisto económico. Pagaré el día 15..."></textarea>
-          <p class="text-[10px] text-slate-400 font-bold uppercase">Mínimo 20 caracteres</p>
-        </div>
-        <div class="px-5 pb-5 flex gap-3">
-          <button onclick="document.getElementById('excuseModal').remove()"
-            class="flex-1 py-3 border-2 border-slate-100 text-slate-500 font-black text-xs uppercase rounded-2xl">Cancelar</button>
-          <button id="btnSendExcuse"
-            class="flex-1 py-3 bg-violet-600 hover:bg-violet-700 text-white font-black text-xs uppercase rounded-2xl shadow-lg active:scale-95 transition-all">Enviar excusa</button>
-        </div>
-      </div>`;
-    document.body.appendChild(modal);
-
-    document.getElementById('btnSendExcuse')?.addEventListener('click', async () => {
-      const text = document.getElementById('excuseText')?.value?.trim();
-      if (!text || text.length < 20) { Helpers.toast('Escribe al menos 20 caracteres', 'warning'); return; }
-      const btn = document.getElementById('btnSendExcuse');
-      if (btn) { btn.disabled = true; btn.textContent = 'Enviando...'; }
-      try {
-        const { PaymentService } = await import('../shared/payment-service.js');
-        await PaymentService.submitExcuse(paymentId, text);
-        modal.remove();
-        Helpers.toast('✅ Excusa enviada. La dirección la revisará pronto.', 'success');
-        await this.loadPayments();
-      } catch (e) {
-        Helpers.toast('Error: ' + e.message, 'error');
-        if (btn) { btn.disabled = false; btn.textContent = 'Enviar excusa'; }
-      }
-    });
   },
 
   async submitPaymentProof(e) {
