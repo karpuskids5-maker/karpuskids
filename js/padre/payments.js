@@ -25,7 +25,7 @@ export const PaymentsModule = {
     try {
       const { data, error } = await supabase
         .from(TABLES.PAYMENTS)
-        .select('id,student_id,amount,concept,status,due_date,created_at,paid_date,method,month_paid,evidence_url,notes,mora_condoned,excuse_text,excuse_approved')
+        .select('id,student_id,amount,concept,status,due_date,created_at,paid_date,method,month_paid,evidence_url,notes')
         .eq('student_id', this._studentId)
         .order('created_at', { ascending: false });
       if (error) throw error;

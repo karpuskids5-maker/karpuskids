@@ -1,2 +1,5 @@
-// OneSignal Service Worker - Karpus Kids
+/**
+ * OneSignal Service Worker v16.1
+ * Karpus Kids - PWA Support
+ */
 importScripts("https://cdn.onesignal.com/sdks/web/v16/OneSignalSDK.sw.js");

@@ -137,6 +137,12 @@ export async function emitEvent(type, data) {
       console.warn('[emitEvent] Function error:', error);
       return null;
     }
+    
+    // ✅ Log de éxito para que la Maestra vea la confirmación
+    if (resData?.ok) {
+      console.log(`[emitEvent] Success (${type}):`, resData);
+    }
+    
     return resData;
   } catch (e) {
     console.warn('[emitEvent] Catch error:', e.message);
@@ -246,6 +252,9 @@ export async function initOneSignal(currentUser = null) {
 
     window.OneSignalDeferred.push(async function(OneSignal) {
       try {
+        const isPWA = window.matchMedia('(display-mode: standalone)').matches || window.navigator.standalone;
+        console.log('[OneSignal] PWA Mode:', isPWA ? 'YES' : 'NO');
+
         // Verificar si ya está inicializado para evitar errores
         if (typeof OneSignal.isInitialized === 'function' && OneSignal.isInitialized()) {
           return;
@@ -284,7 +293,8 @@ export async function initOneSignal(currentUser = null) {
             await OneSignal.User.PushSubscription.optIn();
           }
 
-          console.log('[OneSignal] Inicializado y suscrito para:', user.id);
+          const subId = await OneSignal.User.PushSubscription.id;
+          console.log('[OneSignal] Inicializado para:', user.id, '| SubID:', subId || 'no-sub');
         } catch (loginErr) {
           const errMsg = loginErr?.message?.toLowerCase() || "";
           if (errMsg.includes('409') || loginErr?.status === 409 || errMsg.includes('conflict')) {
