@@ -386,39 +386,74 @@ export const WallModule = {
     const content = input?.value.trim();
     if (!content) return;
 
-    const user = this._appState?.get('user');
+    const user    = this._appState?.get('user');
     const profile = this._appState?.get('profile');
-
     if (!user) return;
 
-    try {
-      // 1. Si es un padre, necesitamos el nombre del estudiante para el registro del comentario
-      // aunque guardemos el user_id del padre en la tabla.
-      let userName = 'Usuario';
-      
-      if (profile?.role === 'padre') {
-        const { data: student } = await supabase.from('students').select('name').eq('parent_id', user.id).maybeSingle();
-        userName = student?.name || profile.name || 'Padre';
-      } else {
-        userName = profile?.name || 'Personal';
-      }
+    // Resolver nombre del autor
+    let userName = 'Usuario';
+    if (profile?.role === 'padre') {
+      const { data: student } = await supabase.from('students').select('name').eq('parent_id', user.id).maybeSingle();
+      userName = student?.name || profile.name || 'Padre';
+    } else {
+      userName = profile?.name || 'Personal';
+    }
 
-      const { error } = await supabase
-        .from('comments')
-        .insert({
-          post_id: postId,
-          user_id: user.id,
-          user_name: userName, // Guardamos el nombre resuelto (estudiante o personal)
-          content: content
-        });
+    // Optimistic UI — agregar comentario sin recargar
+    const commentsList = document.getElementById(`comments-list-${postId}`);
+    const tempId = `temp-${Date.now()}`;
+    if (commentsList) {
+      const placeholder = commentsList.querySelector('.italic');
+      if (placeholder) placeholder.remove();
+
+      const tempEl = document.createElement('div');
+      tempEl.id = tempId;
+      tempEl.className = 'flex gap-2 text-xs opacity-60';
+      tempEl.innerHTML = `
+        <div class="w-6 h-6 rounded-full bg-slate-200 flex items-center justify-center font-bold text-[9px] text-slate-500 shrink-0">
+          ${Helpers.escapeHTML(userName.charAt(0).toUpperCase())}
+        </div>
+        <div class="bg-white p-2 rounded-xl rounded-tl-none border border-slate-100 shadow-sm flex-1">
+          <div class="flex justify-between">
+            <span class="font-bold text-slate-700">${Helpers.escapeHTML(userName)}</span>
+            <span class="text-[9px] text-slate-400">ahora</span>
+          </div>
+          <p class="text-slate-600 mt-0.5">${Helpers.escapeHTML(content)}</p>
+        </div>`;
+      commentsList.appendChild(tempEl);
+      commentsList.scrollTop = commentsList.scrollHeight;
+    }
+
+    // Limpiar input inmediatamente
+    input.value = '';
+
+    try {
+      const { error } = await supabase.from('comments').insert({
+        post_id:   postId,
+        user_id:   user.id,
+        user_name: userName,
+        content
+      });
 
       if (error) throw error;
 
-      input.value = '';
-      const comments = await this._fetchComments(postId);
-      this.renderComments(postId, comments);
+      // Confirmar — quitar opacidad del comentario temporal
+      const tempEl = document.getElementById(tempId);
+      if (tempEl) tempEl.classList.remove('opacity-60');
+
+      // Actualizar contador en el botón de comentarios
+      const countBtn = document.querySelector(`#post-${postId} button[onclick*="toggleCommentSection"] span`);
+      if (countBtn) {
+        const match = countBtn.textContent.match(/\d+/);
+        const current = match ? parseInt(match[0]) : 0;
+        countBtn.textContent = `${current + 1} Comentarios`;
+      }
+
     } catch (err) {
       console.error('[WallModule] Error sendComment:', err);
+      // Revertir optimistic
+      document.getElementById(tempId)?.remove();
+      input.value = content;
     }
   },
 
@@ -426,9 +461,15 @@ export const WallModule = {
     const section = document.getElementById(`comments-section-${postId}`);
     if (!section) return;
     section.classList.toggle('hidden');
+
+    // Solo cargar desde DB si la sección se abre Y la lista está vacía o tiene solo el placeholder
     if (!section.classList.contains('hidden')) {
-      const comments = await this._fetchComments(postId);
-      this.renderComments(postId, comments);
+      const list = document.getElementById(`comments-list-${postId}`);
+      const hasRealComments = list && list.querySelectorAll('[id^="comment-"]').length > 0;
+      if (!hasRealComments) {
+        const comments = await this._fetchComments(postId);
+        this.renderComments(postId, comments);
+      }
     }
   },
 

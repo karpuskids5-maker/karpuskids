@@ -178,25 +178,66 @@ export const FeedModule = {
     const student = AppState.get('currentStudent');
     if (!user) return;
 
-    // Para padres: mostrar nombre del estudiante (no del padre)
-    // El estudiante ya está cargado en el AppState del panel padre
     const authorName = student?.name || 'Padre';
 
+    // Optimistic UI — agregar el comentario inmediatamente sin recargar
+    const commentsList = document.getElementById(`comments-list-${postId}`);
+    const tempId = `temp-comment-${Date.now()}`;
+    if (commentsList) {
+      // Quitar el placeholder "Sé el primero en comentar"
+      const placeholder = commentsList.querySelector('.italic');
+      if (placeholder) placeholder.remove();
+
+      const tempEl = document.createElement('div');
+      tempEl.id = tempId;
+      tempEl.className = 'flex gap-2 text-xs opacity-60';
+      tempEl.innerHTML = `
+        <div class="w-6 h-6 rounded-full bg-blue-100 flex items-center justify-center font-bold text-[9px] text-blue-600 shrink-0">
+          ${authorName.charAt(0).toUpperCase()}
+        </div>
+        <div class="bg-white p-2 rounded-xl rounded-tl-none border border-slate-100 shadow-sm flex-1">
+          <div class="flex justify-between">
+            <span class="font-bold text-slate-700">${escapeHtml(authorName)}</span>
+            <span class="text-[9px] text-slate-400">ahora</span>
+          </div>
+          <p class="text-slate-600 mt-0.5">${escapeHtml(content)}</p>
+        </div>`;
+      commentsList.appendChild(tempEl);
+      commentsList.scrollTop = commentsList.scrollHeight;
+    }
+
+    // Limpiar input inmediatamente
+    input.value = '';
+
     try {
-      const { error } = await supabase.from('comments').insert({
+      const { data: newComment, error } = await supabase.from('comments').insert({
         post_id:   postId,
         user_id:   user.id,
-        user_name: authorName, // Guardamos el nombre del estudiante directamente en user_name
+        user_name: authorName,
         content
-      });
+      }).select('id, content, user_name, created_at').single();
+
       if (error) throw error;
-      input.value = '';
-      
-      // Feedback inmediato y recarga
-      Helpers.toast('Comentario enviado como ' + authorName, 'success');
-      await this.loadPosts();
+
+      // Reemplazar el comentario temporal con el real
+      const tempEl = document.getElementById(tempId);
+      if (tempEl && newComment) {
+        tempEl.id = `comment-${newComment.id}`;
+        tempEl.classList.remove('opacity-60');
+      }
+
+      // Actualizar contador de comentarios en el botón
+      const countBtn = document.querySelector(`[data-post-id="${postId}"][data-action="comment"] span`);
+      if (countBtn) {
+        const current = parseInt(countBtn.textContent) || 0;
+        countBtn.textContent = `${current + 1} Comentarios`;
+      }
+
     } catch (err) {
       console.error('Error enviando comentario:', err);
+      // Revertir optimistic — quitar el comentario temporal
+      document.getElementById(tempId)?.remove();
+      input.value = content; // restaurar el texto
       Helpers.toast('Error al enviar comentario', 'error');
     }
   },

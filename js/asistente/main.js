@@ -258,13 +258,20 @@ function initNavigation() {
     overlay.addEventListener('click', _closeSidebar);
   }
 
+  // Cerrar sidebar al hacer click en el main (móvil)
+  document.getElementById('layoutShell')?.addEventListener('click', () => {
+    if (window.innerWidth < 768 && sidebar?.classList.contains('mobile-visible')) {
+      _closeSidebar();
+    }
+  });
+
   // ── Colapsar sidebar desktop ─────────────────────────────────────────────
   const toggleBtn   = document.getElementById('toggleSidebar');
-  const layoutShell = document.getElementById('layoutShell');
-  if (toggleBtn && sidebar && layoutShell) {
+  const wrapper     = sidebar?.closest('.app-content-wrapper') || document.querySelector('.app-content-wrapper');
+  if (toggleBtn && sidebar) {
     toggleBtn.addEventListener('click', () => {
       sidebar.classList.toggle('collapsed');
-      layoutShell.classList.toggle('sidebar-collapsed');
+      wrapper?.classList.toggle('sidebar-collapsed');
     });
   }
 }

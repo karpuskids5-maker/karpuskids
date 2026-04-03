@@ -1,4 +1,4 @@
--- Karpus Kids - Esquema de Base de Datos para Supabase (Postgres)
+﻿-- Karpus Kids - Esquema de Base de Datos para Supabase (Postgres)
 -- ARQUITECTURA FINAL KARPUS KIDS (Supabase Auth + RLS)
 -- Versión Corregida y Optimizada con Sistema de Notificaciones
 
@@ -1580,24 +1580,6 @@ begin
 end;
 $$;
 
--- Obtener conteo de mensajes no leídos por remitente
-create or replace function public.get_unread_counts()
-returns jsonb
-language sql
-security definer
-set search_path = public
-as $$
-  select jsonb_object_agg(sender_id, count)
-  from (
-    select m.sender_id, count(*) as count
-    from messages m
-    join conversation_participants cp on cp.conversation_id = m.conversation_id
-    where cp.user_id = auth.uid()
-      and m.sender_id != auth.uid()
-      and m.is_read = false
-    group by m.sender_id
-  ) t;
-$$;
 
 -- Marcar mensajes como leídos en una conversación
 create or replace function public.mark_conversation_read(p_conversation_id bigint)
@@ -2392,110 +2374,29 @@ create index if not exists idx_students_classroom
 create index if not exists idx_posts_classroom_created
   on posts(classroom_id, created_at desc);
 
--- ── 7. Trigger updated_at en daily_logs ──────────────────────
-create or replace function public.set_updated_at()
-returns trigger language plpgsql as $$
-begin
-  new.updated_at = now();
-  return new;
-end;
-$$;
 
-drop trigger if exists daily_logs_updated_at on daily_logs;
-create trigger daily_logs_updated_at
-  before update on daily_logs
-  for each row execute function set_updated_at();
+-- ── Columnas adicionales (idempotentes) ───────────────────────
+alter table public.payments      add column if not exists bank               text;
+alter table public.payments      add column if not exists reference          text;
+alter table public.payments      add column if not exists transfer_date      date;
+alter table public.daily_logs    add column if not exists activities         text;
+alter table public.profiles      add column if not exists onesignal_player_id text;
+alter table public.messages      add column if not exists is_read            boolean default false;
+alter table public.notifications add column if not exists link               text;
+alter table public.notifications add column if not exists type               text default 'info';
 
--- ── 8. Función RPC para ciclo de pagos (si no existe) ─────────
-create or replace function public.run_payment_cycle()
-returns json language plpgsql security definer as $$
-declare
-  v_generated int := 0;
-  v_expired   int := 0;
-  v_settings  record;
-  v_student   record;
-  v_today     date := current_date;
-  v_month     text;
-begin
-  -- Obtener configuración
-  select * into v_settings from school_settings where id = 1;
-  if not found then
-    v_settings.generation_day := 25;
-    v_settings.due_day := 5;
-  end if;
-
-  -- Nombre del mes siguiente
-  v_month := to_char(v_today + interval '1 month', 'TMMonth');
-
-  -- Generar pagos del mes siguiente si es día de generación
-  if extract(day from v_today) = v_settings.generation_day then
-    for v_student in
-      select id, monthly_fee, due_day
-      from students
-      where is_active = true
-      and monthly_fee > 0
-    loop
-      insert into payments (student_id, amount, concept, status, month_paid, due_date, created_at)
-      values (
-        v_student.id,
-        v_student.monthly_fee,
-        'Mensualidad ' || v_month,
-        'pending',
-        v_month,
-        (date_trunc('month', v_today + interval '1 month') + ((coalesce(v_student.due_day, v_settings.due_day) - 1) || ' days')::interval)::date,
-        now()
-      )
-      on conflict do nothing;
-      v_generated := v_generated + 1;
-    end loop;
-  end if;
-
-  -- Marcar como vencidos los pagos pasados
-  update payments
-  set status = 'overdue'
-  where status in ('pending','pendiente')
-  and due_date < v_today;
-  get diagnostics v_expired = row_count;
-
-  return json_build_object('generated', v_generated, 'expired', v_expired);
-end;
-$$;
-
--- ── 9. Función get_unread_counts (si no existe) ───────────────
-create or replace function public.get_unread_counts()
-returns json language plpgsql security definer as $$
-declare
-  v_user_id uuid := auth.uid();
-  v_counts  json;
-begin
-  select json_object_agg(sender_id, cnt)
-  into v_counts
-  from (
-    select m.sender_id, count(*) as cnt
-    from messages m
-    join conversation_participants cp
-      on cp.conversation_id = m.conversation_id
-      and cp.user_id = v_user_id
-    where m.sender_id != v_user_id
-    and m.is_read = false
-    group by m.sender_id
-  ) t;
-  return coalesce(v_counts, '{}'::json);
-end;
-$$;
-
--- ── 10. Tabla school_settings (si no existe) ──────────────────
+-- ── Tabla school_settings ─────────────────────────────────────
 create table if not exists public.school_settings (
-  id              int primary key default 1,
-  generation_day  int default 25,
-  due_day         int default 5,
-  school_name     text default 'Karpus Kids',
-  monthly_fee     numeric default 0,
-  updated_at      timestamptz default now()
+  id             int primary key default 1,
+  generation_day int default 25,
+  due_day        int default 5,
+  school_name    text default 'Karpus Kids',
+  monthly_fee    numeric default 0,
+  updated_at     timestamptz default now()
 );
 insert into public.school_settings (id) values (1) on conflict do nothing;
 
--- ── 11. Tabla terms_acceptance (si no existe) ─────────────────
+-- ── Tabla terms_acceptance ────────────────────────────────────
 create table if not exists public.terms_acceptance (
   user_id       uuid references public.profiles(id) on delete cascade,
   terms_version text not null,
@@ -2503,15 +2404,72 @@ create table if not exists public.terms_acceptance (
   primary key (user_id, terms_version)
 );
 alter table public.terms_acceptance enable row level security;
+drop policy if exists "user_own_terms" on terms_acceptance;
 create policy "user_own_terms" on terms_acceptance for all
   using (user_id = auth.uid());
 
--- ── 12. Columna is_read en messages (si no existe) ────────────
-alter table public.messages add column if not exists is_read boolean default false;
+-- ── Tabla meetings (videollamadas) ────────────────────────────
+create table if not exists public.meetings (
+  id          bigint generated by default as identity primary key,
+  title       text not null,
+  description text,
+  room_name   text unique not null,
+  type        text default 'classroom' check (type in ('classroom','private','staff')),
+  target_id   bigint,
+  host_id     uuid references public.profiles(id) on delete set null,
+  status      text default 'scheduled' check (status in ('scheduled','live','ended','cancelled')),
+  start_time  timestamptz,
+  created_at  timestamptz default now()
+);
+alter table public.meetings enable row level security;
+drop policy if exists "staff_manage_meetings" on meetings;
+create policy "staff_manage_meetings" on meetings for all
+  using (exists (select 1 from profiles where id = auth.uid() and role in ('directora','maestra','asistente')));
+drop policy if exists "padre_view_meetings" on meetings;
+create policy "padre_view_meetings" on meetings for select
+  using (auth.uid() is not null);
 
--- ── 13. Verificar que notifications tiene todas las columnas ──
-alter table public.notifications add column if not exists link text;
-alter table public.notifications add column if not exists type text default 'info';
+-- ── RLS daily_logs ────────────────────────────────────────────
+drop policy if exists "maestra_daily_logs_all" on daily_logs;
+create policy "maestra_daily_logs_all" on daily_logs for all
+  using (exists (select 1 from classrooms where id = daily_logs.classroom_id and teacher_id = auth.uid()));
+drop policy if exists "padre_read_daily_logs" on daily_logs;
+create policy "padre_read_daily_logs" on daily_logs for select
+  using (exists (select 1 from students where id = daily_logs.student_id and parent_id = auth.uid()));
 
--- ── DONE ──────────────────────────────────────────────────────
-select 'Production fixes applied successfully' as status;
+-- ── NOTA IMPORTANTE ───────────────────────────────────────────
+-- Las funciones run_payment_cycle() y get_unread_counts() ya están
+-- definidas arriba con returns jsonb. Para actualizarlas ejecuta:
+--   1. db/drop-functions.sql   (elimina las funciones existentes)
+--   2. db/production-fixes.sql (recrea con returns json)
+
+-- ============================================================
+-- 🔧 Fix: RLS para tabla comments
+-- Ejecutar en Supabase SQL Editor
+-- ============================================================
+
+alter table public.comments enable row level security;
+
+-- Leer: cualquier usuario autenticado
+drop policy if exists "comments_select_all" on comments;
+create policy "comments_select_all" on comments for select
+  using (auth.uid() is not null);
+
+-- Insertar: solo el propio usuario
+drop policy if exists "comments_insert_own" on comments;
+create policy "comments_insert_own" on comments for insert
+  with check (auth.uid() = user_id);
+
+-- Eliminar: el autor o staff (directora/maestra/asistente)
+drop policy if exists "comments_delete" on comments;
+create policy "comments_delete" on comments for delete
+  using (
+    auth.uid() = user_id
+    or exists (
+      select 1 from profiles
+      where id = auth.uid()
+      and role in ('directora', 'asistente', 'maestra')
+    )
+  );
+
+select 'Comments RLS fixed ✅' as status;
