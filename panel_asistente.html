@@ -43,12 +43,15 @@
     aside#sidebar { 
       position: fixed;
       top: 0; bottom: 0; left: 0;
-      z-index: 1050; /* Por encima del header */
+      z-index: 1050;
       display: flex;
       flex-direction: column;
-      overflow: hidden;
+      overflow-y: auto;   /* ✅ scroll en sidebar en móvil */
+      overflow-x: hidden;
+      scrollbar-width: none;
       transition: width 0.3s cubic-bezier(0.4, 0, 0.2, 1), transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
     }
+    aside#sidebar::-webkit-scrollbar { display: none; }
 
     /* --- DESKTOP (≥ 768px) --- */
     @media (min-width: 768px) {
@@ -151,6 +154,58 @@
       #layoutShell { margin-left: 0 !important; }
     }
     #attendanceModal { -webkit-backdrop-filter: blur(4px); backdrop-filter: blur(4px); }
+
+    /* ═══════════════════════════════════════════════
+       MOBILE GLOBAL — scroll libre en todas las secciones
+    ═══════════════════════════════════════════════ */
+    @media (max-width: 767px) {
+      html, body { overflow-x: hidden; }
+
+      /* Secciones: sin altura fija, scroll natural */
+      .section, .section.active {
+        overflow: visible !important;
+        height: auto !important;
+      }
+
+      /* KPI grids: 2 columnas */
+      .grid.grid-cols-2.lg\\:grid-cols-4 { grid-template-columns: repeat(2, 1fr) !important; }
+
+      /* Tablas: siempre scroll horizontal */
+      .overflow-x-auto, .responsive-panel {
+        overflow-x: auto !important;
+        -webkit-overflow-scrolling: touch;
+      }
+
+      /* Canvas: no desbordar */
+      canvas { max-width: 100% !important; }
+
+      /* Chat: altura adaptada a móvil */
+      .chat-shell {
+        min-height: calc(100dvh - 140px) !important;
+        height: calc(100dvh - 140px) !important;
+        border-radius: 16px;
+      }
+
+      /* Pagos: filtros en columna */
+      #pagos .flex.flex-wrap.gap-2 { flex-direction: column; }
+      #pagos #statusPills { flex-wrap: wrap; }
+
+      /* Accesos: grid en columna */
+      #accesos .grid.grid-cols-1.lg\\:grid-cols-3 { grid-template-columns: 1fr !important; }
+
+      /* Perfil: grid en columna */
+      #perfil .grid.grid-cols-1.lg\\:grid-cols-2 { grid-template-columns: 1fr !important; }
+
+      /* Modales: full width */
+      .modal-content, [id$="Modal"] > div, [id$="modal"] > div {
+        width: 95% !important;
+        max-height: 90dvh !important;
+        overflow-y: auto !important;
+      }
+
+      /* Botones de acción: más grandes para touch */
+      button { touch-action: manipulation; }
+    }
   </style>
 </head>
 <body class="bg-slate-50 text-slate-800 font-sans panel-asistente-body">
@@ -474,7 +529,7 @@
       </section>
 
       <!-- MODAL: Ver Estudiantes de Aula -->
-      <div id="roomStudentsModal" class="fixed inset-0 bg-black/40 hidden items-center justify-center z-50">
+      <div id="roomStudentsModal" class="fixed inset-0 bg-black/40 hidden z-50 items-center justify-center">
         <div class="bg-white rounded-lg p-6 w-full max-w-md">
           <div class="flex justify-between items-center mb-4">
             <h3 class="font-semibold flex items-center gap-2">
@@ -491,7 +546,7 @@
       </div>
 
       <!-- MODAL: Crear/Editar Aula -->
-      <div id="roomModal" class="fixed inset-0 bg-black/50 backdrop-blur-sm hidden items-center justify-center z-50 p-4">
+      <div id="roomModal" class="fixed inset-0 bg-black/50 backdrop-blur-sm hidden z-50 p-4 items-center justify-center">
         <div class="bg-white rounded-3xl shadow-2xl w-full max-w-lg max-h-[90vh] overflow-hidden flex flex-col">
           <!-- Header -->
           <div class="bg-gradient-to-r from-teal-600 to-emerald-600 text-white p-5 flex items-center justify-between shrink-0">
@@ -669,7 +724,7 @@
           </select>
 
           <!-- Table -->
-          <div class="overflow-x-auto -webkit-overflow-scrolling-touch">
+          <div class="overflow-x-auto -webkit-overflow-scrolling: touch">
             <table class="w-full text-sm" style="min-width:600px;">
               <thead class="bg-slate-50 border-b border-slate-100">
                 <tr>
@@ -702,7 +757,7 @@
         </header>
 
         <!-- Layout WhatsApp: lista ↔ conversación -->
-        <div class="chat-shell" style="min-height:72vh;">
+        <div class="chat-shell">
 
           <!-- Panel lista de contactos -->
           <div id="chatListPanel" class="chat-list-col">

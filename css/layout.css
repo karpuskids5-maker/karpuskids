@@ -230,12 +230,13 @@ video.karpus-img-loading { background: #1e293b; }
 /* ── 15. CHAT WHATSAPP ───────────────────────────────────────── */
 .chat-shell {
   display: flex;
+  height: calc(100dvh - 120px);
+  min-height: 500px;
   border-radius: 20px;
   overflow: hidden;
   border: 1px solid #e2e8f0;
   box-shadow: 0 4px 24px -4px rgba(0,0,0,0.07);
   background: white;
-  min-height: 72vh;
 }
 .chat-list-col {
   width: 300px; flex-shrink: 0;
@@ -252,7 +253,7 @@ video.karpus-img-loading { background: #1e293b; }
   border-top: 1px solid #f1f5f9; padding: 0.75rem 1rem; z-index: 2;
 }
 @media (max-width: 768px) {
-  .chat-shell { flex-direction: column; min-height: 75vh; border-radius: 16px; }
+  .chat-shell { flex-direction: column; height: calc(100dvh - 100px); min-height: 400px; border-radius: 16px; }
   .chat-list-col { width: 100%; border-right: none; border-bottom: 1px solid #f1f5f9; }
   .chat-list-col.chat-hidden { display: none; }
   .chat-conv-col.chat-hidden { display: none; }
