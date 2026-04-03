@@ -5,6 +5,7 @@ import { supabase } from '../shared/supabase.js';
 import { AppState, TABLES } from './appState.js';
 import { Helpers, escapeHtml } from './helpers.js';
 import { calcMora, getMoraBreakdown, normalizeStatus, daysUntilDue } from '../shared/payment-service.js';
+import { emitEvent } from '../shared/supabase.js';
 
 export const PaymentsModule = {
   _studentId: null,
@@ -162,6 +163,7 @@ export const PaymentsModule = {
                 <p class="font-black text-slate-800 text-sm truncate">${escapeHtml(p.month_paid || 'Colegiatura')}</p>
                 <div class="flex items-center gap-1.5 mt-0.5 flex-wrap">
                   <span class="text-[9px] font-bold text-slate-400 uppercase">${Helpers.formatDate(p.created_at)}</span>
+                  ${p.bank ? `<span class="text-[9px] font-bold text-slate-500 bg-slate-100 px-1.5 py-0.5 rounded-full">🏦 ${escapeHtml(p.bank)}</span>` : ''}
                   ${urgencyBadge}
                 </div>
                 ${p.due_date && !isPaid ? `<p class="text-[9px] font-black uppercase mt-0.5 ${mora > 0 ? 'text-rose-500' : 'text-slate-400'}">Vence: ${new Date(p.due_date + 'T00:00:00').toLocaleDateString('es-DO')}</p>` : ''}
@@ -205,10 +207,12 @@ export const PaymentsModule = {
     const amount = parseFloat(document.getElementById('paymentAmount')?.value || '0');
     const month  = document.getElementById('paymentMonth')?.value?.trim();
     const method = document.getElementById('paymentMethod')?.value || 'transferencia';
+    const bank   = document.getElementById('paymentBank')?.value?.trim() || null;
 
     if (!file)   { Helpers.toast('Adjunta el comprobante', 'warning'); return; }
-    if (!amount) { Helpers.toast('Ingresa el monto', 'warning'); return; }
+    if (!amount || amount <= 0 || amount > 99999) { Helpers.toast('Ingresa un monto válido (mayor a 0)', 'warning'); return; }
     if (!month)  { Helpers.toast('Selecciona el mes', 'warning'); return; }
+    if (!bank)   { Helpers.toast('Selecciona el banco de origen', 'warning'); return; }
     if (file.size > 5 * 1024 * 1024) { Helpers.toast('Archivo muy grande (max 5MB)', 'error'); return; }
     if (!['image/jpeg','image/png','image/webp','application/pdf'].includes(file.type)) {
       Helpers.toast('Formato no permitido (JPG, PNG, PDF)', 'error'); return;
@@ -234,19 +238,28 @@ export const PaymentsModule = {
       );
       if (existing) {
         const { error } = await supabase.from(TABLES.PAYMENTS)
-          .update({ evidence_url: publicUrl, status: 'review', method }).eq('id', existing.id);
+          .update({ evidence_url: publicUrl, status: 'review', method, bank }).eq('id', existing.id);
         if (error) throw error;
       } else {
         const { error } = await supabase.from(TABLES.PAYMENTS).insert({
           student_id: student.id, amount, month_paid: month,
-          method, evidence_url: publicUrl, status: 'review',
+          method, bank, evidence_url: publicUrl, status: 'review',
           created_at: new Date().toISOString()
         });
         if (error) throw error;
       }
-      this._showSuccessConfirmation(amount, month);
+      this._showSuccessConfirmation(amount, month, bank);
       e.target.reset();
       await this.loadPayments();
+
+      // Notificar al staff que hay un comprobante nuevo
+      const student = AppState.get('currentStudent');
+      emitEvent('payment.receipt_uploaded', {
+        student_id:   student?.id,
+        student_name: student?.name || 'Estudiante',
+        amount:       amount.toFixed(2),
+        month
+      }).catch(() => {});
     } catch (err) {
       console.error('[submitPaymentProof]', err);
       Helpers.toast('Error al enviar: ' + (err.message || ''), 'error');
@@ -255,14 +268,16 @@ export const PaymentsModule = {
     }
   },
 
-  _showSuccessConfirmation(amount, month) {
+  _showSuccessConfirmation(amount, month, bank = '') {
     const container = document.getElementById('paymentsHistory');
     if (!container) return;
     const el = document.createElement('div');
     el.className = 'bg-emerald-50 border-2 border-emerald-200 rounded-2xl p-4 mb-4 flex items-center gap-3';
     el.innerHTML = `<div class="w-10 h-10 bg-emerald-500 rounded-xl flex items-center justify-center text-white text-xl shrink-0">✅</div>
-      <div><p class="font-black text-emerald-800 text-sm">Comprobante enviado correctamente</p>
-      <p class="text-[10px] font-bold text-emerald-600 uppercase">${Helpers.formatCurrency(amount)} · ${month} · En revisión</p></div>`;
+      <div>
+        <p class="font-black text-emerald-800 text-sm">Comprobante enviado correctamente</p>
+        <p class="text-[10px] font-bold text-emerald-600 uppercase">${Helpers.formatCurrency(amount)} · ${month}${bank ? ' · ' + bank : ''} · En revisión</p>
+      </div>`;
     container.insertBefore(el, container.firstChild);
     setTimeout(() => { el.style.opacity='0'; el.style.transition='opacity 0.4s'; setTimeout(()=>el.remove(),400); }, 8000);
   },

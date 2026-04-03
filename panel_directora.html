@@ -1111,6 +1111,9 @@
               <button id="btnGeneratePaymentsNow" class="w-full py-2.5 bg-emerald-500 text-white rounded-xl font-bold text-xs uppercase tracking-wide hover:bg-emerald-600 transition-all shadow-md mt-1 flex items-center justify-center gap-2">
                 <i data-lucide="play-circle" class="w-4 h-4"></i> Generar pagos ahora
               </button>
+              <button id="btnSendPaymentReminders" class="w-full py-2.5 bg-blue-500 text-white rounded-xl font-bold text-xs uppercase tracking-wide hover:bg-blue-600 transition-all shadow-md mt-1 flex items-center justify-center gap-2">
+                <i data-lucide="bell" class="w-4 h-4"></i> Enviar recordatorios ahora
+              </button>
             </div>
             <p class="text-[10px] text-slate-400 mt-4 text-center leading-tight">
               El sistema generará los cobros y aplicará estados de vencimiento automáticamente según estos días.
@@ -1476,5 +1479,12 @@
     });
   </script>
 <script src="js/pwa-install.js" defer></script>
+<script>
+  if ('serviceWorker' in navigator) {
+    window.addEventListener('load', () => {
+      navigator.serviceWorker.register('/sw.js', { scope: '/' }).catch(() => {});
+    });
+  }
+</script>
 </body>
 </html>

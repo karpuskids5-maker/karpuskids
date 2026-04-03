@@ -113,4 +113,13 @@ document.addEventListener('DOMContentLoaded', () => {
   }
 
   // Botón de cierre para cada sección
-  
+
+  document.querySelectorAll('[data-close-section]').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const targetId = btn.dataset.closeSection;
+      const target = document.getElementById(targetId);
+      if (target) target.classList.add('hidden');
+    });
+  });
+
+}); // end DOMContentLoaded

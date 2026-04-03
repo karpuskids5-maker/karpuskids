@@ -14,13 +14,21 @@ import { initLiveClassListener } from './attendance_live.js';
 import { NotifyPermission } from '../shared/notify-permission.js';
 import { BadgeSystem } from '../shared/badges.js';
 import { ImageLoader } from '../shared/image-loader.js';
-import { Prefetch } from '../shared/prefetch.js';
+import { OnboardingGuide } from '../shared/onboarding.js';
+import { VideoCallUI } from '../shared/videocall-ui.js';
 
 window.App = {
   feed: FeedModule, payments: PaymentsModule, tasks: TasksModule,
   attendance: AttendanceModule, chat: ChatModule, profile: ProfileModule,
   grades: GradesModule, navigateTo: navigateTo
 };
+
+// Global error handler
+window.addEventListener('unhandledrejection', (e) => {
+  const msg = e.reason?.message?.toLowerCase() ?? '';
+  if (msg.includes('indexeddb') || msg.includes('network') || msg.includes('fetch')) return;
+  console.error('[Padre] Unhandled rejection:', e.reason);
+});
 
 document.addEventListener('DOMContentLoaded', async () => {
   try {
@@ -100,6 +108,46 @@ document.addEventListener('DOMContentLoaded', async () => {
 
     // 🔴 Sistema de badges por sección
     BadgeSystem.init(auth.user.id);
+
+    // 🎓 Guía de bienvenida para nuevos padres
+    const parentName = auth.profile?.name?.split(' ')[0] || 'Bienvenido';
+    OnboardingGuide.init({
+      userName:   parentName,
+      storageKey: 'padre_v2',
+      delay:      2000,
+      steps: [
+        {
+          target:  '[data-target="home"]',
+          icon:    '🏠',
+          title:   'Inicio',
+          text:    'Aquí ves el resumen del día: asistencia, tareas pendientes, pagos y más. Todo de un vistazo.'
+        },
+        {
+          target:  '[data-target="class"]',
+          icon:    '📢',
+          title:   'Muro del Aula',
+          text:    'La maestra publica fotos, videos y comunicados aquí. ¡Mantente al día con lo que pasa en el aula!'
+        },
+        {
+          target:  '[data-target="tasks"]',
+          icon:    '📚',
+          title:   'Tareas',
+          text:    'Revisa las tareas asignadas, fechas de entrega y calificaciones de tu hijo/a.'
+        },
+        {
+          target:  '#dashboardGrid',
+          icon:    '💳',
+          title:   'Pagos',
+          text:    'Envía tu comprobante de transferencia directamente desde aquí. Selecciona el mes y adjunta la foto.'
+        },
+        {
+          target:  '[data-target="profile"]',
+          icon:    '👤',
+          title:   'Mi Perfil',
+          text:    'Activa las notificaciones push para recibir alertas en tiempo real sobre tu hijo/a.'
+        }
+      ]
+    });
 
     // 🔔 Pedir permiso de notificaciones al cargar (con delay para no interrumpir)
     setTimeout(() => NotifyPermission.requestIfNeeded('notifPermissionSlot'), 3000);
@@ -362,7 +410,16 @@ export function navigateTo(targetId) {
       case 'class':           FeedModule.init(student?.classroom_id); break;
       case 'profile':         ProfileModule.init(); NotifyPermission.requestIfNeeded(); break;
       case 'grades':          GradesModule.init(student?.id); break;
-      case 'videocall':       checkActiveMeetings(); break;
+      case 'videocall': {
+        const student = AppState.get('currentStudent');
+        VideoCallUI.renderSection('videocall-section', {
+          role: 'padre',
+          userName: AppState.get('profile')?.name || 'Padre',
+          studentName: student?.name || '',
+          classroomId: student?.classroom_id || null
+        });
+        break;
+      }
     }
   }
 

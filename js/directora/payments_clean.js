@@ -26,6 +26,7 @@ export const PaymentsModule = {
       on('btnNewPayment',         'click',  () => this.openPaymentModal());
       on('btnGenerateCharges',    'click',  () => this.runCycle());
       on('btnGeneratePaymentsNow','click',  () => this.runCycle());
+      on('btnSendPaymentReminders','click', () => this.sendReminders());
       on('btnSavePaymentConfig',  'click',  () => this.savePaymentConfig());
     }
     await this.loadPayments();
@@ -305,6 +306,25 @@ export const PaymentsModule = {
       Helpers.toast('Ciclo completado: ' + (r.generated || 0) + ' generados, ' + (r.expired || 0) + ' vencidos', 'success');
       await this.loadPayments();
     } catch (e) { Helpers.toast('Error en ciclo: ' + e.message, 'error'); }
+  },
+
+  async sendReminders() {
+    if (!confirm('¿Enviar recordatorios de pago ahora?\n\nSe enviarán push y correos a padres con pagos que vencen en 3 días, hoy o ayer.')) return;
+    const btn = document.getElementById('btnSendPaymentReminders');
+    if (btn) { btn.disabled = true; btn.textContent = 'Enviando...'; }
+    try {
+      const { data, error } = await supabase.functions.invoke('payment-reminders', { body: {} });
+      if (error) throw error;
+      const r = data || {};
+      Helpers.toast(
+        `Recordatorios enviados: ${r.reminder_3d || 0} preventivos, ${r.due_today || 0} hoy, ${r.overdue_1d || 0} vencidos. Emails: ${r.emails_sent || 0}`,
+        'success'
+      );
+    } catch (e) {
+      Helpers.toast('Error enviando recordatorios: ' + (e.message || e), 'error');
+    } finally {
+      if (btn) { btn.disabled = false; btn.textContent = 'Enviar recordatorios ahora'; }
+    }
   },
 
   async savePaymentConfig() {

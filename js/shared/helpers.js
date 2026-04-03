@@ -431,12 +431,6 @@ export const Helpers = {
     return `<div class="w-full h-full bg-indigo-100 flex items-center justify-center text-indigo-600 font-black">${letter}</div>`;
   },
 
-      ">
-
-        ${letter}
-
-      </div>
-
   /**
    * ⏳ debounce pro
    */

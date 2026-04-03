@@ -1,8 +1,9 @@
 import { supabase } from './supabase.js';
 import { Helpers } from './helpers.js';
 import { ImageLoader } from './image-loader.js';
-import { optimizeImageUrl, thumbnailUrl, activateLazyImages } from './media.js';
-import { Skeletons } from './prefetch.js';
+
+// Inline helper — evita dependencia de media.js
+const optimizeImageUrl = (url) => url || null;
 
 /**
  * Módulo de Muro Global Mejorado

@@ -2,7 +2,7 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { Resend } from "https://esm.sh/resend@2.1.0";
 
 const CORS = {
-  'Access-Control-Allow-Origin':  '*',
+  'Access-Control-Allow-Origin':  'https://karpuskids.com',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
   'Access-Control-Allow-Methods': 'POST, OPTIONS',
 };
@@ -163,22 +163,39 @@ Deno.serve(async (req) => {
       case 'payment.approved': {
         const { parent_email, parent_id, student_name, amount, month, payment_id } = data;
         const tasks: Promise<unknown>[] = [];
-        if (resend && parent_email) {
+
+        // Si no viene parent_email en el payload, buscarlo en la DB
+        let resolvedEmail = parent_email;
+        let resolvedParentId = parent_id;
+
+        if ((!resolvedEmail || !resolvedParentId) && payment_id) {
+          const { data: payData } = await supabase
+            .from('payments')
+            .select('students:student_id(p1_email, parent_id, p1_name)')
+            .eq('id', payment_id)
+            .single();
+          const st = payData?.students as { p1_email?: string; parent_id?: string } | null;
+          if (!resolvedEmail)    resolvedEmail    = st?.p1_email;
+          if (!resolvedParentId) resolvedParentId = st?.parent_id;
+        }
+
+        if (resend && resolvedEmail) {
           tasks.push(resend.emails.send({
             from: FROM_EMAIL,
-            to:   parent_email,
+            to:   resolvedEmail,
             subject: `✅ Pago Confirmado — ${month}`,
-            html: `<div style="font-family:sans-serif;max-width:600px;margin:auto;padding:20px">
-              <h2 style="color:#16a34a">¡Pago Confirmado! ✅</h2>
+            html: `<div style="font-family:sans-serif;max-width:600px;margin:auto;padding:24px;background:#f0fdf4;border-radius:12px;border:1px solid #bbf7d0">
+              <h2 style="color:#16a34a;margin:0 0 16px">✅ ¡Pago Confirmado!</h2>
               <p>El pago de <b>${amount}</b> para <b>${month}</b> del estudiante <b>${student_name}</b> fue aprobado.</p>
-              <p><b>ID:</b> ${payment_id}</p>
-              <a href="https://karpuskids.com/panel_padres.html" style="display:inline-block;padding:12px 20px;background:#16a34a;color:white;text-decoration:none;border-radius:8px;font-weight:bold">Ver Panel</a>
+              ${payment_id ? `<p style="color:#6b7280;font-size:13px"><b>Referencia:</b> ${payment_id}</p>` : ''}
+              <a href="https://karpuskids.com/panel_padres.html" style="display:inline-block;margin-top:16px;padding:12px 24px;background:#16a34a;color:white;text-decoration:none;border-radius:8px;font-weight:bold">Ver mi Panel →</a>
+              <p style="margin-top:24px;font-size:12px;color:#9ca3af">Karpus Kids · Correo automático</p>
             </div>`
           }));
         }
-        if (parent_id) {
+        if (resolvedParentId) {
           tasks.push(sendPushToUser(
-            parent_id,
+            resolvedParentId,
             '✅ Pago Confirmado',
             `Tu pago de ${amount} para ${month} fue aprobado.`,
             'payment',
@@ -186,7 +203,7 @@ Deno.serve(async (req) => {
           ));
         }
         await Promise.allSettled(tasks);
-        result = { sent: true };
+        result = { sent: true, email_to: resolvedEmail || 'none', push_to: resolvedParentId || 'none' };
         break;
       }
 
@@ -225,14 +242,24 @@ Deno.serve(async (req) => {
       }
 
       case 'payment.receipt_uploaded': {
-        const { student_id, amount, month } = data;
-        const { data: staff } = await supabase.from('profiles').select('email').in('role', ['directora', 'asistente']);
+        const { student_id, amount, month, student_name } = data;
+        const { data: staff } = await supabase.from('profiles').select('email,name').in('role', ['directora', 'asistente']);
         const emails = (staff ?? []).map((s: { email: string }) => s.email).filter(Boolean) as string[];
         if (resend && emails.length) {
           await resend.emails.send({
             from: FROM_EMAIL, to: emails,
-            subject: `💳 Nuevo comprobante subido — Estudiante ${student_id}`,
-            html: `<p>Se subió un comprobante de <b>${amount}</b> para <b>${month}</b>. Revisa el panel para validar.</p>`
+            subject: `💳 Nuevo comprobante — ${student_name || 'Estudiante'} · ${month}`,
+            html: `<div style="font-family:sans-serif;max-width:600px;margin:auto;padding:24px;background:#eff6ff;border-radius:12px;border:1px solid #bfdbfe">
+              <h2 style="color:#1d4ed8;margin:0 0 16px">💳 Nuevo Comprobante de Pago</h2>
+              <p>El padre/madre de <b>${student_name || 'un estudiante'}</b> subió un comprobante de pago.</p>
+              <table style="width:100%;border-collapse:collapse;margin:16px 0">
+                <tr><td style="padding:8px;color:#6b7280">Estudiante:</td><td style="padding:8px;font-weight:bold">${student_name || '-'}</td></tr>
+                <tr style="background:#dbeafe"><td style="padding:8px;color:#6b7280">Monto:</td><td style="padding:8px;font-weight:bold">$${amount}</td></tr>
+                <tr><td style="padding:8px;color:#6b7280">Mes:</td><td style="padding:8px;font-weight:bold">${month}</td></tr>
+              </table>
+              <a href="https://karpuskids.com/panel_directora.html" style="display:inline-block;padding:12px 24px;background:#1d4ed8;color:white;text-decoration:none;border-radius:8px;font-weight:bold">Revisar y Aprobar →</a>
+              <p style="margin-top:24px;font-size:12px;color:#9ca3af">Karpus Kids · Correo automático</p>
+            </div>`
           });
         }
         result = { notified: emails.length };

@@ -155,6 +155,15 @@ async function loadProfile() {
 /**
  * 🚀 Inicialización Principal
  */
+
+// Global error handler — captura errores no manejados
+window.addEventListener('unhandledrejection', (e) => {
+  // Ignorar errores de IndexedDB (OneSignal) y errores de red silenciosos
+  const msg = e.reason?.message?.toLowerCase() ?? '';
+  if (msg.includes('indexeddb') || msg.includes('network') || msg.includes('fetch')) return;
+  console.error('[Directora] Unhandled rejection:', e.reason);
+});
+
 document.addEventListener('DOMContentLoaded', async () => {
   try {
     // 1. Verificar Rol

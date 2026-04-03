@@ -1,0 +1,41 @@
+# Environment variables — NEVER commit these
+.env
+.env.local
+.env.production
+.env.*.local
+
+# Supabase
+supabase/.temp/
+supabase/functions/.env
+
+# Node
+node_modules/
+npm-debug.log*
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Editor
+.vscode/settings.json
+.idea/
+
+# Build
+dist/
+build/
+*.min.js.map
+
+# Logs
+*.log
+logs/
+
+# Data
+data/*.db
+data/*.db-shm
+data/*.db-wal
+
+# Legacy files (no longer used)
+app.js
+update_main.cjs
+update_asistente_main.cjs
+fix_escapes.cjs
