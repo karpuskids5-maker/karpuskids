@@ -1,5 +1,4 @@
 import { supabase } from '../shared/supabase.js';
-import { withTimeout, withRetry, COLS } from '../shared/db-utils.js';
 import { QueryCache } from '../shared/query-cache.js';
 
 const TABLES = {
@@ -14,9 +13,11 @@ const TABLES = {
   REPORT_CARDS: 'report_cards'
 };
 
-const withTimeout = (promise, ms = 10000) => {
+// Local timeout helper — accepts a promise OR a function returning a promise
+const withTimeout = (promiseOrFn, ms = 10000) => {
+  const p = typeof promiseOrFn === 'function' ? promiseOrFn() : promiseOrFn;
   const timeout = new Promise((_, reject) => setTimeout(() => reject(new Error('Timeout')), ms));
-  return Promise.race([promise, timeout]);
+  return Promise.race([p, timeout]);
 };
 
 const logError = (context, err) => {

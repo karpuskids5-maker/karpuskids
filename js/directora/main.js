@@ -255,9 +255,21 @@ document.addEventListener('DOMContentLoaded', async () => {
       if (overlay) overlay.style.display = 'none';
     };
 
-    menuBtn?.addEventListener('click', (e) => {
+    // Remove any previous listener to avoid duplicates
+    const newMenuBtn = menuBtn?.cloneNode(true);
+    if (menuBtn && newMenuBtn) menuBtn.parentNode.replaceChild(newMenuBtn, menuBtn);
+
+    newMenuBtn?.addEventListener('click', (e) => {
       e.stopPropagation();
-      openSidebar();
+      const sb = document.getElementById('sidebar');
+      const ov = document.getElementById('sidebarOverlay');
+      if (sb?.classList.contains('mobile-visible')) {
+        sb.classList.remove('mobile-visible');
+        if (ov) ov.style.display = 'none';
+      } else {
+        sb?.classList.add('mobile-visible');
+        if (ov) ov.style.display = 'block';
+      }
     });
 
     overlay?.addEventListener('click', closeSidebar);

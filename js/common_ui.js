@@ -4,8 +4,8 @@ document.addEventListener('DOMContentLoaded', () => {
   const menuBtn = document.getElementById('menuBtn');
   const toggleSidebarBtn = document.getElementById('toggleSidebar');
 
-  // Skip if this panel has its own dedicated sidebar logic (directora, asistente, maestra)
-  if (menuBtn && menuBtn.dataset.managed) return;
+  // Skip if no sidebar or if this panel manages its own sidebar
+  if (!sidebar || (menuBtn && menuBtn.dataset.managed)) return;
 
   function isMobile() { return window.innerWidth < 768; }
 

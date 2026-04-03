@@ -1,207 +1,528 @@
-﻿-- Karpus Kids - Esquema de Base de Datos para Supabase (Postgres)
--- ARQUITECTURA FINAL KARPUS KIDS (Supabase Auth + RLS)
--- Versión Corregida y Optimizada con Sistema de Notificaciones
+-- ============================================================
+-- ?? KARPUS KIDS � Schema Completo para Supabase
+-- Un solo archivo, limpio y organizado.
+-- Ejecutar en Supabase SQL Editor (corre de arriba a abajo).
+-- ============================================================
 
--- -----------------------------------------------------------------------------
--- 🔧 DROP FUNCTIONS FIRST — evita error "cannot change return type"
--- Necesario cuando se cambia el tipo de retorno de una función existente
--- -----------------------------------------------------------------------------
+-- -- 0. DROP FUNCTIONS (evita error "cannot change return type") --
 drop function if exists public.run_payment_cycle() cascade;
 drop function if exists public.get_unread_counts() cascade;
-drop function if exists public.set_updated_at() cascade;
+drop function if exists public.get_dashboard_kpis() cascade;
 drop function if exists public.get_dashboard_kpis(text) cascade;
 drop function if exists public.get_monthly_financial_report_by_classroom(text) cascade;
--- -----------------------------------------------------------------------------
+drop function if exists public.attendance_last_7_days() cascade;
+drop function if exists public.financial_summary_month(integer, integer) cascade;
+drop function if exists public.generate_report_card(bigint, bigint) cascade;
+drop function if exists public.close_period(bigint) cascade;
+drop function if exists public.find_or_create_private_conversation(uuid, uuid) cascade;
+drop function if exists public.get_direct_messages(uuid) cascade;
+drop function if exists public.mark_conversation_read(bigint) cascade;
+drop function if exists public.mark_messages_read(uuid, uuid) cascade;
+drop function if exists public.send_notification(uuid, text, text, text, text) cascade;
+drop function if exists public.user_is_participant(bigint, uuid) cascade;
+drop function if exists public.generate_monthly_charges(integer, integer) cascade;
+drop function if exists public.get_student_total_debt(bigint) cascade;
+drop function if exists public.get_my_role() cascade;
+drop function if exists public.get_my_classroom_ids() cascade;
+drop function if exists public.can_access_app() cascade;
+drop function if exists public.is_teacher_of_classroom(bigint) cascade;
+drop function if exists public.is_parent_of_student(bigint) cascade;
+drop function if exists public.is_parent_of_classroom(bigint) cascade;
+drop function if exists public.is_teacher_of_student(bigint) cascade;
+drop function if exists public.handle_new_user() cascade;
+drop function if exists public.handle_new_post_teacher_info() cascade;
+drop function if exists public.update_post_comments_count() cascade;
+drop function if exists public.update_post_likes_count() cascade;
+drop function if exists public.handle_student_chat_creation() cascade;
+drop function if exists public.notify_parent_on_new_charge() cascade;
+drop function if exists public.generate_report_card(bigint, bigint) cascade;
+drop function if exists public.close_period(bigint) cascade;
 
--- -----------------------------------------------------------------------------
--- 🚀 QUICK FIXES: Run these if you get 400 Bad Request errors (Missing columns)
--- -----------------------------------------------------------------------------
--- alter table public.daily_logs add column if not exists activities text;
--- alter table public.tasks add column if not exists teacher_id uuid references public.profiles(id);
--- alter table public.tasks add column if not exists grading_system text default 'letter_stars';
--- -----------------------------------------------------------------------------
--- 📦 STORAGE BUCKETS:
--- 1. Create a public bucket named 'task_files' in Supabase Storage.
--- -----------------------------------------------------------------------------
 
--- 1.1 Perfiles (Usuarios del sistema)
+-- ============================================================
+-- 1. TABLAS PRINCIPALES
+-- ============================================================
+
+-- 1.1 Perfiles (sincronizado con auth.users)
 create table if not exists public.profiles (
-  id uuid not null references auth.users(id) on delete cascade primary key,
-  email text unique,
-  name text,
-  role text check (role in ('directora', 'maestra', 'padre', 'asistente')),
-  avatar_url text,
-  phone text,
-  notes text,
-  bio text, -- Aseguramos que la columna exista
-  accepted_terms boolean default false,
+  id          uuid primary key references auth.users(id) on delete cascade,
+  email       text unique,
+  name        text,
+  role        text check (role in ('directora','maestra','padre','asistente')),
+  avatar_url  text,
+  phone       text,
+  bio         text,
+  notes       text,
+  accepted_terms    boolean default false,
   accepted_terms_at timestamp with time zone,
-  created_at timestamp with time zone default timezone('utc'::text, now()) not null
+  created_at  timestamp with time zone default now() not null
 );
-
--- FIX: Asegurar que la columna bio existe para evitar error PGRST204
 alter table public.profiles add column if not exists bio text;
-
-alter table public.profiles drop constraint if exists profiles_role_check;
-alter table public.profiles add constraint profiles_role_check check (role in ('directora','maestra','padre','asistente'));
 
 -- 1.2 Aulas
 create table if not exists public.classrooms (
-  id bigint generated by default as identity primary key,
-  name text not null,
-  level text,
-  capacity integer default 20,
-  teacher_id uuid references public.profiles(id) on delete set null, -- Maestra asignada
-  is_live boolean default false, -- Estado de videollamada activa
-  created_at timestamp with time zone default timezone('utc'::text, now()) not null
+  id          bigint generated by default as identity primary key,
+  name        text not null,
+  level       text,
+  capacity    integer default 20,
+  teacher_id  uuid references public.profiles(id) on delete set null,
+  is_live     boolean default false,
+  created_at  timestamp with time zone default now() not null
 );
-
--- FIX: Asegurar que la columna is_live exista para evitar errores 400
-alter table public.classrooms add column if not exists is_live boolean default false;
 
 -- 1.3 Estudiantes
 create table if not exists public.students (
-  id bigint generated by default as identity primary key,
-  name text not null,
+  id           bigint generated by default as identity primary key,
+  name         text not null,
   classroom_id bigint references public.classrooms(id) on delete set null,
-  parent_id uuid references public.profiles(id),
-  is_active boolean default true,
-  avatar_url text,
-  matricula text unique, -- Identificador único escolar
-  
-  -- Información Adicional (Padres y Datos Médicos)
-  p1_name text,
-  p1_phone text,
-  p1_email text,
-  p1_job text,
-  p1_address text,
-  p1_emergency_contact text,
-  p2_name text,
-  p2_phone text,
-  p2_email text,
-  p2_job text,
-  p2_address text,
-  p2_emergency_contact text,
-  start_date date,
-  allergies text,
-  blood_type text,
+  parent_id    uuid  references public.profiles(id),
+  is_active    boolean default true,
+  avatar_url   text,
+  matricula    text,
+  -- Tutor 1
+  p1_name      text, p1_phone text, p1_email text,
+  p1_job       text, p1_address text, p1_emergency_contact text,
+  -- Tutor 2
+  p2_name      text, p2_phone text, p2_email text,
+  p2_job       text, p2_address text, p2_emergency_contact text,
+  -- Datos adicionales
+  start_date   date,
+  allergies    text,
+  blood_type   text,
   authorized_pickup text,
-  monthly_fee numeric default 0,
-  due_day integer default 5,
-
-  created_at timestamp with time zone default timezone('utc'::text, now()) not null
+  monthly_fee  numeric default 0,
+  due_day      integer default 5,
+  created_at   timestamp with time zone default now() not null
 );
+create unique index if not exists idx_students_matricula on public.students(matricula) where matricula is not null;
 
 -- 1.4 Asistencia
 create table if not exists public.attendance (
-  id bigint generated by default as identity primary key,
-  student_id bigint references public.students(id) on delete cascade,
+  id           bigint generated by default as identity primary key,
+  student_id   bigint references public.students(id) on delete cascade,
   classroom_id bigint references public.classrooms(id),
-  date date default current_date,
-  status text check (status in ('present', 'absent', 'late')),
-  check_in timestamp with time zone,
-  check_out timestamp with time zone,
-  created_at timestamp with time zone default timezone('utc'::text, now()) not null,
+  date         date default current_date,
+  status       text check (status in ('present','absent','late','presente','ausente','tarde')),
+  check_in     timestamp with time zone,
+  check_out    timestamp with time zone,
+  created_at   timestamp with time zone default now() not null,
   unique(student_id, date)
 );
 
--- FIX: Asegurar que existan las columnas de tiempo para evitar error 400 en API
-alter table public.attendance add column if not exists check_in timestamp with time zone;
-alter table public.attendance add column if not exists check_out timestamp with time zone;
-
--- 1.4.1 Solicitudes de Ausencia (Padres)
+-- 1.4.1 Solicitudes de ausencia
 create table if not exists public.attendance_requests (
-  id bigint generated by default as identity primary key,
+  id         bigint generated by default as identity primary key,
   student_id bigint references public.students(id) on delete cascade,
-  date date not null,
-  reason text not null,
-  note text,
-  status text default 'pending' check (status in ('pending', 'approved', 'rejected')),
-  created_at timestamp with time zone default timezone('utc'::text, now()) not null
+  date       date not null,
+  reason     text not null,
+  note       text,
+  status     text default 'pending' check (status in ('pending','approved','rejected')),
+  created_at timestamp with time zone default now() not null
 );
 
-alter table public.attendance_requests enable row level security;
-
--- 1.5 Tareas (Tasks)
--- Aseguramos que exista la tabla de tareas mencionada en el código JS
+-- 1.5 Tareas
 create table if not exists public.tasks (
-  id bigint generated by default as identity primary key,
-  classroom_id bigint references public.classrooms(id) on delete cascade,
-  teacher_id uuid references public.profiles(id) on delete set null,
-  title text not null,
-  description text,
-  due_date timestamp with time zone,
-  file_url text,
+  id             bigint generated by default as identity primary key,
+  classroom_id   bigint references public.classrooms(id) on delete cascade,
+  teacher_id     uuid  references public.profiles(id) on delete set null,
+  title          text not null,
+  description    text,
+  due_date       timestamp with time zone,
+  file_url       text,
   grading_system text default 'letter_stars',
-  created_at timestamp with time zone default timezone('utc'::text, now()) not null
+  created_at     timestamp with time zone default now() not null
 );
 
--- 1.5.1 Evidencias de Tareas (Entregas de padres)
+-- 1.5.1 Evidencias de tareas
 create table if not exists public.task_evidences (
-  id bigint generated by default as identity primary key,
-  task_id bigint references public.tasks(id) on delete cascade,
-  student_id bigint references public.students(id) on delete cascade,
-  parent_id uuid references public.profiles(id),
-  file_url text,
-  comment text,
-  status text default 'submitted', -- submitted, graded
-  created_at timestamp with time zone default timezone('utc'::text, now()) not null
+  id           bigint generated by default as identity primary key,
+  task_id      bigint references public.tasks(id) on delete cascade,
+  student_id   bigint references public.students(id) on delete cascade,
+  parent_id    uuid  references public.profiles(id),
+  file_url     text,
+  comment      text,
+  status       text default 'submitted',
+  grade_letter text check (grade_letter in ('A','B','C','D')),
+  stars        integer check (stars >= 1 and stars <= 5),
+  created_at   timestamp with time zone default now() not null
 );
--- Ajuste: calificación por letra y estrellas
-alter table public.task_evidences add column if not exists grade_letter text check (grade_letter in ('A', 'B', 'C', 'D'));
-alter table public.task_evidences add column if not exists stars integer check (stars >= 1 and stars <= 5);
 
 -- 1.6 Publicaciones (Muro)
 create table if not exists public.posts (
-  id bigint generated by default as identity primary key,
-  classroom_id bigint references public.classrooms(id) on delete cascade,
-  teacher_id uuid references public.profiles(id),
-  content text,
-  media_url text,
-  media_type text, -- 'image', 'video', 'document'
-  created_at timestamp with time zone default timezone('utc'::text, now()) not null
+  id             bigint generated by default as identity primary key,
+  classroom_id   bigint references public.classrooms(id) on delete cascade,
+  teacher_id     uuid  references public.profiles(id),
+  content        text,
+  media_url      text,
+  media_type     text,   -- 'image' | 'video' | 'document'
+  image_url      text,   -- legacy alias
+  images         text[]  default '{}',
+  title          text,
+  teacher_name   text,
+  teacher_avatar text,
+  likes_count    integer default 0,
+  comments_count integer default 0,
+  updated_at     timestamp with time zone default now(),
+  created_at     timestamp with time zone default now() not null
 );
 
--- Add missing columns for Wall/Forum functionality
-alter table public.posts add column if not exists title text;
-alter table public.posts add column if not exists image_url text;
-alter table public.posts add column if not exists likes_count integer default 0;
-alter table public.posts add column if not exists comments_count integer default 0;
-alter table public.posts add column if not exists updated_at timestamp with time zone default timezone('utc'::text, now());
+-- 1.7 Comentarios
+create table if not exists public.comments (
+  id         bigint generated by default as identity primary key,
+  post_id    bigint references public.posts(id) on delete cascade,
+  user_id    uuid  references public.profiles(id) on delete cascade,
+  user_name  text,
+  content    text not null,
+  created_at timestamp with time zone default now() not null
+);
 
--- Optimización: Guardar datos de la maestra en el post para evitar problemas de RLS y joins
-alter table public.posts add column if not exists teacher_name text;
-alter table public.posts add column if not exists teacher_avatar text;
+-- 1.8 Likes
+create table if not exists public.likes (
+  id            bigint generated by default as identity primary key,
+  post_id       bigint references public.posts(id) on delete cascade,
+  user_id       uuid  references public.profiles(id) on delete cascade,
+  reaction_type text default 'like',
+  created_at    timestamp with time zone default now() not null,
+  unique(post_id, user_id)
+);
 
--- Trigger para autocompletar datos de maestra en nuevos posts
-create or replace function public.handle_new_post_teacher_info()
-returns trigger
-language plpgsql
-security definer
-as $$
+-- 1.9 Conversaciones (Chat)
+create table if not exists public.conversations (
+  id           bigint generated by default as identity primary key,
+  type         text default 'direct_message'
+                 check (type in ('direct_message','private','classroom','group')),
+  classroom_id bigint references public.classrooms(id) on delete set null,
+  updated_at   timestamp with time zone default now(),
+  created_at   timestamp with time zone default now() not null
+);
+
+create table if not exists public.conversation_participants (
+  conversation_id bigint references public.conversations(id) on delete cascade,
+  user_id         uuid  references public.profiles(id) on delete cascade,
+  created_at      timestamp with time zone default now() not null,
+  primary key(conversation_id, user_id)
+);
+
+create table if not exists public.messages (
+  id              bigint generated by default as identity primary key,
+  conversation_id bigint references public.conversations(id) on delete cascade,
+  sender_id       uuid  references public.profiles(id) on delete cascade not null,
+  receiver_id     uuid  references public.profiles(id),  -- legacy, nullable
+  content         text not null,
+  is_read         boolean default false,
+  created_at      timestamp with time zone default now() not null
+);
+
+-- 1.10 Notificaciones
+create table if not exists public.notifications (
+  id         bigint generated by default as identity primary key,
+  user_id    uuid  references public.profiles(id) on delete cascade not null,
+  title      text not null,
+  message    text not null,
+  type       text default 'info',
+  link       text,
+  is_read    boolean default false,
+  created_at timestamp with time zone default now() not null
+);
+
+-- 1.11 Pagos
+create table if not exists public.payments (
+  id            bigint generated by default as identity primary key,
+  student_id    bigint references public.students(id) on delete cascade,
+  amount        numeric(10,2) not null,
+  concept       text default 'Mensualidad',
+  status        text default 'pending',
+  month_paid    text,
+  due_date      date,
+  paid_date     timestamp with time zone,
+  method        text,
+  bank          text,
+  reference     text,
+  transfer_date date,
+  proof_url     text,
+  evidence_url  text,
+  created_at    timestamp with time zone default now() not null
+);
+create unique index if not exists idx_payments_unique_student_month
+  on public.payments(student_id, month_paid, due_date, concept);
+
+-- 1.12 Incidencias
+create table if not exists public.incidents (
+  id           bigint generated by default as identity primary key,
+  student_id   bigint references public.students(id) on delete cascade,
+  classroom_id bigint references public.classrooms(id) on delete cascade,
+  teacher_id   uuid  references public.profiles(id),
+  severity     text check (severity in ('leve','media','alta')),
+  status       text default 'received'
+                 check (status in ('received','review','resolved','archived')),
+  description  text,
+  reported_at  timestamp with time zone default now() not null,
+  created_at   timestamp with time zone default now() not null
+);
+
+-- 1.13 Rutina diaria
+create table if not exists public.daily_logs (
+  id           bigint generated by default as identity primary key,
+  student_id   bigint references public.students(id) on delete cascade,
+  classroom_id bigint references public.classrooms(id) on delete cascade,
+  date         date default current_date,
+  mood         text,
+  food         text,
+  nap          text,
+  eating       text,
+  sleeping     text,
+  activities   text,
+  notes        text,
+  created_at   timestamp with time zone default now() not null,
+  unique(student_id, date)
+);
+
+-- 1.14 Galer�a del aula
+create table if not exists public.classroom_gallery (
+  id           bigint generated by default as identity primary key,
+  classroom_id bigint references public.classrooms(id) on delete cascade,
+  image_url    text not null,
+  caption      text,
+  date         date default current_date,
+  created_at   timestamp with time zone default now() not null
+);
+
+-- 1.15 Chat de aula (videollamada)
+create table if not exists public.classroom_chat (
+  id           bigint generated by default as identity primary key,
+  classroom_id bigint references public.classrooms(id) on delete cascade,
+  user_id      uuid  references public.profiles(id) on delete cascade,
+  message      text not null,
+  created_at   timestamp with time zone default now() not null
+);
+
+-- 1.16 Calificaciones formales
+create table if not exists public.grades (
+  id           bigint generated by default as identity primary key,
+  student_id   bigint references public.students(id) on delete cascade,
+  classroom_id bigint references public.classrooms(id),
+  period_id    bigint,  -- FK a�adida despu�s de crear periods
+  subject      text,
+  score        numeric(4,2),
+  period       text,
+  teacher_id   uuid  references public.profiles(id),
+  notes        text,
+  created_at   timestamp with time zone default now() not null
+);
+
+-- 1.17 Periodos acad�micos
+create table if not exists public.periods (
+  id           bigint generated by default as identity primary key,
+  name         text not null,
+  start_date   date not null,
+  end_date     date not null,
+  status       text default 'open' check (status in ('open','closed')),
+  is_active    boolean default false,
+  classroom_id bigint references public.classrooms(id) on delete cascade,
+  created_at   timestamp with time zone default now() not null
+);
+
+-- FK grades ? periods (ahora que periods existe)
+alter table public.grades
+  add column if not exists period_id bigint references public.periods(id);
+
+-- 1.18 Boletines finales
+create table if not exists public.report_cards (
+  id              bigint generated by default as identity primary key,
+  student_id      bigint references public.students(id) on delete cascade,
+  classroom_id    bigint references public.classrooms(id),
+  period_id       bigint references public.periods(id),
+  task_avg        numeric(4,2),
+  formal_avg      numeric(4,2),
+  final_score     numeric(4,2),
+  level           text,
+  teacher_comment text,
+  generated_at    timestamp with time zone default now(),
+  unique(student_id, period_id)
+);
+
+-- 1.19 Inquietudes (padres ? directora)
+create table if not exists public.inquiries (
+  id             bigint generated by default as identity primary key,
+  parent_id      uuid  references public.profiles(id) not null,
+  student_id     bigint references public.students(id),
+  subject        text,
+  message        text not null,
+  response       text,
+  status         text default 'pending',
+  priority       text default 'medium',
+  folio          text,
+  attachment_url text,
+  updated_at     timestamp with time zone,
+  responded_at   timestamp with time zone,
+  created_at     timestamp with time zone default now() not null
+);
+
+-- 1.20 Configuraci�n escolar
+create table if not exists public.school_settings (
+  id             int primary key default 1,
+  generation_day int default 25,
+  due_day        int default 5,
+  updated_at     timestamp with time zone default now()
+);
+insert into public.school_settings (id, generation_day, due_day)
+values (1, 25, 5) on conflict (id) do nothing;
+
+-- 1.21 Eventos del sistema (Edge Functions)
+create table if not exists public.system_events (
+  id           bigint generated by default as identity primary key,
+  type         text not null,
+  payload      jsonb,
+  status       text default 'pending' check (status in ('pending','processing','completed','failed')),
+  processed_at timestamp with time zone,
+  created_at   timestamp with time zone default now() not null
+);
+
+-- 1.22 Aceptaci�n de t�rminos
+create table if not exists public.terms_acceptance (
+  id            bigint generated by default as identity primary key,
+  user_id       uuid references auth.users(id) on delete cascade not null,
+  accepted_at   timestamp with time zone default now() not null,
+  terms_version text default '1.0' not null,
+  unique(user_id, terms_version)
+);
+
+
+-- ============================================================
+-- 2. HABILITAR RLS EN TODAS LAS TABLAS
+-- ============================================================
+alter table public.profiles              enable row level security;
+alter table public.classrooms            enable row level security;
+alter table public.students              enable row level security;
+alter table public.attendance            enable row level security;
+alter table public.attendance_requests   enable row level security;
+alter table public.tasks                 enable row level security;
+alter table public.task_evidences        enable row level security;
+alter table public.posts                 enable row level security;
+alter table public.comments              enable row level security;
+alter table public.likes                 enable row level security;
+alter table public.conversations         enable row level security;
+alter table public.conversation_participants enable row level security;
+alter table public.messages              enable row level security;
+alter table public.notifications         enable row level security;
+alter table public.payments              enable row level security;
+alter table public.incidents             enable row level security;
+alter table public.daily_logs            enable row level security;
+alter table public.classroom_gallery     enable row level security;
+alter table public.classroom_chat        enable row level security;
+alter table public.grades                enable row level security;
+alter table public.periods               enable row level security;
+alter table public.report_cards          enable row level security;
+alter table public.inquiries             enable row level security;
+alter table public.school_settings       enable row level security;
+alter table public.system_events         enable row level security;
+alter table public.terms_acceptance      enable row level security;
+
+-- ============================================================
+-- 3. FUNCIONES AUXILIARES (SECURITY DEFINER � sin recursi�n RLS)
+-- ============================================================
+
+-- Rol del usuario actual
+create or replace function public.get_my_role()
+returns text language sql security definer stable set search_path = public as $$
+  select role from public.profiles where id = auth.uid() limit 1;
+$$;
+
+-- �El usuario es maestra de este aula?
+create or replace function public.is_teacher_of_classroom(p_classroom_id bigint)
+returns boolean language sql security definer stable set search_path = public as $$
+  select exists (
+    select 1 from public.classrooms
+    where id = p_classroom_id and teacher_id = auth.uid()
+  );
+$$;
+
+-- �El usuario es padre de este estudiante?
+create or replace function public.is_parent_of_student(p_student_id bigint)
+returns boolean language sql security definer stable set search_path = public as $$
+  select exists (
+    select 1 from public.students
+    where id = p_student_id and parent_id = auth.uid()
+  );
+$$;
+
+-- �El usuario es padre de alg�n estudiante en este aula?
+create or replace function public.is_parent_of_classroom(p_classroom_id bigint)
+returns boolean language sql security definer stable set search_path = public as $$
+  select exists (
+    select 1 from public.students
+    where classroom_id = p_classroom_id and parent_id = auth.uid()
+  );
+$$;
+
+-- �El usuario es maestra del estudiante (via aula)?
+create or replace function public.is_teacher_of_student(p_student_id bigint)
+returns boolean language sql security definer stable set search_path = public as $$
+  select exists (
+    select 1 from public.students s
+    join public.classrooms c on c.id = s.classroom_id
+    where s.id = p_student_id and c.teacher_id = auth.uid()
+  );
+$$;
+
+-- IDs de aulas donde el padre tiene hijos
+create or replace function public.get_my_classroom_ids()
+returns setof bigint language sql security definer stable set search_path = public as $$
+  select classroom_id from public.students
+  where parent_id = auth.uid() and classroom_id is not null;
+$$;
+
+-- �El usuario es participante de esta conversaci�n? (evita recursi�n RLS)
+create or replace function public.user_is_participant(p_conversation_id bigint, p_user_id uuid)
+returns boolean language sql security definer stable set search_path = public as $$
+  select exists (
+    select 1 from public.conversation_participants
+    where conversation_id = p_conversation_id and user_id = p_user_id
+  );
+$$;
+
+-- ============================================================
+-- 4. TRIGGERS
+-- ============================================================
+
+-- 4.1 Crear perfil al registrar usuario en auth
+create or replace function public.handle_new_user()
+returns trigger language plpgsql security definer set search_path = public as $$
 begin
-  if new.teacher_id is not null then
-    select name, avatar_url
-    into new.teacher_name, new.teacher_avatar
-    from public.profiles
-    where id = new.teacher_id;
-  end if;
-
+  insert into public.profiles (id, email, name, role)
+  values (
+    new.id,
+    new.email,
+    new.raw_user_meta_data->>'name',
+    coalesce(new.raw_user_meta_data->>'role', 'padre')
+  ) on conflict (id) do nothing;
   return new;
 end;
 $$;
+drop trigger if exists on_auth_user_created on auth.users;
+create trigger on_auth_user_created
+  after insert on auth.users
+  for each row execute function public.handle_new_user();
 
+-- 4.2 Autocompletar datos de maestra en posts
+create or replace function public.handle_new_post_teacher_info()
+returns trigger language plpgsql security definer as $$
+begin
+  if new.teacher_id is not null then
+    select name, avatar_url into new.teacher_name, new.teacher_avatar
+    from public.profiles where id = new.teacher_id;
+  end if;
+  return new;
+end;
+$$;
 drop trigger if exists on_new_post_populate_teacher on public.posts;
 create trigger on_new_post_populate_teacher
-before insert on public.posts
-for each row execute function public.handle_new_post_teacher_info();
+  before insert on public.posts
+  for each row execute function public.handle_new_post_teacher_info();
 
--- Triggers para mantener contadores actualizados
+-- 4.3 Contador de comentarios
 create or replace function public.update_post_comments_count()
-returns trigger
-language plpgsql
-security definer
-as $$
+returns trigger language plpgsql security definer as $$
 begin
   if TG_OP = 'INSERT' then
     update public.posts set comments_count = comments_count + 1 where id = NEW.post_id;
@@ -213,17 +534,14 @@ begin
   return null;
 end;
 $$;
-
 drop trigger if exists on_comment_change_update_count on public.comments;
 create trigger on_comment_change_update_count
-after insert or delete on public.comments
-for each row execute function public.update_post_comments_count();
+  after insert or delete on public.comments
+  for each row execute function public.update_post_comments_count();
 
+-- 4.4 Contador de likes
 create or replace function public.update_post_likes_count()
-returns trigger
-language plpgsql
-security definer
-as $$
+returns trigger language plpgsql security definer as $$
 begin
   if TG_OP = 'INSERT' then
     update public.posts set likes_count = likes_count + 1 where id = NEW.post_id;
@@ -235,1110 +553,72 @@ begin
   return null;
 end;
 $$;
-
 drop trigger if exists on_like_change_update_count on public.likes;
 create trigger on_like_change_update_count
-after insert or delete on public.likes
-for each row execute function public.update_post_likes_count();
+  after insert or delete on public.likes
+  for each row execute function public.update_post_likes_count();
 
--- 1.7 Comentarios
-create table if not exists public.comments (
-  id bigint generated by default as identity primary key,
-  post_id bigint references public.posts(id) on delete cascade,
-  user_id uuid references public.profiles(id) on delete cascade,
-  content text not null,
-  created_at timestamp with time zone default timezone('utc'::text, now()) not null
-);
-
--- Optimization for Wall: Store user name in comments to avoid extra joins/fetches
-alter table public.comments add column if not exists user_name text;
-
--- 1.7.1 Mensajería Directa (Chat tipo Facebook)
--- 🔥 ARQUITECTURA CHAT PROFESIONAL (Conversaciones + Participantes + Mensajes)
-create table if not exists public.conversations (
-  id bigint generated by default as identity primary key,
-  type text default 'direct_message' check (type in ('direct_message', 'classroom', 'private', 'group')),
-  classroom_id bigint references public.classrooms(id) on delete set null,
-  created_at timestamp with time zone default timezone('utc'::text, now()) not null,
-  updated_at timestamp with time zone default timezone('utc'::text, now()) not null
-);
-
-create table if not exists public.conversation_participants (
-  conversation_id bigint references public.conversations(id) on delete cascade,
-  user_id uuid references public.profiles(id) on delete cascade,
-  created_at timestamp with time zone default timezone('utc'::text, now()) not null,
-  primary key(conversation_id, user_id)
-);
-
-create table if not exists public.messages (
-  id bigint generated by default as identity primary key,
-  conversation_id bigint references public.conversations(id) on delete cascade,
-  sender_id uuid references public.profiles(id) on delete cascade not null,
-  content text not null,
-  created_at timestamp with time zone default timezone('utc'::text, now()) not null,
-  is_read boolean default false
-);
-
--- 8. FLUJO AUTOMÁTICO: Crear conversaciones al asignar estudiante
+-- 4.5 Crear conversaciones al asignar estudiante a aula
 create or replace function public.handle_student_chat_creation()
-returns trigger
-language plpgsql
-security definer
-as $$
+returns trigger language plpgsql security definer as $$
 declare
   v_teacher_id uuid;
   v_classroom_chat_id bigint;
   v_dm_chat_id bigint;
 begin
-  -- 1. Obtener maestra del aula
   select teacher_id into v_teacher_id from public.classrooms where id = new.classroom_id;
+  if v_teacher_id is null or new.parent_id is null then return new; end if;
 
-  if v_teacher_id is not null and new.parent_id is not null then
-    -- 2. Asegurar Chat de Aula (Grupo)
-    select id into v_classroom_chat_id 
-    from public.conversations 
-    where type = 'classroom' and classroom_id = new.classroom_id;
+  -- Chat de aula (grupo)
+  select id into v_classroom_chat_id from public.conversations
+  where type = 'classroom' and classroom_id = new.classroom_id;
+  if v_classroom_chat_id is null then
+    insert into public.conversations (type, classroom_id)
+    values ('classroom', new.classroom_id) returning id into v_classroom_chat_id;
+  end if;
+  insert into public.conversation_participants (conversation_id, user_id)
+  values (v_classroom_chat_id, new.parent_id), (v_classroom_chat_id, v_teacher_id)
+  on conflict do nothing;
 
-    if v_classroom_chat_id is null then
-      insert into public.conversations (type, classroom_id)
-      values ('classroom', new.classroom_id)
-      returning id into v_classroom_chat_id;
-    end if;
-
-    -- Participante: Padre
+  -- Chat privado padre-maestra
+  select c.id into v_dm_chat_id
+  from public.conversations c
+  join public.conversation_participants cp1 on cp1.conversation_id = c.id
+  join public.conversation_participants cp2 on cp2.conversation_id = c.id
+  where c.type = 'direct_message'
+    and cp1.user_id = new.parent_id and cp2.user_id = v_teacher_id
+  limit 1;
+  if v_dm_chat_id is null then
+    insert into public.conversations (type) values ('direct_message') returning id into v_dm_chat_id;
     insert into public.conversation_participants (conversation_id, user_id)
-    values (v_classroom_chat_id, new.parent_id)
-    on conflict (conversation_id, user_id) do nothing;
-    
-    -- Participante: Maestra
-    insert into public.conversation_participants (conversation_id, user_id)
-    values (v_classroom_chat_id, v_teacher_id)
-    on conflict (conversation_id, user_id) do nothing;
-
-    -- 3. Asegurar Chat Privado Padre-Maestra
-    select c.id into v_dm_chat_id
-    from public.conversations c
-    join public.conversation_participants cp1 on cp1.conversation_id = c.id
-    join public.conversation_participants cp2 on cp2.conversation_id = c.id
-    where c.type = 'direct_message'
-      and cp1.user_id = new.parent_id
-      and cp2.user_id = v_teacher_id
-    limit 1;
-
-    if v_dm_chat_id is null then
-      insert into public.conversations (type)
-      values ('direct_message')
-      returning id into v_dm_chat_id;
-
-      insert into public.conversation_participants (conversation_id, user_id)
-      values 
-        (v_dm_chat_id, new.parent_id),
-        (v_dm_chat_id, v_teacher_id);
-    end if;
+    values (v_dm_chat_id, new.parent_id), (v_dm_chat_id, v_teacher_id);
   end if;
 
   return new;
 end;
 $$;
-
 drop trigger if exists on_student_upsert_chat on public.students;
 create trigger on_student_upsert_chat
-after insert or update of classroom_id, parent_id on public.students
-for each row execute function public.handle_student_chat_creation();
+  after insert or update of classroom_id, parent_id on public.students
+  for each row execute function public.handle_student_chat_creation();
 
--- 12. SEGURIDAD SUPABASE (RLS)
-alter table public.conversations enable row level security;
-alter table public.conversation_participants enable row level security;
-alter table public.messages enable row level security;
-
-drop policy if exists "Usuarios ven sus conversaciones" on public.conversations;
-create policy "Usuarios ven sus conversaciones" on public.conversations for select using (
-  public.get_my_role() = 'directora' 
-  or exists (
-    select 1 from conversation_participants cp
-    where cp.conversation_id = conversations.id
-    and cp.user_id = auth.uid()
-  )
-);
-
-drop policy if exists "Usuarios ven sus participaciones" on public.conversation_participants;
-create policy "Usuarios ven sus participaciones" on public.conversation_participants for select using (
-  public.get_my_role() = 'directora'
-  or user_id = auth.uid()
-);
-
-drop policy if exists "Usuarios ven sus mensajes" on public.messages;
-create policy "Usuarios ven sus mensajes" on public.messages for select using (
-  public.get_my_role() = 'directora'
-  or exists (
-    select 1 from conversation_participants cp
-    where cp.conversation_id = messages.conversation_id
-    and cp.user_id = auth.uid()
-  )
-);
-
--- Ensure conversation_id column exists (for migration from old schema)
-alter table public.messages add column if not exists conversation_id bigint references public.conversations(id) on delete cascade;
-
--- 1.8 Likes
-create table if not exists public.likes (
-  id bigint generated by default as identity primary key,
-  post_id bigint references public.posts(id) on delete cascade,
-  user_id uuid references public.profiles(id) on delete cascade,
-  created_at timestamp with time zone default timezone('utc'::text, now()) not null,
-  reaction_type text default 'like', -- 'like', 'love', 'haha', etc.
-  unique(post_id, user_id)
-);
-
--- 1.9 NOTIFICACIONES (NUEVO SISTEMA)
-create table if not exists public.notifications (
-  id bigint generated by default as identity primary key,
-  user_id uuid references public.profiles(id) on delete cascade not null,
-  title text not null,
-  message text not null,
-  type text default 'info', -- 'info', 'post', 'alert', 'grade'
-  link text,
-  is_read boolean default false,
-  created_at timestamp with time zone default timezone('utc'::text, now()) not null
-);
-
--- 1.12 Chat de Aula (Videollamada)
-create table if not exists public.classroom_chat (
-  id bigint generated by default as identity primary key,
-  classroom_id bigint references public.classrooms(id) on delete cascade,
-  user_id uuid references public.profiles(id) on delete cascade,
-  message text not null,
-  created_at timestamp with time zone default timezone('utc'::text, now()) not null
-);
-
--- 1.10 Calificaciones (Grades)
-create table if not exists public.grades (
-  id bigint generated by default as identity primary key,
-  student_id bigint references public.students(id) on delete cascade,
-  classroom_id bigint references public.classrooms(id),
-  subject text not null, -- Matemáticas, Lenguaje, etc.
-  score numeric(5,2),
-  period text, -- Trimestre 1, etc.
-  teacher_id uuid references public.profiles(id),
-  created_at timestamp with time zone default timezone('utc'::text, now()) not null
-);
-create unique index if not exists grades_unique_student_subject_period
-  on public.grades (student_id, subject, period);
-
-create table if not exists public.payments (
-  id bigint generated by default as identity primary key,
-  student_id bigint references public.students(id) on delete cascade,
-  amount numeric(10,2) not null,
-  concept text default 'Mensualidad',
-  status text default 'pending' check (status in ('pending', 'paid', 'overdue', 'review')),
-  due_date date,
-  paid_date timestamp with time zone,
-  created_at timestamp with time zone default timezone('utc'::text, now()) not null
-);
-
--- Fix old schema where concept may be missing
-alter table public.payments add column if not exists concept text default 'Mensualidad';
-
--- Fix old constraint if it exists with wrong values
-alter table public.payments drop constraint if exists payments_status_check;
-
--- Evitar duplicados de pagos mensuales (un pago por student_id/month_paid/due_date/concept)
-create unique index if not exists idx_payments_unique_student_month_due on public.payments(student_id, month_paid, due_date, concept);
-
--- Fix 400 Error: Missing columns in payments
-alter table public.payments add column if not exists month_paid text;
-alter table public.payments add column if not exists method text;
-alter table public.payments add column if not exists bank text;
-alter table public.payments add column if not exists reference text;
-alter table public.payments add column if not exists transfer_date date;
-alter table public.payments add column if not exists proof_url text;
-alter table public.payments add column if not exists evidence_url text; -- Alias for compatibility
-alter table public.payments add column if not exists due_date date;
-
--- Ensure monthly_fee exists in students
-alter table public.students add column if not exists monthly_fee numeric default 0;
-alter table public.students add column if not exists due_day integer default 5;
-
--- 1.13 Incidentes (Reportes de conducta)
-create table if not exists public.incidents (
-  id bigint generated by default as identity primary key,
-  student_id bigint references public.students(id) on delete cascade,
-  classroom_id bigint references public.classrooms(id) on delete cascade,
-  teacher_id uuid references public.profiles(id),
-  severity text check (severity in ('leve', 'media', 'alta')),
-  status text default 'received' check (status in ('received', 'review', 'resolved', 'archived')),
-  description text,
-  reported_at timestamp with time zone default timezone('utc'::text, now()) not null,
-  created_at timestamp with time zone default timezone('utc'::text, now()) not null
-);
-
--- 1.14 Rutina Diaria (Daily Logs) - Fix 404 daily_logs
-create table if not exists public.daily_logs (
-  id bigint generated by default as identity primary key,
-  student_id bigint references public.students(id) on delete cascade,
-  classroom_id bigint references public.classrooms(id) on delete cascade,
-  date date default current_date,
-  mood text,
-  food text,
-  nap text,
-  eating text,    -- Nueva columna (para compatibilidad)
-  sleeping text,  -- Nueva columna (para compatibilidad)
-  activities text, -- Nueva columna (para compatibilidad)
-  notes text,     -- Nueva columna (para compatibilidad)
-  created_at timestamp with time zone default timezone('utc'::text, now()) not null,
-  unique(student_id, date)
-);
-
--- Asegurar que todas las columnas de daily_logs existan para evitar errores 400
-alter table public.daily_logs add column if not exists mood text;
-alter table public.daily_logs add column if not exists food text;
-alter table public.daily_logs add column if not exists nap text;
-alter table public.daily_logs add column if not exists eating text;
-alter table public.daily_logs add column if not exists sleeping text;
-alter table public.daily_logs add column if not exists activities text;
-alter table public.daily_logs add column if not exists notes text;
-
--- 1.15 Galería del Aula - Fix 404 classroom_gallery
-create table if not exists public.classroom_gallery (
-  id bigint generated by default as identity primary key,
-  classroom_id bigint references public.classrooms(id) on delete cascade,
-  image_url text not null,
-  caption text,
-  date date default current_date,
-  created_at timestamp with time zone default timezone('utc'::text, now()) not null
-);
-
--- 2. SEGURIDAD (Row Level Security)
--- -----------------------------------------------------------------------------
-alter table public.profiles enable row level security;
-alter table public.classrooms enable row level security;
-alter table public.students enable row level security;
-alter table public.attendance enable row level security;
-alter table public.tasks enable row level security;
-alter table public.task_evidences enable row level security;
-alter table public.posts enable row level security;
-alter table public.comments enable row level security;
-alter table public.likes enable row level security;
-alter table public.messages enable row level security;
-alter table public.notifications enable row level security;
-alter table public.classroom_chat enable row level security;
-alter table public.grades enable row level security;
-alter table public.payments enable row level security;
-alter table public.incidents enable row level security;
-alter table public.daily_logs enable row level security;
-alter table public.classroom_gallery enable row level security;
-
--- 3. FUNCIONES AUXILIARES
--- -----------------------------------------------------------------------------
-
--- Función segura para obtener rol (evita recursión)
-create or replace function public.get_my_role()
-RETURNS text
-LANGUAGE sql
-SECURITY DEFINER
-SET search_path = public
-STABLE
-AS $$
-  select role from profiles where id = auth.uid() limit 1;
-$$;
-
--- Función para verificar si el usuario autenticado ha aceptado los términos y condiciones.
--- Retorna TRUE si el usuario ha aceptado los términos, FALSE en caso contrario o si no hay usuario.
-create or replace function public.can_access_app()
-returns boolean
-language plpgsql
-security definer
-stable
-as $$
-declare
-  v_accepted_terms boolean;
-begin
-  if auth.uid() is null then return false; end if; -- No autenticado, no puede acceder
-  select accepted_terms into v_accepted_terms from public.profiles where id = auth.uid();
-  return coalesce(v_accepted_terms, false); -- Si accepted_terms es NULL, se considera FALSE
-end;
-$$;
-
--- Funciones para romper recursión RLS
-create or replace function public.is_teacher_of_classroom(p_classroom_id bigint)
-returns boolean language sql security definer stable as $$
-  select exists (select 1 from public.classrooms where id = p_classroom_id and teacher_id = auth.uid());
-$$;
-
-create or replace function public.is_parent_of_student(p_student_id bigint)
-returns boolean language sql security definer stable as $$
-  select exists (select 1 from public.students where id = p_student_id and parent_id = auth.uid());
-$$;
-
-create or replace function public.is_parent_of_classroom(p_classroom_id bigint)
-returns boolean language sql security definer stable as $$
-  select exists (select 1 from public.students where classroom_id = p_classroom_id and parent_id = auth.uid());
-$$;
-
-create or replace function public.is_teacher_of_student(p_student_id bigint)
-returns boolean language sql security definer stable as $$
-  select exists (
-    select 1 from public.students s
-    join public.classrooms c on c.id = s.classroom_id
-    where s.id = p_student_id and c.teacher_id = auth.uid()
-  );
-$$;
-
--- Función para manejar nuevos usuarios (Trigger Auth)
-create or replace function public.handle_new_user()
-returns trigger
-language plpgsql
-security definer set search_path = public
-as $$
-begin
-  insert into public.profiles (id, email, name, role)
-  values (
-    new.id,
-    new.email,
-    new.raw_user_meta_data->>'name',
-    coalesce(new.raw_user_meta_data->>'role', 'padre')
-  );
-  return new;
-end;
-$$;
-
--- Función RPC para generar cuotas mensuales
--- Utiliza transacciones para asegurar integridad de datos
-create or replace function public.generate_monthly_charges(p_month integer, p_year integer)
-returns json language plpgsql security definer set search_path = public
-as $$
-declare
-  v_student record;
-  v_due_date date;
-  v_created_count integer := 0;
-  v_existing_count integer := 0;
-  v_total_amount numeric := 0;
-begin
-  -- Validar parámetros
-  if p_month < 1 or p_month > 12 then
-    raise exception 'Mes inválido: debe estar entre 1 y 12';
-  end if;
-
-  if p_year < 2020 or p_year > 2050 then
-    raise exception 'Año inválido: debe estar entre 2020 y 2050';
-  end if;
-
-  -- Calcular fecha de vencimiento (día del estudiante o día 5 por defecto)
-  -- Para simplificar, usaremos el día 5 de cada mes
-  v_due_date := make_date(p_year, p_month, 5);
-
-  -- Iterar sobre todos los estudiantes activos con tarifa mensual
-  for v_student in
-    select id, name, monthly_fee, due_day
-    from public.students
-    where is_active = true
-      and monthly_fee > 0
-  loop
-    -- Verificar si ya existe una cuota para este estudiante en este mes/año
-    if not exists (
-      select 1 from public.payments
-      where student_id = v_student.id
-        and extract(month from due_date) = p_month
-        and extract(year from due_date) = p_year
-    ) then
-      -- Insertar nueva cuota
-      insert into public.payments (
-        student_id,
-        amount,
-        status,
-        due_date,
-        created_at
-      ) values (
-        v_student.id,
-        v_student.monthly_fee,
-        'pending',
-        v_due_date,
-        now()
-      );
-
-      v_created_count := v_created_count + 1;
-      v_total_amount := v_total_amount + v_student.monthly_fee;
-    else
-      v_existing_count := v_existing_count + 1;
-    end if;
-  end loop;
-
-  -- Retornar resultado
-  return json_build_object(
-    'success', true,
-    'created_count', v_created_count,
-    'existing_count', v_existing_count,
-    'total_amount', v_total_amount,
-    'month', p_month,
-    'year', p_year,
-    'due_date', v_due_date
-  );
-
-exception
-  when others then
-    -- En caso de error, hacer rollback automático
-    return json_build_object(
-      'success', false,
-      'error', SQLERRM,
-      'created_count', 0,
-      'existing_count', 0,
-      'total_amount', 0
-    );
-end;
-$$;
-
--- Trigger para la función anterior
-drop trigger if exists on_auth_user_created on auth.users;
-create trigger on_auth_user_created
-  after insert on auth.users
-  for each row execute procedure public.handle_new_user();
-
--- 4. POLÍTICAS DE ACCESO (RLS)
--- -----------------------------------------------------------------------------
-
--- Las políticas para la tabla 'profiles' NO deben incluir 'can_access_app()',
--- ya que los usuarios necesitan poder leer y actualizar su propio perfil
--- para aceptar los términos en primer lugar.
--- PROFILES
-drop policy if exists "Directora y Asistente ven todos los perfiles" on public.profiles;
-create policy "Directora y Asistente ven todos los perfiles" on public.profiles for select using (
-  get_my_role() in ('directora', 'asistente')
-);
-
--- Allow authenticated users to view basic profile info (needed for social feed avatars/names)
-drop policy if exists "Ver perfiles basicos" on public.profiles;
-create policy "Ver perfiles basicos" on public.profiles for select using (
-  auth.role() = 'authenticated'
-);
-
--- Permitir que cualquiera (padres) vea los perfiles del staff (para saber quién publica)
-drop policy if exists "Ver perfiles de staff" on public.profiles;
-create policy "Ver perfiles de staff" on public.profiles for select using (
-  role in ('maestra', 'directora', 'asistente')
-);
-
-drop policy if exists "Usuarios ven su propio perfil" on public.profiles;
-create policy "Usuarios ven su propio perfil" on public.profiles for select using (
-  auth.uid() = id
-);
-
-drop policy if exists "Editar propio perfil" on public.profiles;
-create policy "Editar propio perfil" on public.profiles for update using (auth.uid() = id);
-
-drop policy if exists "Insertar propio perfil" on public.profiles;
-create policy "Insertar propio perfil" on public.profiles for insert with check (auth.uid() = id);
-
-drop policy if exists "Directora y Asistente insertan perfiles" on public.profiles;
-create policy "Directora y Asistente insertan perfiles" on public.profiles for insert with check (
-  get_my_role() in ('directora', 'asistente')
-);
-
-drop policy if exists "Directora y Asistente editan perfiles" on public.profiles;
-create policy "Directora y Asistente editan perfiles" on public.profiles for update using (
-  get_my_role() in ('directora', 'asistente')
-);
-
-drop policy if exists "Directora y Asistente eliminan perfiles" on public.profiles;
-create policy "Directora y Asistente eliminan perfiles" on public.profiles for delete using (
-  get_my_role() in ('directora', 'asistente')
-);
-
--- DATA FIX: corregir rol de asistente creado como padre
-update public.profiles set role = 'asistente' where id = 'b9eaa8f4-5e53-4079-b01d-92a4c1707553';
-
--- CLASSROOMS
-drop policy if exists "Directora y Asistente gestionan aulas" on public.classrooms;
-create policy "Directora y Asistente gestionan aulas" on public.classrooms for all using (
-  get_my_role() in ('directora', 'asistente')
-) with check (
-  get_my_role() in ('directora', 'asistente')
-);
-
-drop policy if exists "Maestra ve sus aulas" on public.classrooms;
-create policy "Maestra ve sus aulas" on public.classrooms for select using (
-  teacher_id = auth.uid()
-);
-
--- ✅ NUEVA POLÍTICA: Permitir a los padres ver el aula de sus hijos
-drop policy if exists "Padres ven aula de sus hijos" on public.classrooms;
-create policy "Padres ven aula de sus hijos" on public.classrooms for select using (
-  is_parent_of_classroom(id)
-);
-
--- Policies for 'students' table
--- STUDENTS
--- Función auxiliar SECURITY DEFINER para evitar recursión infinita en RLS
-create or replace function public.get_my_classroom_ids()
-returns setof bigint
-language sql
-security definer
-stable
-set search_path = public
-as $$
-  select classroom_id from public.students where parent_id = auth.uid() and classroom_id is not null;
-$$;
-
-drop policy if exists "Directora y Asistente gestionan estudiantes" on public.students;
-create policy "Directora y Asistente gestionan estudiantes" on public.students for all using (
-  get_my_role() in ('directora', 'asistente')
-) with check (
-  get_my_role() in ('directora', 'asistente')
-);
-
-drop policy if exists "Maestra ve estudiantes de sus aulas" on public.students;
-create policy "Maestra ve estudiantes de sus aulas" on public.students for select using (
-  is_teacher_of_student(id)
-);
-
-drop policy if exists "Padres ven sus hijos" on public.students;
-create policy "Padres ven sus hijos" on public.students for select using (parent_id = auth.uid());
-
-drop policy if exists "Padres actualizan datos hijo" on public.students;
-create policy "Padres actualizan datos hijo" on public.students for update
-  using (parent_id = auth.uid())
-  with check (parent_id = auth.uid());
-
-drop policy if exists "Padres ven compañeros de aula" on public.students;
-create policy "Padres ven compañeros de aula"
-on public.students for select
-using (
-  classroom_id in (select public.get_my_classroom_ids())
-);
-
--- Policies for 'attendance' table
--- ATTENDANCE
-drop policy if exists "Directora y Asistente ven asistencia" on public.attendance;
-create policy "Directora y Asistente ven asistencia" on public.attendance for select using (
-  get_my_role() in ('directora', 'asistente')
-);
-
-drop policy if exists "Maestra registra asistencia" on public.attendance;
-create policy "Maestra registra asistencia" on public.attendance for all using (
-  is_teacher_of_classroom(classroom_id)
-);
-
-drop policy if exists "Padres ven asistencia de sus hijos" on public.attendance;
-create policy "Padres ven asistencia de sus hijos" on public.attendance for select using (
-  is_parent_of_student(student_id)
-);
-
--- Policies for 'attendance_requests' table
--- ATTENDANCE REQUESTS
-drop policy if exists "Padres envian solicitudes de ausencia" on public.attendance_requests;
-create policy "Padres envian solicitudes de ausencia" on public.attendance_requests for insert with check (
-  is_parent_of_student(student_id)
-);
-
-drop policy if exists "Padres ven sus solicitudes de ausencia" on public.attendance_requests;
-create policy "Padres ven sus solicitudes de ausencia" on public.attendance_requests for select using (
-  is_parent_of_student(student_id)
-);
-
-drop policy if exists "Staff ve todas las solicitudes de ausencia" on public.attendance_requests;
-create policy "Staff ve todas las solicitudes de ausencia" on public.attendance_requests for all using (
-  get_my_role() in ('directora', 'asistente', 'maestra')
-);
-
--- Policies for 'tasks' table
-drop policy if exists "Directora ve todas las tareas" on public.tasks;
-create policy "Directora ve todas las tareas" on public.tasks for select using (
-  get_my_role() = 'directora'
-);
-
-drop policy if exists "Maestras ven tareas de sus aulas" on public.tasks;
-create policy "Maestras ven tareas de sus aulas" on public.tasks for select using (
-  is_teacher_of_classroom(classroom_id)
-);
-
-drop policy if exists "Maestras crean tareas" on public.tasks;
-create policy "Maestras crean tareas" on public.tasks for insert with check (
-  is_teacher_of_classroom(classroom_id)
-);
-
-drop policy if exists "Maestras actualizan tareas" on public.tasks;
-create policy "Maestras actualizan tareas" on public.tasks for update using (
-  is_teacher_of_classroom(classroom_id)
-);
-
-drop policy if exists "Padres ven tareas del aula de su hijo" on public.tasks;
-create policy "Padres ven tareas del aula de su hijo" on public.tasks for select using (
-  is_parent_of_classroom(classroom_id)
-);
-
--- Policies for 'task_evidences' table
--- TASK EVIDENCES
-drop policy if exists "Directora ve todas las evidencias" on public.task_evidences;
-create policy "Directora ve todas las evidencias" on public.task_evidences for select using (
-  get_my_role() = 'directora'
-);
-
-drop policy if exists "Padres suben evidencias" on public.task_evidences;
-create policy "Padres suben evidencias" on public.task_evidences for insert with check (auth.uid() = parent_id);
-drop policy if exists "Padres ven sus evidencias" on public.task_evidences;
-create policy "Padres ven sus evidencias" on public.task_evidences for select using (auth.uid() = parent_id);
-drop policy if exists "Maestras ven evidencias de sus aulas" on public.task_evidences;
-create policy "Maestras ven evidencias de sus aulas" on public.task_evidences for select using (
-  exists (
-    select 1
-    from public.tasks t
-    where t.id = public.task_evidences.task_id
-      and is_teacher_of_classroom(t.classroom_id)
-  )
-);
-drop policy if exists "Maestras califican evidencias" on public.task_evidences;
-create policy "Maestras califican evidencias" on public.task_evidences for update using (
-  exists (
-    select 1
-    from public.tasks t
-    where t.id = public.task_evidences.task_id
-      and is_teacher_of_classroom(t.classroom_id)
-  )
-);
-
--- Policies for 'posts' table
--- POSTS & COMMENTS
-drop policy if exists "Ver posts" on public.posts;
-create policy "Ver posts" on public.posts
-for select using (
-  get_my_role() in ('directora','asistente')
-  or is_teacher_of_classroom(classroom_id)
-  or is_parent_of_classroom(classroom_id)
-);
-
-drop policy if exists "Maestras crean posts" on public.posts;
-create policy "Maestras crean posts" on public.posts for insert with check (
-  get_my_role() in ('directora', 'asistente', 'maestra')
-);
-
--- Policies for 'comments' table
--- COMMENTS
-drop policy if exists "Usuarios ven comentarios de posts visibles" on public.comments;
-create policy "Usuarios ven comentarios de posts visibles"
-on public.comments
-for select
-using (
-  exists (
-    select 1 from posts p
-    where p.id = comments.post_id
-    and (
-      get_my_role() in ('directora','asistente')
-      or is_teacher_of_classroom(p.classroom_id) 
-      or is_parent_of_classroom(p.classroom_id)
-    )
-  )
-);
-
-drop policy if exists "Usuarios comentan en publicaciones visibles" on public.comments;
-create policy "Usuarios comentan en publicaciones visibles"
-on public.comments
-for insert
-with check (
-  exists (
-    select 1 from posts p
-    where p.id = comments.post_id
-    and (is_teacher_of_classroom(p.classroom_id) or is_parent_of_classroom(p.classroom_id))
-  )
-);
-
-drop policy if exists "Usuarios eliminan sus comentarios" on public.comments;
-create policy "Usuarios eliminan sus comentarios" on public.comments for delete using (auth.uid() = user_id);
-
--- POSTS (UPDATE/DELETE)
-drop policy if exists "Maestras actualizan sus posts" on public.posts;
-create policy "Maestras actualizan sus posts" on public.posts
-for update using (
-  get_my_role() in ('directora', 'asistente') or auth.uid() = teacher_id
-);
-
-drop policy if exists "Maestras eliminan sus posts" on public.posts;
-create policy "Maestras eliminan sus posts" on public.posts
-for delete using (
-  get_my_role() in ('directora', 'asistente') or auth.uid() = teacher_id
-);
-
-
--- LIKES
-drop policy if exists "Ver likes" on public.likes;
-create policy "Ver likes"
-on public.likes
-for select
-using (
-  exists (
-    select 1
-    from posts p
-    where p.id = likes.post_id
-    and (
-      get_my_role() in ('directora','asistente')
-      or is_teacher_of_classroom(p.classroom_id)
-      or is_parent_of_classroom(p.classroom_id)
-    )
-  )
-);
-
-drop policy if exists "Usuarios reaccionan a posts visibles" on public.likes;
-create policy "Usuarios reaccionan a posts visibles"
-on public.likes
-for insert
-with check (
-  auth.uid() = user_id
-  and exists (
-    select 1
-    from posts p
-    where p.id = likes.post_id
-    and (is_teacher_of_classroom(p.classroom_id) or is_parent_of_classroom(p.classroom_id))
-  )
-);
-
-drop policy if exists "Padres pueden quitar like" on public.likes;
-create policy "Padres pueden quitar like" on public.likes for delete using (auth.uid() = user_id);
-
--- Policies for 'messages' table
--- MESSAGES
-create table if not exists public.conversations (
-  id bigint generated by default as identity primary key,
-  type text default 'private', -- private, group
-  name text,
-  created_at timestamp with time zone default now()
-);
-
-create table if not exists public.conversation_participants (
-  id bigint generated by default as identity primary key,
-  conversation_id bigint references public.conversations(id) on delete cascade,
-  user_id uuid references public.profiles(id) on delete cascade,
-  joined_at timestamp with time zone default now(),
-  unique(conversation_id, user_id)
-);
-
--- Asegurar que la tabla messages tenga conversation_id
-alter table public.messages add column if not exists conversation_id bigint references public.conversations(id) on delete cascade;
-alter table public.messages add column if not exists sender_id uuid references public.profiles(id);
-alter table public.messages add column if not exists receiver_id uuid references public.profiles(id); -- Legacy support
-alter table public.messages add column if not exists is_read boolean default false;
-
-alter table public.messages enable row level security;
-alter table public.conversations enable row level security;
-alter table public.conversation_participants enable row level security;
-
-drop policy if exists "Usuarios ven sus conversaciones" on public.conversations;
-create policy "Usuarios ven sus conversaciones" on public.conversations for select using (
-  exists (
-    select 1 from conversation_participants cp
-    where cp.conversation_id = conversations.id
-    and cp.user_id = auth.uid()
-  )
-);
-
-drop policy if exists "Usuarios ven sus participaciones" on public.conversation_participants;
-create policy "Usuarios ven sus participaciones" on public.conversation_participants for select using (
-  user_id = auth.uid()
-);
-
-drop policy if exists "Usuarios ven sus mensajes" on public.messages;
-create policy "Usuarios ven sus mensajes" on public.messages for select using (
-  exists (
-    select 1 from conversation_participants cp
-    where cp.conversation_id = messages.conversation_id
-    and cp.user_id = auth.uid()
-  )
-  or sender_id = auth.uid()
-  or receiver_id = auth.uid()
-);
-
-drop policy if exists "Usuarios envian mensajes" on public.messages;
-create policy "Usuarios envian mensajes" on public.messages for insert with check (
-  auth.uid() = sender_id or auth.role() = 'authenticated'
-);
-
-drop policy if exists "Usuarios actualizan mensajes" on public.messages;
-create policy "Usuarios actualizan mensajes" on public.messages for update using (
-  auth.uid() = sender_id or auth.role() = 'authenticated'
-);
-
-
--- Policies for 'payments' table
--- PAYMENTS
-drop policy if exists "Directora ve todos los pagos" on public.payments;
-create policy "Directora ve todos los pagos" on public.payments for all using (
-  get_my_role() in ('directora', 'asistente')
-);
-
-drop policy if exists "Padres ven sus pagos" on public.payments;
-create policy "Padres ven sus pagos" on public.payments for select using (
-  is_parent_of_student(student_id)
-);
-
-drop policy if exists "Padres registran pagos" on public.payments;
-create policy "Padres registran pagos" on public.payments for insert with check (
-  is_parent_of_student(student_id)
-);
-
--- Policies for 'notifications' table
--- NOTIFICATIONS
-drop policy if exists "Usuarios ven sus notificaciones" on public.notifications;
-create policy "Usuarios ven sus notificaciones" on public.notifications for select using (
-  auth.uid() = user_id
-);
-
-drop policy if exists "Sistema crea notificaciones" on public.notifications;
-create policy "Sistema crea notificaciones"
-on public.notifications
-for insert
-with check (auth.role() = 'authenticated');
-
--- 1.11 Inquietudes (Inquiries - Comunicación Padres-Directora)
--- Policies for 'inquiries' table
-create table if not exists public.inquiries (
-  id bigint generated by default as identity primary key,
-  parent_id uuid references public.profiles(id) not null,
-  student_id bigint references public.students(id), -- Opcional, para contexto
-  subject text,
-  message text not null,
-  response text,
-  status text default 'pending', -- pending, resolved
-  created_at timestamp with time zone default timezone('utc'::text, now()) not null,
-  responded_at timestamp with time zone
-);
-
--- Fix 400 Error: Missing columns in inquiries
-alter table public.inquiries add column if not exists priority text default 'medium';
-alter table public.inquiries add column if not exists folio text;
-alter table public.inquiries add column if not exists updated_at timestamp with time zone;
-alter table public.inquiries add column if not exists attachment_url text;
-
-alter table public.inquiries enable row level security;
-
-drop policy if exists "Directora ve todas las inquietudes" on public.inquiries;
-create policy "Directora ve todas las inquietudes" on public.inquiries for all using (
-  get_my_role() in ('directora', 'asistente')
-);
-
-drop policy if exists "Padres ven sus inquietudes" on public.inquiries;
-create policy "Padres ven sus inquietudes" on public.inquiries for select using (
-  auth.uid() = parent_id
-);
-
-drop policy if exists "Padres crean inquietudes" on public.inquiries;
-create policy "Padres crean inquietudes" on public.inquiries for insert with check (
-  auth.uid() = parent_id
-);
-
-drop policy if exists "Usuarios marcan leida" on public.notifications;
-create policy "Usuarios marcan leida" on public.notifications for update using (
-  auth.uid() = user_id
-);
-
--- Policies for 'classroom_chat' table
--- CLASSROOM CHAT
-drop policy if exists "Ver chat aula" on public.classroom_chat;
-create policy "Ver chat aula" on public.classroom_chat for select using (
-  is_teacher_of_classroom(classroom_id) or is_parent_of_classroom(classroom_id)
-);
-drop policy if exists "Enviar chat aula" on public.classroom_chat;
-create policy "Enviar chat aula" on public.classroom_chat for insert with check (auth.uid() = user_id);
-
--- INCIDENTS
--- Policies for 'incidents' table
-drop policy if exists "Maestras crean incidentes" on public.incidents;
-create policy "Maestras crean incidentes" on public.incidents for insert with check (auth.uid() = teacher_id);
-
-drop policy if exists "Ver incidentes" on public.incidents;
-create policy "Ver incidentes" on public.incidents for select using (
-  auth.uid() = teacher_id OR get_my_role() in ('directora', 'asistente') OR is_parent_of_student(student_id)
-);
-
--- Policies for 'daily_logs' and 'classroom_gallery' tables
--- DAILY LOGS & GALLERY POLICIES
-drop policy if exists "Maestras gestionan daily_logs" on public.daily_logs;
-create policy "Maestras gestionan daily_logs" on public.daily_logs for all using (
-  is_teacher_of_classroom(classroom_id)
-);
-
-drop policy if exists "Maestras gestionan galeria" on public.classroom_gallery;
-create policy "Maestras gestionan galeria" on public.classroom_gallery for all using (
-  is_teacher_of_classroom(classroom_id)
-);
-drop policy if exists "Padres ven galeria" on public.classroom_gallery;
-create policy "Padres ven galeria" on public.classroom_gallery for select using (
-  is_parent_of_classroom(classroom_id)
-);
-
--- 1. RPC: Reporte Financiero Mensual por Aula (Optimizado para gráficas)
-create or replace function public.get_monthly_financial_report_by_classroom(p_month text)
-returns table (
-  classroom_name text,
-  total_expected numeric,
-  total_paid numeric,
-  total_pending numeric
-)
-language plpgsql
-security definer
-as $$
-begin
-  return query
-  select 
-    c.name as classroom_name,
-    coalesce(sum(p.amount), 0) as total_expected,
-    coalesce(sum(case when p.status = 'paid' or p.status = 'efectivo' then p.amount else 0 end), 0) as total_paid,
-    coalesce(sum(case when p.status = 'pending' then p.amount else 0 end), 0) as total_pending
-  from classrooms c
-  left join students s on s.classroom_id = c.id
-  left join payments p on p.student_id = s.id and p.month_paid = p_month
-  group by c.name
-  order by c.name;
-end;
-$$;
-
--- 2. RPC: KPIs del Dashboard (Todos los contadores en una sola llamada)
-create or replace function public.get_dashboard_kpis()
-returns jsonb
-language plpgsql
-security definer
-as $$
-declare
-  v_total_students int;
-  v_total_teachers int;
-  v_active_classrooms int;
-  v_attendance_today int;
-  v_pending_payments numeric;
-  v_active_incidents int;
-begin
-  select count(*) into v_total_students from students where is_active = true;
-  select count(*) into v_total_teachers from profiles where role = 'maestra';
-  select count(*) into v_active_classrooms from classrooms;
-  select count(*) into v_attendance_today from attendance where date = current_date and status = 'present';
-  select coalesce(sum(amount), 0) into v_pending_payments from payments where status = 'pending';
-  select count(*) into v_active_incidents from inquiries where status = 'pending';
-
-  return jsonb_build_object(
-    'total_students', v_total_students,
-    'total_teachers', v_total_teachers,
-    'active_classrooms', v_active_classrooms,
-    'attendance_today', v_attendance_today,
-    'pending_payments', v_pending_payments,
-    'active_incidents', v_active_incidents
-  );
-end;
-$$;
-
--- BUCKETS DE ALMACENAMIENTO (AVATARES Y MULTIMEDIA)
--- -----------------------------------------------------------------------------
-insert into storage.buckets (id, name, public) 
-values ('avatars', 'avatars', true)
-on conflict (id) do nothing;
-
-insert into storage.buckets (id, name, public) 
-values ('classroom_media', 'classroom_media', true)
-on conflict (id) do nothing;
-
--- El bucket 'karpus-uploads' parece ser el que se está usando para avatares según el error 400
-insert into storage.buckets (id, name, public) 
-values ('karpus-uploads', 'karpus-uploads', true)
-on conflict (id) do nothing;
-
--- Políticas para avatares
-drop policy if exists "Cualquiera ve avatares" on storage.objects;
-create policy "Cualquiera ve avatares" on storage.objects for select using (bucket_id = 'karpus-uploads');
-drop policy if exists "Usuarios suben sus propios avatares" on storage.objects;
-create policy "Usuarios suben sus propios avatares" on storage.objects for insert with check (
-  bucket_id = 'karpus-uploads' and (storage.foldername(name))[1] = 'avatars'
-);
-drop policy if exists "Usuarios actualizan sus propios avatares" on storage.objects;
-create policy "Usuarios actualizan sus propios avatares" on storage.objects for update using (
-  bucket_id = 'karpus-uploads' and (storage.foldername(name))[1] = 'avatars'
-);
-
--- CONVERSATIONS & MESSAGES (Fix 403 Error)
--- -----------------------------------------------------------------------------
-create table if not exists public.conversations (
-  id bigint generated by default as identity primary key,
-  type text check (type in ('private', 'group')) default 'private',
-  created_at timestamp with time zone default now()
-);
-
-create table if not exists public.conversation_participants (
-  id bigint generated by default as identity primary key,
-  conversation_id bigint references public.conversations(id) on delete cascade,
-  user_id uuid references public.profiles(id) on delete cascade,
-  joined_at timestamp with time zone default now(),
-  unique(conversation_id, user_id)
-);
-
-create table if not exists public.messages (
-  id bigint generated by default as identity primary key,
-  conversation_id bigint references public.conversations(id) on delete cascade,
-  sender_id uuid references public.profiles(id) on delete cascade,
-  content text not null,
-  is_read boolean default false,
-  created_at timestamp with time zone default now()
-);
-
--- RLS para Chat (Fix 403 y Infinite Recursion)
-alter table public.conversations enable row level security;
-alter table public.conversation_participants enable row level security;
-alter table public.messages enable row level security;
-
--- CONVERSATIONS
-drop policy if exists "Usuarios ven sus conversaciones" on public.conversations;
-create policy "Usuarios ven sus conversaciones" on public.conversations for select using (
-  id in (
-    select conversation_id from public.conversation_participants 
-    where user_id = auth.uid()
-  )
-);
-
--- CONVERSATION PARTICIPANTS
--- Usamos una subquery simple sin recursión para evitar el error 42P17
-drop policy if exists "Usuarios ven participantes" on public.conversation_participants;
-create policy "Usuarios ven participantes" on public.conversation_participants for select using (
-  conversation_id in (
-    select cp.conversation_id 
-    from public.conversation_participants cp 
-    where cp.user_id = auth.uid()
-  )
-);
-
--- MESSAGES
-drop policy if exists "Usuarios ven mensajes" on public.messages;
-create policy "Usuarios ven mensajes" on public.messages for select using (
-  conversation_id in (
-    select cp.conversation_id 
-    from public.conversation_participants cp 
-    where cp.user_id = auth.uid()
-  )
-);
-
-drop policy if exists "Usuarios envian mensajes" on public.messages;
-create policy "Usuarios envian mensajes" on public.messages for insert with check (
-  auth.uid() = sender_id and
-  conversation_id in (
-    select cp.conversation_id 
-    from public.conversation_participants cp 
-    where cp.user_id = auth.uid()
-  )
-);
-
--- 4. TRIGGER: Notificar al padre sobre nuevo cargo
+-- 4.6 Notificar al padre cuando se genera un cargo
 create or replace function public.notify_parent_on_new_charge()
-returns trigger
-language plpgsql
-security definer
-as $$
+returns trigger language plpgsql security definer as $$
 declare
   v_parent_id uuid;
   v_student_name text;
 begin
-  -- Solo notificar si el estado es 'pending' (generado por sistema o manual pendiente)
   if new.status = 'pending' then
     select parent_id, name into v_parent_id, v_student_name
-    from public.students
-    where id = new.student_id;
-
+    from public.students where id = new.student_id;
     if v_parent_id is not null then
       insert into public.notifications (user_id, title, message, type, link)
       values (
         v_parent_id,
         'Nuevo Cargo Generado',
-        'Se ha generado un cargo de $' || new.amount || ' para ' || v_student_name || ' (' || coalesce(new.month_paid, 'Mensualidad') || ').',
+        'Se gener� un cargo de $' || new.amount || ' para ' || v_student_name
+          || ' (' || coalesce(new.month_paid, 'Mensualidad') || ').',
         'alert',
         'panel_padres.html#payments'
       );
@@ -1347,163 +627,570 @@ begin
   return new;
 end;
 $$;
-
 drop trigger if exists on_new_payment_charge on public.payments;
 create trigger on_new_payment_charge
-after insert on public.payments
-for each row execute function public.notify_parent_on_new_charge();
+  after insert on public.payments
+  for each row execute function public.notify_parent_on_new_charge();
 
--- 3. RPC: Calcular Deuda Total de Estudiante
-create or replace function public.get_student_total_debt(p_student_id bigint)
-returns numeric
-language plpgsql
-security definer
-as $$
-declare
-  v_debt numeric;
+
+-- ============================================================
+-- 5. POL�TICAS RLS
+-- ============================================================
+
+-- Drop ALL existing policies on all app tables (clean slate)
+do $$
+declare pol record;
 begin
-  select coalesce(sum(amount), 0) into v_debt
-  from public.payments
-  where student_id = p_student_id
-    and status = 'pending';
-  
-  return v_debt;
+  for pol in
+    select policyname, tablename, schemaname
+    from pg_policies
+    where schemaname = 'public'
+      and tablename in (
+        'profiles','classrooms','students','attendance','attendance_requests',
+        'tasks','task_evidences','posts','comments','likes',
+        'conversations','conversation_participants','messages',
+        'notifications','payments','incidents','daily_logs',
+        'classroom_gallery','classroom_chat','grades','periods',
+        'report_cards','inquiries','school_settings','system_events',
+        'terms_acceptance'
+      )
+  loop
+    execute format('drop policy if exists %I on %I.%I',
+                   pol.policyname, pol.schemaname, pol.tablename);
+  end loop;
 end;
 $$;
--- Actualización de la función RPC para aceptar filtro de mes
-create or replace function public.get_dashboard_kpis(p_month text)
-returns jsonb
-language plpgsql
-security definer
-as $$
-declare
-  v_total_students int;
-  v_total_teachers int;
-  v_active_classrooms int;
-  v_attendance_today int;
-  v_pending_payments numeric;
-  v_active_incidents int;
-begin
-  -- Contadores generales
-  select count(*) into v_total_students from students where is_active = true;
-  select count(*) into v_total_teachers from profiles where role = 'maestra';
-  select count(*) into v_active_classrooms from classrooms;
-  
-  -- Asistencia de hoy (Métrica en tiempo real)
-  select count(*) into v_attendance_today from attendance where date = current_date and status = 'present';
-  
-  -- Pagos Pendientes (Filtrado por mes seleccionado)
-  -- Si el mes no coincide, no suma al KPI de "deuda del mes"
-  select coalesce(sum(amount), 0) into v_pending_payments 
-  from payments 
-  where status = 'pending' 
-  and month_paid ilike p_month;
 
-  -- Incidencias activas
-  select count(*) into v_active_incidents from inquiries where status = 'pending';
+drop policy if exists "profiles_select" on public.profiles;
+create policy "profiles_select" on public.profiles
+  for select using (auth.role() = 'authenticated');
+drop policy if exists "profiles_insert" on public.profiles;
+create policy "profiles_insert" on public.profiles
+  for insert with check (auth.uid() = id);
+drop policy if exists "profiles_update" on public.profiles;
+create policy "profiles_update" on public.profiles
+  for update using (auth.uid() = id or get_my_role() in ('directora','asistente'));
+drop policy if exists "profiles_delete" on public.profiles;
+create policy "profiles_delete" on public.profiles
+  for delete using (get_my_role() in ('directora','asistente'));
+
+-- -- CLASSROOMS --------------------------------------------
+drop policy if exists "classrooms_staff" on public.classrooms;
+create policy "classrooms_staff" on public.classrooms
+  for all using (get_my_role() in ('directora','asistente'))
+  with check (get_my_role() in ('directora','asistente'));
+drop policy if exists "classrooms_teacher" on public.classrooms;
+create policy "classrooms_teacher" on public.classrooms
+  for select using (teacher_id = auth.uid());
+drop policy if exists "classrooms_parent" on public.classrooms;
+create policy "classrooms_parent" on public.classrooms
+  for select using (is_parent_of_classroom(id));
+
+-- -- STUDENTS ----------------------------------------------
+drop policy if exists "students_staff" on public.students;
+create policy "students_staff" on public.students
+  for all using (get_my_role() in ('directora','asistente'))
+  with check (get_my_role() in ('directora','asistente'));
+drop policy if exists "students_teacher" on public.students;
+create policy "students_teacher" on public.students
+  for select using (is_teacher_of_student(id));
+drop policy if exists "students_parent_own" on public.students;
+create policy "students_parent_own" on public.students
+  for select using (parent_id = auth.uid());
+drop policy if exists "students_parent_update" on public.students;
+create policy "students_parent_update" on public.students
+  for update using (parent_id = auth.uid()) with check (parent_id = auth.uid());
+drop policy if exists "students_parent_classmates" on public.students;
+create policy "students_parent_classmates" on public.students
+  for select using (classroom_id in (select get_my_classroom_ids()));
+
+-- -- ATTENDANCE --------------------------------------------
+drop policy if exists "attendance_staff" on public.attendance;
+create policy "attendance_staff" on public.attendance
+  for all using (get_my_role() in ('directora','asistente'));
+drop policy if exists "attendance_teacher" on public.attendance;
+create policy "attendance_teacher" on public.attendance
+  for all using (is_teacher_of_classroom(classroom_id));
+drop policy if exists "attendance_parent" on public.attendance;
+create policy "attendance_parent" on public.attendance
+  for select using (
+    exists (select 1 from public.students
+            where id = attendance.student_id and parent_id = auth.uid())
+  );
+
+-- -- ATTENDANCE REQUESTS -----------------------------------
+create policy "att_req_staff"  on public.attendance_requests
+  for all using (get_my_role() in ('directora','asistente','maestra'));
+drop policy if exists "att_req_parent_insert" on public.attendance_requests;
+create policy "att_req_parent_insert" on public.attendance_requests
+  for insert with check (is_parent_of_student(student_id));
+drop policy if exists "att_req_parent_select" on public.attendance_requests;
+create policy "att_req_parent_select" on public.attendance_requests
+  for select using (is_parent_of_student(student_id));
+
+-- -- TASKS -------------------------------------------------
+drop policy if exists "tasks_directora" on public.tasks;
+create policy "tasks_directora" on public.tasks
+  for all using (get_my_role() in ('directora','asistente'));
+drop policy if exists "tasks_teacher" on public.tasks;
+create policy "tasks_teacher" on public.tasks
+  for all using (is_teacher_of_classroom(classroom_id));
+drop policy if exists "tasks_parent" on public.tasks;
+create policy "tasks_parent" on public.tasks
+  for select using (is_parent_of_classroom(classroom_id));
+
+-- -- TASK EVIDENCES ----------------------------------------
+drop policy if exists "evidences_staff" on public.task_evidences;
+create policy "evidences_staff" on public.task_evidences
+  for all using (get_my_role() in ('directora','asistente'));
+drop policy if exists "evidences_teacher" on public.task_evidences;
+create policy "evidences_teacher" on public.task_evidences
+  for all using (
+    exists (select 1 from public.tasks t
+            where t.id = task_evidences.task_id
+              and is_teacher_of_classroom(t.classroom_id))
+  );
+drop policy if exists "evidences_parent_insert" on public.task_evidences;
+create policy "evidences_parent_insert" on public.task_evidences
+  for insert with check (auth.uid() = parent_id);
+drop policy if exists "evidences_parent_select" on public.task_evidences;
+create policy "evidences_parent_select" on public.task_evidences
+  for select using (
+    auth.uid() = parent_id
+    or exists (select 1 from public.students
+               where id = task_evidences.student_id and parent_id = auth.uid())
+  );
+
+-- -- POSTS -------------------------------------------------
+drop policy if exists "posts_select" on public.posts;
+create policy "posts_select" on public.posts
+  for select using (
+    get_my_role() in ('directora','asistente')
+    or is_teacher_of_classroom(classroom_id)
+    or is_parent_of_classroom(classroom_id)
+  );
+drop policy if exists "posts_insert" on public.posts;
+create policy "posts_insert" on public.posts
+  for insert with check (get_my_role() in ('directora','asistente','maestra'));
+drop policy if exists "posts_update" on public.posts;
+create policy "posts_update" on public.posts
+  for update using (get_my_role() in ('directora','asistente') or auth.uid() = teacher_id);
+drop policy if exists "posts_delete" on public.posts;
+create policy "posts_delete" on public.posts
+  for delete using (get_my_role() in ('directora','asistente') or auth.uid() = teacher_id);
+
+-- -- COMMENTS ----------------------------------------------
+drop policy if exists "comments_select" on public.comments;
+create policy "comments_select" on public.comments
+  for select using (
+    exists (select 1 from public.posts p where p.id = comments.post_id
+      and (get_my_role() in ('directora','asistente')
+           or is_teacher_of_classroom(p.classroom_id)
+           or is_parent_of_classroom(p.classroom_id)))
+  );
+drop policy if exists "comments_insert" on public.comments;
+create policy "comments_insert" on public.comments
+  for insert with check (
+    auth.uid() = user_id
+    and exists (select 1 from public.posts p where p.id = comments.post_id
+      and (get_my_role() in ('directora','asistente','maestra')
+           or is_parent_of_classroom(p.classroom_id)))
+  );
+drop policy if exists "comments_delete" on public.comments;
+create policy "comments_delete" on public.comments
+  for delete using (
+    auth.uid() = user_id
+    or get_my_role() in ('directora','asistente','maestra')
+  );
+
+-- -- LIKES -------------------------------------------------
+drop policy if exists "likes_select" on public.likes;
+create policy "likes_select" on public.likes
+  for select using (
+    exists (select 1 from public.posts p where p.id = likes.post_id
+      and (get_my_role() in ('directora','asistente')
+           or is_teacher_of_classroom(p.classroom_id)
+           or is_parent_of_classroom(p.classroom_id)))
+  );
+drop policy if exists "likes_insert" on public.likes;
+create policy "likes_insert" on public.likes
+  for insert with check (auth.uid() = user_id);
+drop policy if exists "likes_delete" on public.likes;
+create policy "likes_delete" on public.likes
+  for delete using (auth.uid() = user_id);
+
+-- -- CONVERSATIONS -----------------------------------------
+drop policy if exists "conv_select" on public.conversations;
+create policy "conv_select" on public.conversations
+  for select using (
+    get_my_role() = 'directora'
+    or user_is_participant(id, auth.uid())
+  );
+drop policy if exists "conv_insert" on public.conversations;
+create policy "conv_insert" on public.conversations
+  for insert with check (auth.role() = 'authenticated');
+drop policy if exists "conv_update" on public.conversations;
+create policy "conv_update" on public.conversations
+  for update using (user_is_participant(id, auth.uid()));
+
+drop policy if exists "cp_select" on public.conversation_participants;
+create policy "cp_select" on public.conversation_participants
+  for select using (get_my_role() = 'directora' or user_id = auth.uid());
+drop policy if exists "cp_insert" on public.conversation_participants;
+create policy "cp_insert" on public.conversation_participants
+  for insert with check (auth.role() = 'authenticated');
+drop policy if exists "cp_delete" on public.conversation_participants;
+create policy "cp_delete" on public.conversation_participants
+  for delete using (user_id = auth.uid());
+
+drop policy if exists "msg_select" on public.messages;
+create policy "msg_select" on public.messages
+  for select using (
+    get_my_role() = 'directora'
+    or user_is_participant(conversation_id, auth.uid())
+  );
+drop policy if exists "msg_insert" on public.messages;
+create policy "msg_insert" on public.messages
+  for insert with check (
+    auth.uid() = sender_id
+    and user_is_participant(conversation_id, auth.uid())
+  );
+drop policy if exists "msg_update" on public.messages;
+create policy "msg_update" on public.messages
+  for update using (
+    get_my_role() in ('directora','maestra','asistente')
+    or sender_id = auth.uid()
+  );
+
+-- -- PAYMENTS ----------------------------------------------
+drop policy if exists "payments_staff" on public.payments;
+create policy "payments_staff" on public.payments
+  for all using (get_my_role() in ('directora','asistente'));
+drop policy if exists "payments_parent_select" on public.payments;
+create policy "payments_parent_select" on public.payments
+  for select using (
+    exists (select 1 from public.students
+            where id = payments.student_id and parent_id = auth.uid())
+  );
+drop policy if exists "payments_parent_insert" on public.payments;
+create policy "payments_parent_insert" on public.payments
+  for insert with check (
+    exists (select 1 from public.students
+            where id = payments.student_id and parent_id = auth.uid())
+  );
+
+-- -- NOTIFICATIONS -----------------------------------------
+drop policy if exists "notifications_all" on public.notifications;
+create policy "notifications_all" on public.notifications
+  for all using (auth.uid() = user_id);
+
+-- -- INQUIRIES ---------------------------------------------
+drop policy if exists "inquiries_staff" on public.inquiries;
+create policy "inquiries_staff" on public.inquiries
+  for all using (get_my_role() in ('directora','asistente'));
+drop policy if exists "inquiries_parent_select" on public.inquiries;
+create policy "inquiries_parent_select" on public.inquiries
+  for select using (auth.uid() = parent_id);
+drop policy if exists "inquiries_parent_insert" on public.inquiries;
+create policy "inquiries_parent_insert" on public.inquiries
+  for insert with check (auth.uid() = parent_id);
+
+-- -- DAILY LOGS --------------------------------------------
+drop policy if exists "daily_logs_staff" on public.daily_logs;
+create policy "daily_logs_staff" on public.daily_logs
+  for all using (get_my_role() in ('directora','asistente'));
+drop policy if exists "daily_logs_teacher" on public.daily_logs;
+create policy "daily_logs_teacher" on public.daily_logs
+  for all using (is_teacher_of_classroom(classroom_id));
+drop policy if exists "daily_logs_parent" on public.daily_logs;
+create policy "daily_logs_parent" on public.daily_logs
+  for select using (
+    exists (select 1 from public.students
+            where id = daily_logs.student_id and parent_id = auth.uid())
+  );
+
+-- -- CLASSROOM GALLERY -------------------------------------
+drop policy if exists "gallery_teacher" on public.classroom_gallery;
+create policy "gallery_teacher" on public.classroom_gallery
+  for all using (is_teacher_of_classroom(classroom_id));
+drop policy if exists "gallery_parent" on public.classroom_gallery;
+create policy "gallery_parent" on public.classroom_gallery
+  for select using (is_parent_of_classroom(classroom_id));
+
+-- -- CLASSROOM CHAT ----------------------------------------
+drop policy if exists "classroom_chat_select" on public.classroom_chat;
+create policy "classroom_chat_select" on public.classroom_chat
+  for select using (is_teacher_of_classroom(classroom_id) or is_parent_of_classroom(classroom_id));
+drop policy if exists "classroom_chat_insert" on public.classroom_chat;
+create policy "classroom_chat_insert" on public.classroom_chat
+  for insert with check (auth.uid() = user_id);
+
+-- -- INCIDENTS ---------------------------------------------
+drop policy if exists "incidents_insert" on public.incidents;
+create policy "incidents_insert" on public.incidents
+  for insert with check (auth.uid() = teacher_id);
+drop policy if exists "incidents_select" on public.incidents;
+create policy "incidents_select" on public.incidents
+  for select using (
+    auth.uid() = teacher_id
+    or get_my_role() in ('directora','asistente')
+    or is_parent_of_student(student_id)
+  );
+
+-- -- GRADES ------------------------------------------------
+drop policy if exists "grades_staff" on public.grades;
+create policy "grades_staff" on public.grades
+  for all using (get_my_role() in ('directora','asistente','maestra'));
+drop policy if exists "grades_parent" on public.grades;
+create policy "grades_parent" on public.grades
+  for select using (is_parent_of_student(student_id));
+
+-- -- PERIODS -----------------------------------------------
+drop policy if exists "periods_staff" on public.periods;
+create policy "periods_staff" on public.periods
+  for all using (get_my_role() in ('directora','asistente','maestra'));
+drop policy if exists "periods_parent" on public.periods;
+create policy "periods_parent" on public.periods
+  for select using (auth.role() = 'authenticated');
+
+-- -- REPORT CARDS ------------------------------------------
+drop policy if exists "report_cards_staff" on public.report_cards;
+create policy "report_cards_staff" on public.report_cards
+  for all using (get_my_role() in ('directora','asistente','maestra'));
+drop policy if exists "report_cards_parent" on public.report_cards;
+create policy "report_cards_parent" on public.report_cards
+  for select using (
+    exists (select 1 from public.students
+            where id = report_cards.student_id and parent_id = auth.uid())
+  );
+
+-- -- SCHOOL SETTINGS ---------------------------------------
+drop policy if exists "settings_staff" on public.school_settings;
+create policy "settings_staff" on public.school_settings
+  for all using (get_my_role() in ('directora','asistente'));
+drop policy if exists "settings_read" on public.school_settings;
+create policy "settings_read" on public.school_settings
+  for select using (auth.role() = 'authenticated');
+
+-- -- SYSTEM EVENTS -----------------------------------------
+drop policy if exists "system_events_staff" on public.system_events;
+create policy "system_events_staff" on public.system_events
+  for all using (get_my_role() in ('directora','asistente'));
+
+-- -- TERMS ACCEPTANCE --------------------------------------
+drop policy if exists "terms_own" on public.terms_acceptance;
+create policy "terms_own" on public.terms_acceptance
+  for all using (auth.uid() = user_id);
+
+
+-- ============================================================
+-- 6. FUNCIONES RPC
+-- ============================================================
+
+-- 6.1 Ciclo de pagos (genera cuotas + marca vencidos)
+create or replace function public.run_payment_cycle()
+returns jsonb language plpgsql security definer as $$
+declare
+  v_settings     record;
+  v_today        int := extract(day from current_date);
+  v_next_month   int;
+  v_next_year    int;
+  v_gen_count    int := 0;
+  v_expire_count int := 0;
+  v_student      record;
+  v_target_date  date;
+begin
+  select * into v_settings from public.school_settings where id = 1;
+  if not found then
+    return jsonb_build_object('error', 'school_settings no encontrado');
+  end if;
+
+  -- A. Generar cuotas del pr�ximo mes
+  if v_today >= v_settings.generation_day then
+    v_next_month := extract(month from current_date)::int + 1;
+    v_next_year  := extract(year  from current_date)::int;
+    if v_next_month > 12 then v_next_month := 1; v_next_year := v_next_year + 1; end if;
+    v_target_date := make_date(v_next_year, v_next_month, v_settings.due_day);
+
+    for v_student in
+      select id, monthly_fee from public.students where is_active = true and monthly_fee > 0
+    loop
+      if not exists (
+        select 1 from public.payments
+        where student_id = v_student.id
+          and month_paid = to_char(v_target_date, 'FMMonth')
+      ) then
+        insert into public.payments (student_id, amount, status, due_date, month_paid)
+        values (v_student.id, v_student.monthly_fee, 'pending',
+                v_target_date, to_char(v_target_date, 'FMMonth'));
+        v_gen_count := v_gen_count + 1;
+      end if;
+    end loop;
+  end if;
+
+  -- B. Marcar vencidos
+  with upd as (
+    update public.payments set status = 'overdue'
+    where status = 'pending' and due_date < current_date
+    returning 1
+  )
+  select count(*) into v_expire_count from upd;
+
+  return jsonb_build_object('generated', v_gen_count, 'expired', v_expire_count);
+end;
+$$;
+
+-- 6.2 KPIs del dashboard
+create or replace function public.get_dashboard_kpis(p_month text default '%')
+returns jsonb language plpgsql security definer as $$
+declare
+  v_students   int; v_teachers int; v_classrooms int;
+  v_attendance int; v_pending   numeric; v_incidents int;
+begin
+  select count(*) into v_students   from public.students  where is_active = true;
+  select count(*) into v_teachers   from public.profiles  where role = 'maestra';
+  select count(*) into v_classrooms from public.classrooms;
+  select count(*) into v_attendance from public.attendance
+    where date = current_date and status in ('present','presente');
+  select coalesce(sum(amount),0) into v_pending from public.payments
+    where status in ('pending','pendiente') and month_paid ilike p_month;
+  select count(*) into v_incidents from public.inquiries where status = 'pending';
 
   return jsonb_build_object(
-    'total_students', v_total_students,
-    'total_teachers', v_total_teachers,
-    'active_classrooms', v_active_classrooms,
-    'attendance_today', v_attendance_today,
-    'pending_payments', v_pending_payments,
-    'active_incidents', v_active_incidents
+    'total',            v_students,
+    'active',           v_students,
+    'teachers',         v_teachers,
+    'classrooms',       v_classrooms,
+    'attendance_today', v_attendance,
+    'pending_payments', v_pending,
+    'pending_amount',   v_pending,
+    'inquiries',        v_incidents
   );
 end;
 $$;
 
--- Buscar o crear conversación privada entre dos usuarios
-create or replace function public.find_or_create_private_conversation(p_user1 uuid, p_user2 uuid)
-returns bigint
-language plpgsql
-security definer
-as $$
-declare
-  v_conv_id bigint;
+-- 6.3 Tendencia de asistencia �ltimos 7 d�as
+create or replace function public.attendance_last_7_days()
+returns table (date date, present integer, absent integer, late integer)
+language sql stable security definer set search_path = public as $$
+  select
+    a.date,
+    count(*) filter (where a.status in ('present','presente'))::integer,
+    count(*) filter (where a.status in ('absent','ausente'))::integer,
+    count(*) filter (where a.status in ('late','tarde'))::integer
+  from public.attendance a
+  where a.date >= current_date - interval '7 days'
+  group by a.date order by a.date desc;
+$$;
+
+-- 6.4 Resumen financiero del mes
+create or replace function public.financial_summary_month(
+  p_year  integer default extract(year  from now())::integer,
+  p_month integer default extract(month from now())::integer
+)
+returns table (total_invoiced numeric, total_paid numeric, total_pending numeric, percentagePaid numeric)
+language sql stable security definer set search_path = public as $$
+  select
+    coalesce(sum(amount), 0)::numeric,
+    coalesce(sum(amount) filter (where status in ('paid','pagado')), 0)::numeric,
+    coalesce(sum(amount) filter (where status in ('pending','pendiente')), 0)::numeric,
+    case when coalesce(sum(amount),0) > 0
+      then round(coalesce(sum(amount) filter (where status in ('paid','pagado')),0)
+                 / sum(amount) * 100, 2)
+      else 0 end::numeric
+  from public.payments
+  where extract(year  from due_date) = p_year
+    and extract(month from due_date) = p_month;
+$$;
+
+-- 6.5 Reporte financiero por aula
+create or replace function public.get_monthly_financial_report_by_classroom(p_month text)
+returns table (classroom_name text, total_expected numeric, total_paid numeric, total_pending numeric)
+language plpgsql security definer as $$
 begin
-  -- 1. Intentar encontrar conversación existente
+  return query
+  select c.name,
+    coalesce(sum(p.amount), 0),
+    coalesce(sum(p.amount) filter (where p.status in ('paid','pagado')), 0),
+    coalesce(sum(p.amount) filter (where p.status in ('pending','pendiente')), 0)
+  from public.classrooms c
+  left join public.students s on s.classroom_id = c.id
+  left join public.payments p on p.student_id = s.id and p.month_paid = p_month
+  group by c.name order by c.name;
+end;
+$$;
+
+-- 6.6 Deuda total de un estudiante
+create or replace function public.get_student_total_debt(p_student_id bigint)
+returns numeric language plpgsql security definer as $$
+declare v_debt numeric;
+begin
+  select coalesce(sum(amount),0) into v_debt
+  from public.payments
+  where student_id = p_student_id and status in ('pending','pendiente','overdue');
+  return v_debt;
+end;
+$$;
+
+-- 6.7 Buscar o crear conversaci�n privada
+create or replace function public.find_or_create_private_conversation(p_user1 uuid, p_user2 uuid)
+returns bigint language plpgsql security definer set search_path = public as $$
+declare v_conv_id bigint;
+begin
   select c.id into v_conv_id
-  from conversations c
-  join conversation_participants cp1 on c.id = cp1.conversation_id
-  join conversation_participants cp2 on c.id = cp2.conversation_id
-  where c.type = 'private'
-    and cp1.user_id = p_user1
-    and cp2.user_id = p_user2
+  from public.conversations c
+  join public.conversation_participants cp1 on c.id = cp1.conversation_id
+  join public.conversation_participants cp2 on c.id = cp2.conversation_id
+  where c.type in ('direct_message','private')
+    and cp1.user_id = p_user1 and cp2.user_id = p_user2
   limit 1;
 
-  if v_conv_id is not null then
-    return v_conv_id;
-  end if;
+  if v_conv_id is not null then return v_conv_id; end if;
 
-  -- 2. Si no existe, crearla
-  insert into conversations (type) values ('private') returning id into v_conv_id;
-  
-  -- Añadir participantes
-  insert into conversation_participants (conversation_id, user_id)
-  values (v_conv_id, p_user1), (v_conv_id, p_user2);
+  insert into public.conversations (type, updated_at)
+  values ('direct_message', now()) returning id into v_conv_id;
+
+  insert into public.conversation_participants (conversation_id, user_id)
+  values (v_conv_id, p_user1), (v_conv_id, p_user2)
+  on conflict do nothing;
 
   return v_conv_id;
 end;
 $$;
 
--- Grant execute access to find_or_create_private_conversation
-grant execute on function public.find_or_create_private_conversation to authenticated;
-grant execute on function public.find_or_create_private_conversation to anon;
-grant execute on function public.find_or_create_private_conversation to service_role;
-
--- 7. RPCs CHAT OPTIMIZADO
--- -----------------------------------------------------------------------------
-
--- Obtener mensajes de chat directo (privado) entre usuario autenticado y otro usuario
+-- 6.8 Mensajes directos entre dos usuarios
 create or replace function public.get_direct_messages(p_other_user_id uuid)
-returns table (
-  id bigint,
-  content text,
-  sender_id uuid,
-  created_at timestamp with time zone,
-  is_read boolean,
-  conversation_id bigint
-)
-language plpgsql
-security definer
-set search_path = public
-as $$
-declare
-  v_conv_id bigint;
+returns table (id bigint, content text, sender_id uuid,
+               created_at timestamp with time zone, is_read boolean, conversation_id bigint)
+language plpgsql security definer set search_path = public as $$
+declare v_conv_id bigint;
 begin
-  -- Buscar conversación privada compartida
   select c.id into v_conv_id
-  from conversations c
-  join conversation_participants cp1 on c.id = cp1.conversation_id
-  join conversation_participants cp2 on c.id = cp2.conversation_id
-  where c.type = 'private'
-    and cp1.user_id = auth.uid()
-    and cp2.user_id = p_other_user_id
+  from public.conversations c
+  join public.conversation_participants cp1 on c.id = cp1.conversation_id
+  join public.conversation_participants cp2 on c.id = cp2.conversation_id
+  where c.type in ('direct_message','private')
+    and cp1.user_id = auth.uid() and cp2.user_id = p_other_user_id
   limit 1;
 
   if v_conv_id is not null then
     return query
     select m.id, m.content, m.sender_id, m.created_at, m.is_read, m.conversation_id
-    from messages m
+    from public.messages m
     where m.conversation_id = v_conv_id
     order by m.created_at asc;
   end if;
 end;
 $$;
 
--- Obtener conteo de mensajes no leídos por remitente
+-- 6.9 Conteo de mensajes no le�dos por remitente
 create or replace function public.get_unread_counts()
-returns jsonb
-language sql
-security definer
-set search_path = public
-as $$
-  select jsonb_object_agg(sender_id, count)
+returns jsonb language sql security definer set search_path = public as $$
+  select coalesce(jsonb_object_agg(sender_id::text, cnt), '{}'::jsonb)
   from (
-    select m.sender_id, count(*) as count
-    from messages m
-    join conversation_participants cp on cp.conversation_id = m.conversation_id
+    select m.sender_id, count(*) as cnt
+    from public.messages m
+    join public.conversation_participants cp on cp.conversation_id = m.conversation_id
     where cp.user_id = auth.uid()
       and m.sender_id != auth.uid()
       and m.is_read = false
@@ -1511,566 +1198,20 @@ as $$
   ) t;
 $$;
 
--- Marcar mensajes como leídos en una conversación
+-- 6.10 Marcar conversaci�n como le�da
 create or replace function public.mark_conversation_read(p_conversation_id bigint)
-returns void
-language sql
-security definer
-set search_path = public
-as $$
-  update messages
-  set is_read = true
-  where conversation_id = p_conversation_id
-    and sender_id != auth.uid()
-    and is_read = false;
-$$;
-
-grant execute on function public.get_direct_messages to authenticated;
-grant execute on function public.get_unread_counts to authenticated;
-grant execute on function public.mark_conversation_read to authenticated;
-
--- 6. ÍNDICES PARA MEJORA DE RENDIMIENTO
--- -----------------------------------------------------------------------------
-create index if not exists idx_students_parent on public.students(parent_id);
-create index if not exists idx_students_classroom on public.students(classroom_id);
-create index if not exists idx_posts_classroom on public.posts(classroom_id);
-create index if not exists idx_comments_post on public.comments(post_id);
-create index if not exists idx_likes_post on public.likes(post_id);
-create index if not exists idx_messages_sender on public.messages(sender_id);
-create index if not exists idx_messages_conversation on public.messages(conversation_id);
-create index if not exists idx_payments_student on public.payments(student_id);
-
--- 7. RPCs CHAT OPTIMIZADO
--- -----------------------------------------------------------------------------
-
--- Obtener mensajes de chat directo (privado) entre usuario autenticado y otro usuario
-create or replace function public.get_direct_messages(p_other_user_id uuid)
-returns table (
-  id bigint,
-  content text,
-  sender_id uuid,
-  created_at timestamp with time zone,
-  is_read boolean,
-  conversation_id bigint
-)
-language plpgsql
-security definer
-set search_path = public
-as $$
-declare
-  v_conv_id bigint;
-begin
-  -- Buscar conversación privada compartida
-  select c.id into v_conv_id
-  from conversations c
-  join conversation_participants cp1 on c.id = cp1.conversation_id
-  join conversation_participants cp2 on c.id = cp2.conversation_id
-  where c.type = 'private'
-    and cp1.user_id = auth.uid()
-    and cp2.user_id = p_other_user_id
-  limit 1;
-
-  if v_conv_id is not null then
-    return query
-    select m.id, m.content, m.sender_id, m.created_at, m.is_read, m.conversation_id
-    from messages m
-    where m.conversation_id = v_conv_id
-    order by m.created_at asc;
-  end if;
-end;
-$$;
-
-
--- Marcar mensajes como leídos en una conversación
-create or replace function public.mark_conversation_read(p_conversation_id bigint)
-returns void
-language sql
-security definer
-set search_path = public
-as $$
-  update messages
-  set is_read = true
-  where conversation_id = p_conversation_id
-    and sender_id != auth.uid()
-    and is_read = false;
-$$;
-
--- 8. RPCs DASHBOARD DIRECTORA
--- -----------------------------------------------------------------------------
-
--- 📊 RPC: Tendencia de asistencia últimos 7 días
-create or replace function public.attendance_last_7_days()
-returns table (
-  date date,
-  present integer,
-  absent integer,
-  late integer
-)
-language sql
-stable
-security definer
-set search_path = public
-as $$
-  select
-    a.date,
-    count(*) filter (where a.status = 'present') as present,
-    count(*) filter (where a.status = 'absent') as absent,
-    count(*) filter (where a.status = 'late') as late
-  from attendance a
-  where a.date >= current_date - interval '7 days'
-    and a.date <= current_date
-  group by a.date
-  order by a.date desc;
-$$;
-
--- 💰 RPC: Resumen financiero del mes
-create or replace function public.financial_summary_month(
-  p_year integer default extract(year from now())::integer,
-  p_month integer default extract(month from now())::integer
-)
-returns table (
-  total_invoiced numeric,
-  total_paid numeric,
-  total_pending numeric,
-  percentagePaid numeric
-)
-language sql
-stable
-security definer
-set search_path = public
-as $$
-  select
-    coalesce(sum(amount), 0)::numeric as total_invoiced,
-    coalesce(sum(amount) filter (where status = 'paid'), 0)::numeric as total_paid,
-    coalesce(sum(amount) filter (where status = 'pending'), 0)::numeric as total_pending,
-    case
-      when coalesce(sum(amount), 0) > 0 
-      then round((coalesce(sum(amount) filter (where status = 'paid'), 0) / sum(amount)) * 100, 2)
-      else 0
-    end::numeric as percentagePaid
-  from payments
-  where extract(year from due_date) = p_year
-    and extract(month from due_date) = p_month;
-$$;
-
-
--- Verificar que RPCs existen
-SELECT routine_name FROM information_schema.routines 
-WHERE routine_name IN ('attendance_last_7_days', 'financial_summary_month');
-
--- Prueba rápida
-SELECT * FROM attendance_last_7_days() LIMIT 5;
-SELECT * FROM financial_summary_month();
-
--- Agregar columna images si no existe
-ALTER TABLE public.posts ADD COLUMN IF NOT EXISTS images TEXT[] DEFAULT '{}';
-
--- (Opcional) Migrar datos antiguos si tenías image_url antes
--- UPDATE public.posts SET images = ARRAY[image_url] WHERE image_url IS NOT NULL AND images = '{}';
--- ALTER TABLE public.posts DROP COLUMN IF EXISTS image_url;
--- 1. TABLA DE CONFIGURACIÓN GLOBAL
-create table if not exists public.school_settings (
-  id int primary key default 1, -- Singleton pattern
-  generation_day int default 25,
-  due_day int default 5,
-  updated_at timestamp with time zone default now()
-);
-
--- RLS para settings
-alter table public.school_settings enable row level security;
-drop policy if exists "Solo directores editan config" on public.school_settings;
-create policy "Solo directores editan config" on public.school_settings 
-  for all using (get_my_role() in ('directora', 'admin'));
-
--- 2. FUNCIÓN INTELIGENTE: CICLO DE PAGOS (El Cerebro)
--- Esta función hace 3 cosas:
--- A. Genera pagos del próximo mes si hoy es >= día de generación
--- B. Marca como VENCIDOS los pagos pendientes que pasaron el día límite
--- C. Retorna estadísticas de lo que hizo
-create or replace function public.run_payment_cycle()
-returns jsonb
-language plpgsql
-security definer
-as $$
-declare
-  v_settings record;
-  v_today int := extract(day from current_date);
-  v_next_month int;
-  v_next_year int;
-  v_gen_count int := 0;
-  v_expire_count int := 0;
-  v_student record;
-  v_target_date date;
-begin
-  -- Obtener configuración
-  select * into v_settings from public.school_settings where id = 1;
-  if not found then
-    -- Usar una tabla temporal o valores fijos para asegurar que los campos existan
-    return jsonb_build_object('error', 'No se encontró la configuración en school_settings con id = 1');
-  end if;
-
-  -- A. GENERACIÓN DE CUOTAS (Si es día de generación o posterior)
-  if v_today >= v_settings.generation_day then
-    v_next_month := extract(month from current_date) + 1;
-    v_next_year := extract(year from current_date);
-    
-    if v_next_month > 12 then
-      v_next_month := 1;
-      v_next_year := v_next_year + 1;
-    end if;
-    
-    v_target_date := make_date(v_next_year, v_next_month, v_settings.due_day);
-
-    -- Loop para generar (Solo si no existe ya)
-    for v_student in select id, monthly_fee from public.students where is_active = true and monthly_fee > 0 loop
-      if not exists (
-        select 1 from public.payments 
-        where student_id = v_student.id 
-        and (
-          (extract(month from due_date) = v_next_month and extract(year from due_date) = v_next_year)
-          or month_paid = to_char(v_target_date, 'FMMonth')
-        )
-      ) then
-        insert into public.payments (student_id, amount, status, due_date, month_paid)
-        values (v_student.id, v_student.monthly_fee, 'pending', v_target_date, to_char(v_target_date, 'FMMonth'));
-        v_gen_count := v_gen_count + 1;
-      end if;
-    end loop;
-  end if;
-
-  -- B. VENCIMIENTO DE PAGOS (Inteligente)
-  -- Busca pagos 'pending' o 'review' cuya fecha límite ya pasó
-  with updated_rows as (
-    update public.payments
-    set status = 'overdue'
-    where status in ('pending') 
-    and due_date < current_date
-    returning 1
-  )
-  select count(*) into v_expire_count from updated_rows;
-
-  return jsonb_build_object('generated', v_gen_count, 'expired', v_expire_count);
-end;
-$$;
-
--- 🛠️ CORRECCIONES DE SCHEMA PARA EVITAR ERRORES 400
-
--- 1. Arreglar tabla TASKS (Error al guardar tarea)
--- Agrega las columnas que el JS está enviando pero la DB no tiene
-ALTER TABLE public.tasks 
-ADD COLUMN IF NOT EXISTS teacher_id uuid references public.profiles(id),
-ADD COLUMN IF NOT EXISTS grading_system text DEFAULT 'letter_stars',
-ADD COLUMN IF NOT EXISTS file_url text;
-
--- 2. Arreglar tabla DAILY_LOGS (Error al guardar rutina)
--- Asegura compatibilidad entre 'sleeping' y 'nap'
-ALTER TABLE public.daily_logs
-ADD COLUMN IF NOT EXISTS nap text,
-ADD COLUMN IF NOT EXISTS eating text,
-ADD COLUMN IF NOT EXISTS sleeping text, -- Agregamos sleeping para que no falle si el JS lo envía
-ADD COLUMN IF NOT EXISTS activities text,
-ADD COLUMN IF NOT EXISTS notes text; -- 🔥 FIX: Agregar columna notes solicitada
-
--- 3. Arreglar permisos (Por si acaso es un error 403 disfrazado)
-GRANT ALL ON public.tasks TO authenticated;
-GRANT ALL ON public.daily_logs TO authenticated;
-
--- 4. Asegurar tabla de incidencias
-ALTER TABLE public.incidents ADD COLUMN IF NOT EXISTS teacher_id uuid references public.profiles(id) on delete set null;
-
--- Inicializar configuración escolar (Evita Error 406 al consultar configuración vacía)
-INSERT INTO public.school_settings (id, generation_day, due_day)
-VALUES (1, 25, 5)
-ON CONFLICT (id) DO NOTHING;
-
--- ============================================================
--- SISTEMA DE CALIFICACIONES KARPUS KIDS
--- Ejecutar en Supabase SQL Editor
--- ============================================================
-
--- 1. PERIODOS ACADÉMICOS
-create table if not exists public.periods (
-  id bigint generated by default as identity primary key,
-  name text not null,                          -- "Trimestre 1", "Trimestre 2"
-  start_date date not null,
-  end_date date not null,
-  status text default 'open' check (status in ('open', 'closed')),
-  is_active boolean default false,
-  classroom_id bigint references public.classrooms(id) on delete cascade,
-  created_at timestamp with time zone default now()
-);
-alter table public.periods enable row level security;
-drop policy if exists "Staff gestiona periodos" on public.periods;
-create policy "Staff gestiona periodos" on public.periods for all
-  using (get_my_role() in ('directora', 'asistente', 'maestra'));
-drop policy if exists "Padres ven periodos" on public.periods;
-create policy "Padres ven periodos" on public.periods for select
-  using (get_my_role() = 'padre');
-
--- 2. CALIFICACIONES FORMALES (por materia/periodo)
-alter table public.grades add column if not exists period_id bigint references public.periods(id);
-alter table public.grades add column if not exists subject text;
-alter table public.grades add column if not exists score numeric(4,2);
-alter table public.grades add column if not exists teacher_id uuid references public.profiles(id) on delete set null;
-alter table public.grades add column if not exists notes text;
-
--- 3. BOLETINES FINALES
-create table if not exists public.report_cards (
-  id bigint generated by default as identity primary key,
-  student_id bigint references public.students(id) on delete cascade,
-  classroom_id bigint references public.classrooms(id),
-  period_id bigint references public.periods(id),
-  task_avg numeric(4,2),          -- Promedio de task_evidences (70%)
-  formal_avg numeric(4,2),        -- Promedio de grades (30%)
-  final_score numeric(4,2),       -- (task_avg * 0.7) + (formal_avg * 0.3)
-  level text,                     -- Excelente / Bueno / En proceso / Requiere apoyo
-  teacher_comment text,
-  generated_at timestamp with time zone default now(),
-  unique(student_id, period_id)
-);
-alter table public.report_cards enable row level security;
-drop policy if exists "Staff ve boletines" on public.report_cards;
-create policy "Staff ve boletines" on public.report_cards for all
-  using (get_my_role() in ('directora', 'asistente', 'maestra'));
-drop policy if exists "Padres ven sus boletines" on public.report_cards;
-create policy "Padres ven sus boletines" on public.report_cards for select
-  using (exists (select 1 from public.students where id = report_cards.student_id and parent_id = auth.uid()));
-
--- 4. FUNCIÓN: Calcular y guardar boletín de un estudiante en un periodo
-create or replace function public.generate_report_card(p_student_id bigint, p_period_id bigint)
-returns jsonb language plpgsql security definer as $$
-declare
-  v_period record;
-  v_task_avg numeric := 0;
-  v_formal_avg numeric := 0;
-  v_final numeric := 0;
-  v_level text;
-  v_classroom_id bigint;
-  v_count int;
-begin
-  -- Verificar que el periodo existe
-  select * into v_period from public.periods where id = p_period_id;
-  if not found then
-    return jsonb_build_object('error', 'Periodo no encontrado');
-  end if;
-
-  -- Obtener classroom_id del estudiante
-  select classroom_id into v_classroom_id from public.students where id = p_student_id;
-
-  -- Calcular promedio de tareas (task_evidences) en el periodo
-  select coalesce(avg(
-    case
-      when stars is not null then stars::numeric
-      when grade_letter = 'A' then 5
-      when grade_letter = 'B' then 4
-      when grade_letter = 'C' then 3
-      when grade_letter = 'D' then 2
-      else null
-    end
-  ), 0), count(*) into v_task_avg, v_count
-  from public.task_evidences te
-  join public.tasks t on t.id = te.task_id
-  where te.student_id = p_student_id
-    and t.created_at between v_period.start_date and v_period.end_date;
-
-  -- Calcular promedio de calificaciones formales
-  select coalesce(avg(score), 0) into v_formal_avg
-  from public.grades
-  where student_id = p_student_id and period_id = p_period_id;
-
-  -- Nota final ponderada
-  v_final := (v_task_avg * 0.7) + (v_formal_avg * 0.3);
-
-  -- Nivel
-  v_level := case
-    when v_final >= 4.5 then 'Excelente'
-    when v_final >= 3.5 then 'Bueno'
-    when v_final >= 2.5 then 'En proceso'
-    else 'Requiere apoyo'
-  end;
-
-  -- Guardar o actualizar boletín
-  insert into public.report_cards (student_id, classroom_id, period_id, task_avg, formal_avg, final_score, level, generated_at)
-  values (p_student_id, v_classroom_id, p_period_id, v_task_avg, v_formal_avg, v_final, v_level, now())
-  on conflict (student_id, period_id) do update
-    set task_avg = excluded.task_avg,
-        formal_avg = excluded.formal_avg,
-        final_score = excluded.final_score,
-        level = excluded.level,
-        generated_at = now();
-
-  return jsonb_build_object(
-    'student_id', p_student_id,
-    'period_id', p_period_id,
-    'task_avg', v_task_avg,
-    'formal_avg', v_formal_avg,
-    'final_score', v_final,
-    'level', v_level
-  );
-end;
-$$;
-
--- 5. FUNCIÓN: Cerrar periodo (genera todos los boletines + bloquea edición)
-create or replace function public.close_period(p_period_id bigint)
-returns jsonb language plpgsql security definer as $$
-declare
-  v_student record;
-  v_count int := 0;
-  v_period record;
-begin
-  select * into v_period from public.periods where id = p_period_id;
-  if not found then return jsonb_build_object('error', 'Periodo no encontrado'); end if;
-  if v_period.status = 'closed' then return jsonb_build_object('error', 'El periodo ya está cerrado'); end if;
-
-  -- Generar boletín para cada estudiante del aula
-  for v_student in
-    select id from public.students
-    where classroom_id = v_period.classroom_id and is_active = true
-  loop
-    perform public.generate_report_card(v_student.id, p_period_id);
-    v_count := v_count + 1;
-  end loop;
-
-  -- Cerrar el periodo
-  update public.periods set status = 'closed' where id = p_period_id;
-
-  return jsonb_build_object('success', true, 'report_cards_generated', v_count);
-end;
-$$;
-
--- Permisos
-grant execute on function public.generate_report_card to authenticated;
-grant execute on function public.close_period to authenticated;
-
--- ============================================================
--- 🔒 MEJORAS DE SEGURIDAD — PRODUCCIÓN REAL
--- Ejecutar en Supabase SQL Editor
--- ============================================================
-
--- 1. RLS: Padres solo ven pagos de SUS hijos
-drop policy if exists "Padres ven sus pagos" on public.payments;
-create policy "Padres ven sus pagos" on public.payments
-  for select using (
-    exists (
-      select 1 from public.students
-      where students.id = payments.student_id
-        and students.parent_id = auth.uid()
-    )
-  );
-
--- 2. RLS: Padres solo insertan pagos de SUS hijos
-drop policy if exists "Padres insertan sus pagos" on public.payments;
-create policy "Padres insertan sus pagos" on public.payments
-  for insert with check (
-    exists (
-      select 1 from public.students
-      where students.id = payments.student_id
-        and students.parent_id = auth.uid()
-    )
-  );
-
--- 3. RLS: Staff (directora/asistente) gestiona todos los pagos
-drop policy if exists "Staff gestiona pagos" on public.payments;
-create policy "Staff gestiona pagos" on public.payments
-  for all using (
-    get_my_role() in ('directora', 'asistente')
-  );
-
--- 4. RLS: Padres solo ven asistencia de SUS hijos
-drop policy if exists "Padres ven asistencia de sus hijos" on public.attendance;
-create policy "Padres ven asistencia de sus hijos" on public.attendance
-  for select using (
-    exists (
-      select 1 from public.students
-      where students.id = attendance.student_id
-        and students.parent_id = auth.uid()
-    )
-  );
-
--- 5. RLS: Padres solo ven evidencias de SUS hijos
-drop policy if exists "Padres ven evidencias de sus hijos" on public.task_evidences;
-create policy "Padres ven evidencias de sus hijos" on public.task_evidences
-  for select using (
-    auth.uid() = parent_id
-    or exists (
-      select 1 from public.students
-      where students.id = task_evidences.student_id
-        and students.parent_id = auth.uid()
-    )
-  );
-
--- 6. Tabla para registrar aceptación de términos
-create table if not exists public.terms_acceptance (
-  id bigint generated by default as identity primary key,
-  user_id uuid references auth.users(id) on delete cascade not null,
-  accepted_at timestamp with time zone default now() not null,
-  terms_version text default '1.0' not null,
-  ip_address text,
-  unique(user_id, terms_version)
-);
-alter table public.terms_acceptance enable row level security;
-drop policy if exists "Usuarios ven su propia aceptacion" on public.terms_acceptance;
-create policy "Usuarios ven su propia aceptacion" on public.terms_acceptance
-  for all using (auth.uid() = user_id);
-
--- 7. Índices para mejorar performance de queries frecuentes
-create index if not exists idx_payments_student_created on public.payments(student_id, created_at desc);
-create index if not exists idx_attendance_student_date on public.attendance(student_id, date desc);
-create index if not exists idx_task_evidences_student on public.task_evidences(student_id, created_at desc);
-create index if not exists idx_posts_classroom_created on public.posts(classroom_id, created_at desc);
-
--- ============================================================
--- 🔔 FIX: Agregar columna is_read a messages
--- Ejecutar en Supabase SQL Editor
--- ============================================================
-alter table public.messages add column if not exists is_read boolean default false;
-
--- Índice para queries de mensajes no leídos
-create index if not exists idx_messages_receiver_unread on public.messages(receiver_id, is_read, created_at desc);
-
--- Función para marcar mensajes como leídos
-create or replace function public.mark_messages_read(p_receiver_id uuid, p_sender_id uuid)
-returns void language plpgsql security definer as $$
-begin
+returns void language sql security definer set search_path = public as $$
   update public.messages
   set is_read = true
-  where receiver_id = p_receiver_id
-    and sender_id = p_sender_id
+  where conversation_id = p_conversation_id
+    and sender_id != auth.uid()
     and is_read = false;
-end;
 $$;
 
--- ============================================================
--- 🔔 SISTEMA DE NOTIFICACIONES Y TÉRMINOS — PRODUCCIÓN REAL
--- Ejecutar en Supabase SQL Editor
--- ============================================================
-
--- 1. Tabla system_events (para process-event Edge Function)
-create table if not exists public.system_events (
-  id bigint generated by default as identity primary key,
-  type text not null,
-  payload jsonb,
-  status text default 'pending' check (status in ('pending','processing','completed','failed')),
-  processed_at timestamp with time zone,
-  created_at timestamp with time zone default now()
-);
-alter table public.system_events enable row level security;
-drop policy if exists "Solo staff ve eventos" on public.system_events;
-create policy "Solo staff ve eventos" on public.system_events
-  for all using (get_my_role() in ('directora','asistente'));
-
--- 2. Asegurar columna is_read en notifications
-alter table public.notifications add column if not exists is_read boolean default false;
-alter table public.notifications add column if not exists link text;
-
--- 3. RPC send_notification (usada por send-push como fallback)
-DROP FUNCTION IF EXISTS public.send_notification(uuid, text, text, text, text);
+-- 6.11 Insertar notificaci�n (usada por Edge Functions)
 create or replace function public.send_notification(
-  p_user_id uuid,
-  p_title   text,
-  p_message text,
-  p_type    text default 'info',
-  p_link    text default null
+  p_user_id uuid, p_title text, p_message text,
+  p_type text default 'info', p_link text default null
 )
 returns void language plpgsql security definer as $$
 begin
@@ -2079,397 +1220,157 @@ begin
 end;
 $$;
 
--- 4. Índice para notificaciones no leídas
-create index if not exists idx_notifications_user_unread
-  on public.notifications(user_id, is_read, created_at desc);
-
--- 5. Política RLS para notifications
-drop policy if exists "Usuarios ven sus notificaciones" on public.notifications;
-create policy "Usuarios ven sus notificaciones" on public.notifications
-  for all using (auth.uid() = user_id);
-
--- 6. Tabla terms_acceptance (ya existe, asegurar estructura)
-create table if not exists public.terms_acceptance (
-  id bigint generated by default as identity primary key,
-  user_id uuid references auth.users(id) on delete cascade not null,
-  accepted_at timestamp with time zone default now() not null,
-  terms_version text default '1.0' not null,
-  unique(user_id, terms_version)
-);
-alter table public.terms_acceptance enable row level security;
-drop policy if exists "Usuarios ven su aceptacion" on public.terms_acceptance;
-create policy "Usuarios ven su aceptacion" on public.terms_acceptance
-  for all using (auth.uid() = user_id);
-
--- 7. Variables de entorno requeridas en Supabase Dashboard > Edge Functions > Secrets:
--- RESEND_API_KEY       = re_xxxxxxxxxxxx  (de resend.com)
--- ONESIGNAL_APP_ID     = 47ce2d1e-152e-4ea7-9ddc-8e2142992989
--- ONESIGNAL_REST_API_KEY = (de onesignal.com > Settings > Keys & IDs)
-
--- ============================================================
--- FIX: Infinite recursion in conversation_participants RLS
--- Run this in Supabase SQL Editor → New Query → Run
--- ============================================================
-
--- Step 1: Helper function that bypasses RLS (SECURITY DEFINER)
-create or replace function public.user_is_participant(p_conversation_id bigint, p_user_id uuid)
-returns boolean
-language sql
-security definer
-stable
-set search_path = public
-as $$
-  select exists (
-    select 1 from public.conversation_participants
-    where conversation_id = p_conversation_id
-      and user_id = p_user_id
-  );
-$$;
-
-grant execute on function public.user_is_participant to authenticated;
-
--- Step 2: Drop ALL existing policies on the 3 chat tables
-do $$
-declare pol record;
-begin
-  for pol in
-    select policyname, tablename
-    from pg_policies
-    where tablename in ('conversations','conversation_participants','messages')
-      and schemaname = 'public'
-  loop
-    execute format('drop policy if exists %I on public.%I', pol.policyname, pol.tablename);
-  end loop;
-end;
-$$;
-
--- Step 3: conversations policies
-create policy "conv_select" on public.conversations
-  for select using (
-    public.get_my_role() = 'directora'
-    or public.user_is_participant(id, auth.uid())
-  );
-
-create policy "conv_insert" on public.conversations
-  for insert with check (auth.role() = 'authenticated');
-
-create policy "conv_update" on public.conversations
-  for update using (public.user_is_participant(id, auth.uid()));
-
--- Step 4: conversation_participants policies (NO self-reference)
-create policy "cp_select" on public.conversation_participants
-  for select using (
-    public.get_my_role() = 'directora'
-    or user_id = auth.uid()
-  );
-
-create policy "cp_insert" on public.conversation_participants
-  for insert with check (auth.role() = 'authenticated');
-
-create policy "cp_delete" on public.conversation_participants
-  for delete using (user_id = auth.uid());
-
--- Step 5: messages policies (use helper, not direct subquery)
-create policy "msg_select" on public.messages
-  for select using (
-    public.get_my_role() = 'directora'
-    or public.user_is_participant(conversation_id, auth.uid())
-  );
-
-create policy "msg_insert" on public.messages
-  for insert with check (
-    auth.uid() = sender_id
-    and public.user_is_participant(conversation_id, auth.uid())
-  );
-
-create policy "msg_update" on public.messages
-  for update using (
-    public.get_my_role() in ('directora','maestra','asistente')
-    or sender_id = auth.uid()
-  );
-
--- Step 6: Rewrite find_or_create_private_conversation as SECURITY DEFINER
--- so it can insert participants without RLS blocking it
-create or replace function public.find_or_create_private_conversation(p_user1 uuid, p_user2 uuid)
-returns bigint
-language plpgsql
-security definer
-set search_path = public
-as $$
+-- 6.12 Generar bolet�n de un estudiante
+create or replace function public.generate_report_card(p_student_id bigint, p_period_id bigint)
+returns jsonb language plpgsql security definer as $$
 declare
-  v_conv_id bigint;
+  v_period       record;
+  v_task_avg     numeric := 0;
+  v_formal_avg   numeric := 0;
+  v_final        numeric := 0;
+  v_level        text;
+  v_classroom_id bigint;
 begin
-  select c.id into v_conv_id
-  from conversations c
-  join conversation_participants cp1 on c.id = cp1.conversation_id
-  join conversation_participants cp2 on c.id = cp2.conversation_id
-  where c.type in ('direct_message', 'private')
-    and cp1.user_id = p_user1
-    and cp2.user_id = p_user2
-  limit 1;
+  select * into v_period from public.periods where id = p_period_id;
+  if not found then return jsonb_build_object('error','Periodo no encontrado'); end if;
 
-  if v_conv_id is not null then
-    return v_conv_id;
-  end if;
+  select classroom_id into v_classroom_id from public.students where id = p_student_id;
 
-  insert into conversations (type, updated_at)
-  values ('direct_message', now())
-  returning id into v_conv_id;
+  select coalesce(avg(
+    case when stars is not null then stars::numeric
+         when grade_letter = 'A' then 5
+         when grade_letter = 'B' then 4
+         when grade_letter = 'C' then 3
+         when grade_letter = 'D' then 2
+         else null end
+  ), 0) into v_task_avg
+  from public.task_evidences te
+  join public.tasks t on t.id = te.task_id
+  where te.student_id = p_student_id
+    and t.created_at between v_period.start_date and v_period.end_date;
 
-  insert into conversation_participants (conversation_id, user_id)
-  values (v_conv_id, p_user1), (v_conv_id, p_user2)
-  on conflict (conversation_id, user_id) do nothing;
+  select coalesce(avg(score), 0) into v_formal_avg
+  from public.grades where student_id = p_student_id and period_id = p_period_id;
 
-  return v_conv_id;
+  v_final := (v_task_avg * 0.7) + (v_formal_avg * 0.3);
+  v_level := case
+    when v_final >= 4.5 then 'Excelente'
+    when v_final >= 3.5 then 'Bueno'
+    when v_final >= 2.5 then 'En proceso'
+    else 'Requiere apoyo' end;
+
+  insert into public.report_cards
+    (student_id, classroom_id, period_id, task_avg, formal_avg, final_score, level, generated_at)
+  values (p_student_id, v_classroom_id, p_period_id, v_task_avg, v_formal_avg, v_final, v_level, now())
+  on conflict (student_id, period_id) do update
+    set task_avg = excluded.task_avg, formal_avg = excluded.formal_avg,
+        final_score = excluded.final_score, level = excluded.level, generated_at = now();
+
+  return jsonb_build_object('student_id',p_student_id,'final_score',v_final,'level',v_level);
 end;
 $$;
 
-grant execute on function public.find_or_create_private_conversation to authenticated;
-grant execute on function public.find_or_create_private_conversation to anon;
-grant execute on function public.find_or_create_private_conversation to service_role;
+-- 6.13 Cerrar periodo (genera todos los boletines)
+create or replace function public.close_period(p_period_id bigint)
+returns jsonb language plpgsql security definer as $$
+declare
+  v_period  record;
+  v_student record;
+  v_count   int := 0;
+begin
+  select * into v_period from public.periods where id = p_period_id;
+  if not found then return jsonb_build_object('error','Periodo no encontrado'); end if;
+  if v_period.status = 'closed' then return jsonb_build_object('error','Ya est� cerrado'); end if;
 
+  for v_student in
+    select id from public.students
+    where classroom_id = v_period.classroom_id and is_active = true
+  loop
+    perform public.generate_report_card(v_student.id, p_period_id);
+    v_count := v_count + 1;
+  end loop;
 
--- ============================================================
--- FIX: receiver_id NOT NULL constraint blocks new chat inserts
--- Run this in Supabase SQL Editor
--- ============================================================
-
--- Drop NOT NULL on receiver_id (legacy column, no longer used)
-alter table public.messages alter column receiver_id drop not null;
-
--- Also drop NOT NULL on any other legacy columns that may block inserts
-alter table public.messages alter column conversation_id drop not null;
-alter table public.messages add column if not exists conversation_id bigint references public.conversations(id) on delete cascade;
-
-
--- ============================================================
--- FIX: Padres can read daily_logs for their own children
--- Run in Supabase SQL Editor → New Query → Run
--- ============================================================
-
--- 1. Allow padres to read daily_logs for their own students
-drop policy if exists "Padres leen daily_logs de sus hijos" on public.daily_logs;
-create policy "Padres leen daily_logs de sus hijos" on public.daily_logs
-  for select using (
-    exists (
-      select 1 from public.students s
-      where s.id = daily_logs.student_id
-        and s.parent_id = auth.uid()
-    )
-  );
-
--- 2. Allow directora and asistente to read all daily_logs
-drop policy if exists "Staff lee daily_logs" on public.daily_logs;
-create policy "Staff lee daily_logs" on public.daily_logs
-  for select using (
-    public.get_my_role() in ('directora', 'asistente')
-  );
-
+  update public.periods set status = 'closed' where id = p_period_id;
+  return jsonb_build_object('success', true, 'report_cards_generated', v_count);
+end;
+$$;
 
 -- ============================================================
--- FIX: Add matricula column to students table
--- Run in Supabase SQL Editor
+-- 7. GRANTS
 -- ============================================================
-alter table public.students add column if not exists matricula text;
-create unique index if not exists idx_students_matricula on public.students(matricula) where matricula is not null;
--- ============================================================
--- 🚀 KARPUS KIDS — Production Fixes SQL
--- Ejecutar en Supabase SQL Editor antes del lanzamiento
--- ============================================================
+grant execute on function public.get_my_role()                              to authenticated;
+grant execute on function public.is_teacher_of_classroom(bigint)            to authenticated;
+grant execute on function public.is_parent_of_student(bigint)               to authenticated;
+grant execute on function public.is_parent_of_classroom(bigint)             to authenticated;
+grant execute on function public.is_teacher_of_student(bigint)              to authenticated;
+grant execute on function public.get_my_classroom_ids()                     to authenticated;
+grant execute on function public.user_is_participant(bigint, uuid)          to authenticated;
+grant execute on function public.run_payment_cycle()                        to authenticated;
+grant execute on function public.get_dashboard_kpis(text)                   to authenticated;
+grant execute on function public.attendance_last_7_days()                   to authenticated;
+grant execute on function public.financial_summary_month(integer, integer)  to authenticated;
+grant execute on function public.get_monthly_financial_report_by_classroom(text) to authenticated;
+grant execute on function public.get_student_total_debt(bigint)             to authenticated;
+grant execute on function public.find_or_create_private_conversation(uuid, uuid) to authenticated, anon, service_role;
+grant execute on function public.get_direct_messages(uuid)                  to authenticated;
+grant execute on function public.get_unread_counts()                        to authenticated;
+grant execute on function public.mark_conversation_read(bigint)             to authenticated;
+grant execute on function public.send_notification(uuid, text, text, text, text) to authenticated, service_role;
+grant execute on function public.generate_report_card(bigint, bigint)       to authenticated;
+grant execute on function public.close_period(bigint)                       to authenticated;
 
--- ── 1. Columnas faltantes en payments ────────────────────────
-alter table public.payments add column if not exists bank text;
-alter table public.payments add column if not exists reference text;
-alter table public.payments add column if not exists transfer_date date;
-
--- ── 2. Columnas faltantes en daily_logs ──────────────────────
-alter table public.daily_logs add column if not exists updated_at timestamptz default now();
-alter table public.daily_logs add column if not exists activities text;
-
--- ── 3. Columnas faltantes en profiles ────────────────────────
-alter table public.profiles add column if not exists onesignal_player_id text;
-alter table public.profiles add column if not exists title text;
-alter table public.profiles add column if not exists address text;
-
--- ── 4. Tabla meetings (videollamadas) ────────────────────────
-create table if not exists public.meetings (
-  id          bigint generated by default as identity primary key,
-  title       text not null,
-  description text,
-  room_name   text unique not null,
-  type        text default 'classroom' check (type in ('classroom','private','staff')),
-  target_id   bigint,
-  host_id     uuid references public.profiles(id) on delete set null,
-  status      text default 'scheduled' check (status in ('scheduled','live','ended','cancelled')),
-  start_time  timestamptz,
-  created_at  timestamptz default now()
-);
-alter table public.meetings enable row level security;
-
--- Staff puede gestionar reuniones
-drop policy if exists "staff_manage_meetings" on meetings;
-create policy "staff_manage_meetings" on meetings for all
-  using (exists (
-    select 1 from profiles where id = auth.uid()
-    and role in ('directora','maestra','asistente')
-  ));
-
--- Padres pueden ver reuniones
-drop policy if exists "padre_view_meetings" on meetings;
-create policy "padre_view_meetings" on meetings for select
-  using (auth.uid() is not null);
-
--- ── 5. RLS para daily_logs ────────────────────────────────────
-drop policy if exists "maestra_daily_logs_all" on daily_logs;
-create policy "maestra_daily_logs_all" on daily_logs for all
-  using (
-    exists (
-      select 1 from classrooms
-      where id = daily_logs.classroom_id
-      and teacher_id = auth.uid()
-    )
-  );
-
-drop policy if exists "padre_read_daily_logs" on daily_logs;
-create policy "padre_read_daily_logs" on daily_logs for select
-  using (
-    exists (
-      select 1 from students
-      where id = daily_logs.student_id
-      and parent_id = auth.uid()
-    )
-  );
-
--- ── 6. Índices de rendimiento ─────────────────────────────────
-create index if not exists idx_payments_student_due
-  on payments(student_id, due_date);
-
-create index if not exists idx_payments_status_month
-  on payments(status, month_paid);
-
-create index if not exists idx_daily_logs_student_date
-  on daily_logs(student_id, date);
-
-create index if not exists idx_daily_logs_classroom_date
-  on daily_logs(classroom_id, date);
-
-create index if not exists idx_messages_conversation_created
-  on messages(conversation_id, created_at);
-
-create index if not exists idx_attendance_student_date
-  on attendance(student_id, date);
-
-create index if not exists idx_attendance_classroom_date
-  on attendance(classroom_id, date);
-
-create index if not exists idx_notifications_user_read
-  on notifications(user_id, is_read, created_at desc);
-
-create index if not exists idx_students_parent
-  on students(parent_id);
-
-create index if not exists idx_students_classroom
-  on students(classroom_id);
-
-create index if not exists idx_posts_classroom_created
-  on posts(classroom_id, created_at desc);
-
-
--- ── Columnas adicionales (idempotentes) ───────────────────────
-alter table public.payments      add column if not exists bank               text;
-alter table public.payments      add column if not exists reference          text;
-alter table public.payments      add column if not exists transfer_date      date;
-alter table public.daily_logs    add column if not exists activities         text;
-alter table public.profiles      add column if not exists onesignal_player_id text;
-alter table public.messages      add column if not exists is_read            boolean default false;
-alter table public.notifications add column if not exists link               text;
-alter table public.notifications add column if not exists type               text default 'info';
-
--- ── Tabla school_settings ─────────────────────────────────────
-create table if not exists public.school_settings (
-  id             int primary key default 1,
-  generation_day int default 25,
-  due_day        int default 5,
-  school_name    text default 'Karpus Kids',
-  monthly_fee    numeric default 0,
-  updated_at     timestamptz default now()
-);
-insert into public.school_settings (id) values (1) on conflict do nothing;
-
--- ── Tabla terms_acceptance ────────────────────────────────────
-create table if not exists public.terms_acceptance (
-  user_id       uuid references public.profiles(id) on delete cascade,
-  terms_version text not null,
-  accepted_at   timestamptz default now(),
-  primary key (user_id, terms_version)
-);
-alter table public.terms_acceptance enable row level security;
-drop policy if exists "user_own_terms" on terms_acceptance;
-create policy "user_own_terms" on terms_acceptance for all
-  using (user_id = auth.uid());
-
--- ── Tabla meetings (videollamadas) ────────────────────────────
-create table if not exists public.meetings (
-  id          bigint generated by default as identity primary key,
-  title       text not null,
-  description text,
-  room_name   text unique not null,
-  type        text default 'classroom' check (type in ('classroom','private','staff')),
-  target_id   bigint,
-  host_id     uuid references public.profiles(id) on delete set null,
-  status      text default 'scheduled' check (status in ('scheduled','live','ended','cancelled')),
-  start_time  timestamptz,
-  created_at  timestamptz default now()
-);
-alter table public.meetings enable row level security;
-drop policy if exists "staff_manage_meetings" on meetings;
-create policy "staff_manage_meetings" on meetings for all
-  using (exists (select 1 from profiles where id = auth.uid() and role in ('directora','maestra','asistente')));
-drop policy if exists "padre_view_meetings" on meetings;
-create policy "padre_view_meetings" on meetings for select
-  using (auth.uid() is not null);
-
--- ── RLS daily_logs ────────────────────────────────────────────
-drop policy if exists "maestra_daily_logs_all" on daily_logs;
-create policy "maestra_daily_logs_all" on daily_logs for all
-  using (exists (select 1 from classrooms where id = daily_logs.classroom_id and teacher_id = auth.uid()));
-drop policy if exists "padre_read_daily_logs" on daily_logs;
-create policy "padre_read_daily_logs" on daily_logs for select
-  using (exists (select 1 from students where id = daily_logs.student_id and parent_id = auth.uid()));
-
--- ── NOTA IMPORTANTE ───────────────────────────────────────────
--- Las funciones run_payment_cycle() y get_unread_counts() ya están
--- definidas arriba con returns jsonb. Para actualizarlas ejecuta:
---   1. db/drop-functions.sql   (elimina las funciones existentes)
---   2. db/production-fixes.sql (recrea con returns json)
+grant all on public.tasks       to authenticated;
+grant all on public.daily_logs  to authenticated;
+grant all on public.payments    to authenticated;
+grant all on public.profiles    to authenticated;
 
 -- ============================================================
--- 🔧 Fix: RLS para tabla comments
--- Ejecutar en Supabase SQL Editor
+-- 8. STORAGE BUCKETS
 -- ============================================================
+insert into storage.buckets (id, name, public) values
+  ('avatars',         'avatars',         true),
+  ('classroom_media', 'classroom_media', true),
+  ('karpus-uploads',  'karpus-uploads',  true),
+  ('posts',           'posts',           true),
+  ('task_files',      'task_files',      true)
+on conflict (id) do nothing;
 
-alter table public.comments enable row level security;
+-- Pol�ticas de storage
+drop policy if exists "Cualquiera ve avatares"              on storage.objects;
+drop policy if exists "Usuarios suben sus propios avatares" on storage.objects;
+drop policy if exists "Usuarios actualizan sus propios avatares" on storage.objects;
 
--- Leer: cualquier usuario autenticado
-drop policy if exists "comments_select_all" on comments;
-create policy "comments_select_all" on comments for select
-  using (auth.uid() is not null);
+create policy "storage_public_read" on storage.objects
+  for select using (bucket_id in ('karpus-uploads','avatars','classroom_media','posts','task_files'));
+create policy "storage_auth_insert" on storage.objects
+  for insert with check (auth.role() = 'authenticated');
+create policy "storage_auth_update" on storage.objects
+  for update using (auth.role() = 'authenticated');
+create policy "storage_auth_delete" on storage.objects
+  for delete using (auth.role() = 'authenticated');
 
--- Insertar: solo el propio usuario
-drop policy if exists "comments_insert_own" on comments;
-create policy "comments_insert_own" on comments for insert
-  with check (auth.uid() = user_id);
+-- ============================================================
+-- 9. �NDICES DE RENDIMIENTO
+-- ============================================================
+create index if not exists idx_students_parent       on public.students(parent_id);
+create index if not exists idx_students_classroom    on public.students(classroom_id);
+create index if not exists idx_posts_classroom       on public.posts(classroom_id, created_at desc);
+create index if not exists idx_comments_post         on public.comments(post_id);
+create index if not exists idx_likes_post            on public.likes(post_id);
+create index if not exists idx_messages_conversation on public.messages(conversation_id, created_at asc);
+create index if not exists idx_messages_sender       on public.messages(sender_id);
+create index if not exists idx_payments_student      on public.payments(student_id, created_at desc);
+create index if not exists idx_attendance_student    on public.attendance(student_id, date desc);
+create index if not exists idx_evidences_student     on public.task_evidences(student_id, created_at desc);
+create index if not exists idx_notifications_user    on public.notifications(user_id, is_read, created_at desc);
 
--- Eliminar: el autor o staff (directora/maestra/asistente)
-drop policy if exists "comments_delete" on comments;
-create policy "comments_delete" on comments for delete
-  using (
-    auth.uid() = user_id
-    or exists (
-      select 1 from profiles
-      where id = auth.uid()
-      and role in ('directora', 'asistente', 'maestra')
-    )
-  );
+-- ============================================================
+-- 10. DATOS INICIALES
+-- ============================================================
+-- Configuraci�n escolar (singleton)
+insert into public.school_settings (id, generation_day, due_day)
+values (1, 25, 5) on conflict (id) do nothing;
 
-select 'Comments RLS fixed ✅' as status;
+-- ============================================================
+-- ? FIN DEL SCHEMA � Karpus Kids
+-- ============================================================

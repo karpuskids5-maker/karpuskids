@@ -408,18 +408,19 @@ async function loadChatContacts(searchTerm = '', unreadMap = {}) {
 
     container.innerHTML = profiles.map(c => {
       const unread = unreadMap[c.id] || 0;
-      const roleLabel = c.role.charAt(0).toUpperCase() + c.role.slice(1);
+      const displayName = c.name || 'Usuario';
+      const roleLabel = (c.role || '').charAt(0).toUpperCase() + (c.role || '').slice(1);
       return `
-      <div onclick="App.selectChatContact('${c.id}', '${Helpers.escapeHTML(c.name)}', '${roleLabel}')" 
+      <div onclick="App.selectChatContact('${c.id}', '${Helpers.escapeHTML(displayName)}', '${roleLabel}')" 
            class="p-3 hover:bg-slate-50 rounded-xl cursor-pointer transition-colors flex items-center gap-3 border-b border-slate-50 last:border-0 relative">
         <div class="relative">
           <div class="w-10 h-10 rounded-full bg-teal-100 text-teal-600 flex items-center justify-center font-bold overflow-hidden">
-            ${c.avatar_url ? `<img src="${c.avatar_url}" class="w-full h-full object-cover" loading="lazy">` : c.name.charAt(0)}
+            ${c.avatar_url ? `<img src="${c.avatar_url}" class="w-full h-full object-cover" loading="lazy">` : displayName.charAt(0).toUpperCase()}
           </div>
           ${unread > 0 ? `<div class="absolute -top-1 -right-1 bg-red-500 text-white text-[10px] font-bold px-1.5 py-0.5 rounded-full shadow-sm">${unread}</div>` : ''}
         </div>
         <div class="min-w-0">
-          <div class="font-bold text-slate-700 text-sm truncate">${Helpers.escapeHTML(c.name)}</div>
+          <div class="font-bold text-slate-700 text-sm truncate">${Helpers.escapeHTML(displayName)}</div>
           <div class="text-[10px] text-slate-400 truncate">${roleLabel}</div>
         </div>
       </div>
