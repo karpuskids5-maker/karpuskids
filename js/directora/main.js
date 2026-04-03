@@ -127,11 +127,9 @@ async function loadProfile() {
     
     const setVal = (id, val) => { const el = document.getElementById(id); if (el) el.value = val || ''; };
     setVal('confDirName', profile.name);
-    setVal('confDirTitle', profile.title);
     setVal('confDirBio', profile.bio);
     setVal('confPhone', profile.phone);
     setVal('confEmail', profile.email);
-    setVal('confAddress', profile.address);
     
     const nameEl = document.getElementById('sidebarName'); 
     if(nameEl) nameEl.textContent = profile.name || 'Directora';
@@ -245,18 +243,12 @@ document.addEventListener('DOMContentLoaded', async () => {
     const overlay = document.getElementById('sidebarOverlay');
 
     const openSidebar = () => {
-      if (sidebar) sidebar.style.transform = 'translateX(0)';
-      if (overlay) { 
-        overlay.style.display = 'block';
-        setTimeout(() => overlay.style.opacity = '1', 10);
-      }
+      if (sidebar) sidebar.classList.add('mobile-visible');
+      if (overlay) overlay.style.display = 'block';
     };
     const closeSidebar = () => {
-      if (sidebar) sidebar.style.transform = 'translateX(-100%)';
-      if (overlay) {
-        overlay.style.opacity = '0';
-        setTimeout(() => overlay.style.display = 'none', 300);
-      }
+      if (sidebar) sidebar.classList.remove('mobile-visible');
+      if (overlay) overlay.style.display = 'none';
     };
 
     menuBtn?.addEventListener('click', (e) => {

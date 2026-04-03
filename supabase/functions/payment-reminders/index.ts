@@ -15,7 +15,7 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { Resend } from "https://esm.sh/resend@2.1.0";
 
 const CORS = {
-  'Access-Control-Allow-Origin':  'https://karpuskids.com',
+  'Access-Control-Allow-Origin':  '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
   'Access-Control-Allow-Methods': 'POST, OPTIONS',
 };
@@ -45,6 +45,7 @@ Deno.serve(async (req) => {
     const fmt = (d: Date) => d.toISOString().split('T')[0];
 
     // Traer pagos pendientes con datos del estudiante y correo de notificaciones
+    // Usamos gte/lte para cubrir due_date como date o timestamp
     const { data: payments, error: qErr } = await supabase
       .from('payments')
       .select(`
@@ -57,7 +58,8 @@ Deno.serve(async (req) => {
         )
       `)
       .in('status', ['pending', 'pendiente'])
-      .in('due_date', [fmt(d3), fmt(today), fmt(d1)]);
+      .gte('due_date', fmt(d1))
+      .lte('due_date', fmt(d3));
 
     if (qErr) {
       console.error('[payment-reminders] Query error:', qErr.message);
@@ -97,7 +99,10 @@ Deno.serve(async (req) => {
 
       if (!parentId && !email) continue;
 
-      if (p.due_date === fmt(d3)) {
+      // Normalizar due_date a YYYY-MM-DD (maneja tanto date como timestamp)
+      const dueDateStr = (p.due_date || '').substring(0, 10);
+
+      if (dueDateStr === fmt(d3)) {
         // ── 3 días antes ──────────────────────────────────────────────────
         const title = `📅 Recordatorio de pago — ${month}`;
         const msg   = `Hola, recuerda que el pago de ${name} (${amount}) vence en 3 días. ¡Paga a tiempo y evita recargos!`;
@@ -116,7 +121,7 @@ Deno.serve(async (req) => {
         }
         results.reminder_3d++;
 
-      } else if (p.due_date === fmt(today)) {
+      } else if (dueDateStr === fmt(today)) {
         // ── Día del vencimiento ───────────────────────────────────────────
         const title = `⏰ ¡Hoy vence tu pago! — ${month}`;
         const msg   = `Hoy es el último día para pagar la mensualidad de ${name} (${amount}). Envía tu comprobante antes de las 6:00 PM.`;
@@ -135,7 +140,7 @@ Deno.serve(async (req) => {
         }
         results.due_today++;
 
-      } else if (p.due_date === fmt(d1)) {
+      } else if (dueDateStr === fmt(d1)) {
         // ── 1 día después (mora) ──────────────────────────────────────────
         // Marcar como vencido
         await supabase.from('payments').update({ status: 'overdue' }).eq('id', p.id);

@@ -26,7 +26,8 @@ export const PaymentsModule = {
       on('btnNewPayment',         'click',  () => this.openPaymentModal());
       on('btnGenerateCharges',    'click',  () => this.runCycle());
       on('btnGeneratePaymentsNow','click',  () => this.runCycle());
-      on('btnSavePaymentConfig',  'click',  () => this.savePaymentConfig());
+      on('btnSavePaymentConfig',      'click',  () => this.savePaymentConfig());
+      on('btnSendPaymentReminders',   'click',  () => this.sendReminders());
     }
     await this.loadPayments();
   },
@@ -327,6 +328,23 @@ export const PaymentsModule = {
       Helpers.toast('Ciclo completado: ' + (r.generated || 0) + ' generados, ' + (r.expired || 0) + ' vencidos', 'success');
       await this.loadPayments();
     } catch (e) { Helpers.toast('Error en ciclo: ' + e.message, 'error'); }
+  },
+
+  async sendReminders() {
+    if (!confirm('¿Enviar recordatorios de pago por correo y push ahora?')) return;
+    try {
+      Helpers.toast('Enviando recordatorios...', 'info');
+      const { data, error } = await supabase.functions.invoke('payment-reminders', { body: {} });
+      if (error) throw new Error(error.message || JSON.stringify(error));
+      const r = data || {};
+      Helpers.toast(
+        `Recordatorios enviados: ${r.emails_sent || 0} correos, ${r.pushes_sent || 0} push`,
+        'success'
+      );
+    } catch (e) {
+      console.error('[sendReminders]', e);
+      Helpers.toast('Error enviando recordatorios: ' + e.message, 'error');
+    }
   },
 
   async savePaymentConfig() {

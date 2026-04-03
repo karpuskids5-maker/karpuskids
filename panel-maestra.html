@@ -243,12 +243,18 @@
       .table-responsive table { min-width: 600px; }
     }
 
-    /* FIX: Asegurar que el body no tenga scroll bloqueado */
+    /* FIX: Scroll natural en móvil — no bloquear body */
     html, body {
       height: 100%;
       margin: 0;
       padding: 0;
-      overflow: hidden; /* El scroll lo maneja el layoutShell */
+    }
+    @media (min-width: 769px) {
+      html, body { overflow: hidden; } /* Desktop: scroll en layoutShell */
+    }
+    @media (max-width: 768px) {
+      html, body { overflow-x: hidden; overflow-y: auto; } /* Móvil: scroll del documento */
+      #layoutShell { overflow: visible !important; min-height: auto !important; }
     }
     
     #sidebarOverlay {

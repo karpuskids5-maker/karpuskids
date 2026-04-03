@@ -1,99 +1,60 @@
 /* ============================================================
    🧠 Karpus Kids — Global Layout System
-   App-shell pattern: sidebar + scrollable main
+   Regla de oro: en móvil el scroll es del DOCUMENTO.
+                 en desktop el scroll es del .main.
    ============================================================ */
 
-/* ── 1. RESET GLOBAL ─────────────────────────────────────────── */
+/* ── 1. RESET ────────────────────────────────────────────────── */
 *, *::before, *::after {
   margin: 0;
   padding: 0;
   box-sizing: border-box;
 }
 
-html {
-  height: 100%;
-  overflow-x: clip;
-}
-
-body {
-  height: 100%;
+html, body {
   overflow-x: hidden;
-  /* NO overflow:hidden — rompe el scroll en iOS/Android */
-  font-family: system-ui, -apple-system, 'Segoe UI', sans-serif;
-  background: #f5f7fb;
+  max-width: 100%;
 }
 
-/* Paneles de staff: el scroll lo maneja .main */
-.panel-directora-body,
-.panel-asistente-body,
-.panel-maestra-body {
-  overflow: hidden;
-  height: 100%;
-}
-
-/* ── 2. APP SHELL (contenedor raíz) ──────────────────────────── */
+/* ── 2. APP SHELL ────────────────────────────────────────────── */
 .app {
   display: flex;
   flex-direction: row;
   min-height: 100dvh;
-  /* NO overflow:hidden aquí — en móvil bloquea el scroll de .main */
 }
 
-/* En desktop: el .app puede tener overflow hidden porque .main scrollea */
-@media (min-width: 768px) {
-  .app {
-    overflow: hidden;
-    height: 100dvh;
-  }
-}
-
-/* ── 3. WRAPPER DEL CONTENIDO (todo excepto el sidebar) ─────── */
+/* ── 3. WRAPPER CONTENIDO ────────────────────────────────────── */
 .app-content-wrapper {
   flex: 1;
   display: flex;
   flex-direction: column;
   min-width: 0;
-  margin-left: 288px;
-  transition: margin-left 0.3s ease;
-  /* En desktop: altura completa para scroll interno */
-  height: 100dvh;
-  overflow: hidden;
+  min-height: 100dvh;
 }
 
-/* Sidebar colapsado en desktop */
-.app-content-wrapper.sidebar-collapsed {
-  margin-left: 90px;
+/* Desktop: compensar sidebar fijo */
+@media (min-width: 768px) {
+  .app-content-wrapper          { margin-left: 288px; height: 100dvh; overflow: hidden; }
+  .panel-asistente-body
+    .app-content-wrapper         { margin-left: 280px; }
+  .app-content-wrapper
+    .sidebar-collapsed           { margin-left: 90px; }
 }
 
-/* Panel asistente usa sidebar de 280px */
-.panel-asistente-body .app-content-wrapper {
-  margin-left: 280px;
-}
-.panel-asistente-body .app-content-wrapper.sidebar-collapsed {
-  margin-left: 90px;
-}
-
-/* En móvil: sin margin, sin height fija, sin overflow hidden */
+/* Móvil: sin margin, sin overflow hidden */
 @media (max-width: 767px) {
   .app-content-wrapper {
     margin-left: 0 !important;
     height: auto !important;
     overflow: visible !important;
-    min-height: 100dvh;
-  }
-  /* El header en móvil no debe crear stacking context que bloquee clicks */
-  .header {
-    position: sticky;
-    top: 0;
-    z-index: 200;
   }
 }
 
-/* ── 4. HEADER FIJO (sticky dentro del wrapper) ─────────────── */
+/* ── 4. HEADER ───────────────────────────────────────────────── */
 .header {
   position: sticky;
   top: 0;
-  z-index: 200;          /* Por encima del contenido pero debajo del sidebar (1050) */
+  z-index: 200;
   background: #fff;
   padding: 10px 16px;
   display: flex;
@@ -104,58 +65,49 @@ body {
   min-height: 52px;
 }
 
-/* ── 5. MAIN SCROLLABLE ──────────────────────────────────────── */
-.main {
-  flex: 1;
-  overflow-y: auto;
-  overflow-x: hidden;
-  padding: 16px 16px 80px; /* pb-80px para no quedar bajo nav móvil */
-  -webkit-overflow-scrolling: touch;
-  scroll-behavior: smooth;
-  /* En móvil: min-height en lugar de height fija */
-  min-height: 0;
-}
+/* ── 5. MAIN ─────────────────────────────────────────────────── */
 
+/* Desktop: scroll interno */
 @media (min-width: 768px) {
   .main {
-    padding: 24px 24px 32px;
-    /* En desktop: height fija para que el scroll sea interno */
-    height: calc(100dvh - 52px); /* 52px = altura del header */
+    flex: 1;
     overflow-y: auto;
+    overflow-x: hidden;
+    -webkit-overflow-scrolling: touch;
+    padding: 24px 24px 32px;
+    height: calc(100dvh - 52px);
   }
 }
 
-/* En móvil: el scroll es del documento, no del .main */
+/* Móvil: scroll del documento (NO overflow-y en .main) */
 @media (max-width: 767px) {
   .main {
-    overflow-y: visible;
-    height: auto;
+    flex: 1;
+    overflow: visible;
+    padding: 16px 16px 80px;
     min-height: calc(100dvh - 52px);
-  }
-  /* El body scrollea en móvil */
-  .panel-directora-body,
-  .panel-asistente-body,
-  .panel-maestra-body {
-    overflow-y: auto;
-    height: auto;
   }
 }
 
-/* ── 6. SIDEBAR FIJO ─────────────────────────────────────────── */
+/* ── 6. SIDEBAR ──────────────────────────────────────────────── */
 aside#sidebar {
   position: fixed;
   top: 0;
   left: 0;
   height: 100dvh;
-  z-index: 50;
+  z-index: 1050;
+  overflow-y: auto;
+  overflow-x: hidden;
+  scrollbar-width: none;
   transition: transform 0.3s ease, width 0.3s ease;
   will-change: transform;
 }
+aside#sidebar::-webkit-scrollbar { display: none; }
 
-/* Móvil: sidebar oculto por defecto */
 @media (max-width: 767px) {
   aside#sidebar {
     transform: translateX(-100%);
+    width: 280px !important;
   }
   aside#sidebar.mobile-visible {
     transform: translateX(0) !important;
@@ -163,28 +115,26 @@ aside#sidebar {
   }
 }
 
-/* ── 7. OVERLAY MÓVIL ────────────────────────────────────────── */
+/* ── 7. OVERLAY ──────────────────────────────────────────────── */
 #sidebarOverlay {
   position: fixed;
   inset: 0;
   background: rgba(0,0,0,0.5);
-  z-index: 45;
+  z-index: 1040;
   backdrop-filter: blur(2px);
   -webkit-backdrop-filter: blur(2px);
   cursor: pointer;
-  display: none; /* controlado por JS con style.display */
+  display: none;
 }
 
-/* ── 8. SECCIONES — ocultas por defecto ─────────────────────── */
-.section {
-  display: none;
-  animation: sectionFadeIn 0.25s ease-out;
-}
+/* ── 8. SECCIONES ────────────────────────────────────────────── */
+.section { display: none; }
 .section.active {
   display: block;
+  animation: karpusFadeIn 0.25s ease-out;
 }
-@keyframes sectionFadeIn {
-  from { opacity: 0; transform: translateY(6px); }
+@keyframes karpusFadeIn {
+  from { opacity: 0; transform: translateY(5px); }
   to   { opacity: 1; transform: translateY(0); }
 }
 
@@ -206,7 +156,6 @@ aside#sidebar {
   -webkit-overflow-scrolling: touch;
   border-radius: 12px;
 }
-
 .table-container table,
 .table-scroll-wrap table,
 .table-responsive {
@@ -231,17 +180,15 @@ aside#sidebar {
   -webkit-tap-highlight-color: transparent;
 }
 .btn:active { transform: scale(0.96); }
-
 .btn-primary { background: linear-gradient(135deg, #5b5ef7, #7a7dfc); color: #fff; }
 .btn-success { background: #10b981; color: #fff; }
 .btn-danger  { background: #ef4444; color: #fff; }
 .btn-ghost   { background: #f1f5f9; color: #475569; }
-
 @media (max-width: 480px) {
   .btn-mobile-full { width: 100%; justify-content: center; }
 }
 
-/* ── 12. GRIDS RESPONSIVOS ───────────────────────────────────── */
+/* ── 12. GRIDS ───────────────────────────────────────────────── */
 .responsive-grid {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(min(100%, 200px), 1fr));
@@ -258,7 +205,7 @@ aside#sidebar {
   gap: 1rem;
 }
 
-/* ── 13. SKELETON SHIMMER ────────────────────────────────────── */
+/* ── 13. SKELETON ────────────────────────────────────────────── */
 @keyframes karpus-shimmer {
   0%   { background-position: -400px 0; }
   100% { background-position:  400px 0; }
@@ -270,25 +217,17 @@ aside#sidebar {
   border-radius: 0.5rem;
 }
 
-/* ── 14. LAZY LOADING IMÁGENES ───────────────────────────────── */
+/* ── 14. IMÁGENES LAZY ───────────────────────────────────────── */
 .karpus-img-loading {
   background: linear-gradient(90deg, #f1f5f9 25%, #e2e8f0 50%, #f1f5f9 75%);
   background-size: 400px 100%;
   animation: karpus-shimmer 1.4s infinite linear;
 }
-.karpus-img {
-  transition: filter 0.4s ease, opacity 0.4s ease;
-  opacity: 0.7;
-}
-.karpus-img-loaded {
-  filter: none !important;
-  opacity: 1 !important;
-  animation: none !important;
-  background: none !important;
-}
+.karpus-img { transition: filter 0.4s ease, opacity 0.4s ease; opacity: 0.7; }
+.karpus-img-loaded { filter: none !important; opacity: 1 !important; animation: none !important; background: none !important; }
 video.karpus-img-loading { background: #1e293b; }
 
-/* ── 15. CHAT WHATSAPP LAYOUT ────────────────────────────────── */
+/* ── 15. CHAT WHATSAPP ───────────────────────────────────────── */
 .chat-shell {
   display: flex;
   border-radius: 20px;
@@ -299,36 +238,18 @@ video.karpus-img-loading { background: #1e293b; }
   min-height: 72vh;
 }
 .chat-list-col {
-  width: 300px;
-  flex-shrink: 0;
-  display: flex;
-  flex-direction: column;
-  border-right: 1px solid #f1f5f9;
-  background: #f8fafc;
+  width: 300px; flex-shrink: 0;
+  display: flex; flex-direction: column;
+  border-right: 1px solid #f1f5f9; background: #f8fafc;
 }
-.chat-conv-col {
-  flex: 1;
-  display: flex;
-  flex-direction: column;
-  min-width: 0;
-}
+.chat-conv-col { flex: 1; display: flex; flex-direction: column; min-width: 0; }
 .chat-messages-scroll {
-  flex: 1;
-  overflow-y: auto;
-  -webkit-overflow-scrolling: touch;
-  padding: 1rem;
-  display: flex;
-  flex-direction: column;
-  gap: 0.5rem;
-  min-height: 200px;
+  flex: 1; overflow-y: auto; -webkit-overflow-scrolling: touch;
+  padding: 1rem; display: flex; flex-direction: column; gap: 0.5rem; min-height: 200px;
 }
 .chat-input-sticky {
-  position: sticky;
-  bottom: 0;
-  background: white;
-  border-top: 1px solid #f1f5f9;
-  padding: 0.75rem 1rem;
-  z-index: 2;
+  position: sticky; bottom: 0; background: white;
+  border-top: 1px solid #f1f5f9; padding: 0.75rem 1rem; z-index: 2;
 }
 @media (max-width: 768px) {
   .chat-shell { flex-direction: column; min-height: 75vh; border-radius: 16px; }
@@ -340,11 +261,4 @@ video.karpus-img-loading { background: #1e293b; }
 @media (min-width: 769px) {
   .chat-conv-col { display: flex !important; }
   .chat-list-col { display: flex !important; }
-}
-
-/* ── 16. PANEL-SPECIFIC BODY CLASSES ─────────────────────────── */
-.panel-directora-body,
-.panel-asistente-body,
-.panel-maestra-body {
-  overflow: hidden; /* el scroll lo maneja .main */
 }

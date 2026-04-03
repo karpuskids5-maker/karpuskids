@@ -5,7 +5,7 @@
 import { Resend } from "https://esm.sh/resend@2.1.0";
 
 const CORS = {
-  'Access-Control-Allow-Origin':  'https://karpuskids.com',
+  'Access-Control-Allow-Origin':  '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
   'Access-Control-Allow-Methods': 'POST, OPTIONS',
 };
