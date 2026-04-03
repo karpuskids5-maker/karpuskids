@@ -31,7 +31,8 @@ export const BadgeSystem = {
         .from('notifications')
         .select('type, created_at')
         .eq('user_id', this._userId)
-        .eq('is_read', false);
+        .eq('is_read', false)
+        .limit(100); // ✅ límite para evitar queries pesadas
 
       if (!data) return;
 
@@ -54,31 +55,29 @@ export const BadgeSystem = {
   /** Suscripción realtime a nuevas notificaciones */
   _subscribeRealtime() {
     if (!this._userId) return;
-    import('./supabase.js').then(({ supabase }) => {
-      if (this._channel) supabase.removeChannel(this._channel);
-      this._channel = supabase
-        .channel('badges_' + this._userId)
-        .on('postgres_changes', {
-          event: 'INSERT',
-          schema: 'public',
-          table: 'notifications',
-          filter: `user_id=eq.${this._userId}`
-        }, (payload) => {
-          const section = this._typeToSection(payload.new?.type);
-          if (!section) return;
-          // Solo incrementar si no estamos en esa sección ahora mismo
-          const current = document.querySelector('.section.active')?.id;
-          if (current === section) {
-            // Ya está viendo esa sección — marcar como leída inmediatamente
-            this._markReadInDB(section);
-            return;
-          }
-          const badge = document.getElementById('badge-' + section);
-          if (!badge) return;
-          const prev = parseInt(badge.textContent) || 0;
-          this._renderBadge(section, prev + 1);
-        })
-        .subscribe();
+    import('./supabase.js').then(() => {
+      import('./realtime-manager.js').then(({ RealtimeManager }) => {
+        RealtimeManager.subscribe('badges_' + this._userId, (channel) => {
+          channel.on('postgres_changes', {
+            event: 'INSERT',
+            schema: 'public',
+            table: 'notifications',
+            filter: `user_id=eq.${this._userId}`
+          }, (payload) => {
+            const section = this._typeToSection(payload.new?.type);
+            if (!section) return;
+            const current = document.querySelector('.section.active')?.id;
+            if (current === section) {
+              this._markReadInDB(section);
+              return;
+            }
+            const badge = document.getElementById('badge-' + section);
+            if (!badge) return;
+            const prev = parseInt(badge.textContent) || 0;
+            this._renderBadge(section, prev + 1);
+          });
+        });
+      });
     });
   },
 

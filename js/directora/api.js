@@ -1,4 +1,6 @@
 import { supabase } from '../shared/supabase.js';
+import { withTimeout, withRetry, COLS } from '../shared/db-utils.js';
+import { QueryCache } from '../shared/query-cache.js';
 
 const TABLES = {
   PROFILES: 'profiles',
@@ -256,22 +258,20 @@ export const DirectorApi = {
 
   // --- CLASSROOMS ---
   async getClassroomsWithOccupancy() {
-    try {
-      const { data, error } = await supabase
-        .from(TABLES.CLASSROOMS)
-        .select(`
-          *,
-          profiles:teacher_id(name),
-          students(count)
-        `)
-        .order('name');
-      if (error) throw error;
-      const normalized = (data || []).map(r => ({
-        ...r,
-        student_count: r.students?.[0]?.count || 0
-      }));
-      return { data: normalized, error: null };
-    } catch (e) { return logError('getClassroomsWithOccupancy', e); }
+    return QueryCache.get('dir_classrooms_occ', async () => {
+      try {
+        const { data, error } = await supabase
+          .from(TABLES.CLASSROOMS)
+          .select('id, name, level, capacity, profiles:teacher_id(name), students(count)')
+          .order('name');
+        if (error) throw error;
+        const normalized = (data || []).map(r => ({
+          ...r,
+          student_count: r.students?.[0]?.count || 0
+        }));
+        return { data: normalized, error: null };
+      } catch (e) { return logError('getClassroomsWithOccupancy', e); }
+    }, 3 * 60_000);
   },
 
   // --- CHAT ---
@@ -301,39 +301,53 @@ export const DirectorApi = {
 
   // --- ESTUDIANTES ---
   async getStudents() {
-    try {
-      return await supabase.from(TABLES.STUDENTS).select('*, classrooms:classroom_id(name)').order('name');
-    } catch (e) { return logError('getStudents', e); }
+    return QueryCache.get('dir_students', async () => {
+      try {
+        return await withTimeout(() =>
+          supabase.from('students')
+            .select('id, name, is_active, parent_id, classroom_id, p1_name, p1_phone, p1_email, classrooms:classroom_id(name)')
+            .order('name')
+        );
+      } catch (e) { return logError('getStudents', e); }
+    }, 3 * 60_000);
   },
   async createStudent(data) {
     try {
-      return await supabase.from(TABLES.STUDENTS).insert(data).select().single();
+      const result = await supabase.from(TABLES.STUDENTS).insert(data).select().single();
+      QueryCache.invalidate('dir_students');
+      return result;
     } catch (e) { return logError('createStudent', e); }
   },
   async updateStudent(id, data) {
-    return await supabase.from(TABLES.STUDENTS).update(data).eq('id', id);
+    const result = await supabase.from(TABLES.STUDENTS).update(data).eq('id', id);
+    QueryCache.invalidate('dir_students');
+    return result;
   },
   async deleteStudent(id) {
-    return await supabase.from(TABLES.STUDENTS).delete().eq('id', id);
+    const result = await supabase.from(TABLES.STUDENTS).delete().eq('id', id);
+    QueryCache.invalidate('dir_students');
+    return result;
   },
 
   // --- PERSONAL (MAESTROS/ASISTENTES) ---
   async getTeachers() {
-    try {
-      const { data, error } = await supabase
-        .from(TABLES.PROFILES)
-        .select('*, classrooms!classrooms_teacher_id_fkey(id, name)')
-        .in('role', ['maestra', 'asistente'])
-        .order('name');
-      if (error) throw error;
-      // Normalizar classroom join
-      const normalized = (data || []).map(t => ({
-        ...t,
-        classroom_id: t.classrooms?.[0]?.id || t.classrooms?.id || null,
-        classrooms: t.classrooms?.[0] || t.classrooms || null
-      }));
-      return { data: normalized, error: null };
-    } catch (e) { return logError('getTeachers', e); }
+    return QueryCache.get('dir_teachers', async () => {
+      try {
+        const { data, error } = await withTimeout(() =>
+          supabase.from(TABLES.PROFILES)
+            .select('id, name, role, email, phone, avatar_url, classrooms!classrooms_teacher_id_fkey(id, name)')
+            .in('role', ['maestra', 'asistente'])
+            .order('name')
+        );
+        if (error) throw error;
+        const normalized = (data || []).map(t => ({
+          ...t,
+          classroom_id: t.classrooms?.[0]?.id || t.classrooms?.id || null,
+          classrooms: t.classrooms?.[0] || t.classrooms || null
+        }));
+        return { data: normalized, error: null };
+      } catch (e) { return logError('getTeachers', e); }
+    }, 5 * 60_000);
   },
 
   async updateTeacher(id, data) {
@@ -344,11 +358,17 @@ export const DirectorApi = {
         await supabase.from(TABLES.CLASSROOMS).update({ teacher_id: id }).eq('id', classroom_id);
       }
     }
-    return await supabase.from(TABLES.PROFILES).update(profileData).eq('id', id);
+    const result = await supabase.from(TABLES.PROFILES).update(profileData).eq('id', id);
+    QueryCache.invalidate('dir_teachers');
+    QueryCache.invalidate('classrooms_list');
+    return result;
   },
 
   async getClassrooms() {
-    return await supabase.from(TABLES.CLASSROOMS).select('*, teacher:teacher_id(name)').order('name');
+    return QueryCache.get('dir_classrooms', async () =>
+      supabase.from(TABLES.CLASSROOMS).select('id, name, level, capacity, teacher:teacher_id(name)').order('name'),
+      5 * 60_000
+    );
   },
 
   async generateMonthlyCharges(month, year) {

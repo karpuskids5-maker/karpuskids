@@ -1,6 +1,8 @@
 import { supabase } from './supabase.js';
 import { Helpers } from './helpers.js';
 import { ImageLoader } from './image-loader.js';
+import { QueryCache } from './query-cache.js';
+import { withTimeout } from './db-utils.js';
 
 // Inline helper — evita dependencia de media.js
 const optimizeImageUrl = (url) => url || null;
@@ -75,7 +77,14 @@ export const WallModule = {
 
   async loadClassrooms() {
     try {
-      const { data: classrooms } = await supabase.from('classrooms').select('id, name').order('name');
+      const classrooms = await QueryCache.get(
+        'classrooms_list',
+        async () => {
+          const { data } = await supabase.from('classrooms').select('id, name').order('name');
+          return data || [];
+        },
+        10 * 60_000 // 10 min TTL — classrooms rarely change
+      );
       const select = document.getElementById('wallClassroomFilter');
       if (select && classrooms) {
         select.innerHTML = '<option value="">Todas las aulas</option>';
@@ -170,7 +179,7 @@ export const WallModule = {
       if (this._options.classroomId) query = query.eq('classroom_id', this._options.classroomId);
       if (this._options.searchTerm) query = query.ilike('content', `%${this._options.searchTerm}%`);
 
-      const { data: posts, error } = await query;
+      const { data: posts, error } = await withTimeout(() => query, 10_000);
       if (error) throw error;
 
       // Limpiar loaders

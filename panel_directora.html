@@ -459,6 +459,7 @@
       <header class="header">
         <button id="menuBtn" class="md:hidden p-2.5 rounded-xl bg-white shadow-sm border border-slate-100 text-slate-600 hover:bg-purple-50 hover:text-purple-600 transition-colors active:scale-95"
           style="position:relative;z-index:200;"
+          data-managed="true"
           aria-label="Abrir menú">
           <i data-lucide="menu" class="w-5 h-5"></i>
         </button>
@@ -1123,7 +1124,7 @@
               <div class="flex gap-2">
                 <select id="chartYear" class="px-3 py-1.5 bg-slate-50 border-none rounded-lg text-xs font-bold text-slate-600 outline-none">
                   <option value="2025">2025</option>
-                  <option value="2026">2026</option>
+                  <option value="2026" selected>2026</option>
                 </select>
                 <select id="chartMonth" class="px-3 py-1.5 bg-slate-50 border-none rounded-lg text-xs font-bold text-slate-600 outline-none">
                   <option value="all">Todo el año</option>
@@ -1202,8 +1203,8 @@
                  </select>
                  <select id="filterPaymentYear" class="px-3 py-2 border rounded-xl text-sm bg-slate-50 font-bold text-slate-700">
                     <option value="2024">2024</option>
-                    <option value="2025" selected>2025</option>
-                    <option value="2026">2026</option>
+                    <option value="2025">2025</option>
+                    <option value="2026" selected>2026</option>
                  </select>
                </div>
                <select id="filterPaymentStatus" class="px-3 py-2 border rounded-xl text-sm bg-slate-50">

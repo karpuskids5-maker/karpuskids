@@ -1,5 +1,8 @@
 import { supabase } from './supabase.js';
 import { ScrollModule } from './scroll.module.js';
+import { QueryCache } from './query-cache.js';
+import { RealtimeManager } from './realtime-manager.js';
+import { withTimeout } from './db-utils.js';
 
 const MSG_PAGE_SIZE = 20;
 
@@ -30,38 +33,32 @@ export const ChatModule = {
    * Carga los contactos para el padre (Restringido a Maestra y Directora)
    */
   async loadPadreContacts(studentId) {
-    try {
-      // 1. Obtener Maestra del Aula
-      const { data: student } = await supabase
-        .from('students')
-        .select('classroom_id, classrooms(teacher_id)')
-        .eq('id', studentId)
-        .single();
-      
-      const teacherId = student?.classrooms?.teacher_id;
+    return QueryCache.get(`padre_contacts_${studentId}`, async () => {
+      try {
+        const { data: student } = await supabase
+          .from('students')
+          .select('classroom_id, classrooms(teacher_id)')
+          .eq('id', studentId)
+          .single();
+        
+        const teacherId = student?.classrooms?.teacher_id;
 
-      // 2. Consultar Maestra y Directivos
-      const [teacherRes, staffRes] = await Promise.all([
-        teacherId ? supabase.from('profiles').select('id, name, avatar_url, role').eq('id', teacherId).single() : Promise.resolve({ data: null }),
-        supabase.from('profiles').select('id, name, avatar_url, role').in('role', ['directora', 'asistente']).order('name')
-      ]);
+        const [teacherRes, staffRes] = await Promise.all([
+          teacherId ? supabase.from('profiles').select('id, name, avatar_url, role').eq('id', teacherId).single() : Promise.resolve({ data: null }),
+          supabase.from('profiles').select('id, name, avatar_url, role').in('role', ['directora', 'asistente']).order('name')
+        ]);
 
-      const contacts = [];
-      if (teacherRes.data) {
-        contacts.push({ ...teacherRes.data, roleLabel: 'Maestra Titular' });
+        const contacts = [];
+        if (teacherRes.data) contacts.push({ ...teacherRes.data, roleLabel: 'Maestra Titular' });
+        (staffRes.data || []).forEach(s => {
+          if (s.id !== teacherId) contacts.push({ ...s, roleLabel: s.role === 'directora' ? 'Directora' : 'Administración' });
+        });
+        return contacts;
+      } catch (err) {
+        console.error('[ChatModule] Error loadPadreContacts:', err);
+        return [];
       }
-      
-      (staffRes.data || []).forEach(s => {
-        if (s.id !== teacherId) {
-          contacts.push({ ...s, roleLabel: s.role === 'directora' ? 'Directora' : 'Administración' });
-        }
-      });
-
-      return contacts;
-    } catch (err) {
-      console.error('[ChatModule] Error loadPadreContacts:', err);
-      return [];
-    }
+    }, 5 * 60_000); // 5 min TTL
   },
 
   /**
@@ -183,23 +180,25 @@ export const ChatModule = {
     // Limpiar suscripción anterior si existe
     this.unsubscribe();
 
-    this._activeSubscription = supabase.channel(`chat_cv_${conversationId}`)
-      .on('postgres_changes', {
+    const channelName = `chat_cv_${conversationId}`;
+    this._activeSubscription = RealtimeManager.subscribe(channelName, (channel) => {
+      channel.on('postgres_changes', {
         event: 'INSERT',
         schema: 'public',
         table: 'messages',
         filter: `conversation_id=eq.${conversationId}`
       }, (payload) => {
         if (payload.new) onMessage(payload.new);
-      })
-      .subscribe();
-
+      });
+    });
+    this._activeChannelName = channelName;
     return this._activeSubscription;
   },
 
   unsubscribe() {
-    if (this._activeSubscription) {
-      supabase.removeChannel(this._activeSubscription);
+    if (this._activeChannelName) {
+      RealtimeManager.unsubscribe(this._activeChannelName);
+      this._activeChannelName = null;
       this._activeSubscription = null;
     }
   },

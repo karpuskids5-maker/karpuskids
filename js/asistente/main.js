@@ -12,6 +12,8 @@ import { RoomsModule } from './modules/rooms.js';
 import { DashboardModule } from './modules/dashboard.js';
 import { BadgeSystem } from '../shared/badges.js';
 import { ImageLoader } from '../shared/image-loader.js';
+import { QueryCache } from '../shared/query-cache.js';
+import { RealtimeManager } from '../shared/realtime-manager.js';
 
 // 🚀 Definir objeto App globalmente para evitar ReferenceError en onclicks del HTML
 window.App = {
@@ -68,6 +70,7 @@ document.addEventListener('DOMContentLoaded', async () => {
 
   // Logout
   document.getElementById('btnLogout')?.addEventListener('click', async () => {
+    RealtimeManager.unsubscribeAll();
     await supabase.auth.signOut();
     window.location.href = 'login.html';
   });
@@ -379,48 +382,52 @@ async function initAssistantChat() {
 async function loadChatContacts(searchTerm = '', unreadMap = {}) {
   const container = document.getElementById('chatContactsList');
   if(!container) return;
-  
-  let query = supabase
-    .from('profiles')
-    .select('id, name, role, avatar_url')
-    .in('role', ['padre', 'maestra', 'directora'])
-    .order('name');
-    
-  if (searchTerm) {
-    query = query.ilike('name', `%${searchTerm}%`);
-  }
 
-  const { data: profiles, error } = await query.limit(50);
+  // Cache key includes search term
+  const cacheKey = `asistente_contacts_${searchTerm.slice(0, 20)}`;
+  const TTL = searchTerm ? 30_000 : 3 * 60_000; // búsquedas: 30s, lista base: 3min
 
-  if (error) {
+  try {
+    const profiles = await QueryCache.get(cacheKey, async () => {
+      let query = supabase
+        .from('profiles')
+        .select('id, name, role, avatar_url')
+        .in('role', ['padre', 'maestra', 'directora'])
+        .order('name');
+      if (searchTerm) query = query.ilike('name', `%${searchTerm}%`);
+      // Limitar a 50 — la búsqueda filtra más
+      const { data, error } = await query.limit(50);
+      if (error) throw error;
+      return data || [];
+    }, TTL);
+
+    if (!profiles.length) {
+      container.innerHTML = `<div class="p-4 text-center text-slate-400 text-sm">No hay contactos.</div>`;
+      return;
+    }
+
+    container.innerHTML = profiles.map(c => {
+      const unread = unreadMap[c.id] || 0;
+      const roleLabel = c.role.charAt(0).toUpperCase() + c.role.slice(1);
+      return `
+      <div onclick="App.selectChatContact('${c.id}', '${Helpers.escapeHTML(c.name)}', '${roleLabel}')" 
+           class="p-3 hover:bg-slate-50 rounded-xl cursor-pointer transition-colors flex items-center gap-3 border-b border-slate-50 last:border-0 relative">
+        <div class="relative">
+          <div class="w-10 h-10 rounded-full bg-teal-100 text-teal-600 flex items-center justify-center font-bold overflow-hidden">
+            ${c.avatar_url ? `<img src="${c.avatar_url}" class="w-full h-full object-cover" loading="lazy">` : c.name.charAt(0)}
+          </div>
+          ${unread > 0 ? `<div class="absolute -top-1 -right-1 bg-red-500 text-white text-[10px] font-bold px-1.5 py-0.5 rounded-full shadow-sm">${unread}</div>` : ''}
+        </div>
+        <div class="min-w-0">
+          <div class="font-bold text-slate-700 text-sm truncate">${Helpers.escapeHTML(c.name)}</div>
+          <div class="text-[10px] text-slate-400 truncate">${roleLabel}</div>
+        </div>
+      </div>
+    `}).join('');
+  } catch (error) {
     console.error('❌ Chat contacts error:', error);
     container.innerHTML = `<div class="p-4 text-center text-red-500 text-sm">Error cargando contactos.</div>`;
-    return;
   }
-  
-  if (!profiles || profiles.length === 0) {
-    container.innerHTML = `<div class="p-4 text-center text-slate-400 text-sm">No hay contactos.</div>`;
-    return;
-  }
-
-  container.innerHTML = profiles.map(c => {
-    const unread = unreadMap[c.id] || 0;
-    const roleLabel = c.role.charAt(0).toUpperCase() + c.role.slice(1);
-    return `
-    <div onclick="App.selectChatContact('${c.id}', '${Helpers.escapeHTML(c.name)}', '${roleLabel}')" 
-         class="p-3 hover:bg-slate-50 rounded-xl cursor-pointer transition-colors flex items-center gap-3 border-b border-slate-50 last:border-0 relative">
-      <div class="relative">
-        <div class="w-10 h-10 rounded-full bg-teal-100 text-teal-600 flex items-center justify-center font-bold overflow-hidden">
-          ${c.avatar_url ? `<img src="${c.avatar_url}" class="w-full h-full object-cover">` : c.name.charAt(0)}
-        </div>
-        ${unread > 0 ? `<div class="absolute -top-1 -right-1 bg-red-500 text-white text-[10px] font-bold px-1.5 py-0.5 rounded-full shadow-sm">${unread}</div>` : ''}
-      </div>
-      <div class="min-w-0">
-        <div class="font-bold text-slate-700 text-sm truncate">${Helpers.escapeHTML(c.name)}</div>
-        <div class="text-[10px] text-slate-400 truncate">${roleLabel}</div>
-      </div>
-    </div>
-  `}).join('');
 }
 
 async function selectAssistantChat(userId, name, role) {

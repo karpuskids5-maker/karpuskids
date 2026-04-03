@@ -4,6 +4,9 @@ document.addEventListener('DOMContentLoaded', () => {
   const menuBtn = document.getElementById('menuBtn');
   const toggleSidebarBtn = document.getElementById('toggleSidebar');
 
+  // Skip if this panel has its own dedicated sidebar logic (directora, asistente, maestra)
+  if (menuBtn && menuBtn.dataset.managed) return;
+
   function isMobile() { return window.innerWidth < 768; }
 
   // Crear Overlay si no existe
@@ -11,7 +14,8 @@ document.addEventListener('DOMContentLoaded', () => {
   if (!overlay) {
     overlay = document.createElement('div');
     overlay.id = 'sidebarOverlay';
-    overlay.className = 'fixed inset-0 bg-black/50 z-40 hidden transition-opacity duration-300 backdrop-blur-sm';
+    overlay.className = 'fixed inset-0 bg-black/50 z-40 backdrop-blur-sm';
+    overlay.style.display = 'none';
     document.body.appendChild(overlay);
   }
 
@@ -19,19 +23,15 @@ document.addEventListener('DOMContentLoaded', () => {
   
   function initSidebarState() {
     if (isMobile()) {
-      // Móvil: Siempre expandido internamente, pero oculto por transform
       sidebar.classList.remove('collapsed');
-      layoutShell.classList.remove('sidebar-collapsed');
+      layoutShell?.classList.remove('sidebar-collapsed');
       sidebar.classList.remove('mobile-visible');
-      overlay.classList.add('hidden');
+      overlay.style.display = 'none';
     } else {
-      // Escritorio: Recuperar estado
       const isCollapsed = localStorage.getItem('sidebarCollapsed') === 'true';
       toggleDesktopSidebar(isCollapsed);
-      // Limpiar estados móviles
       sidebar.classList.remove('mobile-visible');
-      overlay.classList.add('hidden');
-      document.body.style.overflow = '';
+      overlay.style.display = 'none';
     }
   }
 
@@ -52,8 +52,7 @@ document.addEventListener('DOMContentLoaded', () => {
   // Botón Hamburguesa (Móvil)
   menuBtn?.addEventListener('click', () => {
     const isVisible = sidebar.classList.toggle('mobile-visible');
-    overlay.classList.toggle('hidden', !isVisible);
-    document.body.style.overflow = isVisible ? 'hidden' : ''; // Bloquear scroll
+    overlay.style.display = isVisible ? 'block' : 'none';
   });
 
   // Botón Colapsar (Escritorio)
@@ -64,8 +63,7 @@ document.addEventListener('DOMContentLoaded', () => {
   // Cerrar al tocar fuera (Móvil)
   overlay.addEventListener('click', () => {
     sidebar.classList.remove('mobile-visible');
-    overlay.classList.add('hidden');
-    document.body.style.overflow = '';
+    overlay.style.display = 'none';
   });
 
   // Manejar cambio de tamaño de ventana
@@ -105,8 +103,7 @@ document.addEventListener('DOMContentLoaded', () => {
         // Cerrar sidebar en móvil al navegar
         if (isMobile()) {
           sidebar.classList.remove('mobile-visible');
-          overlay.classList.add('hidden');
-          document.body.style.overflow = '';
+          overlay.style.display = 'none';
         }
       });
     });

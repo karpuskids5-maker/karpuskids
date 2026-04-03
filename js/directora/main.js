@@ -14,6 +14,8 @@ import { InquiriesModule } from './inquiries.module.js';
 import { RoomsModule } from './rooms.module.js';
 import { BadgeSystem } from '../shared/badges.js';
 import { ImageLoader } from '../shared/image-loader.js';
+import { RealtimeManager } from '../shared/realtime-manager.js';
+import { QueryCache } from '../shared/query-cache.js';
 const debounce = (fn, delay) => {
   let timeout;
   return (...args) => {
@@ -233,6 +235,8 @@ document.addEventListener('DOMContentLoaded', async () => {
 
     // 6. Configurar Logout
     document.getElementById('btnLogout')?.addEventListener('click', async () => {
+      RealtimeManager.unsubscribeAll();
+      QueryCache.clear();
       await supabase.auth.signOut();
       window.location.href = 'index.html';
     });
