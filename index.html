@@ -35,10 +35,10 @@
   <style>
     :root {
       /* Paleta de colores oficial de Karpus Kids */
-      --verde: 76, 175, 80;   /* #4CAF50 */
-      --azul: 33, 150, 243;    /* #2196F3 */
-      --rosa: 233, 30, 99;     /* #E91E63 */
-      --naranja: 255, 152, 0;  /* #FF9800 */
+      --verde: 124, 252, 0;   /* #7CFC00 */
+      --azul: 0, 206, 209;    /* #00CED1 */
+      --rosa: 255, 105, 180;  /* #FF69B4 */
+      --naranja: 255, 140, 0; /* #FF8C00 */
     }
     
     body {
@@ -54,7 +54,6 @@
       display: inline-block;
       font-weight: 800;
       text-shadow: 2px 2px 10px rgba(0,0,0,0.5);
-      font-size: 3rem;
     }
     
     .k-1 { color: rgb(var(--naranja)); }
@@ -72,16 +71,16 @@
     .karpus-kids-inline {
       font-weight: 700;
     }
-    .karpus-kids-inline .k-1 { color: #FF9800; }
-    .karpus-kids-inline .k-2 { color: #2196F3; }
-    .karpus-kids-inline .k-3 { color: #E91E63; }
-    .karpus-kids-inline .k-4 { color: #4CAF50; }
-    .karpus-kids-inline .k-5 { color: #FF9800; }
-    .karpus-kids-inline .k-6 { color: #2196F3; }
-    .karpus-kids-inline .k-7 { color: #4CAF50; }
-    .karpus-kids-inline .k-8 { color: #E91E63; }
-    .karpus-kids-inline .k-9 { color: #2196F3; }
-    .karpus-kids-inline .k-10 { color: #FF9800; }
+    .karpus-kids-inline .k-1 { color: #FF8C00; }
+    .karpus-kids-inline .k-2 { color: #00CED1; }
+    .karpus-kids-inline .k-3 { color: #FF69B4; }
+    .karpus-kids-inline .k-4 { color: #7CFC00; }
+    .karpus-kids-inline .k-5 { color: #FF8C00; }
+    .karpus-kids-inline .k-6 { color: #00CED1; }
+    .karpus-kids-inline .k-7 { color: #7CFC00; }
+    .karpus-kids-inline .k-8 { color: #FF69B4; }
+    .karpus-kids-inline .k-9 { color: #00CED1; }
+    .karpus-kids-inline .k-10 { color: #FF8C00; }
 
     @keyframes float-up-down {
       0%, 100% { transform: translateY(0); }
@@ -126,7 +125,6 @@
 
     .block {
       position: absolute;
-      font-size: 40px;
       opacity: 0.15;
       animation: float-block 6s ease-in-out infinite;
     }
@@ -141,7 +139,7 @@
     .floating-btn {
       position: fixed;
       bottom: 15px;
-      z-index: 9999;
+      z-index: 40;
       width: 56px;
       height: 56px;
       border-radius: 50%;
@@ -149,7 +147,6 @@
       justify-content: center;
       align-items: center;
       color: white;
-      font-size: 1.8rem;
       box-shadow: 0 4px 8px rgba(0,0,0,0.2);
       cursor: pointer;
       transition: transform 0.3s ease;
@@ -160,14 +157,6 @@
     .btn-ws { background-color: #25D366; right: 80px; }
     .btn-ig { background-color: #E4405F; right: 15px; }
     
-    /* Video de fondo */
-    .video-bg {
-      position: absolute;
-      top: 0; left: 0;
-      width: 100%; height: 100%;
-      object-fit: cover;
-      z-index: -1;
-    }
     
     /* Galería horizontal animada */
     .scroll-horizontal {
@@ -237,10 +226,6 @@
         padding-left: 1rem;
         padding-right: 1rem;
       }
-      /* Ajuste de tamaño del logo multicolor para que no se corte en móvil */
-      .karpus-kids-colored span {
-        font-size: 3.5rem !important;
-      }
       .hero-section { padding-top: 4rem; padding-bottom: 4rem; }
       .nav-links { display: none; } /* Ocultar nav links en móvil si no hay menu hamburguesa */
       .grid-cols-3 { grid-template-columns: 1fr !important; }
@@ -283,7 +268,7 @@
 </head>
 <body class="bg-white text-gray-800">
   <!-- Header Fijo -->
-  <header x-data="{ open: false }" class="fixed top-0 left-0 w-full z-[60] px-2 pt-2" style="overflow-x:hidden;">
+  <header x-data="{ open: false }" class="fixed top-0 left-0 w-full z-50 px-2 pt-2" style="overflow-x:hidden;">
 
     <div class="w-full max-w-7xl mx-auto">
       <div class="flex items-center justify-between bg-white/90 backdrop-blur-md rounded-2xl shadow-lg border border-white/20 px-3 py-2 sm:px-4 sm:py-3 gap-2">
@@ -313,7 +298,7 @@
 
           <!-- Hamburger — solo móvil -->
           <button @click="open = !open" aria-label="Abrir menú"
-            class="md:hidden flex items-center justify-center w-9 h-9 rounded-xl bg-slate-100 text-slate-700 hover:bg-orange-100 hover:text-orange-600 transition-colors active:scale-95 z-[110] relative">
+            class="md:hidden flex items-center justify-center w-9 h-9 rounded-xl bg-slate-100 text-slate-700 hover:bg-orange-100 hover:text-orange-600 transition-colors active:scale-95 z-[80] relative">
             <i class="bi bi-list text-xl leading-none" x-show="!open"></i>
             <i class="bi bi-x-lg text-base leading-none" x-show="open" x-cloak></i>
           </button>
@@ -332,7 +317,7 @@
          x-transition:leave-end="opacity-0"
          x-cloak
          @click="open = false"
-         class="fixed inset-0 bg-black/50 z-[100]"
+         class="fixed inset-0 bg-black/50 z-[70]"
          style="pointer-events:auto;">
     </div>
 
@@ -345,7 +330,7 @@
          x-transition:leave-start="opacity-100 translate-x-0"
          x-transition:leave-end="opacity-0 translate-x-full"
          x-cloak
-         class="fixed top-0 right-0 h-full w-[85%] max-w-sm bg-white z-[110] shadow-2xl flex flex-col">
+         class="fixed top-0 right-0 h-full w-[85%] max-w-sm bg-white z-[80] shadow-2xl flex flex-col overflow-y-auto">
 
       <!-- Header del menú -->
       <div class="flex items-center justify-between px-5 py-4 border-b border-slate-100">
@@ -389,13 +374,14 @@
 
   <!-- Hero con Video -->
   <section class="relative min-h-screen flex items-center justify-center text-center overflow-hidden">
-    <img src="/img/karpus.jpg"
-       class="absolute inset-0 w-full h-full object-cover hero-bg-animate"
-       alt="Niños felices en Karpus Kids" loading="lazy">
+    <video autoplay muted loop playsinline poster="img/karpus.jpg" class="absolute inset-0 w-full h-full object-cover -z-10">
+      <source src="img/14.mp4" type="video/mp4">
+    </video>
     <div class="absolute inset-0 bg-gradient-to-b from-black/60 via-black/40 to-black/70"></div>
     <div x-data="{ contactModal: false }" class="relative z-10 p-8 text-white max-w-4xl mx-auto" data-aos="fade-up">
-      <h1 class="karpus-kids-colored mb-4 text-5xl md:text-8xl">
-        <span class="k-1">K</span><span class="k-2">A</span><span class="k-3">R</span><span class="k-4">P</span><span class="k-5">U</span><span class="k-6">S</span>&nbsp;<span class="k-7">K</span><span class="k-8">I</span><span class="k-9">D</span><span class="k-10">S</span>
+      <h1 class="karpus-kids-colored mb-4 text-5xl md:text-8xl flex flex-wrap justify-center">
+        <span class="whitespace-nowrap"><span class="k-1">K</span><span class="k-2">A</span><span class="k-3">R</span><span class="k-4">P</span><span class="k-5">U</span><span class="k-6">S</span></span>
+        <span class="whitespace-nowrap">&nbsp;<span class="k-7">K</span><span class="k-8">I</span><span class="k-9">D</span><span class="k-10">S</span></span>
       </h1>
       <p class="text-xl font-light max-w-2xl mx-auto mb-10">
         Tu hijo merece un lugar seguro donde aprenda, se divierta y esté protegido mientras tú trabajas con tranquilidad.  
@@ -731,9 +717,9 @@ Invertir en la educación y seguridad de tu hijo hoy, es asegurar su futuro mañ
 
   <!-- CTA Final (Muy Fuerte) -->
   <section class="py-24 bg-gradient-to-b from-pink-50 to-white text-center relative overflow-hidden">
-    <div class="block block1 text-blue-500 font-bold">A</div>
-    <div class="block block2 text-orange-500 font-bold">1</div>
-    <div class="block block3 text-green-500">🎨</div>
+    <div class="block block1 text-blue-500 font-bold text-4xl">A</div>
+    <div class="block block2 text-orange-500 font-bold text-4xl">1</div>
+    <div class="block block3 text-green-500 text-4xl">🎨</div>
     <div class="max-w-4xl mx-auto relative z-10">
       <h2 class="text-4xl font-bold mb-6 text-gray-800">
         ¿Listo para formar parte de la familia Karpus Kids?
@@ -758,7 +744,7 @@ Invertir en la educación y seguridad de tu hijo hoy, es asegurar su futuro mañ
       <!-- Contacto -->
       <div data-aos="fade-up" data-aos-delay="100">
         <h3 class="text-xl font-bold mb-4">Contáctanos</h3>
-        <p class="mb-2"><i class="bi bi-telephone-fill mr-2"></i> +1 (829) 803-8424</p>
+        <p class="mb-2"><i class="bi bi-telephone-fill mr-2"></i> +1 (829) 803-8484</p>
         <p class="mb-2"><i class="bi bi-instagram mr-2"></i> <a href="https://www.instagram.com/karpus_kids/" target="_blank" class="text-slate-400 hover:text-white hover:underline">@karpus_kids</a></p>
         <p class="mb-2"><i class="bi bi-envelope-fill mr-2"></i> info@karpuskids.com</p>
         <h3 class="text-xl font-bold mb-4 mt-6">Horario</h3>
@@ -773,8 +759,8 @@ Invertir en la educación y seguridad de tu hijo hoy, es asegurar su futuro mañ
   </footer>
   
   <!-- Botones flotantes -->
-  <a href="https://wa.me/18298038484" target="_blank" class="floating-btn btn-ws"><i class="bi bi-whatsapp"></i></a>
-  <a href="https://www.instagram.com/karpus_kids/" target="_blank" class="floating-btn btn-ig"><i class="bi bi-instagram"></i></a>
+  <a href="https://wa.me/18298038484" target="_blank" class="floating-btn btn-ws text-3xl"><i class="bi bi-whatsapp"></i></a>
+  <a href="https://www.instagram.com/karpus_kids/" target="_blank" class="floating-btn btn-ig text-3xl"><i class="bi bi-instagram"></i></a>
   
   <!-- Lightbox modal para galería de imágenes -->
   <div id="lightbox" class="fixed inset-0 bg-black/80 hidden items-center justify-center z-50 p-4">
