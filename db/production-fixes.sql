@@ -1,6 +1,8 @@
 -- ============================================================
 -- 🚀 KARPUS KIDS — Production Fixes SQL
--- Ejecutar en Supabase SQL Editor antes del lanzamiento
+-- INSTRUCCIONES:
+--   1. Ejecutar PRIMERO: db/drop-functions.sql
+--   2. Ejecutar DESPUÉS: este archivo (production-fixes.sql)
 -- ============================================================
 
 -- ── 1. Columnas faltantes en payments ────────────────────────
@@ -9,13 +11,10 @@ alter table public.payments add column if not exists reference text;
 alter table public.payments add column if not exists transfer_date date;
 
 -- ── 2. Columnas faltantes en daily_logs ──────────────────────
-alter table public.daily_logs add column if not exists updated_at timestamptz default now();
 alter table public.daily_logs add column if not exists activities text;
 
 -- ── 3. Columnas faltantes en profiles ────────────────────────
 alter table public.profiles add column if not exists onesignal_player_id text;
-alter table public.profiles add column if not exists title text;
-alter table public.profiles add column if not exists address text;
 
 -- ── 4. Tabla meetings (videollamadas) ────────────────────────
 create table if not exists public.meetings (
@@ -32,15 +31,10 @@ create table if not exists public.meetings (
 );
 alter table public.meetings enable row level security;
 
--- Staff puede gestionar reuniones
 drop policy if exists "staff_manage_meetings" on meetings;
 create policy "staff_manage_meetings" on meetings for all
-  using (exists (
-    select 1 from profiles where id = auth.uid()
-    and role in ('directora','maestra','asistente')
-  ));
+  using (exists (select 1 from profiles where id = auth.uid() and role in ('directora','maestra','asistente')));
 
--- Padres pueden ver reuniones
 drop policy if exists "padre_view_meetings" on meetings;
 create policy "padre_view_meetings" on meetings for select
   using (auth.uid() is not null);
@@ -48,59 +42,26 @@ create policy "padre_view_meetings" on meetings for select
 -- ── 5. RLS para daily_logs ────────────────────────────────────
 drop policy if exists "maestra_daily_logs_all" on daily_logs;
 create policy "maestra_daily_logs_all" on daily_logs for all
-  using (
-    exists (
-      select 1 from classrooms
-      where id = daily_logs.classroom_id
-      and teacher_id = auth.uid()
-    )
-  );
+  using (exists (select 1 from classrooms where id = daily_logs.classroom_id and teacher_id = auth.uid()));
 
 drop policy if exists "padre_read_daily_logs" on daily_logs;
 create policy "padre_read_daily_logs" on daily_logs for select
-  using (
-    exists (
-      select 1 from students
-      where id = daily_logs.student_id
-      and parent_id = auth.uid()
-    )
-  );
+  using (exists (select 1 from students where id = daily_logs.student_id and parent_id = auth.uid()));
 
 -- ── 6. Índices de rendimiento ─────────────────────────────────
-create index if not exists idx_payments_student_due
-  on payments(student_id, due_date);
+create index if not exists idx_payments_student_due      on payments(student_id, due_date);
+create index if not exists idx_payments_status_month     on payments(status, month_paid);
+create index if not exists idx_daily_logs_student_date   on daily_logs(student_id, date);
+create index if not exists idx_daily_logs_classroom_date on daily_logs(classroom_id, date);
+create index if not exists idx_messages_conv_created     on messages(conversation_id, created_at);
+create index if not exists idx_attendance_student_date   on attendance(student_id, date);
+create index if not exists idx_attendance_classroom_date on attendance(classroom_id, date);
+create index if not exists idx_notifications_user_read   on notifications(user_id, is_read, created_at desc);
+create index if not exists idx_students_parent           on students(parent_id);
+create index if not exists idx_students_classroom        on students(classroom_id);
+create index if not exists idx_posts_classroom_created   on posts(classroom_id, created_at desc);
 
-create index if not exists idx_payments_status_month
-  on payments(status, month_paid);
-
-create index if not exists idx_daily_logs_student_date
-  on daily_logs(student_id, date);
-
-create index if not exists idx_daily_logs_classroom_date
-  on daily_logs(classroom_id, date);
-
-create index if not exists idx_messages_conversation_created
-  on messages(conversation_id, created_at);
-
-create index if not exists idx_attendance_student_date
-  on attendance(student_id, date);
-
-create index if not exists idx_attendance_classroom_date
-  on attendance(classroom_id, date);
-
-create index if not exists idx_notifications_user_read
-  on notifications(user_id, is_read, created_at desc);
-
-create index if not exists idx_students_parent
-  on students(parent_id);
-
-create index if not exists idx_students_classroom
-  on students(classroom_id);
-
-create index if not exists idx_posts_classroom_created
-  on posts(classroom_id, created_at desc);
-
--- ── 7. Trigger updated_at en daily_logs ──────────────────────
+-- ── 7. Función set_updated_at (ya fue dropeada en drop-functions.sql) ──
 create or replace function public.set_updated_at()
 returns trigger language plpgsql as $$
 begin
@@ -114,7 +75,7 @@ create trigger daily_logs_updated_at
   before update on daily_logs
   for each row execute function set_updated_at();
 
--- ── 8. Función RPC para ciclo de pagos (si no existe) ─────────
+-- ── 8. run_payment_cycle (ya fue dropeada en drop-functions.sql) ──
 create or replace function public.run_payment_cycle()
 returns json language plpgsql security definer as $$
 declare
@@ -125,85 +86,69 @@ declare
   v_today     date := current_date;
   v_month     text;
 begin
-  -- Obtener configuración
   select * into v_settings from school_settings where id = 1;
   if not found then
     v_settings.generation_day := 25;
     v_settings.due_day := 5;
   end if;
 
-  -- Nombre del mes siguiente
   v_month := to_char(v_today + interval '1 month', 'TMMonth');
 
-  -- Generar pagos del mes siguiente si es día de generación
   if extract(day from v_today) = v_settings.generation_day then
     for v_student in
-      select id, monthly_fee, due_day
-      from students
-      where is_active = true
-      and monthly_fee > 0
+      select id, monthly_fee, due_day from students where is_active = true and monthly_fee > 0
     loop
       insert into payments (student_id, amount, concept, status, month_paid, due_date, created_at)
       values (
-        v_student.id,
-        v_student.monthly_fee,
-        'Mensualidad ' || v_month,
-        'pending',
-        v_month,
-        (date_trunc('month', v_today + interval '1 month') + ((coalesce(v_student.due_day, v_settings.due_day) - 1) || ' days')::interval)::date,
+        v_student.id, v_student.monthly_fee, 'Mensualidad ' || v_month, 'pending', v_month,
+        (date_trunc('month', v_today + interval '1 month') +
+         ((coalesce(v_student.due_day, v_settings.due_day) - 1) || ' days')::interval)::date,
         now()
-      )
-      on conflict do nothing;
+      ) on conflict do nothing;
       v_generated := v_generated + 1;
     end loop;
   end if;
 
-  -- Marcar como vencidos los pagos pasados
-  update payments
-  set status = 'overdue'
-  where status in ('pending','pendiente')
-  and due_date < v_today;
+  update payments set status = 'overdue'
+  where status in ('pending','pendiente') and due_date < v_today;
   get diagnostics v_expired = row_count;
 
   return json_build_object('generated', v_generated, 'expired', v_expired);
 end;
 $$;
 
--- ── 9. Función get_unread_counts (si no existe) ───────────────
+-- ── 9. get_unread_counts (ya fue dropeada en drop-functions.sql) ──
 create or replace function public.get_unread_counts()
 returns json language plpgsql security definer as $$
 declare
   v_user_id uuid := auth.uid();
   v_counts  json;
 begin
-  select json_object_agg(sender_id, cnt)
-  into v_counts
+  select json_object_agg(sender_id, cnt) into v_counts
   from (
     select m.sender_id, count(*) as cnt
     from messages m
     join conversation_participants cp
-      on cp.conversation_id = m.conversation_id
-      and cp.user_id = v_user_id
-    where m.sender_id != v_user_id
-    and m.is_read = false
+      on cp.conversation_id = m.conversation_id and cp.user_id = v_user_id
+    where m.sender_id != v_user_id and m.is_read = false
     group by m.sender_id
   ) t;
   return coalesce(v_counts, '{}'::json);
 end;
 $$;
 
--- ── 10. Tabla school_settings (si no existe) ──────────────────
+-- ── 10. Tabla school_settings ─────────────────────────────────
 create table if not exists public.school_settings (
-  id              int primary key default 1,
-  generation_day  int default 25,
-  due_day         int default 5,
-  school_name     text default 'Karpus Kids',
-  monthly_fee     numeric default 0,
-  updated_at      timestamptz default now()
+  id             int primary key default 1,
+  generation_day int default 25,
+  due_day        int default 5,
+  school_name    text default 'Karpus Kids',
+  monthly_fee    numeric default 0,
+  updated_at     timestamptz default now()
 );
 insert into public.school_settings (id) values (1) on conflict do nothing;
 
--- ── 11. Tabla terms_acceptance (si no existe) ─────────────────
+-- ── 11. Tabla terms_acceptance ────────────────────────────────
 create table if not exists public.terms_acceptance (
   user_id       uuid references public.profiles(id) on delete cascade,
   terms_version text not null,
@@ -211,15 +156,13 @@ create table if not exists public.terms_acceptance (
   primary key (user_id, terms_version)
 );
 alter table public.terms_acceptance enable row level security;
-create policy "user_own_terms" on terms_acceptance for all
-  using (user_id = auth.uid());
+drop policy if exists "user_own_terms" on terms_acceptance;
+create policy "user_own_terms" on terms_acceptance for all using (user_id = auth.uid());
 
--- ── 12. Columna is_read en messages (si no existe) ────────────
-alter table public.messages add column if not exists is_read boolean default false;
-
--- ── 13. Verificar que notifications tiene todas las columnas ──
-alter table public.notifications add column if not exists link text;
-alter table public.notifications add column if not exists type text default 'info';
+-- ── 12. Columnas en messages y notifications ──────────────────
+alter table public.messages      add column if not exists is_read boolean default false;
+alter table public.notifications add column if not exists link    text;
+alter table public.notifications add column if not exists type    text default 'info';
 
 -- ── DONE ──────────────────────────────────────────────────────
-select 'Production fixes applied successfully' as status;
+select 'Production fixes applied successfully ✅' as status;

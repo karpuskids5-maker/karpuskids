@@ -59,14 +59,14 @@ export const VideoCallUI = {
           </div>
           ${isHost ? `
           <button id="btn-schedule-meeting"
-            class="flex items-center gap-2 px-5 py-2.5 bg-violet-600 hover:bg-violet-700 text-white rounded-2xl font-black text-xs uppercase tracking-wider shadow-lg active:scale-95 transition-all">
+            class="flex items-center gap-2 px-5 py-2.5 bg-orange-600 hover:bg-orange-700 text-white rounded-2xl font-black text-xs uppercase tracking-wider shadow-lg active:scale-95 transition-all">
             <i data-lucide="calendar-plus" class="w-4 h-4"></i> Programar reunión
           </button>` : ''}
         </div>
 
         <!-- Reunión activa -->
         ${active ? `
-        <div class="bg-gradient-to-r from-rose-500 to-pink-600 rounded-3xl p-5 text-white shadow-xl">
+        <div class="bg-gradient-to-r from-orange-500 to-amber-500 rounded-3xl p-5 text-white shadow-xl">
           <div class="flex items-center gap-3 mb-4">
             <div class="w-3 h-3 bg-white rounded-full animate-pulse"></div>
             <span class="font-black text-sm uppercase tracking-wider">En vivo ahora</span>
@@ -75,7 +75,7 @@ export const VideoCallUI = {
           <p class="text-white/80 text-sm mb-4">${active.description || 'Reunión activa'}</p>
           <button id="btn-join-active"
             data-room="${active.room_name}"
-            class="w-full py-3.5 bg-white text-rose-600 rounded-2xl font-black text-sm uppercase tracking-wider shadow-lg active:scale-95 transition-all flex items-center justify-center gap-2">
+            class="w-full py-3.5 bg-white text-orange-600 rounded-2xl font-black text-sm uppercase tracking-wider shadow-lg active:scale-95 transition-all flex items-center justify-center gap-2">
             <i data-lucide="video" class="w-5 h-5"></i> Unirse ahora
           </button>
         </div>` : `
@@ -127,7 +127,7 @@ export const VideoCallUI = {
         ${isHost ? `
         <div class="flex gap-2 shrink-0">
           <button data-room="${m.room_name}" data-meeting-id="${m.id}"
-            class="btn-start-meeting px-3 py-2 bg-violet-600 text-white rounded-xl font-black text-xs uppercase hover:bg-violet-700 transition-all active:scale-95">
+            class="btn-start-meeting px-3 py-2 bg-orange-600 text-white rounded-xl font-black text-xs uppercase hover:bg-orange-700 transition-all active:scale-95">
             Iniciar
           </button>
           <button data-meeting-id="${m.id}"
@@ -295,7 +295,7 @@ export const VideoCallUI = {
         </div>
         <div class="p-4 border-t border-slate-100 flex gap-3">
           <button onclick="document.getElementById('schedule-modal').remove()" class="flex-1 py-2.5 bg-slate-100 text-slate-500 rounded-2xl font-black text-xs uppercase">Cancelar</button>
-          <button id="btn-confirm-schedule" class="flex-1 py-2.5 bg-violet-600 text-white rounded-2xl font-black text-xs uppercase shadow-lg active:scale-95 transition-all">Programar</button>
+          <button id="btn-confirm-schedule" class="flex-1 py-2.5 bg-orange-600 text-white rounded-2xl font-black text-xs uppercase shadow-lg active:scale-95 transition-all">Programar</button>
         </div>
       </div>`;
 

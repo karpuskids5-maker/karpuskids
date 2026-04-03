@@ -30,8 +30,22 @@ export async function initTasks() {
       return;
     }
 
+    // Cargar conteo de entregas pendientes de revisar
+    const taskIds = tasks.map(t => t.id);
+    const { data: pendingSubmissions } = await supabase
+      .from('task_evidences')
+      .select('task_id')
+      .in('task_id', taskIds)
+      .neq('status', 'graded');
+
+    const pendingMap = {};
+    (pendingSubmissions || []).forEach(s => {
+      pendingMap[s.task_id] = (pendingMap[s.task_id] || 0) + 1;
+    });
+
     listContainer.innerHTML = tasks.map(t => {
       const dueDate = new Date(t.due_date).toLocaleDateString('es-ES', { day: 'numeric', month: 'long', year: 'numeric' });
+      const pendingCount = pendingMap[t.id] || 0;
       return `
       <div class="bg-white p-6 rounded-3xl border-2 border-slate-50 shadow-sm hover:shadow-md transition-all group">
         <div class="flex justify-between items-start mb-4">
@@ -53,7 +67,10 @@ export async function initTasks() {
           <div>
             ${t.file_url ? '<span class="px-2 py-1 bg-blue-50 text-blue-600 text-[10px] font-bold rounded-full flex items-center gap-1"><i data-lucide="paperclip" class="w-3 h-3"></i> Adjunto</span>' : ''}
           </div>
-          <button onclick="App.viewTaskSubmissions('${t.id}')" class="px-4 py-2 bg-orange-600 text-white rounded-xl text-[10px] font-black uppercase hover:bg-orange-700 transition-all shadow-sm">Ver Entregas</button>
+          <button onclick="App.viewTaskSubmissions('${t.id}')" class="relative px-4 py-2 bg-orange-600 text-white rounded-xl text-[10px] font-black uppercase hover:bg-orange-700 transition-all shadow-sm flex items-center gap-2">
+            Ver Entregas
+            ${pendingCount > 0 ? `<span class="absolute -top-2 -right-2 w-5 h-5 bg-rose-500 text-white text-[9px] font-black rounded-full flex items-center justify-center shadow-sm animate-pulse">${pendingCount}</span>` : ''}
+          </button>
         </div>
       </div>
     `}).join('');
@@ -76,33 +93,15 @@ export async function openEditTaskModal(taskId) {
 }
 
 export async function deleteTask(taskId) {
-  const modalId = 'confirmDeleteTaskModal';
-  const content = `
-    <div class="bg-white w-full max-w-sm rounded-[2rem] shadow-2xl p-8 animate-fadeIn text-center">
-      <div class="w-16 h-16 bg-rose-100 text-rose-600 rounded-full flex items-center justify-center mx-auto mb-4">
-        <i data-lucide="alert-triangle" class="w-8 h-8"></i>
-      </div>
-      <h3 class="text-xl font-black text-slate-800 mb-2">Eliminar Tarea</h3>
-      <p class="text-sm text-slate-500 mb-6 font-medium">¿Estás segura de que quieres eliminar esta tarea? Los datos se perderán.</p>
-      <div class="flex gap-3">
-        <button onclick="Modal.close('${modalId}')" class="flex-1 py-3 bg-slate-100 text-slate-600 rounded-xl font-bold uppercase text-xs hover:bg-slate-200 transition-colors">Cancelar</button>
-        <button id="btnConfirmDeleteTask" class="flex-[2] py-3 bg-rose-500 text-white rounded-xl font-bold uppercase text-xs hover:bg-rose-600 shadow-lg shadow-rose-200 transition-all flex items-center justify-center gap-2">Eliminar</button>
-      </div>
-    </div>
-  `;
-  Modal.open(modalId, content);
-
-  document.getElementById('btnConfirmDeleteTask').addEventListener('click', async () => {
-    try {
-      Modal.close(modalId);
-      await MaestraApi.deleteTask(taskId);
-      safeToast('Tarea eliminada correctamente');
-      await initTasks();
-    } catch (err) {
-      console.error('Error al eliminar tarea:', err);
-      safeToast('No se pudo eliminar la tarea', 'error');
-    }
-  });
+  if (!confirm('¿Eliminar esta tarea? Los datos se perderán permanentemente.')) return;
+  try {
+    await MaestraApi.deleteTask(taskId);
+    safeToast('Tarea eliminada correctamente');
+    await initTasks();
+  } catch (err) {
+    console.error('Error al eliminar tarea:', err);
+    safeToast('No se pudo eliminar la tarea', 'error');
+  }
 }
 
 export async function openNewTaskModal(taskToEdit = null) {

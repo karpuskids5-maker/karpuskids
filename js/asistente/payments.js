@@ -91,12 +91,12 @@ export const PaymentsModule = {
 
   async _loadSettings() {
     try {
-      const { data } = await supabase.from('school_settings').select('*').eq('id', 1).single();
+      const { data } = await supabase.from('school_settings').select('*').eq('id', 1).maybeSingle();
       if (data) {
         this.settings.generation_day = data.generation_day || 25;
         this.settings.due_day = data.due_day || 5;
       }
-    } catch (e) { /* silencioso */ }
+    } catch (e) { /* silencioso — tabla puede no existir */ }
   },
 
   filterBy(status) {

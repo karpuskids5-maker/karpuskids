@@ -275,17 +275,18 @@ document.addEventListener('DOMContentLoaded', async () => {
 
     // 7. Configurar guardado de perfil
     document.getElementById('btnSaveMainConfig')?.addEventListener('click', async () => {
-      const updates = {
-        name: document.getElementById('confDirName').value,
-        title: document.getElementById('confDirTitle').value,
-        bio: document.getElementById('confDirBio').value,
-        phone: document.getElementById('confPhone').value,
-        email: document.getElementById('confEmail').value,
-        address: document.getElementById('confAddress').value
-      };
-      
+      // Solo actualizar columnas que existen en profiles (name, bio, phone)
+      // title y address no existen — causan 400
+      const updates = {};
+      const nameVal  = document.getElementById('confDirName')?.value?.trim();
+      const bioVal   = document.getElementById('confDirBio')?.value?.trim();
+      const phoneVal = document.getElementById('confPhone')?.value?.trim();
+      if (nameVal)  updates.name  = nameVal;
+      if (bioVal)   updates.bio   = bioVal;
+      if (phoneVal) updates.phone = phoneVal;
+
       const { error } = await supabase.from('profiles').update(updates).eq('id', auth.user.id);
-      if (error) Helpers.toast('Error al guardar perfil', 'error');
+      if (error) Helpers.toast('Error al guardar perfil: ' + error.message, 'error');
       else {
         Helpers.toast('Perfil actualizado correctamente');
         AppState.set('profile', { ...auth.profile, ...updates });

@@ -102,7 +102,7 @@ function _renderCompactRow(s, log) {
   const sid = s.id;
 
   // Si el log tiene más de 12 horas, tratar como vacío
-  const isValid = _isWithin12h(log.updated_at || log.created_at);
+  const isValid = _isWithin12h(log.created_at);
   const currentMood  = isValid ? (log.mood  || '') : '';
   const currentFood  = isValid ? (log.food  || log.eating || '') : '';
   const currentSleep = isValid ? (log.nap   || log.sleeping || '') : '';
@@ -221,8 +221,7 @@ export async function saveRoutineLog(studentId, field = 'notes', value = null) {
       student_id:   studentId,
       classroom_id: classroom.id,
       date:         today,
-      [dbField]:    fieldValue,
-      updated_at:   new Date().toISOString()
+      [dbField]:    fieldValue
     });
 
     if (statusEl) statusEl.textContent = '✓';
