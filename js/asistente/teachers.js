@@ -62,18 +62,18 @@ export const TeachersModule = {
     const LC = 'block text-[11px] font-black text-slate-400 uppercase tracking-wider mb-1.5 ml-1';
 
     const html = `
-      <div class="bg-gradient-to-r from-teal-600 to-emerald-600 text-white p-6 rounded-t-3xl flex items-center justify-between">
+      <div class="bg-gradient-to-r from-teal-600 to-emerald-600 text-white p-5 rounded-t-3xl flex items-center justify-between shrink-0">
         <div class="flex items-center gap-3">
-          <div class="w-12 h-12 bg-white/20 rounded-2xl flex items-center justify-center text-2xl">👩‍🏫</div>
+          <div class="w-10 h-10 bg-white/20 rounded-2xl flex items-center justify-center text-xl">👩‍🏫</div>
           <div>
-            <h3 class="text-xl font-black">${id ? 'Editar Maestra' : 'Gestión de Personal'}</h3>
-            <p class="text-xs text-white/70 font-bold uppercase tracking-widest">Maestras y Asistentes</p>
+            <h3 class="text-lg font-black">${id ? 'Editar Maestra' : 'Gestión de Personal'}</h3>
+            <p class="text-[10px] text-white/70 font-bold uppercase tracking-widest">Maestras y Asistentes</p>
           </div>
         </div>
-        <button onclick="window._closeAsistenteModal()" class="w-10 h-10 flex items-center justify-center rounded-xl bg-white/10 hover:bg-white/20">✕</button>
+        <button onclick="window._closeAsistenteModal()" class="w-9 h-9 flex items-center justify-center rounded-xl bg-white/10 hover:bg-white/20 transition-all">✕</button>
       </div>
 
-      <div class="p-6 space-y-4">
+      <div class="p-6 space-y-4 overflow-y-auto flex-1 custom-scrollbar" style="max-height: calc(90vh - 140px);">
         <input type="hidden" id="teacherId" value="${id || ''}">
 
         <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -95,25 +95,24 @@ export const TeachersModule = {
           </div>
           <div class="sm:col-span-2">
             <label class="flex items-center gap-3 p-3 bg-white border-2 border-slate-100 rounded-2xl cursor-pointer">
-              <input type="checkbox" id="teacherActive" checked class="w-5 h-5 rounded accent-rose-500">
+              <input type="checkbox" id="teacherActive" checked class="w-5 h-5 rounded accent-teal-600">
               <span class="text-sm font-bold text-slate-700">Cuenta Activa</span>
             </label>
           </div>
         </div>
       </div>
 
-      <div class="bg-white p-5 rounded-b-3xl border-t border-slate-100 flex justify-end gap-3">
-        <button onclick="window._closeAsistenteModal()" class="px-6 py-2.5 text-slate-500 font-black text-xs uppercase hover:bg-slate-50 rounded-2xl transition-all">Cancelar</button>
-        <button onclick="window._saveTeacherNow()" class="px-8 py-2.5 bg-gradient-to-r from-teal-600 to-emerald-600 text-white rounded-2xl font-black text-xs uppercase shadow-lg hover:-translate-y-0.5 transition-all active:scale-95" id="btnSaveTeacherModal">Guardar Personal</button>
+      <div class="bg-white p-5 rounded-b-3xl border-t border-slate-100 flex justify-end gap-3 shrink-0">
+        <button onclick="window._closeAsistenteModal()" class="px-6 py-2.5 text-slate-500 font-black text-[10px] uppercase hover:bg-slate-50 rounded-2xl transition-all">Cancelar</button>
+        <button onclick="window._saveTeacherNow()" class="px-8 py-2.5 bg-gradient-to-r from-teal-600 to-emerald-600 text-white rounded-2xl font-black text-[10px] uppercase shadow-lg hover:-translate-y-0.5 transition-all active:scale-95" id="btnSaveTeacherModal">Guardar Personal</button>
       </div>`;
 
     const gc = document.getElementById('globalModalContainer');
     if (gc) {
-      gc.innerHTML = '<div class="bg-white rounded-3xl shadow-2xl w-full max-w-lg max-h-[90vh] overflow-hidden mx-3">' + html + '</div>';
+      gc.innerHTML = '<div class="bg-white rounded-3xl shadow-2xl w-full max-w-lg max-h-[92vh] overflow-hidden mx-3 flex flex-col">' + html + '</div>';
       gc.style.display = 'flex';
-      gc.style.alignItems = 'flex-start';
+      gc.style.alignItems = 'center';
       gc.style.justifyContent = 'center';
-      gc.style.paddingTop = '5vh';
       gc.style.zIndex = '9999';
     }
 

@@ -63,106 +63,107 @@ export const StudentsModule = {
   },
 
   async openModal(studentId = null) {
+    const IC = 'w-full px-4 py-2.5 border-2 border-slate-100 rounded-2xl outline-none focus:ring-4 focus:ring-teal-100 focus:border-teal-400 bg-slate-50/50 transition-all text-sm font-medium';
+    const LC = 'block text-[11px] font-black text-slate-400 uppercase tracking-wider mb-1.5 ml-1';
+
     const html = `
-      <div class="bg-gradient-to-r from-teal-600 to-emerald-600 text-white p-6 rounded-t-3xl flex items-center justify-between">
+      <div class="bg-gradient-to-r from-teal-600 to-emerald-600 text-white p-5 rounded-t-3xl flex items-center justify-between shrink-0">
         <div class="flex items-center gap-3">
-          <div class="w-12 h-12 bg-white/20 rounded-2xl flex items-center justify-center text-2xl">👶</div>
+          <div class="w-10 h-10 bg-white/20 rounded-2xl flex items-center justify-center text-xl">👶</div>
           <div>
-            <h3 class="text-xl font-black">${studentId ? 'Editar Estudiante' : 'Crear Estudiante'}</h3>
-            <p class="text-xs text-white/70 font-bold uppercase tracking-widest">${studentId ? 'Actualizar Registro' : 'Nuevo Registro'}</p>
+            <h3 class="text-lg font-black">${studentId ? 'Editar Estudiante' : 'Crear Estudiante'}</h3>
+            <p class="text-[10px] text-white/70 font-bold uppercase tracking-widest">${studentId ? 'Actualizar Registro' : 'Nuevo Registro'}</p>
           </div>
         </div>
-        <button onclick="window._closeAsistenteModal()" class="w-10 h-10 flex items-center justify-center rounded-xl bg-white/10 hover:bg-white/20">✕</button>
+        <button onclick="window._closeAsistenteModal()" class="w-9 h-9 flex items-center justify-center rounded-xl bg-white/10 hover:bg-white/20 transition-all">✕</button>
       </div>
 
-      <div class="p-6 space-y-5 overflow-y-auto" style="max-height:70vh">
+      <div class="p-5 space-y-4 overflow-y-auto flex-1 custom-scrollbar" style="max-height: calc(90vh - 140px);">
         <input type="hidden" id="stId" value="${studentId || ''}">
 
         <!-- Foto y Matrícula -->
-        <div class="flex flex-col sm:flex-row gap-5 items-center bg-white p-5 rounded-2xl border-2 border-slate-100">
+        <div class="flex flex-col sm:flex-row gap-4 items-center bg-slate-50/50 p-4 rounded-2xl border-2 border-slate-100">
           <div class="relative group cursor-pointer shrink-0">
-            <div id="stAvatarPreview" class="w-20 h-20 rounded-2xl bg-slate-100 border-4 border-dashed border-slate-200 flex flex-col items-center justify-center text-slate-400 group-hover:border-teal-400 transition-all overflow-hidden">
+            <div id="stAvatarPreview" class="w-20 h-20 rounded-2xl bg-white border-2 border-dashed border-slate-200 flex flex-col items-center justify-center text-slate-400 group-hover:border-teal-400 transition-all overflow-hidden shadow-sm">
               <span class="text-2xl">📷</span>
               <span class="text-[9px] font-black uppercase mt-1">Foto</span>
             </div>
             <input type="file" id="stAvatarFile" class="absolute inset-0 opacity-0 cursor-pointer" accept="image/*">
           </div>
-          <div class="flex-1 w-full">
-            <p class="text-[11px] font-black text-slate-500 uppercase tracking-wider mb-2">📷 FOTO Y MATRÍCULA</p>
-            <div class="flex gap-2 mb-3">
-              <input id="stMatricula" placeholder="Generar automática..." class="${IC} flex-1" readonly>
-              <button onclick="window._genMatricula()" class="px-4 py-2 bg-teal-600 text-white rounded-xl font-black text-xs uppercase hover:bg-teal-700 transition-all">Generar</button>
+          <div class="flex-1 w-full space-y-3">
+            <div>
+              <label class="${LC}">Matrícula</label>
+              <div class="flex gap-2">
+                <input id="stMatricula" placeholder="Generar automática..." class="${IC} flex-1 py-2" readonly>
+                <button onclick="window._genMatricula()" class="px-3 py-2 bg-teal-600 text-white rounded-xl font-black text-[10px] uppercase hover:bg-teal-700 transition-all shadow-sm">Generar</button>
+              </div>
             </div>
             <div class="grid grid-cols-2 gap-3">
-              <div><label class="${LC}">Fecha inscripción</label><input type="date" id="stJoinedDate" class="${IC}"></div>
-              <div class="flex items-end pb-1"><label class="flex items-center gap-2 cursor-pointer"><input type="checkbox" id="stActive" checked class="w-4 h-4 rounded accent-teal-600"><span class="text-sm font-bold text-teal-700">Estado Activo</span></label></div>
+              <div><label class="${LC}">Inscripción</label><input type="date" id="stJoinedDate" class="${IC} py-2"></div>
+              <div class="flex items-end pb-2"><label class="flex items-center gap-2 cursor-pointer"><input type="checkbox" id="stActive" checked class="w-4 h-4 rounded accent-teal-600"><span class="text-[11px] font-bold text-teal-700 uppercase">Activo</span></label></div>
             </div>
           </div>
         </div>
 
         <!-- Info del estudiante -->
-        <div class="bg-white p-5 rounded-2xl border-2 border-slate-100 space-y-3">
-          <p class="text-[11px] font-black text-slate-500 uppercase tracking-wider">👦 INFORMACIÓN DEL ESTUDIANTE</p>
-          <div><label class="${LC}">Nombre completo</label><input id="stName" placeholder="Nombre completo" class="${IC}"></div>
-          <div class="grid grid-cols-2 gap-3">
+        <div class="space-y-3">
+          <p class="text-[10px] font-black text-teal-600 uppercase tracking-widest flex items-center gap-2"><span class="w-1.5 h-3 bg-teal-500 rounded-full"></span> Información del Estudiante</p>
+          <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <div class="sm:col-span-2"><label class="${LC}">Nombre completo *</label><input id="stName" placeholder="Nombre completo" class="${IC}"></div>
             <div><label class="${LC}">Aula</label>
               <select id="stClassroom" class="${IC}"><option value="">-- Seleccionar Aula --</option></select>
             </div>
-            <div class="flex items-end pb-1"><label class="flex items-center gap-2 cursor-pointer"><input type="checkbox" id="stActiveAlt" class="w-4 h-4 rounded accent-teal-600 hidden"></label></div>
-          </div>
-        </div>
-
-        <!-- Acceso -->
-        <div class="bg-white p-5 rounded-2xl border-2 border-slate-100 space-y-3">
-          <p class="text-[11px] font-black text-slate-500 uppercase tracking-wider">🔐 ACCESO Y NOTIFICACIONES</p>
-          <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
-            <div><label class="${LC}">Correo de Usuario (Login)</label><input id="stEmailUser" type="email" placeholder="usuario@karpus.com" class="${IC}"></div>
-            <div><label class="${LC}">Correo de Notificaciones</label><input id="stEmailNotif" type="email" placeholder="avisos@ejemplo.com" class="${IC}"></div>
-            <div><label class="${LC}">Contraseña (Min 6 caracteres)</label><input id="stPassword" type="text" placeholder="********" class="${IC}"></div>
-          </div>
-        </div>
-
-        <!-- Salud -->
-        <div class="bg-white p-5 rounded-2xl border-2 border-slate-100 space-y-3">
-          <p class="text-[11px] font-black text-slate-500 uppercase tracking-wider">🩺 SALUD Y SEGURIDAD</p>
-          <div class="grid grid-cols-2 gap-3">
             <div><label class="${LC}">Tipo Sangre</label>
               <select id="stBlood" class="${IC}">
                 <option value="O+">O+</option><option value="O-">O-</option><option value="A+">A+</option><option value="A-">A-</option>
                 <option value="B+">B+</option><option value="B-">B-</option><option value="AB+">AB+</option><option value="AB-">AB-</option>
               </select>
             </div>
-            <div><label class="${LC}">Alergias</label><input id="stAllergies" placeholder="Ej: Maní, Polvo" class="${IC}"></div>
           </div>
+        </div>
+
+        <!-- Acceso -->
+        <div class="space-y-3 pt-2 border-t border-slate-100">
+          <p class="text-[10px] font-black text-teal-600 uppercase tracking-widest flex items-center gap-2"><span class="w-1.5 h-3 bg-teal-500 rounded-full"></span> Acceso y Notificaciones</p>
+          <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <div><label class="${LC}">Email Login (Padre)</label><input id="stEmailUser" type="email" placeholder="usuario@karpus.com" class="${IC}"></div>
+            <div><label class="${LC}">Email Avisos</label><input id="stEmailNotif" type="email" placeholder="avisos@ejemplo.com" class="${IC}"></div>
+            <div class="sm:col-span-2"><label class="${LC}">Contraseña ${studentId ? '(Solo si desea cambiarla)' : '(Mínimo 6 caracteres)'}</label><input id="stPassword" type="text" placeholder="********" class="${IC}"></div>
+          </div>
+        </div>
+
+        <!-- Salud -->
+        <div class="space-y-3 pt-2 border-t border-slate-100">
+          <p class="text-[10px] font-black text-teal-600 uppercase tracking-widest flex items-center gap-2"><span class="w-1.5 h-3 bg-teal-500 rounded-full"></span> Salud y Seguridad</p>
+          <div><label class="${LC}">Alergias / Condiciones</label><input id="stAllergies" placeholder="Ej: Maní, Polvo" class="${IC}"></div>
           <div><label class="${LC}">Autorizados para recoger</label><textarea id="stPickup" rows="2" placeholder="Ej: Abuela Carmen, Tío Juan" class="${IC} resize-none"></textarea></div>
         </div>
 
-        <!-- Tutor Principal -->
-        <div class="bg-white p-5 rounded-2xl border-2 border-slate-100 space-y-3">
-          <p class="text-[11px] font-black text-slate-500 uppercase tracking-wider">👨‍👩‍👦 TUTOR PRINCIPAL</p>
-          <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
-            <div><label class="${LC}">Nombre</label><input id="p1Name" placeholder="Nombre completo" class="${IC}"></div>
-            <div><label class="${LC}">Teléfono</label><input id="p1Phone" placeholder="Teléfono" class="${IC}"></div>
-            <div><label class="${LC}">Profesión</label><input id="p1Profession" placeholder="Ej: Ingeniero" class="${IC}"></div>
-            <div><label class="${LC}">Dirección</label><input id="p1Address" placeholder="Dirección completa" class="${IC}"></div>
-            <div class="sm:col-span-2"><label class="${LC}">Contacto de Emergencia (Extra)</label><input id="p1Emergency" placeholder="Nombre y Teléfono alternativo" class="${IC}"></div>
+        <!-- Tutores -->
+        <div class="space-y-4 pt-2 border-t border-slate-100">
+          <p class="text-[10px] font-black text-teal-600 uppercase tracking-widest flex items-center gap-2"><span class="w-1.5 h-3 bg-teal-500 rounded-full"></span> Información de Tutores</p>
+          
+          <div class="bg-slate-50/50 p-4 rounded-2xl border-2 border-slate-100 space-y-3">
+            <p class="text-[9px] font-black text-slate-400 uppercase tracking-wider">Tutor Principal</p>
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <div><label class="${LC}">Nombre</label><input id="p1Name" placeholder="Nombre completo" class="${IC}"></div>
+              <div><label class="${LC}">Teléfono</label><input id="p1Phone" placeholder="Teléfono" class="${IC}"></div>
+              <div class="sm:col-span-2"><label class="${LC}">Dirección</label><input id="p1Address" placeholder="Dirección completa" class="${IC}"></div>
+            </div>
           </div>
-        </div>
 
-        <!-- Tutor Secundario -->
-        <div class="bg-white p-5 rounded-2xl border-2 border-slate-100 space-y-3">
-          <p class="text-[11px] font-black text-slate-500 uppercase tracking-wider">👨‍👩‍👧 TUTOR SECUNDARIO</p>
-          <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
-            <div><label class="${LC}">Nombre</label><input id="p2Name" placeholder="Nombre" class="${IC}"></div>
-            <div><label class="${LC}">Teléfono</label><input id="p2Phone" placeholder="Teléfono" class="${IC}"></div>
-            <div><label class="${LC}">Profesión</label><input id="p2Profession" placeholder="Ej: Abogada" class="${IC}"></div>
-            <div><label class="${LC}">Dirección</label><input id="p2Address" placeholder="Dirección opcional" class="${IC}"></div>
+          <div class="bg-slate-50/50 p-4 rounded-2xl border-2 border-slate-100 space-y-3">
+            <p class="text-[9px] font-black text-slate-400 uppercase tracking-wider">Tutor Secundario (Opcional)</p>
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <div><label class="${LC}">Nombre</label><input id="p2Name" placeholder="Nombre" class="${IC}"></div>
+              <div><label class="${LC}">Teléfono</label><input id="p2Phone" placeholder="Teléfono" class="${IC}"></div>
+            </div>
           </div>
         </div>
 
         <!-- Pago -->
-        <div class="bg-amber-50 p-5 rounded-2xl border-2 border-amber-100 space-y-3">
-          <p class="text-[11px] font-black text-amber-700 uppercase tracking-wider">💳 INFORMACIÓN DE PAGO</p>
+        <div class="bg-amber-50/50 p-5 rounded-2xl border-2 border-amber-100 space-y-3">
+          <p class="text-[10px] font-black text-amber-700 uppercase tracking-widest flex items-center gap-2"><span class="w-1.5 h-3 bg-amber-500 rounded-full"></span> Información de Pago</p>
           <div class="grid grid-cols-2 gap-3">
             <div><label class="${LC}">Mensualidad $</label><input id="stMonthlyFee" type="number" step="0.01" placeholder="0.00" class="${IC} bg-white"></div>
             <div><label class="${LC}">Día Vencimiento</label><input id="stDueDay" type="number" min="1" max="31" placeholder="5" class="${IC} bg-white"></div>
@@ -170,25 +171,24 @@ export const StudentsModule = {
         </div>
       </div>
 
-      <div class="bg-white p-5 rounded-b-3xl border-t border-slate-100 flex justify-end gap-3">
-        <button onclick="window._closeAsistenteModal()" class="px-6 py-2.5 text-slate-500 font-black text-xs uppercase hover:bg-slate-50 rounded-2xl transition-all">Cancelar</button>
-        <button onclick="window._saveStudentNow()" class="px-8 py-2.5 bg-gradient-to-r from-teal-600 to-emerald-600 text-white rounded-2xl font-black text-xs uppercase shadow-lg hover:-translate-y-0.5 transition-all active:scale-95" id="btnSaveStudentModal">Guardar Estudiante</button>
+      <div class="bg-white p-5 rounded-b-3xl border-t border-slate-100 flex justify-end gap-3 shrink-0">
+        <button onclick="window._closeAsistenteModal()" class="px-6 py-2.5 text-slate-500 font-black text-[10px] uppercase hover:bg-slate-50 rounded-2xl transition-all">Cancelar</button>
+        <button onclick="window._saveStudentNow()" class="px-8 py-2.5 bg-gradient-to-r from-teal-600 to-emerald-600 text-white rounded-2xl font-black text-[10px] uppercase shadow-lg hover:-translate-y-0.5 transition-all active:scale-95" id="btnSaveStudentModal">Guardar Estudiante</button>
       </div>`;
 
-    // Show in globalModalContainer if available, else fallback modal
     const gc = document.getElementById('globalModalContainer');
     if (gc) {
-      gc.innerHTML = '<div class="bg-white rounded-3xl shadow-2xl w-full max-w-2xl max-h-[92vh] overflow-hidden mx-3">' + html + '</div>';
+      gc.innerHTML = '<div class="bg-white rounded-3xl shadow-2xl w-full max-w-2xl max-h-[92vh] overflow-hidden mx-3 flex flex-col">' + html + '</div>';
       gc.style.display = 'flex';
-      gc.style.alignItems = 'flex-start';
+      gc.style.alignItems = 'center';
       gc.style.justifyContent = 'center';
-      gc.style.paddingTop = '4vh';
       gc.style.zIndex = '9999';
     }
 
     window._closeAsistenteModal = () => {
       if (gc) { gc.style.display = 'none'; gc.innerHTML = ''; }
     };
+
     window._genMatricula = () => {
       const el = document.getElementById('stMatricula');
       if (el) el.value = 'KK-' + new Date().getFullYear() + '-' + String(Math.floor(Math.random() * 9000) + 1000);
@@ -208,7 +208,8 @@ export const StudentsModule = {
 
     // Load classrooms
     try {
-      const { data } = await supabase.from('classrooms').select('id, name').order('name');
+      const { data, error } = await supabase.from('classrooms').select('id, name').order('name');
+      if (error) throw error;
       const sel = document.getElementById('stClassroom');
       if (sel && data) {
         data.forEach(c => {
@@ -217,12 +218,16 @@ export const StudentsModule = {
           sel.appendChild(o);
         });
       }
-    } catch (_) {}
+    } catch (e) {
+      console.error('Error loading classrooms for student modal:', e);
+      Helpers.toast('Error al cargar las aulas', 'error');
+    }
 
     // Prefill if editing
     if (studentId) {
       try {
-        const { data: st } = await supabase.from('students').select('*').eq('id', studentId).single();
+        const { data: st, error } = await supabase.from('students').select('*').eq('id', studentId).single();
+        if (error) throw error;
         if (st) {
           const sv = (id, v) => { const el = document.getElementById(id); if (el) el.value = v || ''; };
           sv('stId', st.id); sv('stMatricula', st.matricula); sv('stName', st.name);
@@ -230,36 +235,48 @@ export const StudentsModule = {
           sv('stEmailNotif', st.p1_email); sv('stBlood', st.blood_type);
           sv('stAllergies', st.allergies); sv('stPickup', st.authorized_pickup);
           sv('p1Name', st.p1_name); sv('p1Phone', st.p1_phone);
-          sv('p1Profession', st.p1_job); sv('p1Address', st.p1_address);
-          sv('p1Emergency', st.p1_emergency_contact);
+          sv('p1Address', st.p1_address);
           sv('p2Name', st.p2_name); sv('p2Phone', st.p2_phone);
-          sv('p2Profession', st.p2_job); sv('p2Address', st.p2_address);
           sv('stMonthlyFee', st.monthly_fee); sv('stDueDay', st.due_day);
+          
           const cb = document.getElementById('stActive');
           if (cb) cb.checked = !!st.is_active;
           if (st.avatar_url) {
             const p = document.getElementById('stAvatarPreview');
             if (p) p.innerHTML = '<img src="' + st.avatar_url + '" class="w-full h-full object-cover">';
           }
+
+          // Fetch parent email if possible
+          if (st.parent_id) {
+            const { data: prof } = await supabase.from('profiles').select('email').eq('id', st.parent_id).maybeSingle();
+            if (prof) sv('stEmailUser', prof.email);
+          }
         }
-      } catch (_) {}
+      } catch (e) {
+        console.error('Error loading student for edit:', e);
+        Helpers.toast('Error al cargar datos del estudiante', 'error');
+      }
     }
 
-    // Expose save function globally — avoids duplicate addEventListener stacking
     window._saveStudentNow = () => this.saveStudent();
     if (window.lucide) window.lucide.createIcons();
   },
 
   async saveStudent() {
     const btn = document.getElementById('btnSaveStudentModal');
-    if (btn) { btn.disabled = true; btn.textContent = 'Guardando...'; }
+    if (btn) { btn.disabled = true; btn.innerHTML = '<i data-lucide="loader-2" class="w-4 h-4 animate-spin"></i> Guardando...'; if(window.lucide) lucide.createIcons(); }
 
     const id         = document.getElementById('stId')?.value;
     const name       = document.getElementById('stName')?.value?.trim();
     const emailUser  = document.getElementById('stEmailUser')?.value?.trim();
     const password   = document.getElementById('stPassword')?.value?.trim();
+    const avatarFile = document.getElementById('stAvatarFile')?.files[0];
 
-    if (!name) { Helpers.toast('El nombre es obligatorio', 'warning'); if (btn) { btn.disabled = false; btn.textContent = 'Guardar Estudiante'; } return; }
+    if (!name) { 
+      Helpers.toast('El nombre es obligatorio', 'warning'); 
+      if (btn) { btn.disabled = false; btn.innerHTML = 'Guardar Estudiante'; if(window.lucide) lucide.createIcons(); } 
+      return; 
+    }
 
     const payload = {
       name,
@@ -271,60 +288,63 @@ export const StudentsModule = {
       authorized_pickup:    document.getElementById('stPickup')?.value?.trim() || null,
       p1_name:              document.getElementById('p1Name')?.value?.trim() || null,
       p1_phone:             document.getElementById('p1Phone')?.value?.trim() || null,
-      p1_job:               document.getElementById('p1Profession')?.value?.trim() || null,
       p1_address:           document.getElementById('p1Address')?.value?.trim() || null,
-      p1_emergency_contact: document.getElementById('p1Emergency')?.value?.trim() || null,
       p1_email:             document.getElementById('stEmailNotif')?.value?.trim() || null,
       p2_name:              document.getElementById('p2Name')?.value?.trim() || null,
       p2_phone:             document.getElementById('p2Phone')?.value?.trim() || null,
-      p2_job:               document.getElementById('p2Profession')?.value?.trim() || null,
-      p2_address:           document.getElementById('p2Address')?.value?.trim() || null,
       monthly_fee:          parseFloat(document.getElementById('stMonthlyFee')?.value || 0) || 0,
       due_day:              parseInt(document.getElementById('stDueDay')?.value || 5) || 5
     };
 
     try {
-      // Handle auth user creation/linking
-      if (!id && emailUser && password) {
-        // Use temp client to avoid logging out the current asistente session
-        const tempClient = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
-          auth: { persistSession: false, autoRefreshToken: false, detectSessionInUrl: false }
-        });
-        const { data: authData, error: authError } = await tempClient.auth.signUp({
-          email: emailUser, password,
-          options: { data: { name: payload.p1_name, role: 'padre', phone: payload.p1_phone } }
-        });
-
-        let parentId = null;
-        if (authError) {
-          if (authError.status === 422 || authError.message?.toLowerCase().includes('already registered')) {
-            const { data: ex } = await supabase.from('profiles').select('id').eq('email', emailUser).maybeSingle();
-            if (ex?.id) { 
-              parentId = ex.id; 
-              Helpers.toast('Usuario ya existe — vinculando', 'info'); 
-            } else {
-              throw new Error('El correo ya está registrado pero no tiene un perfil asociado.');
-            }
-          } else {
-            throw authError;
-          }
-        } else if (authData?.user) {
-          parentId = authData.user.id;
-        }
-
-        if (parentId) {
-          payload.parent_id = parentId;
-          // El perfil se crea por trigger o manualmente si no existe
-          await supabase.from('profiles').upsert({ 
-            id: parentId, 
-            name: payload.p1_name || payload.name + ' Parent', 
-            email: emailUser, 
-            phone: payload.p1_phone, 
-            role: 'padre' 
-          }, { onConflict: 'id' });
-        }
+      // 1. Subir avatar si existe
+      if (avatarFile) {
+        const ext = avatarFile.name.split('.').pop();
+        const path = `students/${Date.now()}_${Math.random().toString(36).substr(2,9)}.${ext}`;
+        const { error: upErr } = await supabase.storage.from('karpus-uploads').upload(path, avatarFile);
+        if (upErr) throw upErr;
+        const { data } = supabase.storage.from('karpus-uploads').getPublicUrl(path);
+        payload.avatar_url = data.publicUrl;
       }
 
+      // 2. Manejar creación/vinculación de padre
+      if (emailUser && (password || !id)) {
+        let parentId = null;
+        
+        // Buscar si el perfil ya existe
+        const { data: existingProf } = await supabase.from('profiles').select('id').eq('email', emailUser).maybeSingle();
+        
+        if (existingProf) {
+          parentId = existingProf.id;
+          Helpers.toast('Vinculando con usuario existente', 'info');
+        } else if (password) {
+          // Crear nuevo usuario con cliente temporal para no cerrar sesión actual
+          const tempClient = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
+            auth: { persistSession: false, autoRefreshToken: false, detectSessionInUrl: false }
+          });
+          const { data: authData, error: authError } = await tempClient.auth.signUp({
+            email: emailUser, password,
+            options: { data: { name: payload.p1_name || 'Padre', role: 'padre' } }
+          });
+
+          if (authError) throw authError;
+          if (authData?.user) {
+            parentId = authData.user.id;
+            // Crear perfil manualmente para asegurar rol y datos
+            await supabase.from('profiles').upsert({ 
+              id: parentId, 
+              name: payload.p1_name || 'Padre de ' + payload.name, 
+              email: emailUser, 
+              phone: payload.p1_phone, 
+              role: 'padre' 
+            });
+          }
+        }
+
+        if (parentId) payload.parent_id = parentId;
+      }
+
+      // 3. Guardar Estudiante
       if (id) {
         const { error } = await supabase.from('students').update(payload).eq('id', id);
         if (error) throw error;
@@ -338,10 +358,10 @@ export const StudentsModule = {
       window._closeAsistenteModal?.();
       await this.loadStudents();
     } catch (err) {
-      console.error(err);
-      Helpers.toast('Error: ' + (err.message || err), 'error');
+      console.error('[saveStudent] Error:', err);
+      Helpers.toast('Error: ' + (err.message || 'No se pudo guardar'), 'error');
     } finally {
-      if (btn) { btn.disabled = false; btn.textContent = 'Guardar Estudiante'; }
+      if (btn) { btn.disabled = false; btn.innerHTML = 'Guardar Estudiante'; if(window.lucide) lucide.createIcons(); }
     }
   },
 

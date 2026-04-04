@@ -817,9 +817,14 @@
 
       <!-- MURO ESCOLAR UNIFICADO -->
       <section id="muro" class="section">
-        <header class="mb-6">
-          <h1 class="text-3xl font-black text-slate-800">Muro Escolar</h1>
-          <p class="text-slate-500 font-medium">Visualiza todas las publicaciones, reacciones y comentarios de las maestras.</p>
+        <header class="mb-6 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+          <div>
+            <h1 class="text-3xl font-black text-slate-800">Muro Escolar</h1>
+            <p class="text-slate-500 font-medium">Visualiza todas las publicaciones, reacciones y comentarios de las maestras.</p>
+          </div>
+          <button onclick="App.openNewPostModal()" class="px-6 py-2.5 bg-teal-600 text-white rounded-xl font-bold shadow-md hover:bg-teal-700 transition-all flex items-center gap-2 shrink-0">
+            <i data-lucide="plus-circle" class="w-5 h-5"></i> Nueva Publicación
+          </button>
         </header>
 
         <div class="max-w-4xl mx-auto">

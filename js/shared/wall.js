@@ -307,7 +307,7 @@ export const WallModule = {
     const isMaestra   = profile?.role === 'maestra';
     const isAsistente = profile?.role === 'asistente';
     const canDelete   = isDirectora || isMaestra || isAsistente;
-    const canComment  = ['directora', 'maestra', 'padre'].includes(profile?.role);
+    const canComment  = ['directora', 'maestra', 'padre', 'asistente'].includes(profile?.role);
 
     return `
       <div class="bg-white rounded-3xl shadow-sm border border-slate-100 overflow-hidden mb-6" id="post-${p.id}">

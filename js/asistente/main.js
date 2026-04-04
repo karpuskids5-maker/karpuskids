@@ -90,8 +90,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   
   initNavigation(); // Esto cargará el dashboard y configurará los listeners
 
-  // 3. Estandarizar funciones globales en objeto App (Senior Level)
-  // Se mantienen las que son llamadas por módulos que aún usan `onclick`
+  // Asignar funciones internas al objeto global App
   Object.assign(window.App, {
     _registerAccess: (sid, type) => AccessModule.register(sid, type),
     _confirmPayment: (id) => PaymentsModule.confirmPayment(id),
@@ -103,15 +102,20 @@ document.addEventListener('DOMContentLoaded', async () => {
     _deleteComment: (cid, pid) => WallModule.deleteComment(cid, pid),
     _sendComment: (pid) => sendComment(pid),
     _toggleLike: (pid) => WallModule.toggleLike(pid),
-    _selectChatContact: (uid, name, role) => selectAssistantChat(uid, name, role)
+    _selectChatContact: (uid, name, role) => selectAssistantChat(uid, name, role),
+    selectChatContact: (uid, name, role) => selectAssistantChat(uid, name, role),
+    _openStudentModal: (id) => StudentsModule.openModal(id),
+    _openRoomModal: (id) => RoomsModule.openModal(id),
+    openNewPostModal,
+    submitNewPost
   });
-  
-  // Mantener compatibilidad temporal para onclick en HTML que no use App.
-  Object.assign(window, window.App);
-  
-  // 🔥 EXPOSICIÓN GLOBAL DE MÓDULOS
+
+  // Exponer WallModule globalmente
   window.WallModule = WallModule;
   window.openTeacherModal = (id) => TeachersModule.openModal(id);
+
+  // Mantener compatibilidad temporal para onclick en HTML que no use App.
+  Object.assign(window, window.App);
 
   if (window.lucide) window.lucide.createIcons();
 });
@@ -297,18 +301,66 @@ async function initProfile() {
   setVal('profileEmail', profile.email);
   setVal('profileBio', profile.bio || '');
 
+  // Avatar preview y upload
+  const avatarInput = document.getElementById('profileAvatarInput');
+  const avatarPreview = document.getElementById('profileAvatarPreview');
+  
+  if (avatarPreview && profile.avatar_url) {
+    avatarPreview.innerHTML = `<img src="${profile.avatar_url}" class="w-full h-full object-cover rounded-full">`;
+  }
+
+  if (avatarInput) {
+    avatarInput.onchange = (e) => {
+      const file = e.target.files[0];
+      if (file && avatarPreview) {
+        const reader = new FileReader();
+        reader.onload = (ev) => {
+          avatarPreview.innerHTML = `<img src="${ev.target.result}" class="w-full h-full object-cover rounded-full">`;
+        };
+        reader.readAsDataURL(file);
+      }
+    };
+  }
+
   const form = document.getElementById('profileForm');
   if (form) {
     form.onsubmit = async (e) => {
       e.preventDefault();
-      const updates = {
-        name: document.getElementById('profileName').value,
-        phone: document.getElementById('profilePhone').value,
-        bio: document.getElementById('profileBio').value
-      };
-      const { error } = await supabase.from('profiles').update(updates).eq('id', AppState.get('user').id);
-      if (error) Helpers.toast('Error al guardar perfil', 'error');
-      else Helpers.toast('Perfil actualizado correctamente');
+      const btn = form.querySelector('button[type="submit"]');
+      if (btn) { btn.disabled = true; btn.textContent = 'Guardando...'; }
+
+      try {
+        const updates = {
+          name: document.getElementById('profileName').value,
+          phone: document.getElementById('profilePhone').value,
+          bio: document.getElementById('profileBio').value
+        };
+
+        // Subir avatar si hay uno seleccionado
+        const file = avatarInput?.files[0];
+        if (file) {
+          const ext = file.name.split('.').pop();
+          const path = `avatars/${AppState.get('user').id}_${Date.now()}.${ext}`;
+          const { error: upErr } = await supabase.storage.from('karpus-uploads').upload(path, file);
+          if (upErr) throw upErr;
+          
+          const { data: { publicUrl } } = supabase.storage.from('karpus-uploads').getPublicUrl(path);
+          updates.avatar_url = publicUrl;
+        }
+
+        const { error } = await supabase.from('profiles').update(updates).eq('id', AppState.get('user').id);
+        if (error) throw error;
+        
+        Helpers.toast('Perfil actualizado correctamente');
+        // Actualizar estado local
+        AppState.set('profile', { ...profile, ...updates });
+        
+      } catch (err) {
+        console.error('Error updating profile:', err);
+        Helpers.toast('Error al guardar perfil', 'error');
+      } finally {
+        if (btn) { btn.disabled = false; btn.textContent = 'Guardar Cambios'; }
+      }
     };
   }
 }
@@ -385,31 +437,56 @@ async function loadChatContacts(searchTerm = '', unreadMap = {}) {
 
   // Cache key includes search term
   const cacheKey = `asistente_contacts_${searchTerm.slice(0, 20)}`;
-  const TTL = searchTerm ? 30_000 : 3 * 60_000; // búsquedas: 30s, lista base: 3min
+  const TTL = searchTerm ? 30_000 : 3 * 60_000;
 
   try {
-    const profiles = await QueryCache.get(cacheKey, async () => {
+    const contacts = await QueryCache.get(cacheKey, async () => {
+      // 1. Obtener perfiles
       let query = supabase
         .from('profiles')
         .select('id, name, role, avatar_url')
         .in('role', ['padre', 'maestra', 'directora'])
         .order('name');
       if (searchTerm) query = query.ilike('name', `%${searchTerm}%`);
-      // Limitar a 50 — la búsqueda filtra más
-      const { data, error } = await query.limit(50);
+      const { data: profiles, error } = await query.limit(100);
       if (error) throw error;
-      return data || [];
+
+      // 2. Para los padres, buscar el nombre de sus hijos
+      const parentIds = profiles.filter(p => p.role === 'padre').map(p => p.id);
+      let studentMap = {};
+      
+      if (parentIds.length > 0) {
+        const { data: students } = await supabase
+          .from('students')
+          .select('parent_id, name')
+          .in('parent_id', parentIds);
+        
+        if (students) {
+          students.forEach(s => {
+            if (!studentMap[s.parent_id]) studentMap[s.parent_id] = [];
+            studentMap[s.parent_id].push(s.name);
+          });
+        }
+      }
+
+      return profiles.map(p => ({
+        ...p,
+        studentNames: studentMap[p.id] ? studentMap[p.id].join(', ') : null
+      }));
     }, TTL);
 
-    if (!profiles.length) {
+    if (!contacts.length) {
       container.innerHTML = `<div class="p-4 text-center text-slate-400 text-sm">No hay contactos.</div>`;
       return;
     }
 
-    container.innerHTML = profiles.map(c => {
+    container.innerHTML = contacts.map(c => {
       const unread = unreadMap[c.id] || 0;
-      const displayName = c.name || 'Usuario';
+      // Prioridad: Nombre Estudiante (si es padre) > Nombre Perfil
+      const displayName = c.role === 'padre' && c.studentNames ? c.studentNames : (c.name || 'Usuario');
       const roleLabel = (c.role || '').charAt(0).toUpperCase() + (c.role || '').slice(1);
+      const subLabel = c.role === 'padre' && c.studentNames ? `Padre de ${c.name}` : roleLabel;
+
       return `
       <div onclick="App.selectChatContact('${c.id}', '${Helpers.escapeHTML(displayName)}', '${roleLabel}')" 
            class="p-3 hover:bg-slate-50 rounded-xl cursor-pointer transition-colors flex items-center gap-3 border-b border-slate-50 last:border-0 relative">
@@ -421,7 +498,7 @@ async function loadChatContacts(searchTerm = '', unreadMap = {}) {
         </div>
         <div class="min-w-0">
           <div class="font-bold text-slate-700 text-sm truncate">${Helpers.escapeHTML(displayName)}</div>
-          <div class="text-[10px] text-slate-400 truncate">${roleLabel}</div>
+          <div class="text-[10px] text-slate-400 truncate">${subLabel}</div>
         </div>
       </div>
     `}).join('');
@@ -522,6 +599,106 @@ async function sendAssistantMessage() {
   } catch (e) {
     console.error('❌ Send message error:', e);
     Helpers.toast('Error enviando mensaje', 'error');
+  }
+}
+
+// =======================================================
+// 📰 MURO ESCOLAR (ASISTENTE)
+// =======================================================
+
+async function openNewPostModal() {
+  // Cargar aulas para el selector
+  const { data: classrooms } = await supabase.from('classrooms').select('id, name').order('name');
+  
+  const classroomOptions = (classrooms || []).map(c => `<option value="${c.id}">${Helpers.escapeHTML(c.name)}</option>`).join('');
+
+  const html = `
+    <div class="bg-white w-full max-w-lg rounded-[2.5rem] shadow-2xl p-8 animate-fadeIn">
+      <div class="flex justify-between items-start mb-6">
+        <h3 class="text-2xl font-black text-slate-800">Crear Publicación</h3>
+        <button onclick="window._closeAsistenteModal()" class="p-2 hover:bg-slate-100 rounded-full text-slate-400">✕</button>
+      </div>
+      <div class="space-y-4">
+        <div>
+          <label class="block text-[11px] font-black text-slate-400 uppercase tracking-wider mb-1.5 ml-1">Aula (Opcional)</label>
+          <select id="postClassroom" class="w-full px-4 py-2.5 border-2 border-slate-100 rounded-2xl outline-none focus:ring-4 focus:ring-teal-100 focus:border-teal-400 bg-slate-50/50 transition-all text-sm font-medium">
+            <option value="">-- Todas las Aulas (General) --</option>
+            ${classroomOptions}
+          </select>
+        </div>
+
+        <textarea id="postContent" rows="4" class="w-full p-4 bg-slate-50 border-2 border-slate-100 rounded-2xl text-sm outline-none resize-none focus:ring-4 focus:ring-teal-100 focus:border-teal-400" placeholder="¿Qué quieres compartir con la escuela?"></textarea>
+        
+        <div class="relative">
+          <input type="file" id="postFile" class="hidden" accept="image/*,video/*" onchange="document.getElementById('fileName').textContent = this.files[0]?.name || 'Adjuntar foto/video'">
+          <label for="postFile" class="flex items-center gap-3 p-3 border-2 border-dashed border-slate-200 rounded-2xl cursor-pointer hover:bg-teal-50 hover:border-teal-300 transition-all">
+            <div class="w-10 h-10 bg-teal-100 text-teal-600 rounded-xl flex items-center justify-center"><i data-lucide="image-plus"></i></div>
+            <span id="fileName" class="text-sm font-bold text-slate-500">Adjuntar foto o video</span>
+          </label>
+        </div>
+
+        <button id="btnSubmitPost" onclick="App.submitNewPost()" class="w-full py-3.5 bg-teal-600 text-white rounded-2xl font-black text-sm uppercase tracking-widest hover:bg-teal-700 shadow-lg shadow-teal-200 transition-all">PUBLICAR</button>
+      </div>
+    </div>
+  `;
+
+  const gc = document.getElementById('globalModalContainer');
+  if (gc) {
+    gc.innerHTML = '<div class="bg-white rounded-3xl shadow-2xl w-full max-w-lg max-h-[92vh] overflow-hidden mx-3 flex flex-col">' + html + '</div>';
+    gc.style.display = 'flex';
+    gc.style.alignItems = 'center';
+    gc.style.justifyContent = 'center';
+    gc.style.zIndex = '9999';
+  }
+  if (window.lucide) lucide.createIcons();
+}
+
+async function submitNewPost() {
+  const content = document.getElementById('postContent').value.trim();
+  const classroomId = document.getElementById('postClassroom').value || null;
+  const fileInput = document.getElementById('postFile');
+  const file = fileInput?.files[0];
+  const btn = document.getElementById('btnSubmitPost');
+
+  if (!content && !file) return Helpers.toast('Escribe algo o sube un archivo', 'warning');
+
+  btn.disabled = true;
+  btn.innerHTML = '<i data-lucide="loader-2" class="w-5 h-5 animate-spin mx-auto"></i>';
+  if(window.lucide) window.lucide.createIcons();
+
+  try {
+    let mediaUrl = null;
+    let mediaType = null;
+
+    if (file) {
+      const ext = file.name.split('.').pop();
+      const path = `posts/${Date.now()}_${Math.random().toString(36).substr(2,9)}.${ext}`;
+      const { error: upErr } = await supabase.storage.from('posts').upload(path, file);
+      if (upErr) throw upErr;
+      
+      const { data } = supabase.storage.from('posts').getPublicUrl(path);
+      mediaUrl = data.publicUrl;
+      mediaType = file.type.startsWith('video') ? 'video' : 'image';
+    }
+
+    const { error } = await supabase.from('posts').insert({
+      classroom_id: classroomId,
+      teacher_id: AppState.get('user').id,
+      content: content,
+      media_url: mediaUrl,
+      media_type: mediaType
+    });
+
+    if (error) throw error;
+    Helpers.toast('Publicado correctamente', 'success');
+    window._closeAsistenteModal?.();
+    WallModule.loadPosts(document.getElementById('muroPostsContainer'));
+
+  } catch (e) {
+    console.error('Error submitting post:', e);
+    Helpers.toast('Error al publicar', 'error');
+    btn.disabled = false;
+    btn.innerHTML = 'PUBLICAR';
   }
 }
 

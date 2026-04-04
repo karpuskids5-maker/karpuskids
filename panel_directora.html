@@ -50,6 +50,10 @@
     }
     @media (max-width: 768px) {
       .app-content-wrapper { margin-left: 0 !important; height: auto !important; overflow: visible !important; }
+      /* Scroll natural del documento en móvil */
+      html, body { overflow-y: auto !important; overflow-x: hidden; }
+      /* .main no debe tener altura fija en móvil */
+      .main { height: auto !important; overflow: visible !important; min-height: 0 !important; }
     }
 
     /* ═══════════════════════════════════════════════
@@ -417,19 +421,6 @@
         <button data-section="pagos" class="nav-btn teams-nav-item text-white hover:bg-white/20" title="Pagos">
           <i data-lucide="credit-card" class="text-yellow-400"></i>
           <span class="label">Pagos</span>
-        </button>
-        <button data-section="muro" class="nav-btn teams-nav-item text-white hover:bg-white/20" title="Muro Escolar">
-          <i data-lucide="layout" class="text-orange-400"></i>
-          <span class="label">Muro Escolar</span>
-        </button>
-        <button data-section="comunicacion" class="nav-btn teams-nav-item text-white hover:bg-white/20" title="Chat" style="position:relative;">
-          <i data-lucide="message-square" class="text-blue-300"></i>
-          <span class="label">Chat</span>
-          <span id="badge-chat-dir" class="hidden absolute top-1 right-1 min-w-[16px] h-4 bg-rose-500 text-white text-[9px] font-black rounded-full flex items-center justify-center px-1 shadow">0</span>
-        </button>
-        <button data-section="reportes" class="nav-btn teams-nav-item text-white hover:bg-white/20" title="Reportes">
-          <i data-lucide="file-text" class="text-indigo-300"></i>
-          <span class="label">Reportes</span>
         </button>
         <button data-section="configuracion" class="nav-btn teams-nav-item text-white hover:bg-white/20" title="Configuración">
           <i data-lucide="settings" class="text-slate-400"></i>

@@ -163,10 +163,10 @@ Deno.serve(async (req) => {
         }
       }
 
-      // Sin suscriptores activos
+      // Sin suscriptores activos — notificación guardada en DB, push pendiente
       onesignalStatus = 'no_subscribers';
-      onesignalDetail = `user_id=${user_id} — El usuario debe abrir la app y aceptar notificaciones push.`;
-      console.warn('[send-push] ⚠️', onesignalDetail);
+      onesignalDetail = `user_id=${user_id} — Sin suscripción push activa. La notificación fue guardada en la app.`;
+      console.info('[send-push] ℹ️', onesignalDetail);
 
     } catch (e) {
       onesignalStatus = 'error';

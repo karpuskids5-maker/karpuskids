@@ -250,6 +250,14 @@ export async function initOneSignal(currentUser = null) {
 
     const ONESIGNAL_APP_ID = "47ce2d1e-152e-4ea7-9ddc-8e2142992989";
 
+    // Pre-register service worker before loading OneSignal SDK
+    // This prevents the "[WM] No SW registration for postMessage" warning
+    if ('serviceWorker' in navigator) {
+      try {
+        await navigator.serviceWorker.register('/OneSignalSDKWorker.js', { scope: '/' });
+      } catch (_) { /* silencioso — puede ya estar registrado */ }
+    }
+
     // Inyectar script dinámicamente solo si pasó la prueba de IndexedDB
     if (!document.getElementById('onesignal-sdk')) {
       const s = document.createElement('script');
@@ -294,12 +302,26 @@ export async function initOneSignal(currentUser = null) {
 
         // Vincular usuario externo
         try {
+          // Wait a bit more for SDK to fully initialize before checking identity
+          await new Promise(r => setTimeout(r, 1000));
+
           const currentExtId = await OneSignal.User?.getExternalId?.();
-          if (currentExtId !== user.id) {
+          if (currentExtId && currentExtId === user.id) {
+            // Already linked — just ensure push subscription is active
+            console.log('[OneSignal] ✅ Ya vinculado:', user.id);
+          } else if (!currentExtId) {
+            // Not linked yet — safe to call login
             console.log('[OneSignal] Vinculando usuario:', user.id);
-            await OneSignal.login(user.id);
+            await OneSignal.login(user.id).catch((e) => {
+              const msg = (e?.message || '').toLowerCase();
+              if (!msg.includes('409') && !msg.includes('conflict')) {
+                console.info('[OneSignal] login info:', e?.message ?? e);
+              }
+              // 409 = already linked on server side, that's fine
+            });
             await new Promise(r => setTimeout(r, 500));
           }
+          // If currentExtId !== user.id (different user), skip to avoid 409
 
           // Activar suscripción push si el permiso está concedido
           try {
