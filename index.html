@@ -312,10 +312,13 @@
           </a>
 
           <!-- Hamburger — solo móvil -->
-          <button @click="open = !open" aria-label="Abrir menú"
-            class="md:hidden flex items-center justify-center w-9 h-9 rounded-xl bg-slate-100 text-slate-700 hover:bg-orange-100 hover:text-orange-600 transition-colors active:scale-95 z-[110] relative">
-            <i class="bi bi-list text-xl leading-none" x-show="!open"></i>
-            <i class="bi bi-x-lg text-base leading-none" x-show="open" x-cloak></i>
+          <button @click="open = !open" aria-label="Abrir menú" 
+            class="md:hidden flex items-center justify-center w-11 h-11 rounded-2xl bg-white border border-slate-100 shadow-sm active:scale-90 transition-all duration-300 z-[120] relative group">
+            <div class="relative w-6 h-6 flex items-center justify-center">
+              <span class="absolute h-0.5 bg-slate-600 rounded-full transition-all duration-300 ease-in-out" :class="open ? 'w-6 rotate-45 bg-orange-500' : 'w-6 -translate-y-2'"></span>
+              <span class="absolute h-0.5 bg-slate-600 rounded-full transition-all duration-300 ease-in-out" :class="open ? 'w-0 opacity-0 translate-x-4' : 'w-4 ml-auto'"></span>
+              <span class="absolute h-0.5 bg-slate-600 rounded-full transition-all duration-300 ease-in-out" :class="open ? 'w-6 -rotate-45 bg-orange-500' : 'w-6 translate-y-2'"></span>
+            </div>
           </button>
 
         </div>
@@ -345,41 +348,37 @@
          x-transition:leave-start="opacity-100 translate-x-0"
          x-transition:leave-end="opacity-0 translate-x-full"
          x-cloak
-         class="fixed top-0 right-0 h-full w-[85%] max-w-sm bg-white z-[110] shadow-2xl flex flex-col">
-
+         class="fixed top-0 right-0 h-full w-72 max-w-[80%] bg-white z-[110] shadow-2xl flex flex-col">
+      
       <!-- Header del menú -->
-      <div class="flex items-center justify-between px-5 py-4 border-b border-slate-100">
+      <div class="flex items-center px-6 py-6 border-b border-slate-50">
         <div class="flex items-center gap-2">
-          <img src="img/mundo.jpg" alt="Logo" class="h-8 w-8 rounded-full object-cover">
-          <span class="font-bold text-slate-800">Karpus Kids</span>
+          <img src="img/mundo.jpg" alt="Logo" class="h-10 w-10 rounded-full object-cover shadow-sm">
+          <span class="font-black text-slate-800 text-lg tracking-tight">Karpus Kids</span>
         </div>
-        <button @click="open = false"
-          class="w-8 h-8 flex items-center justify-center rounded-full bg-slate-100 text-slate-500 hover:bg-slate-200 transition-colors">
-          <i class="bi bi-x-lg text-sm"></i>
-        </button>
       </div>
 
       <!-- Links -->
-      <nav class="flex flex-col px-5 py-4 gap-1 flex-1">
-        <a href="#nosotros"    @click="open=false" class="flex items-center gap-3 py-3 px-3 rounded-xl font-semibold text-slate-700 hover:bg-orange-50 hover:text-orange-600 transition-colors">
-          <i class="bi bi-people text-lg text-orange-400"></i> Nosotros
+      <nav class="flex flex-col px-4 py-6 gap-2 flex-1">
+        <a href="#nosotros"    @click="open=false" class="flex items-center gap-4 py-4 px-4 rounded-2xl font-bold text-slate-700 hover:bg-orange-50 hover:text-orange-600 transition-all active:scale-95">
+          <i class="bi bi-people-fill text-xl text-orange-400"></i> Nosotros
         </a>
-        <a href="#galeria-fotos" @click="open=false" class="flex items-center gap-3 py-3 px-3 rounded-xl font-semibold text-slate-700 hover:bg-pink-50 hover:text-pink-600 transition-colors">
-          <i class="bi bi-images text-lg text-pink-400"></i> Galería
+        <a href="#galeria-fotos" @click="open=false" class="flex items-center gap-4 py-4 px-4 rounded-2xl font-bold text-slate-700 hover:bg-pink-50 hover:text-pink-600 transition-all active:scale-95">
+          <i class="bi bi-images text-xl text-pink-400"></i> Galería
         </a>
-        <a href="#precios"    @click="open=false" class="flex items-center gap-3 py-3 px-3 rounded-xl font-semibold text-slate-700 hover:bg-blue-50 hover:text-blue-600 transition-colors">
-          <i class="bi bi-star text-lg text-blue-400"></i> Servicios
+        <a href="#precios"    @click="open=false" class="flex items-center gap-4 py-4 px-4 rounded-2xl font-bold text-slate-700 hover:bg-blue-50 hover:text-blue-600 transition-all active:scale-95">
+          <i class="bi bi-star-fill text-xl text-blue-400"></i> Servicios
         </a>
-        <a href="#footer"     @click="open=false" class="flex items-center gap-3 py-3 px-3 rounded-xl font-semibold text-slate-700 hover:bg-green-50 hover:text-green-600 transition-colors">
-          <i class="bi bi-envelope text-lg text-green-400"></i> Contacto
+        <a href="#footer"     @click="open=false" class="flex items-center gap-4 py-4 px-4 rounded-2xl font-bold text-slate-700 hover:bg-green-50 hover:text-green-600 transition-all active:scale-95">
+          <i class="bi bi-envelope-paper-fill text-xl text-green-400"></i> Contacto
         </a>
       </nav>
 
       <!-- Botón Acceso abajo -->
-      <div class="p-5 border-t border-slate-100">
+      <div class="p-6 border-t border-slate-50">
         <a href="login.html"
-           class="flex items-center justify-center gap-2 w-full bg-gradient-to-r from-orange-400 to-pink-500 text-white py-3.5 rounded-2xl font-bold text-base shadow-lg active:scale-95 transition-transform">
-          <i class="bi bi-person-circle text-lg"></i> Acceso Padres 🚀
+           class="flex items-center justify-center gap-2 w-full bg-gradient-to-r from-orange-400 to-pink-500 text-white py-4 rounded-2xl font-black text-sm uppercase tracking-wider shadow-lg shadow-orange-100 active:scale-95 transition-all">
+          <i class="bi bi-person-circle text-lg"></i> Acceso Padres
         </a>
       </div>
 

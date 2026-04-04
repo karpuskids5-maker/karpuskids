@@ -1,6 +1,7 @@
 /**
  * 🛡️ Karpus Kids — DB Utils
  * Utilidades para queries robustas a escala:
+ *   - safeQuery: interceptor global de errores con toast automático
  *   - withRetry: reintentos con backoff exponencial
  *   - withTimeout: timeout configurable por query
  *   - paginate: paginación cursor-based eficiente
@@ -22,6 +23,55 @@ export const COLS = {
   tasks:      'id, title, description, due_date, classroom_id, created_at, status',
   notifications: 'id, user_id, type, title, body, is_read, created_at',
 };
+
+/**
+ * 🛡️ safeQuery — Interceptor global de errores de base de datos.
+ * Muestra un toast automático en errores y retorna { data, ok, error }.
+ *
+ * Uso: const { data, ok } = await safeQuery(supabase.from('students').select('*'));
+ */
+export async function safeQuery(queryPromise, { silent = false, label = '' } = {}) {
+  try {
+    const { data, error } = await queryPromise;
+    if (error) {
+      const msg = error.message || JSON.stringify(error);
+      console.error(`[DB${label ? ':' + label : ''}] Error:`, msg);
+      if (!silent) {
+        // Disparar evento global para que cualquier panel muestre el toast
+        window.dispatchEvent(new CustomEvent('karpus:db-error', { detail: { message: msg, label } }));
+      }
+      return { data: null, ok: false, error: msg };
+    }
+    return { data, ok: true, error: null };
+  } catch (err) {
+    const msg = err?.message || String(err);
+    console.error(`[DB${label ? ':' + label : ''}] Exception:`, msg);
+    if (!silent) {
+      window.dispatchEvent(new CustomEvent('karpus:db-error', { detail: { message: msg, label } }));
+    }
+    return { data: null, ok: false, error: msg };
+  }
+}
+
+/**
+ * 📋 auditLog — Registra acciones críticas del staff en audit_logs.
+ * Llama esto después de aprobar pagos, cambiar calificaciones, etc.
+ *
+ * @param {string} action   — 'payment.approved', 'grade.updated', etc.
+ * @param {object} payload  — datos relevantes de la acción
+ */
+export async function auditLog(action, payload = {}) {
+  try {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) return;
+    await supabase.from('audit_logs').insert({
+      user_id:    user.id,
+      action,
+      payload,
+      created_at: new Date().toISOString()
+    });
+  } catch (_) { /* silencioso — no bloquear la acción principal */ }
+}
 
 /**
  * Ejecuta una query con reintentos y backoff exponencial.

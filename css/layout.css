@@ -90,7 +90,9 @@ html, body {
 }
 
 /* ── 6. SIDEBAR ──────────────────────────────────────────────── */
-aside#sidebar {
+/* Only applies to panels with slide-in sidebar (directora, asistente, maestra) */
+/* Panel padre uses a bottom-nav pattern — excluded via .panel-padre-body */
+body:not(.panel-padre-body) aside#sidebar {
   position: fixed;
   top: 0;
   left: 0;
@@ -102,14 +104,14 @@ aside#sidebar {
   transition: transform 0.3s ease, width 0.3s ease;
   will-change: transform;
 }
-aside#sidebar::-webkit-scrollbar { display: none; }
+body:not(.panel-padre-body) aside#sidebar::-webkit-scrollbar { display: none; }
 
 @media (max-width: 767px) {
-  aside#sidebar {
+  body:not(.panel-padre-body) aside#sidebar {
     transform: translateX(-100%);
     width: 280px !important;
   }
-  aside#sidebar.mobile-visible {
+  body:not(.panel-padre-body) aside#sidebar.mobile-visible {
     transform: translateX(0) !important;
     box-shadow: 8px 0 32px rgba(0,0,0,0.25);
   }

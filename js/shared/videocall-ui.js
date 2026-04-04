@@ -228,7 +228,8 @@ export const VideoCallUI = {
       });
     } catch (e) {
       console.error('[VideoCallUI] Jitsi error:', e);
-      container.innerHTML = `<div class="p-8 text-center text-rose-500 font-bold">Error al iniciar la videollamada. Verifica tu conexión.</div>`;
+      container.innerHTML = Helpers.errorState('Error al iniciar la videollamada. Verifica tu conexión.');
+      if (window.lucide) lucide.createIcons();
     }
   },
 

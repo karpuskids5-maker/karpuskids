@@ -1,6 +1,7 @@
 import { supabase } from '../shared/supabase.js';
 import { AppState } from './appState.js';
 import { Helpers, escapeHtml } from './helpers.js';
+import { Helpers as SharedHelpers } from '../shared/helpers.js';
 import { ChatModule as SharedChatModule } from '../shared/chat.js';
 import { ScrollModule } from '../shared/scroll.module.js';
 
@@ -172,7 +173,8 @@ export const ChatModule = {
 
     } catch (err) {
       console.error('[ChatModule] loadMessages error:', err);
-      if (!loadMore) container.innerHTML = '<div class="p-4 text-center text-rose-500 text-sm">Error al cargar mensajes.</div>';
+      if (!loadMore) container.innerHTML = SharedHelpers.errorState('Error al cargar mensajes');
+      if (window.lucide) lucide.createIcons();
     }
   },
 

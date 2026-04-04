@@ -188,7 +188,8 @@ export const ChatModule = {
 
     } catch (e) {
       console.error('[ChatModule] loadMessages:', e);
-      if (container) container.innerHTML = '<div class="p-4 text-center text-rose-500 text-sm font-bold">Error al cargar mensajes.</div>';
+      if (container) container.innerHTML = '<div class="p-4 text-center">' + Helpers.errorState('Error al cargar mensajes') + '</div>';
+      if (window.lucide) lucide.createIcons();
     }
   },
 

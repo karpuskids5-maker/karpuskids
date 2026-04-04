@@ -28,46 +28,44 @@ const { initChat, selectChatContact } = ChatApp;
  * Evita errores de "App is not defined" y centraliza la lógica.
  */
 window.App = {
-  // Inicializamos con funciones seguras
-  registerAttendance: (...args) => window.App._registerAttendance?.(...args),
-  markAllPresent: (...args) => window.App._markAllPresent?.(...args),
-  openStudentProfile: (...args) => window.App._openStudentProfile?.(...args),
-  showClassroomDetail: (...args) => window.App._showClassroomDetail?.(...args),
-  registerIncidentModal: (...args) => window.App._registerIncidentModal?.(...args),
-  _openEditTaskModal: (...args) => window.App._openEditTaskModal?.(...args),
-  _deleteTask: (...args) => window.App._deleteTask?.(...args),
-  openNewTaskModal: (...args) => window.App._openNewTaskModal?.(...args),
-  viewTaskSubmissions: (...args) => window.App._viewTaskSubmissions?.(...args),
-  saveRoutineLog: (...args) => window.App._saveRoutineLog?.(...args),
-  submitGrade: (...args) => window.App._submitGrade?.(...args),
-  openNewRoutineModal: (...args) => window.App._openNewRoutineModal?.(...args),
-  startJitsi: (...args) => window.App._startJitsi?.(...args),
-  updateRoutineField: (...args) => window.App._updateRoutineField?.(...args),
-  selectChatContact: (...args) => window.App._selectChatContact?.(...args),
+  // UI Helpers
+  safeToast: UI.safeToast,
+  safeEscapeHTML: UI.safeEscapeHTML,
+  Modal: UI.Modal,
+
+  // Attendance
+  registerAttendance: Attendance.registerAttendance,
+  markAllPresent: Attendance.markAllPresent,
+  initAttendance: Attendance.initAttendance,
+
+  // Routine
+  initRoutine: Routine.initRoutine,
+  updateRoutineField: Routine.updateRoutineField,
+  saveRoutineLog: Routine.saveRoutineLog,
+  openNewRoutineModal: Routine.openNewRoutineModal,
+
+  // Tasks
+  initTasks: Tasks.initTasks,
+  openEditTaskModal: Tasks.openEditTaskModal,
+  deleteTask: Tasks.deleteTask,
+  openNewTaskModal: Tasks.openNewTaskModal,
+  viewTaskSubmissions: Tasks.viewTaskSubmissions,
+  submitGrade: Tasks.submitGrade,
+
+  // Students
+  openStudentProfile: Students.openStudentProfile,
+  registerIncidentModal: Students.registerIncidentModal,
+
+  // Chat
+  initChat: ChatApp.initChat,
+  selectChatContact: ChatApp.selectChatContact,
+
+  // Global actions
+  setActiveSection: (targetId) => window.App._setActiveSection?.(targetId),
+  showClassroomDetail: (classroomId) => window.App._showClassroomDetail?.(classroomId),
+  startJitsi: () => window.App._startJitsi?.(),
   openNewPostModal: () => window.App._openNewPostModal(),
   submitNewPost: () => window.App._submitNewPost()
-};
-
-// ✅ Helpers robustos
-const obsolete_safeToast = (message, type = 'success') => {
-  if (!message) return;
-  try {
-    if (Helpers && typeof Helpers.toast === 'function') {
-      return Helpers.toast(message, type);
-    }
-    console.log(`[Toast Fallback]: ${message}`);
-  } catch (e) {
-    console.warn('Toast Error:', e);
-  }
-};
-
-const obsolete_safeEscapeHTML = (str = '') => {
-  try {
-    if (Helpers && typeof Helpers.escapeHTML === 'function') {
-      return Helpers.escapeHTML(str);
-    }
-  } catch (e) {}
-  return String(str).replace(/[&<>"']/g, m => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]));
 };
 
 /**
@@ -232,51 +230,16 @@ document.addEventListener('DOMContentLoaded', async () => {
     };
   }
 
-  // Mapeo de funciones reales al objeto global App (MOVIDO ARRIBA para evitar ReferenceError)
-  
+  // 🔥 EXPOSICIÓN GLOBAL DE MÓDULOS (CRUCIAL PARA EL MURO)
+  window.WallModule = WallModule;
+
+  // Asignar funciones internas al objeto global App
   Object.assign(window.App, {
-    // UI Helpers
-    safeToast: UI.safeToast,
-    safeEscapeHTML: UI.safeEscapeHTML,
-    Modal: UI.Modal,
-
-    // Attendance
-    registerAttendance: Attendance.registerAttendance,
-    markAllPresent: Attendance.markAllPresent,
-    initAttendance: Attendance.initAttendance,
-
-    // Routine
-    initRoutine: Routine.initRoutine,
-    updateRoutineField: Routine.updateRoutineField,
-    saveRoutineLog: Routine.saveRoutineLog,
-    openNewRoutineModal: Routine.openNewRoutineModal,
-
-    // Tasks
-    initTasks: Tasks.initTasks,
-    openEditTaskModal: Tasks.openEditTaskModal,
-    deleteTask: Tasks.deleteTask,
-    openNewTaskModal: Tasks.openNewTaskModal,
-    viewTaskSubmissions: Tasks.viewTaskSubmissions,
-    submitGrade: Tasks.submitGrade,
-
-    // Students
-    openStudentProfile: Students.openStudentProfile,
-    registerIncidentModal: Students.registerIncidentModal,
-
-    // Chat
-    initChat: ChatApp.initChat,
-    selectChatContact: ChatApp.selectChatContact,
-
-    // Fallbacks to old ones not ported yet
     _showClassroomDetail: showClassroomDetail,
     _startJitsi: startJitsi,
     _openNewPostModal: openNewPostModal,
     _submitNewPost: submitNewPost
   });
-
-
-  // 🔥 EXPOSICIÓN GLOBAL DE MÓDULOS (CRUCIAL PARA EL MURO)
-  window.WallModule = WallModule;
 
   // Listener delegado para acciones (PRO: submit-grade)
   document.addEventListener('click', (e) => {
@@ -366,21 +329,6 @@ document.addEventListener('DOMContentLoaded', async () => {
       accentColor: 'orange',
       classroomId: classroom.id
     }, AppState);
-
-    // 🔥 INYECTAR BOTÓN DE NUEVA PUBLICACIÓN (Fix visual)
-    const wallContainer = document.getElementById('muroPostsContainer');
-    if (wallContainer) {
-      const parent = wallContainer.parentElement;
-      if (parent && !parent.querySelector('#btnNewPost')) {
-        const headerDiv = document.createElement('div');
-        headerDiv.className = "flex justify-between items-center mb-6";
-        headerDiv.innerHTML = `
-          <h3 class="text-2xl font-black text-slate-800">📢 Muro del Aula</h3>
-          <button id="btnNewPost" onclick="App.openNewPostModal()" class="px-6 py-2.5 bg-orange-600 text-white rounded-xl font-bold shadow-md hover:bg-orange-700 transition-all flex items-center gap-2"><i data-lucide="plus-circle" class="w-5 h-5"></i> Nueva Publicación</button>
-        `;
-        parent.insertBefore(headerDiv, wallContainer);
-      }
-    }
 
   } catch (e) {
     console.error('Error init:', e);
@@ -507,184 +455,6 @@ async function initDashboard() {
 
 
 
-
-/**
- * 🛠️ Modales (Centralizado PRO)
- */
-const obsolete_Modal = {
-  open(id, content) {
-    document.getElementById(id)?.remove();
-    const modal = document.createElement('div');
-    modal.id = id;
-    modal.className = 'fixed inset-0 z-[60] flex items-center justify-center bg-slate-900/60 backdrop-blur-sm p-4 animate-fade-in';
-    modal.innerHTML = content;
-    document.body.appendChild(modal);
-    requestAnimationFrame(() => window.lucide?.createIcons());
-  },
-  close(id) {
-    document.getElementById(id)?.remove();
-  }
-};
-
-// Make Modal globally available
-window.Modal = Modal;
-
-// Función de compatibilidad temporal (si se usa en otros archivos o HTML legacy)
-function obsolete_createOrGetModal(id, content) {
-  Modal.open(id, content);
-}
-
-function obsolete_openStudentProfile(studentId) {
-  const student = AppState.get('students').find(s => s.id == studentId);
-  if (!student) return safeToast('Estudiante no encontrado', 'error');
-  
-  const modalId = 'studentProfileModal';
-  const content = `
-    <div class="bg-white w-full max-w-2xl rounded-[2.5rem] shadow-2xl overflow-hidden p-8 animate-fadeIn flex flex-col max-h-[90vh]">
-      <div class="flex justify-between items-start mb-8">
-        <div class="flex items-center gap-6">
-          <div class="w-24 h-24 rounded-3xl bg-orange-50 flex items-center justify-center text-4xl font-black text-orange-500 overflow-hidden shadow-inner">
-            ${student.avatar_url ? `<img src="${student.avatar_url}" class="w-full h-full object-cover">` : student.name.charAt(0)}
-          </div>
-          <div>
-            <h3 class="text-3xl font-black text-slate-800">${safeEscapeHTML(student.name)}</h3>
-            <p class="text-xs font-black text-orange-500 uppercase tracking-widest mt-1">Ficha del Alumno</p>
-          </div>
-        </div>
-        <button onclick="Modal.close('${modalId}')" class="p-2 hover:bg-slate-100 rounded-full transition-colors">
-          <i data-lucide="x" class="w-6 h-6 text-slate-400"></i>
-        </button>
-      </div>
-      
-      <div class="space-y-6 overflow-y-auto pr-2">
-        <div class="bg-slate-50 p-6 rounded-3xl border border-slate-100">
-          <h4 class="font-bold text-sm text-slate-400 uppercase tracking-wider mb-4">Datos del Alumno</h4>
-          <div class="grid grid-cols-2 gap-4 text-sm">
-            <div class="flex flex-col"><span class="font-bold text-slate-400 text-xs">Alergias</span> <span class="text-rose-500 font-bold">${safeEscapeHTML(student.allergies || 'Ninguna')}</span></div>
-            <div class="flex flex-col"><span class="font-bold text-slate-400 text-xs">Tipo de Sangre</span> <span class="text-slate-700 font-medium">${safeEscapeHTML(student.blood_type || 'N/A')}</span></div>
-            <div class="flex flex-col col-span-2"><span class="font-bold text-slate-400 text-xs">Personas Autorizadas para Recoger</span> <span class="text-slate-700 font-medium">${safeEscapeHTML(student.authorized_pickup || 'N/A')}</span></div>
-          </div>
-        </div>
-
-        <div class="bg-slate-50 p-6 rounded-3xl border border-slate-100">
-          <h4 class="font-bold text-sm text-slate-400 uppercase tracking-wider mb-4">Contacto Principal (Tutor 1)</h4>
-          <div class="grid grid-cols-2 gap-4 text-sm">
-            <div class="flex flex-col"><span class="font-bold text-slate-400 text-xs">Nombre</span> <span class="text-slate-700 font-medium">${safeEscapeHTML(student.p1_name || 'N/A')}</span></div>
-            <div class="flex flex-col"><span class="font-bold text-slate-400 text-xs">Teléfono</span> <span class="text-slate-700 font-medium">${safeEscapeHTML(student.p1_phone || 'N/A')}</span></div>
-            <div class="flex flex-col col-span-2"><span class="font-bold text-slate-400 text-xs">Email</span> <span class="text-slate-700 font-medium">${safeEscapeHTML(student.p1_email || 'N/A')}</span></div>
-          </div>
-        </div>
-
-        ${(student.p2_name || student.p2_phone) ? `
-        <div class="bg-slate-50 p-6 rounded-3xl border border-slate-100">
-          <h4 class="font-bold text-sm text-slate-400 uppercase tracking-wider mb-4">Contacto Secundario (Tutor 2)</h4>
-          <div class="grid grid-cols-2 gap-4 text-sm">
-            <div class="flex flex-col"><span class="font-bold text-slate-400 text-xs">Nombre</span> <span class="text-slate-700 font-medium">${safeEscapeHTML(student.p2_name || 'N/A')}</span></div>
-            <div class="flex flex-col"><span class="font-bold text-slate-400 text-xs">Teléfono</span> <span class="text-slate-700 font-medium">${safeEscapeHTML(student.p2_phone || 'N/A')}</span></div>
-          </div>
-        </div>` : ''}
-      </div>
-      
-      <button onclick="Modal.close('${modalId}')" class="mt-8 w-full py-4 bg-slate-900 text-white rounded-2xl font-black text-xs uppercase tracking-widest hover:bg-slate-800 transition-colors">Cerrar</button>
-    </div>
-  `;
-  Modal.open(modalId, content);
-}
-
-function obsolete_registerIncidentModal(studentId) {
-  const student = AppState.get('students').find(s => s.id == studentId);
-  if (!student) return safeToast('Estudiante no encontrado', 'error');
-  
-  const modalId = 'incidentModal';
-  const content = `
-    <div class="bg-white w-full max-w-lg rounded-[2.5rem] shadow-2xl p-8 animate-fadeIn flex flex-col">
-      <div class="flex justify-between items-start mb-6">
-        <h3 class="text-2xl font-black text-slate-800 flex items-center gap-3">
-          <span class="text-rose-500">⚠️</span>
-          <span>Reportar Incidente</span>
-        </h3>
-        <button onclick="Modal.close('${modalId}')" class="p-2 hover:bg-slate-100 rounded-full transition-colors">
-          <i data-lucide="x" class="w-6 h-6 text-slate-400"></i>
-        </button>
-      </div>
-      
-      <form id="incidentForm" class="space-y-5">
-        <p class="text-sm text-slate-600 bg-slate-50 p-3 rounded-xl">Reportando a: <span class="font-black text-slate-800">${safeEscapeHTML(student.name)}</span></p>
-        
-        <div>
-          <label class="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1">Severidad</label>
-          <select id="incSeverity" class="w-full p-3 bg-slate-50 border-none rounded-xl text-sm font-bold focus:ring-2 focus:ring-rose-400 outline-none">
-            <option value="leve">Leve</option>
-            <option value="media">Media</option>
-            <option value="alta">Alta</option>
-          </select>
-        </div>
-
-        <div>
-          <label class="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1">Descripción del incidente</label>
-          <textarea id="incDesc" rows="4" class="w-full p-3 bg-slate-50 border-none rounded-xl text-sm focus:ring-2 focus:ring-rose-400 outline-none resize-none" placeholder="Detalla lo sucedido de forma clara y objetiva..." required></textarea>
-        </div>
-
-        <div class="flex justify-end gap-3 pt-4">
-          <button type="button" onclick="Modal.close('${modalId}')" class="px-6 py-3 rounded-xl font-bold text-slate-500 hover:bg-slate-100 transition-colors">Cancelar</button>
-          <button type="submit" class="px-6 py-3 rounded-xl font-bold bg-rose-500 text-white hover:bg-rose-600 shadow-lg shadow-rose-200 transition-transform active:scale-95 flex items-center gap-2">
-            <i data-lucide="send" class="w-4 h-4"></i> Enviar Reporte
-          </button>
-        </div>
-      </form>
-    </div>
-  `;
-  Modal.open(modalId, content);
-  const form = document.getElementById('incidentForm');
-  form.onsubmit = async (e) => {
-    e.preventDefault();
-    const btn = form.querySelector('button[type="submit"]');
-    btn.disabled = true;
-    btn.innerHTML = '<i data-lucide="loader-2" class="w-4 h-4 animate-spin"></i> Enviando...';
-    if(window.lucide) window.lucide.createIcons();
-    
-    try {
-      const payload = {
-        student_id: student.id,
-        classroom_id: AppState.get('classroom').id,
-        teacher_id: AppState.get('user').id,
-        severity: document.getElementById('incSeverity').value,
-        description: document.getElementById('incDesc').value
-      };
-
-      await MaestraApi.registerIncident(payload);
-      safeToast('Incidente reportado correctamente');
-      Modal.close(modalId);
-
-      // Notificar al padre (Notificación Push)
-      if (student.parent_id) {
-        sendPush({
-          user_id: student.parent_id,
-          title: 'Aviso de Incidente ⚠️',
-          message: `Se ha registrado un reporte de conducta sobre ${student.name}. Por favor revisa la sección de incidentes.`,
-          link: 'panel_padres.html#incidents'
-        }).catch(err => console.warn('Error notificando incidente:', err));
-      }
-
-      // Actualizar contador de incidentes en el dashboard
-      const statEl = document.getElementById('statIncidents');
-      if (statEl) {
-        const current = parseInt(statEl.textContent || '0', 10);
-        statEl.textContent = current + 1;
-      }
-    } catch (err) {
-      console.error('Error reporting incident:', err);
-      safeToast('Error al reportar incidente. Revisa tu conexión.', 'error');
-      btn.disabled = false;
-      btn.innerHTML = '<i data-lucide="send" class="w-4 h-4"></i> Enviar Reporte';
-      if(window.lucide) window.lucide.createIcons();
-    }
-  };
-}
-
-function obsolete_openNewRoutineModal() {
-  safeToast('Usa "Guardar Reporte" en cada tarjeta para registrar la rutina.', 'info');
-}
 
 /**
  * 🧭 Navegación
@@ -906,35 +676,6 @@ async function startJitsi() {
 let activeChatUserId = null;
 let activeConversationId = null; // Guardamos el ID de la conversación activa
 
-
-
-/**
- * Busca o inicializa la conversación (sin crearla en DB hasta enviar mensaje, 
- * pero buscamos si ya existe para cargar historial)
- */
-
-function obsolete_renderMessages(messages, myId) {
-  const container = document.getElementById('chatMessagesContainer');
-  if (!container) return;
-  if (!messages.length) {
-    container.innerHTML = '<div class="text-center text-xs text-slate-400 mt-4 italic">Inicio de la conversación. Di hola 👋</div>';
-    return;
-  }
-
-  container.innerHTML = messages.map(m => {
-    const isMe = m.sender_id === myId;
-    return `
-      <div class="flex ${isMe ? 'justify-end' : 'justify-start'} mb-2">
-        <div class="max-w-[80%] px-4 py-2.5 rounded-2xl text-sm ${isMe ? 'bg-orange-600 text-white rounded-br-none shadow-md shadow-orange-100' : 'bg-white border border-slate-100 text-slate-700 rounded-bl-none shadow-sm'}">
-          ${safeEscapeHTML(m.content)}
-        </div>
-      </div>
-    `;
-  }).join('');
-  
-  container.scrollTop = container.scrollHeight;
-}
-
 async function sendChatMessage() {
   if (!activeChatUserId) return;
   const input = document.getElementById('chatMessageInput');
@@ -1008,6 +749,20 @@ async function submitNewPost() {
   btn.innerHTML = '<i data-lucide="loader-2" class="w-5 h-5 animate-spin mx-auto"></i>';
   if(window.lucide) window.lucide.createIcons();
 
+  // Barra de progreso para archivos grandes
+  let progressBar = null;
+  if (file && file.size > 500_000) {
+    progressBar = document.createElement('div');
+    progressBar.className = 'mt-3 w-full bg-slate-100 rounded-full h-2 overflow-hidden';
+    progressBar.innerHTML = '<div id="upload-progress-fill" class="h-full bg-orange-500 rounded-full transition-all duration-200" style="width:0%"></div>';
+    btn.parentElement?.insertBefore(progressBar, btn.nextSibling);
+  }
+
+  const setProgress = (pct) => {
+    const fill = document.getElementById('upload-progress-fill');
+    if (fill) fill.style.width = pct + '%';
+  };
+
   try {
     let mediaUrl = null;
     let mediaType = null;
@@ -1015,12 +770,15 @@ async function submitNewPost() {
     if (file) {
       const ext = file.name.split('.').pop();
       const path = `posts/${Date.now()}_${Math.random().toString(36).substr(2,9)}.${ext}`;
+      setProgress(10);
       const { error: upErr } = await supabase.storage.from('classroom_media').upload(path, file);
+      setProgress(80);
       if (upErr) throw upErr;
       
       const { data } = supabase.storage.from('classroom_media').getPublicUrl(path);
       mediaUrl = data.publicUrl;
       mediaType = file.type.startsWith('video') ? 'video' : 'image';
+      setProgress(90);
     }
 
     const { error } = await supabase.from('posts').insert({
@@ -1031,6 +789,7 @@ async function submitNewPost() {
       media_type: mediaType
     });
 
+    setProgress(100);
     if (error) throw error;
     safeToast('Publicado correctamente', 'success');
     Modal.close('newPostModal');
@@ -1151,7 +910,10 @@ async function initGrades() {
   } catch (e) {
     console.error('[initGrades]', e);
     const content = document.getElementById('gradesContent');
-    if (content) content.innerHTML = '<div class="text-center py-8 text-rose-500 font-bold">Error al cargar calificaciones.</div>';
+    if (content) {
+      content.innerHTML = Helpers.errorState('Error al cargar calificaciones', 'App.initGrades?.()');
+      if (window.lucide) window.lucide.createIcons();
+    }
   }
 }
 

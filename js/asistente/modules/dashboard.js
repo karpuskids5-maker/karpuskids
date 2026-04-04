@@ -100,7 +100,8 @@ export const DashboardModule = {
 
     } catch (e) {
       console.error('[DashboardModule] loadRecentPayments:', e);
-      container.innerHTML = '<div class="px-5 py-6 text-center text-rose-500 text-sm font-bold">Error al cargar pagos.</div>';
+      container.innerHTML = Helpers.errorState('Error al cargar pagos');
+      if (window.lucide) lucide.createIcons();
     }
   },
 

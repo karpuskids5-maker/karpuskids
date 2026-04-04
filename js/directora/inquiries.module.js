@@ -20,7 +20,8 @@ export const InquiriesModule = {
       if (window.lucide) lucide.createIcons();
     } catch (e) {
       console.error('Error initReports:', e);
-      container.innerHTML = '<div class="col-span-3 text-center p-8 text-red-500">Error al cargar reportes.</div>';
+      container.innerHTML = '<div class="col-span-3 text-center p-8">' + Helpers.errorState('Error al cargar reportes', 'App.inquiries.init()') + '</div>';
+      if (window.lucide) lucide.createIcons();
     }
   },
 

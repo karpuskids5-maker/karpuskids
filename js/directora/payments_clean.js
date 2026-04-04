@@ -2,6 +2,7 @@ import { DirectorApi } from './api.js';
 import { Helpers } from '../shared/helpers.js';
 import { UIHelpers } from './ui.module.js';
 import { supabase } from '../shared/supabase.js';
+import { auditLog } from '../shared/db-utils.js';
 
 const MES = ['enero','febrero','marzo','abril','mayo','junio','julio','agosto','septiembre','octubre','noviembre','diciembre'];
 const MES_LABEL = ['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'];
@@ -109,7 +110,8 @@ export const PaymentsModule = {
       if (window.lucide) lucide.createIcons();
     } catch (e) {
       console.error('[Payments] loadPayments:', e);
-      tbody.innerHTML = '<tr><td colspan="8" class="text-center py-8 text-rose-500 font-bold text-sm">Error al cargar pagos.</td></tr>';
+      tbody.innerHTML = '<tr><td colspan="8" class="text-center py-8">' + Helpers.errorState('Error al cargar pagos', 'App.payments.loadPayments()') + '</td></tr>';
+      if (window.lucide) lucide.createIcons();
     }
   },
 
@@ -274,6 +276,7 @@ export const PaymentsModule = {
   async markPaid(id) {
     try {
       await supabase.from('payments').update({ status: 'paid', paid_date: new Date().toISOString() }).eq('id', id);
+      auditLog('payment.approved', { payment_id: id });
       Helpers.toast('Pago aprobado', 'success');
       await this.loadPayments();
       // Send receipt email + show feedback
@@ -291,6 +294,7 @@ export const PaymentsModule = {
     if (!confirm('Eliminar este registro?')) return;
     try {
       await supabase.from('payments').delete().eq('id', id);
+      auditLog('payment.deleted', { payment_id: id });
       Helpers.toast('Pago eliminado', 'success');
       await this.loadPayments();
     } catch (_) { Helpers.toast('Error al eliminar', 'error'); }

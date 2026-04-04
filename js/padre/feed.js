@@ -64,7 +64,8 @@ export const FeedModule = {
 
     } catch (err) {
       console.error('Feed error:', err);
-      container.innerHTML = Helpers.emptyState('Error al cargar el muro');
+      container.innerHTML = Helpers.errorState('Error al cargar el muro', 'window.App.feed.reload?.()');
+      if (window.lucide) lucide.createIcons();
     }
   },
 

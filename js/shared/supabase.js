@@ -13,6 +13,17 @@ export const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
   }
 });
 
+// ── Global DB error handler — muestra toast automático en errores de DB ───────
+window.addEventListener('karpus:db-error', (e) => {
+  const msg = e.detail?.message || 'Error de conexión';
+  // Usar Helpers.toast si está disponible, sino fallback simple
+  if (window.Helpers?.toast) {
+    window.Helpers.toast('Error: ' + msg, 'error');
+  } else {
+    console.error('[Karpus DB Error]', msg);
+  }
+});
+
 export const TERMS_VERSION = '1.0';
 
 // ── Autenticación ─────────────────────────────────────────────────────────────

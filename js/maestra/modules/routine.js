@@ -2,6 +2,7 @@ import { supabase } from '../../shared/supabase.js';
 import { AppState } from '../state.js';
 import { MaestraApi } from '../api.js';
 import { safeToast, safeEscapeHTML } from './ui.js';
+import { Helpers } from '../../shared/helpers.js';
 
 const _saving = {};
 
@@ -94,7 +95,8 @@ export async function initRoutine() {
     if (window.lucide) window.lucide.createIcons();
   } catch (e) {
     console.error('[Routine]', e);
-    container.innerHTML = '<div class="text-center p-8 text-rose-500 font-bold">Error al cargar la rutina.</div>';
+    container.innerHTML = Helpers.errorState('Error al cargar la rutina', 'App.initRoutine()');
+    if (window.lucide) window.lucide.createIcons();
   }
 }
 

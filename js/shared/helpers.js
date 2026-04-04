@@ -88,6 +88,26 @@ export const Helpers = {
 
 
   /**
+   * ❌ Error state con botón de reintentar
+   * @param {string} msg — mensaje de error
+   * @param {string} retryFn — nombre de función global a llamar al reintentar (ej: 'App.payments.loadPayments()')
+   */
+  errorState(msg = 'Error al cargar', retryFn = null) {
+    const retryBtn = retryFn
+      ? `<button onclick="${retryFn}" class="mt-3 px-4 py-2 bg-rose-600 text-white rounded-xl text-xs font-black uppercase hover:bg-rose-700 transition-all active:scale-95">Reintentar</button>`
+      : '';
+    return `
+      <div class="flex flex-col items-center justify-center p-10 text-center">
+        <div class="w-14 h-14 bg-rose-50 rounded-full flex items-center justify-center mb-3">
+          <i data-lucide="wifi-off" class="w-7 h-7 text-rose-400"></i>
+        </div>
+        <p class="font-black text-rose-600 text-sm">${Helpers.escapeHTML(msg)}</p>
+        <p class="text-slate-400 text-xs mt-1">Verifica tu conexión e intenta de nuevo.</p>
+        ${retryBtn}
+      </div>`;
+  },
+
+  /**
    * 🎭 Empty state
    */
   emptyState(msg = 'Sin datos', icon = 'smile') {
@@ -748,3 +768,6 @@ export const Helpers = {
   }
 
 };
+
+// Exponer globalmente para que el listener karpus:db-error pueda usar toast
+if (typeof window !== 'undefined') window.Helpers = Helpers;

@@ -1,53 +1,42 @@
 /**
  * 🔔 Notification Permission Manager — Karpus Kids
- * Shows a permission request UI when the user visits their profile section.
- * Works on all panels. Call requestIfNeeded() when profile section loads.
+ * Requests push notification permission.
+ * - requestIfNeeded(): shows banner if not yet granted (no dismiss timeout)
+ * - requestSilent(): auto-requests without UI (for app startup)
  */
-
-const STORAGE_KEY = 'karpus-notif-dismissed';
 
 export const NotifyPermission = {
 
-  /** Returns true if push is already granted */
   isGranted() {
     return 'Notification' in window && Notification.permission === 'granted';
   },
 
-  /** Returns true if the user permanently denied */
   isDenied() {
     return 'Notification' in window && Notification.permission === 'denied';
   },
 
-  /** Returns true if user dismissed our UI recently (7 days) */
-  _wasDismissed() {
-    const v = localStorage.getItem(STORAGE_KEY);
-    if (!v) return false;
-    return Date.now() < parseInt(v, 10);
-  },
-
-  /**
-   * Call this when the profile section becomes visible.
-   * Injects a permission card into the given container ID (or body).
-   */
+  /** Show banner if permission not yet granted. Always shows until user decides. */
   requestIfNeeded(containerId = 'notifPermissionSlot') {
-    // Already granted or permanently denied — nothing to do
-    if (this.isDenied()) return;
-    // Browser doesn't support notifications
     if (!('Notification' in window)) return;
-
-    // Si ya está concedido, verificar que OneSignal esté vinculado
-    if (this.isGranted()) {
-      this._ensureOneSignalLinked();
-      return;
-    }
-
-    // User dismissed recently
-    if (this._wasDismissed()) return;
-
+    if (this.isDenied()) return;
+    if (this.isGranted()) { this._ensureOneSignalLinked(); return; }
     this._render(containerId);
   },
 
-  /** Si el permiso ya está dado, asegurar que OneSignal esté vinculado */
+  /** Auto-request without banner — use on app startup */
+  async requestSilent() {
+    if (!('Notification' in window)) return;
+    if (this.isGranted()) { this._ensureOneSignalLinked(); return; }
+    if (this.isDenied()) return;
+    try {
+      const result = await Notification.requestPermission();
+      if (result === 'granted') {
+        await this._ensureOneSignalLinked();
+        this._showSuccess();
+      }
+    } catch (_) {}
+  },
+
   async _ensureOneSignalLinked() {
     try {
       if (!window.OneSignal) return;
@@ -55,95 +44,55 @@ export const NotifyPermission = {
       const { data } = await supabase.auth.getUser();
       const userId = data?.user?.id;
       if (!userId) return;
-
       const currentExtId = await window.OneSignal.User?.getExternalId?.();
-      if (currentExtId !== userId) {
-        console.log('[NotifyPermission] Re-vinculando OneSignal para:', userId);
-        await window.OneSignal.login(userId).catch(() => {});
-      }
+      if (currentExtId !== userId) await window.OneSignal.login(userId).catch(() => {});
       await window.OneSignal.User?.PushSubscription?.optIn?.().catch(() => {});
       const subId = window.OneSignal.User?.PushSubscription?.id;
       if (subId) {
-        supabase.from('profiles').update({ onesignal_player_id: subId }).eq('id', userId).then(() => {}).catch(() => {});
+        supabase.from('profiles').update({ onesignal_player_id: subId })
+          .eq('id', userId).then(() => {}).catch(() => {});
       }
-    } catch (_) { /* silencioso */ }
+    } catch (_) {}
   },
 
   _render(containerId) {
-    // Remove any existing banner
     document.getElementById('karpus-notif-banner')?.remove();
-
     const slot = document.getElementById(containerId);
     const banner = document.createElement('div');
     banner.id = 'karpus-notif-banner';
-    banner.className = [
-      'flex items-start gap-4 p-5 rounded-2xl border-2 border-amber-200',
-      'bg-gradient-to-r from-amber-50 to-orange-50 shadow-sm mb-6'
-    ].join(' ');
-
+    banner.className = 'flex items-start gap-4 p-5 rounded-2xl border-2 border-amber-200 bg-gradient-to-r from-amber-50 to-orange-50 shadow-sm mb-6';
     banner.innerHTML =
-      '<div class="w-12 h-12 bg-amber-100 rounded-2xl flex items-center justify-center text-2xl shrink-0">🔔</div>' +
+      '<div class="w-12 h-12 bg-amber-100 rounded-2xl flex items-center justify-center text-2xl shrink-0">\uD83D\uDD14</div>' +
       '<div class="flex-1 min-w-0">' +
-        '<p class="font-black text-slate-800 text-sm leading-tight">Activa las notificaciones</p>' +
-        '<p class="text-xs text-slate-500 font-medium mt-0.5 leading-snug">' +
-          'Recibe alertas de asistencia, tareas, pagos y mensajes en tiempo real.' +
-        '</p>' +
-        '<div class="flex gap-2 mt-3">' +
-          '<button id="karpus-notif-allow" ' +
-            'class="px-4 py-2 bg-amber-500 hover:bg-amber-600 text-white rounded-xl text-xs font-black uppercase tracking-wider transition-all active:scale-95 shadow-sm">' +
-            'Activar ahora' +
-          '</button>' +
-          '<button id="karpus-notif-dismiss" ' +
-            'class="px-4 py-2 bg-white border border-slate-200 text-slate-500 rounded-xl text-xs font-black uppercase tracking-wider hover:bg-slate-50 transition-all">' +
-            'Ahora no' +
-          '</button>' +
-        '</div>' +
+        '<p class="font-black text-slate-800 text-sm">Activa las notificaciones</p>' +
+        '<p class="text-xs text-slate-500 font-medium mt-0.5">Recibe alertas de asistencia, tareas, pagos y mensajes en tiempo real.</p>' +
+        '<button id="karpus-notif-allow" class="mt-3 px-4 py-2 bg-amber-500 hover:bg-amber-600 text-white rounded-xl text-xs font-black uppercase tracking-wider transition-all active:scale-95 shadow-sm">Activar ahora</button>' +
       '</div>' +
-      '<button id="karpus-notif-close" class="text-slate-300 hover:text-slate-500 transition-colors shrink-0 p-1">✕</button>';
+      '<button id="karpus-notif-close" class="text-slate-300 hover:text-slate-500 transition-colors shrink-0 p-1" title="Cerrar">\u2715</button>';
 
-    // Insert at top of slot, or prepend to body as fallback
-    if (slot) {
-      slot.insertBefore(banner, slot.firstChild);
-    } else {
-      document.body.insertBefore(banner, document.body.firstChild);
-    }
+    if (slot) slot.insertBefore(banner, slot.firstChild);
+    else document.body.insertBefore(banner, document.body.firstChild);
 
-    // Allow button
     document.getElementById('karpus-notif-allow')?.addEventListener('click', async () => {
       banner.remove();
       try {
         const result = await Notification.requestPermission();
         if (result === 'granted') {
+          await this._ensureOneSignalLinked();
           this._showSuccess();
-          // Re-init OneSignal if available
-          if (window.OneSignal?.User) {
-            const { data } = await (await import('./supabase.js')).supabase.auth.getUser();
-            if (data?.user) await window.OneSignal.login(data.user.id).catch(() => {});
-          }
         }
-      } catch (e) {
-        console.warn('[NotifyPermission] requestPermission error:', e);
-      }
+      } catch (e) { console.warn('[NotifyPermission]', e); }
     });
 
-    // Dismiss for 7 days
-    const dismiss = () => {
-      banner.remove();
-      localStorage.setItem(STORAGE_KEY, String(Date.now() + 7 * 24 * 60 * 60 * 1000));
-    };
-    document.getElementById('karpus-notif-dismiss')?.addEventListener('click', dismiss);
-    document.getElementById('karpus-notif-close')?.addEventListener('click', dismiss);
+    // Close just hides — will show again next visit (no permanent dismiss)
+    document.getElementById('karpus-notif-close')?.addEventListener('click', () => banner.remove());
   },
 
   _showSuccess() {
-    const toast = document.createElement('div');
-    toast.className = [
-      'fixed bottom-6 right-6 z-[9999] flex items-center gap-3',
-      'bg-green-600 text-white px-5 py-3 rounded-2xl shadow-xl',
-      'text-sm font-black'
-    ].join(' ');
-    toast.textContent = '🔔 Notificaciones activadas';
-    document.body.appendChild(toast);
-    setTimeout(() => toast.remove(), 3500);
+    const t = document.createElement('div');
+    t.className = 'fixed bottom-6 right-6 z-[9999] flex items-center gap-3 bg-green-600 text-white px-5 py-3 rounded-2xl shadow-xl text-sm font-black';
+    t.textContent = '\uD83D\uDD14 Notificaciones activadas';
+    document.body.appendChild(t);
+    setTimeout(() => t.remove(), 3500);
   }
 };

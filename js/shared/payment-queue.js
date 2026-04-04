@@ -65,7 +65,8 @@ export const PaymentQueue = {
       if (window.lucide) lucide.createIcons();
     } catch (e) {
       console.error('[PaymentQueue]', e);
-      container.innerHTML = `<p class="text-center text-rose-500 py-8 text-sm font-bold">Error al cargar la cola.</p>`;
+      container.innerHTML = Helpers.errorState('Error al cargar la cola de pagos');
+      if (window.lucide) lucide.createIcons();
     }
   },
 

@@ -427,7 +427,8 @@ async function loadChatContacts(searchTerm = '', unreadMap = {}) {
     `}).join('');
   } catch (error) {
     console.error('❌ Chat contacts error:', error);
-    container.innerHTML = `<div class="p-4 text-center text-red-500 text-sm">Error cargando contactos.</div>`;
+    container.innerHTML = Helpers.errorState('Error cargando contactos');
+    if (window.lucide) lucide.createIcons();
   }
 }
 
@@ -506,7 +507,8 @@ async function selectAssistantChat(userId, name, role) {
 
   } catch (e) {
     console.error('❌ Chat load error:', e);
-    msgs.innerHTML = '<div class="p-4 text-center text-red-500 text-sm">Error cargando chat</div>';
+    msgs.innerHTML = Helpers.errorState('Error cargando chat');
+    if (window.lucide) lucide.createIcons();
   }
 }
 
@@ -568,7 +570,8 @@ async function loadAsistenteStudents() {
     if (window.lucide) lucide.createIcons();
   } catch (e) {
     console.error('[loadAsistenteStudents]', e);
-    tbody.innerHTML = '<tr><td colspan="4" class="text-center py-8 text-rose-500 font-bold text-sm">Error al cargar estudiantes.</td></tr>';
+    tbody.innerHTML = '<tr><td colspan="4" class="text-center py-8">' + Helpers.errorState('Error al cargar estudiantes') + '</td></tr>';
+    if (window.lucide) lucide.createIcons();
   }
 }
 
@@ -619,6 +622,7 @@ async function loadAsistenteRooms() {
     if (window.lucide) lucide.createIcons();
   } catch (e) {
     console.error('[loadAsistenteRooms]', e);
-    tbody.innerHTML = '<tr><td colspan="5" class="text-center py-8 text-rose-500 font-bold text-sm">Error al cargar aulas.</td></tr>';
+    tbody.innerHTML = '<tr><td colspan="5" class="text-center py-8">' + Helpers.errorState('Error al cargar aulas') + '</td></tr>';
+    if (window.lucide) lucide.createIcons();
   }
 }

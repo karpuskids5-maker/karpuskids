@@ -220,6 +220,15 @@ export const PaymentsModule = {
 
     const btn = document.getElementById('btnSubmitPayment');
     if (btn) { btn.disabled = true; btn.textContent = 'Enviando...'; }
+
+    // Barra de progreso visual
+    const progressWrap = document.createElement('div');
+    progressWrap.id = 'payment-upload-progress';
+    progressWrap.className = 'mt-3 w-full bg-slate-100 rounded-full h-2 overflow-hidden';
+    progressWrap.innerHTML = '<div id="payment-progress-fill" class="h-full bg-green-500 rounded-full transition-all duration-300" style="width:5%"></div>';
+    btn?.parentElement?.insertBefore(progressWrap, btn.nextSibling);
+    const setP = (p) => { const f = document.getElementById('payment-progress-fill'); if(f) f.style.width = p + '%'; };
+
     try {
       Helpers.toast('Subiendo comprobante...', 'info');
       const ext  = file.name.split('.').pop().toLowerCase();
@@ -228,9 +237,12 @@ export const PaymentsModule = {
       if (file.type.startsWith('image/')) {
         try { uploadFile = await this._compressImage(file, 800, 0.8); } catch (_) {}
       }
+      setP(20);
       const { error: upErr } = await supabase.storage.from('classroom_media').upload(path, uploadFile);
+      setP(70);
       if (upErr) throw upErr;
       const { data: { publicUrl } } = supabase.storage.from('classroom_media').getPublicUrl(path);
+      setP(85);
 
       const existing = this._payments.find(p =>
         (p.month_paid||'').toLowerCase() === month.toLowerCase() &&
@@ -249,6 +261,8 @@ export const PaymentsModule = {
         if (error) throw error;
       }
       this._showSuccessConfirmation(amount, month, bank);
+      setP(100);
+      setTimeout(() => document.getElementById('payment-upload-progress')?.remove(), 1500);
       e.target.reset();
       await this.loadPayments();
 
@@ -262,6 +276,7 @@ export const PaymentsModule = {
       }).catch(() => {});
     } catch (err) {
       console.error('[submitPaymentProof]', err);
+      document.getElementById('payment-upload-progress')?.remove();
       Helpers.toast('Error al enviar: ' + (err.message || ''), 'error');
     } finally {
       if (btn) { btn.disabled = false; btn.textContent = 'Enviar Comprobante'; }

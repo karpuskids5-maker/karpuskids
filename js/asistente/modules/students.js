@@ -57,7 +57,8 @@ export const StudentsModule = {
       if (window.lucide) window.lucide.createIcons();
     } catch (e) {
       console.error('[loadStudents]', e);
-      tbody.innerHTML = '<tr><td colspan="4" class="text-center py-8 text-rose-500 font-bold text-sm">Error al cargar estudiantes.</td></tr>';
+      tbody.innerHTML = '<tr><td colspan="4" class="text-center py-8">' + Helpers.errorState('Error al cargar estudiantes', 'App.students.init()') + '</td></tr>';
+      if (window.lucide) lucide.createIcons();
     }
   },
 

@@ -32,7 +32,8 @@ export const AccessModule = {
           .limit(5);
           
         if (error) {
-          resultsContainer.innerHTML = '<p class="text-red-500 text-[10px] font-bold">Error al buscar</p>';
+          resultsContainer.innerHTML = Helpers.errorState('Error al buscar');
+          if (window.lucide) lucide.createIcons();
           return;
         }
         

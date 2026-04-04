@@ -183,7 +183,8 @@ export const PaymentsModule = {
     } catch (e) {
       console.error('[PaymentsModule] loadPayments:', e);
       container.innerHTML =
-        '<tr><td colspan="7" class="text-center py-8 text-rose-500 font-bold text-sm">Error al cargar pagos.</td></tr>';
+        '<tr><td colspan="7" class="text-center py-8">' + Helpers.errorState('Error al cargar pagos', 'App.payments.loadPayments?.()') + '</td></tr>';
+      if (window.lucide) lucide.createIcons();
     }
   },
 

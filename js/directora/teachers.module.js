@@ -3,6 +3,7 @@ import { Helpers } from '../shared/helpers.js';
 import { UI } from './ui.module.js';
 import { AppState } from './state.js';
 import { supabase, createClient, SUPABASE_URL, SUPABASE_ANON_KEY } from '../shared/supabase.js';
+import { auditLog } from '../shared/db-utils.js';
 
 export const TeachersModule = {
   async init(renderTargetId = 'teachersTableBody') {
@@ -49,7 +50,8 @@ export const TeachersModule = {
       if (window.lucide) lucide.createIcons();
     } catch (e) {
       console.error('Error initTeachersSection:', e);
-      container.innerHTML = '<div class="col-span-3 text-center p-8 text-red-500">Error al cargar.</div>';
+      container.innerHTML = '<tr><td colspan="5" class="text-center py-8">' + Helpers.errorState('Error al cargar personal', 'App.teachers.init()') + '</td></tr>';
+      if (window.lucide) lucide.createIcons();
     }
   },
 

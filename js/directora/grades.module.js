@@ -2,6 +2,7 @@ import { DirectorApi } from './api.js';
 import { Helpers } from '../shared/helpers.js';
 import { supabase } from '../shared/supabase.js';
 import { AppState } from './state.js';
+import { auditLog } from '../shared/db-utils.js';
 
 function scoreFromEvidence(g) {
   if (g.stars != null) return Number(g.stars);
@@ -160,7 +161,8 @@ export const GradesModule = {
 
     } catch (e) {
       console.error('[GradesModule] loadGrades:', e);
-      tableBody.innerHTML = '<tr><td colspan="4" class="text-center py-12 text-rose-500 font-bold">Error al conectar con el centro de calificaciones.</td></tr>';
+      tableBody.innerHTML = '<tr><td colspan="4" class="text-center py-12">' + Helpers.errorState('Error al cargar calificaciones', 'App.grades.loadGrades()') + '</td></tr>';
+      if (window.lucide) lucide.createIcons();
     }
   },
 

@@ -3,6 +3,7 @@ import { Helpers } from '../shared/helpers.js';
 import { UI } from './ui.module.js';
 import { AppState } from './state.js';
 import { supabase, createClient, SUPABASE_URL, SUPABASE_ANON_KEY } from '../shared/supabase.js';
+import { auditLog } from '../shared/db-utils.js';
 
 // Vista activa: 'table' | 'grid'
 let _view = 'table';
@@ -150,7 +151,10 @@ export const StudentsModule = {
     } catch (e) {
       console.error('[StudentsModule] init error:', e);
       const container = document.getElementById('studentsTable') || document.getElementById('studentsGrid');
-      if (container) container.innerHTML = '<div class="col-span-3 text-center p-8 text-red-500">Error al cargar estudiantes.</div>';
+      if (container) {
+        container.innerHTML = '<div class="col-span-3 text-center p-8">' + Helpers.errorState('Error al cargar estudiantes', 'App.students.init()') + '</div>';
+        if (window.lucide) lucide.createIcons();
+      }
     }
   },
 
@@ -373,6 +377,7 @@ export const StudentsModule = {
       const res = await DirectorApi.deleteStudent(id);
       const { error } = res || {};
       if (error) throw new Error(error);
+      auditLog('student.deleted', { student_id: id });
       Helpers.toast('Estudiante eliminado con éxito.', 'success');
       this.init();
     } catch (e) {

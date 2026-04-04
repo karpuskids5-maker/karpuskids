@@ -22,7 +22,8 @@ export const RoomsModule = {
       if (window.lucide) lucide.createIcons();
     } catch (e) {
       console.error('Error initClassroomsSection:', e);
-      container.innerHTML = '<tr><td colspan="4" class="text-center py-8 text-red-500">Error al cargar.</td></tr>';
+      container.innerHTML = '<tr><td colspan="4" class="text-center py-8">' + Helpers.errorState('Error al cargar aulas', 'App.rooms.init()') + '</td></tr>';
+      if (window.lucide) lucide.createIcons();
     }
   },
 

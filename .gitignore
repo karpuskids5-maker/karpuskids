@@ -39,3 +39,9 @@ app.js
 update_main.cjs
 update_asistente_main.cjs
 fix_escapes.cjs
+
+# Scripts with sensitive keys — run locally only, NEVER deploy
+scripts/fix_auth_activation.js
+scripts/confirm_users.js
+scripts/seed-demo.js
+scripts/seed-demo.cjs

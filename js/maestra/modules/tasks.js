@@ -3,6 +3,7 @@ import { AppState } from '../state.js';
 import { MaestraApi } from '../api.js';
 import { safeToast, safeEscapeHTML, Modal } from './ui.js';
 import { notifyParents } from '../../shared/notify-feedback.js';
+import { Helpers } from '../../shared/helpers.js';
 
 export async function initTasks() {
   const classroom = AppState.get('classroom');
@@ -77,7 +78,8 @@ export async function initTasks() {
     if (window.lucide) window.lucide.createIcons();
   } catch (e) {
     console.error(e);
-    listContainer.innerHTML = '<div class="text-center p-8 text-rose-500">Error al cargar tareas.</div>';
+    listContainer.innerHTML = Helpers.errorState('Error al cargar tareas', 'App.initTasks()');
+    if (window.lucide) window.lucide.createIcons();
   }
 }
 

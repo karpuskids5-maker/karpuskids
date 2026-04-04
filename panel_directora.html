@@ -44,12 +44,12 @@
       transition: margin-left .25s ease;
     }
     @media (min-width: 769px) {
-      .app-content-wrapper { margin-left: 288px; }
+      .app-content-wrapper { margin-left: 288px; height: 100dvh; overflow: hidden; }
       .app-content-wrapper.sidebar-collapsed aside#sidebar { width: 80px; }
       .app-content-wrapper.sidebar-collapsed #layoutShell { margin-left: 80px; }
     }
     @media (max-width: 768px) {
-      .app-content-wrapper { margin-left: 0 !important; }
+      .app-content-wrapper { margin-left: 0 !important; height: auto !important; overflow: visible !important; }
     }
 
     /* ═══════════════════════════════════════════════

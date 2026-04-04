@@ -67,7 +67,8 @@ export const RoomsModule = {
       
     } catch (e) {
       console.error('[loadRooms]', e);
-      tbody.innerHTML = '<tr><td colspan="5" class="text-center py-8 text-rose-500 font-bold text-sm">Error al cargar aulas.</td></tr>';
+      tbody.innerHTML = '<tr><td colspan="5" class="text-center py-8">' + Helpers.errorState('Error al cargar aulas', 'App.rooms.init()') + '</td></tr>';
+      if (window.lucide) lucide.createIcons();
     }
   },
 

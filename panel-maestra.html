@@ -51,7 +51,7 @@
     }
 
     @media (max-width: 768px) {
-      #layoutShell { margin-left: 0 !important; padding-top: 4rem; }
+      #layoutShell { margin-left: 0 !important; }
       aside#sidebar { transform: translateX(-100%); width: 280px !important; z-index: 100; }
       aside#sidebar.mobile-visible { transform: translateX(0); }
       aside#sidebar.collapsed .label { opacity: 1; visibility: visible; position: static; width: auto; height: auto; }
@@ -262,6 +262,7 @@
       backdrop-filter: blur(4px);
       -webkit-backdrop-filter: blur(4px);
       z-index: 90;
+      display: none;
     }
 
     /* ═══════════════════════════════════════════════
@@ -364,25 +365,33 @@
     </aside>
 
     <!-- OVERLAY MOBILE -->
-    <div id="sidebarOverlay" class="fixed inset-0 bg-black/50 z-40 backdrop-blur-sm transition-opacity" style="display:none;"></div>
+    <div id="sidebarOverlay" class="fixed inset-0 bg-black/50 z-40 backdrop-blur-sm transition-opacity"></div>
 
     <!-- Hamburger — FIXED so it never scrolls away on mobile -->
-    <button id="menuBtn"
-      class="md:hidden fixed top-4 left-4 z-[200] w-11 h-11 flex items-center justify-center bg-white rounded-xl shadow-lg border border-slate-100 text-slate-600 hover:bg-orange-50 hover:text-orange-600 transition-colors active:scale-95"
-      data-managed="true"
+    <button
+      class="menu-btn-mobile md:hidden fixed top-4 left-4 z-[200] w-11 h-11 flex items-center justify-center bg-white rounded-xl shadow-lg border border-slate-100 text-slate-600 hover:bg-orange-50 hover:text-orange-600 transition-colors active:scale-95"
       aria-label="Abrir menú">
       <i data-lucide="menu" class="w-5 h-5"></i>
     </button>
 
     <!-- MAIN -->
-    <main class="flex-1 p-4 md:p-6 pb-24 md:pb-6 transition-all duration-300" id="layoutShell">
-      <!-- Topbar mobile — spacer so content doesn't hide under fixed hamburger -->
-      <div class="md:hidden mb-6 h-11 flex items-center justify-center">
-        <h2 class="font-semibold text-slate-700 text-sm">Panel Maestra</h2>
-      </div>
+    <main class="flex-1 transition-all duration-300" id="layoutShell">
+      <!-- HEADER STICKY MÓVIL — igual que panel asistente -->
+      <header class="header md:hidden">
+        <button
+          class="menu-btn-mobile p-2.5 rounded-xl bg-white shadow-sm border border-slate-100 text-slate-600 hover:bg-orange-50 hover:text-orange-600 transition-colors active:scale-95"
+          aria-label="Abrir menú"
+          style="position:relative;z-index:200;">
+          <i data-lucide="menu" class="w-5 h-5"></i>
+        </button>
+        <span class="text-xs font-semibold text-slate-400 uppercase tracking-widest ml-2">Panel Maestra</span>
+      </header>
+
+      <!-- CONTENIDO SCROLLABLE -->
+      <div class="p-4 md:p-6 pb-24 md:pb-6">
 
       <!-- SECTION: HOME (Mis Clases) -->
-      <section id="t-home" class="section active pt-14 md:pt-0">
+      <section id="t-home" class="section active">
         <header class="mb-6">
           <h1 class="text-2xl md:text-3xl font-black text-slate-800 flex flex-wrap items-center gap-2">
             <span>🧑‍🏫</span> <span>Hola, <span class="user-name-display text-orange-600">Maestra</span>!</span>
@@ -421,7 +430,7 @@
       </section>
 
       <!-- SECTION: CLASS DETAIL (Detalle de Aula) -->
-      <section id="t-class-detail" class="section pt-14 md:pt-0">
+      <section id="t-class-detail" class="section">
         <header class="mb-4 flex items-center gap-4">
           <button id="backToClasses" class="p-2 hover:bg-slate-100 rounded-full transition-colors text-slate-600 shrink-0">
             <i data-lucide="arrow-left" class="w-6 h-6"></i>
@@ -486,6 +495,12 @@
 
         <!-- Tab Contents -->
         <div id="tab-feed" class="class-tab-content">
+          <div class="flex justify-between items-center mb-6">
+            <h3 class="text-2xl font-black text-slate-800">📢 Muro del Aula</h3>
+            <button id="btnNewPost" onclick="App.openNewPostModal()" class="px-6 py-2.5 bg-orange-600 text-white rounded-xl font-bold shadow-md hover:bg-orange-700 transition-all flex items-center gap-2">
+              <i data-lucide="plus-circle" class="w-5 h-5"></i> Nueva Publicación
+            </button>
+          </div>
           <div id="muroPostsContainer" class="space-y-6">
             <div class="bg-white p-6 rounded-2xl shadow-sm text-center text-slate-500">
               <p>Aquí se mostrarán las publicaciones del aula.</p>
@@ -517,52 +532,13 @@
         </div>
       </section>
 
-      <!-- SECTION: STUDENTS (Global) -->
-      <section id="t-students" class="section">
-        <header class="mb-6">
-          <h1 class="text-2xl font-bold text-slate-800">Mis Alumnos</h1>
-        </header>
-        <div class="bg-white rounded-xl shadow-sm table-responsive">
-          <div class="p-4 border-b flex gap-4">
-            <input type="text" placeholder="Buscar alumno..." class="border rounded-lg px-4 py-2 w-full max-w-sm">
-          </div>
-          <table class="w-full text-left text-sm">
-            <thead class="bg-slate-50 text-slate-600 font-medium">
-              <tr>
-                <th class="p-4">Nombre</th>
-                <th class="p-4">Edad</th>
-                <th class="p-4">Contacto</th>
-                <th class="p-4 text-right">Acciones</th>
-              </tr>
-            </thead>
-            <tbody id="studentsTableBody">
-              <tr><td colspan="4" class="p-8 text-center text-slate-500">Selecciona una clase para ver alumnos</td></tr>
-            </tbody>
-          </table>
-        </div>
-      </section>
-
-      <!-- SECTION: ATTENDANCE -->
-      <section id="t-attendance" class="section">
-        <header class="mb-6 flex justify-between items-center">
-          <h1 class="text-2xl font-bold text-slate-800">Asistencia</h1>
-          <div class="flex gap-2">
-            <input type="date" class="border rounded-lg px-3 py-2 text-sm">
-            <button class="bg-blue-600 text-white px-4 py-2 rounded-lg text-sm hover:bg-blue-700">Guardar</button>
-          </div>
-        </header>
-        <div class="bg-white rounded-xl shadow-sm p-6 text-center text-slate-500">
-          Selecciona una clase para tomar asistencia.
-        </div>
-      </section>
-
       <!-- SECTION: CALIFICACIONES -->
-      <section id="t-grades" class="section pt-14 md:pt-0">
+      <section id="t-grades" class="section">
         <div id="t-grades-inner"></div>
       </section>
 
       <!-- SECTION: CHAT UNIFICADO -->
-      <section id="t-chat" class="section pt-14 md:pt-0">
+      <section id="t-chat" class="section">
         <header class="mb-4">
           <h1 class="text-2xl font-black text-slate-800">Centro de Comunicación</h1>
           <p class="text-slate-500 text-sm font-medium">Habla con padres y dirección en tiempo real.</p>
@@ -699,6 +675,7 @@
           </div>
         </div>
       </section>
+      </div><!-- end scrollable content -->
     </main>
   </div>
 
@@ -812,209 +789,6 @@
     </div>
   </div>
 
-  <!-- MODAL: REPORTE DE RUTINA DIARIA (Lógica Mejorada) -->
-  <div id="dailyReportModal" class="fixed inset-0 bg-black/60 hidden items-center justify-center z-50 p-4 backdrop-blur-sm" role="dialog" aria-modal="true">
-    <div class="bg-white rounded-[2rem] shadow-2xl w-full max-w-md p-0 overflow-hidden relative">
-      <!-- Header Colorido -->
-      <div class="bg-gradient-to-r from-orange-400 to-pink-500 p-6 text-white relative">
-        <button type="button" onclick="document.getElementById('dailyReportModal').classList.add('hidden'); document.getElementById('dailyReportModal').classList.remove('flex');" class="absolute top-4 right-4 p-2 bg-white/20 rounded-full hover:bg-white/30 transition-colors">
-          <i data-lucide="x" class="w-5 h-5 text-white"></i>
-        </button>
-        <h3 class="text-2xl font-black flex items-center gap-2">
-          📝 Reporte del Día
-        </h3>
-        <p class="text-orange-100 text-sm font-medium">Registra los momentos clave del alumno</p>
-      </div>
-
-      <form id="dailyRoutineForm" class="p-6 space-y-6 max-h-[75vh] overflow-y-auto custom-scrollbar">
-        
-        <!-- 1. Estado Emocional (Mañana) -->
-        <div class="space-y-3">
-          <label class="block text-sm font-black text-slate-700 uppercase tracking-wide mb-2">👤 Alumno a Reportar</label>
-          <select id="reportStudentSelect" class="w-full p-3 bg-slate-50 border-2 border-slate-100 rounded-xl mb-4 font-bold outline-none focus:border-orange-400">
-            <option value="">Cargando alumnos...</option>
-          </select>
-          
-          <label class="block text-sm font-black text-slate-700 uppercase tracking-wide">☀️ En la mañana (Ánimo)</label>
-          <div class="grid grid-cols-4 gap-2">
-            <label class="cursor-pointer group">
-              <input type="radio" name="mood" value="feliz" class="peer sr-only" checked>
-              <div class="flex flex-col items-center justify-center p-3 rounded-xl border-2 border-slate-100 bg-slate-50 peer-checked:border-emerald-400 peer-checked:bg-emerald-50 transition-all group-hover:scale-105">
-                <span class="text-2xl mb-1 grayscale peer-checked:grayscale-0">😃</span>
-                <span class="text-[10px] font-bold text-slate-500 peer-checked:text-emerald-600">Feliz</span>
-              </div>
-            </label>
-            <label class="cursor-pointer group">
-              <input type="radio" name="mood" value="normal" class="peer sr-only">
-              <div class="flex flex-col items-center justify-center p-3 rounded-xl border-2 border-slate-100 bg-slate-50 peer-checked:border-blue-400 peer-checked:bg-blue-50 transition-all group-hover:scale-105">
-                <span class="text-2xl mb-1 grayscale peer-checked:grayscale-0">🙂</span>
-                <span class="text-[10px] font-bold text-slate-500 peer-checked:text-blue-600">Normal</span>
-              </div>
-            </label>
-            <label class="cursor-pointer group">
-              <input type="radio" name="mood" value="triste" class="peer sr-only">
-              <div class="flex flex-col items-center justify-center p-3 rounded-xl border-2 border-slate-100 bg-slate-50 peer-checked:border-amber-400 peer-checked:bg-amber-50 transition-all group-hover:scale-105">
-                <span class="text-2xl mb-1 grayscale peer-checked:grayscale-0">😢</span>
-                <span class="text-[10px] font-bold text-slate-500 peer-checked:text-amber-600">Triste</span>
-              </div>
-            </label>
-            <label class="cursor-pointer group">
-              <input type="radio" name="mood" value="enojado" class="peer sr-only">
-              <div class="flex flex-col items-center justify-center p-3 rounded-xl border-2 border-slate-100 bg-slate-50 peer-checked:border-rose-400 peer-checked:bg-rose-50 transition-all group-hover:scale-105">
-                <span class="text-2xl mb-1 grayscale peer-checked:grayscale-0">😡</span>
-                <span class="text-[10px] font-bold text-slate-500 peer-checked:text-rose-600">Enojado</span>
-              </div>
-            </label>
-          </div>
-        </div>
-
-        <!-- 2. Alimentación (Mediodía) -->
-        <div class="space-y-3 pt-4 border-t border-slate-100">
-          <label class="block text-sm font-black text-slate-700 uppercase tracking-wide">🍽️ Alimentación</label>
-          <div class="grid grid-cols-3 gap-3">
-            <label class="cursor-pointer relative">
-              <input type="radio" name="food" value="todo" class="peer sr-only" checked>
-              <div class="text-center p-3 rounded-xl border-2 border-slate-100 bg-slate-50 peer-checked:border-green-500 peer-checked:bg-green-50 peer-checked:text-green-700 font-bold text-xs transition-all">
-                Todo 😋
-              </div>
-            </label>
-            <label class="cursor-pointer relative">
-              <input type="radio" name="food" value="poco" class="peer sr-only">
-              <div class="text-center p-3 rounded-xl border-2 border-slate-100 bg-slate-50 peer-checked:border-orange-400 peer-checked:bg-orange-50 peer-checked:text-orange-700 font-bold text-xs transition-all">
-                Poco 😐
-              </div>
-            </label>
-            <label class="cursor-pointer relative">
-              <input type="radio" name="food" value="nada" class="peer sr-only">
-              <div class="text-center p-3 rounded-xl border-2 border-slate-100 bg-slate-50 peer-checked:border-red-400 peer-checked:bg-red-50 peer-checked:text-red-700 font-bold text-xs transition-all">
-                Nada 🤐
-              </div>
-            </label>
-          </div>
-        </div>
-
-        <!-- 3. Sueño (Tarde) -->
-        <div class="space-y-3 pt-4 border-t border-slate-100">
-          <label class="block text-sm font-black text-slate-700 uppercase tracking-wide">😴 Siesta / Descanso</label>
-          <div class="flex gap-4">
-            <label class="flex-1 cursor-pointer">
-              <input type="radio" name="sleep" value="si" class="peer sr-only" checked>
-              <div class="flex items-center justify-center gap-2 p-3 rounded-xl border-2 border-slate-100 bg-slate-50 peer-checked:border-indigo-400 peer-checked:bg-indigo-50 peer-checked:text-indigo-700 transition-all font-bold text-sm">
-                <i data-lucide="moon" class="w-4 h-4"></i> Durmió
-              </div>
-            </label>
-            <label class="flex-1 cursor-pointer">
-              <input type="radio" name="sleep" value="no" class="peer sr-only">
-              <div class="flex items-center justify-center gap-2 p-3 rounded-xl border-2 border-slate-100 bg-slate-50 peer-checked:border-amber-400 peer-checked:bg-amber-50 peer-checked:text-amber-700 transition-all font-bold text-sm">
-                <i data-lucide="sun" class="w-4 h-4"></i> No Durmió
-              </div>
-            </label>
-          </div>
-        </div>
-
-        <!-- Observaciones -->
-        <div class="pt-4 border-t border-slate-100">
-          <label class="block text-sm font-black text-slate-700 uppercase tracking-wide mb-2">Nota adicional (Opcional)</label>
-          <textarea name="notes" rows="2" class="w-full p-3 rounded-xl border-2 border-slate-100 focus:border-orange-400 focus:bg-white bg-slate-50 outline-none text-sm font-medium transition-all resize-none" placeholder="Ej: Estuvo muy participativo hoy..."></textarea>
-        </div>
-
-        <div class="pt-2">
-          <button type="submit" class="w-full py-4 bg-orange-600 hover:bg-orange-700 text-white font-black rounded-xl shadow-lg shadow-orange-200 active:scale-95 transition-all flex items-center justify-center gap-2">
-            <i data-lucide="send" class="w-5 h-5"></i> Enviar a Padres
-          </button>
-        </div>
-      </form>
-    </div>
-  </div>
-
-  <!-- MODAL: Incident Report -->
-  <div id="incidentModal" class="fixed inset-0 bg-black/60 hidden items-center justify-center z-50 p-4 backdrop-blur-sm">
-    <div class="bg-white rounded-2xl shadow-xl w-full max-w-md p-6">
-      <h3 class="text-xl font-bold text-red-600 mb-4 flex items-center gap-2"><i data-lucide="alert-triangle"></i> Reportar Incidente</h3>
-      <input type="hidden" id="incidentStudentId">
-      <div class="space-y-4">
-        <div>
-          <label class="block text-sm font-bold text-slate-700 mb-1">Gravedad</label>
-          <select id="incidentSeverity" class="w-full border rounded-lg p-2"><option value="leve">Leve</option><option value="media">Media</option><option value="alta">Alta</option></select>
-        </div>
-        <div>
-          <label class="block text-sm font-bold text-slate-700 mb-1">Descripción</label>
-          <textarea id="incidentDesc" class="w-full border rounded-lg p-2" rows="3" placeholder="¿Qué sucedió?"></textarea>
-        </div>
-        <div class="flex justify-end gap-2">
-          <button id="btnCancelIncident" class="px-4 py-2 border rounded-lg">Cancelar</button>
-          <button id="btnSaveIncident" class="px-4 py-2 bg-red-600 text-white rounded-lg font-bold">Registrar</button>
-        </div>
-      </div>
-    </div>
-  </div>
-
-  <!-- MODAL: New Task -->
-  <div id="newTaskModal" class="fixed inset-0 bg-black/60 hidden items-center justify-center z-50 p-4 backdrop-blur-sm">
-    <div class="bg-white rounded-[2.5rem] shadow-2xl w-full max-w-lg p-8 relative overflow-hidden">
-      <div class="absolute top-0 right-0 w-32 h-32 bg-orange-50 rounded-full -mr-16 -mt-16 opacity-50"></div>
-      
-      <h3 class="text-2xl font-black text-slate-800 mb-6 flex items-center gap-2 relative z-10">
-        <i data-lucide="plus-circle" class="text-orange-500"></i> Asignar Nueva Tarea
-      </h3>
-      
-      <form id="taskForm" class="space-y-5 relative z-10">
-        <div>
-          <label class="block text-sm font-black text-slate-700 mb-2 ml-1">Título de la Tarea</label>
-          <input type="text" id="taskTitle" required class="w-full px-4 py-3 rounded-2xl border-2 border-slate-100 focus:border-orange-400 outline-none transition-all font-bold text-slate-700 placeholder:text-slate-300" placeholder="Ej: Dibujo de la Primavera">
-        </div>
-        
-        <div>
-          <label class="block text-sm font-black text-slate-700 mb-2 ml-1">Descripción / Instrucciones</label>
-          <textarea id="taskDesc" rows="3" required class="w-full px-4 py-3 rounded-2xl border-2 border-slate-100 focus:border-orange-400 outline-none transition-all text-slate-600 placeholder:text-slate-300" placeholder="¿Qué deben hacer los alumnos?"></textarea>
-        </div>
-        
-        <div class="grid grid-cols-2 gap-4">
-          <div>
-            <label class="block text-sm font-black text-slate-700 mb-2 ml-1">Fecha de Entrega</label>
-            <input type="date" id="taskDueDate" required class="w-full px-4 py-3 rounded-2xl border-2 border-slate-100 focus:border-orange-400 outline-none transition-all font-bold text-slate-700">
-          </div>
-          <div>
-            <label class="block text-sm font-black text-slate-700 mb-2 ml-1">Puntos / Valor</label>
-            <input type="number" id="taskPoints" value="100" class="w-full px-4 py-3 rounded-2xl border-2 border-slate-100 focus:border-orange-400 outline-none transition-all font-bold text-slate-700">
-          </div>
-        </div>
-
-        <div class="pt-4 flex gap-3">
-          <button type="button" id="btnCancelTask" class="flex-1 py-4 px-6 border-2 border-slate-100 text-slate-400 font-black text-xs uppercase tracking-widest rounded-2xl hover:bg-slate-50 transition-all">Cancelar</button>
-          <button type="submit" id="btnSaveTask" class="flex-[2] py-4 px-6 bg-orange-600 text-white font-black text-xs uppercase tracking-widest rounded-2xl shadow-lg shadow-orange-100 hover:bg-orange-700 transition-all">Asignar Tarea</button>
-        </div>
-      </form>
-    </div>
-  </div>
-
-  <!-- MODAL: New Routine Item -->
-  <div id="newRoutineModal" class="fixed inset-0 bg-black/60 hidden items-center justify-center z-50 p-4 backdrop-blur-sm">
-    <div class="bg-white rounded-[2.5rem] shadow-2xl w-full max-w-md p-8 relative overflow-hidden">
-      <h3 class="text-2xl font-black text-slate-800 mb-6 flex items-center gap-2">
-        <i data-lucide="clock" class="text-orange-500"></i> Agregar Actividad
-      </h3>
-      <form id="routineForm" class="space-y-4">
-        <div>
-          <label class="block text-sm font-black text-slate-700 mb-1">Hora</label>
-          <input type="time" id="routineTime" required class="w-full px-4 py-3 rounded-2xl border-2 border-slate-100 focus:border-orange-400 outline-none transition-all font-bold">
-        </div>
-        <div>
-          <label class="block text-sm font-black text-slate-700 mb-1">Actividad</label>
-          <input type="text" id="routineActivity" required class="w-full px-4 py-3 rounded-2xl border-2 border-slate-100 focus:border-orange-400 outline-none transition-all font-bold" placeholder="Ej: Hora de Merienda">
-        </div>
-        <div>
-          <label class="block text-sm font-black text-slate-700 mb-1">Descripción</label>
-          <textarea id="routineDesc" rows="2" class="w-full px-4 py-3 rounded-2xl border-2 border-slate-100 focus:border-orange-400 outline-none transition-all text-slate-600" placeholder="Opcional..."></textarea>
-        </div>
-        <div class="pt-4 flex gap-3">
-          <button type="button" id="btnCancelRoutine" class="flex-1 py-3 px-4 border-2 border-slate-100 text-slate-400 font-black text-xs uppercase tracking-widest rounded-2xl">Cancelar</button>
-          <button type="submit" id="btnSaveRoutine" class="flex-[2] py-3 px-4 bg-slate-800 text-white font-black text-xs uppercase tracking-widest rounded-2xl shadow-lg hover:bg-slate-900 transition-all">Guardar</button>
-        </div>
-      </form>
-    </div>
-  </div>
-
     <!-- Core App Module -->
     <script type="module" src="js/maestra/main.js"></script>
     <script src="js/shared/lightbox.js" defer></script>
@@ -1033,6 +807,51 @@
         navigator.serviceWorker.register('/sw.js', { scope: '/' }).catch(() => {});
       });
     }
+
+    // ═══════════════════════════════════════════════
+    // GESTIÓN DE SIDEBAR (Móvil y Desktop)
+    // ═══════════════════════════════════════════════
+    document.addEventListener('DOMContentLoaded', () => {
+      const sidebar = document.getElementById('sidebar');
+      const overlay = document.getElementById('sidebarOverlay');
+      const mobileBtns = document.querySelectorAll('.menu-btn-mobile');
+      const toggleDesktop = document.getElementById('toggleSidebar');
+      const layoutShell = document.getElementById('layoutShell');
+      const sidebarIcon = document.getElementById('toggleSidebarIcon');
+
+      // Abrir/Cerrar en Móvil
+      const toggleMobile = () => {
+        sidebar.classList.toggle('mobile-visible');
+        overlay.classList.toggle('visible');
+      };
+
+      mobileBtns.forEach(btn => btn.addEventListener('click', toggleMobile));
+      overlay.addEventListener('click', toggleMobile);
+
+      // Cerrar sidebar al hacer click en opciones (móvil)
+      sidebar.querySelectorAll('button').forEach(btn => {
+        btn.addEventListener('click', () => {
+          if (window.innerWidth <= 768 && !btn.id.includes('toggleSidebar')) {
+            sidebar.classList.remove('mobile-visible');
+            overlay.classList.remove('visible');
+          }
+        });
+      });
+
+      // Colapso en Desktop
+      if (toggleDesktop) {
+        toggleDesktop.addEventListener('click', () => {
+          sidebar.classList.toggle('collapsed');
+          layoutShell.classList.toggle('sidebar-collapsed');
+          
+          if (sidebarIcon) {
+            const isCollapsed = sidebar.classList.contains('collapsed');
+            sidebarIcon.setAttribute('data-lucide', isCollapsed ? 'chevron-right' : 'chevron-left');
+            if (window.lucide) lucide.createIcons();
+          }
+        });
+      }
+    });
   </script>
 </body>
 </html>
