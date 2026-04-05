@@ -1348,6 +1348,11 @@ drop policy if exists "storage_auth_insert" on storage.objects;
 drop policy if exists "storage_auth_update" on storage.objects;
 drop policy if exists "storage_auth_delete" on storage.objects;
 
+
+drop policy if exists "storage_public_read" on storage.objects;
+drop policy if exists "storage_auth_insert" on storage.objects;
+drop policy if exists "storage_auth_update" on storage.objects;
+drop policy if exists "storage_auth_delete" on storage.objects;
 create policy "storage_public_read" on storage.objects
   for select using (bucket_id in ('karpus-uploads','avatars','classroom_media','posts','task_files'));
 create policy "storage_auth_insert" on storage.objects

@@ -78,15 +78,14 @@ export const StudentsModule = {
         <button onclick="window._closeAsistenteModal()" class="w-8 h-8 flex items-center justify-center rounded-lg bg-white/10 hover:bg-white/20 transition-all">✕</button>
       </div>
 
-      <div class="p-4 space-y-4 overflow-y-auto flex-1 custom-scrollbar" style="max-height: calc(90vh - 120px);">
+      <div class="p-4 space-y-4 overflow-y-auto flex-1" style="max-height: calc(90vh - 120px);">
         <input type="hidden" id="stId" value="${studentId || ''}">
 
-        <!-- Foto y Matrícula -->
-        <div class="flex flex-col sm:flex-row gap-3 items-center bg-slate-50/80 p-3 rounded-2xl border border-slate-100">
+        <!-- 📷 FOTO Y MATRÍCULA -->
+        <div class="flex flex-col sm:flex-row gap-3 items-center bg-slate-50 p-3 rounded-2xl border border-slate-100">
           <div class="relative group cursor-pointer shrink-0">
             <div id="stAvatarPreview" class="w-16 h-16 rounded-xl bg-white border-2 border-dashed border-slate-200 flex flex-col items-center justify-center text-slate-400 group-hover:border-teal-400 transition-all overflow-hidden shadow-sm">
-              <span class="text-xl">📷</span>
-              <span class="text-[8px] font-black uppercase mt-0.5">Foto</span>
+              <span class="text-xl">📷</span><span class="text-[8px] font-black uppercase mt-0.5">Foto</span>
             </div>
             <input type="file" id="stAvatarFile" class="absolute inset-0 opacity-0 cursor-pointer" accept="image/*">
           </div>
@@ -95,54 +94,93 @@ export const StudentsModule = {
               <label class="${LC}">Matrícula</label>
               <div class="flex gap-1.5">
                 <input id="stMatricula" placeholder="Generar..." class="${IC} py-1.5 text-xs" readonly>
-                <button onclick="window._genMatricula()" class="px-3 py-1.5 bg-teal-600 text-white rounded-xl font-black text-[9px] uppercase hover:bg-teal-700 shadow-sm transition-all">Gen</button>
+                <button onclick="window._genMatricula()" class="px-3 py-1.5 bg-teal-600 text-white rounded-xl font-black text-[9px] uppercase hover:bg-teal-700 shadow-sm transition-all shrink-0">Gen</button>
               </div>
             </div>
             <div class="grid grid-cols-2 gap-2">
               <div><label class="${LC}">Inscripción</label><input type="date" id="stJoinedDate" class="${IC} py-1.5 text-xs"></div>
-              <div class="flex items-center justify-center pt-3"><label class="flex items-center gap-2 cursor-pointer"><input type="checkbox" id="stActive" checked class="w-3.5 h-3.5 rounded accent-teal-600"><span class="text-[10px] font-bold text-teal-700 uppercase">Activo</span></label></div>
+              <div class="flex items-center pt-4"><label class="flex items-center gap-2 cursor-pointer"><input type="checkbox" id="stActive" checked class="w-3.5 h-3.5 rounded accent-teal-600"><span class="text-[10px] font-bold text-teal-700 uppercase">Activo</span></label></div>
             </div>
           </div>
         </div>
 
-        <!-- Info del estudiante -->
-        <div class="space-y-3">
+        <!-- 👦 INFORMACIÓN DEL ESTUDIANTE -->
+        <div class="bg-white rounded-2xl border border-slate-100 p-3 space-y-3">
+          <p class="text-[10px] font-black text-teal-600 uppercase tracking-widest flex items-center gap-1.5">👦 Información del Estudiante</p>
           <div class="grid grid-cols-1 sm:grid-cols-2 gap-2">
             <div class="sm:col-span-2"><label class="${LC}">Nombre completo *</label><input id="stName" placeholder="Nombre completo" class="${IC} py-2"></div>
-            <div><label class="${LC}">Aula</label>
+            <div><label class="${LC}">Edad</label><input id="stAge" type="number" min="1" max="18" placeholder="Ej: 5" class="${IC} py-2"></div>
+            <div><label class="${LC}">Horario</label><input id="stHorario" placeholder="Ej: 08:00-12:00" class="${IC} py-2"></div>
+            <div class="sm:col-span-2"><label class="${LC}">Aula</label>
               <select id="stClassroom" class="${IC} py-2"><option value="">-- Seleccionar Aula --</option></select>
             </div>
+          </div>
+        </div>
+
+        <!-- 🔐 ACCESO Y NOTIFICACIONES -->
+        <div class="bg-white rounded-2xl border border-slate-100 p-3 space-y-3">
+          <p class="text-[10px] font-black text-teal-600 uppercase tracking-widest flex items-center gap-1.5">🔐 Acceso y Notificaciones</p>
+          <div class="grid grid-cols-1 sm:grid-cols-2 gap-2">
+            <div><label class="${LC}">Correo de Usuario (Login)</label><input id="stEmailUser" type="email" placeholder="usuario@karpus.com" class="${IC} py-2"></div>
+            <div><label class="${LC}">Correo de Notificaciones</label><input id="stEmailNotif" type="email" placeholder="avisos@ejemplo.com" class="${IC} py-2"></div>
+            <div class="sm:col-span-2"><label class="${LC}">Contraseña (Mín 6 caracteres)</label><input id="stPassword" type="text" placeholder="********" class="${IC} py-2"></div>
+          </div>
+        </div>
+
+        <!-- 🩺 SALUD Y SEGURIDAD -->
+        <div class="bg-white rounded-2xl border border-slate-100 p-3 space-y-3">
+          <p class="text-[10px] font-black text-teal-600 uppercase tracking-widest flex items-center gap-1.5">🩺 Salud y Seguridad</p>
+          <div class="grid grid-cols-1 sm:grid-cols-2 gap-2">
             <div><label class="${LC}">Tipo Sangre</label>
               <select id="stBlood" class="${IC} py-2">
                 <option value="O+">O+</option><option value="O-">O-</option><option value="A+">A+</option><option value="A-">A-</option>
                 <option value="B+">B+</option><option value="B-">B-</option><option value="AB+">AB+</option><option value="AB-">AB-</option>
               </select>
             </div>
+            <div><label class="${LC}">Alergias</label><input id="stAllergies" placeholder="Ej: Maní, Polvo" class="${IC} py-2"></div>
+            <div class="sm:col-span-2"><label class="${LC}">Autorizados para recoger</label><textarea id="stPickup" rows="2" placeholder="Ej: Abuela Carmen, Tío Juan" class="${IC} py-2 resize-none"></textarea></div>
           </div>
         </div>
 
-        <!-- Acceso -->
-        <div class="space-y-2 pt-2 border-t border-slate-100">
-          <p class="text-[9px] font-black text-teal-600 uppercase tracking-widest">Acceso Padre</p>
+        <!-- 👨‍👩‍👦 TUTOR PRINCIPAL -->
+        <div class="bg-white rounded-2xl border border-slate-100 p-3 space-y-3">
+          <p class="text-[10px] font-black text-teal-600 uppercase tracking-widest flex items-center gap-1.5">👨‍👩‍👦 Tutor Principal</p>
           <div class="grid grid-cols-1 sm:grid-cols-2 gap-2">
-            <div><label class="${LC}">Email Login</label><input id="stEmailUser" type="email" placeholder="usuario@karpus.com" class="${IC} py-2"></div>
-            <div><label class="${LC}">Contraseña</label><input id="stPassword" type="text" placeholder="********" class="${IC} py-2"></div>
+            <div><label class="${LC}">Nombre</label><input id="p1Name" placeholder="Nombre completo" class="${IC} py-2"></div>
+            <div><label class="${LC}">Teléfono</label><input id="p1Phone" placeholder="Teléfono" class="${IC} py-2"></div>
+            <div><label class="${LC}">Profesión</label><input id="p1Profession" placeholder="Ej: Ingeniero" class="${IC} py-2"></div>
+            <div><label class="${LC}">Dirección</label><input id="p1Address" placeholder="Dirección completa" class="${IC} py-2"></div>
+            <div class="sm:col-span-2"><label class="${LC}">Contacto de Emergencia (Extra)</label><input id="p1Emergency" placeholder="Nombre y Teléfono alternativo" class="${IC} py-2"></div>
           </div>
         </div>
 
-        <!-- Tutores -->
-        <div class="space-y-3 pt-2 border-t border-slate-100">
-          <p class="text-[9px] font-black text-teal-600 uppercase tracking-widest">Tutores</p>
+        <!-- 👨‍👩‍👧 TUTOR SECUNDARIO -->
+        <div class="bg-white rounded-2xl border border-slate-100 p-3 space-y-3">
+          <p class="text-[10px] font-black text-teal-600 uppercase tracking-widest flex items-center gap-1.5">👨‍👩‍👧 Tutor Secundario</p>
           <div class="grid grid-cols-1 sm:grid-cols-2 gap-2">
-            <div><label class="${LC}">Nombre P1</label><input id="p1Name" placeholder="Tutor 1" class="${IC} py-2"></div>
-            <div><label class="${LC}">Teléfono P1</label><input id="p1Phone" placeholder="Teléfono" class="${IC} py-2"></div>
+            <div><label class="${LC}">Nombre</label><input id="p2Name" placeholder="Nombre" class="${IC} py-2"></div>
+            <div><label class="${LC}">Teléfono</label><input id="p2Phone" placeholder="Teléfono" class="${IC} py-2"></div>
+            <div><label class="${LC}">Profesión</label><input id="p2Profession" placeholder="Ej: Abogada" class="${IC} py-2"></div>
+            <div><label class="${LC}">Dirección</label><input id="p2Address" placeholder="Dirección opcional" class="${IC} py-2"></div>
+          </div>
+        </div>
+
+        <!-- 💳 INFORMACIÓN DE PAGO -->
+        <div class="bg-amber-50 rounded-2xl border border-amber-100 p-3 space-y-3">
+          <p class="text-[10px] font-black text-amber-700 uppercase tracking-widest flex items-center gap-1.5">💳 Información de Pago</p>
+          <div class="grid grid-cols-2 gap-2">
+            <div><label class="${LC}">Mensualidad ($)</label>
+              <div class="relative"><span class="absolute left-3 top-1/2 -translate-y-1/2 text-amber-600 font-black text-sm">$</span>
+              <input id="stMonthlyFee" type="number" step="0.01" min="0" placeholder="0.00" class="${IC} py-2 pl-7"></div>
+            </div>
+            <div><label class="${LC}">Día Vencimiento</label><input id="stDueDay" type="number" min="1" max="31" placeholder="5" class="${IC} py-2"></div>
           </div>
         </div>
       </div>
 
       <div class="bg-white p-4 rounded-b-3xl border-t border-slate-100 flex justify-end gap-2 shrink-0">
         <button onclick="window._closeAsistenteModal()" class="px-4 py-2 text-slate-500 font-black text-[9px] uppercase hover:bg-slate-50 rounded-xl transition-all">Cancelar</button>
-        <button onclick="window._saveStudentNow()" class="px-6 py-2 bg-gradient-to-r from-teal-600 to-emerald-600 text-white rounded-xl font-black text-[9px] uppercase shadow-md hover:-translate-y-0.5 transition-all active:scale-95" id="btnSaveStudentModal">Guardar</button>
+        <button onclick="window._saveStudentNow()" class="px-6 py-2 bg-gradient-to-r from-teal-600 to-emerald-600 text-white rounded-xl font-black text-[9px] uppercase shadow-md hover:-translate-y-0.5 transition-all active:scale-95" id="btnSaveStudentModal">Guardar Estudiante</button>
       </div>`;
 
     const gc = document.getElementById('globalModalContainer');
@@ -211,10 +249,11 @@ export const StudentsModule = {
           sv('stEmailNotif', st.p1_email); sv('stBlood', st.blood_type);
           sv('stAllergies', st.allergies); sv('stPickup', st.authorized_pickup);
           sv('p1Name', st.p1_name); sv('p1Phone', st.p1_phone);
-          sv('p1Address', st.p1_address);
+          sv('p1Profession', st.p1_job); sv('p1Address', st.p1_address);
+          sv('p1Emergency', st.p1_emergency_contact);
           sv('p2Name', st.p2_name); sv('p2Phone', st.p2_phone);
+          sv('p2Profession', st.p2_job); sv('p2Address', st.p2_address);
           sv('stMonthlyFee', st.monthly_fee); sv('stDueDay', st.due_day);
-          
           const cb = document.getElementById('stActive');
           if (cb) cb.checked = !!st.is_active;
           if (st.avatar_url) {
@@ -261,22 +300,25 @@ export const StudentsModule = {
 
     const payload = {
       name,
-      classroom_id:      getVal('stClassroom') || null,
-      start_date:        getVal('stJoinedDate') || new Date().toISOString().split('T')[0],
-      is_active:         getChecked('stActive'),
-      blood_type:        getVal('stBlood') || null,
-      allergies:         getVal('stAllergies') || null,
-      authorized_pickup: getVal('stPickup') || null,
-      p1_name:           getVal('p1Name') || null,
-      p1_phone:          getVal('p1Phone') || null,
-      p1_address:        getVal('p1Address') || null,
-      p1_email:          getVal('stEmailNotif') || null,
-      p2_name:           getVal('p2Name') || null,
-      p2_phone:          getVal('p2Phone') || null,
-      monthly_fee:       parseFloat(getVal('stMonthlyFee') || '0') || 0,
-      due_day:           parseInt(getVal('stDueDay') || '5') || 5
+      classroom_id:         getVal('stClassroom') || null,
+      start_date:           getVal('stJoinedDate') || new Date().toISOString().split('T')[0],
+      is_active:            getChecked('stActive'),
+      blood_type:           getVal('stBlood') || null,
+      allergies:            getVal('stAllergies') || null,
+      authorized_pickup:    getVal('stPickup') || null,
+      p1_name:              getVal('p1Name') || null,
+      p1_phone:             getVal('p1Phone') || null,
+      p1_job:               getVal('p1Profession') || null,
+      p1_address:           getVal('p1Address') || null,
+      p1_emergency_contact: getVal('p1Emergency') || null,
+      p1_email:             getVal('stEmailNotif') || null,
+      p2_name:              getVal('p2Name') || null,
+      p2_phone:             getVal('p2Phone') || null,
+      p2_job:               getVal('p2Profession') || null,
+      p2_address:           getVal('p2Address') || null,
+      monthly_fee:          parseFloat(getVal('stMonthlyFee') || '0') || 0,
+      due_day:              parseInt(getVal('stDueDay') || '5') || 5
     };
-
     try {
       // 1. Subir avatar si existe
       if (avatarFile) {
