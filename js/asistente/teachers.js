@@ -62,54 +62,65 @@ export const TeachersModule = {
     const LC = 'block text-[11px] font-black text-slate-400 uppercase tracking-wider mb-1.5 ml-1';
 
     const html = `
-      <div class="bg-gradient-to-r from-teal-600 to-emerald-600 text-white p-5 rounded-t-3xl flex items-center justify-between shrink-0">
-        <div class="flex items-center gap-3">
-          <div class="w-10 h-10 bg-white/20 rounded-2xl flex items-center justify-center text-xl">👩‍🏫</div>
+      <div class="bg-gradient-to-r from-teal-600 to-emerald-600 text-white p-4 rounded-t-3xl flex items-center justify-between shrink-0">
+        <div class="flex items-center gap-2">
+          <div class="w-9 h-9 bg-white/20 rounded-xl flex items-center justify-center text-lg">👩‍🏫</div>
           <div>
-            <h3 class="text-lg font-black">${id ? 'Editar Maestra' : 'Gestión de Personal'}</h3>
-            <p class="text-[10px] text-white/70 font-bold uppercase tracking-widest">Maestras y Asistentes</p>
+            <h3 class="text-base font-black">${id ? 'Editar Personal' : 'Nuevo Personal'}</h3>
+            <p class="text-[9px] text-white/70 font-bold uppercase tracking-widest">Maestras y Asistentes</p>
           </div>
         </div>
-        <button onclick="window._closeAsistenteModal()" class="w-9 h-9 flex items-center justify-center rounded-xl bg-white/10 hover:bg-white/20 transition-all">✕</button>
+        <button onclick="window._closeAsistenteModal()" class="w-8 h-8 flex items-center justify-center rounded-lg bg-white/10 hover:bg-white/20 transition-all">✕</button>
       </div>
 
-      <div class="p-6 space-y-4 overflow-y-auto flex-1 custom-scrollbar" style="max-height: calc(90vh - 140px);">
+      <div class="p-4 space-y-4 overflow-y-auto flex-1 custom-scrollbar" style="max-height: calc(90vh - 120px);">
         <input type="hidden" id="teacherId" value="${id || ''}">
 
-        <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
-          <div class="sm:col-span-2"><label class="${LC}">Nombre completo</label><input id="teacherName" placeholder="Ej: Maria Lopez" class="${IC}"></div>
-          <div><label class="${LC}">Correo electrónico</label><input id="teacherEmail" type="email" placeholder="usuario@karpus.com" class="${IC}"></div>
-          <div><label class="${LC}">Teléfono</label><input id="teacherPhone" type="tel" placeholder="Opcional" class="${IC}"></div>
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
           <div class="sm:col-span-2">
-            <label class="${LC}">Contraseña (Mínimo 6 caracteres) <span class="normal-case font-normal text-slate-300">* Solo requerida para nuevos usuarios</span></label>
-            <input id="teacherPassword" type="text" placeholder="Crear contraseña de acceso" class="${IC}">
+            <label class="${LC}">Nombre completo *</label>
+            <input id="teacherName" placeholder="Ej: Maria Lopez" class="${IC} py-2">
           </div>
-          <div><label class="${LC}">Rol</label>
-            <select id="teacherRole" class="${IC}">
+          <div class="sm:col-span-2">
+            <label class="${LC}">Correo electrónico *</label>
+            <input id="teacherEmail" type="email" placeholder="usuario@karpus.com" class="${IC} py-2">
+          </div>
+          <div>
+            <label class="${LC}">Teléfono</label>
+            <input id="teacherPhone" type="tel" placeholder="Opcional" class="${IC} py-2">
+          </div>
+          <div>
+            <label class="${LC}">Rol</label>
+            <select id="teacherRole" class="${IC} py-2">
               <option value="maestra">Maestra</option>
               <option value="asistente">Asistente</option>
             </select>
           </div>
-          <div><label class="${LC}">Aula asignada</label>
-            <select id="teacherClassroom" class="${IC}"><option value="">Seleccionar Aula</option></select>
+          <div class="sm:col-span-2">
+            <label class="${LC}">Aula asignada</label>
+            <select id="teacherClassroom" class="${IC} py-2"><option value="">-- Sin Aula --</option></select>
+          </div>
+          <div class="sm:col-span-2">
+            <label class="${LC}">Contraseña ${id ? '(Solo si desea cambiarla)' : '(Mínimo 6 caracteres) *'}</label>
+            <input id="teacherPassword" type="text" placeholder="********" class="${IC} py-2">
           </div>
           <div class="sm:col-span-2">
             <label class="flex items-center gap-3 p-3 bg-white border-2 border-slate-100 rounded-2xl cursor-pointer">
-              <input type="checkbox" id="teacherActive" checked class="w-5 h-5 rounded accent-teal-600">
-              <span class="text-sm font-bold text-slate-700">Cuenta Activa</span>
+              <input type="checkbox" id="teacherActive" checked class="w-4 h-4 rounded accent-teal-600">
+              <span class="text-[11px] font-black text-slate-700 uppercase">Cuenta Activa</span>
             </label>
           </div>
         </div>
       </div>
 
-      <div class="bg-white p-5 rounded-b-3xl border-t border-slate-100 flex justify-end gap-3 shrink-0">
-        <button onclick="window._closeAsistenteModal()" class="px-6 py-2.5 text-slate-500 font-black text-[10px] uppercase hover:bg-slate-50 rounded-2xl transition-all">Cancelar</button>
-        <button onclick="window._saveTeacherNow()" class="px-8 py-2.5 bg-gradient-to-r from-teal-600 to-emerald-600 text-white rounded-2xl font-black text-[10px] uppercase shadow-lg hover:-translate-y-0.5 transition-all active:scale-95" id="btnSaveTeacherModal">Guardar Personal</button>
+      <div class="bg-white p-4 rounded-b-3xl border-t border-slate-100 flex justify-end gap-2 shrink-0">
+        <button onclick="window._closeAsistenteModal()" class="px-4 py-2 text-slate-500 font-black text-[9px] uppercase hover:bg-slate-50 rounded-xl transition-all">Cancelar</button>
+        <button onclick="window._saveTeacherNow()" class="px-6 py-2 bg-gradient-to-r from-teal-600 to-emerald-600 text-white rounded-xl font-black text-[9px] uppercase shadow-md hover:-translate-y-0.5 transition-all active:scale-95" id="btnSaveTeacherModal">Guardar</button>
       </div>`;
 
     const gc = document.getElementById('globalModalContainer');
     if (gc) {
-      gc.innerHTML = '<div class="bg-white rounded-3xl shadow-2xl w-full max-w-lg max-h-[92vh] overflow-hidden mx-3 flex flex-col">' + html + '</div>';
+      gc.innerHTML = '<div class="bg-white rounded-3xl shadow-2xl w-full max-w-md max-h-[92vh] overflow-hidden mx-3 flex flex-col">' + html + '</div>';
       gc.style.display = 'flex';
       gc.style.alignItems = 'center';
       gc.style.justifyContent = 'center';
@@ -151,16 +162,21 @@ export const TeachersModule = {
   },
 
   async saveTeacher() {
-    const id       = document.getElementById('teacherId')?.value;
-    const name     = document.getElementById('teacherName')?.value?.trim();
-    const email    = document.getElementById('teacherEmail')?.value?.trim();
-    const password = document.getElementById('teacherPassword')?.value?.trim();
-    const phone    = document.getElementById('teacherPhone')?.value?.trim();
-    const role     = document.getElementById('teacherRole')?.value || 'maestra';
-    const classroomId = document.getElementById('teacherClassroom')?.value || null;
-    const isActive = document.getElementById('teacherActive')?.checked ?? true;
+    const gc = document.getElementById('globalModalContainer');
+    const getVal = (id) => (gc?.querySelector('#' + id) || document.getElementById(id))?.value?.trim() || '';
+    const getChecked = (id) => (gc?.querySelector('#' + id) || document.getElementById(id))?.checked ?? true;
 
-    if (!name || !email) { Helpers.toast('Nombre y correo son obligatorios', 'error'); return; }
+    const id          = getVal('teacherId');
+    const name        = getVal('teacherName');
+    const email       = getVal('teacherEmail');
+    const password    = getVal('teacherPassword');
+    const phone       = getVal('teacherPhone');
+    const role        = getVal('teacherRole') || 'maestra';
+    const classroomId = getVal('teacherClassroom') || null;
+    const isActive    = getChecked('teacherActive');
+
+    if (!name || name.length < 2) { Helpers.toast('El nombre es obligatorio', 'warning'); return; }
+    if (!email || !email.includes('@')) { Helpers.toast('El correo es obligatorio', 'warning'); return; }
 
     const btn = document.getElementById('btnSaveTeacherModal');
     if (btn) { btn.disabled = true; btn.textContent = 'Guardando...'; }

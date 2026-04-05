@@ -298,6 +298,34 @@
       touch-action: manipulation;
     }
     .nav-btn-toy:hover { background: white; color: #F97316; transform: translateX(6px); }
+
+    /* ═══════════════════════════════════════════════
+       ROUTINE UI IMPROVEMENTS (Mobile First)
+    ═══════════════════════════════════════════════ */
+    @keyframes bounce-subtle {
+      0%, 100% { transform: translateY(0); }
+      50% { transform: translateY(-4px); }
+    }
+    .animate-bounce-subtle {
+      animation: bounce-subtle 2s infinite ease-in-out;
+    }
+    @keyframes pulse-subtle {
+      0%, 100% { opacity: 1; transform: scale(1); }
+      50% { opacity: 0.9; transform: scale(0.98); }
+    }
+    .animate-pulse-subtle {
+      animation: pulse-subtle 3s infinite ease-in-out;
+    }
+    .custom-scrollbar::-webkit-scrollbar {
+      width: 4px;
+    }
+    .custom-scrollbar::-webkit-scrollbar-track {
+      background: transparent;
+    }
+    .custom-scrollbar::-webkit-scrollbar-thumb {
+      background: #e2e8f0;
+      border-radius: 10px;
+    }
     .nav-btn-toy.active { background: white; color: #C2410C; }
   </style>
 </head>

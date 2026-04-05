@@ -18,7 +18,7 @@ import * as UI from './modules/ui.js';
 window.safeToast = UI.safeToast;
 const { safeToast, safeEscapeHTML, Modal } = UI;
 const { initAttendance, markAllPresent, registerAttendance } = Attendance;
-const { initRoutine, updateRoutineField, saveRoutineLog, openNewRoutineModal } = Routine;
+const { initRoutine, updateRoutineField, saveRoutineLog, openNewRoutineModal, openStudentRoutine, openBulkRoutineModal, updateRoutineFieldInModal, saveRoutineInModal, applyBulkRoutine } = Routine;
 const { initTasks, openEditTaskModal, deleteTask, openNewTaskModal, viewTaskSubmissions, submitGrade } = Tasks;
 const { openStudentProfile, registerIncidentModal } = Students;
 const { initChat, selectChatContact } = ChatApp;
@@ -43,6 +43,11 @@ window.App = {
   updateRoutineField: Routine.updateRoutineField,
   saveRoutineLog: Routine.saveRoutineLog,
   openNewRoutineModal: Routine.openNewRoutineModal,
+  openStudentRoutine: Routine.openStudentRoutine,
+  openBulkRoutineModal: Routine.openBulkRoutineModal,
+  updateRoutineFieldInModal: Routine.updateRoutineFieldInModal,
+  saveRoutineInModal: Routine.saveRoutineInModal,
+  applyBulkRoutine: Routine.applyBulkRoutine,
 
   // Tasks
   initTasks: Tasks.initTasks,

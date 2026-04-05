@@ -441,11 +441,12 @@ async function loadChatContacts(searchTerm = '', unreadMap = {}) {
 
   try {
     const contacts = await QueryCache.get(cacheKey, async () => {
-      // 1. Obtener perfiles
+      // 1. Obtener perfiles — todos los roles con quienes puede chatear
       let query = supabase
         .from('profiles')
         .select('id, name, role, avatar_url')
-        .in('role', ['padre', 'maestra', 'directora'])
+        .in('role', ['padre', 'maestra', 'directora', 'asistente'])
+        .neq('id', AppState.get('user')?.id || 'none')  // no mostrar a sí mismo
         .order('name');
       if (searchTerm) query = query.ilike('name', `%${searchTerm}%`);
       const { data: profiles, error } = await query.limit(100);

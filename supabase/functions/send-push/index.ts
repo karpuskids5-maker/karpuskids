@@ -85,11 +85,27 @@ Deno.serve(async (req) => {
       ? (link.startsWith('http') ? link : 'https://karpuskids.com/' + link.replace(/^\//, ''))
       : 'https://karpuskids.com/';
 
+    const ICON_URL = 'https://karpuskids.com/img/mundo.jpg';
+
     const basePayload = {
       app_id:               ONESIGNAL_APP_ID,
       headings:             { en: title, es: title },
       contents:             { en: message, es: message },
       url:                  fullLink,
+      // ── Íconos Karpus Kids ──────────────────────────────────────────────
+      // Android: ícono pequeño en la barra de estado (debe ser PNG blanco/transparente idealmente)
+      // Si no tienes un PNG monocromático, OneSignal usará el ícono de la app por defecto
+      // El large_icon aparece en el cuerpo de la notificación (imagen grande)
+      large_icon:           ICON_URL,   // imagen grande en el cuerpo (Android)
+      big_picture:          ICON_URL,   // imagen expandida al deslizar (Android)
+      // iOS: ícono de la app (se toma del bundle, no se puede cambiar por API)
+      // Pero sí podemos poner una imagen adjunta
+      ios_attachments:      { id1: ICON_URL },
+      // Web push (Chrome/Firefox): ícono en la notificación del navegador
+      chrome_web_icon:      ICON_URL,
+      chrome_web_image:     ICON_URL,
+      firefox_icon:         ICON_URL,
+      // ────────────────────────────────────────────────────────────────────
       android_accent_color: 'FF22C55E',
       ios_sound:            'default',
       ios_badge_type:       'Increase',

@@ -67,54 +67,53 @@ export const StudentsModule = {
     const LC = 'block text-[11px] font-black text-slate-400 uppercase tracking-wider mb-1.5 ml-1';
 
     const html = `
-      <div class="bg-gradient-to-r from-teal-600 to-emerald-600 text-white p-5 rounded-t-3xl flex items-center justify-between shrink-0">
-        <div class="flex items-center gap-3">
-          <div class="w-10 h-10 bg-white/20 rounded-2xl flex items-center justify-center text-xl">👶</div>
+      <div class="bg-gradient-to-r from-teal-600 to-emerald-600 text-white p-4 rounded-t-3xl flex items-center justify-between shrink-0">
+        <div class="flex items-center gap-2">
+          <div class="w-9 h-9 bg-white/20 rounded-xl flex items-center justify-center text-lg">👶</div>
           <div>
-            <h3 class="text-lg font-black">${studentId ? 'Editar Estudiante' : 'Crear Estudiante'}</h3>
-            <p class="text-[10px] text-white/70 font-bold uppercase tracking-widest">${studentId ? 'Actualizar Registro' : 'Nuevo Registro'}</p>
+            <h3 class="text-base font-black">${studentId ? 'Editar Estudiante' : 'Nuevo Estudiante'}</h3>
+            <p class="text-[9px] text-white/70 font-bold uppercase tracking-widest">Ficha del Alumno</p>
           </div>
         </div>
-        <button onclick="window._closeAsistenteModal()" class="w-9 h-9 flex items-center justify-center rounded-xl bg-white/10 hover:bg-white/20 transition-all">✕</button>
+        <button onclick="window._closeAsistenteModal()" class="w-8 h-8 flex items-center justify-center rounded-lg bg-white/10 hover:bg-white/20 transition-all">✕</button>
       </div>
 
-      <div class="p-5 space-y-4 overflow-y-auto flex-1 custom-scrollbar" style="max-height: calc(90vh - 140px);">
+      <div class="p-4 space-y-4 overflow-y-auto flex-1 custom-scrollbar" style="max-height: calc(90vh - 120px);">
         <input type="hidden" id="stId" value="${studentId || ''}">
 
         <!-- Foto y Matrícula -->
-        <div class="flex flex-col sm:flex-row gap-4 items-center bg-slate-50/50 p-4 rounded-2xl border-2 border-slate-100">
+        <div class="flex flex-col sm:flex-row gap-3 items-center bg-slate-50/80 p-3 rounded-2xl border border-slate-100">
           <div class="relative group cursor-pointer shrink-0">
-            <div id="stAvatarPreview" class="w-20 h-20 rounded-2xl bg-white border-2 border-dashed border-slate-200 flex flex-col items-center justify-center text-slate-400 group-hover:border-teal-400 transition-all overflow-hidden shadow-sm">
-              <span class="text-2xl">📷</span>
-              <span class="text-[9px] font-black uppercase mt-1">Foto</span>
+            <div id="stAvatarPreview" class="w-16 h-16 rounded-xl bg-white border-2 border-dashed border-slate-200 flex flex-col items-center justify-center text-slate-400 group-hover:border-teal-400 transition-all overflow-hidden shadow-sm">
+              <span class="text-xl">📷</span>
+              <span class="text-[8px] font-black uppercase mt-0.5">Foto</span>
             </div>
             <input type="file" id="stAvatarFile" class="absolute inset-0 opacity-0 cursor-pointer" accept="image/*">
           </div>
-          <div class="flex-1 w-full space-y-3">
+          <div class="flex-1 w-full space-y-2">
             <div>
               <label class="${LC}">Matrícula</label>
-              <div class="flex gap-2">
-                <input id="stMatricula" placeholder="Generar automática..." class="${IC} flex-1 py-2" readonly>
-                <button onclick="window._genMatricula()" class="px-3 py-2 bg-teal-600 text-white rounded-xl font-black text-[10px] uppercase hover:bg-teal-700 transition-all shadow-sm">Generar</button>
+              <div class="flex gap-1.5">
+                <input id="stMatricula" placeholder="Generar..." class="${IC} py-1.5 text-xs" readonly>
+                <button onclick="window._genMatricula()" class="px-3 py-1.5 bg-teal-600 text-white rounded-xl font-black text-[9px] uppercase hover:bg-teal-700 shadow-sm transition-all">Gen</button>
               </div>
             </div>
-            <div class="grid grid-cols-2 gap-3">
-              <div><label class="${LC}">Inscripción</label><input type="date" id="stJoinedDate" class="${IC} py-2"></div>
-              <div class="flex items-end pb-2"><label class="flex items-center gap-2 cursor-pointer"><input type="checkbox" id="stActive" checked class="w-4 h-4 rounded accent-teal-600"><span class="text-[11px] font-bold text-teal-700 uppercase">Activo</span></label></div>
+            <div class="grid grid-cols-2 gap-2">
+              <div><label class="${LC}">Inscripción</label><input type="date" id="stJoinedDate" class="${IC} py-1.5 text-xs"></div>
+              <div class="flex items-center justify-center pt-3"><label class="flex items-center gap-2 cursor-pointer"><input type="checkbox" id="stActive" checked class="w-3.5 h-3.5 rounded accent-teal-600"><span class="text-[10px] font-bold text-teal-700 uppercase">Activo</span></label></div>
             </div>
           </div>
         </div>
 
         <!-- Info del estudiante -->
         <div class="space-y-3">
-          <p class="text-[10px] font-black text-teal-600 uppercase tracking-widest flex items-center gap-2"><span class="w-1.5 h-3 bg-teal-500 rounded-full"></span> Información del Estudiante</p>
-          <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
-            <div class="sm:col-span-2"><label class="${LC}">Nombre completo *</label><input id="stName" placeholder="Nombre completo" class="${IC}"></div>
+          <div class="grid grid-cols-1 sm:grid-cols-2 gap-2">
+            <div class="sm:col-span-2"><label class="${LC}">Nombre completo *</label><input id="stName" placeholder="Nombre completo" class="${IC} py-2"></div>
             <div><label class="${LC}">Aula</label>
-              <select id="stClassroom" class="${IC}"><option value="">-- Seleccionar Aula --</option></select>
+              <select id="stClassroom" class="${IC} py-2"><option value="">-- Seleccionar Aula --</option></select>
             </div>
             <div><label class="${LC}">Tipo Sangre</label>
-              <select id="stBlood" class="${IC}">
+              <select id="stBlood" class="${IC} py-2">
                 <option value="O+">O+</option><option value="O-">O-</option><option value="A+">A+</option><option value="A-">A-</option>
                 <option value="B+">B+</option><option value="B-">B-</option><option value="AB+">AB+</option><option value="AB-">AB-</option>
               </select>
@@ -123,57 +122,27 @@ export const StudentsModule = {
         </div>
 
         <!-- Acceso -->
-        <div class="space-y-3 pt-2 border-t border-slate-100">
-          <p class="text-[10px] font-black text-teal-600 uppercase tracking-widest flex items-center gap-2"><span class="w-1.5 h-3 bg-teal-500 rounded-full"></span> Acceso y Notificaciones</p>
-          <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
-            <div><label class="${LC}">Email Login (Padre)</label><input id="stEmailUser" type="email" placeholder="usuario@karpus.com" class="${IC}"></div>
-            <div><label class="${LC}">Email Avisos</label><input id="stEmailNotif" type="email" placeholder="avisos@ejemplo.com" class="${IC}"></div>
-            <div class="sm:col-span-2"><label class="${LC}">Contraseña ${studentId ? '(Solo si desea cambiarla)' : '(Mínimo 6 caracteres)'}</label><input id="stPassword" type="text" placeholder="********" class="${IC}"></div>
+        <div class="space-y-2 pt-2 border-t border-slate-100">
+          <p class="text-[9px] font-black text-teal-600 uppercase tracking-widest">Acceso Padre</p>
+          <div class="grid grid-cols-1 sm:grid-cols-2 gap-2">
+            <div><label class="${LC}">Email Login</label><input id="stEmailUser" type="email" placeholder="usuario@karpus.com" class="${IC} py-2"></div>
+            <div><label class="${LC}">Contraseña</label><input id="stPassword" type="text" placeholder="********" class="${IC} py-2"></div>
           </div>
-        </div>
-
-        <!-- Salud -->
-        <div class="space-y-3 pt-2 border-t border-slate-100">
-          <p class="text-[10px] font-black text-teal-600 uppercase tracking-widest flex items-center gap-2"><span class="w-1.5 h-3 bg-teal-500 rounded-full"></span> Salud y Seguridad</p>
-          <div><label class="${LC}">Alergias / Condiciones</label><input id="stAllergies" placeholder="Ej: Maní, Polvo" class="${IC}"></div>
-          <div><label class="${LC}">Autorizados para recoger</label><textarea id="stPickup" rows="2" placeholder="Ej: Abuela Carmen, Tío Juan" class="${IC} resize-none"></textarea></div>
         </div>
 
         <!-- Tutores -->
-        <div class="space-y-4 pt-2 border-t border-slate-100">
-          <p class="text-[10px] font-black text-teal-600 uppercase tracking-widest flex items-center gap-2"><span class="w-1.5 h-3 bg-teal-500 rounded-full"></span> Información de Tutores</p>
-          
-          <div class="bg-slate-50/50 p-4 rounded-2xl border-2 border-slate-100 space-y-3">
-            <p class="text-[9px] font-black text-slate-400 uppercase tracking-wider">Tutor Principal</p>
-            <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
-              <div><label class="${LC}">Nombre</label><input id="p1Name" placeholder="Nombre completo" class="${IC}"></div>
-              <div><label class="${LC}">Teléfono</label><input id="p1Phone" placeholder="Teléfono" class="${IC}"></div>
-              <div class="sm:col-span-2"><label class="${LC}">Dirección</label><input id="p1Address" placeholder="Dirección completa" class="${IC}"></div>
-            </div>
-          </div>
-
-          <div class="bg-slate-50/50 p-4 rounded-2xl border-2 border-slate-100 space-y-3">
-            <p class="text-[9px] font-black text-slate-400 uppercase tracking-wider">Tutor Secundario (Opcional)</p>
-            <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
-              <div><label class="${LC}">Nombre</label><input id="p2Name" placeholder="Nombre" class="${IC}"></div>
-              <div><label class="${LC}">Teléfono</label><input id="p2Phone" placeholder="Teléfono" class="${IC}"></div>
-            </div>
-          </div>
-        </div>
-
-        <!-- Pago -->
-        <div class="bg-amber-50/50 p-5 rounded-2xl border-2 border-amber-100 space-y-3">
-          <p class="text-[10px] font-black text-amber-700 uppercase tracking-widest flex items-center gap-2"><span class="w-1.5 h-3 bg-amber-500 rounded-full"></span> Información de Pago</p>
-          <div class="grid grid-cols-2 gap-3">
-            <div><label class="${LC}">Mensualidad $</label><input id="stMonthlyFee" type="number" step="0.01" placeholder="0.00" class="${IC} bg-white"></div>
-            <div><label class="${LC}">Día Vencimiento</label><input id="stDueDay" type="number" min="1" max="31" placeholder="5" class="${IC} bg-white"></div>
+        <div class="space-y-3 pt-2 border-t border-slate-100">
+          <p class="text-[9px] font-black text-teal-600 uppercase tracking-widest">Tutores</p>
+          <div class="grid grid-cols-1 sm:grid-cols-2 gap-2">
+            <div><label class="${LC}">Nombre P1</label><input id="p1Name" placeholder="Tutor 1" class="${IC} py-2"></div>
+            <div><label class="${LC}">Teléfono P1</label><input id="p1Phone" placeholder="Teléfono" class="${IC} py-2"></div>
           </div>
         </div>
       </div>
 
-      <div class="bg-white p-5 rounded-b-3xl border-t border-slate-100 flex justify-end gap-3 shrink-0">
-        <button onclick="window._closeAsistenteModal()" class="px-6 py-2.5 text-slate-500 font-black text-[10px] uppercase hover:bg-slate-50 rounded-2xl transition-all">Cancelar</button>
-        <button onclick="window._saveStudentNow()" class="px-8 py-2.5 bg-gradient-to-r from-teal-600 to-emerald-600 text-white rounded-2xl font-black text-[10px] uppercase shadow-lg hover:-translate-y-0.5 transition-all active:scale-95" id="btnSaveStudentModal">Guardar Estudiante</button>
+      <div class="bg-white p-4 rounded-b-3xl border-t border-slate-100 flex justify-end gap-2 shrink-0">
+        <button onclick="window._closeAsistenteModal()" class="px-4 py-2 text-slate-500 font-black text-[9px] uppercase hover:bg-slate-50 rounded-xl transition-all">Cancelar</button>
+        <button onclick="window._saveStudentNow()" class="px-6 py-2 bg-gradient-to-r from-teal-600 to-emerald-600 text-white rounded-xl font-black text-[9px] uppercase shadow-md hover:-translate-y-0.5 transition-all active:scale-95" id="btnSaveStudentModal">Guardar</button>
       </div>`;
 
     const gc = document.getElementById('globalModalContainer');
@@ -206,21 +175,28 @@ export const StudentsModule = {
       reader.readAsDataURL(file);
     });
 
-    // Load classrooms
+    // Load classrooms — critical for the form
     try {
-      const { data, error } = await supabase.from('classrooms').select('id, name').order('name');
-      if (error) throw error;
-      const sel = document.getElementById('stClassroom');
-      if (sel && data) {
-        data.forEach(c => {
-          const o = document.createElement('option');
-          o.value = c.id; o.textContent = c.name;
-          sel.appendChild(o);
-        });
+      const sel = document.getElementById('stClassroom') || gc?.querySelector('#stClassroom');
+      if (sel) {
+        sel.innerHTML = '<option value="">Cargando aulas...</option>';
+        const { data, error } = await supabase.from('classrooms').select('id, name').order('name');
+        if (error) throw error;
+        sel.innerHTML = '<option value="">-- Seleccionar Aula --</option>';
+        if (data?.length) {
+          data.forEach(c => {
+            const o = document.createElement('option');
+            o.value = c.id; o.textContent = c.name;
+            sel.appendChild(o);
+          });
+        } else {
+          sel.innerHTML = '<option value="">No hay aulas registradas</option>';
+        }
       }
     } catch (e) {
       console.error('Error loading classrooms for student modal:', e);
-      Helpers.toast('Error al cargar las aulas', 'error');
+      const sel = document.getElementById('stClassroom') || gc?.querySelector('#stClassroom');
+      if (sel) sel.innerHTML = '<option value="">Error al cargar aulas</option>';
     }
 
     // Prefill if editing
@@ -266,34 +242,39 @@ export const StudentsModule = {
     const btn = document.getElementById('btnSaveStudentModal');
     if (btn) { btn.disabled = true; btn.innerHTML = '<i data-lucide="loader-2" class="w-4 h-4 animate-spin"></i> Guardando...'; if(window.lucide) lucide.createIcons(); }
 
-    const id         = document.getElementById('stId')?.value;
-    const name       = document.getElementById('stName')?.value?.trim();
-    const emailUser  = document.getElementById('stEmailUser')?.value?.trim();
-    const password   = document.getElementById('stPassword')?.value?.trim();
-    const avatarFile = document.getElementById('stAvatarFile')?.files[0];
+    // Leer valores directamente del DOM — usar querySelector como fallback
+    const gc = document.getElementById('globalModalContainer');
+    const getVal = (id) => (gc?.querySelector('#' + id) || document.getElementById(id))?.value?.trim() || '';
+    const getChecked = (id) => (gc?.querySelector('#' + id) || document.getElementById(id))?.checked ?? true;
 
-    if (!name) { 
-      Helpers.toast('El nombre es obligatorio', 'warning'); 
-      if (btn) { btn.disabled = false; btn.innerHTML = 'Guardar Estudiante'; if(window.lucide) lucide.createIcons(); } 
-      return; 
+    const id         = getVal('stId');
+    const name       = getVal('stName');
+    const emailUser  = getVal('stEmailUser');
+    const password   = getVal('stPassword');
+    const avatarFile = (gc?.querySelector('#stAvatarFile') || document.getElementById('stAvatarFile'))?.files?.[0];
+
+    if (!name || name.length < 2) {
+      Helpers.toast('El nombre del estudiante es obligatorio', 'warning');
+      if (btn) { btn.disabled = false; btn.innerHTML = 'Guardar Estudiante'; }
+      return;
     }
 
     const payload = {
       name,
-      classroom_id:         document.getElementById('stClassroom')?.value || null,
-      start_date:           document.getElementById('stJoinedDate')?.value || new Date().toISOString().split('T')[0],
-      is_active:            document.getElementById('stActive')?.checked ?? true,
-      blood_type:           document.getElementById('stBlood')?.value || null,
-      allergies:            document.getElementById('stAllergies')?.value?.trim() || null,
-      authorized_pickup:    document.getElementById('stPickup')?.value?.trim() || null,
-      p1_name:              document.getElementById('p1Name')?.value?.trim() || null,
-      p1_phone:             document.getElementById('p1Phone')?.value?.trim() || null,
-      p1_address:           document.getElementById('p1Address')?.value?.trim() || null,
-      p1_email:             document.getElementById('stEmailNotif')?.value?.trim() || null,
-      p2_name:              document.getElementById('p2Name')?.value?.trim() || null,
-      p2_phone:             document.getElementById('p2Phone')?.value?.trim() || null,
-      monthly_fee:          parseFloat(document.getElementById('stMonthlyFee')?.value || 0) || 0,
-      due_day:              parseInt(document.getElementById('stDueDay')?.value || 5) || 5
+      classroom_id:      getVal('stClassroom') || null,
+      start_date:        getVal('stJoinedDate') || new Date().toISOString().split('T')[0],
+      is_active:         getChecked('stActive'),
+      blood_type:        getVal('stBlood') || null,
+      allergies:         getVal('stAllergies') || null,
+      authorized_pickup: getVal('stPickup') || null,
+      p1_name:           getVal('p1Name') || null,
+      p1_phone:          getVal('p1Phone') || null,
+      p1_address:        getVal('p1Address') || null,
+      p1_email:          getVal('stEmailNotif') || null,
+      p2_name:           getVal('p2Name') || null,
+      p2_phone:          getVal('p2Phone') || null,
+      monthly_fee:       parseFloat(getVal('stMonthlyFee') || '0') || 0,
+      due_day:           parseInt(getVal('stDueDay') || '5') || 5
     };
 
     try {

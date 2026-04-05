@@ -302,8 +302,17 @@ document.addEventListener('DOMContentLoaded', async () => {
       }
     });
 
+    // 8. Quitar loader inicial
+    const loader = document.getElementById('initial-loading');
+    if (loader) {
+      loader.style.opacity = '0';
+      setTimeout(() => loader.remove(), 500);
+    }
+
   } catch (err) {
     console.error('Error during initialization:', err);
+    // Quitar loader incluso si hay error
+    document.getElementById('initial-loading')?.remove();
     window.location.href = 'index.html';
   }
 });

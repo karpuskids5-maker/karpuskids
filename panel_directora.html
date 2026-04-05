@@ -48,12 +48,54 @@
       .app-content-wrapper.sidebar-collapsed aside#sidebar { width: 80px; }
       .app-content-wrapper.sidebar-collapsed #layoutShell { margin-left: 80px; }
     }
-    @media (max-width: 768px) {
-      .app-content-wrapper { margin-left: 0 !important; height: auto !important; overflow: visible !important; }
-      /* Scroll natural del documento en móvil */
-      html, body { overflow-y: auto !important; overflow-x: hidden; }
-      /* .main no debe tener altura fija en móvil */
-      .main { height: auto !important; overflow: visible !important; min-height: 0 !important; }
+    @media (max-width: 767px) {
+      /* 1. Reset Global Scroll */
+      html, body { 
+        overflow-y: auto !important; 
+        overflow-x: hidden !important; 
+        height: auto !important; 
+        position: relative !important;
+        display: block !important;
+        -webkit-overflow-scrolling: touch !important;
+      }
+
+      /* 2. Reset Layout Containers */
+      .app {
+        display: block !important;
+        height: auto !important;
+        min-height: 100vh !important;
+        overflow: visible !important;
+      }
+
+      .app-content-wrapper { 
+        margin-left: 0 !important; 
+        height: auto !important; 
+        overflow: visible !important; 
+        display: block !important; 
+      }
+
+      .main { 
+        height: auto !important; 
+        overflow: visible !important; 
+        min-height: 0 !important; 
+        padding-bottom: 80px !important; 
+      }
+
+      #layoutShell {
+        overflow: visible !important;
+        height: auto !important;
+        display: block !important;
+      }
+
+      /* 3. Reset Sections */
+      .section, .section.active {
+        overflow: visible !important;
+        height: auto !important;
+        display: none;
+      }
+      .section.active {
+        display: block !important;
+      }
     }
 
     /* ═══════════════════════════════════════════════
@@ -289,54 +331,6 @@
       .modal-content { width: 95%; max-height: 85dvh; }
       /* Botones full-width en móvil */
       .btn-mobile-full { width: 100% !important; justify-content: center; }
-    }
-
-    /* ═══════════════════════════════════════════════
-       MOBILE GLOBAL — scroll libre en todas las secciones
-    ═══════════════════════════════════════════════ */
-    @media (max-width: 767px) {
-      /* Asegurar que el body y html no bloqueen scroll */
-      html, body { overflow-x: hidden; }
-
-      /* Secciones: sin altura fija, scroll natural */
-      .section, .section.active {
-        overflow: visible !important;
-        height: auto !important;
-      }
-
-      /* Grids de KPI: 2 columnas en móvil */
-      .kpi-grid {
-        grid-template-columns: repeat(2, 1fr) !important;
-        gap: 0.75rem !important;
-      }
-
-      /* Texto grande en KPIs: reducir en móvil */
-      .kpi-grid .text-3xl { font-size: 1.5rem !important; }
-
-      /* Tablas: siempre scroll horizontal */
-      .table-scroll-wrap, .overflow-x-auto {
-        overflow-x: auto !important;
-        -webkit-overflow-scrolling: touch;
-      }
-
-      /* Gráficos: no desbordar */
-      canvas { max-width: 100% !important; height: auto !important; }
-
-      /* Grids de 2+ columnas → 1 columna en móvil */
-      .grid-cols-2:not(.kpi-grid):not([class*="sm:grid-cols"]) {
-        grid-template-columns: 1fr !important;
-      }
-
-      /* Botones de acción: más grandes para touch */
-      .btn-action { padding: 8px !important; }
-
-      /* Header de secciones: stack vertical */
-      .section > .flex.flex-col.md\\:flex-row { flex-direction: column !important; }
-
-      /* Muro: búsqueda en columna */
-      #muro .flex.items-center.gap-2 { flex-wrap: wrap; }
-      #muro #wallSearch { width: 100%; }
-      #muro #wallClassroomFilter { width: 100%; }
     }
 
     /* ═══════════════════════════════════════════════

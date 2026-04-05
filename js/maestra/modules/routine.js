@@ -1,14 +1,14 @@
 import { supabase } from '../../shared/supabase.js';
 import { AppState } from '../state.js';
 import { MaestraApi } from '../api.js';
-import { safeToast, safeEscapeHTML } from './ui.js';
+import { safeToast, safeEscapeHTML, Modal } from './ui.js';
 import { Helpers } from '../../shared/helpers.js';
 
 const _saving = {};
 
-// ── Lógica de 12 horas ────────────────────────────────────────────────────────
-// El reporte del día solo es válido si fue guardado hace menos de 12 horas.
-// Pasadas las 12 horas, los campos se resetean visualmente para el nuevo turno.
+/**
+ * Lógica de 12 horas: El reporte del día solo es válido si fue guardado hace menos de 12 horas.
+ */
 function _isWithin12h(dateStr) {
   if (!dateStr) return false;
   const saved = new Date(dateStr);
@@ -16,8 +16,8 @@ function _isWithin12h(dateStr) {
 }
 
 /**
- * Vista compacta de rutina — tabla con una fila por estudiante.
- * Mucho más eficiente que tarjetas grandes.
+ * Vista de rutina mejorada — Tarjetas de estudiantes con progreso visual (burbujas).
+ * Optimizada para móvil y con sistema de alertas.
  */
 export async function initRoutine() {
   const classroom = AppState.get('classroom');
@@ -28,6 +28,7 @@ export async function initRoutine() {
     const students = AppState.get('students') || [];
     const today    = new Date().toISOString().split('T')[0];
 
+    // Cargar logs de hoy
     const { data: todayLogs } = await supabase
       .from('daily_logs')
       .select('*')
@@ -43,52 +44,87 @@ export async function initRoutine() {
     }
 
     const todayLabel = new Date().toLocaleDateString('es-ES', { weekday: 'long', day: 'numeric', month: 'long' });
-    const totalFilled = students.filter(s => {
+    
+    // Calcular periodo actual para alarmas
+    const now = new Date();
+    const hour = now.getHours();
+    let currentPeriod = 'morning'; // 0-12
+    if (hour >= 12 && hour < 16) currentPeriod = 'afternoon';
+    if (hour >= 16) currentPeriod = 'late';
+
+    const periodNames = { morning: 'Mañana ☀️', afternoon: 'Tarde 🌤️', late: 'Tardecita 🌙' };
+    
+    // Estudiantes pendientes en el periodo actual
+    const pendingStudents = students.filter(s => {
       const log = logsMap[s.id];
-      return log && _isWithin12h(log.updated_at || log.created_at);
-    }).length;
+      if (!log || !_isWithin12h(log.updated_at || log.created_at)) return true;
+      
+      // Validar si falta algún campo crítico según el periodo
+      if (currentPeriod === 'morning' && !log.mood) return true;
+      if (currentPeriod === 'afternoon' && (!log.food || !log.mood)) return true;
+      if (currentPeriod === 'late' && (!log.nap || !log.food || !log.mood)) return true;
+      
+      return false;
+    });
 
     container.innerHTML = `
-      <div class="space-y-4">
-        <!-- Header con progreso -->
-        <div class="flex items-center justify-between flex-wrap gap-3">
-          <div>
-            <h3 class="text-lg font-black text-slate-800">📝 Reporte Diario</h3>
-            <p class="text-xs font-bold text-slate-400 uppercase tracking-wider mt-0.5">${todayLabel}</p>
-          </div>
-          <div class="flex items-center gap-3">
-            <div class="flex items-center gap-2 bg-slate-50 border border-slate-200 rounded-xl px-3 py-2">
-              <div class="w-24 bg-slate-200 rounded-full h-2 overflow-hidden">
-                <div class="bg-emerald-500 h-full rounded-full transition-all" style="width:${Math.round((totalFilled/students.length)*100)}%"></div>
-              </div>
-              <span class="text-xs font-black text-slate-600">${totalFilled}/${students.length}</span>
+      <div class="space-y-6 pb-20">
+        <!-- Header y Alarmas -->
+        <div class="space-y-4">
+          <div class="flex items-center justify-between">
+            <div>
+              <h3 class="text-xl font-black text-slate-800">📝 Rutina Diaria</h3>
+              <p class="text-xs font-bold text-slate-400 uppercase tracking-wider mt-0.5">${todayLabel}</p>
             </div>
-            <span class="text-[10px] font-black text-orange-600 bg-orange-50 border border-orange-100 px-3 py-1.5 rounded-full uppercase tracking-wider">
-              Auto-guardado · Válido 12h
-            </span>
+            <div class="flex flex-col items-end">
+               <span class="text-[10px] font-black text-orange-600 bg-orange-50 border border-orange-100 px-3 py-1 rounded-full uppercase tracking-wider mb-1">
+                Periodo: ${periodNames[currentPeriod]}
+              </span>
+              <button onclick="App.openBulkRoutineModal()" class="text-[10px] font-black text-blue-600 hover:text-blue-700 underline uppercase tracking-widest">
+                Rutina General (Bulk)
+              </button>
+            </div>
           </div>
+
+          <!-- Alarma Visual si hay pendientes -->
+          ${pendingStudents.length > 0 ? `
+            <div class="bg-amber-50 border-2 border-amber-100 rounded-[2rem] p-5 flex items-center gap-4 animate-pulse-subtle">
+              <div class="w-12 h-12 bg-amber-400 text-white rounded-2xl flex items-center justify-center text-2xl shrink-0 shadow-lg shadow-amber-200">⚠️</div>
+              <div class="flex-1">
+                <p class="text-sm font-black text-amber-800">Reportes Pendientes</p>
+                <p class="text-xs font-bold text-amber-600/80">Faltan ${pendingStudents.length} estudiantes por reportar en este periodo.</p>
+              </div>
+              <div class="flex -space-x-3 overflow-hidden">
+                ${pendingStudents.slice(0, 3).map(s => `
+                  <div class="w-8 h-8 rounded-full border-2 border-white bg-slate-200 overflow-hidden shadow-sm">
+                    ${s.avatar_url ? `<img src="${s.avatar_url}" class="w-full h-full object-cover">` : `<div class="w-full h-full flex items-center justify-center text-[10px] font-black text-slate-500">${s.name.charAt(0)}</div>`}
+                  </div>
+                `).join('')}
+                ${pendingStudents.length > 3 ? `<div class="w-8 h-8 rounded-full border-2 border-white bg-amber-100 flex items-center justify-center text-[10px] font-black text-amber-600 shadow-sm">+${pendingStudents.length - 3}</div>` : ''}
+              </div>
+            </div>
+          ` : `
+            <div class="bg-emerald-50 border-2 border-emerald-100 rounded-[2rem] p-5 flex items-center gap-4">
+              <div class="w-12 h-12 bg-emerald-500 text-white rounded-2xl flex items-center justify-center text-2xl shrink-0 shadow-lg shadow-emerald-200">✅</div>
+              <div>
+                <p class="text-sm font-black text-emerald-800">¡Todo al día!</p>
+                <p class="text-xs font-bold text-emerald-600/80">Has completado los reportes de este periodo.</p>
+              </div>
+            </div>
+          `}
         </div>
 
-        <!-- Tabla compacta -->
-        <div class="bg-white rounded-2xl border border-slate-200 overflow-hidden shadow-sm">
-          <!-- Headers -->
-          <div class="grid grid-cols-[1fr_auto_auto_auto_1fr] gap-0 bg-slate-50 border-b border-slate-200 px-4 py-2.5">
-            <span class="text-[10px] font-black text-slate-400 uppercase tracking-wider">Estudiante</span>
-            <span class="text-[10px] font-black text-slate-400 uppercase tracking-wider text-center px-3">Ánimo</span>
-            <span class="text-[10px] font-black text-slate-400 uppercase tracking-wider text-center px-3">Comida</span>
-            <span class="text-[10px] font-black text-slate-400 uppercase tracking-wider text-center px-3">Siesta</span>
-            <span class="text-[10px] font-black text-slate-400 uppercase tracking-wider pl-3">Nota</span>
-          </div>
-
-          <!-- Filas por estudiante -->
-          <div class="divide-y divide-slate-100">
-            ${students.map(s => _renderCompactRow(s, logsMap[s.id] || {})).join('')}
-          </div>
+        <!-- Grid de Estudiantes (Cards) -->
+        <div class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4" id="routineStudentsGrid">
+          ${students.map(s => _renderStudentRoutineCard(s, logsMap[s.id] || {})).join('')}
         </div>
 
-        <p class="text-[10px] text-slate-400 text-center font-medium">
-          💡 Los reportes se reinician automáticamente cada 12 horas. Toca cada emoji para guardar.
-        </p>
+        <div class="bg-white p-6 rounded-[2rem] border border-slate-100 shadow-sm text-center">
+          <p class="text-xs text-slate-400 font-medium">
+            💡 Toca a un estudiante para abrir su reporte de rutina individual.<br>
+            Los emojis flotantes indican el progreso actual.
+          </p>
+        </div>
       </div>
     `;
 
@@ -96,109 +132,280 @@ export async function initRoutine() {
   } catch (e) {
     console.error('[Routine]', e);
     container.innerHTML = Helpers.errorState('Error al cargar la rutina', 'App.initRoutine()');
-    if (window.lucide) window.lucide.createIcons();
   }
 }
 
-function _renderCompactRow(s, log) {
-  const sid = s.id;
+/**
+ * Renderiza la tarjeta individual del estudiante para la sección de rutina.
+ */
+function _renderStudentRoutineCard(s, log) {
+  const isValid = _isWithin12h(log.created_at || log.updated_at);
+  const mood  = isValid && log.mood ? log.mood : null;
+  const food  = isValid && log.food ? log.food : null;
+  const sleep = isValid && log.nap  ? log.nap  : null;
+  const note  = isValid && log.notes ? true : false;
 
-  // Si el log tiene más de 12 horas, tratar como vacío
-  const isValid = _isWithin12h(log.created_at);
-  const currentMood  = isValid ? (log.mood  || '') : '';
-  const currentFood  = isValid ? (log.food  || log.eating || '') : '';
-  const currentSleep = isValid ? (log.nap   || log.sleeping || '') : '';
-  const currentNotes = isValid ? (log.notes || '') : '';
-
-  const moodEmoji  = { feliz: '😊', normal: '😐', triste: '😢', enojado: '😠' };
-  const foodEmoji  = { todo: '😋', poco: '😕', nada: '🚫' };
-  const sleepEmoji = { si: '😴', no: '🌞' };
-
-  const btnCls = 'w-9 h-9 rounded-xl text-lg flex items-center justify-center transition-all active:scale-90 cursor-pointer border-2';
-  const activeCls = 'border-orange-400 bg-orange-50 scale-105 shadow-sm';
-  const inactiveCls = 'border-slate-100 bg-slate-50 hover:border-slate-300';
+  const moodEmojis  = { feliz: '😊', normal: '😐', triste: '😢', enojado: '😠' };
+  const foodEmojis  = { todo: '😋', poco: '😕', nada: '🚫' };
+  const sleepEmojis = { si: '😴', no: '🌞' };
 
   return `
-    <div class="grid grid-cols-[1fr_auto_auto_auto_1fr] gap-0 items-center px-4 py-3 hover:bg-slate-50/50 transition-colors" id="row-${sid}">
+    <div onclick="App.openStudentRoutine('${s.id}')" 
+      class="group relative bg-white rounded-[2rem] p-4 border-2 border-slate-100 hover:border-orange-400 hover:shadow-xl hover:shadow-orange-100 transition-all cursor-pointer active:scale-95 flex flex-col items-center text-center overflow-hidden">
+      
+      <!-- Burbujas de Emojis Flotantes (Status) -->
+      <div class="absolute top-2 right-2 flex flex-col gap-1 z-10">
+        ${mood ? `<div class="w-7 h-7 bg-orange-50 rounded-full flex items-center justify-center text-sm shadow-sm border border-orange-100 animate-bounce-subtle">${moodEmojis[mood]}</div>` : ''}
+        ${food ? `<div class="w-7 h-7 bg-emerald-50 rounded-full flex items-center justify-center text-sm shadow-sm border border-emerald-100 animate-bounce-subtle" style="animation-delay: 0.2s">${foodEmojis[food]}</div>` : ''}
+        ${sleep ? `<div class="w-7 h-7 bg-indigo-50 rounded-full flex items-center justify-center text-sm shadow-sm border border-indigo-100 animate-bounce-subtle" style="animation-delay: 0.4s">${sleepEmojis[sleep]}</div>` : ''}
+        ${note ? `<div class="w-7 h-7 bg-slate-50 rounded-full flex items-center justify-center text-xs shadow-sm border border-slate-100 animate-bounce-subtle" style="animation-delay: 0.6s">📝</div>` : ''}
+      </div>
 
-      <!-- Nombre -->
-      <div class="flex items-center gap-2.5 min-w-0 pr-2">
-        <div class="w-8 h-8 rounded-xl bg-orange-100 text-orange-600 flex items-center justify-center font-black text-sm overflow-hidden shrink-0">
-          ${s.avatar_url ? `<img src="${s.avatar_url}" class="w-full h-full object-cover" loading="lazy">` : s.name.charAt(0)}
+      <!-- Avatar -->
+      <div class="w-20 h-20 rounded-[1.5rem] bg-orange-50 border-4 border-white shadow-inner overflow-hidden mb-3 group-hover:scale-110 transition-transform duration-500">
+        ${s.avatar_url ? `<img src="${s.avatar_url}" class="w-full h-full object-cover">` : `<div class="w-full h-full flex items-center justify-center text-2xl font-black text-orange-300">${s.name.charAt(0)}</div>`}
+      </div>
+
+      <!-- Info -->
+      <h4 class="text-sm font-black text-slate-800 leading-tight mb-1 line-clamp-2">${safeEscapeHTML(s.name)}</h4>
+      
+      <!-- Progress Indicator (Dot) -->
+      <div class="flex gap-1 mt-auto pt-2">
+        <div class="w-1.5 h-1.5 rounded-full ${mood ? 'bg-orange-400' : 'bg-slate-200'}"></div>
+        <div class="w-1.5 h-1.5 rounded-full ${food ? 'bg-emerald-400' : 'bg-slate-200'}"></div>
+        <div class="w-1.5 h-1.5 rounded-full ${sleep ? 'bg-indigo-400' : 'bg-slate-200'}"></div>
+      </div>
+    </div>
+  `;
+}
+
+/**
+ * Abre el modal de reporte individual para un estudiante.
+ */
+export async function openStudentRoutine(studentId) {
+  const student = AppState.get('students').find(s => s.id == studentId);
+  if (!student) return;
+
+  const today = new Date().toISOString().split('T')[0];
+  const { data: log } = await supabase.from('daily_logs').select('*').eq('student_id', studentId).eq('date', today).maybeSingle();
+  
+  const isValid = log && _isWithin12h(log.created_at || log.updated_at);
+  const currentMood  = isValid ? (log?.mood || '') : '';
+  const currentFood  = isValid ? (log?.food || '') : '';
+  const currentSleep = isValid ? (log?.nap || '') : '';
+  const currentNotes = isValid ? (log?.notes || '') : '';
+
+  const moodEmojis  = { feliz: '😊', normal: '😐', triste: '😢', enojado: '😠' };
+  const foodEmojis  = { todo: '😋', poco: '😕', nada: '🚫' };
+  const sleepEmojis = { si: '😴', no: '🌞' };
+
+  const modalId = 'routineStudentModal';
+  const content = `
+    <div class="bg-white w-full max-w-md rounded-[2.5rem] shadow-2xl overflow-hidden animate-fadeIn flex flex-col max-h-[90vh]">
+      <!-- Header Colorido -->
+      <div class="bg-gradient-to-r from-orange-500 to-pink-500 p-6 text-white relative">
+        <button onclick="Modal.close('${modalId}')" class="absolute top-4 right-4 p-2 bg-white/20 rounded-full hover:bg-white/30 transition-colors">
+          <i data-lucide="x" class="w-5 h-5"></i>
+        </button>
+        <div class="flex items-center gap-4">
+          <div class="w-16 h-16 rounded-2xl bg-white border-4 border-white/20 overflow-hidden shadow-lg">
+            ${student.avatar_url ? `<img src="${student.avatar_url}" class="w-full h-full object-cover">` : `<div class="w-full h-full flex items-center justify-center text-xl font-black text-orange-500">${student.name.charAt(0)}</div>`}
+          </div>
+          <div>
+            <h3 class="text-xl font-black">${safeEscapeHTML(student.name)}</h3>
+            <p class="text-xs font-bold text-orange-100 uppercase tracking-widest">Reporte de Rutina</p>
+          </div>
         </div>
-        <div class="min-w-0">
-          <p class="font-bold text-slate-800 text-sm truncate">${safeEscapeHTML(s.name)}</p>
-          <span id="status-${sid}" class="text-[9px] text-slate-400 font-bold"></span>
+      </div>
+
+      <div class="p-6 space-y-6 overflow-y-auto custom-scrollbar">
+        <!-- 1. Estado de Ánimo -->
+        <div class="space-y-3">
+          <label class="block text-[11px] font-black text-slate-400 uppercase tracking-widest ml-1">¿Cómo está de ánimo? ☀️</label>
+          <div class="grid grid-cols-4 gap-2">
+            ${Object.entries(moodEmojis).map(([v, e]) => `
+              <button onclick="App.updateRoutineFieldInModal('${studentId}','mood','${v}')"
+                class="routine-modal-mood-${studentId} flex flex-col items-center justify-center p-3 rounded-2xl border-2 transition-all active:scale-90
+                ${currentMood === v ? 'border-orange-400 bg-orange-50 shadow-md' : 'border-slate-100 bg-slate-50'}"
+                data-val="${v}">
+                <span class="text-2xl mb-1">${e}</span>
+                <span class="text-[9px] font-black uppercase text-slate-500">${v}</span>
+              </button>
+            `).join('')}
+          </div>
+        </div>
+
+        <!-- 2. Alimentación -->
+        <div class="space-y-3">
+          <label class="block text-[11px] font-black text-slate-400 uppercase tracking-widest ml-1">¿Cómo comió hoy? 🍽️</label>
+          <div class="grid grid-cols-3 gap-2">
+            ${Object.entries(foodEmojis).map(([v, e]) => `
+              <button onclick="App.updateRoutineFieldInModal('${studentId}','food','${v}')"
+                class="routine-modal-food-${studentId} flex flex-col items-center justify-center p-3 rounded-2xl border-2 transition-all active:scale-90
+                ${currentFood === v ? 'border-emerald-400 bg-emerald-50 shadow-md' : 'border-slate-100 bg-slate-50'}"
+                data-val="${v}">
+                <span class="text-2xl mb-1">${e}</span>
+                <span class="text-[9px] font-black uppercase text-slate-500">${v}</span>
+              </button>
+            `).join('')}
+          </div>
+        </div>
+
+        <!-- 3. Siesta -->
+        <div class="space-y-3">
+          <label class="block text-[11px] font-black text-slate-400 uppercase tracking-widest ml-1">¿Hizo su siesta? 😴</label>
+          <div class="grid grid-cols-2 gap-3">
+            ${Object.entries(sleepEmojis).map(([v, e]) => `
+              <button onclick="App.updateRoutineFieldInModal('${studentId}','sleep','${v}')"
+                class="routine-modal-sleep-${studentId} flex items-center justify-center gap-3 p-4 rounded-2xl border-2 transition-all active:scale-90
+                ${currentSleep === v ? 'border-indigo-400 bg-indigo-50 shadow-md' : 'border-slate-100 bg-slate-50'}"
+                data-val="${v}">
+                <span class="text-2xl">${e}</span>
+                <span class="text-xs font-black uppercase text-slate-600">${v === 'si' ? 'Durmió' : 'No durmió'}</span>
+              </button>
+            `).join('')}
+          </div>
+        </div>
+
+        <!-- 4. Notas -->
+        <div class="space-y-3">
+          <label class="block text-[11px] font-black text-slate-400 uppercase tracking-widest ml-1">Observaciones adicionales 📝</label>
+          <textarea id="modal-note-${studentId}" 
+            class="w-full p-4 bg-slate-50 border-2 border-slate-100 rounded-2xl text-sm font-medium outline-none focus:border-orange-400 transition-all resize-none"
+            rows="3" placeholder="Ej: Estuvo muy participativo hoy...">${safeEscapeHTML(currentNotes)}</textarea>
         </div>
       </div>
 
-      <!-- Ánimo — 4 botones compactos -->
-      <div class="flex gap-1 px-2">
-        ${Object.entries(moodEmoji).map(([v, e]) => `
-          <button onclick="App.updateRoutineField('${sid}','mood','${v}')"
-            data-mood="${v}"
-            title="${v}"
-            class="routine-mood-${sid} ${btnCls} ${currentMood === v ? activeCls : inactiveCls}">
-            ${e}
-          </button>`).join('')}
+      <div class="p-6 pt-0 mt-auto">
+        <button onclick="App.saveRoutineInModal('${studentId}')" id="btnSaveModalRoutine"
+          class="w-full py-4 bg-slate-900 text-white rounded-2xl font-black text-xs uppercase tracking-widest hover:bg-slate-800 transition-all shadow-lg shadow-slate-200 flex items-center justify-center gap-2">
+          <i data-lucide="check-circle" class="w-4 h-4"></i> Guardar y Cerrar
+        </button>
       </div>
+    </div>
+  `;
 
-      <!-- Comida — 3 botones -->
-      <div class="flex gap-1 px-2">
-        ${Object.entries(foodEmoji).map(([v, e]) => `
-          <button onclick="App.updateRoutineField('${sid}','food','${v}')"
-            data-food="${v}"
-            title="${v}"
-            class="routine-food-${sid} ${btnCls} ${currentFood === v ? 'border-emerald-400 bg-emerald-50 scale-105 shadow-sm' : inactiveCls}">
-            ${e}
-          </button>`).join('')}
+  Modal.open(modalId, content);
+  if (window.lucide) window.lucide.createIcons();
+}
+
+/**
+ * Helper para actualizar en modal y luego guardar
+ */
+export function updateRoutineFieldInModal(sid, field, val) {
+  const btns = document.querySelectorAll(`.routine-modal-${field}-${sid}`);
+  const colorMap = {
+    mood: 'border-orange-400 bg-orange-50 shadow-md',
+    food: 'border-emerald-400 bg-emerald-50 shadow-md',
+    sleep: 'border-indigo-400 bg-indigo-50 shadow-md'
+  };
+  const activeCls = colorMap[field].split(' ');
+  
+  btns.forEach(b => {
+    b.classList.remove(...activeCls);
+    b.classList.add('border-slate-100', 'bg-slate-50');
+    b.classList.remove('shadow-md');
+    if (b.dataset.val === val) {
+      b.classList.add(...activeCls);
+      b.classList.remove('border-slate-100', 'bg-slate-50');
+    }
+  });
+  // Auto-save
+  updateRoutineField(sid, field, val);
+}
+
+export async function saveRoutineInModal(sid) {
+  const note = document.getElementById(`modal-note-${sid}`)?.value;
+  await saveRoutineLog(sid, 'notes', note);
+  Modal.close('routineStudentModal');
+  initRoutine(); // Recargar grid para ver burbujas
+}
+
+/**
+ * Modal para reporte masivo ( Bulk Report ).
+ */
+export async function openBulkRoutineModal() {
+  const modalId = 'bulkRoutineModal';
+  const content = `
+    <div class="bg-white w-full max-w-md rounded-[2.5rem] shadow-2xl p-8 animate-fadeIn">
+      <h3 class="text-2xl font-black text-slate-800 mb-2">Rutina General</h3>
+      <p class="text-sm text-slate-500 mb-6">Aplica el mismo reporte para todos los estudiantes presentes hoy.</p>
+      
+      <div class="space-y-6">
+        <div class="grid grid-cols-2 gap-4">
+          <div class="space-y-2">
+            <label class="text-[10px] font-black uppercase text-slate-400 ml-1">Ánimo 😊</label>
+            <select id="bulkMood" class="w-full p-3 bg-slate-50 border-2 border-slate-100 rounded-xl font-bold text-sm outline-none focus:border-orange-400">
+              <option value="feliz">Feliz 😊</option>
+              <option value="normal">Normal 😐</option>
+            </select>
+          </div>
+          <div class="space-y-2">
+            <label class="text-[10px] font-black uppercase text-slate-400 ml-1">Comida 🍽️</label>
+            <select id="bulkFood" class="w-full p-3 bg-slate-50 border-2 border-slate-100 rounded-xl font-bold text-sm outline-none focus:border-orange-400">
+              <option value="todo">Todo 😋</option>
+              <option value="poco">Poco 😕</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="space-y-2">
+          <label class="text-[10px] font-black uppercase text-slate-400 ml-1">Siesta 😴</label>
+          <select id="bulkSleep" class="w-full p-3 bg-slate-50 border-2 border-slate-100 rounded-xl font-bold text-sm outline-none focus:border-orange-400">
+            <option value="si">Durmió 😴</option>
+            <option value="no">No durmió 🌞</option>
+          </select>
+        </div>
+
+        <div class="flex gap-3 pt-4">
+          <button onclick="Modal.close('${modalId}')" class="flex-1 py-4 text-slate-400 font-black text-xs uppercase tracking-widest hover:bg-slate-50 rounded-2xl">Cancelar</button>
+          <button onclick="App.applyBulkRoutine()" id="btnBulkSave" class="flex-[2] py-4 bg-blue-600 text-white rounded-2xl font-black text-xs uppercase tracking-widest shadow-lg shadow-blue-100 hover:bg-blue-700 active:scale-95 transition-all">Aplicar a Todos</button>
+        </div>
       </div>
+    </div>
+  `;
+  Modal.open(modalId, content);
+}
 
-      <!-- Siesta — 2 botones -->
-      <div class="flex gap-1 px-2">
-        ${Object.entries(sleepEmoji).map(([v, e]) => `
-          <button onclick="App.updateRoutineField('${sid}','sleep','${v}')"
-            data-sleep="${v}"
-            title="${v === 'si' ? 'Durmió' : 'No durmió'}"
-            class="routine-sleep-${sid} ${btnCls} ${currentSleep === v ? 'border-indigo-400 bg-indigo-50 scale-105 shadow-sm' : inactiveCls}">
-            ${e}
-          </button>`).join('')}
-      </div>
+export async function applyBulkRoutine() {
+  const btn = document.getElementById('btnBulkSave');
+  if (!btn) return;
+  
+  btn.disabled = true;
+  btn.innerHTML = 'Aplicando...';
+  
+  const mood = document.getElementById('bulkMood').value;
+  const food = document.getElementById('bulkFood').value;
+  const sleep = document.getElementById('bulkSleep').value;
+  
+  const students = AppState.get('students') || [];
+  const classroom = AppState.get('classroom');
+  const today = new Date().toISOString().split('T')[0];
 
-      <!-- Nota rápida -->
-      <div class="pl-2">
-        <input
-          id="note-${sid}"
-          type="text"
-          value="${safeEscapeHTML(currentNotes)}"
-          onblur="App.saveRoutineLog('${sid}','notes')"
-          placeholder="Observación..."
-          class="w-full px-3 py-1.5 bg-slate-50 rounded-xl text-xs font-medium outline-none border-2 border-transparent focus:border-orange-400 transition-all">
-      </div>
-
-    </div>`;
+  try {
+    const promises = students.map(s => MaestraApi.upsertDailyLog({
+      student_id: s.id,
+      classroom_id: classroom.id,
+      date: today,
+      mood, food, nap: sleep
+    }));
+    
+    await Promise.all(promises);
+    safeToast(`Rutina aplicada a ${students.length} estudiantes`);
+    Modal.close('bulkRoutineModal');
+    initRoutine();
+  } catch (e) {
+    console.error(e);
+    safeToast('Error al aplicar rutina masiva', 'error');
+    btn.disabled = false;
+    btn.innerHTML = 'Aplicar a Todos';
+  }
 }
 
 /**
  * Actualiza un campo visualmente y guarda en DB.
  */
 export async function updateRoutineField(studentId, field, value) {
-  const colorMap = {
-    mood:  { active: 'border-orange-400 bg-orange-50 scale-105 shadow-sm',  inactive: 'border-slate-100 bg-slate-50' },
-    food:  { active: 'border-emerald-400 bg-emerald-50 scale-105 shadow-sm', inactive: 'border-slate-100 bg-slate-50' },
-    sleep: { active: 'border-indigo-400 bg-indigo-50 scale-105 shadow-sm',   inactive: 'border-slate-100 bg-slate-50' }
-  };
-  const cm = colorMap[field];
-  if (cm) {
-    document.querySelectorAll(`.routine-${field}-${studentId}`).forEach(btn => {
-      const isSelected = btn.dataset[field] === value;
-      // Reset classes
-      btn.className = btn.className
-        .replace(/border-\S+/g, '').replace(/bg-\S+/g, '')
-        .replace(/scale-\S+/g, '').replace(/shadow-\S+/g, '').trim();
-      btn.classList.add(...(isSelected ? cm.active : cm.inactive).split(' '));
-    });
-  }
   await saveRoutineLog(studentId, field, value);
 }
 
@@ -209,15 +416,12 @@ export async function saveRoutineLog(studentId, field = 'notes', value = null) {
   if (_saving[studentId + field]) return;
   _saving[studentId + field] = true;
 
-  const statusEl = document.getElementById(`status-${studentId}`);
-  if (statusEl) statusEl.textContent = '⏳';
-
   try {
     const classroom = AppState.get('classroom');
     const today = new Date().toISOString().split('T')[0];
     const fieldMap = { mood: 'mood', food: 'food', sleep: 'nap', notes: 'notes' };
     const dbField  = fieldMap[field] || field;
-    const fieldValue = value ?? document.getElementById(`note-${studentId}`)?.value ?? '';
+    const fieldValue = value ?? '';
 
     await MaestraApi.upsertDailyLog({
       student_id:   studentId,
@@ -226,12 +430,8 @@ export async function saveRoutineLog(studentId, field = 'notes', value = null) {
       [dbField]:    fieldValue
     });
 
-    if (statusEl) statusEl.textContent = '✓';
-    setTimeout(() => { if (statusEl) statusEl.textContent = ''; }, 2000);
-
   } catch (err) {
     console.error('[Routine] saveRoutineLog:', err);
-    if (statusEl) statusEl.textContent = '⚠';
     safeToast('Error al guardar. Intenta de nuevo.', 'error');
   } finally {
     _saving[studentId + field] = false;
@@ -239,5 +439,5 @@ export async function saveRoutineLog(studentId, field = 'notes', value = null) {
 }
 
 export function openNewRoutineModal() {
-  safeToast('Toca cada emoji para guardar automáticamente. Válido por 12 horas.', 'info');
+  safeToast('Toca a un estudiante para reportar su rutina diaria.', 'info');
 }

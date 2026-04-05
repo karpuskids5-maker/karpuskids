@@ -889,90 +889,6 @@
   </div> <!-- Cierre de .app-content-wrapper -->
 </div> <!-- Cierre de .app -->
 
-  <!-- MODAL: Agregar/Editar Estudiante -->
-  <div id="modalAddStudent" class="fixed inset-0 bg-black/50 hidden flex items-center justify-center z-50 p-4 backdrop-blur-sm">
-    <div class="bg-white rounded-3xl shadow-2xl w-full max-w-2xl overflow-y-auto max-h-[92vh]">
-      <!-- Header -->
-      <div class="bg-gradient-to-r from-teal-600 to-emerald-600 text-white p-6 rounded-t-3xl flex items-center justify-between">
-        <div class="flex items-center gap-3">
-          <div class="w-11 h-11 bg-white/20 rounded-2xl flex items-center justify-center text-xl">👶</div>
-          <div>
-            <h3 id="modalStudentTitle" class="text-lg font-black">Agregar Estudiante</h3>
-            <p class="text-xs text-white/70 font-bold uppercase tracking-widest">Ficha del Alumno</p>
-          </div>
-        </div>
-        <button id="btnCancelStudent" class="w-9 h-9 bg-white/10 hover:bg-white/20 rounded-xl flex items-center justify-center text-white transition-all">✕</button>
-      </div>
-
-      <div class="p-6 space-y-5">
-        <input type="hidden" id="stId">
-        <input type="hidden" id="stParentId">
-
-        <!-- Datos básicos -->
-        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <div class="md:col-span-2">
-            <label class="block text-[11px] font-black text-slate-400 uppercase tracking-wider mb-1.5">Nombre del Estudiante *</label>
-            <input id="stName" placeholder="Nombre completo" class="w-full px-4 py-2.5 border-2 border-slate-100 rounded-2xl outline-none focus:border-teal-400 focus:ring-4 focus:ring-teal-50 bg-slate-50 text-sm font-medium transition-all">
-          </div>
-          <div>
-            <label class="block text-[11px] font-black text-slate-400 uppercase tracking-wider mb-1.5">Aula Asignada</label>
-            <select id="stClassroom" class="w-full px-4 py-2.5 border-2 border-slate-100 rounded-2xl outline-none focus:border-teal-400 bg-slate-50 text-sm font-medium transition-all">
-              <option value="">-- Sin Aula --</option>
-            </select>
-          </div>
-          <div class="flex items-end pb-1">
-            <label class="flex items-center gap-2 cursor-pointer">
-              <input id="stActive" type="checkbox" checked class="w-4 h-4 rounded accent-teal-600">
-              <span class="text-sm font-bold text-slate-600">Estudiante activo</span>
-            </label>
-          </div>
-        </div>
-
-        <!-- Contacto Principal -->
-        <div>
-          <p class="text-[11px] font-black text-teal-600 uppercase tracking-wider mb-3 flex items-center gap-1.5">
-            <span class="w-4 h-4 bg-teal-100 rounded-full flex items-center justify-center text-[9px]">1</span> Padre / Madre Principal
-          </p>
-          <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
-            <input id="p1Name" placeholder="Nombre completo" class="px-4 py-2.5 border-2 border-slate-100 rounded-2xl outline-none focus:border-teal-400 bg-slate-50 text-sm font-medium transition-all">
-            <input id="p1Phone" placeholder="Teléfono" class="px-4 py-2.5 border-2 border-slate-100 rounded-2xl outline-none focus:border-teal-400 bg-slate-50 text-sm font-medium transition-all">
-            <input id="p1Email" type="email" placeholder="Correo (acceso al panel)" class="px-4 py-2.5 border-2 border-slate-100 rounded-2xl outline-none focus:border-teal-400 bg-slate-50 text-sm font-medium transition-all">
-            <input id="p1Password" type="text" placeholder="Contraseña (nuevo usuario)" class="px-4 py-2.5 border-2 border-slate-100 rounded-2xl outline-none focus:border-teal-400 bg-slate-50 text-sm font-medium transition-all">
-          </div>
-        </div>
-
-        <!-- Contacto Secundario -->
-        <div>
-          <p class="text-[11px] font-black text-slate-400 uppercase tracking-wider mb-3 flex items-center gap-1.5">
-            <span class="w-4 h-4 bg-slate-100 rounded-full flex items-center justify-center text-[9px]">2</span> Contacto Secundario (opcional)
-          </p>
-          <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
-            <input id="p2Name" placeholder="Nombre" class="px-4 py-2.5 border-2 border-slate-100 rounded-2xl outline-none focus:border-teal-400 bg-slate-50 text-sm font-medium transition-all">
-            <input id="p2Phone" placeholder="Teléfono" class="px-4 py-2.5 border-2 border-slate-100 rounded-2xl outline-none focus:border-teal-400 bg-slate-50 text-sm font-medium transition-all">
-          </div>
-        </div>
-
-        <!-- Datos médicos -->
-        <div>
-          <p class="text-[11px] font-black text-slate-400 uppercase tracking-wider mb-3">Información Médica</p>
-          <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
-            <input id="stAllergies" placeholder="Alergias / condiciones" class="px-4 py-2.5 border-2 border-slate-100 rounded-2xl outline-none focus:border-teal-400 bg-slate-50 text-sm font-medium transition-all">
-            <input id="stBlood" placeholder="Tipo de sangre (ej: O+)" class="px-4 py-2.5 border-2 border-slate-100 rounded-2xl outline-none focus:border-teal-400 bg-slate-50 text-sm font-medium transition-all">
-            <div class="md:col-span-2">
-              <input id="stPickup" placeholder="Personas autorizadas para recoger (ej: Abuela Carmen)" class="w-full px-4 py-2.5 border-2 border-slate-100 rounded-2xl outline-none focus:border-teal-400 bg-slate-50 text-sm font-medium transition-all">
-            </div>
-          </div>
-        </div>
-      </div>
-
-      <!-- Footer -->
-      <div class="px-6 pb-6 flex justify-end gap-3">
-        <button id="btnCancelStudent2" onclick="document.getElementById('modalAddStudent').classList.add('hidden');document.getElementById('modalAddStudent').classList.remove('flex');" class="px-6 py-2.5 text-slate-500 font-black text-xs uppercase hover:bg-slate-50 rounded-2xl transition-all">Cancelar</button>
-        <button id="btnSaveStudent" class="px-8 py-2.5 bg-gradient-to-r from-teal-600 to-emerald-600 text-white rounded-2xl font-black text-xs uppercase shadow-lg hover:-translate-y-0.5 transition-all active:scale-95">Guardar Estudiante</button>
-      </div>
-    </div>
-  </div>
-
   <!-- Modal Detalle de Pago (Validación) -->
   <div id="paymentDetailModal" class="fixed inset-0 bg-black/30 z-50 hidden items-center justify-center">
     <div class="bg-white rounded-2xl shadow-xl p-6 w-full max-w-md">
@@ -1126,42 +1042,6 @@
       <div class="px-6 py-4 bg-slate-50 flex justify-end gap-2">
         <button id="cancelAccessBtn" class="px-4 py-2 rounded-lg border hover:bg-slate-100">Cancelar</button>
         <button id="confirmAccessBtn" class="px-4 py-2 rounded-lg bg-teal-600 text-white hover:bg-teal-700">Confirmar</button>
-      </div>
-    </div>
-  </div>
-
-  <!-- Modal Crear/Editar Maestro -->
-  <div id="modalAddTeacher" class="fixed inset-0 bg-black/50 hidden flex items-center justify-center z-50 backdrop-blur-sm p-4">
-    <div class="bg-white rounded-2xl shadow-xl w-full max-w-md">
-      <div class="p-6 border-b flex justify-between items-center">
-        <h3 class="font-bold text-lg text-slate-800 flex items-center gap-2">
-          <i data-lucide="user-plus" class="w-5 h-5 text-teal-600"></i>
-          <span id="teacherModalTitle">Agregar Maestro</span>
-        </h3>
-        <button id="btnCancelTeacher" class="text-slate-400 hover:text-slate-600 transition-colors"><i data-lucide="x" class="w-6 h-6"></i></button>
-      </div>
-      <div class="p-6 space-y-4">
-          <input type="hidden" id="teacherId">
-          <div>
-              <label class="text-sm font-medium text-slate-700 block mb-1">Nombre completo *</label>
-              <input id="teacherName" placeholder="Ej: Carlos Rivas" class="w-full border border-slate-300 rounded-xl px-3 py-2 focus:ring-2 focus:ring-teal-500 outline-none" />
-          </div>
-          <div>
-              <label class="text-sm font-medium text-slate-700 block mb-1">Correo (Usuario) *</label>
-              <input id="teacherEmail" type="email" placeholder="Ej: carlos@karpus.com" class="w-full border border-slate-300 rounded-xl px-3 py-2 focus:ring-2 focus:ring-teal-500 outline-none" />
-          </div>
-          <div>
-              <label class="text-sm font-medium text-slate-700 block mb-1">Contraseña <span id="passHint" class="text-xs font-normal text-slate-400">(Requerida para nuevos)</span></label>
-              <input id="teacherPassword" type="text" placeholder="Mínimo 6 caracteres" class="w-full border border-slate-300 rounded-xl px-3 py-2 focus:ring-2 focus:ring-teal-500 outline-none" />
-          </div>
-          <div>
-              <label class="text-sm font-medium text-slate-700 block mb-1">Teléfono</label>
-              <input id="teacherPhone" placeholder="Ej: 809-555-0000" class="w-full border border-slate-300 rounded-xl px-3 py-2 focus:ring-2 focus:ring-teal-500 outline-none" />
-          </div>
-      </div>
-      <div class="p-6 border-t bg-slate-50 rounded-b-2xl flex justify-end gap-3">
-        <button id="btnCancelTeacherFooter" class="px-5 py-2.5 border border-slate-300 rounded-xl text-slate-700 font-medium hover:bg-white transition-colors">Cancelar</button>
-        <button id="btnSaveTeacher" class="px-5 py-2.5 bg-teal-600 text-white rounded-xl font-bold shadow-lg shadow-teal-200 hover:bg-teal-700 transition-all">Guardar</button>
       </div>
     </div>
   </div>
