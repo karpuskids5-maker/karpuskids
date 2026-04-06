@@ -298,27 +298,32 @@ export const StudentsModule = {
       return;
     }
 
+    // Build payload with only columns that exist in the DB
+    // Only include fields with actual values to avoid 42703 on missing columns
     const payload = {
       name,
-      classroom_id:         getVal('stClassroom') || null,
-      start_date:           getVal('stJoinedDate') || new Date().toISOString().split('T')[0],
-      is_active:            getChecked('stActive'),
-      blood_type:           getVal('stBlood') || null,
-      allergies:            getVal('stAllergies') || null,
-      authorized_pickup:    getVal('stPickup') || null,
-      p1_name:              getVal('p1Name') || null,
-      p1_phone:             getVal('p1Phone') || null,
-      p1_job:               getVal('p1Profession') || null,
-      p1_address:           getVal('p1Address') || null,
-      p1_emergency_contact: getVal('p1Emergency') || null,
-      p1_email:             getVal('stEmailNotif') || null,
-      p2_name:              getVal('p2Name') || null,
-      p2_phone:             getVal('p2Phone') || null,
-      p2_job:               getVal('p2Profession') || null,
-      p2_address:           getVal('p2Address') || null,
-      monthly_fee:          parseFloat(getVal('stMonthlyFee') || '0') || 0,
-      due_day:              parseInt(getVal('stDueDay') || '5') || 5
+      is_active:   getChecked('stActive'),
+      start_date:  getVal('stJoinedDate') || new Date().toISOString().split('T')[0],
+      monthly_fee: parseFloat(getVal('stMonthlyFee') || '0') || 0,
+      due_day:     parseInt(getVal('stDueDay') || '5') || 5
     };
+
+    // Optional columns — only add if non-empty
+    const optionals = {
+      classroom_id:      getVal('stClassroom') || null,
+      blood_type:        getVal('stBlood') || null,
+      allergies:         getVal('stAllergies') || null,
+      authorized_pickup: getVal('stPickup') || null,
+      p1_name:           getVal('p1Name') || null,
+      p1_phone:          getVal('p1Phone') || null,
+      p1_email:          getVal('stEmailNotif') || null,
+      p1_address:        getVal('p1Address') || null,
+      p2_name:           getVal('p2Name') || null,
+      p2_phone:          getVal('p2Phone') || null,
+    };
+    for (const [k, v] of Object.entries(optionals)) {
+      if (v !== null && v !== '') payload[k] = v;
+    }
     try {
       // 1. Subir avatar si existe
       if (avatarFile) {

@@ -17,7 +17,6 @@ import * as UI from './modules/ui.js';
 
 window.safeToast = UI.safeToast;
 const { safeToast, safeEscapeHTML, Modal } = UI;
-
 // Exponer Modal globalmente ANTES de cualquier interacción del usuario
 // Los onclick inline en HTML dinámico necesitan window.Modal disponible de inmediato
 window.Modal = Modal;
