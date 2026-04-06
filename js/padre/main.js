@@ -114,6 +114,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     OnboardingGuide.init({
       userName:   parentName,
       storageKey: 'padre_v2',
+      userId:     auth.user.id,
       delay:      2000,
       steps: [
         {
@@ -412,9 +413,11 @@ export function navigateTo(targetId) {
       case 'grades':          GradesModule.init(student?.id); break;
       case 'videocall': {
         const student = AppState.get('currentStudent');
+        const profile = AppState.get('profile');
         VideoCallUI.renderSection('videocall-section', {
           role: 'padre',
-          userName: AppState.get('profile')?.name || 'Padre',
+          // Mostrar nombre del estudiante en la videollamada, no del padre
+          userName: student?.name || profile?.name || 'Padre',
           studentName: student?.name || '',
           classroomId: student?.classroom_id || null
         });

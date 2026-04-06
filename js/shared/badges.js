@@ -77,16 +77,16 @@ export const BadgeSystem = {
             this._renderBadge(section, prev + 1);
           });
 
-          // Nuevos mensajes → badge en chat
+          // Nuevos mensajes → badge en chat (filtrado por receiver para evitar error de canal)
           channel.on('postgres_changes', {
             event: 'INSERT',
             schema: 'public',
-            table: 'messages'
+            table: 'messages',
+            filter: `sender_id=neq.${this._userId}`
           }, (payload) => {
-            if (payload.new?.sender_id === this._userId) return; // propio mensaje
+            if (payload.new?.sender_id === this._userId) return;
             const current = document.querySelector('.section.active')?.id;
             if (current === 'chat' || current === 'comunicacion') return;
-            // Incrementar badge de chat en ambos paneles
             ['chat', 'comunicacion'].forEach(s => {
               const badge = document.getElementById('badge-' + s);
               if (!badge) return;
@@ -95,20 +95,22 @@ export const BadgeSystem = {
             });
           });
 
-          // Nuevos posts → badge en muro
-          channel.on('postgres_changes', {
-            event: 'INSERT',
-            schema: 'public',
-            table: 'posts'
-          }, (payload) => {
-            if (payload.new?.teacher_id === this._userId) return;
-            const current = document.querySelector('.section.active')?.id;
-            if (current === 'muro') return;
-            const badge = document.getElementById('badge-muro');
-            if (!badge) return;
-            const prev = parseInt(badge.textContent) || 0;
-            this._renderBadge('muro', prev + 1);
-          });
+          // Nuevos posts → badge en muro (solo si hay un badge-muro en el DOM)
+          if (document.getElementById('badge-muro')) {
+            channel.on('postgres_changes', {
+              event: 'INSERT',
+              schema: 'public',
+              table: 'posts'
+            }, (payload) => {
+              if (payload.new?.teacher_id === this._userId) return;
+              const current = document.querySelector('.section.active')?.id;
+              if (current === 'muro') return;
+              const badge = document.getElementById('badge-muro');
+              if (!badge) return;
+              const prev = parseInt(badge.textContent) || 0;
+              this._renderBadge('muro', prev + 1);
+            });
+          }
         });
       });
     });

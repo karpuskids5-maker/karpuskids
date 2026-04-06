@@ -88,7 +88,17 @@
                 <span><strong>Estado "Vencido":</strong> Transcurrido el día 5, si no existe un pago registrado y validado, el sistema marcará la cuota como <strong>Vencida</strong> automáticamente.</span>
               </li>
             </ul>
-            <p><strong>Penalidades por Mora:</strong> Las cuentas en estado "Vencido" podrán generar recargos por mora administrativa definidos por la dirección, o resultar en la suspensión temporal de los servicios educativos hasta la liquidación total de la deuda.</p>
+            <p><strong>Penalidades por Mora:</strong> Las cuentas en estado "Vencido" generan recargos automáticos calculados de la siguiente manera:</p>
+            <div class="bg-rose-50 border border-rose-200 rounded-2xl p-4 my-3">
+              <p class="font-black text-rose-800 mb-2">📊 Tabla de Recargos por Mora</p>
+              <ul class="space-y-1 text-xs text-rose-700">
+                <li>• <strong>Días 1 al 6 de atraso:</strong> RD$50 por día</li>
+                <li>• <strong>Día 7 (primer bloque):</strong> Se convierte en RD$500 acumulados</li>
+                <li>• <strong>Después del día 7:</strong> +RD$50 por día adicional</li>
+                <li>• <strong>Cada 7 días (nuevo bloque):</strong> +RD$500 adicionales</li>
+              </ul>
+              <p class="text-xs text-rose-600 mt-2 font-bold">Fórmula: (bloques de 7 días × RD$500) + (días restantes × RD$50)</p>
+            </div>
             <p><strong>Proceso de Validación:</strong> Al registrar un pago mediante transferencia, este entra en estado "En Revisión". La validación final la realiza el personal administrativo tras confirmar los fondos en las cuentas institucionales.</p>
           </div>
         </section>

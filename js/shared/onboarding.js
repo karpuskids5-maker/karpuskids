@@ -17,18 +17,33 @@ export const OnboardingGuide = {
 
   /**
    * Inicializa la guía si el usuario no la ha completado.
-   * @param {object} opts
-   *   userName   — nombre del usuario para el saludo
-   *   steps      — array de { target, title, text, position }
-   *   storageKey — clave única por panel (ej: 'padre_v1')
-   *   delay      — ms antes de mostrar (default 1500)
+   * Usa Supabase para persistir entre dispositivos si userId está disponible.
    */
-  init({ userName = 'Bienvenido', steps = [], storageKey = 'default', delay = 1500 } = {}) {
+  async init({ userName = 'Bienvenido', steps = [], storageKey = 'default', delay = 1500, userId = null } = {}) {
     this._storageKey = STORAGE_KEY_PREFIX + storageKey;
     this._steps = steps;
+    this._userId = userId;
 
-    // No mostrar si ya completó la guía
+    // 1. Check localStorage first (fast)
     if (localStorage.getItem(this._storageKey) === 'done') return;
+
+    // 2. If userId provided, check Supabase (persists across devices)
+    if (userId) {
+      try {
+        const { supabase } = await import('./supabase.js');
+        const { data } = await supabase
+          .from('profiles')
+          .select('notes')
+          .eq('id', userId)
+          .maybeSingle();
+        // Store onboarding state in profiles.notes as JSON
+        const notes = data?.notes ? JSON.parse(data.notes) : {};
+        if (notes[storageKey] === 'done') {
+          localStorage.setItem(this._storageKey, 'done'); // sync to local
+          return;
+        }
+      } catch (_) { /* fallback to localStorage */ }
+    }
 
     setTimeout(() => this._showWelcome(userName), delay);
   },
@@ -197,6 +212,18 @@ export const OnboardingGuide = {
 
   _complete() {
     localStorage.setItem(this._storageKey, 'done');
+    // Persist to Supabase if userId available
+    if (this._userId) {
+      import('./supabase.js').then(({ supabase }) => {
+        const storageKey = this._storageKey.replace(STORAGE_KEY_PREFIX, '');
+        supabase.from('profiles').select('notes').eq('id', this._userId).maybeSingle()
+          .then(({ data }) => {
+            const notes = data?.notes ? JSON.parse(data.notes) : {};
+            notes[storageKey] = 'done';
+            supabase.from('profiles').update({ notes: JSON.stringify(notes) }).eq('id', this._userId).then(() => {}).catch(() => {});
+          }).catch(() => {});
+      }).catch(() => {});
+    }
   },
 
   _clearHighlight() {
