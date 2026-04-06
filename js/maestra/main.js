@@ -17,6 +17,10 @@ import * as UI from './modules/ui.js';
 
 window.safeToast = UI.safeToast;
 const { safeToast, safeEscapeHTML, Modal } = UI;
+
+// Exponer Modal globalmente ANTES de cualquier interacción del usuario
+// Los onclick inline en HTML dinámico necesitan window.Modal disponible de inmediato
+window.Modal = Modal;
 const { initAttendance, markAllPresent, registerAttendance } = Attendance;
 const { initRoutine, updateRoutineField, saveRoutineLog, openNewRoutineModal, openStudentRoutine, openBulkRoutineModal, updateRoutineFieldInModal, saveRoutineInModal, applyBulkRoutine } = Routine;
 const { initTasks, openEditTaskModal, deleteTask, openNewTaskModal, viewTaskSubmissions, submitGrade } = Tasks;
