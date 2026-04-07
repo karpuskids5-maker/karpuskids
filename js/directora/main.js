@@ -16,6 +16,7 @@ import { BadgeSystem } from '../shared/badges.js';
 import { ImageLoader } from '../shared/image-loader.js';
 import { RealtimeManager } from '../shared/realtime-manager.js';
 import { QueryCache } from '../shared/query-cache.js';
+import { Security } from '../shared/security.js';
 const debounce = (fn, delay) => {
   let timeout;
   return (...args) => {

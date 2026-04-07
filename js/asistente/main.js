@@ -14,6 +14,7 @@ import { BadgeSystem } from '../shared/badges.js';
 import { ImageLoader } from '../shared/image-loader.js';
 import { QueryCache } from '../shared/query-cache.js';
 import { RealtimeManager } from '../shared/realtime-manager.js';
+import { Security } from '../shared/security.js';
 
 // 🚀 Definir objeto App globalmente para evitar ReferenceError en onclicks del HTML
 window.App = {

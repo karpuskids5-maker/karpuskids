@@ -4,6 +4,24 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Karpus Kids — Acceso</title>
+  <!-- Security Headers -->
+  <meta http-equiv="X-Content-Type-Options" content="nosniff">
+  <meta http-equiv="X-Frame-Options" content="DENY">
+  <meta http-equiv="Referrer-Policy" content="strict-origin-when-cross-origin">
+  <meta http-equiv="Permissions-Policy" content="camera=(self), microphone=(self), geolocation=()">
+  <!-- CSP: permite CDNs necesarios y bloquea inline scripts no autorizados -->
+  <meta http-equiv="Content-Security-Policy" content="
+    default-src 'self';
+    script-src 'self' 'unsafe-inline' https://cdn.tailwindcss.com https://cdn.jsdelivr.net https://unpkg.com https://cdn.onesignal.com https://onesignal.com https://meet.jit.si https://8x8.vc;
+    style-src 'self' 'unsafe-inline' https://fonts.googleapis.com https://cdn.tailwindcss.com;
+    font-src 'self' https://fonts.gstatic.com;
+    img-src 'self' data: blob: https://*.supabase.co https://*.supabase.in https://karpuskids.com;
+    connect-src 'self' https://*.supabase.co https://*.supabase.in wss://*.supabase.co https://onesignal.com https://api.onesignal.com https://cdn.onesignal.com;
+    frame-src https://meet.jit.si https://8x8.vc;
+    worker-src 'self' blob:;
+    object-src 'none';
+    base-uri 'self';
+  ">
   <script src="https://cdn.tailwindcss.com"></script>
   <link href="https://fonts.googleapis.com/css2?family=Nunito:wght@400;600;700;800;900&display=swap" rel="stylesheet">
   <link rel="icon" href="logo/favicon.ico" sizes="any">

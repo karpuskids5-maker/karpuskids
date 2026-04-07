@@ -1,5 +1,59 @@
 import { supabase, initOneSignal, TERMS_VERSION } from "./shared/supabase.js";
 
+// ── Protección contra fuerza bruta ────────────────────────────────────────────
+const RATE_LIMIT = {
+  MAX_ATTEMPTS: 5,       // intentos máximos
+  WINDOW_MS:    15 * 60 * 1000, // ventana de 15 minutos
+  LOCKOUT_MS:   30 * 60 * 1000, // bloqueo de 30 minutos
+
+  _key: 'karpus_login_attempts',
+
+  getState() {
+    try { return JSON.parse(localStorage.getItem(this._key) || '{}'); } catch (_) { return {}; }
+  },
+
+  isLocked() {
+    const s = this.getState();
+    if (!s.lockedUntil) return false;
+    if (Date.now() < s.lockedUntil) return true;
+    // Bloqueo expirado — limpiar
+    localStorage.removeItem(this._key);
+    return false;
+  },
+
+  getRemainingLockTime() {
+    const s = this.getState();
+    if (!s.lockedUntil) return 0;
+    return Math.max(0, Math.ceil((s.lockedUntil - Date.now()) / 60000));
+  },
+
+  recordFailure() {
+    const s = this.getState();
+    const now = Date.now();
+    // Resetear si la ventana expiró
+    if (s.windowStart && now - s.windowStart > this.WINDOW_MS) {
+      localStorage.setItem(this._key, JSON.stringify({ attempts: 1, windowStart: now }));
+      return false;
+    }
+    const attempts = (s.attempts || 0) + 1;
+    const state = { attempts, windowStart: s.windowStart || now };
+    if (attempts >= this.MAX_ATTEMPTS) {
+      state.lockedUntil = now + this.LOCKOUT_MS;
+    }
+    localStorage.setItem(this._key, JSON.stringify(state));
+    return attempts >= this.MAX_ATTEMPTS;
+  },
+
+  recordSuccess() {
+    localStorage.removeItem(this._key);
+  },
+
+  getAttemptsLeft() {
+    const s = this.getState();
+    return Math.max(0, this.MAX_ATTEMPTS - (s.attempts || 0));
+  }
+};
+
 document.addEventListener('DOMContentLoaded', async () => {
   try { initOneSignal(); } catch (_) {}
 
@@ -104,6 +158,13 @@ document.addEventListener('DOMContentLoaded', async () => {
     if (!emailRegex.test(email)) { showError('Ingresa un correo válido.'); return; }
     if (!password || password.length < 6) { showError('La contraseña debe tener al menos 6 caracteres.'); return; }
 
+    // ── Verificar bloqueo por intentos fallidos ──────────────────────────────
+    if (RATE_LIMIT.isLocked()) {
+      const mins = RATE_LIMIT.getRemainingLockTime();
+      showError(`Demasiados intentos fallidos. Espera ${mins} minuto${mins !== 1 ? 's' : ''} antes de intentar de nuevo.`);
+      return;
+    }
+
     if (errorDiv) errorDiv.classList.add('hidden');
     if (submitBtn) submitBtn.disabled = true;
     if (btnText) btnText.textContent = 'Verificando...';
@@ -132,7 +193,8 @@ document.addEventListener('DOMContentLoaded', async () => {
       // 3. OneSignal
       try { await initOneSignal(authData.user); } catch (_) {}
 
-      // 4. Redirigir
+      // 4. Redirigir — limpiar intentos fallidos
+      RATE_LIMIT.recordSuccess();
       localStorage.setItem('karpus_user', JSON.stringify({ id: userId }));
       await redirectByRole(userId);
 
@@ -146,6 +208,17 @@ document.addEventListener('DOMContentLoaded', async () => {
       if (isNetwork)                               errorMessage = 'Sin conexión. Verifica tu internet.';
       else if (msg.includes('Invalid login'))      errorMessage = 'Correo o contraseña incorrectos.';
       else if (msg.includes('Email not confirmed')) errorMessage = 'Confirma tu correo antes de ingresar.';
+
+      // Registrar intento fallido (solo para errores de credenciales, no de red)
+      if (!isNetwork && msg.includes('Invalid login')) {
+        const locked = RATE_LIMIT.recordFailure();
+        if (locked) {
+          errorMessage = `Cuenta bloqueada por ${RATE_LIMIT.LOCKOUT_MS / 60000} minutos por múltiples intentos fallidos.`;
+        } else {
+          const left = RATE_LIMIT.getAttemptsLeft();
+          if (left <= 2) errorMessage += ` (${left} intento${left !== 1 ? 's' : ''} restante${left !== 1 ? 's' : ''})`;
+        }
+      }
 
       const errorDiv = document.getElementById('loginError');
       if (errorDiv) { errorDiv.textContent = errorMessage; errorDiv.classList.remove('hidden'); }
