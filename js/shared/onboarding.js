@@ -145,17 +145,8 @@ export const OnboardingGuide = {
     this._clearHighlight();
     const isMobile = this._isMobile();
     const toast = document.createElement('div');
-    toast.className = [
-      isMobile ? 'fixed top-4 right-4 z-[9990]' : 'fixed bottom-6 right-4 z-[9990]',
-      'bg-gradient-to-br from-emerald-500 to-teal-600 text-white',
-      'rounded-3xl shadow-2xl p-4 max-w-[260px] w-[calc(100vw-2rem)]',
-      isMobile ? 'animate-slide-down-in' : 'animate-slide-up-in'
-    ].join(' ');
-    toast.innerHTML =
-      '<div class="text-2xl mb-1">🎉</div>' +
-      '<p class="font-black text-base">Listo!</p>' +
-      '<p class="text-xs text-white/80 font-medium mt-0.5">Ya conoces tu panel.</p>' +
-      '<button onclick="this.parentElement.remove()" class="mt-2 w-full py-1.5 bg-white/20 hover:bg-white/30 rounded-2xl font-black text-xs uppercase transition-all">Entendido</button>';
+    toast.className = [(isMobile ? 'fixed top-4 right-4' : 'fixed bottom-6 right-4') + ' z-[9990]', 'bg-gradient-to-br from-emerald-500 to-teal-600 text-white', 'rounded-3xl shadow-2xl p-4 max-w-[260px] w-[calc(100vw-2rem)]', isMobile ? 'animate-slide-down-in' : 'animate-slide-up-in'].join(' ');
+    toast.innerHTML = '<div class="text-2xl mb-1">🎉</div><p class="fo()" class="mt-2 w-full py-1.5 bg-white/20 hover:bg-white/30 rounded-2xl font-black text-xs uppercase transition-all">Entendido</button>';
     document.body.appendChild(toast);
     setTimeout(() => toast.remove(), 5000);
     this._complete();
@@ -166,7 +157,7 @@ export const OnboardingGuide = {
     if (this._userId) {
       import('./supabase.js').then(({ supabase }) => {
         const key = this._storageKey.replace(STORAGE_KEY_PREFIX, '');
-        supabase.from('profiles').select('notes').eq('id', this._userId).maybeSingle().then(({ data }) => {
+    d', this._userId).maybeSingle().then(({ data }) => {
           const notes = data?.notes ? JSON.parse(data.notes) : {};
           notes[key] = 'done';
           supabase.from('profiles').update({ notes: JSON.stringify(notes) }).eq('id', this._userId).then(() => {}).catch(() => {});
@@ -177,7 +168,7 @@ export const OnboardingGuide = {
 
   _clearHighlight() {
     document.querySelectorAll('.onboarding-highlight').forEach(el => el.classList.remove('onboarding-highlight'));
-    document.getElementById('onboarding-overlay')?.remove();
+onboarding-overlay')?.remove();
   },
 
   _escapeHTML(str = '') {
@@ -192,15 +183,7 @@ export const OnboardingGuide = {
     if (document.getElementById('onboarding-css')) return;
     const s = document.createElement('style');
     s.id = 'onboarding-css';
-    s.textContent = [
-      '@keyframes slideUpIn{from{opacity:0;transform:translateY(16px)}to{opacity:1;transform:translateY(0)}}',
-      '@keyframes slideDownIn{from{opacity:0;transform:translateY(-16px)}to{opacity:1;transform:translateY(0)}}',
-      '.animate-slide-up-in{animation:slideUpIn 0.35s cubic-bezier(0.34,1.56,0.64,1) both}',
-      '.animate-slide-down-in{animation:slideDownIn 0.35s cubic-bezier(0.34,1.56,0.64,1) both}',
-      '.onboarding-highlight{position:relative!important;z-index:9985!important;',
-      'box-shadow:0 0 0 3px #10b981,0 0 0 6px rgba(16,185,129,0.25)!important;',
-      'border-radius:12px!important;pointer-events:auto!important}'
-    ].join('');
+    s.textContent = 'tant}';
     document.head.appendChild(s);
   }
 };

@@ -98,9 +98,13 @@ export const FeedModule = {
     let mediaHTML = '';
     if (p.media_url) {
       const isVideo = p.media_url.match(/\.(mp4|webm|ogg)$/i);
+      // Optimizar URL con transformación de Supabase (WebP + resize)
+      const optimizedUrl = p.media_url.includes('supabase.co/storage')
+        ? p.media_url + (p.media_url.includes('?') ? '&' : '?') + 'width=900&quality=80&format=webp'
+        : p.media_url;
       mediaHTML = isVideo
         ? ImageLoader.video(p.media_url, '', { cls: 'w-full rounded-2xl mb-4 max-h-80 object-cover' })
-        : `<div class="cursor-zoom-in" onclick="window.openLightbox && window.openLightbox('${p.media_url}','image')">${ImageLoader.img(p.media_url, { cls: 'w-full rounded-2xl mb-4 max-h-80 object-cover shadow-sm', fallback: 'img/mundo.jpg' })}</div>`;
+        : `<div class="cursor-zoom-in" onclick="window.openLightbox && window.openLightbox('${optimizedUrl}','image')">${ImageLoader.img(optimizedUrl, { cls: 'w-full rounded-2xl mb-4 max-h-80 object-cover shadow-sm', fallback: 'img/mundo.jpg' })}</div>`;
     }
 
     return `

@@ -1,4 +1,4 @@
-﻿﻿-- ============================================================
+﻿﻿﻿-- ============================================================
 -- ?? KARPUS KIDS ? Schema Completo para Supabase
 -- Un solo archivo, limpio y organizado.
 -- Ejecutar en Supabase SQL Editor (corre de arriba a abajo).
@@ -1520,7 +1520,8 @@ create index if not exists idx_audit_logs_created
 notify pgrst, 'reload schema';
 
 -- ============================================================
--- 12. ONESIGNAL SUBSCRIPTION ID en profiles
+-- 12. ONESIGNAL SUBSCRIPTION ID y notas en profiles
 -- ============================================================
 alter table public.profiles add column if not exists onesignal_player_id text;
+alter table public.profiles add column if not exists notes text;
 create index if not exists idx_profiles_onesignal on public.profiles(onesignal_player_id) where onesignal_player_id is not null;

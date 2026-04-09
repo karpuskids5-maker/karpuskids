@@ -303,9 +303,14 @@ export async function initOneSignal(currentUser = null) {
         // Vincular usuario externo
         try {
           // Wait a bit more for SDK to fully initialize before checking identity
-          await new Promise(r => setTimeout(r, 1000));
+          await new Promise(r => setTimeout(r, 1500));
 
-          const currentExtId = await OneSignal.User?.getExternalId?.();
+          if (!OneSignal.User) {
+            console.warn('[OneSignal] User object not available yet');
+            return;
+          }
+
+          const currentExtId = await OneSignal.User.getExternalId?.();
           if (currentExtId && currentExtId === user.id) {
             // Already linked — just ensure push subscription is active
             console.log('[OneSignal] ✅ Ya vinculado:', user.id);
@@ -317,31 +322,30 @@ export async function initOneSignal(currentUser = null) {
               if (!msg.includes('409') && !msg.includes('conflict')) {
                 console.info('[OneSignal] login info:', e?.message ?? e);
               }
-              // 409 = already linked on server side, that's fine
             });
-            await new Promise(r => setTimeout(r, 500));
+            await new Promise(r => setTimeout(r, 1000));
           }
-          // If currentExtId !== user.id (different user), skip to avoid 409
 
           // Activar suscripción push si el permiso está concedido
           try {
             const hasPermission = OneSignal.Notifications?.permission === true;
             const isOptedIn     = OneSignal.User?.PushSubscription?.optedIn;
             if (hasPermission && isOptedIn === false) {
-              await OneSignal.User.PushSubscription.optIn();
+              await OneSignal.User.PushSubscription.optIn().catch(() => {});
             }
           } catch (_) { /* silencioso */ }
 
           const subId = OneSignal.User?.PushSubscription?.id;
-          console.log('[OneSignal] ✅ Listo para:', user.id, '| SubID:', subId || 'pendiente');
-
-          // Guardar subscription_id en profiles para fallback en send-push
           if (subId) {
+            console.log('[OneSignal] ✅ Listo para:', user.id, '| SubID:', subId);
+            // Guardar subscription_id en profiles para fallback en send-push
             supabase.from('profiles')
               .update({ onesignal_player_id: subId })
               .eq('id', user.id)
               .then(() => {})
               .catch(() => {});
+          } else {
+            console.log('[OneSignal] ✅ Listo para:', user.id, '| SubID: pendiente');
           }
 
         } catch (loginErr) {

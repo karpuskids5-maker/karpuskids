@@ -44,10 +44,17 @@ export const NotifyPermission = {
       const { data } = await supabase.auth.getUser();
       const userId = data?.user?.id;
       if (!userId) return;
-      const currentExtId = await window.OneSignal.User?.getExternalId?.();
-      if (currentExtId !== userId) await window.OneSignal.login(userId).catch(() => {});
-      await window.OneSignal.User?.PushSubscription?.optIn?.().catch(() => {});
-      const subId = window.OneSignal.User?.PushSubscription?.id;
+
+    window.OneSignalDeferred.push(async function(OneSignal) {
+      if (!OneSignal || !OneSignal.User) return;
+      const currentExtId = await OneSignal.User.getExternalId?.();
+      if (currentExtId !== userId) {
+        await OneSignal.login(userId).catch(() => {});
+      }
+      await OneSignal.User.PushSubscription?.optIn?.().catch(() => {});
+    });
+
+    const subId = window.OneSignal?.User?.PushSubscription?.id;
       if (subId) {
         supabase.from('profiles').update({ onesignal_player_id: subId })
           .eq('id', userId).then(() => {}).catch(() => {});

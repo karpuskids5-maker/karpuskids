@@ -4,8 +4,16 @@ import { ImageLoader } from './image-loader.js';
 import { QueryCache } from './query-cache.js';
 import { withTimeout } from './db-utils.js';
 
-// Inline helper \u2014 evita dependencia de media.js
-const optimizeImageUrl = (url) => url || null;
+// Inline helper — optimiza URLs de Supabase Storage con transformación automática
+const optimizeImageUrl = (url, opts = {}) => {
+  if (!url) return null;
+  // Solo aplicar transformación a URLs de Supabase Storage
+  if (!url.includes('supabase.co/storage')) return url;
+  const { width = 800, quality = 80 } = opts;
+  // Supabase Image Transformation API
+  const sep = url.includes('?') ? '&' : '?';
+  return `${url}${sep}width=${width}&quality=${quality}&format=webp`;
+};
 
 /**
  * M\u00f3dulo de Muro Global Mejorado
@@ -192,14 +200,21 @@ export const WallModule = {
         return;
       }
 
-      const processedPosts = await Promise.all(posts.map(p => this._processPost(p, user)));
+      // Procesar posts de forma SÍNCRONA — sin await, renderiza al instante
+      const processedPosts = posts.map(p => this._processPost(p, user));
       const html = processedPosts.map(p => this.renderPost(p)).join('');
-      
+
       if (append) container.insertAdjacentHTML('beforeend', html);
       else container.innerHTML = html;
 
-      // Activar lazy loading en las nuevas im\u00e1genes
+      // Activar lazy loading en las nuevas imágenes
       ImageLoader.observe(container);
+
+      // Pre-cargar avatares e imágenes en background
+      const urlsToPrefetch = processedPosts
+        .flatMap(p => [p.display_media_url, p.teacher_avatar])
+        .filter(Boolean);
+      ImageLoader.prefetch(urlsToPrefetch);
 
       // Paginaci\u00f3n
       if (posts.length < this._pageSize) {
@@ -251,19 +266,17 @@ export const WallModule = {
     document.querySelectorAll('video').forEach(v => videoObserver.observe(v));
   },
 
-  async _processPost(p, user) {
+  _processPost(p, user) {
     const teacherData = p.teacher || {};
-    // Correcci\u00f3n para Likes: Ahora likes es un array de objetos con user_id
     const likesArray = p.likes || [];
     const likeCount = likesArray.length;
     const userLiked = user ? likesArray.some(l => l.user_id === user.id) : false;
-    
-    // Obtener URL p\u00fablica
+
+    // Resolver URLs de forma SÍNCRONA — sin await, sin llamadas extra
+    // Las URLs de Supabase Storage son deterministas y no necesitan fetch
     const mediaUrl = p.media_url || p.image_url || null;
-    const publicUrl = await this._getPublicImageUrl(mediaUrl);
-    
-    // Obtener Avatar
-    const teacherAvatar = await this._getPublicImageUrl(teacherData.avatar_url);
+    const publicUrl = this._resolveUrlSync(mediaUrl, { width: 900, quality: 80 });
+    const teacherAvatar = this._resolveUrlSync(teacherData.avatar_url, { width: 80, quality: 85 });
 
     return {
       ...p,
@@ -272,9 +285,22 @@ export const WallModule = {
       like_count: likeCount,
       user_liked: userLiked,
       display_media_url: publicUrl,
-      // Priorizar media_type de la BD, o inferir si es video
-      is_video: p.media_type === 'video' || (mediaUrl && mediaUrl.match(/\.(mp4|mov|webm)$/i))
+      is_video: p.media_type === 'video' || (mediaUrl && /\.(mp4|mov|webm)$/i.test(mediaUrl))
     };
+  },
+
+  // Resolución síncrona de URLs — sin await, sin fetch
+  _resolveUrlSync(url, opts = {}) {
+    if (!url) return null;
+    // Ya es URL completa
+    if (/^https?:\/\//i.test(url)) return optimizeImageUrl(url, opts);
+    // Construir URL pública de Supabase Storage
+    const clean = url.replace(/^(posts|karpus-uploads|avatars|classroom_media)\//, '');
+    const isAvatar = url.includes('avatar');
+    const bucket = isAvatar ? 'karpus-uploads' : 'posts';
+    const path = isAvatar ? `avatars/${clean}` : clean;
+    const { data } = supabase.storage.from(bucket).getPublicUrl(path);
+    return optimizeImageUrl(data?.publicUrl, opts);
   },
 
   renderPost(p) {

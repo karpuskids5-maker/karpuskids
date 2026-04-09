@@ -77,8 +77,12 @@ export const ImageLoader = {
   },
 
   img(src, opts = {}) {
-    const { fallback = 'img/mundo.jpg', alt = '', cls = 'w-full h-full object-cover' } = opts;
+    const { fallback = 'img/mundo.jpg', alt = '', cls = 'w-full h-full object-cover', priority = 'low' } = opts;
     if (!src) return `<img src="${fallback}" alt="${alt}" class="${cls}" loading="lazy">`;
+    // Primer post o imágenes críticas: cargar inmediatamente sin lazy
+    if (priority === 'high') {
+      return `<img src="${src}" alt="${alt}" class="${cls}" loading="eager" decoding="async" onerror="this.src='${fallback}'">`;
+    }
     return `<img src="${BLUR_PH}" data-src="${src}" data-fallback="${fallback}" alt="${alt}" class="karpus-img karpus-img-loading ${cls}" loading="lazy" decoding="async">`;
   },
 
@@ -99,6 +103,45 @@ export const ImageLoader = {
 
   skeleton(cls = 'w-full h-48') {
     return `<div class="skeleton ${cls} rounded-xl"></div>`;
+  },
+
+  prefetch(urls = []) {
+    if (!urls.length) return;
+    const load = () => {
+      urls.forEach(url => {
+        if (!url || _urlCache.has(url)) return;
+        const img = new Image();
+        img.onload = () => _urlCache.set(url, url);
+        img.src = url;
+      });
+    };
+    if ('requestIdleCallback' in window) {
+      requestIdleCallback(load, { timeout: 2000 });
+    } else {
+      setTimeout(load, 500);
+    }
+  },
+
+  /**
+   * 🚀 Prefetch — pre-carga URLs en background para que estén listas antes de mostrarse.
+   * Llamar con las URLs del siguiente lote de posts.
+   */
+  prefetch(urls = []) {
+    if (!urls.length) return;
+    // Usar requestIdleCallback para no bloquear el hilo principal
+    const load = () => {
+      urls.forEach(url => {
+        if (!url || _urlCache.has(url)) return;
+        const img = new Image();
+        img.onload = () => _urlCache.set(url, url);
+        img.src = url;
+      });
+    };
+    if ('requestIdleCallback' in window) {
+      requestIdleCallback(load, { timeout: 2000 });
+    } else {
+      setTimeout(load, 500);
+    }
   },
 
   /**
