@@ -7,7 +7,7 @@ import { Helpers } from '../../shared/helpers.js';
 const _saving = {};
 
 /**
- * Lógica de 12 horas: El reporte del día solo es válido si fue guardado hace menos de 12 horas.
+ * L\u00f3gica de 12 horas: El reporte del d\u00eda solo es v\u00e1lido si fue guardado hace menos de 12 horas.
  */
 function _isWithin12h(dateStr) {
   if (!dateStr) return false;
@@ -16,8 +16,8 @@ function _isWithin12h(dateStr) {
 }
 
 /**
- * Vista de rutina mejorada — Tarjetas de estudiantes con progreso visual (burbujas).
- * Optimizada para móvil y con sistema de alertas.
+ * Vista de rutina mejorada \u2014 Tarjetas de estudiantes con progreso visual (burbujas).
+ * Optimizada para m\u00f3vil y con sistema de alertas.
  */
 export async function initRoutine() {
   const classroom = AppState.get('classroom');
@@ -52,14 +52,14 @@ export async function initRoutine() {
     if (hour >= 12 && hour < 16) currentPeriod = 'afternoon';
     if (hour >= 16) currentPeriod = 'late';
 
-    const periodNames = { morning: 'Mañana ☀️', afternoon: 'Tarde 🌤️', late: 'Tardecita 🌙' };
+    const periodNames = { morning: 'Ma\u00f1ana', afternoon: 'Tarde', late: 'Tardecita' };
     
     // Estudiantes pendientes en el periodo actual
     const pendingStudents = students.filter(s => {
       const log = logsMap[s.id];
       if (!log || !_isWithin12h(log.updated_at || log.created_at)) return true;
       
-      // Validar si falta algún campo crítico según el periodo
+      // Validar si falta alg\u00fan campo cr\u00edtico seg\u00fan el periodo
       if (currentPeriod === 'morning' && !log.mood) return true;
       if (currentPeriod === 'afternoon' && (!log.food || !log.mood)) return true;
       if (currentPeriod === 'late' && (!log.nap || !log.food || !log.mood)) return true;
@@ -73,7 +73,7 @@ export async function initRoutine() {
         <div class="space-y-4">
           <div class="flex items-center justify-between">
             <div>
-              <h3 class="text-xl font-black text-slate-800">📝 Rutina Diaria</h3>
+              <h3 class="text-xl font-black text-slate-800">\ud83d\udcdd Rutina Diaria</h3>
               <p class="text-xs font-bold text-slate-400 uppercase tracking-wider mt-0.5">${todayLabel}</p>
             </div>
             <div class="flex flex-col items-end">
@@ -107,7 +107,7 @@ export async function initRoutine() {
             <div class="bg-emerald-50 border-2 border-emerald-100 rounded-[2rem] p-5 flex items-center gap-4">
               <div class="w-12 h-12 bg-emerald-500 text-white rounded-2xl flex items-center justify-center text-2xl shrink-0 shadow-lg shadow-emerald-200">✅</div>
               <div>
-                <p class="text-sm font-black text-emerald-800">¡Todo al día!</p>
+                <p class="text-sm font-black text-emerald-800">\u00a1Todo al d\u00eda!</p>
                 <p class="text-xs font-bold text-emerald-600/80">Has completado los reportes de este periodo.</p>
               </div>
             </div>
@@ -121,7 +121,7 @@ export async function initRoutine() {
 
         <div class="bg-white p-6 rounded-[2rem] border border-slate-100 shadow-sm text-center">
           <p class="text-xs text-slate-400 font-medium">
-            💡 Toca a un estudiante para abrir su reporte de rutina individual.<br>
+            \ud83d\udca1 Toca a un estudiante para abrir su reporte de rutina individual.<br>
             Los emojis flotantes indican el progreso actual.
           </p>
         </div>
@@ -136,7 +136,7 @@ export async function initRoutine() {
 }
 
 /**
- * Renderiza la tarjeta individual del estudiante para la sección de rutina.
+ * Renderiza la tarjeta individual del estudiante para la secci\u00f3n de rutina.
  */
 function _renderStudentRoutineCard(s, log) {
   const isValid = _isWithin12h(log.created_at || log.updated_at);
@@ -145,9 +145,9 @@ function _renderStudentRoutineCard(s, log) {
   const sleep = isValid && log.nap  ? log.nap  : null;
   const note  = isValid && log.notes ? true : false;
 
-  const moodEmojis  = { feliz: '😊', normal: '😐', triste: '😢', enojado: '😠' };
-  const foodEmojis  = { todo: '😋', poco: '😕', nada: '🚫' };
-  const sleepEmojis = { si: '😴', no: '🌞' };
+  const moodEmojis  = { feliz: '\ud83d\ude0a', normal: '\ud83d\ude10', triste: '\ud83d\ude22', enojado: '\ud83d\ude21' };
+  const foodEmojis  = { todo: '\ud83d\ude0b', poco: '\ud83d\ude15', nada: '\ud83d\udeab' };
+  const sleepEmojis = { si: '\ud83d\ude34', no: '\ud83c\udf1e' };
 
   return `
     <div onclick="App.openStudentRoutine('${s.id}')" 
@@ -158,7 +158,7 @@ function _renderStudentRoutineCard(s, log) {
         ${mood ? `<div class="w-7 h-7 bg-orange-50 rounded-full flex items-center justify-center text-sm shadow-sm border border-orange-100 animate-bounce-subtle">${moodEmojis[mood]}</div>` : ''}
         ${food ? `<div class="w-7 h-7 bg-emerald-50 rounded-full flex items-center justify-center text-sm shadow-sm border border-emerald-100 animate-bounce-subtle" style="animation-delay: 0.2s">${foodEmojis[food]}</div>` : ''}
         ${sleep ? `<div class="w-7 h-7 bg-indigo-50 rounded-full flex items-center justify-center text-sm shadow-sm border border-indigo-100 animate-bounce-subtle" style="animation-delay: 0.4s">${sleepEmojis[sleep]}</div>` : ''}
-        ${note ? `<div class="w-7 h-7 bg-slate-50 rounded-full flex items-center justify-center text-xs shadow-sm border border-slate-100 animate-bounce-subtle" style="animation-delay: 0.6s">📝</div>` : ''}
+        ${note ? `<div class="w-7 h-7 bg-slate-50 rounded-full flex items-center justify-center text-xs shadow-sm border border-slate-100 animate-bounce-subtle" style="animation-delay: 0.6s">\ud83d\udcdd</div>` : ''}
       </div>
 
       <!-- Avatar -->
@@ -195,9 +195,9 @@ export async function openStudentRoutine(studentId) {
   const currentSleep = isValid ? (log?.nap || '') : '';
   const currentNotes = isValid ? (log?.notes || '') : '';
 
-  const moodEmojis  = { feliz: '😊', normal: '😐', triste: '😢', enojado: '😠' };
-  const foodEmojis  = { todo: '😋', poco: '😕', nada: '🚫' };
-  const sleepEmojis = { si: '😴', no: '🌞' };
+  const moodEmojis  = { feliz: '\ud83d\ude0a', normal: '\ud83d\ude10', triste: '\ud83d\ude22', enojado: '\ud83d\ude21' };
+  const foodEmojis  = { todo: '\ud83d\ude0b', poco: '\ud83d\ude15', nada: '\ud83d\udeab' };
+  const sleepEmojis = { si: '\ud83d\ude34', no: '\ud83c\udf1e' };
 
   const modalId = 'routineStudentModal';
   const content = `
@@ -219,9 +219,9 @@ export async function openStudentRoutine(studentId) {
       </div>
 
       <div class="p-6 space-y-6 overflow-y-auto custom-scrollbar">
-        <!-- 1. Estado de Ánimo -->
+        <!-- 1. Estado de \u00c1nimo -->
         <div class="space-y-3">
-          <label class="block text-[11px] font-black text-slate-400 uppercase tracking-widest ml-1">¿Cómo está de ánimo? ☀️</label>
+          <label class="block text-[11px] font-black text-slate-400 uppercase tracking-widest ml-1">\u00bfC\u00f3mo est\u00e1 de \u00e1nimo? \u2600\ufe0f</label>
           <div class="grid grid-cols-4 gap-2">
             ${Object.entries(moodEmojis).map(([v, e]) => `
               <button onclick="App.updateRoutineFieldInModal('${studentId}','mood','${v}')"
@@ -235,9 +235,9 @@ export async function openStudentRoutine(studentId) {
           </div>
         </div>
 
-        <!-- 2. Alimentación -->
+        <!-- 2. Alimentaci\u00f3n -->
         <div class="space-y-3">
-          <label class="block text-[11px] font-black text-slate-400 uppercase tracking-widest ml-1">¿Cómo comió hoy? 🍽️</label>
+          <label class="block text-[11px] font-black text-slate-400 uppercase tracking-widest ml-1">\u00bfC\u00f3mo comi\u00f3 hoy? \ud83c\udf7d\ufe0f</label>
           <div class="grid grid-cols-3 gap-2">
             ${Object.entries(foodEmojis).map(([v, e]) => `
               <button onclick="App.updateRoutineFieldInModal('${studentId}','food','${v}')"
@@ -253,7 +253,7 @@ export async function openStudentRoutine(studentId) {
 
         <!-- 3. Siesta -->
         <div class="space-y-3">
-          <label class="block text-[11px] font-black text-slate-400 uppercase tracking-widest ml-1">¿Hizo su siesta? 😴</label>
+          <label class="block text-[11px] font-black text-slate-400 uppercase tracking-widest ml-1">\u00bfHizo su siesta? \ud83d\ude34</label>
           <div class="grid grid-cols-2 gap-3">
             ${Object.entries(sleepEmojis).map(([v, e]) => `
               <button onclick="App.updateRoutineFieldInModal('${studentId}','sleep','${v}')"
@@ -261,7 +261,7 @@ export async function openStudentRoutine(studentId) {
                 ${currentSleep === v ? 'border-indigo-400 bg-indigo-50 shadow-md' : 'border-slate-100 bg-slate-50'}"
                 data-val="${v}">
                 <span class="text-2xl">${e}</span>
-                <span class="text-xs font-black uppercase text-slate-600">${v === 'si' ? 'Durmió' : 'No durmió'}</span>
+                <span class="text-xs font-black uppercase text-slate-600">${v === 'si' ? 'Durmi\u00f3' : 'No durmi\u00f3'}</span>
               </button>
             `).join('')}
           </div>
@@ -269,7 +269,7 @@ export async function openStudentRoutine(studentId) {
 
         <!-- 4. Notas -->
         <div class="space-y-3">
-          <label class="block text-[11px] font-black text-slate-400 uppercase tracking-widest ml-1">Observaciones adicionales 📝</label>
+          <label class="block text-[11px] font-black text-slate-400 uppercase tracking-widest ml-1">Observaciones adicionales \ud83d\udcdd</label>
           <textarea id="modal-note-${studentId}" 
             class="w-full p-4 bg-slate-50 border-2 border-slate-100 rounded-2xl text-sm font-medium outline-none focus:border-orange-400 transition-all resize-none"
             rows="3" placeholder="Ej: Estuvo muy participativo hoy...">${safeEscapeHTML(currentNotes)}</textarea>
@@ -334,26 +334,26 @@ export async function openBulkRoutineModal() {
       <div class="space-y-6">
         <div class="grid grid-cols-2 gap-4">
           <div class="space-y-2">
-            <label class="text-[10px] font-black uppercase text-slate-400 ml-1">Ánimo 😊</label>
+            <label class="text-[10px] font-black uppercase text-slate-400 ml-1">\u00c1nimo \ud83d\ude0a</label>
             <select id="bulkMood" class="w-full p-3 bg-slate-50 border-2 border-slate-100 rounded-xl font-bold text-sm outline-none focus:border-orange-400">
-              <option value="feliz">Feliz 😊</option>
-              <option value="normal">Normal 😐</option>
+              <option value="feliz">Feliz \ud83d\ude0a</option>
+              <option value="normal">Normal \ud83d\ude10</option>
             </select>
           </div>
           <div class="space-y-2">
-            <label class="text-[10px] font-black uppercase text-slate-400 ml-1">Comida 🍽️</label>
+            <label class="text-[10px] font-black uppercase text-slate-400 ml-1">Comida \ud83c\udf7d\ufe0f</label>
             <select id="bulkFood" class="w-full p-3 bg-slate-50 border-2 border-slate-100 rounded-xl font-bold text-sm outline-none focus:border-orange-400">
-              <option value="todo">Todo 😋</option>
-              <option value="poco">Poco 😕</option>
+              <option value="todo">Todo \ud83d\ude0b</option>
+              <option value="poco">Poco \ud83d\ude15</option>
             </select>
           </div>
         </div>
 
         <div class="space-y-2">
-          <label class="text-[10px] font-black uppercase text-slate-400 ml-1">Siesta 😴</label>
+          <label class="text-[10px] font-black uppercase text-slate-400 ml-1">Siesta \ud83d\ude34</label>
           <select id="bulkSleep" class="w-full p-3 bg-slate-50 border-2 border-slate-100 rounded-xl font-bold text-sm outline-none focus:border-orange-400">
-            <option value="si">Durmió 😴</option>
-            <option value="no">No durmió 🌞</option>
+            <option value="si">Durmi\u00f3 \ud83d\ude34</option>
+            <option value="no">No durmi\u00f3 \ud83c\udf1e</option>
           </select>
         </div>
 

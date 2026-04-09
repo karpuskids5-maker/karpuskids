@@ -4,12 +4,12 @@ import { ImageLoader } from './image-loader.js';
 import { QueryCache } from './query-cache.js';
 import { withTimeout } from './db-utils.js';
 
-// Inline helper — evita dependencia de media.js
+// Inline helper \u2014 evita dependencia de media.js
 const optimizeImageUrl = (url) => url || null;
 
 /**
- * Módulo de Muro Global Mejorado
- * Soporta Videos, Imágenes y conteo real de likes
+ * M\u00f3dulo de Muro Global Mejorado
+ * Soporta Videos, Im\u00e1genes y conteo real de likes
  */
 export const WallModule = {
   _appState: null,
@@ -31,11 +31,11 @@ export const WallModule = {
       const hours = Math.floor(minutes / 60);
       if (hours < 24) return `hace ${hours} h`;
       const days = Math.floor(hours / 24);
-      if (days < 30) return `hace ${days} días`;
+      if (days < 30) return `hace ${days} d\u00edas`;
       const months = Math.floor(days / 30);
       if (months < 12) return `hace ${months} meses`;
       const years = Math.floor(months / 12);
-      return `hace ${years} años`;
+      return `hace ${years} a\u00f1os`;
     } catch (e) {
       return '';
     }
@@ -83,7 +83,7 @@ export const WallModule = {
           const { data } = await supabase.from('classrooms').select('id, name').order('name');
           return data || [];
         },
-        10 * 60_000 // 10 min TTL — classrooms rarely change
+        10 * 60_000 // 10 min TTL \u2014 classrooms rarely change
       );
       const select = document.getElementById('wallClassroomFilter');
       if (select && classrooms) {
@@ -104,7 +104,7 @@ export const WallModule = {
     const searchInput = document.getElementById('wallSearch');
     const classroomSelect = document.getElementById('wallClassroomFilter');
     
-    // Debounce para búsqueda
+    // Debounce para b\u00fasqueda
     let timeout;
     if (searchInput) {
       searchInput.addEventListener('input', () => {
@@ -131,11 +131,11 @@ export const WallModule = {
   },
 
   async loadPosts(container, append = false) {
-    // 🛡️ Fix: Si 'container' es un string (ID), convertirlo a elemento DOM
+    // \ud83d\udee1\ufe0f Fix: Si 'container' es un string (ID), convertirlo a elemento DOM
     if (typeof container === 'string') {
       container = document.getElementById(container);
     }
-    // Si no se pasó container o no es válido, usar el ID configurado
+    // Si no se pas\u00f3 container o no es v\u00e1lido, usar el ID configurado
     if (!container) {
       container = document.getElementById(this._containerId);
     }
@@ -198,20 +198,20 @@ export const WallModule = {
       if (append) container.insertAdjacentHTML('beforeend', html);
       else container.innerHTML = html;
 
-      // Activar lazy loading en las nuevas imágenes
+      // Activar lazy loading en las nuevas im\u00e1genes
       ImageLoader.observe(container);
 
-      // Paginación
+      // Paginaci\u00f3n
       if (posts.length < this._pageSize) {
         this._hasMore = false;
-        container.insertAdjacentHTML('beforeend', '<div class="py-8 text-center text-xs text-slate-300 italic">No hay más publicaciones.</div>');
+        container.insertAdjacentHTML('beforeend', '<div class="py-8 text-center text-xs text-slate-300 italic">No hay m\u00e1s publicaciones.</div>');
       } else {
         this._page++;
         this._setupInfiniteScroll(container);
       }
 
       if (window.lucide) lucide.createIcons();
-      // Activar lazy loading en imágenes recién inyectadas
+      // Activar lazy loading en im\u00e1genes reci\u00e9n inyectadas
       ImageLoader.observe(container);
     } catch (err) {
       console.error('Error loadPosts:', err);
@@ -232,7 +232,7 @@ export const WallModule = {
     const last = container.lastElementChild;
     if (last) this._observer.observe(last);
 
-    // 🎥 Setup Autoplay de videos al hacer scroll
+    // \ud83c\udfa5 Setup Autoplay de videos al hacer scroll
     this._setupVideoAutoplay();
   },
 
@@ -253,12 +253,12 @@ export const WallModule = {
 
   async _processPost(p, user) {
     const teacherData = p.teacher || {};
-    // Corrección para Likes: Ahora \`likes\` es un array de objetos con user_id
+    // Correcci\u00f3n para Likes: Ahora likes es un array de objetos con user_id
     const likesArray = p.likes || [];
     const likeCount = likesArray.length;
     const userLiked = user ? likesArray.some(l => l.user_id === user.id) : false;
     
-    // Obtener URL pública
+    // Obtener URL p\u00fablica
     const mediaUrl = p.media_url || p.image_url || null;
     const publicUrl = await this._getPublicImageUrl(mediaUrl);
     
@@ -282,7 +282,7 @@ export const WallModule = {
     const accent = this._options.accentColor || 'indigo';
     const isFirstPost = this._page === 0;
 
-    // Lógica de Renderizado Multimedia con lazy loading
+    // L\u00f3gica de Renderizado Multimedia con lazy loading
     let mediaHtml = '';
     if (p.display_media_url) {
       if (p.is_video) {
@@ -320,18 +320,18 @@ export const WallModule = {
                 ${ImageLoader.img(p.teacher_avatar, { 
                   cls: 'w-full h-full object-cover', 
                   fallback: 'img/1.jpg',
-                  w: 80, h: 80 // Sugerencia de tamaño para avatar
+                  w: 80, h: 80 // Sugerencia de tama\u00f1o para avatar
                 })}
               </div>
               <div>
                 <div class="font-bold text-slate-800 text-sm">${Helpers.escapeHTML(p.teacher_name)}</div>
                 <div class="text-[10px] text-slate-400 font-bold uppercase tracking-wider">
-                  ${date} • ${Helpers.escapeHTML(p.classroom?.name || 'General')}
+                  ${date} \u2022 ${Helpers.escapeHTML(p.classroom?.name || 'General')}
                 </div>
               </div>
             </div>
             ${canDelete ? `
-              <button onclick="WallModule.deletePost('${p.id}')" class="text-slate-300 hover:text-red-500 transition-colors p-1 rounded-lg hover:bg-red-50" title="Eliminar publicación"><i data-lucide="trash-2" class="w-4 h-4"></i></button>
+              <button onclick="WallModule.deletePost('${p.id}')" class="text-slate-300 hover:text-red-500 transition-colors p-1 rounded-lg hover:bg-red-50" title="Eliminar publicaci\u00f3n"><i data-lucide="trash-2" class="w-4 h-4"></i></button>
             ` : ''}
           </div>
 
@@ -366,7 +366,7 @@ export const WallModule = {
     `;
   },
 
-  // Funciones de acción (Like, Comentar, Eliminar)
+  // Funciones de acci\u00f3n (Like, Comentar, Eliminar)
   async toggleLike(postId) {
     const user = this._appState?.get('user');
     if (!user) return;
@@ -412,7 +412,7 @@ export const WallModule = {
       userName = profile?.name || 'Personal';
     }
 
-    // Optimistic UI — agregar comentario sin recargar
+    // Optimistic UI \u2014 agregar comentario sin recargar
     const commentsList = document.getElementById(`comments-list-${postId}`);
     const tempId = `temp-${Date.now()}`;
     if (commentsList) {
@@ -450,11 +450,11 @@ export const WallModule = {
 
       if (error) throw error;
 
-      // Confirmar — quitar opacidad del comentario temporal
+      // Confirmar \u2014 quitar opacidad del comentario temporal
       const tempEl = document.getElementById(tempId);
       if (tempEl) tempEl.classList.remove('opacity-60');
 
-      // Actualizar contador en el botón de comentarios
+      // Actualizar contador en el bot\u00f3n de comentarios
       const countBtn = document.querySelector(`#post-${postId} button[onclick*="toggleCommentSection"] span`);
       if (countBtn) {
         const match = countBtn.textContent.match(/\d+/);
@@ -475,7 +475,7 @@ export const WallModule = {
     if (!section) return;
     section.classList.toggle('hidden');
 
-    // Solo cargar desde DB si la sección se abre Y la lista está vacía o tiene solo el placeholder
+    // Solo cargar desde DB si la secci\u00f3n se abre Y la lista est\u00e1 vac\u00eda o tiene solo el placeholder
     if (!section.classList.contains('hidden')) {
       const list = document.getElementById(`comments-list-${postId}`);
       const hasRealComments = list && list.querySelectorAll('[id^="comment-"]').length > 0;
@@ -487,7 +487,7 @@ export const WallModule = {
   },
 
   async _fetchComments(postId) {
-    // Traer comentarios con join a profiles (name) y también a students (para padres)
+    // Traer comentarios con join a profiles (name) y tambi\u00e9n a students (para padres)
     const { data, error } = await supabase
       .from('comments')
       .select(`
@@ -515,7 +515,7 @@ export const WallModule = {
         .select('parent_id, name')
         .in('parent_id', parentIds);
 
-      // Mapa parent_id → nombre del estudiante
+      // Mapa parent_id \u2192 nombre del estudiante
       const studentByParent = {};
       (students || []).forEach(s => { studentByParent[s.parent_id] = s.name; });
 
@@ -533,8 +533,8 @@ export const WallModule = {
   },
 
   // Resuelve el nombre a mostrar en un comentario:
-  // - Padre → nombre del estudiante hijo (no el nombre del padre)
-  // - Maestra/Directora/Asistente → profile.name de profiles
+  // - Padre \u2192 nombre del estudiante hijo (no el nombre del padre)
+  // - Maestra/Directora/Asistente \u2192 profile.name de profiles
   _resolveCommentName(c) {
     const profile = Array.isArray(c.profile) ? c.profile[0] : (c.profile || null);
     
@@ -557,7 +557,7 @@ export const WallModule = {
     if (!container) return;
     
     if (comments.length === 0) {
-      container.innerHTML = '<p class="text-center text-[10px] text-slate-400 italic py-2">Sé el primero en comentar.</p>';
+      container.innerHTML = '<p class="text-center text-[10px] text-slate-400 italic py-2">S\u00e9 el primero en comentar.</p>';
       return;
     }
 
@@ -586,7 +586,7 @@ export const WallModule = {
   },
 
   async deletePost(postId) {
-    if (!confirm('¿Eliminar publicación?')) return;
+    if (!confirm('\u00bfEliminar publicaci\u00f3n?')) return;
     try {
       await supabase.from('posts').delete().eq('id', postId);
       document.getElementById(`post-${postId}`)?.remove();
@@ -596,6 +596,6 @@ export const WallModule = {
   },
 
   subscribeRealtime() {
-    // Implementar suscripción simple si se desea actualizaciones en vivo
+    // Implementar suscripci\u00f3n simple si se desea actualizaciones en vivo
   }
 };

@@ -17,8 +17,8 @@ import * as UI from './modules/ui.js';
 
 window.safeToast = UI.safeToast;
 const { safeToast, safeEscapeHTML, Modal } = UI;
-// Exponer Modal globalmente ANTES de cualquier interacción del usuario
-// Los onclick inline en HTML dinámico necesitan window.Modal disponible de inmediato
+// Exponer Modal globalmente ANTES de cualquier interacci\u00f3n del usuario
+// Los onclick inline en HTML din\u00e1mico necesitan window.Modal disponible de inmediato
 window.Modal = Modal;
 const { initAttendance, markAllPresent, registerAttendance } = Attendance;
 const { initRoutine, updateRoutineField, saveRoutineLog, openNewRoutineModal, openStudentRoutine, openBulkRoutineModal, updateRoutineFieldInModal, saveRoutineInModal, applyBulkRoutine } = Routine;
@@ -27,8 +27,8 @@ const { openStudentProfile, registerIncidentModal } = Students;
 const { initChat, selectChatContact } = ChatApp;
 
 /**
- * 🚀 ARQUITECTURA SENIOR: Definición Global del Objeto App
- * Evita errores de "App is not defined" y centraliza la lógica.
+ * \ud83d\ude80 ARQUITECTURA SENIOR: Definici\u00f3n Global del Objeto App
+ * Evita errores de "App is not defined" y centraliza la l\u00f3gica.
  */
 window.App = {
   // UI Helpers
@@ -77,7 +77,7 @@ window.App = {
 };
 
 /**
- * Inicialización principal
+ * Inicializaci\u00f3n principal
  */
 
 // Global error handler
@@ -90,13 +90,13 @@ window.addEventListener('unhandledrejection', (e) => {
 document.addEventListener('DOMContentLoaded', async () => {
   // Logout
     document.getElementById('logoutBtn')?.addEventListener('click', async () => {
-      if (confirm('¿Cerrar sesión?')) {
+      if (confirm('\u00bfCerrar sesi\u00f3n?')) {
         await supabase.auth.signOut();
         window.location.href = 'login.html';
       }
     });
 
-    console.log('🎒 Karpus Maestra Module Starting...');
+    console.log('Karpus Maestra Module Starting...');
   
   const auth = await ensureRole(['maestra', 'admin']);
   if (!auth) return;
@@ -104,8 +104,8 @@ document.addEventListener('DOMContentLoaded', async () => {
   AppState.set('user', auth.user);
   AppState.set('profile', auth.profile);
 
-  // 🔔 Inicializar Notificaciones Push
-  // 🔥 FIX: Permitir subdominios como www. y otros para la inicialización
+  // \ud83d\udd14 Inicializar Notificaciones Push
+  // \ud83d\udd25 FIX: Permitir subdominios como www. y otros para la inicializaci\u00f3n
   const host = window.location.hostname;
   const isProd = host === 'karpuskids.com' || host === 'www.karpuskids.com' || host.endsWith('.karpuskids.com');
   
@@ -132,9 +132,9 @@ document.addEventListener('DOMContentLoaded', async () => {
   document.querySelectorAll('.user-name-display').forEach(el => el.textContent = teacherName);
   document.querySelectorAll('.user-email-display').forEach(el => el.textContent = auth.user.email);
   const welcomeText = document.querySelector('#t-home header h1');
-  if (welcomeText) welcomeText.innerHTML = `<span>🧑‍🏫</span> <span>Hola, <span class="user-name-display text-orange-600">${teacherName}</span>!</span>`;
+  if (welcomeText) welcomeText.innerHTML = `<span>Hola, <span class="user-name-display text-orange-600">${teacherName}</span>!</span>`;
 
-  // Cargar Perfil en sección perfil
+  // Cargar Perfil en secci\u00f3n perfil
   const pName = document.getElementById('teacherName');
   const pEmail = document.getElementById('teacherEmail');
   if (pName) pName.textContent = teacherName;
@@ -178,11 +178,11 @@ document.addEventListener('DOMContentLoaded', async () => {
         AppState.set('profile', { ...oldProfile, ...updates });
         
         safeToast('Perfil actualizado correctamente');
-        // Recargar la página para reflejar cambios en sidebar y UI
+        // Recargar la p\u00e1gina para reflejar cambios en sidebar y UI
         setTimeout(() => location.reload(), 1000);
       } catch (err) {
         console.error('Error saving profile:', err);
-        safeToast('Error al guardar perfil. Revisa tu conexión.', 'error');
+        safeToast('Error al guardar perfil. Revisa tu conexi\u00f3n.', 'error');
         btn.disabled = false;
         btn.innerHTML = '<i data-lucide="save" class="w-5 h-5"></i> Guardar Cambios';
       }
@@ -197,7 +197,7 @@ document.addEventListener('DOMContentLoaded', async () => {
       if (!file) return;
       
       if (file.size > 5 * 1024 * 1024) { // 5MB limit
-        safeToast('La imagen es demasiado grande (máx. 5MB)', 'error');
+        safeToast('La imagen es demasiado grande (m\u00e1x. 5MB)', 'error');
         return;
       }
       
@@ -205,7 +205,7 @@ document.addEventListener('DOMContentLoaded', async () => {
       const filePath = `avatars/${fileName}`;
 
       try {
-        // Comprimir avatar antes de subir (máx 400px, WebP)
+        // Comprimir avatar antes de subir (m\u00e1x 400px, WebP)
         const publicUrl = await ImageLoader.uploadToStorage(file, 'karpus-uploads', filePath, {
           maxWidth: 400, maxHeight: 400, quality: 0.85, maxSizeKB: 150
         });
@@ -233,7 +233,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     };
   }
 
-  // 🔥 EXPOSICIÓN GLOBAL DE MÓDULOS (CRUCIAL PARA EL MURO)
+  // \ud83d\udd25 EXPOSICI\u00d3N GLOBAL DE M\u00d3DULOS (CRUCIAL PARA EL MURO)
   window.WallModule = WallModule;
 
   // Asignar funciones internas al objeto global App
@@ -274,20 +274,20 @@ document.addEventListener('DOMContentLoaded', async () => {
       console.log('Using profile classroom_id');
     }
 
-    // Inicializar Módulos
+    // Inicializar M\u00f3dulos
     await initDashboard();
     await initAttendance();
     await initNavigation();
     await initChat();
     initRealtimeUpdates(classroom.id);
 
-    // Badge mensajes no leídos
+    // Badge mensajes no le\u00eddos
     loadMaestraUnreadBadge(auth.user.id);
 
-    // 🔴 Sistema de badges por sección
+    // \ud83d\udd34 Sistema de badges por secci\u00f3n
     BadgeSystem.init(auth.user.id);
 
-    // ── Botón hamburguesa móvil ──────────────────────────────────────────────
+    // \u2500\u2500 Bot\u00f3n hamburguesa m\u00f3vil \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500
     const menuBtn = document.getElementById('menuBtn');
     const sidebar  = document.getElementById('sidebar');
     const overlay  = document.getElementById('sidebarOverlay');
@@ -311,14 +311,14 @@ document.addEventListener('DOMContentLoaded', async () => {
       overlay.addEventListener('click', _closeSidebar);
     }
 
-    // Cerrar sidebar al hacer click en un link (móvil)
+    // Cerrar sidebar al hacer click en un link (m\u00f3vil)
     sidebar.querySelectorAll('button[data-section]').forEach(btn => {
       btn.addEventListener('click', () => {
         if (window.innerWidth <= 768) _closeSidebar();
       });
     });
 
-    // ── Botón colapsar sidebar desktop ───────────────────────────────────────
+    // \u2500\u2500 Bot\u00f3n colapsar sidebar desktop \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500
     const toggleBtn  = document.getElementById('toggleSidebar');
     const layoutShell = document.getElementById('layoutShell');
     if (toggleBtn && sidebar && layoutShell) {
@@ -352,7 +352,7 @@ function initRealtimeUpdates(classroomId) {
   currentChannel = supabase.channel(`maestra_room_${classroomId}`)
     .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'task_evidences' }, (payload) => {
       const student = (AppState.get('students') || []).find(s => s.id === payload.new.student_id);
-      if (student) safeToast(`📝 ${student.name} entregó una tarea`, 'info');
+      if (student) safeToast(`\ud83d\udcdd ${student.name} entreg\u00f3 una tarea`, 'info');
     })
     .subscribe();
 }
@@ -362,7 +362,7 @@ async function notify({ message, pushTo = null }) {
   if (pushTo) {
     sendPush({
       user_id: pushTo,
-      title: 'Notificación Karpus',
+      title: 'Notificaci\u00f3n Karpus',
       message: message,
       link: '/panel_padres.html'
     }).catch(console.warn);
@@ -370,7 +370,7 @@ async function notify({ message, pushTo = null }) {
 }
 
 /**
- * 📊 Dashboard
+ * \ud83d\udcca Dashboard
  */
 async function initDashboard() {
   const classroom = AppState.get('classroom');
@@ -436,22 +436,22 @@ async function initDashboard() {
 }
 
 /**
- * 📅 Asistencia
+ * \ud83d\udcc5 Asistencia
  */
 
 
 
 /**
- * 🍱 Rutina Diaria
+ * \ud83c\udf71 Rutina Diaria
  */
 
 /**
- * 🍱 Rutina Diaria - Lógica Profesional
+ * \ud83c\udf71 Rutina Diaria - L\u00f3gica Profesional
  */
 
 
 /**
- * 📝 Tareas
+ * \ud83d\udcdd Tareas
  */
 
 
@@ -460,7 +460,7 @@ async function initDashboard() {
 
 
 /**
- * 🧭 Navegación
+ * \ud83e\udded Navegaci\u00f3n
  */
 function initNavigation() {
   const navButtons = document.querySelectorAll('.nav-btn-toy[data-section]');
@@ -494,7 +494,7 @@ function initNavigation() {
       import('../shared/notify-permission.js').then(m => m.NotifyPermission.requestIfNeeded());
     }
 
-    // 🔴 Marcar badge como leído al entrar a la sección
+    // \ud83d\udd34 Marcar badge como le\u00eddo al entrar a la secci\u00f3n
     BadgeSystem.mark(fullId);
   };
 
@@ -509,7 +509,7 @@ function initNavigation() {
 }
 
 /**
-   * 🏫 Mostrar Detalle de Aula
+   * \ud83c\udfeb Mostrar Detalle de Aula
    */
   async function showClassroomDetail(classroomId) {
     let classroom = AppState.get('classroom');
@@ -530,7 +530,7 @@ function initNavigation() {
    const nameEl = document.getElementById('currentClassName');
    if (nameEl) nameEl.textContent = classroom.name;
 
-  // 2. Cambiar a la sección de detalle
+  // 2. Cambiar a la secci\u00f3n de detalle
   const layoutShell = document.getElementById('layoutShell');
   if (layoutShell) layoutShell.scrollTop = 0;
 
@@ -547,12 +547,12 @@ function initNavigation() {
     classroomId: classroom.id 
   }, AppState);
 
-  // 4. Configurar listeners de tabs si no están
+  // 4. Configurar listeners de tabs si no est\u00e1n
   initClassTabs();
 }
 
 /**
- * 📑 Inicializar Tabs Internas de Aula
+ * \ud83d\udcd1 Inicializar Tabs Internas de Aula
  */
 function initClassTabs() {
   const tabBtns     = document.querySelectorAll('.class-tab-btn');
@@ -601,7 +601,7 @@ function initVideocall() {
   if (!container) return;
   const classroom = AppState.get('classroom');
 
-  // 1. Mostrar Panel de Gestión
+  // 1. Mostrar Panel de Gesti\u00f3n
   container.innerHTML = `
     <div class="flex flex-col items-center justify-center p-12 text-center">
       <div class="w-20 h-20 bg-orange-100 rounded-full flex items-center justify-center mb-6">
@@ -623,7 +623,7 @@ function initVideocall() {
 }
 
 window.App.scheduleClassMeeting = async () => {
-    const title = prompt("Título de la clase/reunión:");
+    const title = prompt("T\u00edtulo de la clase/reuni\u00f3n:");
     if(!title) return;
     
     try {
@@ -647,7 +647,7 @@ async function startJitsi() {
   if (btn) { btn.disabled = true; btn.textContent = 'Iniciando...'; }
 
   try {
-    // 1. Crear reunión y notificar padres automáticamente
+    // 1. Crear reuni\u00f3n y notificar padres autom\u00e1ticamente
     const meeting = await VideoCallModule.scheduleMeeting({
       title:      `Clase en Vivo: ${classroom.name}`,
       start_time: new Date().toISOString(),
@@ -659,13 +659,13 @@ async function startJitsi() {
     // 2. Marcar como en vivo en la tabla classrooms (para que el padre lo vea)
     await supabase.from('classrooms').update({ is_live: true }).eq('id', classroom.id);
 
-    // 3. Iniciar la reunión
+    // 3. Iniciar la reuni\u00f3n
     await VideoCallModule.startMeeting(meeting.id);
 
     // 4. Renderizar Jitsi
     VideoCallModule.joinMeeting(meeting, 'meet', AppState.get('profile'));
 
-    safeToast('¡Clase iniciada! Los padres han sido notificados 🎥', 'success');
+    safeToast('\u00a1Clase iniciada! Los padres han sido notificados \ud83c\udfa5', 'success');
   } catch (e) {
     console.error('startJitsi error:', e);
     safeToast('Error al iniciar la clase: ' + e.message, 'error');
@@ -674,10 +674,10 @@ async function startJitsi() {
 }
 
 /**
- * 💬 SISTEMA DE CHAT MAESTRA
+ * \ud83d\udcac SISTEMA DE CHAT MAESTRA
  */
 let activeChatUserId = null;
-let activeConversationId = null; // Guardamos el ID de la conversación activa
+let activeConversationId = null; // Guardamos el ID de la conversaci\u00f3n activa
 
 async function sendChatMessage() {
   if (!activeChatUserId) return;
@@ -719,11 +719,11 @@ async function openNewPostModal() {
   const html = `
     <div class="bg-white w-full max-w-lg rounded-[2.5rem] shadow-2xl p-8 animate-fadeIn">
       <div class="flex justify-between items-start mb-6">
-        <h3 class="text-2xl font-black text-slate-800">Crear Publicación</h3>
+        <h3 class="text-2xl font-black text-slate-800">Crear Publicaci\u00f3n</h3>
         <button onclick="Modal.close('newPostModal')" class="p-2 hover:bg-slate-100 rounded-full"><i data-lucide="x" class="w-6 h-6 text-slate-400"></i></button>
       </div>
       <div class="space-y-4">
-        <textarea id="postContent" rows="4" class="w-full p-4 bg-slate-50 border-none rounded-2xl text-sm outline-none resize-none focus:ring-2 focus:ring-orange-400" placeholder="¿Qué quieres compartir con la clase?"></textarea>
+        <textarea id="postContent" rows="4" class="w-full p-4 bg-slate-50 border-none rounded-2xl text-sm outline-none resize-none focus:ring-2 focus:ring-orange-400" placeholder="\u00bfQu\u00e9 quieres compartir con la clase?"></textarea>
         
         <div class="relative">
           <input type="file" id="postFile" class="hidden" accept="image/*,video/*" onchange="document.getElementById('fileName').textContent = this.files[0]?.name || 'Adjuntar foto/video'">
@@ -774,7 +774,7 @@ async function submitNewPost() {
       const ext = file.type.startsWith('video') ? file.name.split('.').pop() : 'webp';
       const path = `posts/${Date.now()}_${Math.random().toString(36).substr(2,9)}.${ext}`;
       setProgress(10);
-      // Comprimir imágenes antes de subir, videos sin comprimir
+      // Comprimir im\u00e1genes antes de subir, videos sin comprimir
       const publicUrl = await ImageLoader.uploadToStorage(
         file,
         'classroom_media',
@@ -818,9 +818,9 @@ async function submitNewPost() {
   }
 }
 
-// ═══════════════════════════════════════════════════════════════════════════
-// 📊 SISTEMA DE CALIFICACIONES — PANEL MAESTRA
-// ═══════════════════════════════════════════════════════════════════════════
+// \u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550
+// \ud83d\udcca SISTEMA DE CALIFICACIONES \u2014 PANEL MAESTRA
+// \u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550
 
 function scoreFromEvidence(g) {
   if (g.stars != null && g.stars > 0) return Number(g.stars);
@@ -842,7 +842,7 @@ async function initGrades() {
 
   container.innerHTML =
     '<div class="flex justify-between items-center mb-6">' +
-      '<h3 class="text-2xl font-black text-slate-800">📊 Calificaciones del Aula</h3>' +
+      '<h3 class="text-2xl font-black text-slate-800">\ud83d\udcca Calificaciones del Aula</h3>' +
     '</div>' +
     '<div id="gradesContent" class="space-y-4">' +
       '<div class="text-center py-8"><div class="animate-spin rounded-full h-8 w-8 border-b-2 border-orange-600 mx-auto"></div></div>' +
@@ -923,7 +923,7 @@ async function initGrades() {
   }
 }
 
-// ── Badge mensajes no leídos (maestra) ───────────────────────────────────────
+// \u2500\u2500 Badge mensajes no le\u00eddos (maestra) \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500
 async function loadMaestraUnreadBadge(userId) {
   try {
     let total = 0;
