@@ -4,15 +4,12 @@ import { ImageLoader } from './image-loader.js';
 import { QueryCache } from './query-cache.js';
 import { withTimeout } from './db-utils.js';
 
-// Inline helper — optimiza URLs de Supabase Storage con transformación automática
+// Inline helper — optimiza URLs de Supabase Storage
+// NOTA: La transformación automática (WebP/resize) requiere plan Pro de Supabase.
+// En plan gratuito, simplemente retorna la URL original.
 const optimizeImageUrl = (url, opts = {}) => {
-  if (!url) return null;
-  // Solo aplicar transformación a URLs de Supabase Storage
-  if (!url.includes('supabase.co/storage')) return url;
-  const { width = 800, quality = 80 } = opts;
-  // Supabase Image Transformation API
-  const sep = url.includes('?') ? '&' : '?';
-  return `${url}${sep}width=${width}&quality=${quality}&format=webp`;
+  if (!url) return url || null;
+  return url;
 };
 
 /**
@@ -50,19 +47,8 @@ export const WallModule = {
   },
 
   async _getPublicImageUrl(imagePath, opts = {}) {
-    if (!imagePath) return null;
-    if (/^https?:\/\//i.test(imagePath)) return optimizeImageUrl(imagePath, opts);
-
-    const cleanPath = imagePath.replace(/^posts\//, '').replace(/^karpus-uploads\//, '').replace(/^avatars\//, '');
-    try {
-      const isAvatar = imagePath.includes('avatar');
-      const bucket = isAvatar ? 'karpus-uploads' : 'posts';
-      const { data } = supabase.storage.from(bucket).getPublicUrl(isAvatar ? `avatars/${cleanPath}` : cleanPath);
-      return optimizeImageUrl(data?.publicUrl, opts);
-    } catch (err) {
-      console.warn('Error resolviendo imagen:', err);
-      return null;
-    }
+    // Legacy — use _resolveUrlSync instead
+    return this._resolveUrlSync(imagePath, opts);
   },
 
   async init(containerId, options = {}, appState = null) {
@@ -226,8 +212,6 @@ export const WallModule = {
       }
 
       if (window.lucide) lucide.createIcons();
-      // Activar lazy loading en im\u00e1genes reci\u00e9n inyectadas
-      ImageLoader.observe(container);
     } catch (err) {
       console.error('Error loadPosts:', err);
       if (!append) container.innerHTML = Helpers.emptyState('Error al cargar el muro', 'alert-triangle');

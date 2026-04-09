@@ -49,7 +49,7 @@ export const OnboardingGuide = {
     const safeUser = this._escapeHTML(userName);
     toast.innerHTML =
       '<div class="flex items-start gap-3">' +
-        '<div class="w-10 h-10 rounded-2xl bg-gradient-to-br from-emerald-400 to-teal-500 flex items-center justify-center text-xl shrink-0 shadow-lg">👋</div>' +
+        '<div class="w-10 h-10 rounded-2xl bg-gradient-to-br from-emerald-400 to-teal-500 flex items-center justify-center text-xl shrink-0 shadow-lg">\uD83D\uDC4B</div>' +
         '<div class="min-w-0">' +
           '<p class="font-black text-slate-800 text-sm leading-tight">Hola, ' + safeUser + '!</p>' +
           '<p class="text-xs text-slate-500 font-medium mt-0.5 leading-snug">Te gustaria un recorrido rapido?</p>' +
@@ -110,7 +110,7 @@ export const OnboardingGuide = {
 
     tip.innerHTML =
       '<div class="flex items-center gap-2 mb-2">' +
-        '<span class="text-lg">' + (step.icon || '💡') + '</span>' +
+        '<span class="text-lg">' + (step.icon || '\uD83D\uDCA1') + '</span>' +
         '<h4 class="font-black text-slate-800 text-sm flex-1">' + this._escapeHTML(step.title) + '</h4>' +
         '<span class="text-[10px] font-black text-slate-400 bg-slate-100 px-2 py-0.5 rounded-full">' + (this._current + 1) + '/' + this._steps.length + '</span>' +
       '</div>' +
@@ -146,7 +146,7 @@ export const OnboardingGuide = {
     const isMobile = this._isMobile();
     const toast = document.createElement('div');
     toast.className = [(isMobile ? 'fixed top-4 right-4' : 'fixed bottom-6 right-4') + ' z-[9990]', 'bg-gradient-to-br from-emerald-500 to-teal-600 text-white', 'rounded-3xl shadow-2xl p-4 max-w-[260px] w-[calc(100vw-2rem)]', isMobile ? 'animate-slide-down-in' : 'animate-slide-up-in'].join(' ');
-    toast.innerHTML = '<div class="text-2xl mb-1">🎉</div><p class="fo()" class="mt-2 w-full py-1.5 bg-white/20 hover:bg-white/30 rounded-2xl font-black text-xs uppercase transition-all">Entendido</button>';
+    toast.innerHTML = '<div class="text-2xl mb-1">\uD83C\uDF89</div><p class="font-black text-sm">Recorrido completado!</p><p class="text-xs opacity-80 mt-1">Ya conoces lo basico para aprovechar Karpus Kids.</p><button onclick="this.parentElement.remove()" class="mt-2 w-full py-1.5 bg-white/20 hover:bg-white/30 rounded-2xl font-black text-xs uppercase transition-all">Entendido</button>';
     document.body.appendChild(toast);
     setTimeout(() => toast.remove(), 5000);
     this._complete();
@@ -157,7 +157,7 @@ export const OnboardingGuide = {
     if (this._userId) {
       import('./supabase.js').then(({ supabase }) => {
         const key = this._storageKey.replace(STORAGE_KEY_PREFIX, '');
-    d', this._userId).maybeSingle().then(({ data }) => {
+        supabase.from('profiles').select('notes').eq('id', this._userId).maybeSingle().then(({ data }) => {
           const notes = data?.notes ? JSON.parse(data.notes) : {};
           notes[key] = 'done';
           supabase.from('profiles').update({ notes: JSON.stringify(notes) }).eq('id', this._userId).then(() => {}).catch(() => {});
@@ -168,7 +168,7 @@ export const OnboardingGuide = {
 
   _clearHighlight() {
     document.querySelectorAll('.onboarding-highlight').forEach(el => el.classList.remove('onboarding-highlight'));
-onboarding-overlay')?.remove();
+    document.getElementById('onboarding-overlay')?.remove();
   },
 
   _escapeHTML(str = '') {
@@ -183,7 +183,7 @@ onboarding-overlay')?.remove();
     if (document.getElementById('onboarding-css')) return;
     const s = document.createElement('style');
     s.id = 'onboarding-css';
-    s.textContent = 'tant}';
+    s.textContent = '.onboarding-highlight { position: relative !important; z-index: 9981 !important; pointer-events: auto !important; box-shadow: 0 0 0 9999px rgba(0,0,0,0.5) !important; transition: all 0.3s !important; }';
     document.head.appendChild(s);
   }
 };
