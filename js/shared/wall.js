@@ -167,11 +167,11 @@ export const WallModule = {
       let query = supabase
         .from('posts')
         .select(`
-          id, content, image_url, media_url, media_type, created_at,
+          id, content, media_url, media_type, created_at,
           classroom:classrooms(name),
           teacher:profiles!posts_teacher_id_fkey(name, avatar_url),
           likes(user_id),
-          comments(count)
+          comments:comments(count)
         `)
         .order('created_at', { ascending: false })
         .range(from, to);
@@ -280,7 +280,8 @@ export const WallModule = {
   renderPost(p) {
     const date = this._relativeTimeFromNow(p.created_at);
     const accent = this._options.accentColor || 'indigo';
-    
+    const isFirstPost = this._page === 0;
+
     // Lógica de Renderizado Multimedia con lazy loading
     let mediaHtml = '';
     if (p.display_media_url) {
@@ -296,7 +297,8 @@ export const WallModule = {
             ${ImageLoader.img(p.display_media_url, {
               alt: 'Post media',
               cls: 'w-full max-h-[480px] object-contain mx-auto',
-              fallback: 'img/mundo.jpg'
+              fallback: 'img/mundo.jpg',
+              priority: isFirstPost ? 'high' : 'low'
             })}
           </div>`;
       }
@@ -315,9 +317,11 @@ export const WallModule = {
           <div class="flex justify-between items-start mb-4">
             <div class="flex items-center gap-3">
               <div class="w-10 h-10 rounded-full bg-${accent}-100 flex items-center justify-center overflow-hidden">
-                ${p.teacher_avatar
-                  ? ImageLoader.img(p.teacher_avatar, { cls: 'w-full h-full object-cover', fallback: 'img/mundo.jpg' })
-                  : `<i data-lucide="user" class="w-5 h-5 text-${accent}-600"></i>`}
+                ${ImageLoader.img(p.teacher_avatar, { 
+                  cls: 'w-full h-full object-cover', 
+                  fallback: 'img/1.jpg',
+                  w: 80, h: 80 // Sugerencia de tamaño para avatar
+                })}
               </div>
               <div>
                 <div class="font-bold text-slate-800 text-sm">${Helpers.escapeHTML(p.teacher_name)}</div>

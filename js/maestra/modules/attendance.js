@@ -5,13 +5,16 @@ import { safeToast, safeEscapeHTML, Modal } from './ui.js';
 import { notifyParents, showNotifyFeedback } from '../../shared/notify-feedback.js';
 
 /**
- * 📅 Asistencia
+ * 📅 Asistencia — carga el panel y las solicitudes de ausencia pendientes
  */
 export async function initAttendance() {
   const classroom = AppState.get('classroom');
   const students = AppState.get('students') || [];
   const today = new Date().toISOString().split('T')[0];
-  
+
+  // Cargar solicitudes de ausencia pendientes
+  await _loadAbsenceRequests(classroom?.id, students);
+
   try {
     const attendance = await MaestraApi.getAttendance(classroom.id, today);
     const attMap = {};
@@ -178,5 +181,88 @@ export async function registerAttendance(studentId, status) {
     console.error('Error attendance:', e);
     safeToast('Error al registrar asistencia', 'error');
     await initAttendance();
+  }
+}
+
+/**
+ * 📋 Cargar solicitudes de ausencia pendientes de los padres
+ */
+async function _loadAbsenceRequests(classroomId, students) {
+  if (!classroomId) return;
+
+  try {
+    const studentIds = students.map(s => s.id);
+    if (!studentIds.length) return;
+
+    const { data: requests, error } = await supabase
+      .from('attendance_requests')
+      .select('*, student:student_id(name)')
+      .in('student_id', studentIds)
+      .eq('status', 'pending')
+      .order('date', { ascending: true });
+
+    if (error || !requests?.length) return;
+
+    // Mostrar banner de avisos pendientes
+    const container = document.getElementById('attendanceList');
+    if (!container) return;
+
+    const banner = document.createElement('div');
+    banner.id = 'absence-requests-banner';
+    banner.className = 'mb-4 bg-amber-50 border border-amber-200 rounded-2xl p-4';
+    banner.innerHTML = `
+      <div class="flex items-center gap-2 mb-3">
+        <span class="text-lg">📋</span>
+        <h4 class="font-black text-amber-800 text-sm uppercase tracking-wider">Avisos de Ausencia (${requests.length})</h4>
+      </div>
+      <div class="space-y-2">
+        ${requests.map(r => `
+          <div class="bg-white rounded-xl p-3 border border-amber-100 flex items-center justify-between gap-3">
+            <div class="min-w-0">
+              <p class="font-bold text-slate-800 text-sm truncate">${safeEscapeHTML(r.student?.name || 'Estudiante')}</p>
+              <p class="text-[10px] text-slate-500 font-bold">
+                ${new Date(r.date + 'T12:00:00').toLocaleDateString('es-DO', { weekday: 'short', day: 'numeric', month: 'short' })}
+                · ${safeEscapeHTML(r.reason)}
+                ${r.note ? ' · ' + safeEscapeHTML(r.note) : ''}
+              </p>
+            </div>
+            <button
+              onclick="window._approveAbsence('${r.id}', '${r.student_id}', '${r.date}')"
+              class="shrink-0 px-3 py-1.5 bg-emerald-500 text-white rounded-xl text-[10px] font-black uppercase hover:bg-emerald-600 transition-all active:scale-95">
+              Registrar
+            </button>
+          </div>
+        `).join('')}
+      </div>`;
+
+    // Insertar antes del contenido de asistencia
+    const existing = document.getElementById('absence-requests-banner');
+    if (existing) existing.remove();
+    container.parentElement?.insertBefore(banner, container);
+
+    // Función global para aprobar ausencia
+    window._approveAbsence = async (requestId, studentId, date) => {
+      try {
+        const classroom = AppState.get('classroom');
+        // Registrar como ausente en attendance
+        await MaestraApi.upsertAttendance({
+          student_id:   studentId,
+          classroom_id: classroom.id,
+          date,
+          status:       'absent'
+        });
+        // Marcar solicitud como aprobada
+        await supabase.from('attendance_requests').update({ status: 'approved' }).eq('id', requestId);
+        safeToast('Ausencia registrada correctamente');
+        // Recargar
+        await initAttendance();
+      } catch (e) {
+        safeToast('Error al registrar ausencia: ' + e.message, 'error');
+      }
+    };
+
+    if (window.lucide) window.lucide.createIcons();
+  } catch (e) {
+    console.warn('[_loadAbsenceRequests]', e.message);
   }
 }

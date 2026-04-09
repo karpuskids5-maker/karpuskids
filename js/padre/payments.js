@@ -235,7 +235,10 @@ export const PaymentsModule = {
       const path = `payments/${student.id}_${Date.now()}.${ext}`;
       let uploadFile = file;
       if (file.type.startsWith('image/')) {
-        try { uploadFile = await this._compressImage(file, 800, 0.8); } catch (_) {}
+        try {
+          const { ImageLoader } = await import('../shared/image-loader.js');
+          uploadFile = await ImageLoader.compress(file, { maxWidth: 800, maxHeight: 800, quality: 0.82, maxSizeKB: 300 });
+        } catch (_) {}
       }
       setP(20);
       const { error: upErr } = await supabase.storage.from('classroom_media').upload(path, uploadFile);

@@ -5,7 +5,7 @@
  * NO definir handlers push/notificationclick aquí para no interferir con OneSignal.
  */
 
-const CACHE_NAME = 'karpus-pwa-v3';
+const CACHE_NAME = 'karpus-pwa-v4';
 const ASSETS = [
   './',
   'login.html',

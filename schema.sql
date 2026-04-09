@@ -1,4 +1,4 @@
-﻿-- ============================================================
+﻿﻿-- ============================================================
 -- ?? KARPUS KIDS ? Schema Completo para Supabase
 -- Un solo archivo, limpio y organizado.
 -- Ejecutar en Supabase SQL Editor (corre de arriba a abajo).
@@ -1377,6 +1377,10 @@ create index if not exists idx_attendance_student    on public.attendance(studen
 create index if not exists idx_evidences_student     on public.task_evidences(student_id, created_at desc);
 create index if not exists idx_notifications_user    on public.notifications(user_id, is_read, created_at desc);
 
+-- Optimización para carga de perfiles y muros
+create index if not exists idx_profiles_role_id on public.profiles(role, id);
+create index if not exists idx_posts_teacher_classroom on public.posts(teacher_id, classroom_id);
+
 -- ============================================================
 -- 10. DATOS INICIALES
 -- ============================================================
@@ -1514,3 +1518,9 @@ create index if not exists idx_audit_logs_created
 
 -- ── 7. NOTIFICAR SCHEMA CACHE (ejecutar después de cambios) ───
 notify pgrst, 'reload schema';
+
+-- ============================================================
+-- 12. ONESIGNAL SUBSCRIPTION ID en profiles
+-- ============================================================
+alter table public.profiles add column if not exists onesignal_player_id text;
+create index if not exists idx_profiles_onesignal on public.profiles(onesignal_player_id) where onesignal_player_id is not null;

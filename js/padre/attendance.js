@@ -1,5 +1,7 @@
 import { supabase } from '../shared/supabase.js';
 import { Helpers } from './helpers.js';
+import { AppState } from './appState.js';
+import { emitEvent, sendPush } from '../shared/supabase.js';
 
 export const AttendanceModule = {
   _studentId: null,
@@ -44,6 +46,138 @@ export const AttendanceModule = {
 
     const now = new Date();
     await this.loadAttendance(now.getFullYear(), now.getMonth() + 1);
+
+    // ── Inicializar formulario de ausencia ──────────────────────────────────
+    this._initAbsenceForm();
+  },
+
+  _initAbsenceForm() {
+    const form = document.getElementById('formAbsence');
+    if (!form || form._initialized) return;
+    form._initialized = true;
+
+    // Fecha por defecto: hoy
+    const dateInput = document.getElementById('absenceDate');
+    if (dateInput && !dateInput.value) {
+      dateInput.value = new Date().toISOString().split('T')[0];
+    }
+
+    // Selector visual de motivos
+    document.querySelectorAll('.reason-btn').forEach(btn => {
+      btn.addEventListener('click', () => {
+        document.querySelectorAll('.reason-btn').forEach(b => {
+          b.classList.remove('border-emerald-400', 'bg-emerald-50', 'text-emerald-700');
+          b.classList.add('border-slate-50', 'bg-slate-50', 'text-slate-600');
+        });
+        btn.classList.add('border-emerald-400', 'bg-emerald-50', 'text-emerald-700');
+        btn.classList.remove('border-slate-50', 'bg-slate-50', 'text-slate-600');
+        const hidden = document.getElementById('absenceReason');
+        if (hidden) hidden.value = btn.dataset.value;
+      });
+    });
+
+    // Cerrar modal
+    document.querySelectorAll('[data-close-modal]').forEach(btn => {
+      btn.addEventListener('click', () => {
+        document.getElementById('modalAbsence')?.classList.add('hidden');
+        document.getElementById('modalAbsence')?.classList.remove('flex');
+      });
+    });
+
+    // Submit
+    form.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      await this._submitAbsence();
+    });
+  },
+
+  async _submitAbsence() {
+    const date   = document.getElementById('absenceDate')?.value;
+    const reason = document.getElementById('absenceReason')?.value;
+    const note   = document.getElementById('absenceNote')?.value?.trim() || null;
+    const btn    = document.querySelector('#formAbsence button[type="submit"]');
+
+    if (!date) { Helpers.toast('Selecciona la fecha', 'warning'); return; }
+    if (!reason) { Helpers.toast('Selecciona el motivo', 'warning'); return; }
+
+    const student = AppState.get('currentStudent');
+    if (!student) { Helpers.toast('No se encontró el estudiante', 'error'); return; }
+
+    if (btn) { btn.disabled = true; btn.textContent = 'Enviando...'; }
+
+    try {
+      // 1. Guardar en attendance_requests
+      const { error } = await supabase.from('attendance_requests').insert({
+        student_id: student.id,
+        date,
+        reason,
+        note,
+        status: 'pending'
+      });
+      if (error) throw error;
+
+      // 2. Notificar a la maestra y directora
+      const classroomId = student.classroom_id;
+      if (classroomId) {
+        // Obtener maestra del aula
+        const { data: classroom } = await supabase
+          .from('classrooms')
+          .select('teacher_id, name')
+          .eq('id', classroomId)
+          .maybeSingle();
+
+        const notifyIds = [];
+        if (classroom?.teacher_id) notifyIds.push(classroom.teacher_id);
+
+        // Obtener directoras y asistentes
+        const { data: staff } = await supabase
+          .from('profiles')
+          .select('id')
+          .in('role', ['directora', 'asistente']);
+        (staff || []).forEach(s => {
+          if (!notifyIds.includes(s.id)) notifyIds.push(s.id);
+        });
+
+        const msg = `${student.name} no asistirá el ${new Date(date + 'T12:00:00').toLocaleDateString('es-DO', { weekday: 'long', day: 'numeric', month: 'long' })}. Motivo: ${reason}${note ? '. ' + note : ''}`;
+
+        for (const uid of notifyIds) {
+          sendPush({
+            user_id: uid,
+            title:   `📅 Aviso de Ausencia — ${student.name}`,
+            message: msg,
+            type:    'attendance',
+            link:    'panel-maestra.html'
+          }).catch(() => {});
+        }
+
+        // Emitir evento para email
+        emitEvent('attendance.marked', {
+          parent_id:    AppState.get('user')?.id,
+          student_name: student.name,
+          status:       'absent',
+          date,
+          reason,
+          note
+        }).catch(() => {});
+      }
+
+      // 3. Cerrar modal y mostrar confirmación
+      document.getElementById('modalAbsence')?.classList.add('hidden');
+      document.getElementById('modalAbsence')?.classList.remove('flex');
+      document.getElementById('formAbsence')?.reset();
+      document.querySelectorAll('.reason-btn').forEach(b => {
+        b.classList.remove('border-emerald-400', 'bg-emerald-50', 'text-emerald-700');
+        b.classList.add('border-slate-50', 'bg-slate-50', 'text-slate-600');
+      });
+
+      Helpers.toast('Aviso enviado a la maestra y dirección ✅', 'success');
+
+    } catch (err) {
+      console.error('[submitAbsence]', err);
+      Helpers.toast('Error al enviar: ' + (err.message || ''), 'error');
+    } finally {
+      if (btn) { btn.disabled = false; btn.innerHTML = '<i data-lucide="send" class="w-5 h-5"></i> Enviar a la Maestra'; if(window.lucide) lucide.createIcons(); }
+    }
   },
 
   async loadAttendance(year, month) {

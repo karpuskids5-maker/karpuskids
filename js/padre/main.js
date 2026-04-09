@@ -15,6 +15,7 @@ import { NotifyPermission } from '../shared/notify-permission.js';
 import { BadgeSystem } from '../shared/badges.js';
 import { ImageLoader } from '../shared/image-loader.js';
 import { OnboardingGuide } from '../shared/onboarding.js';
+import { Prefetch } from '../shared/prefetch.js';
 import { VideoCallUI } from '../shared/videocall-ui.js';
 
 window.App = {
@@ -39,6 +40,14 @@ document.addEventListener('DOMContentLoaded', async () => {
 
     AppState.set('user', auth.user);
     AppState.set('profile', auth.profile);
+
+    // ⚡ PREFETCH: Iniciar carga silenciosa de recursos críticos
+    Prefetch.start({
+      userId: auth.user.id,
+      role: 'padre',
+      classroomId: auth.profile?.classroom_id,
+      studentId: null // Se actualizará al obtener estudiantes
+    });
 
     // ✅ FIX OneSignal: Solo inicializar en el dominio correcto para evitar errores de consola
     const host = window.location.hostname;
@@ -115,6 +124,7 @@ document.addEventListener('DOMContentLoaded', async () => {
       userName:   parentName,
       storageKey: 'padre_v2',
       userId:     auth.user.id,
+      navigateTo: navigateTo,
       delay:      2000,
       steps: [
         {

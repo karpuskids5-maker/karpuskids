@@ -201,19 +201,14 @@ document.addEventListener('DOMContentLoaded', async () => {
         return;
       }
       
-      const fileName = `avatar-${auth.user.id}-${Date.now()}.${file.name.split('.').pop()}`;
+      const fileName = `avatar-${auth.user.id}-${Date.now()}.webp`;
       const filePath = `avatars/${fileName}`;
-      
+
       try {
-        const { error: uploadError } = await supabase.storage
-          .from('karpus-uploads')
-          .upload(filePath, file);
-        
-        if (uploadError) throw uploadError;
-        
-        const { data: { publicUrl } } = supabase.storage
-          .from('karpus-uploads')
-          .getPublicUrl(filePath);
+        // Comprimir avatar antes de subir (máx 400px, WebP)
+        const publicUrl = await ImageLoader.uploadToStorage(file, 'karpus-uploads', filePath, {
+          maxWidth: 400, maxHeight: 400, quality: 0.85, maxSizeKB: 150
+        });
         
         // Actualizar perfil con nueva URL
         const { error: updateError } = await supabase
@@ -776,15 +771,18 @@ async function submitNewPost() {
     let mediaType = null;
 
     if (file) {
-      const ext = file.name.split('.').pop();
+      const ext = file.type.startsWith('video') ? file.name.split('.').pop() : 'webp';
       const path = `posts/${Date.now()}_${Math.random().toString(36).substr(2,9)}.${ext}`;
       setProgress(10);
-      const { error: upErr } = await supabase.storage.from('classroom_media').upload(path, file);
+      // Comprimir imágenes antes de subir, videos sin comprimir
+      const publicUrl = await ImageLoader.uploadToStorage(
+        file,
+        'classroom_media',
+        path,
+        { maxWidth: 1200, maxHeight: 1200, quality: 0.82, maxSizeKB: 400 }
+      );
       setProgress(80);
-      if (upErr) throw upErr;
-      
-      const { data } = supabase.storage.from('classroom_media').getPublicUrl(path);
-      mediaUrl = data.publicUrl;
+      mediaUrl = publicUrl;
       mediaType = file.type.startsWith('video') ? 'video' : 'image';
       setProgress(90);
     }

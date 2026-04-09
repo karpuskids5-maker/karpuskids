@@ -335,7 +335,7 @@ export async function initOneSignal(currentUser = null) {
           const subId = OneSignal.User?.PushSubscription?.id;
           console.log('[OneSignal] ✅ Listo para:', user.id, '| SubID:', subId || 'pendiente');
 
-          // Intentar guardar player_id en profiles (silencioso si la columna no existe)
+          // Guardar subscription_id en profiles para fallback en send-push
           if (subId) {
             supabase.from('profiles')
               .update({ onesignal_player_id: subId })
