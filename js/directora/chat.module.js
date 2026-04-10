@@ -48,7 +48,11 @@ export const ChatModule = {
 
     try {
       const roleVal = document.getElementById('chatRoleFilter')?.value || '';
-      const { data: users, error } = await DirectorApi.getChatUsers(this._currentUserId, roleVal || null);
+      const [usersRes, unreadData] = await Promise.all([
+        DirectorApi.getChatUsers(this._currentUserId, roleVal || null),
+        supabase.rpc('get_unread_counts').then(r => r.data || {}).catch(() => ({}))
+      ]);
+      const { data: users, error } = usersRes;
       if (error) throw error;
 
       // Enrich padres with student name
@@ -68,6 +72,7 @@ export const ChatModule = {
           id: u.id,
           name: displayName,
           avatar: u.avatar_url,
+          unread: Number(unreadData[u.id] || 0),
           roleLabel: { maestra: 'Maestra', padre: 'Padre/Madre', asistente: 'Asistente', directora: 'Directora' }[u.role] || u.role,
           meta: u.role === 'padre'
             ? `Padre de ${si?.studentName || 'N/A'} · ${si?.classroomName || 'Sin aula'}`
@@ -93,14 +98,18 @@ export const ChatModule = {
     if (!filtered.length) { list.innerHTML = Helpers.emptyState('Sin contactos'); return; }
 
     list.innerHTML = filtered.map(c => `
-      <div data-contact-id="${c.id}" class="flex items-center gap-3 p-3 rounded-2xl hover:bg-slate-100 cursor-pointer transition-all group">
-        <div class="w-11 h-11 rounded-full bg-slate-200 flex items-center justify-center font-bold text-slate-500 overflow-hidden shrink-0">
-          ${c.avatar ? `<img src="${c.avatar}" class="w-full h-full object-cover">` : c.name.charAt(0)}
+      <div data-contact-id="${c.id}" class="flex items-center gap-3 p-3 rounded-2xl hover:bg-slate-100 cursor-pointer transition-all group relative">
+        <div class="relative shrink-0">
+          <div class="w-11 h-11 rounded-full bg-slate-200 flex items-center justify-center font-bold text-slate-500 overflow-hidden">
+            ${c.avatar ? `<img src="${c.avatar}" class="w-full h-full object-cover">` : c.name.charAt(0)}
+          </div>
+          ${c.unread > 0 ? `<span class="absolute -top-1 -right-1 min-w-[18px] h-[18px] bg-rose-500 text-white text-[9px] font-black rounded-full flex items-center justify-center px-1 shadow animate-pulse">${c.unread > 9 ? '9+' : c.unread}</span>` : ''}
         </div>
         <div class="min-w-0 flex-1">
-          <div class="font-bold text-slate-800 text-sm truncate">${Helpers.escapeHTML(c.name)}</div>
+          <div class="font-bold text-slate-800 text-sm truncate ${c.unread > 0 ? 'text-slate-900' : ''}">${Helpers.escapeHTML(c.name)}</div>
           <div class="text-[10px] text-slate-400 font-bold uppercase truncate">${c.roleLabel}</div>
         </div>
+        ${c.unread > 0 ? `<div class="w-2 h-2 bg-rose-500 rounded-full shrink-0"></div>` : ''}
       </div>`).join('');
 
     // Delegate click
@@ -119,6 +128,10 @@ export const ChatModule = {
 
     this._activeContactId = contactId;
     this._conversationId  = null;
+
+    // Limpiar badge del contacto
+    contact.unread = 0;
+    this._renderContacts();
 
     // Mobile: show chat panel
     document.getElementById('chatAppContainer')?.classList.add('show-chat');

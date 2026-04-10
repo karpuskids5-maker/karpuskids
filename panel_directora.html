@@ -421,8 +421,10 @@
           <span class="label">Pagos</span>
           <span id="badge-pagos" class="hidden absolute top-1 right-1 min-w-[16px] h-4 bg-rose-500 text-white text-[9px] font-black rounded-full flex items-center justify-center px-1 shadow">0</span>
         </button>
-        <button data-section="configuracion" class="nav-btn teams-nav-item text-white hover:bg-white/20" title="Configuración">
-          <i data-lucide="settings" class="text-slate-400"></i>
+        <!-- badges ocultos para JS — no se muestran en sidebar -->
+        <span id="badge-comunicacion" class="hidden"></span>
+        <span id="badge-muro" class="hidden"></span>
+        <button data-section="configuracion" class="nav-btn teams-nav-item text-white hover:bg-white/20" title="Configuración">          <i data-lucide="settings" class="text-slate-400"></i>
           <span class="label">Configuración</span>
         </button>
       </nav>
@@ -555,7 +557,8 @@
           </div>
 
           <!-- Comunicaciones -->
-          <div id="cardComunicaciones" data-action="go-section" data-section="comunicacion" class="bg-white p-6 rounded-3xl shadow-sm border border-slate-100 hover:shadow-md hover:-translate-y-1 active:scale-95 transition-all duration-300 text-left group cursor-pointer">
+          <div id="cardComunicaciones" data-action="go-section" data-section="comunicacion" class="bg-white p-6 rounded-3xl shadow-sm border border-slate-100 hover:shadow-md hover:-translate-y-1 active:scale-95 transition-all duration-300 text-left group cursor-pointer relative">
+            <span id="badge-card-comunicacion" class="hidden absolute -top-2 -right-2 min-w-[22px] h-5 bg-rose-500 text-white text-[10px] font-black rounded-full flex items-center justify-center px-1.5 shadow-md animate-pulse z-10">0</span>
             <div class="w-14 h-14 bg-blue-50 rounded-2xl flex items-center justify-center mb-4 group-hover:bg-blue-600 transition-colors">
               <i data-lucide="message-square" class="w-7 h-7 text-blue-600 group-hover:text-white transition-colors"></i>
             </div>
@@ -564,9 +567,10 @@
           </div>
 
           <!-- Muro Escolar -->
-          <div id="cardMuro" data-action="go-section" data-section="muro" class="bg-white p-6 rounded-3xl shadow-sm border border-slate-100 hover:shadow-md hover:-translate-y-1 active:scale-95 transition-all duration-300 text-left group cursor-pointer">
-            <div class="w-14 h-14 bg-orange-50 rounded-2xl flex items-center justify-center mb-4 group-hover:bg-orange-600 transition-colors">
-              <i data-lucide="layout" class="w-7 h-7 text-orange-600 group-hover:text-white transition-colors"></i>
+          <div id="cardMuro" data-action="go-section" data-section="muro" class="bg-white p-6 rounded-3xl shadow-sm border border-slate-100 hover:shadow-md hover:-translate-y-1 active:scale-95 transition-all duration-300 text-left group cursor-pointer relative">
+            <span id="badge-card-muro" class="hidden absolute -top-2 -right-2 min-w-[22px] h-5 bg-rose-500 text-white text-[10px] font-black rounded-full flex items-center justify-center px-1.5 shadow-md animate-pulse z-10">0</span>
+            <div class="w-14 h-14 bg-purple-50 rounded-2xl flex items-center justify-center mb-4 group-hover:bg-purple-600 transition-colors">
+              <i data-lucide="layout" class="w-7 h-7 text-purple-600 group-hover:text-white transition-colors"></i>
             </div>
             <h3 class="font-black text-slate-800 text-lg">Muro Escolar</h3>
             <p class="text-slate-500 text-xs mt-1">Publicaciones generales para la estancia.</p>
@@ -1294,8 +1298,8 @@
             <h1 class="text-3xl font-black text-slate-800">🎭 Muro Escolar</h1>
             <p class="text-slate-500 font-medium">Comunicación y actualizaciones de la comunidad educativa</p>
           </div>
-          <button id="btnNewPost" onclick="App.wall.openNewPostModal()" class="px-4 py-2 bg-orange-600 text-white rounded-lg hover:bg-orange-700 transition-colors flex items-center gap-2 font-medium shadow-sm">
-            <i data-lucide="plus" class="w-5 h-5"></i> Nuevo Post
+          <button id="btnNewPost" onclick="App.wall.openNewPostModal()" class="px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors flex items-center gap-2 font-medium shadow-sm">
+            <i data-lucide="plus" class="w-5 h-5"></i> Nueva Publicación
           </button>
         </header>
 
@@ -1379,7 +1383,7 @@
             <div class="bg-white rounded shadow p-6 text-center">
               <h3 class="text-sm font-semibold mb-4">Foto de Perfil</h3>
               <div class="relative w-32 h-32 mx-auto mb-4 group">
-                <img id="configProfileAvatar" src="img/mundo.jpg" alt="Avatar" class="w-full h-full object-cover rounded-full border-4 border-slate-100 shadow-sm group-hover:opacity-90 transition-opacity" loading="lazy">
+                <img id="configProfileAvatar" src="img/mundo.jpg" alt="Avatar" class="w-full h-full object-cover rounded-full border-4 border-slate-100 shadow-sm group-hover:opacity-90 transition-opacity">
                 <button onclick="document.getElementById('configAvatarInput').click()" class="absolute bottom-0 right-0 bg-purple-600 text-white p-2 rounded-full shadow hover:bg-purple-700 transition-colors" title="Cambiar foto" aria-label="Cambiar foto de perfil">
                   <i data-lucide="camera" class="w-4 h-4"></i>
                 </button>

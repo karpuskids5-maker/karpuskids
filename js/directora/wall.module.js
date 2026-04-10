@@ -13,8 +13,8 @@ export const WallModule = {
    * Sobrescribir init para manejar lógica específica de Directora si es necesario
    */
   async init(containerId, options = {}, appState = null) {
-    // Forzar color de acento y rol
-    options.accentColor = options.accentColor || 'orange';
+    // Forzar color de acento morado para directora
+    options.accentColor = 'purple';
     
     // Asignar _appState ANTES de llamar al shared init
     this._appState = appState;
@@ -79,6 +79,12 @@ export const WallModule = {
 
     window.openGlobalModal(html);
     
+    // Reset file input para evitar que tome archivos de sesiones anteriores
+    setTimeout(() => {
+      const fi = document.getElementById('postMediaFile');
+      if (fi) fi.value = '';
+    }, 50);
+
     // Cargar aulas en el select
     this.loadClassroomsForPost();
 
@@ -151,7 +157,10 @@ export const WallModule = {
           .upload(filePath, mediaFile);
 
         if (uploadError) throw uploadError;
-        mediaUrl = filePath;
+
+        // Obtener URL pública completa — no solo el path
+        const { data: urlData } = supabase.storage.from('posts').getPublicUrl(filePath);
+        mediaUrl = urlData.publicUrl;
       }
 
       const { error } = await supabase.from('posts').insert({

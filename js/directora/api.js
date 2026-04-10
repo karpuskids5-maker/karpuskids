@@ -307,7 +307,7 @@ export const DirectorApi = {
         // Intentar con classroom_id (columna estándar del schema)
         const res = await withTimeout(() =>
           supabase.from('students')
-            .select('id, name, is_active, parent_id, classroom_id, p1_name, p1_phone, p1_email, classrooms:classroom_id(name)')
+            .select('id, name, is_active, parent_id, classroom_id, matricula, p1_name, p1_phone, p1_email, classrooms:classroom_id(name)')
             .order('name')
         );
         // Si falla por columna inexistente, intentar sin classroom_id
@@ -331,7 +331,24 @@ export const DirectorApi = {
     } catch (e) { return logError('createStudent', e); }
   },
   async updateStudent(id, data) {
-    const result = await supabase.from(TABLES.STUDENTS).update(data).eq('id', id);
+    const numId = parseInt(id, 10);
+    if (isNaN(numId)) return { data: null, error: 'ID de estudiante inválido' };
+
+    const clean = { ...data };
+    // Mapear horario → schedule
+    if ('horario' in clean) { clean.schedule = clean.horario || null; delete clean.horario; }
+    // Asegurar tipos correctos para columnas numéricas
+    if ('classroom_id' in clean) clean.classroom_id = clean.classroom_id ? parseInt(clean.classroom_id) : null;
+    if ('age'          in clean) clean.age          = clean.age ? parseInt(clean.age) : null;
+    if ('monthly_fee'  in clean) clean.monthly_fee  = clean.monthly_fee != null ? parseFloat(clean.monthly_fee) : 0;
+    if ('due_day'      in clean) clean.due_day      = clean.due_day ? parseInt(clean.due_day) : 5;
+    // Eliminar campos que no existen en la DB
+    delete clean.stAge;
+
+    const result = await supabase.from(TABLES.STUDENTS).update(clean).eq('id', numId);
+    if (result.error) {
+      console.error('[updateStudent] Error:', result.error.message, '| payload keys:', Object.keys(clean));
+    }
     QueryCache.invalidate('dir_students');
     return result;
   },

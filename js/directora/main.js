@@ -227,6 +227,9 @@ document.addEventListener('DOMContentLoaded', async () => {
     // 5c. Badge de mensajes no leídos (directora)
     loadUnreadMessageBadge(auth.user.id);
 
+    // Badge de posts nuevos en muro
+    loadNewPostsBadge();
+
     // 🔴 Sistema de badges por sección
     BadgeSystem.init(auth.user.id);
 
@@ -303,6 +306,53 @@ document.addEventListener('DOMContentLoaded', async () => {
       }
     });
 
+    // 7b. Avatar upload — preview inmediato + guardar en Supabase
+    document.getElementById('configAvatarInput')?.addEventListener('change', async (e) => {
+      const file = e.target.files?.[0];
+      if (!file) return;
+      if (file.size > 2 * 1024 * 1024) {
+        Helpers.toast('Imagen muy grande (máx 2MB)', 'error');
+        return;
+      }
+
+      const img = document.getElementById('configProfileAvatar');
+      const sidebarImg = document.getElementById('sidebarProfileAvatar');
+
+      // Preview INMEDIATO con ObjectURL (más rápido que FileReader)
+      const objectUrl = URL.createObjectURL(file);
+      if (img) { img.src = objectUrl; img.style.opacity = '0.6'; }
+      if (sidebarImg) sidebarImg.src = objectUrl;
+      Helpers.toast('Subiendo foto...', 'info');
+
+      // Subir a Supabase Storage
+      try {
+        const ext = file.name.split('.').pop().toLowerCase();
+        const path = `avatars/${auth.user.id}_${Date.now()}.${ext}`;
+        const { error: upErr } = await supabase.storage.from('karpus-uploads').upload(path, file, { upsert: true });
+        if (upErr) throw upErr;
+
+        const { data: { publicUrl } } = supabase.storage.from('karpus-uploads').getPublicUrl(path);
+
+        const { error: dbErr } = await supabase.from('profiles').update({ avatar_url: publicUrl }).eq('id', auth.user.id);
+        if (dbErr) throw dbErr;
+
+        // Actualizar estado y UI con URL real
+        const currentProfile = AppState.get('profile') || {};
+        AppState.set('profile', { ...currentProfile, avatar_url: publicUrl });
+        // Cache-buster para forzar recarga de la imagen
+        const bustedUrl = publicUrl + '?t=' + Date.now();
+        if (img) { img.src = bustedUrl; img.style.opacity = '1'; }
+        if (sidebarImg) sidebarImg.src = bustedUrl;
+        URL.revokeObjectURL(objectUrl);
+
+        Helpers.toast('Foto de perfil actualizada', 'success');
+      } catch (err) {
+        console.error('Error uploading avatar:', err);
+        if (img) img.style.opacity = '1';
+        Helpers.toast('Error al subir la foto: ' + err.message, 'error');
+      }
+    });
+
     // 8. Quitar loader inicial
     const loader = document.getElementById('initial-loading');
     if (loader) {
@@ -349,4 +399,54 @@ function updateBadgeUI(total) {
       badge.classList.add('hidden');
     }
   }
+
+  // Sincronizar con sidebar badge y tarjeta del dashboard
+  const sidebarBadge = document.getElementById('badge-comunicacion');
+  const cardBadge = document.getElementById('badge-card-comunicacion');
+  [sidebarBadge, cardBadge].forEach(b => {
+    if (!b) return;
+    if (total > 0) {
+      b.textContent = total > 99 ? '99+' : String(total);
+      b.classList.remove('hidden');
+      b.classList.add('flex');
+    } else {
+      b.classList.add('hidden');
+      b.classList.remove('flex');
+    }
+  });
+}
+
+async function loadNewPostsBadge() {
+  try {
+    // Guardar timestamp de última visita al muro en localStorage
+    const lastVisit = localStorage.getItem('karpus_muro_last_visit') || new Date(0).toISOString();
+    const { count } = await supabase
+      .from('posts')
+      .select('id', { count: 'exact', head: true })
+      .gt('created_at', lastVisit);
+
+    const total = count || 0;
+    const sidebarBadge = document.getElementById('badge-muro');
+    const cardBadge = document.getElementById('badge-card-muro');
+    [sidebarBadge, cardBadge].forEach(b => {
+      if (!b) return;
+      if (total > 0) {
+        b.textContent = total > 99 ? '99+' : String(total);
+        b.classList.remove('hidden');
+        b.classList.add('flex');
+      } else {
+        b.classList.add('hidden');
+        b.classList.remove('flex');
+      }
+    });
+
+    // Limpiar badge al entrar a muro
+    document.querySelector('[data-section="muro"]')?.addEventListener('click', () => {
+      localStorage.setItem('karpus_muro_last_visit', new Date().toISOString());
+      [sidebarBadge, cardBadge].forEach(b => {
+        if (b) { b.classList.add('hidden'); b.classList.remove('flex'); }
+      });
+    }, { once: false });
+
+  } catch (_) {}
 }

@@ -115,11 +115,12 @@ export const RoomsModule = {
     list.innerHTML = '<div class="text-[10px] text-slate-400 p-2">Cargando...</div>';
 
     try {
-      // Load ALL students — filter client-side to show unassigned + those in this room
-      const { data: students } = await supabase
+      const { data: students, error } = await supabase
         .from('students')
         .select('id, name, classroom_id')
         .order('name');
+
+      if (error) throw error;
 
       if (!students?.length) {
         list.innerHTML = '<div class="text-[10px] text-slate-400 p-2 italic">No hay estudiantes registrados.</div>';
@@ -127,7 +128,7 @@ export const RoomsModule = {
       }
 
       const rid = roomId ? String(roomId) : null;
-      // Show: students with no classroom OR students already in this room
+      // Mostrar: sin aula + los que ya están en esta aula
       const visible = students.filter(s =>
         !s.classroom_id || (rid && String(s.classroom_id) === rid)
       );
@@ -147,7 +148,23 @@ export const RoomsModule = {
         </label>`;
       }).join('');
     } catch (e) {
-      list.innerHTML = '<div class="text-[10px] text-rose-400 p-2">Error cargando estudiantes.</div>';
+      console.error('[_loadStudentsChecklist]', e);
+      // Si falla por classroom_id, intentar sin ese campo
+      try {
+        const { data: students2 } = await supabase
+          .from('students').select('id, name').order('name');
+        if (students2?.length) {
+          list.innerHTML = students2.map(s => `
+            <label class="flex items-center gap-2 py-1.5 cursor-pointer hover:bg-slate-100 px-1 rounded-lg">
+              <input type="checkbox" value="${s.id}" class="room-student-check w-4 h-4 rounded accent-teal-600">
+              <span class="text-sm font-medium text-slate-700">${Helpers.escapeHTML(s.name)}</span>
+            </label>`).join('');
+        } else {
+          list.innerHTML = '<div class="text-[10px] text-slate-400 p-2 italic">No hay estudiantes.</div>';
+        }
+      } catch (_) {
+        list.innerHTML = '<div class="text-[10px] text-rose-400 p-2">Error cargando estudiantes.</div>';
+      }
     }
   },
 
@@ -207,12 +224,22 @@ export const RoomsModule = {
       }
 
       // Assign checked students to this room
-      const checks = document.querySelectorAll('.room-student-check');
+      const modal = document.getElementById('roomModal');
+      const checks = modal ? modal.querySelectorAll('.room-student-check') : [];
       if (checks.length && savedId) {
-        const toAssign   = [...checks].filter(c => c.checked).map(c => c.value);
-        const toUnassign = [...checks].filter(c => !c.checked).map(c => c.value);
-        if (toAssign.length)   await supabase.from('students').update({ classroom_id: savedId }).in('id', toAssign);
-        if (toUnassign.length) await supabase.from('students').update({ classroom_id: null }).in('id', toUnassign);
+        const roomIdNum = parseInt(savedId, 10);
+        const toAssign   = [...checks].filter(c => c.checked).map(c => parseInt(c.value, 10));
+        const toUnassign = [...checks].filter(c => !c.checked).map(c => parseInt(c.value, 10));
+        if (toAssign.length) {
+          const { error: assignErr } = await supabase
+            .from('students').update({ classroom_id: roomIdNum }).in('id', toAssign);
+          if (assignErr) console.warn('[saveRoom] assign error:', assignErr.message);
+        }
+        if (toUnassign.length) {
+          const { error: unassignErr } = await supabase
+            .from('students').update({ classroom_id: null }).in('id', toUnassign);
+          if (unassignErr) console.warn('[saveRoom] unassign error:', unassignErr.message);
+        }
       }
 
       this.closeModal();

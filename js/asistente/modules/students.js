@@ -30,14 +30,27 @@ export const StudentsModule = {
       }
 
       tbody.innerHTML = students.map(s => `
-        <tr class="hover:bg-slate-50 border-b border-slate-100 transition-colors cursor-pointer">
-          <td class="px-6 py-3 font-bold text-slate-800 text-sm" onclick="window.App.students.openModal('${s.id}')">${Helpers.escapeHTML(s.name)}</td>
-          <td class="px-6 py-3 text-slate-500 text-sm" onclick="window.App.students.openModal('${s.id}')">${Helpers.escapeHTML(s.classrooms?.name || 'Sin Aula')}</td>
-          <td class="px-6 py-3 text-slate-500 text-sm" onclick="window.App.students.openModal('${s.id}')">${Helpers.escapeHTML(s.p1_name || 'N/A')}</td>
-          <td class="px-6 py-3">
+        <tr class="hover:bg-slate-50 border-b border-slate-100 transition-colors">
+          <td class="px-4 py-3">
+            <div class="flex items-center gap-2">
+              <div class="w-8 h-8 rounded-lg bg-teal-100 text-teal-600 flex items-center justify-center font-bold text-sm shrink-0 overflow-hidden">
+                ${s.avatar_url ? `<img src="${s.avatar_url}" class="w-full h-full object-cover">` : (s.name || '?').charAt(0)}
+              </div>
+              <div>
+                <div class="font-bold text-slate-800 text-sm">${Helpers.escapeHTML(s.name)}</div>
+                <div class="text-[10px] text-slate-400">${s.matricula || 'Sin matrícula'}</div>
+              </div>
+            </div>
+          </td>
+          <td class="px-4 py-3 text-slate-500 text-sm hidden sm:table-cell">${Helpers.escapeHTML(s.classrooms?.name || 'Sin Aula')}</td>
+          <td class="px-4 py-3 text-slate-500 text-sm hidden md:table-cell">${Helpers.escapeHTML(s.p1_name || 'N/A')}</td>
+          <td class="px-4 py-3">
             <div class="flex items-center gap-1.5">
               <span class="px-2 py-1 rounded-full text-[10px] font-bold ${s.is_active ? 'bg-emerald-100 text-emerald-700' : 'bg-rose-100 text-rose-700'}">${s.is_active ? 'Activo' : 'Inactivo'}</span>
-              <button onclick="window.App.students.deleteStudent('${s.id}')" class="p-1.5 bg-rose-50 text-rose-400 rounded-lg hover:bg-rose-100 hover:text-rose-600 transition-all" title="Eliminar">
+              <button onclick="window.App.students.openModal('${s.id}')" class="p-1.5 bg-teal-50 text-teal-500 rounded-lg hover:bg-teal-100 hover:text-teal-700 transition-all" title="Editar">
+                <i data-lucide="edit-2" class="w-3.5 h-3.5"></i>
+              </button>
+              <button onclick="window.App.students.deleteStudent('${s.id}', '${Helpers.escapeHTML(s.name)}')" class="p-1.5 bg-rose-50 text-rose-400 rounded-lg hover:bg-rose-100 hover:text-rose-600 transition-all" title="Eliminar">
                 <i data-lucide="trash-2" class="w-3.5 h-3.5"></i>
               </button>
             </div>
@@ -93,7 +106,7 @@ export const StudentsModule = {
             <div>
               <label class="${LC}">Matr\u00edcula</label>
               <div class="flex gap-1.5">
-                <input id="stMatricula" placeholder="Generar..." class="${IC} py-1.5 text-xs" readonly>
+                <input id="stMatricula" placeholder="Generar..." class="${IC} py-1.5 text-xs">
                 <button onclick="window._genMatricula()" class="px-3 py-1.5 bg-teal-600 text-white rounded-xl font-black text-[9px] uppercase hover:bg-teal-700 shadow-sm transition-all shrink-0">Gen</button>
               </div>
             </div>
@@ -240,7 +253,9 @@ export const StudentsModule = {
     // Prefill if editing
     if (studentId) {
       try {
-        const { data: st, error } = await supabase.from('students').select('*').eq('id', studentId).single();
+        const numId = parseInt(studentId, 10);
+        if (isNaN(numId)) throw new Error('ID inválido');
+        const { data: st, error } = await supabase.from('students').select('*').eq('id', numId).single();
         if (error) throw error;
         if (st) {
           const sv = (id, v) => { const el = document.getElementById(id); if (el) el.value = v || ''; };
@@ -310,16 +325,21 @@ export const StudentsModule = {
 
     // Optional columns \u2014 only add if non-empty
     const optionals = {
-      classroom_id:      getVal('stClassroom') || null,
+      matricula:         getVal('stMatricula') || null,
+      classroom_id:      getVal('stClassroom') ? parseInt(getVal('stClassroom'), 10) : null,
       blood_type:        getVal('stBlood') || null,
       allergies:         getVal('stAllergies') || null,
       authorized_pickup: getVal('stPickup') || null,
       p1_name:           getVal('p1Name') || null,
       p1_phone:          getVal('p1Phone') || null,
       p1_email:          getVal('stEmailNotif') || null,
+      p1_job:            getVal('p1Profession') || null,
       p1_address:        getVal('p1Address') || null,
+      p1_emergency_contact: getVal('p1Emergency') || null,
       p2_name:           getVal('p2Name') || null,
       p2_phone:          getVal('p2Phone') || null,
+      p2_job:            getVal('p2Profession') || null,
+      p2_address:        getVal('p2Address') || null,
     };
     for (const [k, v] of Object.entries(optionals)) {
       if (v !== null && v !== '') payload[k] = v;

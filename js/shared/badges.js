@@ -21,6 +21,9 @@ export const BadgeSystem = {
     try {
       const { supabase } = await import('./supabase.js');
 
+      // Solo mostrar badges en secciones relevantes — no en maestros/estudiantes/aulas/dashboard
+      const BADGE_SECTIONS = ['pagos', 'chat', 'comunicacion', 'muro', 'reportes', 'asistencia', 't-chat', 'notifications'];
+
       // 1. Notificaciones no leídas → badges por sección
       const { data: notifs } = await supabase
         .from('notifications')
@@ -33,7 +36,9 @@ export const BadgeSystem = {
         const counts = {};
         for (const n of notifs) {
           const section = this._typeToSection(n.type);
-          if (section) counts[section] = (counts[section] || 0) + 1;
+          if (section && BADGE_SECTIONS.includes(section)) {
+            counts[section] = (counts[section] || 0) + 1;
+          }
         }
         for (const [section, count] of Object.entries(counts)) {
           this._renderBadge(section, count);
@@ -45,7 +50,6 @@ export const BadgeSystem = {
       if (unreadData) {
         const totalUnread = Object.values(unreadData).reduce((a, b) => a + Number(b), 0);
         if (totalUnread > 0) {
-          // Directora usa 'comunicacion', asistente usa 'chat'
           this._renderBadge('comunicacion', totalUnread);
           this._renderBadge('chat', totalUnread);
         }

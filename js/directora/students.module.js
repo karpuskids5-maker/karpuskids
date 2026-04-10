@@ -4,6 +4,7 @@ import { UI } from './ui.module.js';
 import { AppState } from './state.js';
 import { supabase, createClient, SUPABASE_URL, SUPABASE_ANON_KEY } from '../shared/supabase.js';
 import { auditLog } from '../shared/db-utils.js';
+import { QueryCache } from '../shared/query-cache.js';
 
 // Vista activa: 'table' | 'grid'
 let _view = 'table';
@@ -290,7 +291,8 @@ export const StudentsModule = {
     const password = document.getElementById('stPassword')?.value?.trim();
 
     if (!payload.name || payload.name.trim().length < 3) return Helpers.toast('Nombre inválido (min 3 caracteres)', 'warning');
-    if (!payload.p1_name || !payload.p1_phone || !payload.p1_email) return Helpers.toast('Datos del padre/madre 1 incompletos', 'warning');
+    // Solo validar datos del padre en creación, no en edición
+    if (!id && (!payload.p1_name || !payload.p1_phone || !payload.p1_email)) return Helpers.toast('Datos del padre/madre 1 incompletos', 'warning');
     
     UI.setLoading(true);
     try {
@@ -368,6 +370,7 @@ export const StudentsModule = {
       
       Helpers.toast(id ? 'Estudiante actualizado' : 'Estudiante creado', 'success');
       UI.closeModal();
+      QueryCache.invalidate('dir_students');
       this.init();
     } catch (e) {
       console.error('Error saveStudent:', e);
@@ -403,7 +406,10 @@ export const StudentsModule = {
 
     return {
       name:                 v('stName'),
+      matricula:            v('stMatricula') || null,
       classroom_id:         v('stClassroom') ? parseInt(v('stClassroom')) : null,
+      age:                  i('stAge', null),
+      schedule:             v('stHorario'),
       start_date:           v('stJoinedDate') || new Date().toISOString().split('T')[0],
       is_active:            document.getElementById('active')?.checked ?? true,
       blood_type:           v('bloodType'),
@@ -461,7 +467,7 @@ export const StudentsModule = {
               <div class="flex gap-2">
                 <div class="relative flex-1">
                   <i data-lucide="hash" class="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400"></i>
-                  <input id="stMatricula" placeholder="Generar automática..." class="${inputClass} pl-10 bg-white" readonly>
+                  <input id="stMatricula" placeholder="Generar automática..." class="${inputClass} pl-10 bg-white">
                 </div>
                 <button onclick="window.generateMatricula()" class="px-6 py-2 bg-indigo-600 text-white rounded-2xl font-black text-xs uppercase hover:bg-indigo-700 shadow-md transition-all active:scale-95">Generar</button>
               </div>
@@ -615,7 +621,7 @@ export const StudentsModule = {
     try {
       const { data: rooms } = await DirectorApi.getClassrooms();
       const select = document.getElementById('stClassroom');
-      if(select && rooms?.length) {
+      if (select && rooms?.length) {
         rooms.forEach(r => {
           const opt = document.createElement('option');
           opt.value = r.id;
@@ -626,35 +632,59 @@ export const StudentsModule = {
     } catch (e) { console.error('Error cargando aulas:', e); }
 
     if (id) {
-      const students = AppState.get('students') || [];
-      const student = students.find(s => s.id == id);
-      if (student) {
-        const setVal = (eid, val) => { const e = document.getElementById(eid); if(e) e.value = val || ''; };
-        setVal('stId', student.id);
-        setVal('stMatricula', student.matricula);
-        setVal('stName', student.name);
-        setVal('stAge', student.age);
-        setVal('stHorario', student.horario);
-        setVal('stClassroom', student.classroom_id);
-        setVal('p1Name', student.p1_name);
-        setVal('p1Phone', student.p1_phone);
-        setVal('stEmailUser', student.parent?.email || '');
-        setVal('stEmailNotif', student.p1_email);
-        setVal('p1Profession', student.p1_job);
-        setVal('p1Address', student.p1_address);
-        setVal('p1Emergency', student.p1_emergency_contact);
-        setVal('p2Name', student.p2_name);
-        setVal('p2Phone', student.p2_phone);
-        setVal('p2Profession', student.p2_job);
-        setVal('p2Address', student.p2_address);
-        setVal('allergies', student.allergies);
-        setVal('bloodType', student.blood_type);
-        setVal('monthlyFee', student.monthly_fee);
-        setVal('dueDay', student.due_day);
-        setVal('authorized', student.authorized_pickup);
-        setVal('stJoinedDate', student.start_date ? student.start_date.split('T')[0] : '');
-        const checkActive = document.getElementById('active');
-        if(checkActive) checkActive.checked = student.is_active;
+      // Fetch completo desde DB — convertir id a número para evitar error 400 (bigint vs string)
+      try {
+        const numericId = parseInt(id, 10);
+        if (isNaN(numericId)) throw new Error('ID inválido');
+
+        const { data: student, error } = await supabase
+          .from('students')
+          .select('*, parent:parent_id(email)')
+          .eq('id', numericId)
+          .single();
+
+        if (error) throw error;
+        if (student) {
+          const setVal = (eid, val) => {
+            const el = document.getElementById(eid);
+            if (el) el.value = (val !== null && val !== undefined) ? val : '';
+          };
+          setVal('stId',         student.id);
+          setVal('stMatricula',  student.matricula);
+          setVal('stName',       student.name);
+          setVal('stClassroom',  student.classroom_id);
+          setVal('stJoinedDate', student.start_date ? student.start_date.split('T')[0] : '');
+          setVal('stAge',        student.age);
+          setVal('stHorario',    student.schedule);
+          setVal('p1Name',       student.p1_name);
+          setVal('p1Phone',      student.p1_phone);
+          setVal('stEmailNotif', student.p1_email);
+          setVal('stEmailUser',  student.parent?.email || '');
+          setVal('p1Profession', student.p1_job);
+          setVal('p1Address',    student.p1_address);
+          setVal('p1Emergency',  student.p1_emergency_contact);
+          setVal('p2Name',       student.p2_name);
+          setVal('p2Phone',      student.p2_phone);
+          setVal('p2Profession', student.p2_job);
+          setVal('p2Address',    student.p2_address);
+          setVal('allergies',    student.allergies);
+          setVal('bloodType',    student.blood_type);
+          setVal('authorized',   student.authorized_pickup);
+          setVal('monthlyFee',   student.monthly_fee);
+          setVal('dueDay',       student.due_day);
+
+          const checkActive = document.getElementById('active');
+          if (checkActive) checkActive.checked = student.is_active !== false;
+
+          // Avatar preview
+          if (student.avatar_url) {
+            const preview = document.getElementById('stAvatarPreview');
+            if (preview) preview.innerHTML = `<img src="${student.avatar_url}" class="w-full h-full object-cover">`;
+          }
+        }
+      } catch (e) {
+        console.error('Error cargando datos del estudiante:', e);
+        Helpers.toast('Error al cargar datos del estudiante', 'error');
       }
     }
     if (window.lucide) lucide.createIcons();

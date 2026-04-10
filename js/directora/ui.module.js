@@ -97,9 +97,14 @@ const DirectorUI = {
           '</div>' +
         '</td>' +
         '<td class="py-4 px-6 text-center">' +
-          '<button onclick="App.rooms.openModal(\'' + r.id + '\')" class="p-2 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-lg transition-all">' +
+          '<div class="flex items-center justify-center gap-1">' +
+          '<button onclick="App.rooms.openModal(\'' + r.id + '\')" class="p-2 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-lg transition-all" title="Editar">' +
             '<i data-lucide="edit-3" class="w-4 h-4"></i>' +
           '</button>' +
+          '<button onclick="App.rooms.deleteRoom(\'' + r.id + '\',\'' + Helpers.escapeHTML(r.name) + '\')" class="p-2 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-all" title="Eliminar">' +
+            '<i data-lucide="trash-2" class="w-4 h-4"></i>' +
+          '</button>' +
+          '</div>' +
         '</td>' +
       '</tr>'
     );
