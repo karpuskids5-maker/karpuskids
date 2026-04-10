@@ -31,17 +31,22 @@ export const RealtimeManager = {
     if (_channels.size >= MAX_CHANNELS) {
       const oldest = _channels.keys().next().value;
       this.unsubscribe(oldest);
-      console.warn(`[RealtimeManager] Límite alcanzado — eliminando canal: ${oldest}`);
     }
 
     const channel = supabase.channel(name);
     setupFn(channel);
-    channel.subscribe((status) => {
-      if (status === 'CHANNEL_ERROR') {
-        console.warn(`[RealtimeManager] Error en canal: ${name}`);
-        _channels.delete(name);
-      }
-    });
+
+    // Pequeño delay para evitar "WebSocket closed before connection established"
+    // cuando se crean/destruyen canales rápidamente
+    setTimeout(() => {
+      if (!_channels.has(name)) return; // fue cancelado antes de conectar
+      channel.subscribe((status) => {
+        if (status === 'CHANNEL_ERROR') {
+          console.warn(`[RealtimeManager] Error en canal: ${name}`);
+          _channels.delete(name);
+        }
+      });
+    }, 100);
 
     _channels.set(name, channel);
     return channel;

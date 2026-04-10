@@ -291,14 +291,13 @@ export async function initOneSignal(currentUser = null) {
         try {
           const perm = OneSignal.Notifications?.permissionNative;
           if (perm === 'default') {
-            // En móvil el permiso debe pedirse desde un gesto — lo diferimos al perfil
-            // Solo pedimos automáticamente en desktop
             const isMobile = /Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
             if (!isMobile) {
-              await OneSignal.Notifications.requestPermission();
+              // Silenciar el error "Permission dismissed" — es comportamiento normal
+              await OneSignal.Notifications.requestPermission().catch(() => {});
             }
           }
-        } catch (_) { /* silencioso */ }
+        } catch (_) { /* silencioso — el usuario puede rechazar el permiso */ }
 
         // Vincular usuario externo
         try {

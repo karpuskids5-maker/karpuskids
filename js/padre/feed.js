@@ -102,7 +102,7 @@ export const FeedModule = {
       const optimizedUrl = p.media_url;
       mediaHTML = isVideo
         ? ImageLoader.video(p.media_url, '', { cls: 'w-full rounded-2xl mb-4 max-h-80 object-cover' })
-        : `<div class="cursor-zoom-in" onclick="window.openLightbox && window.openLightbox('${optimizedUrl}','image')">${ImageLoader.img(optimizedUrl, { cls: 'w-full rounded-2xl mb-4 max-h-80 object-cover shadow-sm', fallback: 'img/mundo.jpg' })}</div>`;
+        : `<div class="cursor-zoom-in rounded-2xl overflow-hidden mb-4 bg-black" onclick="window.openLightbox && window.openLightbox('${optimizedUrl}','image')">${ImageLoader.img(optimizedUrl, { cls: 'w-full max-h-[500px] object-cover', fallback: 'img/mundo.jpg' })}</div>`;
     }
 
     return `

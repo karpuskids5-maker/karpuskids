@@ -302,11 +302,11 @@ export const WallModule = {
           </div>`;
       } else {
         mediaHtml = `
-          <div class="rounded-2xl overflow-hidden border border-slate-100 mb-4 bg-slate-50 cursor-zoom-in"
+          <div class="rounded-2xl overflow-hidden border border-slate-100 mb-4 cursor-zoom-in bg-black"
                onclick="window.openLightbox('${p.display_media_url}','image')">
             ${ImageLoader.img(p.display_media_url, {
               alt: 'Post media',
-              cls: 'w-full max-h-[480px] object-contain mx-auto',
+              cls: 'w-full object-cover max-h-[500px]',
               fallback: 'img/mundo.jpg',
               priority: isFirstPost ? 'high' : 'low'
             })}

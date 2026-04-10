@@ -294,7 +294,7 @@ export const TasksModule = {
           ${statusBadge}
         </div>
         
-        ${t.file_url ? `<div class="mb-3 rounded-xl overflow-hidden border border-slate-100 cursor-zoom-in" onclick="window.openLightbox('${t.file_url}','image')"><img src="${t.file_url}" class="w-full max-h-48 object-contain bg-slate-50" loading="lazy" alt="Imagen de tarea" data-no-lightbox></div>` : ''}
+        ${t.file_url ? `<div class="mb-3 rounded-xl overflow-hidden border border-slate-100 cursor-zoom-in bg-black" onclick="window.openLightbox('${t.file_url}','image')"><img src="${t.file_url}" class="w-full max-h-64 object-cover" loading="lazy" alt="Imagen de tarea" onerror="this.parentElement.style.display='none'"></div>` : ''}
         
         <p class="text-xs text-slate-500 leading-relaxed line-clamp-2 mb-4">${escapeHtml(t.description || 'Sin descripción detallada.')}</p>
         
