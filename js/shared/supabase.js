@@ -320,19 +320,19 @@ export async function initOneSignal(currentUser = null) {
           }
 
           const currentExtId = await OneSignal.User.getExternalId?.();
-          if (currentExtId && currentExtId === user.id) {
+          if (currentExtId === user.id) {
             // Already linked — just ensure push subscription is active
             console.log('[OneSignal] ✅ Ya vinculado:', user.id);
-          } else if (!currentExtId) {
-            // Not linked yet — safe to call login
-            console.log('[OneSignal] Vinculando usuario:', user.id);
+          } else {
+            // Not linked yet or linked to someone else — safe to call login
+            console.log('[OneSignal] Vinculando usuario:', user.id, '(era:', currentExtId || 'nadie', ')');
             await OneSignal.login(user.id).catch((e) => {
               const msg = (e?.message || '').toLowerCase();
               if (!msg.includes('409') && !msg.includes('conflict')) {
                 console.info('[OneSignal] login info:', e?.message ?? e);
               }
             });
-            await new Promise(r => setTimeout(r, 1000));
+            await new Promise(r => setTimeout(r, 1500));
           }
 
           // Activar suscripción push si el permiso está concedido

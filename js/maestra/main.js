@@ -283,6 +283,8 @@ document.addEventListener('DOMContentLoaded', async () => {
 
     // Badge mensajes no le\u00eddos
     loadMaestraUnreadBadge(auth.user.id);
+g    // Badge tareas pendientes de calificar
+    loadPendingTasksBadge(classroom.id);
 
     // \ud83d\udd34 Sistema de badges por secci\u00f3n
     BadgeSystem.init(auth.user.id);
@@ -934,7 +936,8 @@ async function loadMaestraUnreadBadge(userId) {
     }
     // Si el RPC falla, mostrar 0 silenciosamente
 
-    const badge = document.getElementById('badge-chat-maestra');
+    // badge-t-chat es el ID real en el HTML del sidebar
+    const badge = document.getElementById('badge-t-chat');
     if (!badge) return;
     if (total > 0) {
       badge.textContent = total > 9 ? '9+' : String(total);
@@ -952,5 +955,47 @@ async function loadMaestraUnreadBadge(userId) {
         })
         .subscribe();
     }
+  } catch (_) {}
+}
+
+// ── Badge tareas pendientes de calificar ──────────────────────────────────────
+async function loadPendingTasksBadge(classroomId) {
+  if (!classroomId) return;
+  try {
+    // Obtener IDs de tareas del aula
+    const { data: tasks } = await supabase
+      .from('tasks')
+      .select('id')
+      .eq('classroom_id', classroomId);
+
+    if (!tasks?.length) return;
+
+    const taskIds = tasks.map(t => t.id);
+
+    // Contar entregas sin calificar
+    const { count } = await supabase
+      .from('task_evidences')
+      .select('id', { count: 'exact', head: true })
+      .in('task_id', taskIds)
+      .neq('status', 'graded');
+
+    const total = count || 0;
+
+    // Badge en el tab de tareas dentro del aula (desktop + mobile)
+    document.querySelectorAll('.class-tab-btn[data-tab="tasks"]').forEach(btn => {
+      let badge = btn.querySelector('.tasks-pending-badge');
+      if (!badge) {
+        badge = document.createElement('span');
+        badge.className = 'tasks-pending-badge absolute -top-1 -right-1 w-5 h-5 bg-rose-500 text-white text-[9px] font-black rounded-full flex items-center justify-center shadow-sm animate-pulse';
+        btn.style.position = 'relative';
+        btn.appendChild(badge);
+      }
+      if (total > 0) {
+        badge.textContent = total > 9 ? '9+' : String(total);
+        badge.style.display = 'flex';
+      } else {
+        badge.style.display = 'none';
+      }
+    });
   } catch (_) {}
 }

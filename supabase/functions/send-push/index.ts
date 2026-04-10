@@ -54,17 +54,17 @@ async function getSubscriptionIds(appId: string, key: string, externalUserId: st
       token?: string;
     }>;
 
-    console.log(`[send-push] API v2 found ${subscriptions.length} total subscriptions for ${externalUserId}`);
+    console.log(`[send-push] API v2 found ${subscriptions.length} total subscriptions for ${externalUserId}:`, JSON.stringify(subscriptions));
 
     // Filtro corregido:
     // - enabled !== false (debe estar habilitada)
     // - notification_types !== -2 (OneSignal v2 usa -2 para suscripciones deshabilitadas/pendientes)
     // - Debe ser un tipo de push soportado
     const pushTypes = ['ChromePush', 'FirefoxPush', 'SafariPush', 'SafariLegacyPush',
-                       'AndroidPush', 'iOSPush', 'HuaweiPush', 'EdgePush', 'OperaPush'];
+                       'AndroidPush', 'iOSPush', 'HuaweiPush', 'EdgePush', 'OperaPush', 'Push']; // Agregamos 'Push' genérico
     
     const validSubs = subscriptions.filter(s => {
-      const isPush = pushTypes.includes(s.type);
+      const isPush = pushTypes.includes(s.type) || s.type.toLowerCase().includes('push');
       const isEnabled = s.enabled !== false;
       const notDisabled = s.notification_types !== -2;
       
@@ -174,7 +174,8 @@ Deno.serve(async (req) => {
         console.log('[send-push] Intento 2 — player_ids encontrados:', playerIds);
         const { ok: ok2, result: r2 } = await osNotify(ONESIGNAL_APP_ID, ONESIGNAL_KEY, {
           ...basePayload,
-          include_player_ids: playerIds   // ← campo correcto para API v1
+          include_subscription_ids: playerIds,   // ← campo moderno para IDs de v2
+          include_player_ids:       playerIds    // ← fallback por si acaso
         });
         console.log('[send-push] Intento 2 result:', JSON.stringify(r2));
 
@@ -206,7 +207,8 @@ Deno.serve(async (req) => {
         console.log('[send-push] Intento 3 — saved player_id fallback:', savedPlayerId);
         const { ok: ok3, result: r3 } = await osNotify(ONESIGNAL_APP_ID, ONESIGNAL_KEY, {
           ...basePayload,
-          include_player_ids: [savedPlayerId]
+          include_subscription_ids: [savedPlayerId],
+          include_player_ids:       [savedPlayerId]
         });
         console.log('[send-push] Intento 3 result:', JSON.stringify(r3));
 
