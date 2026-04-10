@@ -12,9 +12,6 @@ const json = (data: unknown, status = 200) =>
     headers: { ...CORS, 'Content-Type': 'application/json' },
   });
 
-/**
- * Enviar notificación a OneSignal usando la API v1
- */
 async function osNotify(appId: string, key: string, payload: Record<string, unknown>) {
   const res = await fetch('https://onesignal.com/api/v1/notifications', {
     method: 'POST',
@@ -25,16 +22,15 @@ async function osNotify(appId: string, key: string, payload: Record<string, unkn
     body: JSON.stringify(payload)
   });
   const result = await res.json();
-  return { ok: res.ok, result };
+  return { ok: res.ok, status: res.status, result };
 }
 
 /**
- * Buscar subscriptions activas de un usuario usando la API v2 de OneSignal.
- * La API v2 filtra correctamente por external_id y solo devuelve suscripciones activas.
+ * Busca todos los subscription IDs (player_ids) de un usuario via API v2.
+ * Devuelve array de IDs — sin filtrar agresivamente para no perder suscripciones válidas.
  */
-async function getActiveSubscriptions(appId: string, key: string, externalUserId: string): Promise<string[]> {
+async function getSubscriptionIds(appId: string, key: string, externalUserId: string): Promise<{ ids: string[], raw: unknown }> {
   try {
-    // API v2: buscar usuario por external_id
     const res = await fetch(
       `https://api.onesignal.com/apps/${appId}/users/by/external_id/${encodeURIComponent(externalUserId)}`,
       {
@@ -44,24 +40,45 @@ async function getActiveSubscriptions(appId: string, key: string, externalUserId
         }
       }
     );
-    if (!res.ok) {
-      console.warn('[send-push] API v2 user lookup failed:', res.status);
-      return [];
-    }
     const data = await res.json();
-    // Extraer subscription_ids activos (tipo 'ChromePush', 'SafariLegacyPush', 'AndroidPush', 'iOSPush')
+    if (!res.ok) {
+      console.warn('[send-push] API v2 lookup failed:', res.status, JSON.stringify(data));
+      return { ids: [], raw: data };
+    }
+
     const subscriptions = (data.subscriptions || []) as Array<{
       id: string;
       type: string;
       enabled: boolean;
       notification_types?: number;
+      token?: string;
     }>;
-    return subscriptions
-      .filter(s => s.enabled !== false && (s.notification_types === undefined || s.notification_types > 0))
-      .map(s => s.id);
+
+    console.log(`[send-push] API v2 found ${subscriptions.length} total subscriptions for ${externalUserId}`);
+
+    // Filtro corregido:
+    // - enabled !== false (debe estar habilitada)
+    // - notification_types !== -2 (OneSignal v2 usa -2 para suscripciones deshabilitadas/pendientes)
+    // - Debe ser un tipo de push soportado
+    const pushTypes = ['ChromePush', 'FirefoxPush', 'SafariPush', 'SafariLegacyPush',
+                       'AndroidPush', 'iOSPush', 'HuaweiPush', 'EdgePush', 'OperaPush'];
+    
+    const validSubs = subscriptions.filter(s => {
+      const isPush = pushTypes.includes(s.type);
+      const isEnabled = s.enabled !== false;
+      const notDisabled = s.notification_types !== -2;
+      
+      console.log(`  - Sub ID: ${s.id.slice(0,8)}... | Type: ${s.type} | Enabled: ${s.enabled} | NotifTypes: ${s.notification_types} | Valid: ${isPush && isEnabled && notDisabled}`);
+      
+      return isPush && isEnabled && notDisabled;
+    });
+
+    const ids = validSubs.map(s => s.id);
+    console.log('[send-push] IDs finales para envío:', ids);
+    return { ids, raw: subscriptions };
   } catch (e) {
-    console.warn('[send-push] getActiveSubscriptions error:', e);
-    return [];
+    console.warn('[send-push] getSubscriptionIds error:', e);
+    return { ids: [], raw: null };
   }
 }
 
@@ -84,6 +101,10 @@ Deno.serve(async (req) => {
     if (!user_id || !title || !message) {
       return json({ error: 'Missing: user_id, title, message' }, 400);
     }
+
+    // 0. Verificar si ya tenemos un player_id guardado (para diagnóstico)
+    const { data: profileCheck } = await supabase.from('profiles').select('onesignal_player_id').eq('id', user_id).maybeSingle();
+    console.log(`[send-push] Diagnóstico inicial para ${user_id}: ${profileCheck?.onesignal_player_id ? 'Tiene player_id: ' + profileCheck.onesignal_player_id : 'NO tiene player_id guardado'}`);
 
     // 1. Guardar notificación interna siempre
     const { error: dbErr } = await supabase.from('notifications').insert({
@@ -110,20 +131,12 @@ Deno.serve(async (req) => {
       headings:             { en: title, es: title },
       contents:             { en: message, es: message },
       url:                  fullLink,
-      // ── Íconos Karpus Kids ──────────────────────────────────────────────
-      // Android: ícono pequeño en la barra de estado (debe ser PNG blanco/transparente idealmente)
-      // Si no tienes un PNG monocromático, OneSignal usará el ícono de la app por defecto
-      // El large_icon aparece en el cuerpo de la notificación (imagen grande)
-      large_icon:           ICON_URL,   // imagen grande en el cuerpo (Android)
-      big_picture:          ICON_URL,   // imagen expandida al deslizar (Android)
-      // iOS: ícono de la app (se toma del bundle, no se puede cambiar por API)
-      // Pero sí podemos poner una imagen adjunta
+      large_icon:           ICON_URL,
+      big_picture:          ICON_URL,
       ios_attachments:      { id1: ICON_URL },
-      // Web push (Chrome/Firefox): ícono en la notificación del navegador
       chrome_web_icon:      ICON_URL,
       chrome_web_image:     ICON_URL,
       firefox_icon:         ICON_URL,
-      // ────────────────────────────────────────────────────────────────────
       android_accent_color: 'FF22C55E',
       ios_sound:            'default',
       ios_badge_type:       'Increase',
@@ -137,44 +150,51 @@ Deno.serve(async (req) => {
     let onesignalDetail = '';
 
     try {
-      // ── Intento 1: external_user_id (método estándar v1) ──────────────────
+      // ── Intento 1: external_user_id (API v1) ──────────────────────────────────
       console.log('[send-push] Intento 1 — external_user_id:', user_id);
-      const { ok: ok1, result: r1 } = await osNotify(ONESIGNAL_APP_ID, ONESIGNAL_KEY, {
+      const { ok: ok1, status: s1, result: r1 } = await osNotify(ONESIGNAL_APP_ID, ONESIGNAL_KEY, {
         ...basePayload,
         include_external_user_ids:     [String(user_id)],
         channel_for_external_user_ids: 'push'
       });
+      console.log('[send-push] Intento 1 result:', JSON.stringify(r1));
 
       if (ok1 && (r1.recipients ?? 0) > 0) {
         onesignalStatus = 'sent';
         onesignalDetail = `id=${r1.id} recipients=${r1.recipients}`;
-        console.log('[send-push] ✅ Enviado | id:', r1.id, '| recipients:', r1.recipients);
+        console.log('[send-push] ✅ Enviado via external_user_id');
         return json({ ok: true, notification_saved: !dbErr, onesignal: onesignalStatus, detail: onesignalDetail });
       }
 
-      console.warn('[send-push] 0 recipients para external_user_id:', user_id, '| errors:', r1.errors);
+      // ── Intento 2: player_ids via API v2 lookup ───────────────────────────
+      console.log('[send-push] Intento 2 — buscando player_ids via API v2...');
+      const { ids: playerIds } = await getSubscriptionIds(ONESIGNAL_APP_ID, ONESIGNAL_KEY, String(user_id));
 
-      // ── Intento 2: API v2 — buscar subscriptions activas del usuario ───────
-      console.log('[send-push] Intento 2 — buscando subscriptions activas via API v2...');
-      const activeSubIds = await getActiveSubscriptions(ONESIGNAL_APP_ID, ONESIGNAL_KEY, String(user_id));
-
-      if (activeSubIds.length > 0) {
-        console.log('[send-push] Intento 2 — subscriptions activas:', activeSubIds.length);
+      if (playerIds.length > 0) {
+        console.log('[send-push] Intento 2 — player_ids encontrados:', playerIds);
         const { ok: ok2, result: r2 } = await osNotify(ONESIGNAL_APP_ID, ONESIGNAL_KEY, {
           ...basePayload,
-          include_subscription_ids: activeSubIds
+          include_player_ids: playerIds   // ← campo correcto para API v1
         });
+        console.log('[send-push] Intento 2 result:', JSON.stringify(r2));
 
         if (ok2 && (r2.recipients ?? 0) > 0) {
-          onesignalStatus = 'sent_via_subscription_id';
+          onesignalStatus = 'sent_via_player_ids';
           onesignalDetail = `id=${r2.id} recipients=${r2.recipients}`;
-          console.log('[send-push] ✅ Enviado via subscription_id | id:', r2.id);
+          console.log('[send-push] ✅ Enviado via player_ids');
+
+          // Actualizar el player_id guardado con el primero válido para fallback rápido
+          supabase.from('profiles')
+            .update({ onesignal_player_id: playerIds[0] })
+            .eq('id', user_id)
+            .then(() => {}).catch(() => {});
+
           return json({ ok: true, notification_saved: !dbErr, onesignal: onesignalStatus, detail: onesignalDetail });
         }
-        console.warn('[send-push] subscription_ids fallaron:', r2.errors);
+        console.warn('[send-push] Intento 2 falló:', JSON.stringify(r2.errors || r2));
       }
 
-      // ── Intento 3: player_id guardado en profiles ──────────────────────────
+      // ── Intento 3: player_id guardado en base de datos ──────────────────────
       const { data: profile } = await supabase
         .from('profiles')
         .select('onesignal_player_id')
@@ -182,22 +202,23 @@ Deno.serve(async (req) => {
         .maybeSingle();
 
       const savedPlayerId = profile?.onesignal_player_id;
-      if (savedPlayerId) {
-        console.log('[send-push] Intento 3 — player_id de profiles:', savedPlayerId);
+      if (savedPlayerId && !playerIds.includes(savedPlayerId)) {
+        console.log('[send-push] Intento 3 — saved player_id fallback:', savedPlayerId);
         const { ok: ok3, result: r3 } = await osNotify(ONESIGNAL_APP_ID, ONESIGNAL_KEY, {
           ...basePayload,
           include_player_ids: [savedPlayerId]
         });
+        console.log('[send-push] Intento 3 result:', JSON.stringify(r3));
 
         if (ok3 && (r3.recipients ?? 0) > 0) {
           onesignalStatus = 'sent_via_saved_player_id';
           onesignalDetail = `id=${r3.id} recipients=${r3.recipients}`;
-          console.log('[send-push] ✅ Enviado via saved player_id | id:', r3.id);
+          console.log('[send-push] ✅ Enviado via saved player_id');
           return json({ ok: true, notification_saved: !dbErr, onesignal: onesignalStatus, detail: onesignalDetail });
         }
+        console.warn('[send-push] Intento 3 falló:', JSON.stringify(r3.errors || r3));
       }
 
-      // Sin suscripción activa — notificación guardada en DB para ver en app
       onesignalStatus = 'no_active_subscription';
       onesignalDetail = `user_id=${user_id} — Sin suscripción push activa. El usuario debe abrir la app y aceptar notificaciones.`;
       console.info('[send-push] ℹ️', onesignalDetail);
