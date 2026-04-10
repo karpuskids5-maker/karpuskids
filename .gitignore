@@ -43,5 +43,9 @@ fix_escapes.cjs
 # Scripts with sensitive keys — run locally only, NEVER deploy
 scripts/fix_auth_activation.js
 scripts/confirm_users.js
+
+# Verification
+verification/
+verify_index_fix.py
 scripts/seed-demo.js
 scripts/seed-demo.cjs
