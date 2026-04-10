@@ -297,6 +297,11 @@ export const StudentsModule = {
       let res;
       if (id) {
         res = await DirectorApi.updateStudent(id, payload);
+        // Si falla por classroom_id, reintentar sin esa columna
+        if (res?.error && (res.error.message?.includes('classroom_id') || res.error.code === '42703')) {
+          const { classroom_id, ...payloadWithout } = payload;
+          res = await DirectorApi.updateStudent(id, payloadWithout);
+        }
       } else {
         // Create auth user if email+password provided
         if (emailUser && password) {
@@ -348,6 +353,11 @@ export const StudentsModule = {
         }
         
         res = await DirectorApi.createStudent(payload);
+        // Si falla por classroom_id, reintentar sin esa columna
+        if (res?.error && (res.error.message?.includes('classroom_id') || res.error.code === '42703')) {
+          const { classroom_id, ...payloadWithout } = payload;
+          res = await DirectorApi.createStudent(payloadWithout);
+        }
       }
       
       const { error } = res || {};
@@ -393,7 +403,7 @@ export const StudentsModule = {
 
     return {
       name:                 v('stName'),
-      classroom_id:         v('stClassroom') || null,
+      classroom_id:         v('stClassroom') ? parseInt(v('stClassroom')) : null,
       start_date:           v('stJoinedDate') || new Date().toISOString().split('T')[0],
       is_active:            document.getElementById('active')?.checked ?? true,
       blood_type:           v('bloodType'),

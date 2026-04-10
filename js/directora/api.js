@@ -304,11 +304,22 @@ export const DirectorApi = {
   async getStudents() {
     return QueryCache.get('dir_students', async () => {
       try {
-        return await withTimeout(() =>
+        // Intentar con classroom_id (columna estándar del schema)
+        const res = await withTimeout(() =>
           supabase.from('students')
             .select('id, name, is_active, parent_id, classroom_id, p1_name, p1_phone, p1_email, classrooms:classroom_id(name)')
             .order('name')
         );
+        // Si falla por columna inexistente, intentar sin classroom_id
+        if (res.error && (res.error.message?.includes('classroom_id') || res.error.code === '42703')) {
+          console.warn('[DirectorApi] classroom_id no existe, usando select básico');
+          return await withTimeout(() =>
+            supabase.from('students')
+              .select('id, name, is_active, parent_id, p1_name, p1_phone, p1_email')
+              .order('name')
+          );
+        }
+        return res;
       } catch (e) { return logError('getStudents', e); }
     }, 3 * 60_000);
   },
