@@ -1,19 +1,15 @@
 /**
  * 🎥 Karpus Kids — VideoCall UI
  * Sistema unificado de videollamadas para todos los paneles.
- *
- * ⚠️ IMPORTANTE: meet.jit.si limita reuniones a 5 min para usuarios no autenticados.
- * Usamos 8x8.vc (Jitsi gratuito sin límite de tiempo) como dominio principal.
- * Fallback: meet.jit.si si 8x8.vc no está disponible.
+ * Usa meet.jit.si — funciona sin cuenta, sin límite de tiempo en salas privadas.
  */
 import { supabase, sendPush } from './supabase.js';
 import { Helpers } from './helpers.js';
 
-// 8x8.vc = Jitsi Meet sin límite de tiempo (gratis, mismo protocolo)
-const JITSI_DOMAIN    = '8x8.vc';
-const JITSI_DOMAIN_FB = 'meet.jit.si'; // fallback
-// Prefijo de sala — debe ser único por organización para evitar colisiones
-const ROOM_PREFIX = 'karpuskids2026';
+// meet.jit.si funciona sin tenant y sin límite de tiempo para salas con nombre único
+const JITSI_DOMAIN = 'meet.jit.si';
+// Prefijo largo y único para evitar colisiones con otras organizaciones
+const ROOM_PREFIX = 'karpuskids-edu-2026';
 
 export const VideoCallUI = {
   _api: null,
@@ -201,39 +197,39 @@ export const VideoCallUI = {
       this._api = null;
     }
 
-    // Suppress WakeLock errors — they're cosmetic and don't affect functionality
+    // Suppress cosmetic errors from Jitsi
     const origConsoleError = console.error;
     console.error = (...args) => {
       const msg = args.join(' ');
-      if (msg.includes('WakeLock') || msg.includes('wake lock') || msg.includes('ERR_FAILED')) return;
+      if (msg.includes('WakeLock') || msg.includes('wake lock') || msg.includes('ERR_FAILED') ||
+          msg.includes('No SW registration') || msg.includes('postMessage')) return;
       origConsoleError.apply(console, args);
+    };
+    // Suppress speaker-selection warning
+    const origConsoleWarn = console.warn;
+    console.warn = (...args) => {
+      const msg = args.join(' ');
+      if (msg.includes('speaker-selection') || msg.includes('Unrecognized feature')) return;
+      origConsoleWarn.apply(console, args);
     };
 
     const loadJitsi = () => {
       if (window.JitsiMeetExternalAPI) {
         this._startJitsi(roomName, userName, jitsiContainer);
       } else {
-        // Intentar cargar desde 8x8.vc primero, luego meet.jit.si como fallback
-        const tryLoad = (domain, onFail) => {
-          const script = document.createElement('script');
-          script.src = `https://${domain}/external_api.js`;
-          script.onload = () => this._startJitsi(roomName, userName, jitsiContainer);
-          script.onerror = onFail;
-          document.head.appendChild(script);
-        };
-
-        tryLoad(JITSI_DOMAIN, () => {
-          console.warn('[VideoCallUI] 8x8.vc script failed, trying meet.jit.si...');
-          tryLoad(JITSI_DOMAIN_FB, () => {
-            jitsiContainer.innerHTML = `
+        const script = document.createElement('script');
+        script.src = `https://${JITSI_DOMAIN}/external_api.js`;
+        script.onload = () => this._startJitsi(roomName, userName, jitsiContainer);
+        script.onerror = () => {
+          jitsiContainer.innerHTML = `
               <div class="flex flex-col items-center justify-center h-full bg-slate-50 gap-4 p-8 text-center">
                 <div class="w-16 h-16 bg-rose-100 rounded-full flex items-center justify-center text-3xl">📵</div>
                 <p class="font-black text-slate-700">No se pudo cargar la videollamada</p>
                 <p class="text-sm text-slate-400">Verifica tu conexión a internet e intenta de nuevo.</p>
                 <button onclick="location.reload()" class="px-6 py-2.5 bg-orange-600 text-white rounded-2xl font-black text-xs uppercase">Reintentar</button>
               </div>`;
-          });
-        });
+        };
+        document.head.appendChild(script);
       }
     };
 
@@ -243,8 +239,6 @@ export const VideoCallUI = {
 
   _startJitsi(roomName, userName, container) {
     try {
-      // 8x8.vc usa /vpaas-magic-cookie-xxx/roomName — sin cuenta usamos el dominio directo
-      // El nombre de sala con prefijo largo evita colisiones con otras organizaciones
       const fullRoom = `${ROOM_PREFIX}_${roomName}`;
 
       this._api = new window.JitsiMeetExternalAPI(JITSI_DOMAIN, {
@@ -291,48 +285,26 @@ export const VideoCallUI = {
         console.log('[VideoCallUI] ✅ Conectado a sala:', fullRoom);
       });
 
-      // Si falla 8x8.vc, intentar con meet.jit.si como fallback
       this._api.addEventListener('connectionFailed', () => {
-        console.warn('[VideoCallUI] 8x8.vc falló, intentando meet.jit.si...');
-        try { this._api.dispose(); } catch (_) {}
-        this._startJitsiFallback(roomName, userName, container);
+        console.error('[VideoCallUI] Conexión fallida a meet.jit.si');
+        container.innerHTML = `
+          <div class="flex flex-col items-center justify-center h-full bg-slate-50 gap-4 p-8 text-center">
+            <div class="w-16 h-16 bg-rose-100 rounded-full flex items-center justify-center text-3xl">📵</div>
+            <p class="font-black text-slate-700">No se pudo conectar a la sala</p>
+            <p class="text-sm text-slate-400">Verifica tu conexión a internet e intenta de nuevo.</p>
+            <button onclick="location.reload()" class="px-6 py-2.5 bg-orange-600 text-white rounded-2xl font-black text-xs uppercase">Reintentar</button>
+          </div>`;
       });
 
     } catch (e) {
-      console.warn('[VideoCallUI] 8x8.vc error, usando fallback:', e.message);
-      this._startJitsiFallback(roomName, userName, container);
-    }
-  },
-
-  _startJitsiFallback(roomName, userName, container) {
-    try {
-      this._api = new window.JitsiMeetExternalAPI(JITSI_DOMAIN_FB, {
-        roomName:   `${ROOM_PREFIX}_${roomName}`,
-        parentNode: container,
-        width:      '100%',
-        height:     520,
-        userInfo:   { displayName: userName },
-        configOverwrite: {
-          startWithAudioMuted: false,
-          startWithVideoMuted: false,
-          disableDeepLinking:  true,
-          prejoinPageEnabled:  false,
-          analytics:           { disabled: true },
-        },
-        interfaceConfigOverwrite: {
-          TOOLBAR_BUTTONS: ['microphone','camera','hangup','chat','tileview','fullscreen','raisehand'],
-          SHOW_JITSI_WATERMARK: false,
-          SHOW_BRAND_WATERMARK: false,
-        }
-      });
-      this._api.addEventListener('videoConferenceLeft', () => {
-        container.classList.add('hidden');
-        container.innerHTML = '';
-      });
-    } catch (e) {
-      console.error('[VideoCallUI] Fallback error:', e);
-      container.innerHTML = Helpers.errorState('Error al iniciar la videollamada. Verifica tu conexión.');
-      if (window.lucide) lucide.createIcons();
+      console.error('[VideoCallUI] Error al iniciar Jitsi:', e.message);
+      container.innerHTML = `
+        <div class="flex flex-col items-center justify-center h-full bg-slate-50 gap-4 p-8 text-center">
+          <div class="w-16 h-16 bg-rose-100 rounded-full flex items-center justify-center text-3xl">📵</div>
+          <p class="font-black text-slate-700">Error al iniciar la videollamada</p>
+          <p class="text-sm text-slate-400">Verifica tu conexión e intenta de nuevo.</p>
+          <button onclick="location.reload()" class="px-6 py-2.5 bg-orange-600 text-white rounded-2xl font-black text-xs uppercase">Reintentar</button>
+        </div>`;
     }
   },
 

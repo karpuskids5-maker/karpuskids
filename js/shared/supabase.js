@@ -287,13 +287,23 @@ export async function initOneSignal(currentUser = null) {
         // Esperar a que el SDK esté listo
         await new Promise(r => setTimeout(r, 800));
 
-        // Pedir permiso solo si no se ha dado aún
+        // Pedir permiso si no se ha dado aún — en móvil y desktop
         try {
           const perm = OneSignal.Notifications?.permissionNative;
           if (perm === 'default') {
             const isMobile = /Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
-            if (!isMobile) {
-              // Silenciar el error "Permission dismissed" — es comportamiento normal
+            if (isMobile) {
+              // En móvil: pedir permiso tras interacción del usuario (click/touch)
+              // para cumplir con la política de browsers móviles
+              const askOnInteraction = () => {
+                document.removeEventListener('click', askOnInteraction);
+                document.removeEventListener('touchend', askOnInteraction);
+                OneSignal.Notifications.requestPermission().catch(() => {});
+              };
+              document.addEventListener('click', askOnInteraction, { once: true });
+              document.addEventListener('touchend', askOnInteraction, { once: true });
+            } else {
+              // Desktop: pedir directamente
               await OneSignal.Notifications.requestPermission().catch(() => {});
             }
           }
@@ -341,11 +351,40 @@ export async function initOneSignal(currentUser = null) {
             supabase.from('profiles')
               .update({ onesignal_player_id: subId })
               .eq('id', user.id)
-              .then(() => {})
+              .then(({ error }) => {
+                if (error) console.warn('[OneSignal] No se pudo guardar player_id:', error.message);
+                else console.log('[OneSignal] player_id guardado en profiles:', subId);
+              })
               .catch(() => {});
           } else {
             console.log('[OneSignal] ✅ Listo para:', user.id, '| SubID: pendiente');
+            // Reintentar obtener subId después de un momento
+            setTimeout(async () => {
+              try {
+                const retrySubId = OneSignal.User?.PushSubscription?.id;
+                if (retrySubId) {
+                  await supabase.from('profiles')
+                    .update({ onesignal_player_id: retrySubId })
+                    .eq('id', user.id);
+                  console.log('[OneSignal] player_id guardado (retry):', retrySubId);
+                }
+              } catch (_) {}
+            }, 3000);
           }
+
+          // Escuchar cambios de suscripción (cuando el usuario acepta el permiso después)
+          try {
+            OneSignal.User?.PushSubscription?.addEventListener('change', async (event) => {
+              const newSubId = event?.current?.id;
+              if (newSubId) {
+                console.log('[OneSignal] Suscripción activada:', newSubId);
+                await supabase.from('profiles')
+                  .update({ onesignal_player_id: newSubId })
+                  .eq('id', user.id)
+                  .catch(() => {});
+              }
+            });
+          } catch (_) { /* silencioso */ }
 
         } catch (loginErr) {
           const msg = loginErr?.message?.toLowerCase() ?? '';
