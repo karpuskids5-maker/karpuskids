@@ -394,12 +394,29 @@ export const StudentsModule = {
 
       // 3. Guardar Estudiante
       if (id) {
-        const { error } = await supabase.from('students').update(payload).eq('id', id);
-        if (error) throw error;
+        // Intentar con classroom_id, fallback RPC si la columna no existe
+        let { error } = await supabase.from('students').update(payload).eq('id', id);
+        if (error && error.code === '42703' && 'classroom_id' in payload) {
+          const { classroom_id, ...payloadWithout } = payload;
+          const res2 = await supabase.from('students').update(payloadWithout).eq('id', id);
+          if (res2.error) throw res2.error;
+          // Asignar aula via RPC
+          if (classroom_id) {
+            await supabase.rpc('assign_student_to_classroom', {
+              p_student_id: parseInt(id, 10),
+              p_classroom_id: classroom_id
+            });
+          }
+        } else if (error) throw error;
         Helpers.toast('Estudiante actualizado correctamente');
       } else {
-        const { error } = await supabase.from('students').insert([payload]);
-        if (error) throw error;
+        // Intentar con classroom_id, fallback sin ella
+        let { error } = await supabase.from('students').insert([payload]);
+        if (error && error.code === '42703' && 'classroom_id' in payload) {
+          const { classroom_id, ...payloadWithout } = payload;
+          const res2 = await supabase.from('students').insert([payloadWithout]);
+          if (res2.error) throw res2.error;
+        } else if (error) throw error;
         Helpers.toast('Estudiante registrado correctamente');
       }
 

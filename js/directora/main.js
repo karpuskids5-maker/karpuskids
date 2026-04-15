@@ -400,20 +400,18 @@ function updateBadgeUI(total) {
     }
   }
 
-  // Sincronizar con sidebar badge y tarjeta del dashboard
-  const sidebarBadge = document.getElementById('badge-comunicacion');
+  // Solo actualizar tarjeta del dashboard (no sidebar)
   const cardBadge = document.getElementById('badge-card-comunicacion');
-  [sidebarBadge, cardBadge].forEach(b => {
-    if (!b) return;
+  if (cardBadge) {
     if (total > 0) {
-      b.textContent = total > 99 ? '99+' : String(total);
-      b.classList.remove('hidden');
-      b.classList.add('flex');
+      cardBadge.textContent = total > 99 ? '99+' : String(total);
+      cardBadge.classList.remove('hidden');
+      cardBadge.classList.add('flex');
     } else {
-      b.classList.add('hidden');
-      b.classList.remove('flex');
+      cardBadge.classList.add('hidden');
+      cardBadge.classList.remove('flex');
     }
-  });
+  }
 }
 
 async function loadNewPostsBadge() {
@@ -426,26 +424,23 @@ async function loadNewPostsBadge() {
       .gt('created_at', lastVisit);
 
     const total = count || 0;
-    const sidebarBadge = document.getElementById('badge-muro');
+    // Solo actualizar tarjeta del dashboard (no sidebar)
     const cardBadge = document.getElementById('badge-card-muro');
-    [sidebarBadge, cardBadge].forEach(b => {
-      if (!b) return;
+    if (cardBadge) {
       if (total > 0) {
-        b.textContent = total > 99 ? '99+' : String(total);
-        b.classList.remove('hidden');
-        b.classList.add('flex');
+        cardBadge.textContent = total > 99 ? '99+' : String(total);
+        cardBadge.classList.remove('hidden');
+        cardBadge.classList.add('flex');
       } else {
-        b.classList.add('hidden');
-        b.classList.remove('flex');
+        cardBadge.classList.add('hidden');
+        cardBadge.classList.remove('flex');
       }
-    });
+    }
 
     // Limpiar badge al entrar a muro
     document.querySelector('[data-section="muro"]')?.addEventListener('click', () => {
       localStorage.setItem('karpus_muro_last_visit', new Date().toISOString());
-      [sidebarBadge, cardBadge].forEach(b => {
-        if (b) { b.classList.add('hidden'); b.classList.remove('flex'); }
-      });
+      if (cardBadge) { cardBadge.classList.add('hidden'); cardBadge.classList.remove('flex'); }
     }, { once: false });
 
   } catch (_) {}

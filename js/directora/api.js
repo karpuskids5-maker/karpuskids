@@ -123,7 +123,7 @@ export const DirectorApi = {
         supabase.from('students').select('id', { count: 'exact', head: true }),
         supabase.from('profiles').select('id', { count: 'exact', head: true }).in('role', ['maestra', 'asistente']),
         supabase.from('classrooms').select('id', { count: 'exact', head: true }),
-        supabase.from('attendance').select('id', { count: 'exact', head: true }).eq('date', today).in('status', ['present', 'late', 'presente', 'tarde']),
+        supabase.from('attendance').select('id', { count: 'exact', head: true }).eq('date', today).in('status', ['present', 'late']),
         supabase.from('payments').select('amount').eq('status', 'pending'),
         supabase.from('inquiries').select('id', { count: 'exact', head: true }).not('status', 'in', '("resolved","closed")')
       ]);
@@ -325,7 +325,13 @@ export const DirectorApi = {
   },
   async createStudent(data) {
     try {
-      const result = await supabase.from(TABLES.STUDENTS).insert(data).select().single();
+      let result = await supabase.from(TABLES.STUDENTS).insert(data).select().single();
+      // Si falla por classroom_id inexistente, reintentar sin esa columna
+      if (result.error && (result.error.message?.includes('classroom_id') || result.error.code === '42703')) {
+        console.warn('[createStudent] classroom_id no existe en DB, reintentando sin ella');
+        const { classroom_id, ...dataWithout } = data;
+        result = await supabase.from(TABLES.STUDENTS).insert(dataWithout).select().single();
+      }
       QueryCache.invalidate('dir_students');
       return result;
     } catch (e) { return logError('createStudent', e); }
@@ -345,7 +351,15 @@ export const DirectorApi = {
     // Eliminar campos que no existen en la DB
     delete clean.stAge;
 
-    const result = await supabase.from(TABLES.STUDENTS).update(clean).eq('id', numId);
+    let result = await supabase.from(TABLES.STUDENTS).update(clean).eq('id', numId);
+
+    // Si falla por classroom_id inexistente, reintentar sin esa columna
+    if (result.error && (result.error.message?.includes('classroom_id') || result.error.code === '42703')) {
+      console.warn('[updateStudent] classroom_id no existe en DB, reintentando sin ella');
+      const { classroom_id, ...cleanWithout } = clean;
+      result = await supabase.from(TABLES.STUDENTS).update(cleanWithout).eq('id', numId);
+    }
+
     if (result.error) {
       console.error('[updateStudent] Error:', result.error.message, '| payload keys:', Object.keys(clean));
     }
@@ -402,7 +416,10 @@ export const DirectorApi = {
 
   async generateMonthlyCharges(month, year) {
     try {
-      return await supabase.rpc('generate_monthly_charges', { p_month: month, p_year: year });
+      return await supabase.rpc('generate_monthly_charges', { 
+        p_month: Number(month), 
+        p_year: Number(year) 
+      });
     } catch (e) { return logError('generateMonthlyCharges', e); }
   },
 

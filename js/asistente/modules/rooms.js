@@ -230,16 +230,26 @@ export const RoomsModule = {
         const roomIdNum = parseInt(savedId, 10);
         const toAssign   = [...checks].filter(c => c.checked).map(c => parseInt(c.value, 10));
         const toUnassign = [...checks].filter(c => !c.checked).map(c => parseInt(c.value, 10));
-        if (toAssign.length) {
-          const { error: assignErr } = await supabase
-            .from('students').update({ classroom_id: roomIdNum }).in('id', toAssign);
-          if (assignErr) console.warn('[saveRoom] assign error:', assignErr.message);
-        }
-        if (toUnassign.length) {
-          const { error: unassignErr } = await supabase
-            .from('students').update({ classroom_id: null }).in('id', toUnassign);
-          if (unassignErr) console.warn('[saveRoom] unassign error:', unassignErr.message);
-        }
+
+        // Helper con fallback RPC si classroom_id no existe
+        const updateClassroom = async (ids, value) => {
+          if (!ids.length) return;
+          const updateVal = value === null || value === undefined ? null : value;
+          const res = await supabase.from('students').update({ classroom_id: updateVal }).in('id', ids);
+          if (res.error && res.error.code === '42703') {
+            for (const sid of ids) {
+              await supabase.rpc('assign_student_to_classroom', {
+                p_student_id: sid,
+                p_classroom_id: updateVal
+              });
+            }
+          } else if (res.error) {
+            console.warn('[saveRoom] assign error:', res.error.message);
+          }
+        };
+
+        await updateClassroom(toAssign, roomIdNum);
+        await updateClassroom(toUnassign, null);
       }
 
       this.closeModal();

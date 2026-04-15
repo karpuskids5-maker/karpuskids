@@ -215,13 +215,13 @@ export const ChatModule = {
       // 🛡️ Verificación de Auditoría:
       // Solo intentamos marcar como leído si somos participantes del chat.
       const { data: isParticipant } = await supabase.rpc('user_is_participant', {
-        p_conversation_id: conversationId,
+        p_conversation_id: Number(conversationId),
         p_user_id: user.id
       });
 
       if (!isParticipant) return;
 
-      await supabase.rpc('mark_conversation_read', { p_conversation_id: conversationId });
+      await supabase.rpc('mark_conversation_read', { p_conversation_id: Number(conversationId) });
     } catch (e) {
       console.warn('Error marcando leído:', e);
     }
