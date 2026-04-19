@@ -9,7 +9,8 @@ const functions = [
   'send-push',
   'process-event',
   'payment-reminders',
-  'create-student-with-parent'
+  'create-student-with-parent',
+  'backup-to-sheets'
 ];
 
 console.log('🚀 Deploying Karpus Kids Edge Functions...\n');

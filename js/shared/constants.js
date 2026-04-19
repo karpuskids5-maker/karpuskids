@@ -93,6 +93,14 @@ export const MONTHS = Object.freeze([
 ]);
 
 // ============================
+// 🔑 CLAVES Y CONFIGURACIÓN
+// ============================
+export const CONFIG = Object.freeze({
+  GOOGLE_SHEET_ID: '1UoYhq7nHbtHfzfOT3im4l4UKwPBCy2zc-rSBHV_oA_k',
+  TERMS_VERSION: '1.0'
+});
+
+// ============================
 // 🛠️ HELPERS
 // ============================
 

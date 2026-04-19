@@ -178,63 +178,45 @@ export const VideoCallUI = {
   },
 
   _joinRoom(roomName, userName) {
+    const fullRoom = `${ROOM_PREFIX}_${roomName}`;
+
+    // Padres y participantes: abrir en nueva pestaña (evita lobby y límites)
+    // El host (maestra) usa el embed para controlar la sala
     const jitsiContainer = document.getElementById('jitsi-container');
-    if (!jitsiContainer) return;
+
+    // Si no hay container o ya está oculto, abrir en nueva pestaña directamente
+    if (!jitsiContainer) {
+      window.open(`https://${JITSI_DOMAIN}/${fullRoom}`, '_blank');
+      return;
+    }
 
     jitsiContainer.classList.remove('hidden');
     jitsiContainer.scrollIntoView({ behavior: 'smooth', block: 'start' });
-
-    // Loading state
     jitsiContainer.innerHTML = `
-      <div class="flex flex-col items-center justify-center h-full bg-slate-900 text-white gap-4">
-        <div class="w-12 h-12 border-4 border-orange-500 border-t-transparent rounded-full animate-spin"></div>
-        <p class="font-bold text-sm">Conectando a la sala...</p>
-        <p class="text-xs text-white/50">Esto puede tomar unos segundos</p>
+      <div class="flex flex-col items-center justify-center h-full bg-slate-900 text-white gap-4 p-8">
+        <div class="w-16 h-16 bg-orange-500/20 rounded-full flex items-center justify-center text-3xl">🎥</div>
+        <p class="font-black text-lg">Sala lista</p>
+        <p class="text-sm text-white/60 text-center">La videollamada se abrirá en una nueva pestaña para mejor experiencia</p>
+        <button id="btn-open-jitsi-tab"
+          class="px-8 py-3.5 bg-orange-500 hover:bg-orange-600 text-white rounded-2xl font-black text-sm uppercase tracking-wider shadow-lg active:scale-95 transition-all flex items-center gap-2">
+          🚀 Abrir videollamada
+        </button>
+        <button onclick="document.getElementById('jitsi-container').classList.add('hidden')"
+          class="text-xs text-white/40 hover:text-white/70 transition-colors mt-2">
+          Cancelar
+        </button>
       </div>`;
+
+    document.getElementById('btn-open-jitsi-tab')?.addEventListener('click', () => {
+      window.open(`https://${JITSI_DOMAIN}/${fullRoom}`, '_blank');
+      jitsiContainer.classList.add('hidden');
+      jitsiContainer.innerHTML = '';
+    });
 
     if (this._api) {
       try { this._api.dispose(); } catch (_) {}
       this._api = null;
     }
-
-    // Suppress cosmetic errors from Jitsi
-    const origConsoleError = console.error;
-    console.error = (...args) => {
-      const msg = args.join(' ');
-      if (msg.includes('WakeLock') || msg.includes('wake lock') || msg.includes('ERR_FAILED') ||
-          msg.includes('No SW registration') || msg.includes('postMessage')) return;
-      origConsoleError.apply(console, args);
-    };
-    // Suppress speaker-selection warning
-    const origConsoleWarn = console.warn;
-    console.warn = (...args) => {
-      const msg = args.join(' ');
-      if (msg.includes('speaker-selection') || msg.includes('Unrecognized feature')) return;
-      origConsoleWarn.apply(console, args);
-    };
-
-    const loadJitsi = () => {
-      if (window.JitsiMeetExternalAPI) {
-        this._startJitsi(roomName, userName, jitsiContainer);
-      } else {
-        const script = document.createElement('script');
-        script.src = `https://${JITSI_DOMAIN}/external_api.js`;
-        script.onload = () => this._startJitsi(roomName, userName, jitsiContainer);
-        script.onerror = () => {
-          jitsiContainer.innerHTML = `
-              <div class="flex flex-col items-center justify-center h-full bg-slate-50 gap-4 p-8 text-center">
-                <div class="w-16 h-16 bg-rose-100 rounded-full flex items-center justify-center text-3xl">📵</div>
-                <p class="font-black text-slate-700">No se pudo cargar la videollamada</p>
-                <p class="text-sm text-slate-400">Verifica tu conexión a internet e intenta de nuevo.</p>
-                <button onclick="location.reload()" class="px-6 py-2.5 bg-orange-600 text-white rounded-2xl font-black text-xs uppercase">Reintentar</button>
-              </div>`;
-        };
-        document.head.appendChild(script);
-      }
-    };
-
-    // Small delay to let the loading UI render
-    setTimeout(loadJitsi, 300);
   },
 
   _startJitsi(roomName, userName, container) {

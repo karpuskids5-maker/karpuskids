@@ -15,6 +15,9 @@ const json = (data, status = 200) =>
 
 const fmt = (d) => d ? new Date(d).toLocaleString('es-DO') : '';
 
+// ── Configuración ─────────────────────────────────────────────────────────────
+const GOOGLE_SPREADSHEET_ID = '1UoYhq7nHbtHfzfOT3im4l4UKwPBCy2zc-rSBHV_oA_k';
+
 // ── Google JWT Auth ───────────────────────────────────────────────────────────
 async function getGoogleAccessToken(email, privateKey) {
   const now = Math.floor(Date.now() / 1000);
@@ -120,7 +123,7 @@ Deno.serve(async (req) => {
     const SERVICE_KEY  = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')  ?? '';
     const SA_EMAIL     = Deno.env.get('GOOGLE_SERVICE_ACCOUNT_EMAIL') ?? '';
     const SA_KEY       = Deno.env.get('GOOGLE_PRIVATE_KEY')         ?? '';
-    const SHEET_ID     = Deno.env.get('GOOGLE_SPREADSHEET_ID')      ?? '';
+    const SHEET_ID     = Deno.env.get('GOOGLE_SPREADSHEET_ID')      ?? GOOGLE_SPREADSHEET_ID;
 
     if (!SUPABASE_URL || !SERVICE_KEY) return json({ error: 'Missing Supabase env vars' }, 500);
     if (!SA_EMAIL || !SA_KEY || !SHEET_ID) return json({ error: 'Missing Google env vars' }, 500);
