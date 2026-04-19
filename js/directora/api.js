@@ -325,13 +325,7 @@ export const DirectorApi = {
   },
   async createStudent(data) {
     try {
-      let result = await supabase.from(TABLES.STUDENTS).insert(data).select().single();
-      // Si falla por classroom_id inexistente, reintentar sin esa columna
-      if (result.error && (result.error.message?.includes('classroom_id') || result.error.code === '42703')) {
-        console.warn('[createStudent] classroom_id no existe en DB, reintentando sin ella');
-        const { classroom_id, ...dataWithout } = data;
-        result = await supabase.from(TABLES.STUDENTS).insert(dataWithout).select().single();
-      }
+      const result = await withTimeout(() => supabase.from(TABLES.STUDENTS).insert(data).select().single());
       QueryCache.invalidate('dir_students');
       return result;
     } catch (e) { return logError('createStudent', e); }
@@ -341,27 +335,17 @@ export const DirectorApi = {
     if (isNaN(numId)) return { data: null, error: 'ID de estudiante inválido' };
 
     const clean = { ...data };
-    // Mapear horario → schedule
     if ('horario' in clean) { clean.schedule = clean.horario || null; delete clean.horario; }
-    // Asegurar tipos correctos para columnas numéricas
     if ('classroom_id' in clean) clean.classroom_id = clean.classroom_id ? parseInt(clean.classroom_id) : null;
     if ('age'          in clean) clean.age          = clean.age ? parseInt(clean.age) : null;
     if ('monthly_fee'  in clean) clean.monthly_fee  = clean.monthly_fee != null ? parseFloat(clean.monthly_fee) : 0;
     if ('due_day'      in clean) clean.due_day      = clean.due_day ? parseInt(clean.due_day) : 5;
-    // Eliminar campos que no existen en la DB
     delete clean.stAge;
 
-    let result = await supabase.from(TABLES.STUDENTS).update(clean).eq('id', numId);
-
-    // Si falla por classroom_id inexistente, reintentar sin esa columna
-    if (result.error && (result.error.message?.includes('classroom_id') || result.error.code === '42703')) {
-      console.warn('[updateStudent] classroom_id no existe en DB, reintentando sin ella');
-      const { classroom_id, ...cleanWithout } = clean;
-      result = await supabase.from(TABLES.STUDENTS).update(cleanWithout).eq('id', numId);
-    }
+    const result = await withTimeout(() => supabase.from(TABLES.STUDENTS).update(clean).eq('id', numId).select().single());
 
     if (result.error) {
-      console.error('[updateStudent] Error:', result.error.message, '| payload keys:', Object.keys(clean));
+      console.error('[updateStudent] Error fatal:', result.error.message);
     }
     QueryCache.invalidate('dir_students');
     return result;

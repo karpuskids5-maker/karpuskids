@@ -48,6 +48,8 @@ export const GradesModule = {
         container.innerHTML = Helpers.emptyState('No hay registros académicos aún.', '🏆');
         return;
       }
+
+      const gpa = this.calculateGPA(grades, taskEvidences);
       const { label: gpaLabel, color: gpaLabelColor } = this.getGPALabel(gpa);
 
       container.innerHTML = `

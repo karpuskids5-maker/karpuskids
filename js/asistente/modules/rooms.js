@@ -215,43 +215,34 @@ export const RoomsModule = {
       if (id) {
         const { error } = await supabase.from('classrooms').update(payload).eq('id', id);
         if (error) throw error;
-        Helpers.toast('Aula actualizada correctamente');
       } else {
         const { data: newRoom, error } = await supabase.from('classrooms').insert([payload]).select('id').single();
         if (error) throw error;
         savedId = newRoom?.id;
-        Helpers.toast('Aula creada correctamente');
       }
 
       // Assign checked students to this room
       const modal = document.getElementById('roomModal');
       const checks = modal ? modal.querySelectorAll('.room-student-check') : [];
       if (checks.length && savedId) {
-        const roomIdNum = parseInt(savedId, 10);
+        const roomIdVal = parseInt(savedId, 10);
         const toAssign   = [...checks].filter(c => c.checked).map(c => parseInt(c.value, 10));
         const toUnassign = [...checks].filter(c => !c.checked).map(c => parseInt(c.value, 10));
 
-        // Helper con fallback RPC si classroom_id no existe
+        // Helper para actualizar aula de estudiantes
         const updateClassroom = async (ids, value) => {
           if (!ids.length) return;
-          const updateVal = value === null || value === undefined ? null : value;
-          const res = await supabase.from('students').update({ classroom_id: updateVal }).in('id', ids);
-          if (res.error && res.error.code === '42703') {
-            for (const sid of ids) {
-              await supabase.rpc('assign_student_to_classroom', {
-                p_student_id: sid,
-                p_classroom_id: updateVal
-              });
-            }
-          } else if (res.error) {
-            console.warn('[saveRoom] assign error:', res.error.message);
-          }
+          const { error } = await supabase.from('students')
+            .update({ classroom_id: value })
+            .in('id', ids);
+          if (error) throw error;
         };
 
-        await updateClassroom(toAssign, roomIdNum);
+        await updateClassroom(toAssign, roomIdVal);
         await updateClassroom(toUnassign, null);
       }
 
+      Helpers.toast(id ? 'Aula actualizada correctamente' : 'Aula creada correctamente');
       this.closeModal();
       await this.loadRooms();
     } catch (e) {

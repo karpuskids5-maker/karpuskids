@@ -54,10 +54,10 @@ export const AccessModule = {
               </div>
             </div>
             <div class="flex gap-2">
-              <button onclick="window.App.registerAccess(${s.id}, 'check-in')" class="px-3 py-1.5 bg-emerald-50 text-emerald-600 rounded-xl text-[10px] font-black uppercase hover:bg-emerald-100 border border-emerald-100 flex items-center gap-1 transition-all">
+              <button onclick="window.App.registerAccess('${s.id}', 'check-in')" class="px-3 py-1.5 bg-emerald-50 text-emerald-600 rounded-xl text-[10px] font-black uppercase hover:bg-emerald-100 border border-emerald-100 flex items-center gap-1 transition-all">
                 <i data-lucide="log-in" class="w-3 h-3"></i> Entrada
               </button>
-              <button onclick="window.App.registerAccess(${s.id}, 'check-out')" class="px-3 py-1.5 bg-rose-50 text-rose-600 rounded-xl text-[10px] font-black uppercase hover:bg-rose-100 border border-rose-100 flex items-center gap-1 transition-all">
+              <button onclick="window.App.registerAccess('${s.id}', 'check-out')" class="px-3 py-1.5 bg-rose-50 text-rose-600 rounded-xl text-[10px] font-black uppercase hover:bg-rose-100 border border-rose-100 flex items-center gap-1 transition-all">
                 <i data-lucide="log-out" class="w-3 h-3"></i> Salida
               </button>
             </div>

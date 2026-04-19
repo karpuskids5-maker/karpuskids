@@ -18,10 +18,22 @@ export const StudentsModule = {
     tbody.innerHTML = '<tr><td colspan="4" class="text-center py-8"><div class="animate-spin rounded-full h-6 w-6 border-b-2 border-teal-600 mx-auto"></div></td></tr>';
 
     try {
-      const { data: students, error } = await supabase
+      let { data: students, error } = await supabase
         .from('students')
-        .select('id, name, is_active, p1_name, p1_phone, classroom_id, classrooms:classroom_id(name)')
+        .select('id, name, is_active, p1_name, p1_phone, avatar_url, matricula, classroom_id, classrooms:classroom_id(name)')
         .order('name');
+      
+      // Fallback si classroom_id no existe
+      if (error && (error.message?.includes('classroom_id') || error.code === '42703')) {
+        console.warn('[loadStudents] classroom_id no existe, reintentando select básico');
+        const basicRes = await supabase
+          .from('students')
+          .select('id, name, is_active, p1_name, p1_phone, avatar_url, matricula')
+          .order('name');
+        students = basicRes.data;
+        error = basicRes.error;
+      }
+
       if (error) throw error;
 
       if (!students?.length) {
@@ -253,9 +265,7 @@ export const StudentsModule = {
     // Prefill if editing
     if (studentId) {
       try {
-        const numId = parseInt(studentId, 10);
-        if (isNaN(numId)) throw new Error('ID inválido');
-        const { data: st, error } = await supabase.from('students').select('*').eq('id', numId).single();
+        const { data: st, error } = await supabase.from('students').select('*').eq('id', studentId).single();
         if (error) throw error;
         if (st) {
           const sv = (id, v) => { const el = document.getElementById(id); if (el) el.value = v || ''; };
@@ -326,7 +336,7 @@ export const StudentsModule = {
     // Optional columns \u2014 only add if non-empty
     const optionals = {
       matricula:         getVal('stMatricula') || null,
-      classroom_id:      getVal('stClassroom') ? parseInt(getVal('stClassroom'), 10) : null,
+      classroom_id:      getVal('stClassroom') || null, // Mantener como string si es UUID
       blood_type:        getVal('stBlood') || null,
       allergies:         getVal('stAllergies') || null,
       authorized_pickup: getVal('stPickup') || null,
@@ -394,29 +404,13 @@ export const StudentsModule = {
 
       // 3. Guardar Estudiante
       if (id) {
-        // Intentar con classroom_id, fallback RPC si la columna no existe
-        let { error } = await supabase.from('students').update(payload).eq('id', id);
-        if (error && error.code === '42703' && 'classroom_id' in payload) {
-          const { classroom_id, ...payloadWithout } = payload;
-          const res2 = await supabase.from('students').update(payloadWithout).eq('id', id);
-          if (res2.error) throw res2.error;
-          // Asignar aula via RPC
-          if (classroom_id) {
-            await supabase.rpc('assign_student_to_classroom', {
-              p_student_id: parseInt(id, 10),
-              p_classroom_id: classroom_id
-            });
-          }
-        } else if (error) throw error;
+        const numId = parseInt(id, 10);
+        const { error } = await supabase.from('students').update(payload).eq('id', numId);
+        if (error) throw error;
         Helpers.toast('Estudiante actualizado correctamente');
       } else {
-        // Intentar con classroom_id, fallback sin ella
-        let { error } = await supabase.from('students').insert([payload]);
-        if (error && error.code === '42703' && 'classroom_id' in payload) {
-          const { classroom_id, ...payloadWithout } = payload;
-          const res2 = await supabase.from('students').insert([payloadWithout]);
-          if (res2.error) throw res2.error;
-        } else if (error) throw error;
+        const { error } = await supabase.from('students').insert([payload]);
+        if (error) throw error;
         Helpers.toast('Estudiante registrado correctamente');
       }
 

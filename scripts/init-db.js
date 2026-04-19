@@ -21,14 +21,9 @@ function readSql(file) {
 }
 
 function runSql(db, sql) {
-  const statements = sql
-    .split(/;\s*\n/) // separa por ; fin de línea
-    .map(s => s.trim())
-    .filter(Boolean);
-  const tx = db.transaction(() => {
-    for (const s of statements) db.prepare(s).run();
-  });
-  tx();
+  // Use .exec() for scripts with multiple statements and complex blocks
+  // This prevents breaking PL/pgSQL functions or multi-line statements.
+  db.exec(sql);
 }
 
 function main() {
@@ -61,4 +56,3 @@ function main() {
 }
 
 main();
-

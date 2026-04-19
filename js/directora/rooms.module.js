@@ -108,40 +108,15 @@ export const RoomsModule = {
     if (btn) { btn.disabled = true; btn.textContent = '...'; }
 
     try {
-      // Intentar columnas posibles: classroom_id → aula_id → room_id
-      const candidates = ['classroom_id', 'aula_id', 'room_id'];
-      let result = null;
-      let usedCol = null;
+      const { error } = await supabase
+        .from('students')
+        .update({ classroom_id: parseInt(classroomId) })
+        .eq('id', studentId);
 
-      for (const col of candidates) {
-        result = await supabase
-          .from('students')
-          .update({ [col]: parseInt(classroomId) })
-          .eq('id', studentId);
-
-        if (!result.error || result.error.code !== '42703') {
-          usedCol = col;
-          break;
-        }
-      }
-
-      if (result.error) {
-        // Último recurso: RPC si existe
-        const rpcResult = await supabase.rpc('assign_student_to_classroom', {
-          p_student_id: parseInt(studentId),
-          p_classroom_id: parseInt(classroomId)
-        });
-        if (rpcResult.error) {
-          console.error('[assignStudent]', result.error);
-          Helpers.toast('No se pudo asignar. Ejecuta en Supabase SQL Editor: ALTER TABLE public.students ADD COLUMN IF NOT EXISTS classroom_id bigint REFERENCES public.classrooms(id) ON DELETE SET NULL;', 'error');
-          if (btn) { btn.disabled = false; btn.textContent = 'Asignar'; }
-          return;
-        }
-      }
+      if (error) throw error;
 
       const row = document.getElementById(`unassigned-row-${studentId}`);
       if (row) {
-        row.style.transition = 'opacity 0.3s, transform 0.3s';
         row.style.opacity = '0';
         row.style.transform = 'translateX(20px)';
         setTimeout(() => row.remove(), 300);
@@ -198,29 +173,27 @@ export const RoomsModule = {
         savedId = newRoom?.id;
       }
 
-      // Asignar/desasignar estudiantes del checklist
+      // Asignar/desasignar estudiantes del checklist via update directo
       const checks = document.querySelectorAll('.room-student-check');
-      if (checks.length && savedId) {
+      if (checks.length > 0 && savedId) {
         const roomIdNum = parseInt(savedId, 10);
         const toAssign   = [...checks].filter(c => c.checked).map(c => parseInt(c.value, 10));
         const toUnassign = [...checks].filter(c => !c.checked).map(c => parseInt(c.value, 10));
 
-        const updateClassroom = async (ids, value) => {
-          if (!ids.length) return;
-          const updateVal = value === null || value === undefined ? null : value;
-          const res = await supabase.from('students').update({ classroom_id: updateVal }).in('id', ids);
-          if (res.error && res.error.code === '42703') {
-            // Siempre usar 2 parámetros — evita error de overload con función de 1 parámetro
-            for (const sid of ids) {
-              await supabase.rpc('assign_student_to_classroom', {
-                p_student_id: sid,
-                p_classroom_id: updateVal
-              });
-            }
-          }
-        };
-        await updateClassroom(toAssign, roomIdNum);
-        await updateClassroom(toUnassign, null);
+        if (toAssign.length) {
+          const { error } = await supabase
+            .from('students')
+            .update({ classroom_id: roomIdNum })
+            .in('id', toAssign);
+          if (error) throw error;
+        }
+        if (toUnassign.length) {
+          const { error } = await supabase
+            .from('students')
+            .update({ classroom_id: null })
+            .in('id', toUnassign);
+          if (error) throw error;
+        }
       }
 
       Helpers.toast(id ? 'Aula actualizada' : 'Aula creada', 'success');

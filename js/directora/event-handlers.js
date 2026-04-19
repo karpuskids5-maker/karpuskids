@@ -1,7 +1,7 @@
-// ✅ DELEGATED EVENT HANDLERS (XSS Safe)
-// Centralized event handling to replace inline onclick handlers
+import { DirectorApi } from './api.js';
+import { supabase } from '../shared/supabase.js';
 
-// 🎯 Mapa central de acciones
+// ✅ DELEGATED EVENT HANDLERS (XSS Safe)
 const ACTIONS = {
   'btn-inquiry-detail': (id) => window.App?.inquiries?.openDetail?.(id),
   'btn-inquiry-reply': (id) => window.App?.inquiries?.reply?.(id),
@@ -9,7 +9,7 @@ const ACTIONS = {
   'btn-student-delete': (id) => window.App?.students?.delete?.(id),
   'btn-teacher-edit': (id) => window.App?.teachers?.edit?.(id),
   'btn-modal-close': () => window.App?.ui?.closeModal?.(),
-  'btn-logout': () => window.supabase?.auth?.signOut()?.then(() => window.location.href = 'index.html')
+  'btn-logout': () => window.supabase?.auth?.signOut()?.then(() => window.location.href = 'index.html'),
 };
 
 // 🎯 Delegación optimizada
