@@ -210,6 +210,17 @@ function initNavigation() {
           case 'chat':
             await initAssistantChat();
             break;
+          case 'videocall': {
+            const vcProfile = AppState.get('profile') || {};
+            import('../shared/videocall-ui.js').then(({ VideoCallUI }) => {
+              VideoCallUI.renderSection('videocall-asistente-section', {
+                role: 'asistente',
+                userName: vcProfile?.name || 'Asistente',
+                classroomId: null
+              });
+            }).catch(console.error);
+            break;
+          }
           case 'perfil':
             initProfile();
             import('../shared/notify-permission.js').then(m => m.NotifyPermission.requestIfNeeded());

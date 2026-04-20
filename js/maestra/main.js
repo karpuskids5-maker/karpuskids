@@ -664,8 +664,9 @@ async function startJitsi() {
     // 3. Iniciar la reuni\u00f3n
     await VideoCallModule.startMeeting(meeting.id);
 
-    // 4. Renderizar Jitsi
-    VideoCallModule.joinMeeting(meeting, 'meet', AppState.get('profile'));
+    // 4. Abrir en nueva pestana (evita lobby membersOnly)
+    const _fullRoom = 'karpuskids-edu-2026_' + meeting.room_name;
+    window.open('https://meet.jit.si/' + _fullRoom, '_blank');
 
     safeToast('\u00a1Clase iniciada! Los padres han sido notificados \ud83c\udfa5', 'success');
   } catch (e) {

@@ -421,6 +421,7 @@ export function navigateTo(targetId) {
       case 'class':           FeedModule.init(student?.classroom_id); break;
       case 'profile':         ProfileModule.init(); NotifyPermission.requestIfNeeded(); break;
       case 'grades':          GradesModule.init(student?.id); break;
+      case 'qr-access':       _initPadreQR(student); break;
       case 'videocall': {
         const student = AppState.get('currentStudent');
         const profile = AppState.get('profile');
@@ -578,7 +579,7 @@ async function checkActiveMeetings() {
       if (!btn._vcInitialized) {
         btn.addEventListener('click', () => {
           navigateTo('videocall');
-          VideoCallModule.joinMeeting(active, 'meet', AppState.get('profile'));
+          window.open('https://meet.jit.si/karpuskids-edu-2026_' + active.room_name, '_blank');
         });
         btn._vcInitialized = true;
       }
@@ -587,4 +588,85 @@ async function checkActiveMeetings() {
       btn.classList.remove('ring-2', 'ring-rose-400', 'animate-pulse');
     }
   } catch (_) {}
+}
+
+// ── QR de Acceso del Padre ────────────────────────────────────────────────────
+async function _initPadreQR(student) {
+  const container = document.getElementById('padre-qr-container');
+  const matLabel  = document.getElementById('padre-qr-matricula');
+  const nameLabel = document.getElementById('padre-qr-name');
+  if (!container || !student) return;
+
+  const matricula = student.matricula;
+  const name      = student.name;
+
+  if (matLabel) matLabel.textContent = matricula || 'Sin matrícula';
+  if (nameLabel) nameLabel.textContent = name || '';
+
+  if (!matricula) {
+    container.innerHTML = '<div class="w-48 h-48 flex flex-col items-center justify-center text-slate-400 gap-2"><i data-lucide="alert-circle" class="w-10 h-10"></i><p class="text-xs font-bold text-center">Sin matrícula asignada.<br>Contacta a la directora.</p></div>';
+    if (window.lucide) lucide.createIcons();
+    return;
+  }
+
+  // Cargar librería QR
+  if (!window.QRCode) {
+    await new Promise(resolve => {
+      const s = document.createElement('script');
+      s.src = 'https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js';
+      s.onload = resolve;
+      document.head.appendChild(s);
+    });
+  }
+
+  container.innerHTML = '';
+  const qrData = JSON.stringify({ matricula, name, type: 'karpus-access', v: 1 });
+
+  new window.QRCode(container, {
+    text: qrData,
+    width: 192,
+    height: 192,
+    colorDark: '#1e293b',
+    colorLight: '#ffffff',
+    correctLevel: window.QRCode.CorrectLevel.H
+  });
+
+  // Funciones globales para imprimir/compartir
+  window.App.printPadreQR = () => {
+    const img = container.querySelector('img')?.src || container.querySelector('canvas')?.toDataURL();
+    if (!img) return;
+    const win = window.open('', '_blank');
+    win.document.write(`<!DOCTYPE html><html><head><title>QR - ${matricula}</title>
+      <style>body{font-family:Arial,sans-serif;display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:100vh;margin:0;background:#fff;}
+      .card{border:2px solid #e2e8f0;border-radius:16px;padding:24px;text-align:center;max-width:280px;}
+      .logo{font-size:12px;font-weight:900;color:#f97316;text-transform:uppercase;letter-spacing:2px;margin-bottom:12px;}
+      img{width:192px;height:192px;}.name{font-size:16px;font-weight:900;color:#1e293b;margin-top:12px;}
+      .mat{font-size:11px;color:#64748b;font-weight:700;margin-top:4px;}.hint{font-size:9px;color:#94a3b8;margin-top:8px;}</style>
+    </head><body><div class="card">
+      <div class="logo">🎓 Karpus Kids</div>
+      <img src="${img}" alt="QR">
+      <div class="name">${name}</div>
+      <div class="mat">${matricula}</div>
+      <div class="hint">Escanea para registrar entrada/salida</div>
+    </div><script>window.onload=()=>{window.print();}<\/script></body></html>`);
+    win.document.close();
+  };
+
+  window.App.sharePadreQR = async () => {
+    const canvas = container.querySelector('canvas');
+    if (!canvas) return;
+    try {
+      canvas.toBlob(async (blob) => {
+        const file = new File([blob], `QR-${matricula}.png`, { type: 'image/png' });
+        if (navigator.share && navigator.canShare({ files: [file] })) {
+          await navigator.share({ title: `QR Karpus Kids - ${name}`, files: [file] });
+        } else {
+          const url = URL.createObjectURL(blob);
+          const a = document.createElement('a');
+          a.href = url; a.download = `QR-${matricula}.png`; a.click();
+          URL.revokeObjectURL(url);
+        }
+      });
+    } catch (_) {}
+  };
 }

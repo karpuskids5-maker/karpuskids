@@ -11,6 +11,7 @@ import { GradesModule } from './grades.module.js';
 import { AttendanceModule } from './attendance.module.js';
 import { ChatModule } from './chat.module.js';
 import { InquiriesModule } from './inquiries.module.js';
+import { AccessModule } from './access.module.js';
 import { RoomsModule } from './rooms.module.js';
 import { BadgeSystem } from '../shared/badges.js';
 import { ImageLoader } from '../shared/image-loader.js';
@@ -91,9 +92,21 @@ export function goToSection(sectionId) {
       case 'calificaciones': GradesModule.init(); break;
       case 'pagos': PaymentsModule.init(); break;
       case 'comunicacion': ChatModule.init(); break;
+      case 'videoconferencia': {
+        const profile = AppState.get('profile');
+        import('../shared/videocall-ui.js').then(({ VideoCallUI }) => {
+          VideoCallUI.renderSection('videocall-directora-section', {
+            role: 'directora',
+            userName: profile?.name || 'Directora',
+            classroomId: null
+          });
+        }).catch(console.error);
+        break;
+      }
       case 'muro':
         WallModule.init('muroPostsContainer', { accentColor: 'orange' }, AppState);
         break;
+      case 'accesos': AccessModule.init(); break;
       case 'reportes': InquiriesModule.init(); break;
       case 'configuracion':
         loadProfile();
@@ -133,6 +146,41 @@ async function loadProfile() {
     setVal('confDirBio', profile.bio);
     setVal('confPhone', profile.phone);
     setVal('confEmail', profile.email);
+
+    // Cargar horario desde school_settings
+    try {
+      const { data: settings } = await supabase.from('school_settings').select('*').eq('id', 1).single();
+      if (settings) {
+        if (settings.open_time)  { const el = document.getElementById('confOpenTime');  if (el) el.value = settings.open_time; }
+        if (settings.close_time) { const el = document.getElementById('confCloseTime'); if (el) el.value = settings.close_time; }
+        if (settings.work_days) {
+          const days = typeof settings.work_days === 'string' ? JSON.parse(settings.work_days) : settings.work_days;
+          document.querySelectorAll('.work-day-btn').forEach(btn => {
+            if (days.includes(btn.dataset.day)) {
+              btn.classList.add('bg-violet-600', 'text-white', 'border-violet-600');
+              btn.classList.remove('bg-white', 'text-slate-500', 'border-slate-200');
+            }
+          });
+        }
+        _updateSchedulePreview();
+      }
+    } catch (_) {}
+
+    // Inicializar toggle de días y preview
+    window.toggleWorkDay = (btn) => {
+      const active = btn.classList.contains('bg-violet-600');
+      if (active) {
+        btn.classList.remove('bg-violet-600', 'text-white', 'border-violet-600');
+        btn.classList.add('bg-white', 'text-slate-500', 'border-slate-200');
+      } else {
+        btn.classList.add('bg-violet-600', 'text-white', 'border-violet-600');
+        btn.classList.remove('bg-white', 'text-slate-500', 'border-slate-200');
+      }
+      _updateSchedulePreview();
+    };
+
+    document.getElementById('confOpenTime')?.addEventListener('change', _updateSchedulePreview);
+    document.getElementById('confCloseTime')?.addEventListener('change', _updateSchedulePreview);
     
     const nameEl = document.getElementById('sidebarName'); 
     if(nameEl) nameEl.textContent = profile.name || 'Directora';
@@ -300,7 +348,18 @@ document.addEventListener('DOMContentLoaded', async () => {
       const { error } = await supabase.from('profiles').update(updates).eq('id', auth.user.id);
       if (error) Helpers.toast('Error al guardar perfil: ' + error.message, 'error');
       else {
-        Helpers.toast('Perfil actualizado correctamente');
+        // Guardar horario en school_settings
+        const openTime  = document.getElementById('confOpenTime')?.value;
+        const closeTime = document.getElementById('confCloseTime')?.value;
+        const workDays  = [...document.querySelectorAll('.work-day-btn.bg-violet-600')].map(b => b.dataset.day);
+        const scheduleUpdates = {};
+        if (openTime)  scheduleUpdates.open_time  = openTime;
+        if (closeTime) scheduleUpdates.close_time = closeTime;
+        if (workDays.length) scheduleUpdates.work_days = JSON.stringify(workDays);
+        if (Object.keys(scheduleUpdates).length) {
+          await supabase.from('school_settings').update(scheduleUpdates).eq('id', 1);
+        }
+        Helpers.toast('Configuración guardada correctamente', 'success');
         AppState.set('profile', { ...auth.profile, ...updates });
         loadProfile();
       }
@@ -444,4 +503,107 @@ async function loadNewPostsBadge() {
     }, { once: false });
 
   } catch (_) {}
+}
+
+// ── Sección de Accesos (QR + Asistencia en vivo) ─────────────────────────────
+function _initAccesosSection() {
+  const container = document.getElementById('accesos-content');
+  if (!container) return;
+
+  // Cargar librería QR si no está
+  const loadQR = () => new Promise(resolve => {
+    if (window.QRCode) { resolve(); return; }
+    const s = document.createElement('script');
+    s.src = 'https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js';
+    s.onload = resolve;
+    document.head.appendChild(s);
+  });
+
+  // Cargar estudiantes y generar QRs
+  const loadStudentsQR = async () => {
+    container.innerHTML = '<div class="flex justify-center py-12"><div class="animate-spin w-8 h-8 border-2 border-orange-500 rounded-full border-t-transparent"></div></div>';
+    await loadQR();
+
+    const { data: students } = await supabase
+      .from('students')
+      .select('id, name, matricula, classrooms:classroom_id(name)')
+      .eq('is_active', true)
+      .not('matricula', 'is', null)
+      .order('name');
+
+    if (!students?.length) {
+      container.innerHTML = '<div class="text-center py-12 text-slate-400"><p class="font-bold">No hay estudiantes con matrícula asignada.</p><p class="text-xs mt-1">Asigna matrículas desde la sección Estudiantes.</p></div>';
+      return;
+    }
+
+    container.innerHTML = students.map(s => `
+      <div class="bg-white rounded-3xl border border-slate-100 shadow-sm p-5 flex flex-col items-center gap-3 hover:shadow-md transition-all">
+        <div id="qr-${s.id}" class="bg-white p-2 rounded-xl border border-slate-100"></div>
+        <div class="text-center">
+          <p class="font-black text-slate-800 text-sm">${s.name}</p>
+          <p class="text-[10px] font-bold text-orange-600 uppercase tracking-widest">${s.matricula}</p>
+          <p class="text-[10px] text-slate-400">${s.classrooms?.name || 'Sin aula'}</p>
+        </div>
+        <button onclick="window._printStudentQR('${s.id}','${s.name}','${s.matricula}')"
+          class="w-full py-2 bg-slate-800 text-white rounded-xl font-black text-[9px] uppercase tracking-widest hover:bg-slate-900 transition-all flex items-center justify-center gap-1.5">
+          <i data-lucide="printer" class="w-3 h-3"></i> Imprimir
+        </button>
+      </div>`).join('');
+
+    // Generar QRs
+    students.forEach(s => {
+      const el = document.getElementById(`qr-${s.id}`);
+      if (!el) return;
+      new window.QRCode(el, {
+        text: JSON.stringify({ matricula: s.matricula, name: s.name, type: 'karpus-access', v: 1 }),
+        width: 120, height: 120,
+        colorDark: '#1e293b', colorLight: '#ffffff',
+        correctLevel: window.QRCode.CorrectLevel.H
+      });
+    });
+
+    if (window.lucide) lucide.createIcons();
+  };
+
+  // Función global para imprimir QR individual
+  window._printStudentQR = (id, name, matricula) => {
+    const el = document.getElementById(`qr-${id}`);
+    const img = el?.querySelector('img')?.src || el?.querySelector('canvas')?.toDataURL();
+    if (!img) return;
+    const win = window.open('', '_blank');
+    win.document.write(`<!DOCTYPE html><html><head><title>QR ${matricula}</title>
+      <style>body{font-family:Arial,sans-serif;display:flex;align-items:center;justify-content:center;min-height:100vh;margin:0;}
+      .card{border:2px solid #e2e8f0;border-radius:16px;padding:20px;text-align:center;max-width:240px;}
+      .logo{font-size:11px;font-weight:900;color:#f97316;text-transform:uppercase;letter-spacing:2px;margin-bottom:10px;}
+      img{width:160px;height:160px;}.name{font-size:14px;font-weight:900;color:#1e293b;margin-top:10px;}
+      .mat{font-size:10px;color:#64748b;font-weight:700;margin-top:3px;}.hint{font-size:8px;color:#94a3b8;margin-top:6px;}</style>
+    </head><body><div class="card">
+      <div class="logo">🎓 Karpus Kids</div>
+      <img src="${img}">
+      <div class="name">${name}</div>
+      <div class="mat">${matricula}</div>
+      <div class="hint">Escanea para registrar entrada/salida</div>
+    </div><script>window.onload=()=>window.print()<\/script></body></html>`);
+    win.document.close();
+  };
+
+  loadStudentsQR();
+}
+
+// ── Preview dinámico del horario ──────────────────────────────────────────────
+function _updateSchedulePreview() {
+  const preview = document.getElementById('schedulePreview');
+  if (!preview) return;
+
+  const days = [...document.querySelectorAll('.work-day-btn.bg-violet-600')].map(b => b.dataset.day);
+  const open  = document.getElementById('confOpenTime')?.value  || '';
+  const close = document.getElementById('confCloseTime')?.value || '';
+
+  if (!days.length && !open) { preview.classList.add('hidden'); return; }
+
+  const daysText = days.length ? days.join(' · ') : 'Sin días seleccionados';
+  const timeText = open && close ? `${open} – ${close}` : '';
+
+  preview.classList.remove('hidden');
+  preview.innerHTML = `<span class="text-violet-600">📅 ${daysText}</span>${timeText ? `<span class="mx-2 text-violet-300">|</span><span class="text-violet-800">🕐 ${timeText}</span>` : ''}`;
 }

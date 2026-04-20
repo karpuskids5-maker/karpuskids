@@ -49,8 +49,12 @@ export const PaymentsModule = {
       this.settings.due_day = data.due_day || 5;
       const g = document.getElementById('confGenDay');
       const d = document.getElementById('confDueDay');
+      const p = document.getElementById('confPhone');
+      const h = document.getElementById('confHours');
       if (g) g.value = this.settings.generation_day;
       if (d) d.value = this.settings.due_day;
+      if (p) p.value = data.phone || '';
+      if (h) h.value = data.business_hours || '';
     } catch (_) {}
   },
 
@@ -334,10 +338,21 @@ export const PaymentsModule = {
   async savePaymentConfig() {
     const g = parseInt(document.getElementById('confGenDay')?.value || 25);
     const d = parseInt(document.getElementById('confDueDay')?.value || 5);
+    const phone = document.getElementById('confPhone')?.value?.trim();
+    const hours = document.getElementById('confHours')?.value?.trim();
+
     if (isNaN(g) || g < 1 || g > 28) return Helpers.toast('Dia generacion invalido (1-28)', 'warning');
     if (isNaN(d) || d < 1 || d > 28) return Helpers.toast('Dia limite invalido (1-28)', 'warning');
+
     try {
-      await supabase.from('school_settings').upsert({ id: 1, generation_day: g, due_day: d, updated_at: new Date().toISOString() });
+      await supabase.from('school_settings').upsert({ 
+        id: 1, 
+        generation_day: g, 
+        due_day: d, 
+        phone: phone,
+        business_hours: hours,
+        updated_at: new Date().toISOString() 
+      });
       this.settings.generation_day = g;
       this.settings.due_day = d;
       Helpers.toast('Configuracion guardada', 'success');

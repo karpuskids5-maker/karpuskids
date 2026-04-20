@@ -13,10 +13,11 @@
   
   <script src="https://cdn.jsdelivr.net/npm/chart.js" defer></script>
   <script src="https://cdn.jsdelivr.net/npm/lucide/dist/umd/lucide.js" defer></script>
-  <!-- OCR Library for Vouchers -->
   <script src='https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js' defer></script>
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js" crossorigin="anonymous" referrerpolicy="no-referrer" defer></script>
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.31/jspdf.plugin.autotable.min.js" defer></script>
+  
+  <!-- PDF Libs corregidas con crossorigin y sin acceso a storage innecesario -->
+  <script src="https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js" crossorigin="anonymous"></script>
+  <script src="https://cdn.jsdelivr.net/npm/jspdf-autotable@3.5.31/dist/jspdf.plugin.autotable.min.js" crossorigin="anonymous"></script>
   
   <style>
     /* ═══════════════════════════════════════════════
@@ -576,6 +577,16 @@
             <h3 class="font-black text-slate-800 text-lg">Muro Escolar</h3>
             <p class="text-slate-500 text-xs mt-1">Publicaciones generales para la estancia.</p>
           </div>
+
+          <!-- Sistema de Acceso -->
+          <div data-action="go-section" data-section="accesos" id="cardAcceso" class="bg-white p-6 rounded-3xl shadow-sm border border-slate-100 hover:shadow-md hover:-translate-y-1 active:scale-95 transition-all duration-300 text-left group cursor-pointer relative overflow-hidden block">
+            <div class="absolute top-0 right-0 w-24 h-24 bg-orange-500/5 rounded-full -mr-12 -mt-12 group-hover:bg-orange-500/10 transition-colors"></div>
+            <div class="w-14 h-14 bg-orange-50 rounded-2xl flex items-center justify-center mb-4 group-hover:bg-orange-500 transition-colors relative z-10">
+              <i data-lucide="qr-code" class="w-7 h-7 text-orange-600 group-hover:text-white transition-colors"></i>
+            </div>
+            <h3 class="font-black text-slate-800 text-lg relative z-10">Control de Accesos</h3>
+            <p class="text-slate-500 text-xs mt-1 relative z-10">Monitoreo de asistencia de personal y estudiantes en tiempo real.</p>
+          </div>
         </div>
 
       </section>
@@ -659,22 +670,12 @@
 
       </section>
 
-      <!-- VIDEOCONFERENCIA (NUEVA SECCIÓN) -->
+      <!-- VIDEOCONFERENCIA -->
       <section id="videoconferencia" class="section">
-        <div class="flex items-center justify-between mb-6">
-          <div>
-            <h2 class="text-2xl font-bold text-slate-800 flex items-center gap-2">
-              <i data-lucide="video" class="w-6 h-6 text-rose-600"></i>
-              Sala de Videoconferencias
-            </h2>
-            <p class="text-slate-500 text-sm">Inicie reuniones virtuales para aulas específicas</p>
+        <div id="videocall-directora-section" class="min-h-[60vh]">
+          <div class="flex justify-center py-12">
+            <div class="animate-spin w-8 h-8 border-2 border-rose-500 rounded-full border-t-transparent"></div>
           </div>
-        </div>
-        <div class="bg-white rounded-3xl shadow-sm border border-slate-100 p-12 text-center">
-          <div class="w-20 h-20 bg-rose-50 rounded-full flex items-center justify-center mx-auto mb-4"><i data-lucide="camera" class="w-10 h-10 text-rose-500"></i></div>
-          <h3 class="text-xl font-bold text-slate-800 mb-2">Módulo de Clases en Vivo</h3>
-          <p class="text-slate-500 mb-6 max-w-md mx-auto">Seleccione un aula desde la sección "Aulas" para iniciar una transmisión específica para ese grupo.</p>
-          <button onclick="App.navigation.goTo('aulas')" class="px-6 py-3 bg-rose-600 text-white rounded-xl font-bold hover:bg-rose-700 transition-colors">Ir a Aulas</button>
         </div>
       </section>
 
@@ -1059,6 +1060,86 @@
         <div id="reportsList" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 p-2"><!-- JS --></div>
       </section>
 
+      <!-- SECCIÓN DE ACCESOS — QRs de Estudiantes -->
+      <section id="accesos" class="section">
+        <div class="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-6">
+          <div>
+            <h1 class="text-2xl font-black text-slate-800 tracking-tight flex items-center gap-3">
+              <span class="p-2 bg-orange-100 text-orange-600 rounded-2xl"><i data-lucide="user-check" class="w-5 h-5"></i></span>
+              Monitoreo de Asistencia en Vivo
+            </h1>
+            <p class="text-slate-500 text-sm font-medium mt-0.5">Seguimiento de puntualidad del personal y estudiantes</p>
+          </div>
+          <div class="flex gap-2 flex-wrap">
+            <button id="btnExportAccessReport" class="px-4 py-2.5 bg-slate-800 text-white rounded-xl font-black text-[10px] uppercase tracking-wider hover:bg-slate-900 transition-all flex items-center gap-2">
+              <i data-lucide="file-text" class="w-4 h-4"></i> Reporte Diario
+            </button>
+            <button id="btnIntelligentReport" class="px-4 py-2.5 bg-rose-600 text-white rounded-xl font-black text-[10px] uppercase tracking-wider hover:bg-rose-700 transition-all flex items-center gap-2 shadow-lg shadow-rose-100">
+              <i data-lucide="zap" class="w-4 h-4"></i> Reporte No Reportados
+            </button>
+          </div>
+        </div>
+
+        <!-- FILTROS PROFESIONALES -->
+        <div class="bg-white p-4 rounded-3xl border border-slate-100 shadow-sm mb-6 flex flex-wrap gap-4 items-end">
+          <div class="flex-1 min-w-[200px]">
+            <label class="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1.5 ml-1">Buscar por nombre</label>
+            <div class="relative">
+              <i data-lucide="search" class="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400"></i>
+              <input id="accessSearch" type="text" placeholder="Ej: Juan Perez..." class="w-full pl-9 pr-4 py-2.5 bg-slate-50 border-2 border-slate-50 rounded-2xl outline-none focus:border-orange-400 focus:bg-white transition-all text-sm font-bold">
+            </div>
+          </div>
+          <div class="w-full md:w-auto">
+            <label class="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1.5 ml-1">Desde</label>
+            <input id="accessDateFrom" type="date" class="px-4 py-2.5 bg-slate-50 border-2 border-slate-50 rounded-2xl outline-none focus:border-orange-400 focus:bg-white transition-all text-sm font-bold">
+          </div>
+          <div class="w-full md:w-auto">
+            <label class="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1.5 ml-1">Hasta</label>
+            <input id="accessDateTo" type="date" class="px-4 py-2.5 bg-slate-50 border-2 border-slate-50 rounded-2xl outline-none focus:border-orange-400 focus:bg-white transition-all text-sm font-bold">
+          </div>
+        </div>
+
+        <!-- Visualización Gráfica -->
+        <div class="grid grid-cols-1 lg:grid-cols-4 gap-6 mb-8">
+          <div class="lg:col-span-3 bg-white p-6 rounded-[2.5rem] border border-slate-100 shadow-sm">
+            <h3 class="text-xs font-black text-slate-400 uppercase tracking-widest mb-6">Tendencia de Entradas en el Periodo</h3>
+            <div class="h-64">
+              <canvas id="accessChart"></canvas>
+            </div>
+          </div>
+          <div class="space-y-4">
+            <div class="bg-indigo-600 p-6 rounded-3xl text-white shadow-lg shadow-indigo-100">
+              <p class="text-[10px] font-black uppercase opacity-70 mb-1">Personal en Estancia</p>
+              <p class="text-4xl font-black" id="statStaffIn">0</p>
+            </div>
+            <div class="bg-emerald-500 p-6 rounded-3xl text-white shadow-lg shadow-emerald-100">
+              <p class="text-[10px] font-black uppercase opacity-70 mb-1">Alumnos en Estancia</p>
+              <p class="text-4xl font-black" id="statStudentsIn">0</p>
+            </div>
+          </div>
+        </div>
+
+        <!-- TABLA DE ACCESOS -->
+        <div class="bg-white rounded-[2.5rem] border border-slate-100 shadow-sm overflow-hidden mb-12">
+          <div class="table-scroll-wrap">
+            <table class="w-full text-left">
+              <thead>
+                <tr class="bg-slate-50 border-b border-slate-100 text-slate-400">
+                  <th class="px-6 py-4 text-[10px] font-black uppercase tracking-widest">Nombre</th>
+                  <th class="px-6 py-4 text-[10px] font-black uppercase tracking-widest">Rol / Aula</th>
+                  <th class="px-6 py-4 text-[10px] font-black uppercase tracking-widest text-center">Entrada</th>
+                  <th class="px-6 py-4 text-[10px] font-black uppercase tracking-widest text-center">Salida</th>
+                  <th class="px-6 py-4 text-[10px] font-black uppercase tracking-widest text-right">Estado</th>
+                </tr>
+              </thead>
+              <tbody id="access-monitor-table-body" class="divide-y divide-slate-50">
+                <!-- Inyectado por JS -->
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </section>
+
       <!-- PAGOS -->
       <section id="pagos" class="section">
         <!-- Header -->
@@ -1374,6 +1455,10 @@
                 <div class="md:col-span-2">
                   <label class="block text-sm font-medium text-slate-700 mb-1">Dirección Física</label>
                   <input id="confAddress" type="text" class="w-full border rounded px-3 py-2 focus:ring-2 focus:ring-purple-500 outline-none" placeholder="Dirección de la estancia">
+                </div>
+                <div class="md:col-span-2">
+                  <label class="block text-sm font-medium text-slate-700 mb-1">Horario de Atención</label>
+                  <textarea id="confHours" rows="3" class="w-full border rounded px-3 py-2 focus:ring-2 focus:ring-purple-500 outline-none" placeholder="Lunes a Viernes..."></textarea>
                 </div>
               </div>
             </div>

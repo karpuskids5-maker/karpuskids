@@ -61,3 +61,6 @@ DROP POLICY IF EXISTS "profiles_select" ON public.profiles;
 CREATE POLICY "profiles_select" ON public.profiles FOR SELECT USING (
   deleted_at IS NULL AND auth.uid() IS NOT NULL
 );
+
+-- QR code column for students
+ALTER TABLE public.students ADD COLUMN IF NOT EXISTS qr_code text;

@@ -585,7 +585,35 @@ export const StudentsModule = {
                 </div>
                 <div><label class="${labelClass}">Día Vencimiento</label><input id="dueDay" placeholder="5" type="number" min="1" max="31" class="${inputClass} bg-white"></div>
               </div>
+          </div>
+
+          <!-- 8. CÓDIGO QR DE ASISTENCIA -->
+          <div class="bg-gradient-to-br from-orange-50 to-amber-50 p-6 rounded-[2rem] border-2 border-orange-100 space-y-4">
+            <h4 class="text-sm font-black text-orange-800 flex items-center gap-2">
+              <div class="w-8 h-8 rounded-xl bg-orange-100 text-orange-600 flex items-center justify-center"><i data-lucide="qr-code" class="w-4 h-4"></i></div>
+              📱 CÓDIGO QR DE ASISTENCIA
+            </h4>
+            <p class="text-xs text-orange-600 font-medium">El QR se genera automáticamente con la matrícula. El padre puede escanearlo para registrar entrada/salida.</p>
+            <div id="qr-section" class="flex flex-col items-center gap-4 bg-white p-6 rounded-3xl border border-orange-100 shadow-sm">
+              <div id="qr-container" class="bg-white p-3 rounded-2xl border-2 border-slate-100 shadow-sm min-h-[160px] flex items-center justify-center">
+                <p class="text-xs text-slate-400 font-bold text-center">Genera o ingresa una matrícula<br>para ver el QR</p>
+              </div>
+              <div class="text-center w-full">
+                <p class="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Matrícula vinculada</p>
+                <p id="qr-matricula-label" class="text-lg font-black text-slate-700">--</p>
+              </div>
+              <div class="flex gap-2 w-full">
+                <button type="button" id="btn-generate-qr" onclick="window.generateStudentQR()"
+                  class="flex-1 py-2.5 bg-orange-500 hover:bg-orange-600 text-white rounded-xl font-black text-[10px] uppercase tracking-widest transition-all active:scale-95 flex items-center justify-center gap-2">
+                  <i data-lucide="refresh-cw" class="w-3.5 h-3.5"></i> Generar QR
+                </button>
+                <button type="button" id="btn-print-qr" onclick="window.printStudentQR()"
+                  class="flex-1 py-2.5 bg-slate-800 hover:bg-slate-900 text-white rounded-xl font-black text-[10px] uppercase tracking-widest transition-all active:scale-95 flex items-center justify-center gap-2">
+                  <i data-lucide="printer" class="w-3.5 h-3.5"></i> Imprimir
+                </button>
+              </div>
             </div>
+          </div>
         </div>
       </div>
       
@@ -599,8 +627,95 @@ export const StudentsModule = {
     // Generar matrícula automática
     window.generateMatricula = () => {
       const el = document.getElementById('stMatricula');
-      if (el) el.value = 'KK-' + new Date().getFullYear() + '-' + String(Math.floor(Math.random() * 9000) + 1000);
+      if (el) {
+        el.value = 'KK-' + new Date().getFullYear() + '-' + String(Math.floor(Math.random() * 9000) + 1000);
+        // Auto-generar QR al generar matrícula
+        window.generateStudentQR();
+      }
     };
+
+    // Cargar librería QR si no está disponible
+    const _loadQRLib = () => new Promise((resolve) => {
+      if (window.QRCode) { resolve(); return; }
+      const s = document.createElement('script');
+      s.src = 'https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js';
+      s.onload = resolve;
+      document.head.appendChild(s);
+    });
+
+    // Generar QR del estudiante
+    window.generateStudentQR = async () => {
+      const matricula = document.getElementById('stMatricula')?.value?.trim();
+      const name = document.getElementById('stName')?.value?.trim();
+      const container = document.getElementById('qr-container');
+      const label = document.getElementById('qr-matricula-label');
+      if (!container) return;
+
+      if (!matricula) {
+        Helpers.toast('Genera o ingresa una matrícula primero', 'warning');
+        return;
+      }
+
+      await _loadQRLib();
+      container.innerHTML = '';
+      label && (label.textContent = matricula);
+
+      // El QR contiene JSON con datos del estudiante para el sistema de acceso
+      const qrData = JSON.stringify({ matricula, name: name || '', type: 'karpus-access', v: 1 });
+
+      new window.QRCode(container, {
+        text: qrData,
+        width: 160,
+        height: 160,
+        colorDark: '#1e293b',
+        colorLight: '#ffffff',
+        correctLevel: window.QRCode.CorrectLevel.H
+      });
+    };
+
+    // Imprimir QR
+    window.printStudentQR = () => {
+      const matricula = document.getElementById('stMatricula')?.value?.trim();
+      const name = document.getElementById('stName')?.value?.trim();
+      const container = document.getElementById('qr-container');
+      if (!container || !matricula) { Helpers.toast('Genera el QR primero', 'warning'); return; }
+
+      const qrImg = container.querySelector('img')?.src || container.querySelector('canvas')?.toDataURL();
+      if (!qrImg) { Helpers.toast('Genera el QR primero', 'warning'); return; }
+
+      const win = window.open('', '_blank');
+      win.document.write(`<!DOCTYPE html><html><head><title>QR - ${matricula}</title>
+        <style>
+          body { font-family: Arial, sans-serif; display: flex; flex-direction: column; align-items: center; justify-content: center; min-height: 100vh; margin: 0; background: #fff; }
+          .card { border: 2px solid #e2e8f0; border-radius: 16px; padding: 24px; text-align: center; max-width: 280px; }
+          .logo { font-size: 12px; font-weight: 900; color: #7c3aed; text-transform: uppercase; letter-spacing: 2px; margin-bottom: 12px; }
+          img { width: 180px; height: 180px; }
+          .name { font-size: 16px; font-weight: 900; color: #1e293b; margin-top: 12px; }
+          .mat { font-size: 11px; color: #64748b; font-weight: 700; margin-top: 4px; }
+          .hint { font-size: 9px; color: #94a3b8; margin-top: 8px; }
+        </style>
+      </head><body>
+        <div class="card">
+          <div class="logo">🎓 Karpus Kids</div>
+          <img src="${qrImg}" alt="QR">
+          <div class="name">${name || 'Estudiante'}</div>
+          <div class="mat">${matricula}</div>
+          <div class="hint">Escanea para registrar entrada/salida</div>
+        </div>
+        <script>window.onload=()=>{window.print();}<\/script>
+      </body></html>`);
+      win.document.close();
+    };
+
+    // Auto-generar QR si ya hay matrícula (modo edición)
+    const existingMatricula = document.getElementById('stMatricula')?.value?.trim();
+    if (existingMatricula) setTimeout(() => window.generateStudentQR(), 300);
+
+    // Escuchar cambios en matrícula para actualizar QR en tiempo real
+    document.getElementById('stMatricula')?.addEventListener('input', () => {
+      clearTimeout(window._qrDebounce);
+      window._qrDebounce = setTimeout(() => window.generateStudentQR(), 600);
+    });
 
     // Handler de avatar
     const avatarFile = document.getElementById('stAvatarFile');
@@ -680,6 +795,45 @@ export const StudentsModule = {
           if (student.avatar_url) {
             const preview = document.getElementById('stAvatarPreview');
             if (preview) preview.innerHTML = `<img src="${student.avatar_url}" class="w-full h-full object-cover">`;
+          }
+
+          // ✅ Generar QR si tiene matrícula
+          if (student.matricula) {
+            document.getElementById('qr-section')?.classList.remove('hidden');
+            document.getElementById('qr-matricula-label').textContent = student.matricula;
+            
+            const qrContainer = document.getElementById('qr-container');
+            if (qrContainer) {
+              qrContainer.innerHTML = '';
+              const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${encodeURIComponent(student.matricula)}`;
+              qrContainer.innerHTML = `<img src="${qrUrl}" class="w-48 h-48 mx-auto" alt="QR ${student.matricula}">`;
+              
+              document.getElementById('btn-print-qr').onclick = () => {
+                const win = window.open('', '_blank');
+                win.document.write(`
+                  <html>
+                    <head>
+                      <title>Imprimir QR - ${student.name}</title>
+                      <style>
+                        body { font-family: sans-serif; text-align: center; padding: 40px; }
+                        .card { border: 2px solid #eee; padding: 20px; display: inline-block; border-radius: 20px; }
+                        h1 { margin: 0; color: #333; }
+                        p { color: #666; font-weight: bold; font-size: 20px; }
+                        img { margin: 20px 0; width: 300px; height: 300px; }
+                      </style>
+                    </head>
+                    <body onload="window.print(); window.close();">
+                      <div class="card">
+                        <h1>Karpus Kids</h1>
+                        <img src="${qrUrl}">
+                        <p>${student.name}</p>
+                        <p style="font-size: 14px; color: #999;">MATRÍCULA: ${student.matricula}</p>
+                      </div>
+                    </body>
+                  </html>
+                `);
+              };
+            }
           }
         }
       } catch (e) {

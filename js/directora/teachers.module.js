@@ -87,6 +87,9 @@ export const TeachersModule = {
       classroom_id, // será separado en updateTeacher
       is_active: document.getElementById('tActive').checked
     };
+    // Guardar matrícula por separado si existe (columna en profiles puede no existir)
+    const matricula = (document.getElementById('tMatricula').value || '').trim();
+    if (matricula) payload.notes = matricula; // usar notes como fallback temporal
     
     const password = document.getElementById('tPassword')?.value;
 
@@ -138,7 +141,7 @@ export const TeachersModule = {
     const labelClass = "block text-[11px] font-black text-slate-400 uppercase tracking-wider mb-1.5 ml-1";
 
     const modalHTML = `
-      <div class="modal-header bg-gradient-to-r from-pink-500 to-rose-500 text-white p-6 rounded-t-3xl flex items-center justify-between">
+      <div class="modal-header bg-gradient-to-r from-purple-600 to-indigo-600 text-white p-6 rounded-t-3xl flex items-center justify-between">
         <div class="flex items-center gap-3">
           <div class="w-12 h-12 bg-white/20 rounded-2xl flex items-center justify-center text-2xl shadow-inner">👩‍🏫</div>
           <div>
@@ -163,6 +166,17 @@ export const TeachersModule = {
             <input id="tEmail" placeholder="usuario@karpus.com" type="email" class="${inputClass}">
           </div>
 
+          <div class="col-span-2 bg-slate-50 p-4 rounded-2xl border-2 border-slate-100">
+            <label class="${labelClass}">Código de Acceso (Matrícula)</label>
+            <div class="flex gap-2 mb-4">
+              <input id="tMatricula" placeholder="Ej: TEA-1234" class="${inputClass} bg-white">
+              <button onclick="window.genStaffCode()" class="px-4 py-2 bg-slate-800 text-white rounded-xl text-xs font-black uppercase">Generar</button>
+            </div>
+            <div id="staff-qr-container" class="flex justify-center bg-white p-4 rounded-xl border border-slate-200 min-h-[100px] items-center text-slate-400 text-[10px] font-bold uppercase">
+              Ingresa un código para ver el QR
+            </div>
+          </div>
+
           <div>
             <label class="${labelClass}">Teléfono</label>
             <input id="tPhone" placeholder="Opcional" type="tel" class="${inputClass}">
@@ -181,7 +195,6 @@ export const TeachersModule = {
             <label class="${labelClass}">Rol</label>
             <select id="tRole" class="${inputClass}">
               <option value="maestra">Maestra</option>
-              <option value="asistente">Asistente</option>
             </select>
           </div>
           <div>
@@ -190,7 +203,7 @@ export const TeachersModule = {
           </div>
           <div class="col-span-2">
             <label class="flex items-center gap-3 p-3 bg-white border border-slate-100 rounded-xl cursor-pointer">
-              <input type="checkbox" id="tActive" checked class="w-5 h-5 rounded text-rose-500 focus:ring-rose-200">
+              <input type="checkbox" id="tActive" checked class="w-5 h-5 rounded text-purple-600 focus:ring-purple-200">
               <span class="text-sm font-bold text-slate-700">Cuenta Activa</span>
             </label>
           </div>
@@ -198,10 +211,49 @@ export const TeachersModule = {
       </div>
       <div class="modal-footer bg-white p-6 rounded-b-3xl border-t border-slate-100 flex justify-end gap-3">
         <button onclick="App.ui.closeModal()" class="px-8 py-3 text-slate-500 font-black text-xs uppercase hover:bg-slate-50 rounded-2xl transition-all">Cancelar</button>
-        <button onclick="App.teachers.save()" class="px-10 py-3 bg-gradient-to-r from-rose-500 to-pink-600 text-white rounded-2xl font-black text-xs uppercase shadow-lg shadow-rose-200 hover:shadow-rose-300 hover:-translate-y-0.5 transition-all active:scale-95">Guardar Personal</button>
+        <button onclick="App.teachers.save()" class="px-10 py-3 bg-gradient-to-r from-purple-600 to-indigo-600 text-white rounded-2xl font-black text-xs uppercase shadow-lg shadow-purple-200 hover:shadow-purple-300 hover:-translate-y-0.5 transition-all active:scale-95">Guardar Personal</button>
       </div>`;
 
     window.openGlobalModal(modalHTML);
+
+    // Función para generar código de acceso del personal
+    window.genStaffCode = async () => {
+      const prefix = 'TEA';
+      const code = prefix + '-' + new Date().getFullYear() + '-' + String(Math.floor(Math.random() * 9000) + 1000);
+      const input = document.getElementById('tMatricula');
+      if (input) {
+        input.value = code;
+        // Generar QR automáticamente
+        window.renderStaffQR(code);
+      }
+    };
+
+    window.renderStaffQR = async (code) => {
+      const container = document.getElementById('staff-qr-container');
+      if (!container || !code) return;
+      // Cargar librería QR si no está
+      if (!window.QRCode) {
+        await new Promise(resolve => {
+          const s = document.createElement('script');
+          s.src = 'https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js';
+          s.onload = resolve;
+          document.head.appendChild(s);
+        });
+      }
+      container.innerHTML = '';
+      new window.QRCode(container, {
+        text: JSON.stringify({ matricula: code, type: 'karpus-staff', v: 1 }),
+        width: 100, height: 100,
+        colorDark: '#1e293b', colorLight: '#ffffff',
+        correctLevel: window.QRCode.CorrectLevel.H
+      });
+    };
+
+    // Escuchar cambios en el input de matrícula para actualizar QR
+    document.getElementById('tMatricula')?.addEventListener('input', (e) => {
+      clearTimeout(window._staffQrDebounce);
+      window._staffQrDebounce = setTimeout(() => window.renderStaffQR(e.target.value.trim()), 600);
+    });
 
     try {
       const { data: rooms } = await DirectorApi.getClassrooms();

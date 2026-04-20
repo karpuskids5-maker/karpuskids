@@ -90,27 +90,38 @@ async function ensureSheet(token, spreadsheetId, sheetName) {
   }
 }
 
-// ── Escribir en Google Sheets ─────────────────────────────────────────────────
+// ── Verificar si la hoja está vacía ──────────────────────────────────────────
+async function isSheetEmpty(token, spreadsheetId, sheetName) {
+  const res = await fetch(
+    `https://sheets.googleapis.com/v4/spreadsheets/${spreadsheetId}/values/${encodeURIComponent(sheetName)}?majorDimension=ROWS&valueRenderOption=UNFORMATTED_VALUE`,
+    { headers: { 'Authorization': `Bearer ${token}` } }
+  );
+  const data = await res.json();
+  return !data.values || data.values.length === 0;
+}
+
+// ── Escribir en Google Sheets (append — no borra historial) ──────────────────
 async function writeToSheet(token, spreadsheetId, sheetName, rows) {
   if (!rows.length) return;
 
-  await fetch(
-    `https://sheets.googleapis.com/v4/spreadsheets/${spreadsheetId}/values/${encodeURIComponent(sheetName)}:clear`,
-    { method: 'POST', headers: { 'Authorization': `Bearer ${token}` } }
-  );
+  // Solo incluir encabezados si la hoja está vacía
+  const empty = await isSheetEmpty(token, spreadsheetId, sheetName);
+  const rowsToWrite = empty ? rows : rows.slice(1); // skip header if sheet has data
+
+  if (!rowsToWrite.length) return;
 
   const res = await fetch(
-    `https://sheets.googleapis.com/v4/spreadsheets/${spreadsheetId}/values/${encodeURIComponent(sheetName)}?valueInputOption=RAW`,
+    `https://sheets.googleapis.com/v4/spreadsheets/${spreadsheetId}/values/${encodeURIComponent(sheetName)}:append?valueInputOption=RAW&insertDataOption=INSERT_ROWS`,
     {
-      method: 'PUT',
+      method: 'POST',
       headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
-      body: JSON.stringify({ values: rows }),
+      body: JSON.stringify({ values: rowsToWrite }),
     }
   );
 
   if (!res.ok) {
     const err = await res.text();
-    throw new Error(`Sheets write error (${sheetName}): ${err}`);
+    throw new Error(`Sheets append error (${sheetName}): ${err}`);
   }
 }
 

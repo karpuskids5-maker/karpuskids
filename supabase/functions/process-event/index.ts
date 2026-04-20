@@ -179,15 +179,28 @@ Deno.serve(async (req) => {
 
       case 'attendance.checkin':
       case 'attendance.checkout': {
-        const { parent_email, student_name, time } = data;
+        const { parent_email, parent_id, student_name, time } = data;
         const isEntry = type === 'attendance.checkin';
+        const action = isEntry ? 'entrada' : 'salida';
+        const color = isEntry ? '#16a34a' : '#2563eb';
+        
         if (resend && parent_email) {
           await resend.emails.send({
             from: FROM_EMAIL,
             to:   parent_email,
             subject: (isEntry ? 'Entrada' : 'Salida') + ': ' + student_name,
-            html: emailWrap('<h2 style="color:' + (isEntry ? '#16a34a' : '#dc2626') + ';margin:0 0 12px">' + (isEntry ? 'Entrada Registrada' : 'Salida Registrada') + '</h2><p style="color:#374151"><b>' + student_name + '</b> registro su ' + (isEntry ? 'entrada' : 'salida') + ' a las <b>' + time + '</b>.</p><a href="https://karpuskids.com/panel_padres.html" style="display:inline-block;padding:12px 24px;background:' + (isEntry ? '#16a34a' : '#dc2626') + ';color:white;text-decoration:none;border-radius:8px;font-weight:bold;margin-top:8px">Ver Asistencia</a>')
+            html: emailWrap('<h2 style="color:' + color + ';margin:0 0 12px">' + (isEntry ? 'Entrada Registrada' : 'Salida Registrada') + '</h2><p style="color:#374151"><b>' + student_name + '</b> registro su ' + action + ' a las <b>' + time + '</b>.</p><p style="color:#6b7280;font-size:13px">Gracias por confiar en Karpus Kids para el cuidado de tu hijo.</p><a href="https://karpuskids.com/panel_padres.html" style="display:inline-block;padding:12px 24px;background:' + color + ';color:white;text-decoration:none;border-radius:8px;font-weight:bold;margin-top:8px">Ver mi Panel</a>')
           });
+        }
+        
+        if (parent_id) {
+          await sendPushToUser(
+            parent_id, 
+            (isEntry ? 'Llegada' : 'Salida') + ' de ' + student_name, 
+            'Su hijo ha ' + (isEntry ? 'llegado a' : 'salido de') + ' Karpus Kids a las ' + time, 
+            'attendance', 
+            'panel_padres.html'
+          );
         }
         result = { sent: true };
         break;
