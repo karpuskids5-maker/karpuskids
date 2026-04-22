@@ -94,6 +94,7 @@ create table if not exists public.students (
   authorized_pickup    text,
   monthly_fee          numeric default 0,
   due_day              integer default 5,
+  qr_code              text,
   created_at           timestamp with time zone default now() not null
 );
 create unique index if not exists idx_students_matricula on public.students(matricula) where matricula is not null;
@@ -116,6 +117,9 @@ alter table public.students add column if not exists matricula text;
 alter table public.students add column if not exists start_date date;
 alter table public.students add column if not exists avatar_url text;
 alter table public.students add column if not exists qr_code text;
+
+alter table public.profiles add column if not exists qr_code text;
+alter table public.profiles add column if not exists matricula text unique;
 
 -- Garantizar columnas en tabla conversations
 alter table public.conversations add column if not exists classroom_id bigint references public.classrooms(id) on delete set null;

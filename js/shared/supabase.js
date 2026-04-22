@@ -1,4 +1,4 @@
-import { createClient } from "https://cdn.jsdelivr.net/npm/@supabase/supabase-js/+esm";
+﻿import { createClient } from "https://cdn.jsdelivr.net/npm/@supabase/supabase-js/+esm";
 
 export { createClient };
 export const SUPABASE_URL      = "https://wwnfonkvemimwiqjpkij.supabase.co";
@@ -12,6 +12,43 @@ export const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
     storageKey:         'karpus_auth_token_v2'
   }
 });
+
+// ── Auto-refresh: detectar JWT expirado y refrescar sesión ───────────────────
+supabase.auth.onAuthStateChange((event, session) => {
+  if (event === 'TOKEN_REFRESHED') {
+    // Token refrescado — no hacer nada, las próximas requests usarán el nuevo token
+  }
+  if (event === 'SIGNED_OUT') {
+    // Sesión cerrada — redirigir al login
+    if (!window.location.pathname.includes('login.html') &&
+        !window.location.pathname.includes('index.html')) {
+      window.location.href = 'login.html';
+    }
+  }
+});
+
+// Interceptar errores 401 globalmente y refrescar token
+const _originalFetch = window.fetch;
+window.fetch = async function(...args) {
+  const res = await _originalFetch.apply(this, args);
+  if (res.status === 401) {
+    const url = typeof args[0] === 'string' ? args[0] : args[0]?.url || '';
+    if (url.includes('supabase.co')) {
+      // Intentar refrescar el token
+      const { error } = await supabase.auth.refreshSession();
+      if (error) {
+        // Refresh falló — redirigir al login
+        if (!window.location.pathname.includes('login.html')) {
+          window.location.href = 'login.html';
+        }
+      } else {
+        // Reintentar la request original con el nuevo token
+        return _originalFetch.apply(this, args);
+      }
+    }
+  }
+  return res;
+};
 
 // ── Global DB error handler — muestra toast automático en errores de DB ───────
 window.addEventListener('karpus:db-error', (e) => {
@@ -33,9 +70,19 @@ export async function ensureRole(requiredRoles) {
   // Usar getSession() primero (más rápido)
   const { data: { session }, error: sessionError } = await supabase.auth.getSession();
   if (sessionError || !session?.user) { 
-    console.warn('[ensureRole] No session found');
     window.location.href = 'login.html'; 
     return null; 
+  }
+
+  // Si el token está próximo a expirar o ya expiró, refrescarlo
+  const expiresAt = session.expires_at || 0;
+  const nowSecs   = Math.floor(Date.now() / 1000);
+  if (expiresAt - nowSecs < 60) {
+    const { data: refreshed, error: refreshErr } = await supabase.auth.refreshSession();
+    if (refreshErr || !refreshed?.session) {
+      window.location.href = 'login.html';
+      return null;
+    }
   }
 
   const user = session.user;
@@ -131,7 +178,6 @@ export async function sendPush(payload) {
       console.warn('[sendPush] Function error:', error);
       return null;
     }
-    console.log('[sendPush] Success:', data);
     return data;
   } catch (e) {
     console.warn('[sendPush] Catch error (silencioso):', e.message);
@@ -153,7 +199,6 @@ export async function emitEvent(type, data) {
     
     // ✅ Log de éxito para que la Maestra vea la confirmación
     if (resData?.ok) {
-      console.log(`[emitEvent] Success (${type}):`, resData);
     }
     
     return resData;
@@ -324,10 +369,8 @@ export async function initOneSignal(currentUser = null) {
           const currentExtId = await OneSignal.User.getExternalId?.();
           if (currentExtId === user.id) {
             // Already linked — just ensure push subscription is active
-            console.log('[OneSignal] ✅ Ya vinculado:', user.id);
           } else {
             // Not linked yet or linked to someone else — safe to call login
-            console.log('[OneSignal] Vinculando usuario:', user.id, '(era:', currentExtId || 'nadie', ')');
             await OneSignal.login(user.id).catch((e) => {
               const msg = (e?.message || '').toLowerCase();
               if (!msg.includes('409') && !msg.includes('conflict')) {
@@ -348,18 +391,15 @@ export async function initOneSignal(currentUser = null) {
 
           const subId = OneSignal.User?.PushSubscription?.id;
           if (subId) {
-            console.log('[OneSignal] ✅ Listo para:', user.id, '| SubID:', subId);
             // Guardar subscription_id en profiles para fallback en send-push
             supabase.from('profiles')
               .update({ onesignal_player_id: subId })
               .eq('id', user.id)
               .then(({ error }) => {
                 if (error) console.warn('[OneSignal] No se pudo guardar player_id:', error.message);
-                else console.log('[OneSignal] player_id guardado en profiles:', subId);
               })
               .catch(() => {});
           } else {
-            console.log('[OneSignal] ✅ Listo para:', user.id, '| SubID: pendiente');
             // Reintentar obtener subId después de un momento
             setTimeout(async () => {
               try {
@@ -368,7 +408,6 @@ export async function initOneSignal(currentUser = null) {
                   await supabase.from('profiles')
                     .update({ onesignal_player_id: retrySubId })
                     .eq('id', user.id);
-                  console.log('[OneSignal] player_id guardado (retry):', retrySubId);
                 }
               } catch (_) {}
             }, 3000);
@@ -379,7 +418,6 @@ export async function initOneSignal(currentUser = null) {
             OneSignal.User?.PushSubscription?.addEventListener('change', async (event) => {
               const newSubId = event?.current?.id;
               if (newSubId) {
-                console.log('[OneSignal] Suscripción activada:', newSubId);
                 await supabase.from('profiles')
                   .update({ onesignal_player_id: newSubId })
                   .eq('id', user.id)

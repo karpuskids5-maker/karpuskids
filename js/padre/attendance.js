@@ -197,7 +197,7 @@ export const AttendanceModule = {
 
       const { data, error } = await supabase
         .from('attendance')
-        .select('*')
+        .select('id, student_id, date, status, check_in, check_out, notes')
         .eq('student_id', this._studentId)
         .gte('date', startDate)
         .lte('date', endDate)

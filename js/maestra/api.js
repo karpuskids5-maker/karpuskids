@@ -5,10 +5,7 @@ import { TABLES } from '../shared/constants.js';
  * Helper interno para manejar errores
  */
 function handleError(error, context) {
-  if (error) {
-    console.error(`Error en ${context}:`, error);
-    throw error;
-  }
+  if (error) throw error;
 }
 
 /**
@@ -29,10 +26,7 @@ export const MaestraApi = {
   async getTeacherProfile(userId) {
     const { data, error } = await supabase
       .from(TABLES.PROFILES)
-      .select(`
-        *,
-        classrooms(id, name)
-      `)
+      .select('id, name, email, phone, avatar_url, role, bio, classrooms:classrooms(id, name)')
       .eq('id', userId)
       .maybeSingle(); // 🔥 FIX
 
@@ -52,7 +46,7 @@ export const MaestraApi = {
   async getStudentsByClassroom(classroomId) {
     const { data, error } = await supabase
       .from(TABLES.STUDENTS)
-      .select('*')
+      .select('id, name, avatar_url, matricula, allergies, blood_type, p1_name, p1_phone')
       .eq('classroom_id', classroomId)
       .eq('is_active', true)
       .order('name');
@@ -67,7 +61,7 @@ export const MaestraApi = {
   async getAttendance(classroomId, date) {
     const { data, error } = await supabase
       .from(TABLES.ATTENDANCE)
-      .select('*')
+      .select('id, student_id, status, check_in, check_out, date')
       .eq('classroom_id', classroomId)
       .eq('date', date);
 
@@ -109,9 +103,10 @@ export const MaestraApi = {
   async getTasksByClassroom(classroomId) {
     const { data, error } = await supabase
       .from('tasks')
-      .select('*')
+      .select('id, title, description, due_date, grading_system, file_url, created_at')
       .eq('classroom_id', classroomId)
-      .order('created_at', { ascending: false });
+      .order('created_at', { ascending: false })
+      .limit(50);
 
     handleError(error, 'getTasksByClassroom');
     return data || [];
@@ -123,9 +118,10 @@ export const MaestraApi = {
   async getDailyRoutine(classroomId) {
     const { data, error } = await supabase
       .from('daily_logs')
-      .select('*')
+      .select('id, student_id, date, mood, food, nap, eating, sleeping, activities, notes')
       .eq('classroom_id', classroomId)
-      .order('created_at', { ascending: false });
+      .order('created_at', { ascending: false })
+      .limit(50);
 
     handleError(error, 'getDailyRoutine');
     return data || [];

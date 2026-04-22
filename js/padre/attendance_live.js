@@ -33,7 +33,6 @@ export async function initLiveClassListener(classroomId) {
     // Evitar múltiples canales activos para la misma classroom
     const existingChannel = AppState.get('liveChannel');
     if (existingChannel?.topic === `live_status_${classroomId}`) {
-      console.log('[Live] Ya existe un canal activo para esta classroom, reutilizando.');
       return existingChannel;
     }
 
@@ -115,9 +114,6 @@ export async function initLiveClassListener(classroomId) {
 
             // Evitar ejecuciones duplicadas
             if (prev === isLive) return;
-
-            console.log(`[Live] classroom=${classroomId} isLive=${isLive}`);
-
             AppState.set('isClassLive', isLive);
 
             // Notificación solo cuando inicia
@@ -135,14 +131,12 @@ export async function initLiveClassListener(classroomId) {
     // subscribeResult puede ser string o un objeto dependiendo del SDK
     // Registramos logs según el resultado
     if (subscribeResult === 'SUBSCRIBED' || (subscribeResult && subscribeResult.status === 'SUBSCRIBED')) {
-      console.log('[Live] Conectado a live class realtime');
     } else if (subscribeResult === 'CHANNEL_ERROR' || (subscribeResult && subscribeResult.status === 'CHANNEL_ERROR')) {
       console.error('[Live] Error en canal realtime', subscribeResult);
     } else if (subscribeResult === 'TIMED_OUT' || (subscribeResult && subscribeResult.status === 'TIMED_OUT')) {
       console.warn('[Live] Reintentando conexión...');
     } else {
       // valor inesperado, pero guardamos el channel de todas formas
-      console.log('[Live] Resultado de suscripción:', subscribeResult);
     }
 
     // Guardar canal en AppState para que otros módulos puedan limpiarlo
@@ -181,8 +175,6 @@ export async function removeLiveClassListener(channel) {
     if (AppState.get('liveChannel') === channel) {
       AppState.set('liveChannel', null);
     }
-
-    console.log('[Live] Canal eliminado correctamente.');
   } catch (err) {
     console.warn('[Live] Error eliminando canal:', err?.message || err);
   }

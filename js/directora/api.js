@@ -1,4 +1,4 @@
-import { supabase } from '../shared/supabase.js';
+﻿import { supabase } from '../shared/supabase.js';
 import { QueryCache } from '../shared/query-cache.js';
 
 const TABLES = {
@@ -29,7 +29,7 @@ export const DirectorApi = {
   // --- PERIODS ---
   async getPeriods() {
     try {
-      const res = await withTimeout(supabase.from(TABLES.PERIODS).select('*').order('start_date', { ascending: false }));
+      const res = await withTimeout(supabase.from(TABLES.PERIODS).select('id, name, start_date, end_date, status, is_active, classroom_id, created_at').limit(10).order('start_date', { ascending: false }));
       return res;
     } catch (e) { return logError('getPeriods', e); }
   },
@@ -61,10 +61,12 @@ export const DirectorApi = {
 
   // --- TASKS & GRADES ---
   async getTaskGrades(filters = {}) {
+    // Simplified select to avoid N+1 triple join
     let query = supabase
       .from(TABLES.TASK_EVIDENCES)
-      .select('*, student:student_id(name, avatar_url, classroom_id, classrooms:classroom_id(name)), task:task_id(title, classroom:classroom_id(name, teacher:teacher_id(name)))')
-      .order('created_at', { ascending: false });
+      .select('id, status, grade_letter, stars, created_at, student:student_id(name, classroom_id), task:task_id(title, classroom_id)')
+      .order('created_at', { ascending: false })
+      .limit(100);
 
     if (filters.classroom_id) query = query.eq('task.classroom_id', filters.classroom_id);
     
@@ -76,7 +78,10 @@ export const DirectorApi = {
 
   async getFormalGrades(periodId) {
     try {
-      const res = await withTimeout(supabase.from(TABLES.GRADES).select('*, student:student_id(name, classroom_id)').eq('period_id', periodId));
+      const res = await withTimeout(supabase.from(TABLES.GRADES)
+        .select('id, subject, score, period, created_at, student:student_id(name, classroom_id)')
+        .eq('period_id', periodId)
+        .limit(200));
       return res;
     } catch (e) { return logError('getFormalGrades', e); }
   },
@@ -177,13 +182,13 @@ export const DirectorApi = {
 
   async getPayments(filters = {}) {
     try {
-      let query = supabase.from('payments').select('*, students(name, classrooms:classroom_id(name))');
+      let query = supabase.from('payments')
+        .select('id, amount, status, month_paid, due_date, paid_date, method, bank, reference, proof_url, created_at, students:student_id(name, classrooms:classroom_id(name))');
       if (filters.status && filters.status !== 'all') query = query.eq('status', filters.status);
       if (filters.year) {
         query = query.gte('due_date', `${filters.year}-01-01`).lte('due_date', `${filters.year}-12-31`);
       }
-      if (filters.search) query = query.ilike('students.name', `%${filters.search}%`);
-      return await query.order('created_at', { ascending: false });
+      return await query.order('created_at', { ascending: false }).limit(filters.limit || 100);
     } catch (e) { return logError('getPayments', e); }
   },
 
@@ -235,7 +240,10 @@ export const DirectorApi = {
   // --- INQUIRIES / REPORTES ---
   async getInquiries(filters = {}) {
     try {
-      let query = supabase.from('inquiries').select('*, parent:parent_id(name, email)').order('created_at', { ascending: false });
+      let query = supabase.from('inquiries')
+        .select('id, subject, message, status, priority, created_at, parent:parent_id(name, email)')
+        .order('created_at', { ascending: false })
+        .limit(50);
       if (filters.status && filters.status !== 'all') query = query.eq('status', filters.status);
       return await query;
     } catch (e) { return logError('getInquiries', e); }
@@ -249,7 +257,7 @@ export const DirectorApi = {
   async getSchoolSettings() {
     try {
       // .maybeSingle() devuelve null si no hay fila, en lugar de Error 406
-      return await supabase.from('school_settings').select('*').eq('id', 1).maybeSingle();
+      return await supabase.from('school_settings').select('id, generation_day, due_day, open_time, close_time, work_days, phone, business_hours').eq('id', 1).maybeSingle();
     } catch (e) { return logError('getSchoolSettings', e); }
   },
 
@@ -278,7 +286,7 @@ export const DirectorApi = {
   // --- CHAT ---
   async getChatUsers(myId, roleFilter) {
     try {
-      let query = supabase.from('profiles').select('*').neq('id', myId);
+      let query = supabase.from('profiles').select('id, name, role, avatar_url, email, phone').neq('id', myId).limit(100);
       if (roleFilter && roleFilter !== 'all') query = query.eq('role', roleFilter);
       return await query.order('name');
     } catch (e) { return logError('getChatUsers', e); }
@@ -385,7 +393,10 @@ export const DirectorApi = {
         await supabase.from(TABLES.CLASSROOMS).update({ teacher_id: id }).eq('id', classroom_id);
       }
     }
-    const result = await supabase.from(TABLES.PROFILES).update(profileData).eq('id', id);
+    // Only send columns that exist in profiles table
+    const ALLOWED = ['name', 'email', 'phone', 'role', 'is_active', 'bio', 'notes', 'avatar_url', 'onesignal_player_id'];
+    const safeData = Object.fromEntries(Object.entries(profileData).filter(([k]) => ALLOWED.includes(k)));
+    const result = await supabase.from(TABLES.PROFILES).update(safeData).eq('id', id);
     QueryCache.invalidate('dir_teachers');
     QueryCache.invalidate('classrooms_list');
     return result;
@@ -472,7 +483,6 @@ export const DirectorApi = {
 
         const { sendEmail } = await import('../shared/supabase.js');
         const result = await sendEmail(emails, 'Recibo de Pago — ' + month + ' · ' + studentName, html);
-        if (result) console.log('[sendPaymentReceipt] Sent to:', emails);
         return !!result;
       } catch (e) {
         console.error('[sendPaymentReceipt] Error:', e);

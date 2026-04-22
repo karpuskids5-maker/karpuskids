@@ -1,4 +1,4 @@
-/**
+﻿/**
  * 📡 Karpus Kids — RealtimeManager
  * Gestión centralizada de canales Supabase Realtime.
  * Evita memory leaks por canales huérfanos y limita a MAX_CHANNELS activos.
@@ -13,6 +13,7 @@ import { supabase } from './supabase.js';
 
 const MAX_CHANNELS = 8; // máximo de canales activos por sesión
 const _channels = new Map(); // name → RealtimeChannel
+const _retries  = new Map(); // name → retry count
 
 export const RealtimeManager = {
   /**
@@ -37,13 +38,20 @@ export const RealtimeManager = {
     setupFn(channel);
 
     // Pequeño delay para evitar "WebSocket closed before connection established"
-    // cuando se crean/destruyen canales rápidamente
     setTimeout(() => {
       if (!_channels.has(name)) return; // fue cancelado antes de conectar
       channel.subscribe((status) => {
         if (status === 'CHANNEL_ERROR') {
           console.warn(`[RealtimeManager] Error en canal: ${name}`);
           _channels.delete(name);
+          // Exponential backoff reconnect
+          const delay = Math.min(1000 * Math.pow(2, (_retries.get(name) || 0)), 30000);
+          _retries.set(name, (_retries.get(name) || 0) + 1);
+          setTimeout(() => {
+            if (!_channels.has(name)) this.subscribe(name, setupFn);
+          }, delay);
+        } else if (status === 'SUBSCRIBED') {
+          _retries.delete(name); // reset on success
         }
       });
     }, 100);
@@ -58,6 +66,7 @@ export const RealtimeManager = {
     if (ch) {
       supabase.removeChannel(ch);
       _channels.delete(name);
+      _retries.delete(name);
     }
   },
 
@@ -67,7 +76,6 @@ export const RealtimeManager = {
       supabase.removeChannel(ch);
     }
     _channels.clear();
-    console.log('[RealtimeManager] Todos los canales cerrados');
   },
 
   /** Retorna los canales activos */

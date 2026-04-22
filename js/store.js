@@ -122,7 +122,7 @@
       if (date) qs.push(`date=${date}`);
       const q = qs.length ? '?' + qs.join('&') : '';
       if (USE_SUPABASE && window.supabase) {
-        let query = window.supabase.from('attendance').select('*');
+        let query = window.supabase.from('attendance').select('id, student_id, date, status, check_in, check_out');
         if (studentId) query = query.eq('student_id', studentId);
         if (date) query = query.eq('date', date);
         const { data } = await query;

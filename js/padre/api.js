@@ -37,19 +37,26 @@ export const Api = {
   async getStudentFinancialStatus(studentId) {
     const [student, allPending, history] = await Promise.all([
       handle(supabase.from(TABLES.STUDENTS).select('monthly_fee, due_day').eq('id', studentId).single(), 'getStudentFee'),
-      handle(supabase.from(TABLES.PAYMENTS).select('*').eq('student_id', studentId).in('status', ['pending', 'overdue']).order('due_date', { ascending: true }), 'getPendingPayments'),
-      handle(supabase.from(TABLES.PAYMENTS).select('*').eq('student_id', studentId).eq('status', 'paid').order('created_at', { ascending: false }).limit(5), 'getPaymentHistory')
+      handle(supabase.from(TABLES.PAYMENTS)
+        .select('id, amount, status, due_date, month_paid, evidence_url, proof_url, method')
+        .eq('student_id', studentId)
+        .in('status', ['pending', 'overdue'])
+        .order('due_date', { ascending: true })
+        .limit(24), 'getPendingPayments'),
+      handle(supabase.from(TABLES.PAYMENTS)
+        .select('id, amount, status, due_date, month_paid, paid_date, method')
+        .eq('student_id', studentId)
+        .eq('status', 'paid')
+        .order('created_at', { ascending: false })
+        .limit(5), 'getPaymentHistory')
     ]);
 
-    // Filtrar: si hay un pago con evidencia, ese mes está "en revisión" y no cuenta como deuda exigible
-    // pero si hay un cargo sin evidencia para el mismo mes, ese es el que cuenta si no hay abono.
-    // Lógica PRO: Solo sumamos los que NO tienen evidencia (son cargos puros)
     const trueDebt = (allPending || []).filter(p => !p.evidence_url && !p.proof_url);
     const totalDebt = trueDebt.reduce((sum, p) => sum + Number(p.amount || 0), 0);
 
     return {
       config: { monthly_fee: student?.monthly_fee || 0, due_day: student?.due_day || 5 },
-      debt: { total: totalDebt, items: allPending || [] }, // Enviamos todos para que la UI decida qué mostrar
+      debt: { total: totalDebt, items: allPending || [] },
       history: history || []
     };
   },
@@ -79,13 +86,18 @@ export const Api = {
     const [evidences, reports] = await Promise.all([
       handle(
         supabase.from(TABLES.TASK_EVIDENCES)
-          .select('*, task:task_id(title, description, due_date)')
+          .select('id, status, grade_letter, stars, comment, created_at, task:task_id(title, due_date)')
           .eq('student_id', studentId)
           .not('grade_letter', 'is', null)
-          .order('created_at', { ascending: false }), 
+          .order('created_at', { ascending: false })
+          .limit(50),
         'getTaskGrades'
       ),
-      handle(supabase.from(TABLES.GRADES).select('*').eq('student_id', studentId).order('created_at', { ascending: false }), 'getReportGrades')
+      handle(supabase.from(TABLES.GRADES)
+        .select('id, subject, score, period, created_at')
+        .eq('student_id', studentId)
+        .order('created_at', { ascending: false })
+        .limit(20), 'getReportGrades')
     ]);
 
     return { evidences: evidences || [], reports: reports || [] };
@@ -97,7 +109,7 @@ export const Api = {
   async getDailyLog(studentId, date) {
     return await handle(
       supabase.from(TABLES.DAILY_LOGS)
-        .select('*')
+        .select('mood, food, nap, eating, sleeping, activities, notes, date')
         .eq('student_id', studentId)
         .eq('date', date)
         .maybeSingle(),
@@ -110,8 +122,15 @@ export const Api = {
    */
   async getStudentTasks(classroomId, studentId) {
     const [tasks, evidences] = await Promise.all([
-      handle(supabase.from(TABLES.TASKS).select('*').eq('classroom_id', classroomId).order('due_date', { ascending: true }), 'getTasks'),
-      handle(supabase.from(TABLES.TASK_EVIDENCES).select('*').eq('student_id', studentId), 'getEvidences')
+      handle(supabase.from(TABLES.TASKS)
+        .select('id, title, description, due_date, grading_system, file_url')
+        .eq('classroom_id', classroomId)
+        .order('due_date', { ascending: true })
+        .limit(30), 'getTasks'),
+      handle(supabase.from(TABLES.TASK_EVIDENCES)
+        .select('id, task_id, status, grade_letter, stars, file_url, created_at')
+        .eq('student_id', studentId)
+        .limit(50), 'getEvidences')
     ]);
 
     return { tasks: tasks || [], evidences: evidences || [] };

@@ -31,7 +31,7 @@ export async function initRoutine() {
     // Cargar logs de hoy
     const { data: todayLogs } = await supabase
       .from('daily_logs')
-      .select('*')
+      .select('id, student_id, date, mood, food, nap, eating, sleeping, activities, notes')
       .eq('classroom_id', classroom.id)
       .eq('date', today);
 
@@ -187,7 +187,7 @@ export async function openStudentRoutine(studentId) {
   if (!student) return;
 
   const today = new Date().toISOString().split('T')[0];
-  const { data: log } = await supabase.from('daily_logs').select('*').eq('student_id', studentId).eq('date', today).maybeSingle();
+  const { data: log } = await supabase.from('daily_logs').select('id, student_id, date, mood, food, nap, eating, sleeping, activities, notes').eq('student_id', studentId).eq('date', today).maybeSingle();
   
   const isValid = log && _isWithin12h(log.created_at || log.updated_at);
   const currentMood  = isValid ? (log?.mood || '') : '';

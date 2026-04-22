@@ -206,7 +206,6 @@ export const ImageLoader = {
               const ext = useFormat === 'image/webp' ? 'webp' : 'jpg';
               const name = file.name.replace(/\.[^.]+$/, '') + '.' + ext;
               const compressed = new File([blob], name, { type: useFormat });
-              console.log(`[ImageLoader] Comprimido: ${(file.size/1024).toFixed(0)}KB → ${(compressed.size/1024).toFixed(0)}KB`);
               resolve(compressed);
             }
           }, useFormat, quality);

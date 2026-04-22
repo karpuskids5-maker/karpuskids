@@ -264,7 +264,6 @@ export const VideoCallUI = {
       });
 
       this._api.addEventListener('videoConferenceJoined', () => {
-        console.log('[VideoCallUI] ✅ Conectado a sala:', fullRoom);
       });
 
       this._api.addEventListener('connectionFailed', () => {
@@ -294,7 +293,7 @@ export const VideoCallUI = {
     try {
       let q = supabase
         .from('meetings')
-        .select('*')
+        .select('id, title, description, room_name, start_time, status, type, target_id, host_id')
         .in('status', ['scheduled', 'live'])
         .order('start_time', { ascending: true });
 

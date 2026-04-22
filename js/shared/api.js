@@ -145,7 +145,7 @@ export const Api = {
    */
   async getPayments(month, year) {
     const query = db(TABLES.PAYMENTS)
-      .select('*')
+      .select('id, title, message, type, link, is_read, created_at')
       .eq('month_paid', month)
       .gte('created_at', `${year}-01-01`)
       .lte('created_at', `${year}-12-31`);
@@ -206,9 +206,9 @@ export const Api = {
       // 1. Datos base (cuota mensual configurada)
       handle(db(TABLES.STUDENTS).select('monthly_fee, due_day').eq('id', studentId).single(), 'getStudentFee'),
       // 2. Deuda real acumulada (Tabla payments)
-      handle(db(TABLES.PAYMENTS).select('*').eq('student_id', studentId).in('status', ['pending', 'overdue']).order('due_date', { ascending: true }), 'getPendingPayments'),
+      handle(db(TABLES.PAYMENTS).select('id, amount, status, month_paid, due_date, paid_date, method, proof_url, created_at').eq('student_id', studentId).in('status', ['pending', 'overdue']).order('due_date', { ascending: true }), 'getPendingPayments'),
       // 3. Historial de pagos
-      handle(db(TABLES.PAYMENTS).select('*').eq('student_id', studentId).eq('status', 'paid').order('created_at', { ascending: false }).limit(5), 'getPaymentHistory')
+      handle(db(TABLES.PAYMENTS).select('id, amount, status, month_paid, due_date, paid_date, method, proof_url, created_at').eq('student_id', studentId).eq('status', 'paid').order('created_at', { ascending: false }).limit(5), 'getPaymentHistory')
     ]);
 
     const totalDebt = (pendingPayments || []).reduce((sum, p) => sum + Number(p.amount || 0), 0);
@@ -229,7 +229,7 @@ export const Api = {
         db(TABLES.TASK_EVIDENCES).select('*, task:task_id(title)').eq('student_id', studentId).not('grade_letter', 'is', null).order('created_at', { ascending: false }), 
         'getTaskGrades'
       ),
-      handle(db(TABLES.GRADES).select('*').eq('student_id', studentId).order('period', { ascending: true }), 'getReportGrades')
+      handle(db(TABLES.GRADES).select('id, subject, score, period, notes, created_at').eq('student_id', studentId).order('period', { ascending: true }), 'getReportGrades')
     ]);
 
     return {

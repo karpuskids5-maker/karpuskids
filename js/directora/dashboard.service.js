@@ -1,4 +1,4 @@
-/**
+﻿/**
  * 🎯 DASHBOARD SERVICE — Sincronización centralizada de datos
  * 
  * Responsabilidad: Orquestar carga de TODOS los datos del dashboard
@@ -144,7 +144,6 @@ export const DashboardService = {
         }
       };
 
-      console.log('📊 DashboardData:', dashboardData);
       AppState.set('dashboardData', dashboardData);
       this.lastFetch = Date.now();
 
@@ -181,7 +180,6 @@ export const DashboardService = {
   invalidateCache() {
     this.lastFetch = null;
     AppState.set('dashboardData', null); // Limpiar estado global para forzar skeletons si es necesario
-    console.log('🔄 Caché de dashboard invalidado');
     this.notifyListeners(); // 🔔 Avisar a la UI que debe recargar
   },
 

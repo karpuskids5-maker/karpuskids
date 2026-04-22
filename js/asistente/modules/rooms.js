@@ -87,7 +87,7 @@ export const RoomsModule = {
     if (roomId) {
       title.textContent = 'Editar Aula';
       try {
-        const { data: rm, error } = await supabase.from('classrooms').select('*').eq('id', roomId).single();
+        const { data: rm, error } = await supabase.from('classrooms').select('id, name, level, capacity, teacher_id').eq('id', roomId).single();
         if (error) throw error;
 
         document.getElementById('roomId').value = rm.id;

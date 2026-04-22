@@ -149,7 +149,6 @@ export const VideoCallModule = {
   },
 
   async init() {
-     console.log('✅ VideoCallModule initialized');
   }
 };
 

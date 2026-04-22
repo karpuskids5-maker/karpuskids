@@ -53,7 +53,7 @@ export const TasksModule = {
    */
   async openSubmitModal(taskId) {
     try {
-      const { data: task, error } = await supabase.from(TABLES.TASKS).select('*').eq('id', taskId).single();
+      const { data: task, error } = await supabase.from(TABLES.TASKS).select('id, title, description, due_date, grading_system, file_url, classroom_id, created_at').eq('id', taskId).single();
       if (error) throw error;
 
       const modal = document.getElementById('modalTaskDetail');
@@ -215,8 +215,8 @@ export const TasksModule = {
 
       // Obtener tareas y evidencias en paralelo
       const [tasksRes, evidencesRes] = await Promise.all([
-        supabase.from(TABLES.TASKS).select('*').eq('classroom_id', student.classroom_id).order('due_date', { ascending: false }),
-        supabase.from(TABLES.TASK_EVIDENCES).select('*').eq('student_id', student.id)
+        supabase.from(TABLES.TASKS).select('id, title, description, due_date, grading_system, file_url, created_at').eq('classroom_id', student.classroom_id).order('due_date', { ascending: false }),
+        supabase.from(TABLES.TASK_EVIDENCES).select('id, task_id, status, grade_letter, stars, file_url, comment, created_at').eq('student_id', student.id)
       ]);
 
       if (tasksRes.error) throw tasksRes.error;

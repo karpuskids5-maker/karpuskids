@@ -27,7 +27,7 @@ export const GradesModule = {
       const [gradesRes, taskRes] = await Promise.all([
         supabase
           .from(TABLES.GRADES)
-          .select('*')
+          .select('id, subject, score, period, notes, created_at')
           .eq('student_id', studentId)
           .order('created_at', { ascending: false }),
         supabase

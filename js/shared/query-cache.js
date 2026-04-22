@@ -4,7 +4,7 @@
  * estrategia stale-while-revalidate para 10k+ usuarios.
  *
  * Uso:
- *   const data = await QueryCache.get('students', () => supabase.from('students').select('*'), 60_000);
+ *   const data = await QueryCache.get('students', () => supabase.from('students').select('*').limit(100), 60_000);
  *   QueryCache.invalidate('students');
  */
 

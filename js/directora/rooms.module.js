@@ -293,7 +293,7 @@ export const RoomsModule = {
     // Pre-llenar si es edición
     if (roomId) {
       try {
-        const { data: room } = await supabase.from('classrooms').select('*').eq('id', parseInt(roomId)).single();
+        const { data: room } = await supabase.from('classrooms').select('id, name, level, capacity, teacher_id, is_live').eq('id', parseInt(roomId)).single();
         if (room) {
           document.getElementById('roomName').value     = room.name || '';
           document.getElementById('roomCapacity').value = room.capacity || '';

@@ -49,7 +49,6 @@ window.App = {
  * Inicialización principal del Panel de Asistente
  */
 document.addEventListener('DOMContentLoaded', async () => {
-  console.log('🚀 Karpus Assistant Module Starting...');
   
   // 1. Verificar Rol
   const auth = await ensureRole(['asistente', 'admin', 'directora']);
@@ -57,7 +56,6 @@ document.addEventListener('DOMContentLoaded', async () => {
   
   AppState.set('user', auth.user);
   AppState.set('profile', auth.profile);
-  console.log('👤 Assistant Role Verified:', auth.profile?.role);
 
   // 🔴 Sistema de badges por sección
   BadgeSystem.init(auth.user.id);
@@ -86,7 +84,6 @@ document.addEventListener('DOMContentLoaded', async () => {
       console.warn('⚠️ OneSignal error:', e);
     }
   } else {
-    console.log('ℹ️ OneSignal skipping: restricted domain');
   }
   
   initNavigation(); // Esto cargará el dashboard y configurará los listeners
@@ -163,7 +160,6 @@ function initNavigation() {
     if (sectionEl) {
       sectionEl.classList.remove('hidden');
       sectionEl.classList.add('active'); 
-      console.log(`🎯 Mostrando escenario: ${target}`);
     } else {
       console.error(`❌ Sección no encontrada: ${target}`);
     }
@@ -183,7 +179,6 @@ function initNavigation() {
 
     // ✅ --- LÓGICA DE CARGA PEREZOSA (LAZY LOADING) ---
     if (!loadedSections.has(target)) {
-      console.log(`🚀 Cargando sección por primera vez: ${target}`);
       try {
         switch (target) {
           case 'pagos':
@@ -193,7 +188,7 @@ function initNavigation() {
             ).catch(() => {});
             break;
           case 'accesos':
-            if (AccessModule.init) AccessModule.init();
+            await AccessModule.init();
             break;
           case 'maestros':
             await TeachersModule.init();
@@ -358,6 +353,15 @@ async function initProfile() {
           
           const { data: { publicUrl } } = supabase.storage.from('karpus-uploads').getPublicUrl(path);
           updates.avatar_url = publicUrl;
+          
+          // Actualizar sidebar inmediatamente
+          const sidebarAvatar = document.getElementById('sidebarAvatar');
+          if (sidebarAvatar) sidebarAvatar.src = publicUrl;
+          
+          // Actualizar preview con la URL real
+          if (avatarPreview) {
+            avatarPreview.innerHTML = `<img src="${publicUrl}" class="w-full h-full object-cover rounded-full">`;
+          }
         }
 
         const { error } = await supabase.from('profiles').update(updates).eq('id', AppState.get('user').id);
@@ -365,7 +369,11 @@ async function initProfile() {
         
         Helpers.toast('Perfil actualizado correctamente');
         // Actualizar estado local
-        AppState.set('profile', { ...profile, ...updates });
+        AppState.set('profile', { ...AppState.get('profile'), ...updates });
+        
+        // Actualizar UI de cabecera si es necesario
+        document.getElementById('profileNameDisplay').textContent = updates.name;
+        document.getElementById('sidebarUserName').textContent = updates.name;
         
       } catch (err) {
         console.error('Error updating profile:', err);

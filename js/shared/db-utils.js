@@ -28,7 +28,7 @@ export const COLS = {
  * 🛡️ safeQuery — Interceptor global de errores de base de datos.
  * Muestra un toast automático en errores y retorna { data, ok, error }.
  *
- * Uso: const { data, ok } = await safeQuery(supabase.from('students').select('*'));
+ * Uso: const { data, ok } = await safeQuery(supabase.from('students').select('id, action, payload, created_at'));
  */
 export async function safeQuery(queryPromise, { silent = false, label = '' } = {}) {
   try {

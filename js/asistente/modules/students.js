@@ -201,6 +201,28 @@ export const StudentsModule = {
             <div><label class="${LC}">D\u00eda Vencimiento</label><input id="stDueDay" type="number" min="1" max="31" placeholder="5" class="${IC} py-2"></div>
           </div>
         </div>
+
+        <!-- QR DE ASISTENCIA -->
+        <div class="bg-gradient-to-br from-teal-50 to-emerald-50 rounded-2xl border border-teal-100 p-3 space-y-3">
+          <p class="text-[10px] font-black text-teal-700 uppercase tracking-widest flex items-center gap-1.5">\ud83d\udcf1 C\u00f3digo QR de Asistencia</p>
+          <p class="text-[9px] text-teal-600 font-medium">El QR se genera con la matr\u00edcula para registrar entrada/salida.</p>
+          <div class="flex flex-col items-center gap-3 bg-white p-3 rounded-xl border border-teal-100">
+            <div id="asis-qr-container" class="bg-white p-2 rounded-xl border border-slate-100 min-h-[130px] flex items-center justify-center">
+              <p class="text-[9px] text-slate-400 font-bold text-center">Genera una matr\u00edcula<br>para ver el QR</p>
+            </div>
+            <p id="asis-qr-label" class="text-sm font-black text-slate-700">--</p>
+            <div class="flex gap-2 w-full">
+              <button type="button" onclick="window._renderStudentQR(document.getElementById('stMatricula')?.value?.trim())"
+                class="flex-1 py-2 bg-teal-500 text-white rounded-xl font-black text-[9px] uppercase tracking-widest hover:bg-teal-600 transition-all active:scale-95">
+                Generar QR
+              </button>
+              <button type="button" onclick="window._printStudentQRAsistente()"
+                class="flex-1 py-2 bg-slate-800 text-white rounded-xl font-black text-[9px] uppercase tracking-widest hover:bg-slate-900 transition-all active:scale-95">
+                Imprimir
+              </button>
+            </div>
+          </div>
+        </div>
       </div>
 
       <div class="bg-white p-4 rounded-b-3xl border-t border-slate-100 flex justify-end gap-2 shrink-0">
@@ -223,8 +245,48 @@ export const StudentsModule = {
 
     window._genMatricula = () => {
       const el = document.getElementById('stMatricula');
-      if (el) el.value = 'KK-' + new Date().getFullYear() + '-' + String(Math.floor(Math.random() * 9000) + 1000);
+      if (el) {
+        el.value = 'KK-' + new Date().getFullYear() + '-' + String(Math.floor(Math.random() * 9000) + 1000);
+        window._renderStudentQR(el.value);
+      }
     };
+
+    // QR generation for student
+    window._renderStudentQR = async (matricula) => {
+      const container = document.getElementById('asis-qr-container');
+      const label = document.getElementById('asis-qr-label');
+      if (!container || !matricula) return;
+      if (!window.QRCode) {
+        await new Promise(r => { const s = document.createElement('script'); s.src = 'https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js'; s.onload = r; document.head.appendChild(s); });
+      }
+      container.innerHTML = '';
+      if (label) label.textContent = matricula;
+      const name = document.getElementById('stName')?.value?.trim() || '';
+      new window.QRCode(container, {
+        text: JSON.stringify({ matricula, name, type: 'karpus-access', v: 1 }),
+        width: 120, height: 120, colorDark: '#1e293b', colorLight: '#ffffff',
+        correctLevel: window.QRCode.CorrectLevel.H
+      });
+    };
+
+    window._printStudentQRAsistente = () => {
+      const container = document.getElementById('asis-qr-container');
+      const matricula = document.getElementById('stMatricula')?.value?.trim();
+      const name = document.getElementById('stName')?.value?.trim() || 'Estudiante';
+      const img = container?.querySelector('img')?.src || container?.querySelector('canvas')?.toDataURL();
+      if (!img || !matricula) return;
+      const win = window.open('', '_blank');
+      win.document.write(`<!DOCTYPE html><html><head><title>QR ${matricula}</title><style>body{font-family:Arial,sans-serif;display:flex;align-items:center;justify-content:center;min-height:100vh;margin:0;}.card{border:2px solid #e2e8f0;border-radius:16px;padding:20px;text-align:center;max-width:240px;}.logo{font-size:11px;font-weight:900;color:#0d9488;text-transform:uppercase;letter-spacing:2px;margin-bottom:10px;}img{width:160px;height:160px;}.name{font-size:14px;font-weight:900;color:#1e293b;margin-top:10px;}.mat{font-size:10px;color:#64748b;font-weight:700;margin-top:3px;}.hint{font-size:8px;color:#94a3b8;margin-top:6px;}</style></head><body><div class="card"><div class="logo">🎓 Karpus Kids</div><img src="${img}"><div class="name">${name}</div><div class="mat">${matricula}</div><div class="hint">Escanea para registrar entrada/salida</div></div><script>window.onload=()=>window.print()<\/script></body></html>`);
+      win.document.close();
+    };
+
+    // Auto-render QR if matricula already set
+    const existingMat = document.getElementById('stMatricula')?.value?.trim();
+    if (existingMat) setTimeout(() => window._renderStudentQR(existingMat), 300);
+    document.getElementById('stMatricula')?.addEventListener('input', (e) => {
+      clearTimeout(window._asisQrDebounce);
+      window._asisQrDebounce = setTimeout(() => window._renderStudentQR(e.target.value.trim()), 600);
+    });
 
     // Avatar preview
     document.getElementById('stAvatarFile')?.addEventListener('change', (e) => {
@@ -265,7 +327,7 @@ export const StudentsModule = {
     // Prefill if editing
     if (studentId) {
       try {
-        const { data: st, error } = await supabase.from('students').select('*').eq('id', studentId).single();
+        const { data: st, error } = await supabase.from('students').select('id, name, is_active, parent_id, classroom_id, matricula, p1_name, p1_phone, p1_email, p2_name, p2_phone, monthly_fee, due_day, blood_type, allergies, authorized_pickup, start_date, avatar_url').eq('id', studentId).single();
         if (error) throw error;
         if (st) {
           const sv = (id, v) => { const el = document.getElementById(id); if (el) el.value = v || ''; };

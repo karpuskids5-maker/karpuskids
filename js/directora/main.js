@@ -1,4 +1,4 @@
-import { ensureRole, supabase, initOneSignal } from '../shared/supabase.js';
+﻿import { ensureRole, supabase, initOneSignal } from '../shared/supabase.js';
 import { AppState } from './state.js';
 import { Helpers } from '../shared/helpers.js';
 import { WallModule } from './wall.module.js';
@@ -147,20 +147,39 @@ async function loadProfile() {
     setVal('confPhone', profile.phone);
     setVal('confEmail', profile.email);
 
-    // Cargar horario desde school_settings
+    // Cargar horario desde school_settings (con fallback si columnas nuevas no existen)
     try {
-      const { data: settings } = await supabase.from('school_settings').select('*').eq('id', 1).single();
+      // Intentar con columnas nuevas primero
+      let settings = null;
+      const { data: s1, error: e1 } = await supabase
+        .from('school_settings')
+        .select('id, generation_day, due_day, phone, business_hours, open_time, close_time, work_days')
+        .eq('id', 1).single();
+
+      if (e1 && e1.code === '42703') {
+        // Columnas nuevas no existen — usar solo las base
+        const { data: s2 } = await supabase
+          .from('school_settings')
+          .select('id, generation_day, due_day, phone, business_hours')
+          .eq('id', 1).single();
+        settings = s2;
+      } else {
+        settings = s1;
+      }
+
       if (settings) {
         if (settings.open_time)  { const el = document.getElementById('confOpenTime');  if (el) el.value = settings.open_time; }
         if (settings.close_time) { const el = document.getElementById('confCloseTime'); if (el) el.value = settings.close_time; }
         if (settings.work_days) {
-          const days = typeof settings.work_days === 'string' ? JSON.parse(settings.work_days) : settings.work_days;
-          document.querySelectorAll('.work-day-btn').forEach(btn => {
-            if (days.includes(btn.dataset.day)) {
-              btn.classList.add('bg-violet-600', 'text-white', 'border-violet-600');
-              btn.classList.remove('bg-white', 'text-slate-500', 'border-slate-200');
-            }
-          });
+          try {
+            const days = typeof settings.work_days === 'string' ? JSON.parse(settings.work_days) : settings.work_days;
+            document.querySelectorAll('.work-day-btn').forEach(btn => {
+              if (days.includes(btn.dataset.day)) {
+                btn.classList.add('bg-violet-600', 'text-white', 'border-violet-600');
+                btn.classList.remove('bg-white', 'text-slate-500', 'border-slate-200');
+              }
+            });
+          } catch (_) {}
         }
         _updateSchedulePreview();
       }
@@ -233,7 +252,6 @@ document.addEventListener('DOMContentLoaded', async () => {
         console.warn('⚠️ OneSignal error:', e);
       }
     } else {
-      console.log('ℹ️ OneSignal skipping: restricted domain');
     }
 
     // 4. Cargar Perfil Inicial

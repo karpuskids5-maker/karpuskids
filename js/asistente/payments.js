@@ -91,7 +91,7 @@ export const PaymentsModule = {
 
   async _loadSettings() {
     try {
-      const { data } = await supabase.from('school_settings').select('*').eq('id', 1).maybeSingle();
+      const { data } = await supabase.from('school_settings').select('id, generation_day, due_day').eq('id', 1).maybeSingle();
       if (data) {
         this.settings.generation_day = data.generation_day || 25;
         this.settings.due_day = data.due_day || 5;
@@ -238,6 +238,10 @@ export const PaymentsModule = {
         '</td>' +
         '<td class="px-5 py-3.5">' +
           '<span class="text-[10px] font-black uppercase text-slate-500 bg-slate-100 px-2 py-0.5 rounded-md">' + (p.method || '-') + '</span>' +
+        '</td>' +
+        '<td class="px-5 py-3.5">' +
+          '<div class="text-[11px] font-bold text-slate-700">' + (p.bank || '-') + '</div>' +
+          '<div class="text-[9px] text-slate-400 font-bold uppercase">Banco</div>' +
         '</td>' +
         '<td class="px-5 py-3.5">' +
           '<div class="text-[11px] font-bold text-slate-700">' + (p.paid_date ? new Date(p.paid_date).toLocaleDateString('es-ES') : dueDateStr) + '</div>' +

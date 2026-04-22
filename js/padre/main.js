@@ -1,4 +1,4 @@
-import { supabase, ensureRole, initOneSignal } from '../shared/supabase.js';
+﻿import { supabase, ensureRole, initOneSignal } from '../shared/supabase.js';
 import { Api } from './api.js';
 import { Helpers } from './helpers.js';
 import { AppState } from './appState.js';
@@ -58,7 +58,6 @@ document.addEventListener('DOMContentLoaded', async () => {
         console.warn('⚠️ OneSignal error:', e);
       }
     } else {
-      console.log('ℹ️ OneSignal skipping: restricted domain');
     }
 
     const { data: students, error } = await supabase

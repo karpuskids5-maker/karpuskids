@@ -1,4 +1,4 @@
-/**
+﻿/**
  * 🧠 AppState PRO+ (Nivel Empresa)
  */
 export class SafeAppState {
@@ -152,17 +152,14 @@ export class SafeAppState {
 
     // ✅ Si existe caché y no ha expirado, devolverlo
     if (cached !== undefined && expiry !== undefined && now < expiry) {
-      console.log(`✅ [Cache HIT] ${key} (${Math.round((expiry - now) / 1000)}s restantes)`);
       return cached;
     }
 
     // 🔄 Si caché expiró o no existe, hacer fetch
-    console.log(`🔄 [Cache MISS] ${key} - Obteniendo datos frescos...`);
     try {
       const data = await fetchFn();
       this._cache[key] = data;
       this._cacheTTL[key] = now + ttl;
-      console.log(`✅ [Cache STORED] ${key} (TTL: ${Math.round(ttl / 1000)}s)`);
       return data;
     } catch (error) {
       console.error(`❌ [Cache ERROR] ${key}:`, error);
@@ -190,7 +187,6 @@ export class SafeAppState {
   invalidateCache(key) {
     delete this._cache[key];
     delete this._cacheTTL[key];
-    console.log(`🗑️ [Cache INVALIDATED] ${key}`);
   }
 
   /**
@@ -199,7 +195,6 @@ export class SafeAppState {
   clearAllCache() {
     this._cache = {};
     this._cacheTTL = {};
-    console.log('🗑️ [Cache CLEARED] Todos los cachés fueron limpiados');
   }
 
   /**

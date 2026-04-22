@@ -33,7 +33,7 @@ export const AccessModule = {
       const [staff, students, attendance] = await Promise.all([
         supabase.from('profiles').select('id, name, role, matricula').in('role', ['maestra', 'asistente', 'directora']),
         supabase.from('students').select('id, name, matricula, classrooms(name)'),
-        supabase.from('attendance').select('*').gte('date', from).lte('date', to)
+        supabase.from('attendance').select('id, name, role, avatar_url, is_active, created_at').gte('date', from).lte('date', to)
       ]);
 
       this._data = {

@@ -1,4 +1,4 @@
-import { supabase } from './supabase.js';
+﻿import { supabase } from './supabase.js';
 import { Helpers } from './helpers.js';
 import { ImageLoader } from './image-loader.js';
 import { QueryCache } from './query-cache.js';
@@ -240,7 +240,6 @@ export const WallModule = {
       entries.forEach(entry => {
         const video = entry.target;
         if (entry.isIntersecting) {
-          video.play().catch(e => console.log('Autoplay blocked:', e));
         } else {
           video.pause();
         }

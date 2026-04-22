@@ -3,271 +3,268 @@ import { Helpers } from '../shared/helpers.js';
 import { AssistantApi } from './api.js';
 
 let isProcessing = false;
-let _searchTimeout = null;
+let _accessChart = null;
 
 export const AccessModule = {
 
   async init() {
-    this._bindSearch();
-    this._bindQRScanner();
+    this._setupDateFilters();
+    this._bindTableSearch();
     await this.loadStats();
     await this.loadHistory();
+    await this.initChart();
+    this._bindExport();
   },
 
-  // ── Búsqueda por nombre O matrícula ──────────────────────────────────────
-  _bindSearch() {
-    const input = document.getElementById('accessSearchInput');
-    const results = document.getElementById('accessSearchResults');
-    if (!input) return;
-
-    input.addEventListener('input', (e) => {
-      clearTimeout(_searchTimeout);
-      const term = e.target.value.trim();
-      if (term.length < 2) { results.innerHTML = ''; return; }
-      results.innerHTML = `<div class="flex items-center gap-2 px-3 py-2 text-xs text-slate-400"><div class="w-3 h-3 border-2 border-teal-400 border-t-transparent rounded-full animate-spin"></div> Buscando...</div>`;
-      _searchTimeout = setTimeout(() => this._search(term), 280);
-    });
-
-    // Limpiar al presionar Escape
-    input.addEventListener('keydown', (e) => {
-      if (e.key === 'Escape') { input.value = ''; results.innerHTML = ''; }
-    });
-  },
-
-  async _search(term) {
-    const results = document.getElementById('accessSearchResults');
-    try {
-      // Buscar por nombre O matrícula
-      const { data: students, error } = await supabase
-        .from('students')
-        .select('id, name, matricula, classroom_id, avatar_url, classrooms:classroom_id(name)')
-        .or(`name.ilike.%${term}%,matricula.ilike.%${term}%`)
-        .eq('is_active', true)
-        .limit(6);
-
-      if (error) throw error;
-
-      if (!students?.length) {
-        results.innerHTML = `<div class="px-3 py-4 text-center text-xs text-slate-400 font-bold">Sin resultados para "${Helpers.escapeHTML(term)}"</div>`;
-        return;
-      }
-
-      results.innerHTML = students.map(s => this._studentResultHTML(s)).join('');
-      if (window.lucide) lucide.createIcons();
-    } catch (e) {
-      results.innerHTML = `<div class="px-3 py-2 text-xs text-rose-500">Error al buscar</div>`;
-    }
-  },
-
-  _studentResultHTML(s) {
-    const initials = (s.name || '?').charAt(0).toUpperCase();
-    const aula = s.classrooms?.name || 'Sin aula';
-    const mat  = s.matricula ? `<span class="font-mono text-[9px] bg-slate-100 px-1.5 py-0.5 rounded text-slate-500">${s.matricula}</span>` : '';
-    return `
-      <div class="flex items-center justify-between px-3 py-2.5 hover:bg-slate-50 transition-colors border-b border-slate-50 last:border-0">
-        <div class="flex items-center gap-2.5 min-w-0">
-          <div class="w-9 h-9 rounded-xl bg-teal-100 text-teal-700 font-black text-sm flex items-center justify-center shrink-0 overflow-hidden">
-            ${s.avatar_url ? `<img src="${s.avatar_url}" class="w-full h-full object-cover">` : initials}
-          </div>
-          <div class="min-w-0">
-            <p class="font-bold text-slate-800 text-sm truncate">${Helpers.escapeHTML(s.name)}</p>
-            <div class="flex items-center gap-1.5 mt-0.5">${mat}<span class="text-[10px] text-slate-400 font-bold">${aula}</span></div>
-          </div>
-        </div>
-        <div class="flex gap-1.5 shrink-0 ml-2">
-          <button data-id="${s.id}" data-type="check-in"
-            class="punch-btn px-2.5 py-1.5 bg-emerald-50 text-emerald-700 rounded-lg text-[10px] font-black uppercase hover:bg-emerald-100 border border-emerald-100 flex items-center gap-1 transition-all active:scale-95">
-            <i data-lucide="log-in" class="w-3 h-3"></i> Entrada
-          </button>
-          <button data-id="${s.id}" data-type="check-out"
-            class="punch-btn px-2.5 py-1.5 bg-rose-50 text-rose-600 rounded-lg text-[10px] font-black uppercase hover:bg-rose-100 border border-rose-100 flex items-center gap-1 transition-all active:scale-95">
-            <i data-lucide="log-out" class="w-3 h-3"></i> Salida
-          </button>
-        </div>
-      </div>`;
-  },
-
-  // ── Ponche por matrícula (QR / manual) ───────────────────────────────────
-  async punchByMatricula(matricula) {
-    if (isProcessing) return;
-    isProcessing = true;
-    try {
-      const { data, error } = await supabase.rpc('process_student_punch', { p_matricula: matricula.trim() });
-      if (error) throw error;
-      if (data?.success) {
-        Helpers.toast(`${data.type === 'check_in' ? '✅ Entrada' : '🚪 Salida'}: ${data.student_name} · ${data.time}`, 'success');
-        this._showPunchFeedback(data);
-      } else {
-        Helpers.toast(data?.message || 'Error en ponche', 'warning');
-      }
-      await this.loadStats();
-      await this.loadHistory();
-    } catch (e) {
-      Helpers.toast('Error: ' + e.message, 'error');
-    } finally {
-      isProcessing = false;
-    }
-  },
-
-  // ── Ponche manual por ID ──────────────────────────────────────────────────
-  async register(studentId, type) {
-    if (isProcessing) return;
-    isProcessing = true;
+  _setupDateFilters() {
+    const fromInput = document.getElementById('accessFilterFrom');
+    const toInput = document.getElementById('accessFilterTo');
+    const applyBtn = document.getElementById('btnApplyAccessFilters');
+    
+    // Set default dates (today)
     const today = new Date().toISOString().split('T')[0];
-    try {
-      if (type === 'check-in') {
-        const existing = await AssistantApi.getAttendanceStatus(studentId, today);
-        if (existing) { Helpers.toast('Ya tiene asistencia registrada hoy', 'info'); return; }
-        const { data: student, error } = await supabase
-          .from('students').select('name, classroom_id, p1_email').eq('id', studentId).single();
-        if (error || !student) throw new Error('Estudiante no encontrado');
-        await AssistantApi.checkIn(studentId, student.classroom_id, today);
-        Helpers.toast(`✅ Entrada: ${student.name}`, 'success');
-        emitEvent('attendance.checkin', { student_id: studentId, student_name: student.name, time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) });
-      } else {
-        const existing = await AssistantApi.getAttendanceStatus(studentId, today);
-        if (!existing) { Helpers.toast('Sin entrada registrada hoy', 'error'); return; }
-        if (existing.check_out) { Helpers.toast('Salida ya registrada', 'info'); return; }
-        await AssistantApi.checkOut(existing.id);
-        Helpers.toast(`🚪 Salida: ${existing.student?.name}`, 'success');
-      }
-      // Limpiar búsqueda
-      const input = document.getElementById('accessSearchInput');
-      const res   = document.getElementById('accessSearchResults');
-      if (input) input.value = '';
-      if (res)   res.innerHTML = '';
-      await this.loadStats();
-      await this.loadHistory();
-    } catch (e) {
-      Helpers.toast('Error: ' + e.message, 'error');
-    } finally {
-      isProcessing = false;
-    }
+    if (fromInput) fromInput.value = today;
+    if (toInput) toInput.value = today;
+
+    applyBtn?.addEventListener('click', () => {
+      this.loadHistory();
+      this.loadStats();
+      this.updateChart();
+    });
   },
 
-  // ── Estadísticas del día ──────────────────────────────────────────────────
+  _bindTableSearch() {
+    const input = document.getElementById('searchAccessTable');
+    input?.addEventListener('input', Helpers.debounce((e) => {
+      this._filterTable(e.target.value.toLowerCase());
+    }, 200));
+  },
+
+  _filterTable(term) {
+    const rows = document.querySelectorAll('#accessTableBody tr');
+    rows.forEach(row => {
+      const text = row.textContent.toLowerCase();
+      row.style.display = text.includes(term) ? '' : 'none';
+    });
+  },
+
+  _bindExport() {
+    const btn = document.getElementById('btnExportExcel');
+    btn?.addEventListener('click', () => this.exportToExcel());
+  },
+
+  // ── Estadísticas con Filtro ──────────────────────────────────────────────
   async loadStats() {
     try {
-      const today = new Date().toISOString().split('T')[0];
-      const { data } = await supabase
-        .from('attendance')
-        .select('status, check_out')
-        .eq('date', today);
+      const from = document.getElementById('accessFilterFrom')?.value;
+      const to = document.getElementById('accessFilterTo')?.value;
+      
+      let query = supabase.from('attendance').select('status, check_out');
+      if (from) query = query.gte('date', from);
+      if (to) query = query.lte('date', to);
 
-      const present  = (data || []).filter(r => r.status === 'present').length;
+      const { data } = await query;
+
+      const present  = (data || []).filter(r => ['present', 'late'].includes(r.status)).length;
       const late     = (data || []).filter(r => r.status === 'late').length;
-      const checkouts = (data || []).filter(r => r.check_out).length;
+      const checkouts = (data || []).filter(r => r.status === 'retirado').length;
       const total    = (data || []).length;
 
       const set = (id, v) => { const el = document.getElementById(id); if (el) el.textContent = v; };
-      set('statPresent',  present);
-      set('statLate',     late);
-      set('statCheckout', checkouts);
-      set('statTotal',    total);
-    } catch (_) {}
+      set('statAccessPresent',  present);
+      set('statAccessLate',     late);
+      set('statAccessCheckout', checkouts);
+      set('statAccessTotal',    total);
+    } catch (err) {
+      console.error('Error loadStats:', err);
+    }
   },
 
-  // ── Historial reciente ────────────────────────────────────────────────────
+  // ── Historial Detallado (Tabla) ───────────────────────────────────────────
   async loadHistory() {
-    const container = document.getElementById('accessRecentLog');
-    if (!container) return;
+    const tbody = document.getElementById('accessTableBody');
+    if (!tbody) return;
+
+    tbody.innerHTML = `<tr><td colspan="6" class="py-12 text-center text-slate-400 font-bold">Cargando registros...</td></tr>`;
+
     try {
-      const logs = await AssistantApi.getTodayAttendance();
-      if (!logs?.length) {
-        container.innerHTML = `<div class="text-center py-8 text-slate-300"><i data-lucide="clock" class="w-8 h-8 mx-auto mb-2"></i><p class="text-xs font-bold uppercase tracking-widest">Sin actividad hoy</p></div>`;
-        if (window.lucide) lucide.createIcons();
+      const from = document.getElementById('accessFilterFrom')?.value;
+      const to = document.getElementById('accessFilterTo')?.value;
+      const status = document.getElementById('accessFilterStatus')?.value;
+
+      let query = supabase
+        .from('attendance')
+        .select('*, student:student_id(name, matricula, avatar_url)')
+        .order('date', { ascending: false })
+        .order('check_in', { ascending: false });
+
+      if (from) query = query.gte('date', from);
+      if (to) query = query.lte('date', to);
+      if (status && status !== 'all') query = query.eq('status', status);
+
+      const { data, error } = await query.limit(200);
+      if (error) throw error;
+
+      if (!data?.length) {
+        tbody.innerHTML = `<tr><td colspan="6" class="py-12 text-center text-slate-300 font-bold uppercase tracking-widest text-xs">Sin movimientos en este rango</td></tr>`;
         return;
       }
-      container.innerHTML = logs.map(log => {
-        const inTime  = log.check_in  ? new Date(log.check_in).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : null;
-        const outTime = log.check_out ? new Date(log.check_out).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : null;
-        const dot = log.check_out ? 'bg-rose-400' : (log.check_in ? 'bg-emerald-400' : 'bg-slate-300');
+
+      tbody.innerHTML = data.map(log => {
+        const dateStr = new Date(log.date + 'T12:00:00').toLocaleDateString('es-DO', { day: '2-digit', month: 'short' });
+        const inTime = log.check_in ? new Date(log.check_in).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '--:--';
+        const outTime = log.check_out ? new Date(log.check_out).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '--:--';
+        
+        let statusBadge = '';
+        if (log.status === 'present') statusBadge = '<span class="px-2.5 py-1 bg-emerald-50 text-emerald-600 rounded-lg text-[9px] font-black uppercase">Entrada</span>';
+        else if (log.status === 'late') statusBadge = '<span class="px-2.5 py-1 bg-amber-50 text-amber-600 rounded-lg text-[9px] font-black uppercase">Tardanza</span>';
+        else if (log.status === 'retirado') statusBadge = '<span class="px-2.5 py-1 bg-blue-50 text-blue-600 rounded-lg text-[9px] font-black uppercase">Salida</span>';
+
         return `
-          <div class="flex items-center gap-3 px-3 py-2.5 hover:bg-slate-50 transition-colors border-b border-slate-50 last:border-0">
-            <div class="w-8 h-8 rounded-full bg-slate-100 flex items-center justify-center overflow-hidden shrink-0">
-              ${log.student?.avatar_url ? `<img src="${log.student.avatar_url}" class="w-full h-full object-cover">` : `<i data-lucide="user" class="w-4 h-4 text-slate-400"></i>`}
-            </div>
-            <div class="flex-1 min-w-0">
-              <p class="text-xs font-black text-slate-700 truncate">${Helpers.escapeHTML(log.student?.name || '—')}</p>
-              <div class="flex gap-2 mt-0.5">
-                ${inTime  ? `<span class="text-[9px] font-bold text-emerald-600 flex items-center gap-0.5"><i data-lucide="log-in" class="w-2.5 h-2.5"></i>${inTime}</span>` : ''}
-                ${outTime ? `<span class="text-[9px] font-bold text-rose-500 flex items-center gap-0.5"><i data-lucide="log-out" class="w-2.5 h-2.5"></i>${outTime}</span>` : ''}
+          <tr class="hover:bg-slate-50/50 transition-colors">
+            <td class="px-8 py-4">
+              <div class="flex items-center gap-3">
+                <div class="w-8 h-8 rounded-xl bg-slate-100 flex items-center justify-center overflow-hidden shrink-0 border border-slate-200">
+                  ${log.student?.avatar_url ? `<img src="${log.student.avatar_url}" class="w-full h-full object-cover">` : `<i data-lucide="user" class="w-4 h-4 text-slate-300"></i>`}
+                </div>
+                <span class="font-bold text-slate-700">${Helpers.escapeHTML(log.student?.name || '—')}</span>
               </div>
-            </div>
-            <div class="w-2 h-2 rounded-full ${dot} shrink-0"></div>
-          </div>`;
+            </td>
+            <td class="px-8 py-4 font-mono text-[10px] text-slate-400 font-bold">${log.student?.matricula || '—'}</td>
+            <td class="px-8 py-4 text-slate-500 font-bold">${dateStr}</td>
+            <td class="px-8 py-4 text-center font-black text-slate-700 italic">${inTime}</td>
+            <td class="px-8 py-4 text-center font-black text-slate-700 italic">${outTime}</td>
+            <td class="px-8 py-4 text-center">${statusBadge}</td>
+          </tr>`;
       }).join('');
+
       if (window.lucide) lucide.createIcons();
-    } catch (e) {
-      container.innerHTML = `<div class="px-3 py-4 text-xs text-rose-500 text-center">Error al cargar historial</div>`;
+    } catch (err) {
+      tbody.innerHTML = `<tr><td colspan="6" class="py-12 text-center text-rose-500 font-bold">Error al cargar datos: ${err.message}</td></tr>`;
     }
   },
 
-  // ── Feedback visual de ponche ─────────────────────────────────────────────
-  _showPunchFeedback(data) {
-    const overlay = document.getElementById('punchFeedbackOverlay');
-    if (!overlay) return;
-    const isIn = data.type === 'check_in';
-    overlay.innerHTML = `
-      <div class="bg-white rounded-3xl p-8 max-w-xs w-full mx-4 text-center shadow-2xl animate-bounce-in">
-        <div class="w-20 h-20 rounded-full ${isIn ? 'bg-emerald-100' : 'bg-rose-100'} flex items-center justify-center mx-auto mb-4 text-4xl">
-          ${isIn ? '✅' : '🚪'}
-        </div>
-        <h3 class="text-xl font-black text-slate-800 mb-1">${Helpers.escapeHTML(data.student_name)}</h3>
-        <p class="text-sm font-bold ${isIn ? 'text-emerald-600' : 'text-rose-500'} uppercase tracking-wider mb-3">
-          ${isIn ? 'Entrada registrada' : 'Salida registrada'}
-        </p>
-        <div class="text-2xl font-black text-slate-700 bg-slate-50 rounded-2xl py-2">${data.time}</div>
-      </div>`;
-    overlay.classList.remove('hidden');
-    setTimeout(() => overlay.classList.add('hidden'), 2500);
+  // ── Gráfico de Tendencia ──────────────────────────────────────────────────
+  async initChart() {
+    const ctx = document.getElementById('accessChart')?.getContext('2d');
+    if (!ctx) return;
+
+    if (!window.Chart) {
+      await this._loadChartJs();
+    }
+
+    this.updateChart();
   },
 
-  // ── Escáner QR integrado ──────────────────────────────────────────────────
-  _bindQRScanner() {
-    const btn = document.getElementById('btnOpenQRScanner');
-    if (!btn) return;
-    btn.addEventListener('click', () => this._openScanner());
+  async updateChart() {
+    const ctx = document.getElementById('accessChart')?.getContext('2d');
+    if (!ctx) return;
+
+    try {
+      const from = document.getElementById('accessFilterFrom')?.value;
+      const { data } = await supabase.from('attendance').select('date, status').gte('date', from).order('date');
+      
+      const days = [...new Set(data.map(d => d.date))].slice(-7);
+      const entries = days.map(day => data.filter(d => d.date === day && d.status === 'present').length);
+      const lates = days.map(day => data.filter(d => d.date === day && d.status === 'late').length);
+
+      if (_accessChart) _accessChart.destroy();
+
+      _accessChart = new Chart(ctx, {
+        type: 'line',
+        data: {
+          labels: days.map(d => new Date(d + 'T12:00:00').toLocaleDateString('es-DO', { weekday: 'short' })),
+          datasets: [
+            { label: 'Entradas', data: entries, borderColor: '#10b981', backgroundColor: '#10b98120', fill: true, tension: 0.4 },
+            { label: 'Tardanzas', data: lates, borderColor: '#f59e0b', backgroundColor: '#f59e0b20', fill: true, tension: 0.4 }
+          ]
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          plugins: { legend: { display: false } },
+          scales: { y: { beginAtZero: true, ticks: { stepSize: 1 } }, x: { grid: { display: false } } }
+        }
+      });
+    } catch (e) { console.error('Chart error:', e); }
   },
 
-  _openScanner() {
-    const modal = document.getElementById('qrScannerModal');
-    if (!modal) return;
-    modal.classList.remove('hidden');
-
-    if (!window.Html5Qrcode) {
+  async _loadChartJs() {
+    return new Promise((resolve) => {
       const script = document.createElement('script');
-      script.src = 'https://unpkg.com/html5-qrcode';
-      script.onload = () => this._startScanner();
+      script.src = 'https://cdn.jsdelivr.net/npm/chart.js';
+      script.onload = resolve;
       document.head.appendChild(script);
-    } else {
-      this._startScanner();
-    }
+    });
   },
 
-  _startScanner() {
-    const el = document.getElementById('qrReaderInline');
-    if (!el || window._qrInstance) return;
-    window._qrInstance = new Html5Qrcode('qrReaderInline');
-    window._qrInstance.start(
-      { facingMode: 'environment' },
-      { fps: 10, qrbox: { width: 220, height: 220 } },
-      async (decodedText) => {
-        await window._qrInstance.stop();
-        window._qrInstance = null;
-        document.getElementById('qrScannerModal')?.classList.add('hidden');
-        await this.punchByMatricula(decodedText);
-      },
-      () => {}
-    ).catch(e => console.warn('[QR]', e));
+  // ── Exportación a Excel (Simple CSV) ───────────────────────────────────────
+  async exportToExcel() {
+    const rows = [['Estudiante', 'Matricula', 'Fecha', 'Entrada', 'Salida', 'Estado']];
+    const tbody = document.querySelectorAll('#accessTableBody tr');
+    
+    tbody.forEach(tr => {
+      const cols = tr.querySelectorAll('td');
+      if (cols.length < 6) return;
+      rows.push([
+        cols[0].querySelector('span')?.textContent || '',
+        cols[1].textContent,
+        cols[2].textContent,
+        cols[3].textContent,
+        cols[4].textContent,
+        cols[5].textContent.trim()
+      ]);
+    });
+
+    const csvContent = "data:text/csv;charset=utf-8," + rows.map(e => e.join(",")).join("\n");
+    const encodedUri = encodeURI(csvContent);
+    const link = document.createElement("a");
+    link.setAttribute("href", encodedUri);
+    link.setAttribute("download", `reporte_asistencia_${new Date().toISOString().split('T')[0]}.csv`);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    Helpers.toast('Reporte generado correctamente');
   },
 
-  closeScanner() {
-    if (window._qrInstance) {
-      window._qrInstance.stop().catch(() => {});
-      window._qrInstance = null;
-    }
-    document.getElementById('qrScannerModal')?.classList.add('hidden');
+  async updateChart() {
+    const ctx = document.getElementById('accessChart')?.getContext('2d');
+    if (!ctx) return;
+
+    try {
+      const from = document.getElementById('accessFilterFrom')?.value;
+      const to = document.getElementById('accessFilterTo')?.value;
+      
+      let query = supabase.from('attendance').select('date, status').order('date');
+      if (from) query = query.gte('date', from);
+      if (to) query = query.lte('date', to);
+
+      const { data } = await query;
+      if (!data) return;
+
+      const days = [...new Set(data.map(d => d.date))];
+      const entries = days.map(day => data.filter(d => d.date === day && d.status === 'present').length);
+      const lates = days.map(day => data.filter(d => d.date === day && d.status === 'late').length);
+
+      if (_accessChart) _accessChart.destroy();
+
+      _accessChart = new Chart(ctx, {
+        type: 'line',
+        data: {
+          labels: days.map(d => new Date(d + 'T12:00:00').toLocaleDateString('es-DO', { weekday: 'short', day: 'numeric' })),
+          datasets: [
+            { label: 'Entradas', data: entries, borderColor: '#10b981', backgroundColor: '#10b98120', fill: true, tension: 0.4 },
+            { label: 'Tardanzas', data: lates, borderColor: '#f59e0b', backgroundColor: '#f59e0b20', fill: true, tension: 0.4 }
+          ]
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          plugins: { legend: { display: false } },
+          scales: { y: { beginAtZero: true, ticks: { stepSize: 1 } }, x: { grid: { display: false } } }
+        }
+      });
+    } catch (e) { console.error('Chart error:', e); }
   }
 };
 

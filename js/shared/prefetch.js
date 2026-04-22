@@ -1,4 +1,4 @@
-/**
+﻿/**
  * ⚡ Karpus Kids — Prefetch System
  *
  * CONCEPTO:
@@ -44,7 +44,6 @@ export const Prefetch = {
       _cache.set('evidencias', this._prefetchEvidencias(studentId));
     }
 
-    console.log('[Prefetch] Iniciado para:', ctx);
   },
 
   /**
@@ -80,7 +79,6 @@ export const Prefetch = {
 
       await this._preloadImages(urls);
       _done.add('muro');
-      console.log('[Prefetch] Muro listo —', urls.length, 'recursos');
     } catch (e) {
       console.warn('[Prefetch] muro error:', e.message);
     }
@@ -112,7 +110,6 @@ export const Prefetch = {
 
       await this._preloadImages(urls);
       _done.add('tareas');
-      console.log('[Prefetch] Tareas listo —', urls.length, 'recursos');
     } catch (e) {
       console.warn('[Prefetch] tareas error:', e.message);
     }
@@ -135,7 +132,6 @@ export const Prefetch = {
       const urls = (profiles || []).map(p => p.avatar_url).filter(Boolean);
       await this._preloadImages(urls);
       _done.add('avatares');
-      console.log('[Prefetch] Avatares listo —', urls.length, 'recursos');
     } catch (e) {
       console.warn('[Prefetch] avatares error:', e.message);
     }
@@ -154,7 +150,6 @@ export const Prefetch = {
       const urls = (evidences || []).map(e => e.file_url).filter(Boolean);
       await this._preloadImages(urls);
       _done.add('evidencias');
-      console.log('[Prefetch] Evidencias listo —', urls.length, 'recursos');
     } catch (e) {
       console.warn('[Prefetch] evidencias error:', e.message);
     }

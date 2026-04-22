@@ -85,7 +85,7 @@ export async function initTasks() {
 
 export async function openEditTaskModal(taskId) {
   try {
-    const { data: task, error } = await supabase.from('tasks').select('*').eq('id', taskId).single();
+    const { data: task, error } = await supabase.from('tasks').select('id, title, description, due_date, grading_system, file_url, classroom_id').eq('id', taskId).single();
     if (error) throw error;
     openNewTaskModal(task);
   } catch (err) {
@@ -271,7 +271,7 @@ export async function viewTaskSubmissions(taskId) {
   const students = AppState.get('students') || [];
   const modalId = 'taskSubmissionsModal';
   try {
-    const { data: submissions, error: subError } = await supabase.from('task_evidences').select('*').eq('task_id', taskId);
+    const { data: submissions, error: subError } = await supabase.from('task_evidences').select('id, task_id, student_id, status, grade_letter, stars, file_url, comment, created_at').eq('task_id', taskId);
     if (subError) throw subError;
 
     const subMap = {};

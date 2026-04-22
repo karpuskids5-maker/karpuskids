@@ -166,14 +166,32 @@ export const TeachersModule = {
             <input id="tEmail" placeholder="usuario@karpus.com" type="email" class="${inputClass}">
           </div>
 
-          <div class="col-span-2 bg-slate-50 p-4 rounded-2xl border-2 border-slate-100">
-            <label class="${labelClass}">Código de Acceso (Matrícula)</label>
-            <div class="flex gap-2 mb-4">
-              <input id="tMatricula" placeholder="Ej: TEA-1234" class="${inputClass} bg-white">
-              <button onclick="window.genStaffCode()" class="px-4 py-2 bg-slate-800 text-white rounded-xl text-xs font-black uppercase">Generar</button>
-            </div>
-            <div id="staff-qr-container" class="flex justify-center bg-white p-4 rounded-xl border border-slate-200 min-h-[100px] items-center text-slate-400 text-[10px] font-bold uppercase">
-              Ingresa un código para ver el QR
+          <div class="col-span-2 bg-gradient-to-br from-orange-50 to-amber-50 p-6 rounded-[2rem] border-2 border-orange-100 space-y-4">
+            <h4 class="text-sm font-black text-orange-800 flex items-center gap-2">
+              <div class="w-8 h-8 rounded-xl bg-orange-100 text-orange-600 flex items-center justify-center"><i data-lucide="qr-code" class="w-4 h-4"></i></div>
+              📱 CÓDIGO QR DE ACCESO (PERSONAL)
+            </h4>
+            <p class="text-xs text-orange-600 font-medium leading-relaxed">Este código permite a la maestra/asistente registrar su propia asistencia en el terminal de ponche.</p>
+            
+            <div class="bg-white p-6 rounded-3xl border border-orange-100 shadow-sm flex flex-col items-center gap-4">
+              <div class="flex gap-2 w-full">
+                <div class="relative flex-1">
+                  <i data-lucide="hash" class="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400"></i>
+                  <input id="tMatricula" placeholder="Generar ID Empleado..." class="${inputClass} pl-10 bg-white border-orange-50 focus:border-orange-300">
+                </div>
+                <button type="button" onclick="window.genStaffCode()" class="px-6 py-2 bg-orange-600 text-white rounded-2xl font-black text-xs uppercase hover:bg-orange-700 shadow-md transition-all active:scale-95">Generar</button>
+              </div>
+
+              <div id="staff-qr-container" class="bg-white p-3 rounded-2xl border-2 border-slate-100 shadow-sm min-h-[160px] flex items-center justify-center w-full max-w-[180px]">
+                <p class="text-[10px] text-slate-400 font-black uppercase text-center leading-tight">Ingresa un ID<br>para ver el QR</p>
+              </div>
+
+              <div class="flex gap-2 w-full">
+                <button type="button" id="btn-print-staff-qr" onclick="window.printStaffQR()"
+                  class="flex-1 py-3 bg-slate-800 hover:bg-slate-900 text-white rounded-xl font-black text-[10px] uppercase tracking-widest transition-all active:scale-95 flex items-center justify-center gap-2">
+                  <i data-lucide="printer" class="w-3.5 h-3.5"></i> Imprimir Carnet
+                </button>
+              </div>
             </div>
           </div>
 
@@ -230,7 +248,13 @@ export const TeachersModule = {
 
     window.renderStaffQR = async (code) => {
       const container = document.getElementById('staff-qr-container');
-      if (!container || !code) return;
+      if (!container) return;
+      
+      if (!code) {
+        container.innerHTML = '<p class="text-[10px] text-slate-400 font-black uppercase text-center leading-tight">Ingresa un ID<br>para ver el QR</p>';
+        return;
+      }
+
       // Cargar librería QR si no está
       if (!window.QRCode) {
         await new Promise(resolve => {
@@ -243,10 +267,44 @@ export const TeachersModule = {
       container.innerHTML = '';
       new window.QRCode(container, {
         text: JSON.stringify({ matricula: code, type: 'karpus-staff', v: 1 }),
-        width: 100, height: 100,
+        width: 140, height: 140,
         colorDark: '#1e293b', colorLight: '#ffffff',
         correctLevel: window.QRCode.CorrectLevel.H
       });
+    };
+
+    window.printStaffQR = () => {
+      const matricula = document.getElementById('tMatricula')?.value?.trim();
+      const name = document.getElementById('tName')?.value?.trim();
+      const role = document.getElementById('tRole')?.value?.trim();
+      const container = document.getElementById('staff-qr-container');
+      if (!container || !matricula) { Helpers.toast('Genera el QR primero', 'warning'); return; }
+
+      const qrImg = container.querySelector('img')?.src || container.querySelector('canvas')?.toDataURL();
+      if (!qrImg) { Helpers.toast('Genera el QR primero', 'warning'); return; }
+
+      const win = window.open('', '_blank');
+      win.document.write(`<!DOCTYPE html><html><head><title>Carnet Personal - ${name}</title>
+        <style>
+          body { font-family: Arial, sans-serif; display: flex; flex-direction: column; align-items: center; justify-content: center; min-height: 100vh; margin: 0; background: #fff; }
+          .card { border: 4px solid #4f46e5; border-radius: 24px; padding: 30px; text-align: center; max-width: 300px; position: relative; }
+          .header { background: #4f46e5; color: white; margin: -30px -30px 20px -30px; padding: 15px; border-radius: 20px 20px 0 0; font-weight: 900; text-transform: uppercase; font-size: 14px; }
+          img { width: 180px; height: 180px; border: 4px solid #f8fafc; border-radius: 12px; }
+          .name { font-size: 18px; font-weight: 900; color: #1e293b; margin-top: 15px; }
+          .role { font-size: 12px; color: #4f46e5; font-weight: 800; text-transform: uppercase; margin-top: 2px; }
+          .id { font-size: 11px; color: #64748b; font-weight: 700; margin-top: 10px; border-top: 1px solid #eee; pt: 10px; }
+        </style>
+      </head><body>
+        <div class="card">
+          <div class="header">STAFF · KARPUS KIDS</div>
+          <img src="${qrImg}" alt="QR">
+          <div class="name">${name || 'Personal'}</div>
+          <div class="role">${role || 'Maestra'}</div>
+          <div class="id">ID: ${matricula}</div>
+        </div>
+        <script>window.onload=()=>{window.print();}<\/script>
+      </body></html>`);
+      win.document.close();
     };
 
     // Escuchar cambios en el input de matrícula para actualizar QR
@@ -265,7 +323,12 @@ export const TeachersModule = {
 
     if (id) {
       const teachers = AppState.get('teachers') || [];
-      const teacher = teachers.find(t => t.id == id);
+      let teacher = teachers.find(t => t.id == id);
+      // Si no está en cache, buscar en DB para obtener notes (matrícula)
+      if (!teacher) {
+        const { data } = await supabase.from('profiles').select('id, name, email, phone, role, is_active, notes').eq('id', id).maybeSingle();
+        teacher = data;
+      }
       if (teacher) {
         const setVal = (eid, val) => { const e = document.getElementById(eid); if(e) e.value = val || ''; };
         setVal('tId', teacher.id);
@@ -273,11 +336,13 @@ export const TeachersModule = {
         setVal('tPhone', teacher.phone);
         setVal('tEmail', teacher.email);
         setVal('tRole', teacher.role);
-        // classroom_id viene normalizado desde el join classrooms!classrooms_teacher_id_fkey
+        setVal('tMatricula', teacher.notes || '');
         const classId = teacher.classroom_id || teacher.classrooms?.id;
         setVal('tClassroom', classId);
         const checkActive = document.getElementById('tActive');
         if(checkActive) checkActive.checked = teacher.is_active !== false;
+        // Auto-render QR if has code
+        if (teacher.notes) setTimeout(() => window.renderStaffQR(teacher.notes), 400);
       }
     }
     if (window.lucide) lucide.createIcons();

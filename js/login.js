@@ -179,10 +179,7 @@ document.addEventListener('DOMContentLoaded', async () => {
 
       // 2. Registrar aceptación de términos si no está registrada
       if (acceptTerms?.checked) {
-        // Guardar en localStorage para no volver a preguntar en este dispositivo
         localStorage.setItem('karpus_terms_accepted_' + TERMS_VERSION, 'true');
-
-        // Guardar en Supabase (upsert — no duplica si ya existe)
         await supabase.from('terms_acceptance').upsert({
           user_id:       userId,
           terms_version: TERMS_VERSION,
@@ -193,8 +190,9 @@ document.addEventListener('DOMContentLoaded', async () => {
       // 3. OneSignal
       try { await initOneSignal(authData.user); } catch (_) {}
 
-      // 4. Redirigir — limpiar intentos fallidos
+      // 4. Registrar login exitoso y redirigir
       RATE_LIMIT.recordSuccess();
+      supabase.from('login_attempts').insert({ email, success: true }).then(() => {}).catch(() => {});
       localStorage.setItem('karpus_user', JSON.stringify({ id: userId }));
       await redirectByRole(userId);
 
@@ -209,8 +207,9 @@ document.addEventListener('DOMContentLoaded', async () => {
       else if (msg.includes('Invalid login'))      errorMessage = 'Correo o contraseña incorrectos.';
       else if (msg.includes('Email not confirmed')) errorMessage = 'Confirma tu correo antes de ingresar.';
 
-      // Registrar intento fallido (solo para errores de credenciales, no de red)
+      // Registrar intento fallido en Supabase para rate limiting server-side
       if (!isNetwork && msg.includes('Invalid login')) {
+        supabase.from('login_attempts').insert({ email, success: false }).then(() => {}).catch(() => {});
         const locked = RATE_LIMIT.recordFailure();
         if (locked) {
           errorMessage = `Cuenta bloqueada por ${RATE_LIMIT.LOCKOUT_MS / 60000} minutos por múltiples intentos fallidos.`;

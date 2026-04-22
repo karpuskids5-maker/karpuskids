@@ -81,7 +81,7 @@ export const ChatModule = {
 
         const { data: messages, error } = await supabase
           .from('messages')
-          .select('*')
+          .select('id, name, role, avatar_url, email')
           .eq('conversation_id', conversationId)
           .order('created_at', { ascending: false })  // más recientes primero
           .range(from, to);

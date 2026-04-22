@@ -1,4 +1,4 @@
-/**
+﻿/**
  * 🛡️ Karpus Kids — Security Module
  * Protección contra XSS, CSRF, clickjacking e inyección.
  * Importar en todos los paneles: import { Security } from '../shared/security.js';
@@ -143,7 +143,6 @@ export const Security = {
       }
     }, true);
 
-    console.log('[Security] ✅ Protecciones activas');
   }
 };
 

@@ -28,7 +28,7 @@ export const AssistantApi = {
   async getReminderConfig() {
     const { data, error } = await supabase
       .from('payment_reminders')
-      .select('*')
+      .select('id, amount, status, month_paid, due_date, paid_date, method, bank, reference, proof_url, created_at')
       .limit(1)
       .maybeSingle();
       

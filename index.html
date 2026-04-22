@@ -7,6 +7,8 @@
   <meta name="description" content="Karpus Kids: Estancia infantil segura y amorosa en Santo Domingo. Cuidado experto, educación integral, supervisión constante y app exclusiva para padres. ¡Agenda tu visita hoy!">
   
   <!-- Tailwind CSS -->
+  <link rel="stylesheet" href="css/karpus-tailwind.css">
+  <!-- Tailwind CDN para clases adicionales del landing -->
   <script src="https://cdn.tailwindcss.com"></script>
   
   <!-- AOS Animations -->
@@ -278,6 +280,58 @@
     /* Mejora de tarjetas en móvil */
     .card {
       margin-bottom: 1.5rem;
+    }
+
+    /* ── FIXES RESPONSIVOS GLOBALES ── */
+    img { max-width: 100%; height: auto; }
+
+    /* Logo hero — nunca desborda */
+    .karpus-kids-colored {
+      line-height: 1.1;
+      word-break: break-word;
+    }
+    .karpus-kids-colored span {
+      font-size: clamp(2rem, 8vw, 5rem) !important;
+    }
+
+    /* Secciones — nunca desbordan */
+    section { overflow-x: hidden; max-width: 100vw; }
+
+    /* Grids responsivos seguros */
+    @media (max-width: 640px) {
+      .grid { grid-template-columns: 1fr !important; }
+      .md\:grid-cols-2, .md\:grid-cols-3, .lg\:grid-cols-3, .lg\:grid-cols-4 {
+        grid-template-columns: 1fr !important;
+      }
+      /* Botones hero full-width en móvil */
+      .hero-cta-btn {
+        width: 100% !important;
+        display: block !important;
+        text-align: center !important;
+        margin-bottom: 0.75rem !important;
+      }
+      /* Flex columns en móvil */
+      .flex.flex-col.md\:flex-row { flex-direction: column !important; }
+      /* Padding reducido */
+      .px-8 { padding-left: 1rem !important; padding-right: 1rem !important; }
+      .py-20 { padding-top: 3rem !important; padding-bottom: 3rem !important; }
+    }
+
+    /* Film strips — no rompen layout */
+    .film-strip-container { overflow: hidden; max-width: 100vw; }
+    .film-strip img { height: 10rem; width: auto; object-fit: cover; flex-shrink: 0; }
+
+    /* Videos — aspect ratio seguro */
+    video { max-width: 100%; height: auto; }
+
+    /* Contenedor principal */
+    .container { max-width: 1200px; margin: 0 auto; padding-left: 1rem; padding-right: 1rem; }
+
+    /* Elementos flotantes decorativos — no rompen layout */
+    .block { pointer-events: none; user-select: none; }
+    @media (max-width: 768px) {
+      .block { display: none !important; }
+      .animate-float-slow { animation: none !important; }
     }
   </style>
 </head>
@@ -765,7 +819,14 @@ Invertir en la educación y seguridad de tu hijo hoy, es asegurar su futuro mañ
       </div>
       <!-- Mapa -->
       <div data-aos="fade-up" data-aos-delay="200">
-        <iframe src="https://www.google.com/maps/embed?pb=!1m18!1m12!1m3!1d3785.686618411939!2d-70.09190389999999!3d18.407108499999996!2m3!1f0!2f0!3f0!3m2!1i1024!2i768!4f13.1!3m3!1m2!1s0x8ea55f2cf6f6cc17%3A0x31dbf4c810db6cd7!2sKarpus%20Kids!5e0!3m2!1ses-419!2sdo!4v1761453539695!5m2!1ses-419!2sdo" width="100%" height="200" style="border:0;" allowfullscreen="" loading="lazy" class="rounded-lg"></iframe>
+        <a href="https://maps.google.com/?q=Karpus+Kids+Santo+Domingo" target="_blank" rel="noopener"
+           class="block w-full h-48 rounded-xl overflow-hidden bg-slate-100 border border-slate-200 hover:opacity-90 transition-opacity relative">
+          <div class="absolute inset-0 flex flex-col items-center justify-center gap-2 text-slate-500">
+            <svg xmlns="http://www.w3.org/2000/svg" class="w-10 h-10 text-rose-500" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5c-1.38 0-2.5-1.12-2.5-2.5s1.12-2.5 2.5-2.5 2.5 1.12 2.5 2.5-1.12 2.5-2.5 2.5z"/></svg>
+            <span class="text-sm font-bold text-slate-700">Karpus Kids — Santo Domingo</span>
+            <span class="text-xs text-slate-400 font-medium">Toca para ver en Google Maps →</span>
+          </div>
+        </a>
       </div>
     </div>
     <p class="text-center mt-8 text-slate-500 text-sm">© 2025 <span class="karpus-kids-inline"><span class="k-1">K</span><span class="k-2">a</span><span class="k-3">r</span><span class="k-4">p</span><span class="k-5">u</span><span class="k-6">s</span> <span class="k-7">K</span><span class="k-8">i</span><span class="k-9">d</span><span class="k-10">s</span></span> | Todos los derechos reservados</p>

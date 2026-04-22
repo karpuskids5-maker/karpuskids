@@ -21,8 +21,6 @@ export const WallModule = {
     
     // Llamar al init del módulo compartido
     await SharedWallModule.init.call(this, containerId, options, appState);
-    
-    console.log('✅ WallModule (Directora) - Sincronizado con Shared');
   },
 
   /**

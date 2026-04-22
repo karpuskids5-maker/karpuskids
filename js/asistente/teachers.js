@@ -104,6 +104,19 @@ export const TeachersModule = {
             <label class="${LC}">Contraseña ${id ? '(Solo si desea cambiarla)' : '(Mínimo 6 caracteres) *'}</label>
             <input id="teacherPassword" type="text" placeholder="********" class="${IC} py-2">
           </div>
+
+          <!-- QR DE ACCESO -->
+          <div class="sm:col-span-2 bg-gradient-to-br from-orange-50 to-amber-50 rounded-2xl border border-orange-100 p-3 space-y-3">
+            <p class="text-[10px] font-black text-orange-700 uppercase tracking-widest flex items-center gap-1.5">📱 Código QR de Acceso</p>
+            <div class="flex gap-1.5">
+              <input id="teacherMatricula" placeholder="ID Empleado (ej: TEA-2026-1234)" class="${IC} py-2 text-xs">
+              <button type="button" onclick="window._genTeacherCode()" class="px-3 py-2 bg-orange-600 text-white rounded-xl font-black text-[9px] uppercase hover:bg-orange-700 transition-all shrink-0">Gen</button>
+            </div>
+            <div id="asis-teacher-qr" class="bg-white p-2 rounded-xl border border-orange-100 min-h-[120px] flex items-center justify-center">
+              <p class="text-[9px] text-slate-400 font-bold text-center">Genera un ID para ver el QR</p>
+            </div>
+            <button type="button" onclick="window._printTeacherQR()" class="w-full py-2 bg-slate-800 text-white rounded-xl font-black text-[9px] uppercase tracking-widest hover:bg-slate-900 transition-all">🖨️ Imprimir Carnet</button>
+          </div>
           <div class="sm:col-span-2">
             <label class="flex items-center gap-3 p-3 bg-white border-2 border-slate-100 rounded-2xl cursor-pointer">
               <input type="checkbox" id="teacherActive" checked class="w-4 h-4 rounded accent-teal-600">
@@ -141,13 +154,15 @@ export const TeachersModule = {
     // Prefill if editing
     if (id) {
       try {
-        const { data: t } = await supabase.from('profiles').select('*').eq('id', id).single();
+        const { data: t } = await supabase.from('profiles').select('id, name, email, phone, avatar_url, role, is_active, notes').eq('id', id).single();
         if (t) {
           const sv = (eid, v) => { const el = document.getElementById(eid); if (el) el.value = v || ''; };
           sv('teacherName', t.name); sv('teacherEmail', t.email); sv('teacherPhone', t.phone);
           if (document.getElementById('teacherRole')) document.getElementById('teacherRole').value = t.role || 'maestra';
           const cb = document.getElementById('teacherActive');
           if (cb) cb.checked = t.is_active !== false;
+          // Mostrar matrícula/código de acceso si existe
+          sv('teacherMatricula', t.notes);
           // Find classroom
           const { data: cls } = await supabase.from('classrooms').select('id').eq('teacher_id', id).maybeSingle();
           if (cls) document.getElementById('teacherClassroom').value = cls.id;
@@ -158,6 +173,53 @@ export const TeachersModule = {
     window._saveTeacherNow = () => this.saveTeacher();
     // Exponer globalmente para los onclick del HTML
     window.openTeacherModal = (id) => this.openModal(id);
+
+    // QR functions for teacher modal
+    const _loadQR = () => new Promise(r => {
+      if (window.QRCode) { r(); return; }
+      const s = document.createElement('script');
+      s.src = 'https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js';
+      s.onload = r; document.head.appendChild(s);
+    });
+
+    window._genTeacherCode = async () => {
+      const code = 'TEA-' + new Date().getFullYear() + '-' + String(Math.floor(Math.random() * 9000) + 1000);
+      const el = document.getElementById('teacherMatricula');
+      if (el) { el.value = code; await window._renderTeacherQR(code); }
+    };
+
+    window._renderTeacherQR = async (code) => {
+      const container = document.getElementById('asis-teacher-qr');
+      if (!container || !code) return;
+      await _loadQR();
+      container.innerHTML = '';
+      new window.QRCode(container, {
+        text: JSON.stringify({ matricula: code, type: 'karpus-staff', v: 1 }),
+        width: 110, height: 110, colorDark: '#1e293b', colorLight: '#ffffff',
+        correctLevel: window.QRCode.CorrectLevel.H
+      });
+    };
+
+    window._printTeacherQR = () => {
+      const code = document.getElementById('teacherMatricula')?.value?.trim();
+      const name = document.getElementById('teacherName')?.value?.trim() || 'Personal';
+      const container = document.getElementById('asis-teacher-qr');
+      const img = container?.querySelector('img')?.src || container?.querySelector('canvas')?.toDataURL();
+      if (!img || !code) { Helpers.toast('Genera el QR primero', 'warning'); return; }
+      const win = window.open('', '_blank');
+      win.document.write(`<!DOCTYPE html><html><head><title>Carnet ${name}</title><style>body{font-family:Arial,sans-serif;display:flex;align-items:center;justify-content:center;min-height:100vh;margin:0;}.card{border:4px solid #0d9488;border-radius:20px;padding:24px;text-align:center;max-width:260px;}.hdr{background:#0d9488;color:white;margin:-24px -24px 16px;padding:12px;border-radius:16px 16px 0 0;font-weight:900;font-size:12px;text-transform:uppercase;}img{width:160px;height:160px;border-radius:8px;}.name{font-size:16px;font-weight:900;color:#1e293b;margin-top:12px;}.code{font-size:10px;color:#64748b;font-weight:700;margin-top:4px;}</style></head><body><div class="card"><div class="hdr">STAFF · KARPUS KIDS</div><img src="${img}"><div class="name">${name}</div><div class="code">ID: ${code}</div></div><script>window.onload=()=>window.print()<\/script></body></html>`);
+      win.document.close();
+    };
+
+    // Auto-render if editing and has code
+    document.getElementById('teacherMatricula')?.addEventListener('input', (e) => {
+      clearTimeout(window._teacherQrDebounce);
+      window._teacherQrDebounce = setTimeout(() => window._renderTeacherQR(e.target.value.trim()), 600);
+    });
+
+    // Auto-render on edit load
+    const existingCode = document.getElementById('teacherMatricula')?.value?.trim();
+    if (existingCode) setTimeout(() => window._renderTeacherQR(existingCode), 400);
     if (window.lucide) window.lucide.createIcons();
   },
 
@@ -174,6 +236,7 @@ export const TeachersModule = {
     const role        = getVal('teacherRole') || 'maestra';
     const classroomId = getVal('teacherClassroom') || null;
     const isActive    = getChecked('teacherActive');
+    const matricula   = getVal('teacherMatricula') || null;
 
     if (!name || name.length < 2) { Helpers.toast('El nombre es obligatorio', 'warning'); return; }
     if (!email || !email.includes('@')) { Helpers.toast('El correo es obligatorio', 'warning'); return; }
@@ -183,7 +246,9 @@ export const TeachersModule = {
 
     try {
       if (id) {
-        const { error } = await supabase.from('profiles').update({ name, phone, email, role, is_active: isActive }).eq('id', id);
+        const updates = { name, phone, email, role, is_active: isActive };
+        if (matricula !== null) updates.notes = matricula;
+        const { error } = await supabase.from('profiles').update(updates).eq('id', id);
         if (error) throw error;
         // Update classroom assignment
         await supabase.from('classrooms').update({ teacher_id: null }).eq('teacher_id', id);

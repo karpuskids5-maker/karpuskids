@@ -1,4 +1,4 @@
-import { supabase, ensureRole, emitEvent, sendPush, initOneSignal } from '../shared/supabase.js';
+﻿import { supabase, ensureRole, emitEvent, sendPush, initOneSignal } from '../shared/supabase.js';
 import { AppState } from './state.js';
 import { MaestraApi } from './api.js';
 import { Helpers } from '../shared/helpers.js';
@@ -96,7 +96,6 @@ document.addEventListener('DOMContentLoaded', async () => {
       }
     });
 
-    console.log('Karpus Maestra Module Starting...');
   
   const auth = await ensureRole(['maestra', 'admin']);
   if (!auth) return;
@@ -236,6 +235,9 @@ document.addEventListener('DOMContentLoaded', async () => {
   // \ud83d\udd25 EXPOSICI\u00d3N GLOBAL DE M\u00d3DULOS (CRUCIAL PARA EL MURO)
   window.WallModule = WallModule;
 
+  // Inicializar QR de la maestra en sección perfil
+  _initMaestraQR(auth.profile, auth.user);
+
   // Asignar funciones internas al objeto global App
   Object.assign(window.App, {
     _showClassroomDetail: showClassroomDetail,
@@ -255,7 +257,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   try {
     const { data: classroom, error } = await supabase
       .from('classrooms')
-      .select('*')
+      .select('id, name, level, capacity, teacher_id, is_live')
       .eq('teacher_id', auth.user.id)
       .order('name')
       .limit(1)
@@ -271,7 +273,6 @@ document.addEventListener('DOMContentLoaded', async () => {
 
     // Forzar el ID del aula si el perfil lo tiene (con null check)
     if (auth.profile?.classroom_id && classroom.id !== auth.profile.classroom_id) {
-      console.log('Using profile classroom_id');
     }
 
     // Inicializar M\u00f3dulos
@@ -519,7 +520,7 @@ function initNavigation() {
     // Si no coincide (usamos loose equality para manejar string vs number), intentar obtenerlo de la base de datos o AppState
     if (!classroom || classroom.id != classroomId) {
       console.warn('Classroom mismatch, fetching or using state...');
-      const { data } = await supabase.from('classrooms').select('*').eq('id', classroomId).maybeSingle();
+      const { data } = await supabase.from('classrooms').select('id, name, email, phone, avatar_url, role, bio').eq('id', classroomId).maybeSingle();
       if (data) {
         classroom = data;
         AppState.set('classroom', data);
@@ -999,4 +1000,58 @@ async function loadPendingTasksBadge(classroomId) {
       }
     });
   } catch (_) {}
+}
+
+// ── QR de identificación de la maestra ───────────────────────────────────────
+async function _initMaestraQR(profile, user) {
+  const section  = document.getElementById('maestra-qr-section');
+  const container = document.getElementById('maestra-qr-container');
+  const label    = document.getElementById('maestra-qr-matricula');
+  if (!section || !container) return;
+
+  // Usar notes como código de acceso (guardado desde el modal de directora)
+  const code = profile?.notes || user?.id?.substring(0, 8).toUpperCase() || 'SIN-CODIGO';
+
+  section.classList.remove('hidden');
+  if (label) label.textContent = code;
+
+  // Cargar QR lib
+  if (!window.QRCode) {
+    await new Promise(r => {
+      const s = document.createElement('script');
+      s.src = 'https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js';
+      s.onload = r;
+      document.head.appendChild(s);
+    });
+  }
+
+  container.innerHTML = '';
+  new window.QRCode(container, {
+    text: JSON.stringify({ matricula: code, name: profile?.name || 'Maestra', type: 'karpus-staff', v: 1 }),
+    width: 160, height: 160,
+    colorDark: '#1e293b', colorLight: '#ffffff',
+    correctLevel: window.QRCode.CorrectLevel.H
+  });
+
+  // Función global para imprimir
+  window.App.printMaestraQR = () => {
+    const img = container.querySelector('img')?.src || container.querySelector('canvas')?.toDataURL();
+    if (!img) return;
+    const name = profile?.name || 'Maestra';
+    const win = window.open('', '_blank');
+    win.document.write(`<!DOCTYPE html><html><head><title>QR ${code}</title>
+      <style>body{font-family:Arial,sans-serif;display:flex;align-items:center;justify-content:center;min-height:100vh;margin:0;}
+      .card{border:2px solid #e2e8f0;border-radius:16px;padding:24px;text-align:center;max-width:260px;}
+      .logo{font-size:11px;font-weight:900;color:#f97316;text-transform:uppercase;letter-spacing:2px;margin-bottom:12px;}
+      img{width:180px;height:180px;}.name{font-size:15px;font-weight:900;color:#1e293b;margin-top:12px;}
+      .code{font-size:10px;color:#64748b;font-weight:700;margin-top:4px;}.hint{font-size:8px;color:#94a3b8;margin-top:6px;}</style>
+    </head><body><div class="card">
+      <div class="logo">🎓 Karpus Kids — Personal</div>
+      <img src="${img}">
+      <div class="name">${name}</div>
+      <div class="code">${code}</div>
+      <div class="hint">Escanea para registrar entrada/salida</div>
+    </div><script>window.onload=()=>window.print()<\/script></body></html>`);
+    win.document.close();
+  };
 }
