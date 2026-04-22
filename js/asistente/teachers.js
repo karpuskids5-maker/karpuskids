@@ -246,7 +246,7 @@ export const TeachersModule = {
 
     try {
       if (id) {
-        const updates = { name, phone, email, role, is_active: isActive };
+        const updates = { name, phone, role };
         if (matricula !== null) updates.notes = matricula;
         const { error } = await supabase.from('profiles').update(updates).eq('id', id);
         if (error) throw error;

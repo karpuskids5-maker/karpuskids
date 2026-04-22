@@ -80,21 +80,23 @@ export const TeachersModule = {
     const id = document.getElementById('tId')?.value;
     const classroom_id = document.getElementById('tClassroom')?.value || null;
     const payload = {
-      name: (document.getElementById('tName').value || '').trim(),
-      phone: (document.getElementById('tPhone').value || '').trim(),
-      email: (document.getElementById('tEmail').value || '').trim(),
-      role: document.getElementById('tRole').value,
-      classroom_id, // será separado en updateTeacher
+      name:      (document.getElementById('tName').value || '').trim(),
+      phone:     (document.getElementById('tPhone').value || '').trim(),
+      role:      document.getElementById('tRole').value,
+      classroom_id,
       is_active: document.getElementById('tActive').checked
     };
-    // Guardar matrícula por separado si existe (columna en profiles puede no existir)
+    // email solo para crear, no para actualizar (Supabase no permite update de email via profiles)
+    const emailVal = (document.getElementById('tEmail').value || '').trim();
+    if (!id) payload.email = emailVal; // solo en creación
+
     const matricula = (document.getElementById('tMatricula').value || '').trim();
-    if (matricula) payload.notes = matricula; // usar notes como fallback temporal
+    if (matricula) payload.notes = matricula;
     
     const password = document.getElementById('tPassword')?.value;
 
     if (!payload.name || payload.name.length < 3) return Helpers.toast('Nombre inválido (min 3 caracteres)', 'warning');
-    if (!payload.email) return Helpers.toast('Correo requerido', 'warning');
+    if (!id && !emailVal) return Helpers.toast('Correo requerido', 'warning');
     
     UI.setLoading(true);
     try {
@@ -109,21 +111,20 @@ export const TeachersModule = {
         });
         
         const { data: authData, error: authError } = await tempClient.auth.signUp({
-          email: payload.email,
+          email: emailVal,
           password: password,
           options: { data: { name: payload.name, role: payload.role, phone: payload.phone } }
         });
         
         if (authError) throw authError;
         if (authData.user) {
-           // Para nuevo usuario, actualizar perfil y asignar aula
            await DirectorApi.updateTeacher(authData.user.id, payload);
            res = { data: authData.user, error: null };
         }
       }
       
       const { error } = res || {};
-      if (error) throw new Error(error);
+      if (error) throw new Error(error?.message || error?.details || JSON.stringify(error));
       
       Helpers.toast(id ? 'Maestra actualizada' : 'Maestra creada', 'success');
       UI.closeModal();

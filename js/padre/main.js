@@ -117,6 +117,15 @@ document.addEventListener('DOMContentLoaded', async () => {
     // 🔴 Sistema de badges por sección
     BadgeSystem.init(auth.user.id);
 
+    // Precargar librería QR en background para que esté lista cuando el padre la necesite
+    setTimeout(() => {
+      if (!window.QRCode) {
+        const s = document.createElement('script');
+        s.src = 'https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js';
+        document.head.appendChild(s);
+      }
+    }, 2000);
+
     // 🎓 Guía de bienvenida para nuevos padres
     const parentName = auth.profile?.name?.split(' ')[0] || 'Bienvenido';
     OnboardingGuide.init({
@@ -326,16 +335,16 @@ function renderHomeCards(student, data) {
     }
   ];
 
-  grid.innerHTML = cards.map(c =>
-    '<div class="bg-white rounded-2xl p-4 border-2 ' + c.color + ' shadow-sm hover:shadow-lg hover:-translate-y-1 transition-all cursor-pointer group relative" data-target="' + c.target + '">' +
-      '<span id="badge-card-' + c.target + '" class="hidden absolute -top-1.5 -right-1.5 min-w-[18px] h-[18px] bg-rose-500 text-white text-[9px] font-black rounded-full flex items-center justify-center shadow px-1 z-10">0</span>' +
+  grid.innerHTML = cards.map(card =>
+    '<div class="bg-white rounded-2xl p-4 border-2 ' + card.color + ' shadow-sm hover:shadow-lg hover:-translate-y-1 transition-all cursor-pointer group relative" data-target="' + card.target + '">' +
+      '<span id="badge-card-' + card.target + '" class="hidden absolute -top-1.5 -right-1.5 min-w-[18px] h-[18px] bg-rose-500 text-white text-[9px] font-black rounded-full flex items-center justify-center shadow px-1 z-10">0</span>' +
       '<div class="flex justify-between items-start mb-3">' +
-        '<div class="w-11 h-11 rounded-xl ' + c.iconBg + ' flex items-center justify-center text-xl shadow-sm group-hover:scale-110 transition-transform">' + c.icon + '</div>' +
+        '<div class="w-11 h-11 rounded-xl ' + card.iconBg + ' flex items-center justify-center text-xl shadow-sm group-hover:scale-110 transition-transform">' + card.icon + '</div>' +
         '<i data-lucide="chevron-right" class="w-4 h-4 text-slate-300 group-hover:text-slate-500 transition-colors mt-1"></i>' +
       '</div>' +
-      '<p class="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-0.5">' + c.title + '</p>' +
-      '<h4 class="text-sm font-black text-slate-800 leading-tight">' + c.value + '</h4>' +
-      '<p class="text-[10px] font-bold text-slate-500 mt-0.5">' + c.sub + '</p>' +
+      '<p class="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-0.5">' + card.title + '</p>' +
+      '<h4 class="text-sm font-black text-slate-800 leading-tight">' + card.value + '</h4>' +
+      '<p class="text-[10px] font-bold text-slate-500 mt-0.5">' + card.sub + '</p>' +
     '</div>'
   ).join('');
 
@@ -602,13 +611,22 @@ async function _initPadreQR(student) {
   if (matLabel) matLabel.textContent = matricula || 'Sin matrícula';
   if (nameLabel) nameLabel.textContent = name || '';
 
+  // Mostrar botones siempre (solo compartir para el padre)
+  const shareBtn = document.getElementById('btn-share-padre-qr');
+  const printBtn = document.getElementById('btn-print-padre-qr');
+  if (shareBtn) shareBtn.classList.remove('hidden');
+  if (printBtn) printBtn.classList.remove('hidden');
+
   if (!matricula) {
-    container.innerHTML = '<div class="w-48 h-48 flex flex-col items-center justify-center text-slate-400 gap-2"><i data-lucide="alert-circle" class="w-10 h-10"></i><p class="text-xs font-bold text-center">Sin matrícula asignada.<br>Contacta a la directora.</p></div>';
+    container.innerHTML = '<div class="w-48 h-48 flex flex-col items-center justify-center text-slate-400 gap-2 text-center"><p class="text-xs font-bold">Sin matrícula asignada.<br>Contacta a la directora.</p></div>';
     if (window.lucide) lucide.createIcons();
     return;
   }
 
-  // Cargar librería QR
+  // Mostrar spinner mientras carga
+  container.innerHTML = '<div class="w-48 h-48 flex items-center justify-center"><div class="w-8 h-8 border-2 border-orange-400 border-t-transparent rounded-full animate-spin"></div></div>';
+
+  // Esperar QR lib (ya debería estar precargada)
   if (!window.QRCode) {
     await new Promise(resolve => {
       const s = document.createElement('script');
@@ -623,20 +641,18 @@ async function _initPadreQR(student) {
 
   new window.QRCode(container, {
     text: qrData,
-    width: 192,
-    height: 192,
-    colorDark: '#1e293b',
-    colorLight: '#ffffff',
+    width: 192, height: 192,
+    colorDark: '#1e293b', colorLight: '#ffffff',
     correctLevel: window.QRCode.CorrectLevel.H
   });
 
-  // Funciones globales para imprimir/compartir
+  // Imprimir
   window.App.printPadreQR = () => {
     const img = container.querySelector('img')?.src || container.querySelector('canvas')?.toDataURL();
     if (!img) return;
     const win = window.open('', '_blank');
     win.document.write(`<!DOCTYPE html><html><head><title>QR - ${matricula}</title>
-      <style>body{font-family:Arial,sans-serif;display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:100vh;margin:0;background:#fff;}
+      <style>body{font-family:Arial,sans-serif;display:flex;align-items:center;justify-content:center;min-height:100vh;margin:0;}
       .card{border:2px solid #e2e8f0;border-radius:16px;padding:24px;text-align:center;max-width:280px;}
       .logo{font-size:12px;font-weight:900;color:#f97316;text-transform:uppercase;letter-spacing:2px;margin-bottom:12px;}
       img{width:192px;height:192px;}.name{font-size:16px;font-weight:900;color:#1e293b;margin-top:12px;}
@@ -651,21 +667,29 @@ async function _initPadreQR(student) {
     win.document.close();
   };
 
+  // Compartir (solo padre)
   window.App.sharePadreQR = async () => {
     const canvas = container.querySelector('canvas');
-    if (!canvas) return;
+    const img    = container.querySelector('img');
     try {
-      canvas.toBlob(async (blob) => {
-        const file = new File([blob], `QR-${matricula}.png`, { type: 'image/png' });
-        if (navigator.share && navigator.canShare({ files: [file] })) {
-          await navigator.share({ title: `QR Karpus Kids - ${name}`, files: [file] });
-        } else {
-          const url = URL.createObjectURL(blob);
-          const a = document.createElement('a');
-          a.href = url; a.download = `QR-${matricula}.png`; a.click();
-          URL.revokeObjectURL(url);
+      if (canvas) {
+        canvas.toBlob(async (blob) => {
+          const file = new File([blob], `QR-${matricula}.png`, { type: 'image/png' });
+          if (navigator.share && navigator.canShare?.({ files: [file] })) {
+            await navigator.share({ title: `QR Karpus Kids - ${name}`, text: `Código QR de ${name} para Karpus Kids`, files: [file] });
+          } else {
+            // Fallback: descargar
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a'); a.href = url; a.download = `QR-${matricula}.png`; a.click();
+            URL.revokeObjectURL(url);
+          }
+        });
+      } else if (img) {
+        // Compartir como URL si no hay canvas
+        if (navigator.share) {
+          await navigator.share({ title: `QR Karpus Kids - ${name}`, text: `Código QR de ${name}`, url: img.src });
         }
-      });
+      }
     } catch (_) {}
   };
 }

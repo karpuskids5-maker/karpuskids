@@ -4,90 +4,214 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
   <title>Ponche Digital — Karpus Kids</title>
-  <link rel="stylesheet" href="css/karpus-tailwind.css">
   <script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
-  <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;600;800;900&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Nunito:wght@400;600;700;800;900&display=swap" rel="stylesheet">
   <style>
-    * { box-sizing: border-box; }
-    html, body { height: 100%; margin: 0; font-family: 'Poppins', sans-serif; background: #0f172a; color: white; overflow: hidden; }
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    html, body { height: 100%; font-family: 'Nunito', sans-serif; overflow: hidden; }
 
-    /* ── Layout ── */
-    .app { display: flex; flex-direction: column; height: 100dvh; }
-    .header { display: flex; align-items: center; justify-content: space-between; padding: 12px 20px; background: rgba(255,255,255,0.05); border-bottom: 1px solid rgba(255,255,255,0.08); flex-shrink: 0; }
-    .main { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 12px; gap: 12px; overflow: hidden; }
+    /* ── Fondo verde igual que login.html ── */
+    body {
+      background: linear-gradient(135deg, #f0fdf4 0%, #ecfdf5 50%, #f0fdfa 100%);
+      display: flex;
+      flex-direction: column;
+      min-height: 100dvh;
+    }
+
+    /* Blobs decorativos igual que login */
+    .blob-tl {
+      position: fixed; top: 0; left: 0;
+      width: 18rem; height: 18rem;
+      background: #bbf7d0; border-radius: 50%;
+      opacity: 0.35; filter: blur(60px);
+      transform: translate(-50%, -50%);
+      pointer-events: none; z-index: 0;
+    }
+    .blob-br {
+      position: fixed; bottom: 0; right: 0;
+      width: 24rem; height: 24rem;
+      background: #a7f3d0; border-radius: 50%;
+      opacity: 0.35; filter: blur(60px);
+      transform: translate(33%, 33%);
+      pointer-events: none; z-index: 0;
+    }
+
+    /* ── Header ── */
+    .header {
+      position: relative; z-index: 10;
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 12px 20px;
+      background: rgba(255,255,255,0.85);
+      backdrop-filter: blur(12px);
+      border-bottom: 1px solid rgba(134,239,172,0.4);
+      box-shadow: 0 1px 12px rgba(0,0,0,0.06);
+      flex-shrink: 0;
+    }
+
+    /* Logo multicolor Karpus Kids */
+    .kk-logo { font-size: 20px; font-weight: 900; line-height: 1; letter-spacing: -0.5px; }
+    .kk-logo .k1  { color: #f97316; }
+    .kk-logo .k2  { color: #3b82f6; }
+    .kk-logo .k3  { color: #ec4899; }
+    .kk-logo .k4  { color: #22c55e; }
+    .kk-logo .k5  { color: #f97316; }
+    .kk-logo .k6  { color: #3b82f6; }
+    .kk-logo .k7  { color: #22c55e; }
+    .kk-logo .k8  { color: #ec4899; }
+    .kk-logo .k9  { color: #3b82f6; }
+    .kk-logo .k10 { color: #f97316; }
+    .kk-sub { font-size: 9px; font-weight: 800; color: #6b7280; text-transform: uppercase; letter-spacing: 0.12em; margin-top: 1px; }
+
+    .clock {
+      font-size: 18px; font-weight: 900; font-variant-numeric: tabular-nums;
+      background: #f0fdf4; border: 2px solid #bbf7d0;
+      color: #166534; padding: 6px 14px; border-radius: 12px;
+    }
+
+    /* ── Main ── */
+    .main {
+      position: relative; z-index: 10;
+      flex: 1; display: flex; flex-direction: column;
+      align-items: center; justify-content: center;
+      padding: 16px; gap: 16px; overflow: hidden;
+    }
 
     /* ── Scanner ── */
-    .scanner-wrap { position: relative; width: min(92vw, 520px); aspect-ratio: 1; border-radius: 24px; overflow: hidden; background: #000; box-shadow: 0 0 0 4px rgba(251,146,60,0.4), 0 25px 50px rgba(0,0,0,0.5); }
+    .scanner-wrap {
+      position: relative;
+      width: min(92vw, 520px);
+      aspect-ratio: 1;
+      border-radius: 28px;
+      overflow: hidden;
+      background: #000;
+      box-shadow:
+        0 0 0 5px rgba(134,239,172,0.5),
+        0 0 0 10px rgba(134,239,172,0.2),
+        0 30px 60px rgba(0,0,0,0.25);
+    }
     #reader { width: 100% !important; height: 100% !important; border: none !important; }
     #reader video { object-fit: cover !important; width: 100% !important; height: 100% !important; }
     #reader__scan_region { background: transparent !important; }
     #reader__dashboard { display: none !important; }
 
-    /* Corner brackets */
-    .corner { position: absolute; width: 36px; height: 36px; border-color: #fb923c; border-style: solid; z-index: 10; }
-    .corner-tl { top: 12px; left: 12px; border-width: 4px 0 0 4px; border-radius: 8px 0 0 0; }
-    .corner-tr { top: 12px; right: 12px; border-width: 4px 4px 0 0; border-radius: 0 8px 0 0; }
-    .corner-bl { bottom: 12px; left: 12px; border-width: 0 0 4px 4px; border-radius: 0 0 0 8px; }
-    .corner-br { bottom: 12px; right: 12px; border-width: 0 4px 4px 0; border-radius: 0 0 8px 0; }
+    /* Corner brackets — verde */
+    .corner { position: absolute; width: 40px; height: 40px; border-color: #22c55e; border-style: solid; z-index: 10; }
+    .corner-tl { top: 14px; left: 14px; border-width: 4px 0 0 4px; border-radius: 10px 0 0 0; }
+    .corner-tr { top: 14px; right: 14px; border-width: 4px 4px 0 0; border-radius: 0 10px 0 0; }
+    .corner-bl { bottom: 14px; left: 14px; border-width: 0 0 4px 4px; border-radius: 0 0 0 10px; }
+    .corner-br { bottom: 14px; right: 14px; border-width: 0 4px 4px 0; border-radius: 0 0 10px 0; }
 
-    /* Scan line */
-    .scan-line { position: absolute; left: 12px; right: 12px; height: 3px; background: linear-gradient(90deg, transparent, #fb923c, transparent); box-shadow: 0 0 12px 4px rgba(251,146,60,0.6); animation: scan 2.5s ease-in-out infinite; z-index: 10; border-radius: 2px; }
-    @keyframes scan { 0%,100% { top: 12px; opacity: 0.4; } 50% { top: calc(100% - 15px); opacity: 1; } }
-
-    /* ── Stats ── */
-    .stats { display: flex; gap: 10px; width: min(90vw, 420px); }
-    .stat { flex: 1; background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.1); border-radius: 16px; padding: 10px 14px; text-align: center; }
-    .stat-val { font-size: 1.6rem; font-weight: 900; line-height: 1; }
-    .stat-lbl { font-size: 9px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.1em; opacity: 0.6; margin-top: 2px; }
-
-    /* ── Overlay ── */
-    .overlay { position: fixed; inset: 0; z-index: 100; display: flex; align-items: center; justify-content: center; background: rgba(0,0,0,0.7); backdrop-filter: blur(12px); opacity: 0; pointer-events: none; transition: opacity 0.2s; }
-    .overlay.show { opacity: 1; pointer-events: all; }
-    .result-card { background: #1e293b; border-radius: 28px; padding: 32px 28px; width: min(90vw, 360px); text-align: center; border: 1px solid rgba(255,255,255,0.1); transform: scale(0.9); transition: transform 0.25s cubic-bezier(0.34,1.56,0.64,1); box-shadow: 0 40px 80px rgba(0,0,0,0.5); }
-    .overlay.show .result-card { transform: scale(1); }
-    .result-icon { width: 80px; height: 80px; border-radius: 50%; display: flex; align-items: center; justify-content: center; margin: 0 auto 16px; }
-    .result-name { font-size: 1.4rem; font-weight: 900; margin-bottom: 4px; }
-    .result-role { font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.12em; opacity: 0.5; margin-bottom: 12px; }
-    .result-msg { font-size: 0.9rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.08em; margin-bottom: 16px; }
-    .result-time { display: inline-block; background: rgba(255,255,255,0.08); border-radius: 12px; padding: 8px 20px; font-size: 1.3rem; font-weight: 900; font-variant-numeric: tabular-nums; }
+    /* Scan line — verde */
+    .scan-line {
+      position: absolute; left: 14px; right: 14px; height: 3px;
+      background: linear-gradient(90deg, transparent, #22c55e, transparent);
+      box-shadow: 0 0 14px 5px rgba(34,197,94,0.5);
+      animation: scan 2.5s ease-in-out infinite;
+      z-index: 10; border-radius: 2px;
+    }
+    @keyframes scan { 0%,100% { top: 14px; opacity: 0.5; } 50% { top: calc(100% - 17px); opacity: 1; } }
 
     /* ── Hint ── */
-    .hint { font-size: 11px; font-weight: 600; opacity: 0.4; text-align: center; }
+    .hint {
+      font-size: 12px; font-weight: 700; color: #6b7280;
+      text-align: center; max-width: 320px;
+    }
+
+    /* ── Stats ── */
+    .stats { display: flex; gap: 10px; width: min(92vw, 520px); }
+    .stat {
+      flex: 1; background: rgba(255,255,255,0.85);
+      border: 2px solid rgba(134,239,172,0.5);
+      border-radius: 18px; padding: 10px 14px; text-align: center;
+      backdrop-filter: blur(8px);
+      box-shadow: 0 2px 8px rgba(0,0,0,0.06);
+    }
+    .stat-val { font-size: 1.6rem; font-weight: 900; line-height: 1; }
+    .stat-lbl { font-size: 9px; font-weight: 800; text-transform: uppercase; letter-spacing: 0.1em; color: #6b7280; margin-top: 2px; }
+
+    /* ── Overlay ── */
+    .overlay {
+      position: fixed; inset: 0; z-index: 100;
+      display: flex; align-items: center; justify-content: center;
+      background: rgba(0,0,0,0.5);
+      backdrop-filter: blur(16px);
+      opacity: 0; pointer-events: none;
+      transition: opacity 0.2s;
+    }
+    .overlay.show { opacity: 1; pointer-events: all; }
+
+    .result-card {
+      background: rgba(255,255,255,0.97);
+      border-radius: 32px; padding: 36px 28px;
+      width: min(90vw, 380px); text-align: center;
+      border: 2px solid rgba(134,239,172,0.4);
+      transform: scale(0.88);
+      transition: transform 0.3s cubic-bezier(0.34,1.56,0.64,1);
+      box-shadow: 0 40px 80px rgba(0,0,0,0.2);
+    }
+    .overlay.show .result-card { transform: scale(1); }
+
+    .result-icon {
+      width: 88px; height: 88px; border-radius: 50%;
+      display: flex; align-items: center; justify-content: center;
+      margin: 0 auto 18px; font-size: 2.2rem;
+    }
+    .result-name { font-size: 1.5rem; font-weight: 900; color: #1e293b; margin-bottom: 4px; }
+    .result-role { font-size: 11px; font-weight: 800; text-transform: uppercase; letter-spacing: 0.12em; color: #94a3b8; margin-bottom: 12px; }
+    .result-msg  { font-size: 0.9rem; font-weight: 800; text-transform: uppercase; letter-spacing: 0.08em; margin-bottom: 16px; }
+    .result-time {
+      display: inline-block;
+      background: #f0fdf4; border: 2px solid #bbf7d0;
+      border-radius: 14px; padding: 8px 22px;
+      font-size: 1.3rem; font-weight: 900; font-variant-numeric: tabular-nums;
+      color: #166534;
+    }
 
     /* ── Responsive ── */
-    @media (max-height: 700px) {
-      .scanner-wrap { width: min(80vw, 320px); }
-      .stats { width: min(80vw, 320px); }
-      .result-card { padding: 24px 20px; }
-      .result-icon { width: 64px; height: 64px; }
+    @media (max-height: 680px) {
+      .scanner-wrap { width: min(80vw, 340px); }
+      .stats { width: min(80vw, 340px); }
     }
     @media (min-width: 768px) {
-      .scanner-wrap { width: min(70vw, 620px); }
-      .stats { width: min(70vw, 620px); }
+      .scanner-wrap { width: min(65vw, 620px); }
+      .stats { width: min(65vw, 620px); }
     }
     @media (min-width: 1024px) {
-      .scanner-wrap { width: min(60vw, 700px); }
-      .stats { width: min(60vw, 700px); }
+      .scanner-wrap { width: min(55vw, 700px); }
+      .stats { width: min(55vw, 700px); }
     }
   </style>
 </head>
 <body>
-<div class="app">
+
+  <!-- Blobs decorativos -->
+  <div class="blob-tl"></div>
+  <div class="blob-br"></div>
 
   <!-- Header -->
   <header class="header">
     <div style="display:flex;align-items:center;gap:10px;">
-      <div style="width:36px;height:36px;background:#fb923c;border-radius:10px;display:flex;align-items:center;justify-content:center;">
-        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"/><rect x="7" y="7" width="3" height="3"/><rect x="14" y="7" width="3" height="3"/><rect x="7" y="14" width="3" height="3"/><path d="M14 14h3v3h-3z"/></svg>
+      <div style="width:40px;height:40px;background:linear-gradient(135deg,#22c55e,#16a34a);border-radius:12px;display:flex;align-items:center;justify-content:center;box-shadow:0 4px 12px rgba(34,197,94,0.35);">
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+          <rect x="3" y="3" width="18" height="18" rx="2"/>
+          <rect x="7" y="7" width="3" height="3"/>
+          <rect x="14" y="7" width="3" height="3"/>
+          <rect x="7" y="14" width="3" height="3"/>
+          <path d="M14 14h3v3h-3z"/>
+        </svg>
       </div>
       <div>
-        <div style="font-size:14px;font-weight:900;line-height:1;">Ponche Digital</div>
-        <div style="font-size:9px;font-weight:700;opacity:0.5;text-transform:uppercase;letter-spacing:0.1em;">Karpus Kids</div>
+        <div class="kk-logo">
+          <span class="k1">K</span><span class="k2">a</span><span class="k3">r</span><span class="k4">p</span><span class="k5">u</span><span class="k6">s</span>
+          <span style="color:#94a3b8;font-weight:400;"> </span>
+          <span class="k7">K</span><span class="k8">i</span><span class="k9">d</span><span class="k10">s</span>
+        </div>
+        <div class="kk-sub">Ponche Digital</div>
       </div>
     </div>
     <div style="display:flex;align-items:center;gap:12px;">
-      <div id="clock" style="font-size:18px;font-weight:900;font-variant-numeric:tabular-nums;background:rgba(255,255,255,0.08);padding:6px 14px;border-radius:10px;">00:00:00</div>
-      <a href="panel_directora.html" style="font-size:10px;font-weight:700;opacity:0.4;text-decoration:none;color:white;text-transform:uppercase;letter-spacing:0.08em;">← Panel</a>
+      <div id="clock" class="clock">00:00:00</div>
+      <a href="panel_directora.html" style="font-size:10px;font-weight:800;color:#6b7280;text-decoration:none;text-transform:uppercase;letter-spacing:0.08em;background:#f0fdf4;border:2px solid #bbf7d0;padding:6px 12px;border-radius:10px;">← Panel</a>
     </div>
   </header>
 
@@ -104,37 +228,36 @@
       <div id="reader"></div>
     </div>
 
-    <p class="hint">Apunta la cámara al código QR del estudiante o personal</p>
+    <p class="hint">📷 Apunta la cámara al código QR del estudiante o personal</p>
 
     <!-- Stats -->
     <div class="stats">
       <div class="stat">
-        <div class="stat-val" id="count-in" style="color:#4ade80;">0</div>
+        <div class="stat-val" id="count-in" style="color:#16a34a;">0</div>
         <div class="stat-lbl">Entradas</div>
       </div>
       <div class="stat">
-        <div class="stat-val" id="count-out" style="color:#60a5fa;">0</div>
+        <div class="stat-val" id="count-out" style="color:#2563eb;">0</div>
         <div class="stat-lbl">Salidas</div>
       </div>
       <div class="stat">
-        <div class="stat-val" id="count-total" style="color:#fb923c;">0</div>
+        <div class="stat-val" id="count-total" style="color:#f97316;">0</div>
         <div class="stat-lbl">Total hoy</div>
       </div>
     </div>
 
   </main>
-</div>
 
-<!-- Result Overlay -->
-<div class="overlay" id="overlay">
-  <div class="result-card">
-    <div class="result-icon" id="res-icon"></div>
-    <div class="result-name" id="res-name">—</div>
-    <div class="result-role" id="res-role">—</div>
-    <div class="result-msg" id="res-msg">—</div>
-    <div class="result-time" id="res-time">—</div>
+  <!-- Result Overlay -->
+  <div class="overlay" id="overlay">
+    <div class="result-card">
+      <div class="result-icon" id="res-icon"></div>
+      <div class="result-name" id="res-name">—</div>
+      <div class="result-role" id="res-role">—</div>
+      <div class="result-msg"  id="res-msg">—</div>
+      <div class="result-time" id="res-time">—</div>
+    </div>
   </div>
-</div>
 
 <script type="module">
 import { supabase } from './js/shared/supabase.js';
@@ -142,46 +265,40 @@ import { supabase } from './js/shared/supabase.js';
 let isProcessing = false;
 let lastScan = '';
 let scanTimeout;
+let hideTimer;
 
-// ── Clock ────────────────────────────────────────────────────────────────────
+// ── Clock ─────────────────────────────────────────────────────────────────────
 function tick() {
   document.getElementById('clock').textContent =
     new Date().toLocaleTimeString('es-DO', { hour12: false });
 }
-tick();
-setInterval(tick, 1000);
+tick(); setInterval(tick, 1000);
 
-// ── Stats ────────────────────────────────────────────────────────────────────
+// ── Stats ─────────────────────────────────────────────────────────────────────
 async function updateStats() {
   const today = new Date().toISOString().split('T')[0];
   const { data } = await supabase
     .from('attendance')
-    .select('status, check_in, check_out')
+    .select('check_in, check_out')
     .eq('date', today);
-
-  const ins   = (data || []).filter(a => a.check_in).length;
-  const outs  = (data || []).filter(a => a.check_out).length;
-  const total = (data || []).length;
-
-  document.getElementById('count-in').textContent    = ins;
-  document.getElementById('count-out').textContent   = outs;
-  document.getElementById('count-total').textContent = total;
+  document.getElementById('count-in').textContent    = (data || []).filter(a => a.check_in).length;
+  document.getElementById('count-out').textContent   = (data || []).filter(a => a.check_out).length;
+  document.getElementById('count-total').textContent = (data || []).length;
 }
 updateStats();
 
-// ── Scanner ──────────────────────────────────────────────────────────────────
+// ── Scanner ───────────────────────────────────────────────────────────────────
 const scanner = new Html5Qrcode('reader');
-
 scanner.start(
   { facingMode: 'environment' },
   { fps: 12, qrbox: { width: 320, height: 320 }, aspectRatio: 1 },
   onScan
 ).catch(() => {
   document.getElementById('reader').innerHTML =
-    '<div style="padding:40px;text-align:center;color:#f87171;font-size:13px;font-weight:700;">No se pudo acceder a la cámara.<br>Permite los permisos e intenta de nuevo.</div>';
+    '<div style="padding:40px;text-align:center;color:#ef4444;font-size:13px;font-weight:700;">No se pudo acceder a la cámara.<br>Permite los permisos e intenta de nuevo.</div>';
 });
 
-// ── Scan handler ─────────────────────────────────────────────────────────────
+// ── Scan handler ──────────────────────────────────────────────────────────────
 async function onScan(raw) {
   if (isProcessing || raw === lastScan) return;
   isProcessing = true;
@@ -190,46 +307,32 @@ async function onScan(raw) {
   scanTimeout = setTimeout(() => { lastScan = ''; }, 5000);
 
   try {
-    // Parse QR — puede ser JSON {matricula, name, type} o string plano
     let matricula = raw.trim();
     let qrName = null;
     let qrType = null;
-
     try {
       const parsed = JSON.parse(raw);
-      if (parsed.matricula) {
-        matricula = parsed.matricula;
-        qrName    = parsed.name || null;
-        qrType    = parsed.type || null; // 'karpus-access' | 'karpus-staff'
-      }
-    } catch (_) { /* string plano — usar como matrícula directa */ }
+      if (parsed.matricula) { matricula = parsed.matricula; qrName = parsed.name; qrType = parsed.type; }
+    } catch (_) {}
 
-    // Buscar en students primero, luego en profiles (staff)
     let person = null;
     let personType = 'student';
 
-    // 1. Buscar estudiante por matrícula
     const { data: student } = await supabase
       .from('students')
       .select('id, name, classroom_id, classrooms:classroom_id(name), is_active')
       .eq('matricula', matricula)
       .maybeSingle();
 
-    if (student && student.is_active) {
-      person = student;
-      personType = 'student';
-    } else if (qrType === 'karpus-staff' || !student) {
-      // 2. Buscar en profiles (personal)
+    if (student?.is_active) {
+      person = student; personType = 'student';
+    } else {
       const { data: staff } = await supabase
         .from('profiles')
-        .select('id, name, role, avatar_url')
-        .eq('notes', matricula) // matricula guardada en notes
+        .select('id, name, role')
+        .eq('notes', matricula)
         .maybeSingle();
-
-      if (staff) {
-        person = staff;
-        personType = 'staff';
-      }
+      if (staff) { person = staff; personType = 'staff'; }
     }
 
     if (!person) {
@@ -237,70 +340,37 @@ async function onScan(raw) {
       return;
     }
 
-    // Registrar ponche
     const now = new Date();
     const today = now.toISOString().split('T')[0];
-    const timeStr = now.toLocaleTimeString('es-DO', { hour: '2-digit', minute: '2-digit', hour12: true });
 
-    if (personType === 'student') {
-      // Verificar si ya tiene check_in hoy
-      const { data: existing } = await supabase
-        .from('attendance')
-        .select('id, check_in, check_out, status')
-        .eq('student_id', person.id)
-        .eq('date', today)
-        .maybeSingle();
+    const { data: existing } = await supabase
+      .from('attendance')
+      .select('id, check_in, check_out')
+      .eq('student_id', person.id)
+      .eq('date', today)
+      .maybeSingle();
 
-      if (!existing || !existing.check_in) {
-        // Entrada
-        await supabase.from('attendance').upsert({
-          student_id:   person.id,
-          classroom_id: person.classroom_id,
-          date:         today,
-          status:       'present',
-          check_in:     now.toISOString()
-        }, { onConflict: 'student_id,date' });
+    const roleLabel = personType === 'student'
+      ? (person.classrooms?.name || 'Estudiante')
+      : (person.role || 'Personal');
 
-        showResult('in', person.name, person.classrooms?.name || 'Estudiante', '✅ Entrada registrada', now);
-      } else if (!existing.check_out) {
-        // Salida
-        await supabase.from('attendance')
-          .update({ check_out: now.toISOString(), status: 'retirado' })
-          .eq('id', existing.id);
-
-        showResult('out', person.name, person.classrooms?.name || 'Estudiante', '👋 Salida registrada', now);
-      } else {
-        showResult('warn', person.name, 'Ya registrado', 'Entrada y salida ya registradas', now);
-      }
+    if (!existing || !existing.check_in) {
+      await supabase.from('attendance').upsert({
+        student_id:   person.id,
+        classroom_id: person.classroom_id || null,
+        date:         today,
+        status:       'present',
+        check_in:     now.toISOString()
+      }, { onConflict: 'student_id,date' });
+      showResult('in', person.name, roleLabel, '✅ Entrada registrada', now);
+    } else if (!existing.check_out) {
+      await supabase.from('attendance').update({ check_out: now.toISOString(), status: 'retirado' }).eq('id', existing.id);
+      showResult('out', person.name, roleLabel, '👋 Salida registrada', now);
     } else {
-      // Staff — registrar en attendance con classroom_id null
-      const { data: existing } = await supabase
-        .from('attendance')
-        .select('id, check_in, check_out')
-        .eq('student_id', person.id) // reutilizamos student_id para staff
-        .eq('date', today)
-        .maybeSingle();
-
-      if (!existing || !existing.check_in) {
-        await supabase.from('attendance').upsert({
-          student_id: person.id,
-          date:       today,
-          status:     'present',
-          check_in:   now.toISOString()
-        }, { onConflict: 'student_id,date' });
-        showResult('in', person.name, person.role || 'Personal', '✅ Entrada registrada', now);
-      } else if (!existing.check_out) {
-        await supabase.from('attendance')
-          .update({ check_out: now.toISOString() })
-          .eq('id', existing.id);
-        showResult('out', person.name, person.role || 'Personal', '👋 Salida registrada', now);
-      } else {
-        showResult('warn', person.name, 'Ya registrado', 'Entrada y salida ya registradas', now);
-      }
+      showResult('warn', person.name, roleLabel, 'Ya registrado hoy', now);
     }
 
     updateStats();
-
   } catch (err) {
     showResult('error', 'Error', '', 'Fallo de conexión', new Date());
   } finally {
@@ -310,25 +380,24 @@ async function onScan(raw) {
 
 // ── UI Feedback ───────────────────────────────────────────────────────────────
 const COLORS = {
-  in:    { bg: '#16a34a', shadow: 'rgba(22,163,74,0.4)',  icon: '✅', msg_color: '#4ade80' },
-  out:   { bg: '#2563eb', shadow: 'rgba(37,99,235,0.4)',  icon: '👋', msg_color: '#60a5fa' },
-  warn:  { bg: '#d97706', shadow: 'rgba(217,119,6,0.4)',  icon: '⚠️', msg_color: '#fbbf24' },
-  error: { bg: '#dc2626', shadow: 'rgba(220,38,38,0.4)',  icon: '❌', msg_color: '#f87171' },
+  in:    { bg: '#16a34a', shadow: 'rgba(22,163,74,0.35)',  icon: '✅', msgColor: '#16a34a' },
+  out:   { bg: '#2563eb', shadow: 'rgba(37,99,235,0.35)',  icon: '👋', msgColor: '#2563eb' },
+  warn:  { bg: '#d97706', shadow: 'rgba(217,119,6,0.35)',  icon: '⚠️', msgColor: '#d97706' },
+  error: { bg: '#dc2626', shadow: 'rgba(220,38,38,0.35)',  icon: '❌', msgColor: '#dc2626' },
 };
 
-let hideTimer;
 function showResult(type, name, role, msg, time) {
   const cfg = COLORS[type] || COLORS.error;
   const overlay = document.getElementById('overlay');
 
   document.getElementById('res-icon').style.cssText =
-    `background:${cfg.bg};box-shadow:0 0 40px ${cfg.shadow};font-size:2rem;`;
-  document.getElementById('res-icon').textContent = cfg.icon;
-  document.getElementById('res-name').textContent = name;
-  document.getElementById('res-role').textContent = role;
-  document.getElementById('res-msg').style.color  = cfg.msg_color;
-  document.getElementById('res-msg').textContent  = msg;
-  document.getElementById('res-time').textContent =
+    `background:${cfg.bg};box-shadow:0 0 40px ${cfg.shadow};font-size:2.2rem;`;
+  document.getElementById('res-icon').textContent  = cfg.icon;
+  document.getElementById('res-name').textContent  = name;
+  document.getElementById('res-role').textContent  = role;
+  document.getElementById('res-msg').style.color   = cfg.msgColor;
+  document.getElementById('res-msg').textContent   = msg;
+  document.getElementById('res-time').textContent  =
     time.toLocaleTimeString('es-DO', { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: true });
 
   overlay.classList.add('show');
@@ -336,7 +405,6 @@ function showResult(type, name, role, msg, time) {
   hideTimer = setTimeout(() => overlay.classList.remove('show'), type === 'error' ? 4000 : 3000);
 }
 
-// Tap overlay to dismiss
 document.getElementById('overlay').addEventListener('click', () => {
   document.getElementById('overlay').classList.remove('show');
 });

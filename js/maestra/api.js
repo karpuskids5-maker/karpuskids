@@ -229,38 +229,23 @@ export const MaestraApi = {
    * Calificar tarea
    */
   async gradeTask(taskId, studentId, gradeLetter, stars, feedback) {
-    if (!taskId || !studentId) {
-      throw new Error('Task ID and Student ID are required');
-    }
-
-    const { data: existing, error: findError } = await supabase
-      .from('task_evidences')
-      .select('id')
-      .eq('task_id', taskId)
-      .eq('student_id', studentId)
-      .maybeSingle();
-
-    handleError(findError, 'findTaskEvidence');
+    if (!taskId || !studentId) throw new Error('Task ID and Student ID are required');
 
     const record = {
-      task_id: taskId,
-      student_id: studentId,
+      task_id:      taskId,
+      student_id:   studentId,
       grade_letter: gradeLetter,
-      stars: parseInt(stars) || 0,
-      comment: feedback,
-      status: 'graded'
+      stars:        parseInt(stars) || 0,
+      comment:      feedback,
+      status:       'graded'
     };
 
-    const query = existing
-      ? supabase
-          .from('task_evidences')
-          .update(record)
-          .eq('id', existing.id)
-      : supabase
-          .from('task_evidences')
-          .insert([record]);
-
-    const { data, error } = await query.select();
+    // upsert evita el error PGRST116 cuando hay múltiples filas
+    const { data, error } = await supabase
+      .from('task_evidences')
+      .upsert(record, { onConflict: 'task_id,student_id', ignoreDuplicates: false })
+      .select()
+      .maybeSingle();
 
     handleError(error, 'gradeTask');
     return data;
