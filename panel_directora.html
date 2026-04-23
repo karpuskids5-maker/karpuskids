@@ -55,9 +55,11 @@
         overflow-y: auto !important; 
         overflow-x: hidden !important; 
         height: auto !important; 
+        min-height: 100% !important;
         position: relative !important;
         display: block !important;
         -webkit-overflow-scrolling: touch !important;
+        overscroll-behavior: auto !important; /* Permitir scroll normal */
       }
 
       /* 2. Reset Layout Containers */
@@ -78,8 +80,9 @@
       .main { 
         height: auto !important; 
         overflow: visible !important; 
-        min-height: 0 !important; 
+        min-height: 100vh !important; /* Asegurar que ocupe al menos la pantalla */
         padding-bottom: 80px !important; 
+        display: block !important;
       }
 
       #layoutShell {

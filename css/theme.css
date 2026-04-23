@@ -15,7 +15,7 @@ body {
   font-family: 'Nunito', sans-serif;
   background-color: #f5f7fb;
   transition: all 0.3s ease;
-  overscroll-behavior: none;
+  overscroll-behavior: auto; /* Permitir scroll normal en móviles */
 }
 
 /* Panel Padres: cabecera cielo con nubes suaves */
