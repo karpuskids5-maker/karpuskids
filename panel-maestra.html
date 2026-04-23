@@ -854,9 +854,12 @@
   <!-- Lógica PWA Profesional -->
   <script src="js/pwa-install.js" defer></script>
   <script>
+    // Service Worker registration (Unified for PWA + OneSignal)
     if ('serviceWorker' in navigator) {
       window.addEventListener('load', () => {
-        navigator.serviceWorker.register('/sw.js', { scope: '/' }).catch(() => {});
+        navigator.serviceWorker.register('/OneSignalSDKWorker.js', { scope: '/' })
+          .then(r => console.log('[SW] Registered:', r.scope))
+          .catch(e => console.warn('[SW] Registration failed:', e));
       });
     }
 

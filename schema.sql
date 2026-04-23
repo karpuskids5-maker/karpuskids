@@ -1,4 +1,4 @@
-﻿﻿-- ============================================================
+﻿-- ============================================================
 -- KARPUS KIDS - Schema Completo para Supabase
 -- Ejecutar en Supabase SQL Editor de arriba a abajo.
 -- ============================================================
@@ -429,7 +429,11 @@ declare
   v_type text; -- 'check_in' or 'check_out'
 begin
   -- 1. Validar estudiante
-  select * into v_student from public.students where matricula = p_matricula and deleted_at is null;
+  select * into v_student from public.students 
+  where matricula = p_matricula 
+  and deleted_at is null 
+  and (is_active is true or is_active is null);
+  
   if not found then
     return jsonb_build_object('success', false, 'message', 'Estudiante no encontrado');
   end if;

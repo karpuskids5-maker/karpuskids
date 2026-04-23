@@ -1,4 +1,4 @@
-﻿import { supabase, ensureRole, initOneSignal } from '../shared/supabase.js';
+import { supabase, ensureRole, initOneSignal } from '../shared/supabase.js';
 import { Api } from './api.js';
 import { Helpers } from './helpers.js';
 import { AppState } from './appState.js';
@@ -427,7 +427,7 @@ export function navigateTo(targetId) {
       case 'live-attendance': AttendanceModule.init(student?.id); break;
       case 'notifications':   ChatModule.init(); break;
       case 'class':           FeedModule.init(student?.classroom_id); break;
-      case 'profile':         ProfileModule.init(); NotifyPermission.requestIfNeeded(); break;
+      case 'profile':         ProfileModule.init(); _initPadreQR(student); NotifyPermission.requestIfNeeded(); break;
       case 'grades':          GradesModule.init(student?.id); break;
       case 'qr-access':       _initPadreQR(student); break;
       case 'videocall': {
@@ -603,7 +603,10 @@ async function _initPadreQR(student) {
   const container = document.getElementById('padre-qr-container');
   const matLabel  = document.getElementById('padre-qr-matricula');
   const nameLabel = document.getElementById('padre-qr-name');
-  if (!container || !student) return;
+  if (!container || !student) {
+    console.warn('[PadreQR] Container or student not found:', { container: !!container, student: !!student });
+    return;
+  }
 
   const matricula = student.matricula;
   const name      = student.name;
@@ -619,42 +622,49 @@ async function _initPadreQR(student) {
 
   if (!matricula) {
     container.innerHTML = '<div class="w-48 h-48 flex flex-col items-center justify-center text-slate-400 gap-2 text-center"><p class="text-xs font-bold">Sin matrícula asignada.<br>Contacta a la directora.</p></div>';
-    if (window.lucide) lucide.createIcons();
+    if (window.lucide) lucide.createIcons({ props: { class: 'w-10 h-10' } });
     return;
   }
 
   // Mostrar spinner mientras carga
-  container.innerHTML = '<div class="w-48 h-48 flex items-center justify-center"><div class="w-8 h-8 border-2 border-orange-400 border-t-transparent rounded-full animate-spin"></div></div>';
+  container.innerHTML = '<div class="w-48 h-48 flex items-center justify-center"><div class="w-8 h-8 border-2 border-emerald-400 border-t-transparent rounded-full animate-spin"></div></div>';
 
   // Esperar QR lib (ya debería estar precargada)
-  if (!window.QRCode) {
-    await new Promise(resolve => {
-      const s = document.createElement('script');
-      s.src = 'https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js';
-      s.onload = resolve;
-      document.head.appendChild(s);
+  try {
+    if (!window.QRCode) {
+      await new Promise((resolve, reject) => {
+        const s = document.createElement('script');
+        s.src = 'https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js';
+        s.onload = resolve;
+        s.onerror = reject;
+        document.head.appendChild(s);
+      });
+    }
+
+    container.innerHTML = '';
+    const qrData = JSON.stringify({ matricula, name, type: 'karpus-access', v: 1 });
+
+    new window.QRCode(container, {
+      text: qrData,
+      width: 192, height: 192,
+      colorDark: '#1e293b', colorLight: '#ffffff',
+      correctLevel: window.QRCode.CorrectLevel.H
     });
+  } catch (e) {
+    console.error('[PadreQR] Error loading QR library:', e);
+    container.innerHTML = '<div class="w-48 h-48 flex items-center justify-center text-rose-500 text-xs text-center font-bold">Error al cargar QR.<br>Reintenta recargando la página.</div>';
   }
-
-  container.innerHTML = '';
-  const qrData = JSON.stringify({ matricula, name, type: 'karpus-access', v: 1 });
-
-  new window.QRCode(container, {
-    text: qrData,
-    width: 192, height: 192,
-    colorDark: '#1e293b', colorLight: '#ffffff',
-    correctLevel: window.QRCode.CorrectLevel.H
-  });
 
   // Imprimir
   window.App.printPadreQR = () => {
     const img = container.querySelector('img')?.src || container.querySelector('canvas')?.toDataURL();
     if (!img) return;
     const win = window.open('', '_blank');
+    if (!win) return;
     win.document.write(`<!DOCTYPE html><html><head><title>QR - ${matricula}</title>
       <style>body{font-family:Arial,sans-serif;display:flex;align-items:center;justify-content:center;min-height:100vh;margin:0;}
       .card{border:2px solid #e2e8f0;border-radius:16px;padding:24px;text-align:center;max-width:280px;}
-      .logo{font-size:12px;font-weight:900;color:#f97316;text-transform:uppercase;letter-spacing:2px;margin-bottom:12px;}
+      .logo{font-size:12px;font-weight:900;color:#10B981;text-transform:uppercase;letter-spacing:2px;margin-bottom:12px;}
       img{width:192px;height:192px;}.name{font-size:16px;font-weight:900;color:#1e293b;margin-top:12px;}
       .mat{font-size:11px;color:#64748b;font-weight:700;margin-top:4px;}.hint{font-size:9px;color:#94a3b8;margin-top:8px;}</style>
     </head><body><div class="card">
@@ -674,6 +684,7 @@ async function _initPadreQR(student) {
     try {
       if (canvas) {
         canvas.toBlob(async (blob) => {
+          if (!blob) return;
           const file = new File([blob], `QR-${matricula}.png`, { type: 'image/png' });
           if (navigator.share && navigator.canShare?.({ files: [file] })) {
             await navigator.share({ title: `QR Karpus Kids - ${name}`, text: `Código QR de ${name} para Karpus Kids`, files: [file] });

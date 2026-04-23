@@ -262,6 +262,19 @@
 <script type="module">
 import { supabase } from './js/shared/supabase.js';
 
+// ── Verificar Sesión ──────────────────────────────────────────────────────────
+async function ensureAuth() {
+  const { data: { session } } = await supabase.auth.getSession();
+  if (!session) {
+    // Redirigir al login si no hay sesión para evitar errores de RLS
+    console.warn('[Attendance] No hay sesión activa. Redirigiendo...');
+    window.location.href = 'login.html?returnTo=attendance-live.html';
+  } else {
+    console.log('[Attendance] Sesión activa:', session.user.email);
+  }
+}
+ensureAuth();
+
 let isProcessing = false;
 let lastScan = '';
 let scanTimeout;
@@ -269,21 +282,28 @@ let hideTimer;
 
 // ── Clock ─────────────────────────────────────────────────────────────────────
 function tick() {
-  document.getElementById('clock').textContent =
-    new Date().toLocaleTimeString('es-DO', { hour12: false });
+  const el = document.getElementById('clock');
+  if (el) el.textContent = new Date().toLocaleTimeString('es-DO', { hour12: false });
 }
 tick(); setInterval(tick, 1000);
 
 // ── Stats ─────────────────────────────────────────────────────────────────────
 async function updateStats() {
-  const today = new Date().toISOString().split('T')[0];
-  const { data } = await supabase
-    .from('attendance')
-    .select('check_in, check_out')
-    .eq('date', today);
-  document.getElementById('count-in').textContent    = (data || []).filter(a => a.check_in).length;
-  document.getElementById('count-out').textContent   = (data || []).filter(a => a.check_out).length;
-  document.getElementById('count-total').textContent = (data || []).length;
+  try {
+    const today = new Date().toISOString().split('T')[0];
+    const { data, error } = await supabase
+      .from('attendance')
+      .select('check_in, check_out')
+      .eq('date', today);
+    
+    if (error) throw error;
+
+    document.getElementById('count-in').textContent    = (data || []).filter(a => a.check_in).length;
+    document.getElementById('count-out').textContent   = (data || []).filter(a => a.check_out).length;
+    document.getElementById('count-total').textContent = (data || []).length;
+  } catch (err) {
+    console.error('[Stats] Error cargando estadísticas:', err);
+  }
 }
 updateStats();
 
@@ -293,7 +313,8 @@ scanner.start(
   { facingMode: 'environment' },
   { fps: 12, qrbox: { width: 320, height: 320 }, aspectRatio: 1 },
   onScan
-).catch(() => {
+).catch((err) => {
+  console.error('[Scanner] Error al iniciar cámara:', err);
   document.getElementById('reader').innerHTML =
     '<div style="padding:40px;text-align:center;color:#ef4444;font-size:13px;font-weight:700;">No se pudo acceder a la cámara.<br>Permite los permisos e intenta de nuevo.</div>';
 });
@@ -306,73 +327,61 @@ async function onScan(raw) {
   clearTimeout(scanTimeout);
   scanTimeout = setTimeout(() => { lastScan = ''; }, 5000);
 
+  console.log('[Attendance] QR detectado:', raw);
+
   try {
     let matricula = raw.trim();
     let qrName = null;
-    let qrType = null;
     try {
       const parsed = JSON.parse(raw);
-      if (parsed.matricula) { matricula = parsed.matricula; qrName = parsed.name; qrType = parsed.type; }
+      if (parsed.matricula) { 
+        matricula = String(parsed.matricula).trim(); 
+        qrName = parsed.name; 
+      }
     } catch (_) {}
 
-    let person = null;
-    let personType = 'student';
+    // ✅ Usar RPC 'process_student_punch' para una operación atómica y segura
+    // Esto evita problemas de RLS y garantiza consistencia en la base de datos
+    const { data: res, error: rpcError } = await supabase.rpc('process_student_punch', { 
+      p_matricula: matricula 
+    });
 
-    const { data: student } = await supabase
-      .from('students')
-      .select('id, name, classroom_id, classrooms:classroom_id(name), is_active')
-      .eq('matricula', matricula)
-      .maybeSingle();
-
-    if (student?.is_active) {
-      person = student; personType = 'student';
-    } else {
-      const { data: staff } = await supabase
-        .from('profiles')
-        .select('id, name, role')
-        .eq('notes', matricula)
-        .maybeSingle();
-      if (staff) { person = staff; personType = 'staff'; }
+    if (rpcError) {
+      console.error('[Attendance] Error en RPC:', rpcError);
+      throw rpcError;
     }
 
-    if (!person) {
-      showResult('error', qrName || 'Desconocido', '', 'QR no registrado', new Date());
-      return;
-    }
-
-    const now = new Date();
-    const today = now.toISOString().split('T')[0];
-
-    const { data: existing } = await supabase
-      .from('attendance')
-      .select('id, check_in, check_out')
-      .eq('student_id', person.id)
-      .eq('date', today)
-      .maybeSingle();
-
-    const roleLabel = personType === 'student'
-      ? (person.classrooms?.name || 'Estudiante')
-      : (person.role || 'Personal');
-
-    if (!existing || !existing.check_in) {
-      await supabase.from('attendance').upsert({
-        student_id:   person.id,
-        classroom_id: person.classroom_id || null,
-        date:         today,
-        status:       'present',
-        check_in:     now.toISOString()
-      }, { onConflict: 'student_id,date' });
-      showResult('in', person.name, roleLabel, '✅ Entrada registrada', now);
-    } else if (!existing.check_out) {
-      await supabase.from('attendance').update({ check_out: now.toISOString(), status: 'retirado' }).eq('id', existing.id);
-      showResult('out', person.name, roleLabel, '👋 Salida registrada', now);
+    if (res && res.success) {
+      const uiType = res.type === 'check_in' ? 'in' : 'out';
+      const emoji  = res.type === 'check_in' ? '✅ ' : '👋 ';
+      showResult(uiType, res.name, 'Estudiante', emoji + res.message, new Date());
     } else {
-      showResult('warn', person.name, roleLabel, 'Ya registrado hoy', now);
+      const msg = res?.message || 'Error desconocido';
+      
+      if (msg === 'Estudiante no encontrado') {
+        // Fallback: Intentar buscar como Personal (Staff)
+        const { data: staff } = await supabase
+          .from('profiles')
+          .select('id, name, role')
+          .eq('matricula', matricula)
+          .maybeSingle();
+        
+        if (staff) {
+          showResult('warn', staff.name, staff.role || 'Personal', 'Acceso personal detectado', new Date());
+        } else {
+          console.warn('[Attendance] QR no reconocido:', matricula);
+          showResult('error', qrName || 'Desconocido', '', 'QR no registrado en sistema', new Date());
+        }
+      } else {
+        // Otros casos (ej: "Ya registrado hoy")
+        showResult('warn', res?.name || qrName || 'Estudiante', 'Estudiante', msg, new Date());
+      }
     }
 
     updateStats();
   } catch (err) {
-    showResult('error', 'Error', '', 'Fallo de conexión', new Date());
+    console.error('[Attendance] Error fatal:', err);
+    showResult('error', 'Error', '', 'Fallo de conexión o permisos', new Date());
   } finally {
     setTimeout(() => { isProcessing = false; }, 2500);
   }

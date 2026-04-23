@@ -1,4 +1,4 @@
-﻿import { createClient } from "https://cdn.jsdelivr.net/npm/@supabase/supabase-js/+esm";
+import { createClient } from "https://cdn.jsdelivr.net/npm/@supabase/supabase-js/+esm";
 
 export { createClient };
 export const SUPABASE_URL      = "https://wwnfonkvemimwiqjpkij.supabase.co";
@@ -392,13 +392,14 @@ export async function initOneSignal(currentUser = null) {
           const subId = OneSignal.User?.PushSubscription?.id;
           if (subId) {
             // Guardar subscription_id en profiles para fallback en send-push
-            supabase.from('profiles')
-              .update({ onesignal_player_id: subId })
-              .eq('id', user.id)
-              .then(({ error }) => {
-                if (error) console.warn('[OneSignal] No se pudo guardar player_id:', error.message);
-              })
-              .catch(() => {});
+            try {
+              const { error } = await supabase.from('profiles')
+                .update({ onesignal_player_id: subId })
+                .eq('id', user.id);
+              if (error) console.warn('[OneSignal] No se pudo guardar player_id:', error.message);
+            } catch (_) {
+              // Silencioso
+            }
           } else {
             // Reintentar obtener subId después de un momento
             setTimeout(async () => {
@@ -418,10 +419,11 @@ export async function initOneSignal(currentUser = null) {
             OneSignal.User?.PushSubscription?.addEventListener('change', async (event) => {
               const newSubId = event?.current?.id;
               if (newSubId) {
-                await supabase.from('profiles')
-                  .update({ onesignal_player_id: newSubId })
-                  .eq('id', user.id)
-                  .catch(() => {});
+                try {
+                  await supabase.from('profiles')
+                    .update({ onesignal_player_id: newSubId })
+                    .eq('id', user.id);
+                } catch (_) {}
               }
             });
           } catch (_) { /* silencioso */ }

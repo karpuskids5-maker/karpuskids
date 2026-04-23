@@ -54,10 +54,15 @@ export const NotifyPermission = {
       await OneSignal.User.PushSubscription?.optIn?.().catch(() => {});
     });
 
-    const subId = window.OneSignal?.User?.PushSubscription?.id;
+      const subId = window.OneSignal?.User?.PushSubscription?.id;
       if (subId) {
-        supabase.from('profiles').update({ onesignal_player_id: subId })
-          .eq('id', userId).then(() => {}).catch(() => {});
+        try {
+          await supabase.from('profiles')
+            .update({ onesignal_player_id: subId })
+            .eq('id', userId);
+        } catch (e) {
+          console.warn('[NotifyPermission] No se pudo guardar player_id:', e.message);
+        }
       }
     } catch (_) {}
   },
