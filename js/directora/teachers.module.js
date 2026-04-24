@@ -214,6 +214,7 @@ export const TeachersModule = {
             <label class="${labelClass}">Rol</label>
             <select id="tRole" class="${inputClass}">
               <option value="maestra">Maestra</option>
+              <option value="asistente">Asistente</option>
             </select>
           </div>
           <div>

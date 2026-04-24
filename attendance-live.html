@@ -359,17 +359,53 @@ async function onScan(raw) {
       const msg = res?.message || 'Error desconocido';
       
       if (msg === 'Estudiante no encontrado') {
-        // Fallback: Intentar buscar como Personal (Staff)
-        const { data: staff } = await supabase
+        // Buscar como Personal (Staff) — por notes (código de acceso) o por id
+        let staff = null;
+        const { data: s1 } = await supabase
           .from('profiles')
           .select('id, name, role')
-          .eq('matricula', matricula)
+          .eq('notes', matricula)
+          .in('role', ['maestra', 'asistente', 'directora'])
           .maybeSingle();
-        
+        staff = s1;
+
+        if (!staff) {
+          // Fallback: buscar por id si el QR contiene UUID
+          const { data: s2 } = await supabase
+            .from('profiles')
+            .select('id, name, role')
+            .eq('id', matricula)
+            .in('role', ['maestra', 'asistente', 'directora'])
+            .maybeSingle();
+          staff = s2;
+        }
+
         if (staff) {
-          showResult('warn', staff.name, staff.role || 'Personal', 'Acceso personal detectado', new Date());
+          // Registrar ponche del personal
+          const now = new Date();
+          const today = now.toISOString().split('T')[0];
+          const { data: existing } = await supabase
+            .from('attendance')
+            .select('id, check_in, check_out')
+            .eq('student_id', staff.id)
+            .eq('date', today)
+            .maybeSingle();
+
+          const roleLabel = staff.role === 'maestra' ? 'Maestra' : staff.role === 'asistente' ? 'Asistente' : 'Directora';
+
+          if (!existing || !existing.check_in) {
+            await supabase.from('attendance').upsert({
+              student_id: staff.id, date: today,
+              status: 'present', check_in: now.toISOString()
+            }, { onConflict: 'student_id,date' });
+            showResult('in', staff.name, roleLabel, '✅ Entrada registrada', now);
+          } else if (!existing.check_out) {
+            await supabase.from('attendance').update({ check_out: now.toISOString() }).eq('id', existing.id);
+            showResult('out', staff.name, roleLabel, '👋 Salida registrada', now);
+          } else {
+            showResult('warn', staff.name, roleLabel, 'Ya registrado hoy', now);
+          }
         } else {
-          console.warn('[Attendance] QR no reconocido:', matricula);
           showResult('error', qrName || 'Desconocido', '', 'QR no registrado en sistema', new Date());
         }
       } else {

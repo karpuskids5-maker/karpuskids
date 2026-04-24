@@ -214,6 +214,9 @@ async function loadProfile() {
     if (configAvatarImg) {
       configAvatarImg.src = profile.avatar_url || 'img/mundo.jpg';
     }
+
+    // Inicializar ID de acceso QR de la directora
+    _initDirectorAccessId(profile);
     
   } catch (err) {
     console.error('Error loading profile:', err);
@@ -362,6 +365,10 @@ document.addEventListener('DOMContentLoaded', async () => {
       if (nameVal)  updates.name  = nameVal;
       if (bioVal)   updates.bio   = bioVal;
       if (phoneVal) updates.phone = phoneVal;
+
+      // Guardar ID de acceso QR de la directora
+      const accessId = document.getElementById('confDirAccessId')?.value?.trim();
+      if (accessId) updates.notes = accessId;
 
       const { error } = await supabase.from('profiles').update(updates).eq('id', auth.user.id);
       if (error) Helpers.toast('Error al guardar perfil: ' + error.message, 'error');
@@ -624,4 +631,57 @@ function _updateSchedulePreview() {
 
   preview.classList.remove('hidden');
   preview.innerHTML = `<span class="text-violet-600">📅 ${daysText}</span>${timeText ? `<span class="mx-2 text-violet-300">|</span><span class="text-violet-800">🕐 ${timeText}</span>` : ''}`;
+}
+
+// ── ID de Acceso QR de la Directora ──────────────────────────────────────────
+async function _initDirectorAccessId(profile) {
+  const input = document.getElementById('confDirAccessId');
+  if (!input) return;
+
+  // Cargar ID guardado en notes
+  if (profile?.notes) input.value = profile.notes;
+
+  const _loadQR = () => new Promise(r => {
+    if (window.QRCode) { r(); return; }
+    const s = document.createElement('script');
+    s.src = 'https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js';
+    s.onload = r; document.head.appendChild(s);
+  });
+
+  const _renderQR = async (code) => {
+    const container = document.getElementById('dir-qr-container');
+    if (!container || !code) return;
+    await _loadQR();
+    container.innerHTML = '';
+    new window.QRCode(container, {
+      text: JSON.stringify({ matricula: code, name: profile?.name || 'Directora', type: 'karpus-staff', v: 1 }),
+      width: 100, height: 100, colorDark: '#1e293b', colorLight: '#ffffff',
+      correctLevel: window.QRCode.CorrectLevel.H
+    });
+  };
+
+  window._genDirectorId = async () => {
+    const code = 'DIR-' + new Date().getFullYear() + '-' + String(Math.floor(Math.random() * 9000) + 1000);
+    input.value = code;
+    await _renderQR(code);
+  };
+
+  window._printDirectorQR = () => {
+    const code = input.value.trim();
+    const container = document.getElementById('dir-qr-container');
+    const img = container?.querySelector('img')?.src || container?.querySelector('canvas')?.toDataURL();
+    if (!img || !code) { Helpers.toast('Genera el QR primero', 'warning'); return; }
+    const name = profile?.name || 'Directora';
+    const win = window.open('', '_blank');
+    win.document.write(`<!DOCTYPE html><html><head><title>Carnet ${name}</title><style>body{font-family:Arial,sans-serif;display:flex;align-items:center;justify-content:center;min-height:100vh;margin:0;}.card{border:4px solid #7c3aed;border-radius:20px;padding:24px;text-align:center;max-width:260px;}.hdr{background:#7c3aed;color:white;margin:-24px -24px 16px;padding:12px;border-radius:16px 16px 0 0;font-weight:900;font-size:12px;text-transform:uppercase;}img{width:160px;height:160px;border-radius:8px;}.name{font-size:16px;font-weight:900;color:#1e293b;margin-top:12px;}.code{font-size:10px;color:#64748b;font-weight:700;margin-top:4px;}</style></head><body><div class="card"><div class="hdr">DIRECTORA · KARPUS KIDS</div><img src="${img}"><div class="name">${name}</div><div class="code">ID: ${code}</div></div><script>window.onload=()=>window.print()<\/script></body></html>`);
+    win.document.close();
+  };
+
+  // Auto-render si ya tiene ID
+  if (profile?.notes) setTimeout(() => _renderQR(profile.notes), 400);
+
+  input.addEventListener('input', (e) => {
+    clearTimeout(window._dirQrDebounce);
+    window._dirQrDebounce = setTimeout(() => _renderQR(e.target.value.trim()), 600);
+  });
 }

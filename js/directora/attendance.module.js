@@ -22,6 +22,25 @@ export const AttendanceModule = {
     this._bindControls();
     this._setDefaultDates();
     await this.load();
+    // Realtime: recargar cuando llegue nueva asistencia
+    this._subscribeRealtime();
+  },
+
+  _subscribeRealtime() {
+    if (this._realtimeChannel) return; // ya suscrito
+    this._realtimeChannel = supabase
+      .channel('dir_attendance_live')
+      .on('postgres_changes', {
+        event: '*', schema: 'public', table: 'attendance'
+      }, () => {
+        // Solo recargar si estamos en modo día y es hoy
+        const today = new Date().toISOString().split('T')[0];
+        const dateEl = document.getElementById('attDateSingle');
+        if (this._mode === 'day' && (!dateEl || dateEl.value === today)) {
+          this.load();
+        }
+      })
+      .subscribe();
   },
 
   _setDefaultDates() {

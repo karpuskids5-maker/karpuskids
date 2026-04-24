@@ -398,7 +398,7 @@ export const StudentsModule = {
     // Optional columns \u2014 only add if non-empty
     const optionals = {
       matricula:         getVal('stMatricula') || null,
-      classroom_id:      getVal('stClassroom') || null, // Mantener como string si es UUID
+      classroom_id:      getVal('stClassroom') ? parseInt(getVal('stClassroom'), 10) : null,
       blood_type:        getVal('stBlood') || null,
       allergies:         getVal('stAllergies') || null,
       authorized_pickup: getVal('stPickup') || null,
