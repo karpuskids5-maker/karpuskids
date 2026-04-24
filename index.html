@@ -1,921 +1,866 @@
 <!DOCTYPE html>
 <html lang="es" class="scroll-smooth">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Karpus Kids - Estancia Infantil</title>
-  <meta name="description" content="Karpus Kids: Estancia infantil segura y amorosa en Santo Domingo. Cuidado experto, educación integral, supervisión constante y app exclusiva para padres. ¡Agenda tu visita hoy!">
-  
-  <!-- Tailwind CSS -->
-  <link rel="stylesheet" href="css/karpus-tailwind.css">
-  <!-- Tailwind CDN para clases adicionales del landing -->
-  <script src="https://cdn.tailwindcss.com"></script>
-  
-  <!-- AOS Animations -->
-  <link href="https://unpkg.com/aos@2.3.1/dist/aos.css" rel="stylesheet">
-  <script src="https://unpkg.com/aos@2.3.1/dist/aos.js"></script>
-  
-  <!-- Bootstrap Icons -->
-  <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css" rel="stylesheet">
-  
-  <!-- Google Fonts -->
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Karpus Kids — Estancia Infantil | Santo Domingo</title>
+  <meta name="description" content="Karpus Kids: Estancia infantil segura y amorosa en Santo Domingo. Cuidado experto, educación integral y app exclusiva para padres.">
+  <link rel="icon" href="logo/favicon.ico" sizes="any">
+  <link rel="apple-touch-icon" href="logo/apple-touch-icon.png">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@600;700&family=Nunito:wght@400;500&display=swap" rel="stylesheet">
-  
-  <!-- Alpine.js para interactividad -->
-  <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>
-  <script>
-    document.addEventListener('alpine:init', () => {});
-  </script>
-
-  <!-- Favicon -->
-  <link rel="icon" href="logo/favicon.ico" sizes="any">
-
-  <link rel="apple-touch-icon" href="logo/apple-touch-icon.png">
-  
+  <link href="https://fonts.googleapis.com/css2?family=Nunito:wght@400;600;700;800;900&family=Poppins:wght@700;800;900&display=swap" rel="stylesheet">
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css" rel="stylesheet">
   <style>
-    :root {
-      /* Paleta de colores oficial de Karpus Kids */
-      --verde: 76, 175, 80;   /* #4CAF50 */
-      --azul: 33, 150, 243;    /* #2196F3 */
-      --rosa: 233, 30, 99;     /* #E91E63 */
-      --naranja: 255, 152, 0;  /* #FF9800 */
-    }
-    
-    body {
-      font-family: 'Nunito', sans-serif;
-    }
+    :root{--kk-orange:#FF9800;--kk-blue:#2196F3;--kk-pink:#E91E63;--kk-green:#4CAF50;--kk-purple:#9C27B0;}
+    *{box-sizing:border-box;margin:0;padding:0;}
+    html,body{overflow-x:hidden;scroll-behavior:smooth;}
+    body{font-family:'Nunito',sans-serif;color:#1e293b;background:#fff;}
+    h1,h2,h3,h4{font-family:'Poppins',sans-serif;}
+    img{max-width:100%;height:auto;display:block;}
+    a{text-decoration:none;}
 
-    h1, h2, h3 {
-      font-family: 'Poppins', sans-serif;
-    }
-    
-    /* Logo multicolor */
-    .karpus-kids-colored span {
-      display: inline-block;
-      font-weight: 800;
-      text-shadow: 2px 2px 10px rgba(0,0,0,0.5);
-      font-size: 3rem;
-    }
-    
-    .k-1 { color: rgb(var(--naranja)); }
-    .k-2 { color: rgb(var(--azul)); }
-    .k-3 { color: rgb(var(--rosa)); }
-    .k-4 { color: rgb(var(--verde)); }
-    .k-5 { color: rgb(var(--naranja)); }
-    .k-6 { color: rgb(var(--azul)); }
-    .k-7 { color: rgb(var(--verde)); }
-    .k-8 { color: rgb(var(--rosa)); }
-    .k-9 { color: rgb(var(--azul)); }
-    .k-10 { color: rgb(var(--naranja)); }
+    /* ── Brand colors ── */
+    .kk .k1{color:#FF9800}.kk .k2{color:#2196F3}.kk .k3{color:#E91E63}
+    .kk .k4{color:#4CAF50}.kk .k5{color:#FF9800}.kk .k6{color:#2196F3}
+    .kk .k7{color:#4CAF50}.kk .k8{color:#E91E63}.kk .k9{color:#2196F3}.kk .k10{color:#FF9800}
 
-    /* Versión pequeña para texto */
-    .karpus-kids-inline {
-      font-weight: 700;
-    }
-    .karpus-kids-inline .k-1 { color: #FF9800; }
-    .karpus-kids-inline .k-2 { color: #2196F3; }
-    .karpus-kids-inline .k-3 { color: #E91E63; }
-    .karpus-kids-inline .k-4 { color: #4CAF50; }
-    .karpus-kids-inline .k-5 { color: #FF9800; }
-    .karpus-kids-inline .k-6 { color: #2196F3; }
-    .karpus-kids-inline .k-7 { color: #4CAF50; }
-    .karpus-kids-inline .k-8 { color: #E91E63; }
-    .karpus-kids-inline .k-9 { color: #2196F3; }
-    .karpus-kids-inline .k-10 { color: #FF9800; }
+    /* ── Nav ── */
+    .site-header{position:fixed;top:0;left:0;width:100%;z-index:200;transition:all .35s;}
+    .site-header.scrolled{background:rgba(255,255,255,0.97);box-shadow:0 2px 24px rgba(0,0,0,0.09);backdrop-filter:blur(14px);}
+    .nav-link{font-weight:700;font-size:14px;color:#475569;padding:6px 2px;position:relative;transition:color .2s;}
+    .nav-link::after{content:'';position:absolute;bottom:-2px;left:0;width:0;height:2px;background:#FF9800;border-radius:2px;transition:width .25s;}
+    .nav-link:hover{color:#FF9800;}
+    .nav-link:hover::after{width:100%;}
 
-    @keyframes float-up-down {
-      0%, 100% { transform: translateY(0); }
-      50% { transform: translateY(-20px); }
-    }
-    .animate-float-slow {
-      animation: float-up-down 6s ease-in-out infinite;
-    }
+    /* ── Hero ── */
+    .hero{min-height:100svh;display:flex;align-items:center;position:relative;overflow:hidden;background:#0a0f1e;}
+    .hero-video{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;opacity:0.35;}
+    .hero-overlay{position:absolute;inset:0;background:linear-gradient(135deg,rgba(10,15,30,0.95) 0%,rgba(10,15,30,0.75) 55%,rgba(10,15,30,0.4) 100%);}
+    .hero-content{position:relative;z-index:2;max-width:1280px;margin:0 auto;padding:110px 24px 70px;width:100%;}
 
-    @keyframes subtle-pulse {
-      0%, 100% { transform: scale(1); opacity: 1; }
-      50% { transform: scale(1.1); opacity: 0.8; }
-    }
-    .animate-subtle-pulse { animation: subtle-pulse 2.5s ease-in-out infinite; }
+    /* ── Blobs ── */
+    .blob{position:absolute;border-radius:50%;pointer-events:none;z-index:1;}
 
-    @keyframes slow-zoom {
-      0% { transform: scale(1); }
-      100% { transform: scale(1.08); }
-    }
+    /* ── Animations ── */
+    @keyframes float{0%,100%{transform:translateY(0)}50%{transform:translateY(-14px)}}
+    @keyframes fadeUp{from{opacity:0;transform:translateY(36px)}to{opacity:1;transform:translateY(0)}}
+    @keyframes scrollLeft{0%{transform:translateX(0)}100%{transform:translateX(-50%)}}
+    @keyframes pulseRing{0%{box-shadow:0 0 0 0 rgba(34,197,94,.45)}70%{box-shadow:0 0 0 14px rgba(34,197,94,0)}100%{box-shadow:0 0 0 0 rgba(34,197,94,0)}}
+    @keyframes shimmer{0%{background-position:-200% 0}100%{background-position:200% 0}}
+    @keyframes slideIn{from{opacity:0;transform:translateX(-20px)}to{opacity:1;transform:translateX(0)}}
 
-    .hero-bg-animate {
-      animation: slow-zoom 20s ease-in-out infinite alternate;
-    }
+    .float{animation:float 6s ease-in-out infinite;}
+    .fade-up{animation:fadeUp .7s ease both;}
+    .fade-up-2{animation:fadeUp .7s .15s ease both;}
+    .fade-up-3{animation:fadeUp .7s .3s ease both;}
+    .fade-up-4{animation:fadeUp .7s .45s ease both;}
+    .pulse-dot{animation:pulseRing 2s infinite;}
 
-    @keyframes glow-pulse {
-      0%,100% { box-shadow: 0 0 0 rgba(236,72,153,0.5); }
-      50% { box-shadow: 0 0 25px rgba(236,72,153,0.8); }
-    }
+    /* ── Film strip ── */
+    .film-strip{display:flex;width:max-content;animation:scrollLeft 42s linear infinite;gap:14px;}
+    .film-strip:hover{animation-play-state:paused;}
+    .film-strip img{height:230px;width:auto;object-fit:cover;flex-shrink:0;border-radius:18px;cursor:pointer;transition:transform .3s,box-shadow .3s;}
+    .film-strip img:hover{transform:scale(1.05);box-shadow:0 16px 40px rgba(0,0,0,0.22);}
 
-    .btn-glow {
-      animation: glow-pulse 2s infinite;
-    }
+    /* ── Testimonials ── */
+    .testi-strip{display:flex;width:max-content;animation:scrollLeft 52s linear infinite;gap:18px;}
+    .testi-strip:hover{animation-play-state:paused;}
+    .testi-card{flex:0 0 330px;background:#fff;border-radius:24px;padding:28px;box-shadow:0 4px 24px rgba(0,0,0,0.07);border:1px solid #f1f5f9;}
 
-    .float-soft {
-      animation: float-soft 5s ease-in-out infinite;
-    }
+    /* ── Feature cards ── */
+    .feat-card{background:#fff;border-radius:24px;padding:30px;box-shadow:0 4px 24px rgba(0,0,0,0.06);border:1px solid #f1f5f9;transition:transform .3s,box-shadow .3s;position:relative;overflow:hidden;}
+    .feat-card::before{content:'';position:absolute;top:0;left:0;right:0;height:4px;border-radius:24px 24px 0 0;}
+    .feat-card:hover{transform:translateY(-8px);box-shadow:0 24px 52px rgba(0,0,0,0.1);}
+    .feat-card.c-orange::before{background:linear-gradient(90deg,#FF9800,#FFB74D);}
+    .feat-card.c-blue::before{background:linear-gradient(90deg,#2196F3,#64B5F6);}
+    .feat-card.c-green::before{background:linear-gradient(90deg,#4CAF50,#81C784);}
+    .feat-card.c-pink::before{background:linear-gradient(90deg,#E91E63,#F48FB1);}
 
-    @keyframes float-block {
-      0%,100% { transform: translateY(0); }
-      50% { transform: translateY(-15px); }
-    }
+    /* ── Program scroll ── */
+    .prog-scroll{display:flex;gap:16px;overflow-x:auto;padding:8px 4px 16px;scroll-snap-type:x mandatory;-webkit-overflow-scrolling:touch;}
+    .prog-scroll::-webkit-scrollbar{height:4px;}
+    .prog-scroll::-webkit-scrollbar-track{background:#f1f5f9;border-radius:4px;}
+    .prog-scroll::-webkit-scrollbar-thumb{background:#cbd5e1;border-radius:4px;}
+    .prog-card{flex:0 0 auto;scroll-snap-align:start;width:172px;cursor:pointer;transition:transform .3s;}
+    .prog-card:hover{transform:translateY(-8px);}
+    .prog-card img{width:100%;height:152px;object-fit:cover;border-radius:20px;box-shadow:0 6px 20px rgba(0,0,0,0.12);}
+    .prog-card span{display:block;font-weight:800;font-size:13px;margin-top:10px;color:#1e293b;text-align:center;}
 
-    .block {
-      position: absolute;
-      font-size: 40px;
-      opacity: 0.15;
-      animation: float-block 6s ease-in-out infinite;
-    }
+    /* ── Steps ── */
+    .step-line{position:absolute;top:28px;left:calc(50% + 28px);right:calc(-50% + 28px);height:2px;background:linear-gradient(90deg,#e2e8f0,#e2e8f0);z-index:0;}
 
-    .block1 { top: 15%; left: 8%; }
-    .block2 { bottom: 20%; right: 10%; animation-delay: 2s; }
-    .block3 { top: 40%; right: 20%; animation-delay: 4s; }
+    /* ── CTA dark ── */
+    .cta-dark{background:linear-gradient(135deg,#0a0f1e 0%,#1e293b 100%);position:relative;overflow:hidden;}
 
+    /* ── FABs ── */
+    .fab{position:fixed;bottom:22px;z-index:9999;width:52px;height:52px;border-radius:50%;display:flex;justify-content:center;align-items:center;color:white;font-size:1.4rem;box-shadow:0 6px 20px rgba(0,0,0,0.28);transition:transform .3s,box-shadow .3s;}
+    .fab:hover{transform:scale(1.12);box-shadow:0 10px 28px rgba(0,0,0,0.32);}
+    .fab-ws{background:linear-gradient(135deg,#25D366,#128C7E);right:84px;}
+    .fab-ig{background:linear-gradient(45deg,#f09433,#e6683c,#dc2743,#cc2366,#bc1888);right:18px;}
 
-    
-    /* Botones flotantes */
-    .floating-btn {
-      position: fixed;
-      bottom: 15px;
-      z-index: 9999;
-      width: 56px;
-      height: 56px;
-      border-radius: 50%;
-      display: flex;
-      justify-content: center;
-      align-items: center;
-      color: white;
-      font-size: 1.8rem;
-      box-shadow: 0 4px 8px rgba(0,0,0,0.2);
-      cursor: pointer;
-      transition: transform 0.3s ease;
-    }
-    
-    .floating-btn:hover { transform: scale(1.1); }
-    
-    .btn-ws { background-color: #25D366; right: 80px; }
-    .btn-ig { background-color: #E4405F; right: 15px; }
-    
-    /* Video de fondo */
-    .video-bg {
-      position: absolute;
-      top: 0; left: 0;
-      width: 100%; height: 100%;
-      object-fit: cover;
-      z-index: -1;
-    }
-    
-    /* Galería horizontal animada */
-    .scroll-horizontal {
-      display: flex;
-      overflow-x: auto;
-      scroll-snap-type: x mandatory;
-      gap: 1rem;
-      padding: 0.5rem 0 1.5rem 0;
-    }
-    
-    .scroll-horizontal > div {
-      flex: 0 0 auto;
-      scroll-snap-align: start;
-      transition: transform 0.5s ease;
-    }
-    
-    .scroll-horizontal > div:hover {
-        transform: scale(1.05);
-    }
-    
-    .scroll-horizontal::-webkit-scrollbar { display: none; }
+    /* ── Section label ── */
+    .sec-label{display:inline-block;font-size:11px;font-weight:900;text-transform:uppercase;letter-spacing:.12em;padding:5px 16px;border-radius:50px;margin-bottom:14px;}
 
-    /* Animación de galería tipo película */
-    @keyframes scroll-left {
-      0% { transform: translateX(0); }
-      100% { transform: translateX(-100%); }
-    }
-    @keyframes scroll-right {
-      0% { transform: translateX(-100%); }
-      100% { transform: translateX(0); }
-    }
-    .film-strip {
-      display: flex;
-      width: fit-content;
-    }
-    .film-strip-left { animation: scroll-left 40s linear infinite; }
-    .film-strip-right { animation: scroll-right 40s linear infinite; }
-    .film-strip-container:hover .film-strip {
-      animation-play-state: paused;
-    }
-    .film-strip img {
-      height: 16rem; /* 256px */
-    }
+    /* ── Lightbox ── */
+    #lb{position:fixed;inset:0;background:rgba(0,0,0,0.93);z-index:9999;display:none;align-items:center;justify-content:center;backdrop-filter:blur(10px);}
+    #lb.open{display:flex;}
+    #lb img{max-width:90vw;max-height:88vh;border-radius:16px;box-shadow:0 40px 80px rgba(0,0,0,0.5);}
+    #lb-close{position:absolute;top:20px;right:24px;color:white;background:rgba(255,255,255,0.12);border:none;width:44px;height:44px;border-radius:50%;display:flex;align-items:center;justify-content:center;cursor:pointer;font-size:1.3rem;transition:background .2s;}
+    #lb-close:hover{background:rgba(255,255,255,0.22);}
 
-    /* Animación para testimonios */
-    .testimonial-strip {
-      display: flex;
-      width: fit-content;
-      animation: scroll-left 50s linear infinite;
-    }
-    .testimonial-container:hover .testimonial-strip {
-      animation-play-state: paused;
-    }
-    
-  </style>
-  <style>
-    html, body {
-      max-width: 100%;
-      overflow-x: hidden;
-    }
-    * {
-      box-sizing: border-box;
-    }
-    /* Correcciones de Responsividad */
-    @media (max-width: 768px) {
-      .container {
-        padding-left: 1rem;
-        padding-right: 1rem;
-      }
-      /* Ajuste de tamaño del logo multicolor para que no se corte en móvil */
-      .karpus-kids-colored span {
-        font-size: 3.5rem !important;
-      }
-      .hero-section { padding-top: 4rem; padding-bottom: 4rem; }
-      .nav-links { display: none; } /* Ocultar nav links en móvil si no hay menu hamburguesa */
-      .grid-cols-3 { grid-template-columns: 1fr !important; }
-      .grid-cols-2 { grid-template-columns: 1fr !important; }
-      img { max-width: 100%; height: auto; }
-      
-      /* Desactivar animaciones pesadas en móvil */
-      .animate-pulse,
-      .animate-subtle-pulse,
-      .hero-bg-animate {
-        animation: none !important;
-      }
+    /* ── Responsive ── */
+    .two-col{display:grid;grid-template-columns:1fr 1fr;gap:64px;align-items:center;}
+    .two-col-cta{display:grid;grid-template-columns:1fr 1fr;gap:32px;}
+    .four-col{display:grid;grid-template-columns:repeat(4,1fr);gap:24px;}
+    .three-col{display:grid;grid-template-columns:repeat(3,1fr);gap:24px;}
+    .footer-grid{display:grid;grid-template-columns:2fr 1fr 1fr;gap:48px;}
 
-      /* Botones full width en móvil */
-      .hero-cta-btn, .modal-btn, section a.inline-block {
-        width: 100%;
-        display: block;
-        text-align: center;
-        margin-bottom: 0.5rem;
-      }
+    @media(max-width:1024px){
+      .four-col{grid-template-columns:repeat(2,1fr);}
     }
-    
-    /* Asegurar que el body no tenga scroll horizontal */
-    body {
-      overflow-x: hidden;
-      width: 100%;
+    @media(max-width:768px){
+      .two-col{grid-template-columns:1fr;gap:40px;}
+      .two-col-cta{grid-template-columns:1fr;}
+      .four-col{grid-template-columns:repeat(2,1fr);}
+      .three-col{grid-template-columns:1fr;}
+      .footer-grid{grid-template-columns:1fr;gap:32px;}
+      .film-strip img{height:165px;}
+      .prog-card{width:145px;}
+      .prog-card img{height:125px;}
+      .testi-card{flex:0 0 285px;}
+      .hide-mobile{display:none!important;}
     }
-
-    /* Header — nunca desborda */
-    header { overflow-x: hidden; }
-
-    /* Menú lateral — transición suave */
-    [x-cloak] { display: none !important; }
-    
-    /* Mejora de tarjetas en móvil */
-    .card {
-      margin-bottom: 1.5rem;
-    }
-
-    /* ── FIXES RESPONSIVOS GLOBALES ── */
-    img { max-width: 100%; height: auto; }
-
-    /* Logo hero — nunca desborda */
-    .karpus-kids-colored {
-      line-height: 1.1;
-      word-break: break-word;
-    }
-    .karpus-kids-colored span {
-      font-size: clamp(2rem, 8vw, 5rem) !important;
-    }
-
-    /* Secciones — nunca desbordan */
-    section { overflow-x: hidden; max-width: 100vw; }
-
-    /* Grids responsivos seguros */
-    @media (max-width: 640px) {
-      .grid { grid-template-columns: 1fr !important; }
-      .md\:grid-cols-2, .md\:grid-cols-3, .lg\:grid-cols-3, .lg\:grid-cols-4 {
-        grid-template-columns: 1fr !important;
-      }
-      /* Botones hero full-width en móvil */
-      .hero-cta-btn {
-        width: 100% !important;
-        display: block !important;
-        text-align: center !important;
-        margin-bottom: 0.75rem !important;
-      }
-      /* Flex columns en móvil */
-      .flex.flex-col.md\:flex-row { flex-direction: column !important; }
-      /* Padding reducido */
-      .px-8 { padding-left: 1rem !important; padding-right: 1rem !important; }
-      .py-20 { padding-top: 3rem !important; padding-bottom: 3rem !important; }
-    }
-
-    /* Film strips — no rompen layout */
-    .film-strip-container { overflow: hidden; max-width: 100vw; }
-    .film-strip img { height: 10rem; width: auto; object-fit: cover; flex-shrink: 0; }
-
-    /* Videos — aspect ratio seguro */
-    video { max-width: 100%; height: auto; }
-
-    /* Contenedor principal */
-    .container { max-width: 1200px; margin: 0 auto; padding-left: 1rem; padding-right: 1rem; }
-
-    /* Elementos flotantes decorativos — no rompen layout */
-    .block { pointer-events: none; user-select: none; }
-    @media (max-width: 768px) {
-      .block { display: none !important; }
-      .animate-float-slow { animation: none !important; }
-    }
+    @media(min-width:769px){.md-nav{display:flex!important;}.mob-btn{display:none!important;}}
   </style>
 </head>
-<body class="bg-white text-gray-800">
-  <!-- Header Fijo -->
-  <header x-data="{ open: false }" class="fixed top-0 left-0 w-full z-[60] px-2 pt-2" style="overflow-x:hidden;">
+<body>
 
-    <div class="w-full max-w-7xl mx-auto">
-      <div class="flex items-center justify-between bg-white/90 backdrop-blur-md rounded-2xl shadow-lg border border-white/20 px-3 py-2 sm:px-4 sm:py-3 gap-2">
+<!-- ════════════════════════════════════════════════════════════
+     NAVBAR
+════════════════════════════════════════════════════════════ -->
+<header class="site-header" id="siteHeader">
+  <div style="max-width:1280px;margin:0 auto;padding:0 20px;">
+    <nav style="display:flex;align-items:center;justify-content:space-between;height:70px;">
 
-        <!-- Logo -->
-        <a href="#" class="flex items-center gap-2 min-w-0 shrink-0">
-          <img src="img/mundo.jpg" alt="Logo" class="h-9 w-9 sm:h-10 sm:w-10 rounded-full object-cover shrink-0">
-          <span class="hidden sm:block text-sm sm:text-lg font-bold truncate">Karpus Kids</span>
-        </a>
-
-        <!-- Nav Desktop -->
-        <nav class="hidden md:flex items-center gap-6 font-medium text-slate-600 text-sm">
-          <a href="#nosotros" class="hover:text-orange-500 whitespace-nowrap">Nosotros</a>
-          <a href="#galeria-fotos" class="hover:text-pink-500 whitespace-nowrap">Galería</a>
-          <a href="#precios" class="hover:text-blue-500 whitespace-nowrap">Servicios</a>
-          <a href="#footer" class="hover:text-green-500 whitespace-nowrap">Contacto</a>
-        </nav>
-
-        <!-- Derecha: CTA + Hamburger -->
-        <div class="flex items-center gap-2 shrink-0">
-
-          <!-- Botón Acceso — solo desktop -->
-          <a href="login.html"
-             class="hidden md:inline-flex items-center gap-1.5 bg-gradient-to-r from-orange-400 to-pink-500 text-white px-3 py-1.5 rounded-full text-xs sm:text-sm font-bold whitespace-nowrap shadow-sm hover:shadow-md transition-all">
-            <i class="bi bi-person-circle"></i> Acceso
-          </a>
-
-          <!-- Hamburger — solo móvil -->
-          <button @click="open = !open" aria-label="Abrir menú" 
-            class="md:hidden flex items-center justify-center w-11 h-11 rounded-2xl bg-white border border-slate-100 shadow-sm active:scale-90 transition-all duration-300 z-[120] relative group">
-            <div class="relative w-6 h-6 flex items-center justify-center">
-              <span class="absolute h-0.5 bg-slate-600 rounded-full transition-all duration-300 ease-in-out" :class="open ? 'w-6 rotate-45 bg-orange-500' : 'w-6 -translate-y-2'"></span>
-              <span class="absolute h-0.5 bg-slate-600 rounded-full transition-all duration-300 ease-in-out" :class="open ? 'w-0 opacity-0 translate-x-4' : 'w-4 ml-auto'"></span>
-              <span class="absolute h-0.5 bg-slate-600 rounded-full transition-all duration-300 ease-in-out" :class="open ? 'w-6 -rotate-45 bg-orange-500' : 'w-6 translate-y-2'"></span>
-            </div>
-          </button>
-
+      <!-- Logo -->
+      <a href="#inicio" style="display:flex;align-items:center;gap:10px;">
+        <div style="width:40px;height:40px;border-radius:12px;overflow:hidden;box-shadow:0 3px 10px rgba(0,0,0,0.18);flex-shrink:0;">
+          <img src="img/mundo.jpg" alt="Logo" style="width:100%;height:100%;object-fit:cover;">
         </div>
-      </div>
-    </div>
+        <span class="kk" style="font-size:20px;font-weight:900;line-height:1;">
+          <span class="k1">K</span><span class="k2">a</span><span class="k3">r</span><span class="k4">p</span><span class="k5">u</span><span class="k6">s</span>&#32;<span class="k7">K</span><span class="k8">i</span><span class="k9">d</span><span class="k10">s</span>
+        </span>
+      </a>
 
-    <!-- Overlay -->
-    <div x-show="open"
-         x-transition:enter="transition ease-out duration-200"
-         x-transition:enter-start="opacity-0"
-         x-transition:enter-end="opacity-100"
-         x-transition:leave="transition ease-in duration-150"
-         x-transition:leave-start="opacity-100"
-         x-transition:leave-end="opacity-0"
-         x-cloak
-         @click="open = false"
-         class="fixed inset-0 bg-black/50 z-[100]"
-         style="pointer-events:auto;">
-    </div>
-
-    <!-- Menú lateral (slide desde la derecha) -->
-    <div x-show="open"
-         x-transition:enter="transition ease-out duration-300"
-         x-transition:enter-start="opacity-0 translate-x-full"
-         x-transition:enter-end="opacity-100 translate-x-0"
-         x-transition:leave="transition ease-in duration-200"
-         x-transition:leave-start="opacity-100 translate-x-0"
-         x-transition:leave-end="opacity-0 translate-x-full"
-         x-cloak
-         class="fixed top-0 right-0 h-full w-72 max-w-[80%] bg-white z-[110] shadow-2xl flex flex-col">
-      
-      <!-- Header del menú -->
-      <div class="flex items-center px-6 py-6 border-b border-slate-50">
-        <div class="flex items-center gap-2">
-          <img src="img/mundo.jpg" alt="Logo" class="h-10 w-10 rounded-full object-cover shadow-sm">
-          <span class="font-black text-slate-800 text-lg tracking-tight">Karpus Kids</span>
-        </div>
-      </div>
-
-      <!-- Links -->
-      <nav class="flex flex-col px-4 py-6 gap-2 flex-1">
-        <a href="#nosotros"    @click="open=false" class="flex items-center gap-4 py-4 px-4 rounded-2xl font-bold text-slate-700 hover:bg-orange-50 hover:text-orange-600 transition-all active:scale-95">
-          <i class="bi bi-people-fill text-xl text-orange-400"></i> Nosotros
-        </a>
-        <a href="#galeria-fotos" @click="open=false" class="flex items-center gap-4 py-4 px-4 rounded-2xl font-bold text-slate-700 hover:bg-pink-50 hover:text-pink-600 transition-all active:scale-95">
-          <i class="bi bi-images text-xl text-pink-400"></i> Galería
-        </a>
-        <a href="#precios"    @click="open=false" class="flex items-center gap-4 py-4 px-4 rounded-2xl font-bold text-slate-700 hover:bg-blue-50 hover:text-blue-600 transition-all active:scale-95">
-          <i class="bi bi-star-fill text-xl text-blue-400"></i> Servicios
-        </a>
-        <a href="#footer"     @click="open=false" class="flex items-center gap-4 py-4 px-4 rounded-2xl font-bold text-slate-700 hover:bg-green-50 hover:text-green-600 transition-all active:scale-95">
-          <i class="bi bi-envelope-paper-fill text-xl text-green-400"></i> Contacto
-        </a>
+      <!-- Desktop links -->
+      <nav class="md-nav" style="display:none;align-items:center;gap:30px;">
+        <a href="#nosotros"  class="nav-link">Nosotros</a>
+        <a href="#programas" class="nav-link">Programas</a>
+        <a href="#app"       class="nav-link">App</a>
+        <a href="#galeria"   class="nav-link">Galería</a>
+        <a href="#contacto"  class="nav-link">Contacto</a>
       </nav>
 
-      <!-- Botón Acceso abajo -->
-      <div class="p-6 border-t border-slate-50">
+      <div style="display:flex;align-items:center;gap:10px;">
         <a href="login.html"
-           class="flex items-center justify-center gap-2 w-full bg-gradient-to-r from-orange-400 to-pink-500 text-white py-4 rounded-2xl font-black text-sm uppercase tracking-wider shadow-lg shadow-orange-100 active:scale-95 transition-all">
-          <i class="bi bi-person-circle text-lg"></i> Acceso Padres
+          style="display:inline-flex;align-items:center;gap:6px;background:linear-gradient(135deg,#FF9800,#E91E63);color:white;font-weight:900;font-size:13px;padding:10px 22px;border-radius:50px;box-shadow:0 4px 16px rgba(255,152,0,.4);transition:transform .2s,box-shadow .2s;"
+          onmouseover="this.style.transform='translateY(-2px)';this.style.boxShadow='0 8px 24px rgba(255,152,0,.5)'"
+          onmouseout="this.style.transform='';this.style.boxShadow='0 4px 16px rgba(255,152,0,.4)'">
+          <i class="bi bi-person-circle"></i> Acceso
+        </a>
+        <button id="mobBtn" class="mob-btn"
+          style="display:flex;align-items:center;justify-content:center;width:42px;height:42px;border:none;background:#f1f5f9;border-radius:10px;cursor:pointer;">
+          <i class="bi bi-list" id="mobIcon" style="font-size:20px;color:#475569;"></i>
+        </button>
+      </div>
+    </nav>
+
+    <!-- Mobile menu -->
+    <div id="mobMenu" style="display:none;background:#fff;border-top:1px solid #f1f5f9;padding:10px 0 14px;border-radius:0 0 16px 16px;box-shadow:0 8px 24px rgba(0,0,0,0.08);">
+      <a href="#nosotros"  style="display:block;padding:12px 16px;font-weight:700;color:#475569;border-radius:10px;">Nosotros</a>
+      <a href="#programas" style="display:block;padding:12px 16px;font-weight:700;color:#475569;border-radius:10px;">Programas</a>
+      <a href="#app"       style="display:block;padding:12px 16px;font-weight:700;color:#475569;border-radius:10px;">App</a>
+      <a href="#galeria"   style="display:block;padding:12px 16px;font-weight:700;color:#475569;border-radius:10px;">Galería</a>
+      <a href="#contacto"  style="display:block;padding:12px 16px;font-weight:700;color:#475569;border-radius:10px;">Contacto</a>
+      <a href="login.html" style="display:block;margin:8px 16px 0;padding:12px;text-align:center;background:linear-gradient(135deg,#FF9800,#E91E63);color:white;font-weight:900;border-radius:14px;">Acceso Padres</a>
+    </div>
+  </div>
+</header>
+
+<!-- ════════════════════════════════════════════════════════════
+     HERO — video background
+════════════════════════════════════════════════════════════ -->
+<section class="hero" id="inicio">
+  <!-- Video background (muted, autoplay) -->
+  <video class="hero-video" autoplay muted loop playsinline poster="img/karpus.jpg">
+    <source src="/img/mundo.jpg" type="video/mp4">
+  </video>
+  <div class="hero-overlay"></div>
+
+  <!-- Decorative blobs -->
+  <div class="blob" style="width:520px;height:520px;background:radial-gradient(circle,rgba(255,152,0,.16),transparent 70%);top:-120px;right:-80px;"></div>
+  <div class="blob" style="width:380px;height:380px;background:radial-gradient(circle,rgba(233,30,99,.13),transparent 70%);bottom:-60px;left:-60px;"></div>
+
+  <div class="hero-content">
+    <div style="max-width:660px;">
+
+      <!-- Live badge -->
+      <div class="fade-up" style="display:inline-flex;align-items:center;gap:8px;background:rgba(255,255,255,.1);border:1px solid rgba(255,255,255,.2);border-radius:50px;padding:7px 18px;margin-bottom:28px;backdrop-filter:blur(8px);">
+        <span class="pulse-dot" style="width:9px;height:9px;background:#22c55e;border-radius:50%;display:inline-block;flex-shrink:0;"></span>
+        <span style="font-size:12px;font-weight:800;color:rgba(255,255,255,.9);text-transform:uppercase;letter-spacing:.1em;">Inscripciones abiertas · Cupos limitados</span>
+      </div>
+
+      <h1 class="fade-up-2" style="font-size:clamp(2.8rem,6.5vw,4.6rem);font-weight:900;line-height:1.06;color:#fff;margin-bottom:22px;">
+        El futuro brillante<br>de tu hijo<br>
+        <span style="background:linear-gradient(90deg,#FF9800,#E91E63);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;">empieza aquí</span>
+      </h1>
+
+      <p class="fade-up-3" style="font-size:1.1rem;color:rgba(255,255,255,.72);line-height:1.78;margin-bottom:36px;font-weight:500;max-width:520px;">
+        Por más de 5 años hemos ayudado a los niños a construir una base educativa y social sólida — con toda la diversión de la infancia incluida.
+      </p>
+
+      <!-- CTAs -->
+      <div class="fade-up-4" style="display:flex;flex-wrap:wrap;gap:14px;margin-bottom:52px;">
+        <a href="https://wa.me/18298038424?text=¡Hola!%20Quiero%20información%20sobre%20Karpus%20Kids" target="_blank"
+          style="display:inline-flex;align-items:center;gap:8px;background:linear-gradient(135deg,#25D366,#128C7E);color:white;font-weight:900;font-size:14px;padding:15px 30px;border-radius:14px;box-shadow:0 8px 24px rgba(37,211,102,.4);transition:transform .2s,box-shadow .2s;"
+          onmouseover="this.style.transform='translateY(-3px)';this.style.boxShadow='0 14px 32px rgba(37,211,102,.5)'"
+          onmouseout="this.style.transform='';this.style.boxShadow='0 8px 24px rgba(37,211,102,.4)'">
+          <i class="bi bi-whatsapp" style="font-size:18px;"></i> Contáctanos por WhatsApp
+        </a>
+        <a href="#programas"
+          style="display:inline-flex;align-items:center;gap:8px;background:rgba(255,255,255,.12);border:2px solid rgba(255,255,255,.25);color:white;font-weight:900;font-size:14px;padding:15px 28px;border-radius:14px;backdrop-filter:blur(8px);transition:background .2s;"
+          onmouseover="this.style.background='rgba(255,255,255,.2)'"
+          onmouseout="this.style.background='rgba(255,255,255,.12)'">
+          <i class="bi bi-play-circle-fill"></i> Ver programas
         </a>
       </div>
 
-    </div>
-
-  </header>
-
-  <!-- Hero con Video -->
-  <section class="relative min-h-screen flex items-center justify-center text-center overflow-hidden">
-    <img src="/img/karpus.jpg"
-       class="absolute inset-0 w-full h-full object-cover hero-bg-animate"
-       alt="Niños felices en Karpus Kids" loading="lazy">
-    <div class="absolute inset-0 bg-gradient-to-b from-black/60 via-black/40 to-black/70"></div>
-    <div x-data="{ contactModal: false }" class="relative z-10 p-8 text-white max-w-4xl mx-auto" data-aos="fade-up">
-      <h1 class="karpus-kids-colored mb-4 text-5xl md:text-8xl">
-        <span class="k-1">K</span><span class="k-2">A</span><span class="k-3">R</span><span class="k-4">P</span><span class="k-5">U</span><span class="k-6">S</span>&nbsp;<span class="k-7">K</span><span class="k-8">I</span><span class="k-9">D</span><span class="k-10">S</span>
-      </h1>
-      <p class="text-xl font-light max-w-2xl mx-auto mb-10">
-        Tu hijo merece un lugar seguro donde aprenda, se divierta y esté protegido mientras tú trabajas con tranquilidad.  
-En Karpus Kids cuidamos lo que más amas… como si fuera nuestro.
-      </p>
-      <p class="text-lg text-pink-300 font-semibold">
-✔ Cupos limitados • ✔ Supervisión constante • ✔ App exclusiva para padres
-</p>
-      <div class="flex justify-center items-center gap-4">
-        <a href="https://wa.me/18298038484?text=¡Hola! Me interesa inscribir a mi pequeño en Karpus Kids" target="_blank" class="bg-pink-500 text-white font-bold px-8 py-4 rounded-full shadow-lg hover:bg-pink-600 transition transform hover:scale-105 border-2 border-pink-400 animate-pulse hero-cta-btn">INSCRIBE A TU HIJO HOY</a>
-        <a href="#nosotros" class="bg-transparent border-2 border-white text-white font-bold px-8 py-4 rounded-full shadow-lg hover:bg-white hover:text-gray-900 transition transform hover:scale-105 hero-cta-btn">Conocer Más</a>
-      </div>
-      <p class="mt-6 text-sm text-gray-200">
-        Más de 120 familias confían en nosotros cada año ❤️
-      </p>
-      <!-- Modal de Contacto -->
-      <div x-show="contactModal" @keydown.escape.window="contactModal = false" class="fixed inset-0 bg-black/50 z-50 flex items-center justify-center" style="display: none;">
-        <div @click.away="contactModal = false" class="bg-white rounded-2xl p-8 w-full max-w-md text-gray-800">
-          <h3 class="text-2xl font-bold mb-4 text-blue-600">¡Contáctanos!</h3>
-          <p class="text-sm mb-6">¡Hola! Estamos aquí para ayudarte. ¿Cómo podemos asistirte hoy?</p>
-          <div class="space-y-4">
-            <a href="https://wa.me/18298038484?text=¡Hola! Me interesa inscribir a mi pequeño en Karpus Kids" target="_blank" class="modal-btn block w-full text-center bg-green-500 text-white font-bold px-6 py-3 rounded-lg hover:bg-green-600 transition">
-              <i class="bi bi-whatsapp mr-2"></i>Inscribir a mi Pequeño
-            </a>
-            <a href="https://wa.me/18298038484?text=¡Hola! Me gustaría obtener más información sobre Karpus Kids" target="_blank" class="modal-btn block w-full text-center bg-blue-500 text-white font-bold px-6 py-3 rounded-lg hover:bg-blue-600 transition">
-              <i class="bi bi-info-circle mr-2"></i>Solicitar Información
-            </a>
-            <a href="https://wa.me/18298038484?text=¡Hola! Me gustaría contactarlos sobre Karpus Kids" target="_blank" class="modal-btn block w-full text-center bg-pink-500 text-white font-bold px-6 py-3 rounded-lg hover:bg-pink-600 transition">
-              <i class="bi bi-chat-dots mr-2"></i>Contactar por WhatsApp
-            </a>
-          </div>
-          <button type="button" @click="contactModal = false" class="mt-6 w-full px-6 py-2 text-gray-600 hover:text-gray-800 modal-btn">Cerrar</button>
+      <!-- Stats pill -->
+      <div class="fade-up-4" style="display:inline-flex;gap:0;background:rgba(255,255,255,.08);border:1px solid rgba(255,255,255,.12);border-radius:20px;padding:18px 28px;backdrop-filter:blur(8px);flex-wrap:wrap;gap:4px;">
+        <div style="flex:1;text-align:center;min-width:80px;padding:0 8px;">
+          <div style="font-size:clamp(1.8rem,3.5vw,2.6rem);font-weight:900;color:#FF9800;line-height:1;">120+</div>
+          <div style="font-size:10px;font-weight:800;color:rgba(255,255,255,.45);text-transform:uppercase;letter-spacing:.08em;margin-top:4px;">Familias</div>
+        </div>
+        <div style="width:1px;background:rgba(255,255,255,.12);"></div>
+        <div style="flex:1;text-align:center;min-width:80px;padding:0 8px;">
+          <div style="font-size:clamp(1.8rem,3.5vw,2.6rem);font-weight:900;color:#E91E63;line-height:1;">5★</div>
+          <div style="font-size:10px;font-weight:800;color:rgba(255,255,255,.45);text-transform:uppercase;letter-spacing:.08em;margin-top:4px;">Calificación</div>
+        </div>
+        <div style="width:1px;background:rgba(255,255,255,.12);"></div>
+        <div style="flex:1;text-align:center;min-width:80px;padding:0 8px;">
+          <div style="font-size:clamp(1.8rem,3.5vw,2.6rem);font-weight:900;color:#4CAF50;line-height:1;">5+</div>
+          <div style="font-size:10px;font-weight:800;color:rgba(255,255,255,.45);text-transform:uppercase;letter-spacing:.08em;margin-top:4px;">Años</div>
         </div>
       </div>
-
     </div>
-  </section>
-  <div class="bg-red-500 text-white py-3 text-center font-semibold">
-    ⚠️ Inscripciones abiertas – Cupos limitados para este mes
   </div>
 
-  <!-- Beneficios Clave (Antes Objetivo, Misión y Visión) -->
-  <section class="py-20 bg-white">
-    <div class="max-w-7xl mx-auto px-8 grid md:grid-cols-3 gap-8">
-      <!-- Desarrollo Integral -->
-      <div class="p-6 rounded-xl shadow-lg bg-green-50 text-green-800" data-aos="fade-right">
-        <img src="img/4.jpg" loading="lazy" alt="Niño desarrollando habilidades cognitivas" class="h-40 w-full object-cover rounded-lg mb-4">
-        <h3 class="text-2xl font-bold mb-3 text-green-600">Desarrollo Integral</h3>
-        <p>Tu hijo potenciará sus habilidades cognitivas y sociales en un espacio diseñado para el aprendizaje lúdico.</p>
-      </div>
-      <!-- Ambiente Amoroso -->
-      <div class="p-6 rounded-xl shadow-lg bg-blue-50 text-blue-800" data-aos="fade-up" data-aos-delay="200">
-        <img src="img/3.jpg" loading="lazy" alt="Maestra cuidando niños con amor" class="h-40 w-full object-cover rounded-lg mb-4">
-        <h3 class="text-2xl font-bold mb-3 text-blue-600">Ambiente Amoroso</h3>
-        <p>Cuidamos el corazón de tu pequeño. Fomentamos valores y seguridad emocional con personal cálido y atento.</p>
-      </div>
-      <!-- Calidad Educativa -->
-      <div class="p-6 rounded-xl shadow-lg bg-orange-50 text-orange-800" data-aos="fade-left" data-aos-delay="400">
-        <img src="img/1.jpg" loading="lazy" alt="Instalaciones educativas de calidad" class="h-40 w-full object-cover rounded-lg mb-4">
-        <h3 class="text-2xl font-bold mb-3 text-orange-500">Calidad Educativa</h3>
-        <p>Somos un referente en educación infantil. Tu hijo recibirá la mejor preparación para su futuro escolar.</p>
-      </div>
+  <!-- Scroll indicator -->
+  <div style="position:absolute;bottom:28px;left:50%;transform:translateX(-50%);z-index:2;display:flex;flex-direction:column;align-items:center;gap:6px;opacity:.55;">
+    <span style="font-size:10px;font-weight:800;color:white;text-transform:uppercase;letter-spacing:.12em;">Descubre más</span>
+    <div style="width:24px;height:38px;border:2px solid rgba(255,255,255,.4);border-radius:12px;display:flex;justify-content:center;padding-top:6px;">
+      <div style="width:4px;height:8px;background:white;border-radius:2px;animation:float 1.6s ease-in-out infinite;"></div>
     </div>
-  </section>
+  </div>
+</section>
 
-  <!-- App Section -->
-  <section class="py-20 bg-gradient-to-r from-indigo-600 to-pink-500 text-white relative overflow-hidden">
-    <div class="absolute top-0 left-0 w-full h-full opacity-10 bg-[url('img/4.jpg')] bg-cover bg-center"></div>
-    <div class="container mx-auto px-6 flex flex-col md:flex-row items-center gap-12 relative z-10">
-      <div class="md:w-1/2" data-aos="fade-right">
-        <h2 class="text-4xl font-bold mb-6">La primera estancia infantil con App privada para padres</h2>
-        <p class="mb-8 text-indigo-100 text-lg leading-relaxed">Sabemos que dejar a tu hijo no es fácil.  
-Por eso creamos una aplicación exclusiva donde puedes ver fotos, recibir reportes diarios y comunicarte con nosotros en tiempo real.
-Tranquilidad en tu bolsillo.</p>
-        <p class="text-yellow-300 font-semibold text-lg mb-6">📲 Recibe notificaciones cuando tu hijo llegue, coma y termine su jornada.</p>
-        <a href="login.html" class="bg-white text-indigo-600 font-bold px-10 py-4 rounded-full shadow-xl hover:bg-indigo-50 transition transform hover:scale-105 inline-flex items-center gap-2">
-          <i class="bi bi-person-circle"></i> Acceder al Panel
-        </a>
-      </div>
-      <div class="md:w-1/2 flex justify-center" data-aos="fade-left">
-         <img src="img/mundo.jpg" loading="lazy" class="rounded-3xl shadow-2xl rotate-3 border-8 border-white/20 w-64 h-64 object-cover" alt="Vista previa de la App Karpus Kids">
-      </div>
+<!-- ── ALERT BANNER ── -->
+<div style="background:linear-gradient(90deg,#E91E63,#FF9800,#E91E63);background-size:200% 100%;animation:shimmer 4s linear infinite;color:white;text-align:center;padding:13px 20px;font-weight:800;font-size:13px;letter-spacing:.03em;">
+  🔥 ¡Cupos limitados para este mes! &nbsp;·&nbsp;
+  <a href="https://wa.me/18298038424" target="_blank" style="color:white;text-decoration:underline;font-weight:900;">Reserva el tuyo ahora →</a>
+</div>
+
+<!-- ════════════════════════════════════════════════════════════
+     FEATURES — 4 cards
+════════════════════════════════════════════════════════════ -->
+<section style="padding:88px 24px;background:#f8fafc;">
+  <div style="max-width:1280px;margin:0 auto;">
+    <div style="text-align:center;margin-bottom:52px;">
+      <span class="sec-label" style="background:#fff7ed;color:#FF9800;">¿Por qué Karpus Kids?</span>
+      <h2 style="font-size:clamp(1.9rem,3.5vw,2.8rem);font-weight:900;color:#1e293b;margin:0 0 12px;">Un lugar donde los niños florecen</h2>
+      <p style="color:#64748b;font-size:15px;max-width:520px;margin:0 auto;line-height:1.7;">Cuidado experto, educación de calidad y tecnología para que tu familia esté siempre conectada.</p>
     </div>
-  </section>
-  
-  <!-- Sobre Nosotros -->
-  <section id="nosotros" class="py-20 px-8 bg-gray-50">
-    <h2 class="text-4xl md:text-5xl font-bold text-center mb-6 text-blue-600" data-aos="fade-up">Sobre Nosotros</h2>
-    <div class="max-w-6xl mx-auto grid md:grid-cols-2 gap-8 items-center">
-      <!-- Imagen a la izquierda como biografía visual -->
-      <div class="order-1 md:order-1" data-aos="fade-right">
-        <img src="img/1.jpg" loading="lazy" alt="Fundadora Karonlyn García en Karpus Kids" class="w-full h-96 object-cover rounded-xl shadow-lg">
-      </div>
-      <!-- Biografía y texto a la derecha -->
-      <div class="order-2 md:order-2 space-y-4 text-left" data-aos="fade-left">
-        <h3 class="text-xl font-semibold text-gray-800">Biografía — Karonlyn García</h3>
-        <p class="text-gray-700">
-          <span class="karpus-kids-inline"><span class="k-1">K</span><span class="k-2">a</span><span class="k-3">r</span><span class="k-4">p</span><span class="k-5">u</span><span class="k-6">s</span> <span class="k-7">K</span><span class="k-8">i</span><span class="k-9">d</span><span class="k-10">s</span></span> es mucho más que una estancia infantil: es un espacio donde los niños crecen, aprenden y descubren el mundo con amor y alegría. Detrás de este proyecto está Karonlyn García, fundadora y CEO, una mujer apasionada por la educación y el bienestar infantil.
-        </p>
-        <p class="text-gray-700">
-          Con una visión clara y un corazón dedicado, Karonlyn creó Karpus Kids con el sueño de ofrecer a las familias un lugar donde cada niño se sienta único, protegido y motivado a desarrollar todo su potencial.
-        </p>
-        <p class="text-gray-700">
-          Combinamos aprendizaje, juego y valores para que los más pequeños crezcan seguros, felices y llenos de confianza. Nuestro equipo de profesionales cuida cada detalle, desde el entorno educativo hasta las actividades diarias.
-        </p>
-        <div class="pt-4">
-          <a href="https://wa.me/18298038484?text=¡Hola! Me gustaría conocer más sobre Karpus Kids" target="_blank" class="bg-pink-500 text-white font-bold px-6 py-2 rounded-full shadow-lg hover:bg-pink-600 transition inline-block">
-            ¡Quiero más Información!
-          </a>
+    <div class="four-col">
+      <div class="feat-card c-orange obs-fade">
+        <div style="width:56px;height:56px;background:#fff7ed;border-radius:18px;display:flex;align-items:center;justify-content:center;margin-bottom:18px;">
+          <i class="bi bi-shield-check-fill" style="font-size:26px;color:#FF9800;"></i>
         </div>
+        <h3 style="font-size:17px;font-weight:900;color:#1e293b;margin-bottom:8px;">Seguridad Total</h3>
+        <p style="font-size:14px;color:#64748b;line-height:1.65;">Acceso controlado con QR, cámaras y personal certificado. Tu hijo siempre protegido.</p>
       </div>
-    </div>
-  </section>
-
-  <section class="py-24 bg-blue-50">
-  <div class="max-w-5xl mx-auto text-center">
-    <h2 class="text-4xl md:text-5xl font-bold mb-12 text-blue-700">
-      La seguridad de tu hijo es nuestra prioridad
-    </h2>
-
-    <div class="grid md:grid-cols-3 gap-10 mt-10">
-      <div class="bg-white p-8 rounded-2xl shadow-lg transform transition duration-500 hover:-translate-y-4 hover:rotate-1 hover:shadow-2xl">
-        <i class="bi bi-camera-video text-4xl text-blue-600 animate-subtle-pulse"></i>
-        <p class="mt-4 font-semibold">Supervisión constante</p>
+      <div class="feat-card c-blue obs-fade">
+        <div style="width:56px;height:56px;background:#eff6ff;border-radius:18px;display:flex;align-items:center;justify-content:center;margin-bottom:18px;">
+          <i class="bi bi-book-fill" style="font-size:26px;color:#2196F3;"></i>
+        </div>
+        <h3 style="font-size:17px;font-weight:900;color:#1e293b;margin-bottom:8px;">Educación Integral</h3>
+        <p style="font-size:14px;color:#64748b;line-height:1.65;">Metodología basada en juego y descubrimiento para el desarrollo cognitivo y social.</p>
       </div>
-      <div class="bg-white p-8 rounded-2xl shadow-lg transform transition duration-500 hover:-translate-y-4 hover:rotate-1 hover:shadow-2xl">
-        <i class="bi bi-shield-check text-4xl text-green-600 animate-subtle-pulse" style="animation-delay: 0.3s;"></i>
-        <p class="mt-4 font-semibold">Instalaciones seguras</p>
+      <div class="feat-card c-green obs-fade">
+        <div style="width:56px;height:56px;background:#f0fdf4;border-radius:18px;display:flex;align-items:center;justify-content:center;margin-bottom:18px;">
+          <i class="bi bi-phone-fill" style="font-size:26px;color:#4CAF50;"></i>
+        </div>
+        <h3 style="font-size:17px;font-weight:900;color:#1e293b;margin-bottom:8px;">App para Padres</h3>
+        <p style="font-size:14px;color:#64748b;line-height:1.65;">Fotos, reportes, pagos y comunicación directa con maestras — todo desde tu celular.</p>
       </div>
-      <div class="bg-white p-8 rounded-2xl shadow-lg transform transition duration-500 hover:-translate-y-4 hover:rotate-1 hover:shadow-2xl">
-        <i class="bi bi-phone text-4xl text-pink-600 animate-subtle-pulse" style="animation-delay: 0.6s;"></i>
-        <p class="mt-4 font-semibold">Comunicación inmediata</p>
+      <div class="feat-card c-pink obs-fade">
+        <div style="width:56px;height:56px;background:#fdf2f8;border-radius:18px;display:flex;align-items:center;justify-content:center;margin-bottom:18px;">
+          <i class="bi bi-heart-fill" style="font-size:26px;color:#E91E63;"></i>
+        </div>
+        <h3 style="font-size:17px;font-weight:900;color:#1e293b;margin-bottom:8px;">Ambiente Amoroso</h3>
+        <p style="font-size:14px;color:#64748b;line-height:1.65;">Personal dedicado que trata a cada niño como parte de la familia Karpus Kids.</p>
       </div>
     </div>
   </div>
 </section>
-  
-  <!-- Galería de Fotos -->
-  <section id="galeria-fotos" class="py-20 bg-white overflow-hidden">
-    <h2 class="text-4xl md:text-5xl font-bold text-center mb-8 text-rose-500" data-aos="fade-up">Galería de Fotos</h2>
-    <div class="container mx-auto px-4">
-      <div class="grid grid-cols-1 md:grid-cols-3 gap-8">
-        <!-- Imágenes en Grid -->
-        <div class="aspect-square overflow-hidden rounded-xl shadow-md hover:shadow-xl transition-all duration-300 transform hover:scale-105" data-aos="fade-up">
-          <img src="img/2.jpg" loading="lazy" class="w-full h-full object-cover cursor-pointer lightbox-thumb" alt="Niños jugando en piscina de pelotas" data-caption="Niños jugando">
-        </div>
-        <div class="aspect-square overflow-hidden rounded-xl shadow-md hover:shadow-xl transition-all duration-300 transform hover:scale-105" data-aos="fade-up" data-aos-delay="100">
-          <img src="img/3.jpg" loading="lazy" class="w-full h-full object-cover cursor-pointer lightbox-thumb" alt="Maestra realizando actividad con niño" data-caption="Actividad de aprendizaje">
-        </div>
-        <div class="aspect-square overflow-hidden rounded-xl shadow-md hover:shadow-xl transition-all duration-300 transform hover:scale-105" data-aos="fade-up" data-aos-delay="200">
-          <img src="img/4.jpg" loading="lazy" class="w-full h-full object-cover cursor-pointer lightbox-thumb" alt="Niño explorando juegos didácticos" data-caption="Juegos didácticos">
-        </div>
-        <div class="aspect-square overflow-hidden rounded-xl shadow-md hover:shadow-xl transition-all duration-300 transform hover:scale-105" data-aos="fade-up" data-aos-delay="300">
-          <img src="img/5.jpg" loading="lazy" class="w-full h-full object-cover cursor-pointer lightbox-thumb" alt="Niña sonriendo en área de juegos" data-caption="Felicidad y seguridad">
-        </div>
-        <div class="aspect-square overflow-hidden rounded-xl shadow-md hover:shadow-xl transition-all duration-300 transform hover:scale-105" data-aos="fade-up">
-          <img src="img/6.jpg" loading="lazy" class="w-full h-full object-cover cursor-pointer lightbox-thumb" alt="Grupo de niños en actividad" data-caption="Convivencia">
-        </div>
-        <div class="aspect-square overflow-hidden rounded-xl shadow-md hover:shadow-xl transition-all duration-300 transform hover:scale-105" data-aos="fade-up" data-aos-delay="100">
-          <img src="img/7.jpg" loading="lazy" class="w-full h-full object-cover cursor-pointer lightbox-thumb" alt="Niño jugando con aros" data-caption="Desarrollo motriz">
-        </div>
-      </div>
-    </div>
-  </section>
-  
-  <!-- Galería de Videos -->
-  <section id="galeria-videos" class="py-20 bg-gray-50">
-    <div x-data="{ videoModal: false, videoSrc: '' }">
-      <h2 class="text-4xl md:text-5xl font-bold text-center mb-8 text-orange-500" data-aos="fade-up">Galería de Videos</h2>
-      <p class="text-center max-w-2xl mx-auto text-lg text-gray-700 mb-6" data-aos="fade-up">En Karpus Kids nos dedicamos a la diversión, al aprendizaje y a crear recuerdos inolvidables para tus hijos. ¡Mira algunos de nuestros momentos favoritos!</p>
-      <div class="max-w-5xl mx-auto flex justify-center flex-wrap gap-8 px-8">
-        <!-- Video 1 -->
-        <div class="bg-white rounded-xl shadow-lg overflow-hidden w-full sm:w-72 transform transition-transform duration-300 hover:scale-105" data-aos="fade-up" data-aos-delay="100">
-          <div @click="videoModal = true; videoSrc = 'img/14.mp4'" class="relative cursor-pointer group">
-            <video muted loop playsinline preload="metadata" class="aspect-video w-full object-cover" src="img/14.mp4" alt="Video de actividades recreativas"></video>
-            <div class="absolute inset-0 bg-black/30 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
-              <i class="bi bi-volume-up-fill text-white text-5xl"></i>
-            </div>
-          </div>
-          <div class="p-4 text-center">
-            <h4 class="font-semibold text-gray-800">¡La diversión es importante!</h4>
-            <p class="text-sm text-gray-600 mt-1">En Karpus Kids, cada día es una nueva aventura llena de sonrisas.</p>
-          </div>
-        </div>
-        <!-- Video 2 -->
-        <div class="bg-white rounded-xl shadow-lg overflow-hidden w-full sm:w-72 transform transition-transform duration-300 hover:scale-105" data-aos="fade-up" data-aos-delay="200">
-          <div @click="videoModal = true; videoSrc = 'img/karpus invitacion.mp4'" class="relative cursor-pointer group">
-            <video muted loop playsinline preload="metadata" class="aspect-video w-full object-cover" src="img/karpus invitacion.mp4" alt="Video invitación a Karpus Kids"></video>
-            <div class="absolute inset-0 bg-black/30 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
-              <i class="bi bi-volume-up-fill text-white text-5xl"></i>
-            </div>
-          </div>
-          <div class="p-4 text-center">
-            <h4 class="font-semibold text-gray-800">Momentos Inolvidables</h4>
-            <p class="text-sm text-gray-600 mt-1">Creamos recuerdos que durarán toda la vida a través del juego y la amistad.</p>
-          </div>
-        </div>
-        <!-- Video 3 -->
-        <div class="bg-white rounded-xl shadow-lg overflow-hidden w-full sm:w-72 transform transition-transform duration-300 hover:scale-105" data-aos="fade-up" data-aos-delay="300">
-          <div @click="videoModal = true; videoSrc = 'img/video karpus kids.mp4'" class="relative cursor-pointer group">
-            <video muted loop playsinline preload="metadata" class="aspect-video w-full object-cover" src="img/video karpus kids.mp4" alt="Video de aprendizaje creativo"></video>
-            <div class="absolute inset-0 bg-black/30 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
-              <i class="bi bi-volume-up-fill text-white text-5xl"></i>
-            </div>
-          </div>
-          <div class="p-4 text-center">
-            <h4 class="font-semibold text-gray-800">Aprendizaje Creativo</h4>
-            <p class="text-sm text-gray-600 mt-1">Nuestras actividades fomentan la imaginación y el desarrollo de habilidades.</p>
-          </div>
-        </div>
-      </div>
 
-      <!-- Modal de Video -->
-      <div x-show="videoModal" @keydown.escape.window="videoModal = false; videoSrc = ''" class="fixed inset-0 bg-black/80 z-50 flex items-center justify-center p-4" style="display: none;">
-        <div @click.away="videoModal = false; videoSrc = ''" class="relative w-full max-w-4xl">
-          <button @click="videoModal = false; videoSrc = ''" class="absolute -top-10 right-0 text-white text-3xl">&times;</button>
-          <video x-show="videoSrc" :src="videoSrc" class="w-full h-auto rounded-lg" controls autoplay></video>
-        </div>
+<!-- ════════════════════════════════════════════════════════════
+     PROGRAMAS
+════════════════════════════════════════════════════════════ -->
+<section id="programas" style="padding:88px 24px;background:#fff;">
+  <div style="max-width:1280px;margin:0 auto;">
+    <div style="display:flex;align-items:flex-end;justify-content:space-between;flex-wrap:wrap;gap:16px;margin-bottom:36px;">
+      <div>
+        <span class="sec-label" style="background:#fdf2f8;color:#E91E63;">Nuestros programas</span>
+        <h2 style="font-size:clamp(1.9rem,3.5vw,2.8rem);font-weight:900;color:#1e293b;margin:0 0 8px;">Programas para cada edad</h2>
+        <p style="color:#64748b;font-size:15px;">Cuidado y educación para niños de 0 a 12 años.</p>
       </div>
-    </div>
-  </section>
-
-  <!-- Testimonios -->
-  <section id="testimonios" class="py-20 bg-white">
-    <h2 class="text-4xl md:text-5xl font-bold text-center mb-8 text-pink-600" data-aos="fade-up">Lo que dicen nuestros padres</h2>
-    <div class="testimonial-container overflow-hidden">
-      <div class="testimonial-strip flex gap-6">
-        <!-- Testimonios duplicados para el bucle -->
-        <div class="flex gap-4 px-2">
-          <!-- Testimonio 1 -->
-          <div class="flex-shrink-0 w-80 md:w-96 p-6 rounded-xl shadow-lg bg-white text-gray-700">
-            <div class="flex items-center mb-4">
-              <img src="https://i.pravatar.cc/150?u=a042581f4e29026704d" loading="lazy" alt="Foto de Carlos Pérez" class="w-12 h-12 rounded-full object-cover mr-4">
-              <div><h4 class="font-bold">Carlos Pérez</h4><div class="text-yellow-400">★★★★★</div></div>
-            </div>
-            <p class="text-sm">"¡Increíble! Mi hijo ha aprendido muchísimo y siempre llega a casa feliz. El personal es muy atento y cariñoso."</p>
-          </div>
-          <!-- Testimonio 2 -->
-          <div class="flex-shrink-0 w-80 md:w-96 p-6 rounded-xl shadow-lg bg-white text-gray-700">
-            <div class="flex items-center mb-4">
-              <img src="https://i.pravatar.cc/150?u=a042581f4e29026704e" loading="lazy" alt="Foto de Ana García" class="w-12 h-12 rounded-full object-cover mr-4">
-              <div><h4 class="font-bold">Ana García</h4><div class="text-yellow-400">★★★★★</div></div>
-            </div>
-            <p class="text-sm">"La mejor decisión que hemos tomado. Las instalaciones son seguras y las actividades muy creativas. ¡Totalmente recomendado!"</p>
-          </div>
-          <!-- Testimonio 3 -->
-          <div class="flex-shrink-0 w-80 md:w-96 p-6 rounded-xl shadow-lg bg-white text-gray-700">
-            <div class="flex items-center mb-4">
-              <img src="https://i.pravatar.cc/150?u=a042581f4e29026704f" loading="lazy" alt="Foto de Laura Martínez" class="w-12 h-12 rounded-full object-cover mr-4">
-              <div><h4 class="font-bold">Laura Martínez</h4><div class="text-yellow-400">★★★★★</div></div>
-            </div>
-            <p class="text-sm">"<span class="karpus-kids-inline"><span class="k-1">K</span><span class="k-2">a</span><span class="k-3">r</span><span class="k-4">p</span><span class="k-5">u</span><span class="k-6">s</span> <span class="k-7">K</span><span class="k-8">i</span><span class="k-9">d</span><span class="k-10">s</span></span> es más que una estancia, es una segunda familia. Mi hija adora a sus maestras."</p>
-          </div>
-        </div>
-        <div class="flex gap-4 px-2">
-          <!-- Testimonio 1 -->
-          <div class="flex-shrink-0 w-80 md:w-96 p-6 rounded-xl shadow-lg bg-white text-gray-700">
-            <div class="flex items-center mb-4">
-              <img src="https://i.pravatar.cc/150?u=a042581f4e29026704d" loading="lazy" alt="Foto de Carlos Pérez" class="w-12 h-12 rounded-full object-cover mr-4">
-              <div><h4 class="font-bold">Carlos Pérez</h4><div class="text-yellow-400">★★★★★</div></div>
-            </div>
-            <p class="text-sm">"¡Increíble! Mi hijo ha aprendido muchísimo y siempre llega a casa feliz. El personal es muy atento y cariñoso."</p>
-          </div>
-          <!-- Testimonio 2 -->
-          <div class="flex-shrink-0 w-80 md:w-96 p-6 rounded-xl shadow-lg bg-white text-gray-700">
-            <div class="flex items-center mb-4">
-              <img src="https://i.pravatar.cc/150?u=a042581f4e29026704e" loading="lazy" alt="Foto de Ana García" class="w-12 h-12 rounded-full object-cover mr-4">
-              <div><h4 class="font-bold">Ana García</h4><div class="text-yellow-400">★★★★★</div></div>
-            </div>
-            <p class="text-sm">"La mejor decisión que hemos tomado. Las instalaciones son seguras y las actividades muy creativas. ¡Totalmente recomendado!"</p>
-          </div>
-          <!-- Testimonio 3 -->
-          <div class="flex-shrink-0 w-80 md:w-96 p-6 rounded-xl shadow-lg bg-white text-gray-700">
-            <div class="flex items-center mb-4">
-              <img src="https://i.pravatar.cc/150?u=a042581f4e29026704f" loading="lazy" alt="Foto de Laura Martínez" class="w-12 h-12 rounded-full object-cover mr-4">
-              <div><h4 class="font-bold">Laura Martínez</h4><div class="text-yellow-400">★★★★★</div></div>
-            </div>
-            <p class="text-sm">"<span class="karpus-kids-inline"><span class="k-1">K</span><span class="k-2">a</span><span class="k-3">r</span><span class="k-4">p</span><span class="k-5">u</span><span class="k-6">s</span> <span class="k-7">K</span><span class="k-8">i</span><span class="k-9">d</span><span class="k-10">s</span></span> es más que una estancia, es una segunda familia. Mi hija adora a sus maestras."</p>
-          </div>
-        </div>
-      </div>
-    </div>
-  </section>
-  
-  <!-- Cuadro de Precios y Servicios -->
-  <section id="precios" class="py-20 bg-gradient-to-br from-blue-600 to-cyan-600 text-white">
-    <h2 class="text-4xl md:text-5xl font-bold text-center mb-2 uppercase" data-aos="fade-up">Nuestros Servicios</h2>
-    <p class="text-center text-lg mb-8 text-blue-100">
-Invertir en la educación y seguridad de tu hijo hoy, es asegurar su futuro mañana.
-</p>
-    <div class="max-w-6xl mx-auto grid md:grid-cols-3 gap-8 px-8">
-      <!-- Estancia Infantil -->
-      <div class="bg-blue-600 p-6 rounded-xl shadow-lg flex flex-col" data-aos="fade-up" data-aos-delay="100">
-        <h3 class="text-xl font-bold mb-3">ESTANCIA INFANTIL</h3>
-        <p class="mb-2 font-semibold">INSCRIPCIÓN: 5,000 PESOS.</p>
-        <ul class="list-disc list-inside">
-          <li>Plan A: 7:00 AM - 1:00 PM - RD$ 3,800</li>
-          <li>Plan B: 2:30 PM - 5:30 PM - RD$ 3,800</li>
-          <li>Plan C: 7:00 AM - 2:30 PM (Incluye comida) - RD$ 5,400</li>
-        </ul>
-        <p class="mt-auto pt-4 text-xs text-blue-200">Nota: Recibimos niños hasta 5 años.</p>
-      </div>
-      <!-- Sala de Tareas -->
-      <div class="bg-green-600 p-6 rounded-xl shadow-lg flex flex-col" data-aos="fade-up" data-aos-delay="200">
-        <h3 class="text-xl font-bold mb-3">SALA DE TAREAS</h3>
-        <p class="mb-2 font-semibold">¿EN QUÉ NOSOTROS APOYAMOS?</p>
-        <ul class="list-disc list-inside">
-          <li>Lectoescritura</li>
-          <li>Refuerzo académico en matemáticas y español</li>
-          <li>Apoyo en las tareas</li>
-        </ul>
-        <p class="mt-4 font-semibold">INVERSIÓN:</p>
-        <p>Inscripción $1,500. Mensualidad desde $2,000.</p>
-        <p class="mt-auto pt-4 text-xs text-green-200">Horario: L-J de 4:00 PM a 8:00 PM. Mínimo un mes.</p>
-      </div>
-      <!-- Cursos Gratuitos -->
-      <div class="bg-orange-600 p-6 rounded-xl shadow-lg flex flex-col" data-aos="fade-up" data-aos-delay="300">
-        <h3 class="text-xl font-bold mb-3">CURSOS GRATUITOS</h3>
-        <p class="mb-2 font-semibold">TOTALMENTE GRATIS</p>
-        <ul class="list-disc list-inside">
-          <li>English, Pintura, Barbería, Bisutería, y más.</li>
-        </ul>
-        <p class="mt-4 text-yellow-200 text-sm">Nota: Edad de 7 a 18 años. Se imparten Sábados y Domingos.</p>
-        <p class="mt-auto pt-4 text-center italic text-yellow-200">"¡Vive la vida llena de oportunidades y haz que las aprovechen!"</p>
-      </div>
-    </div>
-    <div class="text-center mt-12" data-aos="fade-up">
-      <a href="https://wa.me/18298038484?text=¡Hola! Me interesa inscribir a mi pequeño en Karpus Kids" target="_blank" class="bg-white text-blue-800 font-bold px-8 py-3 rounded-full shadow-lg hover:bg-blue-100 transition transform hover:scale-105 inline-block hero-cta-btn">
-        Inscribir Ahora
+      <a href="https://wa.me/18298038424" target="_blank"
+        style="display:inline-flex;align-items:center;gap:6px;background:linear-gradient(135deg,#E91E63,#FF9800);color:white;font-weight:900;font-size:13px;padding:12px 24px;border-radius:50px;box-shadow:0 4px 16px rgba(233,30,99,.3);transition:transform .2s;"
+        onmouseover="this.style.transform='translateY(-2px)'" onmouseout="this.style.transform=''">
+        <i class="bi bi-whatsapp"></i> Más información
       </a>
     </div>
-  </section>
-
-  <!-- CTA Final (Muy Fuerte) -->
-  <section class="py-24 bg-gradient-to-b from-pink-50 to-white text-center relative overflow-hidden">
-    <div class="block block1 text-blue-500 font-bold">A</div>
-    <div class="block block2 text-orange-500 font-bold">1</div>
-    <div class="block block3 text-green-500">🎨</div>
-    <div class="max-w-4xl mx-auto relative z-10">
-      <h2 class="text-4xl font-bold mb-6 text-gray-800">
-        ¿Listo para formar parte de la familia Karpus Kids?
-      </h2>
-      <p class="text-xl text-gray-600 mb-8">No dejes pasar la oportunidad de brindarle a tu hijo el mejor cuidado y educación.</p>
-      <a href="https://wa.me/18298038484?text=¡Hola! Quiero agendar una visita a Karpus Kids" target="_blank"
-       class="inline-block bg-pink-500 text-white font-bold px-10 py-4 rounded-full text-lg btn-glow hover:scale-105 transition hero-cta-btn">
-        Agenda una visita hoy mismo
-      </a>
-    </div>
-  </section>
-
-  <!-- Footer con Contacto + Horarios + Mapa -->
-  <footer id="footer" class="bg-slate-900 text-white py-14">
-    <div class="max-w-6xl mx-auto px-4 grid md:grid-cols-3 gap-10 text-center md:text-left">
-      <!-- Logo e Info -->
-      <div data-aos="fade-up" class="flex flex-col items-center md:items-start">
-        <img src="img/mundo.jpg" alt="Logo Karpus Kids Footer" class="h-12 mb-4 bg-white p-1 rounded-lg" loading="lazy">
-        <h3 class="text-xl font-bold karpus-kids-inline"><span class="k-1">K</span><span class="k-2">a</span><span class="k-3">r</span><span class="k-4">p</span><span class="k-5">u</span><span class="k-6">s</span> <span class="k-7">K</span><span class="k-8">i</span><span class="k-9">d</span><span class="k-10">s</span></h3>
-        <p class="text-sm mt-2 text-slate-400">Donde cada niño aprende, juega y crece.</p>
-      </div>
-      <!-- Contacto -->
-      <div data-aos="fade-up" data-aos-delay="100">
-        <h3 class="text-xl font-bold mb-4">Contáctanos</h3>
-        <p class="mb-2"><i class="bi bi-telephone-fill mr-2"></i> +1 (829) 803-8424</p>
-        <p class="mb-2"><i class="bi bi-instagram mr-2"></i> <a href="https://www.instagram.com/karpus_kids/" target="_blank" class="text-slate-400 hover:text-white hover:underline">@karpus_kids</a></p>
-        <p class="mb-2"><i class="bi bi-envelope-fill mr-2"></i> info@karpuskids.com</p>
-        <h3 class="text-xl font-bold mb-4 mt-6">Horario</h3>
-        <p><i class="bi bi-clock-fill mr-2"></i> Lunes a Viernes: 7:00 AM - 6:00 PM</p>
-      </div>
-      <!-- Mapa -->
-      <div data-aos="fade-up" data-aos-delay="200">
-        <a href="https://maps.google.com/?q=Karpus+Kids+Santo+Domingo" target="_blank" rel="noopener"
-           class="block w-full h-48 rounded-xl overflow-hidden bg-slate-100 border border-slate-200 hover:opacity-90 transition-opacity relative">
-          <div class="absolute inset-0 flex flex-col items-center justify-center gap-2 text-slate-500">
-            <svg xmlns="http://www.w3.org/2000/svg" class="w-10 h-10 text-rose-500" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5c-1.38 0-2.5-1.12-2.5-2.5s1.12-2.5 2.5-2.5 2.5 1.12 2.5 2.5-1.12 2.5-2.5 2.5z"/></svg>
-            <span class="text-sm font-bold text-slate-700">Karpus Kids — Santo Domingo</span>
-            <span class="text-xs text-slate-400 font-medium">Toca para ver en Google Maps →</span>
-          </div>
-        </a>
-      </div>
-    </div>
-    <p class="text-center mt-8 text-slate-500 text-sm">© 2025 <span class="karpus-kids-inline"><span class="k-1">K</span><span class="k-2">a</span><span class="k-3">r</span><span class="k-4">p</span><span class="k-5">u</span><span class="k-6">s</span> <span class="k-7">K</span><span class="k-8">i</span><span class="k-9">d</span><span class="k-10">s</span></span> | Todos los derechos reservados</p>
-  </footer>
-  
-  <!-- Botones flotantes -->
-  <a href="https://wa.me/18298038484" target="_blank" class="floating-btn btn-ws"><i class="bi bi-whatsapp"></i></a>
-  <a href="https://www.instagram.com/karpus_kids/" target="_blank" class="floating-btn btn-ig"><i class="bi bi-instagram"></i></a>
-  
-  <!-- Lightbox modal para galería de imágenes -->
-  <div id="lightbox" class="fixed inset-0 bg-black/80 hidden items-center justify-center z-50 p-4">
-    <div class="relative max-w-4xl w-full">
-      <button id="lbClose" class="absolute -top-8 right-0 text-white text-3xl">&times;</button>
-      <img id="lbImage" src="data:image/gif;base64,R0lGODlhAQABAAD/ACwAAAAAAQABAAACADs=" alt="" class="w-full h-auto rounded-lg shadow-lg object-contain max-h-[80vh] mx-auto" />
-      <p id="lbCaption" class="text-center text-white mt-3"></p>
-      <button id="lbPrev" class="absolute left-0 top-1/2 -translate-y-1/2 text-white text-4xl px-4">&#8249;</button>
-      <button id="lbNext" class="absolute right-0 top-1/2 -translate-y-1/2 text-white text-4xl px-4">&#8250;</button>
+    <div class="prog-scroll">
+      <div class="prog-card obs-fade"><img src="img/1.jpg" alt="Bebés" loading="lazy"><span>Bebés (0-1 año)</span></div>
+      <div class="prog-card obs-fade"><img src="img/2.jpg" alt="Caminadores" loading="lazy"><span>Caminadores (1-2 años)</span></div>
+      <div class="prog-card obs-fade"><img src="img/3.jpg" alt="Exploradores" loading="lazy"><span>Exploradores (2-3 años)</span></div>
+      <div class="prog-card obs-fade"><img src="img/4.jpg" alt="Preescolar" loading="lazy"><span>Preescolar (3-4 años)</span></div>
+      <div class="prog-card obs-fade"><img src="img/5.jpg" alt="Pre-K" loading="lazy"><span>Pre-K (4-5 años)</span></div>
+      <div class="prog-card obs-fade"><img src="img/6.jpg" alt="Sala de Tareas" loading="lazy"><span>Sala de Tareas</span></div>
+      <div class="prog-card obs-fade"><img src="img/7.jpg" alt="Cursos" loading="lazy"><span>Cursos Gratuitos</span></div>
+      <div class="prog-card obs-fade"><img src="img/8.jpg" alt="Campamento" loading="lazy"><span>Campamento Verano</span></div>
     </div>
   </div>
-  
-  <script>
-    // Inicializar AOS (animaciones)
-    AOS.init({ duration: 800, once: true });
+</section>
 
-    // Nota: los thumbnails de video usan poster para evitar una pantalla negra inicial.
-    // La reproducción se controla al abrir el modal (Alpine.js). No hay autoplay en los thumbnails.
+<!-- ════════════════════════════════════════════════════════════
+     CÓMO FUNCIONA — 4 pasos
+════════════════════════════════════════════════════════════ -->
+<section style="padding:88px 24px;background:#f8fafc;">
+  <div style="max-width:1280px;margin:0 auto;">
+    <div style="text-align:center;margin-bottom:56px;">
+      <span class="sec-label" style="background:#eff6ff;color:#2196F3;">Proceso simple</span>
+      <h2 style="font-size:clamp(1.9rem,3.5vw,2.8rem);font-weight:900;color:#1e293b;margin:0 0 12px;">¿Cómo inscribir a tu hijo?</h2>
+      <p style="color:#64748b;font-size:15px;max-width:480px;margin:0 auto;">En 4 pasos sencillos tu hijo ya forma parte de la familia Karpus Kids.</p>
+    </div>
+    <div class="four-col" style="position:relative;">
+      <!-- Step 1 -->
+      <div class="obs-fade" style="text-align:center;position:relative;z-index:1;">
+        <div style="width:60px;height:60px;background:linear-gradient(135deg,#FF9800,#FFB74D);border-radius:50%;display:flex;align-items:center;justify-content:center;margin:0 auto 18px;box-shadow:0 8px 24px rgba(255,152,0,.35);">
+          <i class="bi bi-whatsapp" style="font-size:24px;color:white;"></i>
+        </div>
+        <div style="font-size:11px;font-weight:900;color:#FF9800;text-transform:uppercase;letter-spacing:.1em;margin-bottom:6px;">Paso 1</div>
+        <h4 style="font-size:16px;font-weight:900;color:#1e293b;margin-bottom:8px;">Contáctanos</h4>
+        <p style="font-size:13px;color:#64748b;line-height:1.6;">Escríbenos por WhatsApp o visítanos. Te respondemos de inmediato.</p>
+      </div>
+      <!-- Step 2 -->
+      <div class="obs-fade" style="text-align:center;position:relative;z-index:1;">
+        <div style="width:60px;height:60px;background:linear-gradient(135deg,#2196F3,#64B5F6);border-radius:50%;display:flex;align-items:center;justify-content:center;margin:0 auto 18px;box-shadow:0 8px 24px rgba(33,150,243,.35);">
+          <i class="bi bi-building" style="font-size:24px;color:white;"></i>
+        </div>
+        <div style="font-size:11px;font-weight:900;color:#2196F3;text-transform:uppercase;letter-spacing:.1em;margin-bottom:6px;">Paso 2</div>
+        <h4 style="font-size:16px;font-weight:900;color:#1e293b;margin-bottom:8px;">Visita las instalaciones</h4>
+        <p style="font-size:13px;color:#64748b;line-height:1.6;">Agenda un tour y conoce nuestros espacios, maestras y metodología.</p>
+      </div>
+      <!-- Step 3 -->
+      <div class="obs-fade" style="text-align:center;position:relative;z-index:1;">
+        <div style="width:60px;height:60px;background:linear-gradient(135deg,#E91E63,#F48FB1);border-radius:50%;display:flex;align-items:center;justify-content:center;margin:0 auto 18px;box-shadow:0 8px 24px rgba(233,30,99,.35);">
+          <i class="bi bi-file-earmark-check-fill" style="font-size:24px;color:white;"></i>
+        </div>
+        <div style="font-size:11px;font-weight:900;color:#E91E63;text-transform:uppercase;letter-spacing:.1em;margin-bottom:6px;">Paso 3</div>
+        <h4 style="font-size:16px;font-weight:900;color:#1e293b;margin-bottom:8px;">Completa la inscripción</h4>
+        <p style="font-size:13px;color:#64748b;line-height:1.6;">Llena el formulario y realiza el pago de inscripción de forma segura.</p>
+      </div>
+      <!-- Step 4 -->
+      <div class="obs-fade" style="text-align:center;position:relative;z-index:1;">
+        <div style="width:60px;height:60px;background:linear-gradient(135deg,#4CAF50,#81C784);border-radius:50%;display:flex;align-items:center;justify-content:center;margin:0 auto 18px;box-shadow:0 8px 24px rgba(76,175,80,.35);">
+          <i class="bi bi-emoji-smile-fill" style="font-size:24px;color:white;"></i>
+        </div>
+        <div style="font-size:11px;font-weight:900;color:#4CAF50;text-transform:uppercase;letter-spacing:.1em;margin-bottom:6px;">Paso 4</div>
+        <h4 style="font-size:16px;font-weight:900;color:#1e293b;margin-bottom:8px;">¡Bienvenido a la familia!</h4>
+        <p style="font-size:13px;color:#64748b;line-height:1.6;">Tu hijo comienza su aventura y tú accedes a la app de padres.</p>
+      </div>
+    </div>
+    <div style="text-align:center;margin-top:44px;">
+      <a href="https://wa.me/18298038424?text=¡Hola!%20Quiero%20inscribir%20a%20mi%20hijo%20en%20Karpus%20Kids" target="_blank"
+        style="display:inline-flex;align-items:center;gap:8px;background:linear-gradient(135deg,#25D366,#128C7E);color:white;font-weight:900;font-size:14px;padding:15px 32px;border-radius:14px;box-shadow:0 8px 24px rgba(37,211,102,.4);transition:transform .2s;"
+        onmouseover="this.style.transform='translateY(-2px)'" onmouseout="this.style.transform=''">
+        <i class="bi bi-whatsapp" style="font-size:18px;"></i> Iniciar inscripción ahora
+      </a>
+    </div>
+  </div>
+</section>
 
-    // Lightbox: comportamiento para galerías de imágenes
-    (function(){
-      const thumbs = Array.from(document.querySelectorAll('.lightbox-thumb'));
-      if(!thumbs.length) return;
+<!-- ════════════════════════════════════════════════════════════
+     SOBRE NOSOTROS
+════════════════════════════════════════════════════════════ -->
+<section id="nosotros" style="padding:88px 24px;background:#fff;">
+  <div style="max-width:1280px;margin:0 auto;" class="two-col">
 
-      const lb = document.getElementById('lightbox');
-      const lbImage = document.getElementById('lbImage');
-      const lbCaption = document.getElementById('lbCaption');
-      const lbClose = document.getElementById('lbClose');
-      const lbPrev = document.getElementById('lbPrev');
-      const lbNext = document.getElementById('lbNext');
+    <!-- Image block -->
+    <div style="position:relative;" class="obs-fade">
+      <div style="border-radius:28px;overflow:hidden;box-shadow:0 24px 64px rgba(0,0,0,.14);aspect-ratio:4/3;">
+        <img src="img/WhatsApp Image 2026-02-13 at 1.35.33 AM.jpeg" alt="Karpus Kids instalaciones" loading="lazy" style="width:100%;height:100%;object-fit:cover;">
+      </div>
+      <!-- Floating badge -->
+      <div style="position:absolute;bottom:-20px;right:-16px;background:#fff;border-radius:20px;padding:16px 20px;box-shadow:0 12px 32px rgba(0,0,0,.12);border:2px solid #f1f5f9;min-width:155px;">
+        <div style="font-size:1.8rem;font-weight:900;color:#FF9800;line-height:1;">120+</div>
+        <div style="font-size:11px;font-weight:800;color:#94a3b8;text-transform:uppercase;letter-spacing:.08em;margin-top:2px;">Familias felices</div>
+      </div>
+      <!-- Deco ring -->
+      <div style="position:absolute;top:-16px;left:-16px;width:64px;height:64px;border-radius:50%;border:4px dashed #FF9800;opacity:.35;"></div>
+      <!-- Second image overlay -->
+      <div style="position:absolute;bottom:24px;left:-24px;width:130px;height:130px;border-radius:18px;overflow:hidden;border:4px solid white;box-shadow:0 8px 24px rgba(0,0,0,.15);" class="hide-mobile">
+        <img src="/img/1.jpg" alt="Karpus Kids" loading="lazy" style="width:100%;height:100%;object-fit:cover;">
+      </div>
+    </div>
 
-      let index = 0;
+    <!-- Text block -->
+    <div class="obs-fade">
+      <span class="sec-label" style="background:#fff7ed;color:#FF9800;">Nuestra historia</span>
+      <h2 style="font-size:clamp(1.9rem,3.5vw,2.8rem);font-weight:900;color:#1e293b;margin-bottom:18px;">Confianza familiar por más de 5 años</h2>
+      <p style="color:#64748b;font-size:15px;line-height:1.78;margin-bottom:16px;">
+        Desde nuestra fundación, <strong class="kk"><span class="k1">K</span><span class="k2">a</span><span class="k3">r</span><span class="k4">p</span><span class="k5">u</span><span class="k6">s</span> <span class="k7">K</span><span class="k8">i</span><span class="k9">d</span><span class="k10">s</span></strong> ha sido un socio de confianza para las familias de Santo Domingo. Nuestra fundadora, Karonlyn García, creó este espacio con una misión clara: cuidado y educación de alta calidad para cada niño, cada familia, cada día.
+      </p>
+      <p style="color:#64748b;font-size:15px;line-height:1.78;margin-bottom:28px;">
+        Contamos con personal certificado, instalaciones modernas y una app exclusiva que mantiene a los padres conectados en todo momento.
+      </p>
 
-      function openAt(i){
-        index = (i + thumbs.length) % thumbs.length;
-        const img = thumbs[index];
-        lbImage.src = img.src;
-        lbImage.alt = img.alt || '';
-        lbCaption.textContent = img.dataset.caption || img.alt || '';
-        lb.classList.remove('hidden');
-        document.body.style.overflow = 'hidden';
-        lbClose.focus();
+      <!-- Mini stats -->
+      <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin-bottom:32px;">
+        <div style="text-align:center;padding:18px 10px;background:#f8fafc;border-radius:18px;border:1px solid #f1f5f9;">
+          <div style="font-size:1.7rem;font-weight:900;color:#FF9800;">120+</div>
+          <div style="font-size:10px;color:#94a3b8;font-weight:800;text-transform:uppercase;letter-spacing:.06em;margin-top:3px;">Familias</div>
+        </div>
+        <div style="text-align:center;padding:18px 10px;background:#f8fafc;border-radius:18px;border:1px solid #f1f5f9;">
+          <div style="font-size:1.7rem;font-weight:900;color:#E91E63;">100%</div>
+          <div style="font-size:10px;color:#94a3b8;font-weight:800;text-transform:uppercase;letter-spacing:.06em;margin-top:3px;">Satisfacción</div>
+        </div>
+        <div style="text-align:center;padding:18px 10px;background:#f8fafc;border-radius:18px;border:1px solid #f1f5f9;">
+          <div style="font-size:1.7rem;font-weight:900;color:#4CAF50;">5★</div>
+          <div style="font-size:10px;color:#94a3b8;font-weight:800;text-transform:uppercase;letter-spacing:.06em;margin-top:3px;">Calificación</div>
+        </div>
+      </div>
+
+      <a href="https://wa.me/18298038424?text=¡Hola!%20Quiero%20agendar%20una%20visita%20a%20Karpus%20Kids" target="_blank"
+        style="display:inline-flex;align-items:center;gap:8px;background:linear-gradient(135deg,#25D366,#128C7E);color:white;font-weight:900;font-size:14px;padding:14px 28px;border-radius:14px;box-shadow:0 6px 20px rgba(37,211,102,.35);transition:transform .2s;"
+        onmouseover="this.style.transform='translateY(-2px)'" onmouseout="this.style.transform=''">
+        <i class="bi bi-whatsapp" style="font-size:18px;"></i> Agendar una visita
+      </a>
+    </div>
+  </div>
+</section>
+
+<!-- ════════════════════════════════════════════════════════════
+     APP SHOWCASE
+════════════════════════════════════════════════════════════ -->
+<section id="app" style="padding:88px 24px;background:linear-gradient(135deg,#0a0f1e 0%,#1e293b 100%);position:relative;overflow:hidden;">
+  <!-- Blobs -->
+  <div class="blob" style="width:500px;height:500px;background:radial-gradient(circle,rgba(255,152,0,.12),transparent 70%);top:-150px;right:-100px;"></div>
+  <div class="blob" style="width:400px;height:400px;background:radial-gradient(circle,rgba(76,175,80,.1),transparent 70%);bottom:-100px;left:-80px;"></div>
+
+  <div style="max-width:1280px;margin:0 auto;" class="two-col">
+
+    <!-- Phone mockup -->
+    <div style="display:flex;justify-content:center;align-items:center;" class="obs-fade">
+      <div style="position:relative;width:260px;">
+        <!-- Phone frame -->
+        <div style="background:linear-gradient(145deg,#1e293b,#0f172a);border-radius:40px;padding:12px;box-shadow:0 40px 80px rgba(0,0,0,.6),0 0 0 1px rgba(255,255,255,.08);position:relative;">
+          <!-- Notch -->
+          <div style="width:80px;height:22px;background:#0a0f1e;border-radius:0 0 14px 14px;margin:0 auto 8px;"></div>
+          <!-- Screen content -->
+          <div style="background:#f8fafc;border-radius:28px;overflow:hidden;aspect-ratio:9/16;display:flex;flex-direction:column;">
+            <!-- App header -->
+            <div style="background:linear-gradient(135deg,#FF9800,#E91E63);padding:16px;color:white;">
+              <div style="font-size:10px;font-weight:900;text-transform:uppercase;letter-spacing:.1em;opacity:.8;margin-bottom:4px;">Karpus Kids</div>
+              <div style="font-size:14px;font-weight:900;">¡Hola, Mamá! 👋</div>
+            </div>
+            <!-- App body -->
+            <div style="padding:12px;flex:1;display:flex;flex-direction:column;gap:8px;">
+              <!-- Attendance card -->
+              <div style="background:#f0fdf4;border-radius:12px;padding:10px;border-left:3px solid #4CAF50;">
+                <div style="font-size:9px;font-weight:900;color:#166534;text-transform:uppercase;letter-spacing:.08em;">✅ Entrada registrada</div>
+                <div style="font-size:11px;font-weight:800;color:#1e293b;margin-top:2px;">Sofía llegó a las 8:02 AM</div>
+              </div>
+              <!-- Photo card -->
+              <div style="background:#fff;border-radius:12px;overflow:hidden;box-shadow:0 2px 8px rgba(0,0,0,.06);">
+                <img src="img/4.jpg" alt="Actividad" style="width:100%;height:70px;object-fit:cover;">
+                <div style="padding:8px;">
+                  <div style="font-size:10px;font-weight:800;color:#1e293b;">📸 Nueva foto del aula</div>
+                  <div style="font-size:9px;color:#94a3b8;margin-top:1px;">Hace 10 minutos</div>
+                </div>
+              </div>
+              <!-- Payment card -->
+              <div style="background:#eff6ff;border-radius:12px;padding:10px;border-left:3px solid #2196F3;">
+                <div style="font-size:9px;font-weight:900;color:#1d4ed8;text-transform:uppercase;letter-spacing:.08em;">💳 Pago confirmado</div>
+                <div style="font-size:11px;font-weight:800;color:#1e293b;margin-top:2px;">Mensualidad Abril · RD$4,500</div>
+              </div>
+              <!-- Message -->
+              <div style="background:#fdf2f8;border-radius:12px;padding:10px;border-left:3px solid #E91E63;">
+                <div style="font-size:9px;font-weight:900;color:#9d174d;text-transform:uppercase;letter-spacing:.08em;">💬 Mensaje de maestra</div>
+                <div style="font-size:10px;color:#475569;margin-top:2px;line-height:1.4;">"Sofía participó muy bien hoy..."</div>
+              </div>
+            </div>
+          </div>
+          <!-- Home bar -->
+          <div style="width:80px;height:4px;background:rgba(255,255,255,.2);border-radius:2px;margin:10px auto 0;"></div>
+        </div>
+        <!-- Floating notification -->
+        <div style="position:absolute;top:-16px;right:-20px;background:#fff;border-radius:14px;padding:10px 14px;box-shadow:0 8px 24px rgba(0,0,0,.2);min-width:160px;animation:float 4s ease-in-out infinite;">
+          <div style="font-size:9px;font-weight:900;color:#166534;text-transform:uppercase;letter-spacing:.08em;">Notificación</div>
+          <div style="font-size:11px;font-weight:800;color:#1e293b;margin-top:2px;">Sofía llegó a la estancia ✅</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Text -->
+    <div class="obs-fade">
+      <span class="sec-label" style="background:rgba(255,152,0,.15);color:#FF9800;">App exclusiva para padres</span>
+      <h2 style="font-size:clamp(1.9rem,3.5vw,2.8rem);font-weight:900;color:#fff;margin-bottom:18px;">Todo sobre tu hijo en la palma de tu mano</h2>
+      <p style="color:rgba(255,255,255,.65);font-size:15px;line-height:1.78;margin-bottom:32px;">
+        Nuestra app te mantiene conectado con la estancia en tiempo real. Recibe notificaciones de entrada y salida, ve fotos del día, revisa calificaciones y comunícate directamente con las maestras.
+      </p>
+
+      <div style="display:flex;flex-direction:column;gap:16px;margin-bottom:36px;">
+        <div style="display:flex;align-items:center;gap:14px;">
+          <div style="width:44px;height:44px;background:rgba(255,152,0,.15);border-radius:14px;display:flex;align-items:center;justify-content:center;flex-shrink:0;">
+            <i class="bi bi-bell-fill" style="color:#FF9800;font-size:18px;"></i>
+          </div>
+          <div>
+            <div style="font-size:14px;font-weight:900;color:#fff;">Notificaciones en tiempo real</div>
+            <div style="font-size:13px;color:rgba(255,255,255,.5);">Entrada, salida, mensajes y más al instante.</div>
+          </div>
+        </div>
+        <div style="display:flex;align-items:center;gap:14px;">
+          <div style="width:44px;height:44px;background:rgba(76,175,80,.15);border-radius:14px;display:flex;align-items:center;justify-content:center;flex-shrink:0;">
+            <i class="bi bi-camera-fill" style="color:#4CAF50;font-size:18px;"></i>
+          </div>
+          <div>
+            <div style="font-size:14px;font-weight:900;color:#fff;">Fotos y videos del día</div>
+            <div style="font-size:13px;color:rgba(255,255,255,.5);">Las maestras comparten momentos especiales.</div>
+          </div>
+        </div>
+        <div style="display:flex;align-items:center;gap:14px;">
+          <div style="width:44px;height:44px;background:rgba(33,150,243,.15);border-radius:14px;display:flex;align-items:center;justify-content:center;flex-shrink:0;">
+            <i class="bi bi-credit-card-fill" style="color:#2196F3;font-size:18px;"></i>
+          </div>
+          <div>
+            <div style="font-size:14px;font-weight:900;color:#fff;">Pagos y estados de cuenta</div>
+            <div style="font-size:13px;color:rgba(255,255,255,.5);">Sube comprobantes y revisa tu historial.</div>
+          </div>
+        </div>
+        <div style="display:flex;align-items:center;gap:14px;">
+          <div style="width:44px;height:44px;background:rgba(233,30,99,.15);border-radius:14px;display:flex;align-items:center;justify-content:center;flex-shrink:0;">
+            <i class="bi bi-chat-dots-fill" style="color:#E91E63;font-size:18px;"></i>
+          </div>
+          <div>
+            <div style="font-size:14px;font-weight:900;color:#fff;">Chat directo con maestras</div>
+            <div style="font-size:13px;color:rgba(255,255,255,.5);">Comunicación privada y segura.</div>
+          </div>
+        </div>
+      </div>
+
+      <a href="login.html"
+        style="display:inline-flex;align-items:center;gap:8px;background:linear-gradient(135deg,#FF9800,#E91E63);color:white;font-weight:900;font-size:14px;padding:14px 28px;border-radius:14px;box-shadow:0 8px 24px rgba(255,152,0,.4);transition:transform .2s;"
+        onmouseover="this.style.transform='translateY(-2px)'" onmouseout="this.style.transform=''">
+        <i class="bi bi-box-arrow-in-right"></i> Acceder al panel de padres
+      </a>
+    </div>
+  </div>
+</section>
+
+<!-- ════════════════════════════════════════════════════════════
+     GALERÍA — film strip
+════════════════════════════════════════════════════════════ -->
+<section id="galeria" style="padding:88px 0;background:#fff;overflow:hidden;">
+  <div style="max-width:1280px;margin:0 auto 36px;padding:0 24px;text-align:center;">
+    <span class="sec-label" style="background:#fdf2f8;color:#E91E63;">Momentos especiales</span>
+    <h2 style="font-size:clamp(1.9rem,3.5vw,2.8rem);font-weight:900;color:#1e293b;margin:0 0 10px;">Galería de Fotos</h2>
+    <p style="color:#64748b;font-size:15px;">Cada día está lleno de sonrisas, aprendizaje y aventuras.</p>
+  </div>
+  <!-- Row 1 — left to right -->
+  <div style="overflow:hidden;padding:4px 0;margin-bottom:14px;">
+    <div class="film-strip">
+      <img src="img/2.jpg"  loading="lazy" alt="Karpus Kids" onclick="openLb(this.src)">
+      <img src="img/3.jpg"  loading="lazy" alt="Karpus Kids" onclick="openLb(this.src)">
+      <img src="img/4.jpg"  loading="lazy" alt="Karpus Kids" onclick="openLb(this.src)">
+      <img src="img/5.jpg"  loading="lazy" alt="Karpus Kids" onclick="openLb(this.src)">
+      <img src="img/6.jpg"  loading="lazy" alt="Karpus Kids" onclick="openLb(this.src)">
+      <img src="img/7.jpg"  loading="lazy" alt="Karpus Kids" onclick="openLb(this.src)">
+      <img src="img/8.jpg"  loading="lazy" alt="Karpus Kids" onclick="openLb(this.src)">
+      <img src="img/9.jpg"  loading="lazy" alt="Karpus Kids" onclick="openLb(this.src)">
+      <img src="img/10.jpg" loading="lazy" alt="Karpus Kids" onclick="openLb(this.src)">
+      <img src="img/11.jpg" loading="lazy" alt="Karpus Kids" onclick="openLb(this.src)">
+      <img src="img/12.jpg" loading="lazy" alt="Karpus Kids" onclick="openLb(this.src)">
+      <!-- duplicate for seamless loop -->
+      <img src="img/2.jpg"  loading="lazy" alt="Karpus Kids">
+      <img src="img/3.jpg"  loading="lazy" alt="Karpus Kids">
+      <img src="img/4.jpg"  loading="lazy" alt="Karpus Kids">
+      <img src="img/5.jpg"  loading="lazy" alt="Karpus Kids">
+      <img src="img/6.jpg"  loading="lazy" alt="Karpus Kids">
+      <img src="img/7.jpg"  loading="lazy" alt="Karpus Kids">
+      <img src="img/8.jpg"  loading="lazy" alt="Karpus Kids">
+      <img src="img/9.jpg"  loading="lazy" alt="Karpus Kids">
+      <img src="img/10.jpg" loading="lazy" alt="Karpus Kids">
+      <img src="img/11.jpg" loading="lazy" alt="Karpus Kids">
+      <img src="img/12.jpg" loading="lazy" alt="Karpus Kids">
+    </div>
+  </div>
+  <!-- Row 2 — right to left (reverse) -->
+  <div style="overflow:hidden;padding:4px 0;">
+    <div style="display:flex;width:max-content;animation:scrollLeft 50s linear infinite reverse;gap:14px;">
+      <img src="img/1.jpg"  loading="lazy" alt="Karpus Kids" style="height:180px;width:auto;object-fit:cover;flex-shrink:0;border-radius:16px;cursor:pointer;" onclick="openLb(this.src)">
+      <img src="img/5.jpg"  loading="lazy" alt="Karpus Kids" style="height:180px;width:auto;object-fit:cover;flex-shrink:0;border-radius:16px;cursor:pointer;" onclick="openLb(this.src)">
+      <img src="img/8.jpg"  loading="lazy" alt="Karpus Kids" style="height:180px;width:auto;object-fit:cover;flex-shrink:0;border-radius:16px;cursor:pointer;" onclick="openLb(this.src)">
+      <img src="img/11.jpg" loading="lazy" alt="Karpus Kids" style="height:180px;width:auto;object-fit:cover;flex-shrink:0;border-radius:16px;cursor:pointer;" onclick="openLb(this.src)">
+      <img src="img/3.jpg"  loading="lazy" alt="Karpus Kids" style="height:180px;width:auto;object-fit:cover;flex-shrink:0;border-radius:16px;cursor:pointer;" onclick="openLb(this.src)">
+      <img src="img/6.jpg"  loading="lazy" alt="Karpus Kids" style="height:180px;width:auto;object-fit:cover;flex-shrink:0;border-radius:16px;cursor:pointer;" onclick="openLb(this.src)">
+      <img src="img/9.jpg"  loading="lazy" alt="Karpus Kids" style="height:180px;width:auto;object-fit:cover;flex-shrink:0;border-radius:16px;cursor:pointer;" onclick="openLb(this.src)">
+      <img src="img/12.jpg" loading="lazy" alt="Karpus Kids" style="height:180px;width:auto;object-fit:cover;flex-shrink:0;border-radius:16px;cursor:pointer;" onclick="openLb(this.src)">
+      <img src="img/2.jpg"  loading="lazy" alt="Karpus Kids" style="height:180px;width:auto;object-fit:cover;flex-shrink:0;border-radius:16px;cursor:pointer;" onclick="openLb(this.src)">
+      <!-- duplicate -->
+      <img src="img/1.jpg"  loading="lazy" alt="Karpus Kids" style="height:180px;width:auto;object-fit:cover;flex-shrink:0;border-radius:16px;">
+      <img src="img/5.jpg"  loading="lazy" alt="Karpus Kids" style="height:180px;width:auto;object-fit:cover;flex-shrink:0;border-radius:16px;">
+      <img src="img/8.jpg"  loading="lazy" alt="Karpus Kids" style="height:180px;width:auto;object-fit:cover;flex-shrink:0;border-radius:16px;">
+      <img src="img/11.jpg" loading="lazy" alt="Karpus Kids" style="height:180px;width:auto;object-fit:cover;flex-shrink:0;border-radius:16px;">
+      <img src="img/3.jpg"  loading="lazy" alt="Karpus Kids" style="height:180px;width:auto;object-fit:cover;flex-shrink:0;border-radius:16px;">
+      <img src="img/6.jpg"  loading="lazy" alt="Karpus Kids" style="height:180px;width:auto;object-fit:cover;flex-shrink:0;border-radius:16px;">
+      <img src="img/9.jpg"  loading="lazy" alt="Karpus Kids" style="height:180px;width:auto;object-fit:cover;flex-shrink:0;border-radius:16px;">
+      <img src="img/12.jpg" loading="lazy" alt="Karpus Kids" style="height:180px;width:auto;object-fit:cover;flex-shrink:0;border-radius:16px;">
+      <img src="img/2.jpg"  loading="lazy" alt="Karpus Kids" style="height:180px;width:auto;object-fit:cover;flex-shrink:0;border-radius:16px;">
+    </div>
+  </div>
+</section>
+
+<!-- ════════════════════════════════════════════════════════════
+     TESTIMONIOS
+════════════════════════════════════════════════════════════ -->
+<section style="padding:88px 0;background:#f8fafc;overflow:hidden;">
+  <div style="max-width:1280px;margin:0 auto 44px;padding:0 24px;text-align:center;">
+    <span class="sec-label" style="background:#eff6ff;color:#2196F3;">Lo que dicen las familias</span>
+    <h2 style="font-size:clamp(1.9rem,3.5vw,2.8rem);font-weight:900;color:#1e293b;margin:0 0 10px;">Familias que confían en nosotros</h2>
+    <p style="color:#64748b;font-size:15px;">Escucha directamente de quienes viven la experiencia Karpus Kids.</p>
+  </div>
+  <div style="overflow:hidden;padding:4px 0;">
+    <div class="testi-strip">
+      <div class="testi-card" style="border-top:4px solid #4CAF50;">
+        <div style="font-size:18px;margin-bottom:12px;">⭐⭐⭐⭐⭐</div>
+        <p style="color:#475569;font-size:14px;line-height:1.72;margin-bottom:18px;">"Sentimos que todos aquí son parte de nuestra familia extendida. El cuidado y la atención que le dan a mi hija es incomparable."</p>
+        <div style="display:flex;align-items:center;gap:10px;">
+          <div style="width:38px;height:38px;background:linear-gradient(135deg,#4CAF50,#81C784);border-radius:50%;display:flex;align-items:center;justify-content:center;color:white;font-weight:900;font-size:15px;flex-shrink:0;">M</div>
+          <div><p style="font-weight:900;color:#1e293b;font-size:13px;margin:0;">María González</p><p style="font-size:11px;color:#94a3b8;margin:0;">Mamá de Sofía, 3 años</p></div>
+        </div>
+      </div>
+      <div class="testi-card" style="border-top:4px solid #FF9800;">
+        <div style="font-size:18px;margin-bottom:12px;">⭐⭐⭐⭐⭐</div>
+        <p style="color:#475569;font-size:14px;line-height:1.72;margin-bottom:18px;">"Los maestros y el personal realmente se preocupan por el éxito de cada niño. Mi hijo ha crecido muchísimo desde que llegó."</p>
+        <div style="display:flex;align-items:center;gap:10px;">
+          <div style="width:38px;height:38px;background:linear-gradient(135deg,#FF9800,#FFB74D);border-radius:50%;display:flex;align-items:center;justify-content:center;color:white;font-weight:900;font-size:15px;flex-shrink:0;">C</div>
+          <div><p style="font-weight:900;color:#1e293b;font-size:13px;margin:0;">Carlos Rodríguez</p><p style="font-size:11px;color:#94a3b8;margin:0;">Papá de Mateo, 4 años</p></div>
+        </div>
+      </div>
+      <div class="testi-card" style="border-top:4px solid #E91E63;">
+        <div style="font-size:18px;margin-bottom:12px;">⭐⭐⭐⭐⭐</div>
+        <p style="color:#475569;font-size:14px;line-height:1.72;margin-bottom:18px;">"La app para padres es increíble. Puedo ver fotos de mi hija durante el día y recibir reportes en tiempo real. ¡Me da mucha tranquilidad!"</p>
+        <div style="display:flex;align-items:center;gap:10px;">
+          <div style="width:38px;height:38px;background:linear-gradient(135deg,#E91E63,#F48FB1);border-radius:50%;display:flex;align-items:center;justify-content:center;color:white;font-weight:900;font-size:15px;flex-shrink:0;">A</div>
+          <div><p style="font-weight:900;color:#1e293b;font-size:13px;margin:0;">Ana Martínez</p><p style="font-size:11px;color:#94a3b8;margin:0;">Mamá de Valentina, 2 años</p></div>
+        </div>
+      </div>
+      <div class="testi-card" style="border-top:4px solid #2196F3;">
+        <div style="font-size:18px;margin-bottom:12px;">⭐⭐⭐⭐⭐</div>
+        <p style="color:#475569;font-size:14px;line-height:1.72;margin-bottom:18px;">"Es notable cuánto crecimiento académico he visto en mi hijo en solo unos meses. El equipo es excepcional y muy profesional."</p>
+        <div style="display:flex;align-items:center;gap:10px;">
+          <div style="width:38px;height:38px;background:linear-gradient(135deg,#2196F3,#64B5F6);border-radius:50%;display:flex;align-items:center;justify-content:center;color:white;font-weight:900;font-size:15px;flex-shrink:0;">P</div>
+          <div><p style="font-weight:900;color:#1e293b;font-size:13px;margin:0;">Pedro Sánchez</p><p style="font-size:11px;color:#94a3b8;margin:0;">Papá de Lucas, 5 años</p></div>
+        </div>
+      </div>
+      <div class="testi-card" style="border-top:4px solid #9C27B0;">
+        <div style="font-size:18px;margin-bottom:12px;">⭐⭐⭐⭐⭐</div>
+        <p style="color:#475569;font-size:14px;line-height:1.72;margin-bottom:18px;">"El personal es maravilloso y muy cariñoso. Es genial ver a mi hijo emocionado por ir a la estancia cada mañana."</p>
+        <div style="display:flex;align-items:center;gap:10px;">
+          <div style="width:38px;height:38px;background:linear-gradient(135deg,#9C27B0,#CE93D8);border-radius:50%;display:flex;align-items:center;justify-content:center;color:white;font-weight:900;font-size:15px;flex-shrink:0;">L</div>
+          <div><p style="font-weight:900;color:#1e293b;font-size:13px;margin:0;">Laura Pérez</p><p style="font-size:11px;color:#94a3b8;margin:0;">Mamá de Diego, 3 años</p></div>
+        </div>
+      </div>
+      <!-- duplicates for seamless loop -->
+      <div class="testi-card" style="border-top:4px solid #4CAF50;"><div style="font-size:18px;margin-bottom:12px;">⭐⭐⭐⭐⭐</div><p style="color:#475569;font-size:14px;line-height:1.72;margin-bottom:18px;">"Sentimos que todos aquí son parte de nuestra familia extendida."</p><div style="display:flex;align-items:center;gap:10px;"><div style="width:38px;height:38px;background:linear-gradient(135deg,#4CAF50,#81C784);border-radius:50%;display:flex;align-items:center;justify-content:center;color:white;font-weight:900;font-size:15px;flex-shrink:0;">M</div><div><p style="font-weight:900;color:#1e293b;font-size:13px;margin:0;">María González</p><p style="font-size:11px;color:#94a3b8;margin:0;">Mamá de Sofía, 3 años</p></div></div></div>
+      <div class="testi-card" style="border-top:4px solid #FF9800;"><div style="font-size:18px;margin-bottom:12px;">⭐⭐⭐⭐⭐</div><p style="color:#475569;font-size:14px;line-height:1.72;margin-bottom:18px;">"Los maestros y el personal realmente se preocupan por el éxito de cada niño."</p><div style="display:flex;align-items:center;gap:10px;"><div style="width:38px;height:38px;background:linear-gradient(135deg,#FF9800,#FFB74D);border-radius:50%;display:flex;align-items:center;justify-content:center;color:white;font-weight:900;font-size:15px;flex-shrink:0;">C</div><div><p style="font-weight:900;color:#1e293b;font-size:13px;margin:0;">Carlos Rodríguez</p><p style="font-size:11px;color:#94a3b8;margin:0;">Papá de Mateo, 4 años</p></div></div></div>
+    </div>
+  </div>
+</section>
+
+<!-- ════════════════════════════════════════════════════════════
+     CTA DARK — 2 cards
+════════════════════════════════════════════════════════════ -->
+<section class="cta-dark" style="padding:88px 24px;">
+  <div class="blob" style="width:600px;height:600px;background:radial-gradient(circle,rgba(255,152,0,.1),transparent 70%);top:-200px;right:-100px;"></div>
+  <div class="blob" style="width:400px;height:400px;background:radial-gradient(circle,rgba(76,175,80,.08),transparent 70%);bottom:-100px;left:-60px;"></div>
+  <div style="max-width:1280px;margin:0 auto;position:relative;z-index:1;" class="two-col-cta">
+    <!-- App card -->
+    <div class="obs-fade" style="background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.1);border-radius:28px;padding:40px;backdrop-filter:blur(8px);">
+      <div style="width:56px;height:56px;background:linear-gradient(135deg,#FF9800,#E91E63);border-radius:18px;display:flex;align-items:center;justify-content:center;margin-bottom:20px;box-shadow:0 8px 24px rgba(255,152,0,.35);">
+        <i class="bi bi-phone-fill" style="font-size:26px;color:white;"></i>
+      </div>
+      <h3 style="font-size:1.6rem;font-weight:900;color:#fff;margin-bottom:12px;">App para Padres</h3>
+      <p style="color:rgba(255,255,255,.58);font-size:14px;line-height:1.72;margin-bottom:26px;">Accede al panel de tu hijo, ve fotos, reportes de asistencia, calificaciones y comunícate con las maestras — todo en un solo lugar.</p>
+      <a href="login.html"
+        style="display:inline-flex;align-items:center;gap:8px;background:linear-gradient(135deg,#FF9800,#E91E63);color:white;font-weight:900;font-size:13px;padding:13px 26px;border-radius:12px;box-shadow:0 6px 20px rgba(255,152,0,.4);transition:transform .2s;"
+        onmouseover="this.style.transform='translateY(-2px)'" onmouseout="this.style.transform=''">
+        <i class="bi bi-box-arrow-in-right"></i> Acceder al Panel
+      </a>
+    </div>
+    <!-- Visit card -->
+    <div class="obs-fade" style="background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.1);border-radius:28px;padding:40px;backdrop-filter:blur(8px);">
+      <div style="width:56px;height:56px;background:linear-gradient(135deg,#25D366,#128C7E);border-radius:18px;display:flex;align-items:center;justify-content:center;margin-bottom:20px;box-shadow:0 8px 24px rgba(37,211,102,.35);">
+        <i class="bi bi-calendar-check-fill" style="font-size:26px;color:white;"></i>
+      </div>
+      <h3 style="font-size:1.6rem;font-weight:900;color:#fff;margin-bottom:12px;">Agenda una Visita</h3>
+      <p style="color:rgba(255,255,255,.58);font-size:14px;line-height:1.72;margin-bottom:26px;">¿Listo para conocernos? Nuestro equipo está disponible para mostrarte las instalaciones y responder todas tus preguntas.</p>
+      <a href="https://wa.me/18298038424?text=¡Hola!%20Quiero%20agendar%20una%20visita%20a%20Karpus%20Kids" target="_blank"
+        style="display:inline-flex;align-items:center;gap:8px;background:linear-gradient(135deg,#25D366,#128C7E);color:white;font-weight:900;font-size:13px;padding:13px 26px;border-radius:12px;box-shadow:0 6px 20px rgba(37,211,102,.4);transition:transform .2s;"
+        onmouseover="this.style.transform='translateY(-2px)'" onmouseout="this.style.transform=''">
+        <i class="bi bi-whatsapp"></i> Agendar por WhatsApp
+      </a>
+    </div>
+  </div>
+</section>
+
+<!-- ════════════════════════════════════════════════════════════
+     FOOTER
+════════════════════════════════════════════════════════════ -->
+<footer id="contacto" style="background:#0a0f1e;color:rgba(255,255,255,.65);padding:64px 24px 32px;">
+  <div style="max-width:1280px;margin:0 auto;">
+    <div class="footer-grid" style="margin-bottom:48px;">
+      <!-- Brand -->
+      <div>
+        <div style="display:flex;align-items:center;gap:10px;margin-bottom:16px;">
+          <div style="width:40px;height:40px;border-radius:12px;overflow:hidden;flex-shrink:0;">
+            <img src="img/mundo.jpg" alt="Karpus Kids" style="width:100%;height:100%;object-fit:cover;">
+          </div>
+          <span class="kk" style="font-size:20px;font-weight:900;line-height:1;">
+            <span class="k1">K</span><span class="k2">a</span><span class="k3">r</span><span class="k4">p</span><span class="k5">u</span><span class="k6">s</span>&#32;<span class="k7">K</span><span class="k8">i</span><span class="k9">d</span><span class="k10">s</span>
+          </span>
+        </div>
+        <p style="font-size:14px;line-height:1.72;color:rgba(255,255,255,.45);max-width:280px;margin-bottom:20px;">Estancia infantil de confianza en Santo Domingo. Cuidado experto, educación integral y tecnología para las familias modernas.</p>
+        <div style="display:flex;gap:10px;">
+          <a href="https://wa.me/18298038424" target="_blank" style="width:38px;height:38px;background:rgba(255,255,255,.08);border-radius:10px;display:flex;align-items:center;justify-content:center;color:rgba(255,255,255,.65);font-size:16px;transition:background .2s,color .2s;" onmouseover="this.style.background='#25D366';this.style.color='white'" onmouseout="this.style.background='rgba(255,255,255,.08)';this.style.color='rgba(255,255,255,.65)'"><i class="bi bi-whatsapp"></i></a>
+          <a href="https://instagram.com" target="_blank" style="width:38px;height:38px;background:rgba(255,255,255,.08);border-radius:10px;display:flex;align-items:center;justify-content:center;color:rgba(255,255,255,.65);font-size:16px;transition:background .2s,color .2s;" onmouseover="this.style.background='#E91E63';this.style.color='white'" onmouseout="this.style.background='rgba(255,255,255,.08)';this.style.color='rgba(255,255,255,.65)'"><i class="bi bi-instagram"></i></a>
+          <a href="https://facebook.com" target="_blank" style="width:38px;height:38px;background:rgba(255,255,255,.08);border-radius:10px;display:flex;align-items:center;justify-content:center;color:rgba(255,255,255,.65);font-size:16px;transition:background .2s,color .2s;" onmouseover="this.style.background='#2196F3';this.style.color='white'" onmouseout="this.style.background='rgba(255,255,255,.08)';this.style.color='rgba(255,255,255,.65)'"><i class="bi bi-facebook"></i></a>
+        </div>
+      </div>
+      <!-- Links -->
+      <div>
+        <h4 style="font-size:12px;font-weight:900;color:white;text-transform:uppercase;letter-spacing:.1em;margin-bottom:16px;">Navegación</h4>
+        <ul style="list-style:none;display:flex;flex-direction:column;gap:10px;">
+          <li><a href="#nosotros"  style="color:rgba(255,255,255,.45);font-size:14px;font-weight:600;transition:color .2s;" onmouseover="this.style.color='#FF9800'" onmouseout="this.style.color='rgba(255,255,255,.45)'">Nosotros</a></li>
+          <li><a href="#programas" style="color:rgba(255,255,255,.45);font-size:14px;font-weight:600;transition:color .2s;" onmouseover="this.style.color='#FF9800'" onmouseout="this.style.color='rgba(255,255,255,.45)'">Programas</a></li>
+          <li><a href="#app"       style="color:rgba(255,255,255,.45);font-size:14px;font-weight:600;transition:color .2s;" onmouseover="this.style.color='#FF9800'" onmouseout="this.style.color='rgba(255,255,255,.45)'">App</a></li>
+          <li><a href="#galeria"   style="color:rgba(255,255,255,.45);font-size:14px;font-weight:600;transition:color .2s;" onmouseover="this.style.color='#FF9800'" onmouseout="this.style.color='rgba(255,255,255,.45)'">Galería</a></li>
+          <li><a href="login.html" style="color:rgba(255,255,255,.45);font-size:14px;font-weight:600;transition:color .2s;" onmouseover="this.style.color='#FF9800'" onmouseout="this.style.color='rgba(255,255,255,.45)'">Acceso Padres</a></li>
+          <li><a href="politica-privacidad.html" style="color:rgba(255,255,255,.45);font-size:14px;font-weight:600;transition:color .2s;" onmouseover="this.style.color='#FF9800'" onmouseout="this.style.color='rgba(255,255,255,.45)'">Privacidad</a></li>
+        </ul>
+      </div>
+      <!-- Contact -->
+      <div>
+        <h4 style="font-size:12px;font-weight:900;color:white;text-transform:uppercase;letter-spacing:.1em;margin-bottom:16px;">Contacto</h4>
+        <div style="display:flex;flex-direction:column;gap:14px;">
+          <a href="https://wa.me/18298038424" target="_blank" style="display:flex;align-items:center;gap:10px;color:rgba(255,255,255,.45);font-size:14px;transition:color .2s;" onmouseover="this.style.color='#25D366'" onmouseout="this.style.color='rgba(255,255,255,.45)'">
+            <i class="bi bi-whatsapp" style="font-size:16px;flex-shrink:0;"></i> +1 (829) 803-8424
+          </a>
+          <div style="display:flex;align-items:flex-start;gap:10px;color:rgba(255,255,255,.45);font-size:14px;">
+            <i class="bi bi-geo-alt-fill" style="font-size:16px;flex-shrink:0;margin-top:2px;"></i> Santo Domingo, República Dominicana
+          </div>
+          <div style="display:flex;align-items:center;gap:10px;color:rgba(255,255,255,.45);font-size:14px;">
+            <i class="bi bi-clock-fill" style="font-size:16px;flex-shrink:0;"></i> Lun–Vie: 7:00 AM – 6:00 PM
+          </div>
+        </div>
+      </div>
+    </div>
+    <div style="border-top:1px solid rgba(255,255,255,.07);padding-top:24px;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:12px;">
+      <p style="font-size:12px;color:rgba(255,255,255,.28);">© 2026 Karpus Kids. Todos los derechos reservados.</p>
+      <p style="font-size:12px;color:rgba(255,255,255,.28);">Hecho con ❤️ en Santo Domingo</p>
+    </div>
+  </div>
+</footer>
+
+<!-- ── FABs ── -->
+<a href="https://wa.me/18298038424" target="_blank" class="fab fab-ws" title="WhatsApp"><i class="bi bi-whatsapp"></i></a>
+<a href="https://instagram.com"     target="_blank" class="fab fab-ig" title="Instagram"><i class="bi bi-instagram"></i></a>
+
+<!-- ── LIGHTBOX ── -->
+<div id="lb" onclick="closeLb()">
+  <button id="lb-close" onclick="closeLb()">✕</button>
+  <img id="lb-img" src="" alt="Karpus Kids" onclick="event.stopPropagation()">
+</div>
+
+<script>
+  // ── Navbar scroll ─────────────────────────────────────────────────────────
+  const hdr = document.getElementById('siteHeader');
+  window.addEventListener('scroll', () => hdr.classList.toggle('scrolled', scrollY > 40), { passive: true });
+
+  // ── Mobile menu ───────────────────────────────────────────────────────────
+  const mobBtn  = document.getElementById('mobBtn');
+  const mobMenu = document.getElementById('mobMenu');
+  const mobIcon = document.getElementById('mobIcon');
+  mobBtn.addEventListener('click', () => {
+    const open = mobMenu.style.display === 'block';
+    mobMenu.style.display = open ? 'none' : 'block';
+    mobIcon.className = open ? 'bi bi-list' : 'bi bi-x-lg';
+  });
+  mobMenu.querySelectorAll('a').forEach(a => a.addEventListener('click', () => {
+    mobMenu.style.display = 'none';
+    mobIcon.className = 'bi bi-list';
+  }));
+
+  // ── Lightbox ──────────────────────────────────────────────────────────────
+  function openLb(src) {
+    document.getElementById('lb-img').src = src;
+    document.getElementById('lb').classList.add('open');
+    document.body.style.overflow = 'hidden';
+  }
+  function closeLb() {
+    document.getElementById('lb').classList.remove('open');
+    document.body.style.overflow = '';
+  }
+  document.addEventListener('keydown', e => { if (e.key === 'Escape') closeLb(); });
+
+  // ── Intersection Observer — fade-in on scroll ─────────────────────────────
+  const io = new IntersectionObserver((entries) => {
+    entries.forEach(en => {
+      if (en.isIntersecting) {
+        en.target.style.opacity = '1';
+        en.target.style.transform = 'translateY(0)';
+        io.unobserve(en.target);
       }
-
-      function closeLB(){
-        lb.classList.add('hidden');
-        document.body.style.overflow = '';
-        lbImage.src = 'data:image/gif;base64,R0lGODlhAQABAAD/ACwAAAAAAQABAAACADs=';
-      }
-
-      function prev(){ openAt(index - 1); }
-      function next(){ openAt(index + 1); }
-
-      thumbs.forEach((t, i) => {
-        t.addEventListener('click', ()=> openAt(i));
-        t.addEventListener('keydown', (e)=>{
-          if(e.key === 'Enter' || e.key === ' ') { e.preventDefault(); openAt(i); }
-        });
-      });
-
-      lbClose.addEventListener('click', closeLB);
-      lbPrev.addEventListener('click', prev);
-      lbNext.addEventListener('click', next);
-
-      lb.addEventListener('click', (e)=>{
-        if(e.target === lb) closeLB();
-      });
-
-      document.addEventListener('keydown', (e)=>{
-        if(lb.classList.contains('hidden')) return;
-        if(e.key === 'Escape') closeLB();
-        if(e.key === 'ArrowLeft') prev();
-        if(e.key === 'ArrowRight') next();
-      });
-    })();
-  </script>
-  <script type="module">
-    import { initOneSignal } from './js/shared/supabase.js';
-    document.addEventListener('DOMContentLoaded', () => {
-      try { initOneSignal(); } catch(e) { console.warn("OneSignal loading skipped (no user or error)"); }
     });
-  </script>
+  }, { threshold: 0.1 });
+
+  document.querySelectorAll('.obs-fade').forEach(el => {
+    el.style.opacity = '0';
+    el.style.transform = 'translateY(28px)';
+    el.style.transition = 'opacity .65s ease, transform .65s ease';
+    io.observe(el);
+  });
+
+  // ── Smooth scroll ─────────────────────────────────────────────────────────
+  document.querySelectorAll('a[href^="#"]').forEach(a => {
+    a.addEventListener('click', e => {
+      const t = document.querySelector(a.getAttribute('href'));
+      if (t) { e.preventDefault(); t.scrollIntoView({ behavior: 'smooth', block: 'start' }); }
+    });
+  });
+</script>
 </body>
 </html>
