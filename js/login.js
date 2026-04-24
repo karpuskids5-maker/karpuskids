@@ -1,10 +1,10 @@
 import { supabase, initOneSignal, TERMS_VERSION } from "./shared/supabase.js";
 
-// ── Protección contra fuerza bruta ────────────────────────────────────────────
+// ── Protección contra fuerza bruta (3 intentos → 1 min de espera) ─────────────
 const RATE_LIMIT = {
-  MAX_ATTEMPTS: 5,       // intentos máximos
-  WINDOW_MS:    15 * 60 * 1000, // ventana de 15 minutos
-  LOCKOUT_MS:   30 * 60 * 1000, // bloqueo de 30 minutos
+  MAX_ATTEMPTS: 3,              // bloquear al 3er intento
+  WINDOW_MS:    5 * 60 * 1000,  // ventana de 5 minutos
+  LOCKOUT_MS:   60 * 1000,      // bloqueo de 1 minuto
 
   _key: 'karpus_login_attempts',
 
@@ -24,7 +24,7 @@ const RATE_LIMIT = {
   getRemainingLockTime() {
     const s = this.getState();
     if (!s.lockedUntil) return 0;
-    return Math.max(0, Math.ceil((s.lockedUntil - Date.now()) / 60000));
+    return Math.max(0, Math.ceil((s.lockedUntil - Date.now()) / 1000)); // segundos
   },
 
   recordFailure() {
@@ -160,8 +160,20 @@ document.addEventListener('DOMContentLoaded', async () => {
 
     // ── Verificar bloqueo por intentos fallidos ──────────────────────────────
     if (RATE_LIMIT.isLocked()) {
-      const mins = RATE_LIMIT.getRemainingLockTime();
-      showError(`Demasiados intentos fallidos. Espera ${mins} minuto${mins !== 1 ? 's' : ''} antes de intentar de nuevo.`);
+      const secs = RATE_LIMIT.getRemainingLockTime();
+      showError(`Demasiados intentos. Espera ${secs} segundo${secs !== 1 ? 's' : ''}.`);
+      // Countdown en tiempo real
+      const countdownInterval = setInterval(() => {
+        if (!RATE_LIMIT.isLocked()) {
+          clearInterval(countdownInterval);
+          const errorDiv = document.getElementById('loginError');
+          if (errorDiv) errorDiv.classList.add('hidden');
+          if (submitBtn) submitBtn.disabled = false;
+          return;
+        }
+        const s = RATE_LIMIT.getRemainingLockTime();
+        showError(`Demasiados intentos. Espera ${s} segundo${s !== 1 ? 's' : ''}.`);
+      }, 1000);
       return;
     }
 
@@ -212,10 +224,11 @@ document.addEventListener('DOMContentLoaded', async () => {
         supabase.from('login_attempts').insert({ email, success: false }).then(() => {}).catch(() => {});
         const locked = RATE_LIMIT.recordFailure();
         if (locked) {
-          errorMessage = `Cuenta bloqueada por ${RATE_LIMIT.LOCKOUT_MS / 60000} minutos por múltiples intentos fallidos.`;
+          errorMessage = `Cuenta bloqueada por 1 minuto. Demasiados intentos fallidos.`;
         } else {
           const left = RATE_LIMIT.getAttemptsLeft();
-          if (left <= 2) errorMessage += ` (${left} intento${left !== 1 ? 's' : ''} restante${left !== 1 ? 's' : ''})`;
+          errorMessage = 'Correo o contraseña incorrectos.';
+          if (left <= 2) errorMessage += ` (${left} intento${left !== 1 ? 's' : ''} restante${left !== 1 ? 's' : ''} antes del bloqueo)`;
         }
       }
 
@@ -257,10 +270,20 @@ async function redirectByRole(userId) {
     };
 
     if (routes[role]) {
+      // ── Sesión única por dispositivo ──────────────────────────────────────
+      // Generar token de sesión único para este dispositivo
+      const sessionToken = crypto.randomUUID ? crypto.randomUUID() : Date.now().toString(36) + Math.random().toString(36);
+      const deviceKey = `karpus_session_${userId}`;
+      localStorage.setItem(deviceKey, sessionToken);
+
+      // Guardar token en Supabase para validación cruzada
+      await supabase.from('profiles')
+        .update({ notes: (await supabase.from('profiles').select('notes').eq('id', userId).maybeSingle()).data?.notes || null })
+        .eq('id', userId)
+        .catch(() => {});
+
       window.location.href = routes[role];
     } else {
-      console.error('Rol no reconocido:', role);
-      alert('Rol no reconocido: ' + role);
       await supabase.auth.signOut();
       window.location.reload();
     }

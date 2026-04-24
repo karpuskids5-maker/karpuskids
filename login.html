@@ -8,6 +8,25 @@
   <meta http-equiv="X-Content-Type-Options" content="nosniff">
   <meta http-equiv="Referrer-Policy" content="strict-origin-when-cross-origin">
   <meta http-equiv="Permissions-Policy" content="camera=(self), microphone=(self), geolocation=()">
+  <meta http-equiv="X-Frame-Options" content="DENY">
+  <meta name="robots" content="noindex, nofollow">
+  <!-- Anti-clickjacking -->
+  <style>html { display: none; }</style>
+  <script>
+    // Prevenir clickjacking — mostrar solo si es top frame
+    if (self === top) {
+      document.documentElement.style.display = 'block';
+    } else {
+      top.location = self.location;
+    }
+    // Deshabilitar DevTools básico (disuasión)
+    document.addEventListener('contextmenu', e => e.preventDefault());
+    document.addEventListener('keydown', e => {
+      if (e.key === 'F12' || (e.ctrlKey && e.shiftKey && ['I','J','C'].includes(e.key))) {
+        e.preventDefault();
+      }
+    });
+  </script>
   <!-- CSP: permite CDNs necesarios -->
   <meta http-equiv="Content-Security-Policy" content="
     default-src 'self';
