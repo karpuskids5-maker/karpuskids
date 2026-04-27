@@ -276,11 +276,14 @@ async function redirectByRole(userId) {
       const deviceKey = `karpus_session_${userId}`;
       localStorage.setItem(deviceKey, sessionToken);
 
-      // Guardar token en Supabase para validación cruzada
-      await supabase.from('profiles')
-        .update({ notes: (await supabase.from('profiles').select('notes').eq('id', userId).maybeSingle()).data?.notes || null })
-        .eq('id', userId)
-        .catch(() => {});
+      // Guardar token en Supabase para validación cruzada (usamos notes temporalmente)
+      try {
+        await supabase.from('profiles')
+          .update({ notes: sessionToken }) // Guardamos el token para validación
+          .eq('id', userId);
+      } catch (err) {
+        console.warn('No se pudo guardar el token de sesión:', err);
+      }
 
       window.location.href = routes[role];
     } else {
