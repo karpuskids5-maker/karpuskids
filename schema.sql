@@ -44,7 +44,7 @@ create table if not exists public.profiles (
   email               text unique,
   name                text,
   matricula           text unique,
-  role                text check (role in ('directora','maestra','padre','asistente')),
+  role                text check (role in ('directora','maestra','padre','asistente','admin')),
   avatar_url          text,
   phone               text,
   bio                 text,

@@ -118,6 +118,11 @@ export async function ensureRole(requiredRoles) {
   }
 
   if (resolvedProfile && !roles.includes(resolvedProfile.role?.toLowerCase())) {
+    // Admin can access any panel (they have their own panel_control.html)
+    if (resolvedProfile.role?.toLowerCase() === 'admin') {
+      window.location.href = 'panel_control.html';
+      return null;
+    }
     console.warn('[ensureRole] Role mismatch. User has:', resolvedProfile.role, 'Expected one of:', roles);
     await supabase.auth.signOut();
     window.location.href = 'login.html?error=role';

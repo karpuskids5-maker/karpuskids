@@ -74,13 +74,14 @@ export const PaymentsModule = {
       const yv = document.getElementById('filterPaymentYear')?.value;
       const sf = document.getElementById('filterPaymentStatus')?.value;
       const sq = document.getElementById('searchPaymentStudent')?.value?.trim();
-      const mi = mv ? parseInt(mv, 10) - 1 : new Date().getMonth();
-      const mn = MES[mi];
+      
+      // Formato YYYY-MM para coincidir con la base de datos
+      const monthKey = `${yv}-${mv}`;
 
       let q = supabase
         .from('payments')
         .select('id,student_id,amount,concept,status,due_date,created_at,paid_date,method,bank,reference,month_paid,evidence_url,students:student_id(name,classroom_id,classrooms:classroom_id(name))')
-        .ilike('month_paid', mn)
+        .eq('month_paid', monthKey)
         .order('due_date', { ascending: true });
       if (sf && sf !== 'all') q = q.eq('status', sf);
 
@@ -102,7 +103,8 @@ export const PaymentsModule = {
       }
 
       if (!list.length) {
-        const label = MES_LABEL[mi];
+        const mi = parseInt(mv, 10) - 1;
+        const label = MES_LABEL[mi] || mv;
         tbody.innerHTML = '<tr><td colspan="8" class="text-center py-16"><div class="flex flex-col items-center gap-3"><div class="w-14 h-14 bg-slate-100 rounded-full flex items-center justify-center"><i data-lucide="inbox" class="w-7 h-7 text-slate-400"></i></div><p class="font-bold text-slate-500">Sin registros para ' + label + ' ' + (yv || '') + '</p></div></td></tr>';
         if (window.lucide) lucide.createIcons();
         return;
@@ -207,7 +209,10 @@ export const PaymentsModule = {
     const dm  = now.getMonth() + 1;
     const dy  = dm > 11 ? now.getFullYear() + 1 : now.getFullYear();
     const dd  = new Date(dy, dm > 11 ? 0 : dm, this.settings.due_day).toISOString().split('T')[0];
-    const mo  = MES.map((m, i) => '<option value="' + m + '"' + (i === now.getMonth() ? ' selected' : '') + '>' + MES_LABEL[i] + '</option>').join('');
+    const mo  = MES.map((m, i) => {
+      const val = `${dy}-${String(i + 1).padStart(2, '0')}`;
+      return '<option value="' + val + '"' + (i === now.getMonth() ? ' selected' : '') + '>' + MES_LABEL[i] + '</option>';
+    }).join('');
 
     window.openGlobalModal(
       '<div class="bg-gradient-to-r from-emerald-600 to-teal-600 text-white p-6 rounded-t-3xl flex items-center justify-between">' +
@@ -268,7 +273,18 @@ export const PaymentsModule = {
       Helpers.toast('Pago registrado correctamente', 'success');
       UIHelpers.closeModal();
       await this.loadPayments();
-      if (pay?.id) { try { await DirectorApi.sendPaymentReceipt(pay.id); } catch (_) {} }
+      if (pay?.id && sta === 'paid') {
+        DirectorApi.sendPaymentReceipt(pay.id).catch(() => {});
+        try {
+          const { emitEvent } = await import('../shared/supabase.js');
+          await emitEvent('payment.approved', {
+            payment_id:   pay.id,
+            student_name: (await DirectorApi.getStudents()).data?.find(s => String(s.id) === String(sid))?.name || 'Estudiante',
+            amount:       amt.toLocaleString('es-ES', { style: 'currency', currency: 'USD', minimumFractionDigits: 2 }),
+            month:        mp || 'Colegiatura'
+          });
+        } catch (_) {}
+      }
     } catch (e) {
       console.error(e);
       Helpers.toast('Error al guardar: ' + e.message, 'error');
@@ -279,11 +295,15 @@ export const PaymentsModule = {
 
   async markPaid(id) {
     try {
-      await supabase.from('payments').update({ status: 'paid', paid_date: new Date().toISOString() }).eq('id', id);
+      const { error } = await supabase.from('payments')
+        .update({ status: 'paid', paid_date: new Date().toISOString() })
+        .eq('id', id);
+      if (error) throw error;
       auditLog('payment.approved', { payment_id: id });
       Helpers.toast('Pago aprobado', 'success');
       await this.loadPayments();
-      // Send receipt email + show feedback
+
+      // Send receipt email + push notification
       DirectorApi.sendPaymentReceipt(id).then(ok => {
         if (ok) {
           import('../shared/notify-feedback.js').then(m =>
@@ -291,7 +311,24 @@ export const PaymentsModule = {
           ).catch(() => {});
         }
       }).catch(() => {});
-    } catch (_) { Helpers.toast('Error al aprobar pago', 'error'); }
+
+      // Push notification via process-event
+      try {
+        const { data: p } = await DirectorApi.getPaymentById(id);
+        if (p) {
+          const { emitEvent } = await import('../shared/supabase.js');
+          await emitEvent('payment.approved', {
+            payment_id:   id,
+            parent_email: p.students?.p1_email || p.students?.p2_email || null,
+            student_name: p.students?.name || 'Estudiante',
+            amount:       Number(p.amount || 0).toLocaleString('es-ES', { style: 'currency', currency: 'USD', minimumFractionDigits: 2 }),
+            month:        p.month_paid || 'Colegiatura'
+          });
+        }
+      } catch (_) {}
+    } catch (e) {
+      Helpers.toast('Error al aprobar pago: ' + (e.message || e), 'error');
+    }
   },
 
   async delete(id) {

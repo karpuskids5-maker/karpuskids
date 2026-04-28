@@ -1,4 +1,4 @@
-﻿import { supabase } from '../shared/supabase.js';
+import { supabase } from '../shared/supabase.js';
 import { QueryCache } from '../shared/query-cache.js';
 
 const TABLES = {
@@ -195,14 +195,15 @@ export const DirectorApi = {
   async getPaymentStats() {
     try {
       const now = new Date();
-      const month = now.toLocaleString('es-ES', { month: 'long' });
-      const formattedMonth = month.charAt(0).toUpperCase() + month.slice(1);
+      const year = now.getFullYear();
+      const month = String(now.getMonth() + 1).padStart(2, '0');
+      const monthKey = `${year}-${month}`;
       
       const [incomeRes, pendingRes, overdueRes, reviewRes] = await Promise.all([
-        supabase.from('payments').select('amount').in('status', ['paid', 'pagado', 'confirmado']).ilike('month_paid', formattedMonth),
-        supabase.from('payments').select('id', { count: 'exact', head: true }).in('status', ['pending', 'pendiente']),
-        supabase.from('payments').select('id', { count: 'exact', head: true }).in('status', ['overdue', 'vencido']),
-        supabase.from('payments').select('id', { count: 'exact', head: true }).in('status', ['review', 'revision', 'en revision'])
+        supabase.from('payments').select('amount').in('status', ['paid', 'pagado', 'confirmado']).eq('month_paid', monthKey),
+        supabase.from('payments').select('id', { count: 'exact', head: true }).in('status', ['pending', 'pendiente']).eq('month_paid', monthKey),
+        supabase.from('payments').select('id', { count: 'exact', head: true }).in('status', ['overdue', 'vencido']).eq('month_paid', monthKey),
+        supabase.from('payments').select('id', { count: 'exact', head: true }).in('status', ['review', 'revision', 'en revision']).eq('month_paid', monthKey)
       ]);
 
       const income = (incomeRes.data || []).reduce((sum, p) => sum + Number(p.amount), 0);

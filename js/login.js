@@ -266,7 +266,8 @@ async function redirectByRole(userId) {
       directora: 'panel_directora.html',
       maestra:   'panel-maestra.html',
       padre:     'panel_padres.html',
-      asistente: 'panel_asistente.html'
+      asistente: 'panel_asistente.html',
+      admin:     'panel_control.html'
     };
 
     if (routes[role]) {
