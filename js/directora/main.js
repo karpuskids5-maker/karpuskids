@@ -219,7 +219,6 @@ async function loadProfile() {
     _initDirectorAccessId(profile);
     
   } catch (err) {
-    console.error('Error loading profile:', err);
   }
 }
 
@@ -232,7 +231,6 @@ window.addEventListener('unhandledrejection', (e) => {
   // Ignorar errores de IndexedDB (OneSignal) y errores de red silenciosos
   const msg = e.reason?.message?.toLowerCase() ?? '';
   if (msg.includes('indexeddb') || msg.includes('network') || msg.includes('fetch')) return;
-  console.error('[Directora] Unhandled rejection:', e.reason);
 });
 
 document.addEventListener('DOMContentLoaded', async () => {
@@ -252,7 +250,6 @@ document.addEventListener('DOMContentLoaded', async () => {
     
     if (isProd) {
       try { initOneSignal(auth.user); } catch(e) {
-        console.warn('⚠️ OneSignal error:', e);
       }
     } else {
     }
@@ -431,7 +428,6 @@ document.addEventListener('DOMContentLoaded', async () => {
 
         Helpers.toast('Foto de perfil actualizada', 'success');
       } catch (err) {
-        console.error('Error uploading avatar:', err);
         if (img) img.style.opacity = '1';
         Helpers.toast('Error al subir la foto: ' + err.message, 'error');
       }
@@ -445,7 +441,6 @@ document.addEventListener('DOMContentLoaded', async () => {
     }
 
   } catch (err) {
-    console.error('Error during initialization:', err);
     // Quitar loader incluso si hay error
     document.getElementById('initial-loading')?.remove();
     window.location.href = 'index.html';

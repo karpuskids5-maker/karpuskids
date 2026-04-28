@@ -1,4 +1,4 @@
-import { supabase } from './supabase.js';
+﻿import { supabase } from './supabase.js';
 import { ScrollModule } from './scroll.module.js';
 import { QueryCache } from './query-cache.js';
 import { RealtimeManager } from './realtime-manager.js';
@@ -24,7 +24,6 @@ export const ChatModule = {
       const { data, error } = await supabase.rpc('get_unread_counts');
       return error ? {} : (data || {});
     } catch (e) {
-      console.warn('ChatModule: Error obteniendo conteos', e);
       return {};
     }
   },
@@ -55,7 +54,6 @@ export const ChatModule = {
         });
         return contacts;
       } catch (err) {
-        console.error('[ChatModule] Error loadPadreContacts:', err);
         return [];
       }
     }, 5 * 60_000); // 5 min TTL
@@ -168,7 +166,6 @@ export const ChatModule = {
 
       return { message, conversationId: activeConvId };
     } catch (err) {
-      console.error('[ChatModule] Error enviando mensaje:', err);
       throw err;
     }
   },
@@ -223,7 +220,6 @@ export const ChatModule = {
 
       await supabase.rpc('mark_conversation_read', { p_conversation_id: Number(conversationId) });
     } catch (e) {
-      console.warn('Error marcando leído:', e);
     }
   },
 

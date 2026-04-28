@@ -378,7 +378,7 @@ alter table public.school_settings add column if not exists check_out_start time
 alter table public.school_settings add column if not exists check_out_end time default '17:30:00';
 
 insert into public.school_settings (id, phone, business_hours, generation_day, due_day, check_in_start, check_in_end, check_out_start, check_out_end) 
-values (1, '(829) 803-8424', 'Lunes a Viernes: 7:00 AM – 6:00 PM. Sábados y Domingos: Cerrado.', 25, 5, '07:30:00', '08:30:00', '16:00:00', '17:30:00') 
+values (1, '(829) 803-8424', 'Lunes a Viernes: 7:00 AM � 6:00 PM. S�bados y Domingos: Cerrado.', 25, 5, '07:30:00', '08:30:00', '16:00:00', '17:30:00') 
 on conflict (id) do nothing;
 
 create table if not exists public.system_events (
@@ -415,7 +415,7 @@ create table if not exists public.audit_logs (
   created_at timestamp with time zone default now() not null
 );
 
--- ✅ RPC: Procesar Ponche (Entrada/Salida Automática)
+-- ? RPC: Procesar Ponche (Entrada/Salida Autom�tica)
 create or replace function public.process_student_punch(p_matricula text)
 returns jsonb language plpgsql security definer set search_path = public as $$
 declare
@@ -438,19 +438,19 @@ begin
     return jsonb_build_object('success', false, 'message', 'Estudiante no encontrado');
   end if;
 
-  -- 2. Obtener configuración de horario
+  -- 2. Obtener configuraci�n de horario
   select * into v_settings from public.school_settings where id = 1;
 
   -- 3. Verificar si ya existe registro hoy
   select * into v_attendance from public.attendance 
   where student_id = v_student.id and date = v_today;
 
-  -- 4. Lógica de Ponche
+  -- 4. L�gica de Ponche
   if v_attendance.id is null then
     -- No hay registro -> ENTRADA
     v_type := 'check_in';
     
-    -- Validar tardanza (solo si entra después de la hora permitida)
+    -- Validar tardanza (solo si entra despu�s de la hora permitida)
     if v_now::time > v_settings.check_in_end then
       v_status := 'late';
       v_msg := v_student.name || ' registrado - Entrada (Tardanza)';
@@ -463,7 +463,7 @@ begin
     values (v_student.id, v_student.classroom_id, v_today, v_status, v_now);
 
   elsif v_attendance.check_out is null then
-    -- Ya entró pero no ha salido -> SALIDA
+    -- Ya entr� pero no ha salido -> SALIDA
     v_type := 'check_out';
     v_status := 'retirado';
     v_msg := v_student.name || ' registrado - Salida';
@@ -473,8 +473,8 @@ begin
     where id = v_attendance.id;
 
   else
-    -- Ya entró y ya salió
-    return jsonb_build_object('success', false, 'message', v_student.name || ' ya registró entrada y salida hoy');
+    -- Ya entr� y ya sali�
+    return jsonb_build_object('success', false, 'message', v_student.name || ' ya registr� entrada y salida hoy');
   end if;
 
   -- 5. Registrar evento para notificaciones
@@ -594,7 +594,7 @@ returns boolean language sql security definer stable set search_path = public as
 $$;
 
 -- ============================================================
--- RPC: Asignar estudiante a aula (versión única, sin overloads)
+-- RPC: Asignar estudiante a aula (versi�n �nica, sin overloads)
 -- Para desasignar: pasar p_classroom_id = null
 -- ============================================================
 create or replace function public.assign_student_to_classroom(
@@ -613,7 +613,7 @@ begin
 end;
 $$;
 
--- RPC: Asignación en lote (bulk)
+-- RPC: Asignaci�n en lote (bulk)
 create or replace function public.assign_students_bulk(
   p_student_ids  bigint[],
   p_classroom_id bigint
@@ -1030,27 +1030,37 @@ create policy "login_attempts_insert" on public.login_attempts for insert with c
 -- 6. FUNCIONES RPC
 -- ============================================================
 create or replace function public.run_payment_cycle()
-returns jsonb language plpgsql security definer set search_path = public as $$
+returns jsonb language plpgsql security definer set search_path = public as $
 declare
   v_gen_day      int;
   v_due_day      int;
   v_today        int := extract(day from current_date)::int;
-  v_next_month   int; v_next_year int;
-  v_gen_count    int := 0; v_expire_count int := 0;
-  v_student      record; v_target_date date; v_month_key text;
+  v_cur_month    int := extract(month from current_date)::int;
+  v_cur_year     int := extract(year  from current_date)::int;
+  v_next_month   int;
+  v_next_year    int;
+  v_gen_count    int := 0;
+  v_expire_count int := 0;
+  v_due_date     date;
+  v_month_key    text;
 begin
-  v_gen_day := (select generation_day from public.school_settings where id = 1);
-  v_due_day := (select due_day from public.school_settings where id = 1);
-  if v_gen_day is null then return jsonb_build_object('error','school_settings no encontrado'); end if;
+  select generation_day, due_day into v_gen_day, v_due_day
+  from public.school_settings where id = 1;
+
+  if v_gen_day is null then
+    return jsonb_build_object('error', 'school_settings no encontrado');
+  end if;
+
+  -- Regla: month_paid = mes ACTUAL, due_date = dia v_due_day del mes SIGUIENTE
   if v_today >= v_gen_day then
-    v_next_month := extract(month from current_date)::int + 1;
-    v_next_year  := extract(year  from current_date)::int;
+    v_month_key  := to_char(current_date, 'YYYY-MM');
+    v_next_month := v_cur_month + 1;
+    v_next_year  := v_cur_year;
     if v_next_month > 12 then v_next_month := 1; v_next_year := v_next_year + 1; end if;
-    v_target_date := make_date(v_next_year, v_next_month, v_due_day);
-    v_month_key   := to_char(v_target_date, 'YYYY-MM');
-    -- INSERT...SELECT es más eficiente que loop para muchos estudiantes
-    insert into public.payments (student_id, amount, status, due_date, month_paid)
-    select s.id, s.monthly_fee, 'pending', v_target_date, v_month_key
+    v_due_date := make_date(v_next_year, v_next_month, v_due_day);
+
+    insert into public.payments (student_id, amount, status, due_date, month_paid, concept)
+    select s.id, s.monthly_fee, 'pending', v_due_date, v_month_key, 'Mensualidad'
     from public.students s
     where s.is_active = true and s.monthly_fee > 0
       and not exists (
@@ -1060,382 +1070,11 @@ begin
     get diagnostics v_gen_count = row_count;
   end if;
 
-  update public.payments 
-  set status = 'overdue' 
+  update public.payments
+  set status = 'overdue'
   where status = 'pending' and due_date < current_date;
   get diagnostics v_expire_count = row_count;
 
   return jsonb_build_object('generated', v_gen_count, 'expired', v_expire_count);
 end;
-$$;
-
-create or replace function public.get_dashboard_kpis(p_month text default '%')
-returns jsonb language plpgsql security definer set search_path = public as $$
-declare
-  v_students int; v_teachers int; v_classrooms int;
-  v_attendance int; v_pending numeric; v_incidents int;
-begin
-  v_students   := (select count(*)::int from public.students where is_active = true);
-  v_teachers   := (select count(*)::int from public.profiles where role = 'maestra');
-  v_classrooms := (select count(*)::int from public.classrooms);
-  v_attendance := (select count(*)::int from public.attendance where date = current_date and status = 'present');
-  v_pending    := (select coalesce(sum(amount),0) from public.payments 
-                   where status = 'pending' and (p_month = '%' or month_paid = p_month) and deleted_at is null);
-  v_incidents  := (select count(*)::int from public.inquiries where status = 'pending');
-  return jsonb_build_object(
-    'total',v_students,'active',v_students,'teachers',v_teachers,
-    'classrooms',v_classrooms,'attendance_today',v_attendance,
-    'pending_payments',v_pending,'pending_amount',v_pending,'inquiries',v_incidents
-  );
-end;
-$$;
-
-create or replace function public.attendance_last_7_days()
-returns table (date date, present integer, absent integer, late integer)
-language sql stable security definer set search_path = public as $$
-  select a.date,
-    count(*) filter (where a.status = 'present')::integer,
-    count(*) filter (where a.status = 'absent')::integer,
-    count(*) filter (where a.status = 'late')::integer
-  from public.attendance a
-  where a.date >= current_date - interval '7 days'
-  group by a.date order by a.date desc;
-$$;
-
-create or replace function public.financial_summary_month(
-  p_year  integer default extract(year  from now())::integer,
-  p_month integer default extract(month from now())::integer
-)
-returns table (total_invoiced numeric, total_paid numeric, total_pending numeric, percentagePaid numeric)
-language sql stable security definer set search_path = public as $$
-  select
-    coalesce(sum(amount), 0)::numeric,
-    coalesce(sum(amount) filter (where status = 'paid'), 0)::numeric,
-    coalesce(sum(amount) filter (where status = 'pending'), 0)::numeric,
-    case when coalesce(sum(amount),0) > 0
-      then round(coalesce(sum(amount) filter (where status = 'paid'),0) / sum(amount) * 100, 2)
-      else 0 end::numeric
-  from public.payments
-  where extract(year  from due_date)::integer = p_year
-    and extract(month from due_date)::integer = p_month;
-$$;
-
-create or replace function public.get_monthly_financial_report_by_classroom(p_month text)
-returns table (classroom_name text, total_expected numeric, total_paid numeric, total_pending numeric)
-language plpgsql security definer set search_path = public as $$
-begin
-  return query
-  select c.name,
-    coalesce(sum(p.amount), 0),
-    coalesce(sum(p.amount) filter (where p.status = 'paid'), 0),
-    coalesce(sum(p.amount) filter (where p.status = 'pending'), 0)
-  from public.classrooms c
-  left join public.students s on s.classroom_id = c.id
-  left join public.payments p on p.student_id = s.id and p.month_paid = p_month and p.deleted_at is null
-  group by c.name order by c.name;
-end;
-$$;
-
-create or replace function public.get_student_total_debt(p_student_id bigint)
-returns numeric language plpgsql security definer set search_path = public as $$
-declare v_debt numeric;
-begin
-  v_debt := (select coalesce(sum(amount),0) from public.payments 
-             where student_id = p_student_id and status in ('pending','overdue') and deleted_at is null);
-  return v_debt;
-end;
-$$;
-
-create or replace function public.find_or_create_private_conversation(p_user1 uuid, p_user2 uuid)
-returns bigint language plpgsql security definer set search_path = public as $$
-declare v_conv_id bigint;
-begin
-  if p_user1 = p_user2 then raise exception 'No puedes crear una conversacion contigo mismo'; end if;
-  v_conv_id := (select c.id from public.conversations c
-    where c.type in ('direct_message','private')
-      and exists (select 1 from public.conversation_participants where conversation_id = c.id and user_id = p_user1)
-      and exists (select 1 from public.conversation_participants where conversation_id = c.id and user_id = p_user2)
-    limit 1);
-  if v_conv_id is not null then return v_conv_id; end if;
-  insert into public.conversations (type, updated_at) values ('direct_message', now()) returning id into v_conv_id;
-  insert into public.conversation_participants (conversation_id, user_id)
-    values (v_conv_id, p_user1), (v_conv_id, p_user2) on conflict do nothing;
-  return v_conv_id;
-end;
-$$;
-
-create or replace function public.get_direct_messages(p_other_user_id uuid)
-returns table (msg_id bigint, msg_content text, msg_sender_id uuid, msg_created_at timestamp with time zone, msg_is_read boolean, msg_conversation_id bigint)
-language plpgsql security definer set search_path = public as $$
-declare v_conv_id bigint;
-begin
-  select c.id into v_conv_id
-  from public.conversations c
-  where c.type in ('direct_message','private')
-    and exists (
-      select 1 from public.conversation_participants cp1
-      where cp1.conversation_id = c.id and cp1.user_id = auth.uid()
-    )
-    and exists (
-      select 1 from public.conversation_participants cp2
-      where cp2.conversation_id = c.id and cp2.user_id = p_other_user_id
-    )
-  limit 1;
-
-  if v_conv_id is not null then
-    return query
-      select m.id, m.content, m.sender_id, m.created_at, m.is_read, m.conversation_id
-      from public.messages m
-      where m.conversation_id = v_conv_id
-      order by m.created_at asc;
-  else
-    return query
-      select null::bigint, null::text, null::uuid, null::timestamptz, null::boolean, null::bigint
-      where false;
-  end if;
-end;
-$$;
-
-create or replace function public.get_unread_counts()
-returns jsonb language sql security definer set search_path = public as $$
-  select coalesce(jsonb_object_agg(sender_id::text, cnt), '{}'::jsonb)
-  from (
-    select m.sender_id, count(*) as cnt
-    from public.messages m
-    join public.conversation_participants cp on cp.conversation_id = m.conversation_id
-    where cp.user_id = auth.uid() and m.sender_id != auth.uid() and m.is_read = false
-    group by m.sender_id
-  ) t;
-$$;
-
-create or replace function public.mark_conversation_read(p_conversation_id bigint)
-returns void language sql security definer set search_path = public as $$
-  update public.messages set is_read = true
-  where conversation_id = p_conversation_id and sender_id != auth.uid() and is_read = false;
-$$;
-
-create or replace function public.send_notification(
-  p_user_id uuid, p_title text, p_message text,
-  p_type text default 'info', p_link text default null
-)
-returns void language plpgsql security definer set search_path = public as $$
-begin
-  insert into public.notifications (user_id, title, message, type, link, is_read, created_at)
-  values (p_user_id, p_title, p_message, p_type, p_link, false, now());
-end;
-$$;
-
-create or replace function public.upload_payment_proof(p_payment_id bigint, p_proof_url text)
-returns void language plpgsql security definer set search_path = public as $$
-begin
-  if not exists (
-    select 1 from public.payments pay
-    join public.students s on s.id = pay.student_id
-    where pay.id = p_payment_id and s.parent_id = auth.uid()
-  ) then raise exception 'No tienes permiso para actualizar este pago' using errcode = '42501'; end if;
-  update public.payments set proof_url = p_proof_url, status = 'review' where id = p_payment_id;
-end;
-$$;
-
-create or replace function public.generate_report_card(p_student_id bigint, p_period_id bigint)
-returns jsonb language plpgsql security definer set search_path = public as $$
-declare
-  v_p_start date; v_p_end date; v_task_avg numeric := 0; v_formal_avg numeric := 0;
-  v_final numeric := 0; v_level text; v_classroom_id bigint;
-begin
-  v_p_start := (select start_date from public.periods where id = p_period_id);
-  v_p_end   := (select end_date from public.periods where id = p_period_id);
-  if v_p_start is null then return jsonb_build_object('error','Periodo no encontrado'); end if;
-  
-  v_classroom_id := (select classroom_id from public.students where id = p_student_id);
-  
-  v_task_avg := (select coalesce(avg(case when stars is not null then stars::numeric
-    when grade_letter='A' then 5 when grade_letter='B' then 4
-    when grade_letter='C' then 3 when grade_letter='D' then 2 else null end), 0)
-  from public.task_evidences te join public.tasks t on t.id = te.task_id
-  where te.student_id = p_student_id and t.created_at between v_p_start and v_p_end);
-  
-  v_formal_avg := (select coalesce(avg(score), 0) from public.grades
-  where student_id = p_student_id and period_id = p_period_id);
-
-  v_final := (v_task_avg * 0.7) + (v_formal_avg * 0.3);
-  v_level := case when v_final >= 4.5 then 'Excelente' when v_final >= 3.5 then 'Bueno'
-    when v_final >= 2.5 then 'En proceso' else 'Requiere apoyo' end;
-  insert into public.report_cards (student_id, classroom_id, period_id, task_avg, formal_avg, final_score, level, generated_at)
-  values (p_student_id, v_classroom_id, p_period_id, v_task_avg, v_formal_avg, v_final, v_level, now())
-  on conflict (student_id, period_id) do update
-    set task_avg=excluded.task_avg, formal_avg=excluded.formal_avg,
-        final_score=excluded.final_score, level=excluded.level, generated_at=now();
-  return jsonb_build_object('student_id',p_student_id,'final_score',v_final,'level',v_level);
-end;
-$$;
-
-create or replace function public.close_period(p_period_id bigint)
-returns jsonb language plpgsql security definer set search_path = public as $$
-declare 
-  v_p_status text; v_p_classroom_id bigint; v_student record; v_count int := 0;
-begin
-  v_p_status := (select status from public.periods where id = p_period_id);
-  v_p_classroom_id := (select classroom_id from public.periods where id = p_period_id);
-  
-  if v_p_status is null then return jsonb_build_object('error','Periodo no encontrado'); end if;
-  if v_p_status = 'closed' then return jsonb_build_object('error','Ya esta cerrado'); end if;
-  for v_student in select id from public.students where classroom_id = v_p_classroom_id and is_active = true loop
-    perform public.generate_report_card(v_student.id, p_period_id);
-    v_count := v_count + 1;
-  end loop;
-  update public.periods set status = 'closed' where id = p_period_id;
-  return jsonb_build_object('success', true, 'report_cards_generated', v_count);
-end;
-$$;
-
-create or replace function public.generate_monthly_charges(p_month integer, p_year integer)
-returns jsonb language plpgsql security definer set search_path = public as $$
-declare
-  v_student record; v_target_date date; v_count int := 0;
-  v_month_key text; v_due_day int := 5;
-begin
-  v_due_day := (select due_day from public.school_settings where id = 1);
-  v_target_date := make_date(p_year, p_month, coalesce(v_due_day, 5));
-  v_month_key   := to_char(v_target_date, 'YYYY-MM');
-  for v_student in select id, monthly_fee from public.students where is_active = true and monthly_fee > 0 loop
-    if not exists (select 1 from public.payments where student_id = v_student.id and month_paid = v_month_key) then
-      insert into public.payments (student_id, amount, status, due_date, month_paid)
-      values (v_student.id, v_student.monthly_fee, 'pending', v_target_date, v_month_key);
-      v_count := v_count + 1;
-    end if;
-  end loop;
-  return jsonb_build_object('generated', v_count, 'month', v_month_key);
-end;
-$$;
-
-create or replace function public.create_students_snapshot()
-returns void language plpgsql security definer set search_path = public as $$
-begin
-  insert into public.data_snapshots (table_name, row_count, snapshot)
-  select 'students', count(*)::integer, jsonb_agg(row_to_json(s))
-  from (select * from public.students limit 1000) s;
-end;
-$$;
-
-create or replace function public.create_payments_snapshot()
-returns void language plpgsql security definer set search_path = public as $$
-begin
-  insert into public.data_snapshots (table_name, row_count, snapshot)
-  select 'payments_' || to_char(now(), 'YYYY_MM'), count(*)::integer, jsonb_agg(row_to_json(p))
-  from (select * from public.payments
-    where extract(month from created_at)::integer = extract(month from now())::integer
-      and extract(year  from created_at)::integer = extract(year  from now())::integer
-    limit 1000) p;
-end;
-$$;
-
-create or replace function public.cleanup_old_login_attempts()
-returns void language sql security definer set search_path = public as $$
-  delete from public.login_attempts where created_at < now() - interval '30 days';
-$$;
-
--- ============================================================
--- 7. GRANTS
--- ============================================================
-grant execute on function public.get_my_role()                                    to authenticated;
-grant execute on function public.is_teacher_of_classroom(bigint)                  to authenticated;
-grant execute on function public.is_parent_of_student(bigint)                     to authenticated;
-grant execute on function public.is_parent_of_classroom(bigint)                   to authenticated;
-grant execute on function public.is_teacher_of_student(bigint)                    to authenticated;
-grant execute on function public.get_my_classroom_ids()                           to authenticated;
-grant execute on function public.user_is_participant(bigint, uuid)                to authenticated;
-grant execute on function public.assign_student_to_classroom(bigint, bigint)      to authenticated;
-grant execute on function public.assign_students_bulk(bigint[], bigint)           to authenticated;
-grant execute on function public.run_payment_cycle()                              to authenticated;
-grant execute on function public.get_dashboard_kpis(text)                         to authenticated;
-grant execute on function public.attendance_last_7_days()                         to authenticated;
-grant execute on function public.financial_summary_month(integer, integer)        to authenticated;
-grant execute on function public.get_monthly_financial_report_by_classroom(text)  to authenticated;
-grant execute on function public.get_student_total_debt(bigint)                   to authenticated;
-grant execute on function public.find_or_create_private_conversation(uuid, uuid)  to authenticated, anon, service_role;
-grant execute on function public.get_direct_messages(uuid)                        to authenticated;
-grant execute on function public.get_unread_counts()                              to authenticated;
-grant execute on function public.mark_conversation_read(bigint)                   to authenticated;
-grant execute on function public.send_notification(uuid, text, text, text, text)  to authenticated, service_role;
-grant execute on function public.generate_report_card(bigint, bigint)             to authenticated;
-grant execute on function public.close_period(bigint)                             to authenticated;
-grant execute on function public.generate_monthly_charges(integer, integer)       to authenticated;
-grant execute on function public.create_students_snapshot()                       to authenticated;
-grant execute on function public.create_payments_snapshot()                       to authenticated;
-grant execute on function public.cleanup_old_login_attempts()                     to authenticated;
-grant execute on function public.upload_payment_proof(bigint, text)               to authenticated;
-
-grant select, insert, update, delete on public.tasks        to authenticated;
-grant select, insert, update, delete on public.daily_logs   to authenticated;
-grant select, insert, update, delete on public.payments     to authenticated;
-grant select, insert, update         on public.profiles     to authenticated;
-grant select, insert, update, delete on public.audit_logs   to authenticated;
-grant select, insert, update, delete on public.meetings     to authenticated;
-
--- ============================================================
--- 8. STORAGE
--- ============================================================
-insert into storage.buckets (id, name, public) values
-  ('avatars','avatars',true),
-  ('classroom_media','classroom_media',true),
-  ('karpus-uploads','karpus-uploads',true),
-  ('posts','posts',true),
-  ('task_files','task_files',true)
-on conflict (id) do nothing;
-
-drop policy if exists "storage_public_read" on storage.objects;
-drop policy if exists "storage_auth_insert" on storage.objects;
-drop policy if exists "storage_auth_update" on storage.objects;
-drop policy if exists "storage_auth_delete" on storage.objects;
-
--- Staff ve todo; padres solo ven sus propios archivos (owner)
-create policy "storage_public_read" on storage.objects for select using (
-  bucket_id in ('karpus-uploads','avatars','classroom_media','posts','task_files')
-  and (
-    get_my_role() in ('directora','asistente','maestra')
-    or auth.uid() = owner
-  )
-);
-create policy "storage_auth_insert" on storage.objects for insert
-  with check (auth.uid() is not null);
-create policy "storage_auth_update" on storage.objects for update
-  using (auth.uid() = owner or get_my_role() in ('directora','asistente'));
-create policy "storage_auth_delete" on storage.objects for delete
-  using (auth.uid() = owner or get_my_role() in ('directora','asistente'));
-
--- ============================================================
--- 9. INDICES
--- ============================================================
-create index if not exists idx_students_parent         on public.students(parent_id);
-create index if not exists idx_students_classroom      on public.students(classroom_id);
-create index if not exists idx_posts_classroom         on public.posts(classroom_id, created_at desc);
-create index if not exists idx_comments_post           on public.comments(post_id);
-create index if not exists idx_likes_post              on public.likes(post_id);
-create index if not exists idx_messages_conversation   on public.messages(conversation_id, created_at asc);
-create index if not exists idx_messages_sender         on public.messages(sender_id);
-create index if not exists idx_payments_student        on public.payments(student_id, created_at desc);
-create index if not exists idx_payments_status_due     on public.payments(status, due_date);
-create index if not exists idx_payments_status_month   on public.payments(status, month_paid);
-create index if not exists idx_attendance_student      on public.attendance(student_id, date desc);
-create index if not exists idx_evidences_student       on public.task_evidences(student_id, created_at desc);
-create index if not exists idx_notifications_user      on public.notifications(user_id, is_read, created_at desc);
-create index if not exists idx_profiles_role_id        on public.profiles(role, id);
-create index if not exists idx_profiles_email_lower    on public.profiles(lower(email));
-create index if not exists idx_profiles_onesignal      on public.profiles(onesignal_player_id) where onesignal_player_id is not null;
-create index if not exists idx_posts_teacher_classroom on public.posts(teacher_id, classroom_id);
-create index if not exists idx_audit_logs_user         on public.audit_logs(user_id, created_at desc);
-create index if not exists idx_meetings_target         on public.meetings(target_id, status);
-create index if not exists idx_attendance_status       on public.attendance(status, date);
-
--- ============================================================
--- 10. DATOS INICIALES
--- ============================================================
--- Vincular directora principal
-insert into public.profiles (id, email, name, role)
-values ('08fd7933-4027-48b4-87e5-d81144e134cd', 'directora@karpus.local', 'Directora Principal', 'directora')
-on conflict (id) do update set role = 'directora', email = excluded.email, name = excluded.name;
-
--- ============================================================
--- FIN DEL SCHEMA - Karpus Kids
--- ============================================================
+$;

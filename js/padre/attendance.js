@@ -1,4 +1,4 @@
-import { supabase } from '../shared/supabase.js';
+﻿import { supabase } from '../shared/supabase.js';
 import { Helpers } from './helpers.js';
 import { AppState } from './appState.js';
 import { emitEvent, sendPush } from '../shared/supabase.js';
@@ -173,7 +173,6 @@ export const AttendanceModule = {
       Helpers.toast('Aviso enviado a la maestra y dirección ✅', 'success');
 
     } catch (err) {
-      console.error('[submitAbsence]', err);
       Helpers.toast('Error al enviar: ' + (err.message || ''), 'error');
     } finally {
       if (btn) { btn.disabled = false; btn.innerHTML = '<i data-lucide="send" class="w-5 h-5"></i> Enviar a la Maestra'; if(window.lucide) lucide.createIcons(); }
@@ -220,7 +219,6 @@ export const AttendanceModule = {
       this.renderList(this._attendance);
 
     } catch (err) {
-      console.error('Error loadAttendance:', err);
       if (calendar) {
         calendar.innerHTML = Helpers.emptyState('Error al cargar asistencia', '❌');
       }

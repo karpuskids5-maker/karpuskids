@@ -1,4 +1,4 @@
-import { DirectorApi } from './api.js';
+﻿import { DirectorApi } from './api.js';
 import { Helpers } from '../shared/helpers.js';
 import { UI } from './ui.module.js';
 import { AppState } from './state.js';
@@ -150,7 +150,6 @@ export const StudentsModule = {
 
       if (window.lucide) lucide.createIcons();
     } catch (e) {
-      console.error('[StudentsModule] init error:', e);
       const container = document.getElementById('studentsTable') || document.getElementById('studentsGrid');
       if (container) {
         container.innerHTML = '<div class="col-span-3 text-center p-8">' + Helpers.errorState('Error al cargar estudiantes', 'App.students.init()') + '</div>';
@@ -373,7 +372,6 @@ export const StudentsModule = {
       QueryCache.invalidate('dir_students');
       this.init();
     } catch (e) {
-      console.error('Error saveStudent:', e);
       Helpers.toast('Error al guardar: ' + (e.message || e), 'error');
     } finally {
       UI.setLoading(false);
@@ -395,7 +393,6 @@ export const StudentsModule = {
       this.init();
     } catch (e) {
       Helpers.toast('Error al eliminar estudiante.', 'error');
-      console.error('Error deleteStudent:', e);
     }
   },
 
@@ -837,7 +834,6 @@ export const StudentsModule = {
           }
         }
       } catch (e) {
-        console.error('Error cargando datos del estudiante:', e);
         Helpers.toast('Error al cargar datos del estudiante', 'error');
       }
     }

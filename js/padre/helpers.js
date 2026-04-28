@@ -87,6 +87,41 @@ export const Helpers = {
   },
 
   /**
+   * 💸 Calcular mora por días de retraso
+   * Regla: mora empieza el día 6 del mes siguiente (día después del vencimiento día 5)
+   * Tasa: 5% del monto base por cada 30 días de retraso (mínimo 1 día = 1 día de mora)
+   * Se aplica sobre el monto base del pago
+   */
+  calculateMora(dueDate, baseAmount = 0) {
+    if (!dueDate) return 0;
+    const today = new Date(); today.setHours(0,0,0,0);
+    const due   = new Date(dueDate + 'T00:00:00');
+    const daysLate = Math.floor((today - due) / 86400000);
+    if (daysLate <= 0) return 0;
+    // 5% mensual = 0.1667% diario
+    const dailyRate = 0.05 / 30;
+    return Math.round(Number(baseAmount || 0) * dailyRate * daysLate * 100) / 100;
+  },
+
+  /**
+   * 📊 Desglose de mora para mostrar en UI
+   */
+  getMoraBreakdown(dueDate, baseAmount = 0) {
+    if (!dueDate) return null;
+    const today = new Date(); today.setHours(0,0,0,0);
+    const due   = new Date(dueDate + 'T00:00:00');
+    const daysLate = Math.floor((today - due) / 86400000);
+    if (daysLate <= 0) return null;
+    const mora = this.calculateMora(dueDate, baseAmount);
+    const weeks = Math.floor(daysLate / 7);
+    const formattedText = daysLate === 1 ? '1 día de retraso'
+      : daysLate < 7  ? `${daysLate} días de retraso`
+      : weeks === 1   ? '1 semana de retraso'
+      : `${weeks} semanas de retraso`;
+    return { daysLate, mora, formattedText };
+  },
+
+  /**
    * Delegación de eventos segura
    */
   delegate: (el, selector, event, handler) => {

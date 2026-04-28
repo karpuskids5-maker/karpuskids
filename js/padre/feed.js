@@ -1,4 +1,4 @@
-import { supabase } from '../shared/supabase.js';
+﻿import { supabase } from '../shared/supabase.js';
 import { AppState, TABLES } from './appState.js';
 import { Helpers, escapeHtml } from './helpers.js';
 import { ImageLoader } from '../shared/image-loader.js';
@@ -63,7 +63,6 @@ export const FeedModule = {
       AppState.set('feedPosts', posts || []);
 
     } catch (err) {
-      console.error('Feed error:', err);
       container.innerHTML = Helpers.errorState('Error al cargar el muro', 'window.App.feed.reload?.()');
       if (window.lucide) lucide.createIcons();
     }
@@ -237,7 +236,6 @@ export const FeedModule = {
       }
 
     } catch (err) {
-      console.error('Error enviando comentario:', err);
       // Revertir optimistic — quitar el comentario temporal
       document.getElementById(tempId)?.remove();
       input.value = content; // restaurar el texto

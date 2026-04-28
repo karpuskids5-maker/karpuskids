@@ -1,4 +1,4 @@
-import { DirectorApi } from './api.js';
+﻿import { DirectorApi } from './api.js';
 import { Helpers } from '../shared/helpers.js';
 import { UI } from './ui.module.js';
 import { AppState } from './state.js';
@@ -49,7 +49,6 @@ export const TeachersModule = {
 
       if (window.lucide) lucide.createIcons();
     } catch (e) {
-      console.error('Error initTeachersSection:', e);
       container.innerHTML = '<tr><td colspan="5" class="text-center py-8">' + Helpers.errorState('Error al cargar personal', 'App.teachers.init()') + '</td></tr>';
       if (window.lucide) lucide.createIcons();
     }
@@ -130,7 +129,6 @@ export const TeachersModule = {
       UI.closeModal();
       this.init();
     } catch (e) {
-      console.error('Error saveTeacher:', e);
       Helpers.toast('Error al guardar: ' + (e.message || e), 'error');
     } finally {
       UI.setLoading(false);

@@ -1,4 +1,4 @@
-import { DirectorApi } from './api.js';
+﻿import { DirectorApi } from './api.js';
 import { Helpers } from '../shared/helpers.js';
 import { UI } from './ui.module.js';
 import { supabase } from '../shared/supabase.js';
@@ -26,7 +26,6 @@ export const RoomsModule = {
       container.innerHTML = classrooms.map(r => UI.renderClassroomRow(r)).join('');
       if (window.lucide) lucide.createIcons();
     } catch (e) {
-      console.error('Error initClassroomsSection:', e);
       container.innerHTML = '<tr><td colspan="4" class="text-center py-8">' + Helpers.errorState('Error al cargar aulas') + '</td></tr>';
       if (window.lucide) lucide.createIcons();
     }
@@ -94,7 +93,6 @@ export const RoomsModule = {
 
       if (window.lucide) lucide.createIcons();
     } catch (e) {
-      console.error('[loadUnassigned]', e);
       list.innerHTML = '<div class="px-6 py-5 text-sm text-rose-500">Error al cargar estudiantes sin aula.</div>';
     }
   },
@@ -139,7 +137,6 @@ export const RoomsModule = {
         this.init();
       }, 350);
     } catch (e) {
-      console.error('[assignStudent]', e);
       Helpers.toast('Error al asignar: ' + e.message, 'error');
       if (btn) { btn.disabled = false; btn.textContent = 'Asignar'; }
     }
@@ -203,7 +200,6 @@ export const RoomsModule = {
       QueryCache.invalidate('dir_students');
       await this.init();
     } catch (e) {
-      console.error('Error saveRoom:', e);
       Helpers.toast('Error al guardar aula: ' + e.message, 'error');
     } finally {
       if (btn) { btn.disabled = false; btn.textContent = 'Guardar Aula'; }
@@ -347,7 +343,6 @@ export const RoomsModule = {
           </label>`;
       }).join('');
     } catch (e) {
-      console.error('[_loadStudentsChecklist]', e);
       list.innerHTML = '<div class="px-4 py-5 text-xs text-rose-400">Error al cargar estudiantes.</div>';
     }
   }

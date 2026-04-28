@@ -1,4 +1,4 @@
-import { supabase } from '../shared/supabase.js';
+﻿import { supabase } from '../shared/supabase.js';
 import { AppState, TABLES, CacheKeys } from './appState.js';
 import { Helpers, escapeHtml } from './helpers.js';
 
@@ -91,7 +91,6 @@ export const TasksModule = {
         modal._initialized = true;
       }
     } catch (e) {
-      console.error('Error openSubmitModal:', e);
       Helpers.toast('Error al abrir detalle de tarea', 'error');
     }
   },
@@ -142,7 +141,6 @@ export const TasksModule = {
       await this.loadTasks('pending');
 
     } catch (e) {
-      console.error('Submit task error:', e);
       Helpers.toast('Error al enviar tarea', 'error');
     } finally {
       AppState.set('loading', false);
@@ -192,7 +190,6 @@ export const TasksModule = {
         modal._initialized = true;
       }
     } catch (e) {
-      console.error('Error viewEvidence:', e);
       Helpers.toast('Error al ver entrega', 'error');
     }
   },
@@ -241,7 +238,6 @@ export const TasksModule = {
       if (window.lucide) lucide.createIcons();
 
     } catch (err) {
-      console.error('Error loadTasks:', err);
       container.innerHTML = Helpers.emptyState('Error al cargar tareas', '❌');
     }
   },

@@ -1,4 +1,4 @@
-import { DirectorApi } from './api.js';
+﻿import { DirectorApi } from './api.js';
 import { Helpers } from '../shared/helpers.js';
 import { UIHelpers } from './ui.module.js';
 import { supabase } from '../shared/supabase.js';
@@ -131,7 +131,7 @@ export const PaymentsModule = {
       tbody.innerHTML = list.map(p => this._row(p)).join('');
       if (window.lucide) lucide.createIcons();
     } catch (e) {
-      console.error('[Payments] loadPayments:', e);
+
       tbody.innerHTML = '<tr><td colspan="8" class="text-center py-8">' + Helpers.errorState('Error al cargar pagos', 'App.payments.loadPayments()') + '</td></tr>';
       if (window.lucide) lucide.createIcons();
     }
@@ -144,6 +144,11 @@ export const PaymentsModule = {
     if (s === 'overdue' || s === 'vencido') return 'overdue';
     // transferencia sin aprobar → review
     if ((s === 'pending' || s === 'pendiente') && p.method === 'transferencia') return 'review';
+    // Si el due_date ya pasó y sigue pending → mostrar como overdue en UI
+    if ((s === 'pending' || s === 'pendiente') && p.due_date) {
+      const today = new Date(); today.setHours(0,0,0,0);
+      if (new Date(p.due_date + 'T00:00:00') < today) return 'overdue';
+    }
     return 'pending';
   },
 
@@ -197,7 +202,7 @@ export const PaymentsModule = {
       set('kpiPendingCount', data.pending);
       set('kpiOverdueCount', data.overdue);
       set('kpiReviewCount',  data.toApprove || 0);
-    } catch (e) { console.error(e); }
+    } catch (_) {}
   },
 
   async loadIncomeChart() {
@@ -215,19 +220,22 @@ export const PaymentsModule = {
         data: { labels, datasets: [{ label: 'Ingresos ($)', data: vals, backgroundColor: 'rgba(79,70,229,0.15)', borderColor: 'rgb(79,70,229)', borderWidth: 2, borderRadius: 6 }] },
         options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } }, scales: { y: { beginAtZero: true, grid: { color: 'rgba(0,0,0,0.04)' } }, x: { grid: { display: false } } } }
       });
-    } catch (e) { console.error(e); }
+    } catch (_) {}
   },
 
   async openPaymentModal(prefillStudentId = null) {
     const ic = 'w-full px-4 py-2.5 border-2 border-slate-100 rounded-2xl outline-none focus:ring-4 focus:ring-emerald-100 focus:border-emerald-400 bg-slate-50/50 transition-all text-sm font-medium';
     const lc = 'block text-[11px] font-black text-slate-400 uppercase tracking-wider mb-1.5 ml-1';
     const now = new Date();
-    const dm  = now.getMonth() + 1;
-    const dy  = dm > 11 ? now.getFullYear() + 1 : now.getFullYear();
-    const dd  = new Date(dy, dm > 11 ? 0 : dm, this.settings.due_day).toISOString().split('T')[0];
-    const mo  = MES.map((m, i) => {
-      const val = `${dy}-${String(i + 1).padStart(2, '0')}`;
-      return '<option value="' + val + '"' + (i === now.getMonth() ? ' selected' : '') + '>' + MES_LABEL[i] + '</option>';
+    const curMonth = now.getMonth();      // 0-based
+    const curYear  = now.getFullYear();
+    // due_date = día 5 del mes SIGUIENTE
+    const nextM = curMonth + 1 > 11 ? 0 : curMonth + 1;
+    const nextY = curMonth + 1 > 11 ? curYear + 1 : curYear;
+    const dd = `${nextY}-${String(nextM + 1).padStart(2,'0')}-${String(this.settings.due_day || 5).padStart(2,'0')}`;
+    const mo = MES.map((m, i) => {
+      const val = `${curYear}-${String(i + 1).padStart(2, '0')}`;
+      return '<option value="' + val + '"' + (i === curMonth ? ' selected' : '') + '>' + MES_LABEL[i] + '</option>';
     }).join('');
 
     window.openGlobalModal(
@@ -263,7 +271,7 @@ export const PaymentsModule = {
           sel.appendChild(o);
         });
       }
-    } catch (e) { console.error(e); }
+    } catch (_) {}
 
     document.getElementById('btnSavePaymentAction')?.addEventListener('click', () => this.saveManualPayment());
     if (window.lucide) lucide.createIcons();
@@ -302,7 +310,7 @@ export const PaymentsModule = {
         } catch (_) {}
       }
     } catch (e) {
-      console.error(e);
+
       Helpers.toast('Error al guardar: ' + e.message, 'error');
     } finally {
       UIHelpers.setLoading(false, '#modalPayment');
@@ -358,69 +366,93 @@ export const PaymentsModule = {
   },
 
   async runCycle() {
-    if (!confirm('¿Ejecutar ciclo de pagos?\n\nSe generarán cobros para el mes siguiente y se marcarán como vencidos los pagos atrasados.')) return;
+    if (!confirm('¿Ejecutar ciclo de pagos?\n\nRegla: el cobro de cada mes se genera el día 25 y vence el día 5 del mes siguiente.')) return;
     try {
       Helpers.toast('Ejecutando ciclo...', 'info');
 
-      // 1. Run the standard cycle (generates next month if today >= gen_day)
-      const { data, error } = await supabase.rpc('run_payment_cycle');
-      if (error) throw error;
-      const r = typeof data === 'string' ? JSON.parse(data) : (data || {});
+      const now      = new Date();
+      const genDay   = this.settings.generation_day || 25;
+      const dueDay   = this.settings.due_day || 5;
 
-      // 2. Also generate current month charges for students that have none yet
-      const now = new Date();
-      const currentMonthKey = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
-      const dueDay = this.settings.due_day || 5;
-      const dueDate = new Date(now.getFullYear(), now.getMonth(), dueDay).toISOString().split('T')[0];
+      // ── Lógica correcta de fechas ──────────────────────────────────────────
+      // month_paid  = mes ACTUAL  (ej: 2026-04 = Abril)
+      // due_date    = día 5 del mes SIGUIENTE (ej: 5 de Mayo 2026)
+      // Se genera a partir del día 25 del mes actual
+      // ──────────────────────────────────────────────────────────────────────
+      const currentMonth = now.getMonth();       // 0-based (3 = Abril)
+      const currentYear  = now.getFullYear();
+
+      // month_paid key = mes actual
+      const monthKey = `${currentYear}-${String(currentMonth + 1).padStart(2, '0')}`;
+
+      // due_date = día 5 del mes siguiente
+      const nextMonth     = currentMonth + 1 > 11 ? 0 : currentMonth + 1;
+      const nextMonthYear = currentMonth + 1 > 11 ? currentYear + 1 : currentYear;
+      const dueDate = `${nextMonthYear}-${String(nextMonth + 1).padStart(2, '0')}-${String(dueDay).padStart(2, '0')}`;
 
       // Get active students with monthly_fee > 0
-      const { data: students } = await supabase
+      const { data: students, error: sErr } = await supabase
         .from('students')
-        .select('id, monthly_fee, due_day')
+        .select('id, name, monthly_fee')
         .eq('is_active', true)
         .gt('monthly_fee', 0);
 
-      let extraGenerated = 0;
-      if (students?.length) {
-        // Find which students already have a payment for current month
-        const { data: existing } = await supabase
-          .from('payments')
-          .select('student_id')
-          .eq('month_paid', currentMonthKey);
+      if (sErr) throw sErr;
 
-        const existingIds = new Set((existing || []).map(p => String(p.student_id)));
-        const missing = students.filter(s => !existingIds.has(String(s.id)));
-
-        if (missing.length) {
-          const inserts = missing.map(s => ({
-            student_id: s.id,
-            amount:     s.monthly_fee,
-            status:     'pending',
-            due_date:   dueDate,
-            month_paid: currentMonthKey,
-            concept:    'Mensualidad',
-            created_at: new Date().toISOString()
-          }));
-          const { error: insErr } = await supabase.from('payments').insert(inserts);
-          if (!insErr) extraGenerated = missing.length;
-        }
+      if (!students?.length) {
+        Helpers.toast('No hay estudiantes activos con cuota mensual configurada. Ve a Estudiantes → edita cada uno y asigna una cuota mensual.', 'warning');
+        return;
       }
 
-      const totalGen = (r.generated || 0) + extraGenerated;
-      const totalExp = r.expired || 0;
+      // Find which students already have a payment for this month
+      const { data: existing } = await supabase
+        .from('payments')
+        .select('student_id')
+        .eq('month_paid', monthKey);
 
-      Helpers.toast(
-        totalGen > 0
-          ? `✅ ${totalGen} cobro(s) generado(s), ${totalExp} marcado(s) como vencido(s)`
-          : `Ciclo completado: ${totalExp} vencido(s). Los estudiantes sin cuota mensual no generan cobros.`,
-        totalGen > 0 ? 'success' : 'info'
-      );
+      const existingIds = new Set((existing || []).map(p => String(p.student_id)));
+      const missing = students.filter(s => !existingIds.has(String(s.id)));
 
-      // Switch filter to current month so user sees the new records
+      let generated = 0;
+      if (missing.length) {
+        const inserts = missing.map(s => ({
+          student_id: s.id,
+          amount:     s.monthly_fee,
+          status:     'pending',
+          due_date:   dueDate,
+          month_paid: monthKey,
+          concept:    'Mensualidad',
+          created_at: new Date().toISOString()
+        }));
+        const { error: insErr } = await supabase.from('payments').insert(inserts);
+        if (insErr) throw insErr;
+        generated = missing.length;
+      }
+
+      // Mark overdue: payments where due_date < today AND status = pending
+      const { count: expired } = await supabase
+        .from('payments')
+        .update({ status: 'overdue' })
+        .eq('status', 'pending')
+        .lt('due_date', now.toISOString().split('T')[0])
+        .select('id', { count: 'exact', head: true });
+
+      // Show result
+      const MES_LABEL_LOCAL = ['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'];
+      const monthLabel = MES_LABEL_LOCAL[currentMonth];
+      const dueDateLabel = `${dueDay} de ${MES_LABEL_LOCAL[nextMonth]} ${nextMonthYear}`;
+
+      if (generated > 0) {
+        Helpers.toast(`✅ ${generated} cobro(s) de ${monthLabel} generados — vencen el ${dueDateLabel}`, 'success');
+      } else if (missing.length === 0) {
+        Helpers.toast(`ℹ️ Todos los estudiantes ya tienen cobro de ${monthLabel} registrado.`, 'info');
+      }
+
+      // Switch filter to current month
       const ms = document.getElementById('filterPaymentMonth');
       const ys = document.getElementById('filterPaymentYear');
-      if (ms) ms.value = String(now.getMonth() + 1).padStart(2, '0');
-      if (ys) ys.value = String(now.getFullYear());
+      if (ms) ms.value = String(currentMonth + 1).padStart(2, '0');
+      if (ys) ys.value = String(currentYear);
 
       await this.loadPayments();
     } catch (e) {

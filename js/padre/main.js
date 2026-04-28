@@ -28,7 +28,7 @@ window.App = {
 window.addEventListener('unhandledrejection', (e) => {
   const msg = e.reason?.message?.toLowerCase() ?? '';
   if (msg.includes('indexeddb') || msg.includes('network') || msg.includes('fetch')) return;
-  console.error('[Padre] Unhandled rejection:', e.reason);
+
 });
 
 document.addEventListener('DOMContentLoaded', async () => {
@@ -55,7 +55,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     
     if (isProd) {
       try { await initOneSignal(auth.user); } catch(e) {
-        console.warn('⚠️ OneSignal error:', e);
+
       }
     } else {
     }
@@ -175,7 +175,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     _initDailyLogRealtime(currentStudent.id);
 
   } catch (err) {
-    console.error('Init Error:', err);
+
     Helpers.toast('Error al iniciar el panel', 'error');
   } finally {
     AppState.set('loading', false);
@@ -604,7 +604,7 @@ async function _initPadreQR(student) {
   const matLabel  = document.getElementById('padre-qr-matricula');
   const nameLabel = document.getElementById('padre-qr-name');
   if (!container || !student) {
-    console.warn('[PadreQR] Container or student not found:', { container: !!container, student: !!student });
+
     return;
   }
 
@@ -651,7 +651,7 @@ async function _initPadreQR(student) {
       correctLevel: window.QRCode.CorrectLevel.H
     });
   } catch (e) {
-    console.error('[PadreQR] Error loading QR library:', e);
+
     container.innerHTML = '<div class="w-48 h-48 flex items-center justify-center text-rose-500 text-xs text-center font-bold">Error al cargar QR.<br>Reintenta recargando la página.</div>';
   }
 

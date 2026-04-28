@@ -42,7 +42,6 @@ export const RealtimeManager = {
       if (!_channels.has(name)) return; // fue cancelado antes de conectar
       channel.subscribe((status) => {
         if (status === 'CHANNEL_ERROR') {
-          console.warn(`[RealtimeManager] Error en canal: ${name}`);
           _channels.delete(name);
           // Exponential backoff reconnect
           const delay = Math.min(1000 * Math.pow(2, (_retries.get(name) || 0)), 30000);

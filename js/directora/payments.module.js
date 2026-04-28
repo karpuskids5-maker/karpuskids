@@ -1,4 +1,4 @@
-import { DirectorApi } from './api.js';
+﻿import { DirectorApi } from './api.js';
 import { Helpers } from '../shared/helpers.js';
 import { UIHelpers } from './ui.module.js';
 import { supabase } from '../shared/supabase.js';
@@ -121,7 +121,6 @@ export const PaymentsModule = {
       tbody.innerHTML = list.map(p => this._row(p)).join('');
       if (window.lucide) lucide.createIcons();
     } catch (e) {
-      console.error('[Payments] loadPayments:', e);
       tbody.innerHTML = '<tr><td colspan="8" class="text-center py-8">' + Helpers.errorState('Error al cargar pagos', 'App.payments.loadPayments()') + '</td></tr>';
       if (window.lucide) lucide.createIcons();
     }
@@ -295,7 +294,6 @@ export const PaymentsModule = {
       await this.loadPayments();
       if (pay?.id) { try { await DirectorApi.sendPaymentReceipt(pay.id); } catch (_) {} }
     } catch (e) {
-      console.error(e);
       Helpers.toast('Error al guardar: ' + e.message, 'error');
     } finally {
       UIHelpers.setLoading(false, '#modalPayment');
@@ -343,7 +341,6 @@ export const PaymentsModule = {
         'success'
       );
     } catch (e) {
-      console.error('[sendReminders]', e);
       Helpers.toast('Error enviando recordatorios: ' + e.message, 'error');
     }
   },

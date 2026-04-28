@@ -1,4 +1,4 @@
-import { supabase } from '../shared/supabase.js';
+﻿import { supabase } from '../shared/supabase.js';
 import { AppState } from './appState.js';
 import { Helpers, escapeHtml } from './helpers.js';
 import { Helpers as SharedHelpers } from '../shared/helpers.js';
@@ -72,7 +72,6 @@ export const ChatModule = {
       ).join('');
 
     } catch (err) {
-      console.error('[ChatModule] loadContacts error:', err);
       list.innerHTML = Helpers.emptyState('Error al cargar contactos');
     }
   },
@@ -172,7 +171,6 @@ export const ChatModule = {
       }
 
     } catch (err) {
-      console.error('[ChatModule] loadMessages error:', err);
       if (!loadMore) container.innerHTML = SharedHelpers.errorState('Error al cargar mensajes');
       if (window.lucide) lucide.createIcons();
     }
@@ -228,7 +226,6 @@ export const ChatModule = {
         this.initRealtime();
       }
     } catch (err) {
-      console.error('[ChatModule] sendMessage error:', err);
       Helpers.toast('Error al enviar mensaje', 'error');
       container?.lastElementChild?.remove(); // revertir optimistic
     } finally {

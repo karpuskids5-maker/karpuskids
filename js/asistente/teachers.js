@@ -1,4 +1,4 @@
-import { supabase, sendEmail } from '../shared/supabase.js';
+﻿import { supabase, sendEmail } from '../shared/supabase.js';
 import { AssistantApi } from './api.js';
 import { Helpers } from '../shared/helpers.js';
 
@@ -52,7 +52,6 @@ export const TeachersModule = {
       
       if (window.lucide) lucide.createIcons();
     } catch (e) {
-      console.error(e);
       tbody.innerHTML = `<tr><td colspan="4" class="text-center text-rose-500 py-8 font-bold text-sm">Error cargando maestros</td></tr>`;
     }
   },
@@ -313,7 +312,6 @@ export const TeachersModule = {
       window._closeAsistenteModal?.();
       await this.loadTeachers();
     } catch (e) {
-      console.error(e);
       Helpers.toast(e.message || 'Error al guardar', 'error');
     } finally {
       if (btn) { btn.disabled = false; btn.textContent = 'Guardar Personal'; }

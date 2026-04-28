@@ -1,4 +1,4 @@
-import { supabase } from '../shared/supabase.js';
+﻿import { supabase } from '../shared/supabase.js';
 import { Helpers } from '../shared/helpers.js';
 import { AppState } from './state.js';
 import { sendEmail } from '../shared/supabase.js';
@@ -181,7 +181,6 @@ export const PaymentsModule = {
       if (window.lucide) lucide.createIcons();
 
     } catch (e) {
-      console.error('[PaymentsModule] loadPayments:', e);
       container.innerHTML =
         '<tr><td colspan="7" class="text-center py-8">' + Helpers.errorState('Error al cargar pagos', 'App.payments.loadPayments?.()') + '</td></tr>';
       if (window.lucide) lucide.createIcons();
@@ -466,7 +465,6 @@ export const PaymentsModule = {
       closeGlobalModal();
       await this.loadPayments();
     } catch (e) {
-      console.error(e);
       Helpers.toast('Error al guardar: ' + e.message, 'error');
     } finally {
       if (btn) { btn.disabled = false; btn.textContent = 'Registrar Pago'; }
@@ -537,7 +535,6 @@ export const PaymentsModule = {
 
       await sendEmail(emails, 'Recibo de Pago — ' + month + ' · ' + studentName, html);
     } catch (e) {
-      console.warn('[Asistente] sendReceipt error:', e);
     }
   },
 
@@ -573,7 +570,6 @@ export const PaymentsModule = {
       Helpers.toast('Ciclo completado: ' + (result.generated || 0) + ' generados, ' + (result.expired || 0) + ' vencidos', 'success');
       await this.loadPayments();
     } catch (e) {
-      console.error(e);
       Helpers.toast('Error en ciclo: ' + e.message, 'error');
     }
   }

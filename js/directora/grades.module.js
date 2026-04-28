@@ -1,4 +1,4 @@
-import { DirectorApi } from './api.js';
+﻿import { DirectorApi } from './api.js';
 import { Helpers } from '../shared/helpers.js';
 import { supabase } from '../shared/supabase.js';
 import { AppState } from './state.js';
@@ -160,7 +160,6 @@ export const GradesModule = {
       this._updateKPIs(this._allData);
 
     } catch (e) {
-      console.error('[GradesModule] loadGrades:', e);
       tableBody.innerHTML = '<tr><td colspan="4" class="text-center py-12">' + Helpers.errorState('Error al cargar calificaciones', 'App.grades.loadGrades()') + '</td></tr>';
       if (window.lucide) lucide.createIcons();
     }
@@ -374,7 +373,6 @@ export const GradesModule = {
       await this._loadPeriods();
       await this.loadGrades();
     } catch (e) {
-      console.error(e);
       Helpers.toast('Error al cerrar periodo', 'error');
     }
   },
@@ -442,7 +440,6 @@ export const GradesModule = {
       await this._loadPeriods();
       await this.loadGrades();
     } catch (e) {
-      console.error(e);
       Helpers.toast('Error al crear periodo', 'error');
     }
   },
@@ -521,7 +518,6 @@ export const GradesModule = {
       doc.save(`reporte_calificaciones_${new Date().toISOString().split('T')[0]}.pdf`);
       Helpers.toast('PDF generado correctamente', 'success');
     } catch (err) {
-      console.error('Error generando PDF:', err);
       Helpers.toast('Error al generar PDF. Asegúrate de que las librerías cargaron correctamente.', 'error');
     }
   }

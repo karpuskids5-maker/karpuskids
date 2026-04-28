@@ -1,4 +1,4 @@
-import { supabase, sendPush, emitEvent } from '../../shared/supabase.js';
+﻿import { supabase, sendPush, emitEvent } from '../../shared/supabase.js';
 import { AppState } from '../state.js';
 import { MaestraApi } from '../api.js';
 import { safeToast, safeEscapeHTML, Modal } from './ui.js';
@@ -77,7 +77,6 @@ export async function initTasks() {
     `}).join('');
     if (window.lucide) window.lucide.createIcons();
   } catch (e) {
-    console.error(e);
     listContainer.innerHTML = Helpers.errorState('Error al cargar tareas', 'App.initTasks()');
     if (window.lucide) window.lucide.createIcons();
   }
@@ -89,7 +88,6 @@ export async function openEditTaskModal(taskId) {
     if (error) throw error;
     openNewTaskModal(task);
   } catch (err) {
-    console.error('Error al obtener la tarea para editar:', err);
     safeToast('No se pudo cargar la tarea para editar', 'error');
   }
 }
@@ -101,7 +99,6 @@ export async function deleteTask(taskId) {
     safeToast('Tarea eliminada correctamente');
     await initTasks();
   } catch (err) {
-    console.error('Error al eliminar tarea:', err);
     safeToast('No se pudo eliminar la tarea', 'error');
   }
 }
@@ -257,7 +254,6 @@ export async function openNewTaskModal(taskToEdit = null) {
       await initTasks();
 
     } catch (err) {
-      console.error('Error guardando tarea:', err);
       safeToast(`Error al ${isEditing ? 'actualizar' : 'crear'} la tarea.`, 'error');
     } finally {
       saveBtn.disabled = false;
@@ -339,7 +335,6 @@ export async function viewTaskSubmissions(taskId) {
     `;
     Modal.open(modalId, content);
   } catch (err) {
-    console.error('Error al cargar entregas:', err);
     safeToast('Error al cargar entregas', 'error');
   }
 }
@@ -374,7 +369,6 @@ export async function submitGrade(taskId, studentId) {
       }
     }
   } catch (e) {
-    console.error('Error al calificar tarea:', e);
     safeToast('Error al calificar', 'error');
   }
 }

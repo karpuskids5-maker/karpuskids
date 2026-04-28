@@ -1,4 +1,4 @@
-import { createClient } from "https://cdn.jsdelivr.net/npm/@supabase/supabase-js/+esm";
+﻿import { createClient } from "https://cdn.jsdelivr.net/npm/@supabase/supabase-js/+esm";
 
 export { createClient };
 export const SUPABASE_URL      = "https://wwnfonkvemimwiqjpkij.supabase.co";
@@ -57,7 +57,6 @@ window.addEventListener('karpus:db-error', (e) => {
   if (window.Helpers?.toast) {
     window.Helpers.toast('Error: ' + msg, 'error');
   } else {
-    console.error('[Karpus DB Error]', msg);
   }
 });
 
@@ -102,7 +101,6 @@ export async function ensureRole(requiredRoles) {
   // 1. Si el perfil no existe, intentar crearlo automáticamente
   let resolvedProfile = profile;
   if (!profile && !profileRes.error) {
-    console.warn('[ensureRole] Profile not found, creating basic profile for:', user.id);
     const { data: newProfile } = await supabase.from('profiles').insert({
       id:    user.id,
       email: user.email,
@@ -113,7 +111,6 @@ export async function ensureRole(requiredRoles) {
   }
 
   if (!resolvedProfile) {
-    console.warn('[ensureRole] Could not resolve profile for user:', user.id);
     // No redirigir — dejar que el panel maneje el estado sin perfil
   }
 
@@ -123,7 +120,6 @@ export async function ensureRole(requiredRoles) {
       window.location.href = 'panel_control.html';
       return null;
     }
-    console.warn('[ensureRole] Role mismatch. User has:', resolvedProfile.role, 'Expected one of:', roles);
     await supabase.auth.signOut();
     window.location.href = 'login.html?error=role';
     return null;
@@ -132,7 +128,6 @@ export async function ensureRole(requiredRoles) {
   // 2. Verificar aceptación de términos (solo si es panel real, no login)
   // Si termsRes.error existe (ej: tabla no existe), permitimos pasar para no bloquear la app
   if (!terms && !termsRes.error && !window.location.pathname.includes('login.html')) {
-    console.warn('[ensureRole] Terms not accepted yet');
     window.location.href = 'login.html?reason=terms';
     return null;
   }
@@ -158,12 +153,10 @@ export async function sendEmail(to, subject, html, text) {
     });
     
     if (error) {
-      console.warn('[sendEmail] Function error:', error);
       return null;
     }
     return data;
   } catch (e) {
-    console.warn('[sendEmail] Catch error (silencioso en local):', e.message);
     return null;
   }
 }
@@ -180,12 +173,10 @@ export async function sendPush(payload) {
     });
 
     if (error) {
-      console.warn('[sendPush] Function error:', error);
       return null;
     }
     return data;
   } catch (e) {
-    console.warn('[sendPush] Catch error (silencioso):', e.message);
     return null;
   }
 }
@@ -198,7 +189,6 @@ export async function emitEvent(type, data) {
     });
     
     if (error) {
-      console.warn('[emitEvent] Function error:', error);
       return null;
     }
     
@@ -208,7 +198,6 @@ export async function emitEvent(type, data) {
     
     return resData;
   } catch (e) {
-    console.warn('[emitEvent] Catch error:', e.message);
     return null;
   }
 }
@@ -293,7 +282,6 @@ export async function initOneSignal(currentUser = null) {
         event.reason.name === 'UnknownError' ||
         event.reason.message?.toLowerCase().includes('backing store')
       )) {
-        console.warn('[OneSignal] Error de almacenamiento silenciado (incógnito):', event.reason.message);
         event.preventDefault();
         event.stopPropagation();
       }
@@ -367,7 +355,6 @@ export async function initOneSignal(currentUser = null) {
           await new Promise(r => setTimeout(r, 1500));
 
           if (!OneSignal.User) {
-            console.warn('[OneSignal] User object not available yet');
             return;
           }
 
@@ -445,6 +432,5 @@ export async function initOneSignal(currentUser = null) {
       }
     });
   } catch (globalErr) {
-    console.warn('[OneSignal] Error global en initOneSignal:', globalErr.message);
   }
 }

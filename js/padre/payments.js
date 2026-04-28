@@ -1,4 +1,4 @@
-/**
+﻿/**
  * 💳 Panel Padre — Módulo de Pagos (limpio, sin columnas inexistentes)
  */
 import { supabase } from '../shared/supabase.js';
@@ -51,7 +51,6 @@ export const PaymentsModule = {
       container.innerHTML = this._payments.map(p => this._renderCard(p)).join('');
       if (window.lucide) lucide.createIcons();
     } catch (err) {
-      console.error('[PaymentsModule]', err);
       container.innerHTML = Helpers.emptyState('Error al cargar pagos', 'alert-triangle');
     }
   },
@@ -278,7 +277,6 @@ export const PaymentsModule = {
         month
       }).catch(() => {});
     } catch (err) {
-      console.error('[submitPaymentProof]', err);
       document.getElementById('payment-upload-progress')?.remove();
       Helpers.toast('Error al enviar: ' + (err.message || ''), 'error');
     } finally {

@@ -1,4 +1,4 @@
-import { supabase } from '../shared/supabase.js';
+﻿import { supabase } from '../shared/supabase.js';
 import { Helpers } from '../shared/helpers.js';
 
 const STATUS = {
@@ -108,7 +108,6 @@ export const AttendanceModule = {
       this._renderTable();
       this._renderCharts();
     } catch (e) {
-      console.error('[AttendanceModule]', e);
       const tb = document.getElementById('attTableBody');
       if (tb) tb.innerHTML = '<tr><td colspan="6" class="text-center py-10">' + Helpers.errorState('Error al cargar asistencia', 'App.attendance.load()') + '</td></tr>';
       if (window.lucide) lucide.createIcons();

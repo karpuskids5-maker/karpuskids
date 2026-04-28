@@ -1,4 +1,4 @@
-import { supabase, sendPush } from '../../shared/supabase.js';
+﻿import { supabase, sendPush } from '../../shared/supabase.js';
 import { AppState } from '../state.js';
 import { MaestraApi } from '../api.js';
 import { safeToast, safeEscapeHTML, Modal } from './ui.js';
@@ -53,7 +53,6 @@ export async function initAttendance() {
       if (window.lucide) window.lucide.createIcons();
     }
   } catch (err) {
-    console.error(err);
   }
 }
 
@@ -100,7 +99,6 @@ export async function markAllPresent() {
 
       const failures = results.filter(r => r.status === 'rejected');
       if (failures.length > 0) {
-        console.error('Algunas asistencias fallaron:', failures);
         safeToast(`Se registraron ${results.length - failures.length} asistencias, ${failures.length} fallaron`, 'warning');
       } else {
         safeToast('Asistencia masiva completada');
@@ -118,7 +116,6 @@ export async function markAllPresent() {
 
       await initAttendance();
     } catch (e) {
-      console.error('Error masivo:', e);
       safeToast('Error crítico en asistencia masiva', 'error');
     }
   };
@@ -178,7 +175,6 @@ export async function registerAttendance(studentId, status) {
     
     safeToast(`Asistencia: ${statusLiteral}`);
   } catch (e) {
-    console.error('Error attendance:', e);
     safeToast('Error al registrar asistencia', 'error');
     await initAttendance();
   }
@@ -263,6 +259,5 @@ async function _loadAbsenceRequests(classroomId, students) {
 
     if (window.lucide) window.lucide.createIcons();
   } catch (e) {
-    console.warn('[_loadAbsenceRequests]', e.message);
   }
 }

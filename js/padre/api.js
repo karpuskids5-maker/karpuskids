@@ -1,4 +1,4 @@
-import { supabase } from '../shared/supabase.js';
+﻿import { supabase } from '../shared/supabase.js';
 import { TABLES } from './appState.js';
 
 /**
@@ -7,7 +7,6 @@ import { TABLES } from './appState.js';
 async function handle(queryPromise, context = 'API') {
   const { data, error } = await queryPromise;
   if (error) {
-    console.error(`❌ [${context}]`, { message: error.message, details: error.details });
     throw new Error(error.message);
   }
   return data;

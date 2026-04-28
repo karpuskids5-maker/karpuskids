@@ -1,4 +1,4 @@
-import { supabase, createClient, SUPABASE_URL, SUPABASE_ANON_KEY, initOneSignal } from './js/shared/supabase.js';
+﻿import { supabase, createClient, SUPABASE_URL, SUPABASE_ANON_KEY, initOneSignal } from './js/shared/supabase.js';
 import { ChatModule } from './js/shared/chat.js';
 import { WallModule } from './js/directora/wall.module.js'; // 🔥 Usar módulo específico
 import { VideoCallModule } from './js/shared/videocall.js'; // 🔥 Nuevo Módulo
@@ -84,7 +84,7 @@ window.AttendanceCache = {
 // 3. FUNCIÓN PARA CARGAR AULAS
 window.loadRooms = async function(teacherId = null, searchTerm = '') {
   await safeExecute(async () => {
-    let query = supabase.from('classrooms').select('*');
+    let query = supabase.from('classrooms').select('id, name, level, capacity, teacher_id');
     
     if (teacherId && teacherId !== 'all') {
       query = query.eq('teacher_id', teacherId);
@@ -167,7 +167,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     return;
   }
   
-  const { data: profile } = await supabase.from('profiles').select('*').eq('id', user.id).single();
+  const { data: profile } = await supabase.from('profiles').select('id, name, email, role, avatar_url, phone, bio').eq('id', user.id).single();
   if (!profile || profile.role !== 'directora') {
     try { await supabase.auth.signOut(); } catch (_) {}
     window.location.href = 'login.html';
@@ -220,7 +220,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   try {
     const channel = supabase.channel('karpus-global-updates');
     channel.on('broadcast', { event: 'attendance_updated' }, (message) => {
-      console.log('Director Panel: Received attendance update!', message.payload);
+
       AttendanceCache.invalidateAll(); // Limpiar cache de asistencia
       
       // Recargar dashboard y sección de asistencia si están visibles
@@ -575,7 +575,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         // Modo Edición: Cargar datos del estudiante y rellenar formulario
         const { data: student, error } = await supabase
             .from('students')
-            .select('*')
+            .select('id, name, classroom_id, is_active, p1_name, p1_phone, p1_email, p2_name, p2_phone, p2_email, monthly_fee, matricula')
             .eq('id', studentId)
             .single();
         if (error) throw error;
@@ -847,7 +847,7 @@ document.addEventListener('DOMContentLoaded', async () => {
       specialtyInput && (specialtyInput.value = '');
       
       try {
-        const { data, error } = await supabase.from('profiles').select('*').eq('id', id).single();
+        const { data, error } = await supabase.from('profiles').select('id, name, email, role, avatar_url, phone, bio').eq('id', id).single();
         if (error) throw error;
         nameInput && (nameInput.value = data?.name || '');
         phoneInput && (phoneInput.value = data?.phone || '');
@@ -986,7 +986,7 @@ document.addEventListener('DOMContentLoaded', async () => {
       const cacheKey = `list:${today}`;
       let data = AttendanceCache.get(cacheKey);
       if (!data) {
-        const { data: fresh, error } = await supabase.from('attendance').select('*').eq('date', today);
+        const { data: fresh, error } = await supabase.from('attendance').select('id, student_id, classroom_id, date, status, check_in, check_out').eq('date', today);
         if (error) throw error;
         data = fresh || [];
         AttendanceCache.set(cacheKey, data);
@@ -1732,7 +1732,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     if (roomId) {
        title.textContent = 'Editar Aula';
        idInput.value = roomId;
-       const { data: room } = await supabase.from('classrooms').select('*').eq('id', roomId).single();
+       const { data: room } = await supabase.from('classrooms').select('id, name, level, capacity, teacher_id').eq('id', roomId).single();
        if (room) {
           nameInput.value = room.name || '';
           capacityInput.value = room.capacity || '';
@@ -1791,3 +1791,4 @@ document.addEventListener('DOMContentLoaded', async () => {
     }
   }
 });
+

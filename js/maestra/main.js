@@ -1,4 +1,4 @@
-﻿import { supabase, ensureRole, emitEvent, sendPush, initOneSignal } from '../shared/supabase.js';
+import { supabase, ensureRole, emitEvent, sendPush, initOneSignal } from '../shared/supabase.js';
 import { AppState } from './state.js';
 import { MaestraApi } from './api.js';
 import { Helpers } from '../shared/helpers.js';
@@ -84,7 +84,7 @@ window.App = {
 window.addEventListener('unhandledrejection', (e) => {
   const msg = e.reason?.message?.toLowerCase() ?? '';
   if (msg.includes('indexeddb') || msg.includes('network') || msg.includes('fetch')) return;
-  console.error('[Maestra] Unhandled rejection:', e.reason);
+
 });
 
 document.addEventListener('DOMContentLoaded', async () => {
@@ -109,7 +109,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   const isProd = host === 'karpuskids.com' || host === 'www.karpuskids.com' || host.endsWith('.karpuskids.com');
   
   if (isProd) {
-    try { initOneSignal(auth.user); } catch(e) { console.warn("OneSignal ignored:", e); }
+    try { initOneSignal(auth.user); } catch(_) {}
   }
 
   // Identidad
@@ -180,7 +180,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         // Recargar la p\u00e1gina para reflejar cambios en sidebar y UI
         setTimeout(() => location.reload(), 1000);
       } catch (err) {
-        console.error('Error saving profile:', err);
+
         safeToast('Error al guardar perfil. Revisa tu conexi\u00f3n.', 'error');
         btn.disabled = false;
         btn.innerHTML = '<i data-lucide="save" class="w-5 h-5"></i> Guardar Cambios';
@@ -226,7 +226,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         
         safeToast('Avatar actualizado correctamente');
       } catch (err) {
-        console.error('Error uploading avatar:', err);
+
         safeToast('Error al subir avatar', 'error');
       }
     };
@@ -337,7 +337,7 @@ g    // Badge tareas pendientes de calificar
     }, AppState);
 
   } catch (e) {
-    console.error('Error init:', e);
+
     safeToast('Error cargando datos del aula', 'error');
   }
 
@@ -368,7 +368,7 @@ async function notify({ message, pushTo = null }) {
       title: 'Notificaci\u00f3n Karpus',
       message: message,
       link: '/panel_padres.html'
-    }).catch(console.warn);
+    }).catch(() => {});
   }
 }
 
@@ -433,7 +433,7 @@ async function initDashboard() {
     }
     if (window.lucide) window.lucide.createIcons();
   } catch (err) {
-    console.error(err);
+
     safeToast('Error cargando dashboard', 'error');
   }
 }
@@ -519,7 +519,7 @@ function initNavigation() {
     
     // Si no coincide (usamos loose equality para manejar string vs number), intentar obtenerlo de la base de datos o AppState
     if (!classroom || classroom.id != classroomId) {
-      console.warn('Classroom mismatch, fetching or using state...');
+
       const { data } = await supabase.from('classrooms').select('id, name, email, phone, avatar_url, role, bio').eq('id', classroomId).maybeSingle();
       if (data) {
         classroom = data;
@@ -593,7 +593,7 @@ function initClassTabs() {
             userName:    profile?.name || 'Maestra',
             classroomId: classroom?.id || null
           });
-        }).catch(console.error);
+        }).catch(() => {});
       }
     };
   });
@@ -671,7 +671,7 @@ async function startJitsi() {
 
     safeToast('\u00a1Clase iniciada! Los padres han sido notificados \ud83c\udfa5', 'success');
   } catch (e) {
-    console.error('startJitsi error:', e);
+
     safeToast('Error al iniciar la clase: ' + e.message, 'error');
     if (btn) { btn.disabled = false; btn.innerHTML = '<i data-lucide="radio"></i> Iniciar Clase Ahora'; }
   }
@@ -710,7 +710,7 @@ async function sendChatMessage() {
     await loadChatMessages(activeChatUserId);
 
   } catch (err) {
-    console.error('Error enviando mensaje:', err);
+
     safeToast('Error al enviar mensaje', 'error');
   } finally {
     input.disabled = false;
@@ -813,9 +813,9 @@ async function submitNewPost() {
       classroom_id:    classroom?.id,
       teacher_name:    teacherName,
       content_preview: content.slice(0, 80)
-    }).catch(err => console.warn('[post.created] event failed:', err));
+    }).catch(() => {});
   } catch (e) {
-    console.error(e);
+
     safeToast('Error al publicar', 'error');
     btn.disabled = false;
     btn.innerHTML = 'PUBLICAR';
@@ -918,7 +918,7 @@ async function initGrades() {
 
     if (window.lucide) window.lucide.createIcons();
   } catch (e) {
-    console.error('[initGrades]', e);
+
     const content = document.getElementById('gradesContent');
     if (content) {
       content.innerHTML = Helpers.errorState('Error al cargar calificaciones', 'App.initGrades?.()');

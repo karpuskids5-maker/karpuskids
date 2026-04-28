@@ -81,7 +81,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   // ✅ FIX OneSignal: Solo inicializar en el dominio correcto para evitar errores de consola
   if (window.location.hostname === 'karpuskids.com' || window.location.hostname === 'localhost') {
     try { initOneSignal(auth.user); } catch(e) {
-      console.warn('⚠️ OneSignal error:', e);
+
     }
   } else {
   }
@@ -161,7 +161,7 @@ function initNavigation() {
       sectionEl.classList.remove('hidden');
       sectionEl.classList.add('active'); 
     } else {
-      console.error(`❌ Sección no encontrada: ${target}`);
+
     }
     
     AppState.set('currentSection', target);
@@ -213,7 +213,7 @@ function initNavigation() {
                 userName: vcProfile?.name || 'Asistente',
                 classroomId: null
               });
-            }).catch(console.error);
+            }).catch(() => {});
             break;
           }
           case 'perfil':
@@ -223,7 +223,7 @@ function initNavigation() {
         }
         loadedSections.add(target);
       } catch (err) {
-        console.error(`[Asistente] Error cargando sección ${target}:`, err);
+
         Helpers.toast(`Error al cargar ${target}`, 'error');
       }
     } else {
@@ -298,7 +298,7 @@ function initNavigation() {
 async function initProfile() {
   const profile = AppState.get('profile');
   if (!profile) {
-    console.warn('⚠️ Profile not loaded');
+
     return;
   }
   
@@ -376,7 +376,7 @@ async function initProfile() {
         document.getElementById('sidebarUserName').textContent = updates.name;
         
       } catch (err) {
-        console.error('Error updating profile:', err);
+
         Helpers.toast('Error al guardar perfil', 'error');
       } finally {
         if (btn) { btn.disabled = false; btn.textContent = 'Guardar Cambios'; }
@@ -447,7 +447,7 @@ async function initAssistantChat() {
       });
     }
   } catch (e) {
-    console.error("Error initAssistantChat:", e);
+
   }
 }
 
@@ -524,7 +524,7 @@ async function loadChatContacts(searchTerm = '', unreadMap = {}) {
       </div>
     `}).join('');
   } catch (error) {
-    console.error('❌ Chat contacts error:', error);
+
     container.innerHTML = Helpers.errorState('Error cargando contactos');
     if (window.lucide) lucide.createIcons();
   }
@@ -604,7 +604,7 @@ async function selectAssistantChat(userId, name, role) {
     });
 
   } catch (e) {
-    console.error('❌ Chat load error:', e);
+
     msgs.innerHTML = Helpers.errorState('Error cargando chat');
     if (window.lucide) lucide.createIcons();
   }
@@ -618,7 +618,7 @@ async function sendAssistantMessage() {
     input.value = '';
     await ChatModule.sendMessage(AppState.get('user').id, activeChatUserId, text, activeConversationId);
   } catch (e) {
-    console.error('❌ Send message error:', e);
+
     Helpers.toast('Error enviando mensaje', 'error');
   }
 }
@@ -716,7 +716,7 @@ async function submitNewPost() {
     WallModule.loadPosts(document.getElementById('muroPostsContainer'));
 
   } catch (e) {
-    console.error('Error submitting post:', e);
+
     Helpers.toast('Error al publicar', 'error');
     btn.disabled = false;
     btn.innerHTML = 'PUBLICAR';
@@ -767,7 +767,7 @@ async function loadAsistenteStudents() {
 
     if (window.lucide) lucide.createIcons();
   } catch (e) {
-    console.error('[loadAsistenteStudents]', e);
+
     tbody.innerHTML = '<tr><td colspan="4" class="text-center py-8">' + Helpers.errorState('Error al cargar estudiantes') + '</td></tr>';
     if (window.lucide) lucide.createIcons();
   }
@@ -819,7 +819,7 @@ async function loadAsistenteRooms() {
 
     if (window.lucide) lucide.createIcons();
   } catch (e) {
-    console.error('[loadAsistenteRooms]', e);
+
     tbody.innerHTML = '<tr><td colspan="5" class="text-center py-8">' + Helpers.errorState('Error al cargar aulas') + '</td></tr>';
     if (window.lucide) lucide.createIcons();
   }

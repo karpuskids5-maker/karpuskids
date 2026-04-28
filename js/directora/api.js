@@ -21,7 +21,7 @@ const withTimeout = (promiseOrFn, ms = 10000) => {
 };
 
 const logError = (context, err) => {
-  console.error(`[DirectorApi:${context}]`, err);
+
   return { data: null, error: err.message || err };
 };
 
@@ -332,7 +332,7 @@ export const DirectorApi = {
         );
         // Si falla por columna inexistente, intentar sin classroom_id
         if (res.error && (res.error.message?.includes('classroom_id') || res.error.code === '42703')) {
-          console.warn('[DirectorApi] classroom_id no existe, usando select básico');
+
           return await withTimeout(() =>
             supabase.from('students')
               .select('id, name, is_active, parent_id, p1_name, p1_phone, p1_email')
@@ -365,7 +365,7 @@ export const DirectorApi = {
     const result = await withTimeout(() => supabase.from(TABLES.STUDENTS).update(clean).eq('id', numId).select().single());
 
     if (result.error) {
-      console.error('[updateStudent] Error fatal:', result.error.message);
+
     }
     QueryCache.invalidate('dir_students');
     return result;
@@ -441,10 +441,10 @@ export const DirectorApi = {
   async sendPaymentReceipt(paymentId) {
       try {
         const { data: p, error } = await this.getPaymentById(paymentId);
-        if (error || !p) { console.warn('[sendPaymentReceipt] Payment not found:', paymentId); return false; }
+        if (error || !p) { return false; }
 
         const emails = [p.students?.p1_email, p.students?.p2_email].filter(e => e && e.includes('@'));
-        if (!emails.length) { console.warn('[sendPaymentReceipt] No valid emails for payment:', paymentId); return false; }
+        if (!emails.length) { return false; }
 
         const studentName = p.students?.name || 'Estudiante';
         const amount  = Number(p.amount || 0).toLocaleString('es-ES', { style: 'currency', currency: 'USD', minimumFractionDigits: 2 });
@@ -497,7 +497,7 @@ export const DirectorApi = {
         const result = await sendEmail(emails, 'Recibo de Pago — ' + month + ' · ' + studentName, html);
         return !!result;
       } catch (e) {
-        console.error('[sendPaymentReceipt] Error:', e);
+
         return false;
       }
     }
