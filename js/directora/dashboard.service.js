@@ -104,6 +104,14 @@ export const DashboardService = {
         ...(financialSummaryRes?.data || {})
       };
 
+      // Calculate pending amount directly from fetched payments (more reliable than RPC)
+      const allPendingPayments = paymentsRes?.data || [];
+      const directPendingAmount = allPendingPayments
+        .reduce((sum, p) => sum + Number(p.amount || 0), 0);
+      if (directPendingAmount > 0) {
+        financialSummarySafe.total_pending = directPendingAmount;
+      }
+
       const inquiries = inquiriesRaw
         .filter(x => !['resolved', 'closed'].includes(x.status))
         .slice(0, 5);

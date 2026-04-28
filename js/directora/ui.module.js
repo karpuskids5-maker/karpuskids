@@ -1,4 +1,4 @@
-import { Helpers } from '../shared/helpers.js';
+﻿import { Helpers } from '../shared/helpers.js';
 
 const UIHelpers = {
   setLoading(isLoading, containerSelector = '#globalModalContainer', btnSelector = null) {

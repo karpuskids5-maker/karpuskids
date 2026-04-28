@@ -186,9 +186,11 @@ export const DirectorApi = {
         .select('id, amount, status, month_paid, due_date, paid_date, method, bank, reference, proof_url, created_at, students:student_id(name, classrooms:classroom_id(name))');
       if (filters.status && filters.status !== 'all') query = query.eq('status', filters.status);
       if (filters.year) {
-        query = query.gte('due_date', `${filters.year}-01-01`).lte('due_date', `${filters.year}-12-31`);
+        // Use month_paid prefix to match current year payments
+        const yr = String(filters.year);
+        query = query.like('month_paid', yr + '-%');
       }
-      return await query.order('created_at', { ascending: false }).limit(filters.limit || 100);
+      return await query.order('created_at', { ascending: false }).limit(filters.limit || 200);
     } catch (e) { return logError('getPayments', e); }
   },
 

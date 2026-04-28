@@ -219,6 +219,7 @@ async function refreshDashboard() {
   }
 
   if (finance?.config) AppState.set('financeConfig', finance.config);
+  if (finance?.history) AppState.set('financeHistory', finance.history);
   AppState.set('todayAttendance', todayAtt?.status || null);
 
   renderHomeCards(student, { finance, academic, todayAtt: todayAtt?.status });
@@ -422,7 +423,17 @@ export function navigateTo(targetId) {
     const student = AppState.get('currentStudent');
     switch (targetId) {
       case 'home':            refreshDashboard(); break;
-      case 'payments':        PaymentsModule.init(student?.id); break;
+      case 'payments': {
+        const fin = AppState.get('financeConfig') || {};
+        // Update header stats
+        const setEl = (id, v) => { const el = document.getElementById(id); if (el) el.textContent = v; };
+        const paidTotal = (AppState.get('financeHistory') || []).reduce((s, p) => s + Number(p.amount || 0), 0);
+        setEl('paymentsBalance', Helpers.formatCurrency(paidTotal));
+        setEl('paymentsMonthlyFee', Helpers.formatCurrency(fin.monthly_fee || 0));
+        setEl('paymentsDueDay', fin.due_day || '-');
+        PaymentsModule.init(student?.id);
+        break;
+      }
       case 'tasks':           TasksModule.init(student?.id); break;
       case 'live-attendance': AttendanceModule.init(student?.id); break;
       case 'notifications':   ChatModule.init(); break;

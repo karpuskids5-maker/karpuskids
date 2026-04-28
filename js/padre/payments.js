@@ -28,20 +28,35 @@ export const PaymentsModule = {
         .from(TABLES.PAYMENTS)
         .select('id,student_id,amount,concept,status,due_date,created_at,paid_date,method,month_paid,evidence_url,notes')
         .eq('student_id', this._studentId)
-        .order('created_at', { ascending: false });
+        .order('due_date', { ascending: false });
       if (error) throw error;
 
-      // Deduplicar por mes
+      // Deduplicar: por mes, conservar el más relevante
+      // Prioridad: paid > review > overdue > pending (más reciente gana en empate)
+      const statusPriority = { paid: 4, pagado: 4, confirmado: 4, review: 3, revision: 3, overdue: 2, vencido: 2, pending: 1, pendiente: 1 };
       const monthMap = new Map();
       for (const p of data || []) {
-        const key = (p.month_paid || 'varios').toLowerCase();
+        const key = (p.month_paid || 'varios').toLowerCase().trim();
         const ex  = monthMap.get(key);
         if (!ex) { monthMap.set(key, p); continue; }
-        if (p.evidence_url && !ex.evidence_url) { monthMap.set(key, p); continue; }
-        if (new Date(p.created_at) > new Date(ex.created_at)) monthMap.set(key, p);
+        const pPri  = statusPriority[(p.status||'').toLowerCase()] || 0;
+        const exPri = statusPriority[(ex.status||'').toLowerCase()] || 0;
+        // Keep paid over pending; if same priority keep most recent
+        if (pPri > exPri) { monthMap.set(key, p); continue; }
+        if (pPri === exPri && new Date(p.created_at) > new Date(ex.created_at)) {
+          monthMap.set(key, p);
+        }
       }
       this._payments = Array.from(monthMap.values())
-        .sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
+        .sort((a, b) => {
+          // Sort: pending/overdue first (by due_date asc), then paid (by paid_date desc)
+          const aIsPaid = ['paid','pagado','confirmado'].includes((a.status||'').toLowerCase());
+          const bIsPaid = ['paid','pagado','confirmado'].includes((b.status||'').toLowerCase());
+          if (!aIsPaid && !bIsPaid) return new Date(a.due_date||0) - new Date(b.due_date||0);
+          if (!aIsPaid) return -1;
+          if (!bIsPaid) return 1;
+          return new Date(b.paid_date||b.created_at) - new Date(a.paid_date||a.created_at);
+        });
 
       if (!this._payments.length) {
         container.innerHTML = Helpers.emptyState('No hay registros de pagos', 'credit-card');
@@ -49,6 +64,14 @@ export const PaymentsModule = {
       }
       this._renderAlertBanner(this._payments);
       container.innerHTML = this._payments.map(p => this._renderCard(p)).join('');
+
+      // Update header stats
+      const paidTotal = this._payments
+        .filter(p => ['paid','pagado','confirmado'].includes((p.status||'').toLowerCase()))
+        .reduce((s, p) => s + Number(p.amount || 0), 0);
+      const el = document.getElementById('paymentsBalance');
+      if (el) el.textContent = Helpers.formatCurrency(paidTotal);
+
       if (window.lucide) lucide.createIcons();
     } catch (err) {
       container.innerHTML = Helpers.emptyState('Error al cargar pagos', 'alert-triangle');
@@ -151,7 +174,7 @@ export const PaymentsModule = {
     }
 
     return `
-      <div class="bg-white rounded-3xl border border-slate-100 shadow-sm hover:shadow-md transition-all mb-4 overflow-hidden ${sc.border}">
+      <div class="bg-white rounded-3xl border border-slate-100 overflow-hidden ${sc.border} mb-3">
         <div class="p-5">
           <div class="flex justify-between items-start gap-3">
             <div class="flex items-center gap-3 min-w-0">

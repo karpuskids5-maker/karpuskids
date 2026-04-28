@@ -1030,7 +1030,7 @@ create policy "login_attempts_insert" on public.login_attempts for insert with c
 -- 6. FUNCIONES RPC
 -- ============================================================
 create or replace function public.run_payment_cycle()
-returns jsonb language plpgsql security definer set search_path = public as $
+returns jsonb language plpgsql security definer set search_path = public as $$
 declare
   v_gen_day      int;
   v_due_day      int;
@@ -1077,4 +1077,4 @@ begin
 
   return jsonb_build_object('generated', v_gen_count, 'expired', v_expire_count);
 end;
-$;
+$$;

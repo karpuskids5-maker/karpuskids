@@ -114,20 +114,20 @@ async function loadUsers() {
 }
 
 async function loadAudit() {
-  // Use notifications table as audit log (all system events)
+  // Cambiado de 'notifications' a 'audit_logs' para reflejar movimientos reales
   const { data } = await supabase
-    .from('notifications')
-    .select('id, user_id, title, message, type, created_at, is_read, link')
+    .from('audit_logs')
+    .select('id, user_id, action, payload, created_at')
     .order('created_at', { ascending: false })
     .limit(500);
   allAudit = data || [];
-  document.getElementById('badge-audit').textContent = allAudit.filter(a => !a.is_read).length || 0;
+  document.getElementById('badge-audit').textContent = allAudit.length;
 }
 
 async function loadPayments() {
   const { data } = await supabase
     .from('payments')
-    .select('id, amount, status, method, bank, month, created_at, students:student_id(name, p1_name)')
+    .select('id, amount, status, method, bank, month, created_at, student_id')
     .order('created_at', { ascending: false })
     .limit(300);
   allPayments = data || [];
@@ -146,18 +146,17 @@ async function loadAttendance() {
 }
 
 // ── Dashboard render ──────────────────────────────────────────────────────────
-function renderDashboard() {
+async function renderDashboard() {
   // Students
-  const { data: studData } = { data: null };
-  supabase.from('students').select('id', { count: 'exact', head: true }).eq('is_active', true)
-    .then(({ count }) => { document.getElementById('kpi-students').textContent = count || 0; });
+  const { count } = await supabase.from('students').select('*', { count: 'exact', head: true }).eq('is_active', true);
+  document.getElementById('kpi-students').textContent = count || 0;
 
   // Payments this month
   const now = new Date();
   const monthStr = `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}`;
   const monthPays = allPayments.filter(p => p.created_at?.startsWith(monthStr));
   document.getElementById('kpi-payments').textContent = monthPays.length;
-  const revenue = monthPays.filter(p => p.status === 'approved').reduce((s, p) => s + Number(p.amount || 0), 0);
+  const revenue = monthPays.filter(p => p.status === 'paid' || p.status === 'approved').reduce((s, p) => s + Number(p.amount || 0), 0);
   document.getElementById('kpi-revenue').textContent = revenue.toLocaleString('es-DO');
 
   // Fraud alerts
@@ -226,13 +225,14 @@ function renderRecentAudit() {
     const user = allUsers.find(u => u.id === a.user_id);
     const name = user?.name || user?.email || a.user_id?.slice(0,8) || '—';
     const time = a.created_at ? new Date(a.created_at).toLocaleTimeString('es-DO', { hour: '2-digit', minute: '2-digit' }) : '—';
-    const typeBadge = { payment: 'badge-green', attendance: 'badge-blue', error: 'badge-red', task: 'badge-purple', post: 'badge-orange' };
-    const badge = typeBadge[a.type] || 'badge-gray';
+    const action = a.action || 'movimiento';
+    const typeBadge = { 'payment.approved': 'badge-green', 'attendance.check_in': 'badge-blue', 'error': 'badge-red' };
+    const badge = typeBadge[action] || 'badge-gray';
     return `<tr>
       <td><span style="font-weight:800;">${escH(name)}</span></td>
-      <td style="max-width:180px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${escH(a.title || a.message || '—')}</td>
+      <td style="max-width:180px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${escH(action)}</td>
       <td style="color:var(--muted);">${time}</td>
-      <td><span class="badge ${badge}">${a.type || 'info'}</span></td>
+      <td><span class="badge ${badge}">${action.split('.')[0]}</span></td>
     </tr>`;
   }).join('');
 }
@@ -249,18 +249,18 @@ function renderAuditTable(data) {
     const email = user?.email || a.user_id?.slice(0,12) || '—';
     const role  = user?.role  || '—';
     const dt = a.created_at ? new Date(a.created_at).toLocaleString('es-DO') : '—';
-    const typeBadge = { payment: 'badge-green', attendance: 'badge-blue', error: 'badge-red', task: 'badge-purple', post: 'badge-orange', info: 'badge-gray' };
-    const badge = typeBadge[a.type] || 'badge-gray';
+    const action = a.action || '—';
+    const badge = action.includes('payment') ? 'badge-green' : action.includes('attendance') ? 'badge-blue' : 'badge-gray';
     const roleBadge = { padre: 'badge-blue', maestra: 'badge-green', directora: 'badge-orange', asistente: 'badge-purple', admin: 'badge-yellow' };
     return `<tr>
       <td style="color:var(--muted);">${i+1}</td>
       <td style="white-space:nowrap;color:var(--muted);font-size:11px;">${dt}</td>
       <td><div style="font-weight:800;font-size:12px;">${escH(name)}</div><div style="font-size:10px;color:var(--muted);">${escH(email)}</div></td>
       <td><span class="badge ${roleBadge[role]||'badge-gray'}">${role}</span></td>
-      <td><span class="badge ${badge}">${a.type || 'info'}</span></td>
-      <td style="max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${escH(a.message || a.title || '—')}</td>
+      <td><span class="badge ${badge}">${action}</span></td>
+      <td style="max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${escH(JSON.stringify(a.payload || {}))}</td>
       <td style="color:var(--muted);font-size:11px;">Web</td>
-      <td><span class="badge ${a.is_read ? 'badge-gray' : 'badge-green'}">${a.is_read ? 'Leído' : 'Nuevo'}</span></td>
+      <td><span class="badge badge-gray">Sincronizado</span></td>
     </tr>`;
   }).join('');
 }

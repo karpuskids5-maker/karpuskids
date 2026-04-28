@@ -300,13 +300,16 @@ export const PaymentsModule = {
       if (pay?.id && sta === 'paid') {
         DirectorApi.sendPaymentReceipt(pay.id).catch(() => {});
         try {
-          const { emitEvent } = await import('../shared/supabase.js');
-          await emitEvent('payment.approved', {
-            payment_id:   pay.id,
-            student_name: (await DirectorApi.getStudents()).data?.find(s => String(s.id) === String(sid))?.name || 'Estudiante',
-            amount:       amt.toLocaleString('es-ES', { style: 'currency', currency: 'USD', minimumFractionDigits: 2 }),
-            month:        mp || 'Colegiatura'
-          });
+          const { data: p } = await DirectorApi.getPaymentById(pay.id);
+          if (p) {
+            const { notifyPaymentApproved } = await import('../shared/supabase.js');
+            const email = p.students?.p1_email || p.students?.p2_email || null;
+            const studentName = p.students?.name || 'Estudiante';
+            const amountStr = Number(amt || 0).toLocaleString('es-ES', { style: 'currency', currency: 'USD', minimumFractionDigits: 2 });
+            const monthStr = mp || 'Colegiatura';
+
+            await notifyPaymentApproved(pay.id, email, studentName, amountStr, monthStr);
+          }
         } catch (_) {}
       }
     } catch (e) {
@@ -340,14 +343,13 @@ export const PaymentsModule = {
       try {
         const { data: p } = await DirectorApi.getPaymentById(id);
         if (p) {
-          const { emitEvent } = await import('../shared/supabase.js');
-          await emitEvent('payment.approved', {
-            payment_id:   id,
-            parent_email: p.students?.p1_email || p.students?.p2_email || null,
-            student_name: p.students?.name || 'Estudiante',
-            amount:       Number(p.amount || 0).toLocaleString('es-ES', { style: 'currency', currency: 'USD', minimumFractionDigits: 2 }),
-            month:        p.month_paid || 'Colegiatura'
-          });
+          const { notifyPaymentApproved } = await import('../shared/supabase.js');
+          const email = p.students?.p1_email || p.students?.p2_email || null;
+          const studentName = p.students?.name || 'Estudiante';
+          const amountStr = Number(p.amount || 0).toLocaleString('es-ES', { style: 'currency', currency: 'USD', minimumFractionDigits: 2 });
+          const monthStr = p.month_paid || 'Colegiatura';
+
+          await notifyPaymentApproved(id, email, studentName, amountStr, monthStr);
         }
       } catch (_) {}
     } catch (e) {
@@ -371,21 +373,24 @@ export const PaymentsModule = {
       Helpers.toast('Ejecutando ciclo...', 'info');
 
       const now      = new Date();
+      const today    = now.getDate();
       const genDay   = this.settings.generation_day || 25;
       const dueDay   = this.settings.due_day || 5;
 
-      // ── Lógica correcta de fechas ──────────────────────────────────────────
-      // month_paid  = mes ACTUAL  (ej: 2026-04 = Abril)
-      // due_date    = día 5 del mes SIGUIENTE (ej: 5 de Mayo 2026)
-      // Se genera a partir del día 25 del mes actual
-      // ──────────────────────────────────────────────────────────────────────
-      const currentMonth = now.getMonth();       // 0-based (3 = Abril)
+      // ── Validar que hoy sea >= día de generación ──────────────────────────
+      if (today < genDay) {
+        Helpers.toast(
+          `El ciclo se activa a partir del día ${genDay} del mes. Hoy es día ${today}.`,
+          'warning'
+        );
+        return;
+      }
+
+      const currentMonth = now.getMonth();
       const currentYear  = now.getFullYear();
+      const monthKey     = `${currentYear}-${String(currentMonth + 1).padStart(2, '0')}`;
 
-      // month_paid key = mes actual
-      const monthKey = `${currentYear}-${String(currentMonth + 1).padStart(2, '0')}`;
-
-      // due_date = día 5 del mes siguiente
+      // due_date = día 5 del mes SIGUIENTE
       const nextMonth     = currentMonth + 1 > 11 ? 0 : currentMonth + 1;
       const nextMonthYear = currentMonth + 1 > 11 ? currentYear + 1 : currentYear;
       const dueDate = `${nextMonthYear}-${String(nextMonth + 1).padStart(2, '0')}-${String(dueDay).padStart(2, '0')}`;
@@ -400,7 +405,7 @@ export const PaymentsModule = {
       if (sErr) throw sErr;
 
       if (!students?.length) {
-        Helpers.toast('No hay estudiantes activos con cuota mensual configurada. Ve a Estudiantes → edita cada uno y asigna una cuota mensual.', 'warning');
+        Helpers.toast('No hay estudiantes activos con cuota mensual configurada.', 'warning');
         return;
       }
 
@@ -429,22 +434,20 @@ export const PaymentsModule = {
         generated = missing.length;
       }
 
-      // Mark overdue: payments where due_date < today AND status = pending
-      const { count: expired } = await supabase
+      // Mark overdue: pending payments where due_date < today
+      await supabase
         .from('payments')
         .update({ status: 'overdue' })
         .eq('status', 'pending')
-        .lt('due_date', now.toISOString().split('T')[0])
-        .select('id', { count: 'exact', head: true });
+        .lt('due_date', now.toISOString().split('T')[0]);
 
-      // Show result
       const MES_LABEL_LOCAL = ['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'];
-      const monthLabel = MES_LABEL_LOCAL[currentMonth];
+      const monthLabel   = MES_LABEL_LOCAL[currentMonth];
       const dueDateLabel = `${dueDay} de ${MES_LABEL_LOCAL[nextMonth]} ${nextMonthYear}`;
 
       if (generated > 0) {
         Helpers.toast(`✅ ${generated} cobro(s) de ${monthLabel} generados — vencen el ${dueDateLabel}`, 'success');
-      } else if (missing.length === 0) {
+      } else {
         Helpers.toast(`ℹ️ Todos los estudiantes ya tienen cobro de ${monthLabel} registrado.`, 'info');
       }
 

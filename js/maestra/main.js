@@ -89,12 +89,10 @@ window.addEventListener('unhandledrejection', (e) => {
 
 document.addEventListener('DOMContentLoaded', async () => {
   // Logout
-    document.getElementById('logoutBtn')?.addEventListener('click', async () => {
-      if (confirm('\u00bfCerrar sesi\u00f3n?')) {
-        await supabase.auth.signOut();
-        window.location.href = 'login.html';
-      }
-    });
+  document.getElementById('logoutBtn')?.addEventListener('click', async () => {
+    await supabase.auth.signOut();
+    window.location.href = 'login.html';
+  });
 
   
   const auth = await ensureRole(['maestra', 'admin']);
