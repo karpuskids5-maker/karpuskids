@@ -5,6 +5,10 @@
  * NO definir handlers push/notificationclick aquí para no interferir con OneSignal.
  */
 
+self.addEventListener('message', (event) => {
+  // Manejador preventivo
+});
+
 const CACHE_NAME = 'karpus-pwa-v4';
 const ASSETS = [
   './',

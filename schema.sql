@@ -1049,25 +1049,22 @@ begin
     v_target_date := make_date(v_next_year, v_next_month, v_due_day);
     v_month_key   := to_char(v_target_date, 'YYYY-MM');
     -- INSERT...SELECT es más eficiente que loop para muchos estudiantes
-    v_gen_count := (
-      with inserted as (
-      insert into public.payments (student_id, amount, status, due_date, month_paid)
-      select s.id, s.monthly_fee, 'pending', v_target_date, v_month_key
-      from public.students s
-      where s.is_active = true and s.monthly_fee > 0
-        and not exists (
-          select 1 from public.payments p
-          where p.student_id = s.id and p.month_paid = v_month_key
-        )
-      returning 1
-      )
-      select count(*)::int from inserted
-    );
+    insert into public.payments (student_id, amount, status, due_date, month_paid)
+    select s.id, s.monthly_fee, 'pending', v_target_date, v_month_key
+    from public.students s
+    where s.is_active = true and s.monthly_fee > 0
+      and not exists (
+        select 1 from public.payments p
+        where p.student_id = s.id and p.month_paid = v_month_key
+      );
+    get diagnostics v_gen_count = row_count;
   end if;
-  v_expire_count := (
-    with upd as (update public.payments set status = 'overdue' where status = 'pending' and due_date < current_date returning 1)
-    select count(*)::int from upd
-  );
+
+  update public.payments 
+  set status = 'overdue' 
+  where status = 'pending' and due_date < current_date;
+  get diagnostics v_expire_count = row_count;
+
   return jsonb_build_object('generated', v_gen_count, 'expired', v_expire_count);
 end;
 $$;

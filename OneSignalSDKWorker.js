@@ -1,3 +1,7 @@
+self.addEventListener('message', (event) => {
+  // Manejador preventivo para evitar el error de registro tardío (sw.ts:21)
+});
+
 importScripts('https://cdn.onesignal.com/sdks/web/v16/OneSignalSDK.sw.js');
 
 /**
@@ -14,11 +18,6 @@ const ASSETS = [
   'logo/favicon.ico',
   'img/mundo.jpg'
 ];
-
-// Manejador de mensajes para evitar el error de registro tardío (sw.ts:21)
-self.addEventListener('message', (event) => {
-  // Actualmente no procesamos mensajes específicos aquí.
-});
 
 self.addEventListener('install', e => {
   e.waitUntil(
