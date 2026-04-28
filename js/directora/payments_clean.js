@@ -76,7 +76,7 @@ export const PaymentsModule = {
       const sq = document.getElementById('searchPaymentStudent')?.value?.trim();
       
       // Formato YYYY-MM para coincidir con la base de datos
-      const monthKey = `${yv}-${mv}`;
+      const monthKey = `${yv}-${String(mv).padStart(2,'0')}`;
 
       let q = supabase
         .from('payments')
@@ -85,8 +85,24 @@ export const PaymentsModule = {
         .order('due_date', { ascending: true });
       if (sf && sf !== 'all') q = q.eq('status', sf);
 
-      const { data, error } = await q;
+      let { data, error } = await q;
       if (error) throw error;
+
+      // Fallback: if no results with YYYY-MM, try searching by created_at range
+      // (handles payments created before month_paid was standardized)
+      if (!data?.length) {
+        const rangeStart = `${yv}-${String(mv).padStart(2,'0')}-01`;
+        const rangeEnd   = `${yv}-${String(mv).padStart(2,'0')}-31`;
+        let q2 = supabase
+          .from('payments')
+          .select('id,student_id,amount,concept,status,due_date,created_at,paid_date,method,bank,reference,month_paid,evidence_url,students:student_id(name,classroom_id,classrooms:classroom_id(name))')
+          .gte('created_at', rangeStart)
+          .lte('created_at', rangeEnd + 'T23:59:59')
+          .order('due_date', { ascending: true });
+        if (sf && sf !== 'all') q2 = q2.eq('status', sf);
+        const res2 = await q2;
+        if (!res2.error && res2.data?.length) data = res2.data;
+      }
 
       let list = data || [];
       // Deduplicar: por student_id+month_paid, conservar el registro más reciente (mayor id)
@@ -342,29 +358,135 @@ export const PaymentsModule = {
   },
 
   async runCycle() {
-    if (!confirm('Ejecutar ciclo de pagos?')) return;
+    if (!confirm('¿Ejecutar ciclo de pagos?\n\nSe generarán cobros para el mes siguiente y se marcarán como vencidos los pagos atrasados.')) return;
     try {
-      Helpers.toast('Ejecutando...', 'info');
+      Helpers.toast('Ejecutando ciclo...', 'info');
+
+      // 1. Run the standard cycle (generates next month if today >= gen_day)
       const { data, error } = await supabase.rpc('run_payment_cycle');
       if (error) throw error;
       const r = typeof data === 'string' ? JSON.parse(data) : (data || {});
-      Helpers.toast('Ciclo completado: ' + (r.generated || 0) + ' generados, ' + (r.expired || 0) + ' vencidos', 'success');
+
+      // 2. Also generate current month charges for students that have none yet
+      const now = new Date();
+      const currentMonthKey = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
+      const dueDay = this.settings.due_day || 5;
+      const dueDate = new Date(now.getFullYear(), now.getMonth(), dueDay).toISOString().split('T')[0];
+
+      // Get active students with monthly_fee > 0
+      const { data: students } = await supabase
+        .from('students')
+        .select('id, monthly_fee, due_day')
+        .eq('is_active', true)
+        .gt('monthly_fee', 0);
+
+      let extraGenerated = 0;
+      if (students?.length) {
+        // Find which students already have a payment for current month
+        const { data: existing } = await supabase
+          .from('payments')
+          .select('student_id')
+          .eq('month_paid', currentMonthKey);
+
+        const existingIds = new Set((existing || []).map(p => String(p.student_id)));
+        const missing = students.filter(s => !existingIds.has(String(s.id)));
+
+        if (missing.length) {
+          const inserts = missing.map(s => ({
+            student_id: s.id,
+            amount:     s.monthly_fee,
+            status:     'pending',
+            due_date:   dueDate,
+            month_paid: currentMonthKey,
+            concept:    'Mensualidad',
+            created_at: new Date().toISOString()
+          }));
+          const { error: insErr } = await supabase.from('payments').insert(inserts);
+          if (!insErr) extraGenerated = missing.length;
+        }
+      }
+
+      const totalGen = (r.generated || 0) + extraGenerated;
+      const totalExp = r.expired || 0;
+
+      Helpers.toast(
+        totalGen > 0
+          ? `✅ ${totalGen} cobro(s) generado(s), ${totalExp} marcado(s) como vencido(s)`
+          : `Ciclo completado: ${totalExp} vencido(s). Los estudiantes sin cuota mensual no generan cobros.`,
+        totalGen > 0 ? 'success' : 'info'
+      );
+
+      // Switch filter to current month so user sees the new records
+      const ms = document.getElementById('filterPaymentMonth');
+      const ys = document.getElementById('filterPaymentYear');
+      if (ms) ms.value = String(now.getMonth() + 1).padStart(2, '0');
+      if (ys) ys.value = String(now.getFullYear());
+
       await this.loadPayments();
-    } catch (e) { Helpers.toast('Error en ciclo: ' + e.message, 'error'); }
+    } catch (e) {
+      Helpers.toast('Error en ciclo: ' + (e.message || e), 'error');
+    }
   },
 
   async sendReminders() {
-    if (!confirm('¿Enviar recordatorios de pago ahora?\n\nSe enviarán push y correos a padres con pagos que vencen en 3 días, hoy o ayer.')) return;
+    if (!confirm('¿Enviar recordatorios de pago ahora?\n\nSe notificará a padres con pagos pendientes o vencidos.')) return;
     const btn = document.getElementById('btnSendPaymentReminders');
     if (btn) { btn.disabled = true; btn.textContent = 'Enviando...'; }
     try {
-      const { data, error } = await supabase.functions.invoke('payment-reminders', { body: {} });
+      const now = new Date();
+      const in3days = new Date(now); in3days.setDate(in3days.getDate() + 3);
+      const yesterday = new Date(now); yesterday.setDate(yesterday.getDate() - 1);
+
+      // Get pending/overdue payments with parent info
+      const { data: payments, error } = await supabase
+        .from('payments')
+        .select('id, amount, month_paid, due_date, status, students:student_id(name, parent_id, p1_email, p1_name)')
+        .in('status', ['pending', 'overdue'])
+        .not('students', 'is', null);
+
       if (error) throw error;
-      const r = data || {};
-      Helpers.toast(
-        `Recordatorios enviados: ${r.reminder_3d || 0} preventivos, ${r.due_today || 0} hoy, ${r.overdue_1d || 0} vencidos. Emails: ${r.emails_sent || 0}`,
-        'success'
-      );
+
+      const { sendPush, sendEmail } = await import('../shared/supabase.js');
+      let pushSent = 0, emailSent = 0;
+
+      for (const p of payments || []) {
+        const student = p.students;
+        if (!student?.parent_id) continue;
+
+        const amt = Number(p.amount || 0).toLocaleString('es-ES', { style: 'currency', currency: 'USD', minimumFractionDigits: 2 });
+        const isOverdue = p.status === 'overdue';
+        const title   = isOverdue ? `⚠️ Pago vencido — ${student.name}` : `💳 Recordatorio de pago — ${student.name}`;
+        const message = isOverdue
+          ? `El pago de ${amt} para ${p.month_paid || 'mensualidad'} está vencido. Por favor regulariza tu cuenta.`
+          : `Tu pago de ${amt} para ${p.month_paid || 'mensualidad'} vence pronto. ¡No olvides pagarlo!`;
+
+        // Push
+        sendPush({ user_id: student.parent_id, title, message, type: 'payment', link: 'panel_padres.html' }).catch(() => {});
+        pushSent++;
+
+        // Email
+        if (student.p1_email) {
+          const html = `<div style="font-family:Arial,sans-serif;max-width:500px;margin:auto;padding:20px;">
+            <div style="background:${isOverdue ? '#dc2626' : '#f97316'};padding:20px;border-radius:12px 12px 0 0;text-align:center;">
+              <h2 style="color:white;margin:0;">${isOverdue ? '⚠️ Pago Vencido' : '💳 Recordatorio de Pago'}</h2>
+            </div>
+            <div style="background:#fff;border:1px solid #e5e7eb;border-radius:0 0 12px 12px;padding:24px;">
+              <p>Hola <strong>${student.p1_name || 'Padre/Madre'}</strong>,</p>
+              <p>${message}</p>
+              <div style="background:#f9fafb;border-radius:8px;padding:16px;margin:16px 0;">
+                <p style="margin:0;"><strong>Estudiante:</strong> ${student.name}</p>
+                <p style="margin:8px 0 0;"><strong>Monto:</strong> ${amt}</p>
+                <p style="margin:8px 0 0;"><strong>Mes:</strong> ${p.month_paid || '—'}</p>
+              </div>
+              <a href="https://karpuskids.com/panel_padres.html" style="display:inline-block;background:#f97316;color:white;padding:12px 24px;border-radius:8px;font-weight:bold;text-decoration:none;">Ver mi Panel →</a>
+            </div>
+          </div>`;
+          sendEmail([student.p1_email], title, html).catch(() => {});
+          emailSent++;
+        }
+      }
+
+      Helpers.toast(`Recordatorios enviados: ${pushSent} push, ${emailSent} correos`, 'success');
     } catch (e) {
       Helpers.toast('Error enviando recordatorios: ' + (e.message || e), 'error');
     } finally {

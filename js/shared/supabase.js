@@ -378,7 +378,8 @@ export async function initOneSignal(currentUser = null) {
             // Not linked yet or linked to someone else — safe to call login
             await OneSignal.login(user.id).catch((e) => {
               const msg = (e?.message || '').toLowerCase();
-              if (!msg.includes('409') && !msg.includes('conflict')) {
+              // 409 = already linked to this user — safe to ignore
+              if (!msg.includes('409') && !msg.includes('conflict') && e?.status !== 409) {
                 console.info('[OneSignal] login info:', e?.message ?? e);
               }
             });

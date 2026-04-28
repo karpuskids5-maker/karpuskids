@@ -44,7 +44,7 @@ export const VideoCallUI = {
     const isHost = ['maestra', 'directora', 'asistente'].includes(role);
 
     return `
-      <div class="space-y-6">
+      <div class="space-y-5">
         <!-- Header -->
         <div class="flex items-center justify-between flex-wrap gap-3">
           <div>
@@ -57,26 +57,42 @@ export const VideoCallUI = {
             </p>
           </div>
           ${isHost ? `
-          <button id="btn-schedule-meeting"
-            class="flex items-center gap-2 px-5 py-2.5 bg-orange-600 hover:bg-orange-700 text-white rounded-2xl font-black text-xs uppercase tracking-wider shadow-lg active:scale-95 transition-all">
-            <i data-lucide="calendar-plus" class="w-4 h-4"></i> Programar reunión
-          </button>` : ''}
+          <div class="flex gap-2 flex-wrap">
+            <button id="btn-instant-meeting"
+              class="flex items-center gap-2 px-5 py-2.5 bg-gradient-to-r from-orange-500 to-amber-500 hover:from-orange-600 hover:to-amber-600 text-white rounded-2xl font-black text-xs uppercase tracking-wider shadow-lg shadow-orange-200 active:scale-95 transition-all">
+              <i data-lucide="video" class="w-4 h-4"></i> Reunión instantánea
+            </button>
+            <button id="btn-schedule-meeting"
+              class="flex items-center gap-2 px-5 py-2.5 bg-violet-600 hover:bg-violet-700 text-white rounded-2xl font-black text-xs uppercase tracking-wider shadow-lg shadow-violet-200 active:scale-95 transition-all">
+              <i data-lucide="calendar-plus" class="w-4 h-4"></i> Programar
+            </button>
+          </div>` : ''}
         </div>
 
         <!-- Reunión activa -->
         ${active ? `
-        <div class="bg-gradient-to-r from-orange-500 to-amber-500 rounded-3xl p-5 text-white shadow-xl">
-          <div class="flex items-center gap-3 mb-4">
+        <div class="bg-gradient-to-r from-orange-500 to-amber-500 rounded-3xl p-5 text-white shadow-xl shadow-orange-200">
+          <div class="flex items-center gap-3 mb-3">
             <div class="w-3 h-3 bg-white rounded-full animate-pulse"></div>
-            <span class="font-black text-sm uppercase tracking-wider">En vivo ahora</span>
+            <span class="font-black text-xs uppercase tracking-wider">🔴 En vivo ahora</span>
           </div>
           <h3 class="text-xl font-black mb-1">${Helpers.escapeHTML(active.title || 'Clase en vivo')}</h3>
-          <p class="text-white/80 text-sm mb-4">${active.description || 'Reunión activa'}</p>
-          <button id="btn-join-active"
-            data-room="${active.room_name}"
-            class="w-full py-3.5 bg-white text-orange-600 rounded-2xl font-black text-sm uppercase tracking-wider shadow-lg active:scale-95 transition-all flex items-center justify-center gap-2">
-            <i data-lucide="video" class="w-5 h-5"></i> Unirse ahora
-          </button>
+          <p class="text-white/80 text-sm mb-4">${active.description || 'Reunión activa — únete ahora'}</p>
+          <div class="flex gap-3 flex-wrap">
+            <button id="btn-join-active" data-room="${active.room_name}"
+              class="flex-1 py-3 bg-white text-orange-600 rounded-2xl font-black text-sm uppercase tracking-wider shadow-lg active:scale-95 transition-all flex items-center justify-center gap-2">
+              <i data-lucide="video" class="w-5 h-5"></i> Unirse ahora
+            </button>
+            ${isHost ? `
+            <button data-meeting-id="${active.id}" data-room="${active.room_name}"
+              class="btn-copy-link px-4 py-3 bg-white/20 hover:bg-white/30 text-white rounded-2xl font-black text-xs uppercase tracking-wider transition-all flex items-center gap-2">
+              <i data-lucide="link" class="w-4 h-4"></i> Copiar enlace
+            </button>
+            <button data-meeting-id="${active.id}"
+              class="btn-end-meeting px-4 py-3 bg-red-600/80 hover:bg-red-700 text-white rounded-2xl font-black text-xs uppercase tracking-wider transition-all flex items-center gap-2">
+              <i data-lucide="phone-off" class="w-4 h-4"></i> Terminar
+            </button>` : ''}
+          </div>
         </div>` : `
         <div class="bg-slate-50 border-2 border-dashed border-slate-200 rounded-3xl p-8 text-center">
           <div class="w-16 h-16 bg-slate-100 rounded-full flex items-center justify-center mx-auto mb-3 text-3xl">📵</div>
@@ -88,28 +104,37 @@ export const VideoCallUI = {
         ${upcoming.length ? `
         <div>
           <h3 class="font-black text-slate-700 text-sm uppercase tracking-wider mb-3 flex items-center gap-2">
-            <i data-lucide="calendar" class="w-4 h-4 text-violet-500"></i> Próximas reuniones
+            <i data-lucide="calendar" class="w-4 h-4 text-violet-500"></i> Próximas reuniones (${upcoming.length})
           </h3>
           <div class="space-y-3">
             ${upcoming.map(m => this._meetingCard(m, isHost)).join('')}
           </div>
         </div>` : ''}
 
-        <!-- Sala de reunión embebida -->
-        <div id="jitsi-container" class="hidden rounded-3xl overflow-hidden border border-slate-200 shadow-xl" style="height:520px;"></div>
+        <!-- Sala de reunión feedback -->
+        <div id="jitsi-container" class="hidden rounded-3xl overflow-hidden border border-slate-200 shadow-xl" style="height:320px;"></div>
 
-        <!-- Instrucciones para padre -->
+        <!-- Info para padre -->
         ${!isHost ? `
         <div class="bg-violet-50 border border-violet-100 rounded-2xl p-4">
-          <p class="text-xs font-bold text-violet-700 uppercase tracking-wider mb-2">💡 ¿Cómo funciona?</p>
-          <ul class="text-xs text-violet-600 space-y-1 font-medium">
-            <li>• La maestra inicia la reunión y tú recibirás una notificación</li>
+          <p class="text-xs font-black text-violet-700 uppercase tracking-wider mb-2">💡 ¿Cómo funciona?</p>
+          <ul class="text-xs text-violet-600 space-y-1.5 font-medium">
+            <li>• La maestra inicia la reunión y recibirás una notificación push</li>
             <li>• Haz clic en "Unirse ahora" cuando aparezca la reunión activa</li>
-            <li>• Necesitas cámara y micrófono para participar</li>
-            <li>• Las reuniones son privadas y seguras</li>
+            <li>• La videollamada se abre en una nueva pestaña — necesitas cámara y micrófono</li>
+            <li>• Las reuniones son privadas y seguras con sala única</li>
             ${studentName ? `<li>• Aparecerás como <strong>${Helpers.escapeHTML(studentName)}</strong> en la sala</li>` : ''}
           </ul>
-        </div>` : ''}
+        </div>` : `
+        <div class="bg-orange-50 border border-orange-100 rounded-2xl p-4">
+          <p class="text-xs font-black text-orange-700 uppercase tracking-wider mb-2">💡 Consejos para maestras</p>
+          <ul class="text-xs text-orange-600 space-y-1.5 font-medium">
+            <li>• <strong>Reunión instantánea</strong>: inicia ahora y notifica a los padres automáticamente</li>
+            <li>• <strong>Programar</strong>: agenda con fecha/hora y los padres recibirán recordatorio</li>
+            <li>• Comparte el enlace con el botón "Copiar enlace" para invitar manualmente</li>
+            <li>• La sala se abre en nueva pestaña para mejor calidad de video</li>
+          </ul>
+        </div>`}
       </div>`;
   },
 
@@ -117,21 +142,33 @@ export const VideoCallUI = {
     const date = new Date(m.start_time).toLocaleString('es-DO', {
       weekday: 'short', day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit'
     });
+    const now = new Date();
+    const start = new Date(m.start_time);
+    const diffMin = Math.round((start - now) / 60000);
+    const timeLabel = diffMin <= 0 ? '¡Ahora!' : diffMin < 60 ? `En ${diffMin} min` : date;
+    const isImminent = diffMin <= 15;
+
     return `
-      <div class="bg-white rounded-2xl border border-slate-100 shadow-sm p-4 flex items-center gap-4">
-        <div class="w-12 h-12 bg-violet-50 text-violet-600 rounded-2xl flex items-center justify-center text-xl shrink-0">📅</div>
+      <div class="bg-white rounded-2xl border ${isImminent ? 'border-orange-200 shadow-orange-100' : 'border-slate-100'} shadow-sm p-4 flex items-center gap-4 transition-all hover:shadow-md">
+        <div class="w-12 h-12 ${isImminent ? 'bg-orange-50 text-orange-600' : 'bg-violet-50 text-violet-600'} rounded-2xl flex items-center justify-center text-xl shrink-0">
+          ${isImminent ? '🔔' : '📅'}
+        </div>
         <div class="flex-1 min-w-0">
           <p class="font-bold text-slate-800 text-sm truncate">${Helpers.escapeHTML(m.title || 'Reunión')}</p>
-          <p class="text-[10px] text-slate-400 font-bold uppercase mt-0.5">${date}</p>
+          <p class="text-[10px] ${isImminent ? 'text-orange-500 font-black' : 'text-slate-400 font-bold'} uppercase mt-0.5">${timeLabel}</p>
         </div>
         ${isHost ? `
         <div class="flex gap-2 shrink-0">
           <button data-room="${m.room_name}" data-meeting-id="${m.id}"
-            class="btn-start-meeting px-3 py-2 bg-orange-600 text-white rounded-xl font-black text-xs uppercase hover:bg-orange-700 transition-all active:scale-95">
-            Iniciar
+            class="btn-start-meeting px-3 py-2 bg-gradient-to-r from-orange-500 to-amber-500 text-white rounded-xl font-black text-xs uppercase hover:from-orange-600 hover:to-amber-600 transition-all active:scale-95 shadow-sm flex items-center gap-1.5">
+            <i data-lucide="video" class="w-3.5 h-3.5"></i> Iniciar
+          </button>
+          <button data-room="${m.room_name}" data-meeting-id="${m.id}"
+            class="btn-copy-link p-2 bg-slate-50 text-slate-500 rounded-xl hover:bg-slate-100 transition-all" title="Copiar enlace">
+            <i data-lucide="link" class="w-4 h-4"></i>
           </button>
           <button data-meeting-id="${m.id}"
-            class="btn-cancel-meeting p-2 bg-rose-50 text-rose-500 rounded-xl hover:bg-rose-100 transition-all">
+            class="btn-cancel-meeting p-2 bg-rose-50 text-rose-500 rounded-xl hover:bg-rose-100 transition-all" title="Cancelar">
             <i data-lucide="trash-2" class="w-4 h-4"></i>
           </button>
         </div>` : ''}
@@ -147,20 +184,74 @@ export const VideoCallUI = {
       this._joinRoom(room, userName);
     });
 
+    // Reunión instantánea (host only)
+    container.querySelector('#btn-instant-meeting')?.addEventListener('click', async () => {
+      const btn = container.querySelector('#btn-instant-meeting');
+      if (btn) { btn.disabled = true; btn.innerHTML = '<i data-lucide="loader" class="w-4 h-4 animate-spin"></i> Iniciando...'; if (window.lucide) lucide.createIcons(); }
+      try {
+        const roomName = `${ROOM_PREFIX}_instant_${Date.now()}_${Math.random().toString(36).slice(2,7)}`;
+        const { data: { user } } = await supabase.auth.getUser();
+        const { data: meeting, error } = await supabase.from('meetings').insert({
+          title: 'Reunión instantánea',
+          description: 'Iniciada ahora mismo',
+          start_time: new Date().toISOString(),
+          room_name: roomName,
+          type: 'classroom',
+          target_id: classroomId,
+          host_id: user?.id,
+          status: 'live'
+        }).select().single();
+        if (error) throw error;
+        // Notify parents
+        this._notifyParticipants(meeting.id, classroomId);
+        Helpers.toast('Reunión iniciada — notificando a los padres...', 'success');
+        this._joinRoom(roomName, userName);
+        // Reload section after short delay
+        setTimeout(() => this.renderSection(container.id, { role, userName, classroomId }), 1500);
+      } catch (e) {
+        Helpers.toast('Error al iniciar reunión: ' + e.message, 'error');
+        if (btn) { btn.disabled = false; btn.innerHTML = '<i data-lucide="video" class="w-4 h-4"></i> Reunión instantánea'; if (window.lucide) lucide.createIcons(); }
+      }
+    });
+
     // Iniciar reunión programada
     container.querySelectorAll('.btn-start-meeting').forEach(btn => {
       btn.addEventListener('click', async (e) => {
         const room = e.currentTarget.dataset.room;
         const id   = e.currentTarget.dataset.meetingId;
-        // Marcar como live
         await supabase.from('meetings').update({ status: 'live' }).eq('id', id);
         this._joinRoom(room, userName);
-        // Notificar participantes
         this._notifyParticipants(id, classroomId);
+        setTimeout(() => this.renderSection(container.id, { role, userName, classroomId }), 1000);
       });
     });
 
-    // Cancelar reunión
+    // Copiar enlace de sala
+    container.querySelectorAll('.btn-copy-link').forEach(btn => {
+      btn.addEventListener('click', (e) => {
+        const room = e.currentTarget.dataset.room;
+        const fullRoom = `${ROOM_PREFIX}_${room}`;
+        const url = `https://${JITSI_DOMAIN}/${fullRoom}`;
+        navigator.clipboard?.writeText(url).then(() => {
+          Helpers.toast('Enlace copiado al portapapeles', 'success');
+        }).catch(() => {
+          prompt('Copia este enlace:', url);
+        });
+      });
+    });
+
+    // Terminar reunión activa
+    container.querySelectorAll('.btn-end-meeting').forEach(btn => {
+      btn.addEventListener('click', async (e) => {
+        if (!confirm('¿Terminar la reunión para todos?')) return;
+        const id = e.currentTarget.dataset.meetingId;
+        await supabase.from('meetings').update({ status: 'finished', end_time: new Date().toISOString() }).eq('id', id);
+        Helpers.toast('Reunión terminada', 'success');
+        this.renderSection(container.id, { role, userName, classroomId });
+      });
+    });
+
+    // Cancelar reunión programada
     container.querySelectorAll('.btn-cancel-meeting').forEach(btn => {
       btn.addEventListener('click', async (e) => {
         if (!confirm('¿Cancelar esta reunión?')) return;
@@ -180,38 +271,30 @@ export const VideoCallUI = {
   _joinRoom(roomName, userName) {
     const fullRoom = `${ROOM_PREFIX}_${roomName}`;
 
-    // Padres y participantes: abrir en nueva pestaña (evita lobby y límites)
-    // El host (maestra) usa el embed para controlar la sala
+    // ALWAYS open in new tab for best experience (no membersOnly lobby, no iframe limits)
+    window.open(`https://${JITSI_DOMAIN}/${fullRoom}#userInfo.displayName="${encodeURIComponent(userName)}"&config.startWithAudioMuted=false&config.startWithVideoMuted=false&config.prejoinPageEnabled=false&config.disableDeepLinking=true&interfaceConfig.SHOW_JITSI_WATERMARK=false&interfaceConfig.SHOW_BRAND_WATERMARK=false&interfaceConfig.DEFAULT_BACKGROUND=%231e293b`, '_blank', 'noopener,noreferrer');
+
+    // Show feedback in UI
     const jitsiContainer = document.getElementById('jitsi-container');
-
-    // Si no hay container o ya está oculto, abrir en nueva pestaña directamente
-    if (!jitsiContainer) {
-      window.open(`https://${JITSI_DOMAIN}/${fullRoom}`, '_blank');
-      return;
+    if (jitsiContainer) {
+      jitsiContainer.classList.remove('hidden');
+      jitsiContainer.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      jitsiContainer.innerHTML = `
+        <div class="flex flex-col items-center justify-center h-full bg-gradient-to-br from-violet-600 to-purple-600 text-white gap-4 p-8">
+          <div class="w-20 h-20 bg-white/20 rounded-full flex items-center justify-center text-4xl animate-pulse">🎥</div>
+          <p class="font-black text-xl">Videollamada abierta</p>
+          <p class="text-sm text-white/80 text-center max-w-sm">La sala se abrió en una nueva pestaña. Si no la ves, verifica que tu navegador no bloqueó ventanas emergentes.</p>
+          <button onclick="window.open('https://${JITSI_DOMAIN}/${fullRoom}#userInfo.displayName=${encodeURIComponent(userName)}','_blank')"
+            class="px-8 py-3 bg-white/20 hover:bg-white/30 text-white rounded-2xl font-black text-sm uppercase tracking-wider backdrop-blur-sm transition-all flex items-center gap-2">
+            <i data-lucide="external-link" class="w-4 h-4"></i> Abrir de nuevo
+          </button>
+          <button onclick="document.getElementById('jitsi-container').classList.add('hidden')"
+            class="text-xs text-white/50 hover:text-white/80 transition-colors mt-2 font-bold">
+            Cerrar este mensaje
+          </button>
+        </div>`;
+      if (window.lucide) lucide.createIcons();
     }
-
-    jitsiContainer.classList.remove('hidden');
-    jitsiContainer.scrollIntoView({ behavior: 'smooth', block: 'start' });
-    jitsiContainer.innerHTML = `
-      <div class="flex flex-col items-center justify-center h-full bg-slate-900 text-white gap-4 p-8">
-        <div class="w-16 h-16 bg-orange-500/20 rounded-full flex items-center justify-center text-3xl">🎥</div>
-        <p class="font-black text-lg">Sala lista</p>
-        <p class="text-sm text-white/60 text-center">La videollamada se abrirá en una nueva pestaña para mejor experiencia</p>
-        <button id="btn-open-jitsi-tab"
-          class="px-8 py-3.5 bg-orange-500 hover:bg-orange-600 text-white rounded-2xl font-black text-sm uppercase tracking-wider shadow-lg active:scale-95 transition-all flex items-center gap-2">
-          🚀 Abrir videollamada
-        </button>
-        <button onclick="document.getElementById('jitsi-container').classList.add('hidden')"
-          class="text-xs text-white/40 hover:text-white/70 transition-colors mt-2">
-          Cancelar
-        </button>
-      </div>`;
-
-    document.getElementById('btn-open-jitsi-tab')?.addEventListener('click', () => {
-      window.open(`https://${JITSI_DOMAIN}/${fullRoom}`, '_blank');
-      jitsiContainer.classList.add('hidden');
-      jitsiContainer.innerHTML = '';
-    });
 
     if (this._api) {
       try { this._api.dispose(); } catch (_) {}
@@ -310,10 +393,17 @@ export const VideoCallUI = {
     if (!classroomId) return;
     try {
       const { data: students } = await supabase
-        .from('students').select('parent_id').eq('classroom_id', classroomId).not('parent_id', 'is', null);
-      for (const s of students || []) {
-        sendPush({ user_id: s.parent_id, title: '🔴 Clase en vivo ahora', message: 'Tu maestra inició una videollamada. ¡Únete ahora!', type: 'videocall', link: 'panel_padres.html' }).catch(() => {});
-      }
+        .from('students').select('parent_id, name').eq('classroom_id', classroomId).not('parent_id', 'is', null);
+      const pushes = (students || []).map(s =>
+        sendPush({
+          user_id: s.parent_id,
+          title: '🔴 Clase en vivo ahora',
+          message: 'Tu maestra inició una videollamada. ¡Únete ahora desde tu panel!',
+          type: 'videocall',
+          link: 'panel_padres.html'
+        }).catch(() => {})
+      );
+      await Promise.allSettled(pushes);
     } catch (_) {}
   },
 

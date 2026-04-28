@@ -198,7 +198,9 @@ export const DirectorApi = {
       const year = now.getFullYear();
       const month = String(now.getMonth() + 1).padStart(2, '0');
       const monthKey = `${year}-${month}`;
-      
+      const rangeStart = `${year}-${month}-01`;
+      const rangeEnd   = `${year}-${month}-31`;
+
       const [incomeRes, pendingRes, overdueRes, reviewRes] = await Promise.all([
         supabase.from('payments').select('amount').in('status', ['paid', 'pagado', 'confirmado']).eq('month_paid', monthKey),
         supabase.from('payments').select('id', { count: 'exact', head: true }).in('status', ['pending', 'pendiente']).eq('month_paid', monthKey),
@@ -206,17 +208,26 @@ export const DirectorApi = {
         supabase.from('payments').select('id', { count: 'exact', head: true }).in('status', ['review', 'revision', 'en revision']).eq('month_paid', monthKey)
       ]);
 
-      const income = (incomeRes.data || []).reduce((sum, p) => sum + Number(p.amount), 0);
+      // Fallback: if month_paid filter returns nothing, use created_at range
+      let income = (incomeRes.data || []).reduce((sum, p) => sum + Number(p.amount), 0);
+      let pending  = pendingRes.count  || 0;
+      let overdue  = overdueRes.count  || 0;
+      let toApprove = reviewRes.count  || 0;
 
-      return {
-        data: {
-          incomeMonth: income,
-          pending:   pendingRes.count  || 0,
-          overdue:   overdueRes.count  || 0,
-          toApprove: reviewRes.count   || 0
-        },
-        error: null
-      };
+      if (!income && !pending && !overdue && !toApprove) {
+        const [i2, p2, o2, r2] = await Promise.all([
+          supabase.from('payments').select('amount').in('status', ['paid','pagado','confirmado']).gte('created_at', rangeStart).lte('created_at', rangeEnd + 'T23:59:59'),
+          supabase.from('payments').select('id', { count: 'exact', head: true }).in('status', ['pending','pendiente']).gte('created_at', rangeStart).lte('created_at', rangeEnd + 'T23:59:59'),
+          supabase.from('payments').select('id', { count: 'exact', head: true }).in('status', ['overdue','vencido']).gte('created_at', rangeStart).lte('created_at', rangeEnd + 'T23:59:59'),
+          supabase.from('payments').select('id', { count: 'exact', head: true }).in('status', ['review','revision']).gte('created_at', rangeStart).lte('created_at', rangeEnd + 'T23:59:59'),
+        ]);
+        income    = (i2.data || []).reduce((sum, p) => sum + Number(p.amount), 0);
+        pending   = p2.count || 0;
+        overdue   = o2.count || 0;
+        toApprove = r2.count || 0;
+      }
+
+      return { data: { incomeMonth: income, pending, overdue, toApprove }, error: null };
     } catch (e) { return logError('getPaymentStats', e); }
   },
 
