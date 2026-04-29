@@ -107,8 +107,8 @@ export async function ensureRole(requiredRoles) {
     supabase.from('terms_acceptance').select('user_id').eq('user_id', user.id).eq('terms_version', TERMS_VERSION).maybeSingle()
   ]);
 
-  if (profileRes.error) console.error('[ensureRole] Profile error:', profileRes.error);
-  if (termsRes.error) console.error('[ensureRole] Terms error:', termsRes.error);
+  if (profileRes.error) { /* profile error — handled below */ }
+  if (termsRes.error)   { /* terms error — handled below */ }
 
   const profile = profileRes.data;
   const terms   = termsRes.data;
@@ -263,7 +263,6 @@ export async function initOneSignal(currentUser = null) {
     const isProd = host === 'karpuskids.com' || host === 'www.karpuskids.com' || host.endsWith('.karpuskids.com');
     
     if (!isProd && !isLocal) {
-      console.info('[OneSignal] Omitiendo inicialización en dominio no permitido:', host);
       return;
     }
 
@@ -271,11 +270,9 @@ export async function initOneSignal(currentUser = null) {
     window.OneSignalInitialized = true;
 
     // 🛡️ FIX: Verificar IndexedDB disponible ANTES de inyectar el script
-    // OneSignal v16 intenta abrir IndexedDB apenas se carga, si falla lanza error incapturable.
     const isIndexedDBAvailable = await new Promise(resolve => {
       try {
         if (!window.indexedDB) return resolve(false);
-        // Intentar una operación real para confirmar acceso (algunos navegadores bloquean el open)
         const req = indexedDB.open('_karpus_idb_test', 1);
         req.onsuccess = () => { req.result.close(); resolve(true); };
         req.onerror   = () => resolve(false);
@@ -285,9 +282,30 @@ export async function initOneSignal(currentUser = null) {
     });
 
     if (!isIndexedDBAvailable) {
-      console.info('[OneSignal] IndexedDB no disponible (modo incógnito/privado) — omitiendo carga del SDK.');
       return;
     }
+
+    // 🛡️ FIX: Clear stale OneSignal operation queue (causes "login-user" errors)
+    // This happens when the SDK version changes and old operations are stuck in IDB
+    try {
+      await new Promise(resolve => {
+        const req = indexedDB.open('ONE_SIGNAL_SDK_DB', 1);
+        req.onsuccess = (e) => {
+          const db = e.target.result;
+          const storeNames = Array.from(db.objectStoreNames);
+          if (storeNames.includes('OperationRepo')) {
+            try {
+              const tx = db.transaction('OperationRepo', 'readwrite');
+              tx.objectStore('OperationRepo').clear();
+              tx.oncomplete = () => { db.close(); resolve(); };
+              tx.onerror    = () => { db.close(); resolve(); };
+            } catch (_) { db.close(); resolve(); }
+          } else { db.close(); resolve(); }
+        };
+        req.onerror = () => resolve();
+        setTimeout(resolve, 1000);
+      });
+    } catch (_) { /* silencioso */ }
 
     // 🛡️ FIX: Silenciar errores internos de OneSignal si fallan promesas nativas
     // Este handler debe estar activo ANTES de cargar el script
@@ -380,9 +398,10 @@ export async function initOneSignal(currentUser = null) {
             // Not linked yet or linked to someone else — safe to call login
             await OneSignal.login(user.id).catch((e) => {
               const msg = (e?.message || '').toLowerCase();
-              // 409 = already linked to this user — safe to ignore
-              if (!msg.includes('409') && !msg.includes('conflict') && e?.status !== 409) {
-                console.info('[OneSignal] login info:', e?.message ?? e);
+              // 409/conflict = already linked — safe to ignore silently
+              if (msg.includes('login-user') || msg.includes('unrecognized')) {
+                // Stale operation — clear IDB and skip
+                indexedDB.deleteDatabase('ONE_SIGNAL_SDK_DB');
               }
             });
             await new Promise(r => setTimeout(r, 1500));
@@ -399,17 +418,12 @@ export async function initOneSignal(currentUser = null) {
 
           const subId = OneSignal.User?.PushSubscription?.id;
           if (subId) {
-            // Guardar subscription_id en profiles para fallback en send-push
             try {
-              const { error } = await supabase.from('profiles')
+              await supabase.from('profiles')
                 .update({ onesignal_player_id: subId })
                 .eq('id', user.id);
-              if (error) console.warn('[OneSignal] No se pudo guardar player_id:', error.message);
-            } catch (_) {
-              // Silencioso
-            }
+            } catch (_) {}
           } else {
-            // Reintentar obtener subId después de un momento
             setTimeout(async () => {
               try {
                 const retrySubId = OneSignal.User?.PushSubscription?.id;
@@ -422,7 +436,7 @@ export async function initOneSignal(currentUser = null) {
             }, 3000);
           }
 
-          // Escuchar cambios de suscripción (cuando el usuario acepta el permiso después)
+          // Escuchar cambios de suscripción
           try {
             OneSignal.User?.PushSubscription?.addEventListener('change', async (event) => {
               const newSubId = event?.current?.id;
@@ -434,18 +448,17 @@ export async function initOneSignal(currentUser = null) {
                 } catch (_) {}
               }
             });
-          } catch (_) { /* silencioso */ }
+          } catch (_) {}
 
         } catch (loginErr) {
           const msg = loginErr?.message?.toLowerCase() ?? '';
-          if (msg.includes('409') || loginErr?.status === 409 || msg.includes('conflict')) return;
-          console.info('[OneSignal] login omitido:', loginErr?.message ?? loginErr);
+          if (msg.includes('409') || loginErr?.status === 409 || msg.includes('conflict') || msg.includes('login-user')) return;
+          // Non-critical login error — silently ignored
         }
 
-      } catch (e) {
-        console.info('[OneSignal] SDK error (no crítico):', e?.message ?? e);
+      } catch (_) {
+        // SDK error — non-critical, silently ignored
       }
     });
-  } catch (globalErr) {
-  }
+  } catch (_) {}
 }
