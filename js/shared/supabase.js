@@ -53,11 +53,26 @@ window.fetch = async function(...args) {
 // ── Global DB error handler — muestra toast automático en errores de DB ───────
 window.addEventListener('karpus:db-error', (e) => {
   const msg = e.detail?.message || 'Error de conexión';
-  // Usar Helpers.toast si está disponible, sino fallback simple
   if (window.Helpers?.toast) {
     window.Helpers.toast('Error: ' + msg, 'error');
-  } else {
   }
+});
+
+// ── Global error → log to DB ─────────────────────────────────────────────────
+window.addEventListener('error', (e) => {
+  import('./db-utils.js').then(({ logError }) => {
+    const panel = window.location.pathname.split('/').pop().replace('.html','') || 'unknown';
+    logError(panel, e.message || String(e.error), e.error?.stack || '', e.filename || '');
+  }).catch(() => {});
+});
+window.addEventListener('unhandledrejection', (e) => {
+  const msg = e.reason?.message || String(e.reason);
+  const skip = ['indexeddb','network','fetch','onesignal','409','conflict'].some(k => msg.toLowerCase().includes(k));
+  if (skip) return;
+  import('./db-utils.js').then(({ logError }) => {
+    const panel = window.location.pathname.split('/').pop().replace('.html','') || 'unknown';
+    logError(panel, msg, e.reason?.stack || '', window.location.pathname);
+  }).catch(() => {});
 });
 
 export const TERMS_VERSION = '1.0';

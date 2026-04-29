@@ -264,11 +264,11 @@ async function onScan(raw) {
     // ── Buscar personal (maestra, asistente, directora) ───────────────────────
     let staff = null;
 
-    // Por notes (código de acceso generado)
+    // Por notes (código de acceso generado) o matricula
     const { data: s1 } = await supabase
       .from('profiles')
       .select('id, name, role')
-      .eq('notes', matricula)
+      .or(`notes.eq.${matricula},matricula.eq.${matricula}`)
       .in('role', ['maestra', 'asistente', 'directora'])
       .maybeSingle();
     staff = s1;

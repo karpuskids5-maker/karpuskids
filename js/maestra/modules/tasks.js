@@ -356,7 +356,7 @@ export async function submitGrade(taskId, studentId) {
         title: 'Tarea Calificada 🏆',
         message: `La maestra ha calificado una tarea de ${student.name}. Nota: ${grade}`,
         link: 'panel_padres.html#grades'
-      }).catch(err => console.warn('Push error:', err));
+      }).catch(() => {});
     }
     
     safeToast('Calificación guardada');

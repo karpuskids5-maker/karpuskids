@@ -79,7 +79,7 @@ export const ChatModule = {
 
         const { data: messages, error } = await supabase
           .from('messages')
-          .select('id, name, role, avatar_url, email')
+          .select('id, conversation_id, sender_id, receiver_id, content, is_read, read_at, created_at')
           .eq('conversation_id', conversationId)
           .order('created_at', { ascending: false })  // más recientes primero
           .range(from, to);
@@ -171,14 +171,14 @@ export const ChatModule = {
   },
 
   /**
-   * Suscripción Realtime Unificada
+   * Suscripción Realtime Unificada — con typing indicators
    */
-  subscribeToConversation(conversationId, onMessage) {
-    // Limpiar suscripción anterior si existe
+  subscribeToConversation(conversationId, onMessage, onTyping) {
     this.unsubscribe();
 
     const channelName = `chat_cv_${conversationId}`;
     this._activeSubscription = RealtimeManager.subscribe(channelName, (channel) => {
+      // New messages
       channel.on('postgres_changes', {
         event: 'INSERT',
         schema: 'public',
@@ -187,9 +187,28 @@ export const ChatModule = {
       }, (payload) => {
         if (payload.new) onMessage(payload.new);
       });
+
+      // Typing indicator via broadcast
+      if (onTyping) {
+        channel.on('broadcast', { event: 'typing' }, (payload) => {
+          onTyping(payload.payload);
+        });
+      }
     });
     this._activeChannelName = channelName;
+    this._activeConvId = conversationId;
     return this._activeSubscription;
+  },
+
+  /**
+   * Broadcast typing indicator to conversation participants
+   */
+  async broadcastTyping(conversationId, userName, isTyping) {
+    if (!conversationId) return;
+    try {
+      await supabase.channel(`chat_cv_${conversationId}`)
+        .send({ type: 'broadcast', event: 'typing', payload: { userName, isTyping } });
+    } catch (_) {}
   },
 
   unsubscribe() {
@@ -201,7 +220,7 @@ export const ChatModule = {
   },
 
   /**
-   * Marca como leídos los mensajes de una conversación
+   * Marca como leídos los mensajes de una conversación (con timestamp)
    */
   async markAsRead(conversationId) {
     if (!conversationId) return;
@@ -209,18 +228,16 @@ export const ChatModule = {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) return;
 
-      // 🛡️ Verificación de Auditoría:
-      // Solo intentamos marcar como leído si somos participantes del chat.
-      const { data: isParticipant } = await supabase.rpc('user_is_participant', {
-        p_conversation_id: Number(conversationId),
-        p_user_id: user.id
+      // Use the new RPC that also sets read_at timestamp
+      const { error } = await supabase.rpc('mark_messages_read', {
+        p_conversation_id: Number(conversationId)
       });
 
-      if (!isParticipant) return;
-
-      await supabase.rpc('mark_conversation_read', { p_conversation_id: Number(conversationId) });
-    } catch (e) {
-    }
+      // Fallback to old RPC if new one doesn't exist yet
+      if (error?.code === 'PGRST202') {
+        await supabase.rpc('mark_conversation_read', { p_conversation_id: Number(conversationId) });
+      }
+    } catch (_) {}
   },
 
   /**

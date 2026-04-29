@@ -74,6 +74,25 @@ export async function auditLog(action, payload = {}) {
 }
 
 /**
+ * 🚨 logError — Registra errores del sistema en la DB (reemplaza localStorage).
+ * Se llama automáticamente desde el handler global de errores.
+ */
+export async function logError(panel, message, stack = '', url = '') {
+  try {
+    const { data: { user } } = await supabase.auth.getUser();
+    await supabase.from('system_errors').insert({
+      panel,
+      user_id:    user?.id || null,
+      message:    String(message).slice(0, 500),
+      stack:      String(stack).slice(0, 2000),
+      url:        url || window.location.pathname,
+      user_agent: navigator.userAgent.slice(0, 200),
+      created_at: new Date().toISOString()
+    });
+  } catch (_) { /* silencioso */ }
+}
+
+/**
  * Ejecuta una query con reintentos y backoff exponencial.
  * Ideal para operaciones críticas (pagos, asistencia).
  *

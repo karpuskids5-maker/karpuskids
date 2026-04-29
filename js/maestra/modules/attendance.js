@@ -3,6 +3,12 @@ import { AppState } from '../state.js';
 import { MaestraApi } from '../api.js';
 import { safeToast, safeEscapeHTML, Modal } from './ui.js';
 import { notifyParents, showNotifyFeedback } from '../../shared/notify-feedback.js';
+import { OfflineQueue } from '../../shared/offline-queue.js';
+
+// Start auto-sync when online
+OfflineQueue.startAutoSync(({ synced }) => {
+  safeToast(`✅ ${synced} registro(s) de asistencia sincronizados`, 'success');
+});
 
 /**
  * 📅 Asistencia — carga el panel y las solicitudes de ausencia pendientes
@@ -153,13 +159,15 @@ export async function registerAttendance(studentId, status) {
       btnAbsent?.classList.add('bg-rose-500', 'text-white', 'shadow-lg');
     }
 
-    await MaestraApi.upsertAttendance({ 
-      student_id: studentId, 
-      classroom_id: classroom.id, 
-      date: today, 
-      status 
-    });
-    
+    const attRecord = { student_id: studentId, classroom_id: classroom.id, date: today, status };
+
+    if (navigator.onLine) {
+      await MaestraApi.upsertAttendance(attRecord);
+    } else {
+      await OfflineQueue.enqueue('attendance', 'upsert', { ...attRecord, onConflict: 'student_id,date' });
+      safeToast(`${statusLiteral} guardado sin conexión — se sincronizará automáticamente`, 'info');
+    }
+
     const student = (AppState.get('students') || []).find(s => s.id === studentId);
     if (student?.parent_id) {
       const { sendPush } = await import('../../shared/supabase.js');

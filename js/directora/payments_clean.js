@@ -28,6 +28,7 @@ export const PaymentsModule = {
       on('btnGenerateCharges',    'click',  () => this.runCycle());
       on('btnGeneratePaymentsNow','click',  () => this.runCycle());
       on('btnSendPaymentReminders','click', () => this.sendReminders());
+      on('btnExportMorosidad',    'click',  () => this.exportMorosidad());
       on('btnSavePaymentConfig',  'click',  () => this.savePaymentConfig());
     }
     await this.loadPayments();
@@ -526,6 +527,36 @@ export const PaymentsModule = {
       Helpers.toast('Error enviando recordatorios: ' + (e.message || e), 'error');
     } finally {
       if (btn) { btn.disabled = false; btn.textContent = 'Enviar recordatorios ahora'; }
+    }
+  },
+
+  async exportMorosidad() {
+    try {
+      Helpers.toast('Generando reporte...', 'info');
+      const mv = document.getElementById('filterPaymentMonth')?.value;
+      const yv = document.getElementById('filterPaymentYear')?.value;
+      const monthKey = mv && yv ? `${yv}-${String(mv).padStart(2,'0')}` : null;
+
+      const { data, error } = await supabase.rpc('get_morosidad_report', { p_month: monthKey });
+      if (error) throw error;
+      if (!data?.length) { Helpers.toast('No hay pagos pendientes para exportar', 'info'); return; }
+
+      const headers = ['Estudiante','Aula','Padre/Madre','Email','Teléfono','Mes','Monto','Estado','Vence','Días vencido'];
+      const rows = data.map(r => [
+        r.student_name, r.classroom, r.parent_name, r.parent_email, r.parent_phone,
+        r.month_paid, r.amount, r.status, r.due_date, r.days_overdue
+      ]);
+      const csv = [headers, ...rows].map(r => r.map(v => `"${String(v||'').replace(/"/g,'""')}"`).join(',')).join('\n');
+      const blob = new Blob(['\uFEFF' + csv], { type: 'text/csv;charset=utf-8;' });
+      const url  = URL.createObjectURL(blob);
+      const a    = document.createElement('a');
+      a.href = url;
+      a.download = `morosidad_${monthKey || 'todos'}_${new Date().toISOString().split('T')[0]}.csv`;
+      a.click();
+      URL.revokeObjectURL(url);
+      Helpers.toast(`Reporte exportado: ${data.length} registros`, 'success');
+    } catch (e) {
+      Helpers.toast('Error al exportar: ' + (e.message || e), 'error');
     }
   },
 

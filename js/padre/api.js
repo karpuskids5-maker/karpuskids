@@ -70,7 +70,7 @@ export const Api = {
 
     return await handle(
       supabase.from('attendance')
-        .select('date, status, check_in, notes')
+        .select('date, status, check_in, check_out')
         .eq('student_id', studentId)
         .gte('date', startDate)
         .lte('date', endDate),

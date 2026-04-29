@@ -231,20 +231,23 @@ export const MaestraApi = {
   async gradeTask(taskId, studentId, gradeLetter, stars, feedback) {
     if (!taskId || !studentId) throw new Error('Task ID and Student ID are required');
 
+    const starsVal = parseInt(stars) || null;
+    // DB constraint: stars must be 1-5 or null
+    const validStars = (starsVal && starsVal >= 1 && starsVal <= 5) ? starsVal : null;
+
     const record = {
       task_id:      taskId,
       student_id:   studentId,
-      grade_letter: gradeLetter,
-      stars:        parseInt(stars) || 0,
-      comment:      feedback,
+      grade_letter: gradeLetter || null,
+      stars:        validStars,
+      comment:      feedback || null,
       status:       'graded'
     };
 
-    // upsert evita el error PGRST116 cuando hay múltiples filas
     const { data, error } = await supabase
       .from('task_evidences')
       .upsert(record, { onConflict: 'task_id,student_id', ignoreDuplicates: false })
-      .select()
+      .select('id, grade_letter, stars, status')
       .maybeSingle();
 
     handleError(error, 'gradeTask');

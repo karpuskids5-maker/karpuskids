@@ -135,16 +135,18 @@ export const PaymentsModule = {
 
     banner.classList.remove('hidden');
     banner.innerHTML = `
-      <div class="${cfg.bg} rounded-2xl px-5 py-4 flex items-center gap-3 shadow-lg">
-        <div class="text-2xl shrink-0">${cfg.icon}</div>
-        <div class="flex-1 min-w-0">
-          <p class="font-black text-white text-sm">${cfg.title}</p>
-          <p class="text-white/80 text-xs font-medium mt-0.5">${cfg.msg}</p>
+      <div class="${cfg.bg} rounded-2xl p-4 shadow-lg">
+        <div class="flex items-start gap-3">
+          <div class="text-xl shrink-0 mt-0.5">${cfg.icon}</div>
+          <div class="flex-1 min-w-0">
+            <p class="font-black text-white text-sm leading-tight">${cfg.title}</p>
+            <p class="text-white/80 text-xs font-medium mt-1 leading-relaxed">${cfg.msg}</p>
+            <button onclick="document.getElementById('paymentForm')?.scrollIntoView({behavior:'smooth'})"
+              class="${cfg.btnCls} font-black text-xs px-4 py-2 rounded-xl mt-3 inline-block active:scale-95 transition-transform">
+              ${cfg.btn}
+            </button>
+          </div>
         </div>
-        <button onclick="document.getElementById('paymentForm')?.scrollIntoView({behavior:'smooth'})"
-          class="${cfg.btnCls} font-black text-xs px-4 py-2 rounded-xl shrink-0 active:scale-95 transition-transform whitespace-nowrap">
-          ${cfg.btn}
-        </button>
       </div>`;
   },
 

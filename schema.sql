@@ -789,22 +789,22 @@ create policy "profiles_select" on public.profiles for select using (
   deleted_at is null
   and (
     auth.uid() = id
-    or get_my_role() in ('directora','asistente','maestra')
+    or get_my_role() in ('directora','asistente','maestra','admin')
     or auth.uid() is not null
   )
 );
 create policy "profiles_insert" on public.profiles for insert with check (
-  auth.uid() = id or get_my_role() in ('directora','asistente')
+  auth.uid() = id or get_my_role() in ('directora','asistente','admin')
 );
 create policy "profiles_update" on public.profiles for update using (
-  (auth.uid() = id or get_my_role() in ('directora','asistente')) and deleted_at is null
+  (auth.uid() = id or get_my_role() in ('directora','asistente','admin')) and deleted_at is null
 );
-create policy "profiles_delete" on public.profiles for delete using (get_my_role() in ('directora','asistente'));
+create policy "profiles_delete" on public.profiles for delete using (get_my_role() in ('directora','asistente','admin'));
 
 -- CLASSROOMS
 create policy "classrooms_staff" on public.classrooms for all
-  using (get_my_role() in ('directora','asistente'))
-  with check (get_my_role() in ('directora','asistente'));
+  using (get_my_role() in ('directora','asistente','admin'))
+  with check (get_my_role() in ('directora','asistente','admin'));
 create policy "classrooms_teacher" on public.classrooms for select using (teacher_id = auth.uid());
 create policy "classrooms_parent" on public.classrooms for select using (
   id in (select ret_id from public.get_my_classroom_ids())
@@ -812,8 +812,8 @@ create policy "classrooms_parent" on public.classrooms for select using (
 
 -- STUDENTS
 create policy "students_staff" on public.students for all
-  using (get_my_role() in ('directora','asistente') and deleted_at is null)
-  with check (get_my_role() in ('directora','asistente'));
+  using (get_my_role() in ('directora','asistente','admin') and deleted_at is null)
+  with check (get_my_role() in ('directora','asistente','admin'));
 create policy "students_teacher" on public.students for select using (is_teacher_of_student(id) and deleted_at is null);
 create policy "students_parent_own" on public.students for select using (parent_id = auth.uid() and deleted_at is null);
 create policy "students_parent_update" on public.students for update
@@ -824,8 +824,8 @@ create policy "students_parent_classmates" on public.students for select using (
 
 -- ATTENDANCE
 create policy "attendance_staff" on public.attendance for all
-  using (get_my_role() in ('directora','asistente'))
-  with check (get_my_role() in ('directora','asistente'));
+  using (get_my_role() in ('directora','asistente','admin'))
+  with check (get_my_role() in ('directora','asistente','admin'));
 create policy "attendance_teacher" on public.attendance for all
   using (is_teacher_of_classroom(classroom_id))
   with check (is_teacher_of_classroom(classroom_id));
@@ -835,15 +835,15 @@ create policy "attendance_parent" on public.attendance for select using (
 
 -- ATTENDANCE REQUESTS
 create policy "att_req_staff" on public.attendance_requests for all
-  using (get_my_role() in ('directora','asistente','maestra'))
-  with check (get_my_role() in ('directora','asistente','maestra'));
+  using (get_my_role() in ('directora','asistente','maestra','admin'))
+  with check (get_my_role() in ('directora','asistente','maestra','admin'));
 create policy "att_req_parent_insert" on public.attendance_requests for insert with check (is_parent_of_student(student_id));
 create policy "att_req_parent_select" on public.attendance_requests for select using (is_parent_of_student(student_id));
 
 -- TASKS
 create policy "tasks_directora" on public.tasks for all
-  using (get_my_role() in ('directora','asistente'))
-  with check (get_my_role() in ('directora','asistente'));
+  using (get_my_role() in ('directora','asistente','admin'))
+  with check (get_my_role() in ('directora','asistente','admin'));
 create policy "tasks_teacher" on public.tasks for all
   using (is_teacher_of_classroom(classroom_id))
   with check (is_teacher_of_classroom(classroom_id));
@@ -851,8 +851,8 @@ create policy "tasks_parent" on public.tasks for select using (is_parent_of_clas
 
 -- TASK EVIDENCES
 create policy "evidences_staff" on public.task_evidences for all
-  using (get_my_role() in ('directora','asistente'))
-  with check (get_my_role() in ('directora','asistente'));
+  using (get_my_role() in ('directora','asistente','admin'))
+  with check (get_my_role() in ('directora','asistente','admin'));
 create policy "evidences_teacher" on public.task_evidences for all
   using (exists (select 1 from public.tasks t where t.id = task_evidences.task_id and is_teacher_of_classroom(t.classroom_id)))
   with check (exists (select 1 from public.tasks t where t.id = task_evidences.task_id and is_teacher_of_classroom(t.classroom_id)));
@@ -864,68 +864,68 @@ create policy "evidences_parent_select" on public.task_evidences for select usin
 
 -- POSTS
 create policy "posts_select" on public.posts for select using (
-  get_my_role() in ('directora','asistente') or is_teacher_of_classroom(classroom_id) or is_parent_of_classroom(classroom_id)
+  get_my_role() in ('directora','asistente','admin') or is_teacher_of_classroom(classroom_id) or is_parent_of_classroom(classroom_id)
 );
-create policy "posts_insert" on public.posts for insert with check (get_my_role() in ('directora','asistente','maestra'));
-create policy "posts_update" on public.posts for update using (get_my_role() in ('directora','asistente') or auth.uid() = teacher_id);
-create policy "posts_delete" on public.posts for delete using (get_my_role() in ('directora','asistente') or auth.uid() = teacher_id);
+create policy "posts_insert" on public.posts for insert with check (get_my_role() in ('directora','asistente','maestra','admin'));
+create policy "posts_update" on public.posts for update using (get_my_role() in ('directora','asistente','admin') or auth.uid() = teacher_id);
+create policy "posts_delete" on public.posts for delete using (get_my_role() in ('directora','asistente','admin') or auth.uid() = teacher_id);
 
 -- COMMENTS
 create policy "comments_select" on public.comments for select using (
   exists (select 1 from public.posts p where p.id = comments.post_id
-    and (get_my_role() in ('directora','asistente') or is_teacher_of_classroom(p.classroom_id) or is_parent_of_classroom(p.classroom_id)))
+    and (get_my_role() in ('directora','asistente','admin') or is_teacher_of_classroom(p.classroom_id) or is_parent_of_classroom(p.classroom_id)))
 );
 create policy "comments_insert" on public.comments for insert with check (
   auth.uid() = user_id
   and exists (select 1 from public.posts p where p.id = comments.post_id
-    and (get_my_role() in ('directora','asistente','maestra') or is_parent_of_classroom(p.classroom_id)))
+    and (get_my_role() in ('directora','asistente','maestra','admin') or is_parent_of_classroom(p.classroom_id)))
 );
 create policy "comments_delete" on public.comments for delete using (
-  auth.uid() = user_id or get_my_role() in ('directora','asistente','maestra')
+  auth.uid() = user_id or get_my_role() in ('directora','asistente','maestra','admin')
 );
 
 -- LIKES
 create policy "likes_select" on public.likes for select using (
   exists (select 1 from public.posts p where p.id = likes.post_id
-    and (get_my_role() in ('directora','asistente') or is_teacher_of_classroom(p.classroom_id) or is_parent_of_classroom(p.classroom_id)))
+    and (get_my_role() in ('directora','asistente','admin') or is_teacher_of_classroom(p.classroom_id) or is_parent_of_classroom(p.classroom_id)))
 );
 create policy "likes_insert" on public.likes for insert with check (auth.uid() = user_id);
 create policy "likes_delete" on public.likes for delete using (auth.uid() = user_id);
 
 -- CONVERSATIONS
 create policy "conv_select" on public.conversations for select using (
-  get_my_role() in ('directora','asistente') or user_is_participant(id, auth.uid())
+  get_my_role() in ('directora','asistente','admin') or user_is_participant(id, auth.uid())
 );
 create policy "conv_insert" on public.conversations for insert with check (auth.uid() is not null);
 create policy "conv_update" on public.conversations for update using (user_is_participant(id, auth.uid()));
 
 -- CONVERSATION PARTICIPANTS
 create policy "cp_select" on public.conversation_participants for select using (
-  get_my_role() in ('directora','asistente') or user_id = auth.uid()
+  get_my_role() in ('directora','asistente','admin') or user_id = auth.uid()
 );
 create policy "cp_insert" on public.conversation_participants for insert with check (auth.uid() is not null);
 create policy "cp_delete" on public.conversation_participants for delete using (user_id = auth.uid());
 
 -- MESSAGES
 create policy "msg_select" on public.messages for select using (
-  get_my_role() in ('directora','asistente') or user_is_participant(conversation_id, auth.uid())
+  get_my_role() in ('directora','asistente','admin') or user_is_participant(conversation_id, auth.uid())
 );
 create policy "msg_insert" on public.messages for insert with check (
   auth.uid() = sender_id and user_is_participant(conversation_id, auth.uid())
 );
 create policy "msg_update" on public.messages for update using (
-  get_my_role() in ('directora','maestra','asistente') or sender_id = auth.uid()
+  get_my_role() in ('directora','maestra','asistente','admin') or sender_id = auth.uid()
 );
 
 -- NOTIFICATIONS
 create policy "notifications_all" on public.notifications for all using (
-  auth.uid() = user_id or get_my_role() in ('directora','asistente')
+  auth.uid() = user_id or get_my_role() in ('directora','asistente','admin')
 );
 
 -- PAYMENTS
 create policy "payments_staff" on public.payments for all
-  using (get_my_role() in ('directora','asistente') and deleted_at is null)
-  with check (get_my_role() in ('directora','asistente'));
+  using (get_my_role() in ('directora','asistente','admin') and deleted_at is null)
+  with check (get_my_role() in ('directora','asistente','admin'));
 create policy "payments_parent_select" on public.payments for select using (
   exists (select 1 from public.students where id = payments.student_id and parent_id = auth.uid() and deleted_at is null)
   and deleted_at is null
@@ -934,14 +934,14 @@ create policy "payments_parent_select" on public.payments for select using (
 -- INCIDENTS
 create policy "incidents_insert" on public.incidents for insert with check (auth.uid() = teacher_id);
 create policy "incidents_select" on public.incidents for select using (
-  auth.uid() = teacher_id or get_my_role() in ('directora','asistente') or is_parent_of_student(student_id)
+  auth.uid() = teacher_id or get_my_role() in ('directora','asistente','admin') or is_parent_of_student(student_id)
 );
-create policy "incidents_update" on public.incidents for update using (get_my_role() in ('directora','asistente','maestra'));
+create policy "incidents_update" on public.incidents for update using (get_my_role() in ('directora','asistente','maestra','admin'));
 
 -- DAILY LOGS
 create policy "daily_logs_staff" on public.daily_logs for all
-  using (get_my_role() in ('directora','asistente'))
-  with check (get_my_role() in ('directora','asistente'));
+  using (get_my_role() in ('directora','asistente','admin'))
+  with check (get_my_role() in ('directora','asistente','admin'));
 create policy "daily_logs_teacher" on public.daily_logs for all
   using (is_teacher_of_classroom(classroom_id))
   with check (is_teacher_of_classroom(classroom_id));
@@ -965,65 +965,65 @@ create policy "classroom_chat_insert" on public.classroom_chat for insert with c
 
 -- GRADES
 create policy "grades_staff" on public.grades for all
-  using (get_my_role() in ('directora','asistente','maestra'))
-  with check (get_my_role() in ('directora','asistente','maestra'));
+  using (get_my_role() in ('directora','asistente','maestra','admin'))
+  with check (get_my_role() in ('directora','asistente','maestra','admin'));
 create policy "grades_parent" on public.grades for select using (is_parent_of_student(student_id));
 
 -- PERIODS
 create policy "periods_staff" on public.periods for all
-  using (get_my_role() in ('directora','asistente','maestra'))
-  with check (get_my_role() in ('directora','asistente','maestra'));
+  using (get_my_role() in ('directora','asistente','maestra','admin'))
+  with check (get_my_role() in ('directora','asistente','maestra','admin'));
 create policy "periods_parent" on public.periods for select using (
   classroom_id in (select ret_id from public.get_my_classroom_ids())
 );
 
 -- REPORT CARDS
 create policy "report_cards_staff" on public.report_cards for all
-  using (get_my_role() in ('directora','asistente','maestra'))
-  with check (get_my_role() in ('directora','asistente','maestra'));
+  using (get_my_role() in ('directora','asistente','maestra','admin'))
+  with check (get_my_role() in ('directora','asistente','maestra','admin'));
 create policy "report_cards_parent" on public.report_cards for select using (
   exists (select 1 from public.students where id = report_cards.student_id and parent_id = auth.uid())
 );
 
 -- INQUIRIES
 create policy "inquiries_staff" on public.inquiries for all
-  using (get_my_role() in ('directora','asistente'))
-  with check (get_my_role() in ('directora','asistente'));
+  using (get_my_role() in ('directora','asistente','admin'))
+  with check (get_my_role() in ('directora','asistente','admin'));
 create policy "inquiries_parent_select" on public.inquiries for select using (auth.uid() = parent_id);
 create policy "inquiries_parent_insert" on public.inquiries for insert with check (auth.uid() = parent_id);
 
 -- SCHOOL SETTINGS
 create policy "settings_staff" on public.school_settings for all
-  using (get_my_role() in ('directora','asistente'))
-  with check (get_my_role() in ('directora','asistente'));
+  using (get_my_role() in ('directora','asistente','admin'))
+  with check (get_my_role() in ('directora','asistente','admin'));
 create policy "settings_read" on public.school_settings for select using (auth.uid() is not null);
 
 -- SYSTEM EVENTS
 create policy "system_events_staff" on public.system_events for all
-  using (get_my_role() in ('directora','asistente'))
-  with check (get_my_role() in ('directora','asistente'));
+  using (get_my_role() in ('directora','asistente','admin'))
+  with check (get_my_role() in ('directora','asistente','admin'));
 
 -- TERMS ACCEPTANCE
 create policy "terms_own" on public.terms_acceptance for all using (auth.uid() = user_id);
 
 -- MEETINGS
 create policy "meetings_staff" on public.meetings for all
-  using (get_my_role() in ('directora','asistente','maestra'))
-  with check (get_my_role() in ('directora','asistente','maestra'));
+  using (get_my_role() in ('directora','asistente','maestra','admin'))
+  with check (get_my_role() in ('directora','asistente','maestra','admin'));
 create policy "meetings_parent" on public.meetings for select using (
   exists (select 1 from public.students where classroom_id = meetings.target_id::bigint and parent_id = auth.uid())
 );
 
 -- AUDIT LOGS
 create policy "audit_staff" on public.audit_logs for all
-  using (get_my_role() in ('directora','asistente'))
-  with check (get_my_role() in ('directora','asistente'));
+  using (get_my_role() in ('directora','asistente','admin'))
+  with check (get_my_role() in ('directora','asistente','admin'));
 
 -- DATA SNAPSHOTS
-create policy "snapshots_directora" on public.data_snapshots for all using (get_my_role() = 'directora');
+create policy "snapshots_directora" on public.data_snapshots for all using (get_my_role() in ('directora','admin'));
 
 -- LOGIN ATTEMPTS
-create policy "login_attempts_directora" on public.login_attempts for select using (get_my_role() = 'directora');
+create policy "login_attempts_directora" on public.login_attempts for select using (get_my_role() in ('directora','admin'));
 create policy "login_attempts_insert" on public.login_attempts for insert with check (true);
 
 -- ============================================================
@@ -1078,3 +1078,144 @@ begin
   return jsonb_build_object('generated', v_gen_count, 'expired', v_expire_count);
 end;
 $$;
+
+-- ============================================================
+-- RPC: get_unread_counts — Mensajes no leídos por conversación
+-- ============================================================
+create or replace function public.get_unread_counts()
+returns jsonb language plpgsql security definer set search_path = public as $$
+declare
+  v_user_id uuid := auth.uid();
+  v_result  jsonb := '{}'::jsonb;
+  v_count   bigint;
+begin
+  if v_user_id is null then return v_result; end if;
+
+  -- Count unread messages where user is a participant but not the sender
+  select count(*) into v_count
+  from public.messages m
+  join public.conversation_participants cp
+    on cp.conversation_id = m.conversation_id
+   and cp.user_id = v_user_id
+  where m.sender_id <> v_user_id
+    and m.is_read = false;
+
+  v_result := jsonb_build_object('total', coalesce(v_count, 0));
+  return v_result;
+end;
+$$;
+
+grant execute on function public.get_unread_counts() to authenticated;
+
+-- ============================================================
+-- PRODUCCION: Restricciones adicionales de validacion
+-- ============================================================
+
+-- Pagos: monto no puede ser negativo o cero
+DO $$ BEGIN
+  IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'payments_amount_positive') THEN
+    ALTER TABLE public.payments ADD CONSTRAINT payments_amount_positive CHECK (amount > 0);
+  END IF;
+END $$;
+
+-- Asistencia: no puede registrarse en fechas futuras
+DO $$ BEGIN
+  IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'attendance_no_future_date') THEN
+    ALTER TABLE public.attendance ADD CONSTRAINT attendance_no_future_date CHECK (date <= current_date);
+  END IF;
+END $$;
+
+-- Pagos: estado valido
+DO $$ BEGIN
+  IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'payments_status_check') THEN
+    ALTER TABLE public.payments ADD CONSTRAINT payments_status_check
+      CHECK (status IN ('pending','pendiente','paid','pagado','confirmado','overdue','vencido','review','revision','en revision','rejected'));
+  END IF;
+END $$;
+-- Tabla de errores del sistema (reemplaza localStorage)
+CREATE TABLE IF NOT EXISTS public.system_errors (
+  id          bigint GENERATED BY DEFAULT AS IDENTITY PRIMARY KEY,
+  panel       text,
+  user_id     uuid REFERENCES auth.users(id) ON DELETE SET NULL,
+  message     text NOT NULL,
+  stack       text,
+  url         text,
+  user_agent  text,
+  created_at  timestamp with time zone DEFAULT now() NOT NULL
+);
+ALTER TABLE public.system_errors ENABLE ROW LEVEL SECURITY;
+-- Solo staff puede leer errores
+CREATE POLICY "errors_staff_read" ON public.system_errors FOR SELECT
+  USING (get_my_role() IN ('directora','admin'));
+-- Cualquier usuario autenticado puede insertar su propio error
+CREATE POLICY "errors_insert" ON public.system_errors FOR INSERT
+  WITH CHECK (auth.uid() IS NOT NULL);
+
+-- Tabla de mensajes leídos (read receipts para chat)
+ALTER TABLE public.messages
+  ADD COLUMN IF NOT EXISTS read_at timestamp with time zone;
+
+-- Índice para mensajes no leídos (performance)
+CREATE INDEX IF NOT EXISTS idx_messages_unread
+  ON public.messages(conversation_id, is_read)
+  WHERE is_read = false;
+
+-- Tabla de asistencia a videollamadas
+CREATE TABLE IF NOT EXISTS public.meeting_attendance (
+  id          bigint GENERATED BY DEFAULT AS IDENTITY PRIMARY KEY,
+  meeting_id  bigint REFERENCES public.meetings(id) ON DELETE CASCADE,
+  user_id     uuid REFERENCES public.profiles(id) ON DELETE CASCADE,
+  joined_at   timestamp with time zone DEFAULT now(),
+  left_at     timestamp with time zone,
+  UNIQUE(meeting_id, user_id)
+);
+ALTER TABLE public.meeting_attendance ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "meeting_att_all" ON public.meeting_attendance FOR ALL
+  USING (auth.uid() IS NOT NULL);
+
+-- RPC: Marcar mensaje como leído con timestamp
+CREATE OR REPLACE FUNCTION public.mark_messages_read(p_conversation_id bigint)
+RETURNS void LANGUAGE plpgsql SECURITY DEFINER SET search_path = public AS $$
+BEGIN
+  UPDATE public.messages
+  SET is_read = true, read_at = now()
+  WHERE conversation_id = p_conversation_id
+    AND sender_id <> auth.uid()
+    AND is_read = false;
+END;
+$$;
+GRANT EXECUTE ON FUNCTION public.mark_messages_read(bigint) TO authenticated;
+
+-- RPC: Exportar reporte de morosidad (para directora)
+CREATE OR REPLACE FUNCTION public.get_morosidad_report(p_month text DEFAULT NULL)
+RETURNS TABLE(
+  student_name  text,
+  classroom     text,
+  parent_name   text,
+  parent_email  text,
+  parent_phone  text,
+  month_paid    text,
+  amount        numeric,
+  status        text,
+  due_date      date,
+  days_overdue  int
+) LANGUAGE sql SECURITY DEFINER SET search_path = public AS $$
+  SELECT
+    s.name                                                    AS student_name,
+    c.name                                                    AS classroom,
+    s.p1_name                                                 AS parent_name,
+    s.p1_email                                                AS parent_email,
+    s.p1_phone                                                AS parent_phone,
+    p.month_paid,
+    p.amount,
+    p.status,
+    p.due_date,
+    GREATEST(0, (current_date - p.due_date)::int)            AS days_overdue
+  FROM public.payments p
+  JOIN public.students s ON s.id = p.student_id
+  LEFT JOIN public.classrooms c ON c.id = s.classroom_id
+  WHERE p.status IN ('pending','overdue','pendiente','vencido')
+    AND (p_month IS NULL OR p.month_paid = p_month)
+  ORDER BY days_overdue DESC, s.name;
+$$;
+GRANT EXECUTE ON FUNCTION public.get_morosidad_report(text) TO authenticated;

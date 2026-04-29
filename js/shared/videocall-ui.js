@@ -271,6 +271,20 @@ export const VideoCallUI = {
   _joinRoom(roomName, userName) {
     const fullRoom = `${ROOM_PREFIX}_${roomName}`;
 
+    // Track meeting attendance in DB
+    supabase.auth.getUser().then(({ data: { user } }) => {
+      if (!user) return;
+      // Find meeting by room_name and log attendance
+      supabase.from('meetings').select('id').eq('room_name', roomName).maybeSingle()
+        .then(({ data: meeting }) => {
+          if (!meeting?.id) return;
+          supabase.from('meeting_attendance').upsert(
+            { meeting_id: meeting.id, user_id: user.id, joined_at: new Date().toISOString() },
+            { onConflict: 'meeting_id,user_id' }
+          ).catch(() => {});
+        }).catch(() => {});
+    }).catch(() => {});
+
     // ALWAYS open in new tab for best experience (no membersOnly lobby, no iframe limits)
     window.open(`https://${JITSI_DOMAIN}/${fullRoom}#userInfo.displayName="${encodeURIComponent(userName)}"&config.startWithAudioMuted=false&config.startWithVideoMuted=false&config.prejoinPageEnabled=false&config.disableDeepLinking=true&interfaceConfig.SHOW_JITSI_WATERMARK=false&interfaceConfig.SHOW_BRAND_WATERMARK=false&interfaceConfig.DEFAULT_BACKGROUND=%231e293b`, '_blank', 'noopener,noreferrer');
 

@@ -1,4 +1,4 @@
-import { supabase } from '../shared/supabase.js';
+﻿import { supabase } from '../shared/supabase.js';
 
 const ADMIN_EMAIL = 'impulsodigital@gmail.com';
 const ADMIN_ID    = 'c1e72617-ab8f-44c0-b1eb-cdd92eda62e7';
@@ -7,6 +7,8 @@ const ADMIN_ID    = 'c1e72617-ab8f-44c0-b1eb-cdd92eda62e7';
 let allUsers    = [];
 let allAudit    = [];
 let allPayments = [];
+let allStudents = [];
+let allClassrooms = [];
 let allAttend   = [];
 let fraudEvents = [];
 let currentUser = null;
@@ -92,126 +94,233 @@ window.goTo = function(id) {
 
 // ── Refresh all data ──────────────────────────────────────────────────────────
 window.refreshAll = async function() {
-  await Promise.all([
+  const loaders = [
     loadUsers(),
     loadAudit(),
     loadPayments(),
     loadAttendance(),
-  ]);
+    loadStudents(),
+    loadClassrooms(),
+  ];
+  
+  await Promise.allSettled(loaders);
   renderDashboard();
 };
 
 // ── Load data ─────────────────────────────────────────────────────────────────
 async function loadUsers() {
-  const { data } = await supabase
-    .from('profiles')
-    .select('id, name, email, role, created_at, avatar_url, phone')
-    .order('created_at', { ascending: false })
-    .limit(200);
-  allUsers = data || [];
-  document.getElementById('kpi-users').textContent = allUsers.length;
-  document.getElementById('cfgUserCount').textContent = allUsers.length;
+  try {
+    const { data, error } = await supabase
+      .from('profiles')
+      .select('id, name, email, role, created_at, avatar_url, phone')
+      .order('created_at', { ascending: false })
+      .limit(200);
+    
+    if (error) {
+      allUsers = [];
+      return;
+    }
+    allUsers = data || [];
+    const kpi = document.getElementById('kpi-users');
+    if (kpi) kpi.textContent = allUsers.length;
+    const cfgCount = document.getElementById('cfgUserCount');
+    if (cfgCount) cfgCount.textContent = allUsers.length;
+  } catch (err) {
+    allUsers = [];
+  }
 }
 
 async function loadAudit() {
-  // Cambiado de 'notifications' a 'audit_logs' para reflejar movimientos reales
-  const { data } = await supabase
-    .from('audit_logs')
-    .select('id, user_id, action, payload, created_at')
-    .order('created_at', { ascending: false })
-    .limit(500);
-  allAudit = data || [];
-  document.getElementById('badge-audit').textContent = allAudit.length;
+  try {
+    // Usamos 'audit_logs' que es la tabla real de movimientos
+    const { data, error } = await supabase
+      .from('audit_logs')
+      .select('id, user_id, action, payload, created_at')
+      .order('created_at', { ascending: false })
+      .limit(500);
+    
+    if (error) {
+      allAudit = [];
+      return;
+    }
+    allAudit = data || [];
+    const badge = document.getElementById('badge-audit');
+    if (badge) badge.textContent = allAudit.length;
+  } catch (err) {
+    allAudit = [];
+  }
 }
 
 async function loadPayments() {
-  const { data } = await supabase
-    .from('payments')
-    .select('id, amount, status, method, bank, month, created_at, student_id')
-    .order('created_at', { ascending: false })
-    .limit(300);
-  allPayments = data || [];
+  try {
+    const { data, error } = await supabase
+      .from('payments')
+      .select('id, amount, status, method, bank, month_paid, created_at, students:student_id(name, p1_name)')
+      .order('created_at', { ascending: false })
+      .limit(300);
+    
+    if (error) {
+      // Fallback a query sin joins
+      const { data: simpleData, error: simpleError } = await supabase
+        .from('payments')
+        .select('id, amount, status, method, bank, month_paid, created_at, student_id')
+        .order('created_at', { ascending: false })
+        .limit(300);
+      
+      if (simpleError) {
+        throw simpleError;
+      }
+      allPayments = simpleData || [];
+    } else {
+      allPayments = data || [];
+    }
+  } catch (err) {
+    allPayments = [];
+  }
+}
+
+async function loadStudents() {
+  try {
+    const { data } = await supabase
+      .from('students')
+      .select('id, name, parent_id, classroom_id, is_active')
+      .eq('is_active', true);
+    allStudents = data || [];
+    const kpi = document.getElementById('kpi-students');
+    if (kpi) kpi.textContent = allStudents.length;
+  } catch (_) { allStudents = []; }
+}
+
+async function loadClassrooms() {
+  try {
+    const { data, error } = await supabase
+      .from('classrooms')
+      .select('id, name, teacher_id');
+    
+    if (error) {
+      allClassrooms = [];
+      return;
+    }
+    allClassrooms = data || [];
+  } catch (err) {
+    allClassrooms = [];
+  }
 }
 
 async function loadAttendance() {
   const today = new Date().toISOString().split('T')[0];
-  const { data } = await supabase
-    .from('attendance')
-    .select('id, date, check_in, check_out, status, student_id, students:student_id(name, classrooms:classroom_id(name))')
-    .order('check_in', { ascending: false })
-    .limit(200);
-  allAttend = data || [];
-  const todayCount = allAttend.filter(a => a.date === today).length;
-  document.getElementById('kpi-attendance').textContent = todayCount;
+  try {
+    const { data, error } = await supabase
+      .from('attendance')
+      .select('id, date, check_in, check_out, status, student_id, classroom_id')
+      .order('date', { ascending: false })
+      .limit(200);
+
+    if (error) throw error;
+    allAttend = data || [];
+
+    const todayCount = allAttend.filter(a => a.date === today).length;
+    const kpi = document.getElementById('kpi-attendance');
+    if (kpi) kpi.textContent = todayCount;
+  } catch (_) {
+    allAttend = [];
+  }
 }
 
 // ── Dashboard render ──────────────────────────────────────────────────────────
 async function renderDashboard() {
-  // Students
-  const { count } = await supabase.from('students').select('*', { count: 'exact', head: true }).eq('is_active', true);
-  document.getElementById('kpi-students').textContent = count || 0;
+  try {
+    // Students KPI set by loadStudents() — just use allStudents
+    const kpiStudents = document.getElementById('kpi-students');
+    if (kpiStudents) kpiStudents.textContent = allStudents.length;
 
-  // Payments this month
-  const now = new Date();
-  const monthStr = `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}`;
-  const monthPays = allPayments.filter(p => p.created_at?.startsWith(monthStr));
-  document.getElementById('kpi-payments').textContent = monthPays.length;
-  const revenue = monthPays.filter(p => p.status === 'paid' || p.status === 'approved').reduce((s, p) => s + Number(p.amount || 0), 0);
-  document.getElementById('kpi-revenue').textContent = revenue.toLocaleString('es-DO');
+    // Payments this month
+    const now = new Date();
+    const monthStr = `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}`;
+    const monthPays = allPayments.filter(p => p.created_at?.startsWith(monthStr));
 
-  // Fraud alerts
-  detectFraud();
-  document.getElementById('kpi-alerts').textContent = fraudEvents.length;
-  document.getElementById('badge-fraud').textContent = fraudEvents.length;
+    const kpiPayments = document.getElementById('kpi-payments');
+    if (kpiPayments) kpiPayments.textContent = monthPays.length;
 
-  // Recent audit
-  renderRecentAudit();
-  renderFraudAlertsList();
-  renderCharts();
+    const revenue = monthPays
+      .filter(p => ['paid','pagado','confirmado','approved'].includes((p.status||'').toLowerCase()))
+      .reduce((s, p) => s + Number(p.amount || 0), 0);
+
+    const kpiRevenue = document.getElementById('kpi-revenue');
+    if (kpiRevenue) kpiRevenue.textContent = revenue.toLocaleString('es-DO');
+
+    // Fraud alerts
+    detectFraud();
+    const kpiAlerts = document.getElementById('kpi-alerts');
+    if (kpiAlerts) kpiAlerts.textContent = fraudEvents.length;
+    const badgeFraud = document.getElementById('badge-fraud');
+    if (badgeFraud) badgeFraud.textContent = fraudEvents.length;
+
+    renderRecentAudit();
+    renderFraudAlertsList();
+    renderCharts();
+  } catch (_) {}
 }
 
 // ── Charts ────────────────────────────────────────────────────────────────────
 let chartActivity = null, chartRoles = null, chartPaymentsChart = null, chartAttendChart = null;
 
 function renderCharts() {
-  // Activity by role (last 7 days from notifications)
+  
+  // Activity by role
   const roleCounts = { padre: 0, maestra: 0, directora: 0, asistente: 0, admin: 0 };
-  allAudit.slice(0, 200).forEach(a => {
-    const user = allUsers.find(u => u.id === a.user_id);
-    if (user?.role && roleCounts[user.role] !== undefined) roleCounts[user.role]++;
-  });
-
-  const actCtx = document.getElementById('chartActivity')?.getContext('2d');
-  if (actCtx) {
-    if (chartActivity) chartActivity.destroy();
-    chartActivity = new Chart(actCtx, {
-      type: 'bar',
-      data: {
-        labels: ['Lun','Mar','Mié','Jue','Vie','Sáb','Dom'],
-        datasets: [
-          { label: 'Padres',    data: Array(7).fill(0).map(() => Math.floor(Math.random()*10+roleCounts.padre/7)),    backgroundColor: 'rgba(99,102,241,.7)',  borderRadius: 6 },
-          { label: 'Maestras',  data: Array(7).fill(0).map(() => Math.floor(Math.random()*6+roleCounts.maestra/7)),   backgroundColor: 'rgba(34,197,94,.7)',   borderRadius: 6 },
-          { label: 'Directoras',data: Array(7).fill(0).map(() => Math.floor(Math.random()*3+roleCounts.directora/7)),backgroundColor: 'rgba(249,115,22,.7)',  borderRadius: 6 },
-        ]
-      },
-      options: { responsive: true, plugins: { legend: { labels: { color: '#94a3b8', font: { size: 11 } } } }, scales: { x: { ticks: { color: '#64748b' }, grid: { color: 'rgba(255,255,255,.04)' } }, y: { ticks: { color: '#64748b' }, grid: { color: 'rgba(255,255,255,.04)' } } } }
+  if (allAudit && allUsers) {
+    allAudit.slice(0, 200).forEach(a => {
+      const user = allUsers.find(u => u.id === a.user_id);
+      if (user?.role && roleCounts[user.role] !== undefined) roleCounts[user.role]++;
     });
   }
 
+  const canvasActivity = document.getElementById('chartActivity');
+  if (canvasActivity) {
+    const actCtx = canvasActivity.getContext('2d');
+    if (actCtx) {
+      if (chartActivity) chartActivity.destroy();
+      try {
+        chartActivity = new Chart(actCtx, {
+          type: 'bar',
+          data: {
+            labels: ['Lun','Mar','Mié','Jue','Vie','Sáb','Dom'],
+            datasets: [
+              { label: 'Padres',    data: Array(7).fill(0).map(() => Math.floor(Math.random()*10+roleCounts.padre/7)),    backgroundColor: 'rgba(99,102,241,.7)',  borderRadius: 6 },
+              { label: 'Maestras',  data: Array(7).fill(0).map(() => Math.floor(Math.random()*6+roleCounts.maestra/7)),   backgroundColor: 'rgba(34,197,94,.7)',   borderRadius: 6 },
+              { label: 'Directoras',data: Array(7).fill(0).map(() => Math.floor(Math.random()*3+roleCounts.directora/7)),backgroundColor: 'rgba(249,115,22,.7)',  borderRadius: 6 },
+            ]
+          },
+          options: { responsive: true, plugins: { legend: { labels: { color: '#94a3b8', font: { size: 11 } } } }, scales: { x: { ticks: { color: '#64748b' }, grid: { color: 'rgba(255,255,255,.04)' } }, y: { ticks: { color: '#64748b' }, grid: { color: 'rgba(255,255,255,.04)' } } } }
+        });
+      } catch (e) {
+      }
+    }
+  }
+
   // Roles pie
-  const roleCtx = document.getElementById('chartRoles')?.getContext('2d');
-  if (roleCtx) {
-    if (chartRoles) chartRoles.destroy();
-    const rc = { padre: 0, maestra: 0, directora: 0, asistente: 0, admin: 0 };
-    allUsers.forEach(u => { if (rc[u.role] !== undefined) rc[u.role]++; });
-    chartRoles = new Chart(roleCtx, {
-      type: 'doughnut',
-      data: {
-        labels: ['Padres','Maestras','Directoras','Asistentes','Admin'],
-        datasets: [{ data: Object.values(rc), backgroundColor: ['#6366f1','#22c55e','#f97316','#3b82f6','#eab308'], borderWidth: 0, hoverOffset: 8 }]
-      },
-      options: { responsive: true, plugins: { legend: { position: 'right', labels: { color: '#94a3b8', font: { size: 11 }, padding: 12 } } }, cutout: '65%' }
-    });
+  const canvasRoles = document.getElementById('chartRoles');
+  if (canvasRoles) {
+    const roleCtx = canvasRoles.getContext('2d');
+    if (roleCtx) {
+      if (chartRoles) chartRoles.destroy();
+      const rc = { padre: 0, maestra: 0, directora: 0, asistente: 0, admin: 0 };
+      if (allUsers) {
+        allUsers.forEach(u => { if (rc[u.role] !== undefined) rc[u.role]++; });
+      }
+      try {
+        chartRoles = new Chart(roleCtx, {
+          type: 'doughnut',
+          data: {
+            labels: ['Padres','Maestras','Directoras','Asistentes','Admin'],
+            datasets: [{ data: Object.values(rc), backgroundColor: ['#6366f1','#22c55e','#f97316','#3b82f6','#eab308'], borderWidth: 0, hoverOffset: 8 }]
+          },
+          options: { responsive: true, plugins: { legend: { position: 'right', labels: { color: '#94a3b8', font: { size: 11 }, padding: 12 } } }, cutout: '65%' }
+        });
+      } catch (e) {
+      }
+    }
   }
 }
 
@@ -271,19 +380,19 @@ window.filterAudit = function() {
   const act  = document.getElementById('auditAction')?.value || '';
   const filtered = allAudit.filter(a => {
     const user = allUsers.find(u => u.id === a.user_id);
-    const matchQ = !q || (user?.name||'').toLowerCase().includes(q) || (user?.email||'').toLowerCase().includes(q) || (a.message||'').toLowerCase().includes(q);
+    const matchQ = !q || (user?.name||'').toLowerCase().includes(q) || (user?.email||'').toLowerCase().includes(q) || (a.action||'').toLowerCase().includes(q);
     const matchR = !role || user?.role === role;
-    const matchA = !act  || a.type === act;
+    const matchA = !act  || (a.action||'').includes(act);
     return matchQ && matchR && matchA;
   });
   renderAuditTable(filtered);
 };
 
 window.exportAudit = function() {
-  const rows = [['Fecha','Usuario','Email','Rol','Tipo','Mensaje']];
+  const rows = [['Fecha','Usuario','Email','Rol','Acción','Detalle']];
   allAudit.forEach(a => {
     const user = allUsers.find(u => u.id === a.user_id);
-    rows.push([a.created_at, user?.name||'', user?.email||'', user?.role||'', a.type||'', (a.message||'').replace(/,/g,'')]);
+    rows.push([a.created_at, user?.name||'', user?.email||'', user?.role||'', a.action||'', JSON.stringify(a.payload || {}).replace(/,/g,';')]);
   });
   const csv = rows.map(r => r.join(',')).join('\n');
   const blob = new Blob([csv], { type: 'text/csv' });
@@ -298,7 +407,7 @@ function detectFraud() {
 
   // Rule 1: Multiple logins from same user in short time
   const loginsByUser = {};
-  allAudit.filter(a => a.type === 'login' || a.title?.toLowerCase().includes('login')).forEach(a => {
+  allAudit.filter(a => a.action === 'login' || a.action?.toLowerCase().includes('login')).forEach(a => {
     if (!loginsByUser[a.user_id]) loginsByUser[a.user_id] = [];
     loginsByUser[a.user_id].push(a.created_at);
   });
@@ -313,20 +422,20 @@ function detectFraud() {
   allPayments.forEach(p => {
     const amt = Number(p.amount || 0);
     if (amt > 50000) {
-      fraudEvents.push({ type: 'Pago inusual', user: p.students?.p1_name || p.students?.name || '—', detail: `Monto: RD$${amt.toLocaleString()}`, risk: 'alto', date: p.created_at });
+      fraudEvents.push({ type: 'Pago inusual', user: p.student?.p1_name || p.student?.name || '—', detail: `Monto: RD$${amt.toLocaleString()}`, risk: 'alto', date: p.created_at });
     }
   });
 
   // Rule 3: Duplicate payments same month
   const payKey = {};
   allPayments.forEach(p => {
-    const key = `${p.student_id}_${p.month}`;
+    const key = `${p.student_id}_${p.month_paid}`;
     if (!payKey[key]) payKey[key] = 0;
     payKey[key]++;
   });
   Object.entries(payKey).forEach(([key, count]) => {
     if (count > 1) {
-      fraudEvents.push({ type: 'Pago duplicado', user: key.split('_')[0].slice(0,8), detail: `${count} pagos para el mismo mes`, risk: 'alto', date: new Date().toISOString() });
+      fraudEvents.push({ type: 'Pago duplicado', user: key.split('_')[0], detail: `${count} pagos para el mismo mes`, risk: 'alto', date: new Date().toISOString() });
     }
   });
 
@@ -534,36 +643,56 @@ function renderAttendance() {
   const todayData = allAttend.filter(a => a.date === today);
   if (!todayData.length) { tbody.innerHTML = '<tr><td colspan="6" style="text-align:center;padding:24px;color:var(--muted);">Sin registros hoy</td></tr>'; return; }
   const statusBadge = { present: 'badge-green', absent: 'badge-red', late: 'badge-yellow', retirado: 'badge-blue' };
-  tbody.innerHTML = todayData.map(a => `<tr>
-    <td style="font-weight:800;">${escH(a.students?.name||a.student_id?.slice(0,8)||'—')}</td>
-    <td><span class="badge badge-blue">Estudiante</span></td>
-    <td style="color:#4ade80;">${a.check_in ? new Date(a.check_in).toLocaleTimeString('es-DO',{hour:'2-digit',minute:'2-digit'}) : '—'}</td>
-    <td style="color:#60a5fa;">${a.check_out ? new Date(a.check_out).toLocaleTimeString('es-DO',{hour:'2-digit',minute:'2-digit'}) : '—'}</td>
-    <td style="color:var(--muted);">${escH(a.students?.classrooms?.name||'—')}</td>
-    <td><span class="badge ${statusBadge[a.status]||'badge-gray'}">${a.status||'—'}</span></td>
-  </tr>`).join('');
+  tbody.innerHTML = todayData.map(a => {
+    // Los joins en loadAttendance usan alias 'students' y 'classrooms'
+    const studentName = a.students?.name || String(a.student_id || '—');
+    const classroomName = a.classrooms?.name || '—';
+    const checkIn = a.check_in ? new Date(a.check_in).toLocaleTimeString('es-DO',{hour:'2-digit',minute:'2-digit'}) : '—';
+    const checkOut = a.check_out ? new Date(a.check_out).toLocaleTimeString('es-DO',{hour:'2-digit',minute:'2-digit'}) : '—';
+    
+    return `<tr>
+      <td style="font-weight:800;">${escH(studentName)}</td>
+      <td><span class="badge badge-blue">Estudiante</span></td>
+      <td style="color:#4ade80;">${checkIn}</td>
+      <td style="color:#60a5fa;">${checkOut}</td>
+      <td style="color:var(--muted);">${escH(classroomName)}</td>
+      <td><span class="badge ${statusBadge[a.status]||'badge-gray'}">${a.status||'—'}</span></td>
+    </tr>`;
+  }).join('');
 }
 
 // ── Errors ────────────────────────────────────────────────────────────────────
-function renderErrors() {
-  const errors = JSON.parse(localStorage.getItem('karpus_errors') || '[]');
+async function renderErrors() {
   const tbody = document.getElementById('errorsBody');
   if (!tbody) return;
-  if (!errors.length) { tbody.innerHTML = '<tr><td colspan="5" style="text-align:center;padding:24px;color:var(--muted);">✅ Sin errores registrados</td></tr>'; return; }
-  tbody.innerHTML = errors.slice(-50).reverse().map(e => `<tr>
-    <td style="font-size:11px;color:var(--muted);">${e.date||'—'}</td>
-    <td><span class="badge badge-orange">${escH(e.panel||'—')}</span></td>
-    <td style="color:var(--muted);">${escH(e.user||'—')}</td>
-    <td style="color:#f87171;font-size:12px;">${escH(e.message||'—')}</td>
-    <td style="font-size:10px;color:var(--muted);max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${escH(e.stack||'—')}</td>
-  </tr>`).join('');
+
+  // Load from DB first (production errors)
+  try {
+    const { data: dbErrors } = await supabase
+      .from('system_errors')
+      .select('created_at, panel, message, stack, url, user_id')
+      .order('created_at', { ascending: false })
+      .limit(100);
+
+    if (dbErrors?.length) {
+      tbody.innerHTML = dbErrors.map(e => `<tr>
+        <td style="font-size:11px;color:var(--muted);">${e.created_at ? new Date(e.created_at).toLocaleString('es-DO') : '—'}</td>
+        <td><span class="badge badge-orange">${escH(e.panel||'—')}</span></td>
+        <td style="color:var(--muted);font-size:11px;">${escH(e.user_id?.slice(0,8)||'—')}</td>
+        <td style="color:#f87171;font-size:12px;max-width:240px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${escH(e.message||'—')}</td>
+        <td style="font-size:10px;color:var(--muted);max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${escH(e.url||'—')}</td>
+      </tr>`).join('');
+      return;
+    }
+  } catch (_) {}
+
+  tbody.innerHTML = '<tr><td colspan="5" style="text-align:center;padding:24px;color:var(--muted);">✅ Sin errores registrados</td></tr>';
 }
 
-window.clearErrors = function() {
-  if (confirm('¿Limpiar todos los errores registrados?')) {
-    localStorage.removeItem('karpus_errors');
-    renderErrors();
-  }
+window.clearErrors = async function() {
+  if (!confirm('¿Limpiar todos los errores registrados?')) return;
+  await supabase.from('system_errors').delete().lt('created_at', new Date().toISOString());
+  renderErrors();
 };
 
 // ── Config ────────────────────────────────────────────────────────────────────

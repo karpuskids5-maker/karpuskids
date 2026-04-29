@@ -180,13 +180,20 @@ export const ChatModule = {
     const isMine = m.sender_id === myId;
     const div = document.createElement('div');
     div.className = 'flex ' + (isMine ? 'justify-end' : 'justify-start') + ' mb-3';
+
+    // Read receipt: show "Visto" for my sent messages that have been read
+    const readReceipt = isMine && m.read_at
+      ? '<span class="text-[8px] text-green-300 font-bold ml-1">✓✓ Visto</span>'
+      : (isMine && m.is_read ? '<span class="text-[8px] text-green-300 font-bold ml-1">✓✓</span>' : '');
+
     div.innerHTML =
       '<div class="max-w-[80%] px-4 py-2 rounded-2xl text-sm shadow-sm ' +
         (isMine ? 'bg-green-600 text-white rounded-tr-none' : 'bg-white border border-slate-100 text-slate-700 rounded-tl-none') +
       '">' +
         '<p class="whitespace-pre-wrap">' + escapeHtml(m.content) + '</p>' +
-        '<p class="text-[9px] ' + (isMine ? 'text-green-200' : 'text-slate-400') + ' mt-1 text-right uppercase font-bold">' +
+        '<p class="text-[9px] ' + (isMine ? 'text-green-200' : 'text-slate-400') + ' mt-1 text-right uppercase font-bold flex items-center justify-end gap-1">' +
           new Date(m.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) +
+          readReceipt +
         '</p>' +
       '</div>';
     return div;
@@ -204,11 +211,16 @@ export const ChatModule = {
     const content = input.value.trim();
     if (!content || !this._activeContact) return;
 
-    const user = AppState.get('user');
+    const user    = AppState.get('user');
+    const profile = AppState.get('profile');
     if (!user) return;
 
     input.value = '';
     input.disabled = true;
+    // Stop typing indicator
+    if (this._conversationId) {
+      SharedChatModule.broadcastTyping(this._conversationId, profile?.name || 'Padre', false);
+    }
 
     // Optimistic append
     const container = document.getElementById('chatMessages');
@@ -227,7 +239,7 @@ export const ChatModule = {
       }
     } catch (err) {
       Helpers.toast('Error al enviar mensaje', 'error');
-      container?.lastElementChild?.remove(); // revertir optimistic
+      container?.lastElementChild?.remove();
     } finally {
       input.disabled = false;
       input.focus();
@@ -237,16 +249,62 @@ export const ChatModule = {
   initRealtime() {
     if (this._channel) { supabase.removeChannel(this._channel); this._channel = null; }
     if (!this._conversationId) return;
-    const user = AppState.get('user');
+    const user    = AppState.get('user');
+    const profile = AppState.get('profile');
+
+    // Typing debounce
+    let typingTimer = null;
+    const input = document.getElementById('messageInput');
+    if (input && !input._typingBound) {
+      input._typingBound = true;
+      input.addEventListener('input', () => {
+        if (!this._conversationId) return;
+        SharedChatModule.broadcastTyping(this._conversationId, profile?.name || 'Padre', true);
+        clearTimeout(typingTimer);
+        typingTimer = setTimeout(() => {
+          SharedChatModule.broadcastTyping(this._conversationId, profile?.name || 'Padre', false);
+        }, 2000);
+      });
+    }
+
     this._channel = SharedChatModule.subscribeToConversation(
       this._conversationId,
       (newMsg) => {
         if (newMsg.sender_id !== user?.id) {
           const container = document.getElementById('chatMessages');
           if (container) {
+            // Remove typing indicator if present
+            document.getElementById('typing-indicator')?.remove();
             container.appendChild(this._buildBubble(newMsg, user?.id));
             ScrollModule.scrollToBottom(container, true);
           }
+          // Mark as read
+          SharedChatModule.markAsRead(this._conversationId);
+        }
+      },
+      // Typing callback
+      ({ userName, isTyping }) => {
+        const container = document.getElementById('chatMessages');
+        if (!container) return;
+        const existing = document.getElementById('typing-indicator');
+        if (isTyping) {
+          if (!existing) {
+            const el = document.createElement('div');
+            el.id = 'typing-indicator';
+            el.className = 'flex justify-start mb-2';
+            el.innerHTML = '<div class="bg-white border border-slate-100 rounded-2xl rounded-tl-none px-4 py-2 text-xs text-slate-400 font-bold flex items-center gap-1.5 shadow-sm">' +
+              '<span class="flex gap-0.5">' +
+                '<span class="w-1.5 h-1.5 bg-slate-400 rounded-full animate-bounce" style="animation-delay:0ms"></span>' +
+                '<span class="w-1.5 h-1.5 bg-slate-400 rounded-full animate-bounce" style="animation-delay:150ms"></span>' +
+                '<span class="w-1.5 h-1.5 bg-slate-400 rounded-full animate-bounce" style="animation-delay:300ms"></span>' +
+              '</span>' +
+              escapeHtml(userName) + ' está escribiendo...' +
+            '</div>';
+            container.appendChild(el);
+            ScrollModule.scrollToBottom(container, true);
+          }
+        } else {
+          existing?.remove();
         }
       }
     );
