@@ -231,27 +231,44 @@ export const MaestraApi = {
   async gradeTask(taskId, studentId, gradeLetter, stars, feedback) {
     if (!taskId || !studentId) throw new Error('Task ID and Student ID are required');
 
-    const starsVal = parseInt(stars) || null;
-    // DB constraint: stars must be 1-5 or null
+    const starsVal   = parseInt(stars) || null;
     const validStars = (starsVal && starsVal >= 1 && starsVal <= 5) ? starsVal : null;
 
-    const record = {
-      task_id:      taskId,
-      student_id:   studentId,
+    const updates = {
       grade_letter: gradeLetter || null,
       stars:        validStars,
       comment:      feedback || null,
       status:       'graded'
     };
 
-    const { data, error } = await supabase
+    // Check if evidence already exists for this task+student
+    const { data: existing } = await supabase
       .from('task_evidences')
-      .upsert(record, { onConflict: 'task_id,student_id', ignoreDuplicates: false })
-      .select('id, grade_letter, stars, status')
+      .select('id')
+      .eq('task_id', taskId)
+      .eq('student_id', studentId)
       .maybeSingle();
 
-    handleError(error, 'gradeTask');
-    return data;
+    let result;
+    if (existing?.id) {
+      // Update existing record
+      result = await supabase
+        .from('task_evidences')
+        .update(updates)
+        .eq('id', existing.id)
+        .select('id, grade_letter, stars, status')
+        .maybeSingle();
+    } else {
+      // Insert new record
+      result = await supabase
+        .from('task_evidences')
+        .insert({ task_id: taskId, student_id: studentId, ...updates })
+        .select('id, grade_letter, stars, status')
+        .maybeSingle();
+    }
+
+    handleError(result.error, 'gradeTask');
+    return result.data;
   },
 
   /**

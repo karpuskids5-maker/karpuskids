@@ -6,7 +6,7 @@
 import { supabase } from './supabase.js';
 
 const DB_NAME    = 'karpus_offline';
-const DB_VERSION = 1;
+const DB_VERSION = 2;
 const STORE      = 'queue';
 
 let _db = null;
@@ -18,9 +18,7 @@ async function openDB() {
     req.onupgradeneeded = (e) => {
       const db = e.target.result;
       if (!db.objectStoreNames.contains(STORE)) {
-        const store = db.createObjectStore(STORE, { keyPath: 'id', autoIncrement: true });
-        store.createIndex('table_name', 'table_name', { unique: false });
-        store.createIndex('synced', 'synced', { unique: false });
+        db.createObjectStore(STORE, { keyPath: 'id', autoIncrement: true });
       }
     };
     req.onsuccess  = (e) => { _db = e.target.result; resolve(_db); };
@@ -53,9 +51,10 @@ export const OfflineQueue = {
       const db = await openDB();
       return new Promise((resolve, reject) => {
         const tx    = db.transaction(STORE, 'readonly');
-        const index = tx.objectStore(STORE).index('synced');
-        const req   = index.getAll(false);
-        req.onsuccess = () => resolve(req.result || []);
+        const store = tx.objectStore(STORE);
+        // Get ALL records then filter in JS — avoids IDBIndex boolean key issues
+        const req = store.getAll();
+        req.onsuccess = () => resolve((req.result || []).filter(r => !r.synced));
         req.onerror   = () => resolve([]);
       });
     } catch (_) { return []; }

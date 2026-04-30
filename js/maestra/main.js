@@ -282,7 +282,7 @@ document.addEventListener('DOMContentLoaded', async () => {
 
     // Badge mensajes no le\u00eddos
     loadMaestraUnreadBadge(auth.user.id);
-g    // Badge tareas pendientes de calificar
+    // Badge tareas pendientes de calificar
     loadPendingTasksBadge(classroom.id);
 
     // \ud83d\udd34 Sistema de badges por secci\u00f3n

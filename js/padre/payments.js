@@ -294,7 +294,6 @@ export const PaymentsModule = {
       await this.loadPayments();
 
       // Notificar al staff que hay un comprobante nuevo
-      const student = AppState.get('currentStudent');
       emitEvent('payment.receipt_uploaded', {
         student_id:   student?.id,
         student_name: student?.name || 'Estudiante',
