@@ -36,13 +36,7 @@ window.App = {
   grades: GradesModule,
   ui: { ...UIHelpers, ...DirectorUI },
   inquiries: InquiriesModule,
-  chat: {
-    ...ChatModule,
-    toggleMobileView: (show) => {
-      const container = document.getElementById('chatAppContainer');
-      if (container) container.classList.toggle('show-chat', show);
-    }
-  },
+  chat: ChatModule,
   wall: {
     toggleCommentSection: (pid) => WallModule.toggleCommentSection(pid),
     sendComment: (pid) => WallModule.sendComment(pid),
@@ -280,16 +274,6 @@ document.addEventListener('DOMContentLoaded', async () => {
     setupSearch('wallSearch', 'wall');
     setupSearch('chatSearchInput', 'chat');
 
-    // 5c. Interacciones de Chat en Móvil
-    document.getElementById('chatBackBtn')?.addEventListener('click', () => {
-      window.App.chat.toggleMobileView(false);
-    });
-    document.getElementById('chatContactsList')?.addEventListener('click', (e) => {
-      if (e.target.closest('.chat-contact-item') || e.target.closest('[onclick*="chat.select"]')) {
-        window.App.chat.toggleMobileView(true);
-      }
-    });
-
     // 5c. Badge de mensajes no leídos (directora)
     loadUnreadMessageBadge(auth.user.id);
 
@@ -308,7 +292,7 @@ document.addEventListener('DOMContentLoaded', async () => {
       RealtimeManager.unsubscribeAll();
       QueryCache.clear();
       await supabase.auth.signOut();
-      window.location.href = 'index.html';
+      window.location.href = 'login.html';
     });
 
     // 7. Mobile sidebar hamburger
@@ -365,7 +349,7 @@ document.addEventListener('DOMContentLoaded', async () => {
 
       // Guardar ID de acceso QR de la directora
       const accessId = document.getElementById('confDirAccessId')?.value?.trim();
-      if (accessId) updates.notes = accessId;
+      if (accessId) updates.access_code = accessId;
 
       const { error } = await supabase.from('profiles').update(updates).eq('id', auth.user.id);
       if (error) Helpers.toast('Error al guardar perfil: ' + error.message, 'error');
@@ -443,7 +427,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   } catch (err) {
     // Quitar loader incluso si hay error
     document.getElementById('initial-loading')?.remove();
-    window.location.href = 'index.html';
+    window.location.href = 'login.html';
   }
 });
 
@@ -633,8 +617,11 @@ async function _initDirectorAccessId(profile) {
   const input = document.getElementById('confDirAccessId');
   if (!input) return;
 
-  // Cargar ID guardado en notes
-  if (profile?.notes) input.value = profile.notes;
+  // Cargar ID guardado en access_code
+  if (profile?.access_code) input.value = profile.access_code;
+  else if (profile?.notes && (profile.notes.startsWith('DIR-') || profile.notes.startsWith('TEA-'))) {
+    input.value = profile.notes; // fallback legacy
+  }
 
   const _loadQR = () => new Promise(r => {
     if (window.QRCode) { r(); return; }
@@ -658,6 +645,8 @@ async function _initDirectorAccessId(profile) {
   window._genDirectorId = async () => {
     const code = 'DIR-' + new Date().getFullYear() + '-' + String(Math.floor(Math.random() * 9000) + 1000);
     input.value = code;
+    // Save immediately to access_code
+    await supabase.from('profiles').update({ access_code: code }).eq('id', profile.id);
     await _renderQR(code);
   };
 
@@ -673,7 +662,10 @@ async function _initDirectorAccessId(profile) {
   };
 
   // Auto-render si ya tiene ID
-  if (profile?.notes) setTimeout(() => _renderQR(profile.notes), 400);
+  if (profile?.access_code) setTimeout(() => _renderQR(profile.access_code), 400);
+  else if (profile?.notes && (profile.notes.startsWith('DIR-') || profile.notes.startsWith('TEA-'))) {
+    setTimeout(() => _renderQR(profile.notes), 400);
+  }
 
   input.addEventListener('input', (e) => {
     clearTimeout(window._dirQrDebounce);

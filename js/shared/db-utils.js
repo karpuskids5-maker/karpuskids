@@ -78,6 +78,9 @@ export async function auditLog(action, payload = {}) {
  * Se llama automáticamente desde el handler global de errores.
  */
 export async function logError(panel, message, stack = '', url = '') {
+  // Guard: don't log if message looks like a DB/network error (infinite loop prevention)
+  const msgLower = String(message).toLowerCase();
+  if (msgLower.includes('supabase') || msgLower.includes('fetch') || msgLower.includes('network')) return;
   try {
     const { data: { user } } = await supabase.auth.getUser();
     await supabase.from('system_errors').insert({
@@ -89,7 +92,7 @@ export async function logError(panel, message, stack = '', url = '') {
       user_agent: navigator.userAgent.slice(0, 200),
       created_at: new Date().toISOString()
     });
-  } catch (_) { /* silencioso */ }
+  } catch (_) { /* silencioso — no re-lanzar */ }
 }
 
 /**

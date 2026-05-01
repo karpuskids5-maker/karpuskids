@@ -90,7 +90,7 @@ export const TeachersModule = {
     if (!id) payload.email = emailVal; // solo en creación
 
     const matricula = (document.getElementById('tMatricula').value || '').trim();
-    if (matricula) payload.notes = matricula;
+    if (matricula) payload.access_code = matricula;
     
     const password = document.getElementById('tPassword')?.value;
 
@@ -336,7 +336,7 @@ export const TeachersModule = {
         setVal('tPhone', teacher.phone);
         setVal('tEmail', teacher.email);
         setVal('tRole', teacher.role);
-        setVal('tMatricula', teacher.notes || '');
+        setVal('tMatricula', teacher.access_code || teacher.notes || '');
         const classId = teacher.classroom_id || teacher.classrooms?.id;
         setVal('tClassroom', classId);
         const checkActive = document.getElementById('tActive');

@@ -70,12 +70,13 @@ export const PaymentsModule = {
       const sf = document.getElementById('filterPaymentStatus')?.value;
       const sq = document.getElementById('searchPaymentStudent')?.value?.trim();
       const mi = mv ? parseInt(mv, 10) - 1 : new Date().getMonth();
-      const mn = MES[mi];
+      // ✅ ESTANDARIZACIÓN: Usar formato YYYY-MM en lugar de nombres de meses
+      const monthKey = `${yv}-${String(mi + 1).padStart(2,'0')}`;
 
       let q = supabase
         .from('payments')
         .select('id,student_id,amount,concept,status,due_date,created_at,paid_date,method,bank,reference,month_paid,evidence_url,students:student_id(name,classroom_id,classrooms:classroom_id(name))')
-        .ilike('month_paid', mn)
+        .eq('month_paid', monthKey)
         .order('due_date', { ascending: true });
       if (sf && sf !== 'all') q = q.eq('status', sf);
 

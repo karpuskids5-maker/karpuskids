@@ -31,27 +31,42 @@ export const PaymentsModule = {
         .order('due_date', { ascending: false });
       if (error) throw error;
 
-      // Deduplicar: por mes, conservar el más relevante
-      // Prioridad: paid > review > overdue > pending (más reciente gana en empate)
-      const statusPriority = { paid: 4, pagado: 4, confirmado: 4, review: 3, revision: 3, overdue: 2, vencido: 2, pending: 1, pendiente: 1 };
+      // Deduplicar: por mes — normalizar month_paid a YYYY-MM para comparar
+      // Handles both '2026-04' and 'Abril' formats
+      const MONTH_MAP = {
+        'enero':'01','febrero':'02','marzo':'03','abril':'04','mayo':'05','junio':'06',
+        'julio':'07','agosto':'08','septiembre':'09','octubre':'10','noviembre':'11','diciembre':'12'
+      };
+      const normalizeMonth = (mp) => {
+        if (!mp) return '';
+        const s = mp.toLowerCase().trim();
+        // Already YYYY-MM
+        if (/^\d{4}-\d{2}$/.test(s)) return s;
+        // Spanish month name — use current year
+        const num = MONTH_MAP[s];
+        if (num) return `${new Date().getFullYear()}-${num}`;
+        return s;
+      };
+
+      const statusPriority = { paid: 4, review: 3, overdue: 2, pending: 1 };
       const monthMap = new Map();
       for (const p of data || []) {
-        const key = (p.month_paid || 'varios').toLowerCase().trim();
+        const key = normalizeMonth(p.month_paid);
         const ex  = monthMap.get(key);
         if (!ex) { monthMap.set(key, p); continue; }
         const pPri  = statusPriority[(p.status||'').toLowerCase()] || 0;
         const exPri = statusPriority[(ex.status||'').toLowerCase()] || 0;
-        // Keep paid over pending; if same priority keep most recent
         if (pPri > exPri) { monthMap.set(key, p); continue; }
-        if (pPri === exPri && new Date(p.created_at) > new Date(ex.created_at)) {
-          monthMap.set(key, p);
+        if (pPri === exPri) {
+          if (p.evidence_url && !ex.evidence_url) { monthMap.set(key, p); continue; }
+          if (new Date(p.created_at) > new Date(ex.created_at)) monthMap.set(key, p);
         }
       }
       this._payments = Array.from(monthMap.values())
         .sort((a, b) => {
           // Sort: pending/overdue first (by due_date asc), then paid (by paid_date desc)
-          const aIsPaid = ['paid','pagado','confirmado'].includes((a.status||'').toLowerCase());
-          const bIsPaid = ['paid','pagado','confirmado'].includes((b.status||'').toLowerCase());
+          const aIsPaid = ['paid'].includes((a.status||'').toLowerCase());
+          const bIsPaid = ['paid'].includes((b.status||'').toLowerCase());
           if (!aIsPaid && !bIsPaid) return new Date(a.due_date||0) - new Date(b.due_date||0);
           if (!aIsPaid) return -1;
           if (!bIsPaid) return 1;
@@ -67,7 +82,7 @@ export const PaymentsModule = {
 
       // Update header stats
       const paidTotal = this._payments
-        .filter(p => ['paid','pagado','confirmado'].includes((p.status||'').toLowerCase()))
+        .filter(p => ['paid'].includes((p.status||'').toLowerCase()))
         .reduce((s, p) => s + Number(p.amount || 0), 0);
       const el = document.getElementById('paymentsBalance');
       if (el) el.textContent = Helpers.formatCurrency(paidTotal);
@@ -82,7 +97,7 @@ export const PaymentsModule = {
     const banner = document.getElementById('paymentAlertBanner');
     if (!banner) return;
     const urgent = payments
-      .filter(p => !['paid','pagado','confirmado'].includes((p.status||'').toLowerCase()))
+      .filter(p => !['paid'].includes((p.status||'').toLowerCase()))
       .map(p => ({ ...p, days: daysUntilDue(p.due_date) }))
       .filter(p => p.days !== null)
       .sort((a, b) => a.days - b.days)[0];
@@ -271,15 +286,26 @@ export const PaymentsModule = {
       const { data: { publicUrl } } = supabase.storage.from('classroom_media').getPublicUrl(path);
       setP(85);
 
-      const existing = this._payments.find(p =>
-        (p.month_paid||'').toLowerCase() === month.toLowerCase() &&
-        !['paid','pagado','confirmado'].includes((p.status||'').toLowerCase())
-      );
+      // Always query DB directly — don't rely on cached _payments (may have stale month format)
+      const { data: existingPayments } = await supabase
+        .from(TABLES.PAYMENTS)
+        .select('id, status, month_paid')
+        .eq('student_id', student.id)
+        .eq('month_paid', month)
+        .neq('status', 'paid')
+        .order('created_at', { ascending: false })
+        .limit(1);
+
+      const existing = existingPayments?.[0] || null;
+
       if (existing) {
+        // UPDATE existing record — change status to review and add evidence
         const { error } = await supabase.from(TABLES.PAYMENTS)
-          .update({ evidence_url: publicUrl, status: 'review', method, bank }).eq('id', existing.id);
+          .update({ evidence_url: publicUrl, status: 'review', method, bank })
+          .eq('id', existing.id);
         if (error) throw error;
       } else {
+        // No existing payment for this month — insert new review record
         const { error } = await supabase.from(TABLES.PAYMENTS).insert({
           student_id: student.id, amount, month_paid: month,
           method, bank, evidence_url: publicUrl, status: 'review',

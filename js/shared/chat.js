@@ -22,8 +22,12 @@ export const ChatModule = {
   async getUnreadCounts() {
     try {
       const { data, error } = await supabase.rpc('get_unread_counts');
-      return error ? {} : (data || {});
-    } catch (e) {
+      if (error) {
+        // RPC may not exist yet — return empty object silently
+        return {};
+      }
+      return data || {};
+    } catch (_) {
       return {};
     }
   },

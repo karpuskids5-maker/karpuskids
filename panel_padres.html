@@ -595,19 +595,23 @@
                     <label class="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1">Mes Correspondiente</label>
                     <select id="paymentMonth" class="w-full p-3 border-none rounded-2xl bg-slate-50 focus:bg-white focus:ring-2 focus:ring-green-400 outline-none transition-all font-medium text-slate-700" required>
                       <option value="">Seleccionar mes...</option>
-                      <option value="Enero">Enero</option> <!-- Se mantiene el select para automatización -->
-                      <option value="Febrero">Febrero</option>
-                      <option value="Marzo">Marzo</option>
-                      <option value="Abril">Abril</option>
-                      <option value="Mayo">Mayo</option>
-                      <option value="Junio">Junio</option>
-                      <option value="Julio">Julio</option>
-                      <option value="Agosto">Agosto</option>
-                      <option value="Septiembre">Septiembre</option>
-                      <option value="Octubre">Octubre</option>
-                      <option value="Noviembre">Noviembre</option>
-                      <option value="Diciembre">Diciembre</option>
                     </select>
+                    <script>
+                      (function() {
+                        const sel = document.getElementById('paymentMonth');
+                        const now = new Date();
+                        const months = ['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'];
+                        months.forEach((name, i) => {
+                          const year = now.getFullYear();
+                          const val  = year + '-' + String(i + 1).padStart(2, '0');
+                          const opt  = document.createElement('option');
+                          opt.value = val;
+                          opt.textContent = name + ' ' + year;
+                          if (i === now.getMonth()) opt.selected = true;
+                          sel.appendChild(opt);
+                        });
+                      })();
+                    </script>
                   </div>
 
                   <div>

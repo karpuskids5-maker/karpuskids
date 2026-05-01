@@ -5,15 +5,17 @@ import { AppState } from './state.js';
 import { auditLog } from '../shared/db-utils.js';
 
 function scoreFromEvidence(g) {
-  if (g.stars != null) return Number(g.stars);
+  // Return null for ungraded — don't count as 0 in averages
+  if (g.stars != null && g.stars > 0) return Number(g.stars);
   if (g.grade_letter) {
     const map = { A: 5, B: 4, C: 3, D: 2, E: 1 };
-    return map[g.grade_letter] || 0;
+    return map[g.grade_letter] ?? null;
   }
-  return 0;
+  return null; // null = not graded, excluded from average
 }
 
 function getLevel(score) {
+  if (score === null || score === undefined) return { label: 'Sin calificar', cls: 'bg-slate-100 text-slate-500' };
   if (score >= 4.5) return { label: 'Excelente',     cls: 'bg-emerald-100 text-emerald-700' };
   if (score >= 3.5) return { label: 'Bueno',          cls: 'bg-blue-100 text-blue-700' };
   if (score >= 2.5) return { label: 'En proceso',     cls: 'bg-amber-100 text-amber-700' };
@@ -85,7 +87,7 @@ export const GradesModule = {
       
       const btnClose = document.getElementById('btnClosePeriod');
       if (btnClose) btnClose.style.display = active && active.status === 'open' ? 'flex' : 'none';
-    } catch (e) { console.error('[GradesModule] _loadPeriods:', e); }
+    } catch (_) { /* silencioso — periods table may not exist */ }
   },
 
   async loadGrades() {
@@ -143,8 +145,8 @@ export const GradesModule = {
 
       // Procesar datos finales
       this._allData = Object.values(grouped).map(s => {
-        const scores = s.evidences.map(e => e.score).filter(sc => sc > 0);
-        const avg = scores.length > 0 ? scores.reduce((a, b) => a + b, 0) / scores.length : 0;
+        const scores = s.evidences.map(e => e.score).filter(sc => sc !== null && sc > 0);
+        const avg = scores.length > 0 ? scores.reduce((a, b) => a + b, 0) / scores.length : null;
         
         // La última tarea calificada es la primera del array (ya ordenado DESC por created_at)
         const lastTask = s.evidences[0];

@@ -153,15 +153,16 @@ export const TeachersModule = {
     // Prefill if editing
     if (id) {
       try {
-        const { data: t } = await supabase.from('profiles').select('id, name, email, phone, avatar_url, role, is_active, notes').eq('id', id).single();
+        const { data: t } = await supabase.from('profiles').select('id, name, email, phone, avatar_url, role, is_active, notes, access_code').eq('id', id).single();
         if (t) {
           const sv = (eid, v) => { const el = document.getElementById(eid); if (el) el.value = v || ''; };
           sv('teacherName', t.name); sv('teacherEmail', t.email); sv('teacherPhone', t.phone);
           if (document.getElementById('teacherRole')) document.getElementById('teacherRole').value = t.role || 'maestra';
           const cb = document.getElementById('teacherActive');
           if (cb) cb.checked = t.is_active !== false;
-          // Mostrar matrícula/código de acceso si existe
-          sv('teacherMatricula', t.notes);
+          // Use access_code first, fallback to notes for legacy data
+          const code = t.access_code || (t.notes?.startsWith('TEA-') || t.notes?.startsWith('DIR-') || t.notes?.startsWith('ASI-') ? t.notes : null);
+          sv('teacherMatricula', code);
           // Find classroom
           const { data: cls } = await supabase.from('classrooms').select('id').eq('teacher_id', id).maybeSingle();
           if (cls) document.getElementById('teacherClassroom').value = cls.id;
@@ -246,7 +247,7 @@ export const TeachersModule = {
     try {
       if (id) {
         const updates = { name, phone, role };
-        if (matricula !== null) updates.notes = matricula;
+        if (matricula !== null) updates.access_code = matricula;
         const { error } = await supabase.from('profiles').update(updates).eq('id', id);
         if (error) throw error;
         // Update classroom assignment

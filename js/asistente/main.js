@@ -1,4 +1,4 @@
-import { ensureRole, supabase, initOneSignal } from '../shared/supabase.js';
+﻿import { ensureRole, supabase, initOneSignal } from '../shared/supabase.js';
 import { AppState } from './state.js';
 import { AssistantApi } from './api.js';
 import { PaymentsModule } from './payments.js';
@@ -80,9 +80,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   
   // ✅ FIX OneSignal: Solo inicializar en el dominio correcto para evitar errores de consola
   if (window.location.hostname === 'karpuskids.com' || window.location.hostname === 'localhost') {
-    try { initOneSignal(auth.user); } catch(e) {
-
-    }
+    try { initOneSignal(auth.user); } catch(_) { /* silencioso */ }
   } else {
   }
   
@@ -446,9 +444,7 @@ async function initAssistantChat() {
         }
       });
     }
-  } catch (e) {
-
-  }
+  } catch(_) { /* silencioso */ }
 }
 
 async function loadChatContacts(searchTerm = '', unreadMap = {}) {

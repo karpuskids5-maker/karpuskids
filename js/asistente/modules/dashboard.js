@@ -14,11 +14,21 @@ export const DashboardModule = {
 
   async init() {
     const dateEl = document.getElementById('dashboardDate');
-    if (dateEl) {
-      dateEl.textContent = new Date().toLocaleDateString('es-ES', {
-        weekday: 'long', day: 'numeric', month: 'long', year: 'numeric'
-      });
-    }
+    const updateDate = () => {
+      if (dateEl) {
+        dateEl.textContent = new Date().toLocaleDateString('es-DO', {
+          weekday: 'long', day: 'numeric', month: 'long', year: 'numeric'
+        });
+      }
+    };
+    updateDate();
+    // Update date at midnight
+    const msUntilMidnight = () => {
+      const now = new Date();
+      const midnight = new Date(now); midnight.setHours(24,0,0,0);
+      return midnight - now;
+    };
+    setTimeout(() => { updateDate(); setInterval(updateDate, 86400000); }, msUntilMidnight());
 
     await Promise.all([
       this.loadStats(),

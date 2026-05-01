@@ -1,5 +1,6 @@
 ﻿import { supabase } from '../shared/supabase.js';
 import { Helpers } from '../shared/helpers.js';
+import { RealtimeManager } from '../shared/realtime-manager.js';
 
 const STATUS = {
   present:  { label: 'Presente',  cls: 'bg-emerald-100 text-emerald-700', icon: 'check-circle',    color: '#10b981' },
@@ -28,9 +29,8 @@ export const AttendanceModule = {
 
   _subscribeRealtime() {
     if (this._realtimeChannel) return; // ya suscrito
-    this._realtimeChannel = supabase
-      .channel('dir_attendance_live')
-      .on('postgres_changes', {
+    this._realtimeChannel = RealtimeManager.subscribe('dir_attendance_live', (channel) => {
+      return channel.on('postgres_changes', {
         event: '*', schema: 'public', table: 'attendance'
       }, () => {
         // Solo recargar si estamos en modo día y es hoy
@@ -39,8 +39,8 @@ export const AttendanceModule = {
         if (this._mode === 'day' && (!dateEl || dateEl.value === today)) {
           this.load();
         }
-      })
-      .subscribe();
+      });
+    });
   },
 
   _setDefaultDates() {

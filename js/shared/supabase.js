@@ -60,18 +60,23 @@ window.addEventListener('karpus:db-error', (e) => {
 
 // ── Global error → log to DB ─────────────────────────────────────────────────
 window.addEventListener('error', (e) => {
+  // Don't log if it's a network/connection error (would cause infinite loop)
+  const msg = e.message || '';
+  if (msg.includes('fetch') || msg.includes('network') || msg.includes('Failed to load')) return;
   import('./db-utils.js').then(({ logError }) => {
     const panel = window.location.pathname.split('/').pop().replace('.html','') || 'unknown';
-    logError(panel, e.message || String(e.error), e.error?.stack || '', e.filename || '');
+    logError(panel, msg, e.error?.stack || '', e.filename || '').catch(() => {});
   }).catch(() => {});
 });
 window.addEventListener('unhandledrejection', (e) => {
   const msg = e.reason?.message || String(e.reason);
-  const skip = ['indexeddb','network','fetch','onesignal','409','conflict'].some(k => msg.toLowerCase().includes(k));
+  // Skip: network errors, OneSignal, 409 conflicts, IDB errors — these would loop
+  const skip = ['indexeddb','network','fetch','onesignal','409','conflict',
+                 'failed to load','supabase','connection'].some(k => msg.toLowerCase().includes(k));
   if (skip) return;
   import('./db-utils.js').then(({ logError }) => {
     const panel = window.location.pathname.split('/').pop().replace('.html','') || 'unknown';
-    logError(panel, msg, e.reason?.stack || '', window.location.pathname);
+    logError(panel, msg, e.reason?.stack || '', window.location.pathname).catch(() => {});
   }).catch(() => {});
 });
 
@@ -285,24 +290,15 @@ export async function initOneSignal(currentUser = null) {
       return;
     }
 
-    // 🛡️ FIX: Clear stale OneSignal operation queue (causes "login-user" errors)
-    // This happens when the SDK version changes and old operations are stuck in IDB
+    // 🛡️ FIX: Clear stale OneSignal operation queue (causes "login-user" / "refresh-user" errors)
     try {
       await new Promise(resolve => {
-        const req = indexedDB.open('ONE_SIGNAL_SDK_DB', 1);
-        req.onsuccess = (e) => {
-          const db = e.target.result;
-          const storeNames = Array.from(db.objectStoreNames);
-          if (storeNames.includes('OperationRepo')) {
-            try {
-              const tx = db.transaction('OperationRepo', 'readwrite');
-              tx.objectStore('OperationRepo').clear();
-              tx.oncomplete = () => { db.close(); resolve(); };
-              tx.onerror    = () => { db.close(); resolve(); };
-            } catch (_) { db.close(); resolve(); }
-          } else { db.close(); resolve(); }
-        };
-        req.onerror = () => resolve();
+        // Delete the entire OneSignal DB to force a clean state
+        // This is safe — OneSignal will recreate it on next init
+        const delReq = indexedDB.deleteDatabase('ONE_SIGNAL_SDK_DB');
+        delReq.onsuccess = () => resolve();
+        delReq.onerror   = () => resolve();
+        delReq.onblocked = () => resolve();
         setTimeout(resolve, 1000);
       });
     } catch (_) { /* silencioso */ }

@@ -36,12 +36,13 @@ const PAYMENT_COLS_WITH_STUDENT = PAYMENT_COLS + ',students:student_id(name,p1_e
 
 export const PaymentService = {
 
-  async getByMonth(monthIndex, _year, filters = {}) {
-    const monthName = MES[monthIndex];
+  async getByMonth(monthIndex, year, filters = {}) {
+    // ✅ ESTANDARIZACIÓN: Usar formato YYYY-MM en lugar de nombres de meses
+    const monthKey = `${year}-${String(monthIndex + 1).padStart(2,'0')}`;
     let q = supabase
       .from('payments')
       .select(PAYMENT_COLS_WITH_STUDENT)
-      .ilike('month_paid', monthName)
+      .eq('month_paid', monthKey)
       .order('due_date', { ascending: true });
 
     if (filters.status && filters.status !== 'all') q = q.eq('status', filters.status);

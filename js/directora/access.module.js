@@ -30,16 +30,46 @@ export const AccessModule = {
     const to   = document.getElementById('accessDateTo')?.value;
 
     try {
-      const [staff, students, attendance] = await Promise.all([
+      const [staff, students, doorPunches] = await Promise.all([
         supabase.from('profiles').select('id, name, role, matricula').in('role', ['maestra', 'asistente', 'directora']),
-        supabase.from('students').select('id, name, matricula, classrooms(name)'),
-        supabase.from('attendance').select('id, name, role, avatar_url, is_active, created_at').gte('date', from).lte('date', to)
+        supabase.from('students').select('id, name, matricula, classrooms(id, name)'),
+        supabase.from('door_punches').select('student_id, staff_id, punch_type, punched_at').gte('date', from).lte('date', to)
       ]);
+      
+      // ✅ CORRECCIÓN DE CONEXIÓN: Obtener también asistencia manual para evitar falsos "No Reportados"
+      const { data: manualAtt } = await supabase.from('attendance').select('student_id, status').eq('date', from);
+      const manualMap = new Set((manualAtt || []).map(a => String(a.student_id)));
+
+      // Process door punches to get latest status for each person
+      const punchMap = new Map();
+      (doorPunches.data || []).forEach(punch => {
+        const personId = punch.student_id || punch.staff_id;
+        if (!punchMap.has(personId)) {
+          punchMap.set(personId, []);
+        }
+        punchMap.get(personId).push(punch);
+      });
+
+      // For each person, sort punches by time and determine status
+      const processedPunches = new Map();
+      punchMap.forEach((punches, personId) => {
+        punches.sort((a, b) => new Date(a.punched_at) - new Date(b.punched_at));
+        const latestPunch = punches[punches.length - 1];
+        const checkInPunch = punches.find(p => p.punch_type === 'check_in');
+        const checkOutPunch = punches.find(p => p.punch_type === 'check_out');
+
+        processedPunches.set(personId, {
+          check_in: checkInPunch?.punched_at || null,
+          check_out: checkOutPunch?.punched_at || null,
+          // Si ponchó entrada O si la maestra lo puso presente manualmente
+          is_in: latestPunch?.punch_type === 'check_in' || manualMap.has(String(personId))
+        });
+      });
 
       this._data = {
         staff: staff.data || [],
         students: students.data || [],
-        attendance: attendance.data || []
+        punches: processedPunches
       };
 
       this._render();
@@ -51,24 +81,25 @@ export const AccessModule = {
 
   _getFilteredData() {
     const query = (document.getElementById('accessSearch')?.value || '').toLowerCase().trim();
-    const attMap = new Map(this._data.attendance.map(a => [a.student_id || a.user_id, a]));
 
     const filtered = [
       ...this._data.staff.map(s => ({ ...s, isStaff: true })),
       ...this._data.students.map(s => ({ ...s, isStaff: false }))
     ].filter(p => !query || p.name.toLowerCase().includes(query));
 
-    return { filtered, attMap };
+    return { filtered };
   },
 
   _render() {
     const table = document.getElementById('access-monitor-table-body');
-    const { filtered, attMap } = this._getFilteredData();
+    const { filtered } = this._getFilteredData();
 
     table.innerHTML = filtered.map(p => {
-      const log = attMap.get(p.id);
-      const status = log ? (log.check_out ? 'Fuera' : 'En Estancia') : 'No Reportado';
-      const statusCls = log ? (log.check_out ? 'bg-slate-100 text-slate-500' : 'bg-emerald-100 text-emerald-700') : 'bg-rose-50 text-rose-600 border-rose-100 border';
+      const log = this._data.punches.get(p.id);
+      // ✅ DISEÑO: Status más claro y amigable para producción
+      const isIn = log?.is_in;
+      const status = isIn ? 'En Estancia' : (log?.check_out ? 'Salió' : 'No Reportado');
+      const statusCls = isIn ? 'bg-emerald-100 text-emerald-700' : (log?.check_out ? 'bg-slate-100 text-slate-500' : 'bg-rose-50 text-rose-600 border-rose-100 border');
       
       const checkIn  = log?.check_in  ? new Date(log.check_in).toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'}) : '—';
       const checkOut = log?.check_out ? new Date(log.check_out).toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'}) : '—';
@@ -76,7 +107,7 @@ export const AccessModule = {
       return `<tr class="hover:bg-slate-50 transition-colors">
         <td class="px-6 py-4">
           <div class="flex items-center gap-3">
-            <div class="w-9 h-9 rounded-xl ${p.isStaff ? 'bg-indigo-100 text-indigo-700' : 'bg-orange-100 text-orange-700'} flex items-center justify-center font-black text-sm uppercase">
+            <div class="w-8 h-8 rounded-lg ${p.isStaff ? 'bg-indigo-100 text-indigo-700' : 'bg-orange-100 text-orange-700'} flex items-center justify-center font-black text-xs uppercase">
               ${p.name.charAt(0)}
             </div>
             <span class="font-bold text-slate-800 text-sm">${Helpers.escapeHTML(p.name)}</span>
@@ -95,8 +126,8 @@ export const AccessModule = {
       </tr>`;
     }).join('');
     
-    document.getElementById('statStaffIn').textContent    = this._data.staff.filter(s => attMap.get(s.id) && !attMap.get(s.id).check_out).length;
-    document.getElementById('statStudentsIn').textContent = this._data.students.filter(s => attMap.get(s.id) && !attMap.get(s.id).check_out).length;
+    document.getElementById('statStaffIn').textContent    = this._data.staff.filter(s => this._data.punches.get(s.id)?.is_in).length;
+    document.getElementById('statStudentsIn').textContent = this._data.students.filter(s => this._data.punches.get(s.id)?.is_in).length;
 
     this._renderChart();
     if (window.lucide) lucide.createIcons();
@@ -106,13 +137,13 @@ export const AccessModule = {
     const ctx = document.getElementById('accessChart');
     if (!ctx || !window.Chart) return;
     
-    const hours = ['7am', '8am', '9am', '10am', '11am', '12pm'];
-    const counts = [0,0,0,0,0,0];
+    const hours = ['7am', '8am', '9am', '10am', '11am', '12pm', '1pm', '2pm', '3pm', '4pm', '5pm', '6pm'];
+    const counts = new Array(12).fill(0);
     
-    this._data.attendance.forEach(a => {
-      if (!a.check_in) return;
-      const h = new Date(a.check_in).getHours();
-      if (h >= 7 && h <= 12) counts[h-7]++;
+    this._data.punches.forEach(punch => {
+      if (!punch.check_in) return;
+      const h = new Date(punch.check_in).getHours();
+      if (h >= 7 && h <= 18) counts[h-7]++;
     });
 
     if (this._chart) this._chart.destroy();
@@ -129,16 +160,16 @@ export const AccessModule = {
   async exportDailyReport() {
     const from = document.getElementById('accessDateFrom')?.value;
     const to   = document.getElementById('accessDateTo')?.value;
-    const { filtered, attMap } = this._getFilteredData();
+    const { filtered } = this._getFilteredData();
 
     const body = filtered.map(p => {
-      const log = attMap.get(p.id);
+      const log = this._data.punches.get(p.id);
       return [
         p.name,
         p.isStaff ? p.role : (p.classrooms?.name || 'General'),
         log?.check_in ? new Date(log.check_in).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '—',
         log?.check_out ? new Date(log.check_out).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '—',
-        log ? (log.check_out ? 'Fuera' : 'En Estancia') : 'No Reportado'
+        log ? (log.is_in ? 'En Estancia' : 'Fuera') : 'No Reportado'
       ];
     });
 

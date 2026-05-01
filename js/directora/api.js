@@ -1,4 +1,4 @@
-import { supabase } from '../shared/supabase.js';
+﻿import { supabase } from '../shared/supabase.js';
 import { QueryCache } from '../shared/query-cache.js';
 
 const TABLES = {
@@ -202,26 +202,32 @@ export const DirectorApi = {
       const monthKey = `${year}-${month}`;
       const rangeStart = `${year}-${month}-01`;
       const rangeEnd   = `${year}-${month}-31`;
+      const SPANISH_MONTHS = ['enero','febrero','marzo','abril','mayo','junio','julio','agosto','septiembre','octubre','noviembre','diciembre'];
+      const spanishMonth = SPANISH_MONTHS[now.getMonth()];
+      const spanishMonthCap = spanishMonth.charAt(0).toUpperCase() + spanishMonth.slice(1);
+
+      // Query both YYYY-MM and Spanish name formats
+      const monthFilter = `month_paid.eq.${monthKey},month_paid.eq.${spanishMonthCap},month_paid.ilike.${spanishMonth}`;
 
       const [incomeRes, pendingRes, overdueRes, reviewRes] = await Promise.all([
-        supabase.from('payments').select('amount').in('status', ['paid', 'pagado', 'confirmado']).eq('month_paid', monthKey),
-        supabase.from('payments').select('id', { count: 'exact', head: true }).in('status', ['pending', 'pendiente']).eq('month_paid', monthKey),
-        supabase.from('payments').select('id', { count: 'exact', head: true }).in('status', ['overdue', 'vencido']).eq('month_paid', monthKey),
-        supabase.from('payments').select('id', { count: 'exact', head: true }).in('status', ['review', 'revision', 'en revision']).eq('month_paid', monthKey)
+        supabase.from('payments').select('amount').eq('status', 'paid').or(monthFilter),
+        supabase.from('payments').select('id', { count: 'exact', head: true }).eq('status', 'pending').or(monthFilter),
+        supabase.from('payments').select('id', { count: 'exact', head: true }).eq('status', 'overdue').or(monthFilter),
+        supabase.from('payments').select('id', { count: 'exact', head: true }).eq('status', 'review').or(monthFilter)
       ]);
 
-      // Fallback: if month_paid filter returns nothing, use created_at range
-      let income = (incomeRes.data || []).reduce((sum, p) => sum + Number(p.amount), 0);
-      let pending  = pendingRes.count  || 0;
-      let overdue  = overdueRes.count  || 0;
-      let toApprove = reviewRes.count  || 0;
+      let income    = (incomeRes.data || []).reduce((sum, p) => sum + Number(p.amount), 0);
+      let pending   = pendingRes.count  || 0;
+      let overdue   = overdueRes.count  || 0;
+      let toApprove = reviewRes.count   || 0;
 
+      // Final fallback: created_at range
       if (!income && !pending && !overdue && !toApprove) {
         const [i2, p2, o2, r2] = await Promise.all([
-          supabase.from('payments').select('amount').in('status', ['paid','pagado','confirmado']).gte('created_at', rangeStart).lte('created_at', rangeEnd + 'T23:59:59'),
-          supabase.from('payments').select('id', { count: 'exact', head: true }).in('status', ['pending','pendiente']).gte('created_at', rangeStart).lte('created_at', rangeEnd + 'T23:59:59'),
-          supabase.from('payments').select('id', { count: 'exact', head: true }).in('status', ['overdue','vencido']).gte('created_at', rangeStart).lte('created_at', rangeEnd + 'T23:59:59'),
-          supabase.from('payments').select('id', { count: 'exact', head: true }).in('status', ['review','revision']).gte('created_at', rangeStart).lte('created_at', rangeEnd + 'T23:59:59'),
+          supabase.from('payments').select('amount').eq('status', 'paid').gte('created_at', rangeStart).lte('created_at', rangeEnd + 'T23:59:59'),
+          supabase.from('payments').select('id', { count: 'exact', head: true }).eq('status', 'pending').gte('created_at', rangeStart).lte('created_at', rangeEnd + 'T23:59:59'),
+          supabase.from('payments').select('id', { count: 'exact', head: true }).eq('status', 'overdue').gte('created_at', rangeStart).lte('created_at', rangeEnd + 'T23:59:59'),
+          supabase.from('payments').select('id', { count: 'exact', head: true }).eq('status', 'review').gte('created_at', rangeStart).lte('created_at', rangeEnd + 'T23:59:59'),
         ]);
         income    = (i2.data || []).reduce((sum, p) => sum + Number(p.amount), 0);
         pending   = p2.count || 0;

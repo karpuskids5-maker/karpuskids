@@ -236,10 +236,11 @@ export const AttendanceModule = {
     // Parsear fecha del string "YYYY-MM-DD" directamente — evita problemas de timezone
     const attMap = new Map();
     this._attendance.forEach(a => {
-      if (!a.date) return;
-      // Extraer día del string "YYYY-MM-DD" de forma robusta
+      if (!a.date || typeof a.date !== 'string') return;
       const parts = a.date.split('-');
+      if (parts.length < 3) return; // guard against malformed dates
       const day = parseInt(parts[2], 10);
+      if (isNaN(day) || day < 1 || day > 31) return;
       attMap.set(day, a.status?.toLowerCase());
     });
 

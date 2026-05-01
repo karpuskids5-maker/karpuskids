@@ -30,12 +30,15 @@ function closeGlobalModal() {
 }
 
 function calcStatus(p) {
-  const s = (p.status || '').toLowerCase();
-  if (s === 'paid' || s === 'pagado' || s === 'confirmado') return 'paid';
-  if (s === 'review' || s === 'revision' || s === 'en revision' ||
-      (s === 'pending' || s === 'pendiente') && p.method === 'transferencia') return 'review';
-  if (s === 'overdue' || s === 'vencido') return 'overdue';
-  return 'pending'; // pending, pendiente, or anything else
+  if (!p || !p.status) return 'pending';
+  const s = p.status.toLowerCase().trim();
+  if (s === 'paid') return 'paid';
+  if (s === 'review') return 'review';
+  if (s === 'overdue') return 'overdue';
+  if (s === 'rejected') return 'rejected';
+  // If has evidence_url → show as review regardless of status
+  if (p.evidence_url) return 'review';
+  return 'pending';
 }
 
 export const PaymentsModule = {
@@ -132,14 +135,15 @@ export const PaymentsModule = {
       const statusFilter = document.getElementById('filterPaymentStatus')?.value;
       const search      = document.getElementById('searchPaymentStudent')?.value?.trim();
 
-      // Filtrar por month_paid (nombre en español) igual que directora
-      const monthIndex = monthVal ? parseInt(monthVal, 10) - 1 : new Date().getMonth();
-      const monthName  = MONTH_NAMES_ES[monthIndex];
+      // Use YYYY-MM format to match the database standard
+      const monthKey = yearVal && monthVal
+        ? `${yearVal}-${String(monthVal).padStart(2, '0')}`
+        : `${new Date().getFullYear()}-${String(new Date().getMonth() + 1).padStart(2, '0')}`;
 
       let query = supabase
         .from('payments')
         .select('id, student_id, amount, concept, status, due_date, created_at, paid_date, method, bank, reference, month_paid, evidence_url, students:student_id(name, classroom_id, classrooms:classroom_id(name))')
-        .ilike('month_paid', monthName)
+        .eq('month_paid', monthKey)
         .order('due_date', { ascending: true });
 
       if (statusFilter && statusFilter !== 'all') {
@@ -149,8 +153,19 @@ export const PaymentsModule = {
       const { data: payments, error } = await query;
       if (error) throw error;
 
-      // Filtro búsqueda en cliente
+      // Fallback: if no results with YYYY-MM, try created_at range
       let list = payments || [];
+      if (!list.length && yearVal && monthVal) {
+        const rangeStart = `${yearVal}-${String(monthVal).padStart(2,'0')}-01`;
+        const rangeEnd   = `${yearVal}-${String(monthVal).padStart(2,'0')}-31`;
+        const { data: fallback } = await supabase
+          .from('payments')
+          .select('id, student_id, amount, concept, status, due_date, created_at, paid_date, method, bank, reference, month_paid, evidence_url, students:student_id(name, classroom_id, classrooms:classroom_id(name))')
+          .gte('created_at', rangeStart)
+          .lte('created_at', rangeEnd + 'T23:59:59')
+          .order('due_date', { ascending: true });
+        if (fallback?.length) list = fallback;
+      }
       if (search) {
         const q = search.toLowerCase();
         list = list.filter(p => p.students?.name?.toLowerCase().includes(q));
@@ -159,7 +174,8 @@ export const PaymentsModule = {
       AppState.set('paymentsData', list);
 
       if (!list.length) {
-        const label = MONTH_LABELS[monthIndex];
+        const monthIndex = monthVal ? parseInt(monthVal, 10) - 1 : new Date().getMonth();
+        const label = MONTH_LABELS[monthIndex] || monthVal;
         container.innerHTML =
           '<tr><td colspan="7" class="text-center py-16">' +
             '<div class="flex flex-col items-center gap-3">' +
@@ -272,14 +288,10 @@ export const PaymentsModule = {
       const monthStart = now.getFullYear() + '-' + String(now.getMonth() + 1).padStart(2, '0') + '-01T00:00:00.000Z';
 
       const [incomeRes, pendingRes, overdueRes, reviewRes] = await Promise.all([
-        // Paid: both English and Spanish
-        supabase.from('payments').select('amount').in('status', ['paid', 'pagado', 'confirmado']).gte('created_at', monthStart),
-        // Pending: both English and Spanish
-        supabase.from('payments').select('*', { count: 'exact', head: true }).in('status', ['pending', 'pendiente']),
-        // Overdue: both
-        supabase.from('payments').select('*', { count: 'exact', head: true }).in('status', ['overdue', 'vencido']),
-        // Review: both
-        supabase.from('payments').select('*', { count: 'exact', head: true }).in('status', ['review', 'revision', 'en revision'])
+        supabase.from('payments').select('amount').eq('status', 'paid').gte('created_at', monthStart),
+        supabase.from('payments').select('*', { count: 'exact', head: true }).eq('status', 'pending'),
+        supabase.from('payments').select('*', { count: 'exact', head: true }).eq('status', 'overdue'),
+        supabase.from('payments').select('*', { count: 'exact', head: true }).eq('status', 'review')
       ]);
 
       const income = (incomeRes.data || []).reduce((s, p) => s + Number(p.amount || 0), 0);

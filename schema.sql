@@ -25,7 +25,7 @@ begin
         'notify_parent_on_new_charge','create_students_snapshot',
         'create_payments_snapshot','cleanup_old_login_attempts',
         'assign_student_to_classroom','assign_students_bulk','set_updated_at',
-        'upload_payment_proof','generate_monthly_charges','process_student_punch'
+        'upload_payment_proof','generate_monthly_charges' -- removed process_student_punch
       )
   loop
     execute format('drop function if exists %I.%I(%s) cascade',
@@ -1126,11 +1126,12 @@ DO $$ BEGIN
   END IF;
 END $$;
 
--- Pagos: estado valido
+-- Pagos: estado valido (normalizado a inglés únicamente para producción)
+-- Estados válidos: 'pending' (pendiente), 'paid' (pagado), 'overdue' (vencido), 'review' (en revisión), 'rejected' (rechazado)
 DO $$ BEGIN
   IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'payments_status_check') THEN
     ALTER TABLE public.payments ADD CONSTRAINT payments_status_check
-      CHECK (status IN ('pending','pendiente','paid','pagado','confirmado','overdue','vencido','review','revision','en revision','rejected'));
+      CHECK (status IN ('pending','paid','overdue','review','rejected'));
   END IF;
 END $$;
 -- Tabla de errores del sistema (reemplaza localStorage)
@@ -1216,7 +1217,7 @@ RETURNS TABLE(
   FROM public.payments p
   JOIN public.students s ON s.id = p.student_id
   LEFT JOIN public.classrooms c ON c.id = s.classroom_id
-  WHERE p.status IN ('pending','overdue','pendiente','vencido')
+  WHERE p.status IN ('pending','overdue','review')
     AND (p_month IS NULL OR p.month_paid = p_month)
   ORDER BY days_overdue DESC, s.name;
 $$;
@@ -1646,6 +1647,9 @@ declare
   v_role     text;
   v_parent   uuid;
   v_existing record;
+  v_settings record;
+  v_attendance record;
+  v_status text;
 begin
   -- 1. Buscar estudiante por matricula
   select * into v_student
@@ -1658,13 +1662,33 @@ begin
     v_role   := 'Estudiante';
     v_parent := v_student.parent_id;
 
-    -- Verificar si ya tiene check_in hoy
+    -- Obtener configuraci�n de horario
+    select * into v_settings from public.school_settings where id = 1;
+
+    -- Verificar si ya tiene check_in hoy en door_punches
     select * into v_existing
     from public.door_punches
     where student_id = v_student.id and date = v_today and punch_type = 'check_in';
 
     if not found then
       v_type := 'check_in';
+
+      -- Sincronizar con attendance
+      select * into v_attendance from public.attendance
+      where student_id = v_student.id and date = v_today;
+
+      if v_attendance.id is null then
+        -- Determinar si es tarde
+        if v_now::time > v_settings.check_in_end then
+          v_status := 'late';
+        else
+          v_status := 'present';
+        end if;
+
+        insert into public.attendance (student_id, classroom_id, date, status, check_in)
+        values (v_student.id, v_student.classroom_id, v_today, v_status, v_now);
+      end if;
+
       insert into public.door_punches (student_id, punch_type, punched_at, date)
       values (v_student.id, 'check_in', v_now, v_today)
       on conflict do nothing;
@@ -1675,6 +1699,17 @@ begin
       where student_id = v_student.id and date = v_today and punch_type = 'check_out';
       if not found then
         v_type := 'check_out';
+
+        -- Sincronizar con attendance
+        select * into v_attendance from public.attendance
+        where student_id = v_student.id and date = v_today;
+
+        if v_attendance.id is not null then
+          update public.attendance
+          set check_out = v_now, status = 'retirado'
+          where id = v_attendance.id;
+        end if;
+
         insert into public.door_punches (student_id, punch_type, punched_at, date)
         values (v_student.id, 'check_out', v_now, v_today)
         on conflict do nothing;
@@ -1682,6 +1717,17 @@ begin
         return jsonb_build_object('success', false, 'message', v_name || ' ya registró entrada y salida hoy');
       end if;
     end if;
+
+    -- Registrar evento para notificaciones
+    insert into public.system_events (type, payload)
+    values ('student_punch', jsonb_build_object(
+      'student_id', v_student.id,
+      'student_name', v_student.name,
+      'parent_id', v_student.parent_id,
+      'punch_type', v_type,
+      'timestamp', v_now,
+      'status', v_status
+    ));
 
     return jsonb_build_object(
       'success', true, 'type', v_type, 'name', v_name,
@@ -1693,7 +1739,7 @@ begin
   -- 2. Buscar staff por notes o matricula
   select * into v_staff
   from public.profiles
-  where (notes = p_code or matricula = p_code)
+  where (notes = p_code or matricula = p_code or access_code = p_code)
     and role in ('maestra','asistente','directora','admin')
   limit 1;
 
@@ -1749,3 +1795,342 @@ end;
 $$;
 grant execute on function public.process_door_punch(text) to authenticated;
 grant execute on function public.process_door_punch(text) to anon;
+
+-- ============================================================
+-- FIX: Payments RLS — padres pueden insertar y actualizar sus propios pagos
+-- ============================================================
+drop policy if exists "payments_parent_insert" on public.payments;
+drop policy if exists "payments_parent_update" on public.payments;
+
+-- Padre puede insertar pago para su hijo (subir comprobante)
+create policy "payments_parent_insert" on public.payments for insert
+  with check (
+    exists (
+      select 1 from public.students s
+      where s.id = payments.student_id
+        and s.parent_id = auth.uid()
+        and s.deleted_at is null
+    )
+  );
+
+-- Padre puede actualizar solo sus propios pagos (agregar evidence_url)
+create policy "payments_parent_update" on public.payments for update
+  using (
+    exists (
+      select 1 from public.students s
+      where s.id = payments.student_id
+        and s.parent_id = auth.uid()
+        and s.deleted_at is null
+    )
+  )
+  with check (
+    exists (
+      select 1 from public.students s
+      where s.id = payments.student_id
+        and s.parent_id = auth.uid()
+        and s.deleted_at is null
+    )
+  );
+
+-- ============================================================
+-- FIX: profiles — columna dedicada para QR de acceso del staff
+-- Evita que notes sea sobreescrito por el session token
+-- ============================================================
+alter table public.profiles add column if not exists access_code text;
+
+-- Migrar datos existentes de notes a access_code (solo los que parecen códigos de acceso)
+update public.profiles
+set access_code = notes
+where notes like 'DIR-%'
+   or notes like 'TEA-%'
+   or notes like 'ASI-%'
+   or (notes is not null and length(notes) between 8 and 30 and notes not like '%-%-%-%-%');
+
+-- ============================================================
+-- FIX: periods table — add missing is_active column
+-- ============================================================
+alter table public.periods add column if not exists is_active boolean default false;
+
+-- ============================================================
+-- RPC: get_dashboard_kpis
+-- ============================================================
+create or replace function public.get_dashboard_kpis(p_month text default '%')
+returns jsonb language plpgsql security definer set search_path = public as $$
+declare
+  v_students   int;
+  v_teachers   int;
+  v_classrooms int;
+  v_attendance int;
+  v_pending    numeric;
+  v_incidents  int;
+  v_today      date := current_date;
+begin
+  v_students   := (select count(*)::int from public.students where is_active = true);
+  v_teachers   := (select count(*)::int from public.profiles where role in ('maestra','asistente'));
+  v_classrooms := (select count(*)::int from public.classrooms);
+  v_attendance := (select count(*)::int from public.attendance where date = v_today and status in ('present','late'));
+  v_pending    := coalesce((select sum(amount) from public.payments where status in ('pending','overdue','pendiente','vencido')), 0);
+  v_incidents  := coalesce((select count(*)::int from public.inquiries where status not in ('resolved','closed')), 0);
+
+  return jsonb_build_object(
+    'total',            v_students,
+    'active',           v_students,
+    'teachers',         v_teachers,
+    'classrooms',       v_classrooms,
+    'attendance_today', v_attendance,
+    'pending_payments', v_pending,
+    'pending_amount',   v_pending,
+    'inquiries',        v_incidents
+  );
+end;
+$$;
+grant execute on function public.get_dashboard_kpis(text) to authenticated;
+
+-- ============================================================
+-- RPC: financial_summary_month
+-- ============================================================
+create or replace function public.financial_summary_month(p_year int, p_month int)
+returns jsonb language plpgsql security definer set search_path = public as $$
+declare
+  v_month_key text := p_year || '-' || lpad(p_month::text, 2, '0');
+  v_paid      numeric;
+  v_pending   numeric;
+  v_invoiced  numeric;
+begin
+  v_paid    := coalesce((select sum(amount) from public.payments where month_paid = v_month_key and status in ('paid','pagado','confirmado')), 0);
+  v_pending := coalesce((select sum(amount) from public.payments where month_paid = v_month_key and status in ('pending','overdue','pendiente','vencido','review')), 0);
+  v_invoiced := v_paid + v_pending;
+
+  return jsonb_build_object(
+    'total_paid',     v_paid,
+    'total_pending',  v_pending,
+    'total_invoiced', v_invoiced
+  );
+end;
+$$;
+grant execute on function public.financial_summary_month(int, int) to authenticated;
+
+-- ============================================================
+-- RPC: attendance_last_7_days
+-- ============================================================
+create or replace function public.attendance_last_7_days()
+returns jsonb language plpgsql security definer set search_path = public as $$
+declare
+  v_result jsonb := '{}';
+  v_date   date;
+  v_count  int;
+begin
+  for i in 0..6 loop
+    v_date  := current_date - i;
+    v_count := (select count(*)::int from public.attendance where date = v_date and status in ('present','late'));
+    v_result := v_result || jsonb_build_object(v_date::text, v_count);
+  end loop;
+  return v_result;
+end;
+$$;
+grant execute on function public.attendance_last_7_days() to authenticated;
+
+-- ============================================================
+-- RPC: find_or_create_private_conversation
+-- ============================================================
+create or replace function public.find_or_create_private_conversation(p_user1 uuid, p_user2 uuid)
+returns bigint language plpgsql security definer set search_path = public as $$
+declare
+  v_conv_id bigint;
+begin
+  -- Find existing conversation between these two users
+  select c.id into v_conv_id
+  from public.conversations c
+  where c.type in ('direct_message','private')
+    and exists (select 1 from public.conversation_participants where conversation_id = c.id and user_id = p_user1)
+    and exists (select 1 from public.conversation_participants where conversation_id = c.id and user_id = p_user2)
+  limit 1;
+
+  if v_conv_id is not null then
+    return v_conv_id;
+  end if;
+
+  -- Create new conversation
+  insert into public.conversations (type) values ('direct_message') returning id into v_conv_id;
+  insert into public.conversation_participants (conversation_id, user_id) values (v_conv_id, p_user1), (v_conv_id, p_user2);
+  return v_conv_id;
+end;
+$$;
+grant execute on function public.find_or_create_private_conversation(uuid, uuid) to authenticated;
+
+-- ============================================================
+-- PRODUCCIÓN: Correcciones de seguridad y consistencia
+-- ============================================================
+
+-- 1. NORMALIZAR STATUS DE PAGOS A INGLÉS (una sola fuente de verdad)
+-- Migrar valores en español a inglés
+UPDATE public.payments SET status = 'paid'    WHERE status IN ('pagado','confirmado');
+UPDATE public.payments SET status = 'pending' WHERE status IN ('pendiente');
+UPDATE public.payments SET status = 'overdue' WHERE status IN ('vencido');
+UPDATE public.payments SET status = 'review'  WHERE status IN ('revision','en revision');
+
+-- Reemplazar constraint de status con solo valores en inglés
+DO $$ BEGIN
+  IF EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'payments_status_check') THEN
+    ALTER TABLE public.payments DROP CONSTRAINT payments_status_check;
+  END IF;
+END $$;
+ALTER TABLE public.payments
+  ADD CONSTRAINT payments_status_check
+  CHECK (status IN ('pending','paid','overdue','review','rejected'));
+
+-- 2. SEPARAR PERMISOS: Asistente NO puede borrar pagos ni cambiar configuración escolar
+-- Reemplazar política payments_staff con permisos granulares
+DROP POLICY IF EXISTS "payments_staff"           ON public.payments;
+DROP POLICY IF EXISTS "payments_directora_all"   ON public.payments;
+DROP POLICY IF EXISTS "payments_asistente_write" ON public.payments;
+
+-- Directora y admin: acceso total
+CREATE POLICY "payments_directora_all" ON public.payments FOR ALL
+  USING (get_my_role() IN ('directora','admin') AND deleted_at IS NULL)
+  WITH CHECK (get_my_role() IN ('directora','admin'));
+
+-- Asistente: puede ver y actualizar (aprobar/rechazar), pero NO borrar
+CREATE POLICY "payments_asistente_select" ON public.payments FOR SELECT
+  USING (get_my_role() = 'asistente' AND deleted_at IS NULL);
+CREATE POLICY "payments_asistente_update" ON public.payments FOR UPDATE
+  USING (get_my_role() = 'asistente')
+  WITH CHECK (get_my_role() = 'asistente');
+-- Asistente puede insertar pagos manuales
+CREATE POLICY "payments_asistente_insert" ON public.payments FOR INSERT
+  WITH CHECK (get_my_role() = 'asistente');
+
+-- 3. SCHOOL_SETTINGS: Solo directora y admin pueden modificar
+ALTER TABLE public.school_settings ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS "settings_all"       ON public.school_settings;
+DROP POLICY IF EXISTS "settings_read"      ON public.school_settings;
+DROP POLICY IF EXISTS "settings_write"     ON public.school_settings;
+
+-- Todos los autenticados pueden leer la configuración
+CREATE POLICY "settings_read" ON public.school_settings FOR SELECT
+  USING (auth.uid() IS NOT NULL);
+
+-- Solo directora y admin pueden modificar
+CREATE POLICY "settings_write" ON public.school_settings FOR UPDATE
+  USING (get_my_role() IN ('directora','admin'))
+  WITH CHECK (get_my_role() IN ('directora','admin'));
+
+-- 4. VISTA DE AUDITORÍA DE PAGOS (para directora)
+CREATE OR REPLACE VIEW public.v_payment_audit AS
+SELECT
+  al.id,
+  al.created_at,
+  p.name                                    AS staff_name,
+  p.role                                    AS staff_role,
+  al.action,
+  al.payload->>'payment_id'                 AS payment_id,
+  al.payload->>'student_name'               AS student_name,
+  al.payload->>'amount'                     AS amount,
+  al.payload->>'month'                      AS month
+FROM public.audit_logs al
+LEFT JOIN public.profiles p ON p.id = al.user_id
+WHERE al.action LIKE 'payment.%'
+ORDER BY al.created_at DESC;
+
+-- 5. CRON: Generar cuotas anuales el 1 de enero a las 3 AM
+-- Requiere pg_cron habilitado en Supabase Dashboard → Extensions → pg_cron
+-- Ejecutar manualmente si pg_cron no está disponible:
+-- SELECT public.generate_annual_payments(EXTRACT(YEAR FROM CURRENT_DATE)::int);
+DO $$ BEGIN
+  IF EXISTS (SELECT 1 FROM pg_extension WHERE extname = 'pg_cron') THEN
+    BEGIN
+      PERFORM cron.unschedule('annual-payment-generator');
+    EXCEPTION WHEN OTHERS THEN
+      NULL;
+    END;
+    PERFORM cron.schedule(
+      'annual-payment-generator',
+      '0 3 1 1 *',
+      $cron$ SELECT public.generate_annual_payments(EXTRACT(YEAR FROM CURRENT_DATE)::int); $cron$
+    );
+  END IF;
+END $$;
+
+-- 6. ÍNDICES DE PERFORMANCE para consultas frecuentes
+CREATE INDEX IF NOT EXISTS idx_payments_student_month  ON public.payments(student_id, month_paid);
+CREATE INDEX IF NOT EXISTS idx_payments_status_month   ON public.payments(status, month_paid);
+CREATE INDEX IF NOT EXISTS idx_audit_logs_action       ON public.audit_logs(action, created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_notifications_user_read ON public.notifications(user_id, is_read, created_at DESC);
+
+-- ============================================================
+-- ÍNDICES DE PERFORMANCE — Producción
+-- ============================================================
+
+-- attendance: búsquedas frecuentes por student+date y classroom+date
+CREATE INDEX IF NOT EXISTS idx_attendance_student_date    ON public.attendance(student_id, date DESC);
+CREATE INDEX IF NOT EXISTS idx_attendance_classroom_date  ON public.attendance(classroom_id, date DESC);
+CREATE INDEX IF NOT EXISTS idx_attendance_date            ON public.attendance(date DESC);
+
+-- door_punches: búsquedas por fecha y persona
+CREATE INDEX IF NOT EXISTS idx_door_punches_date_type     ON public.door_punches(date DESC, punch_type);
+CREATE INDEX IF NOT EXISTS idx_door_punches_student_date  ON public.door_punches(student_id, date DESC);
+CREATE INDEX IF NOT EXISTS idx_door_punches_staff_date    ON public.door_punches(staff_id, date DESC);
+
+-- profiles: búsquedas por rol (login, selectores de personal)
+CREATE INDEX IF NOT EXISTS idx_profiles_role              ON public.profiles(role) WHERE deleted_at IS NULL;
+CREATE INDEX IF NOT EXISTS idx_profiles_email             ON public.profiles(email) WHERE deleted_at IS NULL;
+
+-- Foreign keys no indexadas automáticamente en PostgreSQL
+CREATE INDEX IF NOT EXISTS idx_students_classroom_id      ON public.students(classroom_id);
+CREATE INDEX IF NOT EXISTS idx_students_parent_id         ON public.students(parent_id);
+CREATE INDEX IF NOT EXISTS idx_classrooms_teacher_id      ON public.classrooms(teacher_id);
+CREATE INDEX IF NOT EXISTS idx_messages_conversation_id   ON public.messages(conversation_id, created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_messages_sender_id         ON public.messages(sender_id);
+CREATE INDEX IF NOT EXISTS idx_posts_classroom_id         ON public.posts(classroom_id, created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_posts_teacher_id           ON public.posts(teacher_id);
+CREATE INDEX IF NOT EXISTS idx_tasks_classroom_id         ON public.tasks(classroom_id);
+CREATE INDEX IF NOT EXISTS idx_task_evidences_task_id     ON public.task_evidences(task_id);
+CREATE INDEX IF NOT EXISTS idx_task_evidences_student_id  ON public.task_evidences(student_id);
+
+-- audit_logs y system_events: búsquedas por action/type con GIN para JSONB
+CREATE INDEX IF NOT EXISTS idx_audit_logs_user_action     ON public.audit_logs(user_id, action, created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_audit_logs_payload_gin     ON public.audit_logs USING gin(payload);
+CREATE INDEX IF NOT EXISTS idx_system_events_type         ON public.system_events(type, status, created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_system_errors_panel        ON public.system_errors(panel, created_at DESC);
+
+-- payments: búsquedas frecuentes
+CREATE INDEX IF NOT EXISTS idx_payments_student_status    ON public.payments(student_id, status);
+CREATE INDEX IF NOT EXISTS idx_payments_due_date          ON public.payments(due_date) WHERE status IN ('pending','overdue');
+
+-- notifications: no leídas por usuario
+CREATE INDEX IF NOT EXISTS idx_notifications_unread       ON public.notifications(user_id, is_read, created_at DESC) WHERE is_read = false;
+
+-- ============================================================
+-- VISTA UNIFICADA: attendance + door_punches (una sola fuente de verdad)
+-- ============================================================
+CREATE OR REPLACE VIEW public.v_daily_presence AS
+SELECT
+  dp.date,
+  dp.punch_type                                     AS event_type,
+  dp.punched_at                                     AS event_time,
+  s.id                                              AS student_id,
+  s.name                                            AS student_name,
+  c.name                                            AS classroom,
+  s.parent_id,
+  'door_punch'                                      AS source,
+  NULL::text                                        AS attendance_status
+FROM public.door_punches dp
+JOIN public.students s ON s.id = dp.student_id
+LEFT JOIN public.classrooms c ON c.id = s.classroom_id
+WHERE dp.student_id IS NOT NULL
+
+UNION ALL
+
+SELECT
+  a.date,
+  'class_attendance'                                AS event_type,
+  a.check_in                                        AS event_time,
+  s.id                                              AS student_id,
+  s.name                                            AS student_name,
+  c.name                                            AS classroom,
+  s.parent_id,
+  'attendance'                                      AS source,
+  a.status                                          AS attendance_status
+FROM public.attendance a
+JOIN public.students s ON s.id = a.student_id
+LEFT JOIN public.classrooms c ON c.id = a.classroom_id;

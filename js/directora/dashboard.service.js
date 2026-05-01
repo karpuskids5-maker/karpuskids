@@ -197,21 +197,22 @@ export const DashboardService = {
   subscribeToChanges() {
     this.cleanupRealtime();
 
-    const tables = ['attendance', 'payments', 'students'];
+    // Debounce: batch multiple rapid changes into a single refresh (max 1 per 10s)
+    let debounceTimer = null;
+    const debouncedInvalidate = () => {
+      clearTimeout(debounceTimer);
+      debounceTimer = setTimeout(() => {
+        this.invalidateCache();
+        this.notifyListeners();
+      }, 10_000); // 10 second debounce — prevents CPU spike on mass QR punches
+    };
 
+    const tables = ['attendance', 'payments', 'students'];
     tables.forEach(table => {
       const channel = supabase
         .channel(`${table}_changes`)
-        .on('postgres_changes', {
-          event: '*',
-          schema: 'public',
-          table
-        }, () => {
-          // Cuando hay un cambio en la BD, invalidamos y notificamos
-          this.invalidateCache();
-        })
+        .on('postgres_changes', { event: '*', schema: 'public', table }, debouncedInvalidate)
         .subscribe();
-
       this.channels.push(channel);
     });
   },

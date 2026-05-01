@@ -170,7 +170,10 @@ export const WallModule = {
         .order('created_at', { ascending: false })
         .range(from, to);
 
-      if (this._options.classroomId) query = query.eq('classroom_id', this._options.classroomId);
+      if (this._options.classroomId) {
+        // Show posts for this classroom AND general posts (classroom_id = null)
+        query = query.or(`classroom_id.eq.${this._options.classroomId},classroom_id.is.null`);
+      }
       if (this._options.searchTerm) query = query.ilike('content', `%${this._options.searchTerm}%`);
 
       const { data: posts, error } = await withTimeout(() => query, 10_000);

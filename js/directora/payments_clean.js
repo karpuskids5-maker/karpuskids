@@ -78,19 +78,25 @@ export const PaymentsModule = {
       
       // Formato YYYY-MM para coincidir con la base de datos
       const monthKey = `${yv}-${String(mv).padStart(2,'0')}`;
+      // Also get Spanish month name equivalent (legacy records)
+      const SPANISH_MONTHS = ['enero','febrero','marzo','abril','mayo','junio','julio','agosto','septiembre','octubre','noviembre','diciembre'];
+      const spanishMonth = SPANISH_MONTHS[parseInt(mv, 10) - 1];
+      const spanishMonthCap = spanishMonth ? spanishMonth.charAt(0).toUpperCase() + spanishMonth.slice(1) : null;
 
+      // Fetch both YYYY-MM and Spanish name records in one query using OR
       let q = supabase
         .from('payments')
         .select('id,student_id,amount,concept,status,due_date,created_at,paid_date,method,bank,reference,month_paid,evidence_url,students:student_id(name,classroom_id,classrooms:classroom_id(name))')
-        .eq('month_paid', monthKey)
+        .or(spanishMonthCap
+          ? `month_paid.eq.${monthKey},month_paid.eq.${spanishMonthCap},month_paid.ilike.${spanishMonth}`
+          : `month_paid.eq.${monthKey}`)
         .order('due_date', { ascending: true });
       if (sf && sf !== 'all') q = q.eq('status', sf);
 
       let { data, error } = await q;
       if (error) throw error;
 
-      // Fallback: if no results with YYYY-MM, try searching by created_at range
-      // (handles payments created before month_paid was standardized)
+      // Fallback: if still no results, try created_at range
       if (!data?.length) {
         const rangeStart = `${yv}-${String(mv).padStart(2,'0')}-01`;
         const rangeEnd   = `${yv}-${String(mv).padStart(2,'0')}-31`;
@@ -106,12 +112,31 @@ export const PaymentsModule = {
       }
 
       let list = data || [];
-      // Deduplicar: por student_id+month_paid, conservar el registro más reciente (mayor id)
+      // Deduplicar: normalizar month_paid (handles '2026-04' AND 'Abril' formats)
+      const MONTH_MAP_ES = {
+        'enero':'01','febrero':'02','marzo':'03','abril':'04','mayo':'05','junio':'06',
+        'julio':'07','agosto':'08','septiembre':'09','octubre':'10','noviembre':'11','diciembre':'12'
+      };
+      const normMonth = (mp, year) => {
+        if (!mp) return '';
+        const s = mp.toLowerCase().trim();
+        if (/^\d{4}-\d{2}$/.test(s)) return s;
+        const num = MONTH_MAP_ES[s];
+        return num ? `${year || new Date().getFullYear()}-${num}` : s;
+      };
+      const statusPri = { paid: 4, review: 3, overdue: 2, pending: 1 };
       const dedupMap = new Map();
       for (const p of list) {
-        const key = (p.student_id || '') + '|' + (p.month_paid || '') + '|' + (p.status || '');
+        const key = String(p.student_id || '') + '|' + normMonth(p.month_paid, yv);
         const existing = dedupMap.get(key);
-        if (!existing || p.id > existing.id) dedupMap.set(key, p);
+        if (!existing) { dedupMap.set(key, p); continue; }
+        const pPri  = statusPri[p.status?.toLowerCase()] || 0;
+        const exPri = statusPri[existing.status?.toLowerCase()] || 0;
+        if (pPri > exPri) { dedupMap.set(key, p); continue; }
+        if (pPri === exPri) {
+          if (p.evidence_url && !existing.evidence_url) { dedupMap.set(key, p); continue; }
+          if (p.id > existing.id) dedupMap.set(key, p);
+        }
       }
       list = Array.from(dedupMap.values());
       if (sq) {
@@ -140,13 +165,14 @@ export const PaymentsModule = {
 
   _st(p) {
     const s = (p.status || '').toLowerCase();
-    if (s === 'paid' || s === 'pagado' || s === 'confirmado') return 'paid';
-    if (s === 'review' || s === 'revision' || s === 'en revision') return 'review';
-    if (s === 'overdue' || s === 'vencido') return 'overdue';
-    // transferencia sin aprobar → review
-    if ((s === 'pending' || s === 'pendiente') && p.method === 'transferencia') return 'review';
+    if (s === 'paid') return 'paid';
+    if (s === 'review') return 'review';
+    if (s === 'overdue') return 'overdue';
+    if (s === 'rejected') return 'rechazado';
+    // Si tiene comprobante subido → mostrar como en revisión aunque el status sea pending
+    if (p.evidence_url) return 'review';
     // Si el due_date ya pasó y sigue pending → mostrar como overdue en UI
-    if ((s === 'pending' || s === 'pendiente') && p.due_date) {
+    if (s === 'pending' && p.due_date) {
       const today = new Date(); today.setHours(0,0,0,0);
       if (new Date(p.due_date + 'T00:00:00') < today) return 'overdue';
     }
@@ -464,67 +490,56 @@ export const PaymentsModule = {
     }
   },
 
+  /**
+   * 🔧 sendReminders — Llamada delegada a Edge Function
+   * 
+   * ✅ Ventajas:
+   *  - Procesamiento en servidor (no congela navegador)
+   *  - Manejo seguro de lotes grandes
+   *  - Reintentos automáticos en caso de falla
+   *  - Auditoría en el servidor
+   * 
+   * Nota: La Edge Function 'payment-reminders' puede configurarse como cron automático
+   */
   async sendReminders() {
-    if (!confirm('¿Enviar recordatorios de pago ahora?\n\nSe notificará a padres con pagos pendientes o vencidos.')) return;
+    if (!confirm('¿Enviar recordatorios de pago ahora?\n\nEsta acción se procesará en el servidor y puede tomar unos minutos.')) return;
     const btn = document.getElementById('btnSendPaymentReminders');
     if (btn) { btn.disabled = true; btn.textContent = 'Enviando...'; }
+    
     try {
-      const now = new Date();
-      const in3days = new Date(now); in3days.setDate(in3days.getDate() + 3);
-      const yesterday = new Date(now); yesterday.setDate(yesterday.getDate() - 1);
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) throw new Error('No autenticado');
 
-      // Get pending/overdue payments with parent info
-      const { data: payments, error } = await supabase
-        .from('payments')
-        .select('id, amount, month_paid, due_date, status, students:student_id(name, parent_id, p1_email, p1_name)')
-        .in('status', ['pending', 'overdue'])
-        .not('students', 'is', null);
+      // Llamar a la Edge Function payment-reminders que gestiona todo en el servidor
+      const { data, error } = await supabase.functions.invoke('payment-reminders', {
+        body: { action: 'send_all' }
+      });
 
       if (error) throw error;
 
-      const { sendPush, sendEmail } = await import('../shared/supabase.js');
-      let pushSent = 0, emailSent = 0;
-
-      for (const p of payments || []) {
-        const student = p.students;
-        if (!student?.parent_id) continue;
-
-        const amt = Number(p.amount || 0).toLocaleString('es-ES', { style: 'currency', currency: 'USD', minimumFractionDigits: 2 });
-        const isOverdue = p.status === 'overdue';
-        const title   = isOverdue ? `⚠️ Pago vencido — ${student.name}` : `💳 Recordatorio de pago — ${student.name}`;
-        const message = isOverdue
-          ? `El pago de ${amt} para ${p.month_paid || 'mensualidad'} está vencido. Por favor regulariza tu cuenta.`
-          : `Tu pago de ${amt} para ${p.month_paid || 'mensualidad'} vence pronto. ¡No olvides pagarlo!`;
-
-        // Push
-        sendPush({ user_id: student.parent_id, title, message, type: 'payment', link: 'panel_padres.html' }).catch(() => {});
-        pushSent++;
-
-        // Email
-        if (student.p1_email) {
-          const html = `<div style="font-family:Arial,sans-serif;max-width:500px;margin:auto;padding:20px;">
-            <div style="background:${isOverdue ? '#dc2626' : '#f97316'};padding:20px;border-radius:12px 12px 0 0;text-align:center;">
-              <h2 style="color:white;margin:0;">${isOverdue ? '⚠️ Pago Vencido' : '💳 Recordatorio de Pago'}</h2>
-            </div>
-            <div style="background:#fff;border:1px solid #e5e7eb;border-radius:0 0 12px 12px;padding:24px;">
-              <p>Hola <strong>${student.p1_name || 'Padre/Madre'}</strong>,</p>
-              <p>${message}</p>
-              <div style="background:#f9fafb;border-radius:8px;padding:16px;margin:16px 0;">
-                <p style="margin:0;"><strong>Estudiante:</strong> ${student.name}</p>
-                <p style="margin:8px 0 0;"><strong>Monto:</strong> ${amt}</p>
-                <p style="margin:8px 0 0;"><strong>Mes:</strong> ${p.month_paid || '—'}</p>
-              </div>
-              <a href="https://karpuskids.com/panel_padres.html" style="display:inline-block;background:#f97316;color:white;padding:12px 24px;border-radius:8px;font-weight:bold;text-decoration:none;">Ver mi Panel →</a>
-            </div>
-          </div>`;
-          sendEmail([student.p1_email], title, html).catch(() => {});
-          emailSent++;
-        }
+      // Respuesta esperada: { reminder_3d, due_today, overdue_1d, emails_sent, pushes_sent, errors }
+      const results = data || {};
+      const total = (results.reminder_3d || 0) + (results.due_today || 0) + (results.overdue_1d || 0);
+      
+      if (total === 0) {
+        Helpers.toast('No hay pagos para recordar en este momento', 'info');
+      } else {
+        const msg = `✅ ${total} recordatorios procesados\n📧 ${results.emails_sent || 0} correos\n🔔 ${results.pushes_sent || 0} notificaciones`;
+        Helpers.toast(msg, 'success');
+        
+        // Auditar la acción
+        await auditLog('payment_reminders_sent', {
+          reminder_3d: results.reminder_3d,
+          due_today: results.due_today,
+          overdue_1d: results.overdue_1d,
+          emails_sent: results.emails_sent,
+          pushes_sent: results.pushes_sent,
+          total
+        });
       }
-
-      Helpers.toast(`Recordatorios enviados: ${pushSent} push, ${emailSent} correos`, 'success');
     } catch (e) {
-      Helpers.toast('Error enviando recordatorios: ' + (e.message || e), 'error');
+      Helpers.toast('Error: ' + (e.message || e), 'error');
+      console.error('[sendReminders]', e);
     } finally {
       if (btn) { btn.disabled = false; btn.textContent = 'Enviar recordatorios ahora'; }
     }
