@@ -89,9 +89,7 @@ export const WallModule = {
           select.appendChild(option);
         });
       }
-    } catch (err) {
-      console.error('Error loading classrooms:', err);
-    }
+    } catch (_) { /* silencioso */ }
   },
 
   setupFilters() {

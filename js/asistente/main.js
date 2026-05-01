@@ -17,6 +17,12 @@ import { RealtimeManager } from '../shared/realtime-manager.js';
 import { Security } from '../shared/security.js';
 
 // 🚀 Definir objeto App globalmente para evitar ReferenceError en onclicks del HTML
+// Global close modal fallback — always available even before openNewPostModal is called
+window._closeAsistenteModal = () => {
+  const gc = document.getElementById('globalModalContainer');
+  if (gc) { gc.style.display = 'none'; gc.innerHTML = ''; }
+};
+
 window.App = {
   payments: {
     markPaid:      (id)  => PaymentsModule.markPaid(id),
@@ -624,37 +630,61 @@ async function sendAssistantMessage() {
 // =======================================================
 
 async function openNewPostModal() {
-  // Cargar aulas para el selector
+  // Define close function FIRST — before building HTML that references it
+  window._closeAsistenteModal = () => {
+    const gc = document.getElementById('globalModalContainer');
+    if (gc) { gc.style.display = 'none'; gc.innerHTML = ''; }
+  };
+
+  // Load classrooms for selector
   const { data: classrooms } = await supabase.from('classrooms').select('id, name').order('name');
-  
-  const classroomOptions = (classrooms || []).map(c => `<option value="${c.id}">${Helpers.escapeHTML(c.name)}</option>`).join('');
+  const classroomOptions = (classrooms || []).map(c =>
+    `<option value="${c.id}">${Helpers.escapeHTML(c.name)}</option>`
+  ).join('');
 
   const html = `
     <div class="bg-white w-full max-w-lg rounded-[2.5rem] shadow-2xl p-8 animate-fadeIn">
       <div class="flex justify-between items-start mb-6">
-        <h3 class="text-2xl font-black text-slate-800">Crear Publicación</h3>
-        <button onclick="window._closeAsistenteModal()" class="p-2 hover:bg-slate-100 rounded-full text-slate-400">✕</button>
+        <div>
+          <h3 class="text-2xl font-black text-slate-800">Crear Publicación</h3>
+          <p class="text-xs text-slate-400 font-bold mt-1">Visible para padres según el aula seleccionada</p>
+        </div>
+        <button onclick="window._closeAsistenteModal()" class="p-2 hover:bg-slate-100 rounded-full text-slate-400 transition-colors">✕</button>
       </div>
       <div class="space-y-4">
         <div>
-          <label class="block text-[11px] font-black text-slate-400 uppercase tracking-wider mb-1.5 ml-1">Aula (Opcional)</label>
+          <label class="block text-[11px] font-black text-slate-400 uppercase tracking-wider mb-1.5 ml-1">
+            Visibilidad
+          </label>
           <select id="postClassroom" class="w-full px-4 py-2.5 border-2 border-slate-100 rounded-2xl outline-none focus:ring-4 focus:ring-teal-100 focus:border-teal-400 bg-slate-50/50 transition-all text-sm font-medium">
-            <option value="">-- Todas las Aulas (General) --</option>
+            <option value="">🌐 Todas las Aulas (General)</option>
             ${classroomOptions}
           </select>
+          <p class="text-[10px] text-slate-400 font-bold mt-1 ml-1">
+            "Todas las Aulas" = visible para todos los padres de la escuela
+          </p>
         </div>
 
-        <textarea id="postContent" rows="4" class="w-full p-4 bg-slate-50 border-2 border-slate-100 rounded-2xl text-sm outline-none resize-none focus:ring-4 focus:ring-teal-100 focus:border-teal-400" placeholder="¿Qué quieres compartir con la escuela?"></textarea>
+        <div>
+          <label class="block text-[11px] font-black text-slate-400 uppercase tracking-wider mb-1.5 ml-1">Mensaje</label>
+          <textarea id="postContent" rows="4" class="w-full p-4 bg-slate-50 border-2 border-slate-100 rounded-2xl text-sm outline-none resize-none focus:ring-4 focus:ring-teal-100 focus:border-teal-400" placeholder="¿Qué quieres compartir con la escuela?"></textarea>
+        </div>
         
         <div class="relative">
-          <input type="file" id="postFile" class="hidden" accept="image/*,video/*" onchange="document.getElementById('fileName').textContent = this.files[0]?.name || 'Adjuntar foto/video'">
+          <input type="file" id="postFile" class="hidden" accept="image/*,video/*"
+            onchange="document.getElementById('postFileName').textContent = this.files[0]?.name || 'Adjuntar foto/video'">
           <label for="postFile" class="flex items-center gap-3 p-3 border-2 border-dashed border-slate-200 rounded-2xl cursor-pointer hover:bg-teal-50 hover:border-teal-300 transition-all">
-            <div class="w-10 h-10 bg-teal-100 text-teal-600 rounded-xl flex items-center justify-center"><i data-lucide="image-plus"></i></div>
-            <span id="fileName" class="text-sm font-bold text-slate-500">Adjuntar foto o video</span>
+            <div class="w-10 h-10 bg-teal-100 text-teal-600 rounded-xl flex items-center justify-center">
+              <i data-lucide="image-plus"></i>
+            </div>
+            <span id="postFileName" class="text-sm font-bold text-slate-500">Adjuntar foto o video</span>
           </label>
         </div>
 
-        <button id="btnSubmitPost" onclick="App.submitNewPost()" class="w-full py-3.5 bg-teal-600 text-white rounded-2xl font-black text-sm uppercase tracking-widest hover:bg-teal-700 shadow-lg shadow-teal-200 transition-all">PUBLICAR</button>
+        <button id="btnSubmitPost" onclick="App.submitNewPost()"
+          class="w-full py-3.5 bg-teal-600 text-white rounded-2xl font-black text-sm uppercase tracking-widest hover:bg-teal-700 shadow-lg shadow-teal-200 transition-all flex items-center justify-center gap-2">
+          <i data-lucide="send" class="w-4 h-4"></i> PUBLICAR
+        </button>
       </div>
     </div>
   `;
@@ -662,60 +692,81 @@ async function openNewPostModal() {
   const gc = document.getElementById('globalModalContainer');
   if (gc) {
     gc.innerHTML = '<div class="bg-white rounded-3xl shadow-2xl w-full max-w-lg max-h-[92vh] overflow-hidden mx-3 flex flex-col">' + html + '</div>';
-    gc.style.display = 'flex';
-    gc.style.alignItems = 'center';
-    gc.style.justifyContent = 'center';
-    gc.style.zIndex = '9999';
+    gc.style.cssText = 'display:flex;align-items:center;justify-content:center;position:fixed;inset:0;background:rgba(0,0,0,0.5);backdrop-filter:blur(4px);z-index:9999;';
   }
   if (window.lucide) lucide.createIcons();
 }
 
 async function submitNewPost() {
-  const content = document.getElementById('postContent').value.trim();
-  const classroomId = document.getElementById('postClassroom').value || null;
-  const fileInput = document.getElementById('postFile');
-  const file = fileInput?.files[0];
-  const btn = document.getElementById('btnSubmitPost');
+  const content     = document.getElementById('postContent')?.value?.trim();
+  const classroomId = document.getElementById('postClassroom')?.value || null;
+  const fileInput   = document.getElementById('postFile');
+  const file        = fileInput?.files[0];
+  const btn         = document.getElementById('btnSubmitPost');
 
   if (!content && !file) return Helpers.toast('Escribe algo o sube un archivo', 'warning');
 
-  btn.disabled = true;
-  btn.innerHTML = '<i data-lucide="loader-2" class="w-5 h-5 animate-spin mx-auto"></i>';
-  if(window.lucide) window.lucide.createIcons();
+  if (btn) {
+    btn.disabled = true;
+    btn.innerHTML = '<i data-lucide="loader-2" class="w-4 h-4 animate-spin"></i> Publicando...';
+    if (window.lucide) lucide.createIcons();
+  }
 
   try {
-    let mediaUrl = null;
+    let mediaUrl  = null;
     let mediaType = null;
 
     if (file) {
-      const ext = file.name.split('.').pop();
+      if (file.size > 10 * 1024 * 1024) {
+        Helpers.toast('Archivo muy grande (máx 10MB)', 'error');
+        if (btn) { btn.disabled = false; btn.innerHTML = '<i data-lucide="send" class="w-4 h-4"></i> PUBLICAR'; }
+        return;
+      }
+      const ext  = file.name.split('.').pop().toLowerCase();
       const path = `posts/${Date.now()}_${Math.random().toString(36).substr(2,9)}.${ext}`;
       const { error: upErr } = await supabase.storage.from('posts').upload(path, file);
       if (upErr) throw upErr;
-      
-      const { data } = supabase.storage.from('posts').getPublicUrl(path);
-      mediaUrl = data.publicUrl;
+      const { data: urlData } = supabase.storage.from('posts').getPublicUrl(path);
+      mediaUrl  = urlData.publicUrl;
       mediaType = file.type.startsWith('video') ? 'video' : 'image';
     }
 
-    const { error } = await supabase.from('posts').insert({
+    const user = AppState.get('user');
+    const { data: post, error } = await supabase.from('posts').insert({
       classroom_id: classroomId,
-      teacher_id: AppState.get('user').id,
-      content: content,
-      media_url: mediaUrl,
-      media_type: mediaType
-    });
+      teacher_id:   user?.id,
+      content,
+      media_url:    mediaUrl,
+      media_type:   mediaType
+    }).select('id').single();
 
     if (error) throw error;
+
+    // ✅ Close modal and show success IMMEDIATELY — don't wait for notifications
     Helpers.toast('Publicado correctamente', 'success');
     window._closeAsistenteModal?.();
+
+    // Reload wall in background (non-blocking)
     WallModule.loadPosts(document.getElementById('muroPostsContainer'));
 
-  } catch (e) {
+    // Send notifications via Edge Function in background — fire and forget
+    if (post?.id) {
+      import('../shared/supabase.js').then(({ emitEvent }) => {
+        emitEvent('post.created', {
+          classroom_id:    classroomId,
+          teacher_name:    AppState.get('profile')?.name || 'Asistente',
+          content_preview: content.slice(0, 80)
+        }).catch(() => {});
+      }).catch(() => {});
+    }
 
-    Helpers.toast('Error al publicar', 'error');
-    btn.disabled = false;
-    btn.innerHTML = 'PUBLICAR';
+  } catch (e) {
+    Helpers.toast('Error al publicar: ' + (e.message || ''), 'error');
+    if (btn) {
+      btn.disabled = false;
+      btn.innerHTML = '<i data-lucide="send" class="w-4 h-4"></i> PUBLICAR';
+      if (window.lucide) lucide.createIcons();
+    }
   }
 }
 
