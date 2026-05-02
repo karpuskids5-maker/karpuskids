@@ -417,7 +417,7 @@ export const DirectorApi = {
       }
     }
     // Only send columns that exist in profiles table — exclude email (can't update via profiles)
-    const ALLOWED = ['name', 'phone', 'role', 'bio', 'notes', 'avatar_url', 'onesignal_player_id'];
+    const ALLOWED = ['name', 'phone', 'role', 'bio', 'notes', 'access_code', 'avatar_url', 'onesignal_player_id'];
     const safeData = Object.fromEntries(Object.entries(profileData).filter(([k]) => ALLOWED.includes(k)));
     const result = await supabase.from(TABLES.PROFILES).update(safeData).eq('id', id);
     QueryCache.invalidate('dir_teachers');

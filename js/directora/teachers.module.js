@@ -241,8 +241,19 @@ export const TeachersModule = {
       const input = document.getElementById('tMatricula');
       if (input) {
         input.value = code;
-        // Generar QR automáticamente
         window.renderStaffQR(code);
+        // If editing an existing teacher, save immediately
+        const teacherId = document.getElementById('tId')?.value;
+        if (teacherId) {
+          const { error } = await supabase.from('profiles').update({ access_code: code }).eq('id', teacherId);
+          if (!error) {
+            Helpers.toast('Código de acceso guardado', 'success');
+            // Update cache
+            const teachers = AppState.get('teachers') || [];
+            const idx = teachers.findIndex(t => t.id === teacherId);
+            if (idx >= 0) teachers[idx].access_code = code;
+          }
+        }
       }
     };
 
@@ -324,10 +335,14 @@ export const TeachersModule = {
     if (id) {
       const teachers = AppState.get('teachers') || [];
       let teacher = teachers.find(t => t.id == id);
-      // Si no está en cache, buscar en DB para obtener notes (matrícula)
-      if (!teacher) {
-        const { data } = await supabase.from('profiles').select('id, name, email, phone, role, is_active, notes').eq('id', id).maybeSingle();
-        teacher = data;
+      // Fetch from DB to get access_code and notes
+      if (!teacher || !teacher.access_code) {
+        const { data } = await supabase
+          .from('profiles')
+          .select('id, name, email, phone, role, is_active, notes, access_code')
+          .eq('id', id)
+          .maybeSingle();
+        if (data) teacher = { ...teacher, ...data };
       }
       if (teacher) {
         const setVal = (eid, val) => { const e = document.getElementById(eid); if(e) e.value = val || ''; };
@@ -336,13 +351,15 @@ export const TeachersModule = {
         setVal('tPhone', teacher.phone);
         setVal('tEmail', teacher.email);
         setVal('tRole', teacher.role);
-        setVal('tMatricula', teacher.access_code || teacher.notes || '');
+        // Use access_code first, fallback to notes for legacy
+        const code = teacher.access_code || (teacher.notes?.startsWith?.('TEA-') || teacher.notes?.startsWith?.('DIR-') || teacher.notes?.startsWith?.('ASI-') ? teacher.notes : null);
+        setVal('tMatricula', code || '');
         const classId = teacher.classroom_id || teacher.classrooms?.id;
         setVal('tClassroom', classId);
         const checkActive = document.getElementById('tActive');
         if(checkActive) checkActive.checked = teacher.is_active !== false;
         // Auto-render QR if has code
-        if (teacher.notes) setTimeout(() => window.renderStaffQR(teacher.notes), 400);
+        if (code) setTimeout(() => window.renderStaffQR(code), 400);
       }
     }
     if (window.lucide) lucide.createIcons();

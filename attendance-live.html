@@ -322,7 +322,14 @@ async function onScan(raw) {
     // Use DB RPC — handles students and staff, writes to door_punches
     const { data: result, error } = await supabase.rpc('process_door_punch', { p_code: code });
 
-    if (error) throw error;
+    if (error) {
+      // RPC not deployed yet — show helpful message
+      const msg = error.message?.includes('function') || error.code === 'PGRST202'
+        ? 'RPC no desplegado. Ejecuta schema.sql en Supabase SQL Editor.'
+        : error.message || 'Error de conexión';
+      showResult('error', 'Error', '', msg, new Date());
+      return;
+    }
 
     if (!result?.success) {
       showResult('warn', 'Desconocido', '', result?.message || 'QR no registrado', new Date());

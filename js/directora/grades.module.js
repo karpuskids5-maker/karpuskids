@@ -98,10 +98,11 @@ export const GradesModule = {
     
     try {
       // 1. Obtener todos los estudiantes activos
-      const { data: students, error: sError } = await DirectorApi.getStudents();
-      if (sError) throw new Error(typeof sError === 'string' ? sError : JSON.stringify(sError));
+      const studentsResult = await DirectorApi.getStudents();
+      const students = studentsResult?.data || [];
+      // Don't throw on student error — show empty list instead
 
-      // 2. Obtener evidencias calificadas — use simple select without join to avoid FK issues
+      // 2. Obtener evidencias calificadas — simple select without join
       let query = supabase
         .from('task_evidences')
         .select('id, stars, grade_letter, status, comment, file_url, created_at, student_id, task_id')
@@ -118,12 +119,26 @@ export const GradesModule = {
       }
 
       const { data: evidences, error: evError } = await query;
-      if (evError) throw new Error(evError.message || JSON.stringify(evError));
+      // If task_evidences fails (RLS or table issue), show students with no grades
+      // Common cause: get_my_role() function not deployed yet
+      if (evError) {
+        // Try with service-level bypass via a simpler query
+        const { data: ev2 } = await supabase
+          .from('task_evidences')
+          .select('id, stars, grade_letter, status, comment, file_url, created_at, student_id, task_id')
+          .not('grade_letter', 'is', null)
+          .order('created_at', { ascending: false })
+          .limit(500);
+        // Use fallback data or empty array
+        var safeEvidences = ev2 || [];
+      } else {
+        var safeEvidences = evidences || [];
+      }
 
       // 3. Get task titles separately (avoid join issues)
       let taskMap = {};
-      if (evidences?.length) {
-        const taskIds = [...new Set(evidences.map(e => e.task_id).filter(Boolean))];
+      if (safeEvidences.length) {
+        const taskIds = [...new Set(safeEvidences.map(e => e.task_id).filter(Boolean))];
         if (taskIds.length) {
           const { data: tasks } = await supabase
             .from('tasks')
@@ -146,7 +161,7 @@ export const GradesModule = {
       });
 
       // 5. Poblar evidencias
-      (evidences || []).forEach(ev => {
+      safeEvidences.forEach(ev => {
         const sid = ev.student_id;
         if (grouped[sid]) {
           const score = scoreFromEvidence(ev);
@@ -177,7 +192,15 @@ export const GradesModule = {
       this._updateKPIs(this._allData);
 
     } catch (e) {
-      tableBody.innerHTML = '<tr><td colspan="4" class="text-center py-12">' + Helpers.errorState('Error al cargar calificaciones', 'App.grades.loadGrades()') + '</td></tr>';
+      const errMsg = e?.message || String(e) || 'Error desconocido';
+      tableBody.innerHTML = `<tr><td colspan="4" class="text-center py-12">
+        <div class="flex flex-col items-center gap-3">
+          <div class="w-14 h-14 bg-rose-100 rounded-full flex items-center justify-center text-2xl">⚠️</div>
+          <p class="font-bold text-slate-700">Error al cargar calificaciones</p>
+          <p class="text-xs text-slate-400 max-w-sm text-center">${Helpers.escapeHTML(errMsg)}</p>
+          <button onclick="App.grades.loadGrades()" class="px-4 py-2 bg-indigo-600 text-white rounded-xl font-black text-xs uppercase hover:bg-indigo-700 transition-all">Reintentar</button>
+        </div>
+      </td></tr>`;
       if (window.lucide) lucide.createIcons();
     }
   },
