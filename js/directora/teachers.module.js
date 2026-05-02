@@ -319,7 +319,7 @@ export const TeachersModule = {
       if (select && rooms?.length) {
         select.innerHTML += rooms.map(r => `<option value="${r.id}">${(r.name || 'Sin nombre').trim()}</option>`).join('');
       }
-    } catch (error) { console.error('Error cargando aulas:', error); }
+    } catch (_) { /* silencioso */ }
 
     if (id) {
       const teachers = AppState.get('teachers') || [];

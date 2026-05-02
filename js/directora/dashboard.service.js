@@ -64,7 +64,6 @@ export const DashboardService = {
         teachersRes
       ] = results.map((r, i) => {
         if (r.status === 'rejected') {
-          console.error(`❌ Error en request ${i}:`, r.reason);
           return { data: null, error: r.reason };
         }
         return r.value;
@@ -158,7 +157,6 @@ export const DashboardService = {
       return dashboardData;
 
     } catch (error) {
-      console.error('❌ Dashboard error:', error);
       return AppState.get('dashboardData') || this.getEmptyState();
     } finally {
       this.isLoading = false;

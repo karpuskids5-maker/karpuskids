@@ -297,12 +297,12 @@ export const TeachersModule = {
             <div style="font-family: sans-serif; max-width: 600px; margin: auto; padding: 20px; border: 1px solid #e0f2fe; border-radius: 10px;">
               <h2 style="color: #0369a1;">¡Bienvenida al Equipo de Karpus Kids! 🍎</h2>
               <p>Hola <b>${name}</b>,</p>
-              <p>Estamos emocionados de tenerte con nosotros. Se ha creado tu cuenta de acceso al Panel de Maestra.</p>
+              <p>Se ha creado tu cuenta de acceso al Panel de Maestra en Karpus Kids.</p>
               <div style="background: #f0f9ff; padding: 15px; border-radius: 8px; margin: 15px 0;">
                 <p><b>Usuario (Email):</b> ${email}</p>
-                <p><b>Contraseña Temporal:</b> ${password}</p>
+                <p style="color:#6b7280;font-size:13px;">Por seguridad, usa el enlace de abajo para establecer tu contraseña.</p>
               </div>
-              <p>Puedes acceder desde aquí: <a href="${window.location.origin}/login.html" style="color: #0369a1; font-weight: bold;">Iniciar Sesión</a></p>
+              <p>Accede desde aquí: <a href="${window.location.origin}/login.html" style="color: #0369a1; font-weight: bold;">Iniciar Sesión</a></p>
               <hr style="border: none; border-top: 1px solid #e0f2fe; margin: 20px 0;">
               <p style="font-size: 12px; color: #666;">Karpus Kids - Administración</p>
             </div>

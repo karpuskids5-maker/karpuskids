@@ -222,7 +222,9 @@ export const PaymentsModule = {
 
   async loadStats() {
     try {
-      const { data } = await DirectorApi.getPaymentStats();
+      const mv = document.getElementById('filterPaymentMonth')?.value;
+      const yv = document.getElementById('filterPaymentYear')?.value;
+      const { data } = await DirectorApi.getPaymentStats(mv, yv);
       if (!data) return;
       const set = (id, v) => { const el = document.getElementById(id); if (el) el.textContent = v; };
       set('kpiIncomeMonth', '$' + Number(data.incomeMonth || 0).toLocaleString('es-ES', { minimumFractionDigits: 2 }));

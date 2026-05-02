@@ -1,7 +1,7 @@
 import { DirectorApi } from './api.js';
 import { supabase } from '../shared/supabase.js';
 
-// ✅ DELEGATED EVENT HANDLERS (XSS Safe)
+// ? DELEGATED EVENT HANDLERS (XSS Safe)
 const ACTIONS = {
   'btn-inquiry-detail': (id) => window.App?.inquiries?.openDetail?.(id),
   'btn-inquiry-reply': (id) => window.App?.inquiries?.reply?.(id),
@@ -12,9 +12,9 @@ const ACTIONS = {
   'btn-logout': () => window.supabase?.auth?.signOut()?.then(() => window.location.href = 'index.html'),
 };
 
-// 🎯 Delegación optimizada
+// ?? Delegaci�n optimizada
 document.addEventListener('click', e => {
-  // 1. Manejo de Secciones (Navegación)
+  // 1. Manejo de Secciones (Navegaci�n)
   const navTarget = e.target.closest('[data-section]');
   if (navTarget) {
     const section = navTarget.dataset.section;
@@ -34,13 +34,12 @@ document.addEventListener('click', e => {
         const id = actionTarget.dataset?.id;
         ACTIONS[actionClass](id);
       } catch (err) {
-        console.error(`Error ejecutando acción: ${actionClass}`, err);
       }
       return;
     }
   }
 
-  // 3. Manejo de Acciones Genéricas (data-action)
+  // 3. Manejo de Acciones Gen�ricas (data-action)
   const genericTarget = e.target.closest('[data-action]');
   if (genericTarget) {
     const action = genericTarget.dataset.action;
@@ -65,7 +64,6 @@ export const SafeStorage = {
       const item = localStorage.getItem(key);
       return item ? JSON.parse(item) : fallback;
     } catch (e) {
-      console.warn(`Storage GET error [${key}]`, e);
       return fallback;
     }
   },
@@ -75,7 +73,6 @@ export const SafeStorage = {
       localStorage.setItem(key, JSON.stringify(value));
       return true;
     } catch (e) {
-      console.warn(`Storage SET error [${key}]`, e);
       return false;
     }
   },
@@ -85,7 +82,6 @@ export const SafeStorage = {
       localStorage.removeItem(key);
       return true;
     } catch (e) {
-      console.warn(`Storage REMOVE error [${key}]`, e);
       return false;
     }
   },
@@ -94,7 +90,6 @@ export const SafeStorage = {
     try {
       localStorage.clear();
     } catch (e) {
-      console.warn('Storage CLEAR error', e);
     }
   }
 };

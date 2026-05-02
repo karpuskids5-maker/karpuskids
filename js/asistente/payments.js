@@ -300,7 +300,7 @@ export const PaymentsModule = {
       set('kpiPendingCount', pendingRes.count || 0);
       set('kpiOverdueCount', overdueRes.count || 0);
       set('kpiReviewCount',  reviewRes.count  || 0);
-    } catch (e) { console.error(e); }
+    } catch (_) { /* silencioso */ }
   },
 
   async loadIncomeChart() {
@@ -373,7 +373,7 @@ export const PaymentsModule = {
           }
         }
       });
-    } catch (e) { console.error('[loadIncomeChart]', e); }
+    } catch (_) { /* silencioso */ }
   },
 
   async openPaymentModal(prefillStudentId = null) {
@@ -438,7 +438,7 @@ export const PaymentsModule = {
           sel.appendChild(o);
         });
       }
-    } catch (e) { console.error(e); }
+    } catch (_) { /* silencioso */ }
 
     document.getElementById('btnSavePaymentAction')?.addEventListener('click', () => this.saveManualPayment());
     if (window.lucide) lucide.createIcons();

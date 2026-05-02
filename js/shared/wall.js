@@ -136,7 +136,6 @@ export const WallModule = {
     this._isLoading = true;
 
     if (!container) {
-      console.warn('WallModule: No container found to load posts.');
       this._isLoading = false;
       return;
     }
@@ -214,7 +213,6 @@ export const WallModule = {
 
       if (window.lucide) lucide.createIcons();
     } catch (err) {
-      console.error('Error loadPosts:', err);
       if (!append) container.innerHTML = Helpers.emptyState('Error al cargar el muro', 'alert-triangle');
     } finally {
       this._isLoading = false;
@@ -400,7 +398,6 @@ export const WallModule = {
         await supabase.from('likes').insert({ post_id: postId, user_id: user.id });
       }
     } catch (err) {
-      console.error(err); // Revertir si falla
     }
   },
 
@@ -473,7 +470,6 @@ export const WallModule = {
       }
 
     } catch (err) {
-      console.error('[WallModule] Error sendComment:', err);
       // Revertir optimistic
       document.getElementById(tempId)?.remove();
       input.value = content;
@@ -508,7 +504,6 @@ export const WallModule = {
       .order('created_at', { ascending: true });
 
     if (error) {
-      console.error('Error fetching comments:', error);
       return [];
     }
 
@@ -601,7 +596,6 @@ export const WallModule = {
       await supabase.from('posts').delete().eq('id', postId);
       document.getElementById(`post-${postId}`)?.remove();
     } catch (err) {
-      console.error('Error eliminando post:', err);
     }
   },
 

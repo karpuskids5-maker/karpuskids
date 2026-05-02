@@ -428,6 +428,13 @@
                 <span class="badge badge-green" id="funcStatus"><i class="bi bi-circle-fill" style="font-size:6px;"></i> Activas</span>
               </div>
               <div style="display:flex;justify-content:space-between;align-items:center;padding:10px;background:var(--surface2);border-radius:10px;">
+                <span style="font-size:13px;font-weight:700;">Sistema de Correo</span>
+                <div style="display:flex;align-items:center;gap:8px;">
+                  <span id="emailTestResult" style="font-size:11px;"></span>
+                  <button id="btnTestEmail" onclick="testEmail()" class="btn btn-ghost" style="padding:4px 10px;font-size:10px;">📧 Probar correo</button>
+                </div>
+              </div>
+              <div style="display:flex;justify-content:space-between;align-items:center;padding:10px;background:var(--surface2);border-radius:10px;">
                 <span style="font-size:13px;font-weight:700;">Realtime</span>
                 <span class="badge badge-green"><i class="bi bi-circle-fill" style="font-size:6px;"></i> Activo</span>
               </div>

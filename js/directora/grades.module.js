@@ -99,30 +99,41 @@ export const GradesModule = {
     try {
       // 1. Obtener todos los estudiantes activos
       const { data: students, error: sError } = await DirectorApi.getStudents();
-      if (sError) throw sError;
+      if (sError) throw new Error(typeof sError === 'string' ? sError : JSON.stringify(sError));
 
-      // 2. Obtener evidencias calificadas
+      // 2. Obtener evidencias calificadas — use simple select without join to avoid FK issues
       let query = supabase
         .from('task_evidences')
-        .select(`
-          id, stars, grade_letter, status, comment, file_url, created_at, student_id,
-          tasks:task_id(id, title, created_at)
-        `)
+        .select('id, stars, grade_letter, status, comment, file_url, created_at, student_id, task_id')
         .eq('status', 'graded')
-        .order('created_at', { ascending: false });
+        .order('created_at', { ascending: false })
+        .limit(500);
 
       // Filtrar por periodo si hay uno seleccionado
       if (this._currentPeriodId) {
         const period = this._periods.find(p => String(p.id) === String(this._currentPeriodId));
-        if (period) {
+        if (period?.start_date && period?.end_date) {
           query = query.gte('created_at', period.start_date).lte('created_at', period.end_date);
         }
       }
 
-      const { data: evidences, error } = await query;
-      if (error) throw error;
+      const { data: evidences, error: evError } = await query;
+      if (evError) throw new Error(evError.message || JSON.stringify(evError));
 
-      // 3. Inicializar mapa con TODOS los estudiantes para asegurar que aparezcan aunque no tengan notas
+      // 3. Get task titles separately (avoid join issues)
+      let taskMap = {};
+      if (evidences?.length) {
+        const taskIds = [...new Set(evidences.map(e => e.task_id).filter(Boolean))];
+        if (taskIds.length) {
+          const { data: tasks } = await supabase
+            .from('tasks')
+            .select('id, title, created_at')
+            .in('id', taskIds);
+          (tasks || []).forEach(t => { taskMap[t.id] = t; });
+        }
+      }
+
+      // 4. Inicializar mapa con TODOS los estudiantes
       const grouped = {};
       (students || []).forEach(s => {
         grouped[s.id] = {
@@ -134,12 +145,16 @@ export const GradesModule = {
         };
       });
 
-      // 4. Poblar evidencias en los estudiantes correspondientes
+      // 5. Poblar evidencias
       (evidences || []).forEach(ev => {
         const sid = ev.student_id;
         if (grouped[sid]) {
           const score = scoreFromEvidence(ev);
-          grouped[sid].evidences.push({ ...ev, score });
+          grouped[sid].evidences.push({
+            ...ev,
+            score,
+            tasks: taskMap[ev.task_id] || null
+          });
         }
       });
 
@@ -189,7 +204,7 @@ export const GradesModule = {
     tableBody.innerHTML = filtered.map(s => {
       const level = getLevel(s.avg);
       const taskCount = s.evidences.length;
-      const rateBar = taskCount > 0 ? Math.min(100, Math.round((s.avg / 5) * 100)) : 0;
+      const rateBar = (taskCount > 0 && s.avg != null) ? Math.min(100, Math.round((s.avg / 5) * 100)) : 0;
       const barColor = rateBar >= 80 ? 'bg-emerald-500' : rateBar >= 60 ? 'bg-amber-500' : 'bg-rose-500';
 
       return `
@@ -209,7 +224,7 @@ export const GradesModule = {
           <td class="px-6 py-4 text-center">
             <div class="flex flex-col items-center gap-1">
               <span class="px-3 py-1.5 rounded-xl bg-slate-100 text-slate-700 font-black text-sm border border-slate-200">
-                ${s.avg.toFixed(1)}
+                ${s.avg != null ? s.avg.toFixed(1) : 'N/A'}
               </span>
               <div class="w-16 bg-slate-100 rounded-full h-1 overflow-hidden">
                 <div class="${barColor} h-full rounded-full" style="width:${rateBar}%"></div>
@@ -227,7 +242,7 @@ export const GradesModule = {
                 <i data-lucide="file-check" class="w-3 h-3"></i>${taskCount} tarea${taskCount !== 1 ? 's' : ''}
               </span>
               <div class="min-w-0">
-                <div class="text-xs font-bold text-slate-700 truncate max-w-[160px]">${Helpers.escapeHTML(s.lastTask?.tasks?.title || 'Sin tareas')}</div>
+                <div class="text-xs font-bold text-slate-700 truncate max-w-[160px]">${Helpers.escapeHTML(s.lastTask?.tasks?.title || s.lastTask?.title || 'Sin tareas')}</div>
                 <div class="text-[9px] text-slate-400 font-bold uppercase">${s.lastTask ? new Date(s.lastTask.created_at).toLocaleDateString() : '—'}</div>
               </div>
             </div>
@@ -239,14 +254,14 @@ export const GradesModule = {
   },
 
   _updateKPIs(list) {
-    const valid = list.filter(s => s.avg > 0);
-    const globalAvg = valid.length ? valid.reduce((a, b) => a + b.avg, 0) / valid.length : 0;
+    const valid = list.filter(s => s.avg !== null && s.avg > 0);
+    const globalAvg = valid.length ? valid.reduce((a, b) => a + b.avg, 0) / valid.length : null;
     const approvalRate = valid.length ? Math.round((valid.filter(s => s.avg >= 2.5).length / valid.length) * 100) : 0;
     
     const set = (id, v) => { const el = document.getElementById(id); if (el) el.textContent = v; };
     
-    set('kpiAvgGrade', globalAvg > 0 ? globalAvg.toFixed(1) : '0.0');
-    set('kpiApprovalRate', approvalRate + '%');
+    set('kpiAvgGrade', globalAvg != null ? globalAvg.toFixed(1) : 'N/A');
+    set('kpiApprovalRate', valid.length ? approvalRate + '%' : 'N/A');
     set('kpiNeedsSupport', valid.filter(s => s.avg < 2.5).length);
     set('kpiLowGrades', valid.filter(s => s.avg < 2).length);
   },
@@ -262,7 +277,7 @@ export const GradesModule = {
             <div class="w-14 h-14 rounded-2xl bg-white/20 flex items-center justify-center text-2xl">🎓</div>
             <div>
               <h3 class="text-2xl font-black">${Helpers.escapeHTML(data.name)}</h3>
-              <p class="text-sm font-bold text-indigo-100 uppercase tracking-widest">${data.classroom} • Promedio: ${data.avg.toFixed(1)}</p>
+              <p class="text-sm font-bold text-indigo-100 uppercase tracking-widest">${data.classroom} • Promedio: ${data.avg != null ? data.avg.toFixed(1) : 'N/A'}</p>
             </div>
           </div>
           <button onclick="App.ui.closeModal()" class="w-10 h-10 flex items-center justify-center rounded-xl bg-white/10 hover:bg-white/20 transition-colors">
@@ -290,7 +305,7 @@ export const GradesModule = {
                     </td>
                     <td class="px-6 py-4 text-center">
                       <span class="px-3 py-1 rounded-lg bg-white border border-slate-200 font-black text-indigo-600 shadow-sm">
-                        ${ev.score.toFixed(1)}
+                        ${ev.score != null ? ev.score.toFixed(1) : '—'}
                       </span>
                     </td>
                     <td class="px-6 py-4 text-center text-xs font-bold text-slate-500">
@@ -340,7 +355,7 @@ export const GradesModule = {
             </div>
             <div class="text-right">
                <div class="text-[10px] font-black text-slate-400 uppercase mb-1">Nota</div>
-               <div class="text-2xl font-black text-indigo-600">${evidence.score.toFixed(1)}</div>
+               <div class="text-2xl font-black text-indigo-600">${evidence.score != null ? evidence.score.toFixed(1) : '—'}</div>
             </div>
           </div>
           <div class="bg-slate-50 p-4 rounded-2xl border border-slate-100 mb-6">
@@ -465,7 +480,7 @@ export const GradesModule = {
     const csv = ['Estudiante,Aula,Promedio,Nivel,Tareas Calificadas'];
     this._allData.forEach(s => {
       const level = getLevel(s.avg);
-      csv.push(`"${s.name}","${s.classroom}",${s.avg.toFixed(1)},"${level.label}",${s.evidences.length}`);
+      csv.push(`"${s.name}","${s.classroom}",${s.avg != null ? s.avg.toFixed(1) : 'N/A'},"${level.label}",${s.evidences.length}`);
     });
     
     const blob = new Blob([csv.join('\n')], { type: 'text/csv;charset=utf-8;' });
@@ -497,7 +512,7 @@ export const GradesModule = {
         return [
           s.name,
           s.classroom,
-          s.avg.toFixed(1),
+          (s.avg != null ? s.avg.toFixed(1) : 'N/A'),
           level.label,
           s.evidences.length
         ];

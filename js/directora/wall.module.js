@@ -1,4 +1,4 @@
-/**
+﻿/**
  * 📰 WALL MODULE - Módulo de Muro/Forum (Sincronizado con WallModule compartido)
  */
 
@@ -175,7 +175,6 @@ export const WallModule = {
       App.ui.closeModal();
       await this.loadPosts();
     } catch (err) {
-      console.error(err);
       Helpers.toast('Error al publicar', 'error');
     } finally {
       btn.disabled = false;

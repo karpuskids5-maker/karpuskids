@@ -718,6 +718,30 @@ window.changeUserRole = async function() {
   await loadUsers();
 };
 
+// ── Test email function ───────────────────────────────────────────────────────
+window.testEmail = async function() {
+  const btn = document.getElementById('btnTestEmail');
+  if (btn) { btn.disabled = true; btn.textContent = 'Enviando...'; }
+  try {
+    const { data, error } = await supabase.functions.invoke('send-email', {
+      body: {
+        to: 'impulsodigital@gmail.com',
+        subject: '✅ Test de correo — Karpus Kids',
+        html: '<div style="font-family:Arial;padding:20px;"><h2 style="color:#16a34a;">✅ Sistema de correo funcionando</h2><p>Este es un correo de prueba enviado desde el Panel de Control de Karpus Kids.</p><p style="color:#6b7280;font-size:12px;">Enviado: ' + new Date().toLocaleString('es-DO') + '</p></div>'
+      }
+    });
+    if (error) throw new Error(error.message || JSON.stringify(error));
+    if (data?.error) throw new Error(data.error);
+    document.getElementById('emailTestResult').innerHTML =
+      '<span style="color:#4ade80;font-weight:900;">✅ Correo enviado correctamente (ID: ' + (data?.id || 'ok') + ')</span>';
+  } catch (e) {
+    document.getElementById('emailTestResult').innerHTML =
+      '<span style="color:#f87171;font-weight:900;">❌ Error: ' + escH(e.message) + '</span>';
+  } finally {
+    if (btn) { btn.disabled = false; btn.textContent = '📧 Probar correo'; }
+  }
+};
+
 // ── Realtime ──────────────────────────────────────────────────────────────────
 function startRealtime() {
   supabase.channel('admin-realtime')

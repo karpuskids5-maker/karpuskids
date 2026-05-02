@@ -94,7 +94,7 @@ export function goToSection(sectionId) {
             userName: profile?.name || 'Directora',
             classroomId: null
           });
-        }).catch(console.error);
+        }).catch(() => {});
         break;
       }
       case 'muro':

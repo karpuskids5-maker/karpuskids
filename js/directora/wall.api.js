@@ -1,5 +1,5 @@
 /**
- * ðŸ“° WALL API - Acceso a datos para muro/forum
+ * ?? WALL API - Acceso a datos para muro/forum
  * 
  * Responsabilidad: Consultas a Supabase para posts, comentarios y likes
  */
@@ -13,7 +13,6 @@ const COMMENTS_TABLE = 'comments';
 const LIKES_TABLE = 'post_likes';
 
 function logError(context, error) {
-  console.error(`[WallApi:${context}]`, error);
 }
 
 async function withTimeout(promise, ms = 10000) {
@@ -43,7 +42,7 @@ async function queryBuilder(query, context = 'Query') {
 
 export const WallApi = {
   /**
-   * Obtener posts con paginaciÃ³n
+   * Obtener posts con paginación
    */
   async getPosts(page = 1, limit = 10) {
     const start = (page - 1) * limit;
@@ -74,7 +73,7 @@ export const WallApi = {
   },
 
   /**
-   * Obtener un post especÃ­fico
+   * Obtener un post específico
    */
   async getPost(id) {
     return await queryBuilder(

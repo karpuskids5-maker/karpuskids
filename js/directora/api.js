@@ -194,20 +194,23 @@ export const DirectorApi = {
     } catch (e) { return logError('getPayments', e); }
   },
 
-  async getPaymentStats() {
+  async getPaymentStats(filterMonth, filterYear) {
     try {
-      const now = new Date();
-      const year = now.getFullYear();
-      const month = String(now.getMonth() + 1).padStart(2, '0');
-      const monthKey = `${year}-${month}`;
+      const now   = new Date();
+      // Use selected month/year from filter, fallback to current month
+      const year  = filterYear  ? String(filterYear)  : String(now.getFullYear());
+      const month = filterMonth ? String(filterMonth).padStart(2, '0') : String(now.getMonth() + 1).padStart(2, '0');
+      const monthKey   = `${year}-${month}`;
       const rangeStart = `${year}-${month}-01`;
       const rangeEnd   = `${year}-${month}-31`;
-      const SPANISH_MONTHS = ['enero','febrero','marzo','abril','mayo','junio','julio','agosto','septiembre','octubre','noviembre','diciembre'];
-      const spanishMonth = SPANISH_MONTHS[now.getMonth()];
-      const spanishMonthCap = spanishMonth.charAt(0).toUpperCase() + spanishMonth.slice(1);
 
-      // Query both YYYY-MM and Spanish name formats
-      const monthFilter = `month_paid.eq.${monthKey},month_paid.eq.${spanishMonthCap},month_paid.ilike.${spanishMonth}`;
+      // Spanish month name for legacy records
+      const SPANISH_MONTHS = ['enero','febrero','marzo','abril','mayo','junio','julio','agosto','septiembre','octubre','noviembre','diciembre'];
+      const spanishMonth    = SPANISH_MONTHS[parseInt(month, 10) - 1];
+      const spanishMonthCap = spanishMonth ? spanishMonth.charAt(0).toUpperCase() + spanishMonth.slice(1) : null;
+      const monthFilter     = spanishMonthCap
+        ? `month_paid.eq.${monthKey},month_paid.eq.${spanishMonthCap},month_paid.ilike.${spanishMonth}`
+        : `month_paid.eq.${monthKey}`;
 
       const [incomeRes, pendingRes, overdueRes, reviewRes] = await Promise.all([
         supabase.from('payments').select('amount').eq('status', 'paid').or(monthFilter),

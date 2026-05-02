@@ -1,4 +1,4 @@
-import { supabase } from '../shared/supabase.js';
+﻿import { supabase } from '../shared/supabase.js';
 import { AppState, TABLES } from './appState.js';
 import { Helpers, escapeHtml } from './helpers.js';
 
@@ -97,7 +97,6 @@ export const GradesModule = {
       }, 50);
 
     } catch (err) {
-      console.error('Error loadGrades:', err);
       container.innerHTML = Helpers.emptyState('Error al cargar calificaciones', '❌');
     }
   },

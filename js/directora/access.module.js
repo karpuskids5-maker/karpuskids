@@ -1,4 +1,4 @@
-import { supabase } from '../shared/supabase.js';
+﻿import { supabase } from '../shared/supabase.js';
 import { Helpers } from '../shared/helpers.js';
 
 export const AccessModule = {
@@ -74,7 +74,6 @@ export const AccessModule = {
 
       this._render();
     } catch (e) {
-      console.error(e);
       Helpers.toast('Error cargando monitoreo', 'error');
     }
   },
@@ -194,7 +193,6 @@ export const AccessModule = {
       doc.save(`monitoreo_${from}_${to}.pdf`);
       Helpers.toast('PDF generado con éxito', 'success');
     } catch (e) {
-      console.error(e);
       Helpers.toast('Error al generar PDF', 'error');
     }
   },
@@ -223,7 +221,6 @@ export const AccessModule = {
       });
       doc.save(`faltas_${today}.pdf`);
     } catch (e) {
-      console.error(e);
       Helpers.toast('Error generando reporte', 'error');
     }
   }

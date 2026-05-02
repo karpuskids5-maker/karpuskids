@@ -1,4 +1,4 @@
-import { supabase } from '../shared/supabase.js';
+﻿import { supabase } from '../shared/supabase.js';
 import { AppState, TABLES } from './appState.js';
 import { Helpers, escapeHtml } from './helpers.js';
 
@@ -88,7 +88,6 @@ export const ProfileModule = {
       AppState.set('currentStudent', { ...student, ...updates });
       Helpers.toast('Perfil actualizado correctamente');
     } catch (err) {
-      console.error('Save profile error:', err);
       Helpers.toast('Error al guardar cambios', 'error');
     } finally {
       AppState.set('loading', false);
@@ -126,7 +125,6 @@ export const ProfileModule = {
         AppState.set('currentStudent', updated);
         Helpers.toast('Foto actualizada correctamente');
       } catch (err) {
-        console.error('Upload photo error:', err);
         Helpers.toast('Error al subir foto', 'error');
       } finally {
         AppState.set('loading', false);

@@ -13,7 +13,7 @@ export const escapeHtml = (str = '') => {
 };
 
 /**
- * ğŸ› ï¸ HELPERS GLOBALES
+ * ??? HELPERS GLOBALES
  */
 export const Helpers = {
   /**
@@ -55,9 +55,9 @@ export const Helpers = {
   })(),
 
   /**
-   * Estado vacÃ­o visual
+   * Estado vacío visual
    */
-  emptyState: (msg, icon = 'âœ¨') => `
+  emptyState: (msg, icon = '?') => `
     <div class="flex flex-col items-center justify-center py-12 px-4 text-center opacity-60 animate-fade-in">
       <div class="text-4xl mb-3">${icon}</div>
       <p class="text-sm font-bold text-slate-400 uppercase tracking-widest">${escapeHtml(msg)}</p>
@@ -87,9 +87,9 @@ export const Helpers = {
   },
 
   /**
-   * ğŸ’¸ Calcular mora por dÃ­as de retraso
-   * Regla: mora empieza el dÃ­a 6 del mes siguiente (dÃ­a despuÃ©s del vencimiento dÃ­a 5)
-   * Tasa: 5% del monto base por cada 30 dÃ­as de retraso (mÃ­nimo 1 dÃ­a = 1 dÃ­a de mora)
+   * ?? Calcular mora por días de retraso
+   * Regla: mora empieza el día 6 del mes siguiente (día después del vencimiento día 5)
+   * Tasa: 5% del monto base por cada 30 días de retraso (mínimo 1 día = 1 día de mora)
    * Se aplica sobre el monto base del pago
    */
   calculateMora(dueDate, baseAmount = 0) {
@@ -104,7 +104,7 @@ export const Helpers = {
   },
 
   /**
-   * ğŸ“Š Desglose de mora para mostrar en UI
+   * ?? Desglose de mora para mostrar en UI
    */
   getMoraBreakdown(dueDate, baseAmount = 0) {
     if (!dueDate) return null;
@@ -114,15 +114,15 @@ export const Helpers = {
     if (daysLate <= 0) return null;
     const mora = this.calculateMora(dueDate, baseAmount);
     const weeks = Math.floor(daysLate / 7);
-    const formattedText = daysLate === 1 ? '1 dÃ­a de retraso'
-      : daysLate < 7  ? `${daysLate} dÃ­as de retraso`
+    const formattedText = daysLate === 1 ? '1 día de retraso'
+      : daysLate < 7  ? `${daysLate} días de retraso`
       : weeks === 1   ? '1 semana de retraso'
       : `${weeks} semanas de retraso`;
     return { daysLate, mora, formattedText };
   },
 
   /**
-   * DelegaciÃ³n de eventos segura
+   * Delegación de eventos segura
    */
   delegate: (el, selector, event, handler) => {
     el.addEventListener(event, (e) => {
@@ -135,7 +135,7 @@ export const Helpers = {
 };
 
 /**
- * ğŸ“§ ENVÃO DE EMAILS (Proxy a Edge Function)
+ * ?? ENVÍO DE EMAILS (Proxy a Edge Function)
  */
 export async function sendEmail(to, subject, html) {
   try {
@@ -144,12 +144,10 @@ export async function sendEmail(to, subject, html) {
     });
 
     if (error) {
-      console.error('Email error:', error);
       return false;
     }
     return true;
   } catch (e) {
-    console.error('Email catch error:', e);
     return false;
   }
 }

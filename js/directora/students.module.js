@@ -741,7 +741,7 @@ export const StudentsModule = {
           select.appendChild(opt);
         });
       }
-    } catch (e) { console.error('Error cargando aulas:', e); }
+    } catch (_) { /* silencioso */ }
 
     if (id) {
       // Fetch completo desde DB — convertir id a número para evitar error 400 (bigint vs string)

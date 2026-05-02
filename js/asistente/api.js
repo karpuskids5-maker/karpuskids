@@ -1,4 +1,4 @@
-import { supabase } from '../shared/supabase.js';
+﻿import { supabase } from '../shared/supabase.js';
 import { TABLES } from '../shared/constants.js';
 
 /**
@@ -76,7 +76,6 @@ export const AssistantApi = {
       .limit(10);
 
     if (error) {
-      console.error('❌ [AssistantApi.getTodayAttendance]', error.message, error.details);
       throw new Error('Error cargando asistencia');
     }
     return data || [];

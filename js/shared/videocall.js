@@ -1,4 +1,4 @@
-import { supabase, sendPush } from './supabase.js';
+﻿import { supabase, sendPush } from './supabase.js';
 import { Helpers } from './helpers.js';
 
 export const VideoCallModule = {
@@ -64,7 +64,6 @@ export const VideoCallModule = {
 
       await Promise.allSettled(notifications);
     } catch (e) {
-      console.error('Error enviando invitaciones:', e);
     }
   },
 

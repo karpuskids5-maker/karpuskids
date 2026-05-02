@@ -1,4 +1,4 @@
-/**
+﻿/**
  * 🎥 Karpus Kids — VideoCall UI
  * Sistema unificado de videollamadas para todos los paneles.
  * Usa meet.jit.si — funciona sin cuenta, sin límite de tiempo en salas privadas.
@@ -35,7 +35,6 @@ export const VideoCallUI = {
 
       if (window.lucide) lucide.createIcons();
     } catch (e) {
-      console.error('[VideoCallUI]', e);
       container.innerHTML = Helpers.emptyState('Error al cargar videollamadas', 'video-off');
     }
   },
@@ -364,7 +363,6 @@ export const VideoCallUI = {
       });
 
       this._api.addEventListener('connectionFailed', () => {
-        console.error('[VideoCallUI] Conexión fallida a meet.jit.si');
         container.innerHTML = `
           <div class="flex flex-col items-center justify-center h-full bg-slate-50 gap-4 p-8 text-center">
             <div class="w-16 h-16 bg-rose-100 rounded-full flex items-center justify-center text-3xl">📵</div>
@@ -375,7 +373,6 @@ export const VideoCallUI = {
       });
 
     } catch (e) {
-      console.error('[VideoCallUI] Error al iniciar Jitsi:', e.message);
       container.innerHTML = `
         <div class="flex flex-col items-center justify-center h-full bg-slate-50 gap-4 p-8 text-center">
           <div class="w-16 h-16 bg-rose-100 rounded-full flex items-center justify-center text-3xl">📵</div>

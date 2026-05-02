@@ -1,4 +1,4 @@
-import { DirectorApi } from './api.js';
+﻿import { DirectorApi } from './api.js';
 import { Helpers } from '../shared/helpers.js';
 import { supabase, sendPush } from '../shared/supabase.js';
 import { ChatModule as SharedChat } from '../shared/chat.js';
@@ -82,7 +82,6 @@ export const ChatModule = {
 
       this._renderContacts();
     } catch (e) {
-      console.error('[ChatModule] loadContacts:', e);
       list.innerHTML = Helpers.emptyState('Error al cargar contactos');
     }
   },
@@ -200,7 +199,6 @@ export const ChatModule = {
       this._topScrollDestroy = destroy;
 
     } catch (e) {
-      console.error('[ChatModule] loadMessages:', e);
       if (container) container.innerHTML = '<div class="p-4 text-center">' + Helpers.errorState('Error al cargar mensajes') + '</div>';
       if (window.lucide) lucide.createIcons();
     }
@@ -251,7 +249,6 @@ export const ChatModule = {
       // Push notification (silent fail)
       sendPush({ user_id: this._activeContactId, title: 'Nuevo mensaje de Dirección', message: text, type: 'chat' }).catch(() => {});
     } catch (e) {
-      console.error('[ChatModule] sendMessage:', e);
       Helpers.toast('Error al enviar mensaje', 'error');
       // Remove optimistic message
       document.getElementById('chatMessagesContainer')?.lastChild?.remove();

@@ -1,4 +1,4 @@
-import { supabase, emitEvent } from '../shared/supabase.js';
+﻿import { supabase, emitEvent } from '../shared/supabase.js';
 import { Helpers } from '../shared/helpers.js';
 import { AssistantApi } from './api.js';
 
@@ -76,7 +76,6 @@ export const AccessModule = {
       set('statAccessCheckout', checkouts);
       set('statAccessTotal',    total);
     } catch (err) {
-      console.error('Error loadStats:', err);
     }
   },
 

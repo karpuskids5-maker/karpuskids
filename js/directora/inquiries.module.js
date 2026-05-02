@@ -1,4 +1,4 @@
-import { DirectorApi } from './api.js';
+﻿import { DirectorApi } from './api.js';
 import { Helpers } from '../shared/helpers.js';
 import { UI } from './ui.module.js';
 
@@ -19,7 +19,6 @@ export const InquiriesModule = {
       container.innerHTML = inquiries.map((item, idx) => UI.renderInquiryCard(item, idx)).join('');
       if (window.lucide) lucide.createIcons();
     } catch (e) {
-      console.error('Error initReports:', e);
       container.innerHTML = '<div class="col-span-3 text-center p-8">' + Helpers.errorState('Error al cargar reportes', 'App.inquiries.init()') + '</div>';
       if (window.lucide) lucide.createIcons();
     }

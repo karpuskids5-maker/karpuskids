@@ -58,6 +58,16 @@ window.addEventListener('karpus:db-error', (e) => {
   }
 });
 
+// ── Email error handler ───────────────────────────────────────────────────────
+window.addEventListener('karpus:email-error', (e) => {
+  const { message, to, subject } = e.detail || {};
+  // Only show toast if Helpers is available (panels)
+  if (window.Helpers?.toast) {
+    window.Helpers.toast('⚠️ Correo no enviado: ' + (message || 'Error desconocido'), 'warning');
+  }
+  // Always log to console for debugging
+});
+
 // ── Global error → log to DB ─────────────────────────────────────────────────
 window.addEventListener('error', (e) => {
   // Don't log if it's a network/connection error (would cause infinite loop)
@@ -171,12 +181,28 @@ export async function sendEmail(to, subject, html, text) {
     const { data, error } = await supabase.functions.invoke('send-email', {
       body: { to, subject, html, text }
     });
-    
+
     if (error) {
+      // Log to console so it's visible in browser devtools
+      const errMsg = error?.message || JSON.stringify(error);
+      window.dispatchEvent(new CustomEvent('karpus:email-error', {
+        detail: { message: errMsg, to, subject }
+      }));
       return null;
     }
+
+    if (data?.error) {
+      window.dispatchEvent(new CustomEvent('karpus:email-error', {
+        detail: { message: data.error, to, subject }
+      }));
+      return null;
+    }
+
     return data;
   } catch (e) {
+    window.dispatchEvent(new CustomEvent('karpus:email-error', {
+      detail: { message: e?.message || String(e), to, subject }
+    }));
     return null;
   }
 }
