@@ -301,92 +301,145 @@ function initNavigation() {
  */
 async function initProfile() {
   const profile = AppState.get('profile');
-  if (!profile) {
+  if (!profile) return;
 
-    return;
-  }
-  
+  // Fetch fresh profile with access_code from DB
+  const { data: freshProfile } = await supabase
+    .from('profiles')
+    .select('id, name, email, phone, bio, avatar_url, access_code, notes, role')
+    .eq('id', profile.id)
+    .maybeSingle();
+  const p = freshProfile || profile;
+
   const setVal = (id, val) => { const el = document.getElementById(id); if(el) el.value = val || ''; };
-  setVal('profileName', profile.name);
-  setVal('profilePhone', profile.phone);
-  setVal('profileEmail', profile.email);
-  setVal('profileBio', profile.bio || '');
+  setVal('profileName', p.name);
+  setVal('profilePhone', p.phone);
+  setVal('profileEmail', p.email);
+  setVal('profileBio', p.bio || '');
 
-  // Avatar preview y upload
-  const avatarInput = document.getElementById('profileAvatarInput');
+  // Avatar
+  const avatarInput   = document.getElementById('profileAvatarInput');
   const avatarPreview = document.getElementById('profileAvatarPreview');
-  
-  if (avatarPreview && profile.avatar_url) {
-    avatarPreview.innerHTML = `<img src="${profile.avatar_url}" class="w-full h-full object-cover rounded-full">`;
+  if (avatarPreview && p.avatar_url) {
+    avatarPreview.src = p.avatar_url;
   }
-
   if (avatarInput) {
     avatarInput.onchange = (e) => {
       const file = e.target.files[0];
       if (file && avatarPreview) {
         const reader = new FileReader();
-        reader.onload = (ev) => {
-          avatarPreview.innerHTML = `<img src="${ev.target.result}" class="w-full h-full object-cover rounded-full">`;
-        };
+        reader.onload = (ev) => { avatarPreview.src = ev.target.result; };
         reader.readAsDataURL(file);
       }
     };
   }
 
+  // ── QR de Acceso Personal ──────────────────────────────────────────────────
+  const code = p.access_code || (p.notes?.startsWith?.('TEA-') || p.notes?.startsWith?.('ASI-') ? p.notes : null);
+  const codeInput = document.getElementById('profileAccessCode');
+  if (codeInput && code) codeInput.value = code;
+
+  const _loadQR = () => new Promise(r => {
+    if (window.QRCode) { r(); return; }
+    const s = document.createElement('script');
+    s.src = 'https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js';
+    s.onload = r; document.head.appendChild(s);
+  });
+
+  const _renderProfileQR = async (c) => {
+    const container = document.getElementById('profileQrContainer');
+    if (!container || !c) return;
+    await _loadQR();
+    container.innerHTML = '';
+    new window.QRCode(container, {
+      text: JSON.stringify({ matricula: c, name: p.name, type: 'karpus-staff', v: 1 }),
+      width: 130, height: 130, colorDark: '#1e293b', colorLight: '#ffffff',
+      correctLevel: window.QRCode.CorrectLevel.H
+    });
+  };
+
+  if (code) setTimeout(() => _renderProfileQR(code), 300);
+
+  window._genProfileAccessCode = async () => {
+    const prefix = p.role === 'directora' ? 'DIR' : p.role === 'asistente' ? 'ASI' : 'TEA';
+    const newCode = `${prefix}-${new Date().getFullYear()}-${String(Math.floor(Math.random() * 9000) + 1000)}`;
+    if (codeInput) codeInput.value = newCode;
+    // Save immediately
+    const { error } = await supabase.from('profiles').update({ access_code: newCode }).eq('id', p.id);
+    if (!error) {
+      Helpers.toast('Código de acceso guardado', 'success');
+      AppState.set('profile', { ...AppState.get('profile'), access_code: newCode });
+      _renderProfileQR(newCode);
+    } else {
+      Helpers.toast('Error al guardar código: ' + error.message, 'error');
+    }
+  };
+
+  window._printProfileQR = () => {
+    const c = document.getElementById('profileAccessCode')?.value?.trim();
+    const container = document.getElementById('profileQrContainer');
+    const img = container?.querySelector('img')?.src || container?.querySelector('canvas')?.toDataURL();
+    if (!img || !c) { Helpers.toast('Genera el QR primero', 'warning'); return; }
+    const win = window.open('', '_blank');
+    win.document.write(`<!DOCTYPE html><html><head><title>Carnet ${p.name}</title>
+      <style>body{font-family:Arial,sans-serif;display:flex;align-items:center;justify-content:center;min-height:100vh;margin:0;}
+      .card{border:4px solid #0d9488;border-radius:20px;padding:24px;text-align:center;max-width:260px;}
+      .hdr{background:#0d9488;color:white;margin:-24px -24px 16px;padding:12px;border-radius:16px 16px 0 0;font-weight:900;font-size:12px;text-transform:uppercase;}
+      img{width:160px;height:160px;border-radius:8px;}.name{font-size:16px;font-weight:900;color:#1e293b;margin-top:12px;}
+      .role{font-size:11px;color:#0d9488;font-weight:800;text-transform:uppercase;margin-top:2px;}
+      .code{font-size:10px;color:#64748b;font-weight:700;margin-top:8px;}</style>
+    </head><body><div class="card">
+      <div class="hdr">STAFF · KARPUS KIDS</div>
+      <img src="${img}">
+      <div class="name">${p.name || 'Personal'}</div>
+      <div class="role">${p.role || 'Asistente'}</div>
+      <div class="code">ID: ${c}</div>
+    </div><script>window.onload=()=>window.print()<\/script></body></html>`);
+    win.document.close();
+  };
+
+  // ── Form submit ────────────────────────────────────────────────────────────
   const form = document.getElementById('profileForm');
   if (form) {
     form.onsubmit = async (e) => {
       e.preventDefault();
       const btn = form.querySelector('button[type="submit"]');
       if (btn) { btn.disabled = true; btn.textContent = 'Guardando...'; }
-
       try {
         const updates = {
-          name: document.getElementById('profileName').value,
-          phone: document.getElementById('profilePhone').value,
-          bio: document.getElementById('profileBio').value
+          name:  document.getElementById('profileName')?.value?.trim(),
+          phone: document.getElementById('profilePhone')?.value?.trim(),
+          bio:   document.getElementById('profileBio')?.value?.trim()
         };
-
-        // Subir avatar si hay uno seleccionado
         const file = avatarInput?.files[0];
         if (file) {
-          const ext = file.name.split('.').pop();
-          const path = `avatars/${AppState.get('user').id}_${Date.now()}.${ext}`;
+          const ext  = file.name.split('.').pop();
+          const path = `avatars/${p.id}_${Date.now()}.${ext}`;
           const { error: upErr } = await supabase.storage.from('karpus-uploads').upload(path, file);
           if (upErr) throw upErr;
-          
           const { data: { publicUrl } } = supabase.storage.from('karpus-uploads').getPublicUrl(path);
           updates.avatar_url = publicUrl;
-          
-          // Actualizar sidebar inmediatamente
           const sidebarAvatar = document.getElementById('sidebarAvatar');
           if (sidebarAvatar) sidebarAvatar.src = publicUrl;
-          
-          // Actualizar preview con la URL real
-          if (avatarPreview) {
-            avatarPreview.innerHTML = `<img src="${publicUrl}" class="w-full h-full object-cover rounded-full">`;
-          }
+          if (avatarPreview) avatarPreview.src = publicUrl;
         }
-
-        const { error } = await supabase.from('profiles').update(updates).eq('id', AppState.get('user').id);
+        const { error } = await supabase.from('profiles').update(updates).eq('id', p.id);
         if (error) throw error;
-        
-        Helpers.toast('Perfil actualizado correctamente');
-        // Actualizar estado local
+        Helpers.toast('Perfil actualizado correctamente', 'success');
         AppState.set('profile', { ...AppState.get('profile'), ...updates });
-        
-        // Actualizar UI de cabecera si es necesario
-        document.getElementById('profileNameDisplay').textContent = updates.name;
-        document.getElementById('sidebarUserName').textContent = updates.name;
-        
+        const nameDisplay = document.getElementById('profileNameDisplay');
+        const sidebarName = document.getElementById('sidebarUserName');
+        if (nameDisplay) nameDisplay.textContent = updates.name;
+        if (sidebarName)  sidebarName.textContent  = updates.name;
       } catch (err) {
-
-        Helpers.toast('Error al guardar perfil', 'error');
+        Helpers.toast('Error al guardar perfil: ' + (err.message || ''), 'error');
       } finally {
         if (btn) { btn.disabled = false; btn.textContent = 'Guardar Cambios'; }
       }
     };
   }
+
+  if (window.lucide) lucide.createIcons();
 }
 
 // --- Funciones Globales de Ventana ---

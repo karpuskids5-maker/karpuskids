@@ -617,11 +617,16 @@ async function _initDirectorAccessId(profile) {
   const input = document.getElementById('confDirAccessId');
   if (!input) return;
 
-  // Cargar ID guardado en access_code
-  if (profile?.access_code) input.value = profile.access_code;
-  else if (profile?.notes && (profile.notes.startsWith('DIR-') || profile.notes.startsWith('TEA-'))) {
-    input.value = profile.notes; // fallback legacy
-  }
+  // Always fetch fresh from DB to get access_code (not in AppState profile)
+  const { data: freshProfile } = await supabase
+    .from('profiles')
+    .select('id, name, access_code, notes')
+    .eq('id', profile.id)
+    .maybeSingle();
+
+  const p = freshProfile || profile;
+  const code = p.access_code || (p.notes?.startsWith?.('DIR-') ? p.notes : null);
+  if (code) input.value = code;
 
   const _loadQR = () => new Promise(r => {
     if (window.QRCode) { r(); return; }
@@ -636,18 +641,21 @@ async function _initDirectorAccessId(profile) {
     await _loadQR();
     container.innerHTML = '';
     new window.QRCode(container, {
-      text: JSON.stringify({ matricula: code, name: profile?.name || 'Directora', type: 'karpus-staff', v: 1 }),
+      text: JSON.stringify({ matricula: code, name: p?.name || 'Directora', type: 'karpus-staff', v: 1 }),
       width: 100, height: 100, colorDark: '#1e293b', colorLight: '#ffffff',
       correctLevel: window.QRCode.CorrectLevel.H
     });
   };
 
   window._genDirectorId = async () => {
-    const code = 'DIR-' + new Date().getFullYear() + '-' + String(Math.floor(Math.random() * 9000) + 1000);
-    input.value = code;
-    // Save immediately to access_code
-    await supabase.from('profiles').update({ access_code: code }).eq('id', profile.id);
-    await _renderQR(code);
+    const newCode = 'DIR-' + new Date().getFullYear() + '-' + String(Math.floor(Math.random() * 9000) + 1000);
+    input.value = newCode;
+    // Save immediately to access_code using fresh profile id
+    const { error } = await supabase.from('profiles').update({ access_code: newCode }).eq('id', p.id);
+    if (!error) {
+      Helpers.toast('ID de directora guardado', 'success');
+    }
+    await _renderQR(newCode);
   };
 
   window._printDirectorQR = () => {
@@ -655,17 +663,14 @@ async function _initDirectorAccessId(profile) {
     const container = document.getElementById('dir-qr-container');
     const img = container?.querySelector('img')?.src || container?.querySelector('canvas')?.toDataURL();
     if (!img || !code) { Helpers.toast('Genera el QR primero', 'warning'); return; }
-    const name = profile?.name || 'Directora';
+    const name = p?.name || 'Directora';
     const win = window.open('', '_blank');
     win.document.write(`<!DOCTYPE html><html><head><title>Carnet ${name}</title><style>body{font-family:Arial,sans-serif;display:flex;align-items:center;justify-content:center;min-height:100vh;margin:0;}.card{border:4px solid #7c3aed;border-radius:20px;padding:24px;text-align:center;max-width:260px;}.hdr{background:#7c3aed;color:white;margin:-24px -24px 16px;padding:12px;border-radius:16px 16px 0 0;font-weight:900;font-size:12px;text-transform:uppercase;}img{width:160px;height:160px;border-radius:8px;}.name{font-size:16px;font-weight:900;color:#1e293b;margin-top:12px;}.code{font-size:10px;color:#64748b;font-weight:700;margin-top:4px;}</style></head><body><div class="card"><div class="hdr">DIRECTORA · KARPUS KIDS</div><img src="${img}"><div class="name">${name}</div><div class="code">ID: ${code}</div></div><script>window.onload=()=>window.print()<\/script></body></html>`);
     win.document.close();
   };
 
   // Auto-render si ya tiene ID
-  if (profile?.access_code) setTimeout(() => _renderQR(profile.access_code), 400);
-  else if (profile?.notes && (profile.notes.startsWith('DIR-') || profile.notes.startsWith('TEA-'))) {
-    setTimeout(() => _renderQR(profile.notes), 400);
-  }
+  if (code) setTimeout(() => _renderQR(code), 400);
 
   input.addEventListener('input', (e) => {
     clearTimeout(window._dirQrDebounce);
