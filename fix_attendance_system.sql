@@ -121,14 +121,12 @@ BEGIN
     v_name := v_staff.name;
     v_role := initcap(v_staff.role);
 
+    -- Staff only writes to door_punches — NOT attendance (student_id is bigint, staff id is uuid)
     SELECT * INTO v_existing FROM public.door_punches
     WHERE staff_id = v_staff.id AND date = v_today AND punch_type = 'check_in';
 
     IF NOT FOUND THEN
       v_type := 'check_in';
-      INSERT INTO public.attendance (student_id, date, status, check_in)
-      VALUES (v_staff.id, v_today, 'present', v_now)
-      ON CONFLICT (student_id, date) DO NOTHING;
       INSERT INTO public.door_punches (staff_id, punch_type, punched_at, date)
       VALUES (v_staff.id, 'check_in', v_now, v_today) ON CONFLICT DO NOTHING;
     ELSE
@@ -136,7 +134,6 @@ BEGIN
       WHERE staff_id = v_staff.id AND date = v_today AND punch_type = 'check_out';
       IF NOT FOUND THEN
         v_type := 'check_out';
-        UPDATE public.attendance SET check_out = v_now WHERE student_id = v_staff.id AND date = v_today;
         INSERT INTO public.door_punches (staff_id, punch_type, punched_at, date)
         VALUES (v_staff.id, 'check_out', v_now, v_today) ON CONFLICT DO NOTHING;
       ELSE

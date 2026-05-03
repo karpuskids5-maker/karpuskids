@@ -349,33 +349,58 @@ async function _fallbackDirectWrite(code, now) {
     return;
   }
 
-  // Try staff by access_code, notes, or matricula
-  const { data: staff } = await supabase
-    .from('profiles')
-    .select('id, name, role')
-    .or(`access_code.eq.${code},notes.eq.${code},matricula.eq.${code}`)
-    .in('role', ['maestra','asistente','directora','admin'])
-    .maybeSingle();
+  // Try staff by access_code, notes, or matricula (query each field to avoid OR syntax issues)
+  let staff = null;
+  for (const field of ['access_code', 'notes', 'matricula']) {
+    try {
+      const { data } = await supabase
+        .from('profiles')
+        .select('id, name, role')
+        .eq(field, code)
+        .in('role', ['maestra','asistente','directora','admin'])
+        .maybeSingle();
+      if (data) { staff = data; break; }
+    } catch (_) {}
+  }
 
   if (staff) {
     const { data: existing } = await supabase
-      .from('attendance')
-      .select('id, check_in, check_out')
-      .eq('student_id', staff.id)
+      .from('door_punches')
+      .select('id, punch_type')
+      .eq('staff_id', staff.id)
       .eq('date', today)
+      .eq('punch_type', 'check_in')
       .maybeSingle();
 
     const roleMap = { maestra: 'Maestra', asistente: 'Asistente', directora: 'Directora', admin: 'Admin' };
     if (!existing) {
-      await supabase.from('attendance').insert({
-        student_id: staff.id, date: today, status: 'present', check_in: now.toISOString()
+      // Staff: only write to door_punches (NOT attendance — student_id is bigint, staff id is uuid)
+      const { error: insErr } = await supabase.from('door_punches').insert({
+        staff_id: staff.id, punch_type: 'check_in', punched_at: now.toISOString(), date: today
       });
+      if (insErr && !insErr.message?.includes('unique')) {
+        showResult('error', staff.name, roleMap[staff.role] || staff.role, insErr.message, now);
+        return;
+      }
       showResult('in', staff.name, roleMap[staff.role] || staff.role, '✅ Entrada registrada', now);
-    } else if (!existing.check_out) {
-      await supabase.from('attendance').update({ check_out: now.toISOString() }).eq('id', existing.id);
-      showResult('out', staff.name, roleMap[staff.role] || staff.role, '👋 Salida registrada', now);
     } else {
-      showResult('warn', staff.name, roleMap[staff.role] || staff.role, 'Ya registrado hoy', now);
+      // Check if already checked out
+      const { data: existOut } = await supabase
+        .from('door_punches')
+        .select('id')
+        .eq('staff_id', staff.id)
+        .eq('date', today)
+        .eq('punch_type', 'check_out')
+        .maybeSingle();
+
+      if (!existOut) {
+        await supabase.from('door_punches').insert({
+          staff_id: staff.id, punch_type: 'check_out', punched_at: now.toISOString(), date: today
+        }).catch(() => {});
+        showResult('out', staff.name, roleMap[staff.role] || staff.role, '👋 Salida registrada', now);
+      } else {
+        showResult('warn', staff.name, roleMap[staff.role] || staff.role, 'Ya registrado hoy', now);
+      }
     }
     updateStats();
     return;
@@ -400,6 +425,8 @@ async function onScan(raw) {
       if (parsed.matricula) code = parsed.matricula;
       else if (parsed.id)   code = parsed.id;
     } catch (_) {}
+
+    const now = new Date();
 
     // Use DB RPC — handles students and staff, writes to door_punches AND attendance
     const { data: result, error } = await supabase.rpc('process_door_punch', { p_code: code });
