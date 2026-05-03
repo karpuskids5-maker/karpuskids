@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+﻿<!DOCTYPE html>
 <html lang="es">
 <head>
   <meta charset="UTF-8">
@@ -172,19 +172,27 @@ function tick() {
 }
 tick(); setInterval(tick, 1000);
 
-// ── Stats (from door_punches — NOT attendance table) ──────────────────────────
+// ── Stats: reads from door_punches (new) OR attendance (fallback) ────────────
 async function updateStats() {
   try {
     const today = new Date().toISOString().split('T')[0];
-    const { data } = await supabase
-      .from('door_punches')
-      .select('punch_type')
-      .eq('date', today);
-    const ins  = (data || []).filter(p => p.punch_type === 'check_in').length;
-    const outs = (data || []).filter(p => p.punch_type === 'check_out').length;
+    // Try door_punches first
+    const { data: punches, error: pErr } = await supabase.from('door_punches').select('punch_type').eq('date', today);
+    if (!pErr && punches && punches.length > 0) {
+      const ins  = punches.filter(p => p.punch_type === 'check_in').length;
+      const outs = punches.filter(p => p.punch_type === 'check_out').length;
+      document.getElementById('count-in').textContent    = ins;
+      document.getElementById('count-out').textContent   = outs;
+      document.getElementById('count-total').textContent = ins + outs;
+      return;
+    }
+    // Fallback: attendance table
+    const { data: att } = await supabase.from('attendance').select('check_in, check_out').eq('date', today);
+    const ins  = (att || []).filter(a => a.check_in).length;
+    const outs = (att || []).filter(a => a.check_out).length;
     document.getElementById('count-in').textContent    = ins;
     document.getElementById('count-out').textContent   = outs;
-    document.getElementById('count-total').textContent = ins + outs;
+    document.getElementById('count-total').textContent = (att || []).length;
   } catch (_) {}
 }
 updateStats();
@@ -302,6 +310,80 @@ async function notifyParent(studentId, parentId, studentName, punchType, timeStr
     .catch(() => {});
 }
 
+// ── Fallback: write directly to attendance when RPC not deployed ──────────────
+async function _fallbackDirectWrite(code, now) {
+  const today = now.toISOString().split('T')[0];
+
+  // Try student by matricula
+  const { data: student } = await supabase
+    .from('students')
+    .select('id, name, classroom_id, parent_id, is_active')
+    .eq('matricula', code)
+    .maybeSingle();
+
+  if (student?.is_active) {
+    const { data: existing } = await supabase
+      .from('attendance')
+      .select('id, check_in, check_out')
+      .eq('student_id', student.id)
+      .eq('date', today)
+      .maybeSingle();
+
+    if (!existing) {
+      await supabase.from('attendance').insert({
+        student_id: student.id, classroom_id: student.classroom_id,
+        date: today, status: 'present', check_in: now.toISOString()
+      });
+      showResult('in', student.name, 'Estudiante', '✅ Entrada registrada', now);
+      if (student.parent_id) notifyParent(student.id, student.parent_id, student.name, 'check_in',
+        now.toLocaleTimeString('es-DO', { hour: '2-digit', minute: '2-digit', hour12: true }));
+    } else if (!existing.check_out) {
+      await supabase.from('attendance').update({ check_out: now.toISOString(), status: 'retirado' }).eq('id', existing.id);
+      showResult('out', student.name, 'Estudiante', '👋 Salida registrada', now);
+      if (student.parent_id) notifyParent(student.id, student.parent_id, student.name, 'check_out',
+        now.toLocaleTimeString('es-DO', { hour: '2-digit', minute: '2-digit', hour12: true }));
+    } else {
+      showResult('warn', student.name, 'Estudiante', 'Ya registrado hoy', now);
+    }
+    updateStats();
+    return;
+  }
+
+  // Try staff by access_code, notes, or matricula
+  const { data: staff } = await supabase
+    .from('profiles')
+    .select('id, name, role')
+    .or(`access_code.eq.${code},notes.eq.${code},matricula.eq.${code}`)
+    .in('role', ['maestra','asistente','directora','admin'])
+    .maybeSingle();
+
+  if (staff) {
+    const { data: existing } = await supabase
+      .from('attendance')
+      .select('id, check_in, check_out')
+      .eq('student_id', staff.id)
+      .eq('date', today)
+      .maybeSingle();
+
+    const roleMap = { maestra: 'Maestra', asistente: 'Asistente', directora: 'Directora', admin: 'Admin' };
+    if (!existing) {
+      await supabase.from('attendance').insert({
+        student_id: staff.id, date: today, status: 'present', check_in: now.toISOString()
+      });
+      showResult('in', staff.name, roleMap[staff.role] || staff.role, '✅ Entrada registrada', now);
+    } else if (!existing.check_out) {
+      await supabase.from('attendance').update({ check_out: now.toISOString() }).eq('id', existing.id);
+      showResult('out', staff.name, roleMap[staff.role] || staff.role, '👋 Salida registrada', now);
+    } else {
+      showResult('warn', staff.name, roleMap[staff.role] || staff.role, 'Ya registrado hoy', now);
+    }
+    updateStats();
+    return;
+  }
+
+  showResult('error', 'Desconocido', '', 'QR no registrado en el sistema', now);
+}
+
 // ── Scan handler ──────────────────────────────────────────────────────────────
 async function onScan(raw) {
   if (isProcessing || raw === lastScan) return;
@@ -319,15 +401,16 @@ async function onScan(raw) {
       else if (parsed.id)   code = parsed.id;
     } catch (_) {}
 
-    // Use DB RPC — handles students and staff, writes to door_punches
+    // Use DB RPC — handles students and staff, writes to door_punches AND attendance
     const { data: result, error } = await supabase.rpc('process_door_punch', { p_code: code });
 
     if (error) {
-      // RPC not deployed yet — show helpful message
-      const msg = error.message?.includes('function') || error.code === 'PGRST202'
-        ? 'RPC no desplegado. Ejecuta schema.sql en Supabase SQL Editor.'
-        : error.message || 'Error de conexión';
-      showResult('error', 'Error', '', msg, new Date());
+      // RPC not deployed — fallback: write directly to attendance table
+      if (error.message?.includes('function') || error.code === 'PGRST202' || error.code === '42883') {
+        await _fallbackDirectWrite(code, now);
+        return;
+      }
+      showResult('error', 'Error', '', error.message || 'Error de conexión', new Date());
       return;
     }
 
