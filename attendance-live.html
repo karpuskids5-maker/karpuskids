@@ -450,7 +450,6 @@ async function onScan(raw) {
     const name      = result.name;
     const role      = result.role;
     const timeStr   = result.time;
-    const now       = new Date();
 
     showResult(
       punchType === 'check_in' ? 'in' : 'out',
