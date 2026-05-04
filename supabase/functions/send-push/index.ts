@@ -174,8 +174,7 @@ Deno.serve(async (req) => {
         console.log('[send-push] Intento 2 — player_ids encontrados:', playerIds);
         const { ok: ok2, result: r2 } = await osNotify(ONESIGNAL_APP_ID, ONESIGNAL_KEY, {
           ...basePayload,
-          include_subscription_ids: playerIds,   // ← campo moderno para IDs de v2
-          include_player_ids:       playerIds    // ← fallback por si acaso
+          include_subscription_ids: playerIds   // ← API v2 field only
         });
         console.log('[send-push] Intento 2 result:', JSON.stringify(r2));
 
@@ -207,8 +206,7 @@ Deno.serve(async (req) => {
         console.log('[send-push] Intento 3 — saved player_id fallback:', savedPlayerId);
         const { ok: ok3, result: r3 } = await osNotify(ONESIGNAL_APP_ID, ONESIGNAL_KEY, {
           ...basePayload,
-          include_subscription_ids: [savedPlayerId],
-          include_player_ids:       [savedPlayerId]
+          include_subscription_ids: [savedPlayerId]   // ← API v2 only, no mixing
         });
         console.log('[send-push] Intento 3 result:', JSON.stringify(r3));
 
