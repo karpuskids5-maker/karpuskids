@@ -77,8 +77,23 @@ Deno.serve(async (req) => {
       return json({ error: error.message }, 400);
     }
 
-    console.log(`[get-posts] user=${user.id} classroom=${classroomId} posts=${posts?.length ?? 0}`);
-    return json({ posts: posts || [] });
+    // Resolver URLs de media relativas a URLs públicas de Supabase Storage
+    const resolvedPosts = (posts || []).map((p: Record<string, unknown>) => {
+      const mediaUrl = p.media_url as string | null;
+      if (mediaUrl && !mediaUrl.startsWith('http')) {
+        // Es un path relativo — construir URL pública
+        const bucket = mediaUrl.startsWith('posts/') ? 'posts' : 'classroom_media';
+        const path   = mediaUrl.replace(/^(posts|classroom_media)\//, '');
+        p = {
+          ...p,
+          media_url: `${SUPABASE_URL}/storage/v1/object/public/${bucket}/${path}`
+        };
+      }
+      return p;
+    });
+
+    console.log(`[get-posts] user=${user.id} classroom=${classroomId} posts=${resolvedPosts.length}`);
+    return json({ posts: resolvedPosts });
 
   } catch (e) {
     const msg = e instanceof Error ? e.message : String(e);
