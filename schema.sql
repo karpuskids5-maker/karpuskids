@@ -864,8 +864,36 @@ create policy "evidences_parent_select" on public.task_evidences for select usin
 );
 
 -- POSTS
+-- RPC: get_posts_for_parent — bypasea RLS para mostrar posts generales a padres
+create or replace function public.get_posts_for_parent(p_classroom_id bigint default null)
+returns jsonb language plpgsql security definer set search_path = public as $$
+declare v_result jsonb;
+begin
+  select jsonb_agg(
+    jsonb_build_object(
+      'id', p.id, 'content', p.content, 'media_url', p.media_url,
+      'media_type', p.media_type, 'image_url', p.image_url,
+      'created_at', p.created_at, 'classroom_id', p.classroom_id, 'teacher_id', p.teacher_id,
+      'teacher', jsonb_build_object('name', coalesce(pr.name, p.teacher_name, 'Maestra'), 'avatar_url', coalesce(pr.avatar_url, p.teacher_avatar), 'role', pr.role),
+      'likes', coalesce((select jsonb_agg(jsonb_build_object('user_id', l.user_id, 'id', l.id)) from public.likes l where l.post_id = p.id), '[]'::jsonb),
+      'comments', coalesce((select jsonb_agg(jsonb_build_object('id', c.id, 'content', c.content, 'user_name', c.user_name, 'user_id', c.user_id, 'created_at', c.created_at) order by c.created_at asc) from public.comments c where c.post_id = p.id), '[]'::jsonb)
+    ) order by p.created_at desc
+  ) into v_result
+  from public.posts p left join public.profiles pr on pr.id = p.teacher_id
+  where p.classroom_id is null or (p_classroom_id is not null and p.classroom_id = p_classroom_id);
+  return coalesce(v_result, '[]'::jsonb);
+end;
+$$;
+grant execute on function public.get_posts_for_parent(bigint) to authenticated, anon;
+
 create policy "posts_select" on public.posts for select using (
-  get_my_role() in ('directora','asistente','admin') or is_teacher_of_classroom(classroom_id) or is_parent_of_classroom(classroom_id)
+  auth.uid() is not null
+  and (
+    get_my_role() in ('directora','asistente','admin','maestra')
+    or classroom_id is null
+    or is_teacher_of_classroom(classroom_id)
+    or is_parent_of_classroom(classroom_id)
+  )
 );
 create policy "posts_insert" on public.posts for insert with check (get_my_role() in ('directora','asistente','maestra','admin'));
 create policy "posts_update" on public.posts for update using (get_my_role() in ('directora','asistente','admin') or auth.uid() = teacher_id);
@@ -874,12 +902,17 @@ create policy "posts_delete" on public.posts for delete using (get_my_role() in 
 -- COMMENTS
 create policy "comments_select" on public.comments for select using (
   exists (select 1 from public.posts p where p.id = comments.post_id
-    and (get_my_role() in ('directora','asistente','admin') or is_teacher_of_classroom(p.classroom_id) or is_parent_of_classroom(p.classroom_id)))
+    and (get_my_role() in ('directora','asistente','admin','maestra')
+         or p.classroom_id is null
+         or is_teacher_of_classroom(p.classroom_id)
+         or is_parent_of_classroom(p.classroom_id)))
 );
 create policy "comments_insert" on public.comments for insert with check (
   auth.uid() = user_id
   and exists (select 1 from public.posts p where p.id = comments.post_id
-    and (get_my_role() in ('directora','asistente','maestra','admin') or is_parent_of_classroom(p.classroom_id)))
+    and (get_my_role() in ('directora','asistente','maestra','admin')
+         or p.classroom_id is null
+         or is_parent_of_classroom(p.classroom_id)))
 );
 create policy "comments_delete" on public.comments for delete using (
   auth.uid() = user_id or get_my_role() in ('directora','asistente','maestra','admin')
@@ -888,7 +921,10 @@ create policy "comments_delete" on public.comments for delete using (
 -- LIKES
 create policy "likes_select" on public.likes for select using (
   exists (select 1 from public.posts p where p.id = likes.post_id
-    and (get_my_role() in ('directora','asistente','admin') or is_teacher_of_classroom(p.classroom_id) or is_parent_of_classroom(p.classroom_id)))
+    and (get_my_role() in ('directora','asistente','admin','maestra')
+         or p.classroom_id is null
+         or is_teacher_of_classroom(p.classroom_id)
+         or is_parent_of_classroom(p.classroom_id)))
 );
 create policy "likes_insert" on public.likes for insert with check (auth.uid() = user_id);
 create policy "likes_delete" on public.likes for delete using (auth.uid() = user_id);

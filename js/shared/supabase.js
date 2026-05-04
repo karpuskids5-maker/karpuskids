@@ -253,7 +253,20 @@ export async function emitEvent(type, data) {
 /** Notificar pago aprobado al padre */
 export async function notifyPaymentApproved(paymentId, parentEmail, studentName, amount, month) {
   return Promise.all([
-    sendPush({ user_id: parentEmail, title: 'Pago Aprobado ✅', message: 'Tu pago de ' + amount + ' para ' + month + ' fue aprobado.', type: 'payment', link: '/panel_padres.html' }),
+    // sendPush needs parent UUID — fetch it from the payment record
+    (async () => {
+      try {
+        const { data: p } = await supabase
+          .from('payments')
+          .select('students:student_id(parent_id)')
+          .eq('id', paymentId)
+          .maybeSingle();
+        const parentId = p?.students?.parent_id;
+        if (parentId) {
+          return sendPush({ user_id: parentId, title: 'Pago Aprobado ✅', message: 'Tu pago de ' + amount + ' para ' + month + ' fue aprobado.', type: 'payment', link: '/panel_padres.html' });
+        }
+      } catch (_) {}
+    })(),
     emitEvent('payment.approved', { payment_id: paymentId, parent_email: parentEmail, student_name: studentName, amount, month })
   ]);
 }

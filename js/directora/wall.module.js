@@ -102,7 +102,7 @@ export const WallModule = {
           select.appendChild(opt);
         });
       }
-    } catch (e) { console.error(e); }
+    } catch (_) { /* silencioso */ }
   },
 
   handleMediaPreview(e) {

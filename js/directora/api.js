@@ -197,46 +197,37 @@ export const DirectorApi = {
   async getPaymentStats(filterMonth, filterYear) {
     try {
       const now   = new Date();
-      // Use selected month/year from filter, fallback to current month
       const year  = filterYear  ? String(filterYear)  : String(now.getFullYear());
       const month = filterMonth ? String(filterMonth).padStart(2, '0') : String(now.getMonth() + 1).padStart(2, '0');
       const monthKey   = `${year}-${month}`;
       const rangeStart = `${year}-${month}-01`;
       const rangeEnd   = `${year}-${month}-31`;
 
-      // Spanish month name for legacy records
-      const SPANISH_MONTHS = ['enero','febrero','marzo','abril','mayo','junio','julio','agosto','septiembre','octubre','noviembre','diciembre'];
-      const spanishMonth    = SPANISH_MONTHS[parseInt(month, 10) - 1];
-      const spanishMonthCap = spanishMonth ? spanishMonth.charAt(0).toUpperCase() + spanishMonth.slice(1) : null;
-      const monthFilter     = spanishMonthCap
-        ? `month_paid.eq.${monthKey},month_paid.eq.${spanishMonthCap},month_paid.ilike.${spanishMonth}`
-        : `month_paid.eq.${monthKey}`;
-
-      const [incomeRes, pendingRes, overdueRes, reviewRes] = await Promise.all([
-        supabase.from('payments').select('amount').eq('status', 'paid').or(monthFilter),
-        supabase.from('payments').select('id', { count: 'exact', head: true }).eq('status', 'pending').or(monthFilter),
-        supabase.from('payments').select('id', { count: 'exact', head: true }).eq('status', 'overdue').or(monthFilter),
-        supabase.from('payments').select('id', { count: 'exact', head: true }).eq('status', 'review').or(monthFilter)
-      ]);
-
-      let income    = (incomeRes.data || []).reduce((sum, p) => sum + Number(p.amount), 0);
-      let pending   = pendingRes.count  || 0;
-      let overdue   = overdueRes.count  || 0;
-      let toApprove = reviewRes.count   || 0;
-
-      // Final fallback: created_at range
-      if (!income && !pending && !overdue && !toApprove) {
-        const [i2, p2, o2, r2] = await Promise.all([
-          supabase.from('payments').select('amount').eq('status', 'paid').gte('created_at', rangeStart).lte('created_at', rangeEnd + 'T23:59:59'),
-          supabase.from('payments').select('id', { count: 'exact', head: true }).eq('status', 'pending').gte('created_at', rangeStart).lte('created_at', rangeEnd + 'T23:59:59'),
-          supabase.from('payments').select('id', { count: 'exact', head: true }).eq('status', 'overdue').gte('created_at', rangeStart).lte('created_at', rangeEnd + 'T23:59:59'),
-          supabase.from('payments').select('id', { count: 'exact', head: true }).eq('status', 'review').gte('created_at', rangeStart).lte('created_at', rangeEnd + 'T23:59:59'),
+      // Helper: count payments by status for this month (handles both YYYY-MM and Spanish formats)
+      const countByStatus = async (status) => {
+        const [r1, r2] = await Promise.all([
+          supabase.from('payments').select('id', { count: 'exact', head: true }).eq('status', status).eq('month_paid', monthKey),
+          supabase.from('payments').select('id', { count: 'exact', head: true }).eq('status', status).gte('created_at', rangeStart).lte('created_at', rangeEnd + 'T23:59:59')
         ]);
-        income    = (i2.data || []).reduce((sum, p) => sum + Number(p.amount), 0);
-        pending   = p2.count || 0;
-        overdue   = o2.count || 0;
-        toApprove = r2.count || 0;
-      }
+        return Math.max(r1.count || 0, r2.count || 0);
+      };
+
+      const sumPaid = async () => {
+        const [r1, r2] = await Promise.all([
+          supabase.from('payments').select('amount').eq('status', 'paid').eq('month_paid', monthKey),
+          supabase.from('payments').select('amount').eq('status', 'paid').gte('created_at', rangeStart).lte('created_at', rangeEnd + 'T23:59:59')
+        ]);
+        const d1 = r1.data || []; const d2 = r2.data || [];
+        const combined = d1.length >= d2.length ? d1 : d2;
+        return combined.reduce((s, p) => s + Number(p.amount || 0), 0);
+      };
+
+      const [income, pending, overdue, toApprove] = await Promise.all([
+        sumPaid(),
+        countByStatus('pending'),
+        countByStatus('overdue'),
+        countByStatus('review')
+      ]);
 
       return { data: { incomeMonth: income, pending, overdue, toApprove }, error: null };
     } catch (e) { return logError('getPaymentStats', e); }

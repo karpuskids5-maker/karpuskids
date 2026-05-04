@@ -541,7 +541,6 @@ export const PaymentsModule = {
       }
     } catch (e) {
       Helpers.toast('Error: ' + (e.message || e), 'error');
-      console.error('[sendReminders]', e);
     } finally {
       if (btn) { btn.disabled = false; btn.textContent = 'Enviar recordatorios ahora'; }
     }

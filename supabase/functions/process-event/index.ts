@@ -178,9 +178,11 @@ Deno.serve(async (req) => {
       }
 
       case 'attendance.checkin':
-      case 'attendance.checkout': {
+      case 'attendance.checkout':
+      case 'attendance.check_in':
+      case 'attendance.check_out': {
         const { parent_email, parent_id, student_name, time } = data;
-        const isEntry = type === 'attendance.checkin';
+        const isEntry = type === 'attendance.checkin' || type === 'attendance.check_in';
         const action = isEntry ? 'entrada' : 'salida';
         const color = isEntry ? '#16a34a' : '#2563eb';
         

@@ -12,10 +12,10 @@ export const FeedModule = {
 
   /**
    * Inicializa el muro
+   * classroomId puede ser null — en ese caso solo muestra posts generales
    */
   async init(classroomId) {
-    if (!classroomId) return;
-    this._classroomId = classroomId;
+    this._classroomId = classroomId || null;
     
     // Delegación para likes y comentarios
     const container = document.getElementById('classFeed');
@@ -40,6 +40,7 @@ export const FeedModule = {
 
   /**
    * Carga publicaciones de Supabase
+   * Usa Edge Function get-posts (bypasea RLS) con fallback a query directa
    */
   async loadPosts() {
     const container = document.getElementById('classFeed');
@@ -48,18 +49,53 @@ export const FeedModule = {
     container.innerHTML = Helpers.skeleton(2, 'h-48');
 
     try {
-      const { data: posts, error } = await supabase
-        .from(TABLES.POSTS)
-        .select(`
-          *, 
-          teacher:teacher_id(name, avatar_url, role), 
-          likes(*), 
-          comments(*, user:profiles(name, avatar_url, role))
-        `)
-        .eq('classroom_id', this._classroomId)
-        .order('created_at', { ascending: false });
+      let posts = null;
 
-      if (error) throw error;
+      // ── Intento 1: Edge Function (bypasea RLS completamente) ──────────────
+      try {
+        const { data: efData, error: efErr } = await supabase.functions.invoke('get-posts', {
+          body: { classroom_id: this._classroomId || null }
+        });
+        if (!efErr && efData?.posts) {
+          posts = efData.posts;
+        }
+      } catch (_) {}
+
+      // ── Intento 2: RPC SECURITY DEFINER ───────────────────────────────────
+      if (!posts) {
+        try {
+          const { data: rpcData, error: rpcErr } = await supabase
+            .rpc('get_posts_for_parent', { p_classroom_id: this._classroomId || null });
+          if (!rpcErr && Array.isArray(rpcData)) {
+            posts = rpcData;
+          }
+        } catch (_) {}
+      }
+
+      // ── Intento 3: Query directa (puede fallar por RLS) ───────────────────
+      if (!posts) {
+        let query = supabase
+          .from(TABLES.POSTS)
+          .select(`
+            id, content, media_url, media_type, image_url, created_at, classroom_id, teacher_id,
+            teacher:teacher_id(name, avatar_url, role),
+            likes(id, user_id),
+            comments(id, content, user_name, user_id, created_at)
+          `)
+          .order('created_at', { ascending: false })
+          .limit(50);
+
+        if (this._classroomId) {
+          query = query.or(`classroom_id.eq.${this._classroomId},classroom_id.is.null`);
+        } else {
+          query = query.is('classroom_id', null);
+        }
+
+        const { data, error } = await query;
+        if (error) throw error;
+        posts = data || [];
+      }
+
       AppState.set('feedPosts', posts || []);
 
     } catch (err) {
@@ -89,10 +125,15 @@ export const FeedModule = {
    * Crea el HTML de un post individual
    */
   createPostHTML(p) {
-    const teacher = p.teacher || { name: 'Maestra', role: 'docente' };
+    // teacher puede venir como objeto o array (según la fuente)
+    const teacher = Array.isArray(p.teacher) ? p.teacher[0] : (p.teacher || {});
+    const teacherName   = teacher.name   || p.teacher_name   || 'Maestra';
+    const teacherAvatar = teacher.avatar_url || p.teacher_avatar || null;
     const date = Helpers.formatDate(p.created_at);
     const myId = AppState.get('user')?.id;
-    const isLiked = (p.likes || []).some(l => l.user_id === myId);
+    const likes = Array.isArray(p.likes) ? p.likes : [];
+    const comments = Array.isArray(p.comments) ? p.comments : [];
+    const isLiked = likes.some(l => l.user_id === myId);
     
     let mediaHTML = '';
     if (p.media_url) {
@@ -109,37 +150,36 @@ export const FeedModule = {
         <div class="flex items-center justify-between mb-4">
           <div class="flex items-center gap-3">
             <div class="w-11 h-11 rounded-full bg-orange-100 flex items-center justify-center font-bold text-orange-600 overflow-hidden border border-orange-50">
-              ${teacher.avatar_url ? ImageLoader.img(teacher.avatar_url, { cls: 'w-full h-full object-cover', fallback: 'img/mundo.jpg' }) : teacher.name.charAt(0)}
+              ${teacherAvatar ? ImageLoader.img(teacherAvatar, { cls: 'w-full h-full object-cover', fallback: 'img/mundo.jpg' }) : teacherName.charAt(0)}
             </div>
             <div>
-              <p class="font-black text-slate-800 text-sm leading-tight">${escapeHtml(teacher.name)}</p>
+              <p class="font-black text-slate-800 text-sm leading-tight">${escapeHtml(teacherName)}</p>
               <p class="text-[10px] font-bold text-slate-400 uppercase tracking-widest">${date}</p>
             </div>
           </div>
           <span class="px-3 py-1 bg-slate-50 text-slate-400 text-[9px] font-black uppercase rounded-full border border-slate-100">Comunicado</span>
         </div>
 
-        <p class="text-sm text-slate-600 leading-relaxed mb-4">${escapeHtml(p.content)}</p>
+        <p class="text-sm text-slate-600 leading-relaxed mb-4">${escapeHtml(p.content || '')}</p>
         
         ${mediaHTML}
 
         <div class="flex items-center gap-4 pt-4 border-t border-slate-50">
           <button data-action="like" data-post-id="${p.id}" class="flex items-center gap-2 text-xs font-black uppercase tracking-tighter ${isLiked ? 'text-orange-600' : 'text-slate-400'} hover:scale-105 transition-all">
             <i data-lucide="heart" class="w-4 h-4 ${isLiked ? 'fill-current' : ''}"></i>
-            ${(p.likes || []).length} Me gusta
+            ${likes.length} Me gusta
           </button>
           <button data-action="comment" data-post-id="${p.id}" class="flex items-center gap-2 text-xs font-black uppercase tracking-tighter text-slate-400 hover:text-blue-600 transition-all">
             <i data-lucide="message-circle" class="w-4 h-4"></i>
-            ${(p.comments || []).length} Comentarios
+            ${comments.length} Comentarios
           </button>
         </div>
 
         <div id="comments-section-${p.id}" class="hidden mt-4 pt-4 border-t border-slate-50 bg-slate-50/50 -mx-5 px-5 pb-2">
           <div id="comments-list-${p.id}" class="space-y-3 mb-3 max-h-48 overflow-y-auto">
-            ${(p.comments || []).length === 0
+            ${comments.length === 0
               ? '<p class="text-center text-[10px] text-slate-400 italic py-2">Sé el primero en comentar.</p>'
-              : (p.comments || []).map(c => {
-                  // Priorizar c.user_name que es donde guardamos el nombre del estudiante/maestra al insertar
+              : comments.map(c => {
                   const cName = c.user_name || c.user?.name || 'Usuario';
                   return `<div class="flex gap-2 text-xs"><div class="w-6 h-6 rounded-full bg-blue-100 text-blue-600 flex items-center justify-center font-bold text-[9px] shrink-0">${cName.charAt(0)}</div><div class="bg-white p-2 rounded-xl rounded-tl-none border border-slate-100 flex-1"><span class="font-bold text-slate-700">${escapeHtml(cName)}</span><p class="text-slate-600 mt-0.5">${escapeHtml(c.content)}</p></div></div>`;
                 }).join('')
@@ -245,6 +285,7 @@ export const FeedModule = {
 
   /**
    * Realtime para el muro
+   * Escucha posts del aula Y posts generales (classroom_id IS NULL)
    */
   initRealtime() {
     if (this._channel) supabase.removeChannel(this._channel);
@@ -254,19 +295,26 @@ export const FeedModule = {
       .on('postgres_changes', {
         event: 'INSERT',
         schema: 'public',
-        table: 'posts',
-        filter: `classroom_id=eq.${this._classroomId}`
+        table: 'posts'
+        // Sin filter — recibimos todos y filtramos en el handler
       }, (payload) => {
-        // Notificación push al padre cuando la maestra publica
-        Helpers.toast('\uD83D\uDCE2 Nueva publicaci\u00F3n en el muro del aula', 'info');
-        this.loadPosts();
+        const newPost = payload.new;
+        // Solo recargar si el post es del aula del estudiante O es general
+        if (!newPost.classroom_id || newPost.classroom_id === this._classroomId) {
+          Helpers.toast('📢 Nueva publicación en el muro', 'info');
+          this.loadPosts();
+        }
       })
       .on('postgres_changes', {
         event: 'UPDATE',
         schema: 'public',
-        table: 'posts',
-        filter: `classroom_id=eq.${this._classroomId}`
-      }, () => this.loadPosts())
+        table: 'posts'
+      }, (payload) => {
+        const updated = payload.new;
+        if (!updated.classroom_id || updated.classroom_id === this._classroomId) {
+          this.loadPosts();
+        }
+      })
       .subscribe();
   },
 
@@ -283,6 +331,6 @@ export const FeedModule = {
         await supabase.from('likes').insert({ post_id: postId, user_id: user.id });
       }
       // El realtime recargará los posts
-    } catch (e) { console.error('Like error'); }
+    } catch (e) { /* silencioso */ }
   }
 };

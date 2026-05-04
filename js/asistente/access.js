@@ -185,10 +185,8 @@ export const AccessModule = {
           scales: { y: { beginAtZero: true, ticks: { stepSize: 1 } }, x: { grid: { display: false } } }
         }
       });
-    } catch (e) { console.error('Chart error:', e); }
-  },
-
-  async _loadChartJs() {
+    } catch (e) { /* silencioso */ }
+  },async _loadChartJs() {
     return new Promise((resolve) => {
       const script = document.createElement('script');
       script.src = 'https://cdn.jsdelivr.net/npm/chart.js';
@@ -263,7 +261,7 @@ export const AccessModule = {
           scales: { y: { beginAtZero: true, ticks: { stepSize: 1 } }, x: { grid: { display: false } } }
         }
       });
-    } catch (e) { console.error('Chart error:', e); }
+    } catch (e) { /* silencioso */ }
   }
 };
 

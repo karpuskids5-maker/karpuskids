@@ -60,9 +60,7 @@ export const NotifyPermission = {
           await supabase.from('profiles')
             .update({ onesignal_player_id: subId })
             .eq('id', userId);
-        } catch (e) {
-          console.warn('[NotifyPermission] No se pudo guardar player_id:', e.message);
-        }
+        } catch (_) {}
       }
     } catch (_) {}
   },
@@ -93,7 +91,7 @@ export const NotifyPermission = {
           await this._ensureOneSignalLinked();
           this._showSuccess();
         }
-      } catch (e) { console.warn('[NotifyPermission]', e); }
+      } catch (e) { /* silencioso */ }
     });
 
     // Close just hides — will show again next visit (no permanent dismiss)

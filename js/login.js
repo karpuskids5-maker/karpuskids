@@ -102,7 +102,6 @@ document.addEventListener('DOMContentLoaded', async () => {
           localStorage.setItem('karpus_terms_accepted_' + TERMS_VERSION, 'true');
           await redirectByRole(session.user.id);
         } catch (err) {
-          console.error(err);
           alert('Error al guardar. Intenta de nuevo.');
           submitBtn.disabled = false;
         }
@@ -209,7 +208,6 @@ document.addEventListener('DOMContentLoaded', async () => {
       await redirectByRole(userId);
 
     } catch (error) {
-      console.error('Error en el inicio de sesión:', error);
       const msg  = String(error?.message || '');
       const name = String(error?.name || '');
       const isNetwork = name === 'AuthRetryableFetchError' || msg.includes('Failed to fetch') || msg.includes('NetworkError');
@@ -254,7 +252,6 @@ async function redirectByRole(userId) {
     if (error) throw error;
 
     if (!profile) {
-      console.warn('Perfil no encontrado para el usuario:', userId);
       alert('Tu cuenta no tiene un perfil configurado. Por favor, contacta al administrador.');
       await supabase.auth.signOut();
       window.location.reload();
@@ -271,28 +268,12 @@ async function redirectByRole(userId) {
     };
 
     if (routes[role]) {
-      // ── Sesión única por dispositivo ──────────────────────────────────────
-      // Generar token de sesión único para este dispositivo
-      const sessionToken = crypto.randomUUID ? crypto.randomUUID() : Date.now().toString(36) + Math.random().toString(36);
-      const deviceKey = `karpus_session_${userId}`;
-      localStorage.setItem(deviceKey, sessionToken);
-
-      // Guardar token en Supabase para validación cruzada (usamos notes temporalmente)
-      try {
-        await supabase.from('profiles')
-          .update({ notes: sessionToken }) // Guardamos el token para validación
-          .eq('id', userId);
-      } catch (err) {
-        console.warn('No se pudo guardar el token de sesión:', err);
-      }
-
       window.location.href = routes[role];
     } else {
       await supabase.auth.signOut();
       window.location.reload();
     }
   } catch (e) {
-    console.error('Error obteniendo perfil:', e);
     alert('Error al obtener el perfil. Intenta de nuevo.');
   }
 }
