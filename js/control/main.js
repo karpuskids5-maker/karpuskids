@@ -1,7 +1,6 @@
 ﻿import { supabase } from '../shared/supabase.js';
 
-const ADMIN_EMAIL = 'impulsodigital@gmail.com';
-const ADMIN_ID    = 'c1e72617-ab8f-44c0-b1eb-cdd92eda62e7';
+const ADMIN_ID = 'c1e72617-ab8f-44c0-b1eb-cdd92eda62e7';
 
 // ── State ─────────────────────────────────────────────────────────────────────
 let allUsers    = [];
@@ -10,16 +9,15 @@ let allPayments = [];
 let allStudents = [];
 let allClassrooms = [];
 let allAttend   = [];
+let allPunches  = [];
 let fraudEvents = [];
 let currentUser = null;
 
 // ── Init ──────────────────────────────────────────────────────────────────────
 document.addEventListener('DOMContentLoaded', async () => {
-  // Verify session
   const { data: { session } } = await supabase.auth.getSession();
   if (!session?.user) { window.location.href = 'login.html'; return; }
 
-  // Verify admin role
   const { data: profile } = await supabase
     .from('profiles')
     .select('id, name, email, role')
@@ -38,16 +36,13 @@ document.addEventListener('DOMContentLoaded', async () => {
   document.getElementById('adminAvatar').textContent = (profile.name || profile.email)[0].toUpperCase();
   document.getElementById('cfgEmail').value = profile.email || '';
   document.getElementById('cfgName').value  = profile.name  || '';
-
   document.getElementById('loader').style.display = 'none';
 
-  // Clock
   setInterval(() => {
     document.getElementById('topClock').textContent =
       new Date().toLocaleString('es-DO', { dateStyle: 'short', timeStyle: 'medium' });
   }, 1000);
 
-  // Mobile menu button
   if (window.innerWidth <= 768) {
     document.getElementById('mobMenuBtn').style.display = 'block';
   }
@@ -80,182 +75,161 @@ window.goTo = function(id) {
   document.getElementById('pageTitle').textContent    = title;
   document.getElementById('pageSubtitle').textContent = sub;
 
-  // Lazy load per section
   if (id === 'auditoria')   renderAuditTable(allAudit);
   if (id === 'fraude')      renderFraud();
   if (id === 'usuarios')    renderUsers(allUsers);
-  if (id === 'padres')      renderRoleTable('padres',    allUsers.filter(u => u.role === 'padre'));
-  if (id === 'maestras')    renderRoleTable('maestras',  allUsers.filter(u => ['maestra','asistente'].includes(u.role)));
-  if (id === 'directoras')  renderRoleTable('directoras',allUsers.filter(u => u.role === 'directora'));
+  if (id === 'padres')      renderPadres();
+  if (id === 'maestras')    renderMaestras();
+  if (id === 'directoras')  renderRoleTable('directoras', allUsers.filter(u => u.role === 'directora'));
   if (id === 'pagos')       renderPayments();
   if (id === 'asistencia')  renderAttendance();
   if (id === 'errores')     renderErrors();
 };
 
-// ── Refresh all data ──────────────────────────────────────────────────────────
+// ── Refresh ───────────────────────────────────────────────────────────────────
 window.refreshAll = async function() {
-  const loaders = [
-    loadUsers(),
-    loadAudit(),
-    loadPayments(),
-    loadAttendance(),
-    loadStudents(),
-    loadClassrooms(),
-  ];
-  
-  await Promise.allSettled(loaders);
+  await Promise.allSettled([
+    loadUsers(), loadAudit(), loadPayments(),
+    loadAttendance(), loadStudents(), loadClassrooms(), loadPunches()
+  ]);
   renderDashboard();
 };
 
 // ── Load data ─────────────────────────────────────────────────────────────────
 async function loadUsers() {
   try {
-    const { data, error } = await supabase
+    const { data } = await supabase
       .from('profiles')
-      .select('id, name, email, role, created_at, avatar_url, phone')
+      .select('id, name, email, role, created_at, avatar_url, phone, bio')
       .order('created_at', { ascending: false })
-      .limit(200);
-    
-    if (error) {
-      allUsers = [];
-      return;
-    }
+      .limit(300);
     allUsers = data || [];
     const kpi = document.getElementById('kpi-users');
     if (kpi) kpi.textContent = allUsers.length;
     const cfgCount = document.getElementById('cfgUserCount');
     if (cfgCount) cfgCount.textContent = allUsers.length;
-  } catch (err) {
-    allUsers = [];
-  }
+  } catch (_) { allUsers = []; }
+}
+
+async function loadPunches() {
+  try {
+    // Last 30 days of door punches — used for "último acceso"
+    const since = new Date(); since.setDate(since.getDate() - 30);
+    const { data } = await supabase
+      .from('door_punches')
+      .select('staff_id, student_id, punched_at, punch_type')
+      .gte('punched_at', since.toISOString())
+      .order('punched_at', { ascending: false });
+    allPunches = data || [];
+  } catch (_) { allPunches = []; }
 }
 
 async function loadAudit() {
   try {
-    // Usamos 'audit_logs' que es la tabla real de movimientos
-    const { data, error } = await supabase
+    // Try audit_logs first, fallback to system_events
+    let data = null;
+    const { data: d1, error: e1 } = await supabase
       .from('audit_logs')
       .select('id, user_id, action, payload, created_at')
       .order('created_at', { ascending: false })
       .limit(500);
-    
-    if (error) {
-      allAudit = [];
-      return;
+    if (!e1) {
+      data = d1;
+    } else {
+      // Fallback: system_events
+      const { data: d2 } = await supabase
+        .from('system_events')
+        .select('id, user_id:payload->user_id, action:type, payload, created_at')
+        .order('created_at', { ascending: false })
+        .limit(500);
+      data = (d2 || []).map(e => ({
+        id: e.id,
+        user_id: e.payload?.user_id || null,
+        action: e.action || e.type || '—',
+        payload: e.payload,
+        created_at: e.created_at
+      }));
     }
     allAudit = data || [];
     const badge = document.getElementById('badge-audit');
     if (badge) badge.textContent = allAudit.length;
-  } catch (err) {
-    allAudit = [];
-  }
+  } catch (_) { allAudit = []; }
 }
 
 async function loadPayments() {
   try {
     const { data, error } = await supabase
       .from('payments')
-      .select('id, amount, status, method, bank, month_paid, created_at, students:student_id(name, p1_name)')
+      .select('id, amount, status, method, bank, month_paid, created_at, student_id, students:student_id(name, p1_name)')
       .order('created_at', { ascending: false })
       .limit(300);
-    
-    if (error) {
-      // Fallback a query sin joins
-      const { data: simpleData, error: simpleError } = await supabase
-        .from('payments')
-        .select('id, amount, status, method, bank, month_paid, created_at, student_id')
-        .order('created_at', { ascending: false })
-        .limit(300);
-      
-      if (simpleError) {
-        throw simpleError;
-      }
-      allPayments = simpleData || [];
-    } else {
-      allPayments = data || [];
-    }
-  } catch (err) {
-    allPayments = [];
-  }
+    allPayments = error ? [] : (data || []);
+  } catch (_) { allPayments = []; }
 }
 
 async function loadStudents() {
   try {
     const { data } = await supabase
       .from('students')
-      .select('id, name, parent_id, classroom_id, is_active')
-      .eq('is_active', true);
+      .select('id, name, parent_id, classroom_id, is_active, matricula');
     allStudents = data || [];
     const kpi = document.getElementById('kpi-students');
-    if (kpi) kpi.textContent = allStudents.length;
+    if (kpi) kpi.textContent = allStudents.filter(s => s.is_active).length;
   } catch (_) { allStudents = []; }
 }
 
 async function loadClassrooms() {
   try {
-    const { data, error } = await supabase
-      .from('classrooms')
-      .select('id, name, teacher_id');
-    
-    if (error) {
-      allClassrooms = [];
-      return;
-    }
+    const { data } = await supabase.from('classrooms').select('id, name, teacher_id');
     allClassrooms = data || [];
-  } catch (err) {
-    allClassrooms = [];
-  }
+  } catch (_) { allClassrooms = []; }
 }
 
 async function loadAttendance() {
   const today = new Date().toISOString().split('T')[0];
   try {
+    // Fetch attendance with student names
     const { data, error } = await supabase
       .from('attendance')
-      .select('id, date, check_in, check_out, status, student_id, classroom_id')
+      .select('id, date, check_in, check_out, status, student_id, classroom_id, students:student_id(name), classrooms:classroom_id(name)')
       .order('date', { ascending: false })
-      .limit(200);
-
+      .limit(300);
     if (error) throw error;
     allAttend = data || [];
-
     const todayCount = allAttend.filter(a => a.date === today).length;
     const kpi = document.getElementById('kpi-attendance');
     if (kpi) kpi.textContent = todayCount;
   } catch (_) {
-    allAttend = [];
+    // Fallback without joins
+    try {
+      const { data } = await supabase
+        .from('attendance')
+        .select('id, date, check_in, check_out, status, student_id, classroom_id')
+        .order('date', { ascending: false })
+        .limit(300);
+      allAttend = data || [];
+    } catch (__) { allAttend = []; }
   }
 }
 
-// ── Dashboard render ──────────────────────────────────────────────────────────
+// ── Dashboard ─────────────────────────────────────────────────────────────────
 async function renderDashboard() {
   try {
-    // Students KPI set by loadStudents() — just use allStudents
-    const kpiStudents = document.getElementById('kpi-students');
-    if (kpiStudents) kpiStudents.textContent = allStudents.length;
-
-    // Payments this month
     const now = new Date();
     const monthStr = `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}`;
     const monthPays = allPayments.filter(p => p.created_at?.startsWith(monthStr));
-
     const kpiPayments = document.getElementById('kpi-payments');
     if (kpiPayments) kpiPayments.textContent = monthPays.length;
-
     const revenue = monthPays
       .filter(p => ['paid','pagado','confirmado','approved'].includes((p.status||'').toLowerCase()))
       .reduce((s, p) => s + Number(p.amount || 0), 0);
-
     const kpiRevenue = document.getElementById('kpi-revenue');
     if (kpiRevenue) kpiRevenue.textContent = revenue.toLocaleString('es-DO');
-
-    // Fraud alerts
     detectFraud();
     const kpiAlerts = document.getElementById('kpi-alerts');
     if (kpiAlerts) kpiAlerts.textContent = fraudEvents.length;
     const badgeFraud = document.getElementById('badge-fraud');
     if (badgeFraud) badgeFraud.textContent = fraudEvents.length;
-
     renderRecentAudit();
     renderFraudAlertsList();
     renderCharts();
@@ -266,49 +240,32 @@ async function renderDashboard() {
 let chartActivity = null, chartRoles = null, chartPaymentsChart = null, chartAttendChart = null;
 
 function renderCharts() {
-  
-  // Activity by role
-  const roleCounts = { padre: 0, maestra: 0, directora: 0, asistente: 0, admin: 0 };
-  if (allAudit && allUsers) {
-    allAudit.slice(0, 200).forEach(a => {
-      const user = allUsers.find(u => u.id === a.user_id);
-      if (user?.role && roleCounts[user.role] !== undefined) roleCounts[user.role]++;
-    });
-  }
-
   const canvasActivity = document.getElementById('chartActivity');
   if (canvasActivity) {
     const actCtx = canvasActivity.getContext('2d');
     if (actCtx) {
       if (chartActivity) chartActivity.destroy();
       try {
+        const rc = { padre: 0, maestra: 0, directora: 0 };
+        allUsers.forEach(u => { if (rc[u.role] !== undefined) rc[u.role]++; });
         chartActivity = new Chart(actCtx, {
           type: 'bar',
           data: {
-            labels: ['Lun','Mar','Mié','Jue','Vie','Sáb','Dom'],
-            datasets: [
-              { label: 'Padres',    data: Array(7).fill(0).map(() => Math.floor(Math.random()*10+roleCounts.padre/7)),    backgroundColor: 'rgba(99,102,241,.7)',  borderRadius: 6 },
-              { label: 'Maestras',  data: Array(7).fill(0).map(() => Math.floor(Math.random()*6+roleCounts.maestra/7)),   backgroundColor: 'rgba(34,197,94,.7)',   borderRadius: 6 },
-              { label: 'Directoras',data: Array(7).fill(0).map(() => Math.floor(Math.random()*3+roleCounts.directora/7)),backgroundColor: 'rgba(249,115,22,.7)',  borderRadius: 6 },
-            ]
+            labels: ['Padres','Maestras','Directoras'],
+            datasets: [{ label: 'Usuarios', data: [rc.padre, rc.maestra, rc.directora], backgroundColor: ['rgba(99,102,241,.7)','rgba(34,197,94,.7)','rgba(249,115,22,.7)'], borderRadius: 6 }]
           },
-          options: { responsive: true, plugins: { legend: { labels: { color: '#94a3b8', font: { size: 11 } } } }, scales: { x: { ticks: { color: '#64748b' }, grid: { color: 'rgba(255,255,255,.04)' } }, y: { ticks: { color: '#64748b' }, grid: { color: 'rgba(255,255,255,.04)' } } } }
+          options: { responsive: true, plugins: { legend: { display: false } }, scales: { x: { ticks: { color: '#64748b' }, grid: { color: 'rgba(255,255,255,.04)' } }, y: { ticks: { color: '#64748b' }, grid: { color: 'rgba(255,255,255,.04)' } } } }
         });
-      } catch (e) {
-      }
+      } catch (_) {}
     }
   }
-
-  // Roles pie
   const canvasRoles = document.getElementById('chartRoles');
   if (canvasRoles) {
     const roleCtx = canvasRoles.getContext('2d');
     if (roleCtx) {
       if (chartRoles) chartRoles.destroy();
       const rc = { padre: 0, maestra: 0, directora: 0, asistente: 0, admin: 0 };
-      if (allUsers) {
-        allUsers.forEach(u => { if (rc[u.role] !== undefined) rc[u.role]++; });
-      }
+      allUsers.forEach(u => { if (rc[u.role] !== undefined) rc[u.role]++; });
       try {
         chartRoles = new Chart(roleCtx, {
           type: 'doughnut',
@@ -318,13 +275,12 @@ function renderCharts() {
           },
           options: { responsive: true, plugins: { legend: { position: 'right', labels: { color: '#94a3b8', font: { size: 11 }, padding: 12 } } }, cutout: '65%' }
         });
-      } catch (e) {
-      }
+      } catch (_) {}
     }
   }
 }
 
-// ── Recent audit (dashboard) ──────────────────────────────────────────────────
+// ── Recent audit ──────────────────────────────────────────────────────────────
 function renderRecentAudit() {
   const tbody = document.getElementById('recentAuditBody');
   if (!tbody) return;
@@ -351,7 +307,8 @@ function renderAuditTable(data) {
   const tbody = document.getElementById('auditBody');
   if (!tbody) return;
   document.getElementById('auditCount').textContent = data.length + ' registros';
-  if (!data.length) { tbody.innerHTML = '<tr><td colspan="8" style="text-align:center;padding:24px;color:var(--muted);">Sin registros</td></tr>'; return; }
+  if (!data.length) { tbody.innerHTML = '<tr><td colspan="8" style="text-align:center;padding:24px;color:var(--muted);">Sin registros de auditoría</td></tr>'; return; }
+  const roleBadge = { padre: 'badge-blue', maestra: 'badge-green', directora: 'badge-orange', asistente: 'badge-purple', admin: 'badge-yellow' };
   tbody.innerHTML = data.map((a, i) => {
     const user = allUsers.find(u => u.id === a.user_id);
     const name  = user?.name  || '—';
@@ -360,7 +317,6 @@ function renderAuditTable(data) {
     const dt = a.created_at ? new Date(a.created_at).toLocaleString('es-DO') : '—';
     const action = a.action || '—';
     const badge = action.includes('payment') ? 'badge-green' : action.includes('attendance') ? 'badge-blue' : 'badge-gray';
-    const roleBadge = { padre: 'badge-blue', maestra: 'badge-green', directora: 'badge-orange', asistente: 'badge-purple', admin: 'badge-yellow' };
     return `<tr>
       <td style="color:var(--muted);">${i+1}</td>
       <td style="white-space:nowrap;color:var(--muted);font-size:11px;">${dt}</td>
@@ -404,10 +360,8 @@ window.exportAudit = function() {
 // ── Fraud detection ───────────────────────────────────────────────────────────
 function detectFraud() {
   fraudEvents = [];
-
-  // Rule 1: Multiple logins from same user in short time
   const loginsByUser = {};
-  allAudit.filter(a => a.action === 'login' || a.action?.toLowerCase().includes('login')).forEach(a => {
+  allAudit.filter(a => (a.action||'').toLowerCase().includes('login')).forEach(a => {
     if (!loginsByUser[a.user_id]) loginsByUser[a.user_id] = [];
     loginsByUser[a.user_id].push(a.created_at);
   });
@@ -417,29 +371,23 @@ function detectFraud() {
       fraudEvents.push({ type: 'Múltiples logins', user: user?.name || uid, detail: `${times.length} accesos registrados`, risk: 'medio', date: times[0] });
     }
   });
-
-  // Rule 2: Payments with unusual amounts
   allPayments.forEach(p => {
-    const amt = Number(p.amount || 0);
-    if (amt > 50000) {
-      fraudEvents.push({ type: 'Pago inusual', user: p.student?.p1_name || p.student?.name || '—', detail: `Monto: RD$${amt.toLocaleString()}`, risk: 'alto', date: p.created_at });
+    if (Number(p.amount || 0) > 50000) {
+      fraudEvents.push({ type: 'Pago inusual', user: p.students?.p1_name || p.students?.name || '—', detail: `Monto: RD$${Number(p.amount).toLocaleString()}`, risk: 'alto', date: p.created_at });
     }
   });
-
-  // Rule 3: Duplicate payments same month
   const payKey = {};
   allPayments.forEach(p => {
     const key = `${p.student_id}_${p.month_paid}`;
-    if (!payKey[key]) payKey[key] = 0;
-    payKey[key]++;
+    payKey[key] = (payKey[key] || 0) + 1;
   });
   Object.entries(payKey).forEach(([key, count]) => {
     if (count > 1) {
-      fraudEvents.push({ type: 'Pago duplicado', user: key.split('_')[0], detail: `${count} pagos para el mismo mes`, risk: 'alto', date: new Date().toISOString() });
+      const sid = key.split('_')[0];
+      const st = allStudents.find(s => String(s.id) === sid);
+      fraudEvents.push({ type: 'Pago duplicado', user: st?.name || sid, detail: `${count} pagos para el mismo mes`, risk: 'alto', date: new Date().toISOString() });
     }
   });
-
-  // Rule 4: Users with no profile role
   allUsers.filter(u => !u.role).forEach(u => {
     fraudEvents.push({ type: 'Sin rol asignado', user: u.email || u.id, detail: 'Usuario sin rol en el sistema', risk: 'bajo', date: u.created_at });
   });
@@ -447,7 +395,6 @@ function detectFraud() {
 
 function renderFraud() {
   detectFraud();
-  // Rules summary cards
   const rulesEl = document.getElementById('fraudRules');
   if (rulesEl) {
     const rules = [
@@ -468,7 +415,6 @@ function renderFraud() {
         <div style="font-size:1.4rem;font-weight:900;color:${r.count > 0 ? r.color : 'var(--muted)'};">${r.count}</div>
       </div>`).join('');
   }
-
   const tbody = document.getElementById('fraudBody');
   document.getElementById('fraudCount').textContent = fraudEvents.length + ' eventos';
   if (!fraudEvents.length) {
@@ -500,6 +446,13 @@ function renderFraudAlertsList() {
   ).join('');
 }
 
+// ── Helper: last access from door_punches ─────────────────────────────────────
+function getLastAccess(userId) {
+  const punch = allPunches.find(p => p.staff_id === userId || p.student_id === userId);
+  if (!punch) return '—';
+  return new Date(punch.punched_at).toLocaleString('es-DO', { dateStyle: 'short', timeStyle: 'short' });
+}
+
 // ── Users table ───────────────────────────────────────────────────────────────
 function renderUsers(data) {
   const tbody = document.getElementById('usersBody');
@@ -509,6 +462,7 @@ function renderUsers(data) {
   const roleBadge = { padre: 'badge-blue', maestra: 'badge-green', directora: 'badge-orange', asistente: 'badge-purple', admin: 'badge-yellow' };
   tbody.innerHTML = data.map(u => {
     const created = u.created_at ? new Date(u.created_at).toLocaleDateString('es-DO') : '—';
+    const lastAccess = getLastAccess(u.id);
     const initials = (u.name || u.email || '?')[0].toUpperCase();
     return `<tr>
       <td><div style="display:flex;align-items:center;gap:8px;">
@@ -518,9 +472,12 @@ function renderUsers(data) {
       <td style="font-size:12px;color:var(--muted);">${escH(u.email||'—')}</td>
       <td><span class="badge ${roleBadge[u.role]||'badge-gray'}">${u.role||'—'}</span></td>
       <td style="font-size:11px;color:var(--muted);">${created}</td>
-      <td style="font-size:11px;color:var(--muted);">—</td>
+      <td style="font-size:11px;color:var(--muted);">${lastAccess}</td>
       <td><span class="badge badge-green">Activo</span></td>
-      <td><button class="btn btn-ghost" style="padding:4px 10px;font-size:10px;" onclick="viewUser('${u.id}')"><i class="bi bi-eye"></i></button></td>
+      <td style="display:flex;gap:4px;">
+        <button class="btn btn-ghost" style="padding:4px 8px;font-size:10px;" onclick="viewUser('${u.id}')"><i class="bi bi-eye"></i></button>
+        <button class="btn btn-ghost" style="padding:4px 8px;font-size:10px;" onclick="resetPassword('${u.id}','${escH(u.email||'')}')"><i class="bi bi-key"></i></button>
+      </td>
     </tr>`;
   }).join('');
 }
@@ -538,57 +495,173 @@ window.filterUsers = function() {
 window.viewUser = function(id) {
   const u = allUsers.find(x => x.id === id);
   if (!u) return;
-  alert(`Usuario: ${u.name||'—'}\nEmail: ${u.email||'—'}\nRol: ${u.role||'—'}\nID: ${u.id}\nCreado: ${u.created_at||'—'}`);
+  const students = allStudents.filter(s => s.parent_id === id);
+  const lastAccess = getLastAccess(id);
+  const modal = document.getElementById('userModal') || _createModal();
+  modal.innerHTML = `
+    <div style="background:var(--surface);border:1px solid var(--border);border-radius:20px;padding:28px;width:min(90vw,480px);max-height:90vh;overflow-y:auto;">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:20px;">
+        <h3 style="font-size:16px;font-weight:900;color:var(--text);">Detalle de usuario</h3>
+        <button onclick="document.getElementById('userModal').style.display='none'" style="background:none;border:none;color:var(--muted);font-size:20px;cursor:pointer;">✕</button>
+      </div>
+      <div style="display:flex;align-items:center;gap:14px;margin-bottom:20px;">
+        <div style="width:52px;height:52px;background:linear-gradient(135deg,#6366f1,#8b5cf6);border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:20px;font-weight:900;color:white;flex-shrink:0;">${(u.name||u.email||'?')[0].toUpperCase()}</div>
+        <div>
+          <div style="font-size:16px;font-weight:900;color:var(--text);">${escH(u.name||'Sin nombre')}</div>
+          <div style="font-size:12px;color:var(--muted);">${escH(u.email||'—')}</div>
+        </div>
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:20px;">
+        ${_infoRow('Rol', u.role||'—')}
+        ${_infoRow('Teléfono', u.phone||'—')}
+        ${_infoRow('Creado', u.created_at ? new Date(u.created_at).toLocaleDateString('es-DO') : '—')}
+        ${_infoRow('Último acceso', lastAccess)}
+        ${_infoRow('ID', u.id?.slice(0,16)+'...')}
+        ${students.length ? _infoRow('Estudiantes', students.map(s=>s.name).join(', ')) : ''}
+      </div>
+      <div style="display:flex;gap:8px;flex-wrap:wrap;">
+        <button class="btn btn-primary" onclick="resetPassword('${u.id}','${escH(u.email||'')}');document.getElementById('userModal').style.display='none'">
+          <i class="bi bi-key"></i> Cambiar contraseña
+        </button>
+        <button class="btn btn-ghost" onclick="document.getElementById('userModal').style.display='none'">Cerrar</button>
+      </div>
+    </div>`;
+  modal.style.cssText = 'display:flex;position:fixed;inset:0;background:rgba(0,0,0,.7);z-index:9999;align-items:center;justify-content:center;';
 };
+
+function _infoRow(label, value) {
+  return `<div style="background:var(--surface2);border-radius:10px;padding:10px 12px;">
+    <div style="font-size:10px;font-weight:900;color:var(--muted);text-transform:uppercase;letter-spacing:.08em;margin-bottom:3px;">${label}</div>
+    <div style="font-size:13px;font-weight:700;color:var(--text);">${escH(String(value))}</div>
+  </div>`;
+}
+
+function _createModal() {
+  const el = document.createElement('div');
+  el.id = 'userModal';
+  document.body.appendChild(el);
+  el.addEventListener('click', e => { if (e.target === el) el.style.display = 'none'; });
+  return el;
+}
+
+// ── Password reset ────────────────────────────────────────────────────────────
+window.resetPassword = function(userId, email) {
+  const modal = document.getElementById('userModal') || _createModal();
+  modal.innerHTML = `
+    <div style="background:var(--surface);border:1px solid var(--border);border-radius:20px;padding:28px;width:min(90vw,400px);">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:20px;">
+        <h3 style="font-size:16px;font-weight:900;color:var(--text);">Cambiar contraseña</h3>
+        <button onclick="document.getElementById('userModal').style.display='none'" style="background:none;border:none;color:var(--muted);font-size:20px;cursor:pointer;">✕</button>
+      </div>
+      <p style="font-size:13px;color:var(--muted);margin-bottom:16px;">Usuario: <strong style="color:var(--text);">${escH(email)}</strong></p>
+      <div style="margin-bottom:12px;">
+        <label style="font-size:11px;font-weight:900;color:var(--muted);text-transform:uppercase;letter-spacing:.08em;display:block;margin-bottom:6px;">Nueva contraseña</label>
+        <input class="inp" id="newPwdInput" type="password" placeholder="Mínimo 6 caracteres" autocomplete="new-password">
+      </div>
+      <div style="margin-bottom:16px;">
+        <label style="font-size:11px;font-weight:900;color:var(--muted);text-transform:uppercase;letter-spacing:.08em;display:block;margin-bottom:6px;">Confirmar contraseña</label>
+        <input class="inp" id="newPwdConfirm" type="password" placeholder="Repite la contraseña" autocomplete="new-password">
+      </div>
+      <div id="pwdMsg" style="font-size:12px;font-weight:700;margin-bottom:12px;"></div>
+      <div style="display:flex;gap:8px;">
+        <button class="btn btn-primary" onclick="doResetPassword('${userId}')"><i class="bi bi-check-lg"></i> Guardar contraseña</button>
+        <button class="btn btn-ghost" onclick="document.getElementById('userModal').style.display='none'">Cancelar</button>
+      </div>
+    </div>`;
+  modal.style.cssText = 'display:flex;position:fixed;inset:0;background:rgba(0,0,0,.7);z-index:9999;align-items:center;justify-content:center;';
+};
+
+window.doResetPassword = async function(userId) {
+  const pwd  = document.getElementById('newPwdInput')?.value || '';
+  const pwd2 = document.getElementById('newPwdConfirm')?.value || '';
+  const msg  = document.getElementById('pwdMsg');
+  if (pwd.length < 6) { msg.style.color = '#f87171'; msg.textContent = 'La contraseña debe tener al menos 6 caracteres.'; return; }
+  if (pwd !== pwd2)   { msg.style.color = '#f87171'; msg.textContent = 'Las contraseñas no coinciden.'; return; }
+  msg.style.color = '#94a3b8'; msg.textContent = 'Guardando...';
+  try {
+    // Use Supabase admin API via Edge Function to update password
+    const { data, error } = await supabase.functions.invoke('admin-reset-password', {
+      body: { user_id: userId, new_password: pwd }
+    });
+    if (error || data?.error) throw new Error(error?.message || data?.error || 'Error desconocido');
+    msg.style.color = '#4ade80'; msg.textContent = '✅ Contraseña actualizada correctamente.';
+    setTimeout(() => { document.getElementById('userModal').style.display = 'none'; }, 1500);
+  } catch (e) {
+    msg.style.color = '#f87171'; msg.textContent = '❌ Error: ' + e.message;
+  }
+};
+
+// ── Padres table (with student count + last access) ───────────────────────────
+function renderPadres() {
+  const tbody = document.getElementById('roleBody-padres');
+  if (!tbody) return;
+  const data = allUsers.filter(u => u.role === 'padre');
+  if (!data.length) { tbody.innerHTML = '<tr><td colspan="6" style="text-align:center;padding:24px;color:var(--muted);">Sin registros</td></tr>'; return; }
+  tbody.innerHTML = data.map(u => {
+    const students = allStudents.filter(s => s.parent_id === u.id);
+    const payments = allPayments.filter(p => students.some(s => s.id === p.student_id));
+    const lastAccess = getLastAccess(u.id);
+    return `<tr>
+      <td style="font-weight:800;">${escH(u.name||'—')}</td>
+      <td style="color:var(--muted);font-size:12px;">${escH(u.email||'—')}</td>
+      <td>${students.length ? students.map(s => escH(s.name)).join(', ') : '<span style="color:var(--muted);">—</span>'}</td>
+      <td style="font-weight:800;color:#4ade80;">${payments.length}</td>
+      <td style="font-size:11px;color:var(--muted);">${lastAccess}</td>
+      <td><span class="badge badge-green">Activo</span></td>
+    </tr>`;
+  }).join('');
+}
+
+// ── Maestras table (with classroom + last access) ─────────────────────────────
+function renderMaestras() {
+  const tbody = document.getElementById('roleBody-maestras');
+  if (!tbody) return;
+  const data = allUsers.filter(u => ['maestra','asistente'].includes(u.role));
+  if (!data.length) { tbody.innerHTML = '<tr><td colspan="6" style="text-align:center;padding:24px;color:var(--muted);">Sin registros</td></tr>'; return; }
+  tbody.innerHTML = data.map(u => {
+    const classroom = allClassrooms.find(c => c.teacher_id === u.id);
+    const lastAccess = getLastAccess(u.id);
+    return `<tr>
+      <td style="font-weight:800;">${escH(u.name||'—')}</td>
+      <td style="color:var(--muted);font-size:12px;">${escH(u.email||'—')}</td>
+      <td><span class="badge ${u.role==='asistente'?'badge-purple':'badge-green'}">${u.role}</span></td>
+      <td style="color:var(--muted);">${classroom ? escH(classroom.name) : '—'}</td>
+      <td style="font-size:11px;color:var(--muted);">${lastAccess}</td>
+      <td><span class="badge badge-green">Activo</span></td>
+    </tr>`;
+  }).join('');
+}
 
 function renderRoleTable(role, data) {
   const tbody = document.getElementById(`roleBody-${role}`);
   if (!tbody) return;
-  if (!data.length) { tbody.innerHTML = `<tr><td colspan="6" style="text-align:center;padding:24px;color:var(--muted);">Sin registros</td></tr>`; return; }
-  if (role === 'padres') {
-    tbody.innerHTML = data.map(u => `<tr>
-      <td style="font-weight:800;">${escH(u.name||'—')}</td>
-      <td style="color:var(--muted);font-size:12px;">${escH(u.email||'—')}</td>
-      <td>—</td>
-      <td>${allPayments.filter(p => p.students?.p1_name === u.name).length}</td>
-      <td style="color:var(--muted);font-size:11px;">—</td>
-      <td><span class="badge badge-green">Activo</span></td>
-    </tr>`).join('');
-  } else if (role === 'maestras') {
-    tbody.innerHTML = data.map(u => `<tr>
-      <td style="font-weight:800;">${escH(u.name||'—')}</td>
-      <td style="color:var(--muted);font-size:12px;">${escH(u.email||'—')}</td>
-      <td><span class="badge ${u.role==='asistente'?'badge-purple':'badge-green'}">${u.role}</span></td>
-      <td>—</td>
-      <td>${allAttend.filter(a => a.student_id === u.id).length}</td>
-      <td><span class="badge badge-green">Activo</span></td>
-    </tr>`).join('');
-  } else {
-    tbody.innerHTML = data.map(u => `<tr>
+  if (!data.length) { tbody.innerHTML = `<tr><td colspan="5" style="text-align:center;padding:24px;color:var(--muted);">Sin registros</td></tr>`; return; }
+  tbody.innerHTML = data.map(u => {
+    const lastAccess = getLastAccess(u.id);
+    return `<tr>
       <td style="font-weight:800;">${escH(u.name||'—')}</td>
       <td style="color:var(--muted);font-size:12px;">${escH(u.email||'—')}</td>
       <td>Karpus Kids</td>
-      <td style="color:var(--muted);font-size:11px;">—</td>
+      <td style="font-size:11px;color:var(--muted);">${lastAccess}</td>
       <td><span class="badge badge-green">Activo</span></td>
-    </tr>`).join('');
-  }
+    </tr>`;
+  }).join('');
 }
 
 // ── Payments ──────────────────────────────────────────────────────────────────
 function renderPayments() {
-  const approved = allPayments.filter(p => p.status === 'approved').length;
+  const approved = allPayments.filter(p => p.status === 'paid' || p.status === 'approved').length;
   const pending  = allPayments.filter(p => p.status === 'pending').length;
   const rejected = allPayments.filter(p => p.status === 'rejected').length;
-  const total    = allPayments.filter(p => p.status === 'approved').reduce((s,p) => s + Number(p.amount||0), 0);
+  const total    = allPayments.filter(p => p.status === 'paid' || p.status === 'approved').reduce((s,p) => s + Number(p.amount||0), 0);
   document.getElementById('pay-approved').textContent = approved;
   document.getElementById('pay-pending').textContent  = pending;
   document.getElementById('pay-rejected').textContent = rejected;
   document.getElementById('pay-total').textContent    = 'RD$' + total.toLocaleString('es-DO');
 
-  // Chart
   const months = {};
-  allPayments.filter(p => p.status === 'approved').forEach(p => {
-    const m = p.month || p.created_at?.slice(0,7) || '—';
+  allPayments.filter(p => p.status === 'paid' || p.status === 'approved').forEach(p => {
+    const m = p.month_paid || p.created_at?.slice(0,7) || '—';
     months[m] = (months[m] || 0) + Number(p.amount || 0);
   });
   const labels = Object.keys(months).sort().slice(-6);
@@ -605,7 +678,7 @@ function renderPayments() {
 
   const tbody = document.getElementById('paymentsBody');
   if (!tbody) return;
-  const statusBadge = { approved: 'badge-green', pending: 'badge-yellow', rejected: 'badge-red' };
+  const statusBadge = { paid: 'badge-green', approved: 'badge-green', pending: 'badge-yellow', rejected: 'badge-red', review: 'badge-blue', overdue: 'badge-red' };
   tbody.innerHTML = allPayments.slice(0, 100).map(p => `<tr>
     <td style="font-size:11px;color:var(--muted);">${p.created_at ? new Date(p.created_at).toLocaleDateString('es-DO') : '—'}</td>
     <td style="font-weight:800;">${escH(p.students?.name||'—')}</td>
@@ -622,7 +695,6 @@ function renderAttendance() {
   const today = new Date().toISOString().split('T')[0];
   document.getElementById('attendanceDate').textContent = new Date().toLocaleDateString('es-DO', { dateStyle: 'full' });
 
-  // Chart — last 14 days
   const days = Array.from({ length: 14 }, (_, i) => {
     const d = new Date(); d.setDate(d.getDate() - (13 - i));
     return d.toISOString().split('T')[0];
@@ -644,12 +716,11 @@ function renderAttendance() {
   if (!todayData.length) { tbody.innerHTML = '<tr><td colspan="6" style="text-align:center;padding:24px;color:var(--muted);">Sin registros hoy</td></tr>'; return; }
   const statusBadge = { present: 'badge-green', absent: 'badge-red', late: 'badge-yellow', retirado: 'badge-blue' };
   tbody.innerHTML = todayData.map(a => {
-    // Los joins en loadAttendance usan alias 'students' y 'classrooms'
-    const studentName = a.students?.name || String(a.student_id || '—');
-    const classroomName = a.classrooms?.name || '—';
-    const checkIn = a.check_in ? new Date(a.check_in).toLocaleTimeString('es-DO',{hour:'2-digit',minute:'2-digit'}) : '—';
+    // Resolve student name: from join or from allStudents
+    const studentName = a.students?.name || allStudents.find(s => s.id === a.student_id)?.name || String(a.student_id || '—');
+    const classroomName = a.classrooms?.name || allClassrooms.find(c => c.id === a.classroom_id)?.name || '—';
+    const checkIn  = a.check_in  ? new Date(a.check_in).toLocaleTimeString('es-DO',{hour:'2-digit',minute:'2-digit'}) : '—';
     const checkOut = a.check_out ? new Date(a.check_out).toLocaleTimeString('es-DO',{hour:'2-digit',minute:'2-digit'}) : '—';
-    
     return `<tr>
       <td style="font-weight:800;">${escH(studentName)}</td>
       <td><span class="badge badge-blue">Estudiante</span></td>
@@ -665,15 +736,12 @@ function renderAttendance() {
 async function renderErrors() {
   const tbody = document.getElementById('errorsBody');
   if (!tbody) return;
-
-  // Load from DB first (production errors)
   try {
     const { data: dbErrors } = await supabase
       .from('system_errors')
       .select('created_at, panel, message, stack, url, user_id')
       .order('created_at', { ascending: false })
       .limit(100);
-
     if (dbErrors?.length) {
       tbody.innerHTML = dbErrors.map(e => `<tr>
         <td style="font-size:11px;color:var(--muted);">${e.created_at ? new Date(e.created_at).toLocaleString('es-DO') : '—'}</td>
@@ -685,7 +753,6 @@ async function renderErrors() {
       return;
     }
   } catch (_) {}
-
   tbody.innerHTML = '<tr><td colspan="5" style="text-align:center;padding:24px;color:var(--muted);">✅ Sin errores registrados</td></tr>';
 }
 
@@ -718,7 +785,7 @@ window.changeUserRole = async function() {
   await loadUsers();
 };
 
-// ── Test email function ───────────────────────────────────────────────────────
+// ── Test email ────────────────────────────────────────────────────────────────
 window.testEmail = async function() {
   const btn = document.getElementById('btnTestEmail');
   if (btn) { btn.disabled = true; btn.textContent = 'Enviando...'; }
@@ -727,13 +794,13 @@ window.testEmail = async function() {
       body: {
         to: 'impulsodigital@gmail.com',
         subject: '✅ Test de correo — Karpus Kids',
-        html: '<div style="font-family:Arial;padding:20px;"><h2 style="color:#16a34a;">✅ Sistema de correo funcionando</h2><p>Este es un correo de prueba enviado desde el Panel de Control de Karpus Kids.</p><p style="color:#6b7280;font-size:12px;">Enviado: ' + new Date().toLocaleString('es-DO') + '</p></div>'
+        html: '<div style="font-family:Arial;padding:20px;"><h2 style="color:#16a34a;">✅ Sistema de correo funcionando</h2><p>Correo de prueba desde el Panel de Control de Karpus Kids.</p><p style="color:#6b7280;font-size:12px;">Enviado: ' + new Date().toLocaleString('es-DO') + '</p></div>'
       }
     });
     if (error) throw new Error(error.message || JSON.stringify(error));
     if (data?.error) throw new Error(data.error);
     document.getElementById('emailTestResult').innerHTML =
-      '<span style="color:#4ade80;font-weight:900;">✅ Correo enviado correctamente (ID: ' + (data?.id || 'ok') + ')</span>';
+      '<span style="color:#4ade80;font-weight:900;">✅ Correo enviado (ID: ' + (data?.id || 'ok') + ')</span>';
   } catch (e) {
     document.getElementById('emailTestResult').innerHTML =
       '<span style="color:#f87171;font-weight:900;">❌ Error: ' + escH(e.message) + '</span>';
@@ -745,19 +812,15 @@ window.testEmail = async function() {
 // ── Realtime ──────────────────────────────────────────────────────────────────
 function startRealtime() {
   supabase.channel('admin-realtime')
-    .on('postgres_changes', { event: '*', schema: 'public', table: 'notifications' }, async () => {
-      await loadAudit();
-      renderRecentAudit();
-      renderFraudAlertsList();
-      document.getElementById('badge-audit').textContent = allAudit.filter(a => !a.is_read).length || 0;
-    })
     .on('postgres_changes', { event: '*', schema: 'public', table: 'payments' }, async () => {
-      await loadPayments();
-      detectFraud();
+      await loadPayments(); detectFraud();
       document.getElementById('badge-fraud').textContent = fraudEvents.length;
     })
     .on('postgres_changes', { event: '*', schema: 'public', table: 'attendance' }, async () => {
       await loadAttendance();
+    })
+    .on('postgres_changes', { event: '*', schema: 'public', table: 'door_punches' }, async () => {
+      await loadPunches();
     })
     .subscribe();
 }
