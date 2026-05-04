@@ -21,34 +21,39 @@ Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: CORS });
 
   try {
-    const SUPABASE_URL  = Deno.env.get('SUPABASE_URL')              ?? '';
-    const SERVICE_KEY   = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '';
+    const SUPABASE_URL = Deno.env.get('SUPABASE_URL') ?? '';
+    const SERVICE_KEY  = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '';
 
     if (!SUPABASE_URL || !SERVICE_KEY) {
-      return json({ error: 'Missing env vars' }, 500);
+      return json({ error: 'Missing SUPABASE_URL or SUPABASE_SERVICE_ROLE_KEY' }, 500);
     }
 
-    // Verificar que el caller está autenticado
+    // Verificar autenticación del caller usando el JWT del header
     const authHeader = req.headers.get('Authorization') ?? '';
-    const anonKey    = Deno.env.get('SUPABASE_ANON_KEY') ?? '';
-    const callerClient = createClient(SUPABASE_URL, anonKey, {
-      global: { headers: { Authorization: authHeader } },
+    if (!authHeader.startsWith('Bearer ')) {
+      return json({ error: 'Missing authorization header' }, 401);
+    }
+
+    // Usar service role para leer sin RLS
+    const admin = createClient(SUPABASE_URL, SERVICE_KEY, {
       auth: { persistSession: false }
     });
-    const { data: { user } } = await callerClient.auth.getUser();
-    if (!user) return json({ error: 'No autenticado' }, 401);
 
-    // Parsear classroom_id del body o query param
+    // Verificar que el JWT es válido
+    const token = authHeader.replace('Bearer ', '');
+    const { data: { user }, error: authErr } = await admin.auth.getUser(token);
+    if (authErr || !user) {
+      return json({ error: 'Token inválido' }, 401);
+    }
+
+    // Parsear classroom_id del body
     let classroomId: number | null = null;
     try {
-      const body = await req.json().catch(() => ({}));
+      const body = await req.json();
       classroomId = body.classroom_id ? Number(body.classroom_id) : null;
     } catch (_) {}
 
-    // Usar service role para leer sin RLS
-    const admin = createClient(SUPABASE_URL, SERVICE_KEY, { auth: { persistSession: false } });
-
-    // Fetch posts: generales (classroom_id IS NULL) + del aula si se especifica
+    // Fetch posts con service role (sin RLS)
     let query = admin
       .from('posts')
       .select(`
@@ -61,18 +66,23 @@ Deno.serve(async (req) => {
       .limit(50);
 
     if (classroomId) {
-      query = query.or(`classroom_id.is.null,classroom_id.eq.${classroomId}`);
+      query = (query as any).or(`classroom_id.is.null,classroom_id.eq.${classroomId}`);
     } else {
-      query = query.is('classroom_id', null);
+      query = (query as any).is('classroom_id', null);
     }
 
     const { data: posts, error } = await query;
-    if (error) return json({ error: error.message }, 400);
+    if (error) {
+      console.error('[get-posts] DB error:', error.message);
+      return json({ error: error.message }, 400);
+    }
 
+    console.log(`[get-posts] user=${user.id} classroom=${classroomId} posts=${posts?.length ?? 0}`);
     return json({ posts: posts || [] });
 
   } catch (e) {
     const msg = e instanceof Error ? e.message : String(e);
+    console.error('[get-posts] Fatal:', msg);
     return json({ error: msg }, 500);
   }
 });

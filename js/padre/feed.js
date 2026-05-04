@@ -39,8 +39,7 @@ export const FeedModule = {
   },
 
   /**
-   * Carga publicaciones de Supabase
-   * Usa Edge Function get-posts (bypasea RLS) con fallback a query directa
+   * Carga publicaciones de Supabase via Edge Function get-posts
    */
   async loadPosts() {
     const container = document.getElementById('classFeed');
@@ -49,57 +48,29 @@ export const FeedModule = {
     container.innerHTML = Helpers.skeleton(2, 'h-48');
 
     try {
-      let posts = null;
+      // Edge Function bypasea RLS — única fuente de verdad
+      // Obtener sesión actual para enviar JWT
+      const { data: { session } } = await supabase.auth.getSession();
+      const token = session?.access_token;
 
-      // ── Intento 1: Edge Function (bypasea RLS completamente) ──────────────
-      try {
-        const { data: efData, error: efErr } = await supabase.functions.invoke('get-posts', {
-          body: { classroom_id: this._classroomId || null }
-        });
-        if (!efErr && efData?.posts) {
-          posts = efData.posts;
-        }
-      } catch (_) {}
+      const { data: efData, error: efErr } = await supabase.functions.invoke('get-posts', {
+        body: { classroom_id: this._classroomId || null },
+        headers: token ? { Authorization: `Bearer ${token}` } : {}
+      });
 
-      // ── Intento 2: RPC SECURITY DEFINER ───────────────────────────────────
-      if (!posts) {
-        try {
-          const { data: rpcData, error: rpcErr } = await supabase
-            .rpc('get_posts_for_parent', { p_classroom_id: this._classroomId || null });
-          if (!rpcErr && Array.isArray(rpcData)) {
-            posts = rpcData;
-          }
-        } catch (_) {}
-      }
+      if (efErr) throw new Error('Edge Function error: ' + (efErr.message || JSON.stringify(efErr)));
+      if (!efData?.posts) throw new Error('Respuesta inesperada de get-posts');
 
-      // ── Intento 3: Query directa (puede fallar por RLS) ───────────────────
-      if (!posts) {
-        let query = supabase
-          .from(TABLES.POSTS)
-          .select(`
-            id, content, media_url, media_type, image_url, created_at, classroom_id, teacher_id,
-            teacher:teacher_id(name, avatar_url, role),
-            likes(id, user_id),
-            comments(id, content, user_name, user_id, created_at)
-          `)
-          .order('created_at', { ascending: false })
-          .limit(50);
-
-        if (this._classroomId) {
-          query = query.or(`classroom_id.eq.${this._classroomId},classroom_id.is.null`);
-        } else {
-          query = query.is('classroom_id', null);
-        }
-
-        const { data, error } = await query;
-        if (error) throw error;
-        posts = data || [];
-      }
-
-      AppState.set('feedPosts', posts || []);
+      AppState.set('feedPosts', efData.posts || []);
 
     } catch (err) {
-      container.innerHTML = Helpers.errorState('Error al cargar el muro', 'window.App.feed.reload?.()');
+      // Mostrar error real para diagnóstico
+      container.innerHTML = `
+        <div class="p-6 text-center">
+          <p class="text-rose-500 font-bold text-sm mb-2">Error al cargar publicaciones</p>
+          <p class="text-slate-400 text-xs font-mono">${escapeHtml(err.message || String(err))}</p>
+          <button onclick="App.feed.loadPosts()" class="mt-4 px-4 py-2 bg-blue-600 text-white rounded-xl text-xs font-bold">Reintentar</button>
+        </div>`;
       if (window.lucide) lucide.createIcons();
     }
   },
