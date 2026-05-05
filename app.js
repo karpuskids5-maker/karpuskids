@@ -6,7 +6,7 @@ import { VideoCallModule } from './js/shared/videocall.js'; // 🔥 Nuevo Módul
 // ... (rest of imports)
 
 // Inicialización de OneSignal
-try { initOneSignal(); } catch(e) { console.error("Error OneSignal:", e); }
+try { initOneSignal(); } catch(_) {}
 
 /**
  * Lógica principal del Panel de Directora

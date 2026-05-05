@@ -36,7 +36,6 @@ export class SafeAppState {
    */
   set(key, value) {
     if (!(key in this._initialState)) {
-      console.error(`❌ [AppState] Clave inválida: "${key}"`);
       return;
     }
 
@@ -110,19 +109,14 @@ export class SafeAppState {
       this._listeners[key].forEach(cb => {
         try {
           cb(value, prev);
-        } catch (err) {
-          console.error(`❌ Error en listener [${key}]`, err);
-        }
+        } catch (_) {}
       });
     }
 
-    // 🌍 listeners globales
     this._globalListeners.forEach(cb => {
       try {
         cb({ key, value, prev, state: this._state });
-      } catch (err) {
-        console.error('❌ Error global listener:', err);
-      }
+      } catch (_) {}
     });
   }
 
@@ -162,7 +156,6 @@ export class SafeAppState {
       this._cacheTTL[key] = now + ttl;
       return data;
     } catch (error) {
-      console.error(`❌ [Cache ERROR] ${key}:`, error);
       throw error;
     }
   }

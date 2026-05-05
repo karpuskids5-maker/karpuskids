@@ -132,7 +132,7 @@ export function registerIncidentModal(studentId) {
           title: 'Aviso de Incidente ⚠️',
           message: `Se ha registrado un reporte de conducta sobre ${student.name}.`,
           link: 'panel_padres.html#incidents'
-        }).catch(err => console.warn('Error notificando incidente:', err));
+        }).catch(() => {});
       }
 
       const statEl = document.getElementById('statIncidents');
@@ -141,7 +141,6 @@ export function registerIncidentModal(studentId) {
         statEl.textContent = current + 1;
       }
     } catch (err) {
-      console.error('Error reporting incident:', err);
       safeToast('Error al reportar incidente.', 'error');
       btn.disabled = false;
       btn.innerHTML = '<i data-lucide="send" class="w-4 h-4"></i> Enviar Reporte';

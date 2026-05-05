@@ -79,8 +79,8 @@ export const Prefetch = {
 
       await this._preloadImages(urls);
       _done.add('muro');
-    } catch (e) {
-      console.warn('[Prefetch] muro error:', e.message);
+    } catch (_) {
+      _done.add('muro');
     }
   },
 
@@ -110,8 +110,8 @@ export const Prefetch = {
 
       await this._preloadImages(urls);
       _done.add('tareas');
-    } catch (e) {
-      console.warn('[Prefetch] tareas error:', e.message);
+    } catch (_) {
+      _done.add('tareas');
     }
   },
 
@@ -132,8 +132,8 @@ export const Prefetch = {
       const urls = (profiles || []).map(p => p.avatar_url).filter(Boolean);
       await this._preloadImages(urls);
       _done.add('avatares');
-    } catch (e) {
-      console.warn('[Prefetch] avatares error:', e.message);
+    } catch (_) {
+      _done.add('avatares');
     }
   },
 
@@ -150,8 +150,8 @@ export const Prefetch = {
       const urls = (evidences || []).map(e => e.file_url).filter(Boolean);
       await this._preloadImages(urls);
       _done.add('evidencias');
-    } catch (e) {
-      console.warn('[Prefetch] evidencias error:', e.message);
+    } catch (_) {
+      _done.add('evidencias');
     }
   },
 

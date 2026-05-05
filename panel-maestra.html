@@ -3,13 +3,19 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta name="robots" content="noindex, nofollow">
+  <meta http-equiv="X-Content-Type-Options" content="nosniff">
+  <meta http-equiv="X-Frame-Options" content="DENY">
+  <meta http-equiv="Referrer-Policy" content="strict-origin-when-cross-origin">
+  <style>html{display:none;}</style>
+  <script>if(self===top){document.documentElement.style.display='block';}else{top.location=self.location;}</script>
   <title>Karpus Kids — Panel Maestra</title>
   <link rel="icon" href="logo/favicon.ico" type="image/x-icon">
   <link rel="manifest" href="manifest.json">
   <link rel="stylesheet" href="css/theme.css" />
   <link rel="stylesheet" href="css/layout.css" />
   <script src="https://cdn.tailwindcss.com"></script>
-  <script src="https://unpkg.com/lucide@1.7.0/dist/umd/lucide.min.js"></script>
+  <script src="https://unpkg.com/lucide@0.263.1/dist/umd/lucide.min.js"></script>
   
   <style>
     /* ═══════════════════════════════════════════════
@@ -858,8 +864,8 @@
     if ('serviceWorker' in navigator) {
       window.addEventListener('load', () => {
         navigator.serviceWorker.register('/OneSignalSDKWorker.js', { scope: '/' })
-          .then(r => console.log('[SW] Registered:', r.scope))
-          .catch(e => console.warn('[SW] Registration failed:', e));
+          .then(() => {})
+          .catch(() => {});
       });
     }
 

@@ -1,4 +1,4 @@
-Ôªøimport { DirectorApi } from './api.js';
+import { DirectorApi } from './api.js';
 import { Helpers } from '../shared/helpers.js';
 import { UI } from './ui.module.js';
 import { supabase } from '../shared/supabase.js';
@@ -56,7 +56,7 @@ export const RoomsModule = {
         : 'Todos los estudiantes tienen aula asignada';
 
       if (!students?.length) {
-        list.innerHTML = '<div class="flex items-center gap-3 px-6 py-5 text-sm text-emerald-600 font-bold"><span class="text-xl">‚úÖ</span> Todos los estudiantes activos tienen aula asignada.</div>';
+        list.innerHTML = '<div class="flex items-center gap-3 px-6 py-5 text-sm text-emerald-600 font-bold"><span class="text-xl">?</span> Todos los estudiantes activos tienen aula asignada.</div>';
         return;
       }
 
@@ -132,7 +132,7 @@ export const RoomsModule = {
           : 'Todos los estudiantes tienen aula asignada';
         if (!remaining) {
           const list = document.getElementById('unassignedStudentsList');
-          if (list) list.innerHTML = '<div class="flex items-center gap-3 px-6 py-5 text-sm text-emerald-600 font-bold"><span class="text-xl">‚úÖ</span> Todos los estudiantes activos tienen aula asignada.</div>';
+          if (list) list.innerHTML = '<div class="flex items-center gap-3 px-6 py-5 text-sm text-emerald-600 font-bold"><span class="text-xl">?</span> Todos los estudiantes activos tienen aula asignada.</div>';
         }
         this.init();
       }, 350);
@@ -208,8 +208,8 @@ export const RoomsModule = {
 
   async deleteRoom(roomId, roomName) {
     const ok = window._karpusConfirmDelete
-      ? await window._karpusConfirmDelete('¬øEliminar aula "' + roomName + '"?', 'Los estudiantes quedar√°n sin aula asignada.')
-      : confirm('¬øEliminar aula "' + roomName + '"? Los estudiantes quedar√°n sin aula.');
+      ? await window._karpusConfirmDelete('øEliminar aula "' + roomName + '"?', 'Los estudiantes quedar·n sin aula asignada.')
+      : confirm('øEliminar aula "' + roomName + '"? Los estudiantes quedar·n sin aula.');
     if (!ok) return;
 
     try {
@@ -231,13 +231,13 @@ export const RoomsModule = {
     const html = `
       <div class="modal-header bg-gradient-to-r from-purple-600 to-indigo-600 text-white p-6 rounded-t-3xl flex items-center justify-between">
         <div class="flex items-center gap-3">
-          <div class="w-12 h-12 bg-white/20 rounded-2xl flex items-center justify-center text-2xl">üè´</div>
+          <div class="w-12 h-12 bg-white/20 rounded-2xl flex items-center justify-center text-2xl">??</div>
           <div>
             <h3 class="text-xl font-black">${roomId ? 'Editar Aula' : 'Nueva Aula'}</h3>
-            <p class="text-xs text-white/70 font-bold uppercase tracking-widest">Configuraci√≥n del aula</p>
+            <p class="text-xs text-white/70 font-bold uppercase tracking-widest">ConfiguraciÛn del aula</p>
           </div>
         </div>
-        <button onclick="App.ui.closeModal()" class="w-10 h-10 flex items-center justify-center rounded-xl bg-white/10 hover:bg-white/20 transition-colors text-lg">‚úï</button>
+        <button onclick="App.ui.closeModal()" class="w-10 h-10 flex items-center justify-center rounded-xl bg-white/10 hover:bg-white/20 transition-colors text-lg">?</button>
       </div>
 
       <div class="modal-body p-6 bg-slate-50/30 space-y-5">
@@ -284,9 +284,9 @@ export const RoomsModule = {
         select.innerHTML = '<option value="">-- Sin asignar --</option>' +
           teachers.map(t => `<option value="${t.id}">${Helpers.escapeHTML(t.name)}</option>`).join('');
       }
-    } catch (e) { console.error('Error cargando maestras:', e); }
+    } catch (e) {  }
 
-    // Pre-llenar si es edici√≥n
+    // Pre-llenar si es ediciÛn
     if (roomId) {
       try {
         const { data: room } = await supabase.from('classrooms').select('id, name, level, capacity, teacher_id, is_live').eq('id', parseInt(roomId)).single();
@@ -296,7 +296,7 @@ export const RoomsModule = {
           const sel = document.getElementById('roomTeacher');
           if (sel) sel.value = room.teacher_id || '';
         }
-      } catch (e) { console.error('Error cargando aula:', e); }
+      } catch (e) {  }
     }
 
     // Cargar checklist de estudiantes
@@ -332,7 +332,7 @@ export const RoomsModule = {
         const inOtherRoom = s.classroom_id && !inThisRoom;
         return `
           <label class="flex items-center gap-3 px-4 py-3 cursor-pointer hover:bg-purple-50 transition-colors ${inOtherRoom ? 'opacity-50' : ''}">
-            <input type="checkbox" value="${s.id}" ${inThisRoom ? 'checked' : ''} ${inOtherRoom ? 'disabled title="Ya est√° en otra aula"' : ''}
+            <input type="checkbox" value="${s.id}" ${inThisRoom ? 'checked' : ''} ${inOtherRoom ? 'disabled title="Ya est· en otra aula"' : ''}
               class="room-student-check w-4 h-4 rounded accent-purple-600 shrink-0">
             <div class="w-7 h-7 rounded-lg bg-purple-100 text-purple-600 flex items-center justify-center font-black text-xs shrink-0">
               ${(s.name || '?').charAt(0).toUpperCase()}

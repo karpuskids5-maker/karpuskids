@@ -72,7 +72,7 @@ export const InquiriesModule = {
           <button onclick="App.ui.closeModal()" class="px-8 py-2.5 bg-white border border-slate-200 rounded-xl font-bold text-slate-600 hover:bg-slate-100 transition-all">Cerrar</button>
         </div>`;
       window.openGlobalModal(modalHTML);
-    } catch (e) { console.error(e); }
+    } catch (_) { Helpers.toast('Error al cargar consulta', 'error'); }
   },
 
   async reply(id) {
@@ -82,6 +82,6 @@ export const InquiriesModule = {
       await DirectorApi.updateInquiry(id, { status: 'in_progress', internal_notes: reply });
       Helpers.toast('Respuesta registrada', 'success');
       this.init();
-    } catch (e) { console.error(e); }
+    } catch (_) { Helpers.toast('Error al responder', 'error'); }
   }
 };

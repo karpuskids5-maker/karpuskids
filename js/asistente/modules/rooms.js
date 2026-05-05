@@ -66,7 +66,7 @@ export const RoomsModule = {
       }).join('');
       
     } catch (e) {
-      console.error('[loadRooms]', e);
+      
       tbody.innerHTML = '<tr><td colspan="5" class="text-center py-8">' + Helpers.errorState('Error al cargar aulas', 'App.rooms.init()') + '</td></tr>';
       if (window.lucide) lucide.createIcons();
     }
@@ -94,8 +94,7 @@ export const RoomsModule = {
         document.getElementById('roomName').value = rm.name || '';
         document.getElementById('roomTeacher').value = rm.teacher_id || '';
         document.getElementById('roomCapacity').value = rm.capacity || 15;
-      } catch (e) {
-        console.error(e);
+      } catch (_) {
         Helpers.toast('Error cargando aula', 'error');
         return;
       }
@@ -147,9 +146,8 @@ export const RoomsModule = {
           ${inThisRoom ? '<span class="text-[9px] bg-teal-100 text-teal-700 px-1.5 py-0.5 rounded-full font-bold ml-auto">En esta aula</span>' : ''}
         </label>`;
       }).join('');
-    } catch (e) {
-      console.error('[_loadStudentsChecklist]', e);
-      // Si falla por classroom_id, intentar sin ese campo
+    } catch (_) {
+      // fallback sin classroom_id
       try {
         const { data: students2 } = await supabase
           .from('students').select('id, name').order('name');
@@ -245,9 +243,8 @@ export const RoomsModule = {
       Helpers.toast(id ? 'Aula actualizada correctamente' : 'Aula creada correctamente');
       this.closeModal();
       await this.loadRooms();
-    } catch (e) {
-      console.error(e);
-      Helpers.toast('Error al guardar aula: ' + (e.message || e), 'error');
+    } catch (_) {
+      Helpers.toast('Error al guardar aula: ' + (_.message || _), 'error');
     } finally {
       this.resetBtn(btn);
     }

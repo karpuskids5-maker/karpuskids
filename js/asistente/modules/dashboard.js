@@ -67,7 +67,7 @@ export const DashboardModule = {
       set('welcomeName',    (AppState.get('profile')?.name || 'Asistente').split(' ')[0]);
 
     } catch (e) {
-      console.error('[DashboardModule] loadStats:', e);
+      
     }
   },
 
@@ -108,8 +108,7 @@ export const DashboardModule = {
         );
       }).join('');
 
-    } catch (e) {
-      console.error('[DashboardModule] loadRecentPayments:', e);
+    } catch (_) {
       container.innerHTML = Helpers.errorState('Error al cargar pagos');
       if (window.lucide) lucide.createIcons();
     }
@@ -156,7 +155,7 @@ export const DashboardModule = {
         }
       });
     } catch (e) {
-      console.warn('[Dashboard] miniChart:', e);
+      
     }
   }
 };

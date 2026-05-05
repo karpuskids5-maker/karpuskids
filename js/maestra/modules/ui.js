@@ -19,8 +19,8 @@ export const safeToast = (message, type = 'success') => {
     if (window.Helpers && typeof window.Helpers.toast === 'function') {
       return window.Helpers.toast(message, type);
     }
-  } catch (e) {
-    console.warn('Toast Error:', e);
+  } catch (_) {
+    /* silencioso */
   }
 };
 

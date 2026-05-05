@@ -25,30 +25,22 @@ function isValidId(id) {
 
 export async function initLiveClassListener(classroomId) {
   if (!isValidId(classroomId)) {
-    console.warn('[Live] classroomId inválido, se omite la inicialización.');
     return null;
   }
 
   try {
-    // Evitar múltiples canales activos para la misma classroom
     const existingChannel = AppState.get('liveChannel');
     if (existingChannel?.topic === `live_status_${classroomId}`) {
       return existingChannel;
     }
 
-    // Si existe otro canal (de otra classroom), removerlo primero
     if (existingChannel) {
       try {
         await AppState.removeChannelSafe(existingChannel);
-      } catch (e) {
-        console.warn('[Live] Error al remover canal anterior:', e?.message || e);
-      }
+      } catch (_) {}
       AppState.set('liveChannel', null);
     }
 
-    // ============================
-    // UI UPDATE CENTRALIZADO
-    // ============================
     const updateUI = (isLive) => {
       try {
         const btn = document.querySelector('button[data-target="videocall"]');
@@ -56,7 +48,6 @@ export async function initLiveClassListener(classroomId) {
           btn.classList.toggle('hidden', !isLive);
           btn.classList.toggle('flex', isLive);
         }
-
         const card = document.querySelector('.patio-card[data-target="videocall"]');
         if (card) {
           card.classList.toggle('hidden', !isLive);
@@ -65,86 +56,43 @@ export async function initLiveClassListener(classroomId) {
           card.classList.toggle('ring-rose-200', isLive);
           card.classList.toggle('animate-pulse', isLive);
         }
-      } catch (uiErr) {
-        // No debería romper todo el listener si falla la actualización de UI
-        console.warn('[Live] Error actualizando UI:', uiErr?.message || uiErr);
-      }
+      } catch (_) {}
     };
 
-    // REACTIVIDAD GLOBAL: suscribimos la función de UI
     AppState.subscribe('isClassLive', updateUI);
 
-    // ESTADO INICIAL desde supabase
     const { data, error } = await supabase
       .from('classrooms')
       .select('is_live')
       .eq('id', classroomId)
       .maybeSingle();
 
-    if (error) {
-      console.warn('[Live] Error consultando estado inicial:', error.message || error);
-      // no throw para evitar romper la app; retorna null para indicar fallo
-      return null;
-    }
+    if (error) return null;
 
     const initialState = !!(data && data.is_live);
     AppState.set('isClassLive', initialState);
-
-    // Aplicar UI inicial de forma segura
     updateUI(initialState);
 
-    // REALTIME LISTENER
     const channel = supabase
       .channel(`live_status_${classroomId}`)
-      .on(
-        'postgres_changes',
-        {
-          event: 'UPDATE',
-          schema: 'public',
-          table: 'classrooms',
-          filter: `id=eq.${classroomId}`
-        },
-        (payload) => {
-          try {
-            if (!payload || !payload.new) return;
+      .on('postgres_changes', {
+        event: 'UPDATE', schema: 'public', table: 'classrooms',
+        filter: `id=eq.${classroomId}`
+      }, (payload) => {
+        try {
+          if (!payload?.new) return;
+          const isLive = !!payload.new.is_live;
+          const prev = AppState.get('isClassLive');
+          if (prev === isLive) return;
+          AppState.set('isClassLive', isLive);
+          if (isLive && !prev) Helpers.toast('🔴 ¡La clase en vivo ha comenzado!', 'info');
+        } catch (_) {}
+      });
 
-            // Normalizar valor booleano
-            const isLive = !!payload.new.is_live;
-            const prev = AppState.get('isClassLive');
-
-            // Evitar ejecuciones duplicadas
-            if (prev === isLive) return;
-            AppState.set('isClassLive', isLive);
-
-            // Notificación solo cuando inicia
-            if (isLive && !prev) {
-              Helpers.toast('🔴 ¡La clase en vivo ha comenzado!', 'info');
-            }
-          } catch (handlerErr) {
-            console.warn('[Live] Error manejando payload realtime:', handlerErr?.message || handlerErr);
-          }
-        }
-      );
-
-    // Subscribe separado para poder manejar el status (subscribe devuelve una promesa en algunos SDKs)
-    const subscribeResult = await channel.subscribe();
-    // subscribeResult puede ser string o un objeto dependiendo del SDK
-    // Registramos logs según el resultado
-    if (subscribeResult === 'SUBSCRIBED' || (subscribeResult && subscribeResult.status === 'SUBSCRIBED')) {
-    } else if (subscribeResult === 'CHANNEL_ERROR' || (subscribeResult && subscribeResult.status === 'CHANNEL_ERROR')) {
-      console.error('[Live] Error en canal realtime', subscribeResult);
-    } else if (subscribeResult === 'TIMED_OUT' || (subscribeResult && subscribeResult.status === 'TIMED_OUT')) {
-      console.warn('[Live] Reintentando conexión...');
-    } else {
-      // valor inesperado, pero guardamos el channel de todas formas
-    }
-
-    // Guardar canal en AppState para que otros módulos puedan limpiarlo
+    await channel.subscribe();
     AppState.set('liveChannel', channel);
-
     return channel;
-  } catch (err) {
-    console.warn('[Live] Listener error:', err?.message || err);
+  } catch (_) {
     return null;
   }
 }
@@ -175,7 +123,5 @@ export async function removeLiveClassListener(channel) {
     if (AppState.get('liveChannel') === channel) {
       AppState.set('liveChannel', null);
     }
-  } catch (err) {
-    console.warn('[Live] Error eliminando canal:', err?.message || err);
-  }
+  } catch (_) {}
 }

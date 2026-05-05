@@ -25,7 +25,6 @@ export const StudentsModule = {
       
       // Fallback si classroom_id no existe
       if (error && (error.message?.includes('classroom_id') || error.code === '42703')) {
-        console.warn('[loadStudents] classroom_id no existe, reintentando select básico');
         const basicRes = await supabase
           .from('students')
           .select('id, name, is_active, p1_name, p1_phone, avatar_url, matricula')
@@ -80,8 +79,7 @@ export const StudentsModule = {
         });
       }
       if (window.lucide) window.lucide.createIcons();
-    } catch (e) {
-      console.error('[loadStudents]', e);
+    } catch (_) {
       tbody.innerHTML = '<tr><td colspan="4" class="text-center py-8">' + Helpers.errorState('Error al cargar estudiantes', 'App.students.init()') + '</td></tr>';
       if (window.lucide) lucide.createIcons();
     }
@@ -318,8 +316,7 @@ export const StudentsModule = {
           sel.innerHTML = '<option value="">No hay aulas registradas</option>';
         }
       }
-    } catch (e) {
-      console.error('Error loading classrooms for student modal:', e);
+    } catch (_) {
       const sel = document.getElementById('stClassroom') || gc?.querySelector('#stClassroom');
       if (sel) sel.innerHTML = '<option value="">Error al cargar aulas</option>';
     }
@@ -354,8 +351,7 @@ export const StudentsModule = {
             if (prof) sv('stEmailUser', prof.email);
           }
         }
-      } catch (e) {
-        console.error('Error loading student for edit:', e);
+      } catch (_) {
         Helpers.toast('Error al cargar datos del estudiante', 'error');
       }
     }
@@ -479,7 +475,6 @@ export const StudentsModule = {
       window._closeAsistenteModal?.();
       await this.loadStudents();
     } catch (err) {
-      console.error('[saveStudent] Error:', err);
       Helpers.toast('Error: ' + (err.message || 'No se pudo guardar'), 'error');
     } finally {
       if (btn) { btn.disabled = false; btn.innerHTML = 'Guardar Estudiante'; if(window.lucide) lucide.createIcons(); }

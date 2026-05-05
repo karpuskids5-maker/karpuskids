@@ -3,27 +3,22 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta name="robots" content="noindex, nofollow">
+  <meta http-equiv="X-Content-Type-Options" content="nosniff">
+  <meta http-equiv="X-Frame-Options" content="DENY">
+  <meta http-equiv="Referrer-Policy" content="strict-origin-when-cross-origin">
+  <style>html{display:none;}</style>
+  <script>if(self===top){document.documentElement.style.display='block';}else{top.location=self.location;}</script>
   <title>Karpus Kids — Panel Asistente</title>
   <link rel="icon" href="./logo/favicon.ico" type="image/x-icon">
-  <!-- PWA Meta Tags -->
   <meta name="theme-color" content="#0f766e">
   <meta name="mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
   <link rel="manifest" href="manifest.json">
   <script src="https://cdn.tailwindcss.com"></script>
   <link rel="stylesheet" href="css/layout.css" />
-  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-
-  <script src="https://cdn.jsdelivr.net/npm/lucide@latest/dist/umd/lucide.min.js"></script>
-  <script>
-    (function(){
-      if(!(window.lucide && typeof lucide.createIcons==='function')){
-        var s=document.createElement('script');
-        s.src='https://cdn.jsdelivr.net/npm/lucide@latest/dist/umd/lucide.min.js';
-        s.async=true;document.head.appendChild(s);
-      }
-    })();
-  </script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/lucide@0.263.1/dist/umd/lucide.min.js"></script>
   
   <style>
     /* Estilos Karpus Kids Solicitados */
@@ -1132,8 +1127,8 @@
     if ('serviceWorker' in navigator) {
       window.addEventListener('load', () => {
         navigator.serviceWorker.register('/OneSignalSDKWorker.js', { scope: '/' })
-          .then(r => console.log('[SW] Registered:', r.scope))
-          .catch(e => console.warn('[SW] Registration failed:', e));
+          .then(() => {})
+          .catch(() => {});
       });
     }
   </script>

@@ -8,11 +8,6 @@ async function handle(queryPromise, context = 'API') {
   const { data, error } = await queryPromise;
 
   if (error) {
-    console.error(`❌ [${context}]`, {
-      message: error.message,
-      details: error.details,
-      hint: error.hint
-    });
     throw new Error(error.message);
   }
 

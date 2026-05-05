@@ -204,7 +204,7 @@ export const PaymentsModule = {
       set('kpiPendingCount', data.pending);
       set('kpiOverdueCount', data.overdue);
       set('kpiReviewCount',  data.toApprove || 0);
-    } catch (e) { console.error(e); }
+    } catch (_) {}
   },
 
   async loadIncomeChart() {
@@ -222,7 +222,7 @@ export const PaymentsModule = {
         data: { labels, datasets: [{ label: 'Ingresos ($)', data: vals, backgroundColor: 'rgba(79,70,229,0.15)', borderColor: 'rgb(79,70,229)', borderWidth: 2, borderRadius: 6 }] },
         options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } }, scales: { y: { beginAtZero: true, grid: { color: 'rgba(0,0,0,0.04)' } }, x: { grid: { display: false } } } }
       });
-    } catch (e) { console.error(e); }
+    } catch (_) {}
   },
 
   async openPaymentModal(prefillStudentId = null) {
@@ -267,7 +267,7 @@ export const PaymentsModule = {
           sel.appendChild(o);
         });
       }
-    } catch (e) { console.error(e); }
+    } catch (_) {}
 
     document.getElementById('btnSavePaymentAction')?.addEventListener('click', () => this.saveManualPayment());
     if (window.lucide) lucide.createIcons();

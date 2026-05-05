@@ -30,7 +30,6 @@ export const Security = {
     if (!url) return '#';
     const lower = url.toLowerCase().trim();
     if (lower.startsWith('javascript:') || lower.startsWith('data:') || lower.startsWith('vbscript:')) {
-      console.warn('[Security] URL bloqueada:', url);
       return '#';
     }
     return url;
@@ -124,7 +123,6 @@ export const Security = {
       if (el.tagName !== 'INPUT' && el.tagName !== 'TEXTAREA') return;
       if (el.type === 'password' || el.type === 'email') return; // no tocar passwords/emails
       if (el.value && this.isMalicious(el.value)) {
-        console.warn('[Security] Input malicioso detectado y bloqueado');
         el.value = '';
         el.classList.add('border-rose-500');
         el.placeholder = '⚠️ Contenido no permitido';
@@ -139,7 +137,6 @@ export const Security = {
       const pasted = e.clipboardData?.getData('text') || '';
       if (this.isMalicious(pasted)) {
         e.preventDefault();
-        console.warn('[Security] Paste malicioso bloqueado');
       }
     }, true);
 

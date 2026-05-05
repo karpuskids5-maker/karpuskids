@@ -56,7 +56,7 @@ export const BadgeSystem = {
       }
 
     } catch (e) {
-      console.warn('[BadgeSystem] loadCounts error:', e.message);
+      
     }
   },
 
@@ -158,7 +158,7 @@ export const BadgeSystem = {
         .in('type', types)
         .eq('is_read', false);
     } catch (e) {
-      console.warn('[BadgeSystem] markRead error:', e.message);
+      
     }
   },
 

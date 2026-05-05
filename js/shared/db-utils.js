@@ -35,9 +35,7 @@ export async function safeQuery(queryPromise, { silent = false, label = '' } = {
     const { data, error } = await queryPromise;
     if (error) {
       const msg = error.message || JSON.stringify(error);
-      console.error(`[DB${label ? ':' + label : ''}] Error:`, msg);
       if (!silent) {
-        // Disparar evento global para que cualquier panel muestre el toast
         window.dispatchEvent(new CustomEvent('karpus:db-error', { detail: { message: msg, label } }));
       }
       return { data: null, ok: false, error: msg };
@@ -45,7 +43,6 @@ export async function safeQuery(queryPromise, { silent = false, label = '' } = {
     return { data, ok: true, error: null };
   } catch (err) {
     const msg = err?.message || String(err);
-    console.error(`[DB${label ? ':' + label : ''}] Exception:`, msg);
     if (!silent) {
       window.dispatchEvent(new CustomEvent('karpus:db-error', { detail: { message: msg, label } }));
     }
@@ -124,7 +121,6 @@ export async function withRetry(queryFn, retries = 3, baseMs = 300) {
       await new Promise(r => setTimeout(r, baseMs * Math.pow(2, attempt)));
     }
   }
-  console.error('[withRetry] Agotados los reintentos:', lastError);
   return { data: null, error: lastError };
 }
 
@@ -206,7 +202,6 @@ export async function batchInsert(table, records, chunkSize = 50) {
     const { error } = await supabase.from(table).insert(chunk);
     if (error) {
       errors.push({ chunk: i / chunkSize, error });
-      console.error(`[batchInsert] Error en lote ${i / chunkSize}:`, error);
     } else {
       inserted += chunk.length;
     }

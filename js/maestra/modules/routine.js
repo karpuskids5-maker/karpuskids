@@ -130,7 +130,6 @@ export async function initRoutine() {
 
     if (window.lucide) window.lucide.createIcons();
   } catch (e) {
-    console.error('[Routine]', e);
     container.innerHTML = Helpers.errorState('Error al cargar la rutina', 'App.initRoutine()');
   }
 }
@@ -394,8 +393,7 @@ export async function applyBulkRoutine() {
     safeToast(`Rutina aplicada a ${students.length} estudiantes`);
     Modal.close('bulkRoutineModal');
     initRoutine();
-  } catch (e) {
-    console.error(e);
+  } catch (_) {
     safeToast('Error al aplicar rutina masiva', 'error');
     btn.disabled = false;
     btn.innerHTML = 'Aplicar a Todos';
@@ -430,8 +428,7 @@ export async function saveRoutineLog(studentId, field = 'notes', value = null) {
       [dbField]:    fieldValue
     });
 
-  } catch (err) {
-    console.error('[Routine] saveRoutineLog:', err);
+  } catch (_) {
     safeToast('Error al guardar. Intenta de nuevo.', 'error');
   } finally {
     _saving[studentId + field] = false;

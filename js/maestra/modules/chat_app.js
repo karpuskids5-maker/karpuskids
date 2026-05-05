@@ -100,8 +100,8 @@ export async function initChat() {
       });
     }
 
-  } catch (err) {
-    console.error('Error initChat:', err);
+  } catch (_) {
+    /* silencioso */
   }
 }
 
@@ -204,8 +204,7 @@ async function loadChatMessages(otherUserId, loadMore = false) {
 
     subscribeToChat(activeConversationId);
 
-  } catch (err) {
-    console.error('Error cargando chat:', err);
+  } catch (_) {
     if (!loadMore) container.innerHTML = '<div class="text-center text-xs text-red-400 mt-4">Error cargando mensajes.</div>';
   }
 }
@@ -261,7 +260,7 @@ async function sendChatMessage() {
       subscribeToChat(activeConversationId);
     }
   } catch (err) {
-    console.error('Error enviando mensaje:', err);
+    
     safeToast('Error al enviar mensaje', 'error');
     // Revertir optimistic
     container?.lastElementChild?.remove();
