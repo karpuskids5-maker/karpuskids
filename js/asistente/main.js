@@ -1,4 +1,4 @@
-﻿import { ensureRole, supabase, initOneSignal } from '../shared/supabase.js';
+import { ensureRole, supabase, initOneSignal } from '../shared/supabase.js';
 import { AppState } from './state.js';
 import { AssistantApi } from './api.js';
 import { PaymentsModule } from './payments.js';
@@ -16,8 +16,8 @@ import { QueryCache } from '../shared/query-cache.js';
 import { RealtimeManager } from '../shared/realtime-manager.js';
 import { Security } from '../shared/security.js';
 
-// 🚀 Definir objeto App globalmente para evitar ReferenceError en onclicks del HTML
-// Global close modal fallback — always available even before openNewPostModal is called
+// ?? Definir objeto App globalmente para evitar ReferenceError en onclicks del HTML
+// Global close modal fallback � always available even before openNewPostModal is called
 window._closeAsistenteModal = () => {
   const gc = document.getElementById('globalModalContainer');
   if (gc) { gc.style.display = 'none'; gc.innerHTML = ''; }
@@ -52,7 +52,7 @@ window.App = {
 };
 
 /**
- * Inicialización principal del Panel de Asistente
+ * Inicializaci�n principal del Panel de Asistente
  */
 document.addEventListener('DOMContentLoaded', async () => {
   
@@ -63,7 +63,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   AppState.set('user', auth.user);
   AppState.set('profile', auth.profile);
 
-  // 🔴 Sistema de badges por sección
+  // ?? Sistema de badges por secci�n
   BadgeSystem.init(auth.user.id);
 
   // Sidebar profile
@@ -80,17 +80,17 @@ document.addEventListener('DOMContentLoaded', async () => {
     window.location.href = 'login.html';
   });
   
-  // 2. Inicializar módulos ligeros y navegación
-  // La navegación ahora se encargará de la carga perezosa (lazy loading) de las secciones.
+  // 2. Inicializar m�dulos ligeros y navegaci�n
+  // La navegaci�n ahora se encargar� de la carga perezosa (lazy loading) de las secciones.
   WallModule.init('muroPostsContainer', { accentColor: 'teal' }, AppState);
   
-  // ✅ FIX OneSignal: Solo inicializar en el dominio correcto para evitar errores de consola
+  // ? FIX OneSignal: Solo inicializar en el dominio correcto para evitar errores de consola
   if (window.location.hostname === 'karpuskids.com' || window.location.hostname === 'localhost') {
     try { initOneSignal(auth.user); } catch(_) { /* silencioso */ }
   } else {
   }
   
-  initNavigation(); // Esto cargará el dashboard y configurará los listeners
+  initNavigation(); // Esto cargar� el dashboard y configurar� los listeners
 
   // Asignar funciones internas al objeto global App
   Object.assign(window.App, {
@@ -130,7 +130,7 @@ async function initDashboard() {
 }
 
 /**
- * Navegación lateral
+ * Navegaci�n lateral
  */
 const loadedSections = new Set();
 
@@ -139,10 +139,10 @@ function initNavigation() {
   const sections = document.querySelectorAll('section[id]');
 
   const showSection = async (target) => {
-    // 1. Limpiar clases activas en botones de navegación
+    // 1. Limpiar clases activas en botones de navegaci�n
     navLinks.forEach(l => {
       l.classList.remove('bg-white/20', 'bg-teal-50', 'text-teal-600', 'active');
-      // Si el botón está en el sidebar y no es el activo, restaurar su estilo original de texto blanco
+      // Si el bot�n est� en el sidebar y no es el activo, restaurar su estilo original de texto blanco
       if (!l.classList.contains('active')) {
         l.classList.add('text-white');
       }
@@ -170,10 +170,10 @@ function initNavigation() {
     
     AppState.set('currentSection', target);
 
-    // 🔴 Marcar badge como leído al entrar a la sección
+    // ?? Marcar badge como le�do al entrar a la secci�n
     BadgeSystem.mark(target);
 
-    // 3. Cerrar sidebar en móvil automáticamente al cambiar de sección
+    // 3. Cerrar sidebar en m�vil autom�ticamente al cambiar de secci�n
     const sidebar = document.getElementById('sidebar');
     if (sidebar && window.innerWidth < 768) {
       sidebar.classList.remove('mobile-visible');
@@ -181,7 +181,7 @@ function initNavigation() {
       if (ov) ov.style.display = 'none';
     }
 
-    // ✅ --- LÓGICA DE CARGA PEREZOSA (LAZY LOADING) ---
+    // ? --- L�GICA DE CARGA PEREZOSA (LAZY LOADING) ---
     if (!loadedSections.has(target)) {
       try {
         switch (target) {
@@ -231,7 +231,7 @@ function initNavigation() {
         Helpers.toast(`Error al cargar ${target}`, 'error');
       }
     } else {
-      // Re-cargar datos frescos al volver a una sección ya visitada
+      // Re-cargar datos frescos al volver a una secci�n ya visitada
       switch (target) {
         case 'maestros':   TeachersModule.loadTeachers?.(); break;
         case 'estudiantes': StudentsModule.loadStudents?.(); break;
@@ -252,7 +252,7 @@ function initNavigation() {
   DashboardModule.init().then(() => loadedSections.add('dashboard'));
   showSection('dashboard');
 
-  // ── Hamburger móvil ──────────────────────────────────────────────────────
+  // -- Hamburger m�vil ------------------------------------------------------
   const menuBtn = document.getElementById('menuBtn');
   const sidebar  = document.getElementById('sidebar');
   const overlay  = document.getElementById('sidebarOverlay');
@@ -276,14 +276,14 @@ function initNavigation() {
     overlay.addEventListener('click', _closeSidebar);
   }
 
-  // Cerrar sidebar al hacer click en el main (móvil)
+  // Cerrar sidebar al hacer click en el main (m�vil)
   document.getElementById('layoutShell')?.addEventListener('click', () => {
     if (window.innerWidth < 768 && sidebar?.classList.contains('mobile-visible')) {
       _closeSidebar();
     }
   });
 
-  // ── Colapsar sidebar desktop ─────────────────────────────────────────────
+  // -- Colapsar sidebar desktop ---------------------------------------------
   const toggleBtn   = document.getElementById('toggleSidebar');
   const wrapper     = sidebar?.closest('.app-content-wrapper') || document.querySelector('.app-content-wrapper');
   if (toggleBtn && sidebar) {
@@ -334,7 +334,7 @@ async function initProfile() {
     };
   }
 
-  // ── QR de Acceso Personal ──────────────────────────────────────────────────
+  // -- QR de Acceso Personal --------------------------------------------------
   const code = p.access_code || (p.notes?.startsWith?.('TEA-') || p.notes?.startsWith?.('ASI-') ? p.notes : null);
   const codeInput = document.getElementById('profileAccessCode');
   if (codeInput && code) codeInput.value = code;
@@ -342,7 +342,7 @@ async function initProfile() {
   const _loadQR = () => new Promise(r => {
     if (window.QRCode) { r(); return; }
     const s = document.createElement('script');
-    s.src = 'https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js';
+    s.src = 'https://cdn.jsdelivr.net/npm/qrcodejs@1.0.0/qrcode.min.js';
     s.onload = r; document.head.appendChild(s);
   });
 
@@ -367,11 +367,11 @@ async function initProfile() {
     // Save immediately
     const { error } = await supabase.from('profiles').update({ access_code: newCode }).eq('id', p.id);
     if (!error) {
-      Helpers.toast('Código de acceso guardado', 'success');
+      Helpers.toast('C�digo de acceso guardado', 'success');
       AppState.set('profile', { ...AppState.get('profile'), access_code: newCode });
       _renderProfileQR(newCode);
     } else {
-      Helpers.toast('Error al guardar código: ' + error.message, 'error');
+      Helpers.toast('Error al guardar c�digo: ' + error.message, 'error');
     }
   };
 
@@ -389,7 +389,7 @@ async function initProfile() {
       .role{font-size:11px;color:#0d9488;font-weight:800;text-transform:uppercase;margin-top:2px;}
       .code{font-size:10px;color:#64748b;font-weight:700;margin-top:8px;}</style>
     </head><body><div class="card">
-      <div class="hdr">STAFF · KARPUS KIDS</div>
+      <div class="hdr">STAFF � KARPUS KIDS</div>
       <img src="${img}">
       <div class="name">${p.name || 'Personal'}</div>
       <div class="role">${p.role || 'Asistente'}</div>
@@ -398,7 +398,7 @@ async function initProfile() {
     win.document.close();
   };
 
-  // ── Form submit ────────────────────────────────────────────────────────────
+  // -- Form submit ------------------------------------------------------------
   const form = document.getElementById('profileForm');
   if (form) {
     form.onsubmit = async (e) => {
@@ -445,7 +445,7 @@ async function initProfile() {
 // --- Funciones Globales de Ventana ---
 
 async function deleteComment(cid, pid) {
-  if (!confirm('¿Eliminar comentario?')) return;
+  if (!confirm('�Eliminar comentario?')) return;
   const { error } = await supabase.from('comments').delete().eq('id', cid);
   if (!error) {
     Helpers.toast('Comentario eliminado');
@@ -465,7 +465,7 @@ async function sendComment(postId) {
 }
 
 // =======================================================
-// 💬 SISTEMA DE CHAT UNIFICADO (ASISTENTE)
+// ?? SISTEMA DE CHAT UNIFICADO (ASISTENTE)
 // =======================================================
 let activeChatUserId = null;
 let activeConversationId = null;
@@ -516,12 +516,12 @@ async function loadChatContacts(searchTerm = '', unreadMap = {}) {
 
   try {
     const contacts = await QueryCache.get(cacheKey, async () => {
-      // 1. Obtener perfiles — todos los roles con quienes puede chatear
+      // 1. Obtener perfiles � todos los roles con quienes puede chatear
       let query = supabase
         .from('profiles')
         .select('id, name, role, avatar_url')
         .in('role', ['padre', 'maestra', 'directora', 'asistente'])
-        .neq('id', AppState.get('user')?.id || 'none')  // no mostrar a sí mismo
+        .neq('id', AppState.get('user')?.id || 'none')  // no mostrar a s� mismo
         .order('name');
       if (searchTerm) query = query.ilike('name', `%${searchTerm}%`);
       const { data: profiles, error } = await query.limit(100);
@@ -589,7 +589,7 @@ async function selectAssistantChat(userId, name, role) {
   activeChatUserId = userId;
   activeConversationId = null;
 
-  // Mobile: ocultar lista, mostrar conversación
+  // Mobile: ocultar lista, mostrar conversaci�n
   const listPanel = document.getElementById('chatListPanel');
   const convPanel = document.getElementById('chatConversationPanel');
   if (listPanel && convPanel) {
@@ -646,13 +646,13 @@ async function selectAssistantChat(userId, name, role) {
     };
 
     if (!messages || messages.length === 0) {
-      msgs.innerHTML = '<div class="flex-1 flex flex-col items-center justify-center text-slate-400 text-sm py-12"><p>No hay mensajes aún.</p><p class="text-xs mt-1">Escribe el primero 👋</p></div>';
+      msgs.innerHTML = '<div class="flex-1 flex flex-col items-center justify-center text-slate-400 text-sm py-12"><p>No hay mensajes a�n.</p><p class="text-xs mt-1">Escribe el primero ??</p></div>';
     } else {
       msgs.innerHTML = messages.map(buildBubble).join('');
       import('../shared/scroll.module.js').then(({ ScrollModule }) => ScrollModule.scrollToBottom(msgs));
     }
 
-    // Suscripción realtime
+    // Suscripci�n realtime
     ChatModule.subscribeToConversation(conversationId, (newMsg) => {
       msgs.insertAdjacentHTML('beforeend', buildBubble(newMsg));
       import('../shared/scroll.module.js').then(({ ScrollModule }) => ScrollModule.scrollToBottom(msgs, true));
@@ -679,11 +679,11 @@ async function sendAssistantMessage() {
 }
 
 // =======================================================
-// 📰 MURO ESCOLAR (ASISTENTE)
+// ?? MURO ESCOLAR (ASISTENTE)
 // =======================================================
 
 async function openNewPostModal() {
-  // Define close function FIRST — before building HTML that references it
+  // Define close function FIRST � before building HTML that references it
   window._closeAsistenteModal = () => {
     const gc = document.getElementById('globalModalContainer');
     if (gc) { gc.style.display = 'none'; gc.innerHTML = ''; }
@@ -699,10 +699,10 @@ async function openNewPostModal() {
     <div class="bg-white w-full max-w-lg rounded-[2.5rem] shadow-2xl p-8 animate-fadeIn">
       <div class="flex justify-between items-start mb-6">
         <div>
-          <h3 class="text-2xl font-black text-slate-800">Crear Publicación</h3>
-          <p class="text-xs text-slate-400 font-bold mt-1">Visible para padres según el aula seleccionada</p>
+          <h3 class="text-2xl font-black text-slate-800">Crear Publicaci�n</h3>
+          <p class="text-xs text-slate-400 font-bold mt-1">Visible para padres seg�n el aula seleccionada</p>
         </div>
-        <button onclick="window._closeAsistenteModal()" class="p-2 hover:bg-slate-100 rounded-full text-slate-400 transition-colors">✕</button>
+        <button onclick="window._closeAsistenteModal()" class="p-2 hover:bg-slate-100 rounded-full text-slate-400 transition-colors">?</button>
       </div>
       <div class="space-y-4">
         <div>
@@ -710,7 +710,7 @@ async function openNewPostModal() {
             Visibilidad
           </label>
           <select id="postClassroom" class="w-full px-4 py-2.5 border-2 border-slate-100 rounded-2xl outline-none focus:ring-4 focus:ring-teal-100 focus:border-teal-400 bg-slate-50/50 transition-all text-sm font-medium">
-            <option value="">🌐 Todas las Aulas (General)</option>
+            <option value="">?? Todas las Aulas (General)</option>
             ${classroomOptions}
           </select>
           <p class="text-[10px] text-slate-400 font-bold mt-1 ml-1">
@@ -720,7 +720,7 @@ async function openNewPostModal() {
 
         <div>
           <label class="block text-[11px] font-black text-slate-400 uppercase tracking-wider mb-1.5 ml-1">Mensaje</label>
-          <textarea id="postContent" rows="4" class="w-full p-4 bg-slate-50 border-2 border-slate-100 rounded-2xl text-sm outline-none resize-none focus:ring-4 focus:ring-teal-100 focus:border-teal-400" placeholder="¿Qué quieres compartir con la escuela?"></textarea>
+          <textarea id="postContent" rows="4" class="w-full p-4 bg-slate-50 border-2 border-slate-100 rounded-2xl text-sm outline-none resize-none focus:ring-4 focus:ring-teal-100 focus:border-teal-400" placeholder="�Qu� quieres compartir con la escuela?"></textarea>
         </div>
         
         <div class="relative">
@@ -771,7 +771,7 @@ async function submitNewPost() {
 
     if (file) {
       if (file.size > 10 * 1024 * 1024) {
-        Helpers.toast('Archivo muy grande (máx 10MB)', 'error');
+        Helpers.toast('Archivo muy grande (m�x 10MB)', 'error');
         if (btn) { btn.disabled = false; btn.innerHTML = '<i data-lucide="send" class="w-4 h-4"></i> PUBLICAR'; }
         return;
       }
@@ -795,14 +795,14 @@ async function submitNewPost() {
 
     if (error) throw error;
 
-    // ✅ Close modal and show success IMMEDIATELY — don't wait for notifications
+    // ? Close modal and show success IMMEDIATELY � don't wait for notifications
     Helpers.toast('Publicado correctamente', 'success');
     window._closeAsistenteModal?.();
 
     // Reload wall in background (non-blocking)
     WallModule.loadPosts(document.getElementById('muroPostsContainer'));
 
-    // Send notifications via Edge Function in background — fire and forget
+    // Send notifications via Edge Function in background � fire and forget
     if (post?.id) {
       import('../shared/supabase.js').then(({ emitEvent }) => {
         emitEvent('post.created', {
@@ -823,7 +823,7 @@ async function submitNewPost() {
   }
 }
 
-// ── Estudiantes (Asistente) ───────────────────────────────────────────────────
+// -- Estudiantes (Asistente) ---------------------------------------------------
 async function loadAsistenteStudents() {
   const tbody = document.getElementById('studentsTableBody');
   if (!tbody) return;
@@ -873,7 +873,7 @@ async function loadAsistenteStudents() {
   }
 }
 
-// ── Aulas (Asistente) ─────────────────────────────────────────────────────────
+// -- Aulas (Asistente) ---------------------------------------------------------
 async function loadAsistenteRooms() {
   const tbody = document.getElementById('roomsTable');
   if (!tbody) return;

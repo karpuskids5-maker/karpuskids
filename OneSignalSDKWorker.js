@@ -9,12 +9,15 @@ importScripts('https://cdn.onesignal.com/sdks/web/v16/OneSignalSDK.sw.js');
  * Este worker combina la lógica de caché PWA y las notificaciones push.
  */
 
-const CACHE_NAME = 'karpus-pwa-v5';
+const CACHE_NAME = 'karpus-pwa-v6';
 const ASSETS = [
   './',
   'login.html',
   'panel_padres.html',
+  'panel-maestra.html',
+  'panel_asistente.html',
   'css/panel-padre.css',
+  'css/layout.css',
   'logo/favicon.ico',
   'img/mundo.jpg'
 ];

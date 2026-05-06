@@ -209,92 +209,102 @@
     <div id="sidebarOverlay" class="fixed inset-0 bg-black/50 z-40 backdrop-blur-sm" style="display:none;"></div>
 
     <!-- SIDEBAR -->
-    <aside id="sidebar" class="bg-gradient-to-b from-teal-500 to-emerald-600 border-r-4 border-teal-300 p-4 rounded-r-3xl shadow-2xl">
-      <button id="toggleSidebar" class="absolute -right-3 top-6 bg-white rounded-full p-1 shadow-md border border-slate-100 text-slate-500 hover:text-teal-600 hidden md:block">
-        <i data-lucide="chevron-left" class="w-4 h-4"></i>
+    <aside id="sidebar" class="kk-sidebar bg-gradient-to-b from-teal-500 via-teal-600 to-emerald-700 shadow-2xl flex flex-col" style="border-right:none;">
+      <button id="toggleSidebar" class="absolute -right-3 top-8 bg-white rounded-full p-1.5 shadow-lg border border-slate-100 text-slate-500 hover:text-teal-600 hidden md:flex items-center justify-center z-10 transition-all hover:scale-110">
+        <i data-lucide="chevron-left" class="w-3.5 h-3.5"></i>
       </button>
-      
-      <!-- Header Sidebar: Avatar + Nombre + Logo Texto -->
-      <div id="sidebarHeader" class="flex flex-col items-center gap-4 mb-6 pt-6">
-        <!-- Avatar -->
-        <div class="relative group">
-           <div id="sidebarAvatarContainer" class="w-16 h-16 rounded-full border-4 border-white/30 shadow-lg overflow-hidden transition-all duration-300 group-hover:scale-105">
-             <img id="sidebarAvatar" src="img/1.jpg" class="w-full h-full object-cover">
-           </div>
-           <div class="absolute bottom-0 right-0 w-4 h-4 bg-green-400 border-2 border-white rounded-full"></div>
+
+      <!-- Logo Karpus Kids -->
+      <div class="kk-sidebar-logo">
+        <div class="kk-sidebar-logo-img">
+          <img src="img/mundo.jpg" alt="Karpus Kids" loading="eager">
         </div>
-        
-        <!-- Texto (Se oculta al colapsar) -->
-        <div class="label text-center transition-opacity duration-200">
-           <h4 class="text-lg font-bold text-white mb-1" id="sidebarUserName">Asistente</h4>
-           <p class="text-xs text-teal-100 font-medium uppercase tracking-wider mb-3">Panel Administrativo</p>
-           
-           <div class="h-px w-12 bg-white/20 mx-auto mb-3"></div>
-           
-           <h3 class="font-black text-white text-lg karpus-kids-inline drop-shadow-md leading-none">
-            <span class="k-1">K</span><span class="k-2">a</span><span class="k-3">r</span><span class="k-4">p</span><span class="k-5">u</span><span class="k-6">s</span> <span class="k-7">K</span><span class="k-8">i</span><span class="k-9">d</span><span class="k-10">s</span>
-          </h3>
+        <div class="kk-sidebar-logo-text label">
+          <div class="brand karpus-kids-inline">
+            <span class="k-1">K</span><span class="k-2">a</span><span class="k-3">r</span><span class="k-4">p</span><span class="k-5">u</span><span class="k-6">s</span>&#32;<span class="k-7">K</span><span class="k-8">i</span><span class="k-9">d</span><span class="k-10">s</span>
+          </div>
+          <div class="sub">Panel Asistente</div>
         </div>
       </div>
 
-      <nav class="space-y-1 bg-white/10 p-2 rounded-xl mb-4 backdrop-blur-sm relative z-10">
-        <button data-section="dashboard" class="nav-btn w-full flex items-center gap-3 p-3 rounded-lg text-white hover:bg-white/20 transition-colors">
-          <i data-lucide="layout-dashboard" class="w-5 h-5 shrink-0"></i>
+      <!-- Perfil -->
+      <div class="kk-sidebar-profile label mx-2">
+        <div class="kk-sidebar-profile-avatar">
+          <img id="sidebarAvatar" src="img/mundo.jpg" alt="Avatar" class="w-full h-full object-cover">
+        </div>
+        <div class="kk-sidebar-profile-info label">
+          <div class="kk-sidebar-profile-role">Asistente</div>
+          <div class="kk-sidebar-profile-name" id="sidebarUserName">Cargando...</div>
+        </div>
+      </div>
+
+      <!-- Nav -->
+      <nav class="flex-1 overflow-y-auto kk-scroll px-2 py-1 space-y-0.5 relative z-10">
+        <div class="kk-nav-section label">Principal</div>
+        <button data-section="dashboard" class="nav-btn kk-nav-item" data-tooltip="Resumen">
+          <i data-lucide="layout-dashboard" class="text-blue-300"></i>
           <span class="label">Resumen</span>
         </button>
-        <button data-section="estudiantes" class="nav-btn w-full flex items-center gap-3 p-3 rounded-lg text-white hover:bg-white/20 transition-colors relative">
-          <i data-lucide="users" class="w-5 h-5 shrink-0"></i>
+
+        <div class="kk-nav-section label">Gestión</div>
+        <button data-section="estudiantes" class="nav-btn kk-nav-item relative" data-tooltip="Estudiantes">
+          <i data-lucide="users" class="text-orange-300"></i>
           <span class="label">Estudiantes</span>
-          <span id="badge-estudiantes" class="hidden absolute top-1 right-1 min-w-[16px] h-4 bg-rose-500 text-white text-[9px] font-black rounded-full flex items-center justify-center px-1 shadow">0</span>
+          <span id="badge-estudiantes" class="hidden kk-badge">0</span>
         </button>
-        <button data-section="maestros" class="nav-btn w-full flex items-center gap-3 p-3 rounded-lg text-white hover:bg-white/20 transition-colors relative">
-          <i data-lucide="graduation-cap" class="w-5 h-5 shrink-0"></i>
+        <button data-section="maestros" class="nav-btn kk-nav-item relative" data-tooltip="Maestros">
+          <i data-lucide="graduation-cap" class="text-green-300"></i>
           <span class="label">Maestros</span>
-          <span id="badge-maestros" class="hidden absolute top-1 right-1 min-w-[16px] h-4 bg-rose-500 text-white text-[9px] font-black rounded-full flex items-center justify-center px-1 shadow">0</span>
+          <span id="badge-maestros" class="hidden kk-badge">0</span>
         </button>
-        <button data-section="muro" class="nav-btn w-full flex items-center gap-3 p-3 rounded-lg text-white hover:bg-white/20 transition-colors relative">
-          <i data-lucide="layout" class="w-5 h-5 shrink-0"></i>
-          <span class="label">Muro Escolar</span>
-          <span id="badge-muro" class="hidden absolute top-1 right-1 min-w-[16px] h-4 bg-rose-500 text-white text-[9px] font-black rounded-full flex items-center justify-center px-1 shadow">0</span>
-        </button>
-        <button data-section="aulas" class="nav-btn w-full flex items-center gap-3 p-3 rounded-lg text-white hover:bg-white/20 transition-colors">
-          <i data-lucide="home" class="w-5 h-5 shrink-0"></i>
+        <button data-section="aulas" class="nav-btn kk-nav-item" data-tooltip="Aulas">
+          <i data-lucide="home" class="text-purple-300"></i>
           <span class="label">Aulas</span>
         </button>
-        <button data-section="accesos" class="nav-btn w-full flex items-center gap-3 p-3 rounded-lg text-white hover:bg-white/20 transition-colors relative">
-          <i data-lucide="scan-line" class="w-5 h-5 shrink-0"></i>
-          <span class="label">Accesos</span>
+
+        <div class="kk-nav-section label">Comunicación</div>
+        <button data-section="muro" class="nav-btn kk-nav-item relative" data-tooltip="Muro Escolar">
+          <i data-lucide="layout" class="text-amber-300"></i>
+          <span class="label">Muro Escolar</span>
+          <span id="badge-muro" class="hidden kk-badge">0</span>
         </button>
-        <button data-section="pagos" class="nav-btn w-full flex items-center gap-3 p-3 rounded-lg text-white hover:bg-white/20 transition-colors relative">
-          <i data-lucide="credit-card" class="w-5 h-5 shrink-0"></i>
-          <span class="label">Pagos</span>
-          <span id="badge-pagos" class="hidden absolute top-1 right-1 min-w-[16px] h-4 bg-rose-500 text-white text-[9px] font-black rounded-full flex items-center justify-center px-1 shadow">0</span>
-        </button>
-        <button data-section="chat" class="nav-btn w-full flex items-center gap-3 p-3 rounded-lg text-white hover:bg-white/20 transition-colors relative">
-          <i data-lucide="message-square" class="w-5 h-5 shrink-0"></i>
+        <button data-section="chat" class="nav-btn kk-nav-item relative" data-tooltip="Chat">
+          <i data-lucide="message-square" class="text-sky-300"></i>
           <span class="label">Chat</span>
-          <span id="badge-chat" class="hidden absolute top-1 right-1 min-w-[16px] h-4 bg-rose-500 text-white text-[9px] font-black rounded-full flex items-center justify-center px-1 shadow">0</span>
+          <span id="badge-chat" class="hidden kk-badge">0</span>
         </button>
-        <button data-section="videocall" class="nav-btn w-full flex items-center gap-3 p-3 rounded-lg text-white hover:bg-white/20 transition-colors">
-          <i data-lucide="video" class="w-5 h-5 shrink-0 text-orange-400"></i>
+        <button data-section="videocall" class="nav-btn kk-nav-item" data-tooltip="Videollamadas">
+          <i data-lucide="video" class="text-rose-300"></i>
           <span class="label">Videollamadas</span>
         </button>
-        <button data-section="perfil" class="nav-btn w-full flex items-center gap-3 p-3 rounded-lg text-white hover:bg-white/20 transition-colors">
-          <i data-lucide="user-circle" class="w-5 h-5 shrink-0"></i>
+
+        <div class="kk-nav-section label">Operaciones</div>
+        <button data-section="accesos" class="nav-btn kk-nav-item" data-tooltip="Accesos QR">
+          <i data-lucide="scan-line" class="text-lime-300"></i>
+          <span class="label">Accesos QR</span>
+        </button>
+        <button data-section="pagos" class="nav-btn kk-nav-item relative" data-tooltip="Pagos">
+          <i data-lucide="credit-card" class="text-yellow-300"></i>
+          <span class="label">Pagos</span>
+          <span id="badge-pagos" class="hidden kk-badge">0</span>
+        </button>
+        <button data-section="perfil" class="nav-btn kk-nav-item" data-tooltip="Mi Perfil">
+          <i data-lucide="user-circle" class="text-slate-300"></i>
           <span class="label">Mi Perfil</span>
         </button>
       </nav>
 
-      <div class="mt-auto p-2 label relative z-10">
-        <button id="btnLogout" class="w-full bg-white/20 hover:bg-white/30 text-white font-bold py-3 rounded-xl flex items-center justify-center gap-2 transition-all shadow-sm border border-white/10">
-          <i data-lucide="log-out" class="w-5 h-5"></i> 
-          <span>Cerrar Sesión</span>
+      <!-- Logout -->
+      <div class="p-3 relative z-10 border-t border-white/10">
+        <button id="btnLogout" class="kk-logout-btn">
+          <i data-lucide="log-out" class="w-4 h-4"></i>
+          <span class="label">Cerrar Sesión</span>
         </button>
       </div>
 
-      <!-- Icono Grande Decorativo (Rompecabezas) -->
-      <div class="absolute bottom-4 right-4 opacity-20 pointer-events-none transform -rotate-6">
-        <i data-lucide="puzzle" class="w-32 h-32 text-white"></i>
+      <!-- Decorativo -->
+      <div class="kk-sidebar-deco">
+        <i data-lucide="puzzle" class="w-36 h-36 text-white"></i>
       </div>
     </aside>
 

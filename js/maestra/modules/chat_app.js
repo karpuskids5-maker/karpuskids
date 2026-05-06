@@ -13,17 +13,74 @@ export async function initChat() {
 
   try {
     const unreadMap = await ChatModule.getUnreadCounts();
-    const students  = AppState.get('students') || [];
-    const user      = AppState.get('user');
+    let students = AppState.get('students') || [];
+    const user   = AppState.get('user');
 
-    // Build parent contacts from students
+    // Si no hay estudiantes en AppState, cargarlos directamente
+    if (!students.length) {
+      const classroom = AppState.get('classroom');
+      if (classroom?.id) {
+        try {
+          const { MaestraApi } = await import('../api.js');
+          students = await MaestraApi.getStudentsByClassroom(classroom.id);
+          if (students.length) AppState.set('students', students);
+        } catch (_) {}
+      }
+    }
+
+    // Build parent contacts from students — fetch parent names from profiles
     const parentsMap = new Map();
+    const parentIds = students.filter(s => s.parent_id).map(s => s.parent_id);
+
+    // Fetch parent profile names if we have parent_ids
+    let parentProfiles = {};
+    if (parentIds.length > 0) {
+      try {
+        const { supabase: sb } = await import('../../shared/supabase.js');
+        const { data: profiles } = await sb
+          .from('profiles')
+          .select('id, name, avatar_url')
+          .in('id', parentIds);
+        (profiles || []).forEach(p => { parentProfiles[p.id] = p; });
+      } catch (_) {}
+    }
+
+    // Also fetch parents by p1_email for students without parent_id
+    const studentsWithoutParent = students.filter(s => !s.parent_id && s.p1_email);
+    if (studentsWithoutParent.length > 0) {
+      try {
+        const { supabase: sb } = await import('../../shared/supabase.js');
+        const emails = studentsWithoutParent.map(s => s.p1_email).filter(Boolean);
+        const { data: profilesByEmail } = await sb
+          .from('profiles')
+          .select('id, name, avatar_url, email')
+          .in('email', emails);
+        // Map email → profile for lookup
+        const emailMap = {};
+        (profilesByEmail || []).forEach(p => { emailMap[p.email] = p; });
+        // Add these as virtual parent_id entries on the student objects
+        studentsWithoutParent.forEach(s => {
+          const prof = emailMap[s.p1_email];
+          if (prof) s._resolvedParentId = prof.id;
+        });
+      } catch (_) {}
+    }
+
     students.forEach(s => {
-      if (s.parent_id) {
-        if (!parentsMap.has(s.parent_id)) {
-          parentsMap.set(s.parent_id, { id: s.parent_id, name: s.name, childName: s.name, avatar: s.avatar_url || null, roleLabel: 'Padre/Madre' });
+      const pid = s.parent_id || s._resolvedParentId;
+      if (pid) {
+        const profile = parentProfiles[pid];
+        const displayName = profile?.name || s.p1_name || `Padre de ${s.name}`;
+        if (!parentsMap.has(pid)) {
+          parentsMap.set(pid, {
+            id: pid,
+            name: displayName,
+            childName: s.name,
+            avatar: profile?.avatar_url || null,
+            roleLabel: 'Padre/Madre'
+          });
         } else {
-          const p = parentsMap.get(s.parent_id);
+          const p = parentsMap.get(pid);
           if (!p.childName.includes(s.name)) p.childName += `, ${s.name}`;
         }
       }

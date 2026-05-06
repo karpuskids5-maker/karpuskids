@@ -121,7 +121,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     setTimeout(() => {
       if (!window.QRCode) {
         const s = document.createElement('script');
-        s.src = 'https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js';
+        s.src = 'https://cdn.jsdelivr.net/npm/qrcodejs@1.0.0/qrcode.min.js';
         document.head.appendChild(s);
       }
     }, 2000);
@@ -645,7 +645,7 @@ async function _initPadreQR(student) {
     if (!window.QRCode) {
       await new Promise((resolve, reject) => {
         const s = document.createElement('script');
-        s.src = 'https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js';
+        s.src = 'https://cdn.jsdelivr.net/npm/qrcodejs@1.0.0/qrcode.min.js';
         s.onload = resolve;
         s.onerror = reject;
         document.head.appendChild(s);

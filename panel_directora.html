@@ -15,6 +15,7 @@
   <script src="https://cdn.tailwindcss.com"></script>
   <link rel="stylesheet" href="css/theme.css" />
   <link rel="stylesheet" href="css/layout.css" />
+  <link rel="stylesheet" href="css/karpus-modern.css" />
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js" defer></script>
   <script src="https://cdn.jsdelivr.net/npm/lucide@0.263.1/dist/umd/lucide.min.js" defer></script>
   <script src="https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js" crossorigin="anonymous" defer></script>
@@ -364,87 +365,101 @@
     <div id="sidebarOverlay" class="fixed inset-0 bg-black/50 z-40 backdrop-blur-sm transition-opacity" style="display:none;"></div>
     
     <!-- SIDEBAR -->
-    <aside id="sidebar" class="bg-gradient-to-b from-violet-600 to-indigo-700 border-r-4 border-violet-400 p-4 rounded-r-3xl shadow-2xl fixed inset-y-0 left-0 z-50 w-72">
-      <button id="toggleSidebar" class="absolute -right-3 top-6 bg-white rounded-full p-1 shadow-md border border-slate-100 text-slate-500 hover:text-purple-600 hidden md:block"><i data-lucide="chevron-left" class="w-4 h-4"></i></button>
-      <div class="flex items-center gap-3 mb-6">
-        <div class="h-12 w-12 rounded-2xl bg-white/20 flex items-center justify-center shadow-lg overflow-hidden shrink-0 border border-white/10">
-          <img src="img/mundo.jpg" alt="logo" class="w-full h-full object-contain p-1.5" loading="lazy" />
+    <aside id="sidebar" class="kk-sidebar bg-gradient-to-b from-violet-600 via-violet-700 to-indigo-800 shadow-2xl fixed inset-y-0 left-0 z-50 w-72 flex flex-col" style="border-right:none;">
+      <!-- Toggle collapse -->
+      <button id="toggleSidebar" class="absolute -right-3 top-8 bg-white rounded-full p-1.5 shadow-lg border border-slate-100 text-slate-500 hover:text-violet-600 hidden md:flex items-center justify-center z-10 transition-all hover:scale-110">
+        <i data-lucide="chevron-left" id="toggleSidebarIcon" class="w-3.5 h-3.5"></i>
+      </button>
+
+      <!-- Logo Karpus Kids -->
+      <div class="kk-sidebar-logo">
+        <div class="kk-sidebar-logo-img">
+          <img src="img/mundo.jpg" alt="Karpus Kids" loading="eager">
         </div>
-        <div class="label overflow-hidden">
-          <h3 class="font-black text-white text-lg tracking-tight karpus-kids-inline whitespace-nowrap">
-            <span class="k-1">K</span><span class="k-2">a</span><span class="k-3">r</span><span class="k-4">p</span><span class="k-5">u</span><span class="k-6">s</span> <span class="k-7">K</span><span class="k-8">i</span><span class="k-9">d</span><span class="k-10">s</span>
-          </h3>
-          <p class="text-xs text-white/70 font-bold truncate">Panel Directora</p>
+        <div class="kk-sidebar-logo-text label">
+          <div class="brand karpus-kids-inline">
+            <span class="k-1">K</span><span class="k-2">a</span><span class="k-3">r</span><span class="k-4">p</span><span class="k-5">u</span><span class="k-6">s</span>&#32;<span class="k-7">K</span><span class="k-8">i</span><span class="k-9">d</span><span class="k-10">s</span>
+          </div>
+          <div class="sub">Panel Directora</div>
         </div>
       </div>
 
-      <div class="sidebar-scroll relative z-10">
-        <div class="px-4 mb-4 flex items-center gap-3">
-          <div id="sidebarAvatar" class="w-10 h-10 rounded-xl bg-white/20 overflow-hidden shadow-inner flex items-center justify-center font-black text-white relative group cursor-pointer">
-            <img id="sidebarProfileAvatar" src="img/mundo.jpg" alt="Avatar" class="w-full h-full object-cover transition-opacity group-hover:opacity-50">
-            <div class="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
-              <i data-lucide="camera" class="w-5 h-5 text-white"></i>
-            </div>
-            <input type="file" id="sidebarAvatarInput" accept="image/*" class="hidden">
+      <!-- Perfil -->
+      <div class="kk-sidebar-profile label mx-2">
+        <div class="kk-sidebar-profile-avatar relative group cursor-pointer" id="sidebarAvatar">
+          <img id="sidebarProfileAvatar" src="img/mundo.jpg" alt="Avatar" class="w-full h-full object-cover transition-opacity group-hover:opacity-60">
+          <div class="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
+            <i data-lucide="camera" class="w-4 h-4 text-white"></i>
           </div>
-          <div class="label">
-            <p class="text-[10px] font-black uppercase text-white/50 tracking-tighter">Director(a)</p>
-            <p id="sidebarName" class="text-xs font-bold text-white truncate w-32">Cargando...</p>
-          </div>
+          <input type="file" id="sidebarAvatarInput" accept="image/*" class="hidden">
         </div>
-      <nav class="space-y-2 teams-nav bg-white/10 p-2 rounded-xl mb-4 backdrop-blur-sm">
-        <button data-section="dashboard" class="nav-btn teams-nav-item text-white hover:bg-white/20" title="Dashboard">
-          <i data-lucide="grid" class="text-blue-400"></i>
+        <div class="kk-sidebar-profile-info label">
+          <div class="kk-sidebar-profile-role">Directora</div>
+          <div class="kk-sidebar-profile-name" id="sidebarName">Cargando...</div>
+        </div>
+      </div>
+
+      <!-- Nav -->
+      <nav class="flex-1 overflow-y-auto kk-scroll px-2 py-1 space-y-0.5 relative z-10">
+        <div class="kk-nav-section label">Principal</div>
+        <button data-section="dashboard" class="kk-nav-item" data-tooltip="Dashboard">
+          <i data-lucide="layout-dashboard" class="text-blue-300"></i>
           <span class="label">Dashboard</span>
         </button>
-        <button data-section="maestros" class="nav-btn teams-nav-item text-white hover:bg-white/20 relative" title="Maestros">
-          <i data-lucide="users" class="text-green-400"></i>
+
+        <div class="kk-nav-section label">Gestión</div>
+        <button data-section="maestros" class="kk-nav-item relative" data-tooltip="Maestros">
+          <i data-lucide="user-cog" class="text-green-300"></i>
           <span class="label">Maestros</span>
-          <span id="badge-maestros" class="hidden absolute top-1 right-1 min-w-[16px] h-4 bg-rose-500 text-white text-[9px] font-black rounded-full flex items-center justify-center px-1 shadow">0</span>
+          <span id="badge-maestros" class="hidden kk-badge">0</span>
         </button>
-        <button data-section="estudiantes" class="nav-btn teams-nav-item text-white hover:bg-white/20 relative" title="Estudiantes">
-          <i data-lucide="user-check" class="text-orange-400"></i>
+        <button data-section="estudiantes" class="kk-nav-item relative" data-tooltip="Estudiantes">
+          <i data-lucide="graduation-cap" class="text-orange-300"></i>
           <span class="label">Estudiantes</span>
-          <span id="badge-estudiantes" class="hidden absolute top-1 right-1 min-w-[16px] h-4 bg-rose-500 text-white text-[9px] font-black rounded-full flex items-center justify-center px-1 shadow">0</span>
+          <span id="badge-estudiantes" class="hidden kk-badge">0</span>
         </button>
-        <button data-section="aulas" class="nav-btn teams-nav-item text-white hover:bg-white/20" title="Aulas">
-          <i data-lucide="home" class="text-purple-400"></i>
+        <button data-section="aulas" class="kk-nav-item" data-tooltip="Aulas">
+          <i data-lucide="school" class="text-purple-300"></i>
           <span class="label">Aulas</span>
         </button>
-        <button data-section="asistencia" class="nav-btn teams-nav-item text-white hover:bg-white/20 relative" title="Asistencia">
-          <i data-lucide="calendar" class="text-pink-400"></i>
+
+        <div class="kk-nav-section label">Académico</div>
+        <button data-section="asistencia" class="kk-nav-item relative" data-tooltip="Asistencia">
+          <i data-lucide="calendar-check-2" class="text-pink-300"></i>
           <span class="label">Asistencia</span>
-          <span id="badge-asistencia" class="hidden absolute top-1 right-1 min-w-[16px] h-4 bg-rose-500 text-white text-[9px] font-black rounded-full flex items-center justify-center px-1 shadow">0</span>
+          <span id="badge-asistencia" class="hidden kk-badge">0</span>
         </button>
-        <button data-section="calificaciones" class="nav-btn teams-nav-item text-white hover:bg-white/20 relative" title="Calificaciones">
-          <i data-lucide="graduation-cap" class="text-teal-400"></i>
+        <button data-section="calificaciones" class="kk-nav-item relative" data-tooltip="Calificaciones">
+          <i data-lucide="star" class="text-teal-300"></i>
           <span class="label">Calificaciones</span>
-          <span id="badge-calificaciones" class="hidden absolute top-1 right-1 min-w-[16px] h-4 bg-rose-500 text-white text-[9px] font-black rounded-full flex items-center justify-center px-1 shadow">0</span>
+          <span id="badge-calificaciones" class="hidden kk-badge">0</span>
         </button>
-        <button data-section="pagos" class="nav-btn teams-nav-item text-white hover:bg-white/20 relative" title="Pagos">
-          <i data-lucide="credit-card" class="text-yellow-400"></i>
+
+        <div class="kk-nav-section label">Finanzas</div>
+        <button data-section="pagos" class="kk-nav-item relative" data-tooltip="Pagos">
+          <i data-lucide="banknote" class="text-yellow-300"></i>
           <span class="label">Pagos</span>
-          <span id="badge-pagos" class="hidden absolute top-1 right-1 min-w-[16px] h-4 bg-rose-500 text-white text-[9px] font-black rounded-full flex items-center justify-center px-1 shadow">0</span>
+          <span id="badge-pagos" class="hidden kk-badge">0</span>
         </button>
-        <button data-section="configuracion" class="nav-btn teams-nav-item text-white hover:bg-white/20" title="Configuración">          <i data-lucide="settings" class="text-slate-400"></i>
+
+        <div class="kk-nav-section label">Sistema</div>
+        <button data-section="configuracion" class="kk-nav-item" data-tooltip="Configuración">
+          <i data-lucide="sliders-horizontal" class="text-slate-300"></i>
           <span class="label">Configuración</span>
         </button>
       </nav>
 
-      <div class="mt-auto pt-6 border-t border-white/10 relative z-10">
-        <button id="btnLogout" class="nav-btn text-white hover:bg-white/20 w-full group">
-          <i data-lucide="log-out" class="text-white group-hover:text-red-200 transition-colors"></i>
-          <span class="label group-hover:text-red-100 transition-colors">Cerrar Sesión</span>
+      <!-- Logout -->
+      <div class="p-3 relative z-10 border-t border-white/10">
+        <button id="btnLogout" class="kk-logout-btn">
+          <i data-lucide="log-out" class="w-4 h-4"></i>
+          <span class="label">Cerrar Sesión</span>
         </button>
-        <div class="mt-4 text-xs text-white/60 px-4 label">
-          <p>Usuario: <span class="font-medium text-white">Director(a)</span></p>
-        </div>
-      </div>
       </div>
 
-      <!-- Icono Grande Decorativo (Libro/Escuela) -->
-      <div class="absolute bottom-4 right-4 opacity-10 pointer-events-none transform rotate-6">
-        <i data-lucide="book-open" class="w-40 h-40 text-white"></i>
+      <!-- Decorativo -->
+      <div class="kk-sidebar-deco">
+        <i data-lucide="star" class="w-36 h-36 text-white"></i>
       </div>
     </aside>
 

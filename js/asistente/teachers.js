@@ -1,9 +1,9 @@
-Ôªøimport { supabase, sendEmail } from '../shared/supabase.js';
+import { supabase, sendEmail } from '../shared/supabase.js';
 import { AssistantApi } from './api.js';
 import { Helpers } from '../shared/helpers.js';
 
 /**
- * M√≥dulo de Gesti√≥n de Maestros para Asistente
+ * MÛdulo de GestiÛn de Maestros para Asistente
  */
 export const TeachersModule = {
   async init() {
@@ -63,13 +63,13 @@ export const TeachersModule = {
     const html = `
       <div class="bg-gradient-to-r from-teal-600 to-emerald-600 text-white p-4 rounded-t-3xl flex items-center justify-between shrink-0">
         <div class="flex items-center gap-2">
-          <div class="w-9 h-9 bg-white/20 rounded-xl flex items-center justify-center text-lg">üë©‚Äçüè´</div>
+          <div class="w-9 h-9 bg-white/20 rounded-xl flex items-center justify-center text-lg">?????</div>
           <div>
             <h3 class="text-base font-black">${id ? 'Editar Personal' : 'Nuevo Personal'}</h3>
             <p class="text-[9px] text-white/70 font-bold uppercase tracking-widest">Maestras y Asistentes</p>
           </div>
         </div>
-        <button onclick="window._closeAsistenteModal()" class="w-8 h-8 flex items-center justify-center rounded-lg bg-white/10 hover:bg-white/20 transition-all">‚úï</button>
+        <button onclick="window._closeAsistenteModal()" class="w-8 h-8 flex items-center justify-center rounded-lg bg-white/10 hover:bg-white/20 transition-all">?</button>
       </div>
 
       <div class="p-4 space-y-4 overflow-y-auto flex-1 custom-scrollbar" style="max-height: calc(90vh - 120px);">
@@ -81,11 +81,11 @@ export const TeachersModule = {
             <input id="teacherName" placeholder="Ej: Maria Lopez" class="${IC} py-2">
           </div>
           <div class="sm:col-span-2">
-            <label class="${LC}">Correo electr√≥nico *</label>
+            <label class="${LC}">Correo electrÛnico *</label>
             <input id="teacherEmail" type="email" placeholder="usuario@karpus.com" class="${IC} py-2">
           </div>
           <div>
-            <label class="${LC}">Tel√©fono</label>
+            <label class="${LC}">TelÈfono</label>
             <input id="teacherPhone" type="tel" placeholder="Opcional" class="${IC} py-2">
           </div>
           <div>
@@ -100,13 +100,13 @@ export const TeachersModule = {
             <select id="teacherClassroom" class="${IC} py-2"><option value="">-- Sin Aula --</option></select>
           </div>
           <div class="sm:col-span-2">
-            <label class="${LC}">Contrase√±a ${id ? '(Solo si desea cambiarla)' : '(M√≠nimo 6 caracteres) *'}</label>
+            <label class="${LC}">ContraseÒa ${id ? '(Solo si desea cambiarla)' : '(MÌnimo 6 caracteres) *'}</label>
             <input id="teacherPassword" type="text" placeholder="********" class="${IC} py-2">
           </div>
 
           <!-- QR DE ACCESO -->
           <div class="sm:col-span-2 bg-gradient-to-br from-orange-50 to-amber-50 rounded-2xl border border-orange-100 p-3 space-y-3">
-            <p class="text-[10px] font-black text-orange-700 uppercase tracking-widest flex items-center gap-1.5">üì± C√≥digo QR de Acceso</p>
+            <p class="text-[10px] font-black text-orange-700 uppercase tracking-widest flex items-center gap-1.5">?? CÛdigo QR de Acceso</p>
             <div class="flex gap-1.5">
               <input id="teacherMatricula" placeholder="ID Empleado (ej: TEA-2026-1234)" class="${IC} py-2 text-xs">
               <button type="button" onclick="window._genTeacherCode()" class="px-3 py-2 bg-orange-600 text-white rounded-xl font-black text-[9px] uppercase hover:bg-orange-700 transition-all shrink-0">Gen</button>
@@ -114,7 +114,7 @@ export const TeachersModule = {
             <div id="asis-teacher-qr" class="bg-white p-2 rounded-xl border border-orange-100 min-h-[120px] flex items-center justify-center">
               <p class="text-[9px] text-slate-400 font-bold text-center">Genera un ID para ver el QR</p>
             </div>
-            <button type="button" onclick="window._printTeacherQR()" class="w-full py-2 bg-slate-800 text-white rounded-xl font-black text-[9px] uppercase tracking-widest hover:bg-slate-900 transition-all">üñ®Ô∏è Imprimir Carnet</button>
+            <button type="button" onclick="window._printTeacherQR()" class="w-full py-2 bg-slate-800 text-white rounded-xl font-black text-[9px] uppercase tracking-widest hover:bg-slate-900 transition-all">??? Imprimir Carnet</button>
           </div>
           <div class="sm:col-span-2">
             <label class="flex items-center gap-3 p-3 bg-white border-2 border-slate-100 rounded-2xl cursor-pointer">
@@ -178,7 +178,7 @@ export const TeachersModule = {
     const _loadQR = () => new Promise(r => {
       if (window.QRCode) { r(); return; }
       const s = document.createElement('script');
-      s.src = 'https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js';
+      s.src = 'https://cdn.jsdelivr.net/npm/qrcodejs@1.0.0/qrcode.min.js';
       s.onload = r; document.head.appendChild(s);
     });
 
@@ -207,7 +207,7 @@ export const TeachersModule = {
       const img = container?.querySelector('img')?.src || container?.querySelector('canvas')?.toDataURL();
       if (!img || !code) { Helpers.toast('Genera el QR primero', 'warning'); return; }
       const win = window.open('', '_blank');
-      win.document.write(`<!DOCTYPE html><html><head><title>Carnet ${name}</title><style>body{font-family:Arial,sans-serif;display:flex;align-items:center;justify-content:center;min-height:100vh;margin:0;}.card{border:4px solid #0d9488;border-radius:20px;padding:24px;text-align:center;max-width:260px;}.hdr{background:#0d9488;color:white;margin:-24px -24px 16px;padding:12px;border-radius:16px 16px 0 0;font-weight:900;font-size:12px;text-transform:uppercase;}img{width:160px;height:160px;border-radius:8px;}.name{font-size:16px;font-weight:900;color:#1e293b;margin-top:12px;}.code{font-size:10px;color:#64748b;font-weight:700;margin-top:4px;}</style></head><body><div class="card"><div class="hdr">STAFF ¬∑ KARPUS KIDS</div><img src="${img}"><div class="name">${name}</div><div class="code">ID: ${code}</div></div><script>window.onload=()=>window.print()<\/script></body></html>`);
+      win.document.write(`<!DOCTYPE html><html><head><title>Carnet ${name}</title><style>body{font-family:Arial,sans-serif;display:flex;align-items:center;justify-content:center;min-height:100vh;margin:0;}.card{border:4px solid #0d9488;border-radius:20px;padding:24px;text-align:center;max-width:260px;}.hdr{background:#0d9488;color:white;margin:-24px -24px 16px;padding:12px;border-radius:16px 16px 0 0;font-weight:900;font-size:12px;text-transform:uppercase;}img{width:160px;height:160px;border-radius:8px;}.name{font-size:16px;font-weight:900;color:#1e293b;margin-top:12px;}.code{font-size:10px;color:#64748b;font-weight:700;margin-top:4px;}</style></head><body><div class="card"><div class="hdr">STAFF ∑ KARPUS KIDS</div><img src="${img}"><div class="name">${name}</div><div class="code">ID: ${code}</div></div><script>window.onload=()=>window.print()<\/script></body></html>`);
       win.document.close();
     };
 
@@ -256,7 +256,7 @@ export const TeachersModule = {
         Helpers.toast('Maestra actualizada correctamente');
       } else {
         // Crear nuevo maestro (Usa signUp normal con persistSession: false)
-        if (!password || password.length < 6) throw new Error('Contrase√±a requerida (min 6 caracteres)');
+        if (!password || password.length < 6) throw new Error('ContraseÒa requerida (min 6 caracteres)');
         
         // Use temp client to avoid logging out the current asistente session
         const { createClient: _cc } = await import('https://cdn.jsdelivr.net/npm/@supabase/supabase-js/+esm');
@@ -270,11 +270,11 @@ export const TeachersModule = {
 
         if (authError) {
           if (authError.status === 422 || authError.message?.toLowerCase().includes('already registered')) {
-            // User exists ‚Äî just upsert the profile with maestra role
+            // User exists ó just upsert the profile with maestra role
             const { data: existing } = await supabase.from('profiles').select('id').eq('email', email).maybeSingle();
             if (existing?.id) {
               await supabase.from('profiles').update({ name, phone, role: 'maestra' }).eq('id', existing.id);
-              Helpers.toast('Perfil de maestra actualizado (usuario ya exist√≠a)');
+              Helpers.toast('Perfil de maestra actualizado (usuario ya existÌa)');
               window._closeAsistenteModal?.();
               await this.loadTeachers();
               return;
@@ -295,16 +295,16 @@ export const TeachersModule = {
 
           const html = `
             <div style="font-family: sans-serif; max-width: 600px; margin: auto; padding: 20px; border: 1px solid #e0f2fe; border-radius: 10px;">
-              <h2 style="color: #0369a1;">¬°Bienvenida al Equipo de Karpus Kids! üçé</h2>
+              <h2 style="color: #0369a1;">°Bienvenida al Equipo de Karpus Kids! ??</h2>
               <p>Hola <b>${name}</b>,</p>
               <p>Se ha creado tu cuenta de acceso al Panel de Maestra en Karpus Kids.</p>
               <div style="background: #f0f9ff; padding: 15px; border-radius: 8px; margin: 15px 0;">
                 <p><b>Usuario (Email):</b> ${email}</p>
-                <p style="color:#6b7280;font-size:13px;">Por seguridad, usa el enlace de abajo para establecer tu contrase√±a.</p>
+                <p style="color:#6b7280;font-size:13px;">Por seguridad, usa el enlace de abajo para establecer tu contraseÒa.</p>
               </div>
-              <p>Accede desde aqu√≠: <a href="${window.location.origin}/login.html" style="color: #0369a1; font-weight: bold;">Iniciar Sesi√≥n</a></p>
+              <p>Accede desde aquÌ: <a href="${window.location.origin}/login.html" style="color: #0369a1; font-weight: bold;">Iniciar SesiÛn</a></p>
               <hr style="border: none; border-top: 1px solid #e0f2fe; margin: 20px 0;">
-              <p style="font-size: 12px; color: #666;">Karpus Kids - Administraci√≥n</p>
+              <p style="font-size: 12px; color: #666;">Karpus Kids - AdministraciÛn</p>
             </div>
           `;
           await sendEmail(email, `Bienvenida a Karpus Kids - Credenciales de Acceso`, html);
@@ -320,7 +320,7 @@ export const TeachersModule = {
   },
 
   async deleteTeacher(id, name) {
-    const ok = await (window._karpusConfirmDelete || ((t) => Promise.resolve(confirm(t))))(`¬øEliminar a ${name}?`, 'Esta acci√≥n no se puede deshacer.');
+    const ok = await (window._karpusConfirmDelete || ((t) => Promise.resolve(confirm(t))))(`øEliminar a ${name}?`, 'Esta acciÛn no se puede deshacer.');
     if (!ok) return;
     try {
       const { error } = await supabase.from('profiles').delete().eq('id', id);

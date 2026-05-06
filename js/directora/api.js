@@ -201,7 +201,9 @@ export const DirectorApi = {
       const month = filterMonth ? String(filterMonth).padStart(2, '0') : String(now.getMonth() + 1).padStart(2, '0');
       const monthKey   = `${year}-${month}`;
       const rangeStart = `${year}-${month}-01`;
-      const rangeEnd   = `${year}-${month}-31`;
+      // Calculate real last day of month — avoids invalid dates like 04-31
+      const lastDay    = new Date(parseInt(year), parseInt(month), 0).getDate();
+      const rangeEnd   = `${year}-${month}-${String(lastDay).padStart(2, '0')}`;
 
       // Helper: count payments by status for this month (handles both YYYY-MM and Spanish formats)
       const countByStatus = async (status) => {

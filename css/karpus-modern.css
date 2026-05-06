@@ -1,651 +1,424 @@
-/* Karpus Modern CSS - Estilo profesional similar a Teams */
+/* ============================================================
+   🎨 Karpus Kids — Modern Design System v2
+   Mejoras visuales globales: animaciones, sidebar, colores
+   ============================================================ */
 
-:root {
-  /* Core brand colors (single source of truth) */
-  --karpus-blue: #60A5FA;   /* Azul Calma */
-  --karpus-green: #4ADE80;  /* Verde Éxito */
-  --karpus-orange: #FB923C; /* Naranja Pastel */
-  --karpus-pink: #F472B6;   /* Rosa Suave (Brand) */
-  --karpus-purple: #7b1fa2;
-  --karpus-teal: #00897b;
-  --karpus-yellow: #FACC15; /* Amarillo Suave */
-  --teams-purple: #6264a7;
-  --teams-dark: #2d2c2c;
-
-  /* Sidebar sizing system */
-  --sidebar-width: 260px;
-  --sidebar-collapsed-width: 78px;
-
-  /* Additional palette / utility tokens */
-  --karpus-red: #F44336;
-  --karpus-gray: #607D8B;
-
-  /* Shadows & radii */
-  --shadow-sm: 0 2px 4px rgba(0,0,0,0.05);
-  --shadow-md: 0 4px 8px rgba(0,0,0,0.1);
-  --shadow-lg: 0 8px 16px rgba(0,0,0,0.1);
-  --radius-sm: 8px;
-  --radius-md: 16px;
-  --radius-lg: 24px;
-  --radius-xl: 32px; /* rounded-3xl */
+/* ── Keyframes globales ──────────────────────────────────── */
+@keyframes kk-float {
+  0%, 100% { transform: translateY(0px) rotate(0deg); }
+  33%       { transform: translateY(-8px) rotate(1deg); }
+  66%       { transform: translateY(-4px) rotate(-1deg); }
+}
+@keyframes kk-pulse-ring {
+  0%   { box-shadow: 0 0 0 0 rgba(255,255,255,0.4); }
+  70%  { box-shadow: 0 0 0 10px rgba(255,255,255,0); }
+  100% { box-shadow: 0 0 0 0 rgba(255,255,255,0); }
+}
+@keyframes kk-shimmer {
+  0%   { background-position: -200% center; }
+  100% { background-position: 200% center; }
+}
+@keyframes kk-slide-in {
+  from { opacity: 0; transform: translateX(-12px); }
+  to   { opacity: 1; transform: translateX(0); }
+}
+@keyframes kk-fade-up {
+  from { opacity: 0; transform: translateY(16px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+@keyframes kk-spin-slow {
+  to { transform: rotate(360deg); }
+}
+@keyframes kk-bounce-in {
+  0%   { transform: scale(0.8); opacity: 0; }
+  60%  { transform: scale(1.05); opacity: 1; }
+  100% { transform: scale(1); }
+}
+@keyframes kk-glow {
+  0%, 100% { opacity: 0.15; }
+  50%       { opacity: 0.35; }
 }
 
-/* Gradientes profesionales */
-.gradient-purple-blue {
-  background: linear-gradient(135deg, var(--karpus-purple), var(--karpus-blue));
-}
+/* ── Utility classes ─────────────────────────────────────── */
+.kk-float        { animation: kk-float 5s ease-in-out infinite; }
+.kk-fade-up      { animation: kk-fade-up 0.5s ease both; }
+.kk-slide-in     { animation: kk-slide-in 0.3s ease both; }
+.kk-bounce-in    { animation: kk-bounce-in 0.4s cubic-bezier(0.34,1.56,0.64,1) both; }
 
-.gradient-green-teal {
-  background: linear-gradient(135deg, var(--karpus-green), var(--karpus-teal));
-}
+/* ── Logo Karpus Kids — colores estándar ─────────────────── */
+.kk-logo .k-1, .kk-logo .k-5, .kk-logo .k-10 { color: #f97316; }
+.kk-logo .k-2, .kk-logo .k-6, .kk-logo .k-9  { color: #3b82f6; }
+.kk-logo .k-3, .kk-logo .k-8                  { color: #ec4899; }
+.kk-logo .k-4, .kk-logo .k-7                  { color: #22c55e; }
 
-.gradient-orange-pink {
-  background: linear-gradient(135deg, var(--karpus-orange), var(--karpus-pink));
-}
-
-/* Estilo de navegación similar a Teams */
-.teams-nav {
-  display: flex;
-  flex-direction: column;
-  gap: 0.25rem;
-  padding: 0.5rem;
-}
-
-.teams-nav-item {
-  display: flex;
-  align-items: center;
-  gap: 0.75rem;
-  padding: 0.75rem 1rem;
-  border-radius: 0.5rem;
-  transition: all 0.18s ease;
-  text-align: left;
-  width: 100%;
-  white-space: nowrap;
-}
-
-.teams-nav-item:hover {
-  background-color: rgba(255, 255, 255, 0.12);
-  transform: translateX(4px);
-}
-
-.teams-nav-item.active {
-  background-color: rgba(241,245,255,0.9); /* subtle light */
-  border-left: 4px solid var(--karpus-blue);
-  box-shadow: 0 2px 8px rgba(30,136,229,0.06);
-}
-
-/* Accessible focus/hover/active states */
-.teams-nav-item:focus,
-.teams-nav-item:focus-visible,
-.teams-nav-item[aria-current="page"] {
-  outline: none;
-  box-shadow: 0 0 0 3px rgba(59,130,246,0.12);
-}
-
-/* Accesibilidad: foco visible */
-.teams-nav-item:focus-visible,
-.modern-button:focus-visible,
-button:focus-visible,
-a:focus-visible {
-  outline: 2px solid #3b82f6;
-  outline-offset: 2px;
-}
-
-/* Notificaciones estilo Teams */
-.notification-badge {
-  background-color: #ff4081;
-  color: white;
-  border-radius: 1rem;
-  padding: 0.1rem 0.5rem;
-  font-size: 0.75rem;
-  font-weight: bold;
-}
-
-/* Tarjetas modernas */
-.modern-card,
-.card-modern {
-  background-color: white;
-  border-radius: var(--radius-md);
-  box-shadow: var(--shadow-md);
-  transition: transform 0.18s ease, box-shadow 0.18s ease, opacity 0.18s ease;
+/* ── Sidebar base mejorado ───────────────────────────────── */
+.kk-sidebar {
+  position: relative;
   overflow: hidden;
 }
 
-.modern-card:hover,
-.card-modern:hover {
-  transform: translateY(-6px);
-  box-shadow: var(--shadow-lg);
+/* Brillo decorativo en la parte superior del sidebar */
+.kk-sidebar::before {
+  content: '';
+  position: absolute;
+  top: -60px; left: -60px;
+  width: 200px; height: 200px;
+  background: radial-gradient(circle, rgba(255,255,255,0.18) 0%, transparent 70%);
+  pointer-events: none;
+  z-index: 0;
+  animation: kk-glow 4s ease-in-out infinite;
 }
 
-.modern-card-header {
-  padding: 1.25rem;
-  border-bottom: 1px solid rgba(0, 0, 0, 0.05);
-  font-weight: 600;
+/* Patrón de puntos decorativo */
+.kk-sidebar::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background-image: radial-gradient(circle, rgba(255,255,255,0.06) 1px, transparent 1px);
+  background-size: 20px 20px;
+  pointer-events: none;
+  z-index: 0;
 }
 
-.modern-card-body {
-  padding: 1.25rem;
-}
-
-.modern-card-footer {
-  padding: 1rem 1.25rem;
-  background-color: rgba(0, 0, 0, 0.02);
-  border-top: 1px solid rgba(0, 0, 0, 0.05);
-}
-
-/* Estado deshabilitado común */
-.modern-button[disabled],
-.teams-nav-item[aria-disabled="true"],
-button[disabled] {
-  opacity: 0.6;
-  cursor: not-allowed;
-}
-
-/* Botones modernos */
-.modern-button {
-  padding: 0.6rem 1.2rem;
-  border-radius: 0.5rem;
-  font-weight: 500;
-  transition: all 0.2s ease;
-  display: inline-flex;
-  align-items: center;
-  gap: 0.5rem;
-  cursor: pointer;
-}
-
-.modern-button-primary {
-  background-color: var(--karpus-pink);
-  color: white;
-}
-
-.modern-button-primary:hover {
-  background-color: #7476b5;
-  box-shadow: 0 4px 12px rgba(98, 100, 167, 0.3);
-}
-
-.modern-button-success {
-  background-color: var(--karpus-green);
-  color: white;
-}
-
-.modern-button-success:hover {
-  background-color: #4caf50;
-  box-shadow: 0 4px 12px rgba(67, 160, 71, 0.3);
-}
-
-.modern-button-danger {
-  background-color: #e53935;
-  color: white;
-}
-
-.modern-button-danger:hover {
-  background-color: #f44336;
-  box-shadow: 0 4px 12px rgba(229, 57, 53, 0.3);
-}
-
-/* Mensajes estilo Teams */
-.teams-message {
-  display: flex;
-  margin-bottom: 1rem;
-}
-
-.teams-message-avatar {
-  width: 40px;
-  height: 40px;
-  border-radius: 50%;
-  margin-right: 0.75rem;
-  flex-shrink: 0;
-}
-
-.teams-message-content {
-  background-color: #f5f5f5;
-  border-radius: 0.75rem;
-  padding: 0.75rem 1rem;
-  max-width: 80%;
-}
-
-.teams-message-sender {
-  font-weight: 600;
-  margin-bottom: 0.25rem;
-  color: var(--teams-purple);
-}
-
-.teams-message-time {
-  font-size: 0.75rem;
-  color: #757575;
-  margin-top: 0.25rem;
-}
-
-.teams-message-mine {
-  flex-direction: row-reverse;
-}
-
-.teams-message-mine .teams-message-avatar {
-  margin-right: 0;
-  margin-left: 0.75rem;
-}
-
-.teams-message-mine .teams-message-content {
-  background-color: #e3f2fd;
-}
-
-/* Animaciones */
-@keyframes fadeIn {
-  from { opacity: 0; }
-  to { opacity: 1; }
-}
-
-@keyframes slideInUp {
-  from { transform: translateY(20px); opacity: 0; }
-  to { transform: translateY(0); opacity: 1; }
-}
-
-.fade-in {
-  animation: fadeIn 0.3s ease forwards;
-}
-
-.slide-in {
-  animation: slideInUp 0.4s ease forwards;
-}
-
-/* Efecto Glass (compatible) */
-.glass {
-  backdrop-filter: blur(8px);
-  -webkit-backdrop-filter: blur(8px);
-  background-color: rgba(255, 255, 255, 0.15);
-  border: 1px solid rgba(255, 255, 255, 0.3);
-}
-
-/* Notificación temporal */
-.notification-toast {
-  position: fixed;
-  bottom: 20px;
-  right: 20px;
-  background-color: white;
-  border-radius: 0.5rem;
-  padding: 1rem;
-  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.15);
-  z-index: 1000;
-  animation: slideInUp 0.3s ease, fadeOut 0.3s ease 2.7s forwards;
-  display: flex;
-  align-items: center;
-  gap: 0.75rem;
-}
-
-@keyframes fadeOut {
-  from { opacity: 1; }
-  to { opacity: 0; }
-}
-
-.notification-toast-success {
-  border-left: 4px solid var(--karpus-green);
-}
-
-.notification-toast-error {
-  border-left: 4px solid #e53935;
-}
-
-.notification-toast-info {
-  border-left: 4px solid var(--karpus-blue);
-}
-
-/* Estilos base */
-body {
-  font-family: 'Nunito', sans-serif;
-  background-color: #f5f7fb;
-  color: #333;
-  transition: all 0.3s ease;
-}
-
-/* Gradientes profesionales */
-.gradient-blue-green {
-  background: linear-gradient(135deg, var(--karpus-blue), var(--karpus-green));
-  color: white;
-}
-
-.gradient-orange-pink {
-  background: linear-gradient(135deg, var(--karpus-orange), var(--karpus-pink));
-  color: white;
-}
-
-.gradient-purple-blue {
-  background: linear-gradient(135deg, var(--karpus-purple), var(--karpus-blue));
-  color: white;
-}
-
-/* Tarjetas modernas */
-.card-modern {
-  background-color: white;
-  border-radius: var(--radius-md);
-  box-shadow: var(--shadow-md);
-  transition: all 0.3s ease;
-  overflow: hidden;
-}
-
-.card-modern:hover {
-  transform: translateY(-5px);
-  box-shadow: var(--shadow-lg);
-}
-
-.card-modern-header {
-  padding: 16px 20px;
-  border-bottom: 1px solid #f0f0f0;
-  font-weight: 600;
-}
-
-.card-modern-body {
-  padding: 20px;
-}
-
-.card-modern-footer {
-  padding: 12px 20px;
-  border-top: 1px solid #f0f0f0;
-  background-color: #fafafa;
-}
-
-/* Botones modernos */
-.btn-modern {
-  padding: 10px 20px;
-  border-radius: var(--radius-md);
-  font-weight: 600;
-  transition: all 0.3s ease;
-  box-shadow: var(--shadow-sm);
-  border: none;
-  cursor: pointer;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  gap: 8px;
-}
-
-.btn-modern:hover {
-  transform: translateY(-2px);
-  box-shadow: var(--shadow-md);
-}
-
-.btn-modern:active {
-  transform: translateY(0);
-}
-
-.btn-primary {
-  background-color: var(--karpus-blue);
-  color: white;
-}
-
-.btn-success {
-  background-color: var(--karpus-green);
-  color: white;
-}
-
-.btn-danger {
-  background-color: var(--karpus-red);
-  color: white;
-}
-
-.btn-warning {
-  background-color: var(--karpus-orange);
-  color: white;
-}
-
-/* Navegación estilo Teams */
-/* (variables consolidated above) */
-.teams-nav {
-  background-color: white;
-  border-radius: var(--radius-lg);
-  box-shadow: var(--shadow-md);
-  overflow: hidden;
-}
-
-.teams-nav-item {
-  padding: 12px 16px;
+/* ── Logo block en sidebar ───────────────────────────────── */
+.kk-sidebar-logo {
+  position: relative;
+  z-index: 1;
   display: flex;
   align-items: center;
   gap: 12px;
-  color: #555;
-  transition: all 0.2s ease;
-  border-left: 3px solid transparent;
-}
-
-.teams-nav-item:hover {
-  background-color: #f5f7fb;
-  color: var(--karpus-blue);
-}
-
-.teams-nav-item.active {
-  background-color: rgba(33, 150, 243, 0.1);
-  color: var(--karpus-blue);
-  border-left: 3px solid var(--karpus-blue);
-}
-
-.teams-nav-item i {
-  font-size: 20px;
-}
-
-/* Mensajes estilo Teams */
-.teams-message {
-  border-left: 4px solid var(--karpus-blue);
-  padding: 16px;
-  margin-bottom: 16px;
-  background-color: white;
-  border-radius: var(--radius-md);
-  box-shadow: var(--shadow-sm);
-  transition: all 0.3s ease;
-}
-
-.teams-message:hover {
-  box-shadow: var(--shadow-md);
-}
-
-.teams-message-header {
-  display: flex;
-  justify-content: space-between;
+  padding: 20px 16px 16px;
+  border-bottom: 1px solid rgba(255,255,255,0.12);
   margin-bottom: 8px;
 }
 
-.teams-message-sender {
-  font-weight: 600;
-  color: var(--karpus-blue);
-}
-
-.teams-message-time {
-  color: #888;
-  font-size: 0.85em;
-}
-
-.teams-message-content {
-  color: #333;
-}
-
-.teams-message-actions {
-  margin-top: 12px;
-  display: flex;
-  gap: 8px;
-}
-
-/* Notificaciones */
-.notification-badge {
-  position: absolute;
-  top: -5px;
-  right: -5px;
-  background-color: var(--karpus-pink);
-  color: white;
-  border-radius: 50%;
-  width: 20px;
-  height: 20px;
+.kk-sidebar-logo-img {
+  width: 44px;
+  height: 44px;
+  border-radius: 14px;
+  background: rgba(255,255,255,0.95);
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 12px;
-  font-weight: bold;
+  overflow: hidden;
+  box-shadow: 0 4px 16px rgba(0,0,0,0.2), 0 0 0 2px rgba(255,255,255,0.3);
+  flex-shrink: 0;
+  animation: kk-float 6s ease-in-out infinite;
 }
 
-.notification-toast {
-  position: fixed;
-  bottom: 24px;
-  right: 24px;
-  padding: 12px 20px;
-  background-color: white;
-  border-radius: var(--radius-md);
-  box-shadow: var(--shadow-lg);
+.kk-sidebar-logo-img img {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  padding: 4px;
+}
+
+.kk-sidebar-logo-text {
+  flex: 1;
+  min-width: 0;
+}
+
+.kk-sidebar-logo-text .brand {
+  font-size: 17px;
+  font-weight: 900;
+  line-height: 1.1;
+  letter-spacing: -0.3px;
+}
+
+.kk-sidebar-logo-text .sub {
+  font-size: 9px;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+  color: rgba(255,255,255,0.6);
+  margin-top: 2px;
+}
+
+/* ── Profile card en sidebar ─────────────────────────────── */
+.kk-sidebar-profile {
+  position: relative;
+  z-index: 1;
   display: flex;
   align-items: center;
-  gap: 12px;
-  z-index: 1000;
-  animation: slideInUp 0.3s ease-out;
+  gap: 10px;
+  padding: 10px 12px;
+  margin: 0 8px 12px;
+  background: rgba(255,255,255,0.12);
+  border: 1px solid rgba(255,255,255,0.15);
+  border-radius: 16px;
+  backdrop-filter: blur(8px);
+  transition: background 0.2s;
 }
 
-@keyframes slideInUp {
-  from {
-    transform: translateY(100%);
-    opacity: 0;
-  }
-  to {
-    transform: translateY(0);
-    opacity: 1;
-  }
+.kk-sidebar-profile:hover {
+  background: rgba(255,255,255,0.18);
 }
 
-.notification-toast.success {
-  border-left: 4px solid var(--karpus-green);
-}
-
-.notification-toast.error {
-  border-left: 4px solid var(--karpus-red);
-}
-
-.notification-toast.info {
-  border-left: 4px solid var(--karpus-blue);
-}
-
-.notification-toast.warning {
-  border-left: 4px solid var(--karpus-orange);
-}
-
-/* Avatares */
-.avatar {
+.kk-sidebar-profile-avatar {
+  width: 38px;
+  height: 38px;
   border-radius: 50%;
-  object-fit: cover;
-  border: 2px solid white;
-  box-shadow: var(--shadow-sm);
-}
-
-.avatar-sm {
-  width: 32px;
-  height: 32px;
-}
-
-.avatar-md {
-  width: 48px;
-  height: 48px;
-}
-
-.avatar-lg {
-  width: 64px;
-  height: 64px;
-}
-
-.avatar-group .avatar {
-  margin-left: -10px;
-  transition: transform 0.3s ease;
-}
-
-.avatar-group .avatar:hover {
-  transform: translateY(-5px);
-  z-index: 10;
-}
-
-/* Pestañas estilo Teams */
-.teams-tabs {
-  display: flex;
-  border-bottom: 1px solid #e0e0e0;
-  margin-bottom: 20px;
-}
-
-.teams-tab {
-  padding: 12px 20px;
-  cursor: pointer;
+  border: 2px solid rgba(255,255,255,0.4);
+  overflow: hidden;
+  flex-shrink: 0;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.2);
   position: relative;
-  font-weight: 600;
-  color: #666;
-  transition: all 0.3s ease;
 }
 
-.teams-tab.active {
-  color: var(--karpus-blue);
-}
-
-.teams-tab.active::after {
+.kk-sidebar-profile-avatar::after {
   content: '';
   position: absolute;
-  bottom: -1px;
-  left: 0;
+  bottom: 1px; right: 1px;
+  width: 9px; height: 9px;
+  background: #22c55e;
+  border: 2px solid white;
+  border-radius: 50%;
+}
+
+.kk-sidebar-profile-avatar img {
   width: 100%;
-  height: 3px;
-  background-color: var(--karpus-blue);
-  border-radius: 3px 3px 0 0;
+  height: 100%;
+  object-fit: cover;
 }
 
-.teams-tab:hover {
-  color: var(--karpus-blue);
+.kk-sidebar-profile-info {
+  flex: 1;
+  min-width: 0;
 }
 
-/* Animaciones */
-.animate-fadeIn {
-  animation: fadeIn 0.5s ease-in-out;
+.kk-sidebar-profile-name {
+  font-size: 12px;
+  font-weight: 800;
+  color: white;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
-@keyframes fadeIn {
-  from { opacity: 0; }
-  to { opacity: 1; }
+.kk-sidebar-profile-role {
+  font-size: 9px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  color: rgba(255,255,255,0.55);
+  margin-top: 1px;
 }
 
-.animate-slideIn {
-  animation: slideIn 0.5s ease-in-out;
+/* ── Nav items mejorados ─────────────────────────────────── */
+.kk-nav-item {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 12px;
+  border-radius: 12px;
+  font-size: 13px;
+  font-weight: 700;
+  color: rgba(255,255,255,0.8);
+  cursor: pointer;
+  border: none;
+  background: transparent;
+  width: 100%;
+  text-align: left;
+  transition: all 0.2s cubic-bezier(0.4,0,0.2,1);
+  text-decoration: none;
 }
 
-@keyframes slideIn {
-  from { transform: translateY(20px); opacity: 0; }
-  to { transform: translateY(0); opacity: 1; }
+.kk-nav-item:hover {
+  background: rgba(255,255,255,0.15);
+  color: white;
+  transform: translateX(3px);
 }
 
-/* Diseño responsivo */
-@media (max-width: 768px) {
-  .card-modern, .modern-card {
-    margin-bottom: 16px;
-  }
-
-  .teams-tabs {
-    overflow-x: auto;
-    white-space: nowrap;
-  }
-
-  .teams-nav {
-    margin-bottom: 16px;
-  }
-
-  /* Mobile: ensure sidebar becomes off-canvas by default */
-  .layout-shell { grid-template-columns: 0 1fr; }
-  aside#sidebar { position: fixed; left: 0; top: 0; bottom: 0; transform: translateX(-110%); width: var(--sidebar-width); z-index: 40; }
-  aside#sidebar.mobile-open { transform: translateX(0); box-shadow: 0 10px 30px rgba(0,0,0,0.25); }
-  #sidebarOverlay { display: none; }
-  #sidebarOverlay.show { display: block; position: fixed; inset: 0; background: rgba(0,0,0,0.45); z-index: 35; }
+.kk-nav-item.active {
+  background: rgba(255,255,255,0.22);
+  color: white;
+  box-shadow: 0 2px 12px rgba(0,0,0,0.15), inset 0 1px 0 rgba(255,255,255,0.2);
 }
 
-/* Layout: grid-based shell for pages using a sidebar */
-.layout-shell { display: grid; grid-template-columns: var(--sidebar-width) 1fr; min-height: 100vh; transition: grid-template-columns 0.25s ease; }
-.layout-shell.sidebar-collapsed { grid-template-columns: var(--sidebar-collapsed-width) 1fr; }
+.kk-nav-item.active::before {
+  content: '';
+  position: absolute;
+  left: 0; top: 20%; bottom: 20%;
+  width: 3px;
+  background: white;
+  border-radius: 0 3px 3px 0;
+}
 
-/* Sidebar base rules */
-aside#sidebar { width: var(--sidebar-width); transition: width 0.25s ease, transform 0.25s ease, padding 0.18s ease; display:flex; flex-direction:column; height:100vh; box-sizing:border-box; overflow:hidden; }
-aside#sidebar.collapsed { width: var(--sidebar-collapsed-width) !important; }
+.kk-nav-item i {
+  width: 20px;
+  height: 20px;
+  flex-shrink: 0;
+  transition: transform 0.2s;
+}
 
-/* Bottom items remain visible at the bottom */
-.sidebar-bottom { margin-top: auto; display:flex; flex-direction:column; gap:0.5rem; padding-top:0.5rem; }
+.kk-nav-item:hover i {
+  transform: scale(1.1);
+}
 
-/* Scrollbar styling for modern look */
-.teams-nav::-webkit-scrollbar { width: 8px; }
-.teams-nav::-webkit-scrollbar-thumb { background: rgba(0,0,0,0.12); border-radius: 999px; }
+/* ── Logout button ───────────────────────────────────────── */
+.kk-logout-btn {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  width: 100%;
+  padding: 11px 16px;
+  border-radius: 14px;
+  font-size: 12px;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: rgba(255,255,255,0.75);
+  background: rgba(255,255,255,0.08);
+  border: 1px solid rgba(255,255,255,0.12);
+  cursor: pointer;
+  transition: all 0.2s;
+}
 
-/* Small utilities for subtle animations */
-.fade-in { animation: fadeIn 0.25s ease both; }
-.slide-x { transition: transform 0.2s ease, opacity 0.18s ease; }
+.kk-logout-btn:hover {
+  background: rgba(239,68,68,0.25);
+  border-color: rgba(239,68,68,0.4);
+  color: #fca5a5;
+}
+
+/* ── Decorative icon ─────────────────────────────────────── */
+.kk-sidebar-deco {
+  position: absolute;
+  bottom: 16px; right: 16px;
+  opacity: 0.07;
+  pointer-events: none;
+  animation: kk-spin-slow 30s linear infinite;
+}
+
+/* ── Section divider ─────────────────────────────────────── */
+.kk-nav-section {
+  position: relative;
+  z-index: 1;
+  font-size: 9px;
+  font-weight: 900;
+  text-transform: uppercase;
+  letter-spacing: 0.14em;
+  color: rgba(255,255,255,0.4);
+  padding: 8px 12px 4px;
+  margin-top: 4px;
+}
+
+/* ── Badge ───────────────────────────────────────────────── */
+.kk-badge {
+  position: absolute;
+  top: 6px; right: 6px;
+  min-width: 18px;
+  height: 18px;
+  background: #ef4444;
+  color: white;
+  font-size: 9px;
+  font-weight: 900;
+  border-radius: 50px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0 4px;
+  box-shadow: 0 2px 6px rgba(239,68,68,0.5);
+  animation: kk-pulse-ring 2s infinite;
+}
+
+/* ── Card improvements ───────────────────────────────────── */
+.kk-card {
+  background: white;
+  border-radius: 20px;
+  border: 1px solid rgba(0,0,0,0.06);
+  box-shadow: 0 2px 12px rgba(0,0,0,0.06);
+  transition: transform 0.2s, box-shadow 0.2s;
+  overflow: hidden;
+}
+
+.kk-card:hover {
+  transform: translateY(-3px);
+  box-shadow: 0 8px 24px rgba(0,0,0,0.1);
+}
+
+/* ── Gradient KPI cards ──────────────────────────────────── */
+.kk-kpi {
+  border-radius: 20px;
+  padding: 20px;
+  position: relative;
+  overflow: hidden;
+  transition: transform 0.2s, box-shadow 0.2s;
+}
+
+.kk-kpi:hover {
+  transform: translateY(-4px);
+  box-shadow: 0 12px 32px rgba(0,0,0,0.15);
+}
+
+.kk-kpi::after {
+  content: '';
+  position: absolute;
+  top: -30px; right: -30px;
+  width: 100px; height: 100px;
+  background: rgba(255,255,255,0.1);
+  border-radius: 50%;
+  pointer-events: none;
+}
+
+/* ── Shimmer loading ─────────────────────────────────────── */
+.kk-shimmer {
+  background: linear-gradient(90deg, #f1f5f9 25%, #e2e8f0 50%, #f1f5f9 75%);
+  background-size: 200% 100%;
+  animation: kk-shimmer 1.5s infinite;
+  border-radius: 12px;
+}
+
+/* ── Scrollbar personalizado ─────────────────────────────── */
+.kk-scroll::-webkit-scrollbar { width: 4px; }
+.kk-scroll::-webkit-scrollbar-track { background: transparent; }
+.kk-scroll::-webkit-scrollbar-thumb { background: rgba(0,0,0,0.12); border-radius: 4px; }
+.kk-scroll::-webkit-scrollbar-thumb:hover { background: rgba(0,0,0,0.2); }
+
+/* ── Mobile sidebar overlay ──────────────────────────────── */
+.kk-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,0.5);
+  backdrop-filter: blur(4px);
+  z-index: 1040;
+  transition: opacity 0.3s;
+}
+
+/* ── Tooltip ─────────────────────────────────────────────── */
+[data-tooltip] {
+  position: relative;
+}
+[data-tooltip]::after {
+  content: attr(data-tooltip);
+  position: absolute;
+  left: calc(100% + 10px);
+  top: 50%;
+  transform: translateY(-50%);
+  background: rgba(15,23,42,0.9);
+  color: white;
+  font-size: 11px;
+  font-weight: 700;
+  padding: 5px 10px;
+  border-radius: 8px;
+  white-space: nowrap;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 0.15s;
+  z-index: 9999;
+}
+[data-tooltip]:hover::after {
+  opacity: 1;
+}
+
+/* ── Collapsed sidebar tooltips ──────────────────────────── */
+.collapsed [data-tooltip]::after {
+  opacity: 0;
+}
+.collapsed [data-tooltip]:hover::after {
+  opacity: 1;
+}
