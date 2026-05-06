@@ -1,0 +1,3 @@
+-- Production fixes and schema adjustments
+-- This file is used by the pre-deploy check to ensure database parity.
+-- Add any SQL commands here that need to be run in production.
