@@ -178,6 +178,9 @@ export const PaymentsModule = {
     }
 
     const approveBtn = ip ? '<button onclick="App.payments.markPaid(\'' + p.id + '\')" class="p-1.5 bg-emerald-50 text-emerald-600 rounded-lg hover:bg-emerald-100 transition-colors" title="Aprobar"><i data-lucide="check" class="w-4 h-4"></i></button>' : '';
+    const waiveMoraBtn = (currentMora > 0)
+      ? '<button onclick="App.payments.waiveMora(\'' + p.id + '\')" class="p-1.5 bg-violet-50 text-violet-600 rounded-lg hover:bg-violet-100 transition-colors" title="Quitar Mora"><i data-lucide="shield-off" class="w-4 h-4"></i></button>'
+      : '';
     const deleteBtn  = '<button onclick="App.payments.delete(\'' + p.id + '\')" class="p-1.5 bg-rose-50 text-rose-500 rounded-lg hover:bg-rose-100 transition-colors" title="Eliminar"><i data-lucide="trash-2" class="w-4 h-4"></i></button>';
     const voucherCell = p.evidence_url
       ? '<a href="' + p.evidence_url + '" target="_blank" rel="noopener noreferrer" class="inline-flex items-center gap-1 text-sky-600 hover:text-sky-800 text-xs font-bold uppercase"><i data-lucide="external-link" class="w-3 h-3"></i>Ver</a>'
@@ -191,7 +194,7 @@ export const PaymentsModule = {
       '<td class="px-5 py-3.5"><div class="text-[10px] font-bold text-slate-600 uppercase truncate max-w-[110px]">' + (p.bank || '-') + '</div><div class="text-[9px] text-slate-400 font-bold">' + (p.reference || '') + '</div></td>' +
       '<td class="px-5 py-3.5"><div class="text-[11px] font-bold text-slate-700">' + (p.paid_date ? new Date(p.paid_date).toLocaleDateString('es-ES') : ds) + '</div><div class="text-[9px] text-slate-400 font-bold uppercase">' + (p.paid_date ? 'Pagado' : 'Vence') + '</div></td>' +
       '<td class="px-5 py-3.5 text-center">' + voucherCell + '</td>' +
-      '<td class="px-5 py-3.5 text-center"><div class="flex justify-center gap-1.5">' + approveBtn + deleteBtn + '</div></td>' +
+      '<td class="px-5 py-3.5 text-center"><div class="flex justify-center gap-1.5">' + approveBtn + waiveMoraBtn + deleteBtn + '</div></td>' +
     '</tr>';
   },
 
@@ -328,6 +331,34 @@ export const PaymentsModule = {
       Helpers.toast('Ciclo completado: ' + (r.generated || 0) + ' generados, ' + (r.expired || 0) + ' vencidos', 'success');
       await this.loadPayments();
     } catch (e) { Helpers.toast('Error en ciclo: ' + e.message, 'error'); }
+  },
+
+  async waiveMora(id) {
+    const reason = prompt('Motivo de la exoneración de mora (opcional):') ?? 'Mora exonerada por administración';
+    if (reason === null) return;
+    try {
+      const { data, error } = await supabase.rpc('waive_payment_mora', {
+        p_payment_id: id,
+        p_reason: reason || 'Mora exonerada por administración'
+      });
+      if (error) throw error;
+      if (data?.error) throw new Error(data.error);
+      Helpers.toast('Mora eliminada correctamente', 'success');
+      await this.loadPayments();
+    } catch (e) {
+      // Fallback: actualizar due_date directamente si el RPC no existe aún
+      try {
+        const { error: upErr } = await supabase
+          .from('payments')
+          .update({ due_date: new Date().toISOString().split('T')[0] })
+          .eq('id', id);
+        if (upErr) throw upErr;
+        Helpers.toast('Mora eliminada', 'success');
+        await this.loadPayments();
+      } catch (e2) {
+        Helpers.toast('Error al quitar mora: ' + e2.message, 'error');
+      }
+    }
   },
 
   async sendReminders() {

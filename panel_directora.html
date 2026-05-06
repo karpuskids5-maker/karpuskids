@@ -17,7 +17,6 @@
   <link rel="stylesheet" href="css/layout.css" />
   <link rel="stylesheet" href="css/karpus-modern.css" />
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js" defer></script>
-  <script src="https://cdn.jsdelivr.net/npm/lucide@0.263.1/dist/umd/lucide.min.js" defer></script>
   <script src="https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js" crossorigin="anonymous" defer></script>
   <script src="https://cdn.jsdelivr.net/npm/jspdf-autotable@3.5.31/dist/jspdf.plugin.autotable.min.js" crossorigin="anonymous" defer></script>
   
@@ -1671,6 +1670,31 @@
       }
     });
   </script>
+  <!-- Lucide Icons — cargado al final del body para garantizar DOM completo -->
+  <script src="https://cdn.jsdelivr.net/npm/lucide@0.263.1/dist/umd/lucide.min.js"></script>
+  <script>
+    // Inicializar iconos sobre el HTML estático
+    if (window.lucide) lucide.createIcons();
+
+    // MutationObserver: re-ejecutar createIcons cada vez que se inserte
+    // contenido dinámico con atributos data-lucide
+    (function() {
+      let _timer = null;
+      const _run = () => { if (window.lucide) lucide.createIcons(); };
+      const _debounced = () => { clearTimeout(_timer); _timer = setTimeout(_run, 30); };
+      new MutationObserver((mutations) => {
+        for (const m of mutations) {
+          for (const node of m.addedNodes) {
+            if (node.nodeType === 1) {
+              if (node.hasAttribute?.('data-lucide') || node.querySelector?.('[data-lucide]')) {
+                _debounced(); return;
+              }
+            }
+          }
+        }
+      }).observe(document.body, { childList: true, subtree: true });
+    })();
+  </script>
   <!-- Core App Module -->
   <script type="module" src="js/directora/main.js"></script>
   <script src="js/shared/lightbox.js" defer></script>
@@ -1678,11 +1702,6 @@
   <!-- Safe Event Handlers (XSS Protection) -->
   <script type="module" src="js/directora/event-handlers.js"></script>
   <script defer src="js/common_ui.js"></script>
-  <script>
-    document.addEventListener("DOMContentLoaded", () => {
-      if(window.lucide) lucide.createIcons();
-    });
-  </script>
   <script src="js/pwa-install.js" defer></script>
   <script>
     // Service Worker registration (Unified for PWA + OneSignal)

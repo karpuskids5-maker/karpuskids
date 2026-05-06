@@ -2,6 +2,7 @@
 import { Helpers } from '../shared/helpers.js';
 import { AppState } from './state.js';
 import { sendEmail } from '../shared/supabase.js';
+import { calcMora } from '../shared/payment-service.js';
 
 const MONTH_NAMES_ES = [
   'enero','febrero','marzo','abril','mayo','junio',
@@ -217,17 +218,35 @@ export const PaymentsModule = {
     const dueDateStr = p.due_date ? new Date(p.due_date + 'T00:00:00').toLocaleDateString('es-ES') : '-';
     const amountFmt  = Number(p.amount || 0).toLocaleString('es-ES', { style: 'currency', currency: 'USD', minimumFractionDigits: 2 });
 
-    let urgencyBadge = '';
-    if (p.due_date && isPending) {
+    // Mora acumulada
+    const mora        = (isPending && p.due_date) ? calcMora(p.due_date) : 0;
+    const moraBreakdown = (mora > 0 && p.due_date) ? Helpers.getMoraBreakdown(p.due_date) : null;
+    const totalAmount = Number(p.amount || 0) + mora;
+    const totalFmt    = totalAmount.toLocaleString('es-ES', { style: 'currency', currency: 'USD', minimumFractionDigits: 2 });
+
+    let moraBlock = '';
+    if (mora > 0 && moraBreakdown) {
+      moraBlock =
+        '<div class="mt-1 flex flex-col items-end gap-0.5">' +
+          '<span class="text-[9px] font-black text-rose-600 bg-rose-50 border border-rose-200 px-2 py-0.5 rounded-full uppercase">' +
+            'Mora: +' + Helpers.formatCurrency(mora) + ' (' + moraBreakdown.formattedText + ')' +
+          '</span>' +
+          '<span class="text-[10px] font-bold text-slate-800 bg-amber-100 px-2 py-0.5 rounded-md border border-amber-200">' +
+            'Total: ' + totalFmt +
+          '</span>' +
+        '</div>';
+    } else if (isPending && p.due_date) {
       const today = new Date(); today.setHours(0, 0, 0, 0);
       const diff  = Math.round((new Date(p.due_date + 'T00:00:00') - today) / 86400000);
-      if (diff < 0)
-        urgencyBadge = '<span class="ml-1 text-[9px] font-black text-rose-600 bg-rose-50 border border-rose-200 px-1.5 py-0.5 rounded-full">' + Math.abs(diff) + 'd vencido</span>';
-      else if (diff === 0)
-        urgencyBadge = '<span class="ml-1 text-[9px] font-black text-orange-600 bg-orange-50 border border-orange-200 px-1.5 py-0.5 rounded-full">vence hoy</span>';
-      else if (diff <= 5)
-        urgencyBadge = '<span class="ml-1 text-[9px] font-black text-amber-600 bg-amber-50 border border-amber-200 px-1.5 py-0.5 rounded-full">vence en ' + diff + 'd</span>';
+      if (diff === 0)
+        moraBlock = '<span class="ml-1 text-[9px] font-black text-orange-600 bg-orange-50 border border-orange-200 px-1.5 py-0.5 rounded-full">vence hoy</span>';
+      else if (diff > 0 && diff <= 5)
+        moraBlock = '<span class="ml-1 text-[9px] font-black text-amber-600 bg-amber-50 border border-amber-200 px-1.5 py-0.5 rounded-full">vence en ' + diff + 'd</span>';
     }
+
+    const waiveMoraBtn = (mora > 0)
+      ? '<button onclick="App.payments.waiveMora(\'' + p.id + '\')" class="p-1.5 bg-violet-50 text-violet-600 rounded-lg hover:bg-violet-100 transition-colors" title="Quitar Mora"><i data-lucide="shield-off" class="w-4 h-4"></i></button>'
+      : '';
 
     return (
       '<tr class="hover:bg-slate-50 border-b border-slate-100 transition-colors' + (statusKey === 'overdue' ? ' bg-rose-50/20' : '') + '">' +
@@ -249,7 +268,7 @@ export const PaymentsModule = {
         '</td>' +
         '<td class="px-5 py-3.5 text-right">' +
           '<div class="font-black text-slate-800 text-base">' + amountFmt + '</div>' +
-          (isPending ? '<div class="flex items-center justify-end gap-1 mt-0.5"><span class="text-[10px] text-slate-400 font-bold">pendiente</span>' + urgencyBadge + '</div>' : '') +
+          (isPending ? '<div class="flex flex-col items-end gap-0.5 mt-0.5">' + moraBlock + '</div>' : '') +
         '</td>' +
         '<td class="px-5 py-3.5">' +
           '<span class="text-[10px] font-black uppercase text-slate-500 bg-slate-100 px-2 py-0.5 rounded-md">' + (p.method || '-') + '</span>' +
@@ -275,6 +294,7 @@ export const PaymentsModule = {
             (statusKey === 'review'
               ? '<button onclick="App.payments.rejectPayment(\'' + p.id + '\')" class="p-1.5 bg-rose-50 text-rose-500 rounded-lg hover:bg-rose-100 transition-colors" title="Rechazar"><i data-lucide="x" class="w-4 h-4"></i></button>'
               : '') +
+            waiveMoraBtn +
             '<button onclick="App.payments.deletePayment(\'' + p.id + '\')" class="p-1.5 bg-slate-50 text-slate-400 rounded-lg hover:bg-rose-50 hover:text-rose-500 transition-colors" title="Eliminar"><i data-lucide="trash-2" class="w-4 h-4"></i></button>' +
           '</div>' +
         '</td>' +
@@ -570,6 +590,34 @@ export const PaymentsModule = {
       Helpers.toast('Pago eliminado', 'success');
       await this.loadPayments();
     } catch (e) { Helpers.toast('Error al eliminar', 'error'); }
+  },
+
+  async waiveMora(id) {
+    const reason = prompt('Motivo de la exoneración de mora (opcional):') ?? 'Mora exonerada por administración';
+    if (reason === null) return;
+    try {
+      const { data, error } = await supabase.rpc('waive_payment_mora', {
+        p_payment_id: id,
+        p_reason: reason || 'Mora exonerada por administración'
+      });
+      if (error) throw error;
+      if (data?.error) throw new Error(data.error);
+      Helpers.toast('Mora eliminada correctamente', 'success');
+      await this.loadPayments();
+    } catch (e) {
+      // Fallback: actualizar due_date directamente si el RPC no existe
+      try {
+        const { error: upErr } = await supabase
+          .from('payments')
+          .update({ due_date: new Date().toISOString().split('T')[0] })
+          .eq('id', id);
+        if (upErr) throw upErr;
+        Helpers.toast('Mora eliminada', 'success');
+        await this.loadPayments();
+      } catch (e2) {
+        Helpers.toast('Error al quitar mora: ' + e2.message, 'error');
+      }
+    }
   },
 
   async runCycle() {

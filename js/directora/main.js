@@ -59,12 +59,12 @@ window.openGlobalModal = function(html, wide = false) {
 };
 
 /**
- * ?? Navegación Global
+ * ?? Navegaciï¿½n Global
  */
 export function goToSection(sectionId) {
   if (!sectionId) return;
 
-  // Ocultar todas las secciones — solo con CSS class, sin Tailwind hidden
+  // Ocultar todas las secciones ï¿½ solo con CSS class, sin Tailwind hidden
   document.querySelectorAll('.section').forEach(sec => {
     sec.classList.remove('active');
   });
@@ -74,7 +74,7 @@ export function goToSection(sectionId) {
     target.classList.add('active');
     AppState.set('currentSection', sectionId);
     
-    // 2. Carga bajo demanda por módulo
+    // 2. Carga bajo demanda por mï¿½dulo
     switch (sectionId) {
       case 'dashboard':
         DashboardService.getFullData(true).then(data => DirectorUI.renderDashboard(data));
@@ -108,7 +108,7 @@ export function goToSection(sectionId) {
         break;
     }
 
-    // ?? Marcar badge como leído al entrar
+    // ?? Marcar badge como leï¿½do al entrar
     BadgeSystem.mark(sectionId);
   }
 
@@ -121,13 +121,16 @@ export function goToSection(sectionId) {
     }
   });
 
-  // Cerrar sidebar en móvil si está abierto
+  // Cerrar sidebar en mÃ³vil si estÃ¡ abierto
   const sidebar = document.getElementById('sidebar');
   const overlay = document.getElementById('sidebarOverlay');
   if (sidebar && window.innerWidth < 768) {
     sidebar.classList.remove('mobile-visible');
     if (overlay) { overlay.style.display = 'none'; }
   }
+
+  // Re-inicializar iconos Lucide tras cambio de secciÃ³n
+  setTimeout(() => { if (window.lucide) lucide.createIcons(); }, 50);
 }
 
 async function loadProfile() {
@@ -151,7 +154,7 @@ async function loadProfile() {
         .eq('id', 1).single();
 
       if (e1 && e1.code === '42703') {
-        // Columnas nuevas no existen — usar solo las base
+        // Columnas nuevas no existen ï¿½ usar solo las base
         const { data: s2 } = await supabase
           .from('school_settings')
           .select('id, generation_day, due_day, phone, business_hours')
@@ -179,7 +182,7 @@ async function loadProfile() {
       }
     } catch (_) {}
 
-    // Inicializar toggle de días y preview
+    // Inicializar toggle de dï¿½as y preview
     window.toggleWorkDay = (btn) => {
       const active = btn.classList.contains('bg-violet-600');
       if (active) {
@@ -198,7 +201,7 @@ async function loadProfile() {
     const nameEl = document.getElementById('sidebarName'); 
     if(nameEl) nameEl.textContent = profile.name || 'Directora';
     
-    // Actualizar avatares (usando los nuevos IDs únicos)
+    // Actualizar avatares (usando los nuevos IDs ï¿½nicos)
     const sidebarAvatarImg = document.getElementById('sidebarProfileAvatar');
     if (sidebarAvatarImg) {
       sidebarAvatarImg.src = profile.avatar_url || 'img/mundo.jpg';
@@ -217,10 +220,10 @@ async function loadProfile() {
 }
 
 /**
- * ?? Inicialización Principal
+ * ?? Inicializaciï¿½n Principal
  */
 
-// Global error handler — captura errores no manejados
+// Global error handler ï¿½ captura errores no manejados
 window.addEventListener('unhandledrejection', (e) => {
   // Ignorar errores de IndexedDB (OneSignal) y errores de red silenciosos
   const msg = e.reason?.message?.toLowerCase() ?? '';
@@ -274,18 +277,18 @@ document.addEventListener('DOMContentLoaded', async () => {
     setupSearch('wallSearch', 'wall');
     setupSearch('chatSearchInput', 'chat');
 
-    // 5c. Badge de mensajes no leídos (directora)
+    // 5c. Badge de mensajes no leï¿½dos (directora)
     loadUnreadMessageBadge(auth.user.id);
 
     // Badge de posts nuevos en muro
     loadNewPostsBadge();
 
-    // ?? Sistema de badges por sección
+    // ?? Sistema de badges por secciï¿½n
     BadgeSystem.init(auth.user.id);
 
     // ?? Realtime: alertar cuando un padre sube un comprobante
-    // Se eliminó la importación de payment-service.js (404)
-    // El monitoreo de pagos se maneja ahora dentro del PaymentsModule o vía Supabase directamente si es necesario.
+    // Se eliminï¿½ la importaciï¿½n de payment-service.js (404)
+    // El monitoreo de pagos se maneja ahora dentro del PaymentsModule o vï¿½a Supabase directamente si es necesario.
 
     // 6. Configurar Logout
     document.getElementById('btnLogout')?.addEventListener('click', async () => {
@@ -328,7 +331,7 @@ document.addEventListener('DOMContentLoaded', async () => {
 
     overlay?.addEventListener('click', closeSidebar);
 
-    // Cerrar sidebar al hacer click en cualquier link (móvil)
+    // Cerrar sidebar al hacer click en cualquier link (mï¿½vil)
     sidebar?.querySelectorAll('.nav-btn').forEach(btn => {
       btn.addEventListener('click', () => {
         if (window.innerWidth <= 768) closeSidebar();
@@ -338,7 +341,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     // 7. Configurar guardado de perfil
     document.getElementById('btnSaveMainConfig')?.addEventListener('click', async () => {
       // Solo actualizar columnas que existen en profiles (name, bio, phone)
-      // title y address no existen — causan 400
+      // title y address no existen ï¿½ causan 400
       const updates = {};
       const nameVal  = document.getElementById('confDirName')?.value?.trim();
       const bioVal   = document.getElementById('confDirBio')?.value?.trim();
@@ -365,25 +368,25 @@ document.addEventListener('DOMContentLoaded', async () => {
         if (Object.keys(scheduleUpdates).length) {
           await supabase.from('school_settings').update(scheduleUpdates).eq('id', 1);
         }
-        Helpers.toast('Configuración guardada correctamente', 'success');
+        Helpers.toast('Configuraciï¿½n guardada correctamente', 'success');
         AppState.set('profile', { ...auth.profile, ...updates });
         loadProfile();
       }
     });
 
-    // 7b. Avatar upload — preview inmediato + guardar en Supabase
+    // 7b. Avatar upload ï¿½ preview inmediato + guardar en Supabase
     document.getElementById('configAvatarInput')?.addEventListener('change', async (e) => {
       const file = e.target.files?.[0];
       if (!file) return;
       if (file.size > 2 * 1024 * 1024) {
-        Helpers.toast('Imagen muy grande (máx 2MB)', 'error');
+        Helpers.toast('Imagen muy grande (mï¿½x 2MB)', 'error');
         return;
       }
 
       const img = document.getElementById('configProfileAvatar');
       const sidebarImg = document.getElementById('sidebarProfileAvatar');
 
-      // Preview INMEDIATO con ObjectURL (más rápido que FileReader)
+      // Preview INMEDIATO con ObjectURL (mï¿½s rï¿½pido que FileReader)
       const objectUrl = URL.createObjectURL(file);
       if (img) { img.src = objectUrl; img.style.opacity = '0.6'; }
       if (sidebarImg) sidebarImg.src = objectUrl;
@@ -424,6 +427,9 @@ document.addEventListener('DOMContentLoaded', async () => {
       setTimeout(() => loader.remove(), 500);
     }
 
+    // 9. Inicializar iconos Lucide
+    if (window.lucide) lucide.createIcons();
+
   } catch (err) {
     // Quitar loader incluso si hay error
     document.getElementById('initial-loading')?.remove();
@@ -432,7 +438,7 @@ document.addEventListener('DOMContentLoaded', async () => {
 });
 
 /**
- * ?? Notificaciones de Mensajes No Leídos
+ * ?? Notificaciones de Mensajes No Leï¿½dos
  */
 async function loadUnreadMessageBadge(userId) {
   if (!userId) return;
@@ -444,7 +450,7 @@ async function loadUnreadMessageBadge(userId) {
     if (!error && data) {
       total = Object.values(data).reduce((a, b) => a + Number(b), 0);
     }
-    // Si el RPC falla, simplemente mostrar 0 — no hacer fallback a tablas que pueden no existir
+    // Si el RPC falla, simplemente mostrar 0 ï¿½ no hacer fallback a tablas que pueden no existir
 
     updateBadgeUI(total);
   } catch (_) {
@@ -479,7 +485,7 @@ function updateBadgeUI(total) {
 
 async function loadNewPostsBadge() {
   try {
-    // Guardar timestamp de última visita al muro en localStorage
+    // Guardar timestamp de ï¿½ltima visita al muro en localStorage
     const lastVisit = localStorage.getItem('karpus_muro_last_visit') || new Date(0).toISOString();
     const { count } = await supabase
       .from('posts')
@@ -509,12 +515,12 @@ async function loadNewPostsBadge() {
   } catch (_) {}
 }
 
-// -- Sección de Accesos (QR + Asistencia en vivo) -----------------------------
+// -- Secciï¿½n de Accesos (QR + Asistencia en vivo) -----------------------------
 function _initAccesosSection() {
   const container = document.getElementById('accesos-content');
   if (!container) return;
 
-  // Cargar librería QR si no está
+  // Cargar librerï¿½a QR si no estï¿½
   const loadQR = () => new Promise(resolve => {
     if (window.QRCode) { resolve(); return; }
     const s = document.createElement('script');
@@ -536,7 +542,7 @@ function _initAccesosSection() {
       .order('name');
 
     if (!students?.length) {
-      container.innerHTML = '<div class="text-center py-12 text-slate-400"><p class="font-bold">No hay estudiantes con matrícula asignada.</p><p class="text-xs mt-1">Asigna matrículas desde la sección Estudiantes.</p></div>';
+      container.innerHTML = '<div class="text-center py-12 text-slate-400"><p class="font-bold">No hay estudiantes con matrï¿½cula asignada.</p><p class="text-xs mt-1">Asigna matrï¿½culas desde la secciï¿½n Estudiantes.</p></div>';
       return;
     }
 
@@ -569,7 +575,7 @@ function _initAccesosSection() {
     if (window.lucide) lucide.createIcons();
   };
 
-  // Función global para imprimir QR individual
+  // Funciï¿½n global para imprimir QR individual
   window._printStudentQR = (id, name, matricula) => {
     const el = document.getElementById(`qr-${id}`);
     const img = el?.querySelector('img')?.src || el?.querySelector('canvas')?.toDataURL();
@@ -594,7 +600,7 @@ function _initAccesosSection() {
   loadStudentsQR();
 }
 
-// -- Preview dinámico del horario ----------------------------------------------
+// -- Preview dinï¿½mico del horario ----------------------------------------------
 function _updateSchedulePreview() {
   const preview = document.getElementById('schedulePreview');
   if (!preview) return;
@@ -605,8 +611,8 @@ function _updateSchedulePreview() {
 
   if (!days.length && !open) { preview.classList.add('hidden'); return; }
 
-  const daysText = days.length ? days.join(' · ') : 'Sin días seleccionados';
-  const timeText = open && close ? `${open} – ${close}` : '';
+  const daysText = days.length ? days.join(' ï¿½ ') : 'Sin dï¿½as seleccionados';
+  const timeText = open && close ? `${open} ï¿½ ${close}` : '';
 
   preview.classList.remove('hidden');
   preview.innerHTML = `<span class="text-violet-600">?? ${daysText}</span>${timeText ? `<span class="mx-2 text-violet-300">|</span><span class="text-violet-800">?? ${timeText}</span>` : ''}`;
@@ -665,7 +671,7 @@ async function _initDirectorAccessId(profile) {
     if (!img || !code) { Helpers.toast('Genera el QR primero', 'warning'); return; }
     const name = p?.name || 'Directora';
     const win = window.open('', '_blank');
-    win.document.write(`<!DOCTYPE html><html><head><title>Carnet ${name}</title><style>body{font-family:Arial,sans-serif;display:flex;align-items:center;justify-content:center;min-height:100vh;margin:0;}.card{border:4px solid #7c3aed;border-radius:20px;padding:24px;text-align:center;max-width:260px;}.hdr{background:#7c3aed;color:white;margin:-24px -24px 16px;padding:12px;border-radius:16px 16px 0 0;font-weight:900;font-size:12px;text-transform:uppercase;}img{width:160px;height:160px;border-radius:8px;}.name{font-size:16px;font-weight:900;color:#1e293b;margin-top:12px;}.code{font-size:10px;color:#64748b;font-weight:700;margin-top:4px;}</style></head><body><div class="card"><div class="hdr">DIRECTORA · KARPUS KIDS</div><img src="${img}"><div class="name">${name}</div><div class="code">ID: ${code}</div></div><script>window.onload=()=>window.print()<\/script></body></html>`);
+    win.document.write(`<!DOCTYPE html><html><head><title>Carnet ${name}</title><style>body{font-family:Arial,sans-serif;display:flex;align-items:center;justify-content:center;min-height:100vh;margin:0;}.card{border:4px solid #7c3aed;border-radius:20px;padding:24px;text-align:center;max-width:260px;}.hdr{background:#7c3aed;color:white;margin:-24px -24px 16px;padding:12px;border-radius:16px 16px 0 0;font-weight:900;font-size:12px;text-transform:uppercase;}img{width:160px;height:160px;border-radius:8px;}.name{font-size:16px;font-weight:900;color:#1e293b;margin-top:12px;}.code{font-size:10px;color:#64748b;font-weight:700;margin-top:4px;}</style></head><body><div class="card"><div class="hdr">DIRECTORA ï¿½ KARPUS KIDS</div><img src="${img}"><div class="name">${name}</div><div class="code">ID: ${code}</div></div><script>window.onload=()=>window.print()<\/script></body></html>`);
     win.document.close();
   };
 

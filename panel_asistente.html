@@ -16,190 +16,56 @@
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
   <link rel="manifest" href="manifest.json">
   <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="stylesheet" href="css/theme.css" />
   <link rel="stylesheet" href="css/layout.css" />
+  <link rel="stylesheet" href="css/karpus-modern.css" />
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
-  <script src="https://cdn.jsdelivr.net/npm/lucide@0.263.1/dist/umd/lucide.min.js"></script>
-  
+
   <style>
-    /* Estilos Karpus Kids Solicitados */
-    .karpus-kids-inline { font-weight: 700; }
-    .karpus-kids-inline .k-1 { color: #FF9800; }
-    .karpus-kids-inline .k-2 { color: #2196F3; }
-    .karpus-kids-inline .k-3 { color: #E91E63; }
-    .karpus-kids-inline .k-4 { color: #4CAF50; }
-    .karpus-kids-inline .k-5 { color: #FF9800; }
-    .karpus-kids-inline .k-6 { color: #2196F3; }
-    .karpus-kids-inline .k-7 { color: #4CAF50; }
-    .karpus-kids-inline .k-8 { color: #E91E63; }
-    .karpus-kids-inline .k-9 { color: #2196F3; }
-    .karpus-kids-inline .k-10 { color: #FF9800; }
-
-    /* --- SIDEBAR CORE --- */
-    aside#sidebar { 
-      position: fixed;
-      top: 0; bottom: 0; left: 0;
-      z-index: 1050;
-      display: flex;
-      flex-direction: column;
-      overflow-y: auto;   /* ✅ scroll en sidebar en móvil */
-      overflow-x: hidden;
-      scrollbar-width: none;
-      transition: width 0.3s cubic-bezier(0.4, 0, 0.2, 1), transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-    }
-    aside#sidebar::-webkit-scrollbar { display: none; }
-
-    /* --- DESKTOP (≥ 768px) --- */
+    /* ── Sidebar desktop: ancho y colapso ── */
     @media (min-width: 768px) {
-      aside#sidebar { width: 280px; transform: translateX(0); }
-      
-      /* Estado Colapsado */
+      aside#sidebar { width: 280px; }
       aside#sidebar.collapsed { width: 90px; }
-      
-      /* Hover Expand: Expande sidebar Y empuja contenido */
       aside#sidebar.collapsed:hover { width: 280px; box-shadow: 10px 0 30px rgba(0,0,0,0.15); }
-      
-      /* Layout Principal — Ahora controlado por .main de layout.css */
-      #layoutShell { 
-        transition: margin-left 0.3s cubic-bezier(0.4, 0, 0.2, 1); 
-      }
-      
-      .app-content-wrapper { margin-left: 280px; transition: margin-left 0.3s ease; }
+
       .app-content-wrapper.sidebar-collapsed { margin-left: 90px; }
-      
-      /* EL TRUCO: Mover contenido al hacer hover en sidebar colapsado */
       aside#sidebar.collapsed:hover ~ .app-content-wrapper { margin-left: 280px !important; }
 
-      /* Elementos internos: Texto */
-      aside#sidebar .label, aside#sidebar .karpus-kids-inline, aside#sidebar #sidebarUserName {
-        opacity: 1; transition: opacity 0.2s ease 0.1s; display: block; white-space: nowrap;
-      }
-      
-      aside#sidebar.collapsed .label, 
-      aside#sidebar.collapsed .karpus-kids-inline, 
-      aside#sidebar.collapsed #sidebarUserName {
-        opacity: 0; pointer-events: none; display: none; transition: none;
-      }
+      /* Ocultar texto al colapsar */
+      aside#sidebar.collapsed .label,
+      aside#sidebar.collapsed .karpus-kids-inline,
+      aside#sidebar.collapsed #sidebarUserName { opacity: 0; pointer-events: none; display: none; }
 
       aside#sidebar.collapsed:hover .label,
       aside#sidebar.collapsed:hover .karpus-kids-inline,
-      aside#sidebar.collapsed:hover #sidebarUserName {
-        display: block; opacity: 1; transition: opacity 0.2s ease 0.1s;
-      }
+      aside#sidebar.collapsed:hover #sidebarUserName { display: block; opacity: 1; }
 
-      /* Iconos y Botones */
-      aside#sidebar .nav-btn { padding-left: 1rem; justify-content: flex-start; }
-      aside#sidebar.collapsed .nav-btn { padding-left: 0; justify-content: center; }
-      aside#sidebar.collapsed:hover .nav-btn { padding-left: 1rem; justify-content: flex-start; }
-      
-      aside#sidebar .nav-btn i { width: 20px; height: 20px; transition: all 0.3s; }
-      aside#sidebar.collapsed .nav-btn i { width: 28px; height: 28px; }
-      aside#sidebar.collapsed:hover .nav-btn i { width: 20px; height: 20px; }
+      /* Iconos */
+      aside#sidebar.collapsed .kk-nav-item i { width: 26px; height: 26px; }
+      aside#sidebar.collapsed:hover .kk-nav-item i { width: 20px; height: 20px; }
+      aside#sidebar.collapsed .kk-nav-item { justify-content: center; padding-left: 0; padding-right: 0; }
+      aside#sidebar.collapsed:hover .kk-nav-item { justify-content: flex-start; padding-left: 12px; padding-right: 12px; }
 
-      /* Avatar */
-      #sidebarAvatarContainer { transition: all 0.3s; width: 4rem; height: 4rem; }
-      aside#sidebar.collapsed #sidebarAvatarContainer { width: 3rem; height: 3rem; border-width: 2px; }
-      aside#sidebar.collapsed:hover #sidebarAvatarContainer { width: 4rem; height: 4rem; border-width: 4px; }
-
-      /* Botón Colapsar */
+      /* Botón toggle */
       #toggleSidebar i { transition: transform 0.3s; }
       aside#sidebar.collapsed #toggleSidebar i { transform: rotate(180deg); }
     }
-    
-    /* --- MOBILE (< 768px) --- */
-    @media (max-width: 767px) {
-      aside#sidebar { width: 280px; transform: translateX(-100%); overflow-y: auto; }
-      aside#sidebar.mobile-visible { transform: translateX(0); box-shadow: 5px 0 25px rgba(0,0,0,0.3); }
-      
-      #layoutShell { margin-left: 0 !important; width: 100%; }
-      #toggleSidebar { display: none !important; }
 
-      /* Header compacto en móvil: avatar pequeño + texto en fila */
-      #sidebarHeader {
-        flex-direction: row !important;
-        align-items: center !important;
-        gap: 0.75rem !important;
-        padding-top: 0.75rem !important;
-        margin-bottom: 0.75rem !important;
-      }
-      #sidebarAvatarContainer { width: 2.75rem !important; height: 2.75rem !important; border-width: 2px !important; flex-shrink: 0; }
-      #sidebarHeader .label { text-align: left !important; }
-      #sidebarHeader .label h4 { font-size: 0.875rem !important; margin-bottom: 0 !important; }
-      #sidebarHeader .label p { display: none !important; }
-      #sidebarHeader .label .h-px { display: none !important; }
-      #sidebarHeader .label h3 { font-size: 0.875rem !important; }
-    }
-
-    /* Tema Asistente (Teal/Turquesa) */
-    .sidebar-teal { background: linear-gradient(135deg, #0f766e, #115e59); }
-    
-    /* View Transitions — consistente con layout.css */
-    .section {
-      display: none;
-    }
-    .section.active {
-      display: block;
-      animation: fadeIn 0.3s ease-out;
-    }
-    @keyframes fadeIn {
-      from { opacity: 0; transform: translateY(6px); }
-      to   { opacity: 1; transform: translateY(0); }
-    }
-
-    @media (max-width: 768px) {
-      #layoutShell { margin-left: 0 !important; }
-    }
+    /* ── Específicos del panel asistente ── */
     #attendanceModal { -webkit-backdrop-filter: blur(4px); backdrop-filter: blur(4px); }
 
-    /* ═══════════════════════════════════════════════
-       MOBILE GLOBAL — scroll libre en todas las secciones
-    ═══════════════════════════════════════════════ */
     @media (max-width: 767px) {
-      html, body { overflow-x: hidden; }
-
-      /* Secciones: sin altura fija, scroll natural */
-      .section, .section.active {
-        overflow: visible !important;
-        height: auto !important;
-      }
-
-      /* KPI grids: 2 columnas */
-      .grid.grid-cols-2.lg\\:grid-cols-4 { grid-template-columns: repeat(2, 1fr) !important; }
-
-      /* Tablas: siempre scroll horizontal */
-      .overflow-x-auto, .responsive-panel {
-        overflow-x: auto !important;
-        -webkit-overflow-scrolling: touch;
-      }
-
-      /* Canvas: no desbordar */
+      #toggleSidebar { display: none !important; }
+      .section, .section.active { overflow: visible !important; height: auto !important; }
       canvas { max-width: 100% !important; }
-
-      /* Chat: altura adaptada a móvil */
-      .chat-shell {
-        min-height: calc(100dvh - 140px) !important;
-        height: calc(100dvh - 140px) !important;
-        border-radius: 16px;
-      }
-
-      /* Pagos: filtros en columna */
+      .chat-shell { min-height: calc(100dvh - 140px) !important; height: calc(100dvh - 140px) !important; }
       #pagos .flex.flex-wrap.gap-2 { flex-direction: column; }
       #pagos #statusPills { flex-wrap: wrap; }
-
-      /* Accesos: grid en columna */
       #accesos .grid.grid-cols-1.lg\\:grid-cols-3 { grid-template-columns: 1fr !important; }
-
-      /* Perfil: grid en columna */
       #perfil .grid.grid-cols-1.lg\\:grid-cols-2 { grid-template-columns: 1fr !important; }
-
-      /* Modales: full width */
       .modal-content, [id$="Modal"] > div, [id$="modal"] > div {
-        width: 95% !important;
-        max-height: 90dvh !important;
-        overflow-y: auto !important;
+        width: 95% !important; max-height: 90dvh !important; overflow-y: auto !important;
       }
-
-      /* Botones de acción: más grandes para touch */
-      button { touch-action: manipulation; }
     }
   </style>
 </head>
@@ -1128,6 +994,20 @@
 
   <!-- Scripts -->
   <script src="js/common_ui.js"></script>
+  <!-- Lucide Icons — cargado al final del body para garantizar DOM completo -->
+  <script src="https://cdn.jsdelivr.net/npm/lucide@0.263.1/dist/umd/lucide.min.js"></script>
+  <script>
+    if (window.lucide) lucide.createIcons();
+    (function() {
+      let _t = null;
+      const _r = () => { if (window.lucide) lucide.createIcons(); };
+      const _d = () => { clearTimeout(_t); _t = setTimeout(_r, 30); };
+      new MutationObserver((ms) => {
+        for (const m of ms) for (const n of m.addedNodes)
+          if (n.nodeType === 1 && (n.hasAttribute?.('data-lucide') || n.querySelector?.('[data-lucide]'))) { _d(); return; }
+      }).observe(document.body, { childList: true, subtree: true });
+    })();
+  </script>
   <!-- Core App Module -->
   <script type="module" src="js/asistente/main.js"></script>
   <script src="js/shared/lightbox.js" defer></script>

@@ -193,17 +193,34 @@ export const PaymentsModule = {
     const ds  = p.due_date ? new Date(p.due_date + 'T00:00:00').toLocaleDateString('es-ES') : '-';
     const af  = Number(p.amount || 0).toLocaleString('es-ES', { style: 'currency', currency: 'USD', minimumFractionDigits: 2 });
 
+    // Mora acumulada
+    const mora         = (ip && p.due_date) ? Helpers.calculateMora(p.due_date) : 0;
+    const moraBreakdown = (mora > 0 && p.due_date) ? Helpers.getMoraBreakdown(p.due_date) : null;
+    const totalAmount  = Number(p.amount || 0) + mora;
+    const tf           = totalAmount.toLocaleString('es-ES', { style: 'currency', currency: 'USD', minimumFractionDigits: 2 });
+
     let ub = '';
-    if (p.due_date && ip) {
+    if (mora > 0 && moraBreakdown) {
+      ub = '<div class="mt-1 flex flex-col items-end gap-0.5">' +
+             '<span class="text-[9px] font-black text-rose-600 bg-rose-50 border border-rose-200 px-2 py-0.5 rounded-full uppercase">' +
+               'Mora: +' + Helpers.formatCurrency(mora) + ' (' + moraBreakdown.formattedText + ')' +
+             '</span>' +
+             '<span class="text-[10px] font-bold text-slate-800 bg-amber-100 px-2 py-0.5 rounded-md border border-amber-200">' +
+               'Total: ' + tf +
+             '</span>' +
+           '</div>';
+    } else if (p.due_date && ip) {
       const t = new Date(); t.setHours(0, 0, 0, 0);
       const df = Math.round((new Date(p.due_date + 'T00:00:00') - t) / 86400000);
-      if (df < 0)       ub = '<span class="ml-1 text-[9px] font-black text-rose-600 bg-rose-50 border border-rose-200 px-1.5 py-0.5 rounded-full">' + Math.abs(df) + 'd vencido</span>';
-      else if (df === 0) ub = '<span class="ml-1 text-[9px] font-black text-orange-600 bg-orange-50 border border-orange-200 px-1.5 py-0.5 rounded-full">vence hoy</span>';
+      if (df === 0)      ub = '<span class="ml-1 text-[9px] font-black text-orange-600 bg-orange-50 border border-orange-200 px-1.5 py-0.5 rounded-full">vence hoy</span>';
       else if (df <= 5)  ub = '<span class="ml-1 text-[9px] font-black text-amber-600 bg-amber-50 border border-amber-200 px-1.5 py-0.5 rounded-full">vence en ' + df + 'd</span>';
     }
 
-    const approveBtn = ip ? '<button onclick="App.payments.markPaid(\'' + p.id + '\')" class="p-1.5 bg-emerald-50 text-emerald-600 rounded-lg hover:bg-emerald-100 transition-colors" title="Aprobar"><i data-lucide="check" class="w-4 h-4"></i></button>' : '';
-    const deleteBtn  = '<button onclick="App.payments.delete(\'' + p.id + '\')" class="p-1.5 bg-rose-50 text-rose-500 rounded-lg hover:bg-rose-100 transition-colors" title="Eliminar"><i data-lucide="trash-2" class="w-4 h-4"></i></button>';
+    const approveBtn  = ip ? '<button onclick="App.payments.markPaid(\'' + p.id + '\')" class="p-1.5 bg-emerald-50 text-emerald-600 rounded-lg hover:bg-emerald-100 transition-colors" title="Aprobar"><i data-lucide="check" class="w-4 h-4"></i></button>' : '';
+    const waiveMoraBtn = (mora > 0)
+      ? '<button onclick="App.payments.waiveMora(\'' + p.id + '\')" class="p-1.5 bg-violet-50 text-violet-600 rounded-lg hover:bg-violet-100 transition-colors" title="Quitar Mora"><i data-lucide="shield-off" class="w-4 h-4"></i></button>'
+      : '';
+    const deleteBtn   = '<button onclick="App.payments.delete(\'' + p.id + '\')" class="p-1.5 bg-rose-50 text-rose-500 rounded-lg hover:bg-rose-100 transition-colors" title="Eliminar"><i data-lucide="trash-2" class="w-4 h-4"></i></button>';
     const voucherCell = p.evidence_url
       ? '<a href="' + p.evidence_url + '" target="_blank" rel="noopener noreferrer" class="inline-flex items-center gap-1 text-sky-600 hover:text-sky-800 text-xs font-bold uppercase"><i data-lucide="external-link" class="w-3 h-3"></i>Ver</a>'
       : '<span class="text-slate-300 text-xs">-</span>';
@@ -211,12 +228,12 @@ export const PaymentsModule = {
     return '<tr class="hover:bg-slate-50 border-b border-slate-100 transition-colors' + (sk === 'overdue' ? ' bg-rose-50/20' : '') + '">' +
       '<td class="px-5 py-3.5"><div class="flex items-center gap-3"><div class="w-8 h-8 rounded-xl bg-indigo-50 text-indigo-600 flex items-center justify-center font-black text-sm flex-shrink-0">' + Helpers.escapeHTML((stu.name || '?').charAt(0).toUpperCase()) + '</div><div><div class="font-bold text-slate-800 text-sm">' + Helpers.escapeHTML(stu.name || '-') + '</div><div class="text-[10px] text-slate-400 font-bold uppercase">' + (stu.classrooms?.name || 'Sin aula') + '</div></div></div></td>' +
       '<td class="px-5 py-3.5 text-center"><span class="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[10px] font-black uppercase ' + st.c + '"><i data-lucide="' + st.i + '" class="w-3 h-3"></i>' + st.l + '</span></td>' +
-      '<td class="px-5 py-3.5 text-right"><div class="font-black text-slate-800 text-base">' + af + '</div>' + (ip ? '<div class="flex items-center justify-end gap-1 mt-0.5"><span class="text-[10px] text-slate-400 font-bold">pendiente</span>' + ub + '</div>' : '') + '</td>' +
+      '<td class="px-5 py-3.5 text-right"><div class="font-black text-slate-800 text-base">' + af + '</div>' + (ip ? '<div class="flex flex-col items-end gap-0.5 mt-0.5">' + ub + '</div>' : '') + '</td>' +
       '<td class="px-5 py-3.5"><span class="text-[10px] font-black uppercase text-slate-500 bg-slate-100 px-2 py-0.5 rounded-md">' + (p.method || '-') + '</span></td>' +
       '<td class="px-5 py-3.5"><div class="text-[10px] font-bold text-slate-600 uppercase truncate max-w-[110px]">' + (p.bank || '-') + '</div><div class="text-[9px] text-slate-400 font-bold">' + (p.reference || '') + '</div></td>' +
       '<td class="px-5 py-3.5"><div class="text-[11px] font-bold text-slate-700">' + (p.paid_date ? new Date(p.paid_date).toLocaleDateString('es-ES') : ds) + '</div><div class="text-[9px] text-slate-400 font-bold uppercase">' + (p.paid_date ? 'Pagado' : 'Vence') + '</div></td>' +
       '<td class="px-5 py-3.5 text-center">' + voucherCell + '</td>' +
-      '<td class="px-5 py-3.5 text-center"><div class="flex justify-center gap-1.5">' + approveBtn + deleteBtn + '</div></td>' +
+      '<td class="px-5 py-3.5 text-center"><div class="flex justify-center gap-1.5">' + approveBtn + waiveMoraBtn + deleteBtn + '</div></td>' +
     '</tr>';
   },
 
@@ -489,6 +506,37 @@ export const PaymentsModule = {
       await this.loadPayments();
     } catch (e) {
       Helpers.toast('Error en ciclo: ' + (e.message || e), 'error');
+    }
+  },
+
+  /**
+   * 🛡️ waiveMora — Quitar mora a un pago específico
+   */
+  async waiveMora(id) {
+    const reason = prompt('Motivo de la exoneración de mora (opcional):');
+    if (reason === null) return; // cancelado
+    try {
+      const { data, error } = await supabase.rpc('waive_payment_mora', {
+        p_payment_id: id,
+        p_reason: reason || 'Mora exonerada por administración'
+      });
+      if (error) throw error;
+      if (data?.error) throw new Error(data.error);
+      Helpers.toast('Mora eliminada correctamente', 'success');
+      await this.loadPayments();
+    } catch (e) {
+      // Fallback: actualizar due_date directamente si el RPC no existe aún
+      try {
+        const { error: upErr } = await supabase
+          .from('payments')
+          .update({ due_date: new Date().toISOString().split('T')[0] })
+          .eq('id', id);
+        if (upErr) throw upErr;
+        Helpers.toast('Mora eliminada', 'success');
+        await this.loadPayments();
+      } catch (e2) {
+        Helpers.toast('Error al quitar mora: ' + e2.message, 'error');
+      }
     }
   },
 
