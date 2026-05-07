@@ -49,7 +49,7 @@ export const DashboardModule = {
         supabase.from('payments').select('*', { count: 'exact', head: true })
           .in('status', ['pending', 'review']),
         supabase.from('payments').select('amount')
-          .eq('status', 'paid').gte('created_at', monthStart)
+          .eq('status', 'paid').eq('month_paid', new Date().getFullYear() + '-' + String(new Date().getMonth() + 1).padStart(2, '0'))
       ]);
 
       const get = (r) => r.status === 'fulfilled' ? r.value : {};
@@ -120,13 +120,16 @@ export const DashboardModule = {
     try {
       const year = new Date().getFullYear();
       const { data } = await supabase
-        .from('payments').select('amount, created_at')
+        .from('payments').select('amount, month_paid')
         .eq('status', 'paid')
-        .gte('created_at', year + '-01-01')
-        .lte('created_at', year + '-12-31');
+        .like('month_paid', year + '-%');
 
       const vals = new Array(12).fill(0);
-      (data || []).forEach(p => { vals[new Date(p.created_at).getMonth()] += Number(p.amount || 0); });
+      (data || []).forEach(p => {
+        const parts = (p.month_paid || '').split('-');
+        const m = parts.length >= 2 ? parseInt(parts[1], 10) - 1 : -1;
+        if (m >= 0 && m <= 11) vals[m] += Number(p.amount || 0);
+      });
 
       if (this._chart) this._chart.destroy();
       this._chart = new Chart(canvas, {

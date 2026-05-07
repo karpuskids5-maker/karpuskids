@@ -5,9 +5,9 @@
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <meta name="robots" content="noindex, nofollow">
   <meta http-equiv="X-Content-Type-Options" content="nosniff">
-  <meta http-equiv="X-Frame-Options" content="DENY">
   <meta http-equiv="Referrer-Policy" content="strict-origin-when-cross-origin">
   <style>html{display:none;}</style>
+  <!-- X-Frame-Options debe ser configurado por el servidor, no por meta tag -->
   <script>if(self===top){document.documentElement.style.display='block';}else{top.location=self.location;}</script>
   <title>Karpus Kids — Panel Asistente</title>
   <link rel="icon" href="./logo/favicon.ico" type="image/x-icon">
@@ -15,12 +15,12 @@
   <meta name="mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
   <link rel="manifest" href="manifest.json">
+  <!-- cdn.tailwindcss.com no debe usarse en producción. Procesar localmente. -->
   <script src="https://cdn.tailwindcss.com"></script>
   <link rel="stylesheet" href="css/theme.css" />
   <link rel="stylesheet" href="css/layout.css" />
   <link rel="stylesheet" href="css/karpus-modern.css" />
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
-
   <style>
     /* ── Sidebar desktop: ancho y colapso ── */
     @media (min-width: 768px) {
@@ -41,11 +41,11 @@
       aside#sidebar.collapsed:hover #sidebarUserName { display: block; opacity: 1; }
 
       /* Iconos */
-      aside#sidebar.collapsed .kk-nav-item i { width: 26px; height: 26px; }
-      aside#sidebar.collapsed:hover .kk-nav-item i { width: 20px; height: 20px; }
+      aside#sidebar.collapsed .kk-nav-item [data-lucide] { width: 26px; height: 26px; }
+      aside#sidebar.collapsed:hover .kk-nav-item [data-lucide] { width: 20px; height: 20px; }
       aside#sidebar.collapsed .kk-nav-item { justify-content: center; padding-left: 0; padding-right: 0; }
       aside#sidebar.collapsed:hover .kk-nav-item { justify-content: flex-start; padding-left: 12px; padding-right: 12px; }
-
+      
       /* Botón toggle */
       #toggleSidebar i { transition: transform 0.3s; }
       aside#sidebar.collapsed #toggleSidebar i { transform: rotate(180deg); }
@@ -995,12 +995,27 @@
   <!-- Scripts -->
   <script src="js/common_ui.js"></script>
   <!-- Lucide Icons — cargado al final del body para garantizar DOM completo -->
-  <script src="https://cdn.jsdelivr.net/npm/lucide@0.263.1/dist/umd/lucide.min.js"></script>
+  <script src="js/shared/lucide.min.js"></script>
   <script>
-    if (window.lucide) lucide.createIcons();
+    function _initLucide() {
+      if (!window.lucide) return;
+      lucide.createIcons({
+        attrs: { 'stroke-width': '2', 'stroke-linecap': 'round', 'stroke-linejoin': 'round' }
+      });
+      // Fix: remover width/height hardcodeados de Lucide para que mande el CSS/Tailwind
+      document.querySelectorAll('svg[data-lucide]').forEach(svg => {
+        const hasSizeClass = [...svg.classList].some(c => /^w-\d/.test(c) || /^h-\d/.test(c));
+        if (hasSizeClass) {
+          svg.removeAttribute('width');
+          svg.removeAttribute('height');
+        }
+      });
+    }
+    _initLucide();
+
     (function() {
       let _t = null;
-      const _r = () => { if (window.lucide) lucide.createIcons(); };
+      const _r = () => _initLucide();
       const _d = () => { clearTimeout(_t); _t = setTimeout(_r, 30); };
       new MutationObserver((ms) => {
         for (const m of ms) for (const n of m.addedNodes)

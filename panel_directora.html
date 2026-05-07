@@ -5,13 +5,14 @@
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <meta name="robots" content="noindex,nofollow">
   <meta http-equiv="X-Content-Type-Options" content="nosniff">
-  <meta http-equiv="X-Frame-Options" content="DENY">
   <meta http-equiv="Referrer-Policy" content="strict-origin-when-cross-origin">
   <style>html{display:none;}</style>
+  <!-- X-Frame-Options debe ser configurado por el servidor, no por meta tag -->
   <script>if(self===top){document.documentElement.style.display='block';}else{top.location=self.location;}</script>
   <title>Karpus Kids — Panel Directora</title>
   <link rel="icon" href="logo/favicon.ico" type="image/x-icon">
   <link rel="manifest" href="manifest.json">
+  <!-- cdn.tailwindcss.com no debe usarse en producción. Procesar localmente. -->
   <script src="https://cdn.tailwindcss.com"></script>
   <link rel="stylesheet" href="css/theme.css" />
   <link rel="stylesheet" href="css/layout.css" />
@@ -106,7 +107,7 @@
     /* ═══════════════════════════════════════════════
        NAV BUTTONS
     ═══════════════════════════════════════════════ */
-    .nav-btn {
+    .nav-btn, .kk-nav-item {
       display: flex; align-items: center; gap: 12px;
       padding: 12px 16px; width: 100%; color: #94a3b8;
       border-radius: 8px; margin-bottom: 4px;
@@ -115,9 +116,9 @@
       -webkit-tap-highlight-color: transparent;
       touch-action: manipulation;
     }
-    .nav-btn i { transition: color 0.2s ease; }
-    .nav-btn:hover, .nav-btn.active { background: rgba(255,255,255,0.15); color: white; }
-    .nav-btn .badge {
+    .nav-btn [data-lucide], .kk-nav-item [data-lucide] { transition: color 0.2s ease; }
+    .nav-btn:hover, .nav-btn.active, .kk-nav-item:hover, .kk-nav-item.active { background: rgba(255,255,255,0.15); color: white; }
+    .nav-btn .badge, .kk-nav-item .kk-badge {
       position: absolute; top: 0.5rem; right: 0.5rem;
       background: #e91e63; color: white; border-radius: 9999px;
       font-size: 0.75rem; padding: 0.125rem 0.375rem;
@@ -1671,16 +1672,39 @@
     });
   </script>
   <!-- Lucide Icons — cargado al final del body para garantizar DOM completo -->
-  <script src="https://cdn.jsdelivr.net/npm/lucide@0.263.1/dist/umd/lucide.min.js"></script>
+  <script src="js/shared/lucide.min.js"></script>
   <script>
-    // Inicializar iconos sobre el HTML estático
-    if (window.lucide) lucide.createIcons();
+    // Inicializar iconos — pasar atributos de clase al SVG reemplazante
+    function _initLucide() {
+      if (!window.lucide) return;
+      lucide.createIcons({
+        attrs: { 'stroke-width': '2', 'stroke-linecap': 'round', 'stroke-linejoin': 'round' }
+      });
+      // Fix: remover width/height hardcodeados cuando hay clases Tailwind w-* h-*
+      document.querySelectorAll('svg[data-lucide]').forEach(svg => {
+        const hasSizeClass = [...svg.classList].some(c => /^w-\d/.test(c) || /^h-\d/.test(c));
+        if (hasSizeClass) {
+          svg.removeAttribute('width');
+          svg.removeAttribute('height');
+        }
+      });
+    }
+    // Exponer globalmente para que los módulos JS puedan usarla
+    window._initLucide = _initLucide;
+    // Patch: reemplazar lucide.createIcons con nuestra versión mejorada
+    window.addEventListener('load', () => {
+      if (window.lucide) {
+        const _orig = lucide.createIcons.bind(lucide);
+        lucide.createIcons = (opts) => { _orig(opts); window._initLucide && _initLucide(); };
+      }
+    });
+    _initLucide();
 
     // MutationObserver: re-ejecutar createIcons cada vez que se inserte
     // contenido dinámico con atributos data-lucide
     (function() {
       let _timer = null;
-      const _run = () => { if (window.lucide) lucide.createIcons(); };
+      const _run = () => _initLucide();
       const _debounced = () => { clearTimeout(_timer); _timer = setTimeout(_run, 30); };
       new MutationObserver((mutations) => {
         for (const m of mutations) {

@@ -1,4 +1,4 @@
-﻿import { supabase } from '../shared/supabase.js';
+﻿﻿import { supabase } from '../shared/supabase.js';
 import { Helpers } from '../shared/helpers.js';
 import { AppState } from './state.js';
 import { sendEmail } from '../shared/supabase.js';
@@ -50,8 +50,8 @@ export const PaymentsModule = {
     this._initPeriodSelectors();
     await this._loadSettings();
 
-    document.getElementById('filterPaymentMonth')?.addEventListener('change', () => this.loadPayments());
-    document.getElementById('filterPaymentYear')?.addEventListener('change',  () => this.loadPayments());
+    document.getElementById('filterPaymentMonth')?.addEventListener('change', () => { this.loadPayments(); this.loadIncomeChart(); });
+    document.getElementById('filterPaymentYear')?.addEventListener('change',  () => { this.loadPayments(); this.loadIncomeChart(); });
     document.getElementById('filterPaymentStatus')?.addEventListener('change', () => this.loadPayments());
     document.getElementById('searchPaymentStudent')?.addEventListener('input', () => this.loadPayments());
     document.getElementById('btnNewPayment')?.addEventListener('click',        () => this.openPaymentModal());
@@ -77,7 +77,14 @@ export const PaymentsModule = {
     });
 
     // Chart year selector
-    document.getElementById('chartYear')?.addEventListener('change', () => this.loadIncomeChart());
+    document.getElementById('chartYear')?.addEventListener('change', () => {
+      // Sync with main year filter
+      const fy = document.getElementById('filterPaymentYear');
+      const cy = document.getElementById('chartYear');
+      if (fy && cy && fy.value !== cy.value) fy.value = cy.value;
+      this.loadPayments();
+      this.loadIncomeChart();
+    });
 
     await this.loadPayments();
     this.loadIncomeChart();
@@ -91,6 +98,9 @@ export const PaymentsModule = {
     const ys = document.getElementById('filterPaymentYear');
     if (ms) ms.value = m;
     if (ys) ys.value = y;
+    // Sync chartYear with filterPaymentYear
+    const cy = document.getElementById('chartYear');
+    if (cy) cy.value = y;
   },
 
   async _loadSettings() {
@@ -303,25 +313,31 @@ export const PaymentsModule = {
   },
 
   async loadStats() {
-    try {
-      const now = new Date();
-      const monthStart = now.getFullYear() + '-' + String(now.getMonth() + 1).padStart(2, '0') + '-01T00:00:00.000Z';
+      try {
+        // Respetar el mes/año del filtro activo para que las tarjetas sean consistentes con la tabla
+        const mv  = document.getElementById('filterPaymentMonth')?.value;
+        const yv  = document.getElementById('filterPaymentYear')?.value;
+        const now = new Date();
+        const month   = mv ? String(mv).padStart(2, '0') : String(now.getMonth() + 1).padStart(2, '0');
+        const year    = yv || String(now.getFullYear());
+        const monthKey = `${year}-${month}`;
 
-      const [incomeRes, pendingRes, overdueRes, reviewRes] = await Promise.all([
-        supabase.from('payments').select('amount').eq('status', 'paid').gte('created_at', monthStart),
-        supabase.from('payments').select('*', { count: 'exact', head: true }).eq('status', 'pending'),
-        supabase.from('payments').select('*', { count: 'exact', head: true }).eq('status', 'overdue'),
-        supabase.from('payments').select('*', { count: 'exact', head: true }).eq('status', 'review')
-      ]);
+        const [incomeRes, pendingRes, overdueRes, reviewRes] = await Promise.all([
+          // Ingresos del mes seleccionado usando month_paid (no created_at)
+          supabase.from('payments').select('amount').eq('status', 'paid').eq('month_paid', monthKey),
+          supabase.from('payments').select('*', { count: 'exact', head: true }).in('status', ['pending']),
+          supabase.from('payments').select('*', { count: 'exact', head: true }).eq('status', 'overdue'),
+          supabase.from('payments').select('*', { count: 'exact', head: true }).in('status', ['review'])
+        ]);
 
-      const income = (incomeRes.data || []).reduce((s, p) => s + Number(p.amount || 0), 0);
-      const set = (id, v) => { const el = document.getElementById(id); if (el) el.textContent = v; };
-      set('kpiIncomeMonth', '$' + income.toLocaleString('es-ES', { minimumFractionDigits: 2 }));
-      set('kpiPendingCount', pendingRes.count || 0);
-      set('kpiOverdueCount', overdueRes.count || 0);
-      set('kpiReviewCount',  reviewRes.count  || 0);
-    } catch (_) { /* silencioso */ }
-  },
+        const income = (incomeRes.data || []).reduce((s, p) => s + Number(p.amount || 0), 0);
+        const set = (id, v) => { const el = document.getElementById(id); if (el) el.textContent = v; };
+        set('kpiIncomeMonth', '$' + income.toLocaleString('es-ES', { minimumFractionDigits: 2 }));
+        set('kpiPendingCount', pendingRes.count || 0);
+        set('kpiOverdueCount', overdueRes.count || 0);
+        set('kpiReviewCount',  reviewRes.count  || 0);
+      } catch (_) { /* silencioso */ }
+    },
 
   async loadIncomeChart() {
     const canvas = document.getElementById('paymentsIncomeChart');
@@ -329,15 +345,17 @@ export const PaymentsModule = {
     try {
       const year = document.getElementById('chartYear')?.value || new Date().getFullYear();
       const { data: payments } = await supabase
-        .from('payments').select('amount, status, created_at')
-        .gte('created_at', year + '-01-01').lte('created_at', year + '-12-31');
+        .from('payments').select('amount, status, month_paid')
+        .like('month_paid', year + '-%');
 
       const labels = ['Ene','Feb','Mar','Abr','May','Jun','Jul','Ago','Sep','Oct','Nov','Dic'];
       const paid    = new Array(12).fill(0);
       const pending = new Array(12).fill(0);
 
       (payments || []).forEach(p => {
-        const m = new Date(p.created_at).getMonth();
+        const parts = (p.month_paid || '').split('-');
+        const m = parts.length >= 2 ? parseInt(parts[1], 10) - 1 : -1;
+        if (m < 0 || m > 11) return;
         const s = (p.status || '').toLowerCase();
         if (s === 'paid' || s === 'pagado' || s === 'confirmado') paid[m] += Number(p.amount || 0);
         else pending[m] += Number(p.amount || 0);

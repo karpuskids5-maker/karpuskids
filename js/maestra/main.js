@@ -1002,13 +1002,27 @@ async function loadPendingTasksBadge(classroomId) {
 
 // ── QR de identificación de la maestra ───────────────────────────────────────
 async function _initMaestraQR(profile, user) {
-  const section  = document.getElementById('maestra-qr-section');
+  const section   = document.getElementById('maestra-qr-section');
   const container = document.getElementById('maestra-qr-container');
-  const label    = document.getElementById('maestra-qr-matricula');
+  const label     = document.getElementById('maestra-qr-matricula');
   if (!section || !container) return;
 
-  // Usar notes como código de acceso (guardado desde el modal de directora)
-  const code = profile?.notes || user?.id?.substring(0, 8).toUpperCase() || 'SIN-CODIGO';
+  // Siempre hacer fetch fresco para obtener access_code actualizado
+  let freshProfile = profile;
+  try {
+    const { data } = await supabase
+      .from('profiles')
+      .select('id, name, access_code, notes')
+      .eq('id', user.id)
+      .maybeSingle();
+    if (data) freshProfile = { ...profile, ...data };
+  } catch (_) {}
+
+  // Prioridad: access_code > notes (legacy) > fallback con user.id
+  const code = freshProfile?.access_code
+    || (freshProfile?.notes?.startsWith?.('TEA-') || freshProfile?.notes?.startsWith?.('ASI-') || freshProfile?.notes?.startsWith?.('DIR-') ? freshProfile.notes : null)
+    || user?.id?.substring(0, 8).toUpperCase()
+    || 'SIN-CODIGO';
 
   section.classList.remove('hidden');
   if (label) label.textContent = code;
