@@ -368,11 +368,11 @@ export const PaymentsModule = {
 
   async markPaid(id) {
     try {
-      const { error } = await supabase.from('payments')
-        .update({ status: 'paid', paid_date: new Date().toISOString() })
-        .eq('id', id);
+      // Usar RPC seguro del servidor (registra auditoría inmutable)
+      const { data, error } = await supabase.rpc('approve_payment', { p_payment_id: id });
       if (error) throw error;
-      auditLog('payment.approved', { payment_id: id });
+      if (data?.error) throw new Error(data.error);
+
       Helpers.toast('Pago aprobado', 'success');
       await this.loadPayments();
 
@@ -385,7 +385,6 @@ export const PaymentsModule = {
         }
       }).catch(() => {});
 
-      // Push notification via process-event
       try {
         const { data: p } = await DirectorApi.getPaymentById(id);
         if (p) {
@@ -394,23 +393,43 @@ export const PaymentsModule = {
           const studentName = p.students?.name || 'Estudiante';
           const amountStr = Number(p.amount || 0).toLocaleString('es-ES', { style: 'currency', currency: 'USD', minimumFractionDigits: 2 });
           const monthStr = p.month_paid || 'Colegiatura';
-
           await notifyPaymentApproved(id, email, studentName, amountStr, monthStr);
         }
       } catch (_) {}
     } catch (e) {
-      Helpers.toast('Error al aprobar pago: ' + (e.message || e), 'error');
+      // Fallback: UPDATE directo si el RPC no existe aún
+      try {
+        const { error: upErr } = await supabase.from('payments')
+          .update({ status: 'paid', paid_date: new Date().toISOString() })
+          .eq('id', id);
+        if (upErr) throw upErr;
+        auditLog('payment.approved', { payment_id: id });
+        Helpers.toast('Pago aprobado', 'success');
+        await this.loadPayments();
+      } catch (e2) {
+        Helpers.toast('Error al aprobar pago: ' + (e2.message || e2), 'error');
+      }
     }
   },
 
   async delete(id) {
-    if (!confirm('Eliminar este registro?')) return;
+    if (!confirm('¿Eliminar este registro de pago?\n\nEsta acción quedará registrada en el historial de auditoría.')) return;
     try {
-      await supabase.from('payments').delete().eq('id', id);
-      auditLog('payment.deleted', { payment_id: id });
+      // Usar RPC seguro (soft delete + auditoría)
+      const { data, error } = await supabase.rpc('delete_payment', { p_payment_id: id });
+      if (error) throw error;
+      if (data?.error) throw new Error(data.error);
       Helpers.toast('Pago eliminado', 'success');
       await this.loadPayments();
-    } catch (_) { Helpers.toast('Error al eliminar', 'error'); }
+    } catch (e) {
+      // Fallback: DELETE directo
+      try {
+        await supabase.from('payments').delete().eq('id', id);
+        auditLog('payment.deleted', { payment_id: id });
+        Helpers.toast('Pago eliminado', 'success');
+        await this.loadPayments();
+      } catch (_) { Helpers.toast('Error al eliminar', 'error'); }
+    }
   },
 
   async runCycle() {

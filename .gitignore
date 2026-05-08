@@ -45,3 +45,13 @@ scripts/fix_auth_activation.js
 scripts/confirm_users.js
 scripts/seed-demo.js
 scripts/seed-demo.cjs
+
+# Temporary fix scripts (run locally, don't need in repo)
+_fix_*.cjs
+_check_*.cjs
+_verify.cjs
+
+# Tailwind standalone CLI (binary, no commitear)
+tailwindcss.exe
+tailwind.v3.config.js
+css/tailwind.v3.css

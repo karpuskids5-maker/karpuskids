@@ -19,6 +19,7 @@ export const DashboardService = {
 
   /**
    * Obtener TODOS los datos del dashboard en una sola llamada paralela
+   * Con timeout de 10s para evitar bloqueo infinito
    */
   async getFullData(forceRefresh = false) {
     if (this.isLoading) {
@@ -31,25 +32,31 @@ export const DashboardService = {
 
     this.isLoading = true;
 
+    // Helper: envolver cada query con timeout individual de 6s
+    const withTimeout = (promise, fallback = { data: null, error: null }) =>
+      Promise.race([
+        promise,
+        new Promise(resolve => setTimeout(() => resolve(fallback), 6000))
+      ]);
+
     try {
       const today = new Date().toISOString().split('T')[0];
       const year = new Date().getFullYear();
       const month = new Date().getMonth() + 1;
 
-      // Usar mes en formato texto para el RPC get_dashboard_kpis
       const monthName = new Intl.DateTimeFormat('es-ES', { month: 'long' }).format(new Date());
       const formattedMonth = monthName.charAt(0).toUpperCase() + monthName.slice(1);
 
       const results = await Promise.allSettled([
-        DirectorApi.getDashboardKPIs(formattedMonth),
-        DirectorApi.getStudents(),
-        DirectorApi.getClassroomsWithOccupancy(),
-        DirectorApi.getPayments({ status: 'pending', year }),
-        DirectorApi.getInquiries({ status: 'all' }),
-        DirectorApi.getAttendanceByDate(today),
-        DirectorApi.getAttendanceLast7Days(),
-        DirectorApi.getFinancialSummary(year, month),
-        DirectorApi.getTeachers()
+        withTimeout(DirectorApi.getDashboardKPIs(formattedMonth)),
+        withTimeout(DirectorApi.getStudents()),
+        withTimeout(DirectorApi.getClassroomsWithOccupancy()),
+        withTimeout(DirectorApi.getPayments({ status: 'pending', year })),
+        withTimeout(DirectorApi.getInquiries({ status: 'all' })),
+        withTimeout(DirectorApi.getAttendanceByDate(today)),
+        withTimeout(DirectorApi.getAttendanceLast7Days()),
+        withTimeout(DirectorApi.getFinancialSummary(year, month)),
+        withTimeout(DirectorApi.getTeachers())
       ]);
 
       const [

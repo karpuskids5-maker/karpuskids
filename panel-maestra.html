@@ -14,8 +14,9 @@
   <link rel="manifest" href="manifest.json">
   <link rel="stylesheet" href="css/theme.css" />
   <link rel="stylesheet" href="css/layout.css" />
-  <!-- cdn.tailwindcss.com no debe usarse en producción. Procesar localmente. -->
-  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="stylesheet" href="css/karpus-tailwind.css">
+  
+  
   <script src="js/shared/lucide.min.js"></script>
   
   <style>
@@ -849,6 +850,7 @@
   </div>
 
     <!-- Core App Module -->
+    <script src="js/shared/supabase-js.min.js"></script>
     <script type="module" src="js/maestra/main.js"></script>
     <script src="js/shared/lightbox.js" defer></script>
     <script src="js/shared/confirm-dialog.js" defer></script>

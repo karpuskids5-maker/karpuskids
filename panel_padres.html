@@ -19,19 +19,20 @@
   <meta property="og:title" content="Karpus Kids - Panel de Padres">
   <meta property="og:description" content="Gestiona la educación de tu hijo con facilidad">
   <meta property="og:image" content="logo/favicon.ico">
-  <script src="https://cdn.tailwindcss.com"></script>
-  <!-- cdn.tailwindcss.com no debe usarse en producción. Procesar localmente. -->
+  
+  
   <script src="https://meet.jit.si/external_api.js" defer></script>
-  <script src="https://unpkg.com/lucide@0.263.1/dist/umd/lucide.min.js"></script>
+  <script src="js/shared/lucide.min.js"></script>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link rel="preload" href="https://fonts.googleapis.com/css2?family=Quicksand:wght@400;600;700&family=Nunito:wght@400;600;700;800&display=swap" as="style" onload="this.onload=null;this.rel='stylesheet'">
   <noscript><link href="https://fonts.googleapis.com/css2?family=Quicksand:wght@400;600;700&family=Nunito:wght@400;600;700;800&display=swap" rel="stylesheet"></noscript>
   <link rel="stylesheet" href="css/panel-padre.css" />
   <link rel="stylesheet" href="css/layout.css" />
-  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+  <script src="js/shared/chart.min.js"></script>
   <link rel="icon" href="logo/favicon.ico" type="image/x-icon">
-  <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.6.0/dist/confetti.browser.min.js"></script>
+  <link rel="stylesheet" href="css/karpus-tailwind.css">
+  <script src="js/shared/confetti.min.js"></script>
   <style>
     :root {
       /* NOTAS */
@@ -1032,6 +1033,7 @@
   </div>
   
   <!-- Script Principal del Padre -->
+  <script src="js/shared/supabase-js.min.js"></script>
   <script type="module" src="js/padre/main.js"></script>
   <script src="js/shared/lightbox.js" defer></script>
   <script src="js/shared/confirm-dialog.js" defer></script>
@@ -1051,6 +1053,58 @@
   <script>
     // Inicialización de Iconos y Loader
     window.addEventListener("load", () => {
+      // --- MEJORA: Sistema de Descarga de Media del Muro ---
+      window.downloadKarpusMedia = async (url, filename) => {
+        if (!url) return;
+        try {
+          // Intentar descarga directa vía Blob para preservar nombre de archivo
+          const res = await fetch(url);
+          const blob = await res.blob();
+          const blobUrl = URL.createObjectURL(blob);
+          const a = document.createElement('a');
+          a.href = blobUrl;
+          a.download = filename || `karpus_kids_${Date.now()}`;
+          document.body.appendChild(a);
+          a.click();
+          document.body.removeChild(a);
+          URL.revokeObjectURL(blobUrl);
+        } catch (e) {
+          // Fallback: Abrir en pestaña nueva si falla el fetch (CORS)
+          window.open(url, '_blank');
+        }
+      };
+
+      // Observar cambios en el muro para inyectar botón de descarga dinámicamente
+      const muroObserver = new MutationObserver(() => {
+        const feed = document.getElementById('classFeed');
+        if (!feed) return;
+        
+        // Buscar imágenes y videos dentro del feed que no tengan el botón aún
+        feed.querySelectorAll('img, video').forEach(media => {
+          const container = media.closest('.post-media-container') || media.parentElement;
+          if (container && !container.querySelector('.post-media-download-btn')) {
+            container.classList.add('relative', 'group');
+            
+            const btn = document.createElement('button');
+            btn.className = 'post-media-download-btn opacity-0 group-hover:opacity-100 transition-all bg-white/20 backdrop-blur-md text-white p-2.5 rounded-2xl hover:bg-white/40 shadow-lg border border-white/30 active:scale-90 flex items-center justify-center';
+            btn.innerHTML = '<i data-lucide="download" class="w-4 h-4"></i>';
+            btn.title = "Descargar este recuerdo";
+            btn.onclick = (e) => {
+              e.stopPropagation();
+              const src = media.src || media.querySelector('source')?.src;
+              const ext = src?.split('.').pop().split('?')[0] || (media.tagName === 'IMG' ? 'jpg' : 'mp4');
+              window.downloadKarpusMedia(src, `karpus_kids_muro_${Date.now()}.${ext}`);
+            };
+            
+            container.appendChild(btn);
+            if (window.lucide) lucide.createIcons();
+          }
+        });
+      });
+
+      const feedEl = document.getElementById('classFeed');
+      if (feedEl) muroObserver.observe(feedEl, { childList: true, subtree: true });
+
       if (window.lucide) {
         lucide.createIcons();
       }

@@ -8,6 +8,7 @@ import { Helpers } from '../shared/helpers.js';
 import { WallModule } from '../shared/wall.js';
 import { ChatModule } from '../shared/chat.js';
 import { StudentsModule } from './modules/students.js';
+import { auditLog } from '../shared/db-utils.js';
 import { RoomsModule } from './modules/rooms.js';
 import { DashboardModule } from './modules/dashboard.js';
 import { BadgeSystem } from '../shared/badges.js';
@@ -17,7 +18,7 @@ import { RealtimeManager } from '../shared/realtime-manager.js';
 import { Security } from '../shared/security.js';
 
 // ?? Definir objeto App globalmente para evitar ReferenceError en onclicks del HTML
-// Global close modal fallback — always available even before openNewPostModal is called
+// Global close modal fallback ï¿½ always available even before openNewPostModal is called
 window._closeAsistenteModal = () => {
   const gc = document.getElementById('globalModalContainer');
   if (gc) { gc.style.display = 'none'; gc.innerHTML = ''; }
@@ -52,7 +53,7 @@ window.App = {
 };
 
 /**
- * Inicialización principal del Panel de Asistente
+ * Inicializaciï¿½n principal del Panel de Asistente
  */
 document.addEventListener('DOMContentLoaded', async () => {
   
@@ -63,7 +64,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   AppState.set('user', auth.user);
   AppState.set('profile', auth.profile);
 
-  // ?? Sistema de badges por sección
+  // ?? Sistema de badges por secciï¿½n
   BadgeSystem.init(auth.user.id);
 
   // Sidebar profile
@@ -80,8 +81,8 @@ document.addEventListener('DOMContentLoaded', async () => {
     window.location.href = 'login.html';
   });
   
-  // 2. Inicializar módulos ligeros y navegación
-  // La navegación ahora se encargará de la carga perezosa (lazy loading) de las secciones.
+  // 2. Inicializar mï¿½dulos ligeros y navegaciï¿½n
+  // La navegaciï¿½n ahora se encargarï¿½ de la carga perezosa (lazy loading) de las secciones.
   WallModule.init('muroPostsContainer', { accentColor: 'teal' }, AppState);
   
   // ? FIX OneSignal: Solo inicializar en el dominio correcto para evitar errores de consola
@@ -90,7 +91,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   } else {
   }
   
-  initNavigation(); // Esto cargará el dashboard y configurará los listeners
+  initNavigation(); // Esto cargarï¿½ el dashboard y configurarï¿½ los listeners
 
   // Asignar funciones internas al objeto global App
   Object.assign(window.App, {
@@ -130,7 +131,7 @@ async function initDashboard() {
 }
 
 /**
- * Navegación lateral
+ * Navegaciï¿½n lateral
  */
 const loadedSections = new Set();
 
@@ -139,10 +140,10 @@ function initNavigation() {
   const sections = document.querySelectorAll('section[id]');
 
   const showSection = async (target) => {
-    // 1. Limpiar clases activas en botones de navegación
+    // 1. Limpiar clases activas en botones de navegaciï¿½n
     navLinks.forEach(l => {
       l.classList.remove('bg-white/20', 'bg-teal-50', 'text-teal-600', 'active');
-      // Si el botón está en el sidebar y no es el activo, restaurar su estilo original de texto blanco
+      // Si el botï¿½n estï¿½ en el sidebar y no es el activo, restaurar su estilo original de texto blanco
       if (!l.classList.contains('active')) {
         l.classList.add('text-white');
       }
@@ -170,10 +171,10 @@ function initNavigation() {
     
     AppState.set('currentSection', target);
 
-    // ?? Marcar badge como leído al entrar a la sección
+    // ?? Marcar badge como leï¿½do al entrar a la secciï¿½n
     BadgeSystem.mark(target);
 
-    // 3. Cerrar sidebar en móvil automáticamente al cambiar de sección
+    // 3. Cerrar sidebar en mï¿½vil automï¿½ticamente al cambiar de secciï¿½n
     const sidebar = document.getElementById('sidebar');
     if (sidebar && window.innerWidth < 768) {
       sidebar.classList.remove('mobile-visible');
@@ -181,7 +182,7 @@ function initNavigation() {
       if (ov) ov.style.display = 'none';
     }
 
-    // ? --- LÓGICA DE CARGA PEREZOSA (LAZY LOADING) ---
+    // ? --- Lï¿½GICA DE CARGA PEREZOSA (LAZY LOADING) ---
     if (!loadedSections.has(target)) {
       try {
         switch (target) {
@@ -231,7 +232,7 @@ function initNavigation() {
         Helpers.toast(`Error al cargar ${target}`, 'error');
       }
     } else {
-      // Re-cargar datos frescos al volver a una sección ya visitada
+      // Re-cargar datos frescos al volver a una secciï¿½n ya visitada
       switch (target) {
         case 'maestros':   TeachersModule.loadTeachers?.(); break;
         case 'estudiantes': StudentsModule.loadStudents?.(); break;
@@ -252,7 +253,7 @@ function initNavigation() {
   DashboardModule.init().then(() => loadedSections.add('dashboard'));
   showSection('dashboard');
 
-  // -- Hamburger móvil ------------------------------------------------------
+  // -- Hamburger mï¿½vil ------------------------------------------------------
   const menuBtn = document.getElementById('menuBtn');
   const sidebar  = document.getElementById('sidebar');
   const overlay  = document.getElementById('sidebarOverlay');
@@ -276,7 +277,7 @@ function initNavigation() {
     overlay.addEventListener('click', _closeSidebar);
   }
 
-  // Cerrar sidebar al hacer click en el main (móvil)
+  // Cerrar sidebar al hacer click en el main (mï¿½vil)
   document.getElementById('layoutShell')?.addEventListener('click', () => {
     if (window.innerWidth < 768 && sidebar?.classList.contains('mobile-visible')) {
       _closeSidebar();
@@ -367,11 +368,11 @@ async function initProfile() {
     // Save immediately
     const { error } = await supabase.from('profiles').update({ access_code: newCode }).eq('id', p.id);
     if (!error) {
-      Helpers.toast('Código de acceso guardado', 'success');
+      Helpers.toast('Cï¿½digo de acceso guardado', 'success');
       AppState.set('profile', { ...AppState.get('profile'), access_code: newCode });
       _renderProfileQR(newCode);
     } else {
-      Helpers.toast('Error al guardar código: ' + error.message, 'error');
+      Helpers.toast('Error al guardar cï¿½digo: ' + error.message, 'error');
     }
   };
 
@@ -389,7 +390,7 @@ async function initProfile() {
       .role{font-size:11px;color:#0d9488;font-weight:800;text-transform:uppercase;margin-top:2px;}
       .code{font-size:10px;color:#64748b;font-weight:700;margin-top:8px;}</style>
     </head><body><div class="card">
-      <div class="hdr">STAFF · KARPUS KIDS</div>
+      <div class="hdr">STAFF ï¿½ KARPUS KIDS</div>
       <img src="${img}">
       <div class="name">${p.name || 'Personal'}</div>
       <div class="role">${p.role || 'Asistente'}</div>
@@ -445,7 +446,7 @@ async function initProfile() {
 // --- Funciones Globales de Ventana ---
 
 async function deleteComment(cid, pid) {
-  if (!confirm('¿Eliminar comentario?')) return;
+  if (!confirm('ï¿½Eliminar comentario?')) return;
   const { error } = await supabase.from('comments').delete().eq('id', cid);
   if (!error) {
     Helpers.toast('Comentario eliminado');
@@ -516,12 +517,12 @@ async function loadChatContacts(searchTerm = '', unreadMap = {}) {
 
   try {
     const contacts = await QueryCache.get(cacheKey, async () => {
-      // 1. Obtener perfiles — todos los roles con quienes puede chatear
+      // 1. Obtener perfiles ï¿½ todos los roles con quienes puede chatear
       let query = supabase
         .from('profiles')
         .select('id, name, role, avatar_url')
         .in('role', ['padre', 'maestra', 'directora', 'asistente'])
-        .neq('id', AppState.get('user')?.id || 'none')  // no mostrar a sí mismo
+        .neq('id', AppState.get('user')?.id || 'none')  // no mostrar a sï¿½ mismo
         .order('name');
       if (searchTerm) query = query.ilike('name', `%${searchTerm}%`);
       const { data: profiles, error } = await query.limit(100);
@@ -589,7 +590,7 @@ async function selectAssistantChat(userId, name, role) {
   activeChatUserId = userId;
   activeConversationId = null;
 
-  // Mobile: ocultar lista, mostrar conversación
+  // Mobile: ocultar lista, mostrar conversaciï¿½n
   const listPanel = document.getElementById('chatListPanel');
   const convPanel = document.getElementById('chatConversationPanel');
   if (listPanel && convPanel) {
@@ -646,13 +647,13 @@ async function selectAssistantChat(userId, name, role) {
     };
 
     if (!messages || messages.length === 0) {
-      msgs.innerHTML = '<div class="flex-1 flex flex-col items-center justify-center text-slate-400 text-sm py-12"><p>No hay mensajes aún.</p><p class="text-xs mt-1">Escribe el primero ??</p></div>';
+      msgs.innerHTML = '<div class="flex-1 flex flex-col items-center justify-center text-slate-400 text-sm py-12"><p>No hay mensajes aï¿½n.</p><p class="text-xs mt-1">Escribe el primero ??</p></div>';
     } else {
       msgs.innerHTML = messages.map(buildBubble).join('');
       import('../shared/scroll.module.js').then(({ ScrollModule }) => ScrollModule.scrollToBottom(msgs));
     }
 
-    // Suscripción realtime
+    // Suscripciï¿½n realtime
     ChatModule.subscribeToConversation(conversationId, (newMsg) => {
       msgs.insertAdjacentHTML('beforeend', buildBubble(newMsg));
       import('../shared/scroll.module.js').then(({ ScrollModule }) => ScrollModule.scrollToBottom(msgs, true));
@@ -683,7 +684,7 @@ async function sendAssistantMessage() {
 // =======================================================
 
 async function openNewPostModal() {
-  // Define close function FIRST — before building HTML that references it
+  // Define close function FIRST ï¿½ before building HTML that references it
   window._closeAsistenteModal = () => {
     const gc = document.getElementById('globalModalContainer');
     if (gc) { gc.style.display = 'none'; gc.innerHTML = ''; }
@@ -699,8 +700,8 @@ async function openNewPostModal() {
     <div class="bg-white w-full max-w-lg rounded-[2.5rem] shadow-2xl p-8 animate-fadeIn">
       <div class="flex justify-between items-start mb-6">
         <div>
-          <h3 class="text-2xl font-black text-slate-800">Crear Publicación</h3>
-          <p class="text-xs text-slate-400 font-bold mt-1">Visible para padres según el aula seleccionada</p>
+          <h3 class="text-2xl font-black text-slate-800">Crear Publicaciï¿½n</h3>
+          <p class="text-xs text-slate-400 font-bold mt-1">Visible para padres segï¿½n el aula seleccionada</p>
         </div>
         <button onclick="window._closeAsistenteModal()" class="p-2 hover:bg-slate-100 rounded-full text-slate-400 transition-colors">?</button>
       </div>
@@ -720,7 +721,7 @@ async function openNewPostModal() {
 
         <div>
           <label class="block text-[11px] font-black text-slate-400 uppercase tracking-wider mb-1.5 ml-1">Mensaje</label>
-          <textarea id="postContent" rows="4" class="w-full p-4 bg-slate-50 border-2 border-slate-100 rounded-2xl text-sm outline-none resize-none focus:ring-4 focus:ring-teal-100 focus:border-teal-400" placeholder="¿Qué quieres compartir con la escuela?"></textarea>
+          <textarea id="postContent" rows="4" class="w-full p-4 bg-slate-50 border-2 border-slate-100 rounded-2xl text-sm outline-none resize-none focus:ring-4 focus:ring-teal-100 focus:border-teal-400" placeholder="ï¿½Quï¿½ quieres compartir con la escuela?"></textarea>
         </div>
         
         <div class="relative">
@@ -771,7 +772,7 @@ async function submitNewPost() {
 
     if (file) {
       if (file.size > 10 * 1024 * 1024) {
-        Helpers.toast('Archivo muy grande (máx 10MB)', 'error');
+        Helpers.toast('Archivo muy grande (mï¿½x 10MB)', 'error');
         if (btn) { btn.disabled = false; btn.innerHTML = '<i data-lucide="send" class="w-4 h-4"></i> PUBLICAR'; }
         return;
       }
@@ -784,25 +785,28 @@ async function submitNewPost() {
       mediaType = file.type.startsWith('video') ? 'video' : 'image';
     }
 
+    const sanitizedContent = Security.sanitize(content);
     const user = AppState.get('user');
     const { data: post, error } = await supabase.from('posts').insert({
       classroom_id: classroomId,
       teacher_id:   user?.id,
-      content,
+      content:      sanitizedContent,
       media_url:    mediaUrl,
       media_type:   mediaType
     }).select('id').single();
 
     if (error) throw error;
 
-    // ? Close modal and show success IMMEDIATELY — don't wait for notifications
+    await auditLog('wall.post_created', { post_id: post.id, classroom_id: classroomId });
+
+    // ? Close modal and show success IMMEDIATELY ï¿½ don't wait for notifications
     Helpers.toast('Publicado correctamente', 'success');
     window._closeAsistenteModal?.();
 
     // Reload wall in background (non-blocking)
     WallModule.loadPosts(document.getElementById('muroPostsContainer'));
 
-    // Send notifications via Edge Function in background — fire and forget
+    // Send notifications via Edge Function in background ï¿½ fire and forget
     if (post?.id) {
       import('../shared/supabase.js').then(({ emitEvent }) => {
         emitEvent('post.created', {

@@ -431,9 +431,17 @@ document.addEventListener('DOMContentLoaded', async () => {
     if (window.lucide) lucide.createIcons();
 
   } catch (err) {
-    // Quitar loader incluso si hay error
-    document.getElementById('initial-loading')?.remove();
-    window.location.href = 'login.html';
+    // Quitar loader siempre
+    const loader = document.getElementById('initial-loading');
+    if (loader) { loader.style.opacity = '0'; setTimeout(() => loader.remove(), 300); }
+
+    // Solo redirigir al login si es error de autenticación, no por cualquier error
+    const msg = (err?.message || '').toLowerCase();
+    const isAuthError = msg.includes('session') || msg.includes('auth') || msg.includes('jwt') || msg.includes('token');
+    if (isAuthError) {
+      window.location.href = 'login.html';
+    }
+    // Para otros errores: mostrar el panel vacío en vez de redirigir
   }
 });
 

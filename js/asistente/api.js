@@ -1,5 +1,6 @@
-﻿import { supabase } from '../shared/supabase.js';
+﻿﻿import { supabase } from '../shared/supabase.js';
 import { TABLES } from '../shared/constants.js';
+import { withRetry } from '../shared/db-utils.js';
 
 /**
  * Consultas específicas del panel de Asistente
@@ -106,23 +107,21 @@ export const AssistantApi = {
    * Registrar Entrada
    */
   async checkIn(studentId, classroomId, date) {
-    const { error } = await supabase.from(TABLES.ATTENDANCE).insert({
+    return await withRetry(() => supabase.from(TABLES.ATTENDANCE).insert({
       student_id: studentId,
       classroom_id: classroomId,
       date: date,
       status: 'present',
       check_in: new Date().toISOString()
-    });
-    if (error) throw error;
+    }));
   },
 
   /**
    * Registrar Salida
    */
   async checkOut(attendanceId) {
-    const { error } = await supabase.from(TABLES.ATTENDANCE)
+    return await withRetry(() => supabase.from(TABLES.ATTENDANCE)
       .update({ check_out: new Date().toISOString() })
-      .eq('id', attendanceId);
-    if (error) throw error;
+      .eq('id', attendanceId));
   }
 };

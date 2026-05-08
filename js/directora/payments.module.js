@@ -1,7 +1,8 @@
-﻿import { DirectorApi } from './api.js';
+﻿﻿import { DirectorApi } from './api.js';
 import { Helpers } from '../shared/helpers.js';
 import { UIHelpers } from './ui.module.js';
 import { supabase } from '../shared/supabase.js';
+import { auditLog } from '../shared/db-utils.js';
 
 const MES = ['enero','febrero','marzo','abril','mayo','junio','julio','agosto','septiembre','octubre','noviembre','diciembre'];
 const MES_LABEL = ['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'];
@@ -293,6 +294,13 @@ export const PaymentsModule = {
     try {
       const { data: pay, error } = await DirectorApi.createManualPayment({ student_id: sid, amount: amt, concept: con, method: met, status: sta, month_paid: mp, due_date: dd || null, paid_date: pd, created_at: new Date().toISOString() });
       if (error) throw new Error(error);
+      
+      await auditLog('payment.manual_create', {
+        student_id: sid,
+        amount: amt,
+        month: mp
+      });
+
       Helpers.toast('Pago registrado correctamente', 'success');
       UIHelpers.closeModal();
       await this.loadPayments();
@@ -307,6 +315,7 @@ export const PaymentsModule = {
   async markPaid(id) {
     try {
       await supabase.from('payments').update({ status: 'paid', paid_date: new Date().toISOString() }).eq('id', id);
+      await auditLog('payment.approve', { payment_id: id });
       Helpers.toast('Pago aprobado', 'success');
       await this.loadPayments();
     } catch (_) { Helpers.toast('Error al aprobar pago', 'error'); }
@@ -316,6 +325,7 @@ export const PaymentsModule = {
     if (!confirm('Eliminar este registro?')) return;
     try {
       await supabase.from('payments').delete().eq('id', id);
+      await auditLog('payment.delete', { payment_id: id });
       Helpers.toast('Pago eliminado', 'success');
       await this.loadPayments();
     } catch (_) { Helpers.toast('Error al eliminar', 'error'); }

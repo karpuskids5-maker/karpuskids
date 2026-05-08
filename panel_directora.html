@@ -6,20 +6,38 @@
   <meta name="robots" content="noindex,nofollow">
   <meta http-equiv="X-Content-Type-Options" content="nosniff">
   <meta http-equiv="Referrer-Policy" content="strict-origin-when-cross-origin">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self' https://*.supabase.co wss://*.supabase.co; script-src 'self' 'unsafe-inline' https://cdn.onesignal.com https://onesignal.com https://meet.jit.si https://8x8.vc; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com https://cdn.jsdelivr.net; img-src 'self' data: blob: https:; connect-src 'self' https://*.supabase.co wss://*.supabase.co https://cdn.onesignal.com https://onesignal.com https://api.onesignal.com https://meet.jit.si https://8x8.vc https://fonts.googleapis.com https://fonts.gstatic.com; frame-src https://meet.jit.si https://8x8.vc; worker-src 'self' blob:; object-src 'none'; base-uri 'self';">
   <style>html{display:none;}</style>
   <!-- X-Frame-Options debe ser configurado por el servidor, no por meta tag -->
   <script>if(self===top){document.documentElement.style.display='block';}else{top.location=self.location;}</script>
+  <!-- Service Worker — registrar lo antes posible para OneSignal -->
+  <script>
+    if ('serviceWorker' in navigator) {
+      navigator.serviceWorker.register('/OneSignalSDKWorker.js', { scope: '/' }).catch(() => {});
+    }
+  </script>
   <title>Karpus Kids — Panel Directora</title>
   <link rel="icon" href="logo/favicon.ico" type="image/x-icon">
   <link rel="manifest" href="manifest.json">
-  <!-- cdn.tailwindcss.com no debe usarse en producción. Procesar localmente. -->
-  <script src="https://cdn.tailwindcss.com"></script>
+  
+  
   <link rel="stylesheet" href="css/theme.css" />
   <link rel="stylesheet" href="css/layout.css" />
   <link rel="stylesheet" href="css/karpus-modern.css" />
-  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js" defer></script>
-  <script src="https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js" crossorigin="anonymous" defer></script>
-  <script src="https://cdn.jsdelivr.net/npm/jspdf-autotable@3.5.31/dist/jspdf.plugin.autotable.min.js" crossorigin="anonymous" defer></script>
+  <link rel="stylesheet" href="css/karpus-tailwind.css">
+  <script src="js/shared/chart.min.js" defer></script>
+  <script src="js/shared/jspdf.min.js" defer></script>
+  <script src="js/shared/jspdf-autotable.min.js" defer></script>
+  <!-- Fallback: si chart.min.js no carga, definir Chart como stub para evitar ReferenceError -->
+  <script>
+    window.addEventListener('load', () => {
+      if (!window.Chart) {
+        window.Chart = function() { return { destroy: () => {}, update: () => {} }; };
+        window.Chart.register = () => {};
+      }
+      if (!window.jspdf) window.jspdf = { jsPDF: function() { return { save: () => {}, text: () => {}, addPage: () => {} }; } };
+    });
+  </script>
   
   <style>
     /* ═══════════════════════════════════════════════
@@ -501,7 +519,7 @@
               <div class="p-2 bg-purple-200 rounded-xl text-purple-700 shadow-sm group-hover:scale-110 transition-transform"><i data-lucide="users" class="w-6 h-6"></i></div>
               <span class="text-xs font-bold text-purple-600 bg-white/60 px-2 py-1 rounded-full">Total</span>
             </div>
-            <p class="text-3xl font-bold text-purple-800 mb-1" id="kpiStudents">-</p>
+            <p class="text-3xl font-bold text-purple-800 mb-1" id="kpiStudents">0</p>
             <p class="text-xs text-purple-600 font-medium">Estudiantes activos</p>
           </div>
 
@@ -510,7 +528,7 @@
             <div class="flex justify-between items-start mb-2">
               <div class="p-2 bg-sky-200 rounded-xl text-sky-700 shadow-sm group-hover:scale-110 transition-transform"><i data-lucide="graduation-cap" class="w-6 h-6"></i></div>
             </div>
-            <p class="text-3xl font-bold text-sky-800 mb-1" id="kpiTeachers">-</p>
+            <p class="text-3xl font-bold text-sky-800 mb-1" id="kpiTeachers">0</p>
             <p class="text-xs text-sky-600 font-medium">Docentes</p>
           </div>
 
@@ -519,7 +537,7 @@
             <div class="flex justify-between items-start mb-2">
               <div class="p-2 bg-indigo-200 rounded-xl text-indigo-700 shadow-sm group-hover:scale-110 transition-transform"><i data-lucide="home" class="w-6 h-6"></i></div>
             </div>
-            <p class="text-3xl font-bold text-indigo-800 mb-1" id="kpiClassrooms">-</p>
+            <p class="text-3xl font-bold text-indigo-800 mb-1" id="kpiClassrooms">0</p>
             <p class="text-xs text-indigo-600 font-medium">Aulas activas</p>
           </div>
 
@@ -529,7 +547,7 @@
               <div class="p-2 bg-emerald-200 rounded-xl text-emerald-700 shadow-sm group-hover:scale-110 transition-transform"><i data-lucide="user-check" class="w-6 h-6"></i></div>
               <span class="text-xs font-bold text-emerald-600 bg-white/60 px-2 py-1 rounded-full">Hoy</span>
             </div>
-            <p class="text-3xl font-bold text-emerald-800 mb-1" id="kpiAttendance">-</p>
+            <p class="text-3xl font-bold text-emerald-800 mb-1" id="kpiAttendance">0</p>
             <p class="text-xs text-emerald-600 font-medium">Niños presentes</p>
           </div>
 
@@ -545,9 +563,9 @@
           <!-- Incidencias (Rosa Suave) -->
           <div class="bg-pink-100 p-5 rounded-2xl border border-pink-200 shadow-md hover:shadow-md hover:-translate-y-1 transition-all duration-300 group">
             <div class="flex justify-between items-start mb-2">
-              <div class="p-2 bg-pink-200 rounded-xl text-pink-700 shadow-sm group-hover:scale-110 transition-transform"><i data-lucide="message-square-warning" class="w-6 h-6"></i></div>
+              <div class="p-2 bg-pink-200 rounded-xl text-pink-700 shadow-sm group-hover:scale-110 transition-transform"><i data-lucide="alert-triangle" class="w-6 h-6"></i></div>
             </div>
-            <p class="text-3xl font-bold text-pink-800 mb-1" id="kpiIncidents">-</p>
+            <p class="text-3xl font-bold text-pink-800 mb-1" id="kpiIncidents">0</p>
             <p class="text-xs text-pink-600 font-medium">Incidencias</p>
           </div>
         </div>
@@ -1065,7 +1083,7 @@
         <div class="flex items-center justify-between mb-6">
           <div>
             <h2 class="text-2xl font-bold text-slate-800 flex items-center gap-2">
-              <i data-lucide="message-square-warning" class="w-6 h-6 text-pink-600"></i>
+              <i data-lucide="alert-triangle" class="w-6 h-6 text-pink-600"></i>
               Sistema Formal de Incidencias
             </h2>
             <p class="text-slate-500 text-sm">Gestione quejas con estados, prioridad, adjuntos y respuesta oficial</p>
@@ -1570,95 +1588,7 @@
   <!-- TOAST CONTAINER — fuera de secciones para no duplicarse -->
   <div id="toast-container" class="fixed top-5 right-5 z-[9998] flex flex-col gap-2 pointer-events-none"></div>
 
-  <!-- MODAL MAESTRO (CORREGIDO) -->
-  <div id="modalTeacher" class="fixed inset-0 bg-black/50 hidden flex items-center justify-center z-50 backdrop-blur-sm p-4">
-    <div class="bg-white rounded-2xl shadow-2xl w-[95%] max-w-lg transform transition-all scale-100 max-h-[90vh] overflow-y-auto">
-      <!-- Header Morado -->
-      <div class="bg-purple-600 p-6 rounded-t-2xl flex justify-between items-center text-white">
-        <h3 class="font-bold text-xl flex items-center gap-2">
-          <i data-lucide="user-plus" class="w-6 h-6"></i>
-          <span id="teacherModalTitle">Gestión de Maestro</span>
-        </h3>
-        <button onclick="document.getElementById('modalTeacher').classList.add('hidden')" class="text-purple-200 hover:text-white transition-colors">
-          <i data-lucide="x" class="w-6 h-6"></i>
-        </button>
-      </div>
-      
-      <div class="p-6 space-y-4">
-        <input type="hidden" id="teacherId">
-        <div>
-          <label class="block text-sm font-bold text-slate-700 mb-1">Nombre Completo</label>
-          <input id="teacherName" type="text" placeholder="Ej: Lic. María Pérez" class="w-full border border-slate-300 rounded-xl px-4 py-3 focus:ring-2 focus:ring-purple-500 outline-none transition-all">
-        </div>
-        <div class="grid grid-cols-2 gap-4">
-          <div>
-            <label class="block text-sm font-bold text-slate-700 mb-1">Correo (Usuario)</label>
-            <input id="teacherEmail" type="email" placeholder="usuario@karpus.com" class="w-full border border-slate-300 rounded-xl px-4 py-3 focus:ring-2 focus:ring-purple-500 outline-none transition-all">
-          </div>
-          <div>
-             <label class="block text-sm font-bold text-slate-700 mb-1">Teléfono</label>
-             <input id="teacherPhone" type="tel" placeholder="809-000-0000" class="w-full border border-slate-300 rounded-xl px-4 py-3 focus:ring-2 focus:ring-purple-500 outline-none transition-all">
-          </div>
-        </div>
-        <div>
-          <label class="block text-sm font-bold text-slate-700 mb-1">Contraseña</label>
-          <input id="teacherPassword" type="text" placeholder="Mínimo 6 caracteres" class="w-full border border-slate-300 rounded-xl px-4 py-3 focus:ring-2 focus:ring-purple-500 outline-none transition-all">
-          <p class="text-xs text-slate-400 mt-1">* Dejar vacío si no se desea cambiar.</p>
-        </div>
-      </div>
-
-      <div class="p-6 border-t bg-slate-50 rounded-b-2xl flex justify-end gap-3">
-        <button onclick="document.getElementById('modalTeacher').classList.add('hidden')" class="px-6 py-2.5 border border-slate-300 text-slate-600 font-bold rounded-xl hover:bg-white transition-colors">Cancelar</button>
-        <button id="btnSaveTeacher" class="px-6 py-2.5 bg-purple-600 text-white font-bold rounded-xl hover:bg-purple-700 shadow-lg shadow-purple-200 transition-all">Guardar Maestro</button>
-      </div>
-    </div>
-  </div>
-
-  <!-- MODAL ESTUDIANTE (CORREGIDO) -->
-  <div id="modalStudent" class="fixed inset-0 bg-black/50 hidden flex items-center justify-center z-50 backdrop-blur-sm p-4">
-    <div class="bg-white rounded-2xl shadow-2xl w-[95%] max-w-2xl transform transition-all scale-100 max-h-[90vh] overflow-y-auto custom-scrollbar">
-      <!-- Header Naranja/Gradient -->
-      <div class="bg-gradient-to-r from-orange-500 to-pink-500 p-6 flex justify-between items-center text-white sticky top-0 z-10">
-        <h3 class="font-bold text-xl flex items-center gap-2">
-          <i data-lucide="backpack" class="w-6 h-6"></i>
-          <span id="studentModalTitle">Expediente Estudiante</span>
-        </h3>
-        <button onclick="document.getElementById('modalStudent').classList.add('hidden')" class="text-orange-100 hover:text-white transition-colors">
-          <i data-lucide="x" class="w-6 h-6"></i>
-        </button>
-      </div>
-
-      <div class="p-6 space-y-5">
-        <input type="hidden" id="studentId">
-        
-        <!-- Datos del Niño -->
-        <div class="bg-orange-50 p-4 rounded-xl border border-orange-100">
-          <h4 class="text-orange-800 font-bold mb-3 flex items-center gap-2"><i data-lucide="smile" class="w-4 h-4"></i> Datos del Alumno</h4>
-          <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <input id="stName" placeholder="Nombre Completo" class="border p-2 rounded-lg">
-            <input id="stAge" type="number" placeholder="Edad" class="border p-2 rounded-lg">
-            <select id="stClassroom" class="border p-2 rounded-lg bg-white"><option value="">Seleccionar Aula...</option></select>
-            <select id="stStatus" class="border p-2 rounded-lg bg-white"><option value="active">Activo</option><option value="inactive">Inactivo</option></select>
-          </div>
-        </div>
-
-        <!-- Datos de los Padres -->
-        <div class="bg-blue-50 p-4 rounded-xl border border-blue-100">
-          <h4 class="text-blue-800 font-bold mb-3 flex items-center gap-2"><i data-lucide="users" class="w-4 h-4"></i> Datos Familiares</h4>
-          <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-             <input id="stParentName" placeholder="Nombre del Padre/Tutor" class="border p-2 rounded-lg w-full md:col-span-2">
-             <input id="stParentEmail" placeholder="Correo (Login)" class="border p-2 rounded-lg">
-             <input id="stParentPhone" placeholder="Teléfono" class="border p-2 rounded-lg">
-          </div>
-        </div>
-        
-        <div class="flex justify-end pt-4 gap-3">
-           <button onclick="document.getElementById('modalStudent').classList.add('hidden')" class="px-6 py-2 rounded-xl border font-bold text-slate-500">Cerrar</button>
-           <button id="btnSaveStudent" class="px-6 py-2 rounded-xl bg-orange-600 text-white font-bold hover:bg-orange-700 shadow-lg">Guardar Ficha</button>
-        </div>
-      </div>
-    </div>
-  </div>
+  <!-- Los modales de maestros y estudiantes se generan dinámicamente via globalModalContainer -->
 
   <!-- Scripts optimizados -->
   <script>
@@ -1670,8 +1600,22 @@
         setTimeout(() => loader.remove(), 500);
       }
     });
+    // Timeout de seguridad: quitar loader después de 12s pase lo que pase
+    setTimeout(() => {
+      const loader = document.getElementById('initial-loading');
+      if (loader) { loader.style.opacity = '0'; setTimeout(() => loader.remove(), 300); }
+    }, 12000);
   </script>
   <!-- Lucide Icons — cargado al final del body para garantizar DOM completo -->
+  <script>
+    // Silenciar errores internos de lucide UMD (promesas no manejadas)
+    window.addEventListener('unhandledrejection', function(e) {
+      const src = e.reason?.stack || e.reason?.message || String(e.reason);
+      if (src.includes('lucide') || (e.reason && typeof e.reason === 'object' && !e.reason.message)) {
+        e.preventDefault();
+      }
+    }, true);
+  </script>
   <script src="js/shared/lucide.min.js"></script>
   <script>
     // Inicializar iconos — pasar atributos de clase al SVG reemplazante
@@ -1720,6 +1664,7 @@
     })();
   </script>
   <!-- Core App Module -->
+  <script src="js/shared/supabase-js.min.js"></script>
   <script type="module" src="js/directora/main.js"></script>
   <script src="js/shared/lightbox.js" defer></script>
   <script src="js/shared/confirm-dialog.js" defer></script>
@@ -1727,15 +1672,6 @@
   <script type="module" src="js/directora/event-handlers.js"></script>
   <script defer src="js/common_ui.js"></script>
   <script src="js/pwa-install.js" defer></script>
-  <script>
-    // Service Worker registration (Unified for PWA + OneSignal)
-    if ('serviceWorker' in navigator) {
-      window.addEventListener('load', () => {
-        navigator.serviceWorker.register('/OneSignalSDKWorker.js', { scope: '/' })
-          .then(() => {})
-          .catch(() => {});
-      });
-    }
-  </script>
+  <!-- SW ya registrado en el <head> — no duplicar aquí -->
 </body>
 </html>

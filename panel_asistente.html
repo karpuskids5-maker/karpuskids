@@ -6,6 +6,7 @@
   <meta name="robots" content="noindex, nofollow">
   <meta http-equiv="X-Content-Type-Options" content="nosniff">
   <meta http-equiv="Referrer-Policy" content="strict-origin-when-cross-origin">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self' https://*.supabase.co wss://*.supabase.co; script-src 'self' 'unsafe-inline' https://cdn.onesignal.com https://unpkg.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' data: blob: https:; connect-src 'self' https://*.supabase.co wss://*.supabase.co https://cdn.onesignal.com; frame-src 'none'; worker-src 'self' blob:; object-src 'none';">
   <style>html{display:none;}</style>
   <!-- X-Frame-Options debe ser configurado por el servidor, no por meta tag -->
   <script>if(self===top){document.documentElement.style.display='block';}else{top.location=self.location;}</script>
@@ -15,12 +16,13 @@
   <meta name="mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
   <link rel="manifest" href="manifest.json">
-  <!-- cdn.tailwindcss.com no debe usarse en producción. Procesar localmente. -->
-  <script src="https://cdn.tailwindcss.com"></script>
+  
+  
   <link rel="stylesheet" href="css/theme.css" />
   <link rel="stylesheet" href="css/layout.css" />
   <link rel="stylesheet" href="css/karpus-modern.css" />
-  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+  <link rel="stylesheet" href="css/karpus-tailwind.css">
+  <script src="js/shared/chart.min.js"></script>
   <style>
     /* ── Sidebar desktop: ancho y colapso ── */
     @media (min-width: 768px) {
@@ -995,6 +997,14 @@
   <!-- Scripts -->
   <script src="js/common_ui.js"></script>
   <!-- Lucide Icons — cargado al final del body para garantizar DOM completo -->
+  <script>
+    window.addEventListener('unhandledrejection', function(e) {
+      const src = e.reason?.stack || e.reason?.message || String(e.reason);
+      if (src.includes('lucide') || (e.reason && typeof e.reason === 'object' && !e.reason.message)) {
+        e.preventDefault();
+      }
+    }, true);
+  </script>
   <script src="js/shared/lucide.min.js"></script>
   <script>
     function _initLucide() {
@@ -1024,6 +1034,7 @@
     })();
   </script>
   <!-- Core App Module -->
+  <script src="js/shared/supabase-js.min.js"></script>
   <script type="module" src="js/asistente/main.js"></script>
   <script src="js/shared/lightbox.js" defer></script>
   <script src="js/shared/confirm-dialog.js" defer></script>

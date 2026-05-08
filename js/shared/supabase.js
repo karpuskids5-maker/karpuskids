@@ -1,4 +1,6 @@
-﻿import { createClient } from "https://cdn.jsdelivr.net/npm/@supabase/supabase-js/+esm";
+﻿// Supabase JS — cargado localmente (js/shared/supabase-js.min.js via script tag en HTML)
+// El UMD expone window.supabase.createClient
+import { createClient } from "./supabase-wrapper.js";
 
 export { createClient };
 export const SUPABASE_URL      = "https://wwnfonkvemimwiqjpkij.supabase.co";
@@ -28,22 +30,22 @@ supabase.auth.onAuthStateChange((event, session) => {
 });
 
 // Interceptar errores 401 globalmente y refrescar token
+// IMPORTANTE: usar flag para evitar loop infinito
+let _refreshing = false;
 const _originalFetch = window.fetch;
 window.fetch = async function(...args) {
   const res = await _originalFetch.apply(this, args);
-  if (res.status === 401) {
+  if (res.status === 401 && !_refreshing) {
     const url = typeof args[0] === 'string' ? args[0] : args[0]?.url || '';
-    if (url.includes('supabase.co')) {
-      // Intentar refrescar el token
-      const { error } = await supabase.auth.refreshSession();
-      if (error) {
-        // Refresh falló — redirigir al login
-        if (!window.location.pathname.includes('login.html')) {
+    if (url.includes('supabase.co') && !url.includes('/auth/')) {
+      _refreshing = true;
+      try {
+        const { error } = await supabase.auth.refreshSession();
+        if (error && !window.location.pathname.includes('login.html')) {
           window.location.href = 'login.html';
         }
-      } else {
-        // Reintentar la request original con el nuevo token
-        return _originalFetch.apply(this, args);
+      } finally {
+        _refreshing = false;
       }
     }
   }
@@ -82,7 +84,7 @@ window.addEventListener('unhandledrejection', (e) => {
   const msg = e.reason?.message || String(e.reason);
   // Skip: network errors, OneSignal, 409 conflicts, IDB errors — these would loop
   const skip = ['indexeddb','network','fetch','onesignal','409','conflict',
-                 'failed to load','supabase','connection'].some(k => msg.toLowerCase().includes(k));
+                 'failed to load','supabase','connection','lucide'].some(k => msg.toLowerCase().includes(k));
   if (skip) return;
   import('./db-utils.js').then(({ logError }) => {
     const panel = window.location.pathname.split('/').pop().replace('.html','') || 'unknown';
@@ -96,8 +98,21 @@ export const TERMS_VERSION = '1.0';
 export async function ensureRole(requiredRoles) {
   const roles = Array.isArray(requiredRoles) ? requiredRoles : [requiredRoles];
   
-  // Usar getSession() primero (más rápido)
-  const { data: { session }, error: sessionError } = await supabase.auth.getSession();
+  // Usar getSession() con timeout de 5s para evitar bloqueo infinito
+  let session, sessionError;
+  try {
+    const result = await Promise.race([
+      supabase.auth.getSession(),
+      new Promise((_, reject) => setTimeout(() => reject(new Error('session_timeout')), 5000))
+    ]);
+    session = result.data?.session;
+    sessionError = result.error;
+  } catch (e) {
+    // Timeout o error de red — redirigir al login
+    window.location.href = 'login.html';
+    return null;
+  }
+
   if (sessionError || !session?.user) { 
     window.location.href = 'login.html'; 
     return null; 
@@ -116,11 +131,17 @@ export async function ensureRole(requiredRoles) {
 
   const user = session.user;
 
-  // Obtener perfil y aceptación de términos en paralelo
-  const [profileRes, termsRes] = await Promise.all([
-    supabase.from('profiles').select('id, role, name, email, avatar_url, phone, bio').eq('id', user.id).maybeSingle(),
-    supabase.from('terms_acceptance').select('user_id').eq('user_id', user.id).eq('terms_version', TERMS_VERSION).maybeSingle()
+  // Obtener perfil y aceptación de términos en paralelo — con timeout de 8s
+  const TIMEOUT = 8000;
+  const withTimeout = (promise) => Promise.race([
+    promise,
+    new Promise((_, reject) => setTimeout(() => reject(new Error('timeout')), TIMEOUT))
   ]);
+
+  const [profileRes, termsRes] = await Promise.all([
+    withTimeout(supabase.from('profiles').select('id, role, name, email, avatar_url, phone, bio').eq('id', user.id).maybeSingle()),
+    withTimeout(supabase.from('terms_acceptance').select('user_id').eq('user_id', user.id).eq('terms_version', TERMS_VERSION).maybeSingle())
+  ]).catch(() => [{ data: null, error: new Error('timeout') }, { data: null, error: new Error('timeout') }]);
 
   if (profileRes.error) { /* profile error — handled below */ }
   if (termsRes.error)   { /* terms error — handled below */ }
@@ -292,8 +313,20 @@ export async function notifyReceiptUploaded(studentId, amount, month) {
 }
 
 // ── OneSignal ─────────────────────────────────────────────────────────────────
-export async function initOneSignal(currentUser = null) {
+export function initOneSignal(currentUser = null) {
+  // Ejecutar completamente en background — NUNCA bloquear el hilo principal
+  _initOneSignalAsync(currentUser).catch(() => {});
+}
+
+async function _initOneSignalAsync(currentUser) {
   try {
+    const host = window.location.hostname;
+    const isProd = host === 'karpuskids.com' || host === 'www.karpuskids.com' || host.endsWith('.karpuskids.com');
+    if (!isProd) return; // No inicializar en localhost
+
+    if (window.OneSignalInitialized) return;
+    window.OneSignalInitialized = true;
+
     let user = currentUser;
     if (!user) {
       const { data } = await supabase.auth.getUser();
@@ -301,72 +334,22 @@ export async function initOneSignal(currentUser = null) {
     }
     if (!user) return;
 
-    // No inicializar OneSignal si no estamos en el dominio de producción
-    const host = window.location.hostname;
-    const isLocal = host === 'localhost' || host === '127.0.0.1';
-    const isProd = host === 'karpuskids.com' || host === 'www.karpuskids.com' || host.endsWith('.karpuskids.com');
-    
-    if (!isProd && !isLocal) {
-      return;
-    }
-
-    if (window.OneSignalInitialized) return;
-    window.OneSignalInitialized = true;
-
-    // 🛡️ FIX: Verificar IndexedDB disponible ANTES de inyectar el script
-    const isIndexedDBAvailable = await new Promise(resolve => {
-      try {
-        if (!window.indexedDB) return resolve(false);
-        const req = indexedDB.open('_karpus_idb_test', 1);
-        req.onsuccess = () => { req.result.close(); resolve(true); };
-        req.onerror   = () => resolve(false);
-        req.onblocked = () => resolve(false);
-        setTimeout(() => resolve(false), 2000);
-      } catch (_) { resolve(false); }
-    });
-
-    if (!isIndexedDBAvailable) {
-      return;
-    }
-
-    // 🛡️ FIX: Clear stale OneSignal operation queue (causes "login-user" / "refresh-user" errors)
-    try {
-      await new Promise(resolve => {
-        // Delete the entire OneSignal DB to force a clean state
-        // This is safe — OneSignal will recreate it on next init
-        const delReq = indexedDB.deleteDatabase('ONE_SIGNAL_SDK_DB');
-        delReq.onsuccess = () => resolve();
-        delReq.onerror   = () => resolve();
-        delReq.onblocked = () => resolve();
-        setTimeout(resolve, 1000);
-      });
-    } catch (_) { /* silencioso */ }
-
-    // 🛡️ FIX: Silenciar errores internos de OneSignal si fallan promesas nativas
-    // Este handler debe estar activo ANTES de cargar el script
-    const idbErrorHandler = function(event) {
-      if (event.reason && (
-        event.reason.message?.toLowerCase().includes('indexeddb') || 
-        event.reason.name === 'UnknownError' ||
-        event.reason.message?.toLowerCase().includes('backing store')
-      )) {
-        event.preventDefault();
-        event.stopPropagation();
-      }
-    };
-    window.addEventListener('unhandledrejection', idbErrorHandler);
+    // Verificar IndexedDB con timeout corto
+    const idbOk = await Promise.race([
+      new Promise(resolve => {
+        try {
+          if (!window.indexedDB) return resolve(false);
+          const req = indexedDB.open('_karpus_idb_test', 1);
+          req.onsuccess = () => { req.result.close(); resolve(true); };
+          req.onerror   = () => resolve(false);
+        } catch (_) { resolve(false); }
+      }),
+      new Promise(resolve => setTimeout(() => resolve(false), 500))
+    ]);
+    if (!idbOk) return;
 
     const ONESIGNAL_APP_ID = "47ce2d1e-152e-4ea7-9ddc-8e2142992989";
 
-    // Pre-register service worker before loading OneSignal SDK
-    // This prevents the "[WM] No SW registration for postMessage" warning
-    if ('serviceWorker' in navigator) {
-      try {
-        await navigator.serviceWorker.register('/OneSignalSDKWorker.js', { scope: '/' });
-      } catch (_) { /* silencioso — puede ya estar registrado */ }
-    }
-
-    // Inyectar script dinámicamente solo si pasó la prueba de IndexedDB
     if (!document.getElementById('onesignal-sdk')) {
       const s = document.createElement('script');
       s.id = 'onesignal-sdk';
@@ -376,124 +359,31 @@ export async function initOneSignal(currentUser = null) {
     }
 
     window.OneSignalDeferred = window.OneSignalDeferred || [];
-
     window.OneSignalDeferred.push(async function(OneSignal) {
       try {
-        if (typeof OneSignal.isInitialized === 'function' && OneSignal.isInitialized()) {
-          return;
-        }
-
         await OneSignal.init({
           appId: ONESIGNAL_APP_ID,
-          allowLocalhostAsSecureOrigin: true,
+          allowLocalhostAsSecureOrigin: false,
           serviceWorkerParam: { scope: '/' },
           serviceWorkerPath: 'OneSignalSDKWorker.js',
           notifyButton: { enable: false },
           welcomeNotification: { disable: false }
         });
 
-        // Esperar a que el SDK esté listo
-        await new Promise(r => setTimeout(r, 800));
+        // Vincular usuario — sin await largo
+        OneSignal.login(user.id).catch(() => {});
 
-        // Pedir permiso si no se ha dado aún — en móvil y desktop
-        try {
-          const perm = OneSignal.Notifications?.permissionNative;
-          if (perm === 'default') {
-            const isMobile = /Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
-            if (isMobile) {
-              // En móvil: pedir permiso tras interacción del usuario (click/touch)
-              // para cumplir con la política de browsers móviles
-              const askOnInteraction = () => {
-                document.removeEventListener('click', askOnInteraction);
-                document.removeEventListener('touchend', askOnInteraction);
-                OneSignal.Notifications.requestPermission().catch(() => {});
-              };
-              document.addEventListener('click', askOnInteraction, { once: true });
-              document.addEventListener('touchend', askOnInteraction, { once: true });
-            } else {
-              // Desktop: pedir directamente
-              await OneSignal.Notifications.requestPermission().catch(() => {});
-            }
-          }
-        } catch (_) { /* silencioso — el usuario puede rechazar el permiso */ }
-
-        // Vincular usuario externo
-        try {
-          // Wait a bit more for SDK to fully initialize before checking identity
-          await new Promise(r => setTimeout(r, 1500));
-
-          if (!OneSignal.User) {
-            return;
-          }
-
-          const currentExtId = await OneSignal.User.getExternalId?.();
-          if (currentExtId === user.id) {
-            // Already linked — just ensure push subscription is active
-          } else {
-            // Not linked yet or linked to someone else — safe to call login
-            await OneSignal.login(user.id).catch((e) => {
-              const msg = (e?.message || '').toLowerCase();
-              // 409/conflict = already linked — safe to ignore silently
-              if (msg.includes('login-user') || msg.includes('unrecognized')) {
-                // Stale operation — clear IDB and skip
-                indexedDB.deleteDatabase('ONE_SIGNAL_SDK_DB');
-              }
-            });
-            await new Promise(r => setTimeout(r, 1500));
-          }
-
-          // Activar suscripción push si el permiso está concedido
+        // Guardar subscription ID cuando esté disponible
+        setTimeout(async () => {
           try {
-            const hasPermission = OneSignal.Notifications?.permission === true;
-            const isOptedIn     = OneSignal.User?.PushSubscription?.optedIn;
-            if (hasPermission && isOptedIn === false) {
-              await OneSignal.User.PushSubscription.optIn().catch(() => {});
+            const subId = OneSignal.User?.PushSubscription?.id;
+            if (subId) {
+              await supabase.from('profiles').update({ onesignal_player_id: subId }).eq('id', user.id);
             }
-          } catch (_) { /* silencioso */ }
-
-          const subId = OneSignal.User?.PushSubscription?.id;
-          if (subId) {
-            try {
-              await supabase.from('profiles')
-                .update({ onesignal_player_id: subId })
-                .eq('id', user.id);
-            } catch (_) {}
-          } else {
-            setTimeout(async () => {
-              try {
-                const retrySubId = OneSignal.User?.PushSubscription?.id;
-                if (retrySubId) {
-                  await supabase.from('profiles')
-                    .update({ onesignal_player_id: retrySubId })
-                    .eq('id', user.id);
-                }
-              } catch (_) {}
-            }, 3000);
-          }
-
-          // Escuchar cambios de suscripción
-          try {
-            OneSignal.User?.PushSubscription?.addEventListener('change', async (event) => {
-              const newSubId = event?.current?.id;
-              if (newSubId) {
-                try {
-                  await supabase.from('profiles')
-                    .update({ onesignal_player_id: newSubId })
-                    .eq('id', user.id);
-                } catch (_) {}
-              }
-            });
           } catch (_) {}
+        }, 3000);
 
-        } catch (loginErr) {
-          const msg = loginErr?.message?.toLowerCase() ?? '';
-          if (msg.includes('409') || loginErr?.status === 409 || msg.includes('conflict') || msg.includes('login-user')) return;
-          // Non-critical login error — silently ignored
-        }
-
-      } catch (_) {
-        // SDK error — non-critical, silently ignored
-      }
+      } catch (_) {}
     });
   } catch (_) {}
 }

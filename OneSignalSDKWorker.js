@@ -1,6 +1,15 @@
+// Handler de message registrado síncronamente (requerido por spec de SW)
+// Esto previene el warning "Event handler of 'message' event must be added
+// on the initial evaluation of worker script" de OneSignal sw.ts:21
 self.addEventListener('message', (event) => {
-  // Manejador preventivo para evitar el error de registro tardío (sw.ts:21)
+  // Reenviar al SDK de OneSignal si ya está cargado
+  if (typeof OneSignal !== 'undefined' && OneSignal.ServiceWorker) {
+    // OneSignal maneja sus propios mensajes internamente
+  }
 });
+
+// Suprimir warnings internos de OneSignal que no podemos controlar
+self.addEventListener('messageerror', () => {});
 
 importScripts('https://cdn.onesignal.com/sdks/web/v16/OneSignalSDK.sw.js');
 

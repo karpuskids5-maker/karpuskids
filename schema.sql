@@ -1,4 +1,4 @@
-﻿-- ============================================================
+﻿﻿-- ============================================================
 -- KARPUS KIDS - Schema Completo para Supabase
 -- Ejecutar en Supabase SQL Editor de arriba a abajo.
 -- ============================================================
@@ -555,6 +555,8 @@ create or replace function public.get_my_role()
 returns text language sql security definer stable set search_path = public as $$
   select role from public.profiles where id = auth.uid() limit 1;
 $$;
+GRANT EXECUTE ON FUNCTION public.get_my_role() TO authenticated;
+GRANT EXECUTE ON FUNCTION public.get_my_role() TO anon;
 
 create or replace function public.is_teacher_of_classroom(p_classroom_id bigint)
 returns boolean language sql security definer stable set search_path = public as $$
@@ -598,39 +600,20 @@ $$;
 -- RPC: Asignar estudiante a aula (versi�n �nica, sin overloads)
 -- Para desasignar: pasar p_classroom_id = null
 -- ============================================================
-create or replace function public.assign_student_to_classroom(
-  p_student_id   bigint,
-  p_classroom_id bigint
-)
-returns void language plpgsql security definer set search_path = public as $$
-begin
-  if auth.uid() is null then
-    raise exception 'Not authorized' using errcode = '42501';
-  end if;
-  if get_my_role() not in ('directora','asistente','maestra') then
-    raise exception 'No autorizado' using errcode = '42501';
-  end if;
-  update public.students set classroom_id = p_classroom_id where id = p_student_id;
-end;
+CREATE OR REPLACE FUNCTION public.assign_student_to_classroom(p_student_id bigint, p_classroom_id bigint)
+RETURNS void LANGUAGE sql SECURITY DEFINER SET search_path = public AS $$
+  UPDATE public.students SET classroom_id = p_classroom_id WHERE id = p_student_id;
 $$;
 
+GRANT EXECUTE ON FUNCTION public.assign_student_to_classroom(bigint, bigint) TO authenticated;
+
 -- RPC: Asignaci�n en lote (bulk)
-create or replace function public.assign_students_bulk(
-  p_student_ids  bigint[],
-  p_classroom_id bigint
-)
-returns void language plpgsql security definer set search_path = public as $$
-begin
-  if auth.uid() is null then
-    raise exception 'Not authorized' using errcode = '42501';
-  end if;
-  if get_my_role() not in ('directora','asistente','maestra') then
-    raise exception 'No autorizado' using errcode = '42501';
-  end if;
-  update public.students set classroom_id = p_classroom_id
-  where id = any(p_student_ids);
-end;
+CREATE OR REPLACE FUNCTION public.assign_students_bulk(p_student_ids bigint[], p_classroom_id bigint)
+RETURNS void LANGUAGE sql SECURITY DEFINER SET search_path = public AS $$
+  UPDATE public.students SET classroom_id = p_classroom_id WHERE id = ANY(p_student_ids);
 $$;
+
+GRANT EXECUTE ON FUNCTION public.assign_students_bulk(bigint[], bigint) TO authenticated;
 
 -- ============================================================
 -- 4. TRIGGERS
@@ -900,12 +883,19 @@ create policy "posts_update" on public.posts for update using (get_my_role() in 
 create policy "posts_delete" on public.posts for delete using (get_my_role() in ('directora','asistente','admin') or auth.uid() = teacher_id);
 
 -- COMMENTS
-create policy "comments_select" on public.comments for select using (
-  exists (select 1 from public.posts p where p.id = comments.post_id
-    and (get_my_role() in ('directora','asistente','admin','maestra')
-         or p.classroom_id is null
-         or is_teacher_of_classroom(p.classroom_id)
-         or is_parent_of_classroom(p.classroom_id)))
+DROP POLICY IF EXISTS "comments_select" ON public.comments;
+CREATE POLICY "comments_select" ON public.comments FOR SELECT USING (
+  EXISTS (
+    SELECT 1 FROM public.posts p WHERE p.id = comments.post_id
+    AND (
+      auth.uid() IS NOT NULL AND (
+        get_my_role() IN ('directora', 'asistente', 'admin', 'maestra')
+        OR p.classroom_id IS NULL
+        OR is_teacher_of_classroom(p.classroom_id)
+        OR is_parent_of_classroom(p.classroom_id)
+      )
+    )
+  )
 );
 create policy "comments_insert" on public.comments for insert with check (
   auth.uid() = user_id
@@ -919,12 +909,19 @@ create policy "comments_delete" on public.comments for delete using (
 );
 
 -- LIKES
-create policy "likes_select" on public.likes for select using (
-  exists (select 1 from public.posts p where p.id = likes.post_id
-    and (get_my_role() in ('directora','asistente','admin','maestra')
-         or p.classroom_id is null
-         or is_teacher_of_classroom(p.classroom_id)
-         or is_parent_of_classroom(p.classroom_id)))
+DROP POLICY IF EXISTS "likes_select" ON public.likes;
+CREATE POLICY "likes_select" ON public.likes FOR SELECT USING (
+  EXISTS (
+    SELECT 1 FROM public.posts p WHERE p.id = likes.post_id
+    AND (
+      auth.uid() IS NOT NULL AND (
+        get_my_role() IN ('directora', 'asistente', 'admin', 'maestra')
+        OR p.classroom_id IS NULL
+        OR is_teacher_of_classroom(p.classroom_id)
+        OR is_parent_of_classroom(p.classroom_id)
+      )
+    )
+  )
 );
 create policy "likes_insert" on public.likes for insert with check (auth.uid() = user_id);
 create policy "likes_delete" on public.likes for delete using (auth.uid() = user_id);
@@ -2170,3 +2167,242 @@ SELECT
 FROM public.attendance a
 JOIN public.students s ON s.id = a.student_id
 LEFT JOIN public.classrooms c ON c.id = a.classroom_id;
+
+-- ============================================================
+-- 🔒 Karpus Kids — Security & Audit Improvements
+-- Ejecutar en Supabase SQL Editor
+-- ============================================================
+
+-- ── 1. TRIGGER INMUTABLE DE AUDITORÍA DE PAGOS ───────────────
+-- Registra automáticamente en audit_logs cualquier cambio
+-- en la tabla payments (INSERT, UPDATE, DELETE).
+-- Esto es inmutable: el frontend NO puede evitarlo.
+
+CREATE OR REPLACE FUNCTION public.fn_audit_payment()
+RETURNS trigger LANGUAGE plpgsql SECURITY DEFINER SET search_path = public AS $$
+DECLARE
+  v_action text;
+  v_payload jsonb;
+  v_user_id uuid;
+BEGIN
+  -- Intentar obtener el usuario actual de la sesión
+  BEGIN
+    v_user_id := auth.uid();
+  EXCEPTION WHEN OTHERS THEN
+    v_user_id := NULL;
+  END;
+
+  IF TG_OP = 'INSERT' THEN
+    v_action  := 'payment.created';
+    v_payload := jsonb_build_object(
+      'payment_id',  NEW.id,
+      'student_id',  NEW.student_id,
+      'amount',      NEW.amount,
+      'month',       NEW.month_paid,
+      'status',      NEW.status,
+      'method',      NEW.method,
+      'concept',     NEW.concept,
+      'due_date',    NEW.due_date
+    );
+
+  ELSIF TG_OP = 'UPDATE' THEN
+    -- Solo registrar si cambió algo relevante
+    IF OLD.status IS DISTINCT FROM NEW.status
+    OR OLD.amount IS DISTINCT FROM NEW.amount
+    OR OLD.due_date IS DISTINCT FROM NEW.due_date THEN
+
+      v_action := CASE
+        WHEN NEW.status = 'paid'    AND OLD.status != 'paid'    THEN 'payment.approved'
+        WHEN NEW.status = 'overdue' AND OLD.status != 'overdue' THEN 'payment.overdue'
+        WHEN NEW.status = 'rejected'                            THEN 'payment.rejected'
+        WHEN OLD.due_date IS DISTINCT FROM NEW.due_date         THEN 'payment.mora_waived'
+        ELSE 'payment.updated'
+      END;
+
+      v_payload := jsonb_build_object(
+        'payment_id',   NEW.id,
+        'student_id',   NEW.student_id,
+        'amount',       NEW.amount,
+        'month',        NEW.month_paid,
+        'old_status',   OLD.status,
+        'new_status',   NEW.status,
+        'old_due_date', OLD.due_date,
+        'new_due_date', NEW.due_date,
+        'validated_by', NEW.validated_by,
+        'notes',        NEW.notes
+      );
+    ELSE
+      RETURN NEW; -- Sin cambios relevantes, no auditar
+    END IF;
+
+  ELSIF TG_OP = 'DELETE' THEN
+    v_action  := 'payment.deleted';
+    v_payload := jsonb_build_object(
+      'payment_id', OLD.id,
+      'student_id', OLD.student_id,
+      'amount',     OLD.amount,
+      'month',      OLD.month_paid,
+      'status',     OLD.status
+    );
+  END IF;
+
+  INSERT INTO public.audit_logs (user_id, action, payload, created_at)
+  VALUES (v_user_id, v_action, v_payload, now());
+
+  RETURN COALESCE(NEW, OLD);
+END;
+$$;
+
+-- Crear trigger (eliminar si ya existe)
+DROP TRIGGER IF EXISTS trg_audit_payment ON public.payments;
+CREATE TRIGGER trg_audit_payment
+  AFTER INSERT OR UPDATE OR DELETE ON public.payments
+  FOR EACH ROW EXECUTE FUNCTION public.fn_audit_payment();
+
+-- ── 2. FUNCIÓN DE MORA EN BASE DE DATOS ──────────────────────
+-- Calcula la mora directamente en el servidor.
+-- Regla: RD$50/día, cada 7 días = bloque de RD$500.
+-- Esto evita que el frontend manipule el cálculo.
+
+CREATE OR REPLACE FUNCTION public.calc_mora(p_due_date date)
+RETURNS numeric LANGUAGE plpgsql IMMUTABLE AS $$
+DECLARE
+  v_days_late int;
+  v_blocks    int;
+  v_remainder int;
+BEGIN
+  v_days_late := (CURRENT_DATE - p_due_date)::int;
+  IF v_days_late <= 0 THEN RETURN 0; END IF;
+
+  v_blocks    := v_days_late / 7;
+  v_remainder := v_days_late % 7;
+
+  RETURN (v_blocks * 500) + (v_remainder * 50);
+END;
+$$;
+
+-- Vista enriquecida de pagos con mora calculada en servidor
+CREATE OR REPLACE VIEW public.v_payments_with_mora AS
+SELECT
+  p.*,
+  public.calc_mora(p.due_date)                          AS mora_amount,
+  p.amount + public.calc_mora(p.due_date)               AS total_due,
+  (CURRENT_DATE - p.due_date)::int                      AS days_late,
+  s.name                                                AS student_name,
+  s.p1_name                                             AS parent_name,
+  s.p1_email                                            AS parent_email,
+  c.name                                                AS classroom_name,
+  ap.name                                               AS approved_by_name
+FROM public.payments p
+LEFT JOIN public.students  s  ON s.id = p.student_id
+LEFT JOIN public.classrooms c ON c.id = s.classroom_id
+LEFT JOIN public.profiles  ap ON ap.id = p.validated_by
+WHERE p.deleted_at IS NULL;
+
+-- RLS en la vista
+GRANT SELECT ON public.v_payments_with_mora TO authenticated;
+
+-- ── 3. RPC SEGURO PARA APROBAR PAGOS ─────────────────────────
+-- Centraliza la lógica de aprobación en el servidor.
+-- Registra quién aprobó y cuándo de forma inmutable.
+
+CREATE OR REPLACE FUNCTION public.approve_payment(
+  p_payment_id bigint,
+  p_notes      text DEFAULT NULL
+)
+RETURNS jsonb LANGUAGE plpgsql SECURITY DEFINER SET search_path = public AS $$
+DECLARE
+  v_user_id uuid;
+  v_role    text;
+  v_payment payments%ROWTYPE;
+BEGIN
+  v_user_id := auth.uid();
+  SELECT role INTO v_role FROM public.profiles WHERE id = v_user_id;
+
+  -- Solo directora, asistente o admin pueden aprobar
+  IF v_role NOT IN ('directora', 'asistente', 'admin') THEN
+    RETURN jsonb_build_object('error', 'No autorizado');
+  END IF;
+
+  SELECT * INTO v_payment FROM public.payments WHERE id = p_payment_id;
+  IF NOT FOUND THEN
+    RETURN jsonb_build_object('error', 'Pago no encontrado');
+  END IF;
+
+  IF v_payment.status = 'paid' THEN
+    RETURN jsonb_build_object('error', 'El pago ya fue aprobado');
+  END IF;
+
+  UPDATE public.payments
+  SET
+    status       = 'paid',
+    paid_date    = now(),
+    validated_by = v_user_id,
+    notes        = COALESCE(p_notes, notes)
+  WHERE id = p_payment_id;
+
+  RETURN jsonb_build_object(
+    'success',      true,
+    'payment_id',   p_payment_id,
+    'approved_by',  v_user_id,
+    'approved_at',  now()
+  );
+END;
+$$;
+
+GRANT EXECUTE ON FUNCTION public.approve_payment(bigint, text) TO authenticated;
+
+-- ── 4. RPC SEGURO PARA ELIMINAR PAGOS (SOFT DELETE) ──────────
+CREATE OR REPLACE FUNCTION public.delete_payment(
+  p_payment_id bigint,
+  p_reason     text DEFAULT 'Eliminado por administración'
+)
+RETURNS jsonb LANGUAGE plpgsql SECURITY DEFINER SET search_path = public AS $$
+DECLARE
+  v_user_id uuid;
+  v_role    text;
+BEGIN
+  v_user_id := auth.uid();
+  SELECT role INTO v_role FROM public.profiles WHERE id = v_user_id;
+
+  IF v_role NOT IN ('directora', 'asistente', 'admin') THEN
+    RETURN jsonb_build_object('error', 'No autorizado');
+  END IF;
+
+  -- Soft delete: marcar como eliminado en vez de borrar
+  UPDATE public.payments
+  SET deleted_at = now(),
+      notes = COALESCE(notes || ' | ', '') || p_reason || ' (' || to_char(now(), 'DD/MM/YYYY HH24:MI') || ')'
+  WHERE id = p_payment_id;
+
+  IF NOT FOUND THEN
+    RETURN jsonb_build_object('error', 'Pago no encontrado');
+  END IF;
+
+  RETURN jsonb_build_object('success', true, 'payment_id', p_payment_id);
+END;
+$$;
+
+GRANT EXECUTE ON FUNCTION public.delete_payment(bigint, text) TO authenticated;
+
+-- ── 5. COLUMNA validated_by EN PAYMENTS (si no existe) ───────
+ALTER TABLE public.payments
+  ADD COLUMN IF NOT EXISTS validated_by uuid REFERENCES public.profiles(id) ON DELETE SET NULL;
+
+-- ── 6. ÍNDICE PARA AUDITORÍA RÁPIDA ──────────────────────────
+CREATE INDEX IF NOT EXISTS idx_audit_payment_id
+  ON public.audit_logs ((payload->>'payment_id'), created_at DESC)
+  WHERE action LIKE 'payment.%';
+
+-- Registra cada cambio en pagos de forma que no se puede borrar
+CREATE TABLE IF NOT EXISTS public.payment_audit_log (
+  id            bigserial PRIMARY KEY,
+  payment_id    bigint       NOT NULL,
+  action        text         NOT NULL, -- 'approved', 'rejected', 'deleted', 'mora_waived', 'created', 'updated'
+  actor_id      uuid         REFERENCES public.profiles(id),
+  actor_name    text,
+  actor_role    text,
+  old_status    text, -- Estado anterior del pago
+  new_status    text, -- Nuevo estado del pago
+  changed_at    timestamp with time zone DEFAULT now() NOT NULL -- Fecha y hora del cambio
+);

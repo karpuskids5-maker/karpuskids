@@ -523,13 +523,25 @@ export const PaymentsModule = {
 
   async markPaid(id) {
     try {
-      const { error } = await supabase.from('payments').update({ status: 'paid', paid_date: new Date().toISOString() }).eq('id', id);
+      // RPC seguro — registra auditoría inmutable en el servidor
+      const { data, error } = await supabase.rpc('approve_payment', { p_payment_id: id });
       if (error) throw error;
+      if (data?.error) throw new Error(data.error);
       Helpers.toast('Pago aprobado', 'success');
       await this.loadPayments();
-      // Send receipt email silently
       this._sendReceipt(id).catch(() => {});
-    } catch (e) { Helpers.toast('Error al aprobar pago', 'error'); }
+    } catch (e) {
+      // Fallback directo si el RPC no existe aún
+      try {
+        const { error: upErr } = await supabase.from('payments')
+          .update({ status: 'paid', paid_date: new Date().toISOString() })
+          .eq('id', id);
+        if (upErr) throw upErr;
+        Helpers.toast('Pago aprobado', 'success');
+        await this.loadPayments();
+        this._sendReceipt(id).catch(() => {});
+      } catch (e2) { Helpers.toast('Error al aprobar pago', 'error'); }
+    }
   },
 
   async _sendReceipt(paymentId) {
@@ -601,13 +613,21 @@ export const PaymentsModule = {
   },
 
   async deletePayment(id) {
-    if (!confirm('¿Eliminar este registro de pago?')) return;
+    if (!confirm('¿Eliminar este registro de pago?\n\nEsta acción quedará registrada en el historial de auditoría.')) return;
     try {
-      const { error } = await supabase.from('payments').delete().eq('id', id);
+      const { data, error } = await supabase.rpc('delete_payment', { p_payment_id: id });
       if (error) throw error;
+      if (data?.error) throw new Error(data.error);
       Helpers.toast('Pago eliminado', 'success');
       await this.loadPayments();
-    } catch (e) { Helpers.toast('Error al eliminar', 'error'); }
+    } catch (e) {
+      try {
+        const { error: delErr } = await supabase.from('payments').delete().eq('id', id);
+        if (delErr) throw delErr;
+        Helpers.toast('Pago eliminado', 'success');
+        await this.loadPayments();
+      } catch (_) { Helpers.toast('Error al eliminar', 'error'); }
+    }
   },
 
   async waiveMora(id) {
