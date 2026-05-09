@@ -1635,13 +1635,6 @@
     }
     // Exponer globalmente para que los módulos JS puedan usarla
     window._initLucide = _initLucide;
-    // Patch: reemplazar lucide.createIcons con nuestra versión mejorada
-    window.addEventListener('load', () => {
-      if (window.lucide) {
-        const _orig = lucide.createIcons.bind(lucide);
-        lucide.createIcons = (opts) => { _orig(opts); window._initLucide && _initLucide(); };
-      }
-    });
     _initLucide();
 
     // MutationObserver: re-ejecutar createIcons cada vez que se inserte
