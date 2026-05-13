@@ -26,8 +26,23 @@ Deno.serve(async (req) => {
     const body = await req.json();
     const { to, subject, html, text, attachments } = body;
 
+    // Validación de schema
     if (!to || !subject || (!html && !text)) {
       return json({ error: 'Missing required fields: to, subject, html or text' }, 400);
+    }
+    // Validar formato de email
+    const toList = Array.isArray(to) ? to : [to];
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!toList.every(e => typeof e === 'string' && emailRegex.test(e))) {
+      return json({ error: 'Invalid email address in "to" field' }, 400);
+    }
+    if (typeof subject !== 'string' || subject.length > 500) {
+      return json({ error: 'Invalid subject' }, 400);
+    }
+    // Limitar tamaño del body para evitar abuso
+    const bodySize = JSON.stringify(body).length;
+    if (bodySize > 500_000) { // 500KB max
+      return json({ error: 'Request body too large' }, 413);
     }
 
     if (!RESEND_API_KEY) {
@@ -59,7 +74,7 @@ Deno.serve(async (req) => {
       return json({ error: error.message }, 400);
     }
 
-    console.log('[send-email] ✅ Sent:', data?.id, '→', Array.isArray(to) ? to.join(', ') : to);
+    console.log('[send-email] ✅ Sent:', data?.id, '→', Array.isArray(to) ? `${to.length} recipient(s)` : '1 recipient');
     return json({ success: true, id: data?.id });
 
   } catch (err) {

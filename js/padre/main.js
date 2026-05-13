@@ -100,6 +100,8 @@ document.addEventListener('DOMContentLoaded', async () => {
 
     if (currentStudent?.classroom_id) {
       initLiveClassListener(currentStudent.classroom_id);
+      // Verificar si hay un nuevo período académico activo
+      _checkNewAcademicPeriod(currentStudent.classroom_id);
     }
 
     // Logout — ambos botones (móvil y desktop)
@@ -193,13 +195,6 @@ async function refreshDashboard() {
     String(now.getMonth() + 1).padStart(2, '0') + '-' +
     String(now.getDate()).padStart(2, '0');
 
-  // Also try yesterday in case of timezone mismatch
-  const yesterday = new Date(now);
-  yesterday.setDate(yesterday.getDate() - 1);
-  const yd = yesterday.getFullYear() + '-' +
-    String(yesterday.getMonth() + 1).padStart(2, '0') + '-' +
-    String(yesterday.getDate()).padStart(2, '0');
-
   // Carga paralela — allSettled para que un fallo no bloquee el resto
   const [financeRes, academicRes, logsRes, todayAttRes] = await Promise.allSettled([
     Api.getStudentFinancialStatus(student.id),
@@ -212,11 +207,6 @@ async function refreshDashboard() {
   const academic = academicRes.status === 'fulfilled' ? academicRes.value : null;
   let   logs     = logsRes.status     === 'fulfilled' ? logsRes.value     : null;
   const todayAtt = todayAttRes.status === 'fulfilled' ? todayAttRes.value?.data : null;
-
-  // Fallback: if today's log is null, try yesterday (timezone mismatch)
-  if (!logs) {
-    try { logs = await Api.getDailyLog(student.id, yd); } catch (_) {}
-  }
 
   if (finance?.config) AppState.set('financeConfig', finance.config);
   if (finance?.history) AppState.set('financeHistory', finance.history);
@@ -714,4 +704,94 @@ async function _initPadreQR(student) {
       }
     } catch (_) {}
   };
+}
+
+// ── Detección de Nuevo Ciclo Académico ───────────────────────────────────────
+async function _checkNewAcademicPeriod(classroomId) {
+  if (!classroomId) return;
+  try {
+    const STORAGE_KEY = `karpus_last_period_${classroomId}`;
+
+    // Obtener período activo actual
+    const { data: periodData, error } = await supabase.rpc('get_active_period', {
+      p_classroom_id: classroomId
+    });
+    if (error || !periodData?.found) return;
+
+    const currentPeriodId = String(periodData.id);
+    const lastSeenPeriodId = localStorage.getItem(STORAGE_KEY);
+
+    // Si es la primera vez o el período cambió → mostrar banner
+    if (lastSeenPeriodId && lastSeenPeriodId !== currentPeriodId) {
+      _showNewCycleBanner(periodData.name);
+    }
+
+    // Guardar el período actual como "visto"
+    localStorage.setItem(STORAGE_KEY, currentPeriodId);
+  } catch (_) { /* silencioso — RPC puede no existir aún */ }
+}
+
+function _showNewCycleBanner(periodName) {
+  // Crear banner de nuevo ciclo
+  const banner = document.createElement('div');
+  banner.id = 'newCycleBanner';
+  banner.style.cssText = `
+    position: fixed; inset: 0; z-index: 9999;
+    background: rgba(0,0,0,0.7); backdrop-filter: blur(8px);
+    display: flex; align-items: center; justify-content: center; padding: 16px;
+  `;
+  banner.innerHTML = `
+    <div style="background:white;border-radius:28px;max-width:380px;width:100%;overflow:hidden;box-shadow:0 24px 64px rgba(0,0,0,0.3);animation:karpusBounceIn 0.5s cubic-bezier(0.34,1.56,0.64,1) both;">
+      <!-- Header festivo -->
+      <div style="background:linear-gradient(135deg,#f97316,#ec4899,#8b5cf6);padding:32px 24px;text-align:center;">
+        <div style="font-size:56px;margin-bottom:8px;">🎉</div>
+        <h2 style="margin:0;color:white;font-family:sans-serif;font-size:22px;font-weight:900;letter-spacing:-0.5px;">¡Nuevo Ciclo Académico!</h2>
+        <p style="margin:8px 0 0;color:rgba(255,255,255,0.85);font-family:sans-serif;font-size:14px;font-weight:600;">${periodName}</p>
+      </div>
+      <!-- Cuerpo -->
+      <div style="padding:24px;">
+        <div style="display:flex;flex-direction:column;gap:12px;margin-bottom:24px;">
+          <div style="display:flex;align-items:center;gap:12px;padding:12px;background:#f0fdf4;border-radius:14px;border:1px solid #bbf7d0;">
+            <span style="font-size:20px;">✨</span>
+            <div>
+              <p style="margin:0;font-family:sans-serif;font-size:13px;font-weight:800;color:#15803d;">Muro renovado</p>
+              <p style="margin:2px 0 0;font-family:sans-serif;font-size:11px;color:#16a34a;">Solo verás publicaciones del nuevo período</p>
+            </div>
+          </div>
+          <div style="display:flex;align-items:center;gap:12px;padding:12px;background:#eff6ff;border-radius:14px;border:1px solid #bfdbfe;">
+            <span style="font-size:20px;">📚</span>
+            <div>
+              <p style="margin:0;font-family:sans-serif;font-size:13px;font-weight:800;color:#1d4ed8;">Tareas actualizadas</p>
+              <p style="margin:2px 0 0;font-family:sans-serif;font-size:11px;color:#2563eb;">Las tareas del ciclo anterior están archivadas</p>
+            </div>
+          </div>
+          <div style="display:flex;align-items:center;gap:12px;padding:12px;background:#fdf4ff;border-radius:14px;border:1px solid #e9d5ff;">
+            <span style="font-size:20px;">📋</span>
+            <div>
+              <p style="margin:0;font-family:sans-serif;font-size:13px;font-weight:800;color:#7e22ce;">Boletín disponible</p>
+              <p style="margin:2px 0 0;font-family:sans-serif;font-size:11px;color:#9333ea;">Revisa las calificaciones del período anterior en "Boletines"</p>
+            </div>
+          </div>
+        </div>
+        <button onclick="document.getElementById('newCycleBanner').remove()"
+          style="width:100%;padding:16px;background:linear-gradient(135deg,#f97316,#ec4899);color:white;border:none;border-radius:16px;font-family:sans-serif;font-size:15px;font-weight:900;cursor:pointer;box-shadow:0 4px 16px rgba(249,115,22,0.4);">
+          ¡Entendido, empecemos! 🚀
+        </button>
+      </div>
+    </div>
+    <style>
+      @keyframes karpusBounceIn {
+        0%   { transform: scale(0.7); opacity: 0; }
+        60%  { transform: scale(1.05); opacity: 1; }
+        100% { transform: scale(1); }
+      }
+    </style>
+  `;
+
+  // Cerrar al hacer clic fuera
+  banner.addEventListener('click', (e) => {
+    if (e.target === banner) banner.remove();
+  });
+
+  document.body.appendChild(banner);
 }

@@ -290,17 +290,22 @@ export const WallModule = {
     const accent = this._options.accentColor || 'indigo';
     const isFirstPost = this._page === 0;
 
-    // L\u00f3gica de Renderizado Multimedia con lazy loading
+    // Lógica de Renderizado Multimedia con lazy loading
     let mediaHtml = '';
     if (p.display_media_url) {
       if (p.is_video) {
         mediaHtml = `
-          <div class="rounded-2xl overflow-hidden border border-slate-100 mb-4 bg-black">
+          <div class="rounded-2xl overflow-hidden border border-slate-100 mb-4 bg-black relative group/media">
             ${ImageLoader.video(p.display_media_url, '', { cls: 'w-full max-h-[500px] mx-auto' })}
+            <a href="${p.display_media_url}" download target="_blank" rel="noopener noreferrer"
+               class="absolute top-2 right-2 p-2 bg-black/60 hover:bg-black/80 text-white rounded-xl opacity-0 group-hover/media:opacity-100 transition-opacity flex items-center gap-1.5 text-[10px] font-black uppercase backdrop-blur-sm"
+               title="Descargar video" onclick="event.stopPropagation()">
+              <i data-lucide="download" class="w-3.5 h-3.5"></i> Descargar
+            </a>
           </div>`;
       } else {
         mediaHtml = `
-          <div class="rounded-2xl overflow-hidden border border-slate-100 mb-4 cursor-zoom-in bg-black"
+          <div class="rounded-2xl overflow-hidden border border-slate-100 mb-4 cursor-zoom-in bg-black relative group/media"
                onclick="window.openLightbox('${p.display_media_url}','image')">
             ${ImageLoader.img(p.display_media_url, {
               alt: 'Post media',
@@ -308,6 +313,11 @@ export const WallModule = {
               fallback: 'img/mundo.jpg',
               priority: isFirstPost ? 'high' : 'low'
             })}
+            <a href="${p.display_media_url}" download target="_blank" rel="noopener noreferrer"
+               class="absolute top-2 right-2 p-2 bg-black/60 hover:bg-black/80 text-white rounded-xl opacity-0 group-hover/media:opacity-100 transition-opacity flex items-center gap-1.5 text-[10px] font-black uppercase backdrop-blur-sm"
+               title="Descargar imagen" onclick="event.stopPropagation()">
+              <i data-lucide="download" class="w-3.5 h-3.5"></i> Descargar
+            </a>
           </div>`;
       }
     }
@@ -328,19 +338,29 @@ export const WallModule = {
                 ${ImageLoader.img(p.teacher_avatar, { 
                   cls: 'w-full h-full object-cover', 
                   fallback: 'img/1.jpg',
-                  w: 80, h: 80 // Sugerencia de tama\u00f1o para avatar
+                  w: 80, h: 80
                 })}
               </div>
               <div>
                 <div class="font-bold text-slate-800 text-sm">${Helpers.escapeHTML(p.teacher_name)}</div>
                 <div class="text-[10px] text-slate-400 font-bold uppercase tracking-wider">
-                  ${date} \u2022 ${Helpers.escapeHTML(p.classroom?.name || 'General')}
+                  ${date} • ${Helpers.escapeHTML(p.classroom?.name || 'General')}
                 </div>
               </div>
             </div>
-            ${canDelete ? `
-              <button onclick="WallModule.deletePost('${p.id}')" class="text-slate-300 hover:text-red-500 transition-colors p-1 rounded-lg hover:bg-red-50" title="Eliminar publicaci\u00f3n"><i data-lucide="trash-2" class="w-4 h-4"></i></button>
-            ` : ''}
+            <div class="flex items-center gap-1">
+              ${p.display_media_url ? `
+                <a href="${p.display_media_url}" download target="_blank" rel="noopener noreferrer"
+                   class="p-1.5 text-slate-300 hover:text-${accent}-500 hover:bg-${accent}-50 transition-colors rounded-lg" title="Descargar ${p.is_video ? 'video' : 'imagen'}">
+                  <i data-lucide="${p.is_video ? 'video' : 'image'}" class="w-4 h-4"></i>
+                </a>
+              ` : ''}
+              ${canDelete ? `
+                <button onclick="WallModule.deletePost('${p.id}')" class="text-slate-300 hover:text-red-500 transition-colors p-1.5 rounded-lg hover:bg-red-50" title="Eliminar publicación">
+                  <i data-lucide="trash-2" class="w-4 h-4"></i>
+                </button>
+              ` : ''}
+            </div>
           </div>
 
           <div class="text-slate-600 text-sm mb-4 whitespace-pre-wrap leading-relaxed">${Helpers.escapeHTML(p.content)}</div>

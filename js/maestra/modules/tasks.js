@@ -263,32 +263,70 @@ export async function openNewTaskModal(taskToEdit = null) {
   };
 }
 
+// ── Helper: verificar si el período activo del aula está abierto ─────────────
+async function _getPeriodStatus(classroomId) {
+  try {
+    const { data, error } = await supabase.rpc('get_active_period', { p_classroom_id: classroomId });
+    if (error || !data) return { open: true, period: null }; // fallback permisivo si RPC no existe
+    return { open: data.status === 'open', period: data };
+  } catch (_) {
+    return { open: true, period: null }; // fallback permisivo
+  }
+}
+
 export async function viewTaskSubmissions(taskId) {
   const students = AppState.get('students') || [];
+  const classroom = AppState.get('classroom');
   const modalId = 'taskSubmissionsModal';
+
   try {
-    const { data: submissions, error: subError } = await supabase.from('task_evidences').select('id, task_id, student_id, status, grade_letter, stars, file_url, comment, created_at').eq('task_id', taskId);
+    // Verificar estado del período ANTES de mostrar el modal
+    const { open: periodOpen, period } = await _getPeriodStatus(classroom?.id);
+
+    const { data: submissions, error: subError } = await supabase
+      .from('task_evidences')
+      .select('id, task_id, student_id, status, grade_letter, stars, file_url, comment, created_at')
+      .eq('task_id', taskId);
     if (subError) throw subError;
 
     const subMap = {};
     (submissions || []).forEach(s => subMap[s.student_id] = s);
 
+    // Banner de período cerrado
+    const closedBanner = !periodOpen ? `
+      <div class="mb-4 p-3 bg-amber-50 border border-amber-200 rounded-2xl flex items-center gap-3">
+        <span class="text-xl">🔒</span>
+        <div>
+          <p class="text-xs font-black text-amber-800 uppercase tracking-wide">Período cerrado</p>
+          <p class="text-[10px] text-amber-600 font-medium">Las calificaciones están bloqueadas. Solo la directora puede reabrirlo.</p>
+        </div>
+      </div>` : '';
+
     const content = `
       <div class="bg-white w-full max-w-4xl rounded-[2.5rem] shadow-2xl p-8 animate-fadeIn flex flex-col max-h-[90vh]">
         <div class="flex justify-between items-start mb-6">
-          <h3 class="text-2xl font-black text-slate-800">Revisión de Entregas</h3>
+          <div>
+            <h3 class="text-2xl font-black text-slate-800">Revisión de Entregas</h3>
+            ${period ? `<p class="text-xs font-bold text-slate-400 mt-1">Período: ${safeEscapeHTML(period.name)} ${periodOpen ? '🟢 Abierto' : '🔒 Cerrado'}</p>` : ''}
+          </div>
           <button onclick="Modal.close('${modalId}')" class="p-2 hover:bg-slate-100 rounded-full transition-colors">
             <i data-lucide="x" class="w-6 h-6 text-slate-400"></i>
           </button>
         </div>
+        ${closedBanner}
         <div class="space-y-4 overflow-y-auto pr-2 flex-1">
           ${students.length > 0 ? students.map(s => {
             const sub = subMap[s.id];
             const hasSubmission = sub && sub.file_url;
             const isGraded = sub && sub.status === 'graded';
             const safeUrl = hasSubmission ? encodeURI(sub.file_url) : '#';
+            // Deshabilitar inputs si período cerrado
+            const disabled = !periodOpen ? 'disabled class="opacity-50 cursor-not-allowed"' : '';
+            const disabledSelect = !periodOpen ? 'disabled' : '';
+            const btnDisabled = !periodOpen ? 'disabled title="Período cerrado" class="p-2 bg-slate-300 text-slate-500 rounded-lg cursor-not-allowed self-end"' : 'class="p-2 bg-orange-600 text-white rounded-lg hover:bg-orange-700 transition-all self-end" title="Guardar Calificación"';
+
             return `
-              <div class="p-5 bg-slate-50 rounded-2xl border border-slate-100">
+              <div class="p-5 bg-slate-50 rounded-2xl border ${isGraded ? 'border-green-200 bg-green-50/30' : 'border-slate-100'}">
                 <div class="flex items-center justify-between mb-4">
                   <div class="font-bold text-slate-800">${safeEscapeHTML(s.name)}</div>
                   ${hasSubmission 
@@ -298,16 +336,18 @@ export async function viewTaskSubmissions(taskId) {
                     : `<span class="px-3 py-1.5 bg-slate-100 text-slate-400 rounded-lg text-xs font-bold">Sin entregar</span>`
                   }
                 </div>
-                
                 <div class="grid grid-cols-1 md:grid-cols-3 gap-4 items-end">
                   <div class="md:col-span-2">
                     <label class="block text-[10px] font-bold text-slate-400 uppercase mb-1">Retroalimentación</label>
-                    <textarea id="feedback-${s.id}" class="w-full p-2 bg-white rounded-lg text-xs border border-slate-200 focus:ring-1 focus:ring-orange-400 outline-none" rows="2" placeholder="Escribe un comentario...">${safeEscapeHTML(sub?.comment || '')}</textarea>
+                    <textarea id="feedback-${s.id}" ${disabled} rows="2"
+                      class="w-full p-2 bg-white rounded-lg text-xs border border-slate-200 focus:ring-1 focus:ring-orange-400 outline-none ${!periodOpen ? 'opacity-50 cursor-not-allowed' : ''}"
+                      placeholder="Escribe un comentario...">${safeEscapeHTML(sub?.comment || '')}</textarea>
                   </div>
                   <div class="flex items-center gap-2">
                     <div class="flex-1">
                       <label class="block text-[10px] font-bold text-slate-400 uppercase mb-1">Nota</label>
-                      <select id="grade-${s.id}" class="w-full p-2 rounded-lg text-xs font-bold bg-white border border-slate-200">
+                      <select id="grade-${s.id}" ${disabledSelect}
+                        class="w-full p-2 rounded-lg text-xs font-bold bg-white border border-slate-200 ${!periodOpen ? 'opacity-50 cursor-not-allowed' : ''}">
                         <option value="">-</option>
                         <option value="A" ${sub?.grade_letter === 'A' ? 'selected' : ''}>A (Excelente)</option>
                         <option value="B" ${sub?.grade_letter === 'B' ? 'selected' : ''}>B (Bien)</option>
@@ -317,11 +357,12 @@ export async function viewTaskSubmissions(taskId) {
                     </div>
                     <div class="flex-1">
                       <label class="block text-[10px] font-bold text-slate-400 uppercase mb-1">Estrellas</label>
-                      <select id="stars-${s.id}" class="w-full p-2 rounded-lg text-xs font-bold bg-white border border-slate-200">
+                      <select id="stars-${s.id}" ${disabledSelect}
+                        class="w-full p-2 rounded-lg text-xs font-bold bg-white border border-slate-200 ${!periodOpen ? 'opacity-50 cursor-not-allowed' : ''}">
                         ${[0,1,2,3,4,5].map(n => `<option value="${n}" ${sub?.stars === n ? 'selected' : ''}>${'⭐'.repeat(n) || 'Ninguna'}</option>`).join('')}
                       </select>
                     </div>
-                    <button onclick="App.submitGrade('${taskId}', '${s.id}')" class="p-2 bg-orange-600 text-white rounded-lg hover:bg-orange-700 transition-all self-end" title="Guardar Calificación">
+                    <button onclick="${periodOpen ? `App.submitGrade('${taskId}', '${s.id}')` : 'void(0)'}" ${btnDisabled}>
                       <i data-lucide="save" class="w-4 h-4"></i>
                     </button>
                   </div>
@@ -340,6 +381,14 @@ export async function viewTaskSubmissions(taskId) {
 }
 
 export async function submitGrade(taskId, studentId) {
+  // Verificar período antes de guardar
+  const classroom = AppState.get('classroom');
+  const { open: periodOpen } = await _getPeriodStatus(classroom?.id);
+  if (!periodOpen) {
+    safeToast('El período está cerrado. No se pueden modificar calificaciones.', 'warning');
+    return;
+  }
+
   const grade = document.getElementById(`grade-${studentId}`)?.value;
   const stars = document.getElementById(`stars-${studentId}`)?.value;
   const feedback = document.getElementById(`feedback-${studentId}`)?.value;

@@ -227,21 +227,64 @@ export const ImageLoader = {
    * @param {string} path — ruta dentro del bucket
    * @param {object} compressOpts — opciones de compresión
    */
+  /**
+   * Sube una imagen a Supabase Storage, usando la Edge Function resize-image
+   * para redimensionar y convertir a WebP en el servidor si está disponible.
+   * Fallback: compresión client-side + upload directo.
+   *
+   * @param {File}   file         — archivo a subir
+   * @param {string} bucket       — bucket de Storage
+   * @param {string} path         — ruta destino (ej: 'avatars/user123.webp')
+   * @param {object} compressOpts — { maxWidth, maxHeight, quality, maxSizeKB }
+   */
   async uploadToStorage(file, bucket, path, compressOpts = {}) {
     const { supabase } = await import('./supabase.js');
 
-    // Comprimir antes de subir
-    const compressed = await this.compress(file, compressOpts);
+    const maxWidth  = compressOpts.maxWidth  || 800;
+    const maxHeight = compressOpts.maxHeight || 800;
+    const quality   = compressOpts.quality   ? Math.round(compressOpts.quality * 100) : 82;
 
+    // Intentar Edge Function resize-image (servidor — mejor calidad y WebP real)
+    try {
+      const base64 = await this._fileToBase64(file);
+      const { data, error } = await supabase.functions.invoke('resize-image', {
+        body: {
+          base64,
+          mimeType:  file.type || 'image/jpeg',
+          bucket,
+          path,
+          maxWidth,
+          maxHeight,
+          quality,
+        }
+      });
+
+      if (!error && data?.publicUrl) {
+        return data.publicUrl;
+      }
+      // Si la Edge Function falla, continuar con fallback
+    } catch (_) { /* fallback silencioso */ }
+
+    // Fallback: compresión client-side + upload directo
+    const compressed = await this.compress(file, compressOpts);
     const { error } = await supabase.storage.from(bucket).upload(path, compressed, {
-      cacheControl: '31536000', // 1 año de caché en CDN
+      cacheControl: '31536000',
       upsert: true
     });
-
     if (error) throw error;
 
     const { data } = supabase.storage.from(bucket).getPublicUrl(path);
     return data.publicUrl;
+  },
+
+  /** Convierte un File a base64 string */
+  _fileToBase64(file) {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload  = (e) => resolve(String(e.target.result).replace(/^data:[^;]+;base64,/, ''));
+      reader.onerror = reject;
+      reader.readAsDataURL(file);
+    });
   }
 };
 

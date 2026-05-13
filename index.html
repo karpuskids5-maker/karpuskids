@@ -157,6 +157,15 @@
     .three-col{display:grid;grid-template-columns:repeat(3,1fr);gap:24px;}
     .footer-grid{display:grid;grid-template-columns:2fr 1fr 1fr;gap:48px;}
 
+    /* Footer responsive */
+    @media(min-width:768px){
+      #contacto .footer-main-grid { grid-template-columns: 1fr 1fr !important; }
+    }
+    @media(min-width:1024px){
+      #contacto .footer-main-grid { grid-template-columns: 2fr 1fr !important; }
+      #contacto .footer-cols-grid  { grid-template-columns: 1fr 1fr 1fr !important; }
+    }
+
     @media(max-width:1024px){
       .four-col{grid-template-columns:repeat(2,1fr);}
     }
@@ -783,7 +792,10 @@
 ════════════════════════════════════════════════════════════ -->
 <footer id="contacto" style="background:#0a0f1e;color:rgba(255,255,255,.65);padding:64px 24px 32px;">
   <div style="max-width:1280px;margin:0 auto;">
-    <div class="footer-grid" style="margin-bottom:48px;grid-template-columns:2fr 1fr 1fr 1fr!important;">
+
+    <!-- Grid responsive: 1 col móvil → 2 col tablet → 4 col desktop -->
+    <div class="footer-main-grid" style="display:grid;grid-template-columns:1fr;gap:40px;margin-bottom:48px;">
+
       <!-- Brand -->
       <div>
         <div style="display:flex;align-items:center;gap:10px;margin-bottom:16px;">
@@ -794,54 +806,71 @@
             <span class="k1">K</span><span class="k2">a</span><span class="k3">r</span><span class="k4">p</span><span class="k5">u</span><span class="k6">s</span>&#32;<span class="k7">K</span><span class="k8">i</span><span class="k9">d</span><span class="k10">s</span>
           </span>
         </div>
-        <p style="font-size:14px;line-height:1.72;color:rgba(255,255,255,.45);max-width:280px;margin-bottom:20px;">Estancia infantil de confianza en San Cristobal Cuidado experto, educación integral y tecnología para las familias modernas.</p>
+        <p style="font-size:14px;line-height:1.72;color:rgba(255,255,255,.45);max-width:300px;margin-bottom:20px;">Estancia infantil de confianza en San Cristóbal. Cuidado experto, educación integral y tecnología para las familias modernas.</p>
         <div style="display:flex;gap:10px;">
           <a href="https://wa.me/18298038424" target="_blank" style="width:38px;height:38px;background:rgba(255,255,255,.08);border-radius:10px;display:flex;align-items:center;justify-content:center;color:rgba(255,255,255,.65);font-size:16px;transition:background .2s,color .2s;" onmouseover="this.style.background='#25D366';this.style.color='white'" onmouseout="this.style.background='rgba(255,255,255,.08)';this.style.color='rgba(255,255,255,.65)'"><i class="bi bi-whatsapp"></i></a>
           <a href="https://instagram.com" target="_blank" style="width:38px;height:38px;background:rgba(255,255,255,.08);border-radius:10px;display:flex;align-items:center;justify-content:center;color:rgba(255,255,255,.65);font-size:16px;transition:background .2s,color .2s;" onmouseover="this.style.background='#E91E63';this.style.color='white'" onmouseout="this.style.background='rgba(255,255,255,.08)';this.style.color='rgba(255,255,255,.65)'"><i class="bi bi-instagram"></i></a>
           <a href="https://facebook.com" target="_blank" style="width:38px;height:38px;background:rgba(255,255,255,.08);border-radius:10px;display:flex;align-items:center;justify-content:center;color:rgba(255,255,255,.65);font-size:16px;transition:background .2s,color .2s;" onmouseover="this.style.background='#2196F3';this.style.color='white'" onmouseout="this.style.background='rgba(255,255,255,.08)';this.style.color='rgba(255,255,255,.65)'"><i class="bi bi-facebook"></i></a>
         </div>
       </div>
-      <!-- Links -->
-      <div>
-        <h4 style="font-size:12px;font-weight:900;color:white;text-transform:uppercase;letter-spacing:.1em;margin-bottom:16px;">Navegación</h4>
-        <ul style="list-style:none;display:flex;flex-direction:column;gap:10px;">
-          <li><a href="#nosotros"  style="color:rgba(255,255,255,.45);font-size:14px;font-weight:600;transition:color .2s;" onmouseover="this.style.color='#FF9800'" onmouseout="this.style.color='rgba(255,255,255,.45)'">Nosotros</a></li>
-          <li><a href="#programas" style="color:rgba(255,255,255,.45);font-size:14px;font-weight:600;transition:color .2s;" onmouseover="this.style.color='#FF9800'" onmouseout="this.style.color='rgba(255,255,255,.45)'">Programas</a></li>
-          <li><a href="#app"       style="color:rgba(255,255,255,.45);font-size:14px;font-weight:600;transition:color .2s;" onmouseover="this.style.color='#FF9800'" onmouseout="this.style.color='rgba(255,255,255,.45)'">App</a></li>
-          <li><a href="#galeria"   style="color:rgba(255,255,255,.45);font-size:14px;font-weight:600;transition:color .2s;" onmouseover="this.style.color='#FF9800'" onmouseout="this.style.color='rgba(255,255,255,.45)'">Galería</a></li>
-          <li><a href="login.html" style="color:rgba(255,255,255,.45);font-size:14px;font-weight:600;transition:color .2s;" onmouseover="this.style.color='#FF9800'" onmouseout="this.style.color='rgba(255,255,255,.45)'">Acceso Padres</a></li>
-          <li><a href="politica-privacidad.html" style="color:rgba(255,255,255,.45);font-size:14px;font-weight:600;transition:color .2s;" onmouseover="this.style.color='#FF9800'" onmouseout="this.style.color='rgba(255,255,255,.45)'">Privacidad</a></li>
-        </ul>
-      </div>
-      <!-- Contact -->
-      <div>
-        <h4 style="font-size:12px;font-weight:900;color:white;text-transform:uppercase;letter-spacing:.1em;margin-bottom:16px;">Contacto</h4>
-        <div style="display:flex;flex-direction:column;gap:14px;">
-          <a href="https://wa.me/18298038424" target="_blank" style="display:flex;align-items:center;gap:10px;color:rgba(255,255,255,.45);font-size:14px;transition:color .2s;" onmouseover="this.style.color='#25D366'" onmouseout="this.style.color='rgba(255,255,255,.45)'">
-            <i class="bi bi-whatsapp" style="font-size:16px;flex-shrink:0;"></i> +1 (829) 803-8424
-          </a>
-          <div style="display:flex;align-items:flex-start;gap:10px;color:rgba(255,255,255,.45);font-size:14px;">
-            <i class="bi bi-geo-alt-fill" style="font-size:16px;flex-shrink:0;margin-top:2px;"></i> San Cristobal, República Dominicana
-          </div>
-          <div style="display:flex;align-items:center;gap:10px;color:rgba(255,255,255,.45);font-size:14px;">
-            <i class="bi bi-clock-fill" style="font-size:16px;flex-shrink:0;"></i> Lun–Vie: 7:00 AM – 6:00 PM
+
+      <!-- Columnas secundarias: 2 por fila en móvil, 3 en tablet+ -->
+      <div class="footer-cols-grid" style="display:grid;grid-template-columns:1fr 1fr;gap:32px;">
+
+        <!-- Navegación -->
+        <div>
+          <h4 style="font-size:12px;font-weight:900;color:white;text-transform:uppercase;letter-spacing:.1em;margin-bottom:16px;">Navegación</h4>
+          <ul style="list-style:none;display:flex;flex-direction:column;gap:10px;">
+            <li><a href="#nosotros"  style="color:rgba(255,255,255,.45);font-size:14px;font-weight:600;transition:color .2s;" onmouseover="this.style.color='#FF9800'" onmouseout="this.style.color='rgba(255,255,255,.45)'">Nosotros</a></li>
+            <li><a href="#programas" style="color:rgba(255,255,255,.45);font-size:14px;font-weight:600;transition:color .2s;" onmouseover="this.style.color='#FF9800'" onmouseout="this.style.color='rgba(255,255,255,.45)'">Programas</a></li>
+            <li><a href="#app"       style="color:rgba(255,255,255,.45);font-size:14px;font-weight:600;transition:color .2s;" onmouseover="this.style.color='#FF9800'" onmouseout="this.style.color='rgba(255,255,255,.45)'">App</a></li>
+            <li><a href="#galeria"   style="color:rgba(255,255,255,.45);font-size:14px;font-weight:600;transition:color .2s;" onmouseover="this.style.color='#FF9800'" onmouseout="this.style.color='rgba(255,255,255,.45)'">Galería</a></li>
+            <li><a href="login.html" style="color:rgba(255,255,255,.45);font-size:14px;font-weight:600;transition:color .2s;" onmouseover="this.style.color='#FF9800'" onmouseout="this.style.color='rgba(255,255,255,.45)'">Acceso Padres</a></li>
+            <li><a href="politica-privacidad.html" style="color:rgba(255,255,255,.45);font-size:14px;font-weight:600;transition:color .2s;" onmouseover="this.style.color='#FF9800'" onmouseout="this.style.color='rgba(255,255,255,.45)'">Privacidad</a></li>
+          </ul>
+        </div>
+
+        <!-- Contacto -->
+        <div>
+          <h4 style="font-size:12px;font-weight:900;color:white;text-transform:uppercase;letter-spacing:.1em;margin-bottom:16px;">Contacto</h4>
+          <div style="display:flex;flex-direction:column;gap:14px;">
+            <a href="https://wa.me/18298038424" target="_blank" style="display:flex;align-items:center;gap:10px;color:rgba(255,255,255,.45);font-size:14px;transition:color .2s;" onmouseover="this.style.color='#25D366'" onmouseout="this.style.color='rgba(255,255,255,.45)'">
+              <i class="bi bi-whatsapp" style="font-size:16px;flex-shrink:0;"></i>
+              <span>+1 (829) 803-8424</span>
+            </a>
+            <div style="display:flex;align-items:flex-start;gap:10px;color:rgba(255,255,255,.45);font-size:14px;">
+              <i class="bi bi-geo-alt-fill" style="font-size:16px;flex-shrink:0;margin-top:2px;"></i>
+              <span>San Cristóbal, República Dominicana</span>
+            </div>
+            <div style="display:flex;align-items:center;gap:10px;color:rgba(255,255,255,.45);font-size:14px;">
+              <i class="bi bi-clock-fill" style="font-size:16px;flex-shrink:0;"></i>
+              <span>Lun–Vie: 7:00 AM – 6:00 PM</span>
+            </div>
           </div>
         </div>
+
       </div>
-      <!-- Map -->
-      <div style="grid-column: span 1;">
+
+      <!-- Mapa — ancho completo en móvil -->
+      <div>
         <h4 style="font-size:12px;font-weight:900;color:white;text-transform:uppercase;letter-spacing:.1em;margin-bottom:16px;">Ubicación</h4>
         <div style="border-radius:18px;overflow:hidden;box-shadow:0 12px 32px rgba(0,0,0,.3);border:1px solid rgba(255,255,255,.1);">
-          <iframe src="https://www.google.com/maps/embed?pb=!1m18!1m12!1m3!1d3785.686618411939!2d-70.09190389999999!3d18.407108499999996!2m3!1f0!2f0!3f0!3m2!1i1024!2i768!4f13.1!3m3!1m2!1s0x8ea55f2cf6f6cc17%3A0x31dbf4c810db6cd7!2sKarpus%20Kids!5e0!3m2!1ses-419!2sdo!4v1777343675017!5m2!1ses-419!2sdo" width="100%" height="180" style="border:0;display:block;" allowfullscreen="" loading="lazy" referrerpolicy="no-referrer-when-downgrade"></iframe>
+          <iframe src="https://www.google.com/maps/embed?pb=!1m18!1m12!1m3!1d3785.686618411939!2d-70.09190389999999!3d18.407108499999996!2m3!1f0!2f0!3f0!3m2!1i1024!2i768!4f13.1!3m3!1m2!1s0x8ea55f2cf6f6cc17%3A0x31dbf4c810db6cd7!2sKarpus%20Kids!5e0!3m2!1ses-419!2sdo!4v1777343675017!5m2!1ses-419!2sdo" width="100%" height="200" style="border:0;display:block;" allowfullscreen="" loading="lazy" referrerpolicy="no-referrer-when-downgrade"></iframe>
         </div>
       </div>
+
     </div>
-    <div style="border-top:1px solid rgba(255,255,255,.07);padding-top:24px;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:12px;">
+
+    <!-- Bottom bar -->
+    <div style="border-top:1px solid rgba(255,255,255,.07);padding-top:24px;display:flex;flex-direction:column;align-items:center;gap:8px;text-align:center;">
       <p style="font-size:12px;color:rgba(255,255,255,.28);">© 2026 Karpus Kids. Todos los derechos reservados.</p>
-      <p style="font-size:12px;color:rgba(255,255,255,.28);">Hecho por Luis Alfredo Cabrera Reyes - 849-711-4907</p>
+      <p style="font-size:12px;color:rgba(255,255,255,.28);">Hecho por Luis Alfredo Cabrera Reyes · 849-711-4907</p>
     </div>
+
   </div>
 </footer>
+
+
 
 <!-- ── FABs ── -->
 <a href="https://wa.me/18298038424" target="_blank" class="fab fab-ws" title="WhatsApp"><i class="bi bi-whatsapp"></i></a>

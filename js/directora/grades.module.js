@@ -268,6 +268,10 @@ export const GradesModule = {
                 <div class="text-xs font-bold text-slate-700 truncate max-w-[160px]">${Helpers.escapeHTML(s.lastTask?.tasks?.title || s.lastTask?.title || 'Sin tareas')}</div>
                 <div class="text-[9px] text-slate-400 font-bold uppercase">${s.lastTask ? new Date(s.lastTask.created_at).toLocaleDateString() : '—'}</div>
               </div>
+              <button onclick="event.stopPropagation();App.grades.openStudentHistory('${s.sid}','${Helpers.escapeHTML(s.name).replace(/'/g,"\\'")}');"
+                class="ml-auto p-1.5 bg-violet-50 text-violet-600 rounded-lg hover:bg-violet-100 transition-colors shrink-0" title="Ver historial académico">
+                <i data-lucide="history" class="w-3.5 h-3.5"></i>
+              </button>
             </div>
           </td>
         </tr>`;
@@ -403,17 +407,43 @@ export const GradesModule = {
     const period = this._periods.find(p => String(p.id) === String(periodId));
     if (!period || period.status === 'closed') return Helpers.toast('Este periodo ya esta cerrado', 'warning');
     
-    if (!confirm('¿Cerrar el periodo "' + period.name + '"?\n\nEsta acción bloqueará las calificaciones actuales. ¿Deseas continuar?')) return;
+    if (!confirm(
+      '¿Cerrar el periodo "' + period.name + '"?\n\n' +
+      '✅ Se calcularán los promedios finales de todos los estudiantes.\n' +
+      '🔒 Las notas quedarán bloqueadas para edición.\n' +
+      '📋 Se generarán las boletas de calificaciones.\n\n' +
+      '¿Deseas continuar?'
+    )) return;
+
+    const btn = document.getElementById('btnClosePeriod');
+    if (btn) { btn.disabled = true; btn.textContent = 'Cerrando...'; }
 
     try {
-      const { error } = await supabase.from('periods').update({ status: 'closed', is_active: false }).eq('id', periodId);
+      // Usar RPC seguro que calcula promedios y cierra atómicamente
+      const { data, error } = await supabase.rpc('close_period', { p_period_id: parseInt(periodId) });
       if (error) throw error;
-      
-      Helpers.toast('Periodo cerrado correctamente', 'success');
+      if (data?.error) throw new Error(data.error);
+
+      const cards = data?.cards_generated || 0;
+      Helpers.toast(`Periodo cerrado ✅ — ${cards} boleta${cards !== 1 ? 's' : ''} generada${cards !== 1 ? 's' : ''}`, 'success');
+      auditLog('period.closed', { period_id: periodId, period_name: period.name });
       await this._loadPeriods();
       await this.loadGrades();
     } catch (e) {
-      Helpers.toast('Error al cerrar periodo', 'error');
+      // Fallback: cerrar sin RPC si no existe aún
+      try {
+        const { error } = await supabase.from('periods')
+          .update({ status: 'closed', is_active: false })
+          .eq('id', periodId);
+        if (error) throw error;
+        Helpers.toast('Periodo cerrado (sin cálculo de promedios — ejecuta fix_period_close.sql)', 'warning');
+        await this._loadPeriods();
+        await this.loadGrades();
+      } catch (e2) {
+        Helpers.toast('Error al cerrar periodo: ' + (e2.message || e.message), 'error');
+      }
+    } finally {
+      if (btn) { btn.disabled = false; btn.textContent = 'Cerrar Periodo'; }
     }
   },
 
@@ -559,6 +589,83 @@ export const GradesModule = {
       Helpers.toast('PDF generado correctamente', 'success');
     } catch (err) {
       Helpers.toast('Error al generar PDF. Asegúrate de que las librerías cargaron correctamente.', 'error');
+    }
+  },
+
+  /**
+   * 📋 Modo Auditoría — Historial completo de un estudiante por períodos
+   */
+  async openStudentHistory(studentId, studentName) {
+    try {
+      const { data, error } = await supabase.rpc('get_student_history', { p_student_id: parseInt(studentId) });
+      if (error) throw error;
+
+      const history = Array.isArray(data) ? data : [];
+
+      const rows = history.length > 0 ? history.map(h => {
+        const score = h.final_score != null ? Number(h.final_score).toFixed(2) : '-';
+        const levelCls = {
+          'Excelente':      'bg-emerald-100 text-emerald-700',
+          'Bueno':          'bg-blue-100 text-blue-700',
+          'En proceso':     'bg-amber-100 text-amber-700',
+          'Requiere apoyo': 'bg-rose-100 text-rose-700',
+          'Sin calificar':  'bg-slate-100 text-slate-500'
+        }[h.level] || 'bg-slate-100 text-slate-500';
+
+        return `
+          <tr class="border-b border-slate-50 hover:bg-slate-50 transition-colors">
+            <td class="px-4 py-3 text-sm font-bold text-slate-800">${Helpers.escapeHTML(h.period_name)}</td>
+            <td class="px-4 py-3 text-xs text-slate-500">${Helpers.escapeHTML(h.classroom_name || '-')}</td>
+            <td class="px-4 py-3 text-center text-sm font-bold">${h.task_avg != null ? Number(h.task_avg).toFixed(1) : '-'}</td>
+            <td class="px-4 py-3 text-center text-sm font-bold">${h.formal_avg != null ? Number(h.formal_avg).toFixed(1) : '-'}</td>
+            <td class="px-4 py-3 text-center">
+              <span class="text-base font-black ${score !== '-' ? 'text-indigo-700' : 'text-slate-400'}">${score}</span>
+            </td>
+            <td class="px-4 py-3 text-center">
+              <span class="px-2 py-1 rounded-full text-[10px] font-black uppercase ${levelCls}">${h.level || '-'}</span>
+            </td>
+            <td class="px-4 py-3 text-xs text-slate-400 max-w-[160px] truncate">${Helpers.escapeHTML(h.teacher_comment || '-')}</td>
+          </tr>`;
+      }).join('') : `
+        <tr><td colspan="7" class="text-center py-10 text-slate-400 text-sm">
+          No hay historial de calificaciones para este estudiante.
+        </td></tr>`;
+
+      window.openGlobalModal(`
+        <div class="bg-white rounded-3xl shadow-2xl w-full max-w-4xl overflow-hidden">
+          <div class="bg-gradient-to-r from-indigo-600 to-violet-600 p-6 text-white flex items-center justify-between">
+            <div>
+              <h3 class="text-xl font-black">Historial Académico</h3>
+              <p class="text-sm text-white/70 font-medium mt-0.5">${Helpers.escapeHTML(studentName)} — Todos los períodos</p>
+            </div>
+            <button onclick="App.ui.closeModal()" class="w-10 h-10 bg-white/10 hover:bg-white/20 rounded-xl flex items-center justify-center transition-colors">
+              <i data-lucide="x" class="w-5 h-5"></i>
+            </button>
+          </div>
+          <div class="p-6 overflow-x-auto">
+            <table class="w-full text-sm min-w-[600px]">
+              <thead class="bg-slate-50 border-b border-slate-100">
+                <tr>
+                  <th class="px-4 py-3 text-left text-[10px] font-black text-slate-400 uppercase tracking-wider">Período</th>
+                  <th class="px-4 py-3 text-left text-[10px] font-black text-slate-400 uppercase tracking-wider">Aula</th>
+                  <th class="px-4 py-3 text-center text-[10px] font-black text-slate-400 uppercase tracking-wider">Tareas</th>
+                  <th class="px-4 py-3 text-center text-[10px] font-black text-slate-400 uppercase tracking-wider">Formal</th>
+                  <th class="px-4 py-3 text-center text-[10px] font-black text-slate-400 uppercase tracking-wider">Final</th>
+                  <th class="px-4 py-3 text-center text-[10px] font-black text-slate-400 uppercase tracking-wider">Nivel</th>
+                  <th class="px-4 py-3 text-left text-[10px] font-black text-slate-400 uppercase tracking-wider">Comentario</th>
+                </tr>
+              </thead>
+              <tbody class="divide-y divide-slate-50">${rows}</tbody>
+            </table>
+          </div>
+          <div class="p-4 bg-slate-50 border-t border-slate-100 text-center">
+            <p class="text-[10px] text-slate-400 font-bold uppercase tracking-wider">Modo Auditoría — Solo visible para Directora y Asistente</p>
+          </div>
+        </div>
+      `, true);
+      if (window.lucide) lucide.createIcons();
+    } catch (e) {
+      Helpers.toast('Error al cargar historial: ' + (e.message || ''), 'error');
     }
   }
 };

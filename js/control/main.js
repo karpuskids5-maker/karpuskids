@@ -1,6 +1,5 @@
-﻿import { supabase } from '../shared/supabase.js';
-
-const ADMIN_ID = 'c1e72617-ab8f-44c0-b1eb-cdd92eda62e7';
+import { supabase, ensureRole } from '../shared/supabase.js';
+import { logError, auditLog } from '../shared/db-utils.js';
 
 // ── State ─────────────────────────────────────────────────────────────────────
 let allUsers    = [];
@@ -15,40 +14,35 @@ let currentUser = null;
 
 // ── Init ──────────────────────────────────────────────────────────────────────
 document.addEventListener('DOMContentLoaded', async () => {
-  const { data: { session } } = await supabase.auth.getSession();
-  if (!session?.user) { window.location.href = 'login.html'; return; }
+  try {
+    // Usar ensureRole para verificar sesión, token y rol en un solo paso
+    const auth = await ensureRole('admin');
+    if (!auth) return; // ensureRole ya redirige al login si falla
 
-  const { data: profile } = await supabase
-    .from('profiles')
-    .select('id, name, email, role')
-    .eq('id', session.user.id)
-    .maybeSingle();
+    currentUser = auth.profile;
+    document.getElementById('adminName').textContent = auth.profile.name || auth.user.email;
+    document.getElementById('adminAvatar').textContent = (auth.profile.name || auth.user.email)[0].toUpperCase();
+    document.getElementById('cfgEmail').value = auth.user.email || '';
+    document.getElementById('cfgName').value  = auth.profile.name || '';
 
-  if (!profile || profile.role !== 'admin') {
-    alert('Acceso denegado. Solo administradores.');
-    await supabase.auth.signOut();
+    const loader = document.getElementById('loader');
+    if (loader) loader.classList.add('hidden');
+
+    setInterval(() => {
+      document.getElementById('topClock').textContent =
+        new Date().toLocaleString('es-DO', { dateStyle: 'short', timeStyle: 'medium' });
+    }, 1000);
+
+    if (window.innerWidth <= 768) {
+      document.getElementById('mobMenuBtn').style.display = 'block';
+    }
+
+    await refreshAll();
+    startRealtime();
+  } catch (err) {
+    logError('panel_control', err.message || String(err), err.stack || '', 'DOMContentLoaded').catch(() => {});
     window.location.href = 'login.html';
-    return;
   }
-
-  currentUser = profile;
-  document.getElementById('adminName').textContent = profile.name || profile.email;
-  document.getElementById('adminAvatar').textContent = (profile.name || profile.email)[0].toUpperCase();
-  document.getElementById('cfgEmail').value = profile.email || '';
-  document.getElementById('cfgName').value  = profile.name  || '';
-  document.getElementById('loader').style.display = 'none';
-
-  setInterval(() => {
-    document.getElementById('topClock').textContent =
-      new Date().toLocaleString('es-DO', { dateStyle: 'short', timeStyle: 'medium' });
-  }, 1000);
-
-  if (window.innerWidth <= 768) {
-    document.getElementById('mobMenuBtn').style.display = 'block';
-  }
-
-  await refreshAll();
-  startRealtime();
 });
 
 // ── Navigation ────────────────────────────────────────────────────────────────
@@ -84,6 +78,7 @@ window.goTo = function(id) {
   if (id === 'pagos')       renderPayments();
   if (id === 'asistencia')  renderAttendance();
   if (id === 'errores')     renderErrors();
+  if (id === 'seguridad')   { renderBruteForce(); loadSecurityStats(); loadPaymentAudit(); }
 };
 
 // ── Refresh ───────────────────────────────────────────────────────────────────
@@ -108,7 +103,10 @@ async function loadUsers() {
     if (kpi) kpi.textContent = allUsers.length;
     const cfgCount = document.getElementById('cfgUserCount');
     if (cfgCount) cfgCount.textContent = allUsers.length;
-  } catch (_) { allUsers = []; }
+  } catch (err) { 
+    logError('panel_control', err.message || String(err), err.stack || '', 'loadUsers').catch(() => {});
+    allUsers = []; 
+  }
 }
 
 async function loadPunches() {
@@ -121,7 +119,10 @@ async function loadPunches() {
       .gte('punched_at', since.toISOString())
       .order('punched_at', { ascending: false });
     allPunches = data || [];
-  } catch (_) { allPunches = []; }
+  } catch (err) { 
+    logError('panel_control', err?.message || String(err), err?.stack || '', 'loadPunches').catch(() => {});
+    allPunches = []; 
+  }
 }
 
 async function loadAudit() {
@@ -153,7 +154,10 @@ async function loadAudit() {
     allAudit = data || [];
     const badge = document.getElementById('badge-audit');
     if (badge) badge.textContent = allAudit.length;
-  } catch (_) { allAudit = []; }
+  } catch (err) { 
+    logError('panel_control', err?.message || String(err), err?.stack || '', 'loadAudit').catch(() => {});
+    allAudit = []; 
+  }
 }
 
 async function loadPayments() {
@@ -163,8 +167,12 @@ async function loadPayments() {
       .select('id, amount, status, method, bank, month_paid, created_at, student_id, students:student_id(name, p1_name)')
       .order('created_at', { ascending: false })
       .limit(300);
-    allPayments = error ? [] : (data || []);
-  } catch (_) { allPayments = []; }
+    if (error) throw error;
+    allPayments = data || [];
+  } catch (err) { 
+    logError('panel_control', err?.message || String(err), err?.stack || '', 'loadPayments').catch(() => {});
+    allPayments = []; 
+  }
 }
 
 async function loadStudents() {
@@ -175,14 +183,20 @@ async function loadStudents() {
     allStudents = data || [];
     const kpi = document.getElementById('kpi-students');
     if (kpi) kpi.textContent = allStudents.filter(s => s.is_active).length;
-  } catch (_) { allStudents = []; }
+  } catch (err) { 
+    logError('panel_control', err?.message || String(err), err?.stack || '', 'loadStudents').catch(() => {});
+    allStudents = []; 
+  }
 }
 
 async function loadClassrooms() {
   try {
     const { data } = await supabase.from('classrooms').select('id, name, teacher_id');
     allClassrooms = data || [];
-  } catch (_) { allClassrooms = []; }
+  } catch (err) { 
+    logError('panel_control', err?.message || String(err), err?.stack || '', 'loadClassrooms').catch(() => {});
+    allClassrooms = []; 
+  }
 }
 
 async function loadAttendance() {
@@ -208,7 +222,10 @@ async function loadAttendance() {
         .order('date', { ascending: false })
         .limit(300);
       allAttend = data || [];
-    } catch (__) { allAttend = []; }
+    } catch (err2) { 
+      logError('panel_control', err2?.message || String(err2), err2?.stack || '', 'loadAttendance_fallback').catch(() => {});
+      allAttend = []; 
+    }
   }
 }
 
@@ -252,9 +269,9 @@ function renderCharts() {
           type: 'bar',
           data: {
             labels: ['Padres','Maestras','Directoras'],
-            datasets: [{ label: 'Usuarios', data: [rc.padre, rc.maestra, rc.directora], backgroundColor: ['rgba(99,102,241,.7)','rgba(34,197,94,.7)','rgba(249,115,22,.7)'], borderRadius: 6 }]
+            datasets: [{ label: 'Usuarios', data: [rc.padre, rc.maestra, rc.directora], backgroundColor: ['#6366f1','#22c55e','#f97316'], borderRadius: 6, barThickness: 20 }]
           },
-          options: { responsive: true, plugins: { legend: { display: false } }, scales: { x: { ticks: { color: '#64748b' }, grid: { color: 'rgba(255,255,255,.04)' } }, y: { ticks: { color: '#64748b' }, grid: { color: 'rgba(255,255,255,.04)' } } } }
+          options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } }, scales: { x: { grid: { display: false }, ticks: { color: '#94a3b8', font: { size: 11 } } }, y: { beginAtZero: true, grid: { color: 'rgba(255,255,255,0.05)' }, ticks: { color: '#94a3b8' } } } }
         });
       } catch (_) {}
     }
@@ -271,9 +288,9 @@ function renderCharts() {
           type: 'doughnut',
           data: {
             labels: ['Padres','Maestras','Directoras','Asistentes','Admin'],
-            datasets: [{ data: Object.values(rc), backgroundColor: ['#6366f1','#22c55e','#f97316','#3b82f6','#eab308'], borderWidth: 0, hoverOffset: 8 }]
+            datasets: [{ data: [rc.padre, rc.maestra, rc.directora, rc.asistente, rc.admin], backgroundColor: ['#6366f1','#22c55e','#f97316','#3b82f6','#eab308'], borderWidth: 2, borderColor: '#ffffff' }]
           },
-          options: { responsive: true, plugins: { legend: { position: 'right', labels: { color: '#94a3b8', font: { size: 11 }, padding: 12 } } }, cutout: '65%' }
+          options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { position: 'bottom', labels: { color: '#94a3b8', font: { size: 10 }, padding: 15, usePointStyle: true } } }, cutout: '70%' }
         });
       } catch (_) {}
     }
@@ -293,11 +310,11 @@ function renderRecentAudit() {
     const action = a.action || 'movimiento';
     const typeBadge = { 'payment.approved': 'badge-green', 'attendance.check_in': 'badge-blue', 'error': 'badge-red' };
     const badge = typeBadge[action] || 'badge-gray';
-    return `<tr>
-      <td><span style="font-weight:800;">${escH(name)}</span></td>
-      <td style="max-width:180px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${escH(action)}</td>
-      <td style="color:var(--muted);">${time}</td>
-      <td><span class="badge ${badge}">${action.split('.')[0]}</span></td>
+    return `<tr class="border-b border-slate-100 hover:bg-slate-50 transition-colors">
+      <td class="py-3 px-4"><span class="font-bold text-slate-800 text-sm">${escH(name)}</span></td>
+      <td class="py-3 px-4"><div class="max-w-[150px] truncate text-slate-500 text-xs">${escH(action)}</div></td>
+      <td class="py-3 px-4 text-slate-400 text-[10px] uppercase font-bold">${time}</td>
+      <td class="py-3 px-4 text-right"><span class="badge ${badge}">${action.split('.')[0]}</span></td>
     </tr>`;
   }).join('');
 }
@@ -317,15 +334,18 @@ function renderAuditTable(data) {
     const dt = a.created_at ? new Date(a.created_at).toLocaleString('es-DO') : '—';
     const action = a.action || '—';
     const badge = action.includes('payment') ? 'badge-green' : action.includes('attendance') ? 'badge-blue' : 'badge-gray';
-    return `<tr>
-      <td style="color:var(--muted);">${i+1}</td>
-      <td style="white-space:nowrap;color:var(--muted);font-size:11px;">${dt}</td>
-      <td><div style="font-weight:800;font-size:12px;">${escH(name)}</div><div style="font-size:10px;color:var(--muted);">${escH(email)}</div></td>
-      <td><span class="badge ${roleBadge[role]||'badge-gray'}">${role}</span></td>
-      <td><span class="badge ${badge}">${action}</span></td>
-      <td style="max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${escH(JSON.stringify(a.payload || {}))}</td>
-      <td style="color:var(--muted);font-size:11px;">Web</td>
-      <td><span class="badge badge-gray">Sincronizado</span></td>
+    return `<tr class="border-b border-slate-100 hover:bg-slate-50 transition-colors">
+      <td class="py-3 px-4 text-slate-400 text-xs font-bold">${i+1}</td>
+      <td class="py-3 px-4 whitespace-nowrap text-slate-500 text-[10px] uppercase font-black">${dt}</td>
+      <td class="py-3 px-4">
+        <div class="font-bold text-slate-800 text-sm">${escH(name)}</div>
+        <div class="text-[10px] text-slate-400">${escH(email)}</div>
+      </td>
+      <td class="py-3 px-4"><span class="badge ${roleBadge[role]||'badge-gray'} text-[9px] uppercase">${role}</span></td>
+      <td class="py-3 px-4"><span class="badge ${badge} text-[9px] uppercase">${action}</span></td>
+      <td class="py-3 px-4"><div class="max-w-[180px] truncate text-slate-400 text-[10px] font-mono">${escH(JSON.stringify(a.payload || {}))}</div></td>
+      <td class="py-3 px-4 text-slate-400 text-[10px] font-bold">Cloud</td>
+      <td class="py-3 px-4"><span class="w-2 h-2 rounded-full bg-emerald-400 inline-block shadow-[0_0_8px_rgba(52,211,153,0.6)]"></span></td>
     </tr>`;
   }).join('');
 }
@@ -404,15 +424,15 @@ function renderFraud() {
       { icon: 'bi-person-dash',   color: '#6366f1', title: 'Sin rol asignado', desc: 'Usuarios sin rol en el sistema',       count: fraudEvents.filter(f => f.type === 'Sin rol asignado').length },
     ];
     rulesEl.innerHTML = rules.map(r => `
-      <div style="background:var(--surface2);border:1px solid var(--border);border-radius:12px;padding:16px;display:flex;align-items:center;gap:12px;">
-        <div style="width:44px;height:44px;background:${r.color}22;border-radius:12px;display:flex;align-items:center;justify-content:center;flex-shrink:0;">
-          <i class="bi ${r.icon}" style="color:${r.color};font-size:18px;"></i>
+      <div class="bg-white border-2 border-slate-50 rounded-2xl p-4 flex items-center gap-4 shadow-sm hover:shadow-md transition-all">
+        <div class="w-11 h-11 rounded-xl flex items-center justify-center shrink-0" style="background:${r.color}15">
+          <i class="bi ${r.icon}" style="color:${r.color};font-size:20px;"></i>
         </div>
-        <div style="flex:1;">
-          <div style="font-size:13px;font-weight:900;color:var(--text);">${r.title}</div>
-          <div style="font-size:11px;color:var(--muted);">${r.desc}</div>
+        <div class="flex-1">
+          <div class="text-xs font-black text-slate-800 uppercase tracking-wider">${r.title}</div>
+          <div class="text-[10px] text-slate-400 font-bold">${r.desc}</div>
         </div>
-        <div style="font-size:1.4rem;font-weight:900;color:${r.count > 0 ? r.color : 'var(--muted)'};">${r.count}</div>
+        <div class="text-xl font-black" style="color:${r.count > 0 ? r.color : '#e2e8f0'}">${r.count}</div>
       </div>`).join('');
   }
   const tbody = document.getElementById('fraudBody');
@@ -422,13 +442,13 @@ function renderFraud() {
     return;
   }
   const riskBadge = { alto: 'badge-red', medio: 'badge-yellow', bajo: 'badge-blue' };
-  tbody.innerHTML = fraudEvents.map(f => `<tr>
-    <td style="font-size:11px;color:var(--muted);">${f.date ? new Date(f.date).toLocaleString('es-DO') : '—'}</td>
-    <td style="font-weight:800;">${escH(f.user)}</td>
-    <td><span class="badge badge-orange">${f.type}</span></td>
-    <td style="color:var(--muted);">${escH(f.detail)}</td>
-    <td><span class="badge ${riskBadge[f.risk]||'badge-gray'}">${f.risk}</span></td>
-    <td><button class="btn btn-ghost" style="padding:4px 10px;font-size:10px;" onclick="alert('Investigando: ${escH(f.user)}')"><i class="bi bi-search"></i> Revisar</button></td>
+  tbody.innerHTML = fraudEvents.map(f => `<tr class="border-b border-rose-50 hover:bg-rose-50/20 transition-colors">
+    <td class="py-3 px-4 text-[10px] text-slate-400 font-mono">${f.date ? new Date(f.date).toLocaleString('es-DO') : '—'}</td>
+    <td class="py-3 px-4 font-black text-slate-700 uppercase text-xs">${escH(f.user)}</td>
+    <td class="py-3 px-4 font-bold text-orange-600 text-xs">${f.type}</td>
+    <td class="py-3 px-4 text-slate-400 text-xs italic">${escH(f.detail)}</td>
+    <td class="py-3 px-4"><span class="badge ${riskBadge[f.risk]||'badge-gray'} uppercase text-[9px] font-black">${f.risk}</span></td>
+    <td class="py-3 px-4 text-right"><button class="px-3 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-600 rounded-lg text-[10px] font-black uppercase transition-colors" onclick="alert('Investigando: ${escH(f.user)}')">Investigar</button></td>
   </tr>`).join('');
 }
 
@@ -555,12 +575,20 @@ window.resetPassword = function(userId, email) {
       </div>
       <p style="font-size:13px;color:var(--muted);margin-bottom:16px;">Usuario: <strong style="color:var(--text);">${escH(email)}</strong></p>
       <div style="margin-bottom:12px;">
-        <label style="font-size:11px;font-weight:900;color:var(--muted);text-transform:uppercase;letter-spacing:.08em;display:block;margin-bottom:6px;">Nueva contraseña</label>
-        <input class="inp" id="newPwdInput" type="password" placeholder="Mínimo 6 caracteres" autocomplete="new-password">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;">
+          <label style="font-size:11px;font-weight:900;color:var(--muted);text-transform:uppercase;letter-spacing:.08em;">Nueva contraseña</label>
+          <button class="btn btn-ghost" style="padding:2px 8px;font-size:9px;" onclick="generateRandomPassword()">
+            <i class="bi bi-magic"></i> Generar segura
+          </button>
+        </div>
+        <div style="position:relative;">
+          <input class="inp" id="newPwdInput" type="text" placeholder="Mínimo 6 caracteres" autocomplete="off">
+          <i class="bi bi-eye-fill" style="position:absolute;right:12px;top:12px;color:var(--muted);cursor:pointer;" onclick="togglePwdVisibility()"></i>
+        </div>
       </div>
       <div style="margin-bottom:16px;">
         <label style="font-size:11px;font-weight:900;color:var(--muted);text-transform:uppercase;letter-spacing:.08em;display:block;margin-bottom:6px;">Confirmar contraseña</label>
-        <input class="inp" id="newPwdConfirm" type="password" placeholder="Repite la contraseña" autocomplete="new-password">
+        <input class="inp" id="newPwdConfirm" type="text" placeholder="Repite la contraseña" autocomplete="off">
       </div>
       <div id="pwdMsg" style="font-size:12px;font-weight:700;margin-bottom:12px;"></div>
       <div style="display:flex;gap:8px;">
@@ -571,23 +599,53 @@ window.resetPassword = function(userId, email) {
   modal.style.cssText = 'display:flex;position:fixed;inset:0;background:rgba(0,0,0,.7);z-index:9999;align-items:center;justify-content:center;';
 };
 
+window.generateRandomPassword = function() {
+  const chars = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789!@#$%";
+  let pwd = "";
+  for (let i = 0; i < 10; i++) pwd += chars.charAt(Math.floor(Math.random() * chars.length));
+  document.getElementById('newPwdInput').value = pwd;
+  document.getElementById('newPwdConfirm').value = pwd;
+  const msg = document.getElementById('pwdMsg');
+  msg.style.color = '#6366f1';
+  msg.textContent = '💡 Clave generada. Cópiala y dásela al usuario.';
+};
+
+window.togglePwdVisibility = function() {
+  const input = document.getElementById('newPwdInput');
+  const confirm = document.getElementById('newPwdConfirm');
+  const type = input.type === 'password' ? 'text' : 'password';
+  input.type = confirm.type = type;
+};
+
 window.doResetPassword = async function(userId) {
   const pwd  = document.getElementById('newPwdInput')?.value || '';
   const pwd2 = document.getElementById('newPwdConfirm')?.value || '';
   const msg  = document.getElementById('pwdMsg');
   if (pwd.length < 6) { msg.style.color = '#f87171'; msg.textContent = 'La contraseña debe tener al menos 6 caracteres.'; return; }
   if (pwd !== pwd2)   { msg.style.color = '#f87171'; msg.textContent = 'Las contraseñas no coinciden.'; return; }
+
+  // Confirmación antes de ejecutar
+  if (!confirm('¿Confirmas el cambio de contraseña para este usuario?\n\nEsta acción quedará registrada en el historial de auditoría.')) return;
+
   msg.style.color = '#94a3b8'; msg.textContent = 'Guardando...';
   try {
-    // Use Supabase admin API via Edge Function to update password
     const { data, error } = await supabase.functions.invoke('admin-reset-password', {
       body: { user_id: userId, new_password: pwd }
     });
     if (error || data?.error) throw new Error(error?.message || data?.error || 'Error desconocido');
+
+    // Auditoría inmutable
+    await supabase.from('audit_logs').insert({
+      user_id: currentUser.id,
+      action: 'admin.reset_password',
+      payload: { target_id: userId, changed_by: currentUser.email }
+    });
+
     msg.style.color = '#4ade80'; msg.textContent = '✅ Contraseña actualizada correctamente.';
     setTimeout(() => { document.getElementById('userModal').style.display = 'none'; }, 1500);
   } catch (e) {
     msg.style.color = '#f87171'; msg.textContent = '❌ Error: ' + e.message;
+    logError('panel_control', e.message, e.stack || '', 'doResetPassword').catch(() => {});
   }
 };
 
@@ -752,7 +810,9 @@ async function renderErrors() {
       </tr>`).join('');
       return;
     }
-  } catch (_) {}
+  } catch (err) {
+    logError('panel_control', err?.message || String(err), err?.stack || '', 'renderErrors').catch(() => {});
+  }
   tbody.innerHTML = '<tr><td colspan="5" style="text-align:center;padding:24px;color:var(--muted);">✅ Sin errores registrados</td></tr>';
 }
 
@@ -760,6 +820,86 @@ window.clearErrors = async function() {
   if (!confirm('¿Limpiar todos los errores registrados?')) return;
   await supabase.from('system_errors').delete().lt('created_at', new Date().toISOString());
   renderErrors();
+};
+
+// ── Brute Force Monitor ───────────────────────────────────────────────────────
+window.renderBruteForce = async function() {
+  const container = document.getElementById('bruteForceList');
+  if (!container) return;
+  container.innerHTML = '<div style="text-align:center;padding:20px;color:var(--muted);">Cargando...</div>';
+  try {
+    // Intentar usar la vista v_brute_force_attempts
+    const { data, error } = await supabase
+      .from('v_brute_force_attempts')
+      .select('*')
+      .order('failed_attempts', { ascending: false })
+      .limit(50);
+
+    if (error) throw error;
+
+    if (!data?.length) {
+      container.innerHTML = '<div class="alert alert-green"><i class="bi bi-shield-check-fill"></i> Sin intentos sospechosos en las últimas 24 horas.</div>';
+      return;
+    }
+
+    container.innerHTML = data.map(r => {
+      const suspicious = r.is_suspicious;
+      const rowStyle = suspicious ? 'background:rgba(239,68,68,0.08);' : '';
+      return `<div style="${rowStyle}display:flex;align-items:center;justify-content:space-between;padding:10px 14px;border-bottom:1px solid var(--border);">
+        <div>
+          <div style="font-size:13px;font-weight:800;color:var(--text);">${escH(r.email || '—')}</div>
+          <div style="font-size:10px;color:var(--muted);">Último intento: ${r.last_attempt ? new Date(r.last_attempt).toLocaleString('es-DO') : '—'}</div>
+        </div>
+        <div style="display:flex;gap:12px;align-items:center;">
+          <span class="badge ${r.failed_attempts > 0 ? 'badge-red' : 'badge-gray'}">${r.failed_attempts} fallidos</span>
+          <span class="badge badge-green">${r.successful_logins} exitosos</span>
+          ${suspicious ? '<span class="badge badge-red" style="animation:pulse 1s infinite;">⚠️ SOSPECHOSO</span>' : ''}
+        </div>
+      </div>`;
+    }).join('');
+  } catch (err) {
+    // Fallback: query directa a login_attempts
+    try {
+      const { data: raw } = await supabase
+        .from('login_attempts')
+        .select('email, success, created_at')
+        .gte('created_at', new Date(Date.now() - 24*60*60*1000).toISOString())
+        .order('created_at', { ascending: false })
+        .limit(200);
+
+      if (!raw?.length) {
+        container.innerHTML = '<div class="alert alert-green"><i class="bi bi-shield-check-fill"></i> Sin intentos en las últimas 24 horas.</div>';
+        return;
+      }
+
+      // Agrupar por email
+      const grouped = {};
+      raw.forEach(r => {
+        if (!grouped[r.email]) grouped[r.email] = { failed: 0, success: 0, last: r.created_at };
+        if (r.success) grouped[r.email].success++;
+        else grouped[r.email].failed++;
+        if (r.created_at > grouped[r.email].last) grouped[r.email].last = r.created_at;
+      });
+
+      const sorted = Object.entries(grouped).sort((a, b) => b[1].failed - a[1].failed);
+      container.innerHTML = sorted.map(([email, stats]) => {
+        const suspicious = stats.failed >= 5;
+        return `<div style="${suspicious ? 'background:rgba(239,68,68,0.08);' : ''}display:flex;align-items:center;justify-content:space-between;padding:10px 14px;border-bottom:1px solid var(--border);">
+          <div>
+            <div style="font-size:13px;font-weight:800;color:var(--text);">${escH(email)}</div>
+            <div style="font-size:10px;color:var(--muted);">Último: ${new Date(stats.last).toLocaleString('es-DO')}</div>
+          </div>
+          <div style="display:flex;gap:8px;align-items:center;">
+            <span class="badge ${stats.failed > 0 ? 'badge-red' : 'badge-gray'}">${stats.failed} fallidos</span>
+            <span class="badge badge-green">${stats.success} exitosos</span>
+            ${suspicious ? '<span class="badge badge-red">⚠️ SOSPECHOSO</span>' : ''}
+          </div>
+        </div>`;
+      }).join('');
+    } catch (e2) {
+      container.innerHTML = '<div class="alert alert-yellow">Vista v_brute_force_attempts no disponible. Ejecuta fix_production_final.sql</div>';
+    }
+  }
 };
 
 // ── Config ────────────────────────────────────────────────────────────────────
@@ -778,11 +918,38 @@ window.changeUserRole = async function() {
   const role  = document.getElementById('roleChangeVal')?.value;
   const msg   = document.getElementById('roleChangeMsg');
   if (!email || !role) { msg.style.color = '#f87171'; msg.textContent = 'Completa todos los campos.'; return; }
-  const { error } = await supabase.from('profiles').update({ role }).eq('email', email);
-  if (error) { msg.style.color = '#f87171'; msg.textContent = 'Error: ' + error.message; return; }
-  msg.style.color = '#4ade80';
-  msg.textContent = `✅ Rol de ${email} cambiado a "${role}" correctamente.`;
-  await loadUsers();
+
+  // Confirmación antes de ejecutar
+  if (!confirm(`¿Confirmas cambiar el rol de "${email}" a "${role}"?\n\nEsta acción es sensible y quedará registrada en auditoría.`)) return;
+
+  try {
+    const { data: targetUser } = await supabase.from('profiles').select('id, role').eq('email', email).maybeSingle();
+    if (!targetUser) { msg.style.color = '#f87171'; msg.textContent = 'Usuario no encontrado.'; return; }
+
+    const { error } = await supabase.from('profiles').update({ role }).eq('email', email);
+    if (error) throw error;
+
+    // Auditoría inmutable
+    await supabase.from('audit_logs').insert({
+      user_id: currentUser.id,
+      action: 'admin.change_role',
+      payload: {
+        target_email: email,
+        target_id:    targetUser.id,
+        old_role:     targetUser.role,
+        new_role:     role,
+        changed_by:   currentUser.email
+      }
+    });
+
+    msg.style.color = '#4ade80';
+    msg.textContent = `✅ Rol de ${email} cambiado a "${role}" correctamente.`;
+    await loadUsers();
+  } catch (e) {
+    msg.style.color = '#f87171';
+    msg.textContent = 'Error: ' + e.message;
+    logError('panel_control', e.message, e.stack || '', 'changeUserRole').catch(() => {});
+  }
 };
 
 // ── Test email ────────────────────────────────────────────────────────────────
@@ -829,6 +996,80 @@ function startRealtime() {
 window.doLogout = async function() {
   await supabase.auth.signOut();
   window.location.href = 'login.html';
+};
+
+// ── Security Stats ────────────────────────────────────────────────────────────
+window.loadSecurityStats = async function() {
+  try {
+    const since24h = new Date(Date.now() - 24*60*60*1000).toISOString();
+    const sinceToday = new Date(); sinceToday.setHours(0,0,0,0);
+
+    const [activeRes, errorsRes, cronRes] = await Promise.allSettled([
+      supabase.from('login_attempts').select('*', { count: 'exact', head: true })
+        .eq('success', true).gte('created_at', sinceToday.toISOString()),
+      supabase.from('system_errors').select('*', { count: 'exact', head: true })
+        .gte('created_at', since24h),
+      supabase.from('cron.job').select('jobname, active').in('jobname', [
+        'karpus-payment-cycle','karpus-mora-reminders','karpus-mark-overdue'
+      ])
+    ]);
+
+    const set = (id, v) => { const el = document.getElementById(id); if (el) el.textContent = v; };
+    set('activeUsersToday', activeRes.status === 'fulfilled' ? (activeRes.value.count || 0) : '—');
+    set('errorsToday', errorsRes.status === 'fulfilled' ? (errorsRes.value.count || 0) : '—');
+
+    const cronEl = document.getElementById('cronStatus');
+    if (cronEl) {
+      if (cronRes.status === 'fulfilled' && cronRes.value.data?.length > 0) {
+        cronEl.textContent = '✅ Activo';
+        cronEl.className = 'badge badge-green';
+      } else {
+        cronEl.textContent = '⚠️ No configurado';
+        cronEl.className = 'badge badge-yellow';
+      }
+    }
+  } catch (_) {}
+};
+
+// ── Payment Audit ─────────────────────────────────────────────────────────────
+window.loadPaymentAudit = async function() {
+  const tbody = document.getElementById('paymentAuditBody');
+  if (!tbody) return;
+  try {
+    const { data } = await supabase
+      .from('audit_logs')
+      .select('id, action, payload, created_at, user_id, profiles:user_id(name, email)')
+      .like('action', 'payment.%')
+      .order('created_at', { ascending: false })
+      .limit(30);
+
+    if (!data?.length) {
+      tbody.innerHTML = '<tr><td colspan="4" style="text-align:center;padding:20px;color:var(--muted);">Sin registros de auditoría de pagos</td></tr>';
+      return;
+    }
+
+    const actionLabels = {
+      'payment.approved':    { label: 'Aprobado',    cls: 'badge-green' },
+      'payment.deleted':     { label: 'Eliminado',   cls: 'badge-red' },
+      'payment.mora_waived': { label: 'Mora exonerada', cls: 'badge-purple' },
+      'payment.created':     { label: 'Creado',      cls: 'badge-blue' },
+      'payment.overdue':     { label: 'Vencido',     cls: 'badge-orange' },
+    };
+
+    tbody.innerHTML = data.map(a => {
+      const al = actionLabels[a.action] || { label: a.action, cls: 'badge-gray' };
+      const adminName = a.profiles?.name || a.profiles?.email || a.user_id?.slice(0,8) || '—';
+      const detail = a.payload?.month || a.payload?.period_name || a.payload?.payment_id || '—';
+      return `<tr>
+        <td style="font-size:11px;color:var(--muted);">${a.created_at ? new Date(a.created_at).toLocaleString('es-DO') : '—'}</td>
+        <td><span class="badge ${al.cls}">${al.label}</span></td>
+        <td style="font-size:12px;font-weight:700;">${escH(adminName)}</td>
+        <td style="font-size:11px;color:var(--muted);">${escH(String(detail))}</td>
+      </tr>`;
+    }).join('');
+  } catch (err) {
+    tbody.innerHTML = '<tr><td colspan="4" style="text-align:center;padding:20px;color:var(--muted);">Error al cargar auditoría</td></tr>';
+  }
 };
 
 // ── Helpers ───────────────────────────────────────────────────────────────────

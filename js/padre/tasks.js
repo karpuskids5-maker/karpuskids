@@ -210,20 +210,37 @@ export const TasksModule = {
         return;
       }
 
-      // Obtener tareas y evidencias en paralelo
-      const [tasksRes, evidencesRes] = await Promise.all([
-        supabase.from(TABLES.TASKS).select('id, title, description, due_date, grading_system, file_url, created_at').eq('classroom_id', student.classroom_id).order('due_date', { ascending: false }),
-        supabase.from(TABLES.TASK_EVIDENCES).select('id, task_id, status, grade_letter, stars, file_url, comment, created_at').eq('student_id', student.id)
-      ]);
+      // Intentar RPC que filtra por período activo automáticamente
+      let tasks = [];
+      try {
+        const { data: rpcData, error: rpcErr } = await supabase.rpc('get_tasks_for_period', {
+          p_classroom_id: student.classroom_id,
+          p_period_id:    null // null = período activo automático
+        });
+        if (!rpcErr && rpcData?.tasks) {
+          tasks = rpcData.tasks;
+        }
+      } catch (_) { /* fallback */ }
 
-      if (tasksRes.error) throw tasksRes.error;
-      if (evidencesRes.error) throw evidencesRes.error;
+      // Fallback: query directa sin filtro de período
+      if (!tasks.length) {
+        const { data, error } = await supabase
+          .from(TABLES.TASKS)
+          .select('id, title, description, due_date, grading_system, file_url, created_at, period_id')
+          .eq('classroom_id', student.classroom_id)
+          .order('due_date', { ascending: false });
+        if (error) throw error;
+        tasks = data || [];
+      }
 
-      const tasks = tasksRes.data || [];
-      const evidences = evidencesRes.data || [];
-      const evidenceMap = new Map(evidences.map(e => [e.task_id, e]));
+      // Evidencias del estudiante
+      const { data: evidences, error: evErr } = await supabase
+        .from(TABLES.TASK_EVIDENCES)
+        .select('id, task_id, status, grade_letter, stars, file_url, comment, created_at')
+        .eq('student_id', student.id);
+      if (evErr) throw evErr;
 
-      // Filtrar
+      const evidenceMap = new Map((evidences || []).map(e => [e.task_id, e]));
       const filtered = this.filterTasks(tasks, evidenceMap, filter);
 
       if (!filtered.length) {

@@ -686,85 +686,84 @@ export const Helpers = {
 
 
   /**
+  /**
    * 💰 Cálculo de Mora (Reglas Exactas)
    * Del día 1 al 6: RD$50 por día
-   * Día 7: Se convierte en RD$500
-   * Después del día 7: +RD$50 por día
+   * Día 7: Se convierte en RD$500 (bloque completo)
+   * Después del día 7: +RD$50 por día adicional
    * Cada 7 días (bloque): +RD$500
    * Fórmula: (bloques_7 * 500) + (dias_restantes * 50)
+   *
+   * Ejemplos:
+   *   1 día  → RD$50
+   *   6 días → RD$300
+   *   7 días → RD$500  (bloque completo)
+   *   8 días → RD$550
+   *  14 días → RD$1,000
+   *  15 días → RD$1,050
+   *  30 días → RD$2,200  (4 bloques × 500 + 2 días × 50)
    */
   calculateMora(dueDate) {
-
     if (!dueDate) return 0;
 
+    // Normalizar fecha: si es YYYY-MM-DD (sin hora), agregar T00:00:00
+    // para evitar interpretación UTC que causa diferencia de 1 día
+    const dueDateStr = String(dueDate);
+    const normalizedDate = /^\d{4}-\d{2}-\d{2}$/.test(dueDateStr)
+      ? dueDateStr + 'T00:00:00'
+      : dueDateStr;
+
     const today = new Date();
+    today.setHours(0, 0, 0, 0); // comparar solo fechas, sin horas
 
-    const limit = new Date(dueDate);
+    const limit = new Date(normalizedDate);
+    limit.setHours(0, 0, 0, 0);
 
-
-    // Diferencia en milisegundos
-
-    const diff = today - limit;
-
-
-    // Convertir a días (floor para días completos de atraso)
-
+    const diff = today.getTime() - limit.getTime();
     const daysLate = Math.floor(diff / (1000 * 60 * 60 * 24));
-
 
     if (daysLate <= 0) return 0;
 
-
-    const blocks = Math.floor(daysLate / 7);
-
+    // Cálculo acumulativo: cada 7 días = bloque de RD$500
+    // días restantes dentro del bloque actual = RD$50/día
+    const blocks        = Math.floor(daysLate / 7);
     const remainingDays = daysLate % 7;
-
-
-    const totalMora = (blocks * 500) + (remainingDays * 50);
-
+    const totalMora     = (blocks * 500) + (remainingDays * 50);
 
     return totalMora;
-
   },
-
 
   /**
    * 💰 Desglose de Mora para UI
    */
   getMoraBreakdown(dueDate) {
-
     const total = Helpers.calculateMora(dueDate);
-
     if (total === 0) return null;
 
+    const dueDateStr = String(dueDate);
+    const normalizedDate = /^\d{4}-\d{2}-\d{2}$/.test(dueDateStr)
+      ? dueDateStr + 'T00:00:00'
+      : dueDateStr;
 
-    const today = new Date();
+    const today = new Date(); today.setHours(0, 0, 0, 0);
+    const limit = new Date(normalizedDate); limit.setHours(0, 0, 0, 0);
+    const daysLate = Math.floor((today.getTime() - limit.getTime()) / (1000 * 60 * 60 * 24));
 
-    const limit = new Date(dueDate);
-
-    const daysLate = Math.floor((today - limit) / (1000 * 60 * 60 * 24));
-
-
-    const weeks = Math.floor(daysLate / 7);
-
-    const days = daysLate % 7;
-
+    const weeks         = Math.floor(daysLate / 7);
+    const remainingDays = daysLate % 7;
 
     let text = '';
-
-    if (weeks > 0) text += `${weeks} sem `;
-
-    if (days > 0) text += `${days} días`;
-
+    if (weeks > 0)         text += `${weeks} sem `;
+    if (remainingDays > 0) text += `${remainingDays} día${remainingDays !== 1 ? 's' : ''}`;
+    if (!text)             text  = `${daysLate} día${daysLate !== 1 ? 's' : ''}`;
 
     return {
       total,
       daysLate,
       weeks,
-      remainingDays: days,
+      remainingDays,
       formattedText: text.trim()
     };
-
   }
 
 };

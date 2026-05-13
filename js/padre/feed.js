@@ -39,7 +39,7 @@ export const FeedModule = {
   },
 
   /**
-   * Carga publicaciones de Supabase via Edge Function get-posts
+   * Carga publicaciones — solo del período activo del aula
    */
   async loadPosts() {
     const container = document.getElementById('classFeed');
@@ -48,8 +48,19 @@ export const FeedModule = {
     container.innerHTML = Helpers.skeleton(2, 'h-48');
 
     try {
-      // Edge Function bypasea RLS — única fuente de verdad
-      // Obtener sesión actual para enviar JWT
+      // Intentar RPC de período activo primero (más eficiente y filtra por período)
+      const { data: rpcData, error: rpcErr } = await supabase.rpc('get_posts_for_period', {
+        p_classroom_id: this._classroomId || null,
+        p_period_id:    null, // null = usar período activo automáticamente
+        p_limit:        50
+      });
+
+      if (!rpcErr && rpcData?.posts !== undefined) {
+        AppState.set('feedPosts', rpcData.posts || []);
+        return;
+      }
+
+      // Fallback: Edge Function get-posts (sin filtro de período)
       const { data: { session } } = await supabase.auth.getSession();
       const token = session?.access_token;
 
@@ -64,7 +75,6 @@ export const FeedModule = {
       AppState.set('feedPosts', efData.posts || []);
 
     } catch (err) {
-      // Mostrar error real para diagnóstico
       container.innerHTML = `
         <div class="p-6 text-center">
           <p class="text-rose-500 font-bold text-sm mb-2">Error al cargar publicaciones</p>
@@ -108,12 +118,30 @@ export const FeedModule = {
     
     let mediaHTML = '';
     if (p.media_url) {
-      const isVideo = p.media_url.match(/\.(mp4|webm|ogg)$/i);
-      // Optimizar URL — sin transformación (requiere plan Pro de Supabase)
+      const isVideo = p.media_url.match(/\.(mp4|webm|ogg|mov)$/i);
       const optimizedUrl = p.media_url;
-      mediaHTML = isVideo
-        ? ImageLoader.video(p.media_url, '', { cls: 'w-full rounded-2xl mb-4 max-h-80 object-cover' })
-        : `<div class="cursor-zoom-in rounded-2xl overflow-hidden mb-4 bg-black" onclick="window.openLightbox && window.openLightbox('${optimizedUrl}','image')">${ImageLoader.img(optimizedUrl, { cls: 'w-full max-h-[500px] object-cover', fallback: 'img/mundo.jpg' })}</div>`;
+      if (isVideo) {
+        mediaHTML = `
+          <div class="relative group/media rounded-2xl overflow-hidden mb-4 bg-black">
+            ${ImageLoader.video(p.media_url, '', { cls: 'w-full max-h-80 object-cover' })}
+            <a href="${optimizedUrl}" download target="_blank" rel="noopener noreferrer"
+               class="absolute top-2 right-2 p-2 bg-black/60 hover:bg-black/80 text-white rounded-xl opacity-0 group-hover/media:opacity-100 transition-opacity flex items-center gap-1.5 text-[10px] font-black uppercase backdrop-blur-sm"
+               onclick="event.stopPropagation()">
+              <i data-lucide="download" class="w-3.5 h-3.5"></i> Descargar
+            </a>
+          </div>`;
+      } else {
+        mediaHTML = `
+          <div class="relative group/media cursor-zoom-in rounded-2xl overflow-hidden mb-4 bg-black"
+               onclick="window.openLightbox && window.openLightbox('${optimizedUrl}','image')">
+            ${ImageLoader.img(optimizedUrl, { cls: 'w-full max-h-[500px] object-cover', fallback: 'img/mundo.jpg' })}
+            <a href="${optimizedUrl}" download target="_blank" rel="noopener noreferrer"
+               class="absolute top-2 right-2 p-2 bg-black/60 hover:bg-black/80 text-white rounded-xl opacity-0 group-hover/media:opacity-100 transition-opacity flex items-center gap-1.5 text-[10px] font-black uppercase backdrop-blur-sm"
+               onclick="event.stopPropagation()">
+              <i data-lucide="download" class="w-3.5 h-3.5"></i> Descargar
+            </a>
+          </div>`;
+      }
     }
 
     return `
@@ -144,6 +172,12 @@ export const FeedModule = {
             <i data-lucide="message-circle" class="w-4 h-4"></i>
             ${comments.length} Comentarios
           </button>
+          ${p.media_url ? `
+          <a href="${p.media_url}" download target="_blank" rel="noopener noreferrer"
+             class="ml-auto flex items-center gap-1.5 text-xs font-black uppercase tracking-tighter text-slate-400 hover:text-emerald-600 transition-all">
+            <i data-lucide="download" class="w-4 h-4"></i>
+            Descargar
+          </a>` : ''}
         </div>
 
         <div id="comments-section-${p.id}" class="hidden mt-4 pt-4 border-t border-slate-50 bg-slate-50/50 -mx-5 px-5 pb-2">

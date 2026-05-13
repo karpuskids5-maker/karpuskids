@@ -493,6 +493,47 @@ const COLORS = {
   error: { bg: '#dc2626', shadow: 'rgba(220,38,38,0.35)',  icon: '❌', msgColor: '#dc2626' },
 };
 
+// ── Sonidos de feedback (Web Audio API — sin archivos externos) ───────────────
+const _audioCtx = (() => {
+  try { return new (window.AudioContext || window.webkitAudioContext)(); } catch (_) { return null; }
+})();
+
+function _playTone(freq, duration, type = 'sine', gain = 0.3) {
+  if (!_audioCtx) return;
+  try {
+    const osc = _audioCtx.createOscillator();
+    const vol = _audioCtx.createGain();
+    osc.connect(vol); vol.connect(_audioCtx.destination);
+    osc.type = type; osc.frequency.value = freq;
+    vol.gain.setValueAtTime(gain, _audioCtx.currentTime);
+    vol.gain.exponentialRampToValueAtTime(0.001, _audioCtx.currentTime + duration);
+    osc.start(_audioCtx.currentTime);
+    osc.stop(_audioCtx.currentTime + duration);
+  } catch (_) {}
+}
+
+function _playSuccess() {
+  // Dos tonos ascendentes — "bip bip" positivo
+  _playTone(880, 0.12, 'sine', 0.25);
+  setTimeout(() => _playTone(1100, 0.18, 'sine', 0.25), 130);
+}
+
+function _playExit() {
+  // Tono descendente — salida
+  _playTone(660, 0.12, 'sine', 0.2);
+  setTimeout(() => _playTone(440, 0.18, 'sine', 0.2), 130);
+}
+
+function _playError() {
+  // Tono grave — error
+  _playTone(220, 0.35, 'sawtooth', 0.15);
+}
+
+function _playWarn() {
+  // Tono medio — advertencia
+  _playTone(440, 0.25, 'triangle', 0.2);
+}
+
 function showResult(type, name, role, msg, time, timeOverride) {
   const cfg = COLORS[type] || COLORS.error;
   const timeStr = timeOverride || time.toLocaleTimeString('es-DO', { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: true });
@@ -507,6 +548,14 @@ function showResult(type, name, role, msg, time, timeOverride) {
   overlay.classList.add('show');
   clearTimeout(hideTimer);
   hideTimer = setTimeout(() => overlay.classList.remove('show'), type === 'error' ? 4000 : 3000);
+
+  // Reproducir sonido según el tipo
+  // Desbloquear AudioContext en primer gesto del usuario si está suspendido
+  if (_audioCtx?.state === 'suspended') _audioCtx.resume().catch(() => {});
+  if      (type === 'in')    _playSuccess();
+  else if (type === 'out')   _playExit();
+  else if (type === 'warn')  _playWarn();
+  else if (type === 'error') _playError();
 }
 </script>
 </body>

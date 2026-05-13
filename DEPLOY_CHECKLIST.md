@@ -22,8 +22,9 @@ Ir a **Supabase Dashboard → SQL Editor** y ejecutar en este orden:
 1. fix_attendance_system.sql   → Sistema de ponche digital
 2. fix_posts_rls.sql           → Muro visible para padres
 3. fix_mora_system.sql         → Sistema de mora y exoneración
-4. fix_security_audit.sql      → Auditoría inmutable de pagos
-5. fix_production_security.sql → Seguridad adicional (si existe)
+4. fix_security_audit.sql      → Auditoría inmutable + calc_mora en DB
+5. fix_period_close.sql        → Cierre de período con promedios
+6. fix_academic_lifecycle.sql  → Ciclo de vida académico (period_id en tasks/posts)
 ```
 
 ### 3. Desplegar Edge Functions
@@ -33,6 +34,8 @@ supabase functions deploy send-email
 supabase functions deploy send-push
 supabase functions deploy process-event
 supabase functions deploy payment-reminders
+supabase functions deploy resize-image
+supabase functions deploy admin-reset-password
 ```
 
 ### 4. Configurar Secrets en Supabase
@@ -147,9 +150,17 @@ en el CDN/proxy delante del sitio (Cloudflare recomendado).
 
 | Área | Estado |
 |------|--------|
-| Seguridad frontend | ✅ Listo |
-| Librerías locales | ✅ Listo |
 | Tailwind CSS compilado | ✅ Listo (84KB, sin CDN) |
-| Auditoría de pagos | ⚠️ SQL pendiente de ejecutar |
+| Lucide local | ✅ Listo (sin CDN) |
+| Chart.js, jsPDF locales | ✅ Listo |
+| Bootstrap Icons local | ✅ Listo (panel_control) |
+| Supabase JS local | ✅ Listo |
+| Seguridad frontend (CSP, headers) | ✅ Listo |
+| Rate limiting (chat, uploads, pagos) | ✅ Listo |
+| Auditoría inmutable de pagos | ⚠️ Ejecutar `fix_security_audit.sql` |
+| Sistema de mora (cálculo correcto) | ✅ Corregido (normalización UTC) |
+| Recuperación de contraseña | ✅ Listo (`recuperar.html`) |
+| Ciclo de vida académico | ⚠️ Ejecutar `fix_academic_lifecycle.sql` |
+| Cierre de período con promedios | ⚠️ Ejecutar `fix_period_close.sql` |
 | Edge Functions | ⚠️ Pendiente de deploy |
 | Pruebas funcionales | ⏳ Pendiente |

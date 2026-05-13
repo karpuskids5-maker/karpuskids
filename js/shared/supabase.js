@@ -35,15 +35,25 @@ let _refreshing = false;
 const _originalFetch = window.fetch;
 window.fetch = async function(...args) {
   const res = await _originalFetch.apply(this, args);
+  
   if (res.status === 401 && !_refreshing) {
-    const url = typeof args[0] === 'string' ? args[0] : args[0]?.url || '';
-    if (url.includes('supabase.co') && !url.includes('/auth/')) {
+    const url = typeof args[0] === 'string' ? args[0] : (args[0]?.url || '');
+    // Solo interceptar requests a Supabase REST/Storage, no a auth endpoints
+    if (url.includes('supabase.co') && !url.includes('/auth/') && !url.includes('/token')) {
       _refreshing = true;
       try {
-        const { error } = await supabase.auth.refreshSession();
-        if (error && !window.location.pathname.includes('login.html')) {
-          window.location.href = 'login.html';
+        const { data: refreshed, error } = await supabase.auth.refreshSession();
+        if (error || !refreshed?.session) {
+          // Refresh falló — redirigir al login
+          if (!window.location.pathname.includes('login.html')) {
+            window.location.href = 'login.html';
+          }
+          return res; // retornar la respuesta 401 original
         }
+        // Refresh exitoso — reintentar la request original con el nuevo token
+        return _originalFetch.apply(this, args);
+      } catch (_) {
+        return res;
       } finally {
         _refreshing = false;
       }
@@ -82,9 +92,15 @@ window.addEventListener('error', (e) => {
 });
 window.addEventListener('unhandledrejection', (e) => {
   const msg = e.reason?.message || String(e.reason);
-  // Skip: network errors, OneSignal, 409 conflicts, IDB errors — these would loop
-  const skip = ['indexeddb','network','fetch','onesignal','409','conflict',
-                 'failed to load','supabase','connection','lucide'].some(k => msg.toLowerCase().includes(k));
+  // Skip: network errors, OneSignal, 409 conflicts, IDB errors, lucide — these would loop or are non-actionable
+  const SKIP_PATTERNS = [
+    'indexeddb','network','fetch','onesignal','409','conflict',
+    'failed to load','supabase','connection','lucide',
+    'load failed','aborted','cancelled','net::err',
+    'the operation was aborted','signal is aborted',
+    'resizeobserver loop','script error'
+  ];
+  const skip = SKIP_PATTERNS.some(k => msg.toLowerCase().includes(k));
   if (skip) return;
   import('./db-utils.js').then(({ logError }) => {
     const panel = window.location.pathname.split('/').pop().replace('.html','') || 'unknown';
@@ -94,42 +110,86 @@ window.addEventListener('unhandledrejection', (e) => {
 
 export const TERMS_VERSION = '1.0';
 
+// ── Session Guard — verificar sesión en cada cambio de sección ───────────────
+// Llama esto desde los módulos de navegación para proteger rutas del cliente
+export async function guardSession() {
+  try {
+    const { data: { session } } = await supabase.auth.getSession();
+    if (!session?.user) {
+      window.location.href = 'login.html';
+      return false;
+    }
+    // Verificar expiración del token
+    const expiresAt = session.expires_at || 0;
+    const nowSecs   = Math.floor(Date.now() / 1000);
+    if (expiresAt - nowSecs < 30) {
+      const { error } = await supabase.auth.refreshSession();
+      if (error) { window.location.href = 'login.html'; return false; }
+    }
+    return true;
+  } catch (_) {
+    window.location.href = 'login.html';
+    return false;
+  }
+}
+
 // ── Autenticación ─────────────────────────────────────────────────────────────
 export async function ensureRole(requiredRoles) {
   const roles = Array.isArray(requiredRoles) ? requiredRoles : [requiredRoles];
   
-  // Usar getSession() con timeout de 5s para evitar bloqueo infinito
-  let session, sessionError;
+  // Paso 1: Verificar sesión local (rápido, sin red)
+  let session;
   try {
     const result = await Promise.race([
       supabase.auth.getSession(),
       new Promise((_, reject) => setTimeout(() => reject(new Error('session_timeout')), 5000))
     ]);
     session = result.data?.session;
-    sessionError = result.error;
-  } catch (e) {
-    // Timeout o error de red — redirigir al login
+    if (result.error || !session?.user) {
+      window.location.href = 'login.html';
+      return null;
+    }
+  } catch (_) {
     window.location.href = 'login.html';
     return null;
   }
 
-  if (sessionError || !session?.user) { 
-    window.location.href = 'login.html'; 
-    return null; 
-  }
-
-  // Si el token está próximo a expirar o ya expiró, refrescarlo
+  // Paso 2: Si el token está próximo a expirar (< 5 min), refrescarlo
   const expiresAt = session.expires_at || 0;
   const nowSecs   = Math.floor(Date.now() / 1000);
-  if (expiresAt - nowSecs < 60) {
-    const { data: refreshed, error: refreshErr } = await supabase.auth.refreshSession();
-    if (refreshErr || !refreshed?.session) {
+  if (expiresAt - nowSecs < 300) {
+    try {
+      const { data: refreshed, error: refreshErr } = await supabase.auth.refreshSession();
+      if (refreshErr || !refreshed?.session) {
+        window.location.href = 'login.html';
+        return null;
+      }
+      // Usar el token refrescado
+      session = refreshed.session;
+    } catch (_) {
       window.location.href = 'login.html';
       return null;
     }
   }
 
-  const user = session.user;
+  // Paso 3: Validar token contra el servidor (detecta tokens revocados)
+  // Solo si el token parece válido localmente pero queremos confirmar
+  let user = session.user;
+  try {
+    const { data: { user: serverUser }, error: userErr } = await Promise.race([
+      supabase.auth.getUser(),
+      new Promise((_, reject) => setTimeout(() => reject(new Error('getUser_timeout')), 4000))
+    ]);
+    if (userErr || !serverUser) {
+      // Token inválido en el servidor — limpiar sesión y redirigir
+      await supabase.auth.signOut();
+      window.location.href = 'login.html';
+      return null;
+    }
+    user = serverUser;
+  } catch (_) {
+    // Timeout de red — continuar con sesión local (mejor UX que redirigir)
+  }
 
   // Obtener perfil y aceptación de términos en paralelo — con timeout de 8s
   const TIMEOUT = 8000;

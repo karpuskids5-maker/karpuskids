@@ -61,10 +61,18 @@ export async function auditLog(action, payload = {}) {
   try {
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) return;
+
+    // Enmascarar datos sensibles antes de guardar en auditoría
+    const safePayload = { ...payload };
+    if (safePayload.email)        safePayload.email        = maskSensitive(safePayload.email, 'email');
+    if (safePayload.target_email) safePayload.target_email = maskSensitive(safePayload.target_email, 'email');
+    if (safePayload.phone)        safePayload.phone        = maskSensitive(safePayload.phone, 'phone');
+    if (safePayload.parent_email) safePayload.parent_email = maskSensitive(safePayload.parent_email, 'email');
+
     await supabase.from('audit_logs').insert({
       user_id:    user.id,
       action,
-      payload,
+      payload:    safePayload,
       created_at: new Date().toISOString()
     });
   } catch (_) { /* silencioso — no bloquear la acción principal */ }
@@ -243,4 +251,104 @@ export async function countRows(table, filters = {}) {
   const { count, error } = await query;
   if (error) throw error;
   return count || 0;
+}
+
+/**
+ * 📊 ensureChart — Lazy loading de Chart.js
+ * Solo inicializa el gráfico cuando el canvas es visible en el viewport.
+ * Evita inicializar Chart.js en secciones que el usuario nunca visita.
+ *
+ * @param {string}   canvasId  — ID del elemento canvas
+ * @param {Function} initFn    — función que crea el Chart (recibe el canvas)
+ * @returns {Promise<void>}
+ */
+export function ensureChart(canvasId, initFn) {
+  const canvas = document.getElementById(canvasId);
+  if (!canvas) return;
+
+  // Si ya está inicializado, no hacer nada
+  if (canvas._chartInitialized) return;
+
+  // Si Chart.js no está disponible, esperar
+  if (!window.Chart) {
+    const wait = setInterval(() => {
+      if (window.Chart) { clearInterval(wait); _initWhenVisible(canvas, initFn); }
+    }, 200);
+    return;
+  }
+
+  _initWhenVisible(canvas, initFn);
+}
+
+function _initWhenVisible(canvas, initFn) {
+  if (!('IntersectionObserver' in window)) {
+    // Fallback: inicializar directamente
+    canvas._chartInitialized = true;
+    initFn(canvas);
+    return;
+  }
+
+  const observer = new IntersectionObserver((entries) => {
+    entries.forEach(entry => {
+      if (entry.isIntersecting && !canvas._chartInitialized) {
+        canvas._chartInitialized = true;
+        observer.disconnect();
+        initFn(canvas);
+      }
+    });
+  }, { threshold: 0.1 });
+
+  observer.observe(canvas);
+}
+
+/**
+ * 🔒 maskSensitive — Enmascara datos sensibles para logs de auditoría
+ * Nunca guardar emails, teléfonos o nombres completos en logs.
+ *
+ * @param {string} value — valor a enmascarar
+ * @param {string} type  — 'email' | 'phone' | 'name'
+ * @returns {string}
+ */
+export function maskSensitive(value, type = 'email') {
+  if (!value) return '***';
+  const s = String(value);
+  if (type === 'email') {
+    const [local, domain] = s.split('@');
+    if (!domain) return s.slice(0, 2) + '***';
+    return local.slice(0, 2) + '***@' + domain;
+  }
+  if (type === 'phone') {
+    return s.slice(0, 3) + '****' + s.slice(-2);
+  }
+  if (type === 'name') {
+    const parts = s.split(' ');
+    return parts[0] + (parts.length > 1 ? ' ' + parts[1].charAt(0) + '.' : '');
+  }
+  return s.slice(0, 2) + '***';
+}
+
+/**
+ * 🌐 friendlyAuditMessage — Convierte un action de auditoría en texto legible
+ * Para que la directora no tenga que interpretar JSON.
+ *
+ * @param {string} action  — 'payment.approved', 'grade.updated', etc.
+ * @param {object} payload — datos del evento
+ * @returns {string}
+ */
+export function friendlyAuditMessage(action, payload = {}) {
+  const map = {
+    'payment.approved':    `Pago aprobado — ${payload.month || ''}`,
+    'payment.deleted':     `Pago eliminado`,
+    'payment.mora_waived': `Mora exonerada`,
+    'period.closed':       `Período cerrado: ${payload.period_name || ''}`,
+    'period.activated':    `Período activado: ${payload.new_period_name || ''}`,
+    'admin.reset_password':'Contraseña cambiada por admin',
+    'admin.change_role':   `Rol cambiado a "${payload.new_role || ''}"`,
+    'grade.updated':       `Calificación actualizada`,
+    'student.created':     `Nuevo estudiante registrado`,
+    'teacher.created':     `Nuevo maestro registrado`,
+    'payment.created':     `Cobro generado — ${payload.month || ''}`,
+    'payment.overdue':     `Pago marcado como vencido`,
+  };
+  return map[action] || action.replace(/\./g, ' → ');
 }

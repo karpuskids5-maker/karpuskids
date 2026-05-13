@@ -98,12 +98,24 @@ export const MaestraApi = {
   },
 
   /**
-   * Tareas
+   * Tareas — filtradas por período activo del aula
    */
-  async getTasksByClassroom(classroomId) {
+  async getTasksByClassroom(classroomId, periodId = null) {
+    try {
+      // Usar RPC que filtra por período activo automáticamente
+      const { data, error } = await supabase.rpc('get_tasks_for_period', {
+        p_classroom_id: classroomId,
+        p_period_id:    periodId
+      });
+      if (!error && data?.tasks) {
+        return data.tasks;
+      }
+    } catch (_) { /* fallback si RPC no existe aún */ }
+
+    // Fallback: query directa sin filtro de período
     const { data, error } = await supabase
       .from('tasks')
-      .select('id, title, description, due_date, grading_system, file_url, created_at')
+      .select('id, title, description, due_date, grading_system, file_url, created_at, period_id')
       .eq('classroom_id', classroomId)
       .order('created_at', { ascending: false })
       .limit(50);
@@ -176,15 +188,26 @@ export const MaestraApi = {
   },
 
   /**
-   * Crear tarea
+   * Crear tarea — vinculada al período activo del aula
    */
   async createTask(payload) {
     const cleanPayload = {
       ...payload,
       grading_system: 'letter_stars'
     };
-
     delete cleanPayload.points;
+
+    // Vincular al período activo si no se especificó
+    if (!cleanPayload.period_id && cleanPayload.classroom_id) {
+      try {
+        const { data: periodData } = await supabase.rpc('get_active_period', {
+          p_classroom_id: cleanPayload.classroom_id
+        });
+        if (periodData?.found && periodData?.id) {
+          cleanPayload.period_id = periodData.id;
+        }
+      } catch (_) { /* silencioso */ }
+    }
 
     const { data, error } = await supabase
       .from('tasks')

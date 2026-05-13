@@ -428,6 +428,11 @@ export const PaymentsModule = {
   async submitPaymentProof(e) {
     const student = AppState.get('currentStudent');
     if (!student) return;
+
+    // Rate limit: máx 3 comprobantes por hora
+    const { checkRateLimit, paymentProofLimiter } = await import('../shared/rate-limiter.js');
+    if (!checkRateLimit(paymentProofLimiter, 'enviar comprobantes')) return;
+
     const fileInput = document.getElementById('paymentFileInput');
     const file   = fileInput?.files[0];
     const amount = parseFloat(document.getElementById('paymentAmount')?.value || '0');
