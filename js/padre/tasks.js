@@ -215,10 +215,13 @@ export const TasksModule = {
       try {
         const { data: rpcData, error: rpcErr } = await supabase.rpc('get_tasks_for_period', {
           p_classroom_id: student.classroom_id,
-          p_period_id:    null // null = período activo automático
+          p_period_id:    null
         });
+        // Solo usar si el RPC existe (no 404/PGRST202)
         if (!rpcErr && rpcData?.tasks) {
           tasks = rpcData.tasks;
+        } else if (rpcErr?.code === 'PGRST202' || rpcErr?.message?.includes('function') || rpcErr?.message?.includes('404')) {
+          // RPC no desplegado aún — usar fallback silenciosamente
         }
       } catch (_) { /* fallback */ }
 

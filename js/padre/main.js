@@ -402,6 +402,14 @@ export function navigateTo(targetId) {
   if (target) {
     target.classList.remove('hidden');
     target.classList.add('active');
+      
+      // Cambiar color de la barra de estado/tema según sección
+      const themeColors = {
+        home: '#0ea5e9', tasks: '#F59E0B', class: '#3B82F6', 
+        payments: '#059669', 'live-attendance': '#10B981'
+      };
+      document.querySelector('meta[name="theme-color"]')?.setAttribute('content', themeColors[targetId] || '#0ea5e9');
+
     AppState.set('currentSection', targetId);
 
     // 🔴 Marcar badges como leídos al entrar a la sección
@@ -450,6 +458,16 @@ export function navigateTo(targetId) {
     const isActive = btn.dataset.target === targetId;
     btn.classList.toggle('active', isActive);
   });
+  
+  // Cerrar sidebar en móvil al navegar
+  if (window.innerWidth < 768) {
+    const sidebar = document.getElementById('sidebar');
+    const overlay = document.getElementById('sidebarOverlay');
+    if (sidebar?.classList.contains('mobile-visible')) {
+      sidebar.classList.remove('mobile-visible');
+      overlay?.classList.add('hidden');
+    }
+  }
 }
 
 function setupNavigation() {
@@ -459,11 +477,33 @@ function setupNavigation() {
 }
 
 function setupGlobalListeners() {
-  // Solo actualizar header cuando cambia el estudiante — NO navegar a home (ya se hizo en init)
+  // Solo actualizar header cuando cambia el estudiante
   AppState.subscribe('currentStudent', (student) => {
     if (student) {
       updateHeaderProfile(AppState.get('profile'), student);
       if (student.classroom_id) initLiveClassListener(student.classroom_id);
+    }
+  });
+
+  // Actualizar tarjeta de asistencia en tiempo real cuando el BadgeSystem detecta un ponche
+  window.addEventListener('karpus:attendance-update', (e) => {
+    const student = AppState.get('currentStudent');
+    if (!student) return;
+    const payload = e.detail;
+    // Solo actualizar si es el estudiante actual
+    if (String(payload?.student_id) !== String(student.id)) return;
+    const status = payload?.status || 'present';
+    AppState.set('todayAttendance', status);
+    // Re-renderizar solo la tarjeta de asistencia sin recargar todo
+    const attCard = document.querySelector('[data-target="live-attendance"]');
+    if (attCard) {
+      const attLabels = { present: 'Presente', presente: 'Presente', absent: 'Ausente', late: 'Tarde' };
+      const label = attLabels[status?.toLowerCase()] || 'Registrado';
+      const valEl = attCard.querySelector('h4');
+      const subEl = attCard.querySelector('p:last-child');
+      if (valEl) valEl.textContent = label;
+      if (subEl) subEl.textContent = 'Actualizado ahora';
+      attCard.className = attCard.className.replace(/border-\w+-\d+/g, 'border-emerald-300');
     }
   });
 }

@@ -1,6 +1,12 @@
 import { supabase, ensureRole } from '../shared/supabase.js';
 import { logError, auditLog } from '../shared/db-utils.js';
 
+// Función global para cerrar sesión desde onclick inline
+window._signOutAndRedirect = async () => {
+  try { await supabase.auth.signOut(); } catch (_) {}
+  window.location.href = 'login.html';
+};
+
 // ── State ─────────────────────────────────────────────────────────────────────
 let allUsers    = [];
 let allAudit    = [];
@@ -14,16 +20,105 @@ let currentUser = null;
 
 // ── Init ──────────────────────────────────────────────────────────────────────
 document.addEventListener('DOMContentLoaded', async () => {
-  try {
-    // Usar ensureRole para verificar sesión, token y rol en un solo paso
-    const auth = await ensureRole('admin');
-    if (!auth) return; // ensureRole ya redirige al login si falla
+  // Timeout de seguridad: si en 15s no carga, mostrar error en vez de quedarse colgado
+  const loaderTimeout = setTimeout(() => {
+    const loader = document.getElementById('loader');
+    if (loader) {
+      loader.innerHTML = `
+        <div style="text-align:center;padding:32px;">
+          <div style="font-size:32px;margin-bottom:12px;">⚠️</div>
+          <p style="color:#f87171;font-weight:800;font-size:14px;margin-bottom:8px;">Error de conexión</p>
+          <p style="color:#94a3b8;font-size:12px;margin-bottom:20px;">No se pudo verificar el acceso. Verifica tu conexión.</p>
+          <button onclick="window.location.href='login.html'" style="background:#6366f1;color:white;border:none;padding:10px 24px;border-radius:10px;font-weight:800;cursor:pointer;font-size:13px;">Volver al Login</button>
+          <button onclick="window.location.reload()" style="background:rgba(255,255,255,.1);color:#94a3b8;border:1px solid rgba(255,255,255,.1);padding:10px 24px;border-radius:10px;font-weight:800;cursor:pointer;font-size:13px;margin-left:8px;">Reintentar</button>
+        </div>`;
+    }
+  }, 15000);
 
-    currentUser = auth.profile;
-    document.getElementById('adminName').textContent = auth.profile.name || auth.user.email;
-    document.getElementById('adminAvatar').textContent = (auth.profile.name || auth.user.email)[0].toUpperCase();
-    document.getElementById('cfgEmail').value = auth.user.email || '';
-    document.getElementById('cfgName').value  = auth.profile.name || '';
+  try {
+    // Paso 1: Verificar sesión local (rápido)
+    const { data: { session } } = await supabase.auth.getSession();
+
+    // Paso 2: Si no hay sesión local, ir al login
+    if (!session?.user) {
+      clearTimeout(loaderTimeout);
+      window.location.href = 'login.html';
+      return;
+    }
+
+    // Paso 3: Validar token contra el servidor con timeout corto
+    // Esto detecta tokens expirados o revocados
+    let userId = session.user.id;
+    let userEmail = session.user.email;
+    try {
+      const { data: { user: serverUser }, error: userErr } = await Promise.race([
+        supabase.auth.getUser(),
+        new Promise((_, reject) => setTimeout(() => reject(new Error('getUser_timeout')), 5000))
+      ]);
+      if (!userErr && serverUser) {
+        userId = serverUser.id;
+        userEmail = serverUser.email;
+      } else if (userErr && !userErr.message?.includes('timeout')) {
+        // Token inválido — refrescar
+        const { data: refreshed, error: refreshErr } = await supabase.auth.refreshSession();
+        if (refreshErr || !refreshed?.session) {
+          clearTimeout(loaderTimeout);
+          window.location.href = 'login.html';
+          return;
+        }
+        userId = refreshed.session.user.id;
+        userEmail = refreshed.session.user.email;
+      }
+    } catch (_) {
+      // Timeout de getUser — continuar con sesión local
+    }
+
+    // Paso 4: Obtener perfil con timeout
+    const { data: profile, error: profileErr } = await Promise.race([
+      supabase.from('profiles').select('id, name, email, role').eq('id', userId).maybeSingle(),
+      new Promise((_, reject) => setTimeout(() => reject(new Error('timeout')), 8000))
+    ]);
+
+    if (profileErr || !profile) {
+      clearTimeout(loaderTimeout);
+      // Mostrar error específico en vez de redirigir silenciosamente
+      const loader = document.getElementById('loader');
+      if (loader) {
+        loader.innerHTML = `
+          <div style="text-align:center;padding:32px;">
+            <div style="font-size:32px;margin-bottom:12px;">🔒</div>
+            <p style="color:#f87171;font-weight:800;font-size:14px;margin-bottom:8px;">Sin perfil configurado</p>
+            <p style="color:#94a3b8;font-size:12px;margin-bottom:20px;">Tu cuenta no tiene un perfil en el sistema.<br>Contacta al administrador.</p>
+            <button onclick="window._signOutAndRedirect()" style="background:#6366f1;color:white;border:none;padding:10px 24px;border-radius:10px;font-weight:800;cursor:pointer;font-size:13px;">Cerrar Sesión</button>
+          </div>`;
+      }
+      return;
+    }
+
+    // Verificar rol — admin puede acceder, directora también (para supervisión)
+    const allowedRoles = ['admin', 'directora'];
+    if (!allowedRoles.includes(profile.role)) {
+      clearTimeout(loaderTimeout);
+      const loader = document.getElementById('loader');
+      if (loader) {
+        loader.innerHTML = `
+          <div style="text-align:center;padding:32px;">
+            <div style="font-size:32px;margin-bottom:12px;">🚫</div>
+            <p style="color:#f87171;font-weight:800;font-size:14px;margin-bottom:8px;">Acceso denegado</p>
+            <p style="color:#94a3b8;font-size:12px;margin-bottom:4px;">Tu rol: <strong style="color:#f1f5f9;">${profile.role}</strong></p>
+            <p style="color:#94a3b8;font-size:12px;margin-bottom:20px;">Solo administradores pueden acceder a este panel.</p>
+            <button onclick="window.location.href='login.html'" style="background:#6366f1;color:white;border:none;padding:10px 24px;border-radius:10px;font-weight:800;cursor:pointer;font-size:13px;">Volver al Login</button>
+          </div>`;
+      }
+      return;
+    }
+
+    clearTimeout(loaderTimeout);
+    currentUser = profile;
+    document.getElementById('adminName').textContent = profile.name || userEmail;
+    document.getElementById('adminAvatar').textContent = (profile.name || userEmail)[0].toUpperCase();
+    document.getElementById('cfgEmail').value = userEmail || '';
+    document.getElementById('cfgName').value  = profile.name || '';
 
     const loader = document.getElementById('loader');
     if (loader) loader.classList.add('hidden');
@@ -40,8 +135,20 @@ document.addEventListener('DOMContentLoaded', async () => {
     await refreshAll();
     startRealtime();
   } catch (err) {
+    clearTimeout(loaderTimeout);
+    const loader = document.getElementById('loader');
+    if (loader) {
+      const msg = err?.message === 'timeout' ? 'Tiempo de espera agotado. Verifica tu conexión.' : (err?.message || 'Error desconocido');
+      loader.innerHTML = `
+        <div style="text-align:center;padding:32px;">
+          <div style="font-size:32px;margin-bottom:12px;">⚠️</div>
+          <p style="color:#f87171;font-weight:800;font-size:14px;margin-bottom:8px;">Error al cargar</p>
+          <p style="color:#94a3b8;font-size:12px;margin-bottom:20px;">${msg}</p>
+          <button onclick="window.location.href='login.html'" style="background:#6366f1;color:white;border:none;padding:10px 24px;border-radius:10px;font-weight:800;cursor:pointer;font-size:13px;">Volver al Login</button>
+          <button onclick="window.location.reload()" style="background:rgba(255,255,255,.1);color:#94a3b8;border:1px solid rgba(255,255,255,.1);padding:10px 24px;border-radius:10px;font-weight:800;cursor:pointer;font-size:13px;margin-left:8px;">Reintentar</button>
+        </div>`;
+    }
     logError('panel_control', err.message || String(err), err.stack || '', 'DOMContentLoaded').catch(() => {});
-    window.location.href = 'login.html';
   }
 });
 

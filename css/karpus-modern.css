@@ -584,3 +584,67 @@ a > svg[data-lucide] {
     padding-right: 0;
   }
 }
+
+/* ── Badge animations ────────────────────────────────────── */
+@keyframes kk-scale-bounce {
+  0%   { transform: scale(1); }
+  30%  { transform: scale(1.5); }
+  60%  { transform: scale(0.9); }
+  100% { transform: scale(1); }
+}
+.scale-bounce {
+  animation: kk-scale-bounce 0.6s cubic-bezier(0.34,1.56,0.64,1) both;
+}
+
+/* Nav item pulse cuando llega contenido nuevo */
+@keyframes kk-nav-pulse {
+  0%   { background: transparent; }
+  30%  { background: rgba(255,255,255,0.25); }
+  100% { background: transparent; }
+}
+.nav-pulse {
+  animation: kk-nav-pulse 1s ease both;
+}
+
+/* Dot badge en tarjetas del dashboard */
+.card-dot-badge {
+  position: absolute;
+  top: -4px;
+  right: -4px;
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  border: 2px solid white;
+  animation: kk-pulse-ring 2s infinite;
+}
+
+/* ── Card glow — brillo en tarjetas cuando llega contenido nuevo ── */
+@keyframes kk-card-glow-orange {
+  0%   { box-shadow: 0 0 0 0 rgba(249,115,22,0); border-color: transparent; }
+  25%  { box-shadow: 0 0 0 6px rgba(249,115,22,0.35), 0 0 20px rgba(249,115,22,0.2); border-color: #f97316; }
+  75%  { box-shadow: 0 0 0 3px rgba(249,115,22,0.15); border-color: #fdba74; }
+  100% { box-shadow: 0 0 0 0 rgba(249,115,22,0); border-color: transparent; }
+}
+@keyframes kk-card-glow-blue {
+  0%   { box-shadow: 0 0 0 0 rgba(59,130,246,0); border-color: transparent; }
+  25%  { box-shadow: 0 0 0 6px rgba(59,130,246,0.35), 0 0 20px rgba(59,130,246,0.2); border-color: #3b82f6; }
+  75%  { box-shadow: 0 0 0 3px rgba(59,130,246,0.15); border-color: #93c5fd; }
+  100% { box-shadow: 0 0 0 0 rgba(59,130,246,0); border-color: transparent; }
+}
+@keyframes kk-card-glow-green {
+  0%   { box-shadow: 0 0 0 0 rgba(34,197,94,0); border-color: transparent; }
+  25%  { box-shadow: 0 0 0 6px rgba(34,197,94,0.35), 0 0 20px rgba(34,197,94,0.2); border-color: #22c55e; }
+  75%  { box-shadow: 0 0 0 3px rgba(34,197,94,0.15); border-color: #86efac; }
+  100% { box-shadow: 0 0 0 0 rgba(34,197,94,0); border-color: transparent; }
+}
+@keyframes kk-card-glow-red {
+  0%   { box-shadow: 0 0 0 0 rgba(239,68,68,0); border-color: transparent; }
+  25%  { box-shadow: 0 0 0 6px rgba(239,68,68,0.35), 0 0 20px rgba(239,68,68,0.2); border-color: #ef4444; }
+  75%  { box-shadow: 0 0 0 3px rgba(239,68,68,0.15); border-color: #fca5a5; }
+  100% { box-shadow: 0 0 0 0 rgba(239,68,68,0); border-color: transparent; }
+}
+
+.card-glow-orange { animation: kk-card-glow-orange 1.8s ease-out both; }
+.card-glow-blue   { animation: kk-card-glow-blue   1.8s ease-out both; }
+.card-glow-green  { animation: kk-card-glow-green  1.8s ease-out both; }
+.card-glow-red    { animation: kk-card-glow-red    1.8s ease-out both; }
