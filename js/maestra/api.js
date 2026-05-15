@@ -110,7 +110,7 @@ export const MaestraApi = {
       if (!error && data?.tasks) {
         return data.tasks;
       }
-    } catch (_) { /* fallback si RPC no existe aún */ }
+    } catch (_) { /* RPC no existe aún — usar fallback */ }
 
     // Fallback: query directa sin filtro de período
     const { data, error } = await supabase
@@ -143,25 +143,7 @@ export const MaestraApi = {
    * Upsert rutina
    */
   async upsertDailyLog(payload) {
-    // Si la DB no tiene 'activities', podemos mapearlo a 'notes' o simplemente enviarlo si existe.
-    // Como el error dice que no existe 'activities', vamos a ser precavidos.
     const cleanPayload = { ...payload };
-    
-    // Si el usuario envió notes, nos aseguramos que se llame notes en la DB.
-    // Si en un futuro quieres usar 'activities', puedes añadir la columna a la DB.
-    if (cleanPayload.activities) {
-      if (!cleanPayload.notes) {
-      cleanPayload.notes = payload.activities;
-      }
-      // 🔥 FIX: Eliminar columna origen para evitar error 400 si no existe en DB
-      delete cleanPayload.activities;
-    }
-
-    // 🔥 FIX: Mapear 'sleeping' (JS) a 'nap' (DB) para evitar error 400
-    if (cleanPayload.sleeping) {
-      if (!cleanPayload.nap) cleanPayload.nap = cleanPayload.sleeping;
-      delete cleanPayload.sleeping; 
-    }
 
     const { data: existing, error: findError } = await supabase
       .from('daily_logs')
@@ -200,13 +182,13 @@ export const MaestraApi = {
     // Vincular al período activo si no se especificó
     if (!cleanPayload.period_id && cleanPayload.classroom_id) {
       try {
-        const { data: periodData } = await supabase.rpc('get_active_period', {
+        const { data: periodData, error: periodErr } = await supabase.rpc('get_active_period', {
           p_classroom_id: cleanPayload.classroom_id
         });
-        if (periodData?.found && periodData?.id) {
+        if (!periodErr && periodData?.found && periodData?.id) {
           cleanPayload.period_id = periodData.id;
         }
-      } catch (_) { /* silencioso */ }
+      } catch (_) { /* RPC no existe aún — continuar sin period_id */ }
     }
 
     const { data, error } = await supabase

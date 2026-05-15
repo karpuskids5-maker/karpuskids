@@ -813,8 +813,8 @@ async function submitNewPost() {
       content_preview: content.slice(0, 80)
     }).catch(() => {});
   } catch (e) {
-
-    safeToast('Error al publicar', 'error');
+    const errMsg = e?.message || String(e);
+    safeToast('Error al publicar: ' + errMsg, 'error');
     btn.disabled = false;
     btn.innerHTML = 'PUBLICAR';
   }
@@ -849,6 +849,8 @@ async function initGrades() {
     '<div id="gradesContent" class="space-y-4">' +
       '<div class="text-center py-8"><div class="animate-spin rounded-full h-8 w-8 border-b-2 border-orange-600 mx-auto"></div></div>' +
     '</div>';
+  // Asegurar que el contenedor padre no corte el scroll horizontal
+  container.style.overflowX = 'auto';
 
   if (window.lucide) window.lucide.createIcons();
 
@@ -887,14 +889,14 @@ async function initGrades() {
     }
 
     content.innerHTML =
-      '<div class="w-full overflow-x-auto rounded-3xl border border-slate-100 shadow-sm bg-white">' +
-        '<table class="w-full text-sm text-left min-w-[640px]">' +
+      '<div class="w-full overflow-x-auto rounded-3xl border border-slate-100 shadow-sm bg-white" style="-webkit-overflow-scrolling:touch">' +
+        '<table class="w-full text-sm text-left" style="min-width:560px">' +
           '<thead class="bg-slate-50 text-slate-500 font-black uppercase text-[10px] tracking-wider">' +
             '<tr>' +
-              '<th class="px-5 py-4">Estudiante</th>' +
-              '<th class="px-5 py-4 text-center">Promedio</th>' +
-              '<th class="px-5 py-4 text-center">Nivel</th>' +
-              '<th class="px-5 py-4 text-center">Tareas Calificadas</th>' +
+              '<th class="px-5 py-4 whitespace-nowrap">Estudiante</th>' +
+              '<th class="px-5 py-4 text-center whitespace-nowrap">Promedio</th>' +
+              '<th class="px-5 py-4 text-center whitespace-nowrap">Nivel</th>' +
+              '<th class="px-5 py-4 text-center whitespace-nowrap">Tareas Calificadas</th>' +
             '</tr>' +
           '</thead>' +
           '<tbody class="divide-y divide-slate-100">' +
@@ -904,10 +906,10 @@ async function initGrades() {
               const level = getLevelLabel(avg);
               const colorCls = avg >= 3.5 ? 'bg-emerald-50 text-emerald-700' : avg >= 2.5 ? 'bg-amber-50 text-amber-700' : avg > 0 ? 'bg-rose-50 text-rose-700' : 'bg-slate-50 text-slate-400';
               return '<tr class="hover:bg-slate-50 transition-colors">' +
-                '<td class="px-5 py-3.5"><div class="flex items-center gap-3"><div class="w-8 h-8 rounded-xl bg-orange-50 text-orange-600 flex items-center justify-center font-black text-sm">' + s.name.charAt(0) + '</div><div class="font-bold text-slate-800 text-sm">' + safeEscapeHTML(s.name) + '</div></div></td>' +
-                '<td class="px-5 py-3.5 text-center"><span class="px-3 py-1 rounded-lg ' + colorCls + ' font-black text-sm">' + (avg > 0 ? avg.toFixed(1) : '-') + '</span></td>' +
-                '<td class="px-5 py-3.5 text-center"><span class="px-2 py-1 rounded-full text-[10px] font-black uppercase ' + (avg > 0 ? level.cls : 'bg-slate-100 text-slate-400') + '">' + (avg > 0 ? level.label : 'Sin datos') + '</span></td>' +
-                '<td class="px-5 py-3.5 text-center text-sm font-bold text-slate-600">' + (data?.count || 0) + '</td>' +
+                '<td class="px-5 py-3.5 whitespace-nowrap"><div class="flex items-center gap-3"><div class="w-8 h-8 rounded-xl bg-orange-50 text-orange-600 flex items-center justify-center font-black text-sm shrink-0">' + s.name.charAt(0) + '</div><div class="font-bold text-slate-800 text-sm">' + safeEscapeHTML(s.name) + '</div></div></td>' +
+                '<td class="px-5 py-3.5 text-center whitespace-nowrap"><span class="px-3 py-1 rounded-lg ' + colorCls + ' font-black text-sm">' + (avg > 0 ? avg.toFixed(1) : '-') + '</span></td>' +
+                '<td class="px-5 py-3.5 text-center whitespace-nowrap"><span class="px-2 py-1 rounded-full text-[10px] font-black uppercase ' + (avg > 0 ? level.cls : 'bg-slate-100 text-slate-400') + '">' + (avg > 0 ? level.label : 'Sin datos') + '</span></td>' +
+                '<td class="px-5 py-3.5 text-center text-sm font-bold text-slate-600 whitespace-nowrap">' + (data?.count || 0) + '</td>' +
               '</tr>';
             }).join('') +
           '</tbody>' +

@@ -31,7 +31,7 @@ export async function initRoutine() {
     // Cargar logs de hoy
     const { data: todayLogs } = await supabase
       .from('daily_logs')
-      .select('id, student_id, date, mood, food, nap, eating, sleeping, activities, notes')
+      .select('id, student_id, date, mood, food, nap, eating, sleeping, activities, notes, created_at')
       .eq('classroom_id', classroom.id)
       .eq('date', today);
 
@@ -57,7 +57,7 @@ export async function initRoutine() {
     // Estudiantes pendientes en el periodo actual
     const pendingStudents = students.filter(s => {
       const log = logsMap[s.id];
-      if (!log || !_isWithin12h(log.updated_at || log.created_at)) return true;
+      if (!log || !_isWithin12h(log.created_at)) return true;
       
       // Validar si falta alg\u00fan campo cr\u00edtico seg\u00fan el periodo
       if (currentPeriod === 'morning' && !log.mood) return true;
@@ -138,7 +138,7 @@ export async function initRoutine() {
  * Renderiza la tarjeta individual del estudiante para la secci\u00f3n de rutina.
  */
 function _renderStudentRoutineCard(s, log) {
-  const isValid = _isWithin12h(log.created_at || log.updated_at);
+  const isValid = _isWithin12h(log.created_at);
   const mood  = isValid && log.mood ? log.mood : null;
   const food  = isValid && log.food ? log.food : null;
   const sleep = isValid && log.nap  ? log.nap  : null;
@@ -186,9 +186,9 @@ export async function openStudentRoutine(studentId) {
   if (!student) return;
 
   const today = new Date().toISOString().split('T')[0];
-  const { data: log } = await supabase.from('daily_logs').select('id, student_id, date, mood, food, nap, eating, sleeping, activities, notes').eq('student_id', studentId).eq('date', today).maybeSingle();
+  const { data: log } = await supabase.from('daily_logs').select('id, student_id, date, mood, food, nap, eating, sleeping, activities, notes, created_at').eq('student_id', studentId).eq('date', today).maybeSingle();
   
-  const isValid = log && _isWithin12h(log.created_at || log.updated_at);
+  const isValid = log && _isWithin12h(log.created_at);
   const currentMood  = isValid ? (log?.mood || '') : '';
   const currentFood  = isValid ? (log?.food || '') : '';
   const currentSleep = isValid ? (log?.nap || '') : '';

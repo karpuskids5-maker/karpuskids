@@ -19,6 +19,13 @@ let fraudEvents = [];
 let currentUser = null;
 
 // ── Init ──────────────────────────────────────────────────────────────────────
+function _setLoaderMsg(msg) {
+  const loader = document.getElementById('loader');
+  if (!loader) return;
+  const span = loader.querySelector('span');
+  if (span) span.textContent = msg;
+}
+
 document.addEventListener('DOMContentLoaded', async () => {
   // Timeout de seguridad: si en 15s no carga, mostrar error en vez de quedarse colgado
   const loaderTimeout = setTimeout(() => {
@@ -37,6 +44,7 @@ document.addEventListener('DOMContentLoaded', async () => {
 
   try {
     // Paso 1: Verificar sesión local (rápido)
+    _setLoaderMsg('Verificando sesión...');
     const { data: { session } } = await supabase.auth.getSession();
 
     // Paso 2: Si no hay sesión local, ir al login
@@ -47,7 +55,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     }
 
     // Paso 3: Validar token contra el servidor con timeout corto
-    // Esto detecta tokens expirados o revocados
+    _setLoaderMsg('Validando credenciales...');
     let userId = session.user.id;
     let userEmail = session.user.email;
     try {
@@ -58,8 +66,8 @@ document.addEventListener('DOMContentLoaded', async () => {
       if (!userErr && serverUser) {
         userId = serverUser.id;
         userEmail = serverUser.email;
-      } else if (userErr && !userErr.message?.includes('timeout')) {
-        // Token inválido — refrescar
+      } else if (userErr && !userErr.message?.includes('getUser_timeout')) {
+        // Token inválido o expirado (403) — intentar refresh
         const { data: refreshed, error: refreshErr } = await supabase.auth.refreshSession();
         if (refreshErr || !refreshed?.session) {
           clearTimeout(loaderTimeout);
@@ -74,6 +82,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     }
 
     // Paso 4: Obtener perfil con timeout
+    _setLoaderMsg('Cargando perfil...');
     const { data: profile, error: profileErr } = await Promise.race([
       supabase.from('profiles').select('id, name, email, role').eq('id', userId).maybeSingle(),
       new Promise((_, reject) => setTimeout(() => reject(new Error('timeout')), 8000))

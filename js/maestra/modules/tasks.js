@@ -267,10 +267,12 @@ export async function openNewTaskModal(taskToEdit = null) {
 async function _getPeriodStatus(classroomId) {
   try {
     const { data, error } = await supabase.rpc('get_active_period', { p_classroom_id: classroomId });
-    if (error || !data) return { open: true, period: null }; // fallback permisivo si RPC no existe
+    // Si el RPC no existe (404) o hay error, asumir período abierto (permisivo)
+    if (error) return { open: true, period: null };
+    if (!data) return { open: true, period: null };
     return { open: data.status === 'open', period: data };
   } catch (_) {
-    return { open: true, period: null }; // fallback permisivo
+    return { open: true, period: null };
   }
 }
 

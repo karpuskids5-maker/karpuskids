@@ -124,22 +124,20 @@ export const FeedModule = {
         mediaHTML = `
           <div class="relative group/media rounded-2xl overflow-hidden mb-4 bg-black">
             ${ImageLoader.video(p.media_url, '', { cls: 'w-full max-h-80 object-cover' })}
-            <a href="${optimizedUrl}" download target="_blank" rel="noopener noreferrer"
-               class="absolute top-2 right-2 p-2 bg-black/60 hover:bg-black/80 text-white rounded-xl opacity-0 group-hover/media:opacity-100 transition-opacity flex items-center gap-1.5 text-[10px] font-black uppercase backdrop-blur-sm"
-               onclick="event.stopPropagation()">
+            <button onclick="App.feed.downloadMedia('${optimizedUrl}', 'video')"
+               class="absolute top-2 right-2 p-2 bg-black/60 hover:bg-black/80 text-white rounded-xl opacity-0 group-hover/media:opacity-100 transition-opacity flex items-center gap-1.5 text-[10px] font-black uppercase backdrop-blur-sm">
               <i data-lucide="download" class="w-3.5 h-3.5"></i> Descargar
-            </a>
+            </button>
           </div>`;
       } else {
         mediaHTML = `
           <div class="relative group/media cursor-zoom-in rounded-2xl overflow-hidden mb-4 bg-black"
                onclick="window.openLightbox && window.openLightbox('${optimizedUrl}','image')">
             ${ImageLoader.img(optimizedUrl, { cls: 'w-full max-h-[500px] object-cover', fallback: 'img/mundo.jpg' })}
-            <a href="${optimizedUrl}" download target="_blank" rel="noopener noreferrer"
-               class="absolute top-2 right-2 p-2 bg-black/60 hover:bg-black/80 text-white rounded-xl opacity-0 group-hover/media:opacity-100 transition-opacity flex items-center gap-1.5 text-[10px] font-black uppercase backdrop-blur-sm"
-               onclick="event.stopPropagation()">
+            <button onclick="event.stopPropagation(); App.feed.downloadMedia('${optimizedUrl}', 'image')"
+               class="absolute top-2 right-2 p-2 bg-black/60 hover:bg-black/80 text-white rounded-xl opacity-0 group-hover/media:opacity-100 transition-opacity flex items-center gap-1.5 text-[10px] font-black uppercase backdrop-blur-sm">
               <i data-lucide="download" class="w-3.5 h-3.5"></i> Descargar
-            </a>
+            </button>
           </div>`;
       }
     }
@@ -149,7 +147,10 @@ export const FeedModule = {
         <div class="flex items-center justify-between mb-4">
           <div class="flex items-center gap-3">
             <div class="w-11 h-11 rounded-full bg-orange-100 flex items-center justify-center font-bold text-orange-600 overflow-hidden border border-orange-50">
-              ${teacherAvatar ? ImageLoader.img(teacherAvatar, { cls: 'w-full h-full object-cover', fallback: 'img/mundo.jpg' }) : teacherName.charAt(0)}
+              ${teacherAvatar
+                ? `<img src="${teacherAvatar}" alt="${escapeHtml(teacherName)}" class="w-full h-full object-cover" onerror="this.style.display='none';this.nextElementSibling.style.display='flex'">`
+                : ''}
+              <span style="${teacherAvatar ? 'display:none' : 'display:flex'}" class="w-full h-full items-center justify-center font-bold text-orange-600">${escapeHtml(teacherName.charAt(0))}</span>
             </div>
             <div>
               <p class="font-black text-slate-800 text-sm leading-tight">${escapeHtml(teacherName)}</p>
@@ -173,11 +174,11 @@ export const FeedModule = {
             ${comments.length} Comentarios
           </button>
           ${p.media_url ? `
-          <a href="${p.media_url}" download target="_blank" rel="noopener noreferrer"
+          <button onclick="App.feed.downloadMedia('${p.media_url}', '${p.media_url.match(/\.(mp4|webm|ogg|mov)$/i) ? 'video' : 'image'}')"
              class="ml-auto flex items-center gap-1.5 text-xs font-black uppercase tracking-tighter text-slate-400 hover:text-emerald-600 transition-all">
             <i data-lucide="download" class="w-4 h-4"></i>
             Descargar
-          </a>` : ''}
+          </button>` : ''}
         </div>
 
         <div id="comments-section-${p.id}" class="hidden mt-4 pt-4 border-t border-slate-50 bg-slate-50/50 -mx-5 px-5 pb-2">
@@ -301,26 +302,46 @@ export const FeedModule = {
         event: 'INSERT',
         schema: 'public',
         table: 'posts'
-        // Sin filter — recibimos todos y filtramos en el handler
       }, (payload) => {
         const newPost = payload.new;
-        // Solo recargar si el post es del aula del estudiante O es general
         if (!newPost.classroom_id || newPost.classroom_id === this._classroomId) {
           Helpers.toast('📢 Nueva publicación en el muro', 'info');
-          this.loadPosts();
+          this.loadPosts(); // Solo recargar en posts nuevos
         }
       })
-      .on('postgres_changes', {
-        event: 'UPDATE',
-        schema: 'public',
-        table: 'posts'
-      }, (payload) => {
-        const updated = payload.new;
-        if (!updated.classroom_id || updated.classroom_id === this._classroomId) {
-          this.loadPosts();
-        }
-      })
+      // NO escuchar UPDATE de posts — evita recarga por likes/comentarios
       .subscribe();
+  },
+
+  /**
+   * Descarga un archivo multimedia usando fetch+blob para evitar bloqueo CORS
+   */
+  async downloadMedia(url, type = 'image') {
+    try {
+      const btn = event?.currentTarget;
+      if (btn) { btn.innerHTML = '<i data-lucide="loader-2" class="w-3.5 h-3.5 animate-spin"></i> ...'; if (window.lucide) lucide.createIcons(); }
+
+      const response = await fetch(url, { mode: 'cors' });
+      if (!response.ok) throw new Error('HTTP ' + response.status);
+      const blob = await response.blob();
+      const objectUrl = URL.createObjectURL(blob);
+
+      const ext = url.split('?')[0].split('.').pop() || (type === 'video' ? 'mp4' : 'jpg');
+      const filename = `karpus_${Date.now()}.${ext}`;
+
+      const a = document.createElement('a');
+      a.href = objectUrl;
+      a.download = filename;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      setTimeout(() => URL.revokeObjectURL(objectUrl), 5000);
+
+      if (btn) { btn.innerHTML = '<i data-lucide="check" class="w-3.5 h-3.5"></i> Listo'; if (window.lucide) lucide.createIcons(); setTimeout(() => { btn.innerHTML = '<i data-lucide="download" class="w-3.5 h-3.5"></i> Descargar'; if (window.lucide) lucide.createIcons(); }, 2000); }
+    } catch (err) {
+      // Fallback: abrir en nueva pestaña si fetch falla
+      window.open(url, '_blank', 'noopener,noreferrer');
+    }
   },
 
   async toggleLike(postId) {
@@ -329,13 +350,43 @@ export const FeedModule = {
     const post = posts.find(p => p.id === postId);
     const existingLike = post?.likes?.find(l => l.user_id === user.id);
 
+    // Optimistic UI — actualizar inmediatamente sin recargar
+    const btn = document.querySelector(`[data-action="like"][data-post-id="${postId}"]`);
+    const countSpan = btn?.querySelector('span');
+    const isLiked = !!existingLike;
+    const currentCount = post?.likes?.length || 0;
+    const newCount = isLiked ? currentCount - 1 : currentCount + 1;
+
+    if (btn) {
+      btn.className = btn.className.replace(/text-orange-\d+|text-slate-\d+/g, '');
+      btn.classList.add(isLiked ? 'text-slate-400' : 'text-orange-600');
+    }
+    if (countSpan) countSpan.textContent = `${newCount} Me gusta`;
+
+    // Actualizar estado local sin re-render (actualizamos directamente el array interno)
+    if (post) {
+      const updatedLikes = isLiked
+        ? (post.likes || []).filter(l => l.user_id !== user.id)
+        : [...(post.likes || []), { user_id: user.id, id: `temp-${Date.now()}` }];
+      // Mutar el array en el estado sin disparar suscriptores (evita re-render del feed)
+      const currentPosts = AppState.get('feedPosts');
+      const idx = currentPosts.findIndex(p => p.id === postId);
+      if (idx !== -1) currentPosts[idx] = { ...currentPosts[idx], likes: updatedLikes };
+    }
+
     try {
       if (existingLike) {
         await supabase.from('likes').delete().eq('id', existingLike.id);
       } else {
         await supabase.from('likes').insert({ post_id: postId, user_id: user.id });
       }
-      // El realtime recargará los posts
-    } catch (e) { /* silencioso */ }
+    } catch (_) {
+      // Revertir optimistic si falla
+      if (btn) {
+        btn.classList.remove('text-slate-400', 'text-orange-600');
+        btn.classList.add(isLiked ? 'text-orange-600' : 'text-slate-400');
+      }
+      if (countSpan) countSpan.textContent = `${currentCount} Me gusta`;
+    }
   }
 };
