@@ -1,6 +1,10 @@
 import { supabase, ensureRole } from '../shared/supabase.js';
 import { logError, auditLog } from '../shared/db-utils.js';
 
+// Bloquear redirección por SIGNED_OUT desde el primer momento
+// (antes de DOMContentLoaded, para que onAuthStateChange no interrumpa el init)
+window._karpusInitializing = true;
+
 // Función global para cerrar sesión desde onclick inline
 window._signOutAndRedirect = async () => {
   try { await supabase.auth.signOut(); } catch (_) {}
@@ -27,15 +31,16 @@ function _setLoaderMsg(msg) {
 }
 
 document.addEventListener('DOMContentLoaded', async () => {
-  // Timeout de seguridad: si en 15s no carga, mostrar error en vez de quedarse colgado
+  // Timeout de seguridad: si en 15s no carga, mostrar error
   const loaderTimeout = setTimeout(() => {
+    window._karpusInitializing = false;
     const loader = document.getElementById('loader');
     if (loader) {
       loader.innerHTML = `
         <div style="text-align:center;padding:32px;">
           <div style="font-size:32px;margin-bottom:12px;">⚠️</div>
-          <p style="color:#f87171;font-weight:800;font-size:14px;margin-bottom:8px;">Error de conexión</p>
-          <p style="color:#94a3b8;font-size:12px;margin-bottom:20px;">No se pudo verificar el acceso. Verifica tu conexión.</p>
+          <p style="color:#f87171;font-weight:800;font-size:14px;margin-bottom:8px;">Tiempo de espera agotado</p>
+          <p style="color:#94a3b8;font-size:12px;margin-bottom:20px;">No se pudo conectar con el servidor. Verifica tu conexión.</p>
           <button onclick="window.location.href='login.html'" style="background:#6366f1;color:white;border:none;padding:10px 24px;border-radius:10px;font-weight:800;cursor:pointer;font-size:13px;">Volver al Login</button>
           <button onclick="window.location.reload()" style="background:rgba(255,255,255,.1);color:#94a3b8;border:1px solid rgba(255,255,255,.1);padding:10px 24px;border-radius:10px;font-weight:800;cursor:pointer;font-size:13px;margin-left:8px;">Reintentar</button>
         </div>`;
@@ -43,115 +48,142 @@ document.addEventListener('DOMContentLoaded', async () => {
   }, 15000);
 
   try {
-    // Paso 1: Verificar sesión local (rápido)
+    // ── Paso 1: Sesión local ──────────────────────────────────────────────────
     _setLoaderMsg('Verificando sesión...');
-    const { data: { session } } = await supabase.auth.getSession();
+    const { data: sessionData, error: sessionErr } = await supabase.auth.getSession();
 
-    // Paso 2: Si no hay sesión local, ir al login
-    if (!session?.user) {
+    if (sessionErr || !sessionData?.session?.user) {
       clearTimeout(loaderTimeout);
+      window._karpusInitializing = false;
       window.location.href = 'login.html';
       return;
     }
 
-    // Paso 3: Validar token contra el servidor con timeout corto
-    _setLoaderMsg('Validando credenciales...');
-    let userId = session.user.id;
+    const session = sessionData.session;
+    let userId    = session.user.id;
     let userEmail = session.user.email;
-    try {
-      const { data: { user: serverUser }, error: userErr } = await Promise.race([
-        supabase.auth.getUser(),
-        new Promise((_, reject) => setTimeout(() => reject(new Error('getUser_timeout')), 5000))
-      ]);
-      if (!userErr && serverUser) {
-        userId = serverUser.id;
-        userEmail = serverUser.email;
-      } else if (userErr && !userErr.message?.includes('getUser_timeout')) {
-        // Token inválido o expirado (403) — intentar refresh
-        const { data: refreshed, error: refreshErr } = await supabase.auth.refreshSession();
-        if (refreshErr || !refreshed?.session) {
-          clearTimeout(loaderTimeout);
-          window.location.href = 'login.html';
-          return;
-        }
-        userId = refreshed.session.user.id;
-        userEmail = refreshed.session.user.email;
+
+    // ── Paso 2: Refrescar token si está próximo a expirar ────────────────────
+    _setLoaderMsg('Validando credenciales...');
+    const expiresAt = session.expires_at || 0;
+    const nowSec    = Math.floor(Date.now() / 1000);
+    const needsRefresh = (expiresAt - nowSec) < 300; // menos de 5 min
+
+    if (needsRefresh) {
+      const { data: refreshed, error: refreshErr } = await supabase.auth.refreshSession();
+      if (refreshErr || !refreshed?.session) {
+        clearTimeout(loaderTimeout);
+        window._karpusInitializing = false;
+        window.location.href = 'login.html';
+        return;
       }
-    } catch (_) {
-      // Timeout de getUser — continuar con sesión local
+      userId    = refreshed.session.user.id;
+      userEmail = refreshed.session.user.email;
     }
 
-    // Paso 4: Obtener perfil con timeout
+    // ── Paso 3: Cargar perfil (sin Promise.race — evita conflicto con fetch interceptor) ──
     _setLoaderMsg('Cargando perfil...');
-    const { data: profile, error: profileErr } = await Promise.race([
-      supabase.from('profiles').select('id, name, email, role').eq('id', userId).maybeSingle(),
-      new Promise((_, reject) => setTimeout(() => reject(new Error('timeout')), 8000))
-    ]);
+    let profile = null;
+    let profileErrMsg = null;
 
-    if (profileErr || !profile) {
+    try {
+      const { data, error } = await supabase
+        .from('profiles')
+        .select('id, name, email, role')
+        .eq('id', userId)
+        .maybeSingle();
+
+      if (error) {
+        profileErrMsg = `DB error: ${error.message} (code: ${error.code})`;
+      } else {
+        profile = data;
+      }
+    } catch (fetchErr) {
+      profileErrMsg = `Fetch error: ${fetchErr?.message || String(fetchErr)}`;
+    }
+
+    if (!profile) {
       clearTimeout(loaderTimeout);
-      // Mostrar error específico en vez de redirigir silenciosamente
+      window._karpusInitializing = false;
       const loader = document.getElementById('loader');
       if (loader) {
         loader.innerHTML = `
           <div style="text-align:center;padding:32px;">
             <div style="font-size:32px;margin-bottom:12px;">🔒</div>
-            <p style="color:#f87171;font-weight:800;font-size:14px;margin-bottom:8px;">Sin perfil configurado</p>
-            <p style="color:#94a3b8;font-size:12px;margin-bottom:20px;">Tu cuenta no tiene un perfil en el sistema.<br>Contacta al administrador.</p>
+            <p style="color:#f87171;font-weight:800;font-size:14px;margin-bottom:8px;">
+              ${profileErrMsg ? 'Error al cargar perfil' : 'Sin perfil configurado'}
+            </p>
+            <p style="color:#94a3b8;font-size:12px;margin-bottom:8px;">
+              ${profileErrMsg || 'Tu cuenta no tiene un perfil en el sistema.'}
+            </p>
+            <p style="color:#64748b;font-size:11px;margin-bottom:20px;">Usuario: ${userEmail}</p>
             <button onclick="window._signOutAndRedirect()" style="background:#6366f1;color:white;border:none;padding:10px 24px;border-radius:10px;font-weight:800;cursor:pointer;font-size:13px;">Cerrar Sesión</button>
+            <button onclick="window.location.reload()" style="background:rgba(255,255,255,.1);color:#94a3b8;border:1px solid rgba(255,255,255,.1);padding:10px 24px;border-radius:10px;font-weight:800;cursor:pointer;font-size:13px;margin-left:8px;">Reintentar</button>
           </div>`;
       }
       return;
     }
 
-    // Verificar rol — admin puede acceder, directora también (para supervisión)
+    // ── Paso 4: Verificar rol ─────────────────────────────────────────────────
     const allowedRoles = ['admin', 'directora'];
     if (!allowedRoles.includes(profile.role)) {
       clearTimeout(loaderTimeout);
+      window._karpusInitializing = false;
       const loader = document.getElementById('loader');
       if (loader) {
         loader.innerHTML = `
           <div style="text-align:center;padding:32px;">
             <div style="font-size:32px;margin-bottom:12px;">🚫</div>
             <p style="color:#f87171;font-weight:800;font-size:14px;margin-bottom:8px;">Acceso denegado</p>
-            <p style="color:#94a3b8;font-size:12px;margin-bottom:4px;">Tu rol: <strong style="color:#f1f5f9;">${profile.role}</strong></p>
-            <p style="color:#94a3b8;font-size:12px;margin-bottom:20px;">Solo administradores pueden acceder a este panel.</p>
+            <p style="color:#94a3b8;font-size:12px;margin-bottom:4px;">Tu rol: <strong style="color:#f1f5f9;">${profile.role || '(sin rol)'}</strong></p>
+            <p style="color:#94a3b8;font-size:12px;margin-bottom:20px;">Solo administradores y directoras pueden acceder.</p>
             <button onclick="window.location.href='login.html'" style="background:#6366f1;color:white;border:none;padding:10px 24px;border-radius:10px;font-weight:800;cursor:pointer;font-size:13px;">Volver al Login</button>
           </div>`;
       }
       return;
     }
 
+    // ── Paso 5: Mostrar panel ─────────────────────────────────────────────────
     clearTimeout(loaderTimeout);
+    window._karpusInitializing = false;
     currentUser = profile;
-    document.getElementById('adminName').textContent = profile.name || userEmail;
-    document.getElementById('adminAvatar').textContent = (profile.name || userEmail)[0].toUpperCase();
-    document.getElementById('cfgEmail').value = userEmail || '';
-    document.getElementById('cfgName').value  = profile.name || '';
+
+    const adminName   = document.getElementById('adminName');
+    const adminAvatar = document.getElementById('adminAvatar');
+    const cfgEmail    = document.getElementById('cfgEmail');
+    const cfgName     = document.getElementById('cfgName');
+
+    if (adminName)   adminName.textContent   = profile.name || userEmail;
+    if (adminAvatar) adminAvatar.textContent = (profile.name || userEmail)[0].toUpperCase();
+    if (cfgEmail)    cfgEmail.value          = userEmail || '';
+    if (cfgName)     cfgName.value           = profile.name || '';
 
     const loader = document.getElementById('loader');
     if (loader) loader.classList.add('hidden');
 
     setInterval(() => {
-      document.getElementById('topClock').textContent =
-        new Date().toLocaleString('es-DO', { dateStyle: 'short', timeStyle: 'medium' });
+      const clock = document.getElementById('topClock');
+      if (clock) clock.textContent = new Date().toLocaleString('es-DO', { dateStyle: 'short', timeStyle: 'medium' });
     }, 1000);
 
-    if (window.innerWidth <= 768) {
-      document.getElementById('mobMenuBtn').style.display = 'block';
+    const mobMenuBtn = document.getElementById('mobMenuBtn');
+    if (window.innerWidth <= 768 && mobMenuBtn) {
+      mobMenuBtn.style.display = 'block';
     }
 
     await refreshAll();
     startRealtime();
+
   } catch (err) {
     clearTimeout(loaderTimeout);
+    window._karpusInitializing = false;
     const loader = document.getElementById('loader');
     if (loader) {
-      const msg = err?.message === 'timeout' ? 'Tiempo de espera agotado. Verifica tu conexión.' : (err?.message || 'Error desconocido');
+      const msg = err?.message || String(err);
       loader.innerHTML = `
         <div style="text-align:center;padding:32px;">
           <div style="font-size:32px;margin-bottom:12px;">⚠️</div>
-          <p style="color:#f87171;font-weight:800;font-size:14px;margin-bottom:8px;">Error al cargar</p>
+          <p style="color:#f87171;font-weight:800;font-size:14px;margin-bottom:8px;">Error inesperado</p>
           <p style="color:#94a3b8;font-size:12px;margin-bottom:20px;">${msg}</p>
           <button onclick="window.location.href='login.html'" style="background:#6366f1;color:white;border:none;padding:10px 24px;border-radius:10px;font-weight:800;cursor:pointer;font-size:13px;">Volver al Login</button>
           <button onclick="window.location.reload()" style="background:rgba(255,255,255,.1);color:#94a3b8;border:1px solid rgba(255,255,255,.1);padding:10px 24px;border-radius:10px;font-weight:800;cursor:pointer;font-size:13px;margin-left:8px;">Reintentar</button>

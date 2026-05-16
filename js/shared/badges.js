@@ -1,30 +1,30 @@
-/**
- * 🔴 Karpus Kids — Badge System
- * Muestra indicadores numéricos en botones de navegación cuando hay contenido nuevo.
- * Al entrar a la sección, el badge desaparece y se marca como leído en DB.
+﻿/**
+ * Karpus Kids - Badge System v2
+ * Indicadores visuales en tiempo real para todos los paneles.
  */
-
-const STORAGE_PREFIX = 'karpus_badge_';
 
 export const BadgeSystem = {
   _userId: null,
-  _channel: null,
+  _role: null,
 
   async init(userId) {
     if (!userId) return;
     this._userId = userId;
+    this._role = this._detectRole();
     await this._loadCounts();
     this._subscribeRealtime();
+  },
+
+  _detectRole() {
+    if (document.getElementById('badge-class'))  return 'padre';
+    if (document.getElementById('badge-t-chat')) return 'maestra';
+    if (document.getElementById('badge-pagos'))  return 'directora';
+    return 'unknown';
   },
 
   async _loadCounts() {
     try {
       const { supabase } = await import('./supabase.js');
-
-      // Solo mostrar badges en secciones relevantes — no en maestros/estudiantes/aulas/dashboard
-      const BADGE_SECTIONS = ['pagos', 'chat', 'comunicacion', 'muro', 'reportes', 'asistencia', 't-chat', 'notifications'];
-
-      // 1. Notificaciones no leídas → badges por sección
       const { data: notifs } = await supabase
         .from('notifications')
         .select('type')
@@ -32,156 +32,183 @@ export const BadgeSystem = {
         .eq('is_read', false)
         .limit(200);
 
-      if (notifs?.length) {
+      if (notifs && notifs.length) {
         const counts = {};
         for (const n of notifs) {
           const section = this._typeToSection(n.type);
-          if (section && BADGE_SECTIONS.includes(section)) {
-            counts[section] = (counts[section] || 0) + 1;
-          }
+          if (section) counts[section] = (counts[section] || 0) + 1;
         }
         for (const [section, count] of Object.entries(counts)) {
           this._renderBadge(section, count);
-        }
-        window.dispatchEvent(new CustomEvent('karpus:badges-updated', { detail: counts }));
-      }
-
-      // 2. Mensajes no leídos → badge en chat/comunicacion
-      const { data: unreadData } = await supabase.rpc('get_unread_counts');
-      if (unreadData) {
-        const totalUnread = Object.values(unreadData).reduce((a, b) => a + Number(b), 0);
-        if (totalUnread > 0) {
-          this._renderBadge('comunicacion', totalUnread);
-          this._renderBadge('chat', totalUnread);
+          this._renderCardBadge(section, count);
         }
       }
 
-    } catch (e) {
-      
-    }
+      try {
+        const { data: unreadData } = await supabase.rpc('get_unread_counts');
+        if (unreadData) {
+          const total = Object.values(unreadData).reduce((a, b) => a + Number(b), 0);
+          if (total > 0) {
+            this._renderBadge('notifications', total);
+            this._renderCardBadge('notifications', total);
+            this._renderBadge('chat', total);
+            this._renderBadge('comunicacion', total);
+          }
+        }
+      } catch (_) {}
+    } catch (_) {}
   },
 
   _subscribeRealtime() {
     if (!this._userId) return;
-    import('./supabase.js').then(() => {
+    const uid = this._userId;
+    import('./supabase.js').then(({ supabase }) => {
       import('./realtime-manager.js').then(({ RealtimeManager }) => {
-        RealtimeManager.subscribe('badges_' + this._userId, (channel) => {
-          // Nuevas notificaciones
-          channel.on('postgres_changes', {
-            event: 'INSERT',
-            schema: 'public',
-            table: 'notifications',
-            filter: `user_id=eq.${this._userId}`
-          }, (payload) => {
-            const section = this._typeToSection(payload.new?.type);
-            if (!section) return;
-            const current = document.querySelector('.section.active')?.id;
-            if (current === section) { this._markReadInDB(section); return; }
-            const badge = document.getElementById('badge-' + section);
-            this._applyGlow(section);
-            const prev = parseInt(badge?.textContent) || 0;
-            this._renderBadge(section, prev + 1);
-          });
-
-          // Nuevos mensajes → badge en chat (filtrado por receiver para evitar error de canal)
-          channel.on('postgres_changes', {
-            event: 'INSERT',
-            schema: 'public',
-            table: 'messages',
-            filter: `sender_id=neq.${this._userId}`
-          }, () => {
-            if (payload.new?.sender_id === this._userId) return;
-            const current = document.querySelector('.section.active')?.id;
-            if (current === 'chat' || current === 'comunicacion') return;
-            ['chat', 'comunicacion'].forEach(s => {
-              const badge = document.getElementById('badge-' + s);
-              this._applyGlow('notifications'); // Para el dashboard del padre
-              this._applyGlow('chat'); // Para el staff
-              if (!badge) return;
-              const prev = parseInt(badge.textContent) || 0;
-              this._renderBadge(s, prev + 1);
-            });
-          });
-
-          // Nuevos posts/comunicados → badge en muro o class
-          channel.on('postgres_changes', {
-            event: 'INSERT',
-            schema: 'public',
-            table: 'posts'
-          }, (payload) => {
-            if (payload.new?.teacher_id === this._userId) return;
-            // Determinar sección según el panel (muro para staff, class para padre)
-            const section = document.getElementById('badge-class') ? 'class' : 'muro';
-            const current = document.querySelector('.section.active')?.id;
-            if (current === section) return;
-            
-            const badge = document.getElementById('badge-' + section);
-            const prev = parseInt(badge?.textContent) || 0;
-            this._renderBadge(section, prev + 1);
-            this._applyGlow(section);
-          });
-
-          // Nuevas misiones/tareas (Panel Padre)
-          channel.on('postgres_changes', {
-            event: 'INSERT',
-            schema: 'public',
-            table: 'tasks'
-          }, (payload) => {
-            const current = document.querySelector('.section.active')?.id;
-            if (current === 'tasks') return;
-            const badge = document.getElementById('badge-tasks');
-            if (!badge) return;
-            const prev = parseInt(badge.textContent) || 0;
-            this._renderBadge('tasks', prev + 1);
-            this._applyGlow('tasks');
-          });
-
-          // Nuevas entregas de estudiantes (Panel Maestra)
-          channel.on('postgres_changes', {
-            event: 'INSERT',
-            schema: 'public',
-            table: 'task_evidences'
-          }, (payload) => {
-            const current = document.querySelector('.section.active')?.id;
-            if (current === 't-home') return;
-            const badge = document.getElementById('badge-t-home');
-            if (!badge) return;
-            const prev = parseInt(badge.textContent) || 0;
-            this._renderBadge('t-home', prev + 1);
-            this._applyGlow('t-home');
-          });
+        RealtimeManager.subscribe('badges_' + uid, (channel) => {
+          this._setupChannelListeners(channel);
+        });
+      }).catch(() => {
+        import('./supabase.js').then(({ supabase: sb }) => {
+          const channel = sb.channel('badges_direct_' + uid);
+          this._setupChannelListeners(channel);
+          channel.subscribe();
         });
       });
     });
   },
 
-  _applyGlow(section) {
-    // Busca el botón del sidebar o la tarjeta del dashboard que coincida con la sección
-    const selector = `[data-target="${section}"], [data-section="${section}"], .node-${section}`;
-    const targets = document.querySelectorAll(selector);
-    targets.forEach(el => {
-      el.classList.add('animate-glow');
-      setTimeout(() => el.classList.remove('animate-glow'), 6000);
+  _setupChannelListeners(channel) {
+    const self = this;
+
+    channel.on('postgres_changes', {
+      event: 'INSERT', schema: 'public', table: 'notifications',
+      filter: 'user_id=eq.' + self._userId
+    }, function(payload) {
+      const section = self._typeToSection(payload.new && payload.new.type);
+      if (!section) return;
+      if (self._getActiveSection() === section) { self._markReadInDB(section); return; }
+      const prev = self._getBadgeCount(section);
+      self._renderBadge(section, prev + 1);
+      self._renderCardBadge(section, prev + 1);
+      self._applyGlow(section);
+      self._showMiniToast(self._toastMsg(payload.new && payload.new.type));
     });
-    // Glow en tarjeta del dashboard + sonido
-    this._glowCard(section, 'orange');
-    this._playSound('orange');
+
+    channel.on('postgres_changes', {
+      event: 'INSERT', schema: 'public', table: 'messages'
+    }, function(payload) {
+      if (payload.new && payload.new.sender_id === self._userId) return;
+      const active = self._getActiveSection();
+      if (active === 'notifications' || active === 'chat' || active === 'comunicacion') return;
+      const prev = self._getBadgeCount('notifications');
+      self._renderBadge('notifications', prev + 1);
+      self._renderCardBadge('notifications', prev + 1);
+      self._renderBadge('chat', prev + 1);
+      self._renderBadge('comunicacion', prev + 1);
+      self._applyGlow('notifications');
+      self._applyGlow('chat');
+      self._showMiniToast('Nuevo mensaje');
+    });
+
+    channel.on('postgres_changes', {
+      event: 'INSERT', schema: 'public', table: 'posts'
+    }, function(payload) {
+      if (payload.new && payload.new.teacher_id === self._userId) return;
+      const section = document.getElementById('badge-class') ? 'class' : 'muro';
+      if (self._getActiveSection() === section) return;
+      const prev = self._getBadgeCount(section);
+      self._renderBadge(section, prev + 1);
+      self._renderCardBadge(section, prev + 1);
+      self._applyGlow(section);
+      self._showMiniToast('Nueva publicacion en el muro');
+    });
+
+    channel.on('postgres_changes', {
+      event: 'INSERT', schema: 'public', table: 'tasks'
+    }, function() {
+      if (self._getActiveSection() === 'tasks') return;
+      const prev = self._getBadgeCount('tasks');
+      self._renderBadge('tasks', prev + 1);
+      self._renderCardBadge('tasks', prev + 1);
+      self._applyGlow('tasks');
+      self._showMiniToast('Nueva tarea asignada');
+    });
+
+    channel.on('postgres_changes', {
+      event: 'INSERT', schema: 'public', table: 'task_evidences'
+    }, function() {
+      if (self._getActiveSection() === 't-home') return;
+      const prev = self._getBadgeCount('t-home');
+      self._renderBadge('t-home', prev + 1);
+      self._applyGlow('t-home');
+    });
+
+    channel.on('postgres_changes', {
+      event: 'UPDATE', schema: 'public', table: 'payments'
+    }, function(payload) {
+      const ns = ((payload.new && payload.new.status) || '').toLowerCase();
+      const os = ((payload.old && payload.old.status) || '').toLowerCase();
+      if (ns === os) return;
+      if (ns === 'paid' || ns === 'pagado' || ns === 'approved') {
+        if (self._getActiveSection() === 'payments') return;
+        self._applyGlow('payments');
+        self._showMiniToast('Pago confirmado');
+      }
+    });
+  },
+
+  _getActiveSection() {
+    const el = document.querySelector('.section.active');
+    return el ? el.id : '';
+  },
+
+  _getBadgeCount(section) {
+    const el = document.getElementById('badge-' + section);
+    return el ? (parseInt(el.textContent) || 0) : 0;
+  },
+
+  _toastMsg(type) {
+    const msgs = {
+      task: 'Nueva tarea asignada', post: 'Nueva publicacion',
+      muro: 'Nueva publicacion', chat: 'Nuevo mensaje',
+      message: 'Nuevo mensaje', attendance: 'Asistencia registrada',
+      payment: 'Actualizacion de pago', grade: 'Nueva calificacion',
+    };
+    return msgs[type] || 'Nueva notificacion';
   },
 
   mark(section) {
     this._renderBadge(section, 0);
+    this._renderCardBadge(section, 0);
     this._markReadInDB(section);
-    // Limpiar también el alias (chat ↔ comunicacion)
-    if (section === 'chat') this._renderBadge('comunicacion', 0);
-    if (section === 'comunicacion') this._renderBadge('chat', 0);
+    if (section === 'chat' || section === 'notifications') {
+      this._renderBadge('chat', 0);
+      this._renderBadge('comunicacion', 0);
+      this._renderBadge('notifications', 0);
+      this._renderCardBadge('notifications', 0);
+    }
   },
 
   set(section, count) {
     this._renderBadge(section, count);
+    this._renderCardBadge(section, count);
   },
 
   _renderBadge(section, count) {
     const badge = document.getElementById('badge-' + section);
+    if (!badge) return;
+    if (count > 0) {
+      badge.textContent = count > 99 ? '99+' : String(count);
+      badge.classList.remove('hidden');
+      badge.classList.add('flex');
+    } else {
+      badge.classList.add('hidden');
+      badge.classList.remove('flex');
+    }
+  },
+
+  _renderCardBadge(section, count) {
+    const badge = document.getElementById('badge-card-' + section);
     if (!badge) return;
     if (count > 0) {
       badge.textContent = count > 99 ? '99+' : String(count);
@@ -199,145 +226,117 @@ export const BadgeSystem = {
       const { supabase } = await import('./supabase.js');
       const types = this._sectionToTypes(section);
       if (!types.length) return;
-      await supabase
-        .from('notifications')
-        .update({ is_read: true })
-        .eq('user_id', this._userId)
-        .in('type', types)
-        .eq('is_read', false);
-    } catch (e) {
-      
-    }
+      await supabase.from('notifications').update({ is_read: true })
+        .eq('user_id', this._userId).in('type', types).eq('is_read', false);
+    } catch (_) {}
   },
 
   _typeToSection(type) {
     const map = {
-      // Padre
-      task:              'tasks',
-      post:              'class',
-      muro:              'class',
-      comment:           'class',
-      like:              'class',
-      attendance:        'live-attendance',
-      payment:           'payments',
-      grade:             'grades',
-      chat:              'notifications',
-      // Maestra
-      submission:        't-home',
-      'task-submission': 't-home',
-      'post-feedback':   't-home',
-      // Directora / Asistente
-      inquiry:           'reportes',
-      receipt:           'pagos',
-      'new-student':     'estudiantes',
-      'new-teacher':     'maestros',
-      alert:             'pagos',
-      info:              'dashboard',
+      task: 'tasks', post: 'class', muro: 'class', comment: 'class', like: 'class',
+      attendance: 'live-attendance', payment: 'payments', grade: 'grades',
+      chat: 'notifications', message: 'notifications',
+      submission: 't-home', 'task-submission': 't-home', 'post-feedback': 't-home',
+      inquiry: 'reportes', receipt: 'pagos', 'new-student': 'estudiantes',
+      'new-teacher': 'maestros', alert: 'pagos', info: 'dashboard',
     };
     return map[type] || null;
   },
 
   _sectionToTypes(section) {
     const map = {
-      tasks:             ['task', 'submission'],
-      class:             ['post', 'muro'],
+      tasks: ['task'],
+      class: ['post', 'muro', 'comment', 'like'],
       'live-attendance': ['attendance'],
-      payments:          ['payment', 'receipt', 'alert'],
-      grades:            ['grade'],
-      notifications:     ['chat'],
-      't-home':          ['submission', 'task-submission'],
-      't-chat':          ['chat'],
-      't-grades':        ['grade'],
-      reportes:          ['inquiry'],
-      pagos:             ['receipt', 'payment', 'alert'],
-      estudiantes:       ['new-student'],
-      maestros:          ['new-teacher'],
-      muro:              ['post', 'muro'],
-      chat:              ['chat'],
-      comunicacion:      ['chat'],
+      payments: ['payment', 'receipt', 'alert'],
+      grades: ['grade'],
+      notifications: ['chat', 'message'],
+      't-home': ['submission', 'task-submission'],
+      't-chat': ['chat', 'message'],
+      reportes: ['inquiry'],
+      pagos: ['receipt', 'payment', 'alert'],
+      muro: ['post', 'muro'],
+      chat: ['chat', 'message'],
+      comunicacion: ['chat', 'message'],
     };
     return map[section] || [];
   },
 
-  // ── Glow en tarjeta del dashboard ─────────────────────────────────────────
-  _glowCard(target, color = 'orange') {
-    const card = document.querySelector(`[data-target="${target}"]`);
-    if (!card) return;
-    const cls = `card-glow-${color}`;
-    card.classList.remove('card-glow-orange','card-glow-blue','card-glow-green','card-glow-red');
-    void card.offsetWidth;
-    card.classList.add(cls);
-    setTimeout(() => card.classList.remove(cls), 2000);
-  },
-
-  // ── Dot badge en tarjeta del dashboard ────────────────────────────────────
-  _setDotBadge(badgeId, show, color = 'red') {
-    const el = document.getElementById(badgeId);
-    if (!el) return;
-    if (show) {
-      el.textContent = '●';
-      el.classList.remove('hidden');
-      el.classList.add('flex');
-      el.style.cssText = `background:${
-        color === 'green' ? '#22c55e' :
-        color === 'blue'  ? '#3b82f6' :
-        color === 'orange'? '#f97316' : '#ef4444'
-      };font-size:8px;min-width:10px;height:10px;`;
-      // Glow en la tarjeta padre
-      const card = el.closest('[data-target]');
-      if (card) this._glowCard(card.dataset.target, color);
-      // Sonido
-      this._playSound(color);
-    } else {
-      el.classList.add('hidden');
-      el.classList.remove('flex');
+  _applyGlow(section) {
+    const btn = document.querySelector('[data-target="' + section + '"], .node-' + section);
+    if (btn) {
+      btn.classList.add('animate-glow');
+      setTimeout(function() { btn.classList.remove('animate-glow'); }, 4000);
     }
+    const card = document.querySelector('[data-target="' + section + '"]');
+    if (card) {
+      card.classList.remove('card-glow-orange', 'card-glow-blue', 'card-glow-green', 'card-glow-red');
+      void card.offsetWidth;
+      card.classList.add('card-glow-orange');
+      setTimeout(function() { card.classList.remove('card-glow-orange'); }, 2000);
+    }
+    this._playSound('orange');
   },
 
-  _clearDotBadge(badgeId) { this._setDotBadge(badgeId, false); },
-
-  // ── Sonido de notificación (Web Audio API) ─────────────────────────────────
   _audioCtx: null,
-  _playSound(priority = 'orange') {
+  _playSound(priority) {
+    if (priority === undefined) priority = 'orange';
     if (document.hidden) return;
     try {
       if (!this._audioCtx) {
         this._audioCtx = new (window.AudioContext || window.webkitAudioContext)();
       }
       const ctx = this._audioCtx;
-      if (ctx.state === 'suspended') { ctx.resume().catch(() => {}); return; }
-
-      // Configuración por prioridad: red=urgente, orange=medio, blue=info, green=éxito
-      const cfg = {
-        red:    [{ f: 880, t: 0 }, { f: 1100, t: 0.13 }],
-        orange: [{ f: 660, t: 0 }, { f: 880,  t: 0.12 }],
-        blue:   [{ f: 523, t: 0 }],
-        green:  [{ f: 440, t: 0 }, { f: 554,  t: 0.10 }],
-      }[priority] || [{ f: 660, t: 0 }];
-
+      if (ctx.state === 'suspended') { ctx.resume().catch(function() {}); return; }
+      const cfgMap = {
+        red:    [{f:880,t:0},{f:1100,t:0.13}],
+        orange: [{f:660,t:0},{f:880,t:0.12}],
+        blue:   [{f:523,t:0}],
+        green:  [{f:440,t:0},{f:554,t:0.10}],
+      };
+      const cfg = cfgMap[priority] || [{f:660,t:0}];
       const vol = priority === 'red' ? 0.10 : 0.06;
-      cfg.forEach(({ f, t }) => {
+      cfg.forEach(function(item) {
         const osc = ctx.createOscillator();
         const gain = ctx.createGain();
-        osc.connect(gain); gain.connect(ctx.destination);
+        osc.connect(gain);
+        gain.connect(ctx.destination);
         osc.type = 'sine';
-        osc.frequency.value = f;
-        gain.gain.setValueAtTime(vol, ctx.currentTime + t);
-        gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + t + 0.14);
-        osc.start(ctx.currentTime + t);
-        osc.stop(ctx.currentTime + t + 0.15);
+        osc.frequency.value = item.f;
+        gain.gain.setValueAtTime(vol, ctx.currentTime + item.t);
+        gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + item.t + 0.14);
+        osc.start(ctx.currentTime + item.t);
+        osc.stop(ctx.currentTime + item.t + 0.15);
       });
     } catch (_) {}
   },
 
-  // ── Mini-toast discreto ────────────────────────────────────────────────────
   _showMiniToast(msg) {
     if (document.hidden) return;
+    const existing = document.getElementById('karpus-mini-toast');
+    if (existing) existing.remove();
     const toast = document.createElement('div');
-    toast.style.cssText = 'position:fixed;bottom:80px;left:50%;transform:translateX(-50%) translateY(20px);background:rgba(15,23,42,0.92);color:white;padding:8px 16px;border-radius:20px;font-size:12px;font-weight:700;z-index:9990;pointer-events:none;backdrop-filter:blur(8px);box-shadow:0 4px 16px rgba(0,0,0,0.3);transition:all 0.3s ease;opacity:0;white-space:nowrap;';
+    toast.id = 'karpus-mini-toast';
+    toast.style.cssText = [
+      'position:fixed', 'bottom:80px', 'left:50%',
+      'transform:translateX(-50%) translateY(20px)',
+      'background:rgba(15,23,42,0.92)', 'color:white',
+      'padding:8px 16px', 'border-radius:20px',
+      'font-size:12px', 'font-weight:700', 'z-index:9990',
+      'pointer-events:none', 'backdrop-filter:blur(8px)',
+      'box-shadow:0 4px 16px rgba(0,0,0,0.3)',
+      'transition:all 0.3s ease', 'opacity:0', 'white-space:nowrap'
+    ].join(';');
     toast.textContent = msg;
     document.body.appendChild(toast);
-    requestAnimationFrame(() => { toast.style.opacity='1'; toast.style.transform='translateX(-50%) translateY(0)'; });
-    setTimeout(() => { toast.style.opacity='0'; toast.style.transform='translateX(-50%) translateY(10px)'; setTimeout(() => toast.remove(), 300); }, 3000);
+    requestAnimationFrame(function() {
+      toast.style.opacity = '1';
+      toast.style.transform = 'translateX(-50%) translateY(0)';
+    });
+    setTimeout(function() {
+      toast.style.opacity = '0';
+      toast.style.transform = 'translateX(-50%) translateY(10px)';
+      setTimeout(function() { toast.remove(); }, 300);
+    }, 3000);
   }
 };

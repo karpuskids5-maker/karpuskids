@@ -789,22 +789,33 @@ async function submitNewPost() {
       setProgress(90);
     }
 
-    const { error } = await supabase.from('posts').insert({
-      classroom_id: AppState.get('classroom').id,
-      teacher_id: AppState.get('user').id,
-      content: content,
-      media_url: mediaUrl,
-      media_type: mediaType
-    });
+    const classroom = AppState.get('classroom');
+    const user = AppState.get('user');
+    if (!classroom || !user) throw new Error('No hay sesión activa');
+
+    const insertPayload = {
+      classroom_id: classroom.id,
+      teacher_id:   user.id,
+      content:      content,
+      media_url:    mediaUrl,
+      media_type:   mediaType
+    };
+
+    const { error } = await supabase.from('posts').insert(insertPayload);
 
     setProgress(100);
-    if (error) throw error;
+    if (error) {
+      // Si el error es por send_notification, intentar con RPC directo
+      if (error.message?.includes('send_notification') || error.code === '42883') {
+        throw new Error('La función send_notification no existe en la DB. Ejecuta fix_posts_insert.sql en Supabase.');
+      }
+      throw error;
+    }
     safeToast('Publicado correctamente', 'success');
     Modal.close('newPostModal');
     WallModule.loadPosts(document.getElementById('muroPostsContainer'));
 
     // Notify parents of this classroom (via background event)
-    const classroom = AppState.get('classroom');
     const teacherName = AppState.get('profile')?.name || 'La maestra';
 
     emitEvent('post.created', {

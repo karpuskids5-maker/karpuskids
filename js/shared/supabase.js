@@ -21,6 +21,8 @@ supabase.auth.onAuthStateChange((event, session) => {
     // Token refrescado — no hacer nada, las próximas requests usarán el nuevo token
   }
   if (event === 'SIGNED_OUT') {
+    // No redirigir si el panel está en proceso de inicialización/refresh
+    if (window._karpusInitializing) return;
     // Sesión cerrada — redirigir al login
     if (!window.location.pathname.includes('login.html') &&
         !window.location.pathname.includes('index.html')) {
