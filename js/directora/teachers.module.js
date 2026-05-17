@@ -1,4 +1,4 @@
-import { DirectorApi } from './api.js';
+ï»¿import { DirectorApi } from './api.js';
 import { Helpers } from '../shared/helpers.js';
 import { UI } from './ui.module.js';
 import { AppState } from './state.js';
@@ -87,14 +87,14 @@ export const TeachersModule = {
     };
     // email solo para crear, no para actualizar (Supabase no permite update de email via profiles)
     const emailVal = (document.getElementById('tEmail').value || '').trim();
-    if (!id) payload.email = emailVal; // solo en creación
+    if (!id) payload.email = emailVal; // solo en creaciï¿½n
 
     const matricula = (document.getElementById('tMatricula').value || '').trim();
     if (matricula) payload.access_code = matricula;
     
     const password = document.getElementById('tPassword')?.value;
 
-    if (!payload.name || payload.name.length < 3) return Helpers.toast('Nombre inválido (min 3 caracteres)', 'warning');
+    if (!payload.name || payload.name.length < 3) return Helpers.toast('Nombre invï¿½lido (min 3 caracteres)', 'warning');
     if (!id && !emailVal) return Helpers.toast('Correo requerido', 'warning');
     
     UI.setLoading(true);
@@ -103,7 +103,7 @@ export const TeachersModule = {
       if (id) {
         res = await DirectorApi.updateTeacher(id, payload);
       } else {
-        if (!password || password.length < 6) throw new Error('Contraseña requerida (mínimo 6 caracteres)');
+        if (!password || password.length < 6) throw new Error('Contraseï¿½a requerida (mï¿½nimo 6 caracteres)');
         
         const tempClient = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
            auth: { persistSession: false, autoRefreshToken: false, detectSessionInUrl: false }
@@ -144,7 +144,7 @@ export const TeachersModule = {
         <div class="flex items-center gap-3">
           <div class="w-12 h-12 bg-white/20 rounded-2xl flex items-center justify-center text-2xl shadow-inner">?????</div>
           <div>
-            <h3 class="text-xl font-black">${id ? 'Editar Maestra' : 'Gestión de Personal'}</h3>
+            <h3 class="text-xl font-black">${id ? 'Editar Maestra' : 'Gestiï¿½n de Personal'}</h3>
             <p class="text-xs text-white/70 font-bold uppercase tracking-widest">Maestras y Asistentes</p>
           </div>
         </div>
@@ -161,16 +161,16 @@ export const TeachersModule = {
           </div>
           
           <div>
-            <label class="${labelClass}">Correo electrónico</label>
+            <label class="${labelClass}">Correo electrï¿½nico</label>
             <input id="tEmail" placeholder="usuario@karpus.com" type="email" class="${inputClass}">
           </div>
 
           <div class="col-span-2 bg-gradient-to-br from-orange-50 to-amber-50 p-6 rounded-[2rem] border-2 border-orange-100 space-y-4">
             <h4 class="text-sm font-black text-orange-800 flex items-center gap-2">
               <div class="w-8 h-8 rounded-xl bg-orange-100 text-orange-600 flex items-center justify-center"><i data-lucide="qr-code" class="w-4 h-4"></i></div>
-              ?? CÓDIGO QR DE ACCESO (PERSONAL)
+              ?? Cï¿½DIGO QR DE ACCESO (PERSONAL)
             </h4>
-            <p class="text-xs text-orange-600 font-medium leading-relaxed">Este código permite a la maestra/asistente registrar su propia asistencia en el terminal de ponche.</p>
+            <p class="text-xs text-orange-600 font-medium leading-relaxed">Este cï¿½digo permite a la maestra/asistente registrar su propia asistencia en el terminal de ponche.</p>
             
             <div class="bg-white p-6 rounded-3xl border border-orange-100 shadow-sm flex flex-col items-center gap-4">
               <div class="flex gap-2 w-full">
@@ -195,15 +195,15 @@ export const TeachersModule = {
           </div>
 
           <div>
-            <label class="${labelClass}">Teléfono</label>
+            <label class="${labelClass}">Telï¿½fono</label>
             <input id="tPhone" placeholder="Opcional" type="tel" class="${inputClass}">
           </div>
 
           <div class="col-span-2" id="passwordFieldContainer" style="${id ? 'display:none' : ''}">
-            <label class="${labelClass}">Contraseña <span class="text-rose-400 normal-case ml-1 font-normal">(Mínimo 6 caracteres)</span></label>
+            <label class="${labelClass}">Contraseï¿½a <span class="text-rose-400 normal-case ml-1 font-normal">(Mï¿½nimo 6 caracteres)</span></label>
             <div class="relative">
               <i data-lucide="lock" class="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400"></i>
-              <input id="tPassword" placeholder="Crear contraseña de acceso" type="text" class="${inputClass} pl-10">
+              <input id="tPassword" placeholder="Crear contraseï¿½a de acceso" type="text" class="${inputClass} pl-10">
             </div>
             <p class="text-[10px] text-slate-400 mt-1 ml-1">* Solo requerida para nuevos usuarios</p>
           </div>
@@ -234,7 +234,7 @@ export const TeachersModule = {
 
     window.openGlobalModal(modalHTML);
 
-    // Función para generar código de acceso del personal
+    // Funciï¿½n para generar cï¿½digo de acceso del personal
     window.genStaffCode = async () => {
       const prefix = 'TEA';
       const code = prefix + '-' + new Date().getFullYear() + '-' + String(Math.floor(Math.random() * 9000) + 1000);
@@ -247,7 +247,7 @@ export const TeachersModule = {
         if (teacherId) {
           const { error } = await supabase.from('profiles').update({ access_code: code }).eq('id', teacherId);
           if (!error) {
-            Helpers.toast('Código de acceso guardado', 'success');
+            Helpers.toast('Cï¿½digo de acceso guardado', 'success');
             // Update cache
             const teachers = AppState.get('teachers') || [];
             const idx = teachers.findIndex(t => t.id === teacherId);
@@ -266,11 +266,11 @@ export const TeachersModule = {
         return;
       }
 
-      // Cargar librería QR si no está
+      // Cargar librerï¿½a QR si no estï¿½
       if (!window.QRCode) {
         await new Promise(resolve => {
           const s = document.createElement('script');
-          s.src = 'https://cdn.jsdelivr.net/npm/qrcodejs@1.0.0/qrcode.min.js';
+          s.src = 'js/shared/qrcode.min.js';
           s.onload = resolve;
           document.head.appendChild(s);
         });
@@ -307,7 +307,7 @@ export const TeachersModule = {
         </style>
       </head><body>
         <div class="card">
-          <div class="header">STAFF · KARPUS KIDS</div>
+          <div class="header">STAFF ï¿½ KARPUS KIDS</div>
           <img src="${qrImg}" alt="QR">
           <div class="name">${name || 'Personal'}</div>
           <div class="role">${role || 'Maestra'}</div>
@@ -318,7 +318,7 @@ export const TeachersModule = {
       win.document.close();
     };
 
-    // Escuchar cambios en el input de matrícula para actualizar QR
+    // Escuchar cambios en el input de matrï¿½cula para actualizar QR
     document.getElementById('tMatricula')?.addEventListener('input', (e) => {
       clearTimeout(window._staffQrDebounce);
       window._staffQrDebounce = setTimeout(() => window.renderStaffQR(e.target.value.trim()), 600);

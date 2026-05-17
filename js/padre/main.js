@@ -1,4 +1,4 @@
-import { supabase, ensureRole, initOneSignal } from '../shared/supabase.js';
+﻿import { supabase, ensureRole, initOneSignal } from '../shared/supabase.js';
 import { Api } from './api.js';
 import { Helpers } from './helpers.js';
 import { AppState } from './appState.js';
@@ -23,6 +23,7 @@ window.App = {
   attendance: AttendanceModule, chat: ChatModule, profile: ProfileModule,
   grades: GradesModule, navigateTo: navigateTo
 };
+window.BadgeSystem = BadgeSystem;
 
 // Global error handler
 window.addEventListener('unhandledrejection', (e) => {
@@ -96,7 +97,10 @@ document.addEventListener('DOMContentLoaded', async () => {
     if (summary) summary.innerHTML = Helpers.skeleton(1, 'h-40');
 
     // Carga paralela — no bloquea UI
-    refreshDashboard();
+    refreshDashboard().then(() => {
+      // Iniciar badges DESPUÉS de que las tarjetas del dashboard existan
+      BadgeSystem.init(auth.user.id);
+    });
 
     if (currentStudent?.classroom_id) {
       initLiveClassListener(currentStudent.classroom_id);
@@ -116,14 +120,13 @@ document.addEventListener('DOMContentLoaded', async () => {
     loadUnreadBadge();
     initMessageBadgeRealtime();
 
-    // 🔴 Sistema de badges por sección
-    BadgeSystem.init(auth.user.id);
+    // 🔴 Sistema de badges — se inicia en el .then() de refreshDashboard arriba
 
     // Precargar librería QR en background para que esté lista cuando el padre la necesite
     setTimeout(() => {
       if (!window.QRCode) {
         const s = document.createElement('script');
-        s.src = 'https://cdn.jsdelivr.net/npm/qrcodejs@1.0.0/qrcode.min.js';
+        s.src = 'js/shared/qrcode.min.js';
         document.head.appendChild(s);
       }
     }, 2000);
@@ -420,7 +423,12 @@ export function navigateTo(targetId) {
 
     const student = AppState.get('currentStudent');
     switch (targetId) {
-      case 'home':            refreshDashboard(); break;
+      case 'home':
+        refreshDashboard().then(() => {
+          // Re-aplicar badges en tarjetas después de que se rendericen
+          if (window.BadgeSystem) BadgeSystem._reapplyCardBadges();
+        });
+        break;
       case 'payments': {
         const fin = AppState.get('financeConfig') || {};
         // Update header stats
@@ -675,7 +683,7 @@ async function _initPadreQR(student) {
     if (!window.QRCode) {
       await new Promise((resolve, reject) => {
         const s = document.createElement('script');
-        s.src = 'https://cdn.jsdelivr.net/npm/qrcodejs@1.0.0/qrcode.min.js';
+        s.src = 'js/shared/qrcode.min.js';
         s.onload = resolve;
         s.onerror = reject;
         document.head.appendChild(s);

@@ -1,4 +1,4 @@
-import { supabase, ensureRole, emitEvent, sendPush, initOneSignal } from '../shared/supabase.js';
+﻿import { supabase, ensureRole, emitEvent, sendPush, initOneSignal } from '../shared/supabase.js';
 import { AppState } from './state.js';
 import { MaestraApi } from './api.js';
 import { Helpers } from '../shared/helpers.js';
@@ -1044,7 +1044,7 @@ async function _initMaestraQR(profile, user) {
   if (!window.QRCode) {
     await new Promise(r => {
       const s = document.createElement('script');
-      s.src = 'https://cdn.jsdelivr.net/npm/qrcodejs@1.0.0/qrcode.min.js';
+      s.src = 'js/shared/qrcode.min.js';
       s.onload = r;
       document.head.appendChild(s);
     });

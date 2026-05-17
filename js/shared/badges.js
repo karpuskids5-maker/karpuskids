@@ -1,11 +1,13 @@
 ﻿/**
  * Karpus Kids - Badge System v2
  * Indicadores visuales en tiempo real para todos los paneles.
+ * Compatible con: panel_padres, panel_directora, panel_asistente, panel-maestra
  */
 
 export const BadgeSystem = {
   _userId: null,
   _role: null,
+  _counts: {},   // conteos en memoria para re-aplicar en tarjetas dinámicas
 
   async init(userId) {
     if (!userId) return;
@@ -15,16 +17,32 @@ export const BadgeSystem = {
     this._subscribeRealtime();
   },
 
+  // Detecta el panel activo por elementos unicos en el DOM
   _detectRole() {
-    if (document.getElementById('badge-class'))  return 'padre';
-    if (document.getElementById('badge-t-chat')) return 'maestra';
-    if (document.getElementById('badge-pagos'))  return 'directora';
+    if (document.getElementById('badge-class'))   return 'padre';
+    if (document.getElementById('badge-t-chat'))  return 'maestra';
+    // Asistente tiene badge-muro, directora no
+    if (document.getElementById('badge-muro'))    return 'asistente';
+    if (document.getElementById('badge-pagos'))   return 'directora';
     return 'unknown';
+  },
+
+  // Obtiene la seccion activa — compatible con todos los paneles
+  _getActiveSection() {
+    const el = document.querySelector('.section.active');
+    return el ? el.id : '';
+  },
+
+  _getBadgeCount(section) {
+    const el = document.getElementById('badge-' + section);
+    return el ? (parseInt(el.textContent) || 0) : 0;
   },
 
   async _loadCounts() {
     try {
       const { supabase } = await import('./supabase.js');
+
+      // Notificaciones no leidas
       const { data: notifs } = await supabase
         .from('notifications')
         .select('type')
@@ -38,41 +56,45 @@ export const BadgeSystem = {
           const section = this._typeToSection(n.type);
           if (section) counts[section] = (counts[section] || 0) + 1;
         }
-        for (const [section, count] of Object.entries(counts)) {
-          this._renderBadge(section, count);
-          this._renderCardBadge(section, count);
+        for (const section in counts) {
+          this._renderBadge(section, counts[section]);
+          this._renderCardBadge(section, counts[section]);
         }
       }
 
+      // Mensajes no leidos
       try {
         const { data: unreadData } = await supabase.rpc('get_unread_counts');
         if (unreadData) {
-          const total = Object.values(unreadData).reduce((a, b) => a + Number(b), 0);
+          const total = Object.values(unreadData).reduce(function(a, b) { return a + Number(b); }, 0);
           if (total > 0) {
+            // Panel padre
             this._renderBadge('notifications', total);
             this._renderCardBadge('notifications', total);
+            // Panel staff
             this._renderBadge('chat', total);
             this._renderBadge('comunicacion', total);
+            this._renderCardBadge('comunicacion', total);
           }
         }
       } catch (_) {}
+
     } catch (_) {}
   },
 
   _subscribeRealtime() {
     if (!this._userId) return;
-    const uid = this._userId;
-    import('./supabase.js').then(({ supabase }) => {
-      import('./realtime-manager.js').then(({ RealtimeManager }) => {
-        RealtimeManager.subscribe('badges_' + uid, (channel) => {
-          this._setupChannelListeners(channel);
+    const self = this;
+    import('./supabase.js').then(function(mod) {
+      import('./realtime-manager.js').then(function(rtMod) {
+        rtMod.RealtimeManager.subscribe('badges_' + self._userId, function(channel) {
+          self._setupChannelListeners(channel);
         });
-      }).catch(() => {
-        import('./supabase.js').then(({ supabase: sb }) => {
-          const channel = sb.channel('badges_direct_' + uid);
-          this._setupChannelListeners(channel);
-          channel.subscribe();
-        });
+      }).catch(function() {
+        // Fallback sin RealtimeManager
+        const channel = mod.supabase.channel('badges_direct_' + self._userId);
+        self._setupChannelListeners(channel);
+        channel.subscribe();
       });
     });
   },
@@ -80,42 +102,59 @@ export const BadgeSystem = {
   _setupChannelListeners(channel) {
     const self = this;
 
+    // 1. Nuevas notificaciones del usuario
     channel.on('postgres_changes', {
-      event: 'INSERT', schema: 'public', table: 'notifications',
+      event: 'INSERT',
+      schema: 'public',
+      table: 'notifications',
       filter: 'user_id=eq.' + self._userId
     }, function(payload) {
-      const section = self._typeToSection(payload.new && payload.new.type);
+      const type = payload.new && payload.new.type;
+      const section = self._typeToSection(type);
       if (!section) return;
-      if (self._getActiveSection() === section) { self._markReadInDB(section); return; }
+      const active = self._getActiveSection();
+      if (active === section) { self._markReadInDB(section); return; }
       const prev = self._getBadgeCount(section);
       self._renderBadge(section, prev + 1);
       self._renderCardBadge(section, prev + 1);
       self._applyGlow(section);
-      self._showMiniToast(self._toastMsg(payload.new && payload.new.type));
+      self._showMiniToast(self._toastMsg(type));
     });
 
+    // 2. Nuevos mensajes directos
     channel.on('postgres_changes', {
-      event: 'INSERT', schema: 'public', table: 'messages'
+      event: 'INSERT',
+      schema: 'public',
+      table: 'messages'
     }, function(payload) {
       if (payload.new && payload.new.sender_id === self._userId) return;
       const active = self._getActiveSection();
       if (active === 'notifications' || active === 'chat' || active === 'comunicacion') return;
-      const prev = self._getBadgeCount('notifications');
-      self._renderBadge('notifications', prev + 1);
-      self._renderCardBadge('notifications', prev + 1);
-      self._renderBadge('chat', prev + 1);
-      self._renderBadge('comunicacion', prev + 1);
+      // Panel padre
+      const prevN = self._getBadgeCount('notifications');
+      self._renderBadge('notifications', prevN + 1);
+      self._renderCardBadge('notifications', prevN + 1);
+      // Panel staff
+      const prevC = self._getBadgeCount('chat');
+      self._renderBadge('chat', prevC + 1);
+      self._renderBadge('comunicacion', prevC + 1);
+      self._renderCardBadge('comunicacion', prevC + 1);
       self._applyGlow('notifications');
-      self._applyGlow('chat');
+      self._applyGlow('comunicacion');
       self._showMiniToast('Nuevo mensaje');
     });
 
+    // 3. Nuevos posts en el muro
     channel.on('postgres_changes', {
-      event: 'INSERT', schema: 'public', table: 'posts'
+      event: 'INSERT',
+      schema: 'public',
+      table: 'posts'
     }, function(payload) {
       if (payload.new && payload.new.teacher_id === self._userId) return;
+      // Panel padre: badge-class | Panel staff: badge-muro
       const section = document.getElementById('badge-class') ? 'class' : 'muro';
-      if (self._getActiveSection() === section) return;
+      const active = self._getActiveSection();
+      if (active === section) return;
       const prev = self._getBadgeCount(section);
       self._renderBadge(section, prev + 1);
       self._renderCardBadge(section, prev + 1);
@@ -123,10 +162,14 @@ export const BadgeSystem = {
       self._showMiniToast('Nueva publicacion en el muro');
     });
 
+    // 4. Nuevas tareas (panel padre y maestra)
     channel.on('postgres_changes', {
-      event: 'INSERT', schema: 'public', table: 'tasks'
+      event: 'INSERT',
+      schema: 'public',
+      table: 'tasks'
     }, function() {
-      if (self._getActiveSection() === 'tasks') return;
+      const active = self._getActiveSection();
+      if (active === 'tasks') return;
       const prev = self._getBadgeCount('tasks');
       self._renderBadge('tasks', prev + 1);
       self._renderCardBadge('tasks', prev + 1);
@@ -134,57 +177,78 @@ export const BadgeSystem = {
       self._showMiniToast('Nueva tarea asignada');
     });
 
+    // 5. Entregas de tareas (panel maestra)
     channel.on('postgres_changes', {
-      event: 'INSERT', schema: 'public', table: 'task_evidences'
+      event: 'INSERT',
+      schema: 'public',
+      table: 'task_evidences'
     }, function() {
-      if (self._getActiveSection() === 't-home') return;
+      const active = self._getActiveSection();
+      if (active === 't-home') return;
       const prev = self._getBadgeCount('t-home');
       self._renderBadge('t-home', prev + 1);
       self._applyGlow('t-home');
+      self._showMiniToast('Nueva entrega de tarea');
     });
 
+    // 6. Comprobantes de pago subidos (panel directora/asistente)
     channel.on('postgres_changes', {
-      event: 'UPDATE', schema: 'public', table: 'payments'
+      event: 'UPDATE',
+      schema: 'public',
+      table: 'payments'
     }, function(payload) {
       const ns = ((payload.new && payload.new.status) || '').toLowerCase();
       const os = ((payload.old && payload.old.status) || '').toLowerCase();
       if (ns === os) return;
+      // Padre: pago aprobado
       if (ns === 'paid' || ns === 'pagado' || ns === 'approved') {
-        if (self._getActiveSection() === 'payments') return;
-        self._applyGlow('payments');
-        self._showMiniToast('Pago confirmado');
+        const active = self._getActiveSection();
+        if (active !== 'payments') {
+          self._applyGlow('payments');
+          self._showMiniToast('Pago confirmado');
+        }
       }
+      // Staff: nuevo comprobante para revisar
+      if (ns === 'review' || ns === 'revision') {
+        const active = self._getActiveSection();
+        if (active !== 'pagos') {
+          const prev = self._getBadgeCount('pagos');
+          self._renderBadge('pagos', prev + 1);
+          self._applyGlow('pagos');
+          self._showMiniToast('Nuevo comprobante de pago');
+        }
+      }
+    });
+
+    // 7. Nuevas consultas/inquiries (panel directora)
+    channel.on('postgres_changes', {
+      event: 'INSERT',
+      schema: 'public',
+      table: 'inquiries'
+    }, function() {
+      const active = self._getActiveSection();
+      if (active === 'reportes') return;
+      const prev = self._getBadgeCount('reportes');
+      self._renderBadge('reportes', prev + 1);
+      self._applyGlow('reportes');
+      self._showMiniToast('Nueva consulta recibida');
     });
   },
 
-  _getActiveSection() {
-    const el = document.querySelector('.section.active');
-    return el ? el.id : '';
-  },
-
-  _getBadgeCount(section) {
-    const el = document.getElementById('badge-' + section);
-    return el ? (parseInt(el.textContent) || 0) : 0;
-  },
-
-  _toastMsg(type) {
-    const msgs = {
-      task: 'Nueva tarea asignada', post: 'Nueva publicacion',
-      muro: 'Nueva publicacion', chat: 'Nuevo mensaje',
-      message: 'Nuevo mensaje', attendance: 'Asistencia registrada',
-      payment: 'Actualizacion de pago', grade: 'Nueva calificacion',
-    };
-    return msgs[type] || 'Nueva notificacion';
-  },
-
   mark(section) {
+    this._counts[section] = 0;
     this._renderBadge(section, 0);
     this._renderCardBadge(section, 0);
     this._markReadInDB(section);
-    if (section === 'chat' || section === 'notifications') {
+    // Limpiar aliases
+    if (section === 'chat' || section === 'notifications' || section === 'comunicacion') {
+      this._counts['chat'] = 0;
+      this._counts['comunicacion'] = 0;
+      this._counts['notifications'] = 0;
       this._renderBadge('chat', 0);
       this._renderBadge('comunicacion', 0);
       this._renderBadge('notifications', 0);
+      this._renderCardBadge('comunicacion', 0);
       this._renderCardBadge('notifications', 0);
     }
   },
@@ -194,7 +258,9 @@ export const BadgeSystem = {
     this._renderCardBadge(section, count);
   },
 
+  // Badge en el sidebar (badge-class, badge-tasks, badge-pagos, etc.)
   _renderBadge(section, count) {
+    this._counts[section] = count; // guardar en memoria
     const badge = document.getElementById('badge-' + section);
     if (!badge) return;
     if (count > 0) {
@@ -207,6 +273,7 @@ export const BadgeSystem = {
     }
   },
 
+  // Badge en tarjeta del dashboard (badge-card-tasks, badge-card-comunicacion, etc.)
   _renderCardBadge(section, count) {
     const badge = document.getElementById('badge-card-' + section);
     if (!badge) return;
@@ -220,61 +287,120 @@ export const BadgeSystem = {
     }
   },
 
+  // Re-aplica badges en tarjetas del dashboard después de que se re-rendericen
+  // Llamar después de refreshDashboard() en panel padre
+  _reapplyCardBadges() {
+    for (const section in this._counts) {
+      const count = this._counts[section];
+      if (count > 0) this._renderCardBadge(section, count);
+    }
+  },
+
   async _markReadInDB(section) {
     if (!this._userId) return;
     try {
       const { supabase } = await import('./supabase.js');
       const types = this._sectionToTypes(section);
       if (!types.length) return;
-      await supabase.from('notifications').update({ is_read: true })
-        .eq('user_id', this._userId).in('type', types).eq('is_read', false);
+      await supabase.from('notifications')
+        .update({ is_read: true })
+        .eq('user_id', this._userId)
+        .in('type', types)
+        .eq('is_read', false);
     } catch (_) {}
   },
 
   _typeToSection(type) {
     const map = {
-      task: 'tasks', post: 'class', muro: 'class', comment: 'class', like: 'class',
-      attendance: 'live-attendance', payment: 'payments', grade: 'grades',
-      chat: 'notifications', message: 'notifications',
-      submission: 't-home', 'task-submission': 't-home', 'post-feedback': 't-home',
-      inquiry: 'reportes', receipt: 'pagos', 'new-student': 'estudiantes',
-      'new-teacher': 'maestros', alert: 'pagos', info: 'dashboard',
+      // Panel padre
+      task:              'tasks',
+      post:              'class',
+      muro:              'class',
+      comment:           'class',
+      like:              'class',
+      attendance:        'live-attendance',
+      payment:           'payments',
+      grade:             'grades',
+      chat:              'notifications',
+      message:           'notifications',
+      // Panel maestra
+      submission:        't-home',
+      'task-submission': 't-home',
+      'post-feedback':   't-home',
+      // Panel directora / asistente
+      inquiry:           'reportes',
+      receipt:           'pagos',
+      'new-student':     'estudiantes',
+      'new-teacher':     'maestros',
+      alert:             'pagos',
+      info:              'dashboard',
     };
     return map[type] || null;
   },
 
   _sectionToTypes(section) {
     const map = {
-      tasks: ['task'],
-      class: ['post', 'muro', 'comment', 'like'],
+      tasks:             ['task'],
+      class:             ['post', 'muro', 'comment', 'like'],
       'live-attendance': ['attendance'],
-      payments: ['payment', 'receipt', 'alert'],
-      grades: ['grade'],
-      notifications: ['chat', 'message'],
-      't-home': ['submission', 'task-submission'],
-      't-chat': ['chat', 'message'],
-      reportes: ['inquiry'],
-      pagos: ['receipt', 'payment', 'alert'],
-      muro: ['post', 'muro'],
-      chat: ['chat', 'message'],
-      comunicacion: ['chat', 'message'],
+      payments:          ['payment', 'receipt', 'alert'],
+      grades:            ['grade'],
+      notifications:     ['chat', 'message'],
+      't-home':          ['submission', 'task-submission'],
+      't-chat':          ['chat', 'message'],
+      reportes:          ['inquiry'],
+      pagos:             ['receipt', 'payment', 'alert'],
+      muro:              ['post', 'muro'],
+      chat:              ['chat', 'message'],
+      comunicacion:      ['chat', 'message'],
+      maestros:          ['new-teacher'],
+      estudiantes:       ['new-student'],
     };
     return map[section] || [];
   },
 
+  _toastMsg(type) {
+    const msgs = {
+      task:       'Nueva tarea asignada',
+      post:       'Nueva publicacion en el muro',
+      muro:       'Nueva publicacion en el muro',
+      chat:       'Nuevo mensaje',
+      message:    'Nuevo mensaje',
+      attendance: 'Asistencia registrada',
+      payment:    'Actualizacion de pago',
+      grade:      'Nueva calificacion',
+      inquiry:    'Nueva consulta recibida',
+      receipt:    'Nuevo comprobante de pago',
+      submission: 'Nueva entrega de tarea',
+    };
+    return msgs[type] || 'Nueva notificacion';
+  },
+
+  // Glow en boton del sidebar Y en tarjeta del dashboard
+  // Compatible con data-target (padre) y data-section (directora/asistente/maestra)
   _applyGlow(section) {
-    const btn = document.querySelector('[data-target="' + section + '"], .node-' + section);
-    if (btn) {
-      btn.classList.add('animate-glow');
+    // Sidebar: buscar por data-target O data-section
+    const sidebarBtn = document.querySelector(
+      '[data-target="' + section + '"], [data-section="' + section + '"], .node-' + section
+    );
+    if (sidebarBtn) {
+      sidebarBtn.classList.add('animate-glow');
+      const btn = sidebarBtn;
       setTimeout(function() { btn.classList.remove('animate-glow'); }, 4000);
     }
-    const card = document.querySelector('[data-target="' + section + '"]');
-    if (card) {
+
+    // Tarjeta del dashboard: buscar por data-target O data-section O data-action
+    const card = document.querySelector(
+      '[data-target="' + section + '"], [data-section="' + section + '"]'
+    );
+    if (card && card !== sidebarBtn) {
       card.classList.remove('card-glow-orange', 'card-glow-blue', 'card-glow-green', 'card-glow-red');
       void card.offsetWidth;
       card.classList.add('card-glow-orange');
-      setTimeout(function() { card.classList.remove('card-glow-orange'); }, 2000);
+      const c = card;
+      setTimeout(function() { c.classList.remove('card-glow-orange'); }, 2000);
     }
+
     this._playSound('orange');
   },
 

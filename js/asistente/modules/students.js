@@ -1,4 +1,4 @@
-import { supabase, createClient, SUPABASE_URL, SUPABASE_ANON_KEY } from '../../shared/supabase.js';
+﻿import { supabase, createClient, SUPABASE_URL, SUPABASE_ANON_KEY } from '../../shared/supabase.js';
 import { Helpers } from '../../shared/helpers.js';
 
 const IC = 'w-full px-4 py-2.5 border-2 border-slate-100 rounded-2xl outline-none focus:ring-4 focus:ring-teal-100 focus:border-teal-400 bg-slate-50/50 transition-all text-sm font-medium';
@@ -253,7 +253,7 @@ export const StudentsModule = {
       const label = document.getElementById('asis-qr-label');
       if (!container || !matricula) return;
       if (!window.QRCode) {
-        await new Promise(r => { const s = document.createElement('script'); s.src = 'https://cdn.jsdelivr.net/npm/qrcodejs@1.0.0/qrcode.min.js'; s.onload = r; document.head.appendChild(s); });
+        await new Promise(r => { const s = document.createElement('script'); s.src = 'js/shared/qrcode.min.js'; s.onload = r; document.head.appendChild(s); });
       }
       container.innerHTML = '';
       if (label) label.textContent = matricula;

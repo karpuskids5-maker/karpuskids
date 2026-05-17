@@ -1,4 +1,4 @@
-import { ensureRole, supabase, initOneSignal } from '../shared/supabase.js';
+﻿import { ensureRole, supabase, initOneSignal } from '../shared/supabase.js';
 import { AppState } from './state.js';
 import { AssistantApi } from './api.js';
 import { PaymentsModule } from './payments.js';
@@ -343,7 +343,7 @@ async function initProfile() {
   const _loadQR = () => new Promise(r => {
     if (window.QRCode) { r(); return; }
     const s = document.createElement('script');
-    s.src = 'https://cdn.jsdelivr.net/npm/qrcodejs@1.0.0/qrcode.min.js';
+    s.src = 'js/shared/qrcode.min.js';
     s.onload = r; document.head.appendChild(s);
   });
 

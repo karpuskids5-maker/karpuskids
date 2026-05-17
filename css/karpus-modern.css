@@ -606,6 +606,17 @@ a > svg[data-lucide] {
   animation: kk-nav-pulse 1s ease both;
 }
 
+/* animate-glow — usado por BadgeSystem en botones del sidebar */
+@keyframes kk-animate-glow {
+  0%   { background: transparent; box-shadow: none; }
+  20%  { background: rgba(249,115,22,0.18); box-shadow: 0 0 12px rgba(249,115,22,0.3); }
+  60%  { background: rgba(249,115,22,0.10); }
+  100% { background: transparent; box-shadow: none; }
+}
+.animate-glow {
+  animation: kk-animate-glow 1.5s ease-out both;
+}
+
 /* Dot badge en tarjetas del dashboard */
 .card-dot-badge {
   position: absolute;
