@@ -1786,7 +1786,7 @@ begin
 
     return jsonb_build_object(
       'success', true, 'type', v_type, 'name', v_name,
-      'role', v_role, 'parent_id', v_parent,
+      'role', v_role, 'student_id', v_student.id, 'parent_id', v_parent,
       'time', to_char(v_now at time zone 'America/Santo_Domingo', 'HH12:MI AM')
     );
   end if;

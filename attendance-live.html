@@ -156,7 +156,6 @@
 <script src="js/shared/supabase-js.min.js"></script>
 <script type="module">
 import { supabase } from './js/shared/supabase.js';
-import { sendPush, sendEmail } from './js/shared/supabase.js';
 
 // ── State ─────────────────────────────────────────────────────────────────────
 let isProcessing  = false;
@@ -279,8 +278,19 @@ async function notifyParent(studentId, parentId, studentName, punchType, timeStr
   const title   = `${emoji} ${studentName} ${isEntry ? 'llegó' : 'salió'}`;
   const message = `${studentName} ${action} a las ${timeStr}`;
 
-  sendPush({ user_id: parentId, title, message, type: 'attendance', link: 'panel_padres.html' }).catch(() => {});
+  // Llamar directamente a las Edge Functions con fetch + anon key
+  // (attendance-live.html no tiene sesión activa, pero las Edge Functions aceptan anon key)
+  const SUPA_URL = 'https://wwnfonkvemimwiqjpkij.supabase.co';
+  const ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Ind3bmZvbmt2ZW1pbXdpcWpwa2lqIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Njc4MzY0MzUsImV4cCI6MjA4MzQxMjQzNX0.n5VW-3U0r2nRlwC8pDstQLowu9MZ3aWHMzXVVNFQaDo';
+  const headers  = { 'Content-Type': 'application/json', 'apikey': ANON_KEY, 'Authorization': `Bearer ${ANON_KEY}` };
 
+  // Push notification
+  fetch(`${SUPA_URL}/functions/v1/send-push`, {
+    method: 'POST', headers,
+    body: JSON.stringify({ user_id: parentId, title, message, type: 'attendance', link: 'panel_padres.html' })
+  }).catch(() => {});
+
+  // Email notification
   try {
     const { data: st } = await supabase
       .from('students').select('p1_email, p2_email').eq('id', studentId).maybeSingle();
@@ -299,11 +309,14 @@ async function notifyParent(studentId, parentId, studentName, punchType, timeStr
           <p style="color:#6b7280;font-size:12px;margin-top:16px;text-align:center;">Karpus Kids · Notificación automática</p>
         </div>
       </div>`;
-      sendEmail([email], title, html).catch(() => {});
+      fetch(`${SUPA_URL}/functions/v1/send-email`, {
+        method: 'POST', headers,
+        body: JSON.stringify({ to: [email], subject: title, html })
+      }).catch(() => {});
     }
   } catch (_) {}
 
-  // Mark as notified
+  // Mark as notified in door_punches
   supabase.from('door_punches')
     .update({ parent_notified: true })
     .eq('student_id', studentId)
@@ -460,20 +473,9 @@ async function onScan(raw) {
       now, timeStr
     );
 
-    // Notify parent only for students
-    if (result.parent_id) {
-      const today = now.toISOString().split('T')[0];
-      const { data: punch } = await supabase
-        .from('door_punches')
-        .select('student_id')
-        .eq('date', today)
-        .eq('punch_type', punchType)
-        .order('created_at', { ascending: false })
-        .limit(1)
-        .maybeSingle();
-      if (punch?.student_id) {
-        notifyParent(punch.student_id, result.parent_id, name, punchType, timeStr);
-      }
+    // Notify parent only for students — usar student_id del resultado del RPC directamente
+    if (result.parent_id && result.student_id) {
+      notifyParent(result.student_id, result.parent_id, name, punchType, timeStr);
     }
 
     updateStats();
