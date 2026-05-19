@@ -140,7 +140,7 @@ export async function registerAttendance(studentId, status) {
     // reset visual
     [btnPresent, btnLate, btnAbsent].forEach(b => {
       if (b) {
-        b.className = b.className.replace(/bg-\\w+-500 text-white shadow-lg/g, '');
+        b.className = b.className.replace(/bg-\w+-500 text-white shadow-lg/g, '');
         b.classList.add('bg-slate-50', 'text-slate-600');
       }
     });

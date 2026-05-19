@@ -1,4 +1,4 @@
-import { supabase, ensureRole } from '../shared/supabase.js';
+﻿import { supabase, ensureRole } from '../shared/supabase.js';
 import { logError, auditLog } from '../shared/db-utils.js';
 
 // Bloquear redirección por SIGNED_OUT desde el primer momento
@@ -81,46 +81,93 @@ document.addEventListener('DOMContentLoaded', async () => {
       userEmail = refreshed.session.user.email;
     }
 
-    // ── Paso 3: Cargar perfil (sin Promise.race — evita conflicto con fetch interceptor) ──
-    _setLoaderMsg('Cargando perfil...');
+    // ── Paso 3: Obtener perfil ────────────────────────────────────────────────
+    _setLoaderMsg('Verificando permisos...');
     let profile = null;
-    let profileErrMsg = null;
 
+    // Estrategia en orden de prioridad (de más rápido a más lento):
+    // 1. Cache local (localStorage) — sin red, instantáneo
+    // 2. JWT app_metadata — sin red, instantáneo
+    // 3. Query a DB — requiere red
+
+    // 1. Cache local
+    const CACHE_KEY = 'karpus_ctrl_profile_' + userId;
     try {
-      const { data, error } = await supabase
-        .from('profiles')
-        .select('id, name, email, role')
-        .eq('id', userId)
-        .maybeSingle();
-
-      if (error) {
-        profileErrMsg = `DB error: ${error.message} (code: ${error.code})`;
-      } else {
-        profile = data;
+      const cached = JSON.parse(localStorage.getItem(CACHE_KEY) || 'null');
+      if (cached && cached.role && cached.ts && (Date.now() - cached.ts) < 3600000) {
+        // Cache válido (menos de 1 hora)
+        profile = { id: userId, email: userEmail, name: cached.name || userEmail.split('@')[0], role: cached.role };
       }
-    } catch (fetchErr) {
-      profileErrMsg = `Fetch error: ${fetchErr?.message || String(fetchErr)}`;
+    } catch (_) {}
+
+    // 2. JWT app_metadata
+    if (!profile) {
+      const jwtRole = session.user?.app_metadata?.role || session.user?.user_metadata?.role || null;
+      if (jwtRole && ['admin', 'directora'].includes(jwtRole)) {
+        profile = { id: userId, email: userEmail, name: userEmail.split('@')[0], role: jwtRole };
+      }
+    }
+
+    // 3. Query a DB (solo si no hay cache ni JWT)
+    if (!profile) {
+      let timedOut = false;
+      const profileTimer = setTimeout(() => {
+        timedOut = true;
+        clearTimeout(loaderTimeout);
+        window._karpusInitializing = false;
+        const el = document.getElementById('loader');
+        if (el) el.innerHTML = [
+          '<div style="text-align:center;padding:32px">',
+          '<div style="font-size:32px;margin-bottom:12px">⚠️</div>',
+          '<p style="color:#f87171;font-weight:800;font-size:14px;margin-bottom:8px">Sin conexión con Supabase</p>',
+          '<p style="color:#94a3b8;font-size:12px;margin-bottom:16px">El servidor no respondió en 6s.</p>',
+          '<p style="color:#64748b;font-size:11px;margin-bottom:16px">Email: ' + userEmail + '</p>',
+          '<div style="display:flex;gap:8px;justify-content:center">',
+          '<button onclick="window.location.reload()" style="background:#6366f1;color:white;border:none;padding:10px 20px;border-radius:10px;font-weight:800;cursor:pointer;font-size:12px">Reintentar</button>',
+          '<button onclick="window._signOutAndRedirect()" style="background:rgba(255,255,255,.1);color:#94a3b8;border:1px solid rgba(255,255,255,.1);padding:10px 20px;border-radius:10px;font-weight:800;cursor:pointer;font-size:12px">Cerrar Sesión</button>',
+          '</div></div>'
+        ].join('');
+      }, 6000);
+
+      try {
+        const { data, error } = await supabase
+          .from('profiles')
+          .select('id, name, email, role')
+          .eq('id', userId)
+          .maybeSingle();
+
+        clearTimeout(profileTimer);
+        if (timedOut) return;
+
+        if (!error && data) {
+          profile = data;
+          // Guardar en cache para próximas cargas
+          try {
+            localStorage.setItem(CACHE_KEY, JSON.stringify({ role: data.role, name: data.name, ts: Date.now() }));
+          } catch (_) {}
+        } else if (error) {
+          clearTimeout(loaderTimeout);
+          window._karpusInitializing = false;
+          const el = document.getElementById('loader');
+          if (el) el.innerHTML = '<div style="text-align:center;padding:32px"><p style="color:#f87171;font-weight:800">Error DB: ' + error.message + '</p><button onclick="window.location.reload()" style="background:#6366f1;color:white;border:none;padding:10px 20px;border-radius:10px;font-weight:800;cursor:pointer;margin-top:12px">Reintentar</button></div>';
+          return;
+        }
+      } catch (e) {
+        clearTimeout(profileTimer);
+        if (timedOut) return;
+        clearTimeout(loaderTimeout);
+        window._karpusInitializing = false;
+        const el = document.getElementById('loader');
+        if (el) el.innerHTML = '<div style="text-align:center;padding:32px"><p style="color:#f87171;font-weight:800">Error de red: ' + (e.message || String(e)) + '</p><button onclick="window.location.reload()" style="background:#6366f1;color:white;border:none;padding:10px 20px;border-radius:10px;font-weight:800;cursor:pointer;margin-top:12px">Reintentar</button></div>';
+        return;
+      }
     }
 
     if (!profile) {
       clearTimeout(loaderTimeout);
       window._karpusInitializing = false;
-      const loader = document.getElementById('loader');
-      if (loader) {
-        loader.innerHTML = `
-          <div style="text-align:center;padding:32px;">
-            <div style="font-size:32px;margin-bottom:12px;">🔒</div>
-            <p style="color:#f87171;font-weight:800;font-size:14px;margin-bottom:8px;">
-              ${profileErrMsg ? 'Error al cargar perfil' : 'Sin perfil configurado'}
-            </p>
-            <p style="color:#94a3b8;font-size:12px;margin-bottom:8px;">
-              ${profileErrMsg || 'Tu cuenta no tiene un perfil en el sistema.'}
-            </p>
-            <p style="color:#64748b;font-size:11px;margin-bottom:20px;">Usuario: ${userEmail}</p>
-            <button onclick="window._signOutAndRedirect()" style="background:#6366f1;color:white;border:none;padding:10px 24px;border-radius:10px;font-weight:800;cursor:pointer;font-size:13px;">Cerrar Sesión</button>
-            <button onclick="window.location.reload()" style="background:rgba(255,255,255,.1);color:#94a3b8;border:1px solid rgba(255,255,255,.1);padding:10px 24px;border-radius:10px;font-weight:800;cursor:pointer;font-size:13px;margin-left:8px;">Reintentar</button>
-          </div>`;
-      }
+      const el = document.getElementById('loader');
+      if (el) el.innerHTML = '<div style="text-align:center;padding:32px;max-width:440px"><div style="font-size:32px;margin-bottom:12px">🔒</div><p style="color:#f87171;font-weight:800;font-size:14px;margin-bottom:8px">Sin perfil configurado</p><p style="color:#94a3b8;font-size:12px;margin-bottom:8px">Tu cuenta no tiene un perfil en la tabla profiles.</p><p style="color:#64748b;font-size:11px;margin-bottom:4px">Email: ' + userEmail + '</p><p style="color:#64748b;font-size:10px;margin-bottom:16px;font-family:monospace">UUID: ' + userId + '</p><div style="background:#1e293b;border:1px solid rgba(99,102,241,.3);border-radius:10px;padding:12px;margin-bottom:16px;text-align:left"><p style="color:#94a3b8;font-size:11px;font-weight:700;margin-bottom:6px">Ejecuta en Supabase SQL Editor:</p><code style="color:#a5b4fc;font-size:10px;line-height:1.6;display:block;white-space:pre-wrap">INSERT INTO public.profiles (id, email, name, role, accepted_terms) VALUES (\'' + userId + '\', \'' + userEmail + '\', \'Administrador\', \'admin\', true) ON CONFLICT (id) DO UPDATE SET role = \'admin\';</code></div><div style="display:flex;gap:8px;justify-content:center;flex-wrap:wrap"><button onclick="window.location.reload()" style="background:#6366f1;color:white;border:none;padding:10px 20px;border-radius:10px;font-weight:800;cursor:pointer;font-size:12px">Reintentar</button><button onclick="window._signOutAndRedirect()" style="background:rgba(255,255,255,.1);color:#94a3b8;border:1px solid rgba(255,255,255,.1);padding:10px 20px;border-radius:10px;font-weight:800;cursor:pointer;font-size:12px">Cerrar Sesión</button></div></div>';
       return;
     }
 
