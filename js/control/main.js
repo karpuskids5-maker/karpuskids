@@ -316,7 +316,7 @@ async function loadUsers() {
     console.log('[loadUsers] Cargando usuarios...');
     const { data } = await supabase
       .from('profiles')
-      .select('id, name, email, role, created_at, avatar_url, phone, bio')
+      .select('id, name, email, role, created_at, avatar_url, phone, bio, last_sign_in_at')
       .order('created_at', { ascending: false })
       .limit(300);
     allUsers = data || [];
@@ -712,11 +712,18 @@ function renderFraudAlertsList() {
   ).join('');
 }
 
-// ── Helper: last access from door_punches ─────────────────────────────────────
+// ── Helper: last access (session or physical punch) ──────────────────────────
 function getLastAccess(userId) {
+  const user = allUsers.find(u => u.id === userId);
+  const sessionAccess = user?.last_sign_in_at ? new Date(user.last_sign_in_at).getTime() : 0;
+  
   const punch = allPunches.find(p => p.staff_id === userId || p.student_id === userId);
-  if (!punch) return '—';
-  return new Date(punch.punched_at).toLocaleString('es-DO', { dateStyle: 'short', timeStyle: 'short' });
+  const punchAccess = punch ? new Date(punch.punched_at).getTime() : 0;
+  
+  const mostRecent = Math.max(sessionAccess, punchAccess);
+  if (mostRecent === 0) return '—';
+  
+  return new Date(mostRecent).toLocaleString('es-DO', { dateStyle: 'short', timeStyle: 'short' });
 }
 
 // ── Users table ───────────────────────────────────────────────────────────────

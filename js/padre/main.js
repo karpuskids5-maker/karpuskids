@@ -1,4 +1,4 @@
-﻿import { supabase, ensureRole, initOneSignal } from '../shared/supabase.js';
+import { supabase, ensureRole, initOneSignal } from '../shared/supabase.js';
 import { Api } from './api.js';
 import { Helpers } from './helpers.js';
 import { AppState } from './appState.js';
@@ -104,8 +104,6 @@ document.addEventListener('DOMContentLoaded', async () => {
 
     if (currentStudent?.classroom_id) {
       initLiveClassListener(currentStudent.classroom_id);
-      // Verificar si hay un nuevo período académico activo
-      _checkNewAcademicPeriod(currentStudent.classroom_id);
     }
 
     // Logout — ambos botones (móvil y desktop)

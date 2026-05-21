@@ -1,4 +1,4 @@
-﻿/**
+/**
  * 💳 Panel Padre — Módulo de Pagos (limpio, sin columnas inexistentes)
  */
 import { supabase } from '../shared/supabase.js';
@@ -485,7 +485,6 @@ export const PaymentsModule = {
         .eq('student_id', student.id)
         .eq('month_paid', month)
         .neq('status', 'paid')
-        .order('created_at', { ascending: false })
         .limit(1);
 
       const existing = existingPayments?.[0] || null;
@@ -493,15 +492,27 @@ export const PaymentsModule = {
       if (existing) {
         // UPDATE existing record — change status to review and add evidence
         const { error } = await supabase.from(TABLES.PAYMENTS)
-          .update({ evidence_url: publicUrl, status: 'review', method, bank })
+          .update({ 
+            evidence_url: publicUrl, 
+            status: 'review', 
+            method, 
+            bank,
+            updated_at: new Date().toISOString()
+          })
           .eq('id', existing.id);
         if (error) throw error;
       } else {
         // No existing payment for this month — insert new review record
         const { error } = await supabase.from(TABLES.PAYMENTS).insert({
-          student_id: student.id, amount, month_paid: month,
-          method, bank, evidence_url: publicUrl, status: 'review',
-          created_at: new Date().toISOString()
+          student_id: student.id, 
+          amount, 
+          month_paid: month,
+          method, 
+          bank, 
+          evidence_url: publicUrl, 
+          status: 'review',
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString()
         });
         if (error) throw error;
       }

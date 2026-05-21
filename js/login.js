@@ -201,8 +201,14 @@ document.addEventListener('DOMContentLoaded', async () => {
       // 3. OneSignal
       try { await initOneSignal(authData.user); } catch (_) {}
 
-      // 4. Registrar login exitoso y redirigir
+      // 4. Registrar login exitoso, actualizar último acceso y redirigir
       RATE_LIMIT.recordSuccess();
+      
+      // Actualizar último acceso en el perfil
+      supabase.from('profiles').update({ 
+        last_sign_in_at: new Date().toISOString() 
+      }).eq('id', userId).then(() => {}).catch(() => {});
+
       supabase.from('login_attempts').insert({ email, success: true }).then(() => {}).catch(() => {});
       localStorage.setItem('karpus_user', JSON.stringify({ id: userId }));
       await redirectByRole(userId);

@@ -13,8 +13,8 @@ import { supabase } from './supabase.js';
 
 // ── Columnas mínimas por tabla (evitar SELECT *) ──────────────────────────────
 export const COLS = {
-  profiles:   'id, name, role, avatar_url, phone, bio, email',
-  students:   'id, name, is_active, parent_id, classroom_id, p1_name, p1_phone, p1_email',
+  profiles:   'id, name, role, avatar_url, phone, bio, email, last_sign_in_at',
+  students:   'id, name, is_active, parent_id, classroom_id, p1_name, p1_phone, p1_email, matricula',
   classrooms: 'id, name, level, capacity, teacher_id',
   payments:   'id, student_id, amount, status, month_paid, due_date, paid_date, method, evidence_url',
   posts:      'id, content, image_url, media_url, media_type, created_at, classroom_id, teacher_id',

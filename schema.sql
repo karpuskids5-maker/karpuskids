@@ -1,4 +1,4 @@
-﻿﻿﻿﻿﻿-- ============================================================
+﻿﻿﻿﻿﻿﻿﻿-- ============================================================
 -- KARPUS KIDS - Schema Completo para Supabase
 -- Ejecutar en Supabase SQL Editor de arriba a abajo.
 -- ============================================================
@@ -56,8 +56,10 @@ create table if not exists public.profiles (
   deleted_at          timestamp with time zone,
   accepted_terms      boolean default false,
   accepted_terms_at   timestamp with time zone,
+  last_sign_in_at     timestamp with time zone,
   created_at          timestamp with time zone default now() not null
 );
+alter table public.profiles add column if not exists last_sign_in_at timestamp with time zone;
 alter table public.profiles add column if not exists matricula text unique;
 alter table public.profiles add column if not exists bio text;
 alter table public.profiles add column if not exists notes text;
@@ -1348,7 +1350,15 @@ create policy "installments_parent" on public.payment_installments for select
     where s.id = payment_installments.student_id and s.parent_id = auth.uid()
   ));
 
--- Índice de performance
+-- Índices de performance adicionales para producción
+create index if not exists idx_profiles_role        on public.profiles(role);
+create index if not exists idx_attendance_date      on public.attendance(date);
+create index if not exists idx_attendance_student   on public.attendance(student_id, date);
+create index if not exists idx_payments_status      on public.payments(status, month_paid);
+create index if not exists idx_notifications_unread on public.notifications(user_id) where is_read = false;
+create index if not exists idx_audit_logs_created   on public.audit_logs(created_at desc);
+
+-- Índice de performance existente
 create index if not exists idx_installments_status
   on public.payment_installments(status, due_date);
 
