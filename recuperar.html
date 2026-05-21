@@ -37,32 +37,48 @@
     <!-- Card -->
     <div class="bg-white rounded-3xl shadow-xl border border-slate-100 p-7">
 
-      <!-- Estado: esperando token (URL sin hash) -->
+      <!-- Estado: Cambio de contraseña directo -->
       <div id="stateRequest">
         <div class="text-center mb-6">
           <div class="w-14 h-14 bg-green-100 rounded-2xl flex items-center justify-center mx-auto mb-3">
-            <span class="text-2xl">🔑</span>
+            <span class="text-2xl">🔄</span>
           </div>
-          <h2 class="text-xl font-black text-slate-800">Recuperar Contraseña</h2>
-          <p class="text-sm text-slate-500 font-medium mt-1">Ingresa tu correo y te enviaremos un enlace</p>
+          <h2 class="text-xl font-black text-slate-800">Actualizar Contraseña</h2>
+          <p class="text-sm text-slate-500 font-medium mt-1">Verifica tus datos para cambiar tu clave</p>
         </div>
 
-        <form id="requestForm" class="space-y-4">
+        <form id="directResetForm" class="space-y-4">
           <div>
             <label class="block text-xs font-black text-slate-500 uppercase tracking-wider mb-1.5">Correo electrónico</label>
-            <input id="reqEmail" type="email" placeholder="tu@correo.com" required
+            <input id="email" type="email" placeholder="tu@correo.com" required
               class="w-full px-4 py-3 rounded-2xl border-2 border-slate-100 bg-slate-50 text-slate-800 font-bold text-sm focus:outline-none focus:border-green-400 focus:bg-white focus:ring-4 focus:ring-green-50 transition-all">
           </div>
+          <div>
+            <label class="block text-xs font-black text-slate-500 uppercase tracking-wider mb-1.5">Contraseña anterior</label>
+            <input id="oldPassword" type="password" placeholder="Tu contraseña actual" required
+              class="w-full px-4 py-3 rounded-2xl border-2 border-slate-100 bg-slate-50 text-slate-800 font-bold text-sm focus:outline-none focus:border-green-400 focus:bg-white focus:ring-4 focus:ring-green-50 transition-all">
+          </div>
+          <div class="pt-2 border-t border-slate-100">
+            <label class="block text-xs font-black text-slate-500 uppercase tracking-wider mb-1.5">Nueva contraseña</label>
+            <input id="newPasswordDirect" type="password" placeholder="Mínimo 8 caracteres" required minlength="8"
+              class="w-full px-4 py-3 rounded-2xl border-2 border-slate-100 bg-slate-50 text-slate-800 font-bold text-sm focus:outline-none focus:border-blue-400 focus:bg-white focus:ring-4 focus:ring-blue-50 transition-all">
+          </div>
+          <div>
+            <label class="block text-xs font-black text-slate-500 uppercase tracking-wider mb-1.5">Confirmar nueva contraseña</label>
+            <input id="confirmPasswordDirect" type="password" placeholder="Repite la nueva clave" required
+              class="w-full px-4 py-3 rounded-2xl border-2 border-slate-100 bg-slate-50 text-slate-800 font-bold text-sm focus:outline-none focus:border-blue-400 focus:bg-white focus:ring-4 focus:ring-blue-50 transition-all">
+          </div>
+
           <div id="reqError" class="hidden text-xs font-bold text-rose-600 bg-rose-50 border border-rose-100 rounded-xl px-3 py-2"></div>
-          <div id="reqSuccess" class="hidden text-xs font-bold text-emerald-700 bg-emerald-50 border border-emerald-100 rounded-xl px-3 py-2"></div>
-          <button type="submit" id="btnRequest"
+          
+          <button type="submit" id="btnDirectReset"
             class="w-full py-3.5 bg-green-600 hover:bg-green-700 active:scale-95 text-white font-black rounded-2xl shadow-lg shadow-green-200 transition-all text-sm">
-            Enviar enlace de recuperación
+            Actualizar mi contraseña ahora
           </button>
         </form>
       </div>
 
-      <!-- Estado: token recibido (URL con #access_token) -->
+      <!-- Estado: token recibido (URL con #access_token) - Mantenemos por compatibilidad si llegara un enlace -->
       <div id="stateReset" class="hidden">
         <div class="text-center mb-6">
           <div class="w-14 h-14 bg-blue-100 rounded-2xl flex items-center justify-center mx-auto mb-3">
@@ -153,7 +169,58 @@
       show('stateRequest');
     }
 
-    // ── Formulario de solicitud ───────────────────────────────────────────────
+    // ── Formulario de Cambio Directo (Sin Correo) ────────────────────────────
+    document.getElementById('directResetForm')?.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      hideErr('reqError');
+      
+      const email   = document.getElementById('email').value.trim();
+      const oldPass = document.getElementById('oldPassword').value;
+      const newPass = document.getElementById('newPasswordDirect').value;
+      const confPass = document.getElementById('confirmPasswordDirect').value;
+      const btn     = document.getElementById('btnDirectReset');
+
+      if (!email || !oldPass || !newPass) return showErr('reqError', 'Completa todos los campos.');
+      if (newPass.length < 8) return showErr('reqError', 'La nueva contraseña debe tener al menos 8 caracteres.');
+      if (newPass !== confPass) return showErr('reqError', 'Las nuevas contraseñas no coinciden.');
+      if (oldPass === newPass) return showErr('reqError', 'La nueva contraseña no puede ser igual a la anterior.');
+
+      btn.disabled = true;
+      btn.textContent = 'Verificando datos...';
+
+      try {
+        // 1. Intentar iniciar sesión con la contraseña anterior para verificar identidad
+        const { data: signInData, error: signInError } = await supabase.auth.signInWithPassword({
+          email: email,
+          password: oldPass
+        });
+
+        if (signInError) {
+          throw new Error('La contraseña anterior es incorrecta o el usuario no existe.');
+        }
+
+        btn.textContent = 'Actualizando clave...';
+
+        // 2. Actualizar a la nueva contraseña
+        const { error: updateError } = await supabase.auth.updateUser({ 
+          password: newPass 
+        });
+
+        if (updateError) throw updateError;
+
+        // 3. Cerrar sesión por seguridad tras el cambio
+        await supabase.auth.signOut();
+
+        show('stateSuccess');
+      } catch (err) {
+        showErr('reqError', err.message || 'Error al actualizar. Intenta de nuevo.');
+        btn.disabled = false;
+        btn.textContent = 'Actualizar mi contraseña ahora';
+      }
+    });
+
+    // ── Formulario de solicitud (Legado/Enlace) ───────────────────────────────
+    // Este se mantiene solo por si el usuario llega desde un enlace antiguo
     document.getElementById('requestForm')?.addEventListener('submit', async (e) => {
       e.preventDefault();
       hideErr('reqError');

@@ -68,20 +68,28 @@ Deno.serve(async (req) => {
         const { classroom_id, title, due_date } = data;
         const { data: students } = await supabase
           .from('students')
-          .select('p1_email, p1_name, parent_id')
+          .select('p1_email, p1_name, p2_email, p2_name, parent_id')
           .eq('classroom_id', classroom_id);
 
         const emails: Promise<unknown>[] = [];
         const pushes: Promise<unknown>[] = [];
 
         for (const s of students ?? []) {
-          if (resend && s.p1_email) {
-            emails.push(resend.emails.send({
-              from: FROM_EMAIL,
-              to:   s.p1_email,
-              subject: 'Nueva Tarea: ' + title,
-              html: emailWrap('<h2 style="color:#6366f1;margin:0 0 12px">Nueva Tarea Asignada</h2><p style="color:#374151">Hola <b>' + (s.p1_name || 'familia') + '</b>,</p><p style="color:#374151">Se asigno la tarea <b>"' + title + '"</b>.</p><div style="background:#f5f3ff;border-radius:8px;padding:12px 16px;margin:16px 0;border-left:4px solid #6366f1"><p style="margin:0;color:#4338ca;font-weight:700">Fecha de entrega: ' + due_date + '</p></div><a href="https://karpuskids.com/panel_padres.html" style="display:inline-block;padding:12px 24px;background:#6366f1;color:white;text-decoration:none;border-radius:8px;font-weight:bold">Ver Tarea</a>')
-            }));
+          // Enviar a todos los correos disponibles del estudiante
+          const recipients = [
+            s.p1_email ? { email: s.p1_email, name: s.p1_name || 'familia' } : null,
+            s.p2_email ? { email: s.p2_email, name: s.p2_name || 'familia' } : null,
+          ].filter(Boolean) as { email: string; name: string }[];
+
+          for (const r of recipients) {
+            if (resend) {
+              emails.push(resend.emails.send({
+                from: FROM_EMAIL,
+                to:   r.email,
+                subject: 'Nueva Tarea: ' + title,
+                html: emailWrap('<h2 style="color:#6366f1;margin:0 0 12px">Nueva Tarea Asignada</h2><p style="color:#374151">Hola <b>' + r.name + '</b>,</p><p style="color:#374151">Se asigno la tarea <b>"' + title + '"</b>.</p><div style="background:#f5f3ff;border-radius:8px;padding:12px 16px;margin:16px 0;border-left:4px solid #6366f1"><p style="margin:0;color:#4338ca;font-weight:700">Fecha de entrega: ' + due_date + '</p></div><a href="https://karpuskids.com/panel_padres.html" style="display:inline-block;padding:12px 24px;background:#6366f1;color:white;text-decoration:none;border-radius:8px;font-weight:bold">Ver Tarea</a>')
+              }));
+            }
           }
           if (s.parent_id) {
             pushes.push(sendPushToUser(s.parent_id, 'Nueva Tarea - ' + title, 'Entrega: ' + due_date, 'task', 'panel_padres.html'));
@@ -97,7 +105,7 @@ Deno.serve(async (req) => {
         const { classroom_id, teacher_name, content_preview } = data;
         const { data: students } = await supabase
           .from('students')
-          .select('p1_email, p1_name, parent_id')
+          .select('p1_email, p1_name, p2_email, p2_name, parent_id')
           .eq('classroom_id', classroom_id);
 
         const pushes: Promise<unknown>[] = [];
@@ -107,13 +115,21 @@ Deno.serve(async (req) => {
           if (s.parent_id) {
             pushes.push(sendPushToUser(s.parent_id, 'Nueva publicacion en el muro', (teacher_name || 'La maestra') + ' publico: "' + (content_preview || '').slice(0, 60) + '"', 'post', 'panel_padres.html'));
           }
-          if (resend && s.p1_email) {
-            emails.push(resend.emails.send({
-              from: FROM_EMAIL,
-              to:   s.p1_email,
-              subject: 'Nueva publicacion en el muro de Karpus Kids',
-              html: emailWrap('<h2 style="color:#f97316;margin:0 0 12px">Nueva Publicacion</h2><p style="color:#374151">Hola <b>' + (s.p1_name || 'familia') + '</b>,</p><p style="color:#374151"><b>' + (teacher_name || 'La maestra') + '</b> publico algo nuevo en el muro del aula.</p><a href="https://karpuskids.com/panel_padres.html" style="display:inline-block;padding:12px 24px;background:#f97316;color:white;text-decoration:none;border-radius:8px;font-weight:bold;margin-top:8px">Ver Publicacion</a>')
-            }));
+          // Enviar a todos los correos disponibles
+          const recipients = [
+            s.p1_email ? { email: s.p1_email, name: s.p1_name || 'familia' } : null,
+            s.p2_email ? { email: s.p2_email, name: s.p2_name || 'familia' } : null,
+          ].filter(Boolean) as { email: string; name: string }[];
+
+          for (const r of recipients) {
+            if (resend) {
+              emails.push(resend.emails.send({
+                from: FROM_EMAIL,
+                to:   r.email,
+                subject: 'Nueva publicacion en el muro de Karpus Kids',
+                html: emailWrap('<h2 style="color:#f97316;margin:0 0 12px">Nueva Publicacion</h2><p style="color:#374151">Hola <b>' + r.name + '</b>,</p><p style="color:#374151"><b>' + (teacher_name || 'La maestra') + '</b> publico algo nuevo en el muro del aula.</p><a href="https://karpuskids.com/panel_padres.html" style="display:inline-block;padding:12px 24px;background:#f97316;color:white;text-decoration:none;border-radius:8px;font-weight:bold;margin-top:8px">Ver Publicacion</a>')
+              }));
+            }
           }
         }
 
@@ -137,29 +153,33 @@ Deno.serve(async (req) => {
         const { parent_email, parent_id, student_name, amount, month, payment_id } = data;
         const tasks: Promise<unknown>[] = [];
 
-        let resolvedEmail = parent_email;
+        let resolvedEmails: string[] = parent_email ? [parent_email] : [];
         let resolvedParentId = parent_id;
 
-        if ((!resolvedEmail || !resolvedParentId) && payment_id) {
-          const { data: payData } = await supabase.from('payments').select('students:student_id(p1_email, parent_id, p1_name)').eq('id', payment_id).single();
-          const st = payData?.students as { p1_email?: string; parent_id?: string } | null;
-          if (!resolvedEmail)    resolvedEmail    = st?.p1_email;
+        if ((!resolvedEmails.length || !resolvedParentId) && payment_id) {
+          const { data: payData } = await supabase
+            .from('payments')
+            .select('students:student_id(p1_email, p2_email, parent_id, p1_name)')
+            .eq('id', payment_id).single();
+          const st = payData?.students as { p1_email?: string; p2_email?: string; parent_id?: string } | null;
+          if (!resolvedEmails.length) {
+            resolvedEmails = [st?.p1_email, st?.p2_email].filter(Boolean) as string[];
+          }
           if (!resolvedParentId) resolvedParentId = st?.parent_id;
         }
 
-        if (resend && resolvedEmail) {
-          tasks.push(resend.emails.send({
-            from: FROM_EMAIL,
-            to:   resolvedEmail,
-            subject: 'Pago Confirmado - ' + month,
-            html: emailWrap('<h2 style="color:#16a34a;margin:0 0 12px">Pago Confirmado!</h2><p style="color:#374151">El pago de mensualidad de <b>' + student_name + '</b> fue aprobado.</p><div style="background:#f0fdf4;border-radius:8px;padding:16px;margin:16px 0;border:1px solid #bbf7d0"><table style="width:100%;border-collapse:collapse;font-size:14px"><tr><td style="padding:6px 0;color:#6b7280">Estudiante:</td><td style="padding:6px 0;font-weight:700;text-align:right">' + student_name + '</td></tr><tr><td style="padding:6px 0;color:#6b7280">Mes:</td><td style="padding:6px 0;font-weight:700;text-align:right">' + month + '</td></tr><tr><td style="padding:6px 0;color:#6b7280">Monto:</td><td style="padding:6px 0;font-weight:800;color:#16a34a;font-size:16px;text-align:right">' + amount + '</td></tr></table></div><a href="https://karpuskids.com/panel_padres.html" style="display:inline-block;padding:12px 24px;background:#16a34a;color:white;text-decoration:none;border-radius:8px;font-weight:bold">Ver mi Panel</a>')
-          }));
+        const payHtml = emailWrap('<h2 style="color:#16a34a;margin:0 0 12px">Pago Confirmado!</h2><p style="color:#374151">El pago de mensualidad de <b>' + student_name + '</b> fue aprobado.</p><div style="background:#f0fdf4;border-radius:8px;padding:16px;margin:16px 0;border:1px solid #bbf7d0"><table style="width:100%;border-collapse:collapse;font-size:14px"><tr><td style="padding:6px 0;color:#6b7280">Estudiante:</td><td style="padding:6px 0;font-weight:700;text-align:right">' + student_name + '</td></tr><tr><td style="padding:6px 0;color:#6b7280">Mes:</td><td style="padding:6px 0;font-weight:700;text-align:right">' + month + '</td></tr><tr><td style="padding:6px 0;color:#6b7280">Monto:</td><td style="padding:6px 0;font-weight:800;color:#16a34a;font-size:16px;text-align:right">' + amount + '</td></tr></table></div><a href="https://karpuskids.com/panel_padres.html" style="display:inline-block;padding:12px 24px;background:#16a34a;color:white;text-decoration:none;border-radius:8px;font-weight:bold">Ver mi Panel</a>');
+
+        if (resend) {
+          for (const email of resolvedEmails) {
+            tasks.push(resend.emails.send({ from: FROM_EMAIL, to: email, subject: 'Pago Confirmado - ' + month, html: payHtml }));
+          }
         }
         if (resolvedParentId) {
           tasks.push(sendPushToUser(resolvedParentId, 'Pago Confirmado', 'Tu pago de ' + amount + ' para ' + month + ' fue aprobado.', 'payment', 'panel_padres.html'));
         }
         await Promise.allSettled(tasks);
-        result = { sent: true, email_to: resolvedEmail || 'none', push_to: resolvedParentId || 'none' };
+        result = { sent: true, email_to: resolvedEmails.join(',') || 'none', push_to: resolvedParentId || 'none' };
         break;
       }
 

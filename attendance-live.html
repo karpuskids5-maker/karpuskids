@@ -290,12 +290,13 @@ async function notifyParent(studentId, parentId, studentName, punchType, timeStr
     body: JSON.stringify({ user_id: parentId, title, message, type: 'attendance', link: 'panel_padres.html' })
   }).catch(() => {});
 
-  // Email notification
+  // Email notification — enviar a todos los correos disponibles del estudiante
   try {
     const { data: st } = await supabase
-      .from('students').select('p1_email, p2_email').eq('id', studentId).maybeSingle();
-    const email = st?.p1_email || st?.p2_email;
-    if (email) {
+      .from('students').select('p1_email, p2_email, p1_name, p2_name').eq('id', studentId).maybeSingle();
+    // Recopilar todos los correos válidos
+    const emailList = [st?.p1_email, st?.p2_email].filter(e => e && e.includes('@'));
+    if (emailList.length > 0) {
       const html = `<div style="font-family:Arial,sans-serif;max-width:500px;margin:auto;padding:20px;border:1px solid #d1fae5;border-radius:12px;">
         <div style="background:linear-gradient(135deg,#22c55e,#16a34a);padding:20px;border-radius:8px 8px 0 0;text-align:center;">
           <h2 style="color:white;margin:0;">${emoji} Karpus Kids</h2>
@@ -309,10 +310,13 @@ async function notifyParent(studentId, parentId, studentName, punchType, timeStr
           <p style="color:#6b7280;font-size:12px;margin-top:16px;text-align:center;">Karpus Kids · Notificación automática</p>
         </div>
       </div>`;
-      fetch(`${SUPA_URL}/functions/v1/send-email`, {
-        method: 'POST', headers,
-        body: JSON.stringify({ to: [email], subject: title, html })
-      }).catch(() => {});
+      // Enviar a cada correo por separado para personalización futura
+      for (const email of emailList) {
+        fetch(`${SUPA_URL}/functions/v1/send-email`, {
+          method: 'POST', headers,
+          body: JSON.stringify({ to: [email], subject: title, html })
+        }).catch(() => {});
+      }
     }
   } catch (_) {}
 
