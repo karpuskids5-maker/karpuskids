@@ -55,7 +55,7 @@ export const Helpers = {
   })(),
 
   /**
-   * Estado vacío visual
+   * Estado vacï¿½o visual
    */
   emptyState: (msg, icon = '?') => `
     <div class="flex flex-col items-center justify-center py-12 px-4 text-center opacity-60 animate-fade-in">
@@ -74,8 +74,10 @@ export const Helpers = {
   /**
    * Formatear moneda
    */
-  formatCurrency: (val) => 
-    new Intl.NumberFormat('es-MX', { style: 'currency', currency: 'MXN' }).format(Number(val || 0)),
+  formatCurrency: (val) => {
+    const num = Number(val || 0);
+    return 'RD$' + num.toLocaleString('es-DO', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  },
 
   /**
    * Formatear fecha local segura
@@ -87,9 +89,9 @@ export const Helpers = {
   },
 
   /**
-   * ?? Calcular mora por días de retraso
-   * Regla: mora empieza el día 6 del mes siguiente (día después del vencimiento día 5)
-   * Tasa: 5% del monto base por cada 30 días de retraso (mínimo 1 día = 1 día de mora)
+   * ?? Calcular mora por dï¿½as de retraso
+   * Regla: mora empieza el dï¿½a 6 del mes siguiente (dï¿½a despuï¿½s del vencimiento dï¿½a 5)
+   * Tasa: 5% del monto base por cada 30 dï¿½as de retraso (mï¿½nimo 1 dï¿½a = 1 dï¿½a de mora)
    * Se aplica sobre el monto base del pago
    */
   calculateMora(dueDate, baseAmount = 0) {
@@ -114,15 +116,15 @@ export const Helpers = {
     if (daysLate <= 0) return null;
     const mora = this.calculateMora(dueDate, baseAmount);
     const weeks = Math.floor(daysLate / 7);
-    const formattedText = daysLate === 1 ? '1 día de retraso'
-      : daysLate < 7  ? `${daysLate} días de retraso`
+    const formattedText = daysLate === 1 ? '1 dï¿½a de retraso'
+      : daysLate < 7  ? `${daysLate} dï¿½as de retraso`
       : weeks === 1   ? '1 semana de retraso'
       : `${weeks} semanas de retraso`;
     return { daysLate, mora, formattedText };
   },
 
   /**
-   * Delegación de eventos segura
+   * Delegaciï¿½n de eventos segura
    */
   delegate: (el, selector, event, handler) => {
     el.addEventListener(event, (e) => {
@@ -135,7 +137,7 @@ export const Helpers = {
 };
 
 /**
- * ?? ENVÍO DE EMAILS (Proxy a Edge Function)
+ * ?? ENVï¿½O DE EMAILS (Proxy a Edge Function)
  */
 export async function sendEmail(to, subject, html) {
   try {

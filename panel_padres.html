@@ -389,19 +389,19 @@
       <section id="home" class="section">
 
         <!-- 🚨 Banner de deuda vencida — se muestra dinámicamente por JS -->
-        <div id="debtBanner" class="hidden mb-6 rounded-[2rem] overflow-hidden shadow-lg shadow-amber-100 border border-amber-200/50">
-          <div class="bg-gradient-to-br from-amber-400 via-amber-500 to-orange-500 p-4 md:p-6 flex flex-col sm:flex-row items-center gap-4">
-            <div class="w-12 h-12 bg-white/20 backdrop-blur-md rounded-2xl flex items-center justify-center text-2xl shrink-0 animate-bounce">⚠️</div>
-            <div class="flex-1 text-center sm:text-left min-w-0 w-full">
-              <p class="font-black text-white text-base md:text-lg leading-tight">Tienes un saldo pendiente</p>
-              <p id="debtBannerMsg" class="text-white/90 text-xs md:text-sm font-bold mt-1">Saldo pendiente: $0.00. Evita recargos pagando a tiempo.</p>
-            </div>
-            <button onclick="App.navigateTo('payments')"
-              class="w-full sm:w-auto shrink-0 bg-white text-orange-600 font-black text-sm px-6 py-3 rounded-2xl hover:bg-orange-50 transition-all active:scale-95 shadow-md shadow-orange-900/10">
-              Pagar ahora
-            </button>
-          </div>
-        </div>
+<div id="debtBanner" class="hidden mb-6 rounded-[1.5rem] md:rounded-[2rem] overflow-hidden shadow-lg shadow-amber-100 border border-amber-200/50 w-full max-w-full box-border">
+  <div class="bg-gradient-to-br from-amber-400 via-amber-500 to-orange-500 p-4 md:p-6 flex flex-col lg:flex-row items-center gap-4">
+    <div class="w-12 h-12 bg-white/20 backdrop-blur-md rounded-2xl flex items-center justify-center text-2xl shrink-0 animate-bounce">⚠️</div>
+    <div class="flex-1 text-center lg:text-left min-w-0 w-full">
+      <p class="font-black text-white text-base md:text-lg leading-tight break-words">Tienes un saldo pendiente</p>
+      <p id="debtBannerMsg" class="text-white/90 text-xs md:text-sm font-bold mt-1 break-words">Saldo pendiente: $0.00. Evita recargos pagando a tiempo.</p>
+    </div>
+    <button onclick="App.navigateTo('payments')"
+      class="w-full lg:w-auto shrink-0 bg-white text-orange-600 font-black text-sm px-6 py-3 rounded-2xl hover:bg-orange-50 transition-all active:scale-95 shadow-md shadow-orange-900/10">
+      Pagar ahora
+    </button>
+  </div>
+</div>
 
         <!-- tarjetas principales -->
         <div id="dashboardGrid" class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4 mb-8">

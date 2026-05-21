@@ -1,4 +1,4 @@
-﻿import { supabase, emitEvent } from '../shared/supabase.js';
+import { supabase, emitEvent } from '../shared/supabase.js';
 import { Helpers } from '../shared/helpers.js';
 import { AssistantApi } from './api.js';
 
@@ -93,7 +93,7 @@ export const AccessModule = {
 
       let query = supabase
         .from('attendance')
-        .select('*, student:student_id(name, matricula, avatar_url)')
+        .select('id, date, check_in, check_out, status, student_id, classroom_id, student:student_id(name, matricula, avatar_url)')
         .order('date', { ascending: false })
         .order('check_in', { ascending: false });
 

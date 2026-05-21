@@ -191,13 +191,13 @@ export const PaymentsModule = {
     const stu = p.students || { name: 'Desconocido', classrooms: { name: '-' } };
     const ip  = sk !== 'paid';
     const ds  = p.due_date ? new Date(p.due_date + 'T00:00:00').toLocaleDateString('es-ES') : '-';
-    const af  = Number(p.amount || 0).toLocaleString('es-ES', { style: 'currency', currency: 'USD', minimumFractionDigits: 2 });
+    const af  = 'RD$' + Number(p.amount || 0).toLocaleString('es-DO', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
     // Mora acumulada
     const mora         = (ip && p.due_date) ? Helpers.calculateMora(p.due_date) : 0;
     const moraBreakdown = (mora > 0 && p.due_date) ? Helpers.getMoraBreakdown(p.due_date) : null;
     const totalAmount  = Number(p.amount || 0) + mora;
-    const tf           = totalAmount.toLocaleString('es-ES', { style: 'currency', currency: 'USD', minimumFractionDigits: 2 });
+    const tf           = 'RD$' + totalAmount.toLocaleString('es-DO', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
     let ub = '';
     if (mora > 0 && moraBreakdown) {
@@ -351,7 +351,7 @@ export const PaymentsModule = {
             const { notifyPaymentApproved } = await import('../shared/supabase.js');
             const email = p.students?.p1_email || p.students?.p2_email || null;
             const studentName = p.students?.name || 'Estudiante';
-            const amountStr = Number(amt || 0).toLocaleString('es-ES', { style: 'currency', currency: 'USD', minimumFractionDigits: 2 });
+            const amountStr = 'RD$' + Number(amt || 0).toLocaleString('es-DO', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
             const monthStr = mp || 'Colegiatura';
 
             await notifyPaymentApproved(pay.id, email, studentName, amountStr, monthStr);
@@ -391,7 +391,7 @@ export const PaymentsModule = {
           const { notifyPaymentApproved } = await import('../shared/supabase.js');
           const email = p.students?.p1_email || p.students?.p2_email || null;
           const studentName = p.students?.name || 'Estudiante';
-          const amountStr = Number(p.amount || 0).toLocaleString('es-ES', { style: 'currency', currency: 'USD', minimumFractionDigits: 2 });
+          const amountStr = 'RD$' + Number(p.amount || 0).toLocaleString('es-DO', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
           const monthStr = p.month_paid || 'Colegiatura';
           await notifyPaymentApproved(id, email, studentName, amountStr, monthStr);
         }

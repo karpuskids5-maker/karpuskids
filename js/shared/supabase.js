@@ -1,4 +1,4 @@
-﻿// Supabase JS — cargado localmente (js/shared/supabase-js.min.js via script tag en HTML)
+// Supabase JS — cargado localmente (js/shared/supabase-js.min.js via script tag en HTML)
 // El UMD expone window.supabase.createClient
 import { createClient } from "./supabase-wrapper.js";
 
@@ -36,6 +36,37 @@ supabase.auth.onAuthStateChange((event, session) => {
 let _refreshing = false;
 const _originalFetch = window.fetch;
 window.fetch = async function(...args) {
+  // Asegurar que las peticiones a Supabase lleven la API Key
+  const url = typeof args[0] === 'string' ? args[0] : args[0]?.url;
+  const isSupabase = url && url.includes(SUPABASE_URL);
+  
+  if (isSupabase && !_refreshing) {
+    const options = args[1] || {};
+    options.headers = options.headers || {};
+    
+    if (!options.headers['apikey']) {
+      options.headers['apikey'] = SUPABASE_ANON_KEY;
+    }
+    
+    // Solo intentar obtener sesión si no estamos ya en un proceso de auth
+    if (!options.headers['Authorization'] && !url.includes('/auth/v1/')) {
+      try {
+        const sessionStr = localStorage.getItem('karpus_auth_token_v2');
+        if (sessionStr) {
+          const session = JSON.parse(sessionStr);
+          if (session?.access_token) {
+            options.headers['Authorization'] = `Bearer ${session.access_token}`;
+          }
+        }
+      } catch (e) {}
+      
+      if (!options.headers['Authorization']) {
+        options.headers['Authorization'] = `Bearer ${SUPABASE_ANON_KEY}`;
+      }
+    }
+    args[1] = options;
+  }
+
   const res = await _originalFetch.apply(this, args);
   
   if (res.status === 401 && !_refreshing) {

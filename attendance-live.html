@@ -1,4 +1,4 @@
-﻿<!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="es">
 <head>
   <meta charset="UTF-8">
@@ -345,9 +345,21 @@ async function _fallbackDirectWrite(code, now) {
       .maybeSingle();
 
     if (!existing) {
+      // Nueva lógica profesional: 7:00 AM con 30 min de margen
+      const checkInLimit = new Date(now);
+      checkInLimit.setHours(7, 30, 0, 0);
+
+      let status = 'present';
+      if (now > checkInLimit) {
+        status = 'late';
+      }
+
       await supabase.from('attendance').insert({
-        student_id: student.id, classroom_id: student.classroom_id,
-        date: today, status: 'present', check_in: now.toISOString()
+        student_id: student.id, 
+        classroom_id: student.classroom_id,
+        date: today, 
+        status: status, 
+        check_in: now.toISOString()
       });
       showResult('in', student.name, 'Estudiante', '✅ Entrada registrada', now);
       if (student.parent_id) notifyParent(student.id, student.parent_id, student.name, 'check_in',

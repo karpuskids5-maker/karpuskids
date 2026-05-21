@@ -67,16 +67,34 @@ export const ChatModule = {
 
       this._allContacts = (users || []).map(u => {
         const si = studentMap[u.id];
-        const displayName = (u.role === 'padre' && si?.studentName) ? si.studentName : (u.name || 'Usuario');
+        // Para padres: mostrar nombre del estudiante como título principal
+        // y nombre del padre como subtítulo
+        const parentName   = u.name || 'Padre/Madre';
+        const studentName  = si?.studentName || null;
+        const displayName  = (u.role === 'padre' && studentName)
+          ? studentName
+          : parentName;
+
+        const roleLabel = { maestra: 'Maestra', padre: 'Padre/Madre', asistente: 'Asistente', directora: 'Directora' }[u.role] || u.role;
+
+        let meta = 'Personal Karpus';
+        if (u.role === 'padre') {
+          const parts = [];
+          if (studentName)        parts.push(`👦 ${studentName}`);
+          if (si?.classroomName)  parts.push(`🏫 ${si.classroomName}`);
+          parts.push(`👤 ${parentName}`);
+          meta = parts.join(' · ');
+        }
+
         return {
-          id: u.id,
-          name: displayName,
-          avatar: u.avatar_url,
-          unread: Number(unreadData[u.id] || 0),
-          roleLabel: { maestra: 'Maestra', padre: 'Padre/Madre', asistente: 'Asistente', directora: 'Directora' }[u.role] || u.role,
-          meta: u.role === 'padre'
-            ? `Padre de ${si?.studentName || 'N/A'} · ${si?.classroomName || 'Sin aula'}`
-            : 'Personal Karpus'
+          id:          u.id,
+          name:        displayName,
+          parentName:  u.role === 'padre' ? parentName : null,
+          studentName: u.role === 'padre' ? studentName : null,
+          avatar:      u.avatar_url,
+          unread:      Number(unreadData[u.id] || 0),
+          roleLabel,
+          meta
         };
       });
 
@@ -106,7 +124,8 @@ export const ChatModule = {
         </div>
         <div class="min-w-0 flex-1">
           <div class="font-bold text-slate-800 text-sm truncate ${c.unread > 0 ? 'text-slate-900' : ''}">${Helpers.escapeHTML(c.name)}</div>
-          <div class="text-[10px] text-slate-400 font-bold uppercase truncate">${c.roleLabel}</div>
+          ${c.parentName ? `<div class="text-[10px] text-slate-500 font-bold truncate">👤 ${Helpers.escapeHTML(c.parentName)}</div>` : ''}
+          <div class="text-[10px] text-slate-400 font-bold uppercase truncate">${c.roleLabel}${c.studentName && c.parentName ? '' : c.meta !== 'Personal Karpus' ? ' · ' + Helpers.escapeHTML(c.meta) : ''}</div>
         </div>
         ${c.unread > 0 ? `<div class="w-2 h-2 bg-rose-500 rounded-full shrink-0"></div>` : ''}
       </div>`).join('');
@@ -143,7 +162,9 @@ export const ChatModule = {
     const inputEl  = document.getElementById('chatInputArea');
 
     if (nameEl)   nameEl.textContent   = contact.name;
-    if (metaEl)   metaEl.textContent   = contact.roleLabel + ' · ' + contact.meta;
+    if (metaEl)   metaEl.textContent   = contact.parentName
+      ? `${contact.roleLabel} · 👤 ${contact.parentName} · ${contact.meta.split(' · ').slice(-1)[0] || ''}`
+      : contact.roleLabel + ' · ' + contact.meta;
     if (avatarEl) avatarEl.innerHTML   = contact.avatar
       ? `<img src="${contact.avatar}" class="w-full h-full object-cover">`
       : contact.name.charAt(0);

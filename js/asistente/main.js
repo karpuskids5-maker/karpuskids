@@ -528,14 +528,14 @@ async function loadChatContacts(searchTerm = '', unreadMap = {}) {
       const { data: profiles, error } = await query.limit(100);
       if (error) throw error;
 
-      // 2. Para los padres, buscar el nombre de sus hijos
+      // 2. Para los padres, buscar el nombre de sus hijos y el aula
       const parentIds = profiles.filter(p => p.role === 'padre').map(p => p.id);
       let studentMap = {};
       
       if (parentIds.length > 0) {
         const { data: students } = await supabase
           .from('students')
-          .select('parent_id, name')
+          .select('parent_id, name, classrooms:classroom_id(name)')
           .in('parent_id', parentIds);
         
         if (students) {
@@ -559,13 +559,21 @@ async function loadChatContacts(searchTerm = '', unreadMap = {}) {
 
     container.innerHTML = contacts.map(c => {
       const unread = unreadMap[c.id] || 0;
-      // Prioridad: Nombre Estudiante (si es padre) > Nombre Perfil
+      // Título principal: nombre del estudiante (si es padre), sino nombre del perfil
       const displayName = c.role === 'padre' && c.studentNames ? c.studentNames : (c.name || 'Usuario');
-      const roleLabel = (c.role || '').charAt(0).toUpperCase() + (c.role || '').slice(1);
-      const subLabel = c.role === 'padre' && c.studentNames ? `Padre de ${c.name}` : roleLabel;
+      const roleLabel   = (c.role || '').charAt(0).toUpperCase() + (c.role || '').slice(1);
+      // Subtítulo: nombre del padre si es padre
+      const parentLine  = c.role === 'padre' && c.name ? `👤 ${c.name}` : null;
+      const subLabel    = c.role === 'padre' && c.studentNames
+        ? `Padre de ${c.name || ''}${c.studentNames ? ' · 👦 ' + c.studentNames : ''}`
+        : roleLabel;
+
+      // Pasar también el nombre del padre al selectChatContact para el header
+      const safeDisplay = Helpers.escapeHTML(displayName);
+      const safeMeta    = Helpers.escapeHTML(c.role === 'padre' && c.name ? `Padre/Madre · 👤 ${c.name}` : roleLabel);
 
       return `
-      <div onclick="App.selectChatContact('${c.id}', '${Helpers.escapeHTML(displayName)}', '${roleLabel}')" 
+      <div onclick="App.selectChatContact('${c.id}', '${safeDisplay}', '${safeMeta}')" 
            class="p-3 hover:bg-slate-50 rounded-xl cursor-pointer transition-colors flex items-center gap-3 border-b border-slate-50 last:border-0 relative">
         <div class="relative">
           <div class="w-10 h-10 rounded-full bg-teal-100 text-teal-600 flex items-center justify-center font-bold overflow-hidden">
@@ -574,8 +582,9 @@ async function loadChatContacts(searchTerm = '', unreadMap = {}) {
           ${unread > 0 ? `<div class="absolute -top-1 -right-1 bg-red-500 text-white text-[10px] font-bold px-1.5 py-0.5 rounded-full shadow-sm">${unread}</div>` : ''}
         </div>
         <div class="min-w-0">
-          <div class="font-bold text-slate-700 text-sm truncate">${Helpers.escapeHTML(displayName)}</div>
-          <div class="text-[10px] text-slate-400 truncate">${subLabel}</div>
+          <div class="font-bold text-slate-700 text-sm truncate">${safeDisplay}</div>
+          ${parentLine ? `<div class="text-[10px] text-teal-600 font-bold truncate">${Helpers.escapeHTML(parentLine)}</div>` : ''}
+          <div class="text-[10px] text-slate-400 truncate">${Helpers.escapeHTML(roleLabel)}</div>
         </div>
       </div>
     `}).join('');

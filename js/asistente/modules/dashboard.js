@@ -91,7 +91,7 @@ export const DashboardModule = {
 
       container.innerHTML = data.map(p => {
         const st  = STATUS_MAP[p.status] || { label: p.status, cls: 'bg-slate-100 text-slate-600' };
-        const amt = Number(p.amount || 0).toLocaleString('es-ES', { style: 'currency', currency: 'USD', minimumFractionDigits: 2 });
+        const amt = 'RD$' + Number(p.amount || 0).toLocaleString('es-DO', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
         const ini = (p.students?.name || '?').charAt(0).toUpperCase();
         return (
           '<div class="flex items-center gap-3 px-5 py-3 hover:bg-slate-50 transition-colors">' +

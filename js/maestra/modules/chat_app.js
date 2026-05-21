@@ -110,22 +110,26 @@ export async function initChat() {
 
     container.innerHTML = allContacts.map(c => {
       const unread = unreadMap[c.id] || 0;
-      const label  = c.childName ? `Padre de: ${safeEscapeHTML(c.childName)}` : c.roleLabel;
+      // Para padres: título = nombre del estudiante, subtítulo = nombre del padre
+      const displayName = c.childName ? c.childName : (c.name || 'Usuario');
+      const parentLine  = c.childName ? `👤 ${safeEscapeHTML(c.name)}` : null;
+      const label       = c.childName ? `Padre/Madre · 👤 ${safeEscapeHTML(c.name)}` : c.roleLabel;
       const bgColor = c.roleLabel === 'Directora' ? 'bg-indigo-100 text-indigo-600' :
                       c.roleLabel === 'Asistente' ? 'bg-teal-100 text-teal-600' :
                       'bg-orange-100 text-orange-600';
       return `
-      <div onclick="App.selectChatContact('${c.id}', '${safeEscapeHTML(c.name)}', '${safeEscapeHTML(label)}')"
+      <div onclick="App.selectChatContact('${c.id}', '${safeEscapeHTML(displayName)}', '${safeEscapeHTML(label)}')"
            class="p-3 hover:bg-slate-50 rounded-xl cursor-pointer transition-colors flex items-center gap-3 border-b border-slate-50 last:border-0 relative">
         <div class="relative">
           <div class="w-10 h-10 rounded-full ${bgColor} flex items-center justify-center font-bold overflow-hidden">
-            ${c.avatar ? `<img src="${c.avatar}" class="w-full h-full object-cover" loading="lazy">` : c.name.charAt(0)}
+            ${c.avatar ? `<img src="${c.avatar}" class="w-full h-full object-cover" loading="lazy">` : displayName.charAt(0)}
           </div>
           ${unread > 0 ? `<div class="absolute -top-1 -right-1 bg-red-500 text-white text-[10px] font-bold px-1.5 py-0.5 rounded-full shadow-sm animate-pulse">${unread}</div>` : ''}
         </div>
         <div class="min-w-0">
-          <div class="font-bold text-slate-700 text-sm truncate">${safeEscapeHTML(c.name)}</div>
-          <div class="text-[10px] text-slate-400 truncate">${label}</div>
+          <div class="font-bold text-slate-700 text-sm truncate">${safeEscapeHTML(displayName)}</div>
+          ${parentLine ? `<div class="text-[10px] text-orange-600 font-bold truncate">${parentLine}</div>` : ''}
+          <div class="text-[10px] text-slate-400 truncate">${c.childName ? c.roleLabel : label}</div>
         </div>
       </div>`;
     }).join('');

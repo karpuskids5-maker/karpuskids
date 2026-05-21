@@ -1,4 +1,4 @@
-﻿import { supabase } from '../shared/supabase.js';
+import { supabase } from '../shared/supabase.js';
 import { QueryCache } from '../shared/query-cache.js';
 
 const TABLES = {
@@ -159,7 +159,7 @@ export const DirectorApi = {
     try {
       return await supabase
         .from(TABLES.ATTENDANCE)
-        .select('*, student:student_id(name), classroom:classroom_id(name)')
+        .select('id, date, check_in, check_out, status, student_id, classroom_id, student:student_id(name), classroom:classroom_id(name)')
         .eq('date', date);
     } catch (e) { return logError('getAttendanceByDate', e); }
   },
@@ -451,7 +451,7 @@ export const DirectorApi = {
         if (!emails.length) { return false; }
 
         const studentName = p.students?.name || 'Estudiante';
-        const amount  = Number(p.amount || 0).toLocaleString('es-ES', { style: 'currency', currency: 'USD', minimumFractionDigits: 2 });
+        const amount  = 'RD$' + Number(p.amount || 0).toLocaleString('es-DO', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
         const month   = p.month_paid || 'Colegiatura';
         const method  = (p.method || 'efectivo').charAt(0).toUpperCase() + (p.method || 'efectivo').slice(1);
         const dateStr = new Date().toLocaleDateString('es-ES', { day: 'numeric', month: 'long', year: 'numeric' });

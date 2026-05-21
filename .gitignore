@@ -36,6 +36,7 @@ data/*.db-wal
 
 # Legacy files (no longer used)
 app.js
+store.js
 update_main.cjs
 update_asistente_main.cjs
 fix_escapes.cjs
@@ -43,8 +44,10 @@ fix_escapes.cjs
 # Scripts with sensitive keys — run locally only, NEVER deploy
 scripts/fix_auth_activation.js
 scripts/confirm_users.js
+scripts/check_profile.js
 scripts/seed-demo.js
 scripts/seed-demo.cjs
+scripts/
 
 # Temporary fix scripts (run locally, don't need in repo)
 _fix_*.cjs

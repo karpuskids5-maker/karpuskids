@@ -1,4 +1,4 @@
-﻿﻿﻿﻿-- ============================================================
+﻿﻿﻿﻿﻿-- ============================================================
 -- KARPUS KIDS - Schema Completo para Supabase
 -- Ejecutar en Supabase SQL Editor de arriba a abajo.
 -- ============================================================
@@ -371,8 +371,8 @@ create table if not exists public.school_settings (
   business_hours text default 'Lun-Vie: 7am - 6pm',
   generation_day int default 25,
   due_day        int default 5,
-  check_in_start time default '07:30:00',
-  check_in_end   time default '08:30:00',
+  check_in_start time default '07:00:00',
+  check_in_end   time default '07:30:00',
   check_out_start time default '16:00:00',
   check_out_end   time default '17:30:00',
   updated_at     timestamp with time zone default now()

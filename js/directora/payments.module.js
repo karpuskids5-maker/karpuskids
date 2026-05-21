@@ -155,8 +155,8 @@ export const PaymentsModule = {
     const currentMora = moraBreakdown ? moraBreakdown.total : 0;
     const totalAmount = Number(p.amount || 0) + currentMora;
 
-    const af  = Number(p.amount || 0).toLocaleString('es-ES', { style: 'currency', currency: 'USD', minimumFractionDigits: 2 });
-    const tf  = totalAmount.toLocaleString('es-ES', { style: 'currency', currency: 'USD', minimumFractionDigits: 2 });
+    const af  = 'RD$' + Number(p.amount || 0).toLocaleString('es-DO', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+    const tf  = 'RD$' + totalAmount.toLocaleString('es-DO', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
     let ub = '';
     if (moraBreakdown) {

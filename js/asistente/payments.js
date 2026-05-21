@@ -226,13 +226,13 @@ export const PaymentsModule = {
     const student = p.students || { name: 'Desconocido', classrooms: { name: '-' } };
     const isPending  = statusKey !== 'paid';
     const dueDateStr = p.due_date ? new Date(p.due_date + 'T00:00:00').toLocaleDateString('es-ES') : '-';
-    const amountFmt  = Number(p.amount || 0).toLocaleString('es-ES', { style: 'currency', currency: 'USD', minimumFractionDigits: 2 });
+    const amountFmt  = 'RD$' + Number(p.amount || 0).toLocaleString('es-DO', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
     // Mora acumulada
     const mora        = (isPending && p.due_date) ? calcMora(p.due_date) : 0;
     const moraBreakdown = (mora > 0 && p.due_date) ? Helpers.getMoraBreakdown(p.due_date) : null;
     const totalAmount = Number(p.amount || 0) + mora;
-    const totalFmt    = totalAmount.toLocaleString('es-ES', { style: 'currency', currency: 'USD', minimumFractionDigits: 2 });
+    const totalFmt    = 'RD$' + totalAmount.toLocaleString('es-DO', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
     let moraBlock = '';
     if (mora > 0 && moraBreakdown) {
@@ -556,7 +556,7 @@ export const PaymentsModule = {
       if (!emails.length) return;
 
       const studentName = p.students?.name || 'Estudiante';
-      const amount  = Number(p.amount || 0).toLocaleString('es-ES', { style: 'currency', currency: 'USD', minimumFractionDigits: 2 });
+      const amount  = 'RD$' + Number(p.amount || 0).toLocaleString('es-DO', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
       const month   = p.month_paid || 'Colegiatura';
       const method  = (p.method || 'efectivo').charAt(0).toUpperCase() + (p.method || 'efectivo').slice(1);
       const dateStr = new Date().toLocaleDateString('es-ES', { day: 'numeric', month: 'long', year: 'numeric' });
