@@ -1,4 +1,4 @@
-﻿import { supabase, ensureRole } from '../shared/supabase.js';
+import { supabase, ensureRole } from '../shared/supabase.js';
 import { logError, auditLog } from '../shared/db-utils.js';
 
 // Bloquear redirección por SIGNED_OUT desde el primer momento
@@ -83,19 +83,15 @@ document.addEventListener('DOMContentLoaded', async () => {
 
     // ── Paso 3: Obtener perfil ────────────────────────────────────────────────
     _setLoaderMsg('Verificando permisos...');
+    console.log('[Paso 3] Iniciando carga de perfil para:', userId);
     let profile = null;
-
-    // Estrategia en orden de prioridad (de más rápido a más lento):
-    // 1. Cache local (localStorage) — sin red, instantáneo
-    // 2. JWT app_metadata — sin red, instantáneo
-    // 3. Query a DB — requiere red
 
     // 1. Cache local
     const CACHE_KEY = 'karpus_ctrl_profile_' + userId;
     try {
       const cached = JSON.parse(localStorage.getItem(CACHE_KEY) || 'null');
       if (cached && cached.role && cached.ts && (Date.now() - cached.ts) < 3600000) {
-        // Cache válido (menos de 1 hora)
+        console.log('[Paso 3] Perfil cargado desde caché:', cached.role);
         profile = { id: userId, email: userEmail, name: cached.name || userEmail.split('@')[0], role: cached.role };
       }
     } catch (_) {}
@@ -104,15 +100,18 @@ document.addEventListener('DOMContentLoaded', async () => {
     if (!profile) {
       const jwtRole = session.user?.app_metadata?.role || session.user?.user_metadata?.role || null;
       if (jwtRole && ['admin', 'directora'].includes(jwtRole)) {
+        console.log('[Paso 3] Rol detectado en JWT:', jwtRole);
         profile = { id: userId, email: userEmail, name: userEmail.split('@')[0], role: jwtRole };
       }
     }
 
-    // 3. Query a DB (solo si no hay cache ni JWT)
+    // 3. Query a DB
     if (!profile) {
+      console.log('[Paso 3] Consultando base de datos para perfil...');
       let timedOut = false;
       const profileTimer = setTimeout(() => {
         timedOut = true;
+        console.error('[Paso 3] Timeout al consultar perfil');
         clearTimeout(loaderTimeout);
         window._karpusInitializing = false;
         const el = document.getElementById('loader');
@@ -120,32 +119,42 @@ document.addEventListener('DOMContentLoaded', async () => {
           '<div style="text-align:center;padding:32px">',
           '<div style="font-size:32px;margin-bottom:12px">⚠️</div>',
           '<p style="color:#f87171;font-weight:800;font-size:14px;margin-bottom:8px">Sin conexión con Supabase</p>',
-          '<p style="color:#94a3b8;font-size:12px;margin-bottom:16px">El servidor no respondió en 6s.</p>',
+          '<p style="color:#94a3b8;font-size:12px;margin-bottom:16px">El servidor no respondió en 8s.</p>',
           '<p style="color:#64748b;font-size:11px;margin-bottom:16px">Email: ' + userEmail + '</p>',
           '<div style="display:flex;gap:8px;justify-content:center">',
           '<button onclick="window.location.reload()" style="background:#6366f1;color:white;border:none;padding:10px 20px;border-radius:10px;font-weight:800;cursor:pointer;font-size:12px">Reintentar</button>',
           '<button onclick="window._signOutAndRedirect()" style="background:rgba(255,255,255,.1);color:#94a3b8;border:1px solid rgba(255,255,255,.1);padding:10px 20px;border-radius:10px;font-weight:800;cursor:pointer;font-size:12px">Cerrar Sesión</button>',
           '</div></div>'
         ].join('');
-      }, 6000);
+      }, 8000);
 
       try {
         const { data, error } = await supabase
           .from('profiles')
           .select('id, name, email, role')
-          .eq('id', userId)
-          .maybeSingle();
+          .eq('id', userId);
 
         clearTimeout(profileTimer);
         if (timedOut) return;
 
+        console.log('[Paso 3] Respuesta DB:', { data, error });
+
         if (!error && data) {
-          profile = data;
-          // Guardar en cache para próximas cargas
-          try {
-            localStorage.setItem(CACHE_KEY, JSON.stringify({ role: data.role, name: data.name, ts: Date.now() }));
-          } catch (_) {}
+          // Manejar si viene como array o como objeto único
+          const rawProfile = Array.isArray(data) ? data[0] : data;
+          
+          if (rawProfile) {
+            profile = rawProfile;
+            console.log('[Paso 3] Perfil obtenido:', profile.role);
+            // Guardar en cache para próximas cargas
+            try {
+              localStorage.setItem(CACHE_KEY, JSON.stringify({ role: profile.role, name: profile.name, ts: Date.now() }));
+            } catch (_) {}
+          } else {
+            console.warn('[Paso 3] No se encontró perfil para el ID:', userId);
+          }
         } else if (error) {
+          console.error('[Paso 3] Error en consulta de perfil:', error);
           clearTimeout(loaderTimeout);
           window._karpusInitializing = false;
           const el = document.getElementById('loader');
@@ -153,6 +162,7 @@ document.addEventListener('DOMContentLoaded', async () => {
           return;
         }
       } catch (e) {
+        console.error('[Paso 3] Excepción en consulta de perfil:', e);
         clearTimeout(profileTimer);
         if (timedOut) return;
         clearTimeout(loaderTimeout);
@@ -164,6 +174,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     }
 
     if (!profile) {
+      console.error('[Paso 3] Fin del proceso: Perfil NO encontrado');
       clearTimeout(loaderTimeout);
       window._karpusInitializing = false;
       const el = document.getElementById('loader');
@@ -172,8 +183,12 @@ document.addEventListener('DOMContentLoaded', async () => {
     }
 
     // ── Paso 4: Verificar rol ─────────────────────────────────────────────────
+    console.log('[Paso 4] Verificando rol permitido...');
     const allowedRoles = ['admin', 'directora'];
-    if (!allowedRoles.includes(profile.role)) {
+    const userRole = (profile.role || '').toLowerCase();
+    
+    if (!allowedRoles.includes(userRole)) {
+      console.warn('[Paso 4] Rol NO permitido:', userRole);
       clearTimeout(loaderTimeout);
       window._karpusInitializing = false;
       const loader = document.getElementById('loader');
@@ -182,8 +197,11 @@ document.addEventListener('DOMContentLoaded', async () => {
           <div style="text-align:center;padding:32px;">
             <div style="font-size:32px;margin-bottom:12px;">🚫</div>
             <p style="color:#f87171;font-weight:800;font-size:14px;margin-bottom:8px;">Acceso denegado</p>
-            <p style="color:#94a3b8;font-size:12px;margin-bottom:4px;">Tu rol: <strong style="color:#f1f5f9;">${profile.role || '(sin rol)'}</strong></p>
+            <p style="color:#94a3b8;font-size:12px;margin-bottom:4px;">Tu rol: <strong style="color:#f1f5f9;">${userRole || '(sin rol)'}</strong></p>
             <p style="color:#94a3b8;font-size:12px;margin-bottom:20px;">Solo administradores y directoras pueden acceder.</p>
+            <div style="background:rgba(0,0,0,0.2);padding:10px;border-radius:8px;font-family:monospace;font-size:10px;color:#64748b;margin-bottom:20px;text-align:left;overflow-x:auto;">
+              Profile: ${JSON.stringify(profile)}
+            </div>
             <button onclick="window.location.href='login.html'" style="background:#6366f1;color:white;border:none;padding:10px 24px;border-radius:10px;font-weight:800;cursor:pointer;font-size:13px;">Volver al Login</button>
           </div>`;
       }
@@ -191,6 +209,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     }
 
     // ── Paso 5: Mostrar panel ─────────────────────────────────────────────────
+    console.log('[Paso 5] Inicializando panel para:', profile.name);
     clearTimeout(loaderTimeout);
     window._karpusInitializing = false;
     currentUser = profile;
@@ -278,27 +297,36 @@ window.goTo = function(id) {
 
 // ── Refresh ───────────────────────────────────────────────────────────────────
 window.refreshAll = async function() {
-  await Promise.allSettled([
-    loadUsers(), loadAudit(), loadPayments(),
-    loadAttendance(), loadStudents(), loadClassrooms(), loadPunches()
-  ]);
-  renderDashboard();
+  console.log('[refreshAll] Iniciando carga de datos...');
+  try {
+    await Promise.allSettled([
+      loadUsers(), loadAudit(), loadPayments(),
+      loadAttendance(), loadStudents(), loadClassrooms(), loadPunches()
+    ]);
+    console.log('[refreshAll] Datos cargados, renderizando dashboard...');
+    renderDashboard();
+  } catch (err) {
+    console.error('[refreshAll] Error crítico:', err);
+  }
 };
 
 // ── Load data ─────────────────────────────────────────────────────────────────
 async function loadUsers() {
   try {
+    console.log('[loadUsers] Cargando usuarios...');
     const { data } = await supabase
       .from('profiles')
       .select('id, name, email, role, created_at, avatar_url, phone, bio')
       .order('created_at', { ascending: false })
       .limit(300);
     allUsers = data || [];
+    console.log('[loadUsers] OK:', allUsers.length);
     const kpi = document.getElementById('kpi-users');
     if (kpi) kpi.textContent = allUsers.length;
     const cfgCount = document.getElementById('cfgUserCount');
     if (cfgCount) cfgCount.textContent = allUsers.length;
   } catch (err) { 
+    console.error('[loadUsers] Error:', err);
     logError('panel_control', err.message || String(err), err.stack || '', 'loadUsers').catch(() => {});
     allUsers = []; 
   }
@@ -306,6 +334,7 @@ async function loadUsers() {
 
 async function loadPunches() {
   try {
+    console.log('[loadPunches] Cargando accesos...');
     // Last 30 days of door punches — used for "último acceso"
     const since = new Date(); since.setDate(since.getDate() - 30);
     const { data } = await supabase
@@ -314,7 +343,9 @@ async function loadPunches() {
       .gte('punched_at', since.toISOString())
       .order('punched_at', { ascending: false });
     allPunches = data || [];
+    console.log('[loadPunches] OK:', allPunches.length);
   } catch (err) { 
+    console.error('[loadPunches] Error:', err);
     logError('panel_control', err?.message || String(err), err?.stack || '', 'loadPunches').catch(() => {});
     allPunches = []; 
   }
@@ -322,6 +353,7 @@ async function loadPunches() {
 
 async function loadAudit() {
   try {
+    console.log('[loadAudit] Cargando auditoría...');
     // Try audit_logs first, fallback to system_events
     let data = null;
     const { data: d1, error: e1 } = await supabase
@@ -332,6 +364,7 @@ async function loadAudit() {
     if (!e1) {
       data = d1;
     } else {
+      console.warn('[loadAudit] audit_logs falló, usando system_events...');
       // Fallback: system_events
       const { data: d2 } = await supabase
         .from('system_events')
@@ -347,9 +380,11 @@ async function loadAudit() {
       }));
     }
     allAudit = data || [];
+    console.log('[loadAudit] OK:', allAudit.length);
     const badge = document.getElementById('badge-audit');
     if (badge) badge.textContent = allAudit.length;
   } catch (err) { 
+    console.error('[loadAudit] Error:', err);
     logError('panel_control', err?.message || String(err), err?.stack || '', 'loadAudit').catch(() => {});
     allAudit = []; 
   }
@@ -357,14 +392,17 @@ async function loadAudit() {
 
 async function loadPayments() {
   try {
+    console.log('[loadPayments] Cargando pagos...');
     const { data, error } = await supabase
       .from('payments')
-      .select('id, amount, status, method, bank, month_paid, created_at, student_id, students:student_id(name, p1_name)')
+      .select('id, amount, status, method, bank, month_paid, created_at, student_id, student:student_id(name, p1_name)')
       .order('created_at', { ascending: false })
       .limit(300);
     if (error) throw error;
     allPayments = data || [];
+    console.log('[loadPayments] OK:', allPayments.length);
   } catch (err) { 
+    console.error('[loadPayments] Error:', err);
     logError('panel_control', err?.message || String(err), err?.stack || '', 'loadPayments').catch(() => {});
     allPayments = []; 
   }
@@ -372,13 +410,16 @@ async function loadPayments() {
 
 async function loadStudents() {
   try {
+    console.log('[loadStudents] Cargando estudiantes...');
     const { data } = await supabase
       .from('students')
       .select('id, name, parent_id, classroom_id, is_active, matricula');
     allStudents = data || [];
+    console.log('[loadStudents] OK:', allStudents.length);
     const kpi = document.getElementById('kpi-students');
     if (kpi) kpi.textContent = allStudents.filter(s => s.is_active).length;
   } catch (err) { 
+    console.error('[loadStudents] Error:', err);
     logError('panel_control', err?.message || String(err), err?.stack || '', 'loadStudents').catch(() => {});
     allStudents = []; 
   }
@@ -386,9 +427,12 @@ async function loadStudents() {
 
 async function loadClassrooms() {
   try {
+    console.log('[loadClassrooms] Cargando aulas...');
     const { data } = await supabase.from('classrooms').select('id, name, teacher_id');
     allClassrooms = data || [];
+    console.log('[loadClassrooms] OK:', allClassrooms.length);
   } catch (err) { 
+    console.error('[loadClassrooms] Error:', err);
     logError('panel_control', err?.message || String(err), err?.stack || '', 'loadClassrooms').catch(() => {});
     allClassrooms = []; 
   }
@@ -397,27 +441,34 @@ async function loadClassrooms() {
 async function loadAttendance() {
   const today = new Date().toISOString().split('T')[0];
   try {
+    console.log('[loadAttendance] Cargando asistencia de hoy...');
     // Fetch attendance with student names
     const { data, error } = await supabase
       .from('attendance')
-      .select('id, date, check_in, check_out, status, student_id, classroom_id, students:student_id(name), classrooms:classroom_id(name)')
+      .select('id, date, check_in, check_out, status, student_id, classroom_id, student:student_id(name), classroom:classroom_id(name)')
       .order('date', { ascending: false })
       .limit(300);
+    
     if (error) throw error;
     allAttend = data || [];
+    console.log('[loadAttendance] OK:', allAttend.length);
     const todayCount = allAttend.filter(a => a.date === today).length;
     const kpi = document.getElementById('kpi-attendance');
     if (kpi) kpi.textContent = todayCount;
-  } catch (_) {
+  } catch (err) {
+    console.error('[loadAttendance] Error primary:', err);
     // Fallback without joins
     try {
+      console.log('[loadAttendance] Intentando fallback sin joins...');
       const { data } = await supabase
         .from('attendance')
         .select('id, date, check_in, check_out, status, student_id, classroom_id')
         .order('date', { ascending: false })
         .limit(300);
       allAttend = data || [];
+      console.log('[loadAttendance] Fallback OK:', allAttend.length);
     } catch (err2) { 
+      console.error('[loadAttendance] Error total:', err2);
       logError('panel_control', err2?.message || String(err2), err2?.stack || '', 'loadAttendance_fallback').catch(() => {});
       allAttend = []; 
     }
@@ -934,8 +985,8 @@ function renderPayments() {
   const statusBadge = { paid: 'badge-green', approved: 'badge-green', pending: 'badge-yellow', rejected: 'badge-red', review: 'badge-blue', overdue: 'badge-red' };
   tbody.innerHTML = allPayments.slice(0, 100).map(p => `<tr>
     <td style="font-size:11px;color:var(--muted);">${p.created_at ? new Date(p.created_at).toLocaleDateString('es-DO') : '—'}</td>
-    <td style="font-weight:800;">${escH(p.students?.name||'—')}</td>
-    <td style="color:var(--muted);">${escH(p.students?.p1_name||'—')}</td>
+    <td style="font-weight:800;">${escH(p.student?.name||'—')}</td>
+    <td style="color:var(--muted);">${escH(p.student?.p1_name||'—')}</td>
     <td style="font-weight:900;color:#4ade80;">RD$${Number(p.amount||0).toLocaleString()}</td>
     <td>${escH(p.method||'—')}</td>
     <td>${escH(p.bank||'—')}</td>
@@ -970,8 +1021,8 @@ function renderAttendance() {
   const statusBadge = { present: 'badge-green', absent: 'badge-red', late: 'badge-yellow', retirado: 'badge-blue' };
   tbody.innerHTML = todayData.map(a => {
     // Resolve student name: from join or from allStudents
-    const studentName = a.students?.name || allStudents.find(s => s.id === a.student_id)?.name || String(a.student_id || '—');
-    const classroomName = a.classrooms?.name || allClassrooms.find(c => c.id === a.classroom_id)?.name || '—';
+    const studentName = a.student?.name || allStudents.find(s => s.id === a.student_id)?.name || String(a.student_id || '—');
+    const classroomName = a.classroom?.name || allClassrooms.find(c => c.id === a.classroom_id)?.name || '—';
     const checkIn  = a.check_in  ? new Date(a.check_in).toLocaleTimeString('es-DO',{hour:'2-digit',minute:'2-digit'}) : '—';
     const checkOut = a.check_out ? new Date(a.check_out).toLocaleTimeString('es-DO',{hour:'2-digit',minute:'2-digit'}) : '—';
     return `<tr>

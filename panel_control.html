@@ -116,7 +116,8 @@
     ::-webkit-scrollbar-thumb{background:rgba(255,255,255,.12);border-radius:4px;}
 
     /* ── Loading ── */
-    #loader{position:fixed;inset:0;background:var(--bg);z-index:9999;display:flex;align-items:center;justify-content:center;flex-direction:column;gap:16px;}
+    #loader{position:fixed;inset:0;background:var(--bg);z-index:9999;display:flex;align-items:center;justify-content:center;flex-direction:column;gap:16px;transition:opacity .4s,visibility .4s;}
+    #loader.hidden{opacity:0;visibility:hidden;pointer-events:none;}
     .spinner{width:40px;height:40px;border:3px solid rgba(99,102,241,.2);border-top-color:#6366f1;border-radius:50%;animation:spin .8s linear infinite;}
     @keyframes spin{to{transform:rotate(360deg)}}
 

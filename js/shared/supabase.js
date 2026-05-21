@@ -36,60 +36,37 @@ supabase.auth.onAuthStateChange((event, session) => {
 let _refreshing = false;
 const _originalFetch = window.fetch;
 window.fetch = async function(...args) {
-  // Asegurar que las peticiones a Supabase lleven la API Key
   const url = typeof args[0] === 'string' ? args[0] : args[0]?.url;
   const isSupabase = url && url.includes(SUPABASE_URL);
   
-  if (isSupabase && !_refreshing) {
+  if (isSupabase) {
     const options = args[1] || {};
     options.headers = options.headers || {};
     
+    // Inyectar apikey solo si falta (útil para Edge Functions o fetch directo)
     if (!options.headers['apikey']) {
       options.headers['apikey'] = SUPABASE_ANON_KEY;
-    }
-    
-    // Solo intentar obtener sesión si no estamos ya en un proceso de auth
-    if (!options.headers['Authorization'] && !url.includes('/auth/v1/')) {
-      try {
-        const sessionStr = localStorage.getItem('karpus_auth_token_v2');
-        if (sessionStr) {
-          const session = JSON.parse(sessionStr);
-          if (session?.access_token) {
-            options.headers['Authorization'] = `Bearer ${session.access_token}`;
-          }
-        }
-      } catch (e) {}
-      
-      if (!options.headers['Authorization']) {
-        options.headers['Authorization'] = `Bearer ${SUPABASE_ANON_KEY}`;
-      }
     }
     args[1] = options;
   }
 
   const res = await _originalFetch.apply(this, args);
   
-  if (res.status === 401 && !_refreshing) {
-    const url = typeof args[0] === 'string' ? args[0] : (args[0]?.url || '');
-    // Solo interceptar requests a Supabase REST/Storage, no a auth endpoints
-    if (url.includes('supabase.co') && !url.includes('/auth/') && !url.includes('/token')) {
-      _refreshing = true;
-      try {
-        const { data: refreshed, error } = await supabase.auth.refreshSession();
-        if (error || !refreshed?.session) {
-          // Refresh falló — redirigir al login
-          if (!window.location.pathname.includes('login.html')) {
-            window.location.href = 'login.html';
-          }
-          return res; // retornar la respuesta 401 original
-        }
-        // Refresh exitoso — reintentar la request original con el nuevo token
+  // Interceptar 401 para intentar refrescar sesión
+  if (res.status === 401 && isSupabase && !_refreshing && !url.includes('/auth/v1/')) {
+    _refreshing = true;
+    try {
+      console.warn('[supabase-js] 401 detectado, intentando refrescar sesión...');
+      const { data: refreshed, error } = await supabase.auth.refreshSession();
+      if (!error && refreshed?.session) {
+        console.log('[supabase-js] Sesión refrescada con éxito. Reintentando petición...');
+        // El cliente de Supabase ya tiene el nuevo token internamente para el reintento
         return _originalFetch.apply(this, args);
-      } catch (_) {
-        return res;
-      } finally {
-        _refreshing = false;
       }
+    } catch (e) {
+      console.error('[supabase-js] Error al intentar refrescar sesión:', e);
+    } finally {
+      _refreshing = false;
     }
   }
   return res;
