@@ -183,7 +183,7 @@ export const DirectorApi = {
   async getPayments(filters = {}) {
     try {
       let query = supabase.from('payments')
-        .select('id, amount, status, month_paid, due_date, paid_date, method, bank, reference, proof_url, created_at, students:student_id(name, classrooms:classroom_id(name))');
+        .select('id, amount, status, month_paid, due_date, paid_date, method, bank, reference, proof_url, evidence_url, created_at, students:student_id(name, classrooms:classroom_id(name))');
       if (filters.status && filters.status !== 'all') query = query.eq('status', filters.status);
       if (filters.year) {
         // Use month_paid prefix to match current year payments

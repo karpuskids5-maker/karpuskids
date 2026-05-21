@@ -426,6 +426,8 @@ export const PaymentsModule = {
   },
 
   async submitPaymentProof(e) {
+    if (e && e.preventDefault) e.preventDefault();
+    
     const student = AppState.get('currentStudent');
     if (!student) return;
 
@@ -436,14 +438,21 @@ export const PaymentsModule = {
     const fileInput = document.getElementById('paymentFileInput');
     const file   = fileInput?.files[0];
     const amount = parseFloat(document.getElementById('paymentAmount')?.value || '0');
-    const month  = document.getElementById('paymentMonth')?.value?.trim();
+    const monthRaw = document.getElementById('paymentMonth')?.value?.trim();
     const method = document.getElementById('paymentMethod')?.value || 'transferencia';
     const bank   = document.getElementById('paymentBank')?.value?.trim() || null;
 
     if (!file)   { Helpers.toast('Adjunta el comprobante', 'warning'); return; }
     if (!amount || amount <= 0 || amount > 99999) { Helpers.toast('Ingresa un monto válido (mayor a 0)', 'warning'); return; }
-    if (!month)  { Helpers.toast('Selecciona el mes', 'warning'); return; }
+    if (!monthRaw) { Helpers.toast('Selecciona el mes', 'warning'); return; }
     if (!bank)   { Helpers.toast('Selecciona el banco de origen', 'warning'); return; }
+    
+    // Normalizar mes para búsqueda (Abril 2026 -> 2026-04)
+    const month = monthRaw.includes(' ') ? (monthRaw.split(' ')[1] + '-' + {
+      'Enero':'01','Febrero':'02','Marzo':'03','Abril':'04','Mayo':'05','Junio':'06',
+      'Julio':'07','Agosto':'08','Septiembre':'09','Octubre':'10','Noviembre':'11','Diciembre':'12'
+    }[monthRaw.split(' ')[0]] || monthRaw) : monthRaw;
+
     if (file.size > 5 * 1024 * 1024) { Helpers.toast('Archivo muy grande (max 5MB)', 'error'); return; }
     if (!['image/jpeg','image/png','image/webp','application/pdf'].includes(file.type)) {
       Helpers.toast('Formato no permitido (JPG, PNG, PDF)', 'error'); return;
@@ -465,45 +474,52 @@ export const PaymentsModule = {
       const ext  = file.name.split('.').pop().toLowerCase();
       const path = `payments/${student.id}_${Date.now()}.${ext}`;
       let uploadFile = file;
+      
+      // Comprimir imagen si es necesario
       if (file.type.startsWith('image/')) {
         try {
           const { ImageLoader } = await import('../shared/image-loader.js');
-          uploadFile = await ImageLoader.compress(file, { maxWidth: 800, maxHeight: 800, quality: 0.82, maxSizeKB: 300 });
-        } catch (_) {}
+          uploadFile = await ImageLoader.compress(file, { maxWidth: 1000, maxHeight: 1000, quality: 0.8, maxSizeKB: 400 });
+        } catch (err) {
+          console.warn('Fallo compresión, subiendo original:', err);
+        }
       }
+
       setP(20);
       const { error: upErr } = await supabase.storage.from('classroom_media').upload(path, uploadFile);
-      setP(70);
       if (upErr) throw upErr;
+      
+      setP(70);
       const { data: { publicUrl } } = supabase.storage.from('classroom_media').getPublicUrl(path);
       setP(85);
 
-      // Always query DB directly — don't rely on cached _payments (may have stale month format)
-      const { data: existingPayments } = await supabase
+      // 🔍 Buscar registro existente (Vencido o Pendiente) para este mes
+      // Intentamos con el formato normalizado YYYY-MM y con el original
+      const { data: existingPayments, error: fetchErr } = await supabase
         .from(TABLES.PAYMENTS)
         .select('id, status, month_paid')
         .eq('student_id', student.id)
-        .eq('month_paid', month)
+        .or(`month_paid.eq."${month}",month_paid.eq."${monthRaw}"`)
         .neq('status', 'paid')
         .limit(1);
 
+      if (fetchErr) throw fetchErr;
       const existing = existingPayments?.[0] || null;
 
       if (existing) {
-        // UPDATE existing record — change status to review and add evidence
-        const { error } = await supabase.from(TABLES.PAYMENTS)
+        // UPDATE: Cambiar a revisión y adjuntar comprobante
+        const { error: updateErr } = await supabase.from(TABLES.PAYMENTS)
           .update({ 
             evidence_url: publicUrl, 
             status: 'review', 
             method, 
-            bank,
-            updated_at: new Date().toISOString()
+            bank
           })
           .eq('id', existing.id);
-        if (error) throw error;
+        if (updateErr) throw updateErr;
       } else {
-        // No existing payment for this month — insert new review record
-        const { error } = await supabase.from(TABLES.PAYMENTS).insert({
+        // INSERT: Crear nuevo registro en revisión si no existe
+        const { error: insertErr } = await supabase.from(TABLES.PAYMENTS).insert({
           student_id: student.id, 
           amount, 
           month_paid: month,
@@ -511,29 +527,38 @@ export const PaymentsModule = {
           bank, 
           evidence_url: publicUrl, 
           status: 'review',
-          created_at: new Date().toISOString(),
-          updated_at: new Date().toISOString()
+          created_at: new Date().toISOString()
         });
-        if (error) throw error;
+        if (insertErr) throw insertErr;
       }
-      this._showSuccessConfirmation(amount, month, bank);
+      
+      this._showSuccessConfirmation(amount, monthRaw, bank);
       setP(100);
-      setTimeout(() => document.getElementById('payment-upload-progress')?.remove(), 1500);
-      e.target.reset();
+      
+      setTimeout(() => {
+        document.getElementById('payment-upload-progress')?.remove();
+      }, 1500);
+      
+      const form = document.getElementById('paymentForm');
+      if (form) form.reset();
+      
+      // Forzar recarga de datos en AppState y UI
       await this.loadPayments();
-
-      // Notificar al staff que hay un comprobante nuevo
+      
+      // Notificar al staff en tiempo real
       emitEvent('payment.receipt_uploaded', {
-        student_id:   student?.id,
-        student_name: student?.name || 'Estudiante',
+        student_id:   student.id,
+        student_name: student.name,
         amount:       amount.toFixed(2),
-        month
+        month:        monthRaw
       }).catch(() => {});
+
     } catch (err) {
+      console.error('Error en submitPaymentProof:', err);
       document.getElementById('payment-upload-progress')?.remove();
-      Helpers.toast('Error al enviar: ' + (err.message || ''), 'error');
+      Helpers.toast('Error al enviar: ' + (err.message || 'Error desconocido'), 'error');
     } finally {
-      if (btn) { btn.disabled = false; btn.textContent = 'Enviar Comprobante'; }
+      if (btn) { btn.disabled = false; btn.textContent = 'Enviar Reporte'; }
     }
   },
 
