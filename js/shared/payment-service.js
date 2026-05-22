@@ -90,6 +90,11 @@ export const PaymentService = {
       .from('payments').select(PAYMENT_COLS_WITH_STUDENT).eq('id', id).single();
     if (fe) throw fe;
 
+    // Validaciones antes de aprobar
+    if (!p) throw new Error('Pago no encontrado');
+    if (p.status === 'paid') throw new Error('Este pago ya fue aprobado');
+    if (Number(p.amount || 0) <= 0) throw new Error('El monto del pago no es válido');
+
     const { error } = await supabase
       .from('payments').update({ status: 'paid', paid_date: new Date().toISOString() }).eq('id', id);
     if (error) throw error;

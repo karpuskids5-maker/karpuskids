@@ -1,4 +1,4 @@
-﻿import { supabase, ensureRole, emitEvent, sendPush, initOneSignal } from '../shared/supabase.js';
+import { supabase, ensureRole, emitEvent, sendPush, initOneSignal } from '../shared/supabase.js';
 import { AppState } from './state.js';
 import { MaestraApi } from './api.js';
 import { Helpers } from '../shared/helpers.js';
@@ -900,31 +900,62 @@ async function initGrades() {
     }
 
     content.innerHTML =
-      '<div class="w-full overflow-x-auto rounded-3xl border border-slate-100 shadow-sm bg-white" style="-webkit-overflow-scrolling:touch">' +
-        '<table class="w-full text-sm text-left" style="min-width:560px">' +
-          '<thead class="bg-slate-50 text-slate-500 font-black uppercase text-[10px] tracking-wider">' +
-            '<tr>' +
-              '<th class="px-5 py-4 whitespace-nowrap">Estudiante</th>' +
-              '<th class="px-5 py-4 text-center whitespace-nowrap">Promedio</th>' +
-              '<th class="px-5 py-4 text-center whitespace-nowrap">Nivel</th>' +
-              '<th class="px-5 py-4 text-center whitespace-nowrap">Tareas Calificadas</th>' +
-            '</tr>' +
-          '</thead>' +
-          '<tbody class="divide-y divide-slate-100">' +
-            students.map(s => {
-              const data = byStudent[s.id];
-              const avg = data && data.count > 0 ? data.total / data.count : 0;
-              const level = getLevelLabel(avg);
-              const colorCls = avg >= 3.5 ? 'bg-emerald-50 text-emerald-700' : avg >= 2.5 ? 'bg-amber-50 text-amber-700' : avg > 0 ? 'bg-rose-50 text-rose-700' : 'bg-slate-50 text-slate-400';
-              return '<tr class="hover:bg-slate-50 transition-colors">' +
-                '<td class="px-5 py-3.5 whitespace-nowrap"><div class="flex items-center gap-3"><div class="w-8 h-8 rounded-xl bg-orange-50 text-orange-600 flex items-center justify-center font-black text-sm shrink-0">' + s.name.charAt(0) + '</div><div class="font-bold text-slate-800 text-sm">' + safeEscapeHTML(s.name) + '</div></div></td>' +
-                '<td class="px-5 py-3.5 text-center whitespace-nowrap"><span class="px-3 py-1 rounded-lg ' + colorCls + ' font-black text-sm">' + (avg > 0 ? avg.toFixed(1) : '-') + '</span></td>' +
-                '<td class="px-5 py-3.5 text-center whitespace-nowrap"><span class="px-2 py-1 rounded-full text-[10px] font-black uppercase ' + (avg > 0 ? level.cls : 'bg-slate-100 text-slate-400') + '">' + (avg > 0 ? level.label : 'Sin datos') + '</span></td>' +
-                '<td class="px-5 py-3.5 text-center text-sm font-bold text-slate-600 whitespace-nowrap">' + (data?.count || 0) + '</td>' +
-              '</tr>';
-            }).join('') +
-          '</tbody>' +
-        '</table>' +
+      '<div class="grades-container">' +
+        // ── Vista de Tabla (Desktop) ──
+        '<div class="hidden md:block w-full overflow-x-auto rounded-3xl border border-slate-100 shadow-sm bg-white" style="-webkit-overflow-scrolling:touch">' +
+          '<table class="w-full text-sm text-left" style="min-width:560px">' +
+            '<thead class="bg-slate-50 text-slate-500 font-black uppercase text-[10px] tracking-wider">' +
+              '<tr>' +
+                '<th class="px-5 py-4 whitespace-nowrap">Estudiante</th>' +
+                '<th class="px-5 py-4 text-center whitespace-nowrap">Promedio</th>' +
+                '<th class="px-5 py-4 text-center whitespace-nowrap">Nivel</th>' +
+                '<th class="px-5 py-4 text-center whitespace-nowrap">Tareas Calificadas</th>' +
+              '</tr>' +
+            '</thead>' +
+            '<tbody class="divide-y divide-slate-100">' +
+              students.map(s => {
+                const data = byStudent[s.id];
+                const avg = data && data.count > 0 ? data.total / data.count : 0;
+                const level = getLevelLabel(avg);
+                const colorCls = avg >= 3.5 ? 'bg-emerald-50 text-emerald-700' : avg >= 2.5 ? 'bg-amber-50 text-amber-700' : avg > 0 ? 'bg-rose-50 text-rose-700' : 'bg-slate-50 text-slate-400';
+                return '<tr class="hover:bg-slate-50 transition-colors">' +
+                  '<td class="px-5 py-3.5 whitespace-nowrap"><div class="flex items-center gap-3"><div class="w-8 h-8 rounded-xl bg-orange-50 text-orange-600 flex items-center justify-center font-black text-sm shrink-0">' + s.name.charAt(0) + '</div><div class="font-bold text-slate-800 text-sm">' + safeEscapeHTML(s.name) + '</div></div></td>' +
+                  '<td class="px-5 py-3.5 text-center whitespace-nowrap"><span class="px-3 py-1 rounded-lg ' + colorCls + ' font-black text-sm">' + (avg > 0 ? avg.toFixed(1) : '-') + '</span></td>' +
+                  '<td class="px-5 py-3.5 text-center whitespace-nowrap"><span class="px-2 py-1 rounded-full text-[10px] font-black uppercase ' + (avg > 0 ? level.cls : 'bg-slate-100 text-slate-400') + '">' + (avg > 0 ? level.label : 'Sin datos') + '</span></td>' +
+                  '<td class="px-5 py-3.5 text-center text-sm font-bold text-slate-600 whitespace-nowrap">' + (data?.count || 0) + '</td>' +
+                '</tr>';
+              }).join('') +
+            '</tbody>' +
+          '</table>' +
+        '</div>' +
+        // ── Vista de Tarjetas (Mobile) ──
+        '<div class="md:hidden space-y-3">' +
+          students.map(s => {
+            const data = byStudent[s.id];
+            const avg = data && data.count > 0 ? data.total / data.count : 0;
+            const level = getLevelLabel(avg);
+            const colorCls = avg >= 3.5 ? 'bg-emerald-50 text-emerald-700' : avg >= 2.5 ? 'bg-amber-50 text-amber-700' : avg > 0 ? 'bg-rose-50 text-rose-700' : 'bg-slate-50 text-slate-400';
+            return '<div class="bg-white p-4 rounded-3xl border border-slate-100 shadow-sm">' +
+              '<div class="flex items-center justify-between mb-4">' +
+                '<div class="flex items-center gap-3">' +
+                  '<div class="w-10 h-10 rounded-2xl bg-orange-100 text-orange-600 flex items-center justify-center font-black text-lg shrink-0">' + s.name.charAt(0) + '</div>' +
+                  '<div>' +
+                    '<div class="font-black text-slate-800 text-sm">' + safeEscapeHTML(s.name) + '</div>' +
+                    '<div class="text-[10px] font-bold text-slate-400 uppercase tracking-widest">' + (data?.count || 0) + ' tareas calificadas</div>' +
+                  '</div>' +
+                '</div>' +
+                '<div class="text-right">' +
+                  '<div class="text-[20px] font-black ' + (avg > 0 ? 'text-slate-800' : 'text-slate-300') + '">' + (avg > 0 ? avg.toFixed(1) : '-') + '</div>' +
+                  '<div class="text-[9px] font-black text-slate-400 uppercase tracking-tighter">Promedio</div>' +
+                '</div>' +
+              '</div>' +
+              '<div class="flex items-center justify-between pt-3 border-t border-slate-50">' +
+                '<span class="text-[10px] font-black text-slate-400 uppercase tracking-widest">Nivel de Logro</span>' +
+                '<span class="px-3 py-1 rounded-full text-[10px] font-black uppercase ' + (avg > 0 ? level.cls : 'bg-slate-100 text-slate-400') + '">' + (avg > 0 ? level.label : 'Sin datos') + '</span>' +
+              '</div>' +
+            '</div>';
+          }).join('') +
+        '</div>' +
       '</div>';
 
     if (window.lucide) window.lucide.createIcons();

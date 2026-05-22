@@ -389,11 +389,13 @@ export const PaymentsModule = {
         const { data: p } = await DirectorApi.getPaymentById(id);
         if (p) {
           const { notifyPaymentApproved } = await import('../shared/supabase.js');
-          const email = p.students?.p1_email || p.students?.p2_email || null;
+          // Enviar a todos los correos disponibles del estudiante
+          const emails = [p.students?.p1_email, p.students?.p2_email].filter(e => e && e.includes('@'));
           const studentName = p.students?.name || 'Estudiante';
           const amountStr = 'RD$' + Number(p.amount || 0).toLocaleString('es-DO', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
           const monthStr = p.month_paid || 'Colegiatura';
-          await notifyPaymentApproved(id, email, studentName, amountStr, monthStr);
+          // Notificar con el primer email (el RPC process-event enviará a ambos)
+          await notifyPaymentApproved(id, emails[0] || null, studentName, amountStr, monthStr);
         }
       } catch (_) {}
     } catch (e) {
@@ -529,32 +531,39 @@ export const PaymentsModule = {
   },
 
   /**
-   * 🛡️ waiveMora — Quitar mora a un pago específico
+   * Quitar mora a un pago específico
    */
   async waiveMora(id) {
-    const reason = prompt('Motivo de la exoneración de mora (opcional):');
+    const reason = prompt('Motivo de la exoneración de mora (requerido):');
     if (reason === null) return; // cancelado
+    if (!reason || reason.trim().length < 3) {
+      Helpers.toast('Ingresa un motivo válido', 'warning');
+      return;
+    }
     try {
       const { data, error } = await supabase.rpc('waive_payment_mora', {
         p_payment_id: id,
-        p_reason: reason || 'Mora exonerada por administración'
+        p_reason: reason.trim()
       });
       if (error) throw error;
       if (data?.error) throw new Error(data.error);
       Helpers.toast('Mora eliminada correctamente', 'success');
       await this.loadPayments();
     } catch (e) {
-      // Fallback: actualizar due_date directamente si el RPC no existe aún
+      // Fallback: extender due_date 30 días hacia adelante para eliminar mora acumulada
       try {
+        const futureDate = new Date();
+        futureDate.setDate(futureDate.getDate() + 30);
         const { error: upErr } = await supabase
           .from('payments')
-          .update({ due_date: new Date().toISOString().split('T')[0] })
+          .update({ due_date: futureDate.toISOString().split('T')[0] })
           .eq('id', id);
         if (upErr) throw upErr;
-        Helpers.toast('Mora eliminada', 'success');
+        auditLog('payment.mora_waived', { payment_id: id, reason: reason.trim() });
+        Helpers.toast('Mora eliminada (fecha extendida 30 días)', 'success');
         await this.loadPayments();
       } catch (e2) {
-        Helpers.toast('Error al quitar mora: ' + e2.message, 'error');
+        Helpers.toast('Error al quitar mora: ' + (e2.message || e2), 'error');
       }
     }
   },

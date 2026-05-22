@@ -1,4 +1,4 @@
-﻿import { supabase, sendPush } from '../../shared/supabase.js';
+import { supabase, sendPush } from '../../shared/supabase.js';
 import { AppState } from '../state.js';
 import { MaestraApi } from '../api.js';
 import { safeToast, safeEscapeHTML, Modal } from './ui.js';
@@ -92,31 +92,46 @@ export async function markAllPresent() {
       Modal.close(modalId);
       safeToast('Registrando asistencia...', 'info');
 
-      const records = students.map(s => ({ 
-        student_id: s.id, 
-        classroom_id: classroom.id, 
-        date: today, 
-        status: 'present' 
-      }));
+      // 1. Obtener asistencia actual para no sobrescribir "Tardanza"
+      const currentAttendance = await MaestraApi.getAttendance(classroom.id, today);
+      const attMap = {};
+      (currentAttendance || []).forEach(a => attMap[a.student_id] = a.status);
 
-      const results = await Promise.allSettled(
-        records.map(r => MaestraApi.upsertAttendance(r))
-      );
+      const records = [];
+      const studentsToNotify = [];
 
-      const failures = results.filter(r => r.status === 'rejected');
-      if (failures.length > 0) {
-        safeToast(`Se registraron ${results.length - failures.length} asistencias, ${failures.length} fallaron`, 'warning');
-      } else {
-        safeToast('Asistencia masiva completada');
-        
-        // Push with visual feedback
+      students.forEach(s => {
+        const existingStatus = attMap[s.id];
+        // Solo registrar si NO hay asistencia o si estaba marcado como Ausente
+        if (!existingStatus || existingStatus === 'absent') {
+          records.push({ 
+            student_id: s.id, 
+            classroom_id: classroom.id, 
+            date: today, 
+            status: 'present' 
+          });
+        }
+        // Siempre notificar presencia en aula si no es Ausente
+        if (existingStatus !== 'absent') {
+          studentsToNotify.push(s);
+        }
+      });
+
+      if (records.length > 0) {
+        await Promise.allSettled(records.map(r => MaestraApi.upsertAttendance(r)));
+      }
+
+      safeToast('Asistencia masiva completada');
+      
+      // Notificar a los padres (Presence in classroom)
+      if (studentsToNotify.length > 0) {
         notifyParents({
-          students,
-          title:   'Asistencia Karpus ✅',
-          message: 'Tu hijo/a fue marcado como Presente hoy.',
+          students: studentsToNotify,
+          title:   'Karpus Kids ✅',
+          message: 'Tu hijo/a ya se encuentra presente en su aula con su maestra.',
           type:    'attendance',
           link:    'panel_padres.html',
-          label:   'Asistencia del día'
+          label:   'Presencia en aula'
         });
       }
 
@@ -137,6 +152,24 @@ export async function registerAttendance(studentId, status) {
     const btnLate = document.getElementById(`btn-${studentId}-late`);
     const btnAbsent = document.getElementById(`btn-${studentId}-absent`);
     
+    // 1. Verificar si ya existe un registro de hoy (para evitar sobrescribir Tardanza)
+    const { data: existing } = await supabase
+      .from('attendance')
+      .select('status')
+      .eq('student_id', studentId)
+      .eq('date', today)
+      .maybeSingle();
+
+    const isMarkingPresent = status === 'present';
+    const wasLate = existing?.status === 'late';
+    
+    // Si la maestra marca "Presente" pero el niño llegó "Tarde" (por ponche),
+    // no cambiamos el estado en la DB pero sí notificamos.
+    let shouldUpsert = true;
+    if (isMarkingPresent && wasLate) {
+      shouldUpsert = false;
+    }
+
     // reset visual
     [btnPresent, btnLate, btnAbsent].forEach(b => {
       if (b) {
@@ -159,29 +192,38 @@ export async function registerAttendance(studentId, status) {
       btnAbsent?.classList.add('bg-rose-500', 'text-white', 'shadow-lg');
     }
 
-    const attRecord = { student_id: studentId, classroom_id: classroom.id, date: today, status };
-
-    if (navigator.onLine) {
-      await MaestraApi.upsertAttendance(attRecord);
+    if (shouldUpsert) {
+      const attRecord = { student_id: studentId, classroom_id: classroom.id, date: today, status };
+      if (navigator.onLine) {
+        await MaestraApi.upsertAttendance(attRecord);
+      } else {
+        await OfflineQueue.enqueue('attendance', 'upsert', { ...attRecord, onConflict: 'student_id,date' });
+        safeToast(`${statusLiteral} guardado sin conexión — se sincronizará automáticamente`, 'info');
+      }
     } else {
-      await OfflineQueue.enqueue('attendance', 'upsert', { ...attRecord, onConflict: 'student_id,date' });
-      safeToast(`${statusLiteral} guardado sin conexión — se sincronizará automáticamente`, 'info');
+      console.log('Manteniendo estado "Tarde" — Solo notificando presencia en aula');
     }
 
     const student = (AppState.get('students') || []).find(s => s.id === studentId);
     if (student?.parent_id) {
       const { sendPush } = await import('../../shared/supabase.js');
+      
+      // Mensaje personalizado: si era tarde y se puso presente, se notifica que ya está en aula.
+      const pushMessage = (isMarkingPresent && wasLate)
+        ? `${student.name} ya está en su aula con su maestra.`
+        : `${student.name} ha sido marcado como ${statusLiteral} hoy.`;
+
       sendPush({
         user_id: student.parent_id,
         title: 'Asistencia Karpus',
-        message: `${student.name} ha sido marcado como ${statusLiteral} hoy.`,
+        message: pushMessage,
         link: 'panel_padres.html#attendance'
       }).then(res => {
         if (res?.ok !== false) showNotifyFeedback({ sent: 1, type: 'attendance', label: student.name });
       }).catch(() => {});
     }
     
-    safeToast(`Asistencia: ${statusLiteral}`);
+    safeToast(isMarkingPresent && wasLate ? 'Presencia confirmada (Mantiene Tardanza)' : `Asistencia: ${statusLiteral}`);
   } catch (e) {
     safeToast('Error al registrar asistencia', 'error');
     await initAttendance();

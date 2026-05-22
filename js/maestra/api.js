@@ -56,7 +56,7 @@ export const MaestraApi = {
   },
 
   /**
-   * Asistencia del día
+   * Asistencia del d\u00eda
    */
   async getAttendance(classroomId, date) {
     const { data, error } = await supabase
@@ -70,9 +70,19 @@ export const MaestraApi = {
   },
 
   /**
-   * Upsert asistencia (optimizado)
+   * Upsert asistencia (optimizado con periodo)
    */
   async upsertAttendance(record) {
+    // Vincular autom\u00e1ticamente al periodo activo para reportes finales
+    if (!record.period_id) {
+      try {
+        const { data: periodData } = await supabase.rpc('get_active_period', {
+          p_classroom_id: record.classroom_id
+        });
+        if (periodData?.found) record.period_id = periodData.id;
+      } catch (_) {}
+    }
+
     const { data: existing, error: findError } = await supabase
       .from(TABLES.ATTENDANCE)
       .select('id')
@@ -179,16 +189,21 @@ export const MaestraApi = {
     };
     delete cleanPayload.points;
 
-    // Vincular al período activo si no se especificó
+    // 🔄 Lógica Profesional de Período Activo
     if (!cleanPayload.period_id && cleanPayload.classroom_id) {
       try {
         const { data: periodData, error: periodErr } = await supabase.rpc('get_active_period', {
           p_classroom_id: cleanPayload.classroom_id
         });
         if (!periodErr && periodData?.found && periodData?.id) {
+          console.log('[MaestraApi] Vinculando tarea al periodo activo:', periodData.name);
           cleanPayload.period_id = periodData.id;
+        } else {
+          console.warn('[MaestraApi] No se encontr\u00f3 un periodo activo para vincular la tarea.');
         }
-      } catch (_) { /* RPC no existe aún — continuar sin period_id */ }
+      } catch (err) {
+        console.error('[MaestraApi] Error al obtener periodo activo:', err);
+      }
     }
 
     const { data, error } = await supabase
@@ -198,6 +213,8 @@ export const MaestraApi = {
       .maybeSingle();
 
     handleError(error, 'createTask');
+    return data;
+  },
     return data;
   },
 
