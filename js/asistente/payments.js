@@ -1,4 +1,4 @@
-﻿﻿import { supabase } from '../shared/supabase.js';
+﻿import { supabase } from '../shared/supabase.js';
 import { Helpers } from '../shared/helpers.js';
 import { AppState } from './state.js';
 import { sendEmail } from '../shared/supabase.js';
@@ -482,7 +482,13 @@ export const PaymentsModule = {
     if (window.lucide) lucide.createIcons();
   },
 
-  closeModal() { closeGlobalModal(); },
+  closeModal() {
+    const modal = document.getElementById('globalModal');
+    if (modal) {
+      modal.classList.add('hidden');
+      modal.style.display = 'none';
+    }
+  },
 
   async saveManualPayment() {
     const studentId = document.getElementById('payStudentSelect')?.value;
@@ -522,25 +528,117 @@ export const PaymentsModule = {
   },
 
   async markPaid(id) {
+    const p = AppState.get('paymentsData')?.find(x => x.id === id);
+    if (p?.evidence_url) {
+      this._openSideBySideValidation(p);
+      return;
+    }
+    
+    // Si no tiene comprobante (pago manual), proceder normal
+    this._confirmApproval(id);
+  },
+
+  async _openSideBySideValidation(payment) {
+    const ic = 'w-full px-4 py-2.5 border-2 border-slate-100 rounded-2xl outline-none focus:ring-4 focus:ring-teal-100 focus:border-teal-400 bg-slate-50/50 transition-all text-sm font-bold';
+    const lc = 'block text-[10px] font-black text-slate-400 uppercase tracking-wider mb-1 ml-1';
+    
+    const amount = Number(payment.amount || 0);
+    const mora   = calcMora(payment.due_date);
+    const total  = amount + mora;
+
+    const html = `
+      <div class="flex flex-col md:flex-row h-[85vh] md:h-[70vh]">
+        <!-- IZQUIERDA: Comprobante -->
+        <div class="md:w-1/2 bg-slate-900 flex flex-col relative overflow-hidden group">
+          <div class="absolute top-4 left-4 z-10 flex gap-2">
+            <div class="px-3 py-1 bg-black/40 backdrop-blur-md rounded-lg text-[10px] font-black text-white uppercase tracking-widest border border-white/10">Vista de Comprobante</div>
+          </div>
+          <div class="flex-1 overflow-auto flex items-center justify-center p-4 custom-scrollbar">
+            <img src="${payment.evidence_url}" class="max-w-full h-auto rounded-xl shadow-2xl transition-transform duration-500 group-hover:scale-105 cursor-zoom-in" onclick="window.open('${payment.evidence_url}', '_blank')">
+          </div>
+          <div class="p-4 bg-black/20 backdrop-blur-md flex justify-center">
+            <a href="${payment.evidence_url}" target="_blank" class="flex items-center gap-2 px-4 py-2 bg-white/10 hover:bg-white/20 text-white rounded-xl text-xs font-black uppercase transition-all">
+              <i data-lucide="maximize-2" class="w-4 h-4"></i> Pantalla Completa
+            </a>
+          </div>
+        </div>
+
+        <!-- DERECHA: Validación -->
+        <div class="md:w-1/2 bg-white flex flex-col border-l border-slate-100">
+          <div class="p-6 border-b border-slate-50">
+            <h3 class="text-xl font-black text-slate-800">Validación de Pago</h3>
+            <p class="text-xs text-slate-400 font-bold uppercase tracking-widest mt-0.5">${payment.students?.name || 'Estudiante'}</p>
+          </div>
+          
+          <div class="flex-1 overflow-y-auto p-6 space-y-6 custom-scrollbar">
+            <div class="grid grid-cols-2 gap-4">
+              <div class="p-4 bg-slate-50 rounded-2xl border border-slate-100">
+                <span class="${lc}">Cuota Base</span>
+                <span class="text-lg font-black text-slate-700">${Helpers.formatCurrency(amount)}</span>
+              </div>
+              <div class="p-4 bg-rose-50 rounded-2xl border border-rose-100">
+                <span class="${lc} text-rose-400">Mora Aplicada</span>
+                <span class="text-lg font-black text-rose-600">+${Helpers.formatCurrency(mora)}</span>
+              </div>
+              <div class="col-span-2 p-5 bg-teal-600 rounded-3xl shadow-lg shadow-teal-100">
+                <span class="${lc} text-teal-100">Monto Total Esperado</span>
+                <span class="text-2xl font-black text-white">${Helpers.formatCurrency(total)}</span>
+              </div>
+            </div>
+
+            <div class="space-y-4 pt-4">
+              <div>
+                <label class="${lc}">Banco / Método Reportado</label>
+                <div class="px-4 py-3 bg-slate-100 rounded-2xl text-sm font-bold text-slate-600 border border-slate-200 uppercase tracking-tighter">
+                  🏛️ ${payment.bank || 'No especificado'} · ${payment.method || 'Transferencia'}
+                </div>
+              </div>
+              <div>
+                <label class="${lc}">Fecha Reporte</label>
+                <div class="text-sm font-bold text-slate-600 ml-1">
+                  ${new Date(payment.updated_at || payment.created_at).toLocaleString('es-DO', { dateStyle: 'long', timeStyle: 'short' })}
+                </div>
+              </div>
+              <div>
+                <label class="${lc}">Notas Internas / Motivo de Rechazo</label>
+                <textarea id="valNotes" class="${ic} min-h-[80px]" placeholder="Escribe aquí si necesitas rechazar el pago..."></textarea>
+              </div>
+            </div>
+          </div>
+
+          <div class="p-6 bg-slate-50 border-t border-slate-100 grid grid-cols-2 gap-3">
+            <button onclick="App.payments.rejectPayment('${payment.id}', document.getElementById('valNotes').value)" 
+              class="py-4 bg-white text-rose-600 border-2 border-rose-100 rounded-2xl font-black uppercase text-xs hover:bg-rose-50 hover:border-rose-200 transition-all active:scale-95 flex items-center justify-center gap-2">
+              <i data-lucide="x-circle" class="w-4 h-4"></i> Rechazar
+            </button>
+            <button onclick="App.payments._confirmApproval('${payment.id}')" 
+              class="py-4 bg-teal-600 text-white rounded-2xl font-black uppercase text-xs shadow-lg shadow-teal-200 hover:bg-teal-700 transition-all active:scale-95 flex items-center justify-center gap-2">
+              <i data-lucide="check-circle" class="w-4 h-4"></i> Aprobar Pago
+            </button>
+            <button onclick="App.payments.closeModal()" class="col-span-2 py-3 text-slate-400 font-bold uppercase text-[10px] hover:text-slate-600 transition-colors">Cerrar sin cambios</button>
+          </div>
+        </div>
+      </div>
+    `;
+
+    openGlobalModal(html);
+  },
+
+  async _confirmApproval(id) {
     try {
+      const btn = event?.target?.closest('button');
+      if (btn) { btn.disabled = true; btn.innerHTML = '<i class="animate-spin" data-lucide="loader-2"></i> Procesando...'; if(window.lucide) lucide.createIcons(); }
+
       // RPC seguro — registra auditoría inmutable en el servidor
       const { data, error } = await supabase.rpc('approve_payment', { p_payment_id: id });
       if (error) throw error;
-      if (data?.error) throw new Error(data.error);
-      Helpers.toast('Pago aprobado', 'success');
+      
+      Helpers.toast('¡Pago aprobado y recibo enviado!', 'success');
+      this.closeModal();
       await this.loadPayments();
       this._sendReceipt(id).catch(() => {});
     } catch (e) {
-      // Fallback directo si el RPC no existe aún
-      try {
-        const { error: upErr } = await supabase.from('payments')
-          .update({ status: 'paid', paid_date: new Date().toISOString() })
-          .eq('id', id);
-        if (upErr) throw upErr;
-        Helpers.toast('Pago aprobado', 'success');
-        await this.loadPayments();
-        this._sendReceipt(id).catch(() => {});
-      } catch (e2) { Helpers.toast('Error al aprobar pago', 'error'); }
+      Helpers.toast('Error al aprobar: ' + e.message, 'error');
     }
   },
 
@@ -600,16 +698,38 @@ export const PaymentsModule = {
     }
   },
 
-  async rejectPayment(id) {
-    const reason = prompt('Motivo del rechazo (opcional):');
-    if (reason === null) return;
+  async rejectPayment(id, reason) {
+    if (!reason?.trim()) return Helpers.toast('Debes indicar el motivo del rechazo', 'warning');
+    
     try {
-      const user = AppState.get('user');
-      const { error } = await supabase.from('payments').update({ status: 'rechazado', validated_by: user?.id, notes: reason || null }).eq('id', id);
+      const { error } = await supabase.from('payments').update({ 
+        status: 'pending', // Vuelve a pendiente para que el padre pueda reenviar
+        evidence_url: null,
+        notes: reason,
+        updated_at: new Date().toISOString()
+      }).eq('id', id);
+
       if (error) throw error;
-      Helpers.toast('Pago rechazado', 'success');
+      
+      Helpers.toast('Pago rechazado y devuelto al padre', 'info');
+      this.closeModal();
       await this.loadPayments();
-    } catch (e) { Helpers.toast('Error al rechazar', 'error'); }
+      
+      // Notificar al padre vía system_events o push
+      const p = AppState.get('paymentsData')?.find(x => x.id === id);
+      if (p?.student_id) {
+        const { sendPush } = await import('../../shared/supabase.js');
+        sendPush({
+          user_id: p.students?.parent_id,
+          title: 'Pago Rechazado ❌',
+          message: `Tu comprobante de ${p.month_paid} fue rechazado. Motivo: ${reason}`,
+          link: 'panel_padres.html#payments'
+        }).catch(()=>{});
+      }
+
+    } catch (e) {
+      Helpers.toast('Error al rechazar: ' + e.message, 'error');
+    }
   },
 
   async deletePayment(id) {

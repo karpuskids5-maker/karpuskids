@@ -16,7 +16,59 @@ export const PaymentsModule = {
     this._studentId = studentId;
     const form = document.getElementById('paymentForm');
     if (form) form.onsubmit = (e) => this.submitPaymentProof(e);
+    this._initMoraCalculator();
     await this.loadPayments();
+  },
+
+  /**
+   * 🧮 Mora auto-calculator — sugiere el total con recargo si ya pasó el día 5
+   */
+  _initMoraCalculator() {
+    const amountInput = document.getElementById('paymentAmount');
+    const monthSelect = document.getElementById('paymentMonth');
+    if (!amountInput || !monthSelect) return;
+
+    const update = () => {
+      const hint    = document.getElementById('moraCalculatorHint');
+      const baseEl  = document.getElementById('moraBase');
+      const moraEl  = document.getElementById('moraAmount');
+      const totalEl = document.getElementById('moraTotal');
+      const labelEl = document.getElementById('moraLabel');
+      if (!hint) return;
+
+      const base     = parseFloat(amountInput.value) || 0;
+      const monthVal = monthSelect.value; // YYYY-MM
+      if (!base || !monthVal) { hint.classList.add('hidden'); return; }
+
+      // Build due_date: day 5 of the selected month
+      const [yr, mo] = monthVal.split('-').map(Number);
+      const dueDate  = `${yr}-${String(mo).padStart(2,'0')}-05`;
+      const mora     = calcMora(dueDate);
+      const breakdown = getMoraBreakdown(dueDate);
+
+      if (mora <= 0) { hint.classList.add('hidden'); return; }
+
+      const fmt = (n) => 'RD$' + Number(n).toLocaleString('es-DO', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+      if (baseEl)  baseEl.textContent  = fmt(base);
+      if (moraEl)  moraEl.textContent  = '+' + fmt(mora);
+      if (totalEl) totalEl.textContent = fmt(base + mora);
+      if (labelEl && breakdown) labelEl.textContent = `Mora (${breakdown.formattedText}):`;
+      hint.classList.remove('hidden');
+
+      // "Aplicar total" button
+      const btn = document.getElementById('btnApplyMora');
+      if (btn) {
+        btn.onclick = () => {
+          amountInput.value = (base + mora).toFixed(2);
+          hint.classList.add('hidden');
+        };
+      }
+    };
+
+    amountInput.addEventListener('input', update);
+    monthSelect.addEventListener('change', update);
+    // Run once in case month is pre-selected
+    update();
   },
 
   async loadPayments() {
@@ -241,6 +293,7 @@ export const PaymentsModule = {
 
   /**
    * 🧾 openReceipt — Modal de recibo PDF para pagos aprobados
+   * Genera descarga real con jsPDF
    */
   async openReceipt(paymentId) {
     // Buscar en cache local primero
@@ -381,7 +434,7 @@ export const PaymentsModule = {
 
         <!-- Botones de acción -->
         <div style="padding:16px 28px 24px;display:flex;gap:10px;">
-          <button onclick="window._downloadReceipt('${receiptNo}')"
+          <button id="btnDownloadPDF"
             style="flex:1;padding:14px;background:linear-gradient(135deg,#16a34a,#15803d);color:white;border:none;border-radius:14px;font-family:sans-serif;font-size:13px;font-weight:900;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:8px;box-shadow:0 4px 12px rgba(22,163,74,0.35);">
             📥 Descargar PDF
           </button>
@@ -392,37 +445,146 @@ export const PaymentsModule = {
         </div>
       </div>`;
 
-    // Función de descarga PDF usando print
-    window._downloadReceipt = (receiptNo) => {
-      const content = modal.querySelector('div[style*="background:#fff"]').innerHTML;
-      const win = window.open('', '_blank', 'width=520,height=800');
-      win.document.write(`<!DOCTYPE html><html><head>
-        <title>Recibo ${receiptNo} — Karpus Kids</title>
-        <meta charset="utf-8">
-        <style>
-          * { box-sizing: border-box; margin: 0; padding: 0; }
-          body { font-family: Arial, sans-serif; background: white; }
-          @media print {
-            body { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
-            button { display: none !important; }
-          }
-        </style>
-      </head><body>${content}
-      <script>
-        // Ocultar botones de acción al imprimir
-        document.querySelectorAll('button').forEach(b => b.style.display = 'none');
-        setTimeout(() => { window.print(); }, 300);
-      <\/script></body></html>`);
-      win.document.close();
-    };
-
     // Cerrar al hacer click fuera
-    modal.addEventListener('click', (e) => {
-      if (e.target === modal) modal.remove();
-    });
-
+    modal.addEventListener('click', (e) => { if (e.target === modal) modal.remove(); });
     document.body.appendChild(modal);
-    if (window.lucide) lucide.createIcons();
+
+    // Botón de descarga PDF con jsPDF
+    modal.querySelector('#btnDownloadPDF').addEventListener('click', () => {
+      this._downloadReceiptPDF({
+        receiptNo, studentName, parentName, classroom, paidDate,
+        method, bank: payment.bank, reference: payment.reference,
+        monthPaid, amountFmt, approvedBy, amount
+      });
+    });
+  },
+
+  /**
+   * 📄 Genera y descarga el recibo como PDF usando jsPDF
+   */
+  async _downloadReceiptPDF(data) {
+    const btn = document.getElementById('btnDownloadPDF');
+    if (btn) { btn.textContent = '⏳ Generando...'; btn.disabled = true; }
+
+    try {
+      // Cargar jsPDF si no está disponible
+      if (!window.jspdf) {
+        await new Promise((resolve, reject) => {
+          const s = document.createElement('script');
+          s.src = 'js/shared/jspdf.min.js';
+          s.onload = resolve; s.onerror = reject;
+          document.head.appendChild(s);
+        });
+      }
+
+      const { jsPDF } = window.jspdf;
+      const doc = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a5' });
+      const W = doc.internal.pageSize.getWidth();
+
+      // ── Header verde ──────────────────────────────────────────
+      doc.setFillColor(22, 163, 74);
+      doc.roundedRect(0, 0, W, 42, 0, 0, 'F');
+      doc.setTextColor(255, 255, 255);
+      doc.setFont('helvetica', 'bold');
+      doc.setFontSize(18);
+      doc.text('Karpus Kids', W / 2, 16, { align: 'center' });
+      doc.setFontSize(8);
+      doc.setFont('helvetica', 'normal');
+      doc.text('RECIBO DE PAGO OFICIAL', W / 2, 23, { align: 'center' });
+      doc.setFontSize(10);
+      doc.setFont('courier', 'bold');
+      doc.text(data.receiptNo, W / 2, 33, { align: 'center' });
+
+      // ── Sello aprobado ────────────────────────────────────────
+      doc.setFillColor(240, 253, 244);
+      doc.rect(0, 42, W, 16, 'F');
+      doc.setTextColor(21, 128, 61);
+      doc.setFont('helvetica', 'bold');
+      doc.setFontSize(10);
+      doc.text('Pago Confirmado y Aprobado', 14, 51);
+      doc.setFontSize(8);
+      doc.setFont('helvetica', 'normal');
+      doc.text(`Aprobado por: ${data.approvedBy}`, 14, 57);
+
+      // ── Datos del estudiante ──────────────────────────────────
+      let y = 68;
+      doc.setFillColor(248, 250, 252);
+      doc.roundedRect(10, y - 5, W - 20, 36, 3, 3, 'F');
+      doc.setTextColor(148, 163, 184);
+      doc.setFontSize(7);
+      doc.setFont('helvetica', 'bold');
+      doc.text('DATOS DEL ESTUDIANTE', 14, y);
+      y += 6;
+
+      const col2 = W / 2 + 2;
+      const infoRows = [
+        ['Estudiante', data.studentName, 'Aula', data.classroom],
+        ['Padre/Tutor', data.parentName, 'Fecha de Pago', data.paidDate]
+      ];
+      doc.setFontSize(8);
+      for (const [l1, v1, l2, v2] of infoRows) {
+        doc.setTextColor(100, 116, 139); doc.setFont('helvetica', 'normal');
+        doc.text(l1, 14, y); doc.text(l2, col2, y);
+        doc.setTextColor(30, 41, 59); doc.setFont('helvetica', 'bold');
+        doc.text(String(v1), 14, y + 4); doc.text(String(v2), col2, y + 4);
+        y += 11;
+      }
+
+      // ── Detalle del pago ──────────────────────────────────────
+      y += 2;
+      doc.setTextColor(148, 163, 184);
+      doc.setFontSize(7);
+      doc.setFont('helvetica', 'bold');
+      doc.text('DETALLE DEL PAGO', 14, y);
+      y += 6;
+
+      const detailRows = [
+        ['Concepto', data.monthPaid],
+        ['Método de Pago', data.method],
+        ...(data.bank ? [['Banco', data.bank]] : []),
+        ...(data.reference ? [['Referencia', data.reference]] : [])
+      ];
+
+      doc.setFontSize(9);
+      for (const [label, value] of detailRows) {
+        doc.setTextColor(100, 116, 139); doc.setFont('helvetica', 'normal');
+        doc.text(label, 14, y);
+        doc.setTextColor(30, 41, 59); doc.setFont('helvetica', 'bold');
+        doc.text(String(value), W - 14, y, { align: 'right' });
+        doc.setDrawColor(241, 245, 249);
+        doc.line(14, y + 2, W - 14, y + 2);
+        y += 9;
+      }
+
+      // Total row
+      doc.setFillColor(240, 253, 244);
+      doc.roundedRect(10, y - 4, W - 20, 12, 2, 2, 'F');
+      doc.setTextColor(21, 128, 61);
+      doc.setFont('helvetica', 'bold');
+      doc.setFontSize(11);
+      doc.text('TOTAL PAGADO', 14, y + 4);
+      doc.text(data.amountFmt, W - 14, y + 4, { align: 'right' });
+      y += 18;
+
+      // ── Footer ────────────────────────────────────────────────
+      doc.setFillColor(248, 250, 252);
+      doc.roundedRect(10, y, W - 20, 20, 3, 3, 'F');
+      doc.setTextColor(148, 163, 184);
+      doc.setFontSize(7);
+      doc.setFont('helvetica', 'normal');
+      doc.text('San Cristóbal, República Dominicana', W / 2, y + 6, { align: 'center' });
+      doc.text('Este recibo es un comprobante oficial de pago de Karpus Kids.', W / 2, y + 11, { align: 'center' });
+      doc.setFont('courier', 'normal');
+      doc.text(`ID: ${data.receiptNo} · ${new Date().toLocaleDateString('es-DO')}`, W / 2, y + 16, { align: 'center' });
+
+      doc.save(`Recibo-${data.receiptNo}.pdf`);
+      Helpers.toast('Recibo descargado', 'success');
+    } catch (err) {
+      console.error('Error generando PDF:', err);
+      Helpers.toast('Error al generar PDF', 'error');
+    } finally {
+      if (btn) { btn.textContent = '📥 Descargar PDF'; btn.disabled = false; }
+    }
   },
 
   async submitPaymentProof(e) {

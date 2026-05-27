@@ -384,10 +384,9 @@ async function initDashboard() {
     const today = new Date().toISOString().split('T')[0];
     const attendance = await MaestraApi.getAttendance(classroom.id, today);
     
-    const setTxt = (id, val) => { const el = document.getElementById(id); if(el) el.textContent = val; };
-    setTxt('statStudents', (students || []).length);
-    setTxt('statClasses', '1');
-    setTxt('statPresent', (attendance || []).filter(a => a.status === 'present').length);
+    // grid.innerHTML = ...
+    _updateNextActivityWidget();
+    _updatePunchAlertWidget(students, attendance);
 
     // Grid de Aulas
     const grid = document.getElementById('classesGrid'); 
@@ -437,6 +436,97 @@ async function initDashboard() {
 }
 
 /**
+ * 🚀 AUTOMATIZACIÓN: Widgets Inteligentes
+ */
+function _updateNextActivityWidget() {
+  const titleEl = document.getElementById('nextActivityTitle');
+  const timeEl = document.getElementById('nextActivityTime');
+  if (!titleEl || !timeEl) return;
+
+  const now = new Date();
+  const currentTime = now.getHours() * 60 + now.getMinutes();
+
+  // Horario predefinido (se puede traer de DB en el futuro)
+  const schedule = [
+    { name: 'Entrada y Bienvenida', start: 420, end: 480 }, // 7:00 AM - 8:00 AM
+    { name: 'Desayuno', start: 480, end: 540 },            // 8:00 AM - 9:00 AM
+    { name: 'Actividades Pedagógicas', start: 540, end: 660 }, // 9:00 AM - 11:00 AM
+    { name: 'Merienda', start: 660, end: 720 },            // 11:00 AM - 12:00 PM
+    { name: 'Almuerzo', start: 720, end: 780 },            // 12:00 PM - 1:00 PM
+    { name: 'Siesta', start: 780, end: 870 },              // 1:00 PM - 2:30 PM
+    { name: 'Juego Libre', start: 870, end: 960 },          // 2:30 PM - 4:00 PM
+    { name: 'Salida', start: 960, end: 1080 }              // 4:00 PM - 6:00 PM
+  ];
+
+  const current = schedule.find(s => currentTime >= s.start && currentTime < s.end);
+  const next = schedule.find(s => s.start > currentTime);
+
+  if (current) {
+    titleEl.textContent = current.name;
+    const endH = Math.floor(current.end / 60);
+    const endM = current.end % 60;
+    const ampm = endH >= 12 ? 'PM' : 'AM';
+    const h12 = endH > 12 ? endH - 12 : endH;
+    timeEl.textContent = `En curso — Termina ${h12}:${endM.toString().padStart(2, '0')} ${ampm}`;
+  } else if (next) {
+    titleEl.textContent = `Próximo: ${next.name}`;
+    const startH = Math.floor(next.start / 60);
+    const startM = next.start % 60;
+    const ampm = startH >= 12 ? 'PM' : 'AM';
+    const h12 = startH > 12 ? startH - 12 : startH;
+    timeEl.textContent = `Inicia a las ${h12}:${startM.toString().padStart(2, '0')} ${ampm}`;
+  } else {
+    titleEl.textContent = 'Fuera de Horario Escolar';
+    timeEl.textContent = '¡Hasta mañana! 👋';
+  }
+}
+
+function _updatePunchAlertWidget(students, attendance) {
+  const widget = document.getElementById('punchAlertWidget');
+  const textEl = document.getElementById('punchAlertText');
+  if (!widget || !textEl) return;
+
+  const total = students.length;
+  const present = (attendance || []).filter(a => ['present', 'late'].includes(a.status)).length;
+  const missing = total - present;
+
+  if (missing > 0 && total > 0) {
+    widget.classList.remove('hidden');
+    textEl.textContent = `${missing} niños aún no han marcado entrada hoy.`;
+  } else {
+    widget.classList.add('hidden');
+  }
+}
+
+window.App.sendAbsenceAlerts = async () => {
+  const students = AppState.get('students') || [];
+  const today = new Date().toISOString().split('T')[0];
+  const attendance = await MaestraApi.getAttendance(AppState.get('classroom').id, today);
+  const presentIds = (attendance || []).map(a => a.student_id);
+  
+  const missing = students.filter(s => !presentIds.includes(s.id));
+  if (missing.length === 0) return safeToast('Todos los alumnos están presentes');
+
+  const confirm = await Helpers.confirm(`¿Enviar aviso de ausencia a los padres de ${missing.length} niños?`);
+  if (!confirm) return;
+
+  safeToast('Enviando notificaciones...', 'info');
+  let sent = 0;
+  for (const s of missing) {
+    if (s.parent_id) {
+      await sendPush({
+        user_id: s.parent_id,
+        title: 'Aviso de Ausencia ❓',
+        message: `Hola, notamos que ${s.name} no ha llegado hoy. Por favor confírmanos si asistirá o si tiene algún inconveniente.`,
+        link: 'panel_padres.html'
+      }).catch(() => {});
+      sent++;
+    }
+  }
+  safeToast(`Se enviaron ${sent} avisos de ausencia`);
+};
+
+/**
  * \ud83d\udcc5 Asistencia
  */
 
@@ -467,7 +557,7 @@ function initNavigation() {
   const navButtons = document.querySelectorAll('.nav-btn-toy[data-section]');
   const sections = document.querySelectorAll('.section');
 
-  const setActiveSection = (targetId) => {
+  const setActiveSection = (targetId, options = {}) => {
     // Si el targetId ya viene con 't-', lo usamos directamente, si no lo agregamos
     const fullId = targetId.startsWith('t-') ? targetId : `t-${targetId}`;
     const cleanId = targetId.replace('t-', '');
@@ -484,6 +574,11 @@ function initNavigation() {
         btn.classList.remove('active');
       }
     });
+
+    // Guardar en localStorage para persistencia
+    if (!options.skipSave) {
+      localStorage.setItem('maestra_last_section', fullId);
+    }
 
     if (cleanId === 'home') initDashboard();
     if (cleanId === 'attendance') initAttendance();
@@ -506,19 +601,27 @@ function initNavigation() {
   // Exponer para uso global
   window.App.setActiveSection = setActiveSection;
 
-  setActiveSection('t-home');
+  // Restaurar última sección
+  const lastSection = localStorage.getItem('maestra_last_section') || 't-home';
+  const lastClassroom = localStorage.getItem('maestra_last_classroom');
+  const lastTab = localStorage.getItem('maestra_last_tab');
+
+  if (lastSection === 't-class-detail' && lastClassroom) {
+    showClassroomDetail(lastClassroom, { activeTab: lastTab });
+  } else {
+    setActiveSection(lastSection, { skipSave: true });
+  }
 }
 
 /**
    * \ud83c\udfeb Mostrar Detalle de Aula
    */
-  async function showClassroomDetail(classroomId) {
+  async function showClassroomDetail(classroomId, options = {}) {
     let classroom = AppState.get('classroom');
     
     // Si no coincide (usamos loose equality para manejar string vs number), intentar obtenerlo de la base de datos o AppState
     if (!classroom || classroom.id != classroomId) {
-
-      const { data } = await supabase.from('classrooms').select('id, name, email, phone, avatar_url, role, bio').eq('id', classroomId).maybeSingle();
+      const { data } = await supabase.from('classrooms').select('*').eq('id', classroomId).maybeSingle();
       if (data) {
         classroom = data;
         AppState.set('classroom', data);
@@ -526,6 +629,10 @@ function initNavigation() {
     }
 
    if (!classroom) return safeToast('Aula no encontrada', 'error');
+
+   // Guardar para persistencia
+   localStorage.setItem('maestra_last_section', 't-class-detail');
+   localStorage.setItem('maestra_last_classroom', classroomId);
 
    // 1. Actualizar UI del detalle
    const nameEl = document.getElementById('currentClassName');
@@ -536,65 +643,76 @@ function initNavigation() {
   if (layoutShell) layoutShell.scrollTop = 0;
 
   if (window.App.setActiveSection) {
-    window.App.setActiveSection('t-class-detail');
+    window.App.setActiveSection('t-class-detail', { skipSave: true });
   } else {
     document.querySelectorAll('.section').forEach(s => s.classList.remove('active'));
     document.getElementById('t-class-detail')?.classList.add('active');
   }
 
-  // 3. Inicializar tabs del aula (Muro por defecto)
+  // 3. Inicializar tabs del aula (Muro por defecto o el guardado)
   WallModule.init('muroPostsContainer', { 
     accentColor: 'orange',
     classroomId: classroom.id 
   }, AppState);
 
   // 4. Configurar listeners de tabs si no est\u00e1n
-  initClassTabs();
+  initClassTabs(options.activeTab);
 }
 
 /**
  * \ud83d\udcd1 Inicializar Tabs Internas de Aula
  */
-function initClassTabs() {
+function initClassTabs(defaultTab = null) {
   const tabBtns     = document.querySelectorAll('.class-tab-btn');
   const tabContents = document.querySelectorAll('.class-tab-content');
 
+  const activateTab = (targetTab) => {
+    // Reset ALL tab buttons (both mobile grid and desktop row)
+    tabBtns.forEach(b => {
+      b.classList.remove('active', 'bg-orange-600', 'text-white');
+      b.classList.add('bg-slate-100', 'text-slate-600');
+    });
+
+    // Activate button matching targetTab
+    const activeBtn = Array.from(tabBtns).find(b => b.dataset.tab === targetTab);
+    if (activeBtn) {
+      activeBtn.classList.add('active', 'bg-orange-600', 'text-white');
+      activeBtn.classList.remove('bg-slate-100', 'text-slate-600', 'text-slate-500');
+    }
+
+    // Show correct content
+    tabContents.forEach(c => c.classList.add('hidden'));
+    document.getElementById(`tab-${targetTab}`)?.classList.remove('hidden');
+
+    // Guardar tab en localStorage
+    localStorage.setItem('maestra_last_tab', targetTab);
+
+    // Load data
+    if (targetTab === 'feed')          WallModule.loadPosts();
+    if (targetTab === 'daily-routine') initRoutine();
+    if (targetTab === 'students')      initDashboard();
+    if (targetTab === 'attendance')    initAttendance();
+    if (targetTab === 'tasks')         initTasks();
+    if (targetTab === 'videocall') {
+      const classroom = AppState.get('classroom');
+      const profile   = AppState.get('profile');
+      import('../shared/videocall-ui.js').then(({ VideoCallUI }) => {
+        VideoCallUI.renderSection('videocall-maestra-section', {
+          role:        'maestra',
+          userName:    profile?.name || 'Maestra',
+          classroomId: classroom?.id || null
+        });
+      }).catch(() => {});
+    }
+  };
+
   tabBtns.forEach(btn => {
-    btn.onclick = () => {
-      const targetTab = btn.dataset.tab;
-
-      // Reset ALL tab buttons (both mobile grid and desktop row)
-      tabBtns.forEach(b => {
-        b.classList.remove('active', 'bg-orange-600', 'text-white');
-        b.classList.add('bg-slate-100', 'text-slate-600');
-      });
-      // Activate clicked button
-      btn.classList.add('active', 'bg-orange-600', 'text-white');
-      btn.classList.remove('bg-slate-100', 'text-slate-600', 'text-slate-500');
-
-      // Show correct content
-      tabContents.forEach(c => c.classList.add('hidden'));
-      document.getElementById(`tab-${targetTab}`)?.classList.remove('hidden');
-
-      // Load data
-      if (targetTab === 'feed')          WallModule.loadPosts();
-      if (targetTab === 'daily-routine') initRoutine();
-      if (targetTab === 'students')      initDashboard();
-      if (targetTab === 'attendance')    initAttendance();
-      if (targetTab === 'tasks')         initTasks();
-      if (targetTab === 'videocall') {
-        const classroom = AppState.get('classroom');
-        const profile   = AppState.get('profile');
-        import('../shared/videocall-ui.js').then(({ VideoCallUI }) => {
-          VideoCallUI.renderSection('videocall-maestra-section', {
-            role:        'maestra',
-            userName:    profile?.name || 'Maestra',
-            classroomId: classroom?.id || null
-          });
-        }).catch(() => {});
-      }
-    };
+    btn.onclick = () => activateTab(btn.dataset.tab);
   });
+
+  // Activar tab inicial
+  const tabToActivate = defaultTab || localStorage.getItem('maestra_last_tab') || 'feed';
+  activateTab(tabToActivate);
 }
 
 function initVideocall() {

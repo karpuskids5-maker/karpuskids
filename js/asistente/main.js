@@ -1,4 +1,4 @@
-﻿import { ensureRole, supabase, initOneSignal } from '../shared/supabase.js';
+import { ensureRole, supabase, initOneSignal } from '../shared/supabase.js';
 import { AppState } from './state.js';
 import { AssistantApi } from './api.js';
 import { PaymentsModule } from './payments.js';
@@ -194,6 +194,7 @@ function initNavigation() {
             break;
           case 'accesos':
             await AccessModule.init();
+            document.getElementById('btnExteriorMode')?.addEventListener('click', () => AccessModule.toggleExteriorMode());
             break;
           case 'maestros':
             await TeachersModule.init();

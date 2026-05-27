@@ -8,49 +8,322 @@ let _accessChart = null;
 export const AccessModule = {
 
   async init() {
-    this._setupDateFilters();
-    this._bindTableSearch();
+    this._initOfflineSupport();
     await this.loadStats();
     await this.loadHistory();
-    await this.initChart();
-    this._bindExport();
+    this._bindSearch();
   },
 
-  _setupDateFilters() {
-    const fromInput = document.getElementById('accessFilterFrom');
-    const toInput = document.getElementById('accessFilterTo');
-    const applyBtn = document.getElementById('btnApplyAccessFilters');
-    
-    // Set default dates (today)
-    const today = new Date().toISOString().split('T')[0];
-    if (fromInput) fromInput.value = today;
-    if (toInput) toInput.value = today;
+  _bindSearch() {
+    const input = document.getElementById('searchAccessInput');
+    if (input) {
+      input.addEventListener('input', Helpers.debounce((e) => {
+        this.loadHistory(e.target.value);
+      }, 300));
+    }
+  },
 
-    applyBtn?.addEventListener('click', () => {
+  setPunchType(type) {
+    this._punchType = type;
+    const btns = document.querySelectorAll('#qrScannerModal button[onclick*="setPunchType"]');
+    btns.forEach(b => {
+      b.classList.remove('ring-4', 'ring-teal-200', 'border-teal-400');
+      if (b.getAttribute('onclick').includes(type)) {
+        b.classList.add('ring-4', 'ring-teal-200', 'border-teal-400');
+      }
+    });
+    Helpers.toast(`Modo seleccionado: ${type === 'present' ? 'ENTRADA' : 'SALIDA'}`, 'info');
+  },
+
+  async openScanner() {
+    this._punchType = 'present'; // Default
+    const modal = document.getElementById('qrScannerModal');
+    if (!modal) return;
+    modal.classList.remove('hidden');
+    modal.style.display = 'flex';
+    this.setPunchType('present');
+
+    try {
+      if (!window.Html5QrcodeScanner) {
+        throw new Error('Librería QR no cargada');
+      }
+
+      this._scanner = new Html5Qrcode("qrReaderInline");
+      const config = { fps: 10, qrbox: { width: 250, height: 250 } };
+      
+      await this._scanner.start({ facingMode: "environment" }, config, (decodedText) => {
+        this.register(decodedText, this._punchType);
+        this.closeScanner();
+      });
+    } catch (err) {
+      console.error('QR Error:', err);
+      Helpers.toast('No se pudo iniciar la cámara', 'error');
+    }
+  },
+
+  closeScanner() {
+    if (this._scanner) {
+      this._scanner.stop().catch(() => {});
+      this._scanner = null;
+    }
+    const modal = document.getElementById('qrScannerModal');
+    if (modal) {
+      modal.classList.add('hidden');
+      modal.style.display = 'none';
+    }
+  },
+
+  _initOfflineSupport() {
+    window.addEventListener('online', () => {
+      Helpers.toast('Conexión restaurada. Sincronizando...', 'info');
+      this._syncOfflinePunches();
+    });
+    window.addEventListener('offline', () => {
+      Helpers.toast('Modo Offline: Los accesos se guardarán localmente.', 'warning');
+    });
+  },
+
+  async _syncOfflinePunches() {
+    try {
+      const offline = JSON.parse(localStorage.getItem('karpus_offline_punches') || '[]');
+      if (!offline.length) return;
+
+      Helpers.showLoader('Sincronizando datos...');
+      
+      for (const p of offline) {
+        await supabase.rpc('process_door_punch', {
+          p_student_id: p.sid,
+          p_type: p.type === 'retirado' ? 'check_out' : 'check_in',
+          p_time: p.time // Asegurarse que el RPC acepte p_time o usar insert directo
+        });
+      }
+
+      localStorage.removeItem('karpus_offline_punches');
+      Helpers.hideLoader();
+      Helpers.toast('Sincronización completada con éxito', 'success');
       this.loadHistory();
-      this.loadStats();
-      this.updateChart();
+    } catch (e) {
+      console.error('Error syncing offline punches:', e);
+      Helpers.hideLoader();
+    }
+  },
+
+  // ── Registro de Acceso (Ponche) ───────────────────────────────────────────
+  async register(sid, type) {
+    if (isProcessing) return;
+    isProcessing = true;
+
+    if (!navigator.onLine) {
+      this._handleOfflinePunch(sid, type);
+      isProcessing = false;
+      return;
+    }
+
+    try {
+      const { data: student, error: sErr } = await supabase
+        .from('students')
+        .select('id, name, avatar_url, parent_id, classrooms:classroom_id(name)')
+        .eq('id', sid)
+        .maybeSingle();
+
+      if (sErr || !student) throw new Error('Estudiante no encontrado');
+
+      // ── ALERTA DE SALIDA SEGURA (NUEVO) ──
+      if (type === 'retirado') {
+        const confirmed = await this._showSecureExitPopup(student);
+        if (!confirmed) {
+          isProcessing = false;
+          return;
+        }
+      }
+
+      const now = new Date();
+      const today = now.toISOString().split('T')[0];
+
+      // Determinar si es entrada o salida para la DB
+      const { error: pErr } = await supabase.rpc('process_door_punch', {
+        p_student_id: sid,
+        p_type: type === 'retirado' ? 'check_out' : 'check_in'
+      });
+
+      if (pErr) throw pErr;
+
+      this._showPunchFeedback(student, type);
+      await this.loadStats();
+      await this.loadHistory();
+
+    } catch (err) {
+      console.error('Error registerAccess:', err);
+      Helpers.toast(err.message || 'Error al registrar acceso', 'error');
+    } finally {
+      isProcessing = false;
+    }
+  },
+
+  _handleOfflinePunch(sid, type) {
+    try {
+      const offline = JSON.parse(localStorage.getItem('karpus_offline_punches') || '[]');
+      offline.push({
+        sid,
+        type,
+        time: new Date().toISOString()
+      });
+      localStorage.setItem('karpus_offline_punches', JSON.stringify(offline));
+      
+      // Feedback visual offline
+      Helpers.toast('Acceso guardado localmente (Offline)', 'warning');
+      
+      // Feedback sonoro (si está disponible)
+      try { new Audio('assets/sounds/offline.mp3').play().catch(()=>{}); } catch(_){}
+
+      this.loadHistory(); // Refrescar tabla (mostrará datos locales si se implementa)
+    } catch (e) {
+      console.error('Error saving offline punch:', e);
+    }
+  },
+
+  toggleExteriorMode() {
+    const btn = document.getElementById('btnExteriorMode');
+    const isDark = document.body.classList.toggle('exterior-mode');
+    
+    if (isDark) {
+      document.documentElement.style.setProperty('--bg', '#000000');
+      document.documentElement.style.setProperty('--surface', '#1a1a1a');
+      document.body.style.fontSize = '110%';
+      btn.innerHTML = '<i data-lucide="moon" class="w-4 h-4 text-blue-400"></i> Modo Normal';
+      Helpers.toast('Modo Exterior: Alto Contraste Activado', 'info');
+    } else {
+      document.documentElement.style.removeProperty('--bg');
+      document.documentElement.style.removeProperty('--surface');
+      document.body.style.fontSize = '';
+      btn.innerHTML = '<i data-lucide="sun" class="w-4 h-4 text-amber-400"></i> Modo Exterior';
+    }
+    if (window.lucide) lucide.createIcons();
+  },
+
+  async _showSecureExitPopup(student) {
+    return new Promise(async (resolve) => {
+      // Obtener personas autorizadas
+      const { data: authorized } = await supabase
+        .from('authorized_pickups')
+        .select('name, relationship, phone, photo_url')
+        .eq('student_id', student.id);
+
+      const modalId = 'secureExitModal';
+      const content = `
+        <div class="bg-white w-full max-w-lg rounded-[2.5rem] shadow-2xl overflow-hidden animate-slideUp">
+          <div class="bg-rose-600 p-6 text-white flex items-center justify-between">
+            <div class="flex items-center gap-3">
+              <div class="w-12 h-12 bg-white/20 rounded-2xl flex items-center justify-center animate-pulse">
+                <i data-lucide="shield-alert" class="w-7 h-7"></i>
+              </div>
+              <div>
+                <h3 class="text-xl font-black uppercase tracking-tighter">Protocolo de Salida Segura</h3>
+                <p class="text-xs font-bold text-rose-100 uppercase tracking-widest">Verificación de Identidad Obligatoria</p>
+              </div>
+            </div>
+          </div>
+          
+          <div class="p-8">
+            <div class="flex items-center gap-6 mb-8 p-4 bg-slate-50 rounded-3xl border-2 border-slate-100">
+              <div class="w-20 h-20 rounded-2xl bg-white border-4 border-white shadow-md overflow-hidden shrink-0">
+                ${student.avatar_url ? `<img src="${student.avatar_url}" class="w-full h-full object-cover">` : `<div class="w-full h-full flex items-center justify-center bg-teal-50 text-teal-600 font-black text-2xl">${student.name.charAt(0)}</div>`}
+              </div>
+              <div>
+                <h4 class="text-lg font-black text-slate-800">${student.name}</h4>
+                <p class="text-sm font-bold text-teal-600 uppercase tracking-widest">${student.classrooms?.name || 'Aula no asignada'}</p>
+              </div>
+            </div>
+
+            <h5 class="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] mb-4 ml-1">Personas Autorizadas</h5>
+            <div class="space-y-3 mb-8">
+              ${authorized?.length ? authorized.map(a => `
+                <div class="flex items-center gap-4 p-3 bg-emerald-50 border border-emerald-100 rounded-2xl">
+                  <div class="w-10 h-10 rounded-xl bg-white border border-emerald-200 overflow-hidden flex items-center justify-center shrink-0">
+                    ${a.photo_url ? `<img src="${a.photo_url}" class="w-full h-full object-cover">` : `<i data-lucide="user" class="w-5 h-5 text-emerald-300"></i>`}
+                  </div>
+                  <div class="flex-1">
+                    <p class="text-sm font-black text-emerald-900">${a.name}</p>
+                    <p class="text-[10px] font-bold text-emerald-600 uppercase">${a.relationship} · ${a.phone || 'Sin tel'}</p>
+                  </div>
+                  <div class="w-6 h-6 bg-emerald-500 text-white rounded-full flex items-center justify-center"><i data-lucide="check" class="w-4 h-4"></i></div>
+                </div>
+              `).join('') : `
+                <div class="p-6 text-center bg-amber-50 border-2 border-dashed border-amber-200 rounded-2xl">
+                  <p class="text-sm font-black text-amber-700">⚠️ Sin lista de autorizados</p>
+                  <p class="text-[10px] font-bold text-amber-600/70 uppercase mt-1">Contactar al padre inmediatamente</p>
+                </div>
+              `}
+            </div>
+
+            <div class="grid grid-cols-2 gap-4">
+              <button id="btnCancelExit" class="py-4 bg-slate-100 text-slate-500 rounded-2xl font-black uppercase text-xs hover:bg-slate-200 transition-all">Cancelar</button>
+              <button id="btnConfirmExit" class="py-4 bg-rose-600 text-white rounded-2xl font-black uppercase text-xs shadow-lg shadow-rose-200 hover:bg-rose-700 transition-all active:scale-95">Confirmar Salida</button>
+            </div>
+          </div>
+        </div>
+      `;
+
+      const overlay = document.getElementById('punchFeedbackOverlay');
+      if (overlay) {
+        overlay.innerHTML = content;
+        overlay.classList.remove('hidden');
+        overlay.style.display = 'flex';
+      }
+
+      if (window.lucide) lucide.createIcons();
+
+      document.getElementById('btnCancelExit').onclick = () => {
+        overlay.classList.add('hidden');
+        overlay.style.display = 'none';
+        resolve(false);
+      };
+
+      document.getElementById('btnConfirmExit').onclick = () => {
+        overlay.classList.add('hidden');
+        overlay.style.display = 'none';
+        resolve(true);
+      };
     });
   },
 
-  _bindTableSearch() {
-    const input = document.getElementById('searchAccessTable');
-    input?.addEventListener('input', Helpers.debounce((e) => {
-      this._filterTable(e.target.value.toLowerCase());
-    }, 200));
-  },
+  _showPunchFeedback(student, type) {
+    const isEntry = type === 'present' || type === 'late';
+    const color = isEntry ? 'emerald' : 'blue';
+    const icon  = isEntry ? 'check-circle' : 'log-out';
+    const title = isEntry ? 'Entrada Registrada' : 'Salida Registrada';
+    
+    // Feedback de Sonido
+    try {
+      const audio = new Audio(isEntry ? 'assets/sounds/success.mp3' : 'assets/sounds/exit.mp3');
+      audio.play().catch(() => {});
+    } catch (_) {}
 
-  _filterTable(term) {
-    const rows = document.querySelectorAll('#accessTableBody tr');
-    rows.forEach(row => {
-      const text = row.textContent.toLowerCase();
-      row.style.display = text.includes(term) ? '' : 'none';
-    });
-  },
+    const content = `
+      <div class="bg-white rounded-[3rem] shadow-2xl p-10 text-center animate-bounceIn max-w-xs w-full">
+        <div class="w-24 h-24 bg-${color}-100 text-${color}-600 rounded-full flex items-center justify-center mx-auto mb-6 shadow-inner">
+          <i data-lucide="${icon}" class="w-12 h-12"></i>
+        </div>
+        <h3 class="text-2xl font-black text-slate-800 mb-2">${title}</h3>
+        <p class="text-sm font-bold text-slate-400 uppercase tracking-widest mb-6">${student.name}</p>
+        <div class="py-3 px-6 bg-${color}-50 text-${color}-700 rounded-2xl font-black text-xs uppercase tracking-tighter">
+          Acceso Autorizado ✅
+        </div>
+      </div>
+    `;
 
-  _bindExport() {
-    const btn = document.getElementById('btnExportExcel');
-    btn?.addEventListener('click', () => this.exportToExcel());
+    const overlay = document.getElementById('punchFeedbackOverlay');
+    if (overlay) {
+      overlay.innerHTML = content;
+      overlay.classList.remove('hidden');
+      overlay.style.display = 'flex';
+      if (window.lucide) lucide.createIcons();
+      
+      setTimeout(() => {
+        overlay.classList.add('hidden');
+        overlay.style.display = 'none';
+      }, 2500);
+    }
   },
 
   // ── Estadísticas con Filtro ──────────────────────────────────────────────
@@ -90,11 +363,12 @@ export const AccessModule = {
   },
 
   // ── Historial Detallado (Tabla) ───────────────────────────────────────────
-  async loadHistory() {
+  async loadHistory(query = '') {
     const tbody = document.getElementById('accessTableBody');
     if (!tbody) return;
 
-    tbody.innerHTML = `<tr><td colspan="7" class="py-12 text-center text-slate-400 font-bold">Cargando registros...</td></tr>`;
+    // SKELETON LOADING (NUEVO)
+    tbody.innerHTML = Helpers.skeleton(5, 'h-16');
 
     try {
       const from = document.getElementById('accessFilterFrom')?.value;
@@ -112,7 +386,7 @@ export const AccessModule = {
       if (to) qAtt = qAtt.lte('date', to);
       if (status && status !== 'all') qAtt = qAtt.eq('status', status);
 
-      const { data: attData, error: attErr } = await qAtt.limit(150);
+      const { data: attData, error: attErr } = await qAtt.limit(100);
       if (attErr) throw attErr;
 
       // 2. Obtener Ponches del Personal
@@ -125,9 +399,8 @@ export const AccessModule = {
 
       if (from) qPunches = qPunches.gte('date', from);
       if (to) qPunches = qPunches.lte('date', to);
-      // Nota: El filtro de status 'late'/'present' no aplica directamente al staff en door_punches de la misma forma
       
-      const { data: punchData, error: punchErr } = await qPunches.limit(150);
+      const { data: punchData, error: punchErr } = await qPunches.limit(100);
       if (punchErr) throw punchErr;
 
       // 3. Procesar Staff Punches (agrupar in/out por día)
@@ -170,14 +443,20 @@ export const AccessModule = {
         type: 'student'
       }));
 
-      // 5. Unificar y Ordenar
-      const combined = [...studentLogs, ...staffLogs]
+      // 5. Unificar y Filtrar por Query
+      let combined = [...studentLogs, ...staffLogs]
         .sort((a, b) => new Date(b.date + 'T' + (b.check_in ? new Date(b.check_in).toTimeString() : '00:00:00')) - 
-                        new Date(a.date + 'T' + (a.check_in ? new Date(a.check_in).toTimeString() : '00:00:00')))
-        .slice(0, 200);
+                        new Date(a.date + 'T' + (a.check_in ? new Date(a.check_in).toTimeString() : '00:00:00')));
+
+      if (query) {
+        const term = query.toLowerCase();
+        combined = combined.filter(c => c.name.toLowerCase().includes(term) || c.id_code.toLowerCase().includes(term));
+      }
+
+      combined = combined.slice(0, 150);
 
       if (!combined.length) {
-        tbody.innerHTML = `<tr><td colspan="7" class="py-12 text-center text-slate-300 font-bold uppercase tracking-widest text-xs">Sin movimientos en este rango</td></tr>`;
+        tbody.innerHTML = `<tr><td colspan="7" class="py-12 text-center text-slate-300 font-bold uppercase tracking-widest text-xs">Sin registros encontrados</td></tr>`;
         return;
       }
 
@@ -187,32 +466,44 @@ export const AccessModule = {
         const outTime = log.check_out ? new Date(log.check_out).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '--:--';
         
         let statusBadge = '';
-        if (log.status === 'present') statusBadge = '<span class="px-2.5 py-1 bg-emerald-50 text-emerald-600 rounded-lg text-[9px] font-black uppercase">Entrada</span>';
-        else if (log.status === 'late') statusBadge = '<span class="px-2.5 py-1 bg-amber-50 text-amber-600 rounded-lg text-[9px] font-black uppercase">Tardanza</span>';
-        else if (log.status === 'retirado') statusBadge = '<span class="px-2.5 py-1 bg-blue-50 text-blue-600 rounded-lg text-[9px] font-black uppercase">Salida</span>';
-        else if (log.status === 'staff') statusBadge = '<span class="px-2.5 py-1 bg-indigo-50 text-indigo-600 rounded-lg text-[9px] font-black uppercase">Personal</span>';
+        if (log.status === 'present') statusBadge = '<span class="px-2.5 py-1 bg-emerald-50 text-emerald-600 rounded-lg text-[9px] font-black uppercase tracking-tighter shadow-sm border border-emerald-100">Entrada</span>';
+        else if (log.status === 'late') statusBadge = '<span class="px-2.5 py-1 bg-amber-50 text-amber-600 rounded-lg text-[9px] font-black uppercase tracking-tighter shadow-sm border border-amber-100">Tardanza</span>';
+        else if (log.status === 'retirado') statusBadge = '<span class="px-2.5 py-1 bg-blue-50 text-blue-600 rounded-lg text-[9px] font-black uppercase tracking-tighter shadow-sm border border-blue-100">Salida</span>';
+        else if (log.status === 'staff') statusBadge = '<span class="px-2.5 py-1 bg-indigo-50 text-indigo-600 rounded-lg text-[9px] font-black uppercase tracking-tighter shadow-sm border border-indigo-100">Personal</span>';
 
         const roleLabels = { maestra: 'Maestra', asistente: 'Asistente', directora: 'Directora', admin: 'Admin', staff: 'Personal' };
         const roleLabel = log.type === 'student' ? 'Estudiante' : (roleLabels[log.role] || log.role);
-        const roleClass = log.type === 'student' ? 'bg-teal-50 text-teal-600' : 'bg-indigo-50 text-indigo-600';
+        const roleClass = log.type === 'student' ? 'bg-teal-50 text-teal-600 border-teal-100' : 'bg-indigo-50 text-indigo-600 border-indigo-100';
 
         return `
-          <tr class="hover:bg-slate-50/50 transition-colors">
+          <tr class="hover:bg-slate-50/80 transition-all group">
             <td class="px-8 py-4">
               <div class="flex items-center gap-3">
-                <div class="w-8 h-8 rounded-xl bg-slate-100 flex items-center justify-center overflow-hidden shrink-0 border border-slate-200">
-                  ${log.avatar ? `<img src="${log.avatar}" class="w-full h-full object-cover">` : `<i data-lucide="user" class="w-4 h-4 text-slate-300"></i>`}
+                <div class="w-10 h-10 rounded-2xl bg-white border-2 border-slate-100 shadow-sm overflow-hidden shrink-0 group-hover:border-teal-200 transition-all">
+                  ${log.avatar ? `<img src="${log.avatar}" class="w-full h-full object-cover">` : `<div class="w-full h-full flex items-center justify-center bg-slate-50 text-slate-300 font-black">${log.name.charAt(0)}</div>`}
                 </div>
-                <span class="font-bold text-slate-700">${Helpers.escapeHTML(log.name)}</span>
+                <div>
+                  <span class="font-black text-slate-700 text-sm block group-hover:text-teal-600 transition-colors">${Helpers.escapeHTML(log.name)}</span>
+                  <span class="text-[9px] font-bold text-slate-400 uppercase tracking-widest">${roleLabel}</span>
+                </div>
               </div>
             </td>
             <td class="px-8 py-4">
-              <span class="px-2 py-0.5 rounded-md text-[9px] font-black uppercase ${roleClass}">${roleLabel}</span>
+              <span class="px-2 py-0.5 rounded-md text-[9px] font-black uppercase border ${roleClass}">${roleLabel}</span>
             </td>
-            <td class="px-8 py-4 font-mono text-[10px] text-slate-400 font-bold">${log.id_code}</td>
-            <td class="px-8 py-4 text-slate-500 font-bold">${dateStr}</td>
-            <td class="px-8 py-4 text-center font-black text-slate-700 italic">${inTime}</td>
-            <td class="px-8 py-4 text-center font-black text-slate-700 italic">${outTime}</td>
+            <td class="px-8 py-4 font-mono text-[10px] text-slate-400 font-bold tracking-tighter">${log.id_code}</td>
+            <td class="px-8 py-4">
+              <div class="text-sm font-black text-slate-600">${dateStr}</div>
+              <div class="text-[9px] font-bold text-slate-300 uppercase tracking-widest">Fecha</div>
+            </td>
+            <td class="px-8 py-4 text-center">
+              <div class="font-black text-slate-800 italic text-sm">${inTime}</div>
+              <div class="text-[9px] font-bold text-slate-300 uppercase tracking-widest">Entrada</div>
+            </td>
+            <td class="px-8 py-4 text-center">
+              <div class="font-black text-slate-800 italic text-sm">${outTime}</div>
+              <div class="text-[9px] font-bold text-slate-300 uppercase tracking-widest">Salida</div>
+            </td>
             <td class="px-8 py-4 text-center">${statusBadge}</td>
           </tr>`;
       }).join('');
@@ -220,7 +511,7 @@ export const AccessModule = {
       if (window.lucide) lucide.createIcons();
     } catch (err) {
       console.error('Error loading history:', err);
-      tbody.innerHTML = `<tr><td colspan="7" class="py-12 text-center text-rose-500 font-bold">Error al cargar datos: ${err.message}</td></tr>`;
+      tbody.innerHTML = `<tr><td colspan="7" class="py-12 text-center text-rose-500 font-bold">${Helpers.errorState('Fallo al cargar historial')}</td></tr>`;
     }
   },
 

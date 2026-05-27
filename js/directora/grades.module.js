@@ -94,7 +94,20 @@ export const GradesModule = {
     const tableBody = document.getElementById('gradesTableBody');
     if (!tableBody) return;
     
-    tableBody.innerHTML = '<tr><td colspan="4" class="text-center py-12"><div class="animate-spin rounded-full h-10 w-10 border-b-2 border-indigo-600 mx-auto"></div><p class="mt-4 text-xs font-bold text-slate-400 uppercase tracking-widest">Calculando promedios...</p></td></tr>';
+    tableBody.innerHTML = `
+      <tr><td colspan="4" class="px-6 py-3">
+        <div class="h-10 bg-slate-100 rounded-xl animate-pulse w-full"></div>
+      </td></tr>
+      <tr><td colspan="4" class="px-6 py-3">
+        <div class="h-10 bg-slate-100 rounded-xl animate-pulse w-full" style="opacity:.7"></div>
+      </td></tr>
+      <tr><td colspan="4" class="px-6 py-3">
+        <div class="h-10 bg-slate-100 rounded-xl animate-pulse w-full" style="opacity:.5"></div>
+      </td></tr>
+      <tr><td colspan="4" class="px-6 py-3">
+        <div class="h-10 bg-slate-100 rounded-xl animate-pulse w-full" style="opacity:.3"></div>
+      </td></tr>
+    `;
     
     try {
       // 1. Obtener todos los estudiantes activos

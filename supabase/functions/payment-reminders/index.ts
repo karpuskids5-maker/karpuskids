@@ -61,8 +61,14 @@ Deno.serve(async (req) => {
     reminderCutoff.setDate(reminderCutoff.getDate() - 3);
     const cutoffStr = reminderCutoff.toISOString();
 
-    // Obtener pagos vencidos con datos del estudiante y padre
-    const { data: overduePayments, error } = await supabase
+    // Fecha para recordatorio anticipado (vence en ≤3 días)
+    const in3days = new Date(today);
+    in3days.setDate(in3days.getDate() + 3);
+    const in3daysStr = in3days.toISOString().split('T')[0];
+
+    // Obtener pagos pendientes/vencidos con datos del estudiante y padre
+    // Incluye: overdue, pending con due_date ya pasada, y pending que vencen en ≤3 días
+    const { data: allPayments, error } = await supabase
       .from('payments')
       .select(`
         id, student_id, amount, concept, due_date, month_paid, status,
@@ -72,8 +78,8 @@ Deno.serve(async (req) => {
           classrooms:classroom_id ( name )
         )
       `)
-      .eq('status', 'overdue')
-      .lt('due_date', todayStr)
+      .in('status', ['overdue', 'pending'])
+      .lte('due_date', in3daysStr)
       .or(`last_reminder_sent.is.null,last_reminder_sent.lt.${cutoffStr}`);
 
     if (error) {
@@ -88,15 +94,15 @@ Deno.serve(async (req) => {
             classrooms:classroom_id ( name )
           )
         `)
-        .eq('status', 'overdue')
-        .lt('due_date', todayStr);
+        .in('status', ['overdue', 'pending'])
+        .lte('due_date', in3daysStr);
 
       if (err2) return json({ error: err2.message }, 500);
 
       return await processReminders(supabase, resend, FROM_EMAIL, fallback ?? [], false);
     }
 
-    return await processReminders(supabase, resend, FROM_EMAIL, overduePayments ?? [], true);
+    return await processReminders(supabase, resend, FROM_EMAIL, allPayments ?? [], true);
 
   } catch (e) {
     console.error('[payment-reminders] fatal:', e);
@@ -272,11 +278,25 @@ async function processReminders(
 
   console.log(`[payment-reminders] done: ${emailsSent} emails, ${pushesSent} pushes, ${errors.length} errors`);
 
+  // Clasificar para el frontend (reminder_3d = vence en ≤3 días, overdue_1d = ya vencidos)
+  const today2 = new Date(); today2.setHours(0, 0, 0, 0);
+  let reminder3d = 0, dueToday = 0, overdue1d = 0;
+  for (const p of payments) {
+    const due = new Date((p.due_date as string) + 'T00:00:00');
+    const diff = Math.floor((due.getTime() - today2.getTime()) / 86400000);
+    if (diff < 0)      overdue1d++;
+    else if (diff === 0) dueToday++;
+    else                 reminder3d++;
+  }
+
   return new Response(
     JSON.stringify({
-      processed: payments.length,
-      emails_sent: emailsSent,
-      pushes_sent: pushesSent,
+      processed:    payments.length,
+      reminder_3d:  reminder3d,
+      due_today:    dueToday,
+      overdue_1d:   overdue1d,
+      emails_sent:  emailsSent,
+      pushes_sent:  pushesSent,
       errors: errors.length > 0 ? errors : undefined,
     }),
     { status: 200, headers: { ...CORS, 'Content-Type': 'application/json' } }

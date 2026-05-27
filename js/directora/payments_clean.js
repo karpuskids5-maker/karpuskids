@@ -67,7 +67,17 @@ export const PaymentsModule = {
   async loadPayments() {
     const tbody = document.getElementById('paymentsTableBody');
     if (!tbody) return;
-    tbody.innerHTML = '<tr><td colspan="8" class="text-center py-10"><div class="animate-spin rounded-full h-8 w-8 border-b-2 border-indigo-600 mx-auto mb-2"></div><p class="text-xs text-slate-400">Cargando pagos...</p></td></tr>';
+    tbody.innerHTML = `
+      <tr><td colspan="8" class="px-5 py-3">
+        <div class="h-12 bg-slate-100 rounded-xl animate-pulse w-full"></div>
+      </td></tr>
+      <tr><td colspan="8" class="px-5 py-3">
+        <div class="h-12 bg-slate-100 rounded-xl animate-pulse w-full" style="opacity:.7"></div>
+      </td></tr>
+      <tr><td colspan="8" class="px-5 py-3">
+        <div class="h-12 bg-slate-100 rounded-xl animate-pulse w-full" style="opacity:.5"></div>
+      </td></tr>
+    `;
     this.loadStats();
     this.loadIncomeChart();
     try {
@@ -376,26 +386,19 @@ export const PaymentsModule = {
       Helpers.toast('Pago aprobado', 'success');
       await this.loadPayments();
 
-      // Send receipt email + push notification
-      DirectorApi.sendPaymentReceipt(id).then(ok => {
-        if (ok) {
-          import('../shared/notify-feedback.js').then(m =>
-            m.showNotifyFeedback({ sent: 1, type: 'payment', label: 'Recibo enviado al padre' })
-          ).catch(() => {});
-        }
-      }).catch(() => {});
-
+      // Notificar al padre: email + push via process-event (un solo envío)
       try {
         const { data: p } = await DirectorApi.getPaymentById(id);
         if (p) {
           const { notifyPaymentApproved } = await import('../shared/supabase.js');
-          // Enviar a todos los correos disponibles del estudiante
           const emails = [p.students?.p1_email, p.students?.p2_email].filter(e => e && e.includes('@'));
           const studentName = p.students?.name || 'Estudiante';
           const amountStr = 'RD$' + Number(p.amount || 0).toLocaleString('es-DO', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
           const monthStr = p.month_paid || 'Colegiatura';
-          // Notificar con el primer email (el RPC process-event enviará a ambos)
           await notifyPaymentApproved(id, emails[0] || null, studentName, amountStr, monthStr);
+          import('../shared/notify-feedback.js').then(m =>
+            m.showNotifyFeedback({ sent: 1, type: 'payment', label: 'Recibo enviado al padre' })
+          ).catch(() => {});
         }
       } catch (_) {}
     } catch (e) {
@@ -599,8 +602,10 @@ export const PaymentsModule = {
       const results = data || {};
       const total = (results.reminder_3d || 0) + (results.due_today || 0) + (results.overdue_1d || 0);
       
-      if (total === 0) {
-        Helpers.toast('No hay pagos para recordar en este momento', 'info');
+      if (total === 0 && !results.processed) {
+        Helpers.toast('No hay pagos pendientes o vencidos para recordar', 'info');
+      } else if (total === 0 && results.processed > 0) {
+        Helpers.toast(`⚠️ ${results.processed} pago(s) encontrados pero sin correo configurado en los estudiantes`, 'warning');
       } else {
         const msg = `✅ ${total} recordatorios procesados\n📧 ${results.emails_sent || 0} correos\n🔔 ${results.pushes_sent || 0} notificaciones`;
         Helpers.toast(msg, 'success');

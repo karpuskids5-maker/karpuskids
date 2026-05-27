@@ -1,4 +1,4 @@
-﻿import { supabase, createClient, SUPABASE_URL, SUPABASE_ANON_KEY } from '../../shared/supabase.js';
+import { supabase, createClient, SUPABASE_URL, SUPABASE_ANON_KEY } from '../../shared/supabase.js';
 import { Helpers } from '../../shared/helpers.js';
 
 const IC = 'w-full px-4 py-2.5 border-2 border-slate-100 rounded-2xl outline-none focus:ring-4 focus:ring-teal-100 focus:border-teal-400 bg-slate-50/50 transition-all text-sm font-medium';
@@ -10,76 +10,102 @@ export const StudentsModule = {
     document.getElementById('btnAddStudent')?.addEventListener('click', () => this.openModal());
   },
 
-  async loadStudents() {
+  _bindSearch() {
+    const input = document.getElementById('searchStudentInput');
+    if (!input) return;
+    
+    // Búsqueda inteligente con debounce
+    input.addEventListener('input', Helpers.debounce((e) => {
+      const q = e.target.value.toLowerCase().trim();
+      this.loadStudents(q);
+    }, 300));
+  },
+
+  async loadStudents(query = '') {
     const tbody = document.getElementById('studentsTableBody');
     if (!tbody) return;
-    tbody.innerHTML = '<tr><td colspan="4" class="text-center py-8"><div class="animate-spin rounded-full h-6 w-6 border-b-2 border-teal-600 mx-auto"></div></td></tr>';
+
+    // Mostrar Skeleton o Loader
+    tbody.innerHTML = `
+      <tr>
+        <td colspan="4" class="px-6 py-10 text-center">
+          <div class="flex flex-col items-center gap-3">
+            <div class="animate-spin w-8 h-8 border-4 border-teal-500 border-t-transparent rounded-full"></div>
+            <p class="text-xs font-black text-slate-400 uppercase tracking-widest">Buscando Estudiantes...</p>
+          </div>
+        </td>
+      </tr>
+    `;
 
     try {
-      let { data: students, error } = await supabase
+      let q = supabase
         .from('students')
-        .select('id, name, is_active, p1_name, p1_phone, avatar_url, matricula, classroom_id, classrooms:classroom_id(name)')
+        .select('id, name, is_active, p1_name, p1_phone, classroom_id, matricula, avatar_url, classrooms:classroom_id(name)')
         .order('name');
-      
-      // Fallback si classroom_id no existe
-      if (error && (error.message?.includes('classroom_id') || error.code === '42703')) {
-        const basicRes = await supabase
-          .from('students')
-          .select('id, name, is_active, p1_name, p1_phone, avatar_url, matricula')
-          .order('name');
-        students = basicRes.data;
-        error = basicRes.error;
+
+      if (query) {
+        // Buscar por nombre o matrícula
+        q = q.or(`name.ilike.%${query}%,matricula.ilike.%${query}%`);
       }
 
+      const { data: students, error } = await q.limit(100);
       if (error) throw error;
 
       if (!students?.length) {
-        tbody.innerHTML = '<tr><td colspan="4" class="text-center py-8 text-slate-400">No hay estudiantes registrados.</td></tr>';
+        tbody.innerHTML = `
+          <tr>
+            <td colspan="4" class="px-6 py-12 text-center">
+              <div class="opacity-30 mb-2"><i data-lucide="search-x" class="w-12 h-12 mx-auto"></i></div>
+              <p class="text-sm font-bold text-slate-400">No se encontraron resultados para "${query}"</p>
+            </td>
+          </tr>
+        `;
+        if (window.lucide) lucide.createIcons();
         return;
       }
 
       tbody.innerHTML = students.map(s => `
-        <tr class="hover:bg-slate-50 border-b border-slate-100 transition-colors">
-          <td class="px-4 py-3">
-            <div class="flex items-center gap-2">
-              <div class="w-8 h-8 rounded-lg bg-teal-100 text-teal-600 flex items-center justify-center font-bold text-sm shrink-0 overflow-hidden">
-                ${s.avatar_url ? `<img src="${s.avatar_url}" class="w-full h-full object-cover">` : (s.name || '?').charAt(0)}
+        <tr class="hover:bg-slate-50 transition-all group">
+          <td class="px-6 py-4">
+            <div class="flex items-center gap-3">
+              <div class="w-10 h-10 rounded-2xl bg-teal-50 border border-teal-100 overflow-hidden shrink-0 flex items-center justify-center">
+                ${s.avatar_url ? `<img src="${s.avatar_url}" class="w-full h-full object-cover">` : `<span class="font-black text-teal-600">${s.name.charAt(0)}</span>`}
               </div>
               <div>
-                <div class="font-bold text-slate-800 text-sm">${Helpers.escapeHTML(s.name)}</div>
-                <div class="text-[10px] text-slate-400">${s.matricula || 'Sin matrícula'}</div>
+                <div class="font-black text-slate-700 text-sm group-hover:text-teal-600 transition-colors">${Helpers.escapeHTML(s.name)}</div>
+                <div class="text-[10px] font-bold text-slate-400 uppercase tracking-widest">${s.matricula || 'SIN MATRÍCULA'}</div>
               </div>
             </div>
           </td>
-          <td class="px-4 py-3 text-slate-500 text-sm hidden sm:table-cell">${Helpers.escapeHTML(s.classrooms?.name || 'Sin Aula')}</td>
-          <td class="px-4 py-3 text-slate-500 text-sm hidden md:table-cell">${Helpers.escapeHTML(s.p1_name || 'N/A')}</td>
-          <td class="px-4 py-3">
-            <div class="flex items-center gap-1.5">
-              <span class="px-2 py-1 rounded-full text-[10px] font-bold ${s.is_active ? 'bg-emerald-100 text-emerald-700' : 'bg-rose-100 text-rose-700'}">${s.is_active ? 'Activo' : 'Inactivo'}</span>
-              <button onclick="window.App.students.openModal('${s.id}')" class="p-1.5 bg-teal-50 text-teal-500 rounded-lg hover:bg-teal-100 hover:text-teal-700 transition-all" title="Editar">
-                <i data-lucide="edit-2" class="w-3.5 h-3.5"></i>
+          <td class="px-6 py-4">
+            <div class="flex flex-col">
+              <span class="text-sm font-bold text-slate-600">${s.classrooms?.name || '—'}</span>
+              <span class="text-[9px] font-black text-slate-300 uppercase">Aula Asignada</span>
+            </div>
+          </td>
+          <td class="px-6 py-4">
+            <div class="flex items-center gap-2">
+              <div class="w-8 h-8 rounded-full bg-slate-100 flex items-center justify-center text-slate-400"><i data-lucide="user" class="w-4 h-4"></i></div>
+              <div class="text-xs font-bold text-slate-500">${Helpers.escapeHTML(s.p1_name || 'N/A')}</div>
+            </div>
+          </td>
+          <td class="px-6 py-4">
+            <div class="flex items-center gap-2">
+              <button onclick="window.App._openStudentModal('${s.id}')" class="p-2 bg-slate-100 text-slate-500 hover:bg-teal-500 hover:text-white rounded-xl transition-all" title="Editar">
+                <i data-lucide="edit-3" class="w-4 h-4"></i>
               </button>
-              <button onclick="window.App.students.deleteStudent('${s.id}', '${Helpers.escapeHTML(s.name)}')" class="p-1.5 bg-rose-50 text-rose-400 rounded-lg hover:bg-rose-100 hover:text-rose-600 transition-all" title="Eliminar">
-                <i data-lucide="trash-2" class="w-3.5 h-3.5"></i>
+              <button onclick="window.App._registerPayment('${s.id}')" class="p-2 bg-slate-100 text-slate-500 hover:bg-amber-500 hover:text-white rounded-xl transition-all" title="Cobrar">
+                <i data-lucide="dollar-sign" class="w-4 h-4"></i>
               </button>
             </div>
           </td>
-        </tr>`).join('');
+        </tr>
+      `).join('');
 
-      const search = document.getElementById('searchStudentInput');
-      if (search && !search.hasAttribute('data-bound')) {
-        search.setAttribute('data-bound', 'true');
-        search.addEventListener('input', (e) => {
-          const q = e.target.value.toLowerCase();
-          tbody.querySelectorAll('tr').forEach(row => {
-            row.style.display = row.textContent.toLowerCase().includes(q) ? '' : 'none';
-          });
-        });
-      }
       if (window.lucide) window.lucide.createIcons();
-    } catch (_) {
-      tbody.innerHTML = '<tr><td colspan="4" class="text-center py-8">' + Helpers.errorState('Error al cargar estudiantes', 'App.students.init()') + '</td></tr>';
-      if (window.lucide) lucide.createIcons();
+    } catch (e) {
+      console.error('Error loadStudents:', e);
+      tbody.innerHTML = '<tr><td colspan="4">' + Helpers.errorState('Error al cargar datos') + '</td></tr>';
     }
   },
 

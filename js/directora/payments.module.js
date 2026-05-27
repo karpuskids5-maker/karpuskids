@@ -318,6 +318,16 @@ export const PaymentsModule = {
       await auditLog('payment.approve', { payment_id: id });
       Helpers.toast('Pago aprobado', 'success');
       await this.loadPayments();
+      // Notificar al padre: email + push
+      try {
+        const { data: p } = await DirectorApi.getPaymentById(id);
+        if (p) {
+          const { notifyPaymentApproved } = await import('../shared/supabase.js');
+          const emails = [p.students?.p1_email, p.students?.p2_email].filter(e => e && e.includes('@'));
+          const amountStr = 'RD$' + Number(p.amount || 0).toLocaleString('es-DO', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+          await notifyPaymentApproved(id, emails[0] || null, p.students?.name || 'Estudiante', amountStr, p.month_paid || 'Colegiatura');
+        }
+      } catch (_) {}
     } catch (_) { Helpers.toast('Error al aprobar pago', 'error'); }
   },
 

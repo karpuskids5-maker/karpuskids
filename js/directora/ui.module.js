@@ -47,7 +47,7 @@ const DirectorUI = {
 
     const kpis = data?.kpis || {};
 
-    // Estudiantes activos — usar total como fallback si active es 0
+    // Estudiantes activos
     const studentCount = (kpis.active > 0 ? kpis.active : null) ?? kpis.total ?? 0;
     set('kpiStudents', studentCount);
 
@@ -58,14 +58,28 @@ const DirectorUI = {
     set('kpiClassrooms', kpis.classrooms > 0 ? kpis.classrooms : (data?.classrooms?.length ?? 0));
 
     // Niños presentes hoy
-    set('kpiAttendance', data?.attendance?.today?.present ?? kpis.attendance_today ?? 0);
+    const presentToday = data?.attendance?.today?.present ?? kpis.attendance_today ?? 0;
+    const totalToday   = data?.attendance?.today?.total ?? 0;
+    set('kpiAttendance', presentToday);
+
+    // Tasa de asistencia como subtexto
+    if (totalToday > 0) {
+      const rate = Math.round((presentToday / totalToday) * 100);
+      const rateEl = document.getElementById('kpiAttendanceRate');
+      if (rateEl) rateEl.textContent = rate + '% del total';
+    }
 
     // Por cobrar
     const pending = data?.payments?.summary?.total_pending ?? kpis.pending_amount ?? 0;
-    set('kpiPendingMoney', '$' + Number(pending).toLocaleString('es-ES', { minimumFractionDigits: 2 }));
+    set('kpiPendingMoney', 'RD$' + Number(pending).toLocaleString('es-DO', { minimumFractionDigits: 2 }));
 
     // Incidencias
     set('kpiIncidents', data?.inquiries?.count ?? kpis.inquiries ?? 0);
+
+    // Lanzar widgets inteligentes en background (no bloquea el render)
+    import('./automation.js').then(({ AutomationModule }) => {
+      AutomationModule.renderSmartWidgets('smartAlertsContainer');
+    }).catch(() => {});
 
     if (window.lucide) lucide.createIcons();
   },

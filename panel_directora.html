@@ -549,6 +549,7 @@
             </div>
             <p class="text-3xl font-bold text-emerald-800 mb-1" id="kpiAttendance">0</p>
             <p class="text-xs text-emerald-600 font-medium">Niños presentes</p>
+            <p class="text-[10px] text-emerald-500 font-bold mt-0.5" id="kpiAttendanceRate"></p>
           </div>
 
           <!-- Pagos Pendientes (Amarillo Pastel) -->
@@ -570,7 +571,15 @@
           </div>
         </div>
 
-        <!-- BLOQUE 2: Accesos Directos (NUEVO) -->
+        <!-- BLOQUE 2: Alertas Inteligentes (Automatización) -->
+        <div id="smartAlertsContainer" class="mb-6">
+          <div class="flex items-center gap-2 py-4">
+            <div class="w-4 h-4 border-2 border-indigo-400 border-t-transparent rounded-full animate-spin"></div>
+            <span class="text-xs text-slate-400 font-bold">Analizando datos...</span>
+          </div>
+        </div>
+
+        <!-- BLOQUE 3: Accesos Directos (NUEVO) -->
         <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
           <!-- Reportes -->
           <div id="cardReportes" data-action="go-section" data-section="reportes" class="bg-white p-6 rounded-3xl shadow-sm border border-slate-100 hover:shadow-md hover:-translate-y-1 active:scale-95 transition-all duration-300 text-left group cursor-pointer">

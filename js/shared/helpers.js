@@ -92,19 +92,16 @@ export const Helpers = {
    * @param {string} msg — mensaje de error
    * @param {string} retryFn — nombre de función global a llamar al reintentar (ej: 'App.payments.loadPayments()')
    */
-  errorState(msg = 'Error al cargar', retryFn = null) {
-    const retryBtn = retryFn
-      ? `<button onclick="${retryFn}" class="mt-3 px-4 py-2 bg-rose-600 text-white rounded-xl text-xs font-black uppercase hover:bg-rose-700 transition-all active:scale-95">Reintentar</button>`
-      : '';
+  errorState(msg) {
     return `
-      <div class="flex flex-col items-center justify-center p-10 text-center">
-        <div class="w-14 h-14 bg-rose-50 rounded-full flex items-center justify-center mb-3">
-          <i data-lucide="wifi-off" class="w-7 h-7 text-rose-400"></i>
+      <div class="flex flex-col items-center justify-center py-12 text-center">
+        <div class="w-16 h-16 bg-rose-50 text-rose-500 rounded-3xl flex items-center justify-center mb-4">
+          <i data-lucide="alert-circle" class="w-8 h-8"></i>
         </div>
-        <p class="font-black text-rose-600 text-sm">${Helpers.escapeHTML(msg)}</p>
-        <p class="text-slate-400 text-xs mt-1">Verifica tu conexión e intenta de nuevo.</p>
-        ${retryBtn}
-      </div>`;
+        <h4 class="text-sm font-black text-slate-800 uppercase tracking-widest">${msg}</h4>
+        <button onclick="location.reload()" class="mt-4 px-6 py-2 bg-slate-100 hover:bg-slate-200 text-slate-600 rounded-xl font-bold text-xs uppercase transition-all">Reintentar</button>
+      </div>
+    `;
   },
 
   /**
@@ -188,75 +185,20 @@ export const Helpers = {
   /**
    * 🦴 Skeleton lista
    */
-  skeleton(
-    count = 3,
-    height = 'h-20'
-  ) {
-
-    return Array
-      .from({ length: count })
-
-      .map(() => `
-
-        <div class="
-
-          w-full
-          ${height}
-
-          bg-slate-100
-          rounded-3xl
-
-          animate-pulse
-
-          mb-3
-
-          flex
-          items-center
-          gap-4
-
-          px-5
-
-        ">
-
-          <div class="
-
-            w-12
-            h-12
-
-            bg-slate-200
-
-            rounded-2xl
-
-          "></div>
-
-          <div class="flex-1 space-y-2">
-
-            <div class="
-
-              w-1/2
-              h-3
-              bg-slate-200
-              rounded-full
-
-            "></div>
-
-            <div class="
-
-              w-1/4
-              h-2
-              bg-slate-200
-              rounded-full
-
-            "></div>
-
+  skeleton(rows = 3, height = 'h-12') {
+    return Array(rows).fill(0).map(() => `
+      <tr class="animate-pulse">
+        <td colspan="100%" class="px-6 py-4">
+          <div class="flex items-center gap-4">
+            <div class="w-10 h-10 bg-slate-100 rounded-2xl"></div>
+            <div class="flex-1 space-y-2">
+              <div class="h-3 bg-slate-100 rounded-full w-1/3"></div>
+              <div class="h-2 bg-slate-50 rounded-full w-1/4"></div>
+            </div>
           </div>
-
-        </div>
-
-      `)
-
-      .join('');
-
+        </td>
+      </tr>
+    `).join('');
   },
 
 

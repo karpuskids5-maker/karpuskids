@@ -437,7 +437,7 @@ export const DirectorApi = {
   async getPaymentById(id) {
     try {
       return await supabase.from('payments')
-        .select('*, students:student_id(name, p1_email, p2_email, classrooms:classroom_id(name))')
+        .select('*, students:student_id(name, p1_email, p2_email, parent_id, classrooms:classroom_id(name))')
         .eq('id', id).single();
     } catch (e) { return logError('getPaymentById', e); }
   },

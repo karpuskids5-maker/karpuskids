@@ -66,9 +66,61 @@ export const DashboardModule = {
       set('statIncome',     '$' + incomeTotal.toLocaleString('es-ES', { minimumFractionDigits: 2 }));
       set('welcomeName',    (AppState.get('profile')?.name || 'Asistente').split(' ')[0]);
 
+      // ── Renderizar Alertas Urgentes ──
+      this._renderUrgentAlerts(paymentsCount, attendanceCount);
+
     } catch (e) {
-      
+      console.error('Error loading stats:', e);
     }
+  },
+
+  _renderUrgentAlerts(paymentsReview, pendingAbsences) {
+    const container = document.getElementById('urgentAlertsWidget');
+    if (!container) return;
+
+    const alerts = [];
+    
+    if (paymentsReview > 0) {
+      alerts.push({
+        title: `${paymentsReview} Pagos por validar`,
+        desc: 'Comprobantes pendientes de revisión bancaria.',
+        icon: 'credit-card',
+        color: 'rose',
+        section: 'pagos'
+      });
+    }
+
+    // Supongamos que reportes de ausencia son los estudiantes inactivos o algo similar por ahora
+    // En una implementación real, sería una tabla de 'absence_reports'
+    if (pendingAbsences > 0) {
+      alerts.push({
+        title: `Actividad de hoy`,
+        desc: `${pendingAbsences} estudiantes ya ingresaron a la estancia.`,
+        icon: 'users',
+        color: 'amber',
+        section: 'accesos'
+      });
+    }
+
+    if (alerts.length === 0) {
+      container.classList.add('hidden');
+      return;
+    }
+
+    container.classList.remove('hidden');
+    container.innerHTML = alerts.map(a => `
+      <div onclick="window.App.navigateTo('${a.section}')" class="bg-${a.color}-50 border border-${a.color}-100 p-4 rounded-2xl flex items-start gap-4 cursor-pointer hover:shadow-md transition-all group">
+        <div class="w-10 h-10 rounded-xl bg-${a.color}-500 text-white flex items-center justify-center shrink-0 shadow-lg shadow-${a.color}-200 group-hover:scale-110 transition-transform">
+          <i data-lucide="${a.icon}" class="w-5 h-5"></i>
+        </div>
+        <div>
+          <h4 class="text-sm font-black text-${a.color}-900">${a.title}</h4>
+          <p class="text-xs text-${a.color}-700/70 font-bold mt-0.5">${a.desc}</p>
+        </div>
+      </div>
+    `).join('');
+
+    if (window.lucide) lucide.createIcons();
   },
 
   async loadRecentPayments() {

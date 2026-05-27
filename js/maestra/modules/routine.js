@@ -391,8 +391,25 @@ export async function applyBulkRoutine() {
     
     await Promise.all(promises);
     safeToast(`Rutina aplicada a ${students.length} estudiantes`);
+    
+    // 🚀 AUTOMATIZACIÓN: Publicar en el Muro automáticamente
+    const moodEmojis = { feliz: '😊', normal: '😐' };
+    const foodEmojis = { todo: '😋', poco: '🍲' };
+    const wallMessage = `✨ Actualización de Rutina: ¡${moodEmojis[mood] || ''} Día ${mood}! ${food === 'todo' ? '¡Todos los pequeños comieron muy bien hoy! 😋' : 'Estamos completando la jornada con éxito.'}`;
+    
+    await supabase.from('posts').insert({
+      content: wallMessage,
+      classroom_id: classroom.id,
+      teacher_id: AppState.get('user').id,
+      type: 'announcement'
+    });
+
     Modal.close('bulkRoutineModal');
     initRoutine();
+    
+    if (window.WallModule) {
+      window.WallModule.loadPosts(); // Refrescar muro si está cargado
+    }
   } catch (_) {
     safeToast('Error al aplicar rutina masiva', 'error');
     btn.disabled = false;
