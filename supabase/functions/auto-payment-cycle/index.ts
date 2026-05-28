@@ -1,15 +1,12 @@
 /**
  * auto-payment-cycle — Edge Function
- * Ejecuta el ciclo de cobros mensual automáticamente.
- * 
- * Llamar via cron externo (ej: cron-job.org) el día 25 de cada mes:
- *   POST https://<project>.supabase.co/functions/v1/auto-payment-cycle
- *   Authorization: Bearer <SUPABASE_SERVICE_ROLE_KEY>
- * 
- * O habilitar pg_cron en Supabase y ejecutar:
- *   SELECT cron.schedule('monthly-cycle', '0 6 25 * *',
- *     $$ SELECT net.http_post(url := 'https://<project>.supabase.co/functions/v1/auto-payment-cycle',
- *        headers := '{"Authorization":"Bearer <SERVICE_KEY>"}') $$);
+ * Genera cobros mensuales automáticamente para todos los estudiantes activos.
+ * - Corre el día 1 de cada mes (genera cobros del mes actual)
+ * - También rellena meses anteriores que no tienen cobros (backfill)
+ * - Se puede forzar con header x-force-run: true
+ *
+ * Cron recomendado: día 1 de cada mes a las 6am RD (10:00 UTC)
+ *   '0 10 1 * *'
  */
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
@@ -29,63 +26,104 @@ Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: CORS });
 
   try {
-    const SUPABASE_URL  = Deno.env.get('SUPABASE_URL')              ?? '';
-    const SERVICE_KEY   = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '';
+    const SUPABASE_URL = Deno.env.get('SUPABASE_URL')              ?? '';
+    const SERVICE_KEY  = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '';
+    if (!SUPABASE_URL || !SERVICE_KEY) return json({ error: 'Missing env vars' }, 500);
 
-    if (!SUPABASE_URL || !SERVICE_KEY) {
-      return json({ error: 'Missing env vars' }, 500);
-    }
+    const supabase = createClient(SUPABASE_URL, SERVICE_KEY, { auth: { persistSession: false } });
 
-    const supabase = createClient(SUPABASE_URL, SERVICE_KEY, {
-      auth: { persistSession: false }
-    });
+    const body = await req.json().catch(() => ({}));
+    const forceRun = req.headers.get('x-force-run') === 'true' || body?.force === true;
 
-    const today = new Date();
-    const dayOfMonth = today.getDate();
-
-    // Get generation_day from school_settings
+    // ── Configuración ────────────────────────────────────────────────────────
     const { data: settings } = await supabase
-      .from('school_settings')
-      .select('generation_day, due_day')
-      .eq('id', 1)
-      .single();
-
-    const genDay = settings?.generation_day ?? 25;
+      .from('school_settings').select('generation_day, due_day').eq('id', 1).single();
     const dueDay = settings?.due_day ?? 5;
 
-    // Only run if today is the generation day (or called manually)
-    const forceRun = req.headers.get('x-force-run') === 'true';
-    if (!forceRun && dayOfMonth !== genDay) {
-      return json({
-        skipped: true,
-        reason: `Today is day ${dayOfMonth}, generation day is ${genDay}`,
-        today: today.toISOString()
-      });
+    const now = new Date();
+
+    // ── Estudiantes activos con cuota ────────────────────────────────────────
+    const { data: students, error: sErr } = await supabase
+      .from('students')
+      .select('id, name, monthly_fee')
+      .eq('is_active', true)
+      .gt('monthly_fee', 0);
+    if (sErr) return json({ error: sErr.message }, 500);
+    if (!students?.length) return json({ ok: true, generated: 0, message: 'No active students with fee' });
+
+    // ── Determinar qué meses necesitan cobros ────────────────────────────────
+    // Genera cobros para el mes actual + los últimos 3 meses (backfill)
+    const monthsToProcess: string[] = [];
+    for (let offset = -2; offset <= 0; offset++) {
+      const d = new Date(now.getFullYear(), now.getMonth() + offset, 1);
+      monthsToProcess.push(`${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`);
     }
 
-    // Run the payment cycle RPC
-    const { data, error } = await supabase.rpc('run_payment_cycle');
+    console.log('[auto-payment-cycle] Processing months:', monthsToProcess);
 
-    if (error) {
-      console.error('[auto-payment-cycle] RPC error:', error);
-      return json({ error: error.message }, 500);
+    let totalGenerated = 0;
+    const results: Record<string, number> = {};
+
+    for (const monthKey of monthsToProcess) {
+      const [yr, mo] = monthKey.split('-').map(Number);
+
+      // due_date = día 5 del mes siguiente
+      const dueMonth = mo > 11 ? 1 : mo + 1;
+      const dueYear  = mo > 11 ? yr + 1 : yr;
+      const dueDate  = `${dueYear}-${String(dueMonth).padStart(2,'0')}-${String(dueDay).padStart(2,'0')}`;
+
+      // Estudiantes que YA tienen cobro en este mes
+      const { data: existing } = await supabase
+        .from('payments')
+        .select('student_id')
+        .or(`month_paid.eq.${monthKey},month_paid.eq.${monthKey.replace('-0','-').replace(/^(\d{4})-(\d)$/,'$1-0$2')}`)
+        .not('status', 'eq', 'deleted');
+
+      const existingIds = new Set((existing || []).map((p: { student_id: string }) => String(p.student_id)));
+      const missing = students.filter(s => !existingIds.has(String(s.id)));
+
+      if (!missing.length) {
+        console.log(`[auto-payment-cycle] ${monthKey}: all students covered`);
+        results[monthKey] = 0;
+        continue;
+      }
+
+      const inserts = missing.map(s => ({
+        student_id: s.id,
+        amount:     s.monthly_fee,
+        status:     'pending',
+        due_date:   dueDate,
+        month_paid: monthKey,
+        concept:    'Mensualidad',
+        created_at: new Date().toISOString(),
+      }));
+
+      const { error: insErr } = await supabase.from('payments').insert(inserts);
+      if (insErr) {
+        console.error(`[auto-payment-cycle] Insert error for ${monthKey}:`, insErr.message);
+        results[monthKey] = -1;
+        continue;
+      }
+
+      console.log(`[auto-payment-cycle] ${monthKey}: generated ${missing.length} payments`);
+      results[monthKey] = missing.length;
+      totalGenerated += missing.length;
     }
 
-    const result = typeof data === 'string' ? JSON.parse(data) : (data || {});
+    // ── Marcar vencidos ──────────────────────────────────────────────────────
+    const todayStr = now.toISOString().split('T')[0];
+    await supabase.from('payments')
+      .update({ status: 'overdue' })
+      .eq('status', 'pending')
+      .lt('due_date', todayStr);
 
-    console.log(`[auto-payment-cycle] ✅ generated=${result.generated} expired=${result.expired}`);
+    console.log(`[auto-payment-cycle] ✅ Total generated: ${totalGenerated}`);
 
     return json({
-      ok: true,
-      generated: result.generated ?? 0,
-      expired:   result.expired   ?? 0,
-      month:     `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}`,
-      due_date:  (() => {
-        const nm = today.getMonth() + 2 > 12 ? 1 : today.getMonth() + 2;
-        const ny = today.getMonth() + 2 > 12 ? today.getFullYear() + 1 : today.getFullYear();
-        return `${ny}-${String(nm).padStart(2,'0')}-${String(dueDay).padStart(2,'0')}`;
-      })(),
-      ran_at: today.toISOString()
+      ok:        true,
+      generated: totalGenerated,
+      by_month:  results,
+      ran_at:    now.toISOString(),
     });
 
   } catch (e) {

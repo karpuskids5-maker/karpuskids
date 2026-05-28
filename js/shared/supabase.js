@@ -1,3 +1,5 @@
+import { logError } from './db-utils.js';
+
 // Supabase JS — cargado localmente (js/shared/supabase-js.min.js via script tag en HTML)
 // El UMD expone window.supabase.createClient
 import { createClient } from "./supabase-wrapper.js";
@@ -16,9 +18,9 @@ export const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
 });
 
 // ── Auto-refresh: detectar JWT expirado y refrescar sesión ───────────────────
-supabase.auth.onAuthStateChange((event, session) => {
+supabase.auth.onAuthStateChange(async (event, session) => {
   if (event === 'TOKEN_REFRESHED') {
-    // Token refrescado — no hacer nada, las próximas requests usarán el nuevo token
+    console.log('[Auth] Token refrescado automáticamente.');
   }
   if (event === 'SIGNED_OUT') {
     // No redirigir si el panel está en proceso de inicialización/refresh
@@ -27,6 +29,18 @@ supabase.auth.onAuthStateChange((event, session) => {
     if (!window.location.pathname.includes('login.html') &&
         !window.location.pathname.includes('index.html')) {
       window.location.href = 'login.html';
+    }
+  }
+  if (event === 'INITIAL_SESSION' || event === 'SIGNED_IN') {
+    // Guardar rastro de última actividad
+    if (session?.user) {
+      // Usar then() en lugar de catch() directo sobre el builder para evitar TypeError
+      supabase.from('profiles')
+        .update({ last_sign_in_at: new Date().toISOString() })
+        .eq('id', session.user.id)
+        .then(({ error }) => {
+          if (error) console.warn('[Auth] No se pudo actualizar last_sign_in_at:', error);
+        });
     }
   }
 });
@@ -47,6 +61,15 @@ window.fetch = async function(...args) {
     if (!options.headers['apikey']) {
       options.headers['apikey'] = SUPABASE_ANON_KEY;
     }
+    // Inyectar Authorization Bearer si no está presente y tenemos sesión (para mayor seguridad)
+    if (!options.headers['Authorization']) {
+      const { data } = await supabase.auth.getSession();
+      if (data?.session?.access_token) {
+        options.headers['Authorization'] = `Bearer ${data.session.access_token}`;
+      } else {
+        options.headers['Authorization'] = `Bearer ${SUPABASE_ANON_KEY}`;
+      }
+    }
     args[1] = options;
   }
 
@@ -57,14 +80,28 @@ window.fetch = async function(...args) {
     _refreshing = true;
     try {
       console.warn('[supabase-js] 401 detectado, intentando refrescar sesión...');
+      // Intentar refresh una única vez
       const { data: refreshed, error } = await supabase.auth.refreshSession();
       if (!error && refreshed?.session) {
         console.log('[supabase-js] Sesión refrescada con éxito. Reintentando petición...');
-        // El cliente de Supabase ya tiene el nuevo token internamente para el reintento
+        
+        // Clonar opciones y actualizar el header Authorization con el nuevo token
+        const retryOptions = args[1] || {};
+        retryOptions.headers = { 
+          ...retryOptions.headers, 
+          'Authorization': `Bearer ${refreshed.session.access_token}` 
+        };
+        args[1] = retryOptions;
+
         return _originalFetch.apply(this, args);
+      } else {
+        console.error('[supabase-js] Falló el refresco de sesión:', error);
+        // Si el refresh falla con 401, redirigir a login para evitar loop
+        window.location.href = 'login.html';
       }
     } catch (e) {
       console.error('[supabase-js] Error al intentar refrescar sesión:', e);
+      window.location.href = 'login.html';
     } finally {
       _refreshing = false;
     }
@@ -95,10 +132,8 @@ window.addEventListener('error', (e) => {
   // Don't log if it's a network/connection error (would cause infinite loop)
   const msg = e.message || '';
   if (msg.includes('fetch') || msg.includes('network') || msg.includes('Failed to load')) return;
-  import('./db-utils.js').then(({ logError }) => {
-    const panel = window.location.pathname.split('/').pop().replace('.html','') || 'unknown';
-    logError(panel, msg, e.error?.stack || '', e.filename || '').catch(() => {});
-  }).catch(() => {});
+  const panel = window.location.pathname.split('/').pop().replace('.html','') || 'unknown';
+  logError(panel, msg, e.error?.stack || '', e.filename || '').catch(() => {});
 });
 window.addEventListener('unhandledrejection', (e) => {
   const msg = e.reason?.message || String(e.reason);
@@ -112,10 +147,8 @@ window.addEventListener('unhandledrejection', (e) => {
   ];
   const skip = SKIP_PATTERNS.some(k => msg.toLowerCase().includes(k));
   if (skip) return;
-  import('./db-utils.js').then(({ logError }) => {
-    const panel = window.location.pathname.split('/').pop().replace('.html','') || 'unknown';
-    logError(panel, msg, e.reason?.stack || '', window.location.pathname).catch(() => {});
-  }).catch(() => {});
+  const panel = window.location.pathname.split('/').pop().replace('.html','') || 'unknown';
+  logError(panel, msg, e.reason?.stack || '', window.location.pathname).catch(() => {});
 });
 
 export const TERMS_VERSION = '1.0';
@@ -143,6 +176,30 @@ export async function guardSession() {
   }
 }
 
+// ⚡ Robustez Realtime: Manejo de WebSockets y reconexión
+export const RealtimeUtils = {
+  monitorChannel(channel, name = 'global') {
+    channel.subscribe((status) => {
+      if (status === 'SUBSCRIBED') {
+        console.log(`[Realtime] Canal "${name}" conectado.`);
+      }
+      if (status === 'CLOSED') {
+        console.warn(`[Realtime] Canal "${name}" cerrado.`);
+      }
+      if (status === 'CHANNEL_ERROR') {
+        console.error(`[Realtime] Error en canal "${name}". Reintentando...`);
+        setTimeout(() => channel.subscribe(), 5000); // Reintento exponencial simple
+      }
+      if (status === 'TIMED_OUT') {
+        console.warn(`[Realtime] Canal "${name}" tiempo agotado.`);
+      }
+    });
+  }
+};
+
+/**
+ * ensureRole: Verifica el rol del usuario actual y retorna {user, profile}
+ */
 // ── Autenticación ─────────────────────────────────────────────────────────────
 export async function ensureRole(requiredRoles) {
   const roles = Array.isArray(requiredRoles) ? requiredRoles : [requiredRoles];

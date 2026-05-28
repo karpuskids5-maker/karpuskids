@@ -87,7 +87,7 @@ export const TeachersModule = {
     };
     // email solo para crear, no para actualizar (Supabase no permite update de email via profiles)
     const emailVal = (document.getElementById('tEmail').value || '').trim();
-    if (!id) payload.email = emailVal; // solo en creaci�n
+    if (!id) payload.email = emailVal; // solo en creación
 
     const matricula = (document.getElementById('tMatricula').value || '').trim();
     if (matricula) payload.access_code = matricula;
@@ -142,9 +142,9 @@ export const TeachersModule = {
     const modalHTML = `
       <div class="modal-header bg-gradient-to-r from-purple-600 to-indigo-600 text-white p-6 rounded-t-3xl flex items-center justify-between">
         <div class="flex items-center gap-3">
-          <div class="w-12 h-12 bg-white/20 rounded-2xl flex items-center justify-center text-2xl shadow-inner">?????</div>
+          <div class="w-12 h-12 bg-white/20 rounded-2xl flex items-center justify-center shadow-inner"><i data-lucide="users" class="w-6 h-6 text-white"></i></div>
           <div>
-            <h3 class="text-xl font-black">${id ? 'Editar Maestra' : 'Gesti�n de Personal'}</h3>
+            <h3 class="text-xl font-black">${id ? 'Editar Maestra' : 'Gestión de Personal'}</h3>
             <p class="text-xs text-white/70 font-bold uppercase tracking-widest">Maestras y Asistentes</p>
           </div>
         </div>
@@ -168,9 +168,9 @@ export const TeachersModule = {
           <div class="col-span-2 bg-gradient-to-br from-orange-50 to-amber-50 p-6 rounded-[2rem] border-2 border-orange-100 space-y-4">
             <h4 class="text-sm font-black text-orange-800 flex items-center gap-2">
               <div class="w-8 h-8 rounded-xl bg-orange-100 text-orange-600 flex items-center justify-center"><i data-lucide="qr-code" class="w-4 h-4"></i></div>
-              ?? C�DIGO QR DE ACCESO (PERSONAL)
+              CÓDIGO QR DE ACCESO (PERSONAL)
             </h4>
-            <p class="text-xs text-orange-600 font-medium leading-relaxed">Este c�digo permite a la maestra/asistente registrar su propia asistencia en el terminal de ponche.</p>
+            <p class="text-xs text-orange-600 font-medium leading-relaxed">Este código permite a la maestra/asistente registrar su propia asistencia en el terminal de ponche.</p>
             
             <div class="bg-white p-6 rounded-3xl border border-orange-100 shadow-sm flex flex-col items-center gap-4">
               <div class="flex gap-2 w-full">
@@ -234,7 +234,7 @@ export const TeachersModule = {
 
     window.openGlobalModal(modalHTML);
 
-    // Funci�n para generar c�digo de acceso del personal
+    // Función para generar código de acceso del personal
     window.genStaffCode = async () => {
       const prefix = 'TEA';
       const code = prefix + '-' + new Date().getFullYear() + '-' + String(Math.floor(Math.random() * 9000) + 1000);
@@ -247,7 +247,7 @@ export const TeachersModule = {
         if (teacherId) {
           const { error } = await supabase.from('profiles').update({ access_code: code }).eq('id', teacherId);
           if (!error) {
-            Helpers.toast('C�digo de acceso guardado', 'success');
+            Helpers.toast('Código de acceso guardado', 'success');
             // Update cache
             const teachers = AppState.get('teachers') || [];
             const idx = teachers.findIndex(t => t.id === teacherId);
@@ -318,7 +318,7 @@ export const TeachersModule = {
       win.document.close();
     };
 
-    // Escuchar cambios en el input de matr�cula para actualizar QR
+    // Escuchar cambios en el input de matrícula para actualizar QR
     document.getElementById('tMatricula')?.addEventListener('input', (e) => {
       clearTimeout(window._staffQrDebounce);
       window._staffQrDebounce = setTimeout(() => window.renderStaffQR(e.target.value.trim()), 600);

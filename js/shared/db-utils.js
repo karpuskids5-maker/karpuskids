@@ -85,8 +85,11 @@ export async function auditLog(action, payload = {}) {
 export async function logError(panel, message, stack = '', url = '') {
   // Guard: don't log if message looks like a DB/network error (infinite loop prevention)
   const msgLower = String(message).toLowerCase();
-  if (msgLower.includes('supabase') || msgLower.includes('fetch') || msgLower.includes('network')) return;
+  if (msgLower.includes('supabase') || msgLower.includes('fetch') || msgLower.includes('network') || msgLower.includes('failed to load')) return;
   try {
+    // Evitar ruidos de extensiones o errores externos
+    if (url && (url.includes('chrome-extension') || url.includes('moz-extension'))) return;
+
     const { data: { user } } = await supabase.auth.getUser();
     await supabase.from('system_errors').insert({
       panel,
@@ -98,6 +101,16 @@ export async function logError(panel, message, stack = '', url = '') {
       created_at: new Date().toISOString()
     });
   } catch (_) { /* silencioso — no re-lanzar */ }
+}
+
+/**
+ * 🛠️ safeHandle — Reemplazo para bloques catch vacíos
+ */
+export function safeHandle(err, context = 'General') {
+  console.error(`[${context}] Error capturado:`, err);
+  const msg = err?.message || String(err);
+  const panel = window.location.pathname.split('/').pop().replace('.html','') || 'shared';
+  logError(panel, msg, err?.stack || '', window.location.href);
 }
 
 /**

@@ -117,6 +117,7 @@ alter table public.students add column if not exists p2_address text;
 alter table public.students add column if not exists blood_type text;
 alter table public.students add column if not exists authorized_pickup text;
 alter table public.students add column if not exists monthly_fee numeric default 0;
+alter table public.students add column if not exists prolongado_fee numeric default 0;
 alter table public.students add column if not exists due_day integer default 5;
 alter table public.students add column if not exists matricula text;
 alter table public.students add column if not exists start_date date;
@@ -1243,15 +1244,33 @@ begin
     if v_next_month > 12 then v_next_month := 1; v_next_year := v_next_year + 1; end if;
     v_due_date := make_date(v_next_year, v_next_month, v_due_day);
 
+    -- 1. Generar Mensualidad
     insert into public.payments (student_id, amount, status, due_date, month_paid, concept)
     select s.id, s.monthly_fee, 'pending', v_due_date, v_month_key, 'Mensualidad'
     from public.students s
     where s.is_active = true and s.monthly_fee > 0
       and not exists (
         select 1 from public.payments p
-        where p.student_id = s.id and p.month_paid = v_month_key
+        where p.student_id = s.id and p.month_paid = v_month_key and p.concept = 'Mensualidad'
       );
     get diagnostics v_gen_count = row_count;
+
+    -- 2. Generar Día Prolongado (si aplica)
+    insert into public.payments (student_id, amount, status, due_date, month_paid, concept)
+    select s.id, s.prolongado_fee, 'pending', v_due_date, v_month_key, 'Día Prolongado'
+    from public.students s
+    where s.is_active = true and s.prolongado_fee > 0
+      and not exists (
+        select 1 from public.payments p
+        where p.student_id = s.id and p.month_paid = v_month_key and p.concept = 'Día Prolongado'
+      );
+    
+    declare
+      v_prolong_count int;
+    begin
+      get diagnostics v_prolong_count = row_count;
+      v_gen_count := v_gen_count + v_prolong_count;
+    end;
   end if;
 
   update public.payments

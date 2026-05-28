@@ -367,54 +367,52 @@ export const AccessModule = {
     const tbody = document.getElementById('accessTableBody');
     if (!tbody) return;
 
-    // SKELETON LOADING (NUEVO)
     tbody.innerHTML = Helpers.skeleton(5, 'h-16');
 
     try {
-      const from = document.getElementById('accessFilterFrom')?.value;
-      const to = document.getElementById('accessFilterTo')?.value;
-      const status = document.getElementById('accessFilterStatus')?.value;
+      const fromInput = document.getElementById('accessFilterFrom')?.value;
+      const toInput   = document.getElementById('accessFilterTo')?.value;
+      const status    = document.getElementById('accessFilterStatus')?.value;
 
-      // 1. Obtener Asistencia de Estudiantes
+      // Fallback: si no hay filtro de fecha, mostrar últimos 30 días
+      const today = new Date();
+      const defaultFrom = new Date(today); defaultFrom.setDate(today.getDate() - 29);
+      const from = fromInput || defaultFrom.toISOString().split('T')[0];
+      const to   = toInput   || today.toISOString().split('T')[0];
+
+      // 1. Asistencia de Estudiantes
       let qAtt = supabase
         .from('attendance')
         .select('id, date, check_in, check_out, status, student_id, student:student_id(name, matricula, avatar_url)')
+        .gte('date', from).lte('date', to)
         .order('date', { ascending: false })
         .order('check_in', { ascending: false });
 
-      if (from) qAtt = qAtt.gte('date', from);
-      if (to) qAtt = qAtt.lte('date', to);
-      if (status && status !== 'all') qAtt = qAtt.eq('status', status);
+      if (status && status !== 'all' && status !== 'staff') qAtt = qAtt.eq('status', status);
 
-      const { data: attData, error: attErr } = await qAtt.limit(100);
+      const { data: attData, error: attErr } = await qAtt.limit(200);
       if (attErr) throw attErr;
 
-      // 2. Obtener Ponches del Personal
+      // 2. Ponches del Personal
       let qPunches = supabase
         .from('door_punches')
         .select('id, date, punched_at, punch_type, staff_id, staff:staff_id(name, role, matricula, access_code, avatar_url)')
         .not('staff_id', 'is', null)
+        .gte('date', from).lte('date', to)
         .order('date', { ascending: false })
         .order('punched_at', { ascending: false });
 
-      if (from) qPunches = qPunches.gte('date', from);
-      if (to) qPunches = qPunches.lte('date', to);
-      
-      const { data: punchData, error: punchErr } = await qPunches.limit(100);
+      const { data: punchData, error: punchErr } = await qPunches.limit(200);
       if (punchErr) throw punchErr;
 
-      // 3. Procesar Staff Punches (agrupar in/out por día)
-      const staffLogs = [];
-      const staffGroups = {}; // key: staffId-date
-
+      // 3. Agrupar ponches del personal por persona+día (evita duplicados)
+      const staffGroups = {};
       (punchData || []).forEach(p => {
         const key = `${p.staff_id}-${p.date}`;
         if (!staffGroups[key]) {
           staffGroups[key] = {
-            id: p.id,
-            date: p.date,
-            check_in: null,
-            check_out: null,
+            id: p.id, date: p.date,
+            check_in: null, check_out: null,
             status: 'staff',
             name: p.staff?.name || 'Personal',
             role: p.staff?.role || 'staff',
@@ -423,18 +421,15 @@ export const AccessModule = {
             type: 'staff'
           };
         }
-        if (p.punch_type === 'check_in') staffGroups[key].check_in = p.punched_at;
+        if (p.punch_type === 'check_in')  staffGroups[key].check_in  = p.punched_at;
         if (p.punch_type === 'check_out') staffGroups[key].check_out = p.punched_at;
       });
+      const staffLogs = Object.values(staffGroups);
 
-      for (const k in staffGroups) staffLogs.push(staffGroups[k]);
-
-      // 4. Mapear Estudiantes a formato común
+      // 4. Mapear estudiantes
       const studentLogs = (attData || []).map(log => ({
-        id: log.id,
-        date: log.date,
-        check_in: log.check_in,
-        check_out: log.check_out,
+        id: log.id, date: log.date,
+        check_in: log.check_in, check_out: log.check_out,
         status: log.status,
         name: log.student?.name || 'Estudiante',
         role: 'Estudiante',
@@ -443,17 +438,27 @@ export const AccessModule = {
         type: 'student'
       }));
 
-      // 5. Unificar y Filtrar por Query
-      let combined = [...studentLogs, ...staffLogs]
-        .sort((a, b) => new Date(b.date + 'T' + (b.check_in ? new Date(b.check_in).toTimeString() : '00:00:00')) - 
-                        new Date(a.date + 'T' + (a.check_in ? new Date(a.check_in).toTimeString() : '00:00:00')));
+      // 5. Filtrar por tipo si se seleccionó "staff"
+      let combined = status === 'staff'
+        ? staffLogs
+        : [...studentLogs, ...staffLogs];
 
+      // 6. Ordenar por fecha desc
+      combined.sort((a, b) => {
+        const da = new Date(a.date + 'T' + (a.check_in ? new Date(a.check_in).toTimeString().slice(0,8) : '00:00:00'));
+        const db = new Date(b.date + 'T' + (b.check_in ? new Date(b.check_in).toTimeString().slice(0,8) : '00:00:00'));
+        return db - da;
+      });
+
+      // 7. Filtro por nombre/ID
       if (query) {
         const term = query.toLowerCase();
-        combined = combined.filter(c => c.name.toLowerCase().includes(term) || c.id_code.toLowerCase().includes(term));
+        combined = combined.filter(c =>
+          c.name.toLowerCase().includes(term) || c.id_code.toLowerCase().includes(term)
+        );
       }
 
-      combined = combined.slice(0, 150);
+      combined = combined.slice(0, 200);
 
       if (!combined.length) {
         tbody.innerHTML = `<tr><td colspan="7" class="py-12 text-center text-slate-300 font-bold uppercase tracking-widest text-xs">Sin registros encontrados</td></tr>`;
@@ -602,28 +607,43 @@ export const AccessModule = {
     if (!ctx) return;
 
     try {
-      const from = document.getElementById('accessFilterFrom')?.value;
-      const to = document.getElementById('accessFilterTo')?.value;
-      
+      const fromInput = document.getElementById('accessFilterFrom')?.value;
+      const toInput   = document.getElementById('accessFilterTo')?.value;
+
+      // Fallback: si no hay filtro de fecha, mostrar últimos 7 días
+      const today = new Date();
+      const defaultFrom = new Date(today); defaultFrom.setDate(today.getDate() - 6);
+      const from = fromInput || defaultFrom.toISOString().split('T')[0];
+      const to   = toInput   || today.toISOString().split('T')[0];
+
       // 1. Datos Estudiantes
-      let qAtt = supabase.from('attendance').select('date, status').order('date');
-      if (from) qAtt = qAtt.gte('date', from);
-      if (to) qAtt = qAtt.lte('date', to);
-      const { data: attData } = await qAtt;
+      const { data: attData } = await supabase
+        .from('attendance').select('date, status')
+        .gte('date', from).lte('date', to).order('date');
 
-      // 2. Datos Personal (Solo check_ins)
-      let qStaff = supabase.from('door_punches').select('date').eq('punch_type', 'check_in').not('staff_id', 'is', null).order('date');
-      if (from) qStaff = qStaff.gte('date', from);
-      if (to) qStaff = qStaff.lte('date', to);
-      const { data: staffData } = await qStaff;
+      // 2. Datos Personal (solo check_ins)
+      const { data: staffData } = await supabase
+        .from('door_punches').select('date')
+        .eq('punch_type', 'check_in').not('staff_id', 'is', null)
+        .gte('date', from).lte('date', to).order('date');
 
-      const days = [...new Set([...(attData || []).map(d => d.date), ...(staffData || []).map(d => d.date)])].sort();
+      // Generar rango de días completo (sin huecos)
+      const days = [];
+      const cur = new Date(from + 'T12:00:00');
+      const end = new Date(to   + 'T12:00:00');
+      while (cur <= end) {
+        days.push(cur.toISOString().split('T')[0]);
+        cur.setDate(cur.getDate() + 1);
+      }
+
       const entries = days.map(day => {
-        const attCount = (attData || []).filter(d => d.date === day && d.status === 'present').length;
+        const attCount   = (attData  || []).filter(d => d.date === day && d.status === 'present').length;
         const staffCount = (staffData || []).filter(d => d.date === day).length;
         return attCount + staffCount;
       });
-      const lates = days.map(day => (attData || []).filter(d => d.date === day && d.status === 'late').length);
+      const lates = days.map(day =>
+        (attData || []).filter(d => d.date === day && d.status === 'late').length
+      );
 
       if (_accessChart) _accessChart.destroy();
 
@@ -632,8 +652,8 @@ export const AccessModule = {
         data: {
           labels: days.map(d => new Date(d + 'T12:00:00').toLocaleDateString('es-DO', { weekday: 'short', day: 'numeric' })),
           datasets: [
-            { label: 'Entradas Totales', data: entries, borderColor: '#10b981', backgroundColor: '#10b98120', fill: true, tension: 0.4 },
-            { label: 'Tardanzas (Alumnos)', data: lates, borderColor: '#f59e0b', backgroundColor: '#f59e0b20', fill: true, tension: 0.4 }
+            { label: 'Entradas', data: entries, borderColor: '#10b981', backgroundColor: '#10b98120', fill: true, tension: 0.4, pointRadius: 4 },
+            { label: 'Tardanzas', data: lates,   borderColor: '#f59e0b', backgroundColor: '#f59e0b20', fill: true, tension: 0.4, pointRadius: 4 }
           ]
         },
         options: {

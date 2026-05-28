@@ -1,4 +1,4 @@
-﻿import { supabase } from './supabase.js';
+import { supabase, RealtimeUtils } from './supabase.js';
 import { Helpers } from './helpers.js';
 import { ImageLoader } from './image-loader.js';
 import { QueryCache } from './query-cache.js';
@@ -620,6 +620,62 @@ export const WallModule = {
   },
 
   subscribeRealtime() {
-    // Implementar suscripci\u00f3n simple si se desea actualizaciones en vivo
+    if (this._realtimeChannel) {
+      supabase.removeChannel(this._realtimeChannel);
+    }
+
+    const classroomId = this._options.classroomId;
+    
+    this._realtimeChannel = supabase
+      .channel('wall_global')
+      .on('postgres_changes', { 
+        event: '*', 
+        schema: 'public', 
+        table: 'posts' 
+      }, async (payload) => {
+        const { eventType, new: newPost, old: oldPost } = payload;
+
+        // 1. Filtrar por aula si aplica
+        if (classroomId && newPost.classroom_id && newPost.classroom_id !== classroomId) {
+          return;
+        }
+
+        if (eventType === 'INSERT') {
+          // No recargar todo el muro, solo notificar o insertar arriba si es el primer post
+          Helpers.toast('📢 Nueva publicación en el muro', 'info');
+          const container = document.getElementById(this._containerId);
+          if (container && this._page <= 1) {
+            // Recargar solo la primera página para traer el nuevo post con sus relaciones
+            // (Es más seguro que construir el HTML manualmente sin las relaciones de teacher/likes)
+            this.loadPosts(container);
+          }
+        }
+
+        if (eventType === 'UPDATE') {
+          // 🔄 Sincronización Realtime de Contadores
+          const postId = newPost.id;
+          const likeSpan = document.getElementById(`like-count-${postId}`);
+          const commBtn = document.querySelector(`#post-${postId} button[onclick*="toggleCommentSection"] span`);
+
+          if (likeSpan && typeof newPost.likes_count === 'number') {
+            // Solo actualizar si el valor cambió y no estamos en medio de una acción local
+            likeSpan.textContent = newPost.likes_count;
+          }
+
+          if (commBtn && typeof newPost.comments_count === 'number') {
+            commBtn.textContent = `${newPost.comments_count} Comentarios`;
+          }
+        }
+
+        if (eventType === 'DELETE') {
+          const el = document.getElementById(`post-${oldPost.id}`);
+          if (el) {
+            el.classList.add('opacity-0', 'scale-95');
+            setTimeout(() => el.remove(), 300);
+          }
+        }
+      });
+
+    RealtimeUtils.monitorChannel(this._realtimeChannel, 'WallModule');
   }
 };

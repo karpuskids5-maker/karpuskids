@@ -160,8 +160,8 @@ export const OnboardingGuide = {
         supabase.from('profiles').select('notes').eq('id', this._userId).maybeSingle().then(({ data }) => {
           const notes = data?.notes ? JSON.parse(data.notes) : {};
           notes[key] = 'done';
-          supabase.from('profiles').update({ notes: JSON.stringify(notes) }).eq('id', this._userId).then(() => {}).catch(() => {});
-        }).catch(() => {});
+          supabase.from('profiles').update({ notes: JSON.stringify(notes) }).eq('id', this._userId).then(() => {});
+        });
       }).catch(() => {});
     }
   },

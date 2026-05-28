@@ -63,13 +63,13 @@ export const TeachersModule = {
     const html = `
       <div class="bg-gradient-to-r from-teal-600 to-emerald-600 text-white p-4 rounded-t-3xl flex items-center justify-between shrink-0">
         <div class="flex items-center gap-2">
-          <div class="w-9 h-9 bg-white/20 rounded-xl flex items-center justify-center text-lg">?????</div>
+          <div class="w-9 h-9 bg-white/20 rounded-xl flex items-center justify-center"><i data-lucide="users" class="w-5 h-5 text-white"></i></div>
           <div>
             <h3 class="text-base font-black">${id ? 'Editar Personal' : 'Nuevo Personal'}</h3>
             <p class="text-[9px] text-white/70 font-bold uppercase tracking-widest">Maestras y Asistentes</p>
           </div>
         </div>
-        <button onclick="window._closeAsistenteModal()" class="w-8 h-8 flex items-center justify-center rounded-lg bg-white/10 hover:bg-white/20 transition-all">?</button>
+        <button onclick="window._closeAsistenteModal()" class="w-8 h-8 flex items-center justify-center rounded-lg bg-white/10 hover:bg-white/20 transition-all"><i data-lucide="x" class="w-4 h-4 text-white"></i></button>
       </div>
 
       <div class="p-4 space-y-4 overflow-y-auto flex-1 custom-scrollbar" style="max-height: calc(90vh - 120px);">
@@ -81,11 +81,11 @@ export const TeachersModule = {
             <input id="teacherName" placeholder="Ej: Maria Lopez" class="${IC} py-2">
           </div>
           <div class="sm:col-span-2">
-            <label class="${LC}">Correo electr�nico *</label>
+            <label class="${LC}">Correo electrónico *</label>
             <input id="teacherEmail" type="email" placeholder="usuario@karpus.com" class="${IC} py-2">
           </div>
           <div>
-            <label class="${LC}">Tel�fono</label>
+            <label class="${LC}">Teléfono</label>
             <input id="teacherPhone" type="tel" placeholder="Opcional" class="${IC} py-2">
           </div>
           <div>
@@ -100,13 +100,13 @@ export const TeachersModule = {
             <select id="teacherClassroom" class="${IC} py-2"><option value="">-- Sin Aula --</option></select>
           </div>
           <div class="sm:col-span-2">
-            <label class="${LC}">Contrase�a ${id ? '(Solo si desea cambiarla)' : '(M�nimo 6 caracteres) *'}</label>
+            <label class="${LC}">Contraseña ${id ? '(Solo si desea cambiarla)' : '(Mínimo 6 caracteres) *'}</label>
             <input id="teacherPassword" type="text" placeholder="********" class="${IC} py-2">
           </div>
 
           <!-- QR DE ACCESO -->
           <div class="sm:col-span-2 bg-gradient-to-br from-orange-50 to-amber-50 rounded-2xl border border-orange-100 p-3 space-y-3">
-            <p class="text-[10px] font-black text-orange-700 uppercase tracking-widest flex items-center gap-1.5">?? C�digo QR de Acceso</p>
+            <p class="text-[10px] font-black text-orange-700 uppercase tracking-widest flex items-center gap-1.5"><i data-lucide="qr-code" class="w-3.5 h-3.5"></i> Código QR de Acceso</p>
             <div class="flex gap-1.5">
               <input id="teacherMatricula" placeholder="ID Empleado (ej: TEA-2026-1234)" class="${IC} py-2 text-xs">
               <button type="button" onclick="window._genTeacherCode()" class="px-3 py-2 bg-orange-600 text-white rounded-xl font-black text-[9px] uppercase hover:bg-orange-700 transition-all shrink-0">Gen</button>
@@ -114,7 +114,7 @@ export const TeachersModule = {
             <div id="asis-teacher-qr" class="bg-white p-2 rounded-xl border border-orange-100 min-h-[120px] flex items-center justify-center">
               <p class="text-[9px] text-slate-400 font-bold text-center">Genera un ID para ver el QR</p>
             </div>
-            <button type="button" onclick="window._printTeacherQR()" class="w-full py-2 bg-slate-800 text-white rounded-xl font-black text-[9px] uppercase tracking-widest hover:bg-slate-900 transition-all">??? Imprimir Carnet</button>
+            <button type="button" onclick="window._printTeacherQR()" class="w-full py-2 bg-slate-800 text-white rounded-xl font-black text-[9px] uppercase tracking-widest hover:bg-slate-900 transition-all flex items-center justify-center gap-1.5"><i data-lucide="printer" class="w-3.5 h-3.5"></i> Imprimir Carnet</button>
           </div>
           <div class="sm:col-span-2">
             <label class="flex items-center gap-3 p-3 bg-white border-2 border-slate-100 rounded-2xl cursor-pointer">

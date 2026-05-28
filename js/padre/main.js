@@ -209,6 +209,15 @@ async function refreshDashboard() {
   let   logs     = logsRes.status     === 'fulfilled' ? logsRes.value     : null;
   const todayAtt = todayAttRes.status === 'fulfilled' ? todayAttRes.value?.data : null;
 
+  // Registrar errores si fallaron promesas críticas
+  [financeRes, academicRes, logsRes, todayAttRes].forEach((res, i) => {
+    if (res.status === 'rejected') {
+      import('../shared/db-utils.js').then(({ safeHandle }) => {
+        safeHandle(res.reason, `refreshDashboard.Promise[${i}]`);
+      });
+    }
+  });
+
   if (finance?.config) AppState.set('financeConfig', finance.config);
   if (finance?.history) AppState.set('financeHistory', finance.history);
   AppState.set('todayAttendance', todayAtt?.status || null);

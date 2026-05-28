@@ -1,4 +1,4 @@
-﻿﻿import { DirectorApi } from './api.js';
+﻿import { DirectorApi } from './api.js';
 import { Helpers } from '../shared/helpers.js';
 import { UIHelpers } from './ui.module.js';
 import { supabase } from '../shared/supabase.js';
@@ -38,7 +38,19 @@ export const PaymentsModule = {
     const ms = document.getElementById('filterPaymentMonth');
     const ys = document.getElementById('filterPaymentYear');
     if (ms) ms.value = String(now.getMonth() + 1).padStart(2, '0');
-    if (ys) ys.value = String(now.getFullYear());
+    
+    if (ys) {
+      // Dinamizar años: desde el actual hasta 2 años atrás y 1 adelante
+      const currentYear = now.getFullYear();
+      ys.innerHTML = '';
+      for (let y = currentYear + 1; y >= currentYear - 2; y--) {
+        const opt = document.createElement('option');
+        opt.value = String(y);
+        opt.textContent = String(y);
+        ys.appendChild(opt);
+      }
+      ys.value = String(currentYear);
+    }
   },
 
   async _loadSettings() {
@@ -67,7 +79,7 @@ export const PaymentsModule = {
     this.loadIncomeChart();
     try {
       const mv = document.getElementById('filterPaymentMonth')?.value;
-      const yv = document.getElementById('filterPaymentYear')?.value;
+      const yv = document.getElementById('filterPaymentYear')?.value || new Date().getFullYear();
       const sf = document.getElementById('filterPaymentStatus')?.value;
       const sq = document.getElementById('searchPaymentStudent')?.value?.trim();
       const mi = mv ? parseInt(mv, 10) - 1 : new Date().getMonth();
@@ -113,7 +125,7 @@ export const PaymentsModule = {
 
       if (!list.length) {
         const label = MES_LABEL[mi];
-        tbody.innerHTML = '<tr><td colspan="8" class="text-center py-16"><div class="flex flex-col items-center gap-3"><div class="w-14 h-14 bg-slate-100 rounded-full flex items-center justify-center"><i data-lucide="inbox" class="w-7 h-7 text-slate-400"></i></div><p class="font-bold text-slate-500">Sin registros para ' + label + ' ' + (yv || '') + '</p></div></td></tr>';
+        tbody.innerHTML = `<tr><td colspan="8" class="text-center py-16"><div class="flex flex-col items-center gap-3"><div class="w-14 h-14 bg-slate-100 rounded-full flex items-center justify-center"><i data-lucide="inbox" class="w-7 h-7 text-slate-400"></i></div><p class="font-bold text-slate-500">Sin registros para ${label} ${yv}</p></div></td></tr>`;
         if (window.lucide) lucide.createIcons();
         return;
       }
@@ -385,13 +397,17 @@ export const PaymentsModule = {
     if (!confirm('¿Enviar recordatorios de pago por correo y push ahora?')) return;
     try {
       Helpers.toast('Enviando recordatorios...', 'info');
-      const { data, error } = await supabase.functions.invoke('payment-reminders', { body: {} });
+      const { data, error } = await supabase.functions.invoke('payment-reminders', { body: { action: 'send_all' } });
       if (error) throw new Error(error.message || JSON.stringify(error));
       const r = data || {};
-      Helpers.toast(
-        `Recordatorios enviados: ${r.emails_sent || 0} correos, ${r.pushes_sent || 0} push`,
-        'success'
-      );
+      const processed = r.processed || 0;
+      if (processed === 0) {
+        Helpers.toast('No hay pagos pendientes este mes', 'info');
+      } else if ((r.emails_sent || 0) === 0 && (r.pushes_sent || 0) === 0) {
+        Helpers.toast(`⚠️ ${processed} pago(s) encontrados pero sin correo/push configurado`, 'warning');
+      } else {
+        Helpers.toast(`✅ ${processed} recordatorio(s) — ${r.emails_sent || 0} correos, ${r.pushes_sent || 0} push`, 'success');
+      }
     } catch (e) {
       Helpers.toast('Error enviando recordatorios: ' + e.message, 'error');
     }

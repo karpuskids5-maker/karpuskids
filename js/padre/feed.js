@@ -1,4 +1,4 @@
-﻿import { supabase } from '../shared/supabase.js';
+import { supabase, RealtimeUtils } from '../shared/supabase.js';
 import { AppState, TABLES } from './appState.js';
 import { Helpers, escapeHtml } from './helpers.js';
 import { ImageLoader } from '../shared/image-loader.js';
@@ -297,20 +297,47 @@ export const FeedModule = {
     if (this._channel) supabase.removeChannel(this._channel);
 
     this._channel = supabase
-      .channel(`feed_${this._classroomId}`)
+      .channel(`feed_padre_${this._classroomId}`)
       .on('postgres_changes', {
-        event: 'INSERT',
+        event: '*',
         schema: 'public',
         table: 'posts'
       }, (payload) => {
-        const newPost = payload.new;
-        if (!newPost.classroom_id || newPost.classroom_id === this._classroomId) {
-          Helpers.toast('📢 Nueva publicación en el muro', 'info');
-          this.loadPosts(); // Solo recargar en posts nuevos
+        const { eventType, new: newPost, old: oldPost } = payload;
+
+        // Filtrar por aula si aplica
+        if (this._classroomId && newPost.classroom_id && newPost.classroom_id !== this._classroomId) {
+          return;
         }
-      })
-      // NO escuchar UPDATE de posts — evita recarga por likes/comentarios
-      .subscribe();
+
+        if (eventType === 'INSERT') {
+          Helpers.toast('📢 Nueva publicación en el muro', 'info');
+          this.loadPosts(); 
+        }
+
+        if (eventType === 'UPDATE') {
+          // Sincronizar contadores de likes/comentarios sin recargar todo
+          const btnLike = document.querySelector(`[data-action="like"][data-post-id="${newPost.id}"]`);
+          const btnComm = document.querySelector(`[data-action="comment"][data-post-id="${newPost.id}"]`);
+
+          if (btnLike && typeof newPost.likes_count === 'number') {
+            const span = btnLike.querySelector('span') || btnLike;
+            span.textContent = `${newPost.likes_count} Me gusta`;
+          }
+
+          if (btnComm && typeof newPost.comments_count === 'number') {
+            const span = btnComm.querySelector('span') || btnComm;
+            span.textContent = `${newPost.comments_count} Comentarios`;
+          }
+        }
+
+        if (eventType === 'DELETE') {
+          const postEl = document.querySelector(`[data-post-id="${oldPost.id}"]`)?.closest('.animate-fade-in');
+          if (postEl) postEl.remove();
+        }
+      });
+
+    RealtimeUtils.monitorChannel(this._channel, `FeedPadre_${this._classroomId}`);
   },
 
   /**

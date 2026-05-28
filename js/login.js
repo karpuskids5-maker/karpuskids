@@ -204,12 +204,16 @@ document.addEventListener('DOMContentLoaded', async () => {
       // 4. Registrar login exitoso, actualizar último acceso y redirigir
       RATE_LIMIT.recordSuccess();
       
-      // Actualizar último acceso en el perfil
-      supabase.from('profiles').update({ 
-        last_sign_in_at: new Date().toISOString() 
-      }).eq('id', userId).then(() => {}).catch(() => {});
+      // Actualizar último acceso en el perfil (Uso de then() para evitar TypeError)
+      supabase.from('profiles')
+        .update({ last_sign_in_at: new Date().toISOString() })
+        .eq('id', userId)
+        .then(() => {});
 
-      supabase.from('login_attempts').insert({ email, success: true }).then(() => {}).catch(() => {});
+      supabase.from('login_attempts')
+        .insert({ email, success: true })
+        .then(() => {});
+
       localStorage.setItem('karpus_user', JSON.stringify({ id: userId }));
       await redirectByRole(userId);
 
@@ -225,7 +229,10 @@ document.addEventListener('DOMContentLoaded', async () => {
 
       // Registrar intento fallido en Supabase para rate limiting server-side
       if (!isNetwork && msg.includes('Invalid login')) {
-        supabase.from('login_attempts').insert({ email, success: false }).then(() => {}).catch(() => {});
+        supabase.from('login_attempts')
+          .insert({ email, success: false })
+          .then(() => {});
+          
         const locked = RATE_LIMIT.recordFailure();
         if (locked) {
           errorMessage = `Cuenta bloqueada por 1 minuto. Demasiados intentos fallidos.`;

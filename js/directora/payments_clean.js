@@ -68,15 +68,9 @@ export const PaymentsModule = {
     const tbody = document.getElementById('paymentsTableBody');
     if (!tbody) return;
     tbody.innerHTML = `
-      <tr><td colspan="8" class="px-5 py-3">
-        <div class="h-12 bg-slate-100 rounded-xl animate-pulse w-full"></div>
-      </td></tr>
-      <tr><td colspan="8" class="px-5 py-3">
-        <div class="h-12 bg-slate-100 rounded-xl animate-pulse w-full" style="opacity:.7"></div>
-      </td></tr>
-      <tr><td colspan="8" class="px-5 py-3">
-        <div class="h-12 bg-slate-100 rounded-xl animate-pulse w-full" style="opacity:.5"></div>
-      </td></tr>
+      <tr><td colspan="8" class="px-5 py-3"><div class="h-12 bg-slate-100 rounded-xl animate-pulse w-full"></div></td></tr>
+      <tr><td colspan="8" class="px-5 py-3"><div class="h-12 bg-slate-100 rounded-xl animate-pulse w-full" style="opacity:.7"></div></td></tr>
+      <tr><td colspan="8" class="px-5 py-3"><div class="h-12 bg-slate-100 rounded-xl animate-pulse w-full" style="opacity:.5"></div></td></tr>
     `;
     this.loadStats();
     this.loadIncomeChart();
@@ -85,89 +79,147 @@ export const PaymentsModule = {
       const yv = document.getElementById('filterPaymentYear')?.value;
       const sf = document.getElementById('filterPaymentStatus')?.value;
       const sq = document.getElementById('searchPaymentStudent')?.value?.trim();
-      
-      // Formato YYYY-MM para coincidir con la base de datos
-      const monthKey = `${yv}-${String(mv).padStart(2,'0')}`;
-      // Also get Spanish month name equivalent (legacy records)
-      const SPANISH_MONTHS = ['enero','febrero','marzo','abril','mayo','junio','julio','agosto','septiembre','octubre','noviembre','diciembre'];
-      const spanishMonth = SPANISH_MONTHS[parseInt(mv, 10) - 1];
-      const spanishMonthCap = spanishMonth ? spanishMonth.charAt(0).toUpperCase() + spanishMonth.slice(1) : null;
 
-      // Fetch both YYYY-MM and Spanish name records in one query using OR
-      let q = supabase
-        .from('payments')
-        .select('id,student_id,amount,concept,status,due_date,created_at,paid_date,method,bank,reference,month_paid,evidence_url,students:student_id(name,classroom_id,classrooms:classroom_id(name))')
+      const monthKey = `${yv}-${String(mv).padStart(2,'0')}`;
+      const SPANISH_MONTHS = ['enero','febrero','marzo','abril','mayo','junio','julio','agosto','septiembre','octubre','noviembre','diciembre'];
+      const spanishMonth    = SPANISH_MONTHS[parseInt(mv, 10) - 1];
+      const spanishMonthCap = spanishMonth ? spanishMonth.charAt(0).toUpperCase() + spanishMonth.slice(1) : null;
+      const SEL = 'id,student_id,amount,concept,status,due_date,created_at,paid_date,method,bank,reference,month_paid,evidence_url,students:student_id(name,classroom_id,classrooms:classroom_id(name))';
+
+      // ── 1. Registros del mes seleccionado ──────────────────────────────
+      let q = supabase.from('payments').select(SEL)
         .or(spanishMonthCap
           ? `month_paid.eq.${monthKey},month_paid.eq.${spanishMonthCap},month_paid.ilike.${spanishMonth}`
           : `month_paid.eq.${monthKey}`)
         .order('due_date', { ascending: true });
       if (sf && sf !== 'all') q = q.eq('status', sf);
-
       let { data, error } = await q;
       if (error) throw error;
 
-      // Fallback: if still no results, try created_at range
+      // Fallback por created_at si no hay resultados
       if (!data?.length) {
-        const rangeStart = `${yv}-${String(mv).padStart(2,'0')}-01`;
-        const rangeEnd   = `${yv}-${String(mv).padStart(2,'0')}-31`;
-        let q2 = supabase
-          .from('payments')
-          .select('id,student_id,amount,concept,status,due_date,created_at,paid_date,method,bank,reference,month_paid,evidence_url,students:student_id(name,classroom_id,classrooms:classroom_id(name))')
-          .gte('created_at', rangeStart)
-          .lte('created_at', rangeEnd + 'T23:59:59')
+        const rs = `${yv}-${String(mv).padStart(2,'0')}-01`;
+        const re = `${yv}-${String(mv).padStart(2,'0')}-31`;
+        let q2 = supabase.from('payments').select(SEL)
+          .gte('created_at', rs).lte('created_at', re + 'T23:59:59')
           .order('due_date', { ascending: true });
         if (sf && sf !== 'all') q2 = q2.eq('status', sf);
-        const res2 = await q2;
-        if (!res2.error && res2.data?.length) data = res2.data;
+        const r2 = await q2;
+        if (!r2.error && r2.data?.length) data = r2.data;
       }
 
-      let list = data || [];
-      // Deduplicar: normalizar month_paid (handles '2026-04' AND 'Abril' formats)
-      const MONTH_MAP_ES = {
-        'enero':'01','febrero':'02','marzo':'03','abril':'04','mayo':'05','junio':'06',
-        'julio':'07','agosto':'08','septiembre':'09','octubre':'10','noviembre':'11','diciembre':'12'
-      };
-      const normMonth = (mp, year) => {
+      // ── 2. Deudas pendientes/vencidas de TODOS los meses anteriores ────
+      // Se muestran siempre (sin importar el filtro de mes) para visibilidad total
+      let prevDebt = [];
+      const showPrev = !sf || sf === 'all' || sf === 'pending' || sf === 'overdue';
+      if (showPrev) {
+        const { data: prev } = await supabase.from('payments').select(SEL)
+          .in('status', ['pending', 'overdue'])
+          .lt('month_paid', monthKey)
+          .order('month_paid', { ascending: true });
+        if (prev?.length) prevDebt = prev;
+      }
+
+      // ── 3. Normalización y dedup del mes actual ────────────────────────
+      const MMAP = { 'enero':'01','febrero':'02','marzo':'03','abril':'04','mayo':'05','junio':'06','julio':'07','agosto':'08','septiembre':'09','octubre':'10','noviembre':'11','diciembre':'12' };
+      const normM = (mp, yr) => {
         if (!mp) return '';
         const s = mp.toLowerCase().trim();
         if (/^\d{4}-\d{2}$/.test(s)) return s;
-        const num = MONTH_MAP_ES[s];
-        return num ? `${year || new Date().getFullYear()}-${num}` : s;
+        const n = MMAP[s]; return n ? `${yr || new Date().getFullYear()}-${n}` : s;
       };
-      const statusPri = { paid: 4, review: 3, overdue: 2, pending: 1 };
-      const dedupMap = new Map();
-      for (const p of list) {
-        const key = String(p.student_id || '') + '|' + normMonth(p.month_paid, yv);
-        const existing = dedupMap.get(key);
-        if (!existing) { dedupMap.set(key, p); continue; }
-        const pPri  = statusPri[p.status?.toLowerCase()] || 0;
-        const exPri = statusPri[existing.status?.toLowerCase()] || 0;
-        if (pPri > exPri) { dedupMap.set(key, p); continue; }
-        if (pPri === exPri) {
-          if (p.evidence_url && !existing.evidence_url) { dedupMap.set(key, p); continue; }
-          if (p.id > existing.id) dedupMap.set(key, p);
-        }
+      const sPri = { paid: 4, review: 3, overdue: 2, pending: 1 };
+      const dmap = new Map();
+      for (const p of (data || [])) {
+        const k = p.student_id + '|' + normM(p.month_paid, yv);
+        const ex = dmap.get(k);
+        if (!ex) { dmap.set(k, p); continue; }
+        const pp = sPri[p.status?.toLowerCase()] || 0, ep = sPri[ex.status?.toLowerCase()] || 0;
+        if (pp > ep || (pp === ep && p.id > ex.id)) dmap.set(k, p);
       }
-      list = Array.from(dedupMap.values());
-      if (sq) {
-        const s = sq.toLowerCase();
-        list = list.filter(p => p.students?.name?.toLowerCase().includes(s));
+      let list = Array.from(dmap.values());
+
+      // ── 4. Agregar deudas anteriores (marcadas con _prev) ─────────────
+      for (const p of prevDebt) { p._prev = true; list.push(p); }
+
+      // ── 5. Filtro de búsqueda por nombre ──────────────────────────────
+      if (sq) { const s = sq.toLowerCase(); list = list.filter(p => p.students?.name?.toLowerCase().includes(s)); }
+
+      // ── 6. Si no hay registros del mes actual, auto-generar silenciosamente ──
+      const currList = list.filter(p => !p._prev);
+      const prevList = list.filter(p => p._prev);
+
+      if (!currList.length) {
+        // Auto-generar cobros del mes actual en background sin bloquear la UI
+        supabase.functions.invoke('auto-payment-cycle', { body: { force: true } })
+          .then(({ data: cycleData }) => {
+            if (cycleData?.generated > 0) {
+              // Recargar la tabla después de generar
+              setTimeout(() => this.loadPayments(), 800);
+            }
+          })
+          .catch(() => {});
       }
 
       if (!list.length) {
         const mi = parseInt(mv, 10) - 1;
         const label = MES_LABEL[mi] || mv;
-        tbody.innerHTML = '<tr><td colspan="8" class="text-center py-16"><div class="flex flex-col items-center gap-3"><div class="w-14 h-14 bg-slate-100 rounded-full flex items-center justify-center"><i data-lucide="inbox" class="w-7 h-7 text-slate-400"></i></div><p class="font-bold text-slate-500">Sin registros para ' + label + ' ' + (yv || '') + '</p></div></td></tr>';
+        tbody.innerHTML =
+          '<tr><td colspan="8" class="text-center py-10">' +
+            '<div class="flex flex-col items-center gap-4">' +
+              '<div class="w-12 h-12 border-4 border-indigo-100 border-t-indigo-600 rounded-full animate-spin"></div>' +
+              '<p class="font-bold text-slate-500 text-sm">Generando cobros de ' + label + ' ' + (yv || '') + '...</p>' +
+            '</div>' +
+          '</td></tr>';
         if (window.lucide) lucide.createIcons();
         return;
       }
 
+      // ── 7. Ordenar: deudas anteriores primero, luego por estado ───────
       const pri = { overdue: 1, pending: 2, review: 3, paid: 4 };
-      list.sort((a, b) => (pri[this._st(a)] || 99) - (pri[this._st(b)] || 99));
-      tbody.innerHTML = list.map(p => this._row(p)).join('');
+      list.sort((a, b) => {
+        if (a._prev && !b._prev) return -1;
+        if (!a._prev && b._prev) return 1;
+        return (pri[this._st(a)] || 99) - (pri[this._st(b)] || 99);
+      });
+
+      // ── 8. Construir HTML con separadores visuales ────────────────────
+      let html = '';
+      const mi = parseInt(mv, 10) - 1;
+      const currLabel = (MES_LABEL[mi] || mv) + ' ' + yv;
+
+      // Aviso si no hay cobros del mes actual pero sí hay deudas anteriores
+      if (!currList.length && prevList.length) {
+        html += '<tr><td colspan="8" class="px-5 py-3">' +
+          '<div class="flex items-center gap-3 bg-blue-50 border border-blue-200 rounded-2xl px-5 py-3">' +
+            '<div class="w-8 h-8 border-3 border-blue-200 border-t-blue-600 rounded-full animate-spin flex-shrink-0" style="border-width:3px"></div>' +
+            '<span class="text-blue-800 font-bold text-sm">Generando cobros de ' + currLabel + ' automáticamente...</span>' +
+          '</div>' +
+        '</td></tr>';
+      }
+
+      let shownPrevHeader = false;
+      let shownCurrHeader = false;
+      for (const p of list) {
+        if (p._prev && !shownPrevHeader) {
+          html += '<tr><td colspan="8" class="px-5 py-2 bg-rose-50 border-y border-rose-100">' +
+            '<div class="flex items-center gap-2 text-rose-700 font-black text-[11px] uppercase tracking-widest">' +
+              '<i data-lucide="alert-triangle" class="w-3.5 h-3.5"></i>Deudas de meses anteriores' +
+            '</div></td></tr>';
+          shownPrevHeader = true;
+        }
+        if (!p._prev && !shownCurrHeader) {
+          html += '<tr><td colspan="8" class="px-5 py-2 bg-slate-50 border-y border-slate-100">' +
+            '<div class="flex items-center gap-2 text-slate-500 font-black text-[11px] uppercase tracking-widest">' +
+              '<i data-lucide="calendar" class="w-3.5 h-3.5"></i>' + currLabel +
+            '</div></td></tr>';
+          shownCurrHeader = true;
+        }
+        html += this._row(p);
+      }
+      tbody.innerHTML = html;
       if (window.lucide) lucide.createIcons();
     } catch (e) {
-
       tbody.innerHTML = '<tr><td colspan="8" class="text-center py-8">' + Helpers.errorState('Error al cargar pagos', 'App.payments.loadPayments()') + '</td></tr>';
       if (window.lucide) lucide.createIcons();
     }
@@ -447,12 +499,9 @@ export const PaymentsModule = {
       const genDay   = this.settings.generation_day || 25;
       const dueDay   = this.settings.due_day || 5;
 
-      // ── Validar que hoy sea >= día de generación ──────────────────────────
-      if (today < genDay) {
-        Helpers.toast(
-          `El ciclo se activa a partir del día ${genDay} del mes. Hoy es día ${today}.`,
-          'warning'
-        );
+      // ── Validar que hoy sea >= día de generación (solo en modo automático) ──
+      // Cuando se llama manualmente desde el panel, siempre se permite
+      if (today < genDay && !confirm(`Normalmente el ciclo se activa el día ${genDay}. Hoy es día ${today}.\n\n¿Deseas generar los cobros de todas formas?`)) {
         return;
       }
 
@@ -598,23 +647,22 @@ export const PaymentsModule = {
 
       if (error) throw error;
 
-      // Respuesta esperada: { reminder_3d, due_today, overdue_1d, emails_sent, pushes_sent, errors }
+      // Respuesta esperada: { processed, reminder_3d, due_today, overdue_1d, emails_sent, pushes_sent }
       const results = data || {};
-      const total = (results.reminder_3d || 0) + (results.due_today || 0) + (results.overdue_1d || 0);
-      
-      if (total === 0 && !results.processed) {
-        Helpers.toast('No hay pagos pendientes o vencidos para recordar', 'info');
-      } else if (total === 0 && results.processed > 0) {
-        Helpers.toast(`⚠️ ${results.processed} pago(s) encontrados pero sin correo configurado en los estudiantes`, 'warning');
+      const processed = results.processed || 0;
+      const total = (results.reminder_3d || 0) + (results.due_today || 0) + (results.overdue_1d || 0) || processed;
+
+      if (processed === 0 && total === 0) {
+        Helpers.toast('No hay pagos pendientes o vencidos este mes', 'info');
+      } else if (processed > 0 && (results.emails_sent || 0) === 0 && (results.pushes_sent || 0) === 0) {
+        Helpers.toast(`⚠️ ${processed} pago(s) encontrados pero los estudiantes no tienen correo ni notificaciones configuradas`, 'warning');
       } else {
-        const msg = `✅ ${total} recordatorios procesados\n📧 ${results.emails_sent || 0} correos\n🔔 ${results.pushes_sent || 0} notificaciones`;
+        const msg = `✅ ${processed} recordatorio(s) procesados\n📧 ${results.emails_sent || 0} correos enviados\n🔔 ${results.pushes_sent || 0} notificaciones push`;
         Helpers.toast(msg, 'success');
-        
+
         // Auditar la acción
         await auditLog('payment_reminders_sent', {
-          reminder_3d: results.reminder_3d,
-          due_today: results.due_today,
-          overdue_1d: results.overdue_1d,
+          processed,
           emails_sent: results.emails_sent,
           pushes_sent: results.pushes_sent,
           total

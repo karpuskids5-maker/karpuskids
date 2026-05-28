@@ -55,13 +55,21 @@ export async function initChat() {
           .from('profiles')
           .select('id, name, avatar_url, email')
           .in('email', emails);
+        
         // Map email → profile for lookup
         const emailMap = {};
-        (profilesByEmail || []).forEach(p => { emailMap[p.email] = p; });
+        (profilesByEmail || []).forEach(p => { 
+          if (p.email) emailMap[p.email.toLowerCase()] = p; 
+        });
+
         // Add these as virtual parent_id entries on the student objects
         studentsWithoutParent.forEach(s => {
-          const prof = emailMap[s.p1_email];
-          if (prof) s._resolvedParentId = prof.id;
+          const prof = emailMap[s.p1_email.toLowerCase()];
+          if (prof) {
+            s._resolvedParentId = prof.id;
+            // Guardar en parentProfiles para el loop principal
+            parentProfiles[prof.id] = prof;
+          }
         });
       } catch (_) {}
     }
@@ -81,8 +89,22 @@ export async function initChat() {
           });
         } else {
           const p = parentsMap.get(pid);
-          if (!p.childName.includes(s.name)) p.childName += `, ${s.name}`;
+          if (!p.childName.includes(s.name)) {
+            p.childName += `, ${s.name}`;
+          }
         }
+      } else if (s.p1_name) {
+        // Estudiante con nombre de padre pero sin cuenta de perfil vinculada aún
+        // Lo mostramos para que la maestra sepa quién es, aunque el chat sea limitado
+        const virtualId = `unlinked_${s.id}`;
+        parentsMap.set(virtualId, {
+          id: null, // No se puede chatear sin ID de perfil
+          name: s.p1_name,
+          childName: s.name,
+          avatar: null,
+          roleLabel: 'Padre (Sin Cuenta)',
+          unlinked: true
+        });
       }
     });
 
@@ -113,24 +135,31 @@ export async function initChat() {
       // Para padres: título = nombre del estudiante, subtítulo = nombre del padre
       const displayName = c.childName ? c.childName : (c.name || 'Usuario');
       const parentLine  = c.childName ? `👤 ${safeEscapeHTML(c.name)}` : null;
-      const label       = c.childName ? `Padre/Madre · 👤 ${safeEscapeHTML(c.name)}` : c.roleLabel;
+      const label       = c.childName ? `${c.roleLabel} · 👤 ${safeEscapeHTML(c.name)}` : c.roleLabel;
       const bgColor = c.roleLabel === 'Directora' ? 'bg-indigo-100 text-indigo-600' :
                       c.roleLabel === 'Asistente' ? 'bg-teal-100 text-teal-600' :
+                      c.unlinked ? 'bg-slate-100 text-slate-400' :
                       'bg-orange-100 text-orange-600';
+      
+      const onClickAction = c.unlinked 
+        ? `safeToast('Este padre aún no ha creado su cuenta de acceso', 'warning')`
+        : `App.selectChatContact('${c.id}', '${safeEscapeHTML(displayName)}', '${safeEscapeHTML(label)}')`;
+
       return `
-      <div onclick="App.selectChatContact('${c.id}', '${safeEscapeHTML(displayName)}', '${safeEscapeHTML(label)}')"
-           class="p-3 hover:bg-slate-50 rounded-xl cursor-pointer transition-colors flex items-center gap-3 border-b border-slate-50 last:border-0 relative">
+      <div onclick="${onClickAction}"
+           class="p-3 hover:bg-slate-50 rounded-xl cursor-pointer transition-colors flex items-center gap-3 border-b border-slate-50 last:border-0 relative ${c.unlinked ? 'opacity-60' : ''}">
         <div class="relative">
           <div class="w-10 h-10 rounded-full ${bgColor} flex items-center justify-center font-bold overflow-hidden">
             ${c.avatar ? `<img src="${c.avatar}" class="w-full h-full object-cover" loading="lazy">` : displayName.charAt(0)}
           </div>
           ${unread > 0 ? `<div class="absolute -top-1 -right-1 bg-red-500 text-white text-[10px] font-bold px-1.5 py-0.5 rounded-full shadow-sm animate-pulse">${unread}</div>` : ''}
         </div>
-        <div class="min-w-0">
+        <div class="min-w-0 flex-1">
           <div class="font-bold text-slate-700 text-sm truncate">${safeEscapeHTML(displayName)}</div>
-          ${parentLine ? `<div class="text-[10px] text-orange-600 font-bold truncate">${parentLine}</div>` : ''}
+          ${parentLine ? `<div class="text-[10px] ${c.unlinked ? 'text-slate-400' : 'text-orange-600'} font-bold truncate">${parentLine}</div>` : ''}
           <div class="text-[10px] text-slate-400 truncate">${c.childName ? c.roleLabel : label}</div>
         </div>
+        ${c.unlinked ? `<i data-lucide="user-minus" class="w-3.5 h-3.5 text-slate-300"></i>` : `<i data-lucide="chevron-right" class="w-3.5 h-3.5 text-slate-200"></i>`}
       </div>`;
     }).join('');
 

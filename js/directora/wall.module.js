@@ -1,4 +1,4 @@
-﻿/**
+/**
  * 📰 WALL MODULE - Módulo de Muro/Forum (Sincronizado con WallModule compartido)
  */
 
@@ -173,7 +173,7 @@ export const WallModule = {
 
       Helpers.toast('Publicación compartida correctamente', 'success');
       App.ui.closeModal();
-      await this.loadPosts();
+      // await this.loadPosts(); // Comentado: Realtime se encarga de la actualización
     } catch (err) {
       Helpers.toast('Error al publicar', 'error');
     } finally {

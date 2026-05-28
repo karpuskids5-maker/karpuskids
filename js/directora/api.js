@@ -1,5 +1,6 @@
 import { supabase } from '../shared/supabase.js';
 import { QueryCache } from '../shared/query-cache.js';
+import { safeHandle } from '../shared/db-utils.js';
 
 const TABLES = {
   PROFILES: 'profiles',
@@ -21,7 +22,7 @@ const withTimeout = (promiseOrFn, ms = 10000) => {
 };
 
 const logError = (context, err) => {
-
+  safeHandle(err, `DirectorApi.${context}`);
   return { data: null, error: err.message || err };
 };
 
@@ -362,8 +363,9 @@ export const DirectorApi = {
     if ('horario' in clean) { clean.schedule = clean.horario || null; delete clean.horario; }
     if ('classroom_id' in clean) clean.classroom_id = clean.classroom_id ? parseInt(clean.classroom_id) : null;
     if ('age'          in clean) clean.age          = clean.age ? parseInt(clean.age) : null;
-    if ('monthly_fee'  in clean) clean.monthly_fee  = clean.monthly_fee != null ? parseFloat(clean.monthly_fee) : 0;
-    if ('due_day'      in clean) clean.due_day      = clean.due_day ? parseInt(clean.due_day) : 5;
+    if ('monthly_fee'   in clean) clean.monthly_fee   = clean.monthly_fee != null ? parseFloat(clean.monthly_fee) : 0;
+    if ('prolongado_fee' in clean) clean.prolongado_fee = clean.prolongado_fee != null ? parseFloat(clean.prolongado_fee) : 0;
+    if ('due_day'       in clean) clean.due_day       = clean.due_day ? parseInt(clean.due_day) : 5;
     delete clean.stAge;
 
     const result = await withTimeout(() => supabase.from(TABLES.STUDENTS).update(clean).eq('id', numId).select().single());

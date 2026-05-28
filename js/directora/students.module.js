@@ -1,4 +1,4 @@
-﻿import { DirectorApi } from './api.js';
+import { DirectorApi } from './api.js';
 import { Helpers } from '../shared/helpers.js';
 import { UI } from './ui.module.js';
 import { AppState } from './state.js';
@@ -179,7 +179,7 @@ export const StudentsModule = {
               </div>
               <div>
                 <div class="font-bold text-slate-800">${Helpers.escapeHTML(s.name)}</div>
-                <div class="text-[10px] text-slate-400 font-black uppercase tracking-widest">${s.matricula || 'SIN MATR�CULA'}</div>
+                <div class="text-[10px] text-slate-400 font-black uppercase tracking-widest">${s.matricula || 'SIN MATRÍCULA'}</div>
               </div>
             </div>
           </td>
@@ -206,8 +206,8 @@ export const StudentsModule = {
           <div class="absolute top-0 right-0 w-24 h-24 bg-purple-50 rounded-bl-[4rem] -mr-8 -mt-8 transition-transform group-hover:scale-110"></div>
           
           <div class="flex items-start gap-4 mb-4 relative">
-            <div class="w-16 h-16 rounded-2xl bg-gradient-to-br from-purple-500 to-indigo-600 flex items-center justify-center text-2xl shadow-lg shadow-purple-100">
-              ??
+            <div class="w-16 h-16 rounded-2xl bg-gradient-to-br from-purple-500 to-indigo-600 flex items-center justify-center shadow-lg shadow-purple-100">
+              <i data-lucide="user" class="w-8 h-8 text-white"></i>
             </div>
             <div class="flex-1">
               <h3 class="font-black text-slate-800 text-lg leading-tight mb-1">${Helpers.escapeHTML(s.name)}</h3>
@@ -235,7 +235,7 @@ export const StudentsModule = {
 
           <div class="flex items-center justify-between pt-4 border-t border-slate-50">
             <div class="flex -space-x-2">
-               <div class="w-8 h-8 rounded-full border-2 border-white bg-blue-100 flex items-center justify-center text-[10px]" title="Padre: ${Helpers.escapeHTML(s.p1_name || 'N/A')}">??</div>
+               <div class="w-8 h-8 rounded-full border-2 border-white bg-blue-100 flex items-center justify-center text-[10px]" title="Padre: ${Helpers.escapeHTML(s.p1_name || 'N/A')}"><i data-lucide="user" class="w-3.5 h-3.5 text-blue-500"></i></div>
             </div>
             <div class="flex gap-2">
               <button onclick="App.students.openModal('${s.id}')" class="p-2.5 bg-slate-100 text-slate-600 hover:bg-purple-600 hover:text-white rounded-xl transition-all">
@@ -423,6 +423,7 @@ export const StudentsModule = {
       p2_job:               v('p2Profession'),
       p2_address:           v('p2Address'),
       monthly_fee:          n('monthlyFee', 0),
+      prolongado_fee:       n('prolongadoFee', 0),
       due_day:              i('dueDay', 5)
     };
   },
@@ -434,7 +435,7 @@ export const StudentsModule = {
     const modalHTML = `
       <div class="modal-header bg-gradient-to-r from-purple-600 to-indigo-600 text-white p-6 rounded-t-3xl flex items-center justify-between">
         <div class="flex items-center gap-3">
-          <div class="w-12 h-12 bg-white/20 rounded-2xl flex items-center justify-center text-2xl shadow-inner">??</div>
+          <div class="w-12 h-12 bg-white/20 rounded-2xl flex items-center justify-center shadow-inner"><i data-lucide="user-plus" class="w-6 h-6 text-white"></i></div>
           <div>
             <h3 class="text-xl font-black">${id ? 'Editar Estudiante' : 'Crear Estudiante'}</h3>
             <p class="text-xs text-white/70 font-bold uppercase tracking-widest">${id ? 'Actualizar Registro' : 'Nuevo Registro'}</p>
@@ -449,7 +450,7 @@ export const StudentsModule = {
         <div class="grid grid-cols-1 gap-8">
           <input type="hidden" id="stId" value="${id || ''}" />
           
-          <!-- 1. FOTO Y MATR�CULA -->
+          <!-- 1. FOTO Y MATRÍCULA -->
           <div class="flex flex-col md:flex-row gap-6 items-center bg-white p-6 rounded-3xl border-2 border-slate-100 shadow-sm">
             <div class="relative group cursor-pointer">
               <div id="stAvatarPreview" class="w-24 h-24 rounded-[2rem] bg-slate-100 border-4 border-dashed border-slate-200 flex flex-col items-center justify-center text-slate-400 group-hover:border-purple-400 group-hover:bg-purple-50 transition-all overflow-hidden">
@@ -460,11 +461,11 @@ export const StudentsModule = {
             </div>
             
             <div class="flex-1 w-full">
-              <h4 class="text-sm font-black text-slate-800 mb-3">?? FOTO Y MATR�CULA</h4>
+              <h4 class="text-sm font-black text-slate-800 mb-3">📸 FOTO Y MATRÍCULA</h4>
               <div class="flex gap-2">
                 <div class="relative flex-1">
                   <i data-lucide="hash" class="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400"></i>
-                  <input id="stMatricula" placeholder="Generar autom�tica..." class="${inputClass} pl-10 bg-white">
+              <input id="stMatricula" placeholder="Generar automática..." class="${inputClass} pl-10 bg-white">
                 </div>
                 <button onclick="window.generateMatricula()" class="px-6 py-2 bg-indigo-600 text-white rounded-2xl font-black text-xs uppercase hover:bg-indigo-700 shadow-md transition-all active:scale-95">Generar</button>
               </div>
@@ -477,11 +478,11 @@ export const StudentsModule = {
             </div>
           </div>
 
-          <!-- 2. INFORMACI�N DEL ESTUDIANTE -->
+          <!-- 2. INFORMACIÓN DEL ESTUDIANTE -->
           <div class="bg-white p-6 rounded-[2rem] border-2 border-slate-100 shadow-sm space-y-4">
             <h4 class="text-sm font-black text-slate-800 flex items-center gap-2 mb-4">
               <span class="w-8 h-8 rounded-xl bg-purple-100 text-purple-600 flex items-center justify-center"><i data-lucide="user" class="w-4 h-4"></i></span>
-              ?? INFORMACI�N DEL ESTUDIANTE
+              INFORMACIÓN DEL ESTUDIANTE
             </h4>
             <div>
               <label class="${labelClass}">Nombre completo</label>
@@ -506,7 +507,7 @@ export const StudentsModule = {
           <div class="bg-white p-6 rounded-[2rem] border-2 border-slate-100 shadow-sm space-y-4">
             <h4 class="text-sm font-black text-slate-800 flex items-center gap-2 mb-4">
               <span class="w-8 h-8 rounded-xl bg-blue-100 text-blue-600 flex items-center justify-center"><i data-lucide="lock" class="w-4 h-4"></i></span>
-              ?? ACCESO Y NOTIFICACIONES
+              ACCESO Y NOTIFICACIONES
             </h4>
             <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div><label class="${labelClass}">Correo de Usuario (Login)</label><input id="stEmailUser" placeholder="usuario@karpus.com" type="email" class="${inputClass}"></div>
@@ -519,7 +520,7 @@ export const StudentsModule = {
           <div class="bg-white p-6 rounded-[2rem] border-2 border-slate-100 shadow-sm space-y-4">
             <h4 class="text-sm font-black text-slate-800 flex items-center gap-2 mb-4">
               <span class="w-8 h-8 rounded-xl bg-rose-100 text-rose-600 flex items-center justify-center"><i data-lucide="heart-pulse" class="w-4 h-4"></i></span>
-              ?? SALUD Y SEGURIDAD
+              SALUD Y SEGURIDAD
             </h4>
             <div class="grid grid-cols-2 gap-4">
               <div>
@@ -541,7 +542,7 @@ export const StudentsModule = {
           <div class="bg-white p-6 rounded-[2rem] border-2 border-slate-100 shadow-sm space-y-4">
             <h4 class="text-sm font-black text-slate-800 flex items-center gap-2">
               <div class="w-8 h-8 rounded-xl bg-blue-100 text-blue-600 flex items-center justify-center"><i data-lucide="user" class="w-4 h-4"></i></div>
-              ???????? TUTOR PRINCIPAL
+              TUTOR PRINCIPAL
             </h4>
             <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div><label class="${labelClass}">Nombre</label><input id="p1Name" placeholder="Nombre completo" class="${inputClass}"></div>
@@ -556,7 +557,7 @@ export const StudentsModule = {
           <div class="bg-white p-6 rounded-[2rem] border-2 border-slate-100 shadow-sm space-y-4">
               <h4 class="text-sm font-black text-slate-800 flex items-center gap-2">
                 <div class="w-8 h-8 rounded-xl bg-slate-100 text-slate-500 flex items-center justify-center"><i data-lucide="user-plus" class="w-4 h-4"></i></div>
-                ???????? TUTOR SECUNDARIO
+                TUTOR SECUNDARIO
               </h4>
               <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div><label class="${labelClass}">Nombre</label><input id="p2Name" placeholder="Nombre" class="${inputClass}"></div>
@@ -566,13 +567,13 @@ export const StudentsModule = {
               </div>
           </div>
 
-          <!-- 7. INFORMACI�N DE PAGO -->
+          <!-- 7. INFORMACIÓN DE PAGO -->
           <div class="bg-amber-50 p-6 rounded-[2rem] border-2 border-amber-100 space-y-4">
               <h4 class="text-sm font-black text-amber-800 flex items-center gap-2">
                 <div class="w-8 h-8 rounded-xl bg-amber-100 text-amber-600 flex items-center justify-center"><i data-lucide="credit-card" class="w-4 h-4"></i></div>
-                ?? INFORMACI�N DE PAGO
+                INFORMACIÓN DE PAGO
               </h4>
-              <div class="grid grid-cols-2 gap-4">
+              <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
                 <div>
                   <label class="${labelClass}">Mensualidad</label>
                   <div class="relative">
@@ -580,23 +581,30 @@ export const StudentsModule = {
                     <input id="monthlyFee" placeholder="0.00" type="number" step="0.01" class="${inputClass} pl-8 bg-white">
                   </div>
                 </div>
+                <div>
+                  <label class="${labelClass}">D�a Prolongado</label>
+                  <div class="relative">
+                    <span class="absolute left-4 top-1/2 -translate-y-1/2 text-amber-600 font-black text-sm">$</span>
+                    <input id="prolongadoFee" placeholder="0.00" type="number" step="0.01" class="${inputClass} pl-8 bg-white">
+                  </div>
+                </div>
                 <div><label class="${labelClass}">D�a Vencimiento</label><input id="dueDay" placeholder="5" type="number" min="1" max="31" class="${inputClass} bg-white"></div>
               </div>
           </div>
 
-          <!-- 8. C�DIGO QR DE ASISTENCIA -->
+          <!-- 8. CÓDIGO QR DE ASISTENCIA -->
           <div class="bg-gradient-to-br from-orange-50 to-amber-50 p-6 rounded-[2rem] border-2 border-orange-100 space-y-4">
             <h4 class="text-sm font-black text-orange-800 flex items-center gap-2">
               <div class="w-8 h-8 rounded-xl bg-orange-100 text-orange-600 flex items-center justify-center"><i data-lucide="qr-code" class="w-4 h-4"></i></div>
-              ?? C�DIGO QR DE ASISTENCIA
+              CÓDIGO QR DE ASISTENCIA
             </h4>
-            <p class="text-xs text-orange-600 font-medium">El QR se genera autom�ticamente con la matr�cula. El padre puede escanearlo para registrar entrada/salida.</p>
+            <p class="text-xs text-orange-600 font-medium">El QR se genera automáticamente con la matrícula. El padre puede escanearlo para registrar entrada/salida.</p>
             <div id="qr-section" class="flex flex-col items-center gap-4 bg-white p-6 rounded-3xl border border-orange-100 shadow-sm">
               <div id="qr-container" class="bg-white p-3 rounded-2xl border-2 border-slate-100 shadow-sm min-h-[160px] flex items-center justify-center">
-                <p class="text-xs text-slate-400 font-bold text-center">Genera o ingresa una matr�cula<br>para ver el QR</p>
+                <p class="text-xs text-slate-400 font-bold text-center">Genera o ingresa una matrícula<br>para ver el QR</p>
               </div>
               <div class="text-center w-full">
-                <p class="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Matr�cula vinculada</p>
+                <p class="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Matrícula vinculada</p>
                 <p id="qr-matricula-label" class="text-lg font-black text-slate-700">--</p>
               </div>
               <div class="flex gap-2 w-full">
@@ -621,12 +629,12 @@ export const StudentsModule = {
       
     window.openGlobalModal(modalHTML, true);
 
-    // Generar matr�cula autom�tica
+    // Generar matrícula automática
     window.generateMatricula = () => {
       const el = document.getElementById('stMatricula');
       if (el) {
         el.value = 'KK-' + new Date().getFullYear() + '-' + String(Math.floor(Math.random() * 9000) + 1000);
-        // Auto-generar QR al generar matr�cula
+        // Auto-generar QR al generar matrícula
         window.generateStudentQR();
       }
     };
@@ -693,7 +701,7 @@ export const StudentsModule = {
         </style>
       </head><body>
         <div class="card">
-          <div class="logo">?? Karpus Kids</div>
+          <div class="logo">Karpus Kids</div>
           <img src="${qrImg}" alt="QR">
           <div class="name">${name || 'Estudiante'}</div>
           <div class="mat">${matricula}</div>
@@ -783,6 +791,7 @@ export const StudentsModule = {
           setVal('bloodType',    student.blood_type);
           setVal('authorized',   student.authorized_pickup);
           setVal('monthlyFee',   student.monthly_fee);
+          setVal('prolongadoFee', student.prolongado_fee);
           setVal('dueDay',       student.due_day);
 
           const checkActive = document.getElementById('active');

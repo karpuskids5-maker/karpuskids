@@ -1,4 +1,4 @@
-import { supabase, ensureRole, emitEvent, sendPush, initOneSignal } from '../shared/supabase.js';
+import { ensureRole, supabase, initOneSignal, RealtimeUtils, emitEvent } from '../shared/supabase.js';
 import { AppState } from './state.js';
 import { MaestraApi } from './api.js';
 import { Helpers } from '../shared/helpers.js';
@@ -69,8 +69,26 @@ window.App = {
   selectChatContact: ChatApp.selectChatContact,
 
   // Global actions
-  setActiveSection: (targetId) => window.App._setActiveSection?.(targetId),
-  showClassroomDetail: (classroomId) => window.App._showClassroomDetail?.(classroomId),
+  setActiveSection: (targetId, options) => window.App._setActiveSection?.(targetId, options),
+  navigateTo: (sectionId, tabId) => {
+    const cleanSection = sectionId.startsWith('t-') ? sectionId : `t-${sectionId}`;
+    window.App.setActiveSection(cleanSection);
+    if (tabId) {
+      // Si la sección es detalle de aula, activar el tab
+      if (cleanSection === 't-class-detail') {
+        window.App.activateTab?.(tabId);
+      }
+      // Si la sección es home pero el tab es rutina (caso dashboard)
+      if (cleanSection === 't-home' && tabId === 'daily-routine') {
+        // En este caso, el dashboard redirige a la sección de aula detalle tab rutina
+        const classroom = AppState.get('classroom');
+        if (classroom) {
+          window.App.showClassroomDetail(classroom.id, { activeTab: tabId });
+        }
+      }
+    }
+  },
+  showClassroomDetail: (classroomId, options) => window.App._showClassroomDetail?.(classroomId, options),
   startJitsi: () => window.App._startJitsi?.(),
   openNewPostModal: () => window.App._openNewPostModal(),
   submitNewPost: () => window.App._submitNewPost()
@@ -355,7 +373,29 @@ function initRealtimeUpdates(classroomId) {
       const student = (AppState.get('students') || []).find(s => s.id === payload.new.student_id);
       if (student) safeToast(`\ud83d\udcdd ${student.name} entreg\u00f3 una tarea`, 'info');
     })
-    .subscribe();
+    // 📢 Escuchar cambios en posts para actualizar el muro sin recargar
+    .on('postgres_changes', { event: '*', schema: 'public', table: 'posts' }, (payload) => {
+      const { eventType, new: newPost, old: oldPost } = payload;
+      
+      // Solo si es de este aula o general
+      if (newPost.classroom_id && newPost.classroom_id !== classroomId) return;
+
+      if (eventType === 'INSERT') {
+        safeToast('📢 Nueva publicación en el muro', 'info');
+        WallModule.loadPosts('muroPostsContainer');
+      } else if (eventType === 'UPDATE') {
+        const postId = newPost.id;
+        const likeSpan = document.getElementById(`like-count-${postId}`);
+        const commBtn = document.querySelector(`#post-${postId} button[onclick*="toggleCommentSection"] span`);
+        
+        if (likeSpan && typeof newPost.likes_count === 'number') likeSpan.textContent = newPost.likes_count;
+        if (commBtn && typeof newPost.comments_count === 'number') commBtn.textContent = `${newPost.comments_count} Comentarios`;
+      } else if (eventType === 'DELETE') {
+        document.getElementById(`post-${oldPost.id}`)?.remove();
+      }
+    });
+
+  RealtimeUtils.monitorChannel(currentChannel, `MaestraRoom_${classroomId}`);
 }
 
 async function notify({ message, pushTo = null }) {
@@ -377,18 +417,52 @@ async function initDashboard() {
   const classroom = AppState.get('classroom');
   if (!classroom) return;
 
+  console.log('[MaestraDashboard] Iniciando para aula:', classroom.id);
+
   try {
     const students = await MaestraApi.getStudentsByClassroom(classroom.id);
+    console.log('[MaestraDashboard] Estudiantes cargados:', students?.length);
     AppState.set('students', students || []);
     
     const today = new Date().toISOString().split('T')[0];
     const attendance = await MaestraApi.getAttendance(classroom.id, today);
     
-    // grid.innerHTML = ...
+    // 📊 Actualizar Estadísticas (Bloques)
+    const statClasses   = document.getElementById('statClasses');
+    const statStudents  = document.getElementById('statStudents');
+    const statIncidents = document.getElementById('statIncidents');
+    const statPresent   = document.getElementById('statPresent');
+
+    if (statClasses)   statClasses.textContent   = '1';
+    if (statStudents)  statStudents.textContent  = students?.length || '0';
+    if (statPresent) {
+      const presentCount = (attendance || []).filter(a => ['present', 'late'].includes(a.status)).length;
+      statPresent.textContent = presentCount;
+    }
+    
+    // Obtener incidentes de hoy (Query segura)
+    if (statIncidents) {
+      try {
+        const startOfDay = `${today}T00:00:00Z`;
+        const endOfDay   = `${today}T23:59:59Z`;
+        const { count, error: incError } = await supabase
+          .from('incidents')
+          .select('id', { count: 'exact', head: true })
+          .eq('classroom_id', classroom.id)
+          .gte('created_at', startOfDay)
+          .lte('created_at', endOfDay);
+        
+        statIncidents.textContent = (!incError && count !== null) ? count : '0';
+      } catch (e) {
+        console.warn('[MaestraDashboard] Error incidentes:', e);
+        statIncidents.textContent = '0';
+      }
+    }
+
     _updateNextActivityWidget();
     _updatePunchAlertWidget(students, attendance);
 
-    // Grid de Aulas
+    // Grid de Aulas (Home)
     const grid = document.getElementById('classesGrid'); 
     if (grid) {
       grid.innerHTML = `
@@ -407,30 +481,38 @@ async function initDashboard() {
       `;
     }
 
-    // Tab Estudiantes
+    // Grid de Estudiantes (Tab)
     const classGrid = document.getElementById('classroomStudentsGrid');
     if (classGrid) {
-      classGrid.innerHTML = (students || []).map(s => `
-        <div class="p-6 bg-white rounded-[2rem] border border-slate-100 shadow-sm hover:shadow-xl transition-all group">
-          <div class="flex items-center gap-4 mb-6">
-            <div class="w-16 h-16 rounded-2xl bg-orange-50 text-orange-600 flex items-center justify-center font-bold text-2xl overflow-hidden">
-              ${s.avatar_url ? `<img src="${s.avatar_url}" class="w-full h-full object-cover">` : s.name.charAt(0)}
+      if (!students || students.length === 0) {
+        classGrid.innerHTML = `
+          <div class="col-span-full py-12 text-center bg-slate-50 rounded-[2rem] border-2 border-dashed border-slate-200">
+            <p class="font-bold text-slate-400">No hay estudiantes registrados en esta aula.</p>
+          </div>
+        `;
+      } else {
+        classGrid.innerHTML = students.map(s => `
+          <div class="p-6 bg-white rounded-[2rem] border border-slate-100 shadow-sm hover:shadow-xl transition-all group">
+            <div class="flex items-center gap-4 mb-6">
+              <div class="w-16 h-16 rounded-2xl bg-orange-50 text-orange-600 flex items-center justify-center font-bold text-2xl overflow-hidden">
+                ${s.avatar_url ? `<img src="${s.avatar_url}" class="w-full h-full object-cover">` : s.name.charAt(0)}
+              </div>
+              <div class="min-w-0">
+                <div class="font-black text-slate-800 text-lg truncate">${safeEscapeHTML(s.name)}</div>
+                <div class="text-[10px] font-black uppercase tracking-widest text-orange-500">Estudiante</div>
+              </div>
             </div>
-            <div class="min-w-0">
-              <div class="font-black text-slate-800 text-lg truncate">${safeEscapeHTML(s.name)}</div>
-              <div class="text-[10px] font-black uppercase tracking-widest text-orange-500">Estudiante</div>
+            <div class="grid grid-cols-2 gap-2">
+              <button onclick="App.openStudentProfile('${s.id}')" class="py-2.5 bg-slate-50 text-slate-600 rounded-xl text-[10px] font-black uppercase hover:bg-orange-600 hover:text-white transition-all">Ver Perfil</button>
+              <button onclick="App.registerIncidentModal('${s.id}')" class="py-2.5 bg-rose-50 text-rose-600 rounded-xl text-[10px] font-black uppercase hover:bg-rose-600 hover:text-white transition-all">Reportar</button>
             </div>
           </div>
-          <div class="grid grid-cols-2 gap-2">
-            <button onclick="App.openStudentProfile('${s.id}')" class="py-2.5 bg-slate-50 text-slate-600 rounded-xl text-[10px] font-black uppercase hover:bg-orange-600 hover:text-white transition-all">Ver Perfil</button>
-            <button onclick="App.registerIncidentModal('${s.id}')" class="py-2.5 bg-rose-50 text-rose-600 rounded-xl text-[10px] font-black uppercase hover:bg-rose-600 hover:text-white transition-all">Reportar</button>
-          </div>
-        </div>
-      `).join('');
+        `).join('');
+      }
     }
     if (window.lucide) window.lucide.createIcons();
   } catch (err) {
-
+    console.error('[MaestraDashboard] Error crítico:', err);
     safeToast('Error cargando dashboard', 'error');
   }
 }
@@ -600,6 +682,7 @@ function initNavigation() {
 
   // Exponer para uso global
   window.App.setActiveSection = setActiveSection;
+  window.App._setActiveSection = setActiveSection; // Alias interno para el proxy global
 
   // Restaurar última sección
   const lastSection = localStorage.getItem('maestra_last_section') || 't-home';
@@ -697,18 +780,16 @@ function initClassTabs(defaultTab = null) {
       const classroom = AppState.get('classroom');
       const profile   = AppState.get('profile');
       import('../shared/videocall-ui.js').then(({ VideoCallUI }) => {
-        VideoCallUI.renderSection('videocall-maestra-section', {
-          role:        'maestra',
-          userName:    profile?.name || 'Maestra',
-          classroomId: classroom?.id || null
-        });
-      }).catch(() => {});
+        VideoCallUI.init(classroom.id, profile.name, 'maestra');
+      });
     }
   };
 
   tabBtns.forEach(btn => {
-    btn.onclick = () => activateTab(btn.dataset.tab);
+    btn.addEventListener('click', () => activateTab(btn.dataset.tab));
   });
+
+  window.App.activateTab = activateTab;
 
   // Activar tab inicial
   const tabToActivate = defaultTab || localStorage.getItem('maestra_last_tab') || 'feed';
@@ -931,7 +1012,7 @@ async function submitNewPost() {
     }
     safeToast('Publicado correctamente', 'success');
     Modal.close('newPostModal');
-    WallModule.loadPosts(document.getElementById('muroPostsContainer'));
+    // WallModule.loadPosts(document.getElementById('muroPostsContainer')); // Comentado: Realtime se encarga
 
     // Notify parents of this classroom (via background event)
     const teacherName = AppState.get('profile')?.name || 'La maestra';

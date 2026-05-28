@@ -447,11 +447,11 @@ async function initProfile() {
 // --- Funciones Globales de Ventana ---
 
 async function deleteComment(cid, pid) {
-  if (!confirm('�Eliminar comentario?')) return;
+  if (!confirm('¿Eliminar comentario?')) return;
   const { error } = await supabase.from('comments').delete().eq('id', cid);
   if (!error) {
     Helpers.toast('Comentario eliminado');
-    WallModule.loadPosts(document.getElementById('muroPostsContainer'));
+    // Ya no es necesario recargar, el Realtime lo hará automáticamente
   }
 }
 
@@ -463,7 +463,7 @@ async function sendComment(postId) {
   const { data: { user } } = await supabase.auth.getUser();
   await supabase.from('comments').insert({ post_id: postId, user_id: user.id, content: text });
   input.value = '';
-  WallModule.loadPosts(document.getElementById('muroPostsContainer'));
+  // Ya no es necesario recargar, el Realtime lo hará automáticamente
 }
 
 // =======================================================

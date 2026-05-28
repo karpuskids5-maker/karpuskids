@@ -75,12 +75,13 @@ export const MaestraApi = {
   async upsertAttendance(record) {
     // Vincular autom\u00e1ticamente al periodo activo para reportes finales
     if (!record.period_id) {
-      try {
-        const { data: periodData } = await supabase.rpc('get_active_period', {
-          p_classroom_id: record.classroom_id
-        });
-        if (periodData?.found) record.period_id = periodData.id;
-      } catch (_) {}
+      const { data: periodData } = await supabase
+        .from('academic_periods')
+        .select('id')
+        .eq('classroom_id', record.classroom_id)
+        .eq('status', 'active')
+        .maybeSingle();
+      if (periodData) record.period_id = periodData.id;
     }
 
     const { data: existing, error: findError } = await supabase
@@ -111,18 +112,7 @@ export const MaestraApi = {
    * Tareas — filtradas por período activo del aula
    */
   async getTasksByClassroom(classroomId, periodId = null) {
-    try {
-      // Usar RPC que filtra por período activo automáticamente
-      const { data, error } = await supabase.rpc('get_tasks_for_period', {
-        p_classroom_id: classroomId,
-        p_period_id:    periodId
-      });
-      if (!error && data?.tasks) {
-        return data.tasks;
-      }
-    } catch (_) { /* RPC no existe aún — usar fallback */ }
-
-    // Fallback: query directa sin filtro de período
+    // Fallback directo para evitar 404 de RPC si no existe en BD
     const { data, error } = await supabase
       .from('tasks')
       .select('id, title, description, due_date, grading_system, file_url, created_at, period_id')
@@ -191,18 +181,16 @@ export const MaestraApi = {
 
     // 🔄 Lógica Profesional de Período Activo
     if (!cleanPayload.period_id && cleanPayload.classroom_id) {
-      try {
-        const { data: periodData, error: periodErr } = await supabase.rpc('get_active_period', {
-          p_classroom_id: cleanPayload.classroom_id
-        });
-        if (!periodErr && periodData?.found && periodData?.id) {
-          console.log('[MaestraApi] Vinculando tarea al periodo activo:', periodData.name);
-          cleanPayload.period_id = periodData.id;
-        } else {
-          console.warn('[MaestraApi] No se encontr\u00f3 un periodo activo para vincular la tarea.');
-        }
-      } catch (err) {
-        console.error('[MaestraApi] Error al obtener periodo activo:', err);
+      // Intento manual vía query en lugar de RPC para evitar 404
+      const { data: periodData } = await supabase
+        .from('academic_periods')
+        .select('id, name')
+        .eq('classroom_id', cleanPayload.classroom_id)
+        .eq('status', 'active')
+        .maybeSingle();
+
+      if (periodData) {
+        cleanPayload.period_id = periodData.id;
       }
     }
 
@@ -213,8 +201,6 @@ export const MaestraApi = {
       .maybeSingle();
 
     handleError(error, 'createTask');
-    return data;
-  },
     return data;
   },
 

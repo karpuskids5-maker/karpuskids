@@ -329,116 +329,6 @@ async function notifyParent(studentId, parentId, studentName, punchType, timeStr
     .catch(() => {});
 }
 
-// ── Fallback: write directly to attendance when RPC not deployed ──────────────
-async function _fallbackDirectWrite(code, now) {
-  const today = now.toISOString().split('T')[0];
-
-  // Try student by matricula
-  const { data: student } = await supabase
-    .from('students')
-    .select('id, name, classroom_id, parent_id, is_active')
-    .eq('matricula', code)
-    .maybeSingle();
-
-  if (student?.is_active) {
-    const { data: existing } = await supabase
-      .from('attendance')
-      .select('id, check_in, check_out')
-      .eq('student_id', student.id)
-      .eq('date', today)
-      .maybeSingle();
-
-    if (!existing) {
-      // Nueva lógica profesional: 7:00 AM con 30 min de margen
-      const checkInLimit = new Date(now);
-      checkInLimit.setHours(7, 30, 0, 0);
-
-      let status = 'present';
-      if (now > checkInLimit) {
-        status = 'late';
-      }
-
-      await supabase.from('attendance').insert({
-        student_id: student.id, 
-        classroom_id: student.classroom_id,
-        date: today, 
-        status: status, 
-        check_in: now.toISOString()
-      });
-      showResult('in', student.name, 'Estudiante', '✅ Entrada registrada', now);
-      if (student.parent_id) notifyParent(student.id, student.parent_id, student.name, 'check_in',
-        now.toLocaleTimeString('es-DO', { hour: '2-digit', minute: '2-digit', hour12: true }));
-    } else if (!existing.check_out) {
-      await supabase.from('attendance').update({ check_out: now.toISOString(), status: 'retirado' }).eq('id', existing.id);
-      showResult('out', student.name, 'Estudiante', '👋 Salida registrada', now);
-      if (student.parent_id) notifyParent(student.id, student.parent_id, student.name, 'check_out',
-        now.toLocaleTimeString('es-DO', { hour: '2-digit', minute: '2-digit', hour12: true }));
-    } else {
-      showResult('warn', student.name, 'Estudiante', 'Ya registrado hoy', now);
-    }
-    updateStats();
-    return;
-  }
-
-  // Try staff by access_code, notes, or matricula (query each field to avoid OR syntax issues)
-  let staff = null;
-  for (const field of ['access_code', 'notes', 'matricula']) {
-    try {
-      const { data } = await supabase
-        .from('profiles')
-        .select('id, name, role')
-        .eq(field, code)
-        .in('role', ['maestra','asistente','directora','admin'])
-        .maybeSingle();
-      if (data) { staff = data; break; }
-    } catch (_) {}
-  }
-
-  if (staff) {
-    const { data: existing } = await supabase
-      .from('door_punches')
-      .select('id, punch_type')
-      .eq('staff_id', staff.id)
-      .eq('date', today)
-      .eq('punch_type', 'check_in')
-      .maybeSingle();
-
-    const roleMap = { maestra: 'Maestra', asistente: 'Asistente', directora: 'Directora', admin: 'Admin' };
-    if (!existing) {
-      // Staff: only write to door_punches (NOT attendance — student_id is bigint, staff id is uuid)
-      const { error: insErr } = await supabase.from('door_punches').insert({
-        staff_id: staff.id, punch_type: 'check_in', punched_at: now.toISOString(), date: today
-      });
-      if (insErr && !insErr.message?.includes('unique')) {
-        showResult('error', staff.name, roleMap[staff.role] || staff.role, insErr.message, now);
-        return;
-      }
-      showResult('in', staff.name, roleMap[staff.role] || staff.role, '✅ Entrada registrada', now);
-    } else {
-      // Check if already checked out
-      const { data: existOut } = await supabase
-        .from('door_punches')
-        .select('id')
-        .eq('staff_id', staff.id)
-        .eq('date', today)
-        .eq('punch_type', 'check_out')
-        .maybeSingle();
-
-      if (!existOut) {
-        await supabase.from('door_punches').insert({
-          staff_id: staff.id, punch_type: 'check_out', punched_at: now.toISOString(), date: today
-        }).catch(() => {});
-        showResult('out', staff.name, roleMap[staff.role] || staff.role, '👋 Salida registrada', now);
-      } else {
-        showResult('warn', staff.name, roleMap[staff.role] || staff.role, 'Ya registrado hoy', now);
-      }
-    }
-    updateStats();
-    return;
-  }
-
-  showResult('error', 'Desconocido', '', 'QR no registrado en el sistema', now);
-}
 
 // ── Scan handler ──────────────────────────────────────────────────────────────
 async function onScan(raw) {
@@ -460,15 +350,12 @@ async function onScan(raw) {
     const now = new Date();
 
     // Use DB RPC — handles students and staff, writes to door_punches AND attendance
+    // TODO: Ensure RLS allows anon access to this specific RPC or use a Service Role Edge Function
     const { data: result, error } = await supabase.rpc('process_door_punch', { p_code: code });
 
     if (error) {
-      // RPC not deployed — fallback: write directly to attendance table
-      if (error.message?.includes('function') || error.code === 'PGRST202' || error.code === '42883') {
-        await _fallbackDirectWrite(code, now);
-        return;
-      }
-      showResult('error', 'Error', '', error.message || 'Error de conexión', new Date());
+      console.error('[Ponche] Error RPC:', error);
+      showResult('error', 'Error de Sistema', '', 'No se pudo procesar el ponche. Intenta de nuevo.', new Date());
       return;
     }
 
@@ -497,9 +384,10 @@ async function onScan(raw) {
     updateStats();
 
   } catch (err) {
-    showResult('error', 'Error', '', 'Fallo de conexión', new Date());
+    console.error('[Ponche] Error crítico:', err);
+    showResult('error', 'Error', '', 'Fallo de conexión o sistema', new Date());
   } finally {
-    setTimeout(() => { isProcessing = false; }, 2500);
+    isProcessing = false;
   }
 }
 
