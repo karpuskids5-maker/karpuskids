@@ -83,7 +83,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   
   // 2. Inicializar m�dulos ligeros y navegaci�n
   // La navegaci�n ahora se encargar� de la carga perezosa (lazy loading) de las secciones.
-  WallModule.init('muroPostsContainer', { accentColor: 'teal' }, AppState);
+  WallModule.init('muroPostsContainer', { accentColor: 'teal', likeColor: 'emerald' }, AppState);
   
   // ? FIX OneSignal: Solo inicializar en el dominio correcto para evitar errores de consola
   if (window.location.hostname === 'karpuskids.com' || window.location.hostname === 'localhost') {
@@ -308,7 +308,7 @@ async function initProfile() {
   // Fetch fresh profile with access_code from DB
   const { data: freshProfile } = await supabase
     .from('profiles')
-    .select('id, name, email, phone, bio, avatar_url, access_code, notes, role')
+    .select('id, name, email, phone, bio, avatar_url, access_code, role')
     .eq('id', profile.id)
     .maybeSingle();
   const p = freshProfile || profile;

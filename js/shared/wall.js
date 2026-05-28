@@ -23,6 +23,30 @@ export const WallModule = {
   _observer: null,
   _options: {},
 
+  // Obtiene los colores de like según la configuración o el rol del usuario
+  _getLikeColors() {
+    let color = this._options.likeColor;
+    
+    if (!color) {
+      // Fallback basado en el rol si no se pasó un color específico en init
+      const role = this._appState?.get('profile')?.role || 'padre';
+      const roleColors = {
+        'padre': 'emerald',    // Verde
+        'maestra': 'orange',   // Naranja
+        'asistente': 'emerald',// Verde (Asistente usa Teal/Emerald)
+        'directora': 'purple', // Morado
+        'admin': 'purple'
+      };
+      color = roleColors[role] || 'rose';
+    }
+
+    return {
+      text: `text-${color}-500`,
+      fill: `fill-${color}-500`,
+      hover: `hover:text-${color}-500`
+    };
+  },
+
   // Utilidad de tiempo relativo
   _relativeTimeFromNow(timeString) {
     try {
@@ -289,6 +313,7 @@ export const WallModule = {
     const date = this._relativeTimeFromNow(p.created_at);
     const accent = this._options.accentColor || 'indigo';
     const isFirstPost = this._page === 0;
+    const colors = this._getLikeColors();
 
     // Lógica de Renderizado Multimedia con lazy loading
     let mediaHtml = '';
@@ -368,8 +393,8 @@ export const WallModule = {
           ${mediaHtml}
 
           <div class="flex items-center gap-6 pt-4 border-t border-slate-50">
-            <button onclick="WallModule.toggleLike('${p.id}')" class="flex items-center gap-2 text-xs font-bold transition-colors group ${p.user_liked ? 'text-rose-500' : 'text-slate-500 hover:text-rose-500'}">
-              <i data-lucide="heart" class="w-4 h-4 ${p.user_liked ? 'fill-rose-500' : 'group-hover:scale-110 transition-transform'}"></i>
+            <button onclick="WallModule.toggleLike('${p.id}')" class="flex items-center gap-2 text-xs font-bold transition-colors group ${p.user_liked ? colors.text : 'text-slate-500 ' + colors.hover}">
+              <i data-lucide="heart" class="w-4 h-4 ${p.user_liked ? colors.fill : 'group-hover:scale-110 transition-transform'}"></i>
               <span id="like-count-${p.id}">${p.like_count}</span>
             </button>
             <button onclick="WallModule.toggleCommentSection('${p.id}')" class="flex items-center gap-2 text-xs font-bold text-slate-500 hover:text-blue-500 transition-colors">
@@ -399,17 +424,33 @@ export const WallModule = {
     const user = this._appState?.get('user');
     if (!user) return;
 
+    const colors = this._getLikeColors();
+
     // Optimistic Update
     const btn = document.querySelector(`#post-${postId} button[onclick*="toggleLike"]`);
     const countSpan = document.getElementById(`like-count-${postId}`);
-    const icon = btn?.querySelector('i');
+    const icon = btn?.querySelector('i') || btn?.querySelector('svg');
     
-    const isLiked = btn?.classList.contains('text-rose-500');
-    const newCount = parseInt(countSpan?.textContent || 0) + (isLiked ? -1 : 1);
+    // Detección robusta basada en la clase de color configurada
+    const isLiked = btn?.classList.contains(colors.text);
+    const currentCount = parseInt(countSpan?.textContent || 0);
+    const newCount = isLiked ? Math.max(0, currentCount - 1) : currentCount + 1;
     
-    if(btn) btn.className = `flex items-center gap-2 text-xs font-bold transition-colors group ${!isLiked ? 'text-rose-500' : 'text-slate-500 hover:text-rose-500'}`;
-    if(icon) icon.setAttribute('class', `w-4 h-4 ${!isLiked ? 'fill-rose-500' : 'group-hover:scale-110 transition-transform'}`);
-    if(countSpan) countSpan.textContent = newCount;
+    if(btn) {
+      btn.classList.toggle(colors.text, !isLiked);
+      btn.classList.toggle('text-slate-500', isLiked);
+    }
+    
+    if(icon) {
+      icon.classList.toggle(colors.fill, !isLiked);
+      if (!isLiked) {
+        icon.classList.remove('group-hover:scale-110', 'transition-transform');
+      } else {
+        icon.classList.add('group-hover:scale-110', 'transition-transform');
+      }
+    }
+
+    if(countSpan) countSpan.textContent = String(newCount);
 
     try {
       if (isLiked) {

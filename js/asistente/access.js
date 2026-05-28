@@ -8,14 +8,30 @@ let _accessChart = null;
 export const AccessModule = {
 
   async init() {
+    this._initFilters();
     this._initOfflineSupport();
     await this.loadStats();
     await this.loadHistory();
     this._bindSearch();
   },
 
+  _initFilters() {
+    const today = new Date().toISOString().split('T')[0];
+    const fromInput = document.getElementById('accessFilterFrom');
+    const toInput   = document.getElementById('accessFilterTo');
+    
+    if (fromInput) fromInput.value = today;
+    if (toInput) toInput.value = today;
+
+    document.getElementById('btnApplyAccessFilters')?.addEventListener('click', () => {
+      this.loadStats();
+      this.loadHistory();
+      this.updateChart();
+    });
+  },
+
   _bindSearch() {
-    const input = document.getElementById('searchAccessInput');
+    const input = document.getElementById('searchAccessTable');
     if (input) {
       input.addEventListener('input', Helpers.debounce((e) => {
         this.loadHistory(e.target.value);
@@ -374,11 +390,10 @@ export const AccessModule = {
       const toInput   = document.getElementById('accessFilterTo')?.value;
       const status    = document.getElementById('accessFilterStatus')?.value;
 
-      // Fallback: si no hay filtro de fecha, mostrar últimos 30 días
-      const today = new Date();
-      const defaultFrom = new Date(today); defaultFrom.setDate(today.getDate() - 29);
-      const from = fromInput || defaultFrom.toISOString().split('T')[0];
-      const to   = toInput   || today.toISOString().split('T')[0];
+      // Por defecto mostrar solo HOY si no hay filtros manuales
+      const todayStr = new Date().toISOString().split('T')[0];
+      const from = fromInput || todayStr;
+      const to   = toInput   || todayStr;
 
       // 1. Asistencia de Estudiantes
       let qAtt = supabase
@@ -390,7 +405,7 @@ export const AccessModule = {
 
       if (status && status !== 'all' && status !== 'staff') qAtt = qAtt.eq('status', status);
 
-      const { data: attData, error: attErr } = await qAtt.limit(200);
+      const { data: attData, error: attErr } = await qAtt.limit(500);
       if (attErr) throw attErr;
 
       // 2. Ponches del Personal
@@ -402,7 +417,7 @@ export const AccessModule = {
         .order('date', { ascending: false })
         .order('punched_at', { ascending: false });
 
-      const { data: punchData, error: punchErr } = await qPunches.limit(200);
+      const { data: punchData, error: punchErr } = await qPunches.limit(500);
       if (punchErr) throw punchErr;
 
       // 3. Agrupar ponches del personal por persona+día (evita duplicados)

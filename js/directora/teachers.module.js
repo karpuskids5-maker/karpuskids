@@ -1,4 +1,4 @@
-﻿import { DirectorApi } from './api.js';
+﻿﻿import { DirectorApi } from './api.js';
 import { Helpers } from '../shared/helpers.js';
 import { UI } from './ui.module.js';
 import { AppState } from './state.js';
@@ -103,7 +103,7 @@ export const TeachersModule = {
       if (id) {
         res = await DirectorApi.updateTeacher(id, payload);
       } else {
-        if (!password || password.length < 6) throw new Error('Contrase�a requerida (m�nimo 6 caracteres)');
+        if (!password || password.length < 6) throw new Error('Contraseña requerida (mínimo 6 caracteres)');
         
         const tempClient = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
            auth: { persistSession: false, autoRefreshToken: false, detectSessionInUrl: false }
@@ -161,7 +161,7 @@ export const TeachersModule = {
           </div>
           
           <div>
-            <label class="${labelClass}">Correo electr�nico</label>
+            <label class="${labelClass}">Correo electrónico</label>
             <input id="tEmail" placeholder="usuario@karpus.com" type="email" class="${inputClass}">
           </div>
 
@@ -195,15 +195,15 @@ export const TeachersModule = {
           </div>
 
           <div>
-            <label class="${labelClass}">Tel�fono</label>
+            <label class="${labelClass}">Teléfono</label>
             <input id="tPhone" placeholder="Opcional" type="tel" class="${inputClass}">
           </div>
 
           <div class="col-span-2" id="passwordFieldContainer" style="${id ? 'display:none' : ''}">
-            <label class="${labelClass}">Contrase�a <span class="text-rose-400 normal-case ml-1 font-normal">(M�nimo 6 caracteres)</span></label>
+            <label class="${labelClass}">Contraseña <span class="text-rose-400 normal-case ml-1 font-normal">(Mínimo 6 caracteres)</span></label>
             <div class="relative">
               <i data-lucide="lock" class="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400"></i>
-              <input id="tPassword" placeholder="Crear contrase�a de acceso" type="text" class="${inputClass} pl-10">
+              <input id="tPassword" placeholder="Crear contraseña de acceso" type="text" class="${inputClass} pl-10">
             </div>
             <p class="text-[10px] text-slate-400 mt-1 ml-1">* Solo requerida para nuevos usuarios</p>
           </div>
@@ -339,7 +339,7 @@ export const TeachersModule = {
       if (!teacher || !teacher.access_code) {
         const { data } = await supabase
           .from('profiles')
-          .select('id, name, email, phone, role, is_active, notes, access_code')
+          .select('id, name, email, phone, role, is_active, access_code')
           .eq('id', id)
           .maybeSingle();
         if (data) teacher = { ...teacher, ...data };

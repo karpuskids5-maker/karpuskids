@@ -1,4 +1,4 @@
-﻿import { ensureRole, supabase, initOneSignal } from '../shared/supabase.js';
+import { ensureRole, supabase, initOneSignal } from '../shared/supabase.js';
 import { AppState } from './state.js';
 import { Helpers } from '../shared/helpers.js';
 import { WallModule } from './wall.module.js';
@@ -636,7 +636,7 @@ async function _initDirectorAccessId(profile) {
   // Always fetch fresh from DB to get access_code (not in AppState profile)
   const { data: freshProfile } = await supabase
     .from('profiles')
-    .select('id, name, access_code, notes')
+    .select('id, name, access_code')
     .eq('id', profile.id)
     .maybeSingle();
 

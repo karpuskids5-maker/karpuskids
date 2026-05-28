@@ -497,8 +497,12 @@ async function _initOneSignalAsync(currentUser) {
           welcomeNotification: { disable: false }
         });
 
-        // Vincular usuario — sin await largo
-        OneSignal.login(user.id).catch(() => {});
+        // Vincular usuario — con validación y catch
+        if (user?.id) {
+          OneSignal.login(String(user.id)).catch(e => {
+            console.warn('[OneSignal] Login deferred error:', e);
+          });
+        }
 
         // Guardar subscription ID cuando esté disponible
         setTimeout(async () => {

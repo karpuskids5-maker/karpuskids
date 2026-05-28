@@ -11,7 +11,7 @@ let _view = 'table';
 
 function avg(arr) {
   const valid = arr.filter(v => v != null && !isNaN(v));
-  if (!valid.length) return '�';
+  if (!valid.length) return '-';
   return (valid.reduce((a, b) => a + Number(b), 0) / valid.length).toFixed(1);
 }
 
@@ -79,7 +79,7 @@ export const StudentsModule = {
         // Poblar opciones de aulas
         const { data: rooms } = await DirectorApi.getClassrooms();
         if (rooms) {
-          // Limpiar antes de poblar (excepto la opci�n "Todas")
+          // Limpiar antes de poblar (excepto la opción "Todas")
           filterClassroom.innerHTML = '<option value="all">Todas las aulas</option>';
           rooms.forEach(r => {
             const o = document.createElement('option');
@@ -99,7 +99,7 @@ export const StudentsModule = {
       const filterLevel = document.getElementById('filterLevel');
       if (filterLevel && !filterLevel._bound) {
         filterLevel._bound = true;
-        // Poblar niveles �nicos de los estudiantes
+        // Poblar niveles únicos de los estudiantes
         const levels = [...new Set(students.map(s => s.level).filter(Boolean))];
         if (levels.length) {
           filterLevel.innerHTML = '<option value="all">Todos los niveles</option>';
@@ -225,7 +225,7 @@ export const StudentsModule = {
           <div class="grid grid-cols-2 gap-3 mb-6 relative">
             <div class="bg-slate-50 p-3 rounded-2xl">
               <p class="text-[10px] font-black text-slate-400 uppercase mb-1">Promedio</p>
-              <p class="text-xl font-black text-indigo-600">${s.average_grade || '�'}</p>
+              <p class="text-xl font-black text-indigo-600">${s.average_grade || '-'}</p>
             </div>
             <div class="bg-slate-50 p-3 rounded-2xl">
               <p class="text-[10px] font-black text-slate-400 uppercase mb-1">Asistencia</p>
@@ -289,8 +289,8 @@ export const StudentsModule = {
     const emailUser = document.getElementById('stEmailUser')?.value?.trim();
     const password = document.getElementById('stPassword')?.value?.trim();
 
-    if (!payload.name || payload.name.trim().length < 3) return Helpers.toast('Nombre inv�lido (min 3 caracteres)', 'warning');
-    // Solo validar datos del padre en creaci�n, no en edici�n
+    if (!payload.name || payload.name.trim().length < 3) return Helpers.toast('Nombre inválido (min 3 caracteres)', 'warning');
+    // Solo validar datos del padre en creación, no en edición
     if (!id && (!payload.p1_name || !payload.p1_phone || !payload.p1_email)) return Helpers.toast('Datos del padre/madre 1 incompletos', 'warning');
     
     UI.setLoading(true);
@@ -319,7 +319,7 @@ export const StudentsModule = {
           let parentId = null;
 
           if (authError) {
-            // User already exists � look up their profile by email
+            // User already exists – look up their profile by email
             if (authError.message?.toLowerCase().includes('already registered') ||
                 authError.status === 422) {
               const { data: existing } = await supabase
@@ -329,9 +329,9 @@ export const StudentsModule = {
                 .maybeSingle();
               if (existing?.id) {
                 parentId = existing.id;
-                Helpers.toast('Usuario ya existe � vinculando al estudiante', 'info');
+                Helpers.toast('Usuario ya existe – vinculando al estudiante', 'info');
               } else {
-                throw new Error('El correo ya est� registrado pero no tiene perfil. Contacta al administrador.');
+                throw new Error('El correo ya está registrado pero no tiene perfil. Contacta al administrador.');
               }
             } else {
               throw authError;
@@ -381,15 +381,15 @@ export const StudentsModule = {
   async delete(id) {
     const confirmFn = window._karpusConfirmDelete;
     const ok = confirmFn
-      ? await confirmFn('�Eliminar estudiante?', 'Esta acci�n no se puede deshacer. Se perder�n todos los datos del estudiante.')
-      : confirm('�Seguro que desea eliminar a este estudiante?');
+      ? await confirmFn('¿Eliminar estudiante?', 'Esta acción no se puede deshacer. Se perderán todos los datos del estudiante.')
+      : confirm('¿Seguro que desea eliminar a este estudiante?');
     if (!ok) return;
     try {
       const res = await DirectorApi.deleteStudent(id);
       const { error } = res || {};
       if (error) throw new Error(error);
       auditLog('student.deleted', { student_id: id });
-      Helpers.toast('Estudiante eliminado con �xito.', 'success');
+      Helpers.toast('Estudiante eliminado con éxito.', 'success');
       this.init();
     } catch (e) {
       Helpers.toast('Error al eliminar estudiante.', 'error');
@@ -461,16 +461,16 @@ export const StudentsModule = {
             </div>
             
             <div class="flex-1 w-full">
-              <h4 class="text-sm font-black text-slate-800 mb-3">📸 FOTO Y MATRÍCULA</h4>
+              <h4 class="text-sm font-black text-slate-800 mb-3">\ud83d\udcf7 FOTO Y MATR\u00cdCULA</h4>
               <div class="flex gap-2">
                 <div class="relative flex-1">
                   <i data-lucide="hash" class="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400"></i>
-              <input id="stMatricula" placeholder="Generar automática..." class="${inputClass} pl-10 bg-white">
+              <input id="stMatricula" placeholder="Generar autom\u00e1tica..." class="${inputClass} pl-10 bg-white">
                 </div>
                 <button onclick="window.generateMatricula()" class="px-6 py-2 bg-indigo-600 text-white rounded-2xl font-black text-xs uppercase hover:bg-indigo-700 shadow-md transition-all active:scale-95">Generar</button>
               </div>
               <div class="grid grid-cols-2 gap-4 mt-3">
-                 <div><label class="${labelClass}">Fecha inscripci�n</label><input type="date" id="stJoinedDate" class="${inputClass}"></div>
+                 <div><label class="${labelClass}">Fecha inscripci\u00f3n</label><input type="date" id="stJoinedDate" class="${inputClass}"></div>
                  <div class="flex items-center pt-6">
                     <label class="flex items-center gap-2 cursor-pointer"><input type="checkbox" id="active" checked class="w-5 h-5 rounded text-emerald-600"><span class="text-sm font-black text-emerald-700 uppercase">Estado Activo</span></label>
                  </div>
@@ -486,7 +486,7 @@ export const StudentsModule = {
             </h4>
             <div>
               <label class="${labelClass}">Nombre completo</label>
-              <input id="stName" placeholder="Ej: Juan P�rez" class="${inputClass}">
+              <input id="stName" placeholder="Ej: Juan Pérez" class="${inputClass}">
             </div>
             <div class="grid grid-cols-2 gap-4">
               <div><label class="${labelClass}">Edad</label><input id="stAge" placeholder="Ej: 5" type="number" class="${inputClass}"></div>
@@ -512,7 +512,7 @@ export const StudentsModule = {
             <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div><label class="${labelClass}">Correo de Usuario (Login)</label><input id="stEmailUser" placeholder="usuario@karpus.com" type="email" class="${inputClass}"></div>
               <div><label class="${labelClass}">Correo de Notificaciones</label><input id="stEmailNotif" placeholder="avisos@ejemplo.com" type="email" class="${inputClass}"></div>
-              <div><label class="${labelClass}">Contrase�a (Min 6 caracteres)</label><input id="stPassword" type="text" placeholder="********" class="${inputClass}"></div>
+              <div><label class="${labelClass}">Contrase\u00f1a (Min 6 caracteres)</label><input id="stPassword" type="text" placeholder="********" class="${inputClass}"></div>
             </div>
           </div>
 
@@ -530,11 +530,11 @@ export const StudentsModule = {
                   <option value="B+">B+</option><option value="B-">B-</option><option value="AB+">AB+</option><option value="AB-">AB-</option>
                 </select>
               </div>
-              <div><label class="${labelClass}">Alergias</label><input id="allergies" placeholder="Ej: Man�, Polvo" class="${inputClass}"></div>
+              <div><label class="${labelClass}">Alergias</label><input id="allergies" placeholder="Ej: Man\u00ed, Polvo" class="${inputClass}"></div>
             </div>
             <div>
               <label class="${labelClass}">Autorizados para recoger</label>
-              <textarea id="authorized" rows="2" placeholder="Ej: Abuela Carmen, T�o Juan" class="${inputClass} resize-none"></textarea>
+              <textarea id="authorized" rows="2" placeholder="Ej: Abuela Carmen, T\u00edo Juan" class="${inputClass} resize-none"></textarea>
             </div>
           </div>
 
@@ -546,10 +546,10 @@ export const StudentsModule = {
             </h4>
             <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div><label class="${labelClass}">Nombre</label><input id="p1Name" placeholder="Nombre completo" class="${inputClass}"></div>
-              <div><label class="${labelClass}">Tel�fono</label><input id="p1Phone" placeholder="Tel�fono" class="${inputClass}"></div>
-              <div><label class="${labelClass}">Profesi�n</label><input id="p1Profession" placeholder="Ej: Ingeniero" class="${inputClass}"></div>
-              <div class="md:col-span-2"><label class="${labelClass}">Direcci�n</label><input id="p1Address" placeholder="Direcci�n completa" class="${inputClass}"></div>
-              <div class="md:col-span-2"><label class="${labelClass}">Contacto de Emergencia (Extra)</label><input id="p1Emergency" placeholder="Nombre y Tel�fono alternativo" class="${inputClass}"></div>
+              <div><label class="${labelClass}">Tel\u00e9fono</label><input id="p1Phone" placeholder="Tel\u00e9fono" class="${inputClass}"></div>
+              <div><label class="${labelClass}">Profesi\u00f3n</label><input id="p1Profession" placeholder="Ej: Ingeniero" class="${inputClass}"></div>
+              <div class="md:col-span-2"><label class="${labelClass}">Direcci\u00f3n</label><input id="p1Address" placeholder="Direcci\u00f3n completa" class="${inputClass}"></div>
+              <div class="md:col-span-2"><label class="${labelClass}">Contacto de Emergencia (Extra)</label><input id="p1Emergency" placeholder="Nombre y Tel\u00e9fono alternativo" class="${inputClass}"></div>
             </div>
           </div>
 
@@ -561,17 +561,17 @@ export const StudentsModule = {
               </h4>
               <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div><label class="${labelClass}">Nombre</label><input id="p2Name" placeholder="Nombre" class="${inputClass}"></div>
-                <div><label class="${labelClass}">Tel�fono</label><input id="p2Phone" placeholder="Tel�fono" class="${inputClass}"></div>
-                <div><label class="${labelClass}">Profesi�n</label><input id="p2Profession" placeholder="Ej: Abogada" class="${inputClass}"></div>
-                <div><label class="${labelClass}">Direcci�n</label><input id="p2Address" placeholder="Direcci�n opcional" class="${inputClass}"></div>
+                <div><label class="${labelClass}">Tel\u00e9fono</label><input id="p2Phone" placeholder="Tel\u00e9fono" class="${inputClass}"></div>
+                <div><label class="${labelClass}">Profesi\u00f3n</label><input id="p2Profession" placeholder="Ej: Abogada" class="${inputClass}"></div>
+                <div><label class="${labelClass}">Direcci\u00f3n</label><input id="p2Address" placeholder="Direcci\u00f3n opcional" class="${inputClass}"></div>
               </div>
           </div>
 
-          <!-- 7. INFORMACIÓN DE PAGO -->
+          <!-- 7. INFORMACI\u00d3N DE PAGO -->
           <div class="bg-amber-50 p-6 rounded-[2rem] border-2 border-amber-100 space-y-4">
               <h4 class="text-sm font-black text-amber-800 flex items-center gap-2">
                 <div class="w-8 h-8 rounded-xl bg-amber-100 text-amber-600 flex items-center justify-center"><i data-lucide="credit-card" class="w-4 h-4"></i></div>
-                INFORMACIÓN DE PAGO
+                INFORMACI\u00d3N DE PAGO
               </h4>
               <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
                 <div>
@@ -582,29 +582,29 @@ export const StudentsModule = {
                   </div>
                 </div>
                 <div>
-                  <label class="${labelClass}">D�a Prolongado</label>
+                  <label class="${labelClass}">D\u00eda Prolongado</label>
                   <div class="relative">
                     <span class="absolute left-4 top-1/2 -translate-y-1/2 text-amber-600 font-black text-sm">$</span>
                     <input id="prolongadoFee" placeholder="0.00" type="number" step="0.01" class="${inputClass} pl-8 bg-white">
                   </div>
                 </div>
-                <div><label class="${labelClass}">D�a Vencimiento</label><input id="dueDay" placeholder="5" type="number" min="1" max="31" class="${inputClass} bg-white"></div>
+                <div><label class="${labelClass}">D\u00eda Vencimiento</label><input id="dueDay" placeholder="5" type="number" min="1" max="31" class="${inputClass} bg-white"></div>
               </div>
           </div>
 
-          <!-- 8. CÓDIGO QR DE ASISTENCIA -->
+          <!-- 8. C\u00d3DIGO QR DE ASISTENCIA -->
           <div class="bg-gradient-to-br from-orange-50 to-amber-50 p-6 rounded-[2rem] border-2 border-orange-100 space-y-4">
             <h4 class="text-sm font-black text-orange-800 flex items-center gap-2">
               <div class="w-8 h-8 rounded-xl bg-orange-100 text-orange-600 flex items-center justify-center"><i data-lucide="qr-code" class="w-4 h-4"></i></div>
-              CÓDIGO QR DE ASISTENCIA
+              C\u00d3DIGO QR DE ASISTENCIA
             </h4>
-            <p class="text-xs text-orange-600 font-medium">El QR se genera automáticamente con la matrícula. El padre puede escanearlo para registrar entrada/salida.</p>
+            <p class="text-xs text-orange-600 font-medium">El QR se genera autom\u00e1ticamente con la matr\u00edcula. El padre puede escanearlo para registrar entrada/salida.</p>
             <div id="qr-section" class="flex flex-col items-center gap-4 bg-white p-6 rounded-3xl border border-orange-100 shadow-sm">
               <div id="qr-container" class="bg-white p-3 rounded-2xl border-2 border-slate-100 shadow-sm min-h-[160px] flex items-center justify-center">
-                <p class="text-xs text-slate-400 font-bold text-center">Genera o ingresa una matrícula<br>para ver el QR</p>
+                <p class="text-xs text-slate-400 font-bold text-center">Genera o ingresa una matr\u00edcula<br>para ver el QR</p>
               </div>
               <div class="text-center w-full">
-                <p class="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Matrícula vinculada</p>
+                <p class="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Matr\u00edcula vinculada</p>
                 <p id="qr-matricula-label" class="text-lg font-black text-slate-700">--</p>
               </div>
               <div class="flex gap-2 w-full">
@@ -639,7 +639,7 @@ export const StudentsModule = {
       }
     };
 
-    // Cargar librer�a QR si no est� disponible
+    // Cargar librería QR si no está disponible
     const _loadQRLib = () => new Promise((resolve) => {
       if (window.QRCode) { resolve(); return; }
       const s = document.createElement('script');
@@ -657,7 +657,7 @@ export const StudentsModule = {
       if (!container) return;
 
       if (!matricula) {
-        Helpers.toast('Genera o ingresa una matr�cula primero', 'warning');
+        Helpers.toast('Genera o ingresa una matrícula primero', 'warning');
         return;
       }
 
@@ -712,11 +712,11 @@ export const StudentsModule = {
       win.document.close();
     };
 
-    // Auto-generar QR si ya hay matr�cula (modo edici�n)
+    // Auto-generar QR si ya hay matrícula (modo edición)
     const existingMatricula = document.getElementById('stMatricula')?.value?.trim();
     if (existingMatricula) setTimeout(() => window.generateStudentQR(), 300);
 
-    // Escuchar cambios en matr�cula para actualizar QR en tiempo real
+    // Escuchar cambios en matrícula para actualizar QR en tiempo real
     document.getElementById('stMatricula')?.addEventListener('input', () => {
       clearTimeout(window._qrDebounce);
       window._qrDebounce = setTimeout(() => window.generateStudentQR(), 600);
@@ -752,10 +752,10 @@ export const StudentsModule = {
     } catch (_) { /* silencioso */ }
 
     if (id) {
-      // Fetch completo desde DB � convertir id a n�mero para evitar error 400 (bigint vs string)
+  // Fetch completo desde DB - convertir id a número para evitar error 400 (bigint vs string)
       try {
         const numericId = parseInt(id, 10);
-        if (isNaN(numericId)) throw new Error('ID inv�lido');
+    if (isNaN(numericId)) throw new Error('ID inválido');
 
         const { data: student, error } = await supabase
           .from('students')
@@ -803,7 +803,7 @@ export const StudentsModule = {
             if (preview) preview.innerHTML = `<img src="${student.avatar_url}" class="w-full h-full object-cover">`;
           }
 
-          // ? Generar QR si tiene matr�cula
+    // ? Generar QR si tiene matrícula
           if (student.matricula) {
             document.getElementById('qr-section')?.classList.remove('hidden');
             document.getElementById('qr-matricula-label').textContent = student.matricula;
@@ -833,7 +833,7 @@ export const StudentsModule = {
                         <h1>Karpus Kids</h1>
                         <img src="${qrUrl}">
                         <p>${student.name}</p>
-                        <p style="font-size: 14px; color: #999;">MATR�CULA: ${student.matricula}</p>
+                <p style="font-size: 14px; color: #999;">MATRÍCULA: ${student.matricula}</p>
                       </div>
                     </body>
                   </html>

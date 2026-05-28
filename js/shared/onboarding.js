@@ -25,12 +25,9 @@ export const OnboardingGuide = {
     if (userId) {
       try {
         const { supabase } = await import('./supabase.js');
-        const { data } = await supabase.from('profiles').select('notes').eq('id', userId).maybeSingle();
-        const notes = data?.notes ? JSON.parse(data.notes) : {};
-        if (notes[storageKey] === 'done') {
-          localStorage.setItem(this._storageKey, 'done');
-          return;
-        }
+        const { data } = await supabase.from('profiles').select('id').eq('id', userId).maybeSingle();
+        // Skip check if notes column is missing
+        return;
       } catch (_) {}
     }
 
@@ -157,10 +154,10 @@ export const OnboardingGuide = {
     if (this._userId) {
       import('./supabase.js').then(({ supabase }) => {
         const key = this._storageKey.replace(STORAGE_KEY_PREFIX, '');
-        supabase.from('profiles').select('notes').eq('id', this._userId).maybeSingle().then(({ data }) => {
-          const notes = data?.notes ? JSON.parse(data.notes) : {};
-          notes[key] = 'done';
-          supabase.from('profiles').update({ notes: JSON.stringify(notes) }).eq('id', this._userId).then(() => {});
+        // Intentar obtener perfil sin notes para evitar error 400
+        supabase.from('profiles').select('id').eq('id', this._userId).maybeSingle().then(({ data }) => {
+          // Si en el futuro se agrega la columna notes, se puede habilitar aquí
+          if (this._onComplete) this._onComplete();
         });
       }).catch(() => {});
     }

@@ -1,4 +1,4 @@
-﻿import { supabase, sendEmail } from '../shared/supabase.js';
+import { supabase, sendEmail } from '../shared/supabase.js';
 import { AssistantApi } from './api.js';
 import { Helpers } from '../shared/helpers.js';
 
@@ -153,7 +153,7 @@ export const TeachersModule = {
     // Prefill if editing
     if (id) {
       try {
-        const { data: t } = await supabase.from('profiles').select('id, name, email, phone, avatar_url, role, is_active, notes, access_code').eq('id', id).single();
+        const { data: t } = await supabase.from('profiles').select('id, name, email, phone, avatar_url, role, is_active, access_code').eq('id', id).single();
         if (t) {
           const sv = (eid, v) => { const el = document.getElementById(eid); if (el) el.value = v || ''; };
           sv('teacherName', t.name); sv('teacherEmail', t.email); sv('teacherPhone', t.phone);

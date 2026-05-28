@@ -1,4 +1,4 @@
-﻿/**
+/**
  * Karpus Kids - Badge System v2
  * Indicadores visuales en tiempo real para todos los paneles.
  * Compatible con: panel_padres, panel_directora, panel_asistente, panel-maestra
@@ -209,7 +209,7 @@ export const BadgeSystem = {
         }
       }
       // Staff: nuevo comprobante para revisar
-      if (ns === 'review' || ns === 'revision') {
+      if (ns === 'review' || ns === 'revision' || (ns === 'pending' && payload.new.evidence_url)) {
         const active = self._getActiveSection();
         if (active !== 'pagos') {
           const prev = self._getBadgeCount('pagos');
