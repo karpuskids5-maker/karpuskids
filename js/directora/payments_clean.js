@@ -80,7 +80,39 @@ export const PaymentsModule = {
       const sf = document.getElementById('filterPaymentStatus')?.value;
       const sq = document.getElementById('searchPaymentStudent')?.value?.trim();
 
+      const now    = new Date();
+      const today  = now.getDate();
+      const genDay = this.settings.generation_day || 25;
+
+      // Mes visible máximo: cobros del mes siguiente solo aparecen a partir del día de generación
+      const visibleUpToMonth = (() => {
+        const y = now.getFullYear();
+        const m = now.getMonth(); // 0-based
+        if (today >= genDay) {
+          const nextM = m + 1 > 11 ? 0 : m + 1;
+          const nextY = m + 1 > 11 ? y + 1 : y;
+          return `${nextY}-${String(nextM + 1).padStart(2, '0')}`;
+        }
+        return `${y}-${String(m + 1).padStart(2, '0')}`;
+      })();
+
       const monthKey = `${yv}-${String(mv).padStart(2,'0')}`;
+
+      // Si el mes seleccionado aún no se ha generado, mostrar aviso
+      if (monthKey > visibleUpToMonth) {
+        const mi = parseInt(mv, 10) - 1;
+        const label = MES_LABEL[mi] || mv;
+        const genDate = `${today >= genDay ? 'ya generado' : `el día ${genDay} de ${MES_LABEL[now.getMonth()]}`}`;
+        tbody.innerHTML = `<tr><td colspan="8" class="text-center py-16">
+          <div class="flex flex-col items-center gap-3">
+            <div class="w-14 h-14 bg-indigo-50 rounded-full flex items-center justify-center text-2xl">📅</div>
+            <p class="font-black text-slate-600 text-sm">Los cobros de ${label} ${yv} se generan ${genDate}</p>
+            <p class="text-xs text-slate-400 font-medium">Vuelve a partir del día ${genDay} para ver estos cobros.</p>
+          </div></td></tr>`;
+        if (window.lucide) lucide.createIcons();
+        return;
+      }
+
       const SPANISH_MONTHS = ['enero','febrero','marzo','abril','mayo','junio','julio','agosto','septiembre','octubre','noviembre','diciembre'];
       const spanishMonth    = SPANISH_MONTHS[parseInt(mv, 10) - 1];
       const spanishMonthCap = spanishMonth ? spanishMonth.charAt(0).toUpperCase() + spanishMonth.slice(1) : null;
@@ -108,14 +140,14 @@ export const PaymentsModule = {
         if (!r2.error && r2.data?.length) data = r2.data;
       }
 
-      // ── 2. Deudas pendientes/vencidas de TODOS los meses anteriores ────
-      // Se muestran siempre (sin importar el filtro de mes) para visibilidad total
+      // ── 2. Deudas pendientes/vencidas de meses anteriores (solo hasta visibleUpToMonth) ──
       let prevDebt = [];
       const showPrev = !sf || sf === 'all' || sf === 'pending' || sf === 'overdue';
       if (showPrev) {
         const { data: prev } = await supabase.from('payments').select(SEL)
           .in('status', ['pending', 'overdue'])
           .lt('month_paid', monthKey)
+          .lte('month_paid', visibleUpToMonth)
           .order('month_paid', { ascending: true });
         if (prev?.length) prevDebt = prev;
       }
@@ -614,21 +646,110 @@ export const PaymentsModule = {
     try {
       Helpers.toast('Ejecutando ciclo...', 'info');
       
-      // Usar RPC seguro en lugar de lógica en el cliente
-      const { data, error } = await supabase.rpc('run_payment_cycle');
+      // Intentar RPC del servidor primero
+      const { data: rpcData, error: rpcErr } = await supabase.rpc('run_payment_cycle');
       
-      if (error) throw error;
-      if (data?.error) throw new Error(data.error);
+      if (!rpcErr) {
+        const gen = rpcData?.generated || 0;
+        const exp = rpcData?.expired || 0;
+        if (gen > 0) Helpers.toast(`✅ ${gen} cobro(s) generados correctamente`, 'success');
+        else if (exp > 0) Helpers.toast(`ℹ️ Se marcaron ${exp} pago(s) como vencidos`, 'info');
+        else Helpers.toast('ℹ️ No se generaron nuevos cobros (ya existen para este mes)', 'info');
+        await this.loadPayments();
+        this.loadStats();
+        return;
+      }
 
-      const gen = data.generated || 0;
-      const exp = data.expired || 0;
+      // Fallback: lógica en el cliente con regla de gracia para estudiantes nuevos
+      const now       = new Date();
+      const today     = now.getDate();
+      const genDay    = this.settings.generation_day || 25;
+      const dueDay    = this.settings.due_day || 5;
 
-      if (gen > 0) {
-        Helpers.toast(`✅ ${gen} cobro(s) generados correctamente`, 'success');
-      } else if (exp > 0) {
-        Helpers.toast(`ℹ️ Se marcaron ${exp} pago(s) como vencidos`, 'info');
+      // El cobro que se genera hoy es para el mes siguiente
+      const targetM = now.getMonth() + 1 > 11 ? 0 : now.getMonth() + 1;
+      const targetY = now.getMonth() + 1 > 11 ? now.getFullYear() + 1 : now.getFullYear();
+      const monthKey = `${targetY}-${String(targetM + 1).padStart(2, '0')}`;
+
+      // Fecha de vencimiento: día 5 del mes siguiente al cobro
+      const dueM = targetM + 1 > 11 ? 0 : targetM + 1;
+      const dueY = targetM + 1 > 11 ? targetY + 1 : targetY;
+      const dueDate = `${dueY}-${String(dueM + 1).padStart(2, '0')}-${String(dueDay).padStart(2, '0')}`;
+
+      // Obtener estudiantes activos con mensualidad > 0 y su fecha de inscripción
+      const { data: students, error: sErr } = await supabase
+        .from('students')
+        .select('id, name, monthly_fee, start_date')
+        .eq('is_active', true)
+        .gt('monthly_fee', 0);
+      if (sErr) throw sErr;
+      if (!students?.length) { Helpers.toast('No hay estudiantes activos con cuota configurada', 'warning'); return; }
+
+      // Filtrar estudiantes que ya tienen derecho a cobro este mes (regla de gracia)
+      const eligibleStudents = students.filter(s => {
+        if (!s.start_date) return true; // sin fecha de inscripción → siempre cobrar
+        const startDate = new Date(s.start_date + 'T00:00:00');
+        const startY = startDate.getFullYear();
+        const startM = startDate.getMonth(); // 0-based
+        const startDay = startDate.getDate();
+
+        // Calcular el primer mes que se debe cobrar
+        // Si se inscribió antes del día de generación: primer cobro = mes siguiente al de inscripción
+        // Si se inscribió el día de generación o después: primer cobro = 2 meses después
+        let firstBillingM, firstBillingY;
+        if (startDay < genDay) {
+          firstBillingM = startM + 1 > 11 ? 0 : startM + 1;
+          firstBillingY = startM + 1 > 11 ? startY + 1 : startY;
+        } else {
+          firstBillingM = startM + 2 > 11 ? (startM + 2) - 12 : startM + 2;
+          firstBillingY = startM + 2 > 11 ? startY + 1 : startY;
+        }
+        const firstBillingKey = `${firstBillingY}-${String(firstBillingM + 1).padStart(2, '0')}`;
+
+        // Solo cobrar si el mes objetivo >= primer mes de cobro
+        return monthKey >= firstBillingKey;
+      });
+
+      if (!eligibleStudents.length) {
+        Helpers.toast('ℹ️ Ningún estudiante elegible para cobro este mes (período de gracia activo)', 'info');
+        return;
+      }
+
+      // Verificar cuáles ya tienen cobro para este mes
+      const { data: existing } = await supabase
+        .from('payments')
+        .select('student_id')
+        .eq('month_paid', monthKey);
+      const existingIds = new Set((existing || []).map(p => String(p.student_id)));
+
+      const missing = eligibleStudents.filter(s => !existingIds.has(String(s.id)));
+
+      let generated = 0;
+      if (missing.length) {
+        const inserts = missing.map(s => ({
+          student_id: s.id,
+          amount:     s.monthly_fee,
+          status:     'pending',
+          due_date:   dueDate,
+          month_paid: monthKey,
+          concept:    'Mensualidad',
+          created_at: new Date().toISOString()
+        }));
+        const { error: insErr } = await supabase.from('payments').insert(inserts);
+        if (insErr) throw insErr;
+        generated = missing.length;
+      }
+
+      // Marcar como vencidos los pendientes con due_date pasado
+      await supabase.from('payments')
+        .update({ status: 'overdue' })
+        .eq('status', 'pending')
+        .lt('due_date', now.toISOString().split('T')[0]);
+
+      if (generated > 0) {
+        Helpers.toast(`✅ ${generated} cobro(s) generados (${eligibleStudents.length - missing.length} ya existían)`, 'success');
       } else {
-        Helpers.toast('ℹ️ No se generaron nuevos cobros (ya existen para este mes)', 'info');
+        Helpers.toast('ℹ️ Todos los estudiantes elegibles ya tienen cobro para este mes', 'info');
       }
 
       await this.loadPayments();
