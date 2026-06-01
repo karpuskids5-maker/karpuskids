@@ -1,6 +1,6 @@
-import { supabase, sendEmail } from '../shared/supabase.js';
+import { supabase, sendEmail } from '/js/shared/supabase.js';
 import { AssistantApi } from './api.js';
-import { Helpers } from '../shared/helpers.js';
+import { Helpers } from '/js/shared/helpers.js';
 
 /**
  * M�dulo de Gesti�n de Maestros para Asistente
@@ -132,11 +132,13 @@ export const TeachersModule = {
 
     const gc = document.getElementById('globalModalContainer');
     if (gc) {
-      gc.innerHTML = '<div class="bg-white rounded-3xl shadow-2xl w-full max-w-md max-h-[92vh] overflow-hidden mx-3 flex flex-col">' + html + '</div>';
-      gc.style.display = 'flex';
-      gc.style.alignItems = 'center';
-      gc.style.justifyContent = 'center';
-      gc.style.zIndex = '9999';
+      gc.innerHTML = '<div id="asis-teacher-modal-inner" class="bg-white rounded-3xl shadow-2xl w-full max-w-md max-h-[92vh] overflow-hidden mx-3 flex flex-col relative animate-scaleIn">' + html + '</div>';
+      gc.style.cssText = 'display:flex;align-items:center;justify-content:center;position:fixed;inset:0;background:rgba(0,0,0,0.6);backdrop-filter:blur(8px);z-index:9999;';
+      
+      // Manejar clic afuera para cerrar
+      gc.onmousedown = (e) => {
+        if (e.target === gc) window._closeAsistenteModal();
+      };
     }
 
     window._closeAsistenteModal = () => {

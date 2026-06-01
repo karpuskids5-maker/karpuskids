@@ -165,23 +165,31 @@ export const PaymentsModule = {
         .from('payments')
         .select('id, student_id, amount, concept, status, due_date, created_at, paid_date, method, bank, reference, month_paid, evidence_url, students:student_id(name, classroom_id, classrooms:classroom_id(name))');
 
-      // "Todos" sin filtro de mes: mostrar todos los pagos de todos los meses
-      if (statusFilter === 'all' && !monthVal) {
-        query = query.order('month_paid', { ascending: false }).order('due_date', { ascending: true }).limit(300);
-      } else if (statusFilter === 'pending' || statusFilter === 'overdue') {
-        // Pendientes/Vencidos: traer TODOS sin filtro de mes para mostrar atrasos
-        query = query.in('status', ['pending', 'overdue']).order('month_paid', { ascending: true });
-      } else {
-        query = query.eq('month_paid', selectedMonthKey).order('due_date', { ascending: true });
-        if (statusFilter && statusFilter !== 'all') {
+      if (statusFilter === 'all') {
+        // Para 'all', necesitamos traer todos los pagos que no estén 'paid' de cualquier mes,
+        // Y los 'paid' solo del mes seleccionado (para no saturar la tabla).
+        query = query.or(
+          `status.in.("pending", "review", "overdue"),` +
+          `and(status.eq.paid,month_paid.eq.${selectedMonthKey})`
+        );
+        query = query.order('month_paid', { ascending: false }).order('due_date', { ascending: true });
+      } else if (statusFilter === 'pending' || statusFilter === 'overdue' || statusFilter === 'review') {
+        // Si se selecciona un estado no 'paid', se traen todos los pagos con ese estado de CUALQUIER MES
+        query = query.eq('status', statusFilter).order('month_paid', { ascending: false }).order('due_date', { ascending: true });
+      } else { // Si el filtro es 'paid' o cualquier otro estado específico que no sea pending/overdue/review,
+               // o si se mantiene la lógica anterior por mes y estado
+        query = query.eq('month_paid', selectedMonthKey);
+        if (statusFilter) { // Asegurarse de que no estamos filtrando por 'all' aquí
           query = query.eq('status', statusFilter);
         }
+        query = query.order('due_date', { ascending: true });
       }
 
       const { data: payments, error } = await query;
       if (error) throw error;
 
       let list = payments || [];
+      // Aplicar filtro de búsqueda de estudiante en el conjunto completo de resultados
       if (search) {
         const q = search.toLowerCase();
         list = list.filter(p => p.students?.name?.toLowerCase().includes(q));
@@ -205,14 +213,39 @@ export const PaymentsModule = {
         return;
       }
 
-      // SEPARACI\u00d3N VISUAL: Vencidos de meses anteriores vs Mes Actual
-      let html = '';
-      const overduePrevious = list.filter(p => p.month_paid < selectedMonthKey && (p.status === 'overdue' || p.status === 'pending'));
-      const currentMonthItems = list.filter(p => p.month_paid === selectedMonthKey || p.month_paid > selectedMonthKey || p.status === 'paid');
+      // Normalizar y ordenar la lista para la presentación
+      const normalizedList = list.map(p => ({
+        ...p,
+        // Añadir una propiedad `_isPreviousMonthOverdue` para la separación visual
+        _isPreviousMonthOverdue: (p.month_paid < selectedMonthKey && (calcStatus(p) === 'overdue' || calcStatus(p) === 'pending' || calcStatus(p) === 'review'))
+      }));
 
-      if (overduePrevious.length > 0) {
-        html += '<tr class="bg-rose-50/50"><td colspan="8" class="px-8 py-2 text-[10px] font-black text-rose-600 uppercase tracking-[0.2em] border-y border-rose-100">\u26a0\ufe0f PAGOS VENCIDOS (MESES ANTERIORES)</td></tr>';
-        html += overduePrevious.map(p => this._renderRow(p)).join('');
+      // Ordenar: primero los de meses anteriores y luego por el mes seleccionado, y por estado
+      const pri = { overdue: 1, pending: 2, review: 3, paid: 4, rejected: 5 };
+      normalizedList.sort((a, b) => {
+        // Primero los de meses anteriores
+        if (a._isPreviousMonthOverdue && !b._isPreviousMonthOverdue) return -1;
+        if (!a._isPreviousMonthOverdue && b._isPreviousMonthOverdue) return 1;
+        
+        // Luego por mes (descendente para los anteriores, ascendente para el actual si hay mezcla)
+        if (a.month_paid !== b.month_paid) {
+            return b.month_paid.localeCompare(a.month_paid); // Más recientes primero para anteriores
+        }
+
+        // Finalmente por prioridad de estado
+        return (pri[calcStatus(a)] || 99) - (pri[calcStatus(b)] || 99);
+      });
+
+      const previousMonthItems = normalizedList.filter(p => p._isPreviousMonthOverdue);
+      const currentMonthItems = normalizedList.filter(p => !p._isPreviousMonthOverdue);
+
+      let html = '';
+      
+      if (statusFilter === 'all' || statusFilter === 'pending' || statusFilter === 'overdue' || statusFilter === 'review') {
+        if (previousMonthItems.length > 0) {
+          html += '<tr class="bg-rose-50/30"><td colspan="8" class="px-8 py-2 text-[10px] font-black text-rose-600 uppercase tracking-[0.2em] border-y border-rose-100">\u26A0\uFE0F DEUDAS DE MESES ANTERIORES</td></tr>';
+          html += previousMonthItems.map(p => this._renderRow(p)).join('');
+        }
         
         if (currentMonthItems.length > 0) {
           html += '<tr class="bg-slate-50/50"><td colspan="8" class="px-8 py-2 text-[10px] font-black text-slate-500 uppercase tracking-[0.2em] border-y border-slate-100">\uD83D\uDCC5 MES SELECCIONADO / ACTUAL</td></tr>';
@@ -242,8 +275,15 @@ export const PaymentsModule = {
     const st      = statusMap[statusKey] || { label: p.status, cls: 'bg-slate-100 text-slate-700', icon: 'help-circle' };
     const student = p.students || { name: 'Desconocido', classrooms: { name: '-' } };
     const isPending  = statusKey !== 'paid';
-    const dueDateStr = p.due_date ? new Date(p.due_date + 'T00:00:00').toLocaleDateString('es-ES') : '-';
+    const ds      = p.due_date ? new Date(p.due_date + 'T00:00:00').toLocaleDateString('es-ES') : '-';
     const amountFmt  = Number(p.amount || 0).toLocaleString('es-DO', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+    
+    // Formatear mes del pago para mostrarlo en la tabla
+    let monthFmt = p.month_paid || '-';
+    if (/^\d{4}-\d{2}$/.test(monthFmt)) {
+      const [y, m] = monthFmt.split('-');
+      monthFmt = MONTH_LABELS[parseInt(m, 10) - 1] + ' ' + y;
+    }
 
     // Mora acumulada
     const mora        = (isPending && p.due_date) ? calcMora(p.due_date) : 0;
@@ -301,11 +341,11 @@ export const PaymentsModule = {
           '<span class="text-[10px] font-black uppercase text-slate-500 bg-slate-100 px-2 py-0.5 rounded-md">' + (p.method || '-') + '</span>' +
         '</td>' +
         '<td class="px-5 py-3.5">' +
-          '<div class="text-[11px] font-bold text-slate-700">' + (p.bank || '-') + '</div>' +
-          '<div class="text-[9px] text-slate-400 font-bold uppercase">Banco</div>' +
+          '<div class="text-[11px] font-bold text-slate-700">' + monthFmt + '</div>' +
+          '<div class="text-[9px] text-slate-400 font-bold uppercase">Mes Cobrado</div>' +
         '</td>' +
         '<td class="px-5 py-3.5">' +
-          '<div class="text-[11px] font-bold text-slate-700">' + (p.paid_date ? new Date(p.paid_date).toLocaleDateString('es-ES') : dueDateStr) + '</div>' +
+          '<div class="text-[11px] font-bold text-slate-700">' + (p.paid_date ? new Date(p.paid_date).toLocaleDateString('es-ES') : ds) + '</div>' +
           '<div class="text-[9px] text-slate-400 font-bold uppercase">' + (p.paid_date ? 'Pagado' : 'Vence') + '</div>' +
         '</td>' +
         '<td class="px-5 py-3.5 text-center">' +

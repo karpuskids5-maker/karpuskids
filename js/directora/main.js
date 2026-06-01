@@ -1,6 +1,6 @@
-import { ensureRole, supabase, initOneSignal } from '../shared/supabase.js';
+import { ensureRole, supabase, initOneSignal } from '/js/shared/supabase.js';
 import { AppState } from './state.js';
-import { Helpers } from '../shared/helpers.js';
+import { Helpers } from '/js/shared/helpers.js';
 import { WallModule } from './wall.module.js';
 import { DashboardService } from './dashboard.service.js';
 import { UIHelpers, DirectorUI } from './ui.module.js';
@@ -8,18 +8,18 @@ import { StudentsModule } from './students.module.js';
 import { TeachersModule } from './teachers.module.js';
 import { PaymentsModule } from './payments_clean.js';
 import { GradesModule } from './grades.module.js';
-import { AttendanceModule } from './attendance.module.js';
-import { ChatModule } from './chat.module.js';
-import { InquiriesModule } from './inquiries.module.js';
-import { AccessModule } from './access.module.js';
 import { PermitsModule } from './permits.module.js';
+import { InquiriesModule } from './inquiries.module.js';
+import { ChatModule } from '/js/shared/chat.js';
 import { RoomsModule } from './rooms.module.js';
-import { BadgeSystem } from '../shared/badges.js';
-import { ImageLoader } from '../shared/image-loader.js';
-import { RealtimeManager } from '../shared/realtime-manager.js';
-import { QueryCache } from '../shared/query-cache.js';
-import { Security } from '../shared/security.js';
 import { AutomationModule } from './automation.js';
+import { AccessModule } from './access.module.js';
+import { AttendanceModule } from './attendance.module.js';
+import { BadgeSystem } from '/js/shared/badges.js';
+import { RealtimeManager } from '/js/shared/realtime-manager.js';
+import { QueryCache } from '/js/shared/query-cache.js';
+import { ImageLoader } from '/js/shared/image-loader.js';
+import { auditLog } from '/js/shared/db-utils.js';
 const debounce = (fn, delay) => {
   let timeout;
   return (...args) => {

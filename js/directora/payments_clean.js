@@ -1,8 +1,8 @@
 ﻿import { DirectorApi } from './api.js';
-import { Helpers } from '../shared/helpers.js';
+import { Helpers } from '/js/shared/helpers.js';
 import { UIHelpers } from './ui.module.js';
-import { supabase } from '../shared/supabase.js';
-import { auditLog } from '../shared/db-utils.js';
+import { supabase } from '/js/shared/supabase.js';
+import { auditLog } from '/js/shared/db-utils.js';
 
 const MES = ['enero','febrero','marzo','abril','mayo','junio','julio','agosto','septiembre','octubre','noviembre','diciembre'];
 const MES_LABEL = ['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'];
@@ -581,16 +581,10 @@ export const PaymentsModule = {
       // Notificar al padre en background
       if (pay) {
         try {
-          const { notifyPaymentApproved } = await import('../shared/supabase.js');
+          const { notifyPaymentApproved } = await import('/js/shared/supabase.js');
           const emails = [pay.students?.p1_email, pay.students?.p2_email].filter(e => e && e.includes('@'));
           const amountStr = 'RD$' + Number(pay.amount || 0).toLocaleString('es-DO', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
           await notifyPaymentApproved(id, emails[0] || null, pay.students?.name || 'Estudiante', amountStr, pay.month_paid || 'Colegiatura');
-        } catch (_) {}
-      }
-    } catch (e) {
-      Helpers.toast('Error al aprobar pago: ' + (e.message || e), 'error');
-    }
-  },
         } catch (_) {}
       }
     } catch (e) {
