@@ -1,4 +1,4 @@
-﻿import { DirectorApi } from './api.js';
+import { DirectorApi } from './api.js';
 import { Helpers } from '/js/shared/helpers.js';
 import { UIHelpers } from './ui.module.js';
 import { supabase } from '/js/shared/supabase.js';
@@ -98,157 +98,91 @@ export const PaymentsModule = {
 
       const monthKey = `${yv}-${String(mv).padStart(2,'0')}`;
 
-      // Si el mes seleccionado aún no se ha generado, mostrar aviso
-      if (monthKey > visibleUpToMonth) {
-        const mi = parseInt(mv, 10) - 1;
-        const label = MES_LABEL[mi] || mv;
-        const genDate = `${today >= genDay ? 'ya generado' : `el día ${genDay} de ${MES_LABEL[now.getMonth()]}`}`;
+      const SPANISH_MONTHS = ['enero','febrero','marzo','abril','mayo','junio','julio','agosto','septiembre','octubre','noviembre','diciembre'];
+      const SEL = 'id,student_id,amount,concept,status,due_date,created_at,paid_date,method,bank,reference,month_paid,evidence_url,students:student_id(name,classroom_id,classrooms:classroom_id(name))';
+
+      // ── 1. Construir consulta unificada ──────────────────────────────
+      let q = supabase.from('payments').select(SEL);
+
+      if (sf === 'all') {
+        // "Todos": Solo vencidos de CUALQUIER MES + Todos los registros del mes seleccionado
+        q = q.or(
+          `status.eq.overdue,` +
+          `month_paid.eq.${monthKey}`
+        );
+      } else if (sf === 'pending' || sf === 'overdue' || sf === 'review') {
+        // Estados específicos de deuda: buscar en cualquier mes
+        q = q.eq('status', sf);
+      } else {
+        // Pagados o rechazados: filtrar estrictamente por el mes seleccionado
+        q = q.eq('month_paid', monthKey);
+        if (sf && sf !== 'all') q = q.eq('status', sf);
+      }
+
+      // Ordenar por mes (más recientes arriba) y luego por vencimiento
+      q = q.order('month_paid', { ascending: false }).order('due_date', { ascending: true });
+
+      let { data, error } = await q;
+      if (error) throw error;
+
+      let list = data || [];
+      if (sq) {
+        const query = sq.toLowerCase();
+        list = list.filter(p => p.students?.name?.toLowerCase().includes(query));
+      }
+
+      AppState.set('paymentsData', list);
+
+      if (!list.length) {
         tbody.innerHTML = `<tr><td colspan="8" class="text-center py-16">
           <div class="flex flex-col items-center gap-3">
-            <div class="w-14 h-14 bg-indigo-50 rounded-full flex items-center justify-center text-2xl">📅</div>
-            <p class="font-black text-slate-600 text-sm">Los cobros de ${label} ${yv} se generan ${genDate}</p>
-            <p class="text-xs text-slate-400 font-medium">Vuelve a partir del día ${genDay} para ver estos cobros.</p>
+            <div class="w-14 h-14 bg-slate-50 rounded-full flex items-center justify-center">
+              <i data-lucide="inbox" class="w-7 h-7 text-slate-300"></i>
+            </div>
+            <p class="font-black text-slate-400 text-sm">Sin registros para este periodo</p>
           </div></td></tr>`;
         if (window.lucide) lucide.createIcons();
         return;
       }
 
-      const SPANISH_MONTHS = ['enero','febrero','marzo','abril','mayo','junio','julio','agosto','septiembre','octubre','noviembre','diciembre'];
-      const spanishMonth    = SPANISH_MONTHS[parseInt(mv, 10) - 1];
-      const spanishMonthCap = spanishMonth ? spanishMonth.charAt(0).toUpperCase() + spanishMonth.slice(1) : null;
-      const SEL = 'id,student_id,amount,concept,status,due_date,created_at,paid_date,method,bank,reference,month_paid,evidence_url,students:student_id(name,classroom_id,classrooms:classroom_id(name))';
+      // --- Lógica de Agrupación y Presentación ---
+      
+      // 1. Identificar deudas de meses anteriores (SOLO VENCIDAS)
+      const previousMonthDebts = list.filter(p => 
+        p.month_paid < monthKey && 
+        this._st(p) === 'overdue'
+      );
 
-      // ── 1. Registros del mes seleccionado ──────────────────────────────
-      let q = supabase.from('payments').select(SEL)
-        .or(spanishMonthCap
-          ? `month_paid.eq.${monthKey},month_paid.eq.${spanishMonthCap},month_paid.ilike.${spanishMonth}`
-          : `month_paid.eq.${monthKey}`)
-        .order('due_date', { ascending: true });
-      if (sf && sf !== 'all') q = q.eq('status', sf);
-      let { data, error } = await q;
-      if (error) throw error;
+      // 2. Registros del mes seleccionado (según el filtro de estado actual)
+      const currentMonthItems = list.filter(p => p.month_paid === monthKey);
 
-      // Fallback por created_at si no hay resultados
-      if (!data?.length) {
-        const rs = `${yv}-${String(mv).padStart(2,'0')}-01`;
-        const re = `${yv}-${String(mv).padStart(2,'0')}-31`;
-        let q2 = supabase.from('payments').select(SEL)
-          .gte('created_at', rs).lte('created_at', re + 'T23:59:59')
-          .order('due_date', { ascending: true });
-        if (sf && sf !== 'all') q2 = q2.eq('status', sf);
-        const r2 = await q2;
-        if (!r2.error && r2.data?.length) data = r2.data;
-      }
+      // 3. Otros registros (en caso de que el filtro traiga algo más)
+      const otherItems = list.filter(p => 
+        p.month_paid !== monthKey && 
+        !previousMonthDebts.includes(p)
+      );
 
-      // ── 2. Deudas pendientes/vencidas de meses anteriores (solo hasta visibleUpToMonth) ──
-      let prevDebt = [];
-      const showPrev = !sf || sf === 'all' || sf === 'pending' || sf === 'overdue';
-      if (showPrev) {
-        const { data: prev } = await supabase.from('payments').select(SEL)
-          .in('status', ['pending', 'overdue'])
-          .lt('month_paid', monthKey)
-          .lte('month_paid', visibleUpToMonth)
-          .order('month_paid', { ascending: true });
-        if (prev?.length) prevDebt = prev;
-      }
-
-      // ── 3. Normalización y dedup del mes actual ────────────────────────
-      const MMAP = { 'enero':'01','febrero':'02','marzo':'03','abril':'04','mayo':'05','junio':'06','julio':'07','agosto':'08','septiembre':'09','octubre':'10','noviembre':'11','diciembre':'12' };
-      const normM = (mp, yr) => {
-        if (!mp) return '';
-        const s = mp.toLowerCase().trim();
-        if (/^\d{4}-\d{2}$/.test(s)) return s;
-        const n = MMAP[s]; return n ? `${yr || new Date().getFullYear()}-${n}` : s;
-      };
-      const sPri = { paid: 4, review: 3, overdue: 2, pending: 1 };
-      const dmap = new Map();
-      for (const p of (data || [])) {
-        const k = p.student_id + '|' + normM(p.month_paid, yv);
-        const ex = dmap.get(k);
-        if (!ex) { dmap.set(k, p); continue; }
-        const pp = sPri[p.status?.toLowerCase()] || 0, ep = sPri[ex.status?.toLowerCase()] || 0;
-        if (pp > ep || (pp === ep && p.id > ex.id)) dmap.set(k, p);
-      }
-      let list = Array.from(dmap.values());
-
-      // ── 4. Agregar deudas anteriores (marcadas con _prev) ─────────────
-      for (const p of prevDebt) { p._prev = true; list.push(p); }
-
-      // ── 5. Filtro de búsqueda por nombre ──────────────────────────────
-      if (sq) { const s = sq.toLowerCase(); list = list.filter(p => p.students?.name?.toLowerCase().includes(s)); }
-
-      // ── 6. Si no hay registros del mes actual, auto-generar silenciosamente ──
-      const currList = list.filter(p => !p._prev);
-      const prevList = list.filter(p => p._prev);
-
-      if (!currList.length) {
-        // Auto-generar cobros del mes actual en background sin bloquear la UI
-        supabase.functions.invoke('auto-payment-cycle', { body: { force: true } })
-          .then(({ data: cycleData }) => {
-            if (cycleData?.generated > 0) {
-              // Recargar la tabla después de generar
-              setTimeout(() => this.loadPayments(), 800);
-            }
-          })
-          .catch(() => {});
-      }
-
-      if (!list.length) {
-        const mi = parseInt(mv, 10) - 1;
-        const label = MES_LABEL[mi] || mv;
-        tbody.innerHTML =
-          '<tr><td colspan="8" class="text-center py-10">' +
-            '<div class="flex flex-col items-center gap-4">' +
-              '<div class="w-12 h-12 border-4 border-indigo-100 border-t-indigo-600 rounded-full animate-spin"></div>' +
-              '<p class="font-bold text-slate-500 text-sm">Generando cobros de ' + label + ' ' + (yv || '') + '...</p>' +
-            '</div>' +
-          '</td></tr>';
-        if (window.lucide) lucide.createIcons();
-        return;
-      }
-
-      // ── 7. Ordenar: deudas anteriores primero, luego por estado ───────
-      const pri = { overdue: 1, pending: 2, review: 3, paid: 4 };
-      list.sort((a, b) => {
-        if (a._prev && !b._prev) return -1;
-        if (!a._prev && b._prev) return 1;
-        return (pri[this._st(a)] || 99) - (pri[this._st(b)] || 99);
-      });
-
-      // ── 8. Construir HTML con separadores visuales ────────────────────
       let html = '';
-      const mi = parseInt(mv, 10) - 1;
-      const currLabel = (MES_LABEL[mi] || mv) + ' ' + yv;
-
-      // Aviso si no hay cobros del mes actual pero sí hay deudas anteriores
-      if (!currList.length && prevList.length) {
-        html += '<tr><td colspan="8" class="px-5 py-3">' +
-          '<div class="flex items-center gap-3 bg-blue-50 border border-blue-200 rounded-2xl px-5 py-3">' +
-            '<div class="w-8 h-8 border-3 border-blue-200 border-t-blue-600 rounded-full animate-spin flex-shrink-0" style="border-width:3px"></div>' +
-            '<span class="text-blue-800 font-bold text-sm">Generando cobros de ' + currLabel + ' automáticamente...</span>' +
-          '</div>' +
-        '</td></tr>';
+      
+      // Mostrar Sección de Deudas Anteriores (Vencidas)
+      if (previousMonthDebts.length > 0) {
+        html += '<tr class="bg-rose-50/30"><td colspan="8" class="px-5 py-2 text-[10px] font-black text-rose-600 uppercase tracking-[0.2em] border-y border-rose-100">\u26A0\uFE0F DEUDAS VENCIDAS (MESES ANTERIORES)</td></tr>';
+        html += previousMonthDebts.map(p => this._row(p)).join('');
       }
 
-      let shownPrevHeader = false;
-      let shownCurrHeader = false;
-      for (const p of list) {
-        if (p._prev && !shownPrevHeader) {
-          html += '<tr><td colspan="8" class="px-5 py-2 bg-rose-50 border-y border-rose-100">' +
-            '<div class="flex items-center gap-2 text-rose-700 font-black text-[11px] uppercase tracking-widest">' +
-              '<i data-lucide="alert-triangle" class="w-3.5 h-3.5"></i>Deudas de meses anteriores' +
-            '</div></td></tr>';
-          shownPrevHeader = true;
-        }
-        if (!p._prev && !shownCurrHeader) {
-          html += '<tr><td colspan="8" class="px-5 py-2 bg-slate-50 border-y border-slate-100">' +
-            '<div class="flex items-center gap-2 text-slate-500 font-black text-[11px] uppercase tracking-widest">' +
-              '<i data-lucide="calendar" class="w-3.5 h-3.5"></i>' + currLabel +
-            '</div></td></tr>';
-          shownCurrHeader = true;
-        }
-        html += this._row(p);
+      // Mostrar Sección del Mes Seleccionado
+      if (currentMonthItems.length > 0) {
+        const monthLabel = SPANISH_MONTHS[parseInt(mv, 10) - 1]?.toUpperCase() || 'MES SELECCIONADO';
+        html += `<tr class="bg-indigo-50/50"><td colspan="8" class="px-5 py-2 text-[10px] font-black text-indigo-500 uppercase tracking-[0.2em] border-y border-indigo-100">\uD83D\uDCC5 ${monthLabel} ${yv}</td></tr>`;
+        html += currentMonthItems.map(p => this._row(p)).join('');
       }
+
+      // Mostrar otros si existen (por ejemplo si se filtra por un estado específico de meses pasados)
+      if (otherItems.length > 0 && sf !== 'all') {
+        html += '<tr class="bg-slate-50/30"><td colspan="8" class="px-5 py-2 text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] border-y border-slate-100">OTROS REGISTROS</td></tr>';
+        html += otherItems.map(p => this._row(p)).join('');
+      }
+
       tbody.innerHTML = html;
       if (window.lucide) lucide.createIcons();
     } catch (e) {

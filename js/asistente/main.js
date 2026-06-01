@@ -147,13 +147,15 @@ document.addEventListener('DOMContentLoaded', async () => {
     _deleteStudent: (id, name) => StudentsModule._deleteStudent(id, name),
     _genMatricula: () => window._genMatricula?.(),
     _openRoomModal: (id) => RoomsModule.openModal(id),
-    openNewPostModal,
-    submitNewPost
+    openNewPostModal: () => openNewPostModal(),
+    submitNewPost: () => submitNewPost()
   });
 
   // Exponer WallModule globalmente
   window.WallModule = WallModule;
   window.openTeacherModal = (id) => TeachersModule.openModal(id);
+  window.openNewPostModal = openNewPostModal;
+  window.submitNewPost = submitNewPost;
 
   // Mantener compatibilidad temporal para onclick en HTML que no use App.
   Object.assign(window, window.App);
@@ -166,6 +168,89 @@ document.addEventListener('DOMContentLoaded', async () => {
  */
 async function initDashboard() {
   // Obsoleto, delegado a DashboardModule
+}
+
+/**
+ * 🚀 MURO ESCOLAR - Crear Publicación
+ */
+async function openNewPostModal() {
+  const html = `
+    <div class="p-8">
+      <div class="flex justify-between items-start mb-6">
+        <h3 class="text-2xl font-black text-slate-800">Crear Publicación</h3>
+      </div>
+      <div class="space-y-4">
+        <textarea id="postContent" rows="4" class="w-full p-4 bg-slate-50 border-none rounded-2xl text-sm outline-none resize-none focus:ring-2 focus:ring-teal-400" placeholder="¿Qué quieres compartir con la comunidad?"></textarea>
+        
+        <div class="relative">
+          <input type="file" id="postFile" class="hidden" accept="image/*,video/*" onchange="document.getElementById('fileName').textContent = this.files[0]?.name || 'Adjuntar foto/video'">
+          <label for="postFile" class="flex items-center gap-3 p-3 border-2 border-dashed border-slate-200 rounded-2xl cursor-pointer hover:bg-slate-50 hover:border-teal-300 transition-all">
+            <div class="w-10 h-10 bg-teal-100 text-teal-600 rounded-xl flex items-center justify-center"><i data-lucide="image-plus"></i></div>
+            <span id="fileName" class="text-sm font-bold text-slate-500">Adjuntar foto o video</span>
+          </label>
+        </div>
+
+        <button id="btnSubmitPost" onclick="window.submitNewPost()" class="w-full py-3.5 bg-teal-600 text-white rounded-2xl font-black text-sm uppercase tracking-widest hover:bg-teal-700 shadow-lg shadow-teal-200 transition-all">PUBLICAR</button>
+      </div>
+    </div>
+  `;
+  window.openGlobalModal(html);
+}
+
+async function submitNewPost() {
+  const content = document.getElementById('postContent').value.trim();
+  const fileInput = document.getElementById('postFile');
+  const file = fileInput?.files[0];
+  const btn = document.getElementById('btnSubmitPost');
+
+  if (!content && !file) return Helpers.toast('Escribe algo o sube un archivo', 'warning');
+
+  btn.disabled = true;
+  btn.innerHTML = '<i data-lucide="loader-2" class="w-5 h-5 animate-spin mx-auto"></i>';
+  if(window.lucide) window.lucide.createIcons();
+
+  try {
+    let mediaUrl = null;
+    let mediaType = null;
+
+    if (file) {
+      const ext = file.type.startsWith('video') ? file.name.split('.').pop() : 'webp';
+      const path = `posts/${Date.now()}_${Math.random().toString(36).substr(2,9)}.${ext}`;
+      
+      const publicUrl = await ImageLoader.uploadToStorage(
+        file,
+        'classroom_media',
+        path,
+        { maxWidth: 1200, maxHeight: 1200, quality: 0.82, maxSizeKB: 400 }
+      );
+      mediaUrl = publicUrl;
+      mediaType = file.type.startsWith('video') ? 'video' : 'image';
+    }
+
+    const user = AppState.get('user');
+    if (!user) throw new Error('No hay sesión activa');
+
+    const insertPayload = {
+      teacher_id:   user.id,
+      content:      content,
+      media_url:    mediaUrl,
+      media_type:   mediaType
+    };
+
+    const { error } = await supabase.from('posts').insert(insertPayload);
+
+    if (error) throw error;
+    Helpers.toast('Publicado correctamente', 'success');
+    window._closeAsistenteModal();
+  } catch (err) {
+    Helpers.toast('Error al publicar: ' + (err.message || ''), 'error');
+  } finally {
+    if (btn) {
+      btn.disabled = false;
+      btn.textContent = 'PUBLICAR';
+      if(window.lucide) window.lucide.createIcons();
+    }
+  }
 }
 
 /**
