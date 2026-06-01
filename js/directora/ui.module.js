@@ -1,4 +1,4 @@
-﻿import { Helpers } from '../shared/helpers.js';
+import { Helpers } from '../shared/helpers.js';
 
 const UIHelpers = {
   setLoading(isLoading, containerSelector = '#globalModalContainer', btnSelector = null) {
@@ -71,7 +71,7 @@ const DirectorUI = {
 
     // Por cobrar
     const pending = data?.payments?.summary?.total_pending ?? kpis.pending_amount ?? 0;
-    set('kpiPendingMoney', 'RD$' + Number(pending).toLocaleString('es-DO', { minimumFractionDigits: 2 }));
+    set('kpiPendingMoney', Number(pending).toLocaleString('es-DO', { minimumFractionDigits: 2 }));
 
     // Incidencias
     set('kpiIncidents', data?.inquiries?.count ?? kpis.inquiries ?? 0);
@@ -91,7 +91,7 @@ const DirectorUI = {
     const barColor  = percent > 90 ? 'bg-rose-500' : percent > 70 ? 'bg-amber-500' : 'bg-emerald-500';
 
     return (
-      '<tr class="hover:bg-slate-50 transition-colors">' +
+      '<tr class="hover:bg-slate-50 transition-colors cursor-pointer" ondblclick="App.rooms.openModal(\'' + r.id + '\')">' +
         '<td class="py-4 px-6">' +
           '<div class="font-bold text-slate-800">' + Helpers.escapeHTML(r.name) + '</div>' +
           '<div class="text-[10px] text-slate-400 font-bold uppercase tracking-wider">' + (r.level || 'General') + '</div>' +

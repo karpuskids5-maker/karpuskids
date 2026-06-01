@@ -1,4 +1,4 @@
-﻿﻿import { DirectorApi } from './api.js';
+import { DirectorApi } from './api.js';
 import { Helpers } from '../shared/helpers.js';
 import { UI } from './ui.module.js';
 import { AppState } from './state.js';
@@ -63,16 +63,47 @@ export const TeachersModule = {
       return;
     }
     container.innerHTML = staff.map(t => `
-        <tr>
-          <td>${Helpers.escapeHTML(t.name)}</td>
-          <td>${t.email}</td>
-          <td>${t.classrooms?.name || 'Sin Aula'}</td>
-          <td class="capitalize">${t.role}</td>
-          <td class="text-right">
-            <button onclick="App.teachers.openModal('${t.id}')" class="btn-action btn-edit">Gestionar</button>
+        <tr class="hover:bg-slate-50 transition-colors cursor-pointer" ondblclick="App.teachers.openModal('${t.id}')">
+          <td class="p-4 font-bold text-slate-700">${Helpers.escapeHTML(t.name)}</td>
+          <td class="p-4 text-slate-500">${t.email}</td>
+          <td class="p-4"><span class="px-3 py-1 bg-slate-100 rounded-full text-[10px] font-black uppercase text-slate-500">${t.classrooms?.name || 'Sin Aula'}</span></td>
+          <td class="p-4"><span class="px-3 py-1 bg-indigo-50 text-indigo-600 rounded-full text-[10px] font-black uppercase tracking-wider">${t.role}</span></td>
+          <td class="p-4 text-right">
+            <div class="flex justify-end gap-2">
+              <button onclick="App.teachers.openModal('${t.id}')" class="w-9 h-9 flex items-center justify-center bg-indigo-50 text-indigo-600 hover:bg-indigo-600 hover:text-white rounded-xl transition-all" title="Editar">
+                <i data-lucide="settings" class="w-4 h-4"></i>
+              </button>
+              <button onclick="App.teachers.delete('${t.id}')" class="w-9 h-9 flex items-center justify-center bg-rose-50 text-rose-600 hover:bg-rose-600 hover:text-white rounded-xl transition-all" title="Eliminar">
+                <i data-lucide="trash-2" class="w-4 h-4"></i>
+              </button>
+            </div>
           </td>
         </tr>`).join('');
     if (window.lucide) lucide.createIcons();
+  },
+
+  async delete(id) {
+    const teacher = (AppState.get('teachers') || []).find(t => t.id === id);
+    const name = teacher?.name || 'este usuario';
+    const role = teacher?.role === 'asistente' ? 'asistente' : 'maestra';
+    
+    const ok = window.confirm(`¿Eliminar a "${name}" (${role})?\n\nEsta acción no se puede deshacer. El usuario perderá acceso al sistema inmediatamente.`);
+    if (!ok) return;
+
+    UI.setLoading(true);
+    try {
+      const { error } = await supabase.from('profiles').delete().eq('id', id);
+      if (error) throw error;
+      
+      await auditLog('staff.delete', { staff_id: id, name, role });
+      Helpers.toast(`${role.charAt(0).toUpperCase() + role.slice(1)} eliminada correctamente`, 'success');
+      this.init();
+    } catch (e) {
+      console.error('[Teachers] Error deleting:', e);
+      Helpers.toast('No se pudo eliminar: ' + (e.message || 'Error de base de datos'), 'error');
+    } finally {
+      UI.setLoading(false);
+    }
   },
 
   async save() {
@@ -140,7 +171,7 @@ export const TeachersModule = {
     const labelClass = "block text-[11px] font-black text-slate-400 uppercase tracking-wider mb-1.5 ml-1";
 
     const modalHTML = `
-      <div class="modal-header bg-gradient-to-r from-purple-600 to-indigo-600 text-white p-6 rounded-t-3xl flex items-center justify-between">
+      <div class="modal-header bg-gradient-to-r from-purple-600 to-indigo-600 text-white p-6 rounded-t-3xl flex items-center">
         <div class="flex items-center gap-3">
           <div class="w-12 h-12 bg-white/20 rounded-2xl flex items-center justify-center shadow-inner"><i data-lucide="users" class="w-6 h-6 text-white"></i></div>
           <div>
@@ -148,9 +179,6 @@ export const TeachersModule = {
             <p class="text-xs text-white/70 font-bold uppercase tracking-widest">Maestras y Asistentes</p>
           </div>
         </div>
-        <button onclick="App.ui.closeModal()" class="w-10 h-10 flex items-center justify-center rounded-xl bg-white/10 hover:bg-white/20 transition-colors">
-          <i data-lucide="x" class="w-6 h-6"></i>
-        </button>
       </div>
       <div class="modal-body p-8 bg-slate-50/30" id="teacherForm">
         <div class="grid grid-cols-1 md:grid-cols-2 gap-6">

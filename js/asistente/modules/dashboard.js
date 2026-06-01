@@ -1,6 +1,7 @@
 import { supabase } from '../../shared/supabase.js';
 import { AppState } from '../state.js';
 import { Helpers } from '../../shared/helpers.js';
+import { QueryCache } from '../../shared/query-cache.js';
 
 const STATUS_MAP = {
   paid:    { label: 'Aprobado',    cls: 'bg-emerald-100 text-emerald-700' },
@@ -38,40 +39,51 @@ export const DashboardModule = {
   },
 
   async loadStats() {
-    try {
-      const today = new Date().toISOString().split('T')[0];
-      const monthStart = new Date(new Date().getFullYear(), new Date().getMonth(), 1).toISOString();
+      try {
+        const today = new Date().toISOString().split('T')[0];
+        const monthKey = new Date().getFullYear() + '-' + String(new Date().getMonth() + 1).padStart(2, '0');
 
-      const [studentsRes, attendanceRes, paymentsRes, incomeRes] = await Promise.allSettled([
-        supabase.from('students').select('*', { count: 'exact', head: true }),
-        supabase.from('attendance').select('*', { count: 'exact', head: true })
-          .eq('date', today).in('status', ['present', 'presente']),
-        supabase.from('payments').select('*', { count: 'exact', head: true })
-          .in('status', ['pending', 'review']),
-        supabase.from('payments').select('amount')
-          .eq('status', 'paid').eq('month_paid', new Date().getFullYear() + '-' + String(new Date().getMonth() + 1).padStart(2, '0'))
-      ]);
+        // Stale-while-revalidate: mostrar datos cacheados inmediatamente, revalidar en background
+        const cachedStats = QueryCache.getStale(
+          'asis_dashboard_stats',
+          async () => {
+            const [studentsRes, attendanceRes, paymentsRes, incomeRes] = await Promise.allSettled([
+              supabase.from('students').select('*', { count: 'exact', head: true }),
+              supabase.from('attendance').select('*', { count: 'exact', head: true })
+                .eq('date', today).in('status', ['present', 'presente']),
+              supabase.from('payments').select('*', { count: 'exact', head: true })
+                .in('status', ['pending', 'review']),
+              supabase.from('payments').select('amount')
+                .eq('status', 'paid').eq('month_paid', monthKey)
+            ]);
+            const get = (r) => r.status === 'fulfilled' ? r.value : {};
+            return {
+              studentsCount:   get(studentsRes).count  || 0,
+              attendanceCount: get(attendanceRes).count || 0,
+              paymentsCount:   get(paymentsRes).count  || 0,
+              incomeTotal:     (get(incomeRes).data || []).reduce((s, p) => s + Number(p.amount || 0), 0)
+            };
+          },
+          2 * 60_000,
+          (fresh) => this._applyStats(fresh)
+        );
 
-      const get = (r) => r.status === 'fulfilled' ? r.value : {};
-      const studentsCount   = get(studentsRes).count  || 0;
-      const attendanceCount = get(attendanceRes).count || 0;
-      const paymentsCount   = get(paymentsRes).count  || 0;
-      const incomeData      = get(incomeRes).data || [];
-      const incomeTotal     = incomeData.reduce((s, p) => s + Number(p.amount || 0), 0);
+        if (cachedStats) this._applyStats(cachedStats);
 
-      const set = (id, v) => { const el = document.getElementById(id); if (el) el.textContent = v; };
-      set('statStudents',   studentsCount);
-      set('statAttendance', attendanceCount);
-      set('statPayments',   paymentsCount);
-      set('statIncome',     '$' + incomeTotal.toLocaleString('es-ES', { minimumFractionDigits: 2 }));
-      set('welcomeName',    (AppState.get('profile')?.name || 'Asistente').split(' ')[0]);
-
-      // ── Renderizar Alertas Urgentes ──
-      this._renderUrgentAlerts(paymentsCount, attendanceCount);
-
-    } catch (e) {
-      console.error('Error loading stats:', e);
+      } catch (e) {
+        console.error('Error loading stats:', e);
+      }
     }
+,
+
+  _applyStats({ studentsCount, attendanceCount, paymentsCount, incomeTotal }) {
+    const set = (id, v) => { const el = document.getElementById(id); if (el) el.textContent = v; };
+    set('statStudents',   studentsCount);
+    set('statAttendance', attendanceCount);
+    set('statPayments',   paymentsCount);
+    set('statIncome',     incomeTotal.toLocaleString('es-DO', { minimumFractionDigits: 2 }));
+    set('welcomeName',    (AppState.get('profile')?.name || 'Asistente').split(' ')[0]);
+    this._renderUrgentAlerts(paymentsCount, attendanceCount);
   },
 
   _renderUrgentAlerts(paymentsReview, pendingAbsences) {

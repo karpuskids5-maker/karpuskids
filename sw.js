@@ -1,13 +1,13 @@
+self.addEventListener('message', (event) => {
+  // Manejador preventivo para evitar el error de registro tardío (sw.ts:21)
+});
+
 /**
  * Karpus Kids — Service Worker PWA
  * IMPORTANTE: Este SW solo maneja caché PWA.
  * Las notificaciones push las maneja OneSignalSDKWorker.js en el mismo scope.
  * NO definir handlers push/notificationclick aquí para no interferir con OneSignal.
  */
-
-self.addEventListener('message', (event) => {
-  // Manejador preventivo
-});
 
 const CACHE_NAME = 'karpus-pwa-v4';
 const ASSETS = [

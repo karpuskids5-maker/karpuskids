@@ -1,4 +1,4 @@
-import { supabase, sendPush } from '../../shared/supabase.js';
+﻿import { supabase, sendPush } from '../../shared/supabase.js';
 import { AppState } from '../state.js';
 import { MaestraApi } from '../api.js';
 import { safeToast, safeEscapeHTML, Modal } from './ui.js';
@@ -7,28 +7,42 @@ import { OfflineQueue } from '../../shared/offline-queue.js';
 
 // Start auto-sync when online
 OfflineQueue.startAutoSync(({ synced }) => {
-  safeToast(`✅ ${synced} registro(s) de asistencia sincronizados`, 'success');
+  safeToast(`Ã¢Å“â€¦ ${synced} registro(s) de asistencia sincronizados`, 'success');
 });
 
 /**
- * 📅 Asistencia — carga el panel y las solicitudes de ausencia pendientes
+ * Ã°Å¸â€œâ€¦ Asistencia Ã¢â‚¬â€ carga el panel y las solicitudes de ausencia pendientes
  */
 export async function initAttendance() {
   const classroom = AppState.get('classroom');
-  const students = AppState.get('students') || [];
+  const students = AppState.get('students') || []; // Usamos estudiantes ya cargados
   const today = new Date().toISOString().split('T')[0];
 
-  // Cargar solicitudes de ausencia pendientes
-  await _loadAbsenceRequests(classroom?.id, students);
+  const container = document.getElementById('tab-attendance'); // Ajuste de contenedor si es necesario
+  const listContainer = document.getElementById('attendanceList');
+  
+  if (!listContainer) return;
+
+  // Feedback visual inmediato
+  listContainer.innerHTML = `
+    <div class="animate-pulse space-y-4">
+      <div class="h-16 bg-slate-50 rounded-3xl"></div>
+      <div class="h-16 bg-slate-50 rounded-3xl"></div>
+      <div class="h-16 bg-slate-50 rounded-3xl"></div>
+    </div>
+  `;
 
   try {
-    const attendance = await MaestraApi.getAttendance(classroom.id, today);
+    // 1. Cargar solicitudes y asistencia en paralelo
+    const [_, attendance] = await Promise.all([
+      _loadAbsenceRequests(classroom?.id, students),
+      MaestraApi.getAttendance(classroom.id, today)
+    ]);
+
     const attMap = {};
     (attendance || []).forEach(a => attMap[a.student_id] = a.status);
     
-    const container = document.getElementById('attendanceList');
-    if (container) {
-      container.innerHTML = `
+    listContainer.innerHTML = `
         <div class="flex justify-between items-center mb-4 bg-white p-4 rounded-2xl shadow-sm border border-slate-100">
           <h4 class="font-black text-slate-800">Control de Asistencia</h4>
           <button onclick="App.markAllPresent()" class="px-4 py-2 bg-emerald-500 text-white rounded-xl text-xs font-black uppercase shadow-lg hover:bg-emerald-600 transition-all flex items-center gap-2">
@@ -39,9 +53,9 @@ export async function initAttendance() {
           ${students.map(s => {
             const currentStatus = attMap[s.id] || null;
             return `
-              <div class="flex items-center justify-between p-4 bg-white rounded-3xl border border-slate-100 shadow-sm transition-all">
+              <div class="flex items-center justify-between p-4 bg-white rounded-3xl border border-slate-100 shadow-sm transition-all hover:shadow-md">
                 <div class="flex items-center gap-3">
-                  <div class="w-10 h-10 rounded-xl bg-slate-50 flex items-center justify-center font-bold text-slate-400 overflow-hidden">
+                  <div class="w-10 h-10 rounded-xl bg-slate-50 flex items-center justify-center font-bold text-slate-400 overflow-hidden border-2 border-white shadow-sm">
                     ${s.avatar_url ? `<img src="${s.avatar_url}" class="w-full h-full object-cover">` : s.name.charAt(0)}
                   </div>
                   <div class="font-bold text-slate-700 text-sm">${safeEscapeHTML(s.name)}</div>
@@ -57,8 +71,9 @@ export async function initAttendance() {
         </div>
       `;
       if (window.lucide) window.lucide.createIcons();
-    }
   } catch (err) {
+    console.error('Error en initAttendance:', err);
+    listContainer.innerHTML = Helpers.errorState('Error al cargar asistencia');
   }
 }
 
@@ -77,7 +92,7 @@ export async function markAllPresent() {
         <i data-lucide="check-check" class="w-8 h-8"></i>
       </div>
       <h3 class="text-xl font-black text-slate-800 mb-2">Asistencia Masiva</h3>
-      <p class="text-sm text-slate-500 mb-6 font-medium">¿Marcar a todos los alumnos como presentes hoy?</p>
+      <p class="text-sm text-slate-500 mb-6 font-medium">Ã‚Â¿Marcar a todos los alumnos como presentes hoy?</p>
       <div class="flex gap-3">
         <button onclick="Modal.close('${modalId}')" class="flex-1 py-3 bg-slate-100 text-slate-600 rounded-xl font-bold uppercase text-xs hover:bg-slate-200 transition-colors">Cancelar</button>
         <button id="btnConfirmMassAtt" class="flex-[2] py-3 bg-emerald-500 text-white rounded-xl font-bold uppercase text-xs hover:bg-emerald-600 shadow-lg shadow-emerald-200 transition-all flex items-center justify-center gap-2">Confirmar</button>
@@ -127,7 +142,7 @@ export async function markAllPresent() {
       if (studentsToNotify.length > 0) {
         notifyParents({
           students: studentsToNotify,
-          title:   'Karpus Kids ✅',
+          title:   'Karpus Kids Ã¢Å“â€¦',
           message: 'Tu hijo/a ya se encuentra presente en su aula con su maestra.',
           type:    'attendance',
           link:    'panel_padres.html',
@@ -137,7 +152,7 @@ export async function markAllPresent() {
 
       await initAttendance();
     } catch (e) {
-      safeToast('Error crítico en asistencia masiva', 'error');
+      safeToast('Error crÃƒÂ­tico en asistencia masiva', 'error');
     }
   };
 }
@@ -163,8 +178,8 @@ export async function registerAttendance(studentId, status) {
     const isMarkingPresent = status === 'present';
     const wasLate = existing?.status === 'late';
     
-    // Si la maestra marca "Presente" pero el niño llegó "Tarde" (por ponche),
-    // no cambiamos el estado en la DB pero sí notificamos.
+    // Si la maestra marca "Presente" pero el niÃƒÂ±o llegÃƒÂ³ "Tarde" (por ponche),
+    // no cambiamos el estado en la DB pero sÃƒÂ­ notificamos.
     let shouldUpsert = true;
     if (isMarkingPresent && wasLate) {
       shouldUpsert = false;
@@ -198,19 +213,19 @@ export async function registerAttendance(studentId, status) {
         await MaestraApi.upsertAttendance(attRecord);
       } else {
         await OfflineQueue.enqueue('attendance', 'upsert', { ...attRecord, onConflict: 'student_id,date' });
-        safeToast(`${statusLiteral} guardado sin conexión — se sincronizará automáticamente`, 'info');
+        safeToast(`${statusLiteral} guardado sin conexiÃƒÂ³n Ã¢â‚¬â€ se sincronizarÃƒÂ¡ automÃƒÂ¡ticamente`, 'info');
       }
     } else {
-      console.log('Manteniendo estado "Tarde" — Solo notificando presencia en aula');
+      console.log('Manteniendo estado "Tarde" Ã¢â‚¬â€ Solo notificando presencia en aula');
     }
 
     const student = (AppState.get('students') || []).find(s => s.id === studentId);
     if (student?.parent_id) {
       const { sendPush } = await import('../../shared/supabase.js');
       
-      // Mensaje personalizado: si era tarde y se puso presente, se notifica que ya está en aula.
+      // Mensaje personalizado: si era tarde y se puso presente, se notifica que ya estÃƒÂ¡ en aula.
       const pushMessage = (isMarkingPresent && wasLate)
-        ? `${student.name} ya está en su aula con su maestra.`
+        ? `${student.name} ya estÃƒÂ¡ en su aula con su maestra.`
         : `${student.name} ha sido marcado como ${statusLiteral} hoy.`;
 
       sendPush({
@@ -231,7 +246,7 @@ export async function registerAttendance(studentId, status) {
 }
 
 /**
- * 📋 Cargar solicitudes de ausencia pendientes de los padres
+ * Ã°Å¸â€œâ€¹ Cargar solicitudes de ausencia pendientes de los padres
  */
 async function _loadAbsenceRequests(classroomId, students) {
   if (!classroomId) return;
@@ -258,7 +273,7 @@ async function _loadAbsenceRequests(classroomId, students) {
     banner.className = 'mb-4 bg-amber-50 border border-amber-200 rounded-2xl p-4';
     banner.innerHTML = `
       <div class="flex items-center gap-2 mb-3">
-        <span class="text-lg">📋</span>
+        <span class="text-lg">Ã°Å¸â€œâ€¹</span>
         <h4 class="font-black text-amber-800 text-sm uppercase tracking-wider">Avisos de Ausencia (${requests.length})</h4>
       </div>
       <div class="space-y-2">
@@ -268,8 +283,8 @@ async function _loadAbsenceRequests(classroomId, students) {
               <p class="font-bold text-slate-800 text-sm truncate">${safeEscapeHTML(r.student?.name || 'Estudiante')}</p>
               <p class="text-[10px] text-slate-500 font-bold">
                 ${new Date(r.date + 'T12:00:00').toLocaleDateString('es-DO', { weekday: 'short', day: 'numeric', month: 'short' })}
-                · ${safeEscapeHTML(r.reason)}
-                ${r.note ? ' · ' + safeEscapeHTML(r.note) : ''}
+                Ã‚Â· ${safeEscapeHTML(r.reason)}
+                ${r.note ? ' Ã‚Â· ' + safeEscapeHTML(r.note) : ''}
               </p>
             </div>
             <button
@@ -286,7 +301,7 @@ async function _loadAbsenceRequests(classroomId, students) {
     if (existing) existing.remove();
     container.parentElement?.insertBefore(banner, container);
 
-    // Función global para aprobar ausencia
+    // FunciÃƒÂ³n global para aprobar ausencia
     window._approveAbsence = async (requestId, studentId, date) => {
       try {
         const classroom = AppState.get('classroom');

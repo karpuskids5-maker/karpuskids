@@ -1,4 +1,4 @@
-import { ensureRole, supabase, initOneSignal, RealtimeUtils, emitEvent } from '../shared/supabase.js';
+﻿import { ensureRole, supabase, initOneSignal, RealtimeUtils, emitEvent } from '../shared/supabase.js';
 import { AppState } from './state.js';
 import { MaestraApi } from './api.js';
 import { Helpers } from '../shared/helpers.js';
@@ -13,6 +13,7 @@ import * as Routine from './modules/routine.js';
 import * as Tasks from './modules/tasks.js';
 import * as Students from './modules/students.js';
 import * as ChatApp from './modules/chat_app.js';
+import { PermitsModule } from './modules/permits.js';
 import * as UI from './modules/ui.js';
 
 window.safeToast = UI.safeToast;
@@ -47,6 +48,7 @@ window.App = {
   saveRoutineLog: Routine.saveRoutineLog,
   openNewRoutineModal: Routine.openNewRoutineModal,
   openStudentRoutine: Routine.openStudentRoutine,
+  registerInfantEvent: Routine.registerInfantEvent,
   openBulkRoutineModal: Routine.openBulkRoutineModal,
   updateRoutineFieldInModal: Routine.updateRoutineFieldInModal,
   saveRoutineInModal: Routine.saveRoutineInModal,
@@ -68,19 +70,22 @@ window.App = {
   initChat: ChatApp.initChat,
   selectChatContact: ChatApp.selectChatContact,
 
+  // Permits
+  permits: PermitsModule,
+
   // Global actions
   setActiveSection: (targetId, options) => window.App._setActiveSection?.(targetId, options),
   navigateTo: (sectionId, tabId) => {
     const cleanSection = sectionId.startsWith('t-') ? sectionId : `t-${sectionId}`;
     window.App.setActiveSection(cleanSection);
     if (tabId) {
-      // Si la sección es detalle de aula, activar el tab
+      // Si la secciÃ³n es detalle de aula, activar el tab
       if (cleanSection === 't-class-detail') {
         window.App.activateTab?.(tabId);
       }
-      // Si la sección es home pero el tab es rutina (caso dashboard)
+      // Si la secciÃ³n es home pero el tab es rutina (caso dashboard)
       if (cleanSection === 't-home' && tabId === 'daily-routine') {
-        // En este caso, el dashboard redirige a la sección de aula detalle tab rutina
+        // En este caso, el dashboard redirige a la secciÃ³n de aula detalle tab rutina
         const classroom = AppState.get('classroom');
         if (classroom) {
           window.App.showClassroomDetail(classroom.id, { activeTab: tabId });
@@ -251,7 +256,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   // \ud83d\udd25 EXPOSICI\u00d3N GLOBAL DE M\u00d3DULOS (CRUCIAL PARA EL MURO)
   window.WallModule = WallModule;
 
-  // Inicializar QR de la maestra en sección perfil
+  // Inicializar QR de la maestra en secciÃ³n perfil
   _initMaestraQR(auth.profile, auth.user);
 
   // Asignar funciones internas al objeto global App
@@ -265,9 +270,19 @@ document.addEventListener('DOMContentLoaded', async () => {
   // Listener delegado para acciones (PRO: submit-grade)
   document.addEventListener('click', (e) => {
     const btn = e.target.closest('[data-action="submit-grade"]');
-    if (!btn) return;
-    const { taskId, studentId } = btn.dataset;
-    submitGrade(taskId, studentId);
+    if (btn) {
+      const { taskId, studentId } = btn.dataset;
+      submitGrade(taskId, studentId);
+      return;
+    }
+    // Cerrar modal estÃ¡tico studentProfileModal con clic afuera o botÃ³n X
+    const profileModal = document.getElementById('studentProfileModal');
+    if (profileModal && !profileModal.classList.contains('hidden')) {
+      if (e.target === profileModal || e.target.id === 'closeStudentProfileModal' || e.target.closest('#closeStudentProfileModal')) {
+        profileModal.classList.add('hidden');
+        profileModal.classList.remove('flex');
+      }
+    }
   });
 
   try {
@@ -373,7 +388,7 @@ function initRealtimeUpdates(classroomId) {
       const student = (AppState.get('students') || []).find(s => s.id === payload.new.student_id);
       if (student) safeToast(`\ud83d\udcdd ${student.name} entreg\u00f3 una tarea`, 'info');
     })
-    // 📢 Escuchar cambios en posts para actualizar el muro sin recargar
+    // ðŸ“¢ Escuchar cambios en posts para actualizar el muro sin recargar
     .on('postgres_changes', { event: '*', schema: 'public', table: 'posts' }, (payload) => {
       const { eventType, new: newPost, old: oldPost } = payload;
       
@@ -381,7 +396,7 @@ function initRealtimeUpdates(classroomId) {
       if (newPost.classroom_id && newPost.classroom_id !== classroomId) return;
 
       if (eventType === 'INSERT') {
-        safeToast('📢 Nueva publicación en el muro', 'info');
+        safeToast('ðŸ“¢ Nueva publicaciÃ³n en el muro', 'info');
         WallModule.loadPosts('muroPostsContainer');
       } else if (eventType === 'UPDATE') {
         const postId = newPost.id;
@@ -427,7 +442,7 @@ async function initDashboard() {
     const today = new Date().toISOString().split('T')[0];
     const attendance = await MaestraApi.getAttendance(classroom.id, today);
     
-    // 📊 Actualizar Estadísticas (Bloques)
+    // ðŸ“Š Actualizar EstadÃ­sticas (Bloques)
     const statClasses   = document.getElementById('statClasses');
     const statStudents  = document.getElementById('statStudents');
     const statIncidents = document.getElementById('statIncidents');
@@ -512,13 +527,13 @@ async function initDashboard() {
     }
     if (window.lucide) window.lucide.createIcons();
   } catch (err) {
-    console.error('[MaestraDashboard] Error crítico:', err);
+    console.error('[MaestraDashboard] Error crÃ­tico:', err);
     safeToast('Error cargando dashboard', 'error');
   }
 }
 
 /**
- * 🚀 AUTOMATIZACIÓN: Widgets Inteligentes
+ * ðŸš€ AUTOMATIZACIÃ“N: Widgets Inteligentes
  */
 function _updateNextActivityWidget() {
   const titleEl = document.getElementById('nextActivityTitle');
@@ -532,7 +547,7 @@ function _updateNextActivityWidget() {
   const schedule = [
     { name: 'Entrada y Bienvenida', start: 420, end: 480 }, // 7:00 AM - 8:00 AM
     { name: 'Desayuno', start: 480, end: 540 },            // 8:00 AM - 9:00 AM
-    { name: 'Actividades Pedagógicas', start: 540, end: 660 }, // 9:00 AM - 11:00 AM
+    { name: 'Actividades PedagÃ³gicas', start: 540, end: 660 }, // 9:00 AM - 11:00 AM
     { name: 'Merienda', start: 660, end: 720 },            // 11:00 AM - 12:00 PM
     { name: 'Almuerzo', start: 720, end: 780 },            // 12:00 PM - 1:00 PM
     { name: 'Siesta', start: 780, end: 870 },              // 1:00 PM - 2:30 PM
@@ -549,9 +564,9 @@ function _updateNextActivityWidget() {
     const endM = current.end % 60;
     const ampm = endH >= 12 ? 'PM' : 'AM';
     const h12 = endH > 12 ? endH - 12 : endH;
-    timeEl.textContent = `En curso — Termina ${h12}:${endM.toString().padStart(2, '0')} ${ampm}`;
+    timeEl.textContent = `En curso â€” Termina ${h12}:${endM.toString().padStart(2, '0')} ${ampm}`;
   } else if (next) {
-    titleEl.textContent = `Próximo: ${next.name}`;
+    titleEl.textContent = `PrÃ³ximo: ${next.name}`;
     const startH = Math.floor(next.start / 60);
     const startM = next.start % 60;
     const ampm = startH >= 12 ? 'PM' : 'AM';
@@ -559,7 +574,7 @@ function _updateNextActivityWidget() {
     timeEl.textContent = `Inicia a las ${h12}:${startM.toString().padStart(2, '0')} ${ampm}`;
   } else {
     titleEl.textContent = 'Fuera de Horario Escolar';
-    timeEl.textContent = '¡Hasta mañana! 👋';
+    timeEl.textContent = 'Â¡Hasta maÃ±ana! ðŸ‘‹';
   }
 }
 
@@ -574,7 +589,7 @@ function _updatePunchAlertWidget(students, attendance) {
 
   if (missing > 0 && total > 0) {
     widget.classList.remove('hidden');
-    textEl.textContent = `${missing} niños aún no han marcado entrada hoy.`;
+    textEl.textContent = `${missing} niÃ±os aÃºn no han marcado entrada hoy.`;
   } else {
     widget.classList.add('hidden');
   }
@@ -587,9 +602,9 @@ window.App.sendAbsenceAlerts = async () => {
   const presentIds = (attendance || []).map(a => a.student_id);
   
   const missing = students.filter(s => !presentIds.includes(s.id));
-  if (missing.length === 0) return safeToast('Todos los alumnos están presentes');
+  if (missing.length === 0) return safeToast('Todos los alumnos estÃ¡n presentes');
 
-  const confirm = await Helpers.confirm(`¿Enviar aviso de ausencia a los padres de ${missing.length} niños?`);
+  const confirm = await Helpers.confirm(`Â¿Enviar aviso de ausencia a los padres de ${missing.length} niÃ±os?`);
   if (!confirm) return;
 
   safeToast('Enviando notificaciones...', 'info');
@@ -598,8 +613,8 @@ window.App.sendAbsenceAlerts = async () => {
     if (s.parent_id) {
       await sendPush({
         user_id: s.parent_id,
-        title: 'Aviso de Ausencia ❓',
-        message: `Hola, notamos que ${s.name} no ha llegado hoy. Por favor confírmanos si asistirá o si tiene algún inconveniente.`,
+        title: 'Aviso de Ausencia â“',
+        message: `Hola, notamos que ${s.name} no ha llegado hoy. Por favor confÃ­rmanos si asistirÃ¡ o si tiene algÃºn inconveniente.`,
         link: 'panel_padres.html'
       }).catch(() => {});
       sent++;
@@ -667,6 +682,7 @@ function initNavigation() {
     if (cleanId === 'daily-routine') initRoutine();
     if (cleanId === 'tasks') initTasks();
     if (cleanId === 'grades') initGrades();
+    if (cleanId === 'permits') PermitsModule.init();
     if (cleanId === 'chat') initChat();
     if (cleanId === 'profile') {
       import('../shared/notify-permission.js').then(m => m.NotifyPermission.requestIfNeeded());
@@ -684,7 +700,7 @@ function initNavigation() {
   window.App.setActiveSection = setActiveSection;
   window.App._setActiveSection = setActiveSection; // Alias interno para el proxy global
 
-  // Restaurar última sección
+  // Restaurar Ãºltima secciÃ³n
   const lastSection = localStorage.getItem('maestra_last_section') || 't-home';
   const lastClassroom = localStorage.getItem('maestra_last_classroom');
   const lastTab = localStorage.getItem('maestra_last_tab');
@@ -700,46 +716,63 @@ function initNavigation() {
    * \ud83c\udfeb Mostrar Detalle de Aula
    */
   async function showClassroomDetail(classroomId, options = {}) {
-    let classroom = AppState.get('classroom');
-    
-    // Si no coincide (usamos loose equality para manejar string vs number), intentar obtenerlo de la base de datos o AppState
-    if (!classroom || classroom.id != classroomId) {
-      const { data } = await supabase.from('classrooms').select('*').eq('id', classroomId).maybeSingle();
-      if (data) {
-        classroom = data;
-        AppState.set('classroom', data);
+    // 1. Carga eficiente y paralela (OptimizaciÃ³n de Datos)
+    try {
+      // Intentamos obtener del AppState primero para velocidad instantÃ¡nea
+      let classroom = AppState.get('classroom');
+      let students = AppState.get('students');
+
+      // Si no tenemos los datos o el ID es diferente, cargamos en paralelo
+      if (!classroom || classroom.id != classroomId || !students) {
+        const [classroomRes, studentsRes] = await Promise.all([
+          supabase.from('classrooms').select('*').eq('id', classroomId).maybeSingle(),
+          MaestraApi.getStudentsByClassroom(classroomId)
+        ]);
+
+        if (classroomRes.data) {
+          classroom = classroomRes.data;
+          AppState.set('classroom', classroom);
+        }
+        
+        if (studentsRes) {
+          students = studentsRes;
+          AppState.set('students', studentsRes);
+        }
       }
+
+      if (!classroom) return safeToast('Aula no encontrada', 'error');
+
+      // Guardar para persistencia
+      localStorage.setItem('maestra_last_section', 't-class-detail');
+      localStorage.setItem('maestra_last_classroom', classroomId);
+
+      // 2. Actualizar UI del detalle
+      const nameEl = document.getElementById('currentClassName');
+      if (nameEl) nameEl.textContent = classroom.name;
+
+      // 3. Cambiar a la secciÃ³n de detalle
+      const layoutShell = document.getElementById('layoutShell');
+      if (layoutShell) layoutShell.scrollTop = 0;
+
+      if (window.App.setActiveSection) {
+        window.App.setActiveSection('t-class-detail', { skipSave: true });
+      } else {
+        document.querySelectorAll('.section').forEach(s => s.classList.remove('active'));
+        document.getElementById('t-class-detail')?.classList.add('active');
+      }
+
+      // 4. Inicializar tabs del aula
+      WallModule.init('muroPostsContainer', { 
+        accentColor: 'orange',
+        classroomId: classroom.id 
+      }, AppState);
+
+      initClassTabs(options.activeTab);
+
+    } catch (error) {
+      console.error('Error en showClassroomDetail:', error);
+      safeToast('Error al cargar datos del aula', 'error');
     }
-
-   if (!classroom) return safeToast('Aula no encontrada', 'error');
-
-   // Guardar para persistencia
-   localStorage.setItem('maestra_last_section', 't-class-detail');
-   localStorage.setItem('maestra_last_classroom', classroomId);
-
-   // 1. Actualizar UI del detalle
-   const nameEl = document.getElementById('currentClassName');
-   if (nameEl) nameEl.textContent = classroom.name;
-
-  // 2. Cambiar a la secci\u00f3n de detalle
-  const layoutShell = document.getElementById('layoutShell');
-  if (layoutShell) layoutShell.scrollTop = 0;
-
-  if (window.App.setActiveSection) {
-    window.App.setActiveSection('t-class-detail', { skipSave: true });
-  } else {
-    document.querySelectorAll('.section').forEach(s => s.classList.remove('active'));
-    document.getElementById('t-class-detail')?.classList.add('active');
-  }
-
-  // 3. Inicializar tabs del aula (Muro por defecto o el guardado)
-  WallModule.init('muroPostsContainer', { 
-    accentColor: 'orange',
-    classroomId: classroom.id 
-  }, AppState);
-
-  // 4. Configurar listeners de tabs si no est\u00e1n
-  initClassTabs(options.activeTab);
 }
 
 /**
@@ -750,39 +783,61 @@ function initClassTabs(defaultTab = null) {
   const tabContents = document.querySelectorAll('.class-tab-content');
 
   const activateTab = (targetTab) => {
-    // Reset ALL tab buttons (both mobile grid and desktop row)
+    // 1. Resetear TODOS los botones
     tabBtns.forEach(b => {
-      b.classList.remove('active', 'bg-orange-600', 'text-white');
+      b.classList.remove('active', 'bg-orange-600', 'bg-orange-500', 'text-white', 'ring-4', 'ring-orange-100');
       b.classList.add('bg-slate-100', 'text-slate-600');
     });
 
-    // Activate button matching targetTab
-    const activeBtn = Array.from(tabBtns).find(b => b.dataset.tab === targetTab);
-    if (activeBtn) {
-      activeBtn.classList.add('active', 'bg-orange-600', 'text-white');
-      activeBtn.classList.remove('bg-slate-100', 'text-slate-600', 'text-slate-500');
-    }
+    // 2. Activar botones que coincidan (con Ã©nfasis especial en Rutina)
+    tabBtns.forEach(b => {
+      if (b.dataset.tab === targetTab) {
+        const isRoutine = targetTab === 'daily-routine';
+        
+        // Estilo Naranja Vibrante solicitado por el usuario
+        b.classList.add('active', isRoutine ? 'bg-orange-600' : 'bg-orange-500', 'text-white', 'ring-4', 'ring-orange-100');
+        b.classList.remove('bg-slate-100', 'text-slate-600', 'text-slate-500');
+        
+        // Efecto visual extra para Rutina
+        if (isRoutine) {
+           b.classList.add('animate-pulse-subtle');
+        }
+      }
+    });
 
-    // Show correct content
+    // 3. Mostrar contenido correcto
     tabContents.forEach(c => c.classList.add('hidden'));
     document.getElementById(`tab-${targetTab}`)?.classList.remove('hidden');
 
     // Guardar tab en localStorage
     localStorage.setItem('maestra_last_tab', targetTab);
 
-    // Load data
-    if (targetTab === 'feed')          WallModule.loadPosts();
-    if (targetTab === 'daily-routine') initRoutine();
-    if (targetTab === 'students')      initDashboard();
-    if (targetTab === 'attendance')    initAttendance();
-    if (targetTab === 'tasks')         initTasks();
-    if (targetTab === 'videocall') {
-      const classroom = AppState.get('classroom');
-      const profile   = AppState.get('profile');
-      import('../shared/videocall-ui.js').then(({ VideoCallUI }) => {
-        VideoCallUI.init(classroom.id, profile.name, 'maestra');
-      });
-    }
+    // 4. Actualizar indicador de tÃ­tulo para contexto visual
+    const titleMap = { 
+      'feed': 'Muro del Aula', 
+      'daily-routine': 'Rutina Diaria ðŸ•’', 
+      'students': 'Lista de Estudiantes', 
+      'attendance': 'Pase de Lista', 
+      'tasks': 'GestiÃ³n de Tareas' 
+    };
+    const subTitle = document.getElementById('class-detail-subtitle');
+    if (subTitle) subTitle.textContent = titleMap[targetTab] || '';
+
+    // 5. Carga de datos optimizada (Solo si es necesario o forzado)
+    setTimeout(() => {
+      if (targetTab === 'feed')          WallModule.loadPosts();
+      if (targetTab === 'daily-routine') initRoutine();
+      if (targetTab === 'students')      initDashboard();
+      if (targetTab === 'attendance')    initAttendance();
+      if (targetTab === 'tasks')         initTasks();
+      if (targetTab === 'videocall') {
+        const classroom = AppState.get('classroom');
+        const profile   = AppState.get('profile');
+        import('../shared/videocall-ui.js').then(({ VideoCallUI }) => {
+          VideoCallUI.init(classroom.id, profile.name, 'maestra');
+        });
+      }
+    }, 0);
   };
 
   tabBtns.forEach(btn => {
@@ -990,7 +1045,7 @@ async function submitNewPost() {
 
     const classroom = AppState.get('classroom');
     const user = AppState.get('user');
-    if (!classroom || !user) throw new Error('No hay sesión activa');
+    if (!classroom || !user) throw new Error('No hay sesiÃ³n activa');
 
     const insertPayload = {
       classroom_id: classroom.id,
@@ -1006,7 +1061,7 @@ async function submitNewPost() {
     if (error) {
       // Si el error es por send_notification, intentar con RPC directo
       if (error.message?.includes('send_notification') || error.code === '42883') {
-        throw new Error('La función send_notification no existe en la DB. Ejecuta fix_posts_insert.sql en Supabase.');
+        throw new Error('La funciÃ³n send_notification no existe en la DB. Ejecuta fix_posts_insert.sql en Supabase.');
       }
       throw error;
     }
@@ -1100,7 +1155,7 @@ async function initGrades() {
 
     content.innerHTML =
       '<div class="grades-container">' +
-        // ── Vista de Tabla (Desktop) ──
+        // â”€â”€ Vista de Tabla (Desktop) â”€â”€
         '<div class="hidden md:block w-full overflow-x-auto rounded-3xl border border-slate-100 shadow-sm bg-white" style="-webkit-overflow-scrolling:touch">' +
           '<table class="w-full text-sm text-left" style="min-width:560px">' +
             '<thead class="bg-slate-50 text-slate-500 font-black uppercase text-[10px] tracking-wider">' +
@@ -1127,7 +1182,7 @@ async function initGrades() {
             '</tbody>' +
           '</table>' +
         '</div>' +
-        // ── Vista de Tarjetas (Mobile) ──
+        // â”€â”€ Vista de Tarjetas (Mobile) â”€â”€
         '<div class="md:hidden space-y-3">' +
           students.map(s => {
             const data = byStudent[s.id];
@@ -1201,7 +1256,7 @@ async function loadMaestraUnreadBadge(userId) {
   } catch (_) {}
 }
 
-// ── Badge tareas pendientes de calificar ──────────────────────────────────────
+// â”€â”€ Badge tareas pendientes de calificar â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 async function loadPendingTasksBadge(classroomId) {
   if (!classroomId) return;
   try {
@@ -1243,7 +1298,7 @@ async function loadPendingTasksBadge(classroomId) {
   } catch (_) {}
 }
 
-// ── QR de identificación de la maestra ───────────────────────────────────────
+// â”€â”€ QR de identificaciÃ³n de la maestra â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 async function _initMaestraQR(profile, user) {
   const section   = document.getElementById('maestra-qr-section');
   const container = document.getElementById('maestra-qr-container');
@@ -1288,7 +1343,7 @@ async function _initMaestraQR(profile, user) {
     correctLevel: window.QRCode.CorrectLevel.H
   });
 
-  // Función global para imprimir
+  // FunciÃ³n global para imprimir
   window.App.printMaestraQR = () => {
     const img = container.querySelector('img')?.src || container.querySelector('canvas')?.toDataURL();
     if (!img) return;
@@ -1301,7 +1356,7 @@ async function _initMaestraQR(profile, user) {
       img{width:180px;height:180px;}.name{font-size:15px;font-weight:900;color:#1e293b;margin-top:12px;}
       .code{font-size:10px;color:#64748b;font-weight:700;margin-top:4px;}.hint{font-size:8px;color:#94a3b8;margin-top:6px;}</style>
     </head><body><div class="card">
-      <div class="logo">🎓 Karpus Kids — Personal</div>
+      <div class="logo">ðŸŽ“ Karpus Kids â€” Personal</div>
       <img src="${img}">
       <div class="name">${name}</div>
       <div class="code">${code}</div>

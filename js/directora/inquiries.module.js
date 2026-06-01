@@ -1,4 +1,4 @@
-﻿import { DirectorApi } from './api.js';
+import { DirectorApi } from './api.js';
 import { Helpers } from '../shared/helpers.js';
 import { UI } from './ui.module.js';
 
@@ -59,7 +59,6 @@ export const InquiriesModule = {
       const modalHTML = `
         <div class="modal-header p-6 bg-indigo-600 text-white rounded-t-3xl flex justify-between items-center">
           <h3 class="text-xl font-bold">Detalle de Reporte</h3>
-          <button onclick="App.ui.closeModal()" class="text-white/70 hover:text-white"><i data-lucide="x"></i></button>
         </div>
         <div class="modal-body p-8 space-y-4 bg-white">
           <div><label class="text-[10px] font-black text-slate-400 uppercase">Asunto</label><p class="font-bold text-slate-800">${Helpers.escapeHTML(item.subject)}</p></div>

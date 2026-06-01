@@ -1,4 +1,4 @@
-﻿import { supabase } from '../shared/supabase.js';
+import { supabase } from '../shared/supabase.js';
 import { AppState, TABLES } from './appState.js';
 import { Helpers, escapeHtml } from './helpers.js';
 
@@ -49,6 +49,61 @@ export const ProfileModule = {
     if (btnSave && !btnSave._initialized) {
       btnSave.onclick = () => this.save();
       btnSave._initialized = true;
+    }
+
+    // Generar QR para el padre (Carnet Digital)
+    this.renderStudentQR();
+  },
+
+  /**
+   * Genera el QR del estudiante en el perfil del padre
+   */
+  renderStudentQR() {
+    const student = AppState.get('currentStudent');
+    const container = document.getElementById('parentStudentQR'); // Asegúrate que este ID exista en el HTML
+    if (!container || !student?.matricula) return;
+
+    // Limpiar previo
+    container.innerHTML = '';
+
+    // Cargar librería si no está (fallback)
+    if (!window.QRCode) {
+      const s = document.createElement('script');
+      s.src = 'js/shared/qrcode.min.js';
+      s.onload = () => this._generateQR(container, student);
+      document.head.appendChild(s);
+    } else {
+      this._generateQR(container, student);
+    }
+  },
+
+  _generateQR(container, student) {
+    new QRCode(container, {
+      text: student.matricula,
+      width: 160,
+      height: 160,
+      colorDark: "#0f172a",
+      colorLight: "#ffffff",
+      correctLevel: QRCode.CorrectLevel.H
+    });
+
+    // Añadir botón de imprimir si no existe
+    const btnPrint = document.getElementById('btnPrintStudentQR');
+    if (btnPrint && !btnPrint._initialized) {
+      btnPrint.onclick = () => {
+        const canvas = container.querySelector('canvas');
+        if (!canvas) return;
+        const imgData = canvas.toDataURL("image/png");
+        const win = window.open('', '_blank');
+        import('./helpers.js').then(({ Helpers }) => {
+          // Reutilizar la plantilla corporativa centralizada
+          import('../shared/helpers.js').then(({ Helpers: SharedHelpers }) => {
+             win.document.write(SharedHelpers.getQRPrintTemplate(imgData, student.name, student.matricula));
+             win.document.close();
+          });
+        });
+      };
+      btnPrint._initialized = true;
     }
   },
 

@@ -319,15 +319,16 @@ export const TeachersModule = {
   },
 
   async deleteTeacher(id, name) {
-    const ok = await (window._karpusConfirmDelete || ((t) => Promise.resolve(confirm(t))))(`�Eliminar a ${name}?`, 'Esta acci�n no se puede deshacer.');
-    if (!ok) return;
-    try {
-      const { error } = await supabase.from('profiles').delete().eq('id', id);
-      if (error) throw error;
-      Helpers.toast('Maestra eliminada correctamente');
-      await this.loadTeachers();
-    } catch (e) {
-      Helpers.toast('Error al eliminar: ' + e.message, 'error');
+      const ok = window.confirm(`¿Eliminar a "${name}"?\n\nEsta acción no se puede deshacer. El usuario perderá acceso al sistema inmediatamente.`);
+      if (!ok) return;
+      try {
+        const { error } = await supabase.from('profiles').delete().eq('id', id);
+        if (error) throw error;
+        Helpers.toast('Personal eliminado correctamente', 'success');
+        await this.loadTeachers();
+      } catch (e) {
+        Helpers.toast('Error al eliminar: ' + e.message, 'error');
+      }
     }
-  }
+
 };

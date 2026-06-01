@@ -12,6 +12,7 @@ import { AttendanceModule } from './attendance.module.js';
 import { ChatModule } from './chat.module.js';
 import { InquiriesModule } from './inquiries.module.js';
 import { AccessModule } from './access.module.js';
+import { PermitsModule } from './permits.module.js';
 import { RoomsModule } from './rooms.module.js';
 import { BadgeSystem } from '../shared/badges.js';
 import { ImageLoader } from '../shared/image-loader.js';
@@ -37,6 +38,7 @@ window.App = {
   grades: GradesModule,
   ui: { ...UIHelpers, ...DirectorUI },
   inquiries: InquiriesModule,
+  permits: PermitsModule,
   chat: ChatModule,
   automation: AutomationModule,
   wall: {
@@ -55,8 +57,22 @@ window.openGlobalModal = function(html, wide = false) {
   const container = document.getElementById('globalModalContainer');
   if (!container) return;
   const maxW = wide ? 'max-w-4xl' : 'max-w-2xl';
-  container.innerHTML = `<div class="bg-white rounded-3xl shadow-2xl w-full ${maxW} max-h-[92vh] overflow-y-auto mx-3 my-4">${html}</div>`;
-  container.style.cssText = 'display:flex;align-items:flex-start;justify-content:center;padding-top:4vh;position:fixed;inset:0;background:rgba(0,0,0,0.5);backdrop-filter:blur(4px);z-index:var(--z-modal,100);overflow-y:auto;';
+  container.innerHTML = `
+    <div id="globalModalInner" class="bg-white rounded-3xl shadow-2xl w-full ${maxW} max-h-[92vh] overflow-y-auto mx-3 my-4 relative animate-scaleIn">
+      <button onclick="UIHelpers.closeModal()" class="absolute top-4 right-4 w-10 h-10 flex items-center justify-center rounded-full bg-slate-100 text-slate-400 hover:bg-rose-50 hover:text-rose-500 transition-all z-[110]">
+        <i data-lucide="x" class="w-6 h-6"></i>
+      </button>
+      ${html}
+    </div>`;
+  container.style.cssText = 'display:flex;align-items:flex-start;justify-content:center;padding-top:4vh;position:fixed;inset:0;background:rgba(0,0,0,0.6);backdrop-filter:blur(8px);z-index:var(--z-modal,100);overflow-y:auto;';
+  
+  // Cerrar al hacer clic fuera del contenido (en el overlay)
+  container.onmousedown = (e) => {
+    if (e.target === container) {
+      UIHelpers.closeModal();
+    }
+  };
+
   if (window.lucide) lucide.createIcons();
 };
 
@@ -66,7 +82,13 @@ window.openGlobalModal = function(html, wide = false) {
 export function goToSection(sectionId) {
   if (!sectionId) return;
 
-  // Ocultar todas las secciones � solo con CSS class, sin Tailwind hidden
+  // Desuscribir muro al salir (ahorro de recursos Realtime)
+  const prevSection = AppState.get('currentSection');
+  if (prevSection === 'muro' && sectionId !== 'muro') {
+    WallModule.destroy?.();
+  }
+
+  // Ocultar todas las secciones — solo con CSS class, sin Tailwind hidden
   document.querySelectorAll('.section').forEach(sec => {
     sec.classList.remove('active');
   });
@@ -75,8 +97,8 @@ export function goToSection(sectionId) {
   if (target) {
     target.classList.add('active');
     AppState.set('currentSection', sectionId);
-    
-    // 2. Carga bajo demanda por m�dulo
+
+    // Carga bajo demanda por módulo
     switch (sectionId) {
       case 'dashboard':
         DashboardService.getFullData(true).then(data => DirectorUI.renderDashboard(data));
@@ -104,17 +126,18 @@ export function goToSection(sectionId) {
         break;
       case 'accesos': AccessModule.init(); break;
       case 'reportes': InquiriesModule.init(); break;
+      case 'staff-permits': PermitsModule.init(); break;
       case 'configuracion':
         loadProfile();
         import('../shared/notify-permission.js').then(m => m.NotifyPermission.requestIfNeeded());
         break;
     }
 
-    // ?? Marcar badge como le�do al entrar
+    // Marcar badge como leído al entrar
     BadgeSystem.mark(sectionId);
   }
 
-  // 3. Actualizar Botones Nav
+  // Actualizar Botones Nav
   document.querySelectorAll('[data-section]').forEach(btn => {
     if (btn.dataset.section === sectionId) {
       btn.classList.add('bg-white/20');
@@ -134,6 +157,7 @@ export function goToSection(sectionId) {
   // Re-inicializar iconos Lucide tras cambio de sección
   setTimeout(() => { if (window.lucide) lucide.createIcons(); }, 50);
 }
+
 
 async function loadProfile() {
   try {

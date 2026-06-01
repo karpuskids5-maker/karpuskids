@@ -248,9 +248,13 @@ function _updateDebtBanner(finance) {
   if (overdue.length > 0 || debt > 0) {
     banner.classList.remove('hidden');
     const total = Helpers.formatCurrency(debt);
-    if (msgEl) msgEl.textContent = overdue.length > 0
-      ? `Tienes ${overdue.length} pago(s) vencido(s) · Total: ${total}`
-      : `Saldo pendiente: ${total}. Evita recargos pagando a tiempo.`;
+    if (msgEl) {
+      if (overdue.length > 0) {
+        msgEl.innerHTML = `<span class="text-rose-200">🚨 Pago Vencido:</span> Tienes ${overdue.length} mensualidad(es) atrasada(s). Total a pagar: <span class="text-white underline">${total}</span>`;
+      } else {
+        msgEl.innerHTML = `<span class="text-amber-200">⏳ Saldo Pendiente:</span> Tu balance actual es <span class="text-white font-black">${total}</span>. Recuerda pagar antes del día 5 para evitar recargos.`;
+      }
+    }
   } else {
     banner.classList.add('hidden');
   }
@@ -360,41 +364,87 @@ function renderDailySummary(log) {
   if (!log) {
     container.innerHTML =
       '<div class="bg-white rounded-2xl p-6 border border-slate-100 shadow-sm text-center opacity-70">' +
-        '<p class="text-3xl mb-2">\u2728</p>' +
-        '<p class="text-sm font-bold text-slate-400 uppercase tracking-widest">A\u00FAn no hay reporte del d\u00EDa</p>' +
+        '<p class="text-3xl mb-2">✨</p>' +
+        '<p class="text-sm font-bold text-slate-400 uppercase tracking-widest">Aún no hay reporte del día</p>' +
       '</div>';
     return;
   }
 
-  const moodMap = { feliz: '\uD83D\uDE03', bien: '\uD83D\uDE0A', normal: '\uD83D\uDE10', triste: '\uD83D\uDE22', inquieto: '\uD83D\uDE2B', enojado: '\uD83D\uDE20' };
-  const moodIcon = moodMap[(log.mood || '').toLowerCase()] || '\u2728';
+  const student = AppState.get('currentStudent');
+  const isInfant = student?.age_type === 'meses';
 
-  container.innerHTML =
-    '<div class="bg-white rounded-2xl p-6 border border-green-100 shadow-sm">' +
-      '<h3 class="font-black text-slate-800 text-base mb-4 flex items-center gap-2">' +
-        '<span class="bg-green-100 text-green-700 p-1.5 rounded-lg"><i data-lucide="clipboard-list" class="w-4 h-4"></i></span>' +
-        'Resumen del D\u00EDa' +
-      '</h3>' +
-      '<div class="grid grid-cols-1 md:grid-cols-3 gap-3">' +
-        '<div class="bg-slate-50 p-4 rounded-xl flex items-center gap-3">' +
-          '<div class="w-10 h-10 rounded-full bg-white flex items-center justify-center text-xl shadow-sm">' + moodIcon + '</div>' +
-          '<div><p class="text-[10px] font-black text-slate-400 uppercase">\u00C1nimo</p><p class="font-bold text-slate-700 capitalize">' + (log.mood || 'Bien') + '</p></div>' +
-        '</div>' +
-        '<div class="bg-slate-50 p-4 rounded-xl flex items-center gap-3">' +
-          '<div class="w-10 h-10 rounded-full bg-white flex items-center justify-center text-xl shadow-sm">\uD83C\uDF7D\uFE0F</div>' +
-          '<div><p class="text-[10px] font-black text-slate-400 uppercase">Comida</p><p class="font-bold text-slate-700">' + (log.food || 'Sin registro') + '</p></div>' +
-        '</div>' +
-        '<div class="bg-slate-50 p-4 rounded-xl flex items-center gap-3">' +
-          '<div class="w-10 h-10 rounded-full bg-white flex items-center justify-center text-xl shadow-sm">\uD83D\uDE34</div>' +
-          '<div><p class="text-[10px] font-black text-slate-400 uppercase">Siesta</p><p class="font-bold text-slate-700">' + (log.nap || log.sleeping || 'No registrada') + '</p></div>' +
-        '</div>' +
-      '</div>' +
-      ((log.notes || log.observations) ?
-        '<div class="mt-3 p-3 bg-amber-50 rounded-xl border border-amber-100">' +
-          '<p class="text-[10px] font-black text-amber-500 uppercase mb-1">Observaciones</p>' +
-          '<p class="text-sm text-slate-600 italic">&ldquo;' + (log.notes || log.observations) + '&rdquo;</p>' +
-        '</div>' : '') +
-    '</div>';
+  if (isInfant) {
+    // 🍼 LÍNEA DE TIEMPO PARA BEBÉS
+    const infantData = log.infant_data || [];
+    const hasVomit = infantData.some(e => e.type === 'health' && e.value === 'vomito');
+    
+    container.innerHTML = `
+      <div class="bg-white rounded-2xl p-6 border ${hasVomit ? 'border-rose-200 bg-rose-50/30' : 'border-blue-100'} shadow-sm">
+        <h3 class="font-black text-slate-800 text-base mb-4 flex items-center gap-2">
+          <span class="bg-blue-100 text-blue-700 p-1.5 rounded-lg"><i data-lucide="baby" class="w-4 h-4"></i></span>
+          Cuidado del Bebé - Hoy
+        </h3>
+
+        ${hasVomit ? `
+          <div class="mb-4 p-4 bg-rose-100 border-2 border-rose-200 rounded-2xl flex items-center gap-3 animate-pulse">
+            <span class="text-2xl">⚠️</span>
+            <div>
+              <p class="text-xs font-black text-rose-800 uppercase">Alerta de Salud</p>
+              <p class="text-sm font-bold text-rose-700">Se ha registrado un evento de vómito. Favor estar atentos.</p>
+            </div>
+          </div>
+        ` : ''}
+
+        <div class="relative space-y-4 before:content-[''] before:absolute before:left-[15px] before:top-2 before:bottom-2 before:w-0.5 before:bg-blue-100">
+          ${infantData.length ? infantData.map(e => `
+            <div class="relative pl-10">
+              <div class="absolute left-0 top-1 w-8 h-8 rounded-full bg-white border-2 ${e.type === 'health' ? 'border-rose-400' : 'border-blue-400'} flex items-center justify-center text-sm shadow-sm z-10">
+                ${e.type === 'milk' ? '🍼' : e.type === 'health' ? '🤢' : e.type === 'sleep' ? '💤' : '💩'}
+              </div>
+              <p class="text-[10px] font-black text-slate-400 uppercase">${new Date(e.created_at).toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'})}</p>
+              <p class="text-sm font-bold text-slate-700">
+                ${e.type === 'milk' ? `Tomó ${e.value} de leche` : 
+                  e.type === 'health' ? `Reportó ${e.value}` :
+                  e.type === 'sleep' ? `Inició siesta` :
+                  `Cambio de pañal: ${e.value}`}
+              </p>
+            </div>
+          `).join('') : '<p class="text-xs text-slate-400 italic pl-10">Iniciando el seguimiento del día...</p>'}
+        </div>
+      </div>
+    `;
+  } else {
+    // 🧒 RESUMEN ESTÁNDAR
+    const moodMap = { feliz: '😊', bien: '😊', normal: '😐', triste: '😢', inquieto: '😫', enojado: '😡' };
+    const moodIcon = moodMap[(log.mood || '').toLowerCase()] || '✨';
+
+    container.innerHTML = `
+      <div class="bg-white rounded-2xl p-6 border border-green-100 shadow-sm">
+        <h3 class="font-black text-slate-800 text-base mb-4 flex items-center gap-2">
+          <span class="bg-green-100 text-green-700 p-1.5 rounded-lg"><i data-lucide="clipboard-list" class="w-4 h-4"></i></span>
+          Resumen del Día
+        </h3>
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-3">
+          <div class="bg-slate-50 p-4 rounded-xl flex items-center gap-3">
+            <div class="w-10 h-10 rounded-full bg-white flex items-center justify-center text-xl shadow-sm">${moodIcon}</div>
+            <div><p class="text-[10px] font-black text-slate-400 uppercase">Ánimo</p><p class="font-bold text-slate-700 capitalize">${log.mood || 'Bien'}</p></div>
+          </div>
+          <div class="bg-slate-50 p-4 rounded-xl flex items-center gap-3">
+            <div class="w-10 h-10 rounded-full bg-white flex items-center justify-center text-xl shadow-sm">🍽️</div>
+            <div><p class="text-[10px] font-black text-slate-400 uppercase">Comida</p><p class="font-bold text-slate-700">${log.food || 'Sin registro'}</p></div>
+          </div>
+          <div class="bg-slate-50 p-4 rounded-xl flex items-center gap-3">
+            <div class="w-10 h-10 rounded-full bg-white flex items-center justify-center text-xl shadow-sm">💤</div>
+            <div><p class="text-[10px] font-black text-slate-400 uppercase">Siesta</p><p class="font-bold text-slate-700">${log.nap || log.sleeping || 'No registrada'}</p></div>
+          </div>
+        </div>
+        ${(log.notes || log.observations) ? `
+          <div class="mt-3 p-3 bg-amber-50 rounded-xl border border-amber-100">
+            <p class="text-[10px] font-black text-amber-500 uppercase mb-1">Observaciones</p>
+            <p class="text-sm text-slate-600 italic">&ldquo;${log.notes || log.observations}&rdquo;</p>
+          </div>` : ''}
+      </div>`;
+  }
 
   if (window.lucide) lucide.createIcons();
 }

@@ -76,7 +76,7 @@ export const Helpers = {
    */
   formatCurrency: (val) => {
     const num = Number(val || 0);
-    return 'RD$' + num.toLocaleString('es-DO', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+    return num.toLocaleString('es-DO', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
   },
 
   /**

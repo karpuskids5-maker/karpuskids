@@ -167,8 +167,8 @@ export const PaymentsModule = {
     const currentMora = moraBreakdown ? moraBreakdown.total : 0;
     const totalAmount = Number(p.amount || 0) + currentMora;
 
-    const af  = 'RD$' + Number(p.amount || 0).toLocaleString('es-DO', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-    const tf  = 'RD$' + totalAmount.toLocaleString('es-DO', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+    const af  = Number(p.amount || 0).toLocaleString('es-DO', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+    const tf  = totalAmount.toLocaleString('es-DO', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
     let ub = '';
     if (moraBreakdown) {
@@ -242,23 +242,27 @@ export const PaymentsModule = {
   },
 
   async openPaymentModal(prefillStudentId = null) {
-    const ic = 'w-full px-4 py-2.5 border-2 border-slate-100 rounded-2xl outline-none focus:ring-4 focus:ring-emerald-100 focus:border-emerald-400 bg-slate-50/50 transition-all text-sm font-medium';
+    const ic = 'w-full px-4 py-2.5 border-2 border-slate-100 rounded-2xl outline-none focus:ring-4 focus:ring-purple-100 focus:border-purple-400 bg-slate-50/50 transition-all text-sm font-medium';
     const lc = 'block text-[11px] font-black text-slate-400 uppercase tracking-wider mb-1.5 ml-1';
     const now = new Date();
     const dm  = now.getMonth() + 1;
     const dy  = dm > 11 ? now.getFullYear() + 1 : now.getFullYear();
     const dd  = new Date(dy, dm > 11 ? 0 : dm, this.settings.due_day).toISOString().split('T')[0];
-    const mo  = MES.map((m, i) => '<option value="' + m + '"' + (i === now.getMonth() ? ' selected' : '') + '>' + MES_LABEL[i] + '</option>').join('');
+    // Usar formato YYYY-MM para month_paid (consistente con el sistema)
+    const curYear = now.getFullYear();
+    const mo = MES_LABEL.map((label, i) => {
+      const val = `${curYear}-${String(i + 1).padStart(2, '0')}`;
+      return '<option value="' + val + '"' + (i === now.getMonth() ? ' selected' : '') + '>' + label + '</option>';
+    }).join('');
 
     window.openGlobalModal(
-      '<div class="bg-gradient-to-r from-emerald-600 to-teal-600 text-white p-6 rounded-t-3xl flex items-center justify-between">' +
-        '<div class="flex items-center gap-3"><div class="w-12 h-12 bg-white/20 rounded-2xl flex items-center justify-center text-2xl">\uD83D\uDCB0</div>' +
+      '<div class="bg-gradient-to-r from-purple-600 to-indigo-600 text-white p-6 rounded-t-3xl flex items-center justify-between">' +
+        '<div class="flex items-center gap-3"><div class="w-12 h-12 bg-white/20 rounded-2xl flex items-center justify-center text-2xl">💰</div>' +
         '<div><h3 class="text-xl font-black">Registrar Pago</h3><p class="text-xs text-white/70 font-bold uppercase tracking-widest">Cobro Manual</p></div></div>' +
-        '<button onclick="App.ui.closeModal()" class="w-10 h-10 flex items-center justify-center rounded-xl bg-white/10 hover:bg-white/20"><i data-lucide="x" class="w-6 h-6"></i></button>' +
       '</div>' +
       '<div class="p-6 bg-slate-50/30" id="modalPayment"><div class="grid grid-cols-1 md:grid-cols-2 gap-4">' +
         '<div class="md:col-span-2"><label class="' + lc + '">Estudiante</label><select id="payStudentSelect" class="' + ic + '"><option value="">-- Seleccionar --</option></select></div>' +
-        '<div><label class="' + lc + '">Monto ($)</label><input id="payAmount" type="number" step="0.01" min="0" class="' + ic + '" placeholder="0.00"></div>' +
+        '<div><label class="' + lc + '">Monto</label><input id="payAmount" type="number" step="0.01" min="0" class="' + ic + '" placeholder="0.00"></div>' +
         '<div><label class="' + lc + '">Concepto</label><input id="payConcept" type="text" class="' + ic + '" value="Mensualidad"></div>' +
         '<div><label class="' + lc + '">Mes que se cobra</label><select id="payMonthPaid" class="' + ic + '">' + mo + '</select></div>' +
         '<div><label class="' + lc + '">Fecha Limite</label><input id="payDueDate" type="date" class="' + ic + '" value="' + dd + '"></div>' +
@@ -266,24 +270,34 @@ export const PaymentsModule = {
         '<div><label class="' + lc + '">Estado</label><select id="payStatus" class="' + ic + '"><option value="paid">Pagado</option><option value="pending">Pendiente</option></select></div>' +
       '</div></div>' +
       '<div class="bg-white p-5 rounded-b-3xl border-t border-slate-100 flex justify-end gap-3">' +
-        '<button onclick="App.ui.closeModal()" class="px-6 py-2.5 text-slate-500 font-black text-xs uppercase hover:bg-slate-50 rounded-2xl">Cancelar</button>' +
-        '<button id="btnSavePaymentAction" class="px-8 py-2.5 bg-gradient-to-r from-emerald-600 to-teal-600 text-white rounded-2xl font-black text-xs uppercase shadow-lg">Registrar Pago</button>' +
+        '<button onclick="UIHelpers.closeModal()" class="px-6 py-2.5 text-slate-500 font-black text-xs uppercase hover:bg-slate-50 rounded-2xl transition-all">Cancelar</button>' +
+        '<button id="btnSavePaymentAction" class="px-8 py-2.5 bg-gradient-to-r from-purple-600 to-indigo-600 text-white rounded-2xl font-black text-xs uppercase shadow-lg shadow-purple-100 hover:-translate-y-0.5 active:scale-95 transition-all">Registrar Pago</button>' +
       '</div>'
     );
 
+    // Cargar estudiantes en el select
     try {
       const { data: students } = await DirectorApi.getStudents();
-      const sel = document.getElementById('payStudentSelect');
-      if (sel && students) {
-        students.forEach(s => {
-          const o = document.createElement('option');
-          o.value = s.id;
-          o.textContent = s.name + ' (' + (s.classrooms?.name || 'Sin aula') + ')';
-          if (prefillStudentId && String(s.id) === String(prefillStudentId)) o.selected = true;
-          sel.appendChild(o);
+      const select = document.getElementById('payStudentSelect');
+      if (select && students) {
+        select.innerHTML = '<option value="">-- Seleccionar --</option>' +
+          students.map(s => {
+            const selected = prefillStudentId && String(s.id) === String(prefillStudentId) ? ' selected' : '';
+            return `<option value="${s.id}" data-fee="${s.monthly_fee || 0}"${selected}>${Helpers.escapeHTML(s.name)} (${s.classrooms?.name || 'Sin aula'})</option>`;
+          }).join('');
+
+        // Al cambiar de estudiante, poner su mensualidad automáticamente
+        select.addEventListener('change', (e) => {
+          const opt = e.target.selectedOptions[0];
+          const fee = opt?.dataset?.fee || 0;
+          const amtInput = document.getElementById('payAmount');
+          if (amtInput) amtInput.value = fee > 0 ? fee : '';
         });
+
+        // Si hay prefill, disparar el cambio inicial
+        if (prefillStudentId) select.dispatchEvent(new Event('change'));
       }
-    } catch (_) {}
+    } catch (e) { }
 
     document.getElementById('btnSavePaymentAction')?.addEventListener('click', () => this.saveManualPayment());
     if (window.lucide) lucide.createIcons();
@@ -302,32 +316,85 @@ export const PaymentsModule = {
     if (!sid) return Helpers.toast('Selecciona un estudiante', 'warning');
     if (!amt || amt <= 0) return Helpers.toast('Ingresa un monto valido', 'warning');
 
+    const saveBtn = document.getElementById('btnSavePaymentAction');
+    if (saveBtn) saveBtn.disabled = true;
+
     UIHelpers.setLoading(true, '#modalPayment');
     try {
-      const { data: pay, error } = await DirectorApi.createManualPayment({ student_id: sid, amount: amt, concept: con, method: met, status: sta, month_paid: mp, due_date: dd || null, paid_date: pd, created_at: new Date().toISOString() });
-      if (error) throw new Error(error);
+      // 1. Verificar si ya existe un pago para este estudiante y mes
+      // Buscar por formato YYYY-MM Y por nombre de mes (registros legacy)
+      const mesNombre = ['enero','febrero','marzo','abril','mayo','junio','julio','agosto','septiembre','octubre','noviembre','diciembre'][parseInt(mp.split('-')[1], 10) - 1];
       
-      await auditLog('payment.manual_create', {
-        student_id: sid,
-        amount: amt,
-        month: mp
-      });
+      const { data: existingList } = await supabase
+        .from('payments')
+        .select('id, status, month_paid')
+        .eq('student_id', sid)
+        .or(`month_paid.eq.${mp},month_paid.eq.${mesNombre}`)
+        .limit(5);
 
+      const existing = existingList?.[0] || null;
+
+      let pay;
+      if (existing) {
+        if (existing.status === 'paid') {
+          Helpers.toast('Este estudiante ya tiene un pago aprobado para este mes', 'warning');
+          return;
+        }
+        // Actualizar el existente (normalizar month_paid a YYYY-MM)
+        const { data: updated, error: upErr } = await supabase.from('payments').update({
+          amount: amt, concept: con, method: met, status: sta,
+          due_date: dd || null, paid_date: pd,
+          month_paid: mp, // normalizar a YYYY-MM
+          updated_at: new Date().toISOString()
+        }).eq('id', existing.id).select().single();
+        if (upErr) throw upErr;
+        pay = updated;
+      } else {
+        // Insertar nuevo
+        const { data: inserted, error: insErr } = await supabase.from('payments').insert({ 
+          student_id: sid, amount: amt, concept: con, method: met, status: sta, 
+          month_paid: mp, due_date: dd || null, paid_date: pd, 
+          created_at: new Date().toISOString() 
+        }).select().single();
+
+        if (insErr) {
+          if (insErr.code === '23505') {
+             throw new Error('Ya existe un registro para este mes. Por favor actualiza el existente.');
+          }
+          throw insErr;
+        }
+        pay = inserted;
+      }
+      
+      // 2. Si el pago es en efectivo y está pagado, activar estudiante
+      if (sta === 'paid') {
+        await supabase.from('students')
+          .update({ is_active: true, status: 'activo' })
+          .eq('id', sid);
+      }
+
+      await auditLog('payment.manual_create', { student_id: sid, amount: amt, month: mp });
       Helpers.toast('Pago registrado correctamente', 'success');
       UIHelpers.closeModal();
-      await this.loadPayments();
-      if (pay?.id) { try { await DirectorApi.sendPaymentReceipt(pay.id); } catch (_) {} }
+      
+      this.loadPayments();
+      this.loadStats();
+      this.loadIncomeChart();
+      
+      if (pay?.id) { DirectorApi.sendPaymentReceipt(pay.id).catch(()=>{}); }
     } catch (e) {
-      Helpers.toast('Error al guardar: ' + e.message, 'error');
+      console.error('[Payments] Error:', e);
+      Helpers.toast('Error al guardar: ' + (e.message || 'Conflicto de datos'), 'error');
     } finally {
       UIHelpers.setLoading(false, '#modalPayment');
+      if (saveBtn) saveBtn.disabled = false;
     }
   },
 
   async markPaid(id) {
     try {
       await supabase.from('payments').update({ status: 'paid', paid_date: new Date().toISOString() }).eq('id', id);
-      await auditLog('payment.approve', { payment_id: id });
+      // auditLog omitido — cubierto por trigger fn_audit_payment en DB
       Helpers.toast('Pago aprobado', 'success');
       await this.loadPayments();
       // Notificar al padre: email + push
@@ -336,7 +403,7 @@ export const PaymentsModule = {
         if (p) {
           const { notifyPaymentApproved } = await import('../shared/supabase.js');
           const emails = [p.students?.p1_email, p.students?.p2_email].filter(e => e && e.includes('@'));
-          const amountStr = 'RD$' + Number(p.amount || 0).toLocaleString('es-DO', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+          const amountStr = Number(p.amount || 0).toLocaleString('es-DO', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
           await notifyPaymentApproved(id, emails[0] || null, p.students?.name || 'Estudiante', amountStr, p.month_paid || 'Colegiatura');
         }
       } catch (_) {}
@@ -347,7 +414,7 @@ export const PaymentsModule = {
     if (!confirm('Eliminar este registro?')) return;
     try {
       await supabase.from('payments').delete().eq('id', id);
-      await auditLog('payment.delete', { payment_id: id });
+      // auditLog omitido — cubierto por trigger en DB
       Helpers.toast('Pago eliminado', 'success');
       await this.loadPayments();
     } catch (_) { Helpers.toast('Error al eliminar', 'error'); }

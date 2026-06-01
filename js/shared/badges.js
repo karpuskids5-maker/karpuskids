@@ -251,6 +251,15 @@ export const BadgeSystem = {
       this._renderCardBadge('comunicacion', 0);
       this._renderCardBadge('notifications', 0);
     }
+    // Limpiar muro y sus aliases
+    if (section === 'muro' || section === 'class') {
+      this._counts['muro'] = 0;
+      this._counts['class'] = 0;
+      this._renderBadge('muro', 0);
+      this._renderBadge('class', 0);
+      this._renderCardBadge('muro', 0);
+      this._renderCardBadge('class', 0);
+    }
   },
 
   set(section, count) {

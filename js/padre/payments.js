@@ -48,7 +48,7 @@ export const PaymentsModule = {
 
       if (mora <= 0) { hint.classList.add('hidden'); return; }
 
-      const fmt = (n) => 'RD$' + Number(n).toLocaleString('es-DO', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+      const fmt = (n) => Number(n).toLocaleString('es-DO', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
       if (baseEl)  baseEl.textContent  = fmt(base);
       if (moraEl)  moraEl.textContent  = '+' + fmt(mora);
       if (totalEl) totalEl.textContent = fmt(base + mora);
@@ -148,16 +148,38 @@ export const PaymentsModule = {
   _renderAlertBanner(payments) {
     const banner = document.getElementById('paymentAlertBanner');
     if (!banner) return;
-    const urgent = payments
-      .filter(p => !['paid'].includes((p.status||'').toLowerCase()))
+    
+    const pending = payments.filter(p => !['paid'].includes((p.status||'').toLowerCase()));
+    const totalDebt = pending.reduce((sum, p) => sum + Number(p.amount || 0), 0);
+    
+    const urgent = pending
       .map(p => ({ ...p, days: daysUntilDue(p.due_date) }))
       .filter(p => p.days !== null)
       .sort((a, b) => a.days - b.days)[0];
 
-    if (!urgent) { banner.classList.add('hidden'); return; }
-    const days   = urgent.days;
-    const amount = Helpers.formatCurrency(Number(urgent.amount || 0));
-    const month  = urgent.month_paid || 'tu mensualidad';
+    if (!urgent && totalDebt <= 0) {
+      // ✅ Mostrar estado al día si no hay pendientes
+      banner.classList.remove('hidden');
+      banner.innerHTML = `
+        <div class="bg-gradient-to-r from-emerald-500 to-teal-600 rounded-3xl p-5 shadow-lg">
+          <div class="flex items-center gap-4">
+            <div class="text-2xl shrink-0">✨</div>
+            <div class="flex-1 min-w-0">
+              <p class="font-black text-white text-base leading-tight">¡Estás al día!</p>
+              <p class="text-white/80 text-sm font-medium mt-1 leading-relaxed">No tienes pagos pendientes registrados. ¡Gracias!</p>
+            </div>
+            <div class="w-10 h-10 rounded-full bg-white/20 flex items-center justify-center">
+              <i data-lucide="check" class="w-5 h-5 text-white"></i>
+            </div>
+          </div>
+        </div>`;
+      if (window.lucide) lucide.createIcons();
+      return;
+    }
+
+    const days   = urgent?.days ?? 0;
+    const amount = Helpers.formatCurrency(totalDebt);
+    const month  = urgent?.month_paid || 'tus mensualidades';
     let cfg;
 
     if (days < 0) {
@@ -165,34 +187,32 @@ export const PaymentsModule = {
       cfg = {
         bg: 'bg-gradient-to-r from-rose-500 to-red-600',
         icon: '🚨',
-        title: `Pago vencido — ${month}`,
-        msg: mora > 0
-          ? `${Math.abs(days)} días de retraso. Mora: ${Helpers.formatCurrency(mora)}`
-          : `${Math.abs(days)} días de retraso. Paga cuanto antes.`,
+        title: `Pagos pendientes — ${amount}`,
+        msg: `Tienes ${pending.length} pago(s) pendiente(s). ${month} venció hace ${Math.abs(days)} días.`,
         btn: 'Pagar ahora', btnCls: 'bg-white text-rose-600'
       };
     } else if (days === 0) {
       cfg = {
         bg: 'bg-gradient-to-r from-orange-500 to-amber-500',
         icon: '⏰',
-        title: `¡Hoy vence tu pago! — ${month}`,
-        msg: `Último día para pagar ${amount} sin recargo.`,
+        title: `Hoy vence un pago — ${amount}`,
+        msg: `Último día para pagar ${month} sin recargos.`,
         btn: 'Enviar comprobante', btnCls: 'bg-white text-orange-600'
       };
     } else if (days <= 3) {
       cfg = {
         bg: 'bg-gradient-to-r from-amber-400 to-yellow-500',
         icon: '📅',
-        title: `Vence en ${days} día${days > 1 ? 's' : ''} — ${month}`,
-        msg: `Paga ${amount} antes del ${new Date(urgent.due_date + 'T00:00:00').toLocaleDateString('es-DO', { day: 'numeric', month: 'long' })} para evitar recargos.`,
+        title: `Próximo vencimiento — ${amount}`,
+        msg: `${month} vence en ${days} días. Evita recargos pagando a tiempo.`,
         btn: 'Pagar a tiempo', btnCls: 'bg-white text-amber-700'
       };
-    } else if (days <= 7) {
+    } else if (days <= 7 || totalDebt > 0) {
       cfg = {
         bg: 'bg-gradient-to-r from-blue-500 to-indigo-500',
         icon: '💡',
-        title: `Recordatorio — ${month}`,
-        msg: `Tu pago de ${amount} vence en ${days} días.`,
+        title: `Saldo pendiente — ${amount}`,
+        msg: `Recuerda realizar tu pago de ${month} antes de su vencimiento.`,
         btn: 'Ver detalles', btnCls: 'bg-white text-blue-700'
       };
     } else {
@@ -202,14 +222,14 @@ export const PaymentsModule = {
 
     banner.classList.remove('hidden');
     banner.innerHTML = `
-      <div class="${cfg.bg} rounded-2xl p-4 shadow-lg">
+      <div class="${cfg.bg} rounded-2xl p-4 shadow-lg overflow-hidden">
         <div class="flex items-start gap-3">
           <div class="text-xl shrink-0 mt-0.5">${cfg.icon}</div>
-          <div class="flex-1 min-w-0">
-            <p class="font-black text-white text-sm leading-tight">${cfg.title}</p>
-            <p class="text-white/80 text-xs font-medium mt-1 leading-relaxed">${cfg.msg}</p>
+          <div class="flex-1 min-w-0 overflow-hidden">
+            <p class="font-black text-white text-sm leading-tight truncate">${cfg.title}</p>
+            <p class="text-white/80 text-xs font-medium mt-1 leading-relaxed break-words">${cfg.msg}</p>
             <button onclick="document.getElementById('paymentForm')?.scrollIntoView({behavior:'smooth'})"
-              class="${cfg.btnCls} font-black text-xs px-4 py-2 rounded-xl mt-3 inline-block active:scale-95 transition-transform">
+              class="${cfg.btnCls} font-black text-xs px-4 py-2 rounded-xl mt-3 inline-block active:scale-95 transition-transform whitespace-nowrap">
               ${cfg.btn}
             </button>
           </div>

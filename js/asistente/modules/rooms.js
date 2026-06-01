@@ -17,6 +17,14 @@ export const RoomsModule = {
     const close = () => this.closeModal();
     document.getElementById('btnCancelRoom')?.addEventListener('click', close);
     document.getElementById('btnCancelRoom2')?.addEventListener('click', close);
+
+    // Cerrar al hacer clic fuera del contenido del modal
+    const modal = document.getElementById('roomModal');
+    if (modal) {
+      modal.addEventListener('click', (e) => {
+        if (e.target === modal) this.closeModal();
+      });
+    }
   },
 
   async loadRooms() {
@@ -59,8 +67,15 @@ export const RoomsModule = {
                 ${pct < 100 ? 'Disponible' : 'Llena'}
               </span>
             </td>
-            <td class="px-4 py-3 text-right text-teal-600 hover:underline text-xs">
-              Editar
+            <td class="px-4 py-3 text-right">
+              <div class="flex justify-end gap-1">
+                <button onclick="event.stopPropagation(); window.App.rooms.openModal('${r.id}')" class="p-1.5 text-teal-600 hover:bg-teal-50 rounded-lg">
+                  <i data-lucide="edit-3" class="w-4 h-4"></i>
+                </button>
+                <button onclick="event.stopPropagation(); window.App.rooms.deleteRoom('${r.id}', '${Helpers.escapeHTML(r.name)}')" class="p-1.5 text-rose-500 hover:bg-rose-50 rounded-lg">
+                  <i data-lucide="trash-2" class="w-4 h-4"></i>
+                </button>
+              </div>
             </td>
           </tr>`;
       }).join('');
@@ -69,6 +84,20 @@ export const RoomsModule = {
       
       tbody.innerHTML = '<tr><td colspan="5" class="text-center py-8">' + Helpers.errorState('Error al cargar aulas', 'App.rooms.init()') + '</td></tr>';
       if (window.lucide) lucide.createIcons();
+    }
+  },
+
+  async deleteRoom(id, name) {
+    const ok = confirm(`\u00bfEliminar aula "${name}"?\n\nLos estudiantes quedar\u00e1n sin aula asignada.`);
+    if (!ok) return;
+
+    try {
+      const { error } = await supabase.from('classrooms').delete().eq('id', id);
+      if (error) throw error;
+      Helpers.toast('Aula eliminada correctamente', 'success');
+      await this.loadRooms();
+    } catch (e) {
+      Helpers.toast('Error al eliminar: ' + e.message, 'error');
     }
   },
 

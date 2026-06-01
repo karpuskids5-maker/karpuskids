@@ -165,17 +165,27 @@ export const StudentsModule = {
     if (!students?.length) {
       if (tableContainer) tableContainer.innerHTML = '<tr><td colspan="6" class="text-center py-8 text-slate-500">No hay estudiantes.</td></tr>';
       if (gridContainer) gridContainer.innerHTML = '<div class="col-span-3 text-center py-8 text-slate-500">No hay estudiantes.</div>';
+      this._renderDirPagination(0, 0, 0, []);
       return;
     }
 
+    // Paginación
+    if (!this._dirPage) this._dirPage = 1;
+    const pageSize = 10;
+    const total = students.length;
+    const totalPages = Math.max(1, Math.ceil(total / pageSize));
+    if (this._dirPage > totalPages) this._dirPage = totalPages;
+    const start = (this._dirPage - 1) * pageSize;
+    const pageStudents = students.slice(start, start + pageSize);
+
     // Render Table
     if (tableContainer) {
-      tableContainer.innerHTML = students.map(s => `
-        <tr class="hover:bg-slate-50 transition-colors border-b border-slate-100">
+      tableContainer.innerHTML = pageStudents.map(s => `
+        <tr class="hover:bg-slate-50 transition-colors border-b border-slate-100 cursor-pointer" ondblclick="App.students.openModal('${s.id}')">
           <td class="p-4">
             <div class="flex items-center gap-3">
-              <div class="w-10 h-10 rounded-xl bg-purple-100 flex items-center justify-center text-sm font-black text-purple-600">
-                ${(s.name || '?').charAt(0)}
+              <div class="w-10 h-10 rounded-xl bg-purple-100 flex items-center justify-center text-sm font-black text-purple-600 overflow-hidden">
+                ${s.avatar_url ? `<img src="${s.avatar_url}" class="w-full h-full object-cover">` : (s.name || '?').charAt(0)}
               </div>
               <div>
                 <div class="font-bold text-slate-800">${Helpers.escapeHTML(s.name)}</div>
@@ -184,7 +194,9 @@ export const StudentsModule = {
             </div>
           </td>
           <td class="p-4 text-sm font-medium text-slate-600">
-            ${s.classrooms?.name || '<span class="text-slate-300 italic">No asignada</span>'}
+            <span class="px-3 py-1 bg-slate-100 rounded-full text-[10px] font-black uppercase text-slate-500">
+              ${s.classrooms?.name || 'No asignada'}
+            </span>
           </td>
           <td class="p-4 text-right">
             <div class="flex justify-end gap-2">
@@ -201,7 +213,7 @@ export const StudentsModule = {
 
     // Render Grid
     if (gridContainer) {
-      gridContainer.innerHTML = students.map(s => `
+      gridContainer.innerHTML = pageStudents.map(s => `
         <div class="bg-white rounded-3xl p-6 border border-slate-100 shadow-sm hover:shadow-md transition-all group relative overflow-hidden">
           <div class="absolute top-0 right-0 w-24 h-24 bg-purple-50 rounded-bl-[4rem] -mr-8 -mt-8 transition-transform group-hover:scale-110"></div>
           
@@ -250,14 +262,43 @@ export const StudentsModule = {
     }
 
     if (window.lucide) lucide.createIcons();
+    this._renderDirPagination(this._dirPage, totalPages, total, students);
+  },
+
+  _renderDirPagination(page, totalPages, total, students) {
+    let container = document.getElementById('dirStudentsPagination');
+    if (!container) {
+      const tableWrapper = document.getElementById('studentsTableWrapper');
+      const gridWrapper = document.getElementById('studentsGrid');
+      const parent = tableWrapper || gridWrapper?.parentElement;
+      if (!parent) return;
+      container = document.createElement('div');
+      container.id = 'dirStudentsPagination';
+      parent.insertAdjacentElement('afterend', container);
+    }
+    if (totalPages <= 1) { container.innerHTML = ''; return; }
+    const start = (page - 1) * 10 + 1;
+    const end = Math.min(page * 10, total);
+    container.className = 'flex items-center justify-between px-4 py-3 border-t border-slate-100 bg-white rounded-b-3xl';
+    container.innerHTML = `
+      <span class="text-xs font-bold text-slate-400">${start}–${end} de ${total} estudiantes</span>
+      <div class="flex gap-2">
+        <button id="dirBtnPrev" class="px-3 py-1.5 text-xs font-black rounded-xl border border-slate-200 text-slate-500 hover:bg-purple-50 hover:border-purple-300 hover:text-purple-600 transition-all disabled:opacity-40 disabled:cursor-not-allowed" ${page <= 1 ? 'disabled' : ''}>← Ant</button>
+        <span class="px-3 py-1.5 text-xs font-black text-purple-600 bg-purple-50 rounded-xl">${page} / ${totalPages}</span>
+        <button id="dirBtnNext" class="px-3 py-1.5 text-xs font-black rounded-xl border border-slate-200 text-slate-500 hover:bg-purple-50 hover:border-purple-300 hover:text-purple-600 transition-all disabled:opacity-40 disabled:cursor-not-allowed" ${page >= totalPages ? 'disabled' : ''}>Sig →</button>
+      </div>`;
+    document.getElementById('dirBtnPrev')?.addEventListener('click', () => { this._dirPage--; this.render(students); });
+    document.getElementById('dirBtnNext')?.addEventListener('click', () => { this._dirPage++; this.render(students); });
   },
 
   applyFilters() {
+    this._dirPage = 1;
     const term = document.getElementById('searchStudent')?.value.toLowerCase() || '';
     const classroomId = document.getElementById('filterClassroom')?.value || 'all';
     const status = document.getElementById('filterStStatus')?.value || '';
     const level = document.getElementById('filterLevel')?.value || 'all';
 
+    // Búsqueda local en memoria — sin consultas al servidor
     const all = AppState.get('students') || [];
     const filtered = all.filter(s => {
       const matchSearch = s.name.toLowerCase().includes(term) || 
@@ -379,20 +420,22 @@ export const StudentsModule = {
   },
 
   async delete(id) {
-    const confirmFn = window._karpusConfirmDelete;
-    const ok = confirmFn
-      ? await confirmFn('¿Eliminar estudiante?', 'Esta acción no se puede deshacer. Se perderán todos los datos del estudiante.')
-      : confirm('¿Seguro que desea eliminar a este estudiante?');
+    const student = (AppState.get('students') || []).find(s => String(s.id) === String(id));
+    const name = student?.name || 'este estudiante';
+    const ok = window.confirm(`¿Eliminar a "${name}"?\n\nEsta acción no se puede deshacer. Se perderán todos los datos del estudiante.`);
     if (!ok) return;
+    UI.setLoading(true);
     try {
       const res = await DirectorApi.deleteStudent(id);
       const { error } = res || {};
-      if (error) throw new Error(error);
-      auditLog('student.deleted', { student_id: id });
-      Helpers.toast('Estudiante eliminado con éxito.', 'success');
+      if (error) throw new Error(typeof error === 'string' ? error : (error.message || JSON.stringify(error)));
+      Helpers.toast('Estudiante eliminado correctamente', 'success');
+      QueryCache.invalidate('dir_students');
       this.init();
     } catch (e) {
-      Helpers.toast('Error al eliminar estudiante.', 'error');
+      Helpers.toast('Error al eliminar: ' + (e.message || e), 'error');
+    } finally {
+      UI.setLoading(false);
     }
   },
 
@@ -406,6 +449,7 @@ export const StudentsModule = {
       matricula:            v('stMatricula') || null,
       classroom_id:         v('stClassroom') ? parseInt(v('stClassroom')) : null,
       age:                  i('stAge', null),
+      age_type:             v('stAgeType') || 'años',
       schedule:             v('stHorario'),
       start_date:           v('stJoinedDate') || new Date().toISOString().split('T')[0],
       is_active:            document.getElementById('active')?.checked ?? true,
@@ -433,7 +477,7 @@ export const StudentsModule = {
     const labelClass = "block text-[11px] font-black text-slate-400 uppercase tracking-wider mb-1.5 ml-1";
     
     const modalHTML = `
-      <div class="modal-header bg-gradient-to-r from-purple-600 to-indigo-600 text-white p-6 rounded-t-3xl flex items-center justify-between">
+      <div class="modal-header bg-gradient-to-r from-purple-600 to-indigo-600 text-white p-6 rounded-t-3xl flex items-center">
         <div class="flex items-center gap-3">
           <div class="w-12 h-12 bg-white/20 rounded-2xl flex items-center justify-center shadow-inner"><i data-lucide="user-plus" class="w-6 h-6 text-white"></i></div>
           <div>
@@ -441,9 +485,6 @@ export const StudentsModule = {
             <p class="text-xs text-white/70 font-bold uppercase tracking-widest">${id ? 'Actualizar Registro' : 'Nuevo Registro'}</p>
           </div>
         </div>
-        <button onclick="App.ui.closeModal()" class="w-10 h-10 flex items-center justify-center rounded-xl bg-white/10 hover:bg-white/20 transition-colors">
-          <i data-lucide="x" class="w-6 h-6"></i>
-        </button>
       </div>
       
       <div class="modal-body p-8 bg-slate-50/30" id="studentForm">
@@ -489,7 +530,16 @@ export const StudentsModule = {
               <input id="stName" placeholder="Ej: Juan Pérez" class="${inputClass}">
             </div>
             <div class="grid grid-cols-2 gap-4">
-              <div><label class="${labelClass}">Edad</label><input id="stAge" placeholder="Ej: 5" type="number" class="${inputClass}"></div>
+              <div class="flex flex-col">
+                <label class="${labelClass}">Edad</label>
+                <div class="flex gap-2">
+                  <input id="stAge" placeholder="Ej: 5" type="number" class="${inputClass} flex-1">
+                  <select id="stAgeType" class="w-24 px-2 py-2.5 border-2 border-slate-100 rounded-2xl outline-none focus:ring-4 focus:ring-purple-100 focus:border-purple-400 bg-slate-50/50 transition-all text-sm font-black">
+                    <option value="años">Años</option>
+                    <option value="meses">Meses</option>
+                  </select>
+                </div>
+              </div>
               <div><label class="${labelClass}">Horario</label><input id="stHorario" placeholder="08:00-12:00" class="${inputClass}"></div>
             </div>
             <div>
@@ -689,26 +739,7 @@ export const StudentsModule = {
       if (!qrImg) { Helpers.toast('Genera el QR primero', 'warning'); return; }
 
       const win = window.open('', '_blank');
-      win.document.write(`<!DOCTYPE html><html><head><title>QR - ${matricula}</title>
-        <style>
-          body { font-family: Arial, sans-serif; display: flex; flex-direction: column; align-items: center; justify-content: center; min-height: 100vh; margin: 0; background: #fff; }
-          .card { border: 2px solid #e2e8f0; border-radius: 16px; padding: 24px; text-align: center; max-width: 280px; }
-          .logo { font-size: 12px; font-weight: 900; color: #7c3aed; text-transform: uppercase; letter-spacing: 2px; margin-bottom: 12px; }
-          img { width: 180px; height: 180px; }
-          .name { font-size: 16px; font-weight: 900; color: #1e293b; margin-top: 12px; }
-          .mat { font-size: 11px; color: #64748b; font-weight: 700; margin-top: 4px; }
-          .hint { font-size: 9px; color: #94a3b8; margin-top: 8px; }
-        </style>
-      </head><body>
-        <div class="card">
-          <div class="logo">Karpus Kids</div>
-          <img src="${qrImg}" alt="QR">
-          <div class="name">${name || 'Estudiante'}</div>
-          <div class="mat">${matricula}</div>
-          <div class="hint">Escanea para registrar entrada/salida</div>
-        </div>
-        <script>window.onload=()=>{window.print();}<\/script>
-      </body></html>`);
+      win.document.write(Helpers.getQRPrintTemplate(qrImg, name, matricula));
       win.document.close();
     };
 
@@ -752,10 +783,10 @@ export const StudentsModule = {
     } catch (_) { /* silencioso */ }
 
     if (id) {
-  // Fetch completo desde DB - convertir id a número para evitar error 400 (bigint vs string)
+      // Fetch completo desde DB - convertir id a número para evitar error 400 (bigint vs string)
       try {
         const numericId = parseInt(id, 10);
-    if (isNaN(numericId)) throw new Error('ID inválido');
+        if (isNaN(numericId)) throw new Error('ID inválido');
 
         const { data: student, error } = await supabase
           .from('students')
@@ -775,6 +806,7 @@ export const StudentsModule = {
           setVal('stClassroom',  student.classroom_id);
           setVal('stJoinedDate', student.start_date ? student.start_date.split('T')[0] : '');
           setVal('stAge',        student.age);
+          setVal('stAgeType',    student.age_type || 'años');
           setVal('stHorario',    student.schedule);
           setVal('p1Name',       student.p1_name);
           setVal('p1Phone',      student.p1_phone);
@@ -803,43 +835,9 @@ export const StudentsModule = {
             if (preview) preview.innerHTML = `<img src="${student.avatar_url}" class="w-full h-full object-cover">`;
           }
 
-    // ? Generar QR si tiene matrícula
+          // Generar QR si tiene matrícula
           if (student.matricula) {
-            document.getElementById('qr-section')?.classList.remove('hidden');
-            document.getElementById('qr-matricula-label').textContent = student.matricula;
-            
-            const qrContainer = document.getElementById('qr-container');
-            if (qrContainer) {
-              qrContainer.innerHTML = '';
-              const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${encodeURIComponent(student.matricula)}`;
-              qrContainer.innerHTML = `<img src="${qrUrl}" class="w-48 h-48 mx-auto" alt="QR ${student.matricula}">`;
-              
-              document.getElementById('btn-print-qr').onclick = () => {
-                const win = window.open('', '_blank');
-                win.document.write(`
-                  <html>
-                    <head>
-                      <title>Imprimir QR - ${student.name}</title>
-                      <style>
-                        body { font-family: sans-serif; text-align: center; padding: 40px; }
-                        .card { border: 2px solid #eee; padding: 20px; display: inline-block; border-radius: 20px; }
-                        h1 { margin: 0; color: #333; }
-                        p { color: #666; font-weight: bold; font-size: 20px; }
-                        img { margin: 20px 0; width: 300px; height: 300px; }
-                      </style>
-                    </head>
-                    <body onload="window.print(); window.close();">
-                      <div class="card">
-                        <h1>Karpus Kids</h1>
-                        <img src="${qrUrl}">
-                        <p>${student.name}</p>
-                <p style="font-size: 14px; color: #999;">MATRÍCULA: ${student.matricula}</p>
-                      </div>
-                    </body>
-                  </html>
-                `);
-              };
-            }
+            setTimeout(() => window.generateStudentQR(), 500);
           }
         }
       } catch (e) {

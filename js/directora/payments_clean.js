@@ -332,12 +332,11 @@ export const PaymentsModule = {
   },
 
   async openPaymentModal(prefillStudentId = null) {
-    const ic = 'w-full px-4 py-2.5 border-2 border-slate-100 rounded-2xl outline-none focus:ring-4 focus:ring-emerald-100 focus:border-emerald-400 bg-slate-50/50 transition-all text-sm font-medium';
+    const ic = 'w-full px-4 py-2.5 border-2 border-slate-100 rounded-2xl outline-none focus:ring-4 focus:ring-purple-100 focus:border-purple-400 bg-slate-50/50 transition-all text-sm font-bold text-slate-700';
     const lc = 'block text-[11px] font-black text-slate-400 uppercase tracking-wider mb-1.5 ml-1';
     const now = new Date();
-    const curMonth = now.getMonth();      // 0-based
+    const curMonth = now.getMonth();
     const curYear  = now.getFullYear();
-    // due_date = día 5 del mes SIGUIENTE
     const nextM = curMonth + 1 > 11 ? 0 : curMonth + 1;
     const nextY = curMonth + 1 > 11 ? curYear + 1 : curYear;
     const dd = `${nextY}-${String(nextM + 1).padStart(2,'0')}-${String(this.settings.due_day || 5).padStart(2,'0')}`;
@@ -347,13 +346,15 @@ export const PaymentsModule = {
     }).join('');
 
     window.openGlobalModal(
-      '<div class="bg-gradient-to-r from-emerald-600 to-teal-600 text-white p-6 rounded-t-3xl flex items-center justify-between">' +
+      '<div class="bg-gradient-to-r from-purple-600 to-indigo-600 text-white p-6 rounded-t-3xl flex items-center justify-between">' +
         '<div class="flex items-center gap-3"><div class="w-12 h-12 bg-white/20 rounded-2xl flex items-center justify-center text-2xl">\uD83D\uDCB0</div>' +
         '<div><h3 class="text-xl font-black">Registrar Pago</h3><p class="text-xs text-white/70 font-bold uppercase tracking-widest">Cobro Manual</p></div></div>' +
-        '<button onclick="App.ui.closeModal()" class="w-10 h-10 flex items-center justify-center rounded-xl bg-white/10 hover:bg-white/20"><i data-lucide="x" class="w-6 h-6"></i></button>' +
       '</div>' +
       '<div class="p-6 bg-slate-50/30" id="modalPayment"><div class="grid grid-cols-1 md:grid-cols-2 gap-4">' +
-        '<div class="md:col-span-2"><label class="' + lc + '">Estudiante</label><select id="payStudentSelect" class="' + ic + '"><option value="">-- Seleccionar --</option></select></div>' +
+        '<div class="md:col-span-2"><label class="' + lc + '">Estudiante (Pendientes/Vencidos)</label>' +
+          '<select id="payStudentSelect" class="' + ic + '"><option value="">-- Cargando... --</option></select>' +
+          '<div id="payStudentInfo" class="mt-2 hidden p-3 bg-amber-50 border border-amber-200 rounded-2xl text-xs font-bold text-amber-700"></div>' +
+        '</div>' +
         '<div><label class="' + lc + '">Monto ($)</label><input id="payAmount" type="number" step="0.01" min="0" class="' + ic + '" placeholder="0.00"></div>' +
         '<div><label class="' + lc + '">Concepto</label><input id="payConcept" type="text" class="' + ic + '" value="Mensualidad"></div>' +
         '<div><label class="' + lc + '">Mes que se cobra</label><select id="payMonthPaid" class="' + ic + '">' + mo + '</select></div>' +
@@ -363,21 +364,100 @@ export const PaymentsModule = {
       '</div></div>' +
       '<div class="bg-white p-5 rounded-b-3xl border-t border-slate-100 flex justify-end gap-3">' +
         '<button onclick="App.ui.closeModal()" class="px-6 py-2.5 text-slate-500 font-black text-xs uppercase hover:bg-slate-50 rounded-2xl">Cancelar</button>' +
-        '<button id="btnSavePaymentAction" class="px-8 py-2.5 bg-gradient-to-r from-emerald-600 to-teal-600 text-white rounded-2xl font-black text-xs uppercase shadow-lg">Registrar Pago</button>' +
+        '<button id="btnSavePaymentAction" class="px-10 py-2.5 bg-gradient-to-r from-purple-600 to-indigo-600 text-white rounded-2xl font-black text-xs uppercase shadow-lg shadow-purple-100 transition-all hover:-translate-y-0.5 active:scale-95">Registrar Pago</button>' +
       '</div>'
     );
 
     try {
-      const { data: students } = await DirectorApi.getStudents();
-      const sel = document.getElementById('payStudentSelect');
-      if (sel && students) {
-        students.forEach(s => {
-          const o = document.createElement('option');
-          o.value = s.id;
-          o.textContent = s.name + ' (' + (s.classrooms?.name || 'Sin aula') + ')';
-          if (prefillStudentId && String(s.id) === String(prefillStudentId)) o.selected = true;
-          sel.appendChild(o);
+      // Cargar solo estudiantes con pagos pendientes o vencidos
+      const { data: pendingPayments } = await supabase
+        .from('payments')
+        .select('student_id, amount, due_date, month_paid, status, students:student_id(id, name, monthly_fee, classrooms:classroom_id(name))')
+        .in('status', ['pending', 'overdue'])
+        .order('due_date', { ascending: true });
+
+      const select = document.getElementById('payStudentSelect');
+      if (select) {
+        if (!pendingPayments?.length) {
+          select.innerHTML = '<option value="">-- No hay pagos pendientes --</option>';
+        } else {
+          // Deduplicar por estudiante (tomar el más urgente)
+          const studentMap = new Map();
+          for (const p of pendingPayments) {
+            const sid = p.student_id;
+            if (!studentMap.has(sid) || p.status === 'overdue') {
+              studentMap.set(sid, p);
+            }
+          }
+          select.innerHTML = '<option value="">-- Seleccionar Estudiante --</option>' +
+            Array.from(studentMap.values()).map(p => {
+              const s = p.students;
+              const isOverdue = p.status === 'overdue';
+              const label = `${s?.name || 'Estudiante'} (${s?.classrooms?.name || 'Sin aula'}) ${isOverdue ? '⚠️ Vencido' : '⏳ Pendiente'}`;
+              const selected = prefillStudentId && String(p.student_id) === String(prefillStudentId) ? ' selected' : '';
+              return `<option value="${p.student_id}" data-fee="${s?.monthly_fee || 0}" data-due="${p.due_date || ''}" data-month="${p.month_paid || ''}" data-status="${p.status}" data-payment-id="${p.id || ''}"${selected}>${Helpers.escapeHTML(label)}</option>`;
+            }).join('');
+        }
+
+        // Auto-fill monto + mora al seleccionar estudiante
+        select.addEventListener('change', (e) => {
+          const opt = e.target.selectedOptions[0];
+          if (!opt?.value) {
+            document.getElementById('payStudentInfo')?.classList.add('hidden');
+            return;
+          }
+          const fee = parseFloat(opt.dataset.fee || 0);
+          const dueDate = opt.dataset.due;
+          const monthPaid = opt.dataset.month;
+          const status = opt.dataset.status;
+          const amtInput = document.getElementById('payAmount');
+          const infoDiv = document.getElementById('payStudentInfo');
+          const monthSelect = document.getElementById('payMonthPaid');
+
+          // Calcular mora si aplica
+          let mora = 0;
+          if (dueDate && status === 'overdue') {
+            const today = new Date(); today.setHours(0,0,0,0);
+            const due = new Date(dueDate + 'T00:00:00');
+            const daysLate = Math.max(0, Math.floor((today - due) / 86400000));
+            if (daysLate > 0) {
+              const moraRate = 0.05; // 5% por mes de mora
+              const monthsLate = Math.ceil(daysLate / 30);
+              mora = fee * moraRate * monthsLate;
+            }
+          }
+
+          const total = fee + mora;
+          if (amtInput) {
+            amtInput.value = total > 0 ? total.toFixed(2) : '';
+            amtInput.classList.add('ring-2', 'ring-purple-100');
+            setTimeout(() => amtInput.classList.remove('ring-2', 'ring-purple-100'), 1000);
+          }
+
+          // Mostrar info de mora si aplica
+          if (infoDiv) {
+            if (mora > 0) {
+              infoDiv.classList.remove('hidden');
+              infoDiv.innerHTML = `Mensualidad: RD$${fee.toFixed(2)} + Mora: RD$${mora.toFixed(2)} = <strong>Total: RD$${total.toFixed(2)}</strong>`;
+            } else {
+              infoDiv.classList.add('hidden');
+            }
+          }
+
+          // Sincronizar mes del pago
+          if (monthPaid && monthSelect) {
+            const opt2 = monthSelect.querySelector(`option[value="${monthPaid}"]`);
+            if (opt2) monthSelect.value = monthPaid;
+          }
+
+          // Sincronizar fecha límite
+          if (dueDate) {
+            const dueDateInput = document.getElementById('payDueDate');
+            if (dueDateInput) dueDateInput.value = dueDate;
+          }
         });
+
+        if (prefillStudentId) select.dispatchEvent(new Event('change'));
       }
     } catch (_) {}
 
@@ -398,13 +478,61 @@ export const PaymentsModule = {
     if (!sid) return Helpers.toast('Selecciona un estudiante', 'warning');
     if (!amt || amt <= 0) return Helpers.toast('Ingresa un monto valido', 'warning');
 
+    const saveBtn = document.getElementById('btnSavePaymentAction');
+    if (saveBtn) { saveBtn.disabled = true; saveBtn.textContent = 'Guardando...'; }
+
     UIHelpers.setLoading(true, '#modalPayment');
     try {
-      const { data: pay, error } = await DirectorApi.createManualPayment({ student_id: sid, amount: amt, concept: con, method: met, status: sta, month_paid: mp, due_date: dd || null, paid_date: pd, created_at: new Date().toISOString() });
-      if (error) throw new Error(error);
+      // Buscar pago existente por YYYY-MM y también por nombre de mes (legacy)
+      const mesNombre = MES[parseInt(mp.split('-')[1], 10) - 1];
+      const { data: existingList } = await supabase
+        .from('payments')
+        .select('id, status, month_paid')
+        .eq('student_id', sid)
+        .or(`month_paid.eq.${mp},month_paid.eq.${mesNombre}`)
+        .limit(5);
+
+      const existing = existingList?.[0] || null;
+      let pay;
+
+      if (existing) {
+        if (existing.status === 'paid') {
+          Helpers.toast('Este estudiante ya tiene un pago aprobado para este mes', 'warning');
+          return;
+        }
+        // Actualizar existente y normalizar month_paid a YYYY-MM
+        const { data: updated, error: upErr } = await supabase.from('payments').update({
+          amount: amt, concept: con, method: met, status: sta,
+          due_date: dd || null, paid_date: pd,
+          month_paid: mp,
+          updated_at: new Date().toISOString()
+        }).eq('id', existing.id).select().single();
+        if (upErr) throw upErr;
+        pay = updated;
+      } else {
+        const { data: inserted, error: insErr } = await supabase.from('payments').insert({
+          student_id: sid, amount: amt, concept: con, method: met, status: sta,
+          month_paid: mp, due_date: dd || null, paid_date: pd,
+          created_at: new Date().toISOString()
+        }).select().single();
+        if (insErr) {
+          if (insErr.code === '23505') throw new Error('Ya existe un registro para este mes.');
+          throw insErr;
+        }
+        pay = inserted;
+      }
+
+      // Si está pagado, activar estudiante
+      if (sta === 'paid') {
+        await supabase.from('students').update({ is_active: true, status: 'activo' }).eq('id', sid);
+      }
+
       Helpers.toast('Pago registrado correctamente', 'success');
       UIHelpers.closeModal();
       await this.loadPayments();
+      this.loadStats();
+      this.loadIncomeChart();
+
       if (pay?.id && sta === 'paid') {
         DirectorApi.sendPaymentReceipt(pay.id).catch(() => {});
         try {
@@ -412,60 +540,61 @@ export const PaymentsModule = {
           if (p) {
             const { notifyPaymentApproved } = await import('../shared/supabase.js');
             const email = p.students?.p1_email || p.students?.p2_email || null;
-            const studentName = p.students?.name || 'Estudiante';
-            const amountStr = 'RD$' + Number(amt || 0).toLocaleString('es-DO', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-            const monthStr = mp || 'Colegiatura';
-
-            await notifyPaymentApproved(pay.id, email, studentName, amountStr, monthStr);
+            const amountStr = 'RD$' + Number(amt).toLocaleString('es-DO', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+            await notifyPaymentApproved(pay.id, email, p.students?.name || 'Estudiante', amountStr, mp || 'Colegiatura');
           }
         } catch (_) {}
       }
     } catch (e) {
-
-      Helpers.toast('Error al guardar: ' + e.message, 'error');
+      console.error('[Payments] saveManualPayment error:', e);
+      Helpers.toast('Error al guardar: ' + (e.message || 'Error desconocido'), 'error');
     } finally {
       UIHelpers.setLoading(false, '#modalPayment');
+      if (saveBtn) { saveBtn.disabled = false; saveBtn.textContent = 'Registrar Pago'; }
     }
   },
 
   async markPaid(id) {
     try {
-      // Usar RPC seguro del servidor (registra auditoría inmutable)
-      const { data, error } = await supabase.rpc('approve_payment', { p_payment_id: id });
+      // Aprobar directamente — funciona para efectivo y transferencia sin depender de RPC
+      const { error } = await supabase.from('payments')
+        .update({ status: 'paid', paid_date: new Date().toISOString() })
+        .eq('id', id);
       if (error) throw error;
-      if (data?.error) throw new Error(data.error);
 
-      Helpers.toast('Pago aprobado', 'success');
-      await this.loadPayments();
+      // Obtener datos del pago para notificar y activar estudiante
+      const { data: pay } = await supabase.from('payments')
+        .select('student_id, amount, month_paid, students:student_id(name, p1_email, p2_email)')
+        .eq('id', id).single();
 
-      // Notificar al padre: email + push via process-event (un solo envío)
-      try {
-        const { data: p } = await DirectorApi.getPaymentById(id);
-        if (p) {
-          const { notifyPaymentApproved } = await import('../shared/supabase.js');
-          const emails = [p.students?.p1_email, p.students?.p2_email].filter(e => e && e.includes('@'));
-          const studentName = p.students?.name || 'Estudiante';
-          const amountStr = 'RD$' + Number(p.amount || 0).toLocaleString('es-DO', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-          const monthStr = p.month_paid || 'Colegiatura';
-          await notifyPaymentApproved(id, emails[0] || null, studentName, amountStr, monthStr);
-          import('../shared/notify-feedback.js').then(m =>
-            m.showNotifyFeedback({ sent: 1, type: 'payment', label: 'Recibo enviado al padre' })
-          ).catch(() => {});
-        }
-      } catch (_) {}
-    } catch (e) {
-      // Fallback: UPDATE directo si el RPC no existe aún
-      try {
-        const { error: upErr } = await supabase.from('payments')
-          .update({ status: 'paid', paid_date: new Date().toISOString() })
-          .eq('id', id);
-        if (upErr) throw upErr;
-        auditLog('payment.approved', { payment_id: id });
-        Helpers.toast('Pago aprobado', 'success');
-        await this.loadPayments();
-      } catch (e2) {
-        Helpers.toast('Error al aprobar pago: ' + (e2.message || e2), 'error');
+      // Activar estudiante al aprobar pago
+      if (pay?.student_id) {
+        await supabase.from('students')
+          .update({ is_active: true, status: 'activo' })
+          .eq('id', pay.student_id);
       }
+
+      Helpers.toast('Pago aprobado correctamente', 'success');
+      await this.loadPayments();
+      this.loadStats();
+
+      // Notificar al padre en background
+      if (pay) {
+        try {
+          const { notifyPaymentApproved } = await import('../shared/supabase.js');
+          const emails = [pay.students?.p1_email, pay.students?.p2_email].filter(e => e && e.includes('@'));
+          const amountStr = 'RD$' + Number(pay.amount || 0).toLocaleString('es-DO', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+          await notifyPaymentApproved(id, emails[0] || null, pay.students?.name || 'Estudiante', amountStr, pay.month_paid || 'Colegiatura');
+        } catch (_) {}
+      }
+    } catch (e) {
+      Helpers.toast('Error al aprobar pago: ' + (e.message || e), 'error');
+    }
+  },
+        } catch (_) {}
+      }
+    } catch (e) {
+      Helpers.toast('Error al aprobar pago: ' + (e.message || e), 'error');
     }
   },
 
@@ -473,19 +602,16 @@ export const PaymentsModule = {
     if (!confirm('¿Eliminar este registro de pago?\n\nEsta acción quedará registrada en el historial de auditoría.')) return;
     try {
       // Usar RPC seguro (soft delete + auditoría)
-      const { data, error } = await supabase.rpc('delete_payment', { p_payment_id: id });
+      const { data, error } = await supabase.rpc('delete_payment', { 
+        p_payment_id: id,
+        p_reason: 'Eliminado desde el panel de Directora'
+      });
       if (error) throw error;
       if (data?.error) throw new Error(data.error);
       Helpers.toast('Pago eliminado', 'success');
       await this.loadPayments();
     } catch (e) {
-      // Fallback: DELETE directo
-      try {
-        await supabase.from('payments').delete().eq('id', id);
-        auditLog('payment.deleted', { payment_id: id });
-        Helpers.toast('Pago eliminado', 'success');
-        await this.loadPayments();
-      } catch (_) { Helpers.toast('Error al eliminar', 'error'); }
+      Helpers.toast('Error al eliminar: ' + (e.message || e), 'error');
     }
   },
 
@@ -493,90 +619,26 @@ export const PaymentsModule = {
     if (!confirm('¿Ejecutar ciclo de pagos?\n\nRegla: el cobro de cada mes se genera el día 25 y vence el día 5 del mes siguiente.')) return;
     try {
       Helpers.toast('Ejecutando ciclo...', 'info');
+      
+      // Usar RPC seguro en lugar de lógica en el cliente
+      const { data, error } = await supabase.rpc('run_payment_cycle');
+      
+      if (error) throw error;
+      if (data?.error) throw new Error(data.error);
 
-      const now      = new Date();
-      const today    = now.getDate();
-      const genDay   = this.settings.generation_day || 25;
-      const dueDay   = this.settings.due_day || 5;
+      const gen = data.generated || 0;
+      const exp = data.expired || 0;
 
-      // ── Validar que hoy sea >= día de generación (solo en modo automático) ──
-      // Cuando se llama manualmente desde el panel, siempre se permite
-      if (today < genDay && !confirm(`Normalmente el ciclo se activa el día ${genDay}. Hoy es día ${today}.\n\n¿Deseas generar los cobros de todas formas?`)) {
-        return;
-      }
-
-      const currentMonth = now.getMonth();
-      const currentYear  = now.getFullYear();
-      const monthKey     = `${currentYear}-${String(currentMonth + 1).padStart(2, '0')}`;
-
-      // due_date = día 5 del mes SIGUIENTE
-      const nextMonth     = currentMonth + 1 > 11 ? 0 : currentMonth + 1;
-      const nextMonthYear = currentMonth + 1 > 11 ? currentYear + 1 : currentYear;
-      const dueDate = `${nextMonthYear}-${String(nextMonth + 1).padStart(2, '0')}-${String(dueDay).padStart(2, '0')}`;
-
-      // Get active students with monthly_fee > 0
-      const { data: students, error: sErr } = await supabase
-        .from('students')
-        .select('id, name, monthly_fee')
-        .eq('is_active', true)
-        .gt('monthly_fee', 0);
-
-      if (sErr) throw sErr;
-
-      if (!students?.length) {
-        Helpers.toast('No hay estudiantes activos con cuota mensual configurada.', 'warning');
-        return;
-      }
-
-      // Find which students already have a payment for this month
-      const { data: existing } = await supabase
-        .from('payments')
-        .select('student_id')
-        .eq('month_paid', monthKey);
-
-      const existingIds = new Set((existing || []).map(p => String(p.student_id)));
-      const missing = students.filter(s => !existingIds.has(String(s.id)));
-
-      let generated = 0;
-      if (missing.length) {
-        const inserts = missing.map(s => ({
-          student_id: s.id,
-          amount:     s.monthly_fee,
-          status:     'pending',
-          due_date:   dueDate,
-          month_paid: monthKey,
-          concept:    'Mensualidad',
-          created_at: new Date().toISOString()
-        }));
-        const { error: insErr } = await supabase.from('payments').insert(inserts);
-        if (insErr) throw insErr;
-        generated = missing.length;
-      }
-
-      // Mark overdue: pending payments where due_date < today
-      await supabase
-        .from('payments')
-        .update({ status: 'overdue' })
-        .eq('status', 'pending')
-        .lt('due_date', now.toISOString().split('T')[0]);
-
-      const MES_LABEL_LOCAL = ['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'];
-      const monthLabel   = MES_LABEL_LOCAL[currentMonth];
-      const dueDateLabel = `${dueDay} de ${MES_LABEL_LOCAL[nextMonth]} ${nextMonthYear}`;
-
-      if (generated > 0) {
-        Helpers.toast(`✅ ${generated} cobro(s) de ${monthLabel} generados — vencen el ${dueDateLabel}`, 'success');
+      if (gen > 0) {
+        Helpers.toast(`✅ ${gen} cobro(s) generados correctamente`, 'success');
+      } else if (exp > 0) {
+        Helpers.toast(`ℹ️ Se marcaron ${exp} pago(s) como vencidos`, 'info');
       } else {
-        Helpers.toast(`ℹ️ Todos los estudiantes ya tienen cobro de ${monthLabel} registrado.`, 'info');
+        Helpers.toast('ℹ️ No se generaron nuevos cobros (ya existen para este mes)', 'info');
       }
-
-      // Switch filter to current month
-      const ms = document.getElementById('filterPaymentMonth');
-      const ys = document.getElementById('filterPaymentYear');
-      if (ms) ms.value = String(currentMonth + 1).padStart(2, '0');
-      if (ys) ys.value = String(currentYear);
 
       await this.loadPayments();
+      this.loadStats();
     } catch (e) {
       Helpers.toast('Error en ciclo: ' + (e.message || e), 'error');
     }
@@ -602,21 +664,7 @@ export const PaymentsModule = {
       Helpers.toast('Mora eliminada correctamente', 'success');
       await this.loadPayments();
     } catch (e) {
-      // Fallback: extender due_date 30 días hacia adelante para eliminar mora acumulada
-      try {
-        const futureDate = new Date();
-        futureDate.setDate(futureDate.getDate() + 30);
-        const { error: upErr } = await supabase
-          .from('payments')
-          .update({ due_date: futureDate.toISOString().split('T')[0] })
-          .eq('id', id);
-        if (upErr) throw upErr;
-        auditLog('payment.mora_waived', { payment_id: id, reason: reason.trim() });
-        Helpers.toast('Mora eliminada (fecha extendida 30 días)', 'success');
-        await this.loadPayments();
-      } catch (e2) {
-        Helpers.toast('Error al quitar mora: ' + (e2.message || e2), 'error');
-      }
+      Helpers.toast('Error al quitar mora: ' + (e.message || e), 'error');
     }
   },
 

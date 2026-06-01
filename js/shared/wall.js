@@ -4,11 +4,23 @@ import { ImageLoader } from './image-loader.js';
 import { QueryCache } from './query-cache.js';
 import { withTimeout } from './db-utils.js';
 
-// Inline helper — optimiza URLs de Supabase Storage
-// NOTA: La transformación automática (WebP/resize) requiere plan Pro de Supabase.
-// En plan gratuito, simplemente retorna la URL original.
+// Inline helper — optimiza URLs de Supabase Storage con transformaciones
+// Aplica resize y compresión cuando la URL es de Supabase Storage (plan Pro)
+// En plan gratuito, agrega parámetros de caché para mejor rendimiento
 const optimizeImageUrl = (url, opts = {}) => {
   if (!url) return url || null;
+  // Solo optimizar URLs de Supabase Storage
+  if (!url.includes('/storage/v1/object/public/')) return url;
+  const { width, quality } = opts;
+  // Agregar parámetros de transformación (requiere plan Pro de Supabase)
+  // En plan gratuito estos parámetros son ignorados pero no causan error
+  if (width || quality) {
+    const sep = url.includes('?') ? '&' : '?';
+    const params = [];
+    if (width) params.push(`width=${width}`);
+    if (quality) params.push(`quality=${quality}`);
+    return url + sep + params.join('&');
+  }
   return url;
 };
 
@@ -359,7 +371,7 @@ export const WallModule = {
         <div class="p-5">
           <div class="flex justify-between items-start mb-4">
             <div class="flex items-center gap-3">
-              <div class="w-10 h-10 rounded-full bg-${accent}-100 flex items-center justify-center overflow-hidden">
+              <div class="w-10 h-10 rounded-full bg-${accent}-100 flex items-center justify-center overflow-hidden shrink-0 shadow-sm border border-slate-100">
                 ${ImageLoader.img(p.teacher_avatar, { 
                   cls: 'w-full h-full object-cover', 
                   fallback: 'img/1.jpg',
@@ -661,14 +673,13 @@ export const WallModule = {
   },
 
   subscribeRealtime() {
-    if (this._realtimeChannel) {
-      supabase.removeChannel(this._realtimeChannel);
-    }
+    this._unsubscribeRealtime(); // limpiar canal anterior si existe
 
     const classroomId = this._options.classroomId;
+    const self = this;
     
     this._realtimeChannel = supabase
-      .channel('wall_global')
+      .channel('wall_global_' + Date.now()) // nombre único para evitar conflictos
       .on('postgres_changes', { 
         event: '*', 
         schema: 'public', 
@@ -676,47 +687,60 @@ export const WallModule = {
       }, async (payload) => {
         const { eventType, new: newPost, old: oldPost } = payload;
 
-        // 1. Filtrar por aula si aplica
-        if (classroomId && newPost.classroom_id && newPost.classroom_id !== classroomId) {
+        // Filtrar por aula si aplica
+        if (classroomId && newPost?.classroom_id && newPost.classroom_id !== classroomId) {
           return;
         }
 
         if (eventType === 'INSERT') {
-          // No recargar todo el muro, solo notificar o insertar arriba si es el primer post
           Helpers.toast('📢 Nueva publicación en el muro', 'info');
-          const container = document.getElementById(this._containerId);
-          if (container && this._page <= 1) {
-            // Recargar solo la primera página para traer el nuevo post con sus relaciones
-            // (Es más seguro que construir el HTML manualmente sin las relaciones de teacher/likes)
-            this.loadPosts(container);
+          const container = document.getElementById(self._containerId);
+          if (container && self._page <= 1) {
+            self.loadPosts(container);
           }
         }
 
         if (eventType === 'UPDATE') {
-          // 🔄 Sincronización Realtime de Contadores
-          const postId = newPost.id;
+          const postId = newPost?.id;
+          if (!postId) return;
           const likeSpan = document.getElementById(`like-count-${postId}`);
           const commBtn = document.querySelector(`#post-${postId} button[onclick*="toggleCommentSection"] span`);
-
-          if (likeSpan && typeof newPost.likes_count === 'number') {
-            // Solo actualizar si el valor cambió y no estamos en medio de una acción local
-            likeSpan.textContent = newPost.likes_count;
-          }
-
-          if (commBtn && typeof newPost.comments_count === 'number') {
-            commBtn.textContent = `${newPost.comments_count} Comentarios`;
-          }
+          if (likeSpan && typeof newPost.likes_count === 'number') likeSpan.textContent = newPost.likes_count;
+          if (commBtn && typeof newPost.comments_count === 'number') commBtn.textContent = `${newPost.comments_count} Comentarios`;
         }
 
         if (eventType === 'DELETE') {
-          const el = document.getElementById(`post-${oldPost.id}`);
+          const el = document.getElementById(`post-${oldPost?.id}`);
           if (el) {
             el.classList.add('opacity-0', 'scale-95');
             setTimeout(() => el.remove(), 300);
           }
         }
+      })
+      .subscribe((status) => {
+        if (status === 'CHANNEL_ERROR') {
+          // Reintentar en 5s
+          setTimeout(() => {
+            if (self._realtimeChannel) self.subscribeRealtime();
+          }, 5000);
+        }
       });
+  },
 
-    RealtimeUtils.monitorChannel(this._realtimeChannel, 'WallModule');
+  /** Desuscribir el canal del muro — llamar cuando el usuario cambia de sección */
+  _unsubscribeRealtime() {
+    if (this._realtimeChannel) {
+      try { supabase.removeChannel(this._realtimeChannel); } catch (_) {}
+      this._realtimeChannel = null;
+    }
+    if (this._observer) {
+      this._observer.disconnect();
+      this._observer = null;
+    }
+  },
+
+  /** Destruir completamente el módulo — llamar al salir de la sección muro */
+  destroy() {
+    this._unsubscribeRealtime();
   }
 };

@@ -37,9 +37,6 @@ export const WallModule = {
             <p class="text-xs text-white/70 font-bold uppercase tracking-widest">Muro Escolar</p>
           </div>
         </div>
-        <button onclick="App.ui.closeModal()" class="w-10 h-10 flex items-center justify-center rounded-xl bg-white/10 hover:bg-white/20 transition-colors">
-          <i data-lucide="x" class="w-6 h-6"></i>
-        </button>
       </div>
       
       <div class="p-8 bg-white space-y-6">

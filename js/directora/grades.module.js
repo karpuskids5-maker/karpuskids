@@ -1,4 +1,4 @@
-﻿import { DirectorApi } from './api.js';
+import { DirectorApi } from './api.js';
 import { Helpers } from '../shared/helpers.js';
 import { supabase } from '../shared/supabase.js';
 import { AppState } from './state.js';
@@ -320,9 +320,6 @@ export const GradesModule = {
               <p class="text-sm font-bold text-indigo-100 uppercase tracking-widest">${data.classroom} • Promedio: ${data.avg != null ? data.avg.toFixed(1) : 'N/A'}</p>
             </div>
           </div>
-          <button onclick="App.ui.closeModal()" class="w-10 h-10 flex items-center justify-center rounded-xl bg-white/10 hover:bg-white/20 transition-colors">
-            <i data-lucide="x" class="w-6 h-6"></i>
-          </button>
         </div>
 
         <div class="flex-1 overflow-y-auto p-6 bg-slate-50">
@@ -380,12 +377,9 @@ export const GradesModule = {
     if (!evidence) return;
 
     const modalHtml = `
-      <div class="bg-white rounded-3xl shadow-2xl w-full max-w-lg overflow-hidden">
+      <div class="w-full max-w-lg overflow-hidden">
         <div class="relative h-64 bg-slate-900">
           <img src="${evidence.file_url || 'img/placeholder-task.jpg'}" class="w-full h-full object-contain" alt="Evidencia">
-          <button onclick="App.ui.closeModal()" class="absolute top-4 right-4 w-10 h-10 bg-black/50 text-white rounded-full flex items-center justify-center hover:bg-black/70 transition-all">
-            <i data-lucide="x" class="w-5 h-5"></i>
-          </button>
         </div>
         <div class="p-6">
           <div class="flex justify-between items-start mb-4">
@@ -466,10 +460,9 @@ export const GradesModule = {
     const y = new Date().getFullYear();
     
     const modalHtml = `
-      <div class="bg-white rounded-3xl shadow-2xl w-full max-w-md overflow-hidden">
+      <div class="w-full max-w-md overflow-hidden">
         <div class="bg-indigo-600 p-6 text-white flex justify-between items-center">
           <h3 class="text-xl font-black">Nuevo Trimestre</h3>
-          <button onclick="App.ui.closeModal()" class="text-white/70 hover:text-white"><i data-lucide="x"></i></button>
         </div>
         <div class="p-6 space-y-4">
           <div><label class="${lc}">Nombre del Periodo</label><input id="periodName" class="${ic}" placeholder="Ej: 1er Trimestre ${y}"></div>

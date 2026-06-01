@@ -1,4 +1,4 @@
-﻿﻿import { supabase } from '../shared/supabase.js';
+﻿import { supabase } from '../shared/supabase.js';
 import { TABLES } from '../shared/constants.js';
 import { withRetry } from '../shared/db-utils.js';
 
@@ -56,7 +56,8 @@ export const AssistantApi = {
    * ✅ SOLUCIÓN PROFESIONAL: Filtra por rango created_at para evitar error 400
    */
   async getTodayAttendance() {
-    const today = new Date().toISOString().split('T')[0];
+    const d = new Date();
+    const today = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
     
     const { data, error } = await supabase
       .from(TABLES.ATTENDANCE)

@@ -1,4 +1,4 @@
-import { supabase } from '../shared/supabase.js';
+﻿import { supabase } from '../shared/supabase.js';
 import { TABLES } from '../shared/constants.js';
 
 /**
@@ -16,7 +16,7 @@ function getDisplayName(profile) {
 }
 
 /**
- * API Maestra (nivel producción)
+ * API Maestra (nivel producciÃ³n)
  */
 export const MaestraApi = {
 
@@ -28,7 +28,7 @@ export const MaestraApi = {
       .from(TABLES.PROFILES)
       .select('id, name, email, phone, avatar_url, role, bio, classrooms:classrooms(id, name)')
       .eq('id', userId)
-      .maybeSingle(); // 🔥 FIX
+      .maybeSingle(); // ðŸ”¥ FIX
 
     handleError(error, 'getTeacherProfile');
 
@@ -109,7 +109,7 @@ export const MaestraApi = {
   },
 
   /**
-   * Tareas — filtradas por período activo del aula
+   * Tareas â€” filtradas por perÃ­odo activo del aula
    */
   async getTasksByClassroom(classroomId, periodId = null) {
     // Fallback directo para evitar 404 de RPC si no existe en BD
@@ -140,20 +140,37 @@ export const MaestraApi = {
   },
 
   /**
-   * Upsert rutina
+   * Upsert rutina mejorado para bebÃ©s
    */
   async upsertDailyLog(payload) {
     const cleanPayload = { ...payload };
 
+    // 1. Buscar log existente
     const { data: existing, error: findError } = await supabase
       .from('daily_logs')
-      .select('id')
+      .select('id, infant_data')
       .eq('student_id', cleanPayload.student_id)
       .eq('date', cleanPayload.date)
       .maybeSingle();
 
     handleError(findError, 'findDailyLog');
 
+    // 2. Manejo especial de infant_data (JSONB append)
+    if (cleanPayload.infant_event) {
+      const newEvent = cleanPayload.infant_event;
+      delete cleanPayload.infant_event;
+      
+      const currentInfantData = existing?.infant_data || [];
+      const updatedInfantData = [...currentInfantData, {
+        ...newEvent,
+        id: crypto.randomUUID?.() || Math.random().toString(36).substr(2, 9),
+        created_at: new Date().toISOString()
+      }];
+      
+      cleanPayload.infant_data = updatedInfantData;
+    }
+
+    // 3. Ejecutar query
     const query = existing
       ? supabase
           .from('daily_logs')
@@ -170,7 +187,7 @@ export const MaestraApi = {
   },
 
   /**
-   * Crear tarea — vinculada al período activo del aula
+   * Crear tarea â€” vinculada al perÃ­odo activo del aula
    */
   async createTask(payload) {
     const cleanPayload = {
@@ -179,9 +196,9 @@ export const MaestraApi = {
     };
     delete cleanPayload.points;
 
-    // 🔄 Lógica Profesional de Período Activo
+    // ðŸ”„ LÃ³gica Profesional de PerÃ­odo Activo
     if (!cleanPayload.period_id && cleanPayload.classroom_id) {
-      // Intento manual vía query en lugar de RPC para evitar 404
+      // Intento manual vÃ­a query en lugar de RPC para evitar 404
       const { data: periodData } = await supabase
         .from('academic_periods')
         .select('id, name')
@@ -229,7 +246,7 @@ export const MaestraApi = {
       .eq('id', taskId);
 
     handleError(error, 'deleteTask');
-    // Devolvemos un objeto para consistencia, aunque la operación de borrado no devuelve datos.
+    // Devolvemos un objeto para consistencia, aunque la operaciÃ³n de borrado no devuelve datos.
     return { success: !error };
   },
 

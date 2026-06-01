@@ -104,6 +104,141 @@ export const Helpers = {
   },
 
   /**
+   * 📅 Obtener fecha local en formato YYYY-MM-DD
+   * Evita el error de cambio de día prematuro (UTC vs Local)
+   */
+  getYYYYMMDD(date = new Date()) {
+    const d = new Date(date);
+    const year = d.getFullYear();
+    const month = String(d.getMonth() + 1).padStart(2, '0');
+    const day = String(d.getDate()).padStart(2, '0');
+    return `${year}-${month}-${day}`;
+  },
+
+  /**
+   * 🖨️ Plantilla Corporativa para Impresión de QR
+   */
+  getQRPrintTemplate(qrImg, name, matricula) {
+    return `
+      <!DOCTYPE html>
+      <html lang="es">
+      <head>
+        <meta charset="UTF-8">
+        <title>Credencial Digital - ${matricula}</title>
+        <style>
+          @import url('https://fonts.googleapis.com/css2?family=Nunito:wght@400;700;900&display=swap');
+          body { 
+            font-family: 'Nunito', sans-serif; 
+            display: flex; 
+            align-items: center; 
+            justify-content: center; 
+            min-height: 100vh; 
+            margin: 0; 
+            background: #f8fafc; 
+            -webkit-print-color-adjust: exact;
+          }
+          .card { 
+            background: white;
+            border: 2px solid #e2e8f0; 
+            border-radius: 32px; 
+            padding: 40px; 
+            text-align: center; 
+            width: 320px; 
+            box-shadow: 0 20px 50px rgba(0,0,0,0.05);
+            position: relative;
+            overflow: hidden;
+          }
+          .card::before {
+            content: '';
+            position: absolute;
+            top: 0; left: 0; right: 0; height: 8px;
+            background: linear-gradient(90deg, #f97316, #3b82f6, #ec4899, #22c55e);
+          }
+          .logo { 
+            font-size: 24px; 
+            font-weight: 900; 
+            margin-bottom: 30px;
+            letter-spacing: -0.5px;
+          }
+          .k1{color:#f97316} .k2{color:#3b82f6} .k3{color:#ec4899} .k4{color:#22c55e}
+          .qr-wrapper {
+            background: #f1f5f9;
+            padding: 20px;
+            border-radius: 24px;
+            display: inline-block;
+            margin-bottom: 25px;
+            border: 1px solid #e2e8f0;
+          }
+          img { 
+            width: 200px; 
+            height: 200px; 
+            display: block;
+            border-radius: 12px;
+          }
+          .name { 
+            font-size: 20px; 
+            font-weight: 900; 
+            color: #1e293b; 
+            margin-top: 10px;
+            line-height: 1.2;
+          }
+          .mat { 
+            font-size: 13px; 
+            color: #64748b; 
+            font-weight: 700; 
+            margin-top: 6px;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+          }
+          .footer-brand {
+            margin-top: 30px;
+            font-size: 10px;
+            font-weight: 800;
+            color: #94a3b8;
+            text-transform: uppercase;
+            letter-spacing: 2px;
+          }
+          @media print {
+            body { background: white; margin: 0; }
+            .card { box-shadow: none; border: 1px solid #eee; margin: auto; }
+          }
+        </style>
+      </head>
+      <body>
+        <div class="card">
+          <div class="logo">
+            <span class="k1">K</span><span class="k2">a</span><span class="k3">r</span><span class="k4">p</span>us Kids
+          </div>
+          <div class="qr-wrapper">
+            <img src="${qrImg}" alt="QR Code">
+          </div>
+          <div class="name">${name || 'Estudiante'}</div>
+          <div class="mat">${matricula}</div>
+          <div class="footer-brand">Sistema de Acceso Seguro</div>
+        </div>
+        <script>
+          window.onload = () => {
+            setTimeout(() => {
+              window.print();
+              setTimeout(() => window.close(), 500);
+            }, 500);
+          }
+        </script>
+      </body>
+      </html>
+    `;
+  },
+
+  /**
+   * 🎭 Escape HTML
+   */
+  escapeHTML(str = '') {
+    return String(str).replace(/[&<>"']/g, m => ({
+      '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
+    }[m]));
+  },
+
+  /**
    * 🎭 Empty state
    */
   emptyState(msg = 'Sin datos', icon = 'smile') {
@@ -511,28 +646,11 @@ export const Helpers = {
 
 
   /**
-   * 💰 formato moneda RD$
+   * 💰 formato moneda
    */
-  formatCurrency(amount = 0) {
-
-    return new Intl
-
-      .NumberFormat(
-
-        'es-DO',
-
-        {
-
-          style: 'currency',
-
-          currency: 'DOP'
-
-        }
-
-      )
-
-      .format(amount);
-
+  formatCurrency(val = 0) {
+    const num = Number(val || 0);
+    return num.toLocaleString('es-DO', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
   },
 
 

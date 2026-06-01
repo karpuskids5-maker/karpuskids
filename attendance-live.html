@@ -3,7 +3,11 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-  <title>Ponche Digital — Karpus Kids</title>
+  <title>Ponche Digital \u2014 Karpus Kids</title>
+  <link rel="manifest" href="manifest-live.json">
+  <meta name="theme-color" content="#16a34a">
+  <link rel="apple-touch-icon" href="logo/apple-touch-icon.png">
+  <link rel="icon" href="logo/favicon.png" type="image/png">
   <script src="js/shared/html5-qrcode.min.js"></script>
   <link href="https://fonts.googleapis.com/css2?family=Nunito:wght@400;600;700;800;900&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="css/karpus-tailwind.css">
@@ -153,11 +157,60 @@
     </div>
   </div>
 
+  <!-- PWA Install Banner -->
+  <div id="pwa-banner" class="fixed bottom-6 left-6 right-6 bg-white rounded-3xl shadow-2xl p-6 z-[1000] border-2 border-emerald-100 hidden animate-slideUp">
+    <div class="flex items-center gap-4">
+      <div class="w-14 h-14 bg-emerald-500 rounded-2xl flex items-center justify-center shrink-0 shadow-lg shadow-emerald-200">
+        <i data-lucide="download-cloud" class="w-8 h-8 text-white"></i>
+      </div>
+      <div class="flex-1">
+        <h4 class="font-black text-slate-800 text-lg tracking-tight">¡Descarga la App!</h4>
+        <p class="text-xs font-bold text-slate-400 uppercase tracking-widest">Instala el terminal de ponche</p>
+      </div>
+      <div class="flex gap-2">
+        <button id="pwa-close" class="p-3 text-slate-400 hover:bg-slate-50 rounded-xl transition-all font-bold text-sm">Cerrar</button>
+        <button id="pwa-install" class="px-6 py-3 bg-emerald-600 text-white rounded-xl font-black text-xs uppercase tracking-widest shadow-lg shadow-emerald-200 hover:bg-emerald-700 active:scale-95 transition-all">Instalar</button>
+      </div>
+    </div>
+  </div>
+
 <script src="js/shared/supabase-js.min.js"></script>
+<script src="js/shared/lucide.min.js"></script>
 <script type="module">
 import { supabase } from './js/shared/supabase.js';
 
-// ── State ─────────────────────────────────────────────────────────────────────
+// \u2500\u2500 PWA Logic \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500
+let deferredPrompt;
+const banner = document.getElementById('pwa-banner');
+const installBtn = document.getElementById('pwa-install');
+const closeBtn = document.getElementById('pwa-close');
+
+if ('serviceWorker' in navigator) {
+  navigator.serviceWorker.register('sw-live.js').catch(() => {});
+}
+
+window.addEventListener('beforeinstallprompt', (e) => {
+  e.preventDefault();
+  deferredPrompt = e;
+  banner.classList.remove('hidden');
+  banner.style.display = 'block';
+});
+
+installBtn?.addEventListener('click', async () => {
+  if (!deferredPrompt) return;
+  deferredPrompt.prompt();
+  const { outcome } = await deferredPrompt.userChoice;
+  if (outcome === 'accepted') banner.style.display = 'none';
+  deferredPrompt = null;
+});
+
+closeBtn?.addEventListener('click', () => {
+  banner.style.display = 'none';
+});
+
+if (window.lucide) lucide.createIcons();
+
+// \u2500\u2500 State \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500
 let isProcessing  = false;
 let lastScan      = '';
 let scanTimeout;
@@ -176,7 +229,9 @@ tick(); setInterval(tick, 1000);
 // ── Stats: reads from door_punches (new) OR attendance (fallback) ────────────
 async function updateStats() {
   try {
-    const today = new Date().toISOString().split('T')[0];
+    const d = new Date();
+    const today = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+    
     // Try door_punches first
     const { data: punches, error: pErr } = await supabase.from('door_punches').select('punch_type').eq('date', today);
     if (!pErr && punches && punches.length > 0) {
@@ -368,11 +423,20 @@ async function onScan(raw) {
     const name      = result.name;
     const role      = result.role;
     const timeStr   = result.time;
+    const status    = result.status || 'present';
+
+    let displayMsg = punchType === 'check_in' ? '✅ Entrada registrada' : '👋 Salida registrada';
+    let displayType = punchType === 'check_in' ? 'in' : 'out';
+
+    if (status === 'late') {
+      displayMsg = '⚠️ Tardanza registrada';
+      displayType = 'warn';
+    }
 
     showResult(
-      punchType === 'check_in' ? 'in' : 'out',
+      displayType,
       name, role,
-      punchType === 'check_in' ? '✅ Entrada registrada' : '👋 Salida registrada',
+      displayMsg,
       now, timeStr
     );
 

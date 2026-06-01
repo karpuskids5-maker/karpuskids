@@ -1,4 +1,4 @@
-﻿import { supabase } from '../shared/supabase.js';
+import { supabase } from '../shared/supabase.js';
 import { AppState } from './appState.js';
 import { Helpers, escapeHtml } from './helpers.js';
 import { Helpers as SharedHelpers } from '../shared/helpers.js';
@@ -61,7 +61,7 @@ export const ChatModule = {
 
       list.innerHTML = this._contacts.map(c =>
         '<div data-contact-id="' + c.id + '" class="flex items-center gap-3 p-3 rounded-2xl hover:bg-white hover:shadow-sm cursor-pointer transition-all border border-transparent hover:border-slate-100 group mb-1">' +
-          '<div class="w-11 h-11 rounded-full bg-green-100 text-green-700 flex items-center justify-center font-bold overflow-hidden border border-green-50 shrink-0">' +
+          '<div class="w-12 h-12 rounded-full bg-green-100 text-green-700 flex items-center justify-center font-bold overflow-hidden border-2 border-green-50 shrink-0 aspect-square shadow-sm">' +
             (c.avatar_url ? '<img src="' + c.avatar_url + '" class="w-full h-full object-cover">' : c.name.charAt(0)) +
           '</div>' +
           '<div class="min-w-0 flex-1">' +

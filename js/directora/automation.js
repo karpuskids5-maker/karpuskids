@@ -385,7 +385,7 @@ export const AutomationModule = {
                     <p class="text-[10px] text-slate-400">${p.monthPaid || 'Mensualidad'}</p>
                   </div>
                   <div class="text-right">
-                    <p class="text-xs font-black text-blue-700">RD$${p.amount.toLocaleString('es-DO')}</p>
+                    <p class="text-xs font-black text-blue-700">${p.amount.toLocaleString('es-DO', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</p>
                     <p class="text-[9px] font-bold ${p.daysLeft <= 1 ? 'text-rose-600' : 'text-slate-400'}">${p.daysLeft === 0 ? 'Hoy' : p.daysLeft === 1 ? 'Mañana' : `En ${p.daysLeft} días`}</p>
                   </div>
                 </div>`).join('')}

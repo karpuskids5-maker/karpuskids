@@ -24,14 +24,49 @@ window._closeAsistenteModal = () => {
   if (gc) { gc.style.display = 'none'; gc.innerHTML = ''; }
 };
 
+// Cierre de modales estáticos al hacer clic fuera del contenido
+document.addEventListener('click', (e) => {
+  const staticModals = ['roomModal', 'roomStudentsModal', 'paymentDetailModal', 'paymentModal', 'attendanceModal', 'accessModal'];
+  for (const id of staticModals) {
+    const modal = document.getElementById(id);
+    if (modal && e.target === modal && !modal.classList.contains('hidden')) {
+      modal.classList.add('hidden');
+      modal.classList.remove('flex');
+      break;
+    }
+  }
+});
+
+window.openGlobalModal = (html, wide = false) => {
+  const gc = document.getElementById('globalModalContainer');
+  if (!gc) return;
+  const maxW = wide ? 'max-w-4xl' : 'max-w-2xl';
+  gc.innerHTML = `
+    <div id="globalModalInner" class="bg-white rounded-3xl shadow-2xl w-full ${maxW} max-h-[92vh] overflow-y-auto mx-3 my-4 relative animate-scaleIn">
+      <button onclick="window._closeAsistenteModal()" class="absolute top-4 right-4 w-10 h-10 flex items-center justify-center rounded-full bg-slate-100 text-slate-400 hover:bg-rose-50 hover:text-rose-500 transition-all z-[110]">
+        <i data-lucide="x" class="w-6 h-6"></i>
+      </button>
+      ${html}
+    </div>`;
+  gc.style.cssText = 'display:flex;align-items:flex-start;justify-content:center;padding-top:4vh;position:fixed;inset:0;background:rgba(0,0,0,0.6);backdrop-filter:blur(8px);z-index:9999;overflow-y:auto;';
+  
+  gc.onmousedown = (e) => {
+    if (e.target === gc) window._closeAsistenteModal();
+  };
+
+  if (window.lucide) lucide.createIcons();
+};
+
 window.App = {
   payments: {
     markPaid:      (id)  => PaymentsModule.markPaid(id),
-    rejectPayment: (id)  => PaymentsModule.rejectPayment(id),
+    rejectPayment: (id, notes)  => PaymentsModule.rejectPayment(id, notes),
     deletePayment: (id)  => PaymentsModule.deletePayment(id),
     openModal:     (sid) => PaymentsModule.openPaymentModal(sid),
     closeModal:    ()    => PaymentsModule.closeModal(),
-    filterBy:      (s)   => PaymentsModule.filterBy(s)
+    filterBy:      (s)   => PaymentsModule.filterBy(s),
+    waiveMora:     (id)  => PaymentsModule.waiveMora(id),
+    _confirmApproval: (id) => PaymentsModule._confirmApproval(id)
   },
   registerAccess: (sid, type) => window.App._registerAccess(sid, type),
   confirmPayment: (id) => PaymentsModule.markPaid(id),
@@ -107,7 +142,10 @@ document.addEventListener('DOMContentLoaded', async () => {
     _toggleLike: (pid) => WallModule.toggleLike(pid),
     _selectChatContact: (uid, name, role) => selectAssistantChat(uid, name, role),
     selectChatContact: (uid, name, role) => selectAssistantChat(uid, name, role),
+    // Estudiantes
     _openStudentModal: (id) => StudentsModule.openModal(id),
+    _deleteStudent: (id, name) => StudentsModule._deleteStudent(id, name),
+    _genMatricula: () => window._genMatricula?.(),
     _openRoomModal: (id) => RoomsModule.openModal(id),
     openNewPostModal,
     submitNewPost
@@ -140,7 +178,15 @@ function initNavigation() {
   const sections = document.querySelectorAll('section[id]');
 
   const showSection = async (target) => {
-    // 1. Limpiar clases activas en botones de navegaci�n
+    // Desuscribir muro al salir (ahorro de recursos Realtime)
+    const prevSection = AppState.get('currentSection');
+    if (prevSection === 'muro' && target !== 'muro') {
+      WallModule.destroy?.();
+      // Permitir re-inicializar el muro la próxima vez
+      loadedSections.delete('muro');
+    }
+
+    // 1. Limpiar clases activas en botones de navegación�n
     navLinks.forEach(l => {
       l.classList.remove('bg-white/20', 'bg-teal-50', 'text-teal-600', 'active');
       // Si el bot�n est� en el sidebar y no es el activo, restaurar su estilo original de texto blanco
@@ -206,7 +252,13 @@ function initNavigation() {
             await RoomsModule.init();
             break;
           case 'muro':
-            WallModule.loadPosts();
+            WallModule.init('muroPostsContainer', { accentColor: 'teal', likeColor: 'emerald' }, AppState);
+            break;
+          case 'staff-permits':
+            import('../directora/permits.module.js').then(m => {
+              window.App.permits = m.PermitsModule;
+              m.PermitsModule.init();
+            });
             break;
           case 'chat':
             await initAssistantChat();
@@ -558,7 +610,14 @@ async function loadChatContacts(searchTerm = '', unreadMap = {}) {
       return;
     }
 
-    container.innerHTML = contacts.map(c => {
+    // Ordenar: primero los que tienen mensajes sin leer
+    const sorted = [...contacts].sort((a, b) => {
+      const ua = unreadMap[a.id] || 0;
+      const ub = unreadMap[b.id] || 0;
+      return ub - ua;
+    });
+
+    container.innerHTML = sorted.map(c => {
       const unread = unreadMap[c.id] || 0;
       // Título principal: nombre del estudiante (si es padre), sino nombre del perfil
       const displayName = c.role === 'padre' && c.studentNames ? c.studentNames : (c.name || 'Usuario');
@@ -575,18 +634,19 @@ async function loadChatContacts(searchTerm = '', unreadMap = {}) {
 
       return `
       <div onclick="App.selectChatContact('${c.id}', '${safeDisplay}', '${safeMeta}')" 
-           class="p-3 hover:bg-slate-50 rounded-xl cursor-pointer transition-colors flex items-center gap-3 border-b border-slate-50 last:border-0 relative">
+           class="p-3 hover:bg-slate-50 rounded-xl cursor-pointer transition-colors flex items-center gap-3 border-b border-slate-50 last:border-0 relative ${unread > 0 ? 'bg-teal-50/60 border-l-2 border-l-teal-400' : ''}">
         <div class="relative">
-          <div class="w-10 h-10 rounded-full bg-teal-100 text-teal-600 flex items-center justify-center font-bold overflow-hidden">
+          <div class="w-10 h-10 rounded-full bg-teal-100 text-teal-600 flex items-center justify-center font-bold overflow-hidden ${unread > 0 ? 'ring-2 ring-teal-400' : ''}">
             ${c.avatar_url ? `<img src="${c.avatar_url}" class="w-full h-full object-cover" loading="lazy">` : displayName.charAt(0).toUpperCase()}
           </div>
-          ${unread > 0 ? `<div class="absolute -top-1 -right-1 bg-red-500 text-white text-[10px] font-bold px-1.5 py-0.5 rounded-full shadow-sm">${unread}</div>` : ''}
+          ${unread > 0 ? `<div class="absolute -top-1 -right-1 bg-red-500 text-white text-[10px] font-black px-1.5 py-0.5 rounded-full shadow-sm min-w-[18px] text-center">${unread}</div>` : ''}
         </div>
-        <div class="min-w-0">
-          <div class="font-bold text-slate-700 text-sm truncate">${safeDisplay}</div>
+        <div class="min-w-0 flex-1">
+          <div class="font-bold text-slate-700 text-sm truncate ${unread > 0 ? 'text-teal-700' : ''}">${safeDisplay}</div>
           ${parentLine ? `<div class="text-[10px] text-teal-600 font-bold truncate">${Helpers.escapeHTML(parentLine)}</div>` : ''}
           <div class="text-[10px] text-slate-400 truncate">${Helpers.escapeHTML(roleLabel)}</div>
         </div>
+        ${unread > 0 ? `<div class="shrink-0 flex flex-col items-end gap-1"><span class="text-[9px] font-black text-teal-600 bg-teal-100 px-2 py-0.5 rounded-full uppercase">Sin leer</span></div>` : ''}
       </div>
     `}).join('');
   } catch (error) {
@@ -663,11 +723,14 @@ async function selectAssistantChat(userId, name, role) {
       import('../shared/scroll.module.js').then(({ ScrollModule }) => ScrollModule.scrollToBottom(msgs));
     }
 
-    // Suscripci�n realtime
-    ChatModule.subscribeToConversation(conversationId, (newMsg) => {
-      msgs.insertAdjacentHTML('beforeend', buildBubble(newMsg));
-      import('../shared/scroll.module.js').then(({ ScrollModule }) => ScrollModule.scrollToBottom(msgs, true));
-    });
+    // Suscripci�n realtime (Solo si hay conversaci�n activa)
+    if (conversationId) {
+      ChatModule.subscribeToConversation(conversationId, (newMsg) => {
+        // Evitar duplicados si el mensaje ya fue a�adido localmente (aunque aqu� no lo hacemos)
+        msgs.insertAdjacentHTML('beforeend', buildBubble(newMsg));
+        import('../shared/scroll.module.js').then(({ ScrollModule }) => ScrollModule.scrollToBottom(msgs, true));
+      });
+    }
 
   } catch (e) {
 
@@ -680,11 +743,54 @@ async function sendAssistantMessage() {
   const input = document.getElementById('chatMessageInput');
   const text = input?.value.trim();
   if (!text || !activeChatUserId) return;
+
+  const msgs = document.getElementById('chatMessagesContainer');
+  const myId = AppState.get('user')?.id;
+
+  const buildBubble = (m) => {
+    const isMe = m.sender_id === myId;
+    return `<div class="flex ${isMe ? 'justify-end' : 'justify-start'} mb-2">
+      <div class="max-w-[80%] px-4 py-2.5 rounded-2xl text-sm ${isMe
+        ? 'bg-teal-600 text-white rounded-br-none shadow-md'
+        : 'bg-white border border-slate-100 text-slate-700 rounded-bl-none shadow-sm'}">
+        <p class="whitespace-pre-wrap">${Helpers.escapeHTML(m.content)}</p>
+        <p class="text-[9px] ${isMe ? 'text-teal-200' : 'text-slate-400'} mt-1 text-right">${new Date(m.created_at || Date.now()).toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'})}</p>
+      </div>
+    </div>`;
+  };
+
   try {
     input.value = '';
-    await ChatModule.sendMessage(AppState.get('user').id, activeChatUserId, text, activeConversationId);
-  } catch (e) {
+    const { message, conversationId } = await ChatModule.sendMessage(myId, activeChatUserId, text, activeConversationId);
+    
+    // Si era una conversación nueva, actualizar ID y suscribirse
+    if (!activeConversationId && conversationId) {
+      activeConversationId = conversationId;
+      
+      // Limpiar mensaje de "No hay mensajes aún"
+      if (msgs && msgs.innerHTML.includes('No hay mensajes aún')) {
+        msgs.innerHTML = '';
+      }
 
+      // Suscribirse ahora que tenemos ID
+      ChatModule.subscribeToConversation(conversationId, (newMsg) => {
+        // Solo añadir si no es el mensaje que acabamos de enviar (el realtime lo devolverá)
+        // Para simplificar y evitar duplicados, si es el primer mensaje lo mostramos aquí y el realtime lo ignoramos si el ID coincide
+        if (newMsg.id !== message.id) {
+          msgs.insertAdjacentHTML('beforeend', buildBubble(newMsg));
+          import('../shared/scroll.module.js').then(({ ScrollModule }) => ScrollModule.scrollToBottom(msgs, true));
+        }
+      });
+    }
+
+    // Mostrar el mensaje inmediatamente (Optimistic UI)
+    if (msgs) {
+      if (msgs.innerHTML.includes('No hay mensajes aún')) msgs.innerHTML = '';
+      msgs.insertAdjacentHTML('beforeend', buildBubble(message));
+      import('../shared/scroll.module.js').then(({ ScrollModule }) => ScrollModule.scrollToBottom(msgs, true));
+    }
+
+  } catch (e) {
     Helpers.toast('Error enviando mensaje', 'error');
   }
 }

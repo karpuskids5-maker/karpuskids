@@ -1,4 +1,4 @@
-import { supabase } from '../../shared/supabase.js';
+﻿import { supabase } from '../../shared/supabase.js';
 import { AppState } from '../state.js';
 import { MaestraApi } from '../api.js';
 import { safeToast, safeEscapeHTML, Modal } from './ui.js';
@@ -24,16 +24,31 @@ export async function initRoutine() {
   const container = document.getElementById('tab-daily-routine');
   if (!container) return;
 
+  // Mostrar esqueleto de carga para feedback instantÃƒÂ¡neo
+  container.innerHTML = `
+    <div class="animate-pulse space-y-6">
+      <div class="h-12 bg-slate-100 rounded-2xl w-1/3"></div>
+      <div class="h-24 bg-slate-50 rounded-[2rem]"></div>
+      <div class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-4">
+        ${Array(5).fill('<div class="h-40 bg-slate-50 rounded-[2rem]"></div>').join('')}
+      </div>
+    </div>
+  `;
+
   try {
+    // 1. Obtener estudiantes del AppState (ya cargados en showClassroomDetail)
     const students = AppState.get('students') || [];
     const today    = new Date().toISOString().split('T')[0];
 
-    // Cargar logs de hoy
-    const { data: todayLogs } = await supabase
+    // 2. Cargar logs de hoy usando MaestraApi (Capa de abstracciÃƒÂ³n)
+    // Optimizamos: Solo traemos los logs de HOY para esta aula
+    const { data: todayLogs, error } = await supabase
       .from('daily_logs')
       .select('id, student_id, date, mood, food, nap, eating, sleeping, activities, notes, created_at')
       .eq('classroom_id', classroom.id)
       .eq('date', today);
+
+    if (error) throw error;
 
     const logsMap = {};
     (todayLogs || []).forEach(l => { logsMap[l.student_id] = l; });
@@ -52,14 +67,14 @@ export async function initRoutine() {
     if (hour >= 12 && hour < 16) currentPeriod = 'afternoon';
     if (hour >= 16) currentPeriod = 'late';
 
-    const periodNames = { morning: 'Ma\u00f1ana', afternoon: 'Tarde', late: 'Tardecita' };
+    const periodNames = { morning: 'MaÃƒÂ±ana', afternoon: 'Tarde', late: 'Tardecita' };
     
     // Estudiantes pendientes en el periodo actual
     const pendingStudents = students.filter(s => {
       const log = logsMap[s.id];
       if (!log || !_isWithin12h(log.created_at)) return true;
       
-      // Validar si falta alg\u00fan campo cr\u00edtico seg\u00fan el periodo
+      // Validar si falta algÃƒÂºn campo crÃƒÂ­tico segÃƒÂºn el periodo
       if (currentPeriod === 'morning' && !log.mood) return true;
       if (currentPeriod === 'afternoon' && (!log.food || !log.mood)) return true;
       if (currentPeriod === 'late' && (!log.nap || !log.food || !log.mood)) return true;
@@ -73,7 +88,7 @@ export async function initRoutine() {
         <div class="space-y-4">
           <div class="flex items-center justify-between">
             <div>
-              <h3 class="text-xl font-black text-slate-800">\ud83d\udcdd Rutina Diaria</h3>
+              <h3 class="text-xl font-black text-slate-800">Ã°Å¸â€œÂ Rutina Diaria</h3>
               <p class="text-xs font-bold text-slate-400 uppercase tracking-wider mt-0.5">${todayLabel}</p>
             </div>
             <div class="flex flex-col items-end">
@@ -88,11 +103,11 @@ export async function initRoutine() {
 
           <!-- Alarma Visual si hay pendientes -->
           ${pendingStudents.length > 0 ? `
-            <div class="bg-amber-50 border-2 border-amber-100 rounded-[2rem] p-5 flex items-center gap-4 animate-pulse-subtle">
-              <div class="w-12 h-12 bg-amber-400 text-white rounded-2xl flex items-center justify-center text-2xl shrink-0 shadow-lg shadow-amber-200">⚠️</div>
+            <div class="bg-orange-50 border-2 border-orange-100 rounded-[2rem] p-5 flex items-center gap-4 animate-pulse-subtle">
+              <div class="w-12 h-12 bg-orange-500 text-white rounded-2xl flex items-center justify-center text-2xl shrink-0 shadow-lg shadow-orange-200">Ã¢Å¡Â Ã¯Â¸Â</div>
               <div class="flex-1">
-                <p class="text-sm font-black text-amber-800">Reportes Pendientes</p>
-                <p class="text-xs font-bold text-amber-600/80">Faltan ${pendingStudents.length} estudiantes por reportar en este periodo.</p>
+                <p class="text-sm font-black text-orange-800">Reportes Pendientes</p>
+                <p class="text-xs font-bold text-orange-600/80">Faltan ${pendingStudents.length} estudiantes por reportar en este periodo.</p>
               </div>
               <div class="flex -space-x-3 overflow-hidden">
                 ${pendingStudents.slice(0, 3).map(s => `
@@ -100,14 +115,14 @@ export async function initRoutine() {
                     ${s.avatar_url ? `<img src="${s.avatar_url}" class="w-full h-full object-cover">` : `<div class="w-full h-full flex items-center justify-center text-[10px] font-black text-slate-500">${s.name.charAt(0)}</div>`}
                   </div>
                 `).join('')}
-                ${pendingStudents.length > 3 ? `<div class="w-8 h-8 rounded-full border-2 border-white bg-amber-100 flex items-center justify-center text-[10px] font-black text-amber-600 shadow-sm">+${pendingStudents.length - 3}</div>` : ''}
+                ${pendingStudents.length > 3 ? `<div class="w-8 h-8 rounded-full border-2 border-white bg-orange-100 flex items-center justify-center text-[10px] font-black text-orange-600 shadow-sm">+${pendingStudents.length - 3}</div>` : ''}
               </div>
             </div>
           ` : `
             <div class="bg-emerald-50 border-2 border-emerald-100 rounded-[2rem] p-5 flex items-center gap-4">
-              <div class="w-12 h-12 bg-emerald-500 text-white rounded-2xl flex items-center justify-center text-2xl shrink-0 shadow-lg shadow-emerald-200">✅</div>
+              <div class="w-12 h-12 bg-emerald-500 text-white rounded-2xl flex items-center justify-center text-2xl shrink-0 shadow-lg shadow-emerald-200">Ã¢Å“â€¦</div>
               <div>
-                <p class="text-sm font-black text-emerald-800">\u00a1Todo al d\u00eda!</p>
+                <p class="text-sm font-black text-emerald-800">Ã‚Â¡Todo al dÃƒÂ­a!</p>
                 <p class="text-xs font-bold text-emerald-600/80">Has completado los reportes de este periodo.</p>
               </div>
             </div>
@@ -119,9 +134,9 @@ export async function initRoutine() {
           ${students.map(s => _renderStudentRoutineCard(s, logsMap[s.id] || {})).join('')}
         </div>
 
-        <div class="bg-white p-6 rounded-[2rem] border border-slate-100 shadow-sm text-center">
+        <div class="bg-white p-6 rounded-[2rem] border border-slate-100 shadow-sm text-center border-l-4 border-l-orange-500">
           <p class="text-xs text-slate-400 font-medium">
-            \ud83d\udca1 Toca a un estudiante para abrir su reporte de rutina individual.<br>
+            Ã°Å¸â€™Â¡ Toca a un estudiante para abrir su reporte de rutina individual.<br>
             Los emojis flotantes indican el progreso actual.
           </p>
         </div>
@@ -130,6 +145,7 @@ export async function initRoutine() {
 
     if (window.lucide) window.lucide.createIcons();
   } catch (e) {
+    console.error('Error en initRoutine:', e);
     container.innerHTML = Helpers.errorState('Error al cargar la rutina', 'App.initRoutine()');
   }
 }
@@ -143,10 +159,12 @@ function _renderStudentRoutineCard(s, log) {
   const food  = isValid && log.food ? log.food : null;
   const sleep = isValid && log.nap  ? log.nap  : null;
   const note  = isValid && log.notes ? true : false;
+  const isInfant = s.age_type === 'meses';
+  const infantEvents = isValid && log.infant_data ? log.infant_data : [];
 
-  const moodEmojis  = { feliz: '\ud83d\ude0a', normal: '\ud83d\ude10', triste: '\ud83d\ude22', enojado: '\ud83d\ude21' };
-  const foodEmojis  = { todo: '\ud83d\ude0b', poco: '\ud83d\ude15', nada: '\ud83d\udeab' };
-  const sleepEmojis = { si: '\ud83d\ude34', no: '\ud83c\udf1e' };
+  const moodEmojis  = { feliz: 'Ã°Å¸ËœÅ ', normal: 'Ã°Å¸ËœÂ', triste: 'Ã°Å¸ËœÂ¢', enojado: 'Ã°Å¸ËœÂ¡' };
+  const foodEmojis  = { todo: 'Ã°Å¸Ëœâ€¹', poco: 'Ã°Å¸ÂÂ²', nada: 'Ã°Å¸Å¡Â«' };
+  const sleepEmojis = { si: 'Ã°Å¸â€™Â¤', no: 'Ã¢Ëœâ‚¬Ã¯Â¸Â' };
 
   return `
     <div onclick="App.openStudentRoutine('${s.id}')" 
@@ -155,9 +173,10 @@ function _renderStudentRoutineCard(s, log) {
       <!-- Burbujas de Emojis Flotantes (Status) -->
       <div class="absolute top-2 right-2 flex flex-col gap-1 z-10">
         ${mood ? `<div class="w-7 h-7 bg-orange-50 rounded-full flex items-center justify-center text-sm shadow-sm border border-orange-100 animate-bounce-subtle">${moodEmojis[mood]}</div>` : ''}
-        ${food ? `<div class="w-7 h-7 bg-emerald-50 rounded-full flex items-center justify-center text-sm shadow-sm border border-emerald-100 animate-bounce-subtle" style="animation-delay: 0.2s">${foodEmojis[food]}</div>` : ''}
+        ${isInfant && infantEvents.length > 0 ? `<div class="w-7 h-7 bg-blue-50 rounded-full flex items-center justify-center text-sm shadow-sm border border-blue-100 animate-bounce-subtle">Ã°Å¸ÂÂ¼</div>` : ''}
+        ${!isInfant && food ? `<div class="w-7 h-7 bg-emerald-50 rounded-full flex items-center justify-center text-sm shadow-sm border border-emerald-100 animate-bounce-subtle" style="animation-delay: 0.2s">${foodEmojis[food]}</div>` : ''}
         ${sleep ? `<div class="w-7 h-7 bg-indigo-50 rounded-full flex items-center justify-center text-sm shadow-sm border border-indigo-100 animate-bounce-subtle" style="animation-delay: 0.4s">${sleepEmojis[sleep]}</div>` : ''}
-        ${note ? `<div class="w-7 h-7 bg-slate-50 rounded-full flex items-center justify-center text-xs shadow-sm border border-slate-100 animate-bounce-subtle" style="animation-delay: 0.6s">\ud83d\udcdd</div>` : ''}
+        ${note ? `<div class="w-7 h-7 bg-slate-50 rounded-full flex items-center justify-center text-xs shadow-sm border border-slate-100 animate-bounce-subtle" style="animation-delay: 0.6s">Ã°Å¸â€œÂ</div>` : ''}
       </div>
 
       <!-- Avatar -->
@@ -167,11 +186,12 @@ function _renderStudentRoutineCard(s, log) {
 
       <!-- Info -->
       <h4 class="text-sm font-black text-slate-800 leading-tight mb-1 line-clamp-2">${safeEscapeHTML(s.name)}</h4>
+      <p class="text-[10px] font-black text-slate-400 uppercase tracking-tighter">${s.age} ${s.age_type || 'aÃƒÂ±os'}</p>
       
       <!-- Progress Indicator (Dot) -->
       <div class="flex gap-1 mt-auto pt-2">
         <div class="w-1.5 h-1.5 rounded-full ${mood ? 'bg-orange-400' : 'bg-slate-200'}"></div>
-        <div class="w-1.5 h-1.5 rounded-full ${food ? 'bg-emerald-400' : 'bg-slate-200'}"></div>
+        <div class="w-1.5 h-1.5 rounded-full ${isInfant ? (infantEvents.length ? 'bg-blue-400' : 'bg-slate-200') : (food ? 'bg-emerald-400' : 'bg-slate-200')}"></div>
         <div class="w-1.5 h-1.5 rounded-full ${sleep ? 'bg-indigo-400' : 'bg-slate-200'}"></div>
       </div>
     </div>
@@ -186,20 +206,151 @@ export async function openStudentRoutine(studentId) {
   if (!student) return;
 
   const today = new Date().toISOString().split('T')[0];
-  const { data: log } = await supabase.from('daily_logs').select('id, student_id, date, mood, food, nap, eating, sleeping, activities, notes, created_at').eq('student_id', studentId).eq('date', today).maybeSingle();
+  const { data: log } = await supabase.from('daily_logs').select('*').eq('student_id', studentId).eq('date', today).maybeSingle();
   
+  const isValid = log && _isWithin12h(log.created_at);
+  const isInfant = student.age_type === 'meses';
+  
+  const modalId = 'routineStudentModal';
+  
+  let content = '';
+  
+  if (isInfant) {
+    // Ã°Å¸ÂÂ¼ INTERFAZ ESPECIAL PARA BEBÃƒâ€°S
+    content = _renderInfantRoutineUI(student, log, modalId);
+  } else {
+    // Ã°Å¸Â§â€™ INTERFAZ ESTÃƒÂNDAR PARA NIÃƒâ€˜OS
+    content = _renderStandardRoutineUI(student, log, modalId);
+  }
+
+  Modal.open(modalId, content);
+  if (window.lucide) window.lucide.createIcons();
+}
+
+function _renderInfantRoutineUI(student, log, modalId) {
+  const infantData = log?.infant_data || [];
+  const lastMilk = [...infantData].reverse().find(e => e.type === 'milk');
+  
+  let nextFeeding = 'Pendiente';
+  if (lastMilk) {
+    const lastTime = new Date(lastMilk.created_at);
+    lastTime.setHours(lastTime.getHours() + 1); // Sugerencia: cada 1 hora segÃƒÂºn instrucciÃƒÂ³n
+    nextFeeding = lastTime.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+  }
+
+  return `
+    <div class="bg-white w-full max-w-md rounded-[2.5rem] shadow-2xl overflow-hidden animate-fadeIn flex flex-col max-h-[95vh]">
+      <div class="bg-gradient-to-r from-blue-500 to-indigo-600 p-6 text-white relative">
+        <button onclick="Modal.close('${modalId}')" class="absolute top-4 right-4 p-2 bg-white/20 rounded-full hover:bg-white/30 transition-colors">
+          <i data-lucide="x" class="w-5 h-5"></i>
+        </button>
+        <div class="flex items-center gap-4">
+          <div class="w-16 h-16 rounded-2xl bg-white border-4 border-white/20 overflow-hidden shadow-lg">
+            ${student.avatar_url ? `<img src="${student.avatar_url}" class="w-full h-full object-cover">` : `<div class="w-full h-full flex items-center justify-center text-xl font-black text-blue-500">${student.name.charAt(0)}</div>`}
+          </div>
+          <div>
+            <h3 class="text-xl font-black">${safeEscapeHTML(student.name)}</h3>
+            <p class="text-xs font-bold text-blue-100 uppercase tracking-widest">Protocolo de Lactante Ã°Å¸ÂÂ¼</p>
+          </div>
+        </div>
+      </div>
+
+      <div class="p-6 space-y-6 overflow-y-auto custom-scrollbar">
+        <!-- Dashboard RÃƒÂ¡pido BebÃƒÂ© -->
+        <div class="grid grid-cols-2 gap-4">
+          <div class="bg-blue-50 p-4 rounded-3xl border border-blue-100">
+            <p class="text-[10px] font-black text-blue-400 uppercase tracking-widest mb-1">PrÃƒÂ³xima Toma</p>
+            <p class="text-lg font-black text-blue-700">${nextFeeding}</p>
+          </div>
+          <div class="bg-indigo-50 p-4 rounded-3xl border border-indigo-100">
+            <p class="text-[10px] font-black text-indigo-400 uppercase tracking-widest mb-1">ÃƒÅ¡ltima AcciÃƒÂ³n</p>
+            <p class="text-lg font-black text-indigo-700 truncate">${lastMilk ? lastMilk.value : '--'}</p>
+          </div>
+        </div>
+
+        <!-- Panel de Control de BebÃƒÂ©s -->
+        <div class="space-y-4">
+          <label class="block text-[11px] font-black text-slate-400 uppercase tracking-widest ml-1">Acciones RÃƒÂ¡pidas</label>
+          
+          <!-- Selector de Onzas -->
+          <div class="bg-slate-50 p-4 rounded-3xl border-2 border-slate-100">
+             <p class="text-[10px] font-black text-slate-500 uppercase mb-3 flex items-center gap-2">Ã°Å¸ÂÂ¼ Registro de Leche</p>
+             <div class="grid grid-cols-4 gap-2">
+                ${['2oz', '4oz', '6oz', '8oz'].map(oz => `
+                  <button onclick="App.registerInfantEvent('${student.id}', 'milk', '${oz}')"
+                    class="py-3 rounded-xl bg-white border border-slate-200 text-sm font-black text-slate-700 hover:border-blue-400 hover:text-blue-600 transition-all active:scale-95 shadow-sm">
+                    ${oz}
+                  </button>
+                `).join('')}
+             </div>
+          </div>
+
+          <div class="grid grid-cols-2 gap-3">
+             <button onclick="App.registerInfantEvent('${student.id}', 'sleep', 'siesta')"
+                class="flex flex-col items-center gap-2 p-4 bg-indigo-50 text-indigo-700 rounded-3xl border-2 border-indigo-100 hover:bg-indigo-100 transition-all">
+                <span class="text-2xl">Ã°Å¸â€™Â¤</span>
+                <span class="text-[10px] font-black uppercase">Siesta</span>
+             </button>
+             <button onclick="App.registerInfantEvent('${student.id}', 'health', 'vomito')"
+                class="flex flex-col items-center gap-2 p-4 bg-rose-50 text-rose-700 rounded-3xl border-2 border-rose-100 hover:bg-rose-100 transition-all">
+                <span class="text-2xl">Ã°Å¸Â¤Â¢</span>
+                <span class="text-[10px] font-black uppercase">VÃƒÂ³mito</span>
+             </button>
+             <button onclick="App.registerInfantEvent('${student.id}', 'diaper', 'limpio')"
+                class="flex flex-col items-center gap-2 p-4 bg-emerald-50 text-emerald-700 rounded-3xl border-2 border-emerald-100 hover:bg-emerald-100 transition-all">
+                <span class="text-2xl">Ã°Å¸â€™Â©</span>
+                <span class="text-[10px] font-black uppercase">PaÃƒÂ±al Limpio</span>
+             </button>
+             <button onclick="App.registerInfantEvent('${student.id}', 'diaper', 'sucio')"
+                class="flex flex-col items-center gap-2 p-4 bg-amber-50 text-amber-700 rounded-3xl border-2 border-amber-100 hover:bg-amber-100 transition-all">
+                <span class="text-2xl">Ã°Å¸â€™Â©</span>
+                <span class="text-[10px] font-black uppercase">PaÃƒÂ±al Sucio</span>
+             </button>
+          </div>
+        </div>
+
+        <!-- LÃƒÂ­nea de Tiempo del DÃƒÂ­a -->
+        <div class="space-y-4 pt-2">
+          <label class="block text-[11px] font-black text-slate-400 uppercase tracking-widest ml-1">Historial de Hoy</label>
+          <div class="space-y-3 border-l-2 border-slate-100 ml-4 pl-6">
+             ${infantData.length ? infantData.reverse().map(e => `
+               <div class="relative">
+                 <div class="absolute -left-[31px] top-1 w-4 h-4 rounded-full border-4 border-white shadow-sm ${e.type === 'health' ? 'bg-rose-500' : e.type === 'milk' ? 'bg-blue-500' : 'bg-slate-300'}"></div>
+                 <p class="text-[10px] font-black text-slate-400 uppercase">${new Date(e.created_at).toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'})}</p>
+                 <p class="text-sm font-bold text-slate-700">
+                    ${e.type === 'milk' ? `TomÃƒÂ³ ${e.value} de leche Ã°Å¸ÂÂ¼` : 
+                      e.type === 'health' ? `<span class="text-rose-600">ReportÃƒÂ³ ${e.value} Ã°Å¸Â¤Â¢</span>` :
+                      e.type === 'sleep' ? `IniciÃƒÂ³ siesta Ã°Å¸â€™Â¤` :
+                      `Cambio de paÃƒÂ±al: ${e.value} Ã°Å¸â€™Â©`}
+                 </p>
+               </div>
+             `).join('') : '<p class="text-xs text-slate-400 italic">Sin registros aÃƒÂºn.</p>'}
+          </div>
+        </div>
+      </div>
+
+      <div class="p-6 pt-0 mt-auto">
+        <button onclick="Modal.close('${modalId}')" 
+          class="w-full py-4 bg-slate-900 text-white rounded-2xl font-black text-xs uppercase tracking-widest hover:bg-slate-800 transition-all flex items-center justify-center gap-2">
+          <i data-lucide="check-circle" class="w-4 h-4"></i> Finalizar Turno
+        </button>
+      </div>
+    </div>
+  `;
+}
+
+function _renderStandardRoutineUI(student, log, modalId) {
   const isValid = log && _isWithin12h(log.created_at);
   const currentMood  = isValid ? (log?.mood || '') : '';
   const currentFood  = isValid ? (log?.food || '') : '';
   const currentSleep = isValid ? (log?.nap || '') : '';
   const currentNotes = isValid ? (log?.notes || '') : '';
 
-  const moodEmojis  = { feliz: '\ud83d\ude0a', normal: '\ud83d\ude10', triste: '\ud83d\ude22', enojado: '\ud83d\ude21' };
-  const foodEmojis  = { todo: '\ud83d\ude0b', poco: '\ud83d\ude15', nada: '\ud83d\udeab' };
-  const sleepEmojis = { si: '\ud83d\ude34', no: '\ud83c\udf1e' };
+  const moodEmojis  = { feliz: 'Ã°Å¸ËœÅ ', normal: 'Ã°Å¸ËœÂ', triste: 'Ã°Å¸ËœÂ¢', enojado: 'Ã°Å¸ËœÂ¡' };
+  const foodEmojis  = { todo: 'Ã°Å¸Ëœâ€¹', poco: 'Ã°Å¸ÂÂ²', nada: 'Ã°Å¸Å¡Â«' };
+  const sleepEmojis = { si: 'Ã°Å¸â€™Â¤', no: 'Ã¢Ëœâ‚¬Ã¯Â¸Â' };
 
-  const modalId = 'routineStudentModal';
-  const content = `
+  return `
     <div class="bg-white w-full max-w-md rounded-[2.5rem] shadow-2xl overflow-hidden animate-fadeIn flex flex-col max-h-[90vh]">
       <!-- Header Colorido -->
       <div class="bg-gradient-to-r from-orange-500 to-pink-500 p-6 text-white relative">
@@ -218,13 +369,13 @@ export async function openStudentRoutine(studentId) {
       </div>
 
       <div class="p-6 space-y-6 overflow-y-auto custom-scrollbar">
-        <!-- 1. Estado de \u00c1nimo -->
+        <!-- 1. Estado de ÃƒÂnimo -->
         <div class="space-y-3">
-          <label class="block text-[11px] font-black text-slate-400 uppercase tracking-widest ml-1">\u00bfC\u00f3mo est\u00e1 de \u00e1nimo? \u2600\ufe0f</label>
+          <label class="block text-[11px] font-black text-slate-400 uppercase tracking-widest ml-1">Ã‚Â¿CÃƒÂ³mo estÃƒÂ¡ de ÃƒÂ¡nimo? Ã¢Ëœâ‚¬Ã¯Â¸Â</label>
           <div class="grid grid-cols-4 gap-2">
             ${Object.entries(moodEmojis).map(([v, e]) => `
-              <button onclick="App.updateRoutineFieldInModal('${studentId}','mood','${v}')"
-                class="routine-modal-mood-${studentId} flex flex-col items-center justify-center p-3 rounded-2xl border-2 transition-all active:scale-90
+              <button onclick="App.updateRoutineFieldInModal('${student.id}','mood','${v}')"
+                class="routine-modal-mood-${student.id} flex flex-col items-center justify-center p-3 rounded-2xl border-2 transition-all active:scale-90
                 ${currentMood === v ? 'border-orange-400 bg-orange-50 shadow-md' : 'border-slate-100 bg-slate-50'}"
                 data-val="${v}">
                 <span class="text-2xl mb-1">${e}</span>
@@ -234,13 +385,13 @@ export async function openStudentRoutine(studentId) {
           </div>
         </div>
 
-        <!-- 2. Alimentaci\u00f3n -->
+        <!-- 2. AlimentaciÃƒÂ³n -->
         <div class="space-y-3">
-          <label class="block text-[11px] font-black text-slate-400 uppercase tracking-widest ml-1">\u00bfC\u00f3mo comi\u00f3 hoy? \ud83c\udf7d\ufe0f</label>
+          <label class="block text-[11px] font-black text-slate-400 uppercase tracking-widest ml-1">Ã‚Â¿CÃƒÂ³mo comiÃƒÂ³ hoy? Ã°Å¸ÂÂ½Ã¯Â¸Â</label>
           <div class="grid grid-cols-3 gap-2">
             ${Object.entries(foodEmojis).map(([v, e]) => `
-              <button onclick="App.updateRoutineFieldInModal('${studentId}','food','${v}')"
-                class="routine-modal-food-${studentId} flex flex-col items-center justify-center p-3 rounded-2xl border-2 transition-all active:scale-90
+              <button onclick="App.updateRoutineFieldInModal('${student.id}','food','${v}')"
+                class="routine-modal-food-${student.id} flex flex-col items-center justify-center p-3 rounded-2xl border-2 transition-all active:scale-90
                 ${currentFood === v ? 'border-emerald-400 bg-emerald-50 shadow-md' : 'border-slate-100 bg-slate-50'}"
                 data-val="${v}">
                 <span class="text-2xl mb-1">${e}</span>
@@ -252,15 +403,15 @@ export async function openStudentRoutine(studentId) {
 
         <!-- 3. Siesta -->
         <div class="space-y-3">
-          <label class="block text-[11px] font-black text-slate-400 uppercase tracking-widest ml-1">\u00bfHizo su siesta? \ud83d\ude34</label>
+          <label class="block text-[11px] font-black text-slate-400 uppercase tracking-widest ml-1">Ã‚Â¿Hizo su siesta? Ã°Å¸â€™Â¤</label>
           <div class="grid grid-cols-2 gap-3">
             ${Object.entries(sleepEmojis).map(([v, e]) => `
-              <button onclick="App.updateRoutineFieldInModal('${studentId}','sleep','${v}')"
-                class="routine-modal-sleep-${studentId} flex items-center justify-center gap-3 p-4 rounded-2xl border-2 transition-all active:scale-90
+              <button onclick="App.updateRoutineFieldInModal('${student.id}','sleep','${v}')"
+                class="routine-modal-sleep-${student.id} flex items-center justify-center gap-3 p-4 rounded-2xl border-2 transition-all active:scale-90
                 ${currentSleep === v ? 'border-indigo-400 bg-indigo-50 shadow-md' : 'border-slate-100 bg-slate-50'}"
                 data-val="${v}">
                 <span class="text-2xl">${e}</span>
-                <span class="text-xs font-black uppercase text-slate-600">${v === 'si' ? 'Durmi\u00f3' : 'No durmi\u00f3'}</span>
+                <span class="text-xs font-black uppercase text-slate-600">${v === 'si' ? 'DurmiÃƒÂ³' : 'No durmiÃƒÂ³'}</span>
               </button>
             `).join('')}
           </div>
@@ -268,24 +419,45 @@ export async function openStudentRoutine(studentId) {
 
         <!-- 4. Notas -->
         <div class="space-y-3">
-          <label class="block text-[11px] font-black text-slate-400 uppercase tracking-widest ml-1">Observaciones adicionales \ud83d\udcdd</label>
-          <textarea id="modal-note-${studentId}" 
+          <label class="block text-[11px] font-black text-slate-400 uppercase tracking-widest ml-1">Observaciones adicionales Ã°Å¸â€œÂ</label>
+          <textarea id="modal-note-${student.id}" 
             class="w-full p-4 bg-slate-50 border-2 border-slate-100 rounded-2xl text-sm font-medium outline-none focus:border-orange-400 transition-all resize-none"
             rows="3" placeholder="Ej: Estuvo muy participativo hoy...">${safeEscapeHTML(currentNotes)}</textarea>
         </div>
       </div>
 
       <div class="p-6 pt-0 mt-auto">
-        <button onclick="App.saveRoutineInModal('${studentId}')" id="btnSaveModalRoutine"
+        <button onclick="App.saveRoutineInModal('${student.id}')" id="btnSaveModalRoutine"
           class="w-full py-4 bg-slate-900 text-white rounded-2xl font-black text-xs uppercase tracking-widest hover:bg-slate-800 transition-all shadow-lg shadow-slate-200 flex items-center justify-center gap-2">
           <i data-lucide="check-circle" class="w-4 h-4"></i> Guardar y Cerrar
         </button>
       </div>
     </div>
   `;
+}
 
-  Modal.open(modalId, content);
-  if (window.lucide) window.lucide.createIcons();
+/**
+ * Registra un evento de bebÃƒÂ© (leche, siesta, vomito, paÃƒÂ±al)
+ */
+export async function registerInfantEvent(sid, type, val) {
+  try {
+    const today = new Date().toISOString().split('T')[0];
+    const classroom = AppState.get('classroom');
+    
+    await MaestraApi.upsertDailyLog({
+      student_id: sid,
+      classroom_id: classroom.id,
+      date: today,
+      infant_event: { type, value: val }
+    });
+    
+    safeToast(`Registro de ${type} guardado`);
+    // Recargar modal para ver lÃƒÂ­nea de tiempo
+    openStudentRoutine(sid);
+    initRoutine(); // Recargar grid principal
+  } catch (e) {
+    safeToast('Error al registrar evento', 'error');
+  }
 }
 
 /**
@@ -392,10 +564,10 @@ export async function applyBulkRoutine() {
     await Promise.all(promises);
     safeToast(`Rutina aplicada a ${students.length} estudiantes`);
     
-    // 🚀 AUTOMATIZACIÓN: Publicar en el Muro automáticamente
-    const moodEmojis = { feliz: '😊', normal: '😐' };
-    const foodEmojis = { todo: '😋', poco: '🍲' };
-    const wallMessage = `✨ Actualización de Rutina: ¡${moodEmojis[mood] || ''} Día ${mood}! ${food === 'todo' ? '¡Todos los pequeños comieron muy bien hoy! 😋' : 'Estamos completando la jornada con éxito.'}`;
+    // Ã°Å¸Å¡â‚¬ AUTOMATIZACIÃƒâ€œN: Publicar en el Muro automÃƒÂ¡ticamente
+    const moodEmojis = { feliz: 'Ã°Å¸ËœÅ ', normal: 'Ã°Å¸ËœÂ' };
+    const foodEmojis = { todo: 'Ã°Å¸Ëœâ€¹', poco: 'Ã°Å¸ÂÂ²' };
+    const wallMessage = `Ã¢Å“Â¨ ActualizaciÃƒÂ³n de Rutina: Ã‚Â¡${moodEmojis[mood] || ''} DÃƒÂ­a ${mood}! ${food === 'todo' ? 'Ã‚Â¡Todos los pequeÃƒÂ±os comieron muy bien hoy! Ã°Å¸Ëœâ€¹' : 'Estamos completando la jornada con ÃƒÂ©xito.'}`;
     
     await supabase.from('posts').insert({
       content: wallMessage,
@@ -408,7 +580,7 @@ export async function applyBulkRoutine() {
     initRoutine();
     
     if (window.WallModule) {
-      window.WallModule.loadPosts(); // Refrescar muro si está cargado
+      window.WallModule.loadPosts(); // Refrescar muro si estÃƒÂ¡ cargado
     }
   } catch (_) {
     safeToast('Error al aplicar rutina masiva', 'error');

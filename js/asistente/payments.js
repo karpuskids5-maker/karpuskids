@@ -53,7 +53,18 @@ export const PaymentsModule = {
     document.getElementById('filterPaymentMonth')?.addEventListener('change', () => { this.loadPayments(); this.loadIncomeChart(); });
     document.getElementById('filterPaymentYear')?.addEventListener('change',  () => { this.loadPayments(); this.loadIncomeChart(); });
     document.getElementById('filterPaymentStatus')?.addEventListener('change', () => this.loadPayments());
-    document.getElementById('searchPaymentStudent')?.addEventListener('input', () => this.loadPayments());
+    // Búsqueda local en memoria — filtra los datos ya cargados sin ir al servidor
+    document.getElementById('searchPaymentStudent')?.addEventListener('input', (e) => {
+      const q = e.target.value.toLowerCase().trim();
+      const cached = AppState.get('paymentsData');
+      if (cached && q) {
+        // Filtrar localmente si hay datos en memoria
+        const filtered = cached.filter(p => p.students?.name?.toLowerCase().includes(q));
+        this._renderPaymentRows(filtered);
+      } else {
+        this.loadPayments();
+      }
+    });
     document.getElementById('btnNewPayment')?.addEventListener('click',        () => this.openPaymentModal());
     document.getElementById('btnGeneratePayments')?.addEventListener('click',  () => this.runCycle());
     document.getElementById('btnRefreshPayments')?.addEventListener('click',   () => this.loadPayments());
@@ -146,37 +157,31 @@ export const PaymentsModule = {
       const statusFilter = document.getElementById('filterPaymentStatus')?.value;
       const search      = document.getElementById('searchPaymentStudent')?.value?.trim();
 
-      // Use YYYY-MM format to match the database standard
-      const monthKey = yearVal && monthVal
-        ? `${yearVal}-${String(monthVal).padStart(2, '0')}`
-        : `${new Date().getFullYear()}-${String(new Date().getMonth() + 1).padStart(2, '0')}`;
+      const now = new Date();
+      const currentMonthKey = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
+      const selectedMonthKey = yearVal && monthVal ? `${yearVal}-${String(monthVal).padStart(2, '0')}` : currentMonthKey;
 
       let query = supabase
         .from('payments')
-        .select('id, student_id, amount, concept, status, due_date, created_at, paid_date, method, bank, reference, month_paid, evidence_url, students:student_id(name, classroom_id, classrooms:classroom_id(name))')
-        .eq('month_paid', monthKey)
-        .order('due_date', { ascending: true });
+        .select('id, student_id, amount, concept, status, due_date, created_at, paid_date, method, bank, reference, month_paid, evidence_url, students:student_id(name, classroom_id, classrooms:classroom_id(name))');
 
-      if (statusFilter && statusFilter !== 'all') {
-        query = query.eq('status', statusFilter);
+      // "Todos" sin filtro de mes: mostrar todos los pagos de todos los meses
+      if (statusFilter === 'all' && !monthVal) {
+        query = query.order('month_paid', { ascending: false }).order('due_date', { ascending: true }).limit(300);
+      } else if (statusFilter === 'pending' || statusFilter === 'overdue') {
+        // Pendientes/Vencidos: traer TODOS sin filtro de mes para mostrar atrasos
+        query = query.in('status', ['pending', 'overdue']).order('month_paid', { ascending: true });
+      } else {
+        query = query.eq('month_paid', selectedMonthKey).order('due_date', { ascending: true });
+        if (statusFilter && statusFilter !== 'all') {
+          query = query.eq('status', statusFilter);
+        }
       }
 
       const { data: payments, error } = await query;
       if (error) throw error;
 
-      // Fallback: if no results with YYYY-MM, try created_at range
       let list = payments || [];
-      if (!list.length && yearVal && monthVal) {
-        const rangeStart = `${yearVal}-${String(monthVal).padStart(2,'0')}-01`;
-        const rangeEnd   = `${yearVal}-${String(monthVal).padStart(2,'0')}-31`;
-        const { data: fallback } = await supabase
-          .from('payments')
-          .select('id, student_id, amount, concept, status, due_date, created_at, paid_date, method, bank, reference, month_paid, evidence_url, students:student_id(name, classroom_id, classrooms:classroom_id(name))')
-          .gte('created_at', rangeStart)
-          .lte('created_at', rangeEnd + 'T23:59:59')
-          .order('due_date', { ascending: true });
-        if (fallback?.length) list = fallback;
-      }
       if (search) {
         const q = search.toLowerCase();
         list = list.filter(p => p.students?.name?.toLowerCase().includes(q));
@@ -193,18 +198,30 @@ export const PaymentsModule = {
               '<div class="w-14 h-14 bg-slate-100 rounded-full flex items-center justify-center">' +
                 '<i data-lucide="inbox" class="w-7 h-7 text-slate-400"></i>' +
               '</div>' +
-              '<p class="font-bold text-slate-500">Sin registros para ' + label + ' ' + (yearVal || '') + '</p>' +
-              '<p class="text-xs text-slate-400 max-w-xs text-center">Usa "Generar pagos" para crear las cuotas del mes.</p>' +
+              '<p class="font-bold text-slate-500">Sin registros encontrados</p>' +
             '</div>' +
           '</td></tr>';
         if (window.lucide) lucide.createIcons();
         return;
       }
 
-      const priority = { overdue: 1, pending: 2, review: 3, paid: 4 };
-      list.sort((a, b) => (priority[calcStatus(a)] || 99) - (priority[calcStatus(b)] || 99));
+      // SEPARACI\u00d3N VISUAL: Vencidos de meses anteriores vs Mes Actual
+      let html = '';
+      const overduePrevious = list.filter(p => p.month_paid < selectedMonthKey && (p.status === 'overdue' || p.status === 'pending'));
+      const currentMonthItems = list.filter(p => p.month_paid === selectedMonthKey || p.month_paid > selectedMonthKey || p.status === 'paid');
 
-      container.innerHTML = list.map(p => this._renderRow(p)).join('');
+      if (overduePrevious.length > 0) {
+        html += '<tr class="bg-rose-50/50"><td colspan="8" class="px-8 py-2 text-[10px] font-black text-rose-600 uppercase tracking-[0.2em] border-y border-rose-100">\u26a0\ufe0f PAGOS VENCIDOS (MESES ANTERIORES)</td></tr>';
+        html += overduePrevious.map(p => this._renderRow(p)).join('');
+        
+        if (currentMonthItems.length > 0) {
+          html += '<tr class="bg-slate-50/50"><td colspan="8" class="px-8 py-2 text-[10px] font-black text-slate-500 uppercase tracking-[0.2em] border-y border-slate-100">\uD83D\uDCC5 MES SELECCIONADO / ACTUAL</td></tr>';
+        }
+      }
+
+      html += currentMonthItems.map(p => this._renderRow(p)).join('');
+      container.innerHTML = html;
+
       if (window.lucide) lucide.createIcons();
 
     } catch (e) {
@@ -226,13 +243,13 @@ export const PaymentsModule = {
     const student = p.students || { name: 'Desconocido', classrooms: { name: '-' } };
     const isPending  = statusKey !== 'paid';
     const dueDateStr = p.due_date ? new Date(p.due_date + 'T00:00:00').toLocaleDateString('es-ES') : '-';
-    const amountFmt  = 'RD$' + Number(p.amount || 0).toLocaleString('es-DO', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+    const amountFmt  = Number(p.amount || 0).toLocaleString('es-DO', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
     // Mora acumulada
     const mora        = (isPending && p.due_date) ? calcMora(p.due_date) : 0;
     const moraBreakdown = (mora > 0 && p.due_date) ? Helpers.getMoraBreakdown(p.due_date) : null;
     const totalAmount = Number(p.amount || 0) + mora;
-    const totalFmt    = 'RD$' + totalAmount.toLocaleString('es-DO', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+    const totalFmt    = totalAmount.toLocaleString('es-DO', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
     let moraBlock = '';
     if (mora > 0 && moraBreakdown) {
@@ -310,6 +327,19 @@ export const PaymentsModule = {
         '</td>' +
       '</tr>'
     );
+  },
+
+  /** Renderiza filas de pagos en la tabla sin recargar desde el servidor */
+  _renderPaymentRows(list) {
+    const container = document.getElementById('paymentsTableBody');
+    if (!container) return;
+    if (!list.length) {
+      container.innerHTML = '<tr><td colspan="8" class="text-center py-8 text-slate-400 text-sm">Sin resultados.</td></tr>';
+      if (window.lucide) lucide.createIcons();
+      return;
+    }
+    container.innerHTML = list.map(p => this._renderRow(p)).join('');
+    if (window.lucide) lucide.createIcons();
   },
 
   async loadStats() {
@@ -418,25 +448,29 @@ export const PaymentsModule = {
     const ic = 'w-full px-4 py-2.5 border-2 border-slate-100 rounded-2xl outline-none focus:ring-4 focus:ring-teal-100 focus:border-teal-400 bg-slate-50/50 transition-all text-sm font-medium';
     const lc = 'block text-[11px] font-black text-slate-400 uppercase tracking-wider mb-1.5 ml-1';
     const now = new Date();
-    const dueMonth = now.getMonth() + 1;
-    const dueYear  = dueMonth > 11 ? now.getFullYear() + 1 : now.getFullYear();
-    const defaultDue = new Date(dueYear, dueMonth > 11 ? 0 : dueMonth, this.settings.due_day).toISOString().split('T')[0];
-    const monthOptions = MONTH_NAMES_ES.map((m, i) =>
-      '<option value="' + m + '"' + (i === now.getMonth() ? ' selected' : '') + '>' + MONTH_LABELS[i] + '</option>'
-    ).join('');
+    const curMonth = now.getMonth();
+    const curYear  = now.getFullYear();
+    const nextM = curMonth + 1 > 11 ? 0 : curMonth + 1;
+    const nextY = curMonth + 1 > 11 ? curYear + 1 : curYear;
+    const defaultDue = `${nextY}-${String(nextM + 1).padStart(2,'0')}-${String(this.settings.due_day || 5).padStart(2,'0')}`;
+    const monthOptions = MONTH_LABELS.map((label, i) => {
+      const val = `${curYear}-${String(i + 1).padStart(2, '0')}`;
+      return '<option value="' + val + '"' + (i === curMonth ? ' selected' : '') + '>' + label + '</option>';
+    }).join('');
 
     openGlobalModal(
-      '<div class="bg-gradient-to-r from-teal-600 to-emerald-600 text-white p-6 rounded-t-3xl flex items-center justify-between">' +
+      '<div class="bg-gradient-to-r from-emerald-600 to-teal-600 text-white p-6 rounded-t-3xl flex items-center justify-between">' +
         '<div class="flex items-center gap-3">' +
           '<div class="w-12 h-12 bg-white/20 rounded-2xl flex items-center justify-center text-2xl">💰</div>' +
           '<div><h3 class="text-xl font-black">Registrar Pago</h3><p class="text-xs text-white/70 font-bold uppercase tracking-widest">Cobro Manual</p></div>' +
         '</div>' +
-        '<button onclick="App.payments.closeModal()" class="w-10 h-10 flex items-center justify-center rounded-xl bg-white/10 hover:bg-white/20"><i data-lucide="x" class="w-6 h-6"></i></button>' +
       '</div>' +
       '<div class="p-6 bg-slate-50/30" id="modalPaymentBody">' +
         '<div class="grid grid-cols-1 md:grid-cols-2 gap-4">' +
-          '<div class="md:col-span-2"><label class="' + lc + '">Estudiante</label>' +
-            '<select id="payStudentSelect" class="' + ic + '"><option value="">-- Seleccionar --</option></select></div>' +
+          '<div class="md:col-span-2"><label class="' + lc + '">Estudiante (Pendientes/Vencidos)</label>' +
+            '<select id="payStudentSelect" class="' + ic + '"><option value="">-- Cargando... --</option></select>' +
+            '<div id="payStudentInfo" class="mt-2 hidden p-3 bg-amber-50 border border-amber-200 rounded-2xl text-xs font-bold text-amber-700"></div>' +
+          '</div>' +
           '<div><label class="' + lc + '">Monto ($)</label>' +
             '<input id="payAmount" type="number" step="0.01" min="0" class="' + ic + '" placeholder="0.00"></div>' +
           '<div><label class="' + lc + '">Concepto</label>' +
@@ -460,21 +494,88 @@ export const PaymentsModule = {
       '</div>' +
       '<div class="bg-white p-5 rounded-b-3xl border-t border-slate-100 flex justify-end gap-3">' +
         '<button onclick="App.payments.closeModal()" class="px-6 py-2.5 text-slate-500 font-black text-xs uppercase hover:bg-slate-50 rounded-2xl">Cancelar</button>' +
-        '<button id="btnSavePaymentAction" class="px-8 py-2.5 bg-gradient-to-r from-teal-600 to-emerald-600 text-white rounded-2xl font-black text-xs uppercase shadow-lg">Registrar Pago</button>' +
+        '<button id="btnSavePaymentAction" class="px-8 py-2.5 bg-gradient-to-r from-emerald-600 to-teal-600 text-white rounded-2xl font-black text-xs uppercase shadow-lg shadow-emerald-100 transition-all active:scale-95">Registrar Pago</button>' +
       '</div>'
     );
 
     try {
-      const { data: students } = await supabase.from('students').select('id, name, classrooms:classroom_id(name)').order('name');
+      // Cargar solo estudiantes con pagos pendientes o vencidos
+      const { data: pendingPayments } = await supabase
+        .from('payments')
+        .select('student_id, amount, due_date, month_paid, status, students:student_id(id, name, monthly_fee, classrooms:classroom_id(name))')
+        .in('status', ['pending', 'overdue'])
+        .order('due_date', { ascending: true });
+
       const sel = document.getElementById('payStudentSelect');
-      if (sel && students) {
-        students.forEach(s => {
-          const o = document.createElement('option');
-          o.value = s.id;
-          o.textContent = s.name + ' (' + (s.classrooms?.name || 'Sin aula') + ')';
-          if (prefillStudentId && String(s.id) === String(prefillStudentId)) o.selected = true;
-          sel.appendChild(o);
+      if (sel) {
+        if (!pendingPayments?.length) {
+          sel.innerHTML = '<option value="">-- No hay pagos pendientes --</option>';
+        } else {
+          // Deduplicar por estudiante (tomar el más urgente)
+          const studentMap = new Map();
+          for (const p of pendingPayments) {
+            if (!studentMap.has(p.student_id) || p.status === 'overdue') {
+              studentMap.set(p.student_id, p);
+            }
+          }
+          sel.innerHTML = '<option value="">-- Seleccionar Estudiante --</option>' +
+            Array.from(studentMap.values()).map(p => {
+              const s = p.students;
+              const isOverdue = p.status === 'overdue';
+              const label = `${s?.name || 'Estudiante'} (${s?.classrooms?.name || 'Sin aula'}) ${isOverdue ? '⚠️ Vencido' : '⏳ Pendiente'}`;
+              const selected = prefillStudentId && String(p.student_id) === String(prefillStudentId) ? ' selected' : '';
+              return `<option value="${p.student_id}" data-fee="${s?.monthly_fee || 0}" data-due="${p.due_date || ''}" data-month="${p.month_paid || ''}" data-status="${p.status}"${selected}>${Helpers.escapeHTML(label)}</option>`;
+            }).join('');
+        }
+
+        // Auto-fill monto + mora al seleccionar
+        sel.addEventListener('change', (e) => {
+          const opt = e.target.selectedOptions[0];
+          if (!opt?.value) { document.getElementById('payStudentInfo')?.classList.add('hidden'); return; }
+          const fee = parseFloat(opt.dataset.fee || 0);
+          const dueDate = opt.dataset.due;
+          const monthPaid = opt.dataset.month;
+          const status = opt.dataset.status;
+          const amtInput = document.getElementById('payAmount');
+          const infoDiv = document.getElementById('payStudentInfo');
+
+          // Calcular mora si aplica
+          let mora = 0;
+          if (dueDate && status === 'overdue') {
+            const today = new Date(); today.setHours(0,0,0,0);
+            const due = new Date(dueDate + 'T00:00:00');
+            const daysLate = Math.max(0, Math.floor((today - due) / 86400000));
+            if (daysLate > 0) mora = fee * 0.05 * Math.ceil(daysLate / 30);
+          }
+
+          const total = fee + mora;
+          if (amtInput) {
+            amtInput.value = total > 0 ? total.toFixed(2) : '';
+            amtInput.classList.add('ring-2', 'ring-teal-100');
+            setTimeout(() => amtInput.classList.remove('ring-2', 'ring-teal-100'), 1000);
+          }
+
+          if (infoDiv) {
+            if (mora > 0) {
+              infoDiv.classList.remove('hidden');
+              infoDiv.innerHTML = `Mensualidad: RD$${fee.toFixed(2)} + Mora: RD$${mora.toFixed(2)} = <strong>Total: RD$${total.toFixed(2)}</strong>`;
+            } else {
+              infoDiv.classList.add('hidden');
+            }
+          }
+
+          // Sincronizar mes y fecha
+          if (monthPaid) {
+            const opt2 = document.getElementById('payMonthPaid')?.querySelector(`option[value="${monthPaid}"]`);
+            if (opt2) document.getElementById('payMonthPaid').value = monthPaid;
+          }
+          if (dueDate) {
+            const dueDateInput = document.getElementById('payDueDate');
+            if (dueDateInput) dueDateInput.value = dueDate;
+          }
         });
+
+        if (prefillStudentId) sel.dispatchEvent(new Event('change'));
       }
     } catch (_) { /* silencioso */ }
 
@@ -483,11 +584,8 @@ export const PaymentsModule = {
   },
 
   closeModal() {
-    const modal = document.getElementById('globalModal');
-    if (modal) {
-      modal.classList.add('hidden');
-      modal.style.display = 'none';
-    }
+    const c = document.getElementById('globalModalContainer');
+    if (c) { c.style.display = 'none'; c.innerHTML = ''; }
   },
 
   async saveManualPayment() {
@@ -508,20 +606,99 @@ export const PaymentsModule = {
     if (btn) { btn.disabled = true; btn.textContent = 'Guardando...'; }
 
     try {
-      const { error } = await supabase.from('payments').insert({
-        student_id: studentId, amount, concept, method, status,
+      // Verificar si ya existe un pago para este estudiante y mes (evitar duplicate key)
+      // Buscar por formato YYYY-MM Y por nombre de mes (registros legacy)
+      const mesNombre = ['enero','febrero','marzo','abril','mayo','junio','julio','agosto','septiembre','octubre','noviembre','diciembre'][parseInt(monthPaid.split('-')[1], 10) - 1];
+      
+      const { data: existingList } = await supabase
+        .from('payments')
+        .select('id, status, month_paid')
+        .eq('student_id', studentId)
+        .or(`month_paid.eq.${monthPaid},month_paid.eq.${mesNombre}`)
+        .limit(5);
+
+      const existing = existingList?.[0] || null;
+
+      if (existing) {
+        // Si ya existe y está pagado, no permitir duplicado
+        if (existing.status === 'paid') {
+          Helpers.toast('Este estudiante ya tiene un pago registrado para este mes', 'warning');
+          if (btn) { btn.disabled = false; btn.textContent = 'Registrar Pago'; }
+          return;
+        }
+        // Si existe pero no está pagado, actualizar en lugar de insertar (normalizar month_paid)
+        const { data, error } = await supabase.from('payments').update({
+          amount,
+          concept,
+          method,
+          status,
+          month_paid: monthPaid, // normalizar a YYYY-MM
+          due_date: dueDate || null,
+          paid_date: paidDate,
+          recorded_by: user?.id || null,
+          updated_at: new Date().toISOString()
+        }).eq('id', existing.id).select().single();
+
+        if (error) throw new Error(error.message || 'Error al actualizar pago');
+
+        if (status === 'paid') {
+          try { await supabase.from('students').update({ is_active: true, status: 'activo' }).eq('id', studentId); } catch (_) {}
+        }
+
+        Helpers.toast('Pago actualizado correctamente', 'success');
+        const gc = document.getElementById('globalModalContainer');
+        if (gc) { gc.style.display = 'none'; gc.innerHTML = ''; }
+        await Promise.all([this.loadPayments(), this.loadIncomeChart(), this.loadStats()]);
+        import('./modules/dashboard.js').then(m => { if (m.DashboardModule) m.DashboardModule.init(); }).catch(() => {});
+        return;
+      }
+
+      const { data, error } = await supabase.from('payments').insert({
+        student_id: studentId, 
+        amount, 
+        concept, 
+        method, 
+        status,
         month_paid: monthPaid,
         due_date:   dueDate || null,
         paid_date:  paidDate,
         recorded_by: user?.id || null,
         created_at: new Date().toISOString()
-      });
-      if (error) throw error;
+      }).select().single();
+
+      if (error) {
+        console.error('[Asistente] Save payment error:', error);
+        throw new Error(error.message || 'Error en la base de datos');
+      }
+
+      // Si el pago es en efectivo y está pagado, actualizar estado del estudiante a activo
+      if (status === 'paid' && method === 'efectivo') {
+        try {
+          await supabase.from('students')
+            .update({ is_active: true, status: 'activo' })
+            .eq('id', studentId);
+        } catch (_) { /* no bloquear si falla */ }
+      }
+
       Helpers.toast('Pago registrado correctamente', 'success');
-      closeGlobalModal();
-      await this.loadPayments();
+      // Cerrar modal usando la función correcta
+      const gc = document.getElementById('globalModalContainer');
+      if (gc) { gc.style.display = 'none'; gc.innerHTML = ''; }
+
+      // Actualizar tabla, gráfica y stats sin recargar la página
+      await Promise.all([
+        this.loadPayments(),
+        this.loadIncomeChart(),
+        this.loadStats()
+      ]);
+      
+      // Actualizar dashboard en background
+      import('./modules/dashboard.js').then(m => {
+        if (m.DashboardModule) m.DashboardModule.init();
+      }).catch(()=>{});
     } catch (e) {
-      Helpers.toast('Error al guardar: ' + e.message, 'error');
+      console.error('[Asistente] Catch error:', e);
+      Helpers.toast('Error al guardar: ' + (e.message || 'Error desconocido'), 'error');
     } finally {
       if (btn) { btn.disabled = false; btn.textContent = 'Registrar Pago'; }
     }
@@ -627,16 +804,31 @@ export const PaymentsModule = {
   async _confirmApproval(id) {
     try {
       const btn = event?.target?.closest('button');
-      if (btn) { btn.disabled = true; btn.innerHTML = '<i class="animate-spin" data-lucide="loader-2"></i> Procesando...'; if(window.lucide) lucide.createIcons(); }
+      if (btn) { btn.disabled = true; btn.textContent = 'Procesando...'; }
 
-      // RPC seguro — registra auditoría inmutable en el servidor
-      const { data, error } = await supabase.rpc('approve_payment', { p_payment_id: id });
+      // Aprobar directamente — funciona para efectivo y transferencia
+      const { error } = await supabase.from('payments')
+        .update({ status: 'paid', paid_date: new Date().toISOString() })
+        .eq('id', id);
       if (error) throw error;
-      
-      Helpers.toast('¡Pago aprobado y recibo enviado!', 'success');
+
+      // Activar estudiante al aprobar
+      const { data: pay } = await supabase.from('payments')
+        .select('student_id, amount, month_paid, students:student_id(name, p1_email, p2_email)')
+        .eq('id', id).single();
+      if (pay?.student_id) {
+        await supabase.from('students')
+          .update({ is_active: true, status: 'activo' })
+          .eq('id', pay.student_id);
+      }
+
+      Helpers.toast('Pago aprobado correctamente', 'success');
       this.closeModal();
       await this.loadPayments();
-      this._sendReceipt(id).catch(() => {});
+      this.loadStats();
+
+      // Enviar recibo en background
+      if (pay) this._sendReceipt(id).catch(() => {});
     } catch (e) {
       Helpers.toast('Error al aprobar: ' + e.message, 'error');
     }

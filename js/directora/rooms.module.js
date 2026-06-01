@@ -208,8 +208,8 @@ export const RoomsModule = {
 
   async deleteRoom(roomId, roomName) {
     const ok = window._karpusConfirmDelete
-      ? await window._karpusConfirmDelete('¿Eliminar aula "' + roomName + '"?', 'Los estudiantes quedarán sin aula asignada.')
-      : confirm('¿Eliminar aula "' + roomName + '"? Los estudiantes quedarán sin aula.');
+      ? await window._karpusConfirmDelete('ï¿½Eliminar aula "' + roomName + '"?', 'Los estudiantes quedarï¿½n sin aula asignada.')
+      : confirm('ï¿½Eliminar aula "' + roomName + '"? Los estudiantes quedarï¿½n sin aula.');
     if (!ok) return;
 
     try {
@@ -231,13 +231,12 @@ export const RoomsModule = {
     const html = `
       <div class="modal-header bg-gradient-to-r from-purple-600 to-indigo-600 text-white p-6 rounded-t-3xl flex items-center justify-between">
         <div class="flex items-center gap-3">
-          <div class="w-12 h-12 bg-white/20 rounded-2xl flex items-center justify-center text-2xl">??</div>
+          <div class="w-12 h-12 bg-white/20 rounded-2xl flex items-center justify-center text-2xl"><i data-lucide="home" class="w-6 h-6 text-white"></i></div>
           <div>
             <h3 class="text-xl font-black">${roomId ? 'Editar Aula' : 'Nueva Aula'}</h3>
-            <p class="text-xs text-white/70 font-bold uppercase tracking-widest">Configuración del aula</p>
+            <p class="text-xs text-white/70 font-bold uppercase tracking-widest">ConfiguraciÃ³n del aula</p>
           </div>
         </div>
-        <button onclick="App.ui.closeModal()" class="w-10 h-10 flex items-center justify-center rounded-xl bg-white/10 hover:bg-white/20 transition-colors text-lg">?</button>
       </div>
 
       <div class="modal-body p-6 bg-slate-50/30 space-y-5">
@@ -286,7 +285,7 @@ export const RoomsModule = {
       }
     } catch (e) {  }
 
-    // Pre-llenar si es edición
+    // Pre-llenar si es ediciï¿½n
     if (roomId) {
       try {
         const { data: room } = await supabase.from('classrooms').select('id, name, level, capacity, teacher_id, is_live').eq('id', parseInt(roomId)).single();
@@ -332,7 +331,7 @@ export const RoomsModule = {
         const inOtherRoom = s.classroom_id && !inThisRoom;
         return `
           <label class="flex items-center gap-3 px-4 py-3 cursor-pointer hover:bg-purple-50 transition-colors ${inOtherRoom ? 'opacity-50' : ''}">
-            <input type="checkbox" value="${s.id}" ${inThisRoom ? 'checked' : ''} ${inOtherRoom ? 'disabled title="Ya está en otra aula"' : ''}
+            <input type="checkbox" value="${s.id}" ${inThisRoom ? 'checked' : ''} ${inOtherRoom ? 'disabled title="Ya estï¿½ en otra aula"' : ''}
               class="room-student-check w-4 h-4 rounded accent-purple-600 shrink-0">
             <div class="w-7 h-7 rounded-lg bg-purple-100 text-purple-600 flex items-center justify-center font-black text-xs shrink-0">
               ${(s.name || '?').charAt(0).toUpperCase()}

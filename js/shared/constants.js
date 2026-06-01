@@ -20,7 +20,8 @@ export const TABLES = Object.freeze({
   PAYMENTS: 'payments',
   CLASSROOMS: 'classrooms',
   NOTIFICATIONS: 'notifications',
-  INQUIRIES: 'inquiries' // ✅ AGREGADO
+  INQUIRIES: 'inquiries',
+  STAFF_PERMITS: 'staff_permits'
 });
 
 // ============================

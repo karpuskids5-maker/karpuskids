@@ -4,7 +4,13 @@ export const Modal = {
     const modal = document.createElement('div');
     modal.id = id;
     modal.className = 'fixed inset-0 z-[60] flex items-center justify-center bg-slate-900/60 backdrop-blur-sm p-4 animate-fade-in';
-    modal.innerHTML = content;
+    modal.innerHTML = `<div id="${id}-inner" class="relative w-full max-w-2xl max-h-[92vh] overflow-y-auto">${content}</div>`;
+    
+    // Cerrar al hacer clic afuera
+    modal.onclick = (e) => {
+      if (e.target === modal) this.close(id);
+    };
+
     document.body.appendChild(modal);
     requestAnimationFrame(() => window.lucide?.createIcons());
   },

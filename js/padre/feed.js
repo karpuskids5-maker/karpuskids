@@ -146,7 +146,7 @@ export const FeedModule = {
       <div class="bg-white p-5 rounded-[2.5rem] border-2 border-slate-50 mb-6 shadow-sm hover:shadow-md transition-all animate-fade-in">
         <div class="flex items-center justify-between mb-4">
           <div class="flex items-center gap-3">
-            <div class="w-11 h-11 rounded-full bg-orange-100 flex items-center justify-center font-bold text-orange-600 overflow-hidden border border-orange-50">
+            <div class="w-12 h-12 rounded-full bg-orange-100 flex items-center justify-center font-bold text-orange-600 overflow-hidden border-2 border-orange-50 shrink-0 aspect-square shadow-sm">
               ${teacherAvatar
                 ? `<img src="${teacherAvatar}" alt="${escapeHtml(teacherName)}" class="w-full h-full object-cover" onerror="this.style.display='none';this.nextElementSibling.style.display='flex'">`
                 : ''}

@@ -6,7 +6,7 @@
   <meta name="robots" content="noindex, nofollow">
   <meta http-equiv="X-Content-Type-Options" content="nosniff">
   <meta http-equiv="Referrer-Policy" content="strict-origin-when-cross-origin">
-  <meta http-equiv="Content-Security-Policy" content="default-src 'self' https://*.supabase.co wss://*.supabase.co; script-src 'self' 'unsafe-inline' https://cdn.onesignal.com https://unpkg.com https://cdn.jsdelivr.net; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com https://cdn.jsdelivr.net; img-src 'self' data: blob: https:; connect-src 'self' https://*.supabase.co wss://*.supabase.co https://cdn.onesignal.com https://cdn.jsdelivr.net; frame-src 'none'; worker-src 'self' blob:; object-src 'none';">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self' https://*.supabase.co wss://*.supabase.co; script-src 'self' 'unsafe-inline' https://cdn.onesignal.com https://api.onesignal.com https://unpkg.com https://cdn.jsdelivr.net; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com https://cdn.jsdelivr.net; img-src 'self' data: blob: https:; connect-src 'self' https://*.supabase.co wss://*.supabase.co https://cdn.onesignal.com https://api.onesignal.com https://cdn.jsdelivr.net; frame-src 'none'; worker-src 'self' blob:; object-src 'none';">
   <style>html{display:none;}</style>
   <!-- X-Frame-Options debe ser configurado por el servidor, no por meta tag -->
   <script>if(self===top){document.documentElement.style.display='block';}else{top.location=self.location;}</script>
@@ -147,6 +147,11 @@
         </button>
 
         <div class="kk-nav-section label">Operaciones</div>
+        <button data-section="staff-permits" class="nav-btn kk-nav-item relative" data-tooltip="Permisos y Faltas">
+          <i data-lucide="calendar-check" class="text-emerald-300"></i>
+          <span class="label">Permisos y Faltas</span>
+          <span id="badge-permits" class="hidden kk-badge">0</span>
+        </button>
         <button data-section="accesos" class="nav-btn kk-nav-item" data-tooltip="Accesos QR">
           <i data-lucide="scan-line" class="text-lime-300"></i>
           <span class="label">Accesos QR</span>
@@ -614,6 +619,65 @@
           </div>
         </div>
       </div>
+
+      </section>
+
+      <!-- PERMISOS Y FALTAS -->
+      <section id="staff-permits" class="section">
+        <div class="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-6">
+          <div>
+            <h1 class="text-2xl font-black text-slate-800 tracking-tight flex items-center gap-3">
+              <span class="p-2 bg-emerald-100 text-emerald-600 rounded-2xl"><i data-lucide="calendar-check" class="w-5 h-5"></i></span>
+              Gestión de Permisos y Faltas
+            </h1>
+            <p class="text-slate-500 text-sm font-medium mt-0.5">Historial y aprobación de ausencias del personal</p>
+          </div>
+        </div>
+
+        <div class="grid grid-cols-1 lg:grid-cols-4 gap-6 mb-8">
+          <div class="bg-white p-6 rounded-3xl border border-slate-100 shadow-sm col-span-1 lg:col-span-3">
+            <div class="flex items-center justify-between mb-6">
+              <h3 class="text-xs font-black text-slate-400 uppercase tracking-widest">Solicitudes Recientes</h3>
+              <div class="flex gap-2">
+                <select id="permitFilterStatus" class="px-3 py-1.5 bg-slate-50 border-none rounded-lg text-[10px] font-black uppercase text-slate-500 outline-none">
+                  <option value="all">Todos</option>
+                  <option value="pending" selected>Pendientes</option>
+                  <option value="approved">Aprobados</option>
+                  <option value="rejected">Rechazados</option>
+                </select>
+              </div>
+            </div>
+            
+            <div class="table-scroll-wrap">
+              <table class="w-full text-left">
+                <thead>
+                  <tr class="bg-slate-50 border-b border-slate-100 text-slate-400">
+                    <th class="px-6 py-4 text-[10px] font-black uppercase tracking-widest">Maestra</th>
+                    <th class="px-6 py-4 text-[10px] font-black uppercase tracking-widest">Tipo</th>
+                    <th class="px-6 py-4 text-[10px] font-black uppercase tracking-widest">Fecha</th>
+                    <th class="px-6 py-4 text-[10px] font-black uppercase tracking-widest">Estado</th>
+                    <th class="px-6 py-4 text-[10px] font-black uppercase tracking-widest text-right">Acciones</th>
+                  </tr>
+                </thead>
+                <tbody id="permits-table-body" class="divide-y divide-slate-50">
+                  <!-- JS -->
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+          <div class="space-y-4">
+            <div class="bg-emerald-600 p-6 rounded-3xl text-white shadow-lg shadow-emerald-100">
+              <p class="text-[10px] font-black uppercase opacity-70 mb-1">Permisos Hoy</p>
+              <p class="text-4xl font-black" id="statPermitsToday">0</p>
+            </div>
+            <div class="bg-amber-500 p-6 rounded-3xl text-white shadow-lg shadow-amber-100">
+              <p class="text-[10px] font-black uppercase opacity-70 mb-1">Pendientes</p>
+              <p class="text-4xl font-black" id="statPermitsPending">0</p>
+            </div>
+          </div>
+        </div>
+      </section>
 
       <!-- PAGOS -->
       <section id="pagos" class="section">

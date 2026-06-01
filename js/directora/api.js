@@ -1,4 +1,4 @@
-import { supabase } from '../shared/supabase.js';
+﻿import { supabase } from '../shared/supabase.js';
 import { QueryCache } from '../shared/query-cache.js';
 import { safeHandle } from '../shared/db-utils.js';
 
@@ -14,7 +14,7 @@ const TABLES = {
   REPORT_CARDS: 'report_cards'
 };
 
-// Local timeout helper — accepts a promise OR a function returning a promise
+// Local timeout helper â€” accepts a promise OR a function returning a promise
 const withTimeout = (promiseOrFn, ms = 10000) => {
   const p = typeof promiseOrFn === 'function' ? promiseOrFn() : promiseOrFn;
   const timeout = new Promise((_, reject) => setTimeout(() => reject(new Error('Timeout')), ms));
@@ -54,10 +54,10 @@ export const DirectorApi = {
   },
 
   getDescriptor(score) {
-    if (score >= 4.5) return '🌟 Excelente';
-    if (score >= 3.5) return '👍 Bueno';
-    if (score >= 2.5) return '⚠️ En proceso';
-    return '❗ Requiere apoyo';
+    if (score >= 4.5) return 'ðŸŒŸ Excelente';
+    if (score >= 3.5) return 'ðŸ‘ Bueno';
+    if (score >= 2.5) return 'âš ï¸ En proceso';
+    return 'â— Requiere apoyo';
   },
 
   // --- TASKS & GRADES ---
@@ -123,8 +123,9 @@ export const DirectorApi = {
         };
       }
 
-      // Fallback manual si el RPC falla o no está disponible
-      const today = new Date().toISOString().split('T')[0];
+      // Fallback manual si el RPC falla o no estÃ¡ disponible
+      const d = new Date();
+      const today = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
       const results = await Promise.allSettled([
         supabase.from('students').select('id', { count: 'exact', head: true }),
         supabase.from('profiles').select('id', { count: 'exact', head: true }).in('role', ['maestra', 'asistente']),
@@ -202,7 +203,7 @@ export const DirectorApi = {
       const month = filterMonth ? String(filterMonth).padStart(2, '0') : String(now.getMonth() + 1).padStart(2, '0');
       const monthKey   = `${year}-${month}`;
       const rangeStart = `${year}-${month}-01`;
-      // Calculate real last day of month — avoids invalid dates like 04-31
+      // Calculate real last day of month â€” avoids invalid dates like 04-31
       const lastDay    = new Date(parseInt(year), parseInt(month), 0).getDate();
       const rangeEnd   = `${year}-${month}-${String(lastDay).padStart(2, '0')}`;
 
@@ -270,7 +271,7 @@ export const DirectorApi = {
     return await supabase.from('inquiries').update(updates).eq('id', id);
   },
 
-  // --- CONFIGURACIÓN ---
+  // --- CONFIGURACIÃ“N ---
   async getSchoolSettings() {
     try {
       // .maybeSingle() devuelve null si no hay fila, en lugar de Error 406
@@ -329,7 +330,7 @@ export const DirectorApi = {
   async getStudents() {
     return QueryCache.get('dir_students', async () => {
       try {
-        // Intentar con classroom_id (columna estándar del schema)
+        // Intentar con classroom_id (columna estÃ¡ndar del schema)
         const res = await withTimeout(() =>
           supabase.from('students')
             .select('id, name, is_active, parent_id, classroom_id, matricula, p1_name, p1_phone, p1_email, classrooms:classroom_id(name)')
@@ -357,7 +358,7 @@ export const DirectorApi = {
   },
   async updateStudent(id, data) {
     const numId = parseInt(id, 10);
-    if (isNaN(numId)) return { data: null, error: 'ID de estudiante inválido' };
+    if (isNaN(numId)) return { data: null, error: 'ID de estudiante invÃ¡lido' };
 
     const clean = { ...data };
     if ('horario' in clean) { clean.schedule = clean.horario || null; delete clean.horario; }
@@ -411,7 +412,7 @@ export const DirectorApi = {
         await supabase.from(TABLES.CLASSROOMS).update({ teacher_id: id }).eq('id', classroom_id);
       }
     }
-    // Only send columns that exist in profiles table — exclude email (can't update via profiles)
+    // Only send columns that exist in profiles table â€” exclude email (can't update via profiles)
     const ALLOWED = ['name', 'phone', 'role', 'bio', 'notes', 'access_code', 'avatar_url', 'onesignal_player_id'];
     const safeData = Object.fromEntries(Object.entries(profileData).filter(([k]) => ALLOWED.includes(k)));
     const result = await supabase.from(TABLES.PROFILES).update(safeData).eq('id', id);
@@ -463,7 +464,7 @@ export const DirectorApi = {
           ['Estudiante', studentName],
           ['Concepto',   month],
           ['Monto',      amount],
-          ['Método',     method],
+          ['MÃ©todo',     method],
           ['Fecha',      dateStr]
         ].map(([label, value], i) => {
           const border = i < 4 ? 'border-bottom:1px solid #d1fae5;' : '';
@@ -480,8 +481,8 @@ export const DirectorApi = {
           '<body style="margin:0;padding:0;background:#f8fafc;font-family:Arial,sans-serif;">' +
           '<div style="max-width:560px;margin:32px auto;background:#fff;border-radius:16px;overflow:hidden;box-shadow:0 4px 24px rgba(0,0,0,0.08);">' +
             '<div style="background:linear-gradient(135deg,#16a34a,#15803d);padding:32px 40px;text-align:center;">' +
-              '<h1 style="margin:0;color:#fff;font-size:22px;font-weight:800;">✅ Pago Confirmado</h1>' +
-              '<p style="margin:8px 0 0;color:rgba(255,255,255,0.85);font-size:14px;">Karpus Kids — Recibo de Pago</p>' +
+              '<h1 style="margin:0;color:#fff;font-size:22px;font-weight:800;">âœ… Pago Confirmado</h1>' +
+              '<p style="margin:8px 0 0;color:rgba(255,255,255,0.85);font-size:14px;">Karpus Kids â€” Recibo de Pago</p>' +
             '</div>' +
             '<div style="padding:32px 40px;">' +
               '<p style="margin:0 0 8px;color:#374151;font-size:15px;">Hola,</p>' +
@@ -489,18 +490,18 @@ export const DirectorApi = {
               '<div style="background:#f0fdf4;border:1px solid #bbf7d0;border-radius:12px;padding:20px 24px;margin-bottom:24px;">' +
                 '<table style="width:100%;border-collapse:collapse;font-size:14px;">' + rows + '</table>' +
               '</div>' +
-              '<p style="margin:0 0 24px;color:#6b7280;font-size:13px;text-align:center;">Gracias por tu puntualidad y compromiso con la educación de tu hijo/a.</p>' +
+              '<p style="margin:0 0 24px;color:#6b7280;font-size:13px;text-align:center;">Gracias por tu puntualidad y compromiso con la educaciÃ³n de tu hijo/a.</p>' +
               '<div style="text-align:center;">' +
-                '<a href="https://karpuskids.com/panel_padres.html" style="display:inline-block;background:#16a34a;color:#fff;padding:12px 28px;border-radius:8px;font-weight:700;font-size:14px;text-decoration:none;">Ver mi Panel →</a>' +
+                '<a href="https://karpuskids.com/panel_padres.html" style="display:inline-block;background:#16a34a;color:#fff;padding:12px 28px;border-radius:8px;font-weight:700;font-size:14px;text-decoration:none;">Ver mi Panel â†’</a>' +
               '</div>' +
             '</div>' +
             '<div style="background:#f9fafb;border-top:1px solid #f0f0f0;padding:16px 40px;text-align:center;">' +
-              '<p style="margin:0;font-size:11px;color:#9ca3af;">Karpus Kids · Correo automático, por favor no respondas.</p>' +
+              '<p style="margin:0;font-size:11px;color:#9ca3af;">Karpus Kids Â· Correo automÃ¡tico, por favor no respondas.</p>' +
             '</div>' +
           '</div></body></html>';
 
         const { sendEmail } = await import('../shared/supabase.js');
-        const result = await sendEmail(emails, 'Recibo de Pago — ' + month + ' · ' + studentName, html);
+        const result = await sendEmail(emails, 'Recibo de Pago â€” ' + month + ' Â· ' + studentName, html);
         return !!result;
       } catch (e) {
 

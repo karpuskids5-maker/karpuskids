@@ -1,4 +1,4 @@
-﻿import { supabase } from '../shared/supabase.js';
+import { supabase } from '../shared/supabase.js';
 import { Helpers } from '../shared/helpers.js';
 import { RealtimeManager } from '../shared/realtime-manager.js';
 
@@ -34,7 +34,7 @@ export const AttendanceModule = {
         event: '*', schema: 'public', table: 'attendance'
       }, () => {
         // Solo recargar si estamos en modo día y es hoy
-        const today = new Date().toISOString().split('T')[0];
+        const today = Helpers.getYYYYMMDD();
         const dateEl = document.getElementById('attDateSingle');
         if (this._mode === 'day' && (!dateEl || dateEl.value === today)) {
           this.load();
@@ -44,7 +44,7 @@ export const AttendanceModule = {
   },
 
   _setDefaultDates() {
-    const today = new Date().toISOString().split('T')[0];
+    const today = Helpers.getYYYYMMDD();
     const el = (id) => document.getElementById(id);
     if (el('attDateSingle'))  el('attDateSingle').value  = today;
     if (el('attDateFrom'))    el('attDateFrom').value    = this._firstOfMonth();
@@ -53,7 +53,7 @@ export const AttendanceModule = {
 
   _firstOfMonth() {
     const d = new Date();
-    return new Date(d.getFullYear(), d.getMonth(), 1).toISOString().split('T')[0];
+    return Helpers.getYYYYMMDD(new Date(d.getFullYear(), d.getMonth(), 1));
   },
 
   _bindControls() {
@@ -91,11 +91,11 @@ export const AttendanceModule = {
         .order('date', { ascending: false });
 
       if (this._mode === 'day') {
-        const date = document.getElementById('attDateSingle')?.value || new Date().toISOString().split('T')[0];
+        const date = document.getElementById('attDateSingle')?.value || Helpers.getYYYYMMDD();
         q = q.eq('date', date);
       } else {
         const from = document.getElementById('attDateFrom')?.value || this._firstOfMonth();
-        const to   = document.getElementById('attDateTo')?.value   || new Date().toISOString().split('T')[0];
+        const to   = document.getElementById('attDateTo')?.value   || Helpers.getYYYYMMDD();
         q = q.gte('date', from).lte('date', to);
       }
 

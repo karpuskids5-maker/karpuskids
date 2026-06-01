@@ -1,4 +1,4 @@
-﻿/**
+/**
  * 🎯 DASHBOARD SERVICE — Sincronización centralizada de datos
  * 
  * Responsabilidad: Orquestar carga de TODOS los datos del dashboard
@@ -40,24 +40,38 @@ export const DashboardService = {
       ]);
 
     try {
-      const today = new Date().toISOString().split('T')[0];
-      const year = new Date().getFullYear();
-      const month = new Date().getMonth() + 1;
+      const d = new Date();
+      const today = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+      const year = d.getFullYear();
+      const month = d.getMonth() + 1;
 
-      const monthName = new Intl.DateTimeFormat('es-ES', { month: 'long' }).format(new Date());
+      const monthName = new Intl.DateTimeFormat('es-ES', { month: 'long' }).format(d);
       const formattedMonth = monthName.charAt(0).toUpperCase() + monthName.slice(1);
 
-      const results = await Promise.allSettled([
+      // Ejecutar en grupos pequeños para evitar net::ERR_CONNECTION_CLOSED
+      const group1 = await Promise.allSettled([
         withTimeout(DirectorApi.getDashboardKPIs(formattedMonth)),
         withTimeout(DirectorApi.getStudents()),
-        withTimeout(DirectorApi.getClassroomsWithOccupancy()),
+        withTimeout(DirectorApi.getClassroomsWithOccupancy())
+      ]);
+
+      await new Promise(r => setTimeout(r, 100)); // Pequeña pausa
+
+      const group2 = await Promise.allSettled([
         withTimeout(DirectorApi.getPayments({ status: 'pending', year })),
         withTimeout(DirectorApi.getInquiries({ status: 'all' })),
-        withTimeout(DirectorApi.getAttendanceByDate(today)),
+        withTimeout(DirectorApi.getAttendanceByDate(today))
+      ]);
+
+      await new Promise(r => setTimeout(r, 100)); // Pequeña pausa
+
+      const group3 = await Promise.allSettled([
         withTimeout(DirectorApi.getAttendanceLast7Days()),
         withTimeout(DirectorApi.getFinancialSummary(year, month)),
         withTimeout(DirectorApi.getTeachers())
       ]);
+
+      const results = [...group1, ...group2, ...group3];
 
       const [
         kpisRes,
