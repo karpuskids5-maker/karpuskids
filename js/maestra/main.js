@@ -18,6 +18,10 @@ import { UI } from './modules/ui.js';
 
 window.safeToast = UI.safeToast;
 const { safeToast, safeEscapeHTML, Modal } = UI;
+
+// Cache de marcas de tiempo para evitar recargas constantes
+const _lastLoad = {};
+
 // Exponer Modal globalmente ANTES de cualquier interacci\u00f3n del usuario
 // Los onclick inline en HTML din\u00e1mico necesitan window.Modal disponible de inmediato
 window.Modal = Modal;
@@ -307,15 +311,17 @@ document.addEventListener('DOMContentLoaded', async () => {
     }
 
     // Inicializar M\u00f3dulos
-    await initDashboard();
-    await initAttendance();
-    await initNavigation();
-    await initChat();
+    await Promise.all([
+      initDashboard(),
+      initAttendance(),
+      initNavigation(),
+      initChat()
+    ]);
+    
     initRealtimeUpdates(classroom.id);
 
-    // Badge mensajes no le\u00eddos
+    // Cargar Badges en background
     loadMaestraUnreadBadge(auth.user.id);
-    // Badge tareas pendientes de calificar
     loadPendingTasksBadge(classroom.id);
 
     // \ud83d\udd34 Sistema de badges por secci\u00f3n
@@ -436,44 +442,30 @@ async function initDashboard() {
   console.log('[MaestraDashboard] Iniciando para aula:', classroom.id);
 
   try {
-    const students = await MaestraApi.getStudentsByClassroom(classroom.id);
-    console.log('[MaestraDashboard] Estudiantes cargados:', students?.length);
-    AppState.set('students', students || []);
-    
     const today = new Date().toISOString().split('T')[0];
-    const attendance = await MaestraApi.getAttendance(classroom.id, today);
-    
-    // ?ualizar Estadísticas (Bloques)
-    const statClasses   = document.getElementById('statClasses');
-    const statStudents  = document.getElementById('statStudents');
-    const statIncidents = document.getElementById('statIncidents');
-    const statPresent   = document.getElementById('statPresent');
+    const startOfDay = `${today}T00:00:00Z`;
+    const endOfDay   = `${today}T23:59:59Z`;
 
-    if (statClasses)   statClasses.textContent   = '1';
-    if (statStudents)  statStudents.textContent  = students?.length || '0';
-    if (statPresent) {
-      const presentCount = (attendance || []).filter(a => ['present', 'late'].includes(a.status)).length;
-      statPresent.textContent = presentCount;
-    }
-    
-    // Obtener incidentes de hoy (Query segura)
-    if (statIncidents) {
-      try {
-        const startOfDay = `${today}T00:00:00Z`;
-        const endOfDay   = `${today}T23:59:59Z`;
-        const { count, error: incError } = await supabase
-          .from('incidents')
-          .select('id', { count: 'exact', head: true })
-          .eq('classroom_id', classroom.id)
-          .gte('created_at', startOfDay)
-          .lte('created_at', endOfDay);
-        
-        statIncidents.textContent = (!incError && count !== null) ? count : '0';
-      } catch (e) {
-        console.warn('[MaestraDashboard] Error incidentes:', e);
-        statIncidents.textContent = '0';
-      }
-    }
+    // 1. Carga paralela de datos cr\u00edticos
+    const [students, attendance, incidentRes] = await Promise.all([
+      MaestraApi.getStudentsByClassroom(classroom.id),
+      MaestraApi.getAttendance(classroom.id, today),
+      supabase
+        .from('incidents')
+        .select('id', { count: 'exact', head: true })
+        .eq('classroom_id', classroom.id)
+        .gte('created_at', startOfDay)
+        .lte('created_at', endOfDay)
+    ]);
+
+    AppState.set('students', students || []);
+
+    // ?ualizar Estadísticas (Bloques)
+    UI.updateDashboardStats({
+      students: students?.length || 0,
+      present: (attendance || []).filter(a => ['present', 'late'].includes(a.status)).length,
+      incidents: incidentRes.count || 0
+    });
 
     _updateNextActivityWidget();
     _updatePunchAlertWidget(students, attendance);
@@ -677,6 +669,12 @@ function initNavigation() {
     if (!options.skipSave) {
       localStorage.setItem('maestra_last_section', fullId);
     }
+
+    // L\u00f3gica de refresco inteligente (TTL: 2 minutos)
+    const now = Date.now();
+    const isFresh = _lastLoad[cleanId] && (now - _lastLoad[cleanId] < 120000);
+    if (isFresh) return;
+    _lastLoad[cleanId] = now;
 
     if (cleanId === 'home') initDashboard();
     if (cleanId === 'attendance') initAttendance();

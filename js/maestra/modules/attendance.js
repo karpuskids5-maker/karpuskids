@@ -1,10 +1,11 @@
 import { supabase, sendPush } from '/js/shared/supabase.js';
 import { AppState } from '../state.js';
 import { MaestraApi } from '../api.js';
-import { safeToast, safeEscapeHTML, Modal } from './ui.js';
+import { UI } from './ui.js';
 import { notifyParents, showNotifyFeedback } from '/js/shared/notify-feedback.js';
 import { OfflineQueue } from '/js/shared/offline-queue.js';
-import { UI } from './ui.js';
+
+const { safeToast, safeEscapeHTML, Modal } = UI;
 
 // Start auto-sync when online
 OfflineQueue.startAutoSync(({ synced }) => {

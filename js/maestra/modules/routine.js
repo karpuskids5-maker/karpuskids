@@ -1,9 +1,10 @@
 import { supabase } from '/js/shared/supabase.js';
 import { AppState } from '../state.js';
 import { MaestraApi } from '../api.js';
-import { safeToast, safeEscapeHTML, Modal } from './ui.js';
-import { Helpers } from '/js/shared/helpers.js';
 import { UI } from './ui.js';
+import { Helpers } from '/js/shared/helpers.js';
+
+const { safeToast, safeEscapeHTML, Modal } = UI;
 
 const _saving = {};
 
@@ -445,7 +446,8 @@ export async function registerInfantEvent(sid, type, val) {
     const today = new Date().toISOString().split('T')[0];
     const classroom = AppState.get('classroom');
     
-    await MaestraApi.upsertDailyLog({
+    // 1. Guardar en DB (Retorna el objeto actualizado)
+    const updatedLog = await MaestraApi.upsertDailyLog({
       student_id: sid,
       classroom_id: classroom.id,
       date: today,
@@ -453,9 +455,16 @@ export async function registerInfantEvent(sid, type, val) {
     });
     
     safeToast(`Registro de ${type} guardado`);
-    // Recargar modal para ver lÃƒ­nea de tiempo
-    openStudentRoutine(sid);
-    initRoutine(); // Recargar grid principal
+    
+    // 2. Actualizar UI de forma granular sin re-consultar toda la base de datos
+    const modalContent = _renderInfantRoutineUI(
+      AppState.get('students').find(s => s.id == sid),
+      updatedLog,
+      'routineStudentModal'
+    );
+    document.getElementById('routineStudentModal-inner').innerHTML = modalContent;
+    if (window.lucide) window.lucide.createIcons();
+
   } catch (e) {
     safeToast('Error al registrar evento', 'error');
   }

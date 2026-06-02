@@ -12,9 +12,13 @@ export async function initChat() {
   if (!container) return;
 
   try {
-    const unreadMap = await ChatModule.getUnreadCounts();
+    // Carga paralela de datos iniciales
+    const [unreadMap, user] = await Promise.all([
+      ChatModule.getUnreadCounts(),
+      AppState.get('user')
+    ]);
+
     let students = AppState.get('students') || [];
-    const user   = AppState.get('user');
 
     // Si no hay estudiantes en AppState, cargarlos directamente
     if (!students.length) {

@@ -1,23 +1,6 @@
-export const Modal = {
-  open(id, content) {
-    document.getElementById(id)?.remove();
-    const modal = document.createElement('div');
-    modal.id = id;
-    modal.className = 'fixed inset-0 z-[60] flex items-center justify-center bg-slate-900/60 backdrop-blur-sm p-4 animate-fade-in';
-    modal.innerHTML = `<div id="${id}-inner" class="relative w-full max-w-2xl max-h-[92vh] overflow-y-auto">${content}</div>`;
-    
-    // Cerrar al hacer clic afuera
-    modal.onclick = (e) => {
-      if (e.target === modal) this.close(id);
-    };
-
-    document.body.appendChild(modal);
-    requestAnimationFrame(() => window.lucide?.createIcons());
-  },
-  close(id) {
-    document.getElementById(id)?.remove();
-  }
-};
+﻿/**
+ * Módulo de Interfaz de Usuario para el Panel de Maestra
+ */
 
 export const safeToast = (message, type = 'success') => {
   if (!message) return;
@@ -37,6 +20,27 @@ export const safeEscapeHTML = (str = '') => {
     }
   } catch (e) {}
   return String(str).replace(/[&<>"']/g, m => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]));
+};
+
+export const Modal = {
+  open(id, content) {
+    document.getElementById(id)?.remove();
+    const modal = document.createElement('div');
+    modal.id = id;
+    modal.className = 'fixed inset-0 z-[60] flex items-center justify-center bg-slate-900/60 backdrop-blur-sm p-4 animate-fade-in';
+    modal.innerHTML = `<div id="${id}-inner" class="relative w-full max-w-2xl max-h-[92vh] overflow-y-auto">${content}</div>`;
+    
+    // Cerrar al hacer clic afuera
+    modal.onclick = (e) => {
+      if (e.target === modal) this.close(id);
+    };
+
+    document.body.appendChild(modal);
+    requestAnimationFrame(() => window.lucide?.createIcons());
+  },
+  close(id) {
+    document.getElementById(id)?.remove();
+  }
 };
 
 export const Skeleton = {
@@ -83,6 +87,7 @@ export const Skeleton = {
   }
 };
 
+// Exportación unificada para módulos que prefieren el objeto UI
 export const UI = {
   safeToast,
   safeEscapeHTML,

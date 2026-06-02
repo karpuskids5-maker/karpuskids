@@ -2,10 +2,11 @@ import { supabase, sendPush, emitEvent } from '/js/shared/supabase.js';
 import { TABLES } from '/js/shared/constants.js';
 import { AppState } from '../state.js';
 import { MaestraApi } from '../api.js';
-import { safeToast, safeEscapeHTML, Modal } from './ui.js';
+import { UI } from './ui.js';
 import { notifyParents } from '/js/shared/notify-feedback.js';
 import { Helpers } from '/js/shared/helpers.js';
-import { UI } from './ui.js';
+
+const { safeToast, safeEscapeHTML, Modal } = UI;
 
 export async function initTasks() {
   const classroom = AppState.get('classroom');
