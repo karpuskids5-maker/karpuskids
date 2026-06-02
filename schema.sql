@@ -1,4 +1,4 @@
-﻿﻿﻿﻿
+﻿﻿﻿
 -- KARPUS KIDS - Schema Completo para Supabase
 -- Ejecutar en Supabase SQL Editor de arriba a abajo.
 -- ============================================================
@@ -2831,7 +2831,7 @@ BEGIN
     IF v_next_month > 12 THEN v_next_month := 1; v_next_year := v_next_year + 1; END IF; 
     v_due_date := make_date(v_next_year, v_next_month, v_due_day); 
 
-    -- Generar Mensualidad
+    -- Generar Mensualidad (Día 25 del mes actual)
     INSERT INTO public.payments (student_id, amount, status, due_date, month_paid, concept)
     SELECT s.id, s.monthly_fee, 'pending', v_due_date, v_month_key, 'Mensualidad'
     FROM public.students s WHERE s.is_active = true AND s.monthly_fee > 0
@@ -2844,8 +2844,14 @@ BEGIN
     FROM public.students s WHERE s.is_active = true AND s.prolongado_fee > 0
     AND NOT EXISTS (SELECT 1 FROM public.payments p WHERE p.student_id = s.id AND p.month_paid = v_month_key AND p.concept = 'Día Prolongado');
   END IF; 
+
+  -- Marcar vencidos: solo si ya pasó el día 5 del mes siguiente al cobro
+  UPDATE public.payments 
+  SET status = 'overdue' 
+  WHERE status = 'pending' 
+  AND due_date < CURRENT_DATE 
+  AND (deleted_at IS NULL OR deleted_at > NOW());
   
-  UPDATE public.payments SET status = 'overdue' WHERE status = 'pending' AND due_date < current_date; 
   GET DIAGNOSTICS v_expire_count = ROW_COUNT; 
   
   RETURN jsonb_build_object('generated', v_gen_count, 'expired', v_expire_count); 
@@ -2853,6 +2859,30 @@ END; $$;
 
 GRANT EXECUTE ON FUNCTION public.run_payment_cycle() TO authenticated; 
 
+-- ── 1.1 RPC PARA MARCAR VENCIDOS (Ejecutado por Cron cada día) ────────
+CREATE OR REPLACE FUNCTION public.mark_overdue_payments() 
+RETURNS jsonb LANGUAGE plpgsql SECURITY DEFINER SET search_path = public AS $$
+DECLARE
+  v_count int;
+BEGIN
+  UPDATE public.payments 
+  SET status = 'overdue' 
+  WHERE status = 'pending' 
+  AND due_date < CURRENT_DATE 
+  AND (deleted_at IS NULL OR deleted_at > NOW());
+  
+  GET DIAGNOSTICS v_count = ROW_COUNT;
+  RETURN jsonb_build_object('expired', v_count);
+END;
+$$;
+
+-- ── 1.2 Actualizar Cron Jobs ──────────────────────────────────────────
+DO $$ BEGIN
+  IF EXISTS (SELECT 1 FROM pg_extension WHERE extname = 'pg_cron') THEN
+    -- Marcar pagos vencidos cada día 6:00 AM RD
+    PERFORM cron.schedule('karpus-mark-overdue', '0 10 * * *', $cmd$ SELECT public.mark_overdue_payments(); $cmd$);
+  END IF;
+END $$;
 CREATE OR REPLACE FUNCTION public.generate_annual_payments(p_year int) RETURNS jsonb LANGUAGE plpgsql SECURITY DEFINER SET search_path = public AS $$ 
 DECLARE 
   v_role text; 

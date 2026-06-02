@@ -79,13 +79,13 @@ window.App = {
     const cleanSection = sectionId.startsWith('t-') ? sectionId : `t-${sectionId}`;
     window.App.setActiveSection(cleanSection);
     if (tabId) {
-      // Si la secciÃ³n es detalle de aula, activar el tab
+      // Si la sección es detalle de aula, activar el tab
       if (cleanSection === 't-class-detail') {
         window.App.activateTab?.(tabId);
       }
-      // Si la secciÃ³n es home pero el tab es rutina (caso dashboard)
+      // Si la sección es home pero el tab es rutina (caso dashboard)
       if (cleanSection === 't-home' && tabId === 'daily-routine') {
-        // En este caso, el dashboard redirige a la secciÃ³n de aula detalle tab rutina
+        // En este caso, el dashboard redirige a la sección de aula detalle tab rutina
         const classroom = AppState.get('classroom');
         if (classroom) {
           window.App.showClassroomDetail(classroom.id, { activeTab: tabId });
@@ -256,7 +256,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   // \ud83d\udd25 EXPOSICI\u00d3N GLOBAL DE M\u00d3DULOS (CRUCIAL PARA EL MURO)
   window.WallModule = WallModule;
 
-  // Inicializar QR de la maestra en secciÃ³n perfil
+  // Inicializar QR de la maestra en sección perfil
   _initMaestraQR(auth.profile, auth.user);
 
   // Asignar funciones internas al objeto global App
@@ -275,7 +275,7 @@ document.addEventListener('DOMContentLoaded', async () => {
       submitGrade(taskId, studentId);
       return;
     }
-    // Cerrar modal estÃ¡tico studentProfileModal con clic afuera o botÃ³n X
+    // Cerrar modal estático studentProfileModal con clic afuera o botón X
     const profileModal = document.getElementById('studentProfileModal');
     if (profileModal && !profileModal.classList.contains('hidden')) {
       if (e.target === profileModal || e.target.id === 'closeStudentProfileModal' || e.target.closest('#closeStudentProfileModal')) {
@@ -388,7 +388,7 @@ function initRealtimeUpdates(classroomId) {
       const student = (AppState.get('students') || []).find(s => s.id === payload.new.student_id);
       if (student) safeToast(`\ud83d\udcdd ${student.name} entreg\u00f3 una tarea`, 'info');
     })
-    // ðŸ“¢ Escuchar cambios en posts para actualizar el muro sin recargar
+    // ?uchar cambios en posts para actualizar el muro sin recargar
     .on('postgres_changes', { event: '*', schema: 'public', table: 'posts' }, (payload) => {
       const { eventType, new: newPost, old: oldPost } = payload;
       
@@ -396,7 +396,7 @@ function initRealtimeUpdates(classroomId) {
       if (newPost.classroom_id && newPost.classroom_id !== classroomId) return;
 
       if (eventType === 'INSERT') {
-        safeToast('ðŸ“¢ Nueva publicaciÃ³n en el muro', 'info');
+        safeToast('?va publicación en el muro', 'info');
         WallModule.loadPosts('muroPostsContainer');
       } else if (eventType === 'UPDATE') {
         const postId = newPost.id;
@@ -442,7 +442,7 @@ async function initDashboard() {
     const today = new Date().toISOString().split('T')[0];
     const attendance = await MaestraApi.getAttendance(classroom.id, today);
     
-    // ðŸ“Š Actualizar EstadÃ­sticas (Bloques)
+    // ?ualizar Estadísticas (Bloques)
     const statClasses   = document.getElementById('statClasses');
     const statStudents  = document.getElementById('statStudents');
     const statIncidents = document.getElementById('statIncidents');
@@ -527,13 +527,13 @@ async function initDashboard() {
     }
     if (window.lucide) window.lucide.createIcons();
   } catch (err) {
-    console.error('[MaestraDashboard] Error crÃ­tico:', err);
+    console.error('[MaestraDashboard] Error crítico:', err);
     safeToast('Error cargando dashboard', 'error');
   }
 }
 
 /**
- * ðŸš€ AUTOMATIZACIÃ“N: Widgets Inteligentes
+ * ?OMATIZACIÃ“N: Widgets Inteligentes
  */
 function _updateNextActivityWidget() {
   const titleEl = document.getElementById('nextActivityTitle');
@@ -547,7 +547,7 @@ function _updateNextActivityWidget() {
   const schedule = [
     { name: 'Entrada y Bienvenida', start: 420, end: 480 }, // 7:00 AM - 8:00 AM
     { name: 'Desayuno', start: 480, end: 540 },            // 8:00 AM - 9:00 AM
-    { name: 'Actividades PedagÃ³gicas', start: 540, end: 660 }, // 9:00 AM - 11:00 AM
+    { name: 'Actividades Pedagógicas', start: 540, end: 660 }, // 9:00 AM - 11:00 AM
     { name: 'Merienda', start: 660, end: 720 },            // 11:00 AM - 12:00 PM
     { name: 'Almuerzo', start: 720, end: 780 },            // 12:00 PM - 1:00 PM
     { name: 'Siesta', start: 780, end: 870 },              // 1:00 PM - 2:30 PM
@@ -566,7 +566,7 @@ function _updateNextActivityWidget() {
     const h12 = endH > 12 ? endH - 12 : endH;
     timeEl.textContent = `En curso â€” Termina ${h12}:${endM.toString().padStart(2, '0')} ${ampm}`;
   } else if (next) {
-    titleEl.textContent = `PrÃ³ximo: ${next.name}`;
+    titleEl.textContent = `Próximo: ${next.name}`;
     const startH = Math.floor(next.start / 60);
     const startM = next.start % 60;
     const ampm = startH >= 12 ? 'PM' : 'AM';
@@ -574,8 +574,7 @@ function _updateNextActivityWidget() {
     timeEl.textContent = `Inicia a las ${h12}:${startM.toString().padStart(2, '0')} ${ampm}`;
   } else {
     titleEl.textContent = 'Fuera de Horario Escolar';
-    timeEl.textContent = 'Â¡Hasta maÃ±ana! ðŸ‘‹';
-  }
+    timeEl.textContent = '¡Hasta mañana! ?  }
 }
 
 function _updatePunchAlertWidget(students, attendance) {
@@ -589,7 +588,7 @@ function _updatePunchAlertWidget(students, attendance) {
 
   if (missing > 0 && total > 0) {
     widget.classList.remove('hidden');
-    textEl.textContent = `${missing} niÃ±os aÃºn no han marcado entrada hoy.`;
+    textEl.textContent = `${missing} niños aún no han marcado entrada hoy.`;
   } else {
     widget.classList.add('hidden');
   }
@@ -602,9 +601,9 @@ window.App.sendAbsenceAlerts = async () => {
   const presentIds = (attendance || []).map(a => a.student_id);
   
   const missing = students.filter(s => !presentIds.includes(s.id));
-  if (missing.length === 0) return safeToast('Todos los alumnos estÃ¡n presentes');
+  if (missing.length === 0) return safeToast('Todos los alumnos están presentes');
 
-  const confirm = await Helpers.confirm(`Â¿Enviar aviso de ausencia a los padres de ${missing.length} niÃ±os?`);
+  const confirm = await Helpers.confirm(`¿Enviar aviso de ausencia a los padres de ${missing.length} niños?`);
   if (!confirm) return;
 
   safeToast('Enviando notificaciones...', 'info');
@@ -614,7 +613,7 @@ window.App.sendAbsenceAlerts = async () => {
       await sendPush({
         user_id: s.parent_id,
         title: 'Aviso de Ausencia â“',
-        message: `Hola, notamos que ${s.name} no ha llegado hoy. Por favor confÃ­rmanos si asistirÃ¡ o si tiene algÃºn inconveniente.`,
+        message: `Hola, notamos que ${s.name} no ha llegado hoy. Por favor confírmanos si asistirá o si tiene algún inconveniente.`,
         link: 'panel_padres.html'
       }).catch(() => {});
       sent++;
@@ -700,7 +699,7 @@ function initNavigation() {
   window.App.setActiveSection = setActiveSection;
   window.App._setActiveSection = setActiveSection; // Alias interno para el proxy global
 
-  // Restaurar Ãºltima secciÃ³n
+  // Restaurar última sección
   const lastSection = localStorage.getItem('maestra_last_section') || 't-home';
   const lastClassroom = localStorage.getItem('maestra_last_classroom');
   const lastTab = localStorage.getItem('maestra_last_tab');
@@ -716,9 +715,9 @@ function initNavigation() {
    * \ud83c\udfeb Mostrar Detalle de Aula
    */
   async function showClassroomDetail(classroomId, options = {}) {
-    // 1. Carga eficiente y paralela (OptimizaciÃ³n de Datos)
+    // 1. Carga eficiente y paralela (Optimización de Datos)
     try {
-      // Intentamos obtener del AppState primero para velocidad instantÃ¡nea
+      // Intentamos obtener del AppState primero para velocidad instantánea
       let classroom = AppState.get('classroom');
       let students = AppState.get('students');
 
@@ -750,7 +749,7 @@ function initNavigation() {
       const nameEl = document.getElementById('currentClassName');
       if (nameEl) nameEl.textContent = classroom.name;
 
-      // 3. Cambiar a la secciÃ³n de detalle
+      // 3. Cambiar a la sección de detalle
       const layoutShell = document.getElementById('layoutShell');
       if (layoutShell) layoutShell.scrollTop = 0;
 
@@ -789,7 +788,7 @@ function initClassTabs(defaultTab = null) {
       b.classList.add('bg-slate-100', 'text-slate-600');
     });
 
-    // 2. Activar botones que coincidan (con Ã©nfasis especial en Rutina)
+    // 2. Activar botones que coincidan (con énfasis especial en Rutina)
     tabBtns.forEach(b => {
       if (b.dataset.tab === targetTab) {
         const isRoutine = targetTab === 'daily-routine';
@@ -812,13 +811,13 @@ function initClassTabs(defaultTab = null) {
     // Guardar tab en localStorage
     localStorage.setItem('maestra_last_tab', targetTab);
 
-    // 4. Actualizar indicador de tÃ­tulo para contexto visual
+    // 4. Actualizar indicador de título para contexto visual
     const titleMap = { 
       'feed': 'Muro del Aula', 
-      'daily-routine': 'Rutina Diaria ðŸ•’', 
+      'daily-routine': 'Rutina Diaria ?
       'students': 'Lista de Estudiantes', 
       'attendance': 'Pase de Lista', 
-      'tasks': 'GestiÃ³n de Tareas' 
+      'tasks': 'Gestión de Tareas' 
     };
     const subTitle = document.getElementById('class-detail-subtitle');
     if (subTitle) subTitle.textContent = titleMap[targetTab] || '';
@@ -1045,7 +1044,7 @@ async function submitNewPost() {
 
     const classroom = AppState.get('classroom');
     const user = AppState.get('user');
-    if (!classroom || !user) throw new Error('No hay sesiÃ³n activa');
+    if (!classroom || !user) throw new Error('No hay sesión activa');
 
     const insertPayload = {
       classroom_id: classroom.id,
@@ -1061,7 +1060,7 @@ async function submitNewPost() {
     if (error) {
       // Si el error es por send_notification, intentar con RPC directo
       if (error.message?.includes('send_notification') || error.code === '42883') {
-        throw new Error('La funciÃ³n send_notification no existe en la DB. Ejecuta fix_posts_insert.sql en Supabase.');
+        throw new Error('La función send_notification no existe en la DB. Ejecuta fix_posts_insert.sql en Supabase.');
       }
       throw error;
     }
@@ -1298,7 +1297,7 @@ async function loadPendingTasksBadge(classroomId) {
   } catch (_) {}
 }
 
-// â”€â”€ QR de identificaciÃ³n de la maestra â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// â”€â”€ QR de identificación de la maestra â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 async function _initMaestraQR(profile, user) {
   const section   = document.getElementById('maestra-qr-section');
   const container = document.getElementById('maestra-qr-container');
@@ -1343,7 +1342,7 @@ async function _initMaestraQR(profile, user) {
     correctLevel: window.QRCode.CorrectLevel.H
   });
 
-  // FunciÃ³n global para imprimir
+  // Función global para imprimir
   window.App.printMaestraQR = () => {
     const img = container.querySelector('img')?.src || container.querySelector('canvas')?.toDataURL();
     if (!img) return;
@@ -1356,7 +1355,7 @@ async function _initMaestraQR(profile, user) {
       img{width:180px;height:180px;}.name{font-size:15px;font-weight:900;color:#1e293b;margin-top:12px;}
       .code{font-size:10px;color:#64748b;font-weight:700;margin-top:4px;}.hint{font-size:8px;color:#94a3b8;margin-top:6px;}</style>
     </head><body><div class="card">
-      <div class="logo">ðŸŽ“ Karpus Kids â€” Personal</div>
+      <div class="logo">?pus Kids â€” Personal</div>
       <img src="${img}">
       <div class="name">${name}</div>
       <div class="code">${code}</div>

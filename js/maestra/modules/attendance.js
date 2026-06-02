@@ -92,7 +92,7 @@ export async function markAllPresent() {
         <i data-lucide="check-check" class="w-8 h-8"></i>
       </div>
       <h3 class="text-xl font-black text-slate-800 mb-2">Asistencia Masiva</h3>
-      <p class="text-sm text-slate-500 mb-6 font-medium">Ã‚Â¿Marcar a todos los alumnos como presentes hoy?</p>
+      <p class="text-sm text-slate-500 mb-6 font-medium">Ã‚¿Marcar a todos los alumnos como presentes hoy?</p>
       <div class="flex gap-3">
         <button onclick="Modal.close('${modalId}')" class="flex-1 py-3 bg-slate-100 text-slate-600 rounded-xl font-bold uppercase text-xs hover:bg-slate-200 transition-colors">Cancelar</button>
         <button id="btnConfirmMassAtt" class="flex-[2] py-3 bg-emerald-500 text-white rounded-xl font-bold uppercase text-xs hover:bg-emerald-600 shadow-lg shadow-emerald-200 transition-all flex items-center justify-center gap-2">Confirmar</button>
@@ -152,7 +152,7 @@ export async function markAllPresent() {
 
       await initAttendance();
     } catch (e) {
-      safeToast('Error crÃƒÂ­tico en asistencia masiva', 'error');
+      safeToast('Error crÃƒ­tico en asistencia masiva', 'error');
     }
   };
 }
@@ -178,8 +178,8 @@ export async function registerAttendance(studentId, status) {
     const isMarkingPresent = status === 'present';
     const wasLate = existing?.status === 'late';
     
-    // Si la maestra marca "Presente" pero el niÃƒÂ±o llegÃƒÂ³ "Tarde" (por ponche),
-    // no cambiamos el estado en la DB pero sÃƒÂ­ notificamos.
+    // Si la maestra marca "Presente" pero el niÃƒ±o llegÃƒ³ "Tarde" (por ponche),
+    // no cambiamos el estado en la DB pero sÃƒ­ notificamos.
     let shouldUpsert = true;
     if (isMarkingPresent && wasLate) {
       shouldUpsert = false;
@@ -213,7 +213,7 @@ export async function registerAttendance(studentId, status) {
         await MaestraApi.upsertAttendance(attRecord);
       } else {
         await OfflineQueue.enqueue('attendance', 'upsert', { ...attRecord, onConflict: 'student_id,date' });
-        safeToast(`${statusLiteral} guardado sin conexiÃƒÂ³n Ã¢â‚¬â€ se sincronizarÃƒÂ¡ automÃƒÂ¡ticamente`, 'info');
+        safeToast(`${statusLiteral} guardado sin conexiÃƒ³n Ã¢â‚¬â€ se sincronizarÃƒ¡ automÃƒ¡ticamente`, 'info');
       }
     } else {
       console.log('Manteniendo estado "Tarde" Ã¢â‚¬â€ Solo notificando presencia en aula');
@@ -223,9 +223,9 @@ export async function registerAttendance(studentId, status) {
     if (student?.parent_id) {
       const { sendPush } = await import('../../shared/supabase.js');
       
-      // Mensaje personalizado: si era tarde y se puso presente, se notifica que ya estÃƒÂ¡ en aula.
+      // Mensaje personalizado: si era tarde y se puso presente, se notifica que ya estÃƒ¡ en aula.
       const pushMessage = (isMarkingPresent && wasLate)
-        ? `${student.name} ya estÃƒÂ¡ en su aula con su maestra.`
+        ? `${student.name} ya estÃƒ¡ en su aula con su maestra.`
         : `${student.name} ha sido marcado como ${statusLiteral} hoy.`;
 
       sendPush({
@@ -283,8 +283,8 @@ async function _loadAbsenceRequests(classroomId, students) {
               <p class="font-bold text-slate-800 text-sm truncate">${safeEscapeHTML(r.student?.name || 'Estudiante')}</p>
               <p class="text-[10px] text-slate-500 font-bold">
                 ${new Date(r.date + 'T12:00:00').toLocaleDateString('es-DO', { weekday: 'short', day: 'numeric', month: 'short' })}
-                Ã‚Â· ${safeEscapeHTML(r.reason)}
-                ${r.note ? ' Ã‚Â· ' + safeEscapeHTML(r.note) : ''}
+                Ã‚· ${safeEscapeHTML(r.reason)}
+                ${r.note ? ' Ã‚· ' + safeEscapeHTML(r.note) : ''}
               </p>
             </div>
             <button
@@ -301,7 +301,7 @@ async function _loadAbsenceRequests(classroomId, students) {
     if (existing) existing.remove();
     container.parentElement?.insertBefore(banner, container);
 
-    // FunciÃƒÂ³n global para aprobar ausencia
+    // FunciÃƒ³n global para aprobar ausencia
     window._approveAbsence = async (requestId, studentId, date) => {
       try {
         const classroom = AppState.get('classroom');

@@ -157,44 +157,57 @@ export const PaymentsModule = {
       const statusFilter = document.getElementById('filterPaymentStatus')?.value;
       const search       = document.getElementById('searchPaymentStudent')?.value?.trim();
 
-      const now          = new Date();
-      const today        = now.getDate();
-      const genDay       = this.settings.generation_day || 25;
+      const now    = new Date();
+      const today  = now.getDate();
+      const genDay = 25; // Día de generación
 
-      // Mes "visible máximo": el mes cuyos cobros ya se generaron.
-      // Antes del día 25: solo se muestran cobros hasta el mes actual.
-      // A partir del día 25: ya se pueden ver cobros del mes siguiente.
-      const visibleUpToMonth = (() => {
-        const y = now.getFullYear();
-        const m = now.getMonth(); // 0-based
-        if (today >= genDay) {
-          // Ya se generó el cobro del mes siguiente
-          const nextM = m + 1 > 11 ? 0 : m + 1;
-          const nextY = m + 1 > 11 ? y + 1 : y;
-          return `${nextY}-${String(nextM + 1).padStart(2, '0')}`;
-        }
-        // Aún no se genera el siguiente mes — solo mostrar hasta el mes actual
-        return `${y}-${String(m + 1).padStart(2, '0')}`;
-      })();
+      // El mes actual solo es visible si hoy es >= 25.
+      // Si hoy es < 25, el mes "máximo" visible es el mes anterior.
+      const currentYear  = now.getFullYear();
+      const currentMonth = now.getMonth() + 1; // 1-12
+      
+      let maxVisibleMonthKey;
+      if (today >= genDay) {
+        maxVisibleMonthKey = `${currentYear}-${String(currentMonth).padStart(2, '0')}`;
+      } else {
+        const prevM = currentMonth === 1 ? 12 : currentMonth - 1;
+        const prevY = currentMonth === 1 ? currentYear - 1 : currentYear;
+        maxVisibleMonthKey = `${prevY}-${String(prevM).padStart(2, '0')}`;
+      }
 
-      const currentMonthKey  = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
       const selectedMonthKey = yearVal && monthVal
         ? `${yearVal}-${String(monthVal).padStart(2, '0')}`
-        : currentMonthKey;
+        : maxVisibleMonthKey;
+
+      // Si el usuario selecciona un mes que aún no debe ser visible (ej: selecciona Junio pero hoy es 10 de Junio)
+      if (selectedMonthKey > maxVisibleMonthKey) {
+        const mi = parseInt(monthVal, 10) - 1;
+        const label = MONTH_LABELS[mi] || monthVal;
+        container.innerHTML = `<tr><td colspan="8" class="text-center py-16">
+          <div class="flex flex-col items-center gap-3">
+            <div class="w-14 h-14 bg-teal-50 rounded-full flex items-center justify-center text-2xl">📅</div>
+            <p class="font-black text-slate-600 text-sm">Los cobros de ${label} ${yearVal} se generan el día ${genDay}</p>
+            <p class="text-xs text-slate-400 font-medium">Vuelve a partir del día ${genDay} para ver este periodo.</p>
+          </div></td></tr>`;
+        if (window.lucide) lucide.createIcons();
+        return;
+      }
 
       let query = supabase
         .from('payments')
         .select('id, student_id, amount, concept, status, due_date, created_at, paid_date, method, bank, reference, month_paid, evidence_url, students:student_id(name, classroom_id, classrooms:classroom_id(name))');
 
       if (statusFilter === 'all') {
-        // "Todos": Solo vencidos de CUALQUIER MES + Todos los registros del mes seleccionado
+        // "Todos": 
+        // 1. Solo VENCIDOS de cualquier mes pasado (mes < maxVisibleMonthKey)
+        // 2. TODOS los registros del mes seleccionado (siempre que sea <= maxVisibleMonthKey)
         query = query.or(
-          `status.eq.overdue,` +
+          `and(status.eq.overdue,month_paid.lt.${maxVisibleMonthKey}),` +
           `month_paid.eq.${selectedMonthKey}`
         );
       } else if (statusFilter === 'pending' || statusFilter === 'overdue' || statusFilter === 'review') {
-        // Estados específicos de deuda: buscar en cualquier mes
-        query = query.eq('status', statusFilter);
+        // Estados específicos de deuda: buscar solo hasta el mes máximo visible
+        query = query.eq('status', statusFilter).lte('month_paid', maxVisibleMonthKey);
       } else {
         // Pagados o rechazados: filtrar estrictamente por el mes seleccionado
         query = query.eq('month_paid', selectedMonthKey);

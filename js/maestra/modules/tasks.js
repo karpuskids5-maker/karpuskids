@@ -30,7 +30,7 @@ export async function initTasks() {
   try {
     const tasks = await MaestraApi.getTasksByClassroom(classroom.id);
     if (!tasks.length) {
-      listContainer.innerHTML = '<div class="text-center p-8 text-slate-500">AÃƒÂºn no has asignado tareas.</div>';
+      listContainer.innerHTML = '<div class="text-center p-8 text-slate-500">AÃƒºn no has asignado tareas.</div>';
       return;
     }
 
@@ -96,7 +96,7 @@ export async function openEditTaskModal(taskId) {
 }
 
 export async function deleteTask(taskId) {
-  if (!confirm('Ã‚Â¿Eliminar esta tarea? Los datos se perderÃƒÂ¡n permanentemente.')) return;
+  if (!confirm('Ã‚¿Eliminar esta tarea? Los datos se perderÃƒ¡n permanentemente.')) return;
   try {
     await MaestraApi.deleteTask(taskId);
     safeToast('Tarea eliminada correctamente');
@@ -122,12 +122,12 @@ export async function openNewTaskModal(taskToEdit = null) {
       </div>
       <form id="taskForm" class="space-y-5 overflow-y-auto pr-2 flex-1">
         <div>
-          <label class="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1">TÃƒÂ­tulo de la Tarea</label>
+          <label class="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1">TÃƒ­tulo de la Tarea</label>
           <input type="text" id="taskTitle" class="w-full p-3 bg-slate-50 border-none rounded-xl text-sm font-bold focus:ring-2 focus:ring-orange-400 outline-none" required>
         </div>
         <div>
-          <label class="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1">DescripciÃƒÂ³n / Instrucciones</label>
-          <textarea id="taskDesc" rows="5" class="w-full p-3 bg-slate-50 border-none rounded-xl text-sm focus:ring-2 focus:ring-orange-400 outline-none resize-none" placeholder="Explica quÃƒÂ© deben hacer los alumnos..." required></textarea>
+          <label class="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1">DescripciÃƒ³n / Instrucciones</label>
+          <textarea id="taskDesc" rows="5" class="w-full p-3 bg-slate-50 border-none rounded-xl text-sm focus:ring-2 focus:ring-orange-400 outline-none resize-none" placeholder="Explica quÃƒ© deben hacer los alumnos..." required></textarea>
         </div>
         <div>
           <label class="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1">Fecha de Entrega</label>
@@ -185,7 +185,7 @@ export async function openNewTaskModal(taskToEdit = null) {
     const file = fileInput.files[0];
 
     if (file && file.size > 50 * 1024 * 1024) { 
-       return safeToast('El archivo es demasiado grande (mÃƒÂ¡x 50MB)', 'error');
+       return safeToast('El archivo es demasiado grande (mÃƒ¡x 50MB)', 'error');
     }
 
     if (!title || !description || !dueDate) {
@@ -237,7 +237,7 @@ export async function openNewTaskModal(taskToEdit = null) {
         notifyParents({
           students,
           title:   `Ã°Å¸â€œÅ¡ Nueva Tarea Ã¢â‚¬â€ ${classroomName}`,
-          message: `"${payload.title}" Ã‚Â· Entrega: ${payload.due_date}`,
+          message: `"${payload.title}" Ã‚· Entrega: ${payload.due_date}`,
           type:    'task',
           link:    'panel_padres.html',
           label:   payload.title
@@ -266,11 +266,11 @@ export async function openNewTaskModal(taskToEdit = null) {
   };
 }
 
-// Ã¢â€â‚¬Ã¢â€â‚¬ Helper: verificar si el perÃƒÂ­odo activo del aula estÃƒÂ¡ abierto Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬
+// Ã¢â€â‚¬Ã¢â€â‚¬ Helper: verificar si el perÃƒ­odo activo del aula estÃƒ¡ abierto Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬
 async function _getPeriodStatus(classroomId) {
   try {
     const { data, error } = await supabase.rpc('get_active_period', { p_classroom_id: classroomId });
-    // Si el RPC no existe (404) o hay error, asumir perÃƒÂ­odo abierto (permisivo)
+    // Si el RPC no existe (404) o hay error, asumir perÃƒ­odo abierto (permisivo)
     if (error) return { open: true, period: null };
     if (!data) return { open: true, period: null };
     return { open: data.status === 'open', period: data };
@@ -285,7 +285,7 @@ export async function viewTaskSubmissions(taskId) {
   const modalId = 'taskSubmissionsModal';
 
   try {
-    // Verificar estado del perÃƒÂ­odo ANTES de mostrar el modal
+    // Verificar estado del perÃƒ­odo ANTES de mostrar el modal
     const { open: periodOpen, period } = await _getPeriodStatus(classroom?.id);
 
     const { data: submissions, error: subError } = await supabase
@@ -297,13 +297,13 @@ export async function viewTaskSubmissions(taskId) {
     const subMap = {};
     (submissions || []).forEach(s => subMap[s.student_id] = s);
 
-    // Banner de perÃƒÂ­odo cerrado
+    // Banner de perÃƒ­odo cerrado
     const closedBanner = !periodOpen ? `
       <div class="mb-4 p-3 bg-amber-50 border border-amber-200 rounded-2xl flex items-center gap-3">
         <span class="text-xl">Ã°Å¸â€â€™</span>
         <div>
-          <p class="text-xs font-black text-amber-800 uppercase tracking-wide">PerÃƒÂ­odo cerrado</p>
-          <p class="text-[10px] text-amber-600 font-medium">Las calificaciones estÃƒÂ¡n bloqueadas. Solo la directora puede reabrirlo.</p>
+          <p class="text-xs font-black text-amber-800 uppercase tracking-wide">PerÃƒ­odo cerrado</p>
+          <p class="text-[10px] text-amber-600 font-medium">Las calificaciones estÃƒ¡n bloqueadas. Solo la directora puede reabrirlo.</p>
         </div>
       </div>` : '';
 
@@ -311,8 +311,8 @@ export async function viewTaskSubmissions(taskId) {
       <div class="bg-white w-full max-w-4xl rounded-[2.5rem] shadow-2xl p-8 animate-fadeIn flex flex-col max-h-[90vh]">
         <div class="flex justify-between items-start mb-6">
           <div>
-            <h3 class="text-2xl font-black text-slate-800">RevisiÃƒÂ³n de Entregas</h3>
-            ${period ? `<p class="text-xs font-bold text-slate-400 mt-1">PerÃƒÂ­odo: ${safeEscapeHTML(period.name)} ${periodOpen ? 'Ã°Å¸Å¸Â¢ Abierto' : 'Ã°Å¸â€â€™ Cerrado'}</p>` : ''}
+            <h3 class="text-2xl font-black text-slate-800">RevisiÃƒ³n de Entregas</h3>
+            ${period ? `<p class="text-xs font-bold text-slate-400 mt-1">PerÃƒ­odo: ${safeEscapeHTML(period.name)} ${periodOpen ? 'Ã°Å¸Å¸¢ Abierto' : 'Ã°Å¸â€â€™ Cerrado'}</p>` : ''}
           </div>
           <button onclick="Modal.close('${modalId}')" class="p-2 hover:bg-slate-100 rounded-full transition-colors">
             <i data-lucide="x" class="w-6 h-6 text-slate-400"></i>
@@ -325,10 +325,10 @@ export async function viewTaskSubmissions(taskId) {
             const hasSubmission = sub && sub.file_url;
             const isGraded = sub && sub.status === 'graded';
             const safeUrl = hasSubmission ? encodeURI(sub.file_url) : '#';
-            // Deshabilitar inputs si perÃƒÂ­odo cerrado
+            // Deshabilitar inputs si perÃƒ­odo cerrado
             const disabled = !periodOpen ? 'disabled class="opacity-50 cursor-not-allowed"' : '';
             const disabledSelect = !periodOpen ? 'disabled' : '';
-            const btnDisabled = !periodOpen ? 'disabled title="PerÃƒÂ­odo cerrado" class="p-2 bg-slate-300 text-slate-500 rounded-lg cursor-not-allowed self-end"' : 'class="p-2 bg-orange-600 text-white rounded-lg hover:bg-orange-700 transition-all self-end" title="Guardar CalificaciÃƒÂ³n"';
+            const btnDisabled = !periodOpen ? 'disabled title="PerÃƒ­odo cerrado" class="p-2 bg-slate-300 text-slate-500 rounded-lg cursor-not-allowed self-end"' : 'class="p-2 bg-orange-600 text-white rounded-lg hover:bg-orange-700 transition-all self-end" title="Guardar CalificaciÃƒ³n"';
 
             return `
               <div class="p-5 bg-slate-50 rounded-2xl border ${isGraded ? 'border-green-200 bg-green-50/30' : 'border-slate-100'}">
@@ -343,7 +343,7 @@ export async function viewTaskSubmissions(taskId) {
                 </div>
                 <div class="grid grid-cols-1 md:grid-cols-3 gap-4 items-end">
                   <div class="md:col-span-2">
-                    <label class="block text-[10px] font-bold text-slate-400 uppercase mb-1">RetroalimentaciÃƒÂ³n</label>
+                    <label class="block text-[10px] font-bold text-slate-400 uppercase mb-1">RetroalimentaciÃƒ³n</label>
                     <textarea id="feedback-${s.id}" ${disabled} rows="2"
                       class="w-full p-2 bg-white rounded-lg text-xs border border-slate-200 focus:ring-1 focus:ring-orange-400 outline-none ${!periodOpen ? 'opacity-50 cursor-not-allowed' : ''}"
                       placeholder="Escribe un comentario...">${safeEscapeHTML(sub?.comment || '')}</textarea>
@@ -364,7 +364,7 @@ export async function viewTaskSubmissions(taskId) {
                       <label class="block text-[10px] font-bold text-slate-400 uppercase mb-1">Estrellas</label>
                       <select id="stars-${s.id}" ${disabledSelect}
                         class="w-full p-2 rounded-lg text-xs font-bold bg-white border border-slate-200 ${!periodOpen ? 'opacity-50 cursor-not-allowed' : ''}">
-                        ${[0,1,2,3,4,5].map(n => `<option value="${n}" ${sub?.stars === n ? 'selected' : ''}>${'Ã¢Â­Â'.repeat(n) || 'Ninguna'}</option>`).join('')}
+                        ${[0,1,2,3,4,5].map(n => `<option value="${n}" ${sub?.stars === n ? 'selected' : ''}>${'Ã¢­'.repeat(n) || 'Ninguna'}</option>`).join('')}
                       </select>
                     </div>
                     <button onclick="${periodOpen ? `App.submitGrade('${taskId}', '${s.id}')` : 'void(0)'}" ${btnDisabled}>
@@ -386,11 +386,11 @@ export async function viewTaskSubmissions(taskId) {
 }
 
 export async function submitGrade(taskId, studentId) {
-  // Verificar perÃƒÂ­odo antes de guardar
+  // Verificar perÃƒ­odo antes de guardar
   const classroom = AppState.get('classroom');
   const { open: periodOpen } = await _getPeriodStatus(classroom?.id);
   if (!periodOpen) {
-    safeToast('El perÃƒÂ­odo estÃƒÂ¡ cerrado. No se pueden modificar calificaciones.', 'warning');
+    safeToast('El perÃƒ­odo estÃƒ¡ cerrado. No se pueden modificar calificaciones.', 'warning');
     return;
   }
 
@@ -407,13 +407,13 @@ export async function submitGrade(taskId, studentId) {
     if (student?.parent_id) {
       sendPush({
         user_id: student.parent_id,
-        title: 'Tarea Calificada Ã°Å¸Ââ€ ',
+        title: 'Tarea Calificada Ã°Å¸â€ ',
         message: `La maestra ha calificado una tarea de ${student.name}. Nota: ${grade}`,
         link: 'panel_padres.html#grades'
       }).catch(() => {});
     }
     
-    safeToast('CalificaciÃƒÂ³n guardada');
+    safeToast('CalificaciÃƒ³n guardada');
     const el = document.getElementById(`feedback-${studentId}`);
     if (el) {
       const card = el.closest('.p-5');

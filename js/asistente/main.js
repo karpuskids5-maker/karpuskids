@@ -147,8 +147,8 @@ document.addEventListener('DOMContentLoaded', async () => {
     _deleteStudent: (id, name) => StudentsModule._deleteStudent(id, name),
     _genMatricula: () => window._genMatricula?.(),
     _openRoomModal: (id) => RoomsModule.openModal(id),
-    openNewPostModal: () => openNewPostModal(),
-    submitNewPost: () => submitNewPost()
+    openNewPostModal,
+    submitNewPost
   });
 
   // Exponer WallModule globalmente
@@ -162,13 +162,6 @@ document.addEventListener('DOMContentLoaded', async () => {
 
   if (window.lucide) lucide.createIcons();
 });
-
-/**
- * Carga inicial del dashboard de asistente
- */
-async function initDashboard() {
-  // Obsoleto, delegado a DashboardModule
-}
 
 /**
  * 🚀 MURO ESCOLAR - Crear Publicación

@@ -96,23 +96,56 @@ export const PaymentsModule = {
         return `${y}-${String(m + 1).padStart(2, '0')}`;
       })();
 
-      const monthKey = `${yv}-${String(mv).padStart(2,'0')}`;
+      const now    = new Date();
+      const today  = now.getDate();
+      const genDay = 25; // Día de generación
 
-      const SPANISH_MONTHS = ['enero','febrero','marzo','abril','mayo','junio','julio','agosto','septiembre','octubre','noviembre','diciembre'];
+      // El mes actual solo es visible si hoy es >= 25.
+      // Si hoy es < 25, el mes "máximo" visible es el mes anterior.
+      const currentYear  = now.getFullYear();
+      const currentMonth = now.getMonth() + 1; // 1-12
+      
+      let maxVisibleMonthKey;
+      if (today >= genDay) {
+        maxVisibleMonthKey = `${currentYear}-${String(currentMonth).padStart(2, '0')}`;
+      } else {
+        const prevM = currentMonth === 1 ? 12 : currentMonth - 1;
+        const prevY = currentMonth === 1 ? currentYear - 1 : currentYear;
+        maxVisibleMonthKey = `${prevY}-${String(prevM).padStart(2, '0')}`;
+      }
+
+      const monthKey = yv && mv ? `${yv}-${String(mv).padStart(2,'0')}` : maxVisibleMonthKey;
+
+      // Si el usuario selecciona un mes que aún no debe ser visible
+      if (monthKey > maxVisibleMonthKey) {
+        const mi = parseInt(mv, 10) - 1;
+        const label = SPANISH_MONTHS[mi] || mv;
+        tbody.innerHTML = `<tr><td colspan="8" class="text-center py-16">
+          <div class="flex flex-col items-center gap-3">
+            <div class="w-14 h-14 bg-indigo-50 rounded-full flex items-center justify-center text-2xl">📅</div>
+            <p class="font-black text-slate-600 text-sm">Los cobros de ${label} ${yv} se generan el día ${genDay}</p>
+            <p class="text-xs text-slate-400 font-medium">Vuelve a partir del día ${genDay} para ver este periodo.</p>
+          </div></td></tr>`;
+        if (window.lucide) lucide.createIcons();
+        return;
+      }
+
       const SEL = 'id,student_id,amount,concept,status,due_date,created_at,paid_date,method,bank,reference,month_paid,evidence_url,students:student_id(name,classroom_id,classrooms:classroom_id(name))';
 
       // ── 1. Construir consulta unificada ──────────────────────────────
       let q = supabase.from('payments').select(SEL);
 
       if (sf === 'all') {
-        // "Todos": Solo vencidos de CUALQUIER MES + Todos los registros del mes seleccionado
+        // "Todos": 
+        // 1. Solo VENCIDOS de cualquier mes pasado (mes < maxVisibleMonthKey)
+        // 2. TODOS los registros del mes seleccionado (siempre que sea <= maxVisibleMonthKey)
         q = q.or(
-          `status.eq.overdue,` +
+          `and(status.eq.overdue,month_paid.lt.${maxVisibleMonthKey}),` +
           `month_paid.eq.${monthKey}`
         );
       } else if (sf === 'pending' || sf === 'overdue' || sf === 'review') {
-        // Estados específicos de deuda: buscar en cualquier mes
-        q = q.eq('status', sf);
+        // Estados específicos de deuda: buscar solo hasta el mes máximo visible
+        q = q.eq('status', sf).lte('month_paid', maxVisibleMonthKey);
       } else {
         // Pagados o rechazados: filtrar estrictamente por el mes seleccionado
         q = q.eq('month_paid', monthKey);
