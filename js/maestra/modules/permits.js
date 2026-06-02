@@ -1,6 +1,7 @@
-﻿import { supabase } from '../../shared/supabase.js';
-import { TABLES } from '../../shared/constants.js';
-import { Helpers } from '../../shared/helpers.js';
+import { supabase } from '/js/shared/supabase.js';
+import { TABLES } from '/js/shared/constants.js';
+import { Helpers } from '/js/shared/helpers.js';
+import { UI } from './ui.js';
 
 export const PermitsModule = {
   async init() {

@@ -1,9 +1,9 @@
-﻿import { supabase, sendPush } from '../../shared/supabase.js';
-import { TABLES } from '../../shared/constants.js';
+import { supabase, sendPush } from '/js/shared/supabase.js';
+import { TABLES } from '/js/shared/constants.js';
 import { AppState } from '../state.js';
 import { MaestraApi } from '../api.js';
 import { safeToast, safeEscapeHTML, Modal } from './ui.js';
-import { Helpers } from '../../shared/helpers.js';
+import { Helpers } from '/js/shared/helpers.js';
 
 export function openStudentProfile(studentId) {
   const student = AppState.get('students').find(s => s.id == studentId);

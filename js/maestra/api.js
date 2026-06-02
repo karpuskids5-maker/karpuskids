@@ -1,5 +1,5 @@
-﻿import { supabase } from '../shared/supabase.js';
-import { TABLES } from '../shared/constants.js';
+import { supabase } from '/js/shared/supabase.js';
+import { TABLES } from '/js/shared/constants.js';
 
 /**
  * Helper interno para manejar errores

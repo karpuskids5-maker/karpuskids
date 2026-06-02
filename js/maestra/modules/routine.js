@@ -1,8 +1,8 @@
-import { supabase } from '../../shared/supabase.js';
+import { supabase } from '/js/shared/supabase.js';
 import { AppState } from '../state.js';
 import { MaestraApi } from '../api.js';
 import { safeToast, safeEscapeHTML, Modal } from './ui.js';
-import { Helpers } from '../../shared/helpers.js';
+import { Helpers } from '/js/shared/helpers.js';
 
 const _saving = {};
 
@@ -67,7 +67,7 @@ export async function initRoutine() {
     if (hour >= 12 && hour < 16) currentPeriod = 'afternoon';
     if (hour >= 16) currentPeriod = 'late';
 
-    const periodNames = { morning: 'MaÃƒ±ana', afternoon: 'Tarde', late: 'Tardecita' };
+    const periodNames = { morning: 'Mañana', afternoon: 'Tarde', late: 'Tardecita' };
     
     // Estudiantes pendientes en el periodo actual
     const pendingStudents = students.filter(s => {
@@ -162,9 +162,9 @@ function _renderStudentRoutineCard(s, log) {
   const isInfant = s.age_type === 'meses';
   const infantEvents = isValid && log.infant_data ? log.infant_data : [];
 
-    const moodEmojis = { feliz: '+0x1F60A', normal: '+0x1F610', triste: '+0x1F622', enojado: '+0x1F621' };
-    const foodEmojis = { todo: '+0x1F37D', poco: '+0x1F372', nada: '+0x1F645' };
-  const sleepEmojis = { si: 'Ã°Å¸â€™¤', no: 'Ã¢Ëœâ‚¬Ã¯¸' };
+    const moodEmojis = { feliz: '😊', normal: '😐', triste: '😢', enojado: '😡' };
+    const foodEmojis = { todo: '🍽️', poco: '🍲', nada: '🙅' };
+    const sleepEmojis = { si: '💤', no: '☀️' };
 
   return `
     <div onclick="App.openStudentRoutine('${s.id}')" 
@@ -346,9 +346,9 @@ function _renderStandardRoutineUI(student, log, modalId) {
   const currentSleep = isValid ? (log?.nap || '') : '';
   const currentNotes = isValid ? (log?.notes || '') : '';
 
-    const moodEmojis = { feliz: '+0x1F60A', normal: '+0x1F610', triste: '+0x1F622', enojado: '+0x1F621' };
-    const foodEmojis = { todo: '+0x1F37D', poco: '+0x1F372', nada: '+0x1F645' };
-  const sleepEmojis = { si: 'Ã°Å¸â€™¤', no: 'Ã¢Ëœâ‚¬Ã¯¸' };
+    const moodEmojis = { feliz: '😊', normal: '😐', triste: '😢', enojado: '😡' };
+    const foodEmojis = { todo: '🍽️', poco: '🍲', nada: '🙅' };
+    const sleepEmojis = { si: '💤', no: '☀️' };
 
   return `
     <div class="bg-white w-full max-w-md rounded-[2.5rem] shadow-2xl overflow-hidden animate-fadeIn flex flex-col max-h-[90vh]">
@@ -565,9 +565,9 @@ export async function applyBulkRoutine() {
     safeToast(`Rutina aplicada a ${students.length} estudiantes`);
     
     // AUTOMATIZACION: Publicar en el Muro automaticamente
-    const moodEmojis = { feliz: 'ðŸ˜Š', normal: 'ðŸ˜', triste: 'ðŸ˜¢', enojado: 'ðŸ˜¡' };
-    const foodEmojis = { todo: 'ðŸ˜º', poco: 'ðŸ²', nada: '' };
-    const wallMessage = Actualizacion de Rutina: Dia \! \`;
+    const moodEmojis = { feliz: '😊', normal: '😐', triste: '😢', enojado: '😡' };
+    const foodEmojis = { todo: '😋', poco: '🍲', nada: '' };
+    const wallMessage = `Actualización de Rutina: Día ${today}`;
     
     await supabase.from('posts').insert({
       content: wallMessage,

@@ -1,9 +1,9 @@
-﻿import { supabase, sendPush } from '../../shared/supabase.js';
+import { supabase, sendPush } from '/js/shared/supabase.js';
 import { AppState } from '../state.js';
 import { MaestraApi } from '../api.js';
 import { safeToast, safeEscapeHTML, Modal } from './ui.js';
-import { notifyParents, showNotifyFeedback } from '../../shared/notify-feedback.js';
-import { OfflineQueue } from '../../shared/offline-queue.js';
+import { notifyParents, showNotifyFeedback } from '/js/shared/notify-feedback.js';
+import { OfflineQueue } from '/js/shared/offline-queue.js';
 
 // Start auto-sync when online
 OfflineQueue.startAutoSync(({ synced }) => {

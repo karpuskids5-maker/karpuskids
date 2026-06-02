@@ -1,12 +1,12 @@
-﻿import { ensureRole, supabase, initOneSignal, RealtimeUtils, emitEvent } from '../shared/supabase.js';
+import { ensureRole, supabase, initOneSignal, RealtimeUtils, emitEvent, sendPush } from '/js/shared/supabase.js';
 import { AppState } from './state.js';
 import { MaestraApi } from './api.js';
-import { Helpers } from '../shared/helpers.js';
-import { WallModule } from '../shared/wall.js';
-import { ChatModule } from '../shared/chat.js';
-import { VideoCallModule } from '../shared/videocall.js';
-import { BadgeSystem } from '../shared/badges.js';
-import { ImageLoader } from '../shared/image-loader.js';
+import { Helpers } from '/js/shared/helpers.js';
+import { WallModule } from '/js/shared/wall.js';
+import { ChatModule } from '/js/shared/chat.js';
+import { VideoCallModule } from '/js/shared/videocall.js';
+import { BadgeSystem } from '/js/shared/badges.js';
+import { ImageLoader } from '/js/shared/image-loader.js';
 
 import * as Attendance from './modules/attendance.js';
 import * as Routine from './modules/routine.js';
@@ -391,9 +391,10 @@ function initRealtimeUpdates(classroomId) {
     // ?uchar cambios en posts para actualizar el muro sin recargar
     .on('postgres_changes', { event: '*', schema: 'public', table: 'posts' }, (payload) => {
       const { eventType, new: newPost, old: oldPost } = payload;
+      const post = newPost || oldPost;
       
       // Solo si es de este aula o general
-      if (newPost.classroom_id && newPost.classroom_id !== classroomId) return;
+      if (post && post.classroom_id && post.classroom_id !== classroomId) return;
 
       if (eventType === 'INSERT') {
         safeToast('?va publicación en el muro', 'info');
@@ -564,7 +565,7 @@ function _updateNextActivityWidget() {
     const endM = current.end % 60;
     const ampm = endH >= 12 ? 'PM' : 'AM';
     const h12 = endH > 12 ? endH - 12 : endH;
-    timeEl.textContent = `En curso â€” Termina ${h12}:${endM.toString().padStart(2, '0')} ${ampm}`;
+    timeEl.textContent = `En curso — Termina ${h12}:${endM.toString().padStart(2, '0')} ${ampm}`;
   } else if (next) {
     titleEl.textContent = `Próximo: ${next.name}`;
     const startH = Math.floor(next.start / 60);
@@ -574,7 +575,8 @@ function _updateNextActivityWidget() {
     timeEl.textContent = `Inicia a las ${h12}:${startM.toString().padStart(2, '0')} ${ampm}`;
   } else {
     titleEl.textContent = 'Fuera de Horario Escolar';
-    timeEl.textContent = '¡Hasta mañana! ?  }
+    timeEl.textContent = '¡Hasta mañana! 👋';
+  }
 }
 
 function _updatePunchAlertWidget(students, attendance) {
@@ -814,7 +816,7 @@ function initClassTabs(defaultTab = null) {
     // 4. Actualizar indicador de título para contexto visual
     const titleMap = { 
       'feed': 'Muro del Aula', 
-      'daily-routine': 'Rutina Diaria ?
+      'daily-routine': 'Rutina Diaria',
       'students': 'Lista de Estudiantes', 
       'attendance': 'Pase de Lista', 
       'tasks': 'Gestión de Tareas' 
@@ -928,46 +930,6 @@ async function startJitsi() {
   }
 }
 
-/**
- * \ud83d\udcac SISTEMA DE CHAT MAESTRA
- */
-let activeChatUserId = null;
-let activeConversationId = null; // Guardamos el ID de la conversaci\u00f3n activa
-
-async function sendChatMessage() {
-  if (!activeChatUserId) return;
-  const input = document.getElementById('chatMessageInput');
-  const text = input?.value.trim();
-  if (!text) return;
-
-  const user = AppState.get('user');
-  if (!user) return;
-
-  input.value = '';
-  input.disabled = true;
-
-  try {
-    const { message, conversationId } = await ChatModule.sendMessage(
-      user.id,
-      activeChatUserId,
-      text,
-      activeConversationId
-    );
-
-    if (!activeConversationId && conversationId) {
-      activeConversationId = conversationId;
-    }
-
-    await loadChatMessages(activeChatUserId);
-
-  } catch (err) {
-
-    safeToast('Error al enviar mensaje', 'error');
-  } finally {
-    input.disabled = false;
-    input.focus();
-  }
-}
 
 
 async function openNewPostModal() {

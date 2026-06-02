@@ -1,5 +1,5 @@
-﻿import { ChatModule } from '../../shared/chat.js';
-import { ScrollModule } from '../../shared/scroll.module.js';
+import { ChatModule } from '/js/shared/chat.js';
+import { ScrollModule } from '/js/shared/scroll.module.js';
 import { AppState } from '../state.js';
 import { safeToast, safeEscapeHTML } from './ui.js';
 

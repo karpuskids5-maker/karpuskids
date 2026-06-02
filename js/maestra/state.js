@@ -1,4 +1,4 @@
-﻿import { SafeAppState } from '../shared/state.js';
+import { SafeAppState } from '/js/shared/state.js';
 
 /**
  * Estado especÃ­fico para el panel de Maestra
