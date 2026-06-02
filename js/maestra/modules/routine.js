@@ -3,6 +3,7 @@ import { AppState } from '../state.js';
 import { MaestraApi } from '../api.js';
 import { safeToast, safeEscapeHTML, Modal } from './ui.js';
 import { Helpers } from '/js/shared/helpers.js';
+import { UI } from './ui.js';
 
 const _saving = {};
 

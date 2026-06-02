@@ -82,3 +82,12 @@ export const Skeleton = {
     return Array(count).fill(skeletons[type] || skeletons.card).join('');
   }
 };
+
+export const UI = {
+  safeToast,
+  safeEscapeHTML,
+  Modal,
+  Skeleton
+};
+
+export default UI;

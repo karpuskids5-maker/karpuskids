@@ -14,7 +14,7 @@ import * as Tasks from './modules/tasks.js';
 import * as Students from './modules/students.js';
 import * as ChatApp from './modules/chat_app.js';
 import { PermitsModule } from './modules/permits.js';
-import * as UI from './modules/ui.js';
+import { UI } from './modules/ui.js';
 
 window.safeToast = UI.safeToast;
 const { safeToast, safeEscapeHTML, Modal } = UI;
