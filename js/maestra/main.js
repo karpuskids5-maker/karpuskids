@@ -447,8 +447,8 @@ async function initDashboard() {
     const startOfDay = `${today}T00:00:00Z`;
     const endOfDay   = `${today}T23:59:59Z`;
 
-    // 1. Carga paralela de datos cr\u00edticos
-    const [students, attendance, incidentRes] = await Promise.all([
+    // 1. Carga paralela de datos críticos
+    const [students, attendance, incidentRes, classesRes] = await Promise.all([
       MaestraApi.getStudentsByClassroom(classroom.id),
       MaestraApi.getAttendance(classroom.id, today),
       supabase
@@ -456,16 +456,21 @@ async function initDashboard() {
         .select('id', { count: 'exact', head: true })
         .eq('classroom_id', classroom.id)
         .gte('created_at', startOfDay)
-        .lte('created_at', endOfDay)
+        .lte('created_at', endOfDay),
+      supabase
+        .from('classrooms')
+        .select('id', { count: 'exact', head: true })
+        .eq('teacher_id', AppState.get('user').id)
     ]);
 
     AppState.set('students', students || []);
 
-    // ?ualizar Estadísticas (Bloques)
+    // Actualizar Estadísticas (Bloques)
     UI.updateDashboardStats({
       students: students?.length || 0,
       present: (attendance || []).filter(a => ['present', 'late'].includes(a.status)).length,
-      incidents: incidentRes.count || 0
+      incidents: incidentRes.count || 0,
+      classes: classesRes.count || 0
     });
 
     _updateNextActivityWidget();

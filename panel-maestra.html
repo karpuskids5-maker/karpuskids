@@ -1006,7 +1006,7 @@
           sidebar.classList.toggle('collapsed');
           layoutShell.classList.toggle('sidebar-collapsed');
           
-          if (sidebarIcon) {
+          if (sidebarIcon) { // Asegúrate de que estas llaves existan
             const isCollapsed = sidebar.classList.contains('collapsed');
             sidebarIcon.setAttribute('data-lucide', isCollapsed ? 'chevron-right' : 'chevron-left');
             if (window.lucide) lucide.createIcons();

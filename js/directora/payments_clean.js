@@ -256,7 +256,39 @@ export const PaymentsModule = {
     try {
       const mv = document.getElementById('filterPaymentMonth')?.value;
       const yv = document.getElementById('filterPaymentYear')?.value;
-      const { data } = await DirectorApi.getPaymentStats(mv, yv);
+
+      // Lógica de visibilidad (idéntica a loadPayments)
+      const currentDate = new Date();
+      const today  = currentDate.getDate();
+      const genDay = this.settings.generation_day || 25;
+      const currentYear  = currentDate.getFullYear();
+      const currentMonth = currentDate.getMonth() + 1;
+
+      let maxVisibleMonthKey;
+      if (today >= genDay) {
+        maxVisibleMonthKey = `${currentYear}-${String(currentMonth).padStart(2, '0')}`;
+      } else {
+        const prevM = currentMonth === 1 ? 12 : currentMonth - 1;
+        const prevY = currentMonth === 1 ? currentYear - 1 : currentYear;
+        maxVisibleMonthKey = `${prevY}-${String(prevM).padStart(2, '0')}`;
+      }
+
+      // Si el mes seleccionado es mayor al máximo visible, no mostrar estadísticas (o mostrar 0)
+      const selectedMonthKey = yv && mv ? `${yv}-${String(mv).padStart(2,'0')}` : maxVisibleMonthKey;
+      
+      if (selectedMonthKey > maxVisibleMonthKey) {
+        const set = (id, v) => { const el = document.getElementById(id); if (el) el.textContent = v; };
+        set('kpiIncomeMonth', '$0.00');
+        set('kpiPendingCount', '0');
+        set('kpiOverdueCount', '0');
+        set('kpiReviewCount', '0');
+        return;
+      }
+
+      // Si no hay mv/yv (inicio), usar los de maxVisibleMonthKey
+      const [defY, defM] = maxVisibleMonthKey.split('-');
+      const { data } = await DirectorApi.getPaymentStats(mv || defM, yv || defY);
+
       if (!data) return;
       const set = (id, v) => { const el = document.getElementById(id); if (el) el.textContent = v; };
       set('kpiIncomeMonth', '$' + Number(data.incomeMonth || 0).toLocaleString('es-ES', { minimumFractionDigits: 2 }));

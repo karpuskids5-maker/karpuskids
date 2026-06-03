@@ -1,4 +1,4 @@
-﻿import { supabase } from '../shared/supabase.js';
+import { supabase } from '../shared/supabase.js';
 import { Helpers } from '../shared/helpers.js';
 import { AppState } from './state.js';
 import { sendEmail } from '../shared/supabase.js';
@@ -423,12 +423,38 @@ export const PaymentsModule = {
         const year    = yv || String(now.getFullYear());
         const monthKey = `${year}-${month}`;
 
+        // Lógica de visibilidad inteligente
+        const today  = now.getDate();
+        const genDay = this.settings.generation_day || 25;
+        const currentYear  = now.getFullYear();
+        const currentMonth = now.getMonth() + 1;
+
+        let maxVisibleMonthKey;
+        if (today >= genDay) {
+          maxVisibleMonthKey = `${currentYear}-${String(currentMonth).padStart(2, '0')}`;
+        } else {
+          const prevM = currentMonth === 1 ? 12 : currentMonth - 1;
+          const prevY = currentMonth === 1 ? currentYear - 1 : currentYear;
+          maxVisibleMonthKey = `${prevY}-${String(prevM).padStart(2, '0')}`;
+        }
+
+        // Si el mes seleccionado aún no es visible, mostrar 0 en estadísticas
+        if (monthKey > maxVisibleMonthKey) {
+          const set = (id, v) => { const el = document.getElementById(id); if (el) el.textContent = v; };
+          set('kpiIncomeMonth', '$0.00');
+          set('kpiPendingCount', '0');
+          set('kpiOverdueCount', '0');
+          set('kpiReviewCount', '0');
+          return;
+        }
+
         const [incomeRes, pendingRes, overdueRes, reviewRes] = await Promise.all([
           // Ingresos del mes seleccionado usando month_paid (no created_at)
           supabase.from('payments').select('amount').eq('status', 'paid').eq('month_paid', monthKey),
-          supabase.from('payments').select('*', { count: 'exact', head: true }).in('status', ['pending']),
+          // Pendientes filtrados por mes visible
+          supabase.from('payments').select('*', { count: 'exact', head: true }).eq('status', 'pending').eq('month_paid', monthKey),
           supabase.from('payments').select('*', { count: 'exact', head: true }).eq('status', 'overdue'),
-          supabase.from('payments').select('*', { count: 'exact', head: true }).in('status', ['review'])
+          supabase.from('payments').select('*', { count: 'exact', head: true }).in('status', ['review']).eq('month_paid', monthKey)
         ]);
 
         const income = (incomeRes.data || []).reduce((s, p) => s + Number(p.amount || 0), 0);
