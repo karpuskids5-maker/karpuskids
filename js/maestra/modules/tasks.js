@@ -15,7 +15,7 @@ export async function initTasks() {
 
   container.innerHTML = `
     <div class="flex justify-between items-center mb-8">
-      <h3 class="text-2xl font-black text-slate-800 flex items-center gap-3">Ã°Å¸Å½â€™ Mochila de Tareas</h3>
+      <h3 class="text-2xl font-black text-slate-800 flex items-center gap-3">Mochila de Tareas</h3>
       <button onclick="App.openNewTaskModal()" class="px-6 py-3 bg-orange-600 text-white rounded-2xl font-black text-xs uppercase tracking-widest shadow-lg shadow-orange-200 hover:bg-orange-700 transition-all flex items-center gap-2">
         <i data-lucide="plus-circle" class="w-5 h-5"></i> Nueva Tarea
       </button>

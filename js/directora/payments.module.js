@@ -34,14 +34,14 @@ export const PaymentsModule = {
   },
 
   _initSelectors() {
-    const now = new Date();
+    const selectorDate = new Date();
     const ms = document.getElementById('filterPaymentMonth');
     const ys = document.getElementById('filterPaymentYear');
-    if (ms) ms.value = String(now.getMonth() + 1).padStart(2, '0');
+    if (ms) ms.value = String(selectorDate.getMonth() + 1).padStart(2, '0');
     
     if (ys) {
       // Dinamizar años: desde el actual hasta 2 años atrás y 1 adelante
-      const currentYear = now.getFullYear();
+      const currentYear = selectorDate.getFullYear();
       ys.innerHTML = '';
       for (let y = currentYear + 1; y >= currentYear - 2; y--) {
         const opt = document.createElement('option');
@@ -244,15 +244,15 @@ export const PaymentsModule = {
   async openPaymentModal(prefillStudentId = null) {
     const ic = 'w-full px-4 py-2.5 border-2 border-slate-100 rounded-2xl outline-none focus:ring-4 focus:ring-purple-100 focus:border-purple-400 bg-slate-50/50 transition-all text-sm font-medium';
     const lc = 'block text-[11px] font-black text-slate-400 uppercase tracking-wider mb-1.5 ml-1';
-    const now = new Date();
-    const dm  = now.getMonth() + 1;
-    const dy  = dm > 11 ? now.getFullYear() + 1 : now.getFullYear();
+    const modalDate = new Date();
+    const dm  = modalDate.getMonth() + 1;
+    const dy  = dm > 11 ? modalDate.getFullYear() + 1 : modalDate.getFullYear();
     const dd  = new Date(dy, dm > 11 ? 0 : dm, this.settings.due_day).toISOString().split('T')[0];
     // Usar formato YYYY-MM para month_paid (consistente con el sistema)
-    const curYear = now.getFullYear();
+    const curYear = modalDate.getFullYear();
     const mo = MES_LABEL.map((label, i) => {
       const val = `${curYear}-${String(i + 1).padStart(2, '0')}`;
-      return '<option value="' + val + '"' + (i === now.getMonth() ? ' selected' : '') + '>' + label + '</option>';
+      return '<option value="' + val + '"' + (i === modalDate.getMonth() ? ' selected' : '') + '>' + label + '</option>';
     }).join('');
 
     window.openGlobalModal(

@@ -87,12 +87,24 @@ export const Skeleton = {
   }
 };
 
+export const updateDashboardStats = (stats = {}) => {
+  const set = (id, val) => {
+    const el = document.getElementById(id);
+    if (el) el.textContent = val;
+  };
+  if (stats.students !== undefined) set('statStudents', stats.students);
+  if (stats.present !== undefined) set('statPresent', stats.present);
+  if (stats.incidents !== undefined) set('statIncidents', stats.incidents);
+  if (stats.classes !== undefined) set('statClasses', stats.classes);
+};
+
 // Exportación unificada para módulos que prefieren el objeto UI
 export const UI = {
   safeToast,
   safeEscapeHTML,
   Modal,
-  Skeleton
+  Skeleton,
+  updateDashboardStats
 };
 
 export default UI;

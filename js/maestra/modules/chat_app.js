@@ -138,8 +138,8 @@ export async function initChat() {
       const unread = unreadMap[c.id] || 0;
       // Para padres: tÃƒÂ­tulo = nombre del estudiante, subtÃƒÂ­tulo = nombre del padre
       const displayName = c.childName ? c.childName : (c.name || 'Usuario');
-      const parentLine  = c.childName ? `Ã°Å¸â€˜Â¤ ${safeEscapeHTML(c.name)}` : null;
-      const label       = c.childName ? `${c.roleLabel} Ã‚Â· Ã°Å¸â€˜Â¤ ${safeEscapeHTML(c.name)}` : c.roleLabel;
+      const parentLine  = c.childName ? ` ${safeEscapeHTML(c.name)}` : null;
+      const label       = c.childName ? `${c.roleLabel}  ${safeEscapeHTML(c.name)}` : c.roleLabel;
       const bgColor = c.roleLabel === 'Directora' ? 'bg-indigo-100 text-indigo-600' :
                       c.roleLabel === 'Asistente' ? 'bg-teal-100 text-teal-600' :
                       c.unlinked ? 'bg-slate-100 text-slate-400' :

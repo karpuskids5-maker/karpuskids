@@ -9,7 +9,7 @@ const { safeToast, safeEscapeHTML, Modal } = UI;
 const _saving = {};
 
 /**
- * L\u00f3gica de 12 horas: El reporte del d\u00eda solo es v\u00e1lido si fue guardado hace menos de 12 horas.
+ * Lógica de 12 horas: El reporte del día solo es válido si fue guardado hace menos de 12 horas.
  */
 function _isWithin12h(dateStr) {
   if (!dateStr) return false;
@@ -18,15 +18,15 @@ function _isWithin12h(dateStr) {
 }
 
 /**
- * Vista de rutina mejorada \u2014 Tarjetas de estudiantes con progreso visual (burbujas).
- * Optimizada para m\u00f3vil y con sistema de alertas.
+ * Vista de rutina mejorada — Tarjetas de estudiantes con progreso visual (burbujas).
+ * Optimizada para móvil y con sistema de alertas.
  */
 export async function initRoutine() {
   const classroom = AppState.get('classroom');
   const container = document.getElementById('tab-daily-routine');
   if (!container) return;
 
-  // Mostrar esqueleto de carga para feedback instantÃƒ¡neo
+  // Mostrar esqueleto de carga para feedback instantáneo
   container.innerHTML = `
     <div class="animate-pulse space-y-6">
       <div class="h-12 bg-slate-100 rounded-2xl w-1/3"></div>
@@ -42,11 +42,10 @@ export async function initRoutine() {
     const students = AppState.get('students') || [];
     const today    = new Date().toISOString().split('T')[0];
 
-    // 2. Cargar logs de hoy usando MaestraApi (Capa de abstracciÃƒ³n)
-    // Optimizamos: Solo traemos los logs de HOY para esta aula
+    // 2. Cargar logs de hoy usando MaestraApi (Capa de abstracción)
     const { data: todayLogs, error } = await supabase
       .from('daily_logs')
-      .select('id, student_id, date, mood, food, nap, eating, sleeping, activities, notes, created_at')
+      .select('id, student_id, date, mood, food, nap, eating, sleeping, activities, notes, created_at, infant_data')
       .eq('classroom_id', classroom.id)
       .eq('date', today);
 
@@ -65,7 +64,7 @@ export async function initRoutine() {
     // Calcular periodo actual para alarmas
     const now = new Date();
     const hour = now.getHours();
-    let currentPeriod = 'morning'; // 0-12
+    let currentPeriod = 'morning'; 
     if (hour >= 12 && hour < 16) currentPeriod = 'afternoon';
     if (hour >= 16) currentPeriod = 'late';
 
@@ -76,7 +75,7 @@ export async function initRoutine() {
       const log = logsMap[s.id];
       if (!log || !_isWithin12h(log.created_at)) return true;
       
-      // Validar si falta algÃƒºn campo crÃƒ­tico segÃƒºn el periodo
+      // Validar si falta algún campo crítico según el periodo
       if (currentPeriod === 'morning' && !log.mood) return true;
       if (currentPeriod === 'afternoon' && (!log.food || !log.mood)) return true;
       if (currentPeriod === 'late' && (!log.nap || !log.food || !log.mood)) return true;
@@ -90,7 +89,7 @@ export async function initRoutine() {
         <div class="space-y-4">
           <div class="flex items-center justify-between">
             <div>
-              <h3 class="text-xl font-black text-slate-800">Ã°Å¸â€œ Rutina Diaria</h3>
+              <h3 class="text-xl font-black text-slate-800">📝 Rutina Diaria</h3>
               <p class="text-xs font-bold text-slate-400 uppercase tracking-wider mt-0.5">${todayLabel}</p>
             </div>
             <div class="flex flex-col items-end">
@@ -106,7 +105,7 @@ export async function initRoutine() {
           <!-- Alarma Visual si hay pendientes -->
           ${pendingStudents.length > 0 ? `
             <div class="bg-orange-50 border-2 border-orange-100 rounded-[2rem] p-5 flex items-center gap-4 animate-pulse-subtle">
-              <div class="w-12 h-12 bg-orange-500 text-white rounded-2xl flex items-center justify-center text-2xl shrink-0 shadow-lg shadow-orange-200">Ã¢Å¡ Ã¯¸</div>
+              <div class="w-12 h-12 bg-orange-500 text-white rounded-2xl flex items-center justify-center text-2xl shrink-0 shadow-lg shadow-orange-200">⚠️</div>
               <div class="flex-1">
                 <p class="text-sm font-black text-orange-800">Reportes Pendientes</p>
                 <p class="text-xs font-bold text-orange-600/80">Faltan ${pendingStudents.length} estudiantes por reportar en este periodo.</p>
@@ -122,9 +121,9 @@ export async function initRoutine() {
             </div>
           ` : `
             <div class="bg-emerald-50 border-2 border-emerald-100 rounded-[2rem] p-5 flex items-center gap-4">
-              <div class="w-12 h-12 bg-emerald-500 text-white rounded-2xl flex items-center justify-center text-2xl shrink-0 shadow-lg shadow-emerald-200">Ã¢Å“â€¦</div>
+              <div class="w-12 h-12 bg-emerald-500 text-white rounded-2xl flex items-center justify-center text-2xl shrink-0 shadow-lg shadow-emerald-200">✅</div>
               <div>
-                <p class="text-sm font-black text-emerald-800">Ã‚¡Todo al dÃƒ­a!</p>
+                <p class="text-sm font-black text-emerald-800">¡Todo al día!</p>
                 <p class="text-xs font-bold text-emerald-600/80">Has completado los reportes de este periodo.</p>
               </div>
             </div>
@@ -138,7 +137,7 @@ export async function initRoutine() {
 
         <div class="bg-white p-6 rounded-[2rem] border border-slate-100 shadow-sm text-center border-l-4 border-l-orange-500">
           <p class="text-xs text-slate-400 font-medium">
-            Ã°Å¸â€™¡ Toca a un estudiante para abrir su reporte de rutina individual.<br>
+            💡 Toca a un estudiante para abrir su reporte de rutina individual.<br>
             Los emojis flotantes indican el progreso actual.
           </p>
         </div>
@@ -153,7 +152,7 @@ export async function initRoutine() {
 }
 
 /**
- * Renderiza la tarjeta individual del estudiante para la secci\u00f3n de rutina.
+ * Renderiza la tarjeta individual del estudiante para la sección de rutina.
  */
 function _renderStudentRoutineCard(s, log) {
   const isValid = _isWithin12h(log.created_at);
@@ -161,7 +160,7 @@ function _renderStudentRoutineCard(s, log) {
   const food  = isValid && log.food ? log.food : null;
   const sleep = isValid && log.nap  ? log.nap  : null;
   const note  = isValid && log.notes ? true : false;
-  const isInfant = s.age_type === 'meses';
+  const isInfant = s.age_type === 'meses' || s.age_type === 'mes';
   const infantEvents = isValid && log.infant_data ? log.infant_data : [];
 
     const moodEmojis = { feliz: '😊', normal: '😐', triste: '😢', enojado: '😡' };
@@ -175,10 +174,10 @@ function _renderStudentRoutineCard(s, log) {
       <!-- Burbujas de Emojis Flotantes (Status) -->
       <div class="absolute top-2 right-2 flex flex-col gap-1 z-10">
         ${mood ? `<div class="w-7 h-7 bg-orange-50 rounded-full flex items-center justify-center text-sm shadow-sm border border-orange-100 animate-bounce-subtle">${moodEmojis[mood]}</div>` : ''}
-        ${isInfant && infantEvents.length > 0 ? `<div class="w-7 h-7 bg-blue-50 rounded-full flex items-center justify-center text-sm shadow-sm border border-blue-100 animate-bounce-subtle">Ã°Å¸¼</div>` : ''}
+        ${isInfant && infantEvents.length > 0 ? `<div class="w-7 h-7 bg-blue-50 rounded-full flex items-center justify-center text-sm shadow-sm border border-blue-100 animate-bounce-subtle">🍼</div>` : ''}
         ${!isInfant && food ? `<div class="w-7 h-7 bg-emerald-50 rounded-full flex items-center justify-center text-sm shadow-sm border border-emerald-100 animate-bounce-subtle" style="animation-delay: 0.2s">${foodEmojis[food]}</div>` : ''}
         ${sleep ? `<div class="w-7 h-7 bg-indigo-50 rounded-full flex items-center justify-center text-sm shadow-sm border border-indigo-100 animate-bounce-subtle" style="animation-delay: 0.4s">${sleepEmojis[sleep]}</div>` : ''}
-        ${note ? `<div class="w-7 h-7 bg-slate-50 rounded-full flex items-center justify-center text-xs shadow-sm border border-slate-100 animate-bounce-subtle" style="animation-delay: 0.6s">Ã°Å¸â€œ</div>` : ''}
+        ${note ? `<div class="w-7 h-7 bg-slate-50 rounded-full flex items-center justify-center text-xs shadow-sm border border-slate-100 animate-bounce-subtle" style="animation-delay: 0.6s">📝</div>` : ''}
       </div>
 
       <!-- Avatar -->
@@ -188,7 +187,7 @@ function _renderStudentRoutineCard(s, log) {
 
       <!-- Info -->
       <h4 class="text-sm font-black text-slate-800 leading-tight mb-1 line-clamp-2">${safeEscapeHTML(s.name)}</h4>
-      <p class="text-[10px] font-black text-slate-400 uppercase tracking-tighter">${s.age} ${s.age_type || 'aÃƒ±os'}</p>
+      <p class="text-[10px] font-black text-slate-400 uppercase tracking-tighter">${s.age} ${s.age_type || 'años'}</p>
       
       <!-- Progress Indicator (Dot) -->
       <div class="flex gap-1 mt-auto pt-2">
@@ -236,7 +235,7 @@ function _renderInfantRoutineUI(student, log, modalId) {
   let nextFeeding = 'Pendiente';
   if (lastMilk) {
     const lastTime = new Date(lastMilk.created_at);
-    lastTime.setHours(lastTime.getHours() + 1); // Sugerencia: cada 1 hora segÃƒºn instrucciÃƒ³n
+    lastTime.setHours(lastTime.getHours() + 1); // Sugerencia: cada 1 hora según instrucción
     nextFeeding = lastTime.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
   }
 
@@ -252,31 +251,31 @@ function _renderInfantRoutineUI(student, log, modalId) {
           </div>
           <div>
             <h3 class="text-xl font-black">${safeEscapeHTML(student.name)}</h3>
-            <p class="text-xs font-bold text-blue-100 uppercase tracking-widest">Protocolo de Lactante Ã°Å¸¼</p>
+            <p class="text-xs font-bold text-blue-100 uppercase tracking-widest">Protocolo de Lactante 🍼</p>
           </div>
         </div>
       </div>
 
       <div class="p-6 space-y-6 overflow-y-auto custom-scrollbar">
-        <!-- Dashboard RÃƒ¡pido BebÃƒ© -->
+        <!-- Dashboard Rápido Bebé -->
         <div class="grid grid-cols-2 gap-4">
           <div class="bg-blue-50 p-4 rounded-3xl border border-blue-100">
-            <p class="text-[10px] font-black text-blue-400 uppercase tracking-widest mb-1">PrÃƒ³xima Toma</p>
+            <p class="text-[10px] font-black text-blue-400 uppercase tracking-widest mb-1">Próxima Toma</p>
             <p class="text-lg font-black text-blue-700">${nextFeeding}</p>
           </div>
           <div class="bg-indigo-50 p-4 rounded-3xl border border-indigo-100">
-            <p class="text-[10px] font-black text-indigo-400 uppercase tracking-widest mb-1">ÃƒÅ¡ltima AcciÃƒ³n</p>
+            <p class="text-[10px] font-black text-indigo-400 uppercase tracking-widest mb-1">Última Acción</p>
             <p class="text-lg font-black text-indigo-700 truncate">${lastMilk ? lastMilk.value : '--'}</p>
           </div>
         </div>
 
-        <!-- Panel de Control de BebÃƒ©s -->
+        <!-- Panel de Control de Bebés -->
         <div class="space-y-4">
-          <label class="block text-[11px] font-black text-slate-400 uppercase tracking-widest ml-1">Acciones RÃƒ¡pidas</label>
+          <label class="block text-[11px] font-black text-slate-400 uppercase tracking-widest ml-1">Acciones Rápidas</label>
           
           <!-- Selector de Onzas -->
           <div class="bg-slate-50 p-4 rounded-3xl border-2 border-slate-100">
-             <p class="text-[10px] font-black text-slate-500 uppercase mb-3 flex items-center gap-2">Ã°Å¸¼ Registro de Leche</p>
+             <p class="text-[10px] font-black text-slate-500 uppercase mb-3 flex items-center gap-2">🍼 Registro de Leche</p>
              <div class="grid grid-cols-4 gap-2">
                 ${['2oz', '4oz', '6oz', '8oz'].map(oz => `
                   <button onclick="App.registerInfantEvent('${student.id}', 'milk', '${oz}')"
@@ -290,28 +289,28 @@ function _renderInfantRoutineUI(student, log, modalId) {
           <div class="grid grid-cols-2 gap-3">
              <button onclick="App.registerInfantEvent('${student.id}', 'sleep', 'siesta')"
                 class="flex flex-col items-center gap-2 p-4 bg-indigo-50 text-indigo-700 rounded-3xl border-2 border-indigo-100 hover:bg-indigo-100 transition-all">
-                <span class="text-2xl">Ã°Å¸â€™¤</span>
+                <span class="text-2xl">💤</span>
                 <span class="text-[10px] font-black uppercase">Siesta</span>
              </button>
              <button onclick="App.registerInfantEvent('${student.id}', 'health', 'vomito')"
                 class="flex flex-col items-center gap-2 p-4 bg-rose-50 text-rose-700 rounded-3xl border-2 border-rose-100 hover:bg-rose-100 transition-all">
-                <span class="text-2xl">Ã°Å¸¤¢</span>
-                <span class="text-[10px] font-black uppercase">VÃƒ³mito</span>
+                <span class="text-2xl">🤢</span>
+                <span class="text-[10px] font-black uppercase">Vómito</span>
              </button>
              <button onclick="App.registerInfantEvent('${student.id}', 'diaper', 'limpio')"
                 class="flex flex-col items-center gap-2 p-4 bg-emerald-50 text-emerald-700 rounded-3xl border-2 border-emerald-100 hover:bg-emerald-100 transition-all">
-                <span class="text-2xl">Ã°Å¸â€™©</span>
-                <span class="text-[10px] font-black uppercase">PaÃƒ±al Limpio</span>
+                <span class="text-2xl">💩</span>
+                <span class="text-[10px] font-black uppercase">Pañal Limpio</span>
              </button>
              <button onclick="App.registerInfantEvent('${student.id}', 'diaper', 'sucio')"
                 class="flex flex-col items-center gap-2 p-4 bg-amber-50 text-amber-700 rounded-3xl border-2 border-amber-100 hover:bg-amber-100 transition-all">
-                <span class="text-2xl">Ã°Å¸â€™©</span>
-                <span class="text-[10px] font-black uppercase">PaÃƒ±al Sucio</span>
+                <span class="text-2xl">💩</span>
+                <span class="text-[10px] font-black uppercase">Pañal Sucio</span>
              </button>
           </div>
         </div>
 
-        <!-- LÃƒ­nea de Tiempo del DÃƒ­a -->
+        <!-- Línea de Tiempo del Día -->
         <div class="space-y-4 pt-2">
           <label class="block text-[11px] font-black text-slate-400 uppercase tracking-widest ml-1">Historial de Hoy</label>
           <div class="space-y-3 border-l-2 border-slate-100 ml-4 pl-6">
@@ -320,13 +319,13 @@ function _renderInfantRoutineUI(student, log, modalId) {
                  <div class="absolute -left-[31px] top-1 w-4 h-4 rounded-full border-4 border-white shadow-sm ${e.type === 'health' ? 'bg-rose-500' : e.type === 'milk' ? 'bg-blue-500' : 'bg-slate-300'}"></div>
                  <p class="text-[10px] font-black text-slate-400 uppercase">${new Date(e.created_at).toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'})}</p>
                  <p class="text-sm font-bold text-slate-700">
-                    ${e.type === 'milk' ? `TomÃƒ³ ${e.value} de leche Ã°Å¸¼` : 
-                      e.type === 'health' ? `<span class="text-rose-600">ReportÃƒ³ ${e.value} Ã°Å¸¤¢</span>` :
-                      e.type === 'sleep' ? `IniciÃƒ³ siesta Ã°Å¸â€™¤` :
-                      `Cambio de paÃƒ±al: ${e.value} Ã°Å¸â€™©`}
+                    ${e.type === 'milk' ? `Tomó ${e.value} de leche 🍼` : 
+                      e.type === 'health' ? `<span class="text-rose-600">Reportó ${e.value} 🤢</span>` :
+                      e.type === 'sleep' ? `Inició siesta 💤` :
+                      `Cambio de pañal: ${e.value} 💩`}
                  </p>
                </div>
-             `).join('') : '<p class="text-xs text-slate-400 italic">Sin registros aÃƒºn.</p>'}
+             `).join('') : '<p class="text-xs text-slate-400 italic">Sin registros aún.</p>'}
           </div>
         </div>
       </div>
@@ -371,9 +370,9 @@ function _renderStandardRoutineUI(student, log, modalId) {
       </div>
 
       <div class="p-6 space-y-6 overflow-y-auto custom-scrollbar">
-        <!-- 1. Estado de Ãƒnimo -->
+        <!-- 1. Estado de Ánimo -->
         <div class="space-y-3">
-          <label class="block text-[11px] font-black text-slate-400 uppercase tracking-widest ml-1">Ã‚¿CÃƒ³mo estÃƒ¡ de Ãƒ¡nimo? Ã¢Ëœâ‚¬Ã¯¸</label>
+          <label class="block text-[11px] font-black text-slate-400 uppercase tracking-widest ml-1">¿Cómo está de ánimo? ☀️</label>
           <div class="grid grid-cols-4 gap-2">
             ${Object.entries(moodEmojis).map(([v, e]) => `
               <button onclick="App.updateRoutineFieldInModal('${student.id}','mood','${v}')"
@@ -387,9 +386,9 @@ function _renderStandardRoutineUI(student, log, modalId) {
           </div>
         </div>
 
-        <!-- 2. AlimentaciÃƒ³n -->
+        <!-- 2. Alimentación -->
         <div class="space-y-3">
-          <label class="block text-[11px] font-black text-slate-400 uppercase tracking-widest ml-1">Ã‚¿CÃƒ³mo comiÃƒ³ hoy? Ã°Å¸½Ã¯¸</label>
+          <label class="block text-[11px] font-black text-slate-400 uppercase tracking-widest ml-1">¿Cómo comió hoy? 🍽️</label>
           <div class="grid grid-cols-3 gap-2">
             ${Object.entries(foodEmojis).map(([v, e]) => `
               <button onclick="App.updateRoutineFieldInModal('${student.id}','food','${v}')"
@@ -405,7 +404,7 @@ function _renderStandardRoutineUI(student, log, modalId) {
 
         <!-- 3. Siesta -->
         <div class="space-y-3">
-          <label class="block text-[11px] font-black text-slate-400 uppercase tracking-widest ml-1">Ã‚¿Hizo su siesta? Ã°Å¸â€™¤</label>
+          <label class="block text-[11px] font-black text-slate-400 uppercase tracking-widest ml-1">¿Hizo su siesta? 💤</label>
           <div class="grid grid-cols-2 gap-3">
             ${Object.entries(sleepEmojis).map(([v, e]) => `
               <button onclick="App.updateRoutineFieldInModal('${student.id}','sleep','${v}')"
@@ -413,7 +412,7 @@ function _renderStandardRoutineUI(student, log, modalId) {
                 ${currentSleep === v ? 'border-indigo-400 bg-indigo-50 shadow-md' : 'border-slate-100 bg-slate-50'}"
                 data-val="${v}">
                 <span class="text-2xl">${e}</span>
-                <span class="text-xs font-black uppercase text-slate-600">${v === 'si' ? 'DurmiÃƒ³' : 'No durmiÃƒ³'}</span>
+                <span class="text-xs font-black uppercase text-slate-600">${v === 'si' ? 'Durmió' : 'No durmió'}</span>
               </button>
             `).join('')}
           </div>
@@ -421,7 +420,7 @@ function _renderStandardRoutineUI(student, log, modalId) {
 
         <!-- 4. Notas -->
         <div class="space-y-3">
-          <label class="block text-[11px] font-black text-slate-400 uppercase tracking-widest ml-1">Observaciones adicionales Ã°Å¸â€œ</label>
+          <label class="block text-[11px] font-black text-slate-400 uppercase tracking-widest ml-1">Observaciones adicionales 📝</label>
           <textarea id="modal-note-${student.id}" 
             class="w-full p-4 bg-slate-50 border-2 border-slate-100 rounded-2xl text-sm font-medium outline-none focus:border-orange-400 transition-all resize-none"
             rows="3" placeholder="Ej: Estuvo muy participativo hoy...">${safeEscapeHTML(currentNotes)}</textarea>

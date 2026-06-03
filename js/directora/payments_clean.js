@@ -1,4 +1,5 @@
 import { DirectorApi } from './api.js';
+import { AppState } from './state.js';
 import { Helpers } from '/js/shared/helpers.js';
 import { UIHelpers } from './ui.module.js';
 import { supabase } from '/js/shared/supabase.js';
@@ -35,11 +36,11 @@ export const PaymentsModule = {
   },
 
   _initSelectors() {
-    const now = new Date();
+    const selectorDate = new Date();
     const ms = document.getElementById('filterPaymentMonth');
     const ys = document.getElementById('filterPaymentYear');
-    if (ms) ms.value = String(now.getMonth() + 1).padStart(2, '0');
-    if (ys) ys.value = String(now.getFullYear());
+    if (ms) ms.value = String(selectorDate.getMonth() + 1).padStart(2, '0');
+    if (ys) ys.value = String(selectorDate.getFullYear());
   },
 
   async _loadSettings() {
@@ -80,13 +81,13 @@ export const PaymentsModule = {
       const sf = document.getElementById('filterPaymentStatus')?.value;
       const sq = document.getElementById('searchPaymentStudent')?.value?.trim();
 
-      const now    = new Date();
-      const today  = now.getDate();
+      const currentDate = new Date();
+      const today  = currentDate.getDate();
       const genDay = this.settings.generation_day || 25; // Día de generación
 
       // El mes actual solo es visible si hoy es >= 25.
-      const currentYear  = now.getFullYear();
-      const currentMonth = now.getMonth() + 1; // 1-12
+      const currentYear  = currentDate.getFullYear();
+      const currentMonth = currentDate.getMonth() + 1; // 1-12
       
       let maxVisibleMonthKey;
       if (today >= genDay) {
@@ -187,8 +188,8 @@ export const PaymentsModule = {
     if (p.evidence_url) return 'review';
     // Si el due_date ya pasó y sigue pending → mostrar como overdue en UI
     if (s === 'pending' && p.due_date) {
-      const today = new Date(); today.setHours(0,0,0,0);
-      if (new Date(p.due_date + 'T00:00:00') < today) return 'overdue';
+      const todayDate = new Date(); todayDate.setHours(0,0,0,0);
+      if (new Date(p.due_date + 'T00:00:00') < todayDate) return 'overdue';
     }
     return 'pending';
   },
@@ -224,8 +225,8 @@ export const PaymentsModule = {
              '</span>' +
            '</div>';
     } else if (p.due_date && ip) {
-      const t = new Date(); t.setHours(0, 0, 0, 0);
-      const df = Math.round((new Date(p.due_date + 'T00:00:00') - t) / 86400000);
+      const todayMidnight = new Date(); todayMidnight.setHours(0, 0, 0, 0);
+      const df = Math.round((new Date(p.due_date + 'T00:00:00') - todayMidnight) / 86400000);
       if (df === 0)      ub = '<span class="ml-1 text-[9px] font-black text-orange-600 bg-orange-50 border border-orange-200 px-1.5 py-0.5 rounded-full">vence hoy</span>';
       else if (df <= 5)  ub = '<span class="ml-1 text-[9px] font-black text-amber-600 bg-amber-50 border border-amber-200 px-1.5 py-0.5 rounded-full">vence en ' + df + 'd</span>';
     }
@@ -286,9 +287,9 @@ export const PaymentsModule = {
   async openPaymentModal(prefillStudentId = null) {
     const ic = 'w-full px-4 py-2.5 border-2 border-slate-100 rounded-2xl outline-none focus:ring-4 focus:ring-purple-100 focus:border-purple-400 bg-slate-50/50 transition-all text-sm font-bold text-slate-700';
     const lc = 'block text-[11px] font-black text-slate-400 uppercase tracking-wider mb-1.5 ml-1';
-    const now = new Date();
-    const curMonth = now.getMonth();
-    const curYear  = now.getFullYear();
+    const modalDate = new Date();
+    const curMonth = modalDate.getMonth();
+    const curYear  = modalDate.getFullYear();
     const nextM = curMonth + 1 > 11 ? 0 : curMonth + 1;
     const nextY = curMonth + 1 > 11 ? curYear + 1 : curYear;
     const dd = `${nextY}-${String(nextM + 1).padStart(2,'0')}-${String(this.settings.due_day || 5).padStart(2,'0')}`;
@@ -369,9 +370,9 @@ export const PaymentsModule = {
           // Calcular mora si aplica
           let mora = 0;
           if (dueDate && status === 'overdue') {
-            const today = new Date(); today.setHours(0,0,0,0);
+            const todayModal = new Date(); todayModal.setHours(0,0,0,0);
             const due = new Date(dueDate + 'T00:00:00');
-            const daysLate = Math.max(0, Math.floor((today - due) / 86400000));
+            const daysLate = Math.max(0, Math.floor((todayModal - due) / 86400000));
             if (daysLate > 0) {
               const moraRate = 0.05; // 5% por mes de mora
               const monthsLate = Math.ceil(daysLate / 30);
@@ -581,14 +582,14 @@ export const PaymentsModule = {
       }
 
       // Fallback: lógica en el cliente con regla de gracia para estudiantes nuevos
-      const now       = new Date();
-      const today     = now.getDate();
+      const cycleDate = new Date();
+      const today     = cycleDate.getDate();
       const genDay    = this.settings.generation_day || 25;
       const dueDay    = this.settings.due_day || 5;
 
       // El cobro que se genera hoy es para el mes siguiente
-      const targetM = now.getMonth() + 1 > 11 ? 0 : now.getMonth() + 1;
-      const targetY = now.getMonth() + 1 > 11 ? now.getFullYear() + 1 : now.getFullYear();
+      const targetM = cycleDate.getMonth() + 1 > 11 ? 0 : cycleDate.getMonth() + 1;
+      const targetY = cycleDate.getMonth() + 1 > 11 ? cycleDate.getFullYear() + 1 : cycleDate.getFullYear();
       const monthKey = `${targetY}-${String(targetM + 1).padStart(2, '0')}`;
 
       // Fecha de vencimiento: día 5 del mes siguiente al cobro
@@ -664,7 +665,7 @@ export const PaymentsModule = {
       await supabase.from('payments')
         .update({ status: 'overdue' })
         .eq('status', 'pending')
-        .lt('due_date', now.toISOString().split('T')[0]);
+        .lt('due_date', cycleDate.toISOString().split('T')[0]);
 
       if (generated > 0) {
         Helpers.toast(`✅ ${generated} cobro(s) generados (${eligibleStudents.length - missing.length} ya existían)`, 'success');

@@ -53,6 +53,7 @@ window.App = {
   openNewRoutineModal: Routine.openNewRoutineModal,
   openStudentRoutine: Routine.openStudentRoutine,
   registerInfantEvent: Routine.registerInfantEvent,
+  saveInfantEntry: Routine.saveInfantEntry,
   openBulkRoutineModal: Routine.openBulkRoutineModal,
   updateRoutineFieldInModal: Routine.updateRoutineFieldInModal,
   saveRoutineInModal: Routine.saveRoutineInModal,
