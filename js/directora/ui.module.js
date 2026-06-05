@@ -1,4 +1,5 @@
 import { Helpers } from '../shared/helpers.js';
+import { UIPremium } from '../shared/ui-premium.js';
 
 const UIHelpers = {
   setLoading(isLoading, containerSelector = '#globalModalContainer', btnSelector = null) {
@@ -45,10 +46,10 @@ const DirectorUI = {
       if (el) el.textContent = val;
     };
 
-    const kpis = data?.kpis || {};
+    const kpis = data?.stats || data?.kpis || {};
 
     // Estudiantes activos
-    const studentCount = (kpis.active > 0 ? kpis.active : null) ?? kpis.total ?? 0;
+    const studentCount = (kpis.active > 0 ? kpis.active : null) ?? kpis.students ?? kpis.total ?? 0;
     set('kpiStudents', studentCount);
 
     // Docentes
@@ -58,8 +59,8 @@ const DirectorUI = {
     set('kpiClassrooms', kpis.classrooms > 0 ? kpis.classrooms : (data?.classrooms?.length ?? 0));
 
     // Niños presentes hoy
-    const presentToday = data?.attendance?.today?.present ?? kpis.attendance_today ?? 0;
-    const totalToday   = data?.attendance?.today?.total ?? 0;
+    const presentToday = data?.attendance?.today?.present ?? kpis.present ?? kpis.attendance_today ?? 0;
+    const totalToday   = data?.attendance?.today?.total ?? studentCount;
     set('kpiAttendance', presentToday);
 
     // Tasa de asistencia como subtexto
@@ -70,11 +71,21 @@ const DirectorUI = {
     }
 
     // Por cobrar
-    const pending = data?.payments?.summary?.total_pending ?? kpis.pending_amount ?? 0;
+    const pending = data?.payments?.summary?.total_pending ?? kpis.pending_amount ?? kpis.pending_payments ?? 0;
     set('kpiPendingMoney', Number(pending).toLocaleString('es-DO', { minimumFractionDigits: 2 }));
 
     // Incidencias
-    set('kpiIncidents', data?.inquiries?.count ?? kpis.inquiries ?? 0);
+    set('kpiIncidents', data?.inquiries?.count ?? kpis.pendingInquiries ?? kpis.inquiries ?? 0);
+
+    // ✨ Hacer KPIs interactivos
+    this._initInteractiveKPIs();
+
+    // ✨ Inicializar Pull-to-Refresh
+    UIPremium.initPullToRefresh('dashboard', async () => {
+      const { DashboardService } = await import('./dashboard.service.js');
+      const refreshed = await DashboardService.getFullData(true);
+      this.renderDashboard(refreshed);
+    });
 
     // Lanzar widgets inteligentes en background (no bloquea el render)
     import('./automation.js').then(({ AutomationModule }) => {
@@ -82,6 +93,26 @@ const DirectorUI = {
     }).catch(() => {});
 
     if (window.lucide) lucide.createIcons();
+  },
+
+  _initInteractiveKPIs() {
+    const mappings = {
+      'card-kpi-students': 'estudiantes',
+      'card-kpi-teachers': 'maestros',
+      'card-kpi-attendance': 'asistencia',
+      'card-kpi-money': 'pagos',
+      'card-kpi-incidents': 'reportes'
+    };
+
+    Object.entries(mappings).forEach(([id, section]) => {
+      const el = document.getElementById(id);
+      if (el) {
+        el.style.cursor = 'pointer';
+        el.onclick = () => {
+          if (window.App?.navigation?.goTo) window.App.navigation.goTo(section);
+        };
+      }
+    });
   },
 
   renderClassroomRow(r) {

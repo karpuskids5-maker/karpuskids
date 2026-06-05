@@ -18,10 +18,14 @@ import { OnboardingGuide } from '../shared/onboarding.js';
 import { Prefetch } from '../shared/prefetch.js';
 import { VideoCallUI } from '../shared/videocall-ui.js';
 
+import { UIPremium } from '../shared/ui-premium.js';
+
 window.App = {
   feed: FeedModule, payments: PaymentsModule, tasks: TasksModule,
   attendance: AttendanceModule, chat: ChatModule, profile: ProfileModule,
-  grades: GradesModule, navigateTo: navigateTo
+  grades: GradesModule, navigateTo: navigateTo,
+  openDigitalID: openDigitalID,
+  switchStudent: switchStudent
 };
 window.BadgeSystem = BadgeSystem;
 
@@ -64,7 +68,8 @@ document.addEventListener('DOMContentLoaded', async () => {
     const { data: students, error } = await supabase
       .from('students')
       .select('*, classrooms(id, name, level, teacher_id)')
-      .eq('parent_id', auth.user.id);
+      .eq('parent_id', auth.user.id)
+      .order('name');
 
     if (error) throw error;
     if (!students?.length) {
@@ -78,7 +83,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     AppState.set('currentStudent', currentStudent);
 
     // Actualizar sidebar y header ANTES de cargar datos
-    updateHeaderProfile(auth.profile, currentStudent);
+    updateHeaderProfile(auth.profile, currentStudent, students);
     setupNavigation();
     setupGlobalListeners();
 
@@ -131,6 +136,23 @@ document.addEventListener('DOMContentLoaded', async () => {
 
     // 🎓 Guía de bienvenida para nuevos padres
     const parentName = auth.profile?.name?.split(' ')[0] || 'Bienvenido';
+    
+    // ✨ Inicializar Experiencia Premium Móvil (Bottom Nav)
+    UIPremium.injectBottomNav([
+      { section: 'home', label: 'Inicio', icon: 'home' },
+      { section: 'class', label: 'Muro', icon: 'image' },
+      { section: 'tasks', label: 'Tareas', icon: 'book-open' },
+      { section: 'chat', label: 'Chat', icon: 'message-circle' },
+      { section: 'profile', label: 'Mi Perfil', icon: 'user' }
+    ]);
+
+    window.addEventListener('app:nav-change', (e) => {
+      navigateTo(e.detail.section);
+    });
+
+    // ✨ Añadir Botón Flotante de QR (Carnet Digital)
+    _injectFloatingQRButton();
+
     OnboardingGuide.init({
       userName:   parentName,
       storageKey: 'padre_v2',
@@ -614,18 +636,100 @@ function initMessageBadgeRealtime() {
     .subscribe();
 }
 
-function updateHeaderProfile(profile, student) {
+/**
+ * ✨ Botón Flotante de QR (Carnet Digital)
+ */
+function _injectFloatingQRButton() {
+  if (document.getElementById('floatingQRBtn')) return;
+  const btn = document.createElement('button');
+  btn.id = 'floatingQRBtn';
+  btn.className = 'fixed bottom-24 right-6 w-14 h-14 bg-indigo-600 text-white rounded-2xl shadow-2xl flex items-center justify-center z-[90] active:scale-90 transition-all animate-bounce-subtle';
+  btn.innerHTML = '<i data-lucide="qr-code" class="w-7 h-7"></i>';
+  btn.onclick = () => openDigitalID();
+  document.body.appendChild(btn);
+  if (window.lucide) lucide.createIcons();
+}
+
+/**
+ * ✨ Abrir Carnet Digital con Brillo Máximo
+ */
+async function openDigitalID() {
+  const student = AppState.get('currentStudent');
+  if (!student) return;
+
+  Helpers.vibrate('medium');
+
+  const html = `
+    <div class="bg-white rounded-[2.5rem] overflow-hidden shadow-2xl animate-scaleIn">
+      <div class="bg-indigo-600 p-6 text-white text-center">
+        <h3 class="text-xl font-black">Carnet Digital</h3>
+        <p class="text-xs font-bold text-white/70 uppercase tracking-widest mt-1">Escaneo de Acceso</p>
+      </div>
+      <div class="p-8 flex flex-col items-center gap-6">
+        <div class="w-24 h-24 rounded-2xl border-4 border-indigo-50 overflow-hidden shadow-lg">
+          <img src="${student.avatar_url || 'img/1.jpg'}" class="w-full h-full object-cover">
+        </div>
+        <div class="text-center">
+          <h4 class="text-lg font-black text-slate-800">${Helpers.escapeHTML(student.name)}</h4>
+          <p class="text-xs font-bold text-slate-400 uppercase tracking-widest">${student.classrooms?.name || 'Sin aula'}</p>
+        </div>
+        <div id="digitalIDQR" class="p-4 bg-slate-50 rounded-3xl border-2 border-slate-100"></div>
+        <p class="text-[10px] font-bold text-slate-400 uppercase tracking-widest text-center">Muestra este código en la puerta para marcar asistencia rápida</p>
+      </div>
+    </div>
+  `;
+
+  if (window.openGlobalModal) window.openGlobalModal(html);
+
+  // Generar QR
+  setTimeout(() => {
+    const qrContainer = document.getElementById('digitalIDQR');
+    if (qrContainer && window.QRCode) {
+      new QRCode(qrContainer, {
+        text: student.matricula || student.id,
+        width: 180,
+        height: 180,
+        colorDark: "#1e1b4b",
+        colorLight: "#f8fafc"
+      });
+    }
+  }, 100);
+
+  // ✨ Modo Brillo Máximo (Opcional - solo si el navegador lo soporta)
+  if ('wakeLock' in navigator) {
+    try { await navigator.wakeLock.request('screen'); } catch(_) {}
+  }
+}
+
+function updateHeaderProfile(profile, student, allStudents = []) {
   const studentName = student?.name || 'Estudiante';
 
   // Sidebar — nombre + avatar del estudiante
   const sidebarName = document.getElementById('sidebar-student-name');
   if (sidebarName) sidebarName.textContent = studentName;
 
+  // UX: Añadir indicador visual y disparador si hay múltiples estudiantes
+  const switcherTrigger = document.getElementById('student-switcher-trigger');
+  if (switcherTrigger && allStudents.length > 1) {
+    const label = switcherTrigger.querySelector('p');
+    if (label && !label.innerHTML.includes('chevron')) {
+      label.innerHTML += ' <i data-lucide="chevron-down" class="inline w-3 h-3 ml-1"></i>';
+    }
+    switcherTrigger.onclick = () => _showStudentSwitcher(allStudents);
+  }
+
   const sidebarAvatar = document.getElementById('sidebarStudentAvatar');
   if (sidebarAvatar) {
     sidebarAvatar.innerHTML = student?.avatar_url
       ? '<img src="' + student.avatar_url + '" class="w-full h-full object-cover">'
       : '<span class="text-sm font-black text-emerald-700">' + studentName.charAt(0) + '</span>';
+  }
+
+  // Mobile header avatar también abre el selector
+  const mobileAvatar = document.getElementById('headerAvatarMobile');
+  if (mobileAvatar && allStudents.length > 1) {
+    mobileAvatar.style.cursor = 'pointer';
+    mobileAvatar.onclick = () => _showStudentSwitcher(allStudents);
   }
 
   document.querySelectorAll('.guardian-name-display').forEach(el => el.textContent = studentName);
@@ -653,6 +757,88 @@ function updateHeaderProfile(profile, student) {
   if (window.lucide) lucide.createIcons();
 }
 
+/**
+ * 🔄 Cambio de Estudiante (Multi-hijo)
+ */
+async function switchStudent(studentId) {
+  const all = AppState.get('students') || [];
+  const selected = all.find(s => String(s.id) === String(studentId));
+  if (!selected) return;
+
+  Helpers.vibrate('medium');
+  Helpers.showLoader('Cambiando perfil...');
+
+  try {
+    // 1. Limpiar Caché de Prefetch y AppState específico
+    Prefetch.clear();
+    AppState.set('currentDailyLog', null);
+    AppState.set('currentGrades', null);
+    AppState.set('currentPayments', null);
+
+    // 2. Desuscribir Canales Realtime actuales de forma exhaustiva
+    const channels = ['_dailyLogChannel', '_chatChannel', '_classroomChannel', '_notificationChannel', '_padreUnreadChannel'];
+    channels.forEach(ch => {
+      if (window[ch]) {
+        try { supabase.removeChannel(window[ch]); } catch(_) {}
+        window[ch] = null;
+      }
+    });
+
+    // 3. Actualizar Estado Global
+    AppState.set('currentStudent', selected);
+    localStorage.setItem('karpus_last_student_id', studentId);
+    
+    // 4. Reiniciar Realtime para el nuevo hijo
+    _initDailyLogRealtime(selected.id);
+    if (selected.classroom_id) initLiveClassListener(selected.classroom_id);
+
+    // 5. Recargar Dashboard y UI
+    updateHeaderProfile(AppState.get('profile'), selected, all);
+    await refreshDashboard();
+    
+    // Si estamos en una sección específica, reiniciarla
+    const currentSection = AppState.get('currentSection') || 'home';
+    navigateTo(currentSection);
+
+    Helpers.hideLoader();
+    Helpers.toast(`Perfil de ${selected.name.split(' ')[0]} cargado`, 'success');
+
+  } catch (e) {
+    Helpers.hideLoader();
+    Helpers.toast('Error al cambiar de perfil', 'error');
+  }
+}
+
+function _showStudentSwitcher(students) {
+  const current = AppState.get('currentStudent');
+  const html = `
+    <div class="bg-white rounded-[2.5rem] overflow-hidden shadow-2xl animate-scaleIn w-full max-w-xs">
+      <div class="p-6 border-b border-slate-100 bg-slate-50/50">
+        <h3 class="font-black text-slate-800 text-center">Cambiar de Estudiante</h3>
+      </div>
+      <div class="p-4 space-y-2">
+        ${students.map(s => `
+          <button onclick="App.switchStudent('${s.id}'); App.ui.closeModal()" 
+            class="w-full p-4 flex items-center gap-4 rounded-3xl transition-all ${String(s.id) === String(current?.id) ? 'bg-indigo-50 border-2 border-indigo-200' : 'bg-white border border-slate-100 hover:bg-slate-50'}">
+            <div class="w-12 h-12 rounded-2xl overflow-hidden bg-slate-100 flex items-center justify-center shrink-0">
+              ${s.avatar_url ? `<img src="${s.avatar_url}" class="w-full h-full object-cover">` : `<span class="font-black text-slate-400">${s.name.charAt(0)}</span>`}
+            </div>
+            <div class="text-left flex-1 min-w-0">
+              <p class="font-black text-slate-800 text-sm truncate">${s.name}</p>
+              <p class="text-[10px] font-bold text-slate-400 uppercase tracking-widest">${s.classrooms?.name || 'Sin aula'}</p>
+            </div>
+            ${String(s.id) === String(current?.id) ? '<i data-lucide="check" class="w-4 h-4 text-indigo-600"></i>' : ''}
+          </button>
+        `).join('')}
+      </div>
+      <div class="p-4 bg-slate-50 flex justify-center">
+         <button onclick="App.ui.closeModal()" class="text-[10px] font-black text-slate-400 uppercase tracking-widest p-2">Cerrar</button>
+      </div>
+    </div>
+  `;
+  window.openGlobalModal(html);
+  if (window.lucide) lucide.createIcons();
+}
 
 function _initDailyLogRealtime(studentId) {
   if (window._dailyLogChannel) return;

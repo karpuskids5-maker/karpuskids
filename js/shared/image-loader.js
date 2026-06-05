@@ -172,6 +172,7 @@ export const ImageLoader = {
       reader.onload = (e) => {
         const img = new Image();
         img.onload = () => {
+          // Forzar compresión nativa WebP para optimización de carga
           const canvas = document.createElement('canvas');
 
           // Calcular dimensiones manteniendo proporción
@@ -188,27 +189,11 @@ export const ImageLoader = {
           const ctx = canvas.getContext('2d');
           ctx.drawImage(img, 0, 0, width, height);
 
-          // Intentar WebP primero, fallback a JPEG
-          const tryFormat = canvas.toDataURL(format, quality);
-          const useFormat = tryFormat.startsWith('data:image/webp') ? format : 'image/jpeg';
-
           canvas.toBlob((blob) => {
             if (!blob) { resolve(file); return; }
-
-            // Si sigue siendo grande, comprimir más
-            if (blob.size > maxSizeKB * 1024 && quality > 0.5) {
-              canvas.toBlob((blob2) => {
-                const ext = useFormat === 'image/webp' ? 'webp' : 'jpg';
-                const name = file.name.replace(/\.[^.]+$/, '') + '.' + ext;
-                resolve(new File([blob2 || blob], name, { type: useFormat }));
-              }, useFormat, quality * 0.7);
-            } else {
-              const ext = useFormat === 'image/webp' ? 'webp' : 'jpg';
-              const name = file.name.replace(/\.[^.]+$/, '') + '.' + ext;
-              const compressed = new File([blob], name, { type: useFormat });
-              resolve(compressed);
-            }
-          }, useFormat, quality);
+            const name = file.name.replace(/\.[^.]+$/, '') + '.webp';
+            resolve(new File([blob], name, { type: 'image/webp' }));
+          }, 'image/webp', 0.75); // Forzar compresión nativa WebP a 75%
         };
         img.onerror = () => resolve(file);
         img.src = e.target.result;

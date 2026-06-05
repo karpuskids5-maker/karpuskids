@@ -104,6 +104,22 @@ export const Helpers = {
   },
 
   /**
+   * 📳 Haptic Feedback (Vibración sutil para móvil)
+   */
+  vibrate(style = 'light') {
+    if (!('vibrate' in navigator)) return;
+    
+    const patterns = {
+      light: 10,
+      medium: 20,
+      heavy: 40,
+      success: [10, 40, 10],
+      error: [60, 100, 60]
+    };
+    navigator.vibrate(patterns[style] || 10);
+  },
+
+  /**
    * 📅 Obtener fecha local en formato YYYY-MM-DD
    * Evita el error de cambio de día prematuro (UTC vs Local)
    */
@@ -326,12 +342,12 @@ export const Helpers = {
   /**
    * 🦴 Skeleton lista
    */
-  skeleton(rows = 3, height = 'h-12') {
+  skeleton(rows = 3, height = 'h-24') {
     return Array(rows).fill(0).map(() => `
-      <tr class="animate-pulse">
+      <tr class="animate-pulse border-b border-slate-50">
         <td colspan="100%" class="px-6 py-4">
           <div class="flex items-center gap-4">
-            <div class="w-10 h-10 bg-slate-100 rounded-2xl"></div>
+            <div class="w-12 h-12 bg-slate-100 rounded-2xl"></div>
             <div class="flex-1 space-y-2">
               <div class="h-3 bg-slate-100 rounded-full w-1/3"></div>
               <div class="h-2 bg-slate-50 rounded-full w-1/4"></div>
@@ -739,35 +755,19 @@ export const Helpers = {
 
 
   /**
-  /**
-   * 💰 Cálculo de Mora (Reglas Exactas)
-   * Del día 1 al 6: RD$50 por día
-   * Día 7: Se convierte en RD$500 (bloque completo)
-   * Después del día 7: +RD$50 por día adicional
-   * Cada 7 días (bloque): +RD$500
-   * Fórmula: (bloques_7 * 500) + (dias_restantes * 50)
-   *
-   * Ejemplos:
-   *   1 día  → RD$50
-   *   6 días → RD$300
-   *   7 días → RD$500  (bloque completo)
-   *   8 días → RD$550
-   *  14 días → RD$1,000
-   *  15 días → RD$1,050
-   *  30 días → RD$2,200  (4 bloques × 500 + 2 días × 50)
+   * 💰 Cálculo de Mora (Regla Unificada 5% Mensual)
+   * Se aplica un 5% del monto base por cada mes o fracción de mes de retraso.
    */
-  calculateMora(dueDate) {
-    if (!dueDate) return 0;
+  calculateMora(dueDate, baseAmount = 0) {
+    if (!dueDate || !baseAmount) return 0;
 
-    // Normalizar fecha: si es YYYY-MM-DD (sin hora), agregar T00:00:00
-    // para evitar interpretación UTC que causa diferencia de 1 día
     const dueDateStr = String(dueDate);
     const normalizedDate = /^\d{4}-\d{2}-\d{2}$/.test(dueDateStr)
       ? dueDateStr + 'T00:00:00'
       : dueDateStr;
 
     const today = new Date();
-    today.setHours(0, 0, 0, 0); // comparar solo fechas, sin horas
+    today.setHours(0, 0, 0, 0);
 
     const limit = new Date(normalizedDate);
     limit.setHours(0, 0, 0, 0);
@@ -777,20 +777,18 @@ export const Helpers = {
 
     if (daysLate <= 0) return 0;
 
-    // Cálculo acumulativo: cada 7 días = bloque de RD$500
-    // días restantes dentro del bloque actual = RD$50/día
-    const blocks        = Math.floor(daysLate / 7);
-    const remainingDays = daysLate % 7;
-    const totalMora     = (blocks * 500) + (remainingDays * 50);
+    const moraRate = 0.05; // 5% mensual
+    const monthsLate = Math.ceil(daysLate / 30);
+    const totalMora = Number(baseAmount) * moraRate * monthsLate;
 
-    return totalMora;
+    return Math.round(totalMora * 100) / 100;
   },
 
   /**
    * 💰 Desglose de Mora para UI
    */
-  getMoraBreakdown(dueDate) {
-    const total = Helpers.calculateMora(dueDate);
+  getMoraBreakdown(dueDate, baseAmount = 0) {
+    const total = Helpers.calculateMora(dueDate, baseAmount);
     if (total === 0) return null;
 
     const dueDateStr = String(dueDate);
@@ -802,19 +800,17 @@ export const Helpers = {
     const limit = new Date(normalizedDate); limit.setHours(0, 0, 0, 0);
     const daysLate = Math.floor((today.getTime() - limit.getTime()) / (1000 * 60 * 60 * 24));
 
-    const weeks         = Math.floor(daysLate / 7);
-    const remainingDays = daysLate % 7;
+    const monthsLate = Math.ceil(daysLate / 30);
 
-    let text = '';
-    if (weeks > 0)         text += `${weeks} sem `;
-    if (remainingDays > 0) text += `${remainingDays} día${remainingDays !== 1 ? 's' : ''}`;
-    if (!text)             text  = `${daysLate} día${daysLate !== 1 ? 's' : ''}`;
+    let text = daysLate === 1 ? '1 día' : `${daysLate} días`;
+    if (monthsLate > 0) {
+      text = `${monthsLate} mes${monthsLate > 1 ? 'es' : ''} (${daysLate} d)`;
+    }
 
     return {
       total,
       daysLate,
-      weeks,
-      remainingDays,
+      monthsLate,
       formattedText: text.trim()
     };
   }

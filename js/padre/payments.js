@@ -668,12 +668,16 @@ export const PaymentsModule = {
       }
 
       setP(20);
-      const { error: upErr } = await supabase.storage.from('classroom_media').upload(path, uploadFile);
+      const { error: upErr } = await supabase.storage.from('classroom_media').upload(path, uploadFile, {
+        onUploadProgress: (progress) => {
+          const percent = Math.round((progress.loaded / progress.total) * 100);
+          setP(percent);
+        }
+      });
       if (upErr) throw upErr;
       
-      setP(70);
+      setP(95);
       const { data: { publicUrl } } = supabase.storage.from('classroom_media').getPublicUrl(path);
-      setP(85);
 
       // 🔍 Buscar registro existente (Vencido o Pendiente) para este mes
       // Intentamos con el formato normalizado YYYY-MM y con el original
@@ -716,6 +720,16 @@ export const PaymentsModule = {
       
       this._showSuccessConfirmation(amount, monthRaw, bank);
       setP(100);
+
+      // ✅ ÉXITO: Confetti
+      if (window.confetti) {
+        confetti({
+          particleCount: 150,
+          spread: 70,
+          origin: { y: 0.6 },
+          colors: ['#10b981', '#3b82f6', '#f59e0b']
+        });
+      }
       
       setTimeout(() => {
         document.getElementById('payment-upload-progress')?.remove();

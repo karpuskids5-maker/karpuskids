@@ -33,6 +33,7 @@
   <script src="js/shared/chart.min.js"></script>
   <link rel="icon" href="logo/favicon.ico" type="image/x-icon">
   <link rel="stylesheet" href="css/karpus-tailwind.css">
+  <link rel="stylesheet" href="css/premium-mobile.css">
   <script src="js/shared/confetti.min.js"></script>
   <style>
     :root {
@@ -296,7 +297,7 @@
 
       <!-- Card Estudiante -->
       <div class="px-6 mb-8 hidden md:block"> 
-        <div class="bg-emerald-50/40 rounded-3xl p-5 border border-emerald-100/50 transition-all duration-300 hover:bg-emerald-50/60 group">
+        <div id="student-switcher-trigger" class="bg-emerald-50/40 rounded-3xl p-5 border border-emerald-100/50 transition-all duration-300 hover:bg-emerald-50/60 group cursor-pointer">
           <p class="text-[10px] text-slate-400 font-bold uppercase tracking-widest mb-2 flex items-center gap-1.5">
             <i data-lucide="sparkles" class="w-3.5 h-3.5 text-emerald-500 group-hover:animate-pulse"></i> Estudiante
           </p>

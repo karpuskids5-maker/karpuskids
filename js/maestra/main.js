@@ -16,14 +16,16 @@ import * as ChatApp from './modules/chat_app.js';
 import { PermitsModule } from './modules/permits.js';
 import { UI } from './modules/ui.js';
 
+import { UIPremium } from '/js/shared/ui-premium.js';
+
 window.safeToast = UI.safeToast;
 const { safeToast, safeEscapeHTML, Modal } = UI;
 
 // Cache de marcas de tiempo para evitar recargas constantes
 const _lastLoad = {};
 
-// Exponer Modal globalmente ANTES de cualquier interacci\u00f3n del usuario
-// Los onclick inline en HTML din\u00e1mico necesitan window.Modal disponible de inmediato
+// Exponer Modal globalmente ANTES de cualquier interacción del usuario
+// Los onclick inline en HTML dinámico necesitan window.Modal disponible de inmediato
 window.Modal = Modal;
 const { initAttendance, markAllPresent, registerAttendance } = Attendance;
 const { initRoutine, updateRoutineField, saveRoutineLog, openNewRoutineModal, openStudentRoutine, openBulkRoutineModal, updateRoutineFieldInModal, saveRoutineInModal, applyBulkRoutine } = Routine;
@@ -32,8 +34,8 @@ const { openStudentProfile, registerIncidentModal } = Students;
 const { initChat, selectChatContact } = ChatApp;
 
 /**
- * \ud83d\ude80 ARQUITECTURA SENIOR: Definici\u00f3n Global del Objeto App
- * Evita errores de "App is not defined" y centraliza la l\u00f3gica.
+ * 🚀 ARQUITECTURA SENIOR: Definición Global del Objeto App
+ * Evita errores de "App is not defined" y centraliza la lógica.
  */
 window.App = {
   // UI Helpers
@@ -45,6 +47,8 @@ window.App = {
   registerAttendance: Attendance.registerAttendance,
   markAllPresent: Attendance.markAllPresent,
   initAttendance: Attendance.initAttendance,
+  handleAttendancePointerDown: Attendance.handleAttendancePointerDown,
+  handleAttendancePointerUp: Attendance.handleAttendancePointerUp,
 
   // Routine
   initRoutine: Routine.initRoutine,
@@ -105,14 +109,13 @@ window.App = {
 };
 
 /**
- * Inicializaci\u00f3n principal
+ * Inicialización principal
  */
 
 // Global error handler
 window.addEventListener('unhandledrejection', (e) => {
   const msg = e.reason?.message?.toLowerCase() ?? '';
   if (msg.includes('indexeddb') || msg.includes('network') || msg.includes('fetch')) return;
-
 });
 
 document.addEventListener('DOMContentLoaded', async () => {
@@ -122,15 +125,14 @@ document.addEventListener('DOMContentLoaded', async () => {
     window.location.href = 'login.html';
   });
 
-  
   const auth = await ensureRole(['maestra', 'admin']);
   if (!auth) return;
   
   AppState.set('user', auth.user);
   AppState.set('profile', auth.profile);
 
-  // \ud83d\udd14 Inicializar Notificaciones Push
-  // \ud83d\udd25 FIX: Permitir subdominios como www. y otros para la inicializaci\u00f3n
+  // 🔔 Inicializar Notificaciones Push
+  // 🔥 FIX: Permitir subdominios como www. y otros para la inicialización
   const host = window.location.hostname;
   const isProd = host === 'karpuskids.com' || host === 'www.karpuskids.com' || host.endsWith('.karpuskids.com');
   
@@ -159,7 +161,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   const welcomeText = document.querySelector('#t-home header h1');
   if (welcomeText) welcomeText.innerHTML = `<span>Hola, <span class="user-name-display text-orange-600">${teacherName}</span>!</span>`;
 
-  // Cargar Perfil en secci\u00f3n perfil
+  // Cargar Perfil en sección perfil
   const pName = document.getElementById('teacherName');
   const pEmail = document.getElementById('teacherEmail');
   if (pName) pName.textContent = teacherName;
@@ -203,11 +205,10 @@ document.addEventListener('DOMContentLoaded', async () => {
         AppState.set('profile', { ...oldProfile, ...updates });
         
         safeToast('Perfil actualizado correctamente');
-        // Recargar la p\u00e1gina para reflejar cambios en sidebar y UI
+        // Recargar la página para reflejar cambios en sidebar y UI
         setTimeout(() => location.reload(), 1000);
       } catch (err) {
-
-        safeToast('Error al guardar perfil. Revisa tu conexi\u00f3n.', 'error');
+        safeToast('Error al guardar perfil. Revisa tu conexión.', 'error');
         btn.disabled = false;
         btn.innerHTML = '<i data-lucide="save" class="w-5 h-5"></i> Guardar Cambios';
       }
@@ -222,7 +223,7 @@ document.addEventListener('DOMContentLoaded', async () => {
       if (!file) return;
       
       if (file.size > 5 * 1024 * 1024) { // 5MB limit
-        safeToast('La imagen es demasiado grande (m\u00e1x. 5MB)', 'error');
+        safeToast('La imagen es demasiado grande (máx. 5MB)', 'error');
         return;
       }
       
@@ -230,7 +231,7 @@ document.addEventListener('DOMContentLoaded', async () => {
       const filePath = `avatars/${fileName}`;
 
       try {
-        // Comprimir avatar antes de subir (m\u00e1x 400px, WebP)
+        // Comprimir avatar antes de subir (máx 400px, WebP)
         const publicUrl = await ImageLoader.uploadToStorage(file, 'karpus-uploads', filePath, {
           maxWidth: 400, maxHeight: 400, quality: 0.85, maxSizeKB: 150
         });
@@ -252,13 +253,12 @@ document.addEventListener('DOMContentLoaded', async () => {
         
         safeToast('Avatar actualizado correctamente');
       } catch (err) {
-
         safeToast('Error al subir avatar', 'error');
       }
     };
   }
 
-  // \ud83d\udd25 EXPOSICI\u00d3N GLOBAL DE M\u00d3DULOS (CRUCIAL PARA EL MURO)
+  // 🔥 EXPOSICIÓN GLOBAL DE MÓDULOS (CRUCIAL PARA EL MURO)
   window.WallModule = WallModule;
 
   // Inicializar QR de la maestra en sección perfil
@@ -307,11 +307,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     
     AppState.set('classroom', classroom);
 
-    // Forzar el ID del aula si el perfil lo tiene (con null check)
-    if (auth.profile?.classroom_id && classroom.id !== auth.profile.classroom_id) {
-    }
-
-    // Inicializar M\u00f3dulos
+    // Inicializar Módulos
     await Promise.all([
       initDashboard(),
       initAttendance(),
@@ -325,10 +321,23 @@ document.addEventListener('DOMContentLoaded', async () => {
     loadMaestraUnreadBadge(auth.user.id);
     loadPendingTasksBadge(classroom.id);
 
-    // \ud83d\udd34 Sistema de badges por secci\u00f3n
+    // 🔴 Sistema de badges por sección
     BadgeSystem.init(auth.user.id);
 
-    // \u2500\u2500 Bot\u00f3n hamburguesa m\u00f3vil \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500
+    // ✨ Inicializar Experiencia Premium Móvil (Bottom Nav)
+    UIPremium.injectBottomNav([
+      { section: 't-home', label: 'Inicio', icon: 'home' },
+      { section: 't-class-detail', label: 'Mi Aula', icon: 'layout' },
+      { section: 't-tasks', label: 'Tareas', icon: 'book-open' },
+      { section: 't-chat', label: 'Chat', icon: 'message-circle' },
+      { section: 't-profile', label: 'Perfil', icon: 'user' }
+    ]);
+
+    window.addEventListener('app:nav-change', (e) => {
+      window.App.setActiveSection(e.detail.section);
+    });
+
+    // ── Botón hamburguesa móvil ────────────────────────────────────────────────────────
     const menuBtn = document.getElementById('menuBtn');
     const sidebar  = document.getElementById('sidebar');
     const overlay  = document.getElementById('sidebarOverlay');
@@ -352,14 +361,14 @@ document.addEventListener('DOMContentLoaded', async () => {
       overlay.addEventListener('click', _closeSidebar);
     }
 
-    // Cerrar sidebar al hacer click en un link (m\u00f3vil)
-    sidebar.querySelectorAll('button[data-section]').forEach(btn => {
+    // Cerrar sidebar al hacer click en un link (móvil)
+    sidebar?.querySelectorAll('button[data-section]').forEach(btn => {
       btn.addEventListener('click', () => {
         if (window.innerWidth <= 768) _closeSidebar();
       });
     });
 
-    // \u2500\u2500 Bot\u00f3n colapsar sidebar desktop \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500
+    // ── Botón colapsar sidebar desktop ─────────────────────────────────────────
     const toggleBtn  = document.getElementById('toggleSidebar');
     const layoutShell = document.getElementById('layoutShell');
     if (toggleBtn && sidebar && layoutShell) {
@@ -375,7 +384,6 @@ document.addEventListener('DOMContentLoaded', async () => {
     }, AppState);
 
   } catch (e) {
-
     safeToast('Error cargando datos del aula', 'error');
   }
 
@@ -393,9 +401,9 @@ function initRealtimeUpdates(classroomId) {
   currentChannel = supabase.channel(`maestra_room_${classroomId}`)
     .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'task_evidences' }, (payload) => {
       const student = (AppState.get('students') || []).find(s => s.id === payload.new.student_id);
-      if (student) safeToast(`\ud83d\udcdd ${student.name} entreg\u00f3 una tarea`, 'info');
+      if (student) safeToast(`📝 ${student.name} entregó una tarea`, 'info');
     })
-    // ?uchar cambios en posts para actualizar el muro sin recargar
+    // Escuchar cambios en posts para actualizar el muro sin recargar
     .on('postgres_changes', { event: '*', schema: 'public', table: 'posts' }, (payload) => {
       const { eventType, new: newPost, old: oldPost } = payload;
       const post = newPost || oldPost;
@@ -404,7 +412,7 @@ function initRealtimeUpdates(classroomId) {
       if (post && post.classroom_id && post.classroom_id !== classroomId) return;
 
       if (eventType === 'INSERT') {
-        safeToast('?va publicación en el muro', 'info');
+        safeToast('Nueva publicación en el muro', 'info');
         WallModule.loadPosts('muroPostsContainer');
       } else if (eventType === 'UPDATE') {
         const postId = newPost.id;
@@ -426,7 +434,7 @@ async function notify({ message, pushTo = null }) {
   if (pushTo) {
     sendPush({
       user_id: pushTo,
-      title: 'Notificaci\u00f3n Karpus',
+      title: 'Notificación Karpus',
       message: message,
       link: '/panel_padres.html'
     }).catch(() => {});
@@ -434,7 +442,7 @@ async function notify({ message, pushTo = null }) {
 }
 
 /**
- * \ud83d\udcca Dashboard
+ * 📊 Dashboard
  */
 async function initDashboard() {
   const classroom = AppState.get('classroom');
@@ -475,6 +483,7 @@ async function initDashboard() {
 
     _updateNextActivityWidget();
     _updatePunchAlertWidget(students, attendance);
+    _updateTasksToGradeWidget(classroom.id);
 
     // Grid de Aulas (Home)
     const grid = document.getElementById('classesGrid'); 
@@ -532,7 +541,7 @@ async function initDashboard() {
 }
 
 /**
- * ?OMATIZACIÃ“N: Widgets Inteligentes
+ * AUTOMATIZACIÓN: Widgets Inteligentes
  */
 function _updateNextActivityWidget() {
   const titleEl = document.getElementById('nextActivityTitle');
@@ -594,6 +603,46 @@ function _updatePunchAlertWidget(students, attendance) {
   }
 }
 
+/**
+ * Widget de Tareas Pendientes por Calificar
+ * Solo aparece si hay entregas de hace más de 24 horas sin calificar.
+ */
+async function _updateTasksToGradeWidget(classroomId) {
+  const widget = document.getElementById('tasksToGradeWidget');
+  const textEl = document.getElementById('tasksToGradeText');
+  if (!widget || !textEl) return;
+
+  try {
+    // 1. Obtener tareas del aula
+    const { data: tasks } = await supabase.from('tasks').select('id').eq('classroom_id', classroomId);
+    if (!tasks?.length) return widget.classList.add('hidden');
+
+    const taskIds = tasks.map(t => t.id);
+
+    // 2. Buscar entregas no calificadas
+    const { data: pending } = await supabase
+      .from('task_evidences')
+      .select('id, created_at')
+      .in('task_id', taskIds)
+      .neq('status', 'graded');
+
+    if (!pending?.length) return widget.classList.add('hidden');
+
+    // 3. Filtrar las que tienen más de 24 horas (opcional, según requerimiento)
+    const dayAgo = new Date(Date.now() - 24 * 60 * 60 * 1000);
+    const veryOld = pending.filter(p => new Date(p.created_at) < dayAgo);
+
+    if (veryOld.length > 0) {
+      widget.classList.remove('hidden');
+      textEl.textContent = `Tienes ${veryOld.length} entrega${veryOld.length > 1 ? 's' : ''} pendiente${veryOld.length > 1 ? 's' : ''} de revisar (más de 24h).`;
+    } else {
+      widget.classList.add('hidden');
+    }
+  } catch (e) {
+    console.error('Error updating tasks widget:', e);
+  }
+}
+
 window.App.sendAbsenceAlerts = async () => {
   const students = AppState.get('students') || [];
   const today = new Date().toISOString().split('T')[0];
@@ -612,7 +661,7 @@ window.App.sendAbsenceAlerts = async () => {
     if (s.parent_id) {
       await sendPush({
         user_id: s.parent_id,
-        title: 'Aviso de Ausencia â“',
+        title: 'Aviso de Ausencia ❓',
         message: `Hola, notamos que ${s.name} no ha llegado hoy. Por favor confírmanos si asistirá o si tiene algún inconveniente.`,
         link: 'panel_padres.html'
       }).catch(() => {});
@@ -623,31 +672,7 @@ window.App.sendAbsenceAlerts = async () => {
 };
 
 /**
- * \ud83d\udcc5 Asistencia
- */
-
-
-
-/**
- * \ud83c\udf71 Rutina Diaria
- */
-
-/**
- * \ud83c\udf71 Rutina Diaria - L\u00f3gica Profesional
- */
-
-
-/**
- * \ud83d\udcdd Tareas
- */
-
-
-
-
-
-
-/**
- * \ud83e\udded Navegaci\u00f3n
+ * 🧭 Navegación
  */
 function initNavigation() {
   const navButtons = document.querySelectorAll('.nav-btn-toy[data-section]');
@@ -658,9 +683,14 @@ function initNavigation() {
     const fullId = targetId.startsWith('t-') ? targetId : `t-${targetId}`;
     const cleanId = targetId.replace('t-', '');
 
+    Helpers.vibrate('light');
+
     sections.forEach(s => s.classList.remove('active'));
     const target = document.getElementById(fullId);
-    if (target) target.classList.add('active');
+    if (target) {
+      target.classList.add('active');
+      UIPremium.applySectionTransition(fullId);
+    }
 
     navButtons.forEach(btn => {
       const btnSection = btn.dataset.section;
@@ -671,12 +701,17 @@ function initNavigation() {
       }
     });
 
+    // Actualizar Bottom Nav
+    document.querySelectorAll('.nav-item').forEach(btn => {
+      btn.classList.toggle('active', btn.dataset.section === fullId);
+    });
+
     // Guardar en localStorage para persistencia
     if (!options.skipSave) {
       localStorage.setItem('maestra_last_section', fullId);
     }
 
-    // L\u00f3gica de refresco inteligente (TTL: 2 minutos)
+    // Lógica de refresco inteligente (TTL: 2 minutos)
     const now = Date.now();
     const isFresh = _lastLoad[cleanId] && (now - _lastLoad[cleanId] < 120000);
     if (isFresh) return;
@@ -693,7 +728,7 @@ function initNavigation() {
       import('../shared/notify-permission.js').then(m => m.NotifyPermission.requestIfNeeded());
     }
 
-    // \ud83d\udd34 Marcar badge como le\u00eddo al entrar a la secci\u00f3n
+    // 🔴 Marcar badge como leído al entrar a la sección
     BadgeSystem.mark(fullId);
   };
 
@@ -718,7 +753,7 @@ function initNavigation() {
 }
 
 /**
-   * \ud83c\udfeb Mostrar Detalle de Aula
+   * 🏫 Mostrar Detalle de Aula
    */
   async function showClassroomDetail(classroomId, options = {}) {
     // 1. Carga eficiente y paralela (Optimización de Datos)
@@ -769,6 +804,7 @@ function initNavigation() {
       // 4. Inicializar tabs del aula
       WallModule.init('muroPostsContainer', { 
         accentColor: 'orange',
+        likeColor: 'orange',
         classroomId: classroom.id 
       }, AppState);
 
@@ -781,7 +817,7 @@ function initNavigation() {
 }
 
 /**
- * \ud83d\udcd1 Inicializar Tabs Internas de Aula
+ * 📋 Inicializar Tabs Internas de Aula
  */
 function initClassTabs(defaultTab = null) {
   const tabBtns     = document.querySelectorAll('.class-tab-btn');
@@ -839,8 +875,12 @@ function initClassTabs(defaultTab = null) {
         const classroom = AppState.get('classroom');
         const profile   = AppState.get('profile');
         import('../shared/videocall-ui.js').then(({ VideoCallUI }) => {
-          VideoCallUI.init(classroom.id, profile.name, 'maestra');
-        });
+          VideoCallUI.renderSection('videocall-maestra-section', {
+            role: 'maestra',
+            userName: profile?.name || 'Maestra',
+            classroomId: classroom?.id
+          });
+        }).catch(() => {});
       }
     }, 0);
   };
@@ -861,7 +901,7 @@ function initVideocall() {
   if (!container) return;
   const classroom = AppState.get('classroom');
 
-  // 1. Mostrar Panel de Gesti\u00f3n
+  // 1. Mostrar Panel de Gestión
   container.innerHTML = `
     <div class="flex flex-col items-center justify-center p-12 text-center">
       <div class="w-20 h-20 bg-orange-100 rounded-full flex items-center justify-center mb-6">
@@ -883,7 +923,7 @@ function initVideocall() {
 }
 
 window.App.scheduleClassMeeting = async () => {
-    const title = prompt("T\u00edtulo de la clase/reuni\u00f3n:");
+    const title = prompt("Título de la clase/reunión:");
     if(!title) return;
     
     try {
@@ -907,7 +947,7 @@ async function startJitsi() {
   if (btn) { btn.disabled = true; btn.textContent = 'Iniciando...'; }
 
   try {
-    // 1. Crear reuni\u00f3n y notificar padres autom\u00e1ticamente
+    // 1. Crear reunión y notificar padres automáticamente
     const meeting = await VideoCallModule.scheduleMeeting({
       title:      `Clase en Vivo: ${classroom.name}`,
       start_time: new Date().toISOString(),
@@ -919,32 +959,29 @@ async function startJitsi() {
     // 2. Marcar como en vivo en la tabla classrooms (para que el padre lo vea)
     await supabase.from('classrooms').update({ is_live: true }).eq('id', classroom.id);
 
-    // 3. Iniciar la reuni\u00f3n
+    // 3. Iniciar la reunión
     await VideoCallModule.startMeeting(meeting.id);
 
-    // 4. Abrir en nueva pestana (evita lobby membersOnly)
+    // 4. Abrir en nueva pestaña (evita lobby membersOnly)
     const _fullRoom = 'karpuskids-edu-2026_' + meeting.room_name;
     window.open('https://meet.jit.si/' + _fullRoom, '_blank');
 
-    safeToast('\u00a1Clase iniciada! Los padres han sido notificados \ud83c\udfa5', 'success');
+    safeToast('¡Clase iniciada! Los padres han sido notificados 🎥', 'success');
   } catch (e) {
-
     safeToast('Error al iniciar la clase: ' + e.message, 'error');
     if (btn) { btn.disabled = false; btn.innerHTML = '<i data-lucide="radio"></i> Iniciar Clase Ahora'; }
   }
 }
 
-
-
 async function openNewPostModal() {
   const html = `
     <div class="bg-white w-full max-w-lg rounded-[2.5rem] shadow-2xl p-8 animate-fadeIn">
       <div class="flex justify-between items-start mb-6">
-        <h3 class="text-2xl font-black text-slate-800">Crear Publicaci\u00f3n</h3>
+        <h3 class="text-2xl font-black text-slate-800">Crear Publicación</h3>
         <button onclick="Modal.close('newPostModal')" class="p-2 hover:bg-slate-100 rounded-full"><i data-lucide="x" class="w-6 h-6 text-slate-400"></i></button>
       </div>
       <div class="space-y-4">
-        <textarea id="postContent" rows="4" class="w-full p-4 bg-slate-50 border-none rounded-2xl text-sm outline-none resize-none focus:ring-2 focus:ring-orange-400" placeholder="\u00bfQu\u00e9 quieres compartir con la clase?"></textarea>
+        <textarea id="postContent" rows="4" class="w-full p-4 bg-slate-50 border-none rounded-2xl text-sm outline-none resize-none focus:ring-2 focus:ring-orange-400" placeholder="¿Qué quieres compartir con la clase?"></textarea>
         
         <div class="relative">
           <input type="file" id="postFile" class="hidden" accept="image/*,video/*" onchange="document.getElementById('fileName').textContent = this.files[0]?.name || 'Adjuntar foto/video'">
@@ -994,339 +1031,120 @@ async function submitNewPost() {
     if (file) {
       const ext = file.type.startsWith('video') ? file.name.split('.').pop() : 'webp';
       const path = `posts/${Date.now()}_${Math.random().toString(36).substr(2,9)}.${ext}`;
-      setProgress(10);
-      // Comprimir im\u00e1genes antes de subir, videos sin comprimir
-      const publicUrl = await ImageLoader.uploadToStorage(
-        file,
-        'classroom_media',
-        path,
-        { maxWidth: 1200, maxHeight: 1200, quality: 0.82, maxSizeKB: 400 }
-      );
-      setProgress(80);
-      mediaUrl = publicUrl;
+      
+      mediaUrl = await ImageLoader.uploadToStorage(file, 'karpus-uploads', path, {
+        maxWidth: 1200,
+        quality: 0.8,
+        onProgress: setProgress
+      });
       mediaType = file.type.startsWith('video') ? 'video' : 'image';
-      setProgress(90);
     }
 
+    const { data: { user } } = await supabase.auth.getUser();
     const classroom = AppState.get('classroom');
-    const user = AppState.get('user');
-    if (!classroom || !user) throw new Error('No hay sesión activa');
 
-    const insertPayload = {
+    const { error } = await supabase.from('posts').insert({
+      content,
+      media_url: mediaUrl,
+      media_type: mediaType,
+      author_id: user.id,
       classroom_id: classroom.id,
-      teacher_id:   user.id,
-      content:      content,
-      media_url:    mediaUrl,
-      media_type:   mediaType
-    };
+      type: 'classroom'
+    });
 
-    const { error } = await supabase.from('posts').insert(insertPayload);
+    if (error) throw error;
 
-    setProgress(100);
-    if (error) {
-      // Si el error es por send_notification, intentar con RPC directo
-      if (error.message?.includes('send_notification') || error.code === '42883') {
-        throw new Error('La función send_notification no existe en la DB. Ejecuta fix_posts_insert.sql en Supabase.');
-      }
-      throw error;
-    }
-    safeToast('Publicado correctamente', 'success');
+    safeToast('Publicación creada con éxito', 'success');
     Modal.close('newPostModal');
-    // WallModule.loadPosts(document.getElementById('muroPostsContainer')); // Comentado: Realtime se encarga
+    WallModule.loadPosts('muroPostsContainer');
 
-    // Notify parents of this classroom (via background event)
-    const teacherName = AppState.get('profile')?.name || 'La maestra';
-
-    emitEvent('post.created', {
-      classroom_id:    classroom?.id,
-      teacher_name:    teacherName,
-      content_preview: content.slice(0, 80)
-    }).catch(() => {});
-  } catch (e) {
-    const errMsg = e?.message || String(e);
-    safeToast('Error al publicar: ' + errMsg, 'error');
+  } catch (err) {
+    safeToast('Error al crear publicación', 'error');
     btn.disabled = false;
     btn.innerHTML = 'PUBLICAR';
   }
 }
 
-// \u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550
-// \ud83d\udcca SISTEMA DE CALIFICACIONES \u2014 PANEL MAESTRA
-// \u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550
-
-function scoreFromEvidence(g) {
-  if (g.stars != null && g.stars > 0) return Number(g.stars);
-  const map = { A: 5, B: 4, C: 3, D: 2, E: 1 };
-  return map[g.grade_letter] || 0;
-}
-
-function getLevelLabel(score) {
-  if (score >= 4.5) return { label: 'Excelente',     cls: 'bg-emerald-100 text-emerald-700' };
-  if (score >= 3.5) return { label: 'Bueno',          cls: 'bg-blue-100 text-blue-700' };
-  if (score >= 2.5) return { label: 'En proceso',     cls: 'bg-amber-100 text-amber-700' };
-  return              { label: 'Requiere apoyo', cls: 'bg-rose-100 text-rose-700' };
-}
-
-async function initGrades() {
-  const classroom = AppState.get('classroom');
-  const container = document.getElementById('t-grades-inner') || document.getElementById('t-grades');
-  if (!container || !classroom) return;
-
-  container.innerHTML =
-    '<div class="flex justify-between items-center mb-6">' +
-      '<h3 class="text-2xl font-black text-slate-800">\ud83d\udcca Calificaciones del Aula</h3>' +
-    '</div>' +
-    '<div id="gradesContent" class="space-y-4">' +
-      '<div class="text-center py-8"><div class="animate-spin rounded-full h-8 w-8 border-b-2 border-orange-600 mx-auto"></div></div>' +
-    '</div>';
-  // Asegurar que el contenedor padre no corte el scroll horizontal
-  container.style.overflowX = 'auto';
-
-  if (window.lucide) window.lucide.createIcons();
-
-  try {
-    const students = AppState.get('students') || [];
-
-    // Cargar todas las evidencias del aula
-    const { data: evidences, error } = await supabase
-      .from('task_evidences')
-      .select('stars, grade_letter, student_id, task_id, task:task_id(title, classroom_id)')
-      .in('student_id', students.map(s => s.id));
-
-    if (error) throw error;
-
-    // Filtrar solo las del aula actual
-    const filtered = (evidences || []).filter(e => e.task?.classroom_id == classroom.id);
-
-    // Agrupar por estudiante
-    const byStudent = {};
-    filtered.forEach(g => {
-      const score = scoreFromEvidence(g);
-      if (!score) return;
-      const sid = g.student_id;
-      if (!byStudent[sid]) byStudent[sid] = { total: 0, count: 0, tasks: [] };
-      byStudent[sid].total += score;
-      byStudent[sid].count++;
-      byStudent[sid].tasks.push(g);
-    });
-
-    const content = document.getElementById('gradesContent');
-    if (!content) return;
-
-    if (!students.length) {
-      content.innerHTML = '<div class="text-center py-12 text-slate-400">No hay estudiantes en esta aula.</div>';
-      return;
-    }
-
-    content.innerHTML =
-      '<div class="grades-container">' +
-        // â”€â”€ Vista de Tabla (Desktop) â”€â”€
-        '<div class="hidden md:block w-full overflow-x-auto rounded-3xl border border-slate-100 shadow-sm bg-white" style="-webkit-overflow-scrolling:touch">' +
-          '<table class="w-full text-sm text-left" style="min-width:560px">' +
-            '<thead class="bg-slate-50 text-slate-500 font-black uppercase text-[10px] tracking-wider">' +
-              '<tr>' +
-                '<th class="px-5 py-4 whitespace-nowrap">Estudiante</th>' +
-                '<th class="px-5 py-4 text-center whitespace-nowrap">Promedio</th>' +
-                '<th class="px-5 py-4 text-center whitespace-nowrap">Nivel</th>' +
-                '<th class="px-5 py-4 text-center whitespace-nowrap">Tareas Calificadas</th>' +
-              '</tr>' +
-            '</thead>' +
-            '<tbody class="divide-y divide-slate-100">' +
-              students.map(s => {
-                const data = byStudent[s.id];
-                const avg = data && data.count > 0 ? data.total / data.count : 0;
-                const level = getLevelLabel(avg);
-                const colorCls = avg >= 3.5 ? 'bg-emerald-50 text-emerald-700' : avg >= 2.5 ? 'bg-amber-50 text-amber-700' : avg > 0 ? 'bg-rose-50 text-rose-700' : 'bg-slate-50 text-slate-400';
-                return '<tr class="hover:bg-slate-50 transition-colors">' +
-                  '<td class="px-5 py-3.5 whitespace-nowrap"><div class="flex items-center gap-3"><div class="w-8 h-8 rounded-xl bg-orange-50 text-orange-600 flex items-center justify-center font-black text-sm shrink-0">' + s.name.charAt(0) + '</div><div class="font-bold text-slate-800 text-sm">' + safeEscapeHTML(s.name) + '</div></div></td>' +
-                  '<td class="px-5 py-3.5 text-center whitespace-nowrap"><span class="px-3 py-1 rounded-lg ' + colorCls + ' font-black text-sm">' + (avg > 0 ? avg.toFixed(1) : '-') + '</span></td>' +
-                  '<td class="px-5 py-3.5 text-center whitespace-nowrap"><span class="px-2 py-1 rounded-full text-[10px] font-black uppercase ' + (avg > 0 ? level.cls : 'bg-slate-100 text-slate-400') + '">' + (avg > 0 ? level.label : 'Sin datos') + '</span></td>' +
-                  '<td class="px-5 py-3.5 text-center text-sm font-bold text-slate-600 whitespace-nowrap">' + (data?.count || 0) + '</td>' +
-                '</tr>';
-              }).join('') +
-            '</tbody>' +
-          '</table>' +
-        '</div>' +
-        // â”€â”€ Vista de Tarjetas (Mobile) â”€â”€
-        '<div class="md:hidden space-y-3">' +
-          students.map(s => {
-            const data = byStudent[s.id];
-            const avg = data && data.count > 0 ? data.total / data.count : 0;
-            const level = getLevelLabel(avg);
-            const colorCls = avg >= 3.5 ? 'bg-emerald-50 text-emerald-700' : avg >= 2.5 ? 'bg-amber-50 text-amber-700' : avg > 0 ? 'bg-rose-50 text-rose-700' : 'bg-slate-50 text-slate-400';
-            return '<div class="bg-white p-4 rounded-3xl border border-slate-100 shadow-sm">' +
-              '<div class="flex items-center justify-between mb-4">' +
-                '<div class="flex items-center gap-3">' +
-                  '<div class="w-10 h-10 rounded-2xl bg-orange-100 text-orange-600 flex items-center justify-center font-black text-lg shrink-0">' + s.name.charAt(0) + '</div>' +
-                  '<div>' +
-                    '<div class="font-black text-slate-800 text-sm">' + safeEscapeHTML(s.name) + '</div>' +
-                    '<div class="text-[10px] font-bold text-slate-400 uppercase tracking-widest">' + (data?.count || 0) + ' tareas calificadas</div>' +
-                  '</div>' +
-                '</div>' +
-                '<div class="text-right">' +
-                  '<div class="text-[20px] font-black ' + (avg > 0 ? 'text-slate-800' : 'text-slate-300') + '">' + (avg > 0 ? avg.toFixed(1) : '-') + '</div>' +
-                  '<div class="text-[9px] font-black text-slate-400 uppercase tracking-tighter">Promedio</div>' +
-                '</div>' +
-              '</div>' +
-              '<div class="flex items-center justify-between pt-3 border-t border-slate-50">' +
-                '<span class="text-[10px] font-black text-slate-400 uppercase tracking-widest">Nivel de Logro</span>' +
-                '<span class="px-3 py-1 rounded-full text-[10px] font-black uppercase ' + (avg > 0 ? level.cls : 'bg-slate-100 text-slate-400') + '">' + (avg > 0 ? level.label : 'Sin datos') + '</span>' +
-              '</div>' +
-            '</div>';
-          }).join('') +
-        '</div>' +
-      '</div>';
-
-    if (window.lucide) window.lucide.createIcons();
-  } catch (e) {
-
-    const content = document.getElementById('gradesContent');
-    if (content) {
-      content.innerHTML = Helpers.errorState('Error al cargar calificaciones', 'App.initGrades?.()');
-      if (window.lucide) window.lucide.createIcons();
-    }
-  }
-}
-
-// \u2500\u2500 Badge mensajes no le\u00eddos (maestra) \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500
+/**
+ * Cargar insignias de mensajes no leídos para la maestra
+ */
 async function loadMaestraUnreadBadge(userId) {
   try {
-    let total = 0;
-
-    const { data, error } = await supabase.rpc('get_unread_counts');
-    if (!error && data) {
-      total = Object.values(data).reduce((a, b) => a + Number(b), 0);
-    }
-    // Si el RPC falla, mostrar 0 silenciosamente
-
-    // badge-t-chat es el ID real en el HTML del sidebar
+    const { count } = await supabase
+      .from('messages')
+      .select('id', { count: 'exact', head: true })
+      .eq('receiver_id', userId)
+      .eq('is_read', false);
+    
     const badge = document.getElementById('badge-t-chat');
-    if (!badge) return;
-    if (total > 0) {
-      badge.textContent = total > 9 ? '9+' : String(total);
-      badge.classList.remove('hidden');
-      badge.classList.add('flex');
-    } else {
-      badge.classList.add('hidden');
-      badge.classList.remove('flex');
-    }
-
-    if (!window._maestraUnreadChannel) {
-      window._maestraUnreadChannel = supabase.channel('maestra_unread_' + userId)
-        .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'messages' }, () => {
-          loadMaestraUnreadBadge(userId);
-        })
-        .subscribe();
+    if (badge) {
+      if (count > 0) {
+        badge.textContent = count > 99 ? '99+' : count;
+        badge.classList.remove('hidden');
+      } else {
+        badge.classList.add('hidden');
+      }
     }
   } catch (_) {}
 }
 
-// â”€â”€ Badge tareas pendientes de calificar â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+/**
+ * Cargar insignias de tareas pendientes por calificar
+ */
 async function loadPendingTasksBadge(classroomId) {
-  if (!classroomId) return;
   try {
-    // Obtener IDs de tareas del aula
-    const { data: tasks } = await supabase
-      .from('tasks')
-      .select('id')
-      .eq('classroom_id', classroomId);
-
-    if (!tasks?.length) return;
-
-    const taskIds = tasks.map(t => t.id);
-
-    // Contar entregas sin calificar
     const { count } = await supabase
       .from('task_evidences')
       .select('id', { count: 'exact', head: true })
-      .in('task_id', taskIds)
-      .neq('status', 'graded');
-
-    const total = count || 0;
-
-    // Badge en el tab de tareas dentro del aula (desktop + mobile)
-    document.querySelectorAll('.class-tab-btn[data-tab="tasks"]').forEach(btn => {
-      let badge = btn.querySelector('.tasks-pending-badge');
-      if (!badge) {
-        badge = document.createElement('span');
-        badge.className = 'tasks-pending-badge absolute -top-1 -right-1 w-5 h-5 bg-rose-500 text-white text-[9px] font-black rounded-full flex items-center justify-center shadow-sm animate-pulse';
-        btn.style.position = 'relative';
-        btn.appendChild(badge);
-      }
-      if (total > 0) {
-        badge.textContent = total > 9 ? '9+' : String(total);
-        badge.style.display = 'flex';
+      .eq('status', 'pending');
+      // Podrías filtrar por classroom_id si las tareas tienen ese campo
+    
+    const badge = document.getElementById('badge-t-home');
+    if (badge) {
+      if (count > 0) {
+        badge.textContent = count > 99 ? '99+' : count;
+        badge.classList.remove('hidden');
       } else {
-        badge.style.display = 'none';
+        badge.classList.add('hidden');
       }
-    });
+    }
   } catch (_) {}
 }
 
-// â”€â”€ QR de identificación de la maestra â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
-async function _initMaestraQR(profile, user) {
-  const section   = document.getElementById('maestra-qr-section');
-  const container = document.getElementById('maestra-qr-container');
-  const label     = document.getElementById('maestra-qr-matricula');
-  if (!section || !container) return;
-
-  // Siempre hacer fetch fresco para obtener access_code actualizado
-  let freshProfile = profile;
-  try {
-    const { data } = await supabase
-      .from('profiles')
-      .select('id, name, access_code, notes')
-      .eq('id', user.id)
-      .maybeSingle();
-    if (data) freshProfile = { ...profile, ...data };
-  } catch (_) {}
-
-  // Prioridad: access_code > notes (legacy) > fallback con user.id
-  const code = freshProfile?.access_code
-    || (freshProfile?.notes?.startsWith?.('TEA-') || freshProfile?.notes?.startsWith?.('ASI-') || freshProfile?.notes?.startsWith?.('DIR-') ? freshProfile.notes : null)
-    || user?.id?.substring(0, 8).toUpperCase()
-    || 'SIN-CODIGO';
-
-  section.classList.remove('hidden');
-  if (label) label.textContent = code;
-
-  // Cargar QR lib
-  if (!window.QRCode) {
-    await new Promise(r => {
-      const s = document.createElement('script');
-      s.src = 'js/shared/qrcode.min.js';
-      s.onload = r;
-      document.head.appendChild(s);
-    });
-  }
-
-  container.innerHTML = '';
-  new window.QRCode(container, {
-    text: JSON.stringify({ matricula: code, name: profile?.name || 'Maestra', type: 'karpus-staff', v: 1 }),
-    width: 160, height: 160,
-    colorDark: '#1e293b', colorLight: '#ffffff',
-    correctLevel: window.QRCode.CorrectLevel.H
+/**
+ * Inicializar QR de la maestra
+ */
+function _initMaestraQR(profile, user) {
+  const container = document.getElementById('maestraQR');
+  if (!container) return;
+  
+  const qrData = JSON.stringify({
+    id: user.id,
+    role: 'maestra',
+    name: profile?.name || 'Maestra'
   });
+  
+  // Usar una API de QR externa o librería si está disponible
+  container.innerHTML = `<img src="https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=${encodeURIComponent(qrData)}" class="mx-auto border-4 border-white shadow-lg rounded-2xl" alt="QR Maestra">`;
+}
 
-  // Función global para imprimir
-  window.App.printMaestraQR = () => {
-    const img = container.querySelector('img')?.src || container.querySelector('canvas')?.toDataURL();
-    if (!img) return;
-    const name = profile?.name || 'Maestra';
-    const win = window.open('', '_blank');
-    win.document.write(`<!DOCTYPE html><html><head><title>QR ${code}</title>
-      <style>body{font-family:Arial,sans-serif;display:flex;align-items:center;justify-content:center;min-height:100vh;margin:0;}
-      .card{border:2px solid #e2e8f0;border-radius:16px;padding:24px;text-align:center;max-width:260px;}
-      .logo{font-size:11px;font-weight:900;color:#f97316;text-transform:uppercase;letter-spacing:2px;margin-bottom:12px;}
-      img{width:180px;height:180px;}.name{font-size:15px;font-weight:900;color:#1e293b;margin-top:12px;}
-      .code{font-size:10px;color:#64748b;font-weight:700;margin-top:4px;}.hint{font-size:8px;color:#94a3b8;margin-top:6px;}</style>
-    </head><body><div class="card">
-      <div class="logo">?pus Kids â€” Personal</div>
-      <img src="${img}">
-      <div class="name">${name}</div>
-      <div class="code">${code}</div>
-      <div class="hint">Escanea para registrar entrada/salida</div>
-    </div><script>window.onload=()=>window.print()<\/script></body></html>`);
-    win.document.close();
-  };
+function initGrades() {
+  const container = document.getElementById('t-grades-inner');
+  if (!container) return;
+  
+  container.innerHTML = `
+    <header class="mb-6">
+      <h1 class="text-2xl md:text-3xl font-black text-slate-800 flex items-center gap-3">
+        <span class="p-2 bg-indigo-100 text-indigo-600 rounded-2xl"><i data-lucide="graduation-cap" class="w-6 h-6"></i></span>
+        Centro de Calificaciones
+      </h1>
+      <p class="text-slate-500 font-medium">Gestiona las notas y el progreso académico de tus alumnos</p>
+    </header>
+    <div class="bg-white p-8 rounded-[2.5rem] border border-slate-100 shadow-sm text-center">
+      <div class="w-20 h-20 bg-indigo-50 text-indigo-500 rounded-full flex items-center justify-center mx-auto mb-4 text-3xl">📝</div>
+      <h3 class="text-xl font-black text-slate-800 mb-2">Próximamente</h3>
+      <p class="text-slate-500 max-w-sm mx-auto">Estamos trabajando en una nueva interfaz para que calificar sea más rápido y divertido.</p>
+    </div>
+  `;
+  if (window.lucide) window.lucide.createIcons();
 }

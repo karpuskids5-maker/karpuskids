@@ -219,7 +219,12 @@
     <div class="section active" id="sec-dashboard">
       <!-- KPIs -->
       <div class="kpi-grid" id="kpiGrid">
-        <div class="kpi k-indigo"><div class="kpi-val" id="kpi-users">—</div><div class="kpi-lbl">Usuarios totales</div><i class="bi bi-people-fill kpi-icon"></i></div>
+        <div id="paymentHealthWidget" class="kpi k-blue">
+          <div class="kpi-lbl">Salud del Ciclo</div>
+          <div style="font-size:11px;color:var(--muted);margin-top:4px;">Cargando estado...</div>
+          <i class="bi bi-activity kpi-icon"></i>
+        </div>
+        <div class="kpi k-indigo"><div class="kpi-val" id="kpi-users">0</div><div class="kpi-lbl">Usuarios totales</div><i class="bi bi-people-fill kpi-icon"></i></div>
         <div class="kpi k-green"><div class="kpi-val" id="kpi-students">—</div><div class="kpi-lbl">Estudiantes activos</div><i class="bi bi-mortarboard-fill kpi-icon"></i></div>
         <div class="kpi k-orange"><div class="kpi-val" id="kpi-payments">—</div><div class="kpi-lbl">Pagos este mes</div><i class="bi bi-credit-card-fill kpi-icon"></i></div>
         <div class="kpi k-blue"><div class="kpi-val" id="kpi-attendance">—</div><div class="kpi-lbl">Asistencias hoy</div><i class="bi bi-calendar-check-fill kpi-icon"></i></div>

@@ -89,6 +89,10 @@ export const AccessModule = {
     }
   },
 
+  stopScanner() {
+    this.closeScanner();
+  },
+
   _initOfflineSupport() {
     window.addEventListener('online', () => {
       Helpers.toast('Conexión restaurada. Sincronizando...', 'info');

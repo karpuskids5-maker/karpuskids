@@ -4,6 +4,7 @@ import { Helpers } from '/js/shared/helpers.js';
 import { UIHelpers } from './ui.module.js';
 import { supabase } from '/js/shared/supabase.js';
 import { auditLog } from '/js/shared/db-utils.js';
+import { UIPremium } from '/js/shared/ui-premium.js';
 
 const MES = ['enero','febrero','marzo','abril','mayo','junio','julio','agosto','septiembre','octubre','noviembre','diciembre'];
 const MES_LABEL = ['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'];
@@ -20,19 +21,46 @@ export const PaymentsModule = {
       this._ready = true;
       const on = (id, ev, fn) => document.getElementById(id)?.addEventListener(ev, fn);
       on('btnRefreshPayments',    'click',  () => this.loadPayments());
-      on('filterPaymentMonth',    'change', () => this.loadPayments());
-      on('filterPaymentYear',     'change', () => this.loadPayments());
-      on('filterPaymentStatus',   'change', () => this.loadPayments());
-      on('searchPaymentStudent',  'input',  () => this.loadPayments());
+      on('filterPaymentMonth',    'change', () => { this._saveFilters(); this.loadPayments(); });
+      on('filterPaymentYear',     'change', () => { this._saveFilters(); this.loadPayments(); });
+      on('filterPaymentStatus',   'change', () => { this._saveFilters(); this.loadPayments(); });
+      on('searchPaymentStudent',  'input',  () => { this._saveFilters(); this.loadPayments(); });
       on('btnNewPaymentAction',   'click',  () => this.openPaymentModal());
       on('btnNewPayment',         'click',  () => this.openPaymentModal());
-      on('btnGenerateCharges',    'click',  () => this.runCycle());
-      on('btnGeneratePaymentsNow','click',  () => this.runCycle());
+      on('btnGenerateCharges',    'click',  () => this.showCyclePreview());
+      on('btnGeneratePaymentsNow','click',  () => this.showCyclePreview());
       on('btnSendPaymentReminders','click', () => this.sendReminders());
       on('btnExportMorosidad',    'click',  () => this.exportMorosidad());
       on('btnSavePaymentConfig',  'click',  () => this.savePaymentConfig());
     }
+    this._loadFilters();
     await this.loadPayments();
+  },
+
+  _saveFilters() {
+    const filters = {
+      month:  document.getElementById('filterPaymentMonth')?.value,
+      year:   document.getElementById('filterPaymentYear')?.value,
+      status: document.getElementById('filterPaymentStatus')?.value,
+      search: document.getElementById('searchPaymentStudent')?.value
+    };
+    sessionStorage.setItem('karpus_payment_filters', JSON.stringify(filters));
+  },
+
+  _loadFilters() {
+    try {
+      const saved = sessionStorage.getItem('karpus_payment_filters');
+      if (!saved) return;
+      const filters = JSON.parse(saved);
+      const ms = document.getElementById('filterPaymentMonth');
+      const ys = document.getElementById('filterPaymentYear');
+      const ss = document.getElementById('filterPaymentStatus');
+      const qs = document.getElementById('searchPaymentStudent');
+      if (ms && filters.month) ms.value = filters.month;
+      if (ys && filters.year)  ys.value = filters.year;
+      if (ss && filters.status) ss.value = filters.status;
+      if (qs && filters.search) qs.value = filters.search;
+    } catch (_) {}
   },
 
   _initSelectors() {
@@ -114,9 +142,9 @@ export const PaymentsModule = {
         return;
       }
 
-      const SEL = 'id,student_id,amount,concept,status,due_date,created_at,paid_date,method,bank,reference,month_paid,evidence_url,students:student_id(name,classroom_id,classrooms:classroom_id(name))';
+      const SEL = 'id,student_id,amount,concept,status,due_date,created_at,paid_date,method,bank,reference,month_paid,evidence_url,calculated_mora,total_due,student_name,classroom_name';
 
-      let q = supabase.from('payments').select(SEL);
+      let q = supabase.from('v_payments_with_mora').select(SEL);
 
       if (sf === 'all') {
         q = q.or(`and(status.eq.overdue,month_paid.lt.${maxVisibleMonthKey}),month_paid.eq.${monthKey}`);
@@ -135,7 +163,7 @@ export const PaymentsModule = {
       let list = data || [];
       if (sq) {
         const query = sq.toLowerCase();
-        list = list.filter(p => p.students?.name?.toLowerCase().includes(query));
+        list = list.filter(p => p.student_name?.toLowerCase().includes(query));
       }
 
       AppState.set('paymentsData', list);
@@ -170,6 +198,19 @@ export const PaymentsModule = {
       }
 
       tbody.innerHTML = html;
+
+      // ✨ Inicializar Gestos Swipe
+      UIPremium.initSwipeActions('paymentsTableBody', {
+        onRight: (id) => {
+          Helpers.vibrate('medium');
+          this.markPaid(id);
+        },
+        onLeft: (id) => {
+          const p = AppState.get('paymentsData')?.find(x => x.id === id);
+          if (p?.evidence_url) window.open(p.evidence_url, '_blank');
+        }
+      });
+
       if (window.lucide) lucide.createIcons();
     } catch (e) {
       console.error('Error in loadPayments:', e);
@@ -203,22 +244,23 @@ export const PaymentsModule = {
       overdue: { l: 'Vencido',     c: 'bg-rose-100 text-rose-700',       i: 'alert-triangle' }
     };
     const st  = sm[sk] || { l: p.status, c: 'bg-slate-100 text-slate-700', i: 'help-circle' };
-    const stu = p.students || { name: 'Desconocido', classrooms: { name: '-' } };
+    const stu = { name: p.student_name || 'Desconocido', classrooms: { name: p.classroom_name || '-' } };
     const ip  = sk !== 'paid';
     const ds  = p.due_date ? new Date(p.due_date + 'T00:00:00').toLocaleDateString('es-ES') : '-';
     const af  = 'RD$' + Number(p.amount || 0).toLocaleString('es-DO', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
-    // Mora acumulada
-    const mora         = (ip && p.due_date) ? Helpers.calculateMora(p.due_date) : 0;
-    const moraBreakdown = (mora > 0 && p.due_date) ? Helpers.getMoraBreakdown(p.due_date) : null;
-    const totalAmount  = Number(p.amount || 0) + mora;
+    // Mora acumulada (usando valores de la vista de Postgres)
+    const mora         = Number(p.calculated_mora || 0);
+    const totalAmount  = Number(p.total_due || p.amount || 0);
     const tf           = 'RD$' + totalAmount.toLocaleString('es-DO', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
     let ub = '';
-    if (mora > 0 && moraBreakdown) {
+    if (mora > 0) {
+      // Intentar obtener desglose local si es posible para el texto
+      const breakdown = p.due_date ? Helpers.getMoraBreakdown(p.due_date, p.amount) : null;
       ub = '<div class="mt-1 flex flex-col items-end gap-0.5">' +
              '<span class="text-[9px] font-black text-rose-600 bg-rose-50 border border-rose-200 px-2 py-0.5 rounded-full uppercase">' +
-               'Mora: +' + Helpers.formatCurrency(mora) + ' (' + moraBreakdown.formattedText + ')' +
+               'Mora: +' + Helpers.formatCurrency(mora) + (breakdown ? ' (' + breakdown.formattedText + ')' : '') +
              '</span>' +
              '<span class="text-[10px] font-bold text-slate-800 bg-amber-100 px-2 py-0.5 rounded-md border border-amber-200">' +
                'Total: ' + tf +
@@ -240,15 +282,27 @@ export const PaymentsModule = {
       ? '<a href="' + p.evidence_url + '" target="_blank" rel="noopener noreferrer" class="inline-flex items-center gap-1 text-sky-600 hover:text-sky-800 text-xs font-bold uppercase"><i data-lucide="external-link" class="w-3 h-3"></i>Ver</a>'
       : '<span class="text-slate-300 text-xs">-</span>';
 
-    return '<tr class="hover:bg-slate-50 border-b border-slate-100 transition-colors' + (sk === 'overdue' ? ' bg-rose-50/20' : '') + '">' +
-      '<td class="px-5 py-3.5"><div class="flex items-center gap-3"><div class="w-8 h-8 rounded-xl bg-indigo-50 text-indigo-600 flex items-center justify-center font-black text-sm flex-shrink-0">' + Helpers.escapeHTML((stu.name || '?').charAt(0).toUpperCase()) + '</div><div><div class="font-bold text-slate-800 text-sm">' + Helpers.escapeHTML(stu.name || '-') + '</div><div class="text-[10px] text-slate-400 font-bold uppercase">' + (stu.classrooms?.name || 'Sin aula') + '</div></div></div></td>' +
-      '<td class="px-5 py-3.5 text-center"><span class="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[10px] font-black uppercase ' + st.c + '"><i data-lucide="' + st.i + '" class="w-3 h-3"></i>' + st.l + '</span></td>' +
-      '<td class="px-5 py-3.5 text-right"><div class="font-black text-slate-800 text-base">' + af + '</div>' + (ip ? '<div class="flex flex-col items-end gap-0.5 mt-0.5">' + ub + '</div>' : '') + '</td>' +
-      '<td class="px-5 py-3.5"><span class="text-[10px] font-black uppercase text-slate-500 bg-slate-100 px-2 py-0.5 rounded-md">' + (p.method || '-') + '</span></td>' +
-      '<td class="px-5 py-3.5"><div class="text-[10px] font-bold text-slate-600 uppercase truncate max-w-[110px]">' + (p.bank || '-') + '</div><div class="text-[9px] text-slate-400 font-bold">' + (p.reference || '') + '</div></td>' +
-      '<td class="px-5 py-3.5"><div class="text-[11px] font-bold text-slate-700">' + (p.paid_date ? new Date(p.paid_date).toLocaleDateString('es-ES') : ds) + '</div><div class="text-[9px] text-slate-400 font-bold uppercase">' + (p.paid_date ? 'Pagado' : 'Vence') + '</div></td>' +
-      '<td class="px-5 py-3.5 text-center">' + voucherCell + '</td>' +
-      '<td class="px-5 py-3.5 text-center"><div class="flex justify-center gap-1.5">' + approveBtn + waiveMoraBtn + deleteBtn + '</div></td>' +
+    return '<tr class="swipe-row hover:bg-slate-50 border-b border-slate-100 transition-colors' + (sk === 'overdue' ? ' bg-rose-50/20' : '') + '" data-id="' + p.id + '">' +
+      '<td colspan="8" class="p-0 border-none">' +
+        '<div class="swipe-actions">' +
+          '<div class="action-left"><i data-lucide="check"></i></div>' +
+          '<div class="action-right"><i data-lucide="eye"></i></div>' +
+        '</div>' +
+        '<div class="swipe-content bg-white flex w-full">' +
+          '<table class="w-full table-fixed">' +
+            '<tr>' +
+              '<td class="px-5 py-3.5 w-1/4"><div class="flex items-center gap-3"><div class="w-8 h-8 rounded-xl bg-indigo-50 text-indigo-600 flex items-center justify-center font-black text-sm flex-shrink-0">' + Helpers.escapeHTML((stu.name || '?').charAt(0).toUpperCase()) + '</div><div><div class="font-bold text-slate-800 text-sm truncate">' + Helpers.escapeHTML(stu.name || '-') + '</div><div class="text-[10px] text-slate-400 font-bold uppercase truncate">' + (stu.classrooms?.name || 'Sin aula') + '</div></div></div></td>' +
+              '<td class="px-5 py-3.5 text-center w-1/6"><span class="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[10px] font-black uppercase ' + st.c + '"><i data-lucide="' + st.i + '" class="w-3 h-3"></i>' + st.l + '</span></td>' +
+              '<td class="px-5 py-3.5 text-right w-1/6"><div class="font-black text-slate-800 text-base">' + af + '</div>' + (ip ? '<div class="flex flex-col items-end gap-0.5 mt-0.5">' + ub + '</div>' : '') + '</td>' +
+              '<td class="px-5 py-3.5 w-1/8"><span class="text-[10px] font-black uppercase text-slate-500 bg-slate-100 px-2 py-0.5 rounded-md">' + (p.method || '-') + '</span></td>' +
+              '<td class="px-5 py-3.5 w-1/6"><div class="text-[10px] font-bold text-slate-600 uppercase truncate max-w-[110px]">' + (p.bank || '-') + '</div><div class="text-[9px] text-slate-400 font-bold">' + (p.reference || '') + '</div></td>' +
+              '<td class="px-5 py-3.5 w-1/8"><div class="text-[11px] font-bold text-slate-700">' + (p.paid_date ? new Date(p.paid_date).toLocaleDateString('es-ES') : ds) + '</div><div class="text-[9px] text-slate-400 font-bold uppercase">' + (p.paid_date ? 'Pagado' : 'Vence') + '</div></td>' +
+              '<td class="px-5 py-3.5 text-center w-1/12">' + voucherCell + '</td>' +
+              '<td class="px-5 py-3.5 text-center w-1/8"><div class="flex justify-center gap-1.5">' + approveBtn + waiveMoraBtn + deleteBtn + '</div></td>' +
+            '</tr>' +
+          '</table>' +
+        '</div>' +
+      '</td>' +
     '</tr>';
   },
 
@@ -541,6 +595,7 @@ export const PaymentsModule = {
 
   async markPaid(id) {
     try {
+      Helpers.vibrate('success');
       // Aprobar directamente — funciona para efectivo y transferencia sin depender de RPC
       const { error } = await supabase.from('payments')
         .update({ status: 'paid', paid_date: new Date().toISOString() })
@@ -594,121 +649,106 @@ export const PaymentsModule = {
     }
   },
 
-  async runCycle() {
-    if (!confirm('¿Ejecutar ciclo de pagos?\n\nRegla: el cobro de cada mes se genera el día 25 y vence el día 5 del mes siguiente.')) return;
+  async showCyclePreview() {
+    Helpers.showLoader('Calculando resumen del ciclo...');
     try {
-      Helpers.toast('Ejecutando ciclo...', 'info');
-      
-      // Intentar RPC del servidor primero
-      const { data: rpcData, error: rpcErr } = await supabase.rpc('run_payment_cycle');
-      
-      if (!rpcErr) {
-        const gen = rpcData?.generated || 0;
-        const exp = rpcData?.expired || 0;
-        if (gen > 0) Helpers.toast(`✅ ${gen} cobro(s) generados correctamente`, 'success');
-        else if (exp > 0) Helpers.toast(`ℹ️ Se marcaron ${exp} pago(s) como vencidos`, 'info');
-        else Helpers.toast('ℹ️ No se generaron nuevos cobros (ya existen para este mes)', 'info');
-        await this.loadPayments();
-        this.loadStats();
-        return;
-      }
+      // ✅ OBTENCIÓN DE DATOS DESDE EL SERVIDOR (RPC)
+      // Centraliza la lógica de previsualización para que coincida con la ejecución real
+      const { data, error } = await supabase.rpc('preview_payment_cycle');
+      if (error) throw error;
 
-      // Fallback: lógica en el cliente con regla de gracia para estudiantes nuevos
-      const cycleDate = new Date();
-      const today     = cycleDate.getDate();
-      const genDay    = this.settings.generation_day || 25;
-      const dueDay    = this.settings.due_day || 5;
+      const { count, total_amount, grace_count, existing_count, target_month_label } = data;
 
-      // El cobro que se genera hoy es para el mes siguiente
-      const targetM = cycleDate.getMonth() + 1 > 11 ? 0 : cycleDate.getMonth() + 1;
-      const targetY = cycleDate.getMonth() + 1 > 11 ? cycleDate.getFullYear() + 1 : cycleDate.getFullYear();
-      const monthKey = `${targetY}-${String(targetM + 1).padStart(2, '0')}`;
+      Helpers.hideLoader();
 
-      // Fecha de vencimiento: día 5 del mes siguiente al cobro
-      const dueM = targetM + 1 > 11 ? 0 : targetM + 1;
-      const dueY = targetM + 1 > 11 ? targetY + 1 : targetY;
-      const dueDate = `${dueY}-${String(dueM + 1).padStart(2, '0')}-${String(dueDay).padStart(2, '0')}`;
+      window.openGlobalModal(`
+        <div class="bg-white rounded-[2.5rem] overflow-hidden shadow-2xl animate-scaleIn w-full max-w-md">
+          <div class="bg-gradient-to-r from-indigo-600 to-purple-600 p-8 text-white text-center">
+            <div class="w-20 h-20 bg-white/20 rounded-3xl flex items-center justify-center mx-auto mb-4 text-3xl shadow-lg backdrop-blur-md">📅</div>
+            <h3 class="text-2xl font-black">Resumen del Ciclo</h3>
+            <p class="text-indigo-100 font-bold uppercase tracking-widest text-[10px] mt-1">Periodo: ${target_month_label}</p>
+          </div>
+          
+          <div class="p-8 space-y-6 bg-slate-50/50">
+            <div class="grid grid-cols-2 gap-4">
+              <div class="bg-white p-4 rounded-3xl border border-slate-100 shadow-sm">
+                <p class="text-[9px] font-black text-slate-400 uppercase tracking-wider mb-1">Nuevos Cobros</p>
+                <p class="text-2xl font-black text-indigo-600">${count}</p>
+              </div>
+              <div class="bg-white p-4 rounded-3xl border border-slate-100 shadow-sm">
+                <p class="text-[9px] font-black text-slate-400 uppercase tracking-wider mb-1">Total Estimado</p>
+                <p class="text-xl font-black text-slate-700">RD$${Helpers.formatCurrency(total_amount)}</p>
+              </div>
+            </div>
 
-      // Obtener estudiantes activos con mensualidad > 0 y su fecha de inscripción
-      const { data: students, error: sErr } = await supabase
-        .from('students')
-        .select('id, name, monthly_fee, start_date')
-        .eq('is_active', true)
-        .gt('monthly_fee', 0);
-      if (sErr) throw sErr;
-      if (!students?.length) { Helpers.toast('No hay estudiantes activos con cuota configurada', 'warning'); return; }
+            <div class="space-y-3">
+              <div class="flex items-center justify-between text-sm">
+                <span class="text-slate-500 font-medium">En Periodo de Gracia</span>
+                <span class="font-black text-amber-600">${grace_count}</span>
+              </div>
+              <div class="flex items-center justify-between text-sm">
+                <span class="text-slate-500 font-medium">Ya generados</span>
+                <span class="font-black text-emerald-600">${existing_count}</span>
+              </div>
+            </div>
 
-      // Filtrar estudiantes que ya tienen derecho a cobro este mes (regla de gracia)
-      const eligibleStudents = students.filter(s => {
-        if (!s.start_date) return true; // sin fecha de inscripción → siempre cobrar
-        const startDate = new Date(s.start_date + 'T00:00:00');
-        const startY = startDate.getFullYear();
-        const startM = startDate.getMonth(); // 0-based
-        const startDay = startDate.getDate();
+            <div class="p-4 bg-indigo-50 rounded-2xl border border-indigo-100">
+              <p class="text-[10px] text-indigo-700 font-bold leading-relaxed">
+                ℹ️ Los cobros se generan automáticamente para estudiantes activos. La fecha de vencimiento será el día ${this.settings.due_day} del mes próximo.
+              </p>
+            </div>
+          </div>
 
-        // Calcular el primer mes que se debe cobrar
-        // Si se inscribió antes del día de generación: primer cobro = mes siguiente al de inscripción
-        // Si se inscribió el día de generación o después: primer cobro = 2 meses después
-        let firstBillingM, firstBillingY;
-        if (startDay < genDay) {
-          firstBillingM = startM + 1 > 11 ? 0 : startM + 1;
-          firstBillingY = startM + 1 > 11 ? startY + 1 : startY;
-        } else {
-          firstBillingM = startM + 2 > 11 ? (startM + 2) - 12 : startM + 2;
-          firstBillingY = startM + 2 > 11 ? startY + 1 : startY;
-        }
-        const firstBillingKey = `${firstBillingY}-${String(firstBillingM + 1).padStart(2, '0')}`;
+          <div class="p-6 bg-white border-t border-slate-100 flex gap-3">
+            <button onclick="App.ui.closeModal()" class="flex-1 py-4 text-slate-400 font-black text-xs uppercase hover:bg-slate-50 rounded-2xl transition-all">Cancelar</button>
+            <button id="confirmRunCycle" class="flex-[2] py-4 bg-indigo-600 text-white rounded-2xl font-black text-xs uppercase shadow-lg shadow-indigo-100 active:scale-95 transition-all">Confirmar y Ejecutar</button>
+          </div>
+        </div>
+      `);
 
-        // Solo cobrar si el mes objetivo >= primer mes de cobro
-        return monthKey >= firstBillingKey;
+      document.getElementById('confirmRunCycle')?.addEventListener('click', () => {
+        UIHelpers.closeModal();
+        this.runCycle();
       });
 
-      if (!eligibleStudents.length) {
-        Helpers.toast('ℹ️ Ningún estudiante elegible para cobro este mes (período de gracia activo)', 'info');
-        return;
-      }
+    } catch (e) {
+      Helpers.hideLoader();
+      Helpers.toast('Error al calcular resumen: ' + e.message, 'error');
+    }
+  },
 
-      // Verificar cuáles ya tienen cobro para este mes
-      const { data: existing } = await supabase
-        .from('payments')
-        .select('student_id')
-        .eq('month_paid', monthKey);
-      const existingIds = new Set((existing || []).map(p => String(p.student_id)));
+  async runCycle() {
+    try {
+      Helpers.showLoader('Generando cobros en el servidor...');
+      
+      // ✅ EJECUCIÓN 100% SERVIDOR (RPC)
+      // Centraliza la lógica de redondeo, duplicados y periodo de gracia en Postgres
+      const { data, error } = await supabase.rpc('run_payment_cycle');
+      
+      Helpers.hideLoader();
 
-      const missing = eligibleStudents.filter(s => !existingIds.has(String(s.id)));
+      if (error) throw error;
 
-      let generated = 0;
-      if (missing.length) {
-        const inserts = missing.map(s => ({
-          student_id: s.id,
-          amount:     s.monthly_fee,
-          status:     'pending',
-          due_date:   dueDate,
-          month_paid: monthKey,
-          concept:    'Mensualidad',
-          created_at: new Date().toISOString()
-        }));
-        const { error: insErr } = await supabase.from('payments').insert(inserts);
-        if (insErr) throw insErr;
-        generated = missing.length;
-      }
+      const gen = data?.generated || 0;
+      const exp = data?.expired || 0;
 
-      // Marcar como vencidos los pendientes con due_date pasado
-      await supabase.from('payments')
-        .update({ status: 'overdue' })
-        .eq('status', 'pending')
-        .lt('due_date', cycleDate.toISOString().split('T')[0]);
-
-      if (generated > 0) {
-        Helpers.toast(`✅ ${generated} cobro(s) generados (${eligibleStudents.length - missing.length} ya existían)`, 'success');
+      if (gen > 0) {
+        Helpers.vibrate('success');
+        Helpers.toast(`✅ ¡Ciclo completado! Se generaron ${gen} cobros.`, 'success');
+        if (window.confetti) confetti({ particleCount: 150, spread: 70, origin: { y: 0.6 } });
+      } else if (exp > 0) {
+        Helpers.toast(`ℹ️ Se marcaron ${exp} pago(s) como vencidos. No se generaron nuevos cobros.`, 'info');
       } else {
-        Helpers.toast('ℹ️ Todos los estudiantes elegibles ya tienen cobro para este mes', 'info');
+        Helpers.toast('ℹ️ El ciclo ya está al día. No se requirieron acciones.', 'info');
       }
 
       await this.loadPayments();
       this.loadStats();
+
     } catch (e) {
-      Helpers.toast('Error en ciclo: ' + (e.message || e), 'error');
+      Helpers.hideLoader();
+      console.error('[Payments] runCycle error:', e);
+      Helpers.toast('Error crítico en el servidor: ' + (e.message || 'Consulta al administrador'), 'error');
     }
   },
 

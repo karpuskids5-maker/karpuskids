@@ -1,4 +1,4 @@
-﻿import { supabase } from '../shared/supabase.js';
+import { supabase } from '../shared/supabase.js';
 import { TABLES } from './appState.js';
 
 /**
@@ -108,9 +108,10 @@ export const Api = {
   async getDailyLog(studentId, date) {
     return await handle(
       supabase.from(TABLES.DAILY_LOGS)
-        .select('mood, food, nap, eating, sleeping, activities, notes, date')
+        .select('mood, food, nap, eating, sleeping, activities, notes, date, status')
         .eq('student_id', studentId)
         .eq('date', date)
+        .eq('status', 'published') // Solo ver publicados
         .maybeSingle(),
       'getDailyLog'
     );

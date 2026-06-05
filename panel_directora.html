@@ -25,6 +25,7 @@
   <link rel="stylesheet" href="css/layout.css" />
   <link rel="stylesheet" href="css/karpus-modern.css" />
   <link rel="stylesheet" href="css/karpus-tailwind.css">
+  <link rel="stylesheet" href="css/premium-mobile.css">
   <script src="js/shared/chart.min.js" defer></script>
   <script src="js/shared/jspdf.min.js" defer></script>
   <script src="js/shared/jspdf-autotable.min.js" defer></script>
@@ -1505,11 +1506,16 @@
             </div>
 
             <!-- Mensajes -->
-            <div id="chatMessagesContainer">
+            <div id="chatMessagesContainer" class="relative">
               <div class="h-full flex flex-col items-center justify-center text-slate-400 opacity-40">
                 <i data-lucide="message-circle" class="w-16 h-16 mb-4"></i>
                 <p class="font-medium">Selecciona una conversación</p>
               </div>
+            </div>
+
+            <!-- Typing Indicator -->
+            <div id="chatTypingIndicator" class="hidden absolute bottom-[90px] left-6 right-6 px-4 py-2 bg-white/90 backdrop-blur-sm border border-blue-100 rounded-xl text-[10px] font-black text-blue-600 shadow-lg animate-bounce-subtle z-20">
+              Alguien está escribiendo...
             </div>
 
             <!-- Input Area -->

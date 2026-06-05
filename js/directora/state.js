@@ -139,7 +139,9 @@ function createInitialState() {
 /**
  * 🧠 INSTANCIA GLOBAL
  */
-export const AppState = new SafeAppState(createInitialState());
+export const AppState = new SafeAppState(createInitialState(), { 
+  persistenceKey: 'karpus_directora_state' 
+});
 
 /**
  * 🔄 RESET COMPLETO (CLAVE para logout)

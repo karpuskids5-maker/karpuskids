@@ -51,7 +51,7 @@ export const RoomsModule = {
         const barColor = pct > 90 ? 'bg-rose-500' : pct > 70 ? 'bg-amber-500' : 'bg-emerald-500';
         
         return `
-          <tr class="hover:bg-slate-50 border-b border-slate-100 transition-colors cursor-pointer" onclick="window.App.rooms.openModal('${r.id}')">
+          <tr class="hover:bg-slate-50 border-b border-slate-100 transition-colors cursor-pointer" ondblclick="window.App.rooms.openModal('${r.id}')">
             <td class="px-4 py-3 font-bold text-slate-800 text-sm">${Helpers.escapeHTML(r.name)}</td>
             <td class="px-4 py-3 text-slate-500 text-sm hidden md:table-cell">${r.teacher?.name || 'Sin asignar'}</td>
             <td class="px-4 py-3">

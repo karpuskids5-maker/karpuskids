@@ -33,7 +33,7 @@ export const TeachersModule = {
       }
 
       tbody.innerHTML = teachers.map(t => `
-        <tr class="hover:bg-slate-50 transition-colors border-b border-slate-50">
+        <tr class="hover:bg-slate-50 transition-colors border-b border-slate-50 cursor-pointer" ondblclick="window.openTeacherModal('${t.id}')">
           <td class="px-6 py-4 font-bold text-slate-700 text-sm">${Helpers.escapeHTML(t.name)}</td>
           <td class="px-6 py-4 text-slate-500 text-xs font-medium uppercase tracking-wider">${t.email || '-'}</td>
           <td class="px-6 py-4 text-slate-500 text-xs font-bold">${t.phone || '-'}</td>

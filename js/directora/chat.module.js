@@ -1,4 +1,4 @@
-﻿import { DirectorApi } from './api.js';
+import { DirectorApi } from './api.js';
 import { Helpers } from '../shared/helpers.js';
 import { supabase, sendPush } from '../shared/supabase.js';
 import { ChatModule as SharedChat } from '../shared/chat.js';
@@ -290,8 +290,38 @@ export const ChatModule = {
           this._appendMessage(newMsg);
           ScrollModule.scrollToBottom(document.getElementById('chatMessagesContainer'), true);
         }
+      },
+      (typingData) => {
+        // ✅ TYPING INDICATOR
+        const typingEl = document.getElementById('chatTypingIndicator');
+        if (!typingEl) return;
+        
+        if (typingData.isTyping && typingData.userId !== this._currentUserId) {
+          typingEl.textContent = `${typingData.userName} está escribiendo...`;
+          typingEl.classList.remove('hidden');
+        } else {
+          typingEl.classList.add('hidden');
+        }
       }
     );
+
+    // Escuchar input para broadcast
+    const input = document.getElementById('chatMessageInput');
+    const user = { name: 'Dirección' }; // O obtener de profiles
+    let typingTimeout;
+    
+    if (input && !input._typingBound) {
+      input._typingBound = true;
+      input.addEventListener('input', () => {
+        if (this._conversationId) {
+          SharedChat.broadcastTyping(this._conversationId, user.name, true);
+          clearTimeout(typingTimeout);
+          typingTimeout = setTimeout(() => {
+            SharedChat.broadcastTyping(this._conversationId, user.name, false);
+          }, 3000);
+        }
+      });
+    }
   },
 
   _unsubscribe() {

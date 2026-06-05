@@ -1,4 +1,4 @@
-﻿/**
+/**
  * ⚡ Karpus Kids — Prefetch System
  *
  * CONCEPTO:
@@ -117,20 +117,31 @@ export const Prefetch = {
 
   async _prefetchAvatares(userId, role) {
     try {
-      // Cargar avatares de contactos del chat según el rol
-      let query = supabase.from('profiles').select('avatar_url').not('avatar_url', 'is', null);
+      // ✅ SMART PREFETCH: Solo avatares de contactos con conversaciones activas
+      // 1. Obtener IDs de usuarios con los que se ha hablado recientemente
+      const { data: participants } = await supabase
+        .from('conversation_participants')
+        .select('conversation_id, user_id')
+        .eq('user_id', auth.user.id);
 
-      if (role === 'padre') {
-        query = query.in('role', ['maestra', 'directora', 'asistente']);
-      } else if (role === 'maestra') {
-        query = query.in('role', ['directora', 'asistente', 'padre']);
-      } else {
-        query = query.in('role', ['maestra', 'padre', 'asistente', 'directora']);
+      if (!participants?.length) { _done.add('avatares'); return; }
+
+      const convIds = participants.map(p => p.conversation_id);
+
+      const { data: recentContacts } = await supabase
+        .from('conversation_participants')
+        .select('user_id, profiles:user_id(avatar_url)')
+        .in('conversation_id', convIds)
+        .neq('user_id', auth.user.id)
+        .limit(20);
+
+      const urls = (recentContacts || [])
+        .map(c => c.profiles?.avatar_url)
+        .filter(Boolean);
+
+      if (urls.length > 0) {
+        await this._preloadImages(urls);
       }
-
-      const { data: profiles } = await query.limit(30);
-      const urls = (profiles || []).map(p => p.avatar_url).filter(Boolean);
-      await this._preloadImages(urls);
       _done.add('avatares');
     } catch (_) {
       _done.add('avatares');

@@ -13,9 +13,9 @@ export const WallModule = {
    * Sobrescribir init para manejar lógica específica de Directora si es necesario
    */
   async init(containerId, options = {}, appState = null) {
-    // Forzar color de acento morado para directora
-    options.accentColor = 'purple';
-    options.likeColor = 'purple';
+    // Forzar color de acento índigo para directora
+    options.accentColor = 'indigo';
+    options.likeColor = 'indigo';
     
     // Asignar _appState ANTES de llamar al shared init
     this._appState = appState;

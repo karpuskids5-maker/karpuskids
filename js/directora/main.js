@@ -1,6 +1,7 @@
 import { ensureRole, supabase, initOneSignal } from '/js/shared/supabase.js';
 import { AppState } from './state.js';
 import { Helpers } from '/js/shared/helpers.js';
+import { UIPremium } from '/js/shared/ui-premium.js';
 import { WallModule } from './wall.module.js';
 import { DashboardService } from './dashboard.service.js';
 import { UIHelpers, DirectorUI } from './ui.module.js';
@@ -82,13 +83,26 @@ window.openGlobalModal = function(html, wide = false) {
 export function goToSection(sectionId) {
   if (!sectionId) return;
 
+  Helpers.vibrate('light');
+
   // Desuscribir muro al salir (ahorro de recursos Realtime)
   const prevSection = AppState.get('currentSection');
   if (prevSection === 'muro' && sectionId !== 'muro') {
     WallModule.destroy?.();
   }
 
-  // Ocultar todas las secciones — solo con CSS class, sin Tailwind hidden
+  if (prevSection === 'accesos' && sectionId !== 'accesos') {
+    try {
+      if (AccessModule?.stopScanner) {
+        AccessModule.stopScanner();
+      }
+      // Lazy QR: Limpiar QRs generados para ahorrar memoria
+      const qrContainer = document.getElementById('accesos-content');
+      if (qrContainer) qrContainer.innerHTML = '';
+    } catch (_) {}
+  }
+
+  // Ocultar todas las secciones
   document.querySelectorAll('.section').forEach(sec => {
     sec.classList.remove('active');
   });
@@ -97,6 +111,9 @@ export function goToSection(sectionId) {
   if (target) {
     target.classList.add('active');
     AppState.set('currentSection', sectionId);
+
+    // ✨ Transición fluida Premium
+    UIPremium.applySectionTransition(sectionId);
 
     // Carga bajo demanda por módulo
     switch (sectionId) {
@@ -122,7 +139,10 @@ export function goToSection(sectionId) {
         break;
       }
       case 'muro':
-        WallModule.init('muroPostsContainer', { accentColor: 'orange' }, AppState);
+        WallModule.init('muroPostsContainer', { 
+          accentColor: 'indigo', 
+          likeColor: 'indigo' 
+        }, AppState);
         break;
       case 'accesos': AccessModule.init(); break;
       case 'reportes': InquiriesModule.init(); break;
@@ -137,13 +157,18 @@ export function goToSection(sectionId) {
     BadgeSystem.mark(sectionId);
   }
 
-  // Actualizar Botones Nav
+  // Actualizar Botones Nav (Sidebar)
   document.querySelectorAll('[data-section]').forEach(btn => {
     if (btn.dataset.section === sectionId) {
       btn.classList.add('bg-white/20');
     } else {
       btn.classList.remove('bg-white/20');
     }
+  });
+
+  // Actualizar Bottom Nav si existe
+  document.querySelectorAll('.nav-item').forEach(btn => {
+    btn.classList.toggle('active', btn.dataset.section === sectionId);
   });
 
   // Cerrar sidebar en móvil si está abierto
@@ -279,6 +304,19 @@ document.addEventListener('DOMContentLoaded', async () => {
 
     // 4. Cargar Perfil Inicial
     loadProfile();
+
+    // ✨ 4b. Inicializar Experiencia Premium Móvil
+    UIPremium.injectBottomNav([
+      { section: 'dashboard', label: 'Inicio', icon: 'layout' },
+      { section: 'estudiantes', label: 'Alumnos', icon: 'users' },
+      { section: 'pagos', label: 'Pagos', icon: 'credit-card' },
+      { section: 'muro', label: 'Muro', icon: 'image' },
+      { section: 'comunicacion', label: 'Chat', icon: 'message-circle' }
+    ]);
+
+    window.addEventListener('app:nav-change', (e) => {
+      goToSection(e.detail.section);
+    });
 
     // 5. Iniciar Dashboard por defecto
     goToSection('dashboard');
@@ -582,7 +620,13 @@ function _initAccesosSection() {
 
     container.innerHTML = students.map(s => `
       <div class="bg-white rounded-3xl border border-slate-100 shadow-sm p-5 flex flex-col items-center gap-3 hover:shadow-md transition-all">
-        <div id="qr-${s.id}" class="bg-white p-2 rounded-xl border border-slate-100"></div>
+        <div id="qr-${s.id}" class="bg-slate-50 w-[140px] h-[140px] rounded-xl border-2 border-dashed border-slate-200 flex items-center justify-center cursor-pointer group hover:bg-orange-50 hover:border-orange-200 transition-all"
+             onclick="window._generateLazyStudentQR('${s.id}', '${s.matricula}')">
+          <div class="text-center">
+            <i data-lucide="qr-code" class="w-6 h-6 text-slate-300 group-hover:text-orange-400 mx-auto mb-1"></i>
+            <span class="text-[9px] font-bold text-slate-400 group-hover:text-orange-500 uppercase">Generar QR</span>
+          </div>
+        </div>
         <div class="text-center">
           <p class="font-black text-slate-800 text-sm">${s.name}</p>
           <p class="text-[10px] font-bold text-orange-600 uppercase tracking-widest">${s.matricula}</p>
@@ -594,19 +638,31 @@ function _initAccesosSection() {
         </button>
       </div>`).join('');
 
-    // Generar QRs
-    students.forEach(s => {
-      const el = document.getElementById(`qr-${s.id}`);
-      if (!el) return;
-      new window.QRCode(el, {
-        text: JSON.stringify({ matricula: s.matricula, name: s.name, type: 'karpus-access', v: 1 }),
-        width: 120, height: 120,
-        colorDark: '#1e293b', colorLight: '#ffffff',
-        correctLevel: window.QRCode.CorrectLevel.H
-      });
-    });
-
     if (window.lucide) lucide.createIcons();
+  };
+
+  // Función global para generar QR solo cuando sea necesario (Lazy)
+  window._generateLazyStudentQR = (id, matricula) => {
+    const el = document.getElementById(`qr-${id}`);
+    if (!el || el.querySelector('img')) return;
+
+    el.innerHTML = '<div class="animate-spin w-5 h-5 border-2 border-orange-500 rounded-full border-t-transparent"></div>';
+    
+    setTimeout(() => {
+      const qrData = JSON.stringify({ id, matricula, role: 'student' });
+      el.innerHTML = '';
+      new QRCode(el, {
+        text: qrData,
+        width: 120,
+        height: 120,
+        colorDark: "#000000",
+        colorLight: "#ffffff",
+        correctLevel: QRCode.CorrectLevel.H
+      });
+      el.classList.remove('bg-slate-50', 'border-dashed', 'cursor-pointer');
+      el.classList.add('p-2', 'bg-white', 'border-slate-100');
+      el.onclick = null;
+    }, 200);
   };
 
   // Funci�n global para imprimir QR individual

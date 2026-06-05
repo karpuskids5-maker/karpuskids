@@ -32,7 +32,7 @@ export async function initChat() {
       }
     }
 
-    // Build parent contacts from students Ã¢â‚¬â€ fetch parent names from profiles
+    // Build parent contacts from students — fetch parent names from profiles
     const parentsMap = new Map();
     const parentIds = students.filter(s => s.parent_id).map(s => s.parent_id);
 
@@ -60,7 +60,7 @@ export async function initChat() {
           .select('id, name, avatar_url, email')
           .in('email', emails);
         
-        // Map email Ã¢â€ â€™ profile for lookup
+        // Map email → profile for lookup
         const emailMap = {};
         (profilesByEmail || []).forEach(p => { 
           if (p.email) emailMap[p.email.toLowerCase()] = p; 
@@ -98,8 +98,8 @@ export async function initChat() {
           }
         }
       } else if (s.p1_name) {
-        // Estudiante con nombre de padre pero sin cuenta de perfil vinculada aÃƒÂºn
-        // Lo mostramos para que la maestra sepa quiÃƒÂ©n es, aunque el chat sea limitado
+        // Estudiante con nombre de padre pero sin cuenta de perfil vinculada aún
+        // Lo mostramos para que la maestra sepa quién es, aunque el chat sea limitado
         const virtualId = `unlinked_${s.id}`;
         parentsMap.set(virtualId, {
           id: null, // No se puede chatear sin ID de perfil
@@ -136,7 +136,7 @@ export async function initChat() {
 
     container.innerHTML = allContacts.map(c => {
       const unread = unreadMap[c.id] || 0;
-      // Para padres: tÃƒÂ­tulo = nombre del estudiante, subtÃƒÂ­tulo = nombre del padre
+      // Para padres: título = nombre del estudiante, subtítulo = nombre del padre
       const displayName = c.childName ? c.childName : (c.name || 'Usuario');
       const parentLine  = c.childName ? ` ${safeEscapeHTML(c.name)}` : null;
       const label       = c.childName ? `${c.roleLabel}  ${safeEscapeHTML(c.name)}` : c.roleLabel;
@@ -146,7 +146,7 @@ export async function initChat() {
                       'bg-orange-100 text-orange-600';
       
       const onClickAction = c.unlinked 
-        ? `safeToast('Este padre aÃƒÂºn no ha creado su cuenta de acceso', 'warning')`
+        ? `safeToast('Este padre aún no ha creado su cuenta de acceso', 'warning')`
         : `App.selectChatContact('${c.id}', '${safeEscapeHTML(displayName)}', '${safeEscapeHTML(label)}')`;
 
       return `
@@ -182,7 +182,7 @@ export async function initChat() {
       searchInput.addEventListener('input', handler);
     }
 
-    // Wire send button Ã¢â‚¬â€ clone to remove old listeners
+    // Wire send button — clone to remove old listeners
     const btnSend = document.getElementById('btnSendChatMessage');
     const inputMsg = document.getElementById('chatMessageInput');
     if (btnSend && inputMsg) {
@@ -207,8 +207,8 @@ export async function selectChatContact(userId, name, meta) {
   _topScrollDestroy?.();
   _topScrollDestroy = null;
 
-  // Reset paginaciÃƒÂ³n para este contacto
-  ChatModule.resetPagination(null); // se resetearÃƒÂ¡ al cargar
+  // Reset paginación para este contacto
+  ChatModule.resetPagination(null); // se reseteará al cargar
 
   // Mobile: hide list, show conversation
   const listPanel = document.getElementById('chatListPanel');
@@ -255,7 +255,7 @@ export async function selectChatContact(userId, name, meta) {
 }
 
 /**
- * Carga mensajes Ã¢â‚¬â€ primera carga o "cargar mÃƒÂ¡s" (scroll arriba)
+ * Carga mensajes — primera carga o "cargar más" (scroll arriba)
  */
 async function loadChatMessages(otherUserId, loadMore = false) {
   const user = AppState.get('user');
@@ -276,7 +276,7 @@ async function loadChatMessages(otherUserId, loadMore = false) {
     }
 
     if (!messages.length && !loadMore) {
-      container.innerHTML = '<div class="text-center text-xs text-slate-400 mt-4 italic">Inicio de la conversaciÃƒÂ³n. Di hola Ã°Å¸â€˜â€¹</div>';
+      container.innerHTML = '<div class="text-center text-xs text-slate-400 mt-4 italic">Inicio de la conversación. Di hola 👋</div>';
       return;
     }
 
@@ -286,7 +286,7 @@ async function loadChatMessages(otherUserId, loadMore = false) {
     } else {
       renderMessages(messages, user.id, container);
       ScrollModule.scrollToBottom(container);
-      // Activar top-scroll para cargar mÃƒÂ¡s
+      // Activar top-scroll para cargar más
       if (hasMore !== false) {
         const { destroy } = ScrollModule.topScroll({
           container,
@@ -366,13 +366,39 @@ async function sendChatMessage() {
 
 function subscribeToChat(conversationId) {
   if (!conversationId) return;
-  ChatModule.subscribeToConversation(conversationId, (newMsg) => {
-    const user = AppState.get('user');
-    if (newMsg.sender_id === user?.id) return; // ya estÃƒÂ¡ en UI (optimistic)
-    const container = document.getElementById('chatMessagesContainer');
-    if (container) {
-      container.insertAdjacentHTML('beforeend', _msgBubble(newMsg, user?.id));
-      ScrollModule.scrollToBottom(container, true);
+  const user = AppState.get('user');
+  
+  ChatModule.subscribeToConversation(conversationId, 
+    (newMsg) => {
+      if (newMsg.sender_id === user?.id) return; // ya está en UI (optimistic)
+      const container = document.getElementById('chatMessagesContainer');
+      if (container) {
+        container.insertAdjacentHTML('beforeend', _msgBubble(newMsg, user?.id));
+        ScrollModule.scrollToBottom(container, true);
+      }
+    },
+    (typingData) => {
+      // ✅ TYPING INDICATOR
+      const typingEl = document.getElementById('chatTypingIndicator');
+      if (!typingEl) return;
+      
+      if (typingData.isTyping && typingData.userName !== user.name) {
+        typingEl.textContent = `${typingData.userName} está escribiendo...`;
+        typingEl.classList.remove('hidden');
+      } else {
+        typingEl.classList.add('hidden');
+      }
     }
+  );
+
+  // Escuchar input para broadcast
+  const input = document.getElementById('chatMessageInput');
+  let typingTimeout;
+  input?.addEventListener('input', () => {
+    ChatModule.broadcastTyping(conversationId, user.name, true);
+    clearTimeout(typingTimeout);
+    typingTimeout = setTimeout(() => {
+      ChatModule.broadcastTyping(conversationId, user.name, false);
+    }, 3000);
   });
 }

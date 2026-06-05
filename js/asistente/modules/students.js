@@ -56,7 +56,7 @@ export const StudentsModule = {
     }
 
     tbody.innerHTML = page.map(s => `
-      <tr class="hover:bg-slate-50 transition-all group">
+      <tr class="hover:bg-slate-50 transition-all group cursor-pointer" ondblclick="window.App._openStudentModal('${s.id}')">
         <td class="px-6 py-4">
           <div class="flex items-center gap-3">
             <div class="w-10 h-10 rounded-2xl bg-teal-50 border border-teal-100 overflow-hidden shrink-0 flex items-center justify-center">

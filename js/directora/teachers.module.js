@@ -391,5 +391,21 @@ export const TeachersModule = {
       }
     }
     if (window.lucide) lucide.createIcons();
+  },
+
+  generateLazyQR(id, code) {
+    const container = document.getElementById(`qr-placeholder-${id}`);
+    if (!container) return;
+
+    container.innerHTML = '<div class="animate-spin w-6 h-6 border-2 border-indigo-500 rounded-full border-t-transparent"></div>';
+    
+    // Generación diferida para ahorrar recursos
+    setTimeout(() => {
+      const qrData = JSON.stringify({ id, code, role: 'teacher' });
+      container.innerHTML = `<img src="https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=${encodeURIComponent(qrData)}" 
+                                  class="w-full h-full border-4 border-white shadow-lg rounded-xl animate-scaleIn" alt="QR Code">`;
+      container.classList.remove('border-dashed', 'bg-slate-50', 'cursor-pointer');
+      container.onclick = null;
+    }, 300);
   }
 };

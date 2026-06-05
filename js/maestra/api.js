@@ -73,15 +73,18 @@ export const MaestraApi = {
    * Upsert asistencia (optimizado con periodo)
    */
   async upsertAttendance(record) {
-    // Vincular autom\u00e1ticamente al periodo activo para reportes finales
+    // Vincular autom\u00e1ticamente al periodo activo si la tabla existe (silencioso si falla)
     if (!record.period_id) {
-      const { data: periodData } = await supabase
-        .from('academic_periods')
-        .select('id')
-        .eq('classroom_id', record.classroom_id)
-        .eq('status', 'active')
-        .maybeSingle();
-      if (periodData) record.period_id = periodData.id;
+      try {
+        const { data: periodData } = await supabase
+          .from('academic_periods')
+          .select('id')
+          .eq('classroom_id', record.classroom_id)
+          .eq('status', 'active')
+          .limit(1)
+          .maybeSingle();
+        if (periodData) record.period_id = periodData.id;
+      } catch (_) { /* 404 ignorado si no existe la tabla */ }
     }
 
     const { data: existing, error: findError } = await supabase
@@ -144,6 +147,7 @@ export const MaestraApi = {
    */
   async upsertDailyLog(payload) {
     const cleanPayload = { ...payload };
+    if (!cleanPayload.status) cleanPayload.status = 'draft'; // Por defecto es borrador
 
     // 1. Buscar log existente
     const { data: existing, error: findError } = await supabase
@@ -184,6 +188,44 @@ export const MaestraApi = {
 
     handleError(error, 'upsertDailyLog');
     return data;
+  },
+
+  /**
+   * Publicar reporte(s) diario(s)
+   */
+  async publishDailyLogs(logIds) {
+    if (!logIds || !logIds.length) return;
+    const { data, error } = await supabase
+      .from('daily_logs')
+      .update({ status: 'published' })
+      .in('id', logIds);
+    
+    handleError(error, 'publishDailyLogs');
+    return data;
+  },
+
+  /**
+   * 📤 Upload con Cola Secuencial
+   * Evita saturar la red celular subiendo una imagen a la vez
+   */
+  async uploadMedia(file, bucket = 'posts') {
+    if (!this._uploadQueue) this._uploadQueue = Promise.resolve();
+
+    return this._uploadQueue = this._uploadQueue.then(async () => {
+      const { ImageLoader } = await import('/js/shared/image-loader.js');
+      const compressed = await ImageLoader.compress(file);
+      
+      const fileName = `${Date.now()}_${Math.random().toString(36).substr(2, 9)}.webp`;
+      const path = `${fileName}`;
+
+      const { data, error } = await supabase.storage
+        .from(bucket)
+        .upload(path, compressed);
+
+      if (error) throw error;
+      const { data: { publicUrl } } = supabase.storage.from(bucket).getPublicUrl(path);
+      return publicUrl;
+    });
   },
 
   /**

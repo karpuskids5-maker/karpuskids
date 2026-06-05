@@ -22,6 +22,7 @@
   <link rel="stylesheet" href="css/layout.css" />
   <link rel="stylesheet" href="css/karpus-modern.css" />
   <link rel="stylesheet" href="css/karpus-tailwind.css">
+  <link rel="stylesheet" href="css/premium-mobile.css">
   <script src="js/shared/chart.min.js"></script>
   <style>
     /* ── Sidebar desktop: ancho y colapso ── */
@@ -876,11 +877,16 @@
             </div>
 
             <!-- Mensajes -->
-            <div id="chatMessagesContainer" class="chat-messages-scroll">
+            <div id="chatMessagesContainer" class="chat-messages-scroll relative">
               <div class="flex-1 flex flex-col items-center justify-center text-slate-400 opacity-40 py-12">
                 <i data-lucide="messages-square" class="w-14 h-14 mb-3"></i>
                 <p class="font-medium text-sm">Selecciona un contacto</p>
               </div>
+            </div>
+
+            <!-- Typing Indicator -->
+            <div id="chatTypingIndicator" class="hidden absolute bottom-[80px] left-6 right-6 px-4 py-2 bg-white/90 backdrop-blur-sm border border-teal-100 rounded-xl text-[10px] font-black text-teal-600 shadow-lg animate-bounce-subtle z-20">
+              Alguien está escribiendo...
             </div>
 
             <!-- Input fijo abajo -->

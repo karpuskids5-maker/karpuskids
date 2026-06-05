@@ -2,9 +2,10 @@
  * 🧠 AppState PRO+ (Nivel Empresa)
  */
 export class SafeAppState {
-  constructor(initialState = {}) {
+  constructor(initialState = {}, options = {}) {
     this._initialState = Object.freeze({ ...initialState });
     this._state = { ...initialState };
+    this._persistenceKey = options.persistenceKey || null;
 
     this._listeners = {};
     this._globalListeners = new Set();
@@ -15,6 +16,37 @@ export class SafeAppState {
     // 🔄 Sistema de caché con TTL
     this._cache = {};
     this._cacheTTL = {};
+
+    // 💾 Cargar persistencia si existe
+    if (this._persistenceKey) {
+      this._loadFromStorage();
+    }
+  }
+
+  _loadFromStorage() {
+    try {
+      const saved = localStorage.getItem(this._persistenceKey);
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        // Solo restauramos las claves que existen en el estado inicial para evitar basura
+        Object.keys(parsed).forEach(key => {
+          if (key in this._initialState) {
+            this._state[key] = parsed[key];
+          }
+        });
+      }
+    } catch (e) {
+      console.warn('[SafeAppState] Error loading persistence:', e);
+    }
+  }
+
+  _saveToStorage() {
+    if (!this._persistenceKey) return;
+    try {
+      localStorage.setItem(this._persistenceKey, JSON.stringify(this._state));
+    } catch (e) {
+      console.warn('[SafeAppState] Error saving persistence:', e);
+    }
   }
 
   /**
@@ -104,6 +136,9 @@ export class SafeAppState {
    * 🔄 Notificar cambios
    */
   _notify(key, value, prev) {
+    // Guardar en persistencia si aplica
+    this._saveToStorage();
+
     // 🔑 listeners por clave
     if (this._listeners[key]) {
       this._listeners[key].forEach(cb => {
@@ -130,6 +165,9 @@ export class SafeAppState {
     this._batchQueue.clear();
     this._cache = {};
     this._cacheTTL = {};
+    if (this._persistenceKey) {
+      localStorage.removeItem(this._persistenceKey);
+    }
   }
 
   /**
@@ -199,23 +237,10 @@ export class SafeAppState {
       const now = Date.now();
       const expiry = this._cacheTTL[key] || 0;
       status[key] = {
-        isValid: now < expiry,
-        expiresIn: Math.round(Math.max(0, expiry - now) / 1000),
-        size: JSON.stringify(this._cache[key]).length
+        expired: now >= expiry,
+        ttl: Math.max(0, expiry - now)
       };
     });
     return status;
   }
 }
-
-export const AppState = new SafeAppState({
-  user: null,
-  profile: null,
-  currentStudent: null,
-  liveChannel: null,
-  isClassLive: false,
-  // Dashboard data can be cached here if needed
-  dashboardData: null,
-  stats: {},
-  students: [],
-});

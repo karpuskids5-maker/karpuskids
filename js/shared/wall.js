@@ -346,7 +346,7 @@ export const WallModule = {
                onclick="window.openLightbox('${p.display_media_url}','image')">
             ${ImageLoader.img(p.display_media_url, {
               alt: 'Post media',
-              cls: 'w-full object-cover max-h-[500px]',
+              cls: 'w-full object-contain max-h-[600px]',
               fallback: 'img/mundo.jpg',
               priority: isFirstPost ? 'high' : 'low'
             })}
@@ -367,7 +367,7 @@ export const WallModule = {
     const canComment  = ['directora', 'maestra', 'padre', 'asistente'].includes(profile?.role);
 
     return `
-      <div class="bg-white rounded-3xl shadow-sm border border-slate-100 overflow-hidden mb-6" id="post-${p.id}">
+      <div class="bg-white rounded-3xl shadow-sm border border-slate-100 overflow-hidden mb-6" id="post-${p.id}" data-classroom-id="${p.classroom_id || 'null'}">
         <div class="p-5">
           <div class="flex justify-between items-start mb-4">
             <div class="flex items-center gap-3">
@@ -639,15 +639,23 @@ export const WallModule = {
       return;
     }
 
+    // 🔒 Privacidad: Obtener el post para saber si pertenece a un aula
+    const postEl = document.getElementById(`post-${postId}`);
+    const isClassroomPost = postEl && postEl.dataset.classroomId !== 'null';
+
     container.innerHTML = comments.map(c => {
       const { name: displayName, avatar: avatarUrl } = this._resolveCommentName(c);
+      const initial = displayName.charAt(0).toUpperCase();
+
+      // Forzar ocultación de avatares en posts de aulas para privacidad
+      const showAvatar = !isClassroomPost && avatarUrl;
 
       return `
       <div class="flex gap-2 text-xs">
         <div class="w-6 h-6 rounded-full bg-slate-200 flex items-center justify-center font-bold text-[9px] text-slate-500 overflow-hidden border border-white shrink-0">
-          ${avatarUrl
+          ${showAvatar
             ? ImageLoader.img(avatarUrl, { cls: 'w-full h-full object-cover', fallback: '' })
-            : displayName.charAt(0).toUpperCase()}
+            : `<span class="text-slate-500">${initial}</span>`}
         </div>
         <div class="bg-white p-2 rounded-xl rounded-tl-none border border-slate-100 shadow-sm flex-1">
           <div class="flex justify-between">
@@ -659,8 +667,8 @@ export const WallModule = {
       </div>
     `}).join('');
 
-    // Activar lazy loading en avatares de comentarios
-    ImageLoader.observe(container);
+    // Activar lazy loading en avatares de comentarios (solo si se muestran)
+    if (!isClassroomPost) ImageLoader.observe(container);
   },
 
   async deletePost(postId) {
@@ -672,6 +680,7 @@ export const WallModule = {
     }
   },
 
+  // Escuchar cambios en posts para actualizar el muro de forma inteligente
   subscribeRealtime() {
     this._unsubscribeRealtime(); // limpiar canal anterior si existe
 
@@ -679,47 +688,45 @@ export const WallModule = {
     const self = this;
     
     this._realtimeChannel = supabase
-      .channel('wall_global_' + Date.now()) // nombre único para evitar conflictos
-      .on('postgres_changes', { 
-        event: '*', 
-        schema: 'public', 
-        table: 'posts' 
-      }, async (payload) => {
-        const { eventType, new: newPost, old: oldPost } = payload;
-
-        // Filtrar por aula si aplica
-        if (classroomId && newPost?.classroom_id && newPost.classroom_id !== classroomId) {
-          return;
-        }
-
-        if (eventType === 'INSERT') {
-          Helpers.toast('📢 Nueva publicación en el muro', 'info');
-          const container = document.getElementById(self._containerId);
-          if (container && self._page <= 1) {
-            self.loadPosts(container);
+      .channel(`wall_${classroomId || 'global'}_${Date.now()}`)
+      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'posts' }, async (payload) => {
+        const post = payload.new;
+        if (classroomId && post.classroom_id && post.classroom_id !== classroomId) return;
+        
+        // Optimización Directora: Evitar recarga completa si es posible
+        const container = document.getElementById(self._containerId);
+        if (container && self._page <= 1) {
+          const indicator = document.getElementById('wall-new-posts-indicator');
+          if (indicator) {
+            indicator.classList.remove('hidden');
+          } else {
+            container.insertAdjacentHTML('afterbegin', `
+              <div id="wall-new-posts-indicator" onclick="location.reload()" class="bg-indigo-600 text-white px-4 py-2 rounded-full text-xs font-black mx-auto mb-4 cursor-pointer shadow-lg animate-bounce text-center w-max">
+                ✨ NUEVAS PUBLICACIONES DISPONIBLES
+              </div>
+            `);
           }
         }
-
-        if (eventType === 'UPDATE') {
-          const postId = newPost?.id;
-          if (!postId) return;
-          const likeSpan = document.getElementById(`like-count-${postId}`);
-          const commBtn = document.querySelector(`#post-${postId} button[onclick*="toggleCommentSection"] span`);
-          if (likeSpan && typeof newPost.likes_count === 'number') likeSpan.textContent = newPost.likes_count;
-          if (commBtn && typeof newPost.comments_count === 'number') commBtn.textContent = `${newPost.comments_count} Comentarios`;
+      })
+      .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'posts' }, (payload) => {
+        const post = payload.new;
+        const el = document.getElementById(`post-${post.id}`);
+        if (el) {
+          const likeSpan = document.getElementById(`like-count-${post.id}`);
+          const commBtn = el.querySelector(`button[onclick*="toggleCommentSection"] span`);
+          if (likeSpan && typeof post.likes_count === 'number') likeSpan.textContent = post.likes_count;
+          if (commBtn && typeof post.comments_count === 'number') commBtn.textContent = `${post.comments_count} Comentarios`;
         }
-
-        if (eventType === 'DELETE') {
-          const el = document.getElementById(`post-${oldPost?.id}`);
-          if (el) {
-            el.classList.add('opacity-0', 'scale-95');
-            setTimeout(() => el.remove(), 300);
-          }
+      })
+      .on('postgres_changes', { event: 'DELETE', schema: 'public', table: 'posts' }, (payload) => {
+        const el = document.getElementById(`post-${payload.old?.id}`);
+        if (el) {
+          el.classList.add('opacity-0', 'scale-95');
+          setTimeout(() => el.remove(), 300);
         }
       })
       .subscribe((status) => {
         if (status === 'CHANNEL_ERROR') {
-          // Reintentar en 5s
           setTimeout(() => {
             if (self._realtimeChannel) self.subscribeRealtime();
           }, 5000);
@@ -742,5 +749,21 @@ export const WallModule = {
   /** Destruir completamente el módulo — llamar al salir de la sección muro */
   destroy() {
     this._unsubscribeRealtime();
+  },
+
+  openLightbox(postId) {
+    const post = document.getElementById(`post-${postId}`);
+    const img = post?.querySelector('img');
+    if (!img) return;
+
+    const html = `
+      <div class="w-full max-w-lg overflow-hidden relative">
+        <div class="relative h-80 bg-slate-900 flex items-center justify-center">
+          <img src="${img.src}" class="w-full h-full object-contain cursor-zoom-out" alt="Evidencia" onclick="App.ui.closeModal()">
+        </div>
+      </div>
+    `;
+    if (window.openGlobalModal) window.openGlobalModal(html, true);
+    else if (window.Modal?.open) window.Modal.open('lightbox', html);
   }
 };

@@ -493,11 +493,36 @@ async function renderDashboard() {
     if (kpiAlerts) kpiAlerts.textContent = fraudEvents.length;
     const badgeFraud = document.getElementById('badge-fraud');
     if (badgeFraud) badgeFraud.textContent = fraudEvents.length;
+    
+    // ✅ HEALTHCHECK: Estado del Ciclo de Pagos
+    const { data: health } = await supabase.rpc('check_payment_cycle_health');
+    const healthWidget = document.getElementById('paymentHealthWidget');
+    if (healthWidget) {
+      const isOk = health?.status === 'ok';
+      healthWidget.className = `card ${isOk ? 'border-l-emerald-500' : 'border-l-rose-500'} border-l-4`;
+      healthWidget.innerHTML = `
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;">
+          <h3 class="card-title">Salud del Ciclo</h3>
+          <span class="badge ${isOk ? 'badge-green' : 'badge-red'}">${isOk ? 'OK' : 'ERROR'}</span>
+        </div>
+        <p style="font-size:11px;color:var(--muted);margin-bottom:12px;">${health?.message || 'Verificando...'}</p>
+        ${!isOk ? `<button onclick="App.runEmergencyCycle()" class="btn-primary" style="width:100%;background:#ef4444;font-size:10px;padding:8px;">Reparar Ahora</button>` : ''}
+      `;
+    }
+
     renderRecentAudit();
     renderFraudAlertsList();
     renderCharts();
   } catch (_) {}
 }
+
+window.App.runEmergencyCycle = async function() {
+  if (!confirm('¿Ejecutar ciclo de pagos de emergencia?')) return;
+  const { data, error } = await supabase.rpc('run_payment_cycle');
+  if (error) alert('Error: ' + error.message);
+  else alert('Éxito: ' + data.generated + ' cobros generados.');
+  window.location.reload();
+};
 
 // ── Charts ────────────────────────────────────────────────────────────────────
 let chartActivity = null, chartRoles = null, chartPaymentsChart = null, chartAttendChart = null;

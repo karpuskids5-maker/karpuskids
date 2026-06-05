@@ -1,4 +1,4 @@
-﻿import { supabase } from '../shared/supabase.js';
+import { supabase } from '../shared/supabase.js';
 import { QueryCache } from '../shared/query-cache.js';
 import { safeHandle } from '../shared/db-utils.js';
 
@@ -113,7 +113,6 @@ export const DirectorApi = {
       const { data: rpcData, error: rpcError } = await supabase.rpc('get_dashboard_kpis', { p_month: monthText || '%' });
       
       if (!rpcError && rpcData) {
-        // Asegurar que los nombres de campos coincidan con lo que espera el DashboardService
         return { 
           data: {
             ...rpcData,
@@ -123,28 +122,29 @@ export const DirectorApi = {
         };
       }
 
-      // Fallback manual si el RPC falla o no estÃ¡ disponible
+      // Optimización: Usar head: true para conteos rápidos (evita descargar toda la tabla)
       const d = new Date();
       const today = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+      
       const results = await Promise.allSettled([
-        supabase.from('students').select('id', { count: 'exact', head: true }),
-        supabase.from('profiles').select('id', { count: 'exact', head: true }).in('role', ['maestra', 'asistente']),
-        supabase.from('classrooms').select('id', { count: 'exact', head: true }),
-        supabase.from('attendance').select('id', { count: 'exact', head: true }).eq('date', today).in('status', ['present', 'late']),
-        supabase.from('payments').select('amount').eq('status', 'pending'),
-        supabase.from('inquiries').select('id', { count: 'exact', head: true }).not('status', 'in', '("resolved","closed")')
+        supabase.from('students').select('*', { count: 'exact', head: true }).eq('is_active', true),
+        supabase.from('profiles').select('*', { count: 'exact', head: true }).in('role', ['maestra', 'asistente']),
+        supabase.from('classrooms').select('*', { count: 'exact', head: true }),
+        supabase.from('attendance').select('*', { count: 'exact', head: true }).eq('date', today).in('status', ['present', 'late']),
+        supabase.from('inquiries').select('*', { count: 'exact', head: true }).not('status', 'in', '("resolved","closed")'),
+        // Para pagos pendientes, seguimos necesitando la suma de montos, pero limitamos la query
+        supabase.from('payments').select('amount').eq('status', 'pending').limit(1000)
       ]);
 
       const get = (r) => r.status === 'fulfilled' ? r.value : { count: 0, data: [] };
-      const [totalRes, teachersRes, classroomsRes, attendanceRes, pendingPayRes, inquiriesRes] = results.map(get);
+      const [totalRes, teachersRes, classroomsRes, attendanceRes, inquiriesRes, pendingPayRes] = results.map(get);
 
       const pendingAmount = (pendingPayRes.data || []).reduce((s, p) => s + Number(p.amount || 0), 0);
-      const totalStudents = totalRes.count || 0;
 
       return {
         data: {
-          active:           totalStudents,
-          total:            totalStudents,
+          active:           totalRes.count || 0,
+          total:            totalRes.count || 0,
           teachers:         teachersRes.count    || 0,
           classrooms:       classroomsRes.count  || 0,
           attendance_today: attendanceRes.count  || 0,
@@ -185,14 +185,22 @@ export const DirectorApi = {
   async getPayments(filters = {}) {
     try {
       let query = supabase.from('payments')
-        .select('id, amount, status, month_paid, due_date, paid_date, method, bank, reference, proof_url, evidence_url, created_at, students:student_id(name, classrooms:classroom_id(name))');
+        .select('id, amount, status, month_paid, due_date, paid_date, method, bank, reference, proof_url, evidence_url, created_at, students:student_id(name, classrooms:classroom_id(name))', { count: 'exact' });
+      
       if (filters.status && filters.status !== 'all') query = query.eq('status', filters.status);
       if (filters.year) {
-        // Use month_paid prefix to match current year payments
         const yr = String(filters.year);
         query = query.like('month_paid', yr + '-%');
       }
-      return await query.order('created_at', { ascending: false }).limit(filters.limit || 200);
+      if (filters.month_paid) query = query.eq('month_paid', filters.month_paid);
+
+      if (filters.range) {
+        query = query.range(filters.range.from, filters.range.to);
+      } else {
+        query = query.limit(filters.limit || 200);
+      }
+
+      return await query.order('created_at', { ascending: false });
     } catch (e) { return logError('getPayments', e); }
   },
 
@@ -327,27 +335,40 @@ export const DirectorApi = {
   },
 
   // --- ESTUDIANTES ---
-  async getStudents() {
-    return QueryCache.get('dir_students', async () => {
-      try {
-        // Intentar con classroom_id (columna estÃ¡ndar del schema)
-        const res = await withTimeout(() =>
-          supabase.from('students')
-            .select('id, name, is_active, parent_id, classroom_id, matricula, p1_name, p1_phone, p1_email, classrooms:classroom_id(name)')
-            .order('name')
-        );
-        // Si falla por columna inexistente, intentar sin classroom_id
-        if (res.error && (res.error.message?.includes('classroom_id') || res.error.code === '42703')) {
+  async getStudents(filters = {}, range = null) {
+    let q = supabase
+      .from(TABLES.STUDENTS)
+      .select('id, name, avatar_url, matricula, age, age_type, classrooms(id, name), is_active', { count: 'exact' })
+      .order('name');
 
-          return await withTimeout(() =>
-            supabase.from('students')
-              .select('id, name, is_active, parent_id, p1_name, p1_phone, p1_email')
-              .order('name')
-          );
-        }
-        return res;
-      } catch (e) { return logError('getStudents', e); }
-    }, 3 * 60_000);
+    if (filters.search) q = q.ilike('name', `%${filters.search}%`);
+    if (filters.classroom_id) q = q.eq('classroom_id', filters.classroom_id);
+    if (filters.status === 'active') q = q.eq('is_active', true);
+    if (filters.status === 'inactive') q = q.eq('is_active', false);
+    
+    if (range) {
+      q = q.range(range.from, range.to);
+    } else {
+      q = q.limit(100); // Default safety limit
+    }
+
+    return q;
+  },
+
+  async getQuickCounts() {
+    // Ya optimizado con head: true
+    const [students, teachers, classrooms, inquiries] = await Promise.all([
+      supabase.from(TABLES.STUDENTS).select('*', { count: 'exact', head: true }).eq('is_active', true),
+      supabase.from(TABLES.PROFILES).select('*', { count: 'exact', head: true }).in('role', ['maestra', 'asistente']),
+      supabase.from(TABLES.CLASSROOMS).select('*', { count: 'exact', head: true }),
+      supabase.from('inquiries').select('*', { count: 'exact', head: true }).eq('status', 'pending')
+    ]);
+    return {
+      students: students.count || 0,
+      teachers: teachers.count || 0,
+      classrooms: classrooms.count || 0,
+      inquiries: inquiries.count || 0
+    };
   },
   async createStudent(data) {
     try {

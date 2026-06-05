@@ -1,4 +1,4 @@
-﻿import { supabase } from '../shared/supabase.js';
+import { supabase } from '../shared/supabase.js';
 import { AppState, TABLES, CacheKeys } from './appState.js';
 import { Helpers, escapeHtml } from './helpers.js';
 import { OfflineCache } from '../shared/offline-cache.js';
@@ -137,7 +137,32 @@ export const TasksModule = {
 
       if (error) throw error;
 
+      // ✅ ÉXITO: Confetti y Mensaje Motivador
+      if (window.confetti) {
+        confetti({
+          particleCount: 150,
+          spread: 70,
+          origin: { y: 0.6 },
+          colors: ['#f59e0b', '#3b82f6', '#10b981']
+        });
+      }
+
       Helpers.toast('¡Misión cumplida! Tarea enviada', 'success');
+      
+      // Mostrar mensaje de éxito bonito
+      window.openGlobalModal(`
+        <div class="bg-white rounded-[2.5rem] p-8 text-center animate-scaleIn w-full max-w-sm">
+          <div class="w-20 h-20 bg-orange-100 text-orange-600 rounded-3xl flex items-center justify-center mx-auto mb-6 text-4xl shadow-lg shadow-orange-50">🚀</div>
+          <h3 class="text-2xl font-black text-slate-800 mb-2">¡Tarea Enviada!</h3>
+          <p class="text-sm font-bold text-slate-500 leading-relaxed mb-6">
+            ¡Misión cumplida! La maestra revisará tu tarea pronto. ¡Sigue así! 🌟
+          </p>
+          <button onclick="UIHelpers.closeModal()" class="w-full py-4 bg-orange-600 text-white rounded-2xl font-black text-xs uppercase tracking-widest shadow-lg shadow-orange-100 active:scale-95 transition-all">
+            ¡Entendido!
+          </button>
+        </div>
+      `);
+
       modal.classList.add('hidden');
       await this.loadTasks('pending');
 

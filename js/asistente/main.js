@@ -16,6 +16,7 @@ import { ImageLoader } from '/js/shared/image-loader.js';
 import { QueryCache } from '/js/shared/query-cache.js';
 import { RealtimeManager } from '/js/shared/realtime-manager.js';
 import { Security } from '/js/shared/security.js';
+import { UIPremium } from '/js/shared/ui-premium.js';
 
 // ?? Definir objeto App globalmente para evitar ReferenceError en onclicks del HTML
 // Global close modal fallback � always available even before openNewPostModal is called
@@ -256,6 +257,8 @@ function initNavigation() {
   const sections = document.querySelectorAll('section[id]');
 
   const showSection = async (target) => {
+    Helpers.vibrate('light');
+
     // Desuscribir muro al salir (ahorro de recursos Realtime)
     const prevSection = AppState.get('currentSection');
     if (prevSection === 'muro' && target !== 'muro') {
@@ -278,8 +281,22 @@ function initNavigation() {
       activeLink.classList.add('bg-white/20', 'active');
       activeLink.classList.remove('text-white');
     }
+
+    // Actualizar Bottom Nav
+    document.querySelectorAll('.nav-item').forEach(btn => {
+      btn.classList.toggle('active', btn.dataset.section === target);
+    });
     
     // 2. Manejo de visibilidad de secciones (ESCENARIO)
+    // Lógica de salida de sección (Limpieza)
+    if (prevSection === 'accesos' && target !== 'accesos') {
+      try {
+        if (AccessModule?.stopScanner) {
+          AccessModule.stopScanner();
+        }
+      } catch (_) {}
+    }
+
     sections.forEach(s => {
       s.classList.add('hidden');
       s.classList.remove('active');
@@ -289,6 +306,7 @@ function initNavigation() {
     if (sectionEl) {
       sectionEl.classList.remove('hidden');
       sectionEl.classList.add('active'); 
+      UIPremium.applySectionTransition(target);
     } else {
 
     }
@@ -330,7 +348,10 @@ function initNavigation() {
             await RoomsModule.init();
             break;
           case 'muro':
-            WallModule.init('muroPostsContainer', { accentColor: 'teal', likeColor: 'emerald' }, AppState);
+            WallModule.init('muroPostsContainer', { 
+              accentColor: 'teal', 
+              likeColor: 'emerald' 
+            }, AppState);
             break;
           case 'staff-permits':
             import('../directora/permits.module.js').then(m => {
@@ -383,6 +404,19 @@ function initNavigation() {
   // Carga inicial del dashboard
   DashboardModule.init().then(() => loadedSections.add('dashboard'));
   showSection('dashboard');
+
+  // ✨ 5. Inicializar Experiencia Premium Móvil (Bottom Nav)
+  UIPremium.injectBottomNav([
+    { section: 'dashboard', label: 'Inicio', icon: 'layout' },
+    { section: 'estudiantes', label: 'Alumnos', icon: 'users' },
+    { section: 'pagos', label: 'Pagos', icon: 'credit-card' },
+    { section: 'accesos', label: 'Accesos', icon: 'qr-code' },
+    { section: 'chat', label: 'Chat', icon: 'message-circle' }
+  ]);
+
+  window.addEventListener('app:nav-change', (e) => {
+    showSection(e.detail.section);
+  });
 
   // -- Hamburger m�vil ------------------------------------------------------
   const menuBtn = document.getElementById('menuBtn');
@@ -575,3 +609,173 @@ async function initProfile() {
 }
 
 // --- Funciones Globales de Ventana ---
+window.selectAssistantChat = async (userId, name, role, avatarUrl = null) => {
+  const chatList = document.getElementById('chatListPanel');
+  const chatConv = document.getElementById('chatConvPanel');
+  const user = AppState.get('user');
+  
+  if (window.innerWidth < 768) {
+    chatList?.classList.add('chat-hidden');
+    chatConv?.classList.remove('chat-hidden');
+    chatConv?.classList.add('flex');
+  }
+
+  // UI Header
+  const nameEl = document.getElementById('chatActiveName');
+  const metaEl = document.getElementById('chatActiveMeta');
+  const avatarEl = document.getElementById('chatActiveAvatar');
+  const inputArea = document.getElementById('chatInputArea');
+  
+  if (nameEl) nameEl.textContent = name;
+  if (metaEl) metaEl.textContent = role || 'Usuario';
+  if (avatarEl) {
+    if (avatarUrl && avatarUrl !== 'null') {
+      avatarEl.innerHTML = `<img src="${avatarUrl}" class="w-full h-full object-cover">`;
+    } else {
+      avatarEl.innerHTML = name.charAt(0);
+    }
+  }
+  inputArea?.classList.remove('hidden');
+
+    // ✅ Reset UI al cambiar de chat
+    AppState.set('activeChatUserId', userId);
+    AppState.set('activeChatName', name);
+    AppState.set('activeChatRole', role);
+
+    const container = document.getElementById('chatMessagesContainer');
+  if (container) container.innerHTML = '<div class="p-8 text-center"><div class="animate-spin w-6 h-6 border-2 border-teal-500 border-t-transparent rounded-full mx-auto"></div></div>';
+
+  try {
+    const { messages, conversationId } = await ChatModule.loadConversation(userId);
+    AppState.set('activeChatUserId', userId);
+    AppState.set('activeConversationId', conversationId);
+
+    if (container) {
+      container.innerHTML = messages.length 
+        ? messages.map(m => _msgBubble(m, user.id)).join('')
+        : '<div class="p-8 text-center text-slate-400 text-xs font-bold uppercase tracking-widest">No hay mensajes previos</div>';
+      ScrollModule.scrollToBottom(container, false);
+    }
+
+    // Subscribe Realtime
+    if (conversationId) {
+      ChatModule.subscribeToConversation(conversationId, 
+        (newMsg) => {
+          if (newMsg.sender_id === user.id) return;
+          if (container) {
+            container.insertAdjacentHTML('beforeend', _msgBubble(newMsg, user.id));
+            ScrollModule.scrollToBottom(container, true);
+          }
+        },
+        (typing) => {
+          const indicator = document.getElementById('chatTypingIndicator');
+          if (!indicator) return;
+          if (typing.isTyping && typing.userName !== user.name) {
+            indicator.textContent = `${typing.userName} está escribiendo...`;
+            indicator.classList.remove('hidden');
+          } else {
+            indicator.classList.add('hidden');
+          }
+        }
+      );
+    }
+  } catch (err) {
+    Helpers.toast('Error al cargar chat', 'error');
+  }
+};
+
+async function initAssistantChat() {
+  const list = document.getElementById('chatContactsList');
+  if (!list) return;
+  
+  list.innerHTML = Helpers.skeleton(4, 'h-16 mb-2');
+  const user = AppState.get('user');
+
+  try {
+    // Cargar contactos (Padres, Maestras, Directora)
+    const { data: profiles, error } = await supabase
+      .from('profiles')
+      .select('id, name, avatar_url, role')
+      .neq('id', user.id)
+      .order('name');
+
+    if (error) throw error;
+
+    list.innerHTML = (profiles || []).map(p => `
+      <div onclick="window.selectAssistantChat('${p.id}', '${Helpers.escapeHTML(p.name)}', '${p.role}', '${p.avatar_url || ''}')" 
+           class="flex items-center gap-3 p-3 rounded-2xl hover:bg-white hover:shadow-sm cursor-pointer transition-all border border-transparent hover:border-slate-100 group mb-1">
+        <div class="w-12 h-12 rounded-full bg-teal-100 text-teal-700 flex items-center justify-center font-bold overflow-hidden border-2 border-teal-50 shrink-0 shadow-sm">
+          ${p.avatar_url ? `<img src="${p.avatar_url}" class="w-full h-full object-cover">` : p.name.charAt(0)}
+        </div>
+        <div class="min-w-0 flex-1">
+          <div class="font-bold text-slate-700 text-sm truncate group-hover:text-teal-700">${Helpers.escapeHTML(p.name)}</div>
+          <div class="text-[10px] text-slate-400 font-bold uppercase truncate">${p.role}</div>
+        </div>
+      </div>
+    `).join('');
+
+    // Listeners para envío
+    const sendBtn = document.getElementById('btnSendChatMessage');
+    const input = document.getElementById('chatMessageInput');
+    
+    if (sendBtn && !sendBtn._bound) {
+      sendBtn._bound = true;
+      const sendMsg = async () => {
+        const text = input.value.trim();
+        const destId = AppState.get('activeChatUserId');
+        const convId = AppState.get('activeConversationId');
+        if (!text || !destId) return;
+
+        input.value = '';
+        const container = document.getElementById('chatMessagesContainer');
+        container?.insertAdjacentHTML('beforeend', _msgBubble({ sender_id: user.id, content: text }, user.id));
+        ScrollModule.scrollToBottom(container, true);
+
+        try {
+          const res = await ChatModule.sendMessage(user.id, destId, text, convId);
+          if (!convId && res.conversationId) {
+            AppState.set('activeConversationId', res.conversationId);
+            window.selectAssistantChat(destId, AppState.get('activeChatName'), AppState.get('activeChatRole'));
+          }
+        } catch (_) { Helpers.toast('Error al enviar', 'error'); }
+      };
+
+      sendBtn.onclick = sendMsg;
+      input.onkeydown = (e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendMsg(); } };
+      
+      // Typing broadcast
+      let t;
+      input.oninput = () => {
+        const cid = AppState.get('activeConversationId');
+        if (!cid) return;
+        ChatModule.broadcastTyping(cid, user.name, true);
+        clearTimeout(t);
+        t = setTimeout(() => ChatModule.broadcastTyping(cid, user.name, false), 2000);
+      };
+    }
+
+  } catch (err) {
+    list.innerHTML = Helpers.errorState('Error al cargar contactos');
+  }
+}
+
+function _msgBubble(m, myId) {
+  const isMe = m.sender_id === myId;
+  return `
+    <div class="flex ${isMe ? 'justify-end' : 'justify-start'} mb-3 animate-slideInUp">
+      <div class="max-w-[80%] px-4 py-2.5 rounded-2xl text-sm shadow-sm ${isMe ? 'bg-teal-600 text-white rounded-tr-none' : 'bg-white text-slate-700 rounded-tl-none border border-slate-100'}">
+        <p class="leading-relaxed">${Helpers.escapeHTML(m.content)}</p>
+        <div class="text-[9px] mt-1 opacity-60 text-right font-bold uppercase tracking-tighter">
+          ${m.created_at ? new Date(m.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : 'Ahora'}
+        </div>
+      </div>
+    </div>`;
+}
+
+window.App.runEmergencyCycle = async function() {
+  if (!confirm('¿Ejecutar ciclo de pagos de emergencia?')) return;
+  const { data, error } = await supabase.rpc('run_payment_cycle');
+  if (error) alert('Error: ' + error.message);
+  else alert('Éxito: ' + data.generated + ' cobros generados.');
+  window.location.reload();
+};

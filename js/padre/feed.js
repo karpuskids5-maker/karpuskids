@@ -14,28 +14,17 @@ export const FeedModule = {
    * Inicializa el muro
    * classroomId puede ser null — en ese caso solo muestra posts generales
    */
-  async init(classroomId) {
-    this._classroomId = classroomId || null;
-    
-    // Delegación para likes y comentarios
-    const container = document.getElementById('classFeed');
-    if (container && !container._initialized) {
-      Helpers.delegate(container, '[data-action="like"]', 'click', (e, btn) => {
-        this.toggleLike(btn.dataset.postId);
-      });
-      Helpers.delegate(container, '[data-action="comment"]', 'click', (e, btn) => {
-        this.showComments(btn.dataset.postId);
-      });
-      container._initialized = true;
-    }
+  async init() {
+    const student = AppState.get('currentStudent');
+    const parent = AppState.get('user');
+    if (!student || !parent) return;
 
-    // Suscripción reactiva al estado
-    AppState.subscribe('feedPosts', (posts) => {
-      this.renderFeed(posts);
-    });
-
-    await this.loadPosts();
-    this.initRealtime();
+    WallModule.init('muroPostsContainer', {
+      accentColor: 'indigo',
+      likeColor: 'indigo',
+      classroomId: student.classroom_id,
+      parentId: parent.id // Pasar parentId explícitamente para RLS
+    }, AppState);
   },
 
   /**

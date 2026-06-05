@@ -92,13 +92,18 @@ export async function initRoutine() {
               <h3 class="text-xl font-black text-slate-800">📝 Rutina Diaria</h3>
               <p class="text-xs font-bold text-slate-400 uppercase tracking-wider mt-0.5">${todayLabel}</p>
             </div>
-            <div class="flex flex-col items-end">
-               <span class="text-[10px] font-black text-orange-600 bg-orange-50 border border-orange-100 px-3 py-1 rounded-full uppercase tracking-wider mb-1">
+            <div class="flex flex-col items-end gap-2">
+               <span class="text-[10px] font-black text-orange-600 bg-orange-50 border border-orange-100 px-3 py-1 rounded-full uppercase tracking-wider">
                 Periodo: ${periodNames[currentPeriod]}
               </span>
-              <button onclick="App.openBulkRoutineModal()" class="text-[10px] font-black text-blue-600 hover:text-blue-700 underline uppercase tracking-widest">
-                Rutina General (Bulk)
-              </button>
+              <div class="flex gap-4">
+                <button onclick="App.openBulkRoutineModal()" class="text-[10px] font-black text-blue-600 hover:text-blue-700 underline uppercase tracking-widest">
+                  Rutina General (Bulk)
+                </button>
+                <button onclick="Routine.publishAll()" id="btnPublishAll" class="text-[10px] font-black text-emerald-600 hover:text-emerald-700 underline uppercase tracking-widest hidden">
+                  Publicar Todos
+                </button>
+              </div>
             </div>
           </div>
 
@@ -138,16 +143,53 @@ export async function initRoutine() {
         <div class="bg-white p-6 rounded-[2rem] border border-slate-100 shadow-sm text-center border-l-4 border-l-orange-500">
           <p class="text-xs text-slate-400 font-medium">
             💡 Toca a un estudiante para abrir su reporte de rutina individual.<br>
-            Los emojis flotantes indican el progreso actual.
+            Los emojis flotantes indican el progreso actual. Los reportes en <strong>Borrador</strong> no son visibles para los padres.
           </p>
         </div>
       </div>
     `;
 
+    // Mostrar botón de publicar todo si hay borradores
+    const hasDrafts = (todayLogs || []).some(l => l.status === 'draft');
+    if (hasDrafts) document.getElementById('btnPublishAll')?.classList.remove('hidden');
+
     if (window.lucide) window.lucide.createIcons();
   } catch (e) {
     console.error('Error en initRoutine:', e);
     container.innerHTML = Helpers.errorState('Error al cargar la rutina', 'App.initRoutine()');
+  }
+}
+
+/**
+ * Publicar todos los borradores del aula hoy
+ */
+export async function publishAll() {
+  const students = AppState.get('students') || [];
+  const today = new Date().toISOString().split('T')[0];
+  const classroom = AppState.get('classroom');
+
+  try {
+    const { data: drafts } = await supabase
+      .from('daily_logs')
+      .select('id')
+      .eq('classroom_id', classroom.id)
+      .eq('date', today)
+      .eq('status', 'draft');
+
+    if (!drafts?.length) return;
+
+    if (!confirm(`¿Publicar ${drafts.length} reportes? Los padres recibirán las notificaciones ahora.`)) return;
+
+    Helpers.showLoader('Publicando reportes...');
+    await MaestraApi.publishDailyLogs(drafts.map(d => d.id));
+    
+    Helpers.hideLoader();
+    UI.safeToast('Reportes publicados con éxito', 'success');
+    await initRoutine();
+
+  } catch (e) {
+    Helpers.hideLoader();
+    UI.safeToast('Error al publicar reportes', 'error');
   }
 }
 
@@ -160,6 +202,7 @@ function _renderStudentRoutineCard(s, log) {
   const food  = isValid && log.food ? log.food : null;
   const sleep = isValid && log.nap  ? log.nap  : null;
   const note  = isValid && log.notes ? true : false;
+  const isDraft = isValid && log.status === 'draft';
   const isInfant = s.age_type === 'meses' || s.age_type === 'mes';
   const infantEvents = isValid && log.infant_data ? log.infant_data : [];
 
@@ -169,8 +212,15 @@ function _renderStudentRoutineCard(s, log) {
 
   return `
     <div onclick="App.openStudentRoutine('${s.id}')" 
-      class="group relative bg-white rounded-[2rem] p-4 border-2 border-slate-100 hover:border-orange-400 hover:shadow-xl hover:shadow-orange-100 transition-all cursor-pointer active:scale-95 flex flex-col items-center text-center overflow-hidden">
+      class="group relative bg-white rounded-[2rem] p-4 border-2 ${isDraft ? 'border-dashed border-orange-200 bg-orange-50/20' : 'border-slate-100'} hover:border-orange-400 hover:shadow-xl hover:shadow-orange-100 transition-all cursor-pointer active:scale-95 flex flex-col items-center text-center overflow-hidden">
       
+      <!-- Badge de Borrador -->
+      ${isDraft ? `
+        <div class="absolute top-2 left-2 z-10">
+          <span class="px-2 py-0.5 bg-orange-500 text-white text-[8px] font-black uppercase rounded-lg shadow-sm">Borrador</span>
+        </div>
+      ` : ''}
+
       <!-- Burbujas de Emojis Flotantes (Status) -->
       <div class="absolute top-2 right-2 flex flex-col gap-1 z-10">
         ${mood ? `<div class="w-7 h-7 bg-orange-50 rounded-full flex items-center justify-center text-sm shadow-sm border border-orange-100 animate-bounce-subtle">${moodEmojis[mood]}</div>` : ''}
@@ -181,8 +231,8 @@ function _renderStudentRoutineCard(s, log) {
       </div>
 
       <!-- Avatar -->
-      <div class="w-20 h-20 rounded-[1.5rem] bg-orange-50 border-4 border-white shadow-inner overflow-hidden mb-3 group-hover:scale-110 transition-transform duration-500">
-        ${s.avatar_url ? `<img src="${s.avatar_url}" class="w-full h-full object-cover">` : `<div class="w-full h-full flex items-center justify-center text-2xl font-black text-orange-300">${s.name.charAt(0)}</div>`}
+      <div class="w-20 h-20 rounded-[1.5rem] bg-orange-50 border-4 border-white shadow-inner overflow-hidden mb-3 group-hover:scale-110 transition-transform duration-500 flex items-center justify-center font-black text-2xl text-orange-300">
+        ${s.avatar_url ? `<img src="${s.avatar_url}" class="w-full h-full object-cover">` : s.name.charAt(0)}
       </div>
 
       <!-- Info -->
@@ -199,9 +249,6 @@ function _renderStudentRoutineCard(s, log) {
   `;
 }
 
-/**
- * Abre el modal de reporte individual para un estudiante.
- */
 export async function openStudentRoutine(studentId) {
   const student = AppState.get('students').find(s => s.id == studentId);
   if (!student) return;
@@ -209,20 +256,12 @@ export async function openStudentRoutine(studentId) {
   const today = new Date().toISOString().split('T')[0];
   const { data: log } = await supabase.from('daily_logs').select('*').eq('student_id', studentId).eq('date', today).maybeSingle();
   
-  const isValid = log && _isWithin12h(log.created_at);
-  const isInfant = student.age_type === 'meses';
-  
+  const isInfant = student.age_type === 'meses' || student.age_type === 'mes';
   const modalId = 'routineStudentModal';
-  
-  let content = '';
-  
-  if (isInfant) {
-    // INTERFAZ ESPECIAL PARA BEBES
-    content = _renderInfantRoutineUI(student, log, modalId);
-  } else {
-    // INTERFAZ ESTANDAR PARA NINOS
-    content = _renderStandardRoutineUI(student, log, modalId);
-  }
+
+  const content = isInfant 
+    ? _renderInfantRoutineUI(student, log, modalId)
+    : _renderStandardRoutineUI(student, log, modalId);
 
   Modal.open(modalId, content);
   if (window.lucide) window.lucide.createIcons();
@@ -230,14 +269,22 @@ export async function openStudentRoutine(studentId) {
 
 function _renderInfantRoutineUI(student, log, modalId) {
   const infantData = log?.infant_data || [];
-  const lastMilk = [...infantData].reverse().find(e => e.type === 'milk');
+  const lastEntry = [...infantData].reverse()[0];
   
-  let nextFeeding = 'Pendiente';
-  if (lastMilk) {
-    const lastTime = new Date(lastMilk.created_at);
-    lastTime.setHours(lastTime.getHours() + 1); // Sugerencia: cada 1 hora según instrucción
-    nextFeeding = lastTime.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+  const now = new Date();
+  const currentHourStr = now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: true });
+
+  const timeOptions = [];
+  for(let h=7; h<=18; h++) {
+    for(let m=0; m<60; m+=30) {
+      const hh = h > 12 ? h-12 : h;
+      const ampm = h >= 12 ? 'PM' : 'AM';
+      const time = `${hh}:${m.toString().padStart(2, '0')} ${ampm}`;
+      timeOptions.push(time);
+    }
   }
+
+  const activities = ["Sensorial", "Motricidad", "Música", "Lectura", "Juego libre", "Estimulación temprana", "Arte"];
 
   return `
     <div class="bg-white w-full max-w-md rounded-[2.5rem] shadow-2xl overflow-hidden animate-fadeIn flex flex-col max-h-[95vh]">
@@ -246,94 +293,97 @@ function _renderInfantRoutineUI(student, log, modalId) {
           <i data-lucide="x" class="w-5 h-5"></i>
         </button>
         <div class="flex items-center gap-4">
-          <div class="w-16 h-16 rounded-2xl bg-white border-4 border-white/20 overflow-hidden shadow-lg">
-            ${student.avatar_url ? `<img src="${student.avatar_url}" class="w-full h-full object-cover">` : `<div class="w-full h-full flex items-center justify-center text-xl font-black text-blue-500">${student.name.charAt(0)}</div>`}
+          <div class="w-16 h-16 rounded-2xl bg-white/20 border-2 border-white/30 overflow-hidden shadow-inner shrink-0 flex items-center justify-center font-black text-2xl text-white">
+            ${student.avatar_url ? `<img src="${student.avatar_url}" class="w-full h-full object-cover">` : student.name.charAt(0)}
           </div>
           <div>
             <h3 class="text-xl font-black">${safeEscapeHTML(student.name)}</h3>
-            <p class="text-xs font-bold text-blue-100 uppercase tracking-widest">Protocolo de Lactante 🍼</p>
+            <p class="text-xs font-bold text-blue-100 uppercase tracking-widest">Registro del Bebé 🍼</p>
           </div>
         </div>
       </div>
 
-      <div class="p-6 space-y-6 overflow-y-auto custom-scrollbar">
-        <!-- Dashboard Rápido Bebé -->
-        <div class="grid grid-cols-2 gap-4">
-          <div class="bg-blue-50 p-4 rounded-3xl border border-blue-100">
-            <p class="text-[10px] font-black text-blue-400 uppercase tracking-widest mb-1">Próxima Toma</p>
-            <p class="text-lg font-black text-blue-700">${nextFeeding}</p>
-          </div>
-          <div class="bg-indigo-50 p-4 rounded-3xl border border-indigo-100">
-            <p class="text-[10px] font-black text-indigo-400 uppercase tracking-widest mb-1">Última Acción</p>
-            <p class="text-lg font-black text-indigo-700 truncate">${lastMilk ? lastMilk.value : '--'}</p>
+      <div class="p-6 space-y-6 overflow-y-auto custom-scrollbar bg-slate-50/50">
+        
+        <!-- Bloque 1: Hora -->
+        <div class="bg-white p-5 rounded-3xl border border-slate-100 shadow-sm">
+          <label class="block text-[11px] font-black text-slate-400 uppercase tracking-widest mb-3 ml-1">Hora del Registro</label>
+          <select id="infantTime" class="w-full p-3.5 bg-slate-50 border-2 border-slate-100 rounded-2xl font-bold text-sm outline-none focus:ring-4 focus:ring-blue-100 focus:border-blue-400 transition-all">
+            ${timeOptions.map(t => `<option value="${t}" ${t === currentHourStr ? 'selected' : ''}>${t}</option>`).join('')}
+          </select>
+        </div>
+
+        <!-- Bloque 2: Leche -->
+        <div class="bg-white p-5 rounded-3xl border border-slate-100 shadow-sm">
+          <label class="block text-[11px] font-black text-slate-400 uppercase tracking-widest mb-3 ml-1">Leche (Onzas)</label>
+          <div class="flex items-center gap-4">
+            <input type="number" id="infantMilk" min="0" max="12" step="0.5" placeholder="0" class="flex-1 p-3.5 bg-slate-50 border-2 border-slate-100 rounded-2xl font-bold text-lg outline-none focus:ring-4 focus:ring-blue-100 focus:border-blue-400 transition-all">
+            <span class="font-black text-slate-400 uppercase text-[10px] tracking-widest">oz</span>
           </div>
         </div>
 
-        <!-- Panel de Control de Bebés -->
-        <div class="space-y-4">
-          <label class="block text-[11px] font-black text-slate-400 uppercase tracking-widest ml-1">Acciones Rápidas</label>
-          
-          <!-- Selector de Onzas -->
-          <div class="bg-slate-50 p-4 rounded-3xl border-2 border-slate-100">
-             <p class="text-[10px] font-black text-slate-500 uppercase mb-3 flex items-center gap-2">🍼 Registro de Leche</p>
-             <div class="grid grid-cols-4 gap-2">
-                ${['2oz', '4oz', '6oz', '8oz'].map(oz => `
-                  <button onclick="App.registerInfantEvent('${student.id}', 'milk', '${oz}')"
-                    class="py-3 rounded-xl bg-white border border-slate-200 text-sm font-black text-slate-700 hover:border-blue-400 hover:text-blue-600 transition-all active:scale-95 shadow-sm">
-                    ${oz}
-                  </button>
-                `).join('')}
-             </div>
-          </div>
-
-          <div class="grid grid-cols-2 gap-3">
-             <button onclick="App.registerInfantEvent('${student.id}', 'sleep', 'siesta')"
-                class="flex flex-col items-center gap-2 p-4 bg-indigo-50 text-indigo-700 rounded-3xl border-2 border-indigo-100 hover:bg-indigo-100 transition-all">
-                <span class="text-2xl">💤</span>
-                <span class="text-[10px] font-black uppercase">Siesta</span>
-             </button>
-             <button onclick="App.registerInfantEvent('${student.id}', 'health', 'vomito')"
-                class="flex flex-col items-center gap-2 p-4 bg-rose-50 text-rose-700 rounded-3xl border-2 border-rose-100 hover:bg-rose-100 transition-all">
-                <span class="text-2xl">🤢</span>
-                <span class="text-[10px] font-black uppercase">Vómito</span>
-             </button>
-             <button onclick="App.registerInfantEvent('${student.id}', 'diaper', 'limpio')"
-                class="flex flex-col items-center gap-2 p-4 bg-emerald-50 text-emerald-700 rounded-3xl border-2 border-emerald-100 hover:bg-emerald-100 transition-all">
-                <span class="text-2xl">💩</span>
-                <span class="text-[10px] font-black uppercase">Pañal Limpio</span>
-             </button>
-             <button onclick="App.registerInfantEvent('${student.id}', 'diaper', 'sucio')"
-                class="flex flex-col items-center gap-2 p-4 bg-amber-50 text-amber-700 rounded-3xl border-2 border-amber-100 hover:bg-amber-100 transition-all">
-                <span class="text-2xl">💩</span>
-                <span class="text-[10px] font-black uppercase">Pañal Sucio</span>
-             </button>
+        <!-- Bloque 3: Comida -->
+        <div class="bg-white p-5 rounded-3xl border border-slate-100 shadow-sm">
+          <label class="block text-[11px] font-black text-slate-400 uppercase tracking-widest mb-3 ml-1">Alimentación</label>
+          <div class="grid grid-cols-2 gap-2">
+            ${[
+              {id: 'none', label: 'No comió', emoji: '🙅'},
+              {id: 'little', label: 'Poco', emoji: '🍲'},
+              {id: 'half', label: 'La mitad', emoji: '🥣'},
+              {id: 'all', label: 'Todo', emoji: '🍽️'}
+            ].map(f => `
+              <label class="relative flex items-center gap-3 p-3 bg-slate-50 border-2 border-slate-100 rounded-2xl cursor-pointer hover:bg-blue-50 transition-all group">
+                <input type="radio" name="infantFood" value="${f.id}" class="hidden peer">
+                <div class="w-5 h-5 rounded-full border-2 border-slate-300 peer-checked:border-blue-500 peer-checked:bg-blue-500 flex items-center justify-center transition-all">
+                  <div class="w-2 h-2 bg-white rounded-full"></div>
+                </div>
+                <span class="text-xl">${f.emoji}</span>
+                <span class="text-xs font-bold text-slate-600">${f.label}</span>
+              </label>
+            `).join('')}
           </div>
         </div>
 
-        <!-- Línea de Tiempo del Día -->
-        <div class="space-y-4 pt-2">
-          <label class="block text-[11px] font-black text-slate-400 uppercase tracking-widest ml-1">Historial de Hoy</label>
-          <div class="space-y-3 border-l-2 border-slate-100 ml-4 pl-6">
-             ${infantData.length ? infantData.reverse().map(e => `
-               <div class="relative">
-                 <div class="absolute -left-[31px] top-1 w-4 h-4 rounded-full border-4 border-white shadow-sm ${e.type === 'health' ? 'bg-rose-500' : e.type === 'milk' ? 'bg-blue-500' : 'bg-slate-300'}"></div>
-                 <p class="text-[10px] font-black text-slate-400 uppercase">${new Date(e.created_at).toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'})}</p>
-                 <p class="text-sm font-bold text-slate-700">
-                    ${e.type === 'milk' ? `Tomó ${e.value} de leche 🍼` : 
-                      e.type === 'health' ? `<span class="text-rose-600">Reportó ${e.value} 🤢</span>` :
-                      e.type === 'sleep' ? `Inició siesta 💤` :
-                      `Cambio de pañal: ${e.value} 💩`}
-                 </p>
-               </div>
-             `).join('') : '<p class="text-xs text-slate-400 italic">Sin registros aún.</p>'}
+        <!-- Bloque 4: Actividades -->
+        <div class="bg-white p-5 rounded-3xl border border-slate-100 shadow-sm">
+          <label class="block text-[11px] font-black text-slate-400 uppercase tracking-widest mb-3 ml-1">Actividades</label>
+          <div class="flex flex-wrap gap-2">
+            ${activities.map(a => `
+              <label class="relative cursor-pointer group">
+                <input type="checkbox" name="infantActivity" value="${a}" class="hidden peer">
+                <span class="block px-4 py-2 bg-slate-50 border-2 border-slate-100 rounded-xl text-xs font-bold text-slate-500 peer-checked:bg-indigo-50 peer-checked:border-indigo-400 peer-checked:text-indigo-700 transition-all">
+                  ${a}
+                </span>
+              </label>
+            `).join('')}
           </div>
+        </div>
+
+        <!-- Bloque 5: Comentario -->
+        <div class="bg-white p-5 rounded-3xl border border-slate-100 shadow-sm">
+          <label class="block text-[11px] font-black text-slate-400 uppercase tracking-widest mb-3 ml-1">Observación adicional 📝</label>
+          <textarea id="infantNotes" rows="2" class="w-full p-4 bg-slate-50 border-2 border-slate-100 rounded-2xl text-sm font-medium outline-none focus:border-blue-400 transition-all resize-none" placeholder="Escribe algo importante..."></textarea>
+        </div>
+
+        <!-- Historial Rápido -->
+        <div class="pt-2">
+          <label class="block text-[11px] font-black text-slate-400 uppercase tracking-widest ml-1 mb-3">Último Registro</label>
+          ${lastEntry ? `
+            <div class="p-4 bg-white rounded-3xl border border-slate-100 flex items-center gap-3">
+              <div class="w-10 h-10 bg-blue-50 text-blue-600 rounded-2xl flex items-center justify-center font-black">🍼</div>
+              <div class="flex-1 min-w-0">
+                <p class="text-[10px] font-black text-slate-400 uppercase">${new Date(lastEntry.created_at).toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'})}</p>
+                <p class="text-xs font-bold text-slate-700 truncate">${lastEntry.comment || 'Registro de rutina'}</p>
+              </div>
+            </div>
+          ` : '<p class="text-xs text-slate-400 italic ml-1">No hay registros hoy.</p>'}
         </div>
       </div>
 
-      <div class="p-6 pt-0 mt-auto">
-        <button onclick="Modal.close('${modalId}')" 
-          class="w-full py-4 bg-slate-900 text-white rounded-2xl font-black text-xs uppercase tracking-widest hover:bg-slate-800 transition-all flex items-center justify-center gap-2">
-          <i data-lucide="check-circle" class="w-4 h-4"></i> Finalizar Turno
+      <div class="p-6 bg-white border-t border-slate-100">
+        <button onclick="App.saveInfantEntry('${student.id}')" id="btnSaveInfant"
+          class="w-full py-4 bg-blue-600 text-white rounded-2xl font-black text-xs uppercase tracking-widest hover:bg-blue-700 transition-all shadow-lg shadow-blue-100 flex items-center justify-center gap-2 active:scale-95">
+          <i data-lucide="save" class="w-4 h-4"></i> Guardar Registro
         </button>
       </div>
     </div>
@@ -359,8 +409,8 @@ function _renderStandardRoutineUI(student, log, modalId) {
           <i data-lucide="x" class="w-5 h-5"></i>
         </button>
         <div class="flex items-center gap-4">
-          <div class="w-16 h-16 rounded-2xl bg-white border-4 border-white/20 overflow-hidden shadow-lg">
-            ${student.avatar_url ? `<img src="${student.avatar_url}" class="w-full h-full object-cover">` : `<div class="w-full h-full flex items-center justify-center text-xl font-black text-orange-500">${student.name.charAt(0)}</div>`}
+          <div class="w-16 h-16 rounded-2xl bg-white/20 border-2 border-white/30 overflow-hidden shadow-inner shrink-0 flex items-center justify-center font-black text-2xl text-white">
+            ${student.avatar_url ? `<img src="${student.avatar_url}" class="w-full h-full object-cover">` : student.name.charAt(0)}
           </div>
           <div>
             <h3 class="text-xl font-black">${safeEscapeHTML(student.name)}</h3>
@@ -438,14 +488,13 @@ function _renderStandardRoutineUI(student, log, modalId) {
 }
 
 /**
- * Registra un evento de bebÃƒ© (leche, siesta, vomito, paÃƒ±al)
+ * Registra un evento de bebé (leche, siesta, vomito, pañal) - Deprecado por saveInfantEntry pero mantenido por compatibilidad
  */
 export async function registerInfantEvent(sid, type, val) {
   try {
     const today = new Date().toISOString().split('T')[0];
     const classroom = AppState.get('classroom');
     
-    // 1. Guardar en DB (Retorna el objeto actualizado)
     const updatedLog = await MaestraApi.upsertDailyLog({
       student_id: sid,
       classroom_id: classroom.id,
@@ -455,7 +504,6 @@ export async function registerInfantEvent(sid, type, val) {
     
     safeToast(`Registro de ${type} guardado`);
     
-    // 2. Actualizar UI de forma granular sin re-consultar toda la base de datos
     const modalContent = _renderInfantRoutineUI(
       AppState.get('students').find(s => s.id == sid),
       updatedLog,
@@ -466,6 +514,65 @@ export async function registerInfantEvent(sid, type, val) {
 
   } catch (e) {
     safeToast('Error al registrar evento', 'error');
+  }
+}
+
+/**
+ * Nueva lógica para guardar entrada estructurada de bebé
+ */
+export async function saveInfantEntry(sid) {
+  const btn = document.getElementById('btnSaveInfant');
+  if (btn) { btn.disabled = true; btn.innerHTML = '<i data-lucide="loader-2" class="animate-spin w-4 h-4"></i> Guardando...'; }
+  if (window.lucide) window.lucide.createIcons();
+
+  try {
+    const time = document.getElementById('infantTime').value;
+    const milk = parseFloat(document.getElementById('infantMilk').value) || 0;
+    const food = document.querySelector('input[name="infantFood"]:checked')?.value;
+    const activities = Array.from(document.querySelectorAll('input[name="infantActivity"]:checked')).map(cb => cb.value);
+    const notes = document.getElementById('infantNotes').value.trim();
+
+    // Generar comentario inteligente
+    let commentParts = [];
+    if (milk > 0) commentParts.push(`Tomó ${milk} oz de leche.`);
+    else if (milk === 0 && document.getElementById('infantMilk').value !== '') commentParts.push(`No quiso tomar leche.`);
+
+    if (food) {
+      const foodMap = { none: 'No quiso comer.', little: 'Comió una pequeña cantidad.', half: 'Comió la mitad de su comida.', all: 'Comió toda su comida.' };
+      commentParts.push(foodMap[food]);
+    }
+
+    if (activities.length > 0) {
+      commentParts.push(`Participó en actividades de ${activities.join(', ').toLowerCase()}.`);
+    }
+
+    if (notes) commentParts.push(notes);
+
+    const finalComment = commentParts.join(' ');
+
+    const today = new Date().toISOString().split('T')[0];
+    const classroom = AppState.get('classroom');
+
+    await MaestraApi.upsertDailyLog({
+      student_id: sid,
+      classroom_id: classroom.id,
+      date: today,
+      infant_event: {
+        type: 'structured_entry',
+        time, milk, food, activities, notes,
+        comment: finalComment
+      }
+    });
+
+    safeToast('Registro guardado correctamente');
+    Modal.close('routineStudentModal');
+    initRoutine();
+
+  } catch (e) {
+    console.error(e);
+    safeToast('Error al guardar el registro', 'error');
+    if (btn) { btn.disabled = false; btn.innerHTML = '<i data-lucide="save" class="w-4 h-4"></i> Guardar Registro'; }
+    if (window.lucide) window.lucide.createIcons();
   }
 }
 
@@ -496,9 +603,32 @@ export function updateRoutineFieldInModal(sid, field, val) {
 
 export async function saveRoutineInModal(sid) {
   const note = document.getElementById(`modal-note-${sid}`)?.value;
-  await saveRoutineLog(sid, 'notes', note);
-  Modal.close('routineStudentModal');
-  initRoutine(); // Recargar grid para ver burbujas
+  const mood = document.querySelector(`.routine-modal-mood-${sid}.border-orange-400`)?.dataset.val;
+  const food = document.querySelector(`.routine-modal-food-${sid}.border-emerald-400`)?.dataset.val;
+  const sleep = document.querySelector(`.routine-modal-sleep-${sid}.border-indigo-400`)?.dataset.val;
+
+  const updates = { notes: note };
+  if (mood) updates.mood = mood;
+  if (food) updates.food = food;
+  if (sleep) updates.nap = sleep;
+
+  try {
+    const today = new Date().toISOString().split('T')[0];
+    const classroom = AppState.get('classroom');
+
+    await MaestraApi.upsertDailyLog({
+      student_id: sid,
+      classroom_id: classroom.id,
+      date: today,
+      ...updates
+    });
+
+    safeToast('Reporte guardado');
+    Modal.close('routineStudentModal');
+    initRoutine(); 
+  } catch (e) {
+    safeToast('Error al guardar', 'error');
+  }
 }
 
 /**
@@ -514,26 +644,26 @@ export async function openBulkRoutineModal() {
       <div class="space-y-6">
         <div class="grid grid-cols-2 gap-4">
           <div class="space-y-2">
-            <label class="text-[10px] font-black uppercase text-slate-400 ml-1">\u00c1nimo \ud83d\ude0a</label>
+            <label class="text-[10px] font-black uppercase text-slate-400 ml-1">Ánimo 😊</label>
             <select id="bulkMood" class="w-full p-3 bg-slate-50 border-2 border-slate-100 rounded-xl font-bold text-sm outline-none focus:border-orange-400">
-              <option value="feliz">Feliz \ud83d\ude0a</option>
-              <option value="normal">Normal \ud83d\ude10</option>
+              <option value="feliz">Feliz 😊</option>
+              <option value="normal">Normal 😐</option>
             </select>
           </div>
           <div class="space-y-2">
-            <label class="text-[10px] font-black uppercase text-slate-400 ml-1">Comida \ud83c\udf7d\ufe0f</label>
+            <label class="text-[10px] font-black uppercase text-slate-400 ml-1">Comida 🍽️</label>
             <select id="bulkFood" class="w-full p-3 bg-slate-50 border-2 border-slate-100 rounded-xl font-bold text-sm outline-none focus:border-orange-400">
-              <option value="todo">Todo \ud83d\ude0b</option>
-              <option value="poco">Poco \ud83d\ude15</option>
+              <option value="todo">Todo 😋</option>
+              <option value="poco">Poco 🍲</option>
             </select>
           </div>
         </div>
 
         <div class="space-y-2">
-          <label class="text-[10px] font-black uppercase text-slate-400 ml-1">Siesta \ud83d\ude34</label>
+          <label class="text-[10px] font-black uppercase text-slate-400 ml-1">Siesta 💤</label>
           <select id="bulkSleep" class="w-full p-3 bg-slate-50 border-2 border-slate-100 rounded-xl font-bold text-sm outline-none focus:border-orange-400">
-            <option value="si">Durmi\u00f3 \ud83d\ude34</option>
-            <option value="no">No durmi\u00f3 \ud83c\udf1e</option>
+            <option value="si">Durmió 💤</option>
+            <option value="no">No durmió ☀️</option>
           </select>
         </div>
 
@@ -573,23 +703,11 @@ export async function applyBulkRoutine() {
     await Promise.all(promises);
     safeToast(`Rutina aplicada a ${students.length} estudiantes`);
     
-    // AUTOMATIZACION: Publicar en el Muro automaticamente
-    const moodEmojis = { feliz: '😊', normal: '😐', triste: '😢', enojado: '😡' };
-    const foodEmojis = { todo: '😋', poco: '🍲', nada: '' };
-    const wallMessage = `Actualización de Rutina: Día ${today}`;
-    
-    await supabase.from('posts').insert({
-      content: wallMessage,
-      classroom_id: classroom.id,
-      teacher_id: AppState.get('user').id,
-      type: 'announcement'
-    });
-
     Modal.close('bulkRoutineModal');
     initRoutine();
     
     if (window.WallModule) {
-      window.WallModule.loadPosts(); // Refrescar muro si estÃƒ¡ cargado
+      window.WallModule.loadPosts(); 
     }
   } catch (_) {
     safeToast('Error al aplicar rutina masiva', 'error');

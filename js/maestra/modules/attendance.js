@@ -9,11 +9,11 @@ const { safeToast, safeEscapeHTML, Modal } = UI;
 
 // Start auto-sync when online
 OfflineQueue.startAutoSync(({ synced }) => {
-  safeToast(`Ã¢Å“â€¦ ${synced} registro(s) de asistencia sincronizados`, 'success');
+  safeToast(`✅ ${synced} registro(s) de asistencia sincronizados`, 'success');
 });
 
 /**
- * Ã°Å¸â€œâ€¦ Asistencia Ã¢â‚¬â€ carga el panel y las solicitudes de ausencia pendientes
+ * 📅 Asistencia — carga el panel y las solicitudes de ausencia pendientes
  */
 export async function initAttendance() {
   const classroom = AppState.get('classroom');
@@ -27,10 +27,15 @@ export async function initAttendance() {
 
   // Feedback visual inmediato
   listContainer.innerHTML = `
-    <div class="animate-pulse space-y-4">
-      <div class="h-16 bg-slate-50 rounded-3xl"></div>
-      <div class="h-16 bg-slate-50 rounded-3xl"></div>
-      <div class="h-16 bg-slate-50 rounded-3xl"></div>
+    <div class="hidden md:block bg-white rounded-[2.5rem] border border-slate-100 shadow-sm overflow-hidden mb-20">
+      <table class="w-full">
+        <tbody class="divide-y divide-slate-50">
+          ${UI.Skeleton.render('tableRow', 6)}
+        </tbody>
+      </table>
+    </div>
+    <div class="md:hidden grid grid-cols-2 gap-3 mb-20">
+      ${UI.Skeleton.render('card', 4)}
     </div>
   `;
 
@@ -45,27 +50,87 @@ export async function initAttendance() {
     (attendance || []).forEach(a => attMap[a.student_id] = a.status);
     
     listContainer.innerHTML = `
-        <div class="flex justify-between items-center mb-4 bg-white p-4 rounded-2xl shadow-sm border border-slate-100">
-          <h4 class="font-black text-slate-800">Control de Asistencia</h4>
-          <button onclick="App.markAllPresent()" class="px-4 py-2 bg-emerald-500 text-white rounded-xl text-xs font-black uppercase shadow-lg hover:bg-emerald-600 transition-all flex items-center gap-2">
+        <div class="flex justify-between items-center mb-6 bg-white p-5 rounded-[2rem] shadow-sm border border-slate-100">
+          <div>
+            <h4 class="font-black text-slate-800 text-lg">Control de Asistencia</h4>
+            <p class="text-[10px] text-slate-400 font-bold uppercase tracking-widest mt-0.5">Gestión diaria de presencia en aula</p>
+          </div>
+          <button onclick="App.markAllPresent()" class="px-6 py-3 bg-emerald-500 text-white rounded-2xl text-xs font-black uppercase shadow-lg shadow-emerald-100 hover:bg-emerald-600 transition-all flex items-center gap-2 active:scale-95">
             <i data-lucide="check-check" class="w-4 h-4"></i> Marcar Todos
           </button>
         </div>
-        <div class="space-y-3">
+
+        <!-- 🖥️ VISTA TABLA (DESKTOP) -->
+        <div class="hidden md:block bg-white rounded-[2.5rem] border border-slate-100 shadow-sm overflow-hidden mb-20">
+          <table class="w-full">
+            <thead>
+              <tr class="bg-slate-50/50 border-b border-slate-100">
+                <th class="px-6 py-4 text-left text-[10px] font-black text-slate-400 uppercase tracking-widest">Estudiante</th>
+                <th class="px-6 py-4 text-center text-[10px] font-black text-slate-400 uppercase tracking-widest">Estado Actual</th>
+                <th class="px-6 py-4 text-right text-[10px] font-black text-slate-400 uppercase tracking-widest">Acciones Rápidas</th>
+              </tr>
+            </thead>
+            <tbody class="divide-y divide-slate-50">
+              ${students.map(s => {
+                const currentStatus = attMap[s.id] || null;
+                const statusMap = {
+                  'present': { l: 'Presente', c: 'bg-emerald-100 text-emerald-700', i: 'check' },
+                  'late':    { l: 'Tardanza', c: 'bg-amber-100 text-amber-700',   i: 'clock' },
+                  'absent':  { l: 'Ausente',  c: 'bg-rose-100 text-rose-700',     i: 'x' }
+                };
+                const st = statusMap[currentStatus] || { l: 'Sin marcar', c: 'bg-slate-100 text-slate-400', i: 'minus' };
+
+                return `
+                  <tr class="hover:bg-slate-50/50 transition-colors">
+                    <td class="px-6 py-4">
+                      <div class="flex items-center gap-3">
+                        <div class="w-10 h-10 rounded-xl bg-orange-50 text-orange-600 flex items-center justify-center font-black text-sm border-2 border-white shadow-sm overflow-hidden">
+                          ${s.avatar_url ? `<img src="${s.avatar_url}" class="w-full h-full object-cover">` : s.name.charAt(0)}
+                        </div>
+                        <div class="font-bold text-slate-700 text-sm">${safeEscapeHTML(s.name)}</div>
+                      </div>
+                    </td>
+                    <td class="px-6 py-4 text-center">
+                      <span class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-[10px] font-black uppercase ${st.c}">
+                        <i data-lucide="${st.i}" class="w-3 h-3"></i> ${st.l}
+                      </span>
+                    </td>
+                    <td class="px-6 py-4 text-right">
+                      <div class="flex justify-end gap-2">
+                        <button onclick="App.registerAttendance('${s.id}', 'present')" class="w-9 h-9 rounded-xl flex items-center justify-center transition-all ${currentStatus === 'present' ? 'bg-emerald-500 text-white shadow-lg' : 'bg-emerald-50 text-emerald-600 hover:bg-emerald-100'}" title="Presente">
+                          <i data-lucide="check" class="w-4 h-4"></i>
+                        </button>
+                        <button onclick="App.registerAttendance('${s.id}', 'late')" class="w-9 h-9 rounded-xl flex items-center justify-center transition-all ${currentStatus === 'late' ? 'bg-amber-500 text-white shadow-lg' : 'bg-amber-50 text-amber-600 hover:bg-amber-100'}" title="Tardanza">
+                          <i data-lucide="clock" class="w-4 h-4"></i>
+                        </button>
+                        <button onclick="App.registerAttendance('${s.id}', 'absent')" class="w-9 h-9 rounded-xl flex items-center justify-center transition-all ${currentStatus === 'absent' ? 'bg-rose-500 text-white shadow-lg' : 'bg-rose-50 text-rose-600 hover:bg-rose-100'}" title="Falta">
+                          <i data-lucide="user-x" class="w-4 h-4"></i>
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
+                `;
+              }).join('')}
+            </tbody>
+          </table>
+        </div>
+
+        <!-- 📱 VISTA TARJETAS (MÓVIL) -->
+        <div class="md:hidden grid grid-cols-2 gap-3 mb-20">
           ${students.map(s => {
             const currentStatus = attMap[s.id] || null;
+            const statusColor = currentStatus === 'present' ? 'ring-emerald-500 ring-4' : currentStatus === 'late' ? 'ring-amber-500 ring-4' : currentStatus === 'absent' ? 'opacity-40 grayscale' : 'ring-slate-100 ring-2';
+            
             return `
-              <div class="flex items-center justify-between p-4 bg-white rounded-3xl border border-slate-100 shadow-sm transition-all hover:shadow-md">
-                <div class="flex items-center gap-3">
-                  <div class="w-10 h-10 rounded-xl bg-slate-50 flex items-center justify-center font-bold text-slate-400 overflow-hidden border-2 border-white shadow-sm">
-                    ${s.avatar_url ? `<img src="${s.avatar_url}" class="w-full h-full object-cover">` : s.name.charAt(0)}
-                  </div>
-                  <div class="font-bold text-slate-700 text-sm">${safeEscapeHTML(s.name)}</div>
+              <div class="bg-white p-4 rounded-[2rem] border border-slate-100 shadow-sm flex flex-col items-center text-center gap-3 transition-all active:scale-95" onclick="App.registerAttendance('${s.id}', '${currentStatus === 'present' ? 'late' : currentStatus === 'late' ? 'absent' : 'present'}')">
+                <div class="relative w-20 h-20 rounded-[1.5rem] overflow-hidden ${statusColor} transition-all duration-300">
+                  ${s.avatar_url ? `<img src="${s.avatar_url}" class="w-full h-full object-cover">` : `<div class="w-full h-full flex items-center justify-center bg-orange-50 text-orange-500 font-black text-2xl">${s.name.charAt(0)}</div>`}
+                  ${currentStatus === 'present' ? '<div class="absolute inset-0 bg-emerald-500/20 flex items-center justify-center"><i data-lucide="check" class="text-white w-8 h-8 drop-shadow-md"></i></div>' : ''}
+                  ${currentStatus === 'late' ? '<div class="absolute inset-0 bg-amber-500/20 flex items-center justify-center"><i data-lucide="clock" class="text-white w-8 h-8 drop-shadow-md"></i></div>' : ''}
                 </div>
-                <div class="flex gap-2">
-                  <button id="btn-${s.id}-present" onclick="App.registerAttendance('${s.id}', 'present')" class="px-3 py-1.5 rounded-xl text-[10px] font-black uppercase transition-all ${currentStatus === 'present' ? 'bg-emerald-500 text-white shadow-lg' : 'bg-emerald-50 text-emerald-600 hover:bg-emerald-100'}">Presente</button>
-                  <button id="btn-${s.id}-late" onclick="App.registerAttendance('${s.id}', 'late')" class="px-3 py-1.5 rounded-xl text-[10px] font-black uppercase transition-all ${currentStatus === 'late' ? 'bg-amber-500 text-white shadow-lg' : 'bg-amber-50 text-amber-600 hover:bg-amber-100'}">Tarde</button>
-                  <button id="btn-${s.id}-absent" onclick="App.registerAttendance('${s.id}', 'absent')" class="px-3 py-1.5 rounded-xl text-[10px] font-black uppercase transition-all ${currentStatus === 'absent' ? 'bg-rose-500 text-white shadow-lg' : 'bg-rose-50 text-rose-600 hover:bg-rose-100'}">Falta</button>
+                <div class="min-w-0">
+                  <p class="font-black text-slate-800 text-xs truncate w-full px-2 uppercase tracking-tight">${safeEscapeHTML(s.name.split(' ')[0])}</p>
+                  <p class="text-[9px] font-bold text-slate-400 uppercase tracking-widest mt-0.5">${currentStatus || 'Sin marcar'}</p>
                 </div>
               </div>
             `;
@@ -94,7 +159,7 @@ export async function markAllPresent() {
         <i data-lucide="check-check" class="w-8 h-8"></i>
       </div>
       <h3 class="text-xl font-black text-slate-800 mb-2">Asistencia Masiva</h3>
-      <p class="text-sm text-slate-500 mb-6 font-medium">Ã‚¿Marcar a todos los alumnos como presentes hoy?</p>
+      <p class="text-sm text-slate-500 mb-6 font-medium">¿Marcar a todos los alumnos como presentes hoy?</p>
       <div class="flex gap-3">
         <button onclick="Modal.close('${modalId}')" class="flex-1 py-3 bg-slate-100 text-slate-600 rounded-xl font-bold uppercase text-xs hover:bg-slate-200 transition-colors">Cancelar</button>
         <button id="btnConfirmMassAtt" class="flex-[2] py-3 bg-emerald-500 text-white rounded-xl font-bold uppercase text-xs hover:bg-emerald-600 shadow-lg shadow-emerald-200 transition-all flex items-center justify-center gap-2">Confirmar</button>
@@ -135,8 +200,16 @@ export async function markAllPresent() {
       });
 
       if (records.length > 0) {
+      if (navigator.onLine) {
         await Promise.allSettled(records.map(r => MaestraApi.upsertAttendance(r)));
+      } else {
+        // Encolar todos los registros individualmente
+        for (const r of records) {
+          await OfflineQueue.enqueue('attendance', 'upsert', { ...r, onConflict: 'student_id,date' });
+        }
+        safeToast(`${records.length} registros guardados sin conexión — se sincronizarán pronto`, 'info');
       }
+    }
 
       safeToast('Asistencia masiva completada');
       
@@ -144,7 +217,7 @@ export async function markAllPresent() {
       if (studentsToNotify.length > 0) {
         notifyParents({
           students: studentsToNotify,
-          title:   'Karpus Kids Ã¢Å“â€¦',
+          title:   'Karpus Kids ✅',
           message: 'Tu hijo/a ya se encuentra presente en su aula con su maestra.',
           type:    'attendance',
           link:    'panel_padres.html',
@@ -154,9 +227,29 @@ export async function markAllPresent() {
 
       await initAttendance();
     } catch (e) {
-      safeToast('Error crÃƒ­tico en asistencia masiva', 'error');
+      safeToast('Error crítico en asistencia masiva', 'error');
     }
   };
+}
+
+// 👆 Handlers para experiencia de asistencia Premium (Tocar/Mantener)
+let attendanceLongPressTimer = null;
+
+export function handleAttendancePointerDown(e, studentId) {
+  attendanceLongPressTimer = setTimeout(() => {
+    attendanceLongPressTimer = null;
+    Helpers.vibrate('heavy');
+    registerAttendance(studentId, 'late');
+  }, 600); // 600ms para marcar como tarde
+}
+
+export function handleAttendancePointerUp(e, studentId) {
+  if (attendanceLongPressTimer) {
+    clearTimeout(attendanceLongPressTimer);
+    attendanceLongPressTimer = null;
+    Helpers.vibrate('light');
+    registerAttendance(studentId, 'present');
+  }
 }
 
 export async function registerAttendance(studentId, status) {
@@ -180,8 +273,8 @@ export async function registerAttendance(studentId, status) {
     const isMarkingPresent = status === 'present';
     const wasLate = existing?.status === 'late';
     
-    // Si la maestra marca "Presente" pero el niÃƒ±o llegÃƒ³ "Tarde" (por ponche),
-    // no cambiamos el estado en la DB pero sÃƒ­ notificamos.
+    // Si la maestra marca "Presente" pero el niño llegó "Tarde" (por ponche),
+    // no cambiamos el estado en la DB pero sí notificamos.
     let shouldUpsert = true;
     if (isMarkingPresent && wasLate) {
       shouldUpsert = false;
@@ -215,19 +308,19 @@ export async function registerAttendance(studentId, status) {
         await MaestraApi.upsertAttendance(attRecord);
       } else {
         await OfflineQueue.enqueue('attendance', 'upsert', { ...attRecord, onConflict: 'student_id,date' });
-        safeToast(`${statusLiteral} guardado sin conexiÃƒ³n Ã¢â‚¬â€ se sincronizarÃƒ¡ automÃƒ¡ticamente`, 'info');
+        safeToast(`${statusLiteral} guardado sin conexión — se sincronizará automáticamente`, 'info');
       }
     } else {
-      console.log('Manteniendo estado "Tarde" Ã¢â‚¬â€ Solo notificando presencia en aula');
+      console.log('Manteniendo estado "Tarde" — Solo notificando presencia en aula');
     }
 
     const student = (AppState.get('students') || []).find(s => s.id === studentId);
     if (student?.parent_id) {
       const { sendPush } = await import('../../shared/supabase.js');
       
-      // Mensaje personalizado: si era tarde y se puso presente, se notifica que ya estÃƒ¡ en aula.
+      // Mensaje personalizado: si era tarde y se puso presente, se notifica que ya está en aula.
       const pushMessage = (isMarkingPresent && wasLate)
-        ? `${student.name} ya estÃƒ¡ en su aula con su maestra.`
+        ? `${student.name} ya está en su aula con su maestra.`
         : `${student.name} ha sido marcado como ${statusLiteral} hoy.`;
 
       sendPush({
@@ -248,7 +341,7 @@ export async function registerAttendance(studentId, status) {
 }
 
 /**
- * Ã°Å¸â€œâ€¹ Cargar solicitudes de ausencia pendientes de los padres
+ * 📋 Cargar solicitudes de ausencia pendientes de los padres
  */
 async function _loadAbsenceRequests(classroomId, students) {
   if (!classroomId) return;
@@ -275,7 +368,7 @@ async function _loadAbsenceRequests(classroomId, students) {
     banner.className = 'mb-4 bg-amber-50 border border-amber-200 rounded-2xl p-4';
     banner.innerHTML = `
       <div class="flex items-center gap-2 mb-3">
-        <span class="text-lg">Ã°Å¸â€œâ€¹</span>
+        <span class="text-lg">📋</span>
         <h4 class="font-black text-amber-800 text-sm uppercase tracking-wider">Avisos de Ausencia (${requests.length})</h4>
       </div>
       <div class="space-y-2">
@@ -285,8 +378,8 @@ async function _loadAbsenceRequests(classroomId, students) {
               <p class="font-bold text-slate-800 text-sm truncate">${safeEscapeHTML(r.student?.name || 'Estudiante')}</p>
               <p class="text-[10px] text-slate-500 font-bold">
                 ${new Date(r.date + 'T12:00:00').toLocaleDateString('es-DO', { weekday: 'short', day: 'numeric', month: 'short' })}
-                Ã‚· ${safeEscapeHTML(r.reason)}
-                ${r.note ? ' Ã‚· ' + safeEscapeHTML(r.note) : ''}
+                · ${safeEscapeHTML(r.reason)}
+                ${r.note ? ' · ' + safeEscapeHTML(r.note) : ''}
               </p>
             </div>
             <button
@@ -303,7 +396,7 @@ async function _loadAbsenceRequests(classroomId, students) {
     if (existing) existing.remove();
     container.parentElement?.insertBefore(banner, container);
 
-    // FunciÃƒ³n global para aprobar ausencia
+    // Función global para aprobar ausencia
     window._approveAbsence = async (requestId, studentId, date) => {
       try {
         const classroom = AppState.get('classroom');

@@ -19,11 +19,19 @@ export const StudentsModule = {
 
   async init() {
     try {
-      // 1. Obtener datos de estudiantes
-      const { data: students, error } = await DirectorApi.getStudents();
+      if (!this._dirPage) this._dirPage = 1;
+      const pageSize = 10;
+      const range = { 
+        from: (this._dirPage - 1) * pageSize, 
+        to: this._dirPage * pageSize - 1 
+      };
+
+      // 1. Obtener datos de estudiantes paginados desde el servidor
+      const { data: students, error, count } = await DirectorApi.getStudents({}, range);
       if (error) throw error;
 
       AppState.set('students', students || []);
+      this._totalStudentsCount = count || 0;
 
       // 2. Obtener datos globales del dashboard para KPIs complementarios
       let dashboardData = AppState.get('dashboardData');
@@ -32,26 +40,16 @@ export const StudentsModule = {
         dashboardData = await DashboardService.getFullData();
       }
       
-      const kpis = dashboardData?.kpis || {};
-      const attToday = dashboardData?.attendance?.today || { present: 0, late: 0, total: 0 };
+      const kpis = dashboardData?.stats || {}; // DashboardService usa 'stats'
 
       // 3. Actualizar tarjetas KPI
       const setTxt = (id, val) => { const el = document.getElementById(id); if(el) el.textContent = val; };
       
-      setTxt('totalStudents', students.length);
-      setTxt('activeStudents', students.filter(s => s.is_active || s.status === 'activo').length);
-      setTxt('incidents', kpis.inquiries || 0);
-      
-      // Aulas con estudiantes asignados
-      const classroomsWithStudents = new Set(students.map(s => s.classroom_id).filter(Boolean)).size;
-      setTxt('classroomsCount', classroomsWithStudents);
-      
-      // Promedio y Asistencia (Valores reales calculados o mock si no existen columnas)
-      const grades = students.map(s => s.average_grade).filter(v => v != null && !isNaN(v));
-      setTxt('avgGrade', grades.length ? avg(grades) : '0.0');
-
-      const attPct = attToday.total > 0 ? Math.round(((attToday.present + attToday.late) / attToday.total) * 100) : 0;
-      setTxt('avgAttendance', attPct + '%');
+      setTxt('totalStudents', count || 0);
+      setTxt('activeStudents', kpis.active || 0);
+      setTxt('incidents', kpis.pendingInquiries || 0);
+      setTxt('classroomsCount', kpis.classrooms || 0);
+      setTxt('avgAttendance', (kpis.attendance || 0) + '%');
 
       // 4. Renderizar vista actual
       const tableWrapper = document.getElementById('studentsTableWrapper');
@@ -66,7 +64,8 @@ export const StudentsModule = {
       }
       this.render(students);
 
-      // Filtros
+      // Renderizar paginación
+      this._renderDirPagination(this._dirPage, Math.ceil((count || 0) / pageSize), count || 0, students);
       const searchInput = document.getElementById('searchStudent');
       if (searchInput && !searchInput._bound) {
         searchInput._bound = true;
@@ -165,18 +164,10 @@ export const StudentsModule = {
     if (!students?.length) {
       if (tableContainer) tableContainer.innerHTML = '<tr><td colspan="6" class="text-center py-8 text-slate-500">No hay estudiantes.</td></tr>';
       if (gridContainer) gridContainer.innerHTML = '<div class="col-span-3 text-center py-8 text-slate-500">No hay estudiantes.</div>';
-      this._renderDirPagination(0, 0, 0, []);
       return;
     }
 
-    // Paginación
-    if (!this._dirPage) this._dirPage = 1;
-    const pageSize = 10;
-    const total = students.length;
-    const totalPages = Math.max(1, Math.ceil(total / pageSize));
-    if (this._dirPage > totalPages) this._dirPage = totalPages;
-    const start = (this._dirPage - 1) * pageSize;
-    const pageStudents = students.slice(start, start + pageSize);
+    const pageStudents = students; // Ya vienen paginados desde el servidor
 
     // Render Table
     if (tableContainer) {
@@ -262,7 +253,6 @@ export const StudentsModule = {
     }
 
     if (window.lucide) lucide.createIcons();
-    this._renderDirPagination(this._dirPage, totalPages, total, students);
   },
 
   _renderDirPagination(page, totalPages, total, students) {
@@ -287,39 +277,36 @@ export const StudentsModule = {
         <span class="px-3 py-1.5 text-xs font-black text-purple-600 bg-purple-50 rounded-xl">${page} / ${totalPages}</span>
         <button id="dirBtnNext" class="px-3 py-1.5 text-xs font-black rounded-xl border border-slate-200 text-slate-500 hover:bg-purple-50 hover:border-purple-300 hover:text-purple-600 transition-all disabled:opacity-40 disabled:cursor-not-allowed" ${page >= totalPages ? 'disabled' : ''}>Sig →</button>
       </div>`;
-    document.getElementById('dirBtnPrev')?.addEventListener('click', () => { this._dirPage--; this.render(students); });
-    document.getElementById('dirBtnNext')?.addEventListener('click', () => { this._dirPage++; this.render(students); });
+    document.getElementById('dirBtnPrev')?.addEventListener('click', () => { this._dirPage--; this.init(); });
+    document.getElementById('dirBtnNext')?.addEventListener('click', () => { this._dirPage++; this.init(); });
   },
 
-  applyFilters() {
+  async applyFilters() {
     this._dirPage = 1;
     const term = document.getElementById('searchStudent')?.value.toLowerCase() || '';
     const classroomId = document.getElementById('filterClassroom')?.value || 'all';
     const status = document.getElementById('filterStStatus')?.value || '';
-    const level = document.getElementById('filterLevel')?.value || 'all';
+    // const level = document.getElementById('filterLevel')?.value || 'all'; // Comentado si no se usa
 
-    // Búsqueda local en memoria — sin consultas al servidor
-    const all = AppState.get('students') || [];
-    const filtered = all.filter(s => {
-      const matchSearch = s.name.toLowerCase().includes(term) || 
-                         (s.classrooms?.name || '').toLowerCase().includes(term) ||
-                         (s.p1_name || '').toLowerCase().includes(term);
-      
-      const matchClassroom = classroomId === 'all' || String(s.classroom_id) === classroomId;
-      
-      let matchStatus = true;
-      if (status === 'activo' || status === 'true') {
-        matchStatus = s.is_active === true || s.status === 'activo';
-      } else if (status === 'inactivo' || status === 'false') {
-        matchStatus = s.is_active === false || s.status === 'inactivo';
-      }
+    const filters = {};
+    if (term) filters.search = term;
+    if (classroomId !== 'all') filters.classroom_id = classroomId;
+    if (status) filters.status = status;
 
-      const matchLevel = level === 'all' || s.level === level;
+    const pageSize = 10;
+    const range = { from: 0, to: pageSize - 1 };
 
-      return matchSearch && matchClassroom && matchStatus && matchLevel;
-    });
-
-    this.render(filtered);
+    UI.setLoading(true);
+    try {
+      const { data, count } = await DirectorApi.getStudents(filters, range);
+      this._totalStudentsCount = count || 0;
+      this.render(data);
+      this._renderDirPagination(1, Math.ceil((count || 0) / pageSize), count || 0, data);
+    } catch (e) {
+      Helpers.toast('Error al filtrar', 'error');
+    } finally {
+      UI.setLoading(false);
+    }
   },
 
   async save() {

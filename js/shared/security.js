@@ -1,4 +1,4 @@
-﻿/**
+/**
  * 🛡️ Karpus Kids — Security Module
  * Protección contra XSS, CSRF, clickjacking e inyección.
  * Importar en todos los paneles: import { Security } from '../shared/security.js';
@@ -122,10 +122,25 @@ export const Security = {
       const el = e.target;
       if (el.tagName !== 'INPUT' && el.tagName !== 'TEXTAREA') return;
       if (el.type === 'password' || el.type === 'email') return; // no tocar passwords/emails
+      
       if (el.value && this.isMalicious(el.value)) {
-        el.value = '';
-        el.classList.add('border-rose-500');
-        el.placeholder = '⚠️ Contenido no permitido';
+        console.warn('Security check failed for input:', el.id || el.name);
+        
+        // ✅ SANITIZACIÓN SILENCIOSA: Escapar en lugar de borrar
+        // Evita frustración al usuario mientras mantenemos la seguridad.
+        const sanitized = el.value
+          .replace(/<script\b[^>]*>([\s\S]*?)<\/script>/gim, '[Script eliminado]')
+          .replace(/on\w+="[^"]*"/gim, '[Evento eliminado]')
+          .replace(/javascript:/gim, '[JS bloqueado]');
+        
+        el.value = sanitized;
+        
+        // Notificar al usuario (opcionalmente)
+        if (window.safeToast) {
+          window.safeToast('Se han eliminado caracteres no permitidos por seguridad.', 'warning');
+        } else {
+          el.classList.add('border-rose-500');
+        }
       }
     }, true);
 
