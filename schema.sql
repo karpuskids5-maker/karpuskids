@@ -377,7 +377,7 @@ create table if not exists public.inquiries (
 
 create table if not exists public.school_settings (
   id             int primary key default 1,
-  phone          text default '(829) 803-8424',
+  phone          text default '(829) 803-8484',
   business_hours text default 'Lun-Vie: 7am - 6pm',
   generation_day int default 25,
   due_day        int default 5,
@@ -389,7 +389,7 @@ create table if not exists public.school_settings (
 );
 
 -- Asegurar columnas si la tabla ya existe
-alter table public.school_settings add column if not exists phone text default '(829) 803-8424';
+alter table public.school_settings add column if not exists phone text default '(829) 803-8484';
 alter table public.school_settings add column if not exists business_hours text;
 alter table public.school_settings add column if not exists generation_day int default 25;
 alter table public.school_settings add column if not exists due_day int default 5;
@@ -399,7 +399,7 @@ alter table public.school_settings add column if not exists check_out_start time
 alter table public.school_settings add column if not exists check_out_end time default '17:30:00';
 
 insert into public.school_settings (id, phone, business_hours, generation_day, due_day, check_in_start, check_in_end, check_out_start, check_out_end) 
-values (1, '(829) 803-8424', 'Lunes a Viernes: 7:00 AM � 6:00 PM. S�bados y Domingos: Cerrado.', 25, 5, '07:30:00', '08:30:00', '16:00:00', '17:30:00') 
+values (1, '(829) 803-8484', 'Lunes a Viernes: 7:00 AM � 6:00 PM. S�bados y Domingos: Cerrado.', 25, 5, '07:30:00', '08:30:00', '16:00:00', '17:30:00')
 on conflict (id) do nothing;
 
 create table if not exists public.system_events (
