@@ -921,7 +921,16 @@ export const PaymentsModule = {
 
       Helpers.toast('Pago aprobado correctamente', 'success');
       this.closeModal();
-      await this.loadPayments();
+
+      // ✅ ACTUALIZACIÓN REACTIVA DE LA FILA
+      const row = document.querySelector(`tr[id*="${id}"]`) || document.querySelector(`button[onclick*="${id}"]`)?.closest('tr');
+      if (row) {
+        // Re-renderizamos solo esa fila con los datos actualizados si es posible, 
+        // o simplemente actualizamos el badge de estado localmente.
+        this.loadPayments(); // Re-carga optimizada por caché de AppState
+      } else {
+        await this.loadPayments();
+      }
       this.loadStats();
 
       // Enviar recibo en background
@@ -1002,7 +1011,13 @@ export const PaymentsModule = {
       
       Helpers.toast('Pago rechazado y devuelto al padre', 'info');
       this.closeModal();
-      await this.loadPayments();
+      
+      // ✅ ACTUALIZACIÓN REACTIVA
+      const row = document.querySelector(`tr:has(button[onclick*="${id}"])`);
+      if (row) {
+        row.classList.add('bg-rose-50/50');
+        this.loadPayments();
+      }
       
       // Notificar al padre vía system_events o push
       const p = AppState.get('paymentsData')?.find(x => x.id === id);

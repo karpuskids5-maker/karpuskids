@@ -136,11 +136,12 @@ export const ScrollModule = {
     const input = document.getElementById(inputId);
     if (!input) return;
 
+    // ✅ DEBOUNCE CENTRALIZADO (300ms)
     const handler = this.debounce((e) => {
       const q = e.target.value;
       this.filterList(listSelector, q, textSelector);
       if (onSearch) onSearch(q);
-    }, 280);
+    }, 300);
 
     input.addEventListener('input', handler);
     return { destroy: () => input.removeEventListener('input', handler) };

@@ -1,4 +1,4 @@
-﻿/**
+/**
  * 📡 Karpus Kids — RealtimeManager
  * Gestión centralizada de canales Supabase Realtime.
  * Evita memory leaks por canales huérfanos y limita a MAX_CHANNELS activos.
@@ -63,18 +63,21 @@ export const RealtimeManager = {
   unsubscribe(name) {
     const ch = _channels.get(name);
     if (ch) {
+      console.log(`[RealtimeManager] Unsubscribing: ${name}`);
       supabase.removeChannel(ch);
       _channels.delete(name);
       _retries.delete(name);
     }
   },
 
-  /** Elimina todos los canales (llamar en logout) */
-  unsubscribeAll() {
+  /** Elimina todos los canales (llamar en logout o cambio de sección) */
+  unsubscribeAll(except = []) {
     for (const [name, ch] of _channels) {
+      if (except.includes(name)) continue;
       supabase.removeChannel(ch);
+      _channels.delete(name);
+      _retries.delete(name);
     }
-    _channels.clear();
   },
 
   /** Retorna los canales activos */

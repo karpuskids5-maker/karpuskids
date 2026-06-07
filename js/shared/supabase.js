@@ -27,18 +27,16 @@ const options = {
 export const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, options);
 
 // ── Auto-refresh: detectar JWT expirado y refrescar sesión ───────────────────
-supabase.auth.onAuthStateChange(async (event, session) => {
-  if (event === 'TOKEN_REFRESHED') {
-    console.log('[Auth] Token refrescado automáticamente.');
-  }
+supabase.auth.onAuthStateChange((event, session) => {
+  if (event === 'TOKEN_REFRESHED') console.log('✅ JWT Refrescado');
   if (event === 'SIGNED_OUT') {
-    // No redirigir si el panel está en proceso de inicialización/refresh
-    if (window._karpusInitializing) return;
-    // Sesión cerrada — redirigir al login
-    if (!window.location.pathname.includes('login.html') &&
-        !window.location.pathname.includes('index.html')) {
-      window.location.href = 'login.html';
-    }
+    // ✅ LIMPIEZA TOTAL DE CANALES AL SALIR
+    if (window.RealtimeManager) window.RealtimeManager.unsubscribeAll();
+    localStorage.removeItem('karpus_directora_state');
+    localStorage.removeItem('karpus_maestra_state');
+    localStorage.removeItem('karpus_padre_state');
+    localStorage.removeItem('karpus_asistente_state');
+    window.location.href = 'login.html';
   }
   if (event === 'INITIAL_SESSION' || event === 'SIGNED_IN') {
     // Guardar rastro de última actividad

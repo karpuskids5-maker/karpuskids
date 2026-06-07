@@ -83,7 +83,11 @@ window.openGlobalModal = function(html, wide = false) {
 export function goToSection(sectionId) {
   if (!sectionId) return;
 
-  Helpers.vibrate('light');
+  Helpers.vibrate?.('light');
+
+  // ✅ LIMPIEZA DE REALTIME: Eliminar canales al cambiar de sección
+  // Excepto notificaciones globales si existieran
+  RealtimeManager.unsubscribeAll(['notifications']);
 
   // Desuscribir muro al salir (ahorro de recursos Realtime)
   const prevSection = AppState.get('currentSection');
@@ -115,18 +119,32 @@ export function goToSection(sectionId) {
     // ✨ Transición fluida Premium
     UIPremium.applySectionTransition(sectionId);
 
-    // Carga bajo demanda por módulo
+    // Carga bajo demanda por módulo (Lazy Loading via import())
     switch (sectionId) {
       case 'dashboard':
         DashboardService.getFullData(true).then(data => DirectorUI.renderDashboard(data));
         break;
-      case 'maestros': TeachersModule.init(); break;
-      case 'estudiantes': StudentsModule.init(); break;
-      case 'aulas': RoomsModule.init(); break;
-      case 'asistencia': AttendanceModule.init(); break;
-      case 'calificaciones': GradesModule.init(); break;
-      case 'pagos': PaymentsModule.init(); break;
-      case 'comunicacion': ChatModule.init(); break;
+      case 'maestros':
+        import('./teachers.module.js').then(m => m.TeachersModule.init());
+        break;
+      case 'estudiantes':
+        import('./students.module.js').then(m => m.StudentsModule.init());
+        break;
+      case 'aulas':
+        import('./rooms.module.js').then(m => m.RoomsModule.init());
+        break;
+      case 'asistencia':
+        import('./attendance.module.js').then(m => m.AttendanceModule.init());
+        break;
+      case 'calificaciones':
+        import('./grades.module.js').then(m => m.GradesModule.init());
+        break;
+      case 'pagos':
+        import('./payments_clean.js').then(m => m.PaymentsModule.init());
+        break;
+      case 'comunicacion':
+        import('../shared/chat.js').then(m => m.ChatModule.init());
+        break;
       case 'videoconferencia': {
         const profile = AppState.get('profile');
         import('../shared/videocall-ui.js').then(({ VideoCallUI }) => {
@@ -139,14 +157,22 @@ export function goToSection(sectionId) {
         break;
       }
       case 'muro':
-        WallModule.init('muroPostsContainer', { 
-          accentColor: 'indigo', 
-          likeColor: 'indigo' 
-        }, AppState);
+        import('./wall.module.js').then(m => {
+          m.WallModule.init('muroPostsContainer', { 
+            accentColor: 'indigo', 
+            likeColor: 'indigo' 
+          }, AppState);
+        });
         break;
-      case 'accesos': AccessModule.init(); break;
-      case 'reportes': InquiriesModule.init(); break;
-      case 'staff-permits': PermitsModule.init(); break;
+      case 'accesos':
+        import('./access.module.js').then(m => m.AccessModule.init());
+        break;
+      case 'reportes':
+        import('./inquiries.module.js').then(m => m.InquiriesModule.init());
+        break;
+      case 'staff-permits':
+        import('./permits.module.js').then(m => m.PermitsModule.init());
+        break;
       case 'configuracion':
         loadProfile();
         import('../shared/notify-permission.js').then(m => m.NotifyPermission.requestIfNeeded());
@@ -304,19 +330,6 @@ document.addEventListener('DOMContentLoaded', async () => {
 
     // 4. Cargar Perfil Inicial
     loadProfile();
-
-    // ✨ 4b. Inicializar Experiencia Premium Móvil
-    UIPremium.injectBottomNav([
-      { section: 'dashboard', label: 'Inicio', icon: 'layout' },
-      { section: 'estudiantes', label: 'Alumnos', icon: 'users' },
-      { section: 'pagos', label: 'Pagos', icon: 'credit-card' },
-      { section: 'muro', label: 'Muro', icon: 'image' },
-      { section: 'comunicacion', label: 'Chat', icon: 'message-circle' }
-    ]);
-
-    window.addEventListener('app:nav-change', (e) => {
-      goToSection(e.detail.section);
-    });
 
     // 5. Iniciar Dashboard por defecto
     goToSection('dashboard');

@@ -472,8 +472,12 @@ function renderDailySummary(log) {
 }
 
 // ── Navegación ────────────────────────────────────────────────────────────────
-export function navigateTo(targetId) {
+export async function navigateTo(targetId) {
   if (!targetId) return;
+  Helpers.vibrate?.('light');
+
+  // ✅ LIMPIEZA DE REALTIME: Eliminar canales al cambiar de sección
+  if (window.RealtimeManager) RealtimeManager.unsubscribeAll(['notifications', 'live_status']);
 
   document.querySelectorAll('.section').forEach(sec => {
     sec.classList.add('hidden');
@@ -747,7 +751,6 @@ function updateHeaderProfile(profile, student, allStudents = []) {
   }
 
   // Mobile header avatar
-  const mobileAvatar = document.getElementById('headerAvatarMobile');
   if (mobileAvatar) {
     mobileAvatar.innerHTML = student?.avatar_url
       ? '<img src="' + student.avatar_url + '" class="w-full h-full object-cover">'

@@ -13,6 +13,7 @@ export const BadgeSystem = {
     if (!userId) return;
     this._userId = userId;
     this._role = this._detectRole();
+    this._initTimestamps();
     await this._loadCounts();
     this._subscribeRealtime();
   },
@@ -25,6 +26,14 @@ export const BadgeSystem = {
     if (document.getElementById('badge-muro'))    return 'asistente';
     if (document.getElementById('badge-pagos'))   return 'directora';
     return 'unknown';
+  },
+
+  _initTimestamps() {
+    ['last_muro_view', 'last_class_view'].forEach(key => {
+      if (!localStorage.getItem(key)) {
+        localStorage.setItem(key, new Date().toISOString());
+      }
+    });
   },
 
   // Obtiene la seccion activa — compatible con todos los paneles
@@ -99,6 +108,19 @@ export const BadgeSystem = {
     });
   },
 
+  async _loadTimeBasedBadge(section, table) {
+    try {
+      const { supabase } = await import('./supabase.js');
+      const lastView = localStorage.getItem('last_' + section + '_view') || new Date(0).toISOString();
+      
+      const { count } = await supabase.from(table).select('id', { count: 'exact', head: true }).gt('created_at', lastView);
+      if (count > 0) {
+        this._renderBadge(section, count);
+        this._renderCardBadge(section, count);
+      }
+    } catch (_) {}
+  },
+
   _setupChannelListeners(channel) {
     const self = this;
 
@@ -128,6 +150,11 @@ export const BadgeSystem = {
       table: 'messages'
     }, function(payload) {
       if (payload.new && payload.new.sender_id === self._userId) return;
+      
+      // ✅ REGLA DE NO DUPLICACIÓN: Ignorar si el chat con esta conversación ya está abierto
+      const activeConvId = (window.AppState && AppState.get('activeConversationId'));
+      if (activeConvId && payload.new.conversation_id === activeConvId) return;
+
       const active = self._getActiveSection();
       if (active === 'notifications' || active === 'chat' || active === 'comunicacion') return;
       // Panel padre
@@ -233,13 +260,56 @@ export const BadgeSystem = {
       self._applyGlow('reportes');
       self._showMiniToast('Nueva consulta recibida');
     });
+
+    // 8. Solicitudes de permisos (personal)
+    channel.on('postgres_changes', {
+      event: 'INSERT',
+      schema: 'public',
+      table: 'staff_permits'
+    }, function() {
+      if (self._role === 'directora' || self._role === 'asistente') {
+        const section = 'permits';
+        const prev = self._getBadgeCount(section);
+        self._renderBadge(section, prev + 1);
+        self._showMiniToast('Nueva solicitud de permiso');
+      }
+    });
   },
 
-  mark(section) {
+  async mark(section) {
     this._counts[section] = 0;
     this._renderBadge(section, 0);
     this._renderCardBadge(section, 0);
-    this._markReadInDB(section);
+    
+    // ✅ Triple Acción: UI (arriba), DB, State
+    await this._markReadInDB(section);
+
+    // Lógica por tiempo
+    if (section === 'muro' || section === 'class') {
+      localStorage.setItem('last_' + section + '_view', new Date().toISOString());
+    }
+
+    // Lógica especial Chat
+    if (['chat', 'notifications', 'comunicacion'].includes(section)) {
+      const activeConvId = (window.AppState && AppState.get('activeConversationId'));
+      if (activeConvId) {
+        const { ChatModule } = await import('./chat.js');
+        await ChatModule.markAsRead(activeConvId);
+      }
+    }
+
+    // State Update (Dashboard Sync)
+    if (window.AppState) {
+      const dashboardData = AppState.get('dashboardData');
+      if (dashboardData && dashboardData.stats) {
+        const statKey = this._sectionToStatKey(section);
+        if (statKey) {
+          dashboardData.stats[statKey] = 0;
+          AppState.set('dashboardData', { ...dashboardData });
+        }
+      }
+    }
+
     // Limpiar aliases
     if (section === 'chat' || section === 'notifications' || section === 'comunicacion') {
       this._counts['chat'] = 0;
@@ -262,13 +332,29 @@ export const BadgeSystem = {
     }
   },
 
+  _sectionToStatKey(section) {
+    const map = {
+      reportes: 'pendingInquiries',
+      pagos: 'pending_payments',
+      class: 'newPosts',
+      muro: 'newPosts'
+    };
+    return map[section];
+  },
+
+  // ✅ Reactividad externa para cambios en memoria
+  setCount(section, count, type = 'default') {
+    this._renderBadge(section, count, type);
+    this._renderCardBadge(section, count, type);
+  },
+
   set(section, count) {
     this._renderBadge(section, count);
     this._renderCardBadge(section, count);
   },
 
   // Badge en el sidebar (badge-class, badge-tasks, badge-pagos, etc.)
-  _renderBadge(section, count) {
+  _renderBadge(section, count, type = 'default') {
     this._counts[section] = count; // guardar en memoria
     const badge = document.getElementById('badge-' + section);
     if (!badge) return;
@@ -276,6 +362,11 @@ export const BadgeSystem = {
       badge.textContent = count > 99 ? '99+' : String(count);
       badge.classList.remove('hidden');
       badge.classList.add('flex');
+      
+      // Estilos por tipo
+      badge.classList.toggle('bg-rose-600', type === 'urgent');
+      badge.classList.toggle('bg-blue-600', type === 'new');
+      if (type === 'default') badge.classList.add('bg-rose-500');
     } else {
       badge.classList.add('hidden');
       badge.classList.remove('flex');

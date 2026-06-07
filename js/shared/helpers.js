@@ -581,6 +581,37 @@ export const Helpers = {
 
   },
 
+  /**
+   * 🛡️ try/catch global con logging a DB
+   */
+  async safe(fn, context = 'global') {
+    try {
+      return await fn();
+    } catch (err) {
+      console.error(`[Safe:${context}]`, err);
+      
+      // Registrar error en la tabla system_errors de forma silenciosa
+      try {
+        const { supabase } = await import('./supabase.js');
+        const user = (await supabase.auth.getUser())?.data?.user;
+        
+        await supabase.from('system_errors').insert([{
+          context,
+          message: err.message,
+          stack: err.stack,
+          user_id: user?.id,
+          url: window.location.href,
+          user_agent: navigator.userAgent
+        }]);
+      } catch (logErr) {
+        console.warn('Could not log error to DB:', logErr);
+      }
+
+      Helpers.toast('Algo no salió bien. El equipo técnico ha sido notificado.', 'error');
+      return null;
+    }
+  },
+
 
   /**
    * 🆔 generar id

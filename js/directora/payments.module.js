@@ -133,6 +133,11 @@ export const PaymentsModule = {
       const pri = { overdue: 1, pending: 2, review: 3, paid: 4 };
       list.sort((a, b) => (pri[this._st(a)] || 99) - (pri[this._st(b)] || 99));
       tbody.innerHTML = list.map(p => this._row(p)).join('');
+      
+      // ✅ ACTUALIZACIÓN REACTIVA DEL SIDEBAR: Contar pagos en revisión en memoria
+      const reviewCount = list.filter(p => this._st(p) === 'review').length;
+      if (window.BadgeSystem) BadgeSystem.setCount('pagos', reviewCount);
+
       if (window.lucide) lucide.createIcons();
     } catch (e) {
       tbody.innerHTML = '<tr><td colspan="8" class="text-center py-8">' + Helpers.errorState('Error al cargar pagos', 'App.payments.loadPayments()') + '</td></tr>';
@@ -396,7 +401,13 @@ export const PaymentsModule = {
       await supabase.from('payments').update({ status: 'paid', paid_date: new Date().toISOString() }).eq('id', id);
       // auditLog omitido — cubierto por trigger fn_audit_payment en DB
       Helpers.toast('Pago aprobado', 'success');
-      await this.loadPayments();
+      
+      // ✅ ACTUALIZACIÓN REACTIVA: No recargar todo el módulo
+      const row = document.querySelector(`tr:has(button[onclick*="${id}"])`);
+      if (row) row.style.opacity = '0.5';
+      this.loadPayments();
+      this.loadStats();
+
       // Notificar al padre: email + push
       try {
         const { data: p } = await DirectorApi.getPaymentById(id);

@@ -38,9 +38,21 @@ export const ImageLoader = {
   },
 
   _loadImage(el) {
-    const src = el.dataset.src;
+    let src = el.dataset.src;
     const fallback = el.dataset.fallback || 'img/mundo.jpg';
     if (!src) return;
+
+    // ✅ OPTIMIZACIÓN CDN: Transformar URL de Supabase para carga ligera
+    // Solo si es una URL de Supabase Storage
+    if (src.includes('.supabase.co/storage/v1/object/public/')) {
+      const width = el.dataset.width || 400;
+      const quality = el.dataset.quality || 75;
+      // Supabase Image Transformation requiere habilitar el add-on, 
+      // pero podemos usar parámetros estándar si está configurado.
+      if (!src.includes('?')) {
+        src += `?width=${width}&quality=${quality}&format=webp`;
+      }
+    }
 
     // Usar cache si ya se cargó esta URL
     if (_urlCache.has(src)) {
@@ -154,11 +166,11 @@ export const ImageLoader = {
    */
   async compress(file, opts = {}) {
     const {
-      maxWidth  = 1200,
-      maxHeight = 1200,
-      quality   = 0.82,   // 82% calidad — buen balance tamaño/calidad
-      maxSizeKB = 500,    // si supera 500KB, comprimir más
-      format    = 'image/webp' // WebP es 30% más pequeño que JPEG
+      maxWidth  = 800,    // ✅ Reducido de 1200 a 800 para mayor velocidad
+      maxHeight = 800,
+      quality   = 0.75,   // ✅ Calidad 75% para balance óptimo
+      maxSizeKB = 300,    // ✅ Límite más estricto
+      format    = 'image/webp'
     } = opts;
 
     // Solo comprimir imágenes (no PDFs, videos, etc.)

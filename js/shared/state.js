@@ -1,4 +1,4 @@
-﻿/**
+/**
  * 🧠 AppState PRO+ (Nivel Empresa)
  */
 export class SafeAppState {
@@ -24,6 +24,7 @@ export class SafeAppState {
   }
 
   _loadFromStorage() {
+    if (!this._persistenceKey) return;
     try {
       const saved = localStorage.getItem(this._persistenceKey);
       if (saved) {
@@ -34,6 +35,15 @@ export class SafeAppState {
             this._state[key] = parsed[key];
           }
         });
+        
+        // ✅ NOTIFICAR RESTAURACIÓN (Para que la UI se pinte de inmediato)
+        setTimeout(() => {
+          Object.keys(parsed).forEach(key => {
+            if (key in this._initialState) {
+              this._notify(key, this._state[key], null);
+            }
+          });
+        }, 10);
       }
     } catch (e) {
       console.warn('[SafeAppState] Error loading persistence:', e);
@@ -77,6 +87,9 @@ export class SafeAppState {
     if (prev === value) return;
 
     this._state[key] = value;
+
+    // ✅ PERSISTENCIA INMEDIATA: Guardar solo las claves necesarias si se desea
+    this._saveToStorage();
 
     if (this._isBatching) {
       this._batchQueue.add(key);
@@ -136,9 +149,6 @@ export class SafeAppState {
    * 🔄 Notificar cambios
    */
   _notify(key, value, prev) {
-    // Guardar en persistencia si aplica
-    this._saveToStorage();
-
     // 🔑 listeners por clave
     if (this._listeners[key]) {
       this._listeners[key].forEach(cb => {

@@ -159,7 +159,7 @@ export const WallModule = {
   },
 
   async loadPosts(container, append = false) {
-    // \ud83d\udee1\ufe0f Fix: Si 'container' es un string (ID), convertirlo a elemento DOM
+    // 🛡️ Fix: Si 'container' es un string (ID), convertirlo a elemento DOM
     if (typeof container === 'string') {
       container = document.getElementById(container);
     }
@@ -176,7 +176,22 @@ export const WallModule = {
       return;
     }
 
-    if (!append) {
+    // ✅ PERSISTENCIA EN APPSTATE: Si no es append y tenemos datos en cache, mostrarlos primero
+    if (!append && this._appState) {
+      const cachedPosts = this._appState.get('wall_posts_cache');
+      const cachedFilters = this._appState.get('wall_filters_cache');
+      const currentFilters = JSON.stringify(this._options);
+
+      if (cachedPosts && cachedFilters === currentFilters) {
+        container.innerHTML = cachedPosts.map(p => this.renderPost(p)).join('');
+        if (window.lucide) lucide.createIcons();
+        ImageLoader.observe(container);
+        this._isLoading = false; 
+        // Continuamos para refrescar datos en segundo plano
+      }
+    }
+
+    if (!append && !container.innerHTML) {
       container.innerHTML = `
         <div class="py-12 text-center" id="wall-loader">
           <div class="animate-spin rounded-full h-8 w-8 border-b-2 border-orange-400 mx-auto"></div>
@@ -222,8 +237,14 @@ export const WallModule = {
         return;
       }
 
-      // Procesar posts de forma SÍNCRONA — sin await, renderiza al instante
       const processedPosts = posts.map(p => this._processPost(p, user));
+      
+      // Guardar en cache para persistencia instantánea
+      if (!append && this._appState) {
+        this._appState.set('wall_posts_cache', processedPosts);
+        this._appState.set('wall_filters_cache', JSON.stringify(this._options));
+      }
+
       const html = processedPosts.map(p => this.renderPost(p)).join('');
 
       if (append) container.insertAdjacentHTML('beforeend', html);
@@ -290,11 +311,10 @@ export const WallModule = {
     const likeCount = likesArray.length;
     const userLiked = user ? likesArray.some(l => l.user_id === user.id) : false;
 
-    // Resolver URLs de forma SÍNCRONA — sin await, sin llamadas extra
-    // Las URLs de Supabase Storage son deterministas y no necesitan fetch
+    // Resolver URLs de forma SÍNCRONA — con transformación CDN
     const mediaUrl = p.media_url || p.image_url || null;
-    const publicUrl = this._resolveUrlSync(mediaUrl, { width: 900, quality: 80 });
-    const teacherAvatar = this._resolveUrlSync(teacherData.avatar_url, { width: 80, quality: 85 });
+    const publicUrl = this._resolveUrlSync(mediaUrl, { width: 800, quality: 75 });
+    const teacherAvatar = this._resolveUrlSync(teacherData.avatar_url, { width: 80, quality: 80 });
 
     return {
       ...p,
@@ -321,19 +341,40 @@ export const WallModule = {
     return optimizeImageUrl(data?.publicUrl, opts);
   },
 
+  // Utilidad para generar colores consistentes por nombre
+  _getAvatarColor(name) {
+    const colors = [
+      'bg-blue-100 text-blue-600',
+      'bg-emerald-100 text-emerald-600',
+      'bg-purple-100 text-purple-600',
+      'bg-amber-100 text-amber-600',
+      'bg-rose-100 text-rose-600',
+      'bg-indigo-100 text-indigo-600',
+      'bg-teal-100 text-teal-600'
+    ];
+    let hash = 0;
+    for (let i = 0; i < name.length; i++) {
+      hash = name.charCodeAt(i) + ((hash << 5) - hash);
+    }
+    return colors[Math.abs(hash) % colors.length];
+  },
+
   renderPost(p) {
     const date = this._relativeTimeFromNow(p.created_at);
     const accent = this._options.accentColor || 'indigo';
     const isFirstPost = this._page === 0;
     const colors = this._getLikeColors();
 
-    // Lógica de Renderizado Multimedia con lazy loading
+    // Lógica de Renderizado Multimedia con aspect-ratio fijo y lazy loading
     let mediaHtml = '';
     if (p.display_media_url) {
       if (p.is_video) {
         mediaHtml = `
-          <div class="rounded-2xl overflow-hidden border border-slate-100 mb-4 bg-black relative group/media">
-            ${ImageLoader.video(p.display_media_url, '', { cls: 'w-full max-h-[500px] mx-auto' })}
+          <div class="aspect-video rounded-2xl overflow-hidden border border-slate-100 mb-4 bg-black relative group/media shadow-inner">
+            ${ImageLoader.video(p.display_media_url, '', { 
+              cls: 'w-full h-full object-contain',
+              preload: 'none' // Lazy loading nativo para video
+            })}
             <a href="${p.display_media_url}" download target="_blank" rel="noopener noreferrer"
                class="absolute top-2 right-2 p-2 bg-black/60 hover:bg-black/80 text-white rounded-xl opacity-0 group-hover/media:opacity-100 transition-opacity flex items-center gap-1.5 text-[10px] font-black uppercase backdrop-blur-sm"
                title="Descargar video" onclick="event.stopPropagation()">
@@ -342,11 +383,11 @@ export const WallModule = {
           </div>`;
       } else {
         mediaHtml = `
-          <div class="rounded-2xl overflow-hidden border border-slate-100 mb-4 cursor-zoom-in bg-black relative group/media"
+          <div class="aspect-video rounded-2xl overflow-hidden border border-slate-100 mb-4 cursor-zoom-in bg-slate-50 relative group/media shadow-inner"
                onclick="window.openLightbox('${p.display_media_url}','image')">
             ${ImageLoader.img(p.display_media_url, {
               alt: 'Post media',
-              cls: 'w-full object-contain max-h-[600px]',
+              cls: 'w-full h-full object-cover', // Aspect ratio fijo
               fallback: 'img/mundo.jpg',
               priority: isFirstPost ? 'high' : 'low'
             })}
@@ -451,6 +492,11 @@ export const WallModule = {
     if(btn) {
       btn.classList.toggle(colors.text, !isLiked);
       btn.classList.toggle('text-slate-500', isLiked);
+      // Animación de pulso al dar like
+      if (!isLiked) {
+        btn.classList.add('animate-bounce-subtle');
+        setTimeout(() => btn.classList.remove('animate-bounce-subtle'), 500);
+      }
     }
     
     if(icon) {
@@ -468,9 +514,18 @@ export const WallModule = {
       if (isLiked) {
         await supabase.from('likes').delete().eq('post_id', postId).eq('user_id', user.id);
       } else {
+        // Vibración ligera en móviles
+        if (navigator.vibrate) navigator.vibrate(10);
         await supabase.from('likes').insert({ post_id: postId, user_id: user.id });
       }
     } catch (err) {
+      // Revertir en caso de error (Silencioso para el usuario)
+      if(btn) {
+        btn.classList.toggle(colors.text, isLiked);
+        btn.classList.toggle('text-slate-500', !isLiked);
+      }
+      if(icon) icon.classList.toggle(colors.fill, isLiked);
+      if(countSpan) countSpan.textContent = String(currentCount);
     }
   },
 
@@ -499,19 +554,20 @@ export const WallModule = {
       const placeholder = commentsList.querySelector('.italic');
       if (placeholder) placeholder.remove();
 
+      const colorClass = this._getAvatarColor(userName);
       const tempEl = document.createElement('div');
       tempEl.id = tempId;
-      tempEl.className = 'flex gap-2 text-xs opacity-60';
+      tempEl.className = 'flex gap-2 text-xs opacity-60 animate-slideInUp';
       tempEl.innerHTML = `
-        <div class="w-6 h-6 rounded-full bg-slate-200 flex items-center justify-center font-bold text-[9px] text-slate-500 shrink-0">
+        <div class="w-7 h-7 rounded-full ${colorClass} flex items-center justify-center font-black text-[10px] border-2 border-white shrink-0 shadow-sm">
           ${Helpers.escapeHTML(userName.charAt(0).toUpperCase())}
         </div>
-        <div class="bg-white p-2 rounded-xl rounded-tl-none border border-slate-100 shadow-sm flex-1">
-          <div class="flex justify-between">
-            <span class="font-bold text-slate-700">${Helpers.escapeHTML(userName)}</span>
-            <span class="text-[9px] text-slate-400">ahora</span>
+        <div class="bg-white p-3 rounded-2xl rounded-tl-none border border-slate-100 shadow-sm flex-1">
+          <div class="flex justify-between items-center mb-1">
+            <span class="font-black text-slate-800 text-[11px]">${Helpers.escapeHTML(userName)}</span>
+            <span class="text-[9px] text-slate-400 font-bold uppercase">ahora</span>
           </div>
-          <p class="text-slate-600 mt-0.5">${Helpers.escapeHTML(content)}</p>
+          <p class="text-slate-600 leading-relaxed">${Helpers.escapeHTML(content)}</p>
         </div>`;
       commentsList.appendChild(tempEl);
       commentsList.scrollTop = commentsList.scrollHeight;
@@ -554,11 +610,15 @@ export const WallModule = {
     if (!section) return;
     section.classList.toggle('hidden');
 
-    // Solo cargar desde DB si la secci\u00f3n se abre Y la lista est\u00e1 vac\u00eda o tiene solo el placeholder
+    // Solo cargar desde DB si la sección se abre Y la lista está vacía o tiene solo el placeholder
     if (!section.classList.contains('hidden')) {
       const list = document.getElementById(`comments-list-${postId}`);
-      const hasRealComments = list && list.querySelectorAll('[id^="comment-"]').length > 0;
+      const hasRealComments = list && list.querySelectorAll('.bg-white').length > 0;
       if (!hasRealComments) {
+        list.innerHTML = `
+          <div class="py-4 text-center">
+            <div class="animate-spin w-5 h-5 border-2 border-slate-200 border-t-slate-400 rounded-full mx-auto"></div>
+          </div>`;
         const comments = await this._fetchComments(postId);
         this.renderComments(postId, comments);
       }
@@ -644,25 +704,21 @@ export const WallModule = {
     const isClassroomPost = postEl && postEl.dataset.classroomId !== 'null';
 
     container.innerHTML = comments.map(c => {
-      const { name: displayName, avatar: avatarUrl } = this._resolveCommentName(c);
+      const { name: displayName } = this._resolveCommentName(c);
       const initial = displayName.charAt(0).toUpperCase();
-
-      // Forzar ocultación de avatares en posts de aulas para privacidad
-      const showAvatar = !isClassroomPost && avatarUrl;
+      const colorClass = this._getAvatarColor(displayName);
 
       return `
-      <div class="flex gap-2 text-xs">
-        <div class="w-6 h-6 rounded-full bg-slate-200 flex items-center justify-center font-bold text-[9px] text-slate-500 overflow-hidden border border-white shrink-0">
-          ${showAvatar
-            ? ImageLoader.img(avatarUrl, { cls: 'w-full h-full object-cover', fallback: '' })
-            : `<span class="text-slate-500">${initial}</span>`}
+      <div class="flex gap-2 text-xs animate-slideInUp">
+        <div class="w-7 h-7 rounded-full ${colorClass} flex items-center justify-center font-black text-[10px] border-2 border-white shrink-0 shadow-sm">
+          ${initial}
         </div>
-        <div class="bg-white p-2 rounded-xl rounded-tl-none border border-slate-100 shadow-sm flex-1">
-          <div class="flex justify-between">
-            <span class="font-bold text-slate-700">${Helpers.escapeHTML(displayName)}</span>
-            <span class="text-[9px] text-slate-400">${new Date(c.created_at).toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'})}</span>
+        <div class="bg-white p-3 rounded-2xl rounded-tl-none border border-slate-100 shadow-sm flex-1">
+          <div class="flex justify-between items-center mb-1">
+            <span class="font-black text-slate-800 text-[11px]">${Helpers.escapeHTML(displayName)}</span>
+            <span class="text-[9px] text-slate-400 font-bold uppercase">${new Date(c.created_at).toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'})}</span>
           </div>
-          <p class="text-slate-600 mt-0.5">${Helpers.escapeHTML(c.content)}</p>
+          <p class="text-slate-600 leading-relaxed">${Helpers.escapeHTML(c.content)}</p>
         </div>
       </div>
     `}).join('');
@@ -672,11 +728,21 @@ export const WallModule = {
   },
 
   async deletePost(postId) {
-    if (!confirm('\u00bfEliminar publicaci\u00f3n?')) return;
+    if (!confirm('¿Eliminar esta publicación permanentemente?')) return;
     try {
+      // ✅ INTERFAZ OPTIMISTA: Animación de salida
+      const el = document.getElementById(`post-${postId}`);
+      if (el) {
+        el.style.transition = 'all 0.4s ease';
+        el.style.opacity = '0';
+        el.style.transform = 'translateX(20px)';
+      }
+
       await supabase.from('posts').delete().eq('id', postId);
-      document.getElementById(`post-${postId}`)?.remove();
+      setTimeout(() => document.getElementById(`post-${postId}`)?.remove(), 400);
+      Helpers.toast('Publicación eliminada', 'info');
     } catch (err) {
+      Helpers.toast('Error al eliminar', 'error');
     }
   },
 
@@ -693,18 +759,22 @@ export const WallModule = {
         const post = payload.new;
         if (classroomId && post.classroom_id && post.classroom_id !== classroomId) return;
         
-        // Optimización Directora: Evitar recarga completa si es posible
+        // Mostrar indicador de nuevos posts en lugar de refrescar auto
         const container = document.getElementById(self._containerId);
-        if (container && self._page <= 1) {
+        if (container) {
           const indicator = document.getElementById('wall-new-posts-indicator');
-          if (indicator) {
-            indicator.classList.remove('hidden');
-          } else {
-            container.insertAdjacentHTML('afterbegin', `
-              <div id="wall-new-posts-indicator" onclick="location.reload()" class="bg-indigo-600 text-white px-4 py-2 rounded-full text-xs font-black mx-auto mb-4 cursor-pointer shadow-lg animate-bounce text-center w-max">
-                ✨ NUEVAS PUBLICACIONES DISPONIBLES
-              </div>
-            `);
+          if (!indicator) {
+            const btn = document.createElement('div');
+            btn.id = 'wall-new-posts-indicator';
+            btn.className = 'fixed top-24 left-1/2 -translate-x-1/2 bg-indigo-600 text-white px-6 py-2.5 rounded-full text-[10px] font-black uppercase shadow-2xl animate-bounce cursor-pointer z-50 flex items-center gap-2 border-2 border-white/20 backdrop-blur-md';
+            btn.innerHTML = '<i data-lucide="arrow-up" class="w-3 h-3"></i> Nuevas publicaciones disponibles';
+            btn.onclick = () => {
+              window.scrollTo({ top: 0, behavior: 'smooth' });
+              self.applyFilters();
+              btn.remove();
+            };
+            document.body.appendChild(btn);
+            if (window.lucide) lucide.createIcons();
           }
         }
       })

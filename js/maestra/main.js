@@ -205,8 +205,15 @@ document.addEventListener('DOMContentLoaded', async () => {
         AppState.set('profile', { ...oldProfile, ...updates });
         
         safeToast('Perfil actualizado correctamente');
-        // Recargar la página para reflejar cambios en sidebar y UI
-        setTimeout(() => location.reload(), 1000);
+        
+        // ✅ ACTUALIZACIÓN REACTIVA: Actualizar UI sin recargar
+        document.querySelectorAll('.user-name-display').forEach(el => el.textContent = updates.name);
+        const sidebarName = document.getElementById('sidebarName');
+        if (sidebarName) sidebarName.textContent = updates.name;
+        
+        btn.disabled = false;
+        btn.innerHTML = '<i data-lucide="save" class="w-5 h-5"></i> Guardar Cambios';
+        if (window.lucide) lucide.createIcons();
       } catch (err) {
         safeToast('Error al guardar perfil. Revisa tu conexión.', 'error');
         btn.disabled = false;
@@ -323,19 +330,6 @@ document.addEventListener('DOMContentLoaded', async () => {
 
     // 🔴 Sistema de badges por sección
     BadgeSystem.init(auth.user.id);
-
-    // ✨ Inicializar Experiencia Premium Móvil (Bottom Nav)
-    UIPremium.injectBottomNav([
-      { section: 't-home', label: 'Inicio', icon: 'home' },
-      { section: 't-class-detail', label: 'Mi Aula', icon: 'layout' },
-      { section: 't-tasks', label: 'Tareas', icon: 'book-open' },
-      { section: 't-chat', label: 'Chat', icon: 'message-circle' },
-      { section: 't-profile', label: 'Perfil', icon: 'user' }
-    ]);
-
-    window.addEventListener('app:nav-change', (e) => {
-      window.App.setActiveSection(e.detail.section);
-    });
 
     // ── Botón hamburguesa móvil ────────────────────────────────────────────────────────
     const menuBtn = document.getElementById('menuBtn');
@@ -683,7 +677,10 @@ function initNavigation() {
     const fullId = targetId.startsWith('t-') ? targetId : `t-${targetId}`;
     const cleanId = targetId.replace('t-', '');
 
-    Helpers.vibrate('light');
+    Helpers.vibrate?.('light');
+
+    // ✅ LIMPIEZA DE REALTIME: Eliminar canales al cambiar de sección
+    if (window.RealtimeManager) RealtimeManager.unsubscribeAll(['notifications']);
 
     sections.forEach(s => s.classList.remove('active'));
     const target = document.getElementById(fullId);

@@ -58,8 +58,50 @@
     #attendanceModal { -webkit-backdrop-filter: blur(4px); backdrop-filter: blur(4px); }
 
     @media (max-width: 767px) {
+      /* 1. Reset Global Scroll */
+      html, body { 
+        overflow-y: auto !important; 
+        overflow-x: hidden !important; 
+        height: auto !important; 
+        min-height: 100% !important;
+        position: relative !important;
+        display: block !important;
+        -webkit-overflow-scrolling: touch !important;
+        overscroll-behavior: auto !important;
+      }
+
+      /* 2. Reset Layout Containers */
+      .app {
+        display: block !important;
+        height: auto !important;
+        min-height: 100vh !important;
+        overflow: visible !important;
+      }
+
+      .app-content-wrapper { 
+        margin-left: 0 !important; 
+        height: auto !important; 
+        overflow: visible !important; 
+        display: block !important; 
+      }
+
+      .main { 
+        height: auto !important; 
+        overflow: visible !important; 
+        min-height: 100vh !important; 
+        padding-bottom: 20px !important; 
+        display: block !important;
+      }
+
+      #layoutShell {
+        overflow: visible !important;
+        height: auto !important;
+        display: block !important;
+      }
+
       #toggleSidebar { display: none !important; }
-      .section, .section.active { overflow: visible !important; height: auto !important; }
+      .section, .section.active { overflow: visible !important; height: auto !important; display: none; }
+      .section.active { display: block !important; }
       canvas { max-width: 100% !important; }
       .chat-shell { min-height: calc(100dvh - 140px) !important; height: calc(100dvh - 140px) !important; }
       #pagos .flex.flex-wrap.gap-2 { flex-direction: column; }
@@ -870,10 +912,11 @@
                 <i data-lucide="arrow-left" class="w-4 h-4"></i>
               </button>
               <div id="chatActiveAvatar" class="w-10 h-10 rounded-full bg-teal-100 text-teal-600 flex items-center justify-center font-bold overflow-hidden shrink-0"></div>
-              <div class="min-w-0">
+              <div class="flex-1 min-w-0">
                 <div id="chatActiveName" class="font-bold text-slate-800 text-sm truncate"></div>
                 <div id="chatActiveMeta" class="text-[10px] font-bold uppercase tracking-wider text-slate-400 truncate"></div>
               </div>
+              <div id="chatHeaderActions" class="flex items-center gap-1"></div>
             </div>
 
             <!-- Mensajes -->

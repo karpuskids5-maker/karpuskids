@@ -257,12 +257,35 @@ export async function registerAttendance(studentId, status) {
   const today = new Date().toISOString().split('T')[0];
   if (!studentId || !status) return;
 
+  // ✅ OPTIMISTIC UI: Feedback visual inmediato
+  const btnPresent = document.getElementById(`btn-${studentId}-present`);
+  const btnLate = document.getElementById(`btn-${studentId}-late`);
+  const btnAbsent = document.getElementById(`btn-${studentId}-absent`);
+  const prevStates = [btnPresent, btnLate, btnAbsent].map(b => ({ cls: b?.className, id: b?.id }));
+
+  const updateUI = (newStatus) => {
+    [btnPresent, btnLate, btnAbsent].forEach(b => {
+      if (b) {
+        b.className = b.className.replace(/bg-\w+-500 text-white shadow-lg/g, '');
+        b.classList.add('bg-slate-50', 'text-slate-600');
+      }
+    });
+    if (newStatus === 'present') {
+      btnPresent?.classList.remove('bg-slate-50', 'text-slate-600');
+      btnPresent?.classList.add('bg-emerald-500', 'text-white', 'shadow-lg');
+    } else if (newStatus === 'late') {
+      btnLate?.classList.remove('bg-slate-50', 'text-slate-600');
+      btnLate?.classList.add('bg-amber-500', 'text-white', 'shadow-lg');
+    } else if (newStatus === 'absent') {
+      btnAbsent?.classList.remove('bg-slate-50', 'text-slate-600');
+      btnAbsent?.classList.add('bg-rose-500', 'text-white', 'shadow-lg');
+    }
+  };
+
+  updateUI(status);
+
   try {
-    const btnPresent = document.getElementById(`btn-${studentId}-present`);
-    const btnLate = document.getElementById(`btn-${studentId}-late`);
-    const btnAbsent = document.getElementById(`btn-${studentId}-absent`);
-    
-    // 1. Verificar si ya existe un registro de hoy (para evitar sobrescribir Tardanza)
+    // 1. Verificar si ya existe un registro de hoy
     const { data: existing } = await supabase
       .from('attendance')
       .select('status')
@@ -272,35 +295,10 @@ export async function registerAttendance(studentId, status) {
 
     const isMarkingPresent = status === 'present';
     const wasLate = existing?.status === 'late';
-    
-    // Si la maestra marca "Presente" pero el niño llegó "Tarde" (por ponche),
-    // no cambiamos el estado en la DB pero sí notificamos.
     let shouldUpsert = true;
-    if (isMarkingPresent && wasLate) {
-      shouldUpsert = false;
-    }
+    if (isMarkingPresent && wasLate) shouldUpsert = false;
 
-    // reset visual
-    [btnPresent, btnLate, btnAbsent].forEach(b => {
-      if (b) {
-        b.className = b.className.replace(/bg-\w+-500 text-white shadow-lg/g, '');
-        b.classList.add('bg-slate-50', 'text-slate-600');
-      }
-    });
-
-    let statusLiteral = 'Ausente';
-    if (status === 'present') {
-      btnPresent?.classList.remove('bg-slate-50', 'text-slate-600');
-      btnPresent?.classList.add('bg-emerald-500', 'text-white', 'shadow-lg');
-      statusLiteral = 'Presente';
-    } else if (status === 'late') {
-      btnLate?.classList.remove('bg-slate-50', 'text-slate-600');
-      btnLate?.classList.add('bg-amber-500', 'text-white', 'shadow-lg');
-      statusLiteral = 'Tarde';
-    } else {
-      btnAbsent?.classList.remove('bg-slate-50', 'text-slate-600');
-      btnAbsent?.classList.add('bg-rose-500', 'text-white', 'shadow-lg');
-    }
+    let statusLiteral = status === 'present' ? 'Presente' : status === 'late' ? 'Tarde' : 'Ausente';
 
     if (shouldUpsert) {
       const attRecord = { student_id: studentId, classroom_id: classroom.id, date: today, status };
@@ -308,17 +306,12 @@ export async function registerAttendance(studentId, status) {
         await MaestraApi.upsertAttendance(attRecord);
       } else {
         await OfflineQueue.enqueue('attendance', 'upsert', { ...attRecord, onConflict: 'student_id,date' });
-        safeToast(`${statusLiteral} guardado sin conexión — se sincronizará automáticamente`, 'info');
+        safeToast(`${statusLiteral} guardado sin conexión`, 'info');
       }
-    } else {
-      console.log('Manteniendo estado "Tarde" — Solo notificando presencia en aula');
     }
 
     const student = (AppState.get('students') || []).find(s => s.id === studentId);
     if (student?.parent_id) {
-      const { sendPush } = await import('../../shared/supabase.js');
-      
-      // Mensaje personalizado: si era tarde y se puso presente, se notifica que ya está en aula.
       const pushMessage = (isMarkingPresent && wasLate)
         ? `${student.name} ya está en su aula con su maestra.`
         : `${student.name} ha sido marcado como ${statusLiteral} hoy.`;
@@ -333,8 +326,13 @@ export async function registerAttendance(studentId, status) {
       }).catch(() => {});
     }
     
-    safeToast(isMarkingPresent && wasLate ? 'Presencia confirmada (Mantiene Tardanza)' : `Asistencia: ${statusLiteral}`);
+    safeToast(isMarkingPresent && wasLate ? 'Presencia confirmada' : `Asistencia: ${statusLiteral}`);
   } catch (e) {
+    // Revertir UI si falla
+    prevStates.forEach(s => {
+      const b = document.getElementById(s.id);
+      if (b) b.className = s.cls;
+    });
     safeToast('Error al registrar asistencia', 'error');
     await initAttendance();
   }

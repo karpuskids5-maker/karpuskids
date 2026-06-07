@@ -257,7 +257,10 @@ function initNavigation() {
   const sections = document.querySelectorAll('section[id]');
 
   const showSection = async (target) => {
-    Helpers.vibrate('light');
+    Helpers.vibrate?.('light');
+
+    // ✅ LIMPIEZA DE REALTIME: Eliminar canales al cambiar de sección
+    RealtimeManager.unsubscribeAll(['notifications']);
 
     // Desuscribir muro al salir (ahorro de recursos Realtime)
     const prevSection = AppState.get('currentSection');
@@ -404,19 +407,6 @@ function initNavigation() {
   // Carga inicial del dashboard
   DashboardModule.init().then(() => loadedSections.add('dashboard'));
   showSection('dashboard');
-
-  // ✨ 5. Inicializar Experiencia Premium Móvil (Bottom Nav)
-  UIPremium.injectBottomNav([
-    { section: 'dashboard', label: 'Inicio', icon: 'layout' },
-    { section: 'estudiantes', label: 'Alumnos', icon: 'users' },
-    { section: 'pagos', label: 'Pagos', icon: 'credit-card' },
-    { section: 'accesos', label: 'Accesos', icon: 'qr-code' },
-    { section: 'chat', label: 'Chat', icon: 'message-circle' }
-  ]);
-
-  window.addEventListener('app:nav-change', (e) => {
-    showSection(e.detail.section);
-  });
 
   // -- Hamburger m�vil ------------------------------------------------------
   const menuBtn = document.getElementById('menuBtn');
@@ -626,8 +616,25 @@ window.selectAssistantChat = async (userId, name, role, avatarUrl = null) => {
   const avatarEl = document.getElementById('chatActiveAvatar');
   const inputArea = document.getElementById('chatInputArea');
   
-  if (nameEl) nameEl.textContent = name;
-  if (metaEl) metaEl.textContent = role || 'Usuario';
+  // ✅ ENRIQUECIMIENTO DE CONTEXTO: Título con nombre del Estudiante
+  const { data: student } = await supabase.from('students').select('name').eq('parent_id', userId).maybeSingle();
+  if (nameEl) nameEl.textContent = student ? `Estudiante: ${student.name}` : name;
+  if (metaEl) metaEl.textContent = student ? `Padre: ${name}` : (role || 'Usuario');
+  
+  // ✅ BOTONES DE ACCESO RÁPIDO (Directora/Asistente)
+  const headerActions = document.getElementById('chatHeaderActions');
+  if (headerActions) {
+    headerActions.innerHTML = student ? `
+      <button onclick="window.App._openStudentModal('${student.id}')" class="p-2 text-teal-600 hover:bg-teal-50 rounded-xl transition-all" title="Ver Ficha">
+        <i data-lucide="user-square" class="w-5 h-5"></i>
+      </button>
+      <button onclick="window.goToSection('pagos')" class="p-2 text-teal-600 hover:bg-teal-50 rounded-xl transition-all" title="Ver Pagos">
+        <i data-lucide="credit-card" class="w-5 h-5"></i>
+      </button>
+    ` : '';
+    if (window.lucide) lucide.createIcons();
+  }
+  
   if (avatarEl) {
     if (avatarUrl && avatarUrl !== 'null') {
       avatarEl.innerHTML = `<img src="${avatarUrl}" class="w-full h-full object-cover">`;
@@ -647,14 +654,31 @@ window.selectAssistantChat = async (userId, name, role, avatarUrl = null) => {
 
   try {
     const { messages, conversationId } = await ChatModule.loadConversation(userId);
-    AppState.set('activeChatUserId', userId);
     AppState.set('activeConversationId', conversationId);
+
+    // Marcar como leídos al abrir
+    if (conversationId) ChatModule.markAsRead(conversationId);
 
     if (container) {
       container.innerHTML = messages.length 
         ? messages.map(m => _msgBubble(m, user.id)).join('')
         : '<div class="p-8 text-center text-slate-400 text-xs font-bold uppercase tracking-widest">No hay mensajes previos</div>';
       ScrollModule.scrollToBottom(container, false);
+
+      // ✅ TOP-SCROLL: Cargar mensajes históricos
+      if (conversationId) {
+        if (window._chatTopScroll) window._chatTopScroll.destroy();
+        window._chatTopScroll = ScrollModule.topScroll({
+          container: container,
+          loadFn: async () => {
+            const { messages: moreMsg, hasMore } = await ChatModule.loadConversation(userId, conversationId, true);
+            if (moreMsg.length > 0) {
+              const html = moreMsg.map(m => _msgBubble(m, user.id)).join('');
+              container.insertAdjacentHTML('afterbegin', html);
+            }
+          }
+        });
+      }
     }
 
     // Subscribe Realtime
@@ -676,6 +700,18 @@ window.selectAssistantChat = async (userId, name, role, avatarUrl = null) => {
           } else {
             indicator.classList.add('hidden');
           }
+        },
+        (presence) => {
+          // Presence handler: actualizar círculos verdes en la lista
+          _updatePresenceUI(presence);
+        },
+        (receipt) => {
+          // Read receipt handler (✓✓)
+          const msgEl = document.getElementById(`msg-${receipt.id}`);
+          if (msgEl && receipt.is_read) {
+            const checks = msgEl.querySelector('.read-status');
+            if (checks) checks.innerHTML = '✓✓';
+          }
         }
       );
     }
@@ -695,24 +731,31 @@ async function initAssistantChat() {
     // Cargar contactos (Padres, Maestras, Directora)
     const { data: profiles, error } = await supabase
       .from('profiles')
-      .select('id, name, avatar_url, role')
+      .select('id, name, avatar_url, role, students:students!parent_id(name)')
       .neq('id', user.id)
       .order('name');
 
     if (error) throw error;
 
-    list.innerHTML = (profiles || []).map(p => `
+    list.innerHTML = (profiles || []).map(p => {
+      const studentName = p.students && p.students.length > 0 ? p.students[0].name : null;
+      const mainTitle = studentName ? `Estudiante: ${studentName}` : p.name;
+      const subTitle = studentName ? `Padre: ${p.name}` : (p.role || 'Usuario');
+
+      return `
       <div onclick="window.selectAssistantChat('${p.id}', '${Helpers.escapeHTML(p.name)}', '${p.role}', '${p.avatar_url || ''}')" 
-           class="flex items-center gap-3 p-3 rounded-2xl hover:bg-white hover:shadow-sm cursor-pointer transition-all border border-transparent hover:border-slate-100 group mb-1">
+           data-user-id="${p.id}"
+           class="flex items-center gap-3 p-3 rounded-2xl hover:bg-white hover:shadow-sm cursor-pointer transition-all border border-transparent hover:border-slate-100 group mb-1 relative">
         <div class="w-12 h-12 rounded-full bg-teal-100 text-teal-700 flex items-center justify-center font-bold overflow-hidden border-2 border-teal-50 shrink-0 shadow-sm">
           ${p.avatar_url ? `<img src="${p.avatar_url}" class="w-full h-full object-cover">` : p.name.charAt(0)}
         </div>
+        <div class="absolute bottom-3 left-11 w-3.5 h-3.5 bg-slate-300 border-2 border-white rounded-full presence-indicator"></div>
         <div class="min-w-0 flex-1">
-          <div class="font-bold text-slate-700 text-sm truncate group-hover:text-teal-700">${Helpers.escapeHTML(p.name)}</div>
-          <div class="text-[10px] text-slate-400 font-bold uppercase truncate">${p.role}</div>
+          <div class="font-bold text-slate-700 text-sm truncate group-hover:text-teal-700">${Helpers.escapeHTML(mainTitle)}</div>
+          <div class="text-[10px] text-slate-400 font-bold uppercase truncate">${Helpers.escapeHTML(subTitle)}</div>
         </div>
       </div>
-    `).join('');
+    `}).join('');
 
     // Listeners para envío
     const sendBtn = document.getElementById('btnSendChatMessage');
@@ -743,6 +786,41 @@ async function initAssistantChat() {
       sendBtn.onclick = sendMsg;
       input.onkeydown = (e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendMsg(); } };
       
+      // ✅ INTERFAZ OPTIMISTA: Envío inmediato y sincronización
+      const _optimisticSend = async () => {
+        const text = input.value.trim();
+        const destId = AppState.get('activeChatUserId');
+        const convId = AppState.get('activeConversationId');
+        if (!text || !destId) return;
+
+        input.value = '';
+        const tempId = `temp-${Date.now()}`;
+        const container = document.getElementById('chatMessagesContainer');
+        container?.insertAdjacentHTML('beforeend', _msgBubble({ id: tempId, sender_id: user.id, content: text }, user.id));
+        ScrollModule.scrollToBottom(container, true);
+
+        try {
+          const res = await ChatModule.sendMessage(user.id, destId, text, convId);
+          // Actualizar ID temporal con el real de Supabase
+          const tempMsg = document.getElementById(`msg-${tempId}`);
+          if (tempMsg && res.id) {
+            tempMsg.id = `msg-${res.id}`;
+            const timeSpan = tempMsg.querySelector('span:first-child');
+            if (timeSpan) timeSpan.textContent = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+          }
+          if (!convId && res.conversationId) {
+            AppState.set('activeConversationId', res.conversationId);
+          }
+        } catch (_) { 
+          const tempMsg = document.getElementById(`msg-${tempId}`);
+          if (tempMsg) tempMsg.style.opacity = '0.5';
+          Helpers.toast('Error al enviar', 'error'); 
+        }
+      };
+
+      sendBtn.onclick = _optimisticSend;
+      input.onkeydown = (e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); _optimisticSend(); } };
+      
       // Typing broadcast
       let t;
       input.oninput = () => {
@@ -759,14 +837,42 @@ async function initAssistantChat() {
   }
 }
 
+/**
+ * Actualiza los indicadores de presencia en la lista de contactos
+ */
+function _updatePresenceUI(presenceState) {
+  const onlineUsers = new Set();
+  Object.values(presenceState).forEach(p => {
+    p.forEach(presence => onlineUsers.add(presence.user_id));
+  });
+
+  document.querySelectorAll('#chatContactsList [data-user-id]').forEach(el => {
+    const userId = el.dataset.userId;
+    const indicator = el.querySelector('.presence-indicator');
+    if (indicator) {
+      if (onlineUsers.has(userId)) {
+        indicator.classList.remove('bg-slate-300');
+        indicator.classList.add('bg-emerald-500');
+      } else {
+        indicator.classList.remove('bg-emerald-500');
+        indicator.classList.add('bg-slate-300');
+      }
+    }
+  });
+}
+
 function _msgBubble(m, myId) {
   const isMe = m.sender_id === myId;
+  const isRead = m.is_read || false;
+  const msgId = m.id || `temp-${Date.now()}`;
+
   return `
-    <div class="flex ${isMe ? 'justify-end' : 'justify-start'} mb-3 animate-slideInUp">
+    <div id="msg-${msgId}" class="flex ${isMe ? 'justify-end' : 'justify-start'} mb-3 animate-slideInUp">
       <div class="max-w-[80%] px-4 py-2.5 rounded-2xl text-sm shadow-sm ${isMe ? 'bg-teal-600 text-white rounded-tr-none' : 'bg-white text-slate-700 rounded-tl-none border border-slate-100'}">
         <p class="leading-relaxed">${Helpers.escapeHTML(m.content)}</p>
-        <div class="text-[9px] mt-1 opacity-60 text-right font-bold uppercase tracking-tighter">
-          ${m.created_at ? new Date(m.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : 'Ahora'}
+        <div class="flex items-center justify-end gap-1 text-[9px] mt-1 opacity-60 font-bold uppercase tracking-tighter">
+          <span>${m.created_at ? new Date(m.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : 'Enviando...'}</span>
+          ${isMe ? `<span class="read-status text-[11px] leading-none">${isRead ? '✓✓' : '✓'}</span>` : ''}
         </div>
       </div>
     </div>`;

@@ -1,4 +1,4 @@
-﻿import { supabase } from './supabase.js';
+import { supabase } from './supabase.js';
 import { ScrollModule } from './scroll.module.js';
 import { QueryCache } from './query-cache.js';
 import { RealtimeManager } from './realtime-manager.js';
@@ -21,14 +21,25 @@ export const ChatModule = {
    */
   async getUnreadCounts() {
     try {
-      const { data, error } = await supabase.rpc('get_unread_counts');
-      if (error) {
-        // RPC may not exist yet — return empty object silently
-        return {};
-      }
-      return data || {};
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return { total: 0, counts: {} };
+
+      const { data, error } = await supabase
+        .from('messages')
+        .select('sender_id')
+        .eq('receiver_id', user.id)
+        .eq('is_read', false);
+
+      if (error) return { total: 0, counts: {} };
+
+      const counts = {};
+      (data || []).forEach(m => {
+        counts[m.sender_id] = (counts[m.sender_id] || 0) + 1;
+      });
+
+      return { total: data.length, counts };
     } catch (_) {
-      return {};
+      return { total: 0, counts: {} };
     }
   },
 
@@ -93,6 +104,9 @@ export const ChatModule = {
         const ordered = (messages || []).reverse(); // invertir para mostrar cronológico
         state.page++;
         state.hasMore = (messages || []).length === MSG_PAGE_SIZE;
+
+        // ✅ LIMPIEZA LÓGICA DE DOM: Si hay demasiados mensajes, podríamos truncar, 
+        // pero por ahora garantizamos que el estado refleje lo cargado
         return { messages: ordered, conversationId, hasMore: state.hasMore };
       } finally {
         state.loading = false;
@@ -175,30 +189,61 @@ export const ChatModule = {
   },
 
   /**
-   * Suscripción Realtime Unificada — con typing indicators
+   * Suscripción Realtime Unificada — con typing indicators, presence y read receipts
    */
-  subscribeToConversation(conversationId, onMessage, onTyping) {
+  subscribeToConversation(conversationId, onMessage, onTyping, onPresence, onReadReceipt) {
     this.unsubscribe();
 
     const channelName = `chat_cv_${conversationId}`;
-    this._activeSubscription = RealtimeManager.subscribe(channelName, (channel) => {
-      // New messages
-      channel.on('postgres_changes', {
+    this._activeSubscription = supabase.channel(channelName);
+    
+    this._activeSubscription
+      // 1. Nuevos mensajes
+      .on('postgres_changes', {
         event: 'INSERT',
         schema: 'public',
         table: 'messages',
         filter: `conversation_id=eq.${conversationId}`
       }, (payload) => {
-        if (payload.new) onMessage(payload.new);
+        if (payload.new) {
+          // Marcar como leído si el chat está abierto (lado receptor)
+          if (payload.new.sender_id !== supabase.auth.getUser().data?.user?.id) {
+            this.markAsRead(conversationId);
+          }
+          onMessage(payload.new);
+        }
+      })
+      // 2. Read receipts (Doble Check)
+      .on('postgres_changes', {
+        event: 'UPDATE',
+        schema: 'public',
+        table: 'messages',
+        filter: `conversation_id=eq.${conversationId}`
+      }, (payload) => {
+        if (payload.new && onReadReceipt) onReadReceipt(payload.new);
+      })
+      // 3. Typing indicator via broadcast
+      .on('broadcast', { event: 'typing' }, (payload) => {
+        if (onTyping) onTyping(payload.payload);
+      })
+      // 4. Presence (Estado en Línea)
+      .on('presence', { event: 'sync' }, () => {
+        const state = this._activeSubscription.presenceState();
+        if (onPresence) onPresence(state);
+      })
+      .subscribe(async (status) => {
+        if (status === 'SUBSCRIBED') {
+          // Track user presence
+          const user = (await supabase.auth.getUser())?.data?.user;
+          if (user) {
+            await this._activeSubscription.track({
+              user_id: user.id,
+              online_at: new Date().toISOString(),
+            });
+          }
+        }
       });
 
-      // Typing indicator via broadcast
-      if (onTyping) {
-        channel.on('broadcast', { event: 'typing' }, (payload) => {
-          onTyping(payload.payload);
-        });
-      }
-    });
     this._activeChannelName = channelName;
     this._activeConvId = conversationId;
     return this._activeSubscription;
@@ -208,18 +253,22 @@ export const ChatModule = {
    * Broadcast typing indicator to conversation participants
    */
   async broadcastTyping(conversationId, userName, isTyping) {
-    if (!conversationId) return;
+    if (!conversationId || !this._activeSubscription) return;
     try {
-      await supabase.channel(`chat_cv_${conversationId}`)
-        .send({ type: 'broadcast', event: 'typing', payload: { userName, isTyping } });
+      await this._activeSubscription.send({
+        type: 'broadcast',
+        event: 'typing',
+        payload: { userName, isTyping, userId: (await supabase.auth.getUser())?.data?.user?.id }
+      });
     } catch (_) {}
   },
 
   unsubscribe() {
-    if (this._activeChannelName) {
-      RealtimeManager.unsubscribe(this._activeChannelName);
-      this._activeChannelName = null;
+    if (this._activeSubscription) {
+      supabase.removeChannel(this._activeSubscription);
       this._activeSubscription = null;
+      this._activeChannelName = null;
+      this._activeConvId = null;
     }
   },
 
@@ -229,18 +278,10 @@ export const ChatModule = {
   async markAsRead(conversationId) {
     if (!conversationId) return;
     try {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) return;
-
-      // Use the new RPC that also sets read_at timestamp
-      const { error } = await supabase.rpc('mark_messages_read', {
-        p_conversation_id: Number(conversationId)
+      // Use the new RPC that sets read_at timestamp
+      await supabase.rpc('mark_messages_read', {
+        p_conversation_id: conversationId
       });
-
-      // Fallback to old RPC if new one doesn't exist yet
-      if (error?.code === 'PGRST202') {
-        await supabase.rpc('mark_conversation_read', { p_conversation_id: Number(conversationId) });
-      }
     } catch (_) {}
   },
 
