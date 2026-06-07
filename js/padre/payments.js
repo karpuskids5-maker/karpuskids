@@ -74,6 +74,14 @@ export const PaymentsModule = {
   async loadPayments() {
     const container = document.getElementById('paymentsHistory');
     if (!container) return;
+
+    // ✅ REGLA: No mostrar historial hasta el día 25 de cada mes
+    const today = new Date();
+    if (today.getDate() < 25) {
+      container.innerHTML = Helpers.emptyState('El historial de pagos y facturación estará disponible a partir del día 25 del mes.', 'lock');
+      return;
+    }
+
     container.innerHTML = Helpers.skeleton(3, 'h-24');
     try {
       const { data, error } = await supabase
@@ -148,6 +156,12 @@ export const PaymentsModule = {
   _renderAlertBanner(payments) {
     const banner = document.getElementById('paymentAlertBanner');
     if (!banner) return;
+
+    // ✅ REGLA: No mostrar avisos de pago hasta el día 25 de cada mes
+    if (new Date().getDate() < 25) {
+      banner.classList.add('hidden');
+      return;
+    }
     
     const pending = payments.filter(p => !['paid'].includes((p.status||'').toLowerCase()));
     const totalDebt = pending.reduce((sum, p) => sum + Number(p.amount || 0), 0);

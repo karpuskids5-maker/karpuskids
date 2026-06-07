@@ -137,19 +137,6 @@ document.addEventListener('DOMContentLoaded', async () => {
     // 🎓 Guía de bienvenida para nuevos padres
     const parentName = auth.profile?.name?.split(' ')[0] || 'Bienvenido';
     
-    // ✨ Inicializar Experiencia Premium Móvil (Bottom Nav)
-    UIPremium.injectBottomNav([
-      { section: 'home', label: 'Inicio', icon: 'home' },
-      { section: 'class', label: 'Muro', icon: 'image' },
-      { section: 'tasks', label: 'Tareas', icon: 'book-open' },
-      { section: 'chat', label: 'Chat', icon: 'message-circle' },
-      { section: 'profile', label: 'Mi Perfil', icon: 'user' }
-    ]);
-
-    window.addEventListener('app:nav-change', (e) => {
-      navigateTo(e.detail.section);
-    });
-
     // ✨ Añadir Botón Flotante de QR (Carnet Digital)
     _injectFloatingQRButton();
 
