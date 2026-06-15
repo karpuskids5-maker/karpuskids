@@ -171,6 +171,20 @@
     .no-scrollbar::-webkit-scrollbar { display: none; }
     .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
 
+    /* Anular el padding-bottom del body que viene de premium-mobile.css
+       El sidebar flotante (bottom-nav propio) ya maneja el espacio */
+    body { padding-bottom: 0 !important; }
+    @media (max-width: 767px) {
+      /* El main necesita espacio para que el sidebar flotante no tape el contenido.
+         El sidebar mide ~80px + 16px de margen = ~100px */
+      #layoutShell { padding-bottom: 110px !important; }
+      html, body {
+        overflow-y: auto !important;
+        height: auto !important;
+        min-height: 100% !important;
+      }
+    }
+
     /* Tarjetas "Burbuja" */
     .patio-card {
       background: rgba(255, 255, 255, 0.7);
