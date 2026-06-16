@@ -174,14 +174,38 @@
     /* Anular el padding-bottom del body que viene de premium-mobile.css
        El sidebar flotante (bottom-nav propio) ya maneja el espacio */
     body { padding-bottom: 0 !important; }
+
+    /* ── SCROLL FIX MÓVIL ─────────────────────────────────────────
+       El panel padre usa el documento como scroll container.
+       El .app flex debe ser height:auto para no bloquear el scroll.
+    ──────────────────────────────────────────────────────────────── */
     @media (max-width: 767px) {
-      /* El main necesita espacio para que el sidebar flotante no tape el contenido.
-         El sidebar mide ~80px + 16px de margen = ~100px */
-      #layoutShell { padding-bottom: 110px !important; }
-      html, body {
+      html {
         overflow-y: auto !important;
+        overflow-x: hidden !important;
+        height: auto !important;
+      }
+      body {
+        overflow-y: auto !important;
+        overflow-x: hidden !important;
         height: auto !important;
         min-height: 100% !important;
+        overscroll-behavior-y: auto !important;
+        -webkit-overflow-scrolling: touch !important;
+      }
+      /* .app NO debe ser un flex container de altura fija en móvil */
+      .app, .app-panel-padre {
+        display: block !important;
+        height: auto !important;
+        min-height: auto !important;
+        overflow: visible !important;
+      }
+      /* El main necesita padding suficiente para no quedar tapado por el sidebar flotante.
+         El sidebar mide ~72px + 16px de margen bottom-4 = ~88px */
+      #layoutShell {
+        padding-bottom: 100px !important;
+        overflow: visible !important;
+        height: auto !important;
       }
     }
 
@@ -1063,11 +1087,6 @@
           </div>
       </div>
       
-      <!-- Botón Scroll Top -->
-      <button type="button" id="scrollTopBtn" class="fixed bottom-24 right-6 md:bottom-8 z-40 p-3 bg-slate-800 text-white rounded-full shadow-xl hover:bg-slate-900 transition-all hidden" aria-label="Volver arriba">
-        <i data-lucide="arrow-up" class="w-5 h-5"></i>
-      </button>
-
     </main>
   </div>
   
