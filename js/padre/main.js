@@ -25,7 +25,38 @@ window.App = {
   attendance: AttendanceModule, chat: ChatModule, profile: ProfileModule,
   grades: GradesModule, navigateTo: navigateTo,
   openDigitalID: openDigitalID,
-  switchStudent: switchStudent
+  switchStudent: switchStudent,
+  sharePadreQR: () => {
+    const student = AppState.get('currentStudent');
+    const container = document.getElementById('padre-qr-container');
+    const canvas = container?.querySelector('canvas');
+    if (!canvas) return;
+    canvas.toBlob(blob => {
+      const file = new File([blob], `qr-${student?.matricula || 'acceso'}.png`, { type: 'image/png' });
+      if (navigator.share && navigator.canShare({ files: [file] })) {
+        navigator.share({ title: 'Código QR de acceso', files: [file] });
+      } else {
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url; a.download = file.name;
+        a.click(); URL.revokeObjectURL(url);
+      }
+    });
+  },
+  printPadreQR: () => {
+    const student = AppState.get('currentStudent');
+    const container = document.getElementById('padre-qr-container');
+    const canvas = container?.querySelector('canvas');
+    if (!canvas || !student) return;
+    const imgData = canvas.toDataURL('image/png');
+    const win = window.open('', '_blank');
+    win.document.write(`<!DOCTYPE html><html><head><title>QR ${student.name}</title>
+    <style>body{display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:100vh;font-family:sans-serif;padding:2rem;}
+    img{width:200px;height:200px;border:2px solid #e2e8f0;border-radius:12px;padding:8px;}
+    h2{margin:1rem 0 .25rem;font-size:1.2rem;color:#1e293b;}p{color:#64748b;font-size:.9rem;}</style></head>
+    <body><img src="${imgData}"><h2>${student.name}</h2><p>Matrícula: ${student.matricula}</p><script>window.onload=()=>window.print();<\/script></body></html>`);
+    win.document.close();
+  }
 };
 window.BadgeSystem = BadgeSystem;
 
@@ -137,9 +168,6 @@ document.addEventListener('DOMContentLoaded', async () => {
     // 🎓 Guía de bienvenida para nuevos padres
     const parentName = auth.profile?.name?.split(' ')[0] || 'Bienvenido';
     
-    // ✨ Añadir Botón Flotante de QR (Carnet Digital)
-    _injectFloatingQRButton();
-
     OnboardingGuide.init({
       userName:   parentName,
       storageKey: 'padre_v2',
@@ -625,20 +653,6 @@ function initMessageBadgeRealtime() {
       table: 'messages'
     }, () => { loadUnreadBadge(); })
     .subscribe();
-}
-
-/**
- * ✨ Botón Flotante de QR (Carnet Digital)
- */
-function _injectFloatingQRButton() {
-  if (document.getElementById('floatingQRBtn')) return;
-  const btn = document.createElement('button');
-  btn.id = 'floatingQRBtn';
-  btn.className = 'fixed bottom-24 right-6 w-14 h-14 bg-indigo-600 text-white rounded-2xl shadow-2xl flex items-center justify-center z-[90] active:scale-90 transition-all animate-bounce-subtle';
-  btn.innerHTML = '<i data-lucide="qr-code" class="w-7 h-7"></i>';
-  btn.onclick = () => openDigitalID();
-  document.body.appendChild(btn);
-  if (window.lucide) lucide.createIcons();
 }
 
 /**

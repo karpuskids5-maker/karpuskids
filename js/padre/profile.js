@@ -22,58 +22,66 @@ export const ProfileModule = {
 
     // Estudiante
     set('inputStudentName', student.name);
-    // Fecha de cumpleaños — usar birth_date si existe, sino start_date
-    const birthDate = student.birth_date || student.start_date;
-    set('inputStudentBirth', birthDate ? birthDate.split('T')[0] : '');
     set('inputStudentBlood', student.blood_type);
     set('inputStudentAllergy', student.allergies);
     set('profilePickupName', student.authorized_pickup);
 
-    // Padre/Madre/Tutores (Mapeo de las columnas de students)
+    // Padre/Tutor 1
     set('profileFatherName', student.p1_name);
     set('profileFatherPhone', student.p1_phone);
-    set('profileFatherEmail', student.p1_email);
+    // Email es readonly en el HTML — solo poblamos, no incluimos en save
+    set('profileFatherEmail', student.p1_email || profile.email || '');
 
+    // Padre/Tutor 2
     set('profileMotherName', student.p2_name);
     set('profileMotherPhone', student.p2_phone);
-    set('profileMotherEmail', student.p2_email);
-
-    // Si existen más campos en el perfil del usuario (auth)
-    // set('profileName', profile.name);
+    set('profileMotherEmail', student.p2_email || '');
 
     // Configurar subida de foto
     this.setupPhotoUpload();
 
-    // Configurar guardado
+    // Configurar guardado — siempre reasignar para evitar handlers perdidos
     const btnSave = document.getElementById('btnSaveChanges');
-    if (btnSave && !btnSave._initialized) {
+    if (btnSave) {
+      // Remover handler anterior antes de asignar uno nuevo
+      btnSave.onclick = null;
       btnSave.onclick = () => this.save();
-      btnSave._initialized = true;
     }
 
-    // Generar QR para el padre (Carnet Digital)
-    this.renderStudentQR();
+    // Generar QR del estudiante en el perfil
+    await this._initQR(student);
   },
 
   /**
-   * Genera el QR del estudiante en el perfil del padre
+   * Genera el QR del estudiante en el perfil
    */
-  renderStudentQR() {
-    const student = AppState.get('currentStudent');
-    const container = document.getElementById('parentStudentQR'); // Asegúrate que este ID exista en el HTML
-    if (!container || !student?.matricula) return;
+  async _initQR(student) {
+    if (!student?.matricula) return;
 
-    // Limpiar previo
+    // El HTML tiene #padre-qr-container y etiquetas #padre-qr-matricula / #padre-qr-name
+    const container = document.getElementById('padre-qr-container');
+    const matriculaEl = document.getElementById('padre-qr-matricula');
+    const nameEl = document.getElementById('padre-qr-name');
+
+    if (matriculaEl) matriculaEl.textContent = student.matricula;
+    if (nameEl) nameEl.textContent = student.name || '--';
+
+    if (!container) return;
     container.innerHTML = '';
 
-    // Cargar librería si no está (fallback)
+    const generate = () => {
+      if (window.QRCode) {
+        this._generateQR(container, student);
+      }
+    };
+
     if (!window.QRCode) {
       const s = document.createElement('script');
       s.src = 'js/shared/qrcode.min.js';
-      s.onload = () => this._generateQR(container, student);
+      s.onload = generate;
       document.head.appendChild(s);
     } else {
-      this._generateQR(container, student);
+      generate();
     }
   },
 
@@ -86,25 +94,6 @@ export const ProfileModule = {
       colorLight: "#ffffff",
       correctLevel: QRCode.CorrectLevel.H
     });
-
-    // Añadir botón de imprimir si no existe
-    const btnPrint = document.getElementById('btnPrintStudentQR');
-    if (btnPrint && !btnPrint._initialized) {
-      btnPrint.onclick = () => {
-        const canvas = container.querySelector('canvas');
-        if (!canvas) return;
-        const imgData = canvas.toDataURL("image/png");
-        const win = window.open('', '_blank');
-        import('./helpers.js').then(({ Helpers }) => {
-          // Reutilizar la plantilla corporativa centralizada
-          import('../shared/helpers.js').then(({ Helpers: SharedHelpers }) => {
-             win.document.write(SharedHelpers.getQRPrintTemplate(imgData, student.name, student.matricula));
-             win.document.close();
-          });
-        });
-      };
-      btnPrint._initialized = true;
-    }
   },
 
   /**
@@ -114,38 +103,62 @@ export const ProfileModule = {
     const student = AppState.get('currentStudent');
     if (!student) return;
 
-    const get = (id) => document.getElementById(id)?.value.trim();
-
-    const updates = {
-      name: get('inputStudentName'),
-      blood_type: get('inputStudentBlood'),
-      allergies: get('inputStudentAllergy'),
-      authorized_pickup: get('profilePickupName'),
-      p1_name: get('profileFatherName'),
-      p1_phone: get('profileFatherPhone'),
-      p1_email: get('profileFatherEmail'),
-      p2_name: get('profileMotherName'),
-      p2_phone: get('profileMotherPhone'),
-      p2_email: get('profileMotherEmail')
+    const get = (id) => {
+      const el = document.getElementById(id);
+      return el ? el.value.trim() : undefined;
     };
 
-    if (!updates.name) return Helpers.toast('El nombre del estudiante es obligatorio', 'warning');
+    const name = get('inputStudentName');
+    if (!name) return Helpers.toast('El nombre del estudiante es obligatorio', 'warning');
+
+    // Solo incluir campos que tengan valor o que el padre haya borrado explícitamente
+    // Los emails son readonly — no se actualizan
+    const updates = {
+      name,
+      blood_type:        get('inputStudentBlood')   ?? student.blood_type,
+      allergies:         get('inputStudentAllergy')  ?? student.allergies,
+      authorized_pickup: get('profilePickupName')    ?? student.authorized_pickup,
+      p1_name:           get('profileFatherName')    ?? student.p1_name,
+      p1_phone:          get('profileFatherPhone')   ?? student.p1_phone,
+      p2_name:           get('profileMotherName')    ?? student.p2_name,
+      p2_phone:          get('profileMotherPhone')   ?? student.p2_phone,
+    };
+
+    // Botón: estado de carga
+    const btn = document.getElementById('btnSaveChanges');
+    const original = btn?.innerHTML;
+    if (btn) {
+      btn.disabled = true;
+      btn.innerHTML = '<i data-lucide="loader" class="w-5 h-5 animate-spin"></i> Guardando...';
+      if (window.lucide) lucide.createIcons();
+    }
 
     try {
-      AppState.set('loading', true);
       const { error } = await supabase
         .from(TABLES.STUDENTS)
         .update(updates)
         .eq('id', student.id);
 
-      if (error) throw error;
+      if (error) {
+        // RLS o permiso denegado
+        if (error.code === '42501' || error.message?.includes('permission') || error.message?.includes('policy')) {
+          Helpers.toast('Sin permiso para editar. Contacta a la escuela.', 'error');
+        } else {
+          Helpers.toast(`Error: ${error.message}`, 'error');
+        }
+        return;
+      }
 
       AppState.set('currentStudent', { ...student, ...updates });
-      Helpers.toast('Perfil actualizado correctamente');
+      Helpers.toast('Perfil actualizado correctamente ✅', 'success');
     } catch (err) {
       Helpers.toast('Error al guardar cambios', 'error');
     } finally {
-      AppState.set('loading', false);
+      if (btn) {
+        btn.disabled = false;
+        btn.innerHTML = original;
+        if (window.lucide) lucide.createIcons();
+      }
     }
   },
 
