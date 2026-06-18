@@ -1,0 +1,2 @@
+-- Placeholder for production fixes
+-- This file is required by scripts/pre-deploy-check.cjs
