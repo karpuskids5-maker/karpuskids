@@ -22,7 +22,7 @@
     "name": "Karpus Kids",
     "description": "Estancia infantil segura y amorosa en San Cristóbal. Cuidado experto, educación integral y app exclusiva para padres.",
     "url": "https://karpuskids.com",
-    "telephone": "+18298038424",
+    "telephone": "+18298038484",
     "image": "https://karpuskids.com/img/karpus.jpg",
     "address": {
       "@type": "PostalAddress",
@@ -39,7 +39,7 @@
     "priceRange": "$$",
     "openingHours": "Mo-Fr 07:00-18:00",
     "sameAs": [
-      "https://wa.me/18298038424"
+      "https://wa.me/18298038484"
     ]
   }
   </script>
@@ -51,7 +51,13 @@
   <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css" rel="stylesheet">
   <link rel="stylesheet" href="css/karpus-tailwind.css">
   <style>
-    :root{--kk-orange:#FF9800;--kk-blue:#2196F3;--kk-pink:#E91E63;--kk-green:#4CAF50;--kk-purple:#9C27B0;}
+    :root {
+      --naranja: 255, 152, 0;
+      --azul: 33, 150, 243;
+      --rosa: 233, 30, 99;
+      --verde: 76, 175, 80;
+      --purpura: 156, 39, 176;
+    }
     *{box-sizing:border-box;margin:0;padding:0;}
     html,body{overflow-x:hidden;scroll-behavior:smooth;}
     body{font-family:'Nunito',sans-serif;color:#1e293b;background:#fff;}
@@ -60,9 +66,17 @@
     a{text-decoration:none;}
 
     /* ── Brand colors ── */
-    .kk .k1{color:#FF9800}.kk .k2{color:#2196F3}.kk .k3{color:#E91E63}
-    .kk .k4{color:#4CAF50}.kk .k5{color:#FF9800}.kk .k6{color:#2196F3}
-    .kk .k7{color:#4CAF50}.kk .k8{color:#E91E63}.kk .k9{color:#2196F3}.kk .k10{color:#FF9800}
+    .karpus-kids-colored span { transition: all .3s ease; }
+    .karpus-kids-colored .k1 { color: rgb(var(--naranja)); }
+    .karpus-kids-colored .k2 { color: rgb(var(--azul)); }
+    .karpus-kids-colored .k3 { color: rgb(var(--rosa)); }
+    .karpus-kids-colored .k4 { color: rgb(var(--verde)); }
+    .karpus-kids-colored .k5 { color: rgb(var(--naranja)); }
+    .karpus-kids-colored .k6 { color: rgb(var(--azul)); }
+    .karpus-kids-colored .k7 { color: rgb(var(--verde)); }
+    .karpus-kids-colored .k8 { color: rgb(var(--rosa)); }
+    .karpus-kids-colored .k9 { color: rgb(var(--azul)); }
+    .karpus-kids-colored .k10 { color: rgb(var(--naranja)); }
 
     /* ── Nav ── */
     .site-header{position:fixed;top:0;left:0;width:100%;z-index:200;transition:all .35s;}
@@ -135,7 +149,7 @@
     .cta-dark{background:linear-gradient(135deg,#0a0f1e 0%,#1e293b 100%);position:relative;overflow:hidden;}
 
     /* ── FABs ── */
-    .fab{position:fixed;bottom:22px;z-index:9999;width:52px;height:52px;border-radius:50%;display:flex;justify-content:center;align-items:center;color:white;font-size:1.4rem;box-shadow:0 6px 20px rgba(0,0,0,0.28);transition:transform .3s,box-shadow .3s;}
+    .fab{position:fixed;bottom:22px;z-index:40;width:52px;height:52px;border-radius:50%;display:flex;justify-content:center;align-items:center;color:white;font-size:1.4rem;box-shadow:0 6px 20px rgba(0,0,0,0.28);transition:transform .3s,box-shadow .3s;}
     .fab:hover{transform:scale(1.12);box-shadow:0 10px 28px rgba(0,0,0,0.32);}
     .fab-ws{background:linear-gradient(135deg,#25D366,#128C7E);right:84px;}
     .fab-ig{background:linear-gradient(45deg,#f09433,#e6683c,#dc2743,#cc2366,#bc1888);right:18px;}
@@ -144,7 +158,7 @@
     .sec-label{display:inline-block;font-size:11px;font-weight:900;text-transform:uppercase;letter-spacing:.12em;padding:5px 16px;border-radius:50px;margin-bottom:14px;}
 
     /* ── Lightbox ── */
-    #lb{position:fixed;inset:0;background:rgba(0,0,0,0.93);z-index:9999;display:none;align-items:center;justify-content:center;backdrop-filter:blur(10px);}
+    #lb{position:fixed;inset:0;background:rgba(0,0,0,0.93);z-index:100;display:none;align-items:center;justify-content:center;backdrop-filter:blur(10px);}
     #lb.open{display:flex;}
     #lb img{max-width:90vw;max-height:88vh;border-radius:16px;box-shadow:0 40px 80px rgba(0,0,0,0.5);}
     #lb-close{position:absolute;top:20px;right:24px;color:white;background:rgba(255,255,255,0.12);border:none;width:44px;height:44px;border-radius:50%;display:flex;align-items:center;justify-content:center;cursor:pointer;font-size:1.3rem;transition:background .2s;}
@@ -198,7 +212,7 @@
         <div style="width:40px;height:40px;border-radius:12px;overflow:hidden;box-shadow:0 3px 10px rgba(0,0,0,0.18);flex-shrink:0;">
           <img src="img/mundo.jpg" alt="Logo" style="width:100%;height:100%;object-fit:cover;">
         </div>
-        <span class="kk" style="font-size:20px;font-weight:900;line-height:1;">
+        <span class="karpus-kids-colored" style="font-size:20px;font-weight:900;line-height:1;">
           <span class="k1">K</span><span class="k2">a</span><span class="k3">r</span><span class="k4">p</span><span class="k5">u</span><span class="k6">s</span>&#32;<span class="k7">K</span><span class="k8">i</span><span class="k9">d</span><span class="k10">s</span>
         </span>
       </a>
@@ -220,20 +234,23 @@
           <i class="bi bi-person-circle"></i> Acceso
         </a>
         <button id="mobBtn" class="mob-btn"
-          style="display:flex;align-items:center;justify-content:center;width:42px;height:42px;border:none;background:#f1f5f9;border-radius:10px;cursor:pointer;">
+          style="display:flex;align-items:center;justify-content:center;width:42px;height:42px;border:none;background:#f1f5f9;border-radius:10px;cursor:pointer;position:relative;z-index:90;">
           <i class="bi bi-list" id="mobIcon" style="font-size:20px;color:#475569;"></i>
         </button>
       </div>
     </nav>
 
     <!-- Mobile menu -->
-    <div id="mobMenu" style="display:none;background:#fff;border-top:1px solid #f1f5f9;padding:10px 0 14px;border-radius:0 0 16px 16px;box-shadow:0 8px 24px rgba(0,0,0,0.08);">
-      <a href="#nosotros"  style="display:block;padding:12px 16px;font-weight:700;color:#475569;border-radius:10px;">Nosotros</a>
-      <a href="#programas" style="display:block;padding:12px 16px;font-weight:700;color:#475569;border-radius:10px;">Programas</a>
-      <a href="#app"       style="display:block;padding:12px 16px;font-weight:700;color:#475569;border-radius:10px;">App</a>
-      <a href="#galeria"   style="display:block;padding:12px 16px;font-weight:700;color:#475569;border-radius:10px;">Galería</a>
-      <a href="#contacto"  style="display:block;padding:12px 16px;font-weight:700;color:#475569;border-radius:10px;">Contacto</a>
-      <a href="login.html" style="display:block;margin:8px 16px 0;padding:12px;text-align:center;background:linear-gradient(135deg,#FF9800,#E91E63);color:white;font-weight:900;border-radius:14px;">Acceso Padres</a>
+    <div id="mobMenuOverlay" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.5);z-index:70;backdrop-filter:blur(4px);"></div>
+    <div id="mobMenu" style="display:none;position:fixed;top:0;right:0;width:280px;height:100%;background:rgba(255,255,255,0.95);z-index:80;padding:80px 20px 20px;box-shadow:-4px 0 24px rgba(0,0,0,0.1);backdrop-filter:blur(10px);overflow-y:auto;">
+      <a href="#nosotros"  style="display:block;padding:14px 16px;font-weight:700;color:#475569;border-radius:12px;margin-bottom:4px;transition:background .2s;">Nosotros</a>
+      <a href="#programas" style="display:block;padding:14px 16px;font-weight:700;color:#475569;border-radius:12px;margin-bottom:4px;transition:background .2s;">Programas</a>
+      <a href="#app"       style="display:block;padding:14px 16px;font-weight:700;color:#475569;border-radius:12px;margin-bottom:4px;transition:background .2s;">App</a>
+      <a href="#galeria"   style="display:block;padding:14px 16px;font-weight:700;color:#475569;border-radius:12px;margin-bottom:4px;transition:background .2s;">Galería</a>
+      <a href="#contacto"  style="display:block;padding:14px 16px;font-weight:700;color:#475569;border-radius:12px;margin-bottom:4px;transition:background .2s;">Contacto</a>
+      <div style="margin-top:20px;padding-top:20px;border-top:1px solid #f1f5f9;">
+        <a href="login.html" style="display:block;padding:14px;text-align:center;background:linear-gradient(135deg,#FF9800,#E91E63);color:white;font-weight:900;border-radius:14px;box-shadow:0 4px 12px rgba(255,152,0,0.3);">Acceso Padres</a>
+      </div>
     </div>
   </div>
 </header>
@@ -244,7 +261,7 @@
 <section class="hero" id="inicio">
   <!-- Video background (muted, autoplay) -->
   <video class="hero-video" autoplay muted loop playsinline poster="img/karpus.jpg">
-    <source src="/img/mundo.jpg" type="video/mp4">
+    <source src="img/14.mp4" type="video/mp4">
   </video>
   <div class="hero-overlay"></div>
 
@@ -272,7 +289,7 @@
 
       <!-- CTAs -->
       <div class="fade-up-4" style="display:flex;flex-wrap:wrap;gap:14px;margin-bottom:52px;">
-        <a href="https://wa.me/18298038424?text=¡Hola!%20Quiero%20información%20sobre%20Karpus%20Kids" target="_blank"
+        <a href="https://wa.me/18298038484?text=¡Hola!%20Quiero%20información%20sobre%20Karpus%20Kids" target="_blank"
           style="display:inline-flex;align-items:center;gap:8px;background:linear-gradient(135deg,#25D366,#128C7E);color:white;font-weight:900;font-size:14px;padding:15px 30px;border-radius:14px;box-shadow:0 8px 24px rgba(37,211,102,.4);transition:transform .2s,box-shadow .2s;"
           onmouseover="this.style.transform='translateY(-3px)';this.style.boxShadow='0 14px 32px rgba(37,211,102,.5)'"
           onmouseout="this.style.transform='';this.style.boxShadow='0 8px 24px rgba(37,211,102,.4)'">
@@ -318,7 +335,7 @@
 <!-- ── ALERT BANNER ── -->
 <div style="background:linear-gradient(90deg,#E91E63,#FF9800,#E91E63);background-size:200% 100%;animation:shimmer 4s linear infinite;color:white;text-align:center;padding:13px 20px;font-weight:800;font-size:13px;letter-spacing:.03em;">
   🔥 ¡Cupos limitados para este mes! &nbsp;·&nbsp;
-  <a href="https://wa.me/18298038424" target="_blank" style="color:white;text-decoration:underline;font-weight:900;">Reserva el tuyo ahora →</a>
+  <a href="https://wa.me/18298038484" target="_blank" style="color:white;text-decoration:underline;font-weight:900;">Reserva el tuyo ahora →</a>
 </div>
 
 <!-- ════════════════════════════════════════════════════════════
@@ -375,7 +392,7 @@
         <h2 style="font-size:clamp(1.9rem,3.5vw,2.8rem);font-weight:900;color:#1e293b;margin:0 0 8px;">Programas para cada edad</h2>
         <p style="color:#64748b;font-size:15px;">Cuidado, estimulacion  y educación integral para el nivel inicial.</p>
       </div>
-      <a href="https://wa.me/18298038424" target="_blank"
+      <a href="https://wa.me/18298038484" target="_blank"
         style="display:inline-flex;align-items:center;gap:6px;background:linear-gradient(135deg,#E91E63,#FF9800);color:white;font-weight:900;font-size:13px;padding:12px 24px;border-radius:50px;box-shadow:0 4px 16px rgba(233,30,99,.3);transition:transform .2s;"
         onmouseover="this.style.transform='translateY(-2px)'" onmouseout="this.style.transform=''">
         <i class="bi bi-whatsapp"></i> Más información
@@ -578,7 +595,7 @@
     <div class="pt-cta">
       <div class="pt-cta-title">¡Separa tu cupo hoy!</div>
       <p class="pt-cta-sub">¿Cualquier duda? ¡Coméntanos! Estamos listos para ayudarte.</p>
-      <a href="https://wa.me/18298038424?text=%C2%A1Hola!%20Quiero%20informaci%C3%B3n%20sobre%20precios%20e%20inscripci%C3%B3n" target="_blank" class="pt-cta-btn">
+      <a href="https://wa.me/18298038484?text=%C2%A1Hola!%20Quiero%20informaci%C3%B3n%20sobre%20precios%20e%20inscripci%C3%B3n" target="_blank" class="pt-cta-btn">
         <i class="bi bi-whatsapp" style="font-size:20px;color:#25D366;"></i> Consultar por WhatsApp
       </a>
     </div>
@@ -666,7 +683,7 @@
       </div>
     </div>
     <div style="text-align:center;margin-top:44px;">
-      <a href="https://wa.me/18298038424?text=¡Hola!%20Quiero%20inscribir%20a%20mi%20hijo%20en%20Karpus%20Kids" target="_blank"
+      <a href="https://wa.me/18298038484?text=¡Hola!%20Quiero%20inscribir%20a%20mi%20hijo%20en%20Karpus%20Kids" target="_blank"
         style="display:inline-flex;align-items:center;gap:8px;background:linear-gradient(135deg,#25D366,#128C7E);color:white;font-weight:900;font-size:14px;padding:15px 32px;border-radius:14px;box-shadow:0 8px 24px rgba(37,211,102,.4);transition:transform .2s;"
         onmouseover="this.style.transform='translateY(-2px)'" onmouseout="this.style.transform=''">
         <i class="bi bi-whatsapp" style="font-size:18px;"></i> Iniciar inscripción ahora
@@ -684,7 +701,7 @@
     <!-- Image block -->
     <div style="position:relative;" class="obs-fade">
       <div style="border-radius:28px;overflow:hidden;box-shadow:0 24px 64px rgba(0,0,0,.14);aspect-ratio:4/3;">
-        <img src="/img/1.jpg" alt="Karpus Kids instalaciones" loading="lazy" style="width:100%;height:100%;object-fit:cover;">
+        <img src="img/1.jpg" alt="Karpus Kids instalaciones" loading="lazy" style="width:100%;height:100%;object-fit:cover;">
       </div>
       <!-- Floating badge -->
       <div style="position:absolute;bottom:-20px;right:-16px;background:#fff;border-radius:20px;padding:16px 20px;box-shadow:0 12px 32px rgba(0,0,0,.12);border:2px solid #f1f5f9;min-width:155px;">
@@ -695,7 +712,7 @@
       <div style="position:absolute;top:-16px;left:-16px;width:64px;height:64px;border-radius:50%;border:4px dashed #FF9800;opacity:.35;"></div>
       <!-- Second image overlay -->
       <div style="position:absolute;bottom:24px;left:-24px;width:130px;height:130px;border-radius:18px;overflow:hidden;border:4px solid white;box-shadow:0 8px 24px rgba(0,0,0,.15);" class="hide-mobile">
-        <img src="/img/karpus.jpg" alt="Karpus Kids" loading="lazy" style="width:100%;height:100%;object-fit:cover;">
+        <img src="img/karpus.jpg" alt="Karpus Kids" loading="lazy" style="width:100%;height:100%;object-fit:cover;">
       </div>
     </div>
 
@@ -704,7 +721,7 @@
       <span class="sec-label" style="background:#fff7ed;color:#FF9800;">Nuestra historia</span>
       <h2 style="font-size:clamp(1.9rem,3.5vw,2.8rem);font-weight:900;color:#1e293b;margin-bottom:18px;">Confianza familiar por más de 5 años</h2>
       <p style="color:#64748b;font-size:15px;line-height:1.78;margin-bottom:16px;">
-        Desde nuestra fundación, <strong class="kk"><span class="k1">K</span><span class="k2">a</span><span class="k3">r</span><span class="k4">p</span><span class="k5">u</span><span class="k6">s</span> <span class="k7">K</span><span class="k8">i</span><span class="k9">d</span><span class="k10">s</span></strong> ha sido un socio de confianza para las familias de San Cristobal. Nuestra fundadora, Karonlyn García, creó este espacio con una misión clara: cuidado y educación de alta calidad para cada niño, cada familia, cada día.
+        Desde nuestra fundación, <strong class="karpus-kids-colored"><span class="k1">K</span><span class="k2">a</span><span class="k3">r</span><span class="k4">p</span><span class="k5">u</span><span class="k6">s</span> <span class="k7">K</span><span class="k8">i</span><span class="k9">d</span><span class="k10">s</span></strong> ha sido un socio de confianza para las familias de San Cristóbal. Nuestra fundadora, Karonlyn García, creó este espacio con una misión clara: cuidado y educación de alta calidad para cada niño, cada familia, cada día.
       </p>
       <p style="color:#64748b;font-size:15px;line-height:1.78;margin-bottom:28px;">
         Contamos con personal certificado, instalaciones modernas y una app exclusiva que mantiene a los padres conectados en todo momento.
@@ -726,7 +743,7 @@
         </div>
       </div>
 
-      <a href="https://wa.me/18298038424?text=¡Hola!%20Quiero%20agendar%20una%20visita%20a%20Karpus%20Kids" target="_blank"
+      <a href="https://wa.me/18298038484?text=¡Hola!%20Quiero%20agendar%20una%20visita%20a%20Karpus%20Kids" target="_blank"
         style="display:inline-flex;align-items:center;gap:8px;background:linear-gradient(135deg,#25D366,#128C7E);color:white;font-weight:900;font-size:14px;padding:14px 28px;border-radius:14px;box-shadow:0 6px 20px rgba(37,211,102,.35);transition:transform .2s;"
         onmouseover="this.style.transform='translateY(-2px)'" onmouseout="this.style.transform=''">
         <i class="bi bi-whatsapp" style="font-size:18px;"></i> Agendar una visita
@@ -1001,7 +1018,7 @@
       </div>
       <h3 style="font-size:1.6rem;font-weight:900;color:#fff;margin-bottom:12px;">Agenda una Visita</h3>
       <p style="color:rgba(255,255,255,.58);font-size:14px;line-height:1.72;margin-bottom:26px;">¿Listo para conocernos? Nuestro equipo está disponible para mostrarte las instalaciones y responder todas tus preguntas.</p>
-      <a href="https://wa.me/18298038424?text=¡Hola!%20Quiero%20agendar%20una%20visita%20a%20Karpus%20Kids" target="_blank"
+      <a href="https://wa.me/18298038484?text=¡Hola!%20Quiero%20agendar%20una%20visita%20a%20Karpus%20Kids" target="_blank"
         style="display:inline-flex;align-items:center;gap:8px;background:linear-gradient(135deg,#25D366,#128C7E);color:white;font-weight:900;font-size:13px;padding:13px 26px;border-radius:12px;box-shadow:0 6px 20px rgba(37,211,102,.4);transition:transform .2s;"
         onmouseover="this.style.transform='translateY(-2px)'" onmouseout="this.style.transform=''">
         <i class="bi bi-whatsapp"></i> Agendar por WhatsApp
@@ -1025,13 +1042,13 @@
           <div style="width:40px;height:40px;border-radius:12px;overflow:hidden;flex-shrink:0;">
             <img src="img/mundo.jpg" alt="Karpus Kids" style="width:100%;height:100%;object-fit:cover;">
           </div>
-          <span class="kk" style="font-size:20px;font-weight:900;line-height:1;">
+          <span class="karpus-kids-colored" style="font-size:20px;font-weight:900;line-height:1;">
             <span class="k1">K</span><span class="k2">a</span><span class="k3">r</span><span class="k4">p</span><span class="k5">u</span><span class="k6">s</span>&#32;<span class="k7">K</span><span class="k8">i</span><span class="k9">d</span><span class="k10">s</span>
           </span>
         </div>
         <p style="font-size:14px;line-height:1.72;color:rgba(255,255,255,.45);max-width:300px;margin-bottom:20px;">Estancia infantil de confianza en San Cristóbal. Cuidado experto, educación integral y tecnología para las familias modernas.</p>
         <div style="display:flex;gap:10px;">
-          <a href="https://wa.me/18298038424" target="_blank" style="width:38px;height:38px;background:rgba(255,255,255,.08);border-radius:10px;display:flex;align-items:center;justify-content:center;color:rgba(255,255,255,.65);font-size:16px;transition:background .2s,color .2s;" onmouseover="this.style.background='#25D366';this.style.color='white'" onmouseout="this.style.background='rgba(255,255,255,.08)';this.style.color='rgba(255,255,255,.65)'"><i class="bi bi-whatsapp"></i></a>
+          <a href="https://wa.me/18298038484" target="_blank" style="width:38px;height:38px;background:rgba(255,255,255,.08);border-radius:10px;display:flex;align-items:center;justify-content:center;color:rgba(255,255,255,.65);font-size:16px;transition:background .2s,color .2s;" onmouseover="this.style.background='#25D366';this.style.color='white'" onmouseout="this.style.background='rgba(255,255,255,.08)';this.style.color='rgba(255,255,255,.65)'"><i class="bi bi-whatsapp"></i></a>
           <a href="https://instagram.com" target="_blank" style="width:38px;height:38px;background:rgba(255,255,255,.08);border-radius:10px;display:flex;align-items:center;justify-content:center;color:rgba(255,255,255,.65);font-size:16px;transition:background .2s,color .2s;" onmouseover="this.style.background='#E91E63';this.style.color='white'" onmouseout="this.style.background='rgba(255,255,255,.08)';this.style.color='rgba(255,255,255,.65)'"><i class="bi bi-instagram"></i></a>
           <a href="https://facebook.com" target="_blank" style="width:38px;height:38px;background:rgba(255,255,255,.08);border-radius:10px;display:flex;align-items:center;justify-content:center;color:rgba(255,255,255,.65);font-size:16px;transition:background .2s,color .2s;" onmouseover="this.style.background='#2196F3';this.style.color='white'" onmouseout="this.style.background='rgba(255,255,255,.08)';this.style.color='rgba(255,255,255,.65)'"><i class="bi bi-facebook"></i></a>
         </div>
@@ -1057,9 +1074,9 @@
         <div>
           <h4 style="font-size:12px;font-weight:900;color:white;text-transform:uppercase;letter-spacing:.1em;margin-bottom:16px;">Contacto</h4>
           <div style="display:flex;flex-direction:column;gap:14px;">
-            <a href="https://wa.me/18298038424" target="_blank" style="display:flex;align-items:center;gap:10px;color:rgba(255,255,255,.45);font-size:14px;transition:color .2s;" onmouseover="this.style.color='#25D366'" onmouseout="this.style.color='rgba(255,255,255,.45)'">
+            <a href="https://wa.me/18298038484" target="_blank" style="display:flex;align-items:center;gap:10px;color:rgba(255,255,255,.45);font-size:14px;transition:color .2s;" onmouseover="this.style.color='#25D366'" onmouseout="this.style.color='rgba(255,255,255,.45)'">
               <i class="bi bi-whatsapp" style="font-size:16px;flex-shrink:0;"></i>
-              <span>+1 (829) 803-8424</span>
+              <span>+1 (829) 803-8484</span>
             </a>
             <div style="display:flex;align-items:flex-start;gap:10px;color:rgba(255,255,255,.45);font-size:14px;">
               <i class="bi bi-geo-alt-fill" style="font-size:16px;flex-shrink:0;margin-top:2px;"></i>
@@ -1096,7 +1113,7 @@
 
 
 <!-- ── FABs ── -->
-<a href="https://wa.me/18298038424" target="_blank" class="fab fab-ws" title="WhatsApp"><i class="bi bi-whatsapp"></i></a>
+<a href="https://wa.me/18298038484" target="_blank" class="fab fab-ws" title="WhatsApp"><i class="bi bi-whatsapp"></i></a>
 <a href="https://instagram.com"     target="_blank" class="fab fab-ig" title="Instagram"><i class="bi bi-instagram"></i></a>
 
 <!-- ── LIGHTBOX ── -->
@@ -1111,18 +1128,22 @@
   window.addEventListener('scroll', () => hdr.classList.toggle('scrolled', scrollY > 40), { passive: true });
 
   // ── Mobile menu ───────────────────────────────────────────────────────────
-  const mobBtn  = document.getElementById('mobBtn');
-  const mobMenu = document.getElementById('mobMenu');
-  const mobIcon = document.getElementById('mobIcon');
-  mobBtn.addEventListener('click', () => {
+  const mobBtn     = document.getElementById('mobBtn');
+  const mobMenu    = document.getElementById('mobMenu');
+  const mobOverlay = document.getElementById('mobMenuOverlay');
+  const mobIcon    = document.getElementById('mobIcon');
+
+  function toggleMenu() {
     const open = mobMenu.style.display === 'block';
     mobMenu.style.display = open ? 'none' : 'block';
+    mobOverlay.style.display = open ? 'none' : 'block';
     mobIcon.className = open ? 'bi bi-list' : 'bi bi-x-lg';
-  });
-  mobMenu.querySelectorAll('a').forEach(a => a.addEventListener('click', () => {
-    mobMenu.style.display = 'none';
-    mobIcon.className = 'bi bi-list';
-  }));
+    document.body.style.overflow = open ? '' : 'hidden';
+  }
+
+  mobBtn.addEventListener('click', toggleMenu);
+  mobOverlay.addEventListener('click', toggleMenu);
+  mobMenu.querySelectorAll('a').forEach(a => a.addEventListener('click', toggleMenu));
 
   // ── Lightbox ──────────────────────────────────────────────────────────────
   function openLb(src) {
