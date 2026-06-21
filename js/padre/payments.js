@@ -75,12 +75,8 @@ export const PaymentsModule = {
     const container = document.getElementById('paymentsHistory');
     if (!container) return;
 
-    // ✅ REGLA: No mostrar historial hasta el día 25 de cada mes
     const today = new Date();
-    if (today.getDate() < 25) {
-      container.innerHTML = Helpers.emptyState('El historial de pagos y facturación estará disponible a partir del día 25 del mes.', 'lock');
-      return;
-    }
+    const isDay25OrLater = today.getDate() >= 25;
 
     container.innerHTML = Helpers.skeleton(3, 'h-24');
     try {
@@ -122,7 +118,15 @@ export const PaymentsModule = {
           if (new Date(p.created_at) > new Date(ex.created_at)) monthMap.set(key, p);
         }
       }
-      this._payments = Array.from(monthMap.values())
+      
+      // Filter: always show paid, only show pending/overdue if day >= 25
+      let allPayments = Array.from(monthMap.values());
+      let filteredPayments = allPayments.filter(p => {
+        const isPaid = ['paid'].includes((p.status||'').toLowerCase());
+        return isPaid || isDay25OrLater;
+      });
+      
+      this._payments = filteredPayments
         .sort((a, b) => {
           // Sort: pending/overdue first (by due_date asc), then paid (by paid_date desc)
           const aIsPaid = ['paid'].includes((a.status||'').toLowerCase());
@@ -134,14 +138,19 @@ export const PaymentsModule = {
         });
 
       if (!this._payments.length) {
-        container.innerHTML = Helpers.emptyState('No hay registros de pagos', 'credit-card');
+        if (isDay25OrLater) {
+          container.innerHTML = Helpers.emptyState('No hay registros de pagos', 'credit-card');
+        } else {
+          // If no paid payments and not day25+
+          container.innerHTML = Helpers.emptyState('No hay pagos registrados aún. Los pagos pendientes se mostrarán a partir del día 25 del mes.', 'lock');
+        }
         return;
       }
-      this._renderAlertBanner(this._payments);
+      this._renderAlertBanner(allPayments);
       container.innerHTML = this._payments.map(p => this._renderCard(p)).join('');
 
-      // Update header stats
-      const paidTotal = this._payments
+      // Update header stats (always calculate from all payments)
+      const paidTotal = allPayments
         .filter(p => ['paid'].includes((p.status||'').toLowerCase()))
         .reduce((s, p) => s + Number(p.amount || 0), 0);
       const el = document.getElementById('paymentsBalance');
@@ -157,11 +166,8 @@ export const PaymentsModule = {
     const banner = document.getElementById('paymentAlertBanner');
     if (!banner) return;
 
-    // ✅ REGLA: No mostrar avisos de pago hasta el día 25 de cada mes
-    if (new Date().getDate() < 25) {
-      banner.classList.add('hidden');
-      return;
-    }
+    const today = new Date();
+    const isDay25OrLater = today.getDate() >= 25;
     
     const pending = payments.filter(p => !['paid'].includes((p.status||'').toLowerCase()));
     const totalDebt = pending.reduce((sum, p) => sum + Number(p.amount || 0), 0);
@@ -171,8 +177,8 @@ export const PaymentsModule = {
       .filter(p => p.days !== null)
       .sort((a, b) => a.days - b.days)[0];
 
-    if (!urgent && totalDebt <= 0) {
-      // ✅ Mostrar estado al día si no hay pendientes
+    if ((!urgent || !isDay25OrLater) && totalDebt <= 0) {
+      // ✅ Mostrar estado al día si no hay pendientes (even before day 25)
       banner.classList.remove('hidden');
       banner.innerHTML = `
         <div class="bg-gradient-to-r from-emerald-500 to-teal-600 rounded-3xl p-5 shadow-lg">
@@ -188,6 +194,12 @@ export const PaymentsModule = {
           </div>
         </div>`;
       if (window.lucide) lucide.createIcons();
+      return;
+    }
+    
+    // If before day25, hide the alert for pending payments
+    if (!isDay25OrLater) {
+      banner.classList.add('hidden');
       return;
     }
 
