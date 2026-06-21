@@ -25,6 +25,7 @@ export const ProfileModule = {
     set('inputStudentBlood', student.blood_type);
     set('inputStudentAllergy', student.allergies);
     set('profilePickupName', student.authorized_pickup);
+    set('profilePickupPhone', student.authorized_pickup_phone);
 
     // Padre/Tutor 1
     set('profileFatherName', student.p1_name);
@@ -36,6 +37,17 @@ export const ProfileModule = {
     set('profileMotherName', student.p2_name);
     set('profileMotherPhone', student.p2_phone);
     set('profileMotherEmail', student.p2_email || '');
+
+    // Initialize profileAvatarDisplay
+    const profileAvatarDisplay = document.getElementById('profileAvatarDisplay');
+    if (profileAvatarDisplay) {
+      if (student.avatar_url) {
+        profileAvatarDisplay.innerHTML = `<img src="${student.avatar_url}" class="w-full h-full object-cover">`;
+      } else {
+        const studentName = student.name || 'Estudiante';
+        profileAvatarDisplay.innerHTML = `<span class="text-4xl font-black text-emerald-700">${studentName.charAt(0)}</span>`;
+      }
+    }
 
     // Configurar subida de foto
     this.setupPhotoUpload();
@@ -115,13 +127,14 @@ export const ProfileModule = {
     // Los emails son readonly — no se actualizan
     const updates = {
       name,
-      blood_type:        get('inputStudentBlood')   ?? student.blood_type,
-      allergies:         get('inputStudentAllergy')  ?? student.allergies,
-      authorized_pickup: get('profilePickupName')    ?? student.authorized_pickup,
-      p1_name:           get('profileFatherName')    ?? student.p1_name,
-      p1_phone:          get('profileFatherPhone')   ?? student.p1_phone,
-      p2_name:           get('profileMotherName')    ?? student.p2_name,
-      p2_phone:          get('profileMotherPhone')   ?? student.p2_phone,
+      blood_type:             get('inputStudentBlood')   ?? student.blood_type,
+      allergies:              get('inputStudentAllergy')  ?? student.allergies,
+      authorized_pickup:      get('profilePickupName')    ?? student.authorized_pickup,
+      authorized_pickup_phone: get('profilePickupPhone') ?? student.authorized_pickup_phone,
+      p1_name:              get('profileFatherName')    ?? student.p1_name,
+      p1_phone:             get('profileFatherPhone')   ?? student.p1_phone,
+      p2_name:              get('profileMotherName')    ?? student.p2_name,
+      p2_phone:             get('profileMotherPhone')   ?? student.p2_phone,
     };
 
     // Botón: estado de carga
@@ -176,6 +189,13 @@ export const ProfileModule = {
       if (file.size > 2 * 1024 * 1024) return Helpers.toast('Máximo 2MB permitido', 'error');
       if (!file.type.startsWith('image/')) return Helpers.toast('Formato de imagen no válido', 'error');
 
+      // Preview inmediato
+      const objectUrl = URL.createObjectURL(file);
+      const profileAvatarDisplay = document.getElementById('profileAvatarDisplay');
+      if (profileAvatarDisplay) {
+        profileAvatarDisplay.innerHTML = `<img src="${objectUrl}" class="w-full h-full object-cover">`;
+      }
+
       try {
         AppState.set('loading', true);
         const student = AppState.get('currentStudent');
@@ -191,9 +211,25 @@ export const ProfileModule = {
 
         const updated = { ...student, avatar_url: publicUrl };
         AppState.set('currentStudent', updated);
+        
+        // Update all avatar elements
+        const allStudents = AppState.get('students') || [updated];
+        const profile = AppState.get('profile');
+        if (window.App && window.App.updateHeaderProfile) {
+          window.App.updateHeaderProfile(profile, updated, allStudents);
+        }
+        
+        // Update profileAvatarDisplay with real URL (cache bust)
+        const bustedUrl = publicUrl + '?t=' + Date.now();
+        if (profileAvatarDisplay) {
+          profileAvatarDisplay.innerHTML = `<img src="${bustedUrl}" class="w-full h-full object-cover">`;
+        }
+        
+        URL.revokeObjectURL(objectUrl);
+        
         Helpers.toast('Foto actualizada correctamente');
       } catch (err) {
-        Helpers.toast('Error al subir foto', 'error');
+        Helpers.toast('Error al subir foto: ' + (err.message || err), 'error');
       } finally {
         AppState.set('loading', false);
       }

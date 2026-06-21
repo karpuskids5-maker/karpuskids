@@ -26,6 +26,7 @@ window.App = {
   grades: GradesModule, navigateTo: navigateTo,
   openDigitalID: openDigitalID,
   switchStudent: switchStudent,
+  updateHeaderProfile: updateHeaderProfile,
   sharePadreQR: () => {
     const student = AppState.get('currentStudent');
     const container = document.getElementById('padre-qr-container');
@@ -51,10 +52,10 @@ window.App = {
     const imgData = canvas.toDataURL('image/png');
     const win = window.open('', '_blank');
     win.document.write(`<!DOCTYPE html><html><head><title>QR ${student.name}</title>
-    <style>body{display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:100vh;font-family:sans-serif;padding:2rem;}
-    img{width:200px;height:200px;border:2px solid #e2e8f0;border-radius:12px;padding:8px;}
-    h2{margin:1rem 0 .25rem;font-size:1.2rem;color:#1e293b;}p{color:#64748b;font-size:.9rem;}</style></head>
-    <body><img src="${imgData}"><h2>${student.name}</h2><p>Matrícula: ${student.matricula}</p><script>window.onload=()=>window.print();<\/script></body></html>`);
+      <style>body{display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:100vh;font-family:sans-serif;padding:2rem;}
+      img{width:200px;height:200px;border:2px solid #e2e8f0;border-radius:12px;padding:8px;}
+      h2{margin:1rem 0 .25rem;font-size:1.2rem;color:#1e293b;}p{color:#64748b;font-size:.9rem;}</style></head>
+      <body><img src="${imgData}"><h2>${student.name}</h2><p>Matrícula: ${student.matricula}</p><script>window.onload=()=>window.print();<\/script></body></html>`);
     win.document.close();
   }
 };

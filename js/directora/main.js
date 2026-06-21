@@ -451,19 +451,29 @@ document.addEventListener('DOMContentLoaded', async () => {
       }
     });
 
-    // 7b. Avatar upload � preview inmediato + guardar en Supabase
-    document.getElementById('configAvatarInput')?.addEventListener('change', async (e) => {
+    // Make sidebar avatar clickable
+    const sidebarAvatar = document.getElementById('sidebarAvatar');
+    const configAvatarInput = document.getElementById('configAvatarInput');
+    if (sidebarAvatar && configAvatarInput) {
+      sidebarAvatar.style.cursor = 'pointer';
+      sidebarAvatar.addEventListener('click', () => {
+        configAvatarInput.click();
+      });
+    }
+
+    // 7b. Avatar upload — preview inmediato + guardar en Supabase
+    configAvatarInput?.addEventListener('change', async (e) => {
       const file = e.target.files?.[0];
       if (!file) return;
       if (file.size > 2 * 1024 * 1024) {
-        Helpers.toast('Imagen muy grande (m�x 2MB)', 'error');
+        Helpers.toast('Imagen muy grande (máx 2MB)', 'error');
         return;
       }
 
       const img = document.getElementById('configProfileAvatar');
       const sidebarImg = document.getElementById('sidebarProfileAvatar');
 
-      // Preview INMEDIATO con ObjectURL (m�s r�pido que FileReader)
+      // Preview INMEDIATO con ObjectURL (más rápido que FileReader)
       const objectUrl = URL.createObjectURL(file);
       if (img) { img.src = objectUrl; img.style.opacity = '0.6'; }
       if (sidebarImg) sidebarImg.src = objectUrl;

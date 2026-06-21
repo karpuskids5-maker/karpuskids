@@ -432,30 +432,31 @@ export const StudentsModule = {
     const i = (id, def = 5) => { const val = parseInt(document.getElementById(id)?.value); return isNaN(val) ? def : val; };
 
     return {
-      name:                 v('stName'),
-      matricula:            v('stMatricula') || null,
-      classroom_id:         v('stClassroom') ? parseInt(v('stClassroom')) : null,
-      age:                  i('stAge', null),
-      age_type:             v('stAgeType') || 'años',
-      schedule:             v('stHorario'),
-      start_date:           v('stJoinedDate') || new Date().toISOString().split('T')[0],
-      is_active:            document.getElementById('active')?.checked ?? true,
-      blood_type:           v('bloodType'),
-      allergies:            v('allergies'),
-      authorized_pickup:    v('authorized'),
-      p1_name:              v('p1Name'),
-      p1_phone:             v('p1Phone'),
-      p1_job:               v('p1Profession'),
-      p1_address:           v('p1Address'),
-      p1_emergency_contact: v('p1Emergency'),
-      p1_email:             v('stEmailNotif'),
-      p2_name:              v('p2Name'),
-      p2_phone:             v('p2Phone'),
-      p2_job:               v('p2Profession'),
-      p2_address:           v('p2Address'),
-      monthly_fee:          n('monthlyFee', 0),
-      prolongado_fee:       n('prolongadoFee', 0),
-      due_day:              i('dueDay', 5)
+      name:                  v('stName'),
+      matricula:             v('stMatricula') || null,
+      classroom_id:          v('stClassroom') ? parseInt(v('stClassroom')) : null,
+      age:                   i('stAge', null),
+      age_type:              v('stAgeType') || 'años',
+      schedule:              v('stHorario'),
+      start_date:            v('stJoinedDate') || new Date().toISOString().split('T')[0],
+      is_active:             document.getElementById('active')?.checked ?? true,
+      blood_type:            v('bloodType'),
+      allergies:             v('allergies'),
+      authorized_pickup:     v('authorized'),
+      authorized_pickup_phone: v('authorizedPhone'),
+      p1_name:               v('p1Name'),
+      p1_phone:              v('p1Phone'),
+      p1_job:                v('p1Profession'),
+      p1_address:            v('p1Address'),
+      p1_emergency_contact:  v('p1Emergency'),
+      p1_email:              v('stEmailNotif'),
+      p2_name:               v('p2Name'),
+      p2_phone:              v('p2Phone'),
+      p2_job:                v('p2Profession'),
+      p2_address:            v('p2Address'),
+      monthly_fee:           n('monthlyFee', 0),
+      prolongado_fee:        n('prolongadoFee', 0),
+      due_day:               i('dueDay', 5)
     };
   },
 
@@ -571,7 +572,11 @@ export const StudentsModule = {
             </div>
             <div>
               <label class="${labelClass}">Autorizados para recoger</label>
-              <textarea id="authorized" rows="2" placeholder="Ej: Abuela Carmen, T\u00edo Juan" class="${inputClass} resize-none"></textarea>
+              <textarea id="authorized" rows="2" placeholder="Ej: Abuela Carmen, T\u00edo Juan" class="${inputClass} resize-none mb-3"></textarea>
+            </div>
+            <div>
+              <label class="${labelClass}">Teléfono del contacto autorizado</label>
+              <input id="authorizedPhone" placeholder="Ej: 829-000-0000" class="${inputClass}">
             </div>
           </div>
 
@@ -809,6 +814,7 @@ export const StudentsModule = {
           setVal('allergies',    student.allergies);
           setVal('bloodType',    student.blood_type);
           setVal('authorized',   student.authorized_pickup);
+          setVal('authorizedPhone', student.authorized_pickup_phone);
           setVal('monthlyFee',   student.monthly_fee);
           setVal('prolongadoFee', student.prolongado_fee);
           setVal('dueDay',       student.due_day);
