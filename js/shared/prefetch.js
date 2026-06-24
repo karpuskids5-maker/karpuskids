@@ -24,6 +24,15 @@ const _done  = new Set();   // secciones ya pre-cargadas
 export const Prefetch = {
 
   /**
+   * Limpia toda la pre-carga y el caché.
+   * Útil al cambiar de estudiante o de usuario.
+   */
+  clear() {
+    _cache.clear();
+    _done.clear();
+  },
+
+  /**
    * Inicia la pre-carga de todas las secciones en paralelo.
    * Llamar una sola vez al iniciar el panel, después de autenticar.
    *
@@ -122,7 +131,7 @@ export const Prefetch = {
       const { data: participants } = await supabase
         .from('conversation_participants')
         .select('conversation_id, user_id')
-        .eq('user_id', auth.user.id);
+        .eq('user_id', userId);
 
       if (!participants?.length) { _done.add('avatares'); return; }
 
@@ -132,7 +141,7 @@ export const Prefetch = {
         .from('conversation_participants')
         .select('user_id, profiles:user_id(avatar_url)')
         .in('conversation_id', convIds)
-        .neq('user_id', auth.user.id)
+        .neq('user_id', userId)
         .limit(20);
 
       const urls = (recentContacts || [])

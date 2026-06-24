@@ -11,7 +11,7 @@ import { PaymentsModule } from './payments_clean.js';
 import { GradesModule } from './grades.module.js';
 import { PermitsModule } from './permits.module.js';
 import { InquiriesModule } from './inquiries.module.js';
-import { ChatModule } from '/js/shared/chat.js';
+import { ChatModule } from './chat.module.js';
 import { RoomsModule } from './rooms.module.js';
 import { AutomationModule } from './automation.js';
 import { AccessModule } from './access.module.js';
@@ -143,7 +143,7 @@ export function goToSection(sectionId) {
         import('./payments_clean.js').then(m => m.PaymentsModule.init());
         break;
       case 'comunicacion':
-        import('../shared/chat.js').then(m => m.ChatModule.init());
+        import('./chat.module.js').then(m => m.ChatModule.init());
         break;
       case 'videoconferencia': {
         const profile = AppState.get('profile');
@@ -465,45 +465,63 @@ document.addEventListener('DOMContentLoaded', async () => {
     configAvatarInput?.addEventListener('change', async (e) => {
       const file = e.target.files?.[0];
       if (!file) return;
-      if (file.size > 2 * 1024 * 1024) {
-        Helpers.toast('Imagen muy grande (máx 2MB)', 'error');
+      if (file.size > 5 * 1024 * 1024) {
+        Helpers.toast('Imagen muy grande (máx 5MB)', 'error');
+        return;
+      }
+      if (!file.type.startsWith('image/')) {
+        Helpers.toast('Solo se permiten imágenes', 'error');
         return;
       }
 
-      const img = document.getElementById('configProfileAvatar');
+      const img       = document.getElementById('configProfileAvatar');
       const sidebarImg = document.getElementById('sidebarProfileAvatar');
 
-      // Preview INMEDIATO con ObjectURL (más rápido que FileReader)
+      // Preview INMEDIATO con ObjectURL
       const objectUrl = URL.createObjectURL(file);
-      if (img) { img.src = objectUrl; img.style.opacity = '0.6'; }
+      if (img)       { img.src = objectUrl; img.style.opacity = '0.6'; }
       if (sidebarImg) sidebarImg.src = objectUrl;
       Helpers.toast('Subiendo foto...', 'info');
 
-      // Subir a Supabase Storage
       try {
-        const ext = file.name.split('.').pop().toLowerCase();
-        const path = `avatars/${auth.user.id}_${Date.now()}.${ext}`;
-        const { error: upErr } = await supabase.storage.from('karpus-uploads').upload(path, file, { upsert: true });
-        if (upErr) throw upErr;
+        const ext  = file.name.split('.').pop().toLowerCase().replace('jpeg','jpg');
+        const path = `directors/${auth.user.id}_${Date.now()}.${ext}`;
 
-        const { data: { publicUrl } } = supabase.storage.from('karpus-uploads').getPublicUrl(path);
+        // Intentar con los buckets disponibles en orden de preferencia
+        let publicUrl = null;
+        for (const bucket of ['avatars', 'karpus-uploads', 'classroom_media']) {
+          const { error: upErr } = await supabase.storage
+            .from(bucket)
+            .upload(path, file, { upsert: true, contentType: file.type });
+          if (!upErr) {
+            const { data } = supabase.storage.from(bucket).getPublicUrl(path);
+            publicUrl = data.publicUrl;
+            break;
+          }
+        }
+
+        if (!publicUrl) throw new Error('No se pudo subir la imagen. Verifica los permisos de storage en Supabase.');
 
         const { error: dbErr } = await supabase.from('profiles').update({ avatar_url: publicUrl }).eq('id', auth.user.id);
         if (dbErr) throw dbErr;
 
-        // Actualizar estado y UI con URL real
+        // Actualizar estado
         const currentProfile = AppState.get('profile') || {};
         AppState.set('profile', { ...currentProfile, avatar_url: publicUrl });
-        // Cache-buster para forzar recarga de la imagen
+
+        // UI: mostrar URL real con cache-buster
         const bustedUrl = publicUrl + '?t=' + Date.now();
-        if (img) { img.src = bustedUrl; img.style.opacity = '1'; }
+        if (img)       { img.src = bustedUrl; img.style.opacity = '1'; }
         if (sidebarImg) sidebarImg.src = bustedUrl;
         URL.revokeObjectURL(objectUrl);
 
-        Helpers.toast('Foto de perfil actualizada', 'success');
+        // Limpiar input para permitir re-seleccionar el mismo archivo
+        configAvatarInput.value = '';
+        Helpers.toast('Foto de perfil actualizada ✅', 'success');
       } catch (err) {
         if (img) img.style.opacity = '1';
-        Helpers.toast('Error al subir la foto: ' + err.message, 'error');
+        URL.revokeObjectURL(objectUrl);
+        Helpers.toast('Error al subir la foto: ' + (err.message || err), 'error');
       }
     });
 

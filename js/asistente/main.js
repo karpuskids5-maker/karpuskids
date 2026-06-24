@@ -169,26 +169,67 @@ document.addEventListener('DOMContentLoaded', async () => {
  */
 async function openNewPostModal() {
   const html = `
-    <div class="p-8">
-      <div class="flex justify-between items-start mb-6">
-        <h3 class="text-2xl font-black text-slate-800">Crear Publicación</h3>
+      <div class="modal-header bg-gradient-to-r from-teal-600 to-emerald-600 text-white p-6 rounded-t-3xl flex justify-between items-center">
+        <div class="flex items-center gap-3">
+          <div class="w-12 h-12 bg-white/20 rounded-2xl flex items-center justify-center text-2xl shadow-inner">📝</div>
+          <div>
+            <h3 class="text-xl font-black">Crear Publicación</h3>
+            <p class="text-xs text-white/70 font-bold uppercase tracking-widest">Muro Escolar</p>
+          </div>
+        </div>
       </div>
-      <div class="space-y-4">
-        <textarea id="postContent" rows="4" class="w-full p-4 bg-slate-50 border-none rounded-2xl text-sm outline-none resize-none focus:ring-2 focus:ring-teal-400" placeholder="¿Qué quieres compartir con la comunidad?"></textarea>
-        
-        <div class="relative">
-          <input type="file" id="postFile" class="hidden" accept="image/*,video/*" onchange="document.getElementById('fileName').textContent = this.files[0]?.name || 'Adjuntar foto/video'">
-          <label for="postFile" class="flex items-center gap-3 p-3 border-2 border-dashed border-slate-200 rounded-2xl cursor-pointer hover:bg-slate-50 hover:border-teal-300 transition-all">
-            <div class="w-10 h-10 bg-teal-100 text-teal-600 rounded-xl flex items-center justify-center"><i data-lucide="image-plus"></i></div>
-            <span id="fileName" class="text-sm font-bold text-slate-500">Adjuntar foto o video</span>
-          </label>
+      
+      <div class="p-8 bg-white space-y-6">
+        <div>
+          <label class="block text-[11px] font-black text-slate-400 uppercase tracking-wider mb-2 ml-1">Contenido del Mensaje</label>
+          <textarea id="postContent" rows="4" class="w-full px-4 py-3 border-2 border-slate-100 rounded-2xl outline-none focus:ring-4 focus:ring-teal-100 focus:border-teal-400 bg-slate-50/50 transition-all text-sm font-medium resize-none" placeholder="¿Qué quieres compartir hoy con los padres?"></textarea>
         </div>
 
-        <button id="btnSubmitPost" onclick="window.submitNewPost()" class="w-full py-3.5 bg-teal-600 text-white rounded-2xl font-black text-sm uppercase tracking-widest hover:bg-teal-700 shadow-lg shadow-teal-200 transition-all">PUBLICAR</button>
+        <div>
+          <label class="block text-[11px] font-black text-slate-400 uppercase tracking-wider mb-2 ml-1">Aula (Opcional)</label>
+          <select id="postClassroom" class="w-full px-4 py-3 border-2 border-slate-100 rounded-2xl outline-none focus:ring-4 focus:ring-teal-100 focus:border-teal-400 bg-slate-50/50 transition-all text-sm font-medium appearance-none">
+            <option value="">General (Todos)</option>
+          </select>
+        </div>
+
+        <div class="flex flex-col md:flex-row gap-6 items-center bg-slate-50 p-6 rounded-3xl border-2 border-slate-100">
+          <div class="relative group cursor-pointer">
+            <div id="postMediaPreview" class="w-24 h-24 rounded-[2rem] bg-white border-4 border-dashed border-slate-200 flex flex-col items-center justify-center text-slate-400 group-hover:border-teal-400 group-hover:bg-teal-50 transition-all overflow-hidden">
+              <i data-lucide="camera" class="w-8 h-8 mb-1"></i>
+              <span class="text-[9px] font-black uppercase">Media</span>
+            </div>
+            <input type="file" id="postFile" class="absolute inset-0 opacity-0 cursor-pointer" accept="image/*,video/*">
+          </div>
+          <div class="flex-1">
+            <h4 class="text-sm font-black text-slate-800 mb-1">📸 MULTIMEDIA</h4>
+            <p class="text-xs text-slate-500">Sube una imagen o video para acompañar tu publicación. Máximo 10MB.</p>
+          </div>
+        </div>
       </div>
-    </div>
+
+      <div class="p-6 border-t bg-slate-50 rounded-b-3xl flex justify-end gap-3">
+        <button onclick="window._closeAsistenteModal()" class="px-6 py-3 border-2 border-slate-200 text-slate-700 font-bold text-sm rounded-2xl hover:bg-slate-100 transition-all">Cancelar</button>
+        <button id="btnSubmitPost" onclick="window.submitNewPost()" class="px-6 py-3 bg-gradient-to-r from-teal-600 to-emerald-600 text-white font-bold text-sm rounded-2xl hover:from-teal-700 hover:to-emerald-700 transition-all shadow-lg shadow-teal-200">Publicar</button>
+      </div>
   `;
   window.openGlobalModal(html);
+
+  // Load classrooms for the select
+  try {
+    const { data: classrooms } = await supabase.from('classrooms').select('id, name').order('name');
+    const select = document.getElementById('postClassroom');
+    if (select && classrooms) {
+      select.innerHTML = '<option value="">General (Todos)</option>';
+      classrooms.forEach(c => {
+        const opt = document.createElement('option');
+        opt.value = c.id;
+        opt.textContent = c.name;
+        select.appendChild(opt);
+      });
+    }
+  } catch (_) { /* silencioso */ }
+
+  if (window.lucide) lucide.createIcons();
 }
 
 async function submitNewPost() {
@@ -196,6 +237,7 @@ async function submitNewPost() {
   const fileInput = document.getElementById('postFile');
   const file = fileInput?.files[0];
   const btn = document.getElementById('btnSubmitPost');
+  const classroomSelect = document.getElementById('postClassroom');
 
   if (!content && !file) return Helpers.toast('Escribe algo o sube un archivo', 'warning');
 
@@ -228,7 +270,8 @@ async function submitNewPost() {
       teacher_id:   user.id,
       content:      content,
       media_url:    mediaUrl,
-      media_type:   mediaType
+      media_type:   mediaType,
+      classroom_id: classroomSelect?.value || null
     };
 
     const { error } = await supabase.from('posts').insert(insertPayload);
@@ -616,8 +659,16 @@ window.selectAssistantChat = async (userId, name, role, avatarUrl = null) => {
   const avatarEl = document.getElementById('chatActiveAvatar');
   const inputArea = document.getElementById('chatInputArea');
   
-  // ✅ ENRIQUECIMIENTO DE CONTEXTO: Título con nombre del Estudiante
-  const { data: student } = await supabase.from('students').select('name').eq('parent_id', userId).maybeSingle();
+  // ✅ ENRIQUECIMIENTO DE CONTEXTO: Título con nombre del Estudiante (solo activos)
+  const { data: student } = await supabase
+    .from('students')
+    .select('name')
+    .eq('parent_id', userId)
+    .is('deleted_at', null)
+    .eq('is_active', true)
+    .order('name')
+    .limit(1)
+    .maybeSingle();
   if (nameEl) nameEl.textContent = student ? `Estudiante: ${student.name}` : name;
   if (metaEl) metaEl.textContent = student ? `Padre: ${name}` : (role || 'Usuario');
   
@@ -639,7 +690,7 @@ window.selectAssistantChat = async (userId, name, role, avatarUrl = null) => {
     if (avatarUrl && avatarUrl !== 'null') {
       avatarEl.innerHTML = `<img src="${avatarUrl}" class="w-full h-full object-cover">`;
     } else {
-      avatarEl.innerHTML = name.charAt(0);
+      avatarEl.innerHTML = (name || '?').charAt(0);
     }
   }
   inputArea?.classList.remove('hidden');
@@ -653,7 +704,16 @@ window.selectAssistantChat = async (userId, name, role, avatarUrl = null) => {
   if (container) container.innerHTML = '<div class="p-8 text-center"><div class="animate-spin w-6 h-6 border-2 border-teal-500 border-t-transparent rounded-full mx-auto"></div></div>';
 
   try {
-    const { messages, conversationId } = await ChatModule.loadConversation(userId);
+    let messages = [], conversationId = null;
+    try {
+      const res = await ChatModule.loadConversation(userId);
+      messages = res.messages || [];
+      conversationId = res.conversationId || null;
+    } catch (_) {
+      // Si get_direct_messages falla (función no existe aún), mostrar chat vacío
+      messages = [];
+      conversationId = null;
+    }
     AppState.set('activeConversationId', conversationId);
 
     // Marcar como leídos al abrir
@@ -727,27 +787,64 @@ async function initAssistantChat() {
   list.innerHTML = Helpers.skeleton(4, 'h-16 mb-2');
   const user = AppState.get('user');
 
+  // Guard: si no hay usuario autenticado, no continuar
+  if (!user?.id) {
+    list.innerHTML = Helpers.errorState('Sesión no disponible. Recarga la página.');
+    return;
+  }
+
   try {
-    // Cargar contactos (Padres, Maestras, Directora)
+    // Cargar contactos — solo perfiles activos con nombre válido
     const { data: profiles, error } = await supabase
       .from('profiles')
-      .select('id, name, avatar_url, role, students:students!parent_id(name)')
+      .select('id, name, avatar_url, role')
       .neq('id', user.id)
+      .is('deleted_at', null)
+      .not('name', 'is', null)
       .order('name');
 
     if (error) throw error;
 
-    list.innerHTML = (profiles || []).map(p => {
-      const studentName = p.students && p.students.length > 0 ? p.students[0].name : null;
-      const mainTitle = studentName ? `Estudiante: ${studentName}` : p.name;
-      const subTitle = studentName ? `Padre: ${p.name}` : (p.role || 'Usuario');
+    // Obtener nombres de estudiantes para padres en query separada
+    const parentIds = (profiles || []).filter(p => p.role === 'padre').map(p => p.id);
+    let studentMap = {};
+    let activeParentIds = [];
+    if (parentIds.length > 0) {
+      const { data: students } = await supabase
+        .from('students')
+        .select('parent_id, name')
+        .in('parent_id', parentIds)
+        .is('deleted_at', null)
+        .eq('is_active', true);
+      (students || []).forEach(s => {
+        if (!studentMap[s.parent_id]) studentMap[s.parent_id] = s.name;
+        if (!activeParentIds.includes(s.parent_id)) activeParentIds.push(s.parent_id);
+      });
+    }
+
+    // Filtro final: solo perfiles con nombre válido y padres con al menos un estudiante activo
+    const activeProfiles = (profiles || []).filter(p => {
+      if (!p.name || p.name.trim().length === 0) return false;
+      if (p.role === 'padre' && !activeParentIds.includes(p.id)) return false;
+      return true;
+    });
+
+    if (!activeProfiles.length) {
+      list.innerHTML = Helpers.emptyState('No hay contactos disponibles');
+      return;
+    }
+
+    list.innerHTML = activeProfiles.map(p => {
+      const studentName = p.role === 'padre' ? (studentMap[p.id] || null) : null;
+      const mainTitle = studentName ? `Estudiante: ${studentName}` : (p.name || 'Sin nombre');
+      const subTitle = studentName ? `Padre: ${p.name || 'Sin nombre'}` : (p.role || 'Usuario');
 
       return `
       <div onclick="window.selectAssistantChat('${p.id}', '${Helpers.escapeHTML(p.name)}', '${p.role}', '${p.avatar_url || ''}')" 
            data-user-id="${p.id}"
            class="flex items-center gap-3 p-3 rounded-2xl hover:bg-white hover:shadow-sm cursor-pointer transition-all border border-transparent hover:border-slate-100 group mb-1 relative">
         <div class="w-12 h-12 rounded-full bg-teal-100 text-teal-700 flex items-center justify-center font-bold overflow-hidden border-2 border-teal-50 shrink-0 shadow-sm">
-          ${p.avatar_url ? `<img src="${p.avatar_url}" class="w-full h-full object-cover">` : p.name.charAt(0)}
+          ${p.avatar_url ? `<img src="${p.avatar_url}" class="w-full h-full object-cover">` : (p.name || '?').charAt(0)}
         </div>
         <div class="absolute bottom-3 left-11 w-3.5 h-3.5 bg-slate-300 border-2 border-white rounded-full presence-indicator"></div>
         <div class="min-w-0 flex-1">
@@ -833,7 +930,7 @@ async function initAssistantChat() {
     }
 
   } catch (err) {
-    list.innerHTML = Helpers.errorState('Error al cargar contactos');
+    list.innerHTML = Helpers.errorState('Error al cargar contactos: ' + (err?.message || 'Intenta recargar'));
   }
 }
 
@@ -866,8 +963,21 @@ function _msgBubble(m, myId) {
   const isRead = m.is_read || false;
   const msgId = m.id || `temp-${Date.now()}`;
 
+  // Get avatar for sender
+  const profile = AppState.get('profile');
+  const senderName = isMe ? (profile?.name || '') : (m.sender_name || '');
+  const avatarUrl = isMe ? (profile?.avatar_url || null) : (m.sender_avatar || null);
+
+  // Build avatar HTML
+  const avatarHtml = avatarUrl 
+    ? `<img src="${avatarUrl}" class="w-full h-full object-cover">` 
+    : `<span class="text-sm font-bold">${senderName.charAt(0) || ''}</span>`;
+
   return `
-    <div id="msg-${msgId}" class="flex ${isMe ? 'justify-end' : 'justify-start'} mb-3 animate-slideInUp">
+    <div id="msg-${msgId}" class="flex ${isMe ? 'justify-end flex-row-reverse' : 'justify-start'} mb-3 gap-2 animate-slideInUp">
+      <div class="w-8 h-8 rounded-full bg-teal-100 text-teal-700 flex items-center justify-center font-bold overflow-hidden shrink-0">
+        ${avatarHtml}
+      </div>
       <div class="max-w-[80%] px-4 py-2.5 rounded-2xl text-sm shadow-sm ${isMe ? 'bg-teal-600 text-white rounded-tr-none' : 'bg-white text-slate-700 rounded-tl-none border border-slate-100'}">
         <p class="leading-relaxed">${Helpers.escapeHTML(m.content)}</p>
         <div class="flex items-center justify-end gap-1 text-[9px] mt-1 opacity-60 font-bold uppercase tracking-tighter">

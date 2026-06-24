@@ -318,22 +318,31 @@ export const StudentsModule = {
     const password = document.getElementById('stPassword')?.value?.trim();
 
     if (!payload.name || payload.name.trim().length < 3) return Helpers.toast('Nombre inválido (min 3 caracteres)', 'warning');
-    // Solo validar datos del padre en creación, no en edición
-    if (!id && (!payload.p1_name || !payload.p1_phone || !payload.p1_email)) return Helpers.toast('Datos del padre/madre 1 incompletos', 'warning');
+    // Solo validar datos del padre en creación sin hermano seleccionado
+    const hasSibling = !!payload._inheritedParentId;
+    if (!id && !hasSibling && (!payload.p1_name || !payload.p1_phone || !payload.p1_email)) return Helpers.toast('Datos del padre/madre 1 incompletos (o selecciona un hermano)', 'warning');
     
     UI.setLoading(true);
     try {
       let res;
       if (id) {
-        res = await DirectorApi.updateStudent(id, payload);
-        // Si falla por classroom_id, reintentar sin esa columna
+        // Limpiar campos auxiliares que no existen en la DB
+        const { _inheritedParentId, ...cleanPayload } = payload;
+        res = await DirectorApi.updateStudent(id, cleanPayload);
         if (res?.error && (res.error.message?.includes('classroom_id') || res.error.code === '42703')) {
-          const { classroom_id, ...payloadWithout } = payload;
+          const { classroom_id, ...payloadWithout } = cleanPayload;
           res = await DirectorApi.updateStudent(id, payloadWithout);
         }
       } else {
-        // Create auth user if email+password provided
-        if (emailUser && password) {
+        // Extraer y limpiar el campo auxiliar antes de enviar a DB
+        const inheritedParentId = payload._inheritedParentId;
+        delete payload._inheritedParentId;
+
+        // Si se seleccionó un hermano, heredar su parent_id directamente
+        if (inheritedParentId) {
+          payload.parent_id = inheritedParentId;
+          // Validación de padre menos estricta cuando hay hermano
+        } else if (emailUser && password) {
           const tempClient = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
             auth: { persistSession: false, autoRefreshToken: false, detectSessionInUrl: false }
           });
@@ -380,11 +389,16 @@ export const StudentsModule = {
             }, { onConflict: 'id' });
           }
         }
+
+        // Validar que el padre quedó asignado
+        if (!payload.parent_id && !inheritedParentId) {
+          // Si no se eligió hermano ni usuario, aún puede crear sin parent_id (padre se asignará luego)
+        }
         
         res = await DirectorApi.createStudent(payload);
         // Si falla por classroom_id, reintentar sin esa columna
         if (res?.error && (res.error.message?.includes('classroom_id') || res.error.code === '42703')) {
-          const { classroom_id, ...payloadWithout } = payload;
+          const { classroom_id, _inheritedParentId: _aux, ...payloadWithout } = payload;
           res = await DirectorApi.createStudent(payloadWithout);
         }
       }
@@ -431,6 +445,15 @@ export const StudentsModule = {
     const n = (id, def = null) => { const val = parseFloat(document.getElementById(id)?.value); return isNaN(val) ? def : val; };
     const i = (id, def = 5) => { const val = parseInt(document.getElementById(id)?.value); return isNaN(val) ? def : val; };
 
+    // Si se seleccionó un hermano, heredar el parent_id de ese estudiante
+    const siblingId = v('stSiblingId');
+    let inheritedParentId = null;
+    if (siblingId) {
+      const sibSel = document.getElementById('stSiblingId');
+      const opt = sibSel?.options[sibSel?.selectedIndex];
+      inheritedParentId = opt?.dataset?.parentId || null;
+    }
+
     return {
       name:                  v('stName'),
       matricula:             v('stMatricula') || null,
@@ -456,7 +479,9 @@ export const StudentsModule = {
       p2_address:            v('p2Address'),
       monthly_fee:           n('monthlyFee', 0),
       prolongado_fee:        n('prolongadoFee', 0),
-      due_day:               i('dueDay', 5)
+      due_day:               i('dueDay', 5),
+      // Si hay hermano seleccionado, el parent_id se fuerza en save()
+      _inheritedParentId:    inheritedParentId
     };
   },
 
@@ -538,6 +563,19 @@ export const StudentsModule = {
                   <option value="">-- Seleccionar Aula --</option>
                 </select>
               </div>
+            </div>
+
+            <!-- 🔗 HERMANOS — vincular al mismo padre -->
+            <div class="pt-2 border-t border-slate-100">
+              <label class="${labelClass} flex items-center gap-1.5">
+                <i data-lucide="users" class="w-3.5 h-3.5 text-indigo-500"></i>
+                ¿Tiene hermano(s) en la estancia?
+              </label>
+              <p class="text-[10px] text-slate-400 font-medium mb-2 ml-1">Al seleccionar un hermano, este estudiante compartirá el acceso del padre.</p>
+              <select id="stSiblingId" class="${inputClass} appearance-none">
+                <option value="">-- Sin hermanos (nuevo padre) --</option>
+              </select>
+              <p id="stSiblingInfo" class="text-[10px] text-indigo-600 font-bold mt-1.5 ml-1 hidden"></p>
             </div>
           </div>
 
@@ -774,6 +812,60 @@ export const StudentsModule = {
       }
     } catch (_) { /* silencioso */ }
 
+    // Cargar lista de estudiantes activos para el selector de hermanos
+    try {
+      const { data: allStudents } = await supabase
+        .from('students')
+        .select('id, name, p1_name, parent_id, classrooms:classroom_id(name)')
+        .eq('is_active', true)
+        .is('deleted_at', null)
+        .order('name')
+        .limit(200);
+
+      const sibSel = document.getElementById('stSiblingId');
+      if (sibSel && allStudents?.length) {
+        // Excluir el estudiante actual si estamos editando
+        const currentId = id ? parseInt(id, 10) : null;
+        allStudents.filter(s => s.id !== currentId).forEach(s => {
+          const opt = document.createElement('option');
+          opt.value = s.id;
+          const aula = s.classrooms?.name || 'sin aula';
+          const padre = s.p1_name ? ' · ' + s.p1_name : '';
+          opt.textContent = s.name + ' (' + aula + padre + ')';
+          opt.dataset.parentId = s.parent_id || '';
+          sibSel.appendChild(opt);
+        });
+
+        // Evento: al seleccionar un hermano, mostrar info del padre compartido
+        sibSel.addEventListener('change', function() {
+          const infoEl = document.getElementById('stSiblingInfo');
+          const selectedOpt = sibSel.options[sibSel.selectedIndex];
+          if (sibSel.value && selectedOpt) {
+            const parentId = selectedOpt.dataset.parentId;
+            if (infoEl) {
+              infoEl.textContent = parentId
+                ? '✅ Compartirá el acceso del padre: ' + selectedOpt.text.split('·').slice(-1)[0].trim()
+                : '⚠️ Este estudiante no tiene padre asignado aún.';
+              infoEl.classList.remove('hidden');
+            }
+            // Pre-llenar datos del padre si hay parent_id
+            if (parentId) {
+              supabase.from('profiles').select('email, name, phone').eq('id', parentId).maybeSingle().then(({ data: prof }) => {
+                if (prof) {
+                  const setIfEmpty = (elId, val) => { const el = document.getElementById(elId); if (el && !el.value) el.value = val || ''; };
+                  setIfEmpty('stEmailUser', prof.email);
+                  setIfEmpty('p1Name', prof.name);
+                  setIfEmpty('p1Phone', prof.phone);
+                }
+              });
+            }
+          } else {
+            if (infoEl) infoEl.classList.add('hidden');
+          }
+        });
+      }
+    } catch (_) { /* silencioso */ }
+
     if (id) {
       // Fetch completo desde DB - convertir id a número para evitar error 400 (bigint vs string)
       try {
@@ -832,6 +924,56 @@ export const StudentsModule = {
           if (student.matricula) {
             setTimeout(() => window.generateStudentQR(), 500);
           }
+
+          // ── HERMANOS ──────────────────────────────────────────────
+          // Si el estudiante tiene parent_id, buscar hermanos del mismo padre
+          if (student.parent_id) {
+            supabase
+              .from('students')
+              .select('id, name, avatar_url, classrooms:classroom_id(name)')
+              .eq('parent_id', student.parent_id)
+              .eq('is_active', true)
+              .is('deleted_at', null)
+              .neq('id', numericId)
+              .order('name')
+              .then(({ data: siblings }) => {
+                if (!siblings?.length) return;
+                // Inyectar sección hermanos en el modal
+                const form = document.getElementById('studentForm');
+                if (!form) return;
+                const siblingsHTML = `
+                  <div class="bg-indigo-50 p-5 rounded-[2rem] border-2 border-indigo-100">
+                    <h4 class="text-sm font-black text-indigo-800 flex items-center gap-2 mb-4">
+                      <span class="w-8 h-8 rounded-xl bg-indigo-100 text-indigo-600 flex items-center justify-center">
+                        <i data-lucide="users" class="w-4 h-4"></i>
+                      </span>
+                      HERMANOS EN LA ESTANCIA (${siblings.length})
+                    </h4>
+                    <div class="flex flex-wrap gap-3">
+                      ${siblings.map(sib => `
+                        <button type="button"
+                          onclick="App.students.openModal('${sib.id}')"
+                          class="flex items-center gap-2.5 px-4 py-2.5 bg-white rounded-2xl border border-indigo-100 hover:border-indigo-400 hover:bg-indigo-50 transition-all shadow-sm active:scale-95 group">
+                          <div class="w-8 h-8 rounded-full bg-indigo-100 overflow-hidden flex items-center justify-center shrink-0">
+                            ${sib.avatar_url
+                              ? `<img src="${sib.avatar_url}" class="w-full h-full object-cover">`
+                              : `<span class="text-xs font-black text-indigo-600">${(sib.name || '?').charAt(0)}</span>`}
+                          </div>
+                          <div class="text-left">
+                            <div class="text-xs font-black text-slate-700 group-hover:text-indigo-700">${Helpers.escapeHTML(sib.name)}</div>
+                            <div class="text-[9px] font-bold text-slate-400 uppercase">${sib.classrooms?.name || 'Sin aula'}</div>
+                          </div>
+                          <i data-lucide="arrow-right" class="w-3.5 h-3.5 text-slate-300 group-hover:text-indigo-500"></i>
+                        </button>`).join('')}
+                    </div>
+                  </div>`;
+                // Insertar antes del modal-footer
+                form.insertAdjacentHTML('beforeend', siblingsHTML);
+                if (window.lucide) lucide.createIcons();
+              })
+              .catch(() => {}); // silencioso si falla
+          }
+          // ─────────────────────────────────────────────────────────
         }
       } catch (e) {
         Helpers.toast('Error al cargar datos del estudiante', 'error');

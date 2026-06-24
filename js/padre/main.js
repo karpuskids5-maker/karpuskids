@@ -724,6 +724,35 @@ function updateHeaderProfile(profile, student, allStudents = []) {
     switcherTrigger.onclick = () => _showStudentSwitcher(allStudents);
   }
 
+  // ── CHIPS DE HERMANOS ─────────────────────────────────────────
+  if (allStudents.length > 1) {
+    let chipsInner = '';
+    allStudents.forEach(function(s) {
+      const isActive = String(s.id) === String(student?.id);
+      const firstName = (s.name || 'Estudiante').split(' ')[0];
+      const esc = firstName.replace(/[&<>"']/g, function(c) { return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]; });
+      const avatarBgClass = isActive ? 'bg-white text-emerald-600' : 'bg-slate-500 text-white';
+      const avatarHtml = s.avatar_url
+        ? '<img src="' + s.avatar_url + '" class="w-6 h-6 rounded-full object-cover mr-1.5 shrink-0" alt="">'
+        : '<span class="w-6 h-6 rounded-full ' + avatarBgClass + ' flex items-center justify-center text-[10px] font-black mr-1.5 shrink-0">' + firstName.charAt(0) + '</span>';
+      const btnClass = isActive
+        ? 'flex items-center px-3 py-1.5 rounded-full text-[11px] font-black transition-all active:scale-95 bg-emerald-500 text-white shadow-md'
+        : 'flex items-center px-3 py-1.5 rounded-full text-[11px] font-black transition-all active:scale-95 bg-slate-700 text-white hover:bg-slate-600';
+      chipsInner += '<button type="button" onclick="App.switchStudent(\'' + s.id + '\')" class="' + btnClass + '">' + avatarHtml + esc + '</button>';
+    });
+    const chipsHTML = '<div class="flex flex-wrap gap-2">' + chipsInner + '</div>';
+
+    const desktopEl = document.getElementById('siblings-chips-desktop');
+    const mobileEl  = document.getElementById('siblings-chips-mobile');
+    if (desktopEl) desktopEl.innerHTML = chipsHTML;
+    if (mobileEl)  mobileEl.innerHTML  = chipsHTML;
+  } else {
+    const desktopEl = document.getElementById('siblings-chips-desktop');
+    const mobileEl  = document.getElementById('siblings-chips-mobile');
+    if (desktopEl) desktopEl.innerHTML = '';
+    if (mobileEl)  mobileEl.innerHTML  = '';
+  }
+
   const sidebarAvatar = document.getElementById('sidebarStudentAvatar');
   if (sidebarAvatar) {
     sidebarAvatar.innerHTML = student?.avatar_url
@@ -757,6 +786,32 @@ function updateHeaderProfile(profile, student, allStudents = []) {
     mobileAvatar.innerHTML = student?.avatar_url
       ? '<img src="' + student.avatar_url + '" class="w-full h-full object-cover">'
       : '<span class="text-sm font-black text-sky-700">' + studentName.charAt(0) + '</span>';
+  }
+
+  // Render siblings in profile section
+  const siblingsContainer = document.getElementById('profile-siblings-container');
+  const siblingsList = document.getElementById('profile-siblings-list');
+  if (siblingsContainer && siblingsList) {
+    if (allStudents.length > 1) {
+      siblingsContainer.classList.remove('hidden');
+      siblingsList.innerHTML = allStudents.map(s => {
+        const isActive = String(s.id) === String(student?.id);
+        return `
+          <button onclick="App.switchStudent('${s.id}')" 
+            class="flex items-center gap-2 p-3 rounded-2xl transition-all border-2 ${isActive ? 'bg-emerald-500 border-emerald-600 text-white' : 'bg-white border-slate-100 hover:bg-emerald-50 hover:border-emerald-200 text-slate-700'}">
+            <div class="w-8 h-8 rounded-xl overflow-hidden ${isActive ? 'bg-white/20' : 'bg-slate-100'} flex items-center justify-center shrink-0">
+              ${s.avatar_url 
+                ? `<img src="${s.avatar_url}" class="w-full h-full object-cover">` 
+                : `<span class="font-black ${isActive ? 'text-white' : 'text-slate-400'}">${s.name.charAt(0)}</span>`
+              }
+            </div>
+            <span class="text-sm font-bold">${Helpers.escapeHTML(s.name)}</span>
+          </button>`;
+      }).join('');
+    } else {
+      siblingsContainer.classList.add('hidden');
+      siblingsList.innerHTML = '';
+    }
   }
 
   if (window.lucide) lucide.createIcons();
@@ -809,8 +864,9 @@ async function switchStudent(studentId) {
     Helpers.toast(`Perfil de ${selected.name.split(' ')[0]} cargado`, 'success');
 
   } catch (e) {
+    console.error('Error al cambiar de perfil:', e);
     Helpers.hideLoader();
-    Helpers.toast('Error al cambiar de perfil', 'error');
+    Helpers.toast('Error al cambiar de perfil: ' + (e.message || e), 'error');
   }
 }
 
@@ -846,7 +902,12 @@ function _showStudentSwitcher(students) {
 }
 
 function _initDailyLogRealtime(studentId) {
-  if (window._dailyLogChannel) return;
+  // Cancelar el canal anterior si existe
+  if (window._dailyLogChannel) {
+    try {
+      window._dailyLogChannel.unsubscribe();
+    } catch (_) {}
+  }
   window._dailyLogChannel = supabase
     .channel('daily_log_' + studentId)
     .on('postgres_changes', {

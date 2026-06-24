@@ -220,6 +220,14 @@ export const StudentsModule = {
             <div class="sm:col-span-2"><label class="${LC}">Aula</label>
               <select id="stClassroom" class="${IC} py-2"><option value="">-- Seleccionar Aula --</option></select>
             </div>
+            <!-- Hermanos -->
+            <div class="sm:col-span-2 pt-1 border-t border-slate-100">
+              <label class="${LC}">\ud83d\udc68\u200d\ud83d\udc66 \u00bfTiene hermano(s) en la estancia?</label>
+              <select id="stSiblingId" class="${IC} py-2 text-xs">
+                <option value="">-- Sin hermanos (nuevo padre) --</option>
+              </select>
+              <p id="stSiblingInfo" class="text-[9px] text-indigo-600 font-bold mt-1 ml-1 hidden"></p>
+            </div>
           </div>
         </div>
 
@@ -403,6 +411,52 @@ export const StudentsModule = {
       if (sel) sel.innerHTML = '<option value="">Error al cargar aulas</option>';
     }
 
+    // Cargar lista de estudiantes activos para el selector de hermanos
+    try {
+      const sibSel = document.getElementById('stSiblingId') || gc?.querySelector('#stSiblingId');
+      if (sibSel) {
+        const { data: allSt } = await supabase
+          .from('students')
+          .select('id, name, p1_name, parent_id, classrooms:classroom_id(name)')
+          .eq('is_active', true)
+          .is('deleted_at', null)
+          .order('name')
+          .limit(200);
+        const currentId = studentId ? parseInt(studentId, 10) : null;
+        (allSt || []).filter(s => s.id !== currentId).forEach(s => {
+          const opt = document.createElement('option');
+          opt.value = s.id;
+          const aula = s.classrooms?.name || 'sin aula';
+          opt.textContent = s.name + ' (' + aula + (s.p1_name ? ' \u00b7 ' + s.p1_name : '') + ')';
+          opt.dataset.parentId = s.parent_id || '';
+          sibSel.appendChild(opt);
+        });
+        sibSel.addEventListener('change', function() {
+          const infoEl = document.getElementById('stSiblingInfo');
+          const opt = sibSel.options[sibSel.selectedIndex];
+          if (sibSel.value && opt) {
+            const pid = opt.dataset.parentId;
+            if (infoEl) {
+              infoEl.textContent = pid ? '\u2705 Compartir\u00e1 el acceso del padre vinculado' : '\u26a0\ufe0f Este estudiante no tiene padre asignado.';
+              infoEl.classList.remove('hidden');
+            }
+            if (pid) {
+              supabase.from('profiles').select('email, name, phone').eq('id', pid).maybeSingle().then(function(r) {
+                if (r.data) {
+                  var setIfEmpty = function(eid, v) { var el = document.getElementById(eid); if (el && !el.value) el.value = v || ''; };
+                  setIfEmpty('stEmailUser', r.data.email);
+                  setIfEmpty('p1Name', r.data.name);
+                  setIfEmpty('p1Phone', r.data.phone);
+                }
+              });
+            }
+          } else {
+            if (infoEl) infoEl.classList.add('hidden');
+          }
+        });
+      }
+    } catch (_) { /* silencioso */ }
+
     // Prefill if editing
     if (studentId) {
       try {
@@ -431,6 +485,48 @@ export const StudentsModule = {
           if (st.parent_id) {
             const { data: prof } = await supabase.from('profiles').select('email').eq('id', st.parent_id).maybeSingle();
             if (prof) sv('stEmailUser', prof.email);
+
+            // ── HERMANOS ──────────────────────────────────────────
+            const { data: siblings } = await supabase
+              .from('students')
+              .select('id, name, avatar_url, classrooms:classroom_id(name)')
+              .eq('parent_id', st.parent_id)
+              .eq('is_active', true)
+              .is('deleted_at', null)
+              .neq('id', parseInt(studentId, 10))
+              .order('name');
+
+            if (siblings?.length) {
+              const scrollArea = gc?.querySelector('.overflow-y-auto') || document.querySelector('#globalModalInner .overflow-y-auto');
+              if (scrollArea) {
+                const siblingsHTML = `
+                  <div class="bg-indigo-50 rounded-2xl border border-indigo-100 p-3 space-y-2">
+                    <p class="text-[10px] font-black text-indigo-700 uppercase tracking-widest flex items-center gap-1.5">
+                      <i data-lucide="users" class="w-3.5 h-3.5"></i>
+                      HERMANOS EN LA ESTANCIA (${siblings.length})
+                    </p>
+                    <div class="flex flex-wrap gap-2">
+                      ${siblings.map(sib => `
+                        <button type="button"
+                          onclick="window.App._openStudentModal('${sib.id}')"
+                          class="flex items-center gap-2 px-3 py-2 bg-white rounded-xl border border-indigo-100 hover:border-indigo-400 transition-all shadow-sm active:scale-95 group">
+                          <div class="w-7 h-7 rounded-full bg-indigo-100 overflow-hidden flex items-center justify-center shrink-0">
+                            ${sib.avatar_url
+                              ? `<img src="${sib.avatar_url}" class="w-full h-full object-cover">`
+                              : `<span class="text-[10px] font-black text-indigo-600">${(sib.name || '?').charAt(0)}</span>`}
+                          </div>
+                          <div class="text-left">
+                            <div class="text-[11px] font-black text-slate-700 group-hover:text-indigo-700">${Helpers.escapeHTML(sib.name)}</div>
+                            <div class="text-[9px] font-bold text-slate-400">${sib.classrooms?.name || 'Sin aula'}</div>
+                          </div>
+                        </button>`).join('')}
+                    </div>
+                  </div>`;
+                scrollArea.insertAdjacentHTML('beforeend', siblingsHTML);
+                if (window.lucide) window.lucide.createIcons();
+              }
+            }
+            // ─────────────────────────────────────────────────────
           }
         }
       } catch (_) {
@@ -456,6 +552,11 @@ export const StudentsModule = {
     const emailUser  = getVal('stEmailUser');
     const password   = getVal('stPassword');
     const avatarFile = (gc?.querySelector('#stAvatarFile') || document.getElementById('stAvatarFile'))?.files?.[0];
+
+    // Leer parent_id heredado del hermano seleccionado
+    const sibSel = gc?.querySelector('#stSiblingId') || document.getElementById('stSiblingId');
+    const sibOpt = sibSel?.options[sibSel?.selectedIndex];
+    const inheritedParentId = (sibSel?.value && sibOpt?.dataset?.parentId) ? sibOpt.dataset.parentId : null;
 
     if (!name || name.length < 2) {
       Helpers.toast('El nombre del estudiante es obligatorio', 'warning');
@@ -540,6 +641,11 @@ export const StudentsModule = {
         }
 
         if (parentId) payload.parent_id = parentId;
+      }
+
+      // Si se seleccionó hermano, heredar su parent_id (sobrescribe cualquier otro)
+      if (inheritedParentId && !id) {
+        payload.parent_id = inheritedParentId;
       }
 
       // 3. Guardar Estudiante

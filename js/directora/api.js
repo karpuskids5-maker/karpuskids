@@ -312,15 +312,94 @@ export const DirectorApi = {
   // --- CHAT ---
   async getChatUsers(myId, roleFilter) {
     try {
-      let query = supabase.from('profiles').select('id, name, role, avatar_url, email, phone').neq('id', myId).limit(100);
-      if (roleFilter && roleFilter !== 'all') query = query.eq('role', roleFilter);
-      return await query.order('name');
-    } catch (e) { return logError('getChatUsers', e); }
+      console.log('getChatUsers called with myId:', myId, 'roleFilter:', roleFilter);
+      
+      // Primero: obtener TODOS perfiles activos
+      let query = supabase
+        .from('profiles')
+        .select('id, name, role, avatar_url, email, phone')
+        .neq('id', myId)
+        .is('deleted_at', null)
+        .order('name')
+        .limit(200);
+      
+      if (roleFilter && roleFilter !== 'all') {
+        query = query.eq('role', roleFilter);
+      }
+
+      const { data: allProfiles, error: profilesErr } = await query;
+      
+      if (profilesErr) {
+        console.error('Error fetching profiles:', profilesErr);
+        return { data: [], error: profilesErr };
+      }
+      
+      console.log('getChatUsers: allProfiles count:', (allProfiles || []).length);
+
+      // Filtrar perfiles con nombre válido
+      let validProfiles = (allProfiles || []).filter(u => u.name && u.name.trim().length > 0);
+      console.log('getChatUsers: validProfiles count:', validProfiles.length);
+
+      // Obtener IDs de padres con estudiantes activos
+      const { data: activeStudents } = await supabase
+        .from(TABLES.STUDENTS)
+        .select('parent_id')
+        .is('deleted_at', null)
+        .eq('is_active', true);
+
+      const activeParentIds = [...new Set((activeStudents || []).map(s => s.parent_id).filter(Boolean))];
+      console.log('getChatUsers: activeParentIds count:', activeParentIds.length, 'IDs:', activeParentIds);
+
+      // Filtrar perfiles finales:
+      // - Padres: solo si están en activeParentIds
+      // - Personal (directora, maestra, asistente): todos válidos
+      const finalUsers = validProfiles.filter(u => {
+        if (u.role === 'padre') {
+          return activeParentIds.includes(u.id);
+        }
+        return true;
+      });
+
+      console.log('getChatUsers: finalUsers count:', finalUsers.length, 'finalUsers:', finalUsers);
+
+      return { data: finalUsers, error: null };
+    } catch (e) { 
+      console.error('getChatUsers complete error:', e);
+      return logError('getChatUsers', e); 
+    }
   },
 
   async getStudentsByParentIds(ids) {
     try {
-      return await supabase.from(TABLES.STUDENTS).select('parent_id, name, classrooms:classroom_id(name)').in('parent_id', ids);
+      if (!ids || ids.length === 0) {
+        return { data: [], error: null };
+      }
+      // Sin join de classrooms para evitar error 400 por FK hint incorrecto
+      const { data: students, error } = await supabase
+        .from(TABLES.STUDENTS)
+        .select('parent_id, name, classroom_id')
+        .in('parent_id', ids)
+        .is('deleted_at', null)
+        .eq('is_active', true);
+      if (error) throw error;
+
+      // Enriquecer con nombre de aula en query separada si hay classroom_ids
+      const classroomIds = [...new Set((students || []).map(s => s.classroom_id).filter(Boolean))];
+      let classroomMap = {};
+      if (classroomIds.length > 0) {
+        const { data: rooms } = await supabase
+          .from('classrooms')
+          .select('id, name')
+          .in('id', classroomIds);
+        (rooms || []).forEach(r => { classroomMap[r.id] = r.name; });
+      }
+
+      const enriched = (students || []).map(s => ({
+        ...s,
+        classrooms: s.classroom_id ? { name: classroomMap[s.classroom_id] || '' } : null
+      }));
+
+      return { data: enriched, error: null };
     } catch (e) { return logError('getStudentsByParentIds', e); }
   },
 
@@ -379,22 +458,35 @@ export const DirectorApi = {
   },
   async updateStudent(id, data) {
     const numId = parseInt(id, 10);
-    if (isNaN(numId)) return { data: null, error: 'ID de estudiante invÃ¡lido' };
+    if (isNaN(numId)) return { data: null, error: 'ID de estudiante inválido' };
 
-    const clean = { ...data };
-    if ('horario' in clean) { clean.schedule = clean.horario || null; delete clean.horario; }
-    if ('classroom_id' in clean) clean.classroom_id = clean.classroom_id ? parseInt(clean.classroom_id) : null;
-    if ('age'          in clean) clean.age          = clean.age ? parseInt(clean.age) : null;
-    if ('monthly_fee'   in clean) clean.monthly_fee   = clean.monthly_fee != null ? parseFloat(clean.monthly_fee) : 0;
-    if ('prolongado_fee' in clean) clean.prolongado_fee = clean.prolongado_fee != null ? parseFloat(clean.prolongado_fee) : 0;
-    if ('due_day'       in clean) clean.due_day       = clean.due_day ? parseInt(clean.due_day) : 5;
-    delete clean.stAge;
+    // Whitelist explícito de columnas válidas en la tabla students
+    const ALLOWED_COLUMNS = new Set([
+      'name','matricula','classroom_id','age','age_type','schedule','start_date',
+      'is_active','blood_type','allergies','authorized_pickup','authorized_pickup_phone',
+      'p1_name','p1_phone','p1_email','p1_job','p1_address','p1_emergency_contact',
+      'p2_name','p2_phone','p2_email','p2_job','p2_address','p2_emergency_contact',
+      'monthly_fee','prolongado_fee','due_day','avatar_url','parent_id',
+      'notes','qr_code','deleted_at'
+    ]);
 
-    const result = await withTimeout(() => supabase.from(TABLES.STUDENTS).update(clean).eq('id', numId).select().single());
-
-    if (result.error) {
-
+    const clean = {};
+    for (const [k, v] of Object.entries(data)) {
+      if (!ALLOWED_COLUMNS.has(k)) continue; // descartar campos desconocidos
+      clean[k] = v;
     }
+
+    // Conversiones de tipo
+    if ('horario'        in data) { clean.schedule      = data.horario || null; }
+    if ('classroom_id'  in clean) clean.classroom_id   = clean.classroom_id   ? parseInt(clean.classroom_id)   : null;
+    if ('age'           in clean) clean.age            = clean.age            ? parseInt(clean.age)            : null;
+    if ('monthly_fee'   in clean) clean.monthly_fee    = clean.monthly_fee    != null ? parseFloat(clean.monthly_fee)   : 0;
+    if ('prolongado_fee' in clean) clean.prolongado_fee = clean.prolongado_fee != null ? parseFloat(clean.prolongado_fee) : 0;
+    if ('due_day'       in clean) clean.due_day        = clean.due_day        ? parseInt(clean.due_day)        : 5;
+
+    const result = await withTimeout(() =>
+      supabase.from(TABLES.STUDENTS).update(clean).eq('id', numId).select().single()
+    );
     QueryCache.invalidate('dir_students');
     return result;
   },

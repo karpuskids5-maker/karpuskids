@@ -17,6 +17,118 @@ export const escapeHtml = (str = '') => {
  */
 export const Helpers = {
   /**
+   * 📳 Haptic Feedback (Vibración sutil para móvil)
+   */
+  vibrate(style = 'light') {
+    if (!('vibrate' in navigator)) return;
+    
+    try {
+      const patterns = {
+        light: 10,
+        medium: 20,
+        heavy: 40,
+        success: [10, 40, 10],
+        error: [60, 100, 60]
+      };
+      navigator.vibrate(patterns[style] || 10);
+    } catch (e) {
+      // Silenciar error de navegador por falta de interacción
+    }
+  },
+
+  /**
+   * 🛡️ Escapar HTML
+   */
+  escapeHTML(str = '') {
+    return String(str)
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;')
+      .replace(/'/g, '&#39;');
+  },
+  // Alias para compatibilidad
+  escapeHtml(str = '') {
+    return this.escapeHTML(str);
+  },
+
+  /**
+   * 🪟 Loading overlay global
+   */
+  showLoader(msg = 'Cargando...') {
+    this.hideLoader();
+    const el = document.createElement('div');
+    el.id = 'globalLoader';
+    el.className = `
+      fixed
+      inset-0
+      bg-white/70
+      backdrop-blur-sm
+      flex
+      items-center
+      justify-center
+      z-[999]
+    `;
+    el.innerHTML = `
+      <div class="
+        flex
+        flex-col
+        items-center
+        gap-4
+        p-8
+        bg-white
+        rounded-3xl
+        shadow-xl
+      ">
+        <div class="
+          w-10
+          h-10
+          border-4
+          border-slate-200
+          border-t-indigo-500
+          rounded-full
+          animate-spin
+        "></div>
+        <p class="text-sm font-bold text-slate-600">
+          ${this.escapeHTML(msg)}
+        </p>
+      </div>
+    `;
+    document.body.appendChild(el);
+  },
+
+  hideLoader() {
+    document.getElementById('globalLoader')?.remove();
+  },
+
+  /**
+   * 🆔 Generar id
+   */
+  uid() {
+    return crypto.randomUUID();
+  },
+
+  /**
+   * ⏱️ Sleep async
+   */
+  sleep(ms = 300) {
+    return new Promise(resolve => setTimeout(resolve, ms));
+  },
+
+  /**
+   * 🛡️ try/catch global con logging
+   */
+  async safe(fn, context = 'global') {
+    try {
+      return await fn();
+    } catch (err) {
+      console.error(`[Safe:${context}]`, err);
+      this.toast('Algo no salió bien. El equipo técnico ha sido notificado.', 'error');
+      return null;
+    }
+  },
+
+  /**
    * Toast notification profesional
    */
   toast: (() => {

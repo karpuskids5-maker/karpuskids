@@ -177,6 +177,7 @@ export const ProfileModule = {
 
   /**
    * Gestión de foto de perfil del estudiante
+   * Bucket: avatars (público, sin RLS restrictiva)
    */
   setupPhotoUpload() {
     const input = document.getElementById('studentAvatarInput');
@@ -186,53 +187,83 @@ export const ProfileModule = {
       const file = e.target.files[0];
       if (!file) return;
 
-      if (file.size > 2 * 1024 * 1024) return Helpers.toast('Máximo 2MB permitido', 'error');
+      if (file.size > 5 * 1024 * 1024) return Helpers.toast('Máximo 5MB permitido', 'error');
       if (!file.type.startsWith('image/')) return Helpers.toast('Formato de imagen no válido', 'error');
 
-      // Preview inmediato
+      const student = AppState.get('currentStudent');
+      if (!student) return;
+
+      // Preview inmediato antes de subir
       const objectUrl = URL.createObjectURL(file);
-      const profileAvatarDisplay = document.getElementById('profileAvatarDisplay');
-      if (profileAvatarDisplay) {
-        profileAvatarDisplay.innerHTML = `<img src="${objectUrl}" class="w-full h-full object-cover">`;
-      }
+      this._setAvatarPreview(objectUrl);
+
+      const label = input.closest('label');
+      if (label) label.style.opacity = '0.6';
 
       try {
-        AppState.set('loading', true);
-        const student = AppState.get('currentStudent');
-        const ext = file.name.split('.').pop();
-        const path = `avatars/${student.id}_${Date.now()}.${ext}`;
+        const ext = file.name.split('.').pop().toLowerCase().replace('jpeg', 'jpg');
+        const path = `students/${student.id}_${Date.now()}.${ext}`;
 
-        const { error: upErr } = await supabase.storage.from('classroom_media').upload(path, file);
-        if (upErr) throw upErr;
+        // Intentar subir al bucket avatars; si falla, intentar karpus-uploads
+        let publicUrl = null;
+        for (const bucket of ['avatars', 'karpus-uploads', 'classroom_media']) {
+          const { error: upErr } = await supabase.storage
+            .from(bucket)
+            .upload(path, file, { upsert: true, contentType: file.type });
 
-        const { data: { publicUrl } } = supabase.storage.from('classroom_media').getPublicUrl(path);
-        const { error: dbErr } = await supabase.from(TABLES.STUDENTS).update({ avatar_url: publicUrl }).eq('id', student.id);
+          if (!upErr) {
+            const { data } = supabase.storage.from(bucket).getPublicUrl(path);
+            publicUrl = data.publicUrl;
+            break;
+          }
+        }
+
+        if (!publicUrl) throw new Error('No se pudo subir la imagen a ningún bucket');
+
+        const { error: dbErr } = await supabase
+          .from(TABLES.STUDENTS)
+          .update({ avatar_url: publicUrl })
+          .eq('id', student.id);
+
         if (dbErr) throw dbErr;
 
         const updated = { ...student, avatar_url: publicUrl };
         AppState.set('currentStudent', updated);
-        
-        // Update all avatar elements
-        const allStudents = AppState.get('students') || [updated];
+
+        // Actualizar todos los avatares en el header/sidebar
         const profile = AppState.get('profile');
-        if (window.App && window.App.updateHeaderProfile) {
-          window.App.updateHeaderProfile(profile, updated, allStudents);
+        const allStudents = AppState.get('students') || [updated];
+        if (window.updateHeaderProfile) {
+          updateHeaderProfile(profile, updated, allStudents);
         }
-        
-        // Update profileAvatarDisplay with real URL (cache bust)
-        const bustedUrl = publicUrl + '?t=' + Date.now();
-        if (profileAvatarDisplay) {
-          profileAvatarDisplay.innerHTML = `<img src="${bustedUrl}" class="w-full h-full object-cover">`;
-        }
-        
+
+        // Mostrar URL real con cache bust
+        this._setAvatarPreview(publicUrl + '?t=' + Date.now());
         URL.revokeObjectURL(objectUrl);
-        
-        Helpers.toast('Foto actualizada correctamente');
+
+        Helpers.toast('Foto actualizada ✅', 'success');
       } catch (err) {
+        // Revertir preview al avatar anterior
+        this._setAvatarPreview(student.avatar_url || null, student.name);
+        URL.revokeObjectURL(objectUrl);
         Helpers.toast('Error al subir foto: ' + (err.message || err), 'error');
       } finally {
-        AppState.set('loading', false);
+        if (label) label.style.opacity = '';
+        // Limpiar el input para permitir re-seleccionar el mismo archivo
+        input.value = '';
       }
     };
+  },
+
+  /** Actualiza el contenedor de avatar con una URL o iniciales */
+  _setAvatarPreview(url, name) {
+    const el = document.getElementById('profileAvatarDisplay');
+    if (!el) return;
+    if (url) {
+      el.innerHTML = `<img src="${url}" class="w-full h-full object-cover" alt="Avatar">`;
+    } else {
+      const initial = (name || 'E').charAt(0).toUpperCase();
+      el.innerHTML = `<span class="text-4xl font-black text-emerald-700">${initial}</span>`;
+    }
   }
 };

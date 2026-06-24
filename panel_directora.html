@@ -1584,6 +1584,25 @@
           <div class="lg:col-span-2 space-y-6">
             <div class="bg-white rounded shadow p-6">
               <h3 class="text-lg font-semibold mb-4 border-b pb-2 flex items-center gap-2"><i data-lucide="user-circle" class="w-5 h-5"></i> Perfil Profesional (Directora)</h3>
+
+              <!-- Foto de perfil -->
+              <div class="flex items-center gap-5 mb-6 p-4 bg-slate-50 rounded-2xl border border-slate-100">
+                <div class="relative group shrink-0">
+                  <div class="w-24 h-24 rounded-2xl overflow-hidden bg-violet-100 border-2 border-violet-200 shadow-md">
+                    <img id="configProfileAvatar" src="img/mundo.jpg" alt="Foto de perfil" class="w-full h-full object-cover">
+                  </div>
+                  <label for="configAvatarInput" class="absolute -bottom-2 -right-2 w-9 h-9 bg-violet-600 text-white rounded-xl flex items-center justify-center cursor-pointer shadow-lg hover:bg-violet-700 transition-all hover:scale-110 active:scale-95 border-2 border-white">
+                    <i data-lucide="camera" class="w-4 h-4"></i>
+                    <input type="file" id="configAvatarInput" class="hidden" accept="image/jpeg,image/png,image/webp">
+                  </label>
+                </div>
+                <div>
+                  <p class="font-bold text-slate-800 text-sm">Foto de Perfil</p>
+                  <p class="text-xs text-slate-500 mt-0.5">JPG, PNG o WEBP · Máx 5MB</p>
+                  <p class="text-xs text-violet-600 font-bold mt-1">Haz clic en la cámara para cambiarla</p>
+                </div>
+              </div>
+
               <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
                   <label class="block text-sm font-medium text-slate-700 mb-1">Nombre Completo</label>

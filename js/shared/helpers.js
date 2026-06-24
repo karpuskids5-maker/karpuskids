@@ -109,14 +109,18 @@ export const Helpers = {
   vibrate(style = 'light') {
     if (!('vibrate' in navigator)) return;
     
-    const patterns = {
-      light: 10,
-      medium: 20,
-      heavy: 40,
-      success: [10, 40, 10],
-      error: [60, 100, 60]
-    };
-    navigator.vibrate(patterns[style] || 10);
+    try {
+      const patterns = {
+        light: 10,
+        medium: 20,
+        heavy: 40,
+        success: [10, 40, 10],
+        error: [60, 100, 60]
+      };
+      navigator.vibrate(patterns[style] || 10);
+    } catch (e) {
+      // Silenciar error de navegador por falta de interacción
+    }
   },
 
   /**

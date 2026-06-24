@@ -179,7 +179,20 @@ export const ChatModule = {
   _buildBubble(m, myId) {
     const isMine = m.sender_id === myId;
     const div = document.createElement('div');
-    div.className = 'flex ' + (isMine ? 'justify-end' : 'justify-start') + ' mb-3';
+    div.className = 'flex ' + (isMine ? 'justify-end flex-row-reverse' : 'justify-start') + ' mb-3 gap-2';
+
+    // Get avatar for sender
+    const sender = isMine 
+      ? AppState.get('profile') 
+      : this._contacts.find(c => c.id === m.sender_id);
+    
+    const avatarUrl = isMine ? (sender?.avatar_url || null) : (m.sender_avatar || sender?.avatar_url);
+    const name = isMine ? (sender?.name || '') : (m.sender_name || sender?.name || '');
+    
+    // Build avatar HTML
+    const avatarHtml = avatarUrl 
+      ? `<img src="${avatarUrl}" class="w-full h-full object-cover">` 
+      : `<span class="text-sm font-bold">${name.charAt(0) || ''}</span>`;
 
     // Read receipt: show "Visto" for my sent messages that have been read
     const readReceipt = isMine && m.read_at
@@ -187,6 +200,9 @@ export const ChatModule = {
       : (isMine && m.is_read ? '<span class="text-[8px] text-green-300 font-bold ml-1">✓✓</span>' : '');
 
     div.innerHTML =
+      '<div class="w-8 h-8 rounded-full bg-green-100 text-green-700 flex items-center justify-center font-bold overflow-hidden shrink-0 aspect-square">' +
+        avatarHtml +
+      '</div>' +
       '<div class="max-w-[80%] px-4 py-2 rounded-2xl text-sm shadow-sm ' +
         (isMine ? 'bg-green-600 text-white rounded-tr-none' : 'bg-white border border-slate-100 text-slate-700 rounded-tl-none') +
       '">' +

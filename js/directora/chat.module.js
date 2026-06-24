@@ -17,6 +17,10 @@ export const ChatModule = {
     if (!user) return;
     this._currentUserId = user.id;
 
+    // Get current user profile for avatar
+    const { data: profile } = await supabase.from('profiles').select('name, avatar_url').eq('id', user.id).single();
+    this._currentUserProfile = profile || {};
+
     // Bind send button + enter key — once only
     const sendBtn = document.getElementById('btnSendChatMessage');
     const input   = document.getElementById('chatMessageInput');
@@ -45,31 +49,40 @@ export const ChatModule = {
     const list = document.getElementById('chatContactsList');
     if (!list) return;
     list.innerHTML = Helpers.skeleton(4);
+    console.log('=== Director Chat: _loadContacts started ===');
 
     try {
-      const roleVal = document.getElementById('chatRoleFilter')?.value || '';
-      const [usersRes, unreadData] = await Promise.all([
-        DirectorApi.getChatUsers(this._currentUserId, roleVal || null),
-        supabase.rpc('get_unread_counts').then(r => r.data || {}).catch(() => ({}))
-      ]);
-      const { data: users, error } = usersRes;
-      if (error) throw error;
+    const roleVal = document.getElementById('chatRoleFilter')?.value || '';
+    console.log('roleVal:', roleVal);
+    const [usersRes, unreadData] = await Promise.all([
+      DirectorApi.getChatUsers(this._currentUserId, roleVal || null),
+      // get_unread_counts puede no existir — nunca bloquear la carga de contactos
+      supabase.rpc('get_unread_counts').then(r => r.data || {}).catch(() => ({}))
+    ]);
+    console.log('usersRes:', usersRes);
+    const { data: users, error } = usersRes;
+    if (error) throw error;
+    console.log('users from API:', users);
+    console.log('unreadData:', unreadData);
 
       // Enrich padres with student name
       const parentIds = (users || []).filter(u => u.role === 'padre').map(u => u.id);
+      console.log('parentIds:', parentIds);
       let studentMap = {};
       if (parentIds.length) {
         const { data: students } = await DirectorApi.getStudentsByParentIds(parentIds);
+        console.log('students from getStudentsByParentIds:', students);
         (students || []).forEach(s => {
           if (!studentMap[s.parent_id]) studentMap[s.parent_id] = { studentName: s.name, classroomName: s.classrooms?.name || '' };
         });
       }
+      console.log('studentMap:', studentMap);
 
       this._allContacts = (users || []).map(u => {
-        const si = studentMap[u.id];
+        const si = studentMap[u.id] || {};
         // Para padres: mostrar nombre del estudiante como título principal
         // y nombre del padre como subtítulo
-        const parentName   = u.name || 'Padre/Madre';
+        const parentName   = u.name || 'Sin nombre';
         const studentName  = si?.studentName || null;
         const displayName  = (u.role === 'padre' && studentName)
           ? studentName
@@ -86,21 +99,25 @@ export const ChatModule = {
           meta = parts.join(' · ');
         }
 
-        return {
+        const contact = {
           id:          u.id,
           name:        displayName,
           parentName:  u.role === 'padre' ? parentName : null,
           studentName: u.role === 'padre' ? studentName : null,
           avatar:      u.avatar_url,
-          unread:      Number(unreadData[u.id] || 0),
+          unread:      Number((unreadData && unreadData[u.id]) || 0),
           roleLabel,
           meta
         };
+        console.log('Built contact:', contact);
+        return contact;
       });
+      console.log('=== Final this._allContacts:', this._allContacts);
 
       this._renderContacts();
     } catch (e) {
-      list.innerHTML = Helpers.emptyState('Error al cargar contactos');
+      console.error('=== Error loading chat contacts ===', e);
+      list.innerHTML = Helpers.emptyState('Error al cargar contactos: ' + (e.message || 'Desconocido'));
     }
   },
 
@@ -109,7 +126,7 @@ export const ChatModule = {
     if (!list) return;
     const q = (document.getElementById('chatSearchInput')?.value || '').toLowerCase();
     const filtered = this._allContacts.filter(c =>
-      c.name.toLowerCase().includes(q) || c.meta.toLowerCase().includes(q)
+      (c.name || '').toLowerCase().includes(q) || (c.meta || '').toLowerCase().includes(q)
     );
 
     if (!filtered.length) { list.innerHTML = Helpers.emptyState('Sin contactos'); return; }
@@ -118,12 +135,12 @@ export const ChatModule = {
       <div data-contact-id="${c.id}" class="flex items-center gap-3 p-3 rounded-2xl hover:bg-slate-100 cursor-pointer transition-all group relative">
         <div class="relative shrink-0">
           <div class="w-11 h-11 rounded-full bg-slate-200 flex items-center justify-center font-bold text-slate-500 overflow-hidden">
-            ${c.avatar ? `<img src="${c.avatar}" class="w-full h-full object-cover">` : c.name.charAt(0)}
+            ${c.avatar ? `<img src="${c.avatar}" class="w-full h-full object-cover">` : (c.name || '?').charAt(0)}
           </div>
           ${c.unread > 0 ? `<span class="absolute -top-1 -right-1 min-w-[18px] h-[18px] bg-rose-500 text-white text-[9px] font-black rounded-full flex items-center justify-center px-1 shadow animate-pulse">${c.unread > 9 ? '9+' : c.unread}</span>` : ''}
         </div>
         <div class="min-w-0 flex-1">
-          <div class="font-bold text-slate-800 text-sm truncate ${c.unread > 0 ? 'text-slate-900' : ''}">${Helpers.escapeHTML(c.name)}</div>
+          <div class="font-bold text-slate-800 text-sm truncate ${c.unread > 0 ? 'text-slate-900' : ''}">${Helpers.escapeHTML(c.name || 'Sin nombre')}</div>
           ${c.parentName ? `<div class="text-[10px] text-slate-500 font-bold truncate">👤 ${Helpers.escapeHTML(c.parentName)}</div>` : ''}
           <div class="text-[10px] text-slate-400 font-bold uppercase truncate">${c.roleLabel}${c.studentName && c.parentName ? '' : c.meta !== 'Personal Karpus' ? ' · ' + Helpers.escapeHTML(c.meta) : ''}</div>
         </div>
@@ -167,7 +184,7 @@ export const ChatModule = {
       : contact.roleLabel + ' · ' + contact.meta;
     if (avatarEl) avatarEl.innerHTML   = contact.avatar
       ? `<img src="${contact.avatar}" class="w-full h-full object-cover">`
-      : contact.name.charAt(0);
+      : (contact.name || '?').charAt(0);
     headerEl?.classList.remove('hidden');
     inputEl?.classList.remove('hidden');
 
@@ -184,7 +201,16 @@ export const ChatModule = {
       // Reset paginación al abrir un chat nuevo
       SharedChat.resetPagination(this._conversationId);
 
-      const { messages, conversationId } = await SharedChat.loadConversation(this._activeContactId);
+      let messages = [], conversationId = null;
+      try {
+        const res = await SharedChat.loadConversation(this._activeContactId);
+        messages = res.messages || [];
+        conversationId = res.conversationId || null;
+      } catch (_) {
+        // get_direct_messages puede no existir aún — mostrar chat vacío
+        messages = [];
+        conversationId = null;
+      }
       this._conversationId = conversationId;
 
       container.innerHTML = '';
@@ -228,8 +254,25 @@ export const ChatModule = {
   _buildBubble(msg) {
     const isMine = msg.sender_id === this._currentUserId;
     const time   = new Date(msg.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-    return `<div class="flex ${isMine ? 'justify-end' : 'justify-start'} mb-2">
-      <div class="msg-bubble ${isMine ? 'msg-me' : 'msg-them'}">
+    
+    // Get avatar for sender
+    const sender = isMine 
+      ? this._currentUserProfile 
+      : this._allContacts.find(c => c.id === msg.sender_id);
+    
+    const avatarUrl = isMine ? (sender?.avatar_url || null) : (msg.sender_avatar || sender?.avatar);
+    const name = isMine ? (sender?.name || '') : (msg.sender_name || sender?.name || '');
+    
+    // Build avatar HTML
+    const avatarHtml = avatarUrl 
+      ? `<img src="${avatarUrl}" class="w-full h-full object-cover">` 
+      : `<span class="text-sm font-bold">${name.charAt(0) || ''}</span>`;
+    
+    return `<div class="flex ${isMine ? 'justify-end flex-row-reverse' : 'justify-start'} mb-3 gap-2">
+      <div class="w-8 h-8 rounded-full bg-slate-200 flex items-center justify-center font-bold text-slate-500 overflow-hidden shrink-0">
+        ${avatarHtml}
+      </div>
+      <div class="msg-bubble ${isMine ? 'msg-me' : 'msg-them'} max-w-[80%]">
         <div class="whitespace-pre-wrap break-words">${Helpers.escapeHTML(msg.content || '')}</div>
         <div class="text-[9px] ${isMine ? 'text-blue-100' : 'text-slate-400'} mt-1 text-right opacity-80">${time}</div>
       </div>

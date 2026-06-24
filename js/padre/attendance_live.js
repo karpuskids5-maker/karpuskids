@@ -36,7 +36,9 @@ export async function initLiveClassListener(classroomId) {
 
     if (existingChannel) {
       try {
-        await AppState.removeChannelSafe(existingChannel);
+        if (typeof existingChannel.unsubscribe === 'function') {
+          await existingChannel.unsubscribe();
+        }
       } catch (_) {}
       AppState.set('liveChannel', null);
     }
@@ -115,8 +117,6 @@ export async function removeLiveClassListener(channel) {
     } else if (typeof channel.remove === 'function') {
       // fallback a remove si aplica
       await channel.remove();
-    } else if (typeof AppState.removeChannelSafe === 'function') {
-      await AppState.removeChannelSafe(channel);
     }
 
     // limpiar estado global

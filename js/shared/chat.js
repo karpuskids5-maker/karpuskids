@@ -116,14 +116,18 @@ export const ChatModule = {
       const { data, error } = await supabase.rpc('get_direct_messages', {
         p_other_user_id: otherUserId
       });
-      if (error) throw error;
 
-      const messages = (data || []).slice(-MSG_PAGE_SIZE); // solo últimos 20
+      // Si el RPC no existe aún, retornar vacío sin lanzar error
+      if (error) {
+        return { messages: [], conversationId: null, hasMore: false };
+      }
+
+      const messages = (data || []).slice(-MSG_PAGE_SIZE);
       const foundConvId = messages.length > 0 ? messages[0].conversation_id : null;
 
       if (foundConvId) {
         const state = this._getPagState(foundConvId);
-        state.page = 1; // ya cargamos la primera página
+        state.page = 1;
         state.hasMore = (data || []).length >= MSG_PAGE_SIZE;
       }
 
@@ -154,11 +158,33 @@ export const ChatModule = {
 
       // 1. Si no hay conversationId, buscar una existente o crearla
       if (!activeConvId) {
-        // Buscar conversación privada existente entre estos dos usuarios usando RPC para evitar sintaxis compleja de filtros cruzados
-        const { data: convId } = await supabase.rpc('find_or_create_private_conversation', {
+        // Buscar conversación privada existente entre estos dos usuarios
+        let convId = null;
+
+        // Intentar con RPC primero
+        const rpcRes = await supabase.rpc('find_or_create_private_conversation', {
           p_user1: senderId,
           p_user2: receiverId
         });
+
+        if (!rpcRes.error && rpcRes.data) {
+          convId = rpcRes.data;
+        } else {
+          // Fallback: crear manualmente si el RPC no existe
+          const { data: newConv } = await supabase
+            .from('conversations')
+            .insert({ type: 'direct_message' })
+            .select('id')
+            .single();
+
+          if (newConv?.id) {
+            convId = newConv.id;
+            await supabase.from('conversation_participants').insert([
+              { conversation_id: convId, user_id: senderId },
+              { conversation_id: convId, user_id: receiverId }
+            ]).catch(() => {});
+          }
+        }
 
         if (convId) {
           activeConvId = convId;

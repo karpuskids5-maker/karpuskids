@@ -334,7 +334,7 @@
       </div>
 
       <!-- Card Estudiante -->
-      <div class="px-6 mb-8 hidden md:block"> 
+      <div class="px-6 mb-4 hidden md:block"> 
         <div id="student-switcher-trigger" class="bg-emerald-50/40 rounded-3xl p-5 border border-emerald-100/50 transition-all duration-300 hover:bg-emerald-50/60 group cursor-pointer">
           <p class="text-[10px] text-slate-400 font-bold uppercase tracking-widest mb-2 flex items-center gap-1.5">
             <i data-lucide="sparkles" class="w-3.5 h-3.5 text-emerald-500 group-hover:animate-pulse"></i> Estudiante
@@ -347,6 +347,9 @@
           </div>
         </div>
       </div>
+
+      <!-- Chips de Hermanos (desktop) — se inyectan por JS si hay más de 1 hijo -->
+      <div id="siblings-chips-desktop" class="px-6 mb-4 hidden md:block"></div>
       
       <nav
         class="sidebar-nav flex overflow-x-auto no-scrollbar md:flex-col w-full px-3 md:px-4 py-2 gap-1.5 md:gap-1 justify-between md:justify-start relative z-10 md:overflow-y-auto md:flex-1"
@@ -404,7 +407,7 @@
       role="main"
     >
       <!-- Header Móvil -->
-      <div class="md:hidden flex items-center justify-between mb-6">
+      <div class="md:hidden flex items-center justify-between mb-4">
         <span class="font-black text-slate-800 text-xl tracking-tight flex items-center gap-2">
            <span class="text-3xl animate-breathe">🎈</span> 
            <span class="karpus-kids-inline">
@@ -415,6 +418,9 @@
             <i data-lucide="user" class="w-5 h-5"></i>
         </div>
       </div>
+
+      <!-- Chips de Hermanos (móvil) — se inyectan por JS si hay más de 1 hijo -->
+      <div id="siblings-chips-mobile" class="md:hidden mb-4"></div>
 
       <header class="hidden md:flex justify-between items-center mb-10" role="banner">
         <div class="min-w-0 flex-1">
@@ -858,11 +864,16 @@
                   <input type="file" id="studentAvatarInput" class="hidden" accept="image/*">
                 </label>
               </div>
-              <div class="text-center md:text-left">
+              <div class="text-center md:text-left flex-1 w-full">
                 <h3 class="text-3xl font-black text-slate-800 mb-2 student-name-display">Cargando...</h3>
                 <p class="text-sm font-bold text-emerald-600 uppercase tracking-widest flex items-center justify-center md:justify-start gap-2">
                   <i data-lucide="school" class="w-4 h-4"></i> <span class="classroom-name-display">Grado y Sección</span>
                 </p>
+                <!-- Selector rápido de hermanos -->
+                <div id="profile-siblings-container" class="mt-4 hidden">
+                  <p class="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2">Todos los estudiantes</p>
+                  <div id="profile-siblings-list" class="flex gap-3 flex-wrap justify-center md:justify-start"></div>
+                </div>
               </div>
             </div>
 
