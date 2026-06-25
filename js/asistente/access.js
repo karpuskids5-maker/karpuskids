@@ -112,9 +112,7 @@ export const AccessModule = {
       
       for (const p of offline) {
         await supabase.rpc('process_door_punch', {
-          p_student_id: p.sid,
-          p_type: p.type === 'retirado' ? 'check_out' : 'check_in',
-          p_time: p.time // Asegurarse que el RPC acepte p_time o usar insert directo
+          p_code: p.matricula
         });
       }
 
@@ -129,21 +127,40 @@ export const AccessModule = {
   },
 
   // ── Registro de Acceso (Ponche) ───────────────────────────────────────────
-  async register(sid, type) {
+  async register(qrText, type) {
     if (isProcessing) return;
     isProcessing = true;
 
+    let matricula = null;
+
+    // Parse QR data (supports both formats)
+    try {
+      const qrData = JSON.parse(qrText);
+      // New short format
+      if (qrData.m) {
+        matricula = qrData.m;
+      }
+      // Old long format
+      else if (qrData.matricula) {
+        matricula = qrData.matricula;
+      }
+    } catch (e) {
+      // If it's not JSON, assume it's just a matricula string
+      matricula = qrText;
+    }
+
     if (!navigator.onLine) {
-      this._handleOfflinePunch(sid, type);
+      this._handleOfflinePunch(matricula, type);
       isProcessing = false;
       return;
     }
 
     try {
+      // Get student by matricula
       const { data: student, error: sErr } = await supabase
         .from('students')
         .select('id, name, avatar_url, parent_id, classrooms:classroom_id(name)')
-        .eq('id', sid)
+        .eq('matricula', matricula)
         .maybeSingle();
 
       if (sErr || !student) throw new Error('Estudiante no encontrado');
@@ -162,8 +179,7 @@ export const AccessModule = {
 
       // Determinar si es entrada o salida para la DB
       const { error: pErr } = await supabase.rpc('process_door_punch', {
-        p_student_id: sid,
-        p_type: type === 'retirado' ? 'check_out' : 'check_in'
+        p_code: matricula
       });
 
       if (pErr) throw pErr;
@@ -180,11 +196,11 @@ export const AccessModule = {
     }
   },
 
-  _handleOfflinePunch(sid, type) {
+  _handleOfflinePunch(matricula, type) {
     try {
       const offline = JSON.parse(localStorage.getItem('karpus_offline_punches') || '[]');
       offline.push({
-        sid,
+        matricula,
         type,
         time: new Date().toISOString()
       });

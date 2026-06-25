@@ -132,8 +132,8 @@ export const DirectorApi = {
         supabase.from('classrooms').select('*', { count: 'exact', head: true }),
         supabase.from('attendance').select('*', { count: 'exact', head: true }).eq('date', today).in('status', ['present', 'late']),
         supabase.from('inquiries').select('*', { count: 'exact', head: true }).not('status', 'in', '("resolved","closed")'),
-        // Para pagos pendientes, seguimos necesitando la suma de montos, pero limitamos la query
-        supabase.from('payments').select('amount').eq('status', 'pending').limit(1000)
+        // Para pagos pendientes, vencidos y en revisión, necesitamos la suma de montos
+        supabase.from('payments').select('amount').in('status', ['pending', 'overdue', 'review']).limit(1000)
       ]);
 
       const get = (r) => r.status === 'fulfilled' ? r.value : { count: 0, data: [] };

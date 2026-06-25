@@ -23,15 +23,21 @@ export const DashboardService = {
     try {
       const d = new Date();
       const today = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
-      const [counts, attendance, inquiries] = await Promise.all([
+      const [counts, attendance, inquiries, pendingPaymentsData] = await Promise.all([
         DirectorApi.getDashboardKPIs(),
         supabase.from('attendance').select('status').eq('date', today).limit(500),
-        supabase.from('inquiries').select('*').eq('status', 'pending').limit(5)
+        supabase.from('inquiries').select('*').eq('status', 'pending').limit(5),
+        // Obtener suma de pagos pendientes, vencidos y en revisión
+        supabase.from('payments').select('amount, status').in('status', ['pending', 'overdue', 'review']).limit(1000)
       ]);
 
       const att = attendance.data || [];
       const presentCount = att.filter(a => ['present', 'presente', 'late', 'tarde'].includes(a.status?.toLowerCase())).length;
       const kpis = counts.data || {};
+
+      // Calcular total pendiente (pendientes + vencidos + en revisión)
+      const pendingPayments = pendingPaymentsData.data || [];
+      const totalPending = pendingPayments.reduce((sum, p) => sum + Number(p.amount || 0), 0);
 
       const dashboardData = {
         stats: {
@@ -41,7 +47,9 @@ export const DashboardService = {
           classrooms: kpis.classrooms || 0,
           present: kpis.attendance_today ?? presentCount,
           attendance: kpis.attendance_pct || 0,
-          pendingInquiries: kpis.inquiries || 0
+          pendingInquiries: kpis.inquiries || 0,
+          pending_amount: totalPending,
+          pending_payments: totalPending
         },
         recentInquiries: inquiries.data || []
       };

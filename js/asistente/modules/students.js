@@ -349,11 +349,18 @@ export const StudentsModule = {
       container.innerHTML = '';
       if (label) label.textContent = matricula;
       const name = document.getElementById('stName')?.value?.trim() || '';
-      new window.QRCode(container, {
-        text: JSON.stringify({ matricula, name, type: 'karpus-access', v: 1 }),
-        width: 120, height: 120, colorDark: '#1e293b', colorLight: '#ffffff',
-        correctLevel: window.QRCode.CorrectLevel.H
-      });
+      const truncatedName = name.substring(0, 100).trim();
+      try {
+        new window.QRCode(container, {
+          text: JSON.stringify({ m: matricula, n: truncatedName, t: 'karpus-access', v: 1 }),
+          width: 120, height: 120, colorDark: '#1e293b', colorLight: '#ffffff',
+          correctLevel: window.QRCode.CorrectLevel.M
+        });
+      } catch (error) {
+        console.error('Error generating QR:', error);
+        container.innerHTML = '<p class="text-xs text-rose-500 font-bold text-center">Error al generar QR</p>';
+        Helpers.toast('Error al generar QR: texto demasiado largo', 'error');
+      }
     };
 
     window._printStudentQRAsistente = () => {

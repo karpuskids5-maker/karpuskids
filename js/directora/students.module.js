@@ -745,17 +745,26 @@ export const StudentsModule = {
       container.innerHTML = '';
       label && (label.textContent = matricula);
 
+      // Truncar nombre si es muy largo para evitar desbordamiento de QR
+      const truncatedName = (name || '').substring(0, 100).trim();
+      
       // El QR contiene JSON con datos del estudiante para el sistema de acceso
-      const qrData = JSON.stringify({ matricula, name: name || '', type: 'karpus-access', v: 1 });
+      const qrData = JSON.stringify({ m: matricula, n: truncatedName, t: 'karpus-access', v: 1 });
 
-      new window.QRCode(container, {
-        text: qrData,
-        width: 160,
-        height: 160,
-        colorDark: '#1e293b',
-        colorLight: '#ffffff',
-        correctLevel: window.QRCode.CorrectLevel.H
-      });
+      try {
+        new window.QRCode(container, {
+          text: qrData,
+          width: 160,
+          height: 160,
+          colorDark: '#1e293b',
+          colorLight: '#ffffff',
+          correctLevel: window.QRCode.CorrectLevel.M // Usar nivel M para más capacidad
+        });
+      } catch (error) {
+        console.error('Error generando QR:', error);
+        container.innerHTML = '<p class="text-xs text-red-500 font-bold text-center">Error al generar QR</p>';
+        Helpers.toast('Error al generar QR: texto demasiado largo', 'error');
+      }
     };
 
     // Imprimir QR

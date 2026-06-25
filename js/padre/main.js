@@ -1000,13 +1000,14 @@ async function _initPadreQR(student) {
     }
 
     container.innerHTML = '';
-    const qrData = JSON.stringify({ matricula, name, type: 'karpus-access', v: 1 });
+    const truncatedName = name.substring(0, 100).trim();
+    const qrData = JSON.stringify({ m: matricula, n: truncatedName, t: 'karpus-access', v: 1 });
 
     new window.QRCode(container, {
       text: qrData,
       width: 192, height: 192,
       colorDark: '#1e293b', colorLight: '#ffffff',
-      correctLevel: window.QRCode.CorrectLevel.H
+      correctLevel: window.QRCode.CorrectLevel.M
     });
   } catch (e) {
 
