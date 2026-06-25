@@ -99,7 +99,7 @@ export async function openEditTaskModal(taskId) {
 }
 
 export async function deleteTask(taskId) {
-  if (!confirm('Ã‚¿Eliminar esta tarea? Los datos se perderÃƒ¡n permanentemente.')) return;
+  if (!confirm('¿Eliminar esta tarea? Los datos se perderÃƒ¡n permanentemente.')) return;
   try {
     await MaestraApi.deleteTask(taskId);
     safeToast('Tarea eliminada correctamente');
@@ -125,11 +125,11 @@ export async function openNewTaskModal(taskToEdit = null) {
       </div>
       <form id="taskForm" class="space-y-5 overflow-y-auto pr-2 flex-1">
         <div>
-          <label class="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1">TÃƒ­tulo de la Tarea</label>
+          <label class="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1">Ti­tulo de la Tarea</label>
           <input type="text" id="taskTitle" class="w-full p-3 bg-slate-50 border-none rounded-xl text-sm font-bold focus:ring-2 focus:ring-orange-400 outline-none" required>
         </div>
         <div>
-          <label class="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1">DescripciÃƒ³n / Instrucciones</label>
+          <label class="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1">Descripcion / Instrucciones</label>
           <textarea id="taskDesc" rows="5" class="w-full p-3 bg-slate-50 border-none rounded-xl text-sm focus:ring-2 focus:ring-orange-400 outline-none resize-none" placeholder="Explica quÃƒ© deben hacer los alumnos..." required></textarea>
         </div>
         <div>

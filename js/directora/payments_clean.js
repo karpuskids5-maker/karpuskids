@@ -142,7 +142,7 @@ export const PaymentsModule = {
         return;
       }
 
-      const SEL = 'id,student_id,amount,concept,status,due_date,created_at,paid_date,method,bank,reference,month_paid,evidence_url,calculated_mora,total_due,student_name,classroom_name';
+      const SEL = 'id,student_id,amount,concept,status,due_date,created_at,paid_date,method,bank,reference,month_paid,evidence_url,mora_amount,total_due,student_name,classroom_name';
 
       let q = supabase.from('v_payments_with_mora').select(SEL);
 
@@ -250,7 +250,7 @@ export const PaymentsModule = {
     const af  = 'RD$' + Number(p.amount || 0).toLocaleString('es-DO', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
     // Mora acumulada (usando valores de la vista de Postgres)
-    const mora         = Number(p.calculated_mora || 0);
+    const mora         = Number(p.mora_amount || 0);
     const totalAmount  = Number(p.total_due || p.amount || 0);
     const tf           = 'RD$' + totalAmount.toLocaleString('es-DO', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 

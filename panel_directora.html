@@ -593,7 +593,7 @@
             <div class="flex justify-between items-start mb-2">
               <div class="p-2 bg-amber-200 rounded-xl text-amber-700 shadow-sm group-hover:scale-110 transition-transform"><i data-lucide="alert-circle" class="w-6 h-6"></i></div>
             </div>
-            <p class="text-xl font-bold text-amber-800 mb-1 truncate" id="kpiPendingMoney">$0</p>
+            <p class="text-xl font-bold text-amber-800 mb-1 truncate" id="kpiPendingMoney">RD$0.00</p>
             <p class="text-xs text-amber-600 font-medium">Por cobrar</p>
           </div>
 
@@ -1419,6 +1419,7 @@
                </div>
                <div class="flex gap-2">
                  <select id="filterPaymentMonth" class="px-3 py-2 border rounded-xl text-sm bg-slate-50 font-bold text-slate-700">
+                    <option value="all">Todos los meses</option>
                     <option value="01">Enero</option>
                     <option value="02">Febrero</option>
                     <option value="03">Marzo</option>
@@ -1433,9 +1434,11 @@
                     <option value="12">Diciembre</option>
                  </select>
                  <select id="filterPaymentYear" class="px-3 py-2 border rounded-xl text-sm bg-slate-50 font-bold text-slate-700">
+                    <option value="2023">2023</option>
                     <option value="2024">2024</option>
                     <option value="2025">2025</option>
                     <option value="2026" selected>2026</option>
+                    <option value="2027">2027</option>
                  </select>
                </div>
                <select id="filterPaymentStatus" class="px-3 py-2 border rounded-xl text-sm bg-slate-50">

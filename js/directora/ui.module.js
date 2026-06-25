@@ -72,7 +72,7 @@ const DirectorUI = {
 
     // Por cobrar
     const pending = data?.payments?.summary?.total_pending ?? kpis.pending_amount ?? kpis.pending_payments ?? 0;
-    set('kpiPendingMoney', Number(pending).toLocaleString('es-DO', { minimumFractionDigits: 2 }));
+    set('kpiPendingMoney', 'RD$' + Number(pending).toLocaleString('es-DO', { minimumFractionDigits: 2 }));
 
     // Incidencias
     set('kpiIncidents', data?.inquiries?.count ?? kpis.pendingInquiries ?? kpis.inquiries ?? 0);
