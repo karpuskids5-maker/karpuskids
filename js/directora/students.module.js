@@ -731,7 +731,6 @@ export const StudentsModule = {
     // Generar QR del estudiante
     window.generateStudentQR = async () => {
       const matricula = document.getElementById('stMatricula')?.value?.trim();
-      const name = document.getElementById('stName')?.value?.trim();
       const container = document.getElementById('qr-container');
       const label = document.getElementById('qr-matricula-label');
       if (!container) return;
@@ -745,11 +744,8 @@ export const StudentsModule = {
       container.innerHTML = '';
       label && (label.textContent = matricula);
 
-      // Truncar nombre si es muy largo para evitar desbordamiento de QR
-      const truncatedName = (name || '').substring(0, 100).trim();
-      
-      // El QR contiene JSON con datos del estudiante para el sistema de acceso
-      const qrData = JSON.stringify({ m: matricula, n: truncatedName, t: 'karpus-access', v: 1 });
+      // QR just contains the matricula (super short, no overflow!)
+      const qrData = matricula;
 
       try {
         new window.QRCode(container, {
@@ -758,7 +754,7 @@ export const StudentsModule = {
           height: 160,
           colorDark: '#1e293b',
           colorLight: '#ffffff',
-          correctLevel: window.QRCode.CorrectLevel.M // Usar nivel M para más capacidad
+          correctLevel: window.QRCode.CorrectLevel.L // Low ECC allows more capacity
         });
       } catch (error) {
         console.error('Error generando QR:', error);

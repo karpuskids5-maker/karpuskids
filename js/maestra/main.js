@@ -1,4 +1,5 @@
 import { ensureRole, supabase, initOneSignal, RealtimeUtils, emitEvent, sendPush } from '/js/shared/supabase.js';
+import { RealtimeManager } from '/js/shared/realtime-manager.js';
 import { AppState } from './state.js';
 import { MaestraApi } from './api.js';
 import { Helpers } from '/js/shared/helpers.js';
@@ -252,7 +253,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         if (updateError) throw updateError;
         
         // Actualizar avatar en UI
-        document.getElementById('profileAvatar').src = publicUrl;
+        setProfileAvatar(publicUrl, teacherName);
         document.getElementById('sidebarAvatar').innerHTML = `<img src="${publicUrl}" class="w-full h-full object-cover" onerror="this.parentElement.innerHTML='${teacherName.charAt(0)}'">`;
         
         // Actualizar estado
@@ -264,6 +265,20 @@ document.addEventListener('DOMContentLoaded', async () => {
       }
     };
   }
+
+  // Helper to set profile avatar
+  function setProfileAvatar(avatarUrl, name) {
+    const avatarEl = document.getElementById('profileAvatar');
+    if (!avatarEl) return;
+    const initial = (name || 'M').charAt(0).toUpperCase();
+    if (avatarUrl) {
+      avatarEl.innerHTML = `<img src="${avatarUrl}" class="w-full h-full object-cover rounded-full">`;
+    } else {
+      avatarEl.innerHTML = initial;
+    }
+  }
+  // Initialize profile avatar
+  setProfileAvatar(auth.profile?.avatar_url, teacherName);
 
   // 🔥 EXPOSICIÓN GLOBAL DE MÓDULOS (CRUCIAL PARA EL MURO)
   window.WallModule = WallModule;
@@ -384,43 +399,38 @@ document.addEventListener('DOMContentLoaded', async () => {
   if (window.lucide) window.lucide.createIcons();
 });
 
-let currentChannel = null;
-
 function initRealtimeUpdates(classroomId) {
-  if (currentChannel) {
-    currentChannel.unsubscribe();
-    supabase.removeChannel(currentChannel);
-  }
-
-  currentChannel = supabase.channel(`maestra_room_${classroomId}`)
-    .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'task_evidences' }, (payload) => {
-      const student = (AppState.get('students') || []).find(s => s.id === payload.new.student_id);
-      if (student) safeToast(`📝 ${student.name} entregó una tarea`, 'info');
-    })
-    // Escuchar cambios en posts para actualizar el muro sin recargar
-    .on('postgres_changes', { event: '*', schema: 'public', table: 'posts' }, (payload) => {
-      const { eventType, new: newPost, old: oldPost } = payload;
-      const post = newPost || oldPost;
-      
-      // Solo si es de este aula o general
-      if (post && post.classroom_id && post.classroom_id !== classroomId) return;
-
-      if (eventType === 'INSERT') {
-        safeToast('Nueva publicación en el muro', 'info');
-        WallModule.loadPosts('muroPostsContainer');
-      } else if (eventType === 'UPDATE') {
-        const postId = newPost.id;
-        const likeSpan = document.getElementById(`like-count-${postId}`);
-        const commBtn = document.querySelector(`#post-${postId} button[onclick*="toggleCommentSection"] span`);
+  const channelName = `maestra_room_${classroomId}`;
+  
+  RealtimeManager.subscribe(channelName, (channel) => {
+    channel
+      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'task_evidences' }, (payload) => {
+        const student = (AppState.get('students') || []).find(s => s.id === payload.new.student_id);
+        if (student) safeToast(`📝 ${student.name} entregó una tarea`, 'info');
+      })
+      // Escuchar cambios en posts para actualizar el muro sin recargar
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'posts' }, (payload) => {
+        const { eventType, new: newPost, old: oldPost } = payload;
+        const post = newPost || oldPost;
         
-        if (likeSpan && typeof newPost.likes_count === 'number') likeSpan.textContent = newPost.likes_count;
-        if (commBtn && typeof newPost.comments_count === 'number') commBtn.textContent = `${newPost.comments_count} Comentarios`;
-      } else if (eventType === 'DELETE') {
-        document.getElementById(`post-${oldPost.id}`)?.remove();
-      }
-    });
+        // Solo si es de este aula o general
+        if (post && post.classroom_id && post.classroom_id !== classroomId) return;
 
-  RealtimeUtils.monitorChannel(currentChannel, `MaestraRoom_${classroomId}`);
+        if (eventType === 'INSERT') {
+          safeToast('Nueva publicación en el muro', 'info');
+          WallModule.loadPosts('muroPostsContainer');
+        } else if (eventType === 'UPDATE') {
+          const postId = newPost.id;
+          const likeSpan = document.getElementById(`like-count-${postId}`);
+          const commBtn = document.querySelector(`#post-${postId} button[onclick*="toggleCommentSection"] span`);
+          
+          if (likeSpan && typeof newPost.likes_count === 'number') likeSpan.textContent = newPost.likes_count;
+          if (commBtn && typeof newPost.comments_count === 'number') commBtn.textContent = `${newPost.comments_count} Comentarios`;
+        } else if (eventType === 'DELETE') {
+          document.getElementById(`post-${oldPost.id}`)?.remove();
+        }
+      });
+  });
 }
 
 async function notify({ message, pushTo = null }) {
@@ -672,6 +682,9 @@ function initNavigation() {
   const navButtons = document.querySelectorAll('.nav-btn-toy[data-section]');
   const sections = document.querySelectorAll('.section');
 
+  // Track previous section for cleanup
+  let previousSection = null;
+  
   const setActiveSection = (targetId, options = {}) => {
     // Si el targetId ya viene con 't-', lo usamos directamente, si no lo agregamos
     const fullId = targetId.startsWith('t-') ? targetId : `t-${targetId}`;
@@ -680,7 +693,13 @@ function initNavigation() {
     Helpers.vibrate?.('light');
 
     // ✅ LIMPIEZA DE REALTIME: Eliminar canales al cambiar de sección
-    if (window.RealtimeManager) RealtimeManager.unsubscribeAll(['notifications']);
+    if (previousSection && (previousSection === 't-home' || previousSection === 't-class-detail')) {
+      WallModule.destroy();
+      const classroom = AppState.get('classroom');
+      if (classroom) {
+        RealtimeManager.unsubscribe(`maestra_room_${classroom.id}`);
+      }
+    }
 
     sections.forEach(s => s.classList.remove('active'));
     const target = document.getElementById(fullId);
@@ -727,6 +746,8 @@ function initNavigation() {
 
     // 🔴 Marcar badge como leído al entrar a la sección
     BadgeSystem.mark(fullId);
+    
+    previousSection = fullId;
   };
 
   navButtons.forEach(btn => {
@@ -1112,7 +1133,13 @@ async function loadPendingTasksBadge(classroomId) {
  * Inicializar QR de la maestra
  */
 function _initMaestraQR(profile, user) {
-  const container = document.getElementById('maestraQR');
+  const container = document.getElementById('maestra-qr-container');
+  const matriculaEl = document.getElementById('maestra-qr-matricula');
+  
+  if (matriculaEl) {
+    matriculaEl.textContent = user.id;
+  }
+  
   if (!container) return;
   
   const qrData = JSON.stringify({

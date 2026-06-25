@@ -348,13 +348,11 @@ export const StudentsModule = {
       }
       container.innerHTML = '';
       if (label) label.textContent = matricula;
-      const name = document.getElementById('stName')?.value?.trim() || '';
-      const truncatedName = name.substring(0, 100).trim();
       try {
         new window.QRCode(container, {
-          text: JSON.stringify({ m: matricula, n: truncatedName, t: 'karpus-access', v: 1 }),
+          text: matricula,
           width: 120, height: 120, colorDark: '#1e293b', colorLight: '#ffffff',
-          correctLevel: window.QRCode.CorrectLevel.M
+          correctLevel: window.QRCode.CorrectLevel.L
         });
       } catch (error) {
         console.error('Error generating QR:', error);

@@ -516,18 +516,31 @@ async function initProfile() {
   setVal('profileEmail', p.email);
   setVal('profileBio', p.bio || '');
 
+  // Helper to set avatar
+  const setProfileAvatar = (avatarUrl, name) => {
+    const avatarEl = document.getElementById('profileAvatarPreview');
+    if (!avatarEl) return;
+    const initial = (name || 'A').charAt(0).toUpperCase();
+    if (avatarUrl) {
+      avatarEl.innerHTML = `<img src="${avatarUrl}" class="w-full h-full object-cover rounded-full">`;
+    } else {
+      avatarEl.innerHTML = initial;
+    }
+  };
+  
   // Avatar
   const avatarInput   = document.getElementById('profileAvatarInput');
-  const avatarPreview = document.getElementById('profileAvatarPreview');
-  if (avatarPreview && p.avatar_url) {
-    avatarPreview.src = p.avatar_url;
-  }
+  setProfileAvatar(p.avatar_url, p.name);
+
   if (avatarInput) {
     avatarInput.onchange = (e) => {
       const file = e.target.files[0];
-      if (file && avatarPreview) {
+      if (file) {
         const reader = new FileReader();
-        reader.onload = (ev) => { avatarPreview.src = ev.target.result; };
+        reader.onload = (ev) => { 
+          const avatarEl = document.getElementById('profileAvatarPreview');
+          avatarEl.innerHTML = `<img src="${ev.target.result}" class="w-full h-full object-cover rounded-full">`; 
+        };
         reader.readAsDataURL(file);
       }
     };
@@ -620,7 +633,8 @@ async function initProfile() {
           updates.avatar_url = publicUrl;
           const sidebarAvatar = document.getElementById('sidebarAvatar');
           if (sidebarAvatar) sidebarAvatar.src = publicUrl;
-          if (avatarPreview) avatarPreview.src = publicUrl;
+          const avatarEl = document.getElementById('profileAvatarPreview');
+          if (avatarEl) avatarEl.innerHTML = `<img src="${publicUrl}" class="w-full h-full object-cover rounded-full">`;
         }
         const { error } = await supabase.from('profiles').update(updates).eq('id', p.id);
         if (error) throw error;
