@@ -14,8 +14,13 @@ Para mantener la liquidez y evitar malentendidos con los padres, el sistema debe
 *   **Regla de Gracia para Nuevos Ingresos:**
     *   Si un niño entra antes del día 25, se le genera el cobro del mes siguiente.
     *   Si entra el 25 o después, su primer cobro será para el mes subsiguiente.
-*   **Vencimiento y Mora:** La fecha límite de pago es el **día 5 de cada mes**. A partir del día 6, el sistema marcará el pago como "Vencido" y empezará a calcular mora automáticamente (RD$50 diarios o bloque de RD$500 cada 7 días según configuración actual).
-*   **Validación de Comprobantes:** Ningún pago se marca como "Pagado" automáticamente si es transferencia. La administración **debe validar** la evidencia antes de aprobar el pago.
+*   **Vencimiento y Mora:** La fecha límite de pago es el **día 5 de cada mes**. A partir del día 6, el sistema marcará el pago como "Vencido" y aplicará:
+    *   **Cargo Administrativo:** RD$200 fijos al primer día de retraso.
+    *   **Mora Diaria:** RD$50 adicionales por cada día de atraso.
+*   **Validación Estricta de Comprobantes:**
+    *   No se puede aprobar un pago si no hay una imagen de comprobante cargada (excepto si el método de pago se marca como "Efectivo").
+    *   Cuando un padre sube un comprobante, el estado del pago cambia automáticamente a **"En Revisión"**, alertando a la administración.
+*   **Protección de Datos:** Una vez que un pago es marcado como "Pagado", queda bloqueado. No puede ser eliminado ni modificado (excepto por un usuario de rol Admin) para evitar fraudes o errores contables.
 
 ## 3. Normativas de Chat y Comunicación
 El chat es para uso profesional y seguimiento pedagógico.

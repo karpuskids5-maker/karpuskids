@@ -86,18 +86,16 @@ export const PaymentService = {
   },
 
   async approve(id) {
+    // Usar el RPC para aplicar las reglas de negocio de la base de datos
+    const { data, error: rpcError } = await supabase.rpc('approve_payment', { p_payment_id: id });
+
+    if (rpcError) throw rpcError;
+    if (data?.error) throw new Error(data.error);
+
+    // Obtener datos para notificaciones
     const { data: p, error: fe } = await supabase
       .from('payments').select(PAYMENT_COLS_WITH_STUDENT).eq('id', id).single();
     if (fe) throw fe;
-
-    // Validaciones antes de aprobar
-    if (!p) throw new Error('Pago no encontrado');
-    if (p.status === 'paid') throw new Error('Este pago ya fue aprobado');
-    if (Number(p.amount || 0) <= 0) throw new Error('El monto del pago no es válido');
-
-    const { error } = await supabase
-      .from('payments').update({ status: 'paid', paid_date: new Date().toISOString() }).eq('id', id);
-    if (error) throw error;
 
     const student = p.students;
     const amount  = Helpers.formatCurrency(Number(p.amount||0));

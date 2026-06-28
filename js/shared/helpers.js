@@ -790,11 +790,12 @@ export const Helpers = {
 
 
   /**
-   * 💰 Cálculo de Mora (Regla Unificada 5% Mensual)
-   * Se aplica un 5% del monto base por cada mes o fracción de mes de retraso.
+   * 💰 Cálculo de Mora (Regla Unificada v2)
+   * - Día 1 de retraso: RD$200 cargo administrativo fijo.
+   * - A partir del día 2: RD$50 por cada día adicional.
    */
   calculateMora(dueDate, baseAmount = 0) {
-    if (!dueDate || !baseAmount) return 0;
+    if (!dueDate) return 0;
 
     const dueDateStr = String(dueDate);
     const normalizedDate = /^\d{4}-\d{2}-\d{2}$/.test(dueDateStr)
@@ -812,11 +813,13 @@ export const Helpers = {
 
     if (daysLate <= 0) return 0;
 
-    const moraRate = 0.05; // 5% mensual
-    const monthsLate = Math.ceil(daysLate / 30);
-    const totalMora = Number(baseAmount) * moraRate * monthsLate;
+    // RD$200 inicial + (días adicionales * 50)
+    let totalMora = 200;
+    if (daysLate > 1) {
+      totalMora += (daysLate - 1) * 50;
+    }
 
-    return Math.round(totalMora * 100) / 100;
+    return totalMora;
   },
 
   /**
@@ -835,17 +838,11 @@ export const Helpers = {
     const limit = new Date(normalizedDate); limit.setHours(0, 0, 0, 0);
     const daysLate = Math.floor((today.getTime() - limit.getTime()) / (1000 * 60 * 60 * 24));
 
-    const monthsLate = Math.ceil(daysLate / 30);
-
-    let text = daysLate === 1 ? '1 día' : `${daysLate} días`;
-    if (monthsLate > 0) {
-      text = `${monthsLate} mes${monthsLate > 1 ? 'es' : ''} (${daysLate} d)`;
-    }
+    let text = daysLate === 1 ? '1 día (Atraso)' : `${daysLate} días de atraso`;
 
     return {
       total,
       daysLate,
-      monthsLate,
       formattedText: text.trim()
     };
   }
