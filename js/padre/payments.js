@@ -719,10 +719,11 @@ export const PaymentsModule = {
       const existing = existingPayments?.[0] || null;
 
       if (existing) {
-        // UPDATE: Cambiar a revisión y adjuntar comprobante
+        // UPDATE: Cambiar a revisión y adjuntar comprobante (ambos campos para compatibilidad)
         const { error: updateErr } = await supabase.from(TABLES.PAYMENTS)
           .update({ 
-            evidence_url: publicUrl, 
+            evidence_url: publicUrl,
+            proof_url: publicUrl,
             status: 'review', 
             method, 
             bank
@@ -730,14 +731,15 @@ export const PaymentsModule = {
           .eq('id', existing.id);
         if (updateErr) throw updateErr;
       } else {
-        // INSERT: Crear nuevo registro en revisión si no existe
+        // INSERT: Crear nuevo registro en revisión si no existe (ambos campos para compatibilidad)
         const { error: insertErr } = await supabase.from(TABLES.PAYMENTS).insert({
           student_id: student.id, 
           amount, 
           month_paid: month,
           method, 
           bank, 
-          evidence_url: publicUrl, 
+          evidence_url: publicUrl,
+          proof_url: publicUrl,
           status: 'review',
           created_at: new Date().toISOString()
         });

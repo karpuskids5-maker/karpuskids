@@ -790,11 +790,15 @@ export const Helpers = {
 
 
   /**
-   * 💰 Cálculo de Mora (Regla Unificada 5% Mensual)
-   * Se aplica un 5% del monto base por cada mes o fracción de mes de retraso.
+   * 💰 Cálculo de Mora (Regla Nueva 2026)
+   * • Días 1 al 6 de atraso: RD$50 por día 
+   * • Día 7 (primer bloque): Se convierte en RD$500 acumulados 
+   * • Después del día 7: +RD$50 por día adicional 
+   * • Cada 7 días (nuevo bloque): +RD$500 adicionales 
+   * • Fórmula: (bloques de 7 días × RD$500) + (días restantes × RD$50)
    */
   calculateMora(dueDate, baseAmount = 0) {
-    if (!dueDate || !baseAmount) return 0;
+    if (!dueDate) return 0;
 
     const dueDateStr = String(dueDate);
     const normalizedDate = /^\d{4}-\d{2}-\d{2}$/.test(dueDateStr)
@@ -812,9 +816,12 @@ export const Helpers = {
 
     if (daysLate <= 0) return 0;
 
-    const moraRate = 0.05; // 5% mensual
-    const monthsLate = Math.ceil(daysLate / 30);
-    const totalMora = Number(baseAmount) * moraRate * monthsLate;
+    // Calcular bloques completos de 7 días y días restantes
+    const bloques = Math.floor(daysLate / 7);
+    const diasRestantes = daysLate % 7;
+    
+    // Aplicar fórmula: (bloques × 500) + (días restantes × 50)
+    const totalMora = (bloques * 500) + (diasRestantes * 50);
 
     return Math.round(totalMora * 100) / 100;
   },
@@ -835,17 +842,24 @@ export const Helpers = {
     const limit = new Date(normalizedDate); limit.setHours(0, 0, 0, 0);
     const daysLate = Math.floor((today.getTime() - limit.getTime()) / (1000 * 60 * 60 * 24));
 
-    const monthsLate = Math.ceil(daysLate / 30);
+    // Calcular bloques completos de 7 días y días restantes
+    const bloques = Math.floor(daysLate / 7);
+    const diasRestantes = daysLate % 7;
 
-    let text = daysLate === 1 ? '1 día' : `${daysLate} días`;
-    if (monthsLate > 0) {
-      text = `${monthsLate} mes${monthsLate > 1 ? 'es' : ''} (${daysLate} d)`;
+    let text = '';
+    if (bloques > 0 && diasRestantes > 0) {
+      text = `${bloques} bloque${bloques > 1 ? 's' : ''} de 7d + ${diasRestantes} d`;
+    } else if (bloques > 0) {
+      text = `${bloques} bloque${bloques > 1 ? 's' : ''} de 7d`;
+    } else {
+      text = daysLate === 1 ? '1 día' : `${daysLate} días`;
     }
 
     return {
       total,
       daysLate,
-      monthsLate,
+      bloques,
+      diasRestantes,
       formattedText: text.trim()
     };
   }

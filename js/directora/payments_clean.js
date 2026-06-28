@@ -578,11 +578,13 @@ export const PaymentsModule = {
   async markPaid(id) {
     try {
       Helpers.vibrate('success');
-      // Aprobar directamente — funciona para efectivo y transferencia sin depender de RPC
-      const { error } = await supabase.from('payments')
-        .update({ status: 'paid', paid_date: new Date().toISOString() })
-        .eq('id', id);
-      if (error) throw error;
+      // Usar RPC seguro que valida comprobante antes de aprobar
+      const { data, error: rpcError } = await supabase.rpc('approve_payment', {
+        p_payment_id: id,
+        p_notes: 'Aprobado desde panel de Directora'
+      });
+      if (rpcError) throw rpcError;
+      if (data?.error) throw new Error(data.error);
 
       // Obtener datos del pago para notificar y activar estudiante
       const { data: pay } = await supabase.from('payments')
