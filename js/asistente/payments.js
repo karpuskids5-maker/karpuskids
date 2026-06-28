@@ -103,7 +103,7 @@ export const PaymentsModule = {
   async loadPayments() {
     const container = document.getElementById('paymentsTableBody');
     if (!container) return;
-    container.innerHTML = '<tr><td colspan="7" class="text-center py-10"><div class="animate-spin rounded-full h-8 w-8 border-b-2 border-teal-600 mx-auto mb-2"></div><p class="text-xs text-slate-400">Cargando pagos...</p></td></tr>';
+    container.innerHTML = '<tr><td colspan="8" class="text-center py-10"><div class="animate-spin rounded-full h-8 w-8 border-b-2 border-teal-600 mx-auto mb-2"></div><p class="text-xs text-slate-400">Cargando pagos...</p></td></tr>';
     this.loadStats();
 
     try {
@@ -145,7 +145,7 @@ export const PaymentsModule = {
 
       if (!list.length) {
         const label = monthVal ? MONTH_LABELS[parseInt(monthVal, 10) - 1] + ' ' + yearVal : 'este periodo';
-        container.innerHTML = '<tr><td colspan="7" class="text-center py-16"><div class="flex flex-col items-center gap-3"><div class="w-14 h-14 bg-slate-100 rounded-full flex items-center justify-center"><i data-lucide="inbox" class="w-7 h-7 text-slate-400"></i></div><p class="font-bold text-slate-500">Sin registros para ' + label + '</p><p class="text-xs text-slate-400">Prueba cambiando el filtro de estado o mes.</p></div></td></tr>';
+        container.innerHTML = '<tr><td colspan="8" class="text-center py-16"><div class="flex flex-col items-center gap-3"><div class="w-14 h-14 bg-slate-100 rounded-full flex items-center justify-center"><i data-lucide="inbox" class="w-7 h-7 text-slate-400"></i></div><p class="font-bold text-slate-500">Sin registros para ' + label + '</p><p class="text-xs text-slate-400">Prueba cambiando el filtro de estado o mes.</p></div></td></tr>';
         if (window.lucide) lucide.createIcons();
         return;
       }
@@ -153,7 +153,7 @@ export const PaymentsModule = {
       container.innerHTML = list.map(p => this._renderRow(p)).join('');
       if (window.lucide) lucide.createIcons();
     } catch (e) {
-      container.innerHTML = '<tr><td colspan="7" class="text-center py-8"><p class="text-rose-500 font-bold">Error al cargar: ' + (e.message || 'Intenta recargar') + '</p></td></tr>';
+      container.innerHTML = '<tr><td colspan="8" class="text-center py-8"><p class="text-rose-500 font-bold">Error al cargar: ' + (e.message || 'Intenta recargar') + '</p></td></tr>';
     }
   },
 
@@ -185,12 +185,14 @@ export const PaymentsModule = {
       }
     }
 
+    const bankRef = [p.bank, p.reference].filter(Boolean).join(' / ') || '-';
+
     return '<tr class="hover:bg-slate-50 border-b border-slate-100 transition-colors' + (statusKey === 'overdue' ? ' bg-rose-50/20' : '') + '">' +
       '<td class="px-5 py-3.5"><div class="flex items-center gap-3"><div class="w-8 h-8 rounded-xl bg-teal-50 text-teal-600 flex items-center justify-center font-black text-sm flex-shrink-0">' + (student.name || '?').charAt(0).toUpperCase() + '</div><div><div class="font-bold text-slate-800 text-sm">' + Helpers.escapeHTML(student.name || '-') + '</div><div class="text-[10px] text-slate-400 uppercase">' + (student.classrooms?.name || 'Sin aula') + '</div></div></div></td>' +
       '<td class="px-5 py-3.5 text-center"><span class="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[10px] font-black uppercase ' + st.cls + '"><i data-lucide="' + st.icon + '" class="w-3 h-3"></i>' + st.label + '</span></td>' +
       '<td class="px-5 py-3.5 text-right"><div class="font-black text-slate-800">' + amountFmt + '</div>' + (moraBlock ? '<div class="mt-0.5">' + moraBlock + '</div>' : '') + '</td>' +
       '<td class="px-5 py-3.5"><span class="text-[10px] font-black uppercase text-slate-500 bg-slate-100 px-2 py-0.5 rounded-md">' + (p.method || '-') + '</span></td>' +
-      '<td class="px-5 py-3.5"><div class="text-[11px] font-bold text-slate-700">' + monthFmt + '</div></td>' +
+      '<td class="px-5 py-3.5"><div class="text-[11px] font-bold text-slate-700">' + Helpers.escapeHTML(bankRef) + '</div><div class="text-[9px] text-slate-400">' + monthFmt + '</div></td>' +
       '<td class="px-5 py-3.5"><div class="text-[11px] font-bold text-slate-700">' + (p.paid_date ? new Date(p.paid_date).toLocaleDateString('es-ES') : ds) + '</div><div class="text-[9px] text-slate-400 uppercase">' + (p.paid_date ? 'Pagado' : 'Vence') + '</div></td>' +
       '<td class="px-5 py-3.5 text-center">' + (hasV ? '<a href="' + (p.evidence_url || p.proof_url) + '" target="_blank" class="inline-flex items-center gap-1 text-sky-600 text-xs font-bold"><i data-lucide="external-link" class="w-3 h-3"></i>Ver</a>' : '<span class="text-slate-300 text-xs">-</span>') + '</td>' +
       '<td class="px-5 py-3.5 text-center"><div class="flex justify-center gap-1.5">' +

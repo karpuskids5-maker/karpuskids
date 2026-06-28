@@ -126,10 +126,10 @@ export const PaymentsModule = {
         maxVisibleMonthKey = `${prevY}-${String(prevM).padStart(2, '0')}`;
       }
 
-      const monthKey = yv && mv ? `${yv}-${String(mv).padStart(2,'0')}` : maxVisibleMonthKey;
+      const monthKey = (yv && mv && mv !== 'all') ? `${yv}-${String(mv).padStart(2,'0')}` : maxVisibleMonthKey;
 
       // Si el usuario selecciona un mes que aún no debe ser visible
-      if (monthKey > maxVisibleMonthKey) {
+      if (mv && mv !== 'all' && monthKey > maxVisibleMonthKey) {
         const mi = parseInt(mv, 10) - 1;
         const label = MES_LABEL[mi] || mv;
         tbody.innerHTML = `<tr><td colspan="8" class="text-center py-16">
@@ -146,7 +146,12 @@ export const PaymentsModule = {
 
       let q = supabase.from('v_payments_with_mora').select(SEL);
 
-      if (sf === 'all') {
+      if (mv === 'all' || !mv) {
+        // Todos los meses del año seleccionado
+        q = q.gte('month_paid', (yv || currentYear) + '-01')
+             .lte('month_paid', maxVisibleMonthKey);
+        if (sf && sf !== 'all') q = q.eq('status', sf);
+      } else if (sf === 'all') {
         q = q.or(`and(status.eq.overdue,month_paid.lt.${maxVisibleMonthKey}),month_paid.eq.${monthKey}`);
       } else if (sf === 'pending' || sf === 'overdue' || sf === 'review') {
         q = q.eq('status', sf).lte('month_paid', maxVisibleMonthKey);
@@ -188,7 +193,8 @@ export const PaymentsModule = {
         html += previousMonthDebts.map(p => this._row(p)).join('');
       }
       if (currentMonthItems.length > 0) {
-        const monthLabel = MES_LABEL[parseInt(mv || (maxVisibleMonthKey.split('-')[1]), 10) - 1]?.toUpperCase() || 'MES SELECCIONADO';
+        const activeMv = (mv && mv !== 'all') ? mv : maxVisibleMonthKey.split('-')[1];
+        const monthLabel = MES_LABEL[parseInt(activeMv, 10) - 1]?.toUpperCase() || 'MES SELECCIONADO';
         html += `<tr class="bg-indigo-50/50"><td colspan="8" class="px-5 py-2 text-[10px] font-black text-indigo-500 uppercase tracking-[0.2em] border-y border-indigo-100">\uD83D\uDCC5 ${monthLabel} ${yv || maxVisibleMonthKey.split('-')[0]}</td></tr>`;
         html += currentMonthItems.map(p => this._row(p)).join('');
       }
@@ -198,18 +204,6 @@ export const PaymentsModule = {
       }
 
       tbody.innerHTML = html;
-
-      // ✨ Inicializar Gestos Swipe
-      UIPremium.initSwipeActions('paymentsTableBody', {
-        onRight: (id) => {
-          Helpers.vibrate('medium');
-          this.markPaid(id);
-        },
-        onLeft: (id) => {
-          const p = AppState.get('paymentsData')?.find(x => x.id === id);
-          if (p?.evidence_url) window.open(p.evidence_url, '_blank');
-        }
-      });
 
       if (window.lucide) lucide.createIcons();
     } catch (e) {
@@ -282,27 +276,15 @@ export const PaymentsModule = {
       ? '<a href="' + p.evidence_url + '" target="_blank" rel="noopener noreferrer" class="inline-flex items-center gap-1 text-sky-600 hover:text-sky-800 text-xs font-bold uppercase"><i data-lucide="external-link" class="w-3 h-3"></i>Ver</a>'
       : '<span class="text-slate-300 text-xs">-</span>';
 
-    return '<tr class="swipe-row hover:bg-slate-50 border-b border-slate-100 transition-colors' + (sk === 'overdue' ? ' bg-rose-50/20' : '') + '" data-id="' + p.id + '">' +
-      '<td colspan="8" class="p-0 border-none">' +
-        '<div class="swipe-actions">' +
-          '<div class="action-left"><i data-lucide="check"></i></div>' +
-          '<div class="action-right"><i data-lucide="eye"></i></div>' +
-        '</div>' +
-        '<div class="swipe-content bg-white flex w-full">' +
-          '<table class="w-full table-fixed">' +
-            '<tr>' +
-              '<td class="px-5 py-3.5 w-1/4"><div class="flex items-center gap-3"><div class="w-8 h-8 rounded-xl bg-indigo-50 text-indigo-600 flex items-center justify-center font-black text-sm flex-shrink-0">' + Helpers.escapeHTML((stu.name || '?').charAt(0).toUpperCase()) + '</div><div><div class="font-bold text-slate-800 text-sm truncate">' + Helpers.escapeHTML(stu.name || '-') + '</div><div class="text-[10px] text-slate-400 font-bold uppercase truncate">' + (stu.classrooms?.name || 'Sin aula') + '</div></div></div></td>' +
-              '<td class="px-5 py-3.5 text-center w-1/6"><span class="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[10px] font-black uppercase ' + st.c + '"><i data-lucide="' + st.i + '" class="w-3 h-3"></i>' + st.l + '</span></td>' +
-              '<td class="px-5 py-3.5 text-right w-1/6"><div class="font-black text-slate-800 text-base">' + af + '</div>' + (ip ? '<div class="flex flex-col items-end gap-0.5 mt-0.5">' + ub + '</div>' : '') + '</td>' +
-              '<td class="px-5 py-3.5 w-1/8"><span class="text-[10px] font-black uppercase text-slate-500 bg-slate-100 px-2 py-0.5 rounded-md">' + (p.method || '-') + '</span></td>' +
-              '<td class="px-5 py-3.5 w-1/6"><div class="text-[10px] font-bold text-slate-600 uppercase truncate max-w-[110px]">' + (p.bank || '-') + '</div><div class="text-[9px] text-slate-400 font-bold">' + (p.reference || '') + '</div></td>' +
-              '<td class="px-5 py-3.5 w-1/8"><div class="text-[11px] font-bold text-slate-700">' + (p.paid_date ? new Date(p.paid_date).toLocaleDateString('es-ES') : ds) + '</div><div class="text-[9px] text-slate-400 font-bold uppercase">' + (p.paid_date ? 'Pagado' : 'Vence') + '</div></td>' +
-              '<td class="px-5 py-3.5 text-center w-1/12">' + voucherCell + '</td>' +
-              '<td class="px-5 py-3.5 text-center w-1/8"><div class="flex justify-center gap-1.5">' + approveBtn + waiveMoraBtn + deleteBtn + '</div></td>' +
-            '</tr>' +
-          '</table>' +
-        '</div>' +
-      '</td>' +
+    return '<tr class="hover:bg-slate-50 border-b border-slate-100 transition-colors' + (sk === 'overdue' ? ' bg-rose-50/20' : '') + '" data-id="' + p.id + '">' +
+      '<td class="px-6 py-3.5"><div class="flex items-center gap-3"><div class="w-8 h-8 rounded-xl bg-indigo-50 text-indigo-600 flex items-center justify-center font-black text-sm flex-shrink-0">' + Helpers.escapeHTML((stu.name || '?').charAt(0).toUpperCase()) + '</div><div><div class="font-bold text-slate-800 text-sm">' + Helpers.escapeHTML(stu.name || '-') + '</div><div class="text-[10px] text-slate-400 font-bold uppercase">' + (stu.classrooms?.name || 'Sin aula') + '</div></div></div></td>' +
+      '<td class="px-6 py-3.5 text-center"><span class="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[10px] font-black uppercase ' + st.c + '"><i data-lucide="' + st.i + '" class="w-3 h-3"></i>' + st.l + '</span></td>' +
+      '<td class="px-6 py-3.5 text-right"><div class="font-black text-slate-800">' + af + '</div>' + (ip ? '<div class="flex flex-col items-end gap-0.5 mt-0.5">' + ub + '</div>' : '') + '</td>' +
+      '<td class="px-6 py-3.5"><span class="text-[10px] font-black uppercase text-slate-500 bg-slate-100 px-2 py-0.5 rounded-md">' + (p.method || '-') + '</span></td>' +
+      '<td class="px-6 py-3.5"><div class="text-[10px] font-bold text-slate-600 uppercase truncate max-w-[120px]">' + Helpers.escapeHTML(p.bank || '-') + '</div><div class="text-[9px] text-slate-400 font-bold">' + Helpers.escapeHTML(p.reference || '') + '</div></td>' +
+      '<td class="px-6 py-3.5"><div class="text-[11px] font-bold text-slate-700">' + (p.paid_date ? new Date(p.paid_date).toLocaleDateString('es-ES') : ds) + '</div><div class="text-[9px] text-slate-400 font-bold uppercase">' + (p.paid_date ? 'Pagado' : 'Vence') + '</div></td>' +
+      '<td class="px-6 py-3.5 text-center">' + voucherCell + '</td>' +
+      '<td class="px-6 py-3.5 text-center"><div class="flex justify-center gap-1.5">' + approveBtn + waiveMoraBtn + deleteBtn + '</div></td>' +
     '</tr>';
   },
 
