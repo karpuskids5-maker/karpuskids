@@ -42,6 +42,7 @@ window.App = {
   permits: PermitsModule,
   chat: ChatModule,
   automation: AutomationModule,
+  reports: { init: () => import('./reports.module.js').then(m => m.ReportsModule.init()) },
   wall: {
     toggleCommentSection: (pid) => WallModule.toggleCommentSection(pid),
     sendComment: (pid) => WallModule.sendComment(pid),
@@ -100,10 +101,14 @@ export function goToSection(sectionId) {
       if (AccessModule?.stopScanner) {
         AccessModule.stopScanner();
       }
-      // Lazy QR: Limpiar QRs generados para ahorrar memoria
       const qrContainer = document.getElementById('accesos-content');
       if (qrContainer) qrContainer.innerHTML = '';
     } catch (_) {}
+  }
+
+  // Limpiar realtime + charts de asistencia al salir
+  if (prevSection === 'asistencia' && sectionId !== 'asistencia') {
+    try { AttendanceModule.destroy?.(); } catch (_) {}
   }
 
   // Ocultar todas las secciones
@@ -168,7 +173,7 @@ export function goToSection(sectionId) {
         import('./access.module.js').then(m => m.AccessModule.init());
         break;
       case 'reportes':
-        import('./inquiries.module.js').then(m => m.InquiriesModule.init());
+        import('./reports.module.js').then(m => m.ReportsModule.init());
         break;
       case 'staff-permits':
         import('./permits.module.js').then(m => m.PermitsModule.init());
@@ -300,11 +305,13 @@ async function loadProfile() {
  * ?? Inicializaci�n Principal
  */
 
-// Global error handler � captura errores no manejados
+// Global error handler � captu// Global error handler captura errores no manejados
 window.addEventListener('unhandledrejection', (e) => {
-  // Ignorar errores de IndexedDB (OneSignal) y errores de red silenciosos
   const msg = e.reason?.message?.toLowerCase() ?? '';
-  if (msg.includes('indexeddb') || msg.includes('network') || msg.includes('fetch')) return;
+  // Ignorar ruido conocido
+  if (msg.includes('indexeddb') || msg.includes('network') || msg.includes('fetch') || msg.includes('aborted')) return;
+  console.warn('[Karpus] Error no manejado:', e.reason?.message || e.reason);
+  e.preventDefault();
 });
 
 document.addEventListener('DOMContentLoaded', async () => {
@@ -389,22 +396,21 @@ document.addEventListener('DOMContentLoaded', async () => {
       if (overlay) overlay.style.display = 'none';
     };
 
-    // Remove any previous listener to avoid duplicates
-    const newMenuBtn = menuBtn?.cloneNode(true);
-    if (menuBtn && newMenuBtn) menuBtn.parentNode.replaceChild(newMenuBtn, menuBtn);
-
-    newMenuBtn?.addEventListener('click', (e) => {
-      e.stopPropagation();
-      const sb = document.getElementById('sidebar');
-      const ov = document.getElementById('sidebarOverlay');
-      if (sb?.classList.contains('mobile-visible')) {
-        sb.classList.remove('mobile-visible');
-        if (ov) ov.style.display = 'none';
-      } else {
-        sb?.classList.add('mobile-visible');
-        if (ov) ov.style.display = 'block';
+    // Event delegation para evitar listeners duplicados en el boton del menu
+    document.addEventListener('click', (e) => {
+      if (e.target.closest('#menuBtn')) {
+        e.stopPropagation();
+        const sb = document.getElementById('sidebar');
+        const ov = document.getElementById('sidebarOverlay');
+        if (sb?.classList.contains('mobile-visible')) {
+          sb.classList.remove('mobile-visible');
+          if (ov) ov.style.display = 'none';
+        } else {
+          sb?.classList.add('mobile-visible');
+          if (ov) ov.style.display = 'block';
+        }
       }
-    });
+    }, { capture: false });
 
     overlay?.addEventListener('click', closeSidebar);
 
@@ -443,10 +449,11 @@ document.addEventListener('DOMContentLoaded', async () => {
         if (closeTime) scheduleUpdates.close_time = closeTime;
         if (workDays.length) scheduleUpdates.work_days = JSON.stringify(workDays);
         if (Object.keys(scheduleUpdates).length) {
-          await supabase.from('school_settings').update(scheduleUpdates).eq('id', 1);
+          const { error: schedErr } = await supabase.from('school_settings').update(scheduleUpdates).eq('id', 1);
+          if (schedErr) { Helpers.toast('Error al guardar horario: ' + schedErr.message, 'error'); return; }
         }
-        Helpers.toast('Configuraci�n guardada correctamente', 'success');
-        AppState.set('profile', { ...auth.profile, ...updates });
+        Helpers.toast('Configuración guardada correctamente', 'success');
+        AppState.set('profile', { ...(AppState.get('profile') || auth.profile), ...updates });
         loadProfile();
       }
     });
@@ -685,7 +692,9 @@ function _initAccesosSection() {
   // Función global para generar QR solo cuando sea necesario (Lazy)
   window._generateLazyStudentQR = (id, matricula) => {
     const el = document.getElementById(`qr-${id}`);
-    if (!el || el.querySelector('img')) return;
+    // Guard: no generar si ya tiene QR o está en proceso
+    if (!el || el.querySelector('img') || el.dataset.rendering === '1') return;
+    el.dataset.rendering = '1';
 
     el.innerHTML = '<div class="animate-spin w-5 h-5 border-2 border-orange-500 rounded-full border-t-transparent"></div>';
     
@@ -703,6 +712,7 @@ function _initAccesosSection() {
       el.classList.remove('bg-slate-50', 'border-dashed', 'cursor-pointer');
       el.classList.add('p-2', 'bg-white', 'border-slate-100');
       el.onclick = null;
+      delete el.dataset.rendering;
     }, 200);
   };
 

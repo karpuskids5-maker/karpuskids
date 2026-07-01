@@ -110,13 +110,31 @@ export const DirectorApi = {
   async getDashboardKPIs(monthText = '') {
     try {
       // Intentar usar el RPC si existe
-      const { data: rpcData, error: rpcError } = await supabase.rpc('get_dashboard_kpis', { p_month: monthText || '%' });
+      // Calculate current visible month (same as payments_clean.js)
+      const todayDate = new Date();
+      const genDay = 25;
+      let maxVisibleMonthKey;
+      if (todayDate.getDate() >= genDay) {
+        maxVisibleMonthKey = `${todayDate.getFullYear()}-${String(todayDate.getMonth() + 1).padStart(2, '0')}`;
+      } else {
+        const prevM = todayDate.getMonth() === 0 ? 12 : todayDate.getMonth();
+        const prevY = todayDate.getMonth() === 0 ? todayDate.getFullYear() - 1 : todayDate.getFullYear();
+        maxVisibleMonthKey = `${prevY}-${String(prevM).padStart(2, '0')}`;
+      }
+
+      const { data: rpcData, error: rpcError } = await supabase.rpc('get_dashboard_kpis', { p_month: monthText || maxVisibleMonthKey });
       
+      // FORCE: Calculate pending amount manually with ONLY current month and total_due!
+      const { data: pp } = await supabase
+        .from('v_payments_with_mora').select('total_due').in('status', ['pending', 'overdue', 'review'])
+        .eq('month_paid', maxVisibleMonthKey);
+      const pendingAmount = (pp || []).reduce((s, p) => s + Number(p.total_due || 0), 0);
+
       if (!rpcError && rpcData) {
         return { 
           data: {
             ...rpcData,
-            pending_payments: rpcData.pending_amount || rpcData.pending_payments || 0
+            pending_payments: pendingAmount // Use our manual calculation!
           }, 
           error: null 
         };
@@ -131,15 +149,11 @@ export const DirectorApi = {
         supabase.from('profiles').select('*', { count: 'exact', head: true }).in('role', ['maestra', 'asistente']),
         supabase.from('classrooms').select('*', { count: 'exact', head: true }),
         supabase.from('attendance').select('*', { count: 'exact', head: true }).eq('date', today).in('status', ['present', 'late']),
-        supabase.from('inquiries').select('*', { count: 'exact', head: true }).not('status', 'in', '("resolved","closed")'),
-        // Para pagos pendientes, vencidos y en revisión, necesitamos la suma de montos
-        supabase.from('payments').select('amount').in('status', ['pending', 'overdue', 'review']).limit(1000)
+        supabase.from('inquiries').select('*', { count: 'exact', head: true }).not('status', 'in', '("resolved","closed")')
       ]);
 
       const get = (r) => r.status === 'fulfilled' ? r.value : { count: 0, data: [] };
-      const [totalRes, teachersRes, classroomsRes, attendanceRes, inquiriesRes, pendingPayRes] = results.map(get);
-
-      const pendingAmount = (pendingPayRes.data || []).reduce((s, p) => s + Number(p.amount || 0), 0);
+      const [totalRes, teachersRes, classroomsRes, attendanceRes, inquiriesRes] = results.map(get);
 
       return {
         data: {
@@ -148,7 +162,7 @@ export const DirectorApi = {
           teachers:         teachersRes.count    || 0,
           classrooms:       classroomsRes.count  || 0,
           attendance_today: attendanceRes.count  || 0,
-          pending_payments: pendingAmount,
+          pending_payments: pendingAmount, // Use our manual calculation!
           inquiries:        inquiriesRes.count   || 0
         },
         error: null
@@ -211,40 +225,25 @@ export const DirectorApi = {
       const month = filterMonth ? String(filterMonth).padStart(2, '0') : String(now.getMonth() + 1).padStart(2, '0');
       const monthKey   = `${year}-${month}`;
       const rangeStart = `${year}-${month}-01`;
-      // Calculate real last day of month â€” avoids invalid dates like 04-31
       const lastDay    = new Date(parseInt(year), parseInt(month), 0).getDate();
       const rangeEnd   = `${year}-${month}-${String(lastDay).padStart(2, '0')}`;
 
-      // Helper: count payments by status for this month (handles both YYYY-MM and Spanish formats)
-      const countByStatus = async (status) => {
-        const [r1, r2] = await Promise.all([
-          supabase.from('payments').select('id', { count: 'exact', head: true }).eq('status', status).eq('month_paid', monthKey),
-          supabase.from('payments').select('id', { count: 'exact', head: true }).eq('status', status).gte('created_at', rangeStart).lte('created_at', rangeEnd + 'T23:59:59')
-        ]);
-        return Math.max(r1.count || 0, r2.count || 0);
-      };
-
-      const sumPaid = async () => {
-        const [r1, r2] = await Promise.all([
-          supabase.from('payments').select('amount').eq('status', 'paid').eq('month_paid', monthKey),
-          supabase.from('payments').select('amount').eq('status', 'paid').gte('created_at', rangeStart).lte('created_at', rangeEnd + 'T23:59:59')
-        ]);
-        const d1 = r1.data || []; const d2 = r2.data || [];
-        const combined = d1.length >= d2.length ? d1 : d2;
-        return combined.reduce((s, p) => s + Number(p.amount || 0), 0);
-      };
-
-      const [income, pending, overdue, toApprove] = await Promise.all([
-        sumPaid(),
-        countByStatus('pending'),
-        countByStatus('overdue'),
-        countByStatus('review')
+      // Una sola query por estado - elimina duplicados de countByStatus/sumPaid
+      const [paidData, pendingData, overdueData, reviewData] = await Promise.all([
+        supabase.from('payments').select('amount').eq('status', 'paid').gte('created_at', rangeStart).lte('created_at', rangeEnd + 'T23:59:59'),
+        supabase.from('payments').select('id', { count: 'exact', head: true }).eq('status', 'pending').eq('month_paid', monthKey),
+        supabase.from('payments').select('id', { count: 'exact', head: true }).eq('status', 'overdue').eq('month_paid', monthKey),
+        supabase.from('payments').select('id', { count: 'exact', head: true }).eq('status', 'review').eq('month_paid', monthKey)
       ]);
+
+      const income    = (paidData.data || []).reduce((s, p) => s + Number(p.amount || 0), 0);
+      const pending   = pendingData.count  || 0;
+      const overdue   = overdueData.count  || 0;
+      const toApprove = reviewData.count   || 0;
 
       return { data: { incomeMonth: income, pending, overdue, toApprove }, error: null };
     } catch (e) { return logError('getPaymentStats', e); }
   },
-
   async createManualPayment(data) {
     return await supabase.from('payments').insert(data).select().single();
   },

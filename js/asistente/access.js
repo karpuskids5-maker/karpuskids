@@ -72,7 +72,7 @@ export const AccessModule = {
         this.closeScanner();
       });
     } catch (err) {
-      console.error('QR Error:', err);
+      Helpers.safeLog('error', 'QR Error:', err);
       Helpers.toast('No se pudo iniciar la cámara', 'error');
     }
   },
@@ -121,7 +121,7 @@ export const AccessModule = {
       Helpers.toast('Sincronización completada con éxito', 'success');
       this.loadHistory();
     } catch (e) {
-      console.error('Error syncing offline punches:', e);
+      Helpers.safeLog('error', 'Error syncing offline punches:', e);
       Helpers.hideLoader();
     }
   },
@@ -189,7 +189,7 @@ export const AccessModule = {
       await this.loadHistory();
 
     } catch (err) {
-      console.error('Error registerAccess:', err);
+      Helpers.safeLog('error', 'Error registerAccess:', err);
       Helpers.toast(err.message || 'Error al registrar acceso', 'error');
     } finally {
       isProcessing = false;
@@ -214,7 +214,7 @@ export const AccessModule = {
 
       this.loadHistory(); // Refrescar tabla (mostrará datos locales si se implementa)
     } catch (e) {
-      console.error('Error saving offline punch:', e);
+      Helpers.safeLog('error', 'Error saving offline punch:', e);
     }
   },
 
@@ -394,7 +394,7 @@ export const AccessModule = {
       set('statAccessCheckout', checkouts + (staffData || []).filter(p => p.punch_type === 'check_out').length);
       set('statAccessTotal',    (attData || []).length + staffIns);
     } catch (err) {
-      console.error('Error loading stats:', err);
+      Helpers.safeLog('error', 'Error loading stats:', err);
     }
   },
 
@@ -550,7 +550,7 @@ export const AccessModule = {
 
       if (window.lucide) lucide.createIcons();
     } catch (err) {
-      console.error('Error loading history:', err);
+      Helpers.safeLog('error', 'Error loading history:', err);
       tbody.innerHTML = `<tr><td colspan="7" class="py-12 text-center text-rose-500 font-bold">${Helpers.errorState('Fallo al cargar historial')}</td></tr>`;
     }
   },
@@ -567,38 +567,7 @@ export const AccessModule = {
     this.updateChart();
   },
 
-  async updateChart() {
-    const ctx = document.getElementById('accessChart')?.getContext('2d');
-    if (!ctx) return;
-
-    try {
-      const from = document.getElementById('accessFilterFrom')?.value;
-      const { data } = await supabase.from('attendance').select('date, status').gte('date', from).order('date');
-      
-      const days = [...new Set(data.map(d => d.date))].slice(-7);
-      const entries = days.map(day => data.filter(d => d.date === day && d.status === 'present').length);
-      const lates = days.map(day => data.filter(d => d.date === day && d.status === 'late').length);
-
-      if (_accessChart) _accessChart.destroy();
-
-      _accessChart = new Chart(ctx, {
-        type: 'line',
-        data: {
-          labels: days.map(d => new Date(d + 'T12:00:00').toLocaleDateString('es-DO', { weekday: 'short' })),
-          datasets: [
-            { label: 'Entradas', data: entries, borderColor: '#10b981', backgroundColor: '#10b98120', fill: true, tension: 0.4 },
-            { label: 'Tardanzas', data: lates, borderColor: '#f59e0b', backgroundColor: '#f59e0b20', fill: true, tension: 0.4 }
-          ]
-        },
-        options: {
-          responsive: true,
-          maintainAspectRatio: false,
-          plugins: { legend: { display: false } },
-          scales: { y: { beginAtZero: true, ticks: { stepSize: 1 } }, x: { grid: { display: false } } }
-        }
-      });
-    } catch (e) { /* silencioso */ }
-  },async _loadChartJs() {
+  async _loadChartJs() {
     return new Promise((resolve) => {
       const script = document.createElement('script');
       script.src = 'https://cdn.jsdelivr.net/npm/chart.js';
@@ -699,7 +668,7 @@ export const AccessModule = {
         }
       });
     } catch (e) {
-      console.error('Error updating chart:', e);
+      Helpers.safeLog('error', 'Error updating chart:', e);
     }
   }
 };

@@ -23,8 +23,18 @@ export const AttendanceModule = {
     this._bindControls();
     this._setDefaultDates();
     await this.load();
-    // Realtime: recargar cuando llegue nueva asistencia
     this._subscribeRealtime();
+  },
+
+  // Limpiar recursos al salir de la sección (evita memory leaks)
+  destroy() {
+    if (this._realtimeChannel) {
+      RealtimeManager.unsubscribe('dir_attendance_live');
+      this._realtimeChannel = null;
+    }
+    if (this._barChart)   { this._barChart.destroy();   this._barChart   = null; }
+    if (this._donutChart) { this._donutChart.destroy();  this._donutChart = null; }
+    this._controlsBound = false; // Permitir re-bind al volver a la sección
   },
 
   _subscribeRealtime() {
@@ -57,6 +67,10 @@ export const AttendanceModule = {
   },
 
   _bindControls() {
+    // Guard contra bindings duplicados si init() se llama varias veces
+    if (this._controlsBound) return;
+    this._controlsBound = true;
+
     const on = (id, ev, fn) => document.getElementById(id)?.addEventListener(ev, fn);
 
     // Mode tabs

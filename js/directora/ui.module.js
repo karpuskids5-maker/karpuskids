@@ -97,21 +97,23 @@ const DirectorUI = {
 
   _initInteractiveKPIs() {
     const mappings = {
-      'card-kpi-students': 'estudiantes',
-      'card-kpi-teachers': 'maestros',
+      'card-kpi-students':   'estudiantes',
+      'card-kpi-teachers':   'maestros',
       'card-kpi-attendance': 'asistencia',
-      'card-kpi-money': 'pagos',
-      'card-kpi-incidents': 'reportes'
+      'card-kpi-money':      'pagos',
+      'card-kpi-incidents':  'reportes'
     };
 
     Object.entries(mappings).forEach(([id, section]) => {
       const el = document.getElementById(id);
-      if (el) {
-        el.style.cursor = 'pointer';
-        el.onclick = () => {
-          if (window.App?.navigation?.goTo) window.App.navigation.goTo(section);
-        };
-      }
+      if (!el) return;
+      // Verificar que la sección destino existe antes de hacer clickeable
+      const target = document.getElementById(section);
+      if (!target) return;
+      el.style.cursor = 'pointer';
+      el.onclick = () => {
+        if (window.App?.navigation?.goTo) window.App.navigation.goTo(section);
+      };
     });
   },
 

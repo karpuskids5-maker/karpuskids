@@ -1,7 +1,6 @@
-﻿import { supabase } from '../shared/supabase.js';
+import { supabase } from '../shared/supabase.js';
 import { Helpers } from '../shared/helpers.js';
 import { AppState } from './state.js';
-import { sendEmail } from '../shared/supabase.js';
 import { calcMora } from '../shared/payment-service.js';
 
 const MONTH_NAMES_ES = ['enero','febrero','marzo','abril','mayo','junio','julio','agosto','septiembre','octubre','noviembre','diciembre'];

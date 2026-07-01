@@ -1,4 +1,4 @@
-import { DirectorApi } from './api.js';
+﻿import { DirectorApi } from './api.js';
 import { Helpers } from '../shared/helpers.js';
 import { supabase } from '../shared/supabase.js';
 import { AppState } from './state.js';
@@ -58,9 +58,21 @@ export const GradesModule = {
       }
     }
 
-    document.getElementById('btnClosePeriod')?.addEventListener('click', () => this._closePeriod());
-    document.getElementById('btnNewPeriod')?.addEventListener('click', () => this._openPeriodModal());
-    document.getElementById('btnExportGrades')?.addEventListener('click', () => this._exportGrades());
+    const closePeriodBtn = document.getElementById('btnClosePeriod');
+    if (closePeriodBtn && !closePeriodBtn._bound) {
+      closePeriodBtn._bound = true;
+      closePeriodBtn.addEventListener('click', () => this._closePeriod());
+    }
+    const newPeriodBtn = document.getElementById('btnNewPeriod');
+    if (newPeriodBtn && !newPeriodBtn._bound) {
+      newPeriodBtn._bound = true;
+      newPeriodBtn.addEventListener('click', () => this._openPeriodModal());
+    }
+    const exportBtn = document.getElementById('btnExportGrades');
+    if (exportBtn && !exportBtn._bound) {
+      exportBtn._bound = true;
+      exportBtn.addEventListener('click', () => this._exportGrades());
+    }
   },
 
   async _loadPeriods() {
@@ -427,7 +439,8 @@ export const GradesModule = {
 
     try {
       // Usar RPC seguro que calcula promedios y cierra atómicamente
-      const { data, error } = await supabase.rpc('close_period', { p_period_id: parseInt(periodId) });
+      const closeTimeout = new Promise((_, rej) => setTimeout(() => rej(new Error('Tiempo de espera agotado al cerrar periodo')), 30000));
+      const { data, error } = await Promise.race([supabase.rpc('close_period', { p_period_id: parseInt(periodId) }), closeTimeout]);
       if (error) throw error;
       if (data?.error) throw new Error(data.error);
 

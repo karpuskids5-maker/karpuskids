@@ -17,38 +17,50 @@ export const DashboardService = {
   channels: [], // Para limpiar subscripciones realtime
   listeners: [], // 🔔 Lista de funciones a avisar cuando haya cambios
 
-  async getFullData(refresh = false) {
-    if (!refresh && AppState.get('dashboardData')) return AppState.get('dashboardData');
-
+  async getFullData(refresh = true) { // Force refresh by default!
+    // Always clear previous state to ensure freshness
+    AppState.set('dashboardData', null);
+    
     try {
       const d = new Date();
       const today = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
-      const [counts, attendance, inquiries, pendingPaymentsData] = await Promise.all([
+      
+      // Calculate maxVisibleMonthKey (same logic as payments_clean.js)
+      const todayDate = new Date();
+      const genDay = 25; // default, same as payments_clean.js
+      let maxVisibleMonthKey;
+      if (todayDate.getDate() >= genDay) {
+        maxVisibleMonthKey = `${todayDate.getFullYear()}-${String(todayDate.getMonth() + 1).padStart(2, '0')}`;
+      } else {
+        const prevM = todayDate.getMonth() === 0 ? 12 : todayDate.getMonth();
+        const prevY = todayDate.getMonth() === 0 ? todayDate.getFullYear() - 1 : todayDate.getFullYear();
+        maxVisibleMonthKey = `${prevY}-${String(prevM).padStart(2, '0')}`;
+      }
+
+      // getDashboardKPIs already includes pending_payments — not repeating that query
+      const [counts, inquiries] = await Promise.all([
         DirectorApi.getDashboardKPIs(),
-        supabase.from('attendance').select('status').eq('date', today).limit(500),
-        supabase.from('inquiries').select('*').eq('status', 'pending').limit(5),
-        // Obtener suma de pagos pendientes, vencidos y en revisión
-        supabase.from('payments').select('amount, status').in('status', ['pending', 'overdue', 'review']).limit(1000)
+        supabase.from('inquiries').select('id, subject, message, status, created_at, parent:parent_id(name)').eq('status', 'pending').order('created_at', { ascending: false }).limit(5)
       ]);
 
-      const att = attendance.data || [];
-      const presentCount = att.filter(a => ['present', 'presente', 'late', 'tarde'].includes(a.status?.toLowerCase())).length;
       const kpis = counts.data || {};
 
-      // Calcular total pendiente (pendientes + vencidos + en revisión)
-      const pendingPayments = pendingPaymentsData.data || [];
-      const totalPending = pendingPayments.reduce((sum, p) => sum + Number(p.amount || 0), 0);
+      // FORCE: Calculate pending amount manually with ONLY current month and total_due (to be 100% correct!)
+      const { data: pp } = await supabase
+        .from('v_payments_with_mora').select('total_due').in('status', ['pending', 'overdue', 'review'])
+        .eq('month_paid', maxVisibleMonthKey);
+      const totalPending = (pp || []).reduce((s, p) => s + Number(p.total_due || 0), 0);
 
       const dashboardData = {
         stats: {
-          students: kpis.total || 0,
-          active: kpis.active || 0,
-          teachers: kpis.teachers || 0,
-          classrooms: kpis.classrooms || 0,
-          present: kpis.attendance_today ?? presentCount,
-          attendance: kpis.attendance_pct || 0,
+          students:        kpis.total || 0,
+          active:          kpis.active || 0,
+          teachers:        kpis.teachers || 0,
+          classrooms:      kpis.classrooms || 0,
+          present:         kpis.attendance_today ?? 0,
+          attendance:      kpis.attendance_pct || 0,
           pendingInquiries: kpis.inquiries || 0,
-          pending_amount: totalPending,
+          pending_amount:  totalPending,
           pending_payments: totalPending
         },
         recentInquiries: inquiries.data || []

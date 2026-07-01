@@ -1,6 +1,5 @@
 import { ensureRole, supabase, initOneSignal } from '/js/shared/supabase.js';
 import { AppState } from './state.js';
-import { AssistantApi } from './api.js';
 import { PaymentsModule } from './payments.js';
 import { AccessModule } from './access.js';
 import { TeachersModule } from './teachers.js';
@@ -8,15 +7,14 @@ import { Helpers } from '/js/shared/helpers.js';
 import { WallModule } from '/js/shared/wall.js';
 import { ChatModule } from '/js/shared/chat.js';
 import { StudentsModule } from './modules/students.js';
-import { auditLog } from '/js/shared/db-utils.js';
 import { RoomsModule } from './modules/rooms.js';
 import { DashboardModule } from './modules/dashboard.js';
 import { BadgeSystem } from '/js/shared/badges.js';
 import { ImageLoader } from '/js/shared/image-loader.js';
 import { QueryCache } from '/js/shared/query-cache.js';
 import { RealtimeManager } from '/js/shared/realtime-manager.js';
-import { Security } from '/js/shared/security.js';
 import { UIPremium } from '/js/shared/ui-premium.js';
+import { FileManager } from '/js/shared/FileManager.js';
 
 // ?? Definir objeto App globalmente para evitar ReferenceError en onclicks del HTML
 // Global close modal fallback � always available even before openNewPostModal is called
@@ -69,17 +67,6 @@ window.App = {
     waiveMora:     (id)  => PaymentsModule.waiveMora(id),
     _confirmApproval: (id) => PaymentsModule._confirmApproval(id)
   },
-  registerAccess: (sid, type) => window.App._registerAccess(sid, type),
-  confirmPayment: (id) => PaymentsModule.markPaid(id),
-  rejectPayment:  (id) => PaymentsModule.rejectPayment(id),
-  deletePayment:  (id) => PaymentsModule.deletePayment(id),
-  registerPayment:(sid) => PaymentsModule.openPaymentModal(sid),
-  openTeacherModal: (id) => window.App._openTeacherModal(id),
-  toggleCommentSection: (id) => window.App._toggleCommentSection(id),
-  deleteComment: (cid, pid) => window.App._deleteComment(cid, pid),
-  sendComment: (pid) => window.App._sendComment(pid),
-  toggleLike: (pid) => window.App._toggleLike(pid),
-  selectChatContact: (uid, name, role) => window.App._selectChatContact(uid, name, role),
   students: StudentsModule,
   rooms: RoomsModule,
   teachers: {
@@ -300,6 +287,8 @@ function initNavigation() {
   const sections = document.querySelectorAll('section[id]');
 
   const showSection = async (target) => {
+    window.App.navigateTo = showSection;
+    window.goToSection = showSection;
     Helpers.vibrate?.('light');
 
     // ✅ LIMPIEZA DE REALTIME: Eliminar canales al cambiar de sección
@@ -533,15 +522,28 @@ async function initProfile() {
   setProfileAvatar(p.avatar_url, p.name);
 
   if (avatarInput) {
-    avatarInput.onchange = (e) => {
+    avatarInput.onchange = async (e) => {
       const file = e.target.files[0];
       if (file) {
-        const reader = new FileReader();
-        reader.onload = (ev) => { 
+        try {
+          // Validar usando FileManager
+          const validation = FileManager.validateFile(file, FileManager.PRESETS.PROFILE_PHOTO);
+          if (!validation.valid) {
+            Helpers.toast(validation.errors[0], 'warning');
+            avatarInput.value = '';
+            return;
+          }
+          
+          // Obtener vista previa
+          const previewUrl = await FileManager.getPreviewURL(file);
           const avatarEl = document.getElementById('profileAvatarPreview');
-          avatarEl.innerHTML = `<img src="${ev.target.result}" class="w-full h-full object-cover rounded-full">`; 
-        };
-        reader.readAsDataURL(file);
+          avatarEl.innerHTML = `<img src="${previewUrl}" class="w-full h-full object-cover rounded-full">`;
+          
+        } catch (error) {
+          Helpers.toast('Error al procesar la imagen', 'error');
+          Helpers.safeLog('error', 'Profile avatar error:', error);
+          avatarInput.value = '';
+        }
       }
     };
   }
@@ -625,16 +627,25 @@ async function initProfile() {
         };
         const file = avatarInput?.files[0];
         if (file) {
-          const ext  = file.name.split('.').pop();
-          const path = `avatars/${p.id}_${Date.now()}.${ext}`;
-          const { error: upErr } = await supabase.storage.from('karpus-uploads').upload(path, file);
-          if (upErr) throw upErr;
-          const { data: { publicUrl } } = supabase.storage.from('karpus-uploads').getPublicUrl(path);
-          updates.avatar_url = publicUrl;
+          // Usar FileManager para procesar y subir con compresión
+          const result = await FileManager.processAndUpload({
+            file,
+            supabase,
+            bucket: 'karpus-uploads',
+            pathPrefix: 'avatars',
+            options: FileManager.PRESETS.PROFILE_PHOTO,
+            onProgress: null // No need for progress in this context
+          });
+          
+          if (!result.success) {
+            throw new Error(result.error);
+          }
+          
+          updates.avatar_url = result.publicUrl;
           const sidebarAvatar = document.getElementById('sidebarAvatar');
-          if (sidebarAvatar) sidebarAvatar.src = publicUrl;
+          if (sidebarAvatar) sidebarAvatar.src = result.publicUrl;
           const avatarEl = document.getElementById('profileAvatarPreview');
-          if (avatarEl) avatarEl.innerHTML = `<img src="${publicUrl}" class="w-full h-full object-cover rounded-full">`;
+          if (avatarEl) avatarEl.innerHTML = `<img src="${result.publicUrl}" class="w-full h-full object-cover rounded-full">`;
         }
         const { error } = await supabase.from('profiles').update(updates).eq('id', p.id);
         if (error) throw error;

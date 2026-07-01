@@ -592,7 +592,7 @@ export const Helpers = {
     try {
       return await fn();
     } catch (err) {
-      console.error(`[Safe:${context}]`, err);
+      Helpers.safeLog('error', `[Safe:${context}]`, err);
       
       // Registrar error en la tabla system_errors de forma silenciosa
       try {
@@ -608,11 +608,62 @@ export const Helpers = {
           user_agent: navigator.userAgent
         }]);
       } catch (logErr) {
-        console.warn('Could not log error to DB:', logErr);
+        // No use console.warn here either to be safe
       }
 
       Helpers.toast('Algo no salió bien. El equipo técnico ha sido notificado.', 'error');
       return null;
+    }
+  },
+
+  /**
+   * 🛡️ Sanitiza datos sensibles para logs
+   */
+  sanitizeData(data) {
+    if (!data) return data;
+    
+    if (typeof data === 'string') {
+      return data;
+    }
+    
+    if (Array.isArray(data)) {
+      return data.map(item => Helpers.sanitizeData(item));
+    }
+    
+    if (typeof data === 'object') {
+      const sanitized = {};
+      for (const key in data) {
+        if (Object.prototype.hasOwnProperty.call(data, key)) {
+          const lowerKey = key.toLowerCase();
+          if (lowerKey.includes('password') || lowerKey.includes('token') || lowerKey.includes('secret') || lowerKey.includes('credential') || lowerKey.includes('key')) {
+            sanitized[key] = '[REDACTED]';
+          } else {
+            sanitized[key] = Helpers.sanitizeData(data[key]);
+          }
+        }
+      }
+      return sanitized;
+    }
+    
+    return data;
+  },
+  
+  /**
+   * 🛡️ Logging seguro - solo muestra datos no sensibles en entorno de desarrollo
+   */
+  safeLog(level, ...args) {
+    // Check if we're in development mode (you can set window.NODE_ENV or similar)
+    const isDev = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
+    if (!isDev) return;
+    
+    const sanitizedArgs = args.map(arg => Helpers.sanitizeData(arg));
+    
+    switch(level) {
+      case 'log': console.log(...sanitizedArgs); break;
+      case 'warn': console.warn(...sanitizedArgs); break;
+      case 'error': console.error(...sanitizedArgs); break;
+      case 'debug': console.debug(...sanitizedArgs); break;
+      default: console.log(...sanitizedArgs);
     }
   },
 

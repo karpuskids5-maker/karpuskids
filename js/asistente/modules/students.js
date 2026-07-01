@@ -1,5 +1,6 @@
 import { supabase, createClient, SUPABASE_URL, SUPABASE_ANON_KEY } from '../../shared/supabase.js';
 import { Helpers } from '../../shared/helpers.js';
+import { FileManager } from '../../shared/FileManager.js';
 
 const IC = 'w-full px-4 py-2.5 border-2 border-slate-100 rounded-2xl outline-none focus:ring-4 focus:ring-teal-100 focus:border-teal-400 bg-slate-50/50 transition-all text-sm font-medium';
 const LC = 'block text-[11px] font-black text-slate-400 uppercase tracking-wider mb-1.5 ml-1';
@@ -149,7 +150,7 @@ export const StudentsModule = {
       this._page = 1;
       this._renderPage(query);
     } catch (e) {
-      console.error('Error loadStudents:', e);
+      Helpers.safeLog('error', 'Error loadStudents:', e);
       tbody.innerHTML = '<tr><td colspan="4">' + Helpers.errorState('Error al cargar datos') + '</td></tr>';
     }
   },
@@ -169,8 +170,6 @@ export const StudentsModule = {
   },
 
   async openModal(studentId = null) {
-    const IC = 'w-full px-4 py-2.5 border-2 border-slate-100 rounded-2xl outline-none focus:ring-4 focus:ring-teal-100 focus:border-teal-400 bg-slate-50/50 transition-all text-sm font-medium';
-    const LC = 'block text-[11px] font-black text-slate-400 uppercase tracking-wider mb-1.5 ml-1';
 
     const html = `
       <div class="bg-gradient-to-r from-teal-600 to-emerald-600 text-white p-4 rounded-t-3xl flex items-center justify-between shrink-0">
@@ -355,7 +354,7 @@ export const StudentsModule = {
           correctLevel: window.QRCode.CorrectLevel.L
         });
       } catch (error) {
-        console.error('Error generating QR:', error);
+        Helpers.safeLog('error', 'Error generating QR:', error);
         container.innerHTML = '<p class="text-xs text-rose-500 font-bold text-center">Error al generar QR</p>';
         Helpers.toast('Error al generar QR: texto demasiado largo', 'error');
       }
@@ -381,16 +380,30 @@ export const StudentsModule = {
       window._asisQrDebounce = setTimeout(() => window._renderStudentQR(e.target.value.trim()), 600);
     });
 
-    // Avatar preview
-    document.getElementById('stAvatarFile')?.addEventListener('change', (e) => {
+    // Avatar preview with FileManager
+    document.getElementById('stAvatarFile')?.addEventListener('change', async (e) => {
       const file = e.target.files[0];
       if (!file) return;
-      const reader = new FileReader();
-      reader.onload = (ev) => {
+      
+      try {
+        // Validar usando FileManager
+        const validation = FileManager.validateFile(file, FileManager.PRESETS.PROFILE_PHOTO);
+        if (!validation.valid) {
+          Helpers.toast(validation.errors[0], 'warning');
+          e.target.value = '';
+          return;
+        }
+        
+        // Obtener vista previa
+        const previewUrl = await FileManager.getPreviewURL(file);
         const p = document.getElementById('stAvatarPreview');
-        if (p) p.innerHTML = '<img src="' + ev.target.result + '" class="w-full h-full object-cover">';
-      };
-      reader.readAsDataURL(file);
+        if (p) p.innerHTML = '<img src="' + previewUrl + '" class="w-full h-full object-cover">';
+        
+      } catch (error) {
+        Helpers.toast('Error al procesar la imagen', 'error');
+        Helpers.safeLog('error', 'Avatar error:', error);
+        e.target.value = '';
+      }
     });
 
     // Load classrooms \u2014 critical for the form
@@ -601,14 +614,33 @@ export const StudentsModule = {
       if (v !== null && v !== '') payload[k] = v;
     }
     try {
-      // 1. Subir avatar si existe
+      // 1. Subir avatar si existe (con compresión y progreso)
       if (avatarFile) {
-        const ext = avatarFile.name.split('.').pop();
-        const path = `students/${Date.now()}_${Math.random().toString(36).substr(2,9)}.${ext}`;
-        const { error: upErr } = await supabase.storage.from('karpus-uploads').upload(path, avatarFile);
-        if (upErr) throw upErr;
-        const { data } = supabase.storage.from('karpus-uploads').getPublicUrl(path);
-        payload.avatar_url = data.publicUrl;
+        // Mostrar indicador de progreso
+        const progressEl = document.getElementById('stAvatarProgress');
+        const progressTextEl = document.getElementById('stAvatarProgressText');
+        if (progressEl) progressEl.classList.remove('hidden');
+        
+        // Usar FileManager para procesar y subir
+        const result = await FileManager.processAndUpload({
+          file: avatarFile,
+          supabase,
+          bucket: 'karpus-uploads',
+          pathPrefix: 'students',
+          options: FileManager.PRESETS.PROFILE_PHOTO,
+          onProgress: (percent) => {
+            if (progressTextEl) progressTextEl.textContent = `${Math.round(percent)}%`;
+          }
+        });
+        
+        if (!result.success) {
+          throw new Error(result.error);
+        }
+        
+        payload.avatar_url = result.publicUrl;
+        
+        // Ocultar progreso
+        if (progressEl) progressEl.classList.add('hidden');
       }
 
       // 2. Manejar creaci\u00f3n/vinculaci\u00f3n de padre

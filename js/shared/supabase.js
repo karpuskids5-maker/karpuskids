@@ -1,4 +1,5 @@
 import { logError } from './db-utils.js';
+import { Helpers } from './helpers.js';
 
 // Supabase JS — cargado localmente (js/shared/supabase-js.min.js via script tag en HTML)
 // El UMD expone window.supabase.createClient
@@ -28,7 +29,7 @@ export const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, options);
 
 // ── Auto-refresh: detectar JWT expirado y refrescar sesión ───────────────────
 supabase.auth.onAuthStateChange((event, session) => {
-  if (event === 'TOKEN_REFRESHED') console.log('✅ JWT Refrescado');
+  if (event === 'TOKEN_REFRESHED') Helpers.safeLog('log', '✅ JWT Refrescado');
   if (event === 'SIGNED_OUT') {
     // ✅ LIMPIEZA TOTAL DE CANALES AL SALIR
     if (window.RealtimeManager) window.RealtimeManager.unsubscribeAll();
@@ -46,7 +47,7 @@ supabase.auth.onAuthStateChange((event, session) => {
         .update({ last_sign_in_at: new Date().toISOString() })
         .eq('id', session.user.id)
         .then(({ error }) => {
-          if (error) console.warn('[Auth] No se pudo actualizar last_sign_in_at:', error);
+          if (error) Helpers.safeLog('warn', '[Auth] No se pudo actualizar last_sign_in_at:', error);
         });
     }
   }
@@ -86,11 +87,11 @@ window.fetch = async function(...args) {
   if (res.status === 401 && isSupabase && !_refreshing && !url.includes('/auth/v1/')) {
     _refreshing = true;
     try {
-      console.warn('[supabase-js] 401 detectado, intentando refrescar sesión...');
+      Helpers.safeLog('warn', '[supabase-js] 401 detectado, intentando refrescar sesión...');
       // Intentar refresh una única vez
       const { data: refreshed, error } = await supabase.auth.refreshSession();
       if (!error && refreshed?.session) {
-        console.log('[supabase-js] Sesión refrescada con éxito. Reintentando petición...');
+        Helpers.safeLog('log', '[supabase-js] Sesión refrescada con éxito. Reintentando petición...');
         
         // Clonar opciones y actualizar el header Authorization con el nuevo token
         const retryOptions = args[1] || {};
@@ -102,12 +103,12 @@ window.fetch = async function(...args) {
 
         return _originalFetch.apply(this, args);
       } else {
-        console.error('[supabase-js] Falló el refresco de sesión:', error);
+        Helpers.safeLog('error', '[supabase-js] Falló el refresco de sesión:', error);
         // Si el refresh falla con 401, redirigir a login para evitar loop
         window.location.href = 'login.html';
       }
     } catch (e) {
-      console.error('[supabase-js] Error al intentar refrescar sesión:', e);
+      Helpers.safeLog('error', '[supabase-js] Error al intentar refrescar sesión:', e);
       window.location.href = 'login.html';
     } finally {
       _refreshing = false;
@@ -188,17 +189,17 @@ export const RealtimeUtils = {
   monitorChannel(channel, name = 'global') {
     channel.subscribe((status) => {
       if (status === 'SUBSCRIBED') {
-        console.log(`[Realtime] Canal "${name}" conectado.`);
+        Helpers.safeLog('log', `[Realtime] Canal "${name}" conectado.`);
       }
       if (status === 'CLOSED') {
-        console.warn(`[Realtime] Canal "${name}" cerrado.`);
+        Helpers.safeLog('warn', `[Realtime] Canal "${name}" cerrado.`);
       }
       if (status === 'CHANNEL_ERROR') {
-        console.error(`[Realtime] Error en canal "${name}". Reintentando...`);
+        Helpers.safeLog('error', `[Realtime] Error en canal "${name}". Reintentando...`);
         setTimeout(() => channel.subscribe(), 5000); // Reintento exponencial simple
       }
       if (status === 'TIMED_OUT') {
-        console.warn(`[Realtime] Canal "${name}" tiempo agotado.`);
+        Helpers.safeLog('warn', `[Realtime] Canal "${name}" tiempo agotado.`);
       }
     });
   }
@@ -507,7 +508,7 @@ async function _initOneSignalAsync(currentUser) {
         // Vincular usuario — con validación y catch
         if (user?.id) {
           OneSignal.login(String(user.id)).catch(e => {
-            console.warn('[OneSignal] Login deferred error:', e);
+            Helpers.safeLog('warn', '[OneSignal] Login deferred error:', e);
           });
         }
 

@@ -71,7 +71,7 @@ export const DashboardModule = {
         if (cachedStats) this._applyStats(cachedStats);
 
       } catch (e) {
-        console.error('Error loading stats:', e);
+        Helpers.safeLog('error', 'Error loading stats:', e);
       }
     }
 ,
