@@ -497,6 +497,7 @@ async function _initOneSignalAsync(currentUser) {
       try {
         await OneSignal.init({
           appId: ONESIGNAL_APP_ID,
+          safari_web_id: "web.onesignal.auto.10a95079-58d5-450a-8671-55c3c137456d",
           allowLocalhostAsSecureOrigin: false,
           serviceWorkerParam: { scope: '/' },
           serviceWorkerPath: 'OneSignalSDKWorker.js',
