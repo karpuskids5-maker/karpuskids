@@ -293,6 +293,11 @@ async function loadProfile() {
     if (configAvatarImg) {
       configAvatarImg.src = profile.avatar_url || 'img/mundo.jpg';
     }
+    
+    const configAvatarSidebarImg = document.getElementById('configProfileAvatarSidebar');
+    if (configAvatarSidebarImg) {
+      configAvatarSidebarImg.src = profile.avatar_url || 'img/mundo.jpg';
+    }
 
     // Inicializar ID de acceso QR de la directora
     _initDirectorAccessId(profile);
@@ -461,6 +466,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     // Make sidebar avatar clickable
     const sidebarAvatar = document.getElementById('sidebarAvatar');
     const configAvatarInput = document.getElementById('configAvatarInput');
+    const configAvatarInputSidebar = document.getElementById('configAvatarInputSidebar');
     if (sidebarAvatar && configAvatarInput) {
       sidebarAvatar.style.cursor = 'pointer';
       sidebarAvatar.addEventListener('click', () => {
@@ -468,8 +474,8 @@ document.addEventListener('DOMContentLoaded', async () => {
       });
     }
 
-    // 7b. Avatar upload — preview inmediato + guardar en Supabase
-    configAvatarInput?.addEventListener('change', async (e) => {
+    // 7b. Avatar upload — preview inmediato + guardar en Supabase (función reutilizable)
+    const handleAvatarUpload = async (e) => {
       const file = e.target.files?.[0];
       if (!file) return;
       if (file.size > 5 * 1024 * 1024) {
@@ -482,11 +488,13 @@ document.addEventListener('DOMContentLoaded', async () => {
       }
 
       const img       = document.getElementById('configProfileAvatar');
+      const imgSidebar = document.getElementById('configProfileAvatarSidebar');
       const sidebarImg = document.getElementById('sidebarProfileAvatar');
 
       // Preview INMEDIATO con ObjectURL
       const objectUrl = URL.createObjectURL(file);
       if (img)       { img.src = objectUrl; img.style.opacity = '0.6'; }
+      if (imgSidebar) { imgSidebar.src = objectUrl; imgSidebar.style.opacity = '0.6'; }
       if (sidebarImg) sidebarImg.src = objectUrl;
       Helpers.toast('Subiendo foto...', 'info');
 
@@ -519,18 +527,24 @@ document.addEventListener('DOMContentLoaded', async () => {
         // UI: mostrar URL real con cache-buster
         const bustedUrl = publicUrl + '?t=' + Date.now();
         if (img)       { img.src = bustedUrl; img.style.opacity = '1'; }
+        if (imgSidebar) { imgSidebar.src = bustedUrl; imgSidebar.style.opacity = '1'; }
         if (sidebarImg) sidebarImg.src = bustedUrl;
         URL.revokeObjectURL(objectUrl);
 
-        // Limpiar input para permitir re-seleccionar el mismo archivo
-        configAvatarInput.value = '';
+        // Limpiar inputs para permitir re-seleccionar el mismo archivo
+        if (configAvatarInput) configAvatarInput.value = '';
+        if (configAvatarInputSidebar) configAvatarInputSidebar.value = '';
         Helpers.toast('Foto de perfil actualizada ✅', 'success');
       } catch (err) {
         if (img) img.style.opacity = '1';
+        if (imgSidebar) imgSidebar.style.opacity = '1';
         URL.revokeObjectURL(objectUrl);
         Helpers.toast('Error al subir la foto: ' + (err.message || err), 'error');
       }
-    });
+    };
+
+    configAvatarInput?.addEventListener('change', handleAvatarUpload);
+    configAvatarInputSidebar?.addEventListener('change', handleAvatarUpload);
 
     // 8. Quitar loader inicial
     const loader = document.getElementById('initial-loading');

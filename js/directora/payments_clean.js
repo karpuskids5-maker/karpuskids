@@ -778,7 +778,10 @@ export const PaymentsModule = {
         body: { action: 'send_all' }
       });
 
-      if (error) throw error;
+      if (error) {
+        console.error('[Payments] Edge Function error:', error);
+        throw new Error(`Error en la función Edge: ${error.message || 'Función no disponible'}\nPor favor verifica que la función 'payment-reminders' esté desplegada en Supabase.`);
+      }
 
       // Respuesta esperada: { processed, reminder_3d, due_today, overdue_1d, emails_sent, pushes_sent }
       const results = data || {};
@@ -794,6 +797,7 @@ export const PaymentsModule = {
         Helpers.toast(msg, 'success');
       }
     } catch (e) {
+      console.error('[Payments] sendReminders error:', e);
       Helpers.toast('Error: ' + (e.message || e), 'error');
     } finally {
       if (btn) { btn.disabled = false; btn.textContent = 'Enviar recordatorios ahora'; }
