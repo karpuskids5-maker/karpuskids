@@ -29,7 +29,7 @@ const _lastLoad = {};
 // Los onclick inline en HTML dinámico necesitan window.Modal disponible de inmediato
 window.Modal = Modal;
 const { initAttendance, markAllPresent, registerAttendance } = Attendance;
-const { initRoutine, updateRoutineField, saveRoutineLog, openNewRoutineModal, openStudentRoutine, openBulkRoutineModal, updateRoutineFieldInModal, saveRoutineInModal, applyBulkRoutine } = Routine;
+const { initRoutine, updateRoutineField, saveRoutineLog, openNewRoutineModal, openStudentRoutine, openBulkRoutineModal, updateRoutineFieldInModal, saveRoutineInModal, applyBulkRoutine, openBulkEventModal, confirmBulkEvent, wakeAllSiestas, wakeStudentSiesta, undoLastBulk, publishAll } = Routine;
 const { initTasks, openEditTaskModal, deleteTask, openNewTaskModal, viewTaskSubmissions, submitGrade } = Tasks;
 const { openStudentProfile, registerIncidentModal } = Students;
 const { initChat, selectChatContact } = ChatApp;
@@ -63,6 +63,12 @@ window.App = {
   updateRoutineFieldInModal: Routine.updateRoutineFieldInModal,
   saveRoutineInModal: Routine.saveRoutineInModal,
   applyBulkRoutine: Routine.applyBulkRoutine,
+  openBulkEventModal: Routine.openBulkEventModal,
+  confirmBulkEvent: Routine.confirmBulkEvent,
+  wakeAllSiestas: Routine.wakeAllSiestas,
+  wakeStudentSiesta: Routine.wakeStudentSiesta,
+  undoLastBulk: Routine.undoLastBulk,
+  publishAll: Routine.publishAll,
 
   // Tasks
   initTasks: Tasks.initTasks,

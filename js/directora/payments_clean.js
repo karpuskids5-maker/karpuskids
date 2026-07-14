@@ -3,8 +3,6 @@ import { AppState } from './state.js';
 import { Helpers } from '/js/shared/helpers.js';
 import { UIHelpers } from './ui.module.js';
 import { supabase } from '/js/shared/supabase.js';
-import { auditLog } from '/js/shared/db-utils.js';
-import { UIPremium } from '/js/shared/ui-premium.js';
 
 const MES = ['enero','febrero','marzo','abril','mayo','junio','julio','agosto','septiembre','octubre','noviembre','diciembre'];
 const MES_LABEL = ['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'];
@@ -20,14 +18,11 @@ export const PaymentsModule = {
     if (!this._ready) {
       this._ready = true;
       const on = (id, ev, fn) => document.getElementById(id)?.addEventListener(ev, fn);
-      on('btnRefreshPayments',    'click',  () => this.loadPayments());
       on('filterPaymentMonth',    'change', () => { this._saveFilters(); this.loadPayments(); });
       on('filterPaymentYear',     'change', () => { this._saveFilters(); this.loadPayments(); });
       on('filterPaymentStatus',   'change', () => { this._saveFilters(); this.loadPayments(); });
       on('searchPaymentStudent',  'input',  () => { this._saveFilters(); this.loadPayments(); });
-      on('btnNewPaymentAction',   'click',  () => this.openPaymentModal());
       on('btnNewPayment',         'click',  () => this.openPaymentModal());
-      on('btnGenerateCharges',    'click',  () => this.showCyclePreview());
       on('btnGeneratePaymentsNow','click',  () => this.showCyclePreview());
       on('btnSendPaymentReminders','click', () => this.sendReminders());
       on('btnExportMorosidad',    'click',  () => this.exportMorosidad());
@@ -80,11 +75,9 @@ export const PaymentsModule = {
       const g = document.getElementById('confGenDay');
       const d = document.getElementById('confDueDay');
       const p = document.getElementById('confPhone');
-      const h = document.getElementById('confHours');
       if (g) g.value = this.settings.generation_day;
       if (d) d.value = this.settings.due_day;
       if (p) p.value = data.phone || '';
-      if (h) h.value = data.business_hours || '';
     } catch (_) {}
   },
 
@@ -799,14 +792,6 @@ export const PaymentsModule = {
       } else {
         const msg = `✅ ${processed} recordatorio(s) procesados\n📧 ${results.emails_sent || 0} correos enviados\n🔔 ${results.pushes_sent || 0} notificaciones push`;
         Helpers.toast(msg, 'success');
-
-        // Auditar la acción
-        await auditLog('payment_reminders_sent', {
-          processed,
-          emails_sent: results.emails_sent,
-          pushes_sent: results.pushes_sent,
-          total
-        });
       }
     } catch (e) {
       Helpers.toast('Error: ' + (e.message || e), 'error');
@@ -849,7 +834,6 @@ export const PaymentsModule = {
     const g = parseInt(document.getElementById('confGenDay')?.value || 25);
     const d = parseInt(document.getElementById('confDueDay')?.value || 5);
     const phone = document.getElementById('confPhone')?.value?.trim();
-    const hours = document.getElementById('confHours')?.value?.trim();
 
     if (isNaN(g) || g < 1 || g > 28) return Helpers.toast('Dia generacion invalido (1-28)', 'warning');
     if (isNaN(d) || d < 1 || d > 28) return Helpers.toast('Dia limite invalido (1-28)', 'warning');
@@ -860,7 +844,6 @@ export const PaymentsModule = {
         generation_day: g, 
         due_day: d, 
         phone: phone,
-        business_hours: hours,
         updated_at: new Date().toISOString() 
       });
       this.settings.generation_day = g;

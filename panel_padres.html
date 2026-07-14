@@ -373,6 +373,11 @@
           <span class="hidden md:inline">Tareas</span>
           <span id="badge-tasks" class="hidden absolute -top-1 -right-1 w-4 h-4 bg-rose-500 text-white text-[9px] font-black rounded-full flex items-center justify-center shadow-sm">0</span>
         </button>
+        <!-- Rutina Diaria -->
+        <button type="button" data-target="routine" class="sidebar-node node-routine relative" aria-label="Rutina del Día">
+          <i data-lucide="clipboard-list" class="w-5 h-5"></i>
+          <span class="hidden md:inline">Rutina</span>
+        </button>
         <!-- Perfil -->
         <button type="button" data-target="profile" class="sidebar-node node-profile" aria-label="Perfil">
           <i data-lucide="user" class="w-5 h-5"></i>
@@ -845,6 +850,18 @@
             </div>
           </div>
         </div>
+
+        <!-- RUTINA DIARIA DEL HIJO -->
+        <section id="routine" class="section hidden">
+          <div class="mb-6">
+            <h2 class="text-2xl font-black text-slate-800 flex items-center gap-3">
+              <span class="w-10 h-10 bg-[#28B54D]/10 rounded-2xl flex items-center justify-center text-xl">📋</span>
+              Rutina Diaria
+            </h2>
+            <p class="text-xs font-bold text-slate-400 uppercase tracking-widest mt-1">Seguimiento completo del día de tu hijo/a</p>
+          </div>
+          <div id="routineSection"></div>
+        </section>
 
         <!-- PERFIL -->
         <section id="profile" class="section hidden">

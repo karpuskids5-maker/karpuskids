@@ -1,0 +1,77 @@
+/**
+ * ==============================================
+ * RUTINA EXPRESS V2 — Panel Maestra
+ * Filosofía: 1 registro = 1-3 segundos
+ * Eventos estructurados, modal colectivo con chips, siesta activa, undo bar
+===============
+ */
+red/supabase.js';
+import { AppState } from '../state.js';
+import { MaestraApi } from '../api.js';
+import { UI } from './ui.js';
+import { Helpers } from '/js/shared/helpers.js';
+
+const { safeToast, safeEscapeHTML, Modal } = UI;
+const _saving = {};
+let _undoTimer = null;
+let _undoPayload = null;
+
+// ── Constantes de Eventos ─────────────────────────────────────────────────────
+con= {
+  biberon:     { icon: '🍼', label: 'Biberón',    color: 'blue'    },
+  panal_humedo:{ icon: '💧', label: 'Pañal 💧',   color: 'sky'     },
+  panal_sucio: { icon: '💩', label: 'Pañal 💩',   color: 'amber'   },
+  siesta:      { icon: '😴', label: 'Siesta',      color: 'indigo'  },
+  temperatura: { icon: '🌡️', label: 'Temperatura', color: 'rose'    },
+  medicamento: { icon: '💊', label: 'Medicamento', color: 'purple'  },
+  bano:        { icon: '🚽', label: 'Baño',        color: 'teal'    },
+ color: 'orange'  },
+  desayuno:    { icon: '🥐', label: 'Desayuno',    color: 'yellow'  },
+  almuerzo:    { icon: '🍽️', label: 'Almuerzo',   color: 'green'   },
+  merienda:    { icon: '🍎', label: 'Merienda',    color: 'lime'    },
+  nota:        { icon: '📝', label: 'Nota',        color: 'slate'   },
+};
+
+const SCHEDULE = [
+  { hour: 8,  minute: 0,  label: 'Desayuno',  type: 'desayuno'  },
+  { hour: 10, minute: 30, label: 'Merienda',   type: 'merienda'  },
+  { 'almuerzo'  },
+  { hour: 13, minute: 30, label: 'Siesta',     type: 'siesta'    },
+  { hour: 15, minute: 0,  label: 'Biberón',    type: 'biberon'   },
+];
+
+// ── Helpers ───────────────────────────────────────────────────────────────────
+function _isWithin12h(dateStr) {
+  if (!dateStr) return false;
+  return (Date.now() - new Date(dateStr).getTime()) < 12 * 60 * 60 * 1000;
+}
+
+function _getCurrentScheduleEvent() {
+  const now = new Date();
+  const mins = now.getHours() * 60 + now.getMinutes();
+  let closest = null;
+  let minDiff = Infinity;
+  for (const ev of SCHEDULE) {
+    const evMins = ev.hour * 60 + ev.minute;
+    const diff = Math.abs(mins - evMins);
+    if (diff < minDiff && diff <= 90) { minDiff = diff; closest = ev; }
+  }
+  return closest;
+}
+
+function _formatTime(isoStr) {
+  if (!isoStr) return '';
+  return new Date(isoStr).toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' });
+}
+
+function _getActiveSiestas(students, logsMap) {
+  return students.filter(s => {
+    const log = logsMap[s.id];
+ if (!log) return false;
+    const events = log.events || [];
+    const siestas = events.filter(e => e.type === 'siesta');
+    if (!siestas.length) return false;
+    const last = siestas[siestas.length - 1];
+    return last.open === true;
+  });
+}

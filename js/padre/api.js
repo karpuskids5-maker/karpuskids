@@ -108,12 +108,28 @@ export const Api = {
   async getDailyLog(studentId, date) {
     return await handle(
       supabase.from(TABLES.DAILY_LOGS)
-        .select('mood, food, nap, eating, sleeping, activities, notes, date, status')
+        .select('mood, food, nap, eating, sleeping, activities, notes, date, status, events, infant_data, created_at')
         .eq('student_id', studentId)
         .eq('date', date)
-        .eq('status', 'published') // Solo ver publicados
+        .eq('status', 'published')
         .maybeSingle(),
       'getDailyLog'
+    );
+  },
+
+  /**
+   * 📅 Historial de logs para rango de fechas (panel padre)
+   */
+  async getDailyLogsRange(studentId, fromDate, toDate) {
+    return await handle(
+      supabase.from(TABLES.DAILY_LOGS)
+        .select('date, mood, food, nap, notes, events, infant_data, created_at')
+        .eq('student_id', studentId)
+        .eq('status', 'published')
+        .gte('date', fromDate)
+        .lte('date', toDate)
+        .order('date', { ascending: false }),
+      'getDailyLogsRange'
     );
   },
 

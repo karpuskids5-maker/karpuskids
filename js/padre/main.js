@@ -17,6 +17,7 @@ import { ImageLoader } from '../shared/image-loader.js';
 import { OnboardingGuide } from '../shared/onboarding.js';
 import { Prefetch } from '../shared/prefetch.js';
 import { VideoCallUI } from '../shared/videocall-ui.js';
+import { RoutineModule } from './routine.js';
 
 import { UIPremium } from '../shared/ui-premium.js';
 
@@ -408,8 +409,113 @@ function renderDailySummary(log) {
     return;
   }
 
-  const student = AppState.get('currentStudent');
+  const student  = AppState.get('currentStudent');
+  const events   = log.events || log.infant_data || [];
   const isInfant = student?.age_type === 'meses';
+
+  // ── Helpers internos ──────────────────────────────────────────────────
+  const fmtTime = iso => iso ? new Date(iso).toLocaleTimeString('es-ES', { hour:'2-digit', minute:'2-digit' }) : '–';
+  const minsDur = mins => { if (!mins || mins < 0) return '–'; const h = Math.floor(mins/60), m = mins%60; return h > 0 ? `${h}h ${m>0?m+'m':''}`.trim() : `${m}m`; };
+
+  // ── Calcular siesta(s) ─────────────────────────────────────────────────
+  const siestas = events.filter(e => e.type === 'siesta');
+  const siestasInfo = siestas.map(s => {
+    const inicio = fmtTime(s.created_at);
+    const fin    = s.end_at ? fmtTime(s.end_at) : (s.open ? 'En curso' : '–');
+    const dur    = s.duration_min ? minsDur(s.duration_min) : (s.open ? '…' : '–');
+    return { inicio, fin, dur, open: s.open };
+  });
+  const totalNapMins = siestas.reduce((sum,s) => sum + (s.duration_min || 0), 0);
+
+  // ── Biberones ─────────────────────────────────────────────────────────
+  const biberones = events.filter(e => e.type === 'biberon' || e.type === 'milk' || e.type === 'structured_entry');
+  const totalOz   = biberones.reduce((sum,e) => sum + parseFloat(e.oz || e.milk || 0), 0);
+
+  // ── Comidas sólidas ────────────────────────────────────────────────────
+  const mealEmoji = { desayuno:'🥐', almuerzo:'🍽️', merienda:'🍎' };
+  const foodLabelMap = { todo:'Comió todo 🌟', all:'Comió todo 🌟', poco:'Comió poco 🍲', little:'Comió poco 🍲', half:'La mitad 🥣', nada:'No comió 🙅', none:'No comió 🙅' };
+  const mealEvents = events.filter(e => ['desayuno','almuerzo','merienda'].includes(e.type));
+
+  // ── Estado ánimo ───────────────────────────────────────────────────────
+  const moodMap = { feliz:'😊', bien:'😊', normal:'😐', triste:'😢', inquieto:'😫', enojado:'😡' };
+  const moodIcon = moodMap[(log.mood || '').toLowerCase()] || '✨';
+  const moodLabel = { feliz:'Contento/a', bien:'Bien', normal:'Normal', triste:'Triste', inquieto:'Inquieto/a', enojado:'Molesto/a' };
+
+  // ── Temperatura ───────────────────────────────────────────────────────
+  const tempEvents = events.filter(e => e.type === 'temperatura');
+  const lastTemp   = tempEvents.length ? tempEvents[tempEvents.length - 1] : null;
+
+  // ── Pañales ────────────────────────────────────────────────────────────
+  const wetCount   = events.filter(e => e.type === 'panal_humedo').length;
+  const dirtyCount = events.filter(e => e.type === 'panal_sucio').length;
+
+  // ── Construir filas de la timeline resumida ────────────────────────────
+  const rows = [];
+
+  // Ánimo
+  if (log.mood) rows.push({ icon: moodIcon, label: moodLabel[(log.mood||'').toLowerCase()] || log.mood, sub: 'Estado de ánimo', time: fmtTime(log.created_at), color: 'bg-orange-50 border-orange-200' });
+
+  // Desayuno / Almuerzo / Merienda desde eventos
+  mealEvents.forEach(e => {
+    const label = foodLabelMap[e.value || e.food] || (e.value || '');
+    rows.push({ icon: mealEmoji[e.type] || '🍽️', label: label || 'Registrado', sub: e.type.charAt(0).toUpperCase() + e.type.slice(1), time: fmtTime(e.created_at), color: 'bg-green-50 border-green-200' });
+  });
+
+  // Comida general si no hay eventos específicos de comida
+  if (!mealEvents.length && log.food) {
+    rows.push({ icon: '🍽️', label: foodLabelMap[(log.food||'').toLowerCase()] || log.food, sub: 'Alimentación', time: '', color: 'bg-green-50 border-green-200' });
+  }
+
+  // Biberones
+  if (totalOz > 0) rows.push({ icon: '🍼', label: `${totalOz} oz totales`, sub: `${biberones.length} toma${biberones.length > 1 ? 's' : ''}`, time: biberones.length ? fmtTime(biberones[biberones.length-1].created_at) : '', color: 'bg-blue-50 border-blue-200' });
+
+  // Siestas
+  siestasInfo.forEach((s, i) => {
+    const napLabel = s.open ? `Durmiendo desde ${s.inicio}` : `${s.inicio} → ${s.fin}`;
+    const napSub   = s.open ? 'En curso' : (s.dur !== '–' ? `Duración: ${s.dur}` : 'Siesta');
+    rows.push({ icon: s.open ? '😴' : '💤', label: napLabel, sub: napSub, time: s.open ? '' : s.fin, color: 'bg-indigo-50 border-indigo-200' });
+  });
+  if (!siestasInfo.length && log.nap) {
+    rows.push({ icon: log.nap === 'si' ? '💤' : '☀️', label: log.nap === 'si' ? 'Durmió su siesta' : 'No durmió', sub: totalNapMins > 0 ? `Duración: ${minsDur(totalNapMins)}` : 'Siesta', time: '', color: 'bg-indigo-50 border-indigo-200' });
+  }
+
+  // Pañales
+  if (wetCount > 0 || dirtyCount > 0) rows.push({ icon: '🚼', label: `${wetCount} mojado${wetCount !== 1 ? 's' : ''}  ·  ${dirtyCount} sucio${dirtyCount !== 1 ? 's' : ''}`, sub: 'Cambios de pañal', time: '', color: 'bg-sky-50 border-sky-200' });
+
+  // Temperatura
+  if (lastTemp) {
+    const isFever = parseFloat(lastTemp.temp) >= 37.5;
+    rows.push({ icon: isFever ? '🔥' : '🌡️', label: `${lastTemp.temp}°C ${isFever ? '— Fiebre' : '— Normal'}`, sub: 'Temperatura', time: fmtTime(lastTemp.created_at), color: isFever ? 'bg-rose-50 border-rose-200' : 'bg-slate-50 border-slate-200' });
+  }
+
+  // Notas
+  if (log.notes) rows.push({ icon: '📝', label: log.notes.length > 60 ? log.notes.substring(0, 60) + '…' : log.notes, sub: 'Nota de la maestra', time: '', color: 'bg-amber-50 border-amber-200' });
+
+  // ── Render ──────────────────────────────────────────────────────────────
+  const rowsHTML = rows.map(r => `
+    <div class="flex items-center gap-3 p-3 ${r.color} border rounded-2xl">
+      <span class="text-2xl shrink-0">${r.icon}</span>
+      <div class="flex-1 min-w-0">
+        <p class="text-xs font-black text-slate-700 leading-snug truncate">${r.label}</p>
+        <p class="text-[10px] font-bold text-slate-400">${r.sub}</p>
+      </div>
+      ${r.time ? `<span class="text-[10px] font-black text-slate-400 shrink-0">${r.time}</span>` : ''}
+    </div>`).join('');
+
+  container.innerHTML = `
+    <div class="bg-white rounded-2xl border border-green-100 shadow-sm overflow-hidden">
+      <div class="flex items-center justify-between px-5 pt-5 pb-3">
+        <h3 class="font-black text-slate-800 text-sm flex items-center gap-2">
+          <span class="bg-green-100 text-green-700 p-1.5 rounded-lg"><i data-lucide="clipboard-list" class="w-4 h-4"></i></span>
+          Resumen del Día
+        </h3>
+        <button onclick="App.navigateTo('routine')" class="text-[10px] font-black text-[#28B54D] uppercase tracking-widest hover:underline whitespace-nowrap">Ver completo →</button>
+      </div>
+      ${rows.length ? `<div class="px-4 pb-5 space-y-2">${rowsHTML}</div>` : `<div class="px-5 pb-5 text-center text-sm text-slate-400 font-bold">La maestra aún no ha registrado eventos detallados hoy.</div>`}
+    </div>`;
+
+  if (window.lucide) lucide.createIcons();
+}
 
   if (isInfant) {
     // 🍼 LÍNEA DE TIEMPO PARA BEBÉS
@@ -458,10 +564,13 @@ function renderDailySummary(log) {
 
     container.innerHTML = `
       <div class="bg-white rounded-2xl p-6 border border-green-100 shadow-sm">
-        <h3 class="font-black text-slate-800 text-base mb-4 flex items-center gap-2">
-          <span class="bg-green-100 text-green-700 p-1.5 rounded-lg"><i data-lucide="clipboard-list" class="w-4 h-4"></i></span>
-          Resumen del Día
-        </h3>
+        <div class="flex items-center justify-between mb-4">
+          <h3 class="font-black text-slate-800 text-base flex items-center gap-2">
+            <span class="bg-green-100 text-green-700 p-1.5 rounded-lg"><i data-lucide="clipboard-list" class="w-4 h-4"></i></span>
+            Resumen del Día
+          </h3>
+          <button onclick="App.navigateTo('routine')" class="text-[10px] font-black text-[#28B54D] uppercase tracking-widest hover:underline">Ver completo →</button>
+        </div>
         <div class="grid grid-cols-1 md:grid-cols-3 gap-3">
           <div class="bg-slate-50 p-4 rounded-xl flex items-center gap-3">
             <div class="w-10 h-10 rounded-full bg-white flex items-center justify-center text-xl shadow-sm">${moodIcon}</div>
@@ -545,6 +654,10 @@ export async function navigateTo(targetId) {
       case 'class':           FeedModule.init(student?.classroom_id); break;
       case 'profile':         ProfileModule.init(); _initPadreQR(student); NotifyPermission.requestIfNeeded(); break;
       case 'grades':          GradesModule.init(student?.id); break;
+      case 'routine':
+        window.RoutineModule = RoutineModule;
+        RoutineModule.initRoutinePanel(student?.id);
+        break;
       case 'qr-access':       _initPadreQR(student); break;
       case 'videocall': {
         const student = AppState.get('currentStudent');
