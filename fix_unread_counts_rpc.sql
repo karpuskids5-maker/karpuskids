@@ -1,4 +1,4 @@
--- Fix get_unread_counts to return unread counts per sender
+-- Fix get_unread_counts to return unread counts per sender--
 create or replace function public.get_unread_counts()
 returns jsonb language plpgsql security definer set search_path = public as $$
 declare
