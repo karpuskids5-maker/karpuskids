@@ -502,21 +502,6 @@ function renderDailySummary(log) {
       ${r.time ? `<span class="text-[10px] font-black text-slate-400 shrink-0">${r.time}</span>` : ''}
     </div>`).join('');
 
-  container.innerHTML = `
-    <div class="bg-white rounded-2xl border border-green-100 shadow-sm overflow-hidden">
-      <div class="flex items-center justify-between px-5 pt-5 pb-3">
-        <h3 class="font-black text-slate-800 text-sm flex items-center gap-2">
-          <span class="bg-green-100 text-green-700 p-1.5 rounded-lg"><i data-lucide="clipboard-list" class="w-4 h-4"></i></span>
-          Resumen del Día
-        </h3>
-        <button onclick="App.navigateTo('routine')" class="text-[10px] font-black text-[#28B54D] uppercase tracking-widest hover:underline whitespace-nowrap">Ver completo →</button>
-      </div>
-      ${rows.length ? `<div class="px-4 pb-5 space-y-2">${rowsHTML}</div>` : `<div class="px-5 pb-5 text-center text-sm text-slate-400 font-bold">La maestra aún no ha registrado eventos detallados hoy.</div>`}
-    </div>`;
-
-  if (window.lucide) lucide.createIcons();
-}
-
   if (isInfant) {
     // 🍼 LÍNEA DE TIEMPO PARA BEBÉS
     const infantData = log.infant_data || [];
@@ -558,38 +543,17 @@ function renderDailySummary(log) {
       </div>
     `;
   } else {
-    // 🧒 RESUMEN ESTÁNDAR
-    const moodMap = { feliz: '😊', bien: '😊', normal: '😐', triste: '😢', inquieto: '😫', enojado: '😡' };
-    const moodIcon = moodMap[(log.mood || '').toLowerCase()] || '✨';
-
+    // 🧒 RESUMEN ESTÁNDAR — usa el timeline ya calculado
     container.innerHTML = `
-      <div class="bg-white rounded-2xl p-6 border border-green-100 shadow-sm">
-        <div class="flex items-center justify-between mb-4">
-          <h3 class="font-black text-slate-800 text-base flex items-center gap-2">
+      <div class="bg-white rounded-2xl border border-green-100 shadow-sm overflow-hidden">
+        <div class="flex items-center justify-between px-5 pt-5 pb-3">
+          <h3 class="font-black text-slate-800 text-sm flex items-center gap-2">
             <span class="bg-green-100 text-green-700 p-1.5 rounded-lg"><i data-lucide="clipboard-list" class="w-4 h-4"></i></span>
             Resumen del Día
           </h3>
-          <button onclick="App.navigateTo('routine')" class="text-[10px] font-black text-[#28B54D] uppercase tracking-widest hover:underline">Ver completo →</button>
+          <button onclick="App.navigateTo('routine')" class="text-[10px] font-black text-[#28B54D] uppercase tracking-widest hover:underline whitespace-nowrap">Ver completo →</button>
         </div>
-        <div class="grid grid-cols-1 md:grid-cols-3 gap-3">
-          <div class="bg-slate-50 p-4 rounded-xl flex items-center gap-3">
-            <div class="w-10 h-10 rounded-full bg-white flex items-center justify-center text-xl shadow-sm">${moodIcon}</div>
-            <div><p class="text-[10px] font-black text-slate-400 uppercase">Ánimo</p><p class="font-bold text-slate-700 capitalize">${log.mood || 'Bien'}</p></div>
-          </div>
-          <div class="bg-slate-50 p-4 rounded-xl flex items-center gap-3">
-            <div class="w-10 h-10 rounded-full bg-white flex items-center justify-center text-xl shadow-sm">🍽️</div>
-            <div><p class="text-[10px] font-black text-slate-400 uppercase">Comida</p><p class="font-bold text-slate-700">${log.food || 'Sin registro'}</p></div>
-          </div>
-          <div class="bg-slate-50 p-4 rounded-xl flex items-center gap-3">
-            <div class="w-10 h-10 rounded-full bg-white flex items-center justify-center text-xl shadow-sm">💤</div>
-            <div><p class="text-[10px] font-black text-slate-400 uppercase">Siesta</p><p class="font-bold text-slate-700">${log.nap || log.sleeping || 'No registrada'}</p></div>
-          </div>
-        </div>
-        ${(log.notes || log.observations) ? `
-          <div class="mt-3 p-3 bg-amber-50 rounded-xl border border-amber-100">
-            <p class="text-[10px] font-black text-amber-500 uppercase mb-1">Observaciones</p>
-            <p class="text-sm text-slate-600 italic">&ldquo;${log.notes || log.observations}&rdquo;</p>
-          </div>` : ''}
+        ${rows.length ? `<div class="px-4 pb-5 space-y-2">${rowsHTML}</div>` : `<div class="px-5 pb-5 text-center text-sm text-slate-400 font-bold">La maestra aún no ha registrado eventos detallados hoy.</div>`}
       </div>`;
   }
 

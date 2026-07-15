@@ -684,18 +684,48 @@ function _renderStandardRoutineUI(student, log, modalId) {
     const meta = EVENT_TYPES[ev.type] || { icon: '📋', label: ev.type };
     let detail = '';
     if (ev.type === 'biberon')     detail = ev.oz ? `${ev.oz} oz` : '';
-    if (ev.type === 'temperatura') detail = ev.temp ? `${ev.temp}°C ${ev.temp >= 37.5 ? '🔥' : ''}` : '';
+    if (ev.type === 'temperatura') detail = ev.temp ? `${ev.temp}°C ${parseFloat(ev.temp) >= 37.5 ? '🔥' : ''}` : '';
     if (ev.type === 'medicamento') detail = [ev.nombre, ev.dosis].filter(Boolean).join(' · ');
     if (ev.type === 'siesta')      detail = ev.duration_min ? `${ev.duration_min} min` : (ev.open ? 'En curso...' : '');
+    if (ev.type === 'desayuno' || ev.type === 'almuerzo' || ev.type === 'merienda') detail = ev.value || '';
+    if (ev.type === 'nota')        detail = ev.texto ? (ev.texto.length > 40 ? ev.texto.substring(0,40)+'…' : ev.texto) : '';
     return `
       <div class="flex items-start gap-3">
         <div class="w-8 h-8 rounded-xl bg-slate-100 flex items-center justify-center text-sm shrink-0">${meta.icon}</div>
-        <div>
+        <div class="flex-1 min-w-0">
           <p class="text-[10px] font-black text-slate-400">${_formatTime(ev.created_at)}</p>
           <p class="text-xs font-bold text-slate-700">${meta.label}${detail ? ` · ${detail}` : ''}</p>
         </div>
       </div>`;
   }).join('') : '<p class="text-xs text-slate-400 italic">Sin eventos registrados hoy.</p>';
+
+  // Siesta activa
+  const activeSiesta = events.find(e => e.type === 'siesta' && e.open);
+  const siestaSection = activeSiesta ? (() => {
+    const elapsed = Math.round((Date.now() - new Date(activeSiesta.created_at)) / 60000);
+    return `
+      <div class="p-4 bg-purple-50 border-2 border-purple-200 rounded-2xl flex items-center justify-between gap-3">
+        <div class="flex items-center gap-3">
+          <span class="text-2xl animate-pulse">😴</span>
+          <div>
+            <p class="text-xs font-black text-purple-800">Durmiendo ahora</p>
+            <p class="text-[10px] font-bold text-purple-600">Inició a las ${_formatTime(activeSiesta.created_at)} · ${elapsed}min</p>
+          </div>
+        </div>
+        <button onclick="App.wakeStudentSiesta('${student.id}')"
+          class="px-3 py-2 bg-purple-600 text-white rounded-xl font-black text-[10px] uppercase tracking-widest hover:bg-purple-700 active:scale-90 transition-all shrink-0 shadow-md shadow-purple-200">
+          ☀️ Despertó
+        </button>
+      </div>`;
+  })() : `
+    <div class="grid grid-cols-2 gap-2">
+      ${Object.entries({si:'💤',no:'☀️'}).map(([v,e]) => `
+        <button onclick="App.updateRoutineFieldInModal('${student.id}','sleep','${v}')"
+          class="routine-modal-sleep-${student.id} flex items-center justify-center gap-3 p-4 rounded-2xl border-2 transition-all active:scale-90 ${currentSleep===v ? 'border-indigo-400 bg-indigo-50 shadow-md' : 'border-slate-100 bg-slate-50'}" data-val="${v}">
+          <span class="text-2xl">${e}</span>
+          <span class="text-xs font-black uppercase text-slate-600">${v==='si' ? 'Durmió' : 'No durmió'}</span>
+        </button>`).join('')}
+    </div>`;
 
   return `
     <div class="bg-white w-full max-w-md rounded-[1.8rem] shadow-2xl overflow-hidden animate-fadeIn flex flex-col max-h-[92vh]">
@@ -715,7 +745,8 @@ function _renderStandardRoutineUI(student, log, modalId) {
       </div>
 
       <div class="p-5 space-y-5 overflow-y-auto custom-scrollbar">
-        <!-- Ánimo -->
+
+        <!-- Estado de ánimo -->
         <div class="space-y-2">
           <label class="text-[11px] font-black text-slate-400 uppercase tracking-widest">Estado de ánimo ☀️</label>
           <div class="grid grid-cols-4 gap-2">
@@ -728,7 +759,7 @@ function _renderStandardRoutineUI(student, log, modalId) {
           </div>
         </div>
 
-        <!-- Comida -->
+        <!-- Alimentación -->
         <div class="space-y-2">
           <label class="text-[11px] font-black text-slate-400 uppercase tracking-widest">Alimentación 🍽️</label>
           <div class="grid grid-cols-3 gap-2">
@@ -744,39 +775,73 @@ function _renderStandardRoutineUI(student, log, modalId) {
         <!-- Siesta -->
         <div class="space-y-2">
           <label class="text-[11px] font-black text-slate-400 uppercase tracking-widest">Siesta 💤</label>
-          ${(() => {
-            const activeSiesta = events.find(e => e.type === 'siesta' && e.open);
-            if (activeSiesta) {
-              const start = new Date(activeSiesta.created_at);
-              const elapsed = Math.round((Date.now() - start) / 60000);
-              return `
-              <div class="p-4 bg-purple-50 border-2 border-purple-200 rounded-2xl flex items-center justify-between gap-3">
-                <div class="flex items-center gap-3">
-                  <span class="text-2xl animate-pulse">😴</span>
-                  <div>
-                    <p class="text-xs font-black text-purple-800">Durmiendo ahora</p>
-                    <p class="text-[10px] font-bold text-purple-600">Inició a las ${_formatTime(activeSiesta.created_at)} · ${elapsed}min</p>
-                  </div>
-                </div>
-                <button onclick="App.wakeStudentSiesta('${student.id}')"
-                  class="px-3 py-2 bg-purple-600 text-white rounded-xl font-black text-[10px] uppercase tracking-widest hover:bg-purple-700 active:scale-90 transition-all shrink-0 shadow-md shadow-purple-200">
-                  ☀️ Despertó
-                </button>
-              </div>`;
-            }
-            return `
-            <div class="grid grid-cols-2 gap-2">
-              ${Object.entries({si:'💤',no:'☀️'}).map(([v,e]) => `
-                <button onclick="App.updateRoutineFieldInModal('${student.id}','sleep','${v}')"
-                  class="routine-modal-sleep-${student.id} flex items-center justify-center gap-3 p-4 rounded-2xl border-2 transition-all active:scale-90 ${currentSleep===v ? 'border-indigo-400 bg-indigo-50 shadow-md' : 'border-slate-100 bg-slate-50'}" data-val="${v}">
-                  <span class="text-2xl">${e}</span>
-                  <span class="text-xs font-black uppercase text-slate-600">${v==='si' ? 'Durmió' : 'No durmió'}</span>
-                </button>`).join('')}
-            </div>`;
-          })()}
+          ${siestaSection}
         </div>
 
-        <!-- Notas -->
+        <!-- Temperatura -->
+        <div class="space-y-2">
+          <label class="text-[11px] font-black text-slate-400 uppercase tracking-widest">Temperatura 🌡️</label>
+          <div class="grid grid-cols-4 gap-2">
+            ${[36.4,36.6,36.8,37.0,37.2,37.5,37.8,38.0].map(t => {
+              const fiebre = t >= 37.5;
+              return `<button type="button" data-ind-temp-${student.id}="${t}"
+                onclick="document.querySelectorAll('[data-ind-temp-${student.id}]').forEach(b=>{b.classList.remove('bg-rose-500','bg-blue-500','text-white','border-rose-500','border-blue-400'); b.classList.add('bg-slate-50','border-slate-100');}); this.classList.remove('bg-slate-50','border-slate-100'); this.classList.add('${fiebre ? 'bg-rose-500 border-rose-500' : 'bg-blue-500 border-blue-400'}','text-white'); App.registerIndividualEvent('${student.id}','temperatura',{temp:${t}});"
+                class="py-3 bg-slate-50 border-2 border-slate-100 rounded-2xl font-black text-xs ${fiebre ? 'text-rose-600' : 'text-slate-600'} hover:bg-slate-100 transition-all active:scale-90 relative">
+                ${t}°${fiebre ? '<span class="absolute -top-1 -right-1 text-[8px]">🔥</span>' : ''}
+              </button>`;
+            }).join('')}
+          </div>
+        </div>
+
+        <!-- Eventos rápidos -->
+        <div class="space-y-2">
+          <label class="text-[11px] font-black text-slate-400 uppercase tracking-widest">Eventos del día</label>
+          <div class="grid grid-cols-4 gap-2">
+            ${[
+              {type:'desayuno', icon:'🥐', label:'Desayuno'},
+              {type:'almuerzo', icon:'🍽️', label:'Almuerzo'},
+              {type:'merienda', icon:'🍎', label:'Merienda'},
+              {type:'panal_humedo', icon:'💧', label:'Pañal 💧'},
+              {type:'panal_sucio',  icon:'💩', label:'Pañal 💩'},
+              {type:'bano',        icon:'🚽', label:'Baño'},
+            ].map(ev => `
+              <button onclick="App.registerIndividualEvent('${student.id}','${ev.type}',{})"
+                class="flex flex-col items-center gap-1.5 p-3 bg-slate-50 hover:bg-slate-100 border-2 border-transparent hover:border-slate-200 rounded-[1.2rem] transition-all active:scale-90">
+                <span class="text-2xl">${ev.icon}</span>
+                <span class="text-[9px] font-black text-slate-400 uppercase leading-tight text-center">${ev.label}</span>
+              </button>`).join('')}
+          </div>
+        </div>
+
+        <!-- Biberón -->
+        <div class="space-y-2">
+          <label class="text-[11px] font-black text-slate-400 uppercase tracking-widest">Biberón 🍼</label>
+          <div class="grid grid-cols-4 gap-2">
+            ${[2,4,6,8].map(oz => `
+              <button type="button"
+                onclick="App.registerIndividualEvent('${student.id}','biberon',{oz:${oz}}); App.safeToast('${oz}oz registrado ✓');"
+                class="py-3 bg-blue-50 border-2 border-blue-200 rounded-2xl font-black text-sm text-blue-700 hover:bg-blue-100 transition-all active:scale-90">
+                ${oz}<span class="text-[9px]">oz</span>
+              </button>`).join('')}
+          </div>
+        </div>
+
+        <!-- Medicamento -->
+        <div class="space-y-2">
+          <label class="text-[11px] font-black text-slate-400 uppercase tracking-widest">Medicamento 💊</label>
+          <div class="grid grid-cols-2 gap-3">
+            <input id="ind-med-nombre-${student.id}" type="text" placeholder="Ej: Ibuprofeno"
+              class="p-3 bg-slate-50 border-2 border-slate-100 rounded-2xl text-sm font-bold outline-none focus:border-purple-400 transition-all">
+            <input id="ind-med-dosis-${student.id}" type="text" placeholder="Ej: 5ml"
+              class="p-3 bg-slate-50 border-2 border-slate-100 rounded-2xl text-sm font-bold outline-none focus:border-purple-400 transition-all">
+          </div>
+          <button onclick="App.registerIndividualEvent('${student.id}','medicamento',{nombre:document.getElementById('ind-med-nombre-${student.id}')?.value.trim(),dosis:document.getElementById('ind-med-dosis-${student.id}')?.value.trim()}); document.getElementById('ind-med-nombre-${student.id}').value=''; document.getElementById('ind-med-dosis-${student.id}').value='';"
+            class="w-full py-2.5 bg-purple-50 border-2 border-purple-200 rounded-2xl text-xs font-black text-purple-700 hover:bg-purple-100 transition-all active:scale-95 uppercase tracking-widest">
+            💊 Registrar medicamento
+          </button>
+        </div>
+
+        <!-- Observaciones -->
         <div class="space-y-2">
           <label class="text-[11px] font-black text-slate-400 uppercase tracking-widest">Observaciones 📝</label>
           <textarea id="modal-note-${student.id}" rows="3"
@@ -784,12 +849,12 @@ function _renderStandardRoutineUI(student, log, modalId) {
             placeholder="Escribe aquí...">${safeEscapeHTML(currentNotes)}</textarea>
         </div>
 
-        <!-- Línea de tiempo individual -->
-        ${events.length ? `
+        <!-- Línea de tiempo -->
         <div class="space-y-2">
-          <label class="text-[11px] font-black text-slate-400 uppercase tracking-widest">Eventos del día</label>
-          <div class="space-y-3 max-h-40 overflow-y-auto pr-1">${timelineHTML}</div>
-        </div>` : ''}
+          <label class="text-[11px] font-black text-slate-400 uppercase tracking-widest">Registro del día</label>
+          <div class="space-y-3 max-h-48 overflow-y-auto pr-1" id="ind-timeline-${student.id}">${timelineHTML}</div>
+        </div>
+
       </div>
 
       <div class="p-5 pt-0">
@@ -1075,5 +1140,51 @@ export async function registerInfantEvent(sid, type, val) {
     safeToast(`Registro de ${type} guardado`);
     await _refreshLogsMap(classroom.id, today);
     _refreshStudentCards();
+  } catch (e) { safeToast('Error al registrar evento', 'error'); }
+}
+
+export async function registerIndividualEvent(sid, type, extra = {}) {
+  const classroom = AppState.get('classroom');
+  const today     = new Date().toISOString().split('T')[0];
+  const logsMap   = AppState.get('logsMap') || {};
+  const currentLog = logsMap[sid] || {};
+
+  let newEvents = [...(currentLog.events || [])];
+  const now = new Date().toISOString();
+
+  if (type === 'siesta') {
+    // inicio de siesta
+    newEvents = _addEventToLog(currentLog, _makeEvent('siesta', { open: true }));
+  } else {
+    newEvents = _addEventToLog(currentLog, _makeEvent(type, extra));
+  }
+
+  const payload = { student_id: sid, classroom_id: classroom.id, date: today, events: newEvents };
+  // temperatura también actualiza el timeline visual
+  try {
+    await MaestraApi.upsertDailyLog(payload);
+    const meta = EVENT_TYPES[type] || { icon: '📋', label: type };
+    let detail = '';
+    if (type === 'temperatura' && extra.temp) detail = ` · ${extra.temp}°C${parseFloat(extra.temp) >= 37.5 ? ' 🔥' : ''}`;
+    if (type === 'biberon' && extra.oz) detail = ` · ${extra.oz}oz`;
+    if (type === 'medicamento') detail = [extra.nombre, extra.dosis].filter(Boolean).join(' · ');
+    safeToast(`${meta.icon} ${meta.label}${detail} registrado`);
+    await _refreshLogsMap(classroom.id, today);
+    _refreshStudentCards();
+    // Actualizar timeline en el modal sin cerrarlo
+    const tlContainer = document.getElementById(`ind-timeline-${sid}`);
+    if (tlContainer) {
+      const updatedLog = (AppState.get('logsMap') || {})[sid] || {};
+      const updatedEvents = (updatedLog.events || []).slice().reverse();
+      tlContainer.innerHTML = updatedEvents.length ? updatedEvents.map(ev => {
+        const m = EVENT_TYPES[ev.type] || { icon: '📋', label: ev.type };
+        let d = '';
+        if (ev.type === 'biberon')     d = ev.oz ? `${ev.oz} oz` : '';
+        if (ev.type === 'temperatura') d = ev.temp ? `${ev.temp}°C ${parseFloat(ev.temp) >= 37.5 ? '🔥' : ''}` : '';
+        if (ev.type === 'medicamento') d = [ev.nombre, ev.dosis].filter(Boolean).join(' · ');
+        if (ev.type === 'siesta')      d = ev.duration_min ? `${ev.duration_min} min` : (ev.open ? 'En curso...' : '');
+        return `<div class="flex items-start gap-3"><div class="w-8 h-8 rounded-xl bg-slate-100 flex items-center justify-center text-sm shrink-0">${m.icon}</div><div class="flex-1 min-w-0"><p class="text-[10px] font-black text-slate-400">${_formatTime(ev.created_at)}</p><p class="text-xs font-bold text-slate-700">${m.label}${d ? ` · ${d}` : ''}</p></div></div>`;
+      }).join('') : '<p class="text-xs text-slate-400 italic">Sin eventos registrados hoy.</p>';
+    }
   } catch (e) { safeToast('Error al registrar evento', 'error'); }
 }
