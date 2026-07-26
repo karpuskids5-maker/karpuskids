@@ -1,5 +1,6 @@
 import { supabase } from '../../shared/supabase.js';
 import { Helpers } from '../../shared/helpers.js';
+import { QueryCache } from '../../shared/query-cache.js';
 
 export const RoomsModule = {
   async init() {
@@ -94,6 +95,8 @@ export const RoomsModule = {
     try {
       const { error } = await supabase.from('classrooms').delete().eq('id', id);
       if (error) throw error;
+      QueryCache.invalidate('dir_classrooms');
+      QueryCache.invalidate('dir_classrooms_occ');
       Helpers.toast('Aula eliminada correctamente', 'success');
       await this.loadRooms();
     } catch (e) {
@@ -247,6 +250,8 @@ export const RoomsModule = {
         if (error) throw error;
         savedId = newRoom?.id;
       }
+      QueryCache.invalidate('dir_classrooms');
+      QueryCache.invalidate('dir_classrooms_occ');
 
       // Assign checked students to this room
       const modal = document.getElementById('roomModal');

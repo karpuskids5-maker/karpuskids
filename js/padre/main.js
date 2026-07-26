@@ -1,30 +1,29 @@
 import { supabase, ensureRole, initOneSignal } from '../shared/supabase.js';
+import { SchoolEngine } from '../shared/school-engine.js';
 import { Api } from './api.js';
 import { Helpers } from './helpers.js';
 import { AppState } from './appState.js';
-import { VideoCallModule } from '../shared/videocall.js';
-import { PaymentsModule }  from './payments.js';
-import { TasksModule }     from './tasks.js';
-import { AttendanceModule } from './attendance.js';
-import { ChatModule }      from './chat.js';
-import { FeedModule }      from './feed.js';
-import { ProfileModule }   from './profile.js';
-import { GradesModule }    from './grades.js';
-import { initLiveClassListener } from './attendance_live.js';
 import { NotifyPermission } from '../shared/notify-permission.js';
 import { BadgeSystem } from '../shared/badges.js';
 import { ImageLoader } from '../shared/image-loader.js';
 import { OnboardingGuide } from '../shared/onboarding.js';
 import { Prefetch } from '../shared/prefetch.js';
 import { VideoCallUI } from '../shared/videocall-ui.js';
-import { RoutineModule } from './routine.js';
+import { RealtimeManager } from '../shared/realtime-manager.js';
+import { initLiveClassListener } from './attendance_live.js';
 
 import { UIPremium } from '../shared/ui-premium.js';
 
 window.App = {
-  feed: FeedModule, payments: PaymentsModule, tasks: TasksModule,
-  attendance: AttendanceModule, chat: ChatModule, profile: ProfileModule,
-  grades: GradesModule, navigateTo: navigateTo,
+  feed: { init: (cid) => import('./feed.js').then(m => m.FeedModule.init(cid)) },
+  payments: { init: (sid) => import('./payments.js').then(m => m.PaymentsModule.init(sid)) },
+  tasks: { init: (sid) => import('./tasks.js').then(m => m.TasksModule.init(sid)) },
+  attendance: { init: (sid) => import('./attendance.js').then(m => m.AttendanceModule.init(sid)) },
+  chat: { init: () => import('./chat.js').then(m => m.ChatModule.init()) },
+  profile: { init: () => import('./profile.js').then(m => m.ProfileModule.init()) },
+  grades: { init: (sid) => import('./grades.js').then(m => m.GradesModule.init(sid)) },
+  routine: { initRoutinePanel: (sid) => import('./routine.js').then(m => m.RoutineModule.initRoutinePanel(sid)) },
+  navigateTo: navigateTo,
   openDigitalID: openDigitalID,
   switchStudent: switchStudent,
   updateHeaderProfile: updateHeaderProfile,
@@ -100,6 +99,12 @@ document.addEventListener('DOMContentLoaded', async () => {
 
     AppState.set('user', auth.user);
     AppState.set('profile', auth.profile);
+
+    // Inicializar School Engine
+    await SchoolEngine.init({ forceRefresh: true });
+    AppState.set('schoolYear', SchoolEngine.getSchoolYear());
+    AppState.set('activePeriod', SchoolEngine.getActivePeriod());
+    AppState.set('periods', SchoolEngine.getAllPeriods());
 
     // ⚡ PREFETCH: Iniciar carga silenciosa de recursos críticos
     Prefetch.start({
@@ -289,6 +294,9 @@ async function refreshDashboard() {
   // 🚨 Banner de deuda vencida
   _updateDebtBanner(finance);
 
+  // School Engine: Banner del Año Escolar
+  _renderSchoolYearBanner();
+
   // checkActiveMeetings en background — no bloquea las tarjetas
   checkActiveMeetings().catch(() => {});
 }
@@ -319,6 +327,46 @@ function _updateDebtBanner(finance) {
   } else {
     banner.classList.add('hidden');
   }
+}
+
+// ── School Engine: Banner Año Escolar ──────────────────────────────────────
+function _renderSchoolYearBanner() {
+  const banner = document.getElementById('padreSchoolYearBanner');
+  if (!banner) return;
+
+  const year = SchoolEngine.getSchoolYear();
+  const period = SchoolEngine.getActivePeriod();
+  const enrollmentOpen = SchoolEngine.isEnrollmentOpen();
+  const reenrollmentOpen = SchoolEngine.isReenrollmentOpen();
+
+  if (!year) {
+    banner.classList.add('hidden');
+    return;
+  }
+
+  const periodName = period?.name || 'Sin periodo activo';
+  const yearName = year.name || year.label || 'Año Escolar';
+
+  let badge = '';
+  if (enrollmentOpen) badge = '<span class="px-2 py-0.5 bg-emerald-100 text-emerald-700 text-[10px] font-black rounded-full uppercase">Inscripciones Abiertas</span>';
+  else if (reenrollmentOpen) badge = '<span class="px-2 py-0.5 bg-blue-100 text-blue-700 text-[10px] font-black rounded-full uppercase">Reinscripciones Abiertas</span>';
+  else if (year.status === 'active') badge = '<span class="px-2 py-0.5 bg-violet-100 text-violet-700 text-[10px] font-black rounded-full uppercase">En Curso</span>';
+  else if (year.status === 'closed') badge = '<span class="px-2 py-0.5 bg-slate-100 text-slate-500 text-[10px] font-black rounded-full uppercase">Finalizado</span>';
+
+  banner.innerHTML = `
+    <div class="bg-gradient-to-r from-violet-50 to-indigo-50 border border-violet-200 rounded-2xl p-4 flex items-center gap-4">
+      <div class="w-10 h-10 bg-violet-100 rounded-xl flex items-center justify-center shrink-0">
+        <i data-lucide="calendar-range" class="w-5 h-5 text-violet-600"></i>
+      </div>
+      <div class="flex-1 min-w-0">
+        <p class="text-xs font-bold text-slate-800">${Helpers.escapeHTML(yearName)}</p>
+        <p class="text-[10px] text-slate-500 font-semibold mt-0.5">Periodo actual: ${Helpers.escapeHTML(periodName)}</p>
+      </div>
+      ${badge}
+    </div>
+  `;
+  banner.classList.remove('hidden');
+  if (window.lucide) lucide.createIcons();
 }
 
 // ── Tarjetas del Dashboard ────────────────────────────────────────────────────
@@ -587,8 +635,8 @@ export async function navigateTo(targetId) {
   if (!targetId) return;
   Helpers.vibrate?.('light');
 
-  // ✅ LIMPIEZA DE REALTIME: Eliminar canales al cambiar de sección
-  if (window.RealtimeManager) RealtimeManager.unsubscribeAll(['notifications', 'live_status']);
+  // LIMPIEZA DE REALTIME: Eliminar canales al cambiar de sección
+  if (RealtimeManager?.unsubscribeAll) RealtimeManager.unsubscribeAll(['notifications', 'live_status']);
 
   document.querySelectorAll('.section').forEach(sec => {
     sec.classList.add('hidden');
@@ -619,30 +667,27 @@ export async function navigateTo(targetId) {
     switch (targetId) {
       case 'home':
         refreshDashboard().then(() => {
-          // Re-aplicar badges en tarjetas después de que se rendericen
           if (window.BadgeSystem) BadgeSystem._reapplyCardBadges();
         });
         break;
       case 'payments': {
         const fin = AppState.get('financeConfig') || {};
-        // Update header stats
         const setEl = (id, v) => { const el = document.getElementById(id); if (el) el.textContent = v; };
         const paidTotal = (AppState.get('financeHistory') || []).reduce((s, p) => s + Number(p.amount || 0), 0);
         setEl('paymentsBalance', Helpers.formatCurrency(paidTotal));
         setEl('paymentsMonthlyFee', Helpers.formatCurrency(fin.monthly_fee || 0));
         setEl('paymentsDueDay', fin.due_day || '-');
-        PaymentsModule.init(student?.id);
+        import('./payments.js').then(m => m.PaymentsModule.init(student?.id));
         break;
       }
-      case 'tasks':           TasksModule.init(student?.id); break;
-      case 'live-attendance': AttendanceModule.init(student?.id); break;
-      case 'notifications':   ChatModule.init(); break;
-      case 'class':           FeedModule.init(student?.classroom_id); break;
-      case 'profile':         ProfileModule.init(); _initPadreQR(student); NotifyPermission.requestIfNeeded(); break;
-      case 'grades':          GradesModule.init(student?.id); break;
+      case 'tasks':           import('./tasks.js').then(m => m.TasksModule.init(student?.id)); break;
+      case 'live-attendance': import('./attendance.js').then(m => m.AttendanceModule.init(student?.id)); break;
+      case 'notifications':   import('./chat.js').then(m => m.ChatModule.init()); break;
+      case 'class':           import('./feed.js').then(m => m.FeedModule.init(student?.classroom_id)); break;
+      case 'profile':         import('./profile.js').then(m => { m.ProfileModule.init(); _initPadreQR(student); NotifyPermission.requestIfNeeded(); }); break;
+      case 'grades':          import('./grades.js').then(m => m.GradesModule.init(student?.id)); break;
       case 'routine':
-        window.RoutineModule = RoutineModule;
-        RoutineModule.initRoutinePanel(student?.id);
+        import('./routine.js').then(m => { window.RoutineModule = m.RoutineModule; m.RoutineModule.initRoutinePanel(student?.id); });
         break;
       case 'qr-access':       _initPadreQR(student); break;
       case 'videocall': {
@@ -1031,6 +1076,7 @@ function _initDailyLogRealtime(studentId) {
 
 async function checkActiveMeetings() {
   try {
+    const { VideoCallModule } = await import('../shared/videocall.js');
     const meetings = await VideoCallModule.getMyMeetings();
     const active   = (meetings || []).find(m => m.status === 'live');
     AppState.set('isClassLive', !!active);

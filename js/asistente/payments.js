@@ -2,6 +2,7 @@ import { supabase } from '../shared/supabase.js';
 import { Helpers } from '../shared/helpers.js';
 import { AppState } from './state.js';
 import { calcMora } from '../shared/payment-service.js';
+import { QueryCache } from '../shared/query-cache.js';
 
 const MONTH_NAMES_ES = ['enero','febrero','marzo','abril','mayo','junio','julio','agosto','septiembre','octubre','noviembre','diciembre'];
 const MONTH_LABELS   = ['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'];
@@ -337,6 +338,7 @@ export const PaymentsModule = {
         if (error) { if (error.code==='23505') throw new Error('Ya existe un registro para este mes.'); throw error; }
       }
       if (status === 'paid') await supabase.from('students').update({ is_active: true }).eq('id', studentId).catch(() => {});
+      QueryCache.invalidatePrefix('asistente_payments');
       Helpers.toast('Pago registrado correctamente', 'success');
       this.closeModal();
       await Promise.all([this.loadPayments(), this.loadStats(), this.loadIncomeChart()]);
@@ -357,6 +359,7 @@ export const PaymentsModule = {
     try {
       const { error } = await supabase.from('payments').update({ status: 'paid', paid_date: new Date().toISOString() }).eq('id', id);
       if (error) throw error;
+      QueryCache.invalidatePrefix('asistente_payments');
       Helpers.toast('Pago aprobado ✅', 'success');
       this.closeModal();
       this.loadPayments(); this.loadStats();
@@ -369,6 +372,7 @@ export const PaymentsModule = {
     try {
       const { error } = await supabase.from('payments').update({ status: 'pending', evidence_url: null, notes: r }).eq('id', id);
       if (error) throw error;
+      QueryCache.invalidatePrefix('asistente_payments');
       Helpers.toast('Pago rechazado', 'info');
       this.closeModal(); this.loadPayments();
     } catch (e) { Helpers.toast('Error al rechazar: ' + e.message, 'error'); }
@@ -379,6 +383,7 @@ export const PaymentsModule = {
     try {
       const { error } = await supabase.from('payments').delete().eq('id', id);
       if (error) throw error;
+      QueryCache.invalidatePrefix('asistente_payments');
       Helpers.toast('Eliminado', 'success');
       await this.loadPayments();
     } catch (_) { Helpers.toast('Error al eliminar', 'error'); }
@@ -390,11 +395,13 @@ export const PaymentsModule = {
     try {
       const { data, error } = await supabase.rpc('waive_payment_mora', { p_payment_id: id, p_reason: reason || 'Mora exonerada' });
       if (error) throw error;
+      QueryCache.invalidatePrefix('asistente_payments');
       Helpers.toast('Mora eliminada', 'success');
       await this.loadPayments();
     } catch (_) {
       try {
         await supabase.from('payments').update({ due_date: new Date().toISOString().split('T')[0] }).eq('id', id);
+        QueryCache.invalidatePrefix('asistente_payments');
         Helpers.toast('Mora eliminada', 'success');
         await this.loadPayments();
       } catch (e2) { Helpers.toast('Error: ' + e2.message, 'error'); }
@@ -407,6 +414,7 @@ export const PaymentsModule = {
       Helpers.toast('Ejecutando...', 'info');
       const { data, error } = await supabase.rpc('run_payment_cycle');
       if (error) throw error;
+      QueryCache.invalidatePrefix('asistente_payments');
       const r = (typeof data === 'string') ? JSON.parse(data) : (data || {});
       Helpers.toast('Ciclo completado: ' + (r.generated || 0) + ' generados, ' + (r.expired || 0) + ' vencidos', 'success');
       await this.loadPayments();

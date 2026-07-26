@@ -1,7 +1,7 @@
 import { SafeAppState } from '../shared/state.js';
 
 /**
- * 🧠 AppState para Panel de Padres
+ * AppState para Panel de Padres
  * Incluye sistema de suscripción y caché reactiva.
  */
 export const AppState = new SafeAppState({
@@ -18,7 +18,15 @@ export const AppState = new SafeAppState({
   financeHistory: null,
   todayAttendance: null,
   loading: false,
-  error: null
+  error: null,
+  // School Engine
+  schoolYear: null,
+  activePeriod: null,
+  periods: [],
+  studentHistory: null,
+  currentDailyLog: null,
+  currentGrades: null,
+  currentPayments: null
 });
 
 /**

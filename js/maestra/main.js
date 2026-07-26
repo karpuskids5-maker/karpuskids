@@ -1,11 +1,9 @@
 import { ensureRole, supabase, initOneSignal, RealtimeUtils, emitEvent, sendPush } from '/js/shared/supabase.js';
+import { SchoolEngine } from '/js/shared/school-engine.js';
 import { RealtimeManager } from '/js/shared/realtime-manager.js';
 import { AppState } from './state.js';
 import { MaestraApi } from './api.js';
 import { Helpers } from '/js/shared/helpers.js';
-import { WallModule } from '/js/shared/wall.js';
-import { ChatModule } from '/js/shared/chat.js';
-import { VideoCallModule } from '/js/shared/videocall.js';
 import { BadgeSystem } from '/js/shared/badges.js';
 import { ImageLoader } from '/js/shared/image-loader.js';
 
@@ -14,7 +12,6 @@ import * as Routine from './modules/routine.js';
 import * as Tasks from './modules/tasks.js';
 import * as Students from './modules/students.js';
 import * as ChatApp from './modules/chat_app.js';
-import { PermitsModule } from './modules/permits.js';
 import { UI } from './modules/ui.js';
 
 import { UIPremium } from '/js/shared/ui-premium.js';
@@ -100,7 +97,7 @@ window.App = {
   selectChatContact: ChatApp.selectChatContact,
 
   // Permits
-  permits: PermitsModule,
+  permits: { init: () => import('./modules/permits.js').then(m => m.PermitsModule.init()) },
 
   // Global actions
   setActiveSection: (targetId, options) => window.App._setActiveSection?.(targetId, options),
@@ -150,6 +147,12 @@ document.addEventListener('DOMContentLoaded', async () => {
   
   AppState.set('user', auth.user);
   AppState.set('profile', auth.profile);
+
+  // Inicializar School Engine
+  await SchoolEngine.init({ forceRefresh: true });
+  AppState.set('schoolYear', SchoolEngine.getSchoolYear());
+  AppState.set('activePeriod', SchoolEngine.getActivePeriod());
+  AppState.set('periods', SchoolEngine.getAllPeriods());
 
   // 🔔 Inicializar Notificaciones Push
   // 🔥 FIX: Permitir subdominios como www. y otros para la inicialización
@@ -299,8 +302,18 @@ document.addEventListener('DOMContentLoaded', async () => {
   // Initialize profile avatar
   setProfileAvatar(auth.profile?.avatar_url, teacherName);
 
-  // 🔥 EXPOSICIÓN GLOBAL DE MÓDULOS (CRUCIAL PARA EL MURO)
-  window.WallModule = WallModule;
+  // EXPOSICIÓN GLOBAL DE MÓDULOS (CRUCIAL PARA EL MURO)
+  window.WallModule = {
+    init: (...a) => import('/js/shared/wall.js').then(m => m.WallModule.init(...a)),
+    loadPosts: (...a) => import('/js/shared/wall.js').then(m => m.WallModule.loadPosts(...a)),
+    destroy: (...a) => import('/js/shared/wall.js').then(m => m.WallModule.destroy(...a)),
+    toggleCommentSection: (...a) => import('/js/shared/wall.js').then(m => m.WallModule.toggleCommentSection(...a)),
+    sendComment: (...a) => import('/js/shared/wall.js').then(m => m.WallModule.sendComment(...a)),
+    deletePost: (...a) => import('/js/shared/wall.js').then(m => m.WallModule.deletePost(...a)),
+    toggleLike: (...a) => import('/js/shared/wall.js').then(m => m.WallModule.toggleLike(...a)),
+    openNewPostModal: (...a) => import('/js/shared/wall.js').then(m => m.WallModule.openNewPostModal(...a)),
+    deleteComment: (...a) => import('/js/shared/wall.js').then(m => m.WallModule.deleteComment(...a)),
+  };
 
   // Inicializar QR de la maestra en sección perfil
   _initMaestraQR(auth.profile, auth.user);
@@ -390,7 +403,7 @@ document.addEventListener('DOMContentLoaded', async () => {
       });
     }
     
-    WallModule.init('muroPostsContainer', { 
+    window.WallModule.init('muroPostsContainer', { 
       accentColor: 'orange',
       classroomId: classroom.id
     }, AppState);
@@ -421,7 +434,7 @@ function initRealtimeUpdates(classroomId) {
 
         if (eventType === 'INSERT') {
           safeToast('Nueva publicación en el muro', 'info');
-          WallModule.loadPosts('muroPostsContainer');
+          window.WallModule.loadPosts('muroPostsContainer');
         } else if (eventType === 'UPDATE') {
           const postId = newPost.id;
           const likeSpan = document.getElementById(`like-count-${postId}`);
@@ -690,15 +703,14 @@ function initNavigation() {
   let previousSection = null;
   
   const setActiveSection = (targetId, options = {}) => {
-    // Si el targetId ya viene con 't-', lo usamos directamente, si no lo agregamos
     const fullId = targetId.startsWith('t-') ? targetId : `t-${targetId}`;
     const cleanId = targetId.replace('t-', '');
 
     Helpers.vibrate?.('light');
 
-    // ✅ LIMPIEZA DE REALTIME: Eliminar canales al cambiar de sección
+    // LIMPIEZA DE REALTIME: Eliminar canales al cambiar de sección
     if (previousSection && (previousSection === 't-home' || previousSection === 't-class-detail')) {
-      WallModule.destroy();
+      import('/js/shared/wall.js').then(m => m.WallModule.destroy()).catch(() => {});
       const classroom = AppState.get('classroom');
       if (classroom) {
         RealtimeManager.unsubscribe(`maestra_room_${classroom.id}`);
@@ -742,7 +754,7 @@ function initNavigation() {
     if (cleanId === 'daily-routine') initRoutine();
     if (cleanId === 'tasks') initTasks();
     if (cleanId === 'grades') initGrades();
-    if (cleanId === 'permits') PermitsModule.init();
+    if (cleanId === 'permits') import('./modules/permits.js').then(m => m.PermitsModule.init());
     if (cleanId === 'chat') initChat();
     if (cleanId === 'profile') {
       import('../shared/notify-permission.js').then(m => m.NotifyPermission.requestIfNeeded());
@@ -824,7 +836,7 @@ function initNavigation() {
       }
 
       // 4. Inicializar tabs del aula
-      WallModule.init('muroPostsContainer', { 
+      window.WallModule.init('muroPostsContainer', { 
         accentColor: 'orange',
         likeColor: 'orange',
         classroomId: classroom.id 
@@ -888,7 +900,7 @@ function initClassTabs(defaultTab = null) {
 
     // 5. Carga de datos optimizada (Solo si es necesario o forzado)
     setTimeout(() => {
-      if (targetTab === 'feed')          WallModule.loadPosts();
+      if (targetTab === 'feed')          import('/js/shared/wall.js').then(m => m.WallModule.loadPosts()).catch(() => {});
       if (targetTab === 'daily-routine') initRoutine();
       if (targetTab === 'students')      initDashboard();
       if (targetTab === 'attendance')    initAttendance();
@@ -949,9 +961,10 @@ window.App.scheduleClassMeeting = async () => {
     if(!title) return;
     
     try {
+        const { VideoCallModule } = await import('/js/shared/videocall.js');
         await VideoCallModule.scheduleMeeting({
             title,
-            startTime: new Date().toISOString(), // O pedir fecha real
+            startTime: new Date().toISOString(),
             type: 'classroom',
             targetId: AppState.get('classroom').id,
             hostId: AppState.get('user').id
@@ -969,7 +982,7 @@ async function startJitsi() {
   if (btn) { btn.disabled = true; btn.textContent = 'Iniciando...'; }
 
   try {
-    // 1. Crear reunión y notificar padres automáticamente
+    const { VideoCallModule } = await import('/js/shared/videocall.js');
     const meeting = await VideoCallModule.scheduleMeeting({
       title:      `Clase en Vivo: ${classroom.name}`,
       start_time: new Date().toISOString(),
@@ -1078,7 +1091,7 @@ async function submitNewPost() {
 
     safeToast('Publicación creada con éxito', 'success');
     Modal.close('newPostModal');
-    WallModule.loadPosts('muroPostsContainer');
+    window.WallModule.loadPosts('muroPostsContainer');
 
   } catch (err) {
     safeToast('Error al crear publicación', 'error');

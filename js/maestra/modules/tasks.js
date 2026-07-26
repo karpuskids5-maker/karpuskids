@@ -31,7 +31,7 @@ export async function initTasks() {
 
   const listContainer = document.getElementById('tasksListContainer');
   try {
-    const tasks = await MaestraApi.getTasksByClassroom(classroom.id);
+    const tasks = await MaestraApi.getTasksByClassroom(classroom.id, AppState.get('activePeriod')?.id);
     if (!tasks.length) {
       listContainer.innerHTML = '<div class="text-center p-8 text-slate-500">AÃƒºn no has asignado tareas.</div>';
       return;

@@ -51,7 +51,10 @@ function createInitialState() {
       posts: [],
       page: 1,
       hasMore: true
-    }
+    },
+    // School Engine
+    schoolYear: null,
+    activePeriod: null
   };
 }
 

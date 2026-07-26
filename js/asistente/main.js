@@ -1,14 +1,6 @@
 import { ensureRole, supabase, initOneSignal } from '/js/shared/supabase.js';
 import { AppState } from './state.js';
-import { PaymentsModule } from './payments.js';
-import { AccessModule } from './access.js';
-import { TeachersModule } from './teachers.js';
 import { Helpers } from '/js/shared/helpers.js';
-import { WallModule } from '/js/shared/wall.js';
-import { ChatModule } from '/js/shared/chat.js';
-import { StudentsModule } from './modules/students.js';
-import { RoomsModule } from './modules/rooms.js';
-import { DashboardModule } from './modules/dashboard.js';
 import { BadgeSystem } from '/js/shared/badges.js';
 import { ImageLoader } from '/js/shared/image-loader.js';
 import { QueryCache } from '/js/shared/query-cache.js';
@@ -17,8 +9,15 @@ import { UIPremium } from '/js/shared/ui-premium.js';
 import { FileManager } from '/js/shared/FileManager.js';
 import { CarnetsModule } from '/js/shared/carnets.module.js';
 import { ScrollModule } from '/js/shared/scroll.module.js';
+import SchoolEngine from '/js/shared/school-engine.js';
 
-// ?? Definir objeto App globalmente para evitar ReferenceError en onclicks del HTML
+let _chatModule = null;
+async function getChatModule() {
+  if (!_chatModule) _chatModule = (await import('/js/shared/chat.js')).ChatModule;
+  return _chatModule;
+}
+
+// Definir objeto App globalmente para evitar ReferenceError en onclicks del HTML
 // Global close modal fallback � always available even before openNewPostModal is called
 window._closeAsistenteModal = () => {
   const gc = document.getElementById('globalModalContainer');
@@ -60,22 +59,43 @@ window.openGlobalModal = (html, wide = false) => {
 
 window.App = {
   payments: {
-    markPaid:      (id)  => PaymentsModule.markPaid(id),
-    rejectPayment: (id, notes)  => PaymentsModule.rejectPayment(id, notes),
-    deletePayment: (id)  => PaymentsModule.deletePayment(id),
-    openModal:     (sid) => PaymentsModule.openPaymentModal(sid),
-    closeModal:    ()    => PaymentsModule.closeModal(),
-    filterBy:      (s)   => PaymentsModule.filterBy(s),
-    waiveMora:     (id)  => PaymentsModule.waiveMora(id),
-    _confirmApproval: (id) => PaymentsModule._confirmApproval(id)
+    markPaid:      (id)  => import('./payments.js').then(m => m.PaymentsModule.markPaid(id)),
+    rejectPayment: (id, notes)  => import('./payments.js').then(m => m.PaymentsModule.rejectPayment(id, notes)),
+    deletePayment: (id)  => import('./payments.js').then(m => m.PaymentsModule.deletePayment(id)),
+    openModal:     (sid) => import('./payments.js').then(m => m.PaymentsModule.openPaymentModal(sid)),
+    closeModal:    ()    => import('./payments.js').then(m => m.PaymentsModule.closeModal()),
+    filterBy:      (s)   => import('./payments.js').then(m => m.PaymentsModule.filterBy(s)),
+    waiveMora:     (id)  => import('./payments.js').then(m => m.PaymentsModule.waiveMora(id)),
+    _confirmApproval: (id) => import('./payments.js').then(m => m.PaymentsModule._confirmApproval(id))
   },
-  students: StudentsModule,
-  rooms: RoomsModule,
+  students: {
+    init: () => import('./modules/students.js').then(m => m.StudentsModule.init()),
+    loadStudents: () => import('./modules/students.js').then(m => m.StudentsModule.loadStudents?.()),
+    openModal: (id) => import('./modules/students.js').then(m => m.StudentsModule.openModal(id)),
+    _deleteStudent: (id, name) => import('./modules/students.js').then(m => m.StudentsModule._deleteStudent(id, name)),
+  },
+  rooms: {
+    init: () => import('./modules/rooms.js').then(m => m.RoomsModule.init()),
+    loadRooms: () => import('./modules/rooms.js').then(m => m.RoomsModule.loadRooms?.()),
+    openModal: (id) => import('./modules/rooms.js').then(m => m.RoomsModule.openModal(id)),
+  },
   teachers: {
-    openModal:     (id)         => TeachersModule.openModal(id),
-    deleteTeacher: (id, name)   => TeachersModule.deleteTeacher(id, name)
+    init: () => import('./teachers.js').then(m => m.TeachersModule.init()),
+    loadTeachers: () => import('./teachers.js').then(m => m.TeachersModule.loadTeachers?.()),
+    openModal:     (id)         => import('./teachers.js').then(m => m.TeachersModule.openModal(id)),
+    deleteTeacher: (id, name)   => import('./teachers.js').then(m => m.TeachersModule.deleteTeacher(id, name))
   },
   carnets: CarnetsModule,
+  access: {
+    init: () => import('./access.js').then(m => m.AccessModule.init()),
+    closeScanner:  ()         => import('./access.js').then(m => m.AccessModule.closeScanner()),
+    setPunchType:  (type)     => import('./access.js').then(m => m.AccessModule.setPunchType(type)),
+    stopScanner:   ()         => import('./access.js').then(m => m.AccessModule.stopScanner()),
+    toggleExteriorMode: ()    => import('./access.js').then(m => m.AccessModule.toggleExteriorMode()),
+  },
+  dashboard: {
+    init: () => import('./modules/dashboard.js').then(m => m.DashboardModule.init()),
+  },
 };
 
 /**
@@ -107,9 +127,9 @@ document.addEventListener('DOMContentLoaded', async () => {
     window.location.href = 'login.html';
   });
   
-  // 2. Inicializar m�dulos ligeros y navegaci�n
-  // La navegaci�n ahora se encargar� de la carga perezosa (lazy loading) de las secciones.
-  WallModule.init('muroPostsContainer', { accentColor: 'teal', likeColor: 'emerald' }, AppState);
+  // 2. Inicializar módulos ligeros y navegación
+  // La navegación ahora se encargará de la carga perezosa (lazy loading) de las secciones.
+  import('/js/shared/wall.js').then(m => m.WallModule.init('muroPostsContainer', { accentColor: 'teal', likeColor: 'emerald' }, AppState)).catch(() => {});
   
   // ? FIX OneSignal: Solo inicializar en el dominio correcto para evitar errores de consola
   if (window.location.hostname === 'karpuskids.com' || window.location.hostname === 'localhost') {
@@ -121,30 +141,54 @@ document.addEventListener('DOMContentLoaded', async () => {
 
   // Asignar funciones internas al objeto global App
   Object.assign(window.App, {
-    _confirmApproval: (id) => PaymentsModule._confirmApproval(id),
-    _rejectPayment: (id) => PaymentsModule.rejectPayment(id),
-    _deletePayment: (id) => PaymentsModule.deletePayment(id),
-    _registerPayment: (sid) => PaymentsModule.openPaymentModal(sid),
-    _openTeacherModal: (id) => TeachersModule.openModal(id),
-    _toggleCommentSection: (id) => WallModule.toggleCommentSection(id),
-    _deleteComment: (cid, pid) => WallModule.deleteComment(cid, pid),
-    _sendComment: (pid) => WallModule.sendComment(pid),
-    _toggleLike: (pid) => WallModule.toggleLike(pid),
+    _confirmApproval: (id) => import('./payments.js').then(m => m.PaymentsModule._confirmApproval(id)),
+    _rejectPayment: (id) => import('./payments.js').then(m => m.PaymentsModule.rejectPayment(id)),
+    _deletePayment: (id) => import('./payments.js').then(m => m.PaymentsModule.deletePayment(id)),
+    _registerPayment: (sid) => import('./payments.js').then(m => m.PaymentsModule.openPaymentModal(sid)),
+    _openTeacherModal: (id) => import('./teachers.js').then(m => m.TeachersModule.openModal(id)),
+    _toggleCommentSection: (id) => import('/js/shared/wall.js').then(m => m.WallModule.toggleCommentSection(id)),
+    _deleteComment: (cid, pid) => import('/js/shared/wall.js').then(m => m.WallModule.deleteComment(cid, pid)),
+    _sendComment: (pid) => import('/js/shared/wall.js').then(m => m.WallModule.sendComment(pid)),
+    _toggleLike: (pid) => import('/js/shared/wall.js').then(m => m.WallModule.toggleLike(pid)),
     _selectChatContact: (uid, name, role) => selectAssistantChat(uid, name, role),
     selectChatContact: (uid, name, role) => selectAssistantChat(uid, name, role),
-    _openStudentModal: (id) => StudentsModule.openModal(id),
-    _deleteStudent: (id, name) => StudentsModule._deleteStudent(id, name),
+    _openStudentModal: (id) => import('./modules/students.js').then(m => m.StudentsModule.openModal(id)),
+    _deleteStudent: (id, name) => import('./modules/students.js').then(m => m.StudentsModule._deleteStudent(id, name)),
     _genMatricula: () => window._genMatricula?.(),
-    _openRoomModal: (id) => RoomsModule.openModal(id),
+    _openRoomModal: (id) => import('./modules/rooms.js').then(m => m.RoomsModule.openModal(id)),
     openNewPostModal,
     submitNewPost
   });
 
   // Exponer WallModule globalmente
-  window.WallModule = WallModule;
-  window.openTeacherModal = (id) => TeachersModule.openModal(id);
+  window.WallModule = {
+    init: (...a) => import('/js/shared/wall.js').then(m => m.WallModule.init(...a)),
+    loadPosts: (...a) => import('/js/shared/wall.js').then(m => m.WallModule.loadPosts(...a)),
+    destroy: (...a) => import('/js/shared/wall.js').then(m => m.WallModule.destroy(...a)),
+    toggleCommentSection: (...a) => import('/js/shared/wall.js').then(m => m.WallModule.toggleCommentSection(...a)),
+    sendComment: (...a) => import('/js/shared/wall.js').then(m => m.WallModule.sendComment(...a)),
+    deletePost: (...a) => import('/js/shared/wall.js').then(m => m.WallModule.deletePost(...a)),
+    toggleLike: (...a) => import('/js/shared/wall.js').then(m => m.WallModule.toggleLike(...a)),
+    openNewPostModal: (...a) => import('/js/shared/wall.js').then(m => m.WallModule.openNewPostModal(...a)),
+    deleteComment: (...a) => import('/js/shared/wall.js').then(m => m.WallModule.deleteComment(...a)),
+  };
+  window.openTeacherModal = (id) => import('./teachers.js').then(m => m.TeachersModule.openModal(id));
   window.openNewPostModal = openNewPostModal;
   window.submitNewPost = submitNewPost;
+
+  // School Engine init
+  try {
+    await SchoolEngine.init({ forceRefresh: true });
+    AppState.set('schoolYear', SchoolEngine.getSchoolYear());
+    AppState.set('activePeriod', SchoolEngine.getActivePeriod());
+    AppState.set('periods', SchoolEngine.getAllPeriods());
+  } catch(_) {}
+  window.App.schoolYear = {
+    getSchoolYear: () => SchoolEngine.getSchoolYear(),
+    getActivePeriod: () => SchoolEngine.getActivePeriod(),
+    getAllPeriods: () => SchoolEngine.getAllPeriods(),
+    hasActiveYear: () => SchoolEngine.hasActiveYear(),
+  };
 
   // Mantener compatibilidad temporal para onclick en HTML que no use App.
   Object.assign(window, window.App);
@@ -298,7 +342,7 @@ function initNavigation() {
     // Desuscribir muro al salir (ahorro de recursos Realtime)
     const prevSection = AppState.get('currentSection');
     if (prevSection === 'muro' && target !== 'muro') {
-      WallModule.destroy?.();
+      import('/js/shared/wall.js').then(m => m.WallModule.destroy?.()).catch(() => {});
       // Permitir re-inicializar el muro la próxima vez
       loadedSections.delete('muro');
     }
@@ -327,9 +371,7 @@ function initNavigation() {
     // Lógica de salida de sección (Limpieza)
     if (prevSection === 'accesos' && target !== 'accesos') {
       try {
-        if (AccessModule?.stopScanner) {
-          AccessModule.stopScanner();
-        }
+        import('./access.js').then(m => m.AccessModule?.stopScanner?.()).catch(() => {});
       } catch (_) {}
     }
 
@@ -365,29 +407,29 @@ function initNavigation() {
       try {
         switch (target) {
           case 'pagos':
-            await PaymentsModule.init();
+            await import('./payments.js').then(m => m.PaymentsModule.init());
             import('../shared/payment-queue.js').then(m =>
               m.PaymentQueue.init('payment-queue-container')
             ).catch(() => {});
             break;
           case 'accesos':
-            await AccessModule.init();
-            document.getElementById('btnExteriorMode')?.addEventListener('click', () => AccessModule.toggleExteriorMode());
+            await import('./access.js').then(m => m.AccessModule.init());
+            document.getElementById('btnExteriorMode')?.addEventListener('click', () => import('./access.js').then(m => m.AccessModule.toggleExteriorMode()));
             break;
           case 'maestros':
-            await TeachersModule.init();
+            await import('./teachers.js').then(m => m.TeachersModule.init());
             break;
           case 'estudiantes':
-            await StudentsModule.init();
+            await import('./modules/students.js').then(m => m.StudentsModule.init());
             break;
           case 'aulas':
-            await RoomsModule.init();
+            await import('./modules/rooms.js').then(m => m.RoomsModule.init());
             break;
           case 'muro':
-            WallModule.init('muroPostsContainer', { 
+            import('/js/shared/wall.js').then(m => m.WallModule.init('muroPostsContainer', { 
               accentColor: 'teal', 
               likeColor: 'emerald' 
-            }, AppState);
+            }, AppState));
             break;
           case 'staff-permits':
             import('../directora/permits.module.js').then(m => {
@@ -420,12 +462,12 @@ function initNavigation() {
         Helpers.toast(`Error al cargar ${target}`, 'error');
       }
     } else {
-      // Re-cargar datos frescos al volver a una secci�n ya visitada
+      // Re-cargar datos frescos al volver a una sección ya visitada
       switch (target) {
-        case 'maestros':   TeachersModule.loadTeachers?.(); break;
-        case 'estudiantes': StudentsModule.loadStudents?.(); break;
-        case 'aulas':      RoomsModule.loadRooms?.(); break;
-        case 'pagos':      PaymentsModule.loadPayments?.(); break;
+        case 'maestros':   import('./teachers.js').then(m => m.TeachersModule.loadTeachers?.()); break;
+        case 'estudiantes': import('./modules/students.js').then(m => m.StudentsModule.loadStudents?.()); break;
+        case 'aulas':      import('./modules/rooms.js').then(m => m.RoomsModule.loadRooms?.()); break;
+        case 'pagos':      import('./payments.js').then(m => m.PaymentsModule.loadPayments?.()); break;
       }
     }
   };
@@ -438,7 +480,7 @@ function initNavigation() {
   });
 
   // Carga inicial del dashboard
-  DashboardModule.init().then(() => loadedSections.add('dashboard'));
+  import('./modules/dashboard.js').then(m => m.DashboardModule.init().then(() => loadedSections.add('dashboard')));
   showSection('dashboard');
 
   // -- Hamburger m�vil ------------------------------------------------------
@@ -733,7 +775,8 @@ window.selectAssistantChat = async (userId, name, role, avatarUrl = null) => {
   try {
     let messages = [], conversationId = null;
     try {
-      const res = await ChatModule.loadConversation(userId);
+      const chatMod = await getChatModule();
+      const res = await chatMod.loadConversation(userId);
       messages = res.messages || [];
       conversationId = res.conversationId || null;
     } catch (_) {
@@ -744,7 +787,7 @@ window.selectAssistantChat = async (userId, name, role, avatarUrl = null) => {
     AppState.set('activeConversationId', conversationId);
 
     // Marcar como leídos al abrir
-    if (conversationId) ChatModule.markAsRead(conversationId);
+    if (conversationId) (await getChatModule()).markAsRead(conversationId);
 
     if (container) {
       container.innerHTML = messages.length 
@@ -758,7 +801,7 @@ window.selectAssistantChat = async (userId, name, role, avatarUrl = null) => {
         window._chatTopScroll = ScrollModule.topScroll({
           container: container,
           loadFn: async () => {
-            const { messages: moreMsg, hasMore } = await ChatModule.loadConversation(userId, conversationId, true);
+            const { messages: moreMsg, hasMore } = await (await getChatModule()).loadConversation(userId, conversationId, true);
             if (moreMsg.length > 0) {
               const html = moreMsg.map(m => _msgBubble(m, user.id)).join('');
               container.insertAdjacentHTML('afterbegin', html);
@@ -770,7 +813,7 @@ window.selectAssistantChat = async (userId, name, role, avatarUrl = null) => {
 
     // Subscribe Realtime
     if (conversationId) {
-      ChatModule.subscribeToConversation(conversationId, 
+      (await getChatModule()).subscribeToConversation(conversationId, 
         (newMsg) => {
           if (newMsg.sender_id === user.id) return;
           if (container) {
@@ -903,7 +946,7 @@ async function initAssistantChat() {
         ScrollModule.scrollToBottom(container, true);
 
         try {
-          const res = await ChatModule.sendMessage(user.id, destId, text, convId);
+          const res = await (await getChatModule()).sendMessage(user.id, destId, text, convId);
           // Actualizar ID temporal con el real de Supabase
           const tempMsg = document.getElementById(`msg-${tempId}`);
           if (tempMsg && res.id) {
@@ -929,9 +972,9 @@ async function initAssistantChat() {
       input.oninput = () => {
         const cid = AppState.get('activeConversationId');
         if (!cid) return;
-        ChatModule.broadcastTyping(cid, profile?.name, true);
+        (await getChatModule()).broadcastTyping(cid, profile?.name, true);
         clearTimeout(t);
-        t = setTimeout(() => ChatModule.broadcastTyping(cid, profile?.name, false), 2000);
+        t = setTimeout(async () => (await getChatModule()).broadcastTyping(cid, profile?.name, false), 2000);
       };
     }
 

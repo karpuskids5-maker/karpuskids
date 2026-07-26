@@ -42,6 +42,50 @@ const DirectorUI = {
   renderDashboard(data) {
     const kpis = data?.stats || data?.kpis || {};
 
+    // School Engine status bar
+    const syBanner = document.getElementById('schoolYearBanner');
+    if (syBanner) {
+      const schoolYear = data?.schoolYear;
+      if (schoolYear) {
+        syBanner.innerHTML = `
+          <div class="flex items-center gap-3 p-3 bg-white rounded-2xl border border-slate-100 shadow-sm">
+            <div class="w-10 h-10 rounded-xl bg-violet-100 text-violet-700 flex items-center justify-center">
+              <i data-lucide="graduation-cap" class="w-5 h-5"></i>
+            </div>
+            <div class="flex-1 min-w-0">
+              <p class="text-[10px] font-black text-slate-400 uppercase tracking-widest">Año Escolar</p>
+              <p class="text-sm font-black text-slate-800">${Helpers.escapeHTML(schoolYear.name)}</p>
+            </div>
+            <span class="px-3 py-1 rounded-full text-[10px] font-black ${data?.yearStatusColor || 'bg-slate-100 text-slate-500'}">
+              ${data?.yearStatusLabel || 'Sin estado'}
+            </span>
+            ${data?.activePeriod ? `<span class="px-3 py-1 rounded-full text-[10px] font-black bg-violet-100 text-violet-700">${Helpers.escapeHTML(data.activePeriod.name)}</span>` : ''}
+            <button onclick="App.navigation.goTo('anio-escolar')" class="p-2 hover:bg-slate-100 rounded-xl transition-all" title="Gestionar Año Escolar">
+              <i data-lucide="settings" class="w-4 h-4 text-slate-400"></i>
+            </button>
+          </div>
+        `;
+        syBanner.classList.remove('hidden');
+      } else {
+        syBanner.innerHTML = `
+          <div class="flex items-center gap-3 p-3 bg-amber-50 rounded-2xl border border-amber-200">
+            <div class="w-10 h-10 rounded-xl bg-amber-100 text-amber-700 flex items-center justify-center">
+              <i data-lucide="alert-triangle" class="w-5 h-5"></i>
+            </div>
+            <div class="flex-1">
+              <p class="text-xs font-black text-amber-800">No hay año escolar configurado</p>
+              <p class="text-[10px] font-bold text-amber-600">El sistema necesita un año escolar activo para funcionar correctamente.</p>
+            </div>
+            <button onclick="App.schoolYear.openWizard()" class="px-4 py-2 bg-amber-500 text-white rounded-xl text-xs font-black uppercase hover:bg-amber-600 transition-all">
+              Crear Ahora
+            </button>
+          </div>
+        `;
+        syBanner.classList.remove('hidden');
+      }
+      if (window.lucide) lucide.createIcons();
+    }
+
     const studentCount = (kpis.active > 0 ? kpis.active : null) ?? kpis.students ?? kpis.total ?? 0;
     Helpers.setTxt('kpiStudents', studentCount);
     Helpers.setTxt('kpiTeachers', kpis.teachers > 0 ? kpis.teachers : (data?.teacherCount ?? 0));

@@ -7,5 +7,12 @@ export const AppState = new SafeAppState({
   user: null,
   profile: null,
   currentSection: 'dashboard',
-  paymentsData: []
+  paymentsData: [],
+  schoolYear: null,
+  activePeriod: null,
+  periods: [],
+  activeChatUserId: null,
+  activeChatName: null,
+  activeChatRole: null,
+  activeConversationId: null
 });

@@ -29,6 +29,18 @@ const logError = (context, err) => {
 export const DirectorApi = {
   async getPeriods() {
     try {
+      // Try new academic_periods table first (School Engine)
+      const { data: academicPeriods, error: apErr } = await supabase
+        .from('academic_periods')
+        .select('id, name, start_date, end_date, status, is_active, school_year_id, order_index, created_at')
+        .limit(20)
+        .order('order_index', { ascending: true });
+
+      if (!apErr && academicPeriods && academicPeriods.length > 0) {
+        return { data: academicPeriods, error: null };
+      }
+
+      // Fallback to legacy periods table
       const res = await withTimeout(supabase.from(TABLES.PERIODS).select('id, name, start_date, end_date, status, is_active, classroom_id, created_at').limit(10).order('start_date', { ascending: false }));
       return res;
     } catch (e) { return logError('getPeriods', e); }
@@ -131,7 +143,9 @@ export const DirectorApi = {
   },
 
   async updateInquiry(id, updates) {
-    return await supabase.from('inquiries').update(updates).eq('id', id);
+    const result = await supabase.from('inquiries').update(updates).eq('id', id);
+    if (!result.error) QueryCache.invalidatePrefix('dir_inquiries');
+    return result;
   },
 
   async getSchoolSettings() {
@@ -448,13 +462,16 @@ export const DirectorApi = {
 
       const errors = results.filter(r => r.error);
       if (errors.length) throw errors[0].error;
+      QueryCache.invalidatePrefix('dir_period_config');
       return { data: true, error: null };
     } catch (e) { return logError('savePeriodConfig', e); }
   },
 
   async deletePeriodConfig(configId) {
     try {
-      return await supabase.from(TABLES.PERIOD_CONFIG).delete().eq('id', configId);
+      const result = await supabase.from(TABLES.PERIOD_CONFIG).delete().eq('id', configId);
+      if (!result.error) QueryCache.invalidatePrefix('dir_period_config');
+      return result;
     } catch (e) { return logError('deletePeriodConfig', e); }
   },
 
@@ -466,7 +483,7 @@ export const DirectorApi = {
 
   async createActivity(configId, title, description, activityNumber, isMandatory) {
     try {
-      return await supabase.from(TABLES.ACTIVITIES).insert({
+      const result = await supabase.from(TABLES.ACTIVITIES).insert({
         config_id: configId,
         title,
         description: description || null,
@@ -474,12 +491,16 @@ export const DirectorApi = {
         activity_number: activityNumber,
         is_mandatory: isMandatory !== false
       }).select().single();
+      if (!result.error) QueryCache.invalidatePrefix('dir_activities');
+      return result;
     } catch (e) { return logError('createActivity', e); }
   },
 
   async deleteActivity(activityId) {
     try {
-      return await supabase.from(TABLES.ACTIVITIES).delete().eq('id', activityId);
+      const result = await supabase.from(TABLES.ACTIVITIES).delete().eq('id', activityId);
+      if (!result.error) QueryCache.invalidatePrefix('dir_activities');
+      return result;
     } catch (e) { return logError('deleteActivity', e); }
   },
 

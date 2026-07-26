@@ -9,10 +9,31 @@ import { Helpers, escapeHtml } from './helpers.js';
 export const GradesModule = {
   async init(studentId) {
     if (!studentId) return;
+    this._populatePeriodFilter();
     await this.loadGrades(studentId);
+
+    const filter = document.getElementById('padrePeriodFilter');
+    if (filter && !filter._bound) {
+      filter._bound = true;
+      filter.addEventListener('change', () => {
+        const periodId = filter.value || null;
+        this.loadGrades(studentId, periodId);
+      });
+    }
   },
 
-  async loadGrades(studentId) {
+  _populatePeriodFilter() {
+    const select = document.getElementById('padrePeriodFilter');
+    if (!select) return;
+    const periods = AppState.get('periods') || [];
+    const activePeriod = AppState.get('activePeriod');
+    select.innerHTML = periods.length
+      ? '<option value="">Periodo actual</option>' +
+        periods.map(p => `<option value="${p.id}" ${activePeriod && p.id === activePeriod.id ? 'selected' : ''}>${Helpers.escapeHTML(p.name)} ${p.status === 'closed' ? '(Cerrado)' : ''}</option>`).join('')
+      : '<option value="">Sin periodos disponibles</option>';
+  },
+
+  async loadGrades(studentId, overridePeriodId = null) {
     const container = document.getElementById('gradesContent');
     if (!container) return;
 
@@ -34,17 +55,36 @@ export const GradesModule = {
       const periodRes = await supabase.rpc('get_active_period', { p_classroom_id: student.classroom_id });
       const period = periodRes?.data;
 
-      if (!period || !period.found) {
-        // Try to get the most recent closed period
-        const { data: recentPeriods } = await supabase
-          .from(TABLES.PERIODS)
+      // Allow override from period selector
+      let usePeriod = period;
+      if (overridePeriodId) {
+        const periods = AppState.get('periods') || [];
+        const selected = periods.find(p => String(p.id) === String(overridePeriodId));
+        if (selected) usePeriod = { found: true, ...selected };
+      }
+
+      if (!usePeriod || !usePeriod.found) {
+        // Try to get the most recent period from academic_periods first, then legacy
+        let recentPeriods = null;
+        const { data: apPeriods } = await supabase
+          .from('academic_periods')
           .select('id, name, start_date, end_date, status')
-          .eq('classroom_id', student.classroom_id)
           .order('start_date', { ascending: false })
           .limit(1);
+        if (apPeriods?.length) {
+          recentPeriods = apPeriods;
+        } else {
+          const { data: legacyPeriods } = await supabase
+            .from(TABLES.PERIODS)
+            .select('id, name, start_date, end_date, status')
+            .eq('classroom_id', student.classroom_id)
+            .order('start_date', { ascending: false })
+            .limit(1);
+          recentPeriods = legacyPeriods;
+        }
 
         if (!recentPeriods?.length) {
-          container.innerHTML = Helpers.emptyState('No hay periodos académicos disponibles', '📋');
+          container.innerHTML = Helpers.emptyState('No hay periodos academicos disponibles', '📋');
           return;
         }
 
@@ -53,7 +93,7 @@ export const GradesModule = {
         return;
       }
 
-      await this._renderPeriodView(container, studentId, period);
+      await this._renderPeriodView(container, studentId, usePeriod);
     } catch (err) {
       console.error('[GradesModule] Error:', err);
       container.innerHTML = Helpers.emptyState('Error al cargar calificaciones', '❌');

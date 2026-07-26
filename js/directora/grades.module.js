@@ -621,19 +621,37 @@ export const GradesModule = {
     if (!name || !start || !end) return Helpers.toast('Completa todos los campos', 'warning');
 
     try {
-      if (isActive) {
-        await supabase.from('periods').update({ is_active: false }).eq('is_active', true);
-      }
+      const yearId = AppState.get('schoolYear')?.id;
 
-      const { error } = await supabase.from('periods').insert({
+      // Try academic_periods (School Engine) first
+      let targetTable = 'academic_periods';
+      let payload = {
         name,
         start_date: start,
         end_date: end,
         status: 'open',
-        is_active: isActive
-      });
+        is_active: isActive,
+        order_index: this._periods.length + 1
+      };
+      if (yearId) payload.school_year_id = yearId;
 
-      if (error) throw error;
+      if (isActive) {
+        await supabase.from(targetTable).update({ is_active: false }).eq('is_active', true).then(() => {}).catch(() => {});
+      }
+
+      const { error } = await supabase.from(targetTable).insert(payload);
+
+      if (error) {
+        // Fallback to legacy periods table
+        if (isActive) {
+          await supabase.from('periods').update({ is_active: false }).eq('is_active', true);
+        }
+        const { error: legacyErr } = await supabase.from('periods').insert({
+          name, start_date: start, end_date: end, status: 'open', is_active: isActive
+        });
+        if (legacyErr) throw legacyErr;
+      }
+
       Helpers.toast('Periodo creado correctamente', 'success');
       App.ui.closeModal();
       await this._loadPeriods();

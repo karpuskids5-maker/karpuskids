@@ -449,6 +449,9 @@
       <!-- DASHBOARD INFANTIL -->
       <section id="home" class="section">
 
+        <!-- School Engine: Banner del Año Escolar -->
+        <div id="padreSchoolYearBanner" class="mb-6 hidden"></div>
+
         <!-- 🚨 Banner de deuda vencida — se muestra dinámicamente por JS -->
 <div id="debtBanner" class="hidden mb-6 rounded-[1.5rem] md:rounded-[2rem] overflow-hidden shadow-lg shadow-amber-100 border border-amber-200/50 w-full max-w-full box-border">
   <div class="bg-gradient-to-br from-amber-400 via-amber-500 to-orange-500 p-4 md:p-6 flex flex-col lg:flex-row items-center gap-4">
@@ -610,9 +613,14 @@
         <!-- CALIFICACIONES -->
         <section id="grades" class="section hidden">
           <div class="bg-white rounded-3xl shadow-sm p-6 md:p-8 min-h-[80vh] border border-slate-100">
-            <h3 class="text-2xl font-black text-slate-800 tracking-tight mb-6 flex items-center gap-2">
-               <span class="text-3xl">🏆</span> Tablero de Progreso
-            </h3>
+            <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
+              <h3 class="text-2xl font-black text-slate-800 tracking-tight flex items-center gap-2">
+                 <span class="text-3xl">🏆</span> Tablero de Progreso
+              </h3>
+              <select id="padrePeriodFilter" class="px-4 py-2 bg-slate-50 border border-slate-200 rounded-xl text-sm font-bold text-slate-700 focus:ring-2 focus:ring-emerald-300 focus:border-emerald-400">
+                <option value="">Periodo actual</option>
+              </select>
+            </div>
             <div id="gradesContent" class="flex flex-col items-center w-full">
               <canvas id="gradesChart" class="w-full max-w-2xl" style="display:none"></canvas>
             </div>

@@ -1,5 +1,7 @@
 import { supabase } from '/js/shared/supabase.js';
 import { TABLES } from '/js/shared/constants.js';
+import { AppState } from './state.js';
+import { QueryCache } from '/js/shared/query-cache.js';
 
 /**
  * Helper interno para manejar errores
@@ -73,17 +75,19 @@ export const MaestraApi = {
    * Upsert asistencia (optimizado con periodo)
    */
   async upsertAttendance(record) {
+    // School Engine: auto-assign school_year_id
+    if (!record.school_year_id) {
+      const year = AppState.get('schoolYear');
+      if (year) record.school_year_id = year.id;
+    }
+
     // Vincular autom\u00e1ticamente al periodo activo si la tabla existe (silencioso si falla)
     if (!record.period_id) {
       try {
-        const { data: periodData } = await supabase
-          .from('academic_periods')
-          .select('id')
-          .eq('classroom_id', record.classroom_id)
-          .eq('status', 'active')
-          .limit(1)
-          .maybeSingle();
-        if (periodData) record.period_id = periodData.id;
+        const activePeriod = AppState.get('activePeriod');
+        if (activePeriod?.id) {
+          record.period_id = activePeriod.id;
+        }
       } catch (_) { /* 404 ignorado si no existe la tabla */ }
     }
 
@@ -108,21 +112,28 @@ export const MaestraApi = {
     const { data, error } = await query.select().maybeSingle();
 
     handleError(error, 'upsertAttendance');
+    if (data) QueryCache.invalidatePrefix('maestra_attendance');
     return data;
   },
 
   /**
-   * Tareas â€” filtradas por perÃ­odo activo del aula
+   * Tareas — filtradas por período activo del aula
    */
   async getTasksByClassroom(classroomId, periodId = null) {
-    // Fallback directo para evitar 404 de RPC si no existe en BD
-    const { data, error } = await supabase
+    let query = supabase
       .from('tasks')
-      .select('id, title, description, due_date, grading_system, file_url, created_at, period_id')
+      .select('id, title, description, due_date, grading_system, file_url, created_at, period_id, school_year_id')
       .eq('classroom_id', classroomId)
       .order('created_at', { ascending: false })
       .limit(50);
 
+    // Filter by period if provided (School Engine)
+    const activePeriodId = periodId || AppState.get('activePeriod')?.id;
+    if (activePeriodId) {
+      query = query.eq('period_id', activePeriodId);
+    }
+
+    const { data, error } = await query;
     handleError(error, 'getTasksByClassroom');
     return data || [];
   },
@@ -131,23 +142,36 @@ export const MaestraApi = {
    * Rutina diaria
    */
   async getDailyRoutine(classroomId) {
-    const { data, error } = await supabase
+    let query = supabase
       .from('daily_logs')
-      .select('id, student_id, date, mood, food, nap, eating, sleeping, activities, notes')
+      .select('id, student_id, date, mood, food, nap, eating, sleeping, activities, notes, school_year_id')
       .eq('classroom_id', classroomId)
       .order('created_at', { ascending: false })
       .limit(50);
 
+    // School Engine: filter by active school year
+    const activeYearId = AppState.get('schoolYear')?.id;
+    if (activeYearId) {
+      query = query.eq('school_year_id', activeYearId);
+    }
+
+    const { data, error } = await query;
     handleError(error, 'getDailyRoutine');
     return data || [];
   },
 
   /**
-   * Upsert rutina mejorado para bebÃ©s
+   * Upsert rutina mejorado para bebés
    */
   async upsertDailyLog(payload) {
     const cleanPayload = { ...payload };
     if (!cleanPayload.status) cleanPayload.status = 'published'; // Auto-publicar: padres ven en tiempo real
+
+    // School Engine: auto-assign school_year_id
+    if (!cleanPayload.school_year_id) {
+      const year = AppState.get('schoolYear');
+      if (year) cleanPayload.school_year_id = year.id;
+    }
 
     // 1. Buscar log existente
     const { data: existing, error: findError } = await supabase
@@ -187,6 +211,7 @@ export const MaestraApi = {
     const { data, error } = await query.select().maybeSingle();
 
     handleError(error, 'upsertDailyLog');
+    if (data) QueryCache.invalidatePrefix('maestra_daily_logs');
     return data;
   },
 
@@ -201,6 +226,7 @@ export const MaestraApi = {
       .in('id', logIds);
     
     handleError(error, 'publishDailyLogs');
+    if (!error) QueryCache.invalidatePrefix('maestra_daily_logs');
     return data;
   },
 
@@ -229,7 +255,7 @@ export const MaestraApi = {
   },
 
   /**
-   * Crear tarea â€” vinculada al perÃ­odo activo del aula
+   * Crear tarea — vinculada al período activo del aula
    */
   async createTask(payload) {
     const cleanPayload = {
@@ -238,18 +264,18 @@ export const MaestraApi = {
     };
     delete cleanPayload.points;
 
-    // ðŸ”„ LÃ³gica Profesional de PerÃ­odo Activo
-    if (!cleanPayload.period_id && cleanPayload.classroom_id) {
-      // Intento manual vÃ­a query en lugar de RPC para evitar 404
-      const { data: periodData } = await supabase
-        .from('academic_periods')
-        .select('id, name')
-        .eq('classroom_id', cleanPayload.classroom_id)
-        .eq('status', 'active')
-        .maybeSingle();
+    // School Engine: auto-assign school_year_id
+    if (!cleanPayload.school_year_id) {
+      const year = AppState.get('schoolYear');
+      if (year) cleanPayload.school_year_id = year.id;
+    }
 
-      if (periodData) {
-        cleanPayload.period_id = periodData.id;
+    // Lógica Profesional de Período Activo
+    if (!cleanPayload.period_id && cleanPayload.classroom_id) {
+      // Use active period from School Engine
+      const activePeriod = AppState.get('activePeriod');
+      if (activePeriod?.id) {
+        cleanPayload.period_id = activePeriod.id;
       }
     }
 
@@ -260,6 +286,7 @@ export const MaestraApi = {
       .maybeSingle();
 
     handleError(error, 'createTask');
+    if (data) QueryCache.invalidatePrefix('maestra_tasks');
     return data;
   },
 
@@ -275,6 +302,7 @@ export const MaestraApi = {
       .single();
 
     handleError(error, 'updateTask');
+    if (data) QueryCache.invalidatePrefix('maestra_tasks');
     return data;
   },
 
@@ -288,7 +316,7 @@ export const MaestraApi = {
       .eq('id', taskId);
 
     handleError(error, 'deleteTask');
-    // Devolvemos un objeto para consistencia, aunque la operaciÃ³n de borrado no devuelve datos.
+    if (!error) QueryCache.invalidatePrefix('maestra_tasks');
     return { success: !error };
   },
 
@@ -335,6 +363,7 @@ export const MaestraApi = {
     }
 
     handleError(result.error, 'gradeTask');
+    if (result.data) QueryCache.invalidatePrefix('maestra_grades');
     return result.data;
   },
 
@@ -355,6 +384,7 @@ export const MaestraApi = {
       .maybeSingle();
 
     handleError(error, 'registerIncident');
+    if (data) QueryCache.invalidatePrefix('maestra_incidents');
     return data;
   },
 
@@ -396,6 +426,7 @@ export const MaestraApi = {
       .maybeSingle();
 
     handleError(error, 'createActivity');
+    if (data) QueryCache.invalidatePrefix('maestra_activities');
     return data;
   },
 
@@ -405,6 +436,7 @@ export const MaestraApi = {
   async deleteActivity(activityId) {
     const { error } = await supabase.from('activities').delete().eq('id', activityId);
     handleError(error, 'deleteActivity');
+    if (!error) QueryCache.invalidatePrefix('maestra_activities');
     return { success: !error };
   },
 
@@ -459,13 +491,15 @@ export const MaestraApi = {
           score_v2: scoreVal,
           notes: comment || null,
           teacher_id: teacherId,
-          period_id: periodId
+          period_id: periodId,
+          school_year_id: AppState.get('schoolYear')?.id || null
         })
         .select('id, score_v2')
         .maybeSingle();
     }
 
     handleError(result.error, 'saveGradeV2');
+    if (result.data) QueryCache.invalidatePrefix('maestra_grades');
     return result.data;
   },
 

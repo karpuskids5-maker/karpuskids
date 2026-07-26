@@ -483,6 +483,10 @@
         </button>
 
         <div class="kk-nav-section label">Sistema</div>
+        <button data-section="anio-escolar" class="kk-nav-item" data-tooltip="Año Escolar">
+          <i data-lucide="calendar-range" class="text-violet-300"></i>
+          <span class="label">Año Escolar</span>
+        </button>
         <button data-section="configuracion" class="kk-nav-item" data-tooltip="Configuración">
           <i data-lucide="sliders-horizontal" class="text-slate-300"></i>
           <span class="label">Configuración</span>
@@ -532,6 +536,9 @@
 
         <!-- ALERTAS AUTOMÁTICAS (Notificaciones) -->
         <div id="dashboardAlerts" class="mb-6 hidden"></div>
+
+        <!-- SCHOOL ENGINE: Banner de Estado del Año Escolar -->
+        <div id="schoolYearBanner" class="mb-6 hidden"></div>
 
         <!-- BLOQUE 1: KPIs (Tarjetas Pastel) -->
         <div class="kpi-grid mb-8">
@@ -1538,6 +1545,23 @@
                 <p class="text-slate-400">Cargando publicaciones...</p>
               </div>
             </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- AÑO ESCOLAR (School Engine) -->
+      <section id="anio-escolar" class="section">
+        <div class="flex items-center gap-3 mb-6">
+          <i data-lucide="calendar-range" class="w-7 h-7 text-violet-600"></i>
+          <div>
+            <h2 class="text-2xl font-bold text-slate-800">Año Escolar</h2>
+            <p class="text-xs font-black text-slate-400 uppercase tracking-widest">Motor Escolar — Configuración Central</p>
+          </div>
+        </div>
+        <div id="schoolYearContent" class="space-y-6">
+          <div class="animate-pulse space-y-4">
+            <div class="h-48 bg-slate-100 rounded-3xl"></div>
+            <div class="h-32 bg-slate-100 rounded-3xl"></div>
           </div>
         </div>
       </section>

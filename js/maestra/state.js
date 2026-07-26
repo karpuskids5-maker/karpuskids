@@ -1,7 +1,7 @@
 import { SafeAppState } from '/js/shared/state.js';
 
 /**
- * Estado especÃ­fico para el panel de Maestra
+ * Estado específico para el panel de Maestra
  */
 export const AppState = new SafeAppState({
   user: null,
@@ -11,5 +11,11 @@ export const AppState = new SafeAppState({
   students: [],
   attendance: [],
   posts: [],
-  tasks: []
+  tasks: [],
+  // School Engine
+  schoolYear: null,
+  activePeriod: null,
+  periods: [],
+  selectedHistoricalYear: null,
+  logsMap: {}
 });

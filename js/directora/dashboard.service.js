@@ -1,11 +1,12 @@
 /**
- * 🎯 DASHBOARD SERVICE — Sincronización centralizada de datos
+ * DASHBOARD SERVICE — Sincronización centralizada de datos
  * 
  * Responsabilidad: Orquestar carga de TODOS los datos del dashboard
  * en paralelo desde Supabase con RPC, para evitar múltiples queries.
  */
 
 import { supabase } from '../shared/supabase.js';
+import { SchoolEngine } from '../shared/school-engine.js';
 import { DirectorApi } from './api.js';
 import { AppState } from './state.js';
 
@@ -63,7 +64,13 @@ export const DashboardService = {
           pending_amount:  totalPending,
           pending_payments: totalPending
         },
-        recentInquiries: inquiries.data || []
+        recentInquiries: inquiries.data || [],
+        // School Engine data
+        schoolYear: SchoolEngine.getSchoolYear(),
+        activePeriod: SchoolEngine.getActivePeriod(),
+        systemStatus: SchoolEngine.getStatusSummary(),
+        yearStatusLabel: SchoolEngine.getStatusLabel(),
+        yearStatusColor: SchoolEngine.getStatusColor()
       };
       AppState.set('dashboardData', dashboardData);
       return dashboardData;

@@ -1,21 +1,11 @@
 ﻿import { ensureRole, supabase, initOneSignal } from '/js/shared/supabase.js';
 import { AppState } from './state.js';
+import { SchoolEngine } from '/js/shared/school-engine.js';
+import { SchoolYearModule } from './school-year.module.js';
 import { Helpers } from '/js/shared/helpers.js';
 import { UIPremium } from '/js/shared/ui-premium.js';
-import { WallModule } from './wall.module.js';
 import { DashboardService } from './dashboard.service.js';
 import { UIHelpers, DirectorUI } from './ui.module.js';
-import { StudentsModule } from './students.module.js';
-import { TeachersModule } from './teachers.module.js';
-import { PaymentsModule } from './payments_clean.js';
-import { GradesModule } from './grades.module.js';
-import { PermitsModule } from './permits.module.js';
-import { InquiriesModule } from './inquiries.module.js';
-import { ChatModule } from './chat.module.js';
-import { RoomsModule } from './rooms.module.js';
-import { AutomationModule } from './automation.js';
-import { AccessModule } from './access.module.js';
-import { AttendanceModule } from './attendance.module.js';
 import { CarnetsModule } from '/js/shared/carnets.module.js';
 import { BadgeSystem } from '/js/shared/badges.js';
 import { RealtimeManager } from '/js/shared/realtime-manager.js';
@@ -30,30 +20,59 @@ const debounce = (fn, delay) => {
 
 window.App = {
   navigation: { goTo: goToSection },
-  students: StudentsModule,
-  teachers: { ...TeachersModule, edit: (id) => TeachersModule.openModal(id) },
-  rooms: RoomsModule,
-  payments: PaymentsModule,
-  attendance: AttendanceModule,
-  grades: GradesModule,
+  students: {
+    openModal: (id) => import('./students.module.js').then(m => m.StudentsModule.openModal(id)),
+    loadStudents: () => import('./students.module.js').then(m => m.StudentsModule.loadStudents()),
+    filter: (v) => import('./students.module.js').then(m => m.StudentsModule.filter?.(v)),
+  },
+  teachers: {
+    openModal: (id) => import('./teachers.module.js').then(m => m.TeachersModule.openModal(id)),
+    deleteTeacher: (id, n) => import('./teachers.module.js').then(m => m.TeachersModule.deleteTeacher(id, n)),
+  },
+  rooms: {
+    openModal: (id) => import('./rooms.module.js').then(m => m.RoomsModule.openModal(id)),
+    loadRooms: () => import('./rooms.module.js').then(m => m.RoomsModule.loadRooms()),
+  },
+  payments: {
+    init: () => import('./payments_clean.js').then(m => m.PaymentsModule.init()),
+    markPaid: (id) => import('./payments_clean.js').then(m => m.PaymentsModule.markPaid(id)),
+    filter: (v) => import('./payments_clean.js').then(m => m.PaymentsModule.filterBy?.(v)),
+  },
+  attendance: {
+    init: () => import('./attendance.module.js').then(m => m.AttendanceModule.init()),
+  },
+  grades: {
+    init: () => import('./grades.module.js').then(m => m.GradesModule.init()),
+    filter: (v) => import('./grades.module.js').then(m => m.GradesModule.filter?.(v)),
+  },
   ui: { ...UIHelpers, ...DirectorUI },
-  inquiries: InquiriesModule,
-  permits: PermitsModule,
-  chat: ChatModule,
-  automation: AutomationModule,
+  inquiries: {
+    init: () => import('./inquiries.module.js').then(m => m.InquiriesModule.init()),
+  },
+  permits: {
+    init: () => import('./permits.module.js').then(m => m.PermitsModule.init()),
+    loadHistory: () => import('./permits.module.js').then(m => m.PermitsModule.loadHistory?.()),
+  },
+  chat: {
+    init: () => import('./chat.module.js').then(m => m.ChatModule.init()),
+  },
+  automation: {
+    init: () => import('./automation.js').then(m => m.AutomationModule.init()),
+  },
   reports: { init: () => import('./reports.module.js').then(m => m.ReportsModule.init()) },
   wall: {
-    toggleCommentSection: (pid) => WallModule.toggleCommentSection(pid),
-    sendComment: (pid) => WallModule.sendComment(pid),
-    deletePost: (pid) => WallModule.deletePost(pid),
-    toggleLike: (pid) => WallModule.toggleLike(pid),
-    openNewPostModal: () => WallModule.openNewPostModal(),
-    loadPosts: (container) => WallModule.loadPosts(container || 'muroPostsContainer')
+    toggleCommentSection: (pid) => import('./wall.module.js').then(m => m.WallModule.toggleCommentSection(pid)),
+    sendComment: (pid) => import('./wall.module.js').then(m => m.WallModule.sendComment(pid)),
+    deletePost: (pid) => import('./wall.module.js').then(m => m.WallModule.deletePost(pid)),
+    toggleLike: (pid) => import('./wall.module.js').then(m => m.WallModule.toggleLike(pid)),
+    openNewPostModal: () => import('./wall.module.js').then(m => m.WallModule.openNewPostModal()),
+    loadPosts: (container) => import('./wall.module.js').then(m => m.WallModule.loadPosts(container || 'muroPostsContainer'))
   },
   carnets: CarnetsModule,
+  schoolYear: SchoolYearModule,
 };
 
-window.WallModule = WallModule;
+window.WallModule = null;
 
 window.openGlobalModal = function(html, wide = false) {
   const container = document.getElementById('globalModalContainer');
@@ -100,14 +119,12 @@ export function goToSection(sectionId) {
   // Desuscribir muro al salir (ahorro de recursos Realtime)
   const prevSection = AppState.get('currentSection');
   if (prevSection === 'muro' && sectionId !== 'muro') {
-    WallModule.destroy?.();
+    import('./wall.module.js').then(m => m.WallModule.destroy?.()).catch(() => {});
   }
 
   if (prevSection === 'accesos' && sectionId !== 'accesos') {
     try {
-      if (AccessModule?.stopScanner) {
-        AccessModule.stopScanner();
-      }
+      import('./access.module.js').then(m => m.AccessModule?.stopScanner?.()).catch(() => {});
       const qrContainer = document.getElementById('accesos-content');
       if (qrContainer) qrContainer.innerHTML = '';
     } catch (_) {}
@@ -115,7 +132,7 @@ export function goToSection(sectionId) {
 
   // Limpiar realtime + charts de asistencia al salir
   if (prevSection === 'asistencia' && sectionId !== 'asistencia') {
-    try { AttendanceModule.destroy?.(); } catch (_) {}
+    try { import('./attendance.module.js').then(m => m.AttendanceModule.destroy?.()).catch(() => {}); } catch (_) {}
   }
 
   // Ocultar todas las secciones
@@ -188,6 +205,9 @@ export function goToSection(sectionId) {
       case 'configuracion':
         loadProfile();
         import('../shared/notify-permission.js').then(m => m.NotifyPermission.requestIfNeeded());
+        break;
+      case 'anio-escolar':
+        SchoolYearModule.init();
         break;
     }
 
@@ -335,6 +355,11 @@ document.addEventListener('DOMContentLoaded', async () => {
     // 2. Guardar en Estado
     AppState.set('user', auth.user);
     AppState.set('profile', auth.profile);
+
+    // 2b. Inicializar School Engine (Motor Escolar)
+    await SchoolEngine.init({ forceRefresh: true });
+    AppState.set('schoolYear', SchoolEngine.getSchoolYear());
+    AppState.set('activePeriod', SchoolEngine.getActivePeriod());
 
     // 3. Inicializar OneSignal
     // ? FIX: Solo inicializar en el dominio correcto para evitar errores de consola
