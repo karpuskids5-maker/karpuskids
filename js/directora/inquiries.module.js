@@ -6,7 +6,7 @@ export const InquiriesModule = {
   _allInquiries: [],
 
   async init() {
-    const container = document.getElementById('reportsList');
+    const container = document.getElementById('reports-container');
     if (!container) return;
     
     container.innerHTML = '<div class="col-span-3 text-center p-8"><div class="animate-spin rounded-full h-8 w-8 border-b-2 border-indigo-600 mx-auto"></div></div>';
@@ -25,7 +25,7 @@ export const InquiriesModule = {
   },
 
   filter(status) {
-    const container = document.getElementById('reportsList');
+    const container = document.getElementById('reports-container');
     if (!container) return;
 
     let filtered = this._allInquiries;
@@ -40,7 +40,7 @@ export const InquiriesModule = {
     container.innerHTML = filtered.map((item, idx) => UI.renderInquiryCard(item, idx)).join('');
     if (window.lucide) lucide.createIcons();
     
-    const btns = document.querySelectorAll('#reportsFilters button');
+    const btns = document.querySelectorAll('#reportes button[data-filter]');
     btns.forEach(b => {
        const onclick = b.getAttribute('onclick');
        if(onclick && onclick.includes(`'${status}'`)) {

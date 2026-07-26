@@ -394,11 +394,16 @@ function subscribeToChat(conversationId) {
   // Escuchar input para broadcast
   const input = document.getElementById('chatMessageInput');
   let typingTimeout;
-  input?.addEventListener('input', () => {
+
+  // Remover listener previo para evitar leak
+  if (input && input._typingHandler) input.removeEventListener('input', input._typingHandler);
+  const handler = () => {
     ChatModule.broadcastTyping(conversationId, user.name, true);
     clearTimeout(typingTimeout);
     typingTimeout = setTimeout(() => {
       ChatModule.broadcastTyping(conversationId, user.name, false);
     }, 3000);
-  });
+  };
+  input?.addEventListener('input', handler);
+  if (input) input._typingHandler = handler;
 }

@@ -10,20 +10,26 @@ import { Helpers } from './helpers.js';
 
 // ── Constantes ────────────────────────────────────────────────────────────────
 const EVENT_META = {
-  biberon:      { icon: '🍼', label: 'Biberón'     },
-  panal_humedo: { icon: '💧', label: 'Pañal mojado' },
-  panal_sucio:  { icon: '💩', label: 'Pañal sucio'  },
-  siesta:       { icon: '😴', label: 'Siesta'       },
-  temperatura:  { icon: '🌡️', label: 'Temperatura'  },
-  medicamento:  { icon: '💊', label: 'Medicamento'  },
-  bano:         { icon: '🚽', label: 'Baño'          },
-  animo:        { icon: '😊', label: 'Ánimo'         },
-  desayuno:     { icon: '🥐', label: 'Desayuno'      },
-  almuerzo:     { icon: '🍽️', label: 'Almuerzo'     },
-  merienda:     { icon: '🍎', label: 'Merienda'      },
-  nota:         { icon: '📝', label: 'Nota'           },
-  milk:         { icon: '🍼', label: 'Biberón'       },
-  structured_entry: { icon: '📋', label: 'Registro'  },
+  biberon:           { icon: '🍼', label: 'Biberón'          },
+  panal_humedo:      { icon: '💧', label: 'Pañal mojado'     },
+  panal_sucio:       { icon: '💩', label: 'Pañal sucio'      },
+  siesta:            { icon: '😴', label: 'Siesta'            },
+  temperatura:       { icon: '🌡️', label: 'Temperatura'      },
+  medicamento:       { icon: '💊', label: 'Medicamento'      },
+  bano:              { icon: '🚽', label: 'Baño'              },
+  animo:             { icon: '😊', label: 'Ánimo'             },
+  desayuno:          { icon: '🥐', label: 'Desayuno'          },
+  almuerzo:          { icon: '🍽️', label: 'Almuerzo'         },
+  merienda:          { icon: '🍎', label: 'Merienda'          },
+  nota:              { icon: '📝', label: 'Nota'               },
+  milk:              { icon: '🍼', label: 'Biberón'           },
+  structured_entry:  { icon: '📋', label: 'Registro'          },
+  fiebre:            { icon: '🤒', label: 'Fiebre'            },
+  accidente:         { icon: '🩹', label: 'Accidente'        },
+  golpe:             { icon: '🤕', label: 'Golpe'             },
+  llamada_padres:    { icon: '📞', label: 'Llamada a padres'  },
+  medicamento_extra: { icon: '💊', label: 'Medicamento extra' },
+  otro:              { icon: '📋', label: 'Otro evento'       },
 };
 
 const MOOD_MAP  = { feliz:'😊 Contento/a', bien:'😊 Bien', normal:'😐 Normal', triste:'😢 Triste', inquieto:'😫 Inquieto/a', enojado:'😡 Molesto/a' };
@@ -298,6 +304,20 @@ function _renderTimeline(events) {
       } else if (ev.end_at) {
         detail = `Despertó a las ${_formatTime(ev.end_at)}`;
       }
+    } else if (ev.type === 'fiebre') {
+      const temp = ev.temp;
+      if (temp) { detail = `${temp}°C 🔥 Fiebre`; alertCls = 'bg-rose-50 border-rose-200'; }
+    } else if (ev.type === 'accidente') {
+      detail = ev.descripcion || ev.comment || '';
+      alertCls = 'bg-rose-50 border-rose-200';
+    } else if (ev.type === 'golpe') {
+      detail = ev.descripcion || ev.comment || '';
+      alertCls = 'bg-rose-50 border-rose-200';
+    } else if (ev.type === 'llamada_padres') {
+      detail = ev.motivo || ev.comment || 'La maestra llamó';
+      alertCls = 'bg-amber-50 border-amber-200';
+    } else if (ev.type === 'medicamento_extra') {
+      detail = [ev.nombre, ev.dosis, ev.obs].filter(Boolean).join(' · ');
     } else if (ev.type === 'nota' || ev.type === 'note') {
       detail = ev.texto || ev.value || ev.comment || '';
     } else if (ev.comment) {
@@ -367,6 +387,9 @@ function _renderWeeklyAnalytics(logs, todayLog, date) {
     ? Math.round(logs.reduce((sum,l) => sum + (l.events||[]).filter(e=>e.type==='panal_humedo'||e.type==='panal_sucio').length, 0) / totalDays)
     : 0;
 
+  // Eventos de salud (fiebre, accidente, golpe, llamada_padres)
+  const healthAlerts = logs.reduce((sum, l) => sum + (l.events||[]).filter(e => ['fiebre','accidente','golpe','llamada_padres','medicamento_extra'].includes(e.type)).length, 0);
+
   return `
   <div class="bg-white border border-slate-100 rounded-[1.5rem] shadow-sm p-5 space-y-5">
     <p class="text-[11px] font-black text-slate-400 uppercase tracking-widest">Análisis ${totalDays <= 7 ? 'semanal' : 'mensual'} (${totalDays} días)</p>
@@ -433,6 +456,11 @@ function _renderWeeklyAnalytics(logs, todayLog, date) {
         <div class="bg-white rounded-2xl p-3 border border-slate-100 col-span-${lastTemp ? '1' : '2'}">
           <p class="text-[9px] font-black text-slate-400 uppercase">Ánimo frecuente</p>
           <p class="text-sm font-black text-slate-700">${MOOD_MAP[topMood[0]] || topMood[0]}</p>
+        </div>` : ''}
+        ${healthAlerts > 0 ? `
+        <div class="bg-white rounded-2xl p-3 border border-rose-100 col-span-2">
+          <p class="text-[9px] font-black text-slate-400 uppercase">Eventos de salud</p>
+          <p class="text-sm font-black text-rose-600">${healthAlerts} registro${healthAlerts > 1 ? 's' : ''} esta semana (fiebre, golpes, accidentes)</p>
         </div>` : ''}
       </div>
     </div>

@@ -311,9 +311,6 @@ export const DirectorApi = {
   // --- CHAT ---
   async getChatUsers(myId, roleFilter) {
     try {
-      console.log('getChatUsers called with myId:', myId, 'roleFilter:', roleFilter);
-      
-      // Primero: obtener TODOS perfiles activos
       let query = supabase
         .from('profiles')
         .select('id, name, role, avatar_url, email, phone')
@@ -329,17 +326,11 @@ export const DirectorApi = {
       const { data: allProfiles, error: profilesErr } = await query;
       
       if (profilesErr) {
-        console.error('Error fetching profiles:', profilesErr);
         return { data: [], error: profilesErr };
       }
-      
-      console.log('getChatUsers: allProfiles count:', (allProfiles || []).length);
 
-      // Filtrar perfiles con nombre válido
       let validProfiles = (allProfiles || []).filter(u => u.name && u.name.trim().length > 0);
-      console.log('getChatUsers: validProfiles count:', validProfiles.length);
 
-      // Obtener IDs de padres con estudiantes activos
       const { data: activeStudents } = await supabase
         .from(TABLES.STUDENTS)
         .select('parent_id')
@@ -347,11 +338,7 @@ export const DirectorApi = {
         .eq('is_active', true);
 
       const activeParentIds = [...new Set((activeStudents || []).map(s => s.parent_id).filter(Boolean))];
-      console.log('getChatUsers: activeParentIds count:', activeParentIds.length, 'IDs:', activeParentIds);
 
-      // Filtrar perfiles finales:
-      // - Padres: solo si están en activeParentIds
-      // - Personal (directora, maestra, asistente): todos válidos
       const finalUsers = validProfiles.filter(u => {
         if (u.role === 'padre') {
           return activeParentIds.includes(u.id);
@@ -359,11 +346,8 @@ export const DirectorApi = {
         return true;
       });
 
-      console.log('getChatUsers: finalUsers count:', finalUsers.length, 'finalUsers:', finalUsers);
-
       return { data: finalUsers, error: null };
     } catch (e) { 
-      console.error('getChatUsers complete error:', e);
       return logError('getChatUsers', e); 
     }
   },
@@ -616,7 +600,7 @@ export const DirectorApi = {
         const result = await sendEmail(emails, 'Recibo de Pago â€” ' + month + ' Â· ' + studentName, html);
         return !!result;
       } catch (e) {
-
+        safeHandle(e, 'DirectorApi.sendPaymentReceipt');
         return false;
       }
     }

@@ -1,6 +1,5 @@
-import { supabase, emitEvent } from '../shared/supabase.js';
+import { supabase } from '../shared/supabase.js';
 import { Helpers } from '../shared/helpers.js';
-import { AssistantApi } from './api.js';
 
 let isProcessing = false;
 let _accessChart = null;
@@ -553,57 +552,6 @@ export const AccessModule = {
       Helpers.safeLog('error', 'Error loading history:', err);
       tbody.innerHTML = `<tr><td colspan="7" class="py-12 text-center text-rose-500 font-bold">${Helpers.errorState('Fallo al cargar historial')}</td></tr>`;
     }
-  },
-
-  // ── Gráfico de Tendencia ──────────────────────────────────────────────────
-  async initChart() {
-    const ctx = document.getElementById('accessChart')?.getContext('2d');
-    if (!ctx) return;
-
-    if (!window.Chart) {
-      await this._loadChartJs();
-    }
-
-    this.updateChart();
-  },
-
-  async _loadChartJs() {
-    return new Promise((resolve) => {
-      const script = document.createElement('script');
-      script.src = 'https://cdn.jsdelivr.net/npm/chart.js';
-      script.onload = resolve;
-      document.head.appendChild(script);
-    });
-  },
-
-  // ── Exportación a Excel (Simple CSV) ───────────────────────────────────────
-  async exportToExcel() {
-    const rows = [['Nombre', 'Rol', 'ID/Matricula', 'Fecha', 'Entrada', 'Salida', 'Estado']];
-    const tbody = document.querySelectorAll('#accessTableBody tr');
-    
-    tbody.forEach(tr => {
-      const cols = tr.querySelectorAll('td');
-      if (cols.length < 7) return;
-      rows.push([
-        cols[0].querySelector('span')?.textContent || '',
-        cols[1].querySelector('span')?.textContent || '',
-        cols[2].textContent,
-        cols[3].textContent,
-        cols[4].textContent,
-        cols[5].textContent,
-        cols[6].textContent.trim()
-      ]);
-    });
-
-    const csvContent = "data:text/csv;charset=utf-8," + rows.map(e => e.join(",")).join("\n");
-    const encodedUri = encodeURI(csvContent);
-    const link = document.createElement("a");
-    link.setAttribute("href", encodedUri);
-    link.setAttribute("download", `reporte_asistencia_${new Date().toISOString().split('T')[0]}.csv`);
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-    Helpers.toast('Reporte generado correctamente');
   },
 
   async updateChart() {

@@ -20,7 +20,7 @@ export const FeedModule = {
     const parent = AppState.get('user');
     if (!student || !parent) return;
 
-    WallModule.init('muroPostsContainer', {
+    WallModule.init('classFeed', {
       accentColor: 'indigo',
       likeColor: 'indigo',
       classroomId: student.classroom_id,

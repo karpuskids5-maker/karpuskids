@@ -106,9 +106,23 @@ export const Helpers = {
   /**
    * 📳 Haptic Feedback (Vibración sutil para móvil)
    */
+  _vibrateEnabled: false,
+
+  _initVibrate() {
+    if (this._vibrateEnabled) return;
+    const enable = () => { this._vibrateEnabled = true; };
+    ['pointerdown', 'touchstart', 'click'].forEach(evt =>
+      document.addEventListener(evt, enable, { once: true, passive: true })
+    );
+  },
+
   vibrate(style = 'light') {
+    if (!this._vibrateEnabled) {
+      this._initVibrate();
+      return;
+    }
     if (!('vibrate' in navigator)) return;
-    
+
     try {
       const patterns = {
         light: 10,
@@ -119,7 +133,7 @@ export const Helpers = {
       };
       navigator.vibrate(patterns[style] || 10);
     } catch (e) {
-      // Silenciar error de navegador por falta de interacción
+      // Silenciar error de navegador
     }
   },
 
@@ -138,111 +152,106 @@ export const Helpers = {
   /**
    * 🖨️ Plantilla Corporativa para Impresión de QR
    */
-  getQRPrintTemplate(qrImg, name, matricula) {
+  getQRPrintTemplate(qrImg, name, matricula, extra = {}) {
+    const classroom = extra.classroom || '';
+    const level = extra.level || '';
+    const parentName = extra.parentName || 'No registrado';
+    const schoolPhone = extra.schoolPhone || '';
+    const year = extra.year || new Date().getFullYear();
     return `
       <!DOCTYPE html>
       <html lang="es">
       <head>
         <meta charset="UTF-8">
-        <title>Credencial Digital - ${matricula}</title>
+        <title>Carnet Karpus Kids — ${matricula}</title>
         <style>
           @import url('https://fonts.googleapis.com/css2?family=Nunito:wght@400;700;900&display=swap');
-          body { 
-            font-family: 'Nunito', sans-serif; 
-            display: flex; 
-            align-items: center; 
-            justify-content: center; 
-            min-height: 100vh; 
-            margin: 0; 
-            background: #f8fafc; 
-            -webkit-print-color-adjust: exact;
+          * { box-sizing: border-box; margin: 0; padding: 0; }
+          body {
+            font-family: 'Nunito', sans-serif;
+            display: flex; align-items: center; justify-content: center;
+            min-height: 100vh; margin: 0; background: #f1f5f9;
+            -webkit-print-color-adjust: exact; print-color-adjust: exact;
           }
-          .card { 
-            background: white;
-            border: 2px solid #e2e8f0; 
-            border-radius: 32px; 
-            padding: 40px; 
-            text-align: center; 
-            width: 320px; 
-            box-shadow: 0 20px 50px rgba(0,0,0,0.05);
+          .carnet {
+            width: 85.6mm; height: 54mm; background: #fff;
+            border: 2px solid #1e40af; border-radius: 4mm;
+            display: flex; flex-direction: column; overflow: hidden;
+            box-shadow: 0 8px 32px rgba(30,64,175,0.12);
             position: relative;
-            overflow: hidden;
           }
-          .card::before {
-            content: '';
-            position: absolute;
-            top: 0; left: 0; right: 0; height: 8px;
-            background: linear-gradient(90deg, #f97316, #3b82f6, #ec4899, #22c55e);
+          .carnet-body { display: flex; flex: 1; }
+          .carnet-left {
+            width: 42%; display: flex; flex-direction: column;
+            align-items: center; justify-content: center; padding: 3mm;
+            background: linear-gradient(135deg, #eff6ff, #f8fafc);
+            border-right: 1px solid #e2e8f0;
           }
-          .logo { 
-            font-size: 24px; 
-            font-weight: 900; 
-            margin-bottom: 30px;
-            letter-spacing: -0.5px;
+          .carnet-left img { width: 28mm; height: 28mm; border-radius: 2mm; }
+          .carnet-left .qr-hint {
+            font-size: 5pt; font-weight: 700; color: #1e40af;
+            text-align: center; margin-top: 1.5mm; line-height: 1.3;
           }
-          .k1{color:#f97316} .k2{color:#3b82f6} .k3{color:#ec4899} .k4{color:#22c55e}
-          .qr-wrapper {
-            background: #f1f5f9;
-            padding: 20px;
-            border-radius: 24px;
-            display: inline-block;
-            margin-bottom: 25px;
-            border: 1px solid #e2e8f0;
+          .carnet-left .short-code {
+            font-size: 4.5pt; color: #94a3b8; font-weight: 700; margin-top: 0.5mm;
           }
-          img { 
-            width: 200px; 
-            height: 200px; 
-            display: block;
-            border-radius: 12px;
+          .carnet-right { width: 58%; padding: 3mm 4mm; display: flex; flex-direction: column; justify-content: center; }
+          .school-name {
+            font-size: 7pt; font-weight: 900; color: #1e40af;
+            text-transform: uppercase; letter-spacing: 0.5px;
           }
-          .name { 
-            font-size: 20px; 
-            font-weight: 900; 
-            color: #1e293b; 
-            margin-top: 10px;
-            line-height: 1.2;
+          .school-sub { font-size: 4.5pt; color: #64748b; font-weight: 700; margin-bottom: 1mm; }
+          .divider { height: 0.5px; background: #1e40af33; margin-bottom: 1.5mm; }
+          .student-name { font-size: 9pt; font-weight: 900; color: #0f172a; line-height: 1.2; margin-bottom: 1mm; }
+          .info-row { font-size: 5pt; color: #64748b; font-weight: 700; margin-bottom: 0.5mm; }
+          .info-row span { color: #334155; }
+          .carnet-footer {
+            background: #1e40af; padding: 1mm 3mm;
+            text-align: center; color: #fff; font-size: 4.5pt;
+            font-weight: 800; text-transform: uppercase; letter-spacing: 0.5px;
           }
-          .mat { 
-            font-size: 13px; 
-            color: #64748b; 
-            font-weight: 700; 
-            margin-top: 6px;
-            text-transform: uppercase;
-            letter-spacing: 1px;
+          .watermark {
+            position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%) rotate(-15deg);
+            font-size: 28pt; font-weight: 900; color: rgba(30,64,175,0.03);
+            white-space: nowrap; pointer-events: none; z-index: 0;
           }
-          .footer-brand {
-            margin-top: 30px;
-            font-size: 10px;
-            font-weight: 800;
-            color: #94a3b8;
-            text-transform: uppercase;
-            letter-spacing: 2px;
+          .security-text {
+            position: absolute; bottom: 5mm; left: 3mm; right: 3mm;
+            font-size: 3pt; color: #f1f5f9; text-align: center;
+            letter-spacing: 1px; font-weight: 700; z-index: 0;
           }
           @media print {
-            body { background: white; margin: 0; }
-            .card { box-shadow: none; border: 1px solid #eee; margin: auto; }
+            body { background: white; margin: 0; padding: 10mm; }
+            .carnet { box-shadow: none; margin: 0 auto; }
           }
         </style>
       </head>
       <body>
-        <div class="card">
-          <div class="logo">
-            <span class="k1">K</span><span class="k2">a</span><span class="k3">r</span><span class="k4">p</span>us Kids
+        <div class="carnet">
+          <div class="watermark">KARPUS KIDS</div>
+          <div class="security-text">KARPUS KIDS • KARPUS KIDS • KARPUS KIDS • KARPUS KIDS • KARPUS KIDS</div>
+          <div class="carnet-body">
+            <div class="carnet-left">
+              <img src="${qrImg}" alt="QR Code">
+              <p class="qr-hint">Muestre este código<br>al ingresar</p>
+              <p class="short-code">${(matricula || '').slice(-6)}</p>
+            </div>
+            <div class="carnet-right">
+              <p class="school-name">Karpus Kids</p>
+              <p class="school-sub">Centro de Desarrollo Infantil</p>
+              <div class="divider"></div>
+              <p class="student-name">${name || 'Estudiante'}</p>
+              ${classroom ? `<p class="info-row">🏫 <span>${classroom}</span></p>` : ''}
+              ${level ? `<p class="info-row">📚 <span>${level}</span></p>` : ''}
+              <p class="info-row">🆔 <span>${matricula || 'S/M'}</span></p>
+              <p class="info-row">👨 <span>${parentName}</span></p>
+              <p class="info-row">📅 <span>${year}</span></p>
+            </div>
           </div>
-          <div class="qr-wrapper">
-            <img src="${qrImg}" alt="QR Code">
-          </div>
-          <div class="name">${name || 'Estudiante'}</div>
-          <div class="mat">${matricula}</div>
-          <div class="footer-brand">Sistema de Acceso Seguro</div>
+          <div class="carnet-footer">Karpus Kids — Sistema Inteligente de Gestión Infantil</div>
         </div>
         <script>
-          window.onload = () => {
-            setTimeout(() => {
-              window.print();
-              setTimeout(() => window.close(), 500);
-            }, 500);
-          }
+          window.onload = () => { setTimeout(() => { window.print(); }, 400); }
         </script>
       </body>
       </html>

@@ -10,7 +10,7 @@ function openGlobalModal(html) {
   const c = document.getElementById('globalModalContainer');
   if (!c) return;
   c.innerHTML = '<div class="bg-white rounded-3xl shadow-2xl w-full max-w-2xl max-h-[90vh] overflow-y-auto">' + html + '</div>';
-  c.style.cssText = 'display:flex;align-items:center;justify-content:center;position:fixed;inset:0;background:rgba(0,0,0,0.5);backdrop-filter:blur(4px);z-index:9999;';
+  c.style.cssText = 'display:flex;align-items:center;justify-content:center;position:fixed;inset:0;background:rgba(15,23,42,0.75);z-index:9999;';
   if (window.lucide) lucide.createIcons();
 }
 

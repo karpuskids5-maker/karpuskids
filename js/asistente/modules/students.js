@@ -321,7 +321,7 @@ export const StudentsModule = {
     const gc = document.getElementById('globalModalContainer');
     if (gc) {
       gc.innerHTML = '<div id="globalModalInner" class="bg-white rounded-3xl shadow-2xl w-full max-w-2xl max-h-[92vh] overflow-hidden mx-3 flex flex-col">' + html + '</div>';
-      gc.style.cssText = 'display:flex;align-items:center;justify-content:center;position:fixed;inset:0;background:rgba(0,0,0,0.5);backdrop-filter:blur(4px);z-index:9999;overflow-y:auto;padding:1rem;';
+      gc.style.cssText = 'display:flex;align-items:center;justify-content:center;position:fixed;inset:0;background:rgba(15,23,42,0.75);z-index:9999;overflow-y:auto;padding:1rem;';
       gc.onclick = (e) => { if (e.target === gc) window._closeAsistenteModal(); };
     }
 
@@ -703,19 +703,6 @@ export const StudentsModule = {
       Helpers.toast('Error: ' + (err.message || 'No se pudo guardar'), 'error');
     } finally {
       if (btn) { btn.disabled = false; btn.innerHTML = 'Guardar Estudiante'; if(window.lucide) lucide.createIcons(); }
-    }
-  },
-
-  async deleteStudent(id, name) {
-    const ok = await (window._karpusConfirmDelete || ((t) => Promise.resolve(confirm(t))))(`\u00bfEliminar a ${name}?`, 'Esta acci\u00f3n no se puede deshacer.');
-    if (!ok) return;
-    try {
-      const { error } = await supabase.from('students').delete().eq('id', id);
-      if (error) throw error;
-      Helpers.toast('Estudiante eliminado correctamente');
-      await this.loadStudents();
-    } catch (e) {
-      Helpers.toast('Error al eliminar: ' + e.message, 'error');
     }
   }
 };

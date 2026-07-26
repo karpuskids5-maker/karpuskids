@@ -228,7 +228,7 @@ export const ChatModule = {
     if (!content || !this._activeContact) return;
 
     // Rate limit: máx 20 mensajes por minuto
-    const { checkRateLimit, messageLimiter } = await import('./rate-limiter.js');
+    const { checkRateLimit, messageLimiter } = await import('../shared/rate-limiter.js');
     if (!checkRateLimit(messageLimiter, 'enviar mensajes')) return;
 
     const user    = AppState.get('user');

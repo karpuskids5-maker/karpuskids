@@ -49,34 +49,25 @@ export const ChatModule = {
     const list = document.getElementById('chatContactsList');
     if (!list) return;
     list.innerHTML = Helpers.skeleton(4);
-    console.log('=== Director Chat: _loadContacts started ===');
 
     try {
     const roleVal = document.getElementById('chatRoleFilter')?.value || '';
-    console.log('roleVal:', roleVal);
     const [usersRes, unreadData] = await Promise.all([
       DirectorApi.getChatUsers(this._currentUserId, roleVal || null),
-      // get_unread_counts puede no existir — nunca bloquear la carga de contactos
       supabase.rpc('get_unread_counts').then(r => r.data || {}).catch(() => ({}))
     ]);
-    console.log('usersRes:', usersRes);
     const { data: users, error } = usersRes;
     if (error) throw error;
-    console.log('users from API:', users);
-    console.log('unreadData:', unreadData);
 
       // Enrich padres with student name
       const parentIds = (users || []).filter(u => u.role === 'padre').map(u => u.id);
-      console.log('parentIds:', parentIds);
       let studentMap = {};
       if (parentIds.length) {
         const { data: students } = await DirectorApi.getStudentsByParentIds(parentIds);
-        console.log('students from getStudentsByParentIds:', students);
         (students || []).forEach(s => {
           if (!studentMap[s.parent_id]) studentMap[s.parent_id] = { studentName: s.name, classroomName: s.classrooms?.name || '' };
         });
       }
-      console.log('studentMap:', studentMap);
 
       this._allContacts = (users || []).map(u => {
         const si = studentMap[u.id] || {};
@@ -109,14 +100,11 @@ export const ChatModule = {
           roleLabel,
           meta
         };
-        console.log('Built contact:', contact);
         return contact;
       });
-      console.log('=== Final this._allContacts:', this._allContacts);
 
       this._renderContacts();
     } catch (e) {
-      console.error('=== Error loading chat contacts ===', e);
       list.innerHTML = Helpers.emptyState('Error al cargar contactos: ' + (e.message || 'Desconocido'));
     }
   },
@@ -350,17 +338,17 @@ export const ChatModule = {
 
     // Escuchar input para broadcast
     const input = document.getElementById('chatMessageInput');
-    const user = { name: 'Dirección' }; // O obtener de profiles
+    const userName = this._currentUserProfile?.name || 'Dirección';
     let typingTimeout;
     
     if (input && !input._typingBound) {
       input._typingBound = true;
       input.addEventListener('input', () => {
         if (this._conversationId) {
-          SharedChat.broadcastTyping(this._conversationId, user.name, true);
+          SharedChat.broadcastTyping(this._conversationId, userName, true);
           clearTimeout(typingTimeout);
           typingTimeout = setTimeout(() => {
-            SharedChat.broadcastTyping(this._conversationId, user.name, false);
+            SharedChat.broadcastTyping(this._conversationId, userName, false);
           }, 3000);
         }
       });

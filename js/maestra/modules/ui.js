@@ -27,10 +27,10 @@ export const Modal = {
     document.getElementById(id)?.remove();
     const modal = document.createElement('div');
     modal.id = id;
-    modal.className = 'fixed inset-0 z-[60] flex items-center justify-center bg-slate-900/60 backdrop-blur-sm p-4 animate-fade-in';
-    modal.innerHTML = `<div id="${id}-inner" class="relative w-full max-w-2xl max-h-[92vh] overflow-y-auto">${content}</div>`;
-    
-    // Cerrar al hacer clic afuera
+    modal.className = 'fixed inset-0 z-[60] flex items-center justify-center p-4';
+    modal.style.cssText = 'background:rgba(15,23,42,0.6);backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px);animation:fadeInModal 0.15s ease-out;';
+    modal.innerHTML = `<div id="${id}-inner" class="relative max-w-[calc(100vw-2rem)] max-h-[92vh] rounded-[2rem] shadow-2xl border border-black/5 overflow-hidden">${content}</div>`;
+
     modal.onclick = (e) => {
       if (e.target === modal) this.close(id);
     };
@@ -42,6 +42,13 @@ export const Modal = {
     document.getElementById(id)?.remove();
   }
 };
+
+if (!document.getElementById('modal-animations')) {
+  const style = document.createElement('style');
+  style.id = 'modal-animations';
+  style.textContent = `@keyframes fadeInModal{from{opacity:0}to{opacity:1}}`;
+  document.head.appendChild(style);
+}
 
 export const Skeleton = {
   render(type, count = 3) {

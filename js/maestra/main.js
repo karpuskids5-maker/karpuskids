@@ -29,7 +29,7 @@ const _lastLoad = {};
 // Los onclick inline en HTML dinámico necesitan window.Modal disponible de inmediato
 window.Modal = Modal;
 const { initAttendance, markAllPresent, registerAttendance } = Attendance;
-const { initRoutine, updateRoutineField, saveRoutineLog, openNewRoutineModal, openStudentRoutine, openBulkRoutineModal, updateRoutineFieldInModal, saveRoutineInModal, applyBulkRoutine, openBulkEventModal, confirmBulkEvent, wakeAllSiestas, wakeStudentSiesta, undoLastBulk, publishAll, registerIndividualEvent } = Routine;
+const { initRoutine, updateRoutineField, saveRoutineLog, openNewRoutineModal, openStudentRoutine, openBulkRoutineModal, updateRoutineFieldInModal, saveRoutineInModal, applyBulkRoutine, openBulkEventModal, confirmBulkEvent, wakeAllSiestas, wakeStudentSiesta, undoLastBulk, publishAll, registerIndividualEvent, toggleTimeline, openExtraEventModal, confirmExtraEvent, registerMissingStudents } = Routine;
 const { initTasks, openEditTaskModal, deleteTask, openNewTaskModal, viewTaskSubmissions, submitGrade } = Tasks;
 const { openStudentProfile, registerIncidentModal } = Students;
 const { initChat, selectChatContact } = ChatApp;
@@ -70,6 +70,10 @@ window.App = {
   wakeStudentSiesta: Routine.wakeStudentSiesta,
   undoLastBulk: Routine.undoLastBulk,
   publishAll: Routine.publishAll,
+  toggleTimeline: Routine.toggleTimeline,
+  openExtraEventModal: Routine.openExtraEventModal,
+  confirmExtraEvent: Routine.confirmExtraEvent,
+  registerMissingStudents: Routine.registerMissingStudents,
 
   // Tasks
   initTasks: Tasks.initTasks,
@@ -353,39 +357,23 @@ document.addEventListener('DOMContentLoaded', async () => {
     // 🔴 Sistema de badges por sección
     BadgeSystem.init(auth.user.id);
 
-    // ── Botón hamburguesa móvil ────────────────────────────────────────────────────────
-    const menuBtn = document.getElementById('menuBtn');
-    const sidebar  = document.getElementById('sidebar');
-    const overlay  = document.getElementById('sidebarOverlay');
+    // ── Sidebar: cerrar al navegar en móvil ────────────────────────────────────────
+    const sidebar = document.getElementById('sidebar');
+    const overlay = document.getElementById('sidebarOverlay');
 
-    const _openSidebar = () => {
-      sidebar?.classList.add('mobile-visible');
-      if (overlay) overlay.style.display = 'block';
-    };
     const _closeSidebar = () => {
       sidebar?.classList.remove('mobile-visible');
+      overlay?.classList.remove('visible');
       if (overlay) overlay.style.display = 'none';
     };
 
-    if (menuBtn && sidebar) {
-      menuBtn.addEventListener('click', (e) => {
-        e.stopPropagation();
-        sidebar.classList.contains('mobile-visible') ? _closeSidebar() : _openSidebar();
-      });
-    }
-    if (overlay) {
-      overlay.addEventListener('click', _closeSidebar);
-    }
-
-    // Cerrar sidebar al hacer click en un link (móvil)
     sidebar?.querySelectorAll('button[data-section]').forEach(btn => {
       btn.addEventListener('click', () => {
         if (window.innerWidth <= 768) _closeSidebar();
       });
     });
 
-    // ── Botón colapsar sidebar desktop ─────────────────────────────────────────
-    const toggleBtn  = document.getElementById('toggleSidebar');
+    const toggleBtn = document.getElementById('toggleSidebar');
     const layoutShell = document.getElementById('layoutShell');
     if (toggleBtn && sidebar && layoutShell) {
       toggleBtn.addEventListener('click', () => {
@@ -483,6 +471,7 @@ async function initDashboard() {
     ]);
 
     AppState.set('students', students || []);
+    AppState.set('attendance', attendance || []);
 
     // Actualizar Estadísticas (Bloques)
     UI.updateDashboardStats({

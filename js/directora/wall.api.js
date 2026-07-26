@@ -4,8 +4,7 @@
  * Responsabilidad: Consultas a Supabase para posts, comentarios y likes
  */
 
-import { supabase, sendEmail } from '../shared/supabase.js';
-import { TABLES } from '../shared/constants.js';
+import { supabase } from '../shared/supabase.js';
 import { Helpers } from '../shared/helpers.js';
 
 const POSTS_TABLE = 'posts';
@@ -13,6 +12,7 @@ const COMMENTS_TABLE = 'comments';
 const LIKES_TABLE = 'post_likes';
 
 function logError(context, error) {
+  console.warn(`[WallAPI] ${context}:`, error?.message || error);
 }
 
 async function withTimeout(promise, ms = 10000) {
@@ -42,7 +42,7 @@ async function queryBuilder(query, context = 'Query') {
 
 export const WallApi = {
   /**
-   * Obtener posts con paginación
+   * Obtener posts con paginaciï¿½n
    */
   async getPosts(page = 1, limit = 10) {
     const start = (page - 1) * limit;
@@ -73,7 +73,7 @@ export const WallApi = {
   },
 
   /**
-   * Obtener un post específico
+   * Obtener un post especï¿½fico
    */
   async getPost(id) {
     return await queryBuilder(

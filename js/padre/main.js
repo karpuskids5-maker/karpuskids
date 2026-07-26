@@ -62,6 +62,28 @@ window.App = {
 };
 window.BadgeSystem = BadgeSystem;
 
+// Modal global para el panel padre (compatibilidad con directora/asistente)
+if (!window.openGlobalModal) {
+  window.openGlobalModal = (html) => {
+    let gc = document.getElementById('globalModalContainer');
+    if (!gc) {
+      gc = document.createElement('div');
+      gc.id = 'globalModalContainer';
+      document.body.appendChild(gc);
+    }
+    gc.style.cssText = 'position:fixed;inset:0;z-index:100;display:flex;align-items:flex-start;justify-content:center;padding-top:4vh;overflow-y:auto;background:rgba(15,23,42,0.6);';
+    gc.innerHTML = `<div id="globalModalInner" style="max-width:32rem;width:95%;">${html}</div>`;
+    gc.onclick = (e) => { if (e.target === gc) window.closeGlobalModal?.(); };
+    if (window.lucide) requestAnimationFrame(() => lucide.createIcons());
+  };
+  window.closeGlobalModal = () => {
+    const gc = document.getElementById('globalModalContainer');
+    if (gc) { gc.style.display = 'none'; gc.innerHTML = ''; }
+  };
+  window.App.ui = window.App.ui || {};
+  window.App.ui.closeModal = window.closeGlobalModal;
+}
+
 // Global error handler
 window.addEventListener('unhandledrejection', (e) => {
   const msg = e.reason?.message?.toLowerCase() ?? '';
@@ -705,7 +727,7 @@ async function loadUnreadBadge() {
     }
     // Si el RPC falla, mostrar 0 silenciosamente
 
-    const badge = document.getElementById('badge-muro');
+    const badge = document.getElementById('badge-class');
     if (!badge) return;
 
     if (total > 0) {
@@ -962,7 +984,7 @@ function _showStudentSwitcher(students) {
               ${s.avatar_url ? `<img src="${s.avatar_url}" class="w-full h-full object-cover">` : `<span class="font-black text-slate-400">${s.name.charAt(0)}</span>`}
             </div>
             <div class="text-left flex-1 min-w-0">
-              <p class="font-black text-slate-800 text-sm truncate">${s.name}</p>
+              <p class="font-black text-slate-800 text-sm truncate">${Helpers.escapeHTML(s.name)}</p>
               <p class="text-[10px] font-bold text-slate-400 uppercase tracking-widest">${s.classrooms?.name || 'Sin aula'}</p>
             </div>
             ${String(s.id) === String(current?.id) ? '<i data-lucide="check" class="w-4 h-4 text-indigo-600"></i>' : ''}
@@ -1013,7 +1035,7 @@ async function checkActiveMeetings() {
     const active   = (meetings || []).find(m => m.status === 'live');
     AppState.set('isClassLive', !!active);
 
-    const btn = document.querySelector('.node-videocall');
+    const btn = document.querySelector('[data-target="videocall"]');
     if (!btn) return;
 
     if (active) {

@@ -479,7 +479,7 @@
         <section id="live-attendance" class="section hidden">
           <div class="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-8">
             <div>
-              <h3 class="text-3xl font-black text-slate-800 tracking-tight flex items-center gap-3">
+              <h3 class="text-2xl md:text-3xl font-black text-slate-800 tracking-tight flex items-center gap-3">
                 <span class="text-4xl text-emerald-500">📅</span> Registro de Asistencia
               </h3>
               <p class="text-slate-400 font-bold text-sm mt-1">Monitorea la puntualidad y asistencia diaria</p>
@@ -547,7 +547,7 @@
 
             <!-- Calendar View -->
             <div class="lg:col-span-2">
-              <div class="bg-white p-8 rounded-[2.5rem] border border-slate-100 shadow-sm h-full">
+              <div class="bg-white p-4 md:p-8 rounded-[2.5rem] border border-slate-100 shadow-sm h-full">
                 <div class="grid grid-cols-7 gap-2 mb-4">
                   <div class="text-center text-[10px] font-black text-slate-300 uppercase tracking-widest py-2">Dom</div>
                   <div class="text-center text-[10px] font-black text-slate-300 uppercase tracking-widest py-2">Lun</div>
@@ -561,6 +561,11 @@
                   <!-- Se llenará con JS -->
                 </div>
               </div>
+            </div>
+
+            <!-- Lista de historial (renderizado por attendance.js) -->
+            <div class="lg:col-span-3 mt-6">
+              <div id="attendanceHistoryList" class="space-y-3"></div>
             </div>
           </div>
         </section>
@@ -608,7 +613,9 @@
             <h3 class="text-2xl font-black text-slate-800 tracking-tight mb-6 flex items-center gap-2">
                <span class="text-3xl">🏆</span> Tablero de Progreso
             </h3>
-            <div id="gradesContent" class="flex flex-col items-center w-full"></div>
+            <div id="gradesContent" class="flex flex-col items-center w-full">
+              <canvas id="gradesChart" class="w-full max-w-2xl" style="display:none"></canvas>
+            </div>
           </div>
         </section>
 
@@ -616,15 +623,15 @@
         <section id="payments" class="section hidden">
           <div class="flex flex-col gap-6">
             <!-- Header -->
-            <div class="flex items-center justify-between">
-              <h3 class="text-2xl font-black text-slate-800 tracking-tight flex items-center gap-2">
+            <div class="flex flex-wrap items-center justify-between gap-3">
+              <h3 class="text-xl md:text-2xl font-black text-slate-800 tracking-tight flex items-center gap-2">
                 <i data-lucide="credit-card" class="text-green-600"></i> Oficina de Pagos
               </h3>
-            <div class="flex items-center gap-2">
-              <div class="text-sm bg-green-50 px-4 py-2 rounded-full text-green-800 font-bold border border-green-100 shadow-sm">
+            <div class="flex flex-wrap items-center gap-2">
+              <div class="text-xs md:text-sm bg-green-50 px-3 md:px-4 py-1.5 md:py-2 rounded-full text-green-800 font-bold border border-green-100 shadow-sm">
                 Pagado: <span id="paymentsBalance">$0.00</span>
               </div>
-              <div class="text-sm bg-amber-50 px-4 py-2 rounded-full text-amber-800 font-bold border border-amber-100 shadow-sm">
+              <div class="text-xs md:text-sm bg-amber-50 px-3 md:px-4 py-1.5 md:py-2 rounded-full text-amber-800 font-bold border border-amber-100 shadow-sm">
                 Monto mensual: <span id="paymentsMonthlyFee">$0.00</span>
               </div>
               <div class="text-xs text-slate-500 font-bold">
@@ -868,7 +875,7 @@
           <div id="notifPermissionSlot"></div>
           <div class="bg-white rounded-[2.5rem] shadow-sm border border-slate-100 overflow-hidden min-h-[80vh] flex flex-col">
             <!-- Header Perfil -->
-            <div class="p-8 bg-gradient-to-r from-emerald-50 to-teal-50 border-b border-emerald-100 flex flex-col md:flex-row items-center gap-8">
+            <div class="p-4 md:p-8 bg-gradient-to-r from-emerald-50 to-teal-50 border-b border-emerald-100 flex flex-col md:flex-row items-center gap-6 md:gap-8">
               <div class="relative group"> <!-- Contenedor para avatar y botón de cámara -->
                 <div class="w-32 h-32 md:w-40 md:h-40 rounded-[2.5rem] bg-white shadow-xl shadow-emerald-100/50 border-4 border-white overflow-hidden flex items-center justify-center" id="profileAvatarDisplay">
                   <!-- JS content -->
@@ -882,7 +889,7 @@
                 </label>
               </div>
               <div class="text-center md:text-left flex-1 w-full">
-                <h3 class="text-3xl font-black text-slate-800 mb-2 student-name-display">Cargando...</h3>
+                <h3 class="text-2xl md:text-3xl font-black text-slate-800 mb-2 student-name-display">Cargando...</h3>
                 <p class="text-sm font-bold text-emerald-600 uppercase tracking-widest flex items-center justify-center md:justify-start gap-2">
                   <i data-lucide="school" class="w-4 h-4"></i> <span class="classroom-name-display">Grado y Sección</span>
                 </p>
@@ -896,7 +903,7 @@
 
             <!-- Formulario Perfil -->
             <div class="p-8 md:p-10 flex-1">
-              <div class="grid grid-cols-1 lg:grid-cols-2 gap-10">
+              <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 md:gap-10">
                 <!-- Datos del Estudiante -->
                 <div class="space-y-6">
                   <h4 class="text-[11px] font-black text-slate-400 uppercase tracking-[0.2em] mb-4 flex items-center gap-2">
@@ -967,14 +974,14 @@
               </div>
 
               <div class="mt-12 pt-8 border-t border-slate-100 flex justify-center md:justify-end">
-                <button id="btnSaveChanges" class="btn-main px-12 py-4 text-sm uppercase tracking-widest flex items-center gap-3 shadow-lg shadow-emerald-100">
+                <button id="btnSaveChanges" class="btn-main px-6 md:px-12 py-3 md:py-4 text-xs md:text-sm uppercase tracking-widest flex items-center gap-3 shadow-lg shadow-emerald-100">
                   <i data-lucide="save" class="w-5 h-5"></i> Guardar Perfil Estudiantil
                 </button>
               </div>
 
               <!-- SECCIÓN QR INTEGRADA -->
               <div class="mt-12 pt-8 border-t border-slate-100">
-                <div class="bg-slate-50 rounded-[2.5rem] p-8 flex flex-col md:flex-row items-center gap-8 border border-slate-100">
+                <div class="bg-slate-50 rounded-[2.5rem] p-4 md:p-8 flex flex-col md:flex-row items-center gap-6 md:gap-8 border border-slate-100">
                   <div id="padre-qr-container" class="bg-white p-4 rounded-3xl border-2 border-slate-100 shadow-lg shrink-0">
                     <div class="w-40 h-40 flex items-center justify-center text-slate-300">
                       <i data-lucide="loader" class="w-10 h-10 animate-spin"></i>

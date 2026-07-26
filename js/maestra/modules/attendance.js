@@ -234,6 +234,7 @@ export async function markAllPresent() {
 
 // 👆 Handlers para experiencia de asistencia Premium (Tocar/Mantener)
 let attendanceLongPressTimer = null;
+const _pendingAttendance = new Set();
 
 export function handleAttendancePointerDown(e, studentId) {
   attendanceLongPressTimer = setTimeout(() => {
@@ -253,6 +254,8 @@ export function handleAttendancePointerUp(e, studentId) {
 }
 
 export async function registerAttendance(studentId, status) {
+  if (_pendingAttendance.has(studentId)) return;
+  _pendingAttendance.add(studentId);
   const classroom = AppState.get('classroom');
   const today = new Date().toISOString().split('T')[0];
   if (!studentId || !status) return;
@@ -335,6 +338,8 @@ export async function registerAttendance(studentId, status) {
     });
     safeToast('Error al registrar asistencia', 'error');
     await initAttendance();
+  } finally {
+    _pendingAttendance.delete(studentId);
   }
 }
 

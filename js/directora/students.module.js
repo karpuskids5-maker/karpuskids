@@ -3,17 +3,10 @@ import { Helpers } from '../shared/helpers.js';
 import { UI } from './ui.module.js';
 import { AppState } from './state.js';
 import { supabase, createClient, SUPABASE_URL, SUPABASE_ANON_KEY } from '../shared/supabase.js';
-import { auditLog } from '../shared/db-utils.js';
 import { QueryCache } from '../shared/query-cache.js';
 
 // Vista activa: 'table' | 'grid'
 let _view = 'table';
-
-function avg(arr) {
-  const valid = arr.filter(v => v != null && !isNaN(v));
-  if (!valid.length) return '-';
-  return (valid.reduce((a, b) => a + Number(b), 0) / valid.length).toFixed(1);
-}
 
 export const StudentsModule = {
 
@@ -70,66 +63,6 @@ export const StudentsModule = {
       if (searchInput && !searchInput._bound) {
         searchInput._bound = true;
         searchInput.addEventListener('input', () => this.applyFilters());
-      }
-
-      const filterClassroom = document.getElementById('filterClassroom');
-      if (filterClassroom && !filterClassroom._bound) {
-        filterClassroom._bound = true;
-        // Poblar opciones de aulas
-        const { data: rooms } = await DirectorApi.getClassrooms();
-        if (rooms) {
-          // Limpiar antes de poblar (excepto la opción "Todas")
-          filterClassroom.innerHTML = '<option value="all">Todas las aulas</option>';
-          rooms.forEach(r => {
-            const o = document.createElement('option');
-            o.value = r.id; o.textContent = r.name;
-            filterClassroom.appendChild(o);
-          });
-        }
-        filterClassroom.addEventListener('change', () => this.applyFilters());
-      }
-
-      const filterStatus = document.getElementById('filterStStatus');
-      if (filterStatus && !filterStatus._bound) {
-        filterStatus._bound = true;
-        filterStatus.addEventListener('change', () => this.applyFilters());
-      }
-
-      const filterLevel = document.getElementById('filterLevel');
-      if (filterLevel && !filterLevel._bound) {
-        filterLevel._bound = true;
-        // Poblar niveles únicos de los estudiantes
-        const levels = [...new Set(students.map(s => s.level).filter(Boolean))];
-        if (levels.length) {
-          filterLevel.innerHTML = '<option value="all">Todos los niveles</option>';
-          levels.forEach(l => {
-            const o = document.createElement('option');
-            o.value = l; o.textContent = l;
-            filterLevel.appendChild(o);
-          });
-        }
-        filterLevel.addEventListener('change', () => this.applyFilters());
-      }
-
-      const btnToggleView = document.getElementById('btnToggleStuView');
-      if (btnToggleView && !btnToggleView._bound) {
-        btnToggleView._bound = true;
-        btnToggleView.onclick = () => {
-          _view = _view === 'grid' ? 'table' : 'grid';
-          btnToggleView.textContent = _view === 'grid' ? 'Tabla' : 'Grid';
-          
-          const tableWrapper = document.getElementById('studentsTableWrapper');
-          const gridWrapper = document.getElementById('studentsGrid');
-          
-          if (_view === 'grid') {
-            tableWrapper?.classList.add('hidden');
-            gridWrapper?.classList.remove('hidden');
-          } else {
-            tableWrapper?.classList.remove('hidden');
-            gridWrapper?.classList.add('hidden');
-          }
-          this.render(AppState.get('students') || []);
-        };
       }
 
       const btnExport = document.getElementById('btnExportStudents');

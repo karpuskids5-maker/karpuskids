@@ -15,6 +15,8 @@ import { QueryCache } from '/js/shared/query-cache.js';
 import { RealtimeManager } from '/js/shared/realtime-manager.js';
 import { UIPremium } from '/js/shared/ui-premium.js';
 import { FileManager } from '/js/shared/FileManager.js';
+import { CarnetsModule } from '/js/shared/carnets.module.js';
+import { ScrollModule } from '/js/shared/scroll.module.js';
 
 // ?? Definir objeto App globalmente para evitar ReferenceError en onclicks del HTML
 // Global close modal fallback � always available even before openNewPostModal is called
@@ -25,7 +27,7 @@ window._closeAsistenteModal = () => {
 
 // Cierre de modales estáticos al hacer clic fuera del contenido
 document.addEventListener('click', (e) => {
-  const staticModals = ['roomModal', 'roomStudentsModal', 'paymentDetailModal', 'paymentModal', 'attendanceModal', 'accessModal'];
+  const staticModals = ['roomModal', 'roomStudentsModal'];
   for (const id of staticModals) {
     const modal = document.getElementById(id);
     if (modal && e.target === modal && !modal.classList.contains('hidden')) {
@@ -47,7 +49,7 @@ window.openGlobalModal = (html, wide = false) => {
       </button>
       ${html}
     </div>`;
-  gc.style.cssText = 'display:flex;align-items:flex-start;justify-content:center;padding-top:4vh;position:fixed;inset:0;background:rgba(0,0,0,0.6);backdrop-filter:blur(8px);z-index:9999;overflow-y:auto;';
+  gc.style.cssText = 'display:flex;align-items:flex-start;justify-content:center;padding-top:4vh;position:fixed;inset:0;background:rgba(15,23,42,0.75);z-index:9999;overflow-y:auto;';
   
   gc.onmousedown = (e) => {
     if (e.target === gc) window._closeAsistenteModal();
@@ -72,7 +74,8 @@ window.App = {
   teachers: {
     openModal:     (id)         => TeachersModule.openModal(id),
     deleteTeacher: (id, name)   => TeachersModule.deleteTeacher(id, name)
-  }
+  },
+  carnets: CarnetsModule,
 };
 
 /**
@@ -122,11 +125,11 @@ document.addEventListener('DOMContentLoaded', async () => {
     _confirmPayment: (id) => PaymentsModule.confirmPayment(id),
     _rejectPayment: (id) => PaymentsModule.rejectPayment(id),
     _deletePayment: (id) => PaymentsModule.deletePayment(id),
-    _registerPayment: (sid) => PaymentsModule.openModal(sid),
+    _registerPayment: (sid) => PaymentsModule.openPaymentModal(sid),
     _openTeacherModal: (id) => TeachersModule.openModal(id),
     _toggleCommentSection: (id) => WallModule.toggleCommentSection(id),
     _deleteComment: (cid, pid) => WallModule.deleteComment(cid, pid),
-    _sendComment: (pid) => sendComment(pid),
+    _sendComment: (pid) => WallModule.sendComment(pid),
     _toggleLike: (pid) => WallModule.toggleLike(pid),
     _selectChatContact: (uid, name, role) => selectAssistantChat(uid, name, role),
     selectChatContact: (uid, name, role) => selectAssistantChat(uid, name, role),
@@ -669,8 +672,9 @@ async function initProfile() {
 // --- Funciones Globales de Ventana ---
 window.selectAssistantChat = async (userId, name, role, avatarUrl = null) => {
   const chatList = document.getElementById('chatListPanel');
-  const chatConv = document.getElementById('chatConvPanel');
+  const chatConv = document.getElementById('chatConversationPanel');
   const user = AppState.get('user');
+  const profile = AppState.get('profile');
   
   if (window.innerWidth < 768) {
     chatList?.classList.add('chat-hidden');
@@ -779,7 +783,7 @@ window.selectAssistantChat = async (userId, name, role, avatarUrl = null) => {
         (typing) => {
           const indicator = document.getElementById('chatTypingIndicator');
           if (!indicator) return;
-          if (typing.isTyping && typing.userName !== user.name) {
+          if (typing.isTyping && typing.userName !== profile?.name) {
             indicator.textContent = `${typing.userName} está escribiendo...`;
             indicator.classList.remove('hidden');
           } else {
@@ -811,6 +815,7 @@ async function initAssistantChat() {
   
   list.innerHTML = Helpers.skeleton(4, 'h-16 mb-2');
   const user = AppState.get('user');
+  const profile = AppState.get('profile');
 
   // Guard: si no hay usuario autenticado, no continuar
   if (!user?.id) {
@@ -885,28 +890,6 @@ async function initAssistantChat() {
     
     if (sendBtn && !sendBtn._bound) {
       sendBtn._bound = true;
-      const sendMsg = async () => {
-        const text = input.value.trim();
-        const destId = AppState.get('activeChatUserId');
-        const convId = AppState.get('activeConversationId');
-        if (!text || !destId) return;
-
-        input.value = '';
-        const container = document.getElementById('chatMessagesContainer');
-        container?.insertAdjacentHTML('beforeend', _msgBubble({ sender_id: user.id, content: text }, user.id));
-        ScrollModule.scrollToBottom(container, true);
-
-        try {
-          const res = await ChatModule.sendMessage(user.id, destId, text, convId);
-          if (!convId && res.conversationId) {
-            AppState.set('activeConversationId', res.conversationId);
-            window.selectAssistantChat(destId, AppState.get('activeChatName'), AppState.get('activeChatRole'));
-          }
-        } catch (_) { Helpers.toast('Error al enviar', 'error'); }
-      };
-
-      sendBtn.onclick = sendMsg;
-      input.onkeydown = (e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendMsg(); } };
       
       // ✅ INTERFAZ OPTIMISTA: Envío inmediato y sincronización
       const _optimisticSend = async () => {
@@ -948,9 +931,9 @@ async function initAssistantChat() {
       input.oninput = () => {
         const cid = AppState.get('activeConversationId');
         if (!cid) return;
-        ChatModule.broadcastTyping(cid, user.name, true);
+        ChatModule.broadcastTyping(cid, profile?.name, true);
         clearTimeout(t);
-        t = setTimeout(() => ChatModule.broadcastTyping(cid, user.name, false), 2000);
+        t = setTimeout(() => ChatModule.broadcastTyping(cid, profile?.name, false), 2000);
       };
     }
 

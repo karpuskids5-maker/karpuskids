@@ -6,7 +6,7 @@
   <meta name="robots" content="noindex,nofollow">
   <meta http-equiv="X-Content-Type-Options" content="nosniff">
   <meta http-equiv="Referrer-Policy" content="strict-origin-when-cross-origin">
-  <meta http-equiv="Content-Security-Policy" content="default-src 'self' https://*.supabase.co wss://*.supabase.co; script-src 'self' 'unsafe-inline' https://cdn.onesignal.com https://onesignal.com https://api.onesignal.com https://meet.jit.si https://8x8.vc https://cdn.jsdelivr.net; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com https://cdn.jsdelivr.net; img-src 'self' data: blob: https:; connect-src 'self' https://*.supabase.co wss://*.supabase.co https://cdn.onesignal.com https://onesignal.com https://api.onesignal.com https://meet.jit.si https://8x8.vc https://fonts.googleapis.com https://fonts.gstatic.com https://cdn.jsdelivr.net; frame-src https://meet.jit.si https://8x8.vc; worker-src 'self' blob:; object-src 'none'; base-uri 'self';">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self' https://*.supabase.co wss://*.supabase.co; script-src 'self' 'unsafe-inline' https://cdn.onesignal.com https://onesignal.com https://api.onesignal.com https://meet.jit.si https://8x8.vc https://cdn.jsdelivr.net; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com https://cdn.jsdelivr.net; img-src 'self' data: blob: https:; connect-src 'self' https://*.supabase.co wss://*.supabase.co https://cdn.onesignal.com https://onesignal.com https://api.onesignal.com https://meet.jit.si https://8x8.vc https://fonts.googleapis.com https://fonts.gstatic.com https://cdn.jsdelivr.net; frame-src 'self' blob: https://meet.jit.si https://8x8.vc; worker-src 'self' blob:; object-src 'none'; base-uri 'self';">
   <style>html{display:none;}</style>
   <!-- X-Frame-Options debe ser configurado por el servidor, no por meta tag -->
   <script>if(self===top){document.documentElement.style.display='block';}else{top.location=self.location;}</script>
@@ -402,7 +402,7 @@
 
   <div class="app">
     <!-- OVERLAY MOBILE -->
-    <div id="sidebarOverlay" class="fixed inset-0 bg-black/50 z-40 backdrop-blur-sm transition-opacity" style="display:none;"></div>
+    <div id="sidebarOverlay" class="fixed inset-0 bg-black/50 z-40 transition-opacity" style="display:none;"></div>
     
     <!-- SIDEBAR -->
     <aside id="sidebar" class="kk-sidebar bg-gradient-to-b from-violet-600 via-violet-700 to-indigo-800 shadow-2xl fixed inset-y-0 left-0 z-50 w-72 flex flex-col" style="border-right:none;">
@@ -830,6 +830,9 @@
             <input id="searchStudent" placeholder="Buscar estudiante..." class="pl-10 pr-3 py-2.5 border border-slate-200 rounded-xl text-sm w-full focus:ring-2 focus:ring-purple-500 outline-none bg-slate-50 focus:bg-white" />
           </div>
           <div class="ml-auto flex items-center gap-2">
+            <button id="btnCarnets" onclick="App.carnets.openModal()" class="px-3 py-2 bg-green-50 text-green-700 border border-green-200 rounded-xl text-sm hover:bg-green-100 font-bold flex items-center gap-2">
+              <i data-lucide="badge-check" class="w-4 h-4"></i> Carnets
+            </button>
             <button id="btnExportStudents" class="px-3 py-2 bg-green-100 text-green-700 border border-green-200 rounded-xl text-sm hover:bg-green-200 font-bold flex items-center gap-2">
               <i data-lucide="sheet" class="w-4 h-4"></i> Excel
             </button>
@@ -1685,7 +1688,7 @@
   </div> <!-- Cierre de .app -->
 
   <!-- Contenedor Único de Modales -->
-  <div id="globalModalContainer" class="fixed inset-0 bg-black/50 backdrop-blur-sm z-[9999] overflow-y-auto" style="display:none;"></div>
+  <div id="globalModalContainer" class="fixed inset-0 z-[9999] overflow-y-auto" style="display:none;"></div>
 
   <!-- TOAST CONTAINER — fuera de secciones para no duplicarse -->
   <div id="toast-container" class="fixed top-5 right-5 z-[9998] flex flex-col gap-2 pointer-events-none"></div>

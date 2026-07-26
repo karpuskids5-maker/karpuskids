@@ -284,6 +284,11 @@
       z-index: 100; transition: all 0.3s ease;
     }
 
+    /* Modal buttons — always solid, never translucent */
+    [id$="-inner"] button[style*="background"] {
+      opacity: 1 !important;
+    }
+
     /* Karpus colored letters small */
     .karpus-kids-inline { font-weight: 700; }
     .karpus-kids-inline .k-1 { color: #FF9800; }
@@ -325,16 +330,27 @@
       animation: pulse-subtle 3s infinite ease-in-out;
     }
     .custom-scrollbar::-webkit-scrollbar {
-      width: 4px;
+      width: 5px;
     }
     .custom-scrollbar::-webkit-scrollbar-track {
       background: transparent;
     }
     .custom-scrollbar::-webkit-scrollbar-thumb {
-      background: #e2e8f0;
+      background: #cbd5e1;
       border-radius: 10px;
     }
+    .custom-scrollbar::-webkit-scrollbar-thumb:hover {
+      background: #94a3b8;
+    }
     .nav-btn-toy.active { background: white; color: #C2410C; }
+
+    /* Routine section: improve visual consistency between containers */
+    #tab-daily-routine > .space-y-5 > * {
+      transition: box-shadow 0.2s ease;
+    }
+    #tab-daily-routine .group:hover {
+      z-index: 10;
+    }
   </style>
 </head>
 <body class="bg-slate-50 text-slate-800 font-nunito panel-maestra-body" style="overflow-y:auto;overflow-x:hidden;">
@@ -575,9 +591,9 @@
 
         <!-- Tab Contents -->
         <div id="tab-feed" class="class-tab-content">
-          <div class="flex justify-between items-center mb-6">
-            <h3 class="text-2xl font-black text-slate-800">📢 Muro del Aula</h3>
-            <button id="btnNewPost" onclick="App.openNewPostModal()" class="px-6 py-2.5 bg-orange-600 text-white rounded-xl font-bold shadow-md hover:bg-orange-700 transition-all flex items-center gap-2">
+          <div class="flex justify-between items-center gap-3 mb-6">
+            <h3 class="text-xl md:text-2xl font-black text-slate-800 truncate min-w-0">📢 Muro del Aula</h3>
+            <button id="btnNewPost" onclick="App.openNewPostModal()" class="shrink-0 px-4 md:px-6 py-2 md:py-2.5 bg-orange-600 text-white rounded-xl font-bold shadow-md hover:bg-orange-700 transition-all flex items-center gap-2">
               <i data-lucide="plus-circle" class="w-5 h-5"></i> Nueva Publicación
             </button>
           </div>
@@ -787,7 +803,7 @@
 
           <!-- Formulario de Edición (Derecha) -->
           <div class="lg:col-span-2">
-            <div class="bg-white rounded-3xl shadow-sm border border-slate-100 p-8">
+            <div class="bg-white rounded-3xl shadow-sm border border-slate-100 p-4 md:p-8">
               <h3 class="font-bold text-lg text-slate-800 mb-6 flex items-center gap-2">
                 <i data-lucide="user-cog" class="text-orange-500"></i> Editar Información
               </h3>
@@ -824,7 +840,7 @@
 
               <!-- SECCIÓN QR INTEGRADA (MAESTRA) -->
               <div id="maestra-qr-section" class="mt-12 pt-8 border-t border-slate-100">
-                <div class="bg-slate-50 rounded-[2.5rem] p-8 flex flex-col md:flex-row items-center gap-8 border border-slate-100">
+                <div class="bg-slate-50 rounded-[2.5rem] p-4 md:p-8 flex flex-col md:flex-row items-center gap-6 md:gap-8 border border-slate-100">
                   <div id="maestra-qr-container" class="bg-white p-4 rounded-3xl border-2 border-slate-100 shadow-lg shrink-0">
                     <div class="w-40 h-40 flex items-center justify-center text-slate-300">
                       <i data-lucide="qr-code" class="w-10 h-10"></i>

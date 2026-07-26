@@ -133,7 +133,7 @@ export const TeachersModule = {
     const gc = document.getElementById('globalModalContainer');
     if (gc) {
       gc.innerHTML = '<div id="asis-teacher-modal-inner" class="bg-white rounded-3xl shadow-2xl w-full max-w-md max-h-[92vh] overflow-hidden mx-3 flex flex-col relative animate-scaleIn">' + html + '</div>';
-      gc.style.cssText = 'display:flex;align-items:center;justify-content:center;position:fixed;inset:0;background:rgba(0,0,0,0.6);backdrop-filter:blur(8px);z-index:9999;';
+      gc.style.cssText = 'display:flex;align-items:center;justify-content:center;position:fixed;inset:0;background:rgba(15,23,42,0.75);z-index:9999;';
       
       // Manejar clic afuera para cerrar
       gc.onmousedown = (e) => {

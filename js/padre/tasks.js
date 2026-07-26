@@ -157,7 +157,7 @@ export const TasksModule = {
           <p class="text-sm font-bold text-slate-500 leading-relaxed mb-6">
             ¡Misión cumplida! La maestra revisará tu tarea pronto. ¡Sigue así! 🌟
           </p>
-          <button onclick="UIHelpers.closeModal()" class="w-full py-4 bg-orange-600 text-white rounded-2xl font-black text-xs uppercase tracking-widest shadow-lg shadow-orange-100 active:scale-95 transition-all">
+          <button onclick="window.closeGlobalModal?.()" class="w-full py-4 bg-orange-600 text-white rounded-2xl font-black text-xs uppercase tracking-widest shadow-lg shadow-orange-100 active:scale-95 transition-all">
             ¡Entendido!
           </button>
         </div>

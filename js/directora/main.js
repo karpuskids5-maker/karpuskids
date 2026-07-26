@@ -1,4 +1,4 @@
-import { ensureRole, supabase, initOneSignal } from '/js/shared/supabase.js';
+﻿import { ensureRole, supabase, initOneSignal } from '/js/shared/supabase.js';
 import { AppState } from './state.js';
 import { Helpers } from '/js/shared/helpers.js';
 import { UIPremium } from '/js/shared/ui-premium.js';
@@ -16,11 +16,10 @@ import { RoomsModule } from './rooms.module.js';
 import { AutomationModule } from './automation.js';
 import { AccessModule } from './access.module.js';
 import { AttendanceModule } from './attendance.module.js';
+import { CarnetsModule } from '/js/shared/carnets.module.js';
 import { BadgeSystem } from '/js/shared/badges.js';
 import { RealtimeManager } from '/js/shared/realtime-manager.js';
 import { QueryCache } from '/js/shared/query-cache.js';
-import { ImageLoader } from '/js/shared/image-loader.js';
-import { auditLog } from '/js/shared/db-utils.js';
 const debounce = (fn, delay) => {
   let timeout;
   return (...args) => {
@@ -50,7 +49,8 @@ window.App = {
     toggleLike: (pid) => WallModule.toggleLike(pid),
     openNewPostModal: () => WallModule.openNewPostModal(),
     loadPosts: (container) => WallModule.loadPosts(container || 'muroPostsContainer')
-  }
+  },
+  carnets: CarnetsModule,
 };
 
 window.WallModule = WallModule;
@@ -60,13 +60,13 @@ window.openGlobalModal = function(html, wide = false) {
   if (!container) return;
   const maxW = wide ? 'max-w-4xl' : 'max-w-2xl';
   container.innerHTML = `
-    <div id="globalModalInner" class="bg-white rounded-3xl shadow-2xl w-full ${maxW} max-h-[92vh] overflow-y-auto mx-3 my-4 relative animate-scaleIn">
-      <button onclick="App.ui.closeModal()" class="absolute top-4 right-4 w-10 h-10 flex items-center justify-center rounded-full bg-slate-100 text-slate-400 hover:bg-rose-50 hover:text-rose-500 transition-all z-[110]">
-        <i data-lucide="x" class="w-6 h-6"></i>
+    <div id="globalModalInner" style="background:#fff;border-radius:1.5rem;box-shadow:0 25px 50px -12px rgba(0,0,0,0.25);width:100%;${wide ? 'max-width:56rem' : 'max-width:42rem'};max-height:92vh;overflow-y:auto;margin:0.75rem auto;position:relative">
+      <button onclick="App.ui.closeModal()" style="position:absolute;top:1rem;right:1rem;width:2.5rem;height:2.5rem;display:flex;align-items:center;justify-content:center;border-radius:9999px;background:#f1f5f9;color:#94a3b8;border:none;cursor:pointer;z-index:110;transition:all 0.2s">
+        <svg width="24" height="24" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/></svg>
       </button>
       ${html}
     </div>`;
-  container.style.cssText = 'display:flex;align-items:flex-start;justify-content:center;padding-top:4vh;position:fixed;inset:0;background:rgba(0,0,0,0.6);backdrop-filter:blur(8px);z-index:var(--z-modal,100);overflow-y:auto;';
+  container.style.cssText = 'display:flex;align-items:flex-start;justify-content:center;padding-top:4vh;position:fixed;inset:0;background:rgba(15,23,42,0.75);z-index:var(--z-modal,100);overflow-y:auto;';
   
   // Cerrar al hacer clic fuera del contenido (en el overlay)
   container.onmousedown = (e) => {
@@ -74,6 +74,13 @@ window.openGlobalModal = function(html, wide = false) {
       App.ui.closeModal();
     }
   };
+
+  // Hover effects for close button
+  const closeBtn = container.querySelector('button');
+  if (closeBtn) {
+    closeBtn.onmouseenter = () => { closeBtn.style.background = '#fef2f2'; closeBtn.style.color = '#f43f5e'; };
+    closeBtn.onmouseleave = () => { closeBtn.style.background = '#f1f5f9'; closeBtn.style.color = '#94a3b8'; };
+  }
 
   if (window.lucide) lucide.createIcons();
 };
@@ -647,112 +654,6 @@ async function loadNewPostsBadge() {
     }, { once: false });
 
   } catch (_) {}
-}
-
-// -- Secci�n de Accesos (QR + Asistencia en vivo) -----------------------------
-function _initAccesosSection() {
-  const container = document.getElementById('accesos-content');
-  if (!container) return;
-
-  // Cargar librer�a QR si no est�
-  const loadQR = () => new Promise(resolve => {
-    if (window.QRCode) { resolve(); return; }
-    const s = document.createElement('script');
-    s.src = 'js/shared/qrcode.min.js';
-    s.onload = resolve;
-    document.head.appendChild(s);
-  });
-
-  // Cargar estudiantes y generar QRs
-  const loadStudentsQR = async () => {
-    container.innerHTML = '<div class="flex justify-center py-12"><div class="animate-spin w-8 h-8 border-2 border-orange-500 rounded-full border-t-transparent"></div></div>';
-    await loadQR();
-
-    const { data: students } = await supabase
-      .from('students')
-      .select('id, name, matricula, classrooms:classroom_id(name)')
-      .eq('is_active', true)
-      .not('matricula', 'is', null)
-      .order('name');
-
-    if (!students?.length) {
-      container.innerHTML = '<div class="text-center py-12 text-slate-400"><p class="font-bold">No hay estudiantes con matr�cula asignada.</p><p class="text-xs mt-1">Asigna matr�culas desde la secci�n Estudiantes.</p></div>';
-      return;
-    }
-
-    container.innerHTML = students.map(s => `
-      <div class="bg-white rounded-3xl border border-slate-100 shadow-sm p-5 flex flex-col items-center gap-3 hover:shadow-md transition-all">
-        <div id="qr-${s.id}" class="bg-slate-50 w-[140px] h-[140px] rounded-xl border-2 border-dashed border-slate-200 flex items-center justify-center cursor-pointer group hover:bg-orange-50 hover:border-orange-200 transition-all"
-             onclick="window._generateLazyStudentQR('${s.id}', '${s.matricula}')">
-          <div class="text-center">
-            <i data-lucide="qr-code" class="w-6 h-6 text-slate-300 group-hover:text-orange-400 mx-auto mb-1"></i>
-            <span class="text-[9px] font-bold text-slate-400 group-hover:text-orange-500 uppercase">Generar QR</span>
-          </div>
-        </div>
-        <div class="text-center">
-          <p class="font-black text-slate-800 text-sm">${s.name}</p>
-          <p class="text-[10px] font-bold text-orange-600 uppercase tracking-widest">${s.matricula}</p>
-          <p class="text-[10px] text-slate-400">${s.classrooms?.name || 'Sin aula'}</p>
-        </div>
-        <button onclick="window._printStudentQR('${s.id}','${s.name}','${s.matricula}')"
-          class="w-full py-2 bg-slate-800 text-white rounded-xl font-black text-[9px] uppercase tracking-widest hover:bg-slate-900 transition-all flex items-center justify-center gap-1.5">
-          <i data-lucide="printer" class="w-3 h-3"></i> Imprimir
-        </button>
-      </div>`).join('');
-
-    if (window.lucide) lucide.createIcons();
-  };
-
-  // Función global para generar QR solo cuando sea necesario (Lazy)
-  window._generateLazyStudentQR = (id, matricula) => {
-    const el = document.getElementById(`qr-${id}`);
-    // Guard: no generar si ya tiene QR o está en proceso
-    if (!el || el.querySelector('img') || el.dataset.rendering === '1') return;
-    el.dataset.rendering = '1';
-
-    el.innerHTML = '<div class="animate-spin w-5 h-5 border-2 border-orange-500 rounded-full border-t-transparent"></div>';
-    
-    setTimeout(() => {
-      const qrData = JSON.stringify({ id, matricula, role: 'student' });
-      el.innerHTML = '';
-      new QRCode(el, {
-        text: qrData,
-        width: 120,
-        height: 120,
-        colorDark: "#000000",
-        colorLight: "#ffffff",
-        correctLevel: QRCode.CorrectLevel.H
-      });
-      el.classList.remove('bg-slate-50', 'border-dashed', 'cursor-pointer');
-      el.classList.add('p-2', 'bg-white', 'border-slate-100');
-      el.onclick = null;
-      delete el.dataset.rendering;
-    }, 200);
-  };
-
-  // Funci�n global para imprimir QR individual
-  window._printStudentQR = (id, name, matricula) => {
-    const el = document.getElementById(`qr-${id}`);
-    const img = el?.querySelector('img')?.src || el?.querySelector('canvas')?.toDataURL();
-    if (!img) return;
-    const win = window.open('', '_blank');
-    win.document.write(`<!DOCTYPE html><html><head><title>QR ${matricula}</title>
-      <style>body{font-family:Arial,sans-serif;display:flex;align-items:center;justify-content:center;min-height:100vh;margin:0;}
-      .card{border:2px solid #e2e8f0;border-radius:16px;padding:20px;text-align:center;max-width:240px;}
-      .logo{font-size:11px;font-weight:900;color:#f97316;text-transform:uppercase;letter-spacing:2px;margin-bottom:10px;}
-      img{width:160px;height:160px;}.name{font-size:14px;font-weight:900;color:#1e293b;margin-top:10px;}
-      .mat{font-size:10px;color:#64748b;font-weight:700;margin-top:3px;}.hint{font-size:8px;color:#94a3b8;margin-top:6px;}</style>
-    </head><body><div class="card">
-      <div class="logo">?? Karpus Kids</div>
-      <img src="${img}">
-      <div class="name">${name}</div>
-      <div class="mat">${matricula}</div>
-      <div class="hint">Escanea para registrar entrada/salida</div>
-    </div><script>window.onload=()=>window.print()<\/script></body></html>`);
-    win.document.close();
-  };
-
-  loadStudentsQR();
 }
 
 // -- Preview din�mico del horario ----------------------------------------------
