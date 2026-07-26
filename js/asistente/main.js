@@ -121,8 +121,7 @@ document.addEventListener('DOMContentLoaded', async () => {
 
   // Asignar funciones internas al objeto global App
   Object.assign(window.App, {
-    _registerAccess: (sid, type) => AccessModule.register(sid, type),
-    _confirmPayment: (id) => PaymentsModule.confirmPayment(id),
+    _confirmApproval: (id) => PaymentsModule._confirmApproval(id),
     _rejectPayment: (id) => PaymentsModule.rejectPayment(id),
     _deletePayment: (id) => PaymentsModule.deletePayment(id),
     _registerPayment: (sid) => PaymentsModule.openPaymentModal(sid),
@@ -133,7 +132,6 @@ document.addEventListener('DOMContentLoaded', async () => {
     _toggleLike: (pid) => WallModule.toggleLike(pid),
     _selectChatContact: (uid, name, role) => selectAssistantChat(uid, name, role),
     selectChatContact: (uid, name, role) => selectAssistantChat(uid, name, role),
-    // Estudiantes
     _openStudentModal: (id) => StudentsModule.openModal(id),
     _deleteStudent: (id, name) => StudentsModule._deleteStudent(id, name),
     _genMatricula: () => window._genMatricula?.(),
@@ -995,11 +993,3 @@ function _msgBubble(m, myId) {
       </div>
     </div>`;
 }
-
-window.App.runEmergencyCycle = async function() {
-  if (!confirm('¿Ejecutar ciclo de pagos de emergencia?')) return;
-  const { data, error } = await supabase.rpc('run_payment_cycle');
-  if (error) alert('Error: ' + error.message);
-  else alert('Éxito: ' + data.generated + ' cobros generados.');
-  window.location.reload();
-};

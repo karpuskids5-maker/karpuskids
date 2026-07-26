@@ -1,5 +1,4 @@
 import { Helpers } from '../shared/helpers.js';
-import { UIPremium } from '../shared/ui-premium.js';
 
 const UIHelpers = {
   setLoading(isLoading, containerSelector = '#globalModalContainer', btnSelector = null) {
@@ -41,27 +40,17 @@ const DirectorUI = {
    * Renderiza los KPI cards del dashboard
    */
   renderDashboard(data) {
-    const set = (id, val) => {
-      const el = document.getElementById(id);
-      if (el) el.textContent = val;
-    };
-
     const kpis = data?.stats || data?.kpis || {};
 
-    // Estudiantes activos
     const studentCount = (kpis.active > 0 ? kpis.active : null) ?? kpis.students ?? kpis.total ?? 0;
-    set('kpiStudents', studentCount);
-
-    // Docentes
-    set('kpiTeachers', kpis.teachers > 0 ? kpis.teachers : (data?.teacherCount ?? 0));
-
-    // Aulas activas
-    set('kpiClassrooms', kpis.classrooms > 0 ? kpis.classrooms : (data?.classrooms?.length ?? 0));
+    Helpers.setTxt('kpiStudents', studentCount);
+    Helpers.setTxt('kpiTeachers', kpis.teachers > 0 ? kpis.teachers : (data?.teacherCount ?? 0));
+    Helpers.setTxt('kpiClassrooms', kpis.classrooms > 0 ? kpis.classrooms : (data?.classrooms?.length ?? 0));
 
     // Niños presentes hoy
     const presentToday = data?.attendance?.today?.present ?? kpis.present ?? kpis.attendance_today ?? 0;
     const totalToday   = data?.attendance?.today?.total ?? studentCount;
-    set('kpiAttendance', presentToday);
+    Helpers.setTxt('kpiAttendance', presentToday);
 
     // Tasa de asistencia como subtexto
     if (totalToday > 0) {
@@ -72,10 +61,10 @@ const DirectorUI = {
 
     // Por cobrar
     const pending = data?.payments?.summary?.total_pending ?? kpis.pending_amount ?? kpis.pending_payments ?? 0;
-    set('kpiPendingMoney', 'RD$' + Number(pending).toLocaleString('es-DO', { minimumFractionDigits: 2 }));
+    Helpers.setTxt('kpiPendingMoney', 'RD$' + Number(pending).toLocaleString('es-DO', { minimumFractionDigits: 2 }));
 
     // Incidencias
-    set('kpiIncidents', data?.inquiries?.count ?? kpis.pendingInquiries ?? kpis.inquiries ?? 0);
+    Helpers.setTxt('kpiIncidents', data?.inquiries?.count ?? kpis.pendingInquiries ?? kpis.inquiries ?? 0);
 
     // Lanzar widgets inteligentes en background (no bloquea el render)
     import('./automation.js').then(({ AutomationModule }) => {

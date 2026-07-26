@@ -7,8 +7,5 @@ export const AppState = new SafeAppState({
   user: null,
   profile: null,
   currentSection: 'dashboard',
-  paymentsData: [],
-  selectedStudent: null,
-  teachers: [],
-  classrooms: []
+  paymentsData: []
 });

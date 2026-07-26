@@ -5,9 +5,6 @@ import { AppState } from './state.js';
 import { supabase, createClient, SUPABASE_URL, SUPABASE_ANON_KEY } from '../shared/supabase.js';
 import { QueryCache } from '../shared/query-cache.js';
 
-// Vista activa: 'table' | 'grid'
-let _view = 'table';
-
 export const StudentsModule = {
 
   async init() {
@@ -36,25 +33,15 @@ export const StudentsModule = {
       const kpis = dashboardData?.stats || {}; // DashboardService usa 'stats'
 
       // 3. Actualizar tarjetas KPI
-      const setTxt = (id, val) => { const el = document.getElementById(id); if(el) el.textContent = val; };
-      
-      setTxt('totalStudents', count || 0);
-      setTxt('activeStudents', kpis.active || 0);
-      setTxt('incidents', kpis.pendingInquiries || 0);
-      setTxt('classroomsCount', kpis.classrooms || 0);
-      setTxt('avgAttendance', (kpis.attendance || 0) + '%');
+      Helpers.setTxt('totalStudents', count || 0);
+      Helpers.setTxt('activeStudents', kpis.active || 0);
+      Helpers.setTxt('incidents', kpis.pendingInquiries || 0);
+      Helpers.setTxt('classroomsCount', kpis.classrooms || 0);
+      Helpers.setTxt('avgAttendance', (kpis.attendance || 0) + '%');
 
-      // 4. Renderizar vista actual
+      // 4. Renderizar vista de tabla
       const tableWrapper = document.getElementById('studentsTableWrapper');
-      const gridWrapper = document.getElementById('studentsGrid');
-      
-      if (_view === 'grid') {
-        tableWrapper?.classList.add('hidden');
-        gridWrapper?.classList.remove('hidden');
-      } else {
-        tableWrapper?.classList.remove('hidden');
-        gridWrapper?.classList.add('hidden');
-      }
+      tableWrapper?.classList.remove('hidden');
       this.render(students);
 
       // Renderizar paginación

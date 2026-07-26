@@ -47,5 +47,7 @@ export const TABLES = {
   TASK_EVIDENCES: 'task_evidences',
   GRADES: 'grades',
   TASKS: 'tasks',
-  POSTS: 'posts'
+  POSTS: 'posts',
+  PERIODS: 'periods',
+  REPORT_CARDS: 'report_cards'
 };

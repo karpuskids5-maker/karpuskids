@@ -23,11 +23,10 @@ export const TeachersModule = {
       const assistants = normalized.filter(t => t.role === 'asistente').length;
       const inClass = normalized.filter(t => t.classrooms).length;
 
-      const setTxt = (id, val) => { const el = document.getElementById(id); if(el) el.textContent = val; };
-      setTxt('kpiStaffTotal', total);
-      setTxt('kpiStaffActive', active);
-      setTxt('kpiStaffInClass', inClass); 
-      setTxt('kpiStaffAssistants', assistants);
+      Helpers.setTxt('kpiStaffTotal', total);
+      Helpers.setTxt('kpiStaffActive', active);
+      Helpers.setTxt('kpiStaffInClass', inClass); 
+      Helpers.setTxt('kpiStaffAssistants', assistants);
 
       AppState.set('teachers', normalized);
       this.render(normalized, renderTargetId);

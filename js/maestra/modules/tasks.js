@@ -429,3 +429,342 @@ export async function submitGrade(taskId, studentId) {
     safeToast('Error al calificar', 'error');
   }
 }
+
+// ── CALIFICACIONES V2: Actividades Evaluables ───────────────
+
+export async function initGradesV2() {
+  const classroom = AppState.get('classroom');
+  const container = document.getElementById('tab-grades-v2') || document.getElementById('t-grades-inner');
+  if (!container) return;
+
+  container.innerHTML = `
+    <div class="flex justify-between items-center mb-8">
+      <h3 class="text-2xl font-black text-slate-800 flex items-center gap-3">
+        <i data-lucide="star" class="w-6 h-6 text-indigo-500"></i>
+        Calificaciones
+      </h3>
+    </div>
+    <div id="gradesV2Content" class="space-y-4">
+      <div class="animate-pulse space-y-4">
+        <div class="h-32 bg-slate-50 rounded-3xl"></div>
+        <div class="h-32 bg-slate-50 rounded-3xl"></div>
+      </div>
+    </div>
+  `;
+  if (window.lucide) window.lucide.createIcons();
+
+  const content = document.getElementById('gradesV2Content');
+  try {
+    const periodRes = await supabase.rpc('get_active_period', { p_classroom_id: classroom?.id });
+    const period = periodRes?.data;
+
+    if (!period || !period.found) {
+      content.innerHTML = `
+        <div class="text-center py-16">
+          <div class="w-16 h-16 bg-slate-100 rounded-3xl flex items-center justify-center text-3xl mx-auto mb-4">📋</div>
+          <p class="font-bold text-slate-600">No hay periodo activo</p>
+          <p class="text-xs text-slate-400 mt-1">La directora debe crear y activar un periodo primero</p>
+        </div>`;
+      return;
+    }
+
+    const config = await MaestraApi.getPeriodConfig(period.id);
+    if (!config || !config.length) {
+      content.innerHTML = `
+        <div class="text-center py-16">
+          <div class="w-16 h-16 bg-amber-100 rounded-3xl flex items-center justify-center text-3xl mx-auto mb-4">⚙️</div>
+          <p class="font-bold text-slate-600">Sin materias configuradas</p>
+          <p class="text-xs text-slate-400 mt-1">La directora debe configurar las materias del periodo</p>
+        </div>`;
+      return;
+    }
+
+    const activities = await MaestraApi.getActivitiesWithGrades(period.id);
+    const actByConfig = {};
+    (activities || []).forEach(a => {
+      if (!actByConfig[a.config_id]) actByConfig[a.config_id] = [];
+      actByConfig[a.config_id].push(a);
+    });
+
+    const students = AppState.get('students') || [];
+
+    let html = `
+      <div class="mb-4 p-3 bg-indigo-50 border border-indigo-200 rounded-2xl flex items-center gap-3">
+        <i data-lucide="info" class="w-5 h-5 text-indigo-500"></i>
+        <div>
+          <p class="text-xs font-black text-indigo-800 uppercase tracking-wide">${safeEscapeHTML(period.name)}</p>
+          <p class="text-[10px] text-indigo-600 font-medium">Periodo activo — ${config.length} materias configuradas</p>
+        </div>
+      </div>`;
+
+    for (const cfg of config) {
+      const existingActs = actByConfig[cfg.id] || [];
+      const slotsUsed = existingActs.length;
+      const slotsTotal = cfg.activity_count;
+      const isFull = slotsUsed >= slotsTotal;
+
+      html += `
+        <div class="bg-white p-5 rounded-3xl border-2 border-slate-50 shadow-sm">
+          <div class="flex justify-between items-start mb-4">
+            <div>
+              <h4 class="font-black text-slate-800 text-base">${safeEscapeHTML(cfg.subject_name)}</h4>
+              <p class="text-xs font-bold text-slate-400">${slotsUsed}/${slotsTotal} actividades creadas</p>
+            </div>
+            ${!isFull ? `
+              <button onclick="App.openNewActivityModal('${cfg.id}', '${safeEscapeHTML(cfg.subject_name)}', ${slotsUsed + 1})"
+                class="px-4 py-2 bg-indigo-600 text-white rounded-xl text-xs font-black uppercase hover:bg-indigo-700 transition-all flex items-center gap-2">
+                <i data-lucide="plus" class="w-4 h-4"></i> Nueva Actividad
+              </button>
+            ` : '<span class="px-3 py-1 bg-emerald-100 text-emerald-700 rounded-full text-xs font-black">COMPLETO</span>'}
+          </div>
+          ${existingActs.length > 0 ? `
+            <div class="space-y-3">
+              ${existingActs.map(act => `
+                <div class="flex items-center justify-between p-3 bg-slate-50 rounded-xl border border-slate-100">
+                  <div class="flex items-center gap-3">
+                    <span class="w-8 h-8 bg-indigo-100 text-indigo-600 rounded-lg flex items-center justify-center font-black text-sm">${act.activity_number}</span>
+                    <div>
+                      <div class="font-bold text-slate-800 text-sm">${safeEscapeHTML(act.title)}</div>
+                      <div class="text-[10px] text-slate-400 font-bold">${act.graded_count}/${students.length} calificada${students.length !== 1 ? 's' : ''}</div>
+                    </div>
+                  </div>
+                  <div class="flex items-center gap-2">
+                    <button onclick="App.gradeActivity('${act.id}', '${safeEscapeHTML(act.title)}', ${act.activity_number})"
+                      class="px-4 py-2 bg-orange-600 text-white rounded-xl text-xs font-black uppercase hover:bg-orange-700 transition-all">
+                      Calificar
+                    </button>
+                    <button onclick="App.deleteActivityV2('${act.id}')"
+                      class="p-2 text-slate-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition-all"
+                      title="Eliminar actividad">
+                      <i data-lucide="trash-2" class="w-4 h-4"></i>
+                    </button>
+                  </div>
+                </div>
+              `).join('')}
+            </div>
+          ` : `
+            <div class="text-center py-6 text-slate-400 text-sm">
+              <p class="font-bold">Aún no hay actividades creadas</p>
+              <p class="text-xs mt-1">Crea actividades para comenzar a calificar</p>
+            </div>
+          `}
+        </div>`;
+    }
+
+    content.innerHTML = html;
+    if (window.lucide) window.lucide.createIcons();
+  } catch (e) {
+    content.innerHTML = `
+      <div class="text-center py-12">
+        <div class="w-14 h-14 bg-rose-100 rounded-full flex items-center justify-center text-2xl mx-auto mb-3">⚠️</div>
+        <p class="font-bold text-slate-700">Error al cargar calificaciones</p>
+        <p class="text-xs text-slate-400 mt-1">${safeEscapeHTML(e?.message || '')}</p>
+        <button onclick="App.initGradesV2()" class="mt-4 px-4 py-2 bg-indigo-600 text-white rounded-xl font-black text-xs uppercase">Reintentar</button>
+      </div>`;
+  }
+}
+
+export function openNewActivityModal(configId, subjectName, nextNumber) {
+  const modalId = 'newActivityModal';
+  const content = `
+    <div class="bg-white w-full max-w-lg rounded-[2.5rem] shadow-2xl p-8 animate-fadeIn flex flex-col max-h-[90vh]">
+      <div class="flex justify-between items-start mb-6">
+        <div>
+          <h3 class="text-2xl font-black text-slate-800">Nueva Actividad</h3>
+          <p class="text-xs font-bold text-slate-400 mt-1">${safeEscapeHTML(subjectName)} — Actividad #${nextNumber}</p>
+        </div>
+        <button onclick="Modal.close('${modalId}')" class="p-2 hover:bg-slate-100 rounded-full transition-colors">
+          <i data-lucide="x" class="w-6 h-6 text-slate-400"></i>
+        </button>
+      </div>
+      <form id="activityForm" class="space-y-5 overflow-y-auto pr-2 flex-1">
+        <div>
+          <label class="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1">Nombre de la Actividad</label>
+          <input type="text" id="actTitle" class="w-full p-3 bg-slate-50 border-none rounded-xl text-sm font-bold focus:ring-2 focus:ring-indigo-400 outline-none"
+            placeholder="Ej: Examen, Proyecto, Participacion..." required>
+        </div>
+        <div>
+          <label class="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1">Descripcion (Opcional)</label>
+          <textarea id="actDesc" rows="3" class="w-full p-3 bg-slate-50 border-none rounded-xl text-sm focus:ring-2 focus:ring-indigo-400 outline-none resize-none"
+            placeholder="Instrucciones o detalles de la actividad..."></textarea>
+        </div>
+        <div class="flex items-center gap-3 p-4 bg-indigo-50 rounded-2xl">
+          <i data-lucide="info" class="w-5 h-5 text-indigo-500"></i>
+          <p class="text-xs text-indigo-700 font-medium">La calificacion sera del 0 al 100.</p>
+        </div>
+      </form>
+      <div class="pt-6 mt-auto border-t border-slate-100">
+        <button id="btnSaveActivity" class="w-full py-4 bg-indigo-600 text-white rounded-2xl font-black text-xs uppercase tracking-widest shadow-lg shadow-indigo-200 hover:bg-indigo-700 transition-all flex items-center justify-center gap-2">
+          <i data-lucide="plus-circle" class="w-5 h-5"></i> Crear Actividad
+        </button>
+      </div>
+    </div>
+  `;
+  Modal.open(modalId, content);
+
+  document.getElementById('btnSaveActivity').onclick = async () => {
+    const title = document.getElementById('actTitle').value;
+    const desc = document.getElementById('actDesc').value;
+    if (!title) return safeToast('Escribe un nombre para la actividad', 'warning');
+
+    const btn = document.getElementById('btnSaveActivity');
+    btn.disabled = true;
+    btn.innerHTML = '<i data-lucide="loader-2" class="w-5 h-5 animate-spin"></i> Creando...';
+    requestAnimationFrame(() => window.lucide?.createIcons());
+
+    try {
+      await MaestraApi.createActivity(configId, title, desc, nextNumber, true);
+      safeToast('Actividad creada correctamente');
+      Modal.close(modalId);
+      await initGradesV2();
+    } catch (e) {
+      safeToast('Error al crear actividad: ' + (e.message || ''), 'error');
+    } finally {
+      btn.disabled = false;
+      btn.innerHTML = '<i data-lucide="plus-circle" class="w-5 h-5"></i> Crear Actividad';
+      requestAnimationFrame(() => window.lucide?.createIcons());
+    }
+  };
+}
+
+export async function gradeActivity(activityId, activityTitle, activityNumber) {
+  const students = AppState.get('students') || [];
+  const classroom = AppState.get('classroom');
+  const modalId = 'gradeActivityModal';
+
+  try {
+    const { open: periodOpen } = await _getPeriodStatus(classroom?.id);
+
+    const { data: existingGrades } = await supabase
+      .from('grades')
+      .select('id, student_id, score_v2, notes')
+      .eq('activity_id', activityId);
+
+    const gradeMap = {};
+    (existingGrades || []).forEach(g => { gradeMap[g.student_id] = g; });
+
+    const closedBanner = !periodOpen ? `
+      <div class="mb-4 p-3 bg-amber-50 border border-amber-200 rounded-2xl flex items-center gap-3">
+        <i data-lucide="lock" class="w-5 h-5 text-amber-500"></i>
+        <div>
+          <p class="text-xs font-black text-amber-800 uppercase tracking-wide">Periodo cerrado</p>
+          <p class="text-[10px] text-amber-600 font-medium">Las calificaciones estan bloqueadas.</p>
+        </div>
+      </div>` : '';
+
+    const content = `
+      <div class="bg-white w-full max-w-4xl rounded-[2.5rem] shadow-2xl p-8 animate-fadeIn flex flex-col max-h-[90vh]">
+        <div class="flex justify-between items-start mb-6">
+          <div>
+            <h3 class="text-2xl font-black text-slate-800">Calificar Actividad</h3>
+            <p class="text-xs font-bold text-slate-400 mt-1">${safeEscapeHTML(activityTitle)} — #${activityNumber}</p>
+          </div>
+          <button onclick="Modal.close('${modalId}')" class="p-2 hover:bg-slate-100 rounded-full transition-colors">
+            <i data-lucide="x" class="w-6 h-6 text-slate-400"></i>
+          </button>
+        </div>
+        ${closedBanner}
+        <div class="space-y-3 overflow-y-auto pr-2 flex-1">
+          ${students.length > 0 ? students.map(s => {
+            const existing = gradeMap[s.id];
+            const currentScore = existing?.score_v2 ?? '';
+            const disabled = !periodOpen ? 'disabled' : '';
+
+            return `
+              <div class="p-4 bg-slate-50 rounded-2xl border ${existing ? 'border-green-200 bg-green-50/30' : 'border-slate-100'}">
+                <div class="flex items-center justify-between mb-3">
+                  <div class="font-bold text-slate-800 text-sm">${safeEscapeHTML(s.name)}</div>
+                  ${existing ? '<span class="text-xs text-green-600 font-bold flex items-center gap-1"><i data-lucide="check-circle" class="w-3 h-3"></i> Calificado</span>' : ''}
+                </div>
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-3 items-end">
+                  <div class="md:col-span-2">
+                    <label class="block text-[10px] font-bold text-slate-400 uppercase mb-1">Comentario (Opcional)</label>
+                    <textarea id="v2comment-${s.id}" ${disabled} rows="2"
+                      class="w-full p-2 bg-white rounded-lg text-xs border border-slate-200 focus:ring-1 focus:ring-indigo-400 outline-none"
+                      placeholder="Retroalimentacion...">${safeEscapeHTML(existing?.notes || '')}</textarea>
+                  </div>
+                  <div class="flex items-center gap-2">
+                    <div class="flex-1">
+                      <label class="block text-[10px] font-bold text-slate-400 uppercase mb-1">Calificacion (0-100)</label>
+                      <input type="number" id="v2score-${s.id}" ${disabled} min="0" max="100" step="0.1"
+                        value="${currentScore}"
+                        class="w-full p-2 rounded-lg text-sm font-bold bg-white border border-slate-200 focus:ring-1 focus:ring-indigo-400 outline-none text-center"
+                        placeholder="0-100">
+                    </div>
+                    <button onclick="${periodOpen ? `App.saveGradeV2('${activityId}', '${s.id}')` : 'void(0)'}"
+                      class="p-2 ${periodOpen ? 'bg-indigo-600 text-white hover:bg-indigo-700' : 'bg-slate-300 text-slate-500 cursor-not-allowed'} rounded-lg transition-all"
+                      ${!periodOpen ? 'disabled' : ''}>
+                      <i data-lucide="save" class="w-4 h-4"></i>
+                    </button>
+                  </div>
+                </div>
+              </div>`;
+          }).join('') : '<div class="text-center p-4 text-slate-400">No hay alumnos en la clase.</div>'}
+        </div>
+      </div>
+    `;
+    Modal.open(modalId, content);
+    if (window.lucide) window.lucide.createIcons();
+  } catch (e) {
+    safeToast('Error al cargar actividad', 'error');
+  }
+}
+
+export async function saveGradeV2(activityId, studentId) {
+  const classroom = AppState.get('classroom');
+  const { open: periodOpen } = await _getPeriodStatus(classroom?.id);
+  if (!periodOpen) {
+    safeToast('El periodo esta cerrado', 'warning');
+    return;
+  }
+
+  const score = document.getElementById(`v2score-${studentId}`)?.value;
+  const comment = document.getElementById(`v2comment-${studentId}`)?.value;
+
+  if (score === '' || score === null || score === undefined) {
+    return safeToast('Ingresa una calificacion', 'warning');
+  }
+
+  const scoreNum = parseFloat(score);
+  if (isNaN(scoreNum) || scoreNum < 0 || scoreNum > 100) {
+    return safeToast('La calificacion debe ser entre 0 y 100', 'warning');
+  }
+
+  try {
+    const user = AppState.get('user');
+    await MaestraApi.saveGradeV2(activityId, studentId, scoreNum, comment, user?.id);
+
+    const student = (AppState.get('students') || []).find(s => s.id === studentId);
+    if (student?.parent_id) {
+      sendPush({
+        user_id: student.parent_id,
+        title: 'Calificacion Registrada',
+        message: `${student.name} recibio ${scoreNum}/100 en una actividad`,
+        link: 'panel_padres.html#grades'
+      }).catch(() => {});
+    }
+
+    safeToast('Calificacion guardada');
+    const el = document.getElementById(`v2score-${studentId}`);
+    if (el) {
+      const card = el.closest('.p-4');
+      if (card) {
+        card.classList.add('border-green-300', 'bg-emerald-50');
+        setTimeout(() => card.classList.remove('border-green-300', 'bg-emerald-50'), 1500);
+      }
+    }
+  } catch (e) {
+    safeToast('Error al calificar: ' + (e.message || ''), 'error');
+  }
+}
+
+export async function deleteActivityV2(activityId) {
+  if (!confirm('Eliminar esta actividad? Se perderan todas las calificaciones asociadas.')) return;
+  try {
+    await MaestraApi.deleteActivity(activityId);
+    safeToast('Actividad eliminada');
+    await initGradesV2();
+  } catch (e) {
+    safeToast('Error al eliminar', 'error');
+  }
+}

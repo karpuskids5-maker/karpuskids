@@ -9,7 +9,7 @@ self.addEventListener('message', (event) => {
  * NO definir handlers push/notificationclick aquí para no interferir con OneSignal.
  */
 
-const CACHE_NAME = 'karpus-pwa-v6'; // ✅ Evitar cache de HTML antiguo con event-handlers.js
+const CACHE_NAME = 'karpus-pwa-v7'; // ✅ Grades V2 system update
 const ASSETS = [
   './',
   'login.html',

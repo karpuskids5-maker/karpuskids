@@ -19,6 +19,14 @@ export const Helpers = {
 
   },
 
+  /**
+   * Helper para asignar texto a un elemento por ID
+   */
+  setTxt(id, val) {
+    const el = document.getElementById(id);
+    if (el) el.textContent = val;
+  },
+
 
   /**
    * 🔔 Toast moderno

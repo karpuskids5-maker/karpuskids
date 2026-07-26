@@ -3,9 +3,7 @@ import { AppState } from './state.js';
 import { Helpers } from '/js/shared/helpers.js';
 import { UIHelpers } from './ui.module.js';
 import { supabase } from '/js/shared/supabase.js';
-
-const MES = ['enero','febrero','marzo','abril','mayo','junio','julio','agosto','septiembre','octubre','noviembre','diciembre'];
-const MES_LABEL = ['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'];
+import { MES, MES_LABEL } from '/js/shared/payment-service.js';
 
 export const PaymentsModule = {
   settings: { due_day: 5, generation_day: 25 },
@@ -306,11 +304,10 @@ export const PaymentsModule = {
       const selectedMonthKey = yv && mv ? `${yv}-${String(mv).padStart(2,'0')}` : maxVisibleMonthKey;
       
       if (selectedMonthKey > maxVisibleMonthKey) {
-        const set = (id, v) => { const el = document.getElementById(id); if (el) el.textContent = v; };
-        set('kpiIncomeMonth', '$0.00');
-        set('kpiPendingCount', '0');
-        set('kpiOverdueCount', '0');
-        set('kpiReviewCount', '0');
+        Helpers.setTxt('kpiIncomeMonth', '$0.00');
+        Helpers.setTxt('kpiPendingCount', '0');
+        Helpers.setTxt('kpiOverdueCount', '0');
+        Helpers.setTxt('kpiReviewCount', '0');
         return;
       }
 
@@ -319,11 +316,10 @@ export const PaymentsModule = {
       const { data } = await DirectorApi.getPaymentStats(mv || defM, yv || defY);
 
       if (!data) return;
-      const set = (id, v) => { const el = document.getElementById(id); if (el) el.textContent = v; };
-      set('kpiIncomeMonth', '$' + Number(data.incomeMonth || 0).toLocaleString('es-ES', { minimumFractionDigits: 2 }));
-      set('kpiPendingCount', data.pending);
-      set('kpiOverdueCount', data.overdue);
-      set('kpiReviewCount',  data.toApprove || 0);
+      Helpers.setTxt('kpiIncomeMonth', '$' + Number(data.incomeMonth || 0).toLocaleString('es-ES', { minimumFractionDigits: 2 }));
+      Helpers.setTxt('kpiPendingCount', data.pending);
+      Helpers.setTxt('kpiOverdueCount', data.overdue);
+      Helpers.setTxt('kpiReviewCount',  data.toApprove || 0);
     } catch (_) {}
   },
 

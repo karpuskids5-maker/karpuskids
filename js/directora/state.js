@@ -61,10 +61,3 @@ function createInitialState() {
 export const AppState = new SafeAppState(createInitialState(), { 
   persistenceKey: 'karpus_directora_state' 
 });
-
-/**
- * 🔄 RESET COMPLETO (CLAVE para logout)
- */
-export function resetAppState() {
-  AppState.setState(createInitialState());
-}

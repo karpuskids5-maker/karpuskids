@@ -89,14 +89,7 @@ export const PaymentsModule = {
 
   filterBy(status) {
     const sel = document.getElementById('filterPaymentStatus');
-    if (sel) sel.value = status;
-    document.querySelectorAll('.status-pill').forEach(p => {
-      p.classList.toggle('bg-teal-600',   p.dataset.status === status);
-      p.classList.toggle('text-white',    p.dataset.status === status);
-      p.classList.toggle('bg-slate-100',  p.dataset.status !== status);
-      p.classList.toggle('text-slate-500',p.dataset.status !== status);
-    });
-    this.loadPayments();
+    if (sel) { sel.value = status; this.loadPayments(); }
   },
 
   async loadPayments() {

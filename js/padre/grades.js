@@ -3,20 +3,15 @@ import { AppState, TABLES } from './appState.js';
 import { Helpers, escapeHtml } from './helpers.js';
 
 /**
- * 🎓 MÓDULO DE CALIFICACIONES (PADRES)
+ * Calificaciones V2 — Vista para Padres
+ * Tarjetas de período elegante con promedios por materia
  */
 export const GradesModule = {
-  /**
-   * Inicializa el módulo
-   */
   async init(studentId) {
     if (!studentId) return;
     await this.loadGrades(studentId);
   },
 
-  /**
-   * Carga calificaciones y evidencias
-   */
   async loadGrades(studentId) {
     const container = document.getElementById('gradesContent');
     if (!container) return;
@@ -24,215 +19,220 @@ export const GradesModule = {
     container.innerHTML = Helpers.skeleton(3, 'h-24');
 
     try {
-      const [gradesRes, taskRes] = await Promise.all([
-        supabase
-          .from(TABLES.GRADES)
-          .select('id, subject, score, period, notes, created_at')
-          .eq('student_id', studentId)
-          .order('created_at', { ascending: false }),
-        supabase
-          .from(TABLES.TASK_EVIDENCES)
-          .select(`*, tasks:task_id (title, description)`)
-          .eq('student_id', studentId)
-          .not('grade_letter', 'is', null)
-          .order('created_at', { ascending: false })
-      ]);
+      // 1. Get active period for the student's classroom
+      const { data: student } = await supabase
+        .from(TABLES.STUDENTS)
+        .select('classroom_id, classrooms(id, name)')
+        .eq('id', studentId)
+        .single();
 
-      if (gradesRes.error) throw gradesRes.error;
-      if (taskRes.error) throw taskRes.error;
-
-      const grades = gradesRes.data || [];
-      const taskEvidences = taskRes.data || [];
-
-      if (grades.length === 0 && taskEvidences.length === 0) {
-        container.innerHTML = Helpers.emptyState('No hay registros académicos aún.', '🏆');
+      if (!student?.classroom_id) {
+        container.innerHTML = Helpers.emptyState('No hay aula asignada', '🏫');
         return;
       }
 
-      const gpa = this.calculateGPA(grades, taskEvidences);
-      const { label: gpaLabel, color: gpaLabelColor } = this.getGPALabel(gpa);
+      const periodRes = await supabase.rpc('get_active_period', { p_classroom_id: student.classroom_id });
+      const period = periodRes?.data;
 
-      container.innerHTML = `
-        <div class="w-full space-y-8 animate-fade-in">
-          <!-- Dashboard de Rendimiento -->
-          <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
-            <!-- Stats Rápidas -->
-            <div class="lg:col-span-3 grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div class="bg-gradient-to-br from-emerald-500 to-green-600 p-6 rounded-[2rem] text-white shadow-lg shadow-emerald-100 relative overflow-hidden group">
-                <div class="absolute -right-4 -bottom-4 w-24 h-24 bg-white/10 rounded-full group-hover:scale-110 transition-transform"></div>
-                <p class="text-[10px] font-black uppercase tracking-[0.2em] opacity-80">Promedio General</p>
-                <div class="text-4xl font-black mt-2">${gpa}</div>
-                <div class="mt-4 flex items-center gap-2 bg-white/20 px-3 py-1 rounded-full w-fit">
-                  <i data-lucide="sparkles" class="w-3.5 h-3.5 text-yellow-300"></i>
-                  <span class="text-[10px] font-bold ${gpaLabelColor}">${gpaLabel}</span>
-                </div>
-              </div>
-              <div class="bg-white p-6 rounded-[2rem] border border-slate-100 shadow-sm flex items-center justify-between">
-                <div>
-                  <p class="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em]">Tareas Listas</p>
-                  <div class="text-3xl font-black text-slate-700 mt-1">${taskEvidences.length}</div>
-                </div>
-                <div class="w-12 h-12 rounded-2xl bg-emerald-50 text-emerald-500 flex items-center justify-center text-2xl">🎒</div>
-              </div>
-            </div>
-          </div>
+      if (!period || !period.found) {
+        // Try to get the most recent closed period
+        const { data: recentPeriods } = await supabase
+          .from(TABLES.PERIODS)
+          .select('id, name, start_date, end_date, status')
+          .eq('classroom_id', student.classroom_id)
+          .order('start_date', { ascending: false })
+          .limit(1);
 
-          <!-- Desglose -->
-          <div class="grid grid-cols-1 gap-8">
-            <div class="space-y-4">
-              <h4 class="font-black text-slate-800 text-sm px-4 flex items-center gap-2">
-                <i data-lucide="check-circle" class="w-4 h-4 text-emerald-500"></i> Tareas Calificadas
-              </h4>
-              <div class="space-y-3">
-                ${taskEvidences.length > 0 ? taskEvidences.map(t => this.renderTaskEvidenceCard(t)).join('') : Helpers.emptyState('Sin tareas aún', '📝')}
-              </div>
-            </div>
-          </div>
-        </div>
-      `;
+        if (!recentPeriods?.length) {
+          container.innerHTML = Helpers.emptyState('No hay periodos académicos disponibles', '📋');
+          return;
+        }
 
-      // Solo inicializar lucide, ya no hay gráfico
-      setTimeout(() => {
-        if (window.lucide) lucide.createIcons();
-      }, 50);
+        // Load with the most recent period
+        await this._renderPeriodView(container, studentId, recentPeriods[0]);
+        return;
+      }
 
+      await this._renderPeriodView(container, studentId, period);
     } catch (err) {
+      console.error('[GradesModule] Error:', err);
       container.innerHTML = Helpers.emptyState('Error al cargar calificaciones', '❌');
     }
   },
 
-  calculateGPA(grades, taskEvidences) {
-    // Calcular promedio combinando grades + task_evidences con grade_letter
-    const letterToScore = { 'A': 100, 'B': 85, 'C': 70, 'D': 55 };
-    const scores = [];
-    grades.forEach(g => { if (parseFloat(g.score)) scores.push(parseFloat(g.score)); });
-    taskEvidences.forEach(t => { if (t.grade_letter && letterToScore[t.grade_letter]) scores.push(letterToScore[t.grade_letter]); });
-    if (!scores.length) return '—';
-    const avg = scores.reduce((a, b) => a + b, 0) / scores.length;
-    return avg.toFixed(1);
-  },
+  async _renderPeriodView(container, studentId, period) {
+    try {
+      // Load subject averages and grades in parallel
+      const [averagesRes, gradesRes, reportRes] = await Promise.all([
+        supabase.rpc('get_student_subject_averages', {
+          p_student_id: parseInt(studentId),
+          p_period_id: parseInt(period.id)
+        }),
+        supabase.rpc('get_student_grades_v2', {
+          p_student_id: parseInt(studentId),
+          p_period_id: parseInt(period.id)
+        }),
+        supabase.from(TABLES.REPORT_CARDS)
+          .select('final_score, level, teacher_comment')
+          .eq('student_id', studentId)
+          .eq('period_id', period.id)
+          .maybeSingle()
+      ]);
 
-  getGPALabel(gpa) {
-    if (gpa === '—') return { label: 'Sin datos aún', color: 'text-slate-400' };
-    const n = parseFloat(gpa);
-    if (n >= 90) return { label: '\u00a1Excelente progreso!', color: 'text-emerald-200' };
-    if (n >= 75) return { label: 'Muy buen desempe\u00f1o', color: 'text-emerald-200' };
-    if (n >= 60) return { label: 'Progreso aceptable', color: 'text-yellow-200' };
-    return { label: 'Necesita mejorar', color: 'text-red-200' };
-  },
+      const averages = averagesRes?.data || [];
+      const grades = gradesRes?.data || [];
+      const report = reportRes?.data;
 
-  renderGradeCard(g) {
-    const score = parseFloat(g.score) || 0;
-    const color = score >= 90 ? 'text-emerald-500' : (score >= 70 ? 'text-blue-500' : 'text-amber-500');
-    const bg = score >= 90 ? 'bg-emerald-50' : (score >= 70 ? 'bg-blue-50' : 'bg-amber-50');
-    
-    return `
-      <div class="bg-white p-4 rounded-3xl border-2 border-slate-50 shadow-sm hover:shadow-md transition-all flex items-center justify-between group">
-        <div class="flex items-center gap-3">
-          <div class="w-10 h-10 rounded-xl ${bg} flex items-center justify-center group-hover:scale-110 transition-transform">
-            <i data-lucide="book" class="w-5 h-5 ${color}"></i>
-          </div>
-          <div>
-            <h4 class="font-bold text-slate-700 text-sm">${escapeHtml(g.subject || 'Materia')}</h4>
-            <p class="text-[9px] text-slate-400 font-bold uppercase tracking-widest">${Helpers.formatDate(g.created_at)}</p>
-          </div>
-        </div>
-        <div class="text-right">
-          <div class="text-xl font-black ${color}">${score}</div>
-          <p class="text-[8px] font-bold uppercase text-slate-300">Puntaje</p>
-        </div>
-      </div>
-    `;
-  },
-
-  renderTaskEvidenceCard(t) {
-    const gradeColors = {
-      'A': { bg: 'bg-emerald-500', text: 'text-white', ring: 'ring-emerald-200', icon: 'bg-emerald-50 text-emerald-600', label: 'Excelente' },
-      'B': { bg: 'bg-blue-500',    text: 'text-white', ring: 'ring-blue-200',    icon: 'bg-blue-50 text-blue-600',    label: 'Bien' },
-      'C': { bg: 'bg-amber-500',   text: 'text-white', ring: 'ring-amber-200',   icon: 'bg-amber-50 text-amber-600',  label: 'Suficiente' },
-      'D': { bg: 'bg-rose-500',    text: 'text-white', ring: 'ring-rose-200',    icon: 'bg-rose-50 text-rose-600',    label: 'Mejorable' },
-    };
-    const grade = t.grade_letter || 'A';
-    const c = gradeColors[grade] || gradeColors['A'];
-    const starsHtml = t.stars
-      ? `<div class="flex items-center gap-0.5 mt-1 justify-end">${Array(t.stars).fill('<span class="text-amber-400 text-xs">\u2605</span>').join('')}</div>`
-      : '';
-    return `
-      <div class="bg-white p-4 rounded-3xl border-2 border-slate-50 shadow-sm hover:shadow-lg transition-all flex items-center justify-between group ring-2 ${c.ring}">
-        <div class="flex items-center gap-3">
-          <div class="w-11 h-11 rounded-2xl ${c.icon} flex items-center justify-center group-hover:scale-110 transition-transform shrink-0">
-            <i data-lucide="file-check" class="w-5 h-5"></i>
-          </div>
-          <div class="min-w-0">
-            <h5 class="font-bold text-slate-700 text-sm truncate">${escapeHtml(t.tasks?.title || 'Tarea')}</h5>
-            <p class="text-[9px] text-slate-400 font-bold uppercase">${Helpers.formatDate(t.created_at)}</p>
-            ${t.comment ? `<p class="text-[10px] text-slate-500 mt-0.5 italic truncate">"${escapeHtml(t.comment)}"</p>` : ''}
-          </div>
-        </div>
-        <div class="text-right shrink-0 ml-3">
-          <span class="px-3 py-1.5 rounded-xl ${c.bg} ${c.text} text-xs font-black uppercase tracking-tight shadow-sm">
-            ${grade}
-          </span>
-          <p class="text-[8px] font-bold text-slate-400 mt-1 uppercase">${c.label}</p>
-          ${starsHtml}
-        </div>
-      </div>
-    `;
-  },
-
-  renderChart(grades) {
-    const canvas = document.getElementById('gradesChart');
-    if (!canvas || !window.Chart || grades.length === 0) return;
-
-    const chartData = [...grades].slice(0, 8).reverse();
-    const labels = chartData.map(g => g.subject || 'Materia');
-    const scores = chartData.map(g => parseFloat(g.score) || 0);
-
-    new Chart(canvas, {
-      type: 'line',
-      data: {
-        labels: labels,
-        datasets: [{
-          label: 'Puntaje',
-          data: scores,
-          borderColor: '#6366f1',
-          backgroundColor: 'rgba(99, 102, 241, 0.05)',
-          borderWidth: 3,
-          tension: 0.4,
-          pointBackgroundColor: '#ffffff',
-          pointBorderColor: '#6366f1',
-          pointBorderWidth: 2,
-          pointRadius: 4,
-          fill: true
-        }]
-      },
-      options: {
-        responsive: true,
-        maintainAspectRatio: false,
-        plugins: {
-          legend: { display: false },
-          tooltip: {
-            backgroundColor: '#1e293b',
-            titleFont: { family: 'Nunito', size: 12, weight: 'bold' },
-            bodyFont: { family: 'Nunito', size: 11 },
-            padding: 10,
-            cornerRadius: 12,
-            displayColors: false
-          }
-        },
-        scales: {
-          y: {
-            beginAtZero: true,
-            max: 100,
-            grid: { color: '#f1f5f9', drawBorder: false },
-            ticks: { font: { family: 'Nunito', weight: '700', size: 10 }, color: '#94a3b8' }
-          },
-          x: {
-            grid: { display: false },
-            ticks: { font: { family: 'Nunito', weight: '700', size: 9 }, color: '#94a3b8' }
-          }
-        }
+      // Calculate overall average from subject averages
+      let overallAvg = report?.final_score;
+      if (overallAvg == null && averages.length > 0) {
+        const sum = averages.reduce((s, a) => s + Number(a.average), 0);
+        overallAvg = sum / averages.length;
       }
-    });
+
+      const levelLabel = this._getLevel(overallAvg);
+      const periodStatus = period.status === 'closed' ? 'Cerrado' : 'En curso';
+
+      // Group grades by subject
+      const gradesBySubject = {};
+      grades.forEach(g => {
+        if (!gradesBySubject[g.subject_name]) gradesBySubject[g.subject_name] = [];
+        gradesBySubject[g.subject_name].push(g);
+      });
+
+      container.innerHTML = `
+        <div class="w-full space-y-6 animate-fade-in">
+          <!-- Period Header Card -->
+          <div class="bg-gradient-to-br from-indigo-600 to-violet-600 p-6 rounded-[2rem] text-white shadow-lg shadow-indigo-100 relative overflow-hidden">
+            <div class="absolute -right-8 -bottom-8 w-32 h-32 bg-white/10 rounded-full"></div>
+            <div class="absolute right-16 top-4 w-16 h-16 bg-white/5 rounded-full"></div>
+            <div class="relative z-10">
+              <div class="flex items-center justify-between mb-4">
+                <div>
+                  <p class="text-[10px] font-black uppercase tracking-[0.2em] opacity-80">Periodo Académico</p>
+                  <h2 class="text-2xl font-black mt-1">${escapeHtml(period.name)}</h2>
+                </div>
+                <span class="px-3 py-1 bg-white/20 rounded-full text-[10px] font-black uppercase">${periodStatus}</span>
+              </div>
+              <div class="grid grid-cols-3 gap-4 mt-6">
+                <div>
+                  <p class="text-[10px] font-bold opacity-70 uppercase">Promedio</p>
+                  <p class="text-3xl font-black">${overallAvg != null ? Number(overallAvg).toFixed(1) : '—'}</p>
+                </div>
+                <div>
+                  <p class="text-[10px] font-bold opacity-70 uppercase">Nivel</p>
+                  <p class="text-lg font-black">${levelLabel}</p>
+                </div>
+                <div>
+                  <p class="text-[10px] font-bold opacity-70 uppercase">Materias</p>
+                  <p class="text-lg font-black">${averages.length}</p>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          ${averages.length > 0 ? `
+            <!-- Subject Averages Grid -->
+            <div>
+              <h3 class="font-black text-slate-800 text-sm mb-4 flex items-center gap-2 px-1">
+                <i data-lucide="bar-chart-3" class="w-4 h-4 text-indigo-500"></i>
+                Promedios por Materia
+              </h3>
+              <div class="grid grid-cols-2 md:grid-cols-3 gap-3">
+                ${averages.map(avg => {
+                  const level = this._getLevel(avg.average);
+                  const levelCls = this._getLevelClass(avg.average);
+                  const barColor = avg.average >= 80 ? 'bg-emerald-500' : avg.average >= 60 ? 'bg-amber-500' : 'bg-rose-500';
+                  return `
+                    <div class="bg-white p-4 rounded-2xl border border-slate-100 shadow-sm hover:shadow-md transition-all">
+                      <p class="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2">${escapeHtml(avg.subject_name)}</p>
+                      <div class="flex items-end justify-between mb-2">
+                        <span class="text-2xl font-black text-slate-800">${Number(avg.average).toFixed(1)}</span>
+                        <span class="px-2 py-0.5 rounded-full text-[10px] font-black ${levelCls}">${level}</span>
+                      </div>
+                      <div class="w-full bg-slate-100 rounded-full h-1.5 overflow-hidden">
+                        <div class="${barColor} h-full rounded-full transition-all" style="width:${Math.min(100, avg.average)}%"></div>
+                      </div>
+                      <p class="text-[9px] text-slate-400 font-bold mt-2">${avg.graded_count} actividad${avg.graded_count !== 1 ? 'es' : ''}</p>
+                    </div>`;
+                }).join('')}
+              </div>
+            </div>
+          ` : ''}
+
+          ${grades.length > 0 ? `
+            <!-- Activity Detail -->
+            <div>
+              <h3 class="font-black text-slate-800 text-sm mb-4 flex items-center gap-2 px-1">
+                <i data-lucide="list" class="w-4 h-4 text-indigo-500"></i>
+                Detalle de Actividades
+              </h3>
+              <div class="space-y-3">
+                ${Object.entries(gradesBySubject).map(([subName, acts]) => `
+                  <div class="bg-white rounded-2xl border border-slate-100 overflow-hidden shadow-sm">
+                    <div class="px-4 py-3 bg-slate-50 border-b border-slate-100">
+                      <h4 class="font-black text-slate-700 text-xs uppercase tracking-widest">${escapeHtml(subName)}</h4>
+                    </div>
+                    <div class="divide-y divide-slate-50">
+                      ${acts.map(g => {
+                        const score = g.score != null ? Number(g.score) : null;
+                        const scoreColor = score != null ? (score >= 80 ? 'text-emerald-600' : score >= 60 ? 'text-amber-600' : 'text-rose-600') : 'text-slate-400';
+                        return `
+                          <div class="px-4 py-3 flex items-center justify-between hover:bg-slate-50/50 transition-colors">
+                            <div class="flex items-center gap-3">
+                              <span class="w-7 h-7 bg-indigo-50 text-indigo-600 rounded-lg flex items-center justify-center font-black text-xs">${g.activity_number}</span>
+                              <span class="text-sm font-bold text-slate-700">${escapeHtml(g.activity_title)}</span>
+                            </div>
+                            <span class="text-lg font-black ${scoreColor}">${score != null ? score.toFixed(1) : '—'}</span>
+                          </div>`;
+                      }).join('')}
+                    </div>
+                  </div>
+                `).join('')}
+              </div>
+            </div>
+          ` : ''}
+
+          ${report?.teacher_comment ? `
+            <div class="bg-white p-5 rounded-2xl border border-slate-100 shadow-sm">
+              <div class="flex items-center gap-2 mb-3">
+                <i data-lucide="message-circle" class="w-4 h-4 text-indigo-500"></i>
+                <h4 class="font-black text-slate-700 text-xs uppercase tracking-widest">Comentario de la Maestra</h4>
+              </div>
+              <p class="text-sm text-slate-600 italic leading-relaxed">"${escapeHtml(report.teacher_comment)}"</p>
+            </div>
+          ` : ''}
+
+          ${averages.length === 0 && grades.length === 0 ? `
+            <div class="bg-white p-8 rounded-[2rem] border border-slate-100 shadow-sm text-center">
+              <div class="w-16 h-16 bg-indigo-50 text-indigo-500 rounded-full flex items-center justify-center mx-auto mb-4 text-3xl">📝</div>
+              <h3 class="text-lg font-black text-slate-800 mb-2">Sin calificaciones aún</h3>
+              <p class="text-slate-500 text-sm max-w-sm mx-auto">Las calificaciones aparecerán cuando la maestra registre notas en las actividades evaluables.</p>
+            </div>
+          ` : ''}
+        </div>
+      `;
+
+      setTimeout(() => { if (window.lucide) lucide.createIcons(); }, 50);
+    } catch (err) {
+      console.error('[GradesModule] Render error:', err);
+      container.innerHTML = Helpers.emptyState('Error al cargar calificaciones', '❌');
+    }
+  },
+
+  _getLevel(score) {
+    if (score == null) return 'Sin calificar';
+    if (score >= 90) return 'Excelente';
+    if (score >= 80) return 'Bueno';
+    if (score >= 70) return 'En proceso';
+    return 'Requiere apoyo';
+  },
+
+  _getLevelClass(score) {
+    if (score == null) return 'bg-slate-100 text-slate-500';
+    if (score >= 90) return 'bg-emerald-100 text-emerald-700';
+    if (score >= 80) return 'bg-blue-100 text-blue-700';
+    if (score >= 70) return 'bg-amber-100 text-amber-700';
+    return 'bg-rose-100 text-rose-700';
   }
 };

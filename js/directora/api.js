@@ -7,14 +7,14 @@ const TABLES = {
   CLASSROOMS: 'classrooms',
   STUDENTS: 'students',
   ATTENDANCE: 'attendance',
-  TASKS: 'tasks',
-  TASK_EVIDENCES: 'task_evidences',
   GRADES: 'grades',
   PERIODS: 'periods',
-  REPORT_CARDS: 'report_cards'
+  SUBJECTS: 'subjects',
+  PERIOD_CONFIG: 'period_config',
+  ACTIVITIES: 'activities',
+  SUBJECT_AVERAGES: 'subject_averages'
 };
 
-// Local timeout helper â€” accepts a promise OR a function returning a promise
 const withTimeout = (promiseOrFn, ms = 10000) => {
   const p = typeof promiseOrFn === 'function' ? promiseOrFn() : promiseOrFn;
   const timeout = new Promise((_, reject) => setTimeout(() => reject(new Error('Timeout')), ms));
@@ -27,7 +27,6 @@ const logError = (context, err) => {
 };
 
 export const DirectorApi = {
-  // --- PERIODS ---
   async getPeriods() {
     try {
       const res = await withTimeout(supabase.from(TABLES.PERIODS).select('id, name, start_date, end_date, status, is_active, classroom_id, created_at').limit(10).order('start_date', { ascending: false }));
@@ -35,82 +34,8 @@ export const DirectorApi = {
     } catch (e) { return logError('getPeriods', e); }
   },
 
-  async closePeriod(periodId) {
-    try {
-      const { data: period, error: pError } = await supabase.from(TABLES.PERIODS).update({ status: 'closed' }).eq('id', periodId).select().single();
-      if (pError) throw pError;
-      return { data: period, error: null };
-    } catch (e) { return logError('closePeriod', e); }
-  },
-
-  // --- GRADING LOGIC ---
-  calculateGradeFromStars(stars) {
-    return stars || 0; // Escala 1-5
-  },
-
-  calculateGradeFromLetter(letter) {
-    const map = { 'A': 5, 'B': 4, 'C': 3, 'D': 2, 'E': 1 };
-    return map[letter] || 0;
-  },
-
-  getDescriptor(score) {
-    if (score >= 4.5) return 'ðŸŒŸ Excelente';
-    if (score >= 3.5) return 'ðŸ‘ Bueno';
-    if (score >= 2.5) return 'âš ï¸ En proceso';
-    return 'â— Requiere apoyo';
-  },
-
-  // --- TASKS & GRADES ---
-  async getTaskGrades(filters = {}) {
-    // Simplified select to avoid N+1 triple join
-    let query = supabase
-      .from(TABLES.TASK_EVIDENCES)
-      .select('id, status, grade_letter, stars, created_at, student:student_id(name, classroom_id), task:task_id(title, classroom_id)')
-      .order('created_at', { ascending: false })
-      .limit(100);
-
-    if (filters.classroom_id) query = query.eq('task.classroom_id', filters.classroom_id);
-    
-    try {
-      const res = await withTimeout(query);
-      return res;
-    } catch (e) { return logError('getTaskGrades', e); }
-  },
-
-  async getFormalGrades(periodId) {
-    try {
-      const res = await withTimeout(supabase.from(TABLES.GRADES)
-        .select('id, subject, score, period, created_at, student:student_id(name, classroom_id)')
-        .eq('period_id', periodId)
-        .limit(200));
-      return res;
-    } catch (e) { return logError('getFormalGrades', e); }
-  },
-
-  // --- REPORT CARDS ---
-  async generateReportCard(payload) {
-    try {
-      const res = await withTimeout(supabase.from(TABLES.REPORT_CARDS).upsert(payload).select().single());
-      return res;
-    } catch (e) { return logError('generateReportCard', e); }
-  },
-
-  async getReportCards(filters = {}) {
-    let query = supabase.from(TABLES.REPORT_CARDS).select('*, student:student_id(name), period:period_id(name)');
-    if (filters.student_id) query = query.eq('student_id', filters.student_id);
-    if (filters.period_id) query = query.eq('period_id', filters.period_id);
-    
-    try {
-      const res = await withTimeout(query);
-      return res;
-    } catch (e) { return logError('getReportCards', e); }
-  },
-
-  // --- DASHBOARD & KPIs ---
   async getDashboardKPIs(monthText = '') {
     try {
-      // Intentar usar el RPC si existe
-      // Calculate current visible month (same as payments_clean.js)
       const todayDate = new Date();
       const genDay = 25;
       let maxVisibleMonthKey;
@@ -124,7 +49,6 @@ export const DirectorApi = {
 
       const { data: rpcData, error: rpcError } = await supabase.rpc('get_dashboard_kpis', { p_month: monthText || maxVisibleMonthKey });
       
-      // FORCE: Calculate pending amount manually with ONLY current month and total_due!
       const { data: pp } = await supabase
         .from('v_payments_with_mora').select('total_due').in('status', ['pending', 'overdue', 'review'])
         .eq('month_paid', maxVisibleMonthKey);
@@ -134,13 +58,12 @@ export const DirectorApi = {
         return { 
           data: {
             ...rpcData,
-            pending_payments: pendingAmount // Use our manual calculation!
+            pending_payments: pendingAmount
           }, 
           error: null 
         };
       }
 
-      // Optimización: Usar head: true para conteos rápidos (evita descargar toda la tabla)
       const d = new Date();
       const today = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
       
@@ -162,60 +85,12 @@ export const DirectorApi = {
           teachers:         teachersRes.count    || 0,
           classrooms:       classroomsRes.count  || 0,
           attendance_today: attendanceRes.count  || 0,
-          pending_payments: pendingAmount, // Use our manual calculation!
+          pending_payments: pendingAmount,
           inquiries:        inquiriesRes.count   || 0
         },
         error: null
       };
     } catch (e) { return logError('getDashboardKPIs', e); }
-  },
-
-  // --- ATTENDANCE ---
-  async getAttendanceByDate(date) {
-    try {
-      return await supabase
-        .from(TABLES.ATTENDANCE)
-        .select('id, date, check_in, check_out, status, student_id, classroom_id, student:student_id(name), classroom:classroom_id(name)')
-        .eq('date', date);
-    } catch (e) { return logError('getAttendanceByDate', e); }
-  },
-
-  async getAttendanceLast7Days() {
-    try {
-      return await supabase.rpc('attendance_last_7_days');
-    } catch (e) { return logError('getAttendanceLast7Days', e); }
-  },
-
-  // --- FINANCES & PAYMENTS ---
-  async getFinancialSummary(year, month) {
-    try {
-      return await supabase.rpc('financial_summary_month', { 
-        p_year: parseInt(year), 
-        p_month: parseInt(month) 
-      });
-    } catch (e) { return logError('getFinancialSummary', e); }
-  },
-
-  async getPayments(filters = {}) {
-    try {
-      let query = supabase.from('payments')
-        .select('id, amount, status, month_paid, due_date, paid_date, method, bank, reference, proof_url, evidence_url, created_at, students:student_id(name, classrooms:classroom_id(name))', { count: 'exact' });
-      
-      if (filters.status && filters.status !== 'all') query = query.eq('status', filters.status);
-      if (filters.year) {
-        const yr = String(filters.year);
-        query = query.like('month_paid', yr + '-%');
-      }
-      if (filters.month_paid) query = query.eq('month_paid', filters.month_paid);
-
-      if (filters.range) {
-        query = query.range(filters.range.from, filters.range.to);
-      } else {
-        query = query.limit(filters.limit || 200);
-      }
-
-      return await query.order('created_at', { ascending: false });
-    } catch (e) { return logError('getPayments', e); }
   },
 
   async getPaymentStats(filterMonth, filterYear) {
@@ -228,7 +103,6 @@ export const DirectorApi = {
       const lastDay    = new Date(parseInt(year), parseInt(month), 0).getDate();
       const rangeEnd   = `${year}-${month}-${String(lastDay).padStart(2, '0')}`;
 
-      // Una sola query por estado - elimina duplicados de countByStatus/sumPaid
       const [paidData, pendingData, overdueData, reviewData] = await Promise.all([
         supabase.from('payments').select('amount').eq('status', 'paid').gte('created_at', rangeStart).lte('created_at', rangeEnd + 'T23:59:59'),
         supabase.from('payments').select('id', { count: 'exact', head: true }).eq('status', 'pending').eq('month_paid', monthKey),
@@ -244,25 +118,7 @@ export const DirectorApi = {
       return { data: { incomeMonth: income, pending, overdue, toApprove }, error: null };
     } catch (e) { return logError('getPaymentStats', e); }
   },
-  async createManualPayment(data) {
-    return await supabase.from('payments').insert(data).select().single();
-  },
 
-  async updatePayment(id, updates) {
-    return await supabase.from('payments').update(updates).eq('id', id);
-  },
-
-  async deletePayment(id) {
-    return await supabase.from('payments').delete().eq('id', id);
-  },
-
-  async runPaymentCycle() {
-    try {
-      return await supabase.rpc('run_payment_cycle');
-    } catch (e) { return logError('runPaymentCycle', e); }
-  },
-
-  // --- INQUIRIES / REPORTES ---
   async getInquiries(filters = {}) {
     try {
       let query = supabase.from('inquiries')
@@ -278,19 +134,12 @@ export const DirectorApi = {
     return await supabase.from('inquiries').update(updates).eq('id', id);
   },
 
-  // --- CONFIGURACIÃ“N ---
   async getSchoolSettings() {
     try {
-      // .maybeSingle() devuelve null si no hay fila, en lugar de Error 406
       return await supabase.from('school_settings').select('id, generation_day, due_day, open_time, close_time, work_days, phone, business_hours').eq('id', 1).maybeSingle();
     } catch (e) { return logError('getSchoolSettings', e); }
   },
 
-  async updateSchoolSettings(updates) {
-    return await supabase.from('school_settings').update(updates).eq('id', 1);
-  },
-
-  // --- CLASSROOMS ---
   async getClassroomsWithOccupancy() {
     return QueryCache.get('dir_classrooms_occ', async () => {
       try {
@@ -308,7 +157,6 @@ export const DirectorApi = {
     }, 3 * 60_000);
   },
 
-  // --- CHAT ---
   async getChatUsers(myId, roleFilter) {
     try {
       let query = supabase
@@ -357,7 +205,6 @@ export const DirectorApi = {
       if (!ids || ids.length === 0) {
         return { data: [], error: null };
       }
-      // Sin join de classrooms para evitar error 400 por FK hint incorrecto
       const { data: students, error } = await supabase
         .from(TABLES.STUDENTS)
         .select('parent_id, name, classroom_id')
@@ -366,7 +213,6 @@ export const DirectorApi = {
         .eq('is_active', true);
       if (error) throw error;
 
-      // Enriquecer con nombre de aula en query separada si hay classroom_ids
       const classroomIds = [...new Set((students || []).map(s => s.classroom_id).filter(Boolean))];
       let classroomMap = {};
       if (classroomIds.length > 0) {
@@ -386,17 +232,6 @@ export const DirectorApi = {
     } catch (e) { return logError('getStudentsByParentIds', e); }
   },
 
-  async getChatHistory(otherId) {
-    try {
-      return await supabase.rpc('get_direct_messages', { p_other_user_id: otherId });
-    } catch (e) { return logError('getChatHistory', e); }
-  },
-
-  async sendMessage(sender_id, receiver_id, content) {
-    return await supabase.from('messages').insert({ sender_id, receiver_id, content });
-  },
-
-  // --- ESTUDIANTES ---
   async getStudents(filters = {}, range = null) {
     let q = supabase
       .from(TABLES.STUDENTS)
@@ -411,27 +246,12 @@ export const DirectorApi = {
     if (range) {
       q = q.range(range.from, range.to);
     } else {
-      q = q.limit(100); // Default safety limit
+      q = q.limit(100);
     }
 
     return q;
   },
 
-  async getQuickCounts() {
-    // Ya optimizado con head: true
-    const [students, teachers, classrooms, inquiries] = await Promise.all([
-      supabase.from(TABLES.STUDENTS).select('*', { count: 'exact', head: true }).eq('is_active', true),
-      supabase.from(TABLES.PROFILES).select('*', { count: 'exact', head: true }).in('role', ['maestra', 'asistente']),
-      supabase.from(TABLES.CLASSROOMS).select('*', { count: 'exact', head: true }),
-      supabase.from('inquiries').select('*', { count: 'exact', head: true }).eq('status', 'pending')
-    ]);
-    return {
-      students: students.count || 0,
-      teachers: teachers.count || 0,
-      classrooms: classrooms.count || 0,
-      inquiries: inquiries.count || 0
-    };
-  },
   async createStudent(data) {
     try {
       const result = await withTimeout(() => supabase.from(TABLES.STUDENTS).insert(data).select().single());
@@ -443,7 +263,6 @@ export const DirectorApi = {
     const numId = parseInt(id, 10);
     if (isNaN(numId)) return { data: null, error: 'ID de estudiante inválido' };
 
-    // Whitelist explícito de columnas válidas en la tabla students
     const ALLOWED_COLUMNS = new Set([
       'name','matricula','classroom_id','age','age_type','schedule','start_date',
       'is_active','blood_type','allergies','authorized_pickup','authorized_pickup_phone',
@@ -455,11 +274,10 @@ export const DirectorApi = {
 
     const clean = {};
     for (const [k, v] of Object.entries(data)) {
-      if (!ALLOWED_COLUMNS.has(k)) continue; // descartar campos desconocidos
+      if (!ALLOWED_COLUMNS.has(k)) continue;
       clean[k] = v;
     }
 
-    // Conversiones de tipo
     if ('horario'        in data) { clean.schedule      = data.horario || null; }
     if ('classroom_id'  in clean) clean.classroom_id   = clean.classroom_id   ? parseInt(clean.classroom_id)   : null;
     if ('age'           in clean) clean.age            = clean.age            ? parseInt(clean.age)            : null;
@@ -479,7 +297,6 @@ export const DirectorApi = {
     return result;
   },
 
-  // --- PERSONAL (MAESTROS/ASISTENTES) ---
   async getTeachers() {
     return QueryCache.get('dir_teachers', async () => {
       try {
@@ -508,7 +325,6 @@ export const DirectorApi = {
         await supabase.from(TABLES.CLASSROOMS).update({ teacher_id: id }).eq('id', classroom_id);
       }
     }
-    // Only send columns that exist in profiles table â€” exclude email (can't update via profiles)
     const ALLOWED = ['name', 'phone', 'role', 'bio', 'notes', 'access_code', 'avatar_url', 'onesignal_player_id'];
     const safeData = Object.fromEntries(Object.entries(profileData).filter(([k]) => ALLOWED.includes(k)));
     const result = await supabase.from(TABLES.PROFILES).update(safeData).eq('id', id);
@@ -522,15 +338,6 @@ export const DirectorApi = {
       supabase.from(TABLES.CLASSROOMS).select('id, name, level, capacity, teacher:teacher_id(name)').order('name'),
       5 * 60_000
     );
-  },
-
-  async generateMonthlyCharges(month, year) {
-    try {
-      return await supabase.rpc('generate_monthly_charges', { 
-        p_month: Number(month), 
-        p_year: Number(year) 
-      });
-    } catch (e) { return logError('generateMonthlyCharges', e); }
   },
 
   async getPaymentById(id) {
@@ -560,7 +367,7 @@ export const DirectorApi = {
           ['Estudiante', studentName],
           ['Concepto',   month],
           ['Monto',      amount],
-          ['MÃ©todo',     method],
+          ['Método',     method],
           ['Fecha',      dateStr]
         ].map(([label, value], i) => {
           const border = i < 4 ? 'border-bottom:1px solid #d1fae5;' : '';
@@ -577,8 +384,8 @@ export const DirectorApi = {
           '<body style="margin:0;padding:0;background:#f8fafc;font-family:Arial,sans-serif;">' +
           '<div style="max-width:560px;margin:32px auto;background:#fff;border-radius:16px;overflow:hidden;box-shadow:0 4px 24px rgba(0,0,0,0.08);">' +
             '<div style="background:linear-gradient(135deg,#16a34a,#15803d);padding:32px 40px;text-align:center;">' +
-              '<h1 style="margin:0;color:#fff;font-size:22px;font-weight:800;">âœ… Pago Confirmado</h1>' +
-              '<p style="margin:8px 0 0;color:rgba(255,255,255,0.85);font-size:14px;">Karpus Kids â€” Recibo de Pago</p>' +
+              '<h1 style="margin:0;color:#fff;font-size:22px;font-weight:800;">Pago Confirmado</h1>' +
+              '<p style="margin:8px 0 0;color:rgba(255,255,255,0.85);font-size:14px;">Karpus Kids - Recibo de Pago</p>' +
             '</div>' +
             '<div style="padding:32px 40px;">' +
               '<p style="margin:0 0 8px;color:#374151;font-size:15px;">Hola,</p>' +
@@ -586,22 +393,117 @@ export const DirectorApi = {
               '<div style="background:#f0fdf4;border:1px solid #bbf7d0;border-radius:12px;padding:20px 24px;margin-bottom:24px;">' +
                 '<table style="width:100%;border-collapse:collapse;font-size:14px;">' + rows + '</table>' +
               '</div>' +
-              '<p style="margin:0 0 24px;color:#6b7280;font-size:13px;text-align:center;">Gracias por tu puntualidad y compromiso con la educaciÃ³n de tu hijo/a.</p>' +
+              '<p style="margin:0 0 24px;color:#6b7280;font-size:13px;text-align:center;">Gracias por tu puntualidad y compromiso con la educación de tu hijo/a.</p>' +
               '<div style="text-align:center;">' +
-                '<a href="https://karpuskids.com/panel_padres.html" style="display:inline-block;background:#16a34a;color:#fff;padding:12px 28px;border-radius:8px;font-weight:700;font-size:14px;text-decoration:none;">Ver mi Panel â†’</a>' +
+                '<a href="https://karpuskids.com/panel_padres.html" style="display:inline-block;background:#16a34a;color:#fff;padding:12px 28px;border-radius:8px;font-weight:700;font-size:14px;text-decoration:none;">Ver mi Panel</a>' +
               '</div>' +
             '</div>' +
             '<div style="background:#f9fafb;border-top:1px solid #f0f0f0;padding:16px 40px;text-align:center;">' +
-              '<p style="margin:0;font-size:11px;color:#9ca3af;">Karpus Kids Â· Correo automÃ¡tico, por favor no respondas.</p>' +
+              '<p style="margin:0;font-size:11px;color:#9ca3af;">Karpus Kids · Correo automático, por favor no respondas.</p>' +
             '</div>' +
           '</div></body></html>';
 
         const { sendEmail } = await import('../shared/supabase.js');
-        const result = await sendEmail(emails, 'Recibo de Pago â€” ' + month + ' Â· ' + studentName, html);
+        const result = await sendEmail(emails, 'Recibo de Pago - ' + month + ' · ' + studentName, html);
         return !!result;
       } catch (e) {
         safeHandle(e, 'DirectorApi.sendPaymentReceipt');
         return false;
       }
-    }
+    },
+
+  // ── Sistema de Calificaciones V2 ──────────────────────────
+
+  async getSubjects(educationLevel) {
+    try {
+      let q = supabase.from(TABLES.SUBJECTS)
+        .select('id, name, education_level, description, is_active')
+        .eq('is_active', true)
+        .order('name');
+      if (educationLevel) q = q.eq('education_level', educationLevel);
+      return await q;
+    } catch (e) { return logError('getSubjects', e); }
+  },
+
+  async getPeriodConfig(periodId) {
+    try {
+      return await supabase.rpc('get_period_config', { p_period_id: parseInt(periodId) });
+    } catch (e) { return logError('getPeriodConfig', e); }
+  },
+
+  async savePeriodConfig(periodId, configs) {
+    try {
+      // configs = [{ subject_id, activity_count }]
+      const rows = configs.map(c => ({
+        period_id: parseInt(periodId),
+        subject_id: c.subject_id,
+        activity_count: Math.min(8, Math.max(5, c.activity_count || 5))
+      }));
+
+      // Upsert each config
+      const results = await Promise.all(rows.map(row =>
+        supabase.from(TABLES.PERIOD_CONFIG)
+          .upsert(row, { onConflict: 'period_id,subject_id' })
+      ));
+
+      const errors = results.filter(r => r.error);
+      if (errors.length) throw errors[0].error;
+      return { data: true, error: null };
+    } catch (e) { return logError('savePeriodConfig', e); }
+  },
+
+  async deletePeriodConfig(configId) {
+    try {
+      return await supabase.from(TABLES.PERIOD_CONFIG).delete().eq('id', configId);
+    } catch (e) { return logError('deletePeriodConfig', e); }
+  },
+
+  async getActivitiesWithGrades(periodId) {
+    try {
+      return await supabase.rpc('get_activities_with_grades', { p_period_id: parseInt(periodId) });
+    } catch (e) { return logError('getActivitiesWithGrades', e); }
+  },
+
+  async createActivity(configId, title, description, activityNumber, isMandatory) {
+    try {
+      return await supabase.from(TABLES.ACTIVITIES).insert({
+        config_id: configId,
+        title,
+        description: description || null,
+        max_score: 100,
+        activity_number: activityNumber,
+        is_mandatory: isMandatory !== false
+      }).select().single();
+    } catch (e) { return logError('createActivity', e); }
+  },
+
+  async deleteActivity(activityId) {
+    try {
+      return await supabase.from(TABLES.ACTIVITIES).delete().eq('id', activityId);
+    } catch (e) { return logError('deleteActivity', e); }
+  },
+
+  async getStudentGradesV2(studentId, periodId) {
+    try {
+      return await supabase.rpc('get_student_grades_v2', {
+        p_student_id: parseInt(studentId),
+        p_period_id: parseInt(periodId)
+      });
+    } catch (e) { return logError('getStudentGradesV2', e); }
+  },
+
+  async getStudentSubjectAverages(studentId, periodId) {
+    try {
+      return await supabase.rpc('get_student_subject_averages', {
+        p_student_id: parseInt(studentId),
+        p_period_id: parseInt(periodId)
+      });
+    } catch (e) { return logError('getStudentSubjectAverages', e); }
+  },
+
+  async getStudentHistory(studentId) {
+    try {
+      return await supabase.rpc('get_student_history', { p_student_id: parseInt(studentId) });
+    } catch (e) { return logError('getStudentHistory', e); }
+  }
 };

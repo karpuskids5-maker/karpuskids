@@ -31,6 +31,7 @@ window.Modal = Modal;
 const { initAttendance, markAllPresent, registerAttendance } = Attendance;
 const { initRoutine, updateRoutineField, saveRoutineLog, openNewRoutineModal, openStudentRoutine, openBulkRoutineModal, updateRoutineFieldInModal, saveRoutineInModal, applyBulkRoutine, openBulkEventModal, confirmBulkEvent, wakeAllSiestas, wakeStudentSiesta, undoLastBulk, publishAll, registerIndividualEvent, toggleTimeline, openExtraEventModal, confirmExtraEvent, registerMissingStudents } = Routine;
 const { initTasks, openEditTaskModal, deleteTask, openNewTaskModal, viewTaskSubmissions, submitGrade } = Tasks;
+const { initGradesV2, openNewActivityModal, gradeActivity, saveGradeV2, deleteActivityV2 } = Tasks;
 const { openStudentProfile, registerIncidentModal } = Students;
 const { initChat, selectChatContact } = ChatApp;
 
@@ -82,6 +83,13 @@ window.App = {
   openNewTaskModal: Tasks.openNewTaskModal,
   viewTaskSubmissions: Tasks.viewTaskSubmissions,
   submitGrade: Tasks.submitGrade,
+
+  // Grades V2
+  initGradesV2: Tasks.initGradesV2,
+  openNewActivityModal: Tasks.openNewActivityModal,
+  gradeActivity: Tasks.gradeActivity,
+  saveGradeV2: Tasks.saveGradeV2,
+  deleteActivityV2: Tasks.deleteActivityV2,
 
   // Students
   openStudentProfile: Students.openStudentProfile,
@@ -1149,22 +1157,5 @@ function _initMaestraQR(profile, user) {
 }
 
 function initGrades() {
-  const container = document.getElementById('t-grades-inner');
-  if (!container) return;
-  
-  container.innerHTML = `
-    <header class="mb-6">
-      <h1 class="text-2xl md:text-3xl font-black text-slate-800 flex items-center gap-3">
-        <span class="p-2 bg-indigo-100 text-indigo-600 rounded-2xl"><i data-lucide="graduation-cap" class="w-6 h-6"></i></span>
-        Centro de Calificaciones
-      </h1>
-      <p class="text-slate-500 font-medium">Gestiona las notas y el progreso académico de tus alumnos</p>
-    </header>
-    <div class="bg-white p-8 rounded-[2.5rem] border border-slate-100 shadow-sm text-center">
-      <div class="w-20 h-20 bg-indigo-50 text-indigo-500 rounded-full flex items-center justify-center mx-auto mb-4 text-3xl">📝</div>
-      <h3 class="text-xl font-black text-slate-800 mb-2">Próximamente</h3>
-      <p class="text-slate-500 max-w-sm mx-auto">Estamos trabajando en una nueva interfaz para que calificar sea más rápido y divertido.</p>
-    </div>
-  `;
-  if (window.lucide) window.lucide.createIcons();
+  Tasks.initGradesV2();
 }

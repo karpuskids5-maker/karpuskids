@@ -356,5 +356,128 @@ export const MaestraApi = {
 
     handleError(error, 'registerIncident');
     return data;
+  },
+
+  // ── Sistema de Calificaciones V2 ──────────────────────────
+
+  /**
+   * Obtener configuración de materias del período
+   */
+  async getPeriodConfig(periodId) {
+    const { data, error } = await supabase.rpc('get_period_config', { p_period_id: parseInt(periodId) });
+    handleError(error, 'getPeriodConfig');
+    return data || [];
+  },
+
+  /**
+   * Obtener actividades con conteo de calificaciones
+   */
+  async getActivitiesWithGrades(periodId) {
+    const { data, error } = await supabase.rpc('get_activities_with_grades', { p_period_id: parseInt(periodId) });
+    handleError(error, 'getActivitiesWithGrades');
+    return data || [];
+  },
+
+  /**
+   * Crear nueva actividad evaluable
+   */
+  async createActivity(configId, title, description, activityNumber, isMandatory) {
+    const { data, error } = await supabase
+      .from('activities')
+      .insert({
+        config_id: configId,
+        title,
+        description: description || null,
+        max_score: 100,
+        activity_number: activityNumber,
+        is_mandatory: isMandatory !== false
+      })
+      .select()
+      .maybeSingle();
+
+    handleError(error, 'createActivity');
+    return data;
+  },
+
+  /**
+   * Eliminar actividad
+   */
+  async deleteActivity(activityId) {
+    const { error } = await supabase.from('activities').delete().eq('id', activityId);
+    handleError(error, 'deleteActivity');
+    return { success: !error };
+  },
+
+  /**
+   * Guardar calificación V2 (0-100)
+   */
+  async saveGradeV2(activityId, studentId, score, comment, teacherId) {
+    const scoreVal = parseFloat(score);
+    if (isNaN(scoreVal) || scoreVal < 0 || scoreVal > 100) {
+      throw new Error('La calificación debe ser entre 0 y 100');
+    }
+
+    // Buscar si ya existe calificación para esta actividad+estudiante
+    const { data: existing } = await supabase
+      .from('grades')
+      .select('id')
+      .eq('activity_id', activityId)
+      .eq('student_id', studentId)
+      .maybeSingle();
+
+    let result;
+    if (existing?.id) {
+      result = await supabase
+        .from('grades')
+        .update({ score_v2: scoreVal, notes: comment || null, teacher_id: teacherId })
+        .eq('id', existing.id)
+        .select('id, score_v2')
+        .maybeSingle();
+    } else {
+      // Need period_id from the activity's config
+      const { data: activity } = await supabase
+        .from('activities')
+        .select('config_id')
+        .eq('id', activityId)
+        .maybeSingle();
+
+      let periodId = null;
+      if (activity?.config_id) {
+        const { data: config } = await supabase
+          .from('period_config')
+          .select('period_id')
+          .eq('id', activity.config_id)
+          .maybeSingle();
+        periodId = config?.period_id || null;
+      }
+
+      result = await supabase
+        .from('grades')
+        .insert({
+          activity_id: activityId,
+          student_id: studentId,
+          score_v2: scoreVal,
+          notes: comment || null,
+          teacher_id: teacherId,
+          period_id: periodId
+        })
+        .select('id, score_v2')
+        .maybeSingle();
+    }
+
+    handleError(result.error, 'saveGradeV2');
+    return result.data;
+  },
+
+  /**
+   * Obtener calificaciones V2 de un estudiante
+   */
+  async getStudentGradesV2(studentId, periodId) {
+    const { data, error } = await supabase.rpc('get_student_grades_v2', {
+      p_student_id: parseInt(studentId),
+      p_period_id: parseInt(periodId)
+    });
+    handleError(error, 'getStudentGradesV2');
+    return data || [];
   }
 };

@@ -160,12 +160,11 @@ export const AttendanceModule = {
     const late     = d.filter(r => ['late','tarde'].includes(norm(r.status))).length;
     const rate     = total > 0 ? Math.round((present / total) * 100) : 0;
 
-    const set = (id, v) => { const el = document.getElementById(id); if (el) el.textContent = v; };
-    set('attKpiTotal',   total);
-    set('attKpiPresent', present);
-    set('attKpiAbsent',  absent);
-    set('attKpiLate',    late);
-    set('attKpiRate',    rate + '%');
+    Helpers.setTxt('attKpiTotal',   total);
+    Helpers.setTxt('attKpiPresent', present);
+    Helpers.setTxt('attKpiAbsent',  absent);
+    Helpers.setTxt('attKpiLate',    late);
+    Helpers.setTxt('attKpiRate',    rate + '%');
 
     // Barra de progreso
     const bar = document.getElementById('attRateBar');

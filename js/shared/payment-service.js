@@ -5,8 +5,10 @@
 import { supabase, sendPush, emitEvent } from './supabase.js';
 import { Helpers } from './helpers.js';
 
-const MES = ['enero','febrero','marzo','abril','mayo','junio',
+export const MES = ['enero','febrero','marzo','abril','mayo','junio',
              'julio','agosto','septiembre','octubre','noviembre','diciembre'];
+
+export const MES_LABEL = MES.map(m => m.charAt(0).toUpperCase() + m.slice(1));
 
 // ── Helpers exportados ────────────────────────────────────────────────────────
 export function calcMora(dueDate) {

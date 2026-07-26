@@ -28,9 +28,8 @@ export const PermitsModule = {
         .select('id', { count: 'exact' })
         .eq('status', 'pending');
 
-      const setTxt = (id, val) => { const el = document.getElementById(id); if(el) el.textContent = val; };
-      setTxt('statPermitsToday', todayPermits?.length || 0);
-      setTxt('statPermitsPending', pendingPermits?.length || 0);
+      Helpers.setTxt('statPermitsToday', todayPermits?.length || 0);
+      Helpers.setTxt('statPermitsPending', pendingPermits?.length || 0);
     } catch (e) { console.error(e); }
   },
 
