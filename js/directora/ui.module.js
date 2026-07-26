@@ -77,44 +77,12 @@ const DirectorUI = {
     // Incidencias
     set('kpiIncidents', data?.inquiries?.count ?? kpis.pendingInquiries ?? kpis.inquiries ?? 0);
 
-    // ✨ Hacer KPIs interactivos
-    this._initInteractiveKPIs();
-
-    // ✨ Inicializar Pull-to-Refresh
-    UIPremium.initPullToRefresh('dashboard', async () => {
-      const { DashboardService } = await import('./dashboard.service.js');
-      const refreshed = await DashboardService.getFullData(true);
-      this.renderDashboard(refreshed);
-    });
-
     // Lanzar widgets inteligentes en background (no bloquea el render)
     import('./automation.js').then(({ AutomationModule }) => {
       AutomationModule.renderSmartWidgets('smartAlertsContainer');
     }).catch(() => {});
 
     if (window.lucide) lucide.createIcons();
-  },
-
-  _initInteractiveKPIs() {
-    const mappings = {
-      'card-kpi-students':   'estudiantes',
-      'card-kpi-teachers':   'maestros',
-      'card-kpi-attendance': 'asistencia',
-      'card-kpi-money':      'pagos',
-      'card-kpi-incidents':  'reportes'
-    };
-
-    Object.entries(mappings).forEach(([id, section]) => {
-      const el = document.getElementById(id);
-      if (!el) return;
-      // Verificar que la sección destino existe antes de hacer clickeable
-      const target = document.getElementById(section);
-      if (!target) return;
-      el.style.cursor = 'pointer';
-      el.onclick = () => {
-        if (window.App?.navigation?.goTo) window.App.navigation.goTo(section);
-      };
-    });
   },
 
   renderClassroomRow(r) {

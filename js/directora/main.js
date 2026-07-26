@@ -433,6 +433,23 @@ document.addEventListener('DOMContentLoaded', async () => {
       });
     });
 
+    // 7b. Navegación global: dashboard cards + sidebar nav buttons
+    document.addEventListener('click', (e) => {
+      // Dashboard shortcut cards
+      const card = e.target.closest('[data-action="go-section"]');
+      if (card) {
+        const section = card.dataset.section;
+        if (section) goToSection(section);
+        return;
+      }
+      // Sidebar nav buttons (kk-nav-item)
+      const navBtn = e.target.closest('#sidebar [data-section]');
+      if (navBtn) {
+        const section = navBtn.dataset.section;
+        if (section) goToSection(section);
+      }
+    });
+
     // 7. Configurar guardado de perfil
     document.getElementById('btnSaveMainConfig')?.addEventListener('click', async () => {
       // Solo actualizar columnas que existen en profiles (name, bio, phone)

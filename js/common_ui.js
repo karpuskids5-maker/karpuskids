@@ -81,7 +81,7 @@ document.addEventListener('DOMContentLoaded', () => {
   initSidebarState();
 
   // Navegación genérica: sólo si la página NO tiene navegación dedicada
-  const dedicatedNavPresent = document.querySelector('.teams-nav-item[data-section], .nav-button[data-section], .nav-btn[data-section]');
+  const dedicatedNavPresent = document.querySelector('.teams-nav-item[data-section], .nav-button[data-section], .nav-btn[data-section], .kk-nav-item[data-section]');
   if (!dedicatedNavPresent) {
     const navBtns = document.querySelectorAll('#sidebar [data-section]');
     navBtns.forEach(btn => {
