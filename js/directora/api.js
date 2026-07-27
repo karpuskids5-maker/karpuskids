@@ -6,13 +6,10 @@ const TABLES = {
   PROFILES: 'profiles',
   CLASSROOMS: 'classrooms',
   STUDENTS: 'students',
-  ATTENDANCE: 'attendance',
-  GRADES: 'grades',
   PERIODS: 'periods',
   SUBJECTS: 'subjects',
   PERIOD_CONFIG: 'period_config',
-  ACTIVITIES: 'activities',
-  SUBJECT_AVERAGES: 'subject_averages'
+  ACTIVITIES: 'activities'
 };
 
 const withTimeout = (promiseOrFn, ms = 10000) => {

@@ -38,27 +38,6 @@ const PAYMENT_COLS_WITH_STUDENT = PAYMENT_COLS + ',students:student_id(name,p1_e
 
 export const PaymentService = {
 
-  async getByMonth(monthIndex, year, filters = {}) {
-    // ✅ ESTANDARIZACIÓN: Usar formato YYYY-MM en lugar de nombres de meses
-    const monthKey = `${year}-${String(monthIndex + 1).padStart(2,'0')}`;
-    let q = supabase
-      .from('payments')
-      .select(PAYMENT_COLS_WITH_STUDENT)
-      .eq('month_paid', monthKey)
-      .order('due_date', { ascending: true });
-
-    if (filters.status && filters.status !== 'all') q = q.eq('status', filters.status);
-    const { data, error } = await q;
-    if (error) throw error;
-
-    let list = data || [];
-    if (filters.search) {
-      const sq = filters.search.toLowerCase();
-      list = list.filter(p => p.students?.name?.toLowerCase().includes(sq));
-    }
-    return list;
-  },
-
   async getPendingValidation() {
     const { data, error } = await supabase
       .from('payments')
@@ -68,23 +47,6 @@ export const PaymentService = {
       .order('created_at', { ascending: false });
     if (error) throw error;
     return data || [];
-  },
-
-  async getStats() {
-    const now = new Date();
-    const monthStart = `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}-01T00:00:00.000Z`;
-    const [incomeRes, pendingRes, overdueRes, reviewRes] = await Promise.all([
-      supabase.from('payments').select('amount').in('status',['paid','pagado','confirmado']).gte('created_at', monthStart),
-      supabase.from('payments').select('*',{count:'exact',head:true}).in('status',['pending','pendiente']),
-      supabase.from('payments').select('*',{count:'exact',head:true}).in('status',['overdue','vencido']),
-      supabase.from('payments').select('*',{count:'exact',head:true}).not('evidence_url','is',null).in('status',['pending','pendiente','review'])
-    ]);
-    return {
-      incomeMonth: (incomeRes.data||[]).reduce((s,p) => s + Number(p.amount||0), 0),
-      pending:     pendingRes.count || 0,
-      overdue:     overdueRes.count || 0,
-      toApprove:   reviewRes.count  || 0
-    };
   },
 
   async approve(id) {

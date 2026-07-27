@@ -156,12 +156,6 @@ function _countReportedStudents(logsMap, students) {
   }).length;
 }
 
-function _getScheduleDuration(type) {
-  const schedule = _classroomSchedule.length ? _classroomSchedule : DEFAULT_SCHEDULE;
-  const ev = schedule.find(s => s.type === type);
-  return ev?.duration || 30;
-}
-
 function _isStudentPresent(studentId) {
   const attendance = AppState.get('attendance') || [];
   const record = attendance.find(a => a.student_id === studentId);
@@ -285,7 +279,6 @@ export async function initRoutine() {
     if (window.lucide) window.lucide.createIcons();
 
   } catch (e) {
-    console.error(e);
     container.innerHTML = '<div class="text-center p-10 text-rose-500 font-bold">Error al cargar rutina. Intenta de nuevo.</div>';
   }
 }
@@ -894,7 +887,6 @@ export async function confirmBulkEvent(eventType) {
     _showUndoBar(eventType, selected, prevState);
 
   } catch (e) {
-    console.error(e);
     safeToast('Error al guardar', 'error');
   } finally {
     if (btn) { btn.disabled = false; btn.innerHTML = '<i data-lucide="check-circle" class="w-4 h-4"></i> Confirmar'; if (window.lucide) lucide.createIcons(); }
@@ -1555,24 +1547,6 @@ export async function publishAll() {
   } catch (e) { safeToast('Error al publicar', 'error'); }
 }
 
-export async function openBulkRoutineModal() { return openBulkEventModal('animo'); }
-
-export async function applyBulkRoutine() {
-  const mood  = document.getElementById('bulkMood')?.value;
-  const food  = document.getElementById('bulkFood')?.value;
-  const sleep = document.getElementById('bulkSleep')?.value;
-  const students  = AppState.get('students') || [];
-  const classroom = AppState.get('classroom');
-  const today     = new Date().toISOString().split('T')[0];
-  try {
-    await Promise.all(students.map(s => MaestraApi.upsertDailyLog({ student_id: s.id, classroom_id: classroom.id, date: today, mood, food, nap: sleep })));
-    safeToast(`Rutina aplicada a ${students.length} estudiantes`);
-    Modal.close('bulkRoutineModal');
-    await _refreshLogsMap(classroom.id, today);
-    _refreshStudentCards();
-  } catch (_) { safeToast('Error al aplicar rutina masiva', 'error'); }
-}
-
 export async function updateRoutineField(studentId, field, value) {
   await saveRoutineLog(studentId, field, value);
 }
@@ -1589,23 +1563,6 @@ export async function saveRoutineLog(studentId, field = 'notes', value = null) {
     await MaestraApi.upsertDailyLog({ student_id: studentId, classroom_id: classroom.id, date: today, [dbField]: value });
   } catch (_) { safeToast('Error al guardar', 'error'); }
   finally { _saving[key] = false; }
-}
-
-export function openNewRoutineModal() { openBulkEventModal('animo'); }
-
-export async function registerInfantEvent(sid, type, val) {
-  const classroom = AppState.get('classroom');
-  const today     = new Date().toISOString().split('T')[0];
-  const logsMap   = AppState.get('logsMap') || {};
-  const currentLog = logsMap[sid] || {};
-  const newEvents  = _addEventToLog(currentLog, _makeEvent(type, { value: val }));
-  try {
-    await MaestraApi.upsertDailyLog({ student_id: sid, classroom_id: classroom.id, date: today, events: newEvents });
-    await _logTimelineEvent(classroom, type, [sid]);
-    safeToast(`Registro de ${type} guardado`);
-    await _refreshLogsMap(classroom.id, today);
-    _refreshStudentCards();
-  } catch (e) { safeToast('Error al registrar evento', 'error'); }
 }
 
 export async function registerIndividualEvent(sid, type, extra = {}) {

@@ -83,7 +83,6 @@ document.addEventListener('DOMContentLoaded', async () => {
 
     // ── Paso 3: Obtener perfil ────────────────────────────────────────────────
     _setLoaderMsg('Verificando permisos...');
-    console.log('[Paso 3] Iniciando carga de perfil para:', userId);
     let profile = null;
 
     // 1. Cache local
@@ -91,7 +90,6 @@ document.addEventListener('DOMContentLoaded', async () => {
     try {
       const cached = JSON.parse(localStorage.getItem(CACHE_KEY) || 'null');
       if (cached && cached.role && cached.ts && (Date.now() - cached.ts) < 3600000) {
-        console.log('[Paso 3] Perfil cargado desde caché:', cached.role);
         profile = { id: userId, email: userEmail, name: cached.name || userEmail.split('@')[0], role: cached.role };
       }
     } catch (_) {}
@@ -100,18 +98,15 @@ document.addEventListener('DOMContentLoaded', async () => {
     if (!profile) {
       const jwtRole = session.user?.app_metadata?.role || session.user?.user_metadata?.role || null;
       if (jwtRole && ['admin', 'directora'].includes(jwtRole)) {
-        console.log('[Paso 3] Rol detectado en JWT:', jwtRole);
         profile = { id: userId, email: userEmail, name: userEmail.split('@')[0], role: jwtRole };
       }
     }
 
     // 3. Query a DB
     if (!profile) {
-      console.log('[Paso 3] Consultando base de datos para perfil...');
       let timedOut = false;
       const profileTimer = setTimeout(() => {
         timedOut = true;
-        console.error('[Paso 3] Timeout al consultar perfil');
         clearTimeout(loaderTimeout);
         window._karpusInitializing = false;
         const el = document.getElementById('loader');
@@ -137,24 +132,17 @@ document.addEventListener('DOMContentLoaded', async () => {
         clearTimeout(profileTimer);
         if (timedOut) return;
 
-        console.log('[Paso 3] Respuesta DB:', { data, error });
-
         if (!error && data) {
           // Manejar si viene como array o como objeto único
           const rawProfile = Array.isArray(data) ? data[0] : data;
           
           if (rawProfile) {
             profile = rawProfile;
-            console.log('[Paso 3] Perfil obtenido:', profile.role);
-            // Guardar en cache para próximas cargas
             try {
               localStorage.setItem(CACHE_KEY, JSON.stringify({ role: profile.role, name: profile.name, ts: Date.now() }));
             } catch (_) {}
-          } else {
-            console.warn('[Paso 3] No se encontró perfil para el ID:', userId);
           }
         } else if (error) {
-          console.error('[Paso 3] Error en consulta de perfil:', error);
           clearTimeout(loaderTimeout);
           window._karpusInitializing = false;
           const el = document.getElementById('loader');
@@ -162,7 +150,6 @@ document.addEventListener('DOMContentLoaded', async () => {
           return;
         }
       } catch (e) {
-        console.error('[Paso 3] Excepción en consulta de perfil:', e);
         clearTimeout(profileTimer);
         if (timedOut) return;
         clearTimeout(loaderTimeout);
@@ -174,7 +161,6 @@ document.addEventListener('DOMContentLoaded', async () => {
     }
 
     if (!profile) {
-      console.error('[Paso 3] Fin del proceso: Perfil NO encontrado');
       clearTimeout(loaderTimeout);
       window._karpusInitializing = false;
       const el = document.getElementById('loader');
@@ -183,12 +169,10 @@ document.addEventListener('DOMContentLoaded', async () => {
     }
 
     // ── Paso 4: Verificar rol ─────────────────────────────────────────────────
-    console.log('[Paso 4] Verificando rol permitido...');
     const allowedRoles = ['admin', 'directora'];
     const userRole = (profile.role || '').toLowerCase();
     
     if (!allowedRoles.includes(userRole)) {
-      console.warn('[Paso 4] Rol NO permitido:', userRole);
       clearTimeout(loaderTimeout);
       window._karpusInitializing = false;
       const loader = document.getElementById('loader');
@@ -209,7 +193,6 @@ document.addEventListener('DOMContentLoaded', async () => {
     }
 
     // ── Paso 5: Mostrar panel ─────────────────────────────────────────────────
-    console.log('[Paso 5] Inicializando panel para:', profile.name);
     clearTimeout(loaderTimeout);
     window._karpusInitializing = false;
     currentUser = profile;
@@ -297,36 +280,30 @@ window.goTo = function(id) {
 
 // ── Refresh ───────────────────────────────────────────────────────────────────
 window.refreshAll = async function() {
-  console.log('[refreshAll] Iniciando carga de datos...');
   try {
     await Promise.allSettled([
       loadUsers(), loadAudit(), loadPayments(),
       loadAttendance(), loadStudents(), loadClassrooms(), loadPunches()
     ]);
-    console.log('[refreshAll] Datos cargados, renderizando dashboard...');
     renderDashboard();
   } catch (err) {
-    console.error('[refreshAll] Error crítico:', err);
   }
 };
 
 // ── Load data ─────────────────────────────────────────────────────────────────
 async function loadUsers() {
   try {
-    console.log('[loadUsers] Cargando usuarios...');
     const { data } = await supabase
       .from('profiles')
       .select('id, name, email, role, created_at, avatar_url, phone, bio, last_sign_in_at')
       .order('created_at', { ascending: false })
       .limit(300);
     allUsers = data || [];
-    console.log('[loadUsers] OK:', allUsers.length);
     const kpi = document.getElementById('kpi-users');
     if (kpi) kpi.textContent = allUsers.length;
     const cfgCount = document.getElementById('cfgUserCount');
     if (cfgCount) cfgCount.textContent = allUsers.length;
-  } catch (err) { 
-    console.error('[loadUsers] Error:', err);
+  } catch (err) {
     logError('panel_control', err.message || String(err), err.stack || '', 'loadUsers').catch(() => {});
     allUsers = []; 
   }
@@ -334,7 +311,6 @@ async function loadUsers() {
 
 async function loadPunches() {
   try {
-    console.log('[loadPunches] Cargando accesos...');
     // Last 30 days of door punches — used for "último acceso"
     const since = new Date(); since.setDate(since.getDate() - 30);
     const { data } = await supabase
@@ -343,9 +319,7 @@ async function loadPunches() {
       .gte('punched_at', since.toISOString())
       .order('punched_at', { ascending: false });
     allPunches = data || [];
-    console.log('[loadPunches] OK:', allPunches.length);
   } catch (err) { 
-    console.error('[loadPunches] Error:', err);
     logError('panel_control', err?.message || String(err), err?.stack || '', 'loadPunches').catch(() => {});
     allPunches = []; 
   }
@@ -353,7 +327,6 @@ async function loadPunches() {
 
 async function loadAudit() {
   try {
-    console.log('[loadAudit] Cargando auditoría...');
     // Try audit_logs first, fallback to system_events
     let data = null;
     const { data: d1, error: e1 } = await supabase
@@ -364,7 +337,6 @@ async function loadAudit() {
     if (!e1) {
       data = d1;
     } else {
-      console.warn('[loadAudit] audit_logs falló, usando system_events...');
       // Fallback: system_events
       const { data: d2 } = await supabase
         .from('system_events')
@@ -380,11 +352,9 @@ async function loadAudit() {
       }));
     }
     allAudit = data || [];
-    console.log('[loadAudit] OK:', allAudit.length);
     const badge = document.getElementById('badge-audit');
     if (badge) badge.textContent = allAudit.length;
   } catch (err) { 
-    console.error('[loadAudit] Error:', err);
     logError('panel_control', err?.message || String(err), err?.stack || '', 'loadAudit').catch(() => {});
     allAudit = []; 
   }
@@ -392,7 +362,6 @@ async function loadAudit() {
 
 async function loadPayments() {
   try {
-    console.log('[loadPayments] Cargando pagos...');
     const { data, error } = await supabase
       .from('payments')
       .select('id, amount, status, method, bank, month_paid, created_at, student_id, student:student_id(name, p1_name)')
@@ -400,9 +369,7 @@ async function loadPayments() {
       .limit(300);
     if (error) throw error;
     allPayments = data || [];
-    console.log('[loadPayments] OK:', allPayments.length);
   } catch (err) { 
-    console.error('[loadPayments] Error:', err);
     logError('panel_control', err?.message || String(err), err?.stack || '', 'loadPayments').catch(() => {});
     allPayments = []; 
   }
@@ -410,16 +377,13 @@ async function loadPayments() {
 
 async function loadStudents() {
   try {
-    console.log('[loadStudents] Cargando estudiantes...');
     const { data } = await supabase
       .from('students')
       .select('id, name, parent_id, classroom_id, is_active, matricula');
     allStudents = data || [];
-    console.log('[loadStudents] OK:', allStudents.length);
     const kpi = document.getElementById('kpi-students');
     if (kpi) kpi.textContent = allStudents.filter(s => s.is_active).length;
   } catch (err) { 
-    console.error('[loadStudents] Error:', err);
     logError('panel_control', err?.message || String(err), err?.stack || '', 'loadStudents').catch(() => {});
     allStudents = []; 
   }
@@ -427,12 +391,9 @@ async function loadStudents() {
 
 async function loadClassrooms() {
   try {
-    console.log('[loadClassrooms] Cargando aulas...');
     const { data } = await supabase.from('classrooms').select('id, name, teacher_id');
     allClassrooms = data || [];
-    console.log('[loadClassrooms] OK:', allClassrooms.length);
   } catch (err) { 
-    console.error('[loadClassrooms] Error:', err);
     logError('panel_control', err?.message || String(err), err?.stack || '', 'loadClassrooms').catch(() => {});
     allClassrooms = []; 
   }
@@ -441,7 +402,6 @@ async function loadClassrooms() {
 async function loadAttendance() {
   const today = new Date().toISOString().split('T')[0];
   try {
-    console.log('[loadAttendance] Cargando asistencia de hoy...');
     // Fetch attendance with student names
     const { data, error } = await supabase
       .from('attendance')
@@ -451,24 +411,19 @@ async function loadAttendance() {
     
     if (error) throw error;
     allAttend = data || [];
-    console.log('[loadAttendance] OK:', allAttend.length);
     const todayCount = allAttend.filter(a => a.date === today).length;
     const kpi = document.getElementById('kpi-attendance');
     if (kpi) kpi.textContent = todayCount;
   } catch (err) {
-    console.error('[loadAttendance] Error primary:', err);
     // Fallback without joins
     try {
-      console.log('[loadAttendance] Intentando fallback sin joins...');
       const { data } = await supabase
         .from('attendance')
         .select('id, date, check_in, check_out, status, student_id, classroom_id')
         .order('date', { ascending: false })
         .limit(300);
       allAttend = data || [];
-      console.log('[loadAttendance] Fallback OK:', allAttend.length);
     } catch (err2) { 
-      console.error('[loadAttendance] Error total:', err2);
       logError('panel_control', err2?.message || String(err2), err2?.stack || '', 'loadAttendance_fallback').catch(() => {});
       allAttend = []; 
     }

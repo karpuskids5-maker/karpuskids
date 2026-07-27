@@ -24,14 +24,9 @@ const UIHelpers = {
     }
   },
 
-  closeModal(modalSelector = '#globalModalContainer') {
-    if (modalSelector === '#globalModalContainer') {
-      const c = document.getElementById('globalModalContainer');
-      if (c) { c.style.display = 'none'; c.innerHTML = ''; }
-    } else {
-      const m = document.querySelector(modalSelector);
-      if (m) { m.classList.add('hidden'); m.classList.remove('active'); }
-    }
+  closeModal() {
+    const c = document.getElementById('globalModalContainer');
+    if (c) { c.style.display = 'none'; c.innerHTML = ''; }
   }
 };
 

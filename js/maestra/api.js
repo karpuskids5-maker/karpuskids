@@ -11,36 +11,9 @@ function handleError(error, context) {
 }
 
 /**
- * Normaliza nombre de usuario (evita "Usuario")
- */
-function getDisplayName(profile) {
-  return profile?.full_name || profile?.name || 'Usuario';
-}
-
-/**
  * API Maestra (nivel producciÃ³n)
  */
 export const MaestraApi = {
-
-  /**
-   * Perfil de maestra + aula
-   */
-  async getTeacherProfile(userId) {
-    const { data, error } = await supabase
-      .from(TABLES.PROFILES)
-      .select('id, name, email, phone, avatar_url, role, bio, classrooms:classrooms(id, name)')
-      .eq('id', userId)
-      .maybeSingle(); // ðŸ”¥ FIX
-
-    handleError(error, 'getTeacherProfile');
-
-    if (!data) return null;
-
-    return {
-      ...data,
-      display_name: getDisplayName(data)
-    };
-  },
 
   /**
    * Estudiantes por aula
@@ -191,7 +164,7 @@ export const MaestraApi = {
       const currentInfantData = existing?.infant_data || [];
       const updatedInfantData = [...currentInfantData, {
         ...newEvent,
-        id: crypto.randomUUID?.() || Math.random().toString(36).substr(2, 9),
+        id: crypto.randomUUID(),
         created_at: new Date().toISOString()
       }];
       
@@ -241,7 +214,7 @@ export const MaestraApi = {
       const { ImageLoader } = await import('/js/shared/image-loader.js');
       const compressed = await ImageLoader.compress(file);
       
-      const fileName = `${Date.now()}_${Math.random().toString(36).substr(2, 9)}.webp`;
+      const fileName = `${Date.now()}_${crypto.randomUUID()}.webp`;
       const path = `${fileName}`;
 
       const { data, error } = await supabase.storage

@@ -99,29 +99,3 @@ export async function initLiveClassListener(classroomId) {
   }
 }
 
-/**
- * Remueve de forma segura un channel creado por initLiveClassListener.
- * Acepta el objeto channel retornado por supabase.channel(...) o null.
- */
-export async function removeLiveClassListener(channel) {
-  if (!channel) {
-    const c = AppState.get('liveChannel');
-    if (!c) return;
-    channel = c;
-  }
-
-  try {
-    // Intentar unsubscribe si existe la API
-    if (typeof channel.unsubscribe === 'function') {
-      await channel.unsubscribe();
-    } else if (typeof channel.remove === 'function') {
-      // fallback a remove si aplica
-      await channel.remove();
-    }
-
-    // limpiar estado global
-    if (AppState.get('liveChannel') === channel) {
-      AppState.set('liveChannel', null);
-    }
-  } catch (_) {}
-}

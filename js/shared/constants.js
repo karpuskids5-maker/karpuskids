@@ -34,25 +34,9 @@ export const ROLES = Object.freeze({
   PADRE: 'padre'
 });
 
-export const ROLE_LIST = Object.freeze(Object.values(ROLES));
-
 // ============================
 // 📊 ESTADOS
 // ============================
-
-// 📅 Asistencia
-export const ATTENDANCE_STATUS = Object.freeze({
-  PRESENT: 'present',
-  LATE: 'late',
-  ABSENT: 'absent'
-});
-
-// 📚 Tareas
-export const TASK_STATUS = Object.freeze({
-  ACTIVE: 'active',
-  COMPLETED: 'completed',
-  CLOSED: 'closed'
-});
 
 // 💰 Pagos
 export const PAYMENT_STATUS = Object.freeze({
@@ -62,74 +46,3 @@ export const PAYMENT_STATUS = Object.freeze({
   CANCELLED: 'cancelled'
 });
 
-// 📩 Incidencias
-export const INQUIRY_STATUS = Object.freeze({
-  RECEIVED: 'received',
-  REVIEW: 'review',
-  IN_PROGRESS: 'in_progress',
-  RESOLVED: 'resolved',
-  CLOSED: 'closed'
-});
-
-// 🔔 Notificaciones
-export const NOTIFICATION_TYPES = Object.freeze({
-  TASK: 'task',
-  ATTENDANCE: 'attendance',
-  MESSAGE: 'message',
-  SYSTEM: 'system'
-});
-
-// 🎯 Filtros globales
-export const FILTERS = Object.freeze({
-  ALL: 'all'
-});
-
-// ============================
-// 📅 MESES
-// ============================
-export const MONTHS = Object.freeze([
-  "Enero", "Febrero", "Marzo", "Abril",
-  "Mayo", "Junio", "Julio", "Agosto",
-  "Septiembre", "Octubre", "Noviembre", "Diciembre"
-]);
-
-// ============================
-// 🔑 CLAVES Y CONFIGURACIÓN
-// ============================
-export const CONFIG = Object.freeze({
-  GOOGLE_SHEET_ID: '1UoYhq7nHbtHfzfOT3im4l4UKwPBCy2zc-rSBHV_oA_k',
-  TERMS_VERSION: '1.0'
-});
-
-// ============================
-// 🛠️ HELPERS
-// ============================
-
-/**
- * ✅ Valida rol
- */
-export function isValidRole(role) {
-  return ROLE_LIST.includes(role);
-}
-
-/**
- * 🔐 Normaliza texto seguro
- */
-export function normalize(value) {
-  if (value === null || value === undefined) return '';
-  return String(value).trim().toLowerCase();
-}
-
-/**
- * ✅ Valida estado de pago
- */
-export function isValidPaymentStatus(status) {
-  return Object.values(PAYMENT_STATUS).includes(status);
-}
-
-/**
- * ✅ Valida estado de incidencia
- */
-export function isValidInquiryStatus(status) {
-  return Object.values(INQUIRY_STATUS).includes(status);
-}

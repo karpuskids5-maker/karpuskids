@@ -82,7 +82,7 @@ export const SchoolEngine = {
 
       return EngineState.getAll();
     } catch (err) {
-      console.error('[SchoolEngine] Init error:', err);
+      if (window.Helpers?.safeLog) window.Helpers.safeLog('error', '[SchoolEngine] Init error:', err);
       return EngineState.getAll();
     }
   },

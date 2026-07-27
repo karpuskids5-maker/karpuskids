@@ -1,7 +1,3 @@
-self.addEventListener('message', (event) => {
-  // Manejador preventivo para evitar el error de registro tardío (sw.ts:21)
-});
-
 importScripts('https://cdn.onesignal.com/sdks/web/v16/OneSignalSDK.sw.js');
 
 /**

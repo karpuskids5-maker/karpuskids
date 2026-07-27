@@ -46,7 +46,7 @@ export class SafeAppState {
         }, 10);
       }
     } catch (e) {
-      console.warn('[SafeAppState] Error loading persistence:', e);
+      if (window.Helpers?.safeLog) window.Helpers.safeLog('warn', '[SafeAppState] Error loading persistence:', e);
     }
   }
 
@@ -55,7 +55,7 @@ export class SafeAppState {
     try {
       localStorage.setItem(this._persistenceKey, JSON.stringify(this._state));
     } catch (e) {
-      console.warn('[SafeAppState] Error saving persistence:', e);
+      if (window.Helpers?.safeLog) window.Helpers.safeLog('warn', '[SafeAppState] Error saving persistence:', e);
     }
   }
 

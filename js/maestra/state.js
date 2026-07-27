@@ -10,12 +10,9 @@ export const AppState = new SafeAppState({
   currentSection: 'dashboard',
   students: [],
   attendance: [],
-  posts: [],
-  tasks: [],
   // School Engine
   schoolYear: null,
   activePeriod: null,
   periods: [],
-  selectedHistoricalYear: null,
   logsMap: {}
 });

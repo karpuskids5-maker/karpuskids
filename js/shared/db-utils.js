@@ -11,19 +11,6 @@
 
 import { supabase } from './supabase.js';
 
-// ── Columnas mínimas por tabla (evitar SELECT *) ──────────────────────────────
-export const COLS = {
-  profiles:   'id, name, role, avatar_url, phone, bio, email, last_sign_in_at',
-  students:   'id, name, is_active, parent_id, classroom_id, p1_name, p1_phone, p1_email, matricula',
-  classrooms: 'id, name, level, capacity, teacher_id',
-  payments:   'id, student_id, amount, status, month_paid, due_date, paid_date, method, evidence_url',
-  posts:      'id, content, image_url, media_url, media_type, created_at, classroom_id, teacher_id',
-  messages:   'id, conversation_id, sender_id, content, created_at, is_read',
-  attendance: 'id, student_id, classroom_id, date, status, check_in, check_out',
-  tasks:      'id, title, description, due_date, classroom_id, created_at, status',
-  notifications: 'id, user_id, type, title, body, is_read, created_at',
-};
-
 /**
  * 🛡️ safeQuery — Interceptor global de errores de base de datos.
  * Muestra un toast automático en errores y retorna { data, ok, error }.
@@ -232,89 +219,6 @@ export async function batchInsert(table, records, chunkSize = 50) {
 }
 
 /**
- * Upsert en lotes.
- */
-export async function batchUpsert(table, records, onConflict = 'id', chunkSize = 50) {
-  if (!records?.length) return { upserted: 0, errors: [] };
-
-  const errors = [];
-  let upserted = 0;
-
-  for (let i = 0; i < records.length; i += chunkSize) {
-    const chunk = records.slice(i, i + chunkSize);
-    const { error } = await supabase.from(table).upsert(chunk, { onConflict });
-    if (error) {
-      errors.push({ chunk: i / chunkSize, error });
-    } else {
-      upserted += chunk.length;
-    }
-  }
-
-  return { upserted, errors };
-}
-
-/**
- * Cuenta registros de forma eficiente (HEAD request, sin traer datos).
- */
-export async function countRows(table, filters = {}) {
-  let query = supabase.from(table).select('*', { count: 'exact', head: true });
-  for (const [col, val] of Object.entries(filters)) {
-    if (val !== null && val !== undefined) query = query.eq(col, val);
-  }
-  const { count, error } = await query;
-  if (error) throw error;
-  return count || 0;
-}
-
-/**
- * 📊 ensureChart — Lazy loading de Chart.js
- * Solo inicializa el gráfico cuando el canvas es visible en el viewport.
- * Evita inicializar Chart.js en secciones que el usuario nunca visita.
- *
- * @param {string}   canvasId  — ID del elemento canvas
- * @param {Function} initFn    — función que crea el Chart (recibe el canvas)
- * @returns {Promise<void>}
- */
-export function ensureChart(canvasId, initFn) {
-  const canvas = document.getElementById(canvasId);
-  if (!canvas) return;
-
-  // Si ya está inicializado, no hacer nada
-  if (canvas._chartInitialized) return;
-
-  // Si Chart.js no está disponible, esperar
-  if (!window.Chart) {
-    const wait = setInterval(() => {
-      if (window.Chart) { clearInterval(wait); _initWhenVisible(canvas, initFn); }
-    }, 200);
-    return;
-  }
-
-  _initWhenVisible(canvas, initFn);
-}
-
-function _initWhenVisible(canvas, initFn) {
-  if (!('IntersectionObserver' in window)) {
-    // Fallback: inicializar directamente
-    canvas._chartInitialized = true;
-    initFn(canvas);
-    return;
-  }
-
-  const observer = new IntersectionObserver((entries) => {
-    entries.forEach(entry => {
-      if (entry.isIntersecting && !canvas._chartInitialized) {
-        canvas._chartInitialized = true;
-        observer.disconnect();
-        initFn(canvas);
-      }
-    });
-  }, { threshold: 0.1 });
-
-  observer.observe(canvas);
-}
-
-/**
  * 🔒 maskSensitive — Enmascara datos sensibles para logs de auditoría
  * Nunca guardar emails, teléfonos o nombres completos en logs.
  *
@@ -338,30 +242,4 @@ export function maskSensitive(value, type = 'email') {
     return parts[0] + (parts.length > 1 ? ' ' + parts[1].charAt(0) + '.' : '');
   }
   return s.slice(0, 2) + '***';
-}
-
-/**
- * 🌐 friendlyAuditMessage — Convierte un action de auditoría en texto legible
- * Para que la directora no tenga que interpretar JSON.
- *
- * @param {string} action  — 'payment.approved', 'grade.updated', etc.
- * @param {object} payload — datos del evento
- * @returns {string}
- */
-export function friendlyAuditMessage(action, payload = {}) {
-  const map = {
-    'payment.approved':    `Pago aprobado — ${payload.month || ''}`,
-    'payment.deleted':     `Pago eliminado`,
-    'payment.mora_waived': `Mora exonerada`,
-    'period.closed':       `Período cerrado: ${payload.period_name || ''}`,
-    'period.activated':    `Período activado: ${payload.new_period_name || ''}`,
-    'admin.reset_password':'Contraseña cambiada por admin',
-    'admin.change_role':   `Rol cambiado a "${payload.new_role || ''}"`,
-    'grade.updated':       `Calificación actualizada`,
-    'student.created':     `Nuevo estudiante registrado`,
-    'teacher.created':     `Nuevo maestro registrado`,
-    'payment.created':     `Cobro generado — ${payload.month || ''}`,
-    'payment.overdue':     `Pago marcado como vencido`,
-  };
-  return map[action] || action.replace(/\./g, ' → ');
 }

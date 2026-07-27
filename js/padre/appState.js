@@ -9,7 +9,6 @@ export const AppState = new SafeAppState({
   profile: null,
   currentStudent: null,
   students: [],
-  dashboardData: null,
   feedPosts: [],
   isClassLive: false,
   liveChannel: null,
@@ -18,12 +17,10 @@ export const AppState = new SafeAppState({
   financeHistory: null,
   todayAttendance: null,
   loading: false,
-  error: null,
   // School Engine
   schoolYear: null,
   activePeriod: null,
   periods: [],
-  studentHistory: null,
   currentDailyLog: null,
   currentGrades: null,
   currentPayments: null
@@ -38,13 +35,6 @@ export const CacheKeys = {
   grades: (studentId) => `grades_${studentId}`,
   attendance: (studentId, month, year) => `attendance_${studentId}_${year}_${month}`,
   routine: (studentId, date) => `routine_${studentId}_${date}`
-};
-
-/**
- * 🧹 Helper para invalidar caché
- */
-export const invalidateCache = (key) => {
-  AppState.clearCache(key);
 };
 
 export const TABLES = {

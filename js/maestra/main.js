@@ -1,4 +1,4 @@
-import { ensureRole, supabase, initOneSignal, RealtimeUtils, emitEvent, sendPush } from '/js/shared/supabase.js';
+import { ensureRole, supabase, initOneSignal, sendPush } from '/js/shared/supabase.js';
 import { SchoolEngine } from '/js/shared/school-engine.js';
 import { RealtimeManager } from '/js/shared/realtime-manager.js';
 import { AppState } from './state.js';
@@ -26,7 +26,7 @@ const _lastLoad = {};
 // Los onclick inline en HTML dinámico necesitan window.Modal disponible de inmediato
 window.Modal = Modal;
 const { initAttendance, markAllPresent, registerAttendance } = Attendance;
-const { initRoutine, updateRoutineField, saveRoutineLog, openNewRoutineModal, openStudentRoutine, openBulkRoutineModal, updateRoutineFieldInModal, saveRoutineInModal, applyBulkRoutine, openBulkEventModal, confirmBulkEvent, wakeAllSiestas, wakeStudentSiesta, undoLastBulk, publishAll, registerIndividualEvent, toggleTimeline, openExtraEventModal, confirmExtraEvent, registerMissingStudents } = Routine;
+const { initRoutine, updateRoutineField, saveRoutineLog, openStudentRoutine, updateRoutineFieldInModal, saveRoutineInModal, openBulkEventModal, confirmBulkEvent, wakeAllSiestas, wakeStudentSiesta, undoLastBulk, publishAll, registerIndividualEvent, toggleTimeline, openExtraEventModal, confirmExtraEvent, registerMissingStudents } = Routine;
 const { initTasks, openEditTaskModal, deleteTask, openNewTaskModal, viewTaskSubmissions, submitGrade } = Tasks;
 const { initGradesV2, openNewActivityModal, gradeActivity, saveGradeV2, deleteActivityV2 } = Tasks;
 const { openStudentProfile, registerIncidentModal } = Students;
@@ -53,15 +53,11 @@ window.App = {
   initRoutine: Routine.initRoutine,
   updateRoutineField: Routine.updateRoutineField,
   saveRoutineLog: Routine.saveRoutineLog,
-  openNewRoutineModal: Routine.openNewRoutineModal,
   openStudentRoutine: Routine.openStudentRoutine,
-  registerInfantEvent: Routine.registerInfantEvent,
   registerIndividualEvent: Routine.registerIndividualEvent,
   saveInfantEntry: Routine.saveInfantEntry,
-  openBulkRoutineModal: Routine.openBulkRoutineModal,
   updateRoutineFieldInModal: Routine.updateRoutineFieldInModal,
   saveRoutineInModal: Routine.saveRoutineInModal,
-  applyBulkRoutine: Routine.applyBulkRoutine,
   openBulkEventModal: Routine.openBulkEventModal,
   confirmBulkEvent: Routine.confirmBulkEvent,
   wakeAllSiestas: Routine.wakeAllSiestas,
@@ -449,26 +445,12 @@ function initRealtimeUpdates(classroomId) {
   });
 }
 
-async function notify({ message, pushTo = null }) {
-  safeToast(message, 'info');
-  if (pushTo) {
-    sendPush({
-      user_id: pushTo,
-      title: 'Notificación Karpus',
-      message: message,
-      link: '/panel_padres.html'
-    }).catch(() => {});
-  }
-}
-
 /**
  * 📊 Dashboard
  */
 async function initDashboard() {
   const classroom = AppState.get('classroom');
   if (!classroom) return;
-
-  console.log('[MaestraDashboard] Iniciando para aula:', classroom.id);
 
   try {
     const today = new Date().toISOString().split('T')[0];
@@ -556,7 +538,6 @@ async function initDashboard() {
     }
     if (window.lucide) window.lucide.createIcons();
   } catch (err) {
-    console.error('[MaestraDashboard] Error crítico:', err);
     safeToast('Error cargando dashboard', 'error');
   }
 }
@@ -659,9 +640,7 @@ async function _updateTasksToGradeWidget(classroomId) {
     } else {
       widget.classList.add('hidden');
     }
-  } catch (e) {
-    console.error('Error updating tasks widget:', e);
-  }
+  } catch (e) { /* tasks widget */ }
 }
 
 window.App.sendAbsenceAlerts = async () => {
@@ -845,7 +824,6 @@ function initNavigation() {
       initClassTabs(options.activeTab);
 
     } catch (error) {
-      console.error('Error en showClassroomDetail:', error);
       safeToast('Error al cargar datos del aula', 'error');
     }
 }
@@ -928,32 +906,6 @@ function initClassTabs(defaultTab = null) {
   // Activar tab inicial
   const tabToActivate = defaultTab || localStorage.getItem('maestra_last_tab') || 'feed';
   activateTab(tabToActivate);
-}
-
-function initVideocall() {
-  const container = document.getElementById('meet');
-  if (!container) return;
-  const classroom = AppState.get('classroom');
-
-  // 1. Mostrar Panel de Gestión
-  container.innerHTML = `
-    <div class="flex flex-col items-center justify-center p-12 text-center">
-      <div class="w-20 h-20 bg-orange-100 rounded-full flex items-center justify-center mb-6">
-        <i data-lucide="video" class="w-10 h-10 text-orange-600"></i>
-      </div>
-      <h4 class="text-xl font-black text-slate-800 mb-2">Aula Virtual: ${classroom?.name}</h4>
-      
-      <div class="flex gap-4 mt-6">
-        <button onclick="App.startJitsi()" class="px-8 py-4 bg-orange-600 text-white rounded-2xl font-black shadow-xl shadow-orange-200 hover:scale-105 transition-all flex items-center gap-3">
-            <i data-lucide="radio"></i> Iniciar Clase Ahora
-        </button>
-        <button onclick="App.scheduleClassMeeting()" class="px-8 py-4 bg-white border-2 border-orange-100 text-orange-600 rounded-2xl font-black hover:bg-orange-50 transition-all flex items-center gap-3">
-            <i data-lucide="calendar-plus"></i> Programar Futura
-        </button>
-      </div>
-    </div>
-  `;
-  if (window.lucide) window.lucide.createIcons();
 }
 
 window.App.scheduleClassMeeting = async () => {
@@ -1065,7 +1017,7 @@ async function submitNewPost() {
 
     if (file) {
       const ext = file.type.startsWith('video') ? file.name.split('.').pop() : 'webp';
-      const path = `posts/${Date.now()}_${Math.random().toString(36).substr(2,9)}.${ext}`;
+      const path = `posts/${Date.now()}_${crypto.randomUUID()}.${ext}`;
       
       mediaUrl = await ImageLoader.uploadToStorage(file, 'karpus-uploads', path, {
         maxWidth: 1200,

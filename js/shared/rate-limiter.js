@@ -57,17 +57,11 @@ export class RateLimiter {
 
 // ── Instancias predefinidas ───────────────────────────────────────────────────
 
-/** Máx 5 uploads por minuto */
-export const uploadLimiter = new RateLimiter('upload', 5, 60_000);
-
 /** Máx 20 mensajes de chat por minuto */
 export const messageLimiter = new RateLimiter('message', 20, 60_000);
 
 /** Máx 3 envíos de comprobante de pago por hora */
 export const paymentProofLimiter = new RateLimiter('payment_proof', 3, 60 * 60_000);
-
-/** Máx 10 comentarios en el muro por minuto */
-export const commentLimiter = new RateLimiter('comment', 10, 60_000);
 
 /**
  * Helper: verificar rate limit y mostrar toast si está bloqueado

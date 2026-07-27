@@ -184,27 +184,6 @@ export async function guardSession() {
   }
 }
 
-// ⚡ Robustez Realtime: Manejo de WebSockets y reconexión
-export const RealtimeUtils = {
-  monitorChannel(channel, name = 'global') {
-    channel.subscribe((status) => {
-      if (status === 'SUBSCRIBED') {
-        Helpers.safeLog('log', `[Realtime] Canal "${name}" conectado.`);
-      }
-      if (status === 'CLOSED') {
-        Helpers.safeLog('warn', `[Realtime] Canal "${name}" cerrado.`);
-      }
-      if (status === 'CHANNEL_ERROR') {
-        Helpers.safeLog('error', `[Realtime] Error en canal "${name}". Reintentando...`);
-        setTimeout(() => channel.subscribe(), 5000); // Reintento exponencial simple
-      }
-      if (status === 'TIMED_OUT') {
-        Helpers.safeLog('warn', `[Realtime] Canal "${name}" tiempo agotado.`);
-      }
-    });
-  }
-};
-
 /**
  * ensureRole: Verifica el rol del usuario actual y retorna {user, profile}
  */
@@ -321,16 +300,6 @@ export async function ensureRole(requiredRoles) {
   return { user, profile: resolvedProfile };
 }
 
-// ── Notificaciones internas (realtime) ────────────────────────────────────────
-export async function subscribeNotifications(userId, onNotif) {
-  if (!userId) return null;
-  return supabase.channel('notif_' + userId)
-    .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'notifications', filter: 'user_id=eq.' + userId }, (payload) => {
-      if (onNotif) onNotif(payload.new);
-    })
-    .subscribe();
-}
-
 // ── Email via Resend (Edge Function send-email) ───────────────────────────────
 export async function sendEmail(to, subject, html, text) {
   try {
@@ -393,23 +362,15 @@ export async function emitEvent(type, data) {
     if (error) {
       return null;
     }
-    
-    // ✅ Log de éxito para que la Maestra vea la confirmación
-    if (resData?.ok) {
-    }
-    
     return resData;
   } catch (e) {
     return null;
   }
 }
 
-// ── Helpers de eventos específicos ───────────────────────────────────────────
-
-/** Notificar pago aprobado al padre */
+// ── Notificador de pago aprobado (usado por directora/payments_clean.js) ──────
 export async function notifyPaymentApproved(paymentId, parentEmail, studentName, amount, month) {
   return Promise.all([
-    // sendPush needs parent UUID — fetch it from the payment record
     (async () => {
       try {
         const { data: p } = await supabase
@@ -425,26 +386,6 @@ export async function notifyPaymentApproved(paymentId, parentEmail, studentName,
     })(),
     emitEvent('payment.approved', { payment_id: paymentId, parent_email: parentEmail, student_name: studentName, amount, month })
   ]);
-}
-
-/** Notificar entrada/salida al padre */
-export async function notifyAttendance(parentEmail, studentName, type, time) {
-  return emitEvent('attendance.' + type, { parent_email: parentEmail, student_name: studentName, time });
-}
-
-/** Notificar incidente al padre */
-export async function notifyIncident(parentEmail, studentName, severity, description) {
-  return emitEvent('incident.reported', { parent_email: parentEmail, student_name: studentName, severity, description });
-}
-
-/** Notificar nueva tarea a los padres del aula */
-export async function notifyTaskCreated(classroomId, title, dueDate) {
-  return emitEvent('task.created', { classroom_id: classroomId, title, due_date: dueDate });
-}
-
-/** Notificar comprobante subido al staff */
-export async function notifyReceiptUploaded(studentId, amount, month) {
-  return emitEvent('payment.receipt_uploaded', { student_id: studentId, amount, month });
 }
 
 // ── OneSignal ─────────────────────────────────────────────────────────────────

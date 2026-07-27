@@ -1,7 +1,3 @@
-self.addEventListener('message', (event) => {
-  // Manejador preventivo para evitar el error de registro tardío (sw.ts:21)
-});
-
 /**
  * Karpus Kids — Service Worker PWA
  * IMPORTANTE: Este SW solo maneja caché PWA.

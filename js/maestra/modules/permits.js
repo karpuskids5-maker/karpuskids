@@ -1,7 +1,6 @@
 import { supabase } from '/js/shared/supabase.js';
 import { TABLES } from '/js/shared/constants.js';
 import { Helpers } from '/js/shared/helpers.js';
-import { UI } from './ui.js';
 
 export const PermitsModule = {
   async init() {
@@ -82,7 +81,6 @@ export const PermitsModule = {
       }).join('');
 
     } catch (err) {
-      console.error(err);
       tbody.innerHTML = '<tr><td colspan="3" class="text-center py-8 text-rose-500 font-bold">Error al cargar historial.</td></tr>';
     }
   }

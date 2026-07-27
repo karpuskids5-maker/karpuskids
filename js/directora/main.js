@@ -395,8 +395,6 @@ document.addEventListener('DOMContentLoaded', async () => {
     setupSearch('searchStudent', 'students');
     setupSearch('searchGradeStudent', 'grades');
     setupSearch('searchPaymentStudent', 'payments');
-    setupSearch('wallSearch', 'wall');
-    setupSearch('chatSearchInput', 'chat');
 
     // 5c. Badge de mensajes no le�dos (directora)
     loadUnreadMessageBadge(auth.user.id);

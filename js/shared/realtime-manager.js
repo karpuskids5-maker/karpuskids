@@ -63,7 +63,6 @@ export const RealtimeManager = {
   unsubscribe(name) {
     const ch = _channels.get(name);
     if (ch) {
-      console.log(`[RealtimeManager] Unsubscribing: ${name}`);
       supabase.removeChannel(ch);
       _channels.delete(name);
       _retries.delete(name);

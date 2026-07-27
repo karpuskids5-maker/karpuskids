@@ -12,7 +12,5 @@ export const AppState = new SafeAppState({
   activePeriod: null,
   periods: [],
   activeChatUserId: null,
-  activeChatName: null,
-  activeChatRole: null,
   activeConversationId: null
 });

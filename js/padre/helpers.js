@@ -1,16 +1,6 @@
 import { supabase } from '../shared/supabase.js';
 
-export const DATE_FORMAT = { locale: 'es-ES', options: { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' } };
 export const TOAST_DURATION = 2800;
-
-const escapeHtmlMap = {
-  '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
-};
-
-export const escapeHtml = (str = '') => {
-  if (typeof str !== 'string') return '';
-  return str.replace(/[&<>"']/g, m => escapeHtmlMap[m]);
-};
 
 /**
  * ??? HELPERS GLOBALES
@@ -148,7 +138,7 @@ export const Helpers = {
 
       const toast = document.createElement('div');
       toast.className = `fixed bottom-6 right-6 ${map[type] || map.info} text-white px-5 py-3 rounded-2xl shadow-xl z-[9999] transition-all duration-300 opacity-0 translate-y-4 flex items-center gap-3`;
-      toast.innerHTML = `<span class="text-sm font-bold">${escapeHtml(message)}</span>`;
+      toast.innerHTML = `<span class="text-sm font-bold">${Helpers.escapeHTML(message)}</span>`;
 
       document.body.appendChild(toast);
       requestAnimationFrame(() => {
@@ -172,7 +162,7 @@ export const Helpers = {
   emptyState: (msg, icon = '?') => `
     <div class="flex flex-col items-center justify-center py-12 px-4 text-center opacity-60 animate-fade-in">
       <div class="text-4xl mb-3">${icon}</div>
-      <p class="text-sm font-bold text-slate-400 uppercase tracking-widest">${escapeHtml(msg)}</p>
+      <p class="text-sm font-bold text-slate-400 uppercase tracking-widest">${Helpers.escapeHTML(msg)}</p>
     </div>`,
 
   /**
@@ -201,41 +191,6 @@ export const Helpers = {
   },
 
   /**
-   * ?? Calcular mora por d�as de retraso
-   * Regla: mora empieza el d�a 6 del mes siguiente (d�a despu�s del vencimiento d�a 5)
-   * Tasa: 5% del monto base por cada 30 d�as de retraso (m�nimo 1 d�a = 1 d�a de mora)
-   * Se aplica sobre el monto base del pago
-   */
-  calculateMora(dueDate, baseAmount = 0) {
-    if (!dueDate) return 0;
-    const today = new Date(); today.setHours(0,0,0,0);
-    const due   = new Date(dueDate + 'T00:00:00');
-    const daysLate = Math.floor((today - due) / 86400000);
-    if (daysLate <= 0) return 0;
-    // 5% mensual = 0.1667% diario
-    const dailyRate = 0.05 / 30;
-    return Math.round(Number(baseAmount || 0) * dailyRate * daysLate * 100) / 100;
-  },
-
-  /**
-   * ?? Desglose de mora para mostrar en UI
-   */
-  getMoraBreakdown(dueDate, baseAmount = 0) {
-    if (!dueDate) return null;
-    const today = new Date(); today.setHours(0,0,0,0);
-    const due   = new Date(dueDate + 'T00:00:00');
-    const daysLate = Math.floor((today - due) / 86400000);
-    if (daysLate <= 0) return null;
-    const mora = this.calculateMora(dueDate, baseAmount);
-    const weeks = Math.floor(daysLate / 7);
-    const formattedText = daysLate === 1 ? '1 d�a de retraso'
-      : daysLate < 7  ? `${daysLate} d�as de retraso`
-      : weeks === 1   ? '1 semana de retraso'
-      : `${weeks} semanas de retraso`;
-    return { daysLate, mora, formattedText };
-  },
-
-  /**
    * Delegaci�n de eventos segura
    */
   delegate: (el, selector, event, handler) => {
@@ -247,21 +202,3 @@ export const Helpers = {
     });
   }
 };
-
-/**
- * ?? ENV�O DE EMAILS (Proxy a Edge Function)
- */
-export async function sendEmail(to, subject, html) {
-  try {
-    const { data, error } = await supabase.functions.invoke('send-email', {
-      body: { to, subject, html }
-    });
-
-    if (error) {
-      return false;
-    }
-    return true;
-  } catch (e) {
-    return false;
-  }
-}

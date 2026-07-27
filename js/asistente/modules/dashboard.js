@@ -222,7 +222,7 @@ export const DashboardModule = {
         }
       });
     } catch (e) {
-      
+      // Error intentionally ignored (chart render failure is non-critical)
     }
   }
 };

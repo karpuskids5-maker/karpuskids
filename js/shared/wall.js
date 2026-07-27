@@ -1,4 +1,4 @@
-import { supabase, RealtimeUtils } from './supabase.js';
+import { supabase } from './supabase.js';
 import { Helpers } from './helpers.js';
 import { ImageLoader } from './image-loader.js';
 import { QueryCache } from './query-cache.js';

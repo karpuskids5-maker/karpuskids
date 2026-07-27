@@ -150,7 +150,6 @@ document.addEventListener('DOMContentLoaded', async () => {
     _deleteComment: (cid, pid) => import('/js/shared/wall.js').then(m => m.WallModule.deleteComment(cid, pid)),
     _sendComment: (pid) => import('/js/shared/wall.js').then(m => m.WallModule.sendComment(pid)),
     _toggleLike: (pid) => import('/js/shared/wall.js').then(m => m.WallModule.toggleLike(pid)),
-    _selectChatContact: (uid, name, role) => selectAssistantChat(uid, name, role),
     selectChatContact: (uid, name, role) => selectAssistantChat(uid, name, role),
     _openStudentModal: (id) => import('./modules/students.js').then(m => m.StudentsModule.openModal(id)),
     _deleteStudent: (id, name) => import('./modules/students.js').then(m => m.StudentsModule._deleteStudent(id, name)),
@@ -766,8 +765,6 @@ window.selectAssistantChat = async (userId, name, role, avatarUrl = null) => {
 
     // ✅ Reset UI al cambiar de chat
     AppState.set('activeChatUserId', userId);
-    AppState.set('activeChatName', name);
-    AppState.set('activeChatRole', role);
 
     const container = document.getElementById('chatMessagesContainer');
   if (container) container.innerHTML = '<div class="p-8 text-center"><div class="animate-spin w-6 h-6 border-2 border-teal-500 border-t-transparent rounded-full mx-auto"></div></div>';
@@ -969,7 +966,7 @@ async function initAssistantChat() {
       
       // Typing broadcast
       let t;
-      input.oninput = () => {
+      input.oninput = async () => {
         const cid = AppState.get('activeConversationId');
         if (!cid) return;
         (await getChatModule()).broadcastTyping(cid, profile?.name, true);

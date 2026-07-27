@@ -1,5 +1,5 @@
 import { supabase } from '../shared/supabase.js';
-import { AppState, TABLES, CacheKeys } from './appState.js';
+import { AppState, TABLES } from './appState.js';
 import { Helpers, escapeHtml } from './helpers.js';
 import { OfflineCache } from '../shared/offline-cache.js';
 

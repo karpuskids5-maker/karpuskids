@@ -20,7 +20,6 @@ export async function initAttendance() {
   const students = AppState.get('students') || []; // Usamos estudiantes ya cargados
   const today = new Date().toISOString().split('T')[0];
 
-  const container = document.getElementById('tab-attendance'); // Ajuste de contenedor si es necesario
   const listContainer = document.getElementById('attendanceList');
   
   if (!listContainer) return;

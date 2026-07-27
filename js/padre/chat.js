@@ -215,12 +215,6 @@ export const ChatModule = {
     return div;
   },
 
-  _appendMessage(m, myId) {
-    const container = document.getElementById('chatMessages');
-    if (!container) return;
-    container.appendChild(this._buildBubble(m, myId));
-  },
-
   async sendMessage() {
     const input = document.getElementById('messageInput');
     if (!input) return;
@@ -328,9 +322,5 @@ export const ChatModule = {
         }
       }
     );
-  },
-
-  _scrollToBottom() {
-    ScrollModule.scrollToBottom(document.getElementById('chatMessages'));
   }
 };

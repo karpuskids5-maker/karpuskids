@@ -1,4 +1,4 @@
-import { supabase, RealtimeUtils } from '../shared/supabase.js';
+import { supabase } from '../shared/supabase.js';
 import { AppState, TABLES } from './appState.js';
 import { Helpers, escapeHtml } from './helpers.js';
 import { ImageLoader } from '../shared/image-loader.js';
@@ -73,23 +73,6 @@ export const FeedModule = {
         </div>`;
       if (window.lucide) lucide.createIcons();
     }
-  },
-
-  /**
-   * Renderiza los posts en la UI
-   */
-  renderFeed(posts) {
-    const container = document.getElementById('classFeed');
-    if (!container) return;
-
-    if (!posts.length) {
-      container.innerHTML = Helpers.emptyState('No hay publicaciones en este momento', '📢');
-      return;
-    }
-
-    container.innerHTML = posts.map(p => this.createPostHTML(p)).join('');
-    if (window.lucide) lucide.createIcons();
-    ImageLoader.observe(container);
   },
 
   /**
@@ -191,20 +174,6 @@ export const FeedModule = {
   },
 
   /**
-   * Muestra/oculta sección de comentarios usando WallModule compartido
-   */
-  showComments(postId) {
-    // Usar WallModule si está disponible (compartido con directora/maestra)
-    if (window.WallModule?.toggleCommentSection) {
-      window.WallModule.toggleCommentSection(postId);
-      return;
-    }
-    // Fallback: toggle inline
-    const section = document.getElementById(`comments-section-${postId}`);
-    if (section) section.classList.toggle('hidden');
-  },
-
-  /**
    * Envía un comentario en un post
    */
   async sendComment(postId) {
@@ -277,57 +246,6 @@ export const FeedModule = {
       input.value = content; // restaurar el texto
       Helpers.toast('Error al enviar comentario', 'error');
     }
-  },
-
-  /**
-   * Realtime para el muro
-   * Escucha posts del aula Y posts generales (classroom_id IS NULL)
-   */
-  initRealtime() {
-    if (this._channel) supabase.removeChannel(this._channel);
-
-    this._channel = supabase
-      .channel(`feed_padre_${this._classroomId}`)
-      .on('postgres_changes', {
-        event: '*',
-        schema: 'public',
-        table: 'posts'
-      }, (payload) => {
-        const { eventType, new: newPost, old: oldPost } = payload;
-
-        // Filtrar por aula si aplica
-        if (this._classroomId && newPost.classroom_id && newPost.classroom_id !== this._classroomId) {
-          return;
-        }
-
-        if (eventType === 'INSERT') {
-          Helpers.toast('📢 Nueva publicación en el muro', 'info');
-          this.loadPosts(); 
-        }
-
-        if (eventType === 'UPDATE') {
-          // Sincronizar contadores de likes/comentarios sin recargar todo
-          const btnLike = document.querySelector(`[data-action="like"][data-post-id="${newPost.id}"]`);
-          const btnComm = document.querySelector(`[data-action="comment"][data-post-id="${newPost.id}"]`);
-
-          if (btnLike && typeof newPost.likes_count === 'number') {
-            const span = btnLike.querySelector('span') || btnLike;
-            span.textContent = `${newPost.likes_count} Me gusta`;
-          }
-
-          if (btnComm && typeof newPost.comments_count === 'number') {
-            const span = btnComm.querySelector('span') || btnComm;
-            span.textContent = `${newPost.comments_count} Comentarios`;
-          }
-        }
-
-        if (eventType === 'DELETE') {
-          const postEl = document.querySelector(`[data-post-id="${oldPost.id}"]`)?.closest('.animate-fade-in');
-          if (postEl) postEl.remove();
-        }
-      });
-
-    RealtimeUtils.monitorChannel(this._channel, `FeedPadre_${this._classroomId}`);
   },
 
   /**

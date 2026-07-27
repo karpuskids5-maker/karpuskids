@@ -18,19 +18,6 @@ function createInitialState() {
       selected: null,
       filters: { search: '', classroom: '', status: 'all' }
     },
-    classrooms: {
-      all: [],
-      selected: null
-    },
-    teachers: {
-      all: [],
-      selected: null
-    },
-    payments: {
-      all: [],
-      filters: { status: 'all', year: new Date().getFullYear(), search: '' },
-      selected: null
-    },
     attendance: {
       entries: [],
       selectedDate: new Date().toISOString().split('T')[0],
@@ -41,20 +28,15 @@ function createInitialState() {
       filters: { status: 'all' },
       selected: null
     },
-    chat: {
-      contacts: [],
-      selectedUser: null,
-      messages: [],
-      unreadCount: 0
+    teachers: {
+      all: [],
+      selected: null
     },
-    wall: {
-      posts: [],
-      page: 1,
-      hasMore: true
-    },
-    // School Engine
-    schoolYear: null,
-    activePeriod: null
+    payments: {
+      all: [],
+      filters: { status: 'all', year: new Date().getFullYear(), search: '' },
+      selected: null
+    }
   };
 }
 

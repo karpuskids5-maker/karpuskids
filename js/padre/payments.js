@@ -3,7 +3,7 @@
  */
 import { supabase } from '../shared/supabase.js';
 import { AppState, TABLES } from './appState.js';
-import { Helpers, escapeHtml } from './helpers.js';
+import { Helpers } from './helpers.js';
 import { calcMora, getMoraBreakdown, normalizeStatus, daysUntilDue } from '../shared/payment-service.js';
 import { emitEvent } from '../shared/supabase.js';
 
@@ -298,10 +298,10 @@ export const PaymentsModule = {
                 ${mora > 0 ? '⚠️' : (isPaid ? '✅' : (p.method === 'transferencia' ? '🏦' : '💵'))}
               </div>
               <div class="min-w-0">
-                <p class="font-black text-slate-800 text-sm truncate">${escapeHtml(p.month_paid || 'Colegiatura')}</p>
+                <p class="font-black text-slate-800 text-sm truncate">${Helpers.escapeHTML(p.month_paid || 'Colegiatura')}</p>
                 <div class="flex items-center gap-1.5 mt-0.5 flex-wrap">
                   <span class="text-[9px] font-bold text-slate-400 uppercase">${Helpers.formatDate(p.created_at)}</span>
-                  ${p.bank ? `<span class="text-[9px] font-bold text-slate-500 bg-slate-100 px-1.5 py-0.5 rounded-full">🏦 ${escapeHtml(p.bank)}</span>` : ''}
+                  ${p.bank ? `<span class="text-[9px] font-bold text-slate-500 bg-slate-100 px-1.5 py-0.5 rounded-full">🏦 ${Helpers.escapeHTML(p.bank)}</span>` : ''}
                   ${urgencyBadge}
                 </div>
                 ${p.due_date && !isPaid ? `<p class="text-[9px] font-black uppercase mt-0.5 ${mora > 0 ? 'text-rose-500' : 'text-slate-400'}">Vence: ${new Date(p.due_date + 'T00:00:00').toLocaleDateString('es-DO')}</p>` : ''}
@@ -688,9 +688,7 @@ export const PaymentsModule = {
         try {
           const { ImageLoader } = await import('../shared/image-loader.js');
           uploadFile = await ImageLoader.compress(file, { maxWidth: 1000, maxHeight: 1000, quality: 0.8, maxSizeKB: 400 });
-        } catch (err) {
-          console.warn('Fallo compresión, subiendo original:', err);
-        }
+        } catch (_) {}
       }
 
       setP(20);
@@ -798,27 +796,6 @@ export const PaymentsModule = {
       </div>`;
     container.insertBefore(el, container.firstChild);
     setTimeout(() => { el.style.opacity='0'; el.style.transition='opacity 0.4s'; setTimeout(()=>el.remove(),400); }, 8000);
-  },
-
-  _compressImage(file, maxWidth=800, quality=0.8) {
-    return new Promise((resolve, reject) => {
-      const img = new Image();
-      const url = URL.createObjectURL(file);
-      img.onload = () => {
-        URL.revokeObjectURL(url);
-        const canvas = document.createElement('canvas');
-        let w = img.width, h = img.height;
-        if (w > maxWidth) { h = Math.round(h * maxWidth / w); w = maxWidth; }
-        canvas.width = w; canvas.height = h;
-        canvas.getContext('2d').drawImage(img, 0, 0, w, h);
-        canvas.toBlob(
-          blob => blob ? resolve(new File([blob], file.name, {type:'image/jpeg'})) : reject(new Error('Compresión fallida')),
-          'image/jpeg', quality
-        );
-      };
-      img.onerror = reject;
-      img.src = url;
-    });
   }
 };
 

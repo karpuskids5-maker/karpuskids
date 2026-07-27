@@ -7,17 +7,7 @@ export const Helpers = {
   /**
    * 🛡️ Escapar HTML
    */
-  escapeHTML(str = '') {
 
-    return String(str)
-
-      .replace(/&/g, '&amp;')
-      .replace(/</g, '&lt;')
-      .replace(/>/g, '&gt;')
-      .replace(/"/g, '&quot;')
-      .replace(/'/g, '&#039;');
-
-  },
 
   /**
    * Helper para asignar texto a un elemento por ID
@@ -553,23 +543,7 @@ export const Helpers = {
   },
 
 
-  /**
-   * 🖼️ avatar fallback — con lazy loading
-   */
-  avatar(url, name = '') {
-    if (url) {
-      // Usar data-src para lazy loading via ImageLoader
-      return `<img
-        src="data:image/jpeg;base64,/9j/4AAQSkZJRgABAQAAAQABAAD/2wBDAAgGBgcGBQgHBwcJCQgKDBQNDAsLDBkSEw8UHRofHh0aHBwgJC4nICIsIxwcKDcpLDAxNDQ0Hyc5PTgyPC4zNDL/wAARCAABAAEDASIAAhEBAxEB/8QAFAABAAAAAAAAAAAAAAAAAAAACf/EABQQAQAAAAAAAAAAAAAAAAAAAAD/xAAUAQEAAAAAAAAAAAAAAAAAAAAA/8QAFBEBAAAAAAAAAAAAAAAAAAAAAP/aAAwDAQACEQMRAD8AJQAB/9k="
-        data-src="${url}"
-        data-fallback="img/mundo.jpg"
-        class="karpus-img karpus-img-loading w-full h-full object-cover"
-        loading="lazy"
-        decoding="async">`;
-    }
-    const letter = name?.charAt(0)?.toUpperCase() || '?';
-    return `<div class="w-full h-full bg-indigo-100 flex items-center justify-center text-indigo-600 font-black">${letter}</div>`;
-  },
+
 
   /**
    * ⏳ debounce pro
@@ -695,19 +669,7 @@ export const Helpers = {
   },
 
 
-  /**
-   * ⏱️ sleep async
-   */
-  sleep(ms = 300) {
 
-    return new Promise(
-
-      resolve =>
-        setTimeout(resolve, ms)
-
-    );
-
-  },
 
 
   /**
@@ -738,30 +700,7 @@ export const Helpers = {
   },
 
 
-  /**
-   * 📅 formato corto
-   */
-  formatShortDate(date) {
 
-    if (!date) return '';
-
-    return new Date(date)
-
-      .toLocaleDateString(
-
-        'es-DO',
-
-        {
-
-          day: 'numeric',
-
-          month: 'short'
-
-        }
-
-      );
-
-  },
 
 
   /**
