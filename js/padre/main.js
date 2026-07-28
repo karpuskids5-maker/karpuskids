@@ -261,20 +261,31 @@ async function refreshDashboard() {
     String(now.getDate()).padStart(2, '0');
 
   // Carga paralela — allSettled para que un fallo no bloquee el resto
-  const [financeRes, academicRes, logsRes, todayAttRes] = await Promise.allSettled([
+  const [financeRes, academicRes, logsRes, todayAttRes, scheduleRes] = await Promise.allSettled([
     Api.getStudentFinancialStatus(student.id),
     Api.getStudentGrades(student.id),
     Api.getDailyLog(student.id, today),
-    supabase.from('attendance').select('status').eq('student_id', student.id).eq('date', today).maybeSingle()
+    supabase.from('attendance').select('status').eq('student_id', student.id).eq('date', today).maybeSingle(),
+    Api.getClassroomSchedule(student.classroom_id).catch(() => [])
   ]);
 
-  const finance  = financeRes.status  === 'fulfilled' ? financeRes.value  : null;
-  const academic = academicRes.status === 'fulfilled' ? academicRes.value : null;
-  let   logs     = logsRes.status     === 'fulfilled' ? logsRes.value     : null;
-  const todayAtt = todayAttRes.status === 'fulfilled' ? todayAttRes.value?.data : null;
+  const finance   = financeRes.status  === 'fulfilled' ? financeRes.value  : null;
+  const academic  = academicRes.status === 'fulfilled' ? academicRes.value : null;
+  let   logs      = logsRes.status     === 'fulfilled' ? logsRes.value     : null;
+  const todayAtt  = todayAttRes.status === 'fulfilled' ? todayAttRes.value?.data : null;
+  const rawSchedule = scheduleRes.status === 'fulfilled' ? (scheduleRes.value || []) : [];
+  // Normalizar formato del horario
+  const schedule = rawSchedule.map(s => ({
+    type: s.event_type,
+    label: s.event_label,
+    icon: s.event_icon,
+    hour: s.scheduled_hour,
+    minute: s.scheduled_minute,
+    duration: s.duration_minutes,
+  }));
 
   // Registrar errores si fallaron promesas críticas
-  [financeRes, academicRes, logsRes, todayAttRes].forEach((res, i) => {
+  [financeRes, academicRes, logsRes, todayAttRes, scheduleRes].forEach((res, i) => {
     if (res.status === 'rejected') {
       import('../shared/db-utils.js').then(({ safeHandle }) => {
         safeHandle(res.reason, `refreshDashboard.Promise[${i}]`);
@@ -287,7 +298,7 @@ async function refreshDashboard() {
   AppState.set('todayAttendance', todayAtt?.status || null);
 
   renderHomeCards(student, { finance, academic, todayAtt: todayAtt?.status });
-  renderDailySummary(logs);
+  renderDailySummary(logs, schedule);
 
   // 🚨 Banner de deuda vencida
   _updateDebtBanner(finance);
@@ -464,7 +475,7 @@ function renderHomeCards(student, data) {
 }
 
 // ── Reporte Diario ────────────────────────────────────────────────────────────
-function renderDailySummary(log) {
+function renderDailySummary(log, schedule = []) {
   const container = document.getElementById('dailySummaryCard');
   if (!container) return;
 
@@ -520,44 +531,75 @@ function renderDailySummary(log) {
   // ── Construir filas de la timeline resumida ────────────────────────────
   const rows = [];
 
-  // Ánimo
-  if (log.mood) rows.push({ icon: moodIcon, label: moodLabel[(log.mood||'').toLowerCase()] || log.mood, sub: 'Estado de ánimo', time: fmtTime(log.created_at), color: 'bg-orange-50 border-orange-200' });
+  // Si hay horario, mostrar los eventos del horario como timeline principal
+  const _DEFAULT_SCHEDULE = [
+    { type: 'bienvenida', label: 'Bienvenida', hour: 7,  minute: 30, duration: 30, icon: '👋' },
+    { type: 'desayuno',   label: 'Desayuno',   hour: 8,  minute: 0,  duration: 60, icon: '🍞' },
+    { type: 'actividad',  label: 'Actividad',  hour: 9,  minute: 0,  duration: 30, icon: '📚' },
+    { type: 'bano',       label: 'Baño',       hour: 9,  minute: 30, duration: 30, icon: '🚽' },
+    { type: 'patio',      label: 'Patio',      hour: 10, minute: 0,  duration: 90, icon: '🌳' },
+    { type: 'almuerzo',   label: 'Almuerzo',   hour: 11, minute: 30, duration: 60, icon: '🥗' },
+    { type: 'siesta',     label: 'Siesta',     hour: 12, minute: 30, duration: 90, icon: '😴' },
+    { type: 'merienda',   label: 'Merienda',   hour: 14, minute: 0,  duration: 60, icon: '🍎' },
+    { type: 'biberon',    label: 'Biberón',    hour: 15, minute: 0,  duration: 30, icon: '🍼' },
+  ];
+  const sched = (schedule && schedule.length) ? schedule : _DEFAULT_SCHEDULE;
+  const schedIcons = {
+    bienvenida: '👋', desayuno: '🍞', actividad: '📚', bano: '🚽',
+    patio: '🌳', almuerzo: '🥗', siesta: '😴', merienda: '🍎', biberon: '🍼'
+  };
 
-  // Desayuno / Almuerzo / Merienda desde eventos
-  mealEvents.forEach(e => {
-    const label = foodLabelMap[e.value || e.food] || (e.value || '');
-    rows.push({ icon: mealEmoji[e.type] || '🍽️', label: label || 'Registrado', sub: e.type.charAt(0).toUpperCase() + e.type.slice(1), time: fmtTime(e.created_at), color: 'bg-green-50 border-green-200' });
+  // Mapear eventos logueados por tipo
+  const loggedByType = {};
+  events.forEach(ev => {
+    if (!loggedByType[ev.type]) loggedByType[ev.type] = [];
+    loggedByType[ev.type].push(ev);
   });
 
-  // Comida general si no hay eventos específicos de comida
-  if (!mealEvents.length && log.food) {
-    rows.push({ icon: '🍽️', label: foodLabelMap[(log.food||'').toLowerCase()] || log.food, sub: 'Alimentación', time: '', color: 'bg-green-50 border-green-200' });
-  }
+  // Agregar cada slot del horario
+  sched.forEach(s => {
+    const sMins = s.hour * 60 + s.minute;
+    const hh = s.hour > 12 ? s.hour - 12 : (s.hour === 0 ? 12 : s.hour);
+    const ampm = s.hour >= 12 ? 'PM' : 'AM';
+    const timeStr = `${hh}:${String(s.minute).padStart(2,'0')} ${ampm}`;
 
-  // Biberones
-  if (totalOz > 0) rows.push({ icon: '🍼', label: `${totalOz} oz totales`, sub: `${biberones.length} toma${biberones.length > 1 ? 's' : ''}`, time: biberones.length ? fmtTime(biberones[biberones.length-1].created_at) : '', color: 'bg-blue-50 border-blue-200' });
+    const evType = s.type;
+    const matchingEvents = loggedByType[evType] || [];
+    // Para biberón, también checar structured_entry y milk
+    const milkEvents = (loggedByType['biberon'] || []).concat(loggedByType['milk'] || []).concat(loggedByType['structured_entry'] || []);
+    const isBiberon = evType === 'biberon';
+    const hasLogged = isBiberon ? milkEvents.length > 0 : matchingEvents.length > 0;
+    const icon = s.icon || schedIcons[s.type] || '⏰';
 
-  // Siestas
-  siestasInfo.forEach((s, i) => {
-    const napLabel = s.open ? `Durmiendo desde ${s.inicio}` : `${s.inicio} → ${s.fin}`;
-    const napSub   = s.open ? 'En curso' : (s.dur !== '–' ? `Duración: ${s.dur}` : 'Siesta');
-    rows.push({ icon: s.open ? '😴' : '💤', label: napLabel, sub: napSub, time: s.open ? '' : s.fin, color: 'bg-indigo-50 border-indigo-200' });
+    // Detail
+    let detail = s.label;
+    if (hasLogged && isBiberon) {
+      const totalOz = milkEvents.reduce((sum, e) => sum + parseFloat(e.oz || e.milk || e.value || 0), 0);
+      if (totalOz > 0) detail = `${s.label} — ${totalOz} oz`;
+    } else if (hasLogged && evType === 'siesta') {
+      const totalMins = (loggedByType['siesta'] || []).reduce((sum, e) => sum + (e.duration_min || 0), 0);
+      const open = (loggedByType['siesta'] || []).some(e => e.open);
+      if (open) detail = `${s.label} — En curso`;
+      else if (totalMins > 0) detail = `${s.label} — ${totalMins}min`;
+    } else if (hasLogged && matchingEvents[0]) {
+      const first = matchingEvents[0];
+      if (first.food) detail = `${s.label} — ${foodLabelMap[first.food] || first.food}`;
+      else if (first.mood) detail = `${s.label} — ${moodLabel[first.mood] || first.mood}`;
+      else if (first.comment) detail = `${s.label} — ${first.comment}`;
+    }
+
+    const bgCls = hasLogged ? 'bg-green-50 border-green-200' : 'bg-slate-50 border-slate-100';
+    rows.push({ icon, label: detail, sub: timeStr, time: '', color: bgCls });
   });
-  if (!siestasInfo.length && log.nap) {
-    rows.push({ icon: log.nap === 'si' ? '💤' : '☀️', label: log.nap === 'si' ? 'Durmió su siesta' : 'No durmió', sub: totalNapMins > 0 ? `Duración: ${minsDur(totalNapMins)}` : 'Siesta', time: '', color: 'bg-indigo-50 border-indigo-200' });
-  }
 
-  // Pañales
-  if (wetCount > 0 || dirtyCount > 0) rows.push({ icon: '🚼', label: `${wetCount} mojado${wetCount !== 1 ? 's' : ''}  ·  ${dirtyCount} sucio${dirtyCount !== 1 ? 's' : ''}`, sub: 'Cambios de pañal', time: '', color: 'bg-sky-50 border-sky-200' });
-
-  // Temperatura
-  if (lastTemp) {
-    const isFever = parseFloat(lastTemp.temp) >= 37.5;
-    rows.push({ icon: isFever ? '🔥' : '🌡️', label: `${lastTemp.temp}°C ${isFever ? '— Fiebre' : '— Normal'}`, sub: 'Temperatura', time: fmtTime(lastTemp.created_at), color: isFever ? 'bg-rose-50 border-rose-200' : 'bg-slate-50 border-slate-200' });
-  }
-
-  // Notas
-  if (log.notes) rows.push({ icon: '📝', label: log.notes.length > 60 ? log.notes.substring(0, 60) + '…' : log.notes, sub: 'Nota de la maestra', time: '', color: 'bg-amber-50 border-amber-200' });
+  // Agregar eventos extra que no están en el horario
+  const schedTypes = new Set(sched.map(s => s.type));
+  events.filter(e => !schedTypes.has(e.type)).forEach(ev => {
+    const eMeta = { biberon:'🍼', panal_humedo:'💧', panal_sucio:'💩', siesta:'😴', temperatura:'🌡️', medicamento:'💊', bano:'🚽', animo:'😊', nota:'📝', fiebre:'🤒', accidente:'🩹', golpe:'🤕', llamada_padres:'📞', medicamento_extra:'💊', otro:'📋' };
+    const icon = eMeta[ev.type] || '📋';
+    const label = ev.type.charAt(0).toUpperCase() + ev.type.slice(1).replace('_', ' ');
+    rows.push({ icon, label, sub: fmtTime(ev.created_at), time: '', color: 'bg-amber-50 border-amber-200' });
+  });
 
   // ── Render ──────────────────────────────────────────────────────────────
   const rowsHTML = rows.map(r => `
@@ -1065,8 +1107,16 @@ function _initDailyLogRealtime(studentId) {
         String(now.getMonth() + 1).padStart(2, '0') + '-' +
         String(now.getDate()).padStart(2, '0');
       try {
-        const log = await Api.getDailyLog(studentId, today);
-        renderDailySummary(log);
+        const student = AppState.get('currentStudent');
+        const [log, rawSched] = await Promise.all([
+          Api.getDailyLog(studentId, today),
+          student?.classroom_id ? Api.getClassroomSchedule(student.classroom_id).catch(() => []) : Promise.resolve([])
+        ]);
+        const schedNorm = (rawSched || []).map(s => ({
+          type: s.event_type, label: s.event_label, icon: s.event_icon,
+          hour: s.scheduled_hour, minute: s.scheduled_minute, duration: s.duration_minutes,
+        }));
+        renderDailySummary(log, schedNorm);
       } catch (_) {}
     })
     .subscribe();

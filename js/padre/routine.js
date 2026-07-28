@@ -7,6 +7,7 @@
 import { supabase } from '../shared/supabase.js';
 import { Api } from './api.js';
 import { Helpers } from './helpers.js';
+import { AppState } from './appState.js';
 
 // ── Constantes ────────────────────────────────────────────────────────────────
 const EVENT_META = {
@@ -83,12 +84,27 @@ async function _loadAndRender(studentId, date) {
     const monthStart = date.substring(0, 8) + '01';
     const weekAgo    = (() => { const d = new Date(date); d.setDate(d.getDate() - 6); return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`; })();
 
-    const [log, weekLogs] = await Promise.all([
+    // Obtener classroom_id del estudiante actual para cargar el horario
+    const student = AppState.get('currentStudent') || {};
+    const classroomId = student?.classroom_id;
+
+    const [log, weekLogs, rawSchedule] = await Promise.all([
       Api.getDailyLog(studentId, date),
-      Api.getDailyLogsRange(studentId, monthStart < weekAgo ? weekAgo : monthStart, today)
+      Api.getDailyLogsRange(studentId, monthStart < weekAgo ? weekAgo : monthStart, today),
+      classroomId ? Api.getClassroomSchedule(classroomId).catch(() => []) : Promise.resolve([])
     ]);
 
-    container.innerHTML = _renderFullPanel(log, weekLogs || [], date, studentId);
+    // Normalizar formato del horario (DB usa scheduled_hour/scheduled_minute, internamente usamos hour/minute)
+    const schedule = (rawSchedule || []).map(s => ({
+      type: s.event_type,
+      label: s.event_label,
+      icon: s.event_icon,
+      hour: s.scheduled_hour,
+      minute: s.scheduled_minute,
+      duration: s.duration_minutes,
+    }));
+
+    container.innerHTML = _renderFullPanel(log, weekLogs || [], date, studentId, schedule);
     if (window.lucide) window.lucide.createIcons();
   } catch (e) {
     console.error(e);
@@ -133,7 +149,7 @@ function _renderSkeleton() {
 }
 
 // ── RENDER PANEL COMPLETO ────────────────────────────────────────────────────
-function _renderFullPanel(log, weekLogs, date, studentId) {
+function _renderFullPanel(log, weekLogs, date, studentId, schedule = []) {
   const events    = log ? (log.events || log.infant_data || []) : [];
   const lastUpdate = log?.created_at ? `Actualizado ${_formatTime(log.created_at)}` : '';
   const isToday   = date === _todayStr();
@@ -205,7 +221,7 @@ function _renderFullPanel(log, weekLogs, date, studentId) {
     </div>` : ''}
 
     <!-- TIMELINE DE EVENTOS -->
-    ${_renderTimeline(events)}
+    ${_renderTimeline(events, schedule, date)}
 
     `}
 
@@ -266,23 +282,136 @@ function _renderDayStats(napMins, totalOz, wetDiapers, dirtyDiapers, events) {
 }
 
 // ── TIMELINE DE EVENTOS ───────────────────────────────────────────────────────
-function _renderTimeline(events) {
-  if (!events.length) return '';
-  const sorted = [...events].sort((a,b) => new Date(b.created_at) - new Date(a.created_at));
+const _DEFAULT_SCHEDULE = [
+  { type: 'bienvenida', label: 'Bienvenida', hour: 7,  minute: 30, duration: 30, icon: '👋' },
+  { type: 'desayuno',   label: 'Desayuno',   hour: 8,  minute: 0,  duration: 60, icon: '🍞' },
+  { type: 'actividad',  label: 'Actividad',  hour: 9,  minute: 0,  duration: 30, icon: '📚' },
+  { type: 'bano',       label: 'Baño',       hour: 9,  minute: 30, duration: 30, icon: '🚽' },
+  { type: 'patio',      label: 'Patio',      hour: 10, minute: 0,  duration: 90, icon: '🌳' },
+  { type: 'almuerzo',   label: 'Almuerzo',   hour: 11, minute: 30, duration: 60, icon: '🥗' },
+  { type: 'siesta',     label: 'Siesta',     hour: 12, minute: 30, duration: 90, icon: '😴' },
+  { type: 'merienda',   label: 'Merienda',   hour: 14, minute: 0,  duration: 60, icon: '🍎' },
+  { type: 'biberon',    label: 'Biberón',    hour: 15, minute: 0,  duration: 30, icon: '🍼' },
+];
 
-  const items = sorted.map(ev => {
+function _formatTime12(h, m) {
+  const hh = h > 12 ? h - 12 : (h === 0 ? 12 : h);
+  const ampm = h >= 12 ? 'PM' : 'AM';
+  return `${hh}:${String(m).padStart(2,'0')} ${ampm}`;
+}
+
+function _renderTimeline(events, schedule = [], date = '') {
+  const sched = schedule.length ? schedule : _DEFAULT_SCHEDULE;
+  const isToday = date === _todayStr();
+  const now = isToday ? new Date() : null;
+  const nowMins = now ? now.getHours() * 60 + now.getMinutes() : -1;
+
+  // Mapear eventos logueados por tipo para saber cuáles ya tienen registro
+  const loggedByType = {};
+  events.forEach(ev => {
+    if (!loggedByType[ev.type]) loggedByType[ev.type] = [];
+    loggedByType[ev.type].push(ev);
+  });
+
+  // Encontrar el slot activo (el más reciente que ya pasó o está pasando)
+  let activeIdx = -1;
+  if (isToday) {
+    for (let i = sched.length - 1; i >= 0; i--) {
+      const slotMins = sched[i].hour * 60 + sched[i].minute;
+      if (nowMins >= slotMins) { activeIdx = i; break; }
+    }
+  }
+
+  // Construir items del timeline combinando schedule + eventos extra
+  const scheduleItems = sched.map((ev, i) => {
+    const timeStr = _formatTime12(ev.hour, ev.minute);
+    const endMins = ev.hour * 60 + ev.minute + (ev.duration || 30);
+    const endTimeStr = _formatTime12(Math.floor(endMins / 60), endMins % 60);
+    const isPast = i < activeIdx;
+    const isActive = i === activeIdx;
+    const isFuture = i > activeIdx;
+
+    // Verificar si este tipo de evento tiene registros
+    const evType = ev.type;
+    const logged = loggedByType[evType] || [];
+    const hasLogged = logged.length > 0;
+
+    // Para biberón, también checar structured_entry y milk
+    const hasMilkLogged = (loggedByType['biberon'] || []).length > 0 ||
+                          (loggedByType['milk'] || []).length > 0 ||
+                          (loggedByType['structured_entry'] || []).length > 0;
+
+    const isLogged = evType === 'biberon' ? hasMilkLogged : hasLogged;
+
+    // Icono del schedule o del EVENT_META
+    const icon = ev.icon || EVENT_META[evType]?.icon || '⏰';
+
+    // Construir detalle
+    let detail = '';
+    if (isLogged && evType === 'biberon') {
+      const totalOz = (loggedByType['biberon'] || [])
+        .concat(loggedByType['milk'] || [])
+        .reduce((sum, e) => sum + parseFloat(e.oz || e.milk || e.value || 0), 0);
+      detail = totalOz > 0 ? `${totalOz} oz` : '';
+    } else if (isLogged && evType === 'siesta') {
+      const siestaEvs = loggedByType['siesta'] || [];
+      const totalMins = siestaEvs.reduce((sum, e) => sum + (e.duration_min || 0), 0);
+      if (totalMins > 0) detail = _minsToDuration(totalMins);
+    } else if (isLogged && logged[0]) {
+      // Tomar detalle del primer evento logueado de este tipo
+      const firstEv = logged[0];
+      if (firstEv.comment) detail = firstEv.comment;
+      else if (firstEv.value) detail = String(firstEv.value);
+    }
+
+    // Color/estilo según estado
+    let statusBadge = '';
+    if (isActive) {
+      statusBadge = '<span class="px-2 py-0.5 bg-[#FF8A00] text-white text-[7px] font-black uppercase rounded-lg animate-pulse">AHORA</span>';
+    } else if (isPast) {
+      statusBadge = isLogged
+        ? '<span class="px-2 py-0.5 bg-green-100 text-[#28B54D] text-[7px] font-black uppercase rounded-lg">✓ Hecho</span>'
+        : '<span class="px-2 py-0.5 bg-slate-100 text-slate-400 text-[7px] font-black uppercase rounded-lg">—</span>';
+    }
+
+    const borderCls = isActive
+      ? 'border-2 border-[#FF8A00]/30 bg-gradient-to-r from-[#FF8A00]/5 to-orange-50/50 shadow-sm'
+      : isPast && isLogged
+        ? 'border-2 border-green-100 bg-green-50/30'
+        : 'border-2 border-transparent';
+
+    return `
+    <div class="relative flex items-start gap-4 p-3 rounded-2xl ${borderCls}">
+      <div class="w-9 h-9 rounded-xl flex items-center justify-center text-base shrink-0 z-10 ${isActive ? 'shadow-md' : ''}"
+        style="${isActive ? 'background:linear-gradient(135deg, #FF8A00, #f97316);color:white;box-shadow:0 4px 12px rgba(255,138,0,0.3);' : 'background:white;border:2px solid #f1f5f9;'}">
+        ${icon}
+      </div>
+      <div class="flex-1 pb-1">
+        <div class="flex items-center gap-2 mb-0.5">
+          <span class="text-[11px] font-black ${isActive ? 'text-[#FF8A00]' : isPast ? 'text-slate-500' : 'text-slate-400'}">${timeStr}</span>
+          ${statusBadge}
+        </div>
+        <p class="text-xs font-black ${isPast ? 'text-slate-600' : 'text-slate-700'} leading-tight">${ev.label}</p>
+        <div class="flex items-center gap-2 mt-0.5">
+          <span class="text-[9px] font-bold text-slate-300">${endTimeStr}</span>
+          <span class="text-[9px] font-bold text-slate-300">·</span>
+          <span class="text-[9px] font-bold text-slate-300">${ev.duration || 30}min</span>
+        </div>
+        ${detail ? `<p class="text-[10px] font-medium text-slate-500 mt-0.5 leading-snug">${detail}</p>` : ''}
+      </div>
+    </div>`;
+  });
+
+  // Eventos extra que no están en el schedule (fiebre, accidente, golpe, medicamento, nota, etc.)
+  const scheduleTypes = new Set(sched.map(s => s.type));
+  const extraEvents = events.filter(ev => !scheduleTypes.has(ev.type));
+
+  const extraItems = extraEvents.map(ev => {
     const meta = EVENT_META[ev.type] || { icon: '📋', label: ev.type };
     let detail = '';
     let alertCls = '';
 
-    if (ev.type === 'biberon' || ev.type === 'milk') {
-      const oz = ev.oz || ev.milk || ev.value;
-      detail = oz ? `${oz} oz` : '';
-    } else if (ev.type === 'structured_entry') {
-      const oz = ev.milk;
-      if (oz > 0) detail = `${oz} oz leche`;
-      if (ev.food && ev.food !== 'none') detail += (detail ? ' · ' : '') + (FOOD_MAP[ev.food] || ev.food);
-    } else if (ev.type === 'temperatura') {
+    if (ev.type === 'temperatura') {
       const temp = ev.temp;
       if (temp) {
         const isFever = parseFloat(temp) >= 37.5;
@@ -292,18 +421,6 @@ function _renderTimeline(events) {
       }
     } else if (ev.type === 'medicamento') {
       detail = [ev.nombre, ev.dosis].filter(Boolean).join(' · ');
-    } else if (ev.type === 'siesta') {
-      if (ev.open) {
-        const start = new Date(ev.created_at);
-        const elapsed = Math.round((Date.now() - start) / 60000);
-        detail = `Se durmió a las ${_formatTime(ev.created_at)} · ${elapsed}min en curso`;
-        alertCls = 'bg-purple-50 border-purple-200';
-      } else if (ev.duration_min) {
-        const wake = ev.end_at ? ` · Despertó ${_formatTime(ev.end_at)}` : '';
-        detail = `${_minsToDuration(ev.duration_min)}${wake}`;
-      } else if (ev.end_at) {
-        detail = `Despertó a las ${_formatTime(ev.end_at)}`;
-      }
     } else if (ev.type === 'fiebre') {
       const temp = ev.temp;
       if (temp) { detail = `${temp}°C 🔥 Fiebre`; alertCls = 'bg-rose-50 border-rose-200'; }
@@ -325,26 +442,30 @@ function _renderTimeline(events) {
     }
 
     return `
-    <div class="flex items-start gap-4">
-      <div class="flex flex-col items-center shrink-0">
-        <div class="w-9 h-9 rounded-2xl ${alertCls || 'bg-white'} border-2 border-slate-100 flex items-center justify-center text-lg shadow-sm z-10">${meta.icon}</div>
-        <div class="w-0.5 flex-1 bg-slate-100 mt-1"></div>
+    <div class="relative flex items-start gap-4 p-3 rounded-2xl border-2 ${alertCls || 'border-transparent'}">
+      <div class="w-9 h-9 rounded-xl flex items-center justify-center text-base shrink-0 z-10" style="background:white;border:2px solid #f1f5f9;">
+        ${meta.icon}
       </div>
-      <div class="flex-1 pb-4 pt-0.5">
-        <div class="flex items-baseline justify-between gap-2">
-          <p class="text-xs font-black text-slate-700">${meta.label}</p>
-          <p class="text-[10px] font-bold text-slate-400 shrink-0">${_formatTime(ev.created_at)}</p>
+      <div class="flex-1 pb-1">
+        <div class="flex items-center gap-2 mb-0.5">
+          <span class="text-[11px] font-black text-slate-500">${_formatTime(ev.created_at)}</span>
         </div>
-        ${detail ? `<p class="text-[11px] font-medium text-slate-500 mt-0.5 leading-snug">${detail}</p>` : ''}
-        ${alertCls ? `<div class="mt-1 inline-flex items-center gap-1 px-2 py-0.5 bg-rose-100 rounded-full"><span class="text-[9px] font-black text-rose-700 uppercase">Requiere atención</span></div>` : ''}
+        <p class="text-xs font-black text-slate-700 leading-tight">${meta.label}</p>
+        ${detail ? `<p class="text-[10px] font-medium text-slate-500 mt-0.5 leading-snug">${detail}</p>` : ''}
       </div>
     </div>`;
   });
 
+  const allItems = [...scheduleItems, ...extraItems];
+  if (!allItems.length) return '';
+
   return `
   <div class="bg-white border border-slate-100 rounded-[1.5rem] shadow-sm p-5">
     <p class="text-[11px] font-black text-slate-400 uppercase tracking-widest mb-4">Historial del día</p>
-    <div>${items.join('')}</div>
+    <div class="relative">
+      <div class="absolute left-[18px] top-5 bottom-5 w-0.5 bg-gradient-to-b from-slate-200 via-slate-100 to-transparent"></div>
+      <div class="space-y-1">${allItems.join('')}</div>
+    </div>
   </div>`;
 }
 

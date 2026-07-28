@@ -134,6 +134,20 @@ export const Api = {
   },
 
   /**
+   * 📅 Horario del aula (classroom_event_schedule)
+   */
+  async getClassroomSchedule(classroomId) {
+    return await handle(
+      supabase.from('classroom_event_schedule')
+        .select('event_type, event_label, event_icon, scheduled_hour, scheduled_minute, duration_minutes, auto_register, applies_to')
+        .eq('classroom_id', classroomId)
+        .eq('is_active', true)
+        .order('sort_order'),
+      'getClassroomSchedule'
+    );
+  },
+
+  /**
    * 🎒 Tareas pendientes y entregadas
    */
   async getStudentTasks(classroomId, studentId) {
