@@ -27,7 +27,7 @@ const INSTITUTIONAL = {
   phone: '(829) 803-8424',
   website: 'www.karpuskids.com',
   address: 'Al lado de Iglesia Bethel Brazos Abiertos, Urbanización Genesis, C. Raúl Mondesí, San Cristóbal 91000',
-  email: 'info@karpuskids.com',
+  email: 'karpuskids@gmail.com',
   facebook: '@karpuskids',
   instagram: '@karpuskids',
   tiktok: '@karpuskids',
@@ -672,59 +672,53 @@ class CarnetsManager {
     doc.text('Centro de Desarrollo Infantil', x + w / 2 + 3, y + 7.5, { align: 'center' });
 
     const cx = x + w / 2;
-    let cy = y + 11;
+    const logoSize = 14;
 
+    const logoX = cx - logoSize / 2;
+    const logoY = y + 11;
+
+    if (this._logoDataUrl) {
+      try {
+        doc.setDrawColor(...GREEN.primary);
+        doc.setLineWidth(0.6);
+        doc.rect(logoX - 0.6, logoY - 0.6, logoSize + 1.2, logoSize + 1.2);
+        doc.addImage(this._logoDataUrl, 'JPEG', logoX, logoY, logoSize, logoSize);
+      } catch (_) {}
+    }
+
+    const line1Y = logoY + logoSize + 3;
+    doc.setDrawColor(...GREEN.primary);
+    doc.setLineWidth(0.3);
+    doc.line(cx - 28, line1Y, cx + 28, line1Y);
+
+    let textY = line1Y + 3;
     doc.setFont('helvetica', 'bold');
-    doc.setFontSize(3.2);
+    doc.setFontSize(3);
+    doc.setTextColor(...GREEN.darkText);
+    doc.text('🔒 Este carnet es propiedad de la Estancia Karpus Kids.', cx, textY, { align: 'center' });
+    textY += 3.5;
+    doc.setFont('helvetica', 'normal');
+    doc.setFontSize(2.8);
+    doc.setTextColor(...GREEN.slate);
+    doc.text('En caso de pérdida favor devolver a la institución.', cx, textY, { align: 'center' });
+
+    const line2Y = textY + 3;
+    doc.setDrawColor(...GREEN.primary);
+    doc.setLineWidth(0.3);
+    doc.line(cx - 28, line2Y, cx + 28, line2Y);
+
+    let contactY = line2Y + 3.5;
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(2.8);
     doc.setTextColor(...GREEN.dark);
-    doc.text('DATOS DEL ESTUDIANTE', cx, cy);
-    cy += 3.2;
-
-    doc.setDrawColor(...GREEN.light);
-    doc.setLineWidth(0.15);
-    doc.line(cx - 22, cy, cx + 22, cy);
-    cy += 2.5;
-
-    const p1Name = student.p1_name || student._parentName || '';
-    const p2Name = student.p2_name || '';
-    const p1Phone = student.p1_phone || student._parentPhone || '';
-    const p2Phone = student.p2_phone || '';
-
-    const studentFields = [
-      { label: 'Nombre', value: (student.name || 'Estudiante').toUpperCase() },
-      { label: 'Matrícula', value: student.matricula || 'S/M' },
-      { label: 'Aula', value: student.classrooms?.name || 'Sin aula' },
-    ];
-    if (p1Name) studentFields.push({ label: 'Tutor 1', value: p1Name });
-    if (p1Phone) studentFields.push({ label: 'Tel. Tutor 1', value: p1Phone });
-    if (p2Name) studentFields.push({ label: 'Tutor 2', value: p2Name });
-    if (p2Phone) studentFields.push({ label: 'Tel. Tutor 2', value: p2Phone });
-
-    studentFields.forEach(f => {
-      doc.setFont('helvetica', 'bold');
-      doc.setFontSize(2.8);
-      doc.setTextColor(...GREEN.primary);
-      doc.text(f.label + ':', cx - 20, cy);
-      doc.setFont('helvetica', 'normal');
-      doc.setFontSize(3);
-      doc.setTextColor(51, 65, 85);
-      const valLines = doc.splitTextToSize(f.value, 40);
-      doc.text(valLines[0], cx - 2, cy);
-      cy += 2.5;
-    });
-
-    cy += 2;
-    doc.setDrawColor(...GREEN.light);
-    doc.setLineWidth(0.1);
-    doc.line(cx - 16, cy, cx + 16, cy);
-    cy += 2.5;
-
+    doc.text('📞 ' + INSTITUTIONAL.phone, cx, contactY, { align: 'center' });
+    contactY += 3;
+    doc.text('✉️ ' + INSTITUTIONAL.email, cx, contactY, { align: 'center' });
+    contactY += 3;
     doc.setFont('helvetica', 'normal');
     doc.setFontSize(2.5);
     doc.setTextColor(...GREEN.slate);
-    doc.text(INSTITUTIONAL.website + ' · ' + INSTITUTIONAL.phone, cx, cy);
-    cy += 2.5;
-    doc.text(INSTITUTIONAL.email, cx, cy);
+    doc.text('📍 ' + INSTITUTIONAL.address, cx, contactY, { align: 'center' });
 
     doc.setFillColor(...GREEN.primary);
     doc.roundedRect(x, y + h - 2.5, w, 2.5, 0, 0, 'F');
