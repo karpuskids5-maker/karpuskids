@@ -672,54 +672,18 @@ class CarnetsManager {
     doc.text('Centro de Desarrollo Infantil', x + w / 2 + 3, y + 7.5, { align: 'center' });
 
     const cx = x + w / 2;
-    let cy = y + 14;
+    let cy = y + 11;
 
-    if (this._logoDataUrl) {
-      try {
-        const logoS = 9;
-        doc.addImage(this._logoDataUrl, 'JPEG', cx - logoS / 2, cy - logoS / 2, logoS, logoS);
-      } catch (_) {
-        doc.setFillColor(...GREEN.primary);
-        doc.circle(cx, cy, 7, 'F');
-        doc.setFillColor(255, 255, 255);
-        doc.setFont('helvetica', 'bold');
-        doc.setFontSize(7);
-        doc.text('KK', cx, cy + 2.5, { align: 'center' });
-      }
-    } else {
-      doc.setFillColor(...GREEN.primary);
-      doc.circle(cx, cy, 7, 'F');
-      doc.setFillColor(255, 255, 255);
-      doc.setFont('helvetica', 'bold');
-      doc.setFontSize(7);
-      doc.text('KK', cx, cy + 2.5, { align: 'center' });
-    }
-
-    cy += 10;
     doc.setFont('helvetica', 'bold');
-    doc.setFontSize(4.5);
+    doc.setFontSize(3.2);
     doc.setTextColor(...GREEN.dark);
-    doc.text('Centro de Desarrollo Infantil', cx, cy);
-    cy += 4;
+    doc.text('DATOS DEL ESTUDIANTE', cx, cy);
+    cy += 3.2;
 
     doc.setDrawColor(...GREEN.light);
-    doc.setLineWidth(0.2);
+    doc.setLineWidth(0.15);
     doc.line(cx - 22, cy, cx + 22, cy);
-    cy += 3.5;
-
-    doc.setFont('helvetica', 'normal');
-    doc.setFontSize(3);
-    doc.setTextColor(...GREEN.slate);
-    doc.text('Este carnet identifica oficialmente al estudiante', cx, cy);
-    cy += 3;
-    doc.text('inscrito en Karpus Kids.', cx, cy);
-    cy += 4;
-
-    doc.setFont('helvetica', 'bold');
-    doc.setFontSize(3.5);
-    doc.setTextColor(...GREEN.dark);
-    doc.text('INFORMACIÓN DEL ESTUDIANTE', cx, cy);
-    cy += 3.5;
+    cy += 2.5;
 
     const p1Name = student.p1_name || student._parentName || '';
     const p2Name = student.p2_name || '';
@@ -738,45 +702,29 @@ class CarnetsManager {
 
     studentFields.forEach(f => {
       doc.setFont('helvetica', 'bold');
-      doc.setFontSize(3);
+      doc.setFontSize(2.8);
       doc.setTextColor(...GREEN.primary);
       doc.text(f.label + ':', cx - 20, cy);
       doc.setFont('helvetica', 'normal');
-      doc.setFontSize(3.2);
+      doc.setFontSize(3);
       doc.setTextColor(51, 65, 85);
       const valLines = doc.splitTextToSize(f.value, 40);
       doc.text(valLines[0], cx - 2, cy);
-      cy += 3;
+      cy += 2.5;
     });
 
-    cy += 1;
+    cy += 2;
     doc.setDrawColor(...GREEN.light);
-    doc.setLineWidth(0.15);
-    doc.line(cx - 22, cy, cx + 22, cy);
-    cy += 3;
-
-    doc.setFont('helvetica', 'bold');
-    doc.setFontSize(3);
-    doc.setTextColor(...GREEN.dark);
-    doc.text('INFORMACIÓN INSTITUCIONAL', cx, cy);
-    cy += 3;
+    doc.setLineWidth(0.1);
+    doc.line(cx - 16, cy, cx + 16, cy);
+    cy += 2.5;
 
     doc.setFont('helvetica', 'normal');
-    doc.setFontSize(2.8);
+    doc.setFontSize(2.5);
     doc.setTextColor(...GREEN.slate);
-    doc.text('Tel: ' + INSTITUTIONAL.phone, cx, cy);
-    cy += 3;
-    doc.text(INSTITUTIONAL.website, cx, cy);
-    cy += 3;
+    doc.text(INSTITUTIONAL.website + ' · ' + INSTITUTIONAL.phone, cx, cy);
+    cy += 2.5;
     doc.text(INSTITUTIONAL.email, cx, cy);
-    cy += 3;
-    doc.text(INSTITUTIONAL.facebook + ' · ' + INSTITUTIONAL.instagram + ' · ' + INSTITUTIONAL.tiktok, cx, cy);
-    cy += 3.5;
-
-    doc.setFontSize(2.2);
-    doc.setTextColor(170, 185, 195);
-    const addrLines = doc.splitTextToSize(INSTITUTIONAL.address, 60);
-    doc.text(addrLines[0], cx, cy);
 
     doc.setFillColor(...GREEN.primary);
     doc.roundedRect(x, y + h - 2.5, w, 2.5, 0, 0, 'F');

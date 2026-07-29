@@ -2,6 +2,9 @@
  * Karpus Kids — Service Worker PWA for Attendance Live
  */
 
+// ⚠️ Handler message requerido en evaluación inicial (Chrome 120+)
+self.addEventListener('message', () => {});
+
 const CACHE_NAME = 'karpus-live-v1';
 const ASSETS = [
   './attendance-live.html',

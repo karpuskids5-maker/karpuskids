@@ -77,6 +77,7 @@ CREATE TABLE IF NOT EXISTS public.profiles (
   created_at          timestamp with time zone DEFAULT now() NOT NULL
 );
 
+ALTER TABLE public.profiles DROP CONSTRAINT IF EXISTS profiles_role_check;
 ALTER TABLE public.profiles ADD CONSTRAINT profiles_role_check
   CHECK (role IN ('directora','maestra','padre','asistente','admin'));
 
@@ -1236,6 +1237,9 @@ BEGIN
     RETURN jsonb_build_object('success',false,'message','Código QR inválido');
   END IF;
   SELECT * INTO v_student FROM public.students WHERE matricula = trim(p_code) AND is_active = true LIMIT 1;
+  IF NOT FOUND THEN BEGIN
+    SELECT * INTO v_student FROM public.students WHERE id::text = trim(p_code) AND is_active = true LIMIT 1;
+  EXCEPTION WHEN OTHERS THEN NULL; END; END IF;
   IF FOUND THEN
     v_name := v_student.name; v_role := 'Estudiante'; v_parent := v_student.parent_id;
     SELECT * INTO v_settings FROM public.school_settings WHERE id = 1;
@@ -1971,7 +1975,7 @@ CREATE POLICY "classroom_media_update" ON storage.objects FOR UPDATE USING (buck
 
 -- ── 12. CRON JOBS (requiere pg_cron habilitado) ──────────────
 
-DO $$ BEGIN
+DO $outer$ BEGIN
   IF EXISTS (SELECT 1 FROM pg_extension WHERE extname = 'pg_cron') THEN
     BEGIN PERFORM cron.unschedule('karpus-mark-overdue'); EXCEPTION WHEN OTHERS THEN NULL; END;
     BEGIN PERFORM cron.unschedule('karpus-payment-reminders-daily'); EXCEPTION WHEN OTHERS THEN NULL; END;
@@ -1991,7 +1995,7 @@ DO $$ BEGIN
     PERFORM cron.schedule('annual-payment-generator', '0 3 1 1 *',
       $$ SELECT public.generate_annual_payments(EXTRACT(YEAR FROM CURRENT_DATE)::int); $$);
   END IF;
-END $$;
+END $outer$;
 
 -- ── 13. GRANTS FINALES ────────────────────────────────────────
 GRANT USAGE, SELECT ON ALL SEQUENCES IN SCHEMA public TO authenticated;

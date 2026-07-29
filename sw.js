@@ -5,6 +5,9 @@
  * NO definir handlers push/notificationclick aquí para no interferir con OneSignal.
  */
 
+// ⚠️ Handler message requerido en evaluación inicial (Chrome 120+)
+self.addEventListener('message', () => {});
+
 const CACHE_NAME = 'karpus-pwa-v7'; // ✅ Grades V2 system update
 const ASSETS = [
   './',

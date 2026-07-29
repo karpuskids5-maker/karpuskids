@@ -303,6 +303,16 @@ function _renderRoutineLayout({ todayLabel, students, logsMap, withReport, sched
           </div>
         </div>
         <div class="flex items-center gap-2">
+          <button onclick="App.openAllEventsMenu()"
+            class="flex items-center gap-1 px-2.5 py-2 bg-indigo-50 hover:bg-indigo-100 rounded-xl transition-all text-[10px] font-black text-indigo-600 uppercase tracking-widest active:scale-95">
+            <span class="text-sm">➕</span>
+            <span class="hidden sm:inline">Eventos</span>
+          </button>
+          <button onclick="App.openScheduleManager()"
+            class="flex items-center gap-1 px-2.5 py-2 bg-slate-100 hover:bg-slate-200 rounded-xl transition-all text-[10px] font-black text-slate-500 uppercase tracking-widest active:scale-95">
+            <span class="text-sm">⚙️</span>
+            <span class="hidden sm:inline">Rutina</span>
+          </button>
           <span class="text-[10px] font-black text-[#28B54D] bg-green-50 border border-green-200 px-3 py-1.5 rounded-full">
             ${withReport}/${students.length} reportes
           </span>
@@ -345,12 +355,22 @@ function _renderRoutineLayout({ todayLabel, students, logsMap, withReport, sched
                 };
 
                 return `
-                <button onclick="App.openBulkEventModal('${ev.type}')"
-                  class="relative flex items-start gap-4 w-full p-3 rounded-2xl transition-all active:scale-[0.98] ${
+                <div draggable="true"
+                  ondragstart="App.handleTimelineDragStart(event, ${i})"
+                  ondragover="App.handleTimelineDragOver(event)"
+                  ondrop="App.handleTimelineDrop(event, ${i})"
+                  ondragend="App.handleTimelineDragEnd(event)"
+                  onclick="App.openBulkEventModal('${ev.type}')"
+                  class="relative flex items-start gap-4 w-full p-3 rounded-2xl transition-all active:scale-[0.98] cursor-grab active:cursor-grabbing ${
                     isActive ? `bg-gradient-to-r from-[#FF8A00]/10 to-orange-50 border-2 border-[#FF8A00]/30 shadow-md shadow-orange-100/50` :
                     isPast ? 'bg-slate-50/80 border-2 border-transparent hover:bg-slate-50' :
                     'border-2 border-transparent hover:bg-slate-50'
-                  }">
+                  }" data-index="${i}">
+
+                  <!-- Drag Handle -->
+                  <div class="absolute -left-1 top-1/2 -translate-y-1/2 opacity-0 group-hover:opacity-100 transition-opacity cursor-grab active:cursor-grabbing text-slate-300 hover:text-slate-500" style="touch-action:none;">
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M4 8h16M4 16h16"/></svg>
+                  </div>
 
                   <!-- Icono en la línea -->
                   <div class="w-9 h-9 rounded-xl flex items-center justify-center text-base shrink-0 z-10 transition-all ${isActive ? 'text-white shadow-lg scale-110' : 'text-slate-500'}" style="${isActive ? 'background:linear-gradient(135deg, #FF8A00, #f97316);box-shadow:0 4px 12px rgba(255,138,0,0.3);' : `background:${activeSoftBgs[ev.type] || '#f1f5f9'};`}">
@@ -381,7 +401,7 @@ function _renderRoutineLayout({ todayLabel, students, logsMap, withReport, sched
                   <div class="shrink-0 mt-1">
                     <i data-lucide="chevron-right" class="w-4 h-4 ${isActive ? 'text-[#FF8A00]' : 'text-slate-300'}"></i>
                   </div>
-                </button>`;
+                </div>`;
               }).join('')}
             </div>
           </div>
@@ -1619,4 +1639,458 @@ export async function registerIndividualEvent(sid, type, extra = {}) {
       }).join('') : '<p class="text-xs text-slate-400 italic">Sin eventos registrados hoy.</p>';
     }
   } catch (e) { safeToast('Error al registrar evento', 'error'); }
+}
+
+// ════════════════════════════════════════════════════════════════
+// 🎯 GESTIÓN DE RUTINA — Schedule Builder + Drag & Drop
+// ════════════════════════════════════════════════════════════════
+
+let _dragIndex = null;
+
+export function handleTimelineDragStart(e, index) {
+  _dragIndex = index;
+  e.dataTransfer.effectsAllowed = 'move';
+  e.dataTransfer.setData('text/plain', index);
+  e.target.closest('[draggable]')?.classList.add('opacity-40', 'scale-[0.97]');
+}
+
+export function handleTimelineDragOver(e) {
+  e.preventDefault();
+  e.dataTransfer.dropEffect = 'move';
+  const target = e.target.closest('[draggable]');
+  if (target) target.classList.add('ring-2', 'ring-[#FF8A00]', 'ring-offset-1');
+}
+
+export function handleTimelineDrop(e, toIndex) {
+  e.preventDefault();
+  _removeDragHighlights();
+  if (_dragIndex === null || _dragIndex === toIndex) { _dragIndex = null; return; }
+  _reorderSchedule(_dragIndex, toIndex);
+  _dragIndex = null;
+}
+
+export function handleTimelineDragEnd(e) {
+  _removeDragHighlights();
+  _dragIndex = null;
+}
+
+function _removeDragHighlights() {
+  document.querySelectorAll('#timelineExpanded [draggable]').forEach(el => {
+    el.classList.remove('opacity-40', 'scale-[0.97]', 'ring-2', 'ring-[#FF8A00]', 'ring-offset-1');
+  });
+}
+
+function _getScheduleForClassroom() {
+  const defaultTypes = DEFAULT_SCHEDULE.map(s => s.type);
+  const hasCustom = _classroomSchedule.length && _classroomSchedule.some(s => defaultTypes.includes(s.type));
+  return hasCustom ? _classroomSchedule : DEFAULT_SCHEDULE;
+}
+
+async function _reorderSchedule(fromIdx, toIdx) {
+  const schedule = _getScheduleForClassroom();
+  const item = schedule.splice(fromIdx, 1);
+  schedule.splice(toIdx, 0, item[0]);
+  _classroomSchedule = schedule;
+  await _saveScheduleOrder(schedule);
+  _reRenderTimeline();
+}
+
+async function _saveScheduleOrder(schedule) {
+  const classroom = AppState.get('classroom');
+  if (!classroom) return;
+  try {
+    const updates = schedule.map((s, i) => ({
+      classroom_id: classroom.id,
+      event_type: s.type,
+      sort_order: i,
+    }));
+    for (const u of updates) {
+      await supabase
+        .from('classroom_event_schedule')
+        .update({ sort_order: u.sort_order })
+        .eq('classroom_id', u.classroom_id)
+        .eq('event_type', u.event_type);
+    }
+  } catch (e) { /* silencioso */ }
+}
+
+function _reRenderTimeline() {
+  const wrapper = document.getElementById('routineWrapper');
+  if (!wrapper) return;
+  const students = AppState.get('students') || [];
+  const logsMap  = AppState.get('logsMap') || {};
+  const today = new Date().toISOString().split('T')[0];
+  const todayLabel = _formatDate(today);
+  const withReport = _countReportedStudents(logsMap, students);
+  const scheduleNow = _getCurrentScheduleEvent();
+  const activeSiestas = _getActiveSiestas(students, logsMap);
+  const classroom = AppState.get('classroom');
+  wrapper.outerHTML = _renderRoutineLayout({
+    todayLabel, students, logsMap, withReport,
+    scheduleNow, activeSiestas, today, classroom
+  });
+  _refreshStudentCards();
+  if (window.lucide) window.lucide.createIcons();
+}
+
+// ── SCHEDULE MANAGER MODAL ─────────────────────────────────────
+export async function openScheduleManager() {
+  const classroom = AppState.get('classroom');
+  const modalId = 'scheduleManagerModal';
+  const schedule = _classroomSchedule.length ? [..._classroomSchedule] : [...DEFAULT_SCHEDULE];
+
+  // Build full event catalog with all EVENT_TYPES + EXTRA_EVENT_TYPES
+  const allEventTypes = { ...EVENT_TYPES };
+  EXTRA_EVENT_TYPES.forEach(e => {
+    if (!allEventTypes[e.type]) {
+      allEventTypes[e.type] = { icon: e.icon, label: e.label, color: 'slate' };
+    }
+  });
+
+  const scheduleTypes = new Set(schedule.map(s => s.type));
+  const availableEvents = Object.entries(allEventTypes)
+    .filter(([type]) => !scheduleTypes.has(type))
+    .map(([type, meta]) => ({ type, ...meta }));
+
+  const savedEventsHTML = schedule.map((ev, i) => {
+    const meta = allEventTypes[ev.type] || { icon: '⏰', label: ev.type };
+    return `
+      <div class="flex items-center gap-3 p-3 bg-white border border-slate-100 rounded-2xl drag-sched-item" draggable="true" data-index="${i}" data-type="${ev.type}"
+        ondragstart="App.handleSchedDragStart(event, ${i})"
+        ondragover="App.handleSchedDragOver(event)"
+        ondrop="App.handleSchedDrop(event, ${i})"
+        ondragend="App.handleSchedDragEnd(event)">
+        <div class="cursor-grab active:cursor-grabbing text-slate-300 hover:text-slate-500 touch-none">
+          <svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M4 8h16M4 16h16"/></svg>
+        </div>
+        <span class="text-xl shrink-0">${meta.icon}</span>
+        <div class="flex-1 min-w-0">
+          <p class="text-xs font-black text-slate-700">${meta.label}</p>
+          <div class="flex items-center gap-2 mt-1">
+            <select data-sched-hour="${i}" class="text-[9px] font-bold text-slate-500 bg-slate-50 border border-slate-200 rounded-lg px-1.5 py-0.5 outline-none focus:border-[#FF8A00]">
+              ${Array.from({length: 24}, (_, h) => `<option value="${h}" ${ev.hour === h ? 'selected' : ''}>${String(h).padStart(2,'0')}</option>`).join('')}
+            </select>
+            <span class="text-[9px] text-slate-300">:</span>
+            <select data-sched-minute="${i}" class="text-[9px] font-bold text-slate-500 bg-slate-50 border border-slate-200 rounded-lg px-1.5 py-0.5 outline-none focus:border-[#FF8A00]">
+              ${[0,15,30,45].map(m => `<option value="${m}" ${ev.minute === m ? 'selected' : ''}>${String(m).padStart(2,'0')}</option>`).join('')}
+            </select>
+            <select data-sched-duration="${i}" class="text-[9px] font-bold text-slate-500 bg-slate-50 border border-slate-200 rounded-lg px-1.5 py-0.5 outline-none focus:border-[#FF8A00] ml-1">
+              ${[15,30,45,60,90,120].map(d => `<option value="${d}" ${(ev.duration || 30) === d ? 'selected' : ''}>${d}min</option>`).join('')}
+            </select>
+          </div>
+        </div>
+        <button onclick="App.removeEventFromSchedule('${ev.type}')" class="p-1.5 hover:bg-red-50 rounded-lg text-slate-300 hover:text-red-500 transition-colors">
+          <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/></svg>
+        </button>
+      </div>`;
+  }).join('');
+
+  const availableHTML = availableEvents.length ? availableEvents.map(e => `
+    <button onclick="App.addEventToSchedule('${e.type}')"
+      class="flex flex-col items-center gap-1 p-2.5 bg-slate-50 hover:bg-[#FF8A00]/10 border-2 border-transparent hover:border-[#FF8A00]/30 rounded-xl transition-all active:scale-90">
+      <span class="text-lg">${e.icon}</span>
+      <span class="text-[8px] font-black text-slate-400 uppercase leading-tight text-center">${e.label}</span>
+    </button>
+  `).join('') : '<p class="text-[10px] text-slate-400 italic col-span-full text-center py-4">Todos los eventos están en tu rutina</p>';
+
+  const content = `
+    <div class="bg-white w-full max-w-lg rounded-[2rem] shadow-2xl overflow-hidden animate-fadeIn flex flex-col" style="max-height:min(95vh, calc(100vh - 32px));">
+      <!-- Header -->
+      <div class="p-5 text-white relative overflow-hidden shrink-0" style="background:linear-gradient(135deg, #FF8A00 0%, #f97316 50%, #ec4899 100%);">
+        <div class="absolute -top-10 -right-10 w-40 h-40 rounded-full blur-3xl" style="background:rgba(255,255,255,0.1);"></div>
+        <div class="relative flex items-center gap-4">
+          <div class="w-12 h-12 bg-white/20 backdrop-blur-sm rounded-2xl flex items-center justify-center text-2xl border border-white/20 shadow-lg">⚙️</div>
+          <div class="flex-1">
+            <h3 class="text-lg font-black">Gestionar Rutina</h3>
+            <p class="text-[10px] font-bold text-orange-100 uppercase tracking-widest">Arrastra para reordenar · Toca para editar</p>
+          </div>
+          <button onclick="Modal.close('${modalId}')" class="p-2 bg-white/20 backdrop-blur-sm rounded-full hover:bg-white/30 transition-colors border border-white/20">
+            <svg class="w-4 h-4 text-white" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/></svg>
+          </button>
+        </div>
+      </div>
+
+      <div class="overflow-y-auto flex-1 p-5 space-y-5 custom-scrollbar">
+        <!-- Eventos en la rutina actual -->
+        <div class="space-y-2">
+          <div class="flex items-center justify-between">
+            <p class="text-[11px] font-black text-slate-400 uppercase tracking-widest">Tu Rutina</p>
+            <span class="text-[9px] font-bold text-slate-300">${schedule.length} eventos</span>
+          </div>
+          <div class="space-y-2" id="scheduleItemsContainer">
+            ${savedEventsHTML}
+          </div>
+        </div>
+
+        <!-- Separador -->
+        <div class="border-t border-slate-100 pt-4">
+          <p class="text-[11px] font-black text-slate-400 uppercase tracking-widest mb-3">Agregar Eventos</p>
+          <div class="grid grid-cols-4 sm:grid-cols-5 gap-2" id="availableEventsGrid">
+            ${availableHTML}
+          </div>
+        </div>
+      </div>
+
+      <!-- Footer -->
+      <div class="p-4 shrink-0 border-t border-slate-100">
+        <div class="flex gap-2">
+          <button onclick="App.resetScheduleToDefault()"
+            class="px-4 py-3 bg-slate-100 hover:bg-slate-200 rounded-2xl text-[10px] font-black text-slate-500 uppercase tracking-widest transition-all active:scale-95">
+            Restaurar
+          </button>
+          <button onclick="App.saveScheduleManager()" id="btnSaveSchedule"
+            class="flex-1 py-3 text-white rounded-2xl font-black text-sm uppercase tracking-widest active:scale-[0.98] transition-colors flex items-center justify-center gap-2" style="background:#FF8A00 !important;border:2px solid #E67A00 !important;box-shadow:0 6px 20px rgba(255,138,0,0.4);">
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7"/></svg> Guardar Rutina
+          </button>
+        </div>
+      </div>
+    </div>`;
+
+  Modal.open(modalId, content);
+  if (window.lucide) window.lucide.createIcons();
+}
+
+// ── SCHEDULE DRAG HANDLERS ─────────────────────────────────────
+let _schedDragIndex = null;
+
+export function handleSchedDragStart(e, index) {
+  _schedDragIndex = index;
+  e.dataTransfer.effectsAllowed = 'move';
+  e.dataTransfer.setData('text/plain', index);
+  e.target.closest('.drag-sched-item')?.classList.add('opacity-40');
+}
+
+export function handleSchedDragOver(e) {
+  e.preventDefault();
+  e.dataTransfer.dropEffect = 'move';
+}
+
+export function handleSchedDrop(e, toIndex) {
+  e.preventDefault();
+  document.querySelectorAll('.drag-sched-item').forEach(el => el.classList.remove('opacity-40'));
+  if (_schedDragIndex === null || _schedDragIndex === toIndex) { _schedDragIndex = null; return; }
+
+  const container = document.getElementById('scheduleItemsContainer');
+  if (!container) { _schedDragIndex = null; return; }
+  const items = [...container.querySelectorAll('.drag-sched-item')];
+  const [moved] = items.splice(_schedDragIndex, 1);
+  items.splice(toIndex, 0, moved);
+  container.innerHTML = items.map((el, i) => {
+    const type = el.dataset.type;
+    const meta = EVENT_TYPES[type] || EXTRA_EVENT_TYPES.find(e => e.type === type) || { icon: '⏰', label: type };
+    const ev = (_classroomSchedule.length ? _classroomSchedule : DEFAULT_SCHEDULE).find(s => s.type === type) || DEFAULT_SCHEDULE[0];
+    return _renderScheduleItem(type, meta, i, ev);
+  }).join('');
+  _schedDragIndex = null;
+}
+
+export function handleSchedDragEnd(e) {
+  document.querySelectorAll('.drag-sched-item').forEach(el => el.classList.remove('opacity-40'));
+  _schedDragIndex = null;
+}
+
+function _renderScheduleItem(type, meta, i, ev) {
+  return `
+    <div class="flex items-center gap-3 p-3 bg-white border border-slate-100 rounded-2xl drag-sched-item" draggable="true" data-index="${i}" data-type="${type}"
+      ondragstart="App.handleSchedDragStart(event, ${i})"
+      ondragover="App.handleSchedDragOver(event)"
+      ondrop="App.handleSchedDrop(event, ${i})"
+      ondragend="App.handleSchedDragEnd(event)">
+      <div class="cursor-grab active:cursor-grabbing text-slate-300 hover:text-slate-500 touch-none">
+        <svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M4 8h16M4 16h16"/></svg>
+      </div>
+      <span class="text-xl shrink-0">${meta.icon || '⏰'}</span>
+      <div class="flex-1 min-w-0">
+        <p class="text-xs font-black text-slate-700">${meta.label || type}</p>
+        <div class="flex items-center gap-2 mt-1">
+          <select data-sched-hour="${i}" class="text-[9px] font-bold text-slate-500 bg-slate-50 border border-slate-200 rounded-lg px-1.5 py-0.5 outline-none focus:border-[#FF8A00]">
+            ${Array.from({length: 24}, (_, h) => `<option value="${h}" ${ev.hour === h ? 'selected' : ''}>${String(h).padStart(2,'0')}</option>`).join('')}
+          </select>
+          <span class="text-[9px] text-slate-300">:</span>
+          <select data-sched-minute="${i}" class="text-[9px] font-bold text-slate-500 bg-slate-50 border border-slate-200 rounded-lg px-1.5 py-0.5 outline-none focus:border-[#FF8A00]">
+            ${[0,15,30,45].map(m => `<option value="${m}" ${ev.minute === m ? 'selected' : ''}>${String(m).padStart(2,'0')}</option>`).join('')}
+          </select>
+          <select data-sched-duration="${i}" class="text-[9px] font-bold text-slate-500 bg-slate-50 border border-slate-200 rounded-lg px-1.5 py-0.5 outline-none focus:border-[#FF8A00] ml-1">
+            ${[15,30,45,60,90,120].map(d => `<option value="${d}" ${(ev.duration || 30) === d ? 'selected' : ''}>${d}min</option>`).join('')}
+          </select>
+        </div>
+      </div>
+      <button onclick="App.removeEventFromSchedule('${type}')" class="p-1.5 hover:bg-red-50 rounded-lg text-slate-300 hover:text-red-500 transition-colors">
+        <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/></svg>
+      </button>
+    </div>`;
+}
+
+// ── ADD / REMOVE SCHEDULE EVENTS ────────────────────────────────
+export function addEventToSchedule(eventType) {
+  const schedule = _classroomSchedule.length ? [..._classroomSchedule] : [...DEFAULT_SCHEDULE];
+  if (schedule.some(s => s.type === eventType)) return;
+
+  const meta = EVENT_TYPES[eventType] || EXTRA_EVENT_TYPES.find(e => e.type === eventType) || { icon: '⏰', label: eventType };
+  schedule.push({
+    type: eventType,
+    label: meta.label || eventType,
+    icon: meta.icon || '⏰',
+    hour: 12,
+    minute: 0,
+    duration: 30,
+  });
+  _classroomSchedule = schedule;
+  _refreshScheduleManagerUI();
+}
+
+export function removeEventFromSchedule(eventType) {
+  const schedule = _classroomSchedule.length ? [..._classroomSchedule] : [...DEFAULT_SCHEDULE];
+  const idx = schedule.findIndex(s => s.type === eventType);
+  if (idx === -1) return;
+  schedule.splice(idx, 1);
+  if (!schedule.length) {
+    _classroomSchedule = [...DEFAULT_SCHEDULE];
+  } else {
+    _classroomSchedule = schedule;
+  }
+  _refreshScheduleManagerUI();
+}
+
+export function resetScheduleToDefault() {
+  _classroomSchedule = [...DEFAULT_SCHEDULE];
+  _refreshScheduleManagerUI();
+}
+
+function _refreshScheduleManagerUI() {
+  const container = document.getElementById('scheduleItemsContainer');
+  const grid = document.getElementById('availableEventsGrid');
+  if (!container) return;
+
+  const allEventTypes = { ...EVENT_TYPES };
+  EXTRA_EVENT_TYPES.forEach(e => {
+    if (!allEventTypes[e.type]) allEventTypes[e.type] = { icon: e.icon, label: e.label, color: 'slate' };
+  });
+
+  const schedule = _classroomSchedule.length ? _classroomSchedule : DEFAULT_SCHEDULE;
+  const scheduleTypes = new Set(schedule.map(s => s.type));
+  const availableEvents = Object.entries(allEventTypes)
+    .filter(([type]) => !scheduleTypes.has(type))
+    .map(([type, meta]) => ({ type, ...meta }));
+
+  container.innerHTML = schedule.map((ev, i) => {
+    const meta = allEventTypes[ev.type] || { icon: '⏰', label: ev.type };
+    return _renderScheduleItem(ev.type, meta, i, ev);
+  }).join('');
+
+  if (grid) {
+    grid.innerHTML = availableEvents.length ? availableEvents.map(e => `
+      <button onclick="App.addEventToSchedule('${e.type}')"
+        class="flex flex-col items-center gap-1 p-2.5 bg-slate-50 hover:bg-[#FF8A00]/10 border-2 border-transparent hover:border-[#FF8A00]/30 rounded-xl transition-all active:scale-90">
+        <span class="text-lg">${e.icon}</span>
+        <span class="text-[8px] font-black text-slate-400 uppercase leading-tight text-center">${e.label}</span>
+      </button>
+    `).join('') : '<p class="text-[10px] text-slate-400 italic col-span-full text-center py-4">Todos los eventos están en tu rutina</p>';
+  }
+
+  const countEl = container.closest('.space-y-2')?.querySelector('.text-slate-300');
+  if (countEl) countEl.textContent = `${schedule.length} eventos`;
+}
+
+// ── SAVE SCHEDULE TO DB ─────────────────────────────────────────
+export async function saveScheduleManager() {
+  const btn = document.getElementById('btnSaveSchedule');
+  if (btn) { btn.disabled = true; btn.innerHTML = '<span class="animate-spin">⏳</span> Guardando...'; }
+
+  try {
+    const classroom = AppState.get('classroom');
+    if (!classroom) { safeToast('No hay aula seleccionada', 'error'); return; }
+
+    const items = [...document.querySelectorAll('.drag-sched-item')];
+    const schedule = items.map((el, i) => {
+      const type = el.dataset.type;
+      const hour = parseInt(document.querySelector(`[data-sched-hour="${i}"]`)?.value) || 12;
+      const minute = parseInt(document.querySelector(`[data-sched-minute="${i}"]`)?.value) || 0;
+      const duration = parseInt(document.querySelector(`[data-sched-duration="${i}"]`)?.value) || 30;
+      const meta = EVENT_TYPES[type] || EXTRA_EVENT_TYPES.find(e => e.type === type) || { icon: '⏰', label: type };
+      return {
+        type,
+        label: meta.label || type,
+        icon: meta.icon || '⏰',
+        hour,
+        minute,
+        duration,
+        sort_order: i,
+      };
+    });
+
+    // Delete all existing schedule entries for this classroom
+    await supabase
+      .from('classroom_event_schedule')
+      .delete()
+      .eq('classroom_id', classroom.id);
+
+    // Insert new schedule entries
+    if (schedule.length) {
+      const inserts = schedule.map((s, i) => ({
+        classroom_id: classroom.id,
+        event_type: s.type,
+        event_label: s.label,
+        event_icon: s.icon,
+        scheduled_hour: s.hour,
+        scheduled_minute: s.minute,
+        duration_minutes: s.duration,
+        sort_order: i,
+        is_active: true,
+        auto_register: false,
+        applies_to: 'all',
+      }));
+      await supabase.from('classroom_event_schedule').insert(inserts);
+    }
+
+    _classroomSchedule = schedule;
+    Modal.close('scheduleManagerModal');
+    safeToast('Rutina guardada exitosamente');
+    await _reRenderTimeline();
+
+  } catch (e) {
+    safeToast('Error al guardar la rutina', 'error');
+  } finally {
+    if (btn) { btn.disabled = false; btn.innerHTML = '<svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7"/></svg> Guardar Rutina'; }
+  }
+}
+
+// ── ALL EVENTS QUICK MENU ───────────────────────────────────────
+export function openAllEventsMenu() {
+  const modalId = 'allEventsMenuModal';
+
+  const scheduleEvents = Object.entries(EVENT_TYPES).map(([type, meta]) => `
+    <button onclick="Modal.close('${modalId}'); App.openBulkEventModal('${type}')"
+      class="flex flex-col items-center gap-1.5 p-3 bg-slate-50 hover:bg-[#FF8A00]/10 border-2 border-transparent hover:border-[#FF8A00]/30 rounded-2xl transition-all active:scale-90 group">
+      <span class="text-2xl group-hover:scale-110 transition-transform">${meta.icon}</span>
+      <span class="text-[8px] font-black text-slate-400 uppercase text-center leading-tight">${meta.label}</span>
+    </button>
+  `).join('');
+
+  const content = `
+    <div class="bg-white w-full max-w-sm rounded-[2rem] shadow-2xl overflow-hidden animate-fadeIn">
+      <div class="p-5 text-white relative overflow-hidden" style="background:linear-gradient(135deg, #8B5CF6 0%, #6366F1 50%, #3B82F6 100%);">
+        <div class="absolute -top-8 -right-8 w-32 h-32 rounded-full blur-2xl" style="background:rgba(255,255,255,0.1);"></div>
+        <div class="relative flex items-center gap-4">
+          <div class="w-12 h-12 bg-white/20 backdrop-blur-sm rounded-2xl flex items-center justify-center text-2xl border border-white/20 shadow-lg">📋</div>
+          <div class="flex-1">
+            <h3 class="text-lg font-black">Todos los Eventos</h3>
+            <p class="text-[10px] font-bold text-indigo-100 uppercase tracking-widest">Elige un evento para registrar</p>
+          </div>
+          <button onclick="Modal.close('${modalId}')" class="p-2 bg-white/20 backdrop-blur-sm rounded-full hover:bg-white/30 border border-white/20">
+            <svg class="w-4 h-4 text-white" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/></svg>
+          </button>
+        </div>
+      </div>
+      <div class="p-5 max-h-[70vh] overflow-y-auto custom-scrollbar">
+        <p class="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-3">Registro Colectivo</p>
+        <div class="grid grid-cols-4 gap-2">
+          ${scheduleEvents}
+        </div>
+        <p class="text-[10px] text-slate-300 font-medium text-center mt-4">Selecciona un evento para registrar en grupo</p>
+      </div>
+    </div>`;
+
+  Modal.open(modalId, content);
+  if (window.lucide) window.lucide.createIcons();
 }

@@ -1,3 +1,10 @@
+/// <reference lib="webworker" />
+
+// ⚠️ Handler message requerido en evaluación inicial (Chrome 120+)
+// Previene el error: "Event handler of 'message' event must be added on
+// the initial evaluation of worker script".
+self.addEventListener('message', () => {});
+
 importScripts('https://cdn.onesignal.com/sdks/web/v16/OneSignalSDK.sw.js');
 
 /**

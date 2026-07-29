@@ -556,7 +556,10 @@ function renderDailySummary(log, schedule = []) {
     loggedByType[ev.type].push(ev);
   });
 
-  // Agregar cada slot del horario
+  // Solo mostrar eventos registrados cuya hora programada ya pasó
+  const now = new Date();
+  const nowMins = now.getHours() * 60 + now.getMinutes();
+
   sched.forEach(s => {
     const sMins = s.hour * 60 + s.minute;
     const hh = s.hour > 12 ? s.hour - 12 : (s.hour === 0 ? 12 : s.hour);
@@ -569,6 +572,10 @@ function renderDailySummary(log, schedule = []) {
     const milkEvents = (loggedByType['biberon'] || []).concat(loggedByType['milk'] || []).concat(loggedByType['structured_entry'] || []);
     const isBiberon = evType === 'biberon';
     const hasLogged = isBiberon ? milkEvents.length > 0 : matchingEvents.length > 0;
+
+    // Ocultar si no está registrado o aún no es su hora
+    if (!hasLogged || nowMins < sMins) return;
+
     const icon = s.icon || schedIcons[s.type] || '⏰';
 
     // Detail
@@ -588,7 +595,7 @@ function renderDailySummary(log, schedule = []) {
       else if (first.comment) detail = `${s.label} — ${first.comment}`;
     }
 
-    const bgCls = hasLogged ? 'bg-green-50 border-green-200' : 'bg-slate-50 border-slate-100';
+    const bgCls = 'bg-green-50 border-green-200';
     rows.push({ icon, label: detail, sub: timeStr, time: '', color: bgCls });
   });
 

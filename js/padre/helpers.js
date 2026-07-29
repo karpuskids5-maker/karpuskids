@@ -202,3 +202,8 @@ export const Helpers = {
     });
   }
 };
+
+// Named export for compatibility with module imports
+export function escapeHtml(str = '') {
+  return Helpers.escapeHTML(str);
+}

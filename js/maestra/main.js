@@ -68,6 +68,21 @@ window.App = {
   openExtraEventModal: Routine.openExtraEventModal,
   confirmExtraEvent: Routine.confirmExtraEvent,
   registerMissingStudents: Routine.registerMissingStudents,
+  // Schedule Builder & Drag & Drop
+  openScheduleManager: Routine.openScheduleManager,
+  saveScheduleManager: Routine.saveScheduleManager,
+  addEventToSchedule: Routine.addEventToSchedule,
+  removeEventFromSchedule: Routine.removeEventFromSchedule,
+  resetScheduleToDefault: Routine.resetScheduleToDefault,
+  openAllEventsMenu: Routine.openAllEventsMenu,
+  handleTimelineDragStart: Routine.handleTimelineDragStart,
+  handleTimelineDragOver: Routine.handleTimelineDragOver,
+  handleTimelineDrop: Routine.handleTimelineDrop,
+  handleTimelineDragEnd: Routine.handleTimelineDragEnd,
+  handleSchedDragStart: Routine.handleSchedDragStart,
+  handleSchedDragOver: Routine.handleSchedDragOver,
+  handleSchedDrop: Routine.handleSchedDrop,
+  handleSchedDragEnd: Routine.handleSchedDragEnd,
 
   // Tasks
   initTasks: Tasks.initTasks,
