@@ -35,7 +35,8 @@ export const SchoolEngine = {
    */
   async init(options = {}) {
     const now = Date.now();
-    if (!options.forceRefresh && EngineState.get('initialized') && (now - EngineState.get('lastRefresh') < CACHE_TTL)) {
+    const cachedYear = EngineState.get('schoolYear');
+    if (!options.forceRefresh && EngineState.get('initialized') && cachedYear && (now - EngineState.get('lastRefresh') < CACHE_TTL)) {
       return EngineState.getAll();
     }
 
@@ -245,7 +246,8 @@ export const SchoolEngine = {
         p_enrollment_start: yearData.enrollment_start || null,
         p_enrollment_end: yearData.enrollment_end || null,
         p_reenrollment_start: yearData.reenrollment_start || null,
-        p_reenrollment_end: yearData.reenrollment_end || null
+        p_reenrollment_end: yearData.reenrollment_end || null,
+        p_status: yearData.status || null
       });
     if (error) return { data: null, error };
     if (data?.error) return { data: null, error: { message: data.error } };
@@ -263,7 +265,8 @@ export const SchoolEngine = {
         p_enrollment_start: updates.enrollment_start || null,
         p_enrollment_end: updates.enrollment_end || null,
         p_reenrollment_start: updates.reenrollment_start || null,
-        p_reenrollment_end: updates.reenrollment_end || null
+        p_reenrollment_end: updates.reenrollment_end || null,
+        p_status: updates.status || null
       });
     if (error) return { data: null, error };
     if (data?.error) return { data: null, error: { message: data.error } };
@@ -285,19 +288,18 @@ export const SchoolEngine = {
   /** Crear un período para un año escolar */
   async createPeriod(periodData) {
     const { data, error } = await supabase
-      .from('academic_periods')
-      .insert({
-        school_year_id: periodData.school_year_id,
-        name: periodData.name,
-        start_date: periodData.start_date,
-        end_date: periodData.end_date,
-        order_index: periodData.order_index,
-        status: periodData.status || 'pending',
-        is_active: periodData.is_active || false
-      })
-      .select()
-      .single();
-    return { data, error };
+      .rpc('create_academic_period', {
+        p_school_year_id: periodData.school_year_id,
+        p_name: periodData.name,
+        p_start_date: periodData.start_date,
+        p_end_date: periodData.end_date,
+        p_order_index: periodData.order_index,
+        p_status: periodData.status || 'pending',
+        p_is_active: periodData.is_active || false
+      });
+    if (error) return { data: null, error };
+    if (data?.error) return { data: null, error: { message: data.error } };
+    return { data, error: null };
   },
 
   /** Cerrar un período (automáticamente abre el siguiente) */
@@ -311,24 +313,14 @@ export const SchoolEngine = {
 
   /** Activar un período manualmente */
   async activatePeriod(periodId) {
-    // Desactivar todos los demás períodos del mismo año
-    const period = EngineState.get('allPeriods')?.find(p => p.id === periodId);
-    if (!period) return { error: 'Período no encontrado' };
-
-    await supabase
-      .from('academic_periods')
-      .update({ is_active: false })
-      .eq('school_year_id', period.school_year_id);
-
     const { data, error } = await supabase
-      .from('academic_periods')
-      .update({ is_active: true, status: 'open' })
-      .eq('id', periodId)
-      .select()
-      .single();
-
+      .rpc('activate_academic_period', {
+        p_period_id: periodId
+      });
+    if (error) return { data: null, error };
+    if (data?.error) return { data: null, error: { message: data.error } };
     if (!error) await this.refresh();
-    return { data, error };
+    return { data, error: null };
   },
 
   // ── Estados y Transiciones ───────────────────────────────────

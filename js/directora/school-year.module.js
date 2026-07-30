@@ -497,7 +497,7 @@ export const SchoolYearModule = {
 
       // Si es edición, eliminar períodos antiguos
       if (this._selectedYear) {
-        await supabase.from('academic_periods').delete().eq('school_year_id', yearId);
+        await supabase.rpc('delete_academic_periods_by_year', { p_school_year_id: yearId });
       }
 
       // Crear períodos
@@ -516,16 +516,21 @@ export const SchoolYearModule = {
 
       // Activar el primer período si es un año nuevo
       if (!this._selectedYear && periods.length > 0) {
-        const firstPeriod = await supabase
-          .from('academic_periods')
-          .select('id')
-          .eq('school_year_id', yearId)
-          .order('order_index')
-          .limit(1)
-          .maybeSingle();
+        const firstPeriod = await supabase.rpc('get_first_academic_period', {
+          p_school_year_id: yearId
+        });
 
-        if (firstPeriod.data) {
+        if (firstPeriod.data?.found) {
           await SchoolEngine.activatePeriod(firstPeriod.data.id);
+        }
+      }
+
+      // Si el año quedó en draft (sin ventanas de inscripción), forzar a active
+      if (yearResult.data.status === 'draft') {
+        await SchoolEngine.advanceState();
+        const status = await supabase.rpc('get_school_year_status');
+        if (!status.data?.has_active_year) {
+          await SchoolEngine.updateSchoolYear(yearId, { status: 'active' });
         }
       }
 
