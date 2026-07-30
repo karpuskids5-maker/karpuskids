@@ -238,32 +238,36 @@ export const SchoolEngine = {
   /** Crear un nuevo año escolar */
   async createSchoolYear(yearData) {
     const { data, error } = await supabase
-      .from('school_years')
-      .insert({
-        name: yearData.name,
-        start_date: yearData.start_date,
-        end_date: yearData.end_date,
-        enrollment_start: yearData.enrollment_start || null,
-        enrollment_end: yearData.enrollment_end || null,
-        reenrollment_start: yearData.reenrollment_start || null,
-        reenrollment_end: yearData.reenrollment_end || null,
-        status: yearData.status || 'draft',
-        created_by: (await supabase.auth.getUser()).data?.user?.id
-      })
-      .select()
-      .single();
-    return { data, error };
+      .rpc('create_school_year', {
+        p_name: yearData.name,
+        p_start_date: yearData.start_date,
+        p_end_date: yearData.end_date,
+        p_enrollment_start: yearData.enrollment_start || null,
+        p_enrollment_end: yearData.enrollment_end || null,
+        p_reenrollment_start: yearData.reenrollment_start || null,
+        p_reenrollment_end: yearData.reenrollment_end || null
+      });
+    if (error) return { data: null, error };
+    if (data?.error) return { data: null, error: { message: data.error } };
+    return { data, error: null };
   },
 
   /** Actualizar un año escolar */
   async updateSchoolYear(id, updates) {
     const { data, error } = await supabase
-      .from('school_years')
-      .update(updates)
-      .eq('id', id)
-      .select()
-      .single();
-    return { data, error };
+      .rpc('update_school_year', {
+        p_id: id,
+        p_name: updates.name || null,
+        p_start_date: updates.start_date || null,
+        p_end_date: updates.end_date || null,
+        p_enrollment_start: updates.enrollment_start || null,
+        p_enrollment_end: updates.enrollment_end || null,
+        p_reenrollment_start: updates.reenrollment_start || null,
+        p_reenrollment_end: updates.reenrollment_end || null
+      });
+    if (error) return { data: null, error };
+    if (data?.error) return { data: null, error: { message: data.error } };
+    return { data, error: null };
   },
 
   /** Eliminar un año escolar (solo draft) */
