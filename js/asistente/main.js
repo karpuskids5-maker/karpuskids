@@ -595,23 +595,27 @@ async function initProfile() {
   const codeInput = document.getElementById('profileAccessCode');
   if (codeInput && code) codeInput.value = code;
 
-  const _loadQR = () => new Promise(r => {
-    if (window.QRCode) { r(); return; }
-    const s = document.createElement('script');
-    s.src = 'js/shared/qrcode.min.js';
-    s.onload = r; document.head.appendChild(s);
-  });
-
   const _renderProfileQR = async (c) => {
     const container = document.getElementById('profileQrContainer');
     if (!container || !c) return;
-    await _loadQR();
-    container.innerHTML = '';
-    new window.QRCode(container, {
-      text: JSON.stringify({ matricula: c, name: p.name, type: 'karpus-staff', v: 1 }),
-      width: 130, height: 130, colorDark: '#1e293b', colorLight: '#ffffff',
-      correctLevel: window.QRCode.CorrectLevel.H
-    });
+    container.innerHTML = '<div class="flex items-center justify-center p-4"><div class="w-6 h-6 border-2 border-teal-400 border-t-transparent rounded-full animate-spin"></div></div>';
+    try {
+      const qrUrl = await Helpers.generateQRWithLogo(
+        JSON.stringify({ matricula: c, name: p.name, type: 'karpus-staff', v: 1 }),
+        { width: 130, colorDark: '#0d9488' }
+      );
+      if (qrUrl) {
+        container.innerHTML = '';
+        const qi = document.createElement('img');
+        qi.src = qrUrl;
+        qi.style.cssText = 'width:130px;height:130px;border-radius:1.5mm;display:block;margin:auto;';
+        container.appendChild(qi);
+      } else {
+        container.innerHTML = '<p class="text-[9px] text-red-500 font-bold text-center">Error al generar QR</p>';
+      }
+    } catch (e) {
+      container.innerHTML = '<p class="text-[9px] text-red-500 font-bold text-center">Error al generar QR</p>';
+    }
   };
 
   if (code) setTimeout(() => _renderProfileQR(code), 300);
@@ -623,34 +627,29 @@ async function initProfile() {
     // Save immediately
     const { error } = await supabase.from('profiles').update({ access_code: newCode }).eq('id', p.id);
     if (!error) {
-      Helpers.toast('C�digo de acceso guardado', 'success');
+      Helpers.toast('Código de acceso guardado', 'success');
       AppState.set('profile', { ...AppState.get('profile'), access_code: newCode });
       _renderProfileQR(newCode);
     } else {
-      Helpers.toast('Error al guardar c�digo: ' + error.message, 'error');
+      Helpers.toast('Error al guardar código: ' + error.message, 'error');
     }
   };
 
   window._printProfileQR = () => {
     const c = document.getElementById('profileAccessCode')?.value?.trim();
     const container = document.getElementById('profileQrContainer');
-    const img = container?.querySelector('img')?.src || container?.querySelector('canvas')?.toDataURL();
+    const img = container?.querySelector('img')?.src;
     if (!img || !c) { Helpers.toast('Genera el QR primero', 'warning'); return; }
+    const roleLabel = p.role === 'directora' ? 'Directora' : p.role === 'asistente' ? 'Asistente' : 'Maestra';
     const win = window.open('', '_blank');
-    win.document.write(`<!DOCTYPE html><html><head><title>Carnet ${p.name}</title>
-      <style>body{font-family:Arial,sans-serif;display:flex;align-items:center;justify-content:center;min-height:100vh;margin:0;}
-      .card{border:4px solid #0d9488;border-radius:20px;padding:24px;text-align:center;max-width:260px;}
-      .hdr{background:#0d9488;color:white;margin:-24px -24px 16px;padding:12px;border-radius:16px 16px 0 0;font-weight:900;font-size:12px;text-transform:uppercase;}
-      img{width:160px;height:160px;border-radius:8px;}.name{font-size:16px;font-weight:900;color:#1e293b;margin-top:12px;}
-      .role{font-size:11px;color:#0d9488;font-weight:800;text-transform:uppercase;margin-top:2px;}
-      .code{font-size:10px;color:#64748b;font-weight:700;margin-top:8px;}</style>
-    </head><body><div class="card">
-      <div class="hdr">STAFF � KARPUS KIDS</div>
-      <img src="${img}">
-      <div class="name">${p.name || 'Personal'}</div>
-      <div class="role">${p.role || 'Asistente'}</div>
-      <div class="code">ID: ${c}</div>
-    </div><script>window.onload=()=>window.print()<\/script></body></html>`);
+    win.document.write(Helpers.getStaffCarnetTemplate(p.name, roleLabel, p.phone || ''));
+    win.document.close();
+  };
+
+  window._printStaffCredential = () => {
+    const roleLabel = p.role === 'directora' ? 'Directora' : p.role === 'asistente' ? 'Asistente' : 'Maestra';
+    const win = window.open('', '_blank');
+    win.document.write(Helpers.getStaffCarnetTemplate(p.name, roleLabel, p.phone || ''));
     win.document.close();
   };
 

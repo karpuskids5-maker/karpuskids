@@ -660,22 +660,22 @@ export const StudentsModule = {
         return;
       }
 
-      await _loadQRLib();
       container.innerHTML = '';
       label && (label.textContent = matricula);
 
-      // QR just contains the matricula (super short, no overflow!)
       const qrData = matricula;
 
       try {
-        new window.QRCode(container, {
-          text: qrData,
-          width: 160,
-          height: 160,
-          colorDark: '#1e293b',
-          colorLight: '#ffffff',
-          correctLevel: window.QRCode.CorrectLevel.L // Low ECC allows more capacity
-        });
+        const qrUrl = await Helpers.generateQRWithLogo(qrData, { width: 160, colorDark: '#198754' });
+        if (qrUrl) {
+          const qrImg = document.createElement('img');
+          qrImg.src = qrUrl;
+          qrImg.style.cssText = 'width:160px;height:160px;border-radius:1.5mm;display:block;';
+          container.appendChild(qrImg);
+        } else {
+          container.innerHTML = '<p class="text-xs text-red-500 font-bold text-center">Error al generar QR</p>';
+          Helpers.toast('Error al generar QR', 'error');
+        }
       } catch (error) {
         console.error('Error generando QR:', error);
         container.innerHTML = '<p class="text-xs text-red-500 font-bold text-center">Error al generar QR</p>';
@@ -690,11 +690,19 @@ export const StudentsModule = {
       const container = document.getElementById('qr-container');
       if (!container || !matricula) { Helpers.toast('Genera el QR primero', 'warning'); return; }
 
-      const qrImg = container.querySelector('img')?.src || container.querySelector('canvas')?.toDataURL();
+      const qrImg = container.querySelector('img')?.src;
       if (!qrImg) { Helpers.toast('Genera el QR primero', 'warning'); return; }
 
+      const sel = document.getElementById('stClassroom');
+      const classroom = sel?.selectedOptions?.[0]?.text || '';
+      const p1Name = document.getElementById('p1Name')?.value?.trim() || '';
+      const p2Name = document.getElementById('p2Name')?.value?.trim() || '';
+      const p1Phone = document.getElementById('p1Phone')?.value?.trim() || '';
+      const p2Phone = document.getElementById('p2Phone')?.value?.trim() || '';
       const win = window.open('', '_blank');
-      win.document.write(Helpers.getQRPrintTemplate(qrImg, name, matricula));
+      win.document.write(Helpers.getQRPrintTemplate(qrImg, name, matricula, {
+        classroom, p1Name, p2Name, p1Phone, p2Phone
+      }));
       win.document.close();
     };
 

@@ -148,14 +148,131 @@ export const Helpers = {
   },
 
   /**
-   * 🖨️ Plantilla Corporativa para Impresión de QR
+   * 📥 Cargar logo institucional como data URL
+   */
+  async _loadLogoAsDataURL(src = 'img/mundo.jpg') {
+    try {
+      const base = window.location.origin || '';
+      const url = `${base}/${src}`;
+      const resp = await fetch(url);
+      if (!resp.ok) throw new Error('Logo not found');
+      const blob = await resp.blob();
+      return await new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = () => resolve(reader.result);
+        reader.onerror = () => reject(new Error('Failed to read logo'));
+        reader.readAsDataURL(blob);
+      });
+    } catch (e) {
+      console.warn('Logo load failed:', e);
+      return null;
+    }
+  },
+
+  /**
+   * 📱 Generar QR con logo institucional en el centro
+   */
+  async generateQRWithLogo(text, options = {}) {
+    const { width = 300, colorDark = '#198754' } = options;
+    if (typeof window.QRCode === 'undefined') {
+      await new Promise((resolve, reject) => {
+        const s = document.createElement('script');
+        s.src = 'js/shared/qrcode.min.js';
+        s.onload = resolve;
+        s.onerror = reject;
+        document.head.appendChild(s);
+      });
+    }
+    return new Promise((resolve) => {
+      const temp = document.createElement('div');
+      temp.style.cssText = `position:absolute;left:-9999px;top:-9999px;width:${width}px;height:${width}px;`;
+      document.body.appendChild(temp);
+      try {
+        new window.QRCode(temp, {
+          text,
+          width,
+          height: width,
+          colorDark,
+          colorLight: '#ffffff',
+          correctLevel: window.QRCode.CorrectLevel.H,
+        });
+        setTimeout(async () => {
+          const canvas = temp.querySelector('canvas');
+          const img = temp.querySelector('img');
+          let dataUrl = null;
+          if (canvas) {
+            const logoSrc = await this._loadLogoAsDataURL('img/karpus.jpg');
+            if (logoSrc) {
+              const ctx = canvas.getContext('2d');
+              const size = canvas.width;
+              const logoSize = size * 0.2;
+              const logoX = (size - logoSize) / 2;
+              const logoY = (size - logoSize) / 2;
+              ctx.fillStyle = '#ffffff';
+              ctx.beginPath();
+              ctx.arc(size / 2, size / 2, logoSize / 2 + 6, 0, Math.PI * 2);
+              ctx.fill();
+              const logoImg = new Image();
+              logoImg.crossOrigin = 'anonymous';
+              logoImg.onload = () => {
+                ctx.drawImage(logoImg, logoX, logoY, logoSize, logoSize);
+                dataUrl = canvas.toDataURL('image/png');
+                document.body.removeChild(temp);
+                resolve(dataUrl);
+              };
+              logoImg.onerror = () => {
+                const fallbackCanvas = document.createElement('canvas');
+                fallbackCanvas.width = logoSize;
+                fallbackCanvas.height = logoSize;
+                const fctx = fallbackCanvas.getContext('2d');
+                fctx.fillStyle = '#198754';
+                fctx.beginPath();
+                fctx.arc(logoSize / 2, logoSize / 2, logoSize / 2, 0, Math.PI * 2);
+                fctx.fill();
+                fctx.fillStyle = '#ffffff';
+                fctx.font = `bold ${logoSize * 0.4}px Arial`;
+                fctx.textAlign = 'center';
+                fctx.textBaseline = 'middle';
+                fctx.fillText('KK', logoSize / 2, logoSize / 2);
+                ctx.drawImage(fallbackCanvas, logoX, logoY, logoSize, logoSize);
+                dataUrl = canvas.toDataURL('image/png');
+                document.body.removeChild(temp);
+                resolve(dataUrl);
+              };
+              logoImg.src = logoSrc;
+              return;
+            }
+            dataUrl = canvas.toDataURL('image/png');
+          } else if (img) {
+            dataUrl = img.src;
+          }
+          document.body.removeChild(temp);
+          resolve(dataUrl);
+        }, 150);
+      } catch (e) {
+        document.body.removeChild(temp);
+        resolve(null);
+      }
+    });
+  },
+
+  /**
+   * 🖨️ Carnet Estudiante — Frente + Reverso (PVC 85.6×54mm)
    */
   getQRPrintTemplate(qrImg, name, matricula, extra = {}) {
     const classroom = extra.classroom || '';
     const level = extra.level || '';
-    const parentName = extra.parentName || 'No registrado';
-    const schoolPhone = extra.schoolPhone || '';
-    const year = extra.year || new Date().getFullYear();
+    const p1Name = extra.p1Name || '';
+    const p2Name = extra.p2Name || '';
+    const p1Phone = extra.p1Phone || '';
+    const p2Phone = extra.p2Phone || '';
+    const schoolPhone = extra.schoolPhone || '(829) 803-8424';
+    const schoolEmail = extra.schoolEmail || 'karpuskids@gmail.com';
+    const schoolAddress = extra.schoolAddress || 'Al lado de Iglesia Bethel Brazos Abiertos, Urbanización Genesis, C. Raúl Mondesí, San Cristóbal 91000';
+    const isInactive = extra.isInactive || false;
+    const shortCode = (matricula || '').slice(-8);
+    const logoUrl = 'img/mundo.jpg';
+
     return `
       <!DOCTYPE html>
       <html lang="es">
@@ -167,90 +284,325 @@ export const Helpers = {
           * { box-sizing: border-box; margin: 0; padding: 0; }
           body {
             font-family: 'Nunito', sans-serif;
-            display: flex; align-items: center; justify-content: center;
-            min-height: 100vh; margin: 0; background: #f1f5f9;
+            display: flex; flex-direction: column; align-items: center; justify-content: center;
+            min-height: 100vh; margin: 0; background: #f1f5f9; padding: 10mm 0; gap: 8mm;
             -webkit-print-color-adjust: exact; print-color-adjust: exact;
           }
+          @page { size: 85.6mm 54mm; margin: 0; }
           .carnet {
             width: 85.6mm; height: 54mm; background: #fff;
-            border: 2px solid #1e40af; border-radius: 4mm;
-            display: flex; flex-direction: column; overflow: hidden;
-            box-shadow: 0 8px 32px rgba(30,64,175,0.12);
+            border-radius: 0; overflow: hidden;
+            position: relative; box-shadow: 0 2px 16px rgba(0,0,0,0.1);
+            page-break-after: always;
+          }
+          .carnet-back { page-break-after: auto; }
+          .top-bar {
+            height: 8mm; background: linear-gradient(135deg, #198754, #146C43);
+            display: flex; align-items: center; padding: 0 3mm; gap: 2mm;
+          }
+          .top-bar-text { flex: 1; }
+          .top-bar-name { font-size: 6.5pt; font-weight: 900; color: #fff; line-height: 1.1; }
+          .top-bar-sub { font-size: 2.5pt; font-weight: 400; color: rgba(255,255,255,0.7); }
+          .card-body { display: flex; height: calc(100% - 10.5mm); }
+          .left-side {
+            width: 42%; display: flex; flex-direction: column;
+            align-items: center; justify-content: center; padding: 2.5mm;
+            background: #f8fdfa; border-right: 0.5px solid #d1e7dd;
             position: relative;
           }
-          .carnet-body { display: flex; flex: 1; }
-          .carnet-left {
-            width: 42%; display: flex; flex-direction: column;
-            align-items: center; justify-content: center; padding: 3mm;
-            background: linear-gradient(135deg, #eff6ff, #f8fafc);
-            border-right: 1px solid #e2e8f0;
+          .left-side img.qr-img {
+            width: 26mm; height: 26mm; border-radius: 1.5mm;
+            display: block;
           }
-          .carnet-left img { width: 28mm; height: 28mm; border-radius: 2mm; }
-          .carnet-left .qr-hint {
-            font-size: 5pt; font-weight: 700; color: #1e40af;
-            text-align: center; margin-top: 1.5mm; line-height: 1.3;
+          .qr-label {
+            font-size: 3.2pt; font-weight: 700; color: #198754;
+            text-align: center; margin-top: 1.2mm; line-height: 1.3;
           }
-          .carnet-left .short-code {
-            font-size: 4.5pt; color: #94a3b8; font-weight: 700; margin-top: 0.5mm;
+          .qr-code {
+            font-size: 2.8pt; color: #94a3b8; font-weight: 700; margin-top: 0.3mm;
+            font-family: monospace;
           }
-          .carnet-right { width: 58%; padding: 3mm 4mm; display: flex; flex-direction: column; justify-content: center; }
-          .school-name {
-            font-size: 7pt; font-weight: 900; color: #1e40af;
-            text-transform: uppercase; letter-spacing: 0.5px;
+          .right-side {
+            width: 58%; padding: 2.5mm 3mm; display: flex;
+            flex-direction: column; justify-content: center;
           }
-          .school-sub { font-size: 4.5pt; color: #64748b; font-weight: 700; margin-bottom: 1mm; }
-          .divider { height: 0.5px; background: #1e40af33; margin-bottom: 1.5mm; }
-          .student-name { font-size: 9pt; font-weight: 900; color: #0f172a; line-height: 1.2; margin-bottom: 1mm; }
-          .info-row { font-size: 5pt; color: #64748b; font-weight: 700; margin-bottom: 0.5mm; }
-          .info-row span { color: #334155; }
-          .carnet-footer {
-            background: #1e40af; padding: 1mm 3mm;
-            text-align: center; color: #fff; font-size: 4.5pt;
-            font-weight: 800; text-transform: uppercase; letter-spacing: 0.5px;
+          .right-header {
+            display: flex; align-items: center; gap: 1.5mm; margin-bottom: 1mm;
+          }
+          .right-header img.right-logo {
+            width: 7mm; height: 7mm; border-radius: 0.5mm; object-fit: cover;
+          }
+          .right-header .right-title {
+            font-size: 7pt; font-weight: 900; color: #198754;
+            text-transform: uppercase; line-height: 1.1;
+          }
+          .right-header .right-sub {
+            font-size: 3pt; color: #64748b; font-weight: 700;
+          }
+          .right-divider {
+            height: 0.3mm; background: linear-gradient(90deg, #198754, #d1e7dd);
+            margin-bottom: 1.2mm;
+          }
+          .student-name-card {
+            font-size: 6.5pt; font-weight: 900; color: #0f172a;
+            line-height: 1.15; margin-bottom: 1.2mm; text-transform: uppercase;
+          }
+          .field-row {
+            font-size: 3pt; font-weight: 700; color: #64748b;
+            margin-bottom: 0.7mm; display: flex;
+          }
+          .field-label { color: #198754; min-width: 18mm; }
+          .field-value { color: #334155; font-weight: 400; flex: 1; }
+          .field-value.bold { font-weight: 700; }
+          .bottom-bar {
+            height: 2.5mm; background: #198754;
+            display: flex; align-items: center; justify-content: center;
+          }
+          .bottom-bar-text {
+            font-size: 2.8pt; font-weight: 800; color: #fff;
+            text-transform: uppercase; letter-spacing: 0.3px;
           }
           .watermark {
-            position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%) rotate(-15deg);
-            font-size: 28pt; font-weight: 900; color: rgba(30,64,175,0.03);
+            position: absolute; top: 50%; left: 50%;
+            transform: translate(-50%, -50%) rotate(-15deg);
+            font-size: 24pt; font-weight: 900;
+            color: rgba(25,135,84,0.035);
             white-space: nowrap; pointer-events: none; z-index: 0;
           }
-          .security-text {
-            position: absolute; bottom: 5mm; left: 3mm; right: 3mm;
-            font-size: 3pt; color: #f1f5f9; text-align: center;
-            letter-spacing: 1px; font-weight: 700; z-index: 0;
+          .inactive-badge {
+            position: absolute; bottom: 5mm; right: 3mm;
+            background: #fecaca; color: #dc2626;
+            font-size: 2.8pt; font-weight: 900;
+            padding: 0.5mm 2mm; border-radius: 1mm;
+          }
+          /* ── REVERSO ── */
+          .back-logo-area {
+            flex: 1; display: flex; flex-direction: column;
+            align-items: center; justify-content: center;
+            padding: 2mm;
+          }
+          .back-logo-wrapper {
+            border: 0.6mm solid #198754; border-radius: 1mm;
+            padding: 0.5mm; margin-bottom: 2.5mm;
+          }
+          .back-logo-wrapper img.back-logo-img {
+            width: 16mm; height: 16mm; display: block; object-fit: cover;
+          }
+          .back-divider {
+            width: 65%; height: 0.3mm; background: #198754; margin: 0 auto 2.5mm;
+          }
+          .back-ownership {
+            font-size: 3pt; font-weight: 700; color: #0f172a;
+            text-align: center; line-height: 1.4; margin-bottom: 0.5mm;
+          }
+          .back-sub {
+            font-size: 2.5pt; color: #64748b; text-align: center; margin-bottom: 2.5mm;
+          }
+          .back-contact {
+            font-size: 2.5pt; font-weight: 700; color: #146C43;
+            text-align: center; line-height: 1.6;
+          }
+          .back-contact .light { font-weight: 400; color: #64748b; font-size: 2.2pt; }
+          .back-watermark {
+            position: absolute; top: 50%; left: 50%;
+            transform: translate(-50%, -50%) rotate(-15deg);
+            font-size: 22pt; font-weight: 900;
+            color: rgba(25,135,84,0.03);
+            white-space: nowrap; pointer-events: none; z-index: 0;
           }
           @media print {
-            body { background: white; margin: 0; padding: 10mm; }
-            .carnet { box-shadow: none; margin: 0 auto; }
+            body { background: white; padding: 0; gap: 0; }
+            .carnet { box-shadow: none; page-break-after: always; }
+            .carnet-back { page-break-after: auto; }
+          }
+        </style>
+      </head>
+      <body>
+        <!-- ─── FRENTE ─── -->
+        <div class="carnet">
+          <div class="watermark">KARPUS KIDS</div>
+          <div class="top-bar">
+            <div class="top-bar-text">
+              <div class="top-bar-name">KARPUS KIDS</div>
+              <div class="top-bar-sub">Centro de Desarrollo Infantil</div>
+            </div>
+          </div>
+          <div class="card-body">
+            <div class="left-side">
+              <img class="qr-img" src="${qrImg}" alt="QR">
+              <div class="qr-label">Escanee para identificar</div>
+              <div class="qr-code">KK-${shortCode}</div>
+            </div>
+            <div class="right-side">
+              <div class="right-header">
+                <img class="right-logo" src="${logoUrl}" alt="">
+                <div>
+                  <div class="right-title">KARPUS KIDS</div>
+                  <div class="right-sub">Centro de Desarrollo Infantil</div>
+                </div>
+              </div>
+              <div class="right-divider"></div>
+              <div class="student-name-card">${name || 'Estudiante'}</div>
+              <div class="field-row"><span class="field-label">AULA:</span><span class="field-value bold">${classroom || '—'}</span></div>
+              <div class="field-row"><span class="field-label">MATRÍCULA:</span><span class="field-value bold">${matricula || '—'}</span></div>
+              <div class="field-row"><span class="field-label">TUTOR 1:</span><span class="field-value">${p1Name || '—'}</span></div>
+              <div class="field-row"><span class="field-label">TUTOR 2:</span><span class="field-value">${p2Name || '—'}</span></div>
+              <div class="field-row"><span class="field-label">TELÉFONO:</span><span class="field-value">${p1Phone || '—'}</span></div>
+            </div>
+          </div>
+          ${isInactive ? '<div class="inactive-badge">INACTIVO</div>' : ''}
+          <div class="bottom-bar">
+            <span class="bottom-bar-text">KARPUS KIDS — Sistema Inteligente de Gestión Infantil</span>
+          </div>
+        </div>
+        <!-- ─── REVERSO ─── -->
+        <div class="carnet carnet-back">
+          <div class="back-watermark">KARPUS KIDS</div>
+          <div class="top-bar">
+            <div class="top-bar-text">
+              <div class="top-bar-name">KARPUS KIDS</div>
+              <div class="top-bar-sub">Centro de Desarrollo Infantil</div>
+            </div>
+          </div>
+          <div class="card-body">
+            <div class="back-logo-area">
+              <div class="back-logo-wrapper">
+                <img class="back-logo-img" src="${logoUrl}" alt="">
+              </div>
+              <div class="back-divider"></div>
+              <div class="back-ownership">🔒 Este carnet es propiedad de<br>la Estancia Karpus Kids.</div>
+              <div class="back-sub">En caso de pérdida favor devolver a la institución.</div>
+              <div class="back-divider"></div>
+              <div class="back-contact">
+                📞 ${schoolPhone}<br>
+                ✉️ ${schoolEmail}<br>
+                <span class="light">📍 ${schoolAddress}</span>
+              </div>
+            </div>
+          </div>
+          <div class="bottom-bar">
+            <span class="bottom-bar-text">KARPUS KIDS — Sistema Inteligente de Gestión Infantil · www.karpuskids.com</span>
+          </div>
+        </div>
+        <script>
+          window.onload = () => { setTimeout(() => { window.print(); }, 400); }
+        </script>
+      </body>
+      </html>
+    `;
+  },
+
+  /**
+   * 🪪 Carnet Personal Administrativo — Horizontal (PVC 85.6×54mm)
+   */
+  getStaffCarnetTemplate(name, role, phone, extra = {}) {
+    const logoUrl = 'img/mundo.jpg';
+    return `
+      <!DOCTYPE html>
+      <html lang="es">
+      <head>
+        <meta charset="UTF-8">
+        <title>Credencial Karpus Kids — ${name}</title>
+        <style>
+          @import url('https://fonts.googleapis.com/css2?family=Nunito:wght@400;700;900&display=swap');
+          * { box-sizing: border-box; margin: 0; padding: 0; }
+          body {
+            font-family: 'Nunito', sans-serif;
+            display: flex; align-items: center; justify-content: center;
+            min-height: 100vh; background: #f1f5f9;
+            -webkit-print-color-adjust: exact; print-color-adjust: exact;
+          }
+          @page { size: 85.6mm 54mm; margin: 0; }
+          .carnet {
+            width: 85.6mm; height: 54mm; background: #fff;
+            position: relative; overflow: hidden;
+            box-shadow: 0 2px 16px rgba(0,0,0,0.1);
+          }
+          .top-bar {
+            height: 8mm; background: linear-gradient(135deg, #1e40af, #1d4ed8);
+            display: flex; align-items: center; padding: 0 3mm; gap: 2mm;
+          }
+          .top-bar-text { flex: 1; }
+          .top-bar-name { font-size: 6.5pt; font-weight: 900; color: #fff; line-height: 1.1; }
+          .top-bar-sub { font-size: 2.5pt; font-weight: 400; color: rgba(255,255,255,0.7); }
+          .card-body { display: flex; height: calc(100% - 10.5mm); }
+          .left-side {
+            width: 40%; display: flex; flex-direction: column;
+            align-items: center; justify-content: center; padding: 2.5mm;
+            background: #f8faff; border-right: 0.5px solid #dbeafe;
+          }
+          .left-side img.staff-logo {
+            width: 20mm; height: 20mm; border-radius: 1mm; object-fit: cover;
+            border: 0.3mm solid #dbeafe; padding: 0.5mm;
+          }
+          .staff-badge {
+            margin-top: 1.5mm;
+            background: #1e40af; color: #fff;
+            font-size: 3.5pt; font-weight: 900;
+            padding: 0.5mm 2mm; border-radius: 0.8mm;
+            text-transform: uppercase; letter-spacing: 0.5px;
+          }
+          .right-side {
+            width: 60%; padding: 2.5mm 3mm;
+            display: flex; flex-direction: column; justify-content: center;
+          }
+          .staff-name {
+            font-size: 8pt; font-weight: 900; color: #0f172a;
+            line-height: 1.15; margin-bottom: 1.5mm; text-transform: uppercase;
+          }
+          .field-row {
+            font-size: 3.2pt; font-weight: 700; color: #64748b;
+            margin-bottom: 0.8mm; display: flex;
+          }
+          .field-label { color: #1e40af; min-width: 16mm; }
+          .field-value { color: #334155; font-weight: 400; }
+          .bottom-bar {
+            height: 2.5mm; background: #1e40af;
+            display: flex; align-items: center; justify-content: center;
+          }
+          .bottom-bar-text {
+            font-size: 2.8pt; font-weight: 800; color: #fff;
+            text-transform: uppercase; letter-spacing: 0.3px;
+          }
+          .watermark {
+            position: absolute; top: 50%; left: 50%;
+            transform: translate(-50%, -50%) rotate(-15deg);
+            font-size: 24pt; font-weight: 900;
+            color: rgba(30,64,175,0.035);
+            white-space: nowrap; pointer-events: none; z-index: 0;
+          }
+          @media print {
+            body { background: white; }
+            .carnet { box-shadow: none; }
           }
         </style>
       </head>
       <body>
         <div class="carnet">
-          <div class="watermark">KARPUS KIDS</div>
-          <div class="security-text">KARPUS KIDS • KARPUS KIDS • KARPUS KIDS • KARPUS KIDS • KARPUS KIDS</div>
-          <div class="carnet-body">
-            <div class="carnet-left">
-              <img src="${qrImg}" alt="QR Code">
-              <p class="qr-hint">Muestre este código<br>al ingresar</p>
-              <p class="short-code">${(matricula || '').slice(-6)}</p>
-            </div>
-            <div class="carnet-right">
-              <p class="school-name">Karpus Kids</p>
-              <p class="school-sub">Centro de Desarrollo Infantil</p>
-              <div class="divider"></div>
-              <p class="student-name">${name || 'Estudiante'}</p>
-              ${classroom ? `<p class="info-row">🏫 <span>${classroom}</span></p>` : ''}
-              ${level ? `<p class="info-row">📚 <span>${level}</span></p>` : ''}
-              <p class="info-row">🆔 <span>${matricula || 'S/M'}</span></p>
-              <p class="info-row">👨 <span>${parentName}</span></p>
-              <p class="info-row">📅 <span>${year}</span></p>
+          <div class="watermark">PERSONAL ADMINISTRATIVO</div>
+          <div class="top-bar">
+            <div class="top-bar-text">
+              <div class="top-bar-name">KARPUS KIDS</div>
+              <div class="top-bar-sub">Centro de Desarrollo Infantil</div>
             </div>
           </div>
-          <div class="carnet-footer">Karpus Kids — Sistema Inteligente de Gestión Infantil</div>
+          <div class="card-body">
+            <div class="left-side">
+              <img class="staff-logo" src="${logoUrl}" alt="">
+              <div class="staff-badge">Personal Administrativo</div>
+            </div>
+            <div class="right-side">
+              <div class="staff-name">${name || 'Nombre'}</div>
+              <div class="field-row"><span class="field-label">ROL:</span><span class="field-value">${role || '—'}</span></div>
+              <div class="field-row"><span class="field-label">TELÉFONO:</span><span class="field-value">${phone || '—'}</span></div>
+              <div class="field-row"><span class="field-label">INSTITUCIÓN:</span><span class="field-value">Karpus Kids</span></div>
+            </div>
+          </div>
+          <div class="bottom-bar">
+            <span class="bottom-bar-text">KARPUS KIDS — Sistema Inteligente de Gestión Infantil · www.karpuskids.com</span>
+          </div>
         </div>
-        <script>
-          window.onload = () => { setTimeout(() => { window.print(); }, 400); }
-        </script>
+        <script>window.onload=()=>{setTimeout(()=>{window.print()},400)}</script>
       </body>
       </html>
     `;

@@ -45,15 +45,20 @@ window.App = {
   printPadreQR: () => {
     const student = AppState.get('currentStudent');
     const container = document.getElementById('padre-qr-container');
-    const canvas = container?.querySelector('canvas');
-    if (!canvas || !student) return;
-    const imgData = canvas.toDataURL('image/png');
+    const img = container?.querySelector('img');
+    if (!img || !student) return;
+    const imgData = img.src;
+    const classroom = student.classrooms?.name || '';
+    const level = student.classrooms?.level || '';
     const win = window.open('', '_blank');
-    win.document.write(`<!DOCTYPE html><html><head><title>QR ${student.name}</title>
-      <style>body{display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:100vh;font-family:sans-serif;padding:2rem;}
-      img{width:200px;height:200px;border:2px solid #e2e8f0;border-radius:12px;padding:8px;}
-      h2{margin:1rem 0 .25rem;font-size:1.2rem;color:#1e293b;}p{color:#64748b;font-size:.9rem;}</style></head>
-      <body><img src="${imgData}"><h2>${student.name}</h2><p>Matrícula: ${student.matricula}</p><script>window.onload=()=>window.print();<\/script></body></html>`);
+    win.document.write(Helpers.getQRPrintTemplate(imgData, student.name, student.matricula, {
+      classroom, level,
+      p1Name: student.p1_name || '',
+      p2Name: student.p2_name || '',
+      p1Phone: student.p1_phone || '',
+      p2Phone: student.p2_phone || '',
+      isInactive: student.is_active === false
+    }));
     win.document.close();
   }
 };
@@ -1189,25 +1194,18 @@ async function _initPadreQR(student) {
 
   // Esperar QR lib (ya debería estar precargada)
   try {
-    if (!window.QRCode) {
-      await new Promise((resolve, reject) => {
-        const s = document.createElement('script');
-        s.src = 'js/shared/qrcode.min.js';
-        s.onload = resolve;
-        s.onerror = reject;
-        document.head.appendChild(s);
-      });
-    }
-
     container.innerHTML = '';
     const qrData = matricula;
 
-    new window.QRCode(container, {
-      text: qrData,
-      width: 192, height: 192,
-      colorDark: '#1e293b', colorLight: '#ffffff',
-      correctLevel: window.QRCode.CorrectLevel.L
-    });
+    const qrUrl = await Helpers.generateQRWithLogo(qrData, { width: 192, colorDark: '#198754' });
+    if (qrUrl) {
+      const qrImg = document.createElement('img');
+      qrImg.src = qrUrl;
+      qrImg.style.cssText = 'width:192px;height:192px;border-radius:1.5mm;display:block;';
+      container.appendChild(qrImg);
+    } else {
+      container.innerHTML = '<div class="w-48 h-48 flex items-center justify-center text-rose-500 text-xs text-center font-bold">Error al generar QR.<br>Reintenta recargando la página.</div>';
+    }
   } catch (e) {
 
     container.innerHTML = '<div class="w-48 h-48 flex items-center justify-center text-rose-500 text-xs text-center font-bold">Error al cargar QR.<br>Reintenta recargando la página.</div>';
@@ -1215,23 +1213,20 @@ async function _initPadreQR(student) {
 
   // Imprimir
   window.App.printPadreQR = () => {
-    const img = container.querySelector('img')?.src || container.querySelector('canvas')?.toDataURL();
+    const img = container.querySelector('img')?.src;
     if (!img) return;
     const win = window.open('', '_blank');
     if (!win) return;
-    win.document.write(`<!DOCTYPE html><html><head><title>QR - ${matricula}</title>
-      <style>body{font-family:Arial,sans-serif;display:flex;align-items:center;justify-content:center;min-height:100vh;margin:0;}
-      .card{border:2px solid #e2e8f0;border-radius:16px;padding:24px;text-align:center;max-width:280px;}
-      .logo{font-size:12px;font-weight:900;color:#10B981;text-transform:uppercase;letter-spacing:2px;margin-bottom:12px;}
-      img{width:192px;height:192px;}.name{font-size:16px;font-weight:900;color:#1e293b;margin-top:12px;}
-      .mat{font-size:11px;color:#64748b;font-weight:700;margin-top:4px;}.hint{font-size:9px;color:#94a3b8;margin-top:8px;}</style>
-    </head><body><div class="card">
-      <div class="logo">🎓 Karpus Kids</div>
-      <img src="${img}" alt="QR">
-      <div class="name">${name}</div>
-      <div class="mat">${matricula}</div>
-      <div class="hint">Escanea para registrar entrada/salida</div>
-    </div><script>window.onload=()=>{window.print();}<\/script></body></html>`);
+    const classroom = student.classrooms?.name || '';
+    const level = student.classrooms?.level || '';
+    win.document.write(Helpers.getQRPrintTemplate(img, name, matricula, {
+      classroom, level,
+      p1Name: student.p1_name || '',
+      p2Name: student.p2_name || '',
+      p1Phone: student.p1_phone || '',
+      p2Phone: student.p2_phone || '',
+      isInactive: student.is_active === false
+    }));
     win.document.close();
   };
 

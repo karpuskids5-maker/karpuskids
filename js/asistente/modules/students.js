@@ -344,17 +344,20 @@ export const StudentsModule = {
       const container = document.getElementById('asis-qr-container');
       const label = document.getElementById('asis-qr-label');
       if (!container || !matricula) return;
-      if (!window.QRCode) {
-        await new Promise(r => { const s = document.createElement('script'); s.src = 'js/shared/qrcode.min.js'; s.onload = r; document.head.appendChild(s); });
-      }
-      container.innerHTML = '';
+      container.innerHTML = '<div class="w-28 h-28 flex items-center justify-center"><div class="w-6 h-6 border-2 border-teal-400 border-t-transparent rounded-full animate-spin"></div></div>';
       if (label) label.textContent = matricula;
       try {
-        new window.QRCode(container, {
-          text: matricula,
-          width: 120, height: 120, colorDark: '#1e293b', colorLight: '#ffffff',
-          correctLevel: window.QRCode.CorrectLevel.L
-        });
+        const qrUrl = await Helpers.generateQRWithLogo(matricula, { width: 120, colorDark: '#198754' });
+        if (qrUrl) {
+          container.innerHTML = '';
+          const img = document.createElement('img');
+          img.src = qrUrl;
+          img.style.cssText = 'width:120px;height:120px;border-radius:1.5mm;display:block;';
+          container.appendChild(img);
+        } else {
+          container.innerHTML = '<p class="text-xs text-rose-500 font-bold text-center">Error al generar QR</p>';
+          Helpers.toast('Error al generar QR', 'error');
+        }
       } catch (error) {
         Helpers.safeLog('error', 'Error generating QR:', error);
         container.innerHTML = '<p class="text-xs text-rose-500 font-bold text-center">Error al generar QR</p>';
@@ -366,11 +369,20 @@ export const StudentsModule = {
       const container = document.getElementById('asis-qr-container');
       const matricula = document.getElementById('stMatricula')?.value?.trim();
       const name = document.getElementById('stName')?.value?.trim() || 'Estudiante';
-      const img = container?.querySelector('img')?.src || container?.querySelector('canvas')?.toDataURL();
+      const img = container?.querySelector('img')?.src;
       if (!img || !matricula) { Helpers.toast('Genera el QR primero', 'warning'); return; }
       
+      const sel = document.getElementById('stClassroom');
+      const classroom = sel?.selectedOptions?.[0]?.text || '';
+      const p1Name = document.getElementById('p1Name')?.value?.trim() || '';
+      const p2Name = document.getElementById('p2Name')?.value?.trim() || '';
+      const p1Phone = document.getElementById('p1Phone')?.value?.trim() || '';
+      const p2Phone = document.getElementById('p2Phone')?.value?.trim() || '';
+
       const win = window.open('', '_blank');
-      win.document.write(Helpers.getQRPrintTemplate(img, name, matricula));
+      win.document.write(Helpers.getQRPrintTemplate(img, name, matricula, {
+        classroom, p1Name, p2Name, p1Phone, p2Phone
+      }));
       win.document.close();
     };
 

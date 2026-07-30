@@ -86,28 +86,42 @@ export function openStudentProfile(studentId) {
   Modal.open(modalId, content);
 
   // Generar QR en el modal
-  setTimeout(() => {
+  setTimeout(async () => {
     const container = document.getElementById('student-qr-container');
-    if (container && student.matricula && window.QRCode) {
-      new QRCode(container, {
-        text: student.matricula,
-        width: 120,
-        height: 120,
-        colorDark: "#0f172a",
-        colorLight: "#ffffff",
-        correctLevel: QRCode.CorrectLevel.H
-      });
+    if (container && student.matricula) {
+      try {
+        const qrUrl = await Helpers.generateQRWithLogo(student.matricula, { width: 120, colorDark: '#198754' });
+        if (qrUrl) {
+          container.innerHTML = '';
+          const img = document.createElement('img');
+          img.src = qrUrl;
+          img.style.cssText = 'width:120px;height:120px;border-radius:1.5mm;display:block;';
+          container.appendChild(img);
+        }
+      } catch (e) {
+        // silent
+      }
     }
   }, 100);
 
-  // FunciÃƒ³n global para imprimir desde el panel maestra
+  // Función global para imprimir desde el panel maestra
   window._printStudentQRMaestra = (id) => {
     const s = AppState.get('students').find(x => x.id == id);
-    const canvas = document.querySelector('#student-qr-container canvas');
-    if (!canvas || !s) return;
-    const imgData = canvas.toDataURL("image/png");
+    const container = document.getElementById('student-qr-container');
+    const img = container?.querySelector('img');
+    if (!img || !s) return;
+    const imgData = img.src;
+    const classroom = s.classrooms?.name || '';
+    const level = s.classrooms?.level || '';
     const win = window.open('', '_blank');
-    win.document.write(Helpers.getQRPrintTemplate(imgData, s.name, s.matricula));
+    win.document.write(Helpers.getQRPrintTemplate(imgData, s.name, s.matricula, {
+      classroom, level,
+      p1Name: s.p1_name || '',
+      p2Name: s.p2_name || '',
+      p1Phone: s.p1_phone || '',
+      p2Phone: s.p2_phone || '',
+      isInactive: s.is_active === false
+    }));
     win.document.close();
   };
 }

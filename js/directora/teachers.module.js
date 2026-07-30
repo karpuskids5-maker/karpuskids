@@ -293,55 +293,35 @@ export const TeachersModule = {
         return;
       }
 
-      // Cargar librer�a QR si no est�
-      if (!window.QRCode) {
-        await new Promise(resolve => {
-          const s = document.createElement('script');
-          s.src = 'js/shared/qrcode.min.js';
-          s.onload = resolve;
-          document.head.appendChild(s);
-        });
+      container.innerHTML = '<div class="flex items-center justify-center p-4"><div class="w-6 h-6 border-2 border-indigo-400 border-t-transparent rounded-full animate-spin"></div></div>';
+      try {
+        const qrUrl = await Helpers.generateQRWithLogo(
+          JSON.stringify({ matricula: code, type: 'karpus-staff', v: 1 }),
+          { width: 140, colorDark: '#4f46e5' }
+        );
+        if (qrUrl) {
+          container.innerHTML = '';
+          const qi = document.createElement('img');
+          qi.src = qrUrl;
+          qi.style.cssText = 'width:140px;height:140px;border-radius:1.5mm;display:block;margin:auto;';
+          container.appendChild(qi);
+        } else {
+          container.innerHTML = '<p class="text-[10px] text-red-500 font-bold text-center">Error al generar QR</p>';
+        }
+      } catch (e) {
+        container.innerHTML = '<p class="text-[10px] text-red-500 font-bold text-center">Error al generar QR</p>';
       }
-      container.innerHTML = '';
-      new window.QRCode(container, {
-        text: JSON.stringify({ matricula: code, type: 'karpus-staff', v: 1 }),
-        width: 140, height: 140,
-        colorDark: '#1e293b', colorLight: '#ffffff',
-        correctLevel: window.QRCode.CorrectLevel.H
-      });
     };
 
     window.printStaffQR = () => {
       const matricula = document.getElementById('tMatricula')?.value?.trim();
       const name = document.getElementById('tName')?.value?.trim();
       const role = document.getElementById('tRole')?.value?.trim();
-      const container = document.getElementById('staff-qr-container');
-      if (!container || !matricula) { Helpers.toast('Genera el QR primero', 'warning'); return; }
-
-      const qrImg = container.querySelector('img')?.src || container.querySelector('canvas')?.toDataURL();
-      if (!qrImg) { Helpers.toast('Genera el QR primero', 'warning'); return; }
+      const phone = document.getElementById('tPhone')?.value?.trim();
+      if (!matricula) { Helpers.toast('Genera el QR primero', 'warning'); return; }
 
       const win = window.open('', '_blank');
-      win.document.write(`<!DOCTYPE html><html><head><title>Carnet Personal - ${name}</title>
-        <style>
-          body { font-family: Arial, sans-serif; display: flex; flex-direction: column; align-items: center; justify-content: center; min-height: 100vh; margin: 0; background: #fff; }
-          .card { border: 4px solid #4f46e5; border-radius: 24px; padding: 30px; text-align: center; max-width: 300px; position: relative; }
-          .header { background: #4f46e5; color: white; margin: -30px -30px 20px -30px; padding: 15px; border-radius: 20px 20px 0 0; font-weight: 900; text-transform: uppercase; font-size: 14px; }
-          img { width: 180px; height: 180px; border: 4px solid #f8fafc; border-radius: 12px; }
-          .name { font-size: 18px; font-weight: 900; color: #1e293b; margin-top: 15px; }
-          .role { font-size: 12px; color: #4f46e5; font-weight: 800; text-transform: uppercase; margin-top: 2px; }
-          .id { font-size: 11px; color: #64748b; font-weight: 700; margin-top: 10px; border-top: 1px solid #eee; pt: 10px; }
-        </style>
-      </head><body>
-        <div class="card">
-          <div class="header">STAFF � KARPUS KIDS</div>
-          <img src="${qrImg}" alt="QR">
-          <div class="name">${name || 'Personal'}</div>
-          <div class="role">${role || 'Maestra'}</div>
-          <div class="id">ID: ${matricula}</div>
-        </div>
-        <script>window.onload=()=>{window.print();}<\/script>
-      </body></html>`);
+      win.document.write(Helpers.getStaffCarnetTemplate(name || 'Personal', role || 'Maestra', phone || ''));
       win.document.close();
     };
 

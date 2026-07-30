@@ -177,13 +177,6 @@ export const TeachersModule = {
     window.openTeacherModal = (id) => this.openModal(id);
 
     // QR functions for teacher modal
-    const _loadQR = () => new Promise(r => {
-      if (window.QRCode) { r(); return; }
-      const s = document.createElement('script');
-      s.src = 'js/shared/qrcode.min.js';
-      s.onload = r; document.head.appendChild(s);
-    });
-
     window._genTeacherCode = async () => {
       const code = 'TEA-' + new Date().getFullYear() + '-' + String(Math.floor(Math.random() * 9000) + 1000);
       const el = document.getElementById('teacherMatricula');
@@ -193,23 +186,34 @@ export const TeachersModule = {
     window._renderTeacherQR = async (code) => {
       const container = document.getElementById('asis-teacher-qr');
       if (!container || !code) return;
-      await _loadQR();
-      container.innerHTML = '';
-      new window.QRCode(container, {
-        text: JSON.stringify({ matricula: code, type: 'karpus-staff', v: 1 }),
-        width: 110, height: 110, colorDark: '#1e293b', colorLight: '#ffffff',
-        correctLevel: window.QRCode.CorrectLevel.H
-      });
+      container.innerHTML = '<div class="flex items-center justify-center p-4"><div class="w-6 h-6 border-2 border-teal-400 border-t-transparent rounded-full animate-spin"></div></div>';
+      try {
+        const qrUrl = await Helpers.generateQRWithLogo(
+          JSON.stringify({ matricula: code, type: 'karpus-staff', v: 1 }),
+          { width: 110, colorDark: '#0d9488' }
+        );
+        if (qrUrl) {
+          container.innerHTML = '';
+          const qi = document.createElement('img');
+          qi.src = qrUrl;
+          qi.style.cssText = 'width:110px;height:110px;border-radius:1.5mm;display:block;margin:auto;';
+          container.appendChild(qi);
+        } else {
+          container.innerHTML = '<p class="text-[10px] text-red-500 font-bold text-center">Error al generar QR</p>';
+        }
+      } catch (e) {
+        container.innerHTML = '<p class="text-[10px] text-red-500 font-bold text-center">Error al generar QR</p>';
+      }
     };
 
     window._printTeacherQR = () => {
       const code = document.getElementById('teacherMatricula')?.value?.trim();
       const name = document.getElementById('teacherName')?.value?.trim() || 'Personal';
-      const container = document.getElementById('asis-teacher-qr');
-      const img = container?.querySelector('img')?.src || container?.querySelector('canvas')?.toDataURL();
-      if (!img || !code) { Helpers.toast('Genera el QR primero', 'warning'); return; }
+      const role = document.getElementById('teacherRole')?.value?.trim() || 'Maestra';
+      const phone = document.getElementById('teacherPhone')?.value?.trim() || '';
+      if (!code) { Helpers.toast('Genera el QR primero', 'warning'); return; }
       const win = window.open('', '_blank');
-      win.document.write(`<!DOCTYPE html><html><head><title>Carnet ${name}</title><style>body{font-family:Arial,sans-serif;display:flex;align-items:center;justify-content:center;min-height:100vh;margin:0;}.card{border:4px solid #0d9488;border-radius:20px;padding:24px;text-align:center;max-width:260px;}.hdr{background:#0d9488;color:white;margin:-24px -24px 16px;padding:12px;border-radius:16px 16px 0 0;font-weight:900;font-size:12px;text-transform:uppercase;}img{width:160px;height:160px;border-radius:8px;}.name{font-size:16px;font-weight:900;color:#1e293b;margin-top:12px;}.code{font-size:10px;color:#64748b;font-weight:700;margin-top:4px;}</style></head><body><div class="card"><div class="hdr">STAFF � KARPUS KIDS</div><img src="${img}"><div class="name">${name}</div><div class="code">ID: ${code}</div></div><script>window.onload=()=>window.print()<\/script></body></html>`);
+      win.document.write(Helpers.getStaffCarnetTemplate(name, role, phone));
       win.document.close();
     };
 
