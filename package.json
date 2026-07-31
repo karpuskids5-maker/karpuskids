@@ -11,7 +11,8 @@
     "build:css": "postcss ./css/tailwind.css -o ./css/karpus-tailwind.css",
     "watch:css": "postcss ./css/tailwind.css -o ./css/karpus-tailwind.css --watch",
     "predeploy": "node scripts/pre-deploy-check.js",
-    "web": "node server/web.cjs"
+    "web": "node server/web.cjs",
+    "security:audit": "npm audit"
   },
   "description": "��#\u0000 \u0000k\u0000a\u0000r\u0000p\u0000u\u0000s\u0000k\u0000i\u0000d\u0000s\u0000\r\u0000 \u0000",
   "main": "index.js",
@@ -32,7 +33,9 @@
     "better-sqlite3": "^12.5.0",
     "compression": "^1.8.1",
     "cors": "^2.8.5",
-    "express": "^5.2.1"
+    "express": "^5.2.1",
+    "express-rate-limit": "^8.6.1",
+    "helmet": "^8.3.0"
   },
   "devDependencies": {
     "@tailwindcss/postcss": "^4.1.18",

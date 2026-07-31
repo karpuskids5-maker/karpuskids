@@ -1,15 +1,23 @@
 /**
- * Karpus Kids — Service Worker PWA
- * IMPORTANTE: Este SW solo maneja caché PWA.
- * Las notificaciones push las maneja OneSignalSDKWorker.js en el mismo scope.
- * NO definir handlers push/notificationclick aquí para no interferir con OneSignal.
+ * Karpus Kids — Service Worker PWA (standalone, solo caché)
+ * ⚠️ IMPORTANTE: En producción el worker activo es OneSignalSDKWorker.js
+ * (scope '/'), que ya incluye esta misma estrategia de caché. Solo puede
+ * existir UN service worker por scope: registrar este sw.js en '/'
+ * REEMPLAZARÍA al de OneSignal y rompería las notificaciones push.
+ * Este archivo se mantiene como plantilla/fallback de caché.
+ *
+ * Estrategia:
+ *   - Cache versionado (elimina cachés antiguas en activate).
+ *   - skipWaiting() + clients.claim() para tomar control al instante.
+ *   - Network First para HTML, JS y CSS.
+ *   - Cache First (stale-while-revalidate) para imágenes y fuentes.
+ *   - Supabase/OneSignal/auth nunca se cachean.
  */
 
-// ⚠️ Handler message requerido en evaluación inicial (Chrome 120+)
-self.addEventListener('message', () => {});
+const CACHE_VERSION = 'karpus-v1.0.26';
+const CACHE_NAME    = CACHE_VERSION;
 
-const CACHE_NAME = 'karpus-pwa-v7'; // ✅ Grades V2 system update
-const ASSETS = [
+const PRECACHE = [
   './',
   'login.html',
   'css/panel-padre.css',
@@ -22,7 +30,7 @@ const ASSETS = [
 self.addEventListener('install', e => {
   e.waitUntil(
     caches.open(CACHE_NAME)
-      .then(c => c.addAll(ASSETS).catch(() => {}))
+      .then(c => c.addAll(PRECACHE).catch(() => {}))
       .then(() => self.skipWaiting())
   );
 });
@@ -35,58 +43,104 @@ self.addEventListener('activate', e => {
   );
 });
 
+const isNavigate = req => req.mode === 'navigate' || req.headers.get('accept')?.includes('text/html');
+const isJSOrCSS  = url => /\.(?:js|mjs|css)$/i.test(url.pathname);
+const isImage    = url => /\.(?:png|jpe?g|webp|gif|svg|ico|avif|webmanifest)$/i.test(url.pathname) ||
+                          /\.(?:woff2?|ttf|otf|eot)$/i.test(url.pathname);
+
 self.addEventListener('fetch', e => {
-  if (e.request.method !== 'GET') return;
+  const req = e.request;
+  if (req.method !== 'GET') return;
 
-  const url = new URL(e.request.url);
+  const url = new URL(req.url);
 
-  // ✅ CACHÉ DE FUENTES Y CDN (Stale-while-revalidate)
+  if (
+    url.hostname.includes('supabase.co') ||
+    url.hostname.includes('onesignal.com') ||
+    url.pathname.includes('/auth/v1/') ||
+    url.pathname.includes('OneSignal') ||
+    url.protocol === 'chrome-extension:'
+  ) {
+    return;
+  }
+
   if (url.hostname.includes('fonts.googleapis.com') || url.hostname.includes('fonts.gstatic.com')) {
     e.respondWith(
-      caches.match(e.request).then(cached => {
-        const fetchPromise = fetch(e.request).then(networkResponse => {
-          caches.open(CACHE_NAME).then(cache => cache.put(e.request, networkResponse.clone()));
+      caches.match(req).then(cached => {
+        const fetchPromise = fetch(req).then(networkResponse => {
+          if (networkResponse && networkResponse.ok) {
+            const copy = networkResponse.clone();
+            caches.open(CACHE_NAME).then(c => c.put(req, copy)).catch(() => {});
+          }
           return networkResponse;
-        });
+        }).catch(() => cached);
         return cached || fetchPromise;
       })
     );
     return;
   }
 
-  // No interceptar requests críticos de OneSignal ni Auth de Supabase
-  if (
-    url.hostname.includes('onesignal.com') ||
-    url.pathname.includes('/auth/v1/') ||
-    url.pathname.includes('OneSignal')
-  ) {
+  if (isNavigate(req)) {
+    e.respondWith(
+      fetch(req)
+        .then(networkResponse => {
+          if (networkResponse && networkResponse.ok) {
+            const copy = networkResponse.clone();
+            caches.open(CACHE_NAME).then(c => c.put(req, copy)).catch(() => {});
+          }
+          return networkResponse;
+        })
+        .catch(() =>
+          caches.match(req).then(cached =>
+            cached || caches.match('./').then(root => root || caches.match('login.html'))
+          )
+        )
+    );
     return;
   }
 
-  // ✅ CACHÉ DE ASSETS ESTÁTICOS CORE
-  const isCoreAsset = url.pathname.endsWith('.css') || 
-                     url.pathname.endsWith('.js') || 
-                     url.pathname.endsWith('.png') || 
-                     url.pathname.endsWith('.jpg') ||
-                     url.pathname.endsWith('.svg');
-
-  if (isCoreAsset || url.origin === self.location.origin) {
+  if (isJSOrCSS(url)) {
     e.respondWith(
-      caches.match(e.request).then(cached => {
-        if (cached) return cached;
-        return fetch(e.request).then(res => {
-          if (res && res.type === 'basic' && res.ok && res.status === 200) {
-            const copy = res.clone();
-            caches.open(CACHE_NAME).then(c => c.put(e.request, copy)).catch(() => {});
+      fetch(req)
+        .then(networkResponse => {
+          if (networkResponse && networkResponse.ok && networkResponse.type === 'basic') {
+            const copy = networkResponse.clone();
+            caches.open(CACHE_NAME).then(c => c.put(req, copy)).catch(() => {});
           }
-          return res;
-        }).catch(() => caches.match('login.html'));
+          return networkResponse;
+        })
+        .catch(() => caches.match(req).then(cached => cached || caches.match('login.html')))
+    );
+    return;
+  }
+
+  if (isImage(url)) {
+    e.respondWith(
+      caches.match(req).then(cached => {
+        const fetchPromise = fetch(req).then(networkResponse => {
+          if (networkResponse && networkResponse.ok) {
+            const copy = networkResponse.clone();
+            caches.open(CACHE_NAME).then(c => c.put(req, copy)).catch(() => {});
+          }
+          return networkResponse;
+        }).catch(() => cached);
+        return cached || fetchPromise;
       })
+    );
+    return;
+  }
+
+  if (url.origin === self.location.origin) {
+    e.respondWith(
+      fetch(req)
+        .then(networkResponse => {
+          if (networkResponse && networkResponse.ok && networkResponse.type === 'basic') {
+            const copy = networkResponse.clone();
+            caches.open(CACHE_NAME).then(c => c.put(req, copy)).catch(() => {});
+          }
+          return networkResponse;
+        })
+        .catch(() => caches.match(req))
     );
   }
 });
-
-// ⚠️ NO agregar handlers push/notificationclick aquí.
-// OneSignalSDKWorker.js maneja todo lo relacionado con notificaciones push.
-// Tener dos handlers en el mismo scope causa que las notificaciones se dupliquen
-// o no lleguen correctamente en móvil.

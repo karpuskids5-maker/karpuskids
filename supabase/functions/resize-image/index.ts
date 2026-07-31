@@ -2,21 +2,11 @@
  * 🖼️ resize-image — Edge Function
  * Redimensiona y comprime imágenes a WebP antes de guardarlas en Supabase Storage.
  *
- * Uso desde el cliente:
- *   const { data } = await supabase.functions.invoke('resize-image', {
- *     body: { base64: '<base64_string>', filename: 'avatar.jpg', bucket: 'karpus-uploads', path: 'avatars/user_id.webp', maxWidth: 400, quality: 85 }
- *   });
- *   // data.publicUrl → URL pública de la imagen optimizada
- *
- * Parámetros:
- *   base64    — imagen en base64 (sin prefijo data:image/...)
- *   mimeType  — tipo MIME original (default: 'image/jpeg')
- *   filename  — nombre original del archivo
- *   bucket    — bucket de Supabase Storage (default: 'karpus-uploads')
- *   path      — ruta destino en el bucket (ej: 'avatars/user123.webp')
- *   maxWidth  — ancho máximo en px (default: 800)
- *   maxHeight — alto máximo en px (default: 800)
- *   quality   — calidad WebP 1-100 (default: 82)
+ * Seguridad:
+ *  - Requiere JWT válido del llamador (supabase.functions.invoke adjunta el token).
+ *  - Solo buckets permitidos.
+ *  - Valida la ruta: sin traversal, carpetas conocidas, extensiones permitidas.
+ *  - Rutas personales (avatars/directors/profiles) deben contener el id del llamador.
  */
 
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
@@ -26,6 +16,14 @@ const CORS = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
   'Access-Control-Allow-Methods': 'POST, OPTIONS',
 };
+
+const ALLOWED_BUCKETS = new Set(['karpus-uploads', 'classroom_media', 'avatars']);
+const ALLOWED_FOLDERS = new Set([
+  'avatars', 'directors', 'students', 'staff', 'posts',
+  'evidence', 'activities', 'payments', 'reports', 'carnets', 'profiles',
+]);
+const ALLOWED_EXTENSIONS = new Set(['webp', 'jpg', 'jpeg', 'png', 'gif', 'mp4', 'mov', 'webm', 'pdf']);
+const PERSONAL_FOLDERS = new Set(['avatars', 'directors', 'profiles']);
 
 const json = (data: unknown, status = 200) =>
   new Response(JSON.stringify(data), {
@@ -40,8 +38,23 @@ function validateInput(body: Record<string, unknown>): string | null {
   if (body.maxWidth  && (typeof body.maxWidth  !== 'number' || body.maxWidth  < 1 || body.maxWidth  > 4000)) return 'maxWidth must be 1-4000';
   if (body.maxHeight && (typeof body.maxHeight !== 'number' || body.maxHeight < 1 || body.maxHeight > 4000)) return 'maxHeight must be 1-4000';
   if (body.quality   && (typeof body.quality   !== 'number' || body.quality   < 1 || body.quality   > 100))  return 'quality must be 1-100';
-  // Limitar tamaño del base64 (max ~5MB de imagen original)
   if (body.base64.length > 7_000_000) return 'Image too large (max ~5MB)';
+  return null;
+}
+
+// ── Validación de ruta (previene escritura arbitraria de archivos) ───────────
+function validatePath(path: string, bucket: string, callerId: string): string | null {
+  if (path.length === 0 || path.length > 200) return 'Invalid path length';
+  if (/^\/|\.\.|\\|[\u0000-\u001F ]/.test(path)) return 'Invalid path';
+  const parts = path.split('/');
+  const folder = parts[0];
+  if (!ALLOWED_FOLDERS.has(folder)) return 'Invalid folder';
+  if (bucket !== 'avatars' && folder === 'avatars') return 'Bucket mismatch';
+  const ext = path.split('.').pop()?.toLowerCase() ?? '';
+  if (!ALLOWED_EXTENSIONS.has(ext)) return 'Invalid extension';
+  if (PERSONAL_FOLDERS.has(folder) && !path.includes(callerId)) {
+    return 'Cannot write to another user\u0027s personal folder';
+  }
   return null;
 }
 
@@ -53,6 +66,17 @@ Deno.serve(async (req) => {
     const SUPABASE_URL = Deno.env.get('SUPABASE_URL')              ?? '';
     const SERVICE_KEY  = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '';
     if (!SUPABASE_URL || !SERVICE_KEY) return json({ error: 'Missing env vars' }, 500);
+
+    // ── Verificar autenticación del llamador ───────────────────────────────
+    const authHeader = req.headers.get('Authorization') ?? '';
+    if (!authHeader.startsWith('Bearer ')) return json({ error: 'No autenticado' }, 401);
+
+    const callerClient = createClient(SUPABASE_URL, Deno.env.get('SUPABASE_ANON_KEY') ?? '', {
+      global: { headers: { Authorization: authHeader } },
+      auth: { persistSession: false, autoRefreshToken: false },
+    });
+    const { data: { user: caller } } = await callerClient.auth.getUser();
+    if (!caller) return json({ error: 'No autenticado' }, 401);
 
     const body = await req.json() as Record<string, unknown>;
 
@@ -73,31 +97,40 @@ Deno.serve(async (req) => {
       maxWidth?: number; maxHeight?: number; quality?: number;
     };
 
+    // Validar bucket y ruta (anti arbitrary-file-write)
+    if (!ALLOWED_BUCKETS.has(String(bucket))) {
+      return json({ error: 'Bucket no permitido' }, 403);
+    }
+    const pathError = validatePath(String(path), String(bucket), caller.id);
+    if (pathError) return json({ error: pathError }, 403);
+
     // ── Decodificar base64 ────────────────────────────────────────────────────
-    // Limpiar prefijo data:image/...;base64, si existe
     const cleanBase64 = base64.replace(/^data:[^;]+;base64,/, '');
-    const imageBytes  = Uint8Array.from(atob(cleanBase64), c => c.charCodeAt(0));
+    let imageBytes: Uint8Array;
+    try {
+      imageBytes = Uint8Array.from(atob(cleanBase64), c => c.charCodeAt(0));
+    } catch {
+      return json({ error: 'base64 inválido' }, 400);
+    }
+    if (imageBytes.length === 0) return json({ error: 'Empty image' }, 400);
 
     // ── Redimensionar con ImageMagick via Deno ────────────────────────────────
-    // Deno Edge Functions tienen acceso a ImageMagick via Deno.Command
     let processedBytes: Uint8Array;
     let outputMime = 'image/webp';
 
     try {
-      // Escribir imagen temporal
-      const tmpIn  = `/tmp/karpus_in_${Date.now()}`;
-      const tmpOut = `/tmp/karpus_out_${Date.now()}.webp`;
+      const tmpIn  = `/tmp/karpus_in_${Date.now()}_${caller.id}`;
+      const tmpOut = `/tmp/karpus_out_${Date.now()}_${caller.id}.webp`;
 
       await Deno.writeFile(tmpIn, imageBytes);
 
-      // Ejecutar ImageMagick: redimensionar + convertir a WebP
       const cmd = new Deno.Command('convert', {
         args: [
           tmpIn,
-          '-resize', `${maxWidth}x${maxHeight}>`,  // > = solo reducir, nunca ampliar
+          '-resize', `${maxWidth}x${maxHeight}>`,
           '-quality', String(quality),
-          '-strip',                                  // eliminar metadatos EXIF
-          '-auto-orient',                            // corregir orientación EXIF
+          '-strip',
+          '-auto-orient',
           `webp:${tmpOut}`
         ],
         stdout: 'piped',
@@ -109,17 +142,14 @@ Deno.serve(async (req) => {
       if (code !== 0) {
         const errMsg = new TextDecoder().decode(stderr);
         console.error('[resize-image] ImageMagick error:', errMsg);
-        // Fallback: subir imagen original sin procesar
         processedBytes = imageBytes;
         outputMime = String(mimeType);
       } else {
         processedBytes = await Deno.readFile(tmpOut);
-        // Limpiar temporales
         await Deno.remove(tmpIn).catch(() => {});
         await Deno.remove(tmpOut).catch(() => {});
       }
     } catch (imgErr) {
-      // ImageMagick no disponible — subir original
       console.warn('[resize-image] ImageMagick not available, uploading original:', imgErr);
       processedBytes = imageBytes;
       outputMime = String(mimeType);
@@ -130,7 +160,6 @@ Deno.serve(async (req) => {
       auth: { persistSession: false }
     });
 
-    // Asegurar extensión .webp si se procesó
     const finalPath = outputMime === 'image/webp' && !path.endsWith('.webp')
       ? path.replace(/\.[^.]+$/, '.webp')
       : path;
@@ -148,7 +177,6 @@ Deno.serve(async (req) => {
       return json({ error: uploadError.message }, 500);
     }
 
-    // Obtener URL pública
     const { data: { publicUrl } } = supabase.storage
       .from(String(bucket))
       .getPublicUrl(finalPath);

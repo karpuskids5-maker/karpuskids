@@ -182,6 +182,10 @@
           <i data-lucide="home" class="text-purple-300"></i>
           <span class="label">Aulas</span>
         </button>
+        <button data-section="calendario" class="nav-btn kk-nav-item" data-tooltip="Calendario Escolar">
+          <i data-lucide="calendar-range" class="text-violet-300"></i>
+          <span class="label">Calendario Escolar</span>
+        </button>
 
         <div class="kk-nav-section label">Comunicación</div>
         <button data-section="muro" class="nav-btn kk-nav-item relative" data-tooltip="Muro Escolar">
@@ -448,6 +452,28 @@
               </thead>
               <tbody id="teachersTableBody" class="divide-y divide-slate-50"></tbody>
             </table>
+          </div>
+        </div>
+      </section>
+
+      <!-- CALENDARIO ESCOLAR -->
+      <section id="calendario" class="section">
+        <header class="mb-6">
+          <h1 class="text-2xl font-black text-slate-800 tracking-tight flex items-center gap-2">
+            <span class="w-9 h-9 bg-violet-100 text-violet-600 rounded-xl flex items-center justify-center shrink-0"><i data-lucide="calendar-range" class="w-5 h-5"></i></span>
+            Calendario Escolar
+          </h1>
+          <p class="text-slate-400 text-sm font-medium mt-0.5">Visualiza los períodos académicos del año escolar activo</p>
+        </header>
+
+        <div id="calendarSectionContainer" class="space-y-6">
+          <div class="bg-white rounded-3xl border border-slate-100 shadow-sm p-6">
+            <div class="animate-pulse space-y-4">
+              <div class="h-6 bg-slate-100 rounded-xl w-48"></div>
+              <div class="h-24 bg-slate-100 rounded-2xl"></div>
+              <div class="h-16 bg-slate-100 rounded-2xl"></div>
+              <div class="h-16 bg-slate-100 rounded-2xl"></div>
+            </div>
           </div>
         </div>
       </section>

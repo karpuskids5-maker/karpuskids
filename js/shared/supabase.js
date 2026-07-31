@@ -388,8 +388,60 @@ export async function notifyPaymentApproved(paymentId, parentEmail, studentName,
   ]);
 }
 
+// ── PWA: actualización automática ─────────────────────────────────────────────
+// Registra el Service Worker de caché (OneSignalSDKWorker.js) y detecta
+// nuevas versiones publicadas:
+//   - Recarga automáticamente cuando el nuevo worker toma control.
+//   - Comprueba /version.json cada 60s; si cambió, limpia las cachés
+//     viejas (karpus-*) y recarga la app.
+// Idempotente: seguro de llamar desde cualquier panel y coexistir con OneSignal.
+export function initPwaUpdater() {
+  try {
+    if (window.__karpusPwaStarted) return;
+    if (!('serviceWorker' in navigator)) return;
+    window.__karpusPwaStarted = true;
+
+    const VERSION_KEY = 'karpus_pwa_version';
+
+    // Registrar el worker (mismo archivo que usa OneSignal → mismo scope,
+    // el navegador deduplica la registro). No interfiere con las push.
+    navigator.serviceWorker.register('OneSignalSDKWorker.js', { scope: '/' }).catch(() => {});
+
+    // Nuevo worker tomó control (skipWaiting + clients.claim) → recargar
+    navigator.serviceWorker.addEventListener('controllerchange', () => {
+      window.location.reload();
+    });
+
+    const checkVersion = async () => {
+      try {
+        const res = await fetch('/version.json', { cache: 'no-store', headers: { 'Cache-Control': 'no-cache' } });
+        if (!res.ok) return;
+        const data = await res.json();
+        if (!data?.version) return;
+        const known = localStorage.getItem(VERSION_KEY);
+        if (known && known !== data.version) {
+          // Nueva versión publicada → limpiar cachés viejas y recargar
+          try {
+            const keys = await caches.keys();
+            await Promise.all(keys.filter(k => k.startsWith('karpus-')).map(k => caches.delete(k)));
+          } catch (_) {}
+          localStorage.setItem(VERSION_KEY, data.version);
+          window.location.reload();
+        } else if (!known) {
+          localStorage.setItem(VERSION_KEY, data.version);
+        }
+      } catch (_) {}
+    };
+
+    checkVersion();
+    setInterval(checkVersion, 60000);
+  } catch (_) {}
+}
+
 // ── OneSignal ─────────────────────────────────────────────────────────────────
 export function initOneSignal(currentUser = null) {
+  // PWA: registro + auto-update (independiente de OneSignal)
+  initPwaUpdater();
   // Ejecutar completamente en background — NUNCA bloquear el hilo principal
   _initOneSignalAsync(currentUser).catch(() => {});
 }

@@ -454,6 +454,17 @@ function initNavigation() {
             initProfile();
             import('../shared/notify-permission.js').then(m => m.NotifyPermission.requestIfNeeded());
             break;
+          case 'calendario':
+            await import('../shared/calendar-view.js').then(({ CalendarView }) => {
+              const year = SchoolEngine.getSchoolYear();
+              const periods = SchoolEngine.getAllPeriods();
+              const container = document.getElementById('calendarSectionContainer');
+              if (container) {
+                container.innerHTML = '<div class="bg-white rounded-3xl border border-slate-100 shadow-sm p-6"><div id="calendarTimelineAssistant"></div></div>';
+                CalendarView.renderPeriodTimeline('calendarTimelineAssistant', periods, year);
+              }
+            });
+            break;
         }
         loadedSections.add(target);
       } catch (err) {
@@ -467,6 +478,16 @@ function initNavigation() {
         case 'estudiantes': import('./modules/students.js').then(m => m.StudentsModule.loadStudents?.()); break;
         case 'aulas':      import('./modules/rooms.js').then(m => m.RoomsModule.loadRooms?.()); break;
         case 'pagos':      import('./payments.js').then(m => m.PaymentsModule.loadPayments?.()); break;
+        case 'calendario':
+          import('../shared/calendar-view.js').then(({ CalendarView }) => {
+            SchoolEngine.refresh().then(() => {
+              const year = SchoolEngine.getSchoolYear();
+              const periods = SchoolEngine.getAllPeriods();
+              const container = document.getElementById('calendarTimelineAssistant');
+              if (container) CalendarView.renderPeriodTimeline('calendarTimelineAssistant', periods, year);
+            });
+          });
+          break;
       }
     }
   };

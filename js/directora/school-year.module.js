@@ -9,6 +9,7 @@ import { supabase } from '../shared/supabase.js';
 import { SchoolEngine } from '../shared/school-engine.js';
 import { Helpers } from '../shared/helpers.js';
 import { AppState } from './state.js';
+import { CalendarView } from '../shared/calendar-view.js';
 
 const { escapeHTML } = Helpers;
 
@@ -35,10 +36,23 @@ export const SchoolYearModule = {
     const activeYear = SchoolEngine.getSchoolYear();
     const status = SchoolEngine.getSystemStatus();
 
+    const periods = SchoolEngine.getAllPeriods();
+
     container.innerHTML = `
       <div class="space-y-6">
         <!-- Estado Actual -->
         ${this._renderCurrentStatus(activeYear, status)}
+        
+        <!-- Calendario Visual -->
+        <div class="bg-white rounded-3xl border border-slate-100 shadow-sm p-6">
+          <div class="flex items-center justify-between mb-4">
+            <h3 class="text-sm font-black text-slate-800 flex items-center gap-2">
+              <i data-lucide="calendar-range" class="w-4 h-4 text-violet-500"></i>
+              Línea de Tiempo — Períodos Académicos
+            </h3>
+          </div>
+          <div id="calendarTimelineContainer"></div>
+        </div>
         
         <!-- Acciones Rápidas -->
         ${this._renderQuickActions(activeYear, status)}
@@ -51,6 +65,7 @@ export const SchoolYearModule = {
       </div>
     `;
 
+    CalendarView.renderPeriodTimeline('calendarTimelineContainer', periods, activeYear);
     if (window.lucide) lucide.createIcons();
   },
 

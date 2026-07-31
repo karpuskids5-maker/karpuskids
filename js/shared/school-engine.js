@@ -66,8 +66,11 @@ export const SchoolEngine = {
         const periodsRes = await supabase.rpc('get_periods_for_year', {
           p_school_year_id: yearStatus.school_year_id
         });
-        if (!periodsRes.error) {
+        if (!periodsRes.error && periodsRes.data?.length > 0) {
           EngineState.set('allPeriods', periodsRes.data || []);
+        } else {
+          // Fallback: buscar períodos legacy
+          await this._loadLegacyPeriodsFallback(yearStatus.school_year_id);
         }
 
         // El período activo viene del yearStatus
@@ -75,7 +78,11 @@ export const SchoolEngine = {
       } else {
         EngineState.set('schoolYear', null);
         EngineState.set('activePeriod', null);
-        EngineState.set('allPeriods', []);
+        // Fallback: intentar cargar períodos legacy o academic_periods huérfanos
+        const loaded = await this._loadOrphanData();
+        if (!loaded) {
+          EngineState.set('allPeriods', []);
+        }
       }
 
       EngineState.set('initialized', true);
@@ -85,6 +92,82 @@ export const SchoolEngine = {
     } catch (err) {
       if (window.Helpers?.safeLog) window.Helpers.safeLog('error', '[SchoolEngine] Init error:', err);
       return EngineState.getAll();
+    }
+  },
+
+  /**
+   * Fallback: cargar períodos legacy cuando academic_periods está vacío
+   */
+  async _loadLegacyPeriodsFallback(schoolYearId) {
+    try {
+      const { data: legacyData } = await supabase.rpc('get_legacy_periods_for_sync');
+      if (legacyData && legacyData.length > 0) {
+        const mapped = legacyData.map((p, idx) => ({
+          id: p.id,
+          name: p.name,
+          start_date: p.start_date,
+          end_date: p.end_date,
+          status: p.status === 'open' ? 'open' : 'closed',
+          is_active: p.is_active || false,
+          order_index: idx + 1,
+          school_year_id: schoolYearId,
+          source: 'legacy'
+        }));
+        EngineState.set('allPeriods', mapped);
+        if (!EngineState.get('activePeriod')) {
+          const active = mapped.find(p => p.is_active && p.status === 'open');
+          if (active) EngineState.set('activePeriod', active);
+        }
+      }
+    } catch (_) { /* silencioso */ }
+  },
+
+  /**
+   * Fallback: cargar datos huérfanos cuando no hay año activo
+   */
+  async _loadOrphanData() {
+    try {
+      // Intentar cargar academic_periods directamente
+      const { data: apData } = await supabase
+        .from('academic_periods')
+        .select('*')
+        .order('order_index')
+        .limit(50);
+
+      if (apData && apData.length > 0) {
+        EngineState.set('allPeriods', apData);
+        const active = apData.find(p => p.is_active && p.status === 'open');
+        if (active) EngineState.set('activePeriod', active);
+        return true;
+      }
+
+      // Fallback a legacy periods
+      const { data: legacyData } = await supabase
+        .from('periods')
+        .select('*')
+        .order('start_date')
+        .limit(50);
+
+      if (legacyData && legacyData.length > 0) {
+        const mapped = legacyData.map((p, idx) => ({
+          id: p.id,
+          name: p.name,
+          start_date: p.start_date,
+          end_date: p.end_date,
+          status: p.status === 'open' ? 'open' : 'closed',
+          is_active: p.is_active || false,
+          order_index: idx + 1,
+          source: 'legacy'
+        }));
+        EngineState.set('allPeriods', mapped);
+        const active = mapped.find(p => p.is_active && p.status === 'open');
+        if (active) EngineState.set('activePeriod', active);
+        return true;
+      }
+
+      return false;
+    } catch (_) {
+      return false;
     }
   },
 
