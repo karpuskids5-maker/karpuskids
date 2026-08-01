@@ -480,6 +480,22 @@ function renderHomeCards(student, data) {
 }
 
 // ── Reporte Diario ────────────────────────────────────────────────────────────
+const _V8_ICONS = {
+  bienvenida: '👋', desayuno: '🍞', actividad: '📚', bano: '🚽',
+  patio: '🌳', almuerzo: '🥗', siesta: '😴', merienda: '🍎', biberon: '🍼',
+  panal_humedo:'💧', panal_sucio:'💩', cepillado:'🪥', lavado_manos:'🧼',
+  agua:'💧', fruta:'🍌', picada:'🥪', descanso_corto:'😪', crema:'🧴',
+  manualidad:'🎨', musica:'🎵', baile:'💃', gimnasia:'🤸', juego_libre:'🧸',
+  juegos_mesa:'🎲', construccion:'🧱', convivencia:'🤝', compartir:'💬',
+  emociones:'💛', proyecto:'🎯', lectura:'📖', escritura:'✏️', matematicas:'🔢',
+  ciencias:'🔬', idiomas:'🗣️', paseo:'🚶', huerta:'🌱', juegos_agua:'💦',
+  malestar:'🤢', curacion:'🩹', pelea:'🤜', otro_incidente:'⚠️',
+  cumpleanos:'🎂', evento_especial:'🎉',
+  temperatura:'🌡️', medicamento:'💊', animo:'😊', nota:'📝',
+  fiebre:'🤒', accidente:'🩹', golpe:'🤕', llamada_padres:'📞',
+  medicamento_extra:'💊', otro:'📋'
+};
+
 function renderDailySummary(log, schedule = []) {
   const container = document.getElementById('dailySummaryCard');
   if (!container) return;
@@ -549,10 +565,7 @@ function renderDailySummary(log, schedule = []) {
     { type: 'biberon',    label: 'Biberón',    hour: 15, minute: 0,  duration: 30, icon: '🍼' },
   ];
   const sched = (schedule && schedule.length) ? schedule : _DEFAULT_SCHEDULE;
-  const schedIcons = {
-    bienvenida: '👋', desayuno: '🍞', actividad: '📚', bano: '🚽',
-    patio: '🌳', almuerzo: '🥗', siesta: '😴', merienda: '🍎', biberon: '🍼'
-  };
+  const schedIcons = _V8_ICONS;
 
   // Mapear eventos logueados por tipo
   const loggedByType = {};
@@ -573,10 +586,12 @@ function renderDailySummary(log, schedule = []) {
 
     const evType = s.type;
     const matchingEvents = loggedByType[evType] || [];
+    const hasSchedMark = matchingEvents.some(e => e.scheduled_time);
+    const matchingSched = hasSchedMark ? matchingEvents.filter(e => (e.scheduled_time || '') === timeStr) : matchingEvents;
     // Para biberón, también checar structured_entry y milk
     const milkEvents = (loggedByType['biberon'] || []).concat(loggedByType['milk'] || []).concat(loggedByType['structured_entry'] || []);
     const isBiberon = evType === 'biberon';
-    const hasLogged = isBiberon ? milkEvents.length > 0 : matchingEvents.length > 0;
+    const hasLogged = isBiberon ? milkEvents.length > 0 : (hasSchedMark ? matchingSched.length > 0 : matchingEvents.length > 0);
 
     // Ocultar si no está registrado o aún no es su hora
     if (!hasLogged || nowMins < sMins) return;
@@ -593,8 +608,8 @@ function renderDailySummary(log, schedule = []) {
       const open = (loggedByType['siesta'] || []).some(e => e.open);
       if (open) detail = `${s.label} — En curso`;
       else if (totalMins > 0) detail = `${s.label} — ${totalMins}min`;
-    } else if (hasLogged && matchingEvents[0]) {
-      const first = matchingEvents[0];
+    } else if (hasLogged && matchingSched[0]) {
+      const first = matchingSched[0];
       if (first.food) detail = `${s.label} — ${foodLabelMap[first.food] || first.food}`;
       else if (first.mood) detail = `${s.label} — ${moodLabel[first.mood] || first.mood}`;
       else if (first.comment) detail = `${s.label} — ${first.comment}`;
@@ -607,8 +622,7 @@ function renderDailySummary(log, schedule = []) {
   // Agregar eventos extra que no están en el horario
   const schedTypes = new Set(sched.map(s => s.type));
   events.filter(e => !schedTypes.has(e.type)).forEach(ev => {
-    const eMeta = { biberon:'🍼', panal_humedo:'💧', panal_sucio:'💩', siesta:'😴', temperatura:'🌡️', medicamento:'💊', bano:'🚽', animo:'😊', nota:'📝', fiebre:'🤒', accidente:'🩹', golpe:'🤕', llamada_padres:'📞', medicamento_extra:'💊', otro:'📋' };
-    const icon = eMeta[ev.type] || '📋';
+    const icon = _V8_ICONS[ev.type] || '📋';
     const label = ev.type.charAt(0).toUpperCase() + ev.type.slice(1).replace('_', ' ');
     rows.push({ icon, label, sub: fmtTime(ev.created_at), time: '', color: 'bg-amber-50 border-amber-200' });
   });

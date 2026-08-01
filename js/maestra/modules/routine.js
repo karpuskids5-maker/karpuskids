@@ -19,6 +19,7 @@ const { safeToast, safeEscapeHTML, Modal } = UI;
 const _saving = {};
 let _undoTimer = null;
 let _undoPayload = null;
+let _bulkScheduledTime = null;
 let _timelineExpanded = true;
 let _classroomSchedule = [];
 
@@ -63,6 +64,101 @@ const EXTRA_EVENT_TYPES = [
   { type: 'medicamento_extra', icon: '💊', label: 'Medicamento' },
   { type: 'otro',         icon: '📋', label: 'Otro' },
 ];
+
+// ── CATÁLOGO DE EVENTOS V8 (por categorías) ──────────────────────────────────
+// Universo completo de eventos que la maestra puede habilitar en su rutina.
+// Cada evento pertenece a UNA categoría. El schedule de cada aula es un
+// subconjunto de este catálogo, guardado en classroom_event_schedule.
+const CATEGORIES = {
+  alimentacion:   { label: 'Alimentación',   icon: '🍽️', color: 'amber'   },
+  animo:          { label: 'Ánimo',          icon: '😊', color: 'orange'   },
+  salud:          { label: 'Salud',          icon: '🌡️', color: 'rose'     },
+  descanso:       { label: 'Descanso',       icon: '😴', color: 'indigo'   },
+  higiene:        { label: 'Higiene',        icon: '🧼', color: 'cyan'     },
+  actividades:    { label: 'Actividades',    icon: '🎨', color: 'blue'     },
+  juego:          { label: 'Juego',          icon: '🧸', color: 'green'    },
+  social:         { label: 'Social',         icon: '🤝', color: 'purple'   },
+  aprendizaje:    { label: 'Aprendizaje',    icon: '📚', color: 'violet'   },
+  exterior:       { label: 'Exterior',       icon: '🌳', color: 'emerald'  },
+  incidentes:     { label: 'Incidentes',     icon: '⚠️', color: 'red'      },
+  personalizados: { label: 'Personalizados', icon: '⭐', color: 'slate'    },
+};
+
+const EVENT_CATALOG = [
+  // Alimentación
+  { type: 'desayuno',         label: 'Desayuno',        icon: '🥐', category: 'alimentacion',   defaultDuration: 60 },
+  { type: 'almuerzo',         label: 'Almuerzo',        icon: '🍽️', category: 'alimentacion',   defaultDuration: 60 },
+  { type: 'merienda',         label: 'Merienda',        icon: '🍎', category: 'alimentacion',   defaultDuration: 30 },
+  { type: 'biberon',          label: 'Biberón',         icon: '🍼', category: 'alimentacion',   defaultDuration: 30 },
+  { type: 'agua',             label: 'Agua',            icon: '💧', category: 'alimentacion',   defaultDuration: 15 },
+  { type: 'fruta',            label: 'Fruta',           icon: '🍌', category: 'alimentacion',   defaultDuration: 15 },
+  { type: 'picada',           label: 'Picada',          icon: '🥪', category: 'alimentacion',   defaultDuration: 30 },
+  // Ánimo
+  { type: 'animo',            label: 'Ánimo',           icon: '😊', category: 'animo',          defaultDuration: 15 },
+  // Salud
+  { type: 'temperatura',      label: 'Temperatura',     icon: '🌡️', category: 'salud',          defaultDuration: 5  },
+  { type: 'medicamento',      label: 'Medicamento',     icon: '💊', category: 'salud',          defaultDuration: 5  },
+  { type: 'medicamento_extra',label: 'Medicamento extra', icon: '💊', category: 'salud',        defaultDuration: 5  },
+  { type: 'fiebre',           label: 'Fiebre',          icon: '🤒', category: 'salud',          defaultDuration: 5  },
+  { type: 'malestar',         label: 'Malestar',        icon: '🤢', category: 'salud',          defaultDuration: 5  },
+  { type: 'curacion',         label: 'Curaciones',      icon: '🩹', category: 'salud',          defaultDuration: 10 },
+  // Descanso
+  { type: 'siesta',           label: 'Siesta',          icon: '😴', category: 'descanso',       defaultDuration: 90 },
+  { type: 'descanso_corto',   label: 'Descanso breve',  icon: '😪', category: 'descanso',       defaultDuration: 15 },
+  // Higiene
+  { type: 'panal_humedo',     label: 'Pañal mojado',    icon: '💧', category: 'higiene',        defaultDuration: 5  },
+  { type: 'panal_sucio',      label: 'Pañal sucio',     icon: '💩', category: 'higiene',        defaultDuration: 5  },
+  { type: 'bano',             label: 'Baño',            icon: '🚽', category: 'higiene',        defaultDuration: 15 },
+  { type: 'cepillado',        label: 'Cepillado',       icon: '🪥', category: 'higiene',        defaultDuration: 10 },
+  { type: 'lavado_manos',     label: 'Lavado de manos', icon: '🧼', category: 'higiene',        defaultDuration: 5  },
+  { type: 'crema',            label: 'Crema / Solar',   icon: '🧴', category: 'higiene',        defaultDuration: 5  },
+  // Actividades
+  { type: 'actividad',        label: 'Actividad',       icon: '📚', category: 'actividades',    defaultDuration: 30 },
+  { type: 'manualidad',       label: 'Manualidad',      icon: '🎨', category: 'actividades',    defaultDuration: 45 },
+  { type: 'musica',           label: 'Música',          icon: '🎵', category: 'actividades',    defaultDuration: 30 },
+  { type: 'baile',            label: 'Baile',           icon: '💃', category: 'actividades',    defaultDuration: 30 },
+  { type: 'gimnasia',         label: 'Gimnasia',        icon: '🤸', category: 'actividades',    defaultDuration: 30 },
+  // Juego
+  { type: 'patio',            label: 'Patio',           icon: '🌳', category: 'juego',          defaultDuration: 60 },
+  { type: 'juego_libre',      label: 'Juego libre',     icon: '🧸', category: 'juego',          defaultDuration: 45 },
+  { type: 'juegos_mesa',      label: 'Juegos de mesa',  icon: '🎲', category: 'juego',          defaultDuration: 30 },
+  { type: 'construccion',     label: 'Bloques',         icon: '🧱', category: 'juego',          defaultDuration: 30 },
+  // Social
+  { type: 'bienvenida',       label: 'Bienvenida',      icon: '👋', category: 'social',         defaultDuration: 30 },
+  { type: 'convivencia',      label: 'Convivencia',     icon: '🤝', category: 'social',         defaultDuration: 30 },
+  { type: 'compartir',        label: 'Compartir',       icon: '💬', category: 'social',         defaultDuration: 20 },
+  { type: 'emociones',        label: 'Emociones',       icon: '💛', category: 'social',         defaultDuration: 30 },
+  // Aprendizaje
+  { type: 'proyecto',         label: 'Proyecto',        icon: '🎯', category: 'aprendizaje',    defaultDuration: 45 },
+  { type: 'lectura',          label: 'Cuento',          icon: '📖', category: 'aprendizaje',    defaultDuration: 20 },
+  { type: 'escritura',        label: 'Escritura',       icon: '✏️', category: 'aprendizaje',    defaultDuration: 20 },
+  { type: 'matematicas',      label: 'Matemáticas',     icon: '🔢', category: 'aprendizaje',    defaultDuration: 30 },
+  { type: 'ciencias',         label: 'Ciencias',        icon: '🔬', category: 'aprendizaje',    defaultDuration: 30 },
+  { type: 'idiomas',          label: 'Idiomas',         icon: '🗣️', category: 'aprendizaje',    defaultDuration: 20 },
+  // Exterior
+  { type: 'paseo',            label: 'Paseo',           icon: '🚶', category: 'exterior',       defaultDuration: 30 },
+  { type: 'huerta',           label: 'Huerta',          icon: '🌱', category: 'exterior',       defaultDuration: 20 },
+  { type: 'juegos_agua',      label: 'Juegos de agua',  icon: '💦', category: 'exterior',       defaultDuration: 30 },
+  // Incidentes
+  { type: 'accidente',        label: 'Accidente',       icon: '🩹', category: 'incidentes',     defaultDuration: 5  },
+  { type: 'golpe',            label: 'Golpe',           icon: '🤕', category: 'incidentes',     defaultDuration: 5  },
+  { type: 'pelea',            label: 'Pelea',           icon: '🤜', category: 'incidentes',     defaultDuration: 5  },
+  { type: 'llamada_padres',   label: 'Llamada a padres', icon: '📞', category: 'incidentes',    defaultDuration: 5  },
+  { type: 'otro_incidente',   label: 'Incidente',       icon: '⚠️', category: 'incidentes',     defaultDuration: 5  },
+  // Personalizados
+  { type: 'nota',             label: 'Nota',            icon: '📝', category: 'personalizados', defaultDuration: 5  },
+  { type: 'cumpleanos',       label: 'Cumpleaños',      icon: '🎂', category: 'personalizados', defaultDuration: 30 },
+  { type: 'evento_especial',  label: 'Evento especial', icon: '🎉', category: 'personalizados', defaultDuration: 60 },
+  { type: 'otro',             label: 'Otro evento',     icon: '📋', category: 'personalizados', defaultDuration: 5  },
+];
+
+function _getEventMeta(type) {
+  const e = EVENT_CATALOG.find(x => x.type === type);
+  if (e) return e;
+  const core = EVENT_TYPES[type];
+  if (core) return { type, label: core.label, icon: core.icon, color: core.color };
+  return null;
+}
 
 const MOOD_OPTIONS = [
   { value: 'feliz',        icon: '😀', label: 'Feliz' },
@@ -146,7 +242,65 @@ function _getScheduleEventIcon(type) {
     bienvenida: '👋', desayuno: '🍞', actividad: '📚', bano: '🚽',
     patio: '🌳', almuerzo: '🥗', siesta: '😴', merienda: '🍎', biberon: '🍼'
   };
-  return iconMap[type] || EVENT_TYPES[type]?.icon || '⏰';
+  return iconMap[type] || EVENT_TYPES[type]?.icon || _getEventMeta(type)?.icon || '⏰';
+}
+
+// ── V8 Fase 2: helpers de prellenado ─────────────────────────────────────────
+function _getScheduledEventByType(type) {
+  const schedule = _classroomSchedule.length ? _classroomSchedule : DEFAULT_SCHEDULE;
+  const now  = new Date();
+  const mins = now.getHours() * 60 + now.getMinutes();
+  let best = null;
+  for (const ev of schedule) {
+    if (ev.type !== type) continue;
+    if (!best) { best = ev; continue; }
+    if (Math.abs(mins - (ev.hour * 60 + ev.minute)) < Math.abs(mins - (best.hour * 60 + best.minute))) best = ev;
+  }
+  return best;
+}
+
+function _lastRegisteredEvent(type) {
+  const logsMap = AppState.get('logsMap') || {};
+  let last = null, lastT = 0;
+  Object.values(logsMap).forEach(log => {
+    (log.events || []).forEach(ev => {
+      const t = new Date(ev.created_at || 0).getTime();
+      if (ev.type === type && t >= lastT) { lastT = t; last = ev; }
+    });
+  });
+  return last;
+}
+
+function _prefillBulkSubParams(eventType) {
+  if (eventType === 'siesta') {
+    const active = _getActiveSiestas(AppState.get('students') || [], AppState.get('logsMap') || {});
+    const target = active.length ? 'despertar' : 'iniciar';
+    const btn = document.querySelector(`[data-siesta-action="${target}"]`);
+    if (btn) btn.classList.add('bg-indigo-500','text-white','border-indigo-500');
+    return;
+  }
+  const last = _lastRegisteredEvent(eventType);
+  if (!last) return;
+  if (eventType === 'temperatura' && last.temp != null) {
+    const btn = document.querySelector(`[data-temp="${last.temp}"]`);
+    if (btn) { btn.classList.remove('bg-slate-50','border-slate-100'); btn.classList.add(last.temp >= 37.5 ? 'bg-rose-500' : 'bg-blue-500', last.temp >= 37.5 ? 'border-rose-500' : 'border-blue-400','text-white'); }
+  }
+  if (eventType === 'biberon') {
+    const oz = document.querySelector(`[data-oz="${last.oz}"]`);
+    if (oz) oz.classList.add('bg-blue-500','text-white','border-blue-500');
+    const t = document.querySelector(`[data-milk-temp="${last.milk_temp}"]`);
+    if (t) t.classList.add('bg-sky-500','text-white','border-sky-500');
+  }
+  if (eventType === 'animo' && last.mood) {
+    const b = document.querySelector(`[data-mood="${last.mood}"]`);
+    if (b) b.classList.add('border-orange-400','bg-orange-50');
+  }
+  if (eventType === 'medicamento') {
+    const n = document.getElementById('medNombre'), d = document.getElementById('medDosis'), a = document.getElementById('medAuth');
+    if (n) n.value = last.nombre || '';
+    if (d) d.value = last.dosis || '';
+    if (a) a.value = last.autorizacion || '';
+  }
 }
 
 function _countReportedStudents(logsMap, students) {
@@ -172,13 +326,13 @@ async function _loadSchedule(classroomId) {
   try {
     const { data, error } = await supabase
       .from('classroom_event_schedule')
-      .select('event_type, event_label, event_icon, scheduled_hour, scheduled_minute, duration_minutes, auto_register, applies_to')
+      .select('event_type, event_label, event_icon, scheduled_hour, scheduled_minute, duration_minutes, auto_register, applies_to, category')
       .eq('classroom_id', classroomId)
       .eq('is_active', true)
       .order('sort_order');
 
     if (error || !data?.length) {
-      _classroomSchedule = DEFAULT_SCHEDULE;
+      _classroomSchedule = DEFAULT_SCHEDULE.map(s => ({ ...s }));
       return;
     }
 
@@ -191,9 +345,11 @@ async function _loadSchedule(classroomId) {
       duration: d.duration_minutes,
       autoRegister: d.auto_register,
       appliesTo: d.applies_to,
+      category: d.category || null,
     }));
+    _classroomSchedule.sort((a, b) => (a.hour * 60 + a.minute) - (b.hour * 60 + b.minute));
   } catch {
-    _classroomSchedule = DEFAULT_SCHEDULE;
+    _classroomSchedule = DEFAULT_SCHEDULE.map(s => ({ ...s }));
   }
 }
 
@@ -336,6 +492,7 @@ function _renderRoutineLayout({ todayLabel, students, logsMap, withReport, sched
                 const isActive = i === activeIdx;
                 const isPast   = i < activeIdx;
                 const isFuture = i > activeIdx;
+                const isNext   = isFuture && i === activeIdx + 1;
                 const timeStr  = _formatTime12(ev.hour, ev.minute);
                 const eventIcon = _getScheduleEventIcon(ev.type);
                 const endMins  = ev.hour * 60 + ev.minute + (ev.duration || 30);
@@ -355,22 +512,13 @@ function _renderRoutineLayout({ todayLabel, students, logsMap, withReport, sched
                 };
 
                 return `
-                <div draggable="true"
-                  ondragstart="App.handleTimelineDragStart(event, ${i})"
-                  ondragover="App.handleTimelineDragOver(event)"
-                  ondrop="App.handleTimelineDrop(event, ${i})"
-                  ondragend="App.handleTimelineDragEnd(event)"
-                  onclick="App.openBulkEventModal('${ev.type}')"
-                  class="relative flex items-start gap-4 w-full p-3 rounded-2xl transition-all active:scale-[0.98] cursor-grab active:cursor-grabbing ${
+                <div
+                  onclick="App.openBulkEventModal('${ev.type}', '${timeStr}')"
+                  class="relative flex items-start gap-4 w-full p-3 rounded-2xl transition-all active:scale-[0.98] cursor-pointer ${
                     isActive ? `bg-gradient-to-r from-[#FF8A00]/10 to-orange-50 border-2 border-[#FF8A00]/30 shadow-md shadow-orange-100/50` :
                     isPast ? 'bg-slate-50/80 border-2 border-transparent hover:bg-slate-50' :
                     'border-2 border-transparent hover:bg-slate-50'
                   }" data-index="${i}">
-
-                  <!-- Drag Handle -->
-                  <div class="absolute -left-1 top-1/2 -translate-y-1/2 opacity-0 group-hover:opacity-100 transition-opacity cursor-grab active:cursor-grabbing text-slate-300 hover:text-slate-500" style="touch-action:none;">
-                    <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M4 8h16M4 16h16"/></svg>
-                  </div>
 
                   <!-- Icono en la línea -->
                   <div class="w-9 h-9 rounded-xl flex items-center justify-center text-base shrink-0 z-10 transition-all ${isActive ? 'text-white shadow-lg scale-110' : 'text-slate-500'}" style="${isActive ? 'background:linear-gradient(135deg, #FF8A00, #f97316);box-shadow:0 4px 12px rgba(255,138,0,0.3);' : `background:${activeSoftBgs[ev.type] || '#f1f5f9'};`}">
@@ -382,6 +530,7 @@ function _renderRoutineLayout({ todayLabel, students, logsMap, withReport, sched
                     <div class="flex items-center gap-2 mb-0.5">
                       <span class="text-[11px] font-black ${isActive ? 'text-[#FF8A00]' : isPast ? 'text-slate-500' : 'text-slate-400'}">${timeStr}</span>
                       ${isActive ? '<span class="px-2 py-0.5 bg-[#FF8A00] text-white text-[7px] font-black uppercase rounded-lg animate-pulse shadow-sm">AHORA</span>' : ''}
+                      ${isNext ? '<span class="px-2 py-0.5 bg-indigo-500 text-white text-[7px] font-black uppercase rounded-lg shadow-sm">SIGUIENTE</span>' : ''}
                       ${isPast ? '<span class="px-2 py-0.5 bg-slate-200 text-slate-500 text-[7px] font-black uppercase rounded-lg">✓ Hecho</span>' : ''}
                     </div>
                     <p class="text-sm font-black text-slate-700 leading-tight">${ev.label}</p>
@@ -416,7 +565,7 @@ function _renderRoutineLayout({ todayLabel, students, logsMap, withReport, sched
               const isActive = i === activeIdx;
               const isPast   = i < activeIdx;
               return `
-              <button onclick="App.openBulkEventModal('${ev.type}')"
+              <button onclick="App.openBulkEventModal('${ev.type}', '${_formatTime12(ev.hour, ev.minute)}')"
                 class="flex flex-col items-center gap-1 px-3 py-2 rounded-2xl transition-all active:scale-90 ${
                   isActive ? 'bg-[#FF8A00]/10 scale-110 shadow-sm' :
                   isPast ? 'bg-slate-50/50' : 'hover:bg-slate-50'
@@ -460,7 +609,7 @@ function _renderRoutineLayout({ todayLabel, students, logsMap, withReport, sched
         <p class="text-[10px] font-black uppercase tracking-wider" style="color:#FF8A00;">Momento del día</p>
         <p class="text-sm font-black text-slate-800">Es hora del ${scheduleNow.label}</p>
       </div>
-      <button onclick="App.openBulkEventModal('${scheduleNow.type}')"
+      <button onclick="App.openBulkEventModal('${scheduleNow.type}', '${_formatTime12(scheduleNow.hour, scheduleNow.minute)}')"
         class="px-4 py-2.5 text-white rounded-2xl font-black text-[10px] uppercase tracking-widest hover:brightness-110 active:scale-95 transition-all shadow-lg" style="background:linear-gradient(135deg, #FF8A00, #f97316);box-shadow:0 4px 14px rgba(255,138,0,0.35);">
         Registrar todos
       </button>
@@ -645,10 +794,16 @@ export async function registerMissingStudents() {
 }
 
 // ── MODAL COLECTIVO (BULK) — DISEÑO PROFESIONAL ──────────────────────────────
-export async function openBulkEventModal(eventType = 'animo') {
+export async function openBulkEventModal(eventType = 'animo', scheduledTime = null) {
   const students = AppState.get('students') || [];
-  const meta = EVENT_TYPES[eventType] || { icon: '📝', label: eventType, color: 'slate' };
+  const meta = _getEventMeta(eventType) || { icon: '📝', label: eventType, color: 'slate' };
   const modalId = 'bulkEventModal';
+
+  if (!scheduledTime) {
+    const schedEv = _getScheduledEventByType(eventType);
+    if (schedEv) scheduledTime = _formatTime12(schedEv.hour, schedEv.minute);
+  }
+  _bulkScheduledTime = scheduledTime;
 
   const subParams = _renderSubParams(eventType);
 
@@ -678,6 +833,7 @@ export async function openBulkEventModal(eventType = 'animo') {
           <div class="flex-1">
             <h3 class="text-xl font-black">${meta.label}</h3>
             <p class="text-xs font-bold text-green-100 uppercase tracking-widest">Registro colectivo</p>
+            ${scheduledTime ? `<p class="mt-1.5 inline-flex items-center gap-1.5 px-2.5 py-1 bg-white/15 backdrop-blur-sm border border-white/20 rounded-full text-[10px] font-black text-white">⏰ Programado · ${scheduledTime}</p>` : ''}
           </div>
           <button onclick="Modal.close('${modalId}')" class="p-2.5 bg-white/20 backdrop-blur-sm rounded-full hover:bg-white/30 transition-colors border border-white/20">
             <svg class="w-4 h-4 text-white" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/></svg>
@@ -712,6 +868,7 @@ export async function openBulkEventModal(eventType = 'animo') {
 
   Modal.open(modalId, content);
   if (window.lucide) window.lucide.createIcons();
+  _prefillBulkSubParams(eventType);
 }
 
 function _renderSubParams(eventType) {
@@ -813,7 +970,11 @@ function _renderSubParams(eventType) {
           <textarea id="bulkNota" rows="3" placeholder="Escribe aquí la nota para el grupo..." class="w-full p-4 bg-slate-50 border-2 border-slate-100 rounded-2xl text-sm font-medium outline-none focus:border-slate-400 transition-all resize-none"></textarea>
         </div>`;
     default:
-      return '';
+      return `
+        <div class="space-y-1">
+          <p class="text-[11px] font-black text-slate-400 uppercase tracking-widest">Observaciones</p>
+          <textarea id="bulkObs" rows="2" placeholder="Detalles del evento..." class="w-full p-4 bg-slate-50 border-2 border-slate-100 rounded-2xl text-sm font-medium outline-none focus:border-slate-400 transition-all resize-none"></textarea>
+        </div>`;
   }
 }
 
@@ -857,6 +1018,10 @@ export async function confirmBulkEvent(eventType) {
     }
     if (eventType === 'animo')        extra.mood  = document.querySelector('[data-mood].border-orange-400')?.dataset.mood;
     if (eventType === 'nota')         extra.texto = document.getElementById('bulkNota')?.value.trim();
+    if (!['biberon','temperatura','medicamento','animo','nota'].includes(eventType)) {
+      extra.obs = document.getElementById('bulkObs')?.value.trim() || '';
+    }
+    if (_bulkScheduledTime) extra.scheduled_time = _bulkScheduledTime;
     const siestaAction = eventType === 'siesta' ? document.querySelector('[data-siesta-action].bg-indigo-500')?.dataset.siestaAction : null;
 
     const prevState = {};
@@ -895,11 +1060,12 @@ export async function confirmBulkEvent(eventType) {
     await Promise.all(promises);
 
     await _logTimelineEvent(classroom, eventType, selected.map(Number), {
-      metadata: { oz: extra.oz, temp: extra.temp, mood: extra.mood, milk_temp: extra.milk_temp }
+      metadata: { oz: extra.oz, temp: extra.temp, mood: extra.mood, milk_temp: extra.milk_temp, obs: extra.obs, scheduled_time: extra.scheduled_time }
     });
 
+    _bulkScheduledTime = null;
     Modal.close('bulkEventModal');
-    safeToast(`${EVENT_TYPES[eventType]?.label || eventType} registrado para ${selected.length} estudiante${selected.length > 1 ? 's' : ''}`);
+    safeToast(`${_getEventMeta(eventType)?.label || eventType} registrado para ${selected.length} estudiante${selected.length > 1 ? 's' : ''}`);
 
     await _refreshLogsMap(classroom.id, today);
     _refreshStudentCards();
@@ -928,7 +1094,7 @@ function _showUndoBar(eventType, sids, prevState) {
 
   el.innerHTML = `
     <div class="pointer-events-auto bg-slate-900 text-white rounded-2xl px-5 py-3 flex items-center gap-4 shadow-2xl max-w-sm w-full animate-slideUpFade">
-      <span class="text-sm font-bold flex-1">${EVENT_TYPES[eventType]?.icon || '✅'} Registrado para ${sids.length} estudiante${sids.length > 1 ? 's' : ''}</span>
+      <span class="text-sm font-bold flex-1">${_getEventMeta(eventType)?.icon || '✅'} Registrado para ${sids.length} estudiante${sids.length > 1 ? 's' : ''}</span>
       <button onclick="App.undoLastBulk()" class="text-[#FF8A00] font-black text-xs uppercase tracking-widest hover:text-orange-400 transition-colors shrink-0">Deshacer</button>
       <div class="w-1 h-8 bg-slate-700 rounded-full overflow-hidden shrink-0">
         <div id="undoProgress" class="w-full bg-[#FF8A00] rounded-full transition-all" style="height:100%"></div>
@@ -1041,6 +1207,17 @@ export async function openStudentRoutine(studentId) {
   const content  = isInfant ? _renderInfantRoutineUI(student, log, modalId) : _renderStandardRoutineUI(student, log, modalId);
   Modal.open(modalId, content);
   if (window.lucide) window.lucide.createIcons();
+
+  if (!isInfant && log && log.events) {
+    const lastTemp = [...log.events].reverse().find(e => e.type === 'temperatura' && e.temp != null);
+    if (lastTemp) {
+      const btn = document.querySelector(`[data-ind-temp-${student.id}="${lastTemp.temp}"]`);
+      if (btn) {
+        btn.classList.remove('bg-slate-50','border-slate-100');
+        btn.classList.add(lastTemp.temp >= 37.5 ? 'bg-rose-500' : 'bg-blue-500', lastTemp.temp >= 37.5 ? 'border-rose-500' : 'border-blue-400','text-white');
+      }
+    }
+  }
 }
 
 // ── MODAL INDIVIDUAL: ESTÁNDAR (NIVEL 4) ─────────────────────────────────────
@@ -1063,10 +1240,9 @@ function _renderStandardRoutineUI(student, log, modalId) {
   ];
 
   const timelineHTML = events.length ? events.map(ev => {
-    const meta = EVENT_TYPES[ev.type] || { icon: '📋', label: ev.type };
-    const extraType = EXTRA_EVENT_TYPES.find(e => e.type === ev.type);
-    const icon = extraType ? extraType.icon : meta.icon;
-    const label = extraType ? extraType.label : meta.label;
+    const meta = _getEventMeta(ev.type) || { icon: '📋', label: ev.type };
+    const icon = meta.icon;
+    const label = meta.label;
     let detail = '';
     if (ev.type === 'biberon') { const p = []; if (ev.oz) p.push(`${ev.oz} oz`); if (ev.milk_temp) p.push(ev.milk_temp); detail = p.join(' · '); }
     if (ev.type === 'temperatura') detail = ev.temp ? `${ev.temp}°C ${parseFloat(ev.temp) >= 37.5 ? '🔥' : ''}` : '';
@@ -1088,6 +1264,21 @@ function _renderStandardRoutineUI(student, log, modalId) {
   }).join('') : '<p class="text-xs text-slate-400 italic">Sin eventos registrados hoy.</p>';
 
   const activeSiesta = events.find(e => e.type === 'siesta' && e.open);
+  const schedForStudent = _classroomSchedule.length ? _classroomSchedule : DEFAULT_SCHEDULE;
+  const routineQuickHTML = schedForStudent.map(ev => {
+    const meta = _getEventMeta(ev.type) || {};
+    const time = _formatTime12(ev.hour, ev.minute);
+    const regs = events.filter(e => e.type === ev.type);
+    const registered = regs.length && (regs.some(e => (e.scheduled_time || '') === time) || regs.every(e => !e.scheduled_time));
+    return `
+      <button onclick="App.registerIndividualEvent('${student.id}','${ev.type}',{scheduled_time:'${time}'})"
+        class="relative flex flex-col items-center gap-1 p-2.5 rounded-xl border-2 transition-all active:scale-90 ${registered ? 'bg-green-50 border-[#28B54D]/40 opacity-80' : 'bg-slate-50 hover:bg-slate-100 border-transparent hover:border-slate-200'}">
+        ${registered ? '<span class="absolute top-1 right-1 text-[9px]">✅</span>' : ''}
+        <span class="text-lg">${_getScheduleEventIcon(ev.type)}</span>
+        <span class="text-[8px] font-black ${registered ? 'text-[#28B54D]' : 'text-slate-400'} uppercase leading-tight text-center">${ev.label || meta.label || ev.type}</span>
+        <span class="text-[8px] font-black ${registered ? 'text-[#28B54D]' : 'text-[#FF8A00]'}">${time}</span>
+      </button>`;
+  }).join('');
   const siestaSection = activeSiesta ? (() => {
     const elapsed = Math.round((Date.now() - new Date(activeSiesta.created_at)) / 60000);
     return `
@@ -1217,6 +1408,14 @@ function _renderStandardRoutineUI(student, log, modalId) {
               class="w-full py-2 bg-purple-50 border-2 border-purple-200 rounded-xl text-[10px] font-black text-purple-700 hover:bg-purple-100 transition-all active:scale-95 uppercase tracking-widest">
               💊 Registrar medicamento
             </button>
+          </div>
+        </div>
+
+        <!-- Rutina de hoy (prellenada desde el schedule) -->
+        <div class="space-y-2">
+          <label class="text-[11px] font-black text-slate-400 uppercase tracking-widest">Rutina de hoy</label>
+          <div class="grid grid-cols-4 gap-2">
+            ${routineQuickHTML}
           </div>
         </div>
 
@@ -1604,10 +1803,9 @@ export async function registerIndividualEvent(sid, type, extra = {}) {
   try {
     await MaestraApi.upsertDailyLog(payload);
     await _logTimelineEvent(classroom, type, [sid], { metadata: extra });
-    const meta = EVENT_TYPES[type] || { icon: '📋', label: type };
-    const extraType = EXTRA_EVENT_TYPES.find(e => e.type === type);
-    const icon = extraType ? extraType.icon : meta.icon;
-    const label = extraType ? extraType.label : meta.label;
+    const meta = _getEventMeta(type) || { icon: '📋', label: type };
+    const icon = meta.icon;
+    const label = meta.label;
     let detail = '';
     if (type === 'temperatura' && extra.temp) detail = ` · ${extra.temp}°C${parseFloat(extra.temp) >= 37.5 ? ' 🔥' : ''}`;
     if (type === 'biberon' && extra.oz) detail = ` · ${extra.oz}oz`;
@@ -1623,10 +1821,9 @@ export async function registerIndividualEvent(sid, type, extra = {}) {
       const updatedLog = (AppState.get('logsMap') || {})[sid] || {};
       const updatedEvents = (updatedLog.events || []);
       tlContainer.innerHTML = updatedEvents.length ? updatedEvents.map(ev => {
-        const m = EVENT_TYPES[ev.type] || { icon: '📋', label: ev.type };
-        const et = EXTRA_EVENT_TYPES.find(e => e.type === ev.type);
-        const ico = et ? et.icon : m.icon;
-        const lbl = et ? et.label : m.label;
+        const m = _getEventMeta(ev.type) || { icon: '📋', label: ev.type };
+        const ico = m.icon;
+        const lbl = m.label;
         let d = '';
         if (ev.type === 'biberon') { const p = []; if (ev.oz) p.push(`${ev.oz} oz`); if (ev.milk_temp) p.push(ev.milk_temp); d = p.join(' · '); }
         if (ev.type === 'temperatura') d = ev.temp ? `${ev.temp}°C ${parseFloat(ev.temp) >= 37.5 ? '🔥' : ''}` : '';
@@ -1642,79 +1839,10 @@ export async function registerIndividualEvent(sid, type, extra = {}) {
 }
 
 // ════════════════════════════════════════════════════════════════
-// 🎯 GESTIÓN DE RUTINA — Schedule Builder + Drag & Drop
+// 🎯 GESTIÓN DE RUTINA — Schedule Builder
 // ════════════════════════════════════════════════════════════════
 
-let _dragIndex = null;
-
-export function handleTimelineDragStart(e, index) {
-  _dragIndex = index;
-  e.dataTransfer.effectsAllowed = 'move';
-  e.dataTransfer.setData('text/plain', index);
-  e.target.closest('[draggable]')?.classList.add('opacity-40', 'scale-[0.97]');
-}
-
-export function handleTimelineDragOver(e) {
-  e.preventDefault();
-  e.dataTransfer.dropEffect = 'move';
-  const target = e.target.closest('[draggable]');
-  if (target) target.classList.add('ring-2', 'ring-[#FF8A00]', 'ring-offset-1');
-}
-
-export function handleTimelineDrop(e, toIndex) {
-  e.preventDefault();
-  _removeDragHighlights();
-  if (_dragIndex === null || _dragIndex === toIndex) { _dragIndex = null; return; }
-  _reorderSchedule(_dragIndex, toIndex);
-  _dragIndex = null;
-}
-
-export function handleTimelineDragEnd(e) {
-  _removeDragHighlights();
-  _dragIndex = null;
-}
-
-function _removeDragHighlights() {
-  document.querySelectorAll('#timelineExpanded [draggable]').forEach(el => {
-    el.classList.remove('opacity-40', 'scale-[0.97]', 'ring-2', 'ring-[#FF8A00]', 'ring-offset-1');
-  });
-}
-
-function _getScheduleForClassroom() {
-  const defaultTypes = DEFAULT_SCHEDULE.map(s => s.type);
-  const hasCustom = _classroomSchedule.length && _classroomSchedule.some(s => defaultTypes.includes(s.type));
-  return hasCustom ? _classroomSchedule : DEFAULT_SCHEDULE;
-}
-
-async function _reorderSchedule(fromIdx, toIdx) {
-  const schedule = _getScheduleForClassroom();
-  const item = schedule.splice(fromIdx, 1);
-  schedule.splice(toIdx, 0, item[0]);
-  _classroomSchedule = schedule;
-  await _saveScheduleOrder(schedule);
-  _reRenderTimeline();
-}
-
-async function _saveScheduleOrder(schedule) {
-  const classroom = AppState.get('classroom');
-  if (!classroom) return;
-  try {
-    const updates = schedule.map((s, i) => ({
-      classroom_id: classroom.id,
-      event_type: s.type,
-      sort_order: i,
-    }));
-    for (const u of updates) {
-      await supabase
-        .from('classroom_event_schedule')
-        .update({ sort_order: u.sort_order })
-        .eq('classroom_id', u.classroom_id)
-        .eq('event_type', u.event_type);
-    }
-  } catch (e) { /* silencioso */ }
-}
-
-function _reRenderTimeline() {
+async function _reRenderTimeline() {
   const wrapper = document.getElementById('routineWrapper');
   if (!wrapper) return;
   const students = AppState.get('students') || [];
@@ -1733,65 +1861,92 @@ function _reRenderTimeline() {
   if (window.lucide) window.lucide.createIcons();
 }
 
-// ── SCHEDULE MANAGER MODAL ─────────────────────────────────────
+// ── SCHEDULE MANAGER MODAL (V8: catálogo por categorías) ───────
+let _scheduleSearch = '';
+
+const _CATEGORY_ACCENTS = {
+  amber:'#f59e0b', orange:'#f97316', rose:'#f43f5e', indigo:'#6366f1', cyan:'#06b6d4',
+  blue:'#3b82f6', green:'#22c55e', purple:'#a855f7', violet:'#8b5cf6', emerald:'#10b981',
+  red:'#ef4444', slate:'#64748b'
+};
+
+function _renderConfigEventRow(ev, sched, accent) {
+  const active = !!sched;
+  const hour = sched?.hour ?? 8;
+  const minute = sched?.minute ?? 0;
+  const duration = sched?.duration ?? ev.defaultDuration ?? 30;
+  return `
+    <div class="config-event-row flex items-center gap-2 p-2.5 rounded-2xl border-2 transition-all ${active ? 'border-[#FF8A00]/50 bg-orange-50/50' : 'border-slate-100 bg-white hover:border-slate-200'}" data-type="${ev.type}" data-label="${ev.label}" data-active="${active ? 'true' : 'false'}">
+      <span class="text-lg shrink-0">${ev.icon}</span>
+      <div class="flex-1 min-w-0">
+        <p class="text-[10px] font-black text-slate-700 truncate">${ev.label}</p>
+        <div class="flex items-center gap-1.5 mt-1">
+          ${active ? `
+            <select data-sched-hour="${ev.type}" class="text-[9px] font-bold text-slate-600 bg-white border border-slate-200 rounded-lg px-1 py-0.5 outline-none focus:border-[#FF8A00]">
+              ${Array.from({length: 24}, (_, h) => `<option value="${h}" ${hour === h ? 'selected' : ''}>${String(h).padStart(2,'0')}</option>`).join('')}
+            </select>
+            <span class="text-[9px] text-slate-300">:</span>
+            <select data-sched-minute="${ev.type}" class="text-[9px] font-bold text-slate-600 bg-white border border-slate-200 rounded-lg px-1 py-0.5 outline-none focus:border-[#FF8A00]">
+              ${[0,15,30,45].map(m => `<option value="${m}" ${minute === m ? 'selected' : ''}>${String(m).padStart(2,'0')}</option>`).join('')}
+            </select>
+            <select data-sched-duration="${ev.type}" class="text-[9px] font-bold text-slate-600 bg-white border border-slate-200 rounded-lg px-1 py-0.5 outline-none focus:border-[#FF8A00]">
+              ${[5,10,15,30,45,60,90,120].map(d => `<option value="${d}" ${duration === d ? 'selected' : ''}>${d}min</option>`).join('')}
+            </select>
+            <button onclick="App.removeEventFromSchedule('${ev.type}')" class="ml-auto p-1.5 hover:bg-red-50 rounded-lg text-slate-300 hover:text-red-500 transition-colors shrink-0" title="Quitar de la rutina">
+              <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/></svg>
+            </button>` : `
+            <button onclick="App.addEventToSchedule('${ev.type}')" class="px-3 py-1.5 rounded-xl text-[9px] font-black uppercase tracking-wider border-2 transition-all active:scale-90" style="color:${accent};border-color:${accent}40;background:#f8fafc;">
+              ＋ Agregar
+            </button>`}
+        </div>
+      </div>
+    </div>`;
+}
+
+function _renderScheduleConfigHTML() {
+  const schedule = _classroomSchedule.length ? [..._classroomSchedule] : [...DEFAULT_SCHEDULE];
+  const enabled = new Map(schedule.map(s => [s.type, s]));
+
+  return Object.entries(CATEGORIES).map(([catKey, cat]) => {
+    const events = EVENT_CATALOG.filter(e => e.category === catKey);
+    if (!events.length) return '';
+    const activeCount = events.filter(e => enabled.has(e.type)).length;
+    const accent = _CATEGORY_ACCENTS[cat.color] || '#64748b';
+    const soft = `${accent}14`;
+    return `
+      <div class="config-category" data-category="${catKey}">
+        <div class="flex items-center gap-2 mb-2.5">
+          <span class="w-7 h-7 rounded-lg flex items-center justify-center text-sm shrink-0" style="background:${soft};color:${accent};">${cat.icon}</span>
+          <p class="text-[11px] font-black text-slate-500 uppercase tracking-widest flex-1">${cat.label}</p>
+          <span class="text-[9px] font-black px-2 py-0.5 rounded-full" style="color:${accent};background:${soft};">${activeCount}/${events.length}</span>
+        </div>
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-2">
+          ${events.map(ev => _renderConfigEventRow(ev, enabled.get(ev.type), accent)).join('')}
+        </div>
+      </div>`;
+  }).join('');
+}
+
+export function filterEventCatalog(value) {
+  _scheduleSearch = (value || '').trim().toLowerCase();
+  document.querySelectorAll('#scheduleConfigSections .config-category').forEach(section => {
+    let visible = 0;
+    section.querySelectorAll('.config-event-row').forEach(row => {
+      const hay = `${row.dataset.label || ''} ${row.dataset.type || ''}`.toLowerCase();
+      const match = !_scheduleSearch || hay.includes(_scheduleSearch);
+      row.style.display = match ? '' : 'none';
+      if (match) visible++;
+    });
+    section.style.display = visible ? '' : 'none';
+  });
+}
+
 export async function openScheduleManager() {
   const classroom = AppState.get('classroom');
   const modalId = 'scheduleManagerModal';
-  const schedule = _classroomSchedule.length ? [..._classroomSchedule] : [...DEFAULT_SCHEDULE];
-
-  // Build full event catalog with all EVENT_TYPES + EXTRA_EVENT_TYPES
-  const allEventTypes = { ...EVENT_TYPES };
-  EXTRA_EVENT_TYPES.forEach(e => {
-    if (!allEventTypes[e.type]) {
-      allEventTypes[e.type] = { icon: e.icon, label: e.label, color: 'slate' };
-    }
-  });
-
-  const scheduleTypes = new Set(schedule.map(s => s.type));
-  const availableEvents = Object.entries(allEventTypes)
-    .filter(([type]) => !scheduleTypes.has(type))
-    .map(([type, meta]) => ({ type, ...meta }));
-
-  const savedEventsHTML = schedule.map((ev, i) => {
-    const meta = allEventTypes[ev.type] || { icon: '⏰', label: ev.type };
-    return `
-      <div class="flex items-center gap-3 p-3 bg-white border border-slate-100 rounded-2xl drag-sched-item" draggable="true" data-index="${i}" data-type="${ev.type}"
-        ondragstart="App.handleSchedDragStart(event, ${i})"
-        ondragover="App.handleSchedDragOver(event)"
-        ondrop="App.handleSchedDrop(event, ${i})"
-        ondragend="App.handleSchedDragEnd(event)">
-        <div class="cursor-grab active:cursor-grabbing text-slate-300 hover:text-slate-500 touch-none">
-          <svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M4 8h16M4 16h16"/></svg>
-        </div>
-        <span class="text-xl shrink-0">${meta.icon}</span>
-        <div class="flex-1 min-w-0">
-          <p class="text-xs font-black text-slate-700">${meta.label}</p>
-          <div class="flex items-center gap-2 mt-1">
-            <select data-sched-hour="${i}" class="text-[9px] font-bold text-slate-500 bg-slate-50 border border-slate-200 rounded-lg px-1.5 py-0.5 outline-none focus:border-[#FF8A00]">
-              ${Array.from({length: 24}, (_, h) => `<option value="${h}" ${ev.hour === h ? 'selected' : ''}>${String(h).padStart(2,'0')}</option>`).join('')}
-            </select>
-            <span class="text-[9px] text-slate-300">:</span>
-            <select data-sched-minute="${i}" class="text-[9px] font-bold text-slate-500 bg-slate-50 border border-slate-200 rounded-lg px-1.5 py-0.5 outline-none focus:border-[#FF8A00]">
-              ${[0,15,30,45].map(m => `<option value="${m}" ${ev.minute === m ? 'selected' : ''}>${String(m).padStart(2,'0')}</option>`).join('')}
-            </select>
-            <select data-sched-duration="${i}" class="text-[9px] font-bold text-slate-500 bg-slate-50 border border-slate-200 rounded-lg px-1.5 py-0.5 outline-none focus:border-[#FF8A00] ml-1">
-              ${[15,30,45,60,90,120].map(d => `<option value="${d}" ${(ev.duration || 30) === d ? 'selected' : ''}>${d}min</option>`).join('')}
-            </select>
-          </div>
-        </div>
-        <button onclick="App.removeEventFromSchedule('${ev.type}')" class="p-1.5 hover:bg-red-50 rounded-lg text-slate-300 hover:text-red-500 transition-colors">
-          <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/></svg>
-        </button>
-      </div>`;
-  }).join('');
-
-  const availableHTML = availableEvents.length ? availableEvents.map(e => `
-    <button onclick="App.addEventToSchedule('${e.type}')"
-      class="flex flex-col items-center gap-1 p-2.5 bg-slate-50 hover:bg-[#FF8A00]/10 border-2 border-transparent hover:border-[#FF8A00]/30 rounded-xl transition-all active:scale-90">
-      <span class="text-lg">${e.icon}</span>
-      <span class="text-[8px] font-black text-slate-400 uppercase leading-tight text-center">${e.label}</span>
-    </button>
-  `).join('') : '<p class="text-[10px] text-slate-400 italic col-span-full text-center py-4">Todos los eventos están en tu rutina</p>';
+  if (!classroom) { safeToast('No hay aula seleccionada', 'error'); return; }
+  _scheduleSearch = '';
+  const schedule = _classroomSchedule.length ? _classroomSchedule : DEFAULT_SCHEDULE;
 
   const content = `
     <div class="bg-white w-full max-w-lg rounded-[2rem] shadow-2xl overflow-hidden animate-fadeIn flex flex-col" style="max-height:min(95vh, calc(100vh - 32px));">
@@ -1799,36 +1954,26 @@ export async function openScheduleManager() {
       <div class="p-5 text-white relative overflow-hidden shrink-0" style="background:linear-gradient(135deg, #FF8A00 0%, #f97316 50%, #ec4899 100%);">
         <div class="absolute -top-10 -right-10 w-40 h-40 rounded-full blur-3xl" style="background:rgba(255,255,255,0.1);"></div>
         <div class="relative flex items-center gap-4">
-          <div class="w-12 h-12 bg-white/20 backdrop-blur-sm rounded-2xl flex items-center justify-center text-2xl border border-white/20 shadow-lg">⚙️</div>
+          <div class="w-12 h-12 bg-white/20 backdrop-blur-sm rounded-2xl flex items-center justify-center text-2xl border border-white/20 shadow-lg">🧭</div>
           <div class="flex-1">
-            <h3 class="text-lg font-black">Gestionar Rutina</h3>
-            <p class="text-[10px] font-bold text-orange-100 uppercase tracking-widest">Arrastra para reordenar · Toca para editar</p>
+            <h3 class="text-lg font-black">Configurar Rutina</h3>
+            <p class="text-[10px] font-bold text-orange-100 uppercase tracking-widest">Catálogo de eventos por categorías</p>
           </div>
+          <span id="scheduleConfigCount" class="text-[9px] font-black bg-white/20 backdrop-blur-sm border border-white/20 rounded-full px-3 py-1.5">${schedule.length}/${EVENT_CATALOG.length}</span>
           <button onclick="Modal.close('${modalId}')" class="p-2 bg-white/20 backdrop-blur-sm rounded-full hover:bg-white/30 transition-colors border border-white/20">
             <svg class="w-4 h-4 text-white" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/></svg>
           </button>
         </div>
+        <div class="relative mt-4">
+          <span class="absolute left-3.5 top-1/2 -translate-y-1/2 text-white/60 pointer-events-none">🔍</span>
+          <input oninput="App.filterEventCatalog(this.value)" value=""
+            class="w-full py-3 pl-10 pr-4 bg-white/15 backdrop-blur-sm border border-white/20 rounded-2xl text-sm font-bold text-white placeholder-white/50 outline-none focus:bg-white/20 transition-all"
+            placeholder="Buscar evento... (ej: siesta, agua, patio)" />
+        </div>
       </div>
 
-      <div class="overflow-y-auto flex-1 p-5 space-y-5 custom-scrollbar">
-        <!-- Eventos en la rutina actual -->
-        <div class="space-y-2">
-          <div class="flex items-center justify-between">
-            <p class="text-[11px] font-black text-slate-400 uppercase tracking-widest">Tu Rutina</p>
-            <span class="text-[9px] font-bold text-slate-300">${schedule.length} eventos</span>
-          </div>
-          <div class="space-y-2" id="scheduleItemsContainer">
-            ${savedEventsHTML}
-          </div>
-        </div>
-
-        <!-- Separador -->
-        <div class="border-t border-slate-100 pt-4">
-          <p class="text-[11px] font-black text-slate-400 uppercase tracking-widest mb-3">Agregar Eventos</p>
-          <div class="grid grid-cols-4 sm:grid-cols-5 gap-2" id="availableEventsGrid">
-            ${availableHTML}
-          </div>
-        </div>
+      <div id="scheduleConfigSections" class="overflow-y-auto flex-1 p-5 custom-scrollbar space-y-6">
+        ${_renderScheduleConfigHTML()}
       </div>
 
       <!-- Footer -->
@@ -1850,90 +1995,45 @@ export async function openScheduleManager() {
   if (window.lucide) window.lucide.createIcons();
 }
 
-// ── SCHEDULE DRAG HANDLERS ─────────────────────────────────────
-let _schedDragIndex = null;
-
-export function handleSchedDragStart(e, index) {
-  _schedDragIndex = index;
-  e.dataTransfer.effectsAllowed = 'move';
-  e.dataTransfer.setData('text/plain', index);
-  e.target.closest('.drag-sched-item')?.classList.add('opacity-40');
-}
-
-export function handleSchedDragOver(e) {
-  e.preventDefault();
-  e.dataTransfer.dropEffect = 'move';
-}
-
-export function handleSchedDrop(e, toIndex) {
-  e.preventDefault();
-  document.querySelectorAll('.drag-sched-item').forEach(el => el.classList.remove('opacity-40'));
-  if (_schedDragIndex === null || _schedDragIndex === toIndex) { _schedDragIndex = null; return; }
-
-  const container = document.getElementById('scheduleItemsContainer');
-  if (!container) { _schedDragIndex = null; return; }
-  const items = [...container.querySelectorAll('.drag-sched-item')];
-  const [moved] = items.splice(_schedDragIndex, 1);
-  items.splice(toIndex, 0, moved);
-  container.innerHTML = items.map((el, i) => {
-    const type = el.dataset.type;
-    const meta = EVENT_TYPES[type] || EXTRA_EVENT_TYPES.find(e => e.type === type) || { icon: '⏰', label: type };
-    const ev = (_classroomSchedule.length ? _classroomSchedule : DEFAULT_SCHEDULE).find(s => s.type === type) || DEFAULT_SCHEDULE[0];
-    return _renderScheduleItem(type, meta, i, ev);
-  }).join('');
-  _schedDragIndex = null;
-}
-
-export function handleSchedDragEnd(e) {
-  document.querySelectorAll('.drag-sched-item').forEach(el => el.classList.remove('opacity-40'));
-  _schedDragIndex = null;
-}
-
-function _renderScheduleItem(type, meta, i, ev) {
-  return `
-    <div class="flex items-center gap-3 p-3 bg-white border border-slate-100 rounded-2xl drag-sched-item" draggable="true" data-index="${i}" data-type="${type}"
-      ondragstart="App.handleSchedDragStart(event, ${i})"
-      ondragover="App.handleSchedDragOver(event)"
-      ondrop="App.handleSchedDrop(event, ${i})"
-      ondragend="App.handleSchedDragEnd(event)">
-      <div class="cursor-grab active:cursor-grabbing text-slate-300 hover:text-slate-500 touch-none">
-        <svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M4 8h16M4 16h16"/></svg>
-      </div>
-      <span class="text-xl shrink-0">${meta.icon || '⏰'}</span>
-      <div class="flex-1 min-w-0">
-        <p class="text-xs font-black text-slate-700">${meta.label || type}</p>
-        <div class="flex items-center gap-2 mt-1">
-          <select data-sched-hour="${i}" class="text-[9px] font-bold text-slate-500 bg-slate-50 border border-slate-200 rounded-lg px-1.5 py-0.5 outline-none focus:border-[#FF8A00]">
-            ${Array.from({length: 24}, (_, h) => `<option value="${h}" ${ev.hour === h ? 'selected' : ''}>${String(h).padStart(2,'0')}</option>`).join('')}
-          </select>
-          <span class="text-[9px] text-slate-300">:</span>
-          <select data-sched-minute="${i}" class="text-[9px] font-bold text-slate-500 bg-slate-50 border border-slate-200 rounded-lg px-1.5 py-0.5 outline-none focus:border-[#FF8A00]">
-            ${[0,15,30,45].map(m => `<option value="${m}" ${ev.minute === m ? 'selected' : ''}>${String(m).padStart(2,'0')}</option>`).join('')}
-          </select>
-          <select data-sched-duration="${i}" class="text-[9px] font-bold text-slate-500 bg-slate-50 border border-slate-200 rounded-lg px-1.5 py-0.5 outline-none focus:border-[#FF8A00] ml-1">
-            ${[15,30,45,60,90,120].map(d => `<option value="${d}" ${(ev.duration || 30) === d ? 'selected' : ''}>${d}min</option>`).join('')}
-          </select>
-        </div>
-      </div>
-      <button onclick="App.removeEventFromSchedule('${type}')" class="p-1.5 hover:bg-red-50 rounded-lg text-slate-300 hover:text-red-500 transition-colors">
-        <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/></svg>
-      </button>
-    </div>`;
-}
-
 // ── ADD / REMOVE SCHEDULE EVENTS ────────────────────────────────
+function _nextFreeSlot(schedule, startMin, duration) {
+  let mins = startMin;
+  let guard = 0;
+  while (guard++ < 48) {
+    const conflicts = schedule.some(s => {
+      const sStart = (s.hour ?? 0) * 60 + (s.minute ?? 0);
+      const sEnd   = sStart + (s.duration ?? 30);
+      return mins < sEnd && sStart < mins + duration;
+    });
+    if (!conflicts) break;
+    mins += 30;
+  }
+  return { hour: Math.min(Math.floor(mins / 60), 17), minute: mins % 60 };
+}
+
 export function addEventToSchedule(eventType) {
   const schedule = _classroomSchedule.length ? [..._classroomSchedule] : [...DEFAULT_SCHEDULE];
   if (schedule.some(s => s.type === eventType)) return;
 
-  const meta = EVENT_TYPES[eventType] || EXTRA_EVENT_TYPES.find(e => e.type === eventType) || { icon: '⏰', label: eventType };
+  const meta = _getEventMeta(eventType) || { label: eventType, icon: '⏰', defaultDuration: 30 };
+
+  let hour = 8, minute = 0;
+  if (schedule.length) {
+    const last = schedule[schedule.length - 1];
+    const end = (last.hour ?? 8) * 60 + (last.minute ?? 0) + (last.duration ?? 30);
+    const slot = _nextFreeSlot(schedule, Math.min(end, 17 * 60), meta.defaultDuration || 30);
+    hour = slot.hour;
+    minute = slot.minute;
+  }
+
   schedule.push({
     type: eventType,
     label: meta.label || eventType,
     icon: meta.icon || '⏰',
-    hour: 12,
-    minute: 0,
-    duration: 30,
+    hour,
+    minute,
+    duration: meta.defaultDuration || 30,
+    category: meta.category,
   });
   _classroomSchedule = schedule;
   _refreshScheduleManagerUI();
@@ -1944,52 +2044,26 @@ export function removeEventFromSchedule(eventType) {
   const idx = schedule.findIndex(s => s.type === eventType);
   if (idx === -1) return;
   schedule.splice(idx, 1);
-  if (!schedule.length) {
-    _classroomSchedule = [...DEFAULT_SCHEDULE];
-  } else {
-    _classroomSchedule = schedule;
-  }
+  _classroomSchedule = schedule.length ? schedule : [...DEFAULT_SCHEDULE];
   _refreshScheduleManagerUI();
 }
 
 export function resetScheduleToDefault() {
-  _classroomSchedule = [...DEFAULT_SCHEDULE];
+  _classroomSchedule = DEFAULT_SCHEDULE.map(s => ({ ...s }));
   _refreshScheduleManagerUI();
 }
 
 function _refreshScheduleManagerUI() {
-  const container = document.getElementById('scheduleItemsContainer');
-  const grid = document.getElementById('availableEventsGrid');
+  const container = document.getElementById('scheduleConfigSections');
   if (!container) return;
+  container.innerHTML = _renderScheduleConfigHTML();
 
-  const allEventTypes = { ...EVENT_TYPES };
-  EXTRA_EVENT_TYPES.forEach(e => {
-    if (!allEventTypes[e.type]) allEventTypes[e.type] = { icon: e.icon, label: e.label, color: 'slate' };
-  });
-
-  const schedule = _classroomSchedule.length ? _classroomSchedule : DEFAULT_SCHEDULE;
-  const scheduleTypes = new Set(schedule.map(s => s.type));
-  const availableEvents = Object.entries(allEventTypes)
-    .filter(([type]) => !scheduleTypes.has(type))
-    .map(([type, meta]) => ({ type, ...meta }));
-
-  container.innerHTML = schedule.map((ev, i) => {
-    const meta = allEventTypes[ev.type] || { icon: '⏰', label: ev.type };
-    return _renderScheduleItem(ev.type, meta, i, ev);
-  }).join('');
-
-  if (grid) {
-    grid.innerHTML = availableEvents.length ? availableEvents.map(e => `
-      <button onclick="App.addEventToSchedule('${e.type}')"
-        class="flex flex-col items-center gap-1 p-2.5 bg-slate-50 hover:bg-[#FF8A00]/10 border-2 border-transparent hover:border-[#FF8A00]/30 rounded-xl transition-all active:scale-90">
-        <span class="text-lg">${e.icon}</span>
-        <span class="text-[8px] font-black text-slate-400 uppercase leading-tight text-center">${e.label}</span>
-      </button>
-    `).join('') : '<p class="text-[10px] text-slate-400 italic col-span-full text-center py-4">Todos los eventos están en tu rutina</p>';
+  const countEl = document.getElementById('scheduleConfigCount');
+  if (countEl) {
+    const schedule = _classroomSchedule.length ? _classroomSchedule : DEFAULT_SCHEDULE;
+    countEl.textContent = `${schedule.length}/${EVENT_CATALOG.length}`;
   }
-
-  const countEl = container.closest('.space-y-2')?.querySelector('.text-slate-300');
-  if (countEl) countEl.textContent = `${schedule.length} eventos`;
+  if (_scheduleSearch) filterEventCatalog(_scheduleSearch);
 }
 
 // ── SAVE SCHEDULE TO DB ─────────────────────────────────────────
@@ -2001,13 +2075,13 @@ export async function saveScheduleManager() {
     const classroom = AppState.get('classroom');
     if (!classroom) { safeToast('No hay aula seleccionada', 'error'); return; }
 
-    const items = [...document.querySelectorAll('.drag-sched-item')];
-    const schedule = items.map((el, i) => {
-      const type = el.dataset.type;
-      const hour = parseInt(document.querySelector(`[data-sched-hour="${i}"]`)?.value) || 12;
-      const minute = parseInt(document.querySelector(`[data-sched-minute="${i}"]`)?.value) || 0;
-      const duration = parseInt(document.querySelector(`[data-sched-duration="${i}"]`)?.value) || 30;
-      const meta = EVENT_TYPES[type] || EXTRA_EVENT_TYPES.find(e => e.type === type) || { icon: '⏰', label: type };
+    const rows = [...document.querySelectorAll('#scheduleConfigSections .config-event-row[data-active="true"]')];
+    const schedule = rows.map(row => {
+      const type = row.dataset.type;
+      const meta = _getEventMeta(type) || { label: type, icon: '⏰', defaultDuration: 30, category: 'personalizados' };
+      const hour = parseInt(document.querySelector(`[data-sched-hour="${type}"]`)?.value) || 8;
+      const minute = parseInt(document.querySelector(`[data-sched-minute="${type}"]`)?.value) || 0;
+      const duration = parseInt(document.querySelector(`[data-sched-duration="${type}"]`)?.value) || meta.defaultDuration || 30;
       return {
         type,
         label: meta.label || type,
@@ -2015,9 +2089,12 @@ export async function saveScheduleManager() {
         hour,
         minute,
         duration,
-        sort_order: i,
+        category: meta.category || 'personalizados',
       };
     });
+
+    // Cronología inteligente: ordenar por hora programada
+    schedule.sort((a, b) => (a.hour * 60 + a.minute) - (b.hour * 60 + b.minute));
 
     // Delete all existing schedule entries for this classroom
     await supabase
@@ -2032,6 +2109,7 @@ export async function saveScheduleManager() {
         event_type: s.type,
         event_label: s.label,
         event_icon: s.icon,
+        category: s.category,
         scheduled_hour: s.hour,
         scheduled_minute: s.minute,
         duration_minutes: s.duration,
@@ -2040,7 +2118,8 @@ export async function saveScheduleManager() {
         auto_register: false,
         applies_to: 'all',
       }));
-      await supabase.from('classroom_event_schedule').insert(inserts);
+      const { error } = await supabase.from('classroom_event_schedule').insert(inserts);
+      if (error) throw error;
     }
 
     _classroomSchedule = schedule;
@@ -2059,13 +2138,25 @@ export async function saveScheduleManager() {
 export function openAllEventsMenu() {
   const modalId = 'allEventsMenuModal';
 
-  const scheduleEvents = Object.entries(EVENT_TYPES).map(([type, meta]) => `
-    <button onclick="Modal.close('${modalId}'); App.openBulkEventModal('${type}')"
-      class="flex flex-col items-center gap-1.5 p-3 bg-slate-50 hover:bg-[#FF8A00]/10 border-2 border-transparent hover:border-[#FF8A00]/30 rounded-2xl transition-all active:scale-90 group">
-      <span class="text-2xl group-hover:scale-110 transition-transform">${meta.icon}</span>
-      <span class="text-[8px] font-black text-slate-400 uppercase text-center leading-tight">${meta.label}</span>
-    </button>
-  `).join('');
+  const catsHTML = Object.entries(CATEGORIES).map(([catId, cat]) => {
+    const items = EVENT_CATALOG.filter(e => e.category === catId);
+    if (!items.length) return '';
+    return `
+      <div class="space-y-2">
+        <p class="text-[10px] font-black text-slate-400 uppercase tracking-widest flex items-center gap-1.5">
+          <span>${cat.icon}</span> ${cat.label}
+          <span class="text-slate-300">· ${items.length}</span>
+        </p>
+        <div class="grid grid-cols-4 gap-2">
+          ${items.map(ev => `
+            <button onclick="Modal.close('${modalId}'); App.openBulkEventModal('${ev.type}')"
+              class="flex flex-col items-center gap-1 p-3 bg-slate-50 hover:bg-[#FF8A00]/10 border-2 border-transparent hover:border-[#FF8A00]/30 rounded-2xl transition-all active:scale-90 group">
+              <span class="text-xl group-hover:scale-110 transition-transform">${ev.icon}</span>
+              <span class="text-[8px] font-black text-slate-400 uppercase text-center leading-tight">${ev.label}</span>
+            </button>`).join('')}
+        </div>
+      </div>`;
+  }).join('');
 
   const content = `
     <div class="bg-white w-full max-w-sm rounded-[2rem] shadow-2xl overflow-hidden animate-fadeIn">
@@ -2075,19 +2166,15 @@ export function openAllEventsMenu() {
           <div class="w-12 h-12 bg-white/20 backdrop-blur-sm rounded-2xl flex items-center justify-center text-2xl border border-white/20 shadow-lg">📋</div>
           <div class="flex-1">
             <h3 class="text-lg font-black">Todos los Eventos</h3>
-            <p class="text-[10px] font-bold text-indigo-100 uppercase tracking-widest">Elige un evento para registrar</p>
+            <p class="text-[10px] font-bold text-indigo-100 uppercase tracking-widest">Catálogo completo por categoría</p>
           </div>
           <button onclick="Modal.close('${modalId}')" class="p-2 bg-white/20 backdrop-blur-sm rounded-full hover:bg-white/30 border border-white/20">
             <svg class="w-4 h-4 text-white" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/></svg>
           </button>
         </div>
       </div>
-      <div class="p-5 max-h-[70vh] overflow-y-auto custom-scrollbar">
-        <p class="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-3">Registro Colectivo</p>
-        <div class="grid grid-cols-4 gap-2">
-          ${scheduleEvents}
-        </div>
-        <p class="text-[10px] text-slate-300 font-medium text-center mt-4">Selecciona un evento para registrar en grupo</p>
+      <div class="p-5 max-h-[70vh] overflow-y-auto custom-scrollbar space-y-4">
+        ${catsHTML}
       </div>
     </div>`;
 

@@ -779,7 +779,7 @@ async function _initDirectorAccessId(profile) {
     const name = p?.name || 'Directora';
     const phone = p?.phone || '';
     const win = window.open('', '_blank');
-    win.document.write(Helpers.getStaffCarnetTemplate(name, 'Directora', phone));
+    win.document.write(Helpers.getStaffCarnetTemplate(name, 'Directora', phone, { accessCode: code, qrImg: img }));
     win.document.close();
   };
 
@@ -787,7 +787,7 @@ async function _initDirectorAccessId(profile) {
     const name = p?.name || 'Directora';
     const phone = p?.phone || '';
     const win = window.open('', '_blank');
-    win.document.write(Helpers.getStaffCarnetTemplate(name, 'Directora', phone));
+    win.document.write(Helpers.getStaffCarnetTemplate(name, 'Directora', phone, { accessCode: p?.access_code }));
     win.document.close();
   };
 

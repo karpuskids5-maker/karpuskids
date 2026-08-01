@@ -1,4 +1,5 @@
 import { supabase } from '../shared/supabase.js';
+import { Helpers as SharedHelpers } from '../shared/helpers.js';
 
 export const TOAST_DURATION = 2800;
 
@@ -200,7 +201,14 @@ export const Helpers = {
         handler.call(target, e, target);
       }
     });
-  }
+  },
+
+  /**
+   * 🖨️ QR con logo y carnet de estudiante (compartidos con directora/asistente/maestra)
+   */
+  generateQRWithLogo: (text, options = {}) => SharedHelpers.generateQRWithLogo(text, options),
+  getQRPrintTemplate: (...args) => SharedHelpers.getQRPrintTemplate(...args),
+  getStaffCarnetTemplate: (...args) => SharedHelpers.getStaffCarnetTemplate(...args)
 };
 
 // Named export for compatibility with module imports

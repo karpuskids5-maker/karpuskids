@@ -271,7 +271,7 @@ export const Helpers = {
     const schoolAddress = extra.schoolAddress || 'Al lado de Iglesia Bethel Brazos Abiertos, Urbanización Genesis, C. Raúl Mondesí, San Cristóbal 91000';
     const isInactive = extra.isInactive || false;
     const shortCode = (matricula || '').slice(-8);
-    const logoUrl = 'img/mundo.jpg';
+    const logoUrl = 'img/karpus.jpg';
 
     return `
       <!DOCTYPE html>
@@ -302,28 +302,48 @@ export const Helpers = {
           }
           .top-bar-text { flex: 1; }
           .top-bar-name { font-size: 6.5pt; font-weight: 900; color: #fff; line-height: 1.1; }
-          .top-bar-sub { font-size: 2.5pt; font-weight: 400; color: rgba(255,255,255,0.7); }
+          .top-bar-sub { font-size: 2.5pt; font-weight: 400; color: rgba(255,255,255,0.75); }
+          .top-bar img.bar-logo {
+            width: 5.5mm; height: 5.5mm; border-radius: 0.6mm; object-fit: cover;
+            border: 0.3mm solid rgba(255,255,255,0.4);
+          }
+          .security {
+            position: absolute; left: 0; right: 0;
+            font-size: 2.8pt; font-weight: 800; color: rgba(255,255,255,0.28);
+            text-transform: uppercase; letter-spacing: 0.2px; text-align: center;
+            white-space: nowrap; overflow: hidden; pointer-events: none; z-index: 3;
+          }
+          .security-top { top: 0.4mm; }
+          .security-bottom { bottom: 0.4mm; }
           .card-body { display: flex; height: calc(100% - 10.5mm); }
           .left-side {
-            width: 42%; display: flex; flex-direction: column;
+            width: 37%; display: flex; flex-direction: column;
             align-items: center; justify-content: center; padding: 2.5mm;
             background: #f8fdfa; border-right: 0.5px solid #d1e7dd;
             position: relative;
           }
+          .left-side::before {
+            content: '';
+            position: absolute; inset: 0;
+            background:
+              radial-gradient(circle at 20% 20%, rgba(25,135,84,0.06) 0 1.3mm, transparent 1.4mm),
+              radial-gradient(circle at 75% 75%, rgba(25,135,84,0.05) 0 1mm, transparent 1.1mm);
+          }
           .left-side img.qr-img {
-            width: 26mm; height: 26mm; border-radius: 1.5mm;
-            display: block;
+            width: 24mm; height: 24mm; border-radius: 1.5mm;
+            display: block; position: relative; z-index: 1;
           }
           .qr-label {
             font-size: 3.2pt; font-weight: 700; color: #198754;
             text-align: center; margin-top: 1.2mm; line-height: 1.3;
+            position: relative; z-index: 1;
           }
           .qr-code {
             font-size: 2.8pt; color: #94a3b8; font-weight: 700; margin-top: 0.3mm;
-            font-family: monospace;
+            font-family: monospace; position: relative; z-index: 1;
           }
           .right-side {
-            width: 58%; padding: 2.5mm 3mm; display: flex;
+            width: 63%; padding: 2.5mm 3mm; display: flex;
             flex-direction: column; justify-content: center;
           }
           .right-header {
@@ -364,10 +384,9 @@ export const Helpers = {
           }
           .watermark {
             position: absolute; top: 50%; left: 50%;
-            transform: translate(-50%, -50%) rotate(-15deg);
-            font-size: 24pt; font-weight: 900;
-            color: rgba(25,135,84,0.035);
-            white-space: nowrap; pointer-events: none; z-index: 0;
+            transform: translate(-50%, -50%);
+            width: 30mm; height: 30mm; object-fit: cover;
+            opacity: 0.045; pointer-events: none; z-index: 0;
           }
           .inactive-badge {
             position: absolute; bottom: 5mm; right: 3mm;
@@ -405,10 +424,9 @@ export const Helpers = {
           .back-contact .light { font-weight: 400; color: #64748b; font-size: 2.2pt; }
           .back-watermark {
             position: absolute; top: 50%; left: 50%;
-            transform: translate(-50%, -50%) rotate(-15deg);
-            font-size: 22pt; font-weight: 900;
-            color: rgba(25,135,84,0.03);
-            white-space: nowrap; pointer-events: none; z-index: 0;
+            transform: translate(-50%, -50%);
+            width: 28mm; height: 28mm; object-fit: cover;
+            opacity: 0.045; pointer-events: none; z-index: 0;
           }
           @media print {
             body { background: white; padding: 0; gap: 0; }
@@ -420,8 +438,10 @@ export const Helpers = {
       <body>
         <!-- ─── FRENTE ─── -->
         <div class="carnet">
-          <div class="watermark">KARPUS KIDS</div>
+          <div class="security security-top">KARPUS KIDS · CENTRO DE DESARROLLO INFANTIL · KARPUS KIDS · CENTRO DE DESARROLLO INFANTIL · KARPUS KIDS · CENTRO DE DESARROLLO INFANTIL · KARPUS KIDS · CENTRO DE DESARROLLO INFANTIL ·</div>
+          <img class="watermark" src="${logoUrl}" alt="">
           <div class="top-bar">
+            <img class="bar-logo" src="${logoUrl}" alt="">
             <div class="top-bar-text">
               <div class="top-bar-name">KARPUS KIDS</div>
               <div class="top-bar-sub">Centro de Desarrollo Infantil</div>
@@ -445,20 +465,24 @@ export const Helpers = {
               <div class="student-name-card">${name || 'Estudiante'}</div>
               <div class="field-row"><span class="field-label">AULA:</span><span class="field-value bold">${classroom || '—'}</span></div>
               <div class="field-row"><span class="field-label">MATRÍCULA:</span><span class="field-value bold">${matricula || '—'}</span></div>
+              <div class="field-row"><span class="field-label">AÑO ESCOLAR:</span><span class="field-value bold">${level || '—'}</span></div>
               <div class="field-row"><span class="field-label">TUTOR 1:</span><span class="field-value">${p1Name || '—'}</span></div>
               <div class="field-row"><span class="field-label">TUTOR 2:</span><span class="field-value">${p2Name || '—'}</span></div>
-              <div class="field-row"><span class="field-label">TELÉFONO:</span><span class="field-value">${p1Phone || '—'}</span></div>
+              <div class="field-row"><span class="field-label">TEL. TUTOR:</span><span class="field-value">${p1Phone || '—'}</span></div>
             </div>
           </div>
           ${isInactive ? '<div class="inactive-badge">INACTIVO</div>' : ''}
           <div class="bottom-bar">
             <span class="bottom-bar-text">KARPUS KIDS — Sistema Inteligente de Gestión Infantil</span>
           </div>
+          <div class="security security-bottom">KARPUS KIDS · CENTRO DE DESARROLLO INFANTIL · KARPUS KIDS · CENTRO DE DESARROLLO INFANTIL · KARPUS KIDS · CENTRO DE DESARROLLO INFANTIL · KARPUS KIDS · CENTRO DE DESARROLLO INFANTIL ·</div>
         </div>
         <!-- ─── REVERSO ─── -->
         <div class="carnet carnet-back">
-          <div class="back-watermark">KARPUS KIDS</div>
+          <div class="security security-top">KARPUS KIDS · CENTRO DE DESARROLLO INFANTIL · KARPUS KIDS · CENTRO DE DESARROLLO INFANTIL · KARPUS KIDS · CENTRO DE DESARROLLO INFANTIL · KARPUS KIDS · CENTRO DE DESARROLLO INFANTIL ·</div>
+          <img class="back-watermark" src="${logoUrl}" alt="">
           <div class="top-bar">
+            <img class="bar-logo" src="${logoUrl}" alt="">
             <div class="top-bar-text">
               <div class="top-bar-name">KARPUS KIDS</div>
               <div class="top-bar-sub">Centro de Desarrollo Infantil</div>
@@ -483,6 +507,7 @@ export const Helpers = {
           <div class="bottom-bar">
             <span class="bottom-bar-text">KARPUS KIDS — Sistema Inteligente de Gestión Infantil · www.karpuskids.com</span>
           </div>
+          <div class="security security-bottom">KARPUS KIDS · CENTRO DE DESARROLLO INFANTIL · KARPUS KIDS · CENTRO DE DESARROLLO INFANTIL · KARPUS KIDS · CENTRO DE DESARROLLO INFANTIL · KARPUS KIDS · CENTRO DE DESARROLLO INFANTIL ·</div>
         </div>
         <script>
           window.onload = () => { setTimeout(() => { window.print(); }, 400); }
@@ -496,7 +521,9 @@ export const Helpers = {
    * 🪪 Carnet Personal Administrativo — Horizontal (PVC 85.6×54mm)
    */
   getStaffCarnetTemplate(name, role, phone, extra = {}) {
-    const logoUrl = 'img/mundo.jpg';
+    const logoUrl = 'img/karpus.jpg';
+    const id = extra.accessCode || extra.id || '—';
+    const qrImg = extra.qrImg || '';
     return `
       <!DOCTYPE html>
       <html lang="es">
@@ -524,38 +551,88 @@ export const Helpers = {
           }
           .top-bar-text { flex: 1; }
           .top-bar-name { font-size: 6.5pt; font-weight: 900; color: #fff; line-height: 1.1; }
-          .top-bar-sub { font-size: 2.5pt; font-weight: 400; color: rgba(255,255,255,0.7); }
+          .top-bar-sub { font-size: 2.5pt; font-weight: 400; color: rgba(255,255,255,0.75); }
+          .top-bar img.bar-logo {
+            width: 5.5mm; height: 5.5mm; border-radius: 0.6mm; object-fit: cover;
+            border: 0.3mm solid rgba(255,255,255,0.4);
+          }
           .card-body { display: flex; height: calc(100% - 10.5mm); }
           .left-side {
             width: 40%; display: flex; flex-direction: column;
             align-items: center; justify-content: center; padding: 2.5mm;
             background: #f8faff; border-right: 0.5px solid #dbeafe;
+            position: relative; overflow: hidden;
+          }
+          .left-side::before {
+            content: '';
+            position: absolute; inset: 0;
+            background:
+              radial-gradient(circle at 18% 22%, rgba(29,78,216,0.07) 0 1.4mm, transparent 1.5mm),
+              radial-gradient(circle at 75% 72%, rgba(29,78,216,0.06) 0 1.1mm, transparent 1.2mm),
+              radial-gradient(circle at 30% 88%, rgba(29,78,216,0.05) 0 0.9mm, transparent 1mm);
           }
           .left-side img.staff-logo {
-            width: 20mm; height: 20mm; border-radius: 1mm; object-fit: cover;
-            border: 0.3mm solid #dbeafe; padding: 0.5mm;
+            width: 21mm; height: 21mm; border-radius: 1.2mm; object-fit: cover;
+            border: 0.4mm solid #c7d6f5; padding: 0.6mm; background: #fff;
+            box-shadow: 0 0.5mm 2mm rgba(29,78,216,0.14);
+            position: relative; z-index: 1;
           }
           .staff-badge {
-            margin-top: 1.5mm;
-            background: #1e40af; color: #fff;
-            font-size: 3.5pt; font-weight: 900;
-            padding: 0.5mm 2mm; border-radius: 0.8mm;
+            margin-top: 1.8mm; position: relative; z-index: 1;
+            background: linear-gradient(135deg, #1e40af, #1d4ed8); color: #fff;
+            font-size: 3.4pt; font-weight: 900;
+            padding: 0.6mm 2mm; border-radius: 0.8mm;
             text-transform: uppercase; letter-spacing: 0.5px;
+          }
+          .staff-role {
+            margin-top: 1mm; position: relative; z-index: 1;
+            font-size: 3pt; font-weight: 800; color: #1e40af;
+            text-transform: uppercase; letter-spacing: 0.5px;
+          }
+          .left-side img.qr-img {
+            width: 22mm; height: 22mm; border-radius: 1.5mm; object-fit: contain;
+            border: 0.4mm solid #fff; box-shadow: 0 0.5mm 2mm rgba(29,78,216,0.14);
+            background: #fff; padding: 0.4mm; position: relative; z-index: 1;
+          }
+          .left-side .qr-label {
+            margin-top: 1.5mm; position: relative; z-index: 1;
+            font-size: 3.2pt; font-weight: 800; color: #1e40af;
+            text-align: center; line-height: 1.3;
+          }
+          .left-side .qr-code {
+            margin-top: 0.4mm; position: relative; z-index: 1;
+            font-size: 3pt; font-weight: 700; color: #94a3b8;
+            font-family: monospace;
           }
           .right-side {
             width: 60%; padding: 2.5mm 3mm;
             display: flex; flex-direction: column; justify-content: center;
           }
+          .right-header { display: flex; align-items: center; gap: 1.5mm; margin-bottom: 1mm; }
+          .right-header img.right-logo {
+            width: 7mm; height: 7mm; border-radius: 0.6mm; object-fit: cover;
+            border: 0.3mm solid #dbeafe;
+          }
+          .right-title {
+            font-size: 7pt; font-weight: 900; color: #1e40af;
+            text-transform: uppercase; line-height: 1.1;
+          }
+          .right-sub { font-size: 2.8pt; color: #64748b; font-weight: 700; }
+          .right-divider {
+            height: 0.3mm; background: linear-gradient(90deg, #1e40af, #dbeafe);
+            margin-bottom: 1.2mm;
+          }
           .staff-name {
-            font-size: 8pt; font-weight: 900; color: #0f172a;
+            font-size: 7.5pt; font-weight: 900; color: #0f172a;
             line-height: 1.15; margin-bottom: 1.5mm; text-transform: uppercase;
           }
           .field-row {
             font-size: 3.2pt; font-weight: 700; color: #64748b;
-            margin-bottom: 0.8mm; display: flex;
+            margin-bottom: 0.9mm; display: flex; align-items: baseline;
           }
-          .field-label { color: #1e40af; min-width: 16mm; }
-          .field-value { color: #334155; font-weight: 400; }
+          .field-label { color: #1e40af; min-width: 17mm; text-transform: uppercase; letter-spacing: 0.3px; }
+          .field-value { color: #334155; font-weight: 400; flex: 1; }
+          .field-value.bold { font-weight: 700; color: #0f172a; }
           .bottom-bar {
             height: 2.5mm; background: #1e40af;
             display: flex; align-items: center; justify-content: center;
@@ -581,6 +658,7 @@ export const Helpers = {
         <div class="carnet">
           <div class="watermark">PERSONAL ADMINISTRATIVO</div>
           <div class="top-bar">
+            <img class="bar-logo" src="${logoUrl}" alt="">
             <div class="top-bar-text">
               <div class="top-bar-name">KARPUS KIDS</div>
               <div class="top-bar-sub">Centro de Desarrollo Infantil</div>
@@ -588,12 +666,25 @@ export const Helpers = {
           </div>
           <div class="card-body">
             <div class="left-side">
-              <img class="staff-logo" src="${logoUrl}" alt="">
-              <div class="staff-badge">Personal Administrativo</div>
+              ${qrImg
+                ? `<img class="qr-img" src="${qrImg}" alt="QR">
+              <div class="qr-label">Escanee para identificar</div>
+              <div class="qr-code">${id}</div>`
+                : `<img class="staff-logo" src="${logoUrl}" alt="">
+              <div class="staff-badge">Personal Administrativo</div>`}
             </div>
             <div class="right-side">
+              <div class="right-header">
+                <img class="right-logo" src="${logoUrl}" alt="">
+                <div>
+                  <div class="right-title">KARPUS KIDS</div>
+                  <div class="right-sub">Centro de Desarrollo Infantil</div>
+                </div>
+              </div>
+              <div class="right-divider"></div>
               <div class="staff-name">${name || 'Nombre'}</div>
-              <div class="field-row"><span class="field-label">ROL:</span><span class="field-value">${role || '—'}</span></div>
+              <div class="field-row"><span class="field-label">ROL:</span><span class="field-value bold">${role || '—'}</span></div>
+              <div class="field-row"><span class="field-label">ID:</span><span class="field-value bold">${id}</span></div>
               <div class="field-row"><span class="field-label">TELÉFONO:</span><span class="field-value">${phone || '—'}</span></div>
               <div class="field-row"><span class="field-label">INSTITUCIÓN:</span><span class="field-value">Karpus Kids</span></div>
             </div>

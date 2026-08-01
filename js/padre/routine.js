@@ -31,6 +31,42 @@ const EVENT_META = {
   llamada_padres:    { icon: '📞', label: 'Llamada a padres'  },
   medicamento_extra: { icon: '💊', label: 'Medicamento extra' },
   otro:              { icon: '📋', label: 'Otro evento'       },
+  // Catálogo V8
+  bienvenida:        { icon: '👋', label: 'Bienvenida'        },
+  actividad:         { icon: '📚', label: 'Actividad'         },
+  patio:             { icon: '🌳', label: 'Patio'             },
+  cepillado:         { icon: '🪥', label: 'Cepillado'         },
+  lavado_manos:      { icon: '🧼', label: 'Lavado de manos'   },
+  agua:              { icon: '💧', label: 'Agua'              },
+  fruta:             { icon: '🍌', label: 'Fruta'             },
+  picada:            { icon: '🥪', label: 'Picada'            },
+  descanso_corto:    { icon: '😪', label: 'Descanso breve'    },
+  crema:             { icon: '🧴', label: 'Crema / Solar'     },
+  manualidad:        { icon: '🎨', label: 'Manualidad'        },
+  musica:            { icon: '🎵', label: 'Música'            },
+  baile:             { icon: '💃', label: 'Baile'             },
+  gimnasia:          { icon: '🤸', label: 'Gimnasia'          },
+  juego_libre:       { icon: '🧸', label: 'Juego libre'       },
+  juegos_mesa:       { icon: '🎲', label: 'Juegos de mesa'    },
+  construccion:      { icon: '🧱', label: 'Bloques'           },
+  convivencia:       { icon: '🤝', label: 'Convivencia'       },
+  compartir:         { icon: '💬', label: 'Compartir'         },
+  emociones:         { icon: '💛', label: 'Emociones'         },
+  proyecto:          { icon: '🎯', label: 'Proyecto'          },
+  lectura:           { icon: '📖', label: 'Cuento'            },
+  escritura:         { icon: '✏️', label: 'Escritura'         },
+  matematicas:       { icon: '🔢', label: 'Matemáticas'       },
+  ciencias:          { icon: '🔬', label: 'Ciencias'          },
+  idiomas:           { icon: '🗣️', label: 'Idiomas'           },
+  paseo:             { icon: '🚶', label: 'Paseo'             },
+  huerta:            { icon: '🌱', label: 'Huerta'            },
+  juegos_agua:       { icon: '💦', label: 'Juegos de agua'    },
+  malestar:          { icon: '🤢', label: 'Malestar'          },
+  curacion:          { icon: '🩹', label: 'Curaciones'        },
+  pelea:             { icon: '🤜', label: 'Pelea'             },
+  otro_incidente:    { icon: '⚠️', label: 'Incidente'         },
+  cumpleanos:        { icon: '🎂', label: 'Cumpleaños'        },
+  evento_especial:   { icon: '🎉', label: 'Evento especial'   },
 };
 
 const MOOD_MAP  = { feliz:'😊 Contento/a', bien:'😊 Bien', normal:'😐 Normal', triste:'😢 Triste', inquieto:'😫 Inquieto/a', enojado:'😡 Molesto/a' };
@@ -39,6 +75,7 @@ const SLEEP_MAP = { si:'Durmió su siesta 💤', no:'No durmió ☀️' };
 
 let _selectedDate   = _todayStr();
 let _realtimeChannel = null;
+let _scheduleChannel = null;
 
 function _todayStr() {
   const d = new Date();
@@ -120,6 +157,18 @@ function _initRealtime(studentId) {
       _loadAndRender(studentId, _selectedDate);
     })
     .subscribe();
+
+  const student = AppState.get('currentStudent') || {};
+  const classroomId = student?.classroom_id;
+  if (classroomId) {
+    if (_scheduleChannel) supabase.removeChannel(_scheduleChannel);
+    _scheduleChannel = supabase
+      .channel('padre_schedule_' + classroomId)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'classroom_event_schedule', filter: `classroom_id=eq.${classroomId}` }, () => {
+        _loadAndRender(studentId, _selectedDate);
+      })
+      .subscribe();
+  }
 }
 
 export function changeRoutineDate(studentId, delta) {
@@ -334,7 +383,11 @@ function _renderTimeline(events, schedule = [], date = '') {
     // Verificar si este tipo de evento tiene registros
     const evType = ev.type;
     const logged = loggedByType[evType] || [];
-    const hasLogged = logged.length > 0;
+    const hasSchedMark = logged.some(e => e.scheduled_time);
+    const hasLogged = hasSchedMark
+      ? logged.some(e => (e.scheduled_time || '') === timeStr)
+      : logged.length > 0;
+    const detailLogged = hasSchedMark ? logged.filter(e => (e.scheduled_time || '') === timeStr) : logged;
 
     // Para biberón, también checar structured_entry y milk
     const hasMilkLogged = (loggedByType['biberon'] || []).length > 0 ||
@@ -357,9 +410,9 @@ function _renderTimeline(events, schedule = [], date = '') {
       const siestaEvs = loggedByType['siesta'] || [];
       const totalMins = siestaEvs.reduce((sum, e) => sum + (e.duration_min || 0), 0);
       if (totalMins > 0) detail = _minsToDuration(totalMins);
-    } else if (isLogged && logged[0]) {
+    } else if (isLogged && detailLogged[0]) {
       // Tomar detalle del primer evento logueado de este tipo
-      const firstEv = logged[0];
+      const firstEv = detailLogged[0];
       if (firstEv.comment) detail = firstEv.comment;
       else if (firstEv.value) detail = String(firstEv.value);
     }

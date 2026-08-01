@@ -663,14 +663,14 @@ async function initProfile() {
     if (!img || !c) { Helpers.toast('Genera el QR primero', 'warning'); return; }
     const roleLabel = p.role === 'directora' ? 'Directora' : p.role === 'asistente' ? 'Asistente' : 'Maestra';
     const win = window.open('', '_blank');
-    win.document.write(Helpers.getStaffCarnetTemplate(p.name, roleLabel, p.phone || ''));
+    win.document.write(Helpers.getStaffCarnetTemplate(p.name, roleLabel, p.phone || '', { accessCode: c, qrImg: img }));
     win.document.close();
   };
 
   window._printStaffCredential = () => {
     const roleLabel = p.role === 'directora' ? 'Directora' : p.role === 'asistente' ? 'Asistente' : 'Maestra';
     const win = window.open('', '_blank');
-    win.document.write(Helpers.getStaffCarnetTemplate(p.name, roleLabel, p.phone || ''));
+    win.document.write(Helpers.getStaffCarnetTemplate(p.name, roleLabel, p.phone || '', { accessCode: p.access_code }));
     win.document.close();
   };
 

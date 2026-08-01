@@ -320,8 +320,9 @@ export const TeachersModule = {
       const phone = document.getElementById('tPhone')?.value?.trim();
       if (!matricula) { Helpers.toast('Genera el QR primero', 'warning'); return; }
 
+      const qrImg = document.getElementById('staff-qr-container')?.querySelector('img')?.src;
       const win = window.open('', '_blank');
-      win.document.write(Helpers.getStaffCarnetTemplate(name || 'Personal', role || 'Maestra', phone || ''));
+      win.document.write(Helpers.getStaffCarnetTemplate(name || 'Personal', role || 'Maestra', phone || '', { accessCode: matricula, qrImg }));
       win.document.close();
     };
 

@@ -212,8 +212,9 @@ export const TeachersModule = {
       const role = document.getElementById('teacherRole')?.value?.trim() || 'Maestra';
       const phone = document.getElementById('teacherPhone')?.value?.trim() || '';
       if (!code) { Helpers.toast('Genera el QR primero', 'warning'); return; }
+      const qrImg = document.getElementById('asis-teacher-qr')?.querySelector('img')?.src;
       const win = window.open('', '_blank');
-      win.document.write(Helpers.getStaffCarnetTemplate(name, role, phone));
+      win.document.write(Helpers.getStaffCarnetTemplate(name, role, phone, { accessCode: code, qrImg }));
       win.document.close();
     };
 
