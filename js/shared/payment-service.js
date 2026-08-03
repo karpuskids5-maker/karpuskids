@@ -1,0 +1,138 @@
+/**
+ * 💳 PaymentService — Capa centralizada de pagos
+ * Solo usa columnas que existen en la DB real.
+ */
+import { supabase, sendPush, emitEvent } from './supabase.js';
+import { Helpers } from './helpers.js';
+
+export const MES = ['enero','febrero','marzo','abril','mayo','junio',
+             'julio','agosto','septiembre','octubre','noviembre','diciembre'];
+
+export const MES_LABEL = MES.map(m => m.charAt(0).toUpperCase() + m.slice(1));
+
+// ── Helpers exportados ────────────────────────────────────────────────────────
+export function calcMora(dueDate) {
+  return Helpers.calculateMora(dueDate);
+}
+export function getMoraBreakdown(dueDate) {
+  return Helpers.getMoraBreakdown(dueDate);
+}
+export function normalizeStatus(p) {
+  const s = (p.status || '').toLowerCase();
+  if (['paid','pagado','confirmado'].includes(s))      return 'paid';
+  if (['overdue','vencido'].includes(s))               return 'overdue';
+  if (['rechazado','rejected'].includes(s))            return 'rechazado';
+  if (['review','revision','en revision'].includes(s)) return 'review';
+  if ((s === 'pending' || s === 'pendiente') && p.evidence_url) return 'review';
+  return 'pending';
+}
+export function daysUntilDue(dueDate) {
+  if (!dueDate) return null;
+  const today = new Date(); today.setHours(0,0,0,0);
+  return Math.round((new Date(dueDate + 'T00:00:00') - today) / 86400000);
+}
+
+// ── Columnas seguras ──────────────────────────────────────────────────────────
+const PAYMENT_COLS = 'id,student_id,amount,concept,status,due_date,created_at,paid_date,method,bank,reference,month_paid,evidence_url,notes';
+const PAYMENT_COLS_WITH_STUDENT = PAYMENT_COLS + ',students:student_id(name,p1_email,parent_id,classroom_id,classrooms:classroom_id(name))';
+
+export const PaymentService = {
+
+  async getPendingValidation() {
+    const { data, error } = await supabase
+      .from('payments')
+      .select(PAYMENT_COLS + ',students:student_id(name,p1_email,parent_id,classrooms:classroom_id(name))')
+      .not('evidence_url', 'is', null)
+      .in('status', ['pending','pendiente','review'])
+      .order('created_at', { ascending: false });
+    if (error) throw error;
+    return data || [];
+  },
+
+  async approve(id) {
+    const { data: p, error: fe } = await supabase
+      .from('payments').select(PAYMENT_COLS_WITH_STUDENT).eq('id', id).single();
+    if (fe) throw fe;
+
+    // Validaciones antes de aprobar
+    if (!p) throw new Error('Pago no encontrado');
+    if (p.status === 'paid') throw new Error('Este pago ya fue aprobado');
+    if (Number(p.amount || 0) <= 0) throw new Error('El monto del pago no es válido');
+
+    const { error } = await supabase
+      .from('payments').update({ status: 'paid', paid_date: new Date().toISOString() }).eq('id', id);
+    if (error) throw error;
+
+    const student = p.students;
+    const amount  = Helpers.formatCurrency(Number(p.amount||0));
+    const month   = p.month_paid || 'Colegiatura';
+
+    if (student?.parent_id) {
+      sendPush({
+        user_id: student.parent_id,
+        title:   '✅ Pago Confirmado',
+        message: `Tu pago de ${amount} para ${month} fue aprobado.`,
+        type:    'payment',
+        link:    'panel_padres.html'
+      }).catch(() => {});
+    }
+    emitEvent('payment.approved', {
+      payment_id:   id,
+      parent_email: student?.p1_email,
+      parent_id:    student?.parent_id,
+      student_name: student?.name,
+      amount,
+      month
+    }).catch(() => {});
+    return true;
+  },
+
+  async reject(id, reason = '') {
+    const { error } = await supabase
+      .from('payments')
+      .update({ status: 'rechazado', notes: reason || null })
+      .eq('id', id);
+    if (error) throw error;
+
+    const { data: p } = await supabase
+      .from('payments').select('students:student_id(parent_id)').eq('id', id).single();
+    if (p?.students?.parent_id) {
+      sendPush({
+        user_id: p.students.parent_id,
+        title:   '⚠️ Comprobante rechazado',
+        message: reason || 'Por favor sube una foto más clara del comprobante.',
+        type:    'payment',
+        link:    'panel_padres.html'
+      }).catch(() => {});
+    }
+    return true;
+  },
+
+  async checkDuplicate(reference) {
+    if (!reference?.trim()) return null;
+    const { data } = await supabase
+      .from('payments')
+      .select('id,student_id,amount,month_paid,students:student_id(name)')
+      .eq('reference', reference.trim())
+      .limit(1)
+      .maybeSingle();
+    return data || null;
+  },
+
+  subscribeToNewVouchers(onNew) {
+    const enrich = async (id) => {
+      const { data: p } = await supabase
+        .from('payments')
+        .select(PAYMENT_COLS + ',students:student_id(name,classrooms:classroom_id(name))')
+        .eq('id', id)
+        .single();
+      if (p) onNew(p);
+    };
+    return supabase.channel('payment_vouchers')
+      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'payments' },
+        (pl) => { if (pl.new?.evidence_url) enrich(pl.new.id); })
+      .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'payments' },
+        (pl) => { if (pl.new?.evidence_url && !pl.old?.evidence_url) enrich(pl.new.id); })
+      .subscribe();
+  }
+};

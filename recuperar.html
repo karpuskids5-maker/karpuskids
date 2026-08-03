@@ -1,0 +1,304 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Recuperar Contraseña — Karpus Kids</title>
+  <meta name="robots" content="noindex, nofollow">
+  <style>html{display:none;}</style>
+  <script>if(self===top){document.documentElement.style.display='block';}else{top.location=self.location;}</script>
+  <link rel="stylesheet" href="css/karpus-tailwind.css">
+  <link href="https://fonts.googleapis.com/css2?family=Nunito:wght@400;600;700;800;900&display=swap" rel="stylesheet">
+  <link rel="icon" href="logo/favicon.ico" sizes="any">
+  <style>
+    * { font-family: 'Nunito', sans-serif; }
+    @keyframes fadeUp { from { opacity:0; transform:translateY(24px); } to { opacity:1; transform:translateY(0); } }
+    .fade-up { animation: fadeUp .5s ease both; }
+    .kk .k1{color:#f97316} .kk .k2{color:#3b82f6} .kk .k3{color:#ec4899}
+    .kk .k4{color:#22c55e} .kk .k5{color:#f97316} .kk .k6{color:#3b82f6}
+    .kk .k7{color:#22c55e} .kk .k8{color:#ec4899} .kk .k9{color:#3b82f6} .kk .k10{color:#f97316}
+  </style>
+</head>
+<body class="min-h-screen bg-gradient-to-br from-green-50 via-emerald-50 to-teal-50 flex items-center justify-center p-4">
+
+  <div class="w-full max-w-sm relative z-10 fade-up">
+
+    <!-- Logo -->
+    <div class="text-center mb-8">
+      <div class="inline-flex items-center justify-center w-20 h-20 bg-white rounded-3xl shadow-lg border-2 border-green-100 mb-4">
+        <img src="img/mundo.jpg" alt="Karpus" class="w-14 h-14 rounded-2xl object-cover">
+      </div>
+      <h1 class="text-3xl font-black tracking-tight kk">
+        <span class="k1">K</span><span class="k2">a</span><span class="k3">r</span><span class="k4">p</span><span class="k5">u</span><span class="k6">s</span>
+        <span class="k7">K</span><span class="k8">i</span><span class="k9">d</span><span class="k10">s</span>
+      </h1>
+    </div>
+
+    <!-- Card -->
+    <div class="bg-white rounded-3xl shadow-xl border border-slate-100 p-7">
+
+      <!-- Estado: Cambio de contraseña directo -->
+      <div id="stateRequest">
+        <div class="text-center mb-6">
+          <div class="w-14 h-14 bg-green-100 rounded-2xl flex items-center justify-center mx-auto mb-3">
+            <span class="text-2xl">🔄</span>
+          </div>
+          <h2 class="text-xl font-black text-slate-800">Actualizar Contraseña</h2>
+          <p class="text-sm text-slate-500 font-medium mt-1">Verifica tus datos para cambiar tu clave</p>
+        </div>
+
+        <form id="directResetForm" class="space-y-4">
+          <div>
+            <label class="block text-xs font-black text-slate-500 uppercase tracking-wider mb-1.5">Correo electrónico</label>
+            <input id="email" type="email" placeholder="tu@correo.com" required
+              class="w-full px-4 py-3 rounded-2xl border-2 border-slate-100 bg-slate-50 text-slate-800 font-bold text-sm focus:outline-none focus:border-green-400 focus:bg-white focus:ring-4 focus:ring-green-50 transition-all">
+          </div>
+          <div>
+            <label class="block text-xs font-black text-slate-500 uppercase tracking-wider mb-1.5">Contraseña anterior</label>
+            <input id="oldPassword" type="password" placeholder="Tu contraseña actual" required
+              class="w-full px-4 py-3 rounded-2xl border-2 border-slate-100 bg-slate-50 text-slate-800 font-bold text-sm focus:outline-none focus:border-green-400 focus:bg-white focus:ring-4 focus:ring-green-50 transition-all">
+          </div>
+          <div class="pt-2 border-t border-slate-100">
+            <label class="block text-xs font-black text-slate-500 uppercase tracking-wider mb-1.5">Nueva contraseña</label>
+            <input id="newPasswordDirect" type="password" placeholder="Mínimo 8 caracteres" required minlength="8"
+              class="w-full px-4 py-3 rounded-2xl border-2 border-slate-100 bg-slate-50 text-slate-800 font-bold text-sm focus:outline-none focus:border-blue-400 focus:bg-white focus:ring-4 focus:ring-blue-50 transition-all">
+          </div>
+          <div>
+            <label class="block text-xs font-black text-slate-500 uppercase tracking-wider mb-1.5">Confirmar nueva contraseña</label>
+            <input id="confirmPasswordDirect" type="password" placeholder="Repite la nueva clave" required
+              class="w-full px-4 py-3 rounded-2xl border-2 border-slate-100 bg-slate-50 text-slate-800 font-bold text-sm focus:outline-none focus:border-blue-400 focus:bg-white focus:ring-4 focus:ring-blue-50 transition-all">
+          </div>
+
+          <div id="reqError" class="hidden text-xs font-bold text-rose-600 bg-rose-50 border border-rose-100 rounded-xl px-3 py-2"></div>
+          
+          <button type="submit" id="btnDirectReset"
+            class="w-full py-3.5 bg-green-600 hover:bg-green-700 active:scale-95 text-white font-black rounded-2xl shadow-lg shadow-green-200 transition-all text-sm">
+            Actualizar mi contraseña ahora
+          </button>
+        </form>
+      </div>
+
+      <!-- Estado: token recibido (URL con #access_token) - Mantenemos por compatibilidad si llegara un enlace -->
+      <div id="stateReset" class="hidden">
+        <div class="text-center mb-6">
+          <div class="w-14 h-14 bg-blue-100 rounded-2xl flex items-center justify-center mx-auto mb-3">
+            <span class="text-2xl">🔒</span>
+          </div>
+          <h2 class="text-xl font-black text-slate-800">Nueva Contraseña</h2>
+          <p class="text-sm text-slate-500 font-medium mt-1">Elige una contraseña segura</p>
+        </div>
+
+        <form id="resetForm" class="space-y-4">
+          <div>
+            <label class="block text-xs font-black text-slate-500 uppercase tracking-wider mb-1.5">Nueva contraseña</label>
+            <input id="newPassword" type="password" placeholder="Mínimo 8 caracteres" required minlength="8"
+              class="w-full px-4 py-3 rounded-2xl border-2 border-slate-100 bg-slate-50 text-slate-800 font-bold text-sm focus:outline-none focus:border-blue-400 focus:bg-white focus:ring-4 focus:ring-blue-50 transition-all">
+          </div>
+          <div>
+            <label class="block text-xs font-black text-slate-500 uppercase tracking-wider mb-1.5">Confirmar contraseña</label>
+            <input id="confirmPassword" type="password" placeholder="Repite la contraseña" required
+              class="w-full px-4 py-3 rounded-2xl border-2 border-slate-100 bg-slate-50 text-slate-800 font-bold text-sm focus:outline-none focus:border-blue-400 focus:bg-white focus:ring-4 focus:ring-blue-50 transition-all">
+          </div>
+
+          <!-- Indicador de fortaleza -->
+          <div id="strengthBar" class="hidden">
+            <div class="flex gap-1 mb-1">
+              <div id="s1" class="h-1.5 flex-1 rounded-full bg-slate-200 transition-colors"></div>
+              <div id="s2" class="h-1.5 flex-1 rounded-full bg-slate-200 transition-colors"></div>
+              <div id="s3" class="h-1.5 flex-1 rounded-full bg-slate-200 transition-colors"></div>
+              <div id="s4" class="h-1.5 flex-1 rounded-full bg-slate-200 transition-colors"></div>
+            </div>
+            <p id="strengthLabel" class="text-[10px] font-bold text-slate-400"></p>
+          </div>
+
+          <div id="resetError" class="hidden text-xs font-bold text-rose-600 bg-rose-50 border border-rose-100 rounded-xl px-3 py-2"></div>
+          <button type="submit" id="btnReset"
+            class="w-full py-3.5 bg-blue-600 hover:bg-blue-700 active:scale-95 text-white font-black rounded-2xl shadow-lg shadow-blue-200 transition-all text-sm">
+            Guardar nueva contraseña
+          </button>
+        </form>
+      </div>
+
+      <!-- Estado: éxito -->
+      <div id="stateSuccess" class="hidden text-center py-4">
+        <div class="text-5xl mb-4">✅</div>
+        <h2 class="text-xl font-black text-slate-800 mb-2">¡Contraseña actualizada!</h2>
+        <p class="text-sm text-slate-500 font-medium mb-6">Tu contraseña fue cambiada correctamente.</p>
+        <a href="login.html"
+          class="inline-block w-full py-3.5 bg-green-600 hover:bg-green-700 text-white font-black rounded-2xl shadow-lg shadow-green-200 transition-all text-sm text-center">
+          Ir al inicio de sesión →
+        </a>
+      </div>
+
+    </div>
+
+    <p class="text-center text-xs text-slate-400 font-bold mt-5">
+      <a href="login.html" class="hover:text-green-600 transition-colors">← Volver al login</a>
+      &nbsp;·&nbsp; Karpus Kids © 2026
+    </p>
+  </div>
+
+  <script src="js/shared/supabase-js.min.js"></script>
+  <script type="module">
+    import { supabase } from './js/shared/supabase.js';
+
+    const show = (id) => {
+      ['stateRequest','stateReset','stateSuccess'].forEach(s => {
+        document.getElementById(s)?.classList.toggle('hidden', s !== id);
+      });
+    };
+
+    const showErr = (id, msg) => {
+      const el = document.getElementById(id);
+      if (el) { el.textContent = msg; el.classList.remove('hidden'); }
+    };
+    const hideErr = (id) => document.getElementById(id)?.classList.add('hidden');
+
+    // ── Detectar si hay token en la URL (Supabase lo pone en el hash) ─────────
+    const hash = window.location.hash;
+    const params = new URLSearchParams(hash.replace('#', ''));
+    const accessToken  = params.get('access_token');
+    const refreshToken = params.get('refresh_token');
+    const type         = params.get('type');
+
+    if (accessToken && type === 'recovery') {
+      // Establecer sesión con el token del enlace
+      await supabase.auth.setSession({ access_token: accessToken, refresh_token: refreshToken || '' });
+      show('stateReset');
+    } else {
+      show('stateRequest');
+    }
+
+    // ── Formulario de Cambio Directo (Sin Correo) ────────────────────────────
+    document.getElementById('directResetForm')?.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      hideErr('reqError');
+      
+      const email   = document.getElementById('email').value.trim();
+      const oldPass = document.getElementById('oldPassword').value;
+      const newPass = document.getElementById('newPasswordDirect').value;
+      const confPass = document.getElementById('confirmPasswordDirect').value;
+      const btn     = document.getElementById('btnDirectReset');
+
+      if (!email || !oldPass || !newPass) return showErr('reqError', 'Completa todos los campos.');
+      if (newPass.length < 8) return showErr('reqError', 'La nueva contraseña debe tener al menos 8 caracteres.');
+      if (newPass !== confPass) return showErr('reqError', 'Las nuevas contraseñas no coinciden.');
+      if (oldPass === newPass) return showErr('reqError', 'La nueva contraseña no puede ser igual a la anterior.');
+
+      btn.disabled = true;
+      btn.textContent = 'Verificando datos...';
+
+      try {
+        // 1. Intentar iniciar sesión con la contraseña anterior para verificar identidad
+        const { data: signInData, error: signInError } = await supabase.auth.signInWithPassword({
+          email: email,
+          password: oldPass
+        });
+
+        if (signInError) {
+          throw new Error('La contraseña anterior es incorrecta o el usuario no existe.');
+        }
+
+        btn.textContent = 'Actualizando clave...';
+
+        // 2. Actualizar a la nueva contraseña
+        const { error: updateError } = await supabase.auth.updateUser({ 
+          password: newPass 
+        });
+
+        if (updateError) throw updateError;
+
+        // 3. Cerrar sesión por seguridad tras el cambio
+        await supabase.auth.signOut();
+
+        show('stateSuccess');
+      } catch (err) {
+        showErr('reqError', err.message || 'Error al actualizar. Intenta de nuevo.');
+        btn.disabled = false;
+        btn.textContent = 'Actualizar mi contraseña ahora';
+      }
+    });
+
+    // ── Formulario de solicitud (Legado/Enlace) ───────────────────────────────
+    // Este se mantiene solo por si el usuario llega desde un enlace antiguo
+    document.getElementById('requestForm')?.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      hideErr('reqError');
+      const email = document.getElementById('reqEmail').value.trim();
+      const btn   = document.getElementById('btnRequest');
+
+      if (!email) return showErr('reqError', 'Ingresa tu correo electrónico.');
+
+      btn.disabled = true;
+      btn.textContent = 'Enviando...';
+
+      try {
+        const { error } = await supabase.auth.resetPasswordForEmail(email, {
+          redirectTo: `${window.location.origin}/recuperar.html`
+        });
+        if (error) throw error;
+
+        const successEl = document.getElementById('reqSuccess');
+        if (successEl) {
+          successEl.textContent = `✅ Enlace enviado a ${email}. Revisa tu bandeja de entrada (y spam).`;
+          successEl.classList.remove('hidden');
+        }
+        btn.textContent = 'Correo enviado ✓';
+      } catch (err) {
+        showErr('reqError', err.message || 'Error al enviar el correo. Intenta de nuevo.');
+        btn.disabled = false;
+        btn.textContent = 'Enviar enlace de recuperación';
+      }
+    });
+
+    // ── Indicador de fortaleza de contraseña ─────────────────────────────────
+    document.getElementById('newPassword')?.addEventListener('input', (e) => {
+      const pwd = e.target.value;
+      const bar = document.getElementById('strengthBar');
+      if (!bar) return;
+      bar.classList.toggle('hidden', pwd.length === 0);
+
+      let score = 0;
+      if (pwd.length >= 8)  score++;
+      if (/[A-Z]/.test(pwd)) score++;
+      if (/[0-9]/.test(pwd)) score++;
+      if (/[^A-Za-z0-9]/.test(pwd)) score++;
+
+      const colors = ['bg-rose-500','bg-orange-400','bg-amber-400','bg-emerald-500'];
+      const labels = ['Muy débil','Débil','Buena','Fuerte'];
+      for (let i = 1; i <= 4; i++) {
+        const seg = document.getElementById(`s${i}`);
+        if (seg) seg.className = `h-1.5 flex-1 rounded-full transition-colors ${i <= score ? colors[score-1] : 'bg-slate-200'}`;
+      }
+      const lbl = document.getElementById('strengthLabel');
+      if (lbl) lbl.textContent = score > 0 ? labels[score-1] : '';
+    });
+
+    // ── Formulario de nueva contraseña ────────────────────────────────────────
+    document.getElementById('resetForm')?.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      hideErr('resetError');
+
+      const pwd     = document.getElementById('newPassword').value;
+      const confirm = document.getElementById('confirmPassword').value;
+      const btn     = document.getElementById('btnReset');
+
+      if (pwd.length < 8) return showErr('resetError', 'La contraseña debe tener al menos 8 caracteres.');
+      if (pwd !== confirm) return showErr('resetError', 'Las contraseñas no coinciden.');
+
+      btn.disabled = true;
+      btn.textContent = 'Guardando...';
+
+      try {
+        const { error } = await supabase.auth.updateUser({ password: pwd });
+        if (error) throw error;
+        show('stateSuccess');
+      } catch (err) {
+        showErr('resetError', err.message || 'Error al actualizar la contraseña. El enlace puede haber expirado.');
+        btn.disabled = false;
+        btn.textContent = 'Guardar nueva contraseña';
+      }
+    });
+  </script>
+</body>
+</html>

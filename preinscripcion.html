@@ -1,0 +1,541 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Preinscripción — Karpus Kids</title>
+  <meta name="description" content="Preinscripción en línea para Karpus Kids, estancia infantil y guardería en San Cristóbal. Completa el formulario y recibe una evaluación de admisión.">
+  <meta name="robots" content="index, follow">
+  <link rel="icon" href="logo/favicon.ico" sizes="any">
+  <link rel="apple-touch-icon" href="logo/apple-touch-icon.png">
+  <link href="https://fonts.googleapis.com/css2?family=Nunito:wght@400;600;700;800;900&family=Poppins:wght@700;800;900&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="css/karpus-tailwind.css">
+  <style>
+    :root{--kk-orange:#FF9800;--kk-blue:#2196F3;--kk-pink:#E91E63;--kk-green:#4CAF50;--kk-purple:#9C27B0;}
+    *{box-sizing:border-box;margin:0;padding:0;}
+    body{font-family:'Nunito',sans-serif;background:#f8fafc;color:#1e293b;}
+    h1,h2,h3,h4{font-family:'Poppins',sans-serif;}
+    .step-card{display:none;animation:fadeIn .35s ease;}
+    .step-card.active{display:block;}
+    @keyframes fadeIn{from{opacity:0;transform:translateY(12px);}to{opacity:1;transform:none;}}
+    .progress-dot{width:2.5rem;height:.375rem;border-radius:9999px;background:#e2e8f0;transition:all .3s;}
+    .progress-dot.done{background:#10b981;}
+    .progress-dot.current{background:linear-gradient(90deg,#FF9800,#F97316);width:3.5rem;}
+    .field{width:100%;padding:.7rem 1rem;border:2px solid #e2e8f0;border-radius:1rem;outline:none;font-size:.9rem;font-weight:600;color:#334155;background:#fff;transition:all .2s;}
+    .field:focus{border-color:#F97316;box-shadow:0 0 0 4px rgba(249,115,22,.12);}
+    .field.invalid{border-color:#ef4444;box-shadow:0 0 0 4px rgba(239,68,68,.12);}
+    .flabel{display:block;font-size:.7rem;font-weight:900;letter-spacing:.06em;text-transform:uppercase;color:#64748b;margin-bottom:.4rem;}
+    .doc-box{border:2px dashed #cbd5e1;border-radius:1rem;background:#fff;transition:all .2s;}
+    .doc-box.ok{border-style:solid;border-color:#10b981;background:#ecfdf5;}
+    .doc-box.has{opacity:1;}
+    .doc-thumb{width:2.5rem;height:2.5rem;object-fit:cover;border-radius:.6rem;}
+    .sig-canvas{border:2px solid #cbd5e1;border-radius:1rem;background:#fff;touch-action:none;cursor:crosshair;width:100%;}
+    .chip{border:2px solid #e2e8f0;border-radius:.9rem;padding:.6rem 1rem;font-weight:700;font-size:.85rem;cursor:pointer;transition:all .2s;background:#fff;color:#475569;}
+    .chip.active{border-color:#F97316;background:#fff7ed;color:#ea580c;box-shadow:0 0 0 4px rgba(249,115,22,.1);}
+    .summary-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:.9rem;}
+    .summary-block{background:#fff;border:2px solid #f1f5f9;border-radius:1rem;padding:1rem;}
+    .summary-block h5{font-size:.7rem;font-weight:900;letter-spacing:.06em;text-transform:uppercase;color:#F97316;margin-bottom:.5rem;}
+    .summary-block p{font-size:.82rem;font-weight:600;color:#475569;margin-bottom:.2rem;}
+    .err-msg{display:none;color:#ef4444;font-size:.75rem;font-weight:700;margin-top:.35rem;}
+    .swal-pulse{animation:swal .4s ease;}
+    @keyframes swal{from{transform:scale(.9);opacity:0;}to{transform:scale(1);opacity:1;}}
+  </style>
+</head>
+<body class="min-h-screen">
+
+  <!-- Encabezado -->
+  <header class="bg-white shadow-sm sticky top-0 z-40">
+    <div class="max-w-3xl mx-auto px-4 py-3 flex items-center justify-between">
+      <a href="index.html" class="flex items-center gap-3">
+        <img src="img/karpus.jpg" alt="Karpus Kids" class="w-11 h-11 rounded-2xl object-cover shadow-sm">
+        <div>
+          <div class="font-black text-slate-800 leading-none" style="font-family:'Poppins',sans-serif;">Karpus Kids</div>
+          <div class="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Preinscripción</div>
+        </div>
+      </a>
+      <a href="https://wa.me/18298038424" target="_blank" rel="noopener" class="flex items-center gap-2 bg-emerald-50 text-emerald-700 px-4 py-2 rounded-2xl font-black text-xs hover:bg-emerald-100 transition-all">
+        <svg width="16" height="16" fill="currentColor" viewBox="0 0 24 24"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413z"/></svg>
+        ¿Dudas? Escríbenos
+      </a>
+    </div>
+  </header>
+
+  <main class="max-w-3xl mx-auto px-4 py-8">
+
+    <!-- Intro -->
+    <div class="text-center mb-8">
+      <span class="inline-block bg-orange-100 text-orange-700 px-4 py-1.5 rounded-full text-[10px] font-black uppercase tracking-widest mb-3">Admisiones 2026-2027</span>
+      <h1 class="text-3xl md:text-4xl font-black text-slate-800 mb-2" style="font-family:'Poppins',sans-serif;">Preinscripción en línea</h1>
+      <p class="text-sm text-slate-500 font-semibold max-w-xl mx-auto">Completa los 7 pasos. Nuestro equipo de admisiones revisará el expediente y te contactará para coordinar la entrevista y la inscripción oficial.</p>
+    </div>
+
+    <!-- Barra de progreso -->
+    <div class="flex items-center justify-between mb-8" id="progressBar">
+      <div class="flex items-center gap-1.5 flex-1">
+        <span class="progress-dot current" data-pdot="1"></span><span class="progress-dot" data-pdot="2"></span><span class="progress-dot" data-pdot="3"></span><span class="progress-dot" data-pdot="4"></span><span class="progress-dot" data-pdot="5"></span><span class="progress-dot" data-pdot="6"></span><span class="progress-dot" data-pdot="7"></span>
+      </div>
+      <span class="text-xs font-black text-slate-400 uppercase tracking-widest ml-3" id="stepLabel">1 / 7</span>
+    </div>
+
+    <div id="wizardContainer" class="space-y-6">
+
+      <!-- ═══════════ PASO 1 · DATOS DEL NIÑO(A) ═══════════ -->
+      <section class="step-card active" data-step="1">
+        <div class="bg-white rounded-3xl p-6 md:p-8 border border-slate-100 shadow-sm">
+          <div class="flex items-center gap-3 mb-6">
+            <div class="w-11 h-11 rounded-2xl bg-orange-100 text-orange-600 flex items-center justify-center text-lg font-black">1</div>
+            <div>
+              <h2 class="font-black text-slate-800">Datos del niño(a)</h2>
+              <p class="text-xs text-slate-400 font-bold">Información general del menor</p>
+            </div>
+          </div>
+          <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div>
+              <label class="flabel">Nombres completos *</label>
+              <input id="pi_student_name" class="field" placeholder="Ej: Ana Sofía" data-req="true">
+              <p class="err-msg">Ingresa los nombres del menor.</p>
+            </div>
+            <div>
+              <label class="flabel">Apellidos</label>
+              <input id="pi_student_last_name" class="field" placeholder="Ej: Pérez Gómez">
+            </div>
+            <div>
+              <label class="flabel">Fecha de nacimiento *</label>
+              <input id="pi_birth_date" type="date" class="field" data-req="true">
+              <p class="err-msg">Selecciona la fecha de nacimiento.</p>
+            </div>
+            <div>
+              <label class="flabel">Edad calculada</label>
+              <input id="pi_calculated_age" class="field bg-slate-50 text-slate-500" placeholder="Se calcula automáticamente" readonly>
+            </div>
+            <div>
+              <label class="flabel">Sexo *</label>
+              <select id="pi_gender" class="field" data-req="true">
+                <option value="">-- Seleccionar --</option>
+                <option value="Masculino">Masculino</option>
+                <option value="Femenino">Femenino</option>
+              </select>
+              <p class="err-msg">Selecciona el sexo.</p>
+            </div>
+            <div>
+              <label class="flabel">Nacionalidad</label>
+              <input id="pi_nationality" class="field" value="Dominicana">
+            </div>
+            <div>
+              <label class="flabel">Año escolar solicitado *</label>
+              <select id="pi_school_year" class="field" data-req="true"><option value="">Cargando…</option></select>
+              <p class="err-msg">Selecciona el año escolar.</p>
+            </div>
+            <div>
+              <label class="flabel">Nivel educativo solicitado *</label>
+              <select id="pi_level" class="field" data-req="true">
+                <option value="">Cargando…</option>
+              </select>
+              <p class="err-msg">Selecciona el nivel.</p>
+            </div>
+            <div>
+              <label class="flabel">Horario deseado *</label>
+              <select id="pi_schedule" class="field" data-req="true">
+                <option value="">-- Seleccionar --</option>
+                <option value="Medio día">Medio día</option>
+                <option value="Completo">Completo</option>
+                <option value="Extendido">Extendido</option>
+              </select>
+              <p class="err-msg">Selecciona el horario.</p>
+            </div>
+            <div>
+              <label class="flabel">Fecha estimada de ingreso</label>
+              <input id="pi_entry_date" type="date" class="field">
+            </div>
+            <div class="md:col-span-2">
+              <label class="flabel">¿Tiene hermanos inscritos en el centro?</label>
+              <div class="flex gap-3">
+                <button type="button" class="chip" data-sib="false">No</button>
+                <button type="button" class="chip" data-sib="true">Sí</button>
+              </div>
+            </div>
+            <div class="md:col-span-2 hidden" id="pi_sibling_wrap">
+              <label class="flabel">Nombre completo del hermano</label>
+              <input id="pi_sibling_name" class="field" placeholder="Ej: Daniel Pérez Gómez">
+            </div>
+          </div>
+          <div class="flex justify-end mt-8">
+            <button onclick="window.Preinscripcion.next()" class="bg-gradient-to-r from-orange-500 to-orange-600 hover:from-orange-600 hover:to-orange-700 text-white font-black text-xs uppercase tracking-widest px-8 py-3.5 rounded-2xl shadow-lg shadow-orange-200 transition-all active:scale-95">Continuar →</button>
+          </div>
+        </div>
+      </section>
+
+      <!-- ═══════════ PASO 2 · PADRES / TUTORES ═══════════ -->
+      <section class="step-card" data-step="2">
+        <div class="space-y-5">
+          <!-- Tutor 1 -->
+          <div class="bg-white rounded-3xl p-6 md:p-8 border border-slate-100 shadow-sm">
+            <div class="flex items-center gap-3 mb-6">
+              <div class="w-11 h-11 rounded-2xl bg-sky-100 text-sky-600 flex items-center justify-center text-lg font-black">2</div>
+              <div>
+                <h2 class="font-black text-slate-800">Padre / Tutor principal</h2>
+                <p class="text-xs text-slate-400 font-bold">Quien gestionará el acceso al panel de padres</p>
+              </div>
+            </div>
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div>
+                <label class="flabel">Nombre completo *</label>
+                <input id="pi_p1_name" class="field" data-req="true">
+                <p class="err-msg">Ingresa el nombre completo.</p>
+              </div>
+              <div>
+                <label class="flabel">Parentesco *</label>
+                <select id="pi_p1_relationship" class="field" data-req="true">
+                  <option value="">-- Seleccionar --</option>
+                  <option value="Padre">Padre</option>
+                  <option value="Madre">Madre</option>
+                  <option value="Tutor Legal">Tutor Legal</option>
+                </select>
+                <p class="err-msg">Selecciona el parentesco.</p>
+              </div>
+              <div>
+                <label class="flabel">Cédula *</label>
+                <input id="pi_p1_cedula" class="field" placeholder="000-0000000-0" maxlength="13" data-cedula="true">
+                <p class="err-msg">Cédula inválida (verifica los 11 dígitos).</p>
+              </div>
+              <div>
+                <label class="flabel">Teléfono *</label>
+                <input id="pi_p1_phone" class="field" placeholder="809-000-0000" maxlength="12" data-phone="true">
+                <p class="err-msg">Ingresa un teléfono válido (10 dígitos).</p>
+              </div>
+              <div>
+                <label class="flabel">WhatsApp</label>
+                <input id="pi_p1_whatsapp" class="field" placeholder="809-000-0000" maxlength="12" data-phone="true">
+              </div>
+              <div>
+                <label class="flabel">Correo electrónico *</label>
+                <input id="pi_p1_email" type="email" class="field" placeholder="correo@ejemplo.com" data-req="true" data-email="true">
+                <p class="err-msg">Ingresa un correo válido.</p>
+              </div>
+              <div class="md:col-span-2">
+                <label class="flabel">Dirección de residencia *</label>
+                <input id="pi_p1_address" class="field" placeholder="Calle, sector, ciudad" data-req="true">
+                <p class="err-msg">Ingresa la dirección.</p>
+              </div>
+              <div>
+                <label class="flabel">Ocupación</label>
+                <input id="pi_p1_occupation" class="field" placeholder="Ej: Empleado privado">
+              </div>
+              <div>
+                <label class="flabel">Profesión</label>
+                <input id="pi_p1_profession" class="field" placeholder="Ej: Ingeniero">
+              </div>
+              <div class="md:col-span-2">
+                <label class="flabel">Lugar de trabajo</label>
+                <input id="pi_p1_workplace" class="field" placeholder="Empresa o institución">
+              </div>
+            </div>
+          </div>
+
+          <!-- Tutor 2 -->
+          <div class="bg-white rounded-3xl p-6 md:p-8 border border-slate-100 shadow-sm">
+            <div class="flex items-center gap-3 mb-6">
+              <div class="w-11 h-11 rounded-2xl bg-pink-100 text-pink-600 flex items-center justify-center text-lg font-black">2</div>
+              <div>
+                <h2 class="font-black text-slate-800">Madre / Tutora secundaria</h2>
+                <p class="text-xs text-slate-400 font-bold">Opcional si no aplica</p>
+              </div>
+            </div>
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div>
+                <label class="flabel">Nombre completo *</label>
+                <input id="pi_p2_name" class="field" data-req="true">
+                <p class="err-msg">Ingresa el nombre completo.</p>
+              </div>
+              <div>
+                <label class="flabel">Parentesco *</label>
+                <select id="pi_p2_relationship" class="field" data-req="true">
+                  <option value="">-- Seleccionar --</option>
+                  <option value="Padre">Padre</option>
+                  <option value="Madre">Madre</option>
+                  <option value="Tutor Legal">Tutor Legal</option>
+                </select>
+                <p class="err-msg">Selecciona el parentesco.</p>
+              </div>
+              <div>
+                <label class="flabel">Cédula *</label>
+                <input id="pi_p2_cedula" class="field" placeholder="000-0000000-0" maxlength="13" data-cedula="true">
+                <p class="err-msg">Cédula inválida (verifica los 11 dígitos).</p>
+              </div>
+              <div>
+                <label class="flabel">Teléfono *</label>
+                <input id="pi_p2_phone" class="field" placeholder="809-000-0000" maxlength="12" data-phone="true">
+                <p class="err-msg">Ingresa un teléfono válido (10 dígitos).</p>
+              </div>
+              <div>
+                <label class="flabel">WhatsApp</label>
+                <input id="pi_p2_whatsapp" class="field" placeholder="809-000-0000" maxlength="12" data-phone="true">
+              </div>
+              <div>
+                <label class="flabel">Correo electrónico *</label>
+                <input id="pi_p2_email" type="email" class="field" placeholder="correo@ejemplo.com" data-req="true" data-email="true">
+                <p class="err-msg">Ingresa un correo válido.</p>
+              </div>
+              <div class="md:col-span-2">
+                <label class="flabel">Dirección de residencia</label>
+                <input id="pi_p2_address" class="field" placeholder="Calle, sector, ciudad">
+              </div>
+              <div>
+                <label class="flabel">Ocupación</label>
+                <input id="pi_p2_occupation" class="field">
+              </div>
+              <div>
+                <label class="flabel">Profesión</label>
+                <input id="pi_p2_profession" class="field">
+              </div>
+              <div class="md:col-span-2">
+                <label class="flabel">Lugar de trabajo</label>
+                <input id="pi_p2_workplace" class="field">
+              </div>
+            </div>
+          </div>
+
+          <div class="flex justify-between mt-2">
+            <button onclick="window.Preinscripcion.prev()" class="px-8 py-3.5 text-slate-500 font-black text-xs uppercase hover:bg-slate-100 rounded-2xl transition-all">← Atrás</button>
+            <button onclick="window.Preinscripcion.next()" class="bg-gradient-to-r from-orange-500 to-orange-600 hover:from-orange-600 hover:to-orange-700 text-white font-black text-xs uppercase tracking-widest px-8 py-3.5 rounded-2xl shadow-lg shadow-orange-200 transition-all active:scale-95">Continuar →</button>
+          </div>
+        </div>
+      </section>
+
+      <!-- ═══════════ PASO 3 · EMERGENCIA Y AUTORIZADOS ═══════════ -->
+      <section class="step-card" data-step="3">
+        <div class="space-y-5">
+          <div class="bg-white rounded-3xl p-6 md:p-8 border border-slate-100 shadow-sm">
+            <div class="flex items-center gap-3 mb-6">
+              <div class="w-11 h-11 rounded-2xl bg-rose-100 text-rose-600 flex items-center justify-center text-lg font-black">3</div>
+              <div>
+                <h2 class="font-black text-slate-800">Contacto de emergencia</h2>
+                <p class="text-xs text-slate-400 font-bold">A quien contactamos ante cualquier situación</p>
+              </div>
+            </div>
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div>
+                <label class="flabel">Nombre completo *</label>
+                <input id="pi_emg_name" class="field" data-req="true">
+                <p class="err-msg">Ingresa el nombre.</p>
+              </div>
+              <div>
+                <label class="flabel">Parentesco *</label>
+                <input id="pi_emg_relationship" class="field" placeholder="Ej: Abuela, Tío" data-req="true">
+                <p class="err-msg">Indica el parentesco.</p>
+              </div>
+              <div>
+                <label class="flabel">Cédula *</label>
+                <input id="pi_emg_cedula" class="field" placeholder="000-0000000-0" maxlength="13" data-cedula="true">
+                <p class="err-msg">Cédula inválida (verifica los 11 dígitos).</p>
+              </div>
+              <div>
+                <label class="flabel">Teléfono *</label>
+                <input id="pi_emg_phone" class="field" placeholder="809-000-0000" maxlength="12" data-phone="true">
+                <p class="err-msg">Ingresa un teléfono válido.</p>
+              </div>
+              <div class="md:col-span-2">
+                <label class="flabel">Instrucciones especiales</label>
+                <textarea id="pi_emg_observations" rows="2" class="field resize-none" placeholder="Ej: En caso de crisis llamar primero a la madre"></textarea>
+              </div>
+            </div>
+          </div>
+
+          <div class="bg-white rounded-3xl p-6 md:p-8 border border-slate-100 shadow-sm">
+            <div class="flex items-center justify-between mb-6">
+              <div>
+                <h2 class="font-black text-slate-800">Personas autorizadas a retirar</h2>
+                <p class="text-xs text-slate-400 font-bold">Quienes pueden recoger al niño(a)</p>
+              </div>
+              <button onclick="window.Preinscripcion.addAuthorized()" class="flex items-center gap-2 bg-rose-500 hover:bg-rose-600 text-white font-black text-[10px] uppercase tracking-widest px-4 py-2.5 rounded-2xl transition-all active:scale-95">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><path d="M12 5v14M5 12h14"/></svg> Agregar
+              </button>
+            </div>
+            <div class="space-y-3" id="pi_authorized_list">
+              <!-- Filas dinámicas -->
+            </div>
+            <p class="text-xs text-slate-400 font-semibold mt-3">Se recomienda registrar al menos una persona además del tutor.</p>
+          </div>
+
+          <div class="flex justify-between mt-2">
+            <button onclick="window.Preinscripcion.prev()" class="px-8 py-3.5 text-slate-500 font-black text-xs uppercase hover:bg-slate-100 rounded-2xl transition-all">← Atrás</button>
+            <button onclick="window.Preinscripcion.next()" class="bg-gradient-to-r from-orange-500 to-orange-600 hover:from-orange-600 hover:to-orange-700 text-white font-black text-xs uppercase tracking-widest px-8 py-3.5 rounded-2xl shadow-lg shadow-orange-200 transition-all active:scale-95">Continuar →</button>
+          </div>
+        </div>
+      </section>
+
+      <!-- ═══════════ PASO 4 · INFORMACIÓN MÉDICA ═══════════ -->
+      <section class="step-card" data-step="4">
+        <div class="bg-white rounded-3xl p-6 md:p-8 border border-slate-100 shadow-sm">
+          <div class="flex items-center gap-3 mb-6">
+            <div class="w-11 h-11 rounded-2xl bg-emerald-100 text-emerald-600 flex items-center justify-center text-lg font-black">4</div>
+            <div>
+              <h2 class="font-black text-slate-800">Información médica</h2>
+              <p class="text-xs text-slate-400 font-bold">Ficha de salud del menor</p>
+            </div>
+          </div>
+          <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div>
+              <label class="flabel">Tipo de sangre</label>
+              <select id="pi_blood_type" class="field">
+                <option value="">No sabe</option>
+                <option>A+</option><option>A-</option><option>B+</option><option>B-</option>
+                <option>AB+</option><option>AB-</option><option>O+</option><option>O-</option>
+              </select>
+            </div>
+            <div>
+              <label class="flabel">Alergias</label>
+              <input id="pi_allergies" class="field" placeholder="Ej: Maní, polvo">
+            </div>
+            <div class="md:col-span-2">
+              <label class="flabel">Condiciones médicas preexistentes</label>
+              <textarea id="pi_conditions" rows="2" class="field resize-none" placeholder="Ej: Asma, diabetes"></textarea>
+            </div>
+            <div>
+              <label class="flabel">Medicamentos periódicos</label>
+              <input id="pi_medications" class="field" placeholder="Ej: Salbutamol">
+            </div>
+            <div>
+              <label class="flabel">Restricciones alimentarias</label>
+              <input id="pi_food_restrictions" class="field" placeholder="Ej: Sin lactosa">
+            </div>
+            <div class="md:col-span-2">
+              <label class="flabel">Observaciones médicas adicionales</label>
+              <textarea id="pi_medical_notes" rows="2" class="field resize-none" placeholder="Cualquier otra indicación relevante"></textarea>
+            </div>
+          </div>
+          <div class="flex justify-between mt-8">
+            <button onclick="window.Preinscripcion.prev()" class="px-8 py-3.5 text-slate-500 font-black text-xs uppercase hover:bg-slate-100 rounded-2xl transition-all">← Atrás</button>
+            <button onclick="window.Preinscripcion.next()" class="bg-gradient-to-r from-orange-500 to-orange-600 hover:from-orange-600 hover:to-orange-700 text-white font-black text-xs uppercase tracking-widest px-8 py-3.5 rounded-2xl shadow-lg shadow-orange-200 transition-all active:scale-95">Continuar →</button>
+          </div>
+        </div>
+      </section>
+
+      <!-- ═══════════ PASO 5 · DOCUMENTOS ═══════════ -->
+      <section class="step-card" data-step="5">
+        <div class="bg-white rounded-3xl p-6 md:p-8 border border-slate-100 shadow-sm">
+          <div class="flex items-center gap-3 mb-2">
+            <div class="w-11 h-11 rounded-2xl bg-violet-100 text-violet-600 flex items-center justify-center text-lg font-black">5</div>
+            <div>
+              <h2 class="font-black text-slate-800">Documentos de identidad</h2>
+              <p class="text-xs text-slate-400 font-bold">Sube una foto clara de cada documento</p>
+            </div>
+          </div>
+          <p class="text-xs text-slate-500 font-semibold bg-slate-50 border border-slate-100 rounded-2xl p-3 mb-6">📸 Las imágenes se comprimen automáticamente al subirlas. Los documentos son opcionales en este paso; podrás entregarlos físicamente al ser admitido.</p>
+          <div class="grid grid-cols-1 md:grid-cols-2 gap-4" id="pi_docs_grid"></div>
+          <div class="flex justify-between mt-8">
+            <button onclick="window.Preinscripcion.prev()" class="px-8 py-3.5 text-slate-500 font-black text-xs uppercase hover:bg-slate-100 rounded-2xl transition-all">← Atrás</button>
+            <button onclick="window.Preinscripcion.next()" class="bg-gradient-to-r from-orange-500 to-orange-600 hover:from-orange-600 hover:to-orange-700 text-white font-black text-xs uppercase tracking-widest px-8 py-3.5 rounded-2xl shadow-lg shadow-orange-200 transition-all active:scale-95">Continuar →</button>
+          </div>
+        </div>
+      </section>
+
+      <!-- ═══════════ PASO 6 · AUTORIZACIONES Y FIRMA ═══════════ -->
+      <section class="step-card" data-step="6">
+        <div class="space-y-5">
+          <div class="bg-white rounded-3xl p-6 md:p-8 border border-slate-100 shadow-sm">
+            <div class="flex items-center gap-3 mb-6">
+              <div class="w-11 h-11 rounded-2xl bg-blue-100 text-blue-600 flex items-center justify-center text-lg font-black">6</div>
+              <div>
+                <h2 class="font-black text-slate-800">Autorizaciones y firma</h2>
+                <p class="text-xs text-slate-400 font-bold">Consentimientos legales obligatorios</p>
+              </div>
+            </div>
+            <div class="space-y-3">
+              <label class="flex items-start gap-3 cursor-pointer">
+                <input type="checkbox" id="pi_auth_data" class="w-5 h-5 mt-0.5 rounded text-orange-500 accent-orange-500" data-req="true">
+                <span class="text-sm font-semibold text-slate-600">Autorizo el <b>tratamiento de datos personales</b> de mi hijo(a) conforme a la política de privacidad del centro.</span>
+              </label>
+              <label class="flex items-start gap-3 cursor-pointer">
+                <input type="checkbox" id="pi_auth_correct" class="w-5 h-5 mt-0.5 rounded text-orange-500 accent-orange-500" data-req="true">
+                <span class="text-sm font-semibold text-slate-600">Declaro que la información suministrada es <b>verídica</b> y de mi responsabilidad.</span>
+              </label>
+              <label class="flex items-start gap-3 cursor-pointer">
+                <input type="checkbox" id="pi_auth_contact" class="w-5 h-5 mt-0.5 rounded text-orange-500 accent-orange-500" data-req="true">
+                <span class="text-sm font-semibold text-slate-600">Autorizo el <b>contacto vía WhatsApp, SMS o correo</b> con información institucional.</span>
+              </label>
+              <label class="flex items-start gap-3 cursor-pointer">
+                <input type="checkbox" id="pi_auth_regulations" class="w-5 h-5 mt-0.5 rounded text-orange-500 accent-orange-500" data-req="true">
+                <span class="text-sm font-semibold text-slate-600">Acepto el <b>reglamento interno</b> del colegio y me comprometo a cumplirlo.</span>
+              </label>
+              <p class="err-msg text-sm" id="pi_auth_error">Debes marcar todas las autorizaciones para continuar.</p>
+            </div>
+
+            <div class="mt-8">
+              <label class="flabel">Firma digital del tutor *</label>
+              <p class="text-[11px] text-slate-400 font-semibold mb-2">Firma dentro del recuadro con el dedo o el mouse.</p>
+              <canvas id="pi_signature" class="sig-canvas" height="180"></canvas>
+              <div class="flex gap-3 mt-3">
+                <button onclick="window.Preinscripcion.clearSignature()" class="text-[11px] font-black text-slate-500 uppercase tracking-widest bg-slate-100 hover:bg-slate-200 px-4 py-2 rounded-xl transition-all">Limpiar firma</button>
+                <span id="pi_signature_status" class="text-[11px] font-black text-slate-400 uppercase tracking-widest self-center"></span>
+              </div>
+            </div>
+          </div>
+
+          <div class="flex justify-between mt-2">
+            <button onclick="window.Preinscripcion.prev()" class="px-8 py-3.5 text-slate-500 font-black text-xs uppercase hover:bg-slate-100 rounded-2xl transition-all">← Atrás</button>
+            <button onclick="window.Preinscripcion.next()" class="bg-gradient-to-r from-orange-500 to-orange-600 hover:from-orange-600 hover:to-orange-700 text-white font-black text-xs uppercase tracking-widest px-8 py-3.5 rounded-2xl shadow-lg shadow-orange-200 transition-all active:scale-95">Continuar →</button>
+          </div>
+        </div>
+      </section>
+
+      <!-- ═══════════ PASO 7 · RESUMEN Y ENVÍO ═══════════ -->
+      <section class="step-card" data-step="7">
+        <div class="bg-white rounded-3xl p-6 md:p-8 border border-slate-100 shadow-sm">
+          <div class="flex items-center gap-3 mb-6">
+            <div class="w-11 h-11 rounded-2xl bg-green-100 text-green-600 flex items-center justify-center text-lg font-black">7</div>
+            <div>
+              <h2 class="font-black text-slate-800">Resumen y envío</h2>
+              <p class="text-xs text-slate-400 font-bold">Revisa toda la información antes de enviar</p>
+            </div>
+          </div>
+          <div id="pi_review_summary" class="summary-grid">
+            <!-- Render JS -->
+          </div>
+          <div class="mt-8 bg-amber-50 border-2 border-amber-100 rounded-2xl p-4 text-sm font-semibold text-amber-700">
+            Al enviar, un representante de admisiones revisará el expediente y te contactará en los próximos días hábiles.
+          </div>
+          <div class="flex flex-col sm:flex-row justify-between items-center gap-4 mt-8">
+            <button onclick="window.Preinscripcion.prev()" class="w-full sm:w-auto px-8 py-3.5 text-slate-500 font-black text-xs uppercase hover:bg-slate-100 rounded-2xl transition-all">← Atrás</button>
+            <button id="pi_submit_btn" onclick="window.Preinscripcion.submit()" class="w-full sm:w-auto bg-gradient-to-r from-emerald-500 to-emerald-600 hover:from-emerald-600 hover:to-emerald-700 text-white font-black text-xs uppercase tracking-widest px-10 py-4 rounded-2xl shadow-lg shadow-emerald-200 transition-all active:scale-95 flex items-center justify-center gap-2">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M22 2L11 13M22 2l-7 20-4-9-9-4 20-7z"/></svg>
+              Enviar preinscripción
+            </button>
+          </div>
+        </div>
+      </section>
+
+      <!-- ═══════════ ÉXITO ═══════════ -->
+      <div id="pi_success" class="hidden">
+        <div class="bg-white rounded-3xl p-10 text-center border border-slate-100 shadow-sm swal-pulse">
+          <div class="w-20 h-20 mx-auto mb-6 rounded-full bg-emerald-100 flex items-center justify-center">
+            <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="#059669" stroke-width="2.5"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><path d="M22 4L12 14.01l-3-3"/></svg>
+          </div>
+          <h2 class="text-2xl font-black text-slate-800 mb-2" style="font-family:'Poppins',sans-serif;">¡Preinscripción recibida!</h2>
+          <p class="text-sm text-slate-500 font-semibold max-w-md mx-auto mb-2">Tu expediente quedó registrado. Nuestro equipo de admisiones lo revisará y te contactaremos para coordinar la entrevista y el proceso de inscripción.</p>
+          <p class="text-xs font-bold text-slate-400 mb-8">Folio de seguimiento: <span id="pi_folio" class="text-orange-600 font-black"></span></p>
+          <div class="flex flex-col sm:flex-row justify-center gap-3">
+            <a href="index.html" class="px-8 py-3.5 bg-slate-800 text-white font-black text-xs uppercase tracking-widest rounded-2xl hover:bg-slate-900 transition-all text-center">Volver al inicio</a>
+            <a href="https://wa.me/18298038424" target="_blank" rel="noopener" class="px-8 py-3.5 bg-emerald-500 text-white font-black text-xs uppercase tracking-widest rounded-2xl hover:bg-emerald-600 transition-all text-center">Contactar por WhatsApp</a>
+          </div>
+        </div>
+      </div>
+
+    </div>
+  </main>
+
+  <footer class="py-10 mt-10 border-t border-slate-100 bg-white">
+    <div class="max-w-3xl mx-auto px-4 flex flex-col md:flex-row items-center justify-between gap-4">
+      <p class="text-xs font-bold text-slate-400">© 2026 Karpus Kids · Estancia infantil · San Cristóbal, R.D.</p>
+      <div class="flex gap-6">
+        <a href="politica-privacidad.html" class="text-xs font-bold text-slate-400 hover:text-orange-600 transition-colors">Política de privacidad</a>
+        <a href="terminos-uso.html" class="text-xs font-bold text-slate-400 hover:text-orange-600 transition-colors">Términos de uso</a>
+      </div>
+    </div>
+  </footer>
+
+  <script src="js/shared/supabase-js.min.js"></script>
+  <script src="js/shared/lucide.min.js"></script>
+  <script type="module" src="js/preinscripcion.js"></script>
+</body>
+</html>

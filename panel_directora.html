@@ -1,0 +1,1869 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta name="robots" content="noindex,nofollow">
+  <meta http-equiv="X-Content-Type-Options" content="nosniff">
+  <meta http-equiv="Referrer-Policy" content="strict-origin-when-cross-origin">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self' https://*.supabase.co wss://*.supabase.co; script-src 'self' 'unsafe-inline' https://cdn.onesignal.com https://onesignal.com https://api.onesignal.com https://meet.jit.si https://8x8.vc https://cdn.jsdelivr.net; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com https://cdn.jsdelivr.net; img-src 'self' data: blob: https:; connect-src 'self' https://*.supabase.co wss://*.supabase.co https://cdn.onesignal.com https://onesignal.com https://api.onesignal.com https://meet.jit.si https://8x8.vc https://fonts.googleapis.com https://fonts.gstatic.com https://cdn.jsdelivr.net; frame-src 'self' blob: https://meet.jit.si https://8x8.vc; worker-src 'self' blob:; object-src 'none'; base-uri 'self';">
+  <style>html{display:none;}</style>
+  <!-- X-Frame-Options debe ser configurado por el servidor, no por meta tag -->
+  <script>if(self===top){document.documentElement.style.display='block';}else{top.location=self.location;}</script>
+  <!-- Service Worker — registrar lo antes posible para OneSignal -->
+  <script>
+    if ('serviceWorker' in navigator) {
+      navigator.serviceWorker.register('/OneSignalSDKWorker.js', { scope: '/' }).catch(() => {});
+    }
+  </script>
+  <title>Karpus Kids — Panel Directora</title>
+  <link rel="icon" href="logo/favicon.ico" type="image/x-icon">
+  <link rel="manifest" href="manifest.json">
+  
+  
+  <link rel="stylesheet" href="css/theme.css" />
+  <link rel="stylesheet" href="css/layout.css" />
+  <link rel="stylesheet" href="css/karpus-modern.css" />
+  <link rel="stylesheet" href="css/karpus-tailwind.css">
+  <link rel="stylesheet" href="css/premium-mobile.css">
+  <script src="js/shared/chart.min.js" defer></script>
+  <script src="js/shared/jspdf.min.js" defer></script>
+  <script src="js/shared/jspdf-autotable.min.js" defer></script>
+  <!-- Fallback: si chart.min.js no carga, definir Chart como stub para evitar ReferenceError -->
+  <script>
+    window.addEventListener('load', () => {
+      if (!window.Chart) {
+        window.Chart = function() { return { destroy: () => {}, update: () => {} }; };
+        window.Chart.register = () => {};
+      }
+      if (!window.jspdf) window.jspdf = { jsPDF: function() { return { save: () => {}, text: () => {}, addPage: () => {} }; } };
+    });
+  </script>
+  
+  <style>
+    /* ═══════════════════════════════════════════════
+       SIDEBAR
+    ═══════════════════════════════════════════════ */
+    aside#sidebar {
+      width: 288px;
+      background: linear-gradient(to bottom, #7c3aed, #4338ca);
+      color: white;
+      position: fixed;
+      height: 100dvh;
+      top: 0; left: 0;
+      z-index: 1050;
+      overflow-y: auto;
+      overflow-x: hidden;
+      scrollbar-width: none;
+      transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+      box-shadow: 4px 0 24px rgba(0,0,0,0.1);
+    }
+    aside#sidebar::-webkit-scrollbar { display: none; }
+
+    @media (max-width: 767px) {
+      aside#sidebar {
+        transform: translateX(-100%);
+        width: 85%;
+        max-width: 300px;
+      }
+      aside#sidebar.mobile-visible {
+        transform: translateX(0);
+      }
+      #sidebarOverlay {
+        position: fixed;
+        inset: 0;
+        background: rgba(0,0,0,0.5);
+        backdrop-filter: blur(4px);
+        z-index: 1040;
+        display: none;
+        animation: fadeIn 0.3s ease;
+      }
+    }
+
+    @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+
+    /* ═══════════════════════════════════════════════
+       MODALES ANIMADOS
+    ═══════════════════════════════════════════════ */
+    @keyframes scaleIn {
+      from { opacity: 0; transform: scale(0.95) translateY(10px); }
+      to { opacity: 1; transform: scale(1) translateY(0); }
+    }
+    .animate-scaleIn { animation: scaleIn 0.3s cubic-bezier(0.34, 1.56, 0.64, 1); }
+
+    /* ═══════════════════════════════════════════════
+       MAIN / LAYOUT SHELL
+    ═══════════════════════════════════════════════ */
+    #layoutShell {
+      transition: margin-left .25s ease;
+    }
+    @media (min-width: 769px) {
+      .app-content-wrapper { margin-left: 288px; height: 100dvh; overflow: hidden; }
+      .app-content-wrapper.sidebar-collapsed aside#sidebar { width: 80px; }
+      .app-content-wrapper.sidebar-collapsed #layoutShell { margin-left: 80px; }
+    }
+    @media (max-width: 767px) {
+      /* 1. Reset Global Scroll */
+      html, body { 
+        overflow-y: auto !important; 
+        overflow-x: hidden !important; 
+        height: auto !important; 
+        min-height: 100% !important;
+        position: relative !important;
+        display: block !important;
+        -webkit-overflow-scrolling: touch !important;
+        overscroll-behavior: auto !important; /* Permitir scroll normal */
+      }
+
+      /* 2. Reset Layout Containers */
+      .app {
+        display: block !important;
+        height: auto !important;
+        min-height: 100vh !important;
+        overflow: visible !important;
+      }
+
+      .app-content-wrapper { 
+        margin-left: 0 !important; 
+        height: auto !important; 
+        overflow: visible !important; 
+        display: block !important; 
+      }
+
+      .main { 
+        height: auto !important; 
+        overflow: visible !important; 
+        min-height: 100vh !important; /* Asegurar que ocupe al menos la pantalla */
+        padding-bottom: 80px !important; 
+        display: block !important;
+      }
+
+      #layoutShell {
+        overflow: visible !important;
+        height: auto !important;
+        display: block !important;
+      }
+
+      /* 3. Reset Sections */
+      .section, .section.active {
+        overflow: visible !important;
+        height: auto !important;
+        display: none;
+      }
+      .section.active {
+        display: block !important;
+      }
+    }
+
+    /* ═══════════════════════════════════════════════
+       NAV BUTTONS
+    ═══════════════════════════════════════════════ */
+    .nav-btn, .kk-nav-item {
+      display: flex; align-items: center; gap: 12px;
+      padding: 12px 16px; width: 100%; color: #94a3b8;
+      border-radius: 8px; margin-bottom: 4px;
+      text-align: left; transition: all 0.2s ease;
+      position: relative; cursor: pointer;
+      -webkit-tap-highlight-color: transparent;
+      touch-action: manipulation;
+    }
+    .nav-btn [data-lucide], .kk-nav-item [data-lucide] { transition: color 0.2s ease; }
+    .nav-btn:hover, .nav-btn.active, .kk-nav-item:hover, .kk-nav-item.active { background: rgba(255,255,255,0.15); color: white; }
+    .nav-btn .badge, .kk-nav-item .kk-badge {
+      position: absolute; top: 0.5rem; right: 0.5rem;
+      background: #e91e63; color: white; border-radius: 9999px;
+      font-size: 0.75rem; padding: 0.125rem 0.375rem;
+      min-width: 1.5rem; text-align: center;
+    }
+
+    /* ═══════════════════════════════════════════════
+       SECCIONES — ocultas por defecto, visibles con .active
+    ═══════════════════════════════════════════════ */
+    .section {
+      display: none;
+      overflow: visible;
+    }
+    .section.active {
+      display: block;
+      overflow: visible;
+      animation: fadeInDir 0.3s ease-out;
+    }
+    @keyframes fadeInDir { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
+
+    /* ═══════════════════════════════════════════════
+       TABLAS — scroll horizontal contenido, nunca body
+    ═══════════════════════════════════════════════ */
+    .data-table {
+      width: 100%; border-collapse: collapse; background: white;
+      border-radius: 8px; border: 1px solid #e2e8f0;
+    }
+    .data-table th {
+      background: #f1f5f9; padding: 12px 16px; text-align: left;
+      font-size: 12px; text-transform: uppercase; color: #64748b;
+      border-bottom: 1px solid #e2e8f0; white-space: nowrap;
+    }
+    .data-table td { padding: 12px 16px; border-bottom: 1px solid #f1f5f9; color: #334155; }
+    .data-table tr:hover { background: #f8fafc; }
+    /* Wrapper para scroll horizontal en tablas */
+    .table-scroll-wrap {
+      width: 100%;
+      overflow-x: auto;
+      -webkit-overflow-scrolling: touch;
+      border-radius: 12px;
+    }
+    .table-scroll-wrap .data-table { min-width: 600px; }
+
+    /* ═══════════════════════════════════════════════
+       CHAT TIPO MESSENGER
+    ═══════════════════════════════════════════════ */
+    .chat-app {
+      display: flex;
+      height: calc(100dvh - 120px);
+      min-height: 500px;
+      background: white;
+      border-radius: 24px;
+      overflow: hidden;
+      border: 1px solid #e2e8f0;
+      box-shadow: 0 4px 20px -5px rgba(0,0,0,0.05);
+    }
+    .chat-list {
+      display: flex; flex-direction: column;
+      width: 35%; flex-shrink: 0;
+      border-right: 1px solid #f1f5f9; background: #f8fafc;
+      overflow-y: auto;
+    }
+    .chat-conversation {
+      display: flex; flex-direction: column;
+      width: 65%; background: white; min-width: 0;
+    }
+    #chatMessagesContainer {
+      flex: 1; overflow-y: auto; -webkit-overflow-scrolling: touch;
+      padding: 20px; display: flex; flex-direction: column;
+      gap: 8px; background: #ffffff;
+    }
+    .msg-bubble {
+      padding: 10px 16px; border-radius: 20px; font-size: 14px;
+      max-width: 80%; box-shadow: 0 1px 2px rgba(0,0,0,0.08); line-height: 1.5;
+    }
+    .msg-me { background: #7c3aed; color: white; align-self: flex-end; border-bottom-right-radius: 4px; }
+    .msg-them { background: #f0f2f5; color: #1c1e21; align-self: flex-start; border-bottom-left-radius: 4px; }
+    #chatInputArea {
+      position: sticky; bottom: 0;
+      background: white; padding: 16px; border-top: 1px solid #f1f5f9; z-index: 2;
+    }
+    @media (max-width: 768px) {
+      .chat-app { height: calc(100dvh - 100px); border-radius: 16px; min-height: 400px; }
+      .chat-list { width: 100%; border-right: none; }
+      .chat-conversation { display: none; width: 100%; }
+      .chat-app.show-chat .chat-list { display: none; }
+      .chat-app.show-chat .chat-conversation { display: flex; }
+    }
+
+    /* ═══════════════════════════════════════════════
+       MODALES — adaptables en móvil
+    ═══════════════════════════════════════════════ */
+    .modal-content {
+      background: white; border-radius: 24px;
+      width: 95% !important; max-width: 600px !important;
+      max-height: 90vh !important; overflow-y: auto !important;
+    }
+    .modal-header { padding: 1.5rem; border-bottom: 1px solid #e5e7eb; display: flex; align-items: center; justify-content: space-between; }
+    .modal-body { padding: 1.5rem; }
+    .modal-footer { padding: 1.5rem; border-top: 1px solid #e5e7eb; display: flex; justify-content: flex-end; gap: 0.75rem; }
+    .modal-container.hidden { display: none !important; }
+
+    /* ═══════════════════════════════════════════════
+       KPI GRID — auto-fit responsivo
+    ═══════════════════════════════════════════════ */
+    .kpi-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(min(100%, 150px), 1fr));
+      gap: 1rem;
+    }
+
+
+
+    /* ═══════════════════════════════════════════════
+       ATTENDANCE TABS
+    ═══════════════════════════════════════════════ */
+    [data-att-mode] { transition: all .2s ease; }
+    [data-att-mode].active-att-tab { background: white; color: #4f46e5; font-weight: 900; box-shadow: 0 1px 4px rgba(0,0,0,.08); }
+
+    /* ═══════════════════════════════════════════════
+       REPORT DETAILS ANIMATION
+    ═══════════════════════════════════════════════ */
+    .report-details { display: grid; grid-template-rows: 0fr; transition: grid-template-rows 0.3s ease-out; }
+    .report-details.open { grid-template-rows: 1fr; }
+    .report-details > div { overflow: hidden; }
+
+    /* ═══════════════════════════════════════════════
+       SIDEBAR SCROLL
+    ═══════════════════════════════════════════════ */
+    .sidebar-scroll { overflow-y: visible; max-height: none; scrollbar-width: none; }
+    .sidebar-scroll::-webkit-scrollbar { display: none; }
+
+    /* ═══════════════════════════════════════════════
+       MOBILE SIDEBAR
+    ═══════════════════════════════════════════════ */
+    @media (max-width: 767px) {
+      aside#sidebar {
+        transform: translateX(-100%);
+        transition: transform 0.3s ease;
+        will-change: transform;
+      }
+      aside#sidebar.mobile-visible {
+        transform: translateX(0) !important;
+        box-shadow: 8px 0 32px rgba(0,0,0,0.25);
+      }
+    }
+
+    /* ═══════════════════════════════════════════════
+       CHIPS
+    ═══════════════════════════════════════════════ */
+    .chip { padding: 0.25rem 0.75rem; border-radius: 9999px; font-size: 0.75rem; font-weight: 600; }
+    .chip-blue { background-color: #dbeafe; color: #1e40af; }
+    .chip-green { background-color: #dcfce7; color: #166534; }
+    .chip-orange { background-color: #ffedd5; color: #9a3412; }
+
+    /* ═══════════════════════════════════════════════
+       BOTONES DE ACCIÓN EN TABLAS
+    ═══════════════════════════════════════════════ */
+    .btn-action { padding: 6px; border-radius: 6px; font-size: 12px; font-weight: 600; cursor: pointer; touch-action: manipulation; }
+    .btn-edit { color: #4f46e5; background: #eef2ff; }
+    .btn-delete { color: #e11d48; background: #fff1f2; }
+
+    /* ═══════════════════════════════════════════════
+       LOADER INICIAL
+    ═══════════════════════════════════════════════ */
+    #initial-loading {
+      position: fixed; inset: 0; background: white; z-index: 9999;
+      display: flex; flex-direction: column; align-items: center; justify-content: center;
+      transition: opacity 0.5s ease;
+    }
+    .loader-spin {
+      width: 48px; height: 48px; border: 4px solid #e2e8f0;
+      border-top-color: #7c3aed; border-radius: 50%;
+      animation: spin 0.8s linear infinite;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    /* ═══════════════════════════════════════════════
+       KARPUS COLORED LETTERS
+    ═══════════════════════════════════════════════ */
+    .karpus-kids-inline .k-1 { color: #FF9800; }
+    .karpus-kids-inline .k-2 { color: #2196F3; }
+    .karpus-kids-inline .k-3 { color: #E91E63; }
+    .karpus-kids-inline .k-4 { color: #4CAF50; }
+    .karpus-kids-inline .k-5 { color: #FF9800; }
+    .karpus-kids-inline .k-6 { color: #2196F3; }
+    .karpus-kids-inline .k-7 { color: #4CAF50; }
+    .karpus-kids-inline .k-8 { color: #E91E63; }
+    .karpus-kids-inline .k-9 { color: #2196F3; }
+    .karpus-kids-inline .k-10 { color: #FF9800; }
+
+    /* ═══════════════════════════════════════════════
+       MOBILE OVERRIDES GENERALES
+    ═══════════════════════════════════════════════ */
+    @media (max-width: 640px) {
+      .hide-mobile { display: none !important; }
+      /* Tablas: scroll horizontal, nunca romper layout */
+      .overflow-x-auto { -webkit-overflow-scrolling: touch; }
+      /* Gráficos: no desbordar */
+      canvas { max-width: 100% !important; }
+      /* Modales full-width en móvil */
+      .modal-content { width: 95%; max-height: 85dvh; }
+      /* Botones full-width en móvil */
+      .btn-mobile-full { width: 100% !important; justify-content: center; }
+    }
+
+    /* ═══════════════════════════════════════════════
+       TEACHER GRID BUTTON FIX
+    ═══════════════════════════════════════════════ */
+    #teachersGrid button.bg-slate-900,
+    #teachersGrid button.bg-black,
+    #teachersGrid button.bg-gray-800 {
+      background-color: #7c3aed !important;
+      border-color: #7c3aed !important;
+    }
+    #teachersGrid button:hover { background-color: #6d28d9 !important; }
+
+    /* Sin bottom-nav en este panel — cancelar el padding reservado */
+    body { padding-bottom: 0 !important; }
+  </style>
+</head>
+<body class="bg-slate-50 text-slate-800 font-nunito panel-directora-body">
+  
+  <!-- LOADER -->
+  <div id="initial-loading">
+    <div class="loader-spin mb-4"></div>
+    <h2 class="text-xl font-bold text-slate-700 animate-pulse">Karpus Kids</h2>
+    <p class="text-sm text-slate-400">Cargando panel de dirección...</p>
+  </div>
+
+  <div class="app">
+    <!-- OVERLAY MOBILE -->
+    <div id="sidebarOverlay" class="fixed inset-0 bg-black/50 z-40 transition-opacity" style="display:none;"></div>
+    
+    <!-- SIDEBAR -->
+    <aside id="sidebar" class="kk-sidebar bg-gradient-to-b from-violet-600 via-violet-700 to-indigo-800 shadow-2xl fixed inset-y-0 left-0 z-50 w-72 flex flex-col" style="border-right:none;">
+      <!-- Toggle collapse -->
+      <button id="toggleSidebar" class="absolute -right-3 top-8 bg-white rounded-full p-1.5 shadow-lg border border-slate-100 text-slate-500 hover:text-violet-600 hidden md:flex items-center justify-center z-10 transition-all hover:scale-110">
+        <i data-lucide="chevron-left" id="toggleSidebarIcon" class="w-3.5 h-3.5"></i>
+      </button>
+
+      <!-- Logo Karpus Kids -->
+      <div class="kk-sidebar-logo">
+        <div class="kk-sidebar-logo-img">
+          <img src="img/mundo.jpg" alt="Karpus Kids" loading="eager">
+        </div>
+        <div class="kk-sidebar-logo-text label">
+          <div class="brand karpus-kids-inline">
+            <span class="k-1">K</span><span class="k-2">a</span><span class="k-3">r</span><span class="k-4">p</span><span class="k-5">u</span><span class="k-6">s</span>&#32;<span class="k-7">K</span><span class="k-8">i</span><span class="k-9">d</span><span class="k-10">s</span>
+          </div>
+          <div class="sub">Panel Directora</div>
+        </div>
+      </div>
+
+      <!-- Perfil -->
+      <div class="kk-sidebar-profile label mx-2">
+        <div class="kk-sidebar-profile-avatar relative group cursor-pointer" id="sidebarAvatar">
+          <img id="sidebarProfileAvatar" src="img/mundo.jpg" alt="Avatar" class="w-full h-full object-cover transition-opacity group-hover:opacity-60">
+          <div class="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
+            <i data-lucide="camera" class="w-4 h-4 text-white"></i>
+          </div>
+          <input type="file" id="sidebarAvatarInput" accept="image/*" class="hidden">
+        </div>
+        <div class="kk-sidebar-profile-info label">
+          <div class="kk-sidebar-profile-role">Directora</div>
+          <div class="kk-sidebar-profile-name" id="sidebarName">Cargando...</div>
+        </div>
+      </div>
+
+      <!-- Nav -->
+      <nav class="flex-1 overflow-y-auto kk-scroll px-2 py-1 space-y-0.5 relative z-10">
+        <div class="kk-nav-section label">Principal</div>
+        <button data-section="dashboard" class="kk-nav-item" data-tooltip="Dashboard">
+          <i data-lucide="layout-dashboard" class="text-blue-300"></i>
+          <span class="label">Dashboard</span>
+        </button>
+
+        <div class="kk-nav-section label">Gestión</div>
+        <button data-section="maestros" class="kk-nav-item relative" data-tooltip="Maestros">
+          <i data-lucide="user-cog" class="text-green-300"></i>
+          <span class="label">Maestros</span>
+          <span id="badge-maestros" class="hidden kk-badge">0</span>
+        </button>
+        <button data-section="estudiantes" class="kk-nav-item relative" data-tooltip="Estudiantes">
+          <i data-lucide="graduation-cap" class="text-orange-300"></i>
+          <span class="label">Estudiantes</span>
+          <span id="badge-estudiantes" class="hidden kk-badge">0</span>
+        </button>
+        <button data-section="inscripciones" class="kk-nav-item relative" data-tooltip="Inscripciones">
+          <i data-lucide="clipboard-check" class="text-cyan-300"></i>
+          <span class="label">Inscripciones</span>
+          <span id="badge-inscripciones" class="hidden kk-badge">0</span>
+        </button>
+        <button data-section="aulas" class="kk-nav-item" data-tooltip="Aulas">
+          <i data-lucide="school" class="text-purple-300"></i>
+          <span class="label">Aulas</span>
+        </button>
+
+        <div class="kk-nav-section label">Académico</div>
+        <button data-section="asistencia" class="kk-nav-item relative" data-tooltip="Asistencia">
+          <i data-lucide="calendar-check-2" class="text-pink-300"></i>
+          <span class="label">Asistencia</span>
+          <span id="badge-asistencia" class="hidden kk-badge">0</span>
+        </button>
+        <button data-section="calificaciones" class="kk-nav-item relative" data-tooltip="Calificaciones">
+          <i data-lucide="star" class="text-teal-300"></i>
+          <span class="label">Calificaciones</span>
+          <span id="badge-calificaciones" class="hidden kk-badge">0</span>
+        </button>
+
+        <div class="kk-nav-section label">Finanzas</div>
+        <button data-section="pagos" class="kk-nav-item relative" data-tooltip="Pagos">
+          <i data-lucide="banknote" class="text-yellow-300"></i>
+          <span class="label">Pagos</span>
+          <span id="badge-pagos" class="hidden kk-badge">0</span>
+        </button>
+
+        <div class="kk-nav-section label">Sistema</div>
+        <button data-section="anio-escolar" class="kk-nav-item" data-tooltip="Año Escolar">
+          <i data-lucide="calendar-range" class="text-violet-300"></i>
+          <span class="label">Año Escolar</span>
+        </button>
+        <button data-section="configuracion" class="kk-nav-item" data-tooltip="Configuración">
+          <i data-lucide="sliders-horizontal" class="text-slate-300"></i>
+          <span class="label">Configuración</span>
+        </button>
+      </nav>
+
+      <!-- Logout -->
+      <div class="p-3 relative z-10 border-t border-white/10">
+        <button id="btnLogout" class="kk-logout-btn">
+          <i data-lucide="log-out" class="w-4 h-4"></i>
+          <span class="label">Cerrar Sesión</span>
+        </button>
+      </div>
+
+      <!-- Decorativo -->
+      <div class="kk-sidebar-deco">
+        <i data-lucide="star" class="w-36 h-36 text-white"></i>
+      </div>
+    </aside>
+
+    <div class="app-content-wrapper">
+      <!-- HEADER TIPO APP (FIJO Y LIMPIO) -->
+      <header class="header">
+        <button id="menuBtn" class="md:hidden p-2.5 rounded-xl bg-white shadow-sm border border-slate-100 text-slate-600 hover:bg-purple-50 hover:text-purple-600 transition-colors active:scale-95"
+          style="position:relative;z-index:200;"
+          data-managed="true"
+          aria-label="Abrir menú">
+          <i data-lucide="menu" class="w-5 h-5"></i>
+        </button>
+        <h2 class="text-lg font-bold text-slate-800 hidden md:block">Karpus Kids — Panel Director</h2>
+        <span class="text-xs font-semibold text-slate-400 uppercase tracking-widest md:hidden">Panel Directora</span>
+      </header>
+
+      <!-- MAIN SCROLLABLE -->
+      <main class="main" id="layoutShell">
+        <!-- SECTIONS -->
+        <section id="dashboard" class="section active">
+        <!-- Header con Filtros Globales -->
+        <div class="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-8">
+          <div>
+            <h1 class="text-3xl font-bold text-slate-800 tracking-tight">Panel General</h1>
+            <p class="text-slate-500 font-medium">Resumen administrativo de la estancia</p>
+          </div>
+          <div class="flex gap-3 bg-white p-1.5 rounded-xl shadow-sm border border-slate-100">
+          </div>
+        </div>
+
+        <!-- ALERTAS AUTOMÁTICAS (Notificaciones) -->
+        <div id="dashboardAlerts" class="mb-6 hidden"></div>
+
+        <!-- SCHOOL ENGINE: Banner de Estado del Año Escolar -->
+        <div id="schoolYearBanner" class="mb-6 hidden"></div>
+
+        <!-- BLOQUE 1: KPIs (Tarjetas Pastel) -->
+        <div class="kpi-grid mb-8">
+          <!-- Estudiantes (Morado) -->
+          <div data-action="go-section" data-section="estudiantes" class="bg-purple-100 p-5 rounded-2xl border border-purple-200 shadow-md hover:shadow-md hover:-translate-y-1 transition-all duration-300 group cursor-pointer">
+            <div class="flex justify-between items-start mb-2">
+              <div class="p-2 bg-purple-200 rounded-xl text-purple-700 shadow-sm group-hover:scale-110 transition-transform"><i data-lucide="users" class="w-6 h-6"></i></div>
+              <span class="text-xs font-bold text-purple-600 bg-white/60 px-2 py-1 rounded-full">Total</span>
+            </div>
+            <p class="text-3xl font-bold text-purple-800 mb-1" id="kpiStudents">0</p>
+            <p class="text-xs text-purple-600 font-medium">Estudiantes activos</p>
+          </div>
+
+          <!-- Docentes (Azul Cielo) -->
+          <div data-action="go-section" data-section="maestros" class="bg-sky-100 p-5 rounded-2xl border border-sky-200 shadow-md hover:shadow-md hover:-translate-y-1 transition-all duration-300 group cursor-pointer">
+            <div class="flex justify-between items-start mb-2">
+              <div class="p-2 bg-sky-200 rounded-xl text-sky-700 shadow-sm group-hover:scale-110 transition-transform"><i data-lucide="graduation-cap" class="w-6 h-6"></i></div>
+            </div>
+            <p class="text-3xl font-bold text-sky-800 mb-1" id="kpiTeachers">0</p>
+            <p class="text-xs text-sky-600 font-medium">Docentes</p>
+          </div>
+
+          <!-- Aulas (Indigo) -->
+          <div data-action="go-section" data-section="aulas" class="bg-indigo-100 p-5 rounded-2xl border border-indigo-200 shadow-md hover:shadow-md hover:-translate-y-1 transition-all duration-300 group cursor-pointer">
+            <div class="flex justify-between items-start mb-2">
+              <div class="p-2 bg-indigo-200 rounded-xl text-indigo-700 shadow-sm group-hover:scale-110 transition-transform"><i data-lucide="home" class="w-6 h-6"></i></div>
+            </div>
+            <p class="text-3xl font-bold text-indigo-800 mb-1" id="kpiClassrooms">0</p>
+            <p class="text-xs text-indigo-600 font-medium">Aulas activas</p>
+          </div>
+
+          <!-- Asistencia (Verde Menta) -->
+          <div data-action="go-section" data-section="asistencia" class="bg-emerald-100 p-5 rounded-2xl border border-emerald-200 shadow-md hover:shadow-md hover:-translate-y-1 transition-all duration-300 group cursor-pointer">
+            <div class="flex justify-between items-start mb-2">
+              <div class="p-2 bg-emerald-200 rounded-xl text-emerald-700 shadow-sm group-hover:scale-110 transition-transform"><i data-lucide="user-check" class="w-6 h-6"></i></div>
+              <span class="text-xs font-bold text-emerald-600 bg-white/60 px-2 py-1 rounded-full">Hoy</span>
+            </div>
+            <p class="text-3xl font-bold text-emerald-800 mb-1" id="kpiAttendance">0</p>
+            <p class="text-xs text-emerald-600 font-medium">Niños presentes</p>
+            <p class="text-[10px] text-emerald-500 font-bold mt-0.5" id="kpiAttendanceRate"></p>
+          </div>
+
+          <!-- Pagos Pendientes (Amarillo Pastel) -->
+          <div data-action="go-section" data-section="pagos" class="bg-amber-100 p-5 rounded-2xl border border-amber-200 shadow-md hover:shadow-md hover:-translate-y-1 transition-all duration-300 group cursor-pointer">
+            <div class="flex justify-between items-start mb-2">
+              <div class="p-2 bg-amber-200 rounded-xl text-amber-700 shadow-sm group-hover:scale-110 transition-transform"><i data-lucide="alert-circle" class="w-6 h-6"></i></div>
+            </div>
+            <p class="text-xl font-bold text-amber-800 mb-1 truncate" id="kpiPendingMoney">RD$0.00</p>
+            <p class="text-xs text-amber-600 font-medium">Por cobrar</p>
+          </div>
+        </div>
+        <!-- BLOQUE 2: Alertas Inteligentes (Automatización) -->
+        <div id="smartAlertsContainer" class="mb-6">
+          <div class="flex items-center gap-2 py-4">
+            <div class="w-4 h-4 border-2 border-indigo-400 border-t-transparent rounded-full animate-spin"></div>
+            <span class="text-xs text-slate-400 font-bold">Analizando datos...</span>
+          </div>
+        </div>
+
+        <!-- BLOQUE 3: Accesos Directos (NUEVO) -->
+        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+          <!-- Reportes -->
+          <div id="cardReportes" data-action="go-section" data-section="reportes" class="bg-white p-6 rounded-3xl shadow-sm border border-slate-100 hover:shadow-md hover:-translate-y-1 active:scale-95 transition-all duration-300 text-left group cursor-pointer">
+            <div class="w-14 h-14 bg-indigo-50 rounded-2xl flex items-center justify-center mb-4 group-hover:bg-indigo-600 transition-colors">
+              <i data-lucide="file-text" class="w-7 h-7 text-indigo-600 group-hover:text-white transition-colors"></i>
+            </div>
+            <h3 class="font-black text-slate-800 text-lg">Reportes</h3>
+            <p class="text-slate-500 text-xs mt-1">Gestión de incidencias y quejas de padres.</p>
+          </div>
+
+          <!-- Videoconferencia -->
+          <!-- CORREGIDO: Redirige a la sección videoconferencia -->
+          <div id="cardVideoconferencia" data-action="go-section" data-section="videoconferencia" class="bg-white p-6 rounded-3xl shadow-sm border border-slate-100 hover:shadow-md hover:-translate-y-1 active:scale-95 transition-all duration-300 text-left group cursor-pointer">
+            <div class="w-14 h-14 bg-rose-50 rounded-2xl flex items-center justify-center mb-4 group-hover:bg-rose-600 transition-colors">
+              <i data-lucide="video" class="w-7 h-7 text-rose-600 group-hover:text-white transition-colors"></i>
+            </div>
+            <h3 class="font-black text-slate-800 text-lg">Videoconferencia</h3>
+            <p class="text-slate-500 text-xs mt-1">Inicia clases en vivo para las aulas.</p>
+          </div>
+
+          <!-- Comunicaciones -->
+          <div id="cardComunicaciones" data-action="go-section" data-section="comunicacion" class="bg-white p-6 rounded-3xl shadow-sm border border-slate-100 hover:shadow-md hover:-translate-y-1 active:scale-95 transition-all duration-300 text-left group cursor-pointer relative">
+            <span id="badge-card-comunicacion" class="hidden absolute -top-2 -right-2 min-w-[22px] h-5 bg-rose-500 text-white text-[10px] font-black rounded-full flex items-center justify-center px-1.5 shadow-md animate-pulse z-10">0</span>
+            <div class="w-14 h-14 bg-blue-50 rounded-2xl flex items-center justify-center mb-4 group-hover:bg-blue-600 transition-colors">
+              <i data-lucide="message-square" class="w-7 h-7 text-blue-600 group-hover:text-white transition-colors"></i>
+            </div>
+            <h3 class="font-black text-slate-800 text-lg">Comunicaciones</h3>
+            <p class="text-slate-500 text-xs mt-1">Centro de mensajes con los padres.</p>
+          </div>
+
+          <!-- Muro Escolar -->
+          <div id="cardMuro" data-action="go-section" data-section="muro" class="bg-white p-6 rounded-3xl shadow-sm border border-slate-100 hover:shadow-md hover:-translate-y-1 active:scale-95 transition-all duration-300 text-left group cursor-pointer relative">
+            <span id="badge-card-muro" class="hidden absolute -top-2 -right-2 min-w-[22px] h-5 bg-rose-500 text-white text-[10px] font-black rounded-full flex items-center justify-center px-1.5 shadow-md animate-pulse z-10">0</span>
+            <div class="w-14 h-14 bg-purple-50 rounded-2xl flex items-center justify-center mb-4 group-hover:bg-purple-600 transition-colors">
+              <i data-lucide="layout" class="w-7 h-7 text-purple-600 group-hover:text-white transition-colors"></i>
+            </div>
+            <h3 class="font-black text-slate-800 text-lg">Muro Escolar</h3>
+            <p class="text-slate-500 text-xs mt-1">Publicaciones generales para la estancia.</p>
+          </div>
+
+          <!-- Sistema de Acceso -->
+          <div data-action="go-section" data-section="accesos" id="cardAcceso" class="bg-white p-6 rounded-3xl shadow-sm border border-slate-100 hover:shadow-md hover:-translate-y-1 active:scale-95 transition-all duration-300 text-left group cursor-pointer relative overflow-hidden block">
+            <div class="absolute top-0 right-0 w-24 h-24 bg-orange-500/5 rounded-full -mr-12 -mt-12 group-hover:bg-orange-500/10 transition-colors"></div>
+            <div class="w-14 h-14 bg-orange-50 rounded-2xl flex items-center justify-center mb-4 group-hover:bg-orange-500 transition-colors relative z-10">
+              <i data-lucide="qr-code" class="w-7 h-7 text-orange-600 group-hover:text-white transition-colors"></i>
+            </div>
+            <h3 class="font-black text-slate-800 text-lg relative z-10">Control de Accesos</h3>
+            <p class="text-slate-500 text-xs mt-1 relative z-10">Monitoreo de asistencia de personal y estudiantes en tiempo real.</p>
+          </div>
+
+          <!-- Permisos y Faltas -->
+          <div data-action="go-section" data-section="staff-permits" class="bg-white p-6 rounded-3xl shadow-sm border border-slate-100 hover:shadow-md hover:-translate-y-1 active:scale-95 transition-all duration-300 text-left group cursor-pointer relative overflow-hidden block">
+            <div class="absolute top-0 right-0 w-24 h-24 bg-emerald-500/5 rounded-full -mr-12 -mt-12 group-hover:bg-emerald-500/10 transition-colors"></div>
+            <div class="w-14 h-14 bg-emerald-50 rounded-2xl flex items-center justify-center mb-4 group-hover:bg-emerald-500 transition-colors relative z-10">
+              <i data-lucide="calendar-check" class="w-7 h-7 text-emerald-600 group-hover:text-white transition-colors"></i>
+            </div>
+            <h3 class="font-black text-slate-800 text-lg relative z-10">Permisos y Faltas</h3>
+            <p class="text-slate-500 text-xs mt-1 relative z-10">Gestión de ausencias, permisos médicos y faltas del personal.</p>
+          </div>
+        </div>
+
+      </section>
+
+      <!-- MAESTROS -->
+      <section id="maestros" class="section">
+        <!-- BLOQUE 1: Resumen Superior (KPIs Pequeños) -->
+        <div class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
+          <div class="bg-purple-100 text-purple-800 rounded-2xl p-4 shadow-sm flex items-center gap-3">
+            <div class="bg-white p-2 rounded-xl"><i data-lucide="users" class="w-5 h-5 text-purple-600"></i></div>
+            <div>
+              <p class="text-xs font-bold uppercase opacity-70">Total Personal</p>
+              <p class="text-xl font-black" id="kpiStaffTotal">-</p>
+            </div>
+          </div>
+          <div class="bg-green-100 text-green-800 rounded-2xl p-4 shadow-sm flex items-center gap-3">
+            <div class="bg-white p-2 rounded-xl"><i data-lucide="check-circle" class="w-5 h-5 text-green-600"></i></div>
+            <div>
+              <p class="text-xs font-bold uppercase opacity-70">Activos</p>
+              <p class="text-xl font-black" id="kpiStaffActive">-</p>
+            </div>
+          </div>
+          <div class="bg-blue-100 text-blue-800 rounded-2xl p-4 shadow-sm flex items-center gap-3">
+            <div class="bg-white p-2 rounded-xl"><i data-lucide="book-open" class="w-5 h-5 text-blue-600"></i></div>
+            <div>
+              <p class="text-xs font-bold uppercase opacity-70">En Aula</p>
+              <p class="text-xl font-black" id="kpiStaffInClass">-</p>
+            </div>
+          </div>
+          <div class="bg-orange-100 text-orange-800 rounded-2xl p-4 shadow-sm flex items-center gap-3">
+            <div class="bg-white p-2 rounded-xl"><i data-lucide="user-plus" class="w-5 h-5 text-orange-600"></i></div>
+            <div>
+              <p class="text-xs font-bold uppercase opacity-70">Asistentes</p>
+              <p class="text-xl font-black" id="kpiStaffAssistants">-</p>
+            </div>
+          </div>
+        </div>
+
+        <!-- BLOQUE 2: Filtros Modernos -->
+        <div class="bg-white rounded-2xl shadow-md p-4 mb-8 flex flex-col md:flex-row gap-4 items-center justify-between">
+          <div class="flex items-center gap-3 w-full md:w-auto">
+            <div class="relative w-full md:w-64">
+              <i data-lucide="search" class="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400"></i>
+              <input id="searchTeacher" placeholder="Buscar por nombre..." class="pl-10 pr-4 py-2.5 border border-slate-200 rounded-xl text-sm w-full focus:ring-2 focus:ring-purple-500 outline-none bg-slate-50 focus:bg-white transition-all">
+            </div>
+          </div>
+          <div class="flex gap-3 w-full md:w-auto justify-end">
+            <button id="btnAddAssistant" class="px-4 py-2.5 bg-indigo-100 text-indigo-700 hover:bg-indigo-200 rounded-xl text-sm font-bold transition-colors flex items-center gap-2">
+              <i data-lucide="user-plus" class="w-4 h-4"></i> Asistente
+            </button>
+            <button onclick="App.teachers.openModal()" class="px-4 py-2.5 bg-purple-600 text-white hover:bg-purple-700 rounded-xl text-sm font-bold shadow-md hover:shadow-lg transition-all flex items-center gap-2">
+              <i data-lucide="plus" class="w-4 h-4"></i> Nuevo Maestro
+            </button>
+          </div>
+        </div>
+
+        <!-- BLOQUE 3: Tabla de Maestros y Asistentes -->
+        <div class="bg-white rounded-2xl shadow-md border border-slate-100 p-6">
+          <div class="table-scroll-wrap rounded-2xl border border-slate-200">
+            <table class="data-table">
+              <thead class="bg-slate-50 text-slate-500 font-black uppercase text-[10px] tracking-wider">
+                <tr>
+                  <th>Nombre</th>
+                  <th>Correo</th>
+                  <th>Aula Asignada</th>
+                  <th>Rol</th>
+                  <th class="text-right">Acciones</th>
+                </tr>
+              </thead>
+              <tbody id="teachersTableBody">
+                <!-- Filas inyectadas por JS -->
+              </tbody>
+            </table>
+          </div>
+          <div id="teachersEmptyState" class="hidden text-center py-12">
+            <div class="w-16 h-16 bg-slate-100 rounded-full flex items-center justify-center mx-auto mb-3"><i data-lucide="users" class="w-8 h-8 text-slate-400"></i></div>
+            <h3 class="text-slate-600 font-bold">No hay personal registrado</h3>
+            <p class="text-slate-400 text-sm">Comienza agregando maestros o asistentes.</p>
+          </div>
+        </div>
+
+      </section>
+
+      <!-- PERMISOS Y FALTAS -->
+      <section id="staff-permits" class="section">
+        <div class="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-6">
+          <div>
+            <h1 class="text-2xl font-black text-slate-800 tracking-tight flex items-center gap-3">
+              <span class="p-2 bg-emerald-100 text-emerald-600 rounded-2xl"><i data-lucide="calendar-check" class="w-5 h-5"></i></span>
+              Gestión de Permisos y Faltas
+            </h1>
+            <p class="text-slate-500 text-sm font-medium mt-0.5">Historial y aprobación de ausencias del personal</p>
+          </div>
+          <div class="flex gap-2">
+            <button onclick="App.permits.loadHistory()" class="px-4 py-2.5 bg-slate-100 text-slate-600 rounded-xl font-bold text-xs uppercase hover:bg-slate-200 transition-all flex items-center gap-2">
+              <i data-lucide="refresh-cw" class="w-4 h-4"></i> Actualizar
+            </button>
+          </div>
+        </div>
+
+        <div class="grid grid-cols-1 lg:grid-cols-4 gap-6 mb-8">
+          <div class="bg-white p-6 rounded-3xl border border-slate-100 shadow-sm col-span-1 lg:col-span-3">
+            <div class="flex items-center justify-between mb-6">
+              <h3 class="text-xs font-black text-slate-400 uppercase tracking-widest">Solicitudes Recientes</h3>
+              <div class="flex gap-2">
+                <select id="permitFilterStatus" class="px-3 py-1.5 bg-slate-50 border-none rounded-lg text-[10px] font-black uppercase text-slate-500 outline-none">
+                  <option value="all">Todos</option>
+                  <option value="pending" selected>Pendientes</option>
+                  <option value="approved">Aprobados</option>
+                  <option value="rejected">Rechazados</option>
+                </select>
+              </div>
+            </div>
+            
+            <div class="table-scroll-wrap">
+              <table class="w-full text-left">
+                <thead>
+                  <tr class="bg-slate-50 border-b border-slate-100 text-slate-400">
+                    <th class="px-6 py-4 text-[10px] font-black uppercase tracking-widest">Maestra</th>
+                    <th class="px-6 py-4 text-[10px] font-black uppercase tracking-widest">Tipo</th>
+                    <th class="px-6 py-4 text-[10px] font-black uppercase tracking-widest">Fecha</th>
+                    <th class="px-6 py-4 text-[10px] font-black uppercase tracking-widest">Estado</th>
+                    <th class="px-6 py-4 text-[10px] font-black uppercase tracking-widest text-right">Acciones</th>
+                  </tr>
+                </thead>
+                <tbody id="permits-table-body" class="divide-y divide-slate-50">
+                  <!-- JS -->
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+          <div class="space-y-4">
+            <div class="bg-emerald-600 p-6 rounded-3xl text-white shadow-lg shadow-emerald-100">
+              <p class="text-[10px] font-black uppercase opacity-70 mb-1">Permisos Hoy</p>
+              <p class="text-4xl font-black" id="statPermitsToday">0</p>
+            </div>
+            <div class="bg-amber-500 p-6 rounded-3xl text-white shadow-lg shadow-amber-100">
+              <p class="text-[10px] font-black uppercase opacity-70 mb-1">Pendientes</p>
+              <p class="text-4xl font-black" id="statPermitsPending">0</p>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- VIDEOCONFERENCIA -->
+      <section id="videoconferencia" class="section">
+        <div id="videocall-directora-section" class="min-h-[60vh]">
+          <div class="flex justify-center py-12">
+            <div class="animate-spin w-8 h-8 border-2 border-rose-500 rounded-full border-t-transparent"></div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ESTUDIANTES -->
+      <section id="estudiantes" class="section">
+        <!-- BLOQUE 1 — KPIs Superiores -->
+        <div class="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-6 gap-4 mb-6">
+          <div class="bg-purple-100 text-purple-700 rounded-2xl p-4 shadow-sm">
+            <div class="text-xs font-bold uppercase opacity-70">Total estudiantes</div>
+            <div class="text-2xl font-black" id="totalStudents">-</div>
+          </div>
+          <div class="bg-emerald-100 text-emerald-600 rounded-2xl p-4 shadow-sm">
+            <div class="text-xs font-bold uppercase opacity-70">Activos</div>
+            <div class="text-2xl font-black" id="activeStudents">-</div>
+          </div>
+          <div class="bg-sky-100 text-sky-600 rounded-2xl p-4 shadow-sm">
+            <div class="text-xs font-bold uppercase opacity-70">Por aulas</div>
+            <div class="text-2xl font-black" id="classroomsCount">-</div>
+          </div>
+        </div>
+
+        <!-- BLOQUE 2 — Filtros -->
+        <div class="bg-white rounded-2xl shadow-md p-4 flex flex-wrap gap-3 items-center mb-6">
+          <div class="relative w-full md:w-64">
+            <i data-lucide="search" class="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400"></i>
+            <input id="searchStudent" placeholder="Buscar estudiante..." class="pl-10 pr-3 py-2.5 border border-slate-200 rounded-xl text-sm w-full focus:ring-2 focus:ring-purple-500 outline-none bg-slate-50 focus:bg-white" />
+          </div>
+          <div class="ml-auto flex items-center gap-2">
+            <button id="btnCarnets" onclick="App.carnets.openModal()" class="px-3 py-2 bg-green-50 text-green-700 border border-green-200 rounded-xl text-sm hover:bg-green-100 font-bold flex items-center gap-2">
+              <i data-lucide="badge-check" class="w-4 h-4"></i> Carnets
+            </button>
+            <button id="btnExportStudents" class="px-3 py-2 bg-green-100 text-green-700 border border-green-200 rounded-xl text-sm hover:bg-green-200 font-bold flex items-center gap-2">
+              <i data-lucide="sheet" class="w-4 h-4"></i> Excel
+            </button>
+            <button id="btnAddStudent" class="bg-purple-600 hover:bg-purple-700 text-white rounded-xl px-4 py-2 shadow-md flex items-center gap-2">
+              <i data-lucide="user-plus" class="w-4 h-4"></i> Nuevo Estudiante
+            </button>
+          </div>
+        </div>
+
+        <!-- BLOQUE 3 — Grid/List de Estudiantes -->
+        <div id="studentsGrid" class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
+          <!-- Cards inyectadas por JS -->
+        </div>
+        <div id="studentsTableWrapper" class="hidden bg-white rounded-3xl shadow-sm border border-slate-100 overflow-hidden">
+          <table class="w-full text-left border-collapse">
+            <thead>
+              <tr class="bg-slate-50/50 border-b border-slate-100">
+                <th class="p-4 text-[10px] font-black text-slate-400 uppercase tracking-widest">Estudiante</th>
+                <th class="p-4 text-[10px] font-black text-slate-400 uppercase tracking-widest">Aula</th>
+                <th class="p-4 text-[10px] font-black text-slate-400 uppercase tracking-widest text-right">Acciones</th>
+              </tr>
+            </thead>
+            <tbody id="studentsTable"><!-- JS --></tbody>
+          </table>
+        </div>
+      </section>
+
+      <!-- INSCRIPCIONES -->
+      <section id="inscripciones" class="section">
+        <div class="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-6">
+          <div>
+            <h2 class="text-2xl font-bold text-slate-800">Inscripciones y Preinscripciones</h2>
+            <p class="text-slate-500 text-sm">Solicitudes recibidas desde el formulario público</p>
+          </div>
+          <button onclick="window.open('preinscripcion.html', '_blank')" class="px-4 py-2.5 bg-gradient-to-r from-emerald-600 to-teal-600 text-white rounded-xl shadow-md font-black text-xs uppercase tracking-widest flex items-center gap-2">
+            <i data-lucide="external-link" class="w-4 h-4"></i> Formulario público
+          </button>
+        </div>
+
+        <!-- BLOQUE 1 — KPIs -->
+        <div class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
+          <div class="bg-purple-100 text-purple-700 rounded-2xl p-4 shadow-sm">
+            <div class="text-xs font-bold uppercase opacity-70">Total solicitudes</div>
+            <div class="text-2xl font-black" id="inscTotal">-</div>
+          </div>
+          <div class="bg-amber-100 text-amber-700 rounded-2xl p-4 shadow-sm">
+            <div class="text-xs font-bold uppercase opacity-70">Pendientes</div>
+            <div class="text-2xl font-black" id="inscPending">-</div>
+          </div>
+          <div class="bg-emerald-100 text-emerald-700 rounded-2xl p-4 shadow-sm">
+            <div class="text-xs font-bold uppercase opacity-70">Inscritas</div>
+            <div class="text-2xl font-black" id="inscInscribed">-</div>
+          </div>
+          <div class="bg-rose-100 text-rose-600 rounded-2xl p-4 shadow-sm">
+            <div class="text-xs font-bold uppercase opacity-70">Rechazadas</div>
+            <div class="text-2xl font-black" id="inscRejected">-</div>
+          </div>
+        </div>
+
+        <!-- BLOQUE 2 — Filtros -->
+        <div class="bg-white rounded-2xl shadow-md p-4 flex flex-wrap gap-3 items-center mb-6">
+          <div class="relative w-full md:w-72">
+            <i data-lucide="search" class="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400"></i>
+            <input id="searchPrereg" placeholder="Buscar por nombre, tutor, teléfono..." class="pl-10 pr-3 py-2.5 border border-slate-200 rounded-xl text-sm w-full focus:ring-2 focus:ring-purple-500 outline-none bg-slate-50 focus:bg-white" />
+          </div>
+          <select id="filterPrereg" class="px-3 py-2.5 border border-slate-200 rounded-xl text-sm font-bold bg-slate-50 focus:ring-2 focus:ring-purple-500 outline-none">
+            <option value="pending">Pendientes</option>
+            <option value="all">Todas</option>
+            <option value="reviewing">En revisión</option>
+            <option value="converted">Inscritas</option>
+            <option value="rejected">Rechazadas</option>
+            <option value="expired">Expiradas</option>
+          </select>
+        </div>
+
+        <!-- BLOQUE 3 — Lista -->
+        <div id="preregList" class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
+          <!-- Cards inyectadas por JS -->
+        </div>
+      </section>
+
+      <!-- AULAS -->
+      <section id="aulas" class="section">
+        <!-- Encabezado y acciones -->
+        <div class="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-6">
+          <div>
+            <h2 class="text-2xl font-bold text-slate-800">Centro Académico</h2>
+            <p class="text-slate-500 text-sm">Vista moderna de aulas con métricas en tiempo real</p>
+          </div>
+          <div class="flex gap-3">
+            <button id="btnAddRoom" onclick="App.rooms.openModal()" class="px-4 py-2.5 bg-purple-600 text-white rounded-xl hover:bg-purple-700 flex items-center gap-2 shadow-md">
+              <i data-lucide="plus" class="w-4 h-4"></i>
+              Nueva Aula
+            </button>
+          </div>
+        </div>
+
+        <!-- BLOQUE 1 – Tabla de Aulas (sin cambios) -->
+        <div class="bg-white rounded-3xl shadow-sm border border-slate-100 overflow-hidden mb-8">
+          <table class="w-full text-sm">
+            <thead class="bg-slate-50 text-left text-xs font-bold uppercase tracking-wider text-slate-600">
+              <tr>
+                <th class="py-4 px-6">Nombre del Aula</th>
+                <th class="py-4 px-6">Maestra Asignada</th>
+                <th class="py-4 px-6">Ocupación / Capacidad</th>
+                <th class="py-4 px-6 text-center">Acciones</th>
+              </tr>
+            </thead>
+            <tbody id="roomsTable" class="divide-y divide-slate-100">
+              <!-- Inyectado por JS -->
+            </tbody>
+          </table> 
+        </div>
+
+        <!-- BLOQUE 2 – Panel Interno del Aula (Opcional, mantenido para detalle) -->
+        <div id="classroomPanel" class="hidden mt-8">
+          <div class="bg-white rounded-3xl shadow-md border border-slate-100 overflow-hidden">
+            <div class="p-6 bg-gradient-to-r from-purple-600 to-indigo-600 text-white flex items-center justify-between">
+              <div class="flex items-center gap-4">
+                <img id="cpTeacherPhoto" src="img/1.jpg" class="w-14 h-14 rounded-2xl object-cover border-2 border-white/30" alt="Maestro" />
+                <div>
+                  <div class="text-xl font-bold" id="cpClassName">Aula</div>
+                  <div class="text-sm text-white/80">Maestro: <span id="cpTeacherName">—</span> • Alumnos: <span id="cpTotal">0</span></div>
+                </div>
+              </div>
+              <div class="text-right">
+                <div class="text-xs uppercase tracking-wider text-white/70">Alumnos activos</div>
+                <div class="text-2xl font-black" id="cpAverage">-</div>
+              </div>
+            </div>
+
+            <div class="px-6 pb-6 pt-4">
+              <h4 class="text-sm font-semibold text-slate-700 mb-3">Historial por alumno</h4>
+              <div id="cpStudentHistory" class="grid grid-cols-1 md:grid-cols-2 gap-3">
+                <!-- Inyectado por JS -->
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ASISTENCIA -->
+      <section id="asistencia" class="section">
+
+        <!-- Header -->
+        <div class="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-6">
+          <div>
+            <h1 class="text-2xl font-black text-slate-800 tracking-tight flex items-center gap-2">
+              <span class="w-9 h-9 bg-indigo-100 text-indigo-600 rounded-xl flex items-center justify-center"><i data-lucide="calendar-check" class="w-5 h-5"></i></span>
+              Control de Asistencia
+            </h1>
+            <p class="text-slate-400 text-sm font-medium mt-0.5">Seguimiento diario y por periodo de todos los estudiantes</p>
+          </div>
+          <div class="flex items-center gap-2">
+            <div id="attSpinner" class="hidden w-5 h-5 border-2 border-indigo-600 border-t-transparent rounded-full animate-spin"></div>
+            <button id="btnAttExport" class="flex items-center gap-2 px-4 py-2.5 bg-emerald-600 text-white rounded-xl font-black text-xs uppercase tracking-wider hover:bg-emerald-700 shadow-sm transition-all">
+              <i data-lucide="download" class="w-4 h-4"></i> Exportar CSV
+            </button>
+          </div>
+        </div>
+
+        <!-- Mode Tabs -->
+        <div class="flex gap-1 bg-slate-100 p-1 rounded-xl w-fit mb-6">
+          <button data-att-mode="day" class="active-att-tab px-5 py-2 rounded-lg text-xs font-black uppercase tracking-wider transition-all">
+            <i data-lucide="calendar" class="w-3.5 h-3.5 inline mr-1"></i>Por Día
+          </button>
+          <button data-att-mode="range" class="px-5 py-2 rounded-lg text-xs font-black uppercase tracking-wider transition-all text-slate-500 hover:text-slate-700">
+            <i data-lucide="calendar-range" class="w-3.5 h-3.5 inline mr-1"></i>Por Periodo
+          </button>
+        </div>
+
+        <!-- Day picker -->
+        <div id="attPanelDay" class="mb-5">
+          <div class="flex items-center gap-3 flex-wrap">
+            <label class="text-xs font-black text-slate-400 uppercase tracking-wider">Fecha</label>
+            <input type="date" id="attDateSingle" class="px-4 py-2 border-2 border-slate-100 rounded-xl text-sm font-bold bg-white focus:border-indigo-400 focus:ring-4 focus:ring-indigo-50 outline-none transition-all">
+          </div>
+        </div>
+
+        <!-- Range picker -->
+        <div id="attPanelRange" class="hidden mb-5">
+          <div class="flex items-center gap-3 flex-wrap">
+            <label class="text-xs font-black text-slate-400 uppercase tracking-wider">Desde</label>
+            <input type="date" id="attDateFrom" class="px-4 py-2 border-2 border-slate-100 rounded-xl text-sm font-bold bg-white focus:border-indigo-400 focus:ring-4 focus:ring-indigo-50 outline-none transition-all">
+            <label class="text-xs font-black text-slate-400 uppercase tracking-wider">Hasta</label>
+            <input type="date" id="attDateTo"   class="px-4 py-2 border-2 border-slate-100 rounded-xl text-sm font-bold bg-white focus:border-indigo-400 focus:ring-4 focus:ring-indigo-50 outline-none transition-all">
+          </div>
+        </div>
+
+        <!-- KPI Cards -->
+        <div class="grid grid-cols-2 md:grid-cols-5 gap-3 mb-6">
+          <div class="bg-white rounded-2xl p-4 border border-slate-100 shadow-sm">
+            <p class="text-[10px] font-black text-slate-400 uppercase tracking-wider mb-1">Total</p>
+            <p class="text-2xl font-black text-slate-800" id="attKpiTotal">—</p>
+          </div>
+          <div class="bg-emerald-50 rounded-2xl p-4 border border-emerald-100 shadow-sm">
+            <p class="text-[10px] font-black text-emerald-500 uppercase tracking-wider mb-1">Presentes</p>
+            <p class="text-2xl font-black text-emerald-700" id="attKpiPresent">—</p>
+          </div>
+          <div class="bg-rose-50 rounded-2xl p-4 border border-rose-100 shadow-sm">
+            <p class="text-[10px] font-black text-rose-500 uppercase tracking-wider mb-1">Ausentes</p>
+            <p class="text-2xl font-black text-rose-700" id="attKpiAbsent">—</p>
+          </div>
+          <div class="bg-amber-50 rounded-2xl p-4 border border-amber-100 shadow-sm">
+            <p class="text-[10px] font-black text-amber-500 uppercase tracking-wider mb-1">Tardanzas</p>
+            <p class="text-2xl font-black text-amber-700" id="attKpiLate">—</p>
+          </div>
+          <div class="bg-indigo-50 rounded-2xl p-4 border border-indigo-100 shadow-sm col-span-2 md:col-span-1">
+            <p class="text-[10px] font-black text-indigo-500 uppercase tracking-wider mb-1">Tasa Asistencia</p>
+            <p class="text-2xl font-black text-indigo-700" id="attKpiRate">—</p>
+            <div class="mt-2 h-1.5 bg-indigo-100 rounded-full overflow-hidden">
+              <div id="attRateBar" class="h-full bg-indigo-500 rounded-full transition-all duration-500" style="width:0%"></div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Charts + Table layout -->
+        <div class="grid grid-cols-1 lg:grid-cols-3 gap-5 mb-5">
+          <!-- Donut -->
+          <div class="bg-white rounded-2xl p-5 border border-slate-100 shadow-sm">
+            <h3 class="text-xs font-black text-slate-500 uppercase tracking-wider mb-4">Distribución</h3>
+            <div class="h-52"><canvas id="attDonutChart"></canvas></div>
+          </div>
+          <!-- Bar por aula (solo rango) -->
+          <div id="attBarWrap" class="hidden bg-white rounded-2xl p-5 border border-slate-100 shadow-sm lg:col-span-2">
+            <h3 class="text-xs font-black text-slate-500 uppercase tracking-wider mb-4">Asistencia por Aula</h3>
+            <div class="h-52"><canvas id="attBarChart"></canvas></div>
+          </div>
+        </div>
+
+        <!-- Filters row -->
+        <div class="bg-white rounded-2xl border border-slate-100 shadow-sm overflow-hidden">
+          <div class="flex flex-wrap gap-3 p-4 border-b border-slate-100">
+            <div class="flex-1 min-w-[180px] relative">
+              <i data-lucide="search" class="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400"></i>
+              <input id="attSearch" type="text" placeholder="Buscar estudiante..." class="w-full pl-9 pr-4 py-2 border-2 border-slate-100 rounded-xl text-sm font-medium bg-slate-50 focus:border-indigo-400 focus:ring-4 focus:ring-indigo-50 outline-none transition-all">
+            </div>
+            <select id="attFilterRoom" class="px-4 py-2 border-2 border-slate-100 rounded-xl text-sm font-bold bg-slate-50 focus:border-indigo-400 outline-none transition-all">
+              <option value="">Todas las aulas</option>
+            </select>
+            <select id="attFilterStatus" class="px-4 py-2 border-2 border-slate-100 rounded-xl text-sm font-bold bg-slate-50 focus:border-indigo-400 outline-none transition-all">
+              <option value="">Todos los estados</option>
+              <option value="present">Presente</option>
+              <option value="absent">Ausente</option>
+              <option value="late">Tardanza</option>
+            </select>
+          </div>
+
+          <!-- Table -->
+          <div class="table-scroll-wrap">
+            <table class="w-full" style="min-width:560px;">
+              <thead id="attTableHead">
+                <tr class="bg-slate-50 border-b border-slate-100">
+                  <th class="px-5 py-3 text-left text-[10px] font-black text-slate-400 uppercase tracking-wider">Estudiante</th>
+                  <th class="px-5 py-3 text-center text-[10px] font-black text-slate-400 uppercase tracking-wider">Estado</th>
+                  <th class="px-5 py-3 text-center text-[10px] font-black text-slate-400 uppercase tracking-wider">Fecha</th>
+                  <th class="px-5 py-3 text-center text-[10px] font-black text-slate-400 uppercase tracking-wider">Entrada</th>
+                  <th class="px-5 py-3 text-center text-[10px] font-black text-slate-400 uppercase tracking-wider">Salida</th>
+                </tr>
+              </thead>
+              <tbody id="attTableBody">
+                <tr><td colspan="5" class="text-center py-10 text-slate-400 text-sm">Cargando...</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+      </section>
+
+      <!-- CALIFICACIONES V2 -->
+      <section id="calificaciones" class="section">
+        <!-- Header -->
+        <div class="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-8">
+          <div>
+            <h1 class="text-3xl font-bold text-slate-800 tracking-tight">Centro de Calificaciones</h1>
+            <p class="text-slate-500 font-medium">Actividades evaluables y promedios por materia.</p>
+          </div>
+          <div class="flex gap-2 flex-wrap items-center">
+            <div class="flex bg-slate-100 rounded-xl p-1 mr-2">
+              <button id="btnGradesConfig" class="px-4 py-2 bg-indigo-600 text-white rounded-xl font-black text-xs uppercase shadow-md transition-all">
+                Configuración
+              </button>
+              <button id="btnGradesView" class="px-4 py-2 bg-slate-100 text-slate-500 rounded-xl font-black text-xs uppercase hover:bg-slate-200 transition-all">
+                Calificaciones
+              </button>
+            </div>
+            <button id="btnNewPeriod" class="px-5 py-2.5 bg-indigo-600 text-white rounded-xl font-black text-xs uppercase tracking-wider hover:bg-indigo-700 shadow-lg shadow-indigo-200 transition-all flex items-center gap-2 active:scale-95">
+              <i data-lucide="calendar-plus" class="w-4 h-4"></i> Nuevo Periodo
+            </button>
+            <button id="btnClosePeriod" class="px-5 py-2.5 bg-rose-600 text-white rounded-xl font-black text-xs uppercase tracking-wider hover:bg-rose-700 shadow-lg shadow-rose-200 transition-all items-center gap-2 active:scale-95" style="display:none;">
+              <i data-lucide="lock" class="w-4 h-4"></i> Cerrar Periodo
+            </button>
+            <button id="btnExportGrades" class="px-5 py-2.5 bg-emerald-600 text-white rounded-xl font-black text-xs uppercase tracking-wider hover:bg-emerald-700 shadow-lg shadow-emerald-200 transition-all flex items-center gap-2 active:scale-95">
+              <i data-lucide="download" class="w-4 h-4"></i> Exportar
+            </button>
+          </div>
+        </div>
+
+        <!-- KPIs -->
+        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
+          <div class="bg-blue-50 p-4 rounded-2xl border border-blue-100 shadow-sm">
+            <div class="flex items-center gap-3 mb-2"><div class="p-2 bg-blue-100 rounded-lg text-blue-600"><i data-lucide="book-open" class="w-5 h-5"></i></div><span class="text-xs font-bold text-blue-600 uppercase tracking-wider">Materias Config.</span></div>
+            <p class="text-2xl font-black text-slate-800" id="kpiAvgGrade">0</p>
+          </div>
+          <div class="bg-green-50 p-4 rounded-2xl border border-green-100 shadow-sm">
+            <div class="flex items-center gap-3 mb-2"><div class="p-2 bg-green-100 rounded-lg text-green-600"><i data-lucide="list-checks" class="w-5 h-5"></i></div><span class="text-xs font-bold text-green-600 uppercase tracking-wider">Actividades</span></div>
+            <p class="text-2xl font-black text-slate-800" id="kpiApprovalRate">0</p>
+          </div>
+          <div class="bg-yellow-50 p-4 rounded-2xl border border-yellow-100 shadow-sm">
+            <div class="flex items-center gap-3 mb-2"><div class="p-2 bg-yellow-100 rounded-lg text-yellow-600"><i data-lucide="users" class="w-5 h-5"></i></div><span class="text-xs font-bold text-yellow-600 uppercase tracking-wider">Estudiantes</span></div>
+            <p class="text-2xl font-black text-slate-800" id="kpiNeedsSupport">0</p>
+          </div>
+          <div class="bg-red-50 p-4 rounded-2xl border border-red-100 shadow-sm">
+            <div class="flex items-center gap-3 mb-2"><div class="p-2 bg-red-100 rounded-lg text-red-600"><i data-lucide="target" class="w-5 h-5"></i></div><span class="text-xs font-bold text-red-600 uppercase tracking-wider">Slots Totales</span></div>
+            <p class="text-2xl font-black text-slate-800" id="kpiLowGrades">0</p>
+          </div>
+        </div>
+
+        <!-- Tabla Principal -->
+        <div class="bg-white rounded-2xl shadow-md border border-slate-100 p-6">
+          <div class="flex flex-col md:flex-row justify-between items-center gap-4 mb-6">
+            <h3 class="text-lg font-bold text-slate-800 flex items-center gap-2 w-full md:w-auto">
+              <span class="w-2 h-6 bg-blue-600 rounded-full"></span>
+              Configuración del Periodo
+            </h3>
+            <div class="flex flex-wrap gap-3 w-full md:w-auto">
+              <select id="gradesFilterPeriod" class="px-3 py-2 border rounded-xl text-sm bg-slate-50 font-bold text-slate-700 outline-none focus:ring-2 focus:ring-indigo-400">
+                <option value="">Seleccionar periodo</option>
+              </select>
+              <div class="relative flex-1 md:w-56">
+                <i data-lucide="search" class="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400"></i>
+                <input id="searchGradeStudent" placeholder="Buscar estudiante..." class="pl-10 pr-4 py-2 border rounded-xl text-sm w-full bg-slate-50 focus:bg-white transition-all outline-none focus:ring-2 focus:ring-indigo-400">
+              </div>
+              <select id="gradesFilterClassroom" class="px-3 py-2 border rounded-xl text-sm bg-slate-50 font-bold text-slate-700 outline-none focus:ring-2 focus:ring-indigo-400">
+                <option value="all">Todas las aulas</option>
+              </select>
+            </div>
+          </div>
+
+          <div class="table-scroll-wrap rounded-2xl border border-slate-200">
+            <table class="w-full text-sm text-left border-separate border-spacing-0" style="min-width:600px;">
+              <thead class="bg-slate-50 text-slate-500 font-black uppercase text-[10px] tracking-wider sticky top-0 z-10">
+                <tr>
+                  <th class="px-6 py-4 border-b border-slate-200">Materia / Estudiante</th>
+                  <th class="px-6 py-4 text-center border-b border-slate-200">Actividades</th>
+                  <th class="px-6 py-4 text-center border-b border-slate-200">Estado</th>
+                  <th class="px-6 py-4 text-center border-b border-slate-200">Acciones</th>
+                  <th class="px-6 py-4 border-b border-slate-200"></th>
+                </tr>
+              </thead>
+              <tbody id="gradesTableBody" class="divide-y divide-slate-100 bg-white">
+                <tr><td colspan="5" class="text-center py-10 text-slate-400">Selecciona un periodo para comenzar</td></tr>
+              </tbody>
+            </table>
+          </div>
+          <p class="text-[10px] text-slate-400 mt-4 italic">💡 Configura las materias y cantidad de actividades por periodo. La maestra calificará del 0 al 100.</p>
+        </div>
+      </section>
+
+      <!-- INCIDENCIAS (Reportes y Quejas) -->
+      <section id="reportes" class="section">
+        <div class="flex items-center justify-between mb-6">
+          <div>
+            <h2 class="text-2xl font-bold text-slate-800 flex items-center gap-2">
+              <i data-lucide="alert-triangle" class="w-6 h-6 text-pink-600"></i>
+              Sistema Formal de Incidencias
+            </h2>
+            <p class="text-slate-500 text-sm">Gestione quejas con estados, prioridad, adjuntos y respuesta oficial</p>
+          </div>
+          <button id="create-report-btn" class="flex items-center gap-2 px-4 py-2.5 bg-pink-600 text-white rounded-xl font-black text-xs uppercase tracking-wider hover:bg-pink-700 shadow-sm transition-all">
+            <i data-lucide="plus" class="w-4 h-4"></i> Nuevo Reporte
+          </button>
+        </div>
+
+        <!-- Filtros -->
+        <div class="flex flex-wrap gap-3 mb-6">
+          <select id="filter-report-status" class="px-3 py-2 border border-slate-200 rounded-xl text-sm bg-slate-50 font-bold text-slate-700 outline-none focus:ring-2 focus:ring-pink-400">
+            <option value="">Todos los estados</option>
+            <option value="pending">⏳ Pendiente</option>
+            <option value="in_progress">🔄 En Proceso</option>
+            <option value="resolved">✅ Resuelto</option>
+            <option value="escalated">⚠️ Escalado</option>
+            <option value="closed">📦 Cerrado</option>
+          </select>
+          <select id="filter-report-severity" class="px-3 py-2 border border-slate-200 rounded-xl text-sm bg-slate-50 font-bold text-slate-700 outline-none focus:ring-2 focus:ring-pink-400">
+            <option value="">Todas las severidades</option>
+            <option value="low">🔵 Baja</option>
+            <option value="medium">🟡 Media</option>
+            <option value="high">🟠 Alta</option>
+            <option value="critical">🔴 Crítica</option>
+          </select>
+          <select id="filter-report-type" class="px-3 py-2 border border-slate-200 rounded-xl text-sm bg-slate-50 font-bold text-slate-700 outline-none focus:ring-2 focus:ring-pink-400">
+            <option value="">Todos los tipos</option>
+            <option value="teacher">👨‍🏫 Maestros</option>
+            <option value="parent">👨‍👩‍👧 Padres</option>
+          </select>
+        </div>
+
+        <div id="reports-container" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6"></div>
+      </section>
+
+      <!-- SECCIÓN DE ACCESOS — QRs de Estudiantes -->
+      <section id="accesos" class="section">
+        <div class="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-6">
+          <div>
+            <h1 class="text-2xl font-black text-slate-800 tracking-tight flex items-center gap-3">
+              <span class="p-2 bg-orange-100 text-orange-600 rounded-2xl"><i data-lucide="user-check" class="w-5 h-5"></i></span>
+              Monitoreo de Asistencia en Vivo
+            </h1>
+            <p class="text-slate-500 text-sm font-medium mt-0.5">Seguimiento de puntualidad del personal y estudiantes</p>
+          </div>
+          <div class="flex gap-2 flex-wrap">
+            <button id="btnExportAccessReport" class="px-4 py-2.5 bg-slate-800 text-white rounded-xl font-black text-[10px] uppercase tracking-wider hover:bg-slate-900 transition-all flex items-center gap-2">
+              <i data-lucide="file-text" class="w-4 h-4"></i> Reporte Diario
+            </button>
+            <button id="btnIntelligentReport" class="px-4 py-2.5 bg-rose-600 text-white rounded-xl font-black text-[10px] uppercase tracking-wider hover:bg-rose-700 transition-all flex items-center gap-2 shadow-lg shadow-rose-100">
+              <i data-lucide="zap" class="w-4 h-4"></i> Reporte No Reportados
+            </button>
+          </div>
+        </div>
+
+        <!-- FILTROS PROFESIONALES -->
+        <div class="bg-white p-4 rounded-3xl border border-slate-100 shadow-sm mb-6 flex flex-wrap gap-4 items-end">
+          <div class="flex-1 min-w-[200px]">
+            <label class="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1.5 ml-1">Buscar por nombre</label>
+            <div class="relative">
+              <i data-lucide="search" class="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400"></i>
+              <input id="accessSearch" type="text" placeholder="Ej: Juan Perez..." class="w-full pl-9 pr-4 py-2.5 bg-slate-50 border-2 border-slate-50 rounded-2xl outline-none focus:border-orange-400 focus:bg-white transition-all text-sm font-bold">
+            </div>
+          </div>
+          <div class="w-full md:w-auto">
+            <label class="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1.5 ml-1">Desde</label>
+            <input id="accessDateFrom" type="date" class="px-4 py-2.5 bg-slate-50 border-2 border-slate-50 rounded-2xl outline-none focus:border-orange-400 focus:bg-white transition-all text-sm font-bold">
+          </div>
+          <div class="w-full md:w-auto">
+            <label class="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1.5 ml-1">Hasta</label>
+            <input id="accessDateTo" type="date" class="px-4 py-2.5 bg-slate-50 border-2 border-slate-50 rounded-2xl outline-none focus:border-orange-400 focus:bg-white transition-all text-sm font-bold">
+          </div>
+        </div>
+
+        <!-- Visualización Gráfica -->
+        <div class="grid grid-cols-1 lg:grid-cols-4 gap-6 mb-8">
+          <div class="lg:col-span-3 bg-white p-6 rounded-[2.5rem] border border-slate-100 shadow-sm">
+            <h3 class="text-xs font-black text-slate-400 uppercase tracking-widest mb-6">Tendencia de Entradas en el Periodo</h3>
+            <div class="h-64">
+              <canvas id="accessChart"></canvas>
+            </div>
+          </div>
+          <div class="space-y-4">
+            <div class="bg-indigo-600 p-6 rounded-3xl text-white shadow-lg shadow-indigo-100">
+              <p class="text-[10px] font-black uppercase opacity-70 mb-1">Personal en Estancia</p>
+              <p class="text-4xl font-black" id="statStaffIn">0</p>
+            </div>
+            <div class="bg-emerald-500 p-6 rounded-3xl text-white shadow-lg shadow-emerald-100">
+              <p class="text-[10px] font-black uppercase opacity-70 mb-1">Alumnos en Estancia</p>
+              <p class="text-4xl font-black" id="statStudentsIn">0</p>
+            </div>
+          </div>
+        </div>
+
+        <!-- TABLA DE ACCESOS -->
+        <div class="bg-white rounded-[2.5rem] border border-slate-100 shadow-sm overflow-hidden mb-12">
+          <div class="table-scroll-wrap">
+            <table class="w-full text-left">
+              <thead>
+                <tr class="bg-slate-50 border-b border-slate-100 text-slate-400">
+                  <th class="px-6 py-4 text-[10px] font-black uppercase tracking-widest">Nombre</th>
+                  <th class="px-6 py-4 text-[10px] font-black uppercase tracking-widest">Rol / Aula</th>
+                  <th class="px-6 py-4 text-[10px] font-black uppercase tracking-widest text-center">Entrada</th>
+                  <th class="px-6 py-4 text-[10px] font-black uppercase tracking-widest text-center">Salida</th>
+                  <th class="px-6 py-4 text-[10px] font-black uppercase tracking-widest text-right">Estado</th>
+                </tr>
+              </thead>
+              <tbody id="access-monitor-table-body" class="divide-y divide-slate-50">
+                <!-- Inyectado por JS -->
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </section>
+
+      <!-- PAGOS -->
+      <section id="pagos" class="section">
+        <!-- Header -->
+        <div class="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-8">
+          <div>
+            <h1 class="text-3xl font-bold text-slate-800 tracking-tight">Gestión Financiera</h1>
+            <p class="text-slate-500 font-medium">Control de ingresos, mensualidades y transferencias</p>
+          </div>
+          <div>
+            <button id="btnNewPayment" class="px-6 py-3 bg-indigo-600 text-white rounded-xl font-black text-sm uppercase tracking-wider hover:bg-indigo-700 shadow-lg shadow-indigo-200 transition-all flex items-center gap-2 active:scale-95">
+              <i data-lucide="plus-circle" class="w-5 h-5"></i> Registrar Pago
+            </button>
+          </div>
+        </div>
+
+        <!-- BLOQUE 1: KPIs Interactivos -->
+        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
+          <!-- Ingresos del mes -->
+          <div class="bg-purple-50 p-4 rounded-2xl border border-purple-100 shadow-sm">
+             <div class="flex items-center gap-3 mb-2">
+               <div class="p-2 bg-purple-100 rounded-lg text-purple-600"><i data-lucide="trending-up" class="w-5 h-5"></i></div>
+               <span class="text-xs font-bold text-purple-600 uppercase tracking-wider">Ingresos Mes</span>
+             </div>
+             <p class="text-2xl font-black text-slate-800" id="kpiIncomeMonth">$0</p>
+          </div>
+          <!-- Pagos Pendientes -->
+          <div onclick="App.payments.filterBy('pending')" class="bg-slate-50 p-4 rounded-2xl border border-slate-200 shadow-sm cursor-pointer hover:bg-white hover:shadow-md transition-all group">
+             <div class="flex items-center gap-3 mb-2">
+               <div class="p-2 bg-slate-200 rounded-lg text-slate-600 group-hover:bg-slate-300"><i data-lucide="clock" class="w-5 h-5"></i></div>
+               <span class="text-xs font-bold text-slate-500 uppercase tracking-wider">Pendientes</span>
+             </div>
+             <p class="text-2xl font-black text-slate-800" id="kpiPendingCount">0</p>
+          </div>
+          <!-- En Revisión (Transferencias) -->
+          <div onclick="App.payments.filterBy('review')" class="bg-amber-50 p-4 rounded-2xl border border-amber-100 shadow-sm cursor-pointer hover:shadow-md transition-all group">
+             <div class="flex items-center gap-3 mb-2">
+               <div class="p-2 bg-amber-100 rounded-lg text-amber-600 group-hover:bg-amber-200"><i data-lucide="file-search" class="w-5 h-5"></i></div>
+               <span class="text-xs font-bold text-amber-600 uppercase tracking-wider">En Revisión</span>
+             </div>
+             <p class="text-2xl font-black text-slate-800" id="kpiReviewCount">0</p>
+          </div>
+          <!-- Vencidos -->
+          <div onclick="App.payments.filterBy('overdue')" class="bg-rose-50 p-4 rounded-2xl border border-rose-100 shadow-sm cursor-pointer hover:shadow-md transition-all group">
+             <div class="flex items-center gap-3 mb-2">
+               <div class="p-2 bg-rose-100 rounded-lg text-rose-600 group-hover:bg-rose-200"><i data-lucide="alert-triangle" class="w-5 h-5"></i></div>
+               <span class="text-xs font-bold text-rose-600 uppercase tracking-wider">Vencidos</span>
+             </div>
+             <p class="text-2xl font-black text-slate-800" id="kpiOverdueCount">0</p>
+          </div>
+        </div>
+
+        <!-- BLOQUE 2: Gráfico y Configuración (Separado de la tabla) -->
+        <div class="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-8">
+          <!-- Gráfico Financiero -->
+          <div class="lg:col-span-2 bg-white rounded-3xl shadow-sm border border-slate-100 p-6">
+            <div class="flex flex-wrap items-center justify-between gap-4 mb-6">
+              <h3 class="font-bold text-slate-800">Análisis Financiero</h3>
+              <div class="flex gap-2">
+                <select id="chartYear" class="px-3 py-1.5 bg-slate-50 border-none rounded-lg text-xs font-bold text-slate-600 outline-none">
+                  <option value="2025">2025</option>
+                  <option value="2026" selected>2026</option>
+                </select>
+                <select id="chartMonth" class="px-3 py-1.5 bg-slate-50 border-none rounded-lg text-xs font-bold text-slate-600 outline-none">
+                  <option value="all">Todo el año</option>
+                  <option value="1">Enero</option>
+                  <!-- JS llenará esto -->
+                </select>
+              </div>
+            </div>
+            <div class="h-64 w-full">
+              <canvas id="financialChart"></canvas>
+            </div>
+          </div>
+
+          <!-- Configuración de Ciclo de Pagos -->
+          <div class="bg-slate-50 rounded-3xl border border-slate-200 p-6 flex flex-col justify-center">
+            <h3 class="font-bold text-slate-800 mb-4 flex items-center gap-2">
+              <i data-lucide="settings-2" class="w-5 h-5 text-indigo-600"></i> Configuración de Cobro
+            </h3>
+            <div class="space-y-4">
+              <div>
+                <label class="block text-xs font-bold text-slate-500 uppercase mb-1">Día Generación Automática</label>
+                <div class="flex items-center gap-2">
+                  <input type="number" id="confGenDay" min="1" max="28" value="25" class="w-full px-3 py-2 border rounded-xl text-sm font-bold bg-white outline-none focus:ring-2 focus:ring-indigo-500">
+                  <span class="text-xs text-slate-400 font-medium">del mes anterior</span>
+                </div>
+              </div>
+              <div>
+                <label class="block text-xs font-bold text-slate-500 uppercase mb-1">Día Límite de Pago</label>
+                <div class="flex items-center gap-2">
+                  <input type="number" id="confDueDay" min="1" max="28" value="5" class="w-full px-3 py-2 border rounded-xl text-sm font-bold bg-white outline-none focus:ring-2 focus:ring-indigo-500">
+                  <span class="text-xs text-slate-400 font-medium">del mes actual</span>
+                </div>
+              </div>
+              <button id="btnSavePaymentConfig" class="w-full py-2.5 bg-indigo-600 text-white rounded-xl font-bold text-xs uppercase tracking-wide hover:bg-indigo-700 transition-all shadow-md mt-2">
+                Guardar Configuración
+              </button>
+              <button id="btnGeneratePaymentsNow" class="w-full py-2.5 bg-emerald-500 text-white rounded-xl font-bold text-xs uppercase tracking-wide hover:bg-emerald-600 transition-all shadow-md mt-1 flex items-center justify-center gap-2">
+                <i data-lucide="play-circle" class="w-4 h-4"></i> Generar pagos ahora
+              </button>
+              <button id="btnSendPaymentReminders" class="w-full py-2.5 bg-blue-500 text-white rounded-xl font-bold text-xs uppercase tracking-wide hover:bg-blue-600 transition-all shadow-md mt-1 flex items-center justify-center gap-2">
+                <i data-lucide="bell" class="w-4 h-4"></i> Enviar recordatorios ahora
+              </button>
+              <button id="btnExportMorosidad" class="w-full py-2.5 bg-slate-700 text-white rounded-xl font-bold text-xs uppercase tracking-wide hover:bg-slate-800 transition-all shadow-md mt-1 flex items-center justify-center gap-2">
+                <i data-lucide="download" class="w-4 h-4"></i> Exportar reporte morosidad
+              </button>
+            </div>
+            <p class="text-[10px] text-slate-400 mt-4 text-center leading-tight">
+              El sistema generará los cobros y aplicará estados de vencimiento automáticamente según estos días.
+            </p>
+          </div>
+        </div>
+
+        <!-- BLOQUE 3: Tabla Principal -->
+        <div class="bg-white rounded-2xl shadow-md border border-slate-100 p-6">
+          <div class="flex flex-col md:flex-row justify-between items-center gap-4 mb-6">
+            <h3 class="text-lg font-bold text-slate-800 flex items-center gap-2 w-full md:w-auto">
+              <span class="w-2 h-6 bg-indigo-600 rounded-full"></span>
+              Control de Pagos
+            </h3>
+            <div class="flex flex-wrap gap-3 w-full md:w-auto">
+               <div class="relative flex-1 md:w-64">
+                  <i data-lucide="search" class="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400"></i>
+                  <input id="searchPaymentStudent" placeholder="Buscar por nombre..." class="pl-10 pr-4 py-2 border rounded-xl text-sm w-full bg-slate-50 focus:bg-white transition-all">
+               </div>
+               <div class="flex gap-2">
+                 <select id="filterPaymentMonth" class="px-3 py-2 border rounded-xl text-sm bg-slate-50 font-bold text-slate-700">
+                    <option value="all">Todos los meses</option>
+                    <option value="01">Enero</option>
+                    <option value="02">Febrero</option>
+                    <option value="03">Marzo</option>
+                    <option value="04">Abril</option>
+                    <option value="05">Mayo</option>
+                    <option value="06">Junio</option>
+                    <option value="07">Julio</option>
+                    <option value="08">Agosto</option>
+                    <option value="09">Septiembre</option>
+                    <option value="10">Octubre</option>
+                    <option value="11">Noviembre</option>
+                    <option value="12">Diciembre</option>
+                 </select>
+                 <select id="filterPaymentYear" class="px-3 py-2 border rounded-xl text-sm bg-slate-50 font-bold text-slate-700">
+                    <option value="2023">2023</option>
+                    <option value="2024">2024</option>
+                    <option value="2025">2025</option>
+                    <option value="2026" selected>2026</option>
+                    <option value="2027">2027</option>
+                 </select>
+               </div>
+               <select id="filterPaymentStatus" class="px-3 py-2 border rounded-xl text-sm bg-slate-50">
+                  <option value="all">Todos los estados</option>
+                  <option value="paid">Aprobados</option>
+                  <option value="pending">Pendiente</option>
+                  <option value="review">En Revisión</option>
+                  <option value="overdue">Vencido</option>
+               </select>
+            </div>
+          </div>
+
+          <!-- TABLA DE PAGOS ESTRUCTURADA (Solicitado) -->
+          <div class="table-scroll-wrap rounded-2xl border border-slate-200">
+            <table class="w-full text-sm text-left" style="min-width:700px;">
+              <thead class="bg-slate-50 text-slate-500 font-black uppercase text-[10px] tracking-wider">
+                <tr>
+                  <th class="px-6 py-4">Estudiante</th>
+                  <th class="px-6 py-4 text-center">Estado</th>
+                  <th class="px-6 py-4 text-right">Monto</th>
+                  <th class="px-6 py-4">Método</th>
+                  <th class="px-6 py-4">Banco / Ref</th>
+                  <th class="px-6 py-4">Fecha</th>
+                  <th class="px-6 py-4 text-center">Vauche</th>
+                  <th class="px-6 py-4 text-center">Acciones</th>
+                </tr>
+              </thead>
+              <tbody id="paymentsTableBody" class="divide-y divide-slate-100 bg-white">
+                <!-- Rows injected by JS -->
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </section>
+
+      <!-- COMUNICACION tipo Teams -->
+      <section id="comunicacion" class="section">
+        <div class="flex items-center justify-between mb-6">
+          <div>
+            <h2 class="text-2xl font-bold text-slate-800 flex items-center gap-2">
+              <i data-lucide="messages-square" class="w-6 h-6 text-blue-600"></i>
+              Centro de Comunicación
+            </h2>
+            <p class="text-slate-500 text-sm">Chat privado, seguro, con archivos e historial</p>
+          </div>
+        </div>
+
+        <div id="chatAppContainer" class="chat-app">
+          <!-- Vista 1: Lista -->
+          <div class="chat-list">
+            <div class="p-4 border-b border-slate-100 space-y-3">
+              <h3 class="font-black text-lg text-slate-800 px-1">Mensajes</h3>
+              <div class="relative">
+                <i data-lucide="search" class="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400"></i>
+                <input id="chatSearchInput" type="text" class="w-full pl-9 pr-4 py-2.5 bg-slate-100 border-none rounded-2xl text-sm outline-none" placeholder="Buscar en Messenger...">
+              </div>
+            </div>
+            <div id="chatContactsList" class="flex-1 overflow-y-auto p-2"></div>
+          </div>
+
+          <!-- Vista 2: Conversación -->
+          <div class="chat-conversation">
+            <!-- Header -->
+            <div id="chatActiveHeader" class="p-3 border-b border-slate-100 flex items-center gap-3 bg-white hidden">
+              <button id="chatBackBtn" class="md:hidden p-2 hover:bg-slate-100 rounded-full text-blue-600"><i data-lucide="arrow-left"></i></button>
+              <div id="chatActiveAvatar" class="w-10 h-10 rounded-full bg-blue-100 text-blue-600 flex items-center justify-center font-bold"></div>
+              <div class="min-w-0">
+                <div id="chatActiveName" class="font-bold text-slate-800 truncate"></div>
+                <div id="chatActiveMeta" class="text-[10px] font-bold text-slate-400 uppercase tracking-tighter"></div>
+              </div>
+            </div>
+
+            <!-- Mensajes -->
+            <div id="chatMessagesContainer" class="relative">
+              <div class="h-full flex flex-col items-center justify-center text-slate-400 opacity-40">
+                <i data-lucide="message-circle" class="w-16 h-16 mb-4"></i>
+                <p class="font-medium">Selecciona una conversación</p>
+              </div>
+            </div>
+
+            <!-- Typing Indicator -->
+            <div id="chatTypingIndicator" class="hidden absolute bottom-[90px] left-6 right-6 px-4 py-2 bg-white/90 backdrop-blur-sm border border-blue-100 rounded-xl text-[10px] font-black text-blue-600 shadow-lg animate-bounce-subtle z-20">
+              Alguien está escribiendo...
+            </div>
+
+            <!-- Input Area -->
+            <div id="chatInputArea" class="p-4 border-t border-slate-100 bg-white hidden">
+              <div class="flex gap-3 items-end">
+                <textarea id="chatMessageInput" rows="1" class="flex-1 bg-slate-100 border-none rounded-3xl px-5 py-3 focus:ring-2 focus:ring-blue-400 outline-none resize-none text-sm" placeholder="Aa"></textarea>
+                <button id="btnSendChatMessage" class="bg-blue-600 text-white p-3 rounded-full hover:bg-blue-700 transition-all active:scale-90">
+                  <i data-lucide="send" class="w-5 h-5"></i>
+                </button>
+              </div>
+            </div>          </div>
+        </div>
+      </section>
+
+      <!-- MURO ESCOLAR UNIFICADO -->
+      <section id="muro" class="section">
+        <header class="mb-6 flex items-center justify-between">
+          <div>
+            <h1 class="text-3xl font-black text-slate-800">🎭 Muro Escolar</h1>
+            <p class="text-slate-500 font-medium">Comunicación y actualizaciones de la comunidad educativa</p>
+          </div>
+          <button id="btnNewPost" onclick="App.wall.openNewPostModal()" class="px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors flex items-center gap-2 font-medium shadow-sm">
+            <i data-lucide="plus" class="w-5 h-5"></i> Nueva Publicación
+          </button>
+        </header>
+
+        <div class="max-w-5xl mx-auto">
+          <!-- Búsqueda -->
+          <div class="mb-6 flex items-center gap-2">
+            <input type="text" id="wallSearch" placeholder="Buscar posts..." class="flex-1 px-4 py-2 border border-slate-300 rounded-lg focus:outline-none focus:border-orange-600">
+            <select id="wallClassroomFilter" class="px-4 py-2 border border-slate-300 rounded-lg focus:outline-none focus:border-orange-600">
+              <option value="">Todas las aulas</option>
+              <!-- Opciones cargadas por JS -->
+            </select>
+            <button class="px-4 py-2 bg-slate-100 hover:bg-slate-200 rounded-lg transition-colors">
+              <i data-lucide="search" class="w-5 h-5 text-slate-600"></i>
+            </button>
+          </div>
+
+          <!-- Grid de posts -->
+          <div id="muroPostsContainer" class="grid grid-cols-1 gap-6">
+            <!-- Cargado por JS -->
+            <div class="col-span-1 py-12 text-center">
+              <div class="animate-pulse">
+                <i data-lucide="loader" class="w-8 h-8 mx-auto text-orange-400 animate-spin mb-2"></i>
+                <p class="text-slate-400">Cargando publicaciones...</p>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- AÑO ESCOLAR (School Engine) -->
+      <section id="anio-escolar" class="section">
+        <div class="flex items-center gap-3 mb-6">
+          <i data-lucide="calendar-range" class="w-7 h-7 text-violet-600"></i>
+          <div>
+            <h2 class="text-2xl font-bold text-slate-800">Año Escolar</h2>
+            <p class="text-xs font-black text-slate-400 uppercase tracking-widest">Motor Escolar — Configuración Central</p>
+          </div>
+        </div>
+        <div id="schoolYearContent" class="space-y-6">
+          <div class="animate-pulse space-y-4">
+            <div class="h-48 bg-slate-100 rounded-3xl"></div>
+            <div class="h-32 bg-slate-100 rounded-3xl"></div>
+          </div>
+        </div>
+      </section>
+
+      <!-- CONFIGURACIÓN -->
+      <section id="configuracion" class="section">
+        <div id="notifPermissionSlot"></div>
+        <div class="flex items-center gap-3 mb-6">
+          <i data-lucide="settings" class="w-7 h-7 text-slate-600"></i>
+          <h2 class="text-2xl font-bold">Configuración y Perfil</h2>
+        </div>
+
+        <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+          <!-- Perfil Directora -->
+          <div class="lg:col-span-2 space-y-6">
+            <div class="bg-white rounded shadow p-6">
+              <h3 class="text-lg font-semibold mb-4 border-b pb-2 flex items-center gap-2"><i data-lucide="user-circle" class="w-5 h-5"></i> Perfil Profesional (Directora)</h3>
+
+              <!-- Foto de perfil -->
+              <div class="flex items-center gap-5 mb-6 p-4 bg-slate-50 rounded-2xl border border-slate-100">
+                <div class="relative group shrink-0">
+                  <div class="w-24 h-24 rounded-2xl overflow-hidden bg-violet-100 border-2 border-violet-200 shadow-md">
+                    <img id="configProfileAvatar" src="img/mundo.jpg" alt="Foto de perfil" class="w-full h-full object-cover">
+                  </div>
+                  <label for="configAvatarInput" class="absolute -bottom-2 -right-2 w-9 h-9 bg-violet-600 text-white rounded-xl flex items-center justify-center cursor-pointer shadow-lg hover:bg-violet-700 transition-all hover:scale-110 active:scale-95 border-2 border-white">
+                    <i data-lucide="camera" class="w-4 h-4"></i>
+                    <input type="file" id="configAvatarInput" class="hidden" accept="image/jpeg,image/png,image/webp">
+                  </label>
+                </div>
+                <div>
+                  <p class="font-bold text-slate-800 text-sm">Foto de Perfil</p>
+                  <p class="text-xs text-slate-500 mt-0.5">JPG, PNG o WEBP · Máx 5MB</p>
+                  <p class="text-xs text-violet-600 font-bold mt-1">Haz clic en la cámara para cambiarla</p>
+                </div>
+              </div>
+
+              <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <label class="block text-sm font-medium text-slate-700 mb-1">Nombre Completo</label>
+                  <input id="confDirName" type="text" class="w-full border rounded px-3 py-2 focus:ring-2 focus:ring-purple-500 outline-none" placeholder="Cargando...">
+                </div>
+                <div>
+                  <label class="block text-sm font-medium text-slate-700 mb-1">Título / Cargo</label>
+                  <input id="confDirTitle" type="text" class="w-full border rounded px-3 py-2 focus:ring-2 focus:ring-purple-500 outline-none" placeholder="Cargando...">
+                </div>
+                <div class="md:col-span-2">
+                  <label class="block text-sm font-medium text-slate-700 mb-1">Presentación / Biografía</label>
+                  <textarea id="confDirBio" rows="4" class="w-full border rounded px-3 py-2 focus:ring-2 focus:ring-purple-500 outline-none" placeholder="Escribe una breve presentación..."></textarea>
+                  <p class="text-xs text-slate-500 mt-1">Esta información será visible en el perfil público para padres y maestros.</p>
+                </div>
+              </div>
+            </div>
+
+            <div class="bg-white rounded shadow p-6">
+              <h3 class="text-lg font-semibold mb-4 border-b pb-2 flex items-center gap-2"><i data-lucide="building" class="w-5 h-5"></i> Información Institucional</h3>
+              <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <label class="block text-sm font-medium text-slate-700 mb-1">Teléfono Institucional</label>
+                  <input id="confPhone" type="tel" class="w-full border rounded px-3 py-2 focus:ring-2 focus:ring-purple-500 outline-none" placeholder="+1 (000) 000-0000">
+                </div>
+                <div>
+                  <label class="block text-sm font-medium text-slate-700 mb-1">Correo de Contacto</label>
+                  <input id="confEmail" type="email" class="w-full border rounded px-3 py-2 focus:ring-2 focus:ring-purple-500 outline-none" placeholder="contacto@ejemplo.com">
+                </div>
+                <div class="md:col-span-2">
+                  <label class="block text-sm font-medium text-slate-700 mb-1">Dirección Física</label>
+                  <input id="confAddress" type="text" class="w-full border rounded px-3 py-2 focus:ring-2 focus:ring-purple-500 outline-none" placeholder="Dirección de la estancia">
+                </div>
+              </div>
+            </div>
+
+            <div class="bg-white rounded-3xl shadow-sm border border-slate-100 p-6">
+              <h3 class="text-sm font-black text-slate-800 mb-5 flex items-center gap-2">
+                <span class="w-8 h-8 bg-violet-100 text-violet-600 rounded-xl flex items-center justify-center"><i data-lucide="clock" class="w-4 h-4"></i></span>
+                Horario de la Estancia
+              </h3>
+
+              <!-- Días laborables -->
+              <p class="text-[10px] font-black text-slate-500 uppercase tracking-wider mb-2">Días laborables</p>
+              <div class="flex flex-wrap gap-2 mb-5" id="workDaysContainer">
+                <button type="button" data-day="Lun" onclick="window.toggleWorkDay(this)" class="work-day-btn px-3 py-1.5 rounded-xl text-xs font-black border-2 border-slate-200 bg-white text-slate-500 transition-all hover:border-violet-400 hover:text-violet-600">Lun</button>
+                <button type="button" data-day="Mar" onclick="window.toggleWorkDay(this)" class="work-day-btn px-3 py-1.5 rounded-xl text-xs font-black border-2 border-slate-200 bg-white text-slate-500 transition-all hover:border-violet-400 hover:text-violet-600">Mar</button>
+                <button type="button" data-day="Mié" onclick="window.toggleWorkDay(this)" class="work-day-btn px-3 py-1.5 rounded-xl text-xs font-black border-2 border-slate-200 bg-white text-slate-500 transition-all hover:border-violet-400 hover:text-violet-600">Mié</button>
+                <button type="button" data-day="Jue" onclick="window.toggleWorkDay(this)" class="work-day-btn px-3 py-1.5 rounded-xl text-xs font-black border-2 border-slate-200 bg-white text-slate-500 transition-all hover:border-violet-400 hover:text-violet-600">Jue</button>
+                <button type="button" data-day="Vie" onclick="window.toggleWorkDay(this)" class="work-day-btn px-3 py-1.5 rounded-xl text-xs font-black border-2 border-slate-200 bg-white text-slate-500 transition-all hover:border-violet-400 hover:text-violet-600">Vie</button>
+                <button type="button" data-day="Sáb" onclick="window.toggleWorkDay(this)" class="work-day-btn px-3 py-1.5 rounded-xl text-xs font-black border-2 border-slate-200 bg-white text-slate-500 transition-all hover:border-violet-400 hover:text-violet-600">Sáb</button>
+                <button type="button" data-day="Dom" onclick="window.toggleWorkDay(this)" class="work-day-btn px-3 py-1.5 rounded-xl text-xs font-black border-2 border-slate-200 bg-white text-slate-500 transition-all hover:border-violet-400 hover:text-violet-600">Dom</button>
+              </div>
+
+              <!-- Horario apertura/cierre -->
+              <div class="grid grid-cols-2 gap-4 mb-4">
+                <div>
+                  <label class="block text-[10px] font-black text-slate-500 uppercase tracking-wider mb-1.5 flex items-center gap-1">
+                    <i data-lucide="sunrise" class="w-3 h-3 text-amber-500"></i> Apertura
+                  </label>
+                  <input id="confOpenTime" type="time" value="07:00"
+                    class="w-full border-2 border-slate-200 rounded-xl px-3 py-2 text-sm font-bold text-slate-700 bg-white focus:border-violet-400 focus:ring-2 focus:ring-violet-100 outline-none transition-all">
+                </div>
+                <div>
+                  <label class="block text-[10px] font-black text-slate-500 uppercase tracking-wider mb-1.5 flex items-center gap-1">
+                    <i data-lucide="sunset" class="w-3 h-3 text-orange-500"></i> Cierre
+                  </label>
+                  <input id="confCloseTime" type="time" value="17:00"
+                    class="w-full border-2 border-slate-200 rounded-xl px-3 py-2 text-sm font-bold text-slate-700 bg-white focus:border-violet-400 focus:ring-2 focus:ring-violet-100 outline-none transition-all">
+                </div>
+              </div>
+
+              <!-- Preview dinámico -->
+              <div id="schedulePreview" class="p-3 bg-violet-50 rounded-xl border border-violet-100 text-xs font-bold text-violet-700 text-center hidden">
+                <!-- Generado por JS -->
+              </div>
+            </div>
+          </div>
+
+          <!-- Avatar y Acciones -->
+          <div class="space-y-6">
+            <div class="bg-white rounded shadow p-6 text-center">
+              <h3 class="text-sm font-semibold mb-4">Foto de Perfil</h3>
+              <div class="relative w-32 h-32 mx-auto mb-4 group">
+                <img id="configProfileAvatarSidebar" src="img/mundo.jpg" alt="Avatar" class="w-full h-full object-cover rounded-full border-4 border-slate-100 shadow-sm group-hover:opacity-90 transition-opacity">
+                <button onclick="document.getElementById('configAvatarInputSidebar').click()" class="absolute bottom-0 right-0 bg-purple-600 text-white p-2 rounded-full shadow hover:bg-purple-700 transition-colors" title="Cambiar foto" aria-label="Cambiar foto de perfil">
+                  <i data-lucide="camera" class="w-4 h-4"></i>
+                </button>
+              </div>
+              <input type="file" id="configAvatarInputSidebar" accept="image/*" class="hidden">
+              <p class="text-xs text-slate-500 mb-4">JPG, PNG o WEBP. Máx 2MB.</p>
+            </div>
+
+            <div class="bg-white rounded shadow p-6">
+              <h3 class="text-sm font-semibold mb-4">Acciones</h3>
+              <button id="btnSaveMainConfig" class="w-full py-2 bg-green-600 text-white rounded hover:bg-green-700 mb-3 flex items-center justify-center gap-2 transition-colors">
+                <i data-lucide="save" class="w-4 h-4"></i> Guardar Cambios
+              </button>
+              <button onclick="window._printStaffCredential?.()" class="w-full py-2 bg-gradient-to-r from-blue-600 to-blue-500 text-white rounded hover:from-blue-700 hover:to-blue-600 mb-3 flex items-center justify-center gap-2 transition-colors">
+                <i data-lucide="id-card" class="w-4 h-4"></i> Mi Credencial
+              </button>
+
+            <!-- ID de Acceso QR (Directora) -->
+            <div class="mt-4 pt-4 border-t border-slate-100">
+              <h4 class="text-xs font-black text-slate-500 uppercase tracking-wider mb-3 flex items-center gap-1.5">
+                <i data-lucide="qr-code" class="w-3.5 h-3.5 text-violet-500"></i> Mi ID de Acceso
+              </h4>
+              <div class="flex gap-2 mb-3">
+                <input id="confDirAccessId" placeholder="Generar ID..." class="flex-1 border-2 border-slate-100 rounded-xl px-3 py-2 text-xs font-bold bg-slate-50 focus:border-violet-400 outline-none">
+                <button type="button" onclick="window._genDirectorId()" class="px-3 py-2 bg-violet-600 text-white rounded-xl font-black text-[9px] uppercase hover:bg-violet-700 transition-all">Gen</button>
+              </div>
+              <div id="dir-qr-container" class="bg-white p-2 rounded-xl border border-slate-100 min-h-[100px] flex items-center justify-center mb-2">
+                <p class="text-[9px] text-slate-400 font-bold text-center">Genera un ID para ver el QR</p>
+              </div>
+              <button type="button" onclick="window._printDirectorQR()" class="w-full py-2 bg-slate-800 text-white rounded-xl font-black text-[9px] uppercase tracking-widest hover:bg-slate-900 transition-all">🖨️ Imprimir Carnet</button>
+            </div>
+              <button class="w-full py-2 border border-slate-300 text-slate-700 rounded hover:bg-slate-50 transition-colors">Cancelar</button>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      </main> <!-- Cierre de .main -->
+    </div> <!-- Cierre de .app-content-wrapper -->
+  </div> <!-- Cierre de .app -->
+
+  <!-- Contenedor Único de Modales -->
+  <div id="globalModalContainer" class="fixed inset-0 z-[9999] overflow-y-auto" style="display:none;"></div>
+
+  <!-- TOAST CONTAINER — fuera de secciones para no duplicarse -->
+  <div id="toast-container" class="fixed top-5 right-5 z-[9998] flex flex-col gap-2 pointer-events-none"></div>
+
+  <!-- Los modales de maestros y estudiantes se generan dinámicamente via globalModalContainer -->
+
+  <!-- Scripts optimizados -->
+  <script>
+    // Ocultar loader al cargar
+    window.addEventListener('load', () => {
+      const loader = document.getElementById('initial-loading');
+      if(loader) {
+        loader.style.opacity = '0';
+        setTimeout(() => loader.remove(), 500);
+      }
+    });
+    // Timeout de seguridad: quitar loader después de 12s pase lo que pase
+    setTimeout(() => {
+      const loader = document.getElementById('initial-loading');
+      if (loader) { loader.style.opacity = '0'; setTimeout(() => loader.remove(), 300); }
+    }, 12000);
+  </script>
+  <!-- Lucide Icons — cargado al final del body para garantizar DOM completo -->
+  <script>
+    // Silenciar errores internos de lucide UMD (promesas no manejadas)
+    window.addEventListener('unhandledrejection', function(e) {
+      const src = e.reason?.stack || e.reason?.message || String(e.reason);
+      if (src.includes('lucide') || (e.reason && typeof e.reason === 'object' && !e.reason.message)) {
+        e.preventDefault();
+      }
+    }, true);
+  </script>
+  <script src="js/shared/lucide.min.js"></script>
+  <script>
+    // Inicializar iconos — pasar atributos de clase al SVG reemplazante
+    function _initLucide() {
+      if (!window.lucide) return;
+      lucide.createIcons({
+        attrs: { 'stroke-width': '2', 'stroke-linecap': 'round', 'stroke-linejoin': 'round' }
+      });
+      // Fix: remover width/height hardcodeados cuando hay clases Tailwind w-* h-*
+      document.querySelectorAll('svg[data-lucide]').forEach(svg => {
+        const hasSizeClass = [...svg.classList].some(c => /^w-\d/.test(c) || /^h-\d/.test(c));
+        if (hasSizeClass) {
+          svg.removeAttribute('width');
+          svg.removeAttribute('height');
+        }
+      });
+    }
+    // Exponer globalmente para que los módulos JS puedan usarla
+    window._initLucide = _initLucide;
+    _initLucide();
+
+    // MutationObserver: re-ejecutar createIcons cada vez que se inserte
+    // contenido dinámico con atributos data-lucide
+    (function() {
+      let _timer = null;
+      const _run = () => _initLucide();
+      const _debounced = () => { clearTimeout(_timer); _timer = setTimeout(_run, 30); };
+      new MutationObserver((mutations) => {
+        for (const m of mutations) {
+          for (const node of m.addedNodes) {
+            if (node.nodeType === 1) {
+              if (node.hasAttribute?.('data-lucide') || node.querySelector?.('[data-lucide]')) {
+                _debounced(); return;
+              }
+            }
+          }
+        }
+      }).observe(document.body, { childList: true, subtree: true });
+    })();
+  </script>
+  <!-- Core App Module -->
+  <script src="js/shared/supabase-js.min.js"></script>
+  <script type="module" src="js/directora/main.js"></script>
+  <script src="js/shared/lightbox.js" defer></script>
+  <script src="js/shared/confirm-dialog.js" defer></script>
+  <!-- event-handlers.js eliminado: archivo inexistente -->
+  <script defer src="js/common_ui.js"></script>
+  <script src="js/pwa-install.js" defer></script>
+  <!-- SW ya registrado en el <head> — no duplicar aquí -->
+</body>
+</html>

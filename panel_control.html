@@ -1,0 +1,544 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Control Center — Karpus Kids</title>
+  <meta name="robots" content="noindex, nofollow">
+  <meta name="theme-color" content="#0a0f1e">
+  <link rel="icon" href="logo/favicon.ico" type="image/x-icon">
+  <link rel="manifest" href="manifest.json">
+  <style>html{display:none;}</style>
+  <script>if(self===top){document.documentElement.style.display='block';}else{top.location=self.location;}</script>
+  <link href="https://fonts.googleapis.com/css2?family=Nunito:wght@400;600;700;800;900&family=Poppins:wght@700;800;900&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="css/bootstrap-icons.min.css">
+  <link rel="stylesheet" href="css/karpus-modern.css">
+  <link rel="stylesheet" href="css/karpus-tailwind.css">
+  <script src="js/shared/chart.min.js"></script>
+  <style>
+    :root{
+      --bg:#0a0f1e;--surface:#111827;--surface2:#1e293b;--border:rgba(255,255,255,.07);
+      --accent:#6366f1;--accent2:#8b5cf6;--green:#22c55e;--orange:#f97316;
+      --red:#ef4444;--blue:#3b82f6;--yellow:#eab308;
+      --text:#f1f5f9;--muted:rgba(241,245,249,.5);
+    }
+    *{box-sizing:border-box;margin:0;padding:0;}
+    html,body{height:100%;overflow:hidden;}
+    body{font-family:'Nunito',sans-serif;background:var(--bg);color:var(--text);display:flex;}
+
+    /* ── Sidebar ── */
+    #sidebar{width:240px;flex-shrink:0;background:var(--surface);border-right:1px solid var(--border);display:flex;flex-direction:column;height:100vh;overflow-y:auto;transition:width .3s;}
+    .sidebar-logo{padding:20px 16px 16px;border-bottom:1px solid var(--border);}
+    .sidebar-logo .brand{font-family:'Poppins',sans-serif;font-size:15px;font-weight:900;color:var(--text);}
+    .sidebar-logo .sub{font-size:10px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.1em;margin-top:2px;}
+    .nav-section{padding:12px 10px 4px;font-size:9px;font-weight:900;color:var(--muted);text-transform:uppercase;letter-spacing:.12em;}
+    .nav-item{display:flex;align-items:center;gap:10px;padding:10px 14px;border-radius:10px;margin:1px 8px;cursor:pointer;font-size:13px;font-weight:700;color:var(--muted);transition:all .2s;border:none;background:none;width:calc(100% - 16px);text-align:left;}
+    .nav-item:hover{background:rgba(255,255,255,.06);color:var(--text);}
+    .nav-item.active{background:linear-gradient(135deg,rgba(99,102,241,.25),rgba(139,92,246,.15));color:var(--text);border:1px solid rgba(99,102,241,.3);}
+    .nav-item i{font-size:16px;width:20px;text-align:center;}
+    .nav-badge{margin-left:auto;background:var(--red);color:white;font-size:9px;font-weight:900;padding:2px 6px;border-radius:50px;min-width:18px;text-align:center;}
+    .sidebar-footer{margin-top:auto;padding:12px;border-top:1px solid var(--border);}
+
+    /* ── Main ── */
+    #main{flex:1;display:flex;flex-direction:column;height:100vh;overflow:hidden;}
+    #topbar{height:60px;background:var(--surface);border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;padding:0 24px;flex-shrink:0;}
+    #content{flex:1;overflow-y:auto;padding:24px;}
+
+    /* ── Cards ── */
+    .kpi-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:16px;margin-bottom:24px;}
+    .kpi{background:var(--surface);border:1px solid var(--border);border-radius:16px;padding:20px;position:relative;overflow:hidden;transition:transform .2s,box-shadow .2s;}
+    .kpi:hover{transform:translateY(-2px);box-shadow:0 8px 24px rgba(0,0,0,.3);}
+    .kpi::before{content:'';position:absolute;top:0;left:0;right:0;height:3px;border-radius:16px 16px 0 0;}
+    .kpi.k-indigo::before{background:linear-gradient(90deg,#6366f1,#8b5cf6);}
+    .kpi.k-green::before{background:linear-gradient(90deg,#22c55e,#16a34a);}
+    .kpi.k-orange::before{background:linear-gradient(90deg,#f97316,#fb923c);}
+    .kpi.k-red::before{background:linear-gradient(90deg,#ef4444,#f87171);}
+    .kpi.k-blue::before{background:linear-gradient(90deg,#3b82f6,#60a5fa);}
+    .kpi.k-yellow::before{background:linear-gradient(90deg,#eab308,#facc15);}
+    .kpi-val{font-family:'Poppins',sans-serif;font-size:2rem;font-weight:900;line-height:1;margin-bottom:4px;}
+    .kpi-lbl{font-size:11px;font-weight:800;color:var(--muted);text-transform:uppercase;letter-spacing:.08em;}
+    .kpi-icon{position:absolute;right:16px;top:50%;transform:translateY(-50%);font-size:2.2rem;opacity:.12;}
+
+    /* ── Panels ── */
+    .panel{background:var(--surface);border:1px solid var(--border);border-radius:16px;overflow:hidden;}
+    .panel-hdr{padding:16px 20px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;}
+    .panel-hdr h3{font-size:14px;font-weight:900;color:var(--text);}
+    .panel-body{padding:16px 20px;}
+
+    /* ── Table ── */
+    .tbl{width:100%;border-collapse:collapse;font-size:12px;}
+    .tbl th{padding:8px 12px;text-align:left;font-size:10px;font-weight:900;color:var(--muted);text-transform:uppercase;letter-spacing:.08em;border-bottom:1px solid var(--border);}
+    .tbl td{padding:10px 12px;border-bottom:1px solid rgba(255,255,255,.04);color:var(--text);font-weight:600;}
+    .tbl tr:hover td{background:rgba(255,255,255,.03);}
+    .tbl tr:last-child td{border-bottom:none;}
+
+    /* ── Badges ── */
+    .badge{display:inline-flex;align-items:center;gap:4px;padding:3px 10px;border-radius:50px;font-size:10px;font-weight:900;text-transform:uppercase;letter-spacing:.06em;}
+    .badge-green{background:rgba(34,197,94,.15);color:#4ade80;}
+    .badge-red{background:rgba(239,68,68,.15);color:#f87171;}
+    .badge-orange{background:rgba(249,115,22,.15);color:#fb923c;}
+    .badge-blue{background:rgba(59,130,246,.15);color:#60a5fa;}
+    .badge-yellow{background:rgba(234,179,8,.15);color:#facc15;}
+    .badge-purple{background:rgba(139,92,246,.15);color:#a78bfa;}
+    .badge-gray{background:rgba(255,255,255,.08);color:var(--muted);}
+
+    /* ── Sections ── */
+    .section{display:none;}
+    .section.active{display:block;}
+
+    /* ── Grid layouts ── */
+    .grid-2{display:grid;grid-template-columns:1fr 1fr;gap:16px;}
+    .grid-3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:16px;}
+
+    /* ── Alert ── */
+    .alert{display:flex;align-items:flex-start;gap:12px;padding:14px 16px;border-radius:12px;margin-bottom:12px;font-size:13px;font-weight:700;}
+    .alert-red{background:rgba(239,68,68,.1);border:1px solid rgba(239,68,68,.25);color:#fca5a5;}
+    .alert-yellow{background:rgba(234,179,8,.1);border:1px solid rgba(234,179,8,.25);color:#fde047;}
+    .alert-green{background:rgba(34,197,94,.1);border:1px solid rgba(34,197,94,.25);color:#86efac;}
+
+    /* ── Btn ── */
+    .btn{display:inline-flex;align-items:center;gap:6px;padding:8px 16px;border-radius:10px;font-size:12px;font-weight:900;cursor:pointer;border:none;transition:all .2s;text-transform:uppercase;letter-spacing:.06em;}
+    .btn-primary{background:linear-gradient(135deg,#6366f1,#8b5cf6);color:white;box-shadow:0 4px 12px rgba(99,102,241,.3);}
+    .btn-primary:hover{transform:translateY(-1px);box-shadow:0 6px 16px rgba(99,102,241,.4);}
+    .btn-danger{background:rgba(239,68,68,.15);color:#f87171;border:1px solid rgba(239,68,68,.25);}
+    .btn-danger:hover{background:rgba(239,68,68,.25);}
+    .btn-ghost{background:rgba(255,255,255,.06);color:var(--muted);border:1px solid var(--border);}
+    .btn-ghost:hover{background:rgba(255,255,255,.1);color:var(--text);}
+
+    /* ── Input ── */
+    .inp{background:var(--surface2);border:1px solid var(--border);border-radius:10px;padding:9px 14px;color:var(--text);font-size:13px;font-family:'Nunito',sans-serif;font-weight:600;outline:none;width:100%;transition:border .2s;}
+    .inp:focus{border-color:var(--accent);}
+    select.inp option{background:#1e293b;}
+
+    /* ── Scrollbar ── */
+    ::-webkit-scrollbar{width:4px;height:4px;}
+    ::-webkit-scrollbar-track{background:transparent;}
+    ::-webkit-scrollbar-thumb{background:rgba(255,255,255,.12);border-radius:4px;}
+
+    /* ── Loading ── */
+    #loader{position:fixed;inset:0;background:var(--bg);z-index:9999;display:flex;align-items:center;justify-content:center;flex-direction:column;gap:16px;transition:opacity .4s,visibility .4s;}
+    #loader.hidden{opacity:0;visibility:hidden;pointer-events:none;}
+    .spinner{width:40px;height:40px;border:3px solid rgba(99,102,241,.2);border-top-color:#6366f1;border-radius:50%;animation:spin .8s linear infinite;}
+    @keyframes spin{to{transform:rotate(360deg)}}
+
+    /* ── Realtime dot ── */
+    .live-dot{width:8px;height:8px;background:#22c55e;border-radius:50%;animation:pulse 2s infinite;}
+    @keyframes pulse{0%,100%{box-shadow:0 0 0 0 rgba(34,197,94,.4)}50%{box-shadow:0 0 0 6px rgba(34,197,94,0)}}
+
+    /* ── Mobile ── */
+    @media(max-width:768px){
+      #sidebar{position:fixed;left:-240px;z-index:100;transition:left .3s;}
+      #sidebar.open{left:0;}
+      #main{width:100%;}
+    }
+  </style>
+</head>
+<body>
+
+<!-- LOADER -->
+<div id="loader">
+  <div class="spinner"></div>
+  <span style="font-size:13px;font-weight:800;color:var(--muted);">Verificando acceso...</span>
+</div>
+
+<!-- SIDEBAR -->
+<nav id="sidebar">
+  <div class="sidebar-logo">
+    <div style="display:flex;align-items:center;gap:10px;margin-bottom:8px;">
+      <div style="width:36px;height:36px;background:linear-gradient(135deg,#6366f1,#8b5cf6);border-radius:10px;display:flex;align-items:center;justify-content:center;flex-shrink:0;">
+        <i class="bi bi-shield-lock-fill" style="color:white;font-size:16px;"></i>
+      </div>
+      <div>
+        <div class="brand">Control Center</div>
+        <div class="sub">Karpus Kids</div>
+      </div>
+    </div>
+    <div style="display:flex;align-items:center;gap:6px;background:rgba(34,197,94,.1);border:1px solid rgba(34,197,94,.2);border-radius:8px;padding:5px 10px;">
+      <div class="live-dot"></div>
+      <span style="font-size:10px;font-weight:800;color:#4ade80;">Sistema en línea</span>
+    </div>
+  </div>
+
+  <div class="nav-section">Principal</div>
+  <button class="nav-item active" onclick="goTo('dashboard')"><i class="bi bi-grid-fill"></i> Dashboard</button>
+  <button class="nav-item" onclick="goTo('auditoria')"><i class="bi bi-journal-text"></i> Auditoría <span class="nav-badge" id="badge-audit">0</span></button>
+  <button class="nav-item" onclick="goTo('fraude')"><i class="bi bi-exclamation-triangle-fill"></i> Alertas Fraude <span class="nav-badge" id="badge-fraud" style="background:#f97316;">0</span></button>
+
+  <div class="nav-section">Usuarios</div>
+  <button class="nav-item" onclick="goTo('usuarios')"><i class="bi bi-people-fill"></i> Todos los Usuarios</button>
+  <button class="nav-item" onclick="goTo('padres')"><i class="bi bi-person-heart"></i> Padres</button>
+  <button class="nav-item" onclick="goTo('maestras')"><i class="bi bi-person-workspace"></i> Maestras</button>
+  <button class="nav-item" onclick="goTo('directoras')"><i class="bi bi-person-badge-fill"></i> Directoras</button>
+
+  <div class="nav-section">Operaciones</div>
+  <button class="nav-item" onclick="goTo('pagos')"><i class="bi bi-credit-card-fill"></i> Pagos</button>
+  <button class="nav-item" onclick="goTo('asistencia')"><i class="bi bi-calendar-check-fill"></i> Asistencia</button>
+  <button class="nav-item" onclick="goTo('errores')"><i class="bi bi-bug-fill"></i> Errores del Sistema</button>
+
+  <div class="nav-section">Sistema</div>
+  <button class="nav-item" onclick="goTo('seguridad')"><i class="bi bi-shield-exclamation"></i> Seguridad</button>
+  <button class="nav-item" onclick="goTo('configuracion')"><i class="bi bi-gear-fill"></i> Configuración</button>
+
+  <div class="sidebar-footer">
+    <div style="display:flex;align-items:center;gap:10px;margin-bottom:10px;">
+      <div style="width:34px;height:34px;background:linear-gradient(135deg,#6366f1,#8b5cf6);border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:900;color:white;flex-shrink:0;" id="adminAvatar">A</div>
+      <div style="min-width:0;">
+        <div style="font-size:12px;font-weight:900;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;" id="adminName">Admin</div>
+        <div style="font-size:10px;color:var(--muted);">Administrador</div>
+      </div>
+    </div>
+    <button onclick="doLogout()" class="btn btn-ghost" style="width:100%;justify-content:center;">
+      <i class="bi bi-box-arrow-left"></i> Cerrar sesión
+    </button>
+  </div>
+</nav>
+
+<!-- MAIN -->
+<div id="main">
+  <!-- TOPBAR -->
+  <div id="topbar">
+    <div style="display:flex;align-items:center;gap:12px;">
+      <button id="mobMenuBtn" onclick="document.getElementById('sidebar').classList.toggle('open')" style="display:none;background:none;border:none;color:var(--text);font-size:20px;cursor:pointer;"><i class="bi bi-list"></i></button>
+      <div>
+        <div style="font-size:15px;font-weight:900;color:var(--text);" id="pageTitle">Dashboard</div>
+        <div style="font-size:11px;color:var(--muted);" id="pageSubtitle">Vista general del sistema</div>
+      </div>
+    </div>
+    <div style="display:flex;align-items:center;gap:12px;">
+      <div style="font-size:12px;font-weight:700;color:var(--muted);" id="topClock"></div>
+      <button onclick="refreshAll()" class="btn btn-ghost" style="padding:7px 12px;"><i class="bi bi-arrow-clockwise"></i> Actualizar</button>
+    </div>
+  </div>
+
+  <!-- CONTENT -->
+  <div id="content">
+
+    <!-- ══════════════════════════════════════════════════════
+         DASHBOARD
+    ══════════════════════════════════════════════════════ -->
+    <div class="section active" id="sec-dashboard">
+      <!-- KPIs -->
+      <div class="kpi-grid" id="kpiGrid">
+        <div id="paymentHealthWidget" class="kpi k-blue">
+          <div class="kpi-lbl">Salud del Ciclo</div>
+          <div style="font-size:11px;color:var(--muted);margin-top:4px;">Cargando estado...</div>
+          <i class="bi bi-activity kpi-icon"></i>
+        </div>
+        <div class="kpi k-indigo"><div class="kpi-val" id="kpi-users">0</div><div class="kpi-lbl">Usuarios totales</div><i class="bi bi-people-fill kpi-icon"></i></div>
+        <div class="kpi k-green"><div class="kpi-val" id="kpi-students">—</div><div class="kpi-lbl">Estudiantes activos</div><i class="bi bi-mortarboard-fill kpi-icon"></i></div>
+        <div class="kpi k-orange"><div class="kpi-val" id="kpi-payments">—</div><div class="kpi-lbl">Pagos este mes</div><i class="bi bi-credit-card-fill kpi-icon"></i></div>
+        <div class="kpi k-blue"><div class="kpi-val" id="kpi-attendance">—</div><div class="kpi-lbl">Asistencias hoy</div><i class="bi bi-calendar-check-fill kpi-icon"></i></div>
+        <div class="kpi k-red"><div class="kpi-val" id="kpi-alerts">—</div><div class="kpi-lbl">Alertas activas</div><i class="bi bi-exclamation-triangle-fill kpi-icon"></i></div>
+        <div class="kpi k-yellow"><div class="kpi-val" id="kpi-revenue">—</div><div class="kpi-lbl">Ingresos mes (RD$)</div><i class="bi bi-cash-stack kpi-icon"></i></div>
+      </div>
+
+      <!-- Charts row -->
+      <div class="grid-2" style="margin-bottom:16px;">
+        <div class="panel">
+          <div class="panel-hdr"><h3><i class="bi bi-bar-chart-fill" style="color:#6366f1;margin-right:6px;"></i>Actividad por rol (7 días)</h3></div>
+          <div class="panel-body"><canvas id="chartActivity" height="200"></canvas></div>
+        </div>
+        <div class="panel">
+          <div class="panel-hdr"><h3><i class="bi bi-pie-chart-fill" style="color:#22c55e;margin-right:6px;"></i>Distribución de usuarios</h3></div>
+          <div class="panel-body"><canvas id="chartRoles" height="200"></canvas></div>
+        </div>
+      </div>
+
+      <!-- Bottom row -->
+      <div class="grid-2">
+        <div class="panel">
+          <div class="panel-hdr">
+            <h3><i class="bi bi-clock-history" style="color:#f97316;margin-right:6px;"></i>Últimos movimientos</h3>
+            <button class="btn btn-ghost" style="padding:5px 10px;font-size:10px;" onclick="goTo('auditoria')">Ver todo</button>
+          </div>
+          <div class="panel-body" style="padding:0;">
+            <table class="tbl" id="recentAudit">
+              <thead><tr><th>Usuario</th><th>Acción</th><th>Hora</th><th>Estado</th></tr></thead>
+              <tbody id="recentAuditBody"><tr><td colspan="4" style="text-align:center;padding:20px;color:var(--muted);">Cargando...</td></tr></tbody>
+            </table>
+          </div>
+        </div>
+        <div class="panel">
+          <div class="panel-hdr">
+            <h3><i class="bi bi-exclamation-triangle-fill" style="color:#ef4444;margin-right:6px;"></i>Alertas de fraude</h3>
+            <button class="btn btn-ghost" style="padding:5px 10px;font-size:10px;" onclick="goTo('fraude')">Ver todo</button>
+          </div>
+          <div class="panel-body" id="fraudAlertsList">
+            <div style="text-align:center;padding:20px;color:var(--muted);font-size:13px;">Cargando alertas...</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ══════════════════════════════════════════════════════
+         AUDITORÍA
+    ══════════════════════════════════════════════════════ -->
+    <div class="section" id="sec-auditoria">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;flex-wrap:wrap;gap:10px;">
+        <div style="display:flex;gap:8px;flex-wrap:wrap;">
+          <input class="inp" id="auditSearch" placeholder="Buscar usuario, acción..." style="width:220px;" oninput="filterAudit()">
+          <select class="inp" id="auditRole" style="width:140px;" onchange="filterAudit()">
+            <option value="">Todos los roles</option>
+            <option value="padre">Padre</option>
+            <option value="maestra">Maestra</option>
+            <option value="directora">Directora</option>
+            <option value="asistente">Asistente</option>
+            <option value="admin">Admin</option>
+          </select>
+          <select class="inp" id="auditAction" style="width:160px;" onchange="filterAudit()">
+            <option value="">Todas las acciones</option>
+            <option value="login">Login</option>
+            <option value="payment">Pago</option>
+            <option value="attendance">Asistencia</option>
+            <option value="student">Estudiante</option>
+            <option value="error">Error</option>
+          </select>
+        </div>
+        <button class="btn btn-primary" onclick="exportAudit()"><i class="bi bi-download"></i> Exportar CSV</button>
+      </div>
+      <div class="panel">
+        <div class="panel-hdr"><h3><i class="bi bi-journal-text" style="color:#6366f1;margin-right:6px;"></i>Registro de auditoría completo</h3><span id="auditCount" style="font-size:11px;color:var(--muted);">0 registros</span></div>
+        <div style="overflow-x:auto;">
+          <table class="tbl" id="auditTable">
+            <thead><tr><th>#</th><th>Fecha/Hora</th><th>Usuario</th><th>Rol</th><th>Acción</th><th>Detalle</th><th>IP/Device</th><th>Estado</th></tr></thead>
+            <tbody id="auditBody"><tr><td colspan="8" style="text-align:center;padding:24px;color:var(--muted);">Cargando registros...</td></tr></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <!-- ══════════════════════════════════════════════════════
+         FRAUDE
+    ══════════════════════════════════════════════════════ -->
+    <div class="section" id="sec-fraude">
+      <div class="panel" style="margin-bottom:16px;">
+        <div class="panel-hdr"><h3><i class="bi bi-shield-exclamation" style="color:#ef4444;margin-right:6px;"></i>Motor de detección de fraude</h3></div>
+        <div class="panel-body">
+          <div id="fraudRules" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:12px;"></div>
+        </div>
+      </div>
+      <div class="panel">
+        <div class="panel-hdr"><h3>Eventos sospechosos detectados</h3><span id="fraudCount" style="font-size:11px;color:var(--muted);"></span></div>
+        <div style="overflow-x:auto;">
+          <table class="tbl">
+            <thead><tr><th>Fecha</th><th>Usuario</th><th>Tipo de alerta</th><th>Detalle</th><th>Riesgo</th><th>Acción</th></tr></thead>
+            <tbody id="fraudBody"><tr><td colspan="6" style="text-align:center;padding:24px;color:var(--muted);">Analizando patrones...</td></tr></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <!-- ══════════════════════════════════════════════════════
+         USUARIOS
+    ══════════════════════════════════════════════════════ -->
+    <div class="section" id="sec-usuarios">
+      <div style="display:flex;gap:8px;margin-bottom:16px;flex-wrap:wrap;">
+        <input class="inp" id="userSearch" placeholder="Buscar nombre, email..." style="width:240px;" oninput="filterUsers()">
+        <select class="inp" id="userRoleFilter" style="width:140px;" onchange="filterUsers()">
+          <option value="">Todos los roles</option>
+          <option value="padre">Padre</option>
+          <option value="maestra">Maestra</option>
+          <option value="directora">Directora</option>
+          <option value="asistente">Asistente</option>
+          <option value="admin">Admin</option>
+        </select>
+      </div>
+      <div class="panel">
+        <div class="panel-hdr"><h3><i class="bi bi-people-fill" style="color:#6366f1;margin-right:6px;"></i>Todos los usuarios</h3><span id="userCount" style="font-size:11px;color:var(--muted);"></span></div>
+        <div style="overflow-x:auto;">
+          <table class="tbl">
+            <thead><tr><th>Usuario</th><th>Email</th><th>Rol</th><th>Creado</th><th>Último acceso</th><th>Estado</th><th>Acciones</th></tr></thead>
+            <tbody id="usersBody"><tr><td colspan="7" style="text-align:center;padding:24px;color:var(--muted);">Cargando...</td></tr></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <!-- ══════════════════════════════════════════════════════
+         PADRES / MAESTRAS / DIRECTORAS (shared template)
+    ══════════════════════════════════════════════════════ -->
+    <div class="section" id="sec-padres"><div class="panel"><div class="panel-hdr"><h3 id="roleTitle-padres">Padres</h3></div><div style="overflow-x:auto;"><table class="tbl"><thead><tr><th>Nombre</th><th>Email</th><th>Estudiantes</th><th>Pagos</th><th>Último acceso</th><th>Estado</th></tr></thead><tbody id="roleBody-padres"><tr><td colspan="6" style="text-align:center;padding:24px;color:var(--muted);">Cargando...</td></tr></tbody></table></div></div></div>
+    <div class="section" id="sec-maestras"><div class="panel"><div class="panel-hdr"><h3>Maestras y Asistentes</h3></div><div style="overflow-x:auto;"><table class="tbl"><thead><tr><th>Nombre</th><th>Email</th><th>Rol</th><th>Aula</th><th>Asistencias</th><th>Estado</th></tr></thead><tbody id="roleBody-maestras"><tr><td colspan="6" style="text-align:center;padding:24px;color:var(--muted);">Cargando...</td></tr></tbody></table></div></div></div>
+    <div class="section" id="sec-directoras"><div class="panel"><div class="panel-hdr"><h3>Directoras</h3></div><div style="overflow-x:auto;"><table class="tbl"><thead><tr><th>Nombre</th><th>Email</th><th>Escuela</th><th>Último acceso</th><th>Estado</th></tr></thead><tbody id="roleBody-directoras"><tr><td colspan="5" style="text-align:center;padding:24px;color:var(--muted);">Cargando...</td></tr></tbody></table></div></div></div>
+
+    <!-- ══════════════════════════════════════════════════════
+         PAGOS
+    ══════════════════════════════════════════════════════ -->
+    <div class="section" id="sec-pagos">
+      <div class="kpi-grid" style="grid-template-columns:repeat(auto-fit,minmax(180px,1fr));margin-bottom:16px;">
+        <div class="kpi k-green"><div class="kpi-val" id="pay-approved">—</div><div class="kpi-lbl">Aprobados</div></div>
+        <div class="kpi k-yellow"><div class="kpi-val" id="pay-pending">—</div><div class="kpi-lbl">Pendientes</div></div>
+        <div class="kpi k-red"><div class="kpi-val" id="pay-rejected">—</div><div class="kpi-lbl">Rechazados</div></div>
+        <div class="kpi k-orange"><div class="kpi-val" id="pay-total">—</div><div class="kpi-lbl">Total RD$</div></div>
+      </div>
+      <div class="panel" style="margin-bottom:16px;">
+        <div class="panel-hdr"><h3><i class="bi bi-bar-chart-fill" style="color:#22c55e;margin-right:6px;"></i>Pagos por mes</h3></div>
+        <div class="panel-body"><canvas id="chartPayments" height="160"></canvas></div>
+      </div>
+      <div class="panel">
+        <div class="panel-hdr"><h3>Historial de pagos</h3></div>
+        <div style="overflow-x:auto;">
+          <table class="tbl"><thead><tr><th>Fecha</th><th>Estudiante</th><th>Padre</th><th>Monto</th><th>Método</th><th>Banco</th><th>Estado</th></tr></thead>
+          <tbody id="paymentsBody"><tr><td colspan="7" style="text-align:center;padding:24px;color:var(--muted);">Cargando...</td></tr></tbody></table>
+        </div>
+      </div>
+    </div>
+
+    <!-- ══════════════════════════════════════════════════════
+         ASISTENCIA
+    ══════════════════════════════════════════════════════ -->
+    <div class="section" id="sec-asistencia">
+      <div class="panel" style="margin-bottom:16px;">
+        <div class="panel-hdr"><h3><i class="bi bi-graph-up" style="color:#3b82f6;margin-right:6px;"></i>Asistencia últimos 14 días</h3></div>
+        <div class="panel-body"><canvas id="chartAttendance" height="160"></canvas></div>
+      </div>
+      <div class="panel">
+        <div class="panel-hdr"><h3>Registros de hoy</h3><span id="attendanceDate" style="font-size:11px;color:var(--muted);"></span></div>
+        <div style="overflow-x:auto;">
+          <table class="tbl"><thead><tr><th>Nombre</th><th>Tipo</th><th>Entrada</th><th>Salida</th><th>Aula</th><th>Estado</th></tr></thead>
+          <tbody id="attendanceBody"><tr><td colspan="6" style="text-align:center;padding:24px;color:var(--muted);">Cargando...</td></tr></tbody></table>
+        </div>
+      </div>
+    </div>
+
+    <!-- ══════════════════════════════════════════════════════
+         ERRORES
+    ══════════════════════════════════════════════════════ -->
+    <div class="section" id="sec-errores">
+      <div class="panel">
+        <div class="panel-hdr"><h3><i class="bi bi-bug-fill" style="color:#ef4444;margin-right:6px;"></i>Log de errores del sistema</h3><button class="btn btn-danger" onclick="clearErrors()" style="padding:5px 10px;font-size:10px;"><i class="bi bi-trash"></i> Limpiar</button></div>
+        <div style="overflow-x:auto;">
+          <table class="tbl"><thead><tr><th>Fecha</th><th>Panel</th><th>Usuario</th><th>Error</th><th>Stack</th></tr></thead>
+          <tbody id="errorsBody"><tr><td colspan="5" style="text-align:center;padding:24px;color:var(--muted);">Sin errores registrados</td></tr></tbody></table>
+        </div>
+      </div>
+    </div>
+
+    <!-- ══════════════════════════════════════════════════════
+         SEGURIDAD — Fuerza Bruta y Auditoría
+    ══════════════════════════════════════════════════════ -->
+    <div class="section" id="sec-seguridad">
+      <div class="grid-2" style="margin-bottom:16px;">
+        <!-- Intentos de fuerza bruta -->
+        <div class="panel">
+          <div class="panel-hdr">
+            <h3><i class="bi bi-shield-exclamation" style="color:#ef4444;margin-right:6px;"></i>Intentos de Acceso (24h)</h3>
+            <button class="btn btn-ghost" style="padding:5px 10px;font-size:10px;" onclick="renderBruteForce()"><i class="bi bi-arrow-clockwise"></i> Actualizar</button>
+          </div>
+          <div class="panel-body" id="bruteForceList">
+            <div style="text-align:center;padding:20px;color:var(--muted);">Haz clic en Actualizar para cargar</div>
+          </div>
+        </div>
+
+        <!-- Estado del sistema -->
+        <div class="panel">
+          <div class="panel-hdr"><h3><i class="bi bi-activity" style="color:#22c55e;margin-right:6px;"></i>Estado del Sistema</h3></div>
+          <div class="panel-body" style="display:flex;flex-direction:column;gap:10px;">
+            <div style="display:flex;justify-content:space-between;align-items:center;padding:10px;background:var(--surface2);border-radius:10px;">
+              <span style="font-size:13px;font-weight:700;">Base de datos</span>
+              <span class="badge badge-green"><i class="bi bi-circle-fill" style="font-size:6px;"></i> Conectada</span>
+            </div>
+            <div style="display:flex;justify-content:space-between;align-items:center;padding:10px;background:var(--surface2);border-radius:10px;">
+              <span style="font-size:13px;font-weight:700;">Ciclo de pagos</span>
+              <span class="badge badge-blue" id="cronStatus">Verificando...</span>
+            </div>
+            <div style="display:flex;justify-content:space-between;align-items:center;padding:10px;background:var(--surface2);border-radius:10px;">
+              <span style="font-size:13px;font-weight:700;">Usuarios activos hoy</span>
+              <span style="font-size:16px;font-weight:900;color:var(--text);" id="activeUsersToday">—</span>
+            </div>
+            <div style="display:flex;justify-content:space-between;align-items:center;padding:10px;background:var(--surface2);border-radius:10px;">
+              <span style="font-size:13px;font-weight:700;">Errores últimas 24h</span>
+              <span style="font-size:16px;font-weight:900;color:#f87171;" id="errorsToday">—</span>
+            </div>
+            <button class="btn btn-primary" onclick="loadSecurityStats()" style="margin-top:4px;">
+              <i class="bi bi-arrow-clockwise"></i> Actualizar estadísticas
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Auditoría de pagos reciente -->
+      <div class="panel">
+        <div class="panel-hdr">
+          <h3><i class="bi bi-journal-check" style="color:#6366f1;margin-right:6px;"></i>Auditoría de Pagos Reciente</h3>
+        </div>
+        <div style="overflow-x:auto;">
+          <table class="tbl">
+            <thead><tr><th>Fecha</th><th>Acción</th><th>Admin</th><th>Detalle</th></tr></thead>
+            <tbody id="paymentAuditBody"><tr><td colspan="4" style="text-align:center;padding:20px;color:var(--muted);">Cargando...</td></tr></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <!-- ══════════════════════════════════════════════════════
+         CONFIGURACIÓN
+    ══════════════════════════════════════════════════════ -->
+    <div class="section" id="sec-configuracion">
+      <div class="grid-2">
+        <div class="panel">
+          <div class="panel-hdr"><h3><i class="bi bi-person-gear" style="color:#6366f1;margin-right:6px;"></i>Mi perfil de administrador</h3></div>
+          <div class="panel-body" style="display:flex;flex-direction:column;gap:14px;">
+            <div><label style="font-size:11px;font-weight:900;color:var(--muted);text-transform:uppercase;letter-spacing:.08em;display:block;margin-bottom:6px;">Nombre</label><input class="inp" id="cfgName" placeholder="Tu nombre"></div>
+            <div><label style="font-size:11px;font-weight:900;color:var(--muted);text-transform:uppercase;letter-spacing:.08em;display:block;margin-bottom:6px;">Email</label><input class="inp" id="cfgEmail" disabled style="opacity:.5;"></div>
+            <button class="btn btn-primary" onclick="saveAdminProfile()"><i class="bi bi-check-lg"></i> Guardar cambios</button>
+          </div>
+        </div>
+        <div class="panel">
+          <div class="panel-hdr"><h3><i class="bi bi-database-fill" style="color:#22c55e;margin-right:6px;"></i>Estado del sistema</h3></div>
+          <div class="panel-body" id="systemStatus">
+            <div style="display:flex;flex-direction:column;gap:12px;">
+              <div style="display:flex;justify-content:space-between;align-items:center;padding:10px;background:var(--surface2);border-radius:10px;">
+                <span style="font-size:13px;font-weight:700;">Base de datos</span>
+                <span class="badge badge-green"><i class="bi bi-circle-fill" style="font-size:6px;"></i> Conectada</span>
+              </div>
+              <div style="display:flex;justify-content:space-between;align-items:center;padding:10px;background:var(--surface2);border-radius:10px;">
+                <span style="font-size:13px;font-weight:700;">Edge Functions</span>
+                <span class="badge badge-green" id="funcStatus"><i class="bi bi-circle-fill" style="font-size:6px;"></i> Activas</span>
+              </div>
+              <div style="display:flex;justify-content:space-between;align-items:center;padding:10px;background:var(--surface2);border-radius:10px;">
+                <span style="font-size:13px;font-weight:700;">Sistema de Correo</span>
+                <div style="display:flex;align-items:center;gap:8px;">
+                  <span id="emailTestResult" style="font-size:11px;"></span>
+                  <button id="btnTestEmail" onclick="testEmail()" class="btn btn-ghost" style="padding:4px 10px;font-size:10px;">📧 Probar correo</button>
+                </div>
+              </div>
+              <div style="display:flex;justify-content:space-between;align-items:center;padding:10px;background:var(--surface2);border-radius:10px;">
+                <span style="font-size:13px;font-weight:700;">Realtime</span>
+                <span class="badge badge-green"><i class="bi bi-circle-fill" style="font-size:6px;"></i> Activo</span>
+              </div>
+              <div style="display:flex;justify-content:space-between;align-items:center;padding:10px;background:var(--surface2);border-radius:10px;">
+                <span style="font-size:13px;font-weight:700;">Total usuarios</span>
+                <span class="badge badge-blue" id="cfgUserCount">—</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="panel" style="margin-top:16px;">
+        <div class="panel-hdr"><h3><i class="bi bi-person-plus-fill" style="color:#f97316;margin-right:6px;"></i>Gestión de roles</h3></div>
+        <div class="panel-body">
+          <p style="font-size:13px;color:var(--muted);margin-bottom:14px;">Cambia el rol de cualquier usuario del sistema.</p>
+          <div style="display:flex;gap:10px;flex-wrap:wrap;">
+            <input class="inp" id="roleChangeEmail" placeholder="Email del usuario" style="flex:1;min-width:200px;">
+            <select class="inp" id="roleChangeVal" style="width:140px;">
+              <option value="padre">Padre</option>
+              <option value="maestra">Maestra</option>
+              <option value="asistente">Asistente</option>
+              <option value="directora">Directora</option>
+              <option value="admin">Admin</option>
+            </select>
+            <button class="btn btn-primary" onclick="changeUserRole()"><i class="bi bi-arrow-repeat"></i> Cambiar rol</button>
+          </div>
+          <div id="roleChangeMsg" style="margin-top:10px;font-size:12px;font-weight:700;"></div>
+        </div>
+      </div>
+    </div>
+
+  </div><!-- /content -->
+</div><!-- /main -->
+
+<script src="js/shared/supabase-js.min.js"></script>
+<script type="module" src="js/control/main.js"></script>
+</body>
+</html>

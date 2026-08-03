@@ -1,0 +1,661 @@
+/* ============================================================
+   🎨 Karpus Kids — Modern Design System v2
+   Mejoras visuales globales: animaciones, sidebar, colores
+   ============================================================ */
+
+/* ── Lucide Icons — garantizar visibilidad de SVGs ──────── */
+/* Lucide reemplaza <i data-lucide> con <svg>. Estas reglas
+   aseguran que el SVG sea visible y herede dimensiones. */
+
+/* Fix crítico: los SVGs de lucide tienen width/height hardcodeados
+   que sobreescriben las clases Tailwind w-* h-*.
+   Forzamos que las clases Tailwind ganen con !important selectivo. */
+svg[data-lucide].w-3  { width: 0.75rem  !important; height: 0.75rem  !important; }
+svg[data-lucide].w-4  { width: 1rem     !important; height: 1rem     !important; }
+svg[data-lucide].w-5  { width: 1.25rem  !important; height: 1.25rem  !important; }
+svg[data-lucide].w-6  { width: 1.5rem   !important; height: 1.5rem   !important; }
+svg[data-lucide].w-7  { width: 1.75rem  !important; height: 1.75rem  !important; }
+svg[data-lucide].w-8  { width: 2rem     !important; height: 2rem     !important; }
+svg[data-lucide].w-10 { width: 2.5rem   !important; height: 2.5rem   !important; }
+svg[data-lucide].w-12 { width: 3rem     !important; height: 3rem     !important; }
+svg[data-lucide].w-36 { width: 9rem     !important; height: 9rem     !important; }
+
+/* Altura independiente si se especifica */
+svg[data-lucide].h-3  { height: 0.75rem  !important; }
+svg[data-lucide].h-4  { height: 1rem     !important; }
+svg[data-lucide].h-5  { height: 1.25rem  !important; }
+svg[data-lucide].h-6  { height: 1.5rem   !important; }
+svg[data-lucide].h-7  { height: 1.75rem  !important; }
+svg[data-lucide].h-8  { height: 2rem     !important; }
+
+/* SVGs siempre visibles y con display correcto */
+svg[data-lucide] {
+  display: inline-block;
+  vertical-align: middle;
+  flex-shrink: 0;
+  overflow: visible;
+}
+
+/* Dentro de flex containers, usar display:block */
+div > svg[data-lucide],
+button > svg[data-lucide],
+span > svg[data-lucide],
+a > svg[data-lucide] {
+  display: block;
+}
+
+/* ── Keyframes globales ──────────────────────────────────── */
+@keyframes kk-float {
+  0%, 100% { transform: translateY(0px) rotate(0deg); }
+  33%       { transform: translateY(-8px) rotate(1deg); }
+  66%       { transform: translateY(-4px) rotate(-1deg); }
+}
+@keyframes kk-pulse-ring {
+  0%   { box-shadow: 0 0 0 0 rgba(255,255,255,0.4); }
+  70%  { box-shadow: 0 0 0 10px rgba(255,255,255,0); }
+  100% { box-shadow: 0 0 0 0 rgba(255,255,255,0); }
+}
+@keyframes kk-shimmer {
+  0%   { background-position: -200% center; }
+  100% { background-position: 200% center; }
+}
+@keyframes kk-slide-in {
+  from { opacity: 0; transform: translateX(-12px); }
+  to   { opacity: 1; transform: translateX(0); }
+}
+@keyframes kk-fade-up {
+  from { opacity: 0; transform: translateY(16px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+@keyframes kk-spin-slow {
+  to { transform: rotate(360deg); }
+}
+@keyframes kk-bounce-in {
+  0%   { transform: scale(0.8); opacity: 0; }
+  60%  { transform: scale(1.05); opacity: 1; }
+  100% { transform: scale(1); }
+}
+@keyframes kk-glow {
+  0%, 100% { opacity: 0.15; }
+  50%       { opacity: 0.35; }
+}
+
+/* ── Utility classes ─────────────────────────────────────── */
+.kk-float        { animation: kk-float 5s ease-in-out infinite; }
+.kk-fade-up      { animation: kk-fade-up 0.5s ease both; }
+.kk-slide-in     { animation: kk-slide-in 0.3s ease both; }
+.kk-bounce-in    { animation: kk-bounce-in 0.4s cubic-bezier(0.34,1.56,0.64,1) both; }
+
+/* ── Logo Karpus Kids — colores estándar ─────────────────── */
+.kk-logo .k-1, .kk-logo .k-5, .kk-logo .k-10 { color: #f97316; }
+.kk-logo .k-2, .kk-logo .k-6, .kk-logo .k-9  { color: #3b82f6; }
+.kk-logo .k-3, .kk-logo .k-8                  { color: #ec4899; }
+.kk-logo .k-4, .kk-logo .k-7                  { color: #22c55e; }
+
+/* ── Sidebar base mejorado ───────────────────────────────── */
+.kk-sidebar {
+  position: relative;
+  overflow: hidden;
+}
+
+/* Brillo decorativo en la parte superior del sidebar */
+.kk-sidebar::before {
+  content: '';
+  position: absolute;
+  top: -60px; left: -60px;
+  width: 200px; height: 200px;
+  background: radial-gradient(circle, rgba(255,255,255,0.18) 0%, transparent 70%);
+  pointer-events: none;
+  z-index: 0;
+  animation: kk-glow 4s ease-in-out infinite;
+}
+
+/* Patrón de puntos decorativo */
+.kk-sidebar::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background-image: radial-gradient(circle, rgba(255,255,255,0.06) 1px, transparent 1px);
+  background-size: 20px 20px;
+  pointer-events: none;
+  z-index: 0;
+}
+
+/* ── Logo block en sidebar ───────────────────────────────── */
+.kk-sidebar-logo {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 20px 16px 16px;
+  border-bottom: 1px solid rgba(255,255,255,0.12);
+  margin-bottom: 8px;
+}
+
+.kk-sidebar-logo-img {
+  width: 44px;
+  height: 44px;
+  border-radius: 14px;
+  background: rgba(255,255,255,0.95);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  box-shadow: 0 4px 16px rgba(0,0,0,0.2), 0 0 0 2px rgba(255,255,255,0.3);
+  flex-shrink: 0;
+  animation: kk-float 6s ease-in-out infinite;
+}
+
+.kk-sidebar-logo-img img {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  padding: 4px;
+}
+
+.kk-sidebar-logo-text {
+  flex: 1;
+  min-width: 0;
+}
+
+.kk-sidebar-logo-text .brand {
+  font-size: 17px;
+  font-weight: 900;
+  line-height: 1.1;
+  letter-spacing: -0.3px;
+}
+
+.kk-sidebar-logo-text .sub {
+  font-size: 9px;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+  color: rgba(255,255,255,0.6);
+  margin-top: 2px;
+}
+
+/* ── Profile card en sidebar ─────────────────────────────── */
+.kk-sidebar-profile {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 12px;
+  margin: 0 8px 12px;
+  background: rgba(255,255,255,0.12);
+  border: 1px solid rgba(255,255,255,0.15);
+  border-radius: 16px;
+  backdrop-filter: blur(8px);
+  transition: background 0.2s;
+}
+
+.kk-sidebar-profile:hover {
+  background: rgba(255,255,255,0.18);
+}
+
+.kk-sidebar-profile-avatar {
+  width: 38px;
+  height: 38px;
+  border-radius: 50%;
+  border: 2px solid rgba(255,255,255,0.4);
+  overflow: hidden;
+  flex-shrink: 0;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.2);
+  position: relative;
+}
+
+.kk-sidebar-profile-avatar::after {
+  content: '';
+  position: absolute;
+  bottom: 1px; right: 1px;
+  width: 9px; height: 9px;
+  background: #22c55e;
+  border: 2px solid white;
+  border-radius: 50%;
+}
+
+.kk-sidebar-profile-avatar img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.kk-sidebar-profile-info {
+  flex: 1;
+  min-width: 0;
+}
+
+.kk-sidebar-profile-name {
+  font-size: 12px;
+  font-weight: 800;
+  color: white;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.kk-sidebar-profile-role {
+  font-size: 9px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  color: rgba(255,255,255,0.55);
+  margin-top: 1px;
+}
+
+/* ── Nav items mejorados ─────────────────────────────────── */
+.kk-nav-item {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 12px;
+  border-radius: 12px;
+  font-size: 13px;
+  font-weight: 700;
+  color: rgba(255,255,255,0.8);
+  cursor: pointer;
+  border: none;
+  background: transparent;
+  width: 100%;
+  text-align: left;
+  transition: all 0.2s cubic-bezier(0.4,0,0.2,1);
+  text-decoration: none;
+}
+
+.kk-nav-item:hover {
+  background: rgba(255,255,255,0.15);
+  color: white;
+  transform: translateX(3px);
+}
+
+.kk-nav-item.active {
+  background: rgba(255,255,255,0.22);
+  color: white;
+  box-shadow: 0 2px 12px rgba(0,0,0,0.15), inset 0 1px 0 rgba(255,255,255,0.2);
+}
+
+.kk-nav-item.active::before {
+  content: '';
+  position: absolute;
+  left: 0; top: 20%; bottom: 20%;
+  width: 3px;
+  background: white;
+  border-radius: 0 3px 3px 0;
+}
+
+.kk-nav-item i {
+  width: 20px;
+  height: 20px;
+  flex-shrink: 0;
+  transition: transform 0.2s;
+}
+
+.kk-nav-item:hover i {
+  transform: scale(1.1);
+}
+
+/* ── Logout button ───────────────────────────────────────── */
+.kk-logout-btn {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  width: 100%;
+  padding: 11px 16px;
+  border-radius: 14px;
+  font-size: 12px;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: rgba(255,255,255,0.75);
+  background: rgba(255,255,255,0.08);
+  border: 1px solid rgba(255,255,255,0.12);
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.kk-logout-btn:hover {
+  background: rgba(239,68,68,0.25);
+  border-color: rgba(239,68,68,0.4);
+  color: #fca5a5;
+}
+
+/* ── Decorative icon ─────────────────────────────────────── */
+.kk-sidebar-deco {
+  position: absolute;
+  bottom: 16px; right: 16px;
+  opacity: 0.07;
+  pointer-events: none;
+  animation: kk-spin-slow 30s linear infinite;
+}
+
+/* ── Section divider ─────────────────────────────────────── */
+.kk-nav-section {
+  position: relative;
+  z-index: 1;
+  font-size: 9px;
+  font-weight: 900;
+  text-transform: uppercase;
+  letter-spacing: 0.14em;
+  color: rgba(255,255,255,0.4);
+  padding: 8px 12px 4px;
+  margin-top: 4px;
+}
+
+/* ── Badge ───────────────────────────────────────────────── */
+.kk-badge {
+  position: absolute;
+  top: 6px; right: 6px;
+  min-width: 18px;
+  height: 18px;
+  background: #ef4444;
+  color: white;
+  font-size: 9px;
+  font-weight: 900;
+  border-radius: 50px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0 4px;
+  box-shadow: 0 2px 6px rgba(239,68,68,0.5);
+  animation: kk-pulse-ring 2s infinite;
+}
+
+/* ── Card improvements ───────────────────────────────────── */
+.kk-card {
+  background: white;
+  border-radius: 20px;
+  border: 1px solid rgba(0,0,0,0.06);
+  box-shadow: 0 2px 12px rgba(0,0,0,0.06);
+  transition: transform 0.2s, box-shadow 0.2s;
+  overflow: hidden;
+}
+
+.kk-card:hover {
+  transform: translateY(-3px);
+  box-shadow: 0 8px 24px rgba(0,0,0,0.1);
+}
+
+/* ── Gradient KPI cards ──────────────────────────────────── */
+.kk-kpi {
+  border-radius: 20px;
+  padding: 20px;
+  position: relative;
+  overflow: hidden;
+  transition: transform 0.2s, box-shadow 0.2s;
+}
+
+.kk-kpi:hover {
+  transform: translateY(-4px);
+  box-shadow: 0 12px 32px rgba(0,0,0,0.15);
+}
+
+.kk-kpi::after {
+  content: '';
+  position: absolute;
+  top: -30px; right: -30px;
+  width: 100px; height: 100px;
+  background: rgba(255,255,255,0.1);
+  border-radius: 50%;
+  pointer-events: none;
+}
+
+/* ── Shimmer loading ─────────────────────────────────────── */
+.kk-shimmer {
+  background: linear-gradient(90deg, #f1f5f9 25%, #e2e8f0 50%, #f1f5f9 75%);
+  background-size: 200% 100%;
+  animation: kk-shimmer 1.5s infinite;
+  border-radius: 12px;
+}
+
+/* ── Scrollbar personalizado ─────────────────────────────── */
+.kk-scroll::-webkit-scrollbar { width: 4px; }
+.kk-scroll::-webkit-scrollbar-track { background: transparent; }
+.kk-scroll::-webkit-scrollbar-thumb { background: rgba(0,0,0,0.12); border-radius: 4px; }
+.kk-scroll::-webkit-scrollbar-thumb:hover { background: rgba(0,0,0,0.2); }
+
+/* ── Mobile sidebar overlay ──────────────────────────────── */
+.kk-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,0.5);
+  backdrop-filter: blur(4px);
+  z-index: 1040;
+  transition: opacity 0.3s;
+}
+
+/* ── Tooltip ─────────────────────────────────────────────── */
+[data-tooltip] {
+  position: relative;
+}
+[data-tooltip]::after {
+  content: attr(data-tooltip);
+  position: absolute;
+  left: calc(100% + 10px);
+  top: 50%;
+  transform: translateY(-50%);
+  background: rgba(15,23,42,0.9);
+  color: white;
+  font-size: 11px;
+  font-weight: 700;
+  padding: 5px 10px;
+  border-radius: 8px;
+  white-space: nowrap;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 0.15s;
+  z-index: 9999;
+}
+[data-tooltip]:hover::after {
+  opacity: 1;
+}
+
+/* ── Collapsed sidebar tooltips ──────────────────────────── */
+.collapsed [data-tooltip]::after {
+  opacity: 0;
+}
+.collapsed [data-tooltip]:hover::after {
+  opacity: 1;
+}
+
+/* ── Tablas de datos ─────────────────────────────────────── */
+.data-table {
+  width: 100%;
+  border-collapse: collapse;
+  background: white;
+  border-radius: 8px;
+  border: 1px solid #e2e8f0;
+}
+.data-table th {
+  background: #f1f5f9;
+  padding: 12px 16px;
+  text-align: left;
+  font-size: 11px;
+  font-weight: 900;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: #64748b;
+  border-bottom: 1px solid #e2e8f0;
+  white-space: nowrap;
+}
+.data-table td {
+  padding: 12px 16px;
+  border-bottom: 1px solid #f1f5f9;
+  color: #334155;
+  font-size: 13px;
+}
+.data-table tr:last-child td { border-bottom: none; }
+.data-table tr:hover td { background: #f8fafc; }
+
+/* Wrapper scroll horizontal */
+.table-scroll-wrap {
+  width: 100%;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+  border-radius: 12px;
+}
+.table-scroll-wrap .data-table { min-width: 600px; }
+
+/* ── Botones de acción en tablas ─────────────────────────── */
+.btn-action {
+  padding: 6px 10px;
+  border-radius: 8px;
+  font-size: 12px;
+  font-weight: 700;
+  cursor: pointer;
+  border: none;
+  touch-action: manipulation;
+  transition: all 0.15s;
+}
+.btn-action:active { transform: scale(0.95); }
+.btn-edit   { color: #4f46e5; background: #eef2ff; }
+.btn-edit:hover { background: #e0e7ff; }
+.btn-delete { color: #e11d48; background: #fff1f2; }
+.btn-delete:hover { background: #ffe4e6; }
+
+/* ── Modales ─────────────────────────────────────────────── */
+.modal-header {
+  padding: 1.5rem;
+  border-bottom: 1px solid #e5e7eb;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+.modal-body   { padding: 1.5rem; }
+.modal-footer {
+  padding: 1.5rem;
+  border-top: 1px solid #e5e7eb;
+  display: flex;
+  justify-content: flex-end;
+  gap: 0.75rem;
+}
+.modal-container { display: flex; align-items: center; justify-content: center; }
+.modal-container.hidden { display: none !important; }
+
+/* ── karpus-kids-inline (logo colores) ───────────────────── */
+.karpus-kids-inline { font-weight: 900; }
+.karpus-kids-inline .k-1,
+.karpus-kids-inline .k-5,
+.karpus-kids-inline .k-10 { color: #f97316; }
+.karpus-kids-inline .k-2,
+.karpus-kids-inline .k-6,
+.karpus-kids-inline .k-9  { color: #3b82f6; }
+.karpus-kids-inline .k-3,
+.karpus-kids-inline .k-8  { color: #ec4899; }
+.karpus-kids-inline .k-4,
+.karpus-kids-inline .k-7  { color: #22c55e; }
+
+/* ── Sidebar desktop: ancho base (usado por directora/asistente) ── */
+@media (min-width: 768px) {
+  body:not(.panel-padre-body) aside#sidebar {
+    width: 288px;
+  }
+  .panel-asistente-body aside#sidebar { width: 280px; }
+}
+
+/* ── Sidebar collapsed state ─────────────────────────────── */
+@media (min-width: 768px) {
+  aside#sidebar.collapsed .kk-sidebar-logo-text,
+  aside#sidebar.collapsed .kk-sidebar-profile-info,
+  aside#sidebar.collapsed .kk-nav-section,
+  aside#sidebar.collapsed .kk-nav-item span,
+  aside#sidebar.collapsed .kk-logout-btn span,
+  aside#sidebar.collapsed .label {
+    display: none;
+  }
+  aside#sidebar.collapsed .kk-nav-item {
+    justify-content: center;
+    padding-left: 0;
+    padding-right: 0;
+  }
+  aside#sidebar.collapsed .kk-nav-item i {
+    width: 24px;
+    height: 24px;
+  }
+  aside#sidebar.collapsed .kk-logout-btn {
+    justify-content: center;
+    padding-left: 0;
+    padding-right: 0;
+  }
+}
+
+/* ── Badge animations ────────────────────────────────────── */
+@keyframes kk-scale-bounce {
+  0%   { transform: scale(1); }
+  30%  { transform: scale(1.5); }
+  60%  { transform: scale(0.9); }
+  100% { transform: scale(1); }
+}
+.scale-bounce {
+  animation: kk-scale-bounce 0.6s cubic-bezier(0.34,1.56,0.64,1) both;
+}
+
+/* Nav item pulse cuando llega contenido nuevo */
+@keyframes kk-nav-pulse {
+  0%   { background: transparent; }
+  30%  { background: rgba(255,255,255,0.25); }
+  100% { background: transparent; }
+}
+.nav-pulse {
+  animation: kk-nav-pulse 1s ease both;
+}
+
+/* animate-glow — usado por BadgeSystem en botones del sidebar */
+@keyframes kk-animate-glow {
+  0%   { background: transparent; box-shadow: none; }
+  20%  { background: rgba(249,115,22,0.18); box-shadow: 0 0 12px rgba(249,115,22,0.3); }
+  60%  { background: rgba(249,115,22,0.10); }
+  100% { background: transparent; box-shadow: none; }
+}
+.animate-glow {
+  animation: kk-animate-glow 1.5s ease-out both;
+}
+
+/* Dot badge en tarjetas del dashboard */
+.card-dot-badge {
+  position: absolute;
+  top: -4px;
+  right: -4px;
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  border: 2px solid white;
+  animation: kk-pulse-ring 2s infinite;
+}
+
+/* ── Card glow — brillo en tarjetas cuando llega contenido nuevo ── */
+@keyframes kk-card-glow-orange {
+  0%   { box-shadow: 0 0 0 0 rgba(249,115,22,0); border-color: transparent; }
+  25%  { box-shadow: 0 0 0 6px rgba(249,115,22,0.35), 0 0 20px rgba(249,115,22,0.2); border-color: #f97316; }
+  75%  { box-shadow: 0 0 0 3px rgba(249,115,22,0.15); border-color: #fdba74; }
+  100% { box-shadow: 0 0 0 0 rgba(249,115,22,0); border-color: transparent; }
+}
+@keyframes kk-card-glow-blue {
+  0%   { box-shadow: 0 0 0 0 rgba(59,130,246,0); border-color: transparent; }
+  25%  { box-shadow: 0 0 0 6px rgba(59,130,246,0.35), 0 0 20px rgba(59,130,246,0.2); border-color: #3b82f6; }
+  75%  { box-shadow: 0 0 0 3px rgba(59,130,246,0.15); border-color: #93c5fd; }
+  100% { box-shadow: 0 0 0 0 rgba(59,130,246,0); border-color: transparent; }
+}
+@keyframes kk-card-glow-green {
+  0%   { box-shadow: 0 0 0 0 rgba(34,197,94,0); border-color: transparent; }
+  25%  { box-shadow: 0 0 0 6px rgba(34,197,94,0.35), 0 0 20px rgba(34,197,94,0.2); border-color: #22c55e; }
+  75%  { box-shadow: 0 0 0 3px rgba(34,197,94,0.15); border-color: #86efac; }
+  100% { box-shadow: 0 0 0 0 rgba(34,197,94,0); border-color: transparent; }
+}
+@keyframes kk-card-glow-red {
+  0%   { box-shadow: 0 0 0 0 rgba(239,68,68,0); border-color: transparent; }
+  25%  { box-shadow: 0 0 0 6px rgba(239,68,68,0.35), 0 0 20px rgba(239,68,68,0.2); border-color: #ef4444; }
+  75%  { box-shadow: 0 0 0 3px rgba(239,68,68,0.15); border-color: #fca5a5; }
+  100% { box-shadow: 0 0 0 0 rgba(239,68,68,0); border-color: transparent; }
+}
+
+.card-glow-orange { animation: kk-card-glow-orange 1.8s ease-out both; }
+.card-glow-blue   { animation: kk-card-glow-blue   1.8s ease-out both; }
+.card-glow-green  { animation: kk-card-glow-green  1.8s ease-out both; }
+.card-glow-red    { animation: kk-card-glow-red    1.8s ease-out both; }

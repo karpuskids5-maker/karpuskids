@@ -1,0 +1,497 @@
+:root{
+  --karpus-green: #4CAF50;
+  --karpus-pink: #FF4081;
+  --karpus-blue: #2196F3;
+  --karpus-orange: #FF9800;
+  --karpus-yellow: #FFC107;
+  --karpus-purple: #9C27B0;
+  --karpus-teal: #009688;
+}
+
+/* Estilos generales */
+html { -webkit-text-size-adjust: 100%; text-size-adjust: 100%; }
+*, *::before, *::after { box-sizing: border-box; }
+body {
+  font-family: 'Nunito', sans-serif;
+  background-color: #f5f7fb;
+  transition: all 0.3s ease;
+  overscroll-behavior: auto; /* Permitir scroll normal en móviles */
+}
+
+/* Panel Padres: cabecera cielo con nubes suaves */
+.header-kids {
+  background:
+    radial-gradient(ellipse at top left, rgba(227,242,253,0.7), transparent 60%),
+    radial-gradient(ellipse at top right, rgba(227,242,253,0.6), transparent 60%);
+  border-radius: 1.25rem;
+  padding: 1rem;
+}
+
+/* Panel Padres: césped decorativo en el fondo */
+.bushes {
+  position: absolute;
+  left: 0; right: 0;
+  bottom: 0;
+  height: 60px;
+  background:
+    radial-gradient(circle at 10% 50%, #c6f6d5 15px, transparent 16px),
+    radial-gradient(circle at 25% 55%, #a7f3d0 18px, transparent 19px),
+    radial-gradient(circle at 40% 48%, #a7f3d0 16px, transparent 17px),
+    radial-gradient(circle at 55% 50%, #86efac 20px, transparent 21px),
+    radial-gradient(circle at 70% 52%, #86efac 16px, transparent 17px),
+    radial-gradient(circle at 85% 50%, #c6f6d5 18px, transparent 19px);
+  opacity: .6;
+  pointer-events: none;
+}
+
+/* Etiqueta de tutor (pill) en sidebar */
+.parent-tag {
+  backdrop-filter: blur(4px);
+}
+
+/* Accents on white cards */
+.card-white{ background:#fff; border:1px solid #e5e7eb; border-radius: 1rem; }
+.card-clean { background:#fff; border:1px solid #f1f5f9; border-radius: 0.75rem; box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.05); }
+.badge{ display:inline-block; padding:2px 8px; border-radius:10px; font-size:12px; }
+.badge-green{ background: #E8F5E9; color:#2E7D32; }
+.badge-pink{ background: #FCE4EC; color:#C2185B; }
+.badge-blue{ background: #E3F2FD; color:#1565C0; }
+.badge-orange{ background: #FFF3E0; color:#EF6C00; }
+.badge-yellow{ background: #FFF9C4; color:#F57F17; }
+
+.btn{ border-radius:12px; padding:6px 10px; font-size:13px; }
+.btn-green{ background:var(--karpus-green); color:#fff; }
+.btn-pink{ background:var(--karpus-pink); color:#fff; }
+.btn-blue{ background:var(--karpus-blue); color:#fff; }
+.btn-orange{ background:var(--karpus-orange); color:#fff; }
+.btn-yellow{ background:var(--karpus-yellow); color:#fff; }
+
+/* Sidebar gradients in requested palette */
+.sidebar-green { background: linear-gradient(135deg,#E8F8F0,#D0F0E0); }
+.sidebar-yellow { background: linear-gradient(135deg,#FFF8E0,#FFF1C2); }
+.sidebar-pink { background: linear-gradient(135deg,#FFF0F6,#FFE3F0); }
+.sidebar-blue { background: linear-gradient(135deg,#E3F2FD,#BBDEFB); }
+.sidebar-orange { background: linear-gradient(135deg,#FFF3E0,#FFE0B2); }
+
+/* Scroll container para sidebars */
+.sidebar-scroll { max-height: calc(100vh - 4rem); overflow: auto; }
+
+/* Small colorful chips */
+.chip{ display:inline-block; border-radius:9999px; padding:2px 10px; font-size:11px; }
+.chip-green{ background:#E8F5E9; color:#2E7D32; }
+.chip-pink{ background:#FCE4EC; color:#C2185B; }
+.chip-blue{ background:#E3F2FD; color:#1565C0; }
+.chip-orange{ background:#FFF3E0; color:#EF6C00; }
+.chip-yellow{ background:#FFF9C4; color:#F57F17; }
+
+/* Karpus colored letters small */
+.karpus-kids-inline { font-weight: 700; }
+.karpus-kids-inline .k-1 { color: #FF9800; }
+.karpus-kids-inline .k-2 { color: #2196F3; }
+.karpus-kids-inline .k-3 { color: #E91E63; }
+.karpus-kids-inline .k-4 { color: #4CAF50; }
+.karpus-kids-inline .k-5 { color: #FF9800; }
+.karpus-kids-inline .k-6 { color: #2196F3; }
+.karpus-kids-inline .k-7 { color: #4CAF50; }
+.karpus-kids-inline .k-8 { color: #E91E63; }
+.karpus-kids-inline .k-9 { color: #2196F3; }
+.karpus-kids-inline .k-10 { color: #FF9800; }
+
+/* Animaciones y Transiciones Adicionales */
+.card-interactive {
+  transition: transform 0.2s ease-out, box-shadow 0.2s ease-out;
+}
+.card-interactive:hover {
+  transform: translateY(-4px);
+  box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.07), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
+}
+.mobile-visible { display: block !important; }
+
+/* Botón de cierre de sección */
+.section-close {
+  position: absolute;
+  top: 0.5rem;
+  right: 0.5rem;
+  background: rgba(255, 255, 255, 0.85);
+  border: 1px solid rgba(0, 0, 0, 0.06);
+  color: #334155;
+  padding: 0.25rem 0.5rem;
+  border-radius: 0.5rem;
+  line-height: 1;
+  font-size: 14px;
+  cursor: pointer;
+  box-shadow: 0 2px 6px rgba(0,0,0,0.08);
+}
+.section-close:hover { background: rgba(255, 255, 255, 1); }
+
+/* Transiciones del sidebar en móvil */
+#sidebar.mobile-visible { display: block; transform: translateX(0); }
+#sidebar { transition: transform 0.25s ease-in-out; }
+
+/* Mobile Tables */
+@media (max-width: 640px) {
+  .table-mobile tr {
+    display: block;
+    border-bottom: 1px solid #e5e7eb;
+    margin-bottom: 0.5rem;
+  }
+  .table-mobile td {
+    display: block;
+    padding: 0.5rem;
+  }
+  .table-mobile thead {
+    display: none;
+  }
+}
+
+/* Hide scrollbar */
+.no-scrollbar::-webkit-scrollbar { display: none; }
+.no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+
+/* Section visibility */
+.section { display: none; }
+.section.active { display: block; animation: fadeIn 0.2s ease; }
+@keyframes fadeIn { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: translateY(0); } }
+
+/* --- ESTILOS INFANTILES (REDISEÑO) --- */
+
+/* 1. SIDEBAR → ESTILO MOCHILA ESCOLAR */
+body.panel-padre-body #sidebar {
+  background: linear-gradient(180deg, #4ade80 0%, #2dd4bf 100%);
+  box-shadow: 4px 0 24px rgba(20,184,166,0.25);
+  border-right: 4px solid #14b8a6;
+}
+body.panel-maestra-body #sidebar {
+  background: linear-gradient(180deg, #ffb703 0%, #fb8500 100%);
+  box-shadow: 4px 0 24px rgba(217,119,6,0.25);
+  border-right: 4px solid #d97706;
+}
+body.panel-directora-body #sidebar {
+  background: linear-gradient(180deg, #7c3aed 0%, #4f46e5 100%);
+  box-shadow: 4px 0 24px rgba(79,70,229,0.25);
+  border-right: 4px solid #6d28d9;
+}
+body.panel-asistente-body #sidebar {
+  background: linear-gradient(180deg, #0f766e 0%, #115e59 100%);
+  box-shadow: 4px 0 24px rgba(17,94,89,0.25);
+  border-right: 4px solid #0d9488;
+}
+
+.sidebar-btn {
+  padding: 0.75rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  border-radius: 1rem;
+  font-size: 0.95rem;
+  transition: all 0.25s cubic-bezier(0.34, 1.56, 0.64, 1); /* Bounce effect */
+  color: #e0f2fe; /* Sky-100 */
+  font-weight: 700;
+  border: 2px solid transparent;
+  margin-bottom: 0.5rem;
+}
+
+.sidebar-btn:hover {
+  background: #A7F3D0;
+  transform: translateX(6px) scale(1.02);
+  color: #064E3B;
+}
+
+.sidebar-btn.active {
+  background: #0b7934;
+  color: #064E3B;
+  transform: translateX(8px);
+  border-left: 6px solid #22C55E;
+  box-shadow: inset 0 0 0 2px #BAE6FD, 0 4px 12px rgba(0,0,0,0.1);
+}
+
+/* Colores por Sección (Active State) */
+.sidebar-btn[data-target="home"].active { color: #16a34a; /* Green */ }
+.sidebar-btn[data-target="tasks"].active { color: #2563eb; /* Blue */ }
+.sidebar-btn[data-target="class"].active { color: #7c3aed; /* Purple (Muro) */ }
+.sidebar-btn[data-target="live-attendance"].active { color: #db2777; /* Pink */ }
+.sidebar-btn[data-target="grades"].active { color: #ea580c; /* Orange */ }
+.sidebar-btn[data-target="payments"].active { color: #15803d; /* Dark Green */ }
+.sidebar-btn[data-target="profile"].active { color: #0ea5e9; /* Sky */ }
+
+/* Iconos del sidebar */
+.sidebar-btn i {
+  stroke-width: 2.5px;
+  filter: drop-shadow(0 2px 2px rgba(0,0,0,0.1));
+  transition: transform .2s ease;
+}
+.sidebar-btn:hover i { transform: scale(1.2) rotate(-3deg); }
+
+/* Desktop Sidebar Tweaks */
+@media (min-width: 768px) {
+  .sidebar-btn {
+    width: 100%;
+    justify-content: flex-start;
+    padding: 0.75rem 1rem;
+  }
+}
+
+/* Mobile Sidebar Tweaks */
+@media (max-width: 767px) {
+  .sidebar-btn {
+    flex: 0 0 auto;
+    width: 70px;
+    min-height: 56px;
+    padding: 0.5rem;
+    flex-direction: column;
+    font-size: 0.65rem;
+    margin-bottom: 0;
+  }
+  .sidebar-btn:hover { transform: translateY(-4px); }
+  .sidebar-btn.active { transform: translateY(-6px); }
+  .sidebar-btn span {
+    display: block;
+    margin-top: 2px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    max-width: 100%;
+  }
+}
+
+/* Bolsillo del estudiante */
+.student-pocket {
+  background: rgba(255, 255, 255, 0.15);
+  border: 2px dashed rgba(255, 255, 255, 0.4);
+  border-radius: 1.5rem;
+  padding: 1rem;
+  margin-bottom: 1.5rem;
+  backdrop-filter: blur(4px);
+  transition: transform 0.3s ease;
+}
+.student-pocket:hover {
+  transform: rotate(1deg) scale(1.02);
+  background: rgba(255, 255, 255, 0.25);
+}
+
+/* 2. TARJETA DE INICIO → BLOQUES DE JUGUETE */
+.toy-card {
+  background-color: white;
+  border-radius: 1.75rem;
+  padding: 1.2rem;
+  box-shadow: 0 8px 18px rgba(0,0,0,0.08);
+  transition: transform 0.25s ease;
+  position: relative;
+  border: 1px solid #f1f5f9;
+  overflow: hidden;
+}
+.toy-card:hover {
+  transform: translateY(-4px) rotate(-1deg);
+}
+/* Variantes de color para Toy Cards */
+.toy-card.green { border-bottom: 4px solid #22c55e; }
+.toy-card.rose { border-bottom: 4px solid #f43f5e; }
+.toy-card.amber { border-bottom: 4px solid #f59e0b; }
+.toy-card.blue { border-bottom: 4px solid #3b82f6; }
+.toy-card.purple { border-bottom: 4px solid #8b5cf6; }
+.toy-card.emerald { border-bottom: 4px solid #10b981; }
+.toy-card.orange { border-bottom: 4px solid #f97316; }
+.toy-card.slate { border-bottom: 4px solid #64748b; }
+
+/* 3. SECCIÓN TAREAS → ESTILO CUADERNO */
+.notebook-task {
+  background: repeating-linear-gradient(
+    white,
+    white 28px,
+    #cfe5ff 29px
+  );
+  border-left: 6px solid #fb7185;
+  border-radius: 1rem;
+  padding: 1rem 1rem 1rem 2.5rem;
+  box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+  position: relative;
+  margin-bottom: 1rem;
+  transition: transform 0.2s;
+  border-right: 1px solid #e2e8f0;
+  border-bottom: 1px solid #e2e8f0;
+}
+.notebook-task::before {
+  content: '';
+  position: absolute;
+  left: 1.5rem;
+  top: 0;
+  bottom: 0;
+  width: 2px;
+  background-color: #fb7185;
+  opacity: 0.5;
+}
+.notebook-task:hover {
+  transform: scale(1.01);
+  box-shadow: 0 4px 12px rgba(0,0,0,0.08);
+}
+
+/* 4. TAREAS ENTREGADAS → LEGO / BLOQUES */
+.lego-task {
+  background: linear-gradient(145deg, #60a5fa, #93c5fd);
+  border-radius: 1.5rem;
+  position: relative;
+  color: white;
+  padding: 1.5rem;
+  margin-top: 16px;
+  box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+  border: 2px solid #3b82f6;
+}
+.lego-task::before {
+  content: "";
+  width: 40px;
+  height: 8px;
+  background: #bfdbfe;
+  position: absolute;
+  top: -8px;
+  left: 20px;
+  border-radius: 4px 4px 0 0;
+  box-shadow: 50px 0 0 #bfdbfe, 100px 0 0 #bfdbfe; /* Studs */
+}
+.lego-task h3, .lego-task p, .lego-task span {
+  color: white !important;
+  text-shadow: 0 1px 2px rgba(0,0,0,0.1);
+}
+
+/* 5. ANIMACIONES INFANTILES */
+.bounce { transition: transform 0.3s cubic-bezier(0.34, 1.56, 0.64, 1); }
+.bounce:hover {
+  animation: bounce 0.5s infinite alternate;
+}
+@keyframes bounce {
+  0% { transform: translateY(0); }
+  100% { transform: translateY(-6px); }
+}
+
+/* Estilos para impresión (Reporte PDF) */
+@media print {
+  #sidebar, header, .no-print, #scrollTopBtn { display: none !important; }
+  #layoutShell { margin: 0 !important; padding: 0 !important; }
+  body { background: white; }
+}
+
+/* --- ESTILOS TARJETAS DE ESTUDIANTE (PASTEL) --- */
+.student-card-pastel {
+  border-radius: 1.5rem; /* 24px */
+  padding: 1.5rem; /* 24px */
+  text-align: center;
+  transition: all 0.3s ease;
+  position: relative;
+  border: 1px solid rgba(0,0,0,0.05);
+  box-shadow: 0 4px 6px -1px rgba(0,0,0,0.05), 0 2px 4px -1px rgba(0,0,0,0.03);
+}
+.student-card-pastel:hover {
+  transform: translateY(-6px);
+  box-shadow: 0 10px 15px -3px rgba(0,0,0,0.1), 0 4px 6px -2px rgba(0,0,0,0.05);
+}
+.student-card-avatar {
+  width: 80px;
+  height: 80px;
+  border-radius: 9999px;
+  margin: 0 auto 1rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 2.25rem; /* 36px */
+  font-weight: 900; /* black */
+  color: white;
+  text-shadow: 0 2px 4px rgba(0,0,0,0.1);
+  border: 4px solid white;
+  box-shadow: 0 0 0 4px var(--pastel-color, #ccc);
+}
+.student-card-name {
+  font-size: 1.125rem; /* 18px */
+  font-weight: 700; /* bold */
+  color: #1e293b; /* slate-800 */
+  margin-bottom: 0.25rem;
+}
+.student-card-meta {
+  font-size: 0.75rem; /* 12px */
+  color: #64748b; /* slate-500 */
+  margin-bottom: 1rem;
+}
+.student-card-button {
+  width: 100%;
+  padding: 0.75rem 1rem;
+  border-radius: 0.75rem; /* 12px */
+  font-weight: 600; /* semibold */
+  color: white;
+  background-color: var(--pastel-color, #94a3b8);
+  transition: background-color 0.2s;
+  box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+}
+.student-card-button:hover {
+  background-color: var(--pastel-color-dark, #64748b);
+}
+
+/* Color Variants */
+.student-card-pastel.pastel-blue { --pastel-color: #7dd3fc; --pastel-color-dark: #38bdf8; background-color: #f0f9ff; } /* sky-300, sky-50 */
+.student-card-pastel.pastel-green { --pastel-color: #86efac; --pastel-color-dark: #4ade80; background-color: #f0fdf4; } /* green-300, green-50 */
+.student-card-pastel.pastel-pink { --pastel-color: #f9a8d4; --pastel-color-dark: #f472b6; background-color: #fdf2f8; } /* pink-300, pink-50 */
+.student-card-pastel.pastel-yellow { --pastel-color: #fde047; --pastel-color-dark: #facc15; background-color: #fefce8; } /* yellow-300, yellow-50 */
+.student-card-pastel.pastel-purple { --pastel-color: #c4b5fd; --pastel-color-dark: #a78bfa; background-color: #f5f3ff; } /* violet-300, violet-50 */
+
+.student-card-pastel.pastel-blue .student-card-avatar { background-color: #38bdf8; }
+.student-card-pastel.pastel-green .student-card-avatar { background-color: #4ade80; }
+.student-card-pastel.pastel-pink .student-card-avatar { background-color: #f472b6; }
+.student-card-pastel.pastel-yellow .student-card-avatar { background-color: #facc15; }
+.student-card-pastel.pastel-purple .student-card-avatar { background-color: #a78bfa; }
+
+/* --- ESTILOS FICHA ESCOLAR (MODAL PERFIL) --- */
+.school-record-card { background-color: #f8fafc; border-radius: 1.5rem; box-shadow: 0 20px 25px -5px rgba(0,0,0,0.1), 0 10px 10px -5px rgba(0,0,0,0.04); border: 1px solid #e2e8f0; overflow: hidden; }
+.record-header { background-color: white; padding: 1.5rem; display: flex; align-items: center; gap: 1.5rem; border-bottom: 1px solid #e2e8f0; position: relative; }
+.record-photo { width: 80px; height: 80px; border-radius: 9999px; background-color: #e0e7ff; color: #4338ca; display: flex; align-items: center; justify-content: center; flex-shrink: 0; border: 4px solid white; box-shadow: 0 0 0 1px #c7d2fe; }
+.record-title { font-size: 1.5rem; font-weight: 800; color: #1e293b; line-height: 1.2; }
+.record-subtitle { font-size: 0.875rem; font-weight: 600; color: #4f46e5; margin-top: 0.25rem; }
+.record-close-btn { position: absolute; top: 1rem; right: 1rem; padding: 0.5rem; border-radius: 9999px; color: #94a3b8; background-color: transparent; transition: all 0.2s; }
+.record-close-btn:hover { background-color: #f1f5f9; color: #475569; transform: rotate(90deg); }
+.record-body { padding: 1.5rem; overflow-y: auto; display: flex; flex-direction: column; gap: 1.5rem; }
+.record-section { background-color: white; padding: 1.25rem; border-radius: 1rem; border: 1px solid #e2e8f0; }
+.record-section-title { display: flex; align-items: center; gap: 0.75rem; font-size: 1rem; font-weight: 700; color: #334155; margin-bottom: 1.25rem; padding-bottom: 0.75rem; border-bottom: 1px dashed #e2e8f0; }
+.record-section-title i { width: 20px; height: 20px; color: #64748b; }
+.record-subsection { background-color: #f8fafc; padding: 1rem; border-radius: 0.75rem; border: 1px solid #f1f5f9; }
+.record-subsection-title { font-weight: 600; color: #475569; font-size: 0.875rem; margin-bottom: 0.75rem; }
+.record-grid { display: grid; grid-template-columns: repeat(1, minmax(0, 1fr)); gap: 1rem; }
+@media (min-width: 640px) { .record-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+.record-item label { display: block; font-size: 0.75rem; font-weight: 500; color: #64748b; margin-bottom: 0.25rem; }
+.record-item p { font-size: 0.875rem; font-weight: 600; color: #1e293b; }
+.record-footer { padding: 1rem 1.5rem; background-color: white; border-top: 1px solid #e2e8f0; display: flex; justify-content: flex-end; }
+
+/* --- ESTILOS MODAL GLOBAL --- */
+#globalModalContainer { position: fixed; inset: 0; display: flex; align-items: flex-start; justify-content: center; z-index: var(--z-modal, 100); padding-top: 4vh; overflow-y: auto; }
+#globalModalInner { animation: kk-modal-in 0.18s cubic-bezier(0.34, 1.56, 0.64, 1) both; }
+@keyframes kk-modal-in { from { transform: translateY(16px) scale(0.97); opacity: 0; } to { transform: translateY(0) scale(1); opacity: 1; } }
+.modal-overlay { position: fixed; inset: 0; background-color: rgba(0,0,0,0.5); display: flex; align-items: center; justify-content: center; }
+.modal-content { background-color: white; border-radius: 1rem; box-shadow: 0 25px 50px -12px rgba(0,0,0,0.25); max-width: 42rem; width: 90%; max-height: 90vh; overflow: hidden; display: flex; flex-direction: column; animation: kk-modal-in 0.18s cubic-bezier(0.34, 1.56, 0.64, 1) both; }
+@keyframes slideInUp { from { transform: translateY(2rem); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
+.modal-header { padding: 1.5rem; border-bottom: 1px solid #e2e8f0; display: flex; justify-content: space-between; align-items: center; background-color: #ffffff; }
+.modal-header h2 { font-size: 1.5rem; font-weight: 700; color: #1e293b; display: flex; align-items: center; gap: 0.5rem; }
+.modal-header h2 i { width: 24px; height: 24px; }
+.close-modal-btn { background-color: transparent; border: none; cursor: pointer; color: #94a3b8; transition: all 0.2s; padding: 0.5rem; }
+.close-modal-btn:hover { background-color: #f1f5f9; color: #475569; transform: rotate(90deg); }
+.close-modal-btn i { width: 20px; height: 20px; }
+.modal-body { padding: 1.5rem; overflow-y: auto; flex: 1; }
+.modal-body .space-y-4 > div + div { margin-top: 1rem; }
+.modal-body label { display: block; font-size: 0.875rem; font-weight: 600; color: #334155; margin-bottom: 0.5rem; }
+.modal-body input, .modal-body textarea { width: 100%; padding: 0.75rem; border: 1px solid #cbd5e1; border-radius: 0.5rem; font-size: 0.875rem; transition: all 0.2s; }
+.modal-body input:focus, .modal-body textarea:focus { outline: none; border-color: #ea580c; box-shadow: 0 0 0 3px rgba(234, 88, 12, 0.1); }
+.modal-footer { padding: 1rem 1.5rem; background-color: #f8fafc; border-top: 1px solid #e2e8f0; display: flex; justify-content: flex-end; gap: 1rem; }
+.btn-primary { padding: 0.75rem 1.5rem; background-color: #ea580c; color: white; border: none; border-radius: 0.5rem; font-weight: 600; cursor: pointer; transition: all 0.2s; }
+.btn-primary:hover { background-color: #c2410c; }
+.btn-primary:disabled { background-color: #cbd5e1; cursor: not-allowed; }
+.btn-secondary { padding: 0.75rem 1.5rem; background-color: #e2e8f0; color: #1e293b; border: none; border-radius: 0.5rem; font-weight: 600; cursor: pointer; transition: all 0.2s; }
+.btn-secondary:hover { background-color: #cbd5e1; }
+
+/* --- ESTILOS WALL MODULE --- */
+.post-card { transition: all 0.3s ease; }
+.post-card:hover { box-shadow: 0 20px 25px -5px rgba(0,0,0,0.1); }
+.post-card .likes-count, .post-card .comments-count { font-weight: 700; margin-left: 0.25rem; }
+.post-card .like-btn, .post-card .comments-btn { border: none; background: none; cursor: pointer; transition: all 0.2s; color: #64748b; }
+.post-card .like-btn:hover { color: #ea4335; }
+.post-card .comments-btn:hover { color: #3b82f6; }
+.post-card .like-btn.scale-110 { transform: scale(1.1); }
+.comments-section { background-color: #f8fafc; }
+.comments-list { max-height: 400px; overflow-y: auto; }
+.comment-input { width: 100%; padding: 0.75rem; border: 1px solid #cbd5e1; border-radius: 0.5rem; font-size: 0.875rem; }
+.comment-input:focus { outline: none; border-color: #ea580c; box-shadow: 0 0 0 3px rgba(234, 88, 12, 0.1); }
+

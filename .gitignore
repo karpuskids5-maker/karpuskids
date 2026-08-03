@@ -1,0 +1,60 @@
+# Environment variables — NEVER commit these
+.env
+.env.local
+.env.production
+.env.*.local
+
+# Supabase
+supabase/.temp/
+supabase/functions/.env
+
+# Node
+node_modules/
+npm-debug.log*
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Editor
+.vscode/settings.json
+.idea/
+
+# Build
+dist/
+build/
+*.min.js.map
+
+# Logs
+*.log
+logs/
+
+# Data
+data/*.db
+data/*.db-shm
+data/*.db-wal
+
+# Legacy files (no longer used)
+app.js
+store.js
+update_main.cjs
+update_asistente_main.cjs
+fix_escapes.cjs
+
+# Scripts with sensitive keys — run locally only, NEVER deploy
+scripts/fix_auth_activation.js
+scripts/confirm_users.js
+scripts/check_profile.js
+scripts/seed-demo.js
+scripts/seed-demo.cjs
+scripts/
+
+# Temporary fix scripts (run locally, don't need in repo)
+_fix_*.cjs
+_check_*.cjs
+_verify.cjs
+
+# Tailwind standalone CLI (binary, no commitear)
+tailwindcss.exe
+tailwind.v3.config.js
+css/tailwind.v3.css
