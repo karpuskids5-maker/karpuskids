@@ -2,6 +2,7 @@
 import { Helpers } from '../shared/helpers.js';
 import { supabase } from '../shared/supabase.js';
 import { AppState } from './state.js';
+import { SchoolEngine } from '../shared/school-engine.js';
 import { auditLog } from '../shared/db-utils.js';
 
 const LEVEL_LABELS = {
@@ -569,6 +570,7 @@ export const GradesModule = {
       const cards = data?.cards_generated || 0;
       Helpers.toast(`Periodo cerrado ✅ — ${cards} boleta${cards !== 1 ? 's' : ''} generada${cards !== 1 ? 's' : ''}`, 'success');
       auditLog('period.closed.v2', { period_id: periodId, period_name: period.name });
+      try { await SchoolEngine.refresh(); } catch (_) {}
       await this._loadPeriods();
       await this._loadData();
     } catch (e) {
@@ -654,6 +656,7 @@ export const GradesModule = {
 
       Helpers.toast('Periodo creado correctamente', 'success');
       App.ui.closeModal();
+      try { await SchoolEngine.refresh(); } catch (_) {}
       await this._loadPeriods();
       await this._loadData();
     } catch (e) {

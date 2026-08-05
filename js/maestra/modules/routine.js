@@ -193,11 +193,12 @@ function _getActiveScheduleIndex() {
   const schedule = _classroomSchedule.length ? _classroomSchedule : DEFAULT_SCHEDULE;
   const now  = new Date();
   const mins = now.getHours() * 60 + now.getMinutes();
-  let activeIdx = -1;
-  for (let i = schedule.length - 1; i >= 0; i--) {
-    if (mins >= schedule[i].hour * 60 + schedule[i].minute) {
-      activeIdx = i;
-      break;
+  let activeIdx = -1, bestDiff = Infinity;
+  for (let i = 0; i < schedule.length; i++) {
+    const start = (schedule[i].hour ?? 0) * 60 + (schedule[i].minute ?? 0);
+    if (start <= mins) {
+      const diff = mins - start;
+      if (diff < bestDiff) { bestDiff = diff; activeIdx = i; }
     }
   }
   return activeIdx;
@@ -321,12 +322,49 @@ function _getPresentStudentIds() {
   return students.filter(s => _isStudentPresent(s.id)).map(s => s.id);
 }
 
+// ── V8: helpers de cronología ─────────────────────────────────────────────────
+function _minutesToTime(mins) {
+  const t = ((mins % 1440) + 1440) % 1440;
+  return { hour: Math.floor(t / 60), minute: t % 60 };
+}
+
+function _getTimelineState(ev) {
+  const now     = new Date();
+  const nowMins = now.getHours() * 60 + now.getMinutes();
+  const start   = (ev.hour ?? 0) * 60 + (ev.minute ?? 0);
+  const end     = start + (ev.duration || 30);
+  if (nowMins >= end) return 'completed';
+  if (nowMins >= start) return 'in_progress';
+  return 'pending';
+}
+
+let _v8StylesInjected = false;
+function _injectV8Styles() {
+  if (_v8StylesInjected || document.getElementById('routine-v8-styles')) return;
+  _v8StylesInjected = true;
+  const style = document.createElement('style');
+  style.id = 'routine-v8-styles';
+  style.textContent = `
+    @keyframes tlPulse{0%,100%{box-shadow:0 0 0 0 rgba(255,138,0,0.45);}50%{box-shadow:0 0 0 10px rgba(255,138,0,0);}}
+    .tl-pulse{animation:tlPulse 1.6s ease-in-out infinite;}
+    .schedule-order-row.dragging{opacity:.45;border-style:dashed !important;}
+    .schedule-order-row.drop-target{border-color:#FF8A00 !important;background:#fff7ed !important;}
+    .drag-handle{cursor:grab;-webkit-user-select:none;user-select:none;}
+    .drag-handle:active{cursor:grabbing;}
+    .tl-insert-btn{background:#fff;border:2px solid #FF8A00;color:#FF8A00;border-radius:9999px;width:26px;height:26px;display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:900;line-height:1;box-shadow:0 2px 8px rgba(255,138,0,0.35);cursor:pointer;transition:transform .15s ease,background .15s ease,color .15s ease;}
+    .tl-insert-btn:hover{background:#FF8A00;color:#fff;transform:scale(1.1);}
+    .tl-insert-btn:active{transform:scale(.9);}
+    #scheduleOrderList .schedule-order-row select{font-size:9px;font-weight:700;color:#475569;background:#fff;border:1px solid #e2e8f0;border-radius:8px;padding:2px 4px;outline:none;}
+    #scheduleOrderList .schedule-order-row select:focus{border-color:#FF8A00;}`;
+  document.head.appendChild(style);
+}
+
 // ── LOAD SCHEDULE FROM DB ─────────────────────────────────────────────────────
 async function _loadSchedule(classroomId) {
   try {
     const { data, error } = await supabase
       .from('classroom_event_schedule')
-      .select('event_type, event_label, event_icon, scheduled_hour, scheduled_minute, duration_minutes, auto_register, applies_to, category')
+      .select('event_type, event_label, event_icon, scheduled_hour, scheduled_minute, duration_minutes, auto_register, applies_to, category, sort_order')
       .eq('classroom_id', classroomId)
       .eq('is_active', true)
       .order('sort_order');
@@ -346,8 +384,13 @@ async function _loadSchedule(classroomId) {
       autoRegister: d.auto_register,
       appliesTo: d.applies_to,
       category: d.category || null,
+      sort_order: d.sort_order,
     }));
-    _classroomSchedule.sort((a, b) => (a.hour * 60 + a.minute) - (b.hour * 60 + b.minute));
+    // Orden respeta la cronología personalizada (sort_order) y, como respaldo, la hora.
+    _classroomSchedule.sort((a, b) =>
+      ((a.sort_order ?? Infinity) - (b.sort_order ?? Infinity)) ||
+      ((a.hour * 60 + a.minute) - (b.hour * 60 + b.minute))
+    );
   } catch {
     _classroomSchedule = DEFAULT_SCHEDULE.map(s => ({ ...s }));
   }
@@ -441,7 +484,6 @@ export async function initRoutine() {
 
 // ── RENDER LAYOUT PRINCIPAL (4 NIVELES) ───────────────────────────────────────
 function _renderRoutineLayout({ todayLabel, students, logsMap, withReport, scheduleNow, activeSiestas, today, classroom }) {
-  const activeIdx = _getActiveScheduleIndex();
   const schedule = _classroomSchedule.length ? _classroomSchedule : DEFAULT_SCHEDULE;
 
   return `
@@ -489,13 +531,13 @@ function _renderRoutineLayout({ todayLabel, students, logsMap, withReport, sched
 
             <div class="space-y-2">
               ${schedule.map((ev, i) => {
-                const isActive = i === activeIdx;
-                const isPast   = i < activeIdx;
-                const isFuture = i > activeIdx;
-                const isNext   = isFuture && i === activeIdx + 1;
+                const state    = _getTimelineState(ev);
+                const isActive = state === 'in_progress';
+                const isPast   = state === 'completed';
+                const isNext   = state === 'pending' && schedule.slice(0, i).every(e => _getTimelineState(e) === 'completed');
                 const timeStr  = _formatTime12(ev.hour, ev.minute);
                 const eventIcon = _getScheduleEventIcon(ev.type);
-                const endMins  = ev.hour * 60 + ev.minute + (ev.duration || 30);
+                const endMins  = (ev.hour ?? 0) * 60 + (ev.minute ?? 0) + (ev.duration || 30);
                 const endTime  = _formatTime12(Math.floor(endMins / 60), endMins % 60);
 
                 // Contar cuántos alumnos PRESENTES tienen este evento registrado hoy
@@ -512,43 +554,50 @@ function _renderRoutineLayout({ todayLabel, students, logsMap, withReport, sched
                 };
 
                 return `
-                <div
-                  onclick="App.openBulkEventModal('${ev.type}', '${timeStr}')"
-                  class="relative flex items-start gap-4 w-full p-3 rounded-2xl transition-all active:scale-[0.98] cursor-pointer ${
-                    isActive ? `bg-gradient-to-r from-[#FF8A00]/10 to-orange-50 border-2 border-[#FF8A00]/30 shadow-md shadow-orange-100/50` :
-                    isPast ? 'bg-slate-50/80 border-2 border-transparent hover:bg-slate-50' :
-                    'border-2 border-transparent hover:bg-slate-50'
-                  }" data-index="${i}">
+                <div class="relative">
+                  <div
+                    onclick="App.openBulkEventModal('${ev.type}', '${timeStr}')"
+                    class="relative flex items-start gap-4 w-full p-3 rounded-2xl transition-all active:scale-[0.98] cursor-pointer ${
+                      isActive ? `bg-gradient-to-r from-[#FF8A00]/10 to-orange-50 border-2 border-[#FF8A00]/30 shadow-md shadow-orange-100/50` :
+                      isPast ? 'bg-slate-50/80 border-2 border-transparent hover:bg-slate-50' :
+                      'border-2 border-transparent hover:bg-slate-50'
+                    }" data-index="${i}">
 
-                  <!-- Icono en la línea -->
-                  <div class="w-9 h-9 rounded-xl flex items-center justify-center text-base shrink-0 z-10 transition-all ${isActive ? 'text-white shadow-lg scale-110' : 'text-slate-500'}" style="${isActive ? 'background:linear-gradient(135deg, #FF8A00, #f97316);box-shadow:0 4px 12px rgba(255,138,0,0.3);' : `background:${activeSoftBgs[ev.type] || '#f1f5f9'};`}">
-                    ${eventIcon}
+                    <!-- Icono en la línea -->
+                    <div class="w-9 h-9 rounded-xl flex items-center justify-center text-base shrink-0 z-10 transition-all ${isActive ? 'text-white shadow-lg scale-110 tl-pulse' : 'text-slate-500'}" style="${isActive ? 'background:linear-gradient(135deg, #FF8A00, #f97316);box-shadow:0 4px 12px rgba(255,138,0,0.3);' : `background:${activeSoftBgs[ev.type] || '#f1f5f9'};`}">
+                      ${eventIcon}
+                    </div>
+
+                    <!-- Contenido -->
+                    <div class="flex-1 text-left min-w-0">
+                      <div class="flex items-center gap-2 mb-0.5">
+                        <span class="text-[11px] font-black ${isActive ? 'text-[#FF8A00]' : isPast ? 'text-slate-500' : 'text-slate-400'}">${timeStr}</span>
+                        ${isActive ? '<span class="px-2 py-0.5 bg-[#FF8A00] text-white text-[7px] font-black uppercase rounded-lg animate-pulse shadow-sm">AHORA</span>' : ''}
+                        ${isNext ? '<span class="px-2 py-0.5 bg-indigo-500 text-white text-[7px] font-black uppercase rounded-lg shadow-sm">SIGUIENTE</span>' : ''}
+                        ${isPast ? '<span class="px-2 py-0.5 bg-slate-200 text-slate-500 text-[7px] font-black uppercase rounded-lg">✓ Hecho</span>' : ''}
+                      </div>
+                      <p class="text-sm font-black text-slate-700 leading-tight">${ev.label}</p>
+                      <div class="flex items-center gap-3 mt-1">
+                        <span class="text-[9px] font-bold text-slate-400">${endTime}</span>
+                        <span class="text-[9px] font-bold text-slate-300">·</span>
+                        <span class="text-[9px] font-bold text-slate-400">${ev.duration || 30}min</span>
+                        ${studentsWithEvent > 0 ? `
+                          <span class="text-[9px] font-black ${studentsWithEvent === presentStudents.length ? 'text-[#28B54D]' : 'text-[#FF8A00]'}">
+                            ${studentsWithEvent}/${presentStudents.length} alumnos
+                          </span>
+                        ` : ''}
+                      </div>
+                    </div>
+
+                    <!-- Chevron -->
+                    <div class="shrink-0 mt-1">
+                      <i data-lucide="chevron-right" class="w-4 h-4 ${isActive ? 'text-[#FF8A00]' : 'text-slate-300'}"></i>
+                    </div>
                   </div>
 
-                  <!-- Contenido -->
-                  <div class="flex-1 text-left min-w-0">
-                    <div class="flex items-center gap-2 mb-0.5">
-                      <span class="text-[11px] font-black ${isActive ? 'text-[#FF8A00]' : isPast ? 'text-slate-500' : 'text-slate-400'}">${timeStr}</span>
-                      ${isActive ? '<span class="px-2 py-0.5 bg-[#FF8A00] text-white text-[7px] font-black uppercase rounded-lg animate-pulse shadow-sm">AHORA</span>' : ''}
-                      ${isNext ? '<span class="px-2 py-0.5 bg-indigo-500 text-white text-[7px] font-black uppercase rounded-lg shadow-sm">SIGUIENTE</span>' : ''}
-                      ${isPast ? '<span class="px-2 py-0.5 bg-slate-200 text-slate-500 text-[7px] font-black uppercase rounded-lg">✓ Hecho</span>' : ''}
-                    </div>
-                    <p class="text-sm font-black text-slate-700 leading-tight">${ev.label}</p>
-                    <div class="flex items-center gap-3 mt-1">
-                      <span class="text-[9px] font-bold text-slate-400">${endTime}</span>
-                      <span class="text-[9px] font-bold text-slate-300">·</span>
-                      <span class="text-[9px] font-bold text-slate-400">${ev.duration || 30}min</span>
-                      ${studentsWithEvent > 0 ? `
-                        <span class="text-[9px] font-black ${studentsWithEvent === presentStudents.length ? 'text-[#28B54D]' : 'text-[#FF8A00]'}">
-                          ${studentsWithEvent}/${presentStudents.length} alumnos
-                        </span>
-                      ` : ''}
-                    </div>
-                  </div>
-
-                  <!-- Chevron -->
-                  <div class="shrink-0 mt-1">
-                    <i data-lucide="chevron-right" class="w-4 h-4 ${isActive ? 'text-[#FF8A00]' : 'text-slate-300'}"></i>
+                  <!-- Insertar evento entre bloques -->
+                  <div class="relative z-10 flex items-center justify-center" style="margin:-7px 0;" data-insert-slot="${i + 1}">
+                    <button onclick="App.openInsertEventPicker(${i + 1})" class="tl-insert-btn" style="position:absolute;left:25px;" title="Insertar evento aquí">+</button>
                   </div>
                 </div>`;
               }).join('')}
@@ -562,8 +611,9 @@ function _renderRoutineLayout({ todayLabel, students, logsMap, withReport, sched
         <div class="overflow-x-auto" style="scrollbar-width:none" id="timelineCollapsedScroll">
           <div class="flex items-center gap-1.5 min-w-max py-1">
             ${schedule.map((ev, i) => {
-              const isActive = i === activeIdx;
-              const isPast   = i < activeIdx;
+              const state    = _getTimelineState(ev);
+              const isActive = state === 'in_progress';
+              const isPast   = state === 'completed';
               return `
               <button onclick="App.openBulkEventModal('${ev.type}', '${_formatTime12(ev.hour, ev.minute)}')"
                 class="flex flex-col items-center gap-1 px-3 py-2 rounded-2xl transition-all active:scale-90 ${
@@ -571,7 +621,7 @@ function _renderRoutineLayout({ todayLabel, students, logsMap, withReport, sched
                   isPast ? 'bg-slate-50/50' : 'hover:bg-slate-50'
                 }">
                 <span class="text-xl leading-none ${isActive ? 'drop-shadow-md' : ''}">${_getScheduleEventIcon(ev.type)}</span>
-                ${isActive ? '<span class="w-1.5 h-1.5 bg-[#FF8A00] rounded-full"></span>' :
+                ${isActive ? '<span class="w-1.5 h-1.5 bg-[#FF8A00] rounded-full tl-pulse"></span>' :
                   isPast ? '<span class="w-1.5 h-1.5 bg-[#28B54D] rounded-full"></span>' :
                   '<span class="w-1.5 h-1.5 bg-slate-200 rounded-full"></span>'}
               </button>`;
@@ -868,8 +918,98 @@ export async function openBulkEventModal(eventType = 'animo', scheduledTime = nu
 
   Modal.open(modalId, content);
   if (window.lucide) window.lucide.createIcons();
-  _prefillBulkSubParams(eventType);
 }
+
+// ── INSERTAR EVENTO ENTRE BLOQUES ────────────────────────────────────────────
+export function openInsertEventPicker(index) {
+  const modalId = 'insertEventPickerModal';
+
+  const catsHTML = Object.entries(CATEGORIES).map(([catId, cat]) => {
+    const items = EVENT_CATALOG.filter(e => e.category === catId);
+    if (!items.length) return '';
+    return `
+      <div class="space-y-2">
+        <p class="text-[10px] font-black text-slate-400 uppercase tracking-widest flex items-center gap-1.5">
+          <span>${cat.icon}</span> ${cat.label}
+        </p>
+        <div class="grid grid-cols-4 gap-2">
+          ${items.map(ev => `
+            <button onclick="App.insertEventAt(${index}, '${ev.type}')"
+              class="flex flex-col items-center gap-1 p-3 bg-slate-50 hover:bg-[#FF8A00]/10 border-2 border-transparent hover:border-[#FF8A00]/30 rounded-2xl transition-all active:scale-90 group">
+              <span class="text-xl group-hover:scale-110 transition-transform">${ev.icon}</span>
+              <span class="text-[8px] font-black text-slate-400 uppercase text-center leading-tight">${ev.label}</span>
+            </button>`).join('')}
+        </div>
+      </div>`;
+  }).join('');
+
+  const content = `
+    <div class="bg-white w-full max-w-sm rounded-[2rem] shadow-2xl overflow-hidden animate-fadeIn">
+      <div class="p-5 text-white relative overflow-hidden" style="background:linear-gradient(135deg, #FF8A00 0%, #f97316 50%, #ec4899 100%);">
+        <div class="absolute -top-8 -right-8 w-32 h-32 rounded-full blur-2xl" style="background:rgba(255,255,255,0.1);"></div>
+        <div class="relative flex items-center gap-4">
+          <div class="w-12 h-12 bg-white/20 backdrop-blur-sm rounded-2xl flex items-center justify-center text-2xl border border-white/20 shadow-lg">➕</div>
+          <div class="flex-1">
+            <h3 class="text-lg font-black">Insertar evento</h3>
+            <p class="text-[10px] font-bold text-orange-100 uppercase tracking-widest">En la cronología del día</p>
+          </div>
+          <button onclick="Modal.close('${modalId}')" class="p-2 bg-white/20 backdrop-blur-sm rounded-full hover:bg-white/30 transition-colors border border-white/20">
+            <svg class="w-4 h-4 text-white" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/></svg>
+          </button>
+        </div>
+      </div>
+      <div class="p-5 max-h-[70vh] overflow-y-auto custom-scrollbar space-y-4">
+        ${catsHTML}
+      </div>
+    </div>`;
+
+  Modal.open(modalId, content);
+  if (window.lucide) window.lucide.createIcons();
+}
+
+export async function insertEventAt(index, type) {
+  const schedule = _classroomSchedule.length ? [..._classroomSchedule] : [...DEFAULT_SCHEDULE];
+  const meta = _getEventMeta(type) || { label: type, icon: '⏰', defaultDuration: 30, category: 'personalizados' };
+  let duration = meta.defaultDuration || 30;
+
+  const prev      = index > 0 ? schedule[index - 1] : null;
+  const next      = index < schedule.length ? schedule[index] : null;
+  const prevEnd   = prev ? (prev.hour ?? 0) * 60 + (prev.minute ?? 0) + (prev.duration || 30) : 7 * 60;
+  const nextStart = next ? (next.hour ?? 0) * 60 + (next.minute ?? 0) : 18 * 60;
+
+  let start = prevEnd;
+  if (start + duration > nextStart) {
+    start = nextStart - duration;
+    if (start < prevEnd) { start = prevEnd; duration = Math.max(5, nextStart - start); }
+  }
+  start = Math.round(start / 5) * 5;
+  if (start > nextStart - duration) start = nextStart - duration;
+  if (start < 0) start = 0;
+
+  const tm = _minutesToTime(start);
+  schedule.splice(index, 0, {
+    type,
+    label: meta.label || type,
+    icon: meta.icon || '⏰',
+    hour: tm.hour,
+    minute: tm.minute,
+    duration,
+    category: meta.category || 'personalizados',
+  });
+
+  _classroomSchedule = schedule;
+  try {
+    await _persistSchedule(schedule);
+    safeToast(`${meta.icon} ${meta.label} insertado en la cronología`);
+    Modal.close('insertEventPickerModal');
+    await _reRenderTimeline();
+  } catch (e) {
+    safeToast('Error al guardar la cronología', 'error');
+  }
+}
+
+// Inyectar estilos de la cronología V8 al importar el módulo
+_injectV8Styles();
 
 function _renderSubParams(eventType) {
   switch (eventType) {
@@ -1872,35 +2012,143 @@ const _CATEGORY_ACCENTS = {
 
 function _renderConfigEventRow(ev, sched, accent) {
   const active = !!sched;
-  const hour = sched?.hour ?? 8;
-  const minute = sched?.minute ?? 0;
-  const duration = sched?.duration ?? ev.defaultDuration ?? 30;
+  if (active) {
+    const time = _formatTime12(sched?.hour ?? 8, sched?.minute ?? 0);
+    return `
+      <div class="config-event-row flex items-center gap-2 p-2.5 rounded-2xl border-2 transition-all border-[#FF8A00]/40 bg-orange-50/50" data-type="${ev.type}" data-label="${ev.label}" data-active="true">
+        <span class="text-lg shrink-0">${ev.icon}</span>
+        <div class="flex-1 min-w-0">
+          <p class="text-[10px] font-black text-slate-700 truncate">${ev.label}</p>
+          <p class="text-[9px] font-bold text-[#FF8A00] uppercase mt-0.5">⏰ ${time} · ${sched?.duration ?? ev.defaultDuration ?? 30}min</p>
+        </div>
+        <span class="w-5 h-5 rounded-full bg-[#28B54D] text-white flex items-center justify-center text-[10px] shrink-0">✓</span>
+        <button onclick="App.removeEventFromSchedule('${ev.type}')" class="p-1.5 hover:bg-red-50 rounded-lg text-slate-300 hover:text-red-500 transition-colors shrink-0" title="Quitar de la rutina">
+          <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/></svg>
+        </button>
+      </div>`;
+  }
   return `
-    <div class="config-event-row flex items-center gap-2 p-2.5 rounded-2xl border-2 transition-all ${active ? 'border-[#FF8A00]/50 bg-orange-50/50' : 'border-slate-100 bg-white hover:border-slate-200'}" data-type="${ev.type}" data-label="${ev.label}" data-active="${active ? 'true' : 'false'}">
+    <div class="config-event-row flex items-center gap-2 p-2.5 rounded-2xl border-2 transition-all border-slate-100 bg-white hover:border-slate-200" data-type="${ev.type}" data-label="${ev.label}" data-active="false">
       <span class="text-lg shrink-0">${ev.icon}</span>
       <div class="flex-1 min-w-0">
         <p class="text-[10px] font-black text-slate-700 truncate">${ev.label}</p>
-        <div class="flex items-center gap-1.5 mt-1">
-          ${active ? `
-            <select data-sched-hour="${ev.type}" class="text-[9px] font-bold text-slate-600 bg-white border border-slate-200 rounded-lg px-1 py-0.5 outline-none focus:border-[#FF8A00]">
-              ${Array.from({length: 24}, (_, h) => `<option value="${h}" ${hour === h ? 'selected' : ''}>${String(h).padStart(2,'0')}</option>`).join('')}
+      </div>
+      <button onclick="App.addEventToSchedule('${ev.type}')" class="px-3 py-1.5 rounded-xl text-[9px] font-black uppercase tracking-wider border-2 transition-all active:scale-90" style="color:${accent};border-color:${accent}40;background:#f8fafc;">
+        ＋ Agregar
+      </button>
+    </div>`;
+}
+
+// ── CRONOLOGÍA DEL DÍA (lista ordenada editable) ─────────────────────────────
+function _renderScheduleOrderHTML() {
+  const schedule = _classroomSchedule.length ? _classroomSchedule : [...DEFAULT_SCHEDULE];
+  if (!schedule.length) return '<p class="text-center text-[10px] font-bold text-slate-300 py-4">Sin bloques. Agrega eventos desde el catálogo.</p>';
+  return schedule.map((s, i) => {
+    const meta = _getEventMeta(s.type) || { label: s.type, icon: '⏰', defaultDuration: 30 };
+    const minutes = [0,5,10,15,20,25,30,35,40,45,50,55];
+    const minuteOpts = [...new Set([...minutes, (s.minute ?? 0)])].sort((a,b) => a-b);
+    return `
+      <div class="schedule-order-row flex items-center gap-2 p-2.5 rounded-2xl border-2 bg-white transition-all" draggable="true"
+        data-type="${s.type}" data-idx="${i}" data-hour="${s.hour ?? 8}" data-minute="${s.minute ?? 0}"
+        style="border-color:#e2e8f0;">
+        <span class="drag-handle text-slate-300 text-sm shrink-0" title="Arrastrar para reordenar">⋮⋮</span>
+        <span class="text-lg shrink-0">${meta.icon}</span>
+        <div class="flex-1 min-w-0">
+          <p class="text-[10px] font-black text-slate-700 truncate">${meta.label}</p>
+          <div class="flex items-center gap-1.5 mt-1">
+            <select data-sched-hour="${s.type}" onchange="App.cascadeScheduleShift('${s.type}')">
+              ${Array.from({length: 24}, (_, h) => `<option value="${h}" ${(s.hour ?? 8) === h ? 'selected' : ''}>${String(h).padStart(2,'0')}</option>`).join('')}
             </select>
             <span class="text-[9px] text-slate-300">:</span>
-            <select data-sched-minute="${ev.type}" class="text-[9px] font-bold text-slate-600 bg-white border border-slate-200 rounded-lg px-1 py-0.5 outline-none focus:border-[#FF8A00]">
-              ${[0,15,30,45].map(m => `<option value="${m}" ${minute === m ? 'selected' : ''}>${String(m).padStart(2,'0')}</option>`).join('')}
+            <select data-sched-minute="${s.type}" onchange="App.cascadeScheduleShift('${s.type}')">
+              ${minuteOpts.map(m => `<option value="${m}" ${(s.minute ?? 0) === m ? 'selected' : ''}>${String(m).padStart(2,'0')}</option>`).join('')}
             </select>
-            <select data-sched-duration="${ev.type}" class="text-[9px] font-bold text-slate-600 bg-white border border-slate-200 rounded-lg px-1 py-0.5 outline-none focus:border-[#FF8A00]">
-              ${[5,10,15,30,45,60,90,120].map(d => `<option value="${d}" ${duration === d ? 'selected' : ''}>${d}min</option>`).join('')}
+            <select data-sched-duration="${s.type}" onchange="App.cascadeScheduleShift('${s.type}')">
+              ${[5,10,15,20,30,45,60,90,120].map(d => `<option value="${d}" ${(s.duration ?? meta.defaultDuration ?? 30) === d ? 'selected' : ''}>${d}min</option>`).join('')}
             </select>
-            <button onclick="App.removeEventFromSchedule('${ev.type}')" class="ml-auto p-1.5 hover:bg-red-50 rounded-lg text-slate-300 hover:text-red-500 transition-colors shrink-0" title="Quitar de la rutina">
-              <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/></svg>
-            </button>` : `
-            <button onclick="App.addEventToSchedule('${ev.type}')" class="px-3 py-1.5 rounded-xl text-[9px] font-black uppercase tracking-wider border-2 transition-all active:scale-90" style="color:${accent};border-color:${accent}40;background:#f8fafc;">
-              ＋ Agregar
-            </button>`}
+          </div>
         </div>
-      </div>
-    </div>`;
+        <button onclick="App.removeEventFromSchedule('${s.type}')" class="p-1.5 hover:bg-red-50 rounded-lg text-slate-300 hover:text-red-500 transition-colors shrink-0" title="Quitar">
+          <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/></svg>
+        </button>
+      </div>`;
+  }).join('');
+}
+
+let _dragFromIdx = null;
+
+function _bindScheduleDrag() {
+  const list = document.getElementById('scheduleOrderList');
+  if (!list || list.dataset.bound) return;
+  list.dataset.bound = '1';
+
+  list.addEventListener('dragstart', (e) => {
+    const row = e.target.closest('.schedule-order-row');
+    if (!row) return;
+    _dragFromIdx = parseInt(row.dataset.idx, 10);
+    row.classList.add('dragging');
+    e.dataTransfer.effectAllowed = 'move';
+    try { e.dataTransfer.setData('text/plain', String(_dragFromIdx)); } catch (_) {}
+  });
+
+  list.addEventListener('dragover', (e) => {
+    e.preventDefault();
+    e.dataTransfer.dropEffect = 'move';
+    const row = e.target.closest('.schedule-order-row');
+    list.querySelectorAll('.schedule-order-row').forEach(r => r.classList.remove('drop-target'));
+    if (row) row.classList.add('drop-target');
+  });
+
+  list.addEventListener('drop', (e) => {
+    e.preventDefault();
+    const row = e.target.closest('.schedule-order-row');
+    list.querySelectorAll('.schedule-order-row').forEach(r => r.classList.remove('drop-target'));
+    if (row && _dragFromIdx != null) moveScheduleEvent(_dragFromIdx, parseInt(row.dataset.idx, 10));
+    _dragFromIdx = null;
+  });
+
+  list.addEventListener('dragend', () => {
+    list.querySelectorAll('.schedule-order-row').forEach(r => r.classList.remove('dragging','drop-target'));
+    _dragFromIdx = null;
+  });
+}
+
+// ── REORDENAR (drag & drop) ──────────────────────────────────────────────────
+export function moveScheduleEvent(from, to) {
+  const schedule = _classroomSchedule.length ? [..._classroomSchedule] : [...DEFAULT_SCHEDULE];
+  if (!schedule.length) return;
+  if (from < 0 || from >= schedule.length || to < 0 || to >= schedule.length) return;
+  const [item] = schedule.splice(from, 1);
+  schedule.splice(to, 0, item);
+  _classroomSchedule = schedule;
+  _refreshScheduleManagerUI();
+}
+
+// ── RECÁLCULO EN CASCADA ─────────────────────────────────────────────────────
+export function cascadeScheduleShift(type) {
+  const row = document.querySelector(`#scheduleOrderList .schedule-order-row[data-type="${type}"]`);
+  if (!row) return;
+  const idx = _classroomSchedule.findIndex(s => s.type === type);
+  if (idx < 0) return;
+  const block = _classroomSchedule[idx];
+  const newHour = parseInt(row.querySelector('[data-sched-hour]')?.value, 10) || 0;
+  const newMin  = parseInt(row.querySelector('[data-sched-minute]')?.value, 10) || 0;
+  const oldStart = (parseInt(row.dataset.hour, 10) || 0) * 60 + (parseInt(row.dataset.minute, 10) || 0);
+  const newStart = newHour * 60 + newMin;
+  const delta = newStart - oldStart;
+
+  block.hour = newHour;
+  block.minute = newMin;
+
+  if (delta && document.getElementById('cfgRecalc')?.checked) {
+    for (let j = idx + 1; j < _classroomSchedule.length; j++) {
+      const b = _classroomSchedule[j];
+      const t = _minutesToTime((b.hour ?? 0) * 60 + (b.minute ?? 0) + delta);
+      b.hour = t.hour;
+      b.minute = t.minute;
+    }
+  }
+  _refreshScheduleManagerUI();
 }
 
 function _renderScheduleConfigHTML() {
@@ -1957,7 +2205,7 @@ export async function openScheduleManager() {
           <div class="w-12 h-12 bg-white/20 backdrop-blur-sm rounded-2xl flex items-center justify-center text-2xl border border-white/20 shadow-lg">🧭</div>
           <div class="flex-1">
             <h3 class="text-lg font-black">Configurar Rutina</h3>
-            <p class="text-[10px] font-bold text-orange-100 uppercase tracking-widest">Catálogo de eventos por categorías</p>
+            <p class="text-[10px] font-bold text-orange-100 uppercase tracking-widest">Cronología personalizada por aula</p>
           </div>
           <span id="scheduleConfigCount" class="text-[9px] font-black bg-white/20 backdrop-blur-sm border border-white/20 rounded-full px-3 py-1.5">${schedule.length}/${EVENT_CATALOG.length}</span>
           <button onclick="Modal.close('${modalId}')" class="p-2 bg-white/20 backdrop-blur-sm rounded-full hover:bg-white/30 transition-colors border border-white/20">
@@ -1972,8 +2220,28 @@ export async function openScheduleManager() {
         </div>
       </div>
 
-      <div id="scheduleConfigSections" class="overflow-y-auto flex-1 p-5 custom-scrollbar space-y-6">
-        ${_renderScheduleConfigHTML()}
+      <div class="overflow-y-auto flex-1 p-5 custom-scrollbar space-y-6">
+        <div>
+          <div class="flex items-center justify-between mb-2.5">
+            <p class="text-[11px] font-black text-slate-500 uppercase tracking-widest">Cronología del día</p>
+            <label class="flex items-center gap-1.5 cursor-pointer" title="Al cambiar la hora de un bloque, desplaza automáticamente los siguientes">
+              <span class="text-[9px] font-black text-slate-400 uppercase">Recalcular en cascada</span>
+              <input type="checkbox" id="cfgRecalc" checked class="w-3.5 h-3.5 accent-[#FF8A00]">
+            </label>
+          </div>
+          <p class="text-[9px] font-bold text-slate-300 mb-2">Arrastra ⋮⋮ para reordenar · Edita hora y duración por bloque</p>
+          <div id="scheduleOrderList" class="space-y-2">${_renderScheduleOrderHTML()}</div>
+        </div>
+
+        <div class="border-t border-slate-100 pt-5">
+          <div class="flex items-center gap-2 mb-2.5">
+            <span class="w-7 h-7 rounded-lg flex items-center justify-center text-sm shrink-0" style="background:#fff7ed;color:#FF8A00;">📚</span>
+            <p class="text-[11px] font-black text-slate-500 uppercase tracking-widest flex-1">Catálogo de eventos</p>
+          </div>
+          <div id="scheduleConfigSections" class="space-y-6">
+            ${_renderScheduleConfigHTML()}
+          </div>
+        </div>
       </div>
 
       <!-- Footer -->
@@ -1992,6 +2260,7 @@ export async function openScheduleManager() {
     </div>`;
 
   Modal.open(modalId, content);
+  _bindScheduleDrag();
   if (window.lucide) window.lucide.createIcons();
 }
 
@@ -2054,16 +2323,49 @@ export function resetScheduleToDefault() {
 }
 
 function _refreshScheduleManagerUI() {
+  const orderContainer = document.getElementById('scheduleOrderList');
+  if (orderContainer) orderContainer.innerHTML = _renderScheduleOrderHTML();
+
   const container = document.getElementById('scheduleConfigSections');
-  if (!container) return;
-  container.innerHTML = _renderScheduleConfigHTML();
+  if (container) container.innerHTML = _renderScheduleConfigHTML();
 
   const countEl = document.getElementById('scheduleConfigCount');
   if (countEl) {
     const schedule = _classroomSchedule.length ? _classroomSchedule : DEFAULT_SCHEDULE;
     countEl.textContent = `${schedule.length}/${EVENT_CATALOG.length}`;
   }
+  _bindScheduleDrag();
   if (_scheduleSearch) filterEventCatalog(_scheduleSearch);
+}
+
+// ── PERSISTIR CRONOLOGÍA EN BD ───────────────────────────────────────────────
+async function _persistSchedule(schedule) {
+  const classroom = AppState.get('classroom');
+  if (!classroom) return;
+
+  await supabase
+    .from('classroom_event_schedule')
+    .delete()
+    .eq('classroom_id', classroom.id);
+
+  if (schedule.length) {
+    const inserts = schedule.map((s, i) => ({
+      classroom_id: classroom.id,
+      event_type: s.type,
+      event_label: s.label,
+      event_icon: s.icon,
+      category: s.category || 'personalizados',
+      scheduled_hour: s.hour,
+      scheduled_minute: s.minute,
+      duration_minutes: s.duration,
+      sort_order: i,
+      is_active: true,
+      auto_register: false,
+      applies_to: 'all',
+    }));
+    const { error } = await supabase.from('classroom_event_schedule').insert(inserts);
+    if (error) throw error;
+  }
 }
 
 // ── SAVE SCHEDULE TO DB ─────────────────────────────────────────
@@ -2075,13 +2377,14 @@ export async function saveScheduleManager() {
     const classroom = AppState.get('classroom');
     if (!classroom) { safeToast('No hay aula seleccionada', 'error'); return; }
 
-    const rows = [...document.querySelectorAll('#scheduleConfigSections .config-event-row[data-active="true"]')];
+    // La cronología se lee en el ORDEN de la lista (respetando drag & drop)
+    const rows = [...document.querySelectorAll('#scheduleOrderList .schedule-order-row')];
     const schedule = rows.map(row => {
       const type = row.dataset.type;
       const meta = _getEventMeta(type) || { label: type, icon: '⏰', defaultDuration: 30, category: 'personalizados' };
-      const hour = parseInt(document.querySelector(`[data-sched-hour="${type}"]`)?.value) || 8;
-      const minute = parseInt(document.querySelector(`[data-sched-minute="${type}"]`)?.value) || 0;
-      const duration = parseInt(document.querySelector(`[data-sched-duration="${type}"]`)?.value) || meta.defaultDuration || 30;
+      const hour = parseInt(row.querySelector('[data-sched-hour]')?.value, 10) || 8;
+      const minute = parseInt(row.querySelector('[data-sched-minute]')?.value, 10) || 0;
+      const duration = parseInt(row.querySelector('[data-sched-duration]')?.value, 10) || meta.defaultDuration || 30;
       return {
         type,
         label: meta.label || type,
@@ -2093,34 +2396,7 @@ export async function saveScheduleManager() {
       };
     });
 
-    // Cronología inteligente: ordenar por hora programada
-    schedule.sort((a, b) => (a.hour * 60 + a.minute) - (b.hour * 60 + b.minute));
-
-    // Delete all existing schedule entries for this classroom
-    await supabase
-      .from('classroom_event_schedule')
-      .delete()
-      .eq('classroom_id', classroom.id);
-
-    // Insert new schedule entries
-    if (schedule.length) {
-      const inserts = schedule.map((s, i) => ({
-        classroom_id: classroom.id,
-        event_type: s.type,
-        event_label: s.label,
-        event_icon: s.icon,
-        category: s.category,
-        scheduled_hour: s.hour,
-        scheduled_minute: s.minute,
-        duration_minutes: s.duration,
-        sort_order: i,
-        is_active: true,
-        auto_register: false,
-        applies_to: 'all',
-      }));
-      const { error } = await supabase.from('classroom_event_schedule').insert(inserts);
-      if (error) throw error;
-    }
+    await _persistSchedule(schedule);
 
     _classroomSchedule = schedule;
     Modal.close('scheduleManagerModal');

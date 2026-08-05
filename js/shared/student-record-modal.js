@@ -3,14 +3,13 @@ import { Helpers } from './helpers.js';
 import { auditLog } from './db-utils.js';
 
 const TABS = [
-  { id: 'alumno',    label: 'Alumno',                icon: 'user' },
-  { id: 'tutor',     label: 'Tutor',                 icon: 'users' },
-  { id: 'emergency', label: 'Contacto de Emergencia', icon: 'shield' },
-  { id: 'salud',     label: 'Salud',                 icon: 'heart-pulse' },
-  { id: 'docs',      label: 'Documentos',            icon: 'folder-open' },
-  { id: 'pago',      label: 'Pago',                  icon: 'credit-card' },
-  { id: 'history',   label: 'Historial del Estudiante', icon: 'history' },
-  { id: 'acceso',    label: 'Acceso',                icon: 'key-round' },
+  { id: 'info',     label: 'Info General', icon: 'id-card' },
+  { id: 'family',   label: 'Familia',      icon: 'users' },
+  { id: 'health',   label: 'Salud',        icon: 'heart-pulse' },
+  { id: 'payments', label: 'Pagos',        icon: 'credit-card' },
+  { id: 'docs',     label: 'Documentos',   icon: 'folder-open' },
+  { id: 'access',   label: 'Accesos',      icon: 'key-round' },
+  { id: 'history',  label: 'Historial',    icon: 'history' },
 ];
 
 const DOC_TYPES = [
@@ -71,7 +70,9 @@ export const StudentRecordModal = {
 
   async open({ mode = null, prereg = null, studentId = null, onSaved = null } = {}) {
     this._onSaved = onSaved || null;
-    this._mode = mode || (prereg ? 'admit' : studentId ? 'edit' : 'create');
+    let resolved = mode || (prereg ? 'admit' : studentId ? 'edit' : 'create');
+    if (resolved === 'new') resolved = 'create';
+    this._mode = resolved;
     this._prereg = prereg;
     this._student = null;
     this._parentId = null;
@@ -85,7 +86,7 @@ export const StudentRecordModal = {
     this._siblings = [];
     this._history = [];
     this._historyParts = {};
-    this._tab = 'alumno';
+    this._tab = 'info';
     this._saving = false;
     this._form = {};
 
@@ -103,7 +104,12 @@ export const StudentRecordModal = {
       supabase.from('payment_concepts').select('*').eq('is_active', true).order('sort_order'),
       supabase.from('school_years').select('id, name').order('start_date', { ascending: false }).limit(3),
     ]);
-    this._classrooms = rooms.status === 'fulfilled' ? (rooms.value.data || []) : [];
+    let roomsData = rooms.status === 'fulfilled' ? (rooms.value.data || []) : null;
+    if (!roomsData) {
+      const fb = await supabase.from('classrooms').select('id, name, level, capacity');
+      roomsData = (fb.data || []).map(c => ({ ...c, occupied: 0, available: c.capacity }));
+    }
+    this._classrooms = roomsData || [];
     this._concepts = concepts.status === 'fulfilled' ? (concepts.value.data || []) : [];
     this._schoolYearOptions = years.status === 'fulfilled' ? (years.value.data || []) : [];
     this._schoolYears = this._schoolYearOptions.map(y => y.name);
@@ -256,6 +262,11 @@ export const StudentRecordModal = {
       inscription_fee: '', discount_pct: 0, due_day: 5,
       avatar_url: '',
     };
+    if (p.birth_date) {
+      const years = Math.floor((Date.now() - new Date(p.birth_date).getTime()) / (365.25 * 24 * 3600 * 1000));
+      this._form.age = String(Math.max(0, years));
+      this._form.age_type = 'años';
+    }
     this._autofillConcepts();
     this._detectSiblings(p1.email, p1.phone, p1.cedula);
   },
@@ -346,59 +357,77 @@ export const StudentRecordModal = {
 
   // ---------------------------------------------------------------- SHELL
   _renderShell() {
-    const titles = { admit: 'Admisión — Preinscripción #' + (this._prereg?.id || ''), edit: 'Expediente del Estudiante', create: 'Nuevo Estudiante' };
+    const titles = { admit: 'Admisión de Preinscripción', edit: 'Expediente Digital Escolar', create: 'Nuevo Estudiante' };
     const title = titles[this._mode] || titles.create;
+    const fullName = ((this._form.name || '') + ' ' + (this._form.last_name || '')).trim();
     const subtitle = this._mode === 'admit'
-      ? (this._form.name || 'Sin nombre') + (this._form.last_name ? ' ' + this._form.last_name : '')
-      : (this._form.name || '') + (this._form.matricula ? ' · ' + this._form.matricula : '');
-    const bannerColor = this._mode === 'admit' ? 'from-emerald-600 to-teal-600' : 'from-purple-600 to-indigo-600';
+      ? (fullName || 'Sin nombre') + (this._prereg?.id ? ' · Preinscripción #' + this._prereg.id : '')
+      : (fullName || (this._form.matricula ? 'Matrícula ' + this._form.matricula : 'Nuevo registro'));
+    const bannerColor = 'from-purple-600 to-indigo-600';
+    const modeIcon = this._mode === 'admit' ? 'graduation-cap' : this._mode === 'create' ? 'user-plus' : 'folder-open';
+    const statusChip = this._mode === 'admit'
+      ? { label: 'Pendiente de admisión', icon: 'clock', cls: 'bg-white/20 text-white' }
+      : this._mode === 'create'
+        ? { label: 'Alta manual', icon: 'sparkles', cls: 'bg-white/20 text-white' }
+        : { label: this._form.is_active ? 'Activo' : 'Inactivo', icon: this._form.is_active ? 'check-circle-2' : 'x-circle', cls: this._form.is_active ? 'bg-emerald-500/20 text-emerald-50' : 'bg-white/20 text-white' };
 
     const html = `
-      <div class="modal-header bg-gradient-to-r ${bannerColor} text-white p-5 rounded-t-3xl">
-        <div class="flex items-center gap-3">
-          <div class="w-11 h-11 bg-white/20 rounded-2xl flex items-center justify-center shadow-inner">
-            <i data-lucide="${this._mode === 'admit' ? 'graduation-cap' : this._mode === 'create' ? 'user-plus' : 'folder-open'}" class="w-5 h-5 text-white"></i>
+      <div class="modal-header bg-gradient-to-r ${bannerColor} text-white p-5 rounded-t-3xl relative overflow-hidden">
+        <div class="absolute -right-10 -top-12 w-44 h-44 rounded-full bg-white/10 blur-md"></div>
+        <div class="absolute -left-8 -bottom-16 w-36 h-36 rounded-full bg-white/5"></div>
+        <div class="relative flex items-center gap-4">
+          <div class="w-12 h-12 rounded-2xl bg-white/15 border border-white/20 flex items-center justify-center shadow-inner overflow-hidden shrink-0">
+            ${this._form.avatar_url
+              ? `<img src="${Helpers.escapeHTML(this._form.avatar_url)}" class="w-full h-full object-cover">`
+              : `<i data-lucide="${modeIcon}" class="w-5 h-5 text-white"></i>`}
           </div>
-          <div class="min-w-0">
-            <h3 class="text-lg font-black truncate">${Helpers.escapeHTML(title)}</h3>
+          <div class="min-w-0 flex-1">
+            <h3 class="text-lg font-black truncate leading-tight">${Helpers.escapeHTML(title)}</h3>
             <p class="text-xs text-white/70 font-bold uppercase tracking-widest truncate">${Helpers.escapeHTML(subtitle)}</p>
           </div>
-        </div>
-        <div class="mt-3 flex flex-wrap gap-2 text-[10px] font-black uppercase tracking-widest">
-          ${this._mode === 'admit'
-            ? `<span class="px-3 py-1 bg-white/20 rounded-full text-white">Pendiente de admisión</span>`
-            : this._mode === 'create'
-              ? `<span class="px-3 py-1 bg-white/20 rounded-full text-white">Alta manual</span>`
-              : `<span class="px-3 py-1 bg-white/20 rounded-full text-white ${this._form.is_active ? '' : 'opacity-70'}">${this._form.is_active ? 'Activo' : 'Inactivo'}</span>`}
-          <span id="srm-tab-label" class="px-3 py-1 bg-black/20 rounded-full">${Helpers.escapeHTML(TABS.find(t => t.id === this._tab)?.label || '')}</span>
+          <div class="hidden md:flex flex-col items-end gap-1.5 shrink-0 pr-11">
+            <span class="px-3 py-1 ${statusChip.cls} rounded-full text-[10px] font-black uppercase tracking-widest flex items-center gap-1.5">
+              <i data-lucide="${statusChip.icon}" class="w-3 h-3"></i>${statusChip.label}
+            </span>
+            <span id="srm-tab-label" class="px-3 py-1 bg-white/20 text-white/80 rounded-full text-[10px] font-black uppercase tracking-widest">${Helpers.escapeHTML(TABS.find(t => t.id === this._tab)?.label || '')}</span>
+          </div>
         </div>
       </div>
 
-      <div class="flex border-b border-slate-100 bg-slate-50/70 px-2 pt-2 gap-1 overflow-x-auto">
-        ${TABS.map(t => `
-          <button data-tab="${t.id}"
-            class="srm-tab flex items-center gap-1.5 px-3 py-2.5 rounded-t-xl text-[11px] font-black uppercase tracking-widest transition-all whitespace-nowrap
-              ${this._tab === t.id ? 'bg-white text-purple-600 border-t-2 border-purple-500 shadow-sm' : 'text-slate-400 hover:text-slate-600'}">
-            <i data-lucide="${t.icon}" class="w-3.5 h-3.5"></i>${t.label}
-          </button>`).join('')}
+      <div class="px-4 py-2.5 bg-slate-100 border-b border-slate-200 sticky top-0 z-10">
+        <div class="flex gap-1.5 overflow-x-auto">
+          ${TABS.map(t => `
+            <button data-tab="${t.id}"
+              class="srm-tab flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-[11px] font-black uppercase tracking-widest transition-all whitespace-nowrap shrink-0
+                ${this._tab === t.id ? 'bg-white text-purple-600 shadow-sm border border-indigo-100' : 'text-slate-400 hover:text-slate-600 hover:bg-white'}">
+              <i data-lucide="${t.icon}" class="w-3.5 h-3.5"></i>${t.label}
+            </button>`).join('')}
+        </div>
       </div>
 
-      <div id="srm-tab-content" class="p-5 bg-slate-50/40 min-h-[320px]">
+      <div id="srm-tab-content" class="p-5 md:p-6 bg-slate-50/50">
         <div class="flex items-center justify-center py-16 text-slate-400">
           <div class="w-8 h-8 border-4 border-slate-200 border-t-purple-500 rounded-full animate-spin"></div>
         </div>
       </div>
 
-      <div class="modal-footer bg-white p-5 rounded-b-3xl border-t border-slate-100 flex justify-end gap-2 flex-wrap">
-        ${this._mode === 'admit'
-          ? `<button id="srm-reject" class="px-5 py-2.5 text-rose-600 bg-rose-50 hover:bg-rose-100 rounded-2xl font-black text-xs uppercase transition-all">Rechazar</button>
-             <button id="srm-approve" class="px-6 py-2.5 bg-gradient-to-r from-emerald-600 to-teal-600 text-white rounded-2xl font-black text-xs uppercase shadow-lg shadow-emerald-200 hover:-translate-y-0.5 transition-all active:scale-95">Aprobar Admisión</button>`
-          : this._mode === 'create'
-            ? `<button id="srm-create" class="px-6 py-2.5 bg-gradient-to-r from-purple-600 to-indigo-600 text-white rounded-2xl font-black text-xs uppercase shadow-lg shadow-purple-200 hover:-translate-y-0.5 transition-all active:scale-95">Crear Estudiante</button>`
-            : `<button id="srm-save" class="px-6 py-2.5 bg-gradient-to-r from-purple-600 to-indigo-600 text-white rounded-2xl font-black text-xs uppercase shadow-lg shadow-purple-200 hover:-translate-y-0.5 transition-all active:scale-95">Guardar cambios</button>`}
+      <div class="modal-footer bg-white p-5 rounded-b-3xl border-t border-slate-200 flex justify-between gap-3 flex-wrap items-center">
+        <div class="hidden sm:flex items-center gap-2 text-[10px] font-black text-slate-400 uppercase tracking-widest">
+          <i data-lucide="shield-check" class="w-3.5 h-3.5 text-emerald-500"></i>
+          Expediente Digital Escolar
+        </div>
+        <div class="flex justify-end gap-2 ml-auto">
+          ${this._mode === 'admit'
+            ? `<button id="srm-reject" class="px-5 py-2.5 text-rose-600 bg-rose-50 hover:bg-rose-100 rounded-2xl font-black text-xs uppercase transition-all">Rechazar</button>
+               <button id="srm-approve" class="px-6 py-2.5 bg-gradient-to-r from-purple-600 to-indigo-600 text-white rounded-2xl font-black text-xs uppercase shadow-lg shadow-purple-200 hover:-translate-y-0.5 transition-all active:scale-95">Aprobar Admisión</button>`
+            : this._mode === 'create'
+              ? `<button id="srm-create" class="px-6 py-2.5 bg-gradient-to-r from-purple-600 to-indigo-600 text-white rounded-2xl font-black text-xs uppercase shadow-lg shadow-purple-200 hover:-translate-y-0.5 transition-all active:scale-95">Crear Estudiante</button>`
+              : `<button id="srm-save" class="px-6 py-2.5 bg-gradient-to-r from-purple-600 to-indigo-600 text-white rounded-2xl font-black text-xs uppercase shadow-lg shadow-purple-200 hover:-translate-y-0.5 transition-all active:scale-95">Guardar cambios</button>`}
+        </div>
       </div>`;
 
     window.openGlobalModal(html, true);
+    this._sizeModal();
     this._wireTabs();
     this._activateTab(this._tab);
 
@@ -406,6 +435,20 @@ export const StudentRecordModal = {
     document.getElementById('srm-create')?.addEventListener('click', () => this._createStudent());
     document.getElementById('srm-save')?.addEventListener('click', () => this._saveChanges());
     document.getElementById('srm-reject')?.addEventListener('click', () => this._rejectPrereg());
+  },
+
+  _sizeModal() {
+    const container = document.getElementById('globalModalContainer');
+    if (container) {
+      container.style.alignItems = 'center';
+      container.style.paddingTop = '0';
+    }
+    const inner = document.getElementById('globalModalInner');
+    if (!inner) return;
+    inner.style.width = 'min(94vw, 920px)';
+    inner.style.maxWidth = '920px';
+    inner.style.maxHeight = '90vh';
+    inner.style.margin = 'auto';
   },
 
   _wireTabs() {
@@ -419,8 +462,8 @@ export const StudentRecordModal = {
     this._tab = id;
     document.querySelectorAll('.srm-tab').forEach(btn => {
       const active = btn.dataset.tab === id;
-      btn.className = 'srm-tab flex items-center gap-1.5 px-3 py-2.5 rounded-t-xl text-[11px] font-black uppercase tracking-widest transition-all whitespace-nowrap ' +
-        (active ? 'bg-white text-purple-600 border-t-2 border-purple-500 shadow-sm' : 'text-slate-400 hover:text-slate-600');
+      btn.className = 'srm-tab flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-[11px] font-black uppercase tracking-widest transition-all whitespace-nowrap shrink-0 ' +
+        (active ? 'bg-white text-purple-600 shadow-sm border border-indigo-100' : 'text-slate-400 hover:text-slate-600 hover:bg-white');
     });
     const label = document.getElementById('srm-tab-label');
     if (label) label.textContent = TABS.find(t => t.id === id)?.label || '';
@@ -428,14 +471,13 @@ export const StudentRecordModal = {
     const content = document.getElementById('srm-tab-content');
     if (!content) return;
     const renderers = {
-      alumno: this._renderAlumno.bind(this),
-      tutor: this._renderTutor.bind(this),
-      emergency: this._renderEmergency.bind(this),
-      salud: this._renderSalud.bind(this),
+      info: this._renderAlumno.bind(this),
+      family: this._renderFamily.bind(this),
+      health: this._renderSalud.bind(this),
+      payments: this._renderPago.bind(this),
       docs: this._renderDocs.bind(this),
-      pago: this._renderPago.bind(this),
+      access: this._renderAcceso.bind(this),
       history: this._renderHistory.bind(this),
-      acceso: this._renderAcceso.bind(this),
     };
     content.innerHTML = (renderers[id] || this._renderAlumno).call(this);
     if (window.lucide) lucide.createIcons();
@@ -444,14 +486,13 @@ export const StudentRecordModal = {
 
   _wireTab(id) {
     const map = {
-      alumno: this._wireAlumno.bind(this),
-      tutor: this._wireTutor.bind(this),
-      emergency: this._wireEmergency.bind(this),
-      salud: this._wireSalud.bind(this),
+      info: this._wireAlumno.bind(this),
+      family: this._wireFamily.bind(this),
+      health: this._wireSalud.bind(this),
+      payments: this._wirePago.bind(this),
       docs: this._wireDocs.bind(this),
-      pago: this._wirePago.bind(this),
+      access: this._wireAcceso.bind(this),
       history: this._wireHistory.bind(this),
-      acceso: this._wireAcceso.bind(this),
     };
     (map[id] || (() => {}))();
   },
@@ -476,6 +517,14 @@ export const StudentRecordModal = {
 
   _fmt(v) {
     return Helpers.formatCurrency(v);
+  },
+
+  _sectionHeader(icon, title, chip = 'bg-gradient-to-br from-purple-500 to-indigo-600') {
+    return `
+      <h4 class="flex items-center gap-2.5 text-[11px] font-black text-slate-800 uppercase tracking-wider mb-4">
+        <span class="w-8 h-8 rounded-xl ${chip} text-white flex items-center justify-center shadow-sm"><i data-lucide="${icon}" class="w-4 h-4"></i></span>
+        <span>${title}</span>
+      </h4>`;
   },
 
   _genPassword() {
@@ -544,16 +593,13 @@ export const StudentRecordModal = {
     return this._schoolYears.map(y => `<option value="${Helpers.escapeHTML(y)}" ${this._form.school_year_requested === y ? 'selected' : ''}>${Helpers.escapeHTML(y)}</option>`).join('');
   },
 
-  // ---------------------------------------------------------------- CATEGORÍA ALUMNO (Paso 1)
+  // ---------------------------------------------------------------- INFO GENERAL (Pestaña 1)
   _renderAlumno() {
     const f = this._form;
     return `
       <div class="grid grid-cols-1 gap-4">
         <div class="bg-white p-5 rounded-3xl border border-slate-100 shadow-sm">
-          <h4 class="text-xs font-black text-slate-800 uppercase tracking-widest mb-4 flex items-center gap-2">
-            <span class="w-7 h-7 rounded-lg bg-purple-100 text-purple-600 flex items-center justify-center"><i data-lucide="user" class="w-3.5 h-3.5"></i></span>
-            1 · Datos del alumno
-          </h4>
+          ${this._sectionHeader('user', 'Datos del alumno')}
           <div class="flex flex-col md:flex-row gap-5">
             <div class="relative group cursor-pointer shrink-0">
               <div id="srm-avatar" class="w-20 h-20 rounded-2xl bg-slate-100 border-4 border-dashed border-slate-200 flex flex-col items-center justify-center text-slate-400 group-hover:border-purple-400 group-hover:bg-purple-50 transition-all overflow-hidden">
@@ -565,18 +611,18 @@ export const StudentRecordModal = {
               <div>
                 <label class="${LABEL}">Matrícula</label>
                 <div class="flex gap-2">
-                  <input data-f="matricula" placeholder="Generar automática..." class="${INPUT} flex-1">
+                  <input data-f="matricula" placeholder="Generar automática..." value="${Helpers.escapeHTML(String(f.matricula || ''))}" class="${INPUT} flex-1">
                   <button id="srm-gen-matricula" class="px-5 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-2xl font-black text-[10px] uppercase tracking-widest shadow-sm transition-all active:scale-95 shrink-0">Generar</button>
                 </div>
               </div>
               <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
-                <div><label class="${LABEL}">Nombres *</label><input data-f="name" placeholder="Ej: Juan Carlos" class="${INPUT}"></div>
-                <div><label class="${LABEL}">Apellidos</label><input data-f="last_name" placeholder="Ej: Pérez Gómez" class="${INPUT}"></div>
-                <div><label class="${LABEL}">Fecha de nacimiento</label><input data-f="birth_date" type="date" class="${INPUT}"></div>
+                <div><label class="${LABEL}">Nombres *</label><input data-f="name" placeholder="Ej: Juan Carlos" value="${Helpers.escapeHTML(String(f.name || ''))}" class="${INPUT}"></div>
+                <div><label class="${LABEL}">Apellidos</label><input data-f="last_name" placeholder="Ej: Pérez Gómez" value="${Helpers.escapeHTML(String(f.last_name || ''))}" class="${INPUT}"></div>
+                <div><label class="${LABEL}">Fecha de nacimiento</label><input data-f="birth_date" type="date" value="${f.birth_date || ''}" class="${INPUT}"></div>
                 <div>
                   <label class="${LABEL}">Edad</label>
                   <div class="flex gap-2">
-                    <input data-f="age" id="srm-age" placeholder="Auto" class="${INPUT} flex-1">
+                    <input data-f="age" id="srm-age" placeholder="Auto" value="${Helpers.escapeHTML(String(f.age || ''))}" class="${INPUT} flex-1">
                     <select data-f="age_type" class="w-24 px-2 py-2.5 border-2 border-slate-100 rounded-2xl text-sm font-black bg-slate-50/50">
                       <option value="años" ${f.age_type === 'años' ? 'selected' : ''}>Años</option>
                       <option value="meses" ${f.age_type === 'meses' ? 'selected' : ''}>Meses</option>
@@ -625,10 +671,7 @@ export const StudentRecordModal = {
         </div>
 
         <div class="bg-white p-5 rounded-3xl border border-slate-100 shadow-sm">
-          <h4 class="text-xs font-black text-slate-800 uppercase tracking-widest mb-4 flex items-center gap-2">
-            <span class="w-7 h-7 rounded-lg bg-purple-100 text-purple-600 flex items-center justify-center"><i data-lucide="school" class="w-3.5 h-3.5"></i></span>
-            Asignación de aula
-          </h4>
+          ${this._sectionHeader('school', 'Asignación de aula')}
           ${f.discount_pct ? `<div class="mb-3 flex items-center gap-2 bg-emerald-50 border border-emerald-100 rounded-2xl p-3 text-emerald-700 font-black text-xs"><i data-lucide="badge-percent" class="w-4 h-4"></i> Descuento por hermano aplicado: ${f.discount_pct}%</div>` : ''}
           <div>
             <label class="${LABEL}">Aula *</label>
@@ -638,10 +681,7 @@ export const StudentRecordModal = {
         </div>
 
         <div class="bg-white p-5 rounded-3xl border border-slate-100 shadow-sm">
-          <h4 class="text-xs font-black text-slate-800 uppercase tracking-widest mb-4 flex items-center gap-2">
-            <span class="w-7 h-7 rounded-lg bg-orange-100 text-orange-600 flex items-center justify-center"><i data-lucide="qr-code" class="w-3.5 h-3.5"></i></span>
-            QR de asistencia y carnet
-          </h4>
+          ${this._sectionHeader('qr-code', 'QR de asistencia y carnet', 'bg-gradient-to-br from-orange-500 to-amber-500')}
           <div id="srm-qr" class="bg-slate-50 rounded-2xl border border-slate-100 p-4 min-h-[130px] flex items-center justify-center">
             <p class="text-[11px] text-slate-400 font-bold">${f.matricula ? 'Generando…' : 'Ingresa una matrícula arriba para ver el QR'}</p>
           </div>
@@ -713,9 +753,10 @@ export const StudentRecordModal = {
     if (this._form.matricula) setTimeout(() => this._generateQR(), 300);
   },
 
-  // ---------------------------------------------------------------- CATEGORÍA TUTOR (Paso 2)
-  _renderTutor() {
+  // ---------------------------------------------------------------- FAMILIA (Tutores y núcleo familiar)
+  _renderFamily() {
     const esc = Helpers.escapeHTML;
+    const f = this._form;
     const p1Fields = [
       ['p1_name', 'Nombre completo *', ''],
       ['p1_relationship', 'Parentesco', ''], ['p1_cedula', 'Cédula', '000-0000000-0'],
@@ -730,107 +771,66 @@ export const StudentRecordModal = {
       ['p2_address', 'Dirección', ''], ['p2_occupation', 'Ocupación', ''], ['p2_job', 'Profesión', ''],
       ['p2_workplace', 'Lugar de trabajo', ''],
     ];
+    const pRow = (list) => list.map(([k, l, ph]) => `
+      <div class="${k === 'p1_address' || k === 'p1_emergency_contact' || k === 'p2_address' ? 'md:col-span-2' : ''}">
+        <label class="${LABEL}">${l}</label>
+        <input data-f="${k}" placeholder="${ph}" value="${esc(this._form[k] || '')}" class="${INPUT}">
+      </div>`).join('');
     return `
-      <div class="grid grid-cols-1 gap-4">
-        <div class="bg-white p-5 rounded-3xl border border-slate-100 shadow-sm">
-          <h4 class="text-xs font-black text-slate-800 uppercase tracking-widest mb-4 flex items-center gap-2">
-            <span class="w-7 h-7 rounded-lg bg-blue-100 text-blue-600 flex items-center justify-center"><i data-lucide="user" class="w-3.5 h-3.5"></i></span>
-            2 · Tutor principal (Padre/Madre)
-          </h4>
-          <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-            ${p1Fields.map(([k, l, ph]) => `
-              <div class="${k === 'p1_address' || k === 'p1_emergency_contact' ? 'md:col-span-2' : ''}">
-                <label class="${LABEL}">${l}</label>
-                <input data-f="${k}" placeholder="${ph}" value="${esc(this._form[k] || '')}" class="${INPUT}">
-              </div>`).join('')}
+      <div class="grid grid-cols-1 lg:grid-cols-2 gap-4 items-start">
+        <div class="space-y-4">
+          <div class="bg-white p-5 rounded-3xl border border-slate-100 shadow-sm">
+            ${this._sectionHeader('user', 'Tutor principal', 'bg-gradient-to-br from-blue-500 to-indigo-600')}
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">${pRow(p1Fields)}</div>
+          </div>
+          <div class="bg-white p-5 rounded-3xl border border-slate-100 shadow-sm">
+            ${this._sectionHeader('user-plus', 'Tutor secundario', 'bg-indigo-500')}
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">${pRow(p2Fields)}</div>
           </div>
         </div>
 
-        <div class="bg-white p-5 rounded-3xl border border-slate-100 shadow-sm">
-          <h4 class="text-xs font-black text-slate-800 uppercase tracking-widest mb-4 flex items-center gap-2">
-            <span class="w-7 h-7 rounded-lg bg-slate-100 text-slate-500 flex items-center justify-center"><i data-lucide="user-plus" class="w-3.5 h-3.5"></i></span>
-            2 · Tutor secundario (opcional)
-          </h4>
-          <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-            ${p2Fields.map(([k, l, ph]) => `
-              <div class="${k === 'p2_address' ? 'md:col-span-2' : ''}">
-                <label class="${LABEL}">${l}</label>
-                <input data-f="${k}" placeholder="${ph}" value="${esc(this._form[k] || '')}" class="${INPUT}">
-              </div>`).join('')}
-          </div>
-        </div>
-      </div>`;
-  },
-
-  _wireTutor() {},
-
-  // ---------------------------------------------------------------- CATEGORÍA CONTACTO DE EMERGENCIA (Paso 3)
-  _renderEmergency() {
-    const f = this._form;
-    return `
-      <div class="grid grid-cols-1 gap-4">
-        <div class="bg-white p-5 rounded-3xl border border-slate-100 shadow-sm">
-          <h4 class="text-xs font-black text-slate-800 uppercase tracking-widest mb-4 flex items-center gap-2">
-            <span class="w-7 h-7 rounded-lg bg-rose-100 text-rose-600 flex items-center justify-center"><i data-lucide="phone-call" class="w-3.5 h-3.5"></i></span>
-            3 · Contacto de emergencia
-          </h4>
-          <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-            ${this._authedField('emg_name', 'Nombre', 'Persona de contacto')}
-            <div>
-              <label class="${LABEL}">Parentesco</label>
-              <select data-f="emg_relationship" class="${INPUT}">
-                <option value="">--</option>
-                ${RELATIONSHIPS.map(r => `<option value="${r}" ${f.emg_relationship === r ? 'selected' : ''}>${r}</option>`).join('')}
-                <option value="Otro" ${f.emg_relationship === 'Otro' ? 'selected' : ''}>Otro</option>
-              </select>
+        <div class="space-y-4">
+          <div class="bg-white p-5 rounded-3xl border border-slate-100 shadow-sm">
+            ${this._sectionHeader('phone-call', 'Contacto de emergencia', 'bg-gradient-to-br from-rose-500 to-red-500')}
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+              ${this._authedField('emg_name', 'Nombre', 'Persona de contacto')}
+              <div>
+                <label class="${LABEL}">Parentesco</label>
+                <select data-f="emg_relationship" class="${INPUT}">
+                  <option value="">--</option>
+                  ${RELATIONSHIPS.map(r => `<option value="${r}" ${f.emg_relationship === r ? 'selected' : ''}>${r}</option>`).join('')}
+                  <option value="Otro" ${f.emg_relationship === 'Otro' ? 'selected' : ''}>Otro</option>
+                </select>
+              </div>
+              ${this._authedField('emg_cedula', 'Cédula', '')}
+              ${this._authedField('emg_phone', 'Teléfono', '809-000-0000')}
+              ${this._authedField('emg_observations', 'Instrucciones / observaciones', 'Ej: alergias, condiciones, indicaciones', { col: 'md:col-span-2', textarea: true, rows: 2 })}
             </div>
-            ${this._authedField('emg_cedula', 'Cédula', '')}
-            ${this._authedField('emg_phone', 'Teléfono', '809-000-0000')}
-            ${this._authedField('emg_observations', 'Instrucciones / observaciones', 'Ej: alergias, condiciones, indicaciones', { col: 'md:col-span-2', textarea: true, rows: 2 })}
           </div>
-        </div>
 
-        <div class="bg-white p-5 rounded-3xl border border-slate-100 shadow-sm">
-          <h4 class="text-xs font-black text-slate-800 uppercase tracking-widest mb-4 flex items-center gap-2">
-            <span class="w-7 h-7 rounded-lg bg-amber-100 text-amber-600 flex items-center justify-center"><i data-lucide="shield-check" class="w-3.5 h-3.5"></i></span>
-            3 · Personas autorizadas para retiro
-          </h4>
-          <div id="srm-auth-list" class="space-y-2">
-            ${this._authPeople.length ? this._authPeople.map((a, i) => this._authRow(a, i)).join('') : '<p class="text-xs text-slate-400 font-bold">Nadie autorizado aún.</p>'}
+          <div class="bg-white p-5 rounded-3xl border border-slate-100 shadow-sm">
+            ${this._sectionHeader('shield-check', 'Personas autorizadas para retiro', 'bg-gradient-to-br from-amber-400 to-orange-500')}
+            <div id="srm-auth-list" class="space-y-2">
+              ${this._authPeople.length ? this._authPeople.map((a, i) => this._authRow(a, i)).join('') : '<p class="text-xs text-slate-400 font-bold">Nadie autorizado aún.</p>'}
+            </div>
+            <button id="srm-auth-add" class="mt-3 px-4 py-2 bg-amber-50 text-amber-600 hover:bg-amber-100 rounded-xl font-black text-[10px] uppercase tracking-widest transition-all">+ Añadir autorizado</button>
           </div>
-          <button id="srm-auth-add" class="mt-3 px-4 py-2 bg-amber-50 text-amber-600 hover:bg-amber-100 rounded-xl font-black text-[10px] uppercase tracking-widest transition-all">+ Añadir autorizado</button>
-        </div>
 
-        <div class="bg-white p-5 rounded-3xl border border-slate-100 shadow-sm">
-          <h4 class="text-xs font-black text-slate-800 uppercase tracking-widest mb-4 flex items-center gap-2">
-            <span class="w-7 h-7 rounded-lg bg-emerald-100 text-emerald-600 flex items-center justify-center"><i data-lucide="users" class="w-3.5 h-3.5"></i></span>
-            Hermanos en el centro
-          </h4>
-          ${this._siblings.length
-            ? `<div class="flex flex-wrap gap-2">${this._siblings.map(s => `
-                <span class="px-3 py-1.5 bg-emerald-50 border border-emerald-100 rounded-xl text-xs font-black text-emerald-700 flex items-center gap-2">
-                  <i data-lucide="user" class="w-3 h-3"></i>${Helpers.escapeHTML(s.name)} <span class="text-emerald-400">·</span> ${Helpers.escapeHTML(s.classrooms?.name || 'sin aula')}
-                </span>`).join('')}</div>
-               <p class="text-[11px] text-emerald-700 font-black mt-3">Se aplicará descuento de 10% por hermano (ver paso Resumen).</p>`
-            : '<p class="text-xs text-slate-400 font-bold">Sin hermanos detectados para este núcleo familiar.</p>'}
+          <div class="bg-white p-5 rounded-3xl border border-slate-100 shadow-sm">
+            ${this._sectionHeader('users', 'Hermanos en el centro', 'bg-gradient-to-br from-emerald-500 to-teal-500')}
+            ${this._siblings.length
+              ? `<div class="flex flex-wrap gap-2">${this._siblings.map(s => `
+                  <span class="px-3 py-1.5 bg-emerald-50 border border-emerald-100 rounded-xl text-xs font-black text-emerald-700 flex items-center gap-2">
+                    <i data-lucide="user" class="w-3 h-3"></i>${Helpers.escapeHTML(s.name)} <span class="text-emerald-400">·</span> ${Helpers.escapeHTML(s.classrooms?.name || 'sin aula')}
+                  </span>`).join('')}</div>
+                 <p class="text-[11px] text-emerald-700 font-black mt-3">Se aplicará descuento de 10% por hermano (ver pestaña Pagos).</p>`
+              : '<p class="text-xs text-slate-400 font-bold">Sin hermanos detectados para este núcleo familiar.</p>'}
+          </div>
         </div>
       </div>`;
   },
 
-  _authRow(a, i) {
-    const esc = Helpers.escapeHTML;
-    return `
-      <div class="flex flex-wrap items-center gap-2 bg-slate-50 rounded-2xl p-2 border border-slate-100" data-del="${i}">
-        <input data-auth="name" value="${esc(a.name || '')}" placeholder="Nombre" class="flex-1 min-w-[140px] px-3 py-2 border-2 border-slate-100 rounded-xl text-sm bg-white">
-        <input data-auth="relationship" value="${esc(a.relationship || '')}" placeholder="Parentesco" class="flex-1 min-w-[100px] px-3 py-2 border-2 border-slate-100 rounded-xl text-sm bg-white">
-        <input data-auth="phone" value="${esc(a.phone || '')}" placeholder="Teléfono" class="flex-1 min-w-[120px] px-3 py-2 border-2 border-slate-100 rounded-xl text-sm bg-white">
-        <button data-del="${i}" class="w-9 h-9 flex items-center justify-center bg-rose-50 text-rose-600 hover:bg-rose-600 hover:text-white rounded-xl transition-all">
-          <i data-lucide="trash-2" class="w-4 h-4"></i>
-        </button>
-      </div>`;
-  },
-
-  _wireEmergency() {
+  _wireFamily() {
     const add = document.getElementById('srm-auth-add');
     if (add) {
       add.onclick = () => {
@@ -854,6 +854,19 @@ export const StudentRecordModal = {
     });
   },
 
+  _authRow(a, i) {
+    const esc = Helpers.escapeHTML;
+    return `
+      <div class="flex flex-wrap items-center gap-2 bg-slate-50 rounded-2xl p-2 border border-slate-100" data-del="${i}">
+        <input data-auth="name" value="${esc(a.name || '')}" placeholder="Nombre" class="flex-1 min-w-[140px] px-3 py-2 border-2 border-slate-100 rounded-xl text-sm bg-white">
+        <input data-auth="relationship" value="${esc(a.relationship || '')}" placeholder="Parentesco" class="flex-1 min-w-[100px] px-3 py-2 border-2 border-slate-100 rounded-xl text-sm bg-white">
+        <input data-auth="phone" value="${esc(a.phone || '')}" placeholder="Teléfono" class="flex-1 min-w-[120px] px-3 py-2 border-2 border-slate-100 rounded-xl text-sm bg-white">
+        <button data-del="${i}" class="w-9 h-9 flex items-center justify-center bg-rose-50 text-rose-600 hover:bg-rose-600 hover:text-white rounded-xl transition-all">
+          <i data-lucide="trash-2" class="w-4 h-4"></i>
+        </button>
+      </div>`;
+  },
+
   _renderAuthList() {
     const list = document.getElementById('srm-auth-list');
     if (!list) return;
@@ -863,16 +876,13 @@ export const StudentRecordModal = {
     if (window.lucide) lucide.createIcons();
   },
 
-  // ---------------------------------------------------------------- CATEGORÍA SALUD (Paso 4)
+  // ---------------------------------------------------------------- SALUD (Pestaña 3)
   _renderSalud() {
     const f = this._form;
     return `
       <div class="grid grid-cols-1 gap-4">
         <div class="bg-white p-5 rounded-3xl border border-slate-100 shadow-sm">
-          <h4 class="text-xs font-black text-slate-800 uppercase tracking-widest mb-4 flex items-center gap-2">
-            <span class="w-7 h-7 rounded-lg bg-rose-100 text-rose-600 flex items-center justify-center"><i data-lucide="heart-pulse" class="w-3.5 h-3.5"></i></span>
-            4 · Ficha de salud
-          </h4>
+          ${this._sectionHeader('heart-pulse', 'Ficha de salud', 'bg-gradient-to-br from-rose-500 to-red-500')}
           <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
               <label class="${LABEL}">Tipo de sangre</label>
@@ -901,16 +911,13 @@ export const StudentRecordModal = {
 
   _wireSalud() {},
 
-  // ---------------------------------------------------------------- CATEGORÍA DOCUMENTOS (Paso 5)
+  // ---------------------------------------------------------------- DOCUMENTOS (Pestaña 5)
   _renderDocs() {
     const hasSig = !!this._signature;
     return `
       <div class="grid grid-cols-1 gap-4">
         <div class="bg-white p-5 rounded-3xl border border-slate-100 shadow-sm">
-          <h4 class="text-xs font-black text-slate-800 uppercase tracking-widest mb-4 flex items-center gap-2">
-            <span class="w-7 h-7 rounded-lg bg-indigo-100 text-indigo-600 flex items-center justify-center"><i data-lucide="folder-open" class="w-3.5 h-3.5"></i></span>
-            5 · Documentos del expediente
-          </h4>
+          ${this._sectionHeader('folder-open', 'Documentos del expediente')}
           <div class="grid grid-cols-2 md:grid-cols-3 gap-3">
             ${DOC_TYPES.map(d => {
               const url = this._docs[d.key];
@@ -939,10 +946,7 @@ export const StudentRecordModal = {
         </div>
 
         <div class="bg-white p-5 rounded-3xl border border-slate-100 shadow-sm">
-          <h4 class="text-xs font-black text-slate-800 uppercase tracking-widest mb-4 flex items-center gap-2">
-            <span class="w-7 h-7 rounded-lg bg-orange-100 text-orange-600 flex items-center justify-center"><i data-lucide="file-check-2" class="w-3.5 h-3.5"></i></span>
-            6 · Autorizaciones
-          </h4>
+          ${this._sectionHeader('file-check-2', 'Autorizaciones', 'bg-gradient-to-br from-orange-500 to-amber-500')}
           <div class="space-y-3">
             ${CONSENT_DEFS.map(c => `
               <label class="flex items-start gap-3 cursor-pointer bg-slate-50 border border-slate-100 rounded-2xl p-3">
@@ -953,10 +957,7 @@ export const StudentRecordModal = {
         </div>
 
         <div class="bg-white p-5 rounded-3xl border border-slate-100 shadow-sm">
-          <h4 class="text-xs font-black text-slate-800 uppercase tracking-widest mb-4 flex items-center gap-2">
-            <span class="w-7 h-7 rounded-lg bg-indigo-100 text-indigo-600 flex items-center justify-center"><i data-lucide="pen-tool" class="w-3.5 h-3.5"></i></span>
-            6 · Firma del tutor
-          </h4>
+          ${this._sectionHeader('pen-tool', 'Firma del tutor')}
           <div class="bg-slate-50 rounded-2xl border-2 border-dashed border-slate-200 p-2">
             <canvas id="srm-signature" width="640" height="180" class="w-full rounded-xl bg-white touch-none" style="cursor:crosshair;"></canvas>
           </div>
@@ -1159,37 +1160,25 @@ export const StudentRecordModal = {
       </div>`).join('') : '<p class="text-xs text-slate-400 font-bold">Sin actividad registrada.</p>';
 
     return `
-      <div class="grid grid-cols-1 gap-4">
+      <div class="grid grid-cols-1 lg:grid-cols-2 gap-4 items-start">
         <div class="bg-white p-5 rounded-3xl border border-slate-100 shadow-sm">
-          <h4 class="text-xs font-black text-slate-800 uppercase tracking-widest mb-4 flex items-center gap-2">
-            <span class="w-7 h-7 rounded-lg bg-indigo-100 text-indigo-600 flex items-center justify-center"><i data-lucide="graduation-cap" class="w-3.5 h-3.5"></i></span>
-            Años escolares e inscripciones
-          </h4>
+          ${this._sectionHeader('graduation-cap', 'Años escolares e inscripciones', 'bg-gradient-to-br from-blue-500 to-indigo-600')}
           <div class="space-y-2.5">${enrHTML}</div>
           ${this._mode === 'edit' ? '<p class="text-[10px] text-slate-400 font-bold mt-2">Las reinscripciones pendientes pueden aprobarse aquí (al aprobar se valida el pago correspondiente).</p>' : ''}
         </div>
 
         <div class="bg-white p-5 rounded-3xl border border-slate-100 shadow-sm">
-          <h4 class="text-xs font-black text-slate-800 uppercase tracking-widest mb-4 flex items-center gap-2">
-            <span class="w-7 h-7 rounded-lg bg-emerald-100 text-emerald-600 flex items-center justify-center"><i data-lucide="award" class="w-3.5 h-3.5"></i></span>
-            Boletines por período
-          </h4>
+          ${this._sectionHeader('award', 'Boletines por período', 'bg-gradient-to-br from-emerald-500 to-teal-500')}
           <div class="space-y-2.5">${repHTML}</div>
         </div>
 
         <div class="bg-white p-5 rounded-3xl border border-slate-100 shadow-sm">
-          <h4 class="text-xs font-black text-slate-800 uppercase tracking-widest mb-4 flex items-center gap-2">
-            <span class="w-7 h-7 rounded-lg bg-amber-100 text-amber-600 flex items-center justify-center"><i data-lucide="credit-card" class="w-3.5 h-3.5"></i></span>
-            Historial de pagos
-          </h4>
+          ${this._sectionHeader('credit-card', 'Historial de pagos', 'bg-gradient-to-br from-amber-400 to-orange-500')}
           <div class="space-y-1.5">${payHTML}</div>
         </div>
 
         <div class="bg-white p-5 rounded-3xl border border-slate-100 shadow-sm">
-          <h4 class="text-xs font-black text-slate-800 uppercase tracking-widest mb-4 flex items-center gap-2">
-            <span class="w-7 h-7 rounded-lg bg-slate-100 text-slate-500 flex items-center justify-center"><i data-lucide="activity" class="w-3.5 h-3.5"></i></span>
-            Actividad y auditoría
-          </h4>
+          ${this._sectionHeader('activity', 'Actividad y auditoría', 'bg-gradient-to-br from-purple-500 to-indigo-600')}
           <div class="space-y-1.5">${logsHTML}</div>
         </div>
       </div>`;
@@ -1236,7 +1225,7 @@ export const StudentRecordModal = {
     }
   },
 
-  // ---------------------------------------------------------------- CATEGORÍA PAGO
+  // ---------------------------------------------------------------- PAGOS (Pestaña 4)
   _renderPago() {
     const f = this._form;
     const monthly = this._num('monthly_fee');
@@ -1248,10 +1237,7 @@ export const StudentRecordModal = {
     return `
       <div class="grid grid-cols-1 gap-4">
         <div class="bg-white p-5 rounded-3xl border border-slate-100 shadow-sm">
-          <h4 class="text-xs font-black text-slate-800 uppercase tracking-widest mb-4 flex items-center gap-2">
-            <span class="w-7 h-7 rounded-lg bg-amber-100 text-amber-600 flex items-center justify-center"><i data-lucide="credit-card" class="w-3.5 h-3.5"></i></span>
-            Plan financiero
-          </h4>
+          ${this._sectionHeader('credit-card', 'Plan financiero', 'bg-gradient-to-br from-amber-400 to-orange-500')}
           <div class="grid grid-cols-2 md:grid-cols-3 gap-4">
             <div>
               <label class="${LABEL}">Plan de pago</label>
@@ -1311,16 +1297,13 @@ export const StudentRecordModal = {
     });
   },
 
-  // ---------------------------------------------------------------- CATEGORÍA ACCESO
+  // ---------------------------------------------------------------- ACCESOS (Pestaña 6)
   _renderAcceso() {
     const hasAccount = !!this._parentId && this._mode === 'edit';
     return `
       <div class="grid grid-cols-1 gap-4">
         <div class="bg-white p-5 rounded-3xl border border-slate-100 shadow-sm">
-          <h4 class="text-xs font-black text-slate-800 uppercase tracking-widest mb-4 flex items-center gap-2">
-            <span class="w-7 h-7 rounded-lg bg-blue-100 text-blue-600 flex items-center justify-center"><i data-lucide="key-round" class="w-3.5 h-3.5"></i></span>
-            Acceso del padre / tutor
-          </h4>
+          ${this._sectionHeader('key-round', 'Acceso del padre / tutor', 'bg-gradient-to-br from-blue-500 to-indigo-600')}
           ${hasAccount ? `<div class="mb-3 flex items-center gap-2 bg-emerald-50 border border-emerald-100 rounded-2xl p-3 text-emerald-700 font-black text-xs"><i data-lucide="check-circle-2" class="w-4 h-4"></i> Cuenta de padres vinculada</div>` : ''}
           <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
             ${this._authedField('p1_email', 'Correo de login del tutor', 'correo@ejemplo.com', { type: 'email' })}
@@ -1575,7 +1558,7 @@ export const StudentRecordModal = {
   _validateBasics() {
     const f = this._form;
     if (!f.name) { Helpers.toast('El nombre del estudiante es obligatorio (paso 1)', 'warning'); return false; }
-    if (!f.classroom_id) { Helpers.toast('Asigna un aula en el paso Resumen', 'warning'); return false; }
+    if (!f.classroom_id) { Helpers.toast('Asigna un aula en la pestaña "Info General"', 'warning'); return false; }
     const classroom = this._classrooms.find(c => String(c.id) === String(f.classroom_id));
     if (classroom && classroom.available <= 0) { Helpers.toast('Esa aula está llena. Elige otra.', 'warning'); return false; }
     return true;

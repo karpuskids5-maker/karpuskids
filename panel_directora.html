@@ -854,10 +854,7 @@
           </div>
         </div>
 
-        <!-- BLOQUE 3 — Grid/List de Estudiantes -->
-        <div id="studentsGrid" class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
-          <!-- Cards inyectadas por JS -->
-        </div>
+        <!-- BLOQUE 3 — Tabla de Estudiantes -->
         <div id="studentsTableWrapper" class="hidden bg-white rounded-3xl shadow-sm border border-slate-100 overflow-hidden">
           <table class="w-full text-left border-collapse">
             <thead>
@@ -921,8 +918,25 @@
         </div>
 
         <!-- BLOQUE 3 — Lista -->
-        <div id="preregList" class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
-          <!-- Cards inyectadas por JS -->
+        <div class="bg-white rounded-3xl border border-slate-100 shadow-sm overflow-hidden">
+          <div class="overflow-x-auto">
+            <table class="w-full text-left">
+              <thead>
+                <tr class="bg-slate-50 border-b border-slate-100">
+                  <th class="px-4 py-3 text-[10px] font-black uppercase tracking-wider text-slate-400">Estudiante</th>
+                  <th class="px-4 py-3 text-[10px] font-black uppercase tracking-wider text-slate-400">Tutor</th>
+                  <th class="px-4 py-3 text-[10px] font-black uppercase tracking-wider text-slate-400">Contacto</th>
+                  <th class="px-4 py-3 text-[10px] font-black uppercase tracking-wider text-slate-400">Nivel</th>
+                  <th class="px-4 py-3 text-[10px] font-black uppercase tracking-wider text-slate-400">Recibida</th>
+                  <th class="px-4 py-3 text-[10px] font-black uppercase tracking-wider text-slate-400">Estado</th>
+                  <th class="px-4 py-3 text-[10px] font-black uppercase tracking-wider text-right text-slate-400">Acciones</th>
+                </tr>
+              </thead>
+              <tbody id="preregList" class="divide-y divide-slate-50">
+                <!-- Filas inyectadas por JS -->
+              </tbody>
+            </table>
+          </div>
         </div>
       </section>
 

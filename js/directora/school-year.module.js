@@ -16,9 +16,11 @@ const { escapeHTML } = Helpers;
 export const SchoolYearModule = {
   _years: [],
   _selectedYear: null,
+  _existingPeriods: [],
 
   // ── Inicialización ──────────────────────────────────────────
   async init() {
+    try { await SchoolEngine.refresh(); } catch (_) {}
     await this._loadYears();
     this._render();
   },
@@ -100,9 +102,14 @@ export const SchoolYearModule = {
               <p class="text-[10px] font-black uppercase tracking-widest text-white/60">Año Escolar Actual</p>
               <h2 class="text-2xl font-black">${escapeHTML(year.name)}</h2>
             </div>
-            <span class="px-4 py-2 ${SchoolEngine.getStatusColor()} rounded-2xl text-xs font-black">
-              ${SchoolEngine.getStatusLabel()}
-            </span>
+            <div class="flex items-center gap-2">
+              <button onclick="App.schoolYear.viewYear(${year.id})" class="flex items-center gap-2 px-4 py-2 bg-white/15 hover:bg-white/25 rounded-2xl text-xs font-black transition-all" title="Editar año escolar">
+                <i data-lucide="edit-3" class="w-4 h-4"></i> Editar
+              </button>
+              <span class="px-4 py-2 ${SchoolEngine.getStatusColor()} rounded-2xl text-xs font-black">
+                ${SchoolEngine.getStatusLabel()}
+              </span>
+            </div>
           </div>
           <div class="mt-4 grid grid-cols-3 gap-4 text-center">
             <div>
@@ -183,6 +190,14 @@ export const SchoolYearModule = {
     if (!year) return '';
 
     const actions = [];
+
+    // Editar año escolar
+    actions.push({
+      label: 'Editar Año',
+      icon: 'edit-3',
+      color: 'bg-violet-500 hover:bg-violet-600',
+      action: `App.schoolYear.viewYear(${year.id})`
+    });
 
     // Avanzar estado
     actions.push({
@@ -286,6 +301,14 @@ export const SchoolYearModule = {
     const nextYear = new Date().getFullYear();
     const yearName = `${nextYear}-${nextYear + 1}`;
 
+    const existingPeriods = isEdit
+      ? (SchoolEngine.getAllPeriods() || []).filter(p => Number(p.school_year_id) === Number(editYear.id))
+      : [];
+    this._existingPeriods = existingPeriods;
+    const periodsHtml = existingPeriods.length
+      ? existingPeriods.map((p, i) => this._periodRowHtml(i + 1, p)).join('')
+      : this._periodRowHtml(1) + this._periodRowHtml(2);
+
     wizard.innerHTML = `
       <div class="bg-white rounded-3xl border border-violet-200 shadow-lg p-8">
         <div class="flex items-center justify-between mb-6">
@@ -372,25 +395,7 @@ export const SchoolYearModule = {
               </button>
             </div>
             <div id="periodsList" class="space-y-3">
-              <!-- Períodos por defecto: 2 -->
-              <div class="period-row flex items-center gap-3 p-3 bg-slate-50 rounded-xl border border-slate-100">
-                <span class="w-8 h-8 bg-violet-500 text-white rounded-lg flex items-center justify-center text-xs font-black">1</span>
-                <input type="text" placeholder="Nombre (Ej: Periodo 1)" class="period-name flex-1 p-2.5 bg-white rounded-lg text-sm font-bold border border-slate-200 outline-none focus:ring-2 focus:ring-violet-300">
-                <input type="date" class="period-start p-2.5 bg-white rounded-lg text-xs font-bold border border-slate-200 outline-none focus:ring-2 focus:ring-violet-300">
-                <input type="date" class="period-end p-2.5 bg-white rounded-lg text-xs font-bold border border-slate-200 outline-none focus:ring-2 focus:ring-violet-300">
-                <button type="button" onclick="this.closest('.period-row').remove()" class="p-1.5 text-slate-400 hover:text-red-500 transition-colors">
-                  <i data-lucide="trash-2" class="w-4 h-4"></i>
-                </button>
-              </div>
-              <div class="period-row flex items-center gap-3 p-3 bg-slate-50 rounded-xl border border-slate-100">
-                <span class="w-8 h-8 bg-violet-500 text-white rounded-lg flex items-center justify-center text-xs font-black">2</span>
-                <input type="text" placeholder="Nombre (Ej: Periodo 2)" class="period-name flex-1 p-2.5 bg-white rounded-lg text-sm font-bold border border-slate-200 outline-none focus:ring-2 focus:ring-violet-300">
-                <input type="date" class="period-start p-2.5 bg-white rounded-lg text-xs font-bold border border-slate-200 outline-none focus:ring-2 focus:ring-violet-300">
-                <input type="date" class="period-end p-2.5 bg-white rounded-lg text-xs font-bold border border-slate-200 outline-none focus:ring-2 focus:ring-violet-300">
-                <button type="button" onclick="this.closest('.period-row').remove()" class="p-1.5 text-slate-400 hover:text-red-500 transition-colors">
-                  <i data-lucide="trash-2" class="w-4 h-4"></i>
-                </button>
-              </div>
+              ${periodsHtml}
             </div>
           </div>
 
@@ -413,24 +418,26 @@ export const SchoolYearModule = {
     if (window.lucide) lucide.createIcons();
   },
 
+  // ── Fila de Período (reutilizable) ─────────────────────────
+  _periodRowHtml(index, p = {}) {
+    return `
+      <div class="period-row flex items-center gap-3 p-3 bg-slate-50 rounded-xl border border-slate-100" data-period-id="${p.id || ''}">
+        <span class="w-8 h-8 bg-violet-500 text-white rounded-lg flex items-center justify-center text-xs font-black">${index}</span>
+        <input type="text" placeholder="Nombre (Ej: Periodo ${index})" class="period-name flex-1 p-2.5 bg-white rounded-lg text-sm font-bold border border-slate-200 outline-none focus:ring-2 focus:ring-violet-300" value="${escapeHTML(p.name || '')}">
+        <input type="date" class="period-start p-2.5 bg-white rounded-lg text-xs font-bold border border-slate-200 outline-none focus:ring-2 focus:ring-violet-300" value="${p.start_date || ''}">
+        <input type="date" class="period-end p-2.5 bg-white rounded-lg text-xs font-bold border border-slate-200 outline-none focus:ring-2 focus:ring-violet-300" value="${p.end_date || ''}">
+        <button type="button" onclick="this.closest('.period-row').remove()" class="p-1.5 text-slate-400 hover:text-red-500 transition-colors">
+          <i data-lucide="trash-2" class="w-4 h-4"></i>
+        </button>
+      </div>`;
+  },
+
   // ── Agregar Fila de Período ─────────────────────────────────
   addPeriodRow() {
     const list = document.getElementById('periodsList');
     if (!list) return;
-
     const count = list.querySelectorAll('.period-row').length + 1;
-    const row = document.createElement('div');
-    row.className = 'period-row flex items-center gap-3 p-3 bg-slate-50 rounded-xl border border-slate-100';
-    row.innerHTML = `
-      <span class="w-8 h-8 bg-violet-500 text-white rounded-lg flex items-center justify-center text-xs font-black">${count}</span>
-      <input type="text" placeholder="Nombre (Ej: Periodo ${count})" class="period-name flex-1 p-2.5 bg-white rounded-lg text-sm font-bold border border-slate-200 outline-none focus:ring-2 focus:ring-violet-300">
-      <input type="date" class="period-start p-2.5 bg-white rounded-lg text-xs font-bold border border-slate-200 outline-none focus:ring-2 focus:ring-violet-300">
-      <input type="date" class="period-end p-2.5 bg-white rounded-lg text-xs font-bold border border-slate-200 outline-none focus:ring-2 focus:ring-violet-300">
-      <button type="button" onclick="this.closest('.period-row').remove()" class="p-1.5 text-slate-400 hover:text-red-500 transition-colors">
-        <i data-lucide="trash-2" class="w-4 h-4"></i>
-      </button>
-    `;
-    list.appendChild(row);
+    list.insertAdjacentHTML('beforeend', this._periodRowHtml(count));
     if (window.lucide) lucide.createIcons();
   },
 
@@ -510,23 +517,65 @@ export const SchoolYearModule = {
 
       const yearId = yearResult.data.id;
 
-      // Si es edición, eliminar períodos antiguos
-      if (this._selectedYear) {
-        await supabase.rpc('delete_academic_periods_by_year', { p_school_year_id: yearId });
-      }
+      if (this._selectedYear && this._existingPeriods?.length) {
+        // ── Edición segura: actualizar períodos en sitio (sin perder calificaciones)
+        const existingIds = new Set(this._existingPeriods.map(x => Number(x.id)));
+        const keptIds = new Set();
+        let idx = 0;
 
-      // Crear períodos
-      for (const p of periods) {
-        const { error: pErr } = await SchoolEngine.createPeriod({
-          school_year_id: yearId,
-          name: p.name,
-          start_date: p.start_date,
-          end_date: p.end_date,
-          order_index: p.order_index,
-          status: 'pending',
-          is_active: false
-        });
-        if (pErr) throw new Error(pErr.message || pErr);
+        for (const row of document.querySelectorAll('#periodsList .period-row')) {
+          idx++;
+          const rid = row.dataset.periodId;
+          const pName = row.querySelector('.period-name')?.value?.trim() || `Periodo ${idx}`;
+          const pStart = row.querySelector('.period-start')?.value;
+          const pEnd = row.querySelector('.period-end')?.value;
+          if (!pStart || !pEnd) continue;
+
+          if (rid && existingIds.has(Number(rid))) {
+            keptIds.add(Number(rid));
+            const { error: upErr } = await supabase
+              .from('academic_periods')
+              .update({ name: pName, start_date: pStart, end_date: pEnd, order_index: idx })
+              .eq('id', rid);
+            if (upErr) throw new Error(upErr.message || upErr);
+          } else {
+            const { error: pErr } = await SchoolEngine.createPeriod({
+              school_year_id: yearId,
+              name: pName,
+              start_date: pStart,
+              end_date: pEnd,
+              order_index: idx,
+              status: 'pending',
+              is_active: false
+            });
+            if (pErr) throw new Error(pErr.message || pErr);
+          }
+        }
+
+        // Eliminar períodos existentes que ya no están en el formulario
+        for (const x of this._existingPeriods) {
+          if (!keptIds.has(Number(x.id))) {
+            const { error: delErr } = await supabase
+              .from('academic_periods')
+              .delete()
+              .eq('id', x.id);
+            if (delErr) throw new Error(delErr.message || delErr);
+          }
+        }
+      } else {
+        // Año nuevo (o sin períodos previos): crear todos
+        for (const p of periods) {
+          const { error: pErr } = await SchoolEngine.createPeriod({
+            school_year_id: yearId,
+            name: p.name,
+            start_date: p.start_date,
+            end_date: p.end_date,
+            order_index: p.order_index,
+            status: 'pending',
+            is_active: false
+          });
+          if (pErr) throw new Error(pErr.message || pErr);
+        }
       }
 
       // Activar el primer período si es un año nuevo
@@ -564,6 +613,7 @@ export const SchoolYearModule = {
     const wizard = document.getElementById('schoolYearWizard');
     if (wizard) { wizard.innerHTML = ''; wizard.classList.add('hidden'); }
     this._selectedYear = null;
+    this._existingPeriods = [];
   },
 
   async advanceState() {

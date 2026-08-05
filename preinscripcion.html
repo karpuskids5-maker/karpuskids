@@ -18,9 +18,50 @@
     .step-card{display:none;animation:fadeIn .35s ease;}
     .step-card.active{display:block;}
     @keyframes fadeIn{from{opacity:0;transform:translateY(12px);}to{opacity:1;transform:none;}}
-    .progress-dot{width:2.5rem;height:.375rem;border-radius:9999px;background:#e2e8f0;transition:all .3s;}
-    .progress-dot.done{background:#10b981;}
-    .progress-dot.current{background:linear-gradient(90deg,#FF9800,#F97316);width:3.5rem;}
+    /* Letras de colores Karpus Kids */
+    .karpus-kids-inline .k-1,.karpus-kids-inline .k-5,.karpus-kids-inline .k-10{color:#FF9800;}
+    .karpus-kids-inline .k-2,.karpus-kids-inline .k-6,.karpus-kids-inline .k-9{color:#2196F3;}
+    .karpus-kids-inline .k-3,.karpus-kids-inline .k-8{color:#E91E63;}
+    .karpus-kids-inline .k-4,.karpus-kids-inline .k-7{color:#4CAF50;}
+    /* Barra de progreso Karpus Kids */
+    .kk-stepper{background:#fff;border:2px solid #f1f5f9;border-radius:1.4rem;padding:1.15rem 1.25rem .85rem;box-shadow:0 12px 28px -18px rgba(30,41,59,.25);}
+    .kk-stepper__track{--pd:1.05rem;--nh:1.6rem;position:relative;padding:1.1rem var(--pd) 0;display:flex;justify-content:space-between;}
+    .kk-stepper__railwrap{position:absolute;top:calc(1.1rem + 1.05rem);left:calc(var(--pd) + var(--nh));right:calc(var(--pd) + var(--nh));height:.45rem;transform:translateY(-50%);}
+    .kk-stepper__rail{position:absolute;inset:0;background:#eef2f7;border-radius:9999px;}
+    .kk-stepper__fill{position:absolute;left:0;top:0;bottom:0;width:0;border-radius:9999px;background:linear-gradient(90deg,#FF9800,#2196F3,#E91E63,#4CAF50);box-shadow:0 0 14px rgba(255,152,0,.4);transition:width .65s cubic-bezier(.4,0,.2,1);}
+    .kk-step{display:flex;flex-direction:column;align-items:center;gap:.35rem;width:3.2rem;position:relative;z-index:1;}
+    .kk-step__num{width:2.1rem;height:2.1rem;border-radius:9999px;display:flex;align-items:center;justify-content:center;font-family:'Poppins',sans-serif;font-weight:900;font-size:.78rem;color:#94a3b8;background:#fff;border:2.5px solid #e2e8f0;transition:all .3s;}
+    .kk-step__num b{line-height:1;}
+    .kk-step__label{font-size:.52rem;font-weight:900;text-transform:uppercase;letter-spacing:.06em;color:#94a3b8;transition:color .3s;white-space:nowrap;}
+    .kk-step:nth-of-type(1) .kk-step__num{--kk:#FF9800;}
+    .kk-step:nth-of-type(2) .kk-step__num{--kk:#2196F3;}
+    .kk-step:nth-of-type(3) .kk-step__num{--kk:#E91E63;}
+    .kk-step:nth-of-type(4) .kk-step__num{--kk:#4CAF50;}
+    .kk-step:nth-of-type(5) .kk-step__num{--kk:#FF9800;}
+    .kk-step:nth-of-type(6) .kk-step__num{--kk:#2196F3;}
+    .kk-step:nth-of-type(7) .kk-step__num{--kk:#4CAF50;}
+    .kk-step.done .kk-step__num{background:var(--kk);border-color:var(--kk);color:#fff;box-shadow:0 6px 14px -6px var(--kk);transform:scale(1.06);}
+    .kk-step.done .kk-step__num b{display:none;}
+    .kk-step.done .kk-step__num::after{content:'\2713';font-size:.9rem;font-weight:900;}
+    .kk-step.done .kk-step__label{color:#475569;}
+    .kk-step.current .kk-step__num{background:#fff;border-color:var(--kk);color:var(--kk);box-shadow:0 0 0 4px rgba(33,150,243,.12);box-shadow:0 0 0 4px color-mix(in srgb,var(--kk) 16%,transparent);animation:kkPop .5s ease;}
+    .kk-step.current .kk-step__label{color:var(--kk);}
+    @keyframes kkPop{0%{transform:scale(.7);}60%{transform:scale(1.18);}100%{transform:scale(1);}}
+    .kk-stepper__meta{display:flex;align-items:center;justify-content:space-between;gap:1rem;margin-top:.8rem;padding-top:.65rem;border-top:1px dashed #eef2f7;}
+    .kk-stepper__title{font-size:.68rem;font-weight:900;letter-spacing:.05em;text-transform:uppercase;color:#64748b;}
+    .kk-stepper__meta-right{display:flex;align-items:center;gap:.5rem;}
+    .kk-stepper__pct{font-family:'Poppins',sans-serif;font-size:.78rem;font-weight:900;color:#F97316;background:#fff7ed;border:1px solid #ffedd5;padding:.1rem .6rem;border-radius:9999px;min-width:2.9rem;text-align:center;}
+    .kk-stepper__count{font-size:.62rem;font-weight:900;color:#cbd5e1;letter-spacing:.04em;}
+    @media (max-width:639px){
+      .kk-stepper{padding:1rem .9rem .8rem;}
+      .kk-stepper__track{--pd:.5rem;--nh:1.2rem;}
+      .kk-step{width:2.4rem;}
+      .kk-step__num{width:1.9rem;height:1.9rem;font-size:.72rem;border-width:2px;}
+      .kk-step__label{display:none;}
+      .kk-stepper__railwrap{top:calc(1.1rem + .95rem);}
+      .kk-stepper__title{display:none;}
+      .kk-stepper__meta{justify-content:flex-end;}
+    }
     .field{width:100%;padding:.7rem 1rem;border:2px solid #e2e8f0;border-radius:1rem;outline:none;font-size:.9rem;font-weight:600;color:#334155;background:#fff;transition:all .2s;}
     .field:focus{border-color:#F97316;box-shadow:0 0 0 4px rgba(249,115,22,.12);}
     .field.invalid{border-color:#ef4444;box-shadow:0 0 0 4px rgba(239,68,68,.12);}
@@ -49,7 +90,9 @@
       <a href="index.html" class="flex items-center gap-3">
         <img src="img/karpus.jpg" alt="Karpus Kids" class="w-11 h-11 rounded-2xl object-cover shadow-sm">
         <div>
-          <div class="font-black text-slate-800 leading-none" style="font-family:'Poppins',sans-serif;">Karpus Kids</div>
+          <div class="karpus-kids-inline font-black leading-none text-lg" style="font-family:'Poppins',sans-serif;">
+            <span class="k-1">K</span><span class="k-2">a</span><span class="k-3">r</span><span class="k-4">p</span><span class="k-5">u</span><span class="k-6">s</span> <span class="k-7">K</span><span class="k-8">i</span><span class="k-9">d</span><span class="k-10">s</span>
+          </div>
           <div class="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Preinscripción</div>
         </div>
       </a>
@@ -69,12 +112,28 @@
       <p class="text-sm text-slate-500 font-semibold max-w-xl mx-auto">Completa los 7 pasos. Nuestro equipo de admisiones revisará el expediente y te contactará para coordinar la entrevista y la inscripción oficial.</p>
     </div>
 
-    <!-- Barra de progreso -->
-    <div class="flex items-center justify-between mb-8" id="progressBar">
-      <div class="flex items-center gap-1.5 flex-1">
-        <span class="progress-dot current" data-pdot="1"></span><span class="progress-dot" data-pdot="2"></span><span class="progress-dot" data-pdot="3"></span><span class="progress-dot" data-pdot="4"></span><span class="progress-dot" data-pdot="5"></span><span class="progress-dot" data-pdot="6"></span><span class="progress-dot" data-pdot="7"></span>
+    <!-- Barra de progreso Karpus Kids -->
+    <div class="kk-stepper mb-8" id="progressBar">
+      <div class="kk-stepper__track">
+        <div class="kk-stepper__railwrap">
+          <div class="kk-stepper__rail"></div>
+          <div class="kk-stepper__fill" id="progressFill"></div>
+        </div>
+        <div class="kk-step current" data-step-btn="1"><span class="kk-step__num"><b>1</b></span><span class="kk-step__label">Datos</span></div>
+        <div class="kk-step" data-step-btn="2"><span class="kk-step__num"><b>2</b></span><span class="kk-step__label">Familia</span></div>
+        <div class="kk-step" data-step-btn="3"><span class="kk-step__num"><b>3</b></span><span class="kk-step__label">Emergencia</span></div>
+        <div class="kk-step" data-step-btn="4"><span class="kk-step__num"><b>4</b></span><span class="kk-step__label">Salud</span></div>
+        <div class="kk-step" data-step-btn="5"><span class="kk-step__num"><b>5</b></span><span class="kk-step__label">Docs</span></div>
+        <div class="kk-step" data-step-btn="6"><span class="kk-step__num"><b>6</b></span><span class="kk-step__label">Firma</span></div>
+        <div class="kk-step" data-step-btn="7"><span class="kk-step__num"><b>7</b></span><span class="kk-step__label">Enviar</span></div>
       </div>
-      <span class="text-xs font-black text-slate-400 uppercase tracking-widest ml-3" id="stepLabel">1 / 7</span>
+      <div class="kk-stepper__meta">
+        <span class="kk-stepper__title" id="stepTitle">Datos del niño(a)</span>
+        <div class="kk-stepper__meta-right">
+          <span class="kk-stepper__pct" id="stepPct">0%</span>
+          <span class="kk-stepper__count" id="stepLabel">1 / 7</span>
+        </div>
+      </div>
     </div>
 
     <div id="wizardContainer" class="space-y-6">

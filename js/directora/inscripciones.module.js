@@ -77,24 +77,26 @@ export const InscripcionesModule = {
   },
 
   render() {
-    const container = document.getElementById('preregList');
-    if (!container) return;
+    const tbody = document.getElementById('preregList');
+    if (!tbody) return;
     const list = this.filtered();
 
     if (!list.length) {
-      container.innerHTML = `
-        <div class="bg-white rounded-3xl border border-slate-100 shadow-sm p-10 text-center">
-          <div class="w-16 h-16 mx-auto rounded-2xl bg-purple-50 text-purple-400 flex items-center justify-center mb-4">
-            <i data-lucide="inbox" class="w-8 h-8"></i>
-          </div>
-          <h3 class="font-black text-slate-700 mb-1">Sin preinscripciones</h3>
-          <p class="text-xs text-slate-400 font-bold">Comparte el formulario público para recibir solicitudes.</p>
-        </div>`;
+      tbody.innerHTML = `
+        <tr>
+          <td colspan="7" class="px-4 py-12 text-center">
+            <div class="w-16 h-16 mx-auto rounded-2xl bg-purple-50 text-purple-400 flex items-center justify-center mb-4">
+              <i data-lucide="inbox" class="w-8 h-8"></i>
+            </div>
+            <h3 class="font-black text-slate-700 mb-1">Sin preinscripciones</h3>
+            <p class="text-xs text-slate-400 font-bold">Comparte el formulario público para recibir solicitudes.</p>
+          </td>
+        </tr>`;
       if (window.lucide) lucide.createIcons();
       return;
     }
 
-    container.innerHTML = list.map(r => {
+    tbody.innerHTML = list.map(r => {
       const meta = STATUS_META[r.status] || STATUS_META.pending;
       const p1 = r.parent_1 || {};
       const p2 = r.parent_2 || {};
@@ -104,61 +106,40 @@ export const InscripcionesModule = {
         : null;
 
       return `
-        <div class="bg-white rounded-3xl border border-slate-100 shadow-sm hover:shadow-md transition-all overflow-hidden group">
-          <div class="h-1.5 ${meta.dot}"></div>
-          <div class="p-5">
-            <div class="flex items-start justify-between gap-3 mb-3">
-              <div class="flex items-center gap-3 min-w-0">
-                <div class="w-12 h-12 rounded-2xl bg-gradient-to-br from-purple-500 to-indigo-600 flex items-center justify-center text-white font-black text-lg shadow-lg shadow-purple-100 shrink-0">
-                  ${Helpers.escapeHTML((r.student_name || '?').charAt(0))}
-                </div>
-                <div class="min-w-0">
-                  <h3 class="font-black text-slate-800 truncate">${Helpers.escapeHTML(r.student_name || 'Sin nombre')}${r.student_last_name ? ' ' + Helpers.escapeHTML(r.student_last_name) : ''}</h3>
-                  <p class="text-[10px] text-slate-400 font-black uppercase tracking-widest flex items-center gap-1.5">
-                    <span>#${r.id}</span>
-                    ${r.level_requested ? '· ' + Helpers.escapeHTML(r.level_requested) : ''}
-                    ${age != null ? '· ' + age + ' años' : ''}
-                  </p>
-                </div>
+        <tr class="group">
+          <td class="px-4 py-3">
+            <div class="flex items-center gap-3 min-w-0">
+              <div class="w-9 h-9 rounded-xl bg-gradient-to-br from-purple-500 to-indigo-600 flex items-center justify-center text-white font-black text-sm shadow-md shadow-purple-100 shrink-0">
+                ${Helpers.escapeHTML((r.student_name || '?').charAt(0))}
               </div>
-              <span class="px-2.5 py-1 rounded-xl text-[10px] font-black uppercase tracking-wider ${meta.cls} shrink-0">${meta.label}</span>
-            </div>
-
-            <div class="grid grid-cols-1 sm:grid-cols-3 gap-2 mb-4">
-              <div class="bg-slate-50 rounded-xl p-2.5">
-                <p class="text-[9px] font-black text-slate-400 uppercase mb-0.5">Tutor</p>
-                <p class="text-xs font-bold text-slate-700 truncate">${Helpers.escapeHTML(p1.name || '—')}${p2.name ? ' / ' + Helpers.escapeHTML(p2.name) : ''}</p>
-              </div>
-              <div class="bg-slate-50 rounded-xl p-2.5">
-                <p class="text-[9px] font-black text-slate-400 uppercase mb-0.5">Contacto</p>
-                <p class="text-xs font-bold text-slate-700 truncate">${Helpers.escapeHTML(r.contact_phone || '—')}</p>
-              </div>
-              <div class="bg-slate-50 rounded-xl p-2.5">
-                <p class="text-[9px] font-black text-slate-400 uppercase mb-0.5">Recibida</p>
-                <p class="text-xs font-bold text-slate-700">${new Date(r.created_at).toLocaleDateString()}</p>
+              <div class="min-w-0">
+                <p class="font-black text-slate-800 text-sm truncate">${Helpers.escapeHTML(r.student_name || 'Sin nombre')}${r.student_last_name ? ' ' + Helpers.escapeHTML(r.student_last_name) : ''}</p>
+                <p class="text-[10px] text-slate-400 font-black uppercase tracking-widest">#${r.id}${age != null ? ' · ' + age + ' años' : ''}</p>
               </div>
             </div>
-
-            <div class="flex flex-wrap items-center gap-1.5 mb-4">
-              ${r.schedule ? `<span class="px-2 py-1 bg-purple-50 text-purple-600 rounded-lg text-[9px] font-black uppercase">${Helpers.escapeHTML(r.schedule)}</span>` : ''}
-              ${r.has_siblings ? `<span class="px-2 py-1 bg-amber-50 text-amber-600 rounded-lg text-[9px] font-black uppercase">Hermano: ${Helpers.escapeHTML(r.sibling_name || 'Sí')}</span>` : ''}
-              <span class="px-2 py-1 bg-indigo-50 text-indigo-600 rounded-lg text-[9px] font-black uppercase">${docsCount} docs</span>
-              ${r.medical?.allergies ? `<span class="px-2 py-1 bg-rose-50 text-rose-600 rounded-lg text-[9px] font-black uppercase">⚠ Alergias</span>` : ''}
+          </td>
+          <td class="px-4 py-3 text-xs font-bold text-slate-700">${Helpers.escapeHTML(p1.name || '—')}${p2.name ? ' / ' + Helpers.escapeHTML(p2.name) : ''}</td>
+          <td class="px-4 py-3 text-xs text-slate-500">${Helpers.escapeHTML(r.contact_phone || '—')}<span class="block text-[10px] text-slate-400">${Helpers.escapeHTML(r.contact_email || '')}</span></td>
+          <td class="px-4 py-3 text-xs font-bold text-slate-600">${Helpers.escapeHTML(r.level_requested || '—')}${r.schedule ? '<span class="block text-[10px] font-black text-purple-500 uppercase tracking-wider">' + Helpers.escapeHTML(r.schedule) + '</span>' : ''}</td>
+          <td class="px-4 py-3 text-xs text-slate-500 whitespace-nowrap">${new Date(r.created_at).toLocaleDateString()}</td>
+          <td class="px-4 py-3 whitespace-nowrap">
+            <span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-xl text-[10px] font-black uppercase tracking-wider ${meta.cls}">
+              <span class="w-1.5 h-1.5 rounded-full ${meta.dot}"></span>${meta.label}
+            </span>
+          </td>
+          <td class="px-4 py-3">
+            <div class="flex items-center justify-end gap-2">
+              ${r.medical?.allergies ? `<span class="text-[10px] text-rose-500 font-black" title="Alergias registradas">⚠</span>` : ''}
+              ${docsCount ? `<span class="px-2 py-1 bg-indigo-50 text-indigo-600 rounded-lg text-[10px] font-black">${docsCount} docs</span>` : ''}
+              <button onclick="App.inscripciones.reject(${r.id})" class="w-9 h-9 flex items-center justify-center bg-rose-50 text-rose-600 hover:bg-rose-600 hover:text-white rounded-xl transition-all shadow-sm" title="Rechazar">
+                <i data-lucide="x" class="w-4 h-4"></i>
+              </button>
+              <button onclick="App.inscripciones.openRecord(${r.id})" class="flex items-center gap-1.5 px-3 py-2 bg-gradient-to-r from-purple-600 to-indigo-600 text-white rounded-xl font-black text-[10px] uppercase tracking-widest shadow-md shadow-purple-100 transition-all active:scale-95">
+                <i data-lucide="folder-open" class="w-3.5 h-3.5"></i> Revisar
+              </button>
             </div>
-
-            <div class="flex items-center justify-between pt-3 border-t border-slate-50">
-              <span class="text-[10px] text-slate-400 font-black">${Helpers.escapeHTML(r.contact_email || '')}</span>
-              <div class="flex gap-2">
-                <button onclick="App.inscripciones.reject(${r.id})" class="w-9 h-9 flex items-center justify-center bg-rose-50 text-rose-600 hover:bg-rose-600 hover:text-white rounded-xl transition-all shadow-sm" title="Rechazar">
-                  <i data-lucide="x" class="w-4 h-4"></i>
-                </button>
-                <button onclick="App.inscripciones.openRecord(${r.id})" class="flex items-center gap-1.5 px-3 py-2 bg-gradient-to-r from-purple-600 to-indigo-600 text-white rounded-xl font-black text-[10px] uppercase tracking-widest shadow-md shadow-purple-100 hover:-translate-y-0.5 transition-all active:scale-95">
-                  <i data-lucide="folder-open" class="w-3.5 h-3.5"></i> Revisar / Admitir
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>`;
+          </td>
+        </tr>`;
     }).join('');
     if (window.lucide) lucide.createIcons();
   },

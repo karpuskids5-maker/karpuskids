@@ -26,7 +26,7 @@ const _lastLoad = {};
 // Los onclick inline en HTML dinámico necesitan window.Modal disponible de inmediato
 window.Modal = Modal;
 const { initAttendance, markAllPresent, registerAttendance } = Attendance;
-const { initRoutine, updateRoutineField, saveRoutineLog, openStudentRoutine, updateRoutineFieldInModal, saveRoutineInModal, openBulkEventModal, confirmBulkEvent, wakeAllSiestas, wakeStudentSiesta, undoLastBulk, publishAll, registerIndividualEvent, toggleTimeline, openExtraEventModal, confirmExtraEvent, registerMissingStudents } = Routine;
+const { initRoutine, updateRoutineField, saveRoutineLog, openStudentRoutine, updateRoutineFieldInModal, saveRoutineInModal, openBulkEventModal, confirmBulkEvent, wakeAllSiestas, wakeStudentSiesta, undoLastBulk, publishAll, registerIndividualEvent, toggleTimeline, openExtraEventModal, confirmExtraEvent, registerMissingStudents, insertEventAt, openInsertEventPicker, moveScheduleEvent, cascadeScheduleShift } = Routine;
 const { initTasks, openEditTaskModal, deleteTask, openNewTaskModal, viewTaskSubmissions, submitGrade } = Tasks;
 const { initGradesV2, openNewActivityModal, gradeActivity, saveGradeV2, deleteActivityV2 } = Tasks;
 const { openStudentProfile, registerIncidentModal } = Students;
@@ -76,6 +76,11 @@ window.App = {
   resetScheduleToDefault: Routine.resetScheduleToDefault,
   filterEventCatalog: Routine.filterEventCatalog,
   openAllEventsMenu: Routine.openAllEventsMenu,
+  // Cronología V8: drag & drop, insertar entre bloques y recálculo en cascada
+  moveScheduleEvent: Routine.moveScheduleEvent,
+  cascadeScheduleShift: Routine.cascadeScheduleShift,
+  openInsertEventPicker: Routine.openInsertEventPicker,
+  insertEventAt: Routine.insertEventAt,
 
   // Tasks
   initTasks: Tasks.initTasks,

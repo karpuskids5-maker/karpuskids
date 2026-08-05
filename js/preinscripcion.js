@@ -152,15 +152,27 @@ async function loadDynamicData() {
 
 }
 
+const STEP_TITLES = {
+  1: 'Datos del niño(a)', 2: 'Padres / Tutores', 3: 'Emergencia y autorizados',
+  4: 'Información médica', 5: 'Documentos', 6: 'Autorizaciones y firma', 7: 'Resumen y envío',
+};
+
 function goTo(step) {
   STATE.step = step;
+  const pct = Math.round(((step - 1) / 6) * 100);
   $$('.step-card').forEach(s => s.classList.toggle('active', Number(s.dataset.step) === step));
-  $$('#progressBar [data-pdot]').forEach(dot => {
-    const n = Number(dot.dataset.pdot);
-    dot.classList.remove('current', 'done');
-    if (n === step) dot.classList.add('current');
-    else if (n < step) dot.classList.add('done');
+  $$('#progressBar [data-step-btn]').forEach(btn => {
+    const n = Number(btn.dataset.stepBtn);
+    btn.classList.remove('current', 'done');
+    if (n === step) btn.classList.add('current');
+    else if (n < step) btn.classList.add('done');
   });
+  const fill = $('#progressFill');
+  if (fill) fill.style.width = pct + '%';
+  const title = $('#stepTitle');
+  if (title) title.textContent = STEP_TITLES[step] || ('Paso ' + step);
+  const pctEl = $('#stepPct');
+  if (pctEl) pctEl.textContent = pct + '%';
   $('#stepLabel').textContent = `${step} / 7`;
   if (step === 7) renderSummary();
   window.scrollTo({ top: 0, behavior: 'smooth' });
@@ -526,7 +538,12 @@ async function submit() {
       docs[key] = data.publicUrl;
     }));
     if (keys.length) {
-      await supabase.rpc('set_preinscripcion_documents', { p_id: rowId, documents: docs });
+      try {
+        const { error: docsErr } = await supabase.rpc('set_preinscripcion_documents', { p_id: rowId, documents: docs });
+        if (docsErr) console.error('set_preinscripcion_documents:', docsErr);
+      } catch (e) {
+        console.error('set_preinscripcion_documents:', e);
+      }
     }
 
     $('#wizardContainer').classList.add('hidden');
