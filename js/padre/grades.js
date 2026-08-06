@@ -1,6 +1,7 @@
 ﻿import { supabase } from '../shared/supabase.js';
 import { AppState, TABLES } from './appState.js';
 import { Helpers, escapeHtml } from './helpers.js';
+import { fetchBoletin, downloadBoletinPDF } from '../shared/boletin-pdf.js';
 
 /**
  * Calificaciones V2 — Vista para Padres
@@ -168,6 +169,10 @@ export const GradesModule = {
                   <p class="text-lg font-black">${averages.length}</p>
                 </div>
               </div>
+              <button id="btn-padre-boletin-pdf" class="mt-5 w-full px-4 py-2.5 bg-white/15 hover:bg-white/25 rounded-xl text-white font-black text-xs uppercase transition-all flex items-center justify-center gap-2">
+                <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>
+                Descargar Boletín (PDF)
+              </button>
             </div>
           </div>
 
@@ -254,6 +259,18 @@ export const GradesModule = {
       `;
 
       setTimeout(() => { if (window.lucide) lucide.createIcons(); }, 50);
+
+      document.getElementById('btn-padre-boletin-pdf')?.addEventListener('click', async () => {
+        try {
+          Helpers.toast('Generando boletín...', 'info');
+          const boletin = await fetchBoletin(studentId, period.id);
+          if (boletin?.error) throw new Error(boletin.error);
+          await downloadBoletinPDF(boletin);
+          Helpers.toast('Boletín descargado', 'success');
+        } catch (e) {
+          Helpers.toast('Error al generar el boletín: ' + (e?.message || 'período no disponible'), 'error');
+        }
+      });
     } catch (err) {
       console.error('[GradesModule] Render error:', err);
       container.innerHTML = Helpers.emptyState('Error al cargar calificaciones', '❌');

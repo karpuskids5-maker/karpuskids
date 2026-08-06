@@ -10,6 +10,7 @@ import { CarnetsModule } from '/js/shared/carnets.module.js';
 import { BadgeSystem } from '/js/shared/badges.js';
 import { RealtimeManager } from '/js/shared/realtime-manager.js';
 import { QueryCache } from '/js/shared/query-cache.js';
+import { GradesModule } from './grades.module.js';
 const debounce = (fn, delay) => {
   let timeout;
   return (...args) => {
@@ -46,10 +47,7 @@ window.App = {
   attendance: {
     init: () => import('./attendance.module.js').then(m => m.AttendanceModule.init()),
   },
-  grades: {
-    init: () => import('./grades.module.js').then(m => m.GradesModule.init()),
-    filter: (v) => import('./grades.module.js').then(m => m.GradesModule.filter?.(v)),
-  },
+  grades: GradesModule,
   ui: { ...UIHelpers, ...DirectorUI },
   inquiries: {
     init: () => import('./inquiries.module.js').then(m => m.InquiriesModule.init()),

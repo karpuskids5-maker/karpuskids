@@ -10,6 +10,7 @@ import { FileManager } from '/js/shared/FileManager.js';
 import { CarnetsModule } from '/js/shared/carnets.module.js';
 import { ScrollModule } from '/js/shared/scroll.module.js';
 import SchoolEngine from '/js/shared/school-engine.js';
+import { GradesModule } from '../directora/grades.module.js';
 
 let _chatModule = null;
 async function getChatModule() {
@@ -91,6 +92,8 @@ window.App = {
     deleteTeacher: (id, name)   => import('./teachers.js').then(m => m.TeachersModule.deleteTeacher(id, name))
   },
   carnets: CarnetsModule,
+  grades: GradesModule,
+  ui: { closeModal: () => window._closeAsistenteModal() },
   access: {
     init: () => import('./access.js').then(m => m.AccessModule.init()),
     closeScanner:  ()         => import('./access.js').then(m => m.AccessModule.closeScanner()),
@@ -458,6 +461,9 @@ function initNavigation() {
             }).catch(() => {});
             break;
           }
+          case 'calificaciones':
+            await import('../directora/grades.module.js').then(m => m.GradesModule.init());
+            break;
           case 'perfil':
             initProfile();
             import('../shared/notify-permission.js').then(m => m.NotifyPermission.requestIfNeeded());
@@ -486,6 +492,7 @@ function initNavigation() {
         case 'estudiantes': import('./modules/students.js').then(m => m.StudentsModule.loadStudents?.()); break;
         case 'inscripciones': import('../directora/inscripciones.module.js').then(m => m.InscripcionesModule.init()); break;
         case 'aulas':      import('./modules/rooms.js').then(m => m.RoomsModule.loadRooms?.()); break;
+        case 'calificaciones': import('../directora/grades.module.js').then(m => m.GradesModule.init()); break;
         case 'pagos':      import('./payments.js').then(m => m.PaymentsModule.loadPayments?.()); break;
         case 'calendario':
           import('../shared/calendar-view.js').then(({ CalendarView }) => {

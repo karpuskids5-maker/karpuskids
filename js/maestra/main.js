@@ -12,6 +12,7 @@ import * as Routine from './modules/routine.js';
 import * as Tasks from './modules/tasks.js';
 import * as Students from './modules/students.js';
 import * as ChatApp from './modules/chat_app.js';
+import * as Boletin from './modules/boletin.js';
 import { UI } from './modules/ui.js';
 
 import { UIPremium } from '/js/shared/ui-premium.js';
@@ -31,6 +32,7 @@ const { initTasks, openEditTaskModal, deleteTask, openNewTaskModal, viewTaskSubm
 const { initGradesV2, openNewActivityModal, gradeActivity, saveGradeV2, deleteActivityV2 } = Tasks;
 const { openStudentProfile, registerIncidentModal } = Students;
 const { initChat, selectChatContact } = ChatApp;
+const { initBoletin, openBoletin, downloadBoletin } = Boletin;
 
 /**
  * 🚀 ARQUITECTURA SENIOR: Definición Global del Objeto App
@@ -96,6 +98,11 @@ window.App = {
   gradeActivity: Tasks.gradeActivity,
   saveGradeV2: Tasks.saveGradeV2,
   deleteActivityV2: Tasks.deleteActivityV2,
+
+  // Boletines
+  initBoletin: Boletin.initBoletin,
+  openBoletin: Boletin.openBoletin,
+  downloadBoletin: Boletin.downloadBoletin,
 
   // Students
   openStudentProfile: Students.openStudentProfile,
@@ -746,6 +753,7 @@ function initNavigation() {
     if (cleanId === 'daily-routine') initRoutine();
     if (cleanId === 'tasks') initTasks();
     if (cleanId === 'grades') initGrades();
+    if (cleanId === 'boletin') initBoletin();
     if (cleanId === 'permits') import('./modules/permits.js').then(m => m.PermitsModule.init());
     if (cleanId === 'chat') initChat();
     if (cleanId === 'profile') {

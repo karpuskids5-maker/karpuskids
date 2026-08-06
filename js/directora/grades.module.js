@@ -4,6 +4,16 @@ import { supabase } from '../shared/supabase.js';
 import { AppState } from './state.js';
 import { SchoolEngine } from '../shared/school-engine.js';
 import { auditLog } from '../shared/db-utils.js';
+import {
+  fetchBoletin,
+  renderBoletin,
+  boletinEditorHtml,
+  saveBoletinNotes,
+  downloadBoletinPDF,
+  createBoletinDoc,
+  appendBoletinPage,
+  finalizeBoletinDoc,
+} from '../shared/boletin-pdf.js';
 
 const LEVEL_LABELS = {
   estancia:   'Estancia',
@@ -160,6 +170,7 @@ export const GradesModule = {
   _renderConfig() {
     const container = document.getElementById('gradesTableBody');
     if (!container) return;
+    this._pendingConfig = {};
 
     const period = this._periods.find(p => String(p.id) === String(this._currentPeriodId));
     if (!period) {
@@ -180,80 +191,145 @@ export const GradesModule = {
       grouped[s.education_level].push(s);
     });
 
-    let html = '';
-    for (const [level, subjects] of Object.entries(grouped)) {
-      const levelConfig = this._config.filter(c => c.education_level === level);
-      const configMap = {};
-      levelConfig.forEach(c => { configMap[c.subject_id] = c; });
+    const configMap = {};
+    this._config.forEach(c => { configMap[c.subject_id] = c; });
+    const activitiesBySubject = {};
+    this._activities.forEach(a => {
+      if (!activitiesBySubject[a.subject_id]) activitiesBySubject[a.subject_id] = 0;
+      activitiesBySubject[a.subject_id]++;
+    });
 
+    const LEVEL_STYLES = {
+      estancia:   { chip: 'bg-pink-100 text-pink-700',   bar: 'bg-pink-500',   ring: 'focus:border-pink-400 focus:ring-pink-100' },
+      preescolar: { chip: 'bg-violet-100 text-violet-700', bar: 'bg-violet-500', ring: 'focus:border-violet-400 focus:ring-violet-100' },
+      primaria:   { chip: 'bg-indigo-100 text-indigo-700', bar: 'bg-indigo-500', ring: 'focus:border-indigo-400 focus:ring-indigo-100' },
+    };
+
+    let html = `
+      <tr><td colspan="5" class="px-6 pt-5">
+        <div class="flex flex-col lg:flex-row lg:items-center gap-4 p-4 rounded-2xl bg-gradient-to-r from-blue-50 via-indigo-50 to-violet-50 border border-blue-100">
+          <div class="flex items-start gap-3 flex-1">
+            <div class="p-2.5 bg-white rounded-xl text-blue-600 shadow-sm shrink-0"><i data-lucide="users" class="w-5 h-5"></i></div>
+            <div>
+              <p class="text-sm font-black text-slate-800">La configuración se aplica a <span class="text-blue-600">todas las aulas</span></p>
+              <p class="text-xs text-slate-500 font-medium mt-0.5">Edita el nombre y la descripción de cada área, ajusta la cantidad de actividades y guarda. Las maestras de todos los niveles verán estos cambios de inmediato.</p>
+            </div>
+          </div>
+          <div class="flex flex-wrap gap-2 shrink-0">
+            <button onclick="App.grades._openSubjectModal()" class="px-4 py-2.5 bg-violet-600 text-white rounded-xl font-black text-xs uppercase tracking-wider shadow-lg shadow-violet-200 hover:bg-violet-700 transition-all flex items-center gap-2">
+              <i data-lucide="plus" class="w-4 h-4"></i> Nueva Área
+            </button>
+            <button onclick="App.grades._applyToAllClassrooms()" ${isClosed ? 'disabled' : ''} class="px-4 py-2.5 bg-white text-indigo-600 border-2 border-indigo-200 rounded-xl font-black text-xs uppercase tracking-wider hover:bg-indigo-50 transition-all flex items-center gap-2 ${isClosed ? 'opacity-40 cursor-not-allowed' : ''}">
+              <i data-lucide="copy-check" class="w-4 h-4"></i> Aplicar a todas las aulas
+            </button>
+            <button onclick="App.grades._saveAllConfig()" ${isClosed ? 'disabled' : ''} class="px-4 py-2.5 bg-indigo-600 text-white rounded-xl font-black text-xs uppercase tracking-wider shadow-lg shadow-indigo-200 hover:bg-indigo-700 transition-all flex items-center gap-2 ${isClosed ? 'opacity-40 cursor-not-allowed' : ''}">
+              <i data-lucide="save" class="w-4 h-4"></i> Guardar cambios
+            </button>
+          </div>
+        </div>
+      </td></tr>`;
+
+    if (isClosed) {
+      html += `<tr><td colspan="5" class="px-6 pt-2">
+        <div class="flex items-center gap-2 text-[11px] font-bold text-amber-600 bg-amber-50 border border-amber-100 rounded-xl px-4 py-2.5">
+          <i data-lucide="lock" class="w-3.5 h-3.5"></i> Periodo cerrado — la configuración está en modo lectura.
+        </div>
+      </td></tr>`;
+    }
+
+    if (!Object.keys(grouped).length) {
+      html += `<tr><td colspan="5" class="text-center py-16 text-slate-400">
+        <div class="flex flex-col items-center gap-3">
+          <p class="font-bold">No hay áreas disponibles para este periodo</p>
+          <p class="text-xs text-slate-400 mt-1">Usa "Aplicar a todas las aulas" para cargar todas las áreas.</p>
+        </div>
+      </td></tr>`;
+    }
+
+    for (const [level, subjects] of Object.entries(grouped)) {
+      const style = LEVEL_STYLES[level] || LEVEL_STYLES.primaria;
       html += `
         <tr><td colspan="5" class="px-6 pt-6 pb-2">
-          <div class="flex items-center gap-2 mb-3">
-            <span class="px-3 py-1 bg-indigo-100 text-indigo-700 rounded-full text-xs font-black uppercase">${LEVEL_LABELS[level] || level}</span>
-            <span class="text-xs text-slate-400 font-bold">${subjects.length} materias</span>
+          <div class="flex items-center gap-3">
+            <span class="px-3 py-1 rounded-full text-xs font-black uppercase ${style.chip}">${LEVEL_LABELS[level] || level}</span>
+            <span class="h-1.5 flex-1 rounded-full ${style.bar} opacity-20"></span>
+            <span class="text-xs text-slate-400 font-bold">${subjects.length} áreas</span>
           </div>
         </td></tr>
         ${subjects.map(s => {
           const cfg = configMap[s.id];
           const count = cfg?.activity_count || 5;
-          const actCount = this._activities.filter(a => a.subject_id === s.id).length;
+          const actCount = activitiesBySubject[s.id] || 0;
+          const configured = !!cfg;
+          const progressPct = count > 0 ? Math.min(100, Math.round(actCount / count * 100)) : 0;
+          const progressCls = progressPct >= 100 ? 'bg-emerald-500' : progressPct >= 50 ? 'bg-amber-500' : 'bg-rose-400';
           return `
-            <tr class="border-b border-slate-50 hover:bg-slate-50/50 transition-colors">
-              <td class="px-6 py-3">
-                <div class="font-bold text-slate-800 text-sm">${Helpers.escapeHTML(s.name)}</div>
-                <div class="text-[10px] text-slate-400 font-medium">${Helpers.escapeHTML(s.description || '')}</div>
+            <tr id="cfg-row-${s.id}" class="border-b border-slate-100 hover:bg-slate-50/60 transition-all rounded-xl">
+              <td class="px-6 py-4 align-top">
+                <div class="flex flex-wrap items-center gap-2 mb-2">
+                  <span class="px-2 py-0.5 rounded-full text-[9px] font-black uppercase ${style.chip}">${LEVEL_LABELS[level] || level}</span>
+                  <span id="cfg-dirty-${s.id}" class="px-2 py-0.5 rounded-full text-[9px] font-black uppercase bg-amber-100 text-amber-700 opacity-0 transition-opacity">● Sin guardar</span>
+                </div>
+                <input id="cfg-name-${s.id}" value="${Helpers.escapeHTML(s.name)}" oninput="App.grades._markDirty(${s.id})"
+                  placeholder="Nombre del área" ${isClosed ? 'readonly' : ''}
+                  class="w-full bg-slate-50 border-2 border-slate-100 rounded-xl px-3 py-2.5 text-sm font-black text-slate-800 outline-none focus:bg-white transition-all ${style.ring} ${isClosed ? 'opacity-60 cursor-not-allowed' : ''}">
+                <textarea id="cfg-desc-${s.id}" rows="2" oninput="App.grades._markDirty(${s.id})"
+                  placeholder="Descripción del área (lo que se trabaja en esta materia)..." ${isClosed ? 'readonly' : ''}
+                  class="w-full mt-2 bg-slate-50 border-2 border-slate-100 rounded-xl px-3 py-2.5 text-xs text-slate-500 font-medium outline-none focus:bg-white transition-all resize-none ${style.ring} ${isClosed ? 'opacity-60 cursor-not-allowed' : ''}">${Helpers.escapeHTML(s.description || '')}</textarea>
               </td>
-              <td class="px-6 py-3 text-center">
-                <div class="flex items-center justify-center gap-2">
-                  ${isClosed ? `
-                    <span class="px-3 py-1.5 bg-slate-100 text-slate-600 rounded-xl font-black text-sm">${count}</span>
-                  ` : `
-                    <button onclick="App.grades._adjustCount(${s.id}, -1)" class="w-8 h-8 bg-slate-100 text-slate-500 rounded-lg font-black hover:bg-slate-200 transition-all flex items-center justify-center text-sm">−</button>
-                    <span id="cfg-count-${s.id}" class="px-3 py-1.5 bg-white border border-slate-200 rounded-xl font-black text-sm text-indigo-700 min-w-[40px] text-center">${count}</span>
-                    <button onclick="App.grades._adjustCount(${s.id}, 1)" class="w-8 h-8 bg-slate-100 text-slate-500 rounded-lg font-black hover:bg-slate-200 transition-all flex items-center justify-center text-sm">+</button>
-                  `}
+              <td class="px-6 py-4 text-center align-top">
+                <div class="flex flex-col items-center gap-2 pt-2">
+                  <div class="flex items-center gap-2">
+                    ${isClosed ? `
+                      <span class="px-4 py-2 bg-slate-100 text-slate-600 rounded-xl font-black text-sm">${count}</span>
+                    ` : `
+                      <button onclick="App.grades._adjustCount(${s.id}, -1)" class="w-9 h-9 bg-slate-100 text-slate-500 rounded-lg font-black hover:bg-slate-200 transition-all flex items-center justify-center text-base">−</button>
+                      <span id="cfg-count-${s.id}" class="px-3 py-1.5 bg-white border-2 border-slate-200 rounded-xl font-black text-sm text-indigo-700 min-w-[44px] text-center">${count}</span>
+                      <button onclick="App.grades._adjustCount(${s.id}, 1)" class="w-9 h-9 bg-slate-100 text-slate-500 rounded-lg font-black hover:bg-slate-200 transition-all flex items-center justify-center text-base">+</button>
+                    `}
+                  </div>
+                  <span class="text-[9px] font-black text-slate-400 uppercase tracking-wider">actividades</span>
                 </div>
               </td>
-              <td class="px-6 py-3 text-center">
-                <span class="px-3 py-1 rounded-full text-xs font-black ${actCount >= count ? 'bg-emerald-100 text-emerald-700' : 'bg-amber-100 text-amber-700'}">
-                  ${actCount}/${count} actividades
-                </span>
+              <td class="px-6 py-4 text-center align-top">
+                <div class="flex flex-col items-center gap-2 pt-2">
+                  <span class="px-3 py-1 rounded-full text-xs font-black ${actCount >= count ? 'bg-emerald-100 text-emerald-700' : 'bg-amber-100 text-amber-700'}">
+                    ${actCount}/${count} actividades
+                  </span>
+                  <div class="w-24 bg-slate-100 rounded-full h-1.5 overflow-hidden">
+                    <div class="${progressCls} h-full rounded-full transition-all" style="width:${progressPct}%"></div>
+                  </div>
+                </div>
               </td>
-              <td class="px-6 py-3 text-center">
-                ${cfg ? `<button onclick="App.grades._removeSubjectConfig(${cfg.id})" class="p-2 text-slate-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition-all ${isClosed ? 'hidden' : ''}" title="Quitar materia">
-                  <i data-lucide="x" class="w-4 h-4"></i>
-                </button>` : `
+              <td class="px-6 py-4 text-center align-top pt-7">
+                ${configured ? `
+                  <button onclick="App.grades._removeSubjectConfig(${cfg.id})" class="p-2 text-slate-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition-all ${isClosed ? 'hidden' : ''}" title="Quitar área">
+                    <i data-lucide="trash-2" class="w-4 h-4"></i>
+                  </button>
+                  <span class="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[9px] font-black bg-emerald-50 text-emerald-600 border border-emerald-100 mt-1">
+                    <i data-lucide="check" class="w-3 h-3"></i> Activa
+                  </span>` : `
                   <button onclick="App.grades._addSubjectConfig(${s.id})" class="px-3 py-1.5 bg-indigo-50 text-indigo-600 rounded-lg text-xs font-bold hover:bg-indigo-100 transition-all ${isClosed ? 'hidden' : ''}">
                     <i data-lucide="plus" class="w-3 h-3 inline"></i> Agregar
-                  </button>
-                `}
+                  </button>`}
               </td>
               <td></td>
             </tr>`;
         }).join('')}`;
     }
 
-    if (!html) {
-      html = `<tr><td colspan="5" class="text-center py-16 text-slate-400">
-        <p class="font-bold">No hay materias disponibles para este periodo</p>
-      </td></tr>`;
-    }
-
     container.innerHTML = html;
-
-    // Add save button at bottom if not closed
-    if (!isClosed && this._config.length > 0) {
-      container.innerHTML += `<tr><td colspan="5" class="px-6 py-6 text-center">
-        <button onclick="App.grades._saveAllConfig()" class="px-8 py-3 bg-indigo-600 text-white rounded-2xl font-black text-xs uppercase tracking-widest shadow-lg shadow-indigo-200 hover:bg-indigo-700 transition-all">
-          Guardar Configuración
-        </button>
-      </td></tr>`;
-    }
-
     if (window.lucide) lucide.createIcons();
   },
 
   _pendingConfig: {},
+
+  _markDirty(subjectId) {
+    const dot = document.getElementById(`cfg-dirty-${subjectId}`);
+    if (dot) dot.classList.remove('opacity-0');
+    const row = document.getElementById(`cfg-row-${subjectId}`);
+    if (row) row.classList.add('ring-2', 'ring-amber-200', 'ring-inset');
+  },
 
   _adjustCount(subjectId, delta) {
     const el = document.getElementById(`cfg-count-${subjectId}`);
@@ -262,6 +338,7 @@ export const GradesModule = {
     current = Math.min(8, Math.max(5, current + delta));
     el.textContent = current;
     this._pendingConfig[subjectId] = current;
+    this._markDirty(subjectId);
   },
 
   async _addSubjectConfig(subjectId) {
@@ -270,30 +347,161 @@ export const GradesModule = {
       { subject_id: subjectId, activity_count: count }
     ]);
     if (error) return Helpers.toast('Error al guardar', 'error');
-    Helpers.toast('Materia agregada', 'success');
+    Helpers.toast('Área agregada', 'success');
     await this._loadData();
   },
 
   async _removeSubjectConfig(configId) {
-    if (!confirm('Quitar esta materia del periodo?')) return;
+    if (!confirm('¿Quitar esta área del periodo? Se conservarán sus actividades y notas.')) return;
     const { error } = await DirectorApi.deletePeriodConfig(configId);
     if (error) return Helpers.toast('Error al quitar', 'error');
-    Helpers.toast('Materia removida', 'success');
+    Helpers.toast('Área removida', 'success');
     await this._loadData();
   },
 
+  async _updateSubject(subjectId) {
+    const elName = document.getElementById(`cfg-name-${subjectId}`);
+    const elDesc = document.getElementById(`cfg-desc-${subjectId}`);
+    if (!elName) return;
+    const name = elName.value.trim();
+    const desc = (elDesc?.value || '').trim();
+    if (!name) return Helpers.toast('El nombre del área no puede estar vacío', 'warning');
+    const { error } = await supabase.rpc('update_subject', {
+      p_subject_id: parseInt(subjectId),
+      p_name: name,
+      p_description: desc || null
+    });
+    if (error) return Helpers.toast('Error al actualizar el área: ' + error.message, 'error');
+    Helpers.toast('Área actualizada', 'success');
+    await this._loadData();
+  },
+
+  async _applyToAllClassrooms() {
+    const period = this._periods.find(p => String(p.id) === String(this._currentPeriodId));
+    if (!period) return Helpers.toast('Selecciona un periodo', 'warning');
+    if (period.status === 'closed') return Helpers.toast('El periodo está cerrado', 'warning');
+
+    const existingIds = new Set(this._config.map(c => c.subject_id));
+    const missing = this._subjects.filter(s => !existingIds.has(s.id));
+    if (!missing.length) {
+      return Helpers.toast('Todas las áreas ya están configuradas para todas las aulas', 'info');
+    }
+
+    const rows = missing.map(s => ({ subject_id: s.id, activity_count: 5 }));
+    const { error } = await DirectorApi.savePeriodConfig(this._currentPeriodId, rows);
+    if (error) return Helpers.toast('Error al aplicar la configuración', 'error');
+    Helpers.toast(`${rows.length} área${rows.length !== 1 ? 's' : ''} aplicada${rows.length !== 1 ? 's' : ''} a todas las aulas ✅`, 'success');
+    await this._loadData();
+  },
+
+  _openSubjectModal() {
+    const ic = 'w-full px-4 py-2.5 border-2 border-slate-100 rounded-2xl outline-none focus:ring-4 focus:ring-violet-100 focus:border-violet-400 bg-slate-50/50 transition-all text-sm font-medium';
+    const lc = 'block text-[11px] font-black text-slate-400 uppercase tracking-wider mb-1.5 ml-1';
+    const modalHtml = `
+      <div class="w-full max-w-md overflow-hidden">
+        <div class="bg-gradient-to-r from-indigo-600 to-violet-600 p-6 text-white">
+          <h3 class="text-xl font-black">Nueva Área</h3>
+          <p class="text-sm text-white/70 font-medium mt-0.5">Se aplicará a todas las aulas del nivel seleccionado</p>
+        </div>
+        <div class="p-6 space-y-4">
+          <div><label class="${lc}">Nombre del Área</label><input id="newSubjectName" class="${ic}" placeholder="Ej: Música"></div>
+          <div><label class="${lc}">Nivel</label>
+            <select id="newSubjectLevel" class="${ic}">
+              <option value="estancia">Estancia</option>
+              <option value="preescolar">Preescolar</option>
+              <option value="primaria">Primaria</option>
+            </select>
+          </div>
+          <div><label class="${lc}">Descripción</label><textarea id="newSubjectDesc" rows="3" class="${ic} resize-none" placeholder="¿Qué se trabaja en esta área?"></textarea></div>
+        </div>
+        <div class="p-6 bg-slate-50 flex justify-end gap-3">
+          <button onclick="App.ui.closeModal()" class="px-6 py-2.5 text-xs font-black uppercase text-slate-400">Cancelar</button>
+          <button id="btnCreateSubject" class="px-6 py-2.5 bg-violet-600 text-white rounded-xl font-black text-xs uppercase shadow-lg shadow-violet-200 hover:bg-violet-700 transition-all">Crear Área</button>
+        </div>
+      </div>`;
+
+    window.openGlobalModal(modalHtml);
+    document.getElementById('btnCreateSubject')?.addEventListener('click', () => this._createSubject());
+    if (window.lucide) lucide.createIcons();
+  },
+
+  async _createSubject() {
+    const name = document.getElementById('newSubjectName')?.value?.trim();
+    const level = document.getElementById('newSubjectLevel')?.value;
+    const desc = document.getElementById('newSubjectDesc')?.value?.trim() || null;
+    if (!name) return Helpers.toast('Escribe el nombre del área', 'warning');
+    if (!level) return Helpers.toast('Selecciona un nivel', 'warning');
+
+    const btn = document.getElementById('btnCreateSubject');
+    if (btn) { btn.disabled = true; btn.textContent = 'Creando...'; }
+
+    try {
+      const { data, error } = await supabase.rpc('insert_subject', {
+        p_name: name,
+        p_education_level: level,
+        p_description: desc
+      });
+      if (error) throw error;
+      if (data?.error) return Helpers.toast(data.error, 'error');
+
+      const period = this._periods.find(p => String(p.id) === String(this._currentPeriodId));
+      if (period && period.status !== 'closed') {
+        const { error: cfgErr } = await DirectorApi.savePeriodConfig(this._currentPeriodId, [
+          { subject_id: data.id, activity_count: 5 }
+        ]);
+        if (cfgErr) return Helpers.toast('Área creada, pero no se pudo agregar al periodo: ' + cfgErr.message, 'error');
+      }
+
+      App.ui.closeModal();
+      Helpers.toast('Área creada correctamente ✅', 'success');
+      await this._loadData();
+    } catch (e) {
+      Helpers.toast('Error al crear el área: ' + (e?.message || ''), 'error');
+    } finally {
+      if (btn) { btn.disabled = false; btn.textContent = 'Crear Área'; }
+    }
+  },
+
   async _saveAllConfig() {
-    const configs = Object.entries(this._pendingConfig).map(([sid, count]) => ({
+    const countChanges = Object.entries(this._pendingConfig).map(([sid, count]) => ({
       subject_id: parseInt(sid),
       activity_count: count
     }));
 
-    if (!configs.length) return Helpers.toast('No hay cambios que guardar', 'warning');
+    const subjectChanges = [];
+    this._subjects.forEach(s => {
+      const elName = document.getElementById(`cfg-name-${s.id}`);
+      const elDesc = document.getElementById(`cfg-desc-${s.id}`);
+      if (!elName) return;
+      const name = elName.value.trim();
+      const desc = (elDesc?.value || '').trim();
+      if (!name) return;
+      if (name !== s.name || desc !== (s.description || '')) {
+        subjectChanges.push({ subject_id: s.id, name, description: desc || null });
+      }
+    });
 
-    const { error } = await DirectorApi.savePeriodConfig(this._currentPeriodId, configs);
-    if (error) return Helpers.toast('Error al guardar configuración', 'error');
-    Helpers.toast('Configuración guardada', 'success');
+    if (!countChanges.length && !subjectChanges.length) {
+      return Helpers.toast('No hay cambios que guardar', 'warning');
+    }
+
+    let ok = true;
+    if (countChanges.length) {
+      const { error } = await DirectorApi.savePeriodConfig(this._currentPeriodId, countChanges);
+      if (error) ok = false;
+    }
+    for (const sc of subjectChanges) {
+      const { error } = await supabase.rpc('update_subject', {
+        p_subject_id: sc.subject_id,
+        p_name: sc.name,
+        p_description: sc.description
+      });
+      if (error) ok = false;
+    }
+
+    if (!ok) return Helpers.toast('Hubo errores al guardar', 'error');
     this._pendingConfig = {};
+    Helpers.toast('Configuración guardada correctamente', 'success');
     await this._loadData();
   },
 
@@ -399,6 +607,10 @@ export const GradesModule = {
               <button onclick="event.stopPropagation();App.grades.openStudentDetail('${s.id}');"
                 class="px-3 py-1.5 bg-indigo-50 text-indigo-600 rounded-lg text-xs font-bold hover:bg-indigo-100 transition-all">
                 Ver Detalle
+              </button>
+              <button onclick="event.stopPropagation();App.grades.openBoletin('${s.id}');"
+                class="px-3 py-1.5 bg-emerald-50 text-emerald-600 rounded-lg text-xs font-bold hover:bg-emerald-100 transition-all">
+                Boletín
               </button>
               <button onclick="event.stopPropagation();App.grades.openStudentHistory('${s.id}','${Helpers.escapeHTML(s.name).replace(/'/g,"\\'")}');"
                 class="p-1.5 bg-violet-50 text-violet-600 rounded-lg hover:bg-violet-100 transition-colors shrink-0" title="Historial">
@@ -688,35 +900,134 @@ export const GradesModule = {
   },
 
   _exportToPDF() {
+    if (!this._allStudents.length) return Helpers.toast('No hay datos para exportar', 'warning');
+    if (!this._currentPeriodId) return Helpers.toast('Selecciona un periodo', 'warning');
+    this._exportBoletinesPDF();
+  },
+
+  /**
+   * Genera un PDF con el boletín profesional de cada estudiante.
+   */
+  async _exportBoletinesPDF() {
+    const period = this._periods.find(p => String(p.id) === String(this._currentPeriodId));
+    const btn = document.getElementById('btnExportGrades');
+    if (btn) { btn.disabled = true; btn.textContent = 'Generando boletines...'; }
+
     try {
-      const { jsPDF } = window.jspdf;
-      const doc = new jsPDF();
-      doc.setFontSize(20);
-      doc.setTextColor(79, 70, 229);
-      doc.text('Karpus Kids — Reporte de Calificaciones', 14, 22);
-      doc.setFontSize(12);
-      doc.setTextColor(100);
-      const period = this._periods.find(p => String(p.id) === String(this._currentPeriodId));
-      doc.text(`Periodo: ${period?.name || 'N/A'}`, 14, 32);
-      doc.text(`Fecha: ${new Date().toLocaleDateString()}`, 14, 38);
+      Helpers.toast('Generando boletines...', 'info');
+      const doc = createBoletinDoc();
+      let generated = 0;
+      for (const s of this._allStudents) {
+        try {
+          const boletin = await fetchBoletin(s.id, this._currentPeriodId);
+          if (!boletin?.error) {
+            await appendBoletinPage(doc, boletin);
+            generated++;
+          }
+        } catch (_) { /* estudiante sin datos: se omite */ }
+      }
 
-      const tableData = this._allStudents.map(s => [
-        s.name, s.classrooms?.name || 'Sin aula', '—', 'En curso', '0'
-      ]);
+      if (!generated) {
+        Helpers.toast('No hay calificaciones para generar boletines', 'warning');
+        return;
+      }
 
-      doc.autoTable({
-        startY: 45,
-        head: [['Estudiante', 'Aula', 'Promedio', 'Nivel', 'Actividades']],
-        body: tableData,
-        theme: 'grid',
-        headStyles: { fillColor: [79, 70, 229], textColor: 255, fontStyle: 'bold' },
-        styles: { fontSize: 9 }
-      });
-
-      doc.save(`reporte_calificaciones_${new Date().toISOString().split('T')[0]}.pdf`);
-      Helpers.toast('PDF generado', 'success');
+      finalizeBoletinDoc(doc);
+      const ts = new Date().toISOString().slice(0, 10);
+      doc.save(`boletines_${(period?.name || 'periodo').replace(/\s+/g, '_').toLowerCase()}_${ts}.pdf`);
+      Helpers.toast(`${generated} boletín${generated !== 1 ? 'es' : ''} generado${generated !== 1 ? 's' : ''} ✅`, 'success');
+      auditLog('grades.export_boletines', { period_id: this._currentPeriodId, period_name: period?.name, cards: generated });
     } catch (err) {
-      Helpers.toast('Error al generar PDF', 'error');
+      Helpers.toast('Error al generar boletines: ' + (err?.message || ''), 'error');
+    } finally {
+      if (btn) { btn.disabled = false; btn.textContent = 'Exportar PDF'; }
+    }
+  },
+
+  /**
+   * Abre el boletín dinámico de un estudiante (vista + edición + PDF).
+   */
+  async openBoletin(studentId) {
+    const student = this._allStudents.find(s => String(s.id) === String(studentId));
+    if (!student) return;
+    const period = this._periods.find(p => String(p.id) === String(this._currentPeriodId));
+    if (!period) return Helpers.toast('Selecciona un periodo', 'warning');
+
+    const modalHtml = `
+      <div class="bg-white rounded-3xl shadow-2xl w-full max-w-4xl max-h-[90vh] flex flex-col overflow-hidden">
+        <div class="bg-gradient-to-r from-indigo-600 to-violet-600 p-6 text-white flex justify-between items-center">
+          <div class="flex items-center gap-4">
+            <div class="w-14 h-14 rounded-2xl bg-white/20 flex items-center justify-center text-2xl font-black">${student.name.charAt(0)}</div>
+            <div>
+              <h3 class="text-2xl font-black">${Helpers.escapeHTML(student.name)}</h3>
+              <p class="text-sm font-bold text-white/70 uppercase tracking-widest">Boletín · ${Helpers.escapeHTML(period.name)}</p>
+            </div>
+          </div>
+          <button onclick="App.ui.closeModal()" class="w-10 h-10 bg-white/10 hover:bg-white/20 rounded-xl flex items-center justify-center transition-colors">
+            <i data-lucide="x" class="w-5 h-5"></i>
+          </button>
+        </div>
+        <div class="flex-1 overflow-y-auto p-6 bg-slate-50" id="boletinContent">
+          <div class="text-center py-8 text-slate-400">
+            <div class="w-12 h-12 border-4 border-indigo-200 border-t-indigo-600 rounded-full animate-spin mx-auto mb-4"></div>
+            Generando boletín...
+          </div>
+        </div>
+      </div>`;
+
+    window.openGlobalModal(modalHtml, true);
+
+    const content = document.getElementById('boletinContent');
+    try {
+      const boletin = await fetchBoletin(studentId, this._currentPeriodId);
+      if (boletin?.error) throw new Error(boletin.error);
+
+      content.innerHTML = `
+        <div class="grid lg:grid-cols-[300px_1fr] gap-4 items-start">
+          <div class="space-y-3 lg:sticky lg:top-0">
+            ${boletinEditorHtml(boletin)}
+            <button onclick="App.grades._downloadBoletin('${studentId}')"
+              class="w-full px-4 py-2.5 bg-indigo-600 text-white rounded-xl font-black text-xs uppercase shadow-lg shadow-indigo-200 hover:bg-indigo-700 transition-all">
+              <i data-lucide="download" class="w-4 h-4 inline mr-1"></i> Descargar PDF
+            </button>
+          </div>
+          <div class="bg-white rounded-[2rem] border border-slate-200 shadow-sm overflow-hidden">
+            ${renderBoletin(boletin)}
+          </div>
+        </div>`;
+      if (window.lucide) lucide.createIcons();
+
+      document.getElementById('btn-save-boletin')?.addEventListener('click', async () => {
+        const comment = document.getElementById('boletin-comment')?.value || '';
+        const observaciones = document.getElementById('boletin-observaciones')?.value || '';
+        const conducta = document.getElementById('boletin-conducta')?.value || '';
+        const fortalezas = (document.getElementById('boletin-fortalezas')?.value || '').split('\n').map(s => s.trim()).filter(Boolean);
+        const debilidades = (document.getElementById('boletin-debilidades')?.value || '').split('\n').map(s => s.trim()).filter(Boolean);
+        const btn = document.getElementById('btn-save-boletin');
+        if (btn) { btn.disabled = true; btn.textContent = 'Guardando...'; }
+        try {
+          await saveBoletinNotes(studentId, this._currentPeriodId, comment, fortalezas, debilidades, observaciones, conducta);
+          Helpers.toast('Boletín guardado', 'success');
+          await this.openBoletin(studentId);
+        } catch (e) {
+          Helpers.toast('Error al guardar: ' + (e?.message || ''), 'error');
+          if (btn) { btn.disabled = false; btn.textContent = 'Guardar Boletín'; }
+        }
+      });
+    } catch (e) {
+      content.innerHTML = `<div class="text-center py-8 text-rose-500 font-bold">Error: ${Helpers.escapeHTML(e?.message || '')}</div>`;
+    }
+  },
+
+  async _downloadBoletin(studentId) {
+    try {
+      Helpers.toast('Generando PDF...', 'info');
+      const boletin = await fetchBoletin(studentId, this._currentPeriodId);
+      if (boletin?.error) throw new Error(boletin.error);
+      await downloadBoletinPDF(boletin);
+      Helpers.toast('PDF descargado', 'success');
+    } catch (e) {
+      Helpers.toast('Error al generar PDF: ' + (e?.message || ''), 'error');
     }
   },
 

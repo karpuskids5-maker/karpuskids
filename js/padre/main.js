@@ -144,10 +144,20 @@ document.addEventListener('DOMContentLoaded', async () => {
 
     const currentStudent = students[0];
     AppState.set('students', students);
-    AppState.set('currentStudent', currentStudent);
+
+    // 🔗 Deep link del boletín (código QR): ?boletin=<id>&periodo=<id>
+    const urlParams = new URLSearchParams(window.location.search);
+    const deepBoletin = urlParams.get('boletin');
+    const deepPeriodo = urlParams.get('periodo');
+    let selectedStudent = currentStudent;
+    if (deepBoletin) {
+      const target = students.find(s => String(s.id) === String(deepBoletin));
+      if (target) selectedStudent = target;
+    }
+    AppState.set('currentStudent', selectedStudent);
 
     // Actualizar sidebar y header ANTES de cargar datos
-    updateHeaderProfile(auth.profile, currentStudent, students);
+    updateHeaderProfile(auth.profile, selectedStudent, students);
     setupNavigation();
     setupGlobalListeners();
 
@@ -157,6 +167,18 @@ document.addEventListener('DOMContentLoaded', async () => {
     if (homeSection) {
       homeSection.classList.remove('hidden');
       homeSection.classList.add('active');
+    }
+
+    // 🔗 Si viene de un QR del boletín, ir directo a calificaciones y pre-seleccionar el período
+    if (deepBoletin && deepPeriodo) {
+      navigateTo('grades');
+      setTimeout(() => {
+        const filter = document.getElementById('padrePeriodFilter');
+        if (filter && [...filter.options].some(o => o.value === String(deepPeriodo))) {
+          filter.value = String(deepPeriodo);
+          filter.dispatchEvent(new Event('change'));
+        }
+      }, 800);
     }
 
     // Mostrar skeletons inmediatamente

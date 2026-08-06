@@ -26,20 +26,22 @@ const logError = (context, err) => {
 export const DirectorApi = {
   async getPeriods() {
     try {
-      // Try new academic_periods table first (School Engine)
-      const { data: academicPeriods, error: apErr } = await supabase
-        .from('academic_periods')
-        .select('id, name, start_date, end_date, status, is_active, school_year_id, order_index, created_at')
-        .limit(20)
-        .order('order_index', { ascending: true });
-
-      if (!apErr && academicPeriods && academicPeriods.length > 0) {
-        return { data: academicPeriods, error: null };
+      // get_grade_periods devuelve los períodos con id de legacy "periods"
+      // (compatibles con period_config/activities/grades), sincronizando
+      // academic_periods → periods automáticamente por nombre y fechas.
+      const { data: gradePeriods, error: gpErr } = await supabase.rpc('get_grade_periods');
+      if (!gpErr && gradePeriods && gradePeriods.length > 0) {
+        return { data: gradePeriods, error: null };
       }
 
-      // Fallback to legacy periods table
-      const res = await withTimeout(supabase.from(TABLES.PERIODS).select('id, name, start_date, end_date, status, is_active, classroom_id, created_at').limit(10).order('start_date', { ascending: false }));
-      return res;
+      // Fallback: períodos legacy
+      const { data, error } = await supabase
+        .from('periods')
+        .select('id, name, start_date, end_date, status, is_active, classroom_id')
+        .order('start_date', { ascending: true })
+        .limit(50);
+      if (!error) return { data: data || [], error: null };
+      return { data: null, error };
     } catch (e) { return logError('getPeriods', e); }
   },
 
