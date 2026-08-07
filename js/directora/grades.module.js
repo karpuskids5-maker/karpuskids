@@ -43,6 +43,7 @@ export const GradesModule = {
   _config: [],
   _activities: [],
   _allStudents: [],
+  _studentGrades: [],
   _view: 'config', // 'config' | 'grades'
 
   async init() {
@@ -87,8 +88,39 @@ export const GradesModule = {
       ? 'px-4 py-2 bg-indigo-600 text-white rounded-xl font-black text-xs uppercase shadow-md'
       : 'px-4 py-2 bg-slate-100 text-slate-500 rounded-xl font-black text-xs uppercase hover:bg-slate-200 transition-all';
 
-    if (view === 'config') this._renderConfig();
-    else this._renderGradesTable();
+    if (view === 'config') {
+      this._setConfigHeader();
+      this._renderConfig();
+    } else {
+      this._setGradesHeader();
+      this._renderGradesTable();
+    }
+  },
+
+  _setConfigHeader() {
+    const head = document.getElementById('gradesTableHead');
+    if (!head) return;
+    head.innerHTML = `
+      <tr>
+        <th class="px-6 py-4 border-b border-slate-200">Materia / Estudiante</th>
+        <th class="px-6 py-4 text-center border-b border-slate-200">Actividades</th>
+        <th class="px-6 py-4 text-center border-b border-slate-200">Estado</th>
+        <th class="px-6 py-4 text-center border-b border-slate-200">Acciones</th>
+        <th class="px-6 py-4 border-b border-slate-200"></th>
+      </tr>`;
+  },
+
+  _setGradesHeader() {
+    const head = document.getElementById('gradesTableHead');
+    if (!head) return;
+    head.innerHTML = `
+      <tr>
+        <th class="px-6 py-4 border-b border-slate-200">Estudiante</th>
+        <th class="px-6 py-4 border-b border-slate-200">Aula</th>
+        <th class="px-6 py-4 text-center border-b border-slate-200">Promedio</th>
+        <th class="px-6 py-4 text-center border-b border-slate-200">Estado</th>
+        <th class="px-6 py-4 text-right border-b border-slate-200"></th>
+      </tr>`;
   },
 
   async _loadPeriods() {
@@ -127,15 +159,17 @@ export const GradesModule = {
     }
 
     try {
-      const [configRes, activitiesRes, studentsRes] = await Promise.all([
+      const [configRes, activitiesRes, studentsRes, gradesRes] = await Promise.all([
         DirectorApi.getPeriodConfig(this._currentPeriodId),
         DirectorApi.getActivitiesWithGrades(this._currentPeriodId),
-        DirectorApi.getStudents({ status: 'active' })
+        DirectorApi.getStudents({ status: 'active' }),
+        this._fetchStudentGrades(this._currentPeriodId)
       ]);
 
       this._config = configRes?.data || [];
       this._activities = activitiesRes?.data || [];
       this._allStudents = studentsRes?.data || [];
+      this._studentGrades = gradesRes || [];
 
       // Load subjects
       const { data: subjects } = await DirectorApi.getSubjects();
@@ -163,6 +197,168 @@ export const GradesModule = {
     Helpers.setTxt('kpiApprovalRate', this._activities.length);
     Helpers.setTxt('kpiNeedsSupport', this._allStudents.length);
     Helpers.setTxt('kpiLowGrades', this._config.reduce((sum, c) => sum + (c.activity_count || 0), 0));
+  },
+
+  /**
+   * Obtiene en un solo query todas las calificaciones (score_v2) del período
+   * para poder calcular promedios reales por estudiante en la tabla principal.
+   */
+  async _fetchStudentGrades(periodId) {
+    try {
+      const { data, error } = await supabase
+        .from('grades')
+        .select('student_id, score_v2, activity_id, notes')
+        .eq('period_id', parseInt(periodId))
+        .not('score_v2', 'is', null);
+      return error ? [] : (data || []);
+    } catch (_) {
+      return [];
+    }
+  },
+
+  /**
+   * Calcula el promedio real del estudiante replicando la lógica del boletín:
+   * por área se usan las mejores 5 notas (si hay 5+) y el promedio general es
+   * el promedio de los promedios por área.
+   */
+  _computeStudentStats(studentId) {
+    const actSubject = {};
+    this._activities.forEach(a => { actSubject[a.id] = a.subject_id; });
+
+    const bySubject = {};
+    this._studentGrades.forEach(g => {
+      if (String(g.student_id) !== String(studentId)) return;
+      const sid = actSubject[g.activity_id];
+      if (sid == null) return;
+      if (!bySubject[sid]) bySubject[sid] = [];
+      bySubject[sid].push(Number(g.score_v2));
+    });
+
+    const subjectAvgs = Object.values(bySubject).map(scores => {
+      const top = scores.slice().sort((a, b) => b - a);
+      const selected = top.length >= 5 ? top.slice(0, 5) : top;
+      return selected.reduce((s, x) => s + x, 0) / selected.length;
+    });
+
+    let average = null;
+    if (subjectAvgs.length) {
+      average = subjectAvgs.reduce((s, x) => s + x, 0) / subjectAvgs.length;
+    }
+
+    return {
+      average,
+      totalGraded: this._studentGrades.filter(g => String(g.student_id) === String(studentId)).length,
+      subjectsGraded: subjectAvgs.length,
+      totalSubjects: this._config.length,
+      level: getLevel(average)
+    };
+  },
+
+  /**
+   * Construye un objeto boletín equivalente a get_student_boletin usando solo
+   * datos ya cargados en memoria. Es el respaldo cuando las RPC del boletín
+   * (migración add_boletin_dinamico) no están aplicadas en la base.
+   */
+  _buildBoletinFallback(studentId) {
+    const student = this._allStudents.find(s => String(s.id) === String(studentId));
+    if (!student) return null;
+
+    const period = this._periods.find(p => String(p.id) === String(this._currentPeriodId));
+    const actById = {};
+    this._activities.forEach(a => { actById[a.id] = a; });
+
+    const areas = [];
+    const activities = [];
+    let overallSum = 0;
+    let overallCount = 0;
+
+    this._config.forEach(c => {
+      const graded = [];
+      this._studentGrades.forEach(g => {
+        if (String(g.student_id) !== String(studentId)) return;
+        const act = actById[g.activity_id];
+        if (!act || String(act.subject_id) !== String(c.subject_id)) return;
+        const score = Number(g.score_v2);
+        graded.push(score);
+        activities.push({
+          subject_id: act.subject_id,
+          subject_name: c.subject_name || act.subject_name,
+          activity_id: act.id,
+          activity_title: act.title || 'Actividad ' + (act.activity_number ?? ''),
+          activity_number: act.activity_number,
+          score,
+          comment: g.notes || null
+        });
+      });
+
+      let average = null;
+      let method = 'all';
+      if (graded.length) {
+        const top = graded.slice().sort((x, y) => y - x);
+        const selected = top.length >= 5 ? top.slice(0, 5) : top;
+        average = Math.round((selected.reduce((s, x) => s + x, 0) / selected.length) * 100) / 100;
+        method = graded.length >= 5 ? 'best_5' : 'all';
+        overallSum += average;
+        overallCount++;
+      }
+
+      areas.push({
+        subject_id: c.subject_id,
+        subject_name: c.subject_name,
+        activity_count: c.activity_count || 5,
+        graded_count: graded.length,
+        average,
+        method
+      });
+    });
+
+    if (!areas.length && !activities.length) return null;
+
+    const overall = overallCount ? Math.round((overallSum / overallCount) * 100) / 100 : null;
+
+    return {
+      student: {
+        id: student.id,
+        name: student.name,
+        matricula: student.matricula,
+        age: student.age,
+        age_type: student.age_type,
+        birth_date: student.birth_date,
+        avatar_url: student.avatar_url
+      },
+      classroom: student.classrooms
+        ? { id: student.classrooms.id, name: student.classrooms.name }
+        : null,
+      teacher_name: null,
+      directora_name: null,
+      school_year_name: null,
+      period: period
+        ? { id: period.id, name: period.name, start_date: period.start_date, end_date: period.end_date, status: period.status, is_active: period.is_active }
+        : null,
+      areas,
+      activities,
+      overall_average: overall,
+      level: getLevel(overall).label,
+      attendance: {},
+      issued_at: null,
+      report: null
+    };
+  },
+
+  /**
+   * Obtiene el boletín vía RPC y, si falla (función no creada en la base),
+   * lo reconstruye localmente para que el panel siga funcionando.
+   */
+  async _getBoletin(studentId) {
+    try {
+      const boletin = await fetchBoletin(studentId, this._currentPeriodId);
+      if (boletin?.error) throw new Error(boletin.error);
+      return boletin;
+    } catch (e) {
+      const fb = this._buildBoletinFallback(studentId);
+      if (fb) return fb;
+      throw e;
+    }
   },
 
   // ── VISTA: CONFIGURACIÓN ─────────────────────────────────
@@ -514,7 +710,10 @@ export const GradesModule = {
     const period = this._periods.find(p => String(p.id) === String(this._currentPeriodId));
     if (!period) {
       tableBody.innerHTML = `<tr><td colspan="5" class="text-center py-16 text-slate-400">
-        Selecciona un periodo para ver las calificaciones
+        <div class="flex flex-col items-center gap-3">
+          <div class="w-16 h-16 bg-slate-100 rounded-3xl flex items-center justify-center text-3xl">📚</div>
+          <p class="font-bold text-slate-600">Selecciona un periodo para ver las calificaciones</p>
+        </div>
       </td></tr>`;
       return;
     }
@@ -523,7 +722,7 @@ export const GradesModule = {
     const classFilter = document.getElementById('gradesFilterClassroom')?.value || 'all';
 
     let students = this._allStudents;
-    if (search) students = students.filter(s => s.name.toLowerCase().includes(search));
+    if (search) students = students.filter(s => (s.name || '').toLowerCase().includes(search));
     if (classFilter !== 'all') students = students.filter(s => String(s.classroom_id) === classFilter);
 
     if (!students.length) {
@@ -533,89 +732,64 @@ export const GradesModule = {
       return;
     }
 
-    // Build subject columns header
-    const subjectCols = [...new Set(this._activities.map(a => ({ id: a.subject_id, name: a.subject_name })))];
-    const subjectMap = {};
-    subjectCols.forEach(s => { subjectMap[s.id] = s.name; });
-
-    const headerRow = `
-      <tr class="bg-slate-50 border-b border-slate-100">
-        <th class="px-6 py-4 text-left text-[10px] font-black text-slate-400 uppercase tracking-widest">Estudiante</th>
-        <th class="px-6 py-4 text-center text-[10px] font-black text-slate-400 uppercase tracking-widest">Promedio</th>
-        <th class="px-6 py-4 text-center text-[10px] font-black text-slate-400 uppercase tracking-widest">Nivel</th>
-        <th class="px-6 py-4 text-center text-[10px] font-black text-slate-400 uppercase tracking-widest">Actividades</th>
-        <th class="px-6 py-4 text-right text-[10px] font-black text-slate-400 uppercase tracking-widest">Acciones</th>
-      </tr>`;
-
-    tableBody.innerHTML = headerRow + students.map(s => {
-      // Calculate student averages from activities
-      const studentGrades = this._activities
-        .filter(a => a.grade_count > 0)
-        .map(a => {
-          // We need to compute per-subject averages
-          return a;
-        });
-
-      // Group activities by subject for this student's average display
-      const subjectAvgs = {};
-      subjectCols.forEach(sub => {
-        const subActs = this._activities.filter(a => a.subject_id === sub.id);
-        // Use the graded_count from the activity data as a proxy
-        const totalGraded = subActs.reduce((sum, a) => sum + (a.graded_count || 0), 0);
-        const totalActs = subActs.length;
-        subjectAvgs[sub.id] = { graded: totalGraded, total: totalActs };
-      });
-
-      const totalGraded = this._activities.reduce((sum, a) => sum + (a.graded_count || 0), 0);
-      const totalActs = this._activities.length;
-
+    tableBody.innerHTML = students.map(s => {
+      const stats = this._computeStudentStats(s.id);
       const classroom = s.classrooms?.name || 'Sin aula';
-      const level = { label: 'En curso', cls: 'bg-blue-100 text-blue-700' };
+      const avg = stats.average;
+      const isGraded = avg != null;
+      const avatar = s.avatar_url
+        ? `<img src="${Helpers.escapeHTML(s.avatar_url)}" alt="" class="w-full h-full object-cover" onerror="this.remove()">`
+        : (s.name || '?').charAt(0).toUpperCase();
 
       return `
-        <tr class="hover:bg-slate-50 border-b border-slate-50 transition-all cursor-pointer group"
-            ondblclick="App.grades.openStudentDetail('${s.id}')">
+        <tr class="hover:bg-indigo-50/40 border-b border-slate-50 transition-all cursor-pointer group"
+            onclick="App.grades.openStudentDetail('${s.id}')">
           <td class="px-6 py-4">
-            <div class="flex items-center gap-4">
-              <div class="w-10 h-10 rounded-2xl bg-indigo-50 text-indigo-600 flex items-center justify-center font-black text-sm group-hover:scale-110 transition-transform">
-                ${s.name.charAt(0)}
+            <div class="flex items-center gap-3">
+              <div class="w-11 h-11 rounded-2xl bg-gradient-to-br from-indigo-100 to-violet-100 text-indigo-600 flex items-center justify-center font-black text-base overflow-hidden shrink-0 border-2 border-white shadow-sm group-hover:border-indigo-200 transition-all">
+                ${avatar}
               </div>
-              <div>
-                <div class="font-black text-slate-800 text-sm">${Helpers.escapeHTML(s.name)}</div>
-                <div class="text-[10px] text-slate-400 font-black uppercase tracking-tighter">${Helpers.escapeHTML(classroom)}</div>
+              <div class="min-w-0">
+                <div class="font-black text-slate-800 text-sm truncate">${Helpers.escapeHTML(s.name)}</div>
+                <div class="text-[10px] text-slate-400 font-bold uppercase tracking-tighter mt-0.5">${Helpers.escapeHTML(s.matricula || '')}</div>
               </div>
             </div>
           </td>
-          <td class="px-6 py-4 text-center">
-            <div class="flex flex-col items-center gap-1">
-              <span class="px-3 py-1.5 rounded-xl bg-slate-100 text-slate-700 font-black text-sm border border-slate-200">—</span>
-              ${scoreBar(null)}
+          <td class="px-6 py-4">
+            <div class="flex items-center gap-2">
+              <span class="w-2 h-2 rounded-full bg-emerald-400 shrink-0"></span>
+              <span class="text-xs font-bold text-slate-600">${Helpers.escapeHTML(classroom)}</span>
             </div>
           </td>
-          <td class="px-6 py-4 text-center">
-            <span class="px-3 py-1 rounded-full text-[10px] font-black uppercase shadow-sm ${level.cls}">
-              ${level.label}
-            </span>
-          </td>
-          <td class="px-6 py-4 text-center">
-            <span class="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[10px] font-black bg-indigo-50 text-indigo-600 border border-indigo-100">
-              <i data-lucide="file-check" class="w-3 h-3"></i>${totalGraded}/${totalActs}
-            </span>
+          <td class="px-6 py-4">
+            <div class="flex flex-col items-center gap-1.5">
+              <span class="px-3 py-1 rounded-xl font-black text-sm border ${isGraded ? 'bg-indigo-50 text-indigo-700 border-indigo-100' : 'bg-slate-50 text-slate-400 border-slate-100'}">
+                ${isGraded ? Number(avg).toFixed(1) : '—'}
+              </span>
+              ${scoreBar(avg)}
+            </div>
           </td>
           <td class="px-6 py-4">
-            <div class="flex items-center gap-2 justify-end">
-              <button onclick="event.stopPropagation();App.grades.openStudentDetail('${s.id}');"
-                class="px-3 py-1.5 bg-indigo-50 text-indigo-600 rounded-lg text-xs font-bold hover:bg-indigo-100 transition-all">
-                Ver Detalle
-              </button>
+            <div class="flex flex-col items-center gap-1.5">
+              <span class="px-2.5 py-1 rounded-full text-[10px] font-black uppercase shadow-sm ${stats.level.cls}">
+                ${stats.level.label}
+              </span>
+              <span class="text-[9px] font-bold text-slate-400 uppercase tracking-wider">${stats.subjectsGraded}/${stats.totalSubjects} áreas</span>
+            </div>
+          </td>
+          <td class="px-6 py-4">
+            <div class="flex items-center justify-end gap-1">
               <button onclick="event.stopPropagation();App.grades.openBoletin('${s.id}');"
-                class="px-3 py-1.5 bg-emerald-50 text-emerald-600 rounded-lg text-xs font-bold hover:bg-emerald-100 transition-all">
-                Boletín
+                class="p-2 text-emerald-600 bg-emerald-50 hover:bg-emerald-100 rounded-lg transition-colors" title="Ver boletín">
+                <i data-lucide="file-text" class="w-3.5 h-3.5"></i>
               </button>
               <button onclick="event.stopPropagation();App.grades.openStudentHistory('${s.id}','${Helpers.escapeHTML(s.name).replace(/'/g,"\\'")}');"
-                class="p-1.5 bg-violet-50 text-violet-600 rounded-lg hover:bg-violet-100 transition-colors shrink-0" title="Historial">
+                class="p-2 text-violet-600 bg-violet-50 hover:bg-violet-100 rounded-lg transition-colors" title="Historial">
                 <i data-lucide="history" class="w-3.5 h-3.5"></i>
               </button>
+              <span class="w-6 h-6 flex items-center justify-center text-slate-300 group-hover:text-indigo-500 group-hover:translate-x-0.5 transition-all">
+                <i data-lucide="chevron-right" class="w-4 h-4"></i>
+              </span>
             </div>
           </td>
         </tr>`;
@@ -631,43 +805,52 @@ export const GradesModule = {
     const period = this._periods.find(p => String(p.id) === String(this._currentPeriodId));
     if (!period) return;
 
+    const avatar = student.avatar_url
+      ? `<img src="${Helpers.escapeHTML(student.avatar_url)}" alt="" class="w-full h-full object-cover" onerror="this.remove()">`
+      : (student.name || '?').charAt(0).toUpperCase();
+
     const modalHtml = `
-      <div class="bg-white rounded-3xl shadow-2xl w-full max-w-4xl max-h-[90vh] flex flex-col overflow-hidden">
-        <div class="bg-gradient-to-r from-indigo-600 to-violet-600 p-6 text-white flex justify-between items-center">
-          <div class="flex items-center gap-4">
-            <div class="w-14 h-14 rounded-2xl bg-white/20 flex items-center justify-center text-2xl font-black">${student.name.charAt(0)}</div>
-            <div>
-              <h3 class="text-2xl font-black">${Helpers.escapeHTML(student.name)}</h3>
-              <p class="text-sm font-bold text-white/70 uppercase tracking-widest">${Helpers.escapeHTML(student.classrooms?.name || '')} — ${Helpers.escapeHTML(period.name)}</p>
+      <div class="bg-white rounded-3xl shadow-2xl w-full max-w-4xl max-h-[92vh] flex flex-col overflow-hidden">
+        <div class="bg-gradient-to-r from-indigo-600 to-violet-600 px-6 py-6 text-white relative overflow-hidden shrink-0">
+          <div class="absolute -right-10 -top-10 w-40 h-40 bg-white/10 rounded-full"></div>
+          <div class="absolute right-24 -bottom-12 w-28 h-28 bg-white/10 rounded-full"></div>
+          <div class="flex items-center gap-4 relative z-10">
+            <div class="w-16 h-16 rounded-2xl bg-white/20 flex items-center justify-center text-2xl font-black overflow-hidden shrink-0 border-2 border-white/30 shadow-lg">
+              ${avatar}
+            </div>
+            <div class="flex-1 min-w-0">
+              <p class="text-[10px] font-black uppercase tracking-[0.25em] text-white/70">Centro de Calificaciones</p>
+              <h3 class="text-2xl font-black truncate">${Helpers.escapeHTML(student.name)}</h3>
+              <div class="flex flex-wrap items-center gap-x-4 gap-y-1 mt-1.5 text-xs font-bold text-white/85">
+                <span class="inline-flex items-center gap-1.5"><i data-lucide="school" class="w-3.5 h-3.5"></i> ${Helpers.escapeHTML(student.classrooms?.name || 'Sin aula')}</span>
+                <span class="inline-flex items-center gap-1.5"><i data-lucide="calendar" class="w-3.5 h-3.5"></i> ${Helpers.escapeHTML(period.name)}</span>
+                <span class="inline-flex items-center gap-1.5"><i data-lucide="book-open" class="w-3.5 h-3.5"></i> Boletín de calificaciones</span>
+              </div>
             </div>
           </div>
-          <button onclick="App.ui.closeModal()" class="w-10 h-10 bg-white/10 hover:bg-white/20 rounded-xl flex items-center justify-center transition-colors">
-            <i data-lucide="x" class="w-5 h-5"></i>
-          </button>
         </div>
         <div class="flex-1 overflow-y-auto p-6 bg-slate-50" id="studentDetailContent">
-          <div class="text-center py-8 text-slate-400">
-            <div class="h-8 bg-slate-100 rounded-xl animate-pulse w-48 mx-auto mb-3"></div>
-            Cargando calificaciones...
+          <div class="flex flex-col items-center justify-center py-16 text-slate-400 gap-3">
+            <div class="w-12 h-12 border-4 border-indigo-200 border-t-indigo-600 rounded-full animate-spin"></div>
+            <p class="text-sm font-bold">Generando boletín...</p>
           </div>
         </div>
       </div>`;
 
     window.openGlobalModal(modalHtml, true);
 
+    const content = document.getElementById('studentDetailContent');
+    if (!content) return;
+
     try {
-      const [gradesRes, averagesRes] = await Promise.all([
-        DirectorApi.getStudentGradesV2(studentId, this._currentPeriodId),
-        DirectorApi.getStudentSubjectAverages(studentId, this._currentPeriodId)
-      ]);
+      const boletin = await this._getBoletin(studentId);
+      if (boletin?.error) throw new Error(boletin.error);
 
-      const grades = gradesRes?.data || [];
-      const averages = averagesRes?.data || [];
+      const areas = boletin?.areas || [];
+      const acts = boletin?.activities || [];
+      const overall = boletin?.overall_average;
 
-      const content = document.getElementById('studentDetailContent');
-      if (!content) return;
-
-      if (!averages.length && !grades.length) {
+      if (!areas.length) {
         content.innerHTML = `
           <div class="text-center py-12">
             <div class="w-16 h-16 bg-slate-100 rounded-3xl flex items-center justify-center text-3xl mx-auto mb-4">📝</div>
@@ -677,76 +860,111 @@ export const GradesModule = {
         return;
       }
 
-      // Render subject averages
-      let html = `
-        <div class="grid grid-cols-2 md:grid-cols-3 gap-4 mb-8">
-          ${averages.map(avg => {
-            const level = getLevel(avg.average);
-            return `
-              <div class="bg-white rounded-2xl p-5 border border-slate-100 shadow-sm">
-                <div class="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2">${Helpers.escapeHTML(avg.subject_name)}</div>
-                <div class="text-3xl font-black text-indigo-700 mb-1">${Number(avg.average).toFixed(1)}</div>
-                <div class="flex items-center gap-2">
-                  <span class="px-2 py-0.5 rounded-full text-[10px] font-black ${level.cls}">${level.label}</span>
-                  <span class="text-[10px] text-slate-400 font-bold">${avg.graded_count} actividad${avg.graded_count !== 1 ? 'es' : ''}</span>
-                </div>
-                ${scoreBar(avg.average)}
-              </div>`;
-          }).join('')}
-        </div>`;
-
-      // Group grades by subject
-      const grouped = {};
-      grades.forEach(g => {
-        if (!grouped[g.subject_name]) grouped[g.subject_name] = [];
-        grouped[g.subject_name].push(g);
+      // ── Matriz área × actividades (como boletín) ──
+      const bySubjectActs = {};
+      acts.forEach(a => {
+        if (!bySubjectActs[a.subject_id]) bySubjectActs[a.subject_id] = {};
+        bySubjectActs[a.subject_id][a.activity_number] = a;
       });
 
-      html += `
+      const maxActs = Math.min(5, Math.max(1, ...areas.map(a => a.activity_count || 5)));
+      const actCols = Array.from({ length: maxActs }, (_, i) => i + 1);
+      const overallLvl = getLevel(overall);
+
+      const starsOf = (score) => {
+        const n = Math.max(0, Math.min(5, Math.round(Number(score) / 20)));
+        return '★'.repeat(n) + '☆'.repeat(5 - n);
+      };
+
+      const rowsHtml = areas.map((area, i) => {
+        const color = ['#1D4ED8', '#15803D', '#CA8A04', '#DB2777', '#EA580C', '#7C3AED'][i % 6];
+        const cells = actCols.map(n => {
+          const act = bySubjectActs[area.subject_id]?.[n];
+          if (!act || act.score == null) {
+            return `<td class="px-1.5 py-3 text-center"><span class="text-slate-300 font-black text-sm">—</span></td>`;
+          }
+          const lvl = getLevel(act.score);
+          const tip = `${act.activity_title || 'Actividad ' + n}${act.comment ? ' · ' + act.comment : ''}`.replace(/"/g, '&quot;');
+          return `
+            <td class="px-1.5 py-3 text-center" title="${Helpers.escapeHTML(tip)}">
+              <div class="flex flex-col items-center gap-1 cursor-default">
+                <span class="w-11 h-8 rounded-lg font-black text-sm flex items-center justify-center ${lvl.cls}">${Number(act.score).toFixed(0)}</span>
+                <span class="text-[9px] leading-none tracking-tight ${act.score >= 80 ? 'text-amber-400' : act.score >= 60 ? 'text-amber-300' : 'text-rose-400'}">${starsOf(act.score)}</span>
+              </div>
+            </td>`;
+        }).join('');
+
+        return `
+          <tr class="border-b border-slate-100 hover:bg-indigo-50/30 transition-colors">
+            <td class="px-4 py-3">
+              <div class="font-black text-sm" style="color:${color}">${Helpers.escapeHTML(area.subject_name)}</div>
+              <div class="text-[10px] text-slate-400 font-bold uppercase tracking-wider mt-0.5">${area.graded_count} de ${maxActs} actividades</div>
+            </td>
+            ${cells}
+            <td class="px-4 py-3 text-center">
+              <span class="inline-block min-w-[3.5rem] px-2.5 py-1.5 rounded-xl font-black text-sm" style="background:${color}1A;color:${color}">${area.average != null ? Number(area.average).toFixed(1) : '—'}</span>
+            </td>
+          </tr>`;
+      }).join('');
+
+      const headerCells = actCols.map(n => `
+        <th class="px-1.5 py-3 text-center text-[10px] font-black uppercase tracking-widest">Act ${n}</th>`).join('');
+
+      content.innerHTML = `
         <div class="bg-white rounded-2xl border border-slate-200 overflow-hidden shadow-sm">
-          <div class="px-6 py-4 bg-slate-50 border-b border-slate-100">
-            <h4 class="font-black text-slate-800 text-sm uppercase tracking-widest">Detalle por Actividad</h4>
+          <div class="px-5 py-3 bg-slate-50 border-b border-slate-100 flex items-center justify-between">
+            <h4 class="font-black text-slate-700 text-xs uppercase tracking-widest flex items-center gap-2">
+              <span class="w-1.5 h-5 bg-indigo-600 rounded-full"></span> Resultados por Área
+            </h4>
+            <span class="text-[10px] font-bold text-slate-400" title="Se usan las mejores 5 notas por área">Mejores 5 notas por área · <span class="text-indigo-500 font-black">pasa el cursor sobre una nota</span></span>
           </div>
-          <table class="w-full text-left">
-            <thead class="bg-slate-50 text-[10px] font-black text-slate-400 uppercase tracking-widest border-b border-slate-100">
-              <tr>
-                <th class="px-6 py-3">Materia</th>
-                <th class="px-6 py-3">Actividad</th>
-                <th class="px-6 py-3 text-center">Calificación</th>
-                <th class="px-6 py-3 text-right">Comentario</th>
-              </tr>
-            </thead>
-            <tbody class="divide-y divide-slate-50">
-              ${Object.entries(grouped).map(([subName, acts]) =>
-                acts.map((g, i) => {
-                  const level = getLevel(g.score);
-                  return `
-                    <tr class="hover:bg-indigo-50/30 transition-colors">
-                      <td class="px-6 py-3">
-                        ${i === 0 ? `<span class="font-bold text-slate-800 text-sm">${Helpers.escapeHTML(subName)}</span>` : ''}
-                      </td>
-                      <td class="px-6 py-3">
-                        <span class="text-xs font-bold text-slate-600">${Helpers.escapeHTML(g.activity_title)}</span>
-                        <span class="text-[10px] text-slate-400 ml-1">#${g.activity_number}</span>
-                      </td>
-                      <td class="px-6 py-3 text-center">
-                        <span class="px-3 py-1 rounded-lg font-black text-sm ${level.cls}">${g.score != null ? Number(g.score).toFixed(1) : '—'}</span>
-                      </td>
-                      <td class="px-6 py-3 text-right text-xs text-slate-400 max-w-[160px] truncate">
-                        ${Helpers.escapeHTML(g.comment || '—')}
-                      </td>
-                    </tr>`;
-                }).join('')
-              ).join('')}
-            </tbody>
-          </table>
+          <div class="overflow-x-auto">
+            <table class="w-full text-sm min-w-[560px]">
+              <thead class="bg-gradient-to-r from-indigo-600 to-violet-600 text-white">
+                <tr>
+                  <th class="px-4 py-3 text-left text-[10px] font-black uppercase tracking-widest">Área</th>
+                  ${headerCells}
+                  <th class="px-4 py-3 text-center text-[10px] font-black uppercase tracking-widest">Promedio</th>
+                </tr>
+              </thead>
+              <tbody class="divide-y divide-slate-50">
+                ${rowsHtml}
+              </tbody>
+              <tfoot>
+                <tr class="bg-gradient-to-r from-indigo-600 to-violet-600 text-white">
+                  <td class="px-4 py-3.5 font-black text-xs uppercase tracking-widest">Promedio General</td>
+                  <td class="px-1.5 py-3.5 text-center text-[10px] font-bold text-white/70 uppercase tracking-wider" colspan="${maxActs}">${overall != null ? overallLvl.label : 'Sin calificar'}</td>
+                  <td class="px-4 py-3.5 text-center">
+                    <span class="inline-flex items-center gap-2">
+                      <span class="text-2xl font-black">${overall != null ? Number(overall).toFixed(1) : '—'}</span>
+                      <span class="text-amber-300 text-sm">★</span>
+                    </span>
+                  </td>
+                </tr>
+              </tfoot>
+            </table>
+          </div>
+        </div>
+
+        <div class="grid grid-cols-2 gap-3 mt-6">
+          <button onclick="App.grades.openBoletin('${studentId}')"
+            class="px-4 py-3 bg-indigo-600 text-white rounded-xl font-black text-xs uppercase tracking-wider shadow-lg shadow-indigo-200 hover:bg-indigo-700 transition-all flex items-center justify-center gap-2">
+            <i data-lucide="file-text" class="w-4 h-4"></i> Ver Boletín
+          </button>
+          <button onclick="App.grades._downloadBoletin('${studentId}')"
+            class="px-4 py-3 bg-emerald-600 text-white rounded-xl font-black text-xs uppercase tracking-wider shadow-lg shadow-emerald-200 hover:bg-emerald-700 transition-all flex items-center justify-center gap-2">
+            <i data-lucide="download" class="w-4 h-4"></i> Descargar PDF
+          </button>
         </div>`;
 
-      content.innerHTML = html;
       if (window.lucide) lucide.createIcons();
     } catch (e) {
-      const content = document.getElementById('studentDetailContent');
-      if (content) content.innerHTML = `<div class="text-center py-8 text-rose-500">Error: ${Helpers.escapeHTML(e?.message || '')}</div>`;
+      content.innerHTML = `
+        <div class="text-center py-10">
+          <div class="w-14 h-14 bg-rose-100 rounded-2xl flex items-center justify-center text-2xl mx-auto mb-3">⚠️</div>
+          <p class="font-bold text-slate-700">Error al cargar calificaciones</p>
+          <p class="text-xs text-slate-400 mt-1">${Helpers.escapeHTML(e?.message || '')}</p>
+        </div>`;
     }
   },
 
@@ -919,7 +1137,7 @@ export const GradesModule = {
       let generated = 0;
       for (const s of this._allStudents) {
         try {
-          const boletin = await fetchBoletin(s.id, this._currentPeriodId);
+          const boletin = await this._getBoletin(s.id);
           if (!boletin?.error) {
             await appendBoletinPage(doc, boletin);
             generated++;
@@ -979,7 +1197,7 @@ export const GradesModule = {
 
     const content = document.getElementById('boletinContent');
     try {
-      const boletin = await fetchBoletin(studentId, this._currentPeriodId);
+      const boletin = await this._getBoletin(studentId);
       if (boletin?.error) throw new Error(boletin.error);
 
       content.innerHTML = `
@@ -1022,7 +1240,7 @@ export const GradesModule = {
   async _downloadBoletin(studentId) {
     try {
       Helpers.toast('Generando PDF...', 'info');
-      const boletin = await fetchBoletin(studentId, this._currentPeriodId);
+      const boletin = await this._getBoletin(studentId);
       if (boletin?.error) throw new Error(boletin.error);
       await downloadBoletinPDF(boletin);
       Helpers.toast('PDF descargado', 'success');

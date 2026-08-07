@@ -1,0 +1,18 @@
+/* ⚠️ IMPORTANTE
+   El archivo css/karpus-tailwind.css ES LA FUENTE DE VERDAD para producción.
+   Se compiló con Tailwind v3 y contiene parches manuales al final.
+
+   NO ejecutes `npm run build:css` en este proyecto: regenere la hoja con
+   Tailwind v4 (instalado en package.json) y CAMBIA el diseño del panel
+   (preflight, colores oklch, botones y bordes se ven distintos).
+
+   Si algún día se migra a Tailwind v4, hay que ajustar todos los HTML/JS
+   y re-validar el diseño completo del panel. */
+
+@import "tailwindcss";
+
+/* Fuentes explícitas para que el build sea determinista:
+   la detección automática de Tailwind v4 a veces omite archivos y
+   el CSS resultante pierde clases del panel. */
+@source "../*.html";
+@source "../js/**/*.js";
