@@ -413,14 +413,14 @@ export const BadgeSystem = {
   _typeToSection(type) {
     const map = {
       // Panel padre
-      task:              'tasks',
+      task:              this._role === 'maestra' ? 't-home' : 'tasks',
       post:              'class',
       muro:              'class',
       comment:           'class',
       like:              'class',
       attendance:        'live-attendance',
       payment:           'payments',
-      grade:             'grades',
+      grade:             this._role === 'maestra' ? 't-grades' : 'grades',
       chat:              'notifications',
       message:           'notifications',
       // Panel maestra
@@ -445,8 +445,9 @@ export const BadgeSystem = {
       'live-attendance': ['attendance'],
       payments:          ['payment', 'receipt', 'alert'],
       grades:            ['grade'],
+      't-grades':        ['grade'],
       notifications:     ['chat', 'message'],
-      't-home':          ['submission', 'task-submission'],
+      't-home':          ['submission', 'task-submission', 'task'],
       't-chat':          ['chat', 'message'],
       reportes:          ['inquiry'],
       pagos:             ['receipt', 'payment', 'alert'],

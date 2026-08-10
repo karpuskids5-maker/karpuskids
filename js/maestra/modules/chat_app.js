@@ -147,7 +147,7 @@ export async function initChat() {
       
       const onClickAction = c.unlinked 
         ? `safeToast('Este padre aún no ha creado su cuenta de acceso', 'warning')`
-        : `App.selectChatContact('${c.id}', '${safeEscapeHTML(displayName)}', '${safeEscapeHTML(label)}')`;
+        : `App.selectChatContact('${c.id}', '${encodeURIComponent(displayName)}', '${encodeURIComponent(label)}')`;
 
       return `
       <div onclick="${onClickAction}"
@@ -200,6 +200,8 @@ export async function initChat() {
 }
 
 export async function selectChatContact(userId, name, meta) {
+  try { name = decodeURIComponent(name || ''); } catch (_) {}
+  try { meta = decodeURIComponent(meta || ''); } catch (_) {}
   activeChatUserId = userId;
   activeConversationId = null;
 

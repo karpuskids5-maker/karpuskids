@@ -29,10 +29,10 @@ window.Modal = Modal;
 const { initAttendance, markAllPresent, registerAttendance } = Attendance;
 const { initRoutine, updateRoutineField, saveRoutineLog, openStudentRoutine, updateRoutineFieldInModal, saveRoutineInModal, openBulkEventModal, confirmBulkEvent, wakeAllSiestas, wakeStudentSiesta, undoLastBulk, publishAll, registerIndividualEvent, toggleTimeline, openExtraEventModal, confirmExtraEvent, registerMissingStudents, insertEventAt, openInsertEventPicker, moveScheduleEvent, cascadeScheduleShift } = Routine;
 const { initTasks, openEditTaskModal, deleteTask, openNewTaskModal, viewTaskSubmissions, submitGrade } = Tasks;
-const { initGradesV2, openNewActivityModal, gradeActivity, saveGradeV2, deleteActivityV2 } = Tasks;
+const { initGradesV2, openNewActivityModal, gradeActivity, saveGradeV2, deleteActivityV2, toggleArea, deleteArea, openStudentGradesList, viewStudentGrades, openAreasManager, openStudentResultGrid, editStudentScore, editTaskScore } = Tasks;
 const { openStudentProfile, registerIncidentModal } = Students;
 const { initChat, selectChatContact } = ChatApp;
-const { initBoletin, openBoletin, downloadBoletin } = Boletin;
+const { openBoletinList, openBoletin, downloadBoletin } = Boletin;
 
 /**
  * 🚀 ARQUITECTURA SENIOR: Definición Global del Objeto App
@@ -50,6 +50,7 @@ window.App = {
   initAttendance: Attendance.initAttendance,
   handleAttendancePointerDown: Attendance.handleAttendancePointerDown,
   handleAttendancePointerUp: Attendance.handleAttendancePointerUp,
+  openDailyReport: Attendance.openDailyReport,
 
   // Routine
   initRoutine: Routine.initRoutine,
@@ -98,9 +99,18 @@ window.App = {
   gradeActivity: Tasks.gradeActivity,
   saveGradeV2: Tasks.saveGradeV2,
   deleteActivityV2: Tasks.deleteActivityV2,
+  toggleArea: Tasks.toggleArea,
+  deleteArea: Tasks.deleteArea,
+  openStudentGradesList: Tasks.openStudentGradesList,
+  viewStudentGrades: Tasks.viewStudentGrades,
+  openAreasManager: Tasks.openAreasManager,
+  openStudentResultGrid: Tasks.openStudentResultGrid,
+  editStudentScore: Tasks.editStudentScore,
+  editTaskScore: Tasks.editTaskScore,
+  refreshPendingGradesBadge: loadPendingGradesBadge,
 
   // Boletines
-  initBoletin: Boletin.initBoletin,
+  openBoletinList: Boletin.openBoletinList,
   openBoletin: Boletin.openBoletin,
   downloadBoletin: Boletin.downloadBoletin,
 
@@ -390,6 +400,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     // Cargar Badges en background
     loadMaestraUnreadBadge(auth.user.id);
     loadPendingTasksBadge(classroom.id);
+    loadPendingGradesBadge();
 
     // 🔴 Sistema de badges por sección
     BadgeSystem.init(auth.user.id);
@@ -461,7 +472,10 @@ function initRealtimeUpdates(classroomId) {
         } else if (eventType === 'DELETE') {
           document.getElementById(`post-${oldPost.id}`)?.remove();
         }
-      });
+      })
+      // Actualizar badge de calificaciones pendientes en tiempo real
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'grades' }, () => loadPendingGradesBadge())
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'activities' }, () => loadPendingGradesBadge());
   });
 }
 
@@ -752,8 +766,7 @@ function initNavigation() {
     if (cleanId === 'attendance') initAttendance();
     if (cleanId === 'daily-routine') initRoutine();
     if (cleanId === 'tasks') initTasks();
-    if (cleanId === 'grades') initGrades();
-    if (cleanId === 'boletin') initBoletin();
+    if (cleanId === 'grades') { initGrades(); loadPendingGradesBadge(); }
     if (cleanId === 'permits') import('./modules/permits.js').then(m => m.PermitsModule.init());
     if (cleanId === 'chat') initChat();
     if (cleanId === 'profile') {
@@ -774,8 +787,9 @@ function initNavigation() {
   window.App.setActiveSection = setActiveSection;
   window.App._setActiveSection = setActiveSection; // Alias interno para el proxy global
 
-  // Restaurar última sección
-  const lastSection = localStorage.getItem('maestra_last_section') || 't-home';
+  // Restaurar última sección (sección "boletines" eliminada → redirigir a calificaciones)
+  const rawLastSection = localStorage.getItem('maestra_last_section') || 't-home';
+  const lastSection = rawLastSection === 't-boletin' ? 't-grades' : rawLastSection;
   const lastClassroom = localStorage.getItem('maestra_last_classroom');
   const lastTab = localStorage.getItem('maestra_last_tab');
 
@@ -1101,12 +1115,22 @@ async function loadMaestraUnreadBadge(userId) {
  */
 async function loadPendingTasksBadge(classroomId) {
   try {
-    const { count } = await supabase
-      .from('task_evidences')
-      .select('id', { count: 'exact', head: true })
-      .eq('status', 'pending');
-      // Podrías filtrar por classroom_id si las tareas tienen ese campo
-    
+    const { data: tasks } = await supabase
+      .from('tasks')
+      .select('id')
+      .eq('classroom_id', classroomId);
+    const taskIds = (tasks || []).map(t => t.id);
+
+    let count = 0;
+    if (taskIds.length) {
+      const res = await supabase
+        .from('task_evidences')
+        .select('id', { count: 'exact', head: true })
+        .eq('status', 'pending')
+        .in('task_id', taskIds);
+      count = res.count || 0;
+    }
+
     const badge = document.getElementById('badge-t-home');
     if (badge) {
       if (count > 0) {
@@ -1115,6 +1139,43 @@ async function loadPendingTasksBadge(classroomId) {
       } else {
         badge.classList.add('hidden');
       }
+    }
+  } catch (_) {}
+}
+
+/**
+ * Cargar insignia de calificaciones pendientes por llenar (badge-t-grades)
+ */
+async function loadPendingGradesBadge() {
+  try {
+    const classroom = AppState.get('classroom');
+    if (!classroom) return;
+    const periodRes = await supabase.rpc('get_active_period', { p_classroom_id: classroom.id });
+    const period = periodRes?.data;
+    if (!period || !period.found) return;
+
+    const [activities, students, config] = await Promise.all([
+      MaestraApi.getActivitiesWithGrades(period.id),
+      MaestraApi.getStudentsByClassroom(classroom.id),
+      MaestraApi.getPeriodConfig(period.id)
+    ]);
+    const tasks = await MaestraApi.getTasksForPeriod(config);
+    const taskScores = await MaestraApi.getTaskScoresForStudents(tasks.map(t => t.id));
+    const actCount = (activities || []).length;
+    const taskCount = (tasks || []).length;
+    const studentCount = (students || []).length;
+    const graded = (activities || []).reduce((s, a) => s + (Number(a.graded_count) || 0), 0) + taskScores.length;
+    const pending = Math.max(0, ((actCount + taskCount) * studentCount) - graded);
+
+    const badge = document.getElementById('badge-t-grades');
+    if (!badge) return;
+    if (pending > 0) {
+      badge.textContent = pending > 99 ? '99+' : String(pending);
+      badge.classList.remove('hidden');
+      badge.classList.add('flex');
+    } else {
+      badge.classList.add('hidden');
+      badge.classList.remove('flex');
     }
   } catch (_) {}
 }

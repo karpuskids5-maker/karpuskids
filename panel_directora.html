@@ -1131,64 +1131,64 @@
       <!-- CALIFICACIONES V2 -->
       <section id="calificaciones" class="section">
         <!-- Header -->
-        <div class="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-8">
+        <div class="flex flex-col md:flex-row md:items-center justify-between gap-3 mb-5">
           <div>
-            <h1 class="text-3xl font-bold text-slate-800 tracking-tight">Centro de Calificaciones</h1>
-            <p class="text-slate-500 font-medium">Actividades evaluables y promedios por materia.</p>
+            <h1 class="text-2xl font-bold text-slate-800 tracking-tight">Centro de Calificaciones</h1>
+            <p class="text-slate-500 font-medium text-sm">Actividades evaluables y promedios por materia.</p>
           </div>
           <div class="flex gap-2 flex-wrap items-center">
             <div class="flex bg-slate-100 rounded-xl p-1 mr-2">
-              <button id="btnGradesConfig" class="px-4 py-2 bg-indigo-600 text-white rounded-xl font-black text-xs uppercase shadow-md transition-all">
+              <button id="btnGradesConfig" class="px-3 py-1.5 bg-indigo-600 text-white rounded-lg font-black text-[10px] uppercase shadow-md transition-all">
                 Configuración
               </button>
-              <button id="btnGradesView" class="px-4 py-2 bg-slate-100 text-slate-500 rounded-xl font-black text-xs uppercase hover:bg-slate-200 transition-all">
+              <button id="btnGradesView" class="px-3 py-1.5 bg-slate-100 text-slate-500 rounded-lg font-black text-[10px] uppercase hover:bg-slate-200 transition-all">
                 Calificaciones
               </button>
             </div>
-            <button id="btnNewPeriod" class="px-5 py-2.5 bg-indigo-600 text-white rounded-xl font-black text-xs uppercase tracking-wider hover:bg-indigo-700 shadow-lg shadow-indigo-200 transition-all flex items-center gap-2 active:scale-95">
+            <button id="btnNewPeriod" class="px-3.5 py-2 bg-indigo-600 text-white rounded-xl font-black text-[10px] uppercase tracking-wider hover:bg-indigo-700 shadow-lg shadow-indigo-200 transition-all flex items-center gap-2 active:scale-95">
               <i data-lucide="calendar-plus" class="w-4 h-4"></i> Nuevo Periodo
             </button>
-            <button id="btnClosePeriod" class="px-5 py-2.5 bg-rose-600 text-white rounded-xl font-black text-xs uppercase tracking-wider hover:bg-rose-700 shadow-lg shadow-rose-200 transition-all items-center gap-2 active:scale-95" style="display:none;">
+            <button id="btnClosePeriod" class="px-3.5 py-2 bg-rose-600 text-white rounded-xl font-black text-[10px] uppercase tracking-wider hover:bg-rose-700 shadow-lg shadow-rose-200 transition-all items-center gap-2 active:scale-95" style="display:none;">
               <i data-lucide="lock" class="w-4 h-4"></i> Cerrar Periodo
             </button>
-            <button id="btnExportGrades" class="px-5 py-2.5 bg-emerald-600 text-white rounded-xl font-black text-xs uppercase tracking-wider hover:bg-emerald-700 shadow-lg shadow-emerald-200 transition-all flex items-center gap-2 active:scale-95">
+            <button id="btnExportGrades" class="px-3.5 py-2 bg-emerald-600 text-white rounded-xl font-black text-[10px] uppercase tracking-wider hover:bg-emerald-700 shadow-lg shadow-emerald-200 transition-all flex items-center gap-2 active:scale-95">
               <i data-lucide="download" class="w-4 h-4"></i> Exportar
             </button>
           </div>
         </div>
 
         <!-- KPIs -->
-        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
-          <div class="bg-blue-50 p-4 rounded-2xl border border-blue-100 shadow-sm">
-            <div class="flex items-center gap-3 mb-2"><div class="p-2 bg-blue-100 rounded-lg text-blue-600"><i data-lucide="book-open" class="w-5 h-5"></i></div><span class="text-xs font-bold text-blue-600 uppercase tracking-wider">Materias Config.</span></div>
-            <p class="text-2xl font-black text-slate-800" id="kpiAvgGrade">0</p>
+        <div class="grid grid-cols-2 lg:grid-cols-4 gap-3 mb-5">
+          <div class="bg-blue-50 p-3 rounded-xl border border-blue-100 shadow-sm">
+            <div class="flex items-center gap-2 mb-1.5"><div class="p-1.5 bg-blue-100 rounded-lg text-blue-600"><i data-lucide="book-open" class="w-4 h-4"></i></div><span class="text-[10px] font-bold text-blue-600 uppercase tracking-wider">Materias Config.</span></div>
+            <p class="text-xl font-black text-slate-800" id="kpiAvgGrade">0</p>
           </div>
-          <div class="bg-green-50 p-4 rounded-2xl border border-green-100 shadow-sm">
-            <div class="flex items-center gap-3 mb-2"><div class="p-2 bg-green-100 rounded-lg text-green-600"><i data-lucide="list-checks" class="w-5 h-5"></i></div><span class="text-xs font-bold text-green-600 uppercase tracking-wider">Actividades</span></div>
-            <p class="text-2xl font-black text-slate-800" id="kpiApprovalRate">0</p>
+          <div class="bg-green-50 p-3 rounded-xl border border-green-100 shadow-sm">
+            <div class="flex items-center gap-2 mb-1.5"><div class="p-1.5 bg-green-100 rounded-lg text-green-600"><i data-lucide="list-checks" class="w-4 h-4"></i></div><span class="text-[10px] font-bold text-green-600 uppercase tracking-wider">Actividades</span></div>
+            <p class="text-xl font-black text-slate-800" id="kpiApprovalRate">0</p>
           </div>
-          <div class="bg-yellow-50 p-4 rounded-2xl border border-yellow-100 shadow-sm">
-            <div class="flex items-center gap-3 mb-2"><div class="p-2 bg-yellow-100 rounded-lg text-yellow-600"><i data-lucide="users" class="w-5 h-5"></i></div><span class="text-xs font-bold text-yellow-600 uppercase tracking-wider">Estudiantes</span></div>
-            <p class="text-2xl font-black text-slate-800" id="kpiNeedsSupport">0</p>
+          <div class="bg-yellow-50 p-3 rounded-xl border border-yellow-100 shadow-sm">
+            <div class="flex items-center gap-2 mb-1.5"><div class="p-1.5 bg-yellow-100 rounded-lg text-yellow-600"><i data-lucide="users" class="w-4 h-4"></i></div><span class="text-[10px] font-bold text-yellow-600 uppercase tracking-wider">Estudiantes</span></div>
+            <p class="text-xl font-black text-slate-800" id="kpiNeedsSupport">0</p>
           </div>
-          <div class="bg-red-50 p-4 rounded-2xl border border-red-100 shadow-sm">
-            <div class="flex items-center gap-3 mb-2"><div class="p-2 bg-red-100 rounded-lg text-red-600"><i data-lucide="target" class="w-5 h-5"></i></div><span class="text-xs font-bold text-red-600 uppercase tracking-wider">Slots Totales</span></div>
-            <p class="text-2xl font-black text-slate-800" id="kpiLowGrades">0</p>
+          <div class="bg-red-50 p-3 rounded-xl border border-red-100 shadow-sm">
+            <div class="flex items-center gap-2 mb-1.5"><div class="p-1.5 bg-red-100 rounded-lg text-red-600"><i data-lucide="target" class="w-4 h-4"></i></div><span class="text-[10px] font-bold text-red-600 uppercase tracking-wider">Slots Totales</span></div>
+            <p class="text-xl font-black text-slate-800" id="kpiLowGrades">0</p>
           </div>
         </div>
 
         <!-- Tabla Principal -->
-        <div class="bg-white rounded-2xl shadow-md border border-slate-100 p-6">
-          <div class="flex flex-col md:flex-row justify-between items-center gap-4 mb-6">
-            <h3 class="text-lg font-bold text-slate-800 flex items-center gap-2 w-full md:w-auto">
+        <div class="bg-white rounded-2xl shadow-md border border-slate-100 p-4">
+          <div class="flex flex-col md:flex-row justify-between items-center gap-3 mb-4">
+            <h3 class="text-base font-bold text-slate-800 flex items-center gap-2 w-full md:w-auto">
               <span class="w-2 h-6 bg-blue-600 rounded-full"></span>
               Configuración del Periodo
             </h3>
-            <div class="flex flex-wrap gap-3 w-full md:w-auto">
+            <div class="flex flex-wrap gap-2 w-full md:w-auto">
               <select id="gradesFilterPeriod" class="px-3 py-2 border rounded-xl text-sm bg-slate-50 font-bold text-slate-700 outline-none focus:ring-2 focus:ring-indigo-400">
                 <option value="">Seleccionar periodo</option>
               </select>
-              <div class="relative flex-1 md:w-56">
+              <div class="relative flex-1 md:w-52">
                 <i data-lucide="search" class="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400"></i>
                 <input id="searchGradeStudent" placeholder="Buscar estudiante..." class="pl-10 pr-4 py-2 border rounded-xl text-sm w-full bg-slate-50 focus:bg-white transition-all outline-none focus:ring-2 focus:ring-indigo-400">
               </div>
@@ -1214,7 +1214,7 @@
               </tbody>
             </table>
           </div>
-          <p class="text-[10px] text-slate-400 mt-4 italic">💡 Haz clic sobre un estudiante para ver su boletín de calificaciones. Configura las áreas y la cantidad de actividades por período en la pestaña <strong>Configuración</strong>.</p>
+          <p class="text-[10px] text-slate-400 mt-3 italic">💡 Haz clic sobre un estudiante para ver su boletín de calificaciones. Configura las áreas y la cantidad de actividades por período en la pestaña <strong>Configuración</strong>.</p>
         </div>
       </section>
 

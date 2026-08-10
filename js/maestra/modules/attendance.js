@@ -15,7 +15,7 @@ OfflineQueue.startAutoSync(({ synced }) => {
 /**
  * 📅 Asistencia — carga el panel y las solicitudes de ausencia pendientes
  */
-export async function initAttendance() {
+export async function initAttendance(options = {}) {
   const classroom = AppState.get('classroom');
   const students = AppState.get('students') || []; // Usamos estudiantes ya cargados
   const today = new Date().toISOString().split('T')[0];
@@ -24,19 +24,21 @@ export async function initAttendance() {
   
   if (!listContainer) return;
 
-  // Feedback visual inmediato
-  listContainer.innerHTML = `
-    <div class="hidden md:block bg-white rounded-[2.5rem] border border-slate-100 shadow-sm overflow-hidden mb-20">
-      <table class="w-full">
-        <tbody class="divide-y divide-slate-50">
-          ${UI.Skeleton.render('tableRow', 6)}
-        </tbody>
-      </table>
-    </div>
-    <div class="md:hidden grid grid-cols-2 gap-3 mb-20">
-      ${UI.Skeleton.render('card', 4)}
-    </div>
-  `;
+  // Feedback visual inmediato (omitido en refrescos silenciosos)
+  if (!options.silent) {
+    listContainer.innerHTML = `
+      <div class="hidden md:block bg-white rounded-[2.5rem] border border-slate-100 shadow-sm overflow-hidden mb-20">
+        <table class="w-full">
+          <tbody class="divide-y divide-slate-50">
+            ${UI.Skeleton.render('tableRow', 6)}
+          </tbody>
+        </table>
+      </div>
+      <div class="md:hidden grid grid-cols-2 gap-3 mb-20">
+        ${UI.Skeleton.render('card', 4)}
+      </div>
+    `;
+  }
 
   try {
     // 1. Cargar solicitudes y asistencia en paralelo
@@ -96,13 +98,13 @@ export async function initAttendance() {
                     </td>
                     <td class="px-6 py-4 text-right">
                       <div class="flex justify-end gap-2">
-                        <button onclick="App.registerAttendance('${s.id}', 'present')" class="w-9 h-9 rounded-xl flex items-center justify-center transition-all ${currentStatus === 'present' ? 'bg-emerald-500 text-white shadow-lg' : 'bg-emerald-50 text-emerald-600 hover:bg-emerald-100'}" title="Presente">
+                        <button id="btn-${s.id}-present" onclick="App.registerAttendance('${s.id}', 'present')" class="w-9 h-9 rounded-xl flex items-center justify-center transition-all ${currentStatus === 'present' ? 'bg-emerald-500 text-white shadow-lg' : 'bg-emerald-50 text-emerald-600 hover:bg-emerald-100'}" title="Presente">
                           <i data-lucide="check" class="w-4 h-4"></i>
                         </button>
-                        <button onclick="App.registerAttendance('${s.id}', 'late')" class="w-9 h-9 rounded-xl flex items-center justify-center transition-all ${currentStatus === 'late' ? 'bg-amber-500 text-white shadow-lg' : 'bg-amber-50 text-amber-600 hover:bg-amber-100'}" title="Tardanza">
+                        <button id="btn-${s.id}-late" onclick="App.registerAttendance('${s.id}', 'late')" class="w-9 h-9 rounded-xl flex items-center justify-center transition-all ${currentStatus === 'late' ? 'bg-amber-500 text-white shadow-lg' : 'bg-amber-50 text-amber-600 hover:bg-amber-100'}" title="Tardanza">
                           <i data-lucide="clock" class="w-4 h-4"></i>
                         </button>
-                        <button onclick="App.registerAttendance('${s.id}', 'absent')" class="w-9 h-9 rounded-xl flex items-center justify-center transition-all ${currentStatus === 'absent' ? 'bg-rose-500 text-white shadow-lg' : 'bg-rose-50 text-rose-600 hover:bg-rose-100'}" title="Falta">
+                        <button id="btn-${s.id}-absent" onclick="App.registerAttendance('${s.id}', 'absent')" class="w-9 h-9 rounded-xl flex items-center justify-center transition-all ${currentStatus === 'absent' ? 'bg-rose-500 text-white shadow-lg' : 'bg-rose-50 text-rose-600 hover:bg-rose-100'}" title="Falta">
                           <i data-lucide="user-x" class="w-4 h-4"></i>
                         </button>
                       </div>
@@ -329,6 +331,7 @@ export async function registerAttendance(studentId, status) {
     }
     
     safeToast(isMarkingPresent && wasLate ? 'Presencia confirmada' : `Asistencia: ${statusLiteral}`);
+    await initAttendance({ silent: true });
   } catch (e) {
     // Revertir UI si falla
     prevStates.forEach(s => {
@@ -421,5 +424,106 @@ async function _loadAbsenceRequests(classroomId, students) {
 
     if (window.lucide) window.lucide.createIcons();
   } catch (e) {
+  }
+}
+
+/**
+ * 📋 Reporte del día — resumen de asistencia en modal
+ */
+export async function openDailyReport() {
+  const modalId = 'dailyReportModal';
+  const classroom = AppState.get('classroom');
+  const students = AppState.get('students') || [];
+  const today = new Date().toISOString().split('T')[0];
+
+  Modal.open(modalId, `
+    <div class="bg-white w-full max-w-2xl rounded-[2.5rem] shadow-2xl p-8 animate-fadeIn flex flex-col max-h-[90vh]">
+      <div class="flex justify-between items-start mb-6">
+        <div class="min-w-0">
+          <h3 class="text-2xl font-black text-slate-800 flex items-center gap-2"><i data-lucide="clipboard-list" class="w-6 h-6 text-orange-500"></i> Reporte del Día</h3>
+          <p class="text-xs font-bold text-slate-400 mt-1 truncate">${safeEscapeHTML(classroom?.name || 'Aula')} — ${new Date(today + 'T12:00:00').toLocaleDateString('es-DO', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })}</p>
+        </div>
+        <button onclick="Modal.close('${modalId}')" class="p-2 hover:bg-slate-100 rounded-full transition-colors shrink-0"><i data-lucide="x" class="w-6 h-6 text-slate-400"></i></button>
+      </div>
+      <div data-report-body class="flex-1 overflow-y-auto pr-1 space-y-4">
+        <div class="grid grid-cols-4 gap-2 animate-pulse">
+          <div class="h-16 bg-slate-50 rounded-2xl"></div>
+          <div class="h-16 bg-slate-50 rounded-2xl"></div>
+          <div class="h-16 bg-slate-50 rounded-2xl"></div>
+          <div class="h-16 bg-slate-50 rounded-2xl"></div>
+        </div>
+        <div class="space-y-2 animate-pulse">
+          <div class="h-12 bg-slate-50 rounded-2xl"></div>
+          <div class="h-12 bg-slate-50 rounded-2xl"></div>
+          <div class="h-12 bg-slate-50 rounded-2xl"></div>
+        </div>
+      </div>
+    </div>
+  `);
+
+  try {
+    const attendance = await MaestraApi.getAttendance(classroom.id, today);
+    const attMap = {};
+    (attendance || []).forEach(a => attMap[a.student_id] = a.status);
+
+    const counts = { present: 0, late: 0, absent: 0, unmarked: 0 };
+    students.forEach(s => {
+      const st = attMap[s.id];
+      if (st === 'present') counts.present++;
+      else if (st === 'late') counts.late++;
+      else if (st === 'absent') counts.absent++;
+      else counts.unmarked++;
+    });
+
+    const statusMap = {
+      'present': { l: 'Presente', c: 'bg-emerald-100 text-emerald-700', i: 'check' },
+      'late':    { l: 'Tardanza', c: 'bg-amber-100 text-amber-700',   i: 'clock' },
+      'absent':  { l: 'Ausente',  c: 'bg-rose-100 text-rose-700',     i: 'x' }
+    };
+
+    const rowsHtml = students.map(s => {
+      const st = statusMap[attMap[s.id]] || { l: 'Sin marcar', c: 'bg-slate-100 text-slate-400', i: 'minus' };
+      return `
+        <div class="flex items-center justify-between gap-3 p-3 bg-slate-50 rounded-2xl border border-slate-100">
+          <div class="flex items-center gap-3 min-w-0">
+            <div class="w-9 h-9 rounded-xl bg-orange-50 text-orange-600 flex items-center justify-center font-black text-sm overflow-hidden shrink-0">
+              ${s.avatar_url ? `<img src="${s.avatar_url}" class="w-full h-full object-cover">` : safeEscapeHTML((s.name || '?').charAt(0))}
+            </div>
+            <div class="min-w-0">
+              <p class="font-black text-slate-800 text-sm truncate">${safeEscapeHTML(s.name)}</p>
+              <p class="text-[10px] text-slate-400 font-bold uppercase tracking-widest">${safeEscapeHTML(s.matricula || '')}</p>
+            </div>
+          </div>
+          <span class="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[10px] font-black uppercase shrink-0 ${st.c}"><i data-lucide="${st.i}" class="w-3 h-3"></i> ${st.l}</span>
+        </div>`;
+    }).join('');
+
+    const inner = document.getElementById(`${modalId}-inner`);
+    const body = inner?.querySelector('[data-report-body]');
+    if (body) {
+      body.innerHTML = `
+        <div class="grid grid-cols-2 sm:grid-cols-4 gap-2">
+          <div class="p-3 bg-emerald-50 rounded-2xl text-center">
+            <p class="text-2xl font-black text-emerald-600">${counts.present}</p>
+            <p class="text-[9px] font-black text-emerald-600 uppercase tracking-widest">Presentes</p>
+          </div>
+          <div class="p-3 bg-amber-50 rounded-2xl text-center">
+            <p class="text-2xl font-black text-amber-600">${counts.late}</p>
+            <p class="text-[9px] font-black text-amber-600 uppercase tracking-widest">Tardanzas</p>
+          </div>
+          <div class="p-3 bg-rose-50 rounded-2xl text-center">
+            <p class="text-2xl font-black text-rose-600">${counts.absent}</p>
+            <p class="text-[9px] font-black text-rose-600 uppercase tracking-widest">Ausentes</p>
+          </div>
+          <div class="p-3 bg-slate-100 rounded-2xl text-center">
+            <p class="text-2xl font-black text-slate-500">${counts.unmarked}</p>
+            <p class="text-[9px] font-black text-slate-500 uppercase tracking-widest">Sin marcar</p>
+          </div>
+        </div>
+        <div class="space-y-2">${rowsHtml}</div>`;
+      if (window.lucide) window.lucide.createIcons();
+    }
+  } catch (e) {
+    safeToast('Error al generar el reporte: ' + (e.message || ''), 'error');
   }
 }

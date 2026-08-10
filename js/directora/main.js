@@ -25,6 +25,7 @@ window.App = {
     openModal: (id) => import('./students.module.js').then(m => m.StudentsModule.openModal(id)),
     loadStudents: () => import('./students.module.js').then(m => m.StudentsModule.loadStudents()),
     filter: (v) => import('./students.module.js').then(m => m.StudentsModule.filter?.(v)),
+    delete: (id) => import('./students.module.js').then(m => m.StudentsModule.delete(id)),
   },
   inscripciones: {
     init: () => import('./inscripciones.module.js').then(m => m.InscripcionesModule.init()),
@@ -33,16 +34,22 @@ window.App = {
   },
   teachers: {
     openModal: (id) => import('./teachers.module.js').then(m => m.TeachersModule.openModal(id)),
-    deleteTeacher: (id, n) => import('./teachers.module.js').then(m => m.TeachersModule.deleteTeacher(id, n)),
+    delete: (id) => import('./teachers.module.js').then(m => m.TeachersModule.delete(id)),
+    save: () => import('./teachers.module.js').then(m => m.TeachersModule.save()),
   },
   rooms: {
     openModal: (id) => import('./rooms.module.js').then(m => m.RoomsModule.openModal(id)),
-    loadRooms: () => import('./rooms.module.js').then(m => m.RoomsModule.loadRooms()),
+    deleteRoom: (roomId, roomName) => import('./rooms.module.js').then(m => m.RoomsModule.deleteRoom(roomId, roomName)),
+    save: () => import('./rooms.module.js').then(m => m.RoomsModule.save()),
+    assignStudent: (studentId) => import('./rooms.module.js').then(m => m.RoomsModule.assignStudent(studentId)),
   },
   payments: {
     init: () => import('./payments_clean.js').then(m => m.PaymentsModule.init()),
     markPaid: (id) => import('./payments_clean.js').then(m => m.PaymentsModule.markPaid(id)),
     filter: (v) => import('./payments_clean.js').then(m => m.PaymentsModule.filterBy?.(v)),
+    filterBy: (v) => import('./payments_clean.js').then(m => m.PaymentsModule.filterBy?.(v)),
+    delete: (id) => import('./payments_clean.js').then(m => m.PaymentsModule.delete(id)),
+    waiveMora: (id) => import('./payments_clean.js').then(m => m.PaymentsModule.waiveMora(id)),
   },
   attendance: {
     init: () => import('./attendance.module.js').then(m => m.AttendanceModule.init()),
@@ -51,10 +58,13 @@ window.App = {
   ui: { ...UIHelpers, ...DirectorUI },
   inquiries: {
     init: () => import('./inquiries.module.js').then(m => m.InquiriesModule.init()),
+    reply: (id) => import('./inquiries.module.js').then(m => m.InquiriesModule.reply(id)),
   },
   permits: {
     init: () => import('./permits.module.js').then(m => m.PermitsModule.init()),
     loadHistory: () => import('./permits.module.js').then(m => m.PermitsModule.loadHistory?.()),
+    updateStatus: (id, newStatus) => import('./permits.module.js').then(m => m.PermitsModule.updateStatus(id, newStatus)),
+    viewDetails: (id) => import('./permits.module.js').then(m => m.PermitsModule.viewDetails(id)),
   },
   chat: {
     init: () => import('./chat.module.js').then(m => m.ChatModule.init()),
@@ -75,7 +85,18 @@ window.App = {
   schoolYear: SchoolYearModule,
 };
 
-window.WallModule = null;
+window.WallModule = {
+  init: (...a) => import('./wall.module.js').then(m => m.WallModule.init(...a)),
+  loadPosts: (...a) => import('./wall.module.js').then(m => m.WallModule.loadPosts(...a)),
+  destroy: (...a) => import('./wall.module.js').then(m => m.WallModule.destroy(...a)),
+  toggleCommentSection: (...a) => import('./wall.module.js').then(m => m.WallModule.toggleCommentSection(...a)),
+  sendComment: (...a) => import('./wall.module.js').then(m => m.WallModule.sendComment(...a)),
+  deletePost: (...a) => import('./wall.module.js').then(m => m.WallModule.deletePost(...a)),
+  toggleLike: (...a) => import('./wall.module.js').then(m => m.WallModule.toggleLike(...a)),
+  openNewPostModal: (...a) => import('./wall.module.js').then(m => m.WallModule.openNewPostModal(...a)),
+  submitNewPost: (...a) => import('./wall.module.js').then(m => m.WallModule.submitNewPost(...a)),
+  loadClassroomsForPost: (...a) => import('./wall.module.js').then(m => m.WallModule.loadClassroomsForPost(...a)),
+};
 
 window.openGlobalModal = function(html, wide = false) {
   const container = document.getElementById('globalModalContainer');

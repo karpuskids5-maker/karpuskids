@@ -30,7 +30,7 @@ export function openStudentProfile(studentId) {
       </div>
       
       <div class="space-y-6 overflow-y-auto pr-2">
-        <!-- SECCIÃƒâ€œN QR CORPORATIVO -->
+        <!-- SECCIÓN QR CORPORATIVO -->
         <div class="bg-gradient-to-br from-orange-50 to-amber-50 p-6 rounded-[2rem] border-2 border-orange-100 space-y-4">
           <h4 class="text-sm font-black text-orange-800 flex items-center gap-2">
             <div class="w-8 h-8 rounded-xl bg-orange-100 text-orange-600 flex items-center justify-center"><i data-lucide="qr-code" class="w-4 h-4"></i></div>
@@ -38,11 +38,11 @@ export function openStudentProfile(studentId) {
           </h4>
           <div class="flex flex-col sm:flex-row items-center gap-6 bg-white p-6 rounded-3xl border border-orange-100 shadow-sm">
             <div id="student-qr-container" class="bg-white p-2 rounded-2xl border-2 border-slate-50 shadow-inner">
-               <!-- El QR se genera aquÃƒ­ -->
+               <!-- El QR se genera aquí -->
             </div>
             <div class="flex-1 space-y-3 w-full">
               <div class="bg-slate-50 p-3 rounded-xl">
-                <p class="text-[10px] font-black text-slate-400 uppercase tracking-widest">MatrÃƒ­cula</p>
+                <p class="text-[10px] font-black text-slate-400 uppercase tracking-widest">Matrícula</p>
                 <p class="text-sm font-black text-slate-700">${student.matricula || 'PENDIENTE'}</p>
               </div>
               <button onclick="window._printStudentQRMaestra('${student.id}')" class="w-full py-3 bg-slate-900 text-white rounded-xl font-black text-[10px] uppercase tracking-widest hover:bg-black transition-all flex items-center justify-center gap-2">
@@ -65,7 +65,7 @@ export function openStudentProfile(studentId) {
           <h4 class="font-bold text-sm text-slate-400 uppercase tracking-wider mb-4">Contacto Principal (Tutor 1)</h4>
           <div class="grid grid-cols-2 gap-4 text-sm">
             <div class="flex flex-col"><span class="font-bold text-slate-400 text-xs">Nombre</span> <span class="text-slate-700 font-medium">${safeEscapeHTML(student.p1_name || 'N/A')}</span></div>
-            <div class="flex flex-col"><span class="font-bold text-slate-400 text-xs">TelÃƒ©fono</span> <span class="text-slate-700 font-medium">${safeEscapeHTML(student.p1_phone || 'N/A')}</span></div>
+            <div class="flex flex-col"><span class="font-bold text-slate-400 text-xs">Teléfono</span> <span class="text-slate-700 font-medium">${safeEscapeHTML(student.p1_phone || 'N/A')}</span></div>
             <div class="flex flex-col col-span-2"><span class="font-bold text-slate-400 text-xs">Email</span> <span class="text-slate-700 font-medium">${safeEscapeHTML(student.p1_email || 'N/A')}</span></div>
           </div>
         </div>
@@ -75,7 +75,7 @@ export function openStudentProfile(studentId) {
           <h4 class="font-bold text-sm text-slate-400 uppercase tracking-wider mb-4">Contacto Secundario (Tutor 2)</h4>
           <div class="grid grid-cols-2 gap-4 text-sm">
             <div class="flex flex-col"><span class="font-bold text-slate-400 text-xs">Nombre</span> <span class="text-slate-700 font-medium">${safeEscapeHTML(student.p2_name || 'N/A')}</span></div>
-            <div class="flex flex-col"><span class="font-bold text-slate-400 text-xs">TelÃƒ©fono</span> <span class="text-slate-700 font-medium">${safeEscapeHTML(student.p2_phone || 'N/A')}</span></div>
+            <div class="flex flex-col"><span class="font-bold text-slate-400 text-xs">Teléfono</span> <span class="text-slate-700 font-medium">${safeEscapeHTML(student.p2_phone || 'N/A')}</span></div>
           </div>
         </div>` : ''}
       </div>
@@ -135,7 +135,7 @@ export function registerIncidentModal(studentId) {
     <div class="bg-white w-full max-w-lg rounded-[2.5rem] shadow-2xl p-8 animate-fadeIn flex flex-col">
       <div class="flex justify-between items-start mb-6">
         <h3 class="text-2xl font-black text-slate-800 flex items-center gap-3">
-          <span class="text-rose-500">Ã¢Å¡ Ã¯¸</span>
+          <span class="text-rose-500">⚠️</span>
           <span>Reportar Incidente</span>
         </h3>
         <button onclick="Modal.close('${modalId}')" class="p-2 hover:bg-slate-100 rounded-full transition-colors">
@@ -156,7 +156,7 @@ export function registerIncidentModal(studentId) {
         </div>
 
         <div>
-          <label class="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1">DescripciÃƒ³n del incidente</label>
+          <label class="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1">Descripción del incidente</label>
           <textarea id="incDesc" rows="4" class="w-full p-3 bg-slate-50 border-none rounded-xl text-sm focus:ring-2 focus:ring-rose-400 outline-none resize-none" placeholder="Detalla lo sucedido de forma clara y objetiva..." required></textarea>
         </div>
 
@@ -195,7 +195,7 @@ export function registerIncidentModal(studentId) {
       if (student.parent_id) {
         sendPush({
           user_id: student.parent_id,
-          title: 'Aviso de Incidente Ã¢Å¡ Ã¯¸',
+          title: 'Aviso de Incidente ⚠️',
           message: `Se ha registrado un reporte de conducta sobre ${student.name}.`,
           link: 'panel_padres.html#incidents'
         }).catch(() => {});

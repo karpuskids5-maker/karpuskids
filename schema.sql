@@ -274,9 +274,12 @@ CREATE TABLE IF NOT EXISTS public.task_evidences (
   status       text DEFAULT 'submitted',
   grade_letter text CHECK (grade_letter IN ('A','B','C','D')),
   stars        integer CHECK (stars >= 1 AND stars <= 5),
+  score_v2     numeric(5,2) CHECK (score_v2 >= 0 AND score_v2 <= 100),
   created_at   timestamp with time zone DEFAULT now() NOT NULL,
   UNIQUE(task_id, student_id)
 );
+
+ALTER TABLE public.task_evidences ADD COLUMN IF NOT EXISTS score_v2 numeric(5,2) CHECK (score_v2 >= 0 AND score_v2 <= 100);
 
 -- 4.11 POSTS
 CREATE TABLE IF NOT EXISTS public.posts (
@@ -449,6 +452,8 @@ CREATE TABLE IF NOT EXISTS public.grades (
   notes         text,
   created_at    timestamp with time zone DEFAULT now() NOT NULL
 );
+
+ALTER TABLE public.grades ADD COLUMN IF NOT EXISTS score_v2 numeric(5,2) CHECK (score_v2 >= 0 AND score_v2 <= 100);
 
 -- 4.19 SUBJECTS
 CREATE TABLE IF NOT EXISTS public.subjects (
@@ -965,6 +970,7 @@ CREATE INDEX IF NOT EXISTS idx_tasks_school_year         ON public.tasks (school
 CREATE INDEX IF NOT EXISTS idx_task_evidences_task_id    ON public.task_evidences (task_id);
 CREATE INDEX IF NOT EXISTS idx_task_evidences_student_id ON public.task_evidences (student_id);
 CREATE INDEX IF NOT EXISTS idx_task_evidences_task_status ON public.task_evidences (task_id, status);
+CREATE INDEX IF NOT EXISTS idx_task_evidences_score ON public.task_evidences (task_id, student_id) WHERE score_v2 IS NOT NULL;
 
 -- Grades
 CREATE INDEX IF NOT EXISTS idx_grades_period             ON public.grades (period_id, student_id);
@@ -2691,6 +2697,49 @@ END;
 $$;
 GRANT EXECUTE ON FUNCTION public.get_first_academic_period(bigint) TO authenticated;
 
+-- ── resolve_period_id — acepta id de academic_periods O legacy periods ─
+-- period_config, activities, grades y report_cards usan FK a legacy "periods",
+-- mientras el School Engine usa academic_periods. Este helper acepta
+-- CUALQUIER id y devuelve el id legacy (creándolo si falta), de modo que
+-- todas las funciones de calificaciones funcionen con ambos sistemas.
+-- NOTA: se revisa academic_periods PRIMERO para que una colisión de ids
+-- (misma identidad en ambas tablas) no devuelva un período legacy equivocado.
+CREATE OR REPLACE FUNCTION public.resolve_period_id(p_period_id bigint)
+RETURNS bigint LANGUAGE plpgsql SECURITY DEFINER SET search_path = public AS $$
+DECLARE
+  v_legacy bigint;
+  v_ap     record;
+BEGIN
+  -- Si el id pertenece a academic_periods, mapear SIEMPRE por nombre + fechas
+  SELECT * INTO v_ap FROM public.academic_periods WHERE id = p_period_id;
+  IF FOUND THEN
+    SELECT p.id INTO v_legacy
+    FROM public.periods p
+    WHERE p.name = v_ap.name
+      AND p.start_date = v_ap.start_date
+      AND p.end_date = v_ap.end_date
+    ORDER BY p.id
+    LIMIT 1;
+
+    IF v_legacy IS NULL THEN
+      INSERT INTO public.periods (name, start_date, end_date, status, is_active)
+      VALUES (
+        v_ap.name, v_ap.start_date, v_ap.end_date,
+        CASE WHEN v_ap.status IN ('open','closed') THEN v_ap.status ELSE 'open' END,
+        v_ap.is_active
+      )
+      RETURNING id INTO v_legacy;
+    END IF;
+
+    RETURN v_legacy;
+  END IF;
+
+  -- No es academic_period: devolver el id tal cual (legacy periods)
+  RETURN p_period_id;
+END;
+$$;
+GRANT EXECUTE ON FUNCTION public.resolve_period_id(bigint) TO authenticated;
+
 -- ── Grados / reportes ────────────────────────────────────────
 CREATE OR REPLACE FUNCTION public.get_activities_with_grades(p_period_id bigint)
 RETURNS jsonb LANGUAGE sql SECURITY DEFINER SET search_path = public AS $$
@@ -2723,7 +2772,7 @@ RETURNS jsonb LANGUAGE sql SECURITY DEFINER SET search_path = public AS $$
     FROM public.grades g
     WHERE g.activity_id = a.id
   ) g ON true
-  WHERE pc.period_id = p_period_id;
+  WHERE pc.period_id = public.resolve_period_id(p_period_id);
 $$;
 GRANT EXECUTE ON FUNCTION public.get_activities_with_grades(bigint) TO authenticated;
 
@@ -3198,9 +3247,12 @@ $$;
 GRANT EXECUTE ON FUNCTION public.get_current_period() TO authenticated;
 
 -- get_active_period — busca en academic_periods primero, fallback a legacy periods
+-- Devuelve SIEMPRE el id de legacy "periods" (donde viven period_config/activities/
+-- grades/report_cards), igual que get_grade_periods, para que maestra, directora y
+-- padres usen exactamente el mismo id que la configuración de materias.
 CREATE OR REPLACE FUNCTION public.get_active_period(p_classroom_id bigint DEFAULT NULL)
 RETURNS jsonb LANGUAGE plpgsql SECURITY DEFINER STABLE SET search_path = public AS $$
-DECLARE v_ap record; v_p record;
+DECLARE v_ap record; v_p record; v_legacy bigint;
 BEGIN
   SELECT ap.*, sy.name AS school_year_name INTO v_ap
   FROM public.academic_periods ap
@@ -3209,8 +3261,10 @@ BEGIN
     AND sy.status IN ('active','enrollment','reenrollment')
   ORDER BY ap.order_index LIMIT 1;
   IF FOUND THEN
-    RETURN jsonb_build_object('found',true,'id',v_ap.id,'name',v_ap.name,'start_date',v_ap.start_date,
-      'end_date',v_ap.end_date,'status',v_ap.status,'is_active',v_ap.is_active,
+    v_legacy := public.resolve_period_id(v_ap.id);
+    RETURN jsonb_build_object('found',true,'id',v_legacy,'academic_period_id',v_ap.id,
+      'name',v_ap.name,'start_date',v_ap.start_date,'end_date',v_ap.end_date,
+      'status',v_ap.status,'is_active',v_ap.is_active,
       'school_year_id',v_ap.school_year_id,'school_year_name',v_ap.school_year_name,
       'order_index',v_ap.order_index,'source','academic_periods');
   END IF;
@@ -3284,7 +3338,7 @@ BEGIN
     UPDATE public.periods SET status='closed', is_active=false WHERE id = p_period_id;
   END IF;
 
-  -- Calcular calificaciones por materia V2
+  -- Calcular calificaciones por materia V2 (actividades + tareas con área)
   FOR v_student IN
     SELECT s.id AS student_id, s.classroom_id
     FROM public.students s
@@ -3296,19 +3350,31 @@ BEGIN
       FROM public.period_config pc JOIN public.subjects s ON s.id = pc.subject_id
       WHERE pc.period_id = p_period_id
     LOOP
-      SELECT COUNT(*)::text INTO v_method
-      FROM public.grades g JOIN public.activities a ON a.id = g.activity_id
-      WHERE a.config_id = v_config.config_id AND g.student_id = v_student.student_id AND g.score_v2 IS NOT NULL;
+      SELECT (COALESCE(a_cnt,0) + COALESCE(t_cnt,0))::text INTO v_method
+      FROM (
+        SELECT COUNT(*) AS a_cnt FROM public.grades g JOIN public.activities a ON a.id = g.activity_id
+        WHERE a.config_id = v_config.config_id AND g.student_id = v_student.student_id AND g.score_v2 IS NOT NULL
+      ) a, (
+        SELECT COUNT(*) AS t_cnt FROM public.task_evidences te JOIN public.tasks t ON t.id = te.task_id
+        WHERE t.config_id = v_config.config_id AND te.student_id = v_student.student_id AND te.score_v2 IS NOT NULL
+      ) b;
       IF v_method::int >= 5 THEN v_method := 'best_5'; ELSE v_method := 'all'; END IF;
       IF v_method = 'best_5' THEN
-        SELECT ROUND(AVG(score_v2),2) INTO v_subject_avg FROM (
-          SELECT g.score_v2 FROM public.grades g JOIN public.activities a ON a.id = g.activity_id
+        SELECT ROUND(AVG(sv),2) INTO v_subject_avg FROM (
+          SELECT g.score_v2 AS sv FROM public.grades g JOIN public.activities a ON a.id = g.activity_id
           WHERE a.config_id = v_config.config_id AND g.student_id = v_student.student_id AND g.score_v2 IS NOT NULL
-          ORDER BY g.score_v2 DESC LIMIT 5) best;
+          UNION ALL
+          SELECT te.score_v2 AS sv FROM public.task_evidences te JOIN public.tasks t ON t.id = te.task_id
+          WHERE t.config_id = v_config.config_id AND te.student_id = v_student.student_id AND te.score_v2 IS NOT NULL
+          ORDER BY sv DESC LIMIT 5) best;
       ELSE
-        SELECT ROUND(AVG(g.score_v2),2) INTO v_subject_avg FROM public.grades g
-        JOIN public.activities a ON a.id = g.activity_id
-        WHERE a.config_id = v_config.config_id AND g.student_id = v_student.student_id AND g.score_v2 IS NOT NULL;
+        SELECT ROUND(AVG(sv),2) INTO v_subject_avg FROM (
+          SELECT g.score_v2 AS sv FROM public.grades g JOIN public.activities a ON a.id = g.activity_id
+          WHERE a.config_id = v_config.config_id AND g.student_id = v_student.student_id AND g.score_v2 IS NOT NULL
+          UNION ALL
+          SELECT te.score_v2 AS sv FROM public.task_evidences te JOIN public.tasks t ON t.id = te.task_id
+          WHERE t.config_id = v_config.config_id AND te.student_id = v_student.student_id AND te.score_v2 IS NOT NULL
+        ) allscores;
       END IF;
       IF v_subject_avg IS NOT NULL THEN
         INSERT INTO public.subject_averages (student_id, period_id, subject_id, average, graded_count, method)
@@ -3514,27 +3580,109 @@ CREATE OR REPLACE FUNCTION public.get_period_config(p_period_id bigint)
 RETURNS jsonb LANGUAGE sql SECURITY DEFINER SET search_path = public AS $$
   SELECT COALESCE(jsonb_agg(jsonb_build_object('id',pc.id,'subject_id',pc.subject_id,'subject_name',s.name,
     'education_level',s.education_level,'activity_count',pc.activity_count) ORDER BY s.name),'[]')
-  FROM public.period_config pc JOIN public.subjects s ON s.id = pc.subject_id WHERE pc.period_id = p_period_id;
+  FROM public.period_config pc JOIN public.subjects s ON s.id = pc.subject_id WHERE pc.period_id = public.resolve_period_id(p_period_id);
 $$;
 GRANT EXECUTE ON FUNCTION public.get_period_config(bigint) TO authenticated;
 
 CREATE OR REPLACE FUNCTION public.get_student_grades_v2(p_student_id bigint, p_period_id bigint)
 RETURNS jsonb LANGUAGE sql SECURITY DEFINER SET search_path = public AS $$
-  SELECT COALESCE(jsonb_agg(jsonb_build_object('activity_id',g.activity_id,'score',g.score_v2,
-    'subject_name',s.name,'activity_title',a.title,'activity_number',a.activity_number,'comment',g.notes)
-    ORDER BY s.name, a.activity_number),'[]')
-  FROM public.grades g JOIN public.activities a ON a.id = g.activity_id
-  JOIN public.period_config pc ON pc.id = a.config_id JOIN public.subjects s ON s.id = pc.subject_id
-  WHERE g.student_id = p_student_id AND pc.period_id = p_period_id AND g.score_v2 IS NOT NULL;
+  SELECT COALESCE(jsonb_agg(row ORDER BY subject_name, activity_number),'[]')
+  FROM (
+    SELECT g.activity_id, g.score_v2 AS score, s.name AS subject_name, a.title AS activity_title,
+           a.activity_number, g.notes AS comment, false AS is_task
+    FROM public.grades g JOIN public.activities a ON a.id = g.activity_id
+    JOIN public.period_config pc ON pc.id = a.config_id JOIN public.subjects s ON s.id = pc.subject_id
+    WHERE g.student_id = p_student_id AND pc.period_id = public.resolve_period_id(p_period_id) AND g.score_v2 IS NOT NULL
+    UNION ALL
+    SELECT NULL::bigint AS activity_id, te.score_v2 AS score, s.name AS subject_name, t.title AS activity_title,
+           999::int AS activity_number, te.comment AS comment, true AS is_task
+    FROM public.task_evidences te JOIN public.tasks t ON t.id = te.task_id
+    JOIN public.period_config pc ON pc.id = t.config_id JOIN public.subjects s ON s.id = pc.subject_id
+    WHERE te.student_id = p_student_id AND pc.period_id = public.resolve_period_id(p_period_id) AND te.score_v2 IS NOT NULL
+  ) row;
 $$;
 GRANT EXECUTE ON FUNCTION public.get_student_grades_v2(bigint, bigint) TO authenticated;
 
 CREATE OR REPLACE FUNCTION public.get_student_subject_averages(p_student_id bigint, p_period_id bigint)
-RETURNS jsonb LANGUAGE sql SECURITY DEFINER SET search_path = public AS $$
-  SELECT COALESCE(jsonb_agg(jsonb_build_object('subject_name',s.name,'average',sa.average,
-    'graded_count',sa.graded_count,'method',sa.method) ORDER BY s.name),'[]')
-  FROM public.subject_averages sa JOIN public.subjects s ON s.id = sa.subject_id
-  WHERE sa.student_id = p_student_id AND sa.period_id = p_period_id;
+RETURNS jsonb LANGUAGE plpgsql SECURITY DEFINER SET search_path = public AS $$
+DECLARE
+  v_period_id bigint;
+  v_area      record;
+  v_count     int;
+  v_avg       numeric(5,2);
+  v_result    jsonb := '[]'::jsonb;
+BEGIN
+  -- Promedio por materia EN TIEMPO REAL (grades + task_evidences), misma
+  -- lógica del boletín (mejores 5 si hay 5+ notas). Antes solo aparecía al
+  -- cerrar el período (subject_averages), dejando "Sin calificar" en curso.
+  v_period_id := public.resolve_period_id(p_period_id);
+
+  FOR v_area IN
+    SELECT pc.subject_id, s.name AS subject_name
+    FROM public.period_config pc
+    JOIN public.subjects s ON s.id = pc.subject_id
+    WHERE pc.period_id = v_period_id
+    ORDER BY s.name
+  LOOP
+    SELECT (COALESCE(a_cnt,0) + COALESCE(t_cnt,0)) INTO v_count
+    FROM (
+      SELECT COUNT(*) AS a_cnt
+      FROM public.grades g JOIN public.activities a ON a.id = g.activity_id
+      JOIN public.period_config pc ON pc.id = a.config_id
+      WHERE pc.period_id = v_period_id AND pc.subject_id = v_area.subject_id
+        AND g.student_id = p_student_id AND g.score_v2 IS NOT NULL
+    ) a, (
+      SELECT COUNT(*) AS t_cnt
+      FROM public.task_evidences te JOIN public.tasks t ON t.id = te.task_id
+      JOIN public.period_config pc ON pc.id = t.config_id
+      WHERE pc.period_id = v_period_id AND pc.subject_id = v_area.subject_id
+        AND te.student_id = p_student_id AND te.score_v2 IS NOT NULL
+    ) b;
+
+    IF v_count = 0 THEN CONTINUE; END IF;
+
+    IF v_count >= 5 THEN
+      SELECT ROUND(AVG(sv),2) INTO v_avg FROM (
+        SELECT g.score_v2 AS sv
+        FROM public.grades g JOIN public.activities a ON a.id = g.activity_id
+        JOIN public.period_config pc ON pc.id = a.config_id
+        WHERE pc.period_id = v_period_id AND pc.subject_id = v_area.subject_id
+          AND g.student_id = p_student_id AND g.score_v2 IS NOT NULL
+        UNION ALL
+        SELECT te.score_v2 AS sv
+        FROM public.task_evidences te JOIN public.tasks t ON t.id = te.task_id
+        JOIN public.period_config pc ON pc.id = t.config_id
+        WHERE pc.period_id = v_period_id AND pc.subject_id = v_area.subject_id
+          AND te.student_id = p_student_id AND te.score_v2 IS NOT NULL
+        ORDER BY sv DESC
+        LIMIT 5
+      ) best_scores;
+    ELSE
+      SELECT ROUND(AVG(sv),2) INTO v_avg FROM (
+        SELECT g.score_v2 AS sv
+        FROM public.grades g JOIN public.activities a ON a.id = g.activity_id
+        JOIN public.period_config pc ON pc.id = a.config_id
+        WHERE pc.period_id = v_period_id AND pc.subject_id = v_area.subject_id
+          AND g.student_id = p_student_id AND g.score_v2 IS NOT NULL
+        UNION ALL
+        SELECT te.score_v2 AS sv
+        FROM public.task_evidences te JOIN public.tasks t ON t.id = te.task_id
+        JOIN public.period_config pc ON pc.id = t.config_id
+        WHERE pc.period_id = v_period_id AND pc.subject_id = v_area.subject_id
+          AND te.student_id = p_student_id AND te.score_v2 IS NOT NULL
+      ) all_scores;
+    END IF;
+
+    v_result := v_result || jsonb_build_object(
+      'subject_name', v_area.subject_name,
+      'average',      v_avg,
+      'graded_count', v_count,
+      'method',       CASE WHEN v_count >= 5 THEN 'best_5' ELSE 'all' END
+    );
+  END LOOP;
+
+  RETURN v_result;
+END;
 $$;
 GRANT EXECUTE ON FUNCTION public.get_student_subject_averages(bigint, bigint) TO authenticated;
 

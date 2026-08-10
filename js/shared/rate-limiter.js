@@ -4,7 +4,7 @@
  * Usa localStorage para persistir entre recargas.
  */
 
-export class RateLimiter {
+class RateLimiter {
   /**
    * @param {string} key       — identificador único de la acción (ej: 'upload_avatar')
    * @param {number} maxCalls  — máximo de llamadas permitidas en la ventana

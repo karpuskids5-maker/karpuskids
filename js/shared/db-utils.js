@@ -1,41 +1,9 @@
 /**
  * 🛡️ Karpus Kids — DB Utils
- * Utilidades para queries robustas a escala:
- *   - safeQuery: interceptor global de errores con toast automático
- *   - withRetry: reintentos con backoff exponencial
- *   - withTimeout: timeout configurable por query
- *   - paginate: paginación cursor-based eficiente
- *   - batchInsert: inserts en lotes para evitar timeouts
- *   - selectColumns: columnas mínimas por tabla (evita SELECT *)
+ * Utilidades para queries robustas a escala.
  */
 
 import { supabase } from './supabase.js';
-
-/**
- * 🛡️ safeQuery — Interceptor global de errores de base de datos.
- * Muestra un toast automático en errores y retorna { data, ok, error }.
- *
- * Uso: const { data, ok } = await safeQuery(supabase.from('students').select('id, action, payload, created_at'));
- */
-export async function safeQuery(queryPromise, { silent = false, label = '' } = {}) {
-  try {
-    const { data, error } = await queryPromise;
-    if (error) {
-      const msg = error.message || JSON.stringify(error);
-      if (!silent) {
-        window.dispatchEvent(new CustomEvent('karpus:db-error', { detail: { message: msg, label } }));
-      }
-      return { data: null, ok: false, error: msg };
-    }
-    return { data, ok: true, error: null };
-  } catch (err) {
-    const msg = err?.message || String(err);
-    if (!silent) {
-      window.dispatchEvent(new CustomEvent('karpus:db-error', { detail: { message: msg, label } }));
-    }
-    return { data: null, ok: false, error: msg };
-  }
-}
 
 /**
  * 📋 auditLog — Registra acciones críticas del staff en audit_logs.
@@ -101,38 +69,6 @@ export function safeHandle(err, context = 'General') {
 }
 
 /**
- * Ejecuta una query con reintentos y backoff exponencial.
- * Ideal para operaciones críticas (pagos, asistencia).
- *
- * @param {Function} queryFn  — async () => { data, error }
- * @param {number}   retries  — intentos máximos (default 3)
- * @param {number}   baseMs   — delay base en ms (default 300)
- */
-export async function withRetry(queryFn, retries = 3, baseMs = 300) {
-  let lastError;
-  for (let attempt = 0; attempt < retries; attempt++) {
-    try {
-      const result = await queryFn();
-      if (result?.error) {
-        // Errores de red o 5xx → reintentar
-        const code = result.error?.code || result.error?.status;
-        const isRetryable = !code || code >= 500 || code === 'PGRST301';
-        if (!isRetryable) return result; // error de cliente → no reintentar
-        lastError = result.error;
-      } else {
-        return result;
-      }
-    } catch (e) {
-      lastError = e;
-    }
-    if (attempt < retries - 1) {
-      await new Promise(r => setTimeout(r, baseMs * Math.pow(2, attempt)));
-    }
-  }
-  return { data: null, error: lastError };
-}
-
-/**
  * Ejecuta una query con timeout.
  * Evita que queries lentas bloqueen la UI.
  *
@@ -147,78 +83,6 @@ export function withTimeout(queryFn, ms = 8000) {
 }
 
 /**
- * Paginación cursor-based eficiente (más rápida que OFFSET para tablas grandes).
- * Usa el campo `created_at` como cursor.
- *
- * @param {string}  table     — nombre de la tabla
- * @param {object}  opts      — { select, filters, pageSize, cursor, ascending }
- */
-export async function paginate(table, opts = {}) {
-  const {
-    select    = '*',
-    filters   = {},
-    pageSize  = 20,
-    cursor    = null,   // ISO timestamp del último item
-    ascending = false,
-    orderBy   = 'created_at'
-  } = opts;
-
-  let query = supabase.from(table).select(select).limit(pageSize);
-
-  // Aplicar filtros
-  for (const [col, val] of Object.entries(filters)) {
-    if (val !== null && val !== undefined && val !== '') {
-      query = query.eq(col, val);
-    }
-  }
-
-  // Cursor-based pagination
-  if (cursor) {
-    query = ascending
-      ? query.gt(orderBy, cursor)
-      : query.lt(orderBy, cursor);
-  }
-
-  query = query.order(orderBy, { ascending });
-
-  const { data, error } = await query;
-  if (error) throw error;
-
-  const nextCursor = data?.length === pageSize
-    ? data[data.length - 1]?.[orderBy]
-    : null;
-
-  return { data: data || [], nextCursor, hasMore: !!nextCursor };
-}
-
-/**
- * Insert en lotes para evitar timeouts con muchos registros.
- * Divide el array en chunks y los inserta secuencialmente.
- *
- * @param {string}  table     — nombre de la tabla
- * @param {Array}   records   — registros a insertar
- * @param {number}  chunkSize — tamaño del lote (default 50)
- */
-export async function batchInsert(table, records, chunkSize = 50) {
-  if (!records?.length) return { inserted: 0, errors: [] };
-
-  const errors = [];
-  let inserted = 0;
-
-  for (let i = 0; i < records.length; i += chunkSize) {
-    const chunk = records.slice(i, i + chunkSize);
-    const { error } = await supabase.from(table).insert(chunk);
-    if (error) {
-      errors.push({ chunk: i / chunkSize, error });
-    } else {
-      inserted += chunk.length;
-    }
-  }
-
-  return { inserted, errors };
-}
-
-/**
  * 🔒 maskSensitive — Enmascara datos sensibles para logs de auditoría
  * Nunca guardar emails, teléfonos o nombres completos en logs.
  *
@@ -226,7 +90,7 @@ export async function batchInsert(table, records, chunkSize = 50) {
  * @param {string} type  — 'email' | 'phone' | 'name'
  * @returns {string}
  */
-export function maskSensitive(value, type = 'email') {
+function maskSensitive(value, type = 'email') {
   if (!value) return '***';
   const s = String(value);
   if (type === 'email') {

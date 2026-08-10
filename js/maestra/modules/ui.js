@@ -29,7 +29,7 @@ export const Modal = {
     modal.id = id;
     modal.className = 'fixed inset-0 z-[60] flex items-center justify-center p-4';
     modal.style.cssText = 'background:rgba(15,23,42,0.6);backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px);animation:fadeInModal 0.15s ease-out;';
-    modal.innerHTML = `<div id="${id}-inner" class="relative max-w-[calc(100vw-2rem)] max-h-[92vh] rounded-[2rem] shadow-2xl border border-black/5 overflow-hidden">${content}</div>`;
+    modal.innerHTML = `<div id="${id}-inner" class="relative max-w-[calc(100vw-2rem)] max-h-[92vh] overflow-y-auto overscroll-contain">${content}</div>`;
 
     modal.onclick = (e) => {
       if (e.target === modal) this.close(id);

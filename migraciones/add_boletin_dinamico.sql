@@ -109,14 +109,26 @@ BEGIN
     WHERE pc.period_id = p_period_id
     ORDER BY s.name
   LOOP
-    SELECT COUNT(*) INTO v_count
-    FROM public.grades g
-    JOIN public.activities a ON a.id = g.activity_id
-    JOIN public.period_config pc ON pc.id = a.config_id
-    WHERE pc.period_id = p_period_id
-      AND pc.subject_id = v_area.subject_id
-      AND g.student_id = p_student_id
-      AND g.score_v2 IS NOT NULL;
+    SELECT (COALESCE(a_cnt,0) + COALESCE(t_cnt,0)) INTO v_count
+    FROM (
+      SELECT COUNT(*) AS a_cnt
+      FROM public.grades g
+      JOIN public.activities a ON a.id = g.activity_id
+      JOIN public.period_config pc ON pc.id = a.config_id
+      WHERE pc.period_id = p_period_id
+        AND pc.subject_id = v_area.subject_id
+        AND g.student_id = p_student_id
+        AND g.score_v2 IS NOT NULL
+    ) a, (
+      SELECT COUNT(*) AS t_cnt
+      FROM public.task_evidences te
+      JOIN public.tasks t ON t.id = te.task_id
+      JOIN public.period_config pc ON pc.id = t.config_id
+      WHERE pc.period_id = p_period_id
+        AND pc.subject_id = v_area.subject_id
+        AND te.student_id = p_student_id
+        AND te.score_v2 IS NOT NULL
+    ) b;
 
     IF v_count >= 5 THEN
       SELECT ROUND(AVG(score_v2), 2) INTO v_avg
@@ -129,18 +141,39 @@ BEGIN
           AND pc.subject_id = v_area.subject_id
           AND g.student_id = p_student_id
           AND g.score_v2 IS NOT NULL
-        ORDER BY g.score_v2 DESC
+        UNION ALL
+        SELECT te.score_v2
+        FROM public.task_evidences te
+        JOIN public.tasks t ON t.id = te.task_id
+        JOIN public.period_config pc ON pc.id = t.config_id
+        WHERE pc.period_id = p_period_id
+          AND pc.subject_id = v_area.subject_id
+          AND te.student_id = p_student_id
+          AND te.score_v2 IS NOT NULL
+        ORDER BY score_v2 DESC
         LIMIT 5
       ) best_scores;
     ELSE
-      SELECT ROUND(AVG(g.score_v2), 2) INTO v_avg
-      FROM public.grades g
-      JOIN public.activities a ON a.id = g.activity_id
-      JOIN public.period_config pc ON pc.id = a.config_id
-      WHERE pc.period_id = p_period_id
-        AND pc.subject_id = v_area.subject_id
-        AND g.student_id = p_student_id
-        AND g.score_v2 IS NOT NULL;
+      SELECT ROUND(AVG(score_v2), 2) INTO v_avg
+      FROM (
+        SELECT g.score_v2
+        FROM public.grades g
+        JOIN public.activities a ON a.id = g.activity_id
+        JOIN public.period_config pc ON pc.id = a.config_id
+        WHERE pc.period_id = p_period_id
+          AND pc.subject_id = v_area.subject_id
+          AND g.student_id = p_student_id
+          AND g.score_v2 IS NOT NULL
+        UNION ALL
+        SELECT te.score_v2
+        FROM public.task_evidences te
+        JOIN public.tasks t ON t.id = te.task_id
+        JOIN public.period_config pc ON pc.id = t.config_id
+        WHERE pc.period_id = p_period_id
+          AND pc.subject_id = v_area.subject_id
+          AND te.student_id = p_student_id
+          AND te.score_v2 IS NOT NULL
+      ) all_scores;
     END IF;
 
     IF v_avg IS NOT NULL THEN
@@ -158,29 +191,44 @@ BEGIN
     );
   END LOOP;
 
-  -- Detalle de actividades calificadas del estudiante
+  -- Detalle de actividades y tareas calificadas del estudiante
   SELECT COALESCE(
     jsonb_agg(
       jsonb_build_object(
-        'subject_id',      pc.subject_id,
-        'subject_name',    s.name,
-        'activity_id',     a.id,
-        'activity_title',  a.title,
-        'activity_number', a.activity_number,
-        'score',           g.score_v2,
-        'comment',         g.notes
+        'subject_id',      x.subject_id,
+        'subject_name',    x.subject_name,
+        'activity_id',     x.activity_id,
+        'activity_title',  x.activity_title,
+        'activity_number', x.activity_number,
+        'score',           x.score,
+        'comment',         x.comment,
+        'is_task',         x.is_task
       )
-      ORDER BY s.name, a.activity_number
+      ORDER BY x.subject_name, x.activity_number
     ),
     '[]'::jsonb
   ) INTO v_acts
-  FROM public.grades g
-  JOIN public.activities a ON a.id = g.activity_id
-  JOIN public.period_config pc ON pc.id = a.config_id
-  JOIN public.subjects s ON s.id = pc.subject_id
-  WHERE g.student_id = p_student_id
-    AND pc.period_id = p_period_id
-    AND g.score_v2 IS NOT NULL;
+  FROM (
+    SELECT pc.subject_id, s.name AS subject_name, a.id AS activity_id, a.title AS activity_title,
+           a.activity_number, g.score_v2 AS score, g.notes AS comment, false AS is_task
+    FROM public.grades g
+    JOIN public.activities a ON a.id = g.activity_id
+    JOIN public.period_config pc ON pc.id = a.config_id
+    JOIN public.subjects s ON s.id = pc.subject_id
+    WHERE g.student_id = p_student_id
+      AND pc.period_id = p_period_id
+      AND g.score_v2 IS NOT NULL
+    UNION ALL
+    SELECT pc.subject_id, s.name AS subject_name, NULL::bigint AS activity_id, t.title AS activity_title,
+           999::int AS activity_number, te.score_v2 AS score, te.comment AS comment, true AS is_task
+    FROM public.task_evidences te
+    JOIN public.tasks t ON t.id = te.task_id
+    JOIN public.period_config pc ON pc.id = t.config_id
+    JOIN public.subjects s ON s.id = pc.subject_id
+    WHERE te.student_id = p_student_id
+      AND pc.period_id = p_period_id
+      AND te.score_v2 IS NOT NULL
+  ) x;
 
   IF v_area_count > 0 THEN
     v_total := ROUND(v_total / v_area_count, 2);

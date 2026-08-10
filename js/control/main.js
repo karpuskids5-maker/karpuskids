@@ -1,5 +1,5 @@
-import { supabase, ensureRole } from '../shared/supabase.js';
-import { logError, auditLog } from '../shared/db-utils.js';
+import { supabase } from '../shared/supabase.js';
+import { logError } from '../shared/db-utils.js';
 
 // Bloquear redirección por SIGNED_OUT desde el primer momento
 // (antes de DOMContentLoaded, para que onAuthStateChange no interrumpa el init)

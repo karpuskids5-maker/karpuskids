@@ -49,13 +49,13 @@ const HEADER_H = 46;
 
 /* ───────────────────────── utilidades ───────────────────────── */
 
-export function esc(v) {
+function esc(v) {
   return String(v ?? '').replace(/[&<>"']/g, m => ({
     '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
   }[m]));
 }
 
-export function levelInfo(score) {
+function levelInfo(score) {
   if (score == null) return { label: 'Sin calificar', color: 'slate' };
   if (score >= 90) return { label: 'Excelente', color: 'emerald' };
   if (score >= 80) return { label: 'Bueno', color: 'blue' };
@@ -71,7 +71,7 @@ const LEVEL_HTML = {
   rose:    'bg-rose-100 text-rose-700',
 };
 
-export function levelHtmlClass(score) {
+function levelHtmlClass(score) {
   return LEVEL_HTML[levelInfo(score).color] || LEVEL_HTML.slate;
 }
 
@@ -229,7 +229,7 @@ export async function saveBoletinNotes(studentId, periodId, comment, fortalezas,
  * Siempre apunta al panel de padres para que el QR abra el boletín aunque
  * el PDF se genere desde maestra o directora.
  */
-export function boletinUrl(student, period) {
+function boletinUrl(student, period) {
   const path = window.location.pathname || '/';
   const dir = path.includes('/') ? path.substring(0, path.lastIndexOf('/') + 1) : '';
   const page = path.includes('padre') ? path : `${dir}panel_padres.html`;
@@ -356,10 +356,17 @@ export function renderBoletin(boletin) {
               <tbody class="divide-y divide-slate-50">
                 ${matrix.map(a => `
                   <tr class="hover:bg-slate-50/60 transition-colors">
-                    <td class="px-3 py-2.5 font-black text-sm" style="color:${HEX_DARK[a.index % 6]}">${esc(a.subject_name)}</td>
+                    <td class="px-3 py-2.5 font-black text-sm">
+                      <span class="inline-block w-2 h-2 rounded-full mr-2" style="background:${HEX[a.index % 6]}"></span>
+                      <span style="color:${HEX_DARK[a.index % 6]}">${esc(a.subject_name)}</span>
+                    </td>
                     ${a.actScores.map(sc => `
                       <td class="px-1 py-2.5 text-center text-xs font-black ${sc == null ? 'text-slate-300' : sc >= 80 ? 'text-emerald-600' : sc >= 60 ? 'text-amber-600' : 'text-rose-600'}">${sc == null ? '—' : Number(sc).toFixed(0)}</td>`).join('')}
-                    <td class="px-3 py-2.5 text-center font-black" style="color:${HEX_DARK[a.index % 6]}">${a.average != null ? Number(a.average).toFixed(1) : '—'}</td>
+                    <td class="px-3 py-2.5 text-center">
+                      ${a.average != null
+                        ? `<span class="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-black ${levelHtmlClass(a.average)}">${Number(a.average).toFixed(1)}</span>`
+                        : '<span class="text-slate-300 font-black text-xs">—</span>'}
+                    </td>
                   </tr>`).join('')}
               </tbody>
             </table>
@@ -457,42 +464,52 @@ export function renderBoletin(boletin) {
  */
 export function boletinEditorHtml(boletin) {
   const rep = boletin?.report || {};
-  const ic = 'w-full px-4 py-2.5 border-2 border-slate-100 rounded-2xl outline-none focus:ring-4 focus:ring-blue-100 focus:border-blue-400 bg-slate-50/50 transition-all text-sm font-medium';
-  const lc = 'block text-[11px] font-black text-slate-400 uppercase tracking-wider mb-1.5 ml-1';
+  const ic = 'w-full px-3.5 py-2.5 bg-slate-50 border-2 border-slate-100 rounded-xl outline-none focus:ring-4 focus:ring-blue-100 focus:border-blue-400 transition-all text-sm font-medium';
+  const label = (icon, color, text) => `
+    <label class="flex items-center gap-1.5 text-[11px] font-black text-slate-500 uppercase tracking-wider mb-1.5">
+      <i data-lucide="${icon}" class="w-3.5 h-3.5 ${color}"></i> ${text}
+    </label>`;
   return `
-    <div class="bg-blue-50/60 border border-blue-100 rounded-2xl p-4 space-y-3">
-      <div class="flex items-center gap-2">
-        <i data-lucide="edit-3" class="w-4 h-4 text-blue-500"></i>
-        <h4 class="font-black text-blue-700 text-xs uppercase tracking-widest">Editar Boletín</h4>
+    <div class="bg-white border border-slate-200 rounded-2xl shadow-sm overflow-hidden">
+      <div class="px-4 py-3 bg-gradient-to-r from-blue-600 to-violet-600 flex items-center justify-between">
+        <div class="flex items-center gap-2 text-white">
+          <i data-lucide="edit-3" class="w-4 h-4"></i>
+          <h4 class="font-black text-xs uppercase tracking-widest">Editar Boletín</h4>
+        </div>
+        <span class="text-white/70 text-[9px] font-black uppercase tracking-widest">Período ${esc(boletin?.period?.name || '')}</span>
       </div>
-      <div>
-        <label class="${lc}">Comentario de la maestra</label>
-        <textarea id="boletin-comment" rows="3" class="${ic}" placeholder="Comentario libre sobre el desempeño del estudiante...">${esc(rep.teacher_comment || '')}</textarea>
+      <div class="p-4 space-y-4">
+        <div>
+          ${label('message-square', 'text-blue-500', 'Comentario de la maestra')}
+          <textarea id="boletin-comment" rows="3" class="${ic}" placeholder="Comentario libre sobre el desempeño del estudiante...">${esc(rep.teacher_comment || '')}</textarea>
+        </div>
+        <div>
+          ${label('building-2', 'text-violet-500', 'Observaciones (directora)')}
+          <textarea id="boletin-observaciones" rows="2" class="${ic}" placeholder="Observaciones institucionales...">${esc(rep.directora_comment || '')}</textarea>
+        </div>
+        <div>
+          ${label('sparkles', 'text-amber-500', 'Conducta')}
+          <select id="boletin-conducta" class="${ic}">
+            <option value="">— Seleccionar —</option>
+            ${['Excelente', 'Muy buena', 'Buena', 'Regular'].map(c =>
+              `<option value="${c}" ${rep.conducta === c ? 'selected' : ''}>${c}</option>`).join('')}
+          </select>
+        </div>
+        <div>
+          ${label('award', 'text-emerald-500', 'Fortalezas (una por línea)')}
+          <textarea id="boletin-fortalezas" rows="3" class="${ic}" placeholder="Excelente participación&#10;Buen compañerismo">${esc((rep.fortalezas || []).join('\n'))}</textarea>
+        </div>
+        <div>
+          ${label('target', 'text-orange-500', 'Áreas de mejora (una por línea)')}
+          <textarea id="boletin-debilidades" rows="3" class="${ic}" placeholder="Concentración&#10;Orden">${esc((rep.debilidades || []).join('\n'))}</textarea>
+        </div>
       </div>
-      <div>
-        <label class="${lc}">Observaciones (directora)</label>
-        <textarea id="boletin-observaciones" rows="2" class="${ic}" placeholder="Observaciones institucionales...">${esc(rep.directora_comment || '')}</textarea>
+      <div class="px-4 pb-4 pt-1">
+        <button id="btn-save-boletin"
+          class="w-full px-4 py-2.5 bg-blue-600 text-white rounded-xl font-black text-xs uppercase shadow-lg shadow-blue-200 hover:bg-blue-700 transition-all">
+          Guardar Boletín
+        </button>
       </div>
-      <div>
-        <label class="${lc}">Conducta</label>
-        <select id="boletin-conducta" class="${ic}">
-          <option value="">— Seleccionar —</option>
-          ${['Excelente', 'Muy buena', 'Buena', 'Regular'].map(c =>
-            `<option value="${c}" ${rep.conducta === c ? 'selected' : ''}>${c}</option>`).join('')}
-        </select>
-      </div>
-      <div>
-        <label class="${lc}">Fortalezas (una por línea)</label>
-        <textarea id="boletin-fortalezas" rows="3" class="${ic}" placeholder="Excelente participación&#10;Buen compañerismo">${esc((rep.fortalezas || []).join('\n'))}</textarea>
-      </div>
-      <div>
-        <label class="${lc}">Áreas de mejora (una por línea)</label>
-        <textarea id="boletin-debilidades" rows="3" class="${ic}" placeholder="Concentración&#10;Orden">${esc((rep.debilidades || []).join('\n'))}</textarea>
-      </div>
-      <button id="btn-save-boletin"
-        class="w-full px-4 py-2.5 bg-blue-600 text-white rounded-xl font-black text-xs uppercase shadow-lg shadow-blue-200 hover:bg-blue-700 transition-all">
-        Guardar Boletín
-      </button>
     </div>`;
 }
 
@@ -1030,14 +1047,3 @@ export async function downloadBoletinPDF(boletin, fileName) {
   doc.save(name);
   return doc;
 }
-
-export const BoletínModule = {
-  fetchBoletin,
-  saveBoletinNotes,
-  renderBoletin,
-  boletinEditorHtml,
-  downloadBoletinPDF,
-  createBoletinDoc,
-  appendBoletinPage,
-  finalizeBoletinDoc,
-};

@@ -11,7 +11,7 @@ function handleError(error, context) {
 }
 
 /**
- * API Maestra (nivel producciÃ³n)
+ * API Maestra (nivel producción)
  */
 export const MaestraApi = {
 
@@ -95,7 +95,7 @@ export const MaestraApi = {
   async getTasksByClassroom(classroomId, periodId = null) {
     let query = supabase
       .from('tasks')
-      .select('id, title, description, due_date, grading_system, file_url, created_at, period_id, school_year_id')
+      .select('id, title, description, due_date, grading_system, file_url, created_at, period_id, school_year_id, config_id')
       .eq('classroom_id', classroomId)
       .order('created_at', { ascending: false })
       .limit(50);
@@ -294,19 +294,25 @@ export const MaestraApi = {
   },
 
   /**
-   * Calificar tarea
+   * Calificar tarea (letra + estrellas + nota numérica 0-100)
    */
-  async gradeTask(taskId, studentId, gradeLetter, stars, feedback) {
+  async gradeTask(taskId, studentId, gradeLetter, stars, feedback, score) {
     if (!taskId || !studentId) throw new Error('Task ID and Student ID are required');
 
     const starsVal   = parseInt(stars) || null;
     const validStars = (starsVal && starsVal >= 1 && starsVal <= 5) ? starsVal : null;
 
+    const scoreVal = (score != null && score !== '') ? parseFloat(score) : null;
+    if (scoreVal != null && (isNaN(scoreVal) || scoreVal < 0 || scoreVal > 100)) {
+      throw new Error('La calificación debe ser entre 0 y 100');
+    }
+
     const updates = {
       grade_letter: gradeLetter || null,
       stars:        validStars,
       comment:      feedback || null,
-      status:       'graded'
+      status:       'graded',
+      score_v2:     scoreVal
     };
 
     // Check if evidence already exists for this task+student
@@ -338,6 +344,76 @@ export const MaestraApi = {
     handleError(result.error, 'gradeTask');
     if (result.data) QueryCache.invalidatePrefix('maestra_grades');
     return result.data;
+  },
+
+  /**
+   * Guardar nota numérica (0-100) de una tarea para un estudiante.
+   * Hace upsert sobre task_evidences (UNIQUE task_id, student_id).
+   */
+  async saveTaskScoreV2(taskId, studentId, score, comment) {
+    if (!taskId || !studentId) throw new Error('Task ID and Student ID are required');
+    const scoreVal = parseFloat(score);
+    if (isNaN(scoreVal) || scoreVal < 0 || scoreVal > 100) {
+      throw new Error('La calificación debe ser entre 0 y 100');
+    }
+
+    const { data: existing } = await supabase
+      .from('task_evidences')
+      .select('id')
+      .eq('task_id', taskId)
+      .eq('student_id', studentId)
+      .maybeSingle();
+
+    let result;
+    if (existing?.id) {
+      result = await supabase
+        .from('task_evidences')
+        .update({ score_v2: scoreVal, comment: comment || null, status: 'graded' })
+        .eq('id', existing.id)
+        .select('id, score_v2')
+        .maybeSingle();
+    } else {
+      result = await supabase
+        .from('task_evidences')
+        .insert({ task_id: taskId, student_id: studentId, score_v2: scoreVal, comment: comment || null, status: 'graded' })
+        .select('id, score_v2')
+        .maybeSingle();
+    }
+
+    handleError(result.error, 'saveTaskScoreV2');
+    if (result.data) QueryCache.invalidatePrefix('maestra_grades');
+    return result.data;
+  },
+
+  /**
+   * Tareas con área asignada (config_id) del período activo.
+   * Recibe la lista de configs del período para filtrar tareas de otros períodos.
+   */
+  async getTasksForPeriod(config) {
+    const { data, error } = await supabase
+      .from('tasks')
+      .select('id, title, description, config_id, created_at')
+      .not('config_id', 'is', null)
+      .order('created_at', { ascending: true });
+    handleError(error, 'getTasksForPeriod');
+
+    const cfgSet = new Set((config || []).map(c => String(c.id)));
+    return (data || []).filter(t => cfgSet.has(String(t.config_id)));
+  },
+
+  /**
+   * Notas numéricas de tareas por estudiante (task_evidences.score_v2)
+   */
+  async getTaskScoresForStudents(taskIds) {
+    const ids = (taskIds || []).map(Number).filter(Boolean);
+    if (!ids.length) return [];
+    const { data, error } = await supabase
+      .from('task_evidences')
+      .select('task_id, student_id, score_v2, comment')
+      .in('task_id', ids)
+      .not('score_v2', 'is', null);
+    handleError(error, 'getTaskScoresForStudents');
+    return data || [];
   },
 
   /**
@@ -410,6 +486,19 @@ export const MaestraApi = {
     const { error } = await supabase.from('activities').delete().eq('id', activityId);
     handleError(error, 'deleteActivity');
     if (!error) QueryCache.invalidatePrefix('maestra_activities');
+    return { success: !error };
+  },
+
+  /**
+   * Eliminar área del período (borra en cascada actividades y notas asociadas)
+   */
+  async deletePeriodConfig(configId) {
+    const { error } = await supabase.from('period_config').delete().eq('id', configId);
+    handleError(error, 'deletePeriodConfig');
+    if (!error) {
+      QueryCache.invalidatePrefix('maestra_period_config');
+      QueryCache.invalidatePrefix('maestra_activities');
+    }
     return { success: !error };
   },
 

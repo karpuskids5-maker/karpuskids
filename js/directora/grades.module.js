@@ -44,6 +44,8 @@ export const GradesModule = {
   _activities: [],
   _allStudents: [],
   _studentGrades: [],
+  _classrooms: [],
+  _configLevelFilter: 'all', // 'all' | 'estancia' | 'preescolar' | 'primaria'
   _view: 'config', // 'config' | 'grades'
 
   async init() {
@@ -100,14 +102,7 @@ export const GradesModule = {
   _setConfigHeader() {
     const head = document.getElementById('gradesTableHead');
     if (!head) return;
-    head.innerHTML = `
-      <tr>
-        <th class="px-6 py-4 border-b border-slate-200">Materia / Estudiante</th>
-        <th class="px-6 py-4 text-center border-b border-slate-200">Actividades</th>
-        <th class="px-6 py-4 text-center border-b border-slate-200">Estado</th>
-        <th class="px-6 py-4 text-center border-b border-slate-200">Acciones</th>
-        <th class="px-6 py-4 border-b border-slate-200"></th>
-      </tr>`;
+    head.innerHTML = `<tr><th colspan="5" class="px-6 py-2 border-b border-slate-200"></th></tr>`;
   },
 
   _setGradesHeader() {
@@ -175,6 +170,13 @@ export const GradesModule = {
       const { data: subjects } = await DirectorApi.getSubjects();
       this._subjects = subjects || [];
 
+      // Load classrooms (para el filtro por aula)
+      try {
+        const { data: classrooms } = await DirectorApi.getClassrooms();
+        this._classrooms = classrooms || [];
+        this._populateClassroomFilter();
+      } catch (_) {}
+
       this._updateKPIs();
       this._switchView(this._view);
     } catch (e) {
@@ -197,6 +199,18 @@ export const GradesModule = {
     Helpers.setTxt('kpiApprovalRate', this._activities.length);
     Helpers.setTxt('kpiNeedsSupport', this._allStudents.length);
     Helpers.setTxt('kpiLowGrades', this._config.reduce((sum, c) => sum + (c.activity_count || 0), 0));
+  },
+
+  _populateClassroomFilter() {
+    const sel = document.getElementById('gradesFilterClassroom');
+    if (!sel || sel.dataset.populated === '1') return;
+    const current = sel.value;
+    sel.innerHTML = '<option value="all">Todas las aulas</option>' +
+      this._classrooms.map(c =>
+        `<option value="${c.id}">${Helpers.escapeHTML(c.name || 'Aula')}${c.level ? ' · ' + (LEVEL_LABELS[c.level] || c.level) : ''}</option>`
+      ).join('');
+    sel.dataset.populated = '1';
+    if (current) sel.value = current;
   },
 
   /**
@@ -381,11 +395,7 @@ export const GradesModule = {
     }
 
     const isClosed = period.status === 'closed';
-    const grouped = {};
-    this._subjects.forEach(s => {
-      if (!grouped[s.education_level]) grouped[s.education_level] = [];
-      grouped[s.education_level].push(s);
-    });
+    const filter = this._configLevelFilter;
 
     const configMap = {};
     this._config.forEach(c => { configMap[c.subject_id] = c; });
@@ -396,30 +406,38 @@ export const GradesModule = {
     });
 
     const LEVEL_STYLES = {
-      estancia:   { chip: 'bg-pink-100 text-pink-700',   bar: 'bg-pink-500',   ring: 'focus:border-pink-400 focus:ring-pink-100' },
-      preescolar: { chip: 'bg-violet-100 text-violet-700', bar: 'bg-violet-500', ring: 'focus:border-violet-400 focus:ring-violet-100' },
-      primaria:   { chip: 'bg-indigo-100 text-indigo-700', bar: 'bg-indigo-500', ring: 'focus:border-indigo-400 focus:ring-indigo-100' },
+      estancia:   { chip: 'bg-pink-100 text-pink-700',   bar: 'bg-pink-500' },
+      preescolar: { chip: 'bg-violet-100 text-violet-700', bar: 'bg-violet-500' },
+      primaria:   { chip: 'bg-indigo-100 text-indigo-700', bar: 'bg-indigo-500' },
     };
+
+    const visible = this._subjects.filter(s => filter === 'all' || s.education_level === filter);
+    const configuredCount = visible.filter(s => configMap[s.id]).length;
+
+    const pills = [['all', 'Todas'], ['estancia', 'Estancia'], ['preescolar', 'Preescolar'], ['primaria', 'Primaria']]
+      .map(([v, label]) => `
+        <button onclick="App.grades._setConfigLevelFilter('${v}')"
+          class="px-3 py-1.5 rounded-lg text-[10px] font-black uppercase tracking-wider transition-all ${filter === v ? 'bg-indigo-600 text-white shadow-md' : 'bg-white text-slate-500 border border-slate-200 hover:bg-indigo-50 hover:text-indigo-600'}">
+          ${label}
+        </button>`).join('');
 
     let html = `
       <tr><td colspan="5" class="px-6 pt-5">
-        <div class="flex flex-col lg:flex-row lg:items-center gap-4 p-4 rounded-2xl bg-gradient-to-r from-blue-50 via-indigo-50 to-violet-50 border border-blue-100">
-          <div class="flex items-start gap-3 flex-1">
-            <div class="p-2.5 bg-white rounded-xl text-blue-600 shadow-sm shrink-0"><i data-lucide="users" class="w-5 h-5"></i></div>
-            <div>
-              <p class="text-sm font-black text-slate-800">La configuración se aplica a <span class="text-blue-600">todas las aulas</span></p>
-              <p class="text-xs text-slate-500 font-medium mt-0.5">Edita el nombre y la descripción de cada área, ajusta la cantidad de actividades y guarda. Las maestras de todos los niveles verán estos cambios de inmediato.</p>
-            </div>
-          </div>
+        <div class="rounded-2xl border border-slate-200 bg-slate-50/70 p-3 flex flex-col lg:flex-row lg:items-center gap-3">
+          <div class="flex flex-wrap items-center gap-1.5">${pills}</div>
+          <p class="text-[11px] text-slate-500 font-bold flex-1 min-w-[140px]">
+            ${configuredCount} de ${visible.length} áreas configuradas${filter !== 'all' ? ' · ' + (LEVEL_LABELS[filter] || filter) : ''}
+            <span class="block text-[9px] font-semibold normal-case text-slate-400">La configuración es global del periodo: se aplica a todas las aulas.</span>
+          </p>
           <div class="flex flex-wrap gap-2 shrink-0">
-            <button onclick="App.grades._openSubjectModal()" class="px-4 py-2.5 bg-violet-600 text-white rounded-xl font-black text-xs uppercase tracking-wider shadow-lg shadow-violet-200 hover:bg-violet-700 transition-all flex items-center gap-2">
-              <i data-lucide="plus" class="w-4 h-4"></i> Nueva Área
+            <button onclick="App.grades._openSubjectModal()" class="px-3.5 py-2 bg-violet-600 text-white rounded-xl font-black text-[10px] uppercase tracking-wider shadow-md shadow-violet-200 hover:bg-violet-700 transition-all flex items-center gap-1.5">
+              <i data-lucide="plus" class="w-3.5 h-3.5"></i> Nueva Área
             </button>
-            <button onclick="App.grades._applyToAllClassrooms()" ${isClosed ? 'disabled' : ''} class="px-4 py-2.5 bg-white text-indigo-600 border-2 border-indigo-200 rounded-xl font-black text-xs uppercase tracking-wider hover:bg-indigo-50 transition-all flex items-center gap-2 ${isClosed ? 'opacity-40 cursor-not-allowed' : ''}">
-              <i data-lucide="copy-check" class="w-4 h-4"></i> Aplicar a todas las aulas
+            <button onclick="App.grades._applyVisible()" ${isClosed ? 'disabled' : ''} class="px-3.5 py-2 bg-white text-indigo-600 border-2 border-indigo-200 rounded-xl font-black text-[10px] uppercase tracking-wider hover:bg-indigo-50 transition-all flex items-center gap-1.5 ${isClosed ? 'opacity-40 cursor-not-allowed' : ''}">
+              <i data-lucide="copy-check" class="w-3.5 h-3.5"></i> Aplicar visibles
             </button>
-            <button onclick="App.grades._saveAllConfig()" ${isClosed ? 'disabled' : ''} class="px-4 py-2.5 bg-indigo-600 text-white rounded-xl font-black text-xs uppercase tracking-wider shadow-lg shadow-indigo-200 hover:bg-indigo-700 transition-all flex items-center gap-2 ${isClosed ? 'opacity-40 cursor-not-allowed' : ''}">
-              <i data-lucide="save" class="w-4 h-4"></i> Guardar cambios
+            <button onclick="App.grades._saveAllConfig()" ${isClosed ? 'disabled' : ''} class="px-3.5 py-2 bg-indigo-600 text-white rounded-xl font-black text-[10px] uppercase tracking-wider shadow-md shadow-indigo-200 hover:bg-indigo-700 transition-all flex items-center gap-1.5 ${isClosed ? 'opacity-40 cursor-not-allowed' : ''}">
+              <i data-lucide="save" class="w-3.5 h-3.5"></i> Guardar
             </button>
           </div>
         </div>
@@ -427,95 +445,100 @@ export const GradesModule = {
 
     if (isClosed) {
       html += `<tr><td colspan="5" class="px-6 pt-2">
-        <div class="flex items-center gap-2 text-[11px] font-bold text-amber-600 bg-amber-50 border border-amber-100 rounded-xl px-4 py-2.5">
+        <div class="flex items-center gap-2 text-[11px] font-bold text-amber-600 bg-amber-50 border border-amber-100 rounded-xl px-4 py-2">
           <i data-lucide="lock" class="w-3.5 h-3.5"></i> Periodo cerrado — la configuración está en modo lectura.
         </div>
       </td></tr>`;
     }
 
-    if (!Object.keys(grouped).length) {
-      html += `<tr><td colspan="5" class="text-center py-16 text-slate-400">
-        <div class="flex flex-col items-center gap-3">
-          <p class="font-bold">No hay áreas disponibles para este periodo</p>
-          <p class="text-xs text-slate-400 mt-1">Usa "Aplicar a todas las aulas" para cargar todas las áreas.</p>
+    if (!visible.length) {
+      html += `<tr><td colspan="5" class="text-center py-12 text-slate-400">
+        <div class="flex flex-col items-center gap-2">
+          <p class="font-bold">No hay áreas disponibles${filter !== 'all' ? ' para este nivel' : ''}</p>
+          <p class="text-xs text-slate-400 mt-1">Usa "Aplicar visibles" o crea una nueva área.</p>
         </div>
       </td></tr>`;
-    }
-
-    for (const [level, subjects] of Object.entries(grouped)) {
-      const style = LEVEL_STYLES[level] || LEVEL_STYLES.primaria;
-      html += `
-        <tr><td colspan="5" class="px-6 pt-6 pb-2">
-          <div class="flex items-center gap-3">
-            <span class="px-3 py-1 rounded-full text-xs font-black uppercase ${style.chip}">${LEVEL_LABELS[level] || level}</span>
-            <span class="h-1.5 flex-1 rounded-full ${style.bar} opacity-20"></span>
-            <span class="text-xs text-slate-400 font-bold">${subjects.length} áreas</span>
-          </div>
-        </td></tr>
-        ${subjects.map(s => {
-          const cfg = configMap[s.id];
-          const count = cfg?.activity_count || 5;
-          const actCount = activitiesBySubject[s.id] || 0;
-          const configured = !!cfg;
-          const progressPct = count > 0 ? Math.min(100, Math.round(actCount / count * 100)) : 0;
-          const progressCls = progressPct >= 100 ? 'bg-emerald-500' : progressPct >= 50 ? 'bg-amber-500' : 'bg-rose-400';
-          return `
-            <tr id="cfg-row-${s.id}" class="border-b border-slate-100 hover:bg-slate-50/60 transition-all rounded-xl">
-              <td class="px-6 py-4 align-top">
-                <div class="flex flex-wrap items-center gap-2 mb-2">
-                  <span class="px-2 py-0.5 rounded-full text-[9px] font-black uppercase ${style.chip}">${LEVEL_LABELS[level] || level}</span>
-                  <span id="cfg-dirty-${s.id}" class="px-2 py-0.5 rounded-full text-[9px] font-black uppercase bg-amber-100 text-amber-700 opacity-0 transition-opacity">● Sin guardar</span>
-                </div>
-                <input id="cfg-name-${s.id}" value="${Helpers.escapeHTML(s.name)}" oninput="App.grades._markDirty(${s.id})"
-                  placeholder="Nombre del área" ${isClosed ? 'readonly' : ''}
-                  class="w-full bg-slate-50 border-2 border-slate-100 rounded-xl px-3 py-2.5 text-sm font-black text-slate-800 outline-none focus:bg-white transition-all ${style.ring} ${isClosed ? 'opacity-60 cursor-not-allowed' : ''}">
-                <textarea id="cfg-desc-${s.id}" rows="2" oninput="App.grades._markDirty(${s.id})"
-                  placeholder="Descripción del área (lo que se trabaja en esta materia)..." ${isClosed ? 'readonly' : ''}
-                  class="w-full mt-2 bg-slate-50 border-2 border-slate-100 rounded-xl px-3 py-2.5 text-xs text-slate-500 font-medium outline-none focus:bg-white transition-all resize-none ${style.ring} ${isClosed ? 'opacity-60 cursor-not-allowed' : ''}">${Helpers.escapeHTML(s.description || '')}</textarea>
-              </td>
-              <td class="px-6 py-4 text-center align-top">
-                <div class="flex flex-col items-center gap-2 pt-2">
-                  <div class="flex items-center gap-2">
-                    ${isClosed ? `
-                      <span class="px-4 py-2 bg-slate-100 text-slate-600 rounded-xl font-black text-sm">${count}</span>
-                    ` : `
-                      <button onclick="App.grades._adjustCount(${s.id}, -1)" class="w-9 h-9 bg-slate-100 text-slate-500 rounded-lg font-black hover:bg-slate-200 transition-all flex items-center justify-center text-base">−</button>
-                      <span id="cfg-count-${s.id}" class="px-3 py-1.5 bg-white border-2 border-slate-200 rounded-xl font-black text-sm text-indigo-700 min-w-[44px] text-center">${count}</span>
-                      <button onclick="App.grades._adjustCount(${s.id}, 1)" class="w-9 h-9 bg-slate-100 text-slate-500 rounded-lg font-black hover:bg-slate-200 transition-all flex items-center justify-center text-base">+</button>
-                    `}
-                  </div>
-                  <span class="text-[9px] font-black text-slate-400 uppercase tracking-wider">actividades</span>
-                </div>
-              </td>
-              <td class="px-6 py-4 text-center align-top">
-                <div class="flex flex-col items-center gap-2 pt-2">
-                  <span class="px-3 py-1 rounded-full text-xs font-black ${actCount >= count ? 'bg-emerald-100 text-emerald-700' : 'bg-amber-100 text-amber-700'}">
-                    ${actCount}/${count} actividades
-                  </span>
-                  <div class="w-24 bg-slate-100 rounded-full h-1.5 overflow-hidden">
-                    <div class="${progressCls} h-full rounded-full transition-all" style="width:${progressPct}%"></div>
-                  </div>
-                </div>
-              </td>
-              <td class="px-6 py-4 text-center align-top pt-7">
-                ${configured ? `
-                  <button onclick="App.grades._removeSubjectConfig(${cfg.id})" class="p-2 text-slate-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition-all ${isClosed ? 'hidden' : ''}" title="Quitar área">
-                    <i data-lucide="trash-2" class="w-4 h-4"></i>
-                  </button>
-                  <span class="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[9px] font-black bg-emerald-50 text-emerald-600 border border-emerald-100 mt-1">
-                    <i data-lucide="check" class="w-3 h-3"></i> Activa
-                  </span>` : `
-                  <button onclick="App.grades._addSubjectConfig(${s.id})" class="px-3 py-1.5 bg-indigo-50 text-indigo-600 rounded-lg text-xs font-bold hover:bg-indigo-100 transition-all ${isClosed ? 'hidden' : ''}">
-                    <i data-lucide="plus" class="w-3 h-3 inline"></i> Agregar
-                  </button>`}
-              </td>
-              <td></td>
-            </tr>`;
-        }).join('')}`;
+    } else {
+      visible.forEach(s => {
+        const style = LEVEL_STYLES[s.education_level] || LEVEL_STYLES.primaria;
+        const cfg = configMap[s.id];
+        const count = cfg?.activity_count || 5;
+        const actCount = activitiesBySubject[s.id] || 0;
+        const configured = !!cfg;
+        const progressPct = count > 0 ? Math.min(100, Math.round(actCount / count * 100)) : 0;
+        const progressCls = progressPct >= 100 ? 'bg-emerald-500' : progressPct >= 50 ? 'bg-amber-500' : 'bg-rose-400';
+        html += `<tr><td colspan="5" class="px-6 pt-2">
+          ${this._renderConfigRow(s, cfg, style, count, actCount, configured, isClosed, progressPct, progressCls)}
+        </td></tr>`;
+      });
     }
 
     container.innerHTML = html;
     if (window.lucide) lucide.createIcons();
+  },
+
+  _renderConfigRow(s, cfg, style, count, actCount, configured, isClosed, progressPct, progressCls) {
+    const level = s.education_level;
+    return `
+      <div id="cfg-row-${s.id}" class="group rounded-xl border ${configured ? 'border-slate-200 bg-white' : 'border-dashed border-slate-300 bg-slate-50/50'} p-3 flex flex-col gap-2 transition-all hover:shadow-sm">
+        <div class="flex flex-wrap items-center gap-2.5">
+          <span class="px-2 py-0.5 rounded-full text-[9px] font-black uppercase ${style.chip} shrink-0">${LEVEL_LABELS[level] || level}</span>
+          <input id="cfg-name-${s.id}" value="${Helpers.escapeHTML(s.name)}" oninput="App.grades._markDirty(${s.id})"
+            placeholder="Nombre del área" ${isClosed ? 'readonly' : ''}
+            class="flex-1 min-w-[120px] bg-transparent border-b-2 border-transparent focus:border-indigo-400 px-1 py-1 text-sm font-black text-slate-800 outline-none transition-all ${isClosed ? 'opacity-60 cursor-not-allowed' : ''}">
+          <button onclick="App.grades._toggleDesc(${s.id})" class="p-1.5 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-lg transition-colors" title="${s.description ? 'Ver / editar descripción' : 'Agregar descripción'}">
+            <i data-lucide="chevron-down" class="w-4 h-4"></i>
+          </button>
+          <span id="cfg-dirty-${s.id}" class="px-2 py-0.5 rounded-full text-[9px] font-black uppercase bg-amber-100 text-amber-700 opacity-0 transition-opacity">● Sin guardar</span>
+        </div>
+        <div id="cfg-desc-wrap-${s.id}" class="hidden">
+          <textarea id="cfg-desc-${s.id}" rows="2" oninput="App.grades._markDirty(${s.id})"
+            placeholder="Descripción del área (lo que se trabaja en esta materia)..." ${isClosed ? 'readonly' : ''}
+            class="w-full bg-slate-50 border border-slate-200 rounded-lg px-3 py-2 text-xs text-slate-500 font-medium outline-none focus:bg-white transition-all resize-none ${isClosed ? 'opacity-60 cursor-not-allowed' : ''}">${Helpers.escapeHTML(s.description || '')}</textarea>
+        </div>
+        <div class="flex flex-wrap items-center gap-2.5">
+          <div class="flex items-center gap-1.5">
+            ${isClosed ? `
+              <span class="px-3 py-1.5 bg-slate-100 text-slate-600 rounded-lg font-black text-sm">${count}</span>
+            ` : `
+              <button onclick="App.grades._adjustCount(${s.id}, -1)" class="w-8 h-8 bg-slate-100 text-slate-500 rounded-lg font-black hover:bg-slate-200 transition-all flex items-center justify-center text-base">−</button>
+              <span id="cfg-count-${s.id}" class="px-3 py-1 bg-white border-2 border-slate-200 rounded-lg font-black text-sm text-indigo-700 min-w-[40px] text-center">${count}</span>
+              <button onclick="App.grades._adjustCount(${s.id}, 1)" class="w-8 h-8 bg-slate-100 text-slate-500 rounded-lg font-black hover:bg-slate-200 transition-all flex items-center justify-center text-base">+</button>
+            `}
+            <span class="text-[9px] font-black text-slate-400 uppercase tracking-wider">actividades</span>
+          </div>
+          <div class="flex items-center gap-2 ml-auto">
+            <span class="px-2.5 py-1 rounded-full text-[10px] font-black ${actCount >= count ? 'bg-emerald-100 text-emerald-700' : 'bg-amber-100 text-amber-700'}">${actCount}/${count}</span>
+            <div class="hidden md:block w-20 bg-slate-100 rounded-full h-1.5 overflow-hidden">
+              <div class="${progressCls} h-full rounded-full transition-all" style="width:${progressPct}%"></div>
+            </div>
+            ${configured ? `
+              <button onclick="App.grades._removeSubjectConfig(${cfg.id})" class="p-2 text-slate-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition-all ${isClosed ? 'hidden' : ''}" title="Quitar área del periodo">
+                <i data-lucide="trash-2" class="w-4 h-4"></i>
+              </button>
+              <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[9px] font-black bg-emerald-50 text-emerald-600 border border-emerald-100"><i data-lucide="check" class="w-3 h-3"></i> Activa</span>
+            ` : `
+              <button onclick="App.grades._addSubjectConfig(${s.id})" class="px-3 py-1.5 bg-indigo-50 text-indigo-600 rounded-lg text-xs font-bold hover:bg-indigo-100 transition-all ${isClosed ? 'hidden' : ''}">
+                <i data-lucide="plus" class="w-3 h-3 inline"></i> Agregar
+              </button>
+            `}
+          </div>
+        </div>
+      </div>`;
+  },
+
+  _setConfigLevelFilter(level) {
+    this._configLevelFilter = level;
+    this._renderConfig();
+    if (window.lucide) lucide.createIcons();
+  },
+
+  _toggleDesc(subjectId) {
+    const wrap = document.getElementById(`cfg-desc-wrap-${subjectId}`);
+    if (wrap) wrap.classList.toggle('hidden');
+    const btn = document.querySelector(`#cfg-row-${subjectId} button[onclick*="_toggleDesc(${subjectId})"]`);
+    const icon = btn?.querySelector('i');
+    if (icon) icon.classList.toggle('rotate-180');
   },
 
   _pendingConfig: {},
@@ -548,11 +571,26 @@ export const GradesModule = {
   },
 
   async _removeSubjectConfig(configId) {
-    if (!confirm('¿Quitar esta área del periodo? Se conservarán sus actividades y notas.')) return;
-    const { error } = await DirectorApi.deletePeriodConfig(configId);
-    if (error) return Helpers.toast('Error al quitar', 'error');
-    Helpers.toast('Área removida', 'success');
-    await this._loadData();
+    if (configId == null) {
+      Helpers.toast('No se encontró la configuración de esta área', 'warning');
+      return;
+    }
+    const ok = window._karpusConfirmDelete
+      ? await window._karpusConfirmDelete('Quitar área', 'Se quitará esta área del periodo. Sus actividades y notas se conservan.')
+      : window.confirm('¿Quitar esta área del periodo? Se conservarán sus actividades y notas.');
+    if (!ok) return;
+
+    const btn = document.querySelector(`button[onclick*="App.grades._removeSubjectConfig(${configId})"]`);
+    if (btn) { btn.disabled = true; btn.style.opacity = '0.5'; }
+
+    try {
+      const { error } = await DirectorApi.deletePeriodConfig(configId);
+      if (error) return Helpers.toast('No se pudo quitar el área: ' + (error?.message || 'Error'), 'error');
+      Helpers.toast('Área removida', 'success');
+      await this._loadData();
+    } catch (e) {
+      Helpers.toast('Error al quitar el área: ' + (e?.message || ''), 'error');
+    }
   },
 
   async _updateSubject(subjectId) {
@@ -572,21 +610,26 @@ export const GradesModule = {
     await this._loadData();
   },
 
-  async _applyToAllClassrooms() {
+  async _applyVisible() {
     const period = this._periods.find(p => String(p.id) === String(this._currentPeriodId));
     if (!period) return Helpers.toast('Selecciona un periodo', 'warning');
     if (period.status === 'closed') return Helpers.toast('El periodo está cerrado', 'warning');
 
     const existingIds = new Set(this._config.map(c => c.subject_id));
-    const missing = this._subjects.filter(s => !existingIds.has(s.id));
+    let missing = this._subjects.filter(s => !existingIds.has(s.id));
+    if (this._configLevelFilter !== 'all') {
+      missing = missing.filter(s => s.education_level === this._configLevelFilter);
+    }
     if (!missing.length) {
-      return Helpers.toast('Todas las áreas ya están configuradas para todas las aulas', 'info');
+      return Helpers.toast(this._configLevelFilter !== 'all'
+        ? 'Todas las áreas de este nivel ya están configuradas'
+        : 'Todas las áreas ya están configuradas', 'info');
     }
 
     const rows = missing.map(s => ({ subject_id: s.id, activity_count: 5 }));
     const { error } = await DirectorApi.savePeriodConfig(this._currentPeriodId, rows);
     if (error) return Helpers.toast('Error al aplicar la configuración', 'error');
-    Helpers.toast(`${rows.length} área${rows.length !== 1 ? 's' : ''} aplicada${rows.length !== 1 ? 's' : ''} a todas las aulas ✅`, 'success');
+    Helpers.toast(`${rows.length} área${rows.length !== 1 ? 's' : ''} aplicada${rows.length !== 1 ? 's' : ''} al periodo ✅`, 'success');
     await this._loadData();
   },
 
@@ -594,7 +637,7 @@ export const GradesModule = {
     const ic = 'w-full px-4 py-2.5 border-2 border-slate-100 rounded-2xl outline-none focus:ring-4 focus:ring-violet-100 focus:border-violet-400 bg-slate-50/50 transition-all text-sm font-medium';
     const lc = 'block text-[11px] font-black text-slate-400 uppercase tracking-wider mb-1.5 ml-1';
     const modalHtml = `
-      <div class="w-full max-w-md overflow-hidden">
+      <div class="w-full overflow-hidden">
         <div class="bg-gradient-to-r from-indigo-600 to-violet-600 p-6 text-white">
           <h3 class="text-xl font-black">Nueva Área</h3>
           <p class="text-sm text-white/70 font-medium mt-0.5">Se aplicará a todas las aulas del nivel seleccionado</p>
@@ -1018,7 +1061,7 @@ export const GradesModule = {
     const y = new Date().getFullYear();
 
     const modalHtml = `
-      <div class="w-full max-w-md overflow-hidden">
+      <div class="w-full overflow-hidden">
         <div class="bg-indigo-600 p-6 text-white flex justify-between items-center">
           <h3 class="text-xl font-black">Nuevo Periodo</h3>
         </div>

@@ -6,6 +6,7 @@
 import { AppState } from '../state.js';
 import { UI } from './ui.js';
 import { supabase } from '/js/shared/supabase.js';
+import { resolveActivePeriodConfig } from './tasks.js';
 import {
   fetchBoletin,
   saveBoletinNotes,
@@ -16,32 +17,41 @@ import {
 
 const { safeToast, safeEscapeHTML, Modal } = UI;
 
-export async function initBoletin() {
-  const container = document.getElementById('t-boletin-inner');
-  if (!container) return;
+export async function openBoletinList() {
+  const modalId = 'boletinListModal';
+  const classroom = AppState.get('classroom');
 
-  container.innerHTML = `
-    <div class="flex justify-between items-center mb-6">
-      <h3 class="text-2xl font-black text-slate-800 flex items-center gap-3">
-        <i data-lucide="file-text" class="w-6 h-6 text-indigo-500"></i>
-        Boletines
-      </h3>
-    </div>
-    <div id="boletinContent" class="space-y-4">
-      <div class="animate-pulse space-y-4">
-        <div class="h-32 bg-slate-50 rounded-3xl"></div>
-        <div class="h-24 bg-slate-50 rounded-3xl"></div>
+  Modal.open(modalId, `
+    <div class="bg-white rounded-[2rem] w-full max-w-3xl max-h-[90vh] flex flex-col overflow-hidden">
+      <div class="bg-gradient-to-r from-indigo-600 to-violet-600 px-6 py-4 text-white flex justify-between items-center relative overflow-hidden">
+        <div class="absolute -right-8 -top-10 w-40 h-40 bg-white/10 rounded-full pointer-events-none"></div>
+        <div class="flex items-center gap-3 min-w-0 relative z-10">
+          <div class="w-11 h-11 rounded-xl bg-white/20 flex items-center justify-center">
+            <i data-lucide="file-text" class="w-5 h-5"></i>
+          </div>
+          <div class="min-w-0">
+            <h3 class="text-lg font-black truncate">Boletines</h3>
+            <p class="text-xs font-bold text-white/70 uppercase tracking-widest truncate">Calificaciones por estudiante</p>
+          </div>
+        </div>
+        <button onclick="Modal.close('${modalId}')" class="w-9 h-9 bg-white/10 hover:bg-white/20 rounded-xl flex items-center justify-center transition-colors shrink-0 relative z-10">
+          <i data-lucide="x" class="w-5 h-5"></i>
+        </button>
+      </div>
+      <div id="boletinListBody" class="flex-1 overflow-y-auto p-5 bg-slate-50">
+        <div class="text-center py-16 text-slate-400">
+          <div class="w-12 h-12 border-4 border-indigo-200 border-t-indigo-600 rounded-full animate-spin mx-auto mb-4"></div>
+          Cargando boletines...
+        </div>
       </div>
     </div>
-  `;
-  if (window.lucide) window.lucide.createIcons();
+  `);
 
-  const content = document.getElementById('boletinContent');
-  const classroom = AppState.get('classroom');
+  const content = document.getElementById('boletinListBody');
 
   try {
     const periodRes = await supabase.rpc('get_active_period', { p_classroom_id: classroom?.id });
-    const period = periodRes?.data;
+    let period = periodRes?.data;
 
     if (!period || !period.found) {
       content.innerHTML = `
@@ -52,6 +62,9 @@ export async function initBoletin() {
         </div>`;
       return;
     }
+
+    const resolved = await resolveActivePeriodConfig(period);
+    if (resolved.config?.length) period = resolved.period;
 
     const students = AppState.get('students') || [];
 
@@ -109,7 +122,7 @@ export async function initBoletin() {
         <div class="w-14 h-14 bg-rose-100 rounded-full flex items-center justify-center text-2xl mx-auto mb-3">⚠️</div>
         <p class="font-bold text-slate-700">Error al cargar boletines</p>
         <p class="text-xs text-slate-400 mt-1">${safeEscapeHTML(e?.message || '')}</p>
-        <button onclick="App.initBoletin()" class="mt-4 px-4 py-2 bg-indigo-600 text-white rounded-xl font-black text-xs uppercase">Reintentar</button>
+        <button onclick="App.openBoletinList()" class="mt-4 px-4 py-2 bg-indigo-600 text-white rounded-xl font-black text-xs uppercase">Reintentar</button>
       </div>`;
   }
 }
@@ -117,18 +130,24 @@ export async function initBoletin() {
 export async function openBoletin(studentId) {
   const classroom = AppState.get('classroom');
   const periodRes = await supabase.rpc('get_active_period', { p_classroom_id: classroom?.id });
-  const period = periodRes?.data;
+  let period = periodRes?.data;
   if (!period || !period.found) {
     return safeToast('No hay período activo para esta aula', 'warning');
   }
+  const resolved = await resolveActivePeriodConfig(period);
+  if (resolved.config?.length) period = resolved.period;
 
   const students = AppState.get('students') || [];
   const student = students.find(s => String(s.id) === String(studentId));
 
+  const periodStatus = period.status === 'closed' ? 'Cerrado' : 'En curso';
+
   Modal.open('boletinModal', `
-    <div class="bg-white rounded-[2rem] w-[min(92vw,900px)] max-h-[92vh] flex flex-col overflow-hidden">
-      <div class="bg-gradient-to-r from-indigo-600 to-violet-600 px-6 py-4 text-white flex justify-between items-center">
-        <div class="flex items-center gap-3 min-w-0">
+    <div class="bg-white rounded-[2rem] w-full max-w-5xl max-h-[92vh] flex flex-col overflow-hidden">
+      <div class="bg-gradient-to-r from-indigo-600 to-violet-600 px-6 py-4 text-white flex justify-between items-center relative overflow-hidden">
+        <div class="absolute -right-8 -top-10 w-40 h-40 bg-white/10 rounded-full pointer-events-none"></div>
+        <div class="absolute right-28 -bottom-12 w-24 h-24 bg-white/10 rounded-full pointer-events-none"></div>
+        <div class="flex items-center gap-3 min-w-0 relative z-10">
           <div class="w-11 h-11 rounded-xl bg-white/20 flex items-center justify-center font-black text-lg overflow-hidden shrink-0">
             ${student?.avatar_url
               ? `<img src="${safeEscapeHTML(student.avatar_url)}" alt="" class="w-full h-full object-cover">`
@@ -139,9 +158,12 @@ export async function openBoletin(studentId) {
             <p class="text-xs font-bold text-white/70 uppercase tracking-widest truncate">Boletín · ${safeEscapeHTML(period.name)}</p>
           </div>
         </div>
-        <button onclick="Modal.close('boletinModal')" class="w-9 h-9 bg-white/10 hover:bg-white/20 rounded-xl flex items-center justify-center transition-colors shrink-0">
-          <i data-lucide="x" class="w-5 h-5"></i>
-        </button>
+        <div class="flex items-center gap-2 shrink-0 relative z-10">
+          <span class="px-3 py-1 rounded-full ${periodStatus === 'Cerrado' ? 'bg-amber-400 text-amber-900' : 'bg-emerald-400 text-emerald-900'} text-[10px] font-black uppercase">${periodStatus}</span>
+          <button onclick="Modal.close('boletinModal')" class="w-9 h-9 bg-white/10 hover:bg-white/20 rounded-xl flex items-center justify-center transition-colors shrink-0">
+            <i data-lucide="x" class="w-5 h-5"></i>
+          </button>
+        </div>
       </div>
       <div id="boletinModalBody" class="flex-1 overflow-y-auto p-5 bg-slate-50">
         <div class="text-center py-16 text-slate-400">
@@ -158,16 +180,16 @@ export async function openBoletin(studentId) {
     if (boletin?.error) throw new Error(boletin.error);
 
     body.innerHTML = `
-      <div class="grid lg:grid-cols-[300px_1fr] gap-4 items-start max-w-5xl mx-auto">
-        <div class="space-y-3 lg:sticky lg:top-0">
+      <div class="grid lg:grid-cols-3 gap-5 items-start">
+        <div class="rounded-[2rem] border border-slate-200 shadow-sm overflow-hidden min-w-0 lg:col-span-2">
+          ${renderBoletin(boletin)}
+        </div>
+        <div class="space-y-3 lg:sticky lg:top-0 lg:col-span-1">
           ${boletinEditorHtml(boletin)}
           <button onclick="App.downloadBoletin('${studentId}')"
-            class="w-full px-4 py-2.5 bg-indigo-600 text-white rounded-xl font-black text-xs uppercase shadow-lg shadow-indigo-200 hover:bg-indigo-700 transition-all">
-            <i data-lucide="download" class="w-4 h-4 inline mr-1"></i> Descargar PDF
+            class="w-full px-4 py-3 bg-indigo-600 text-white rounded-xl font-black text-xs uppercase shadow-lg shadow-indigo-200 hover:bg-indigo-700 transition-all flex items-center justify-center gap-2">
+            <i data-lucide="download" class="w-4 h-4"></i> Descargar PDF
           </button>
-        </div>
-        <div class="rounded-[2rem] border border-slate-200 shadow-sm overflow-hidden">
-          ${renderBoletin(boletin)}
         </div>
       </div>`;
     if (window.lucide) window.lucide.createIcons();
@@ -202,8 +224,10 @@ export async function openBoletin(studentId) {
 export async function downloadBoletin(studentId) {
   const classroom = AppState.get('classroom');
   const periodRes = await supabase.rpc('get_active_period', { p_classroom_id: classroom?.id });
-  const period = periodRes?.data;
+  let period = periodRes?.data;
   if (!period || !period.found) return safeToast('No hay período activo', 'warning');
+  const resolved = await resolveActivePeriodConfig(period);
+  if (resolved.config?.length) period = resolved.period;
 
   try {
     safeToast('Generando PDF...', 'info');
@@ -216,4 +240,4 @@ export async function downloadBoletin(studentId) {
   }
 }
 
-export const BoletinModule = { initBoletin, openBoletin, downloadBoletin };
+export const BoletinModule = { openBoletinList, openBoletin, downloadBoletin };

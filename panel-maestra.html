@@ -120,13 +120,18 @@
     /* ═══════════════════════════════════════════════
        CALIFICACIONES — scroll horizontal en tabla
     ═══════════════════════════════════════════════ */
-    #t-grades-inner .grades-table-wrap {
+    .grades-table-wrap {
       width: 100%;
       overflow-x: auto;
       -webkit-overflow-scrolling: touch;
       border-radius: 12px;
     }
+    .grades-table-wrap table {
+      min-width: 640px;
+    }
+    #t-grades-inner .grades-table-wrap,
     #t-grades-inner .grades-table-wrap table {
+      width: 100%;
       min-width: 640px;
     }
 
@@ -388,21 +393,17 @@
         <button data-section="t-home" class="nav-btn-toy w-full active relative" aria-selected="true">
           <i data-lucide="home" class="w-5 h-5"></i>
           <span class="label">Mis Clases</span>
-          <span id="badge-t-home" class="hidden absolute -top-1 -right-1 w-4 h-4 bg-rose-500 text-white text-[9px] font-black rounded-full flex items-center justify-center shadow-sm">0</span>
+          <span id="badge-t-home" class="hidden absolute -top-1.5 -right-1.5 min-w-[20px] h-5 px-1 bg-rose-500 text-white text-[9px] font-black rounded-full flex items-center justify-center shadow-md">0</span>
         </button>
         <button data-section="t-chat" class="nav-btn-toy w-full relative">
           <i data-lucide="message-square" class="w-5 h-5"></i>
           <span class="label">Chat</span>
-          <span id="badge-t-chat" class="hidden absolute -top-1 -right-1 w-4 h-4 bg-rose-500 text-white text-[9px] font-black rounded-full flex items-center justify-center shadow-sm">0</span>
+          <span id="badge-t-chat" class="hidden absolute -top-1.5 -right-1.5 min-w-[20px] h-5 px-1 bg-rose-500 text-white text-[9px] font-black rounded-full flex items-center justify-center shadow-md">0</span>
         </button>
         <button data-section="t-grades" class="nav-btn-toy w-full relative">
           <i data-lucide="graduation-cap" class="w-5 h-5"></i>
           <span class="label">Calificaciones</span>
-          <span id="badge-t-grades" class="hidden absolute -top-1 -right-1 w-4 h-4 bg-rose-500 text-white text-[9px] font-black rounded-full flex items-center justify-center shadow-sm">0</span>
-        </button>
-        <button data-section="t-boletin" class="nav-btn-toy w-full relative">
-          <i data-lucide="file-text" class="w-5 h-5"></i>
-          <span class="label">Boletines</span>
+          <span id="badge-t-grades" class="hidden absolute -top-1.5 -right-1.5 min-w-[20px] h-5 px-1 bg-rose-500 text-white text-[9px] font-black rounded-full flex items-center justify-center shadow-md">0</span>
         </button>
         <button data-section="t-permits" class="nav-btn-toy w-full relative">
           <i data-lucide="calendar-off" class="w-5 h-5"></i>
@@ -537,10 +538,10 @@
           </button>
           <div class="min-w-0 flex-1">
             <h1 class="text-xl md:text-2xl font-bold text-slate-800 truncate" id="currentClassName">Nombre del Aula</h1>
-            <p class="text-sm text-slate-500">Vista detallada</p>
+            <p class="text-sm text-slate-500" id="class-detail-subtitle">Vista detallada</p>
           </div>
           <div class="flex gap-2 shrink-0">
-            <button id="btnGenerateReport" onclick="document.getElementById('dailyReportModal').classList.remove('hidden'); document.getElementById('dailyReportModal').classList.add('flex');" class="flex items-center gap-2 px-4 py-2 bg-orange-100 border border-orange-200 rounded-xl text-sm font-bold text-orange-700 hover:bg-orange-200 transition-colors">
+            <button id="btnGenerateReport" onclick="App.openDailyReport()" class="flex items-center gap-2 px-4 py-2 bg-orange-100 border border-orange-200 rounded-xl text-sm font-bold text-orange-700 hover:bg-orange-200 transition-colors">
               <i data-lucide="clipboard-list" class="w-4 h-4"></i>
               <span class="hidden sm:inline">Reporte</span>
             </button>
@@ -635,11 +636,6 @@
       <!-- SECTION: CALIFICACIONES -->
       <section id="t-grades" class="section">
         <div id="t-grades-inner"></div>
-      </section>
-
-      <!-- SECTION: BOLETINES -->
-      <section id="t-boletin" class="section">
-        <div id="t-boletin-inner"></div>
       </section>
 
       <!-- SECTION: CHAT UNIFICADO -->

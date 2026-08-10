@@ -24,25 +24,3 @@ export const TABLES = Object.freeze({
   STAFF_PERMITS: 'staff_permits'
 });
 
-// ============================
-// 👥 ROLES
-// ============================
-export const ROLES = Object.freeze({
-  DIRECTORA: 'directora',
-  ASISTENTE: 'asistente',
-  MAESTRA: 'maestra',
-  PADRE: 'padre'
-});
-
-// ============================
-// 📊 ESTADOS
-// ============================
-
-// 💰 Pagos
-export const PAYMENT_STATUS = Object.freeze({
-  PENDING: 'pending',
-  PAID: 'paid',
-  OVERDUE: 'overdue',
-  CANCELLED: 'cancelled'
-});
-

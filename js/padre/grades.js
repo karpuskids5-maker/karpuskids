@@ -225,7 +225,7 @@ export const GradesModule = {
                         return `
                           <div class="px-4 py-3 flex items-center justify-between hover:bg-slate-50/50 transition-colors">
                             <div class="flex items-center gap-3">
-                              <span class="w-7 h-7 bg-indigo-50 text-indigo-600 rounded-lg flex items-center justify-center font-black text-xs">${g.activity_number}</span>
+                              <span class="w-7 h-7 ${g.is_task ? 'bg-violet-50 text-violet-600' : 'bg-indigo-50 text-indigo-600'} rounded-lg flex items-center justify-center font-black text-xs">${g.is_task ? '📝' : g.activity_number}</span>
                               <span class="text-sm font-bold text-slate-700">${escapeHtml(g.activity_title)}</span>
                             </div>
                             <span class="text-lg font-black ${scoreColor}">${score != null ? score.toFixed(1) : '—'}</span>

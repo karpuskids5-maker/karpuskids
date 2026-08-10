@@ -214,7 +214,7 @@ export const Prefetch = {
 };
 
 // ── Skeletons reutilizables ───────────────────────────────────────────────────
-export const Skeletons = {
+const Skeletons = {
   /** Post del muro con imagen */
   post: () => `
     <div class="bg-white rounded-3xl shadow-sm border border-slate-100 overflow-hidden mb-6 animate-pulse">

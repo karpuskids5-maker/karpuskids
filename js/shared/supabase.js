@@ -161,29 +161,6 @@ window.addEventListener('unhandledrejection', (e) => {
 
 export const TERMS_VERSION = '1.0';
 
-// ── Session Guard — verificar sesión en cada cambio de sección ───────────────
-// Llama esto desde los módulos de navegación para proteger rutas del cliente
-export async function guardSession() {
-  try {
-    const { data: { session } } = await supabase.auth.getSession();
-    if (!session?.user) {
-      window.location.href = 'login.html';
-      return false;
-    }
-    // Verificar expiración del token
-    const expiresAt = session.expires_at || 0;
-    const nowSecs   = Math.floor(Date.now() / 1000);
-    if (expiresAt - nowSecs < 30) {
-      const { error } = await supabase.auth.refreshSession();
-      if (error) { window.location.href = 'login.html'; return false; }
-    }
-    return true;
-  } catch (_) {
-    window.location.href = 'login.html';
-    return false;
-  }
-}
-
 /**
  * ensureRole: Verifica el rol del usuario actual y retorna {user, profile}
  */
@@ -395,7 +372,7 @@ export async function notifyPaymentApproved(paymentId, parentEmail, studentName,
 //   - Comprueba /version.json cada 60s; si cambió, limpia las cachés
 //     viejas (karpus-*) y recarga la app.
 // Idempotente: seguro de llamar desde cualquier panel y coexistir con OneSignal.
-export function initPwaUpdater() {
+function initPwaUpdater() {
   try {
     if (window.__karpusPwaStarted) return;
     if (!('serviceWorker' in navigator)) return;

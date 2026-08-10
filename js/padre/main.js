@@ -110,6 +110,10 @@ document.addEventListener('DOMContentLoaded', async () => {
     AppState.set('activePeriod', SchoolEngine.getActivePeriod());
     AppState.set('periods', SchoolEngine.getAllPeriods());
 
+    // 🔁 Botón de Reinscripción: solo visible durante el período de reinscripción
+    const reenrollBtn = document.querySelector('.node-reenrollment');
+    if (reenrollBtn) reenrollBtn.classList.toggle('hidden', !SchoolEngine.isReenrollmentOpen());
+
     // ⚡ PREFETCH: Iniciar carga silenciosa de recursos críticos
     Prefetch.start({
       userId: auth.user.id,
