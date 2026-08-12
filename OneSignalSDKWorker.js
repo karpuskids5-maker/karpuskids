@@ -26,8 +26,8 @@ importScripts('https://cdn.onesignal.com/sdks/web/v16/OneSignalSDK.sw.js');
 self.addEventListener('message', () => {});
 
 // ── VERSIÓN DE CACHÉ ────────────────────────────────────────────
-// ⚠️ INCREMENTAR en cada deploy: karpus-v1.0.26 → karpus-v1.0.27 ...
-const CACHE_VERSION = 'karpus-v1.0.26';
+// ⚠️ INCREMENTAR en cada deploy: karpus-v1.0.27 → karpus-v1.0.28 ...
+const CACHE_VERSION = 'karpus-v1.0.27';
 const CACHE_NAME    = CACHE_VERSION;
 
 // Assets precacheados en la instalación (mínimos, network-first en runtime)

@@ -43,7 +43,9 @@ export const BadgeSystem = {
   },
 
   _getBadgeCount(section) {
-    const el = document.getElementById('badge-' + section);
+    // Leer el badge del sidebar o, si no existe, el de la tarjeta del
+    // dashboard (badge-card-*) para que los incrementos acumulen el total real.
+    const el = document.getElementById('badge-' + section) || document.getElementById('badge-card-' + section);
     return el ? (parseInt(el.textContent) || 0) : 0;
   },
 

@@ -365,12 +365,15 @@ export async function notifyPaymentApproved(paymentId, parentEmail, studentName,
   ]);
 }
 
-// ── PWA: actualización automática ─────────────────────────────────────────────
-// Registra el Service Worker de caché (OneSignalSDKWorker.js) y detecta
-// nuevas versiones publicadas:
-//   - Recarga automáticamente cuando el nuevo worker toma control.
-//   - Comprueba /version.json cada 60s; si cambió, limpia las cachés
-//     viejas (karpus-*) y recarga la app.
+// ── PWA: actualización profesional ───────────────────────────────────────────
+// La detección de versiones y la UI (banner obligatorio + pantalla de
+// instalación tipo app nativa) viven en js/pwa-updater.js
+// (window.KarpusPwaUpdater). Aquí solo:
+//   - Registra el Service Worker (mismo archivo que usa OneSignal → mismo
+//     scope, el navegador deduplica el registro). No interfiere con las push.
+//   - Reacciona cuando el nuevo worker toma control redirigiendo a la UI.
+//   - Si el script de la UI aún no cargó (página vieja en caché), usa el
+//     mecanismo legacy de recarga silenciosa para nunca quedarse atascado.
 // Idempotente: seguro de llamar desde cualquier panel y coexistir con OneSignal.
 function initPwaUpdater() {
   try {
@@ -378,41 +381,51 @@ function initPwaUpdater() {
     if (!('serviceWorker' in navigator)) return;
     window.__karpusPwaStarted = true;
 
-    const VERSION_KEY = 'karpus_pwa_version';
-
-    // Registrar el worker (mismo archivo que usa OneSignal → mismo scope,
-    // el navegador deduplica la registro). No interfiere con las push.
+    // Registrar el worker (mismo archivo que usa OneSignal → mismo scope)
     navigator.serviceWorker.register('OneSignalSDKWorker.js', { scope: '/' }).catch(() => {});
 
-    // Nuevo worker tomó control (skipWaiting + clients.claim) → recargar
+    // Nuevo worker tomó control (skipWaiting + clients.claim) → actualizar
     navigator.serviceWorker.addEventListener('controllerchange', () => {
-      window.location.reload();
+      const updater = window.KarpusPwaUpdater;
+      if (updater && updater.onControllerChange) updater.onControllerChange();
+      else window.location.reload();
     });
 
-    const checkVersion = async () => {
-      try {
-        const res = await fetch('/version.json', { cache: 'no-store', headers: { 'Cache-Control': 'no-cache' } });
-        if (!res.ok) return;
-        const data = await res.json();
-        if (!data?.version) return;
-        const known = localStorage.getItem(VERSION_KEY);
-        if (known && known !== data.version) {
-          // Nueva versión publicada → limpiar cachés viejas y recargar
-          try {
-            const keys = await caches.keys();
-            await Promise.all(keys.filter(k => k.startsWith('karpus-')).map(k => caches.delete(k)));
-          } catch (_) {}
-          localStorage.setItem(VERSION_KEY, data.version);
-          window.location.reload();
-        } else if (!known) {
-          localStorage.setItem(VERSION_KEY, data.version);
-        }
-      } catch (_) {}
+    // Delegar la detección de versiones a la UI profesional.
+    let tries = 0;
+    const startUpdater = () => {
+      if (window.KarpusPwaUpdater) { window.KarpusPwaUpdater.start(); return; }
+      if (++tries < 40) setTimeout(startUpdater, 250);
+      else legacyAutoReload();
     };
-
-    checkVersion();
-    setInterval(checkVersion, 60000);
+    startUpdater();
   } catch (_) {}
+}
+
+// Fallback para páginas viejas en caché sin js/pwa-updater.js
+function legacyAutoReload() {
+  const VERSION_KEY = 'karpus_pwa_version';
+  const checkVersion = async () => {
+    try {
+      const res = await fetch('/version.json', { cache: 'no-store', headers: { 'Cache-Control': 'no-cache' } });
+      if (!res.ok) return;
+      const data = await res.json();
+      if (!data?.version) return;
+      const known = localStorage.getItem(VERSION_KEY);
+      if (known && known !== data.version) {
+        try {
+          const keys = await caches.keys();
+          await Promise.all(keys.filter(k => k.startsWith('karpus-')).map(k => caches.delete(k)));
+        } catch (_) {}
+        localStorage.setItem(VERSION_KEY, data.version);
+        window.location.reload();
+      } else if (!known) {
+        localStorage.setItem(VERSION_KEY, data.version);
+      }
+    } catch (_) {}
+  };
+  checkVersion();
+  setInterval(checkVersion, 60000);
 }
 
 // ── OneSignal ─────────────────────────────────────────────────────────────────

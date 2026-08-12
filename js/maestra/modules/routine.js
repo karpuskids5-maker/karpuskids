@@ -533,7 +533,7 @@ function _renderRoutineLayout({ todayLabel, students, logsMap, withReport, sched
               ${schedule.map((ev, i) => {
                 const state    = _getTimelineState(ev);
                 const isActive = state === 'in_progress';
-                const isPast   = state === 'completed';
+                const isTimePast = state === 'completed';
                 const isNext   = state === 'pending' && schedule.slice(0, i).every(e => _getTimelineState(e) === 'completed');
                 const timeStr  = _formatTime12(ev.hour, ev.minute);
                 const eventIcon = _getScheduleEventIcon(ev.type);
@@ -547,21 +547,31 @@ function _renderRoutineLayout({ todayLabel, students, logsMap, withReport, sched
                   return evts.some(e => e.type === ev.type);
                 }).length;
 
+                // Estado REAL: "Hecho" SOLO si está registrado (no por el reloj).
+                // Si la hora ya pasó y nadie registró → queda "Sin registrar".
+                const isRegistered = studentsWithEvent > 0;
+                const isDone   = isTimePast && isRegistered;
+                const isMissed = isTimePast && !isRegistered;
+
                 const activeSoftBgs = {
                   bienvenida:'#f1f5f9', desayuno:'#fef3c7', actividad:'#eff6ff',
                   bano:'#f0fdfa', patio:'#f0fdf4', almuerzo:'#f0fdf4',
                   siesta:'#eef2ff', merienda:'#ecfccb', biberon:'#f0f9ff'
                 };
 
+                const rowBgCls = isActive
+                  ? 'bg-gradient-to-r from-[#FF8A00]/10 to-orange-50 border-2 border-[#FF8A00]/30 shadow-md shadow-orange-100/50'
+                  : isDone
+                    ? 'bg-green-50/70 border-2 border-green-200/70 hover:bg-green-50'
+                    : isMissed
+                      ? 'bg-amber-50/70 border-2 border-amber-200/70 hover:bg-amber-50'
+                      : 'border-2 border-transparent hover:bg-slate-50';
+
                 return `
                 <div class="relative">
                   <div
                     onclick="App.openBulkEventModal('${ev.type}', '${timeStr}')"
-                    class="relative flex items-start gap-4 w-full p-3 rounded-2xl transition-all active:scale-[0.98] cursor-pointer ${
-                      isActive ? `bg-gradient-to-r from-[#FF8A00]/10 to-orange-50 border-2 border-[#FF8A00]/30 shadow-md shadow-orange-100/50` :
-                      isPast ? 'bg-slate-50/80 border-2 border-transparent hover:bg-slate-50' :
-                      'border-2 border-transparent hover:bg-slate-50'
-                    }" data-index="${i}">
+                    class="relative flex items-start gap-4 w-full p-3 rounded-2xl transition-all active:scale-[0.98] cursor-pointer ${rowBgCls}" data-index="${i}">
 
                     <!-- Icono en la línea -->
                     <div class="w-9 h-9 rounded-xl flex items-center justify-center text-base shrink-0 z-10 transition-all ${isActive ? 'text-white shadow-lg scale-110 tl-pulse' : 'text-slate-500'}" style="${isActive ? 'background:linear-gradient(135deg, #FF8A00, #f97316);box-shadow:0 4px 12px rgba(255,138,0,0.3);' : `background:${activeSoftBgs[ev.type] || '#f1f5f9'};`}">
@@ -571,18 +581,19 @@ function _renderRoutineLayout({ todayLabel, students, logsMap, withReport, sched
                     <!-- Contenido -->
                     <div class="flex-1 text-left min-w-0">
                       <div class="flex items-center gap-2 mb-0.5">
-                        <span class="text-[11px] font-black ${isActive ? 'text-[#FF8A00]' : isPast ? 'text-slate-500' : 'text-slate-400'}">${timeStr}</span>
+                        <span class="text-[11px] font-black ${isActive ? 'text-[#FF8A00]' : isDone ? 'text-[#28B54D]' : isMissed ? 'text-amber-600' : 'text-slate-400'}">${timeStr}</span>
                         ${isActive ? '<span class="px-2 py-0.5 bg-[#FF8A00] text-white text-[7px] font-black uppercase rounded-lg animate-pulse shadow-sm">AHORA</span>' : ''}
                         ${isNext ? '<span class="px-2 py-0.5 bg-indigo-500 text-white text-[7px] font-black uppercase rounded-lg shadow-sm">SIGUIENTE</span>' : ''}
-                        ${isPast ? '<span class="px-2 py-0.5 bg-slate-200 text-slate-500 text-[7px] font-black uppercase rounded-lg">✓ Hecho</span>' : ''}
+                        ${isDone ? '<span class="px-2 py-0.5 bg-green-100 text-[#28B54D] text-[7px] font-black uppercase rounded-lg">✓ Hecho</span>' : ''}
+                        ${isMissed ? '<span class="px-2 py-0.5 bg-amber-100 text-amber-700 text-[7px] font-black uppercase rounded-lg">Sin registrar</span>' : ''}
                       </div>
                       <p class="text-sm font-black text-slate-700 leading-tight">${ev.label}</p>
                       <div class="flex items-center gap-3 mt-1">
                         <span class="text-[9px] font-bold text-slate-400">${endTime}</span>
                         <span class="text-[9px] font-bold text-slate-300">·</span>
                         <span class="text-[9px] font-bold text-slate-400">${ev.duration || 30}min</span>
-                        ${studentsWithEvent > 0 ? `
-                          <span class="text-[9px] font-black ${studentsWithEvent === presentStudents.length ? 'text-[#28B54D]' : 'text-[#FF8A00]'}">
+                        ${presentStudents.length ? `
+                          <span class="text-[9px] font-black ${isDone ? 'text-[#28B54D]' : 'text-[#FF8A00]'}">
                             ${studentsWithEvent}/${presentStudents.length} alumnos
                           </span>
                         ` : ''}
@@ -613,16 +624,21 @@ function _renderRoutineLayout({ todayLabel, students, logsMap, withReport, sched
             ${schedule.map((ev, i) => {
               const state    = _getTimelineState(ev);
               const isActive = state === 'in_progress';
-              const isPast   = state === 'completed';
+              const isTimePast = state === 'completed';
+              const isRegistered = students.filter(s => _isStudentPresent(s.id) && (logsMap[s.id]?.events || []).some(e => e.type === ev.type)).length > 0;
+              const isDone   = isTimePast && isRegistered;
+              const isMissed = isTimePast && !isRegistered;
               return `
               <button onclick="App.openBulkEventModal('${ev.type}', '${_formatTime12(ev.hour, ev.minute)}')"
                 class="flex flex-col items-center gap-1 px-3 py-2 rounded-2xl transition-all active:scale-90 ${
                   isActive ? 'bg-[#FF8A00]/10 scale-110 shadow-sm' :
-                  isPast ? 'bg-slate-50/50' : 'hover:bg-slate-50'
+                  isDone ? 'bg-green-50' :
+                  isMissed ? 'bg-amber-50' : 'hover:bg-slate-50'
                 }">
                 <span class="text-xl leading-none ${isActive ? 'drop-shadow-md' : ''}">${_getScheduleEventIcon(ev.type)}</span>
                 ${isActive ? '<span class="w-1.5 h-1.5 bg-[#FF8A00] rounded-full tl-pulse"></span>' :
-                  isPast ? '<span class="w-1.5 h-1.5 bg-[#28B54D] rounded-full"></span>' :
+                  isDone ? '<span class="w-1.5 h-1.5 bg-[#28B54D] rounded-full"></span>' :
+                  isMissed ? '<span class="w-1.5 h-1.5 bg-amber-500 rounded-full"></span>' :
                   '<span class="w-1.5 h-1.5 bg-slate-200 rounded-full"></span>'}
               </button>`;
             }).join('')}
@@ -1208,8 +1224,7 @@ export async function confirmBulkEvent(eventType) {
     safeToast(`${_getEventMeta(eventType)?.label || eventType} registrado para ${selected.length} estudiante${selected.length > 1 ? 's' : ''}`);
 
     await _refreshLogsMap(classroom.id, today);
-    _refreshStudentCards();
-    _refreshReportCount();
+    _reRenderTimeline();
     _showUndoBar(eventType, selected, prevState);
 
   } catch (e) {
@@ -1269,8 +1284,7 @@ export async function undoLastBulk() {
     document.getElementById('undoBarWrapper').innerHTML = '';
     safeToast('Registro revertido', 'success');
     await _refreshLogsMap(classroom.id, today);
-    _refreshStudentCards();
-    _refreshReportCount();
+    _reRenderTimeline();
   } catch (e) { safeToast('Error al deshacer', 'error'); }
 }
 
@@ -1330,7 +1344,7 @@ export async function wakeAllSiestas() {
     await _logTimelineEvent(classroom, 'siesta', active.map(s => s.id), { metadata: { action: 'wake_all' } });
     safeToast(`${active.length} siesta${active.length > 1 ? 's' : ''} cerrada${active.length > 1 ? 's' : ''}`);
     await _refreshLogsMap(classroom.id, today);
-    _refreshStudentCards();
+    _reRenderTimeline();
     const banner = document.querySelector('#routineWrapper [class*="border-purple-200"]');
     if (banner) banner.remove();
   } catch(e) { safeToast('Error al cerrar siestas', 'error'); }
@@ -1818,8 +1832,7 @@ export async function saveInfantEntry(sid) {
     safeToast('Registro guardado');
     Modal.close('routineStudentModal');
     await _refreshLogsMap(classroom.id, today);
-    _refreshStudentCards();
-    _refreshReportCount();
+    _reRenderTimeline();
   } catch (e) {
     safeToast('Error al guardar', 'error');
     if (btn) { btn.disabled = false; btn.innerHTML = 'Guardar Registro'; }
@@ -1886,7 +1899,7 @@ export async function wakeStudentSiesta(studentId) {
     safeToast('Siesta cerrada');
     Modal.close('routineStudentModal');
     await _refreshLogsMap(classroom.id, today);
-    _refreshStudentCards();
+    _reRenderTimeline();
   } catch (e) { safeToast('Error al cerrar siesta', 'error'); }
 }
 
@@ -1902,7 +1915,7 @@ export async function publishAll() {
     safeToast('Reportes publicados', 'success');
     document.getElementById('btnPublishAll')?.classList.add('hidden');
     await _refreshLogsMap(classroom.id, today);
-    _refreshStudentCards();
+    _reRenderTimeline();
   } catch (e) { safeToast('Error al publicar', 'error'); }
 }
 
@@ -1954,8 +1967,7 @@ export async function registerIndividualEvent(sid, type, extra = {}) {
     if (type === 'medicamento_extra') detail = [extra.nombre, extra.dosis].filter(Boolean).join(' · ');
     safeToast(`${icon} ${label}${detail} registrado`);
     await _refreshLogsMap(classroom.id, today);
-    _refreshStudentCards();
-    _refreshReportCount();
+    _reRenderTimeline();
     const tlContainer = document.getElementById(`ind-timeline-${sid}`);
     if (tlContainer) {
       const updatedLog = (AppState.get('logsMap') || {})[sid] || {};

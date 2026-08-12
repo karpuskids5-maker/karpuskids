@@ -349,6 +349,13 @@ function _formatTime12(h, m) {
   return `${hh}:${String(m).padStart(2,'0')} ${ampm}`;
 }
 
+function _timeToMins(isoStr) {
+  if (!isoStr) return -1;
+  const d = new Date(isoStr);
+  if (isNaN(d.getTime())) return -1;
+  return d.getHours() * 60 + d.getMinutes();
+}
+
 function _renderTimeline(events, schedule = [], date = '') {
   const sched = schedule.length ? schedule : _DEFAULT_SCHEDULE;
   const isToday = date === _todayStr();
@@ -362,7 +369,7 @@ function _renderTimeline(events, schedule = [], date = '') {
     loggedByType[ev.type].push(ev);
   });
 
-  // Encontrar el slot activo (el más reciente que ya pasó o está pasando)
+  // Último slot del horario que ya comenzó (hoy)
   let activeIdx = -1;
   if (isToday) {
     for (let i = sched.length - 1; i >= 0; i--) {
@@ -371,8 +378,11 @@ function _renderTimeline(events, schedule = [], date = '') {
     }
   }
 
-  // Construir items del timeline combinando schedule + eventos extra
-  const scheduleItems = sched.map((ev, i) => {
+  const scheduleTypes = new Set(sched.map(s => s.type));
+  const timeline = [];
+
+  // ── Bloques del horario programado ──
+  sched.forEach((ev, i) => {
     const timeStr = _formatTime12(ev.hour, ev.minute);
     const endMins = ev.hour * 60 + ev.minute + (ev.duration || 30);
     const endTimeStr = _formatTime12(Math.floor(endMins / 60), endMins % 60);
@@ -395,6 +405,10 @@ function _renderTimeline(events, schedule = [], date = '') {
                           (loggedByType['structured_entry'] || []).length > 0;
 
     const isLogged = evType === 'biberon' ? hasMilkLogged : hasLogged;
+
+    // Revelación progresiva: hoy solo aparecen los eventos ya vividos
+    // (el resto de la jornada queda oculto hasta que llegue su hora)
+    if (isToday && isFuture && !isLogged) return;
 
     // Icono del schedule o del EVENT_META
     const icon = ev.icon || EVENT_META[evType]?.icon || '⏰';
@@ -421,19 +435,21 @@ function _renderTimeline(events, schedule = [], date = '') {
     let statusBadge = '';
     if (isActive) {
       statusBadge = '<span class="px-2 py-0.5 bg-[#FF8A00] text-white text-[7px] font-black uppercase rounded-lg animate-pulse">AHORA</span>';
-    } else if (isPast) {
-      statusBadge = isLogged
-        ? '<span class="px-2 py-0.5 bg-green-100 text-[#28B54D] text-[7px] font-black uppercase rounded-lg">✓ Hecho</span>'
-        : '<span class="px-2 py-0.5 bg-slate-100 text-slate-400 text-[7px] font-black uppercase rounded-lg">—</span>';
+    } else if (isLogged) {
+      statusBadge = '<span class="px-2 py-0.5 bg-green-100 text-[#28B54D] text-[7px] font-black uppercase rounded-lg">✓ Hecho</span>';
+    } else if (isToday && isPast) {
+      statusBadge = '<span class="px-2 py-0.5 bg-slate-100 text-slate-400 text-[7px] font-black uppercase rounded-lg">—</span>';
     }
 
     const borderCls = isActive
       ? 'border-2 border-[#FF8A00]/30 bg-gradient-to-r from-[#FF8A00]/5 to-orange-50/50 shadow-sm'
-      : isPast && isLogged
+      : isLogged
         ? 'border-2 border-green-100 bg-green-50/30'
         : 'border-2 border-transparent';
 
-    return `
+    timeline.push({
+      timeMins: ev.hour * 60 + ev.minute,
+      html: `
     <div class="relative flex items-start gap-4 p-3 rounded-2xl ${borderCls}">
       <div class="w-9 h-9 rounded-xl flex items-center justify-center text-base shrink-0 z-10 ${isActive ? 'shadow-md' : ''}"
         style="${isActive ? 'background:linear-gradient(135deg, #FF8A00, #f97316);color:white;box-shadow:0 4px 12px rgba(255,138,0,0.3);' : 'background:white;border:2px solid #f1f5f9;'}">
@@ -441,7 +457,7 @@ function _renderTimeline(events, schedule = [], date = '') {
       </div>
       <div class="flex-1 pb-1">
         <div class="flex items-center gap-2 mb-0.5">
-          <span class="text-[11px] font-black ${isActive ? 'text-[#FF8A00]' : isPast ? 'text-slate-500' : 'text-slate-400'}">${timeStr}</span>
+          <span class="text-[11px] font-black ${isActive ? 'text-[#FF8A00]' : isLogged || isPast ? 'text-slate-500' : 'text-slate-400'}">${timeStr}</span>
           ${statusBadge}
         </div>
         <p class="text-xs font-black ${isPast ? 'text-slate-600' : 'text-slate-700'} leading-tight">${ev.label}</p>
@@ -452,14 +468,12 @@ function _renderTimeline(events, schedule = [], date = '') {
         </div>
         ${detail ? `<p class="text-[10px] font-medium text-slate-500 mt-0.5 leading-snug">${detail}</p>` : ''}
       </div>
-    </div>`;
+    </div>`,
+    });
   });
 
-  // Eventos extra que no están en el schedule (fiebre, accidente, golpe, medicamento, nota, etc.)
-  const scheduleTypes = new Set(sched.map(s => s.type));
-  const extraEvents = events.filter(ev => !scheduleTypes.has(ev.type));
-
-  const extraItems = extraEvents.map(ev => {
+  // ── Eventos reales no programados (fiebre, accidente, golpe, medicamento, nota, etc.) ──
+  events.filter(ev => !scheduleTypes.has(ev.type)).forEach(ev => {
     const meta = EVENT_META[ev.type] || { icon: '📋', label: ev.type };
     let detail = '';
     let alertCls = '';
@@ -494,8 +508,10 @@ function _renderTimeline(events, schedule = [], date = '') {
       detail = ev.comment;
     }
 
-    return `
-    <div class="relative flex items-start gap-4 p-3 rounded-2xl border-2 ${alertCls || 'border-transparent'}">
+    timeline.push({
+      timeMins: _timeToMins(ev.created_at),
+      html: `
+    <div class="relative flex items-start gap-4 p-3 rounded-2xl border-2 ${alertCls || 'border-slate-100/80 bg-slate-50/40'}">
       <div class="w-9 h-9 rounded-xl flex items-center justify-center text-base shrink-0 z-10" style="background:white;border:2px solid #f1f5f9;">
         ${meta.icon}
       </div>
@@ -506,19 +522,58 @@ function _renderTimeline(events, schedule = [], date = '') {
         <p class="text-xs font-black text-slate-700 leading-tight">${meta.label}</p>
         ${detail ? `<p class="text-[10px] font-medium text-slate-500 mt-0.5 leading-snug">${detail}</p>` : ''}
       </div>
-    </div>`;
+    </div>`,
+    });
   });
 
-  const allItems = [...scheduleItems, ...extraItems];
-  if (!allItems.length) return '';
+  // Ordenar cronológicamente por la hora real en que ocurrió cada evento
+  timeline.sort((a, b) => (a.timeMins < 0 ? 1441 : a.timeMins) - (b.timeMins < 0 ? 1441 : b.timeMins));
+
+  const shown = timeline.length;
+  const startedSlots = isToday ? Math.max(0, activeIdx + 1) : sched.length;
+  const pct = sched.length ? Math.min(100, Math.round(startedSlots / sched.length * 100)) : 0;
+
+  const timelineBody = shown
+    ? `<div class="relative">
+        <div class="absolute left-[18px] top-5 bottom-5 w-0.5 bg-gradient-to-b from-slate-200 via-slate-100 to-transparent"></div>
+        <div class="space-y-1">${timeline.map(t => t.html).join('')}</div>
+      </div>`
+    : `<div class="text-center py-8 px-4">
+        <span class="text-3xl block mb-2">${isToday ? '⏳' : '📭'}</span>
+        <p class="text-xs font-black text-slate-400">${isToday ? 'Aún no hay eventos registrados hoy.' : 'No hay eventos registrados este día.'}</p>
+        <p class="text-[10px] font-medium text-slate-300 mt-1">${isToday ? 'Aquí verás la cronología del día a medida que la maestra registre cada actividad.' : ''}</p>
+      </div>`;
 
   return `
-  <div class="bg-white border border-slate-100 rounded-[1.5rem] shadow-sm p-5">
-    <p class="text-[11px] font-black text-slate-400 uppercase tracking-widest mb-4">Historial del día</p>
-    <div class="relative">
-      <div class="absolute left-[18px] top-5 bottom-5 w-0.5 bg-gradient-to-b from-slate-200 via-slate-100 to-transparent"></div>
-      <div class="space-y-1">${allItems.join('')}</div>
+  <div class="bg-white border border-slate-100 rounded-[1.5rem] shadow-sm overflow-hidden">
+    <div class="px-5 pt-4 pb-3 border-b border-slate-100" style="background:linear-gradient(135deg, #f0fdf4 0%, #ffffff 100%);">
+      <div class="flex items-center justify-between gap-3">
+        <div class="flex items-center gap-2.5 min-w-0">
+          <span class="w-8 h-8 bg-[#28B54D]/10 rounded-xl flex items-center justify-center text-base shrink-0">⏱️</span>
+          <div class="min-w-0">
+            <p class="text-[11px] font-black text-slate-700 uppercase tracking-widest">Historial del día</p>
+            <p class="text-[9px] font-bold text-slate-400 truncate">${isToday ? 'Cronología en tiempo real' : _formatDateLong(date)}</p>
+          </div>
+        </div>
+        ${isToday
+          ? `<span class="flex items-center gap-1.5 px-2.5 py-1 bg-green-100 text-[#28B54D] text-[9px] font-black uppercase tracking-wider rounded-full shrink-0">
+               <span class="w-1.5 h-1.5 bg-[#28B54D] rounded-full animate-pulse"></span>
+               En vivo
+             </span>`
+          : `<span class="px-2.5 py-1 bg-slate-100 text-slate-500 text-[9px] font-black uppercase tracking-wider rounded-full shrink-0">${shown} evento${shown !== 1 ? 's' : ''}</span>`}
+      </div>
+      ${isToday && sched.length ? `
+      <div class="mt-3">
+        <div class="flex items-center justify-between mb-1">
+          <span class="text-[8px] font-black text-slate-400 uppercase tracking-widest">Avance del día</span>
+          <span class="text-[8px] font-black text-[#28B54D]">${Math.min(startedSlots, sched.length)}/${sched.length} actividades</span>
+        </div>
+        <div class="h-1.5 bg-slate-100 rounded-full overflow-hidden">
+          <div class="h-full rounded-full transition-all duration-700" style="width:${pct}%;background:linear-gradient(90deg,#28B54D,#4ade80);"></div>
+        </div>
+      </div>` : ''}
     </div>
+    <div class="p-4 sm:p-5">${timelineBody}</div>
   </div>`;
 }
 

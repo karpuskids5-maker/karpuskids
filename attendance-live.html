@@ -97,6 +97,83 @@
     @media (max-height: 680px) { .scanner-wrap { width: min(80vw, 320px); } .stats { width: min(80vw, 320px); } }
     @media (min-width: 768px)  { .scanner-wrap { width: min(60vw, 580px); } .stats { width: min(60vw, 580px); } }
     @media (min-width: 1024px) { .scanner-wrap { width: min(50vw, 640px); } .stats { width: min(50vw, 640px); } }
+
+    /* ── PWA Install Banner (compacto, móvil-first) ── */
+    #pwa-banner {
+      position: fixed;
+      left: 10px;
+      right: 10px;
+      bottom: calc(10px + env(safe-area-inset-bottom, 0px));
+      z-index: 550; /* debajo del overlay de resultado (600) */
+      display: none;
+      font-family: 'Nunito', system-ui, sans-serif;
+    }
+    #pwa-banner .pwa-card {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      max-width: 420px;
+      margin: 0 auto;
+      background: #ffffff;
+      border: 1.5px solid rgba(16, 185, 129, 0.35);
+      border-radius: 18px;
+      padding: 10px 12px;
+      box-shadow: 0 12px 32px rgba(0, 0, 0, 0.18), 0 2px 8px rgba(16, 185, 129, 0.15);
+    }
+    #pwa-banner .pwa-icon {
+      flex-shrink: 0;
+      width: 38px;
+      height: 38px;
+      border-radius: 12px;
+      background: linear-gradient(135deg, #22c55e, #16a34a);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      box-shadow: 0 4px 10px rgba(34, 197, 94, 0.35);
+    }
+    #pwa-banner .pwa-icon svg { width: 19px; height: 19px; }
+    #pwa-banner .pwa-txt { flex: 1; min-width: 0; }
+    #pwa-banner .pwa-title { font-size: 13px; font-weight: 900; color: #1e293b; line-height: 1.15; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    #pwa-banner .pwa-sub { font-size: 10px; font-weight: 700; color: #64748b; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; margin-top: 1px; }
+    #pwa-banner .pwa-btn {
+      flex-shrink: 0;
+      border: 0;
+      cursor: pointer;
+      font-family: inherit;
+      padding: 9px 13px;
+      border-radius: 12px;
+      background: #059669;
+      color: #fff;
+      font-size: 10px;
+      font-weight: 900;
+      text-transform: uppercase;
+      letter-spacing: 0.4px;
+      transition: transform 0.15s, background 0.15s;
+    }
+    #pwa-banner .pwa-btn:active { transform: scale(0.94); }
+    #pwa-banner .pwa-btn:hover { background: #047857; }
+    #pwa-banner .pwa-close {
+      flex-shrink: 0;
+      width: 30px;
+      height: 30px;
+      border: 0;
+      border-radius: 10px;
+      background: transparent;
+      color: #94a3b8;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 15px;
+      line-height: 1;
+      transition: background 0.15s, color 0.15s;
+    }
+    #pwa-banner .pwa-close:hover { background: #f1f5f9; color: #475569; }
+    @keyframes pwaSlideUp { from { transform: translateY(120%); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
+    #pwa-banner.show { display: block; animation: pwaSlideUp 0.45s cubic-bezier(0.34, 1.56, 0.64, 1); }
+    @media (min-width: 640px) {
+      #pwa-banner { left: auto; right: 16px; bottom: 16px; width: 380px; }
+    }
   </style>
 </head>
 <body>
@@ -157,25 +234,24 @@
     </div>
   </div>
 
-  <!-- PWA Install Banner -->
-  <div id="pwa-banner" class="fixed bottom-6 left-6 right-6 bg-white rounded-3xl shadow-2xl p-6 z-[1000] border-2 border-emerald-100 hidden animate-slideUp">
-    <div class="flex items-center gap-4">
-      <div class="w-14 h-14 bg-emerald-500 rounded-2xl flex items-center justify-center shrink-0 shadow-lg shadow-emerald-200">
-        <i data-lucide="download-cloud" class="w-8 h-8 text-white"></i>
+  <!-- PWA Install Banner (compacto, no tapa la cámara ni los contadores) -->
+  <div id="pwa-banner" role="dialog" aria-label="Instalar aplicación">
+    <div class="pwa-card">
+      <div class="pwa-icon">
+        <i data-lucide="download-cloud"></i>
       </div>
-      <div class="flex-1">
-        <h4 class="font-black text-slate-800 text-lg tracking-tight">¡Descarga la App!</h4>
-        <p class="text-xs font-bold text-slate-400 uppercase tracking-widest">Instala el terminal de ponche</p>
+      <div class="pwa-txt">
+        <p class="pwa-title">Descarga la App</p>
+        <p class="pwa-sub">Terminal de ponche · acceso rápido</p>
       </div>
-      <div class="flex gap-2">
-        <button id="pwa-close" class="p-3 text-slate-400 hover:bg-slate-50 rounded-xl transition-all font-bold text-sm">Cerrar</button>
-        <button id="pwa-install" class="px-6 py-3 bg-emerald-600 text-white rounded-xl font-black text-xs uppercase tracking-widest shadow-lg shadow-emerald-200 hover:bg-emerald-700 active:scale-95 transition-all">Instalar</button>
-      </div>
+      <button id="pwa-close" class="pwa-close" aria-label="Cerrar">✕</button>
+      <button id="pwa-install" class="pwa-btn">Instalar</button>
     </div>
   </div>
 
 <script src="js/shared/supabase-js.min.js"></script>
 <script src="js/shared/lucide.min.js"></script>
+<script src="js/pwa-updater.js" defer></script>
 <script type="module">
 import { supabase } from './js/shared/supabase.js';
 
@@ -192,20 +268,19 @@ if ('serviceWorker' in navigator) {
 window.addEventListener('beforeinstallprompt', (e) => {
   e.preventDefault();
   deferredPrompt = e;
-  banner.classList.remove('hidden');
-  banner.style.display = 'block';
+  banner.classList.add('show');
 });
 
 installBtn?.addEventListener('click', async () => {
   if (!deferredPrompt) return;
   deferredPrompt.prompt();
   const { outcome } = await deferredPrompt.userChoice;
-  if (outcome === 'accepted') banner.style.display = 'none';
+  if (outcome === 'accepted') banner.classList.remove('show');
   deferredPrompt = null;
 });
 
 closeBtn?.addEventListener('click', () => {
-  banner.style.display = 'none';
+  banner.classList.remove('show');
 });
 
 if (window.lucide) lucide.createIcons();
@@ -266,6 +341,8 @@ btnFull.addEventListener('click', () => {
   btnFull.classList.toggle('active', isFullscreen);
   hintText.style.display = isFullscreen ? 'none' : '';
   statsBar.style.display = isFullscreen ? 'none' : '';
+  // Ocultar el banner de instalación mientras el scanner está a pantalla completa
+  if (isFullscreen) banner.classList.remove('show');
 });
 
 // Close fullscreen when overlay shows

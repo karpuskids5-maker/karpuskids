@@ -11,7 +11,7 @@
 // ⚠️ Handler message requerido (Chrome 120+)
 self.addEventListener('message', () => {});
 
-const CACHE_VERSION = 'karpus-live-v2';
+const CACHE_VERSION = 'karpus-live-v3';
 const CACHE_NAME    = CACHE_VERSION;
 
 const PRECACHE = [

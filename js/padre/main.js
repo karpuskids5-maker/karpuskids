@@ -869,7 +869,9 @@ async function loadUnreadBadge() {
     }
     // Si el RPC falla, mostrar 0 silenciosamente
 
-    const badge = document.getElementById('badge-class');
+    // Los mensajes no leídos van en la tarjeta Chat del dashboard.
+    // (badge-class del sidebar es exclusivo para posts nuevos del muro).
+    const badge = document.getElementById('badge-card-notifications');
     if (!badge) return;
 
     if (total > 0) {
@@ -1096,7 +1098,10 @@ async function switchStudent(studentId) {
     // 5. Recargar Dashboard y UI
     updateHeaderProfile(AppState.get('profile'), selected, all);
     await refreshDashboard();
-    
+
+    // Refrescar el badge de reinscripción para el nuevo hijo
+    import('./reinscripcion.js').then(m => m.ReinscripcionModule.checkBadge(selected.id));
+
     // Si estamos en una sección específica, reiniciarla
     const currentSection = AppState.get('currentSection') || 'home';
     navigateTo(currentSection);
