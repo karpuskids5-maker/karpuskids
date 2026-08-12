@@ -951,10 +951,10 @@ window.App.scheduleClassMeeting = async () => {
         const { VideoCallModule } = await import('/js/shared/videocall.js');
         await VideoCallModule.scheduleMeeting({
             title,
-            startTime: new Date().toISOString(),
+            start_time: new Date().toISOString(),
             type: 'classroom',
-            targetId: AppState.get('classroom').id,
-            hostId: AppState.get('user').id
+            target_id: AppState.get('classroom').id,
+            host_id: AppState.get('user').id
         });
         safeToast("Clase programada y notificada");
     } catch(e) { safeToast("Error al programar", "error"); }
@@ -984,9 +984,8 @@ async function startJitsi() {
     // 3. Iniciar la reunión
     await VideoCallModule.startMeeting(meeting.id);
 
-    // 4. Abrir en nueva pestaña (evita lobby membersOnly)
-    const _fullRoom = 'karpuskids-edu-2026_' + meeting.room_name;
-    window.open('https://meet.jit.si/' + _fullRoom, '_blank');
+    // 4. Abrir en nueva pestaña (evita lobby membersOnly) — room_name ya incluye el prefijo único
+    window.open('https://meet.jit.si/' + meeting.room_name, '_blank');
 
     safeToast('¡Clase iniciada! Los padres han sido notificados 🎥', 'success');
   } catch (e) {

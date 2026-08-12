@@ -1367,6 +1367,20 @@ DROP POLICY IF EXISTS "timeline_log_parent" ON public.timeline_event_log;
 CREATE POLICY "timeline_log_parent" ON public.timeline_event_log FOR SELECT
   USING (classroom_id IN (SELECT classroom_id FROM public.students WHERE parent_id = auth.uid()));
 
+-- ── MEETINGS ──
+DROP POLICY IF EXISTS "meetings_staff" ON public.meetings;
+CREATE POLICY "meetings_staff" ON public.meetings FOR ALL
+  USING (get_my_role() IN ('directora','asistente','maestra','admin'))
+  WITH CHECK (get_my_role() IN ('directora','asistente','maestra','admin'));
+DROP POLICY IF EXISTS "meetings_parent" ON public.meetings;
+CREATE POLICY "meetings_parent" ON public.meetings FOR SELECT
+  USING (EXISTS (SELECT 1 FROM public.students WHERE classroom_id = meetings.target_id::bigint AND parent_id = auth.uid()));
+
+-- ── MEETING ATTENDANCE ──
+DROP POLICY IF EXISTS "meeting_att_all" ON public.meeting_attendance;
+CREATE POLICY "meeting_att_all" ON public.meeting_attendance FOR ALL
+  USING (auth.uid() IS NOT NULL);
+
 -- ══════════════════════════════════════════════════════════════
 -- SECCIÓN 9: FUNCIONES UTILITARIAS
 -- ══════════════════════════════════════════════════════════════

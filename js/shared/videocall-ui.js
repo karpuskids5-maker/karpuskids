@@ -7,9 +7,9 @@ import { supabase, sendPush } from './supabase.js';
 import { Helpers } from './helpers.js';
 
 // meet.jit.si funciona sin tenant y sin límite de tiempo para salas con nombre único
-const JITSI_DOMAIN = 'meet.jit.si';
+export const JITSI_DOMAIN = 'meet.jit.si';
 // Prefijo largo y único para evitar colisiones con otras organizaciones
-const ROOM_PREFIX = 'karpuskids-edu-2026';
+export const ROOM_PREFIX = 'karpuskids-edu-2026';
 
 export const VideoCallUI = {
   _api: null,
@@ -203,6 +203,8 @@ export const VideoCallUI = {
         if (error) throw error;
         // Notify parents
         this._notifyParticipants(meeting.id, classroomId);
+        // Marcar el aula como "en vivo" para el badge del padre
+        if (classroomId) await supabase.from('classrooms').update({ is_live: true }).eq('id', classroomId);
         Helpers.toast('Reunión iniciada — notificando a los padres...', 'success');
         this._joinRoom(roomName, userName);
         // Reload section after short delay
@@ -219,6 +221,7 @@ export const VideoCallUI = {
         const room = e.currentTarget.dataset.room;
         const id   = e.currentTarget.dataset.meetingId;
         await supabase.from('meetings').update({ status: 'live' }).eq('id', id);
+        if (classroomId) await supabase.from('classrooms').update({ is_live: true }).eq('id', classroomId);
         this._joinRoom(room, userName);
         this._notifyParticipants(id, classroomId);
         setTimeout(() => this.renderSection(container.id, { role, userName, classroomId }), 1000);
@@ -229,8 +232,7 @@ export const VideoCallUI = {
     container.querySelectorAll('.btn-copy-link').forEach(btn => {
       btn.addEventListener('click', (e) => {
         const room = e.currentTarget.dataset.room;
-        const fullRoom = `${ROOM_PREFIX}_${room}`;
-        const url = `https://${JITSI_DOMAIN}/${fullRoom}`;
+        const url = `https://${JITSI_DOMAIN}/${room}`;
         navigator.clipboard?.writeText(url).then(() => {
           Helpers.toast('Enlace copiado al portapapeles', 'success');
         }).catch(() => {
@@ -245,6 +247,7 @@ export const VideoCallUI = {
         if (!confirm('¿Terminar la reunión para todos?')) return;
         const id = e.currentTarget.dataset.meetingId;
         await supabase.from('meetings').update({ status: 'finished', end_time: new Date().toISOString() }).eq('id', id);
+        if (classroomId) await supabase.from('classrooms').update({ is_live: false }).eq('id', classroomId);
         Helpers.toast('Reunión terminada', 'success');
         this.renderSection(container.id, { role, userName, classroomId });
       });
@@ -268,7 +271,7 @@ export const VideoCallUI = {
   },
 
   _joinRoom(roomName, userName) {
-    const fullRoom = `${ROOM_PREFIX}_${roomName}`;
+    const fullRoom = roomName;
 
     // Track meeting attendance in DB
     supabase.auth.getUser().then(({ data: { user } }) => {
@@ -317,7 +320,7 @@ export const VideoCallUI = {
 
   _startJitsi(roomName, userName, container) {
     try {
-      const fullRoom = `${ROOM_PREFIX}_${roomName}`;
+      const fullRoom = roomName;
 
       this._api = new window.JitsiMeetExternalAPI(JITSI_DOMAIN, {
         roomName:   fullRoom,
@@ -393,11 +396,30 @@ export const VideoCallUI = {
 
       if (role === 'padre' && classroomId) {
         q = q.eq('target_id', classroomId);
+      } else if (role === 'maestra' && classroomId) {
+        q = q.eq('target_id', classroomId);
       }
 
       const { data } = await q;
       return data || [];
     } catch (_) { return []; }
+  },
+
+  /**
+   * Reunión activa de un aula (para el badge "en vivo" del padre).
+   */
+  async getActiveMeeting(classroomId) {
+    if (!classroomId) return null;
+    try {
+      const { data } = await supabase
+        .from('meetings')
+        .select('id, room_name, title')
+        .eq('target_id', classroomId)
+        .eq('status', 'live')
+        .limit(1)
+        .maybeSingle();
+      return data || null;
+    } catch (_) { return null; }
   },
 
   async _notifyParticipants(meetingId, classroomId) {

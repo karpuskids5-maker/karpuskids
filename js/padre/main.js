@@ -1186,9 +1186,8 @@ function _initDailyLogRealtime(studentId) {
 
 async function checkActiveMeetings() {
   try {
-    const { VideoCallModule } = await import('../shared/videocall.js');
-    const meetings = await VideoCallModule.getMyMeetings();
-    const active   = (meetings || []).find(m => m.status === 'live');
+    const student = AppState.get('currentStudent');
+    const active  = await VideoCallUI.getActiveMeeting(student?.classroom_id);
     AppState.set('isClassLive', !!active);
 
     const btn = document.querySelector('[data-target="videocall"]');
@@ -1198,9 +1197,10 @@ async function checkActiveMeetings() {
       btn.classList.remove('hidden');
       btn.classList.add('ring-2', 'ring-rose-400', 'animate-pulse');
       if (!btn._vcInitialized) {
+        const room = active.room_name;
         btn.addEventListener('click', () => {
           navigateTo('videocall');
-          window.open('https://meet.jit.si/karpuskids-edu-2026_' + active.room_name, '_blank');
+          window.open('https://meet.jit.si/' + room, '_blank');
         });
         btn._vcInitialized = true;
       }

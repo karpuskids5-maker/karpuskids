@@ -9,55 +9,29 @@
   <meta http-equiv="Referrer-Policy" content="strict-origin-when-cross-origin">
   <meta http-equiv="Permissions-Policy" content="camera=(self), microphone=(self), geolocation=()">
   <meta name="robots" content="noindex, nofollow">
-  <!-- Anti-clickjacking -->
-  <style>html { display: none; }</style>
+  <!-- Anti-clickjacking + DevTools (script externo — CSP sin 'unsafe-inline') -->
+  <script src="js/login-security.js"></script>
   <!-- X-Frame-Options debe ser configurado por el servidor, no por meta tag -->
-  <script>
-    // Prevenir clickjacking — mostrar solo si es top frame
-    if (self === top) {
-      document.documentElement.style.display = 'block';
-    } else {
-      top.location = self.location;
-    }
-    // Deshabilitar DevTools básico (disuasión)
-    document.addEventListener('contextmenu', e => e.preventDefault());
-    document.addEventListener('keydown', e => {
-      if (e.key === 'F12' || (e.ctrlKey && e.shiftKey && ['I','J','C'].includes(e.key))) {
-        e.preventDefault();
-      }
-    });
-  </script>
-  <!-- CSP: permite CDNs necesarios -->
+  <!-- CSP restrictiva: sin 'unsafe-inline' ni 'unsafe-eval' -->
   <meta http-equiv="Content-Security-Policy" content="
     default-src 'self';
-    script-src 'self' 'unsafe-inline' https://cdn.tailwindcss.com https://cdn.jsdelivr.net https://unpkg.com https://cdn.onesignal.com https://onesignal.com https://api.onesignal.com https://meet.jit.si https://8x8.vc;
-    style-src 'self' 'unsafe-inline' https://fonts.googleapis.com https://cdn.tailwindcss.com https://cdn.jsdelivr.net;
-    font-src 'self' https://fonts.gstatic.com https://cdn.jsdelivr.net;
-    img-src 'self' data: blob: https://*.supabase.co https://*.supabase.in https://karpuskids.com https://cdn.jsdelivr.net https://ui-avatars.com;
+    script-src 'self' https://cdn.jsdelivr.net https://cdn.onesignal.com https://onesignal.com https://api.onesignal.com;
+    style-src 'self' https://fonts.googleapis.com;
+    font-src 'self' https://fonts.gstatic.com;
+    img-src 'self' data: blob: https://*.supabase.co https://*.supabase.in https://karpuskids.com https://ui-avatars.com;
     connect-src 'self' https://*.supabase.co https://*.supabase.in wss://*.supabase.co https://onesignal.com https://api.onesignal.com https://cdn.onesignal.com https://cdn.jsdelivr.net https://fonts.googleapis.com https://fonts.gstatic.com https://8x8.vc https://meet.jit.si https://api.resend.com;
     frame-src https://meet.jit.si https://8x8.vc;
     worker-src 'self' blob:;
     object-src 'none';
     base-uri 'self';
+    form-action 'self';
   ">
     <link rel="stylesheet" href="css/karpus-tailwind.css">
   <link rel="stylesheet" href="css/karpus-modern.css">
   <link href="https://fonts.googleapis.com/css2?family=Nunito:wght@400;600;700;800;900&display=swap" rel="stylesheet">
   <link rel="icon" href="logo/favicon.ico" sizes="any">
   <link rel="manifest" href="manifest.json">
-  <style>
-    * { font-family: 'Nunito', sans-serif; }
-    @keyframes fadeUp { from { opacity:0; transform:translateY(24px); } to { opacity:1; transform:translateY(0); } }
-    .fade-up { animation: fadeUp .5s ease both; }
-    .fade-up-2 { animation: fadeUp .5s .1s ease both; }
-    .fade-up-3 { animation: fadeUp .5s .2s ease both; }
-    @keyframes wiggle { 0%,100%{transform:rotate(-3deg)} 50%{transform:rotate(3deg)} }
-    .wiggle:hover { animation: wiggle .4s ease; }
-    .kk .k1{color:#f97316} .kk .k2{color:#3b82f6} .kk .k3{color:#ec4899}
-    .kk .k4{color:#22c55e} .kk .k5{color:#f97316} .kk .k6{color:#3b82f6}
-    .kk .k7{color:#22c55e} .kk .k8{color:#ec4899} .kk .k9{color:#3b82f6} .kk .k10{color:#f97316}
-    input:-webkit-autofill { -webkit-box-shadow: 0 0 0 40px #f8fafc inset !important; }
-  </style>
+  <link rel="stylesheet" href="css/login.css">
 </head>
 <body class="min-h-screen bg-gradient-to-br from-green-50 via-emerald-50 to-teal-50 flex items-center justify-center p-4">
 
@@ -68,8 +42,7 @@
   <!-- PWA Install Banner — Ad-style, shows for ALL devices -->
   <div id="pwaBanner" class="hidden fixed inset-0 z-[9999] flex items-end justify-center p-4 pb-6 bg-black/40 backdrop-blur-sm">
     <div id="pwaBannerInner"
-      class="w-full max-w-md bg-gradient-to-br from-green-600 via-emerald-500 to-teal-500 rounded-3xl shadow-2xl overflow-hidden border-2 border-white/30"
-      style="animation: bannerSlide .5s cubic-bezier(0.34,1.56,0.64,1) both">
+      class="w-full max-w-md bg-gradient-to-br from-green-600 via-emerald-500 to-teal-500 rounded-3xl shadow-2xl overflow-hidden border-2 border-white/30 pwa-banner-inner">
 
       <!-- Top decoration -->
       <div class="relative px-6 pt-6 pb-4 text-center">
@@ -78,8 +51,7 @@
             class="w-7 h-7 bg-white/20 hover:bg-white/30 rounded-full flex items-center justify-center text-white text-sm font-black transition-all">✕</button>
         </div>
         <!-- Animated icon -->
-        <div class="inline-flex items-center justify-center w-20 h-20 bg-white/20 rounded-3xl mb-3 shadow-lg"
-          style="animation: iconBounce 1.5s ease-in-out infinite">
+        <div class="inline-flex items-center justify-center w-20 h-20 bg-white/20 rounded-3xl mb-3 shadow-lg pwa-icon-bounce">
           <span class="text-4xl">📲</span>
         </div>
         <h2 class="text-white font-black text-xl leading-tight mb-1">¡Descarga Karpus Kids!</h2>
@@ -135,25 +107,6 @@
     </button>
   </div>
 
-  <style>
-    @keyframes fade-in-up {
-      from { opacity: 0; transform: translateY(20px); }
-      to { opacity: 1; transform: translateY(0); }
-    }
-    .animate-fade-in-up { animation: fade-in-up 0.6s cubic-bezier(0.23, 1, 0.32, 1) both; }
-  </style>
-
-  <style>
-    @keyframes bannerSlide {
-      from { opacity:0; transform:translateY(60px) scale(0.92); }
-      to   { opacity:1; transform:translateY(0)    scale(1); }
-    }
-    @keyframes iconBounce {
-      0%,100% { transform: translateY(0) rotate(-3deg); }
-      50%     { transform: translateY(-8px) rotate(3deg); }
-    }
-  </style>
-
   <div class="w-full max-w-sm relative z-10">
 
     <!-- Logo + Brand -->
@@ -175,7 +128,7 @@
 
         <!-- Email -->
         <div>
-          <label class="block text-xs font-black text-slate-500 uppercase tracking-wider mb-1.5">Correo</label>
+          <label for="email" class="block text-xs font-black text-slate-500 uppercase tracking-wider mb-1.5">Correo</label>
           <input id="email" type="email" placeholder="tu@correo.com" required
             class="w-full px-4 py-3 rounded-2xl border-2 border-slate-100 bg-slate-50 text-slate-800 font-bold text-sm
                    focus:outline-none focus:border-green-400 focus:bg-white focus:ring-4 focus:ring-green-50 transition-all">
@@ -183,7 +136,7 @@
 
         <!-- Password -->
         <div>
-          <label class="block text-xs font-black text-slate-500 uppercase tracking-wider mb-1.5">Contraseña</label>
+          <label for="password" class="block text-xs font-black text-slate-500 uppercase tracking-wider mb-1.5">Contraseña</label>
           <div class="relative">
             <input id="password" type="password" placeholder="••••••••" required
               class="w-full px-4 py-3 rounded-2xl border-2 border-slate-100 bg-slate-50 text-slate-800 font-bold text-sm
@@ -249,85 +202,6 @@
   <script type="module" src="js/login.js"></script>
   <script src="js/pwa-install.js" defer></script>
   <script src="js/pwa-updater.js" defer></script>
-  <script>
-    // Toggle password visibility
-    document.getElementById('togglePwd')?.addEventListener('click', () => {
-      const pwd = document.getElementById('password');
-      pwd.type = pwd.type === 'password' ? 'text' : 'password';
-    });
-
-    // PWA Banner — shows on ALL devices (Android, iOS, Desktop)
-    // Always shows unless: already installed, or user dismissed recently
-    (function () {
-      const KEY = 'karpus-pwa-v2';
-      const isInstalled = () =>
-        window.matchMedia('(display-mode: standalone)').matches ||
-        window.navigator.standalone === true ||
-        document.referrer.includes('android-app://');
-
-      const stored = localStorage.getItem(KEY);
-      const snoozed = stored && stored !== 'installed' && Date.now() < parseInt(stored, 10);
-      if (isInstalled() || snoozed || stored === 'installed') return;
-
-      const banner = document.getElementById('pwaBanner');
-      const iosMini = document.getElementById('iosMiniBanner');
-      const isIOS  = /iphone|ipad|ipod/i.test(navigator.userAgent) && !window.MSStream;
-      let deferredPrompt = null;
-
-      // iOS: show mini-banner, hide standard modal
-      if (isIOS) {
-        setTimeout(() => iosMini?.classList.remove('hidden'), 2000);
-        document.getElementById('pwaBannerInstall')?.classList.add('hidden');
-        document.getElementById('iosInstructions')?.classList.remove('hidden');
-      }
-
-      // Capture native install prompt (Android + Desktop Chrome/Edge)
-      window.addEventListener('beforeinstallprompt', (e) => {
-        e.preventDefault();
-        deferredPrompt = e;
-      });
-
-      // Always show after 1.5s — no dependency on beforeinstallprompt
-      if (!isIOS) setTimeout(() => banner?.classList.remove('hidden'), 1500);
-
-      // Install button
-      document.getElementById('pwaBannerInstall')?.addEventListener('click', async () => {
-        if (deferredPrompt) {
-          deferredPrompt.prompt();
-          const { outcome } = await deferredPrompt.userChoice;
-          deferredPrompt = null;
-          if (outcome === 'accepted') {
-            localStorage.setItem(KEY, 'installed');
-            banner?.classList.add('hidden');
-          }
-        } else {
-          // Desktop without prompt: guide user
-          alert('Para instalar en Chrome/Edge:\n\nHaz clic en el ícono ⊕ en la barra de direcciones,\no en el menú ⋮ → "Instalar Karpus Kids".');
-        }
-      });
-
-      const dismiss = (snooze) => {
-        banner?.classList.add('hidden');
-        localStorage.setItem(KEY, snooze ? String(Date.now() + 7 * 24 * 60 * 60 * 1000) : 'installed');
-      };
-
-      const dismissIos = () => {
-        iosMini?.classList.add('hidden');
-        localStorage.setItem(KEY, String(Date.now() + 3 * 24 * 60 * 60 * 1000)); // snooze 3 days
-      };
-
-      document.getElementById('pwaBannerDismiss')?.addEventListener('click',  () => dismiss(true));
-      document.getElementById('pwaBannerDismiss2')?.addEventListener('click', () => dismiss(false));
-      document.getElementById('closeIosBanner')?.addEventListener('click', dismissIos);
-
-      // Tap backdrop to dismiss
-      banner?.addEventListener('click', (e) => { if (e.target === banner) dismiss(true); });
-
-      window.addEventListener('appinstalled', () => {
-        banner?.classList.add('hidden');
-        localStorage.setItem(KEY, 'installed');
-      });
-    })();
-  </script>
+  <script src="js/login-pwa.js" defer></script>
 </body>
 </html>

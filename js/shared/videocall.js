@@ -1,5 +1,6 @@
 ﻿import { supabase, sendPush } from './supabase.js';
 import { Helpers } from './helpers.js';
+import { ROOM_PREFIX } from './videocall-ui.js';
 
 export const VideoCallModule = {
   _domain: 'meet.jit.si',
@@ -10,8 +11,8 @@ export const VideoCallModule = {
    * @param {Object} data { title, description, start_time, type, target_id, host_id }
    */
   async scheduleMeeting(data) {
-    // Generar sala única y segura
-    const roomName = `karpus_${data.type}_${Date.now()}_${Math.random().toString(36).substring(7)}`;
+    // Generar sala única y segura (mismo esquema que VideoCallUI)
+    const roomName = `${ROOM_PREFIX}_${data.type}_${Date.now()}_${Math.random().toString(36).substring(7)}`;
 
     const { data: meeting, error } = await supabase
       .from('meetings')
@@ -68,15 +69,21 @@ export const VideoCallModule = {
   },
 
   /**
-   * 📥 Obtener mis reuniones (Lógica Unificada)
+   * 📥 Obtener reuniones (filtradas por aula si se indica)
+   * @param {number|string|null} classroomId Filtra por aula (padre/maestra)
    */
-  async getMyMeetings() {
-    const { data, error } = await supabase
+  async getMyMeetings(classroomId) {
+    let q = supabase
       .from('meetings')
       .select('*, host:host_id(name)')
-      .or(`status.eq.scheduled,status.eq.live`) 
+      .in('status', ['scheduled', 'live'])
       .order('start_time', { ascending: true });
-    
+
+    if (classroomId) {
+      q = q.eq('target_id', classroomId);
+    }
+
+    const { data, error } = await q;
     if (error) throw error;
     return data || [];
   },

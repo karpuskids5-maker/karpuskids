@@ -83,7 +83,7 @@
     const dismissed = localStorage.getItem('pwa-dismissed');
     if (!dismissed) return true;
     if (dismissed === 'installed') return false;
-    return Date.now() > parseInt(dismissed, 10);
+    return Date.now() > Number.parseInt(dismissed, 10);
   }
 
   // ── Evento beforeinstallprompt ─────────────────────────────────────────────
@@ -158,7 +158,10 @@
   });
 
   // ── CSS para animación del banner ──────────────────────────────────────────
-  const style = document.createElement('style');
-  style.textContent = '@keyframes slideUp{from{transform:translateY(100%);opacity:0}to{transform:translateY(0);opacity:1}}.animate-slide-up{animation:slideUp 0.4s cubic-bezier(0.34,1.56,0.64,1) forwards}';
-  document.head.appendChild(style);
+  // Hoja externa (css/pwa-install.css) en vez de <style> inline para cumplir
+  // una CSP restrictiva sin 'unsafe-inline'.
+  const cssLink = document.createElement('link');
+  cssLink.rel = 'stylesheet';
+  cssLink.href = 'css/pwa-install.css';
+  document.head.appendChild(cssLink);
 })();
