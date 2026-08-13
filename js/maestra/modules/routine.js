@@ -45,15 +45,15 @@ const EVENT_TYPES = {
 };
 
 const DEFAULT_SCHEDULE = [
-  { hour: 7,  minute: 30, label: 'Bienvenida',   type: 'bienvenida', duration: 30 },
-  { hour: 8,  minute: 0,  label: 'Desayuno',     type: 'desayuno',   duration: 60 },
-  { hour: 9,  minute: 0,  label: 'Actividad',    type: 'actividad',  duration: 30 },
-  { hour: 9,  minute: 30, label: 'Baño',         type: 'bano',       duration: 30 },
-  { hour: 10, minute: 0,  label: 'Patio',        type: 'patio',      duration: 90 },
-  { hour: 11, minute: 30, label: 'Almuerzo',     type: 'almuerzo',   duration: 60 },
-  { hour: 12, minute: 30, label: 'Siesta',       type: 'siesta',     duration: 90 },
-  { hour: 14, minute: 0,  label: 'Merienda',     type: 'merienda',   duration: 60 },
-  { hour: 15, minute: 0,  label: 'Biberón',      type: 'biberon',    duration: 30 },
+  { hour: 7,  minute: 30, label: 'Bienvenida',   type: 'bienvenida', duration: 30, autoRegister: true },
+  { hour: 8,  minute: 0,  label: 'Desayuno',     type: 'desayuno',   duration: 60, autoRegister: true },
+  { hour: 9,  minute: 0,  label: 'Actividad',    type: 'actividad',  duration: 30, autoRegister: true },
+  { hour: 9,  minute: 30, label: 'Baño',         type: 'bano',       duration: 30, autoRegister: true },
+  { hour: 10, minute: 0,  label: 'Patio',        type: 'patio',      duration: 90, autoRegister: true },
+  { hour: 11, minute: 30, label: 'Almuerzo',     type: 'almuerzo',   duration: 60, autoRegister: true },
+  { hour: 12, minute: 30, label: 'Siesta',       type: 'siesta',     duration: 90, autoRegister: true },
+  { hour: 14, minute: 0,  label: 'Merienda',     type: 'merienda',   duration: 60, autoRegister: true },
+  { hour: 15, minute: 0,  label: 'Biberón',      type: 'biberon',    duration: 30, autoRegister: true },
 ];
 
 const EXTRA_EVENT_TYPES = [
@@ -477,6 +477,8 @@ export async function initRoutine() {
     _refreshStudentCards();
     if (window.lucide) window.lucide.createIcons();
 
+    _startAutoRegisterClock();
+
   } catch (e) {
     container.innerHTML = '<div class="text-center p-10 text-rose-500 font-bold">Error al cargar rutina. Intenta de nuevo.</div>';
   }
@@ -492,15 +494,15 @@ function _renderRoutineLayout({ todayLabel, students, logsMap, withReport, sched
     <!-- ═══ NIVEL 1: TIMELINE DEL DÍA ═══ -->
     <div class="bg-white border border-slate-100 rounded-[2rem] overflow-hidden" id="timelineContainer" style="box-shadow:0 4px 24px rgba(0,0,0,0.04);">
       <!-- Header -->
-      <div class="px-5 py-4 flex items-center justify-between border-b border-slate-100" style="background:linear-gradient(135deg, #f8fafc 0%, #ffffff 100%);">
-        <div class="flex items-center gap-3">
-          <div class="w-10 h-10 rounded-2xl flex items-center justify-center text-white text-lg shadow-md" style="background:linear-gradient(135deg, #FF8A00, #f97316);box-shadow:0 4px 12px rgba(255,138,0,0.3);">📅</div>
-          <div>
+      <div class="px-4 sm:px-5 py-4 flex flex-wrap items-center justify-between gap-3 border-b border-slate-100" style="background:linear-gradient(135deg, #f8fafc 0%, #ffffff 100%);">
+        <div class="flex items-center gap-3 min-w-0">
+          <div class="w-10 h-10 rounded-2xl flex items-center justify-center text-white text-lg shadow-md shrink-0" style="background:linear-gradient(135deg, #FF8A00, #f97316);box-shadow:0 4px 12px rgba(255,138,0,0.3);">📅</div>
+          <div class="min-w-0">
             <h3 class="text-sm font-black text-slate-800">Timeline del Día</h3>
-            <p class="text-[10px] font-bold text-slate-400 uppercase tracking-wider capitalize">${todayLabel}</p>
+            <p class="text-[10px] font-bold text-slate-400 uppercase tracking-wider capitalize truncate">${todayLabel}</p>
           </div>
         </div>
-        <div class="flex items-center gap-2">
+        <div class="flex items-center gap-2 flex-wrap">
           <button onclick="App.openAllEventsMenu()"
             class="flex items-center gap-1 px-2.5 py-2 bg-indigo-50 hover:bg-indigo-100 rounded-xl transition-all text-[10px] font-black text-indigo-600 uppercase tracking-widest active:scale-95">
             <span class="text-sm">➕</span>
@@ -511,7 +513,7 @@ function _renderRoutineLayout({ todayLabel, students, logsMap, withReport, sched
             <span class="text-sm">⚙️</span>
             <span class="hidden sm:inline">Rutina</span>
           </button>
-          <span class="text-[10px] font-black text-[#28B54D] bg-green-50 border border-green-200 px-3 py-1.5 rounded-full">
+          <span class="hidden sm:inline-flex items-center text-[10px] font-black text-[#28B54D] bg-green-50 border border-green-200 px-3 py-1.5 rounded-full">
             ${withReport}/${students.length} reportes
           </span>
           <button onclick="App.toggleTimeline()" id="btnToggleTimeline"
@@ -525,7 +527,7 @@ function _renderRoutineLayout({ todayLabel, students, logsMap, withReport, sched
       <!-- Timeline Expandido: Ventana Vertical con Detalles -->
       <div id="timelineExpanded" class="${_timelineExpanded ? '' : 'hidden'}">
         <div class="max-h-[420px] overflow-y-auto custom-scrollbar">
-          <div class="relative p-5">
+          <div class="relative p-3 sm:p-5">
             <!-- Línea vertical conectora -->
             <div class="absolute left-[38px] top-5 bottom-5 w-0.5 bg-gradient-to-b from-[#FF8A00]/30 via-slate-200 to-slate-100"></div>
 
@@ -571,7 +573,7 @@ function _renderRoutineLayout({ todayLabel, students, logsMap, withReport, sched
                 <div class="relative">
                   <div
                     onclick="App.openBulkEventModal('${ev.type}', '${timeStr}')"
-                    class="relative flex items-start gap-4 w-full p-3 rounded-2xl transition-all active:scale-[0.98] cursor-pointer ${rowBgCls}" data-index="${i}">
+                    class="relative flex items-start gap-3 sm:gap-4 w-full p-2.5 sm:p-3 rounded-2xl transition-all active:scale-[0.98] cursor-pointer ${rowBgCls}" data-index="${i}">
 
                     <!-- Icono en la línea -->
                     <div class="w-9 h-9 rounded-xl flex items-center justify-center text-base shrink-0 z-10 transition-all ${isActive ? 'text-white shadow-lg scale-110 tl-pulse' : 'text-slate-500'}" style="${isActive ? 'background:linear-gradient(135deg, #FF8A00, #f97316);box-shadow:0 4px 12px rgba(255,138,0,0.3);' : `background:${activeSoftBgs[ev.type] || '#f1f5f9'};`}">
@@ -2013,6 +2015,169 @@ async function _reRenderTimeline() {
   if (window.lucide) window.lucide.createIcons();
 }
 
+// ════════════════════════════════════════════════════════════════
+// ⚡ AUTO-REGISTRO: marca la cronología automáticamente en su hora
+// de activación y la sincroniza con el panel padre (rutina / cronología).
+// ════════════════════════════════════════════════════════════════
+const _AUTO_SKIP_TYPES = new Set([
+  'temperatura','biberon','medicamento','medicamento_extra','fiebre','malestar',
+  'animo','nota','llamada_padres','otro','otro_incidente','accidente','golpe','pelea'
+]);
+
+let _autoRegisterTimer = null;
+let _autoRunning = false;
+let _autoLastDay = '';
+
+function _hasEventType(log, type) {
+  return Array.isArray(log?.events) && log.events.some(e => e.type === type);
+}
+
+function _startAutoRegisterClock() {
+  if (_autoRegisterTimer) return;
+  _checkAutoRegister();
+  _autoRegisterTimer = setInterval(_checkAutoRegister, 30000);
+}
+
+export function stopAutoRegisterClock() {
+  if (_autoRegisterTimer) { clearInterval(_autoRegisterTimer); _autoRegisterTimer = null; }
+}
+
+async function _checkAutoRegister() {
+  if (_autoRunning) return;
+  _autoRunning = true;
+  try {
+    const classroom = AppState.get('classroom');
+    if (!classroom) return;
+    const today = new Date().toISOString().split('T')[0];
+    _autoLastDay = today;
+
+    const schedule  = _classroomSchedule.length ? _classroomSchedule : DEFAULT_SCHEDULE;
+    const students  = AppState.get('students') || [];
+    const logsMap   = AppState.get('logsMap') || {};
+    const presentIds = _getPresentStudentIds();
+    if (!presentIds.length || !schedule.length) return;
+
+    const now     = new Date();
+    const nowMins = now.getHours() * 60 + now.getMinutes();
+
+    const toOpenSiestas = [];   // { ev, timeStr, students }
+    const toCloseSiestas = [];  // { student, log, event }
+    const toRegister = [];      // { ev, timeStr, students }
+    let anyQueued = false;
+
+    for (const ev of schedule) {
+      if (_AUTO_SKIP_TYPES.has(ev.type)) continue;
+      const auto = ev.autoRegister !== false;
+      if (!auto) continue;
+      const start = (ev.hour ?? 0) * 60 + (ev.minute ?? 0);
+      if (nowMins < start) continue;
+      const duration = ev.duration || 30;
+      const end = start + duration;
+      const timeStr = _formatTime12(ev.hour, ev.minute);
+
+      if (ev.type === 'siesta') {
+        // Cierre automático de siestas abiertas por auto-registro cuyo horario ya terminó
+        if (nowMins >= end) {
+          const closing = [];
+          for (const s of students) {
+            if (!presentIds.includes(s.id)) continue;
+            const log = logsMap[s.id];
+            const openEvs = (log?.events || []).filter(e => e.type === 'siesta' && e.open && e.auto === true);
+            openEvs.forEach(evt => closing.push({ student: s, log, event: evt }));
+          }
+          if (closing.length) toCloseSiestas.push(...closing);
+        }
+        // Apertura automática dentro de la ventana de inicio (primeros minutos)
+        if (nowMins >= start && nowMins < start + 10) {
+          const opening = students.filter(s => presentIds.includes(s.id) && !_hasEventType(logsMap[s.id], 'siesta'));
+          if (opening.length) toOpenSiestas.push({ ev, timeStr, students: opening });
+        }
+        anyQueued = anyQueued || toCloseSiestas.length > 0 || toOpenSiestas.length > 0;
+        continue;
+      }
+
+      // Ventana de activación: desde su hora hasta unos minutos después de terminar
+      if (nowMins > end + 10) continue;
+
+      const target = students.filter(s =>
+        presentIds.includes(s.id) && !_hasEventType(logsMap[s.id], ev.type)
+      );
+      if (!target.length) continue;
+      toRegister.push({ ev, timeStr, students: target });
+      anyQueued = true;
+    }
+
+    if (!anyQueued) return;
+    await _applyAutoRegistration(classroom, today, toRegister, toOpenSiestas, toCloseSiestas);
+  } catch (e) { /* silencioso */ }
+  finally { _autoRunning = false; }
+}
+
+async function _applyAutoRegistration(classroom, today, toRegister, toOpenSiestas, toCloseSiestas) {
+  const logsMap = AppState.get('logsMap') || {};
+  const upserts = [];
+  const summarized = [];
+
+  // Cerrar siestas auto-abiertas que ya terminaron
+  toCloseSiestas.forEach(({ log, event }) => {
+    const events = [...(log.events || [])];
+    const idx = events.findIndex(e => e.id === event.id);
+    if (idx < 0) return;
+    const dur = Math.max(0, Math.round((Date.now() - new Date(event.created_at)) / 60000));
+    events[idx] = { ...event, open: false, end_at: new Date().toISOString(), duration_min: dur };
+    upserts.push(MaestraApi.upsertDailyLog({ student_id: log.student_id, classroom_id: classroom.id, date: today, events }));
+  });
+
+  // Abrir siestas automáticamente en su hora
+  toOpenSiestas.forEach(({ timeStr, students }) => {
+    students.forEach(s => {
+      const log = logsMap[s.id] || {};
+      const newEvent = _makeEvent('siesta', { open: true, scheduled_time: timeStr, auto: true });
+      upserts.push(MaestraApi.upsertDailyLog({ student_id: s.id, classroom_id: classroom.id, date: today, events: _addEventToLog(log, newEvent) }));
+    });
+  });
+
+  // Registrar eventos normales
+  toRegister.forEach(({ ev, timeStr, students }) => {
+    students.forEach(s => {
+      const log = logsMap[s.id] || {};
+      const newEvent = _makeEvent(ev.type, { scheduled_time: timeStr, auto: true });
+      upserts.push(MaestraApi.upsertDailyLog({ student_id: s.id, classroom_id: classroom.id, date: today, events: _addEventToLog(log, newEvent) }));
+    });
+    summarized.push({ type: ev.type, count: students.length, icon: ev.icon || _getScheduleEventIcon(ev.type), label: ev.label });
+  });
+
+  if (!upserts.length) return;
+  try {
+    await Promise.all(upserts);
+
+    // Registro en el timeline del aula
+    toRegister.forEach(({ ev, timeStr, students }) => {
+      _logTimelineEvent(classroom, ev.type, students.map(s => s.id), {
+        scheduledTime: null,
+        duration: ev.duration || null,
+        metadata: { auto: true, scheduled_time: timeStr }
+      });
+    });
+    toOpenSiestas.forEach(({ timeStr, students }) => {
+      _logTimelineEvent(classroom, 'siesta', students.map(s => s.id), {
+        metadata: { auto: true, action: 'auto_open', scheduled_time: timeStr }
+      });
+    });
+    if (toCloseSiestas.length) {
+      const ids = [...new Set(toCloseSiestas.map(c => c.student.id))];
+      _logTimelineEvent(classroom, 'siesta', ids, { metadata: { auto: true, action: 'auto_close' } });
+    }
+
+    await _refreshLogsMap(classroom.id, today);
+    _reRenderTimeline();
+    if (summarized.length) {
+      const first = summarized[0];
+      safeToast(`${first.icon} ${first.label} marcado automáticamente (${first.count} alumno${first.count > 1 ? 's' : ''})`, 'success');
+    }
+  } catch (e) { /* silencioso */ }
+}
+
 // ── SCHEDULE MANAGER MODAL (V8: catálogo por categorías) ───────
 let _scheduleSearch = '';
 
@@ -2059,15 +2224,16 @@ function _renderScheduleOrderHTML() {
     const meta = _getEventMeta(s.type) || { label: s.type, icon: '⏰', defaultDuration: 30 };
     const minutes = [0,5,10,15,20,25,30,35,40,45,50,55];
     const minuteOpts = [...new Set([...minutes, (s.minute ?? 0)])].sort((a,b) => a-b);
+    const autoOn = s.autoRegister !== false;
     return `
-      <div class="schedule-order-row flex items-center gap-2 p-2.5 rounded-2xl border-2 bg-white transition-all" draggable="true"
-        data-type="${s.type}" data-idx="${i}" data-hour="${s.hour ?? 8}" data-minute="${s.minute ?? 0}"
+      <div class="schedule-order-row flex flex-wrap items-center gap-2 p-2.5 rounded-2xl border-2 bg-white transition-all" draggable="true"
+        data-type="${s.type}" data-idx="${i}" data-hour="${s.hour ?? 8}" data-minute="${s.minute ?? 0}" data-auto="${autoOn ? '1' : '0'}"
         style="border-color:#e2e8f0;">
         <span class="drag-handle text-slate-300 text-sm shrink-0" title="Arrastrar para reordenar">⋮⋮</span>
         <span class="text-lg shrink-0">${meta.icon}</span>
-        <div class="flex-1 min-w-0">
+        <div class="flex-1 min-w-0 basis-32 sm:basis-0">
           <p class="text-[10px] font-black text-slate-700 truncate">${meta.label}</p>
-          <div class="flex items-center gap-1.5 mt-1">
+          <div class="flex flex-wrap items-center gap-1.5 mt-1">
             <select data-sched-hour="${s.type}" onchange="App.cascadeScheduleShift('${s.type}')">
               ${Array.from({length: 24}, (_, h) => `<option value="${h}" ${(s.hour ?? 8) === h ? 'selected' : ''}>${String(h).padStart(2,'0')}</option>`).join('')}
             </select>
@@ -2080,6 +2246,9 @@ function _renderScheduleOrderHTML() {
             </select>
           </div>
         </div>
+        <button onclick="App.toggleScheduleAuto('${s.type}')"
+          title="${autoOn ? 'Auto: se marcará solo a su hora de activación' : 'Manual: pedirá confirmación al marcar'}"
+          class="schedule-auto-btn shrink-0 w-8 h-8 rounded-xl flex items-center justify-center text-sm font-black border-2 transition-all active:scale-90 ${autoOn ? 'border-[#FF8A00]/40 text-[#FF8A00] bg-orange-50' : 'border-slate-100 text-slate-300 bg-slate-50'}">⚡</button>
         <button onclick="App.removeEventFromSchedule('${s.type}')" class="p-1.5 hover:bg-red-50 rounded-lg text-slate-300 hover:text-red-500 transition-colors shrink-0" title="Quitar">
           <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/></svg>
         </button>
@@ -2315,6 +2484,7 @@ export function addEventToSchedule(eventType) {
     minute,
     duration: meta.defaultDuration || 30,
     category: meta.category,
+    autoRegister: true,
   });
   _classroomSchedule = schedule;
   _refreshScheduleManagerUI();
@@ -2332,6 +2502,18 @@ export function removeEventFromSchedule(eventType) {
 export function resetScheduleToDefault() {
   _classroomSchedule = DEFAULT_SCHEDULE.map(s => ({ ...s }));
   _refreshScheduleManagerUI();
+}
+
+export function toggleScheduleAuto(type) {
+  const schedule = _classroomSchedule.length ? [..._classroomSchedule] : [...DEFAULT_SCHEDULE];
+  const idx = schedule.findIndex(s => s.type === type);
+  if (idx === -1) return;
+  schedule[idx].autoRegister = schedule[idx].autoRegister === false ? true : false;
+  _classroomSchedule = schedule;
+  _refreshScheduleManagerUI();
+  const meta = _getEventMeta(type);
+  const nowAuto = schedule[idx].autoRegister !== false;
+  safeToast(`${nowAuto ? '⚡ Auto: se marcará solo a su hora de activación' : '🖐 Manual: pedirá confirmación al marcar'} — ${meta?.label || type}`, nowAuto ? undefined : 'warning');
 }
 
 function _refreshScheduleManagerUI() {
@@ -2372,7 +2554,7 @@ async function _persistSchedule(schedule) {
       duration_minutes: s.duration,
       sort_order: i,
       is_active: true,
-      auto_register: false,
+      auto_register: s.autoRegister !== false,
       applies_to: 'all',
     }));
     const { error } = await supabase.from('classroom_event_schedule').insert(inserts);
@@ -2391,6 +2573,7 @@ export async function saveScheduleManager() {
 
     // La cronología se lee en el ORDEN de la lista (respetando drag & drop)
     const rows = [...document.querySelectorAll('#scheduleOrderList .schedule-order-row')];
+    const prevAuto = new Map(_classroomSchedule.map(s => [s.type, s.autoRegister]));
     const schedule = rows.map(row => {
       const type = row.dataset.type;
       const meta = _getEventMeta(type) || { label: type, icon: '⏰', defaultDuration: 30, category: 'personalizados' };
@@ -2405,6 +2588,7 @@ export async function saveScheduleManager() {
         minute,
         duration,
         category: meta.category || 'personalizados',
+        autoRegister: prevAuto.has(type) ? prevAuto.get(type) !== false : true,
       };
     });
 
