@@ -3,7 +3,7 @@ import { Helpers } from './helpers.js';
 import { auditLog } from './db-utils.js';
 
 const TABS = [
-  { id: 'info',     label: 'Info General', icon: 'id-card' },
+  { id: 'info',     label: 'Info General', icon: 'user-square' },
   { id: 'family',   label: 'Familia',      icon: 'users' },
   { id: 'health',   label: 'Salud',        icon: 'heart-pulse' },
   { id: 'payments', label: 'Pagos',        icon: 'credit-card' },
@@ -129,6 +129,7 @@ export const StudentRecordModal = {
       start_date: new Date().toISOString().split('T')[0],
       has_siblings: false, sibling_name: '',
       classroom_id: '', is_active: true,
+      login_email: '',
       blood_type: '', allergies: '', insurance: '', pediatrician: '', pediatrician_phone: '',
       medical_conditions: '', medications: '', food_restrictions: '', disabilities: '',
       medical_notes: '', vaccinations_complete: false, emergency_protocol: '',
@@ -158,6 +159,10 @@ export const StudentRecordModal = {
     }
     this._student = student;
     this._parentId = student.parent_id || null;
+    if (this._parentId && !student.login_email) {
+      const { data: prof } = await supabase.from('profiles').select('email').eq('id', this._parentId).maybeSingle();
+      if (prof?.email) student.login_email = prof.email;
+    }
     this._docs = student.documents || {};
     this._consents = student.consents || {};
     this._signature = student.signature_data || '';
@@ -177,6 +182,7 @@ export const StudentRecordModal = {
       has_siblings: !!student.has_siblings, sibling_name: student.sibling_name || '',
       classroom_id: student.classroom_id ? String(student.classroom_id) : '',
       is_active: student.is_active !== false,
+      login_email: student.login_email || '',
       blood_type: student.blood_type || '', allergies: student.allergies || '',
       insurance: student.insurance || '', pediatrician: student.pediatrician || '',
       pediatrician_phone: student.pediatrician_phone || '',
@@ -238,6 +244,7 @@ export const StudentRecordModal = {
       start_date: p.estimated_entry_date || new Date().toISOString().split('T')[0],
       has_siblings: !!p.has_siblings, sibling_name: p.sibling_name || '',
       classroom_id: '', is_active: true,
+      login_email: '',
       blood_type: med.blood_type || '', allergies: med.allergies || '',
       insurance: '', pediatrician: '', pediatrician_phone: '',
       medical_conditions: med.medical_conditions || '', medications: med.medications || '',
@@ -263,12 +270,18 @@ export const StudentRecordModal = {
       avatar_url: '',
     };
     if (p.birth_date) {
-      const years = Math.floor((Date.now() - new Date(p.birth_date).getTime()) / (365.25 * 24 * 3600 * 1000));
-      this._form.age = String(Math.max(0, years));
-      this._form.age_type = 'años';
+      const b = new Date(p.birth_date);
+      const n = new Date();
+      if (!isNaN(b.getTime())) {
+        let months = (n.getFullYear() - b.getFullYear()) * 12 + (n.getMonth() - b.getMonth());
+        if (n.getDate() < b.getDate()) months--;
+        if (months < 0) months = 0;
+        const showMonths = months < 24;
+        this._form.age = String(showMonths ? months : Math.floor(months / 12));
+        this._form.age_type = showMonths ? 'meses' : 'años';
+      }
     }
     this._autofillConcepts();
-    this._detectSiblings(p1.email, p1.phone, p1.cedula);
   },
 
   _autofillConcepts() {
@@ -278,36 +291,17 @@ export const StudentRecordModal = {
     if (!this._form.inscription_fee && pick('inscripcion') != null) this._form.inscription_fee = pick('inscripcion');
   },
 
-  async _detectSiblings(email, phone, cedula) {
-    if (!email && !phone && !cedula) return;
-    const { data } = await supabase
-      .from('students')
-      .select('id, name, parent_id, p1_email, p2_email, p1_phone, p1_cedula, classroom_id, classrooms:classroom_id(name)')
-      .is('deleted_at', null)
-      .limit(50);
-    const list = data || [];
-    const match = list.find(s =>
-      (email && (s.p1_email === email || s.p2_email === email)) ||
-      (phone && (s.p1_phone === phone || s.p2_phone === phone)) ||
-      (cedula && (s.p1_cedula === cedula || s.p2_cedula === cedula))
-    );
-    if (match) {
-      this._siblings = list.filter(s => s.id === match.id || (match.parent_id && s.parent_id === match.parent_id));
-      if (this._siblings.length) {
-        this._parentId = match.parent_id || null;
-        if (!this._form.discount_pct) this._form.discount_pct = 10;
-      }
-    }
-  },
-
   async _loadSiblings() {
-    if (!this._parentId) return;
+    if (!this._form?.has_siblings || !this._parentId) {
+      this._siblings = [];
+      return;
+    }
     const { data } = await supabase
       .from('students')
       .select('id, name, matricula, classroom_id, classrooms:classroom_id(name), is_active')
       .eq('parent_id', this._parentId)
       .is('deleted_at', null);
-    this._siblings = data || [];
+    this._siblings = (data || []).filter(s => s.id !== this._student?.id);
   },
 
   async _loadHistory() {
@@ -531,7 +525,11 @@ export const StudentRecordModal = {
     const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghjkmnpqrstuvwxyz23456789';
     let p = '';
     const arr = new Uint32Array(10);
-    (window.crypto?.getRandomValues || (a => a.map(() => Math.floor(Math.random() * 0xffffffff))))(arr);
+    if (window.crypto?.getRandomValues) {
+      window.crypto.getRandomValues(arr);
+    } else {
+      for (let i = 0; i < arr.length; i++) arr[i] = Math.floor(Math.random() * 0xffffffff);
+    }
     for (let i = 0; i < 10; i++) p += chars[arr[i] % chars.length];
     return p;
   },
@@ -550,7 +548,7 @@ export const StudentRecordModal = {
           '<p>La cuenta de acceso del estudiante <strong>' + Helpers.escapeHTML(studentName) + '</strong> está lista.</p>' +
           '<p>Con ella podrás consultar pagos, reinscripción y las actividades de tu hijo(a) en el centro.</p>' +
           '<table style="width:100%;margin:16px 0;border-collapse:collapse">' +
-            '<tr><td style="padding:8px;color:#64748b;font-size:13px">Acceso:</td><td style="padding:8px;font-weight:bold">' + Helpers.escapeHTML(this._form.p1_email || '') + '</td></tr>' +
+            '<tr><td style="padding:8px;color:#64748b;font-size:13px">Acceso:</td><td style="padding:8px;font-weight:bold">' + Helpers.escapeHTML(this._form.login_email || to || '') + '</td></tr>' +
             '<tr><td style="padding:8px;color:#64748b;font-size:13px">Contraseña temporal:</td><td style="padding:8px;font-weight:bold">' + Helpers.escapeHTML(password || '') + '</td></tr>' +
             '<tr><td style="padding:8px;color:#64748b;font-size:13px">Enlace:</td><td style="padding:8px;font-weight:bold">' + Helpers.escapeHTML(window.location.origin + window.location.pathname.replace(/[^/]*$/, '') + 'login.html') + '</td></tr>' +
           '</table>' +
@@ -724,10 +722,16 @@ export const StudentRecordModal = {
         if (!val) return;
         const ageEl = document.getElementById('srm-age');
         if (ageEl) {
-          const years = Math.floor((Date.now() - new Date(val).getTime()) / (365.25 * 24 * 3600 * 1000));
-          ageEl.value = Math.max(0, years);
+          const b = new Date(val);
+          const n = new Date();
+          if (isNaN(b.getTime())) return;
+          let months = (n.getFullYear() - b.getFullYear()) * 12 + (n.getMonth() - b.getMonth());
+          if (n.getDate() < b.getDate()) months--;
+          if (months < 0) months = 0;
+          const showMonths = months < 24;
+          ageEl.value = String(showMonths ? months : Math.floor(months / 12));
           const typeEl = document.querySelector('[data-f="age_type"]');
-          if (typeEl) typeEl.value = 'años';
+          if (typeEl) typeEl.value = showMonths ? 'meses' : 'años';
         }
       };
     }
@@ -744,7 +748,9 @@ export const StudentRecordModal = {
     const sib = document.querySelector('[data-f="has_siblings"]');
     if (sib) {
       sib.onchange = () => {
+        this._form.has_siblings = sib.checked;
         document.getElementById('srm-sibling-wrap')?.classList.toggle('hidden', !sib.checked);
+        this._loadSiblings();
       };
     }
     document.getElementById('srm-qr-gen')?.addEventListener('click', () => this._generateQR());
@@ -761,13 +767,13 @@ export const StudentRecordModal = {
       ['p1_name', 'Nombre completo *', ''],
       ['p1_relationship', 'Parentesco', ''], ['p1_cedula', 'Cédula', '000-0000000-0'],
       ['p1_phone', 'Teléfono', '809-000-0000'], ['p1_whatsapp', 'WhatsApp', ''],
-      ['p1_email', 'Correo', 'correo@ejemplo.com'], ['p1_address', 'Dirección', ''],
+      ['p1_email', 'Correo (notificación)', 'correo@ejemplo.com'], ['p1_address', 'Dirección', ''],
       ['p1_occupation', 'Ocupación', ''], ['p1_job', 'Profesión', ''],
       ['p1_workplace', 'Lugar de trabajo', ''], ['p1_emergency_contact', 'Contacto de emergencia (extra)', ''],
     ];
     const p2Fields = [
       ['p2_name', 'Nombre', ''], ['p2_relationship', 'Parentesco', ''], ['p2_cedula', 'Cédula', ''],
-      ['p2_phone', 'Teléfono', ''], ['p2_whatsapp', 'WhatsApp', ''], ['p2_email', 'Correo', ''],
+      ['p2_phone', 'Teléfono', ''], ['p2_whatsapp', 'WhatsApp', ''], ['p2_email', 'Correo (notificación)', ''],
       ['p2_address', 'Dirección', ''], ['p2_occupation', 'Ocupación', ''], ['p2_job', 'Profesión', ''],
       ['p2_workplace', 'Lugar de trabajo', ''],
     ];
@@ -1300,22 +1306,27 @@ export const StudentRecordModal = {
   // ---------------------------------------------------------------- ACCESOS (Pestaña 6)
   _renderAcceso() {
     const hasAccount = !!this._parentId && this._mode === 'edit';
+    const notifEmails = [this._form.p1_email, this._form.p2_email].filter(Boolean);
     return `
       <div class="grid grid-cols-1 gap-4">
         <div class="bg-white p-5 rounded-3xl border border-slate-100 shadow-sm">
           ${this._sectionHeader('key-round', 'Acceso del padre / tutor', 'bg-gradient-to-br from-blue-500 to-indigo-600')}
           ${hasAccount ? `<div class="mb-3 flex items-center gap-2 bg-emerald-50 border border-emerald-100 rounded-2xl p-3 text-emerald-700 font-black text-xs"><i data-lucide="check-circle-2" class="w-4 h-4"></i> Cuenta de padres vinculada</div>` : ''}
           <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-            ${this._authedField('p1_email', 'Correo de login del tutor', 'correo@ejemplo.com', { type: 'email' })}
+            ${this._authedField('login_email', 'Correo de acceso (login)', 'correo@ejemplo.com', { type: 'email' })}
             <div>
               <label class="${LABEL}">Contraseña temporal (nueva cuenta)</label>
               <input data-f="password" id="srm-password" type="text" placeholder="Mínimo 6 caracteres" class="${INPUT}">
             </div>
           </div>
-          <p class="text-[10px] text-slate-400 font-bold mt-2">Se envía automáticamente al tutor 1 y tutor 2 al crear/admitir. Si el correo ya tiene cuenta, se vinculará.</p>
+          <div class="mt-3 flex items-start gap-2 bg-sky-50 border border-sky-100 rounded-2xl p-3 text-[10px] font-bold text-sky-700">
+            <i data-lucide="info" class="w-3.5 h-3.5 mt-0.5 shrink-0"></i>
+            <span>Regla del centro: el correo de acceso lo define la directora o asistente. Los correos del tutor 1 y 2 (pestaña Familia) son SOLO de notificación y NO se usan para iniciar sesión.</span>
+          </div>
+          ${notifEmails.length ? `<div class="mt-3 text-[10px] font-bold text-slate-400">Correos de notificación: ${notifEmails.map(e => `<span class="inline-block bg-slate-100 rounded-lg px-2 py-0.5 ml-1">${Helpers.escapeHTML(e)}</span>`).join('')}</div>` : ''}
           <div class="flex gap-2 mt-4">
             <button id="srm-send-creds" class="flex-1 px-4 py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-2xl font-black text-[10px] uppercase tracking-widest transition-all flex items-center justify-center gap-2">
-              <i data-lucide="mail" class="w-3.5 h-3.5"></i> Enviar credenciales por correo (tutor 1 y 2)
+              <i data-lucide="mail" class="w-3.5 h-3.5"></i> ${hasAccount ? 'Reenviar credenciales' : 'Crear cuenta y enviar credenciales'}
             </button>
           </div>
         </div>
@@ -1416,20 +1427,30 @@ export const StudentRecordModal = {
   },
 
   async _sendCredentials() {
-    const email = this._form.p1_email;
-    if (!email) { Helpers.toast('Ingresa el correo del tutor', 'warning'); return; }
+    this._saveForm();
+    const email = this._form.login_email;
+    if (!email) { Helpers.toast('Ingresa el correo de acceso (login) en la pestaña Acceso', 'warning'); return; }
     if (!this._parentPassword) {
       this._parentPassword = this._genPassword();
       this._form.password = this._parentPassword;
       const input = document.getElementById('srm-password');
       if (input) input.value = this._parentPassword;
     }
-    Helpers.toast('Enviando credenciales…', 'info');
+    Helpers.toast('Creando cuenta y enviando credenciales…', 'info');
     try {
+      if (!this._parentId) {
+        await this._createParentAccount(email, this._parentPassword);
+        if (this._parentId && this._mode === 'edit' && this._student?.id) {
+          await supabase
+            .from('students')
+            .update({ parent_id: this._parentId, login_email: email })
+            .eq('id', this._student.id);
+        }
+      }
       await this._sendCredentialsEmail(email, this._parentPassword);
       Helpers.toast('Credenciales enviadas', 'success');
     } catch (e) {
-      Helpers.toast('No se pudieron enviar las credenciales: ' + (e.message || e), 'error');
+      Helpers.toast('No se pudieron crear/enviar las credenciales: ' + (e.message || e), 'error');
     }
   },
 
@@ -1446,7 +1467,6 @@ export const StudentRecordModal = {
       gender: f.gender || null,
       nationality: f.nationality || 'Dominicana',
       birthplace: f.birthplace || null,
-      address: f.address || null,
       province: f.province || null,
       municipality: f.municipality || null,
       sector: f.sector || null,
@@ -1458,6 +1478,7 @@ export const StudentRecordModal = {
       estimated_entry_date: f.start_date || null,
       has_siblings: !!f.has_siblings,
       sibling_name: f.sibling_name || null,
+      login_email: f.login_email || null,
       classroom_id: f.classroom_id ? parseInt(f.classroom_id, 10) : null,
       is_active: f.is_active !== false,
       blood_type: f.blood_type || null,
@@ -1511,13 +1532,10 @@ export const StudentRecordModal = {
     };
   },
 
-  async _attachParent(payload, password) {
-    if (this._parentId) { payload.parent_id = this._parentId; return; }
-    if (password) this._parentPassword = password;
-    const email = payload.p1_email;
-    const name = payload.p1_name;
-    const phone = payload.p1_phone;
-    if (!email || !password) return;
+  async _createParentAccount(email, password) {
+    if (!email || !password) return null;
+    const name = this._form.p1_name || this._form.p2_name || '';
+    const phone = this._form.p1_phone || '';
 
     const tempClient = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
       auth: { persistSession: false, autoRefreshToken: false, detectSessionInUrl: false },
@@ -1547,12 +1565,21 @@ export const StudentRecordModal = {
     }
 
     if (parentId) {
-      payload.parent_id = parentId;
       this._parentId = parentId;
       await supabase.from('profiles').upsert({
         id: parentId, name, email, phone, role: 'padre',
       }, { onConflict: 'id' });
     }
+    return parentId;
+  },
+
+  async _attachParent(payload, password) {
+    if (this._parentId) { payload.parent_id = this._parentId; return; }
+    if (password) this._parentPassword = password;
+    const email = payload.login_email;
+    if (!email || !password) return;
+    const parentId = await this._createParentAccount(email, password);
+    if (parentId) payload.parent_id = parentId;
   },
 
   _validateBasics() {
@@ -1583,6 +1610,7 @@ export const StudentRecordModal = {
 
   async _createStudent() {
     if (this._saving) return;
+    this._saveForm();
     if (!this._validateBasics()) return;
     this._saving = true;
     _setLoading(true);
@@ -1611,10 +1639,11 @@ export const StudentRecordModal = {
         matricula: payload.matricula,
         classroom_id: payload.classroom_id,
         parent_email: payload.p1_email,
+        login_email: payload.login_email,
       });
 
       if (payload.parent_id) {
-        const recipients = [payload.p1_email, payload.p2_email].filter(Boolean);
+        const recipients = [payload.login_email].filter(Boolean);
         if (recipients.length) await this._sendCredentialsEmail(recipients, password);
       }
 
@@ -1631,6 +1660,7 @@ export const StudentRecordModal = {
 
   async _approveAdmission() {
     if (this._saving) return;
+    this._saveForm();
     if (!this._validateBasics()) return;
     this._saving = true;
     _setLoading(true);
@@ -1674,10 +1704,11 @@ export const StudentRecordModal = {
         prereg_id: this._prereg?.id || null,
         classroom_id: payload.classroom_id,
         parent_email: payload.p1_email,
+        login_email: payload.login_email,
       });
 
       if (payload.parent_id) {
-        const recipients = [payload.p1_email, payload.p2_email].filter(Boolean);
+        const recipients = [payload.login_email].filter(Boolean);
         if (recipients.length) await this._sendCredentialsEmail(recipients, password);
       }
 
@@ -1694,6 +1725,7 @@ export const StudentRecordModal = {
 
   async _saveChanges() {
     if (this._saving) return;
+    this._saveForm();
     const f = this._form;
     if (!f.name) return Helpers.toast('El nombre del estudiante es obligatorio (paso 1)', 'warning');
     this._saving = true;

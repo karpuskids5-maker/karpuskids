@@ -216,7 +216,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   if (pName) pName.textContent = teacherName;
   if (pEmail) pEmail.textContent = auth.user.email;
   if (document.getElementById('profileAvatar')) {
-    document.getElementById('profileAvatar').src = auth.profile?.avatar_url || 'img/1.jpg';
+    setProfileAvatar(auth.profile?.avatar_url, teacherName);
   }
 
   // Inicializar formulario de perfil
@@ -1068,9 +1068,8 @@ async function submitNewPost() {
       content,
       media_url: mediaUrl,
       media_type: mediaType,
-      author_id: user.id,
-      classroom_id: classroom.id,
-      type: 'classroom'
+      teacher_id: user.id,
+      classroom_id: classroom.id
     });
 
     if (error) throw error;

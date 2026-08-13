@@ -16,6 +16,21 @@ export const BadgeSystem = {
     this._initTimestamps();
     await this._loadCounts();
     this._subscribeRealtime();
+    this._loadPostsBadgeOnEnter();
+  },
+
+  // Indicador del muro al ingresar: cuenta posts nuevos desde la última visita
+  // (badge-class en panel padre, badge-muro en panel asistente).
+  _loadPostsBadgeOnEnter() {
+    if (this._role === 'padre') {
+      const student = (window.AppState && AppState.get('currentStudent')) || {};
+      const classroomId = student.classroom_id;
+      this._loadTimeBasedBadge('class', 'posts', q => classroomId
+        ? q.or('classroom_id.eq.' + classroomId + ',classroom_id.is.null')
+        : q);
+    } else if (this._role === 'asistente') {
+      this._loadTimeBasedBadge('muro', 'posts');
+    }
   },
 
   // Detecta el panel activo por elementos unicos en el DOM
@@ -110,12 +125,14 @@ export const BadgeSystem = {
     });
   },
 
-  async _loadTimeBasedBadge(section, table) {
+  async _loadTimeBasedBadge(section, table, filterFn) {
     try {
       const { supabase } = await import('./supabase.js');
       const lastView = localStorage.getItem('last_' + section + '_view') || new Date(0).toISOString();
-      
-      const { count } = await supabase.from(table).select('id', { count: 'exact', head: true }).gt('created_at', lastView);
+
+      let query = supabase.from(table).select('id', { count: 'exact', head: true }).gt('created_at', lastView);
+      if (filterFn) query = filterFn(query);
+      const { count } = await query;
       if (count > 0) {
         this._renderBadge(section, count);
         this._renderCardBadge(section, count);

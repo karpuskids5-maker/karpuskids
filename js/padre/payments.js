@@ -75,9 +75,6 @@ export const PaymentsModule = {
     const container = document.getElementById('paymentsHistory');
     if (!container) return;
 
-    const today = new Date();
-    const isDay25OrLater = today.getDate() >= 25;
-
     container.innerHTML = Helpers.skeleton(3, 'h-24');
     try {
       const { data, error } = await supabase
@@ -119,12 +116,8 @@ export const PaymentsModule = {
         }
       }
       
-      // Filter: always show paid, only show pending/overdue if day >= 25
-      let allPayments = Array.from(monthMap.values());
-      let filteredPayments = allPayments.filter(p => {
-        const isPaid = ['paid'].includes((p.status||'').toLowerCase());
-        return isPaid || isDay25OrLater;
-      });
+      // Mostrar siempre: pagados + pendientes + vencidos + en revisión
+      let filteredPayments = Array.from(monthMap.values());
       
       this._payments = filteredPayments
         .sort((a, b) => {
@@ -138,19 +131,14 @@ export const PaymentsModule = {
         });
 
       if (!this._payments.length) {
-        if (isDay25OrLater) {
-          container.innerHTML = Helpers.emptyState('No hay registros de pagos', 'credit-card');
-        } else {
-          // If no paid payments and not day25+
-          container.innerHTML = Helpers.emptyState('No hay pagos registrados aún. Los pagos pendientes se mostrarán a partir del día 25 del mes.', 'lock');
-        }
+        container.innerHTML = Helpers.emptyState('No hay registros de pagos', 'credit-card');
         return;
       }
-      this._renderAlertBanner(allPayments);
+      this._renderAlertBanner(this._payments);
       container.innerHTML = this._payments.map(p => this._renderCard(p)).join('');
 
       // Update header stats (always calculate from all payments)
-      const paidTotal = allPayments
+      const paidTotal = this._payments
         .filter(p => ['paid'].includes((p.status||'').toLowerCase()))
         .reduce((s, p) => s + Number(p.amount || 0), 0);
       const el = document.getElementById('paymentsBalance');
@@ -166,19 +154,11 @@ export const PaymentsModule = {
     const banner = document.getElementById('paymentAlertBanner');
     if (!banner) return;
 
-    const today = new Date();
-    const isDay25OrLater = today.getDate() >= 25;
-    
     const pending = payments.filter(p => !['paid'].includes((p.status||'').toLowerCase()));
     const totalDebt = pending.reduce((sum, p) => sum + Number(p.amount || 0), 0);
-    
-    const urgent = pending
-      .map(p => ({ ...p, days: daysUntilDue(p.due_date) }))
-      .filter(p => p.days !== null)
-      .sort((a, b) => a.days - b.days)[0];
 
-    if ((!urgent || !isDay25OrLater) && totalDebt <= 0) {
-      // ✅ Mostrar estado al día si no hay pendientes (even before day 25)
+    if (totalDebt <= 0) {
+      // ✅ Mostrar estado al día si no hay pendientes
       banner.classList.remove('hidden');
       banner.innerHTML = `
         <div class="bg-gradient-to-r from-emerald-500 to-teal-600 rounded-3xl p-5 shadow-lg">
@@ -196,12 +176,11 @@ export const PaymentsModule = {
       if (window.lucide) lucide.createIcons();
       return;
     }
-    
-    // If before day25, hide the alert for pending payments
-    if (!isDay25OrLater) {
-      banner.classList.add('hidden');
-      return;
-    }
+
+    const urgent = pending
+      .map(p => ({ ...p, days: daysUntilDue(p.due_date) }))
+      .filter(p => p.days !== null)
+      .sort((a, b) => a.days - b.days)[0];
 
     const days   = urgent?.days ?? 0;
     const amount = Helpers.formatCurrency(totalDebt);
@@ -233,17 +212,14 @@ export const PaymentsModule = {
         msg: `${month} vence en ${days} días. Evita recargos pagando a tiempo.`,
         btn: 'Pagar a tiempo', btnCls: 'bg-white text-amber-700'
       };
-    } else if (days <= 7 || totalDebt > 0) {
+    } else {
       cfg = {
         bg: 'bg-gradient-to-r from-blue-500 to-indigo-500',
         icon: '💡',
         title: `Saldo pendiente — ${amount}`,
-        msg: `Recuerda realizar tu pago de ${month} antes de su vencimiento.`,
+        msg: `Recuerda realizar tu pago de ${month} para mantenerte al día.`,
         btn: 'Ver detalles', btnCls: 'bg-white text-blue-700'
       };
-    } else {
-      banner.classList.add('hidden');
-      return;
     }
 
     banner.classList.remove('hidden');

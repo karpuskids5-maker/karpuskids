@@ -2824,6 +2824,7 @@ ALTER TABLE public.students ADD COLUMN IF NOT EXISTS level_requested text;
 ALTER TABLE public.students ADD COLUMN IF NOT EXISTS estimated_entry_date date;
 ALTER TABLE public.students ADD COLUMN IF NOT EXISTS has_siblings boolean DEFAULT false;
 ALTER TABLE public.students ADD COLUMN IF NOT EXISTS sibling_name text;
+ALTER TABLE public.students ADD COLUMN IF NOT EXISTS login_email text;
 ALTER TABLE public.students ADD COLUMN IF NOT EXISTS p1_relationship text;
 ALTER TABLE public.students ADD COLUMN IF NOT EXISTS p1_cedula text;
 ALTER TABLE public.students ADD COLUMN IF NOT EXISTS p1_whatsapp text;

@@ -54,12 +54,15 @@ export const MaestraApi = {
       if (year) record.school_year_id = year.id;
     }
 
-    // Vincular autom\u00e1ticamente al periodo activo si la tabla existe (silencioso si falla)
-    if (!record.period_id) {
+    // Vincular automáticamente al período académico activo si la tabla existe
+    // (silencioso si falla). La columna correcta en attendance es
+    // academic_period_id — NO period_id (esa es de tasks/posts).
+    if (!record.academic_period_id) {
       try {
         const activePeriod = AppState.get('activePeriod');
-        if (activePeriod?.id) {
-          record.period_id = activePeriod.id;
+        // Omitir períodos legacy (id de la tabla 'periods', rompería la FK)
+        if (activePeriod?.id && activePeriod.source !== 'legacy') {
+          record.academic_period_id = activePeriod.id;
         }
       } catch (_) { /* 404 ignorado si no existe la tabla */ }
     }

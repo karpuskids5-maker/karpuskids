@@ -20,6 +20,15 @@
   box-shadow:0 6px 18px rgba(0,0,0,.18);transition:transform .15s,box-shadow .15s;animation:kpuPulse 2.2s ease-in-out infinite;}
 .kpu-banner-btn:hover{transform:translateY(-1px) scale(1.03);}
 .kpu-banner-btn:active{transform:scale(.96);}
+.kpu-banner-later{flex-shrink:0;padding:4px 8px;border:0;border-radius:10px;cursor:pointer;font-family:inherit;
+  font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:.4px;color:rgba(255,255,255,.85);
+  background:rgba(255,255,255,.12);border:1px solid rgba(255,255,255,.25);transition:background .15s,color .15s;}
+.kpu-banner-later:hover{background:rgba(255,255,255,.22);color:#fff;}
+.kpu-banner-later:active{transform:scale(.96);}
+@media (max-width:420px){
+  .kpu-banner-later{padding:4px 6px;font-size:9px;}
+  .kpu-banner-btn{padding:10px 12px;}
+}
 
 #kpu-overlay{position:fixed;inset:0;z-index:99999;overflow:hidden;font-family:'Nunito',system-ui,sans-serif;
   background:radial-gradient(1200px 700px at 80% -10%,#1e293b 0%,#0f172a 55%,#020617 100%);}

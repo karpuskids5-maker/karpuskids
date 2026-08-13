@@ -237,6 +237,26 @@ export const ImageLoader = {
   async uploadToStorage(file, bucket, path, compressOpts = {}) {
     const { supabase } = await import('./supabase.js');
 
+    const isVideo = file.type.startsWith('video/') ||
+      /\.(mp4|webm|mov|ogv|m4v|mkv|3gp|avi|wmv|flv)$/i.test(file.name || '');
+
+    // ── VIDEOS: no se comprimen ni pasan por resize-image (es solo imágenes).
+    // Además, el bucket 'karpus-uploads' NO acepta video/mp4 ni archivos >5MB,
+    // por eso los videos se suben a 'classroom_media' (permite video, 50MB).
+    if (isVideo) {
+      const videoBucket = (bucket === 'karpus-uploads' || bucket === 'avatars' || bucket === 'posts')
+        ? 'classroom_media'
+        : bucket;
+      const { error } = await supabase.storage.from(videoBucket).upload(path, file, {
+        cacheControl: '31536000',
+        contentType: file.type || 'video/mp4',
+        upsert: true
+      });
+      if (error) throw error;
+      const { data } = supabase.storage.from(videoBucket).getPublicUrl(path);
+      return data.publicUrl;
+    }
+
     const maxWidth  = compressOpts.maxWidth  || 800;
     const maxHeight = compressOpts.maxHeight || 800;
     const quality   = compressOpts.quality   ? Math.round(compressOpts.quality * 100) : 82;

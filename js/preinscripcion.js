@@ -201,7 +201,7 @@ function validateStep1() {
 }
 
 function validateStep2() {
-  const req = ['pi_p1_name', 'pi_p1_relationship', 'pi_p1_cedula', 'pi_p1_phone', 'pi_p1_email', 'pi_p1_address', 'pi_p2_name', 'pi_p2_relationship', 'pi_p2_cedula', 'pi_p2_phone', 'pi_p2_email'];
+  const req = ['pi_p1_name', 'pi_p1_relationship', 'pi_p1_cedula', 'pi_p1_phone', 'pi_p1_email', 'pi_p1_address'];
   let ok = true;
   req.forEach(id => {
     const el = document.getElementById(id);
@@ -211,6 +211,18 @@ function validateStep2() {
     if (err && err.classList.contains('err-msg')) err.style.display = bad ? 'block' : 'none';
     if (bad) ok = false;
   });
+  const p2NameEl = document.getElementById('pi_p2_name');
+  const p2Filled = p2NameEl && String(p2NameEl.value || '').trim();
+  if (p2Filled) {
+    ['pi_p2_relationship', 'pi_p2_cedula', 'pi_p2_phone', 'pi_p2_email'].forEach(id => {
+      const el = document.getElementById(id);
+      const bad = !el || !String(el.value || '').trim();
+      el?.classList.toggle('invalid', bad);
+      const err = el?.nextElementSibling;
+      if (err && err.classList.contains('err-msg')) err.style.display = bad ? 'block' : 'none';
+      if (bad) ok = false;
+    });
+  }
   ['pi_p1_cedula', 'pi_p2_cedula'].forEach(id => {
     const el = document.getElementById(id);
     if (el && String(el.value || '').trim() && !validateCedula(el.value)) {

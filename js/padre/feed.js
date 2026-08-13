@@ -4,6 +4,20 @@ import { Helpers, escapeHtml } from './helpers.js';
 import { ImageLoader } from '../shared/image-loader.js';
 import { WallModule } from '../shared/wall.js';
 
+// Exponer WallModule globalmente: los onclick inline del muro (likes,
+// comentarios, etc.) referencian la variable GLOBAL, no el binding del módulo.
+if (!window.WallModule) {
+  window.WallModule = {
+    init: (...a) => WallModule.init(...a),
+    loadPosts: (...a) => WallModule.loadPosts(...a),
+    destroy: (...a) => WallModule.destroy(...a),
+    toggleCommentSection: (...a) => WallModule.toggleCommentSection(...a),
+    sendComment: (...a) => WallModule.sendComment(...a),
+    deletePost: (...a) => WallModule.deletePost(...a),
+    toggleLike: (...a) => WallModule.toggleLike(...a)
+  };
+}
+
 /**
  * 📱 MÓDULO DE MURO (FEED)
  */

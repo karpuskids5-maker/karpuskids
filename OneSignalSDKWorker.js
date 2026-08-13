@@ -12,8 +12,11 @@
 // Estrategia de actualización:
 //   - Cache versionado: al cambiar CACHE_VERSION el navegador descarta
 //     la caché anterior automáticamente.
-//   - skipWaiting() + clients.claim(): el nuevo worker toma el control
-//     sin esperar a que el usuario cierre la app.
+//   - Patrón profesional "waiting worker": el nuevo worker NO se activa solo.
+//     Espera en "waiting" detrás del worker actual (la app sigue funcionando
+//     con la versión vieja sin interrupciones). Solo cuando la página le envía
+//     el mensaje SKIP_WAITING (usuario aceptó "Actualizar ahora") activa,
+//     toma el control con clients.claim() y la página recarga UNA vez.
 //   - Network First para HTML, JS y CSS: siempre se descarga la versión
 //     más reciente cuando hay internet.
 //   - Cache First (stale-while-revalidate) solo para imágenes/fuentes.
@@ -23,11 +26,16 @@
 importScripts('https://cdn.onesignal.com/sdks/web/v16/OneSignalSDK.sw.js');
 
 // ⚠️ Handler message requerido (Chrome 120+)
-self.addEventListener('message', () => {});
+// Atiende SKIP_WAITING: la página lo envía solo cuando el usuario acepta la
+// actualización. Sin mensaje, el worker espera y NUNCA interrumpe al usuario.
+self.addEventListener('message', event => {
+  const data = event.data;
+  if (data && data.type === 'SKIP_WAITING') self.skipWaiting();
+});
 
-// ── VERSIÓN DE CACHÉ ────────────────────────────────────────────
-// ⚠️ INCREMENTAR en cada deploy: karpus-v1.0.27 → karpus-v1.0.28 ...
-const CACHE_VERSION = 'karpus-v1.0.27';
+// ── VERSIÓN DE CACHÉ ────────────────────────────────────────────────────────
+// ⚠️ INCREMENTAR en cada deploy: karpus-v1.0.28 → karpus-v1.0.29 ...
+const CACHE_VERSION = 'karpus-v1.0.29';
 const CACHE_NAME    = CACHE_VERSION;
 
 // Assets precacheados en la instalación (mínimos, network-first en runtime)
@@ -42,12 +50,13 @@ const PRECACHE = [
 ];
 
 // ── INSTALL ─────────────────────────────────────────────────────
+// ⚠️ NO llamar a skipWaiting() aquí: activar de forma automática forzaba
+// recargas en todas las pestañas abiertas. La activación la pide la página
+// vía el mensaje SKIP_WAITING (ver handler message arriba).
 self.addEventListener('install', e => {
   e.waitUntil(
     caches.open(CACHE_NAME)
       .then(c => c.addAll(PRECACHE).catch(() => {}))
-      // Tomar control lo antes posible sin esperar a cerrar la app
-      .then(() => self.skipWaiting())
   );
 });
 

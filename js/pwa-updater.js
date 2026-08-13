@@ -3,11 +3,16 @@
  * Detecta nuevas versiones publicadas (/version.json) y guía al usuario
  * con una experiencia nativa de instalación de app:
  *
- *   - Banner OBLIGATORIO "Nueva versión disponible" con botón "Actualizar ahora".
+ *   - Banner NO intrusivo "Nueva versión disponible" con botón "Actualizar ahora"
+ *     y opción "Ahora no" (no vuelve a molestar hasta la próxima versión).
  *   - Pantalla de actualización estilo descarga de app nativa:
  *     logo con anillo de progreso, porcentaje, barra de carga y mensajes
- *     dinámicos rotativos para que el usuario no se desespere.
- *   - Limpia las cachés viejas (karpus-*) y recarga con la nueva versión.
+ *     dinámicos rotativos.
+ *   - Patrón profesional "waiting worker": el nuevo Service Worker espera
+ *     en silencio. Solo cuando el usuario acepta se envía SKIP_WAITING,
+ *     el worker activa y la página recarga UNA sola vez.
+ *   - NUNCA fuerza recargas automáticas (controllerchange solo recarga si
+ *     el usuario aceptó el flujo de actualización).
  *
  * Funciona en todas las páginas (login, paneles, kiosco). No registra el
  * Service Worker: la app ya lo hace (supabase.js / sw-live.js).
@@ -18,7 +23,10 @@
   if (window.KarpusPwaUpdater) return;
 
   const VERSION_KEY   = 'karpus_pwa_version';
+  const ACCEPT_KEY    = 'karpus_pwa_accepted'; // sessionStorage: el usuario aceptó el flujo
+  const DISMISS_KEY   = 'karpus_pwa_dismissed'; // localStorage: versión que el usuario pospuso
   const POLL_INTERVAL = 60000; // 60s
+  const RELOAD_TIMEOUT = 3500; // ms de respaldo si el worker no activa
   const RING_R        = 54;
   const RING_C        = 2 * Math.PI * RING_R; // ≈ 339.292
 
@@ -49,7 +57,7 @@
     document.head.appendChild(link);
   }
 
-  // ── Banner obligatorio ────────────────────────────────────────────────────
+  // ── Banner no intrusivo ───────────────────────────────────────────────────
   function showBanner() {
     injectStyles();
     if (document.getElementById('kpu-banner') || updating) return;
@@ -64,12 +72,22 @@
           '<p class="kpu-banner-sub">Mejoras y correcciones listas para instalar</p>' +
         '</div>' +
         '<button class="kpu-banner-btn">Actualizar ahora</button>' +
+        '<button type="button" class="kpu-banner-later" title="Recordármelo luego">Ahora no</button>' +
       '</div>';
     document.body.appendChild(wrap);
 
     requestAnimationFrame(() => requestAnimationFrame(() => wrap.classList.add('kpu-on')));
 
     wrap.querySelector('.kpu-banner-btn').addEventListener('click', () => performUpdate());
+    wrap.querySelector('.kpu-banner-later').addEventListener('click', () => dismissBanner());
+  }
+
+  // Pospone la actualización hasta la próxima versión publicada
+  function dismissBanner() {
+    if (nextVersion) {
+      try { localStorage.setItem(DISMISS_KEY, nextVersion); } catch (_) {}
+    }
+    document.getElementById('kpu-banner')?.remove();
   }
 
   // ── Overlay de instalación (estilo app nativa) ────────────────────────────
@@ -139,6 +157,22 @@
     };
   }
 
+  // ── Activación del nuevo Service Worker (waiting worker) ─────────────────
+  function activateNewWorker() {
+    if (!('serviceWorker' in navigator)) return;
+    navigator.serviceWorker.getRegistration().then(registration => {
+      if (!registration) return;
+      const waiting = registration.waiting;
+      if (waiting) {
+        // El worker nuevo ya está instalado → pedirle que active (SKIP_WAITING)
+        waiting.postMessage({ type: 'SKIP_WAITING' });
+      } else {
+        // Sin worker esperando → forzar la comprobación (no activará si no hay cambios)
+        registration.update().catch(() => {});
+      }
+    }).catch(() => {});
+  }
+
   // ── Flujo de actualización ────────────────────────────────────────────────
   async function performUpdate() {
     if (updating) return;
@@ -146,11 +180,12 @@
     document.getElementById('kpu-banner')?.remove();
 
     const ui = showOverlay();
-    const DURATION = 4800; // ms hasta 92% (sensación de descarga real)
+    const DURATION = 2000; // ms hasta 92% (sensación de descarga real, breve)
 
-    let pct = 0;
+    // Marcar que el usuario aceptó: permite que controllerchange recargue
+    try { sessionStorage.setItem(ACCEPT_KEY, '1'); } catch (_) {}
 
-    // Limpiar cachés viejas en paralelo
+    // Limpiar cachés viejas en paralelo (el worker nuevo ya eliminó las suyas)
     const cacheCleaned = (async () => {
       try {
         if (!('caches' in window)) return;
@@ -164,8 +199,7 @@
       const step = now => {
         const k = Math.min(1, (now - start) / DURATION);
         const eased = 1 - Math.pow(1 - k, 3); // easeOutCubic
-        pct = eased * 92;
-        ui.render(pct);
+        ui.render(eased * 92);
         if (k < 1) requestAnimationFrame(step);
         else resolve();
       };
@@ -174,28 +208,40 @@
 
     await cacheCleaned;
 
-    // Guardar la versión nueva y subir a 100%
+    // Guardar la versión nueva para no volver a preguntar tras recargar
     if (nextVersion) {
-      try { localStorage.setItem(VERSION_KEY, nextVersion); } catch (_) {}
+      try {
+        localStorage.setItem(VERSION_KEY, nextVersion);
+        localStorage.removeItem(DISMISS_KEY);
+      } catch (_) {}
     }
 
     await new Promise(resolve => {
       const t0 = performance.now();
       const step = now => {
-        const k = Math.min(1, (now - t0) / 500);
-        pct = 92 + 8 * (1 - Math.pow(1 - k, 2));
-        ui.render(pct);
+        const k = Math.min(1, (now - t0) / 400);
+        ui.render(92 + 8 * (1 - Math.pow(1 - k, 2)));
         if (k < 1) requestAnimationFrame(step);
         else { ui.render(100); resolve(); }
       };
       requestAnimationFrame(step);
     });
 
-    // Respiro antes de recargar con la nueva versión
-    setTimeout(() => {
+    // Recargar cuando el worker nuevo tome control (o por respaldo)
+    let reloaded = false;
+    const doReload = () => {
+      if (reloaded) return;
+      reloaded = true;
+      try { sessionStorage.removeItem(ACCEPT_KEY); } catch (_) {}
       ui.cleanup();
       window.location.reload();
-    }, 600);
+    };
+    if ('serviceWorker' in navigator) {
+      navigator.serviceWorker.addEventListener('controllerchange', doReload);
+    }
+    setTimeout(doReload, RELOAD_TIMEOUT);
+
+    activateNewWorker();
   }
 
   // ── Detección de versión ──────────────────────────────────────────────────
@@ -209,6 +255,9 @@
       const known = localStorage.getItem(VERSION_KEY);
       if (known && known !== data.version) {
         nextVersion = data.version;
+        // No volver a preguntar si el usuario ya pospuso ESTA versión
+        const dismissed = localStorage.getItem(DISMISS_KEY);
+        if (dismissed === data.version) return;
         showBanner();
       } else if (!known) {
         knownVersion = data.version;
@@ -217,24 +266,31 @@
     } catch (_) {}
   }
 
+  // ── Nuevo worker tomó control ─────────────────────────────────────────────
+  // SOLO recarga si el usuario aceptó el flujo (marca en sessionStorage).
+  // Si el worker activa por otro motivo, se ignora: cero recargas forzadas.
+  function onControllerChange() {
+    if (updating) return;
+    try {
+      if (sessionStorage.getItem(ACCEPT_KEY)) {
+        sessionStorage.removeItem(ACCEPT_KEY);
+        window.location.reload();
+      }
+    } catch (_) {}
+  }
+
+  function attachControllerChange() {
+    if (!('serviceWorker' in navigator)) return;
+    navigator.serviceWorker.addEventListener('controllerchange', onControllerChange);
+  }
+
   function start() {
     if (started) return;
     started = true;
     knownVersion = localStorage.getItem(VERSION_KEY);
+    attachControllerChange();
     checkVersion();
     pollTimer = setInterval(checkVersion, POLL_INTERVAL);
-  }
-
-  // Un nuevo Service Worker tomó el control → presentar la instalación
-  function onControllerChange() {
-    if (updating) return;
-    if (document.getElementById('kpu-overlay')) return;
-    try {
-      const res = localStorage.getItem(VERSION_KEY);
-      if (res) knownVersion = res;
-    } catch (_) {}
-    nextVersion = null;
-    performUpdate();
   }
 
   window.KarpusPwaUpdater = {

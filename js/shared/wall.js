@@ -9,6 +9,9 @@ import { withTimeout } from './db-utils.js';
 // En plan gratuito, agrega parámetros de caché para mejor rendimiento
 const optimizeImageUrl = (url, opts = {}) => {
   if (!url) return url || null;
+  // NUNCA optimizar videos: Supabase Image Transformation responde 400
+  // si intenta "transformar" un archivo que no es imagen.
+  if (/\.(mp4|webm|mov|ogv|m4v|mkv|3gp|avi|wmv|flv)([?#]|$)/i.test(url)) return url;
   // Solo optimizar URLs de Supabase Storage
   if (!url.includes('/storage/v1/object/public/')) return url;
   const { width, quality } = opts;
@@ -335,7 +338,8 @@ export const WallModule = {
     // Construir URL pública de Supabase Storage
     const clean = url.replace(/^(posts|karpus-uploads|avatars|classroom_media)\//, '');
     const isAvatar = url.includes('avatar');
-    const bucket = isAvatar ? 'karpus-uploads' : 'posts';
+    const isClassroomMedia = url.includes('classroom_media');
+    const bucket = isAvatar ? 'karpus-uploads' : isClassroomMedia ? 'classroom_media' : 'posts';
     const path = isAvatar ? `avatars/${clean}` : clean;
     const { data } = supabase.storage.from(bucket).getPublicUrl(path);
     return optimizeImageUrl(data?.publicUrl, opts);
@@ -411,14 +415,12 @@ export const WallModule = {
       <div class="bg-white rounded-3xl shadow-sm border border-slate-100 overflow-hidden mb-6" id="post-${p.id}" data-classroom-id="${p.classroom_id || 'null'}">
         <div class="p-5">
           <div class="flex justify-between items-start mb-4">
-            <div class="flex items-center gap-3">
-              <div class="w-10 h-10 rounded-full bg-${accent}-100 flex items-center justify-center overflow-hidden shrink-0 shadow-sm border border-slate-100">
-                ${ImageLoader.img(p.teacher_avatar, { 
-                  cls: 'w-full h-full object-cover', 
-                  fallback: 'img/1.jpg',
-                  w: 80, h: 80
+              <div class="flex items-center gap-3">
+                ${ImageLoader.avatar(p.teacher_avatar, p.teacher_name, {
+                  cls: 'shrink-0 shadow-sm border border-slate-100',
+                  bgCls: `bg-${accent}-100`,
+                  textCls: `text-${accent}-600`
                 })}
-              </div>
               <div>
                 <div class="font-bold text-slate-800 text-sm">${Helpers.escapeHTML(p.teacher_name)}</div>
                 <div class="text-[10px] text-slate-400 font-bold uppercase tracking-wider">

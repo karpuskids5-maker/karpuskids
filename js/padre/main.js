@@ -916,7 +916,9 @@ async function openDigitalID() {
       </div>
       <div class="p-8 flex flex-col items-center gap-6">
         <div class="w-24 h-24 rounded-2xl border-4 border-indigo-50 overflow-hidden shadow-lg">
-          <img src="${student.avatar_url || 'img/1.jpg'}" class="w-full h-full object-cover">
+          ${student.avatar_url
+            ? `<img src="${student.avatar_url}" class="w-full h-full object-cover">`
+            : `<div class="w-full h-full flex items-center justify-center text-5xl font-black text-indigo-600 bg-indigo-50">${Helpers.escapeHTML((student.name || '?').charAt(0).toUpperCase())}</div>`}
         </div>
         <div class="text-center">
           <h4 class="text-lg font-black text-slate-800">${Helpers.escapeHTML(student.name)}</h4>

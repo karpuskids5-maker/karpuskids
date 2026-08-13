@@ -371,9 +371,11 @@ export async function notifyPaymentApproved(paymentId, parentEmail, studentName,
 // (window.KarpusPwaUpdater). Aquí solo:
 //   - Registra el Service Worker (mismo archivo que usa OneSignal → mismo
 //     scope, el navegador deduplica el registro). No interfiere con las push.
-//   - Reacciona cuando el nuevo worker toma control redirigiendo a la UI.
+//   - Delega la detección de versiones y el flujo de actualización a la UI
+//     profesional. El patrón "waiting worker" (ver OneSignalSDKWorker.js)
+//     garantiza que NUNCA se fuerce una recarga sin que el usuario acepte.
 //   - Si el script de la UI aún no cargó (página vieja en caché), usa el
-//     mecanismo legacy de recarga silenciosa para nunca quedarse atascado.
+//     mecanismo legacy de recarga controlada para nunca quedarse atascado.
 // Idempotente: seguro de llamar desde cualquier panel y coexistir con OneSignal.
 function initPwaUpdater() {
   try {
@@ -383,13 +385,6 @@ function initPwaUpdater() {
 
     // Registrar el worker (mismo archivo que usa OneSignal → mismo scope)
     navigator.serviceWorker.register('OneSignalSDKWorker.js', { scope: '/' }).catch(() => {});
-
-    // Nuevo worker tomó control (skipWaiting + clients.claim) → actualizar
-    navigator.serviceWorker.addEventListener('controllerchange', () => {
-      const updater = window.KarpusPwaUpdater;
-      if (updater && updater.onControllerChange) updater.onControllerChange();
-      else window.location.reload();
-    });
 
     // Delegar la detección de versiones a la UI profesional.
     let tries = 0;
@@ -403,8 +398,11 @@ function initPwaUpdater() {
 }
 
 // Fallback para páginas viejas en caché sin js/pwa-updater.js
+// Respetuoso: nunca recarga automáticamente. Solo guarda la versión nueva y,
+// si el usuario ya aceptó una actualización en esta sesión, recarga una vez.
 function legacyAutoReload() {
   const VERSION_KEY = 'karpus_pwa_version';
+  const ACCEPT_KEY  = 'karpus_pwa_accepted';
   const checkVersion = async () => {
     try {
       const res = await fetch('/version.json', { cache: 'no-store', headers: { 'Cache-Control': 'no-cache' } });
@@ -418,7 +416,10 @@ function legacyAutoReload() {
           await Promise.all(keys.filter(k => k.startsWith('karpus-')).map(k => caches.delete(k)));
         } catch (_) {}
         localStorage.setItem(VERSION_KEY, data.version);
-        window.location.reload();
+        // Solo recarga si el usuario aceptó explícitamente el flujo
+        let accepted = false;
+        try { accepted = !!sessionStorage.getItem(ACCEPT_KEY); sessionStorage.removeItem(ACCEPT_KEY); } catch (_) {}
+        if (accepted) window.location.reload();
       } else if (!known) {
         localStorage.setItem(VERSION_KEY, data.version);
       }

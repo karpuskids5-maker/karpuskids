@@ -2,16 +2,20 @@
  * Karpus Kids — Service Worker PWA for Attendance Live (kiosco)
  * Scope propio ('/'), registrado solo por attendance-live.html.
  * Estrategia igual al worker principal:
- *   - Cache versionado + skipWaiting + clients.claim
+ *   - Cache versionado + patrón "waiting worker" (SKIP_WAITING)
  *   - Network First para HTML, JS y CSS
  *   - Cache First (stale-while-revalidate) para imágenes/fuentes
  *   - Supabase nunca se cachea
  */
 
 // ⚠️ Handler message requerido (Chrome 120+)
-self.addEventListener('message', () => {});
+// SKIP_WAITING: la página lo envía solo cuando el usuario acepta actualizar.
+self.addEventListener('message', event => {
+  const data = event.data;
+  if (data && data.type === 'SKIP_WAITING') self.skipWaiting();
+});
 
-const CACHE_VERSION = 'karpus-live-v3';
+const CACHE_VERSION = 'karpus-live-v5';
 const CACHE_NAME    = CACHE_VERSION;
 
 const PRECACHE = [
@@ -25,7 +29,6 @@ self.addEventListener('install', e => {
   e.waitUntil(
     caches.open(CACHE_NAME)
       .then(c => c.addAll(PRECACHE).catch(() => {}))
-      .then(() => self.skipWaiting())
   );
 });
 
