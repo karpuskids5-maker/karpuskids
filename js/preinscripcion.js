@@ -17,6 +17,83 @@ const esc = (v) => String(v ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '
 
 const LEVELS_FALLBACK = ['Maternal','Infantes','Párvulos','Pre-Kinder','Kinder','Pre-Primaria','Primaria'];
 
+let _roomsCache = [];
+let _roomsPollTimer = null;
+
+function _roomLabel(level, rooms) {
+  const names = rooms.map(r => r.name).filter(Boolean).join(', ');
+  const available = rooms.reduce((acc, r) => acc + (r.available || 0), 0);
+  return `${level}${names ? ' · ' + names : ''} · ${available} cupo${available === 1 ? '' : 's'} libre${available === 1 ? '' : 's'}`;
+}
+
+function renderLevels() {
+  const sel = $('#pi_level');
+  const current = sel.value;
+  if (_roomsCache.length) {
+    // Agrupar aulas por nivel (mismo nivel en varias aulas = cupos sumados)
+    const byLevel = new Map();
+    _roomsCache.forEach(r => {
+      const lvl = (r.level || '').trim();
+      if (!lvl) return;
+      if (!byLevel.has(lvl)) byLevel.set(lvl, []);
+      byLevel.get(lvl).push(r);
+    });
+    const options = [...byLevel.entries()]
+      .sort((a, b) => a[0].localeCompare(b[0], 'es'))
+      .map(([lvl, rooms]) => `<option value="${esc(lvl)}">${esc(_roomLabel(lvl, rooms))}</option>`);
+    if (options.length) {
+      sel.innerHTML = options.join('');
+      sel.insertAdjacentHTML('afterbegin', '<option value="">-- Seleccionar nivel / aula --</option>');
+      if (current && [...sel.options].some(o => o.value === current)) sel.value = current;
+      return;
+    }
+  }
+  sel.innerHTML = LEVELS_FALLBACK.map(l => `<option value="${esc(l)}">${esc(l)}</option>`).join('');
+  if (current && [...sel.options].some(o => o.value === current)) sel.value = current;
+}
+
+async function loadClassroomsCapacity() {
+  try {
+    const { data, error } = await supabase.rpc('get_classrooms_capacity');
+    if (error || !Array.isArray(data)) throw error || new Error('sin datos');
+    _roomsCache = data;
+    renderLevels();
+  } catch (_) {
+    // Si el RPC no está disponible aún (migración pendiente), usar niveles básicos
+    if (!_roomsCache.length) renderLevels();
+  }
+}
+
+async function loadDynamicData() {
+  try {
+    const { data: years } = await supabase
+      .from('school_years')
+      .select('id, name')
+      .in('status', ['enrollment','reenrollment','active','draft'])
+      .order('start_date', { ascending: false })
+      .limit(5);
+    const sel = $('#pi_school_year');
+    if (years?.length) {
+      sel.innerHTML = years.map(y => `<option value="${esc(y.name)}">${esc(y.name)}</option>`).join('');
+    } else {
+      const y = new Date().getFullYear();
+      sel.innerHTML = `<option value="${y}-${y + 1}">${y}-${y + 1}</option>`;
+    }
+  } catch (_) {
+    const y = new Date().getFullYear();
+    $('#pi_school_year').innerHTML = `<option value="${y}-${y + 1}">${y}-${y + 1}</option>`;
+  }
+
+  await loadClassroomsCapacity();
+
+  // Tiempo real: refrescar cupos cada 30s y al volver al foco de la pestaña
+  clearInterval(_roomsPollTimer);
+  _roomsPollTimer = setInterval(loadClassroomsCapacity, 30000);
+  document.addEventListener('visibilitychange', () => {
+    if (!document.hidden) loadClassroomsCapacity();
+  });
+}
+
 const DOC_FIELDS = [
   { key: 'photo',        label: 'Foto del estudiante',        maxW: 900  },
   { key: 'acta',         label: 'Acta de nacimiento',         maxW: 1600 },
@@ -118,40 +195,6 @@ function compressImage(file, maxW = 1400, targetKB = 500) {
   });
 }
 
-async function loadDynamicData() {
-  try {
-    const { data: years } = await supabase
-      .from('school_years')
-      .select('id, name')
-      .in('status', ['enrollment','reenrollment','active','draft'])
-      .order('start_date', { ascending: false })
-      .limit(5);
-    const sel = $('#pi_school_year');
-    if (years?.length) {
-      sel.innerHTML = years.map(y => `<option value="${esc(y.name)}">${esc(y.name)}</option>`).join('');
-    } else {
-      const y = new Date().getFullYear();
-      sel.innerHTML = `<option value="${y}-${y + 1}">${y}-${y + 1}</option>`;
-    }
-  } catch (_) {
-    const y = new Date().getFullYear();
-    $('#pi_school_year').innerHTML = `<option value="${y}-${y + 1}">${y}-${y + 1}</option>`;
-  }
-
-  try {
-    const { data: rooms } = await supabase
-      .from('classrooms')
-      .select('level')
-      .not('level', 'is', null);
-    const levels = [...new Set((rooms || []).map(r => r.level).filter(Boolean))];
-    $('#pi_level').innerHTML = (levels.length ? levels : LEVELS_FALLBACK)
-      .map(l => `<option value="${esc(l)}">${esc(l)}</option>`).join('');
-  } catch (_) {
-    $('#pi_level').innerHTML = LEVELS_FALLBACK.map(l => `<option value="${esc(l)}">${esc(l)}</option>`).join('');
-  }
-
-}
-
 const STEP_TITLES = {
   1: 'Datos del niño(a)', 2: 'Padres / Tutores', 3: 'Emergencia y autorizados',
   4: 'Información médica', 5: 'Documentos', 6: 'Autorizaciones y firma', 7: 'Resumen y envío',
@@ -187,94 +230,18 @@ function validateStep(step) {
 }
 
 function validateStep1() {
-  const req = ['pi_student_name', 'pi_birth_date', 'pi_gender', 'pi_school_year', 'pi_level', 'pi_schedule'];
-  let ok = true;
-  req.forEach(id => {
-    const el = document.getElementById(id);
-    const bad = !el || !String(el.value || '').trim();
-    el?.classList.toggle('invalid', bad);
-    const err = el?.nextElementSibling;
-    if (err && err.classList.contains('err-msg')) err.style.display = bad ? 'block' : 'none';
-    if (bad) ok = false;
-  });
-  return ok;
+  return true;
 }
 
 function validateStep2() {
-  const req = ['pi_p1_name', 'pi_p1_relationship', 'pi_p1_cedula', 'pi_p1_phone', 'pi_p1_email', 'pi_p1_address'];
-  let ok = true;
-  req.forEach(id => {
-    const el = document.getElementById(id);
-    const bad = !el || !String(el.value || '').trim();
-    el?.classList.toggle('invalid', bad);
-    const err = el?.nextElementSibling;
-    if (err && err.classList.contains('err-msg')) err.style.display = bad ? 'block' : 'none';
-    if (bad) ok = false;
-  });
-  const p2NameEl = document.getElementById('pi_p2_name');
-  const p2Filled = p2NameEl && String(p2NameEl.value || '').trim();
-  if (p2Filled) {
-    ['pi_p2_relationship', 'pi_p2_cedula', 'pi_p2_phone', 'pi_p2_email'].forEach(id => {
-      const el = document.getElementById(id);
-      const bad = !el || !String(el.value || '').trim();
-      el?.classList.toggle('invalid', bad);
-      const err = el?.nextElementSibling;
-      if (err && err.classList.contains('err-msg')) err.style.display = bad ? 'block' : 'none';
-      if (bad) ok = false;
-    });
-  }
-  ['pi_p1_cedula', 'pi_p2_cedula'].forEach(id => {
-    const el = document.getElementById(id);
-    if (el && String(el.value || '').trim() && !validateCedula(el.value)) {
-      el.classList.add('invalid');
-      if (el.nextElementSibling?.classList.contains('err-msg')) {
-        el.nextElementSibling.textContent = 'Cédula inválida (módulo 10 no coincide).';
-        el.nextElementSibling.style.display = 'block';
-      }
-      ok = false;
-    }
-  });
-  ['pi_p1_email', 'pi_p2_email'].forEach(id => {
-    const el = document.getElementById(id);
-    if (el && String(el.value || '').trim() && !isEmail(el.value)) {
-      el.classList.add('invalid');
-      if (el.nextElementSibling?.classList.contains('err-msg')) el.nextElementSibling.style.display = 'block';
-      ok = false;
-    }
-  });
-  return ok;
+  return true;
 }
 
 function validateStep3() {
-  const req = ['pi_emg_name', 'pi_emg_relationship', 'pi_emg_cedula', 'pi_emg_phone'];
-  let ok = true;
-  req.forEach(id => {
-    const el = document.getElementById(id);
-    const bad = !el || !String(el.value || '').trim();
-    el?.classList.toggle('invalid', bad);
-    const err = el?.nextElementSibling;
-    if (err && err.classList.contains('err-msg')) err.style.display = bad ? 'block' : 'none';
-    if (bad) ok = false;
-  });
-  const emgCed = document.getElementById('pi_emg_cedula');
-  if (emgCed && String(emgCed.value || '').trim() && !validateCedula(emgCed.value)) {
-    emgCed.classList.add('invalid');
-    if (emgCed.nextElementSibling?.classList.contains('err-msg')) emgCed.nextElementSibling.style.display = 'block';
-    ok = false;
-  }
-  return ok;
+  return true;
 }
 
 function validateStep6() {
-  const boxes = ['pi_auth_data', 'pi_auth_correct', 'pi_auth_contact', 'pi_auth_regulations'];
-  const allChecked = boxes.every(id => document.getElementById(id)?.checked);
-  $('#pi_auth_error').style.display = allChecked ? 'none' : 'block';
-  if (!allChecked) return false;
-  if (!STATE.signature) {
-    $('#pi_signature_status').textContent = '⚠ Firma requerida';
-    return false;
-  }
-  $('#pi_signature_status').textContent = '✓ Firma capturada';
   return true;
 }
 
@@ -446,6 +413,8 @@ function collect() {
     school_year_requested: v('pi_school_year'),
     level_requested: v('pi_level'),
     schedule: v('pi_schedule'),
+    entry_time: v('pi_entry_time'),
+    exit_time: v('pi_exit_time'),
     estimated_entry_date: v('pi_entry_date'),
     has_siblings: !$('#pi_sibling_wrap')?.classList.contains('hidden'),
     sibling_name: v('pi_sibling_name'),
@@ -485,7 +454,8 @@ function renderSummary() {
       ['Nombres', d.student_name], ['Apellidos', d.student_last_name],
       ['Nacimiento', d.birth_date], ['Sexo', d.gender], ['Nacionalidad', d.nationality],
       ['Año escolar', d.school_year_requested], ['Nivel', d.level_requested],
-      ['Horario', d.schedule], ['Ingreso estimado', d.estimated_entry_date],
+      ['Horario', d.schedule], ['Entrada', d.entry_time], ['Salida', d.exit_time],
+      ['Ingreso estimado', d.estimated_entry_date],
       ['Hermano inscrito', d.sibling_name ? ('Sí · ' + d.sibling_name) : 'No']
     ]),
     block('Padre / Tutor', [

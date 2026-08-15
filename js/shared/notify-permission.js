@@ -18,29 +18,52 @@ export const NotifyPermission = {
   /** Show banner if permission not yet granted. Always shows until user decides. */
   requestIfNeeded(containerId = 'notifPermissionSlot') {
     if (!('Notification' in window)) return;
+    // Tras una actualización de la app se restablece/re-pide la suscripción
+    // para que la nueva versión quede vinculada a OneSignal.
+    this.consumeUpdateReset(containerId);
     if (this.isDenied()) return;
-    if (this.isGranted()) { this._ensureOneSignalLinked(); return; }
+    if (this.isGranted()) { this._ensureOneSignalLinked(false); return; }
+    this._render(containerId);
+  },
+
+  /**
+   * Re-pide/reestablece notificaciones tras una actualización del sistema.
+   * El PWA Updater guarda karpus_notif_reask='1' antes de recargar con la
+   * versión nueva. Aquí se consume el flag, se re-vincula la suscripción
+   * (optOut + optIn → player_id fresco) y se confirma con un push.
+   */
+  consumeUpdateReset(containerId = 'notifPermissionSlot') {
+    let flag = null;
+    try { flag = localStorage.getItem('karpus_notif_reask'); } catch (_) {}
+    if (flag !== '1') return;
+    try { localStorage.removeItem('karpus_notif_reask'); } catch (_) {}
+    if (this.isGranted()) {
+      // Ya tiene permiso → re-vincular con la nueva versión y confirmar
+      this._ensureOneSignalLinked(true);
+      this._showSuccess();
+      return;
+    }
     this._render(containerId);
   },
 
   /** Auto-request without banner — use on app startup */
   async requestSilent() {
     if (!('Notification' in window)) return;
-    if (this.isGranted()) { this._ensureOneSignalLinked(); return; }
+    this.consumeUpdateReset();
+    if (this.isGranted()) { this._ensureOneSignalLinked(false); return; }
     if (this.isDenied()) return;
     try {
       const result = await Notification.requestPermission();
       if (result === 'granted') {
-        await this._ensureOneSignalLinked();
+        await this._ensureOneSignalLinked(true);
         this._showSuccess();
       }
     } catch (_) {}
   },
 
-  async _ensureOneSignalLinked() {
+  async _ensureOneSignalLinked(sendWelcome = false) {
     try {
-      if (!window.OneSignal) return;
-      const { supabase } = await import('./supabase.js');
+      const { supabase, sendPush } = await import('./supabase.js');
       const { data } = await supabase.auth.getUser();
       const userId = data?.user?.id;
       if (!userId) return;
@@ -71,6 +94,21 @@ export const NotifyPermission = {
               .eq('id', userId);
           } catch (_) {}
         }
+
+        // Notificación de confirmación cuando el usuario ACTIVA las notificaciones.
+        // El welcomeNotification de OneSignal solo se envía UNA vez por dispositivo,
+        // por eso enviamos un push explícito y confiable vía send-push.
+        if (sendWelcome) {
+          try {
+            await sendPush({
+              user_id: userId,
+              title: '🔔 Notificaciones activadas',
+              message: 'Ya recibirás alertas de asistencia, tareas, pagos y mensajes de Karpus Kids en tiempo real.',
+              type: 'info',
+              link: '/panel_padres.html'
+            });
+          } catch (_) {}
+        }
       });
     } catch (_) {}
   },
@@ -98,7 +136,7 @@ export const NotifyPermission = {
       try {
         const result = await Notification.requestPermission();
         if (result === 'granted') {
-          await this._ensureOneSignalLinked();
+          await this._ensureOneSignalLinked(true);
           this._showSuccess();
         }
       } catch (e) { /* silencioso */ }

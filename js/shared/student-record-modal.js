@@ -178,6 +178,8 @@ export const StudentRecordModal = {
       school_year_requested: student.school_year_requested || this._schoolYears[0] || '',
       level_requested: student.level_requested || '',
       schedule: student.schedule || 'Medio día',
+      entry_time: student.entry_time || '',
+      exit_time: student.exit_time || '',
       start_date: student.start_date || student.estimated_entry_date || new Date().toISOString().split('T')[0],
       has_siblings: !!student.has_siblings, sibling_name: student.sibling_name || '',
       classroom_id: student.classroom_id ? String(student.classroom_id) : '',
@@ -241,6 +243,7 @@ export const StudentRecordModal = {
       birthplace: '', address: p1.address || '', province: '', municipality: '', sector: '',
       school_year_requested: p.school_year_requested || this._schoolYears[0] || '',
       level_requested: p.level_requested || '', schedule: p.schedule || 'Medio día',
+      entry_time: p.entry_time || '', exit_time: p.exit_time || '',
       start_date: p.estimated_entry_date || new Date().toISOString().split('T')[0],
       has_siblings: !!p.has_siblings, sibling_name: p.sibling_name || '',
       classroom_id: '', is_active: true,
@@ -655,6 +658,16 @@ export const StudentRecordModal = {
               <select data-f="schedule" class="${INPUT}">
                 ${SCHEDULES.map(s => `<option value="${s}" ${f.schedule === s ? 'selected' : ''}>${s}</option>`).join('')}
               </select>
+              <div class="grid grid-cols-2 gap-2 mt-2">
+                <div>
+                  <label class="text-[9px] font-black text-slate-400 uppercase tracking-wider ml-1">Entrada</label>
+                  <input data-f="entry_time" type="time" value="${f.entry_time || ''}" class="${INPUT}">
+                </div>
+                <div>
+                  <label class="text-[9px] font-black text-slate-400 uppercase tracking-wider ml-1">Salida</label>
+                  <input data-f="exit_time" type="time" value="${f.exit_time || ''}" class="${INPUT}">
+                </div>
+              </div>
             </div>
             ${this._authedField('start_date', 'Fecha estimada de ingreso', '', { type: 'date' })}
             ${this._authedField('sector', 'Sector', '')}
@@ -1474,6 +1487,8 @@ export const StudentRecordModal = {
       school_year_id: (this._schoolYearOptions.find(o => o.name === f.school_year_requested)?.id) || null,
       level_requested: f.level_requested || null,
       schedule: f.schedule || null,
+      entry_time: f.entry_time || null,
+      exit_time: f.exit_time || null,
       start_date: f.start_date || null,
       estimated_entry_date: f.start_date || null,
       has_siblings: !!f.has_siblings,

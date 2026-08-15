@@ -278,6 +278,7 @@ export const DirectorApi = {
 
     const ALLOWED_COLUMNS = new Set([
       'name','matricula','classroom_id','age','age_type','schedule','start_date',
+      'entry_time','exit_time',
       'is_active','blood_type','allergies','authorized_pickup','authorized_pickup_phone',
       'p1_name','p1_phone','p1_email','p1_job','p1_address','p1_emergency_contact',
       'p2_name','p2_phone','p2_email','p2_job','p2_address','p2_emergency_contact',

@@ -109,7 +109,7 @@
     <div class="text-center mb-8">
       <span class="inline-block bg-orange-100 text-orange-700 px-4 py-1.5 rounded-full text-[10px] font-black uppercase tracking-widest mb-3">Admisiones 2026-2027</span>
       <h1 class="text-3xl md:text-4xl font-black text-slate-800 mb-2" style="font-family:'Poppins',sans-serif;">Preinscripción en línea</h1>
-      <p class="text-sm text-slate-500 font-semibold max-w-xl mx-auto">Completa los 7 pasos. Nuestro equipo de admisiones revisará el expediente y te contactará para coordinar la entrevista y la inscripción oficial.</p>
+      <p class="text-sm text-slate-500 font-semibold max-w-xl mx-auto">Completa los 7 pasos con la información del menor. Ningún campo es obligatorio: cuanta más información nos des, más ágil será la evaluación de admisión. Nuestro equipo te contactará para coordinar la entrevista.</p>
     </div>
 
     <!-- Barra de progreso Karpus Kids -->
@@ -150,57 +150,59 @@
           </div>
           <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
-              <label class="flabel">Nombres completos *</label>
-              <input id="pi_student_name" class="field" placeholder="Ej: Ana Sofía" data-req="true">
-              <p class="err-msg">Ingresa los nombres del menor.</p>
+              <label class="flabel">Nombres completos</label>
+              <input id="pi_student_name" class="field" placeholder="Ej: Ana Sofía">
             </div>
             <div>
               <label class="flabel">Apellidos</label>
               <input id="pi_student_last_name" class="field" placeholder="Ej: Pérez Gómez">
             </div>
             <div>
-              <label class="flabel">Fecha de nacimiento *</label>
-              <input id="pi_birth_date" type="date" class="field" data-req="true">
-              <p class="err-msg">Selecciona la fecha de nacimiento.</p>
+              <label class="flabel">Fecha de nacimiento</label>
+              <input id="pi_birth_date" type="date" class="field">
             </div>
             <div>
               <label class="flabel">Edad calculada</label>
               <input id="pi_calculated_age" class="field bg-slate-50 text-slate-500" placeholder="Se calcula automáticamente" readonly>
             </div>
             <div>
-              <label class="flabel">Sexo *</label>
-              <select id="pi_gender" class="field" data-req="true">
+              <label class="flabel">Sexo</label>
+              <select id="pi_gender" class="field">
                 <option value="">-- Seleccionar --</option>
                 <option value="Masculino">Masculino</option>
                 <option value="Femenino">Femenino</option>
               </select>
-              <p class="err-msg">Selecciona el sexo.</p>
             </div>
             <div>
               <label class="flabel">Nacionalidad</label>
               <input id="pi_nationality" class="field" value="Dominicana">
             </div>
             <div>
-              <label class="flabel">Año escolar solicitado *</label>
-              <select id="pi_school_year" class="field" data-req="true"><option value="">Cargando…</option></select>
-              <p class="err-msg">Selecciona el año escolar.</p>
+              <label class="flabel">Año escolar solicitado</label>
+              <select id="pi_school_year" class="field"><option value="">Cargando…</option></select>
             </div>
             <div>
-              <label class="flabel">Nivel educativo solicitado *</label>
-              <select id="pi_level" class="field" data-req="true">
+              <label class="flabel">Nivel educativo solicitado</label>
+              <select id="pi_level" class="field">
                 <option value="">Cargando…</option>
               </select>
-              <p class="err-msg">Selecciona el nivel.</p>
             </div>
             <div>
-              <label class="flabel">Horario deseado *</label>
-              <select id="pi_schedule" class="field" data-req="true">
+              <label class="flabel">Horario deseado</label>
+              <select id="pi_schedule" class="field">
                 <option value="">-- Seleccionar --</option>
                 <option value="Medio día">Medio día</option>
                 <option value="Completo">Completo</option>
                 <option value="Extendido">Extendido</option>
               </select>
-              <p class="err-msg">Selecciona el horario.</p>
+            </div>
+            <div>
+              <label class="flabel">Hora de entrada</label>
+              <input id="pi_entry_time" type="time" class="field">
+            </div>
+            <div>
+              <label class="flabel">Hora de salida</label>
+              <input id="pi_exit_time" type="time" class="field">
             </div>
             <div>
               <label class="flabel">Fecha estimada de ingreso</label>
@@ -238,43 +240,37 @@
             </div>
             <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>
-                <label class="flabel">Nombre completo *</label>
-                <input id="pi_p1_name" class="field" data-req="true">
-                <p class="err-msg">Ingresa el nombre completo.</p>
+                <label class="flabel">Nombre completo</label>
+                <input id="pi_p1_name" class="field">
               </div>
               <div>
-                <label class="flabel">Parentesco *</label>
-                <select id="pi_p1_relationship" class="field" data-req="true">
+                <label class="flabel">Parentesco</label>
+                <select id="pi_p1_relationship" class="field">
                   <option value="">-- Seleccionar --</option>
                   <option value="Padre">Padre</option>
                   <option value="Madre">Madre</option>
                   <option value="Tutor Legal">Tutor Legal</option>
                 </select>
-                <p class="err-msg">Selecciona el parentesco.</p>
               </div>
               <div>
-                <label class="flabel">Cédula *</label>
+                <label class="flabel">Cédula</label>
                 <input id="pi_p1_cedula" class="field" placeholder="000-0000000-0" maxlength="13" data-cedula="true">
-                <p class="err-msg">Cédula inválida (verifica los 11 dígitos).</p>
               </div>
               <div>
-                <label class="flabel">Teléfono *</label>
+                <label class="flabel">Teléfono</label>
                 <input id="pi_p1_phone" class="field" placeholder="809-000-0000" maxlength="12" data-phone="true">
-                <p class="err-msg">Ingresa un teléfono válido (10 dígitos).</p>
               </div>
               <div>
                 <label class="flabel">WhatsApp</label>
                 <input id="pi_p1_whatsapp" class="field" placeholder="809-000-0000" maxlength="12" data-phone="true">
               </div>
               <div>
-                <label class="flabel">Correo electrónico *</label>
-                <input id="pi_p1_email" type="email" class="field" placeholder="correo@ejemplo.com" data-req="true" data-email="true">
-                <p class="err-msg">Ingresa un correo válido.</p>
+                <label class="flabel">Correo electrónico</label>
+                <input id="pi_p1_email" type="email" class="field" placeholder="correo@ejemplo.com" data-email="true">
               </div>
               <div class="md:col-span-2">
-                <label class="flabel">Dirección de residencia *</label>
-                <input id="pi_p1_address" class="field" placeholder="Calle, sector, ciudad" data-req="true">
-                <p class="err-msg">Ingresa la dirección.</p>
+                <label class="flabel">Dirección de residencia</label>
+                <input id="pi_p1_address" class="field" placeholder="Calle, sector, ciudad">
               </div>
               <div>
                 <label class="flabel">Ocupación</label>
@@ -302,38 +298,33 @@
             </div>
             <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>
-                <label class="flabel">Nombre completo *</label>
-                <input id="pi_p2_name" class="field" data-req="true">
-                <p class="err-msg">Ingresa el nombre completo.</p>
+                <label class="flabel">Nombre completo</label>
+                <input id="pi_p2_name" class="field">
               </div>
               <div>
-                <label class="flabel">Parentesco *</label>
-                <select id="pi_p2_relationship" class="field" data-req="true">
+                <label class="flabel">Parentesco</label>
+                <select id="pi_p2_relationship" class="field">
                   <option value="">-- Seleccionar --</option>
                   <option value="Padre">Padre</option>
                   <option value="Madre">Madre</option>
                   <option value="Tutor Legal">Tutor Legal</option>
                 </select>
-                <p class="err-msg">Selecciona el parentesco.</p>
               </div>
               <div>
-                <label class="flabel">Cédula *</label>
+                <label class="flabel">Cédula</label>
                 <input id="pi_p2_cedula" class="field" placeholder="000-0000000-0" maxlength="13" data-cedula="true">
-                <p class="err-msg">Cédula inválida (verifica los 11 dígitos).</p>
               </div>
               <div>
-                <label class="flabel">Teléfono *</label>
+                <label class="flabel">Teléfono</label>
                 <input id="pi_p2_phone" class="field" placeholder="809-000-0000" maxlength="12" data-phone="true">
-                <p class="err-msg">Ingresa un teléfono válido (10 dígitos).</p>
               </div>
               <div>
                 <label class="flabel">WhatsApp</label>
                 <input id="pi_p2_whatsapp" class="field" placeholder="809-000-0000" maxlength="12" data-phone="true">
               </div>
               <div>
-                <label class="flabel">Correo electrónico *</label>
-                <input id="pi_p2_email" type="email" class="field" placeholder="correo@ejemplo.com" data-req="true" data-email="true">
-                <p class="err-msg">Ingresa un correo válido.</p>
+                <label class="flabel">Correo electrónico</label>
+                <input id="pi_p2_email" type="email" class="field" placeholder="correo@ejemplo.com" data-email="true">
               </div>
               <div class="md:col-span-2">
                 <label class="flabel">Dirección de residencia</label>
@@ -374,24 +365,20 @@
             </div>
             <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>
-                <label class="flabel">Nombre completo *</label>
-                <input id="pi_emg_name" class="field" data-req="true">
-                <p class="err-msg">Ingresa el nombre.</p>
+                <label class="flabel">Nombre completo</label>
+                <input id="pi_emg_name" class="field">
               </div>
               <div>
-                <label class="flabel">Parentesco *</label>
-                <input id="pi_emg_relationship" class="field" placeholder="Ej: Abuela, Tío" data-req="true">
-                <p class="err-msg">Indica el parentesco.</p>
+                <label class="flabel">Parentesco</label>
+                <input id="pi_emg_relationship" class="field" placeholder="Ej: Abuela, Tío">
               </div>
               <div>
-                <label class="flabel">Cédula *</label>
+                <label class="flabel">Cédula</label>
                 <input id="pi_emg_cedula" class="field" placeholder="000-0000000-0" maxlength="13" data-cedula="true">
-                <p class="err-msg">Cédula inválida (verifica los 11 dígitos).</p>
               </div>
               <div>
-                <label class="flabel">Teléfono *</label>
+                <label class="flabel">Teléfono</label>
                 <input id="pi_emg_phone" class="field" placeholder="809-000-0000" maxlength="12" data-phone="true">
-                <p class="err-msg">Ingresa un teléfono válido.</p>
               </div>
               <div class="md:col-span-2">
                 <label class="flabel">Instrucciones especiales</label>
@@ -502,27 +489,27 @@
             </div>
             <div class="space-y-3">
               <label class="flex items-start gap-3 cursor-pointer">
-                <input type="checkbox" id="pi_auth_data" class="w-5 h-5 mt-0.5 rounded text-orange-500 accent-orange-500" data-req="true">
+                <input type="checkbox" id="pi_auth_data" class="w-5 h-5 mt-0.5 rounded text-orange-500 accent-orange-500">
                 <span class="text-sm font-semibold text-slate-600">Autorizo el <b>tratamiento de datos personales</b> de mi hijo(a) conforme a la política de privacidad del centro.</span>
               </label>
               <label class="flex items-start gap-3 cursor-pointer">
-                <input type="checkbox" id="pi_auth_correct" class="w-5 h-5 mt-0.5 rounded text-orange-500 accent-orange-500" data-req="true">
+                <input type="checkbox" id="pi_auth_correct" class="w-5 h-5 mt-0.5 rounded text-orange-500 accent-orange-500">
                 <span class="text-sm font-semibold text-slate-600">Declaro que la información suministrada es <b>verídica</b> y de mi responsabilidad.</span>
               </label>
               <label class="flex items-start gap-3 cursor-pointer">
-                <input type="checkbox" id="pi_auth_contact" class="w-5 h-5 mt-0.5 rounded text-orange-500 accent-orange-500" data-req="true">
+                <input type="checkbox" id="pi_auth_contact" class="w-5 h-5 mt-0.5 rounded text-orange-500 accent-orange-500">
                 <span class="text-sm font-semibold text-slate-600">Autorizo el <b>contacto vía WhatsApp, SMS o correo</b> con información institucional.</span>
               </label>
               <label class="flex items-start gap-3 cursor-pointer">
-                <input type="checkbox" id="pi_auth_regulations" class="w-5 h-5 mt-0.5 rounded text-orange-500 accent-orange-500" data-req="true">
+                <input type="checkbox" id="pi_auth_regulations" class="w-5 h-5 mt-0.5 rounded text-orange-500 accent-orange-500">
                 <span class="text-sm font-semibold text-slate-600">Acepto el <b>reglamento interno</b> del colegio y me comprometo a cumplirlo.</span>
               </label>
               <p class="err-msg text-sm" id="pi_auth_error">Debes marcar todas las autorizaciones para continuar.</p>
             </div>
 
             <div class="mt-8">
-              <label class="flabel">Firma digital del tutor *</label>
-              <p class="text-[11px] text-slate-400 font-semibold mb-2">Firma dentro del recuadro con el dedo o el mouse.</p>
+              <label class="flabel">Firma digital del tutor</label>
+              <p class="text-[11px] text-slate-400 font-semibold mb-2">Opcional — firma dentro del recuadro con el dedo o el mouse.</p>
               <canvas id="pi_signature" class="sig-canvas" height="180"></canvas>
               <div class="flex gap-3 mt-3">
                 <button onclick="window.Preinscripcion.clearSignature()" class="text-[11px] font-black text-slate-500 uppercase tracking-widest bg-slate-100 hover:bg-slate-200 px-4 py-2 rounded-xl transition-all">Limpiar firma</button>

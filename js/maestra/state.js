@@ -7,6 +7,7 @@ export const AppState = new SafeAppState({
   user: null,
   profile: null,
   classroom: null,
+  classrooms: [],
   currentSection: 'dashboard',
   students: [],
   attendance: [],

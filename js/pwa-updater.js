@@ -233,6 +233,9 @@
       if (reloaded) return;
       reloaded = true;
       try { sessionStorage.removeItem(ACCEPT_KEY); } catch (_) {}
+      // Tras una actualización, re-pedir/restablecer las notificaciones push
+      // para que la nueva versión quede vinculada a OneSignal.
+      try { localStorage.setItem('karpus_notif_reask', '1'); } catch (_) {}
       ui.cleanup();
       window.location.reload();
     };

@@ -20,9 +20,23 @@ export const ProfileModule = {
       if (el) el.value = val || '';
     };
 
+    const fmtTime = (t) => {
+      if (!t) return '';
+      const m = String(t).match(/^(\d{1,2}):(\d{2})/);
+      if (!m) return String(t);
+      let h = parseInt(m[1], 10);
+      const min = m[2];
+      const ap = h >= 12 ? 'PM' : 'AM';
+      h = h % 12 || 12;
+      return h + ':' + min + ' ' + ap;
+    };
+
     // Estudiante
     set('inputStudentName', student.name);
     set('inputStudentBlood', student.blood_type);
+    set('inputStudentSchedule', [student.schedule, fmtTime(student.entry_time), fmtTime(student.exit_time)]
+      .filter(Boolean)
+      .join(' · '));
     set('inputStudentAllergy', student.allergies);
     set('profilePickupName', student.authorized_pickup);
     set('profilePickupPhone', student.authorized_pickup_phone);

@@ -773,9 +773,12 @@ function _renderTimelineEventRows() {
 }
 
 // ── SHEET MÓVIL DEL TIMELINE (ventana de todos los eventos que sube) ──────────
-function openTimelineSheet() {
+async function openTimelineSheet() {
   const modalId = 'timelineSheetModal';
   const today   = new Date().toISOString().split('T')[0];
+  // Recargar la cronología del aula activa por si se cambió de aula.
+  const classroom = AppState.get('classroom');
+  if (classroom) await _loadSchedule(classroom.id);
   const rows    = _renderTimelineEventRows();
 
   const content = `
@@ -2654,10 +2657,12 @@ export async function openScheduleManager() {
   _scheduleSearch = '';
   _scheduleAgeFilter = '';
   _schedulePage = 1;
+  // Siempre recargar la cronología del aula activa (por si cambió de aula).
+  await _loadSchedule(classroom.id);
   const schedule = _classroomSchedule.length ? _classroomSchedule : DEFAULT_SCHEDULE;
 
   const content = `
-    <div class="bg-white w-full max-w-lg rounded-[2rem] shadow-2xl overflow-hidden animate-fadeIn flex flex-col" style="max-height:calc(100vh - 16px);max-height:calc(100dvh - 16px);">
+    <div class="bg-white w-full max-w-lg rounded-[2rem] shadow-2xl overflow-hidden animate-fadeIn flex flex-col" style="max-height:calc(100dvh - 5rem);">
       <!-- Header -->
       <div class="p-4 sm:p-5 text-white relative overflow-hidden shrink-0" style="background:linear-gradient(135deg, #FF8A00 0%, #f97316 50%, #ec4899 100%);">
         <div class="absolute -top-10 -right-10 w-40 h-40 rounded-full blur-3xl" style="background:rgba(255,255,255,0.1);"></div>
@@ -2915,7 +2920,7 @@ export function openAllEventsMenu() {
   _allEventsPage = 1;
 
   const content = `
-    <div class="bg-white w-full max-w-sm rounded-[2rem] shadow-2xl overflow-hidden animate-fadeIn flex flex-col" style="max-height:calc(100vh - 16px);max-height:calc(100dvh - 16px);">
+    <div class="bg-white w-full max-w-sm rounded-[2rem] shadow-2xl overflow-hidden animate-fadeIn flex flex-col" style="max-height:calc(100dvh - 5rem);">
       <div class="p-4 sm:p-5 text-white relative overflow-hidden shrink-0" style="background:linear-gradient(135deg, #8B5CF6 0%, #6366F1 50%, #3B82F6 100%);">
         <div class="absolute -top-8 -right-8 w-32 h-32 rounded-full blur-2xl" style="background:rgba(255,255,255,0.1);"></div>
         <div class="relative flex items-center gap-3 sm:gap-4">
