@@ -375,23 +375,21 @@ document.addEventListener('DOMContentLoaded', async () => {
   });
 
   try {
-    const { data: classrooms, error } = await supabase
+    // La maestra NO cambia de aula: la directora asigna una sola aula por maestra.
+    const { data: classroom, error } = await supabase
       .from('classrooms')
       .select('id, name, level, capacity, teacher_id, is_live')
       .eq('teacher_id', auth.user.id)
-      .order('name');
+      .order('name')
+      .limit(1)
+      .maybeSingle();
 
     if (error) throw error;
-    if (!classrooms || classrooms.length === 0) {
+    if (!classroom) {
       safeToast('No tienes un aula asignada.', 'warning');
       return;
     }
 
-    AppState.set('classrooms', classrooms);
-
-    // Restaurar la última aula visitada (o la primera por defecto)
-    const lastClassroomId = localStorage.getItem('maestra_last_classroom');
-    const classroom = classrooms.find(c => String(c.id) === lastClassroomId) || classrooms[0];
     AppState.set('classroom', classroom);
 
     // Inicializar Módulos
@@ -529,28 +527,23 @@ async function initDashboard() {
     _updatePunchAlertWidget(students, attendance);
     _updateTasksToGradeWidget(classroom.id);
 
-    // Grid de Aulas (Home)
+    // Grid de Aulas (Home) — la maestra tiene UNA sola aula asignada
     const grid = document.getElementById('classesGrid'); 
     if (grid) {
-      const classrooms = AppState.get('classrooms') || [classroom];
-      if (!classrooms.length) {
-        grid.innerHTML = `<div class="col-span-full py-12 text-center text-slate-400 font-bold">No tienes aulas asignadas.</div>`;
-      } else {
-        grid.innerHTML = classrooms.map(c => `
-          <div onclick="App.showClassroomDetail('${c.id}')" class="p-6 bg-white rounded-[2rem] border-2 border-orange-100 shadow-sm hover:shadow-xl hover:border-orange-200 transition-all cursor-pointer group relative overflow-hidden">
-            <div class="flex items-center gap-5 relative z-10">
-              <div class="w-16 h-16 rounded-2xl bg-gradient-to-br from-orange-400 to-orange-600 text-white flex items-center justify-center font-black text-2xl shadow-lg">${safeEscapeHTML(String(c.name).charAt(0).toUpperCase())}</div>
-              <div>
-                <h3 class="font-black text-slate-800 text-xl tracking-tight">${safeEscapeHTML(c.name)}</h3>
-                <p class="text-xs font-black text-orange-500 uppercase tracking-widest">${safeEscapeHTML(c.level || '')}${c.level ? ' · ' : ''}Aula</p>
-              </div>
-            </div>
-            <div class="mt-8 flex justify-between items-center relative z-10">
-              <span class="text-[10px] font-black text-orange-600 uppercase tracking-widest flex items-center gap-1">Entrar <i data-lucide="arrow-right" class="w-4 h-4"></i></span>
+      grid.innerHTML = `
+        <div onclick="App.showClassroomDetail('${classroom.id}')" class="p-6 bg-white rounded-[2rem] border-2 border-orange-100 shadow-sm hover:shadow-xl hover:border-orange-200 transition-all cursor-pointer group relative overflow-hidden">
+          <div class="flex items-center gap-5 relative z-10">
+            <div class="w-16 h-16 rounded-2xl bg-gradient-to-br from-orange-400 to-orange-600 text-white flex items-center justify-center font-black text-2xl shadow-lg">${safeEscapeHTML(String(classroom.name).charAt(0).toUpperCase())}</div>
+            <div>
+              <h3 class="font-black text-slate-800 text-xl tracking-tight">${safeEscapeHTML(classroom.name)}</h3>
+              <p class="text-xs font-black text-orange-500 uppercase tracking-widest">${safeEscapeHTML(classroom.level || '')}${classroom.level ? ' · ' : ''}Aula</p>
             </div>
           </div>
-        `).join('');
-      }
+          <div class="mt-8 flex justify-between items-center relative z-10">
+            <span class="text-[10px] font-black text-orange-600 uppercase tracking-widest flex items-center gap-1">Entrar <i data-lucide="arrow-right" class="w-4 h-4"></i></span>
+          </div>
+        </div>
+      `;
     }
 
     // Grid de Estudiantes (Tab)
@@ -805,7 +798,12 @@ function initNavigation() {
   const lastClassroom = localStorage.getItem('maestra_last_classroom');
   const lastTab = localStorage.getItem('maestra_last_tab');
 
-  if (lastSection === 't-class-detail' && lastClassroom) {
+  // La maestra trabaja SIEMPRE con su aula asignada por la directora: si el id
+  // guardado no coincide con su aula actual, no se abre un detalle de otra aula.
+  const assignedClassroom = AppState.get('classroom');
+  const sameClassroom = assignedClassroom && String(assignedClassroom.id) === String(lastClassroom);
+
+  if (lastSection === 't-class-detail' && sameClassroom) {
     showClassroomDetail(lastClassroom, { activeTab: lastTab });
   } else {
     setActiveSection(lastSection, { skipSave: true });
@@ -867,10 +865,6 @@ function initNavigation() {
         likeColor: 'orange',
         classroomId: classroom.id 
       }, AppState);
-
-      // Suscribirse al realtime del aula activa (al cambiar de aula)
-      RealtimeManager.unsubscribe(`maestra_room_${classroom.id}`);
-      initRealtimeUpdates(classroom.id);
 
       initClassTabs(options.activeTab);
 
