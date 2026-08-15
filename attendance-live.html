@@ -3,11 +3,11 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-  <title>Ponche Digital \u2014 Karpus Kids</title>
+  <title>Ponche Digital — Karpus Kids</title>
   <link rel="manifest" href="manifest-live.json">
   <meta name="theme-color" content="#16a34a">
   <link rel="apple-touch-icon" href="logo/apple-touch-icon.png">
-  <link rel="icon" href="logo/favicon.png" type="image/png">
+  <link rel="icon" href="logo/favicon.ico" type="image/x-icon">
   <script src="js/shared/html5-qrcode.min.js"></script>
   <link href="https://fonts.googleapis.com/css2?family=Nunito:wght@400;600;700;800;900&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="css/karpus-tailwind.css">
@@ -249,13 +249,13 @@
     </div>
   </div>
 
-<script src="js/shared/supabase-js.min.js"></script>
-<script src="js/shared/lucide.min.js"></script>
+<script src="js/shared/supabase-js.min.js" defer></script>
+<script src="js/shared/lucide.min.js" defer></script>
 <script src="js/pwa-updater.js" defer></script>
 <script type="module">
 import { supabase } from './js/shared/supabase.js';
 
-// \u2500\u2500 PWA Logic \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500
+// ── PWA Logic ─────────────────────────────────────────────────────────────────
 let deferredPrompt;
 const banner = document.getElementById('pwa-banner');
 const installBtn = document.getElementById('pwa-install');
@@ -283,9 +283,9 @@ closeBtn?.addEventListener('click', () => {
   banner.classList.remove('show');
 });
 
-if (window.lucide) lucide.createIcons();
+document.addEventListener('DOMContentLoaded', () => { if (window.lucide) lucide.createIcons(); });
 
-// \u2500\u2500 State \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500
+// ── State ─────────────────────────────────────────────────────────────────────
 let isProcessing  = false;
 let lastScan      = '';
 let scanTimeout;

@@ -689,6 +689,135 @@ export async function initRoutine() {
   }
 }
 
+// ── RENDER FILAS DEL TIMELINE (reutilizable: página + sheet móvil) ────────────
+function _renderTimelineEventRows() {
+  const students = AppState.get('students') || [];
+  const logsMap  = AppState.get('logsMap') || {};
+  const schedule = _classroomSchedule.length ? _classroomSchedule : DEFAULT_SCHEDULE;
+
+  return schedule.map((ev, i) => {
+    const state    = _getTimelineState(ev);
+    const isActive = state === 'in_progress';
+    const isTimePast = state === 'completed';
+    const isNext   = state === 'pending' && schedule.slice(0, i).every(e => _getTimelineState(e) === 'completed');
+    const timeStr  = _formatTime12(ev.hour, ev.minute);
+    const eventIcon = _getScheduleEventIcon(ev.type);
+    const endMins  = (ev.hour ?? 0) * 60 + (ev.minute ?? 0) + (ev.duration || 30);
+    const endTime  = _formatTime12(Math.floor(endMins / 60), endMins % 60);
+
+    const presentStudents = students.filter(s => _isStudentPresent(s.id));
+    const studentsWithEvent = presentStudents.filter(s => {
+      const evts = logsMap[s.id]?.events || [];
+      return evts.some(e => e.type === ev.type);
+    }).length;
+
+    const isRegistered = studentsWithEvent > 0;
+    const isDone   = isTimePast && isRegistered;
+    const isMissed = isTimePast && !isRegistered;
+
+    const activeSoftBgs = {
+      bienvenida:'#f1f5f9', desayuno:'#fef3c7', actividad:'#eff6ff',
+      bano:'#f0fdfa', patio:'#f0fdf4', almuerzo:'#f0fdf4',
+      siesta:'#eef2ff', merienda:'#ecfccb', biberon:'#f0f9ff'
+    };
+
+    const rowBgCls = isActive
+      ? 'bg-gradient-to-r from-[#FF8A00]/10 to-orange-50 border-2 border-[#FF8A00]/30 shadow-md shadow-orange-100/50'
+      : isDone
+        ? 'bg-green-50/70 border-2 border-green-200/70 hover:bg-green-50'
+        : isMissed
+          ? 'bg-amber-50/70 border-2 border-amber-200/70 hover:bg-amber-50'
+          : 'border-2 border-transparent hover:bg-slate-50';
+
+    return `
+    <div class="relative">
+      <div
+        onclick="App.openBulkEventModal('${ev.type}', '${timeStr}')"
+        class="relative flex items-start gap-3 sm:gap-4 w-full p-2.5 sm:p-3 rounded-2xl transition-all active:scale-[0.98] cursor-pointer ${rowBgCls}" data-index="${i}">
+
+        <div class="w-9 h-9 rounded-xl flex items-center justify-center text-base shrink-0 z-10 transition-all ${isActive ? 'text-white shadow-lg scale-110 tl-pulse' : 'text-slate-500'}" style="${isActive ? 'background:linear-gradient(135deg, #FF8A00, #f97316);box-shadow:0 4px 12px rgba(255,138,0,0.3);' : `background:${activeSoftBgs[ev.type] || '#f1f5f9'};`}">
+          ${eventIcon}
+        </div>
+
+        <div class="flex-1 text-left min-w-0">
+          <div class="flex items-center gap-2 mb-0.5">
+            <span class="text-[11px] font-black ${isActive ? 'text-[#FF8A00]' : isDone ? 'text-[#28B54D]' : isMissed ? 'text-amber-600' : 'text-slate-400'}">${timeStr}</span>
+            ${isActive ? '<span class="px-2 py-0.5 bg-[#FF8A00] text-white text-[7px] font-black uppercase rounded-lg animate-pulse shadow-sm">AHORA</span>' : ''}
+            ${isNext ? '<span class="px-2 py-0.5 bg-indigo-500 text-white text-[7px] font-black uppercase rounded-lg shadow-sm">SIGUIENTE</span>' : ''}
+            ${isDone ? '<span class="px-2 py-0.5 bg-green-100 text-[#28B54D] text-[7px] font-black uppercase rounded-lg">✓ Hecho</span>' : ''}
+            ${isMissed ? '<span class="px-2 py-0.5 bg-amber-100 text-amber-700 text-[7px] font-black uppercase rounded-lg">Sin registrar</span>' : ''}
+          </div>
+          <p class="text-sm font-black text-slate-700 leading-tight">${ev.label}</p>
+          <div class="flex items-center gap-3 mt-1">
+            <span class="text-[9px] font-bold text-slate-400">${endTime}</span>
+            <span class="text-[9px] font-bold text-slate-300">·</span>
+            <span class="text-[9px] font-bold text-slate-400">${ev.duration || 30}min</span>
+            ${presentStudents.length ? `
+              <span class="text-[9px] font-black ${isDone ? 'text-[#28B54D]' : 'text-[#FF8A00]'}">
+                ${studentsWithEvent}/${presentStudents.length} alumnos
+              </span>
+            ` : ''}
+          </div>
+        </div>
+
+        <div class="shrink-0 mt-1">
+          <i data-lucide="chevron-right" class="w-4 h-4 ${isActive ? 'text-[#FF8A00]' : 'text-slate-300'}"></i>
+        </div>
+      </div>
+
+      <div class="relative z-10 flex items-center justify-center" style="margin:-7px 0;" data-insert-slot="${i + 1}">
+        <button onclick="App.openInsertEventPicker(${i + 1})" class="tl-insert-btn" style="position:absolute;left:25px;" title="Insertar evento aquí">+</button>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+// ── SHEET MÓVIL DEL TIMELINE (ventana de todos los eventos que sube) ──────────
+function openTimelineSheet() {
+  const modalId = 'timelineSheetModal';
+  const today   = new Date().toISOString().split('T')[0];
+  const rows    = _renderTimelineEventRows();
+
+  const content = `
+    <style>
+      #${modalId}-inner{margin:auto auto 0 !important;animation:sheetUp .26s cubic-bezier(.32,.72,.3,1)}
+      @media (min-width:640px){#${modalId}-inner{margin:auto !important}}
+      @keyframes sheetUp{from{transform:translateY(100%);opacity:.4}to{transform:translateY(0);opacity:1}}
+    </style>
+    <div class="w-full sm:max-w-md flex items-end sm:items-center justify-center" style="height:min(82vh,640px);min-height:52vh;">
+      <div class="bg-white w-full rounded-t-[2rem] sm:rounded-[2rem] shadow-2xl overflow-hidden flex flex-col" style="max-height:100%;">
+        <div class="pt-2 pb-1 flex justify-center sm:hidden"><span class="w-10 h-1.5 rounded-full bg-slate-200"></span></div>
+        <div class="px-4 sm:px-5 pb-3 pt-1 flex items-center justify-between gap-3 border-b border-slate-100" style="background:linear-gradient(135deg, #fff7ed 0%, #ffffff 100%);">
+          <div class="flex items-center gap-2.5 min-w-0">
+            <div class="w-9 h-9 rounded-xl flex items-center justify-center text-base shrink-0" style="background:linear-gradient(135deg, #FF8A00, #f97316);box-shadow:0 4px 10px rgba(255,138,0,0.3);">📅</div>
+            <div class="min-w-0">
+              <h3 class="text-sm font-black text-slate-800">Timeline del Día</h3>
+              <p class="text-[9px] font-bold text-slate-400 uppercase tracking-wider truncate">${_formatDate(today)}</p>
+            </div>
+          </div>
+          <button onclick="Modal.close('${modalId}')" class="p-2 bg-slate-100 hover:bg-slate-200 rounded-full transition-colors shrink-0" aria-label="Cerrar">
+            <svg class="w-4 h-4 text-slate-500" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/></svg>
+          </button>
+        </div>
+        <div class="overflow-y-auto flex-1 custom-scrollbar" style="-webkit-overflow-scrolling:touch;">
+          <div class="relative p-3 sm:p-4">
+            <div class="absolute left-[38px] top-5 bottom-5 w-0.5 bg-gradient-to-b from-[#FF8A00]/30 via-slate-200 to-slate-100"></div>
+            <div class="space-y-2">${rows}</div>
+          </div>
+        </div>
+        <div class="p-3 sm:p-4 shrink-0" style="background:#f8fafc;border-top:1px solid #e2e8f0;">
+          <button onclick="Modal.close('${modalId}'); App.openBulkEventModal('animo')"
+            class="w-full py-3 rounded-2xl font-black text-xs uppercase tracking-widest transition-all active:scale-[0.98]" style="background:#FF8A00 !important;color:#fff !important;border:2px solid #E67A00 !important;box-shadow:0 4px 14px rgba(255,138,0,0.35);">
+            ➕ Registrar evento a todos
+          </button>
+        </div>
+      </div>
+    </div>`;
+
+  Modal.open(modalId, content);
+  if (window.lucide) window.lucide.createIcons();
+}
+
 // ── RENDER LAYOUT PRINCIPAL (4 NIVELES) ───────────────────────────────────────
 function _renderRoutineLayout({ todayLabel, students, logsMap, withReport, scheduleNow, activeSiestas, today, classroom }) {
   const schedule = _classroomSchedule.length ? _classroomSchedule : DEFAULT_SCHEDULE;
@@ -723,102 +852,21 @@ function _renderRoutineLayout({ todayLabel, students, logsMap, withReport, sched
           </span>
           <button onclick="App.toggleTimeline()" id="btnToggleTimeline"
             class="flex items-center gap-1.5 px-3 py-2 bg-slate-100 hover:bg-slate-200 rounded-xl transition-all text-[10px] font-black text-slate-500 uppercase tracking-widest active:scale-95">
-            <span id="timelineToggleIcon">${_timelineExpanded ? '▲' : '▼'}</span>
-            <span id="timelineToggleLabel">${_timelineExpanded ? 'Ocultar' : 'Abrir'}</span>
+            <span id="timelineToggleIcon">${window.innerWidth < 640 ? '📅' : (_timelineExpanded ? '▲' : '▼')}</span>
+            <span id="timelineToggleLabel">${window.innerWidth < 640 ? 'Eventos' : (_timelineExpanded ? 'Ocultar' : 'Abrir')}</span>
           </button>
         </div>
       </div>
 
       <!-- Timeline Expandido: Ventana Vertical con Detalles -->
       <div id="timelineExpanded" class="${_timelineExpanded ? '' : 'hidden'}">
-        <div class="max-h-[420px] overflow-y-auto custom-scrollbar">
+        <div class="max-h-[320px] sm:max-h-[420px] overflow-y-auto custom-scrollbar">
           <div class="relative p-3 sm:p-5">
             <!-- Línea vertical conectora -->
             <div class="absolute left-[38px] top-5 bottom-5 w-0.5 bg-gradient-to-b from-[#FF8A00]/30 via-slate-200 to-slate-100"></div>
 
             <div class="space-y-2">
-              ${schedule.map((ev, i) => {
-                const state    = _getTimelineState(ev);
-                const isActive = state === 'in_progress';
-                const isTimePast = state === 'completed';
-                const isNext   = state === 'pending' && schedule.slice(0, i).every(e => _getTimelineState(e) === 'completed');
-                const timeStr  = _formatTime12(ev.hour, ev.minute);
-                const eventIcon = _getScheduleEventIcon(ev.type);
-                const endMins  = (ev.hour ?? 0) * 60 + (ev.minute ?? 0) + (ev.duration || 30);
-                const endTime  = _formatTime12(Math.floor(endMins / 60), endMins % 60);
-
-                // Contar cuántos alumnos PRESENTES tienen este evento registrado hoy
-                const presentStudents = students.filter(s => _isStudentPresent(s.id));
-                const studentsWithEvent = presentStudents.filter(s => {
-                  const evts = logsMap[s.id]?.events || [];
-                  return evts.some(e => e.type === ev.type);
-                }).length;
-
-                // Estado REAL: "Hecho" SOLO si está registrado (no por el reloj).
-                // Si la hora ya pasó y nadie registró → queda "Sin registrar".
-                const isRegistered = studentsWithEvent > 0;
-                const isDone   = isTimePast && isRegistered;
-                const isMissed = isTimePast && !isRegistered;
-
-                const activeSoftBgs = {
-                  bienvenida:'#f1f5f9', desayuno:'#fef3c7', actividad:'#eff6ff',
-                  bano:'#f0fdfa', patio:'#f0fdf4', almuerzo:'#f0fdf4',
-                  siesta:'#eef2ff', merienda:'#ecfccb', biberon:'#f0f9ff'
-                };
-
-                const rowBgCls = isActive
-                  ? 'bg-gradient-to-r from-[#FF8A00]/10 to-orange-50 border-2 border-[#FF8A00]/30 shadow-md shadow-orange-100/50'
-                  : isDone
-                    ? 'bg-green-50/70 border-2 border-green-200/70 hover:bg-green-50'
-                    : isMissed
-                      ? 'bg-amber-50/70 border-2 border-amber-200/70 hover:bg-amber-50'
-                      : 'border-2 border-transparent hover:bg-slate-50';
-
-                return `
-                <div class="relative">
-                  <div
-                    onclick="App.openBulkEventModal('${ev.type}', '${timeStr}')"
-                    class="relative flex items-start gap-3 sm:gap-4 w-full p-2.5 sm:p-3 rounded-2xl transition-all active:scale-[0.98] cursor-pointer ${rowBgCls}" data-index="${i}">
-
-                    <!-- Icono en la línea -->
-                    <div class="w-9 h-9 rounded-xl flex items-center justify-center text-base shrink-0 z-10 transition-all ${isActive ? 'text-white shadow-lg scale-110 tl-pulse' : 'text-slate-500'}" style="${isActive ? 'background:linear-gradient(135deg, #FF8A00, #f97316);box-shadow:0 4px 12px rgba(255,138,0,0.3);' : `background:${activeSoftBgs[ev.type] || '#f1f5f9'};`}">
-                      ${eventIcon}
-                    </div>
-
-                    <!-- Contenido -->
-                    <div class="flex-1 text-left min-w-0">
-                      <div class="flex items-center gap-2 mb-0.5">
-                        <span class="text-[11px] font-black ${isActive ? 'text-[#FF8A00]' : isDone ? 'text-[#28B54D]' : isMissed ? 'text-amber-600' : 'text-slate-400'}">${timeStr}</span>
-                        ${isActive ? '<span class="px-2 py-0.5 bg-[#FF8A00] text-white text-[7px] font-black uppercase rounded-lg animate-pulse shadow-sm">AHORA</span>' : ''}
-                        ${isNext ? '<span class="px-2 py-0.5 bg-indigo-500 text-white text-[7px] font-black uppercase rounded-lg shadow-sm">SIGUIENTE</span>' : ''}
-                        ${isDone ? '<span class="px-2 py-0.5 bg-green-100 text-[#28B54D] text-[7px] font-black uppercase rounded-lg">✓ Hecho</span>' : ''}
-                        ${isMissed ? '<span class="px-2 py-0.5 bg-amber-100 text-amber-700 text-[7px] font-black uppercase rounded-lg">Sin registrar</span>' : ''}
-                      </div>
-                      <p class="text-sm font-black text-slate-700 leading-tight">${ev.label}</p>
-                      <div class="flex items-center gap-3 mt-1">
-                        <span class="text-[9px] font-bold text-slate-400">${endTime}</span>
-                        <span class="text-[9px] font-bold text-slate-300">·</span>
-                        <span class="text-[9px] font-bold text-slate-400">${ev.duration || 30}min</span>
-                        ${presentStudents.length ? `
-                          <span class="text-[9px] font-black ${isDone ? 'text-[#28B54D]' : 'text-[#FF8A00]'}">
-                            ${studentsWithEvent}/${presentStudents.length} alumnos
-                          </span>
-                        ` : ''}
-                      </div>
-                    </div>
-
-                    <!-- Chevron -->
-                    <div class="shrink-0 mt-1">
-                      <i data-lucide="chevron-right" class="w-4 h-4 ${isActive ? 'text-[#FF8A00]' : 'text-slate-300'}"></i>
-                    </div>
-                  </div>
-
-                  <!-- Insertar evento entre bloques -->
-                  <div class="relative z-10 flex items-center justify-center" style="margin:-7px 0;" data-insert-slot="${i + 1}">
-                    <button onclick="App.openInsertEventPicker(${i + 1})" class="tl-insert-btn" style="position:absolute;left:25px;" title="Insertar evento aquí">+</button>
-                  </div>
-                </div>`;
-              }).join('')}
+              ${_renderTimelineEventRows()}
             </div>
           </div>
         </div>
@@ -1003,6 +1051,12 @@ function _renderStudentRoutineCard(s, log) {
 
 // ── TOGGLE TIMELINE ───────────────────────────────────────────────────────────
 export function toggleTimeline() {
+  // En móvil, "ocultar" abre una ventana de todos los eventos que sube desde abajo
+  // (evita la barra horizontal de iconos). En desktop mantiene colapsar/expandir.
+  if (window.innerWidth < 640) {
+    openTimelineSheet();
+    return;
+  }
   _timelineExpanded = !_timelineExpanded;
   const expanded  = document.getElementById('timelineExpanded');
   const collapsed = document.getElementById('timelineCollapsed');
@@ -1096,25 +1150,25 @@ export async function openBulkEventModal(eventType = 'animo', scheduledTime = nu
   }).join('');
 
   const content = `
-    <div class="bg-white w-full max-w-md rounded-[2rem] shadow-2xl overflow-hidden animate-fadeIn flex flex-col" style="max-height:min(90vh, calc(100vh - 32px));">
+    <div class="bg-white w-full max-w-md rounded-[2rem] shadow-2xl overflow-hidden animate-fadeIn flex flex-col" style="max-height:calc(100vh - 16px);max-height:calc(100dvh - 16px);">
       <!-- Header con gradiente -->
-      <div class="p-6 text-white relative overflow-hidden" style="background:linear-gradient(135deg, #28B54D 0%, #10b981 50%, #14b8a6 100%);">
+      <div class="p-4 sm:p-5 text-white relative overflow-hidden" style="background:linear-gradient(135deg, #28B54D 0%, #10b981 50%, #14b8a6 100%);">
         <div class="absolute -top-8 -right-8 w-32 h-32 rounded-full blur-2xl" style="background:rgba(255,255,255,0.1);"></div>
         <div class="absolute -bottom-8 -left-8 w-24 h-24 rounded-full blur-xl" style="background:rgba(255,255,255,0.1);"></div>
-        <div class="relative flex items-center gap-4">
-          <div class="w-14 h-14 bg-white/20 backdrop-blur-sm rounded-2xl flex items-center justify-center text-2xl border border-white/20 shadow-lg">${meta.icon}</div>
-          <div class="flex-1">
-            <h3 class="text-xl font-black">${meta.label}</h3>
-            <p class="text-xs font-bold text-green-100 uppercase tracking-widest">Registro colectivo</p>
+        <div class="relative flex items-center gap-3 sm:gap-4">
+          <div class="w-11 h-11 sm:w-14 sm:h-14 bg-white/20 backdrop-blur-sm rounded-2xl flex items-center justify-center text-xl sm:text-2xl border border-white/20 shadow-lg shrink-0">${meta.icon}</div>
+          <div class="flex-1 min-w-0">
+            <h3 class="text-lg sm:text-xl font-black truncate">${meta.label}</h3>
+            <p class="text-[10px] sm:text-xs font-bold text-green-100 uppercase tracking-widest">Registro colectivo</p>
             ${scheduledTime ? `<p class="mt-1.5 inline-flex items-center gap-1.5 px-2.5 py-1 bg-white/15 backdrop-blur-sm border border-white/20 rounded-full text-[10px] font-black text-white">⏰ Programado · ${scheduledTime}</p>` : ''}
           </div>
-          <button onclick="Modal.close('${modalId}')" class="p-2.5 bg-white/20 backdrop-blur-sm rounded-full hover:bg-white/30 transition-colors border border-white/20">
+          <button onclick="Modal.close('${modalId}')" class="p-2 bg-white/20 backdrop-blur-sm rounded-full hover:bg-white/30 transition-colors border border-white/20 shrink-0">
             <svg class="w-4 h-4 text-white" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/></svg>
           </button>
         </div>
       </div>
 
-      <div class="overflow-y-auto flex-1 p-5 space-y-5 custom-scrollbar">
+      <div class="overflow-y-auto flex-1 p-4 sm:p-5 space-y-5 custom-scrollbar">
         ${subParams}
 
         <div>
@@ -1131,9 +1185,9 @@ export async function openBulkEventModal(eventType = 'animo', scheduledTime = nu
         </div>
       </div>
 
-      <div class="p-5 bg-white border-t border-slate-100">
+      <div class="p-4 sm:p-5 bg-white border-t border-slate-100">
         <button id="btnBulkConfirm" onclick="App.confirmBulkEvent('${eventType}')"
-          class="w-full py-4 text-white rounded-2xl font-black text-sm uppercase tracking-widest active:scale-[0.98] transition-colors flex items-center justify-center gap-2" style="background:#FF8A00 !important;border:2px solid #E67A00 !important;box-shadow:0 6px 20px rgba(255,138,0,0.4);opacity:1 !important;">
+          class="w-full py-3.5 sm:py-4 text-white rounded-2xl font-black text-sm uppercase tracking-widest active:scale-[0.98] transition-colors flex items-center justify-center gap-2" style="background:#FF8A00 !important;border:2px solid #E67A00 !important;box-shadow:0 6px 20px rgba(255,138,0,0.4);opacity:1 !important;">
           <svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7"/></svg> Confirmar
         </button>
       </div>
@@ -1167,21 +1221,21 @@ export function openInsertEventPicker(index) {
   }).join('');
 
   const content = `
-    <div class="bg-white w-full max-w-sm rounded-[2rem] shadow-2xl overflow-hidden animate-fadeIn">
-      <div class="p-5 text-white relative overflow-hidden" style="background:linear-gradient(135deg, #FF8A00 0%, #f97316 50%, #ec4899 100%);">
+    <div class="bg-white w-full max-w-sm rounded-[2rem] shadow-2xl overflow-hidden animate-fadeIn flex flex-col" style="max-height:calc(100vh - 16px);max-height:calc(100dvh - 16px);">
+      <div class="p-4 sm:p-5 text-white relative overflow-hidden" style="background:linear-gradient(135deg, #FF8A00 0%, #f97316 50%, #ec4899 100%);">
         <div class="absolute -top-8 -right-8 w-32 h-32 rounded-full blur-2xl" style="background:rgba(255,255,255,0.1);"></div>
-        <div class="relative flex items-center gap-4">
-          <div class="w-12 h-12 bg-white/20 backdrop-blur-sm rounded-2xl flex items-center justify-center text-2xl border border-white/20 shadow-lg">➕</div>
-          <div class="flex-1">
-            <h3 class="text-lg font-black">Insertar evento</h3>
-            <p class="text-[10px] font-bold text-orange-100 uppercase tracking-widest">En la cronología del día</p>
+        <div class="relative flex items-center gap-3 sm:gap-4">
+          <div class="w-10 h-10 sm:w-12 sm:h-12 bg-white/20 backdrop-blur-sm rounded-2xl flex items-center justify-center text-xl sm:text-2xl border border-white/20 shadow-lg shrink-0">➕</div>
+          <div class="flex-1 min-w-0">
+            <h3 class="text-base sm:text-lg font-black truncate">Insertar evento</h3>
+            <p class="text-[9px] sm:text-[10px] font-bold text-orange-100 uppercase tracking-widest">En la cronología del día</p>
           </div>
-          <button onclick="Modal.close('${modalId}')" class="p-2 bg-white/20 backdrop-blur-sm rounded-full hover:bg-white/30 transition-colors border border-white/20">
+          <button onclick="Modal.close('${modalId}')" class="p-2 bg-white/20 backdrop-blur-sm rounded-full hover:bg-white/30 transition-colors border border-white/20 shrink-0">
             <svg class="w-4 h-4 text-white" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/></svg>
           </button>
         </div>
       </div>
-      <div class="p-5 max-h-[70vh] overflow-y-auto custom-scrollbar space-y-4">
+      <div class="p-4 flex-1 overflow-y-auto custom-scrollbar space-y-4" style="-webkit-overflow-scrolling:touch;">
         ${catsHTML}
       </div>
     </div>`;
@@ -1672,26 +1726,26 @@ function _renderStandardRoutineUI(student, log, modalId) {
     </div>`;
 
   return `
-    <div class="bg-white w-full max-w-md rounded-[2rem] shadow-2xl overflow-hidden animate-fadeIn flex flex-col" style="max-height:min(95vh, calc(100vh - 32px));">
+    <div class="bg-white w-full max-w-md rounded-[2rem] shadow-2xl overflow-hidden animate-fadeIn flex flex-col" style="max-height:calc(100vh - 16px);max-height:calc(100dvh - 16px);">
       <!-- Header con gradiente -->
-      <div class="p-5 text-white relative overflow-hidden shrink-0" style="background:linear-gradient(135deg, #FF8A00 0%, #f97316 40%, #ec4899 100%);">
+      <div class="p-3.5 sm:p-5 text-white relative overflow-hidden shrink-0" style="background:linear-gradient(135deg, #FF8A00 0%, #f97316 40%, #ec4899 100%);">
         <div class="absolute -top-10 -right-10 w-40 h-40 rounded-full blur-3xl" style="background:rgba(255,255,255,0.1);"></div>
         <div class="absolute -bottom-10 -left-10 w-32 h-32 rounded-full blur-2xl" style="background:rgba(255,255,255,0.1);"></div>
-        <button onclick="Modal.close('${modalId}')" class="absolute top-4 right-4 p-2.5 rounded-full hover:bg-white/30 transition-colors border border-white/20 z-10" style="background:rgba(255,255,255,0.2);backdrop-filter:blur(4px);">
+        <button onclick="Modal.close('${modalId}')" class="absolute top-2.5 right-2.5 p-2 rounded-full hover:bg-white/30 transition-colors border border-white/20 z-10" style="background:rgba(255,255,255,0.2);backdrop-filter:blur(4px);">
           <svg class="w-4 h-4" fill="none" stroke="white" stroke-width="2.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/></svg>
         </button>
-        <div class="relative flex items-center gap-4">
-          <div class="w-14 h-14 rounded-2xl overflow-hidden flex items-center justify-center font-black text-2xl shrink-0 shadow-lg" style="background:rgba(255,255,255,0.2);backdrop-filter:blur(4px);border:2px solid rgba(255,255,255,0.3);color:white;">
+        <div class="relative flex items-center gap-3 sm:gap-4">
+          <div class="w-10 h-10 sm:w-14 sm:h-14 rounded-2xl overflow-hidden flex items-center justify-center font-black text-lg sm:text-2xl shrink-0 shadow-lg" style="background:rgba(255,255,255,0.2);backdrop-filter:blur(4px);border:2px solid rgba(255,255,255,0.3);color:white;">
             ${student.avatar_url ? `<img src="${student.avatar_url}" class="w-full h-full object-cover" style="color:transparent;">` : `<span style="color:white;">${student.name.charAt(0)}</span>`}
           </div>
-          <div>
-            <h3 class="text-lg font-black" style="color:white !important;text-shadow:0 1px 3px rgba(0,0,0,0.15);">${safeEscapeHTML(student.name)}</h3>
-            <p class="text-[10px] font-bold uppercase tracking-widest" style="color:rgba(255,255,255,0.85);">Reporte de Rutina</p>
+          <div class="min-w-0">
+            <h3 class="text-base sm:text-lg font-black truncate" style="color:white !important;text-shadow:0 1px 3px rgba(0,0,0,0.15);">${safeEscapeHTML(student.name)}</h3>
+            <p class="text-[9px] sm:text-[10px] font-bold uppercase tracking-widest" style="color:rgba(255,255,255,0.85);">Reporte de Rutina</p>
           </div>
         </div>
       </div>
 
-      <div class="p-4 space-y-2.5 overflow-y-auto flex-1 custom-scrollbar" style="-webkit-overflow-scrolling:touch;">
+      <div class="p-3 sm:p-4 space-y-2.5 overflow-y-auto flex-1 custom-scrollbar" style="-webkit-overflow-scrolling:touch;">
 
         ${_accSection('Estado emocional', '😊', `
           <div class="grid grid-cols-4 gap-1.5">
@@ -1801,9 +1855,9 @@ function _renderStandardRoutineUI(student, log, modalId) {
           <div class="space-y-3 max-h-64 overflow-y-auto pr-1" id="ind-timeline-${student.id}">${timelineHTML}</div>`, false)}
       </div>
 
-      <div class="p-4 shrink-0" style="background:#f8fafc;border-top:1px solid #e2e8f0;">
+      <div class="p-3 sm:p-4 shrink-0" style="background:#f8fafc;border-top:1px solid #e2e8f0;">
         <button onclick="App.saveRoutineInModal('${student.id}')" id="btnSaveModalRoutine"
-          class="w-full py-4 text-white rounded-2xl font-black text-sm uppercase tracking-widest active:scale-[0.98] transition-colors flex items-center justify-center gap-2" style="background:#198754 !important;border:2px solid #146C43 !important;box-shadow:0 6px 20px rgba(25,135,84,0.45);opacity:1 !important;">
+          class="w-full py-3.5 sm:py-4 text-white rounded-2xl font-black text-sm uppercase tracking-widest active:scale-[0.98] transition-colors flex items-center justify-center gap-2" style="background:#198754 !important;border:2px solid #146C43 !important;box-shadow:0 6px 20px rgba(25,135,84,0.45);opacity:1 !important;">
           <svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7"/></svg> Guardar y Cerrar
         </button>
       </div>
@@ -1840,21 +1894,21 @@ export function openExtraEventModal(studentId, eventType, icon, label) {
   }
 
   const content = `
-    <div class="bg-white w-full max-w-sm rounded-[2rem] shadow-2xl overflow-hidden animate-fadeIn">
-      <div class="p-5 text-white relative overflow-hidden" style="background:linear-gradient(135deg, #e11d48 0%, #db2777 100%);">
+    <div class="bg-white w-full max-w-sm rounded-[2rem] shadow-2xl overflow-hidden animate-fadeIn flex flex-col" style="max-height:calc(100vh - 16px);max-height:calc(100dvh - 16px);">
+      <div class="p-4 sm:p-5 text-white relative overflow-hidden" style="background:linear-gradient(135deg, #e11d48 0%, #db2777 100%);">
         <div class="absolute -top-8 -right-8 w-24 h-24 rounded-full blur-2xl" style="background:rgba(255,255,255,0.1);"></div>
-        <div class="relative flex items-center gap-4">
-          <div class="w-12 h-12 bg-white/20 backdrop-blur-sm rounded-2xl flex items-center justify-center text-2xl border border-white/20 shadow-lg">${icon}</div>
-          <div>
-            <h3 class="text-lg font-black">${label}</h3>
-            <p class="text-xs font-bold text-pink-100 uppercase tracking-widest">Evento especial</p>
+        <div class="relative flex items-center gap-3 sm:gap-4">
+          <div class="w-10 h-10 sm:w-12 sm:h-12 bg-white/20 backdrop-blur-sm rounded-2xl flex items-center justify-center text-xl sm:text-2xl border border-white/20 shadow-lg shrink-0">${icon}</div>
+          <div class="min-w-0">
+            <h3 class="text-base sm:text-lg font-black truncate">${label}</h3>
+            <p class="text-[10px] sm:text-xs font-bold text-pink-100 uppercase tracking-widest">Evento especial</p>
           </div>
-          <button onclick="Modal.close('${modalId}')" class="ml-auto p-2.5 bg-white/20 backdrop-blur-sm rounded-full hover:bg-white/30 transition-colors border border-white/20">
+          <button onclick="Modal.close('${modalId}')" class="ml-auto p-2 bg-white/20 backdrop-blur-sm rounded-full hover:bg-white/30 transition-colors border border-white/20 shrink-0">
             <svg class="w-4 h-4 text-white" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/></svg>
           </button>
         </div>
       </div>
-      <div class="p-5 space-y-4">
+      <div class="p-4 sm:p-5 space-y-4 overflow-y-auto flex-1 custom-scrollbar" style="-webkit-overflow-scrolling:touch;">
         <p class="text-xs text-slate-500 text-center">Hora: <span class="font-black text-slate-800">${new Date().toLocaleTimeString('es-ES', {hour:'2-digit',minute:'2-digit'})}</span></p>
         ${extraFields}
         <div class="space-y-2">
@@ -1898,23 +1952,23 @@ function _renderInfantRoutineUI(student, log, modalId) {
   const activities = ['Sensorial','Motricidad','Música','Lectura','Juego libre','Estimulación temprana','Arte'];
 
   return `
-    <div class="bg-white w-full max-w-md rounded-[2rem] shadow-2xl overflow-hidden animate-fadeIn flex flex-col" style="max-height:min(95vh, calc(100vh - 32px));">
-      <div class="p-5 text-white relative overflow-hidden" style="background:linear-gradient(135deg, #3b82f6 0%, #6366f1 50%, #8b5cf6 100%);">
+    <div class="bg-white w-full max-w-md rounded-[2rem] shadow-2xl overflow-hidden animate-fadeIn flex flex-col" style="max-height:calc(100vh - 16px);max-height:calc(100dvh - 16px);">
+      <div class="p-3.5 sm:p-5 text-white relative overflow-hidden" style="background:linear-gradient(135deg, #3b82f6 0%, #6366f1 50%, #8b5cf6 100%);">
         <div class="absolute -top-10 -right-10 w-40 h-40 rounded-full blur-3xl" style="background:rgba(255,255,255,0.1);"></div>
-        <button onclick="Modal.close('${modalId}')" class="absolute top-4 right-4 p-2.5 rounded-full hover:bg-white/30 border border-white/20 z-10" style="background:rgba(255,255,255,0.2);backdrop-filter:blur(4px);">
+        <button onclick="Modal.close('${modalId}')" class="absolute top-2.5 right-2.5 p-2 rounded-full hover:bg-white/30 border border-white/20 z-10" style="background:rgba(255,255,255,0.2);backdrop-filter:blur(4px);">
           <i data-lucide="x" class="w-4 h-4" style="color:white;"></i>
         </button>
-        <div class="relative flex items-center gap-4">
-          <div class="w-14 h-14 rounded-2xl overflow-hidden flex items-center justify-center font-black text-2xl shrink-0 shadow-lg" style="background:rgba(255,255,255,0.2);backdrop-filter:blur(4px);border:2px solid rgba(255,255,255,0.3);color:white;">
+        <div class="relative flex items-center gap-3 sm:gap-4">
+          <div class="w-10 h-10 sm:w-14 sm:h-14 rounded-2xl overflow-hidden flex items-center justify-center font-black text-lg sm:text-2xl shrink-0 shadow-lg" style="background:rgba(255,255,255,0.2);backdrop-filter:blur(4px);border:2px solid rgba(255,255,255,0.3);color:white;">
             ${student.avatar_url ? `<img src="${student.avatar_url}" class="w-full h-full object-cover" style="color:transparent;">` : `<span style="color:white;">${student.name.charAt(0)}</span>`}
           </div>
-          <div>
-            <h3 class="text-lg font-black" style="color:white !important;text-shadow:0 1px 3px rgba(0,0,0,0.15);">${safeEscapeHTML(student.name)}</h3>
-            <p class="text-[10px] font-bold uppercase tracking-widest" style="color:rgba(255,255,255,0.85);">Registro del Bebé 🍼</p>
+          <div class="min-w-0">
+            <h3 class="text-base sm:text-lg font-black truncate" style="color:white !important;text-shadow:0 1px 3px rgba(0,0,0,0.15);">${safeEscapeHTML(student.name)}</h3>
+            <p class="text-[9px] sm:text-[10px] font-bold uppercase tracking-widest" style="color:rgba(255,255,255,0.85);">Registro del Bebé 🍼</p>
           </div>
         </div>
       </div>
-      <div class="p-4 space-y-2.5 overflow-y-auto flex-1 custom-scrollbar" style="background:rgba(248,250,252,0.5);-webkit-overflow-scrolling:touch;">
+      <div class="p-3 sm:p-4 space-y-2.5 overflow-y-auto flex-1 custom-scrollbar" style="background:rgba(248,250,252,0.5);-webkit-overflow-scrolling:touch;">
 
         ${_accSection('Hora', '🕐', `
           <div class="bg-white p-4 rounded-2xl border border-slate-100 shadow-sm">
@@ -1979,9 +2033,9 @@ function _renderInfantRoutineUI(student, log, modalId) {
             </div>
           </div>`, false) : ''}
       </div>
-      <div class="p-4 shrink-0" style="background:#f8fafc;border-top:1px solid #e2e8f0;">
+      <div class="p-3 sm:p-4 shrink-0" style="background:#f8fafc;border-top:1px solid #e2e8f0;">
         <button onclick="App.saveInfantEntry('${student.id}')" id="btnSaveInfant"
-          class="w-full py-4 text-white rounded-2xl font-black text-sm uppercase tracking-widest active:scale-[0.98] transition-colors flex items-center justify-center gap-2" style="background:#2563EB !important;border:2px solid #1D4ED8 !important;box-shadow:0 6px 20px rgba(37,99,235,0.45);opacity:1 !important;">
+          class="w-full py-3.5 sm:py-4 text-white rounded-2xl font-black text-sm uppercase tracking-widest active:scale-[0.98] transition-colors flex items-center justify-center gap-2" style="background:#2563EB !important;border:2px solid #1D4ED8 !important;box-shadow:0 6px 20px rgba(37,99,235,0.45);opacity:1 !important;">
           <svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7"/></svg> Guardar Registro
         </button>
       </div>
@@ -2356,6 +2410,9 @@ async function _applyAutoRegistration(classroom, today, toRegister, toOpenSiesta
 // ── SCHEDULE MANAGER MODAL (V8: catálogo por categorías) ───────
 let _scheduleSearch = '';
 let _scheduleAgeFilter = '';
+let _schedulePage = 1;
+let _scheduleTotal = 0;
+const _schedulePageSize = 8;
 
 const _CATEGORY_ACCENTS = {
   amber:'#f59e0b', orange:'#f97316', rose:'#f43f5e', indigo:'#6366f1', cyan:'#06b6d4',
@@ -2512,54 +2569,82 @@ function _renderScheduleConfigHTML() {
   const schedule = _classroomSchedule.length ? [..._classroomSchedule] : [...DEFAULT_SCHEDULE];
   const enabled = new Map(schedule.map(s => [s.type, s]));
 
-  return Object.entries(CATEGORIES).map(([catKey, cat]) => {
+  // Lista plana de eventos (orden por categoría) aplicando búsqueda y edad
+  const flat = [];
+  Object.entries(CATEGORIES).forEach(([catKey, cat]) => {
     const events = EVENT_CATALOG.filter(e => e.category === catKey);
-    if (!events.length) return '';
-    const activeCount = events.filter(e => enabled.has(e.type)).length;
+    if (!events.length) return;
     const accent = _CATEGORY_ACCENTS[cat.color] || '#64748b';
-    const soft = `${accent}14`;
-    return `
-      <div class="config-category" data-category="${catKey}">
-        <div class="flex items-center gap-2 mb-2.5">
-          <span class="w-7 h-7 rounded-lg flex items-center justify-center text-sm shrink-0" style="background:${soft};color:${accent};">${cat.icon}</span>
-          <p class="text-[11px] font-black text-slate-500 uppercase tracking-widest flex-1">${cat.label}</p>
-          <span class="text-[9px] font-black px-2 py-0.5 rounded-full" style="color:${accent};background:${soft};">${activeCount}/${events.length}</span>
-        </div>
-        <div class="grid grid-cols-1 sm:grid-cols-2 gap-2">
-          ${events.map(ev => _renderConfigEventRow(ev, enabled.get(ev.type), accent)).join('')}
-        </div>
-      </div>`;
-  }).join('');
+    events.forEach(ev => {
+      const hay = `${ev.label || ''} ${ev.type || ''}`.toLowerCase();
+      const searchOk = !_scheduleSearch || hay.includes(_scheduleSearch);
+      const ageOk = !_scheduleAgeFilter || !ev.ageGroup || ev.ageGroup === _scheduleAgeFilter;
+      if (searchOk && ageOk) flat.push({ ev, sched: enabled.get(ev.type), cat, accent });
+    });
+  });
+
+  _scheduleTotal = flat.length;
+  const pageCount = Math.max(1, Math.ceil(_scheduleTotal / _schedulePageSize));
+  if (_schedulePage > pageCount) _schedulePage = pageCount;
+  if (_schedulePage < 1) _schedulePage = 1;
+  const start = (_schedulePage - 1) * _schedulePageSize;
+  const pageItems = flat.slice(start, start + _schedulePageSize);
+
+  if (!pageItems.length) {
+    return '<p class="text-center text-[10px] font-bold text-slate-300 py-4">Sin eventos que coincidan.</p>';
+  }
+
+  const rows = pageItems.map(({ ev, sched, cat, accent }) => `
+    <div>
+      <div class="flex items-center gap-1.5 mb-1">
+        <span class="w-5 h-5 rounded-md flex items-center justify-center text-[10px] shrink-0" style="background:${accent}14;color:${accent};">${cat.icon}</span>
+        <p class="text-[8px] font-black text-slate-400 uppercase tracking-widest">${cat.label}</p>
+      </div>
+      ${_renderConfigEventRow(ev, sched, accent)}
+    </div>`).join('');
+
+  return `
+    <div class="flex items-center justify-between gap-2 mb-2.5">
+      <button type="button" onclick="App.paginateScheduleCatalog(-1)" ${_schedulePage <= 1 ? 'disabled' : ''}
+        class="px-3 py-2 rounded-xl text-[9px] font-black uppercase tracking-wider border-2 transition-all active:scale-95 disabled:opacity-30 disabled:pointer-events-none" style="color:#FF8A00;border-color:#FF8A00/40;">
+        ‹ Anterior
+      </button>
+      <p class="text-[9px] font-black text-slate-400 uppercase tracking-widest text-center px-1">Página ${_schedulePage} de ${pageCount} · ${_scheduleTotal} eventos</p>
+      <button type="button" onclick="App.paginateScheduleCatalog(1)" ${_schedulePage >= pageCount ? 'disabled' : ''}
+        class="px-3 py-2 rounded-xl text-[9px] font-black uppercase tracking-wider border-2 transition-all active:scale-95 disabled:opacity-30 disabled:pointer-events-none" style="color:#FF8A00;border-color:#FF8A00/40;">
+        Siguiente ›
+      </button>
+    </div>
+    <div class="grid grid-cols-1 sm:grid-cols-2 gap-2">
+      ${rows}
+    </div>`;
 }
 
 export function filterEventCatalog(value) {
   _scheduleSearch = (value || '').trim().toLowerCase();
-  _applyCatalogFilters();
+  _schedulePage = 1;
+  _renderCatalogOnly();
 }
 
 export function filterEventsByAge(age) {
   _scheduleAgeFilter = _scheduleAgeFilter === age ? '' : (age || '');
+  _schedulePage = 1;
   document.querySelectorAll('#ageFilterChips button').forEach(btn => {
     const on = btn.dataset.age === _scheduleAgeFilter;
     btn.classList.toggle('active-age', on);
   });
-  _applyCatalogFilters();
+  _renderCatalogOnly();
 }
 
-function _applyCatalogFilters() {
-  document.querySelectorAll('#scheduleConfigSections .config-category').forEach(section => {
-    let visible = 0;
-    section.querySelectorAll('.config-event-row').forEach(row => {
-      const hay = `${row.dataset.label || ''} ${row.dataset.type || ''}`.toLowerCase();
-      const searchOk = !_scheduleSearch || hay.includes(_scheduleSearch);
-      const rowAge = row.dataset.age || '';
-      const ageOk = !_scheduleAgeFilter || !rowAge || rowAge === _scheduleAgeFilter;
-      const match = searchOk && ageOk;
-      row.style.display = match ? '' : 'none';
-      if (match) visible++;
-    });
-    section.style.display = visible ? '' : 'none';
-  });
+export function paginateScheduleCatalog(dir) {
+  const pageCount = Math.max(1, Math.ceil(_scheduleTotal / _schedulePageSize));
+  _schedulePage = Math.min(pageCount, Math.max(1, _schedulePage + (dir > 0 ? 1 : -1)));
+  _renderCatalogOnly();
+}
+
+function _renderCatalogOnly() {
+  const container = document.getElementById('scheduleConfigSections');
+  if (container) container.innerHTML = _renderScheduleConfigHTML();
 }
 
 export async function openScheduleManager() {
@@ -2568,45 +2653,46 @@ export async function openScheduleManager() {
   if (!classroom) { safeToast('No hay aula seleccionada', 'error'); return; }
   _scheduleSearch = '';
   _scheduleAgeFilter = '';
+  _schedulePage = 1;
   const schedule = _classroomSchedule.length ? _classroomSchedule : DEFAULT_SCHEDULE;
 
   const content = `
-    <div class="bg-white w-full max-w-lg rounded-[2rem] shadow-2xl overflow-hidden animate-fadeIn flex flex-col" style="max-height:min(95vh, calc(100vh - 32px));">
+    <div class="bg-white w-full max-w-lg rounded-[2rem] shadow-2xl overflow-hidden animate-fadeIn flex flex-col" style="max-height:calc(100vh - 16px);max-height:calc(100dvh - 16px);">
       <!-- Header -->
-      <div class="p-5 text-white relative overflow-hidden shrink-0" style="background:linear-gradient(135deg, #FF8A00 0%, #f97316 50%, #ec4899 100%);">
+      <div class="p-4 sm:p-5 text-white relative overflow-hidden shrink-0" style="background:linear-gradient(135deg, #FF8A00 0%, #f97316 50%, #ec4899 100%);">
         <div class="absolute -top-10 -right-10 w-40 h-40 rounded-full blur-3xl" style="background:rgba(255,255,255,0.1);"></div>
-        <div class="relative flex items-center gap-4">
-          <div class="w-12 h-12 bg-white/20 backdrop-blur-sm rounded-2xl flex items-center justify-center text-2xl border border-white/20 shadow-lg">🧭</div>
-          <div class="flex-1">
-            <h3 class="text-lg font-black">Configurar Rutina</h3>
-            <p class="text-[10px] font-bold text-orange-100 uppercase tracking-widest">Cronología personalizada por aula</p>
+        <div class="relative flex items-center gap-3 sm:gap-4">
+          <div class="w-10 h-10 sm:w-12 sm:h-12 bg-white/20 backdrop-blur-sm rounded-2xl flex items-center justify-center text-xl sm:text-2xl border border-white/20 shadow-lg shrink-0">🧭</div>
+          <div class="flex-1 min-w-0">
+            <h3 class="text-base sm:text-lg font-black truncate">Configurar Rutina</h3>
+            <p class="text-[9px] sm:text-[10px] font-bold text-orange-100 uppercase tracking-widest">Cronología personalizada por aula</p>
           </div>
-          <span id="scheduleConfigCount" class="text-[9px] font-black bg-white/20 backdrop-blur-sm border border-white/20 rounded-full px-3 py-1.5">${schedule.length}/${EVENT_CATALOG.length}</span>
-          <button onclick="Modal.close('${modalId}')" class="p-2 bg-white/20 backdrop-blur-sm rounded-full hover:bg-white/30 transition-colors border border-white/20">
+          <span id="scheduleConfigCount" class="text-[9px] font-black bg-white/20 backdrop-blur-sm border border-white/20 rounded-full px-2.5 py-1.5 shrink-0">${schedule.length}/${EVENT_CATALOG.length}</span>
+          <button onclick="Modal.close('${modalId}')" class="p-2 bg-white/20 backdrop-blur-sm rounded-full hover:bg-white/30 transition-colors border border-white/20 shrink-0">
             <svg class="w-4 h-4 text-white" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/></svg>
           </button>
         </div>
-        <div class="relative mt-4">
+        <div class="relative mt-3">
           <span class="absolute left-3.5 top-1/2 -translate-y-1/2 text-white/60 pointer-events-none">🔍</span>
           <input oninput="App.filterEventCatalog(this.value)" value=""
-            class="w-full py-3 pl-10 pr-4 bg-white/15 backdrop-blur-sm border border-white/20 rounded-2xl text-sm font-bold text-white placeholder-white/50 outline-none focus:bg-white/20 transition-all"
+            class="w-full py-2.5 pl-10 pr-4 bg-white/15 backdrop-blur-sm border border-white/20 rounded-2xl text-sm font-bold text-white placeholder-white/50 outline-none focus:bg-white/20 transition-all"
             placeholder="Buscar evento... (ej: siesta, agua, patio)" />
         </div>
         <div class="relative mt-2.5">
-          <p class="text-[9px] font-black text-white/60 uppercase tracking-widest mb-1.5">👶 Edad recomendada</p>
+          <p class="text-[8px] sm:text-[9px] font-black text-white/60 uppercase tracking-widest mb-1.5">👶 Edad recomendada</p>
           <div id="ageFilterChips" class="flex flex-wrap gap-1.5">
             <button type="button" data-age="" onclick="App.filterEventsByAge('')"
-              class="active-age text-[9px] font-black uppercase tracking-wider px-2.5 py-1.5 rounded-xl border-2 border-white/20 bg-white/10 text-white/80 transition-all active:scale-95">Todas</button>
+              class="active-age text-[8px] sm:text-[9px] font-black uppercase tracking-wider px-2 py-1.5 rounded-xl border-2 border-white/20 bg-white/10 text-white/80 transition-all active:scale-95">Todas</button>
             ${Object.entries(AGE_GROUPS).map(([key, g]) => `
               <button type="button" data-age="${key}" onclick="App.filterEventsByAge('${key}')"
                 title="${g.label} · ${g.hint}"
-                class="text-[9px] font-black uppercase tracking-wider px-2.5 py-1.5 rounded-xl border-2 border-white/20 bg-white/10 text-white/80 transition-all active:scale-95">${g.icon} ${g.label}</button>
+                class="text-[8px] sm:text-[9px] font-black uppercase tracking-wider px-2 py-1.5 rounded-xl border-2 border-white/20 bg-white/10 text-white/80 transition-all active:scale-95">${g.icon} ${g.label}</button>
             `).join('')}
           </div>
         </div>
       </div>
 
-      <div class="overflow-y-auto flex-1 p-5 custom-scrollbar space-y-6">
+      <div class="overflow-y-auto flex-1 p-4 sm:p-5 custom-scrollbar space-y-5">
         <div>
           <div class="flex items-center justify-between mb-2.5">
             <p class="text-[11px] font-black text-slate-500 uppercase tracking-widest">Cronología del día</p>
@@ -2619,12 +2705,12 @@ export async function openScheduleManager() {
           <div id="scheduleOrderList" class="space-y-2">${_renderScheduleOrderHTML()}</div>
         </div>
 
-        <div class="border-t border-slate-100 pt-5">
+        <div class="border-t border-slate-100 pt-4">
           <div class="flex items-center gap-2 mb-2.5">
             <span class="w-7 h-7 rounded-lg flex items-center justify-center text-sm shrink-0" style="background:#fff7ed;color:#FF8A00;">📚</span>
             <p class="text-[11px] font-black text-slate-500 uppercase tracking-widest flex-1">Catálogo de eventos</p>
           </div>
-          <div id="scheduleConfigSections" class="space-y-6">
+          <div id="scheduleConfigSections" class="space-y-4">
             ${_renderScheduleConfigHTML()}
           </div>
         </div>
@@ -2733,7 +2819,6 @@ function _refreshScheduleManagerUI() {
     countEl.textContent = `${schedule.length}/${EVENT_CATALOG.length}`;
   }
   _bindScheduleDrag();
-  if (_scheduleSearch || _scheduleAgeFilter) _applyCatalogFilters();
 }
 
 // ── PERSISTIR CRONOLOGÍA EN BD ───────────────────────────────────────────────
@@ -2810,49 +2895,88 @@ export async function saveScheduleManager() {
 }
 
 // ── ALL EVENTS QUICK MENU ───────────────────────────────────────
+let _allEventsFlat = [];
+let _allEventsTotal = 0;
+let _allEventsPage = 1;
+const _allEventsPageSize = 12;
+
 export function openAllEventsMenu() {
   const modalId = 'allEventsMenuModal';
 
-  const catsHTML = Object.entries(CATEGORIES).map(([catId, cat]) => {
+  const flat = [];
+  Object.entries(CATEGORIES).forEach(([catId, cat]) => {
     const items = EVENT_CATALOG.filter(e => e.category === catId);
-    if (!items.length) return '';
-    return `
-      <div class="space-y-2">
-        <p class="text-[10px] font-black text-slate-400 uppercase tracking-widest flex items-center gap-1.5">
-          <span>${cat.icon}</span> ${cat.label}
-          <span class="text-slate-300">· ${items.length}</span>
-        </p>
-        <div class="grid grid-cols-4 gap-2">
-          ${items.map(ev => `
-            <button onclick="Modal.close('${modalId}'); App.openBulkEventModal('${ev.type}')"
-              class="flex flex-col items-center gap-1 p-3 bg-slate-50 hover:bg-[#FF8A00]/10 border-2 border-transparent hover:border-[#FF8A00]/30 rounded-2xl transition-all active:scale-90 group">
-              <span class="text-xl group-hover:scale-110 transition-transform">${ev.icon}</span>
-              <span class="text-[8px] font-black text-slate-400 uppercase text-center leading-tight">${ev.label}</span>
-            </button>`).join('')}
-        </div>
-      </div>`;
-  }).join('');
+    if (!items.length) return;
+    const accent = _CATEGORY_ACCENTS[cat.color] || '#64748b';
+    items.forEach(ev => flat.push({ ev, cat, accent }));
+  });
+  _allEventsFlat = flat;
+  _allEventsTotal = flat.length;
+  _allEventsPage = 1;
 
   const content = `
-    <div class="bg-white w-full max-w-sm rounded-[2rem] shadow-2xl overflow-hidden animate-fadeIn">
-      <div class="p-5 text-white relative overflow-hidden" style="background:linear-gradient(135deg, #8B5CF6 0%, #6366F1 50%, #3B82F6 100%);">
+    <div class="bg-white w-full max-w-sm rounded-[2rem] shadow-2xl overflow-hidden animate-fadeIn flex flex-col" style="max-height:calc(100vh - 16px);max-height:calc(100dvh - 16px);">
+      <div class="p-4 sm:p-5 text-white relative overflow-hidden shrink-0" style="background:linear-gradient(135deg, #8B5CF6 0%, #6366F1 50%, #3B82F6 100%);">
         <div class="absolute -top-8 -right-8 w-32 h-32 rounded-full blur-2xl" style="background:rgba(255,255,255,0.1);"></div>
-        <div class="relative flex items-center gap-4">
-          <div class="w-12 h-12 bg-white/20 backdrop-blur-sm rounded-2xl flex items-center justify-center text-2xl border border-white/20 shadow-lg">📋</div>
-          <div class="flex-1">
-            <h3 class="text-lg font-black">Todos los Eventos</h3>
-            <p class="text-[10px] font-bold text-indigo-100 uppercase tracking-widest">Catálogo completo por categoría</p>
+        <div class="relative flex items-center gap-3 sm:gap-4">
+          <div class="w-10 h-10 sm:w-12 sm:h-12 bg-white/20 backdrop-blur-sm rounded-2xl flex items-center justify-center text-xl sm:text-2xl border border-white/20 shadow-lg shrink-0">📋</div>
+          <div class="flex-1 min-w-0">
+            <h3 class="text-base sm:text-lg font-black truncate">Todos los Eventos</h3>
+            <p class="text-[9px] sm:text-[10px] font-bold text-indigo-100 uppercase tracking-widest">Catálogo completo por categoría</p>
           </div>
-          <button onclick="Modal.close('${modalId}')" class="p-2 bg-white/20 backdrop-blur-sm rounded-full hover:bg-white/30 border border-white/20">
+          <button onclick="Modal.close('${modalId}')" class="p-2 bg-white/20 backdrop-blur-sm rounded-full hover:bg-white/30 border border-white/20 shrink-0">
             <svg class="w-4 h-4 text-white" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/></svg>
           </button>
         </div>
       </div>
-      <div class="p-5 max-h-[70vh] overflow-y-auto custom-scrollbar space-y-4">
-        ${catsHTML}
+      <div id="allEventsList" class="p-4 flex-1 overflow-y-auto custom-scrollbar" style="-webkit-overflow-scrolling:touch;">
+        ${_renderAllEventsPage()}
       </div>
     </div>`;
 
   Modal.open(modalId, content);
   if (window.lucide) window.lucide.createIcons();
+}
+
+export function paginateAllEvents(dir) {
+  const pageCount = Math.max(1, Math.ceil(_allEventsTotal / _allEventsPageSize));
+  _allEventsPage = Math.min(pageCount, Math.max(1, _allEventsPage + (dir > 0 ? 1 : -1)));
+  const list = document.getElementById('allEventsList');
+  if (list) list.innerHTML = _renderAllEventsPage();
+}
+
+function _renderAllEventsPage() {
+  const pageCount = Math.max(1, Math.ceil(_allEventsTotal / _allEventsPageSize));
+  if (_allEventsPage > pageCount) _allEventsPage = pageCount;
+  if (_allEventsPage < 1) _allEventsPage = 1;
+  const start = (_allEventsPage - 1) * _allEventsPageSize;
+  const pageItems = _allEventsFlat.slice(start, start + _allEventsPageSize);
+
+  if (!pageItems.length) {
+    return '<p class="text-center text-[10px] font-bold text-slate-300 py-4">Sin eventos disponibles.</p>';
+  }
+
+  const grid = pageItems.map(({ ev, accent }) => `
+    <button onclick="Modal.close('allEventsMenuModal'); App.openBulkEventModal('${ev.type}')"
+      class="relative flex flex-col items-center gap-1 p-2 sm:p-3 bg-slate-50 hover:bg-[#FF8A00]/10 border-2 border-transparent hover:border-[#FF8A00]/30 rounded-2xl transition-all active:scale-90 group">
+      <span class="absolute top-1 right-1 w-1.5 h-1.5 rounded-full" style="background:${accent}80;"></span>
+      <span class="text-xl group-hover:scale-110 transition-transform">${ev.icon}</span>
+      <span class="text-[8px] font-black text-slate-400 uppercase text-center leading-tight truncate w-full">${ev.label}</span>
+    </button>`).join('');
+
+  return `
+    <div class="flex items-center justify-between gap-2 mb-3">
+      <button type="button" onclick="App.paginateAllEvents(-1)" ${_allEventsPage <= 1 ? 'disabled' : ''}
+        class="px-3 py-2 rounded-xl text-[9px] font-black uppercase tracking-wider border-2 transition-all active:scale-95 disabled:opacity-30 disabled:pointer-events-none" style="color:#6366F1;border-color:#6366F1/40;">
+        ‹ Anterior
+      </button>
+      <p class="text-[9px] font-black text-slate-400 uppercase tracking-widest text-center px-1">Página ${_allEventsPage} de ${pageCount} · ${_allEventsTotal} eventos</p>
+      <button type="button" onclick="App.paginateAllEvents(1)" ${_allEventsPage >= pageCount ? 'disabled' : ''}
+        class="px-3 py-2 rounded-xl text-[9px] font-black uppercase tracking-wider border-2 transition-all active:scale-95 disabled:opacity-30 disabled:pointer-events-none" style="color:#6366F1;border-color:#6366F1/40;">
+        Siguiente ›
+      </button>
+    </div>
+    <div class="grid grid-cols-4 gap-2">
+      ${grid}
+    </div>`;
 }

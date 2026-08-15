@@ -26,10 +26,12 @@ export const Modal = {
   open(id, content) {
     document.getElementById(id)?.remove();
     const modal = document.createElement('div');
+    // items-start + m-auto + overflow-y:auto en el overlay: centra cuando hay
+    // espacio y permite scroll sin que el contenido quede recortado arriba en móvil.
     modal.id = id;
-    modal.className = 'fixed inset-0 flex items-center justify-center p-2 sm:p-4';
-    modal.style.cssText = 'z-index:60;background:rgba(15,23,42,0.6);backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px);animation:fadeInModal 0.15s ease-out;';
-    modal.innerHTML = `<div id="${id}-inner" class="relative" style="max-width:calc(100vw - 1rem);max-height:calc(100dvh - 1rem);overflow-y:auto;overscroll-behavior:contain;-webkit-overflow-scrolling:touch;">${content}</div>`;
+    modal.className = 'fixed inset-0 flex items-start justify-center overflow-y-auto p-2 sm:p-4';
+    modal.style.cssText = 'z-index:60;background:rgba(15,23,42,0.6);backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px);animation:fadeInModal 0.15s ease-out;-webkit-overflow-scrolling:touch;overscroll-behavior:contain;';
+    modal.innerHTML = `<div id="${id}-inner" class="relative m-auto" style="max-width:calc(100vw - 1rem);max-height:calc(100vh - 1rem);max-height:calc(100dvh - 1rem);overflow-y:auto;overscroll-behavior:contain;-webkit-overflow-scrolling:touch;">${content}</div>`;
 
     modal.onclick = (e) => {
       if (e.target === modal) this.close(id);

@@ -8,6 +8,7 @@
  * Usa jsPDF + jspdf-autotable + qrcode.min.js (ya cargados en js/shared).
  */
 import { supabase } from './supabase.js';
+import { ensureJspdf } from './load-pdf.js';
 
 let _logoDataUrl = null;
 
@@ -515,7 +516,8 @@ export function boletinEditorHtml(boletin) {
 
 /* ──────────────────────────── PDF ────────────────────────────── */
 
-export function createBoletinDoc() {
+export async function createBoletinDoc() {
+  await ensureJspdf();
   const { jsPDF } = window.jspdf || {};
   if (!jsPDF) throw new Error('Librería jsPDF no disponible');
   const doc = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
@@ -1005,6 +1007,7 @@ function _drawSignatures(doc, boletin, y) {
  * Dibuja un boletín completo sobre el documento actual (nueva página si ya hay contenido).
  */
 export async function appendBoletinPage(doc, boletin) {
+  await ensureJspdf();
   const { jsPDF } = window.jspdf || {};
   if (!jsPDF) throw new Error('Librería jsPDF no disponible');
 
@@ -1039,7 +1042,7 @@ export async function appendBoletinPage(doc, boletin) {
  * Descarga el PDF de un único boletín.
  */
 export async function downloadBoletinPDF(boletin, fileName) {
-  const doc = createBoletinDoc();
+  const doc = await createBoletinDoc();
   await appendBoletinPage(doc, boletin);
   finalizeBoletinDoc(doc);
   const ts = new Date().toISOString().slice(0, 16).replace(/[-:T]/g, '');

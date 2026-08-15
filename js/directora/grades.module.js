@@ -1176,7 +1176,7 @@ export const GradesModule = {
 
     try {
       Helpers.toast('Generando boletines...', 'info');
-      const doc = createBoletinDoc();
+      const doc = await createBoletinDoc();
       let generated = 0;
       for (const s of this._allStudents) {
         try {

@@ -1,5 +1,6 @@
 ﻿import { supabase } from '../shared/supabase.js';
 import { Helpers } from '../shared/helpers.js';
+import { ensureJspdf } from '../shared/load-pdf.js';
 
 export const AccessModule = {
   _chart: null,
@@ -175,6 +176,7 @@ export const AccessModule = {
     if (!body.length) return Helpers.toast('No hay datos para exportar', 'warning');
 
     try {
+      await ensureJspdf();
       const { jsPDF } = window.jspdf;
       const doc = new jsPDF();
       doc.setFontSize(18);
@@ -209,6 +211,7 @@ export const AccessModule = {
     if (!missing.length) return Helpers.toast('Asistencia completa hoy', 'success');
 
     try {
+      await ensureJspdf();
       const { jsPDF } = window.jspdf;
       const doc = new jsPDF();
       doc.setFontSize(16);

@@ -23,14 +23,7 @@
   <link rel="stylesheet" href="css/karpus-modern.css" />
   <link rel="stylesheet" href="css/karpus-tailwind.css">
   <link rel="stylesheet" href="css/premium-mobile.css">
-  <script src="js/shared/chart.min.js"></script>
-  <script src="js/shared/jspdf.min.js" defer></script>
-  <script src="js/shared/jspdf-autotable.min.js" defer></script>
-  <script>
-    window.addEventListener('load', () => {
-      if (!window.jspdf) window.jspdf = { jsPDF: function() { return { save: () => {}, text: () => {}, addPage: () => {} }; } };
-    });
-  </script>
+  <script src="js/shared/chart.min.js" defer></script>
   <style>
     /* ── Letras de colores Karpus Kids ── */
     .karpus-kids-inline .k-1 { color: #FF9800; }
@@ -1288,7 +1281,7 @@
       }
     }, true);
   </script>
-  <script src="js/shared/lucide.min.js"></script>
+  <script src="js/shared/lucide.min.js" defer></script>
   <script>
     function _initLucide() {
       if (!window.lucide) return;
@@ -1304,7 +1297,8 @@
         }
       });
     }
-    _initLucide();
+    if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', _initLucide);
+    else _initLucide();
 
     (function() {
       let _t = null;
@@ -1317,7 +1311,7 @@
     })();
   </script>
   <!-- Core App Module -->
-  <script src="js/shared/supabase-js.min.js"></script>
+  <script src="js/shared/supabase-js.min.js" defer></script>
   <script type="module" src="js/asistente/main.js"></script>
   <script src="js/shared/lightbox.js" defer></script>
   <script src="js/shared/confirm-dialog.js" defer></script>

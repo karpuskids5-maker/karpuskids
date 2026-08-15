@@ -43,7 +43,6 @@ const PRECACHE = [
   './',
   'login.html',
   'css/panel-padre.css',
-  'css/globals.css',
   'logo/favicon.ico',
   'img/mundo.jpg',
   'https://fonts.googleapis.com/css2?family=Black+Han+Sans&family=Inter:wght@400;700;900&display=swap'

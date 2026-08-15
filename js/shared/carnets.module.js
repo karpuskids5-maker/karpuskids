@@ -1,4 +1,5 @@
 import { supabase } from './supabase.js';
+import { ensureJspdf } from './load-pdf.js';
 
 const CARD_W = 85.6;
 const CARD_H = 54;
@@ -319,6 +320,7 @@ class CarnetsManager {
   }
 
   async _generatePDF(students) {
+    await ensureJspdf();
     const { jsPDF } = window.jspdf || {};
     if (!jsPDF) throw new Error('Librería jsPDF no disponible');
 
@@ -855,6 +857,7 @@ class CarnetsManager {
 
   async _generatePreview(student) {
     if (!student) return;
+    await ensureJspdf();
     const { jsPDF } = window.jspdf || {};
     if (!jsPDF) return;
 
