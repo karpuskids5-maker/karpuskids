@@ -81,7 +81,19 @@ const CATEGORIES = {
   aprendizaje:    { label: 'Aprendizaje',    icon: '📚', color: 'violet'   },
   exterior:       { label: 'Exterior',       icon: '🌳', color: 'emerald'  },
   incidentes:     { label: 'Incidentes',     icon: '⚠️', color: 'red'      },
+  seguridad:      { label: 'Seguridad y Salida', icon: '🛡️', color: 'red' },
   personalizados: { label: 'Personalizados', icon: '⭐', color: 'slate'    },
+};
+
+// ── GRUPOS DE EDAD ───────────────────────────────────────────────────────────
+// Cada actividad del catálogo puede indicar la edad recomendada (ageGroup).
+// Los eventos sin ageGroup son genéricos y aplican a todas las edades.
+const AGE_GROUPS = {
+  lactantes: { label: 'Lactantes',  icon: '👶', hint: '0–12 meses' },
+  maternal:  { label: 'Maternal',   icon: '🧸', hint: '1–2 años'   },
+  parvulos:  { label: 'Párvulos',   icon: '🎨', hint: '2–3 años'   },
+  prekinder: { label: 'Pre-Kínder', icon: '📚', hint: '3–4 años'   },
+  kinder:    { label: 'Kínder',     icon: '🎓', hint: '4–5 años'   },
 };
 
 const EVENT_CATALOG = [
@@ -118,16 +130,38 @@ const EVENT_CATALOG = [
   { type: 'musica',           label: 'Música',          icon: '🎵', category: 'actividades',    defaultDuration: 30 },
   { type: 'baile',            label: 'Baile',           icon: '💃', category: 'actividades',    defaultDuration: 30 },
   { type: 'gimnasia',         label: 'Gimnasia',        icon: '🤸', category: 'actividades',    defaultDuration: 30 },
+  { type: 'gateo',            label: 'Gateo y Desplazamiento', icon: '🚼', category: 'actividades', defaultDuration: 20 },
+  { type: 'masaje_infantil',  label: 'Masaje Infantil', icon: '💆', category: 'descanso',       defaultDuration: 15 },
+  { type: 'texturas_sensoriales', label: 'Exploración Sensorial', icon: '🧊', category: 'actividades', defaultDuration: 30 },
+  { type: 'recortado_ensamble',   label: 'Motricidad Fina', icon: '✂️', category: 'actividades', defaultDuration: 25 },
+  { type: 'circuito_motor',   label: 'Circuito Psicomotor', icon: '🎪', category: 'actividades', defaultDuration: 30 },
+  { type: 'modelado',         label: 'Modelado (Arcilla)', icon: '🧱', category: 'actividades', defaultDuration: 25 },
+  { type: 'exposicion_arte',  label: 'Galería de Arte',  icon: '🎨', category: 'actividades',    defaultDuration: 20 },
+  { type: 'orquesta_infantil', label: 'Concierto de Instrumentos', icon: '🎶', category: 'actividades', defaultDuration: 25 },
+  { type: 'show_talentos',    label: 'Show de Talentos', icon: '👑', category: 'actividades',    defaultDuration: 30 },
+  { type: 'foto_escolar',     label: 'Sesión Fotográfica', icon: '📸', category: 'actividades',  defaultDuration: 15 },
+  { type: 'mini_cocina',      label: 'Taller de Mini Cocina', icon: '🍳', category: 'actividades', defaultDuration: 40 },
+  { type: 'cine_foro',        label: 'Cine Infantil',    icon: '🎬', category: 'actividades',    defaultDuration: 45 },
+  { type: 'yoga_infantil',    label: 'Yoga Infantil',    icon: '🕊️', category: 'descanso',       defaultDuration: 15 },
+  { type: 'cuento_siesta',    label: 'Cuento para dormir', icon: '💤', category: 'descanso',     defaultDuration: 10 },
   // Juego
   { type: 'patio',            label: 'Patio',           icon: '🌳', category: 'juego',          defaultDuration: 60 },
   { type: 'juego_libre',      label: 'Juego libre',     icon: '🧸', category: 'juego',          defaultDuration: 45 },
   { type: 'juegos_mesa',      label: 'Juegos de mesa',  icon: '🎲', category: 'juego',          defaultDuration: 30 },
   { type: 'construccion',     label: 'Bloques',         icon: '🧱', category: 'juego',          defaultDuration: 30 },
+  { type: 'puzzles',          label: 'Rompecabezas',    icon: '🧩', category: 'juego',          defaultDuration: 25 },
+  { type: 'juego_motor_agil', label: 'Correr / Persecución', icon: '🏃', category: 'juego',     defaultDuration: 20 },
   // Social
   { type: 'bienvenida',       label: 'Bienvenida',      icon: '👋', category: 'social',         defaultDuration: 30 },
   { type: 'convivencia',      label: 'Convivencia',     icon: '🤝', category: 'social',         defaultDuration: 30 },
   { type: 'compartir',        label: 'Compartir',       icon: '💬', category: 'social',         defaultDuration: 20 },
   { type: 'emociones',        label: 'Emociones',       icon: '💛', category: 'social',         defaultDuration: 30 },
+  { type: 'asamblea_matutina', label: 'Asamblea de Aula', icon: '💬', category: 'social',       defaultDuration: 20 },
+  { type: 'dramatizacion',    label: 'Juego Simbólico', icon: '🎭', category: 'social',         defaultDuration: 30 },
+  { type: 'mediacion_conflicto', label: 'Resolución de Conflictos', icon: '🤝', category: 'social', defaultDuration: 10 },
+  { type: 'logro_destacado',  label: 'Refuerzo Positivo', icon: '👏', category: 'social',       defaultDuration: 5  },
+  { type: 'objeto_apego',     label: 'Objeto de Transición', icon: '🧸', category: 'social',    defaultDuration: 15 },
+  { type: 'intercambio_detalles', label: 'Intercambio de Detalles', icon: '🎁', category: 'social', defaultDuration: 20 },
   // Aprendizaje
   { type: 'proyecto',         label: 'Proyecto',        icon: '🎯', category: 'aprendizaje',    defaultDuration: 45 },
   { type: 'lectura',          label: 'Cuento',          icon: '📖', category: 'aprendizaje',    defaultDuration: 20 },
@@ -135,10 +169,25 @@ const EVENT_CATALOG = [
   { type: 'matematicas',      label: 'Matemáticas',     icon: '🔢', category: 'aprendizaje',    defaultDuration: 30 },
   { type: 'ciencias',         label: 'Ciencias',        icon: '🔬', category: 'aprendizaje',    defaultDuration: 30 },
   { type: 'idiomas',          label: 'Idiomas',         icon: '🗣️', category: 'aprendizaje',    defaultDuration: 20 },
+  { type: 'terapia_lenguaje', label: 'Terapia de Lenguaje', icon: '🗣️', category: 'aprendizaje', defaultDuration: 20 },
+  { type: 'pantalla_interactiva', label: 'Tecnología Educativa', icon: '💻', category: 'aprendizaje', defaultDuration: 15 },
+  { type: 'balanza_medidas',  label: 'Peso y Medidas',   icon: '⚖️', category: 'aprendizaje',    defaultDuration: 20 },
+  { type: 'tesoro_mapa',      label: 'Orientación y Mapas', icon: '🧭', category: 'aprendizaje', defaultDuration: 30 },
+  { type: 'biblioteca_rincon', label: 'Biblioteca',      icon: '📖', category: 'aprendizaje',    defaultDuration: 20 },
   // Exterior
   { type: 'paseo',            label: 'Paseo',           icon: '🚶', category: 'exterior',       defaultDuration: 30 },
   { type: 'huerta',           label: 'Huerta',          icon: '🌱', category: 'exterior',       defaultDuration: 20 },
   { type: 'juegos_agua',      label: 'Juegos de agua',  icon: '💦', category: 'exterior',       defaultDuration: 30 },
+  { type: 'observacion_insectos_plantas', label: 'Exploración de la Naturaleza', icon: '🌿', category: 'exterior', defaultDuration: 25 },
+  // Seguridad y Logística
+  { type: 'simulacro_evacuacion', label: 'Simulacro de Evacuación', icon: '🚨', category: 'seguridad', defaultDuration: 15 },
+  { type: 'entrega_mochila',  label: 'Entrega de Pertenencias', icon: '🧳', category: 'seguridad', defaultDuration: 10 },
+  { type: 'transporte_escolar', label: 'Abordaje de Transporte', icon: '🚌', category: 'seguridad', defaultDuration: 15 },
+  { type: 'recorrido_salida', label: 'Identificación de Tutor', icon: '👤', category: 'seguridad', defaultDuration: 5  },
+  { type: 'lonchera_sana',    label: 'Revisión de Lonchera', icon: '🎒', category: 'seguridad',  defaultDuration: 10 },
+  { type: 'distintivo_salida', label: 'Chaleco / Distintivo', icon: '🦺', category: 'seguridad', defaultDuration: 5  },
+  // Higiene
+  { type: 'limpieza_colaborativa', label: 'Cuidado del Aula', icon: '🧹', category: 'higiene',   defaultDuration: 15 },
   // Incidentes
   { type: 'accidente',        label: 'Accidente',       icon: '🩹', category: 'incidentes',     defaultDuration: 5  },
   { type: 'golpe',            label: 'Golpe',           icon: '🤕', category: 'incidentes',     defaultDuration: 5  },
@@ -148,8 +197,156 @@ const EVENT_CATALOG = [
   // Personalizados
   { type: 'nota',             label: 'Nota',            icon: '📝', category: 'personalizados', defaultDuration: 5  },
   { type: 'cumpleanos',       label: 'Cumpleaños',      icon: '🎂', category: 'personalizados', defaultDuration: 30 },
-  { type: 'evento_especial',  label: 'Evento especial', icon: '🎉', category: 'personalizados', defaultDuration: 60 },
+  { type: 'fiesta_tematica',  label: 'Fiesta Temática', icon: '🎉', category: 'personalizados', defaultDuration: 60 },
+  { type: 'evento_especial',  label: 'Evento especial', icon: '🎊', category: 'personalizados', defaultDuration: 60 },
   { type: 'otro',             label: 'Otro evento',     icon: '📋', category: 'personalizados', defaultDuration: 5  },
+  // ════════════════════════════════════════════════════════════
+  // ACTIVIDADES POR EDAD — Lactantes (0–12 meses)
+  // ════════════════════════════════════════════════════════════
+  { type: 'estimulacion_visual',       label: 'Estimulación visual',           icon: '👀', category: 'actividades', defaultDuration: 10, ageGroup: 'lactantes' },
+  { type: 'seguimiento_objetos',       label: 'Seguimiento de objetos',        icon: '🎈', category: 'actividades', defaultDuration: 10, ageGroup: 'lactantes' },
+  { type: 'estimulacion_auditiva',     label: 'Estimulación auditiva',         icon: '👂', category: 'actividades', defaultDuration: 10, ageGroup: 'lactantes' },
+  { type: 'sonidos_voces',             label: 'Sonidos y voces',               icon: '🗣️', category: 'actividades', defaultDuration: 10, ageGroup: 'lactantes' },
+  { type: 'canciones_bebe',            label: 'Canciones para bebés',          icon: '🎵', category: 'actividades', defaultDuration: 15, ageGroup: 'lactantes' },
+  { type: 'sonajeros',                 label: 'Sonajeros',                     icon: '🪇', category: 'actividades', defaultDuration: 10, ageGroup: 'lactantes' },
+  { type: 'exploracion_texturas_bebe', label: 'Exploración de texturas',        icon: '🖐️', category: 'actividades', defaultDuration: 15, ageGroup: 'lactantes' },
+  { type: 'causa_efecto',              label: 'Causa y efecto',                icon: '🔘', category: 'actividades', defaultDuration: 10, ageGroup: 'lactantes' },
+  { type: 'alcanzar_objetos',          label: 'Alcanzar objetos',              icon: '🤲', category: 'actividades', defaultDuration: 10, ageGroup: 'lactantes' },
+  { type: 'agarre_objetos',            label: 'Agarre de objetos',             icon: '✋', category: 'actividades', defaultDuration: 10, ageGroup: 'lactantes' },
+  { type: 'transferencia_objetos',     label: 'Transferencia de objetos',      icon: '🔄', category: 'actividades', defaultDuration: 10, ageGroup: 'lactantes' },
+  { type: 'tummy_time',                label: 'Tummy Time',                    icon: '👶', category: 'actividades', defaultDuration: 10, ageGroup: 'lactantes' },
+  { type: 'rodar',                     label: 'Rodar',                         icon: '↩️', category: 'actividades', defaultDuration: 10, ageGroup: 'lactantes' },
+  { type: 'estimulacion_gateo',        label: 'Estimulación para gateo',       icon: '🚼', category: 'actividades', defaultDuration: 15, ageGroup: 'lactantes' },
+  { type: 'gateo_libre',               label: 'Gateo libre',                   icon: '🐾', category: 'actividades', defaultDuration: 15, ageGroup: 'lactantes' },
+  { type: 'juego_espejo',              label: 'Juego con espejo',              icon: '🪞', category: 'actividades', defaultDuration: 10, ageGroup: 'lactantes' },
+  { type: 'escondidas_bebe',           label: 'Juego de escondidas',           icon: '🫥', category: 'actividades', defaultDuration: 10, ageGroup: 'lactantes' },
+  { type: 'balbuceo',                  label: 'Balbuceo / Vocalización',       icon: '👄', category: 'actividades', defaultDuration: 10, ageGroup: 'lactantes' },
+  // ════════════════════════════════════════════════════════════
+  // MATERNAL (1–2 años)
+  // ════════════════════════════════════════════════════════════
+  { type: 'pintura_dedos',             label: 'Pintura con dedos',             icon: '🎨', category: 'actividades', defaultDuration: 25, ageGroup: 'maternal' },
+  { type: 'pintura_esponja',           label: 'Pintura con esponja',           icon: '🧽', category: 'actividades', defaultDuration: 25, ageGroup: 'maternal' },
+  { type: 'garabateo',                 label: 'Garabateo libre',               icon: '✏️', category: 'actividades', defaultDuration: 20, ageGroup: 'maternal' },
+  { type: 'rasgado_papel',             label: 'Rasgado de papel',              icon: '📄', category: 'actividades', defaultDuration: 15, ageGroup: 'maternal' },
+  { type: 'pegado_figuras',            label: 'Pegado de figuras',             icon: '🟦', category: 'actividades', defaultDuration: 20 },
+  { type: 'plastilina',                label: 'Juego con plastilina',          icon: '🟣', category: 'actividades', defaultDuration: 25, ageGroup: 'maternal' },
+  { type: 'clasificacion_objetos',     label: 'Clasificación de objetos',      icon: '🔵', category: 'aprendizaje', defaultDuration: 20 },
+  { type: 'encaje',                    label: 'Juego de encajar',              icon: '🧩', category: 'actividades', defaultDuration: 20, ageGroup: 'maternal' },
+  { type: 'torre_bloques',             label: 'Torre de bloques',              icon: '🧱', category: 'actividades', defaultDuration: 20, ageGroup: 'maternal' },
+  { type: 'colores_basicos',           label: 'Introducción a colores',        icon: '🌈', category: 'aprendizaje', defaultDuration: 20, ageGroup: 'maternal' },
+  { type: 'animales_basicos',          label: 'Identificación de animales',    icon: '🐶', category: 'aprendizaje', defaultDuration: 20, ageGroup: 'maternal' },
+  { type: 'sonidos_animales',          label: 'Sonidos de animales',           icon: '🐮', category: 'aprendizaje', defaultDuration: 15, ageGroup: 'maternal' },
+  { type: 'canciones_movimiento',      label: 'Canciones con movimientos',     icon: '🎵', category: 'actividades', defaultDuration: 20, ageGroup: 'maternal' },
+  { type: 'juegos_imitacion',          label: 'Juegos de imitación',           icon: '🪞', category: 'actividades', defaultDuration: 20, ageGroup: 'maternal' },
+  { type: 'esconder_objetos',          label: 'Juego de esconder objetos',     icon: '🙈', category: 'actividades', defaultDuration: 15, ageGroup: 'maternal' },
+  { type: 'buscar_objetos',            label: 'Buscar objetos',                icon: '🔎', category: 'actividades', defaultDuration: 20, ageGroup: 'maternal' },
+  { type: 'trasvasar_agua',            label: 'Trasvasar agua',                icon: '💧', category: 'actividades', defaultDuration: 20, ageGroup: 'maternal' },
+  { type: 'arena',                     label: 'Juegos con arena',              icon: '🏖️', category: 'actividades', defaultDuration: 25, ageGroup: 'maternal' },
+  { type: 'circuito_motor_sencillo',   label: 'Circuito motor sencillo',       icon: '🤸', category: 'actividades', defaultDuration: 25, ageGroup: 'maternal' },
+  { type: 'caminar_lineas',            label: 'Caminar sobre líneas',          icon: '➖', category: 'actividades', defaultDuration: 15, ageGroup: 'maternal' },
+  { type: 'nombrar_objetos',           label: 'Nombrar objetos',               icon: '🗣️', category: 'aprendizaje', defaultDuration: 15, ageGroup: 'maternal' },
+  { type: 'partes_cuerpo',             label: 'Identificar partes del cuerpo', icon: '👃', category: 'aprendizaje', defaultDuration: 15, ageGroup: 'maternal' },
+  { type: 'repetir_palabras',          label: 'Repetición de palabras',        icon: '🔤', category: 'aprendizaje', defaultDuration: 15, ageGroup: 'maternal' },
+  { type: 'canciones_palabras',        label: 'Canciones de palabras',         icon: '🎵', category: 'aprendizaje', defaultDuration: 15, ageGroup: 'maternal' },
+  { type: 'cuento_imagenes',           label: 'Cuento con imágenes',           icon: '📖', category: 'aprendizaje', defaultDuration: 20, ageGroup: 'maternal' },
+  { type: 'senalar_imagenes',          label: 'Señalar imágenes',              icon: '👆', category: 'aprendizaje', defaultDuration: 15, ageGroup: 'maternal' },
+  { type: 'preguntas_simples',         label: 'Preguntas simples',             icon: '❓', category: 'aprendizaje', defaultDuration: 15, ageGroup: 'maternal' },
+  { type: 'imitacion_sonidos',         label: 'Imitación de sonidos',          icon: '🔊', category: 'aprendizaje', defaultDuration: 15 },
+  // ════════════════════════════════════════════════════════════
+  // PÁRVULOS (2–3 años)
+  // ════════════════════════════════════════════════════════════
+  { type: 'reconocimiento_colores',    label: 'Reconocimiento de colores',     icon: '🌈', category: 'aprendizaje', defaultDuration: 20, ageGroup: 'parvulos' },
+  { type: 'reconocimiento_formas',     label: 'Reconocimiento de formas',      icon: '🔺', category: 'aprendizaje', defaultDuration: 20, ageGroup: 'parvulos' },
+  { type: 'clasificacion_color',       label: 'Clasificación por color',       icon: '🎨', category: 'aprendizaje', defaultDuration: 20, ageGroup: 'parvulos' },
+  { type: 'clasificacion_tamano',      label: 'Clasificación por tamaño',      icon: '📏', category: 'aprendizaje', defaultDuration: 20, ageGroup: 'parvulos' },
+  { type: 'conteo_objetos',            label: 'Conteo de objetos',             icon: '🔢', category: 'aprendizaje', defaultDuration: 20, ageGroup: 'parvulos' },
+  { type: 'asociacion_imagenes',       label: 'Asociación de imágenes',        icon: '🖼️', category: 'aprendizaje', defaultDuration: 20, ageGroup: 'parvulos' },
+  { type: 'memoria_visual',            label: 'Memoria visual',                icon: '🧠', category: 'aprendizaje', defaultDuration: 20, ageGroup: 'parvulos' },
+  { type: 'rompecabezas_sencillos',    label: 'Rompecabezas sencillos',        icon: '🧩', category: 'juego',       defaultDuration: 25, ageGroup: 'parvulos' },
+  { type: 'secuencias_simples',        label: 'Secuencias simples',            icon: '🔢', category: 'aprendizaje', defaultDuration: 20, ageGroup: 'parvulos' },
+  { type: 'grande_pequeno',            label: 'Grande y pequeño',              icon: '↕️', category: 'aprendizaje', defaultDuration: 15, ageGroup: 'parvulos' },
+  { type: 'arriba_abajo',              label: 'Arriba y abajo',                icon: '⬆️', category: 'aprendizaje', defaultDuration: 15, ageGroup: 'parvulos' },
+  { type: 'dentro_fuera',              label: 'Dentro y fuera',                icon: '📦', category: 'aprendizaje', defaultDuration: 15, ageGroup: 'parvulos' },
+  { type: 'trazos_verticales',         label: 'Trazos verticales',             icon: '✏️', category: 'actividades', defaultDuration: 15, ageGroup: 'parvulos' },
+  { type: 'trazos_horizontales',       label: 'Trazos horizontales',           icon: '➖', category: 'actividades', defaultDuration: 15, ageGroup: 'parvulos' },
+  { type: 'trazos_circulares',         label: 'Trazos circulares',             icon: '⭕', category: 'actividades', defaultDuration: 15, ageGroup: 'parvulos' },
+  { type: 'enhebrado',                 label: 'Enhebrado',                     icon: '🧵', category: 'actividades', defaultDuration: 20, ageGroup: 'parvulos' },
+  { type: 'pinzas_objetos',            label: 'Pinzas y objetos',              icon: '🤏', category: 'actividades', defaultDuration: 20, ageGroup: 'parvulos' },
+  { type: 'modelado_plastilina',       label: 'Modelado con plastilina',       icon: '🟣', category: 'actividades', defaultDuration: 25, ageGroup: 'parvulos' },
+  { type: 'rasgado_pegado',            label: 'Rasgado y pegado',              icon: '📄', category: 'actividades', defaultDuration: 20, ageGroup: 'parvulos' },
+  { type: 'pintura_libre',             label: 'Pintura libre',                 icon: '🎨', category: 'actividades', defaultDuration: 25, ageGroup: 'parvulos' },
+  { type: 'pintura_dirigida',          label: 'Pintura dirigida',              icon: '🖌️', category: 'actividades', defaultDuration: 25, ageGroup: 'parvulos' },
+  { type: 'conversacion_guiada',       label: 'Conversación guiada',           icon: '💬', category: 'aprendizaje', defaultDuration: 20, ageGroup: 'parvulos' },
+  { type: 'nombrar_imagenes',          label: 'Nombrar imágenes',              icon: '🖼️', category: 'aprendizaje', defaultDuration: 20, ageGroup: 'parvulos' },
+  { type: 'completar_frases',          label: 'Completar frases',              icon: '🗣️', category: 'aprendizaje', defaultDuration: 15, ageGroup: 'parvulos' },
+  { type: 'cuento_participativo',      label: 'Cuento participativo',          icon: '📖', category: 'aprendizaje', defaultDuration: 20, ageGroup: 'parvulos' },
+  { type: 'rimas',                     label: 'Rimas infantiles',              icon: '🎵', category: 'aprendizaje', defaultDuration: 15, ageGroup: 'parvulos' },
+  { type: 'canciones_educativas',      label: 'Canciones educativas',          icon: '🎶', category: 'aprendizaje', defaultDuration: 15, ageGroup: 'parvulos' },
+  { type: 'adivinanzas',               label: 'Adivinanzas sencillas',         icon: '❓', category: 'aprendizaje', defaultDuration: 15, ageGroup: 'parvulos' },
+  // ════════════════════════════════════════════════════════════
+  // PRE-KÍNDER (3–4 años)
+  // ════════════════════════════════════════════════════════════
+  { type: 'reconocimiento_letras',     label: 'Reconocimiento de letras',      icon: '🔤', category: 'aprendizaje', defaultDuration: 20, ageGroup: 'prekinder' },
+  { type: 'letra_dia',                 label: 'Letra del día',                 icon: '🔠', category: 'aprendizaje', defaultDuration: 20, ageGroup: 'prekinder' },
+  { type: 'trazado_letras',            label: 'Trazado de letras',             icon: '✏️', category: 'aprendizaje', defaultDuration: 20, ageGroup: 'prekinder' },
+  { type: 'identificacion_nombre',     label: 'Identificación del nombre',     icon: '🪪', category: 'aprendizaje', defaultDuration: 15, ageGroup: 'prekinder' },
+  { type: 'escritura_nombre',          label: 'Escritura del nombre',          icon: '✍️', category: 'aprendizaje', defaultDuration: 20 },
+  { type: 'sonido_inicial',            label: 'Sonido inicial de palabras',    icon: '🔊', category: 'aprendizaje', defaultDuration: 15, ageGroup: 'prekinder' },
+  { type: 'letra_imagen',              label: 'Asociación letra-imagen',       icon: '🖼️', category: 'aprendizaje', defaultDuration: 20, ageGroup: 'prekinder' },
+  { type: 'cuento_comprension',        label: 'Cuento y comprensión',          icon: '📖', category: 'aprendizaje', defaultDuration: 25, ageGroup: 'prekinder' },
+  { type: 'ordenar_historia',          label: 'Ordenar una historia',          icon: '📚', category: 'aprendizaje', defaultDuration: 20, ageGroup: 'prekinder' },
+  { type: 'crear_historia',            label: 'Crear una historia',            icon: '📝', category: 'aprendizaje', defaultDuration: 25, ageGroup: 'prekinder' },
+  { type: 'conteo_10',                 label: 'Conteo hasta 10',               icon: '🔢', category: 'aprendizaje', defaultDuration: 20, ageGroup: 'prekinder' },
+  { type: 'conteo_20',                 label: 'Conteo hasta 20',               icon: '🔢', category: 'aprendizaje', defaultDuration: 20 },
+  { type: 'reconocimiento_numeros',    label: 'Reconocimiento de números',     icon: '🔢', category: 'aprendizaje', defaultDuration: 20, ageGroup: 'prekinder' },
+  { type: 'numero_cantidad',           label: 'Número-cantidad',               icon: '🔢', category: 'aprendizaje', defaultDuration: 20, ageGroup: 'prekinder' },
+  { type: 'series_simples',            label: 'Series simples',                icon: '🔴', category: 'aprendizaje', defaultDuration: 20, ageGroup: 'prekinder' },
+  { type: 'comparacion_cantidades',    label: 'Comparación de cantidades',     icon: '⚖️', category: 'aprendizaje', defaultDuration: 20, ageGroup: 'prekinder' },
+  { type: 'formas_geometricas',        label: 'Formas geométricas',            icon: '🔺', category: 'aprendizaje', defaultDuration: 20, ageGroup: 'prekinder' },
+  { type: 'secuencias_numericas',      label: 'Secuencias numéricas',          icon: '🔢', category: 'aprendizaje', defaultDuration: 20, ageGroup: 'prekinder' },
+  { type: 'problemas_sencillos',       label: 'Problemas sencillos',           icon: '🧠', category: 'aprendizaje', defaultDuration: 20, ageGroup: 'prekinder' },
+  { type: 'animales_domesticos',       label: 'Animales domésticos',           icon: '🐶', category: 'aprendizaje', defaultDuration: 20, ageGroup: 'prekinder' },
+  { type: 'animales_salvajes',         label: 'Animales salvajes',             icon: '🦁', category: 'aprendizaje', defaultDuration: 20, ageGroup: 'prekinder' },
+  { type: 'partes_planta',             label: 'Partes de una planta',          icon: '🌱', category: 'aprendizaje', defaultDuration: 20, ageGroup: 'prekinder' },
+  { type: 'cuidado_plantas',           label: 'Cuidado de plantas',            icon: '🌿', category: 'aprendizaje', defaultDuration: 20, ageGroup: 'prekinder' },
+  { type: 'clima',                     label: 'El clima',                      icon: '☀️', category: 'aprendizaje', defaultDuration: 15, ageGroup: 'prekinder' },
+  { type: 'los_sentidos',              label: 'Los sentidos',                  icon: '👀', category: 'aprendizaje', defaultDuration: 20, ageGroup: 'prekinder' },
+  { type: 'cuerpo_humano',             label: 'El cuerpo humano',              icon: '🧍', category: 'aprendizaje', defaultDuration: 20 },
+  { type: 'experimento_agua',          label: 'Experimento con agua',          icon: '💧', category: 'aprendizaje', defaultDuration: 20, ageGroup: 'prekinder' },
+  { type: 'experimento_colores',       label: 'Experimento con colores',       icon: '🌈', category: 'aprendizaje', defaultDuration: 20, ageGroup: 'prekinder' },
+  { type: 'observacion_insectos',      label: 'Observación de insectos',       icon: '🐜', category: 'aprendizaje', defaultDuration: 20, ageGroup: 'prekinder' },
+  // ════════════════════════════════════════════════════════════
+  // KÍNDER (4–5 años)
+  // ════════════════════════════════════════════════════════════
+  { type: 'lectura_palabras',          label: 'Lectura de palabras',           icon: '📖', category: 'aprendizaje', defaultDuration: 25, ageGroup: 'kinder' },
+  { type: 'silabas',                   label: 'Reconocimiento de sílabas',     icon: '🔤', category: 'aprendizaje', defaultDuration: 20, ageGroup: 'kinder' },
+  { type: 'formacion_palabras',        label: 'Formación de palabras',         icon: '📝', category: 'aprendizaje', defaultDuration: 20, ageGroup: 'kinder' },
+  { type: 'escritura_palabras',        label: 'Escritura de palabras',         icon: '✏️', category: 'aprendizaje', defaultDuration: 20, ageGroup: 'kinder' },
+  { type: 'dictado_palabras',          label: 'Dictado de palabras',           icon: '🗣️', category: 'aprendizaje', defaultDuration: 20, ageGroup: 'kinder' },
+  { type: 'comprension_cuentos',       label: 'Comprensión de cuentos',        icon: '📚', category: 'aprendizaje', defaultDuration: 25, ageGroup: 'kinder' },
+  { type: 'crear_cuentos',             label: 'Crear cuentos',                 icon: '📝', category: 'aprendizaje', defaultDuration: 30, ageGroup: 'kinder' },
+  { type: 'exposicion_oral',           label: 'Exposición oral',               icon: '🎤', category: 'aprendizaje', defaultDuration: 20, ageGroup: 'kinder' },
+  { type: 'conversacion_grupal',       label: 'Conversación grupal',           icon: '💬', category: 'aprendizaje', defaultDuration: 20, ageGroup: 'kinder' },
+  { type: 'conteo_50',                 label: 'Conteo hasta 50',               icon: '🔢', category: 'aprendizaje', defaultDuration: 20, ageGroup: 'kinder' },
+  { type: 'sumas',                     label: 'Sumas sencillas',               icon: '➕', category: 'aprendizaje', defaultDuration: 20, ageGroup: 'kinder' },
+  { type: 'restas',                    label: 'Restas sencillas',              icon: '➖', category: 'aprendizaje', defaultDuration: 20, ageGroup: 'kinder' },
+  { type: 'mayor_menor',               label: 'Mayor y menor',                 icon: '⚖️', category: 'aprendizaje', defaultDuration: 20, ageGroup: 'kinder' },
+  { type: 'orden_numerico',            label: 'Orden numérico',                icon: '🔢', category: 'aprendizaje', defaultDuration: 20, ageGroup: 'kinder' },
+  { type: 'series_numericas',          label: 'Series numéricas',              icon: '🔢', category: 'aprendizaje', defaultDuration: 20, ageGroup: 'kinder' },
+  { type: 'patrones',                  label: 'Patrones',                      icon: '🔵', category: 'aprendizaje', defaultDuration: 20, ageGroup: 'kinder' },
+  { type: 'figuras_geometricas',       label: 'Figuras geométricas',           icon: '🔺', category: 'aprendizaje', defaultDuration: 20, ageGroup: 'kinder' },
+  { type: 'medicion',                  label: 'Medición',                      icon: '📏', category: 'aprendizaje', defaultDuration: 20, ageGroup: 'kinder' },
+  { type: 'clasificacion',             label: 'Clasificación',                 icon: '🔢', category: 'aprendizaje', defaultDuration: 20, ageGroup: 'kinder' },
+  { type: 'resolucion_problemas',      label: 'Resolución de problemas',       icon: '🧠', category: 'aprendizaje', defaultDuration: 25, ageGroup: 'kinder' },
+  { type: 'ciclo_planta',              label: 'Ciclo de una planta',           icon: '🌱', category: 'aprendizaje', defaultDuration: 20, ageGroup: 'kinder' },
+  { type: 'germinacion',               label: 'Germinación',                   icon: '🌱', category: 'aprendizaje', defaultDuration: 20, ageGroup: 'kinder' },
+  { type: 'animales_habitats',         label: 'Animales y hábitats',           icon: '🐘', category: 'aprendizaje', defaultDuration: 20, ageGroup: 'kinder' },
+  { type: 'cinco_sentidos',            label: 'Los cinco sentidos',            icon: '👁️', category: 'aprendizaje', defaultDuration: 20, ageGroup: 'kinder' },
+  { type: 'estados_agua',              label: 'Estados del agua',              icon: '💧', category: 'aprendizaje', defaultDuration: 20, ageGroup: 'kinder' },
+  { type: 'mezcla_colores',            label: 'Mezcla de colores',             icon: '🎨', category: 'aprendizaje', defaultDuration: 20, ageGroup: 'kinder' },
+  { type: 'experimentos',              label: 'Experimentos científicos',      icon: '🧪', category: 'aprendizaje', defaultDuration: 25, ageGroup: 'kinder' },
+  { type: 'observacion_clima',         label: 'Observación del clima',         icon: '☀️', category: 'aprendizaje', defaultDuration: 15, ageGroup: 'kinder' },
+  { type: 'medioambiente',             label: 'Cuidado del medioambiente',     icon: '🌎', category: 'aprendizaje', defaultDuration: 20, ageGroup: 'kinder' },
 ];
 
 function _getEventMeta(type) {
@@ -355,7 +552,15 @@ function _injectV8Styles() {
     .tl-insert-btn:hover{background:#FF8A00;color:#fff;transform:scale(1.1);}
     .tl-insert-btn:active{transform:scale(.9);}
     #scheduleOrderList .schedule-order-row select{font-size:9px;font-weight:700;color:#475569;background:#fff;border:1px solid #e2e8f0;border-radius:8px;padding:2px 4px;outline:none;}
-    #scheduleOrderList .schedule-order-row select:focus{border-color:#FF8A00;}`;
+    #scheduleOrderList .schedule-order-row select:focus{border-color:#FF8A00;}
+    .acc-section summary{list-style:none;}
+    .acc-section summary::-webkit-details-marker{display:none;}
+    .acc-section summary::marker{content:"";}
+    .acc-section[open] .acc-chev{transform:rotate(180deg);}
+    .acc-section[open]{background:#fff;border-color:#e2e8f0;box-shadow:0 1px 4px rgba(0,0,0,0.04);}
+    #ageFilterChips button{color:#fff;border-color:rgba(255,255,255,.35);background:rgba(255,255,255,.12);}
+    #ageFilterChips button:hover{background:rgba(255,255,255,.25);}
+    #ageFilterChips button.active-age{background:#fff;color:#f97316;border-color:#fff;}`;
   document.head.appendChild(style);
 }
 
@@ -381,7 +586,7 @@ async function _loadSchedule(classroomId) {
       hour: d.scheduled_hour,
       minute: d.scheduled_minute,
       duration: d.duration_minutes,
-      autoRegister: d.auto_register,
+      autoRegister: true,
       appliesTo: d.applies_to,
       category: d.category || null,
       sort_order: d.sort_order,
@@ -620,9 +825,9 @@ function _renderRoutineLayout({ todayLabel, students, logsMap, withReport, sched
       </div>
 
       <!-- Timeline Colapsado: Barra Horizontal de Emojis -->
-      <div id="timelineCollapsed" class="${_timelineExpanded ? 'hidden' : ''} px-4 py-3 border-t border-slate-100">
-        <div class="overflow-x-auto" style="scrollbar-width:none" id="timelineCollapsedScroll">
-          <div class="flex items-center gap-1.5 min-w-max py-1">
+      <div id="timelineCollapsed" class="${_timelineExpanded ? 'hidden' : ''} px-4 py-3 border-t border-slate-100 w-full max-w-full" style="overflow:hidden;">
+        <div class="overflow-x-auto w-full" style="scrollbar-width:none;-webkit-overflow-scrolling:touch;overscroll-behavior-x:contain;" id="timelineCollapsedScroll">
+          <div class="flex items-center gap-1.5 min-w-max py-1" style="min-width:max-content;">
             ${schedule.map((ev, i) => {
               const state    = _getTimelineState(ev);
               const isActive = state === 'in_progress';
@@ -632,7 +837,7 @@ function _renderRoutineLayout({ todayLabel, students, logsMap, withReport, sched
               const isMissed = isTimePast && !isRegistered;
               return `
               <button onclick="App.openBulkEventModal('${ev.type}', '${_formatTime12(ev.hour, ev.minute)}')"
-                class="flex flex-col items-center gap-1 px-3 py-2 rounded-2xl transition-all active:scale-90 ${
+                class="flex flex-col items-center gap-1 px-3 py-2 rounded-2xl transition-all active:scale-90 shrink-0 ${
                   isActive ? 'bg-[#FF8A00]/10 scale-110 shadow-sm' :
                   isDone ? 'bg-green-50' :
                   isMissed ? 'bg-amber-50' : 'hover:bg-slate-50'
@@ -1152,13 +1357,6 @@ export async function confirmBulkEvent(eventType) {
     const selected = [...document.querySelectorAll('#bulkChipsGrid button.selected[data-sid]')].map(b => b.dataset.sid);
     if (!selected.length) { safeToast('Selecciona al menos un estudiante', 'warning'); return; }
 
-    const presentIds = _getPresentStudentIds();
-    const absentSelected = selected.filter(sid => !presentIds.includes(sid));
-    if (absentSelected.length > 0) {
-      const proceed = confirm(`Hay ${absentSelected.length} estudiante${absentSelected.length > 1 ? 's' : ''} ausente${absentSelected.length > 1 ? 's' : ''} seleccionado${absentSelected.length > 1 ? 's' : ''}. ¿Registrar evento de todos modos?\n\nSolo se recomienda registrar eventos para estudiantes presentes.`);
-      if (!proceed) return;
-    }
-
     const classroom = AppState.get('classroom');
     const today     = new Date().toISOString().split('T')[0];
     const logsMap   = AppState.get('logsMap') || {};
@@ -1377,6 +1575,18 @@ export async function openStudentRoutine(studentId) {
 }
 
 // ── MODAL INDIVIDUAL: ESTÁNDAR (NIVEL 4) ─────────────────────────────────────
+function _accSection(title, icon, inner, open = false) {
+  return `
+    <details class="acc-section rounded-2xl bg-slate-50/60 border border-slate-100 overflow-hidden transition-colors" ${open ? 'open' : ''}>
+      <summary class="flex items-center gap-2.5 px-3.5 py-2.5 cursor-pointer select-none list-none">
+        <span class="text-base leading-none shrink-0">${icon}</span>
+        <span class="text-[11px] font-black text-slate-500 uppercase tracking-widest flex-1 truncate">${title}</span>
+        <svg class="acc-chev w-4 h-4 text-slate-300 shrink-0 transition-transform duration-200" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M19 9l-7 7-7-7"/></svg>
+      </summary>
+      <div class="px-3.5 pb-3 pt-1">${inner}</div>
+    </details>`;
+}
+
 function _renderStandardRoutineUI(student, log, modalId) {
   const isValid      = log && _isWithin12h(log.created_at);
   const currentMood  = isValid ? (log.mood  || '') : '';
@@ -1481,11 +1691,9 @@ function _renderStandardRoutineUI(student, log, modalId) {
         </div>
       </div>
 
-      <div class="p-5 space-y-4 overflow-y-auto flex-1 custom-scrollbar" style="-webkit-overflow-scrolling:touch;">
+      <div class="p-4 space-y-2.5 overflow-y-auto flex-1 custom-scrollbar" style="-webkit-overflow-scrolling:touch;">
 
-        <!-- Estado Emocional -->
-        <div class="space-y-2">
-          <label class="text-[11px] font-black text-slate-400 uppercase tracking-widest">Estado Emocional</label>
+        ${_accSection('Estado emocional', '😊', `
           <div class="grid grid-cols-4 gap-1.5">
             ${MOOD_OPTIONS.map(m => `
               <button onclick="App.updateRoutineFieldInModal('${student.id}','mood','${m.value}')"
@@ -1493,12 +1701,9 @@ function _renderStandardRoutineUI(student, log, modalId) {
                 <span class="text-lg">${m.icon}</span>
                 <span class="text-[7px] font-black uppercase text-slate-500 leading-tight text-center mt-0.5">${m.label}</span>
               </button>`).join('')}
-          </div>
-        </div>
+          </div>`, true)}
 
-        <!-- Alimentación -->
-        <div class="space-y-2">
-          <label class="text-[11px] font-black text-slate-400 uppercase tracking-widest">Alimentación</label>
+        ${_accSection('Alimentación', '🍽️', `
           <div class="grid grid-cols-4 gap-2">
             ${foodOptions.map(f => `
               <button onclick="App.updateRoutineFieldInModal('${student.id}','food','${f.value}')"
@@ -1506,19 +1711,12 @@ function _renderStandardRoutineUI(student, log, modalId) {
                 <span class="text-lg">${f.icon}</span>
                 <span class="text-[8px] font-black uppercase text-slate-500 leading-tight text-center">${f.label}</span>
               </button>`).join('')}
-          </div>
-        </div>
+          </div>`, true)}
 
-        <!-- Siesta -->
-        <div class="space-y-2">
-          <label class="text-[11px] font-black text-slate-400 uppercase tracking-widest">Siesta</label>
-          ${siestaSection}
-        </div>
+        ${_accSection('Siesta', '😴', siestaSection, true)}
 
-        <!-- Biberón -->
-        <div class="space-y-2">
-          <label class="text-[11px] font-black text-slate-400 uppercase tracking-widest">Biberón</label>
-          <div class="bg-blue-50/50 border border-blue-100 rounded-2xl p-3 space-y-2">
+        ${_accSection('Biberón', '🍼', `
+          <div class="bg-blue-50 border border-blue-100 rounded-2xl p-3 space-y-2">
             <div class="grid grid-cols-4 gap-2">
               ${[2,4,6,8].map(oz => `
                 <button onclick="App.registerIndividualEvent('${student.id}','biberon',{oz:${oz}}); App.safeToast('${oz}oz registrado ✓');"
@@ -1533,12 +1731,9 @@ function _renderStandardRoutineUI(student, log, modalId) {
                   ${t}
                 </button>`).join('')}
             </div>
-          </div>
-        </div>
+          </div>`, false)}
 
-        <!-- Temperatura -->
-        <div class="space-y-2">
-          <label class="text-[11px] font-black text-slate-400 uppercase tracking-widest">Temperatura</label>
+        ${_accSection('Temperatura', '🌡️', `
           <div class="grid grid-cols-4 gap-2">
             ${[36.4,36.6,36.8,37.0,37.2,37.5,37.8,38.0].map(t => {
               const fiebre = t >= 37.5;
@@ -1548,13 +1743,10 @@ function _renderStandardRoutineUI(student, log, modalId) {
                 ${t}°${fiebre ? '<span class="absolute -top-1 -right-1 text-[8px]">🔥</span>' : ''}
               </button>`;
             }).join('')}
-          </div>
-        </div>
+          </div>`, false)}
 
-        <!-- Medicamentos -->
-        <div class="space-y-2">
-          <label class="text-[11px] font-black text-slate-400 uppercase tracking-widest">Medicamentos</label>
-          <div class="bg-purple-50/50 border border-purple-100 rounded-2xl p-3 space-y-2">
+        ${_accSection('Medicamentos', '💊', `
+          <div class="bg-purple-50 border border-purple-100 rounded-2xl p-3 space-y-2">
             <div class="grid grid-cols-2 gap-2">
               <input id="ind-med-nombre-${student.id}" type="text" placeholder="Nombre" class="p-2.5 bg-white border-2 border-slate-100 rounded-xl text-xs font-bold outline-none focus:border-purple-400 transition-all">
               <input id="ind-med-dosis-${student.id}" type="text" placeholder="Dosis" class="p-2.5 bg-white border-2 border-slate-100 rounded-xl text-xs font-bold outline-none focus:border-purple-400 transition-all">
@@ -1564,20 +1756,14 @@ function _renderStandardRoutineUI(student, log, modalId) {
               class="w-full py-2 bg-purple-50 border-2 border-purple-200 rounded-xl text-[10px] font-black text-purple-700 hover:bg-purple-100 transition-all active:scale-95 uppercase tracking-widest">
               💊 Registrar medicamento
             </button>
-          </div>
-        </div>
+          </div>`, false)}
 
-        <!-- Rutina de hoy (prellenada desde el schedule) -->
-        <div class="space-y-2">
-          <label class="text-[11px] font-black text-slate-400 uppercase tracking-widest">Rutina de hoy</label>
+        ${_accSection('Rutina de hoy', '📅', `
           <div class="grid grid-cols-4 gap-2">
             ${routineQuickHTML}
-          </div>
-        </div>
+          </div>`, false)}
 
-        <!-- Eventos Rápidos -->
-        <div class="space-y-2">
-          <label class="text-[11px] font-black text-slate-400 uppercase tracking-widest">Eventos del día</label>
+        ${_accSection('Eventos del día', '⚡', `
           <div class="grid grid-cols-4 gap-2">
             ${[
               {type:'desayuno', icon:'🥐', label:'Desayuno'},
@@ -1594,12 +1780,9 @@ function _renderStandardRoutineUI(student, log, modalId) {
                 <span class="text-xl">${ev.icon}</span>
                 <span class="text-[8px] font-black text-slate-400 uppercase leading-tight text-center">${ev.label}</span>
               </button>`).join('')}
-          </div>
-        </div>
+          </div>`, false)}
 
-        <!-- Eventos Extra -->
-        <div class="space-y-2">
-          <label class="text-[11px] font-black text-slate-400 uppercase tracking-widest">Agregar Evento</label>
+        ${_accSection('Agregar evento', '➕', `
           <div class="grid grid-cols-3 gap-2">
             ${EXTRA_EVENT_TYPES.map(ev => `
               <button onclick="App.openExtraEventModal('${student.id}','${ev.type}','${ev.icon}','${ev.label}')"
@@ -1607,22 +1790,15 @@ function _renderStandardRoutineUI(student, log, modalId) {
                 <span class="text-lg">${ev.icon}</span>
                 <span class="text-[8px] font-black text-slate-400 uppercase leading-tight text-center">${ev.label}</span>
               </button>`).join('')}
-          </div>
-        </div>
+          </div>`, false)}
 
-        <!-- Observaciones -->
-        <div class="space-y-2">
-          <label class="text-[11px] font-black text-slate-400 uppercase tracking-widest">Observaciones</label>
+        ${_accSection('Observaciones', '📝', `
           <textarea id="modal-note-${student.id}" rows="3"
             class="w-full p-4 bg-slate-50 border-2 border-slate-100 rounded-2xl text-sm font-medium outline-none focus:border-[#FF8A00] transition-all resize-none"
-            placeholder="Escribe aquí...">${safeEscapeHTML(currentNotes)}</textarea>
-        </div>
+            placeholder="Escribe aquí...">${safeEscapeHTML(currentNotes)}</textarea>`, true)}
 
-        <!-- Timeline individual -->
-        <div class="space-y-2">
-          <label class="text-[11px] font-black text-slate-400 uppercase tracking-widest">Registro del día</label>
-          <div class="space-y-3 max-h-64 overflow-y-auto pr-1" id="ind-timeline-${student.id}">${timelineHTML}</div>
-        </div>
+        ${_accSection('Registro del día', '🕐', `
+          <div class="space-y-3 max-h-64 overflow-y-auto pr-1" id="ind-timeline-${student.id}">${timelineHTML}</div>`, false)}
       </div>
 
       <div class="p-4 shrink-0" style="background:#f8fafc;border-top:1px solid #e2e8f0;">
@@ -1738,65 +1914,70 @@ function _renderInfantRoutineUI(student, log, modalId) {
           </div>
         </div>
       </div>
-      <div class="p-5 space-y-4 overflow-y-auto flex-1 custom-scrollbar" style="background:rgba(248,250,252,0.5);-webkit-overflow-scrolling:touch;">
-        <div class="bg-white p-4 rounded-2xl border border-slate-100 shadow-sm">
-          <label class="text-[11px] font-black text-slate-400 uppercase tracking-widest mb-2 block">Hora</label>
-          <select id="infantTime" class="w-full p-3 bg-slate-50 border-2 border-slate-100 rounded-2xl font-bold text-sm outline-none focus:border-blue-400">
-            ${timeOptions.map(t => `<option ${t === currentHourStr ? 'selected' : ''}>${t}</option>`).join('')}
-          </select>
-        </div>
-        <div class="bg-white p-4 rounded-2xl border border-slate-100 shadow-sm">
-          <label class="text-[11px] font-black text-slate-400 uppercase tracking-widest mb-2 block">Leche (Onzas)</label>
-          <div class="flex items-center gap-3">
-            <input type="number" id="infantMilk" min="0" max="12" step="0.5" placeholder="0" class="flex-1 p-3 bg-slate-50 border-2 border-slate-100 rounded-2xl font-bold text-lg outline-none focus:border-blue-400">
-            <span class="font-black text-slate-400 text-[11px] uppercase">oz</span>
-          </div>
-          <div class="grid grid-cols-4 gap-2 mt-2">
-            ${['Fría','Natural','Tibia','Caliente'].map(t => `
-              <button type="button" onclick="this.parentElement.querySelectorAll('button').forEach(b=>b.classList.remove('bg-sky-500','text-white','border-sky-500')); this.classList.add('bg-sky-500','text-white','border-sky-500');"
-                class="py-1.5 bg-sky-50 border-2 border-sky-200 rounded-xl font-black text-[9px] text-sky-700 hover:bg-sky-100 transition-all active:scale-90 uppercase">
-                ${t}
-              </button>`).join('')}
-          </div>
-        </div>
-        <div class="bg-white p-4 rounded-2xl border border-slate-100 shadow-sm">
-          <label class="text-[11px] font-black text-slate-400 uppercase tracking-widest mb-2 block">Alimentación</label>
-          <div class="grid grid-cols-2 gap-2">
-            ${[{id:'none',label:'No comió',e:'🙅'},{id:'little',label:'Poco',e:'🍲'},{id:'half',label:'La mitad',e:'🥣'},{id:'all',label:'Todo',e:'🍽️'}].map(f => `
-              <label class="flex items-center gap-2 p-3 bg-slate-50 border-2 border-slate-100 rounded-2xl cursor-pointer hover:bg-blue-50 transition-all">
-                <input type="radio" name="infantFood" value="${f.id}" class="accent-blue-500">
-                <span class="text-lg">${f.e}</span>
-                <span class="text-xs font-bold text-slate-600">${f.label}</span>
-              </label>`).join('')}
-          </div>
-        </div>
-        <div class="bg-white p-4 rounded-2xl border border-slate-100 shadow-sm">
-          <label class="text-[11px] font-black text-slate-400 uppercase tracking-widest mb-2 block">Actividades</label>
-          <div class="flex flex-wrap gap-2">
-            ${activities.map(a => `
-              <label class="cursor-pointer">
-                <input type="checkbox" name="infantActivity" value="${a}" class="hidden peer">
-                <span class="block px-3 py-1.5 bg-slate-50 border-2 border-slate-100 rounded-xl text-[11px] font-bold text-slate-500 peer-checked:bg-indigo-50 peer-checked:border-indigo-400 peer-checked:text-indigo-700 transition-all">
-                  ${a}
-                </span>
-              </label>`).join('')}
-          </div>
-        </div>
-        <div class="bg-white p-4 rounded-2xl border border-slate-100 shadow-sm">
-          <label class="text-[11px] font-black text-slate-400 uppercase tracking-widest mb-2 block">Observación</label>
-          <textarea id="infantNotes" rows="2" class="w-full p-3 bg-slate-50 border-2 border-slate-100 rounded-2xl text-sm font-medium outline-none focus:border-blue-400 resize-none" placeholder="Anota algo importante..."></textarea>
-        </div>
-        ${lastEntry ? `
-        <div class="bg-white p-4 rounded-2xl border border-slate-100 shadow-sm">
-          <p class="text-[11px] font-black text-slate-400 uppercase tracking-widest mb-2">Último registro</p>
-          <div class="flex items-center gap-3">
-            <div class="w-9 h-9 bg-blue-50 rounded-xl flex items-center justify-center text-lg">🍼</div>
-            <div>
-              <p class="text-[10px] font-black text-slate-400 uppercase">${_formatTime(lastEntry.created_at)}</p>
-              <p class="text-xs font-bold text-slate-700">${lastEntry.comment || 'Registro de rutina'}</p>
+      <div class="p-4 space-y-2.5 overflow-y-auto flex-1 custom-scrollbar" style="background:rgba(248,250,252,0.5);-webkit-overflow-scrolling:touch;">
+
+        ${_accSection('Hora', '🕐', `
+          <div class="bg-white p-4 rounded-2xl border border-slate-100 shadow-sm">
+            <select id="infantTime" class="w-full p-3 bg-slate-50 border-2 border-slate-100 rounded-2xl font-bold text-sm outline-none focus:border-blue-400">
+              ${timeOptions.map(t => `<option ${t === currentHourStr ? 'selected' : ''}>${t}</option>`).join('')}
+            </select>
+          </div>`, true)}
+
+        ${_accSection('Leche (Onzas)', '🍼', `
+          <div class="bg-white p-4 rounded-2xl border border-slate-100 shadow-sm">
+            <div class="flex items-center gap-3">
+              <input type="number" id="infantMilk" min="0" max="12" step="0.5" placeholder="0" class="flex-1 p-3 bg-slate-50 border-2 border-slate-100 rounded-2xl font-bold text-lg outline-none focus:border-blue-400">
+              <span class="font-black text-slate-400 text-[11px] uppercase">oz</span>
             </div>
-          </div>
-        </div>` : ''}
+            <div class="grid grid-cols-4 gap-2 mt-2">
+              ${['Fría','Natural','Tibia','Caliente'].map(t => `
+                <button type="button" onclick="this.parentElement.querySelectorAll('button').forEach(b=>b.classList.remove('bg-sky-500','text-white','border-sky-500')); this.classList.add('bg-sky-500','text-white','border-sky-500');"
+                  class="py-1.5 bg-sky-50 border-2 border-sky-200 rounded-xl font-black text-[9px] text-sky-700 hover:bg-sky-100 transition-all active:scale-90 uppercase">
+                  ${t}
+                </button>`).join('')}
+            </div>
+          </div>`, true)}
+
+        ${_accSection('Alimentación', '🍽️', `
+          <div class="bg-white p-4 rounded-2xl border border-slate-100 shadow-sm">
+            <div class="grid grid-cols-2 gap-2">
+              ${[{id:'none',label:'No comió',e:'🙅'},{id:'little',label:'Poco',e:'🍲'},{id:'half',label:'La mitad',e:'🥣'},{id:'all',label:'Todo',e:'🍽️'}].map(f => `
+                <label class="flex items-center gap-2 p-3 bg-slate-50 border-2 border-slate-100 rounded-2xl cursor-pointer hover:bg-blue-50 transition-all">
+                  <input type="radio" name="infantFood" value="${f.id}" class="accent-blue-500">
+                  <span class="text-lg">${f.e}</span>
+                  <span class="text-xs font-bold text-slate-600">${f.label}</span>
+                </label>`).join('')}
+            </div>
+          </div>`, true)}
+
+        ${_accSection('Actividades', '🎨', `
+          <div class="bg-white p-4 rounded-2xl border border-slate-100 shadow-sm">
+            <div class="flex flex-wrap gap-2">
+              ${activities.map(a => `
+                <label class="cursor-pointer">
+                  <input type="checkbox" name="infantActivity" value="${a}" class="hidden peer">
+                  <span class="block px-3 py-1.5 bg-slate-50 border-2 border-slate-100 rounded-xl text-[11px] font-bold text-slate-500 peer-checked:bg-indigo-50 peer-checked:border-indigo-400 peer-checked:text-indigo-700 transition-all">
+                    ${a}
+                  </span>
+                </label>`).join('')}
+            </div>
+          </div>`, false)}
+
+        ${_accSection('Observación', '📝', `
+          <div class="bg-white p-4 rounded-2xl border border-slate-100 shadow-sm">
+            <textarea id="infantNotes" rows="2" class="w-full p-3 bg-slate-50 border-2 border-slate-100 rounded-2xl text-sm font-medium outline-none focus:border-blue-400 resize-none" placeholder="Anota algo importante..."></textarea>
+          </div>`, true)}
+
+        ${lastEntry ? _accSection('Último registro', '📋', `
+          <div class="bg-white p-4 rounded-2xl border border-slate-100 shadow-sm">
+            <div class="flex items-center gap-3">
+              <div class="w-9 h-9 bg-blue-50 rounded-xl flex items-center justify-center text-lg">🍼</div>
+              <div>
+                <p class="text-[10px] font-black text-slate-400 uppercase">${_formatTime(lastEntry.created_at)}</p>
+                <p class="text-xs font-bold text-slate-700">${lastEntry.comment || 'Registro de rutina'}</p>
+              </div>
+            </div>
+          </div>`, false) : ''}
       </div>
       <div class="p-4 shrink-0" style="background:#f8fafc;border-top:1px solid #e2e8f0;">
         <button onclick="App.saveInfantEntry('${student.id}')" id="btnSaveInfant"
@@ -1940,10 +2121,6 @@ export async function saveRoutineLog(studentId, field = 'notes', value = null) {
 }
 
 export async function registerIndividualEvent(sid, type, extra = {}) {
-  if (!_isStudentPresent(sid)) {
-    const proceed = confirm('Este estudiante no está marcado como presente. ¿Registrar evento de todos modos?\n\nSolo se recomienda registrar eventos para estudiantes presentes.');
-    if (!proceed) return;
-  }
   const classroom = AppState.get('classroom');
   const today     = new Date().toISOString().split('T')[0];
   const logsMap   = AppState.get('logsMap') || {};
@@ -2067,8 +2244,6 @@ async function _checkAutoRegister() {
 
     for (const ev of schedule) {
       if (_AUTO_SKIP_TYPES.has(ev.type)) continue;
-      const auto = ev.autoRegister !== false;
-      if (!auto) continue;
       const start = (ev.hour ?? 0) * 60 + (ev.minute ?? 0);
       if (nowMins < start) continue;
       const duration = ev.duration || 30;
@@ -2180,6 +2355,7 @@ async function _applyAutoRegistration(classroom, today, toRegister, toOpenSiesta
 
 // ── SCHEDULE MANAGER MODAL (V8: catálogo por categorías) ───────
 let _scheduleSearch = '';
+let _scheduleAgeFilter = '';
 
 const _CATEGORY_ACCENTS = {
   amber:'#f59e0b', orange:'#f97316', rose:'#f43f5e', indigo:'#6366f1', cyan:'#06b6d4',
@@ -2189,13 +2365,16 @@ const _CATEGORY_ACCENTS = {
 
 function _renderConfigEventRow(ev, sched, accent) {
   const active = !!sched;
+  const ageBadge = ev.ageGroup && AGE_GROUPS[ev.ageGroup]
+    ? `<span class="text-[7px] font-black uppercase tracking-wider px-1.5 py-0.5 rounded-md shrink-0" style="color:${accent};background:${accent}18;" title="Edad: ${AGE_GROUPS[ev.ageGroup].label}">${AGE_GROUPS[ev.ageGroup].icon} ${AGE_GROUPS[ev.ageGroup].label}</span>`
+    : '';
   if (active) {
     const time = _formatTime12(sched?.hour ?? 8, sched?.minute ?? 0);
     return `
-      <div class="config-event-row flex items-center gap-2 p-2.5 rounded-2xl border-2 transition-all border-[#FF8A00]/40 bg-orange-50/50" data-type="${ev.type}" data-label="${ev.label}" data-active="true">
+      <div class="config-event-row flex items-center gap-2 p-2.5 rounded-2xl border-2 transition-all border-[#FF8A00]/40 bg-orange-50/50" data-type="${ev.type}" data-label="${ev.label}" data-age="${ev.ageGroup || ''}" data-active="true">
         <span class="text-lg shrink-0">${ev.icon}</span>
         <div class="flex-1 min-w-0">
-          <p class="text-[10px] font-black text-slate-700 truncate">${ev.label}</p>
+          <p class="text-[10px] font-black text-slate-700 truncate">${ev.label} ${ageBadge}</p>
           <p class="text-[9px] font-bold text-[#FF8A00] uppercase mt-0.5">⏰ ${time} · ${sched?.duration ?? ev.defaultDuration ?? 30}min</p>
         </div>
         <span class="w-5 h-5 rounded-full bg-[#28B54D] text-white flex items-center justify-center text-[10px] shrink-0">✓</span>
@@ -2205,10 +2384,10 @@ function _renderConfigEventRow(ev, sched, accent) {
       </div>`;
   }
   return `
-    <div class="config-event-row flex items-center gap-2 p-2.5 rounded-2xl border-2 transition-all border-slate-100 bg-white hover:border-slate-200" data-type="${ev.type}" data-label="${ev.label}" data-active="false">
+    <div class="config-event-row flex items-center gap-2 p-2.5 rounded-2xl border-2 transition-all border-slate-100 bg-white hover:border-slate-200" data-type="${ev.type}" data-label="${ev.label}" data-age="${ev.ageGroup || ''}" data-active="false">
       <span class="text-lg shrink-0">${ev.icon}</span>
       <div class="flex-1 min-w-0">
-        <p class="text-[10px] font-black text-slate-700 truncate">${ev.label}</p>
+        <p class="text-[10px] font-black text-slate-700 truncate">${ev.label} ${ageBadge}</p>
       </div>
       <button onclick="App.addEventToSchedule('${ev.type}')" class="px-3 py-1.5 rounded-xl text-[9px] font-black uppercase tracking-wider border-2 transition-all active:scale-90" style="color:${accent};border-color:${accent}40;background:#f8fafc;">
         ＋ Agregar
@@ -2224,10 +2403,10 @@ function _renderScheduleOrderHTML() {
     const meta = _getEventMeta(s.type) || { label: s.type, icon: '⏰', defaultDuration: 30 };
     const minutes = [0,5,10,15,20,25,30,35,40,45,50,55];
     const minuteOpts = [...new Set([...minutes, (s.minute ?? 0)])].sort((a,b) => a-b);
-    const autoOn = s.autoRegister !== false;
+    const autoOn = true;
     return `
       <div class="schedule-order-row flex flex-wrap items-center gap-2 p-2.5 rounded-2xl border-2 bg-white transition-all" draggable="true"
-        data-type="${s.type}" data-idx="${i}" data-hour="${s.hour ?? 8}" data-minute="${s.minute ?? 0}" data-auto="${autoOn ? '1' : '0'}"
+        data-type="${s.type}" data-idx="${i}" data-hour="${s.hour ?? 8}" data-minute="${s.minute ?? 0}" data-auto="1"
         style="border-color:#e2e8f0;">
         <span class="drag-handle text-slate-300 text-sm shrink-0" title="Arrastrar para reordenar">⋮⋮</span>
         <span class="text-lg shrink-0">${meta.icon}</span>
@@ -2246,9 +2425,6 @@ function _renderScheduleOrderHTML() {
             </select>
           </div>
         </div>
-        <button onclick="App.toggleScheduleAuto('${s.type}')"
-          title="${autoOn ? 'Auto: se marcará solo a su hora de activación' : 'Manual: pedirá confirmación al marcar'}"
-          class="schedule-auto-btn shrink-0 w-8 h-8 rounded-xl flex items-center justify-center text-sm font-black border-2 transition-all active:scale-90 ${autoOn ? 'border-[#FF8A00]/40 text-[#FF8A00] bg-orange-50' : 'border-slate-100 text-slate-300 bg-slate-50'}">⚡</button>
         <button onclick="App.removeEventFromSchedule('${s.type}')" class="p-1.5 hover:bg-red-50 rounded-lg text-slate-300 hover:text-red-500 transition-colors shrink-0" title="Quitar">
           <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/></svg>
         </button>
@@ -2358,11 +2534,27 @@ function _renderScheduleConfigHTML() {
 
 export function filterEventCatalog(value) {
   _scheduleSearch = (value || '').trim().toLowerCase();
+  _applyCatalogFilters();
+}
+
+export function filterEventsByAge(age) {
+  _scheduleAgeFilter = _scheduleAgeFilter === age ? '' : (age || '');
+  document.querySelectorAll('#ageFilterChips button').forEach(btn => {
+    const on = btn.dataset.age === _scheduleAgeFilter;
+    btn.classList.toggle('active-age', on);
+  });
+  _applyCatalogFilters();
+}
+
+function _applyCatalogFilters() {
   document.querySelectorAll('#scheduleConfigSections .config-category').forEach(section => {
     let visible = 0;
     section.querySelectorAll('.config-event-row').forEach(row => {
       const hay = `${row.dataset.label || ''} ${row.dataset.type || ''}`.toLowerCase();
-      const match = !_scheduleSearch || hay.includes(_scheduleSearch);
+      const searchOk = !_scheduleSearch || hay.includes(_scheduleSearch);
+      const rowAge = row.dataset.age || '';
+      const ageOk = !_scheduleAgeFilter || !rowAge || rowAge === _scheduleAgeFilter;
+      const match = searchOk && ageOk;
       row.style.display = match ? '' : 'none';
       if (match) visible++;
     });
@@ -2375,6 +2567,7 @@ export async function openScheduleManager() {
   const modalId = 'scheduleManagerModal';
   if (!classroom) { safeToast('No hay aula seleccionada', 'error'); return; }
   _scheduleSearch = '';
+  _scheduleAgeFilter = '';
   const schedule = _classroomSchedule.length ? _classroomSchedule : DEFAULT_SCHEDULE;
 
   const content = `
@@ -2398,6 +2591,18 @@ export async function openScheduleManager() {
           <input oninput="App.filterEventCatalog(this.value)" value=""
             class="w-full py-3 pl-10 pr-4 bg-white/15 backdrop-blur-sm border border-white/20 rounded-2xl text-sm font-bold text-white placeholder-white/50 outline-none focus:bg-white/20 transition-all"
             placeholder="Buscar evento... (ej: siesta, agua, patio)" />
+        </div>
+        <div class="relative mt-2.5">
+          <p class="text-[9px] font-black text-white/60 uppercase tracking-widest mb-1.5">👶 Edad recomendada</p>
+          <div id="ageFilterChips" class="flex flex-wrap gap-1.5">
+            <button type="button" data-age="" onclick="App.filterEventsByAge('')"
+              class="active-age text-[9px] font-black uppercase tracking-wider px-2.5 py-1.5 rounded-xl border-2 border-white/20 bg-white/10 text-white/80 transition-all active:scale-95">Todas</button>
+            ${Object.entries(AGE_GROUPS).map(([key, g]) => `
+              <button type="button" data-age="${key}" onclick="App.filterEventsByAge('${key}')"
+                title="${g.label} · ${g.hint}"
+                class="text-[9px] font-black uppercase tracking-wider px-2.5 py-1.5 rounded-xl border-2 border-white/20 bg-white/10 text-white/80 transition-all active:scale-95">${g.icon} ${g.label}</button>
+            `).join('')}
+          </div>
         </div>
       </div>
 
@@ -2508,12 +2713,11 @@ export function toggleScheduleAuto(type) {
   const schedule = _classroomSchedule.length ? [..._classroomSchedule] : [...DEFAULT_SCHEDULE];
   const idx = schedule.findIndex(s => s.type === type);
   if (idx === -1) return;
-  schedule[idx].autoRegister = schedule[idx].autoRegister === false ? true : false;
+  schedule[idx].autoRegister = true;
   _classroomSchedule = schedule;
   _refreshScheduleManagerUI();
   const meta = _getEventMeta(type);
-  const nowAuto = schedule[idx].autoRegister !== false;
-  safeToast(`${nowAuto ? '⚡ Auto: se marcará solo a su hora de activación' : '🖐 Manual: pedirá confirmación al marcar'} — ${meta?.label || type}`, nowAuto ? undefined : 'warning');
+  safeToast(`⚡ Auto: se marcará solo a su hora de activación — ${meta?.label || type}`);
 }
 
 function _refreshScheduleManagerUI() {
@@ -2529,7 +2733,7 @@ function _refreshScheduleManagerUI() {
     countEl.textContent = `${schedule.length}/${EVENT_CATALOG.length}`;
   }
   _bindScheduleDrag();
-  if (_scheduleSearch) filterEventCatalog(_scheduleSearch);
+  if (_scheduleSearch || _scheduleAgeFilter) _applyCatalogFilters();
 }
 
 // ── PERSISTIR CRONOLOGÍA EN BD ───────────────────────────────────────────────
@@ -2554,7 +2758,7 @@ async function _persistSchedule(schedule) {
       duration_minutes: s.duration,
       sort_order: i,
       is_active: true,
-      auto_register: s.autoRegister !== false,
+      auto_register: true,
       applies_to: 'all',
     }));
     const { error } = await supabase.from('classroom_event_schedule').insert(inserts);
@@ -2573,7 +2777,6 @@ export async function saveScheduleManager() {
 
     // La cronología se lee en el ORDEN de la lista (respetando drag & drop)
     const rows = [...document.querySelectorAll('#scheduleOrderList .schedule-order-row')];
-    const prevAuto = new Map(_classroomSchedule.map(s => [s.type, s.autoRegister]));
     const schedule = rows.map(row => {
       const type = row.dataset.type;
       const meta = _getEventMeta(type) || { label: type, icon: '⏰', defaultDuration: 30, category: 'personalizados' };
@@ -2588,7 +2791,7 @@ export async function saveScheduleManager() {
         minute,
         duration,
         category: meta.category || 'personalizados',
-        autoRegister: prevAuto.has(type) ? prevAuto.get(type) !== false : true,
+        autoRegister: true,
       };
     });
 

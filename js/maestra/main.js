@@ -27,7 +27,7 @@ const _lastLoad = {};
 // Los onclick inline en HTML dinámico necesitan window.Modal disponible de inmediato
 window.Modal = Modal;
 const { initAttendance, markAllPresent, registerAttendance } = Attendance;
-const { initRoutine, updateRoutineField, saveRoutineLog, openStudentRoutine, updateRoutineFieldInModal, saveRoutineInModal, openBulkEventModal, confirmBulkEvent, wakeAllSiestas, wakeStudentSiesta, undoLastBulk, publishAll, registerIndividualEvent, toggleTimeline, openExtraEventModal, confirmExtraEvent, registerMissingStudents, insertEventAt, openInsertEventPicker, moveScheduleEvent, cascadeScheduleShift, toggleScheduleAuto, stopAutoRegisterClock } = Routine;
+const { initRoutine, updateRoutineField, saveRoutineLog, openStudentRoutine, updateRoutineFieldInModal, saveRoutineInModal, openBulkEventModal, confirmBulkEvent, wakeAllSiestas, wakeStudentSiesta, undoLastBulk, publishAll, registerIndividualEvent, toggleTimeline, openExtraEventModal, confirmExtraEvent, registerMissingStudents, insertEventAt, openInsertEventPicker, moveScheduleEvent, cascadeScheduleShift, toggleScheduleAuto, filterEventsByAge, stopAutoRegisterClock } = Routine;
 const { initTasks, openEditTaskModal, deleteTask, openNewTaskModal, viewTaskSubmissions, submitGrade } = Tasks;
 const { initGradesV2, openNewActivityModal, gradeActivity, saveGradeV2, deleteActivityV2, toggleArea, deleteArea, openStudentGradesList, viewStudentGrades, openAreasManager, openStudentResultGrid, editStudentScore, editTaskScore } = Tasks;
 const { openStudentProfile, registerIncidentModal } = Students;
@@ -78,6 +78,7 @@ window.App = {
   removeEventFromSchedule: Routine.removeEventFromSchedule,
   resetScheduleToDefault: Routine.resetScheduleToDefault,
   filterEventCatalog: Routine.filterEventCatalog,
+  filterEventsByAge: Routine.filterEventsByAge,
   openAllEventsMenu: Routine.openAllEventsMenu,
   // Cronología V8: drag & drop, insertar entre bloques y recálculo en cascada
   moveScheduleEvent: Routine.moveScheduleEvent,
@@ -1154,9 +1155,9 @@ async function loadPendingGradesBadge() {
     if (!period || !period.found) return;
 
     const [activities, students, config] = await Promise.all([
-      MaestraApi.getActivitiesWithGrades(period.id),
+      MaestraApi.getActivitiesWithGrades(period.id, classroom.id),
       MaestraApi.getStudentsByClassroom(classroom.id),
-      MaestraApi.getPeriodConfig(period.id)
+      MaestraApi.getPeriodConfig(period.id, classroom.id)
     ]);
     const tasks = await MaestraApi.getTasksForPeriod(config);
     const taskScores = await MaestraApi.getTaskScoresForStudents(tasks.map(t => t.id));

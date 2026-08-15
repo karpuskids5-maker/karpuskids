@@ -45,23 +45,33 @@ export const NotifyPermission = {
       const userId = data?.user?.id;
       if (!userId) return;
 
-    window.OneSignalDeferred.push(async function(OneSignal) {
-      if (!OneSignal || !OneSignal.User) return;
-      const currentExtId = await OneSignal.User.getExternalId?.();
-      if (currentExtId !== userId) {
-        await OneSignal.login(userId).catch(() => {});
-      }
-      await OneSignal.User.PushSubscription?.optIn?.().catch(() => {});
-    });
+      window.OneSignalDeferred = window.OneSignalDeferred || [];
+      window.OneSignalDeferred.push(async function(OneSignal) {
+        if (!OneSignal || !OneSignal.User) return;
+        const currentExtId = await OneSignal.User.getExternalId?.();
+        if (currentExtId !== userId) {
+          await OneSignal.login(userId).catch(() => {});
+        }
+        await OneSignal.User.PushSubscription?.optIn?.().catch(() => {});
 
-      const subId = window.OneSignal?.User?.PushSubscription?.id;
-      if (subId) {
-        try {
-          await supabase.from('profiles')
-            .update({ onesignal_player_id: subId })
-            .eq('id', userId);
-        } catch (_) {}
-      }
+        // Esperar a que la suscripción se cree y guardar el player_id.
+        // Antes se leía PushSubscription.id afuera del callback (sincrónico),
+        // cuando optIn aún no había corrido → siempre null.
+        let subId = OneSignal.User?.PushSubscription?.id;
+        if (!subId) {
+          for (let i = 0; i < 12 && !subId; i++) {
+            await new Promise(r => setTimeout(r, 300));
+            subId = OneSignal.User?.PushSubscription?.id;
+          }
+        }
+        if (subId) {
+          try {
+            await supabase.from('profiles')
+              .update({ onesignal_player_id: subId })
+              .eq('id', userId);
+          } catch (_) {}
+        }
+      });
     } catch (_) {}
   },
 

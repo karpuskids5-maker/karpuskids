@@ -27,9 +27,9 @@ export const Modal = {
     document.getElementById(id)?.remove();
     const modal = document.createElement('div');
     modal.id = id;
-    modal.className = 'fixed inset-0 z-[60] flex items-center justify-center p-4';
-    modal.style.cssText = 'background:rgba(15,23,42,0.6);backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px);animation:fadeInModal 0.15s ease-out;';
-    modal.innerHTML = `<div id="${id}-inner" class="relative max-w-[calc(100vw-2rem)] max-h-[92vh] overflow-y-auto overscroll-contain">${content}</div>`;
+    modal.className = 'fixed inset-0 flex items-center justify-center p-2 sm:p-4';
+    modal.style.cssText = 'z-index:60;background:rgba(15,23,42,0.6);backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px);animation:fadeInModal 0.15s ease-out;';
+    modal.innerHTML = `<div id="${id}-inner" class="relative" style="max-width:calc(100vw - 1rem);max-height:calc(100dvh - 1rem);overflow-y:auto;overscroll-behavior:contain;-webkit-overflow-scrolling:touch;">${content}</div>`;
 
     modal.onclick = (e) => {
       if (e.target === modal) this.close(id);

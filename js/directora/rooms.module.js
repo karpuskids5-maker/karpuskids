@@ -170,6 +170,13 @@ export const RoomsModule = {
         savedId = newRoom?.id;
       }
 
+      // Generar automáticamente las 5 áreas con sus 5 actividades por defecto
+      if (!id && savedId) {
+        try {
+          await supabase.rpc('ensure_classroom_areas', { p_classroom_id: parseInt(savedId) });
+        } catch (_) { /* el trigger del schema también lo cubre */ }
+      }
+
       // Asignar/desasignar estudiantes del checklist via update directo
       const checks = document.querySelectorAll('.room-student-check');
       if (checks.length > 0 && savedId) {

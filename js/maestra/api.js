@@ -444,18 +444,24 @@ export const MaestraApi = {
 
   /**
    * Obtener configuración de materias del período
+   * (p_classroom_id limita las áreas a las del aula indicada)
    */
-  async getPeriodConfig(periodId) {
-    const { data, error } = await supabase.rpc('get_period_config', { p_period_id: parseInt(periodId) });
+  async getPeriodConfig(periodId, classroomId = null) {
+    const params = { p_period_id: parseInt(periodId) };
+    if (classroomId) params.p_classroom_id = parseInt(classroomId);
+    const { data, error } = await supabase.rpc('get_period_config', params);
     handleError(error, 'getPeriodConfig');
     return data || [];
   },
 
   /**
    * Obtener actividades con conteo de calificaciones
+   * (p_classroom_id limita las actividades a las del aula indicada)
    */
-  async getActivitiesWithGrades(periodId) {
-    const { data, error } = await supabase.rpc('get_activities_with_grades', { p_period_id: parseInt(periodId) });
+  async getActivitiesWithGrades(periodId, classroomId = null) {
+    const params = { p_period_id: parseInt(periodId) };
+    if (classroomId) params.p_classroom_id = parseInt(classroomId);
+    const { data, error } = await supabase.rpc('get_activities_with_grades', params);
     handleError(error, 'getActivitiesWithGrades');
     return data || [];
   },

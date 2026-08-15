@@ -121,3 +121,23 @@
 .lg\:w-auto{width:auto}
 }
 
+/* ============================================================
+   🧩 PATCH: utilidades arbitrarias faltantes (modals + rutina)
+   Clases usadas en js/*.js y *.html que faltaban en el build.
+   ============================================================ */
+.min-w-max{min-width:max-content}
+.w-max{width:max-content}
+.overscroll-contain{overscroll-behavior:contain}
+.max-h-\[420px\]{max-height:420px}
+.max-h-\[70vh\]{max-height:70vh}
+.max-w-\[calc\(100vw-2rem\)\]{max-width:calc(100vw - 2rem)}
+.max-w-\[150px\]{max-width:150px}
+.min-w-\[20px\]{min-width:20px}
+.min-w-\[40px\]{min-width:40px}
+.min-w-\[110px\]{min-width:110px}
+.z-\[110\]{z-index:110}
+.basis-32{flex-basis:8rem}
+.select-none{-webkit-user-select:none;-moz-user-select:none;user-select:none}
+.text-\[7px\]{font-size:7px;line-height:1}
+.ring-\[#28B54D\]{--tw-ring-opacity:1;--tw-ring-color:rgb(40 181 77/var(--tw-ring-opacity,1))}
+

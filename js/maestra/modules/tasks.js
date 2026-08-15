@@ -36,7 +36,7 @@ export async function initTasks() {
     try {
       const periodId = AppState.get('activePeriod')?.id;
       if (periodId) {
-        const cfgList = await MaestraApi.getPeriodConfig(periodId);
+        const cfgList = await MaestraApi.getPeriodConfig(periodId, classroom?.id);
         (cfgList || []).forEach(c => { subjectMap[String(c.id)] = c.subject_name; });
       }
     } catch (_) {}
@@ -131,10 +131,10 @@ export async function openNewTaskModal(taskToEdit = null) {
     const periodRes = await supabase.rpc('get_active_period', { p_classroom_id: classroom?.id });
     const period = periodRes?.data;
     if (period?.found) {
-      periodSubjects = await MaestraApi.getPeriodConfig(period.id);
+      periodSubjects = await MaestraApi.getPeriodConfig(period.id, classroom?.id);
     } else {
       const activePeriod = AppState.get('activePeriod');
-      if (activePeriod?.id) periodSubjects = await MaestraApi.getPeriodConfig(activePeriod.id);
+      if (activePeriod?.id) periodSubjects = await MaestraApi.getPeriodConfig(activePeriod.id, classroom?.id);
     }
   } catch (_) {}
 
@@ -486,11 +486,12 @@ export async function submitGrade(taskId, studentId) {
 // exista. Esto busca el id correcto y reusa la configuración encontrada.
 export async function resolveActivePeriodConfig(period) {
   try {
+    const classroom = AppState.get('classroom');
     const { data: gps, error: gpsErr } = await supabase.rpc('get_grade_periods');
     if (gpsErr || !gps?.length) return { period, config: [] };
     const active = gps.find(p => p.is_active) || gps.find(p => p.status === 'open');
     if (!active || String(active.id) === String(period.id)) return { period, config: [] };
-    const cfg = await MaestraApi.getPeriodConfig(active.id);
+    const cfg = await MaestraApi.getPeriodConfig(active.id, classroom?.id);
     if (!cfg?.length) return { period, config: [] };
     return { period: { ...period, id: active.id, name: active.name || period.name }, config: cfg };
   } catch (_) {
@@ -750,7 +751,7 @@ export async function initGradesV2() {
       return;
     }
 
-    let config = await MaestraApi.getPeriodConfig(period.id);
+    let config = await MaestraApi.getPeriodConfig(period.id, classroom?.id);
     if (!config || !config.length) {
       const resolved = await resolveActivePeriodConfig(period);
       period = resolved.period;
@@ -758,7 +759,7 @@ export async function initGradesV2() {
     }
 
     const students = AppState.get('students') || [];
-    const activities = await MaestraApi.getActivitiesWithGrades(period.id);
+    const activities = await MaestraApi.getActivitiesWithGrades(period.id, classroom?.id);
     const allGrades = await fetchPeriodGrades(period, activities);
     const { tasks, scores } = await loadPeriodTasks(config);
     const stats = buildStudentStats(students, config, activities, allGrades, scores, tasks);
@@ -900,14 +901,14 @@ export async function openAreasManager() {
     let period = periodRes?.data;
     if (!period || !period.found) return safeToast('No hay período activo para esta aula', 'warning');
 
-    let config = await MaestraApi.getPeriodConfig(period.id);
+    let config = await MaestraApi.getPeriodConfig(period.id, classroom?.id);
     if (!config || !config.length) {
       const resolved = await resolveActivePeriodConfig(period);
       period = resolved.period;
       config = resolved.config;
     }
 
-    const activities = await MaestraApi.getActivitiesWithGrades(period.id);
+    const activities = await MaestraApi.getActivitiesWithGrades(period.id, classroom?.id);
     const actByConfig = {};
     (activities || []).forEach(a => { if (!actByConfig[a.config_id]) actByConfig[a.config_id] = []; actByConfig[a.config_id].push(a); });
     const { tasks, scores } = await loadPeriodTasks(config);
@@ -967,14 +968,14 @@ export async function openStudentResultGrid(studentId) {
       return Modal.close(modalId);
     }
 
-    let config = await MaestraApi.getPeriodConfig(period.id);
+    let config = await MaestraApi.getPeriodConfig(period.id, classroom?.id);
     if (!config || !config.length) {
       const resolved = await resolveActivePeriodConfig(period);
       period = resolved.period;
       config = resolved.config;
     }
 
-    const activities = await MaestraApi.getActivitiesWithGrades(period.id);
+    const activities = await MaestraApi.getActivitiesWithGrades(period.id, classroom?.id);
     const allGrades = await fetchPeriodGrades(period, activities);
     const studentGrades = allGrades.filter(g => String(g.student_id) === String(studentId));
     const { tasks, scores } = await loadPeriodTasks(config);
@@ -1549,7 +1550,7 @@ export async function openStudentGradesList() {
   let period = periodRes?.data;
   if (!period || !period.found) return safeToast('No hay período activo para esta aula', 'warning');
 
-  let config = await MaestraApi.getPeriodConfig(period.id);
+  let config = await MaestraApi.getPeriodConfig(period.id, classroom?.id);
   if (!config || !config.length) {
     const resolved = await resolveActivePeriodConfig(period);
     period = resolved.period;
@@ -1557,7 +1558,7 @@ export async function openStudentGradesList() {
   }
 
   const students = AppState.get('students') || [];
-  const activities = await MaestraApi.getActivitiesWithGrades(period.id);
+  const activities = await MaestraApi.getActivitiesWithGrades(period.id, classroom?.id);
   const allGrades = await fetchPeriodGrades(period, activities);
   const { tasks, scores } = await loadPeriodTasks(config);
   const stats = buildStudentStats(students, config, activities, allGrades, scores, tasks);

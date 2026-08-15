@@ -489,22 +489,27 @@ async function _initOneSignalAsync(currentUser) {
           welcomeNotification: { disable: false }
         });
 
-        // Vincular usuario — con validación y catch
+        // Vincular usuario — esperar a que el external_id quede enlazado
         if (user?.id) {
-          OneSignal.login(String(user.id)).catch(e => {
+          await OneSignal.login(String(user.id)).catch(e => {
             Helpers.safeLog('warn', '[OneSignal] Login deferred error:', e);
           });
         }
 
-        // Guardar subscription ID cuando esté disponible
-        setTimeout(async () => {
+        // Guardar el player_id cuando la suscripción exista o cambie.
+        // Evita el bug de carrera: antes se leía PushSubscription.id con un
+        // setTimeout fijo, cuando el usuario aún no había hecho opt-in.
+        const saveSubscriptionId = async () => {
           try {
             const subId = OneSignal.User?.PushSubscription?.id;
-            if (subId) {
+            if (subId && user?.id) {
               await supabase.from('profiles').update({ onesignal_player_id: subId }).eq('id', user.id);
             }
           } catch (_) {}
-        }, 3000);
+        };
+        OneSignal.User?.PushSubscription?.addEventListener?.('change', saveSubscriptionId);
+        setTimeout(saveSubscriptionId, 1500);
+        setTimeout(saveSubscriptionId, 6000);
 
       } catch (_) {}
     });
