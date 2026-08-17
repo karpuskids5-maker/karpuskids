@@ -382,6 +382,9 @@ async function refreshDashboard() {
 
   // checkActiveMeetings en background — no bloquea las tarjetas
   checkActiveMeetings().catch(err => console.warn('checkActiveMeetings falló:', err));
+
+  // Banner recordatorio de retiro
+  _updatePickupReminder(student);
 }
 
 // ── Banner de deuda vencida ───────────────────────────────────────────────────
@@ -412,7 +415,66 @@ function _updateDebtBanner(finance) {
   }
 }
 
-// ── School Engine: Banner Año Escolar ──────────────────────────────────────
+// ── Banner recordatorio de retiro ─────────────────────────────────────────────
+let _pickupTimer = null;
+function _updatePickupReminder(student) {
+  if (_pickupTimer) { clearInterval(_pickupTimer); _pickupTimer = null; }
+  const banner = document.getElementById('pickupReminderBanner');
+  if (!banner) return;
+
+  const exitTime = student?.exit_time;
+  if (!exitTime) { banner.classList.add('hidden'); return; }
+
+  const render = () => {
+    const now = new Date();
+    const [h, m] = exitTime.split(':').map(Number);
+    const exit = new Date(now);
+    exit.setHours(h, m, 0, 0);
+
+    const diffMs  = exit - now;
+    const diffMin = Math.round(diffMs / 60000);
+
+    if (diffMin > 60 || diffMin < -120) {
+      banner.classList.add('hidden');
+      return;
+    }
+
+    banner.classList.remove('hidden');
+
+    if (diffMin < 0) {
+      const overdue = Math.abs(diffMin);
+      banner.innerHTML = `
+        <div class="bg-gradient-to-r from-rose-500 to-red-500 rounded-2xl p-4 flex items-center gap-3 shadow-lg shadow-rose-200 border border-rose-400">
+          <div class="w-10 h-10 bg-white/20 rounded-xl flex items-center justify-center shrink-0 text-xl animate-bounce">🚨</div>
+          <div class="flex-1 min-w-0">
+            <p class="text-xs font-black text-white uppercase tracking-wider">Hora de retiro pasada</p>
+            <p class="text-[11px] font-bold text-white/90 mt-0.5">Llevas ${overdue} min de retraso. Por favor recoge a tu hijo.</p>
+          </div>
+        </div>`;
+    } else if (diffMin <= 15) {
+      banner.innerHTML = `
+        <div class="bg-gradient-to-r from-amber-400 to-orange-400 rounded-2xl p-4 flex items-center gap-3 shadow-lg shadow-amber-200 border border-amber-300 animate-pulse">
+          <div class="w-10 h-10 bg-white/20 rounded-xl flex items-center justify-center shrink-0 text-xl">⏰</div>
+          <div class="flex-1 min-w-0">
+            <p class="text-xs font-black text-white uppercase tracking-wider">¡Quedan ${diffMin} min!</p>
+            <p class="text-[11px] font-bold text-white/90 mt-0.5">Se acerca la hora de retiro de tu hijo. Prepárate para recogerlo.</p>
+          </div>
+        </div>`;
+    } else if (diffMin <= 60) {
+      banner.innerHTML = `
+        <div class="bg-gradient-to-r from-sky-500 to-blue-500 rounded-2xl p-4 flex items-center gap-3 shadow-lg shadow-sky-200 border border-sky-400">
+          <div class="w-10 h-10 bg-white/20 rounded-xl flex items-center justify-center shrink-0 text-xl">📋</div>
+          <div class="flex-1 min-w-0">
+            <p class="text-xs font-black text-white uppercase tracking-wider">Hora de salida: ${exitTime}</p>
+            <p class="text-[11px] font-bold text-white/90 mt-0.5">Te quedan ${diffMin} min. Recuerda planificar tu llegada.</p>
+          </div>
+        </div>`;
+    }
+  };
+
+  render();
+  _pickupTimer = setInterval(render, 60000);
+}
 function _renderSchoolYearBanner() {
   const banner = document.getElementById('padreSchoolYearBanner');
   if (!banner) return;
@@ -1201,6 +1263,7 @@ function _renderProfileSiblings(allStudents, currentStudent) {
  * 🔄 Cambio de Estudiante (Multi-hijo)
  */
 async function switchStudent(studentId) {
+  if (_pickupTimer) { clearInterval(_pickupTimer); _pickupTimer = null; }
   const all = AppState.get('students') || [];
   const selected = all.find(s => String(s.id) === String(studentId));
   if (!selected) return;

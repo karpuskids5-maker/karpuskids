@@ -77,6 +77,11 @@
     .summary-block{background:#fff;border:2px solid #f1f5f9;border-radius:1rem;padding:1rem;}
     .summary-block h5{font-size:.7rem;font-weight:900;letter-spacing:.06em;text-transform:uppercase;color:#F97316;margin-bottom:.5rem;}
     .summary-block p{font-size:.82rem;font-weight:600;color:#475569;margin-bottom:.2rem;}
+    .schedule-card.active{border-color:var(--sc, #F97316) !important;background:var(--sc-bg, #fff7ed) !important;}
+    .schedule-card.active .schedule-check{display:block !important;}
+    .schedule-card[data-schedule="Matutina"].active{--sc:#F97316;--sc-bg:#fff7ed;}
+    .schedule-card[data-schedule="Extendida"].active{--sc:#2196F3;--sc-bg:#eff6ff;}
+    .schedule-card[data-schedule="Completa"].active{--sc:#4CAF50;--sc-bg:#f0fdf4;}
     .err-msg{display:none;color:#ef4444;font-size:.75rem;font-weight:700;margin-top:.35rem;}
     .swal-pulse{animation:swal .4s ease;}
     @keyframes swal{from{transform:scale(.9);opacity:0;}to{transform:scale(1);opacity:1;}}
@@ -187,22 +192,52 @@
                 <option value="">Cargando…</option>
               </select>
             </div>
-            <div>
+            <div class="md:col-span-2">
               <label class="flabel">Horario deseado</label>
-              <select id="pi_schedule" class="field">
-                <option value="">-- Seleccionar --</option>
-                <option value="Medio día">Medio día</option>
-                <option value="Completo">Completo</option>
-                <option value="Extendido">Extendido</option>
-              </select>
+              <input type="hidden" id="pi_schedule" value="">
+              <div class="grid grid-cols-1 sm:grid-cols-3 gap-3" id="pi_schedule_cards">
+                <button type="button" class="schedule-card group border-2 border-slate-200 rounded-2xl p-4 text-left transition-all hover:border-orange-300 hover:bg-orange-50" data-schedule="Matutina">
+                  <div class="flex items-center justify-between mb-2">
+                    <span class="font-black text-sm text-slate-700 group-hover:text-orange-600">Matutina</span>
+                    <span class="w-5 h-5 rounded-full border-2 border-slate-300 group-hover:border-orange-500 flex items-center justify-center transition-all"><span class="schedule-check hidden w-2.5 h-2.5 rounded-full bg-orange-500"></span></span>
+                  </div>
+                  <div class="flex items-center gap-2 text-xs font-bold text-slate-400">
+                    <span class="bg-slate-100 group-hover:bg-orange-100 px-2 py-1 rounded-lg text-slate-600 group-hover:text-orange-700 transition-all">8:00 AM</span>
+                    <span>→</span>
+                    <span class="bg-slate-100 group-hover:bg-orange-100 px-2 py-1 rounded-lg text-slate-600 group-hover:text-orange-700 transition-all">11:45 AM</span>
+                  </div>
+                </button>
+                <button type="button" class="schedule-card group border-2 border-slate-200 rounded-2xl p-4 text-left transition-all hover:border-blue-300 hover:bg-blue-50" data-schedule="Extendida">
+                  <div class="flex items-center justify-between mb-2">
+                    <span class="font-black text-sm text-slate-700 group-hover:text-blue-600">Extendida</span>
+                    <span class="w-5 h-5 rounded-full border-2 border-slate-300 group-hover:border-blue-500 flex items-center justify-center transition-all"><span class="schedule-check hidden w-2.5 h-2.5 rounded-full bg-blue-500"></span></span>
+                  </div>
+                  <div class="flex items-center gap-2 text-xs font-bold text-slate-400">
+                    <span class="bg-slate-100 group-hover:bg-blue-100 px-2 py-1 rounded-lg text-slate-600 group-hover:text-blue-700 transition-all">7:00 AM</span>
+                    <span>→</span>
+                    <span class="bg-slate-100 group-hover:bg-blue-100 px-2 py-1 rounded-lg text-slate-600 group-hover:text-blue-700 transition-all">2:00 PM</span>
+                  </div>
+                </button>
+                <button type="button" class="schedule-card group border-2 border-slate-200 rounded-2xl p-4 text-left transition-all hover:border-green-300 hover:bg-green-50" data-schedule="Completa">
+                  <div class="flex items-center justify-between mb-2">
+                    <span class="font-black text-sm text-slate-700 group-hover:text-green-600">Completa</span>
+                    <span class="w-5 h-5 rounded-full border-2 border-slate-300 group-hover:border-green-500 flex items-center justify-center transition-all"><span class="schedule-check hidden w-2.5 h-2.5 rounded-full bg-green-500"></span></span>
+                  </div>
+                  <div class="flex items-center gap-2 text-xs font-bold text-slate-400">
+                    <span class="bg-slate-100 group-hover:bg-green-100 px-2 py-1 rounded-lg text-slate-600 group-hover:text-green-700 transition-all">7:00 AM</span>
+                    <span>→</span>
+                    <span class="bg-slate-100 group-hover:bg-green-100 px-2 py-1 rounded-lg text-slate-600 group-hover:text-green-700 transition-all">6:00 PM</span>
+                  </div>
+                </button>
+              </div>
             </div>
             <div>
               <label class="flabel">Hora de entrada</label>
-              <input id="pi_entry_time" type="time" class="field">
+              <input id="pi_entry_time" type="time" class="field bg-slate-50">
             </div>
             <div>
               <label class="flabel">Hora de salida</label>
-              <input id="pi_exit_time" type="time" class="field">
+              <input id="pi_exit_time" type="time" class="field bg-slate-50">
             </div>
             <div>
               <label class="flabel">Fecha estimada de ingreso</label>
@@ -551,22 +586,22 @@
         </div>
       </section>
 
-      <!-- ═══════════ ÉXITO ═══════════ -->
-      <div id="pi_success" class="hidden">
-        <div class="bg-white rounded-3xl p-10 text-center border border-slate-100 shadow-sm swal-pulse">
-          <div class="w-20 h-20 mx-auto mb-6 rounded-full bg-emerald-100 flex items-center justify-center">
-            <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="#059669" stroke-width="2.5"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><path d="M22 4L12 14.01l-3-3"/></svg>
-          </div>
-          <h2 class="text-2xl font-black text-slate-800 mb-2" style="font-family:'Poppins',sans-serif;">¡Preinscripción recibida!</h2>
-          <p class="text-sm text-slate-500 font-semibold max-w-md mx-auto mb-2">Tu expediente quedó registrado. Nuestro equipo de admisiones lo revisará y te contactaremos para coordinar la entrevista y el proceso de inscripción.</p>
-          <p class="text-xs font-bold text-slate-400 mb-8">Folio de seguimiento: <span id="pi_folio" class="text-orange-600 font-black"></span></p>
-          <div class="flex flex-col sm:flex-row justify-center gap-3">
-            <a href="index.html" class="px-8 py-3.5 bg-slate-800 text-white font-black text-xs uppercase tracking-widest rounded-2xl hover:bg-slate-900 transition-all text-center">Volver al inicio</a>
-            <a href="https://wa.me/18298038424" target="_blank" rel="noopener" class="px-8 py-3.5 bg-emerald-500 text-white font-black text-xs uppercase tracking-widest rounded-2xl hover:bg-emerald-600 transition-all text-center">Contactar por WhatsApp</a>
-          </div>
+    </div>
+
+    <!-- ═══════════ ÉXITO ═══════════ -->
+    <div id="pi_success" class="hidden">
+      <div class="bg-white rounded-3xl p-10 text-center border border-slate-100 shadow-sm swal-pulse">
+        <div class="w-20 h-20 mx-auto mb-6 rounded-full bg-emerald-100 flex items-center justify-center">
+          <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="#059669" stroke-width="2.5"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><path d="M22 4L12 14.01l-3-3"/></svg>
+        </div>
+        <h2 class="text-2xl font-black text-slate-800 mb-2" style="font-family:'Poppins',sans-serif;">¡Preinscripción recibida!</h2>
+        <p class="text-sm text-slate-500 font-semibold max-w-md mx-auto mb-2">Tu expediente quedó registrado. Nuestro equipo de admisiones lo revisará y te contactaremos para coordinar la entrevista y el proceso de inscripción.</p>
+        <p class="text-xs font-bold text-slate-400 mb-8">Folio de seguimiento: <span id="pi_folio" class="text-orange-600 font-black"></span></p>
+        <div class="flex flex-col sm:flex-row justify-center gap-3">
+          <a href="index.html" class="px-8 py-3.5 bg-slate-800 text-white font-black text-xs uppercase tracking-widest rounded-2xl hover:bg-slate-900 transition-all text-center">Volver al inicio</a>
+          <a href="https://wa.me/18298038424" target="_blank" rel="noopener" class="px-8 py-3.5 bg-emerald-500 text-white font-black text-xs uppercase tracking-widest rounded-2xl hover:bg-emerald-600 transition-all text-center">Contactar por WhatsApp</a>
         </div>
       </div>
-
     </div>
   </main>
 

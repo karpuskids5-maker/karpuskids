@@ -120,7 +120,7 @@ export const InscripcionesModule = {
           </td>
           <td class="px-4 py-3 text-xs font-bold text-slate-700">${Helpers.escapeHTML(p1.name || '—')}${p2.name ? ' / ' + Helpers.escapeHTML(p2.name) : ''}</td>
           <td class="px-4 py-3 text-xs text-slate-500">${Helpers.escapeHTML(r.contact_phone || '—')}<span class="block text-[10px] text-slate-400">${Helpers.escapeHTML(r.contact_email || '')}</span></td>
-          <td class="px-4 py-3 text-xs font-bold text-slate-600">${Helpers.escapeHTML(r.level_requested || '—')}${r.schedule ? '<span class="block text-[10px] font-black text-purple-500 uppercase tracking-wider">' + Helpers.escapeHTML(r.schedule) + '</span>' : ''}</td>
+          <td class="px-4 py-3 text-xs font-bold text-slate-600">${Helpers.escapeHTML(r.level_requested || '—')}${r.schedule ? '<span class="block text-[10px] font-black text-purple-500 uppercase tracking-wider">' + Helpers.escapeHTML(r.schedule) + (r.entry_time && r.exit_time ? ' · ' + r.entry_time + ' – ' + r.exit_time : '') + '</span>' : ''}</td>
           <td class="px-4 py-3 text-xs text-slate-500 whitespace-nowrap">${new Date(r.created_at).toLocaleDateString()}</td>
           <td class="px-4 py-3 whitespace-nowrap">
             <span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-xl text-[10px] font-black uppercase tracking-wider ${meta.cls}">

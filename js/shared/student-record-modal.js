@@ -2,6 +2,7 @@ import { supabase, createClient, SUPABASE_URL, SUPABASE_ANON_KEY, sendEmail } fr
 import { Helpers } from './helpers.js';
 import { auditLog } from './db-utils.js';
 import { QueryCache } from './query-cache.js';
+import { SCHEDULE_DEFINITIONS, SCHEDULE_IDS } from './config.js';
 
 const TABS = [
   { id: 'info',     label: 'Info General', icon: 'user-square' },
@@ -29,7 +30,7 @@ const DOC_TYPES = [
 
 const LEVELS_FALLBACK = []; // Eliminado — solo usar aulas reales de la DB
 const RELATIONSHIPS = ['Padre', 'Madre', 'Tutor Legal'];
-const SCHEDULES = ['Medio día', 'Completo', 'Extendido'];
+const SCHEDULES = SCHEDULE_IDS;
 const CONSENT_DEFS = [
   { key: 'data_treatment', label: 'Autorizo el tratamiento de datos personales del menor según la política de privacidad.' },
   { key: 'correct_info',   label: 'Declaro que los datos suministrados en este formulario son verídicos y correctos.' },
@@ -126,7 +127,7 @@ export const StudentRecordModal = {
       gender: '', nationality: 'Dominicana', birthplace: '', address: '', province: '',
       municipality: '', sector: '',
       school_year_requested: this._schoolYears[0] || '',
-      level_requested: '', schedule: 'Medio día',
+      level_requested: '', schedule: 'Matutina',
       start_date: new Date().toISOString().split('T')[0],
       has_siblings: false, sibling_name: '',
       classroom_id: '', is_active: true,
@@ -178,7 +179,7 @@ export const StudentRecordModal = {
       sector: student.sector || '',
       school_year_requested: student.school_year_requested || this._schoolYears[0] || '',
       level_requested: student.level_requested || '',
-      schedule: student.schedule || 'Medio día',
+      schedule: student.schedule || 'Matutina',
       entry_time: student.entry_time || '',
       exit_time: student.exit_time || '',
       start_date: student.start_date || student.estimated_entry_date || new Date().toISOString().split('T')[0],
@@ -243,7 +244,7 @@ export const StudentRecordModal = {
       gender: p.gender || '', nationality: p.nationality || 'Dominicana',
       birthplace: '', address: p1.address || '', province: '', municipality: '', sector: '',
       school_year_requested: p.school_year_requested || this._schoolYears[0] || '',
-      level_requested: p.level_requested || '', schedule: p.schedule || 'Medio día',
+      level_requested: p.level_requested || '', schedule: p.schedule || 'Matutina',
       entry_time: p.entry_time || '', exit_time: p.exit_time || '',
       start_date: p.estimated_entry_date || new Date().toISOString().split('T')[0],
       has_siblings: !!p.has_siblings, sibling_name: p.sibling_name || '',
@@ -790,6 +791,7 @@ export const StudentRecordModal = {
       };
     }
     this._wireClassroomLevelSync();
+    this._wireScheduleDefaults();
     document.getElementById('srm-qr-gen')?.addEventListener('click', () => this._generateQR());
     document.getElementById('srm-carnet')?.addEventListener('click', () => this._printCarnet());
     this._loadQRLib(() => {});
@@ -836,6 +838,21 @@ export const StudentRecordModal = {
         this._form.level_requested = room.name;
       }
     }
+  },
+
+  /** Auto-llenar entry/exit al cambiar jornada (campos quedan editables). */
+  _wireScheduleDefaults() {
+    const sel = document.querySelector('[data-f="schedule"]');
+    if (!sel || sel.dataset.synced) return;
+    sel.dataset.synced = '1';
+    sel.addEventListener('change', () => {
+      const def = SCHEDULE_DEFINITIONS.find(s => s.id === sel.value);
+      if (!def) return;
+      const entryEl = document.querySelector('[data-f="entry_time"]');
+      const exitEl  = document.querySelector('[data-f="exit_time"]');
+      if (entryEl && !entryEl.value) { entryEl.value = def.entry; this._form.entry_time = def.entry; }
+      if (exitEl  && !exitEl.value)  { exitEl.value  = def.exit;  this._form.exit_time  = def.exit; }
+    });
   },
 
   // ---------------------------------------------------------------- FAMILIA (Tutores y núcleo familiar)
@@ -1411,12 +1428,18 @@ export const StudentRecordModal = {
               <i data-lucide="mail" class="w-3.5 h-3.5"></i> ${hasAccount ? 'Reenviar credenciales' : 'Crear cuenta y enviar credenciales'}
             </button>
           </div>
+          ${hasAccount ? `<div class="mt-3 flex gap-2">
+            <button id="srm-delete-auth" class="px-4 py-2 bg-red-50 hover:bg-red-100 text-red-600 rounded-2xl font-black text-[10px] uppercase tracking-widest transition-all flex items-center justify-center gap-2 border border-red-100">
+              <i data-lucide="trash-2" class="w-3.5 h-3.5"></i> Eliminar cuenta y recrear
+            </button>
+          </div>` : ''}
         </div>
       </div>`;
   },
 
   _wireAcceso() {
     document.getElementById('srm-send-creds')?.addEventListener('click', () => this._sendCredentials());
+    document.getElementById('srm-delete-auth')?.addEventListener('click', () => this._deleteAndRecreateAuth());
   },
 
   _previewCharges(monthly, prolong, insc, disc) {
@@ -1512,7 +1535,11 @@ export const StudentRecordModal = {
     this._saveForm();
     const email = this._form.login_email;
     if (!email) { Helpers.toast('Ingresa el correo de acceso (login) en la pestaña Acceso', 'warning'); return; }
-    if (!this._parentPassword) {
+    // Use director's typed password if available and valid, otherwise generate one
+    const formPassword = this._form.password;
+    if (formPassword && formPassword.length >= 6) {
+      this._parentPassword = formPassword;
+    } else if (!this._parentPassword) {
       this._parentPassword = this._genPassword();
       this._form.password = this._parentPassword;
       const input = document.getElementById('srm-password');
@@ -1528,11 +1555,52 @@ export const StudentRecordModal = {
             .update({ parent_id: this._parentId, login_email: email })
             .eq('id', this._student.id);
         }
+      } else {
+        // Update existing auth password via Edge Function
+        const { data, error } = await supabase.functions.invoke('admin-reset-password', {
+          body: { user_id: this._parentId, new_password: this._parentPassword }
+        });
+        if (error || data?.error) {
+          console.warn('[Credentials] Password update failed:', error || data?.error);
+        }
       }
       await this._sendCredentialsEmail(email, this._parentPassword);
       Helpers.toast('Credenciales enviadas', 'success');
     } catch (e) {
       Helpers.toast('No se pudieron crear/enviar las credenciales: ' + (e.message || e), 'error');
+    }
+  },
+
+  async _deleteAndRecreateAuth() {
+    if (!this._parentId) return;
+    const name = this._form.name || 'este estudiante';
+    const ok = window.confirm(
+      '¿Eliminar la cuenta de acceso vinculada a "' + name + '"?\n\n' +
+      'Se borrará el usuario de autenticación y se desvinculará del estudiante. ' +
+      'Luego podrás crear una nueva cuenta con "Reenviar credenciales".'
+    );
+    if (!ok) return;
+
+    Helpers.toast('Eliminando cuenta corrupta…', 'info');
+    try {
+      const { data, error } = await supabase.functions.invoke('admin-delete-user', {
+        body: { user_id: this._parentId }
+      });
+      if (error || data?.error) throw new Error(error?.message || data?.error);
+
+      this._parentId = null;
+      this._parentPassword = null;
+      this._form.password = '';
+      const pwdInput = document.getElementById('srm-password');
+      if (pwdInput) pwdInput.value = '';
+
+      Helpers.toast('Cuenta eliminada. Ahora crea una nueva credencial.', 'success');
+
+      const card = document.getElementById('srm-delete-auth')?.closest('.bg-white');
+      const badge = card?.querySelector('.bg-emerald-50');
+      if (badge) badge.remove();
+    } catch (e) {
+      Helpers.toast('Error al eliminar: ' + (e.message || e), 'error');
     }
   },
 
@@ -1664,6 +1732,14 @@ export const StudentRecordModal = {
 
     if (parentId) {
       this._parentId = parentId;
+      // If account already existed, update auth password to match
+      if (authError) {
+        try {
+          await supabase.functions.invoke('admin-reset-password', {
+            body: { user_id: parentId, new_password: password }
+          });
+        } catch (_) {}
+      }
       await supabase.from('profiles').upsert({
         id: parentId, name, email, phone, role: 'padre',
       }, { onConflict: 'id' });
@@ -1722,7 +1798,18 @@ export const StudentRecordModal = {
       const password = this._form.password || this._genPassword();
       this._form.password = password;
       this._parentPassword = password;
-      await this._attachParent(payload, password);
+
+      if (!this._parentId && payload.login_email && password) {
+        try {
+          await this._createParentAccount(payload.login_email, password);
+        } catch (authErr) {
+          console.error('[CreateStudent] Auth creation error:', authErr);
+          Helpers.toast('Advertencia: no se pudo crear la cuenta de acceso. ' + (authErr.message || authErr), 'warning');
+        }
+      }
+      if (this._parentId) {
+        payload.parent_id = this._parentId;
+      }
       if (!payload.parent_id) {
         Helpers.toast('Aviso: no se asignó cuenta de padre. Puedes hacerlo luego en el expediente.', 'info');
       }
@@ -1745,9 +1832,12 @@ export const StudentRecordModal = {
         login_email: payload.login_email,
       });
 
-      if (payload.parent_id) {
-        const recipients = [payload.login_email].filter(Boolean);
-        if (recipients.length) await this._sendCredentialsEmail(recipients, password);
+      if (payload.login_email && password) {
+        try {
+          await this._sendCredentialsEmail(payload.login_email, password);
+        } catch (emailErr) {
+          console.error('[CreateStudent] Email send error:', emailErr);
+        }
       }
 
       Helpers.toast(payload.monthly_fee > 0 || payload.inscription_fee > 0 ? 'Estudiante creado y cargos generados' : 'Estudiante creado', 'success');
@@ -1772,7 +1862,19 @@ export const StudentRecordModal = {
       const password = this._form.password || this._genPassword();
       this._form.password = password;
       this._parentPassword = password;
-      await this._attachParent(payload, password);
+
+      if (!this._parentId && payload.login_email && password) {
+        try {
+          await this._createParentAccount(payload.login_email, password);
+        } catch (authErr) {
+          console.error('[Admission] Auth creation error:', authErr);
+          Helpers.toast('Advertencia: no se pudo crear la cuenta de acceso. ' + (authErr.message || authErr), 'warning');
+        }
+      }
+      if (this._parentId) {
+        payload.parent_id = this._parentId;
+      }
+
       if (!payload.parent_id) {
         Helpers.toast('Aviso: no se asignó cuenta de padre. Puedes hacerlo luego en el expediente.', 'info');
       }
@@ -1810,9 +1912,13 @@ export const StudentRecordModal = {
         login_email: payload.login_email,
       });
 
-      if (payload.parent_id) {
-        const recipients = [payload.login_email].filter(Boolean);
-        if (recipients.length) await this._sendCredentialsEmail(recipients, password);
+      if (payload.login_email && password) {
+        try {
+          await this._sendCredentialsEmail(payload.login_email, password);
+        } catch (emailErr) {
+          console.error('[Admission] Email send error:', emailErr);
+          Helpers.toast('Advertencia: credenciales creadas pero no se pudo enviar el correo.', 'warning');
+        }
       }
 
       Helpers.toast('Estudiante admitido y cargos generados', 'success');

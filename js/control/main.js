@@ -473,6 +473,7 @@ async function renderDashboard() {
   } catch (_) {}
 }
 
+window.App = window.App || {};
 window.App.runEmergencyCycle = async function() {
   if (!confirm('¿Ejecutar ciclo de pagos de emergencia?')) return;
   const { data, error } = await supabase.rpc('run_payment_cycle');

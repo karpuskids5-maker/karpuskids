@@ -527,6 +527,27 @@ function _getPresentStudentIds() {
   return students.filter(s => _isStudentPresent(s.id)).map(s => s.id);
 }
 
+// ¿La hora de salida del estudiante ya pasó? (exit_time en formato "HH:MM")
+function _isStudentExitTimePassed(student) {
+  const exitTime = student?.exit_time;
+  if (!exitTime) return false;
+  const now = new Date();
+  const [h, m] = String(exitTime).split(':').map(Number);
+  const exitMins = (h || 0) * 60 + (m || 0);
+  return (now.getHours() * 60 + now.getMinutes()) > exitMins + 30; // 30 min de gracia
+}
+
+// ¿El estudiante está próximo a salir? (dentro de 30 min de su exit_time)
+function _isStudentNearExit(student) {
+  const exitTime = student?.exit_time;
+  if (!exitTime) return false;
+  const now = new Date();
+  const [h, m] = String(exitTime).split(':').map(Number);
+  const exitMins = (h || 0) * 60 + (m || 0);
+  const nowMins = now.getHours() * 60 + now.getMinutes();
+  return nowMins >= exitMins - 30 && nowMins <= exitMins + 30;
+}
+
 // ── V8: helpers de cronología ─────────────────────────────────────────────────
 function _minutesToTime(mins) {
   const t = ((mins % 1440) + 1440) % 1440;
@@ -1024,6 +1045,7 @@ function _renderStudentRoutineCard(s, log) {
   const activeSiesta = events.filter(e => e.type === 'siesta').some(e => e.open === true);
   const isPresent  = _isStudentPresent(s.id);
   const isRetirado = _isStudentRetirado(s.id);
+  const nearExit   = !isRetirado && isPresent && _isStudentNearExit(s);
 
   const moodEmojiMap = {};
   MOOD_OPTIONS.forEach(m => { moodEmojiMap[m.value] = m.icon; });
@@ -1044,6 +1066,7 @@ function _renderStudentRoutineCard(s, log) {
       class="group relative bg-white rounded-[1.5rem] p-3 border-2 ${isRetirado ? 'border-blue-400 bg-blue-50/60' : !isPresent ? 'border-dashed border-slate-200 opacity-60' : isDraft ? 'border-dashed border-[#FF8A00]/40 bg-orange-50/20' : isValid ? 'border-[#28B54D]/30' : 'border-slate-100'} hover:border-[#FF8A00] hover:shadow-xl hover:shadow-orange-100 transition-all cursor-pointer active:scale-95 flex flex-col overflow-hidden">
 
       ${isRetirado ? '<div class="absolute top-2 left-2 z-10"><span class="px-2 py-0.5 bg-blue-500 text-white text-[8px] font-black uppercase rounded-lg shadow-sm">Salió del centro</span></div>' : ''}
+      ${nearExit ? '<div class="absolute top-2 left-2 z-10"><span class="px-2 py-0.5 bg-amber-500 text-white text-[8px] font-black uppercase rounded-lg shadow-sm animate-pulse">⏰ Próximo a salir</span></div>' : ''}
       ${!isRetirado && !isPresent ? '<div class="absolute top-2 left-2 z-10"><span class="px-2 py-0.5 bg-slate-400 text-white text-[8px] font-black uppercase rounded-lg">Ausente</span></div>' : ''}
       ${isDraft ? '<div class="absolute top-2 left-2 z-10"><span class="px-2 py-0.5 bg-[#FF8A00] text-white text-[8px] font-black uppercase rounded-lg">Borrador</span></div>' : ''}
       ${activeSiesta ? '<div class="absolute top-2 left-2 z-10 w-6 h-6 bg-purple-500 rounded-full flex items-center justify-center text-sm shadow-md animate-pulse">😴</div>' : ''}
@@ -1054,7 +1077,7 @@ function _renderStudentRoutineCard(s, log) {
         </div>
         <div class="flex-1 min-w-0">
           <h4 class="text-[11px] font-black text-slate-800 leading-tight truncate">${safeEscapeHTML(s.name)}</h4>
-          <p class="text-[9px] font-bold text-slate-400 uppercase">${s.age} ${s.age_type || 'años'}</p>
+          <p class="text-[9px] font-bold text-slate-400 uppercase">${s.age} ${s.age_type || 'años'}${s.exit_time ? ' · Sale ' + _formatTime12(...s.exit_time.split(':').map(Number)) : ''}</p>
         </div>
         <div class="flex flex-col gap-0.5 shrink-0">
           ${mood ? `<div class="w-5 h-5 bg-orange-50 rounded-full flex items-center justify-center text-[10px] border border-orange-100">${moodEmojis[mood] || '😐'}</div>` : ''}
@@ -2408,7 +2431,7 @@ async function _checkAutoRegister() {
       if (nowMins > end + 10) continue;
 
       const target = students.filter(s =>
-        presentIds.includes(s.id) && !_hasEventType(logsMap[s.id], ev.type)
+        presentIds.includes(s.id) && !_hasEventType(logsMap[s.id], ev.type) && !_isStudentExitTimePassed(s)
       );
       if (!target.length) continue;
       toRegister.push({ ev, timeStr, students: target });

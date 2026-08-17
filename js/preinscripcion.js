@@ -3,7 +3,7 @@
  * Wizard publico de 7 pasos. Inserta en student_preregistrations
  * y sube documentos comprimidos a Supabase Storage.
  */
-import { SUPABASE_URL, SUPABASE_ANON_KEY } from './shared/config.js';
+import { SUPABASE_URL, SUPABASE_ANON_KEY, SCHEDULE_DEFINITIONS } from './shared/config.js';
 
 const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
   auth: { persistSession: false, autoRefreshToken: false, detectSessionInUrl: false }
@@ -29,31 +29,20 @@ function renderLevels() {
   const sel = $('#pi_level');
   const current = sel.value;
   if (_roomsCache.length) {
-    // Mostrar AULAS REALES de la DB, ordenadas por nombre
-    // Primero intentar agrupar por nivel si tienen level asignado
-    const byLevel = new Map();
-    _roomsCache.forEach(r => {
-      // Usar el nombre del aula como clave si no tiene nivel definido
-      const key = (r.level || '').trim() || r.name;
-      if (!byLevel.has(key)) { byLevel.set(key, []); }
-      byLevel.get(key).push(r);
-    });
-    const options = [...byLevel.entries()]
-      .sort((a, b) => a[0].localeCompare(b[0], 'es'))
-      .map(([key, rooms]) => {
-        const available = rooms.reduce((acc, r) => acc + (r.available || 0), 0);
-        const names = rooms.map(r => r.name).join(', ');
+    const options = _roomsCache
+      .slice()
+      .sort((a, b) => (a.name || '').localeCompare(b.name || '', 'es'))
+      .map(r => {
+        const available = r.available || 0;
         const cupos = `${available} cupo${available !== 1 ? 's' : ''} libre${available !== 1 ? 's' : ''}`;
-        const label = rooms.length === 1 && rooms[0].name === key
-          ? `${key} — ${cupos}`
-          : `${key} · ${names} — ${cupos}`;
-        return `<option value="${esc(key)}">${esc(label)}</option>`;
+        const level = r.level ? ` · ${r.level}` : '';
+        const label = `${r.name}${level} — ${cupos}`;
+        return `<option value="${esc(r.name)}">${esc(label)}</option>`;
       });
     sel.innerHTML = '<option value="">-- Seleccionar aula --</option>' + options.join('');
     if (current && [...sel.options].some(o => o.value === current)) { sel.value = current; }
     return;
   }
-  // Sin aulas en DB aún
   sel.innerHTML = '<option value="">-- No hay aulas registradas --</option>';
   if (current && [...sel.options].some(o => o.value === current)) { sel.value = current; }
 }
@@ -569,10 +558,37 @@ window.Preinscripcion = {
   submit
 };
 
+/** Auto-llenar entry/exit al seleccionar jornada con cards. */
+function wireScheduleDefaults() {
+  const hidden = $('#pi_schedule');
+  const cards = $$('.schedule-card');
+  if (!hidden || !cards.length) return;
+
+  const applySchedule = (id) => {
+    const def = SCHEDULE_DEFINITIONS.find(s => s.id === id);
+    if (!def) return;
+    const entryEl = $('#pi_entry_time');
+    const exitEl  = $('#pi_exit_time');
+    if (entryEl) entryEl.value = def.entry;
+    if (exitEl)  exitEl.value = def.exit;
+  };
+
+  cards.forEach(card => {
+    card.addEventListener('click', () => {
+      const id = card.dataset.schedule;
+      cards.forEach(c => c.classList.remove('active'));
+      card.classList.add('active');
+      hidden.value = id;
+      applySchedule(id);
+    });
+  });
+}
+
 document.addEventListener('DOMContentLoaded', () => {
   wireMasks();
   wireAge();
   wireSiblings();
+  wireScheduleDefaults();
   renderAuthorized();
   renderDocs();
   wireSignature();

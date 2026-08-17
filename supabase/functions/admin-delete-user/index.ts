@@ -23,7 +23,6 @@ Deno.serve(async (req) => {
       return json({ error: 'Missing env vars' }, 500);
     }
 
-    // Verify caller is admin
     const authHeader = req.headers.get('Authorization') ?? '';
     const callerClient = createClient(SUPABASE_URL, Deno.env.get('SUPABASE_ANON_KEY') ?? '', {
       global: { headers: { Authorization: authHeader } },
@@ -32,7 +31,6 @@ Deno.serve(async (req) => {
     const { data: { user: caller } } = await callerClient.auth.getUser();
     if (!caller) return json({ error: 'No autenticado' }, 401);
 
-    // Check admin role
     const adminClient = createClient(SUPABASE_URL, SERVICE_KEY, { auth: { persistSession: false } });
     const { data: profile } = await adminClient
       .from('profiles')
@@ -42,25 +40,33 @@ Deno.serve(async (req) => {
 
     const allowedRoles = ['admin', 'directora', 'asistente'];
     if (!allowedRoles.includes(profile?.role)) {
-      return json({ error: 'Acceso denegado. Solo administradores, directoras o asistentes.' }, 403);
+      return json({ error: 'Acceso denegado.' }, 403);
     }
 
-    const { user_id, new_password } = await req.json();
-    if (!user_id || !new_password) {
-      return json({ error: 'Faltan parámetros: user_id, new_password' }, 400);
-    }
-    if (new_password.length < 6) {
-      return json({ error: 'La contraseña debe tener al menos 6 caracteres' }, 400);
+    const { user_id } = await req.json();
+    if (!user_id) {
+      return json({ error: 'Falta parámetro: user_id' }, 400);
     }
 
-    // Update password using service role (admin API)
-    const { error } = await adminClient.auth.admin.updateUserById(user_id, {
-      password: new_password
-    });
+    // Prevent self-deletion
+    if (user_id === caller.id) {
+      return json({ error: 'No puedes eliminarte a ti mismo.' }, 400);
+    }
 
-    if (error) return json({ error: error.message }, 400);
+    // 1. Unlink students from this parent
+    await adminClient
+      .from('students')
+      .update({ parent_id: null })
+      .eq('parent_id', user_id);
 
-    return json({ ok: true, message: 'Contraseña actualizada correctamente' });
+    // 2. Delete profile
+    await adminClient.from('profiles').delete().eq('id', user_id);
+
+    // 3. Delete auth user
+    const { error: authErr } = await adminClient.auth.admin.deleteUser(user_id);
+    if (authErr) return json({ error: 'Auth: ' + authErr.message }, 400);
+
+    return json({ ok: true, message: 'Usuario eliminado correctamente' });
 
   } catch (e) {
     const msg = e instanceof Error ? e.message : String(e);
