@@ -21,6 +21,15 @@ let allAttend   = [];
 let allPunches  = [];
 let fraudEvents = [];
 let currentUser = null;
+let currentFeatureFlags = {
+  chat: true,
+  payments: true,
+  attendance: true,
+  routine: true,
+  grades: true,
+  preregistration: true,
+  push: true
+};
 
 // ── Init ──────────────────────────────────────────────────────────────────────
 function _setLoaderMsg(msg) {
@@ -254,12 +263,15 @@ window.goTo = function(id) {
     auditoria:    ['Auditoría', 'Registro completo de movimientos'],
     fraude:       ['Alertas de Fraude', 'Detección automática de patrones sospechosos'],
     usuarios:     ['Usuarios', 'Todos los usuarios del sistema'],
+    estudiantes:  ['Estudiantes', 'Gestión y desactivación de alumnos'],
     padres:       ['Padres', 'Gestión de padres de familia'],
     maestras:     ['Maestras y Asistentes', 'Personal docente'],
     directoras:   ['Directoras', 'Administración escolar'],
     pagos:        ['Pagos', 'Historial financiero completo'],
     asistencia:   ['Asistencia', 'Control de entradas y salidas'],
     errores:      ['Errores del Sistema', 'Log de errores y excepciones'],
+    funciones:    ['Control de Funciones', 'On/Off de módulos de la plataforma'],
+    seguridad:    ['Seguridad', 'Monitoreo de accesos y fuerza bruta'],
     configuracion:['Configuración', 'Ajustes del panel de control'],
   };
   const [title, sub] = titles[id] || ['Panel', ''];
@@ -269,12 +281,14 @@ window.goTo = function(id) {
   if (id === 'auditoria')   renderAuditTable(allAudit);
   if (id === 'fraude')      renderFraud();
   if (id === 'usuarios')    renderUsers(allUsers);
+  if (id === 'estudiantes') renderStudents(allStudents);
   if (id === 'padres')      renderPadres();
   if (id === 'maestras')    renderMaestras();
   if (id === 'directoras')  renderRoleTable('directoras', allUsers.filter(u => u.role === 'directora'));
   if (id === 'pagos')       renderPayments();
   if (id === 'asistencia')  renderAttendance();
   if (id === 'errores')     renderErrors();
+  if (id === 'funciones')   renderFeatureFlags();
   if (id === 'seguridad')   { renderBruteForce(); loadSecurityStats(); loadPaymentAudit(); }
 };
 
@@ -283,7 +297,7 @@ window.refreshAll = async function() {
   try {
     await Promise.allSettled([
       loadUsers(), loadAudit(), loadPayments(),
-      loadAttendance(), loadStudents(), loadClassrooms(), loadPunches()
+      loadAttendance(), loadStudents(), loadClassrooms(), loadPunches(), loadFeatureFlags()
     ]);
     renderDashboard();
   } catch (err) {
@@ -295,7 +309,7 @@ async function loadUsers() {
   try {
     const { data } = await supabase
       .from('profiles')
-      .select('id, name, email, role, created_at, avatar_url, phone, bio, last_sign_in_at')
+      .select('id, name, email, role, is_active, created_at, avatar_url, phone, bio, last_sign_in_at')
       .order('created_at', { ascending: false })
       .limit(300);
     allUsers = data || [];
@@ -717,6 +731,14 @@ function renderUsers(data) {
     const created = u.created_at ? new Date(u.created_at).toLocaleDateString('es-DO') : '—';
     const lastAccess = getLastAccess(u.id);
     const initials = (u.name || u.email || '?')[0].toUpperCase();
+    const isActive = u.is_active !== false;
+    const statusBadge = isActive
+      ? '<span class="badge badge-green">Activo</span>'
+      : '<span class="badge badge-red">Bloqueado</span>';
+    const toggleBtn = isActive
+      ? `<button class="btn btn-danger" style="padding:4px 8px;font-size:10px;" onclick="toggleUserActive('${u.id}', false)" title="Bloquear usuario"><i class="bi bi-person-x-fill"></i> Bloquear</button>`
+      : `<button class="btn btn-ghost" style="padding:4px 8px;font-size:10px;color:#4ade80;border-color:rgba(34,197,94,.3);" onclick="toggleUserActive('${u.id}', true)" title="Desbloquear usuario"><i class="bi bi-person-check-fill"></i> Desbloquear</button>`;
+
     return `<tr>
       <td><div style="display:flex;align-items:center;gap:8px;">
         <div style="width:32px;height:32px;background:linear-gradient(135deg,#6366f1,#8b5cf6);border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:900;color:white;flex-shrink:0;">${initials}</div>
@@ -726,23 +748,61 @@ function renderUsers(data) {
       <td><span class="badge ${roleBadge[u.role]||'badge-gray'}">${u.role||'—'}</span></td>
       <td style="font-size:11px;color:var(--muted);">${created}</td>
       <td style="font-size:11px;color:var(--muted);">${lastAccess}</td>
-      <td><span class="badge badge-green">Activo</span></td>
+      <td>${statusBadge}</td>
       <td style="display:flex;gap:4px;">
-        <button class="btn btn-ghost" style="padding:4px 8px;font-size:10px;" onclick="viewUser('${u.id}')"><i class="bi bi-eye"></i></button>
-        <button class="btn btn-ghost" style="padding:4px 8px;font-size:10px;" onclick="resetPassword('${u.id}','${escH(u.email||'')}')"><i class="bi bi-key"></i></button>
+        <button class="btn btn-ghost" style="padding:4px 8px;font-size:10px;" onclick="viewUser('${u.id}')" title="Ver detalle"><i class="bi bi-eye"></i></button>
+        <button class="btn btn-ghost" style="padding:4px 8px;font-size:10px;" onclick="resetPassword('${u.id}','${escH(u.email||'')}')" title="Cambiar clave"><i class="bi bi-key"></i></button>
+        ${toggleBtn}
       </td>
     </tr>`;
   }).join('');
 }
 
 window.filterUsers = function() {
-  const q    = document.getElementById('userSearch')?.value.toLowerCase() || '';
-  const role = document.getElementById('userRoleFilter')?.value || '';
-  const filtered = allUsers.filter(u =>
-    (!q    || (u.name||'').toLowerCase().includes(q) || (u.email||'').toLowerCase().includes(q)) &&
-    (!role || u.role === role)
-  );
+  const q      = document.getElementById('userSearch')?.value.toLowerCase() || '';
+  const role   = document.getElementById('userRoleFilter')?.value || '';
+  const status = document.getElementById('userStatusFilter')?.value || '';
+  const filtered = allUsers.filter(u => {
+    const matchQ = !q || (u.name||'').toLowerCase().includes(q) || (u.email||'').toLowerCase().includes(q);
+    const matchR = !role || u.role === role;
+    const isActive = u.is_active !== false;
+    const matchS = !status || (status === 'active' ? isActive : !isActive);
+    return matchQ && matchR && matchS;
+  });
   renderUsers(filtered);
+};
+
+window.toggleUserActive = async function(userId, newStatus) {
+  const u = allUsers.find(x => x.id === userId);
+  const actionText = newStatus ? 'Desbloquear y Activar' : 'Bloquear / Desactivar';
+  if (!confirm(`¿Confirmas ${actionText} la cuenta de "${u?.name || u?.email || userId}"?\n\n` +
+      (newStatus ? 'El usuario podrá volver a iniciar sesión.' : 'El usuario no podrá iniciar sesión en la plataforma.'))) {
+    return;
+  }
+
+  try {
+    const { error } = await supabase.from('profiles').update({ is_active: newStatus }).eq('id', userId);
+    if (error) throw error;
+
+    await supabase.from('audit_logs').insert({
+      user_id: currentUser.id,
+      action: newStatus ? 'admin.user_unblocked' : 'admin.user_blocked',
+      payload: {
+        target_id: userId,
+        target_email: u?.email,
+        target_name: u?.name,
+        action: newStatus ? 'unblocked' : 'blocked',
+        changed_by: currentUser.email
+      }
+    });
+
+    alert(`✅ Usuario ${newStatus ? 'desbloqueado' : 'bloqueado'} correctamente.`);
+    await loadUsers();
+    renderUsers(allUsers);
+  } catch (err) {
+    alert('Error al actualizar el usuario: ' + err.message);
+    logError('panel_control', err.message, err.stack || '', 'toggleUserActive').catch(() => {});
+  }
 };
 
 window.viewUser = function(id) {
@@ -751,6 +811,7 @@ window.viewUser = function(id) {
   const students = allStudents.filter(s => s.parent_id === id);
   const lastAccess = getLastAccess(id);
   const modal = document.getElementById('userModal') || _createModal();
+  const isUserActive = u.is_active !== false;
   modal.innerHTML = `
     <div style="background:var(--surface);border:1px solid var(--border);border-radius:20px;padding:28px;width:min(90vw,480px);max-height:90vh;overflow-y:auto;">
       <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:20px;">
@@ -766,6 +827,7 @@ window.viewUser = function(id) {
       </div>
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:20px;">
         ${_infoRow('Rol', u.role||'—')}
+        ${_infoRow('Estado', isUserActive ? 'Activo' : 'Bloqueado')}
         ${_infoRow('Teléfono', u.phone||'—')}
         ${_infoRow('Creado', u.created_at ? new Date(u.created_at).toLocaleDateString('es-DO') : '—')}
         ${_infoRow('Último acceso', lastAccess)}
@@ -776,6 +838,10 @@ window.viewUser = function(id) {
         <button class="btn btn-primary" onclick="resetPassword('${u.id}','${escH(u.email||'')}');document.getElementById('userModal').style.display='none'">
           <i class="bi bi-key"></i> Cambiar contraseña
         </button>
+        ${isUserActive
+          ? `<button class="btn btn-danger" onclick="toggleUserActive('${u.id}', false);document.getElementById('userModal').style.display='none'"><i class="bi bi-person-x-fill"></i> Bloquear Usuario</button>`
+          : `<button class="btn btn-ghost" style="color:#4ade80;border-color:rgba(34,197,94,.3);" onclick="toggleUserActive('${u.id}', true);document.getElementById('userModal').style.display='none'"><i class="bi bi-person-check-fill"></i> Desbloquear</button>`
+        }
         <button class="btn btn-ghost" onclick="document.getElementById('userModal').style.display='none'">Cerrar</button>
       </div>
     </div>`;
@@ -1302,6 +1368,168 @@ window.loadPaymentAudit = async function() {
     }).join('');
   } catch (err) {
     tbody.innerHTML = '<tr><td colspan="4" style="text-align:center;padding:20px;color:var(--muted);">Error al cargar auditoría</td></tr>';
+  }
+};
+
+// ── Student Management Logic ──────────────────────────────────────────────────
+function renderStudents(data) {
+  const tbody = document.getElementById('studentsBody');
+  if (!tbody) return;
+  document.getElementById('studentCount').textContent = data.length + ' estudiantes';
+  if (!data.length) {
+    tbody.innerHTML = '<tr><td colspan="6" style="text-align:center;padding:24px;color:var(--muted);">Sin estudiantes registrados</td></tr>';
+    return;
+  }
+
+  tbody.innerHTML = data.map(s => {
+    const classroom = allClassrooms.find(c => c.id === s.classroom_id);
+    const isActive = s.is_active !== false;
+    const statusBadge = isActive
+      ? '<span class="badge badge-green">Activo</span>'
+      : '<span class="badge badge-red">Desactivado</span>';
+    const toggleBtn = isActive
+      ? `<button class="btn btn-danger" style="padding:4px 8px;font-size:10px;" onclick="toggleStudentActive(${s.id}, false)"><i class="bi bi-person-x"></i> Desactivar</button>`
+      : `<button class="btn btn-ghost" style="padding:4px 8px;font-size:10px;color:#4ade80;border-color:rgba(34,197,94,.3);" onclick="toggleStudentActive(${s.id}, true)"><i class="bi bi-person-check"></i> Activar</button>`;
+
+    return `<tr>
+      <td style="font-weight:800;font-size:13px;">${escH(s.name)}</td>
+      <td style="font-size:12px;color:var(--muted);">${escH(s.matricula || '—')}</td>
+      <td style="font-size:12px;">${classroom ? escH(classroom.name) : '<span style="color:var(--muted);">Sin aula</span>'}</td>
+      <td style="font-weight:800;color:#4ade80;">RD$${s.monthly_fee ? Number(s.monthly_fee).toLocaleString() : '0'}</td>
+      <td>${statusBadge}</td>
+      <td>${toggleBtn}</td>
+    </tr>`;
+  }).join('');
+}
+
+window.filterStudents = function() {
+  const q      = document.getElementById('studentSearch')?.value.toLowerCase() || '';
+  const status = document.getElementById('studentStatusFilter')?.value || '';
+  const filtered = allStudents.filter(s => {
+    const matchQ = !q || (s.name||'').toLowerCase().includes(q) || (s.matricula||'').toLowerCase().includes(q);
+    const isActive = s.is_active !== false;
+    const matchS = !status || (status === 'active' ? isActive : !isActive);
+    return matchQ && matchS;
+  });
+  renderStudents(filtered);
+};
+
+window.toggleStudentActive = async function(studentId, newStatus) {
+  const st = allStudents.find(x => x.id === studentId);
+  const actionText = newStatus ? 'Activar' : 'Desactivar';
+  if (!confirm(`¿Confirmas ${actionText} al estudiante "${st?.name || studentId}"?\n\n` +
+      (newStatus ? 'El estudiante volverá a figurar en las listas de clase.' : 'El estudiante quedará inactivo en el sistema.'))) {
+    return;
+  }
+
+  try {
+    const { error } = await supabase.from('students').update({ is_active: newStatus }).eq('id', studentId);
+    if (error) throw error;
+
+    await supabase.from('audit_logs').insert({
+      user_id: currentUser.id,
+      action: newStatus ? 'admin.student_activated' : 'admin.student_deactivated',
+      payload: {
+        student_id: studentId,
+        student_name: st?.name,
+        action: newStatus ? 'activated' : 'deactivated',
+        changed_by: currentUser.email
+      }
+    });
+
+    alert(`✅ Estudiante ${newStatus ? 'activado' : 'desactivado'} correctamente.`);
+    await loadStudents();
+    renderStudents(allStudents);
+  } catch (err) {
+    alert('Error al actualizar el estudiante: ' + err.message);
+    logError('panel_control', err.message, err.stack || '', 'toggleStudentActive').catch(() => {});
+  }
+};
+
+// ── Feature Flags Logic ───────────────────────────────────────────────────────
+async function loadFeatureFlags() {
+  try {
+    const { data } = await supabase.from('school_settings').select('feature_flags').eq('id', 1).maybeSingle();
+    if (data?.feature_flags) {
+      currentFeatureFlags = { ...currentFeatureFlags, ...data.feature_flags };
+    }
+  } catch (err) {
+    logError('panel_control', err?.message || String(err), err?.stack || '', 'loadFeatureFlags').catch(() => {});
+  }
+}
+
+function renderFeatureFlags() {
+  const grid = document.getElementById('featureFlagsGrid');
+  if (!grid) return;
+
+  const modules = [
+    { key: 'chat', label: 'Mensajería y Chat', desc: 'Chat de aulas y mensajes directos entre padres y maestras', icon: 'bi-chat-dots-fill', color: '#6366f1' },
+    { key: 'payments', label: 'Módulo de Pagos', desc: 'Reporte y verificación de pagos, cuotas y recibos', icon: 'bi-credit-card-fill', color: '#22c55e' },
+    { key: 'attendance', label: 'Control de Asistencia y QR', desc: 'Registro de entrada/salida mediante código QR y ponche', icon: 'bi-qr-code-scan', color: '#3b82f6' },
+    { key: 'routine', label: 'Rutina y Bitácora Diaria', desc: 'Línea de tiempo de actividades, comidas, siestas e incidentes', icon: 'bi-journal-check', color: '#f97316' },
+    { key: 'grades', label: 'Calificaciones y Boletines', desc: 'Carga de notas por área y generación de boletines', icon: 'bi-file-earmark-text-fill', color: '#a855f7' },
+    { key: 'preregistration', label: 'Preinscripciones Web', desc: 'Formulario público de admisión para nuevos estudiantes', icon: 'bi-person-plus-fill', color: '#eab308' },
+    { key: 'push', label: 'Notificaciones Push', desc: 'Envío de alertas móviles y avisos OneSignal', icon: 'bi-bell-fill', color: '#ec4899' },
+  ];
+
+  grid.innerHTML = modules.map(m => {
+    const isEnabled = currentFeatureFlags[m.key] !== false;
+    return `
+      <div style="background:var(--surface2);border:1px solid var(--border);border-radius:14px;padding:16px;display:flex;flex-direction:column;justify-content:space-between;gap:12px;">
+        <div style="display:flex;align-items:flex-start;gap:12px;">
+          <div style="width:40px;height:40px;border-radius:10px;background:${m.color}20;color:${m.color};display:flex;align-items:center;justify-content:center;font-size:20px;flex-shrink:0;">
+            <i class="bi ${m.icon}"></i>
+          </div>
+          <div>
+            <div style="font-size:14px;font-weight:800;color:var(--text);">${m.label}</div>
+            <div style="font-size:11px;color:var(--muted);margin-top:2px;">${m.desc}</div>
+          </div>
+        </div>
+        <div style="display:flex;justify-content:space-between;align-items:center;border-top:1px solid var(--border);padding-top:10px;margin-top:4px;">
+          <span style="font-size:12px;font-weight:700;" id="ff-label-${m.key}">${isEnabled ? '🟢 Habilitado' : '🔴 Deshabilitado'}</span>
+          <label style="position:relative;display:inline-block;width:44px;height:24px;cursor:pointer;">
+            <input type="checkbox" id="ff-input-${m.key}" ${isEnabled ? 'checked' : ''} onchange="toggleFlagState('${m.key}', this.checked)" style="opacity:0;width:0;height:0;">
+            <span style="position:absolute;inset:0;background:${isEnabled ? '#22c55e' : 'rgba(255,255,255,.2)'};border-radius:24px;transition:.3s;" id="ff-slider-${m.key}">
+              <span style="position:absolute;content:'';height:18px;width:18px;left:${isEnabled ? '22px' : '3px'};bottom:3px;background:white;border-radius:50%;transition:.3s;" id="ff-knob-${m.key}"></span>
+            </span>
+          </label>
+        </div>
+      </div>`;
+  }).join('');
+}
+
+window.toggleFlagState = function(key, isChecked) {
+  currentFeatureFlags[key] = isChecked;
+  const label = document.getElementById(`ff-label-${key}`);
+  const slider = document.getElementById(`ff-slider-${key}`);
+  const knob = document.getElementById(`ff-knob-${key}`);
+  if (label) label.textContent = isChecked ? '🟢 Habilitado' : '🔴 Deshabilitado';
+  if (slider) slider.style.background = isChecked ? '#22c55e' : 'rgba(255,255,255,.2)';
+  if (knob) knob.style.left = isChecked ? '22px' : '3px';
+};
+
+window.saveFeatureFlags = async function() {
+  try {
+    const { error } = await supabase.from('school_settings').update({
+      feature_flags: currentFeatureFlags,
+      updated_at: new Date().toISOString()
+    }).eq('id', 1);
+
+    if (error) throw error;
+
+    await supabase.from('audit_logs').insert({
+      user_id: currentUser.id,
+      action: 'admin.update_feature_flags',
+      payload: {
+        feature_flags: currentFeatureFlags,
+        changed_by: currentUser.email
+      }
+    });
+
+    alert('✅ Configuración de funciones guardada correctamente.');
+  } catch (err) {
+    alert('Error al guardar funciones: ' + err.message);
+    logError('panel_control', err.message, err.stack || '', 'saveFeatureFlags').catch(() => {});
   }
 };
 

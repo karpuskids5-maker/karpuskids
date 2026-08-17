@@ -164,8 +164,9 @@
   <button class="nav-item" onclick="goTo('auditoria')"><i class="bi bi-journal-text"></i> Auditoría <span class="nav-badge" id="badge-audit">0</span></button>
   <button class="nav-item" onclick="goTo('fraude')"><i class="bi bi-exclamation-triangle-fill"></i> Alertas Fraude <span class="nav-badge" id="badge-fraud" style="background:#f97316;">0</span></button>
 
-  <div class="nav-section">Usuarios</div>
+  <div class="nav-section">Usuarios y Alumnos</div>
   <button class="nav-item" onclick="goTo('usuarios')"><i class="bi bi-people-fill"></i> Todos los Usuarios</button>
+  <button class="nav-item" onclick="goTo('estudiantes')"><i class="bi bi-mortarboard-fill"></i> Estudiantes</button>
   <button class="nav-item" onclick="goTo('padres')"><i class="bi bi-person-heart"></i> Padres</button>
   <button class="nav-item" onclick="goTo('maestras')"><i class="bi bi-person-workspace"></i> Maestras</button>
   <button class="nav-item" onclick="goTo('directoras')"><i class="bi bi-person-badge-fill"></i> Directoras</button>
@@ -176,6 +177,7 @@
   <button class="nav-item" onclick="goTo('errores')"><i class="bi bi-bug-fill"></i> Errores del Sistema</button>
 
   <div class="nav-section">Sistema</div>
+  <button class="nav-item" onclick="goTo('funciones')"><i class="bi bi-toggle-on"></i> Control de Funciones</button>
   <button class="nav-item" onclick="goTo('seguridad')"><i class="bi bi-shield-exclamation"></i> Seguridad</button>
   <button class="nav-item" onclick="goTo('configuracion')"><i class="bi bi-gear-fill"></i> Configuración</button>
 
@@ -342,14 +344,66 @@
           <option value="asistente">Asistente</option>
           <option value="admin">Admin</option>
         </select>
+        <select class="inp" id="userStatusFilter" style="width:140px;" onchange="filterUsers()">
+          <option value="">Todos los estados</option>
+          <option value="active">Activos</option>
+          <option value="blocked">Bloqueados</option>
+        </select>
       </div>
       <div class="panel">
-        <div class="panel-hdr"><h3><i class="bi bi-people-fill" style="color:#6366f1;margin-right:6px;"></i>Todos los usuarios</h3><span id="userCount" style="font-size:11px;color:var(--muted);"></span></div>
+        <div class="panel-hdr"><h3><i class="bi bi-people-fill" style="color:#6366f1;margin-right:6px;"></i>Gestión y Bloqueo de Usuarios</h3><span id="userCount" style="font-size:11px;color:var(--muted);"></span></div>
         <div style="overflow-x:auto;">
           <table class="tbl">
             <thead><tr><th>Usuario</th><th>Email</th><th>Rol</th><th>Creado</th><th>Último acceso</th><th>Estado</th><th>Acciones</th></tr></thead>
             <tbody id="usersBody"><tr><td colspan="7" style="text-align:center;padding:24px;color:var(--muted);">Cargando...</td></tr></tbody>
           </table>
+        </div>
+      </div>
+    </div>
+
+    <!-- ══════════════════════════════════════════════════════
+         ESTUDIANTES
+    ══════════════════════════════════════════════════════ -->
+    <div class="section" id="sec-estudiantes">
+      <div style="display:flex;gap:8px;margin-bottom:16px;flex-wrap:wrap;">
+        <input class="inp" id="studentSearch" placeholder="Buscar estudiante, matrícula..." style="width:260px;" oninput="filterStudents()">
+        <select class="inp" id="studentStatusFilter" style="width:150px;" onchange="filterStudents()">
+          <option value="">Todos los estados</option>
+          <option value="active">Activos</option>
+          <option value="inactive">Desactivados</option>
+        </select>
+      </div>
+      <div class="panel">
+        <div class="panel-hdr">
+          <h3><i class="bi bi-mortarboard-fill" style="color:#22c55e;margin-right:6px;"></i>Gestión de Estudiantes</h3>
+          <span id="studentCount" style="font-size:11px;color:var(--muted);"></span>
+        </div>
+        <div style="overflow-x:auto;">
+          <table class="tbl">
+            <thead><tr><th>Estudiante</th><th>Matrícula</th><th>Aula</th><th>Cuota Mes</th><th>Estado</th><th>Acciones</th></tr></thead>
+            <tbody id="studentsBody"><tr><td colspan="6" style="text-align:center;padding:24px;color:var(--muted);">Cargando estudiantes...</td></tr></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <!-- ══════════════════════════════════════════════════════
+         CONTROL DE FUNCIONES (FEATURE FLAGS)
+    ══════════════════════════════════════════════════════ -->
+    <div class="section" id="sec-funciones">
+      <div class="panel" style="margin-bottom:20px;">
+        <div class="panel-hdr">
+          <div>
+            <h3><i class="bi bi-toggle-on" style="color:#8b5cf6;margin-right:6px;"></i>Control Total de Funciones del Sistema</h3>
+            <div style="font-size:11px;color:var(--muted);margin-top:2px;">Activa o desactiva módulos de la plataforma en tiempo real para todos los paneles.</div>
+          </div>
+          <button class="btn btn-primary" onclick="saveFeatureFlags()"><i class="bi bi-check-lg"></i> Guardar Cambios</button>
+        </div>
+        <div class="panel-body">
+          <div id="featureFlagsGrid" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:16px;">
+            <!-- Rendered dynamically -->
+            <div style="text-align:center;padding:20px;color:var(--muted);">Cargando funciones...</div>
+          </div>
         </div>
       </div>
     </div>
