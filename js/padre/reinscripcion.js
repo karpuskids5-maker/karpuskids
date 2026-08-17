@@ -456,7 +456,7 @@ export const ReinscripcionModule = {
         student_name: student.name,
         amount: String(pay.amount || 0),
         month: 'Reinscripción',
-      }).catch(() => {});
+      }).catch(err => console.warn('No se pudo registrar el pago de reinscripción:', err));
 
       await this.init(student.id);
     } catch (err) {
@@ -486,7 +486,7 @@ export const ReinscripcionModule = {
       });
       badge.classList.toggle('hidden', !hasPending);
       badge.classList.toggle('flex', hasPending);
-    } catch (_) {}
+    } catch (_) { console.warn('No se pudo actualizar el badge de reinscripción'); }
   },
 };
 

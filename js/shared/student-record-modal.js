@@ -1,6 +1,7 @@
 import { supabase, createClient, SUPABASE_URL, SUPABASE_ANON_KEY, sendEmail } from './supabase.js';
 import { Helpers } from './helpers.js';
 import { auditLog } from './db-utils.js';
+import { QueryCache } from './query-cache.js';
 
 const TABS = [
   { id: 'info',     label: 'Info General', icon: 'user-square' },
@@ -26,7 +27,7 @@ const DOC_TYPES = [
   { key: 'contract',      label: 'Contrato escolar',          icon: 'file-check',   required: false },
 ];
 
-const LEVELS_FALLBACK = ['Maternal', 'Infantes', 'Párvulos', 'Pre-Kinder', 'Kinder', 'Pre-Primaria', 'Primaria'];
+const LEVELS_FALLBACK = []; // Eliminado — solo usar aulas reales de la DB
 const RELATIONSHIPS = ['Padre', 'Madre', 'Tutor Legal'];
 const SCHEDULES = ['Medio día', 'Completo', 'Extendido'];
 const CONSENT_DEFS = [
@@ -295,14 +296,20 @@ export const StudentRecordModal = {
   },
 
   async _loadSiblings() {
+    // Solo mostrar hermanos si la directora/asistente marcó explícitamente has_siblings = true
+    // NO detectar automáticamente por similitud de datos ni por parent_id compartido
     if (!this._form?.has_siblings || !this._parentId) {
       this._siblings = [];
       return;
     }
+    // Requiere que el otro estudiante también tenga has_siblings = true
+    // para evitar falsos positivos cuando dos estudiantes comparten tutor
+    // sin haber sido vinculados como hermanos por el staff
     const { data } = await supabase
       .from('students')
-      .select('id, name, matricula, classroom_id, classrooms:classroom_id(name), is_active')
+      .select('id, name, matricula, classroom_id, classrooms:classroom_id(name), is_active, has_siblings')
       .eq('parent_id', this._parentId)
+      .eq('has_siblings', true)
       .is('deleted_at', null);
     this._siblings = (data || []).filter(s => s.id !== this._student?.id);
   },
@@ -577,17 +584,33 @@ export const StudentRecordModal = {
     if (!this._classrooms.length) {
       return '<option value="">-- Sin aulas registradas --</option>';
     }
-    return this._classrooms.map(c => {
-      const full = c.available <= 0;
-      const label = `${c.name} — ${c.occupied}/${c.capacity} cupos${c.level ? ' · ' + c.level : ''}${full ? ' (LLENO)' : ''}`;
-      return `<option value="${c.id}" ${String(this._form.classroom_id) === String(c.id) ? 'selected' : ''} ${full ? 'disabled' : ''}>${Helpers.escapeHTML(label)}</option>`;
+    // Si el estudiante no tiene aula, mostrar una opción vacía seleccionada.
+    // Evita que el navegador seleccione silenciosamente la primera aula
+    // y que al guardar se asigne a un aula que el usuario no eligió.
+    const noRoom = !this._form.classroom_id ? '<option value="">-- Sin aula --</option>' : '';
+    return noRoom + this._classrooms.map(c => {
+      // Solo bloquear si la capacidad está definida (> 0) Y está completamente llena
+      // Nunca bloquear si el estudiante ya está en esa aula (modo edición)
+      const isCurrentRoom = String(this._form.classroom_id) === String(c.id);
+      const full = !isCurrentRoom && c.capacity > 0 && c.available <= 0;
+      const cupos = c.capacity > 0
+        ? ` — ${c.occupied}/${c.capacity} cupos${full ? ' · LLENO' : ''}`
+        : '';
+      const label = `${c.name}${cupos}`;
+      return `<option value="${c.id}" ${isCurrentRoom ? 'selected' : ''} ${full ? 'disabled' : ''}>${Helpers.escapeHTML(label)}</option>`;
     }).join('');
   },
 
   _levelOptions() {
-    const fromRooms = this._classrooms.map(c => c.level).filter(Boolean);
-    const levels = [...new Set([...fromRooms, ...LEVELS_FALLBACK])];
-    return levels.map(l => `<option value="${Helpers.escapeHTML(l)}" ${this._form.level_requested === l ? 'selected' : ''}>${Helpers.escapeHTML(l)}</option>`).join('');
+    // Mostrar solo los nombres de las aulas reales como opciones de nivel/aula
+    // No usar fallback hardcodeado
+    if (!this._classrooms.length) {
+      return `<option value="${Helpers.escapeHTML(this._form.level_requested || '')}">${Helpers.escapeHTML(this._form.level_requested || 'Sin aulas disponibles')}</option>`;
+    }
+    return this._classrooms.map(c => {
+      const val = c.name;
+      return `<option value="${Helpers.escapeHTML(val)}" ${this._form.level_requested === val ? 'selected' : ''}>${Helpers.escapeHTML(val)}</option>`;
+    }).join('');
   },
 
   _yearOptions() {
@@ -766,10 +789,53 @@ export const StudentRecordModal = {
         this._loadSiblings();
       };
     }
+    this._wireClassroomLevelSync();
     document.getElementById('srm-qr-gen')?.addEventListener('click', () => this._generateQR());
     document.getElementById('srm-carnet')?.addEventListener('click', () => this._printCarnet());
     this._loadQRLib(() => {});
     if (this._form.matricula) setTimeout(() => this._generateQR(), 300);
+  },
+
+  // Sincronización bidireccional Aula ↔ Nivel solicitado:
+  // al elegir un aula, el nivel se completa con el nombre del aula;
+  // al elegir un nivel, se localiza el aula cuyo nombre coincida.
+  _wireClassroomLevelSync() {
+    const aulaSel = document.querySelector('[data-f="classroom_id"]');
+    const nivelSel = document.querySelector('[data-f="level_requested"]');
+    if (!aulaSel || !nivelSel) return;
+    if (aulaSel.dataset.synced) return;
+    aulaSel.dataset.synced = '1';
+
+    const roomByName = (name) => this._classrooms.find(c => String(c.name).toLowerCase() === String(name).toLowerCase());
+    const roomById = (id) => this._classrooms.find(c => String(c.id) === String(id));
+
+    aulaSel.addEventListener('change', () => {
+      const room = roomById(aulaSel.value);
+      if (room) {
+        nivelSel.value = room.name;
+        this._form.level_requested = room.name;
+      } else {
+        this._form.level_requested = '';
+      }
+    });
+
+    nivelSel.addEventListener('change', () => {
+      const room = roomByName(nivelSel.value);
+      if (room) {
+        aulaSel.value = String(room.id);
+        this._form.classroom_id = String(room.id);
+      } else {
+        this._form.classroom_id = '';
+      }
+    });
+
+    if (this._form.classroom_id && !this._form.level_requested) {
+      const room = roomById(this._form.classroom_id);
+      if (room && roomByName(room.name)) {
+        nivelSel.value = room.name;
+        this._form.level_requested = room.name;
+      }
+    }
   },
 
   // ---------------------------------------------------------------- FAMILIA (Tutores y núcleo familiar)
@@ -843,7 +909,10 @@ export const StudentRecordModal = {
                     <i data-lucide="user" class="w-3 h-3"></i>${Helpers.escapeHTML(s.name)} <span class="text-emerald-400">·</span> ${Helpers.escapeHTML(s.classrooms?.name || 'sin aula')}
                   </span>`).join('')}</div>
                  <p class="text-[11px] text-emerald-700 font-black mt-3">Se aplicará descuento de 10% por hermano (ver pestaña Pagos).</p>`
-              : '<p class="text-xs text-slate-400 font-bold">Sin hermanos detectados para este núcleo familiar.</p>'}
+              : `<div class="flex flex-col gap-1">
+                   <p class="text-xs text-slate-400 font-bold">Sin hermanos registrados.</p>
+                   <p class="text-[11px] text-slate-300 font-medium">Para vincular hermanos, marque la casilla "¿Tiene hermano(s)?" en la pestaña Información y guarde los cambios.</p>
+                 </div>`}
           </div>
         </div>
       </div>`;
@@ -1468,6 +1537,20 @@ export const StudentRecordModal = {
   },
 
   // ---------------------------------------------------------------- COLLECT / SAVE
+  /**
+   * Sincronización en vivo después de cualquier cambio de estudiante:
+   * invalida las cachés de estudiantes/aulas y notifica a las secciones
+   * abiertas (tabla de estudiantes y sección de aulas) para que se
+   * actualicen sin necesidad de recargar la página.
+   */
+  _afterSave() {
+    try { QueryCache.invalidate('dir_students'); } catch (_) {}
+    try { QueryCache.invalidate('dir_classrooms'); } catch (_) {}
+    try { QueryCache.invalidate('dir_classrooms_occ'); } catch (_) {}
+    try { if (this._onSaved) this._onSaved(); } catch (_) {}
+    try { window.dispatchEvent(new CustomEvent('karpus:students-changed')); } catch (_) {}
+  },
+
   _collect() {
     const f = this._form;
     return {
@@ -1602,7 +1685,12 @@ export const StudentRecordModal = {
     if (!f.name) { Helpers.toast('El nombre del estudiante es obligatorio (paso 1)', 'warning'); return false; }
     if (!f.classroom_id) { Helpers.toast('Asigna un aula en la pestaña "Info General"', 'warning'); return false; }
     const classroom = this._classrooms.find(c => String(c.id) === String(f.classroom_id));
-    if (classroom && classroom.available <= 0) { Helpers.toast('Esa aula está llena. Elige otra.', 'warning'); return false; }
+    // Solo bloquear si capacity > 0 Y el aula está llena Y no es el aula actual del estudiante
+    const isCurrentRoom = this._student && String(this._student.classroom_id) === String(f.classroom_id);
+    if (!isCurrentRoom && classroom && classroom.capacity > 0 && classroom.available <= 0) {
+      Helpers.toast('Esa aula está llena. Elige otra o aumenta la capacidad.', 'warning');
+      return false;
+    }
     return true;
   },
 
@@ -1664,7 +1752,7 @@ export const StudentRecordModal = {
 
       Helpers.toast(payload.monthly_fee > 0 || payload.inscription_fee > 0 ? 'Estudiante creado y cargos generados' : 'Estudiante creado', 'success');
       _closeModal();
-      if (this._onSaved) this._onSaved();
+      this._afterSave();
     } catch (e) {
       Helpers.toast('Error al crear: ' + (e.message || e), 'error');
     } finally {
@@ -1729,7 +1817,7 @@ export const StudentRecordModal = {
 
       Helpers.toast('Estudiante admitido y cargos generados', 'success');
       _closeModal();
-      if (this._onSaved) this._onSaved();
+      this._afterSave();
     } catch (e) {
       Helpers.toast('Error al admitir: ' + (e.message || e), 'error');
     } finally {
@@ -1761,7 +1849,7 @@ export const StudentRecordModal = {
 
       Helpers.toast('Expediente actualizado', 'success');
       _closeModal();
-      if (this._onSaved) this._onSaved();
+      this._afterSave();
     } catch (e) {
       Helpers.toast('Error al guardar: ' + (e.message || e), 'error');
     } finally {
@@ -1788,7 +1876,7 @@ export const StudentRecordModal = {
       await auditLog('preregistration.rejected', { prereg_id: this._prereg.id, student_name: this._form.name });
       Helpers.toast('Preinscripción rechazada', 'info');
       _closeModal();
-      if (this._onSaved) this._onSaved();
+      this._afterSave();
     } catch (e) {
       Helpers.toast('Error al rechazar: ' + (e.message || e), 'error');
     } finally {

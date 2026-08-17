@@ -5,7 +5,6 @@ import { Helpers } from './helpers.js';
 import { AppState } from './appState.js';
 import { NotifyPermission } from '../shared/notify-permission.js';
 import { BadgeSystem } from '../shared/badges.js';
-import { ImageLoader } from '../shared/image-loader.js';
 import { OnboardingGuide } from '../shared/onboarding.js';
 import { Prefetch } from '../shared/prefetch.js';
 import { VideoCallUI } from '../shared/videocall-ui.js';
@@ -51,8 +50,7 @@ window.App = {
     const imgData = img.src;
     const classroom = student.classrooms?.name || '';
     const level = student.classrooms?.level || '';
-    const win = window.open('', '_blank');
-    win.document.write(Helpers.getQRPrintTemplate(imgData, student.name, student.matricula, {
+    _openPrintWindow(Helpers.getQRPrintTemplate(imgData, student.name, student.matricula, {
       classroom, level,
       p1Name: student.p1_name || '',
       p2Name: student.p2_name || '',
@@ -60,10 +58,35 @@ window.App = {
       p2Phone: student.p2_phone || '',
       isInactive: student.is_active === false
     }));
-    win.document.close();
   }
 };
 window.BadgeSystem = BadgeSystem;
+
+// Abre una ventana de impresión sin document.write (API obsoleta)
+function _openPrintWindow(html) {
+  const win = window.open('', '_blank');
+  if (!win) return;
+  const parsed = new DOMParser().parseFromString(html, 'text/html');
+  win.document.replaceChild(win.document.adoptNode(parsed.documentElement), win.document.documentElement);
+  const images = Array.from(win.document.images);
+  if (!images.length) {
+    win.print();
+    return;
+  }
+  let remaining = images.length;
+  const tryPrint = () => {
+    remaining -= 1;
+    if (remaining === 0) win.print();
+  };
+  images.forEach(img => {
+    if (img.complete) {
+      tryPrint();
+    } else {
+      img.addEventListener('load', tryPrint, { once: true });
+      img.addEventListener('error', tryPrint, { once: true });
+    }
+  });
+}
 
 // Modal global para el panel padre (compatibilidad con directora/asistente)
 if (!window.openGlobalModal) {
@@ -93,6 +116,53 @@ window.addEventListener('unhandledrejection', (e) => {
   if (msg.includes('indexeddb') || msg.includes('network') || msg.includes('fetch')) return;
 
 });
+
+async function _initPush(user) {
+  try {
+    initOneSignal(user);
+  } catch (e) {
+    console.warn('OneSignal no inicializado:', e);
+  }
+}
+
+function _pickDeepLinkStudent(students, deepBoletin) {
+  if (!deepBoletin) return null;
+  return students.find(s => String(s.id) === String(deepBoletin));
+}
+
+function _applyDeepLink(deepBoletin, deepPeriodo) {
+  if (!deepBoletin || !deepPeriodo) return;
+  navigateTo('grades');
+  setTimeout(() => {
+    const filter = document.getElementById('padrePeriodFilter');
+    if (filter && [...filter.options].some(o => o.value === String(deepPeriodo))) {
+      filter.value = String(deepPeriodo);
+      filter.dispatchEvent(new Event('change'));
+    }
+  }, 800);
+}
+
+function _preloadQRCode() {
+  setTimeout(() => {
+    if (!window.QRCode) {
+      const s = document.createElement('script');
+      s.src = 'js/shared/qrcode.min.js';
+      document.head.appendChild(s);
+    }
+  }, 2000);
+}
+
+function _showEmptyStudents() {
+  const el = document.getElementById('dashboardGrid');
+  if (el) el.innerHTML = Helpers.emptyState('No hay estudiantes vinculados a esta cuenta.');
+}
+
+function _showSkeletons() {
+  const grid = document.getElementById('dashboardGrid');
+  const summary = document.getElementById('dailySummaryCard');
+  if (grid) grid.innerHTML = Helpers.skeleton(5, 'h-28');
+  if (summary) summary.innerHTML = Helpers.skeleton(1, 'h-40');
+}
 
 document.addEventListener('DOMContentLoaded', async () => {
   try {
@@ -126,12 +196,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     const host = window.location.hostname;
     const isProd = host === 'karpuskids.com' || host === 'www.karpuskids.com' || host.endsWith('.karpuskids.com') || host === 'localhost';
     
-    if (isProd) {
-      try { await initOneSignal(auth.user); } catch(e) {
-
-      }
-    } else {
-    }
+    if (isProd) { await _initPush(auth.user); }
 
     const { data: students, error } = await supabase
       .from('students')
@@ -141,8 +206,7 @@ document.addEventListener('DOMContentLoaded', async () => {
 
     if (error) throw error;
     if (!students?.length) {
-      const el = document.getElementById('dashboardGrid');
-      if (el) el.innerHTML = Helpers.emptyState('No hay estudiantes vinculados a esta cuenta.');
+      _showEmptyStudents();
       return;
     }
 
@@ -153,11 +217,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     const urlParams = new URLSearchParams(window.location.search);
     const deepBoletin = urlParams.get('boletin');
     const deepPeriodo = urlParams.get('periodo');
-    let selectedStudent = currentStudent;
-    if (deepBoletin) {
-      const target = students.find(s => String(s.id) === String(deepBoletin));
-      if (target) selectedStudent = target;
-    }
+    const selectedStudent = _pickDeepLinkStudent(students, deepBoletin) || currentStudent;
     AppState.set('currentStudent', selectedStudent);
 
     // Actualizar sidebar y header ANTES de cargar datos
@@ -174,28 +234,13 @@ document.addEventListener('DOMContentLoaded', async () => {
     }
 
     // 🔗 Si viene de un QR del boletín, ir directo a calificaciones y pre-seleccionar el período
-    if (deepBoletin && deepPeriodo) {
-      navigateTo('grades');
-      setTimeout(() => {
-        const filter = document.getElementById('padrePeriodFilter');
-        if (filter && [...filter.options].some(o => o.value === String(deepPeriodo))) {
-          filter.value = String(deepPeriodo);
-          filter.dispatchEvent(new Event('change'));
-        }
-      }, 800);
-    }
+    _applyDeepLink(deepBoletin, deepPeriodo);
 
     // Mostrar skeletons inmediatamente
-    const grid    = document.getElementById('dashboardGrid');
-    const summary = document.getElementById('dailySummaryCard');
-    if (grid)    grid.innerHTML    = Helpers.skeleton(5, 'h-28');
-    if (summary) summary.innerHTML = Helpers.skeleton(1, 'h-40');
+    _showSkeletons();
 
     // Carga paralela — no bloquea UI
-    refreshDashboard().then(() => {
-      // Iniciar badges DESPUÉS de que las tarjetas del dashboard existan
-      BadgeSystem.init(auth.user.id);
-    });
+    refreshDashboard().then(() => BadgeSystem.init(auth.user.id));
 
     if (currentStudent?.classroom_id) {
       initLiveClassListener(currentStudent.classroom_id);
@@ -219,13 +264,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     // 🔴 Sistema de badges — se inicia en el .then() de refreshDashboard arriba
 
     // Precargar librería QR en background para que esté lista cuando el padre la necesite
-    setTimeout(() => {
-      if (!window.QRCode) {
-        const s = document.createElement('script');
-        s.src = 'js/shared/qrcode.min.js';
-        document.head.appendChild(s);
-      }
-    }, 2000);
+    _preloadQRCode();
 
     // 🎓 Guía de bienvenida para nuevos padres
     const parentName = auth.profile?.name?.split(' ')[0] || 'Bienvenido';
@@ -342,7 +381,7 @@ async function refreshDashboard() {
   _renderSchoolYearBanner();
 
   // checkActiveMeetings en background — no bloquea las tarjetas
-  checkActiveMeetings().catch(() => {});
+  checkActiveMeetings().catch(err => console.warn('checkActiveMeetings falló:', err));
 }
 
 // ── Banner de deuda vencida ───────────────────────────────────────────────────
@@ -421,8 +460,22 @@ function renderHomeCards(student, data) {
   const { finance, academic, todayAtt } = data || {};
   const debtTotal = finance?.debt?.total || 0;
   const pendingItems = finance?.debt?.items || [];
-  const inReview = pendingItems.filter(p => p.evidence_url || p.proof_url).length > 0;
+  const inReview = pendingItems.some(p => p.evidence_url || p.proof_url);
   const isLive = AppState.get('isClassLive');
+
+  // Estado del card de Pagos según deuda/revisión
+  let paySub = 'Al día';
+  let payColor = 'border-emerald-200';
+  let payIconBg = 'bg-emerald-100 text-emerald-700';
+  if (debtTotal > 0) {
+    paySub = 'Pendiente';
+    payColor = 'border-amber-200';
+    payIconBg = 'bg-amber-100 text-amber-700';
+  } else if (inReview) {
+    paySub = 'En Revisión';
+    payColor = 'border-blue-200';
+    payIconBg = 'bg-blue-100 text-blue-700';
+  }
 
   // Mapeo de estados de asistencia
   const attLabels = {
@@ -476,10 +529,10 @@ function renderHomeCards(student, data) {
     {
       title: 'Pagos',
       value: Helpers.formatCurrency(debtTotal),
-      sub: debtTotal > 0 ? 'Pendiente' : (inReview ? 'En Revisión' : 'Al día'),
+      sub: paySub,
       icon: ICONS.card,
-      color: debtTotal > 0 ? 'border-amber-200' : (inReview ? 'border-blue-200' : 'border-emerald-200'),
-      iconBg: debtTotal > 0 ? 'bg-amber-100 text-amber-700' : (inReview ? 'bg-blue-100 text-blue-700' : 'bg-emerald-100 text-emerald-700'),
+      color: payColor,
+      iconBg: payIconBg,
       target: 'payments'
     },
     {
@@ -526,6 +579,21 @@ const _V8_ICONS = {
   medicamento_extra:'💊', otro:'📋'
 };
 
+const _DEFAULT_SCHEDULE = [
+  { type: 'bienvenida', label: 'Bienvenida', hour: 7,  minute: 30, duration: 30, icon: '👋' },
+  { type: 'desayuno',   label: 'Desayuno',   hour: 8,  minute: 0,  duration: 60, icon: '🍞' },
+  { type: 'actividad',  label: 'Actividad',  hour: 9,  minute: 0,  duration: 30, icon: '📚' },
+  { type: 'bano',       label: 'Baño',       hour: 9,  minute: 30, duration: 30, icon: '🚽' },
+  { type: 'patio',      label: 'Patio',      hour: 10, minute: 0,  duration: 90, icon: '🌳' },
+  { type: 'almuerzo',   label: 'Almuerzo',   hour: 11, minute: 30, duration: 60, icon: '🥗' },
+  { type: 'siesta',     label: 'Siesta',     hour: 12, minute: 30, duration: 90, icon: '😴' },
+  { type: 'merienda',   label: 'Merienda',   hour: 14, minute: 0,  duration: 60, icon: '🍎' },
+  { type: 'biberon',    label: 'Biberón',    hour: 15, minute: 0,  duration: 30, icon: '🍼' },
+];
+
+const _FOOD_LABEL = { todo:'Comió todo 🌟', all:'Comió todo 🌟', poco:'Comió poco 🍲', little:'Comió poco 🍲', half:'La mitad 🥣', nada:'No comió 🙅', none:'No comió 🙅' };
+const _MOOD_LABEL = { feliz:'Contento/a', bien:'Bien', normal:'Normal', triste:'Triste', inquieto:'Inquieto/a', enojado:'Molesto/a' };
+
 function renderDailySummary(log, schedule = []) {
   const container = document.getElementById('dailySummaryCard');
   if (!container) return;
@@ -539,125 +607,170 @@ function renderDailySummary(log, schedule = []) {
     return;
   }
 
-  const student  = AppState.get('currentStudent');
-  const events   = log.events || log.infant_data || [];
+  const student = AppState.get('currentStudent');
+  const events = log.events || log.infant_data || [];
   const isInfant = student?.age_type === 'meses';
+  const sched = schedule?.length ? schedule : _DEFAULT_SCHEDULE;
+  const loggedByType = _groupEventsByType(events);
+  const rows = _buildDayRows(events, sched, loggedByType);
 
-  // ── Helpers internos ──────────────────────────────────────────────────
-  const fmtTime = iso => iso ? new Date(iso).toLocaleTimeString('es-ES', { hour:'2-digit', minute:'2-digit' }) : '–';
-  const minsDur = mins => { if (!mins || mins < 0) return '–'; const h = Math.floor(mins/60), m = mins%60; return h > 0 ? `${h}h ${m>0?m+'m':''}`.trim() : `${m}m`; };
+  if (isInfant) {
+    _renderInfantSummary(container, log);
+  } else {
+    _renderStandardSummary(container, rows);
+  }
 
-  // ── Calcular siesta(s) ─────────────────────────────────────────────────
-  const siestas = events.filter(e => e.type === 'siesta');
-  const siestasInfo = siestas.map(s => {
-    const inicio = fmtTime(s.created_at);
-    const fin    = s.end_at ? fmtTime(s.end_at) : (s.open ? 'En curso' : '–');
-    const dur    = s.duration_min ? minsDur(s.duration_min) : (s.open ? '…' : '–');
-    return { inicio, fin, dur, open: s.open };
-  });
-  const totalNapMins = siestas.reduce((sum,s) => sum + (s.duration_min || 0), 0);
+  if (window.lucide) lucide.createIcons();
+}
 
-  // ── Biberones ─────────────────────────────────────────────────────────
-  const biberones = events.filter(e => e.type === 'biberon' || e.type === 'milk' || e.type === 'structured_entry');
-  const totalOz   = biberones.reduce((sum,e) => sum + parseFloat(e.oz || e.milk || 0), 0);
-
-  // ── Comidas sólidas ────────────────────────────────────────────────────
-  const mealEmoji = { desayuno:'🥐', almuerzo:'🍽️', merienda:'🍎' };
-  const foodLabelMap = { todo:'Comió todo 🌟', all:'Comió todo 🌟', poco:'Comió poco 🍲', little:'Comió poco 🍲', half:'La mitad 🥣', nada:'No comió 🙅', none:'No comió 🙅' };
-  const mealEvents = events.filter(e => ['desayuno','almuerzo','merienda'].includes(e.type));
-
-  // ── Estado ánimo ───────────────────────────────────────────────────────
-  const moodMap = { feliz:'😊', bien:'😊', normal:'😐', triste:'😢', inquieto:'😫', enojado:'😡' };
-  const moodIcon = moodMap[(log.mood || '').toLowerCase()] || '✨';
-  const moodLabel = { feliz:'Contento/a', bien:'Bien', normal:'Normal', triste:'Triste', inquieto:'Inquieto/a', enojado:'Molesto/a' };
-
-  // ── Temperatura ───────────────────────────────────────────────────────
-  const tempEvents = events.filter(e => e.type === 'temperatura');
-  const lastTemp   = tempEvents.length ? tempEvents[tempEvents.length - 1] : null;
-
-  // ── Pañales ────────────────────────────────────────────────────────────
-  const wetCount   = events.filter(e => e.type === 'panal_humedo').length;
-  const dirtyCount = events.filter(e => e.type === 'panal_sucio').length;
-
-  // ── Construir filas de la timeline resumida ────────────────────────────
-  const rows = [];
-
-  // Si hay horario, mostrar los eventos del horario como timeline principal
-  const _DEFAULT_SCHEDULE = [
-    { type: 'bienvenida', label: 'Bienvenida', hour: 7,  minute: 30, duration: 30, icon: '👋' },
-    { type: 'desayuno',   label: 'Desayuno',   hour: 8,  minute: 0,  duration: 60, icon: '🍞' },
-    { type: 'actividad',  label: 'Actividad',  hour: 9,  minute: 0,  duration: 30, icon: '📚' },
-    { type: 'bano',       label: 'Baño',       hour: 9,  minute: 30, duration: 30, icon: '🚽' },
-    { type: 'patio',      label: 'Patio',      hour: 10, minute: 0,  duration: 90, icon: '🌳' },
-    { type: 'almuerzo',   label: 'Almuerzo',   hour: 11, minute: 30, duration: 60, icon: '🥗' },
-    { type: 'siesta',     label: 'Siesta',     hour: 12, minute: 30, duration: 90, icon: '😴' },
-    { type: 'merienda',   label: 'Merienda',   hour: 14, minute: 0,  duration: 60, icon: '🍎' },
-    { type: 'biberon',    label: 'Biberón',    hour: 15, minute: 0,  duration: 30, icon: '🍼' },
-  ];
-  const sched = (schedule && schedule.length) ? schedule : _DEFAULT_SCHEDULE;
-  const schedIcons = _V8_ICONS;
-
-  // Mapear eventos logueados por tipo
-  const loggedByType = {};
+function _groupEventsByType(events) {
+  const byType = {};
   events.forEach(ev => {
-    if (!loggedByType[ev.type]) loggedByType[ev.type] = [];
-    loggedByType[ev.type].push(ev);
+    if (!byType[ev.type]) byType[ev.type] = [];
+    byType[ev.type].push(ev);
   });
+  return byType;
+}
 
-  // Solo mostrar eventos registrados cuya hora programada ya pasó
+function _formatEventTime(iso) {
+  if (!iso) return '–';
+  return new Date(iso).toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' });
+}
+
+function _formatTime12h(s) {
+  let hh = s.hour;
+  if (hh > 12) hh -= 12;
+  else if (hh === 0) hh = 12;
+  const ampm = s.hour >= 12 ? 'PM' : 'AM';
+  return `${hh}:${String(s.minute).padStart(2, '0')} ${ampm}`;
+}
+
+function _buildDayRows(events, sched, loggedByType) {
+  const rows = [];
   const now = new Date();
   const nowMins = now.getHours() * 60 + now.getMinutes();
 
   sched.forEach(s => {
-    const sMins = s.hour * 60 + s.minute;
-    const hh = s.hour > 12 ? s.hour - 12 : (s.hour === 0 ? 12 : s.hour);
-    const ampm = s.hour >= 12 ? 'PM' : 'AM';
-    const timeStr = `${hh}:${String(s.minute).padStart(2,'0')} ${ampm}`;
-
-    const evType = s.type;
-    const matchingEvents = loggedByType[evType] || [];
-    const hasSchedMark = matchingEvents.some(e => e.scheduled_time);
-    const matchingSched = hasSchedMark ? matchingEvents.filter(e => (e.scheduled_time || '') === timeStr) : matchingEvents;
-    // Para biberón, también checar structured_entry y milk
-    const milkEvents = (loggedByType['biberon'] || []).concat(loggedByType['milk'] || []).concat(loggedByType['structured_entry'] || []);
-    const isBiberon = evType === 'biberon';
-    const hasLogged = isBiberon ? milkEvents.length > 0 : (hasSchedMark ? matchingSched.length > 0 : matchingEvents.length > 0);
-
-    // Ocultar si no está registrado o aún no es su hora
-    if (!hasLogged || nowMins < sMins) return;
-
-    const icon = s.icon || schedIcons[s.type] || '⏰';
-
-    // Detail
-    let detail = s.label;
-    if (hasLogged && isBiberon) {
-      const totalOz = milkEvents.reduce((sum, e) => sum + parseFloat(e.oz || e.milk || e.value || 0), 0);
-      if (totalOz > 0) detail = `${s.label} — ${totalOz} oz`;
-    } else if (hasLogged && evType === 'siesta') {
-      const totalMins = (loggedByType['siesta'] || []).reduce((sum, e) => sum + (e.duration_min || 0), 0);
-      const open = (loggedByType['siesta'] || []).some(e => e.open);
-      if (open) detail = `${s.label} — En curso`;
-      else if (totalMins > 0) detail = `${s.label} — ${totalMins}min`;
-    } else if (hasLogged && matchingSched[0]) {
-      const first = matchingSched[0];
-      if (first.food) detail = `${s.label} — ${foodLabelMap[first.food] || first.food}`;
-      else if (first.mood) detail = `${s.label} — ${moodLabel[first.mood] || first.mood}`;
-      else if (first.comment) detail = `${s.label} — ${first.comment}`;
-    }
-
-    const bgCls = 'bg-green-50 border-green-200';
-    rows.push({ icon, label: detail, sub: timeStr, time: '', color: bgCls });
+    const row = _buildScheduleRow(s, loggedByType, nowMins);
+    if (row) rows.push(row);
   });
 
-  // Agregar eventos extra que no están en el horario
   const schedTypes = new Set(sched.map(s => s.type));
-  events.filter(e => !schedTypes.has(e.type)).forEach(ev => {
+  events.forEach(ev => {
+    if (schedTypes.has(ev.type)) return;
     const icon = _V8_ICONS[ev.type] || '📋';
     const label = ev.type.charAt(0).toUpperCase() + ev.type.slice(1).replace('_', ' ');
-    rows.push({ icon, label, sub: fmtTime(ev.created_at), time: '', color: 'bg-amber-50 border-amber-200' });
+    rows.push({ icon, label, sub: _formatEventTime(ev.created_at), time: '', color: 'bg-amber-50 border-amber-200' });
   });
 
-  // ── Render ──────────────────────────────────────────────────────────────
+  return rows;
+}
+
+function _buildScheduleRow(s, loggedByType, nowMins) {
+  const sMins = s.hour * 60 + s.minute;
+  const timeStr = _formatTime12h(s);
+  const evType = s.type;
+  const matchingEvents = loggedByType[evType] || [];
+  const hasSchedMark = matchingEvents.some(e => e.scheduled_time);
+  const matchingSched = hasSchedMark ? matchingEvents.filter(e => (e.scheduled_time || '') === timeStr) : matchingEvents;
+  const milkEvents = (loggedByType['biberon'] || []).concat(loggedByType['milk'] || []).concat(loggedByType['structured_entry'] || []);
+  const isBiberon = evType === 'biberon';
+  let hasLogged = false;
+  if (isBiberon) {
+    hasLogged = milkEvents.length > 0;
+  } else if (hasSchedMark) {
+    hasLogged = matchingSched.length > 0;
+  } else {
+    hasLogged = matchingEvents.length > 0;
+  }
+
+  if (!hasLogged || nowMins < sMins) return null;
+
+  const icon = s.icon || _V8_ICONS[s.type] || '⏰';
+  const detail = _scheduleDetail(s, matchingSched, loggedByType, isBiberon, milkEvents);
+
+  return { icon, label: detail, sub: timeStr, time: '', color: 'bg-green-50 border-green-200' };
+}
+
+function _siestaDetail(label, loggedByType) {
+  const events = loggedByType['siesta'] || [];
+  if (events.some(e => e.open)) return `${label} — En curso`;
+  const totalMins = events.reduce((sum, e) => sum + (e.duration_min || 0), 0);
+  if (totalMins > 0) return `${label} — ${totalMins}min`;
+  return label;
+}
+
+function _firstEventDetail(label, first) {
+  if (first.food) return `${label} — ${_FOOD_LABEL[first.food] || first.food}`;
+  if (first.mood) return `${label} — ${_MOOD_LABEL[first.mood] || first.mood}`;
+  if (first.comment) return `${label} — ${first.comment}`;
+  return label;
+}
+
+function _scheduleDetail(s, matchingSched, loggedByType, isBiberon, milkEvents) {
+  if (isBiberon) {
+    const totalOz = milkEvents.reduce((sum, e) => sum + Number.parseFloat(e.oz || e.milk || e.value || 0), 0);
+    if (totalOz > 0) return `${s.label} — ${totalOz} oz`;
+    return s.label;
+  }
+  if (s.type === 'siesta') return _siestaDetail(s.label, loggedByType);
+  if (matchingSched[0]) return _firstEventDetail(s.label, matchingSched[0]);
+  return s.label;
+}
+
+function _infantIcon(type) {
+  if (type === 'milk') return '🍼';
+  if (type === 'health') return '🤢';
+  if (type === 'sleep') return '💤';
+  return '💩';
+}
+
+function _infantEventText(e) {
+  if (e.type === 'milk') return `Tomó ${e.value} de leche`;
+  if (e.type === 'health') return `Reportó ${e.value}`;
+  if (e.type === 'sleep') return 'Inició siesta';
+  return `Cambio de pañal: ${e.value}`;
+}
+
+function _renderInfantSummary(container, log) {
+  const infantData = log.infant_data || [];
+  const hasVomit = infantData.some(e => e.type === 'health' && e.value === 'vomito');
+
+  container.innerHTML = `
+    <div class="bg-white rounded-2xl p-6 border ${hasVomit ? 'border-rose-200 bg-rose-50/30' : 'border-blue-100'} shadow-sm">
+      <h3 class="font-black text-slate-800 text-base mb-4 flex items-center gap-2">
+        <span class="bg-blue-100 text-blue-700 p-1.5 rounded-lg"><i data-lucide="baby" class="w-4 h-4"></i></span>
+        Cuidado del Bebé - Hoy
+      </h3>
+
+      ${hasVomit ? `
+        <div class="mb-4 p-4 bg-rose-100 border-2 border-rose-200 rounded-2xl flex items-center gap-3 animate-pulse">
+          <span class="text-2xl">⚠️</span>
+          <div>
+            <p class="text-xs font-black text-rose-800 uppercase">Alerta de Salud</p>
+            <p class="text-sm font-bold text-rose-700">Se ha registrado un evento de vómito. Favor estar atentos.</p>
+          </div>
+        </div>
+      ` : ''}
+
+      <div class="relative space-y-4 before:content-[''] before:absolute before:left-[15px] before:top-2 before:bottom-2 before:w-0.5 before:bg-blue-100">
+        ${infantData.length ? infantData.map(e => `
+          <div class="relative pl-10">
+            <div class="absolute left-0 top-1 w-8 h-8 rounded-full bg-white border-2 ${e.type === 'health' ? 'border-rose-400' : 'border-blue-400'} flex items-center justify-center text-sm shadow-sm z-10">
+              ${_infantIcon(e.type)}
+            </div>
+            <p class="text-[10px] font-black text-slate-400 uppercase">${_formatEventTime(e.created_at)}</p>
+            <p class="text-sm font-bold text-slate-700">
+              ${_infantEventText(e)}
+            </p>
+          </div>
+        `).join('') : '<p class="text-xs text-slate-400 italic pl-10">Iniciando el seguimiento del día...</p>'}
+      </div>
+    </div>
+  `;
+}
+
+function _renderStandardSummary(container, rows) {
   const rowsHTML = rows.map(r => `
     <div class="flex items-center gap-3 p-3 ${r.color} border rounded-2xl">
       <span class="text-2xl shrink-0">${r.icon}</span>
@@ -668,65 +781,25 @@ function renderDailySummary(log, schedule = []) {
       ${r.time ? `<span class="text-[10px] font-black text-slate-400 shrink-0">${r.time}</span>` : ''}
     </div>`).join('');
 
-  if (isInfant) {
-    // 🍼 LÍNEA DE TIEMPO PARA BEBÉS
-    const infantData = log.infant_data || [];
-    const hasVomit = infantData.some(e => e.type === 'health' && e.value === 'vomito');
-    
-    container.innerHTML = `
-      <div class="bg-white rounded-2xl p-6 border ${hasVomit ? 'border-rose-200 bg-rose-50/30' : 'border-blue-100'} shadow-sm">
-        <h3 class="font-black text-slate-800 text-base mb-4 flex items-center gap-2">
-          <span class="bg-blue-100 text-blue-700 p-1.5 rounded-lg"><i data-lucide="baby" class="w-4 h-4"></i></span>
-          Cuidado del Bebé - Hoy
+  container.innerHTML = `
+    <div class="bg-white rounded-2xl border border-green-100 shadow-sm overflow-hidden">
+      <div class="flex items-center justify-between px-5 pt-5 pb-3">
+        <h3 class="font-black text-slate-800 text-sm flex items-center gap-2">
+          <span class="bg-green-100 text-green-700 p-1.5 rounded-lg"><i data-lucide="clipboard-list" class="w-4 h-4"></i></span>
+          Resumen del Día
         </h3>
-
-        ${hasVomit ? `
-          <div class="mb-4 p-4 bg-rose-100 border-2 border-rose-200 rounded-2xl flex items-center gap-3 animate-pulse">
-            <span class="text-2xl">⚠️</span>
-            <div>
-              <p class="text-xs font-black text-rose-800 uppercase">Alerta de Salud</p>
-              <p class="text-sm font-bold text-rose-700">Se ha registrado un evento de vómito. Favor estar atentos.</p>
-            </div>
-          </div>
-        ` : ''}
-
-        <div class="relative space-y-4 before:content-[''] before:absolute before:left-[15px] before:top-2 before:bottom-2 before:w-0.5 before:bg-blue-100">
-          ${infantData.length ? infantData.map(e => `
-            <div class="relative pl-10">
-              <div class="absolute left-0 top-1 w-8 h-8 rounded-full bg-white border-2 ${e.type === 'health' ? 'border-rose-400' : 'border-blue-400'} flex items-center justify-center text-sm shadow-sm z-10">
-                ${e.type === 'milk' ? '🍼' : e.type === 'health' ? '🤢' : e.type === 'sleep' ? '💤' : '💩'}
-              </div>
-              <p class="text-[10px] font-black text-slate-400 uppercase">${new Date(e.created_at).toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'})}</p>
-              <p class="text-sm font-bold text-slate-700">
-                ${e.type === 'milk' ? `Tomó ${e.value} de leche` : 
-                  e.type === 'health' ? `Reportó ${e.value}` :
-                  e.type === 'sleep' ? `Inició siesta` :
-                  `Cambio de pañal: ${e.value}`}
-              </p>
-            </div>
-          `).join('') : '<p class="text-xs text-slate-400 italic pl-10">Iniciando el seguimiento del día...</p>'}
-        </div>
+        <button onclick="App.navigateTo('routine')" class="text-[10px] font-black text-[#28B54D] uppercase tracking-widest hover:underline whitespace-nowrap">Ver completo →</button>
       </div>
-    `;
-  } else {
-    // 🧒 RESUMEN ESTÁNDAR — usa el timeline ya calculado
-    container.innerHTML = `
-      <div class="bg-white rounded-2xl border border-green-100 shadow-sm overflow-hidden">
-        <div class="flex items-center justify-between px-5 pt-5 pb-3">
-          <h3 class="font-black text-slate-800 text-sm flex items-center gap-2">
-            <span class="bg-green-100 text-green-700 p-1.5 rounded-lg"><i data-lucide="clipboard-list" class="w-4 h-4"></i></span>
-            Resumen del Día
-          </h3>
-          <button onclick="App.navigateTo('routine')" class="text-[10px] font-black text-[#28B54D] uppercase tracking-widest hover:underline whitespace-nowrap">Ver completo →</button>
-        </div>
-        ${rows.length ? `<div class="px-4 pb-5 space-y-2">${rowsHTML}</div>` : `<div class="px-5 pb-5 text-center text-sm text-slate-400 font-bold">La maestra aún no ha registrado eventos detallados hoy.</div>`}
-      </div>`;
-  }
-
-  if (window.lucide) lucide.createIcons();
+      ${rows.length ? `<div class="px-4 pb-5 space-y-2">${rowsHTML}</div>` : `<div class="px-5 pb-5 text-center text-sm text-slate-400 font-bold">La maestra aún no ha registrado eventos detallados hoy.</div>`}
+    </div>`;
 }
 
 // ── Navegación ────────────────────────────────────────────────────────────────
+const _SECTION_THEMES = {
+  home: '#0ea5e9', tasks: '#F59E0B', class: '#3B82F6',
+  payments: '#059669', 'live-attendance': '#10B981', reenrollment: '#F59E0B'
+};
+
 export async function navigateTo(targetId) {
   if (!targetId) return;
   Helpers.vibrate?.('light');
@@ -743,79 +816,101 @@ export async function navigateTo(targetId) {
   if (target) {
     target.classList.remove('hidden');
     target.classList.add('active');
-      
-      // Cambiar color de la barra de estado/tema según sección
-      const themeColors = {
-        home: '#0ea5e9', tasks: '#F59E0B', class: '#3B82F6', 
-        payments: '#059669', 'live-attendance': '#10B981', reenrollment: '#F59E0B'
-      };
-      document.querySelector('meta[name="theme-color"]')?.setAttribute('content', themeColors[targetId] || '#0ea5e9');
-
+    _applySectionTheme(targetId);
     AppState.set('currentSection', targetId);
-
-    // 🔴 Marcar badges como leídos al entrar a la sección
-    BadgeSystem.mark(targetId);
-    // También limpiar badge de la tarjeta del dashboard
-    const cardBadge = document.getElementById('badge-card-' + targetId);
-    if (cardBadge) { cardBadge.classList.add('hidden'); cardBadge.classList.remove('flex'); }
-
-    const student = AppState.get('currentStudent');
-    switch (targetId) {
-      case 'home':
-        refreshDashboard().then(() => {
-          if (window.BadgeSystem) BadgeSystem._reapplyCardBadges();
-        });
-        break;
-      case 'payments': {
-        const fin = AppState.get('financeConfig') || {};
-        const setEl = (id, v) => { const el = document.getElementById(id); if (el) el.textContent = v; };
-        const paidTotal = (AppState.get('financeHistory') || []).reduce((s, p) => s + Number(p.amount || 0), 0);
-        setEl('paymentsBalance', Helpers.formatCurrency(paidTotal));
-        setEl('paymentsMonthlyFee', Helpers.formatCurrency(fin.monthly_fee || 0));
-        setEl('paymentsDueDay', fin.due_day || '-');
-        import('./payments.js').then(m => m.PaymentsModule.init(student?.id));
-        break;
-      }
-      case 'tasks':           import('./tasks.js').then(m => m.TasksModule.init(student?.id)); break;
-      case 'live-attendance': import('./attendance.js').then(m => m.AttendanceModule.init(student?.id)); break;
-      case 'notifications':   import('./chat.js').then(m => m.ChatModule.init()); break;
-      case 'class':           import('./feed.js').then(m => m.FeedModule.init(student?.classroom_id)); break;
-      case 'profile':         import('./profile.js').then(m => { m.ProfileModule.init(); _initPadreQR(student); NotifyPermission.requestIfNeeded(); }); break;
-      case 'grades':          import('./grades.js').then(m => m.GradesModule.init(student?.id)); break;
-      case 'reenrollment':    import('./reinscripcion.js').then(m => m.ReinscripcionModule.init(student?.id)); break;
-      case 'routine':
-        import('./routine.js').then(m => { window.RoutineModule = m.RoutineModule; m.RoutineModule.initRoutinePanel(student?.id); });
-        break;
-      case 'qr-access':       _initPadreQR(student); break;
-      case 'videocall': {
-        const student = AppState.get('currentStudent');
-        const profile = AppState.get('profile');
-        VideoCallUI.renderSection('videocall-section', {
-          role: 'padre',
-          // Mostrar nombre del estudiante en la videollamada, no del padre
-          userName: student?.name || profile?.name || 'Padre',
-          studentName: student?.name || '',
-          classroomId: student?.classroom_id || null
-        });
-        break;
-      }
-    }
+    _markBadgeRead(targetId);
+    _runSection(targetId);
   }
 
   document.querySelectorAll('[data-target]').forEach(btn => {
     const isActive = btn.dataset.target === targetId;
     btn.classList.toggle('active', isActive);
   });
-  
-  // Cerrar sidebar en móvil al navegar
-  if (window.innerWidth < 768) {
-    const sidebar = document.getElementById('sidebar');
-    const overlay = document.getElementById('sidebarOverlay');
-    if (sidebar?.classList.contains('mobile-visible')) {
-      sidebar.classList.remove('mobile-visible');
-      overlay?.classList.add('hidden');
-    }
+
+  _closeMobileSidebar();
+}
+
+function _applySectionTheme(targetId) {
+  const meta = document.querySelector('meta[name="theme-color"]');
+  if (meta) meta.setAttribute('content', _SECTION_THEMES[targetId] || '#0ea5e9');
+}
+
+function _markBadgeRead(targetId) {
+  BadgeSystem.mark(targetId);
+  const cardBadge = document.getElementById('badge-card-' + targetId);
+  if (cardBadge) {
+    cardBadge.classList.add('hidden');
+    cardBadge.classList.remove('flex');
   }
+}
+
+function _closeMobileSidebar() {
+  if (window.innerWidth >= 768) return;
+  const sidebar = document.getElementById('sidebar');
+  const overlay = document.getElementById('sidebarOverlay');
+  if (sidebar?.classList.contains('mobile-visible')) {
+    sidebar.classList.remove('mobile-visible');
+    overlay?.classList.add('hidden');
+  }
+}
+
+function _runSection(targetId) {
+  const student = AppState.get('currentStudent');
+  switch (targetId) {
+    case 'home':
+      refreshDashboard().then(() => {
+        if (window.BadgeSystem) BadgeSystem._reapplyCardBadges();
+      });
+      break;
+    case 'payments':        _initPaymentsSection(student); break;
+    case 'tasks':           import('./tasks.js').then(m => m.TasksModule.init(student?.id)); break;
+    case 'live-attendance': import('./attendance.js').then(m => m.AttendanceModule.init(student?.id)); break;
+    case 'notifications':   import('./chat.js').then(m => m.ChatModule.init()); break;
+    case 'class':           import('./feed.js').then(m => m.FeedModule.init(student?.classroom_id)); break;
+    case 'profile':         _initProfileSection(student); break;
+    case 'grades':          import('./grades.js').then(m => m.GradesModule.init(student?.id)); break;
+    case 'reenrollment':    import('./reinscripcion.js').then(m => m.ReinscripcionModule.init(student?.id)); break;
+    case 'routine':         _initRoutineSection(student); break;
+    case 'qr-access':       _initPadreQR(student); break;
+    case 'videocall':       _initVideocallSection(); break;
+  }
+}
+
+function _initPaymentsSection(student) {
+  const fin = AppState.get('financeConfig') || {};
+  const setEl = (id, v) => { const el = document.getElementById(id); if (el) el.textContent = v; };
+  const paidTotal = (AppState.get('financeHistory') || []).reduce((s, p) => s + Number(p.amount || 0), 0);
+  setEl('paymentsBalance', Helpers.formatCurrency(paidTotal));
+  setEl('paymentsMonthlyFee', Helpers.formatCurrency(fin.monthly_fee || 0));
+  setEl('paymentsDueDay', fin.due_day || '-');
+  import('./payments.js').then(m => m.PaymentsModule.init(student?.id));
+}
+
+function _initProfileSection(student) {
+  import('./profile.js').then(m => {
+    m.ProfileModule.init();
+    _initPadreQR(student);
+    NotifyPermission.requestIfNeeded();
+  });
+}
+
+function _initRoutineSection(student) {
+  import('./routine.js').then(m => {
+    window.RoutineModule = m.RoutineModule;
+    m.RoutineModule.initRoutinePanel(student?.id);
+  });
+}
+
+function _initVideocallSection() {
+  const student = AppState.get('currentStudent');
+  const profile = AppState.get('profile');
+  VideoCallUI.renderSection('videocall-section', {
+    role: 'padre',
+    // Mostrar nombre del estudiante en la videollamada, no del padre
+    userName: student?.name || profile?.name || 'Padre',
+    studentName: student?.name || '',
+    classroomId: student?.classroom_id || null
+  });
 }
 
 function setupNavigation() {
@@ -842,7 +937,7 @@ function setupGlobalListeners() {
     if (String(payload?.student_id) !== String(student.id)) return;
     const status = payload?.status || 'present';
     AppState.set('todayAttendance', status);
-    // Re-renderizar solo la tarjeta de asistencia sin recargar todo
+    // Re-renderizar solo la tarjeta de asistencia sin recargar la página
     const attCard = document.querySelector('[data-target="live-attendance"]');
     if (attCard) {
       const attLabels = { present: 'Presente', presente: 'Presente', absent: 'Ausente', late: 'Tarde' };
@@ -863,17 +958,21 @@ async function loadUnreadBadge() {
     if (!user) return;
 
     let total = 0;
-    const { data, error } = await supabase.rpc('get_unread_counts');
-    if (!error && data) {
+    // Mensajes no leídos
+    const { data } = await supabase.rpc('get_unread_counts');
+    if (data) {
       total = Object.values(data).reduce((a, b) => a + Number(b), 0);
     }
-    // Si el RPC falla, mostrar 0 silenciosamente
+    // Notificaciones no leídas
+    const { count: notifCount } = await supabase
+      .from('notifications')
+      .select('id', { count: 'exact', head: true })
+      .eq('user_id', user.id)
+      .eq('is_read', false);
+    total += (notifCount || 0);
 
-    // Los mensajes no leídos van en la tarjeta Chat del dashboard.
-    // (badge-class del sidebar es exclusivo para posts nuevos del muro).
     const badge = document.getElementById('badge-card-notifications');
     if (!badge) return;
-
     if (total > 0) {
       badge.textContent = total > 99 ? '99+' : String(total);
       badge.classList.remove('hidden');
@@ -882,7 +981,7 @@ async function loadUnreadBadge() {
       badge.classList.add('hidden');
       badge.classList.remove('flex');
     }
-  } catch (_) { /* silencioso */ }
+  } catch (_) { console.warn('No se pudo actualizar el badge de mensajes'); }
 }
 
 // Actualizar badge en tiempo real cuando llega un mensaje nuevo
@@ -895,6 +994,12 @@ function initMessageBadgeRealtime() {
       event: 'INSERT',
       schema: 'public',
       table: 'messages'
+    }, () => { loadUnreadBadge(); })
+    .on('postgres_changes', {
+      event: 'INSERT',
+      schema: 'public',
+      table: 'notifications',
+      filter: `user_id=eq.${user.id}`
     }, () => { loadUnreadBadge(); })
     .subscribe();
 }
@@ -948,20 +1053,35 @@ async function openDigitalID() {
 
   // ✨ Modo Brillo Máximo (Opcional - solo si el navegador lo soporta)
   if ('wakeLock' in navigator) {
-    try { await navigator.wakeLock.request('screen'); } catch(_) {}
+    try {
+      await navigator.wakeLock.request('screen');
+    } catch (err) {
+      console.warn('wakeLock no disponible:', err);
+    }
   }
 }
 
 function updateHeaderProfile(profile, student, allStudents = []) {
   const studentName = student?.name || 'Estudiante';
 
-  // Sidebar — nombre + avatar del estudiante
   const sidebarName = document.getElementById('sidebar-student-name');
   if (sidebarName) sidebarName.textContent = studentName;
 
-  // UX: Añadir indicador visual y disparador si hay múltiples estudiantes
+  _wireStudentSwitcher(student, allStudents);
+  _renderSiblingChips(allStudents, student);
+  _renderSidebarAvatar(student, studentName);
+  _renderHeaderAvatars(student, studentName);
+  _renderNameDisplays(student, studentName);
+  _renderProfileSiblings(allStudents, student);
+
+  if (window.lucide) lucide.createIcons();
+}
+
+function _wireStudentSwitcher(student, allStudents) {
+  if (allStudents.length <= 1) return;
+
   const switcherTrigger = document.getElementById('student-switcher-trigger');
-  if (switcherTrigger && allStudents.length > 1) {
+  if (switcherTrigger) {
     const label = switcherTrigger.querySelector('p');
     if (label && !label.innerHTML.includes('chevron')) {
       label.innerHTML += ' <i data-lucide="chevron-down" class="inline w-3 h-3 ml-1"></i>';
@@ -969,97 +1089,112 @@ function updateHeaderProfile(profile, student, allStudents = []) {
     switcherTrigger.onclick = () => _showStudentSwitcher(allStudents);
   }
 
-  // ── CHIPS DE HERMANOS ─────────────────────────────────────────
-  if (allStudents.length > 1) {
-    let chipsInner = '';
-    allStudents.forEach(function(s) {
-      const isActive = String(s.id) === String(student?.id);
-      const firstName = (s.name || 'Estudiante').split(' ')[0];
-      const esc = firstName.replace(/[&<>"']/g, function(c) { return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]; });
-      const avatarBgClass = isActive ? 'bg-white text-emerald-600' : 'bg-slate-500 text-white';
-      const avatarHtml = s.avatar_url
-        ? '<img src="' + s.avatar_url + '" class="w-6 h-6 rounded-full object-cover mr-1.5 shrink-0" alt="">'
-        : '<span class="w-6 h-6 rounded-full ' + avatarBgClass + ' flex items-center justify-center text-[10px] font-black mr-1.5 shrink-0">' + firstName.charAt(0) + '</span>';
-      const btnClass = isActive
-        ? 'flex items-center px-3 py-1.5 rounded-full text-[11px] font-black transition-all active:scale-95 bg-emerald-500 text-white shadow-md'
-        : 'flex items-center px-3 py-1.5 rounded-full text-[11px] font-black transition-all active:scale-95 bg-slate-700 text-white hover:bg-slate-600';
-      chipsInner += '<button type="button" onclick="App.switchStudent(\'' + s.id + '\')" class="' + btnClass + '">' + avatarHtml + esc + '</button>';
-    });
-    const chipsHTML = '<div class="flex flex-wrap gap-2">' + chipsInner + '</div>';
-
-    const desktopEl = document.getElementById('siblings-chips-desktop');
-    const mobileEl  = document.getElementById('siblings-chips-mobile');
-    if (desktopEl) desktopEl.innerHTML = chipsHTML;
-    if (mobileEl)  mobileEl.innerHTML  = chipsHTML;
-  } else {
-    const desktopEl = document.getElementById('siblings-chips-desktop');
-    const mobileEl  = document.getElementById('siblings-chips-mobile');
-    if (desktopEl) desktopEl.innerHTML = '';
-    if (mobileEl)  mobileEl.innerHTML  = '';
-  }
-
-  const sidebarAvatar = document.getElementById('sidebarStudentAvatar');
-  if (sidebarAvatar) {
-    sidebarAvatar.innerHTML = student?.avatar_url
-      ? '<img src="' + student.avatar_url + '" class="w-full h-full object-cover">'
-      : '<span class="text-sm font-black text-emerald-700">' + studentName.charAt(0) + '</span>';
-  }
-
-  // Mobile header avatar también abre el selector
   const mobileAvatar = document.getElementById('headerAvatarMobile');
-  if (mobileAvatar && allStudents.length > 1) {
+  if (mobileAvatar) {
     mobileAvatar.style.cursor = 'pointer';
     mobileAvatar.onclick = () => _showStudentSwitcher(allStudents);
   }
+}
 
-  document.querySelectorAll('.guardian-name-display').forEach(el => el.textContent = studentName);
-  document.querySelectorAll('.student-name-display').forEach(el => el.textContent = studentName);
-  document.querySelectorAll('.classroom-name-display').forEach(el => {
-    el.textContent = student?.classrooms?.name || 'Sin aula';
-  });
+function _escapeAttr(text) {
+  const map = { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' };
+  return String(text || '').replace(/[&<>"']/g, c => map[c]);
+}
 
-  // Desktop header avatar
+function _renderSiblingChips(allStudents, currentStudent) {
+  const desktopEl = document.getElementById('siblings-chips-desktop');
+  const mobileEl = document.getElementById('siblings-chips-mobile');
+  if (!desktopEl && !mobileEl) return;
+
+  if (allStudents.length <= 1) {
+    if (desktopEl) desktopEl.innerHTML = '';
+    if (mobileEl) mobileEl.innerHTML = '';
+    return;
+  }
+
+  const chips = allStudents.map(s => {
+    const isActive = String(s.id) === String(currentStudent?.id);
+    const firstName = (s.name || 'Estudiante').split(' ')[0];
+    const esc = _escapeAttr(firstName);
+    const avatarBgClass = isActive ? 'bg-white text-emerald-600' : 'bg-slate-500 text-white';
+    const avatarHtml = s.avatar_url
+      ? '<img src="' + s.avatar_url + '" class="w-6 h-6 rounded-full object-cover mr-1.5 shrink-0" alt="">'
+      : '<span class="w-6 h-6 rounded-full ' + avatarBgClass + ' flex items-center justify-center text-[10px] font-black mr-1.5 shrink-0">' + firstName.charAt(0) + '</span>';
+    const btnClass = isActive
+      ? 'flex items-center px-3 py-1.5 rounded-full text-[11px] font-black transition-all active:scale-95 bg-emerald-500 text-white shadow-md'
+      : 'flex items-center px-3 py-1.5 rounded-full text-[11px] font-black transition-all active:scale-95 bg-slate-700 text-white hover:bg-slate-600';
+    return '<button type="button" onclick="App.switchStudent(\'' + s.id + '\')" class="' + btnClass + '">' + avatarHtml + esc + '</button>';
+  }).join('');
+  const chipsHTML = '<div class="flex flex-wrap gap-2">' + chips + '</div>';
+  if (desktopEl) desktopEl.innerHTML = chipsHTML;
+  if (mobileEl) mobileEl.innerHTML = chipsHTML;
+}
+
+function _renderSidebarAvatar(student, studentName) {
+  const sidebarAvatar = document.getElementById('sidebarStudentAvatar');
+  if (!sidebarAvatar) return;
+  sidebarAvatar.innerHTML = student?.avatar_url
+    ? '<img src="' + student.avatar_url + '" class="w-full h-full object-cover">'
+    : '<span class="text-sm font-black text-emerald-700">' + studentName.charAt(0) + '</span>';
+}
+
+function _renderHeaderAvatars(student, studentName) {
   const avatarContainer = document.getElementById('headerStudentAvatar');
   if (avatarContainer) {
     avatarContainer.innerHTML = student?.avatar_url
-      ? '<img src="' + student.avatar_url + '" class="w-full h-full object-cover" onerror="this.parentElement.innerHTML=\'<span class=\\\"text-lg font-black text-green-700\\\">' + studentName.charAt(0) + '</span>\'">'
+      ? '<img src="' + student.avatar_url + '" class="w-full h-full object-cover">'
       : '<span class="text-lg font-black text-green-700">' + studentName.charAt(0) + '</span>';
+    const avatarImg = avatarContainer.querySelector('img');
+    if (avatarImg) {
+      avatarImg.onerror = () => {
+        avatarContainer.innerHTML = '<span class="text-lg font-black text-green-700">' + studentName.charAt(0) + '</span>';
+      };
+    }
   }
 
-  // Mobile header avatar
+  const mobileAvatar = document.getElementById('headerAvatarMobile');
   if (mobileAvatar) {
     mobileAvatar.innerHTML = student?.avatar_url
       ? '<img src="' + student.avatar_url + '" class="w-full h-full object-cover">'
       : '<span class="text-sm font-black text-sky-700">' + studentName.charAt(0) + '</span>';
   }
+}
 
-  // Render siblings in profile section
-  const siblingsContainer = document.getElementById('profile-siblings-container');
-  const siblingsList = document.getElementById('profile-siblings-list');
-  if (siblingsContainer && siblingsList) {
-    if (allStudents.length > 1) {
-      siblingsContainer.classList.remove('hidden');
-      siblingsList.innerHTML = allStudents.map(s => {
-        const isActive = String(s.id) === String(student?.id);
-        return `
-          <button onclick="App.switchStudent('${s.id}')" 
-            class="flex items-center gap-2 p-3 rounded-2xl transition-all border-2 ${isActive ? 'bg-emerald-500 border-emerald-600 text-white' : 'bg-white border-slate-100 hover:bg-emerald-50 hover:border-emerald-200 text-slate-700'}">
-            <div class="w-8 h-8 rounded-xl overflow-hidden ${isActive ? 'bg-white/20' : 'bg-slate-100'} flex items-center justify-center shrink-0">
-              ${s.avatar_url 
-                ? `<img src="${s.avatar_url}" class="w-full h-full object-cover">` 
-                : `<span class="font-black ${isActive ? 'text-white' : 'text-slate-400'}">${s.name.charAt(0)}</span>`
-              }
-            </div>
-            <span class="text-sm font-bold">${Helpers.escapeHTML(s.name)}</span>
-          </button>`;
-      }).join('');
-    } else {
-      siblingsContainer.classList.add('hidden');
-      siblingsList.innerHTML = '';
-    }
+function _renderNameDisplays(student, studentName) {
+  document.querySelectorAll('.guardian-name-display').forEach(el => el.textContent = studentName);
+  document.querySelectorAll('.student-name-display').forEach(el => el.textContent = studentName);
+  document.querySelectorAll('.classroom-name-display').forEach(el => {
+    el.textContent = student?.classrooms?.name || 'Sin aula';
+  });
+}
+
+function _renderProfileSiblings(allStudents, currentStudent) {
+  const container = document.getElementById('profile-siblings-container');
+  const list = document.getElementById('profile-siblings-list');
+  if (!container || !list) return;
+
+  if (allStudents.length <= 1) {
+    container.classList.add('hidden');
+    list.innerHTML = '';
+    return;
   }
 
-  if (window.lucide) lucide.createIcons();
+  container.classList.remove('hidden');
+  list.innerHTML = allStudents.map(s => {
+    const isActive = String(s.id) === String(currentStudent?.id);
+    const avatarClass = isActive ? 'text-white' : 'text-slate-400';
+    const avatarHtml = s.avatar_url
+      ? `<img src="${s.avatar_url}" class="w-full h-full object-cover">`
+      : `<span class="font-black ${avatarClass}">${s.name.charAt(0)}</span>`;
+    return `
+      <button onclick="App.switchStudent('${s.id}')" 
+        class="flex items-center gap-2 p-3 rounded-2xl transition-all border-2 ${isActive ? 'bg-emerald-500 border-emerald-600 text-white' : 'bg-white border-slate-100 hover:bg-emerald-50 hover:border-emerald-200 text-slate-700'}">
+        <div class="w-8 h-8 rounded-xl overflow-hidden ${isActive ? 'bg-white/20' : 'bg-slate-100'} flex items-center justify-center shrink-0">
+          ${avatarHtml}
+        </div>
+        <span class="text-sm font-bold">${Helpers.escapeHTML(s.name)}</span>
+      </button>`;
+  }).join('');
 }
 
 /**
@@ -1084,7 +1219,11 @@ async function switchStudent(studentId) {
     const channels = ['_dailyLogChannel', '_chatChannel', '_classroomChannel', '_notificationChannel', '_padreUnreadChannel'];
     channels.forEach(ch => {
       if (window[ch]) {
-        try { supabase.removeChannel(window[ch]); } catch(_) {}
+        try {
+          supabase.removeChannel(window[ch]);
+        } catch (err) {
+          console.warn('No se pudo remover el canal realtime:', err);
+        }
         window[ch] = null;
       }
     });
@@ -1154,7 +1293,9 @@ function _initDailyLogRealtime(studentId) {
   if (window._dailyLogChannel) {
     try {
       window._dailyLogChannel.unsubscribe();
-    } catch (_) {}
+    } catch (err) {
+      console.warn('No se pudo cancelar el canal de daily log:', err);
+    }
   }
   window._dailyLogChannel = supabase
     .channel('daily_log_' + studentId)
@@ -1181,7 +1322,9 @@ function _initDailyLogRealtime(studentId) {
           hour: s.scheduled_hour, minute: s.scheduled_minute, duration: s.duration_minutes,
         }));
         renderDailySummary(log, schedNorm);
-      } catch (_) {}
+      } catch (err) {
+        console.warn('No se pudo renderizar el resumen diario:', err);
+      }
     })
     .subscribe();
 }
@@ -1210,7 +1353,9 @@ async function checkActiveMeetings() {
       btn.classList.add('hidden');
       btn.classList.remove('ring-2', 'ring-rose-400', 'animate-pulse');
     }
-  } catch (_) {}
+  } catch (err) {
+    console.warn('No se pudo verificar la clase en vivo:', err);
+  }
 }
 
 // ── QR de Acceso del Padre ────────────────────────────────────────────────────
@@ -1267,11 +1412,9 @@ async function _initPadreQR(student) {
   window.App.printPadreQR = () => {
     const img = container.querySelector('img')?.src;
     if (!img) return;
-    const win = window.open('', '_blank');
-    if (!win) return;
     const classroom = student.classrooms?.name || '';
     const level = student.classrooms?.level || '';
-    win.document.write(Helpers.getQRPrintTemplate(img, name, matricula, {
+    _openPrintWindow(Helpers.getQRPrintTemplate(img, name, matricula, {
       classroom, level,
       p1Name: student.p1_name || '',
       p2Name: student.p2_name || '',
@@ -1279,7 +1422,6 @@ async function _initPadreQR(student) {
       p2Phone: student.p2_phone || '',
       isInactive: student.is_active === false
     }));
-    win.document.close();
   };
 
   // Compartir (solo padre)
@@ -1306,7 +1448,9 @@ async function _initPadreQR(student) {
           await navigator.share({ title: `QR Karpus Kids - ${name}`, text: `Código QR de ${name}`, url: img.src });
         }
       }
-    } catch (_) {}
+    } catch (err) {
+      console.warn('No se pudo compartir el QR:', err);
+    }
   };
 }
 

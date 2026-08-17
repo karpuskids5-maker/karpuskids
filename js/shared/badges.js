@@ -60,8 +60,14 @@ export const BadgeSystem = {
   _getBadgeCount(section) {
     // Leer el badge del sidebar o, si no existe, el de la tarjeta del
     // dashboard (badge-card-*) para que los incrementos acumulen el total real.
-    const el = document.getElementById('badge-' + section) || document.getElementById('badge-card-' + section);
-    return el ? (parseInt(el.textContent) || 0) : 0;
+    // Panel maestra usa prefijo "t-" en sus badges del sidebar
+    const tId = (this._role === 'maestra' && !section.startsWith('t-'))
+      ? ('badge-t-' + section)
+      : ('badge-' + section);
+    const el = document.getElementById(tId)
+      || document.getElementById('badge-' + section)
+      || document.getElementById('badge-card-' + section);
+    return el ? (Number.parseInt(el.textContent) || 0) : 0;
   },
 
   async _loadCounts() {
@@ -375,7 +381,11 @@ export const BadgeSystem = {
   // Badge en el sidebar (badge-class, badge-tasks, badge-pagos, etc.)
   _renderBadge(section, count, type = 'default') {
     this._counts[section] = count; // guardar en memoria
-    const badge = document.getElementById('badge-' + section);
+    // Panel maestra usa prefijo "t-" para sus badges del sidebar
+    const id = (this._role === 'maestra' && !section.startsWith('t-'))
+      ? ('badge-t-' + section)
+      : ('badge-' + section);
+    const badge = document.getElementById(id) || document.getElementById('badge-' + section);
     if (!badge) return;
     if (count > 0) {
       badge.textContent = count > 99 ? '99+' : String(count);

@@ -339,7 +339,7 @@ export const PaymentsModule = {
         .eq('id', p.id)
         .maybeSingle();
       if (data) payment = data;
-    } catch (_) {}
+    } catch (_) { console.warn('No se pudo recargar el detalle del pago'); }
 
     // Obtener nombre de quien aprobó
     let approvedBy = 'Administración';
@@ -351,7 +351,7 @@ export const PaymentsModule = {
           .eq('id', payment.validated_by)
           .maybeSingle();
         if (approver?.name) approvedBy = approver.name;
-      } catch (_) {}
+      } catch (_) { console.warn('No se pudo obtener el nombre del aprobador'); }
     }
 
     const student    = payment.students || {};
@@ -749,7 +749,7 @@ export const PaymentsModule = {
         student_name: student.name,
         amount:       amount.toFixed(2),
         month:        monthRaw
-      }).catch(() => {});
+      }).catch(err => console.warn('No se pudo registrar el pago:', err));
 
     } catch (err) {
       console.error('Error en submitPaymentProof:', err);

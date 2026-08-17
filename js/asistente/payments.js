@@ -138,7 +138,7 @@ export const PaymentsModule = {
       container.innerHTML = list.map(p => this._renderRow(p)).join('');
       if (window.lucide) lucide.createIcons();
     } catch (e) {
-      container.innerHTML = '<tr><td colspan="8" class="text-center py-8"><p class="text-rose-500 font-bold">Error al cargar: ' + (e.message || 'Intenta recargar') + '</p></td></tr>';
+      container.innerHTML = '<tr><td colspan="8" class="text-center py-8"><p class="text-rose-500 font-bold">Error al cargar: Intenta recargar</p></td></tr>';
     }
   },
 

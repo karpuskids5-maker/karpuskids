@@ -323,7 +323,9 @@ function _initRealtime(studentId) {
   if (_realtimeChannel) { supabase.removeChannel(_realtimeChannel); }
   _realtimeChannel = supabase
     .channel('padre_routine_' + studentId)
-    .on('postgres_changes', { event: '*', schema: 'public', table: 'daily_logs', filter: `student_id=eq.${studentId}` }, () => {
+    .on('postgres_changes', { event: '*', schema: 'public', table: 'daily_logs' }, (payload) => {
+      if (String(payload.new?.student_id) !== String(studentId) &&
+          String(payload.old?.student_id) !== String(studentId)) return;
       _loadAndRender(studentId, _selectedDate);
     })
     .subscribe();
@@ -334,7 +336,9 @@ function _initRealtime(studentId) {
     if (_scheduleChannel) supabase.removeChannel(_scheduleChannel);
     _scheduleChannel = supabase
       .channel('padre_schedule_' + classroomId)
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'classroom_event_schedule', filter: `classroom_id=eq.${classroomId}` }, () => {
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'classroom_event_schedule' }, (payload) => {
+        if (String(payload.new?.classroom_id) !== String(classroomId) &&
+            String(payload.old?.classroom_id) !== String(classroomId)) return;
         _loadAndRender(studentId, _selectedDate);
       })
       .subscribe();

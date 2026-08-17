@@ -88,7 +88,8 @@ function fmtDate(v) {
 }
 
 function classroomLevel(lv) {
-  return ({ estancia: 'Estancia', preescolar: 'Preescolar', primaria: 'Primaria' })[lv] || lv || '—';
+  // Muestra el valor tal cual — ya no hay mapeo a niveles hardcodeados
+  return lv || '—';
 }
 
 function boletinCode(st, period) {

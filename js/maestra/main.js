@@ -1,4 +1,4 @@
-import { ensureRole, supabase, initOneSignal, sendPush } from '/js/shared/supabase.js';
+import { ensureRole, supabase, initOneSignal, sendPush, emitEvent } from '/js/shared/supabase.js';
 import { SchoolEngine } from '/js/shared/school-engine.js';
 import { RealtimeManager } from '/js/shared/realtime-manager.js';
 import { AppState } from './state.js';
@@ -1087,6 +1087,37 @@ async function submitNewPost() {
     safeToast('Publicación creada con éxito', 'success');
     Modal.close('newPostModal');
     window.WallModule.loadPosts('muroPostsContainer');
+
+    // Notificar a padres del aula vía push
+    const students = AppState.get('students') || [];
+    const parentIds = [...new Set(students.map(s => s.parent_id).filter(Boolean))];
+    let pushSent = 0;
+    const preview = content.length > 80 ? content.substring(0, 80) + '…' : content;
+    for (const parentId of parentIds) {
+      const result = await sendPush({
+        user_id: parentId,
+        title: `📢 Nueva publicación — ${classroom?.name || 'Aula'}`,
+        message: preview,
+        type: 'post',
+        link: '/panel_padres.html#feed'
+      });
+      if (result) pushSent++;
+    }
+
+    // Email vía process-event (en background, no bloquea UI)
+    const { data: { user: currentUser } } = await supabase.auth.getUser();
+    const profile = (await supabase.from('profiles').select('name').eq('id', currentUser?.id).maybeSingle()).data;
+    emitEvent('post.created', {
+      classroom_id: classroom?.id,
+      teacher_name: profile?.name || 'La maestra',
+      content_preview: preview
+    }).catch(() => {});
+
+    // Mostrar banner de confirmación de envío
+    if (pushSent > 0) {
+      const { showNotifyFeedback } = await import('/js/shared/notify-feedback.js');
+      showNotifyFeedback({ sent: pushSent, type: 'post', label: 'Muro Escolar' });
+    }
 
   } catch (err) {
     safeToast('Error al crear publicación', 'error');

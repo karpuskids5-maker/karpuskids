@@ -105,7 +105,8 @@ export const ChatModule = {
 
       this._renderContacts();
     } catch (e) {
-      list.innerHTML = Helpers.emptyState('Error al cargar contactos: ' + (e.message || 'Desconocido'));
+      console.error('Chat contacts error:', e);
+      list.innerHTML = Helpers.emptyState('Error al cargar contactos');
     }
   },
 

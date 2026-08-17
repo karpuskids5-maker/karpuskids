@@ -3,8 +3,7 @@
  * Wizard publico de 7 pasos. Inserta en student_preregistrations
  * y sube documentos comprimidos a Supabase Storage.
  */
-const SUPABASE_URL      = "https://wwnfonkvemimwiqjpkij.supabase.co";
-const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Ind3bmZvbmt2ZW1pbXdpcWpwa2lqIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Njc4MzY0MzUsImV4cCI6MjA4MzQxMjQzNX0.n5VW-3U0r2nRlwC8pDstQLowu9MZ3aWHMzXVVNFQaDo";
+import { SUPABASE_URL, SUPABASE_ANON_KEY } from './shared/config.js';
 
 const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
   auth: { persistSession: false, autoRefreshToken: false, detectSessionInUrl: false }
@@ -15,7 +14,7 @@ const $$ = (sel, ctx = document) => [...ctx.querySelectorAll(sel)];
 
 const esc = (v) => String(v ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 
-const LEVELS_FALLBACK = ['Maternal','Infantes','Párvulos','Pre-Kinder','Kinder','Pre-Primaria','Primaria'];
+const LEVELS_FALLBACK = []; // No usar niveles hardcodeados — solo aulas reales de la DB
 
 let _roomsCache = [];
 let _roomsPollTimer = null;
@@ -30,37 +29,45 @@ function renderLevels() {
   const sel = $('#pi_level');
   const current = sel.value;
   if (_roomsCache.length) {
-    // Agrupar aulas por nivel (mismo nivel en varias aulas = cupos sumados)
+    // Mostrar AULAS REALES de la DB, ordenadas por nombre
+    // Primero intentar agrupar por nivel si tienen level asignado
     const byLevel = new Map();
     _roomsCache.forEach(r => {
-      const lvl = (r.level || '').trim();
-      if (!lvl) return;
-      if (!byLevel.has(lvl)) byLevel.set(lvl, []);
-      byLevel.get(lvl).push(r);
+      // Usar el nombre del aula como clave si no tiene nivel definido
+      const key = (r.level || '').trim() || r.name;
+      if (!byLevel.has(key)) { byLevel.set(key, []); }
+      byLevel.get(key).push(r);
     });
     const options = [...byLevel.entries()]
       .sort((a, b) => a[0].localeCompare(b[0], 'es'))
-      .map(([lvl, rooms]) => `<option value="${esc(lvl)}">${esc(_roomLabel(lvl, rooms))}</option>`);
-    if (options.length) {
-      sel.innerHTML = options.join('');
-      sel.insertAdjacentHTML('afterbegin', '<option value="">-- Seleccionar nivel / aula --</option>');
-      if (current && [...sel.options].some(o => o.value === current)) sel.value = current;
-      return;
-    }
+      .map(([key, rooms]) => {
+        const available = rooms.reduce((acc, r) => acc + (r.available || 0), 0);
+        const names = rooms.map(r => r.name).join(', ');
+        const cupos = `${available} cupo${available !== 1 ? 's' : ''} libre${available !== 1 ? 's' : ''}`;
+        const label = rooms.length === 1 && rooms[0].name === key
+          ? `${key} — ${cupos}`
+          : `${key} · ${names} — ${cupos}`;
+        return `<option value="${esc(key)}">${esc(label)}</option>`;
+      });
+    sel.innerHTML = '<option value="">-- Seleccionar aula --</option>' + options.join('');
+    if (current && [...sel.options].some(o => o.value === current)) { sel.value = current; }
+    return;
   }
-  sel.innerHTML = LEVELS_FALLBACK.map(l => `<option value="${esc(l)}">${esc(l)}</option>`).join('');
-  if (current && [...sel.options].some(o => o.value === current)) sel.value = current;
+  // Sin aulas en DB aún
+  sel.innerHTML = '<option value="">-- No hay aulas registradas --</option>';
+  if (current && [...sel.options].some(o => o.value === current)) { sel.value = current; }
 }
 
 async function loadClassroomsCapacity() {
   try {
     const { data, error } = await supabase.rpc('get_classrooms_capacity');
-    if (error || !Array.isArray(data)) throw error || new Error('sin datos');
+    if (error || !Array.isArray(data)) { throw error || new Error('sin datos'); }
     _roomsCache = data;
     renderLevels();
-  } catch (_) {
-    // Si el RPC no está disponible aún (migración pendiente), usar niveles básicos
-    if (!_roomsCache.length) renderLevels();
+  } catch (err) {
+    // Si el RPC no está disponible aún (migración pendiente), mostrar estado vacío
+    console.warn('get_classrooms_capacity:', err);
+    if (!_roomsCache.length) { renderLevels(); }
   }
 }
 
@@ -79,9 +86,10 @@ async function loadDynamicData() {
       const y = new Date().getFullYear();
       sel.innerHTML = `<option value="${y}-${y + 1}">${y}-${y + 1}</option>`;
     }
-  } catch (_) {
+  } catch (err) {
     const y = new Date().getFullYear();
     $('#pi_school_year').innerHTML = `<option value="${y}-${y + 1}">${y}-${y + 1}</option>`;
+    console.warn('school_years:', err);
   }
 
   await loadClassroomsCapacity();
@@ -90,7 +98,7 @@ async function loadDynamicData() {
   clearInterval(_roomsPollTimer);
   _roomsPollTimer = setInterval(loadClassroomsCapacity, 30000);
   document.addEventListener('visibilitychange', () => {
-    if (!document.hidden) loadClassroomsCapacity();
+    if (!document.hidden) { loadClassroomsCapacity(); }
   });
 }
 
@@ -127,45 +135,52 @@ function digitsOf(v) { return String(v || '').replace(/\D/g, ''); }
 // Validacion de cedula dominicana (algoritmo modulo 10 / Luhn)
 function validateCedula(v) {
   const d = digitsOf(v);
-  if (d.length !== 11) return false;
+  if (d.length !== 11) { return false; }
   let sum = 0;
   for (let i = 0; i < 10; i++) {
-    let prod = parseInt(d[i], 10) * (i % 2 === 0 ? 1 : 2);
-    if (prod >= 10) prod -= 9;
+    let prod = Number.parseInt(d[i], 10) * (i % 2 === 0 ? 1 : 2);
+    if (prod >= 10) { prod -= 9; }
     sum += prod;
   }
-  return ((10 - (sum % 10)) % 10) === parseInt(d[10], 10);
+  return ((10 - (sum % 10)) % 10) === Number.parseInt(d[10], 10);
 }
 
 function maskCedula(v) {
   const d = digitsOf(v).slice(0, 11);
-  if (d.length <= 3) return d;
-  if (d.length <= 10) return d.slice(0, 3) + '-' + d.slice(3);
+  if (d.length <= 3) { return d; }
+  if (d.length <= 10) { return d.slice(0, 3) + '-' + d.slice(3); }
   return d.slice(0, 3) + '-' + d.slice(3, 10) + '-' + d.slice(10);
 }
 
 function maskPhone(v) {
   const d = digitsOf(v).slice(0, 10);
-  if (d.length <= 3) return d;
-  if (d.length <= 6) return d.slice(0, 3) + '-' + d.slice(3);
+  if (d.length <= 3) { return d; }
+  if (d.length <= 6) { return d.slice(0, 3) + '-' + d.slice(3); }
   return d.slice(0, 3) + '-' + d.slice(3, 6) + '-' + d.slice(6);
 }
 
-const isEmail = (v) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(String(v || '').trim());
+function isEmail(v) {
+  const s = String(v || '').trim();
+  const at = s.indexOf('@');
+  if (at < 1 || at !== s.lastIndexOf('@') || at === s.length - 1) { return false; }
+  const dot = s.lastIndexOf('.');
+  if (dot < at + 2 || dot === s.length - 1) { return false; }
+  return !/\s/.test(s);
+}
 
 function computeAge(birth) {
-  if (!birth) return '';
+  if (!birth) { return ''; }
   const [y, m, d] = birth.split('-').map(Number);
   const now = new Date();
   let years = now.getFullYear() - y;
   let months = now.getMonth() + 1 - m;
-  if (now.getDate() < d) months--;
+  if (now.getDate() < d) { months--; }
   if (months < 0) { years--; months += 12; }
-  if (years < 0) return '';
+  if (years < 0) { return ''; }
   const parts = [];
-  if (years > 0) parts.push(`${years} año${years === 1 ? '' : 's'}`);
-  if (months > 0) parts.push(`${months} mes${months === 1 ? '' : 'es'}`);
-  if (parts.length === 0) parts.push('Recién nacido');
+  if (years > 0) { parts.push(`${years} año${years === 1 ? '' : 's'}`); }
+  if (months > 0) { parts.push(`${months} mes${months === 1 ? '' : 'es'}`); }
+  if (parts.length === 0) { parts.push('Recién nacido'); }
   return parts.join(' y ');
 }
 
@@ -183,7 +198,7 @@ function compressImage(file, maxW = 1400, targetKB = 500) {
         canvas.getContext('2d').drawImage(img, 0, 0, w, h);
         let quality = 0.82;
         canvas.toBlob((b) => {
-          if (!b) return reject(new Error('No se pudo comprimir la imagen'));
+          if (!b) { return reject(new Error('No se pudo comprimir la imagen')); }
           resolve({ blob: b, preview: canvas.toDataURL('image/jpeg', 0.7), size: b.size });
         }, 'image/jpeg', quality);
       };
@@ -207,25 +222,25 @@ function goTo(step) {
   $$('#progressBar [data-step-btn]').forEach(btn => {
     const n = Number(btn.dataset.stepBtn);
     btn.classList.remove('current', 'done');
-    if (n === step) btn.classList.add('current');
-    else if (n < step) btn.classList.add('done');
+    if (n === step) { btn.classList.add('current'); }
+    else if (n < step) { btn.classList.add('done'); }
   });
   const fill = $('#progressFill');
-  if (fill) fill.style.width = pct + '%';
+  if (fill) { fill.style.width = pct + '%'; }
   const title = $('#stepTitle');
-  if (title) title.textContent = STEP_TITLES[step] || ('Paso ' + step);
+  if (title) { title.textContent = STEP_TITLES[step] || ('Paso ' + step); }
   const pctEl = $('#stepPct');
-  if (pctEl) pctEl.textContent = pct + '%';
+  if (pctEl) { pctEl.textContent = pct + '%'; }
   $('#stepLabel').textContent = `${step} / 7`;
-  if (step === 7) renderSummary();
+  if (step === 7) { renderSummary(); }
   window.scrollTo({ top: 0, behavior: 'smooth' });
 }
 
 function validateStep(step) {
-  if (step === 1) return validateStep1();
-  if (step === 2) return validateStep2();
-  if (step === 3) return validateStep3();
-  if (step === 6) return validateStep6();
+  if (step === 1) { return validateStep1(); }
+  if (step === 2) { return validateStep2(); }
+  if (step === 3) { return validateStep3(); }
+  if (step === 6) { return validateStep6(); }
   return true;
 }
 
@@ -252,11 +267,11 @@ function wireMasks() {
       el.value = maskCedula(el.value);
       el.classList.remove('invalid');
       const err = el.nextElementSibling;
-      if (err && err.classList.contains('err-msg')) { err.textContent = 'Cédula inválida (verifica los 11 dígitos).'; err.style.display = 'none'; }
+      if (err?.classList.contains('err-msg')) { err.textContent = 'Cédula inválida (verifica los 11 dígitos).'; err.style.display = 'none'; }
       if (clean.length === 11) {
         const ok = validateCedula(clean);
         el.classList.toggle('invalid', !ok);
-        if (!ok && err && err.classList.contains('err-msg')) {
+        if (!ok && err?.classList.contains('err-msg')) {
           err.textContent = 'Cédula inválida (módulo 10 no coincide).';
           err.style.display = 'block';
         }
@@ -267,8 +282,8 @@ function wireMasks() {
     el.addEventListener('input', () => { el.value = maskPhone(el.value); });
   });
   document.querySelectorAll('.field').forEach(el => {
-    el.addEventListener('input', () => { el.classList.remove('invalid'); if (el.nextElementSibling?.classList.contains('err-msg')) el.nextElementSibling.style.display = 'none'; });
-    el.addEventListener('change', () => { el.classList.remove('invalid'); if (el.nextElementSibling?.classList.contains('err-msg')) el.nextElementSibling.style.display = 'none'; });
+    el.addEventListener('input', () => { el.classList.remove('invalid'); if (el.nextElementSibling?.classList.contains('err-msg')) { el.nextElementSibling.style.display = 'none'; } });
+    el.addEventListener('change', () => { el.classList.remove('invalid'); if (el.nextElementSibling?.classList.contains('err-msg')) { el.nextElementSibling.style.display = 'none'; } });
   });
 }
 
@@ -291,7 +306,7 @@ function wireSiblings() {
 
 function renderAuthorized() {
   const list = $('#pi_authorized_list');
-  if (!list) return;
+  if (!list) { return; }
   list.innerHTML = STATE.authorized.map((p, i) => `
     <div class="flex flex-col md:flex-row gap-3 bg-slate-50 border border-slate-100 rounded-2xl p-3 items-start md:items-center" data-idx="${i}">
       <input class="field flex-1" placeholder="Nombre completo" value="${esc(p.name)}" data-au="name">
@@ -339,7 +354,7 @@ function renderDocs() {
     input.addEventListener('change', async (e) => {
       const file = e.target.files[0];
       const key = input.dataset.dockey;
-      if (!file) return;
+      if (!file) { return; }
       const field = DOC_FIELDS.find(d => d.key === key);
       try {
         toast('Comprimiendo imagen…', 'warning');
@@ -385,10 +400,10 @@ function wireSignature() {
     $('#pi_signature_status').textContent = STATE.signature ? '✓ Firma capturada' : '';
   };
   canvas.addEventListener('mousedown', (e) => { drawing = true; ctx.beginPath(); ctx.moveTo(pos(e).x, pos(e).y); });
-  canvas.addEventListener('mousemove', (e) => { if (!drawing) return; const p = pos(e); ctx.lineTo(p.x, p.y); ctx.stroke(); });
+  canvas.addEventListener('mousemove', (e) => { if (!drawing) { return; } const p = pos(e); ctx.lineTo(p.x, p.y); ctx.stroke(); });
   ['mouseup', 'mouseleave'].forEach(ev => canvas.addEventListener(ev, () => { drawing = false; STATE.signature = getSignature(); updateSigStatus(); }));
   canvas.addEventListener('touchstart', (e) => { e.preventDefault(); drawing = true; const p = pos(e); ctx.beginPath(); ctx.moveTo(p.x, p.y); }, { passive: false });
-  canvas.addEventListener('touchmove', (e) => { e.preventDefault(); if (!drawing) return; const p = pos(e); ctx.lineTo(p.x, p.y); ctx.stroke(); }, { passive: false });
+  canvas.addEventListener('touchmove', (e) => { e.preventDefault(); if (!drawing) { return; } const p = pos(e); ctx.lineTo(p.x, p.y); ctx.stroke(); }, { passive: false });
   canvas.addEventListener('touchend', () => { drawing = false; STATE.signature = getSignature(); updateSigStatus(); });
 }
 
@@ -505,7 +520,7 @@ async function submit() {
     const { data: rowId, error } = await supabase.rpc('submit_preinscripcion', {
       payload: { ...payload, documents: {}, signature_data: STATE.signature, user_agent: navigator.userAgent.slice(0, 250) }
     });
-    if (error) throw error;
+    if (error) { throw error; }
 
     const docs = {};
     const keys = Object.keys(STATE.docs);
@@ -515,14 +530,14 @@ async function submit() {
       const { error: upErr } = await supabase.storage
         .from('preinscripcion-docs')
         .upload(path, doc.blob, { upsert: true, contentType: 'image/jpeg' });
-      if (upErr) return;
+      if (upErr) { return; }
       const { data } = supabase.storage.from('preinscripcion-docs').getPublicUrl(path);
       docs[key] = data.publicUrl;
     }));
     if (keys.length) {
       try {
         const { error: docsErr } = await supabase.rpc('set_preinscripcion_documents', { p_id: rowId, documents: docs });
-        if (docsErr) console.error('set_preinscripcion_documents:', docsErr);
+        if (docsErr) { console.error('set_preinscripcion_documents:', docsErr); }
       } catch (e) {
         console.error('set_preinscripcion_documents:', e);
       }
@@ -541,8 +556,8 @@ async function submit() {
 }
 
 window.Preinscripcion = {
-  next() { if (validateStep(STATE.step)) goTo(STATE.step + 1); },
-  prev() { if (STATE.step > 1) goTo(STATE.step - 1); },
+  next() { if (validateStep(STATE.step)) { goTo(STATE.step + 1); } },
+  prev() { if (STATE.step > 1) { goTo(STATE.step - 1); } },
   addAuthorized() { STATE.authorized.push({ name: '', relationship: '', phone: '' }); renderAuthorized(); },
   removeAuthorized(i) { STATE.authorized.splice(i, 1); renderAuthorized(); },
   clearSignature() {

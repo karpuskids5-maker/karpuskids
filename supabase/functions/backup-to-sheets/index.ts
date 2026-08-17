@@ -1,11 +1,8 @@
 // @ts-nocheck
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { corsHeaders } from "../_shared/cors.ts";
 
-const CORS = {
-  'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type, x-application-name',
-  'Access-Control-Allow-Methods': 'POST, OPTIONS',
-};
+const CORS = corsHeaders;
 
 const json = (data, status = 200) =>
   new Response(JSON.stringify(data), {
@@ -16,7 +13,7 @@ const json = (data, status = 200) =>
 const fmt = (d) => d ? new Date(d).toLocaleString('es-DO') : '';
 
 // ── Configuración ─────────────────────────────────────────────────────────────
-const GOOGLE_SPREADSHEET_ID = '1UoYhq7nHbtHfzfOT3im4l4UKwPBCy2zc-rSBHV_oA_k';
+const GOOGLE_SPREADSHEET_ID = Deno.env.get('GOOGLE_SPREADSHEET_ID') ?? '';
 
 // ── Google JWT Auth ───────────────────────────────────────────────────────────
 async function getGoogleAccessToken(email, privateKey) {

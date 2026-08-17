@@ -10,12 +10,7 @@
  */
 
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
-
-const CORS = {
-  'Access-Control-Allow-Origin':  '*',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type, x-application-name',
-  'Access-Control-Allow-Methods': 'POST, OPTIONS',
-};
+import { corsHeaders, getCorsHeaders } from "../_shared/cors.ts";
 
 const ALLOWED_BUCKETS = new Set(['karpus-uploads', 'classroom_media', 'avatars']);
 const ALLOWED_FOLDERS = new Set([
@@ -28,7 +23,7 @@ const PERSONAL_FOLDERS = new Set(['avatars', 'directors', 'profiles']);
 const json = (data: unknown, status = 200) =>
   new Response(JSON.stringify(data), {
     status,
-    headers: { ...CORS, 'Content-Type': 'application/json' },
+    headers: { ...corsHeaders, 'Content-Type': 'application/json' },
   });
 
 // ── Validación de schema ──────────────────────────────────────────────────────
@@ -59,7 +54,7 @@ function validatePath(path: string, bucket: string, callerId: string): string | 
 }
 
 Deno.serve(async (req) => {
-  if (req.method === 'OPTIONS') return new Response('ok', { headers: CORS });
+  if (req.method === 'OPTIONS') return new Response('ok', { headers: getCorsHeaders(req) });
   if (req.method !== 'POST')    return json({ error: 'Method not allowed' }, 405);
 
   try {

@@ -1,13 +1,13 @@
 import { logError } from './db-utils.js';
 import { Helpers } from './helpers.js';
+import { SUPABASE_URL, SUPABASE_ANON_KEY } from './config.js';
 
 // Supabase JS — cargado localmente (js/shared/supabase-js.min.js via script tag en HTML)
 // El UMD expone window.supabase.createClient
 import { createClient } from "./supabase-wrapper.js";
 
 export { createClient };
-export const SUPABASE_URL      = "https://wwnfonkvemimwiqjpkij.supabase.co";
-export const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Ind3bmZvbmt2ZW1pbXdpcWpwa2lqIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Njc4MzY0MzUsImV4cCI6MjA4MzQxMjQzNX0.n5VW-3U0r2nRlwC8pDstQLowu9MZ3aWHMzXVVNFQaDo";
+export { SUPABASE_URL, SUPABASE_ANON_KEY };
 
 const options = {
   auth: {
@@ -494,6 +494,14 @@ async function _initOneSignalAsync(currentUser) {
           await OneSignal.login(String(user.id)).catch(e => {
             Helpers.safeLog('warn', '[OneSignal] Login deferred error:', e);
           });
+        }
+
+        // Re-vincular suscripción si el permiso ya estaba concedido.
+        // Después de borrar suscripciones desde el dashboard de OneSignal, el SDK
+        // pierde la suscripción interna. OptIn explícito la recrea SIN pedir permiso
+        // al navegador (usa el permiso granted existente).
+        if ('Notification' in window && Notification.permission === 'granted') {
+          await OneSignal.User.PushSubscription?.optIn?.().catch(() => {});
         }
 
         // Guardar el player_id cuando la suscripción exista o cambie.

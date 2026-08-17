@@ -173,6 +173,7 @@ export const RoomsModule = {
         const inThisRoom = rid && String(s.classroom_id) === rid;
         return `<label class="flex items-center gap-2 py-1.5 cursor-pointer hover:bg-slate-100 px-1 rounded-lg">
           <input type="checkbox" value="${s.id}" ${inThisRoom ? 'checked' : ''}
+            data-orig-checked="${inThisRoom ? '1' : '0'}"
             class="room-student-check w-4 h-4 rounded accent-teal-600">
           <span class="text-sm font-medium text-slate-700">${Helpers.escapeHTML(s.name)}</span>
           ${inThisRoom ? '<span class="text-[9px] bg-teal-100 text-teal-700 px-1.5 py-0.5 rounded-full font-bold ml-auto">En esta aula</span>' : ''}
@@ -182,13 +183,19 @@ export const RoomsModule = {
       // fallback sin classroom_id
       try {
         const { data: students2 } = await supabase
-          .from('students').select('id, name').order('name');
+          .from('students').select('id, name, classroom_id').order('name');
+        const rid2 = roomId ? String(roomId) : null;
         if (students2?.length) {
-          list.innerHTML = students2.map(s => `
+          list.innerHTML = students2.map(s => {
+            const inThisRoom = rid2 && String(s.classroom_id) === rid2;
+            return `
             <label class="flex items-center gap-2 py-1.5 cursor-pointer hover:bg-slate-100 px-1 rounded-lg">
-              <input type="checkbox" value="${s.id}" class="room-student-check w-4 h-4 rounded accent-teal-600">
+              <input type="checkbox" value="${s.id}" ${inThisRoom ? 'checked' : ''}
+                data-orig-checked="${inThisRoom ? '1' : '0'}"
+                class="room-student-check w-4 h-4 rounded accent-teal-600">
               <span class="text-sm font-medium text-slate-700">${Helpers.escapeHTML(s.name)}</span>
-            </label>`).join('');
+            </label>`;
+          }).join('');
         } else {
           list.innerHTML = '<div class="text-[10px] text-slate-400 p-2 italic">No hay estudiantes.</div>';
         }
@@ -258,8 +265,11 @@ export const RoomsModule = {
       const checks = modal ? modal.querySelectorAll('.room-student-check') : [];
       if (checks.length && savedId) {
         const roomIdVal = parseInt(savedId, 10);
-        const toAssign   = [...checks].filter(c => c.checked).map(c => parseInt(c.value, 10));
-        const toUnassign = [...checks].filter(c => !c.checked).map(c => parseInt(c.value, 10));
+        // Solo checkbox habilitados: los deshabilitados pertenecen a OTRA aula y nunca se tocan.
+        // Solo se desasignan los que YA estaban en esta aula y fueron desmarcados.
+        const enabled    = [...checks].filter(c => !c.disabled);
+        const toAssign   = enabled.filter(c => c.checked).map(c => parseInt(c.value, 10));
+        const toUnassign = enabled.filter(c => !c.checked && c.dataset.origChecked === '1').map(c => parseInt(c.value, 10));
 
         // Helper para actualizar aula de estudiantes
         const updateClassroom = async (ids, value) => {

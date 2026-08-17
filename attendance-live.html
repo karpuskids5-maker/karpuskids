@@ -254,6 +254,7 @@
 <script src="js/pwa-updater.js" defer></script>
 <script type="module">
 import { supabase } from './js/shared/supabase.js';
+import { SUPABASE_URL, SUPABASE_ANON_KEY } from './js/shared/config.js';
 
 // ── PWA Logic ─────────────────────────────────────────────────────────────────
 let deferredPrompt;
@@ -412,12 +413,10 @@ async function notifyParent(studentId, parentId, studentName, punchType, timeStr
 
   // Llamar directamente a las Edge Functions con fetch + anon key
   // (attendance-live.html no tiene sesión activa, pero las Edge Functions aceptan anon key)
-  const SUPA_URL = 'https://wwnfonkvemimwiqjpkij.supabase.co';
-  const ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Ind3bmZvbmt2ZW1pbXdpcWpwa2lqIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Njc4MzY0MzUsImV4cCI6MjA4MzQxMjQzNX0.n5VW-3U0r2nRlwC8pDstQLowu9MZ3aWHMzXVVNFQaDo';
-  const headers  = { 'Content-Type': 'application/json', 'apikey': ANON_KEY, 'Authorization': `Bearer ${ANON_KEY}` };
+  const headers  = { 'Content-Type': 'application/json', 'apikey': SUPABASE_ANON_KEY, 'Authorization': `Bearer ${SUPABASE_ANON_KEY}` };
 
   // Push notification
-  fetch(`${SUPA_URL}/functions/v1/send-push`, {
+  fetch(`${SUPABASE_URL}/functions/v1/send-push`, {
     method: 'POST', headers,
     body: JSON.stringify({ user_id: parentId, title, message, type: 'attendance', link: 'panel_padres.html' })
   }).catch(() => {});

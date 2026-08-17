@@ -431,7 +431,7 @@ export const DirectorApi = {
   async getSubjects(educationLevel) {
     try {
       let q = supabase.from(TABLES.SUBJECTS)
-        .select('id, name, education_level, description, is_active')
+        .select('id, name, education_level, description, is_active, classroom_id')
         .eq('is_active', true)
         .order('name');
       if (educationLevel) q = q.eq('education_level', educationLevel);
@@ -447,12 +447,16 @@ export const DirectorApi = {
 
   async savePeriodConfig(periodId, configs) {
     try {
-      // configs = [{ subject_id, activity_count }]
-      const rows = configs.map(c => ({
-        period_id: parseInt(periodId),
-        subject_id: c.subject_id,
-        activity_count: Math.min(8, Math.max(5, c.activity_count || 5))
-      }));
+      // configs = [{ subject_id, activity_count, classroom_id? }]
+      const rows = configs.map(c => {
+        const row = {
+          period_id: parseInt(periodId),
+          subject_id: c.subject_id,
+          activity_count: Math.min(8, Math.max(5, c.activity_count || 5))
+        };
+        if (c.classroom_id != null) row.classroom_id = parseInt(c.classroom_id);
+        return row;
+      });
 
       // Upsert each config
       const results = await Promise.all(rows.map(row =>

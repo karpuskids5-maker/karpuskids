@@ -432,6 +432,18 @@ document.addEventListener('DOMContentLoaded', async () => {
     // ?? Sistema de badges por secci�n
     BadgeSystem.init(auth.user.id);
 
+    // ?? Sincronización en vivo: cuando cambia un estudiante (modal, asignación de aulas,
+    // eliminación), refrescar la tabla de estudiantes y la sección de aulas sin recargar.
+    window.addEventListener('karpus:students-changed', () => {
+      try {
+        QueryCache.invalidate('dir_students');
+        QueryCache.invalidate('dir_classrooms');
+        QueryCache.invalidate('dir_classrooms_occ');
+      } catch (_) {}
+      import('./rooms.module.js').then(m => m.RoomsModule.init()).catch(() => {});
+      import('./students.module.js').then(m => m.StudentsModule.applyFilters()).catch(() => {});
+    });
+
     // ?? Realtime: alertar cuando un padre sube un comprobante
     // Se elimin� la importaci�n de payment-service.js (404)
     // El monitoreo de pagos se maneja ahora dentro del PaymentsModule o v�a Supabase directamente si es necesario.

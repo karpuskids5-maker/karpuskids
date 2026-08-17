@@ -147,7 +147,7 @@ export const AttendanceModule = {
             message: msg,
             type:    'attendance',
             link:    'panel-maestra.html'
-          }).catch(() => {});
+          }).catch(err => console.warn('No se pudo enviar push de ausencia:', err));
         }
 
         // Emitir evento para email
@@ -158,7 +158,7 @@ export const AttendanceModule = {
           date,
           reason,
           note
-        }).catch(() => {});
+        }).catch(err => console.warn('No se pudo emitir evento de asistencia:', err));
       }
 
       // 3. Cerrar modal y mostrar confirmación

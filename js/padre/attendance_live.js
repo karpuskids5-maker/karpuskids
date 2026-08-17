@@ -39,7 +39,7 @@ export async function initLiveClassListener(classroomId) {
         if (typeof existingChannel.unsubscribe === 'function') {
           await existingChannel.unsubscribe();
         }
-      } catch (_) {}
+      } catch (_) { console.warn('No se pudo desuscribir el canal live'); }
       AppState.set('liveChannel', null);
     }
 
@@ -58,7 +58,7 @@ export async function initLiveClassListener(classroomId) {
           card.classList.toggle('ring-rose-200', isLive);
           card.classList.toggle('animate-pulse', isLive);
         }
-      } catch (_) {}
+      } catch (_) { console.warn('No se pudo actualizar UI de clase en vivo'); }
     };
 
     AppState.subscribe('isClassLive', updateUI);
@@ -88,7 +88,7 @@ export async function initLiveClassListener(classroomId) {
           if (prev === isLive) return;
           AppState.set('isClassLive', isLive);
           if (isLive && !prev) Helpers.toast('🔴 ¡La clase en vivo ha comenzado!', 'info');
-        } catch (_) {}
+        } catch (_) { console.warn('Error procesando cambio de estado live'); }
       });
 
     await channel.subscribe();

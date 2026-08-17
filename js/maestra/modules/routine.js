@@ -514,6 +514,14 @@ function _isStudentPresent(studentId) {
   return !record || record.status === 'present' || record.status === 'late';
 }
 
+// ¿El estudiante ya se retiró del centro hoy? (attendance.status = 'retirado').
+// La maestra NO puede cambiar de aula, pero el padre/la puerta marca el retiro.
+function _isStudentRetirado(studentId) {
+  const attendance = AppState.get('attendance') || [];
+  const record = attendance.find(a => a.student_id === studentId);
+  return record?.status === 'retirado';
+}
+
 function _getPresentStudentIds() {
   const students = AppState.get('students') || [];
   return students.filter(s => _isStudentPresent(s.id)).map(s => s.id);
@@ -824,6 +832,12 @@ async function openTimelineSheet() {
 // ── RENDER LAYOUT PRINCIPAL (4 NIVELES) ───────────────────────────────────────
 function _renderRoutineLayout({ todayLabel, students, logsMap, withReport, scheduleNow, activeSiestas, today, classroom }) {
   const schedule = _classroomSchedule.length ? _classroomSchedule : DEFAULT_SCHEDULE;
+  const retirados = students.filter(s => _isStudentRetirado(s.id));
+  const presentStudents = students.filter(s => _isStudentPresent(s.id));
+  const scheduleNowNeedsAction = scheduleNow && presentStudents.some(s => {
+    const evts = logsMap[s.id]?.events || [];
+    return !evts.some(e => e.type === scheduleNow.type);
+  });
 
   return `
   <div class="space-y-5 pb-24" id="routineWrapper">
@@ -923,8 +937,21 @@ function _renderRoutineLayout({ todayLabel, students, logsMap, withReport, sched
     </div>
     ` : ''}
 
-    <!-- Alerta Momento del Día -->
-    ${scheduleNow ? `
+    <!-- Banner Salidas del Día (estudiantes retirados: ya no reciben más eventos) -->
+    ${retirados.length > 0 ? `
+    <div class="bg-white border-2 border-blue-300 rounded-[1.5rem] p-4 flex items-center gap-4 shadow-sm" style="background:linear-gradient(135deg, #eff6ff 0%, #f0f9ff 100%);">
+      <div class="w-12 h-12 text-white rounded-2xl flex items-center justify-center text-xl shrink-0 shadow-lg" style="background:linear-gradient(135deg, #3b82f6, #2563eb);box-shadow:0 4px 14px rgba(59,130,246,0.35);">🚪</div>
+      <div class="flex-1">
+        <p class="text-sm font-black text-blue-800">${retirados.length} estudiante${retirados.length > 1 ? 's' : ''} se retiró${retirados.length > 1 ? 'n' : ''} del centro</p>
+        <p class="text-[11px] font-bold text-blue-600">
+          ${retirados.slice(0,2).map(s => s.name.split(' ')[0]).join(', ')}${retirados.length > 2 ? ` y ${retirados.length - 2} más` : ''} · ya no reciben más eventos
+        </p>
+      </div>
+    </div>
+    ` : ''}
+
+    <!-- Alerta Momento del Día (solo si queda algún alumno sin registrar para ese evento) -->
+    ${scheduleNowNeedsAction ? `
     <div class="bg-white border-2 rounded-[1.5rem] p-4 flex items-center gap-4 shadow-sm" style="border-color:rgba(255,138,0,0.3);background:linear-gradient(135deg, #fff7ed 0%, #fffbeb 100%);">
       <div class="w-12 h-12 text-white rounded-2xl flex items-center justify-center text-xl shrink-0 shadow-lg" style="background:linear-gradient(135deg, #FF8A00, #f97316);box-shadow:0 4px 14px rgba(255,138,0,0.35);">
         ${EVENT_TYPES[scheduleNow.type]?.icon || _getScheduleEventIcon(scheduleNow.type)}
@@ -996,6 +1023,7 @@ function _renderStudentRoutineCard(s, log) {
   const hasBiberon = events.some(e => e.type === 'biberon' || e.type === 'milk' || e.type === 'structured_entry');
   const activeSiesta = events.filter(e => e.type === 'siesta').some(e => e.open === true);
   const isPresent  = _isStudentPresent(s.id);
+  const isRetirado = _isStudentRetirado(s.id);
 
   const moodEmojiMap = {};
   MOOD_OPTIONS.forEach(m => { moodEmojiMap[m.value] = m.icon; });
@@ -1013,9 +1041,10 @@ function _renderStudentRoutineCard(s, log) {
 
   return `
     <div onclick="App.openStudentRoutine('${s.id}')"
-      class="group relative bg-white rounded-[1.5rem] p-3 border-2 ${!isPresent ? 'border-dashed border-slate-200 opacity-60' : isDraft ? 'border-dashed border-[#FF8A00]/40 bg-orange-50/20' : isValid ? 'border-[#28B54D]/30' : 'border-slate-100'} hover:border-[#FF8A00] hover:shadow-xl hover:shadow-orange-100 transition-all cursor-pointer active:scale-95 flex flex-col overflow-hidden">
+      class="group relative bg-white rounded-[1.5rem] p-3 border-2 ${isRetirado ? 'border-blue-400 bg-blue-50/60' : !isPresent ? 'border-dashed border-slate-200 opacity-60' : isDraft ? 'border-dashed border-[#FF8A00]/40 bg-orange-50/20' : isValid ? 'border-[#28B54D]/30' : 'border-slate-100'} hover:border-[#FF8A00] hover:shadow-xl hover:shadow-orange-100 transition-all cursor-pointer active:scale-95 flex flex-col overflow-hidden">
 
-      ${!isPresent ? '<div class="absolute top-2 left-2 z-10"><span class="px-2 py-0.5 bg-slate-400 text-white text-[8px] font-black uppercase rounded-lg">Ausente</span></div>' : ''}
+      ${isRetirado ? '<div class="absolute top-2 left-2 z-10"><span class="px-2 py-0.5 bg-blue-500 text-white text-[8px] font-black uppercase rounded-lg shadow-sm">Salió del centro</span></div>' : ''}
+      ${!isRetirado && !isPresent ? '<div class="absolute top-2 left-2 z-10"><span class="px-2 py-0.5 bg-slate-400 text-white text-[8px] font-black uppercase rounded-lg">Ausente</span></div>' : ''}
       ${isDraft ? '<div class="absolute top-2 left-2 z-10"><span class="px-2 py-0.5 bg-[#FF8A00] text-white text-[8px] font-black uppercase rounded-lg">Borrador</span></div>' : ''}
       ${activeSiesta ? '<div class="absolute top-2 left-2 z-10 w-6 h-6 bg-purple-500 rounded-full flex items-center justify-center text-sm shadow-md animate-pulse">😴</div>' : ''}
 
@@ -1101,6 +1130,7 @@ export async function registerMissingStudents() {
   const students  = AppState.get('students') || [];
   const logsMap   = AppState.get('logsMap') || {};
   const missing   = students.filter(s => {
+    if (_isStudentRetirado(s.id)) return false; // retirados ya no reciben eventos
     const log = logsMap[s.id];
     return !log || !(log.mood || log.food || log.nap || log.notes || (log.events && log.events.length));
   });
@@ -1139,6 +1169,17 @@ export async function openBulkEventModal(eventType = 'animo', scheduledTime = nu
 
   const chipsHTML = students.map(s => {
     const isPresent = _isStudentPresent(s.id);
+    const isRetirado = _isStudentRetirado(s.id);
+    if (isRetirado) return `
+    <div class="flex items-center gap-2 px-3 py-2.5 bg-blue-50/80 border-2 border-blue-200/60 rounded-2xl opacity-70 cursor-not-allowed">
+      <div class="w-8 h-8 rounded-full bg-slate-200 overflow-hidden shrink-0 flex items-center justify-center text-xs font-black text-slate-500">
+        ${s.avatar_url ? `<img src="${s.avatar_url}" class="w-full h-full object-cover">` : s.name.charAt(0)}
+      </div>
+      <div class="flex-1 min-w-0 text-left">
+        <span class="text-[11px] font-black text-slate-700 leading-tight block truncate">${s.name.split(' ')[0]}</span>
+        <span class="text-[8px] font-bold text-blue-500 uppercase">🚪 Salió del centro</span>
+      </div>
+    </div>`;
     return `
     <button type="button" data-sid="${s.id}" onclick="this.classList.toggle('selected'); this.classList.toggle('ring-2'); this.classList.toggle('ring-[#28B54D]');"
       class="${isPresent ? 'selected ring-2 ring-[#28B54D]' : 'opacity-50'} flex items-center gap-2 px-3 py-2.5 ${isPresent ? 'bg-green-50/80 border-2 border-[#28B54D]/20' : 'bg-slate-50/80 border-2 border-slate-200/50'} rounded-2xl transition-all active:scale-95 hover:border-[#28B54D] hover:bg-green-50">
@@ -1153,9 +1194,16 @@ export async function openBulkEventModal(eventType = 'animo', scheduledTime = nu
   }).join('');
 
   const content = `
-    <div class="bg-white w-full max-w-md rounded-[2rem] shadow-2xl overflow-hidden animate-fadeIn flex flex-col" style="max-height:calc(100vh - 16px);max-height:calc(100dvh - 16px);">
+    <style>
+      #bulkEventModal-inner{margin:auto auto 0 !important;animation:sheetUp .26s cubic-bezier(.32,.72,.3,1)}
+      @media (min-width:640px){#bulkEventModal-inner{margin:auto !important}}
+      @keyframes sheetUp{from{transform:translateY(100%);opacity:.4}to{transform:translateY(0);opacity:1}}
+    </style>
+    <div class="w-full sm:max-w-md flex items-end sm:items-center justify-center" style="height:min(90vh,680px);min-height:60vh;">
+    <div class="bg-white w-full rounded-t-[2rem] sm:rounded-[2rem] shadow-2xl overflow-hidden flex flex-col" style="max-height:100%;">
+      <div class="pt-2 pb-1 flex justify-center sm:hidden"><span class="w-10 h-1.5 rounded-full bg-slate-200"></span></div>
       <!-- Header con gradiente -->
-      <div class="p-4 sm:p-5 text-white relative overflow-hidden" style="background:linear-gradient(135deg, #28B54D 0%, #10b981 50%, #14b8a6 100%);">
+      <div class="px-4 sm:px-5 py-3 sm:py-4 text-white relative overflow-hidden" style="background:linear-gradient(135deg, #28B54D 0%, #10b981 50%, #14b8a6 100%);">
         <div class="absolute -top-8 -right-8 w-32 h-32 rounded-full blur-2xl" style="background:rgba(255,255,255,0.1);"></div>
         <div class="absolute -bottom-8 -left-8 w-24 h-24 rounded-full blur-xl" style="background:rgba(255,255,255,0.1);"></div>
         <div class="relative flex items-center gap-3 sm:gap-4">
@@ -1171,7 +1219,7 @@ export async function openBulkEventModal(eventType = 'animo', scheduledTime = nu
         </div>
       </div>
 
-      <div class="overflow-y-auto flex-1 p-4 sm:p-5 space-y-5 custom-scrollbar">
+      <div class="overflow-y-auto flex-1 p-4 sm:p-5 space-y-5 custom-scrollbar" style="-webkit-overflow-scrolling:touch;">
         ${subParams}
 
         <div>
@@ -1188,12 +1236,13 @@ export async function openBulkEventModal(eventType = 'animo', scheduledTime = nu
         </div>
       </div>
 
-      <div class="p-4 sm:p-5 bg-white border-t border-slate-100">
+      <div class="p-3 sm:p-4 bg-white border-t border-slate-100 shrink-0">
         <button id="btnBulkConfirm" onclick="App.confirmBulkEvent('${eventType}')"
-          class="w-full py-3.5 sm:py-4 text-white rounded-2xl font-black text-sm uppercase tracking-widest active:scale-[0.98] transition-colors flex items-center justify-center gap-2" style="background:#FF8A00 !important;border:2px solid #E67A00 !important;box-shadow:0 6px 20px rgba(255,138,0,0.4);opacity:1 !important;">
+          class="w-full py-3 sm:py-3.5 text-white rounded-2xl font-black text-sm uppercase tracking-widest active:scale-[0.98] transition-colors flex items-center justify-center gap-2" style="background:#FF8A00 !important;border:2px solid #E67A00 !important;box-shadow:0 6px 20px rgba(255,138,0,0.4);">
           <svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7"/></svg> Confirmar
         </button>
       </div>
+    </div>
     </div>`;
 
   Modal.open(modalId, content);
@@ -1400,6 +1449,8 @@ function _renderSubParams(eventType) {
 
 window._bulkSelectAll = (select) => {
   document.querySelectorAll('#bulkChipsGrid button[data-sid]').forEach(b => {
+    const sid = b.dataset.sid;
+    if (_isStudentRetirado(sid)) return; // retirados nunca se seleccionan
     if (select) { b.classList.add('selected','ring-2','ring-[#28B54D]'); }
     else { b.classList.remove('selected','ring-2','ring-[#28B54D]'); }
   });
@@ -1558,12 +1609,25 @@ async function _refreshLogsMap(classroomId, today) {
   // Also refresh attendance
   const { data: attData } = await supabase
     .from('attendance')
-    .select('student_id, status')
+    .select('student_id, status, check_out')
     .eq('classroom_id', classroomId)
     .eq('date', today);
   AppState.set('attendance', attData || []);
 
   return newMap;
+}
+
+// Refresca el estado de asistencia en la rutina y re-renderiza (usa en realtime
+// cuando un estudiante se retira desde la puerta/asistencia).
+export async function refreshRoutineAttendance() {
+  const classroom = AppState.get('classroom');
+  const wrapper = document.getElementById('routineWrapper');
+  if (!classroom || !wrapper) return;
+  const today = new Date().toISOString().split('T')[0];
+  try {
+    await _refreshLogsMap(classroom.id, today);
+    _reRenderTimeline();
+  } catch { /* silencioso */ }
 }
 
 function _refreshStudentCards() {
@@ -1651,6 +1715,7 @@ function _renderStandardRoutineUI(student, log, modalId) {
   const currentSleep = isValid ? (log.nap   || '') : '';
   const currentNotes = isValid ? (log.notes || '') : '';
   const events       = isValid ? (log.events || []) : [];
+  const isRetirado   = _isStudentRetirado(student.id);
 
   const moodEmojiMap = {};
   MOOD_OPTIONS.forEach(m => { moodEmojiMap[m.value] = m.icon; });
@@ -1750,6 +1815,15 @@ function _renderStandardRoutineUI(student, log, modalId) {
 
       <div class="p-3 sm:p-4 space-y-2.5 overflow-y-auto flex-1 custom-scrollbar" style="-webkit-overflow-scrolling:touch;">
 
+        ${isRetirado ? `
+        <div class="rounded-2xl p-3.5 flex items-center gap-3 border-2 border-blue-200" style="background:linear-gradient(135deg, #eff6ff 0%, #f0f9ff 100%);">
+          <div class="w-9 h-9 text-white rounded-xl flex items-center justify-center text-base shrink-0 shadow-sm" style="background:linear-gradient(135deg, #3b82f6, #2563eb);">🚪</div>
+          <div class="flex-1 min-w-0">
+            <p class="text-xs font-black text-blue-800">Se retiró del centro</p>
+            <p class="text-[10px] font-bold text-blue-600">Ya no se registran más eventos de la plantilla para hoy.</p>
+          </div>
+        </div>` : ''}
+
         ${_accSection('Estado emocional', '😊', `
           <div class="grid grid-cols-4 gap-1.5">
             ${MOOD_OPTIONS.map(m => `
@@ -1815,7 +1889,7 @@ function _renderStandardRoutineUI(student, log, modalId) {
             </button>
           </div>`, false)}
 
-        ${_accSection('Rutina de hoy', '📅', `
+        ${isRetirado ? '' : _accSection('Rutina de hoy', '📅', `
           <div class="grid grid-cols-4 gap-2">
             ${routineQuickHTML}
           </div>`, false)}
@@ -2047,6 +2121,7 @@ function _renderInfantRoutineUI(student, log, modalId) {
 
 // ── GUARDAR BEBÉ ──────────────────────────────────────────────────────────────
 export async function saveInfantEntry(sid) {
+  if (_isStudentRetirado(sid)) { safeToast('Este estudiante se retiró del centro: no se registran más eventos', 'warning'); return; }
   const btn = document.getElementById('btnSaveInfant');
   if (btn) { btn.disabled = true; btn.innerHTML = '<i data-lucide="loader-2" class="animate-spin w-4 h-4"></i> Guardando...'; if (window.lucide) lucide.createIcons(); }
   try {
@@ -2178,6 +2253,7 @@ export async function saveRoutineLog(studentId, field = 'notes', value = null) {
 }
 
 export async function registerIndividualEvent(sid, type, extra = {}) {
+  if (_isStudentRetirado(sid)) { safeToast('Este estudiante se retiró del centro: no se registran más eventos', 'warning'); return; }
   const classroom = AppState.get('classroom');
   const today     = new Date().toISOString().split('T')[0];
   const logsMap   = AppState.get('logsMap') || {};

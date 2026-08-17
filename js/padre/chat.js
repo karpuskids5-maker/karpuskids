@@ -128,7 +128,15 @@ export const ChatModule = {
     if (!container) return;
 
     if (!loadMore) {
-      container.innerHTML = '<div class="h-full flex items-center justify-center"><div class="animate-spin rounded-full h-8 w-8 border-b-2 border-green-600"></div></div>';
+      // Skeleton de burbujas para no dejar pantalla en blanco mientras carga
+      container.innerHTML = `
+        <div class="flex flex-col gap-3 p-2 animate-pulse">
+          <div class="flex justify-start gap-2"><div class="w-7 h-7 rounded-full bg-slate-200 shrink-0"></div><div class="bg-slate-100 rounded-2xl h-10 w-48"></div></div>
+          <div class="flex justify-end gap-2 flex-row-reverse"><div class="w-7 h-7 rounded-full bg-slate-200 shrink-0"></div><div class="bg-green-100 rounded-2xl h-10 w-36"></div></div>
+          <div class="flex justify-start gap-2"><div class="w-7 h-7 rounded-full bg-slate-200 shrink-0"></div><div class="bg-slate-100 rounded-2xl h-16 w-56"></div></div>
+          <div class="flex justify-end gap-2 flex-row-reverse"><div class="w-7 h-7 rounded-full bg-slate-200 shrink-0"></div><div class="bg-green-100 rounded-2xl h-10 w-44"></div></div>
+          <div class="flex justify-start gap-2"><div class="w-7 h-7 rounded-full bg-slate-200 shrink-0"></div><div class="bg-slate-100 rounded-2xl h-10 w-32"></div></div>
+        </div>`;
       SharedChatModule.resetPagination(this._conversationId);
     }
 

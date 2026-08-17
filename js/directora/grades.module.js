@@ -15,11 +15,7 @@ import {
   finalizeBoletinDoc,
 } from '../shared/boletin-pdf.js';
 
-const LEVEL_LABELS = {
-  estancia:   'Estancia',
-  preescolar: 'Preescolar',
-  primaria:   'Primaria'
-};
+const LEVEL_LABELS = {}; // Eliminado — se usan nombres de aulas reales
 
 function getLevel(score) {
   if (score === null || score === undefined) return { label: 'Sin calificar', cls: 'bg-slate-100 text-slate-500' };
@@ -45,8 +41,8 @@ export const GradesModule = {
   _allStudents: [],
   _studentGrades: [],
   _classrooms: [],
-  _configLevelFilter: 'all', // 'all' | 'estancia' | 'preescolar' | 'primaria'
-  _view: 'config', // 'config' | 'grades'
+  _configLevelFilter: 'all', // 'all' o classroom_id como string
+  _view: 'config',
 
   async init() {
     const container = document.getElementById('gradesTableBody');
@@ -207,7 +203,7 @@ export const GradesModule = {
     const current = sel.value;
     sel.innerHTML = '<option value="all">Todas las aulas</option>' +
       this._classrooms.map(c =>
-        `<option value="${c.id}">${Helpers.escapeHTML(c.name || 'Aula')}${c.level ? ' · ' + (LEVEL_LABELS[c.level] || c.level) : ''}</option>`
+        `<option value="${c.id}">${Helpers.escapeHTML(c.name || 'Aula')}</option>`
       ).join('');
     sel.dataset.populated = '1';
     if (current) sel.value = current;
@@ -405,20 +401,20 @@ export const GradesModule = {
       activitiesBySubject[a.subject_id]++;
     });
 
-    const LEVEL_STYLES = {
-      estancia:   { chip: 'bg-pink-100 text-pink-700',   bar: 'bg-pink-500' },
-      preescolar: { chip: 'bg-violet-100 text-violet-700', bar: 'bg-violet-500' },
-      primaria:   { chip: 'bg-indigo-100 text-indigo-700', bar: 'bg-indigo-500' },
-    };
-
-    const visible = this._subjects.filter(s => filter === 'all' || s.education_level === filter);
+    const visible = this._subjects.filter(s =>
+      filter === 'all' ||
+      String(s.classroom_id) === String(filter) ||
+      s.classroom_id == null
+    );
     const configuredCount = visible.filter(s => configMap[s.id]).length;
 
-    const pills = [['all', 'Todas'], ['estancia', 'Estancia'], ['preescolar', 'Preescolar'], ['primaria', 'Primaria']]
+    // Pills de filtro: Todas + una por cada aula real
+    const pillDefs = [['all', 'Todas'], ...this._classrooms.map(c => [String(c.id), c.name])];
+    const pills = pillDefs
       .map(([v, label]) => `
         <button onclick="App.grades._setConfigLevelFilter('${v}')"
           class="px-3 py-1.5 rounded-lg text-[10px] font-black uppercase tracking-wider transition-all ${filter === v ? 'bg-indigo-600 text-white shadow-md' : 'bg-white text-slate-500 border border-slate-200 hover:bg-indigo-50 hover:text-indigo-600'}">
-          ${label}
+          ${Helpers.escapeHTML(label)}
         </button>`).join('');
 
     let html = `
@@ -426,7 +422,7 @@ export const GradesModule = {
         <div class="rounded-2xl border border-slate-200 bg-slate-50/70 p-3 flex flex-col lg:flex-row lg:items-center gap-3">
           <div class="flex flex-wrap items-center gap-1.5">${pills}</div>
           <p class="text-[11px] text-slate-500 font-bold flex-1 min-w-[140px]">
-            ${configuredCount} de ${visible.length} áreas configuradas${filter !== 'all' ? ' · ' + (LEVEL_LABELS[filter] || filter) : ''}
+            ${configuredCount} de ${visible.length} áreas configuradas${filter !== 'all' ? ' · ' + (this._classrooms.find(c => String(c.id) === String(filter))?.name || filter) : ''}
             <span class="block text-[9px] font-semibold normal-case text-slate-400">La configuración es global del periodo: se aplica a todas las aulas.</span>
           </p>
           <div class="flex flex-wrap gap-2 shrink-0">
@@ -454,13 +450,12 @@ export const GradesModule = {
     if (!visible.length) {
       html += `<tr><td colspan="5" class="text-center py-12 text-slate-400">
         <div class="flex flex-col items-center gap-2">
-          <p class="font-bold">No hay áreas disponibles${filter !== 'all' ? ' para este nivel' : ''}</p>
+          <p class="font-bold">No hay áreas disponibles${filter !== 'all' ? ' para este aula' : ''}</p>
           <p class="text-xs text-slate-400 mt-1">Usa "Aplicar visibles" o crea una nueva área.</p>
         </div>
       </td></tr>`;
     } else {
       visible.forEach(s => {
-        const style = LEVEL_STYLES[s.education_level] || LEVEL_STYLES.primaria;
         const cfg = configMap[s.id];
         const count = cfg?.activity_count || 5;
         const actCount = activitiesBySubject[s.id] || 0;
@@ -468,7 +463,7 @@ export const GradesModule = {
         const progressPct = count > 0 ? Math.min(100, Math.round(actCount / count * 100)) : 0;
         const progressCls = progressPct >= 100 ? 'bg-emerald-500' : progressPct >= 50 ? 'bg-amber-500' : 'bg-rose-400';
         html += `<tr><td colspan="5" class="px-6 pt-2">
-          ${this._renderConfigRow(s, cfg, style, count, actCount, configured, isClosed, progressPct, progressCls)}
+          ${this._renderConfigRow(s, cfg, count, actCount, configured, isClosed, progressPct, progressCls)}
         </td></tr>`;
       });
     }
@@ -477,12 +472,10 @@ export const GradesModule = {
     if (window.lucide) lucide.createIcons();
   },
 
-  _renderConfigRow(s, cfg, style, count, actCount, configured, isClosed, progressPct, progressCls) {
-    const level = s.education_level;
+  _renderConfigRow(s, cfg, count, actCount, configured, isClosed, progressPct, progressCls) {
     return `
       <div id="cfg-row-${s.id}" class="group rounded-xl border ${configured ? 'border-slate-200 bg-white' : 'border-dashed border-slate-300 bg-slate-50/50'} p-3 flex flex-col gap-2 transition-all hover:shadow-sm">
         <div class="flex flex-wrap items-center gap-2.5">
-          <span class="px-2 py-0.5 rounded-full text-[9px] font-black uppercase ${style.chip} shrink-0">${LEVEL_LABELS[level] || level}</span>
           <input id="cfg-name-${s.id}" value="${Helpers.escapeHTML(s.name)}" oninput="App.grades._markDirty(${s.id})"
             placeholder="Nombre del área" ${isClosed ? 'readonly' : ''}
             class="flex-1 min-w-[120px] bg-transparent border-b-2 border-transparent focus:border-indigo-400 px-1 py-1 text-sm font-black text-slate-800 outline-none transition-all ${isClosed ? 'opacity-60 cursor-not-allowed' : ''}">
@@ -618,15 +611,14 @@ export const GradesModule = {
     const existingIds = new Set(this._config.map(c => c.subject_id));
     let missing = this._subjects.filter(s => !existingIds.has(s.id));
     if (this._configLevelFilter !== 'all') {
-      missing = missing.filter(s => s.education_level === this._configLevelFilter);
+      // Cuando hay filtro por aula, mostrar todas las áreas igualmente
+      // ya que las áreas son globales al periodo
     }
     if (!missing.length) {
-      return Helpers.toast(this._configLevelFilter !== 'all'
-        ? 'Todas las áreas de este nivel ya están configuradas'
-        : 'Todas las áreas ya están configuradas', 'info');
+      return Helpers.toast('Todas las áreas ya están configuradas', 'info');
     }
 
-    const rows = missing.map(s => ({ subject_id: s.id, activity_count: 5 }));
+    const rows = missing.map(s => ({ subject_id: s.id, activity_count: 5, classroom_id: s.classroom_id }));
     const { error } = await DirectorApi.savePeriodConfig(this._currentPeriodId, rows);
     if (error) return Helpers.toast('Error al aplicar la configuración', 'error');
     Helpers.toast(`${rows.length} área${rows.length !== 1 ? 's' : ''} aplicada${rows.length !== 1 ? 's' : ''} al periodo ✅`, 'success');
@@ -636,20 +628,25 @@ export const GradesModule = {
   _openSubjectModal() {
     const ic = 'w-full px-4 py-2.5 border-2 border-slate-100 rounded-2xl outline-none focus:ring-4 focus:ring-violet-100 focus:border-violet-400 bg-slate-50/50 transition-all text-sm font-medium';
     const lc = 'block text-[11px] font-black text-slate-400 uppercase tracking-wider mb-1.5 ml-1';
+    const classOpts = ['<option value="">Global (todas las aulas)</option>']
+      .concat(this._classrooms.map(c =>
+        `<option value="${c.id}">${Helpers.escapeHTML(c.name)}</option>`
+      )).join('');
     const modalHtml = `
       <div class="w-full overflow-hidden">
         <div class="bg-gradient-to-r from-indigo-600 to-violet-600 p-6 text-white">
           <h3 class="text-xl font-black">Nueva Área</h3>
-          <p class="text-sm text-white/70 font-medium mt-0.5">Se aplicará a todas las aulas del nivel seleccionado</p>
+          <p class="text-sm text-white/70 font-medium mt-0.5">Solo la directora y la asistente crean áreas</p>
         </div>
         <div class="p-6 space-y-4">
           <div><label class="${lc}">Nombre del Área</label><input id="newSubjectName" class="${ic}" placeholder="Ej: Música"></div>
-          <div><label class="${lc}">Nivel</label>
-            <select id="newSubjectLevel" class="${ic}">
-              <option value="estancia">Estancia</option>
-              <option value="preescolar">Preescolar</option>
-              <option value="primaria">Primaria</option>
-            </select>
+          <div><label class="${lc}">Aula (opcional)</label>
+            <select id="newSubjectClassroom" class="${ic}">${classOpts}</select>
+            <p class="text-[10px] text-slate-400 font-medium mt-1 ml-1">Déjalo en "Global" para un área de todas las aulas, o elige el aula donde se usará.</p>
+          </div>
+          <div><label class="${lc}">Categoría (opcional)</label>
+            <input id="newSubjectLevel" class="${ic}" placeholder="Ej: Arte, Ciencias, Idiomas…" value="">
+            <p class="text-[10px] text-slate-400 font-medium mt-1 ml-1">Etiqueta libre para organizar las áreas. No es obligatoria.</p>
           </div>
           <div><label class="${lc}">Descripción</label><textarea id="newSubjectDesc" rows="3" class="${ic} resize-none" placeholder="¿Qué se trabaja en esta área?"></textarea></div>
         </div>
@@ -666,10 +663,11 @@ export const GradesModule = {
 
   async _createSubject() {
     const name = document.getElementById('newSubjectName')?.value?.trim();
-    const level = document.getElementById('newSubjectLevel')?.value;
+    const level = (document.getElementById('newSubjectLevel')?.value?.trim()) || 'general';
     const desc = document.getElementById('newSubjectDesc')?.value?.trim() || null;
+    const classroomSel = document.getElementById('newSubjectClassroom');
+    const classroomId = classroomSel?.value ? parseInt(classroomSel.value) : null;
     if (!name) return Helpers.toast('Escribe el nombre del área', 'warning');
-    if (!level) return Helpers.toast('Selecciona un nivel', 'warning');
 
     const btn = document.getElementById('btnCreateSubject');
     if (btn) { btn.disabled = true; btn.textContent = 'Creando...'; }
@@ -678,7 +676,8 @@ export const GradesModule = {
       const { data, error } = await supabase.rpc('insert_subject', {
         p_name: name,
         p_education_level: level,
-        p_description: desc
+        p_description: desc,
+        p_classroom_id: classroomId
       });
       if (error) throw error;
       if (data?.error) return Helpers.toast(data.error, 'error');
@@ -686,7 +685,7 @@ export const GradesModule = {
       const period = this._periods.find(p => String(p.id) === String(this._currentPeriodId));
       if (period && period.status !== 'closed') {
         const { error: cfgErr } = await DirectorApi.savePeriodConfig(this._currentPeriodId, [
-          { subject_id: data.id, activity_count: 5 }
+          { subject_id: data.id, activity_count: 5, classroom_id: classroomId }
         ]);
         if (cfgErr) return Helpers.toast('Área creada, pero no se pudo agregar al periodo: ' + cfgErr.message, 'error');
       }
@@ -702,10 +701,10 @@ export const GradesModule = {
   },
 
   async _saveAllConfig() {
-    const countChanges = Object.entries(this._pendingConfig).map(([sid, count]) => ({
-      subject_id: parseInt(sid),
-      activity_count: count
-    }));
+    const countChanges = Object.entries(this._pendingConfig).map(([sid, count]) => {
+      const s = this._subjects.find(x => String(x.id) === String(sid));
+      return { subject_id: parseInt(sid), activity_count: count, classroom_id: s?.classroom_id ?? null };
+    });
 
     const subjectChanges = [];
     this._subjects.forEach(s => {

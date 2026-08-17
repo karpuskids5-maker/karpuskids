@@ -65,15 +65,17 @@ export const PermitsModule = {
       }
 
       tbody.innerHTML = data.map(p => {
-        const typeLabels = { permission: 'Personal', medical: 'M\u00e9dico', absence: 'Falta', other: 'Otro' };
+        const typeLabels = { permission: 'Personal', medical: 'Médico', absence: 'Falta', other: 'Otro' };
         const statusCls = { pending: 'bg-amber-100 text-amber-700', approved: 'bg-emerald-100 text-emerald-700', rejected: 'bg-rose-100 text-rose-700' };
         const statusLabels = { pending: 'Pendiente', approved: 'Aprobado', rejected: 'Rechazado' };
+        const fmt = (d) => d ? new Date(d + 'T12:00:00').toLocaleDateString('es-DO', { day: '2-digit', month: 'short', year: '2-digit' }) : '—';
 
         return `
           <tr class="hover:bg-slate-50/50 transition-colors">
-            <td class="px-4 py-4 font-bold text-slate-700">${typeLabels[p.type] || p.type}</td>
-            <td class="px-4 py-4 text-xs font-medium text-slate-500">${new Date(p.start_date).toLocaleDateString()}</td>
-            <td class="px-4 py-4 text-center">
+            <td class="px-4 py-4 font-bold text-slate-700 whitespace-nowrap">${typeLabels[p.type] || p.type}</td>
+            <td class="px-4 py-4 text-xs font-medium text-slate-500 whitespace-nowrap">${fmt(p.start_date)}</td>
+            <td class="px-4 py-4 text-xs font-medium text-slate-500 whitespace-nowrap">${fmt(p.end_date)}</td>
+            <td class="px-4 py-4 text-center whitespace-nowrap">
               <span class="px-2 py-1 rounded-lg text-[9px] font-black uppercase ${statusCls[p.status] || ''}">${statusLabels[p.status] || p.status}</span>
             </td>
           </tr>

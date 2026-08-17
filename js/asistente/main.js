@@ -121,6 +121,13 @@ document.addEventListener('DOMContentLoaded', async () => {
   // ?? Sistema de badges por secci�n
   BadgeSystem.init(auth.user.id);
 
+  // ?? Sincronización en vivo: cuando cambia un estudiante, refrescar la
+  // tabla de estudiantes y la sección de aulas sin recargar la página.
+  window.addEventListener('karpus:students-changed', () => {
+    import('./modules/students.js').then(m => m.StudentsModule.loadStudents()).catch(() => {});
+    import('./modules/rooms.js').then(m => m.RoomsModule.init()).catch(() => {});
+  });
+
   // Sidebar profile
   const profile = auth.profile;
   const nameEl = document.getElementById('sidebarUserName');

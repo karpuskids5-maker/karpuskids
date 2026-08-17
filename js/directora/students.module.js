@@ -188,6 +188,7 @@ export const StudentsModule = {
       if (error) throw new Error(typeof error === 'string' ? error : (error.message || JSON.stringify(error)));
       Helpers.toast('Estudiante eliminado correctamente', 'success');
       QueryCache.invalidate('dir_students');
+      window.dispatchEvent(new CustomEvent('karpus:students-changed'));
       this.init();
     } catch (e) {
       Helpers.toast('Error al eliminar: ' + (e.message || e), 'error');

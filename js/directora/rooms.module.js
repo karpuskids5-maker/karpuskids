@@ -123,6 +123,7 @@ export const RoomsModule = {
       Helpers.toast('Estudiante asignado al aula', 'success');
       QueryCache.invalidate('dir_students');
       QueryCache.invalidate('dir_classrooms_occ');
+      window.dispatchEvent(new CustomEvent('karpus:students-changed'));
 
       setTimeout(() => {
         const remaining = document.querySelectorAll('[id^="unassigned-row-"]').length;
@@ -170,19 +171,18 @@ export const RoomsModule = {
         savedId = newRoom?.id;
       }
 
-      // Generar automáticamente las 5 áreas con sus 5 actividades por defecto
-      if (!id && savedId) {
-        try {
-          await supabase.rpc('ensure_classroom_areas', { p_classroom_id: parseInt(savedId) });
-        } catch (_) { /* el trigger del schema también lo cubre */ }
-      }
+      // Las áreas ya NO se generan automáticamente: la maestra será quien
+      // cree las áreas de su aula.
 
       // Asignar/desasignar estudiantes del checklist via update directo
       const checks = document.querySelectorAll('.room-student-check');
       if (checks.length > 0 && savedId) {
         const roomIdNum = parseInt(savedId, 10);
-        const toAssign   = [...checks].filter(c => c.checked).map(c => parseInt(c.value, 10));
-        const toUnassign = [...checks].filter(c => !c.checked).map(c => parseInt(c.value, 10));
+        // Solo checkbox habilitados: los deshabilitados pertenecen a OTRA aula y nunca se tocan.
+        // Solo se desasignan los que YA estaban en esta aula y fueron desmarcados.
+        const enabled    = [...checks].filter(c => !c.disabled);
+        const toAssign   = enabled.filter(c => c.checked).map(c => parseInt(c.value, 10));
+        const toUnassign = enabled.filter(c => !c.checked && c.dataset.origChecked === '1').map(c => parseInt(c.value, 10));
 
         if (toAssign.length) {
           const { error } = await supabase
@@ -206,6 +206,7 @@ export const RoomsModule = {
       QueryCache.invalidate('dir_classrooms');
       QueryCache.invalidate('dir_students');
       await this.init();
+      window.dispatchEvent(new CustomEvent('karpus:students-changed'));
     } catch (e) {
       Helpers.toast('Error al guardar aula: ' + e.message, 'error');
     } finally {
@@ -226,6 +227,7 @@ export const RoomsModule = {
       QueryCache.invalidate('dir_classrooms_occ');
       QueryCache.invalidate('dir_classrooms');
       await this.init();
+      window.dispatchEvent(new CustomEvent('karpus:students-changed'));
     } catch (e) {
       Helpers.toast('Error al eliminar: ' + e.message, 'error');
     }
@@ -339,6 +341,7 @@ export const RoomsModule = {
         return `
           <label class="flex items-center gap-3 px-4 py-3 cursor-pointer hover:bg-purple-50 transition-colors ${inOtherRoom ? 'opacity-50' : ''}">
             <input type="checkbox" value="${s.id}" ${inThisRoom ? 'checked' : ''} ${inOtherRoom ? 'disabled title="Ya est� en otra aula"' : ''}
+              data-orig-checked="${inThisRoom ? '1' : '0'}"
               class="room-student-check w-4 h-4 rounded accent-purple-600 shrink-0">
             <div class="w-7 h-7 rounded-lg bg-purple-100 text-purple-600 flex items-center justify-center font-black text-xs shrink-0">
               ${(s.name || '?').charAt(0).toUpperCase()}
