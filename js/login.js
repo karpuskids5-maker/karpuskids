@@ -258,7 +258,7 @@ async function redirectByRole(userId) {
   try {
     const { data: profile, error } = await supabase
       .from('profiles')
-      .select('role')
+      .select('role, is_active')
       .eq('id', userId)
       .maybeSingle();
 
@@ -268,6 +268,13 @@ async function redirectByRole(userId) {
       alert('Tu cuenta no tiene un perfil configurado. Por favor, contacta al administrador.');
       await supabase.auth.signOut();
       window.location.reload();
+      return;
+    }
+
+    if (profile.is_active === false) {
+      alert('🚫 Tu cuenta ha sido bloqueada o desactivada por la administración. Contacta al soporte de Karpus Kids.');
+      await supabase.auth.signOut();
+      window.location.href = 'login.html?error=blocked';
       return;
     }
 

@@ -230,7 +230,7 @@ export async function ensureRole(requiredRoles) {
   ]);
 
   const [profileRes, termsRes] = await Promise.all([
-    withTimeout(supabase.from('profiles').select('id, role, name, email, avatar_url, phone, bio').eq('id', user.id).maybeSingle()),
+    withTimeout(supabase.from('profiles').select('id, role, is_active, name, email, avatar_url, phone, bio').eq('id', user.id).maybeSingle()),
     withTimeout(supabase.from('terms_acceptance').select('user_id').eq('user_id', user.id).eq('terms_version', TERMS_VERSION).maybeSingle())
   ]).catch(() => [{ data: null, error: new Error('timeout') }, { data: null, error: new Error('timeout') }]);
 
@@ -239,6 +239,13 @@ export async function ensureRole(requiredRoles) {
 
   const profile = profileRes.data;
   const terms   = termsRes.data;
+
+  // Verificar si la cuenta está desactivada / bloqueada
+  if (profile && profile.is_active === false) {
+    await supabase.auth.signOut();
+    window.location.href = 'login.html?error=blocked';
+    return null;
+  }
 
   // 1. Si el perfil no existe, intentar crearlo automáticamente
   let resolvedProfile = profile;

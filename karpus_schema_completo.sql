@@ -744,6 +744,7 @@ CREATE TABLE IF NOT EXISTS public.school_settings (
   open_time       time DEFAULT '07:00:00',
   close_time      time DEFAULT '18:00:00',
   work_days       text DEFAULT '["Lun","Mar","Mié","Jue","Vie"]',
+  feature_flags   jsonb DEFAULT '{"chat":true,"payments":true,"attendance":true,"routine":true,"grades":true,"preregistration":true,"push":true}'::jsonb,
   updated_at      timestamp with time zone DEFAULT now()
 );
 INSERT INTO public.school_settings (id) VALUES (1) ON CONFLICT (id) DO NOTHING;
