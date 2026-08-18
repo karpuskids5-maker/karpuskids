@@ -67,25 +67,11 @@ export const MaestraApi = {
       } catch (_) { /* 404 ignorado si no existe la tabla */ }
     }
 
-    const { data: existing, error: findError } = await supabase
+    const { data, error } = await supabase
       .from(TABLES.ATTENDANCE)
-      .select('id')
-      .eq('student_id', record.student_id)
-      .eq('date', record.date)
+      .upsert(record, { onConflict: 'student_id,date' })
+      .select()
       .maybeSingle();
-
-    handleError(findError, 'findAttendance');
-
-    const query = existing
-      ? supabase
-          .from(TABLES.ATTENDANCE)
-          .update(record)
-          .eq('id', existing.id)
-      : supabase
-          .from(TABLES.ATTENDANCE)
-          .insert([record]);
-
-    const { data, error } = await query.select().maybeSingle();
 
     handleError(error, 'upsertAttendance');
     if (data) QueryCache.invalidatePrefix('maestra_attendance');

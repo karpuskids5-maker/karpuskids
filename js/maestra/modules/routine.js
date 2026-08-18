@@ -42,6 +42,10 @@ const EVENT_TYPES = {
   nota:         { icon: '📝', label: 'Nota',        color: 'slate'  },
   cepillado:    { icon: '🪥', label: 'Cepillado',   color: 'cyan'   },
   lavado_manos: { icon: '🧼', label: 'Lavado',      color: 'sky'    },
+  biberon:      { icon: '🍼', label: 'Biberón',     color: 'pink'   },
+  bano:         { icon: '🚽', label: 'Baño',        color: 'blue'   },
+  siesta:       { icon: '😴', label: 'Siesta',      color: 'purple' },
+  bienvenida:   { icon: '👋', label: 'Bienvenida',  color: 'teal'   },
 };
 
 const DEFAULT_SCHEDULE = [
@@ -603,8 +607,14 @@ async function _loadSchedule(classroomId) {
       .eq('is_active', true)
       .order('sort_order');
 
-    if (error || !data?.length) {
+    if (error) {
       _classroomSchedule = DEFAULT_SCHEDULE.map(s => ({ ...s }));
+      return;
+    }
+
+    if (!data?.length) {
+      _classroomSchedule = DEFAULT_SCHEDULE.map(s => ({ ...s }));
+      await _seedDefaultSchedule(classroomId);
       return;
     }
 
@@ -628,6 +638,26 @@ async function _loadSchedule(classroomId) {
   } catch {
     _classroomSchedule = DEFAULT_SCHEDULE.map(s => ({ ...s }));
   }
+}
+
+async function _seedDefaultSchedule(classroomId) {
+  try {
+    const inserts = DEFAULT_SCHEDULE.map((s, i) => ({
+      classroom_id: classroomId,
+      event_type: s.type,
+      event_label: s.label,
+      event_icon: EVENT_TYPES[s.type]?.icon || '📋',
+      category: EVENT_TYPES[s.type]?.color || 'personalizados',
+      scheduled_hour: s.hour,
+      scheduled_minute: s.minute,
+      duration_minutes: s.duration,
+      sort_order: i,
+      is_active: true,
+      auto_register: true,
+      applies_to: 'all',
+    }));
+    await supabase.from('classroom_event_schedule').insert(inserts);
+  } catch { /* noop - fallback to in-memory default */ }
 }
 
 // ── LOG EVENT TO TIMELINE ─────────────────────────────────────────────────────

@@ -289,48 +289,29 @@ export async function registerAttendance(studentId, status) {
   updateUI(status);
 
   try {
-    // 1. Verificar si ya existe un registro de hoy
-    const { data: existing } = await supabase
-      .from('attendance')
-      .select('status')
-      .eq('student_id', studentId)
-      .eq('date', today)
-      .maybeSingle();
-
-    const isMarkingPresent = status === 'present';
-    const wasLate = existing?.status === 'late';
-    let shouldUpsert = true;
-    if (isMarkingPresent && wasLate) shouldUpsert = false;
-
     let statusLiteral = status === 'present' ? 'Presente' : status === 'late' ? 'Tarde' : 'Ausente';
 
-    if (shouldUpsert) {
-      const attRecord = { student_id: studentId, classroom_id: classroom.id, date: today, status };
-      if (navigator.onLine) {
-        await MaestraApi.upsertAttendance(attRecord);
-      } else {
-        await OfflineQueue.enqueue('attendance', 'upsert', { ...attRecord, onConflict: 'student_id,date' });
-        safeToast(`${statusLiteral} guardado sin conexión`, 'info');
-      }
+    const attRecord = { student_id: studentId, classroom_id: classroom.id, date: today, status };
+    if (navigator.onLine) {
+      await MaestraApi.upsertAttendance(attRecord);
+    } else {
+      await OfflineQueue.enqueue('attendance', 'upsert', { ...attRecord, onConflict: 'student_id,date' });
+      safeToast(`${statusLiteral} guardado sin conexión`, 'info');
     }
 
     const student = (AppState.get('students') || []).find(s => s.id === studentId);
     if (student?.parent_id) {
-      const pushMessage = (isMarkingPresent && wasLate)
-        ? `${student.name} ya está en su aula con su maestra.`
-        : `${student.name} ha sido marcado como ${statusLiteral} hoy.`;
-
       sendPush({
         user_id: student.parent_id,
         title: 'Asistencia Karpus',
-        message: pushMessage,
+        message: `${student.name} ha sido marcado como ${statusLiteral} hoy.`,
         link: 'panel_padres.html#attendance'
       }).then(res => {
         if (res?.ok !== false) showNotifyFeedback({ sent: 1, type: 'attendance', label: student.name });
       }).catch(() => {});
     }
     
-    safeToast(isMarkingPresent && wasLate ? 'Presencia confirmada' : `Asistencia: ${statusLiteral}`);
+    safeToast(`Asistencia: ${statusLiteral}`);
     await initAttendance({ silent: true });
   } catch (e) {
     // Revertir UI si falla
