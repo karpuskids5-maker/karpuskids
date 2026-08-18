@@ -753,55 +753,6 @@ function _updateSchedulePreview() {
   preview.innerHTML = `<span class="text-violet-600">📅 ${daysText}</span>${timeText ? `<span class="mx-2 text-violet-300">|</span><span class="text-violet-800">🕐 ${timeText}</span>` : ''}`;
 }
 
-// ── Horarios de Estudiantes ──────────────────────────────────────────────────
-async function _loadStudentSchedules() {
-  const container = document.getElementById('studentSchedulesList');
-  if (!container) return;
-
-  try {
-    const { data: students, error } = await supabase
-      .from('students')
-      .select('id, name, schedule, entry_time, exit_time, classrooms(name)')
-      .eq('is_active', true)
-      .order('name');
-
-    if (error) throw error;
-    if (!students?.length) {
-      container.innerHTML = '<p class="text-xs text-slate-400 text-center py-6">No hay estudiantes activos</p>';
-      return;
-    }
-
-    container.innerHTML = students.map(s => {
-      const classroom = s.classrooms?.name || '—';
-      const scheduleBadge = s.schedule
-        ? `<span class="px-2 py-0.5 bg-sky-100 text-sky-700 text-[9px] font-black rounded-full uppercase">${Helpers.escapeHTML(s.schedule)}</span>`
-        : '<span class="px-2 py-0.5 bg-slate-100 text-slate-400 text-[9px] font-black rounded-full uppercase">Sin horario</span>';
-
-      return `
-        <div class="flex items-center gap-3 p-3 bg-slate-50 rounded-xl border border-slate-100 hover:border-sky-300 transition-all">
-          <div class="w-8 h-8 bg-sky-100 rounded-lg flex items-center justify-center text-sky-500 text-xs font-black shrink-0">
-            ${s.name?.charAt(0) || '?'}
-          </div>
-          <div class="flex-1 min-w-0">
-            <p class="text-[11px] font-black text-slate-700 truncate">${Helpers.escapeHTML(s.name)}</p>
-            <p class="text-[9px] font-bold text-slate-400">${Helpers.escapeHTML(classroom)}</p>
-          </div>
-          ${scheduleBadge}
-          <div class="flex items-center gap-1.5 text-[10px] font-bold text-slate-500 shrink-0">
-            <span>${s.entry_time || '—'}</span>
-            <span class="text-slate-300">→</span>
-            <span>${s.exit_time || '—'}</span>
-          </div>
-        </div>`;
-    }).join('');
-  } catch (e) {
-    console.warn('Error cargando horarios de estudiantes:', e);
-    container.innerHTML = '<p class="text-xs text-rose-400 text-center py-6">Error al cargar horarios</p>';
-  }
-}
-
-// Llamar al cargar la sección de configuración
-setTimeout(() => _loadStudentSchedules(), 500);
 
 // -- ID de Acceso QR de la Directora ------------------------------------------
 async function _initDirectorAccessId(profile) {

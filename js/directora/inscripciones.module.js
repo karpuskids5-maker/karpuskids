@@ -2,6 +2,7 @@ import { supabase } from '../shared/supabase.js';
 import { Helpers } from '../shared/helpers.js';
 import { auditLog } from '../shared/db-utils.js';
 import { StudentRecordModal } from '../shared/student-record-modal.js';
+import { computeAge } from '../shared/birthday-utils.js';
 
 const STATUS_META = {
   pending:   { label: 'Pendiente',  cls: 'bg-amber-100 text-amber-700',  dot: 'bg-amber-500' },
@@ -101,9 +102,7 @@ export const InscripcionesModule = {
       const p1 = r.parent_1 || {};
       const p2 = r.parent_2 || {};
       const docsCount = Object.keys(r.documents || {}).length;
-      const age = r.birth_date
-        ? Math.max(0, Math.floor((Date.now() - new Date(r.birth_date).getTime()) / (365.25 * 24 * 3600 * 1000)))
-        : null;
+      const ageText = r.birth_date ? computeAge(r.birth_date) : '';
 
       return `
         <tr class="group">
@@ -114,7 +113,7 @@ export const InscripcionesModule = {
               </div>
               <div class="min-w-0">
                 <p class="font-black text-slate-800 text-sm truncate">${Helpers.escapeHTML(r.student_name || 'Sin nombre')}${r.student_last_name ? ' ' + Helpers.escapeHTML(r.student_last_name) : ''}</p>
-                <p class="text-[10px] text-slate-400 font-black uppercase tracking-widest">#${r.id}${age != null ? ' · ' + age + ' años' : ''}</p>
+                <p class="text-[10px] text-slate-400 font-black uppercase tracking-widest">#${r.id}${ageText ? ' · ' + ageText : ''}</p>
               </div>
             </div>
           </td>

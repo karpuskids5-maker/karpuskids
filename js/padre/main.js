@@ -8,6 +8,7 @@ import { BadgeSystem } from '../shared/badges.js';
 import { OnboardingGuide } from '../shared/onboarding.js';
 import { Prefetch } from '../shared/prefetch.js';
 import { VideoCallUI } from '../shared/videocall-ui.js';
+import { computeAge, getBirthdayInfo } from '../shared/birthday-utils.js';
 import { RealtimeManager } from '../shared/realtime-manager.js';
 import { initLiveClassListener } from './attendance_live.js';
 
@@ -58,7 +59,10 @@ window.App = {
       p2Phone: student.p2_phone || '',
       isInactive: student.is_active === false
     }));
-  }
+  },
+  openScheduleModal: openScheduleModal,
+  closeScheduleModal: closeScheduleModal,
+  saveSchedule: saveSchedule,
 };
 window.BadgeSystem = BadgeSystem;
 
@@ -385,6 +389,21 @@ async function refreshDashboard() {
 
   // Banner recordatorio de retiro
   _updatePickupReminder(student);
+
+  // Banner cumpleaños del estudiante
+  _updateBirthdayBanner(student);
+
+  // Banner solicitud de horario
+  _updateScheduleReminderBanner(student);
+
+  // Banner suscripción push
+  _updatePushSubscriptionBanner();
+
+  // Banner recordatorio de entrada (drop-off)
+  _updateEntryReminder(student, todayAtt?.status);
+
+  // Banner recordatorio de salida (pick-up)
+  _updateExitReminder(student);
 }
 
 // ── Banner de deuda vencida ───────────────────────────────────────────────────
@@ -475,6 +494,252 @@ function _updatePickupReminder(student) {
   render();
   _pickupTimer = setInterval(render, 60000);
 }
+
+// ── Banner cumpleaños del estudiante ──────────────────────────────────────────
+function _updateBirthdayBanner(student) {
+  const banner = document.getElementById('birthdayBanner');
+  const titleEl = document.getElementById('birthdayBannerTitle');
+  const msgEl = document.getElementById('birthdayBannerMsg');
+  if (!banner) return;
+
+  const info = getBirthdayInfo(student?.birth_date);
+  if (!info) { banner.classList.add('hidden'); return; }
+
+  const studentName = student?.name || 'tu hijo';
+
+  if (info.isToday) {
+    banner.classList.remove('hidden');
+    banner.querySelector('div').style.background = 'linear-gradient(135deg,#f472b6,#f43f5e,#d946ef)';
+    banner.querySelector('div').className = 'p-4 md:p-6 flex flex-col lg:flex-row items-center gap-4';
+    if (titleEl) titleEl.textContent = `¡Feliz cumpleaños, ${studentName}!`;
+    if (msgEl) msgEl.textContent = `Hoy cumple ${info.ageTurning} años. ¡Que tenga un día lleno de alegría! 🎉`;
+  } else if (info.isUpcoming) {
+    banner.classList.remove('hidden');
+    banner.querySelector('div').style.background = 'linear-gradient(135deg,#fda4af,#f472b6,#e879f9)';
+    banner.querySelector('div').className = 'p-4 md:p-6 flex flex-col lg:flex-row items-center gap-4';
+    if (titleEl) titleEl.textContent = `Próximo cumpleaños de ${studentName}`;
+    if (msgEl) msgEl.textContent = `En ${info.daysUntil} día${info.daysUntil === 1 ? '' : 's'} cumplirá ${info.ageTurning} años.`;
+  } else {
+    banner.classList.add('hidden');
+  }
+}
+
+// ── Banner solicitud de horario del estudiante ────────────────────────────────
+function _updateScheduleReminderBanner(student) {
+  const banner = document.getElementById('scheduleReminderBanner');
+  const msgEl = document.getElementById('scheduleReminderMsg');
+  if (!banner) return;
+
+  if (student?.entry_time && student?.exit_time) {
+    banner.classList.add('hidden');
+    return;
+  }
+
+  const studentName = student?.name || 'tu hijo';
+  banner.classList.remove('hidden');
+  if (msgEl) msgEl.textContent = `Aún no has registrado el horario de entrada y salida de ${studentName}. Actualízalo para que la escuela tenga la información.`;
+}
+
+// ── Modal de horario ─────────────────────────────────────────────────────────
+function openScheduleModal() {
+  const modal = document.getElementById('scheduleModal');
+  const entryInput = document.getElementById('modalEntryTime');
+  const exitInput = document.getElementById('modalExitTime');
+  if (!modal) return;
+  const student = AppState.get('currentStudent');
+  if (entryInput) entryInput.value = student?.entry_time || '';
+  if (exitInput) exitInput.value = student?.exit_time || '';
+  modal.classList.remove('hidden');
+  modal.classList.add('flex');
+}
+
+function closeScheduleModal() {
+  const modal = document.getElementById('scheduleModal');
+  if (modal) { modal.classList.add('hidden'); modal.classList.remove('flex'); }
+}
+
+async function saveSchedule() {
+  const entryInput = document.getElementById('modalEntryTime');
+  const exitInput = document.getElementById('modalExitTime');
+  const saveBtn = document.getElementById('scheduleModalSaveBtn');
+  if (!entryInput || !exitInput) return;
+
+  const entry = entryInput.value;
+  const exit = exitInput.value;
+  if (!entry && !exit) {
+    Helpers.toast('Ingresa al menos una hora', 'error');
+    return;
+  }
+
+  const student = AppState.get('currentStudent');
+  if (!student?.id) return;
+
+  try {
+    if (saveBtn) { saveBtn.disabled = true; saveBtn.textContent = 'Guardando...'; }
+    const { error } = await supabase
+      .from('students')
+      .update({ entry_time: entry || null, exit_time: exit || null })
+      .eq('id', student.id);
+    if (error) throw error;
+
+    student.entry_time = entry || null;
+    student.exit_time = exit || null;
+    AppState.set('currentStudent', student);
+
+    const profileInput = document.getElementById('inputEntryTime');
+    const exitProfileInput = document.getElementById('inputExitTime');
+    if (profileInput) profileInput.value = entry || '';
+    if (exitProfileInput) exitProfileInput.value = exit || '';
+
+    closeScheduleModal();
+    Helpers.toast('Horario guardado', 'success');
+    document.getElementById('scheduleReminderBanner')?.classList.add('hidden');
+  } catch (e) {
+    Helpers.toast('Error al guardar: ' + e.message, 'error');
+  } finally {
+    if (saveBtn) { saveBtn.disabled = false; saveBtn.textContent = 'Guardar'; }
+  }
+}
+
+// ── Banner recordatorio de entrada (drop-off) ─────────────────────────────────
+let _entryTimer = null;
+function _updateEntryReminder(student, todayAtt) {
+  if (_entryTimer) { clearInterval(_entryTimer); _entryTimer = null; }
+  const banner = document.getElementById('entryReminderBanner');
+  const titleEl = document.getElementById('entryBannerTitle');
+  const msgEl = document.getElementById('entryBannerMsg');
+  if (!banner) return;
+
+  if (todayAtt === 'present' || todayAtt === 'presente') {
+    banner.classList.add('hidden');
+    return;
+  }
+
+  const entryTime = student?.entry_time;
+  if (!entryTime) { banner.classList.add('hidden'); return; }
+
+  const studentName = student?.name || 'tu hijo';
+
+  const render = () => {
+    const now = new Date();
+    const [h, m] = entryTime.split(':').map(Number);
+    const entry = new Date(now);
+    entry.setHours(h, m, 0, 0);
+
+    const diffMs = entry - now;
+    const diffMin = Math.round(diffMs / 60000);
+
+    if (diffMin > 120 || diffMin < -60) {
+      banner.classList.add('hidden');
+      return;
+    }
+
+    banner.classList.remove('hidden');
+    if (diffMin <= 0) {
+      if (titleEl) titleEl.textContent = `¡Hora de llevar a ${studentName}!`;
+      if (msgEl) msgEl.textContent = 'La hora de entrada ya comenzó. ¡Llévalo a Karpus Kids!';
+    } else if (diffMin <= 15) {
+      if (titleEl) titleEl.textContent = `¡Quedan ${diffMin} min para la entrada!`;
+      if (msgEl) msgEl.textContent = `Prepárate para llevar a ${studentName}. La entrada es a las ${entryTime}.`;
+    } else {
+      if (titleEl) titleEl.textContent = `Entrada de ${studentName} a las ${entryTime}`;
+      if (msgEl) msgEl.textContent = `Quedan ${diffMin} min. Recuerda planificar tu llegada.`;
+    }
+  };
+
+  render();
+  _entryTimer = setInterval(render, 60000);
+}
+
+// ── Banner recordatorio de salida (pick-up) ───────────────────────────────────
+let _exitTimer = null;
+function _updateExitReminder(student) {
+  if (_exitTimer) { clearInterval(_exitTimer); _exitTimer = null; }
+  const banner = document.getElementById('exitReminderBanner');
+  const titleEl = document.getElementById('exitBannerTitle');
+  const msgEl = document.getElementById('exitBannerMsg');
+  if (!banner) return;
+
+  const exitTime = student?.exit_time;
+  if (!exitTime) { banner.classList.add('hidden'); return; }
+
+  const studentName = student?.name || 'tu hijo';
+
+  const render = () => {
+    const now = new Date();
+    const [h, m] = exitTime.split(':').map(Number);
+    const exit = new Date(now);
+    exit.setHours(h, m, 0, 0);
+
+    const diffMs = exit - now;
+    const diffMin = Math.round(diffMs / 60000);
+
+    if (diffMin > 120 || diffMin < -60) {
+      banner.classList.add('hidden');
+      return;
+    }
+
+    banner.classList.remove('hidden');
+    if (diffMin < 0) {
+      const overdue = Math.abs(diffMin);
+      if (titleEl) titleEl.textContent = `¡Hora de recoger a ${studentName}!`;
+      if (msgEl) msgEl.textContent = `Llevas ${overdue} min de retraso. Por favor recógelo lo antes posible.`;
+      banner.style.background = 'linear-gradient(135deg,#ef4444,#dc2626,#b91c1c)';
+    } else if (diffMin <= 15) {
+      if (titleEl) titleEl.textContent = `¡Quedan ${diffMin} min para la salida!`;
+      if (msgEl) msgEl.textContent = `Prepárate para recoger a ${studentName}. La salida es a las ${exitTime}.`;
+      banner.style.background = 'linear-gradient(135deg,#fbbf24,#f59e0b,#d97706)';
+    } else {
+      if (titleEl) titleEl.textContent = `Salida de ${studentName} a las ${exitTime}`;
+      if (msgEl) msgEl.textContent = `Quedan ${diffMin} min. Recuerda planificar tu llegada.`;
+      banner.style.background = 'linear-gradient(135deg,#fbbf24,#f59e0b,#d97706)';
+    }
+  };
+
+  render();
+  _exitTimer = setInterval(render, 60000);
+}
+
+// ── Banner suscripción push ───────────────────────────────────────────────────
+function _updatePushSubscriptionBanner() {
+  const banner = document.getElementById('pushSubBanner');
+  const btn = document.getElementById('pushSubBtn');
+  if (!banner) return;
+
+  if (!('Notification' in window) || !('serviceWorker' in navigator)) {
+    banner.classList.add('hidden');
+    return;
+  }
+
+  const isSubscribed = Notification.permission === 'granted';
+  if (isSubscribed) { banner.classList.add('hidden'); return; }
+
+  banner.classList.remove('hidden');
+  if (btn) {
+    btn.onclick = async () => {
+      try {
+        btn.disabled = true;
+        btn.textContent = 'Activando...';
+        const result = await NotifyPermission.request();
+        if (result === 'granted') {
+          if (window.OneSignal && window.OneSignal.isPushNotificationsEnabled) {
+            await window.OneSignal.registerForPushNotifications();
+          }
+          banner.classList.add('hidden');
+          Helpers.toast('Notificaciones activadas', 'success');
+        } else {
+          btn.textContent = 'Rechazado';
+          setTimeout(() => { banner.classList.add('hidden'); }, 2000);
+        }
+      } catch (e) {
+        btn.textContent = 'Error';
+        btn.disabled = false;
+        Helpers.toast('No se pudo activar: ' + e.message, 'error');
+      }
+    };
+  }
+}
+
 function _renderSchoolYearBanner() {
   const banner = document.getElementById('padreSchoolYearBanner');
   if (!banner) return;
@@ -499,11 +764,11 @@ function _renderSchoolYearBanner() {
   else if (year.status === 'closed') badge = '<span class="px-2 py-0.5 bg-slate-100 text-slate-500 text-[10px] font-black rounded-full uppercase">Finalizado</span>';
 
   banner.innerHTML = `
-    <div class="bg-gradient-to-r from-violet-50 to-indigo-50 border border-violet-200 rounded-2xl p-4 flex items-center gap-4">
-      <div class="w-10 h-10 bg-violet-100 rounded-xl flex items-center justify-center shrink-0">
-        <i data-lucide="calendar-range" class="w-5 h-5 text-violet-600"></i>
+    <div class="rounded-2xl p-4 flex flex-col sm:flex-row items-center gap-4" style="background:linear-gradient(135deg,#ede9fe,#f0fdf4);border:1px solid #c4b5fd">
+      <div class="w-10 h-10 rounded-xl flex items-center justify-center shrink-0" style="background:#ede9fe">
+        <i data-lucide="calendar-range" class="w-5 h-5" style="color:#7c3aed"></i>
       </div>
-      <div class="flex-1 min-w-0">
+      <div class="flex-1 min-w-0 text-center sm:text-left">
         <p class="text-xs font-bold text-slate-800">${Helpers.escapeHTML(yearName)}</p>
         <p class="text-[10px] text-slate-500 font-semibold mt-0.5">Periodo actual: ${Helpers.escapeHTML(periodName)}</p>
       </div>

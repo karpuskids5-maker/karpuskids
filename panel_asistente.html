@@ -289,6 +289,20 @@
           <!-- Alertas inyectadas por JS -->
         </div>
 
+        <!-- 🎂 Cumpleaños próximos de estudiantes -->
+        <div id="staffBirthdayBanner" class="mb-6 hidden rounded-[1.5rem] overflow-hidden shadow-lg" style="background:linear-gradient(135deg,#f9a8d4,#fb7185,#e879f9);box-shadow:0 10px 15px -3px rgba(249,168,212,.25)">
+          <div class="p-4 md:p-5">
+            <div class="flex items-center gap-3 mb-3">
+              <div class="w-10 h-10 bg-white/25 backdrop-blur-md rounded-2xl flex items-center justify-center text-2xl shrink-0">🎂</div>
+              <div>
+                <p class="font-black text-white text-sm leading-tight">Cumpleaños próximos</p>
+                <p class="text-white/80 text-[10px] font-bold uppercase tracking-wider" id="staffBirthdayCount"></p>
+              </div>
+            </div>
+            <div id="staffBirthdayList" class="flex flex-col gap-2"></div>
+          </div>
+        </div>
+
         <!-- KPI Cards -->
         <div class="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
           <div class="bg-gradient-to-br from-blue-500 to-blue-600 p-5 rounded-2xl shadow-md text-white relative overflow-hidden group cursor-pointer" data-section="estudiantes">

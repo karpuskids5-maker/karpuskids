@@ -2,6 +2,7 @@ import { supabase } from '../../shared/supabase.js';
 import { AppState } from '../state.js';
 import { Helpers } from '../../shared/helpers.js';
 import { QueryCache } from '../../shared/query-cache.js';
+import { getBirthdayInfo } from '../../shared/birthday-utils.js';
 
 const STATUS_MAP = {
   paid:    { label: 'Aprobado',    cls: 'bg-emerald-100 text-emerald-700' },
@@ -84,6 +85,7 @@ export const DashboardModule = {
     set('statIncome',     incomeTotal.toLocaleString('es-DO', { minimumFractionDigits: 2 }));
     set('welcomeName',    (AppState.get('profile')?.name || 'Asistente').split(' ')[0]);
     this._renderUrgentAlerts(paymentsCount, attendanceCount);
+    this._renderStaffBirthdayBanner();
   },
 
   _renderUrgentAlerts(paymentsReview, pendingAbsences) {
@@ -223,6 +225,61 @@ export const DashboardModule = {
       });
     } catch (e) {
       // Error intentionally ignored (chart render failure is non-critical)
+    }
+  },
+
+  async _renderStaffBirthdayBanner() {
+    const banner = document.getElementById('staffBirthdayBanner');
+    const listEl = document.getElementById('staffBirthdayList');
+    const countEl = document.getElementById('staffBirthdayCount');
+    if (!banner || !listEl) return;
+
+    try {
+      const { data: students, error } = await supabase
+        .from('students')
+        .select('id, name, last_name, birth_date')
+        .eq('is_active', true)
+        .not('birth_date', 'is', null);
+
+      if (error || !students) { banner.classList.add('hidden'); return; }
+
+      const upcoming = students
+        .map(s => ({ ...s, bday: getBirthdayInfo(s.birth_date) }))
+        .filter(s => s.bday && (s.bday.isToday || s.bday.isUpcoming))
+        .sort((a, b) => a.bday.daysUntil - b.bday.daysUntil);
+
+      if (upcoming.length === 0) { banner.classList.add('hidden'); return; }
+
+      listEl.innerHTML = upcoming.map(s => {
+        const fullName = [s.name, s.last_name].filter(Boolean).join(' ');
+        if (s.bday.isToday) {
+          return '<div class="flex items-center gap-3 bg-white/20 backdrop-blur-sm rounded-xl p-2.5">' +
+            '<div class="w-8 h-8 rounded-lg bg-white/30 flex items-center justify-center text-sm font-black text-white shrink-0">🎂</div>' +
+            '<div class="min-w-0 flex-1">' +
+              '<p class="text-xs font-black text-white truncate">' + Helpers.escapeHTML(fullName) + '</p>' +
+              '<p class="text-[10px] text-white/80 font-bold">¡Hoy cumple ' + s.bday.ageTurning + ' años!</p>' +
+            '</div>' +
+          '</div>';
+        }
+        return '<div class="flex items-center gap-3 bg-white/15 rounded-xl p-2.5">' +
+          '<div class="w-8 h-8 rounded-lg bg-white/25 flex items-center justify-center text-sm font-bold text-white/90 shrink-0">' + s.bday.daysUntil + '</div>' +
+          '<div class="min-w-0 flex-1">' +
+            '<p class="text-xs font-bold text-white truncate">' + Helpers.escapeHTML(fullName) + '</p>' +
+            '<p class="text-[10px] text-white/70 font-bold">En ' + s.bday.daysUntil + ' día' + (s.bday.daysUntil === 1 ? '' : 's') + ' cumple ' + s.bday.ageTurning + ' años</p>' +
+          '</div>' +
+        '</div>';
+      }).join('');
+
+      const todayCount = upcoming.filter(s => s.bday.isToday).length;
+      const soonCount = upcoming.length - todayCount;
+      const parts = [];
+      if (todayCount > 0) parts.push(todayCount + ' hoy');
+      if (soonCount > 0) parts.push(soonCount + ' pronto');
+      if (countEl) countEl.textContent = parts.join(' · ');
+      banner.classList.remove('hidden');
+    } catch (e) {
+      console.warn('staffBirthdayBanner error:', e);
+      banner.classList.add('hidden');
     }
   }
 };

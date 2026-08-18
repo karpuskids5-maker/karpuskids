@@ -473,8 +473,71 @@
       class="w-full lg:w-auto shrink-0 bg-white text-orange-600 font-black text-sm px-6 py-3 rounded-2xl hover:bg-orange-50 transition-all active:scale-95 shadow-md shadow-orange-900/10">
       Pagar ahora
     </button>
-  </div>
+        </div>
 </div>
+
+        <!-- 🎂 Banner cumpleaños del estudiante -->
+        <div id="birthdayBanner" class="hidden mb-6 rounded-[1.5rem] md:rounded-[2rem] overflow-hidden shadow-lg" style="background:linear-gradient(135deg,#f472b6,#f43f5e,#d946ef);box-shadow:0 10px 15px -3px rgba(244,114,182,.25)">
+          <div class="p-4 md:p-6 flex flex-col lg:flex-row items-center gap-4">
+            <div class="w-14 h-14 bg-white/20 backdrop-blur-md rounded-2xl flex items-center justify-center text-3xl shrink-0 animate-bounce">🎂</div>
+            <div class="flex-1 text-center lg:text-left min-w-0">
+              <p id="birthdayBannerTitle" class="font-black text-white text-base md:text-lg leading-tight"></p>
+              <p id="birthdayBannerMsg" class="text-white/90 text-xs md:text-sm font-bold mt-1"></p>
+            </div>
+          </div>
+        </div>
+
+        <!-- 📋 Banner solicitud de horario -->
+        <div id="scheduleReminderBanner" class="hidden mb-6 rounded-[1.5rem] md:rounded-[2rem] overflow-hidden shadow-lg" style="background:linear-gradient(135deg,#34d399,#22c55e,#14b8a6);box-shadow:0 10px 15px -3px rgba(52,211,153,.25)">
+          <div class="p-4 md:p-6 flex flex-col lg:flex-row items-center gap-4">
+            <div class="w-12 h-12 bg-white/20 backdrop-blur-md rounded-2xl flex items-center justify-center text-2xl shrink-0">🕐</div>
+            <div class="flex-1 text-center lg:text-left min-w-0">
+              <p class="font-black text-white text-base leading-tight">Horario del estudiante</p>
+              <p id="scheduleReminderMsg" class="text-white/90 text-xs font-bold mt-1"></p>
+            </div>
+            <button onclick="App.openScheduleModal()"
+              class="w-full lg:w-auto shrink-0 bg-white text-emerald-600 font-black text-xs px-5 py-2.5 rounded-2xl hover:bg-emerald-50 transition-all active:scale-95 shadow-md">
+              Configurar
+            </button>
+          </div>
+        </div>
+
+        <!-- 🚗 Banner entrada — Recuerda llevar al niño -->
+        <div id="entryReminderBanner" class="hidden mb-6 rounded-[1.5rem] md:rounded-[2rem] overflow-hidden shadow-lg" style="background:linear-gradient(135deg,#818cf8,#6366f1,#4f46e5);box-shadow:0 10px 15px -3px rgba(99,102,241,.25)">
+          <div class="p-4 md:p-6 flex flex-col lg:flex-row items-center gap-4">
+            <div class="w-12 h-12 bg-white/20 backdrop-blur-md rounded-2xl flex items-center justify-center text-2xl shrink-0 animate-pulse">🏫</div>
+            <div class="flex-1 text-center lg:text-left min-w-0">
+              <p id="entryBannerTitle" class="font-black text-white text-base leading-tight"></p>
+              <p id="entryBannerMsg" class="text-white/90 text-xs font-bold mt-1"></p>
+            </div>
+          </div>
+        </div>
+
+        <!-- 🏠 Banner salida — Es hora de recoger al estudiante -->
+        <div id="exitReminderBanner" class="hidden mb-6 rounded-[1.5rem] md:rounded-[2rem] overflow-hidden shadow-lg" style="background:linear-gradient(135deg,#fbbf24,#f59e0b,#d97706);box-shadow:0 10px 15px -3px rgba(245,158,11,.25)">
+          <div class="p-4 md:p-6 flex flex-col lg:flex-row items-center gap-4">
+            <div class="w-12 h-12 bg-white/20 backdrop-blur-md rounded-2xl flex items-center justify-center text-2xl shrink-0 animate-bounce">🚗</div>
+            <div class="flex-1 text-center lg:text-left min-w-0">
+              <p id="exitBannerTitle" class="font-black text-white text-base leading-tight"></p>
+              <p id="exitBannerMsg" class="text-white/90 text-xs font-bold mt-1"></p>
+            </div>
+          </div>
+        </div>
+
+        <!-- 🔔 Banner suscripción push -->
+        <div id="pushSubBanner" class="hidden mb-6 rounded-[1.5rem] md:rounded-[2rem] overflow-hidden shadow-lg" style="background:linear-gradient(135deg,#38bdf8,#2563eb,#6366f1);box-shadow:0 10px 15px -3px rgba(56,189,248,.25)">
+          <div class="p-4 md:p-6 flex flex-col lg:flex-row items-center gap-4">
+            <div class="w-12 h-12 bg-white/20 backdrop-blur-md rounded-2xl flex items-center justify-center text-2xl shrink-0 animate-pulse">🔔</div>
+            <div class="flex-1 text-center lg:text-left min-w-0">
+              <p class="font-black text-white text-base leading-tight">Activar notificaciones</p>
+              <p class="text-white/90 text-xs font-bold mt-1">Recibe alertas de asistencia, pagos y mensajes importantes de la escuela.</p>
+            </div>
+            <button id="pushSubBtn"
+              class="w-full lg:w-auto shrink-0 bg-white text-blue-600 font-black text-xs px-5 py-2.5 rounded-2xl hover:bg-blue-50 transition-all active:scale-95 shadow-md">
+              Activar
+            </button>
+          </div>
+        </div>
 
         <!-- tarjetas principales -->
         <div id="dashboardGrid" class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4 mb-8">
@@ -943,8 +1006,12 @@
                       <input id="inputStudentBlood" type="text" class="w-full px-5 py-3.5 bg-slate-50 border border-slate-100 rounded-2xl text-sm font-bold text-slate-700 outline-none focus:ring-4 focus:ring-emerald-100 focus:border-emerald-400 transition-all" placeholder="Ej: O+" aria-label="Tipo de sangre del estudiante">
                     </div>
                     <div class="space-y-1.5">
-                      <label class="text-[10px] font-black text-slate-500 uppercase ml-1">Horario en la estancia</label>
-                      <input id="inputStudentSchedule" type="text" class="w-full px-5 py-3.5 bg-emerald-50 border border-emerald-100 rounded-2xl text-sm font-bold text-emerald-700 outline-none focus:ring-4 focus:ring-emerald-100 focus:border-emerald-400 transition-all" placeholder="Matutina · 8:00 – 11:45" readonly aria-label="Horario de entrada y salida del estudiante">
+                      <label class="text-[10px] font-black text-slate-500 uppercase ml-1">Hora de entrada</label>
+                      <input id="inputEntryTime" type="time" class="w-full px-5 py-3.5 bg-emerald-50 border border-emerald-100 rounded-2xl text-sm font-bold text-emerald-700 outline-none focus:ring-4 focus:ring-emerald-100 focus:border-emerald-400 transition-all" aria-label="Hora de entrada del estudiante">
+                    </div>
+                    <div class="space-y-1.5">
+                      <label class="text-[10px] font-black text-slate-500 uppercase ml-1">Hora de salida</label>
+                      <input id="inputExitTime" type="time" class="w-full px-5 py-3.5 bg-emerald-50 border border-emerald-100 rounded-2xl text-sm font-bold text-emerald-700 outline-none focus:ring-4 focus:ring-emerald-100 focus:border-emerald-400 transition-all" aria-label="Hora de salida del estudiante">
                     </div>
                   </div>
                   <div class="space-y-1.5">
@@ -1274,5 +1341,30 @@
       }
     });
   </script>
+
+  <!-- Modal Horario del Estudiante -->
+  <div id="scheduleModal" class="fixed inset-0 z-[200] hidden items-center justify-center p-4" style="background:rgba(0,0,0,.4);backdrop-filter:blur(4px)" onclick="App.closeScheduleModal()">
+    <div class="bg-white rounded-[2rem] shadow-2xl w-full max-w-md overflow-hidden" onclick="event.stopPropagation()">
+      <div class="p-6 text-center" style="background:linear-gradient(135deg,#34d399,#22c55e,#14b8a6)">
+        <div class="w-14 h-14 bg-white/25 backdrop-blur-md rounded-2xl flex items-center justify-center text-3xl mx-auto mb-3">🕐</div>
+        <h3 class="font-black text-white text-lg">Horario del estudiante</h3>
+        <p class="text-white/80 text-xs font-bold mt-1">Configura los horarios de entrada y salida</p>
+      </div>
+      <div class="p-6 space-y-4">
+        <div>
+          <label class="text-[10px] font-black text-slate-500 uppercase ml-1">Hora de entrada</label>
+          <input id="modalEntryTime" type="time" class="w-full px-5 py-3.5 bg-slate-50 border border-slate-100 rounded-2xl text-sm font-bold text-slate-700 outline-none focus:ring-4 focus:ring-emerald-100 focus:border-emerald-400 transition-all">
+        </div>
+        <div>
+          <label class="text-[10px] font-black text-slate-500 uppercase ml-1">Hora de salida</label>
+          <input id="modalExitTime" type="time" class="w-full px-5 py-3.5 bg-slate-50 border border-slate-100 rounded-2xl text-sm font-bold text-slate-700 outline-none focus:ring-4 focus:ring-emerald-100 focus:border-emerald-400 transition-all">
+        </div>
+      </div>
+      <div class="flex gap-3 p-6 pt-0">
+        <button onclick="App.closeScheduleModal()" class="flex-1 py-3 bg-slate-100 text-slate-600 font-black text-sm rounded-2xl hover:bg-slate-200 transition-all active:scale-95">Cancelar</button>
+        <button id="scheduleModalSaveBtn" onclick="App.saveSchedule()" class="flex-1 py-3 text-white font-black text-sm rounded-2xl transition-all active:scale-95 shadow-md" style="background:linear-gradient(135deg,#34d399,#14b8a6)">Guardar</button>
+      </div>
+    </div>
+  </div>
 </body>
 </html>

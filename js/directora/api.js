@@ -248,7 +248,7 @@ export const DirectorApi = {
   async getStudents(filters = {}, range = null) {
     let q = supabase
       .from(TABLES.STUDENTS)
-      .select('id, name, avatar_url, matricula, age, age_type, classrooms(id, name), is_active', { count: 'exact' })
+      .select('id, name, avatar_url, matricula, age, age_type, entry_time, exit_time, classrooms(id, name), is_active', { count: 'exact' })
       .order('name');
 
     if (filters.search) q = q.ilike('name', `%${filters.search}%`);

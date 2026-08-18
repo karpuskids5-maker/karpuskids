@@ -72,7 +72,7 @@ export const StudentsModule = {
     } catch (e) {
       const container = document.getElementById('studentsTable');
       if (container) {
-        container.innerHTML = '<tr><td colspan="3" class="text-center p-8">' + Helpers.errorState('Error al cargar estudiantes', 'App.students.init()') + '</td></tr>';
+        container.innerHTML = '<tr><td colspan="5" class="text-center p-8">' + Helpers.errorState('Error al cargar estudiantes', 'App.students.init()') + '</td></tr>';
         if (window.lucide) lucide.createIcons();
       }
     }
@@ -82,7 +82,7 @@ export const StudentsModule = {
     const tableContainer = document.getElementById('studentsTable');
 
     if (!students?.length) {
-      if (tableContainer) tableContainer.innerHTML = '<tr><td colspan="3" class="text-center py-8 text-slate-500">No hay estudiantes.</td></tr>';
+      if (tableContainer) tableContainer.innerHTML = '<tr><td colspan="5" class="text-center py-8 text-slate-500">No hay estudiantes.</td></tr>';
       return;
     }
 
@@ -108,6 +108,8 @@ export const StudentsModule = {
               ${s.classrooms?.name || 'No asignada'}
             </span>
           </td>
+          <td class="p-4 text-center text-[11px] font-bold text-slate-500">${s.entry_time || '—'}</td>
+          <td class="p-4 text-center text-[11px] font-bold text-slate-500">${s.exit_time || '—'}</td>
           <td class="p-4 text-right">
             <div class="flex justify-end gap-2">
               <button onclick="App.students.openModal('${s.id}')" class="w-9 h-9 flex items-center justify-center bg-indigo-50 text-indigo-600 hover:bg-indigo-600 hover:text-white rounded-xl transition-all shadow-sm" title="Editar">

@@ -34,9 +34,8 @@ export const ProfileModule = {
     // Estudiante
     set('inputStudentName', student.name);
     set('inputStudentBlood', student.blood_type);
-    set('inputStudentSchedule', [student.schedule, fmtTime(student.entry_time), fmtTime(student.exit_time)]
-      .filter(Boolean)
-      .join(' · '));
+    set('inputEntryTime', student.entry_time || '');
+    set('inputExitTime', student.exit_time || '');
     set('inputStudentAllergy', student.allergies);
     set('profilePickupName', student.authorized_pickup);
     set('profilePickupPhone', student.authorized_pickup_phone);
@@ -142,6 +141,8 @@ export const ProfileModule = {
     const updates = {
       name,
       blood_type:             get('inputStudentBlood')   ?? student.blood_type,
+      entry_time:             get('inputEntryTime')      || null,
+      exit_time:              get('inputExitTime')       || null,
       allergies:              get('inputStudentAllergy')  ?? student.allergies,
       authorized_pickup:      get('profilePickupName')    ?? student.authorized_pickup,
       authorized_pickup_phone: get('profilePickupPhone') ?? student.authorized_pickup_phone,
@@ -178,6 +179,14 @@ export const ProfileModule = {
 
       AppState.set('currentStudent', { ...student, ...updates });
       Helpers.toast('Perfil actualizado correctamente ✅', 'success');
+
+      // Refresh banners after schedule save
+      const updated = { ...student, ...updates };
+      if (updates.entry_time !== undefined || updates.exit_time !== undefined) {
+        if (updated.entry_time && updated.exit_time) {
+          document.getElementById('scheduleReminderBanner')?.classList.add('hidden');
+        }
+      }
     } catch (err) {
       Helpers.toast('Error al guardar cambios', 'error');
     } finally {

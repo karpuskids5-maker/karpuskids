@@ -3,6 +3,7 @@ import { Helpers } from './helpers.js';
 import { auditLog } from './db-utils.js';
 import { QueryCache } from './query-cache.js';
 import { SCHEDULE_DEFINITIONS, SCHEDULE_IDS } from './config.js';
+import { computeAge } from './birthday-utils.js';
 
 const TABS = [
   { id: 'info',     label: 'Info General', icon: 'user-square' },
@@ -653,6 +654,7 @@ export const StudentRecordModal = {
                       <option value="meses" ${f.age_type === 'meses' ? 'selected' : ''}>Meses</option>
                     </select>
                   </div>
+                  ${f.birth_date ? `<p class="text-[10px] font-bold text-indigo-500 mt-1" id="srm-age-computed">${computeAge(f.birth_date)}</p>` : ''}
                 </div>
               </div>
             </div>
@@ -758,6 +760,19 @@ export const StudentRecordModal = {
         const val = birth.value;
         if (!val) return;
         const ageEl = document.getElementById('srm-age');
+        const computedEl = document.getElementById('srm-age-computed');
+        const ageText = computeAge(val);
+        if (computedEl) computedEl.textContent = ageText;
+        else {
+          const label = birth.closest('.grid')?.querySelector('[data-f="age"]')?.parentElement?.parentElement;
+          if (label) {
+            const p = document.createElement('p');
+            p.className = 'text-[10px] font-bold text-indigo-500 mt-1';
+            p.id = 'srm-age-computed';
+            p.textContent = ageText;
+            label.appendChild(p);
+          }
+        }
         if (ageEl) {
           const b = new Date(val);
           const n = new Date();
