@@ -515,7 +515,7 @@ function _countReportedStudents(logsMap, students) {
 function _isStudentPresent(studentId) {
   const attendance = AppState.get('attendance') || [];
   const record = attendance.find(a => a.student_id === studentId);
-  return !record || record.status === 'present' || record.status === 'late';
+  return record?.status === 'present' || record?.status === 'late';
 }
 
 // ¿El estudiante ya se retiró del centro hoy? (attendance.status = 'retirado').
@@ -1183,7 +1183,8 @@ export async function registerMissingStudents() {
   const students  = AppState.get('students') || [];
   const logsMap   = AppState.get('logsMap') || {};
   const missing   = students.filter(s => {
-    if (_isStudentRetirado(s.id)) return false; // retirados ya no reciben eventos
+    if (_isStudentRetirado(s.id)) return false;
+    if (!_isStudentPresent(s.id)) return false;
     const log = logsMap[s.id];
     return !log || !(log.mood || log.food || log.nap || log.notes || (log.events && log.events.length));
   });
@@ -1233,15 +1234,25 @@ export async function openBulkEventModal(eventType = 'animo', scheduledTime = nu
         <span class="text-[8px] font-bold text-blue-500 uppercase">🚪 Salió del centro</span>
       </div>
     </div>`;
-    return `
-    <button type="button" data-sid="${s.id}" onclick="this.classList.toggle('selected'); this.classList.toggle('ring-2'); this.classList.toggle('ring-[#28B54D]');"
-      class="${isPresent ? 'selected ring-2 ring-[#28B54D]' : 'opacity-50'} flex items-center gap-2 px-3 py-2.5 ${isPresent ? 'bg-green-50/80 border-2 border-[#28B54D]/20' : 'bg-slate-50/80 border-2 border-slate-200/50'} rounded-2xl transition-all active:scale-95 hover:border-[#28B54D] hover:bg-green-50">
+    if (!isPresent) return `
+    <div class="flex items-center gap-2 px-3 py-2.5 bg-slate-50/80 border-2 border-slate-200/50 rounded-2xl opacity-50 cursor-not-allowed">
       <div class="w-8 h-8 rounded-full bg-slate-200 overflow-hidden shrink-0 flex items-center justify-center text-xs font-black text-slate-500">
         ${s.avatar_url ? `<img src="${s.avatar_url}" class="w-full h-full object-cover">` : s.name.charAt(0)}
       </div>
       <div class="flex-1 min-w-0 text-left">
         <span class="text-[11px] font-black text-slate-700 leading-tight block truncate">${s.name.split(' ')[0]}</span>
-        <span class="text-[8px] font-bold ${isPresent ? 'text-[#28B54D]' : 'text-slate-400'} uppercase">${isPresent ? 'Presente' : 'Ausente'}</span>
+        <span class="text-[8px] font-bold text-red-400 uppercase">Ausente</span>
+      </div>
+    </div>`;
+    return `
+    <button type="button" data-sid="${s.id}" onclick="this.classList.toggle('selected'); this.classList.toggle('ring-2'); this.classList.toggle('ring-[#28B54D]');"
+      class="selected ring-2 ring-[#28B54D] flex items-center gap-2 px-3 py-2.5 bg-green-50/80 border-2 border-[#28B54D]/20 rounded-2xl transition-all active:scale-95 hover:border-[#28B54D] hover:bg-green-50">
+      <div class="w-8 h-8 rounded-full bg-slate-200 overflow-hidden shrink-0 flex items-center justify-center text-xs font-black text-slate-500">
+        ${s.avatar_url ? `<img src="${s.avatar_url}" class="w-full h-full object-cover">` : s.name.charAt(0)}
+      </div>
+      <div class="flex-1 min-w-0 text-left">
+        <span class="text-[11px] font-black text-slate-700 leading-tight block truncate">${s.name.split(' ')[0]}</span>
+        <span class="text-[8px] font-bold text-[#28B54D] uppercase">Presente</span>
       </div>
     </button>`;
   }).join('');
@@ -1503,7 +1514,7 @@ function _renderSubParams(eventType) {
 window._bulkSelectAll = (select) => {
   document.querySelectorAll('#bulkChipsGrid button[data-sid]').forEach(b => {
     const sid = b.dataset.sid;
-    if (_isStudentRetirado(sid)) return; // retirados nunca se seleccionan
+    if (_isStudentRetirado(sid) || !_isStudentPresent(sid)) return;
     if (select) { b.classList.add('selected','ring-2','ring-[#28B54D]'); }
     else { b.classList.remove('selected','ring-2','ring-[#28B54D]'); }
   });
@@ -1515,8 +1526,10 @@ export async function confirmBulkEvent(eventType) {
   if (btn) { btn.disabled = true; btn.innerHTML = '<span class="animate-spin">⏳</span> Guardando...'; }
 
   try {
-    const selected = [...document.querySelectorAll('#bulkChipsGrid button.selected[data-sid]')].map(b => b.dataset.sid);
-    if (!selected.length) { safeToast('Selecciona al menos un estudiante', 'warning'); return; }
+    const selected = [...document.querySelectorAll('#bulkChipsGrid button.selected[data-sid]')]
+      .map(b => b.dataset.sid)
+      .filter(sid => _isStudentPresent(sid));
+    if (!selected.length) { safeToast('Selecciona al menos un estudiante presente', 'warning'); return; }
 
     const classroom = AppState.get('classroom');
     const today     = new Date().toISOString().split('T')[0];
@@ -2175,6 +2188,7 @@ function _renderInfantRoutineUI(student, log, modalId) {
 // ── GUARDAR BEBÉ ──────────────────────────────────────────────────────────────
 export async function saveInfantEntry(sid) {
   if (_isStudentRetirado(sid)) { safeToast('Este estudiante se retiró del centro: no se registran más eventos', 'warning'); return; }
+  if (!_isStudentPresent(sid)) { safeToast('Este estudiante no está presente: no se pueden registrar eventos', 'warning'); return; }
   const btn = document.getElementById('btnSaveInfant');
   if (btn) { btn.disabled = true; btn.innerHTML = '<i data-lucide="loader-2" class="animate-spin w-4 h-4"></i> Guardando...'; if (window.lucide) lucide.createIcons(); }
   try {
@@ -2307,6 +2321,7 @@ export async function saveRoutineLog(studentId, field = 'notes', value = null) {
 
 export async function registerIndividualEvent(sid, type, extra = {}) {
   if (_isStudentRetirado(sid)) { safeToast('Este estudiante se retiró del centro: no se registran más eventos', 'warning'); return; }
+  if (!_isStudentPresent(sid)) { safeToast('Este estudiante no está presente: no se pueden registrar eventos', 'warning'); return; }
   const classroom = AppState.get('classroom');
   const today     = new Date().toISOString().split('T')[0];
   const logsMap   = AppState.get('logsMap') || {};
