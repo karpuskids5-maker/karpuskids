@@ -1,4 +1,4 @@
-import { ensureRole, supabase, initOneSignal, sendPush, emitEvent } from '/js/shared/supabase.js';
+import { ensureRole, supabase, initOneSignal, sendPush, emitEvent, initSessionTimeout, sanitizePushPayload, validateFileUpload, safeFileName, sanitizeText } from '/js/shared/supabase.js';
 import { SchoolEngine } from '/js/shared/school-engine.js';
 import { RealtimeManager } from '/js/shared/realtime-manager.js';
 import { AppState } from './state.js';
@@ -166,14 +166,20 @@ window.addEventListener('unhandledrejection', (e) => {
 });
 
 document.addEventListener('DOMContentLoaded', async () => {
-  // Logout
+  // Logout seguro — limpia todo el almacenamiento
   document.getElementById('logoutBtn')?.addEventListener('click', async () => {
+    try { localStorage.clear(); } catch (_) {}
+    try { sessionStorage.clear(); } catch (_) {}
+    try { if (window.caches) caches.keys().then(k => k.forEach(c => caches.delete(c))); } catch (_) {}
     await supabase.auth.signOut();
     window.location.href = 'login.html';
   });
 
   const auth = await ensureRole(['maestra', 'admin']);
   if (!auth) return;
+
+  // Activar session timeout por inactividad (30 min)
+  initSessionTimeout();
   
   AppState.set('user', auth.user);
   AppState.set('profile', auth.profile);
@@ -204,15 +210,28 @@ document.addEventListener('DOMContentLoaded', async () => {
   
   if (sidebarAvatar) {
     const avatarUrl = auth.profile?.avatar_url;
-    sidebarAvatar.innerHTML = avatarUrl 
-      ? `<img src="${avatarUrl}" class="w-full h-full object-cover" onerror="this.parentElement.innerHTML='${teacherName.charAt(0)}'">`
-      : `<div class="w-full h-full flex items-center justify-center text-xl font-black text-orange-600 bg-orange-50">${teacherName.charAt(0)}</div>`;
+    if (avatarUrl) {
+      const img = document.createElement('img');
+      img.src = avatarUrl;
+      img.className = 'w-full h-full object-cover';
+      img.alt = '';
+      img.onerror = function() {
+        this.replaceWith(Object.assign(document.createElement('div'), {
+          className: 'w-full h-full flex items-center justify-center text-xl font-black text-orange-600 bg-orange-50',
+          textContent: teacherName.charAt(0)
+        }));
+      };
+      sidebarAvatar.innerHTML = '';
+      sidebarAvatar.appendChild(img);
+    } else {
+      sidebarAvatar.innerHTML = `<div class="w-full h-full flex items-center justify-center text-xl font-black text-orange-600 bg-orange-50">${safeEscapeHTML(teacherName.charAt(0))}</div>`;
+    }
   }
 
   document.querySelectorAll('.user-name-display').forEach(el => el.textContent = teacherName);
   document.querySelectorAll('.user-email-display').forEach(el => el.textContent = auth.user.email);
   const welcomeText = document.querySelector('#t-home header h1');
-  if (welcomeText) welcomeText.innerHTML = `<span>Hola, <span class="user-name-display text-orange-600">${teacherName}</span>!</span>`;
+  if (welcomeText) welcomeText.innerHTML = `<span>Hola, <span class="user-name-display text-orange-600">${safeEscapeHTML(teacherName)}</span>!</span>`;
 
   // Cargar Perfil en sección perfil
   const pName = document.getElementById('teacherName');
@@ -306,7 +325,21 @@ document.addEventListener('DOMContentLoaded', async () => {
         
         // Actualizar avatar en UI
         setProfileAvatar(publicUrl, teacherName);
-        document.getElementById('sidebarAvatar').innerHTML = `<img src="${publicUrl}" class="w-full h-full object-cover" onerror="this.parentElement.innerHTML='${teacherName.charAt(0)}'">`;
+        const sideAvatar = document.getElementById('sidebarAvatar');
+        if (sideAvatar) {
+          const img = document.createElement('img');
+          img.src = publicUrl;
+          img.className = 'w-full h-full object-cover';
+          img.alt = '';
+          img.onerror = function() {
+            this.replaceWith(Object.assign(document.createElement('div'), {
+              className: 'w-full h-full flex items-center justify-center text-xl font-black text-orange-600 bg-orange-50',
+              textContent: teacherName.charAt(0)
+            }));
+          };
+          sideAvatar.innerHTML = '';
+          sideAvatar.appendChild(img);
+        }
         
         // Actualizar estado
         AppState.set('profile', { ...auth.profile, avatar_url: publicUrl });

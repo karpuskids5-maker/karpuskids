@@ -1217,8 +1217,35 @@ CREATE POLICY "tasks_parent" ON public.tasks FOR SELECT
 
 -- ── TASK EVIDENCES ──
 DROP POLICY IF EXISTS "evidences_all" ON public.task_evidences;
-CREATE POLICY "evidences_all" ON public.task_evidences FOR ALL
-  USING (auth.uid() IS NOT NULL);
+DROP POLICY IF EXISTS "evidences_staff" ON public.task_evidences;
+DROP POLICY IF EXISTS "evidences_teacher" ON public.task_evidences;
+DROP POLICY IF EXISTS "evidences_parent_insert" ON public.task_evidences;
+DROP POLICY IF EXISTS "evidences_parent_select" ON public.task_evidences;
+
+CREATE POLICY "evidences_staff" ON public.task_evidences FOR ALL
+  USING (
+    get_my_role() IN ('directora','asistente','maestra','admin')
+    AND is_classroom_accessible(
+      (SELECT t.classroom_id FROM public.tasks t WHERE t.id = task_evidences.task_id)
+    )
+  );
+
+CREATE POLICY "evidences_parent_select" ON public.task_evidences FOR SELECT
+  USING (
+    auth.uid() IS NOT NULL
+    AND (
+      EXISTS (SELECT 1 FROM public.students s WHERE s.id = task_evidences.student_id AND s.parent_id = auth.uid())
+      OR EXISTS (SELECT 1 FROM public.tasks t
+                 JOIN public.students st ON st.classroom_id = t.classroom_id
+                 WHERE t.id = task_evidences.task_id AND st.parent_id = auth.uid())
+    )
+  );
+
+CREATE POLICY "evidences_parent_insert" ON public.task_evidences FOR INSERT
+  WITH CHECK (
+    auth.uid() IS NOT NULL
+    AND EXISTS (SELECT 1 FROM public.students s WHERE s.id = task_evidences.student_id AND s.parent_id = auth.uid())
+  );
 
 -- ── POSTS ──
 DROP POLICY IF EXISTS "posts_select" ON public.posts;

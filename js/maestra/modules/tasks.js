@@ -1,4 +1,4 @@
-import { supabase, sendPush, emitEvent } from '/js/shared/supabase.js';
+import { supabase, sendPush, emitEvent, validateFileUpload, safeFileName } from '/js/shared/supabase.js';
 import { TABLES } from '/js/shared/constants.js';
 import { AppState } from '../state.js';
 import { MaestraApi } from '../api.js';
@@ -238,7 +238,9 @@ export async function openNewTaskModal(taskToEdit = null) {
       if (!classroom) throw new Error('No hay aula activa');
 
       if (file) {
-        const filePath = `${classroom.id}/${Date.now()}-${file.name}`;
+        const fileCheck = validateFileUpload(file);
+        if (!fileCheck.ok) { safeToast(fileCheck.error, 'error'); return; }
+        const filePath = `${classroom.id}/${safeFileName(file.name)}`;
         const { error: uploadError } = await supabase.storage
           .from('classroom_media')
           .upload(filePath, file);

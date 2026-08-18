@@ -48,28 +48,41 @@ export const MaestraApi = {
    * Upsert asistencia (optimizado con periodo)
    */
   async upsertAttendance(record) {
-    // School Engine: auto-assign school_year_id
-    if (!record.school_year_id) {
-      const year = AppState.get('schoolYear');
-      if (year) record.school_year_id = year.id;
+    // Sanitizar IDs: bigint columns require numeric values, not strings
+    if (record.student_id != null) record.student_id = Number(record.student_id);
+    if (record.classroom_id != null) record.classroom_id = Number(record.classroom_id);
+
+    // Solo incluir school_year_id si es un número válido (nullable FK)
+    if (record.school_year_id == null) {
+      const yearId = AppState.get('schoolYear')?.id;
+      if (yearId) record.school_year_id = Number(yearId);
+    }
+    // Validar que sea numérico o eliminar para evitar FK violations
+    if (record.school_year_id != null && (isNaN(record.school_year_id) || record.school_year_id <= 0)) {
+      delete record.school_year_id;
     }
 
-    // Vincular automáticamente al período académico activo si la tabla existe
-    // (silencioso si falla). La columna correcta en attendance es
-    // academic_period_id — NO period_id (esa es de tasks/posts).
-    if (!record.academic_period_id) {
-      try {
-        const activePeriod = AppState.get('activePeriod');
-        // Omitir períodos legacy (id de la tabla 'periods', rompería la FK)
-        if (activePeriod?.id && activePeriod.source !== 'legacy') {
-          record.academic_period_id = activePeriod.id;
-        }
-      } catch (_) { /* 404 ignorado si no existe la tabla */ }
+    // academic_period_id es nullable y NO esencial para asistencia.
+    // Solo incluir si se pasó explícitamente y es numérico válido.
+    // NO auto-asignar desde activePeriod porque puede causar FK violations
+    // si el período no existe en academic_periods.
+    if (record.academic_period_id != null) {
+      if (isNaN(Number(record.academic_period_id)) || Number(record.academic_period_id) <= 0) {
+        delete record.academic_period_id;
+      } else {
+        record.academic_period_id = Number(record.academic_period_id);
+      }
+    }
+
+    // Eliminar campos undefined para evitar errores de serialización
+    const clean = {};
+    for (const [k, v] of Object.entries(record)) {
+      if (v !== undefined) clean[k] = v;
     }
 
     const { data, error } = await supabase
       .from(TABLES.ATTENDANCE)
-      .upsert(record, { onConflict: 'student_id,date' })
+      .upsert(clean, { onConflict: 'student_id,date' })
       .select()
       .maybeSingle();
 

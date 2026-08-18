@@ -159,6 +159,106 @@ window.addEventListener('unhandledrejection', (e) => {
   logError(panel, msg, e.reason?.stack || '', window.location.pathname).catch(() => {});
 });
 
+// ── Session Timeout por Inactividad (30 min) ──────────────────────────────────
+const SESSION_TIMEOUT_MS = 30 * 60 * 1000; // 30 minutos
+let _sessionTimer = null;
+let _sessionOverlay = null;
+
+function _createSessionLockOverlay() {
+  if (_sessionOverlay) return _sessionOverlay;
+  const overlay = document.createElement('div');
+  overlay.id = 'sessionLockOverlay';
+  overlay.className = 'fixed inset-0 z-[9999] bg-slate-900/95 flex items-center justify-center backdrop-blur-sm';
+  overlay.innerHTML = `
+    <div class="text-center p-8 max-w-sm mx-4">
+      <div class="w-20 h-20 mx-auto mb-6 bg-slate-700/50 rounded-full flex items-center justify-center">
+        <svg class="w-10 h-10 text-slate-400" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"/>
+        </svg>
+      </div>
+      <h2 class="text-xl font-black text-white mb-2">Sesión Bloqueada</h2>
+      <p class="text-slate-400 text-sm mb-6">Tu sesión expiró por inactividad. Por seguridad, se cerró automáticamente.</p>
+      <button onclick="window._sessionUnlock()" class="px-6 py-3 bg-orange-500 hover:bg-orange-600 text-white font-black rounded-2xl transition-colors text-sm">
+        Volver a Iniciar Sesión
+      </button>
+    </div>`;
+  document.body.appendChild(overlay);
+  _sessionOverlay = overlay;
+  return overlay;
+}
+
+function _resetSessionTimer() {
+  clearTimeout(_sessionTimer);
+  _sessionTimer = setTimeout(() => {
+    supabase.auth.signOut().catch(() => {});
+    _createSessionLockOverlay();
+  }, SESSION_TIMEOUT_MS);
+}
+
+window._sessionUnlock = () => {
+  window.location.href = 'login.html';
+};
+
+export function initSessionTimeout() {
+  if (_sessionTimer) return;
+  ['mousedown', 'mousemove', 'keydown', 'scroll', 'touchstart', 'click'].forEach(evt => {
+    document.addEventListener(evt, _resetSessionTimer, { passive: true });
+  });
+  _resetSessionTimer();
+}
+
+// ── Sanitizar payloads de notificaciones push ──────────────────────────────────
+export function sanitizePushPayload(payload) {
+  if (!payload) return payload;
+  const strip = (str) => typeof str === 'string'
+    ? str.replace(/<[^>]*>/g, '').replace(/javascript:/gi, '').replace(/on\w+\s*=/gi, '').trim().substring(0, 200)
+    : str;
+  return { ...payload, title: strip(payload.title), message: strip(payload.message) };
+}
+
+// ── Validación de archivos subidos ─────────────────────────────────────────────
+const ALLOWED_MIME_TYPES = new Set([
+  'image/jpeg', 'image/png', 'image/webp', 'image/gif',
+  'video/mp4', 'video/webm',
+  'application/pdf',
+  'application/msword', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'
+]);
+const BLOCKED_EXTENSIONS = new Set(['.exe', '.bat', '.cmd', '.sh', '.php', '.js', '.html', '.svg', '.scr', '.com', '.pif', '.vbs', '.wsf']);
+
+export function validateFileUpload(file) {
+  if (!file) return { ok: false, error: 'No se seleccionó archivo' };
+  if (file.size > 50 * 1024 * 1024) return { ok: false, error: 'El archivo supera el límite de 50MB' };
+  const ext = '.' + file.name.split('.').pop().toLowerCase();
+  if (BLOCKED_EXTENSIONS.has(ext)) return { ok: false, error: `Tipo de archivo no permitido: ${ext}` };
+  if (file.type && !ALLOWED_MIME_TYPES.has(file.type)) {
+    return { ok: false, error: `Tipo MIME no permitido: ${file.type}` };
+  }
+  return { ok: true };
+}
+
+export function safeFileName(originalName) {
+  const ext = originalName.split('.').pop().toLowerCase();
+  return `${crypto.randomUUID()}.${ext}`;
+}
+
+// ── Validación de inputs numéricos ─────────────────────────────────────────────
+export function validateTemperature(temp) {
+  const t = parseFloat(temp);
+  if (isNaN(t) || t < 30 || t > 45) return { ok: false, error: 'Temperatura inválida (30-45°C)' };
+  return { ok: true, value: t };
+}
+
+export function validateOz(oz) {
+  const o = parseFloat(oz);
+  if (isNaN(o) || o < 0 || o > 32) return { ok: false, error: 'Onzas inválidas (0-32oz)' };
+  return { ok: true, value: o };
+}
+
+export function sanitizeText(text, maxLength = 500) {
+  if (typeof text !== 'string') return '';
+  return text.replace(/<[^>]*>/g, '').replace(/javascript:/gi, '').replace(/on\w+\s*=/gi, '').trim().substring(0, maxLength);
+}
+
 export const TERMS_VERSION = '1.0';
 
 /**
@@ -314,10 +414,9 @@ export async function sendEmail(to, subject, html, text) {
 // ── Push via OneSignal (Edge Function send-push) ──────────────────────────────
 export async function sendPush(payload) {
   try {
-    // Usamos invoke sin headers manuales para que el SDK use el token de sesión actual.
-    // Esto evita errores 401 si la anon key no es suficiente para la función.
+    const sanitized = sanitizePushPayload(payload);
     const { data, error } = await supabase.functions.invoke('send-push', {
-      body: payload
+      body: sanitized
     });
 
     if (error) {

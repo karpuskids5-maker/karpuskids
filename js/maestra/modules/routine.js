@@ -13,7 +13,7 @@ import { supabase } from '/js/shared/supabase.js';
 import { AppState } from '../state.js';
 import { MaestraApi } from '../api.js';
 import { UI } from './ui.js';
-import { Helpers } from '/js/shared/helpers.js';
+import { RateLimiter } from '/js/shared/rate-limiter.js';
 
 const { safeToast, safeEscapeHTML, Modal } = UI;
 const _saving = {};
@@ -1520,8 +1520,16 @@ window._bulkSelectAll = (select) => {
   });
 };
 
+// ── RATE LIMITERS ──────────────────────────────────────────────────────────────
+const _bulkEventLimiter = new RateLimiter('bulk_event', 10, 60_000); // max 10 por minuto
+
 // ── CONFIRMAR EVENTO COLECTIVO ────────────────────────────────────────────────
 export async function confirmBulkEvent(eventType) {
+  if (!_bulkEventLimiter.check()) {
+    const secs = _bulkEventLimiter.remainingSeconds();
+    safeToast(`Demasiados registros. Espera ${secs}s`, 'warning');
+    return;
+  }
   const btn = document.getElementById('btnBulkConfirm');
   if (btn) { btn.disabled = true; btn.innerHTML = '<span class="animate-spin">⏳</span> Guardando...'; }
 
@@ -1538,18 +1546,22 @@ export async function confirmBulkEvent(eventType) {
     const extra = {};
     if (eventType === 'biberon') {
       extra.oz    = parseFloat(document.querySelector('[data-oz].bg-blue-500')?.dataset.oz) || 0;
+      if (extra.oz < 0 || extra.oz > 32) { safeToast('Onzas inválidas (0-32oz)', 'error'); return; }
       extra.milk_temp = document.querySelector('[data-milk-temp].bg-sky-500')?.dataset.milkTemp || null;
     }
-    if (eventType === 'temperatura')  extra.temp  = parseFloat(document.querySelector('[data-temp].text-white')?.dataset.temp) || null;
+    if (eventType === 'temperatura') {
+      extra.temp  = parseFloat(document.querySelector('[data-temp].text-white')?.dataset.temp) || null;
+      if (extra.temp !== null && (extra.temp < 30 || extra.temp > 45)) { safeToast('Temperatura inválida (30-45°C)', 'error'); return; }
+    }
     if (eventType === 'medicamento')  {
-      extra.nombre = document.getElementById('medNombre')?.value.trim();
-      extra.dosis  = document.getElementById('medDosis')?.value.trim();
-      extra.autorizacion = document.getElementById('medAuth')?.value.trim();
+      extra.nombre = (document.getElementById('medNombre')?.value || '').replace(/<[^>]*>/g, '').trim().substring(0, 100);
+      extra.dosis  = (document.getElementById('medDosis')?.value || '').replace(/<[^>]*>/g, '').trim().substring(0, 100);
+      extra.autorizacion = (document.getElementById('medAuth')?.value || '').replace(/<[^>]*>/g, '').trim().substring(0, 100);
     }
     if (eventType === 'animo')        extra.mood  = document.querySelector('[data-mood].border-orange-400')?.dataset.mood;
-    if (eventType === 'nota')         extra.texto = document.getElementById('bulkNota')?.value.trim();
+    if (eventType === 'nota')         extra.texto = (document.getElementById('bulkNota')?.value || '').replace(/<[^>]*>/g, '').trim().substring(0, 500);
     if (!['biberon','temperatura','medicamento','animo','nota'].includes(eventType)) {
-      extra.obs = document.getElementById('bulkObs')?.value.trim() || '';
+      extra.obs = (document.getElementById('bulkObs')?.value || '').replace(/<[^>]*>/g, '').trim().substring(0, 500);
     }
     if (_bulkScheduledTime) extra.scheduled_time = _bulkScheduledTime;
     const siestaAction = eventType === 'siesta' ? document.querySelector('[data-siesta-action].bg-indigo-500')?.dataset.siestaAction : null;
@@ -2322,6 +2334,19 @@ export async function saveRoutineLog(studentId, field = 'notes', value = null) {
 export async function registerIndividualEvent(sid, type, extra = {}) {
   if (_isStudentRetirado(sid)) { safeToast('Este estudiante se retiró del centro: no se registran más eventos', 'warning'); return; }
   if (!_isStudentPresent(sid)) { safeToast('Este estudiante no está presente: no se pueden registrar eventos', 'warning'); return; }
+  if (type === 'temperatura' && extra.temp != null) {
+    const t = parseFloat(extra.temp);
+    if (isNaN(t) || t < 30 || t > 45) { safeToast('Temperatura inválida (30-45°C)', 'error'); return; }
+    extra.temp = t;
+  }
+  if (type === 'biberon' && extra.oz != null) {
+    const o = parseFloat(extra.oz);
+    if (isNaN(o) || o < 0 || o > 32) { safeToast('Onzas inválidas (0-32oz)', 'error'); return; }
+    extra.oz = o;
+  }
+  ['nombre', 'dosis', 'autorizacion', 'texto', 'obs', 'motivo'].forEach(k => {
+    if (extra[k] && typeof extra[k] === 'string') extra[k] = extra[k].replace(/<[^>]*>/g, '').trim().substring(0, 200);
+  });
   const classroom = AppState.get('classroom');
   const today     = new Date().toISOString().split('T')[0];
   const logsMap   = AppState.get('logsMap') || {};

@@ -4,6 +4,7 @@ import { MaestraApi } from '../api.js';
 import { UI } from './ui.js';
 import { notifyParents, showNotifyFeedback } from '/js/shared/notify-feedback.js';
 import { OfflineQueue } from '/js/shared/offline-queue.js';
+import { Helpers } from '/js/shared/helpers.js';
 
 const { safeToast, safeEscapeHTML, Modal } = UI;
 
@@ -140,7 +141,7 @@ export async function initAttendance(options = {}) {
       `;
       if (window.lucide) window.lucide.createIcons();
   } catch (err) {
-    console.error('Error en initAttendance:', err);
+    Helpers.safeLog('error', 'Error en initAttendance:', err);
     listContainer.innerHTML = Helpers.errorState('Error al cargar asistencia');
   }
 }
@@ -188,8 +189,8 @@ export async function markAllPresent() {
         // Solo registrar si NO hay asistencia o si estaba marcado como Ausente
         if (!existingStatus || existingStatus === 'absent') {
           records.push({ 
-            student_id: s.id, 
-            classroom_id: classroom.id, 
+            student_id: Number(s.id), 
+            classroom_id: Number(classroom.id), 
             date: today, 
             status: 'present' 
           });
@@ -291,7 +292,11 @@ export async function registerAttendance(studentId, status) {
   try {
     let statusLiteral = status === 'present' ? 'Presente' : status === 'late' ? 'Tarde' : 'Ausente';
 
-    const attRecord = { student_id: studentId, classroom_id: classroom.id, date: today, status };
+    const attRecord = { student_id: studentId, classroom_id: classroom?.id, date: today, status };
+    if (!attRecord.classroom_id) {
+      safeToast('Error: no hay aula asignada', 'error');
+      return;
+    }
     if (navigator.onLine) {
       await MaestraApi.upsertAttendance(attRecord);
     } else {
@@ -319,7 +324,9 @@ export async function registerAttendance(studentId, status) {
       const b = document.getElementById(s.id);
       if (b) b.className = s.cls;
     });
-    safeToast('Error al registrar asistencia', 'error');
+    const msg = e?.message || e?.error?.message || 'Error desconocido';
+    Helpers.safeLog('error', 'Error al registrar asistencia:', e);
+    safeToast('Error al registrar asistencia: ' + msg, 'error');
     await initAttendance();
   } finally {
     _pendingAttendance.delete(studentId);
@@ -388,8 +395,8 @@ async function _loadAbsenceRequests(classroomId, students) {
         const classroom = AppState.get('classroom');
         // Registrar como ausente en attendance
         await MaestraApi.upsertAttendance({
-          student_id:   studentId,
-          classroom_id: classroom.id,
+          student_id:   Number(studentId),
+          classroom_id: Number(classroom.id),
           date,
           status:       'absent'
         });
