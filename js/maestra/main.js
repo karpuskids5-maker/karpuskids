@@ -150,6 +150,7 @@ window.App = {
     }
   },
   showClassroomDetail: (classroomId, options) => window.App._showClassroomDetail?.(classroomId, options),
+  selectClassroom: (classroomId) => window.App._selectClassroom?.(classroomId),
   startJitsi: () => window.App._startJitsi?.(),
   openNewPostModal: () => window.App._openNewPostModal(),
   submitNewPost: () => window.App._submitNewPost()
@@ -384,6 +385,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   // Asignar funciones internas al objeto global App
   Object.assign(window.App, {
     _showClassroomDetail: showClassroomDetail,
+    _selectClassroom: selectClassroom,
     _startJitsi: startJitsi,
     _openNewPostModal: openNewPostModal,
     _submitNewPost: submitNewPost
@@ -408,22 +410,26 @@ document.addEventListener('DOMContentLoaded', async () => {
   });
 
   try {
-    // La maestra NO cambia de aula: la directora asigna una sola aula por maestra.
-    const { data: classroom, error } = await supabase
+    // Obtener TODAS las aulas asignadas a esta maestra
+    const { data: classrooms, error } = await supabase
       .from('classrooms')
       .select('id, name, level, capacity, teacher_id, is_live')
       .eq('teacher_id', auth.user.id)
-      .order('name')
-      .limit(1)
-      .maybeSingle();
+      .order('name');
 
     if (error) throw error;
-    if (!classroom) {
+    if (!classrooms || classrooms.length === 0) {
       safeToast('No tienes un aula asignada.', 'warning');
       return;
     }
 
-    AppState.set('classroom', classroom);
+    // Guardar todas las aulas en estado
+    AppState.set('classrooms', classrooms);
+
+    // Seleccionar aula actual: usar la última guardada o la primera
+    const lastClassroomId = localStorage.getItem('maestra_last_classroom');
+    const initial = classrooms.find(c => String(c.id) === String(lastClassroomId)) || classrooms[0];
+    AppState.set('classroom', initial);
 
     // Inicializar Módulos
     await Promise.all([
@@ -433,11 +439,11 @@ document.addEventListener('DOMContentLoaded', async () => {
       initChat()
     ]);
     
-    initRealtimeUpdates(classroom.id);
+    initRealtimeUpdates(initial.id);
 
-    // Cargar Badges en background
+    // Cargar Badges en background (para todas las aulas combinadas)
     loadMaestraUnreadBadge(auth.user.id);
-    loadPendingTasksBadge(classroom.id);
+    loadAllClassroomsTasksBadge(classrooms);
     loadPendingGradesBadge();
 
     // 🔴 Sistema de badges por sección
@@ -560,23 +566,26 @@ async function initDashboard() {
     _updatePunchAlertWidget(students, attendance);
     _updateTasksToGradeWidget(classroom.id);
 
-    // Grid de Aulas (Home) — la maestra tiene UNA sola aula asignada
+    // Grid de Aulas (Home) — renderizar UNA tarjeta por cada aula asignada
     const grid = document.getElementById('classesGrid'); 
     if (grid) {
-      grid.innerHTML = `
-        <div onclick="App.showClassroomDetail('${classroom.id}')" class="p-6 bg-white rounded-[2rem] border-2 border-orange-100 shadow-sm hover:shadow-xl hover:border-orange-200 transition-all cursor-pointer group relative overflow-hidden">
+      const allClassrooms = AppState.get('classrooms') || [classroom];
+      grid.innerHTML = allClassrooms.map(c => `
+        <div onclick="App.selectClassroom('${c.id}')" class="p-6 bg-white rounded-[2rem] border-2 ${String(c.id) === String(classroom.id) ? 'border-orange-400 ring-4 ring-orange-100' : 'border-orange-100'} shadow-sm hover:shadow-xl hover:border-orange-200 transition-all cursor-pointer group relative overflow-hidden">
           <div class="flex items-center gap-5 relative z-10">
-            <div class="w-16 h-16 rounded-2xl bg-gradient-to-br from-orange-400 to-orange-600 text-white flex items-center justify-center font-black text-2xl shadow-lg">${safeEscapeHTML(String(classroom.name).charAt(0).toUpperCase())}</div>
+            <div class="w-16 h-16 rounded-2xl bg-gradient-to-br from-orange-400 to-orange-600 text-white flex items-center justify-center font-black text-2xl shadow-lg">${safeEscapeHTML(String(c.name).charAt(0).toUpperCase())}</div>
             <div>
-              <h3 class="font-black text-slate-800 text-xl tracking-tight">${safeEscapeHTML(classroom.name)}</h3>
-              <p class="text-xs font-black text-orange-500 uppercase tracking-widest">${safeEscapeHTML(classroom.level || '')}${classroom.level ? ' · ' : ''}Aula</p>
+              <h3 class="font-black text-slate-800 text-xl tracking-tight">${safeEscapeHTML(c.name)}</h3>
+              <p class="text-xs font-black text-orange-500 uppercase tracking-widest">${safeEscapeHTML(c.level || '')}${c.level ? ' · ' : ''}Aula</p>
             </div>
           </div>
           <div class="mt-8 flex justify-between items-center relative z-10">
-            <span class="text-[10px] font-black text-orange-600 uppercase tracking-widest flex items-center gap-1">Entrar <i data-lucide="arrow-right" class="w-4 h-4"></i></span>
+            ${String(c.id) === String(classroom.id)
+              ? '<span class="text-[10px] font-black text-orange-700 uppercase tracking-widest flex items-center gap-1"><i data-lucide="check-circle" class="w-4 h-4"></i> Activa</span>'
+              : '<span class="text-[10px] font-black text-orange-600 uppercase tracking-widest flex items-center gap-1">Entrar <i data-lucide="arrow-right" class="w-4 h-4"></i></span>'}
           </div>
         </div>
-      `;
+      `).join('');
     }
 
     // Grid de Estudiantes (Tab)
@@ -907,6 +916,44 @@ function initNavigation() {
 }
 
 /**
+ * 🔄 Seleccionar aula activa (cuando la maestra tiene varias)
+ */
+async function selectClassroom(classroomId) {
+  const classrooms = AppState.get('classrooms') || [];
+  const target = classrooms.find(c => String(c.id) === String(classroomId));
+  if (!target) return;
+
+  // Si ya es la aula activa, solo abrir detalle
+  const current = AppState.get('classroom');
+  if (current && String(current.id) === String(classroomId)) {
+    return showClassroomDetail(classroomId);
+  }
+
+  // Cambiar aula activa
+  AppState.set('classroom', target);
+  localStorage.setItem('maestra_last_classroom', classroomId);
+
+  // Desuscribir realtime anterior
+  const oldClassroom = current;
+  if (oldClassroom && String(oldClassroom.id) !== String(classroomId)) {
+    RealtimeManager.unsubscribe(`maestra_room_${oldClassroom.id}`);
+  }
+
+  // Recargar datos del dashboard con la nueva aula
+  await initDashboard();
+
+  // Suscribir realtime a la nueva aula
+  initRealtimeUpdates(target.id);
+
+  // Recargar badges
+  loadPendingTasksBadge(target.id);
+  loadPendingGradesBadge();
+
+  // Abrir detalle del aula
+  showClassroomDetail(classroomId);
+}
+
+/**
  * 📋 Inicializar Tabs Internas de Aula
  */
 function initClassTabs(defaultTab = null) {
@@ -1207,6 +1254,39 @@ async function loadPendingTasksBadge(classroomId) {
     if (badge) {
       if (count > 0) {
         badge.textContent = count > 99 ? '99+' : count;
+        badge.classList.remove('hidden');
+      } else {
+        badge.classList.add('hidden');
+      }
+    }
+  } catch (_) {}
+}
+
+/**
+ * Cargar insignia de tareas pendientes para TODAS las aulas de la maestra
+ */
+async function loadAllClassroomsTasksBadge(classrooms) {
+  try {
+    let totalCount = 0;
+    for (const c of classrooms) {
+      const { data: tasks } = await supabase
+        .from('tasks')
+        .select('id')
+        .eq('classroom_id', c.id);
+      const taskIds = (tasks || []).map(t => t.id);
+      if (!taskIds.length) continue;
+      const res = await supabase
+        .from('task_evidences')
+        .select('id', { count: 'exact', head: true })
+        .eq('status', 'pending')
+        .in('task_id', taskIds);
+      totalCount += res.count || 0;
+    }
+
+    const badge = document.getElementById('badge-t-home');
+    if (badge) {
+      if (totalCount > 0) {
+        badge.textContent = totalCount > 99 ? '99+' : totalCount;
         badge.classList.remove('hidden');
       } else {
         badge.classList.add('hidden');

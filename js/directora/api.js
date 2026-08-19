@@ -321,24 +321,42 @@ export const DirectorApi = {
             .order('name')
         );
         if (error) throw error;
-        const normalized = (data || []).map(t => ({
-          ...t,
-          classroom_id: t.classrooms?.[0]?.id || t.classrooms?.id || null,
-          classrooms: t.classrooms?.[0] || t.classrooms || null
-        }));
+        const normalized = (data || []).map(t => {
+          // Soportar array de aulas (múltiples) o un solo objeto
+          const classroomArr = Array.isArray(t.classrooms)
+            ? t.classrooms
+            : t.classrooms ? [t.classrooms] : [];
+          return {
+            ...t,
+            classrooms: classroomArr,
+            classroom_ids: classroomArr.map(c => c.id),
+            classroom_id: classroomArr[0]?.id || null,
+            classroom_name: classroomArr.map(c => c.name).join(', ') || ''
+          };
+        });
         return { data: normalized, error: null };
       } catch (e) { return logError('getTeachers', e); }
     }, 5 * 60_000);
   },
 
   async updateTeacher(id, data) {
-    const { classroom_id, ...profileData } = data;
-    if (classroom_id !== undefined) {
-      await supabase.from(TABLES.CLASSROOMS).update({ teacher_id: null }).eq('teacher_id', id);
-      if (classroom_id) {
-        await supabase.from(TABLES.CLASSROOMS).update({ teacher_id: id }).eq('id', classroom_id);
-      }
+    const { classroom_ids, classroom_id, ...profileData } = data;
+
+    // Determinar las aulas a asignar: classroom_ids (array) tiene prioridad sobre classroom_id (string)
+    const targetIds = Array.isArray(classroom_ids)
+      ? classroom_ids.filter(Boolean)
+      : classroom_id
+        ? [classroom_id]
+        : [];
+
+    // Limpiar todas las asignaciones previas de esta maestra
+    await supabase.from(TABLES.CLASSROOMS).update({ teacher_id: null }).eq('teacher_id', id);
+
+    // Asignar todas las aulas seleccionadas
+    for (const cid of targetIds) {
+      await supabase.from(TABLES.CLASSROOMS).update({ teacher_id: id }).eq('id', cid);
     }
+
     const ALLOWED = ['name', 'phone', 'role', 'bio', 'notes', 'access_code', 'avatar_url', 'onesignal_player_id'];
     const safeData = Object.fromEntries(Object.entries(profileData).filter(([k]) => ALLOWED.includes(k)));
     const result = await supabase.from(TABLES.PROFILES).update(safeData).eq('id', id);

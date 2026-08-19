@@ -23,12 +23,12 @@ export const TeachersModule = {
     const tbody = document.getElementById('teachersTableBody');
     if (!tbody) return;
 
-    tbody.innerHTML = `<tr><td colspan="4" class="p-8">${Helpers.skeleton(3, 'h-12')}</td></tr>`;
+    tbody.innerHTML = `<tr><td colspan="5" class="p-8">${Helpers.skeleton(3, 'h-12')}</td></tr>`;
     
     try {
       const teachers = await AssistantApi.getTeachersDetail(searchTerm);
       if (!teachers.length) {
-        tbody.innerHTML = `<tr><td colspan="4">${Helpers.emptyState('No hay maestros registrados')}</td></tr>`;
+        tbody.innerHTML = `<tr><td colspan="5">${Helpers.emptyState('No hay maestros registrados')}</td></tr>`;
         return;
       }
 
@@ -37,6 +37,13 @@ export const TeachersModule = {
           <td class="px-6 py-4 font-bold text-slate-700 text-sm">${Helpers.escapeHTML(t.name)}</td>
           <td class="px-6 py-4 text-slate-500 text-xs font-medium uppercase tracking-wider">${t.email || '-'}</td>
           <td class="px-6 py-4 text-slate-500 text-xs font-bold">${t.phone || '-'}</td>
+          <td class="px-6 py-4">
+            <div class="flex gap-1.5 flex-wrap">
+              ${(t.classrooms || []).length > 0
+                ? (t.classrooms || []).map(c => `<span class="px-2 py-0.5 bg-teal-50 text-teal-600 text-[9px] font-black uppercase rounded-md">${Helpers.escapeHTML(c.name || '')}</span>`).join('')
+                : '<span class="text-[10px] text-slate-400 font-bold">Sin Aula</span>'}
+            </div>
+          </td>
           <td class="px-6 py-4">
             <div class="flex gap-1.5">
               <button onclick="window.openTeacherModal('${t.id}')" class="px-2 py-1 rounded-lg bg-teal-50 text-teal-600 text-[10px] font-black uppercase hover:bg-teal-100 transition-all border border-teal-100 flex items-center gap-1">
@@ -52,7 +59,7 @@ export const TeachersModule = {
       
       if (window.lucide) lucide.createIcons();
     } catch (e) {
-      tbody.innerHTML = `<tr><td colspan="4" class="text-center text-rose-500 py-8 font-bold text-sm">Error cargando maestros</td></tr>`;
+      tbody.innerHTML = `<tr><td colspan="5" class="text-center text-rose-500 py-8 font-bold text-sm">Error cargando maestros</td></tr>`;
     }
   },
 
@@ -96,8 +103,10 @@ export const TeachersModule = {
             </select>
           </div>
           <div class="sm:col-span-2">
-            <label class="${LC}">Aula asignada</label>
-            <select id="teacherClassroom" class="${IC} py-2"><option value="">-- Sin Aula --</option></select>
+            <label class="${LC}">Aulas asignadas</label>
+            <div id="teacherClassroomChecks" class="mt-1 space-y-1.5 p-3 bg-white border-2 border-slate-100 rounded-2xl max-h-[140px] overflow-y-auto">
+              <p class="text-[10px] text-slate-400 font-bold">Cargando aulas...</p>
+            </div>
           </div>
           <div class="sm:col-span-2">
             <label class="${LC}">Contraseña ${id ? '(Solo si desea cambiarla)' : '(Mínimo 6 caracteres) *'}</label>
@@ -145,11 +154,20 @@ export const TeachersModule = {
       if (gc) { gc.style.display = 'none'; gc.innerHTML = ''; }
     };
 
-    // Load classrooms
+    // Load classrooms as checkboxes
     try {
       const { data } = await supabase.from('classrooms').select('id, name').order('name');
-      const sel = document.getElementById('teacherClassroom');
-      if (sel && data) data.forEach(c => { const o = document.createElement('option'); o.value = c.id; o.textContent = c.name; sel.appendChild(o); });
+      const container = document.getElementById('teacherClassroomChecks');
+      if (container && data?.length) {
+        container.innerHTML = data.map(c => `
+          <label class="flex items-center gap-2 p-1.5 bg-slate-50 rounded-lg cursor-pointer hover:bg-teal-50 transition-all">
+            <input type="checkbox" value="${c.id}" class="w-3.5 h-3.5 rounded accent-teal-600 teacher-classroom-check">
+            <span class="text-xs font-medium text-slate-700">${Helpers.escapeHTML(c.name)}</span>
+          </label>
+        `).join('');
+      } else if (container) {
+        container.innerHTML = '<p class="text-[10px] text-slate-400 font-bold">No hay aulas disponibles</p>';
+      }
     } catch (_) {}
 
     // Prefill if editing
@@ -165,9 +183,12 @@ export const TeachersModule = {
           // Use access_code first, fallback to notes for legacy data
           const code = t.access_code || (t.notes?.startsWith('TEA-') || t.notes?.startsWith('DIR-') || t.notes?.startsWith('ASI-') ? t.notes : null);
           sv('teacherMatricula', code);
-          // Find classroom
-          const { data: cls } = await supabase.from('classrooms').select('id').eq('teacher_id', id).maybeSingle();
-          if (cls) document.getElementById('teacherClassroom').value = cls.id;
+          // Find all classrooms for this teacher and check them
+          const { data: clsArr } = await supabase.from('classrooms').select('id').eq('teacher_id', id);
+          const assignedIds = (clsArr || []).map(c => String(c.id));
+          document.querySelectorAll('#teacherClassroomChecks input[type="checkbox"]').forEach(cbEl => {
+            cbEl.checked = assignedIds.includes(String(cbEl.value));
+          });
         }
       } catch (_) {}
     }
@@ -241,7 +262,9 @@ export const TeachersModule = {
     const password    = getVal('teacherPassword');
     const phone       = getVal('teacherPhone');
     const role        = getVal('teacherRole') || 'maestra';
-    const classroomId = getVal('teacherClassroom') || null;
+    // Recoger todas las aulas seleccionadas (checkboxes)
+    const classroomCheckboxes = (gc || document).querySelectorAll('#teacherClassroomChecks input[type="checkbox"]:checked');
+    const classroomIds = Array.from(classroomCheckboxes).map(cb => cb.value).filter(Boolean);
     const isActive    = getChecked('teacherActive');
     const matricula   = getVal('teacherMatricula') || null;
 
@@ -257,9 +280,11 @@ export const TeachersModule = {
         if (matricula !== null) updates.access_code = matricula;
         const { error } = await supabase.from('profiles').update(updates).eq('id', id);
         if (error) throw error;
-        // Update classroom assignment
+        // Limpiar todas las asignaciones previas y reasignar las seleccionadas
         await supabase.from('classrooms').update({ teacher_id: null }).eq('teacher_id', id);
-        if (classroomId) await supabase.from('classrooms').update({ teacher_id: id }).eq('id', classroomId);
+        for (const cid of classroomIds) {
+          await supabase.from('classrooms').update({ teacher_id: id }).eq('id', cid);
+        }
         Helpers.toast('Maestra actualizada correctamente');
       } else {
         // Crear nuevo maestro (Usa signUp normal con persistSession: false)
@@ -295,8 +320,10 @@ export const TeachersModule = {
             name, email, phone, role
           }, { onConflict: 'id' });
           if (profError) throw profError;
-          // Assign classroom
-          if (classroomId) await supabase.from('classrooms').update({ teacher_id: authData.user.id }).eq('id', classroomId);
+          // Asignar aulas seleccionadas
+          for (const cid of classroomIds) {
+            await supabase.from('classrooms').update({ teacher_id: authData.user.id }).eq('id', cid);
+          }
           Helpers.toast('Maestro creado exitosamente');
 
           const html = `

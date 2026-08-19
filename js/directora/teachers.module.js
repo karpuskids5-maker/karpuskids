@@ -21,7 +21,7 @@ export const TeachersModule = {
       const total = normalized.length;
       const active = normalized.filter(t => t.is_active !== false).length;
       const assistants = normalized.filter(t => t.role === 'asistente').length;
-      const inClass = normalized.filter(t => t.classrooms).length;
+      const inClass = normalized.filter(t => (t.classrooms || []).length > 0).length;
 
       Helpers.setTxt('kpiStaffTotal', total);
       Helpers.setTxt('kpiStaffActive', active);
@@ -40,7 +40,7 @@ export const TeachersModule = {
           const filtered = allStaff.filter(t => 
             t.name.toLowerCase().includes(term) || 
             t.email.toLowerCase().includes(term) ||
-            (t.classrooms?.name || '').toLowerCase().includes(term)
+            (t.classrooms || []).some(c => (c.name || '').toLowerCase().includes(term))
           );
           this.render(filtered);
         });
@@ -65,7 +65,13 @@ export const TeachersModule = {
         <tr class="hover:bg-slate-50 transition-colors cursor-pointer" ondblclick="App.teachers.openModal('${t.id}')">
           <td class="p-4 font-bold text-slate-700">${Helpers.escapeHTML(t.name)}</td>
           <td class="p-4 text-slate-500">${t.email}</td>
-          <td class="p-4"><span class="px-3 py-1 bg-slate-100 rounded-full text-[10px] font-black uppercase text-slate-500">${t.classrooms?.name || 'Sin Aula'}</span></td>
+          <td class="p-4">
+            <div class="flex flex-wrap gap-1">
+              ${(t.classrooms || []).length > 0
+                ? (t.classrooms || []).map(c => `<span class="px-3 py-1 bg-slate-100 rounded-full text-[10px] font-black uppercase text-slate-500">${Helpers.escapeHTML(c.name || '')}</span>`).join('')
+                : '<span class="px-3 py-1 bg-slate-100 rounded-full text-[10px] font-black uppercase text-slate-500">Sin Aula</span>'}
+            </div>
+          </td>
           <td class="p-4"><span class="px-3 py-1 bg-indigo-50 text-indigo-600 rounded-full text-[10px] font-black uppercase tracking-wider">${t.role}</span></td>
           <td class="p-4 text-right">
             <div class="flex justify-end gap-2">
@@ -107,12 +113,14 @@ export const TeachersModule = {
 
   async save() {
     const id = document.getElementById('tId')?.value;
-    const classroom_id = document.getElementById('tClassroom')?.value || null;
+    // Recoger todas las aulas seleccionadas (checkboxes)
+    const classroomCheckboxes = document.querySelectorAll('#classroomCheckboxes input[type="checkbox"]:checked');
+    const classroom_ids = Array.from(classroomCheckboxes).map(cb => cb.value).filter(Boolean);
     const payload = {
       name:      (document.getElementById('tName').value || '').trim(),
       phone:     (document.getElementById('tPhone').value || '').trim(),
       role:      document.getElementById('tRole').value,
-      classroom_id,
+      classroom_ids,
       is_active: document.getElementById('tActive').checked
     };
     // email solo para crear, no para actualizar (Supabase no permite update de email via profiles)
@@ -243,8 +251,10 @@ export const TeachersModule = {
             </select>
           </div>
           <div>
-            <label class="${labelClass}">Aula asignada</label>
-            <select id="tClassroom" class="${inputClass}"><option value="">Seleccionar Aula</option></select>
+            <label class="${labelClass}">Aulas asignadas</label>
+            <div id="classroomCheckboxes" class="mt-2 space-y-2 p-3 bg-white border-2 border-slate-100 rounded-2xl max-h-[160px] overflow-y-auto">
+              <p class="text-[10px] text-slate-400 font-bold">Cargando aulas...</p>
+            </div>
           </div>
           <div class="col-span-2">
             <label class="flex items-center gap-3 p-3 bg-white border border-slate-100 rounded-xl cursor-pointer">
@@ -334,9 +344,16 @@ export const TeachersModule = {
 
     try {
       const { data: rooms } = await DirectorApi.getClassrooms();
-      const select = document.getElementById('tClassroom');
-      if (select && rooms?.length) {
-        select.innerHTML += rooms.map(r => `<option value="${r.id}">${(r.name || 'Sin nombre').trim()}</option>`).join('');
+      const container = document.getElementById('classroomCheckboxes');
+      if (container && rooms?.length) {
+        container.innerHTML = rooms.map(r => `
+          <label class="flex items-center gap-2 p-2 bg-slate-50 rounded-xl cursor-pointer hover:bg-purple-50 transition-all">
+            <input type="checkbox" value="${r.id}" class="w-4 h-4 rounded text-purple-600 focus:ring-purple-200 classroom-check">
+            <span class="text-sm font-medium text-slate-700">${Helpers.escapeHTML(r.name || 'Sin nombre')}</span>
+          </label>
+        `).join('');
+      } else if (container) {
+        container.innerHTML = '<p class="text-[10px] text-slate-400 font-bold">No hay aulas disponibles</p>';
       }
     } catch (_) { /* silencioso */ }
 
@@ -362,8 +379,11 @@ export const TeachersModule = {
         // Use access_code first, fallback to notes for legacy
         const code = teacher.access_code || (teacher.notes?.startsWith?.('TEA-') || teacher.notes?.startsWith?.('DIR-') || teacher.notes?.startsWith?.('ASI-') ? teacher.notes : null);
         setVal('tMatricula', code || '');
-        const classId = teacher.classroom_id || teacher.classrooms?.id;
-        setVal('tClassroom', classId);
+        // Marcar checkboxes de las aulas asignadas
+        const assignedIds = (teacher.classroom_ids || []).map(String);
+        document.querySelectorAll('#classroomCheckboxes input[type="checkbox"]').forEach(cb => {
+          cb.checked = assignedIds.includes(String(cb.value));
+        });
         const checkActive = document.getElementById('tActive');
         if(checkActive) checkActive.checked = teacher.is_active !== false;
         // Auto-render QR if has code

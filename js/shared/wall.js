@@ -213,6 +213,7 @@ export const WallModule = {
         .from('posts')
         .select(`
           id, content, media_url, media_type, created_at,
+          teacher_name, teacher_avatar,
           classroom:classrooms(name),
           teacher:profiles!posts_teacher_id_fkey(name, avatar_url),
           likes(user_id),
@@ -317,11 +318,15 @@ export const WallModule = {
     // Resolver URLs de forma SÍNCRONA — con transformación CDN
     const mediaUrl = p.media_url || p.image_url || null;
     const publicUrl = this._resolveUrlSync(mediaUrl, { width: 800, quality: 75 });
-    const teacherAvatar = this._resolveUrlSync(teacherData.avatar_url, { width: 80, quality: 80 });
+
+    // Cadena de fallback: live profile → snapshot del post → 'Maestra'
+    const teacherName = teacherData.name || p.teacher_name || 'Maestra';
+    const rawAvatar = teacherData.avatar_url || p.teacher_avatar || null;
+    const teacherAvatar = this._resolveUrlSync(rawAvatar, { width: 80, quality: 80 });
 
     return {
       ...p,
-      teacher_name: teacherData.name || 'Maestra',
+      teacher_name: teacherName,
       teacher_avatar: teacherAvatar,
       like_count: likeCount,
       user_liked: userLiked,

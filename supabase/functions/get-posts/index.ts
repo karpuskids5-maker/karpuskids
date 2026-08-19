@@ -58,6 +58,7 @@ Deno.serve(async (req) => {
       .from('posts')
       .select(`
         id, content, media_url, media_type, image_url, created_at, classroom_id, teacher_id,
+        teacher_name, teacher_avatar,
         teacher:profiles!posts_teacher_id_fkey(name, avatar_url, role),
         likes(id, user_id),
         comments(id, content, user_name, user_id, created_at)
