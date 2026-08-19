@@ -4,6 +4,7 @@ import { AppState } from '../state.js';
 import { MaestraApi } from '../api.js';
 import { UI } from './ui.js';
 import { Helpers } from '/js/shared/helpers.js';
+import { showNotifyFeedback } from '/js/shared/notify-feedback.js';
 
 const { safeToast, safeEscapeHTML, Modal } = UI;
 
@@ -199,6 +200,7 @@ export function registerIncidentModal(studentId) {
           message: `Se ha registrado un reporte de conducta sobre ${student.name}.`,
           link: 'panel_padres.html#incidents'
         }).catch(() => {});
+        showNotifyFeedback({ sent: 1, type: 'info', label: student.name });
       }
 
       const statEl = document.getElementById('statIncidents');

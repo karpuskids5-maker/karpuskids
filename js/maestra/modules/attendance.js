@@ -1,4 +1,4 @@
-import { supabase, sendPush } from '/js/shared/supabase.js';
+import { supabase, sendPush, emitEvent } from '/js/shared/supabase.js';
 import { AppState } from '../state.js';
 import { MaestraApi } from '../api.js';
 import { UI } from './ui.js';
@@ -305,17 +305,26 @@ export async function registerAttendance(studentId, status) {
     }
 
     const student = (AppState.get('students') || []).find(s => s.id === studentId);
+
+    // Enviar notificación push + email al padre
     if (student?.parent_id) {
       sendPush({
         user_id: student.parent_id,
         title: 'Asistencia Karpus',
         message: `${student.name} ha sido marcado como ${statusLiteral} hoy.`,
         link: 'panel_padres.html#attendance'
-      }).then(res => {
-        if (res?.ok !== false) showNotifyFeedback({ sent: 1, type: 'attendance', label: student.name });
       }).catch(() => {});
+
+      // Email vía process-event (en background, no bloquea UI)
+      emitEvent('attendance.marked', {
+        parent_id: student.parent_id,
+        student_name: student.name,
+        status
+      }).catch(() => {});
+
+      showNotifyFeedback({ sent: 1, type: 'attendance', label: student.name });
     }
-    
+
     safeToast(`Asistencia: ${statusLiteral}`);
     await initAttendance({ silent: true });
   } catch (e) {

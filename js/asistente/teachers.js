@@ -1,6 +1,7 @@
 import { supabase, sendEmail } from '/js/shared/supabase.js';
 import { AssistantApi } from './api.js';
 import { Helpers } from '/js/shared/helpers.js';
+import { QueryCache } from '/js/shared/query-cache.js';
 
 /**
  * M�dulo de Gesti�n de Maestros para Asistente
@@ -285,6 +286,10 @@ export const TeachersModule = {
         for (const cid of classroomIds) {
           await supabase.from('classrooms').update({ teacher_id: id }).eq('id', cid);
         }
+        // Invalidar caché para que aulas y maestros recarguen datos frescos
+        QueryCache.invalidate('dir_teachers');
+        QueryCache.invalidate('classrooms_list');
+        QueryCache.invalidate('dir_classrooms_occ');
         Helpers.toast('Maestra actualizada correctamente');
       } else {
         // Crear nuevo maestro (Usa signUp normal con persistSession: false)
@@ -324,6 +329,10 @@ export const TeachersModule = {
           for (const cid of classroomIds) {
             await supabase.from('classrooms').update({ teacher_id: authData.user.id }).eq('id', cid);
           }
+          // Invalidar caché para que aulas y maestros recarguen datos frescos
+          QueryCache.invalidate('dir_teachers');
+          QueryCache.invalidate('classrooms_list');
+          QueryCache.invalidate('dir_classrooms_occ');
           Helpers.toast('Maestro creado exitosamente');
 
           const html = `

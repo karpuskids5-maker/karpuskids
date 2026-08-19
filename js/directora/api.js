@@ -362,6 +362,7 @@ export const DirectorApi = {
     const result = await supabase.from(TABLES.PROFILES).update(safeData).eq('id', id);
     QueryCache.invalidate('dir_teachers');
     QueryCache.invalidate('classrooms_list');
+    QueryCache.invalidate('dir_classrooms_occ');
     return result;
   },
 

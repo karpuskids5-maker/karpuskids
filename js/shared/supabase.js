@@ -552,7 +552,7 @@ async function _initOneSignalAsync(currentUser) {
     }
     if (!user) return;
 
-    // Verificar IndexedDB con timeout corto
+    // Verificar IndexedDB con timeout generoso
     const idbOk = await Promise.race([
       new Promise(resolve => {
         try {
@@ -562,7 +562,7 @@ async function _initOneSignalAsync(currentUser) {
           req.onerror   = () => resolve(false);
         } catch (_) { resolve(false); }
       }),
-      new Promise(resolve => setTimeout(() => resolve(false), 500))
+      new Promise(resolve => setTimeout(() => resolve(false), 3000))
     ]);
     if (!idbOk) return;
 
@@ -590,9 +590,17 @@ async function _initOneSignalAsync(currentUser) {
 
         // Vincular usuario — esperar a que el external_id quede enlazado
         if (user?.id) {
-          await OneSignal.login(String(user.id)).catch(e => {
-            Helpers.safeLog('warn', '[OneSignal] Login deferred error:', e);
-          });
+          // Reintentar login hasta 3 veces con pausa entre intentos
+          for (let attempt = 0; attempt < 3; attempt++) {
+            try {
+              await OneSignal.login(String(user.id));
+              console.log('[OneSignal] Login OK, attempt:', attempt + 1);
+              break;
+            } catch (e) {
+              console.warn('[OneSignal] Login attempt', attempt + 1, 'failed:', e);
+              if (attempt < 2) await new Promise(r => setTimeout(r, 2000));
+            }
+          }
         }
 
         // Re-vincular suscripción si el permiso ya estaba concedido.
@@ -606,17 +614,22 @@ async function _initOneSignalAsync(currentUser) {
         // Guardar el player_id cuando la suscripción exista o cambie.
         // Evita el bug de carrera: antes se leía PushSubscription.id con un
         // setTimeout fijo, cuando el usuario aún no había hecho opt-in.
-        const saveSubscriptionId = async () => {
+        const saveSubscriptionId = async (retries = 3) => {
           try {
             const subId = OneSignal.User?.PushSubscription?.id;
             if (subId && user?.id) {
               await supabase.from('profiles').update({ onesignal_player_id: subId }).eq('id', user.id);
+              console.log('[OneSignal] Player ID guardado:', subId);
+            } else if (retries > 0) {
+              // Reintentar si la suscripción aún no está disponible
+              setTimeout(() => saveSubscriptionId(retries - 1), 3000);
             }
           } catch (_) {}
         };
         OneSignal.User?.PushSubscription?.addEventListener?.('change', saveSubscriptionId);
-        setTimeout(saveSubscriptionId, 1500);
-        setTimeout(saveSubscriptionId, 6000);
+        setTimeout(() => saveSubscriptionId(), 1500);
+        setTimeout(() => saveSubscriptionId(), 6000);
+        setTimeout(() => saveSubscriptionId(), 12000);
 
       } catch (_) {}
     });

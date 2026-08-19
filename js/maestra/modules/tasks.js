@@ -3,7 +3,7 @@ import { TABLES } from '/js/shared/constants.js';
 import { AppState } from '../state.js';
 import { MaestraApi } from '../api.js';
 import { UI } from './ui.js';
-import { notifyParents } from '/js/shared/notify-feedback.js';
+import { notifyParents, showNotifyFeedback } from '/js/shared/notify-feedback.js';
 import { Helpers } from '/js/shared/helpers.js';
 
 const { safeToast, safeEscapeHTML, Modal } = UI;
@@ -464,6 +464,7 @@ export async function submitGrade(taskId, studentId) {
         message: `La maestra ha calificado una tarea de ${student.name}. Nota: ${nota}`,
         link: 'panel_padres.html#grades'
       }).catch(() => {});
+      showNotifyFeedback({ sent: 1, type: 'grade', label: student.name });
     }
     
     safeToast('Calificación guardada');
@@ -1197,6 +1198,7 @@ export async function editStudentScore(activityId, studentId, currentScore, enco
           message: `${st.name} recibió ${scoreNum}/100 en "${activityTitle}"`,
           link: 'panel_padres.html#grades'
         }).catch(() => {});
+        showNotifyFeedback({ sent: 1, type: 'grade', label: st.name });
       }
 
       safeToast('Calificación guardada');
@@ -1295,6 +1297,7 @@ export async function editTaskScore(taskId, studentId, currentScore, encodedTitl
           message: `${st.name} recibió ${scoreNum}/100 en "${taskTitle}"`,
           link: 'panel_padres.html#grades'
         }).catch(() => {});
+        showNotifyFeedback({ sent: 1, type: 'grade', label: st.name });
       }
 
       safeToast('Calificación guardada');
@@ -1490,6 +1493,7 @@ export async function saveGradeV2(activityId, studentId) {
         message: `${student.name} recibio ${scoreNum}/100 en una actividad`,
         link: 'panel_padres.html#grades'
       }).catch(() => {});
+      showNotifyFeedback({ sent: 1, type: 'grade', label: student.name });
     }
 
     safeToast('Calificacion guardada');

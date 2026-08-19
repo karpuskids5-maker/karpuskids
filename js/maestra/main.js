@@ -1168,21 +1168,23 @@ async function submitNewPost() {
     Modal.close('newPostModal');
     window.WallModule.loadPosts('muroPostsContainer');
 
-    // Notificar a padres del aula vía push
+    // Notificar a padres del aula vía push + email (process-event maneja ambos)
     const students = AppState.get('students') || [];
     const parentIds = [...new Set(students.map(s => s.parent_id).filter(Boolean))];
-    let pushSent = 0;
     const preview = content.length > 80 ? content.substring(0, 80) + '…' : content;
-    for (const parentId of parentIds) {
-      const result = await sendPush({
+
+    // Enviar push en paralelo a todos los padres
+    const pushPromises = parentIds.map(parentId =>
+      sendPush({
         user_id: parentId,
         title: `📢 Nueva publicación — ${classroom?.name || 'Aula'}`,
         message: preview,
         type: 'post',
         link: '/panel_padres.html#feed'
-      });
-      if (result) pushSent++;
-    }
+      }).catch(() => null)
+    );
+    const pushResults = await Promise.allSettled(pushPromises);
+    const pushSent = pushResults.filter(r => r.status === 'fulfilled' && r.value?.ok !== false).length;
 
     // Email vía process-event (en background, no bloquea UI)
     const { data: { user: currentUser } } = await supabase.auth.getUser();
@@ -1194,9 +1196,11 @@ async function submitNewPost() {
     }).catch(() => {});
 
     // Mostrar banner de confirmación de envío
+    const { showNotifyFeedback } = await import('/js/shared/notify-feedback.js');
     if (pushSent > 0) {
-      const { showNotifyFeedback } = await import('/js/shared/notify-feedback.js');
       showNotifyFeedback({ sent: pushSent, type: 'post', label: 'Muro Escolar' });
+    } else if (parentIds.length > 0) {
+      safeToast(`Publicación enviada a ${parentIds.length} padres`, 'info');
     }
 
   } catch (err) {

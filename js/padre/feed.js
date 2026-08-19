@@ -110,7 +110,7 @@ export const FeedModule = {
       if (isVideo) {
         mediaHTML = `
           <div class="relative group/media rounded-2xl overflow-hidden mb-4 bg-black">
-            ${ImageLoader.video(p.media_url, '', { cls: 'w-full max-h-80 object-cover' })}
+            ${ImageLoader.video(p.media_url, '', { cls: 'w-full max-h-[500px] mx-auto object-contain' })}
             <button onclick="App.feed.downloadMedia('${optimizedUrl}', 'video')"
                class="absolute top-2 right-2 p-2 bg-black/60 hover:bg-black/80 text-white rounded-xl opacity-0 group-hover/media:opacity-100 transition-opacity flex items-center gap-1.5 text-[10px] font-black uppercase backdrop-blur-sm">
               <i data-lucide="download" class="w-3.5 h-3.5"></i> Descargar
@@ -118,9 +118,9 @@ export const FeedModule = {
           </div>`;
       } else {
         mediaHTML = `
-          <div class="relative group/media cursor-zoom-in rounded-2xl overflow-hidden mb-4 bg-black"
+          <div class="relative group/media cursor-zoom-in rounded-2xl overflow-hidden mb-4 bg-slate-50"
                onclick="window.openLightbox && window.openLightbox('${optimizedUrl}','image')">
-            ${ImageLoader.img(optimizedUrl, { cls: 'w-full max-h-[500px] object-cover', fallback: 'img/mundo.jpg' })}
+            ${ImageLoader.img(optimizedUrl, { cls: 'w-full max-h-[500px] object-contain', fallback: 'img/mundo.jpg' })}
             <button onclick="event.stopPropagation(); App.feed.downloadMedia('${optimizedUrl}', 'image')"
                class="absolute top-2 right-2 p-2 bg-black/60 hover:bg-black/80 text-white rounded-xl opacity-0 group-hover/media:opacity-100 transition-opacity flex items-center gap-1.5 text-[10px] font-black uppercase backdrop-blur-sm">
               <i data-lucide="download" class="w-3.5 h-3.5"></i> Descargar

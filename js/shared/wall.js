@@ -374,15 +374,15 @@ export const WallModule = {
     const isFirstPost = this._page === 0;
     const colors = this._getLikeColors();
 
-    // Lógica de Renderizado Multimedia con aspect-ratio fijo y lazy loading
+    // Lógica de Renderizado Multimedia — imágenes y videos se muestran completos
     let mediaHtml = '';
     if (p.display_media_url) {
       if (p.is_video) {
         mediaHtml = `
-          <div class="aspect-video rounded-2xl overflow-hidden border border-slate-100 mb-4 bg-black relative group/media shadow-inner">
+          <div class="rounded-2xl overflow-hidden border border-slate-100 mb-4 bg-black relative group/media shadow-inner">
             ${ImageLoader.video(p.display_media_url, '', { 
-              cls: 'w-full h-full object-contain',
-              preload: 'none' // Lazy loading nativo para video
+              cls: 'w-full max-h-[500px] mx-auto object-contain',
+              preload: 'none'
             })}
             <a href="${p.display_media_url}" download target="_blank" rel="noopener noreferrer"
                class="absolute top-2 right-2 p-2 bg-black/60 hover:bg-black/80 text-white rounded-xl opacity-0 group-hover/media:opacity-100 transition-opacity flex items-center gap-1.5 text-[10px] font-black uppercase backdrop-blur-sm"
@@ -392,11 +392,11 @@ export const WallModule = {
           </div>`;
       } else {
         mediaHtml = `
-          <div class="aspect-video rounded-2xl overflow-hidden border border-slate-100 mb-4 cursor-zoom-in bg-slate-50 relative group/media shadow-inner"
+          <div class="rounded-2xl overflow-hidden border border-slate-100 mb-4 cursor-zoom-in bg-slate-50 relative group/media shadow-inner"
                onclick="window.openLightbox('${p.display_media_url}','image')">
             ${ImageLoader.img(p.display_media_url, {
               alt: 'Post media',
-              cls: 'w-full h-full object-cover', // Aspect ratio fijo
+              cls: 'w-full max-h-[500px] object-contain',
               fallback: 'img/mundo.jpg',
               priority: isFirstPost ? 'high' : 'low'
             })}
@@ -800,6 +800,38 @@ export const WallModule = {
         if (el) {
           el.classList.add('opacity-0', 'scale-95');
           setTimeout(() => el.remove(), 300);
+        }
+      })
+      // Sincronizar likes en tiempo real entre paneles
+      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'likes' }, (payload) => {
+        const like = payload.new;
+        const userId = self._appState?.get('user')?.id;
+        if (!userId) return;
+        const colors = self._getLikeColors();
+        // Si OTRO usuario dio like, actualizar el ícono si somos ese usuario
+        if (like.user_id === userId) {
+          const btn = document.querySelector(`#post-${like.post_id} button[onclick*="toggleLike"]`);
+          if (btn && !btn.classList.contains(colors.text)) {
+            btn.classList.add(colors.text);
+            btn.classList.remove('text-slate-500');
+            const icon = btn.querySelector('i[data-lucide="heart"]');
+            if (icon) icon.classList.add(colors.fill);
+          }
+        }
+      })
+      .on('postgres_changes', { event: 'DELETE', schema: 'public', table: 'likes' }, (payload) => {
+        const like = payload.old;
+        const userId = self._appState?.get('user')?.id;
+        if (!userId) return;
+        if (like?.user_id === userId) {
+          const btn = document.querySelector(`#post-${like.post_id} button[onclick*="toggleLike"]`);
+          if (btn) {
+            const colors = self._getLikeColors();
+            btn.classList.remove(colors.text);
+            btn.classList.add('text-slate-500');
+            const icon = btn.querySelector('i[data-lucide="heart"]');
+            if (icon) icon.classList.remove(colors.fill);
+          }
         }
       })
       .subscribe((status) => {

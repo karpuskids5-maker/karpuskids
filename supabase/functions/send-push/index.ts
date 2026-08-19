@@ -204,9 +204,11 @@ Deno.serve(async (req) => {
       const savedPlayerId = profile?.onesignal_player_id;
       if (savedPlayerId && !playerIds.includes(savedPlayerId)) {
         console.log('[send-push] Intento 3 — saved player_id fallback:', savedPlayerId);
+
+        // Intentar con include_player_ids (API v1) y include_subscription_ids (API v2)
         const { ok: ok3, result: r3 } = await osNotify(ONESIGNAL_APP_ID, ONESIGNAL_KEY, {
           ...basePayload,
-          include_subscription_ids: [savedPlayerId]   // ← API v2 only, no mixing
+          include_player_ids: [savedPlayerId]
         });
         console.log('[send-push] Intento 3 result:', JSON.stringify(r3));
 
