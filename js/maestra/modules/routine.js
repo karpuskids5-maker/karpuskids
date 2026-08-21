@@ -752,6 +752,45 @@ function _injectV8Styles() {
     .routine-section-toggle[aria-expanded="true"] .acc-chevron{transform:rotate(180deg);}
     .routine-section-body{overflow:hidden;transition:max-height .3s ease,opacity .25s ease;}
     .routine-section-body.collapsed{max-height:0!important;opacity:0;padding-top:0;padding-bottom:0;pointer-events:none;}
+    /* ✅ Móvil: rutina más compacta — botones y contenedores pequeños, sin choques */
+    @media (max-width:640px){
+      #routineWrapper > * + *{margin-top:10px !important;}
+      #routineWrapper > div{border-radius:1.25rem !important;}
+      .routine-section-toggle{padding:11px 14px !important;}
+      .routine-section-toggle h3{font-size:12px !important;}
+      .timeline-header-icon{width:34px !important;height:34px !important;font-size:15px !important;border-radius:14px !important;}
+      /* Timeline: altura máxima reducida para que quepa en pantalla */
+      #timelineExpanded > div{max-height:52vh !important;}
+      /* Header timeline: botones no desbordan */
+      #timelineContainer .routine-section-toggle{flex-wrap:wrap;gap:8px !important;}
+      #timelineContainer .routine-section-toggle > div:last-child{flex-wrap:wrap;gap:6px !important;}
+      /* Acciones del aula */
+      #accionesBody,#alumnosBody{padding-left:10px !important;padding-right:10px !important;padding-bottom:12px !important;}
+      /* Acciones: 3 columnas en móvil para que los botones no se aplasten */
+      #accionesBody .grid{grid-template-columns:repeat(3,1fr) !important;gap:6px !important;}
+      #accionesBody .grid button{padding:10px 4px !important;border-radius:14px !important;}
+      #accionesBody .grid button span:first-child{font-size:22px !important;}
+      #accionesBody .grid button span:last-child{font-size:8px !important;word-break:break-word;}
+      /* Chips de filtro compactos */
+      #routineFilterChips{gap:6px !important;}
+      #routineFilterChips button{padding:5px 9px !important;min-height:30px !important;gap:3px !important;font-size:9px !important;}
+      /* Tarjetas de alumno: 2 columnas compactas */
+      #routineStudentsGrid{gap:8px !important;}
+      #routineStudentsGrid .swipe-card > div:last-child{padding:10px !important;border-radius:18px !important;}
+      #routineStudentsGrid .swipe-card .w-11{width:36px !important;height:36px !important;}
+      /* Banners colectivos (siesta / retiros / momento del día) */
+      #routineWrapper .bg-white.border-2{padding:12px !important;gap:10px !important;}
+      #routineWrapper .bg-white.border-2 .w-12{width:38px !important;height:38px !important;font-size:16px !important;}
+      /* Botones "Registrar todos" / "Despertar todos" en banners */
+      #routineWrapper .bg-white.border-2 button{padding:8px 12px !important;font-size:9px !important;white-space:nowrap;}
+      /* Botón + insertar evento entre filas */
+      [data-insert-slot]{margin:-4px 0 !important;height:16px !important;}
+    }
+    /* ✅ Modales tipo sheet (se abren desde abajo en móvil) */
+    .kk-sheet-modal{position:fixed;inset:0;z-index:3000;display:flex;align-items:flex-end;justify-content:center;background:rgba(15,23,42,0.6);backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px);}
+    @media(min-width:640px){.kk-sheet-modal{align-items:center;}}
+    .kk-sheet-inner{width:100%;max-width:28rem;max-height:calc(100dvh - env(safe-area-inset-top,0px) - 8px);display:flex;flex-direction:column;border-radius:2rem 2rem 0 0;overflow:hidden;background:#fff;}
+    @media(min-width:640px){.kk-sheet-inner{border-radius:2rem;max-height:calc(100dvh - 32px);}}
     .acc-section summary{list-style:none;}
     .acc-section summary::-webkit-details-marker{display:none;}
     .acc-section summary::marker{content:"";}
@@ -1029,37 +1068,34 @@ async function openTimelineSheet() {
 
   const content = `
     <style>
-      #${modalId}-inner{margin:auto auto 0 !important;animation:sheetUp .26s cubic-bezier(.32,.72,.3,1)}
-      @media (min-width:640px){#${modalId}-inner{margin:auto !important}}
-      @keyframes sheetUp{from{transform:translateY(100%);opacity:.4}to{transform:translateY(0);opacity:1}}
-    </style>
-    <div class="w-full sm:max-w-md flex items-end sm:items-center justify-center" style="height:min(82vh,640px);min-height:52vh;">
-      <div class="bg-white w-full rounded-t-[2rem] sm:rounded-[2rem] shadow-2xl overflow-hidden flex flex-col" style="max-height:100%;">
-        <div class="pt-2 pb-1 flex justify-center sm:hidden"><span class="w-10 h-1.5 rounded-full bg-slate-200"></span></div>
-        <div class="px-4 sm:px-5 pb-3 pt-1 flex items-center justify-between gap-3 border-b border-slate-100" style="background:linear-gradient(135deg, #fff7ed 0%, #ffffff 100%);">
-          <div class="flex items-center gap-2.5 min-w-0">
-            <div class="w-9 h-9 rounded-xl flex items-center justify-center text-base shrink-0" style="background:linear-gradient(135deg, #FF8A00, #f97316);box-shadow:0 4px 10px rgba(255,138,0,0.3);">📅</div>
-            <div class="min-w-0">
-              <h3 class="text-sm font-black text-slate-800">Timeline del Día</h3>
-              <p class="text-[9px] font-bold text-slate-400 uppercase tracking-wider truncate">${_formatDate(today)}</p>
-            </div>
-          </div>
-          <button onclick="Modal.close('${modalId}')" class="p-2 bg-slate-100 hover:bg-slate-200 rounded-full transition-colors shrink-0" aria-label="Cerrar">
-            <svg class="w-4 h-4 text-slate-500" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/></svg>
-          </button>
-        </div>
-        <div class="overflow-y-auto flex-1 custom-scrollbar" style="-webkit-overflow-scrolling:touch;">
-          <div class="relative p-3 sm:p-4">
-            <div class="absolute left-[38px] top-5 bottom-5 w-0.5 bg-gradient-to-b from-[#FF8A00]/30 via-slate-200 to-slate-100"></div>
-            <div class="space-y-2">${rows}</div>
+      @keyframes sheetUp{from{transform:translateY(60px);opacity:.4}to{transform:translateY(0);opacity:1}}
+      #${modalId}-inner{animation:sheetUp .26s cubic-bezier(.32,.72,.3,1);width:100%;max-width:28rem;}
+    </style><!-- kk-is-sheet -->
+    <div class="bg-white w-full rounded-t-[2rem] sm:rounded-[2rem] shadow-2xl overflow-hidden flex flex-col" style="max-height:calc(100dvh - env(safe-area-inset-top,0px) - 8px);">
+      <div class="pt-2 pb-1 flex justify-center sm:hidden shrink-0"><span class="w-10 h-1.5 rounded-full bg-slate-200"></span></div>
+      <div class="px-4 sm:px-5 pb-3 pt-1 flex items-center justify-between gap-3 border-b border-slate-100 shrink-0" style="background:linear-gradient(135deg, #fff7ed 0%, #ffffff 100%);">
+        <div class="flex items-center gap-2.5 min-w-0">
+          <div class="w-9 h-9 rounded-xl flex items-center justify-center text-base shrink-0" style="background:linear-gradient(135deg, #FF8A00, #f97316);box-shadow:0 4px 10px rgba(255,138,0,0.3);">📅</div>
+          <div class="min-w-0">
+            <h3 class="text-sm font-black text-slate-800">Timeline del Día</h3>
+            <p class="text-[9px] font-bold text-slate-400 uppercase tracking-wider truncate">${_formatDate(today)}</p>
           </div>
         </div>
-        <div class="p-3 sm:p-4 shrink-0" style="background:#f8fafc;border-top:1px solid #e2e8f0;">
-          <button onclick="Modal.close('${modalId}'); App.openBulkEventModal('animo')"
-            class="w-full py-3 rounded-2xl font-black text-xs uppercase tracking-widest transition-all active:scale-[0.98]" style="background:#FF8A00 !important;color:#fff !important;border:2px solid #E67A00 !important;box-shadow:0 4px 14px rgba(255,138,0,0.35);">
-            ➕ Registrar evento a todos
-          </button>
+        <button onclick="Modal.close('${modalId}')" class="p-2 bg-slate-100 hover:bg-slate-200 rounded-full transition-colors shrink-0" aria-label="Cerrar">
+          <svg class="w-4 h-4 text-slate-500" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/></svg>
+        </button>
+      </div>
+      <div class="overflow-y-auto flex-1 custom-scrollbar" style="-webkit-overflow-scrolling:touch;">
+        <div class="relative p-3 sm:p-4">
+          <div class="absolute left-[38px] top-5 bottom-5 w-0.5 bg-gradient-to-b from-[#FF8A00]/30 via-slate-200 to-slate-100"></div>
+          <div class="space-y-2">${rows}</div>
         </div>
+      </div>
+      <div class="p-3 sm:p-4 shrink-0" style="background:#f8fafc;border-top:1px solid #e2e8f0;padding-bottom:max(12px,env(safe-area-inset-bottom,12px));">
+        <button onclick="Modal.close('${modalId}'); App.openBulkEventModal('animo')"
+          class="w-full py-3 rounded-2xl font-black text-xs uppercase tracking-widest transition-all active:scale-[0.98]" style="background:#FF8A00 !important;color:#fff !important;border:2px solid #E67A00 !important;box-shadow:0 4px 14px rgba(255,138,0,0.35);">
+          ➕ Registrar evento a todos
+        </button>
       </div>
     </div>`;
 
@@ -1085,7 +1121,7 @@ function _renderRoutineLayout({ todayLabel, students, logsMap, withReport, sched
       <!-- Header (clickeable para colapsar) -->
       <div class="routine-section-toggle px-4 sm:px-5 py-4 flex flex-wrap items-center justify-between gap-3 border-b border-slate-100" style="background:linear-gradient(135deg, #f8fafc 0%, #ffffff 100%);" onclick="App.toggleRoutineSection('timeline')" aria-expanded="true" aria-controls="timelineBody">
         <div class="flex items-center gap-3 min-w-0">
-          <div class="w-10 h-10 rounded-2xl flex items-center justify-center text-white text-lg shadow-md shrink-0" style="background:linear-gradient(135deg, #FF8A00, #f97316);box-shadow:0 4px 12px rgba(255,138,0,0.3);">📅</div>
+          <div class="timeline-header-icon w-10 h-10 rounded-2xl flex items-center justify-center text-white text-lg shadow-md shrink-0" style="background:linear-gradient(135deg, #FF8A00, #f97316);box-shadow:0 4px 12px rgba(255,138,0,0.3);">📅</div>
           <div class="min-w-0">
             <h3 class="text-sm font-black text-slate-800">Timeline del Día</h3>
             <p class="text-[10px] font-bold text-slate-400 uppercase tracking-wider capitalize truncate">${todayLabel}</p>
@@ -1113,7 +1149,7 @@ function _renderRoutineLayout({ todayLabel, students, logsMap, withReport, sched
       <div id="timelineBody" class="routine-section-body">
         <!-- Timeline Expandido: Ventana Vertical con Detalles -->
         <div id="timelineExpanded" class="${_timelineExpanded ? '' : 'hidden'}">
-          <div class="max-h-[320px] sm:max-h-[420px] overflow-y-auto custom-scrollbar">
+          <div class="max-h-[62vh] sm:max-h-[420px] overflow-y-auto custom-scrollbar">
             <div class="relative p-3 sm:p-5">
               <!-- Línea vertical conectora -->
               <div class="absolute left-[38px] top-5 bottom-5 w-0.5 bg-gradient-to-b from-[#FF8A00]/30 via-slate-200 to-slate-100"></div>
@@ -1508,15 +1544,13 @@ export async function openBulkEventModal(eventType = 'animo', scheduledTime = nu
 
   const content = `
     <style>
-      #bulkEventModal-inner{margin:auto auto 0 !important;animation:sheetUp .26s cubic-bezier(.32,.72,.3,1)}
-      @media (min-width:640px){#bulkEventModal-inner{margin:auto !important}}
-      @keyframes sheetUp{from{transform:translateY(100%);opacity:.4}to{transform:translateY(0);opacity:1}}
-    </style>
-    <div class="w-full sm:max-w-md flex items-end sm:items-center justify-center" style="height:min(90vh,680px);min-height:60vh;">
-    <div class="bg-white w-full rounded-t-[2rem] sm:rounded-[2rem] shadow-2xl overflow-hidden flex flex-col" style="max-height:100%;">
-      <div class="pt-2 pb-1 flex justify-center sm:hidden"><span class="w-10 h-1.5 rounded-full bg-slate-200"></span></div>
+      @keyframes sheetUp{from{transform:translateY(60px);opacity:.4}to{transform:translateY(0);opacity:1}}
+      #bulkEventModal-inner{animation:sheetUp .26s cubic-bezier(.32,.72,.3,1);width:100%;max-width:28rem;}
+    </style><!-- kk-is-sheet -->
+    <div class="bg-white w-full rounded-t-[2rem] sm:rounded-[2rem] shadow-2xl overflow-hidden flex flex-col" style="max-height:calc(100dvh - env(safe-area-inset-top,0px) - 8px);">
+      <div class="pt-2 pb-1 flex justify-center sm:hidden shrink-0"><span class="w-10 h-1.5 rounded-full bg-slate-200"></span></div>
       <!-- Header con gradiente -->
-      <div class="px-4 sm:px-5 py-3 sm:py-4 text-white relative overflow-hidden" style="background:linear-gradient(135deg, #28B54D 0%, #10b981 50%, #14b8a6 100%);">
+      <div class="px-4 sm:px-5 py-3 sm:py-4 text-white relative overflow-hidden shrink-0" style="background:linear-gradient(135deg, #28B54D 0%, #10b981 50%, #14b8a6 100%);">
         <div class="absolute -top-8 -right-8 w-32 h-32 rounded-full blur-2xl" style="background:rgba(255,255,255,0.1);"></div>
         <div class="absolute -bottom-8 -left-8 w-24 h-24 rounded-full blur-xl" style="background:rgba(255,255,255,0.1);"></div>
         <div class="relative flex items-center gap-3 sm:gap-4">
@@ -1549,13 +1583,12 @@ export async function openBulkEventModal(eventType = 'animo', scheduledTime = nu
         </div>
       </div>
 
-      <div class="p-3 sm:p-4 bg-white border-t border-slate-100 shrink-0">
+      <div class="p-3 sm:p-4 bg-white border-t border-slate-100 shrink-0" style="padding-bottom:max(12px,env(safe-area-inset-bottom,12px));">
         <button id="btnBulkConfirm" onclick="App.confirmBulkEvent('${eventType}')"
           class="w-full py-3 sm:py-3.5 text-white rounded-2xl font-black text-sm uppercase tracking-widest active:scale-[0.98] transition-colors flex items-center justify-center gap-2" style="background:#FF8A00 !important;border:2px solid #E67A00 !important;box-shadow:0 6px 20px rgba(255,138,0,0.4);">
           <svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7"/></svg> Confirmar
         </button>
       </div>
-    </div>
     </div>`;
 
   Modal.open(modalId, content);

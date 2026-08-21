@@ -3,16 +3,16 @@
  *
  * - Móvil (<769px): alterna lista ↔ conversación con estilos inline
  *   (a prueba de Tailwind compilado / especificidad).
- * - Historial: al abrir una conversación se empuja un estado; el botón
- *   ATRÁS físico del móvil o del navegador regresa a la lista de contactos
- *   SIN recargar la página.
+ * - Historial: delega en BackNavigation — el botón ATRÁS físico del móvil
+ *   o del navegador cierra la conversación y regresa a la lista SIN recargar
+ *   la página (crítico en modo PWA).
  */
+
+import { BackNavigation } from './back-navigation.js';
 
 const isMobile = () => window.matchMedia('(max-width: 768px)').matches;
 
-let _activeRevert = null;
-let _bound = false;
-let _pushSeq = 0;
+let _lastRevert = null;
 
 /** Placeholder estándar "Selecciona un contacto" */
 function _placeholderHTML(icon = 'messages-square', text = 'Selecciona un contacto') {
@@ -20,27 +20,6 @@ function _placeholderHTML(icon = 'messages-square', text = 'Selecciona un contac
     <i data-lucide="${icon}"></i>
     <p>${text}</p>
   </div>`;
-}
-
-function _bindPopstate() {
-  if (_bound) return;
-  _bound = true;
-  window.addEventListener('popstate', () => {
-    // Botón atrás físico (móvil) o del navegador → cerrar conversación sin recargar
-    if (_activeRevert) {
-      const fn = _activeRevert;
-      _activeRevert = null;
-      try { fn(); } catch (_) { /* silencioso */ }
-    }
-  });
-}
-
-function _pushState() {
-  try {
-    if (!(history.state && 'karpusChat' in history.state)) {
-      history.pushState({ karpusChat: ++_pushSeq }, '', '#chat');
-    }
-  } catch (_) { /* silencioso */ }
 }
 
 export const ChatView = {
@@ -54,40 +33,46 @@ export const ChatView = {
    * @param {Function} opts.revert  — restaura la lista / estado inicial (por panel)
    */
   open({ apply, revert }) {
-    _bindPopstate();
+    _lastRevert = revert || null;
     try { apply?.(); } catch (_) { /* silencioso */ }
-    _pushState();
-    _activeRevert = revert || null;
+    if (BackNavigation.topKind() === 'chat') {
+      // Cambio directo de conversación A→B: sin apilar historial
+      BackNavigation.replaceTop(revert || null, { kind: 'chat' });
+    } else {
+      BackNavigation.push(revert || null, { kind: 'chat' });
+    }
   },
 
   /** ¿Hay una conversación abierta gestionada por ChatView? */
   isOpen() {
-    return !!_activeRevert;
+    return BackNavigation.topKind() === 'chat';
   },
 
-  /** Cierra la conversación directamente (sin tocar historial) */
+  /** Cierra la conversación directamente (consume su entrada de historial) */
   close() {
-    const revert = _activeRevert;
-    _activeRevert = null;
-    try { revert?.(); } catch (_) { /* silencioso */ }
+    if (this.isOpen()) {
+      _lastRevert = null; // lo ejecutará popstate vía BackNavigation
+      BackNavigation.back();
+    }
   },
 
   /**
    * Acción del botón ATRÁS de la interfaz:
-   * si hay entrada de historial propia se consume (dispara popstate → revert);
-   * si no, cierra directo.
+   * consume la entrada de historial de la conversación (popstate → revert).
    */
   back() {
-    if (_activeRevert && history.state && 'karpusChat' in history.state) {
-      history.back();
-    } else {
-      this.close();
-    }
+    this.close();
   },
 
-  /** Limpieza al abandonar la sección (sin revert visual) */
+  /**
+   * Limpieza al abandonar / reentrar a la sección: ejecuta el último revert
+   * registrado (restaura lista + placeholder) y desactiva la capa de chat.
+   * El truncado del historial lo hace BackNavigation.reset() en la navegación.
+   */
   reset() {
-    _activeRevert = null;
+    const r = _lastRevert;
+    _lastRevert = null;
+    if (r) { try { r(); } catch (_) { /* silencioso */ } }
   }
 };
 

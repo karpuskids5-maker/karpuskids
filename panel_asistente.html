@@ -1088,12 +1088,20 @@
 
       <!-- CHAT -->
       <section id="chat" class="section">
-        <header class="mb-4">
-          <h1 class="text-2xl font-black text-slate-800 tracking-tight flex items-center gap-2">
-            <span class="w-9 h-9 bg-teal-100 text-teal-600 rounded-xl flex items-center justify-center shrink-0"><i data-lucide="message-square" class="w-5 h-5"></i></span>
-            Centro de Comunicación
-          </h1>
-          <p class="text-slate-400 text-sm font-medium mt-0.5">Habla con padres, maestras y dirección</p>
+        <header class="mb-4 flex items-center gap-3">
+          <!-- ✅ Botón atrás visible en móvil: vuelve a la sección anterior sin recargar -->
+          <button onclick="window._kkSectionBack ? window._kkSectionBack() : history.back()"
+            class="md:hidden p-2.5 rounded-xl bg-white shadow-sm border border-slate-100 text-slate-600 hover:bg-teal-50 hover:text-teal-600 transition-colors shrink-0"
+            aria-label="Volver">
+            <i data-lucide="arrow-left" class="w-5 h-5"></i>
+          </button>
+          <div class="min-w-0">
+            <h1 class="text-2xl font-black text-slate-800 tracking-tight flex items-center gap-2">
+              <span class="w-9 h-9 bg-teal-100 text-teal-600 rounded-xl flex items-center justify-center shrink-0"><i data-lucide="message-square" class="w-5 h-5"></i></span>
+              Centro de Comunicación
+            </h1>
+            <p class="text-slate-400 text-sm font-medium mt-0.5">Habla con padres, maestras y dirección</p>
+          </div>
         </header>
 
         <!-- Layout WhatsApp: lista ↔ conversación -->

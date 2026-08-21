@@ -20,6 +20,7 @@ import {
 } from '/js/shared/chat-actions.js';
 import SchoolEngine from '/js/shared/school-engine.js';
 import { GradesModule } from '../directora/grades.module.js';
+import { BackNavigation } from '/js/shared/back-navigation.js';
 
 let _chatModule = null;
 async function getChatModule() {
@@ -44,7 +45,7 @@ function closeAssistantConversationUI() {
   const inputArea = document.getElementById('chatInputArea');
   const container = document.getElementById('chatMessagesContainer');
   if (header) header.style.display = 'none';
-  if (inputArea) inputArea.style.display = 'none';
+  if (inputArea) { inputArea.classList.add('hidden'); inputArea.style.removeProperty('display'); }
   if (container) {
     container.innerHTML = `
       <div class="flex-1 flex flex-col items-center justify-center text-slate-400 opacity-40 py-12">
@@ -420,9 +421,8 @@ function initNavigation() {
   const navLinks = document.querySelectorAll('[data-section]');
   const sections = document.querySelectorAll('section[id]');
 
-  const showSection = async (target) => {
-    window.App.navigateTo = showSection;
-    window.goToSection = showSection;
+  const showSection = async (target, opts = {}) => {
+    const pushHistory = opts.pushHistory !== false;
     Helpers.vibrate?.('light');
 
     // ✅ LIMPIEZA DE REALTIME: Eliminar canales al cambiar de sección
@@ -479,6 +479,11 @@ function initNavigation() {
     }
     
     AppState.set('currentSection', target);
+
+    // ✅ HISTORIAL (PWA): ATRÁS físico → regresa a la sección anterior sin recargar
+    if (pushHistory && prevSection && prevSection !== target) {
+      BackNavigation.push(() => showSection(prevSection, { pushHistory: false }), { kind: 'section' });
+    }
 
     // ?? Marcar badge como le�do al entrar a la secci�n
     BadgeSystem.mark(target);
@@ -603,13 +608,27 @@ function initNavigation() {
   navLinks.forEach(link => {
     link.addEventListener('click', (e) => {
       e.preventDefault();
-      showSection(link.dataset.section);
+      navigateFromUser(link.dataset.section);
     });
   });
 
+  /**
+   * ✅ Navegación iniciada por el usuario: colapsa capas de historial
+   * (conversaciones abiertas, sección previa) y trunca el historial hacia
+   * adelante antes de apilar la nueva sección → el botón ATRÁS del móvil
+   * nunca "muere" ni saca al usuario de la app inesperadamente.
+   */
+  async function navigateFromUser(target) {
+    await BackNavigation.reset();
+    await showSection(target);
+  }
+  window.App.navigateTo = navigateFromUser;
+  window.goToSection = navigateFromUser;
+
   // Carga inicial del dashboard
+  BackNavigation.init();
   import('./modules/dashboard.js').then(m => m.DashboardModule.init().then(() => loadedSections.add('dashboard')));
-  showSection('dashboard');
+  showSection('dashboard', { pushHistory: false });
 
   // -- Hamburger m�vil ------------------------------------------------------
   const menuBtn = document.getElementById('menuBtn');
@@ -916,7 +935,13 @@ window.selectAssistantChat = async (userId, name, role, avatarUrl = null) => {
       avatarEl.innerHTML = (name || '?').charAt(0);
     }
   }
-  inputArea?.style.setProperty('display', '');
+  // ✅ Composer SIEMPRE activo al entrar a una conversación
+  inputArea?.classList.remove('hidden');
+  inputArea?.style.removeProperty('display');
+  const sendBtn = document.getElementById('btnSendChatMessage');
+  const chatInput = document.getElementById('chatMessageInput');
+  if (sendBtn) { sendBtn.disabled = false; sendBtn.style.display = ''; }
+  if (chatInput) { chatInput.disabled = false; }
 
   // ✅ Limpiar respuesta pendiente anterior
   hideReplyBar();

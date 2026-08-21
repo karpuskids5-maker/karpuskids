@@ -17,6 +17,7 @@ import * as Boletin from './modules/boletin.js';
 import { UI } from './modules/ui.js';
 
 import { UIPremium } from '/js/shared/ui-premium.js';
+import { BackNavigation } from '/js/shared/back-navigation.js';
 
 window.safeToast = UI.safeToast;
 const { safeToast, safeEscapeHTML, Modal } = UI;
@@ -27,6 +28,20 @@ const _lastLoad = {};
 // Exponer Modal globalmente ANTES de cualquier interacción del usuario
 // Los onclick inline en HTML dinámico necesitan window.Modal disponible de inmediato
 window.Modal = Modal;
+
+// ✅ Shim compatible con otros paneles: módulos compartidos (wall, carnets,
+// student-record-modal) llaman window.openGlobalModal() y App.ui.closeModal().
+// Sin esto, esos modales fallan silenciosamente en el panel maestra.
+window.openGlobalModal = (html, wide = false) => {
+  Modal.open('globalModal', `
+    <div class="bg-white rounded-3xl shadow-2xl ${wide ? 'sm:max-w-4xl' : 'sm:max-w-2xl'} w-full mx-auto relative">
+      <button onclick="Modal.close('globalModal')" class="absolute top-4 right-4 w-9 h-9 flex items-center justify-center rounded-full bg-slate-100 text-slate-400 hover:bg-rose-50 hover:text-rose-500 transition-all z-10" aria-label="Cerrar">
+        <i data-lucide="x" class="w-5 h-5"></i>
+      </button>
+      ${html}
+    </div>`);
+};
+window.closeGlobalModal = () => Modal.close('globalModal');
 const { initAttendance, markAllPresent, registerAttendance } = Attendance;
 const { initRoutine, updateRoutineField, saveRoutineLog, openStudentRoutine, updateRoutineFieldInModal, saveRoutineInModal, openBulkEventModal, confirmBulkEvent, wakeAllSiestas, wakeStudentSiesta, undoLastBulk, publishAll, registerIndividualEvent, toggleTimeline, openExtraEventModal, confirmExtraEvent, registerMissingStudents, insertEventAt, openInsertEventPicker, moveScheduleEvent, cascadeScheduleShift, toggleScheduleAuto, filterEventsByAge, stopAutoRegisterClock, paginateScheduleCatalog, paginateAllEvents, setRoutineFilter, refreshRoutineAttendance, toggleRoutineSection } = Routine;
 const { initTasks, openEditTaskModal, deleteTask, openNewTaskModal, viewTaskSubmissions, submitGrade } = Tasks;
@@ -44,6 +59,7 @@ window.App = {
   safeToast: UI.safeToast,
   safeEscapeHTML: UI.safeEscapeHTML,
   Modal: UI.Modal,
+  ui: { closeModal: () => Modal.close('globalModal') },
 
   // Attendance
   registerAttendance: Attendance.registerAttendance,
@@ -843,6 +859,12 @@ function initNavigation() {
       localStorage.setItem('maestra_last_section', fullId);
     }
 
+    // ✅ HISTORIAL (PWA): ATRÁS físico → regresa a la sección anterior sin recargar
+    if (!options.noHistory && previousSection && previousSection !== fullId) {
+      const backTo = previousSection;
+      BackNavigation.push(() => setActiveSection(backTo, { noHistory: true, skipSave: true }), { kind: 'section' });
+    }
+
     // Lógica de refresco inteligente (TTL: 2 minutos)
     const now = Date.now();
     const isFresh = _lastLoad[cleanId] && (now - _lastLoad[cleanId] < 120000);
@@ -866,13 +888,35 @@ function initNavigation() {
     previousSection = fullId;
   };
 
+  /**
+   * ✅ Navegación iniciada por el usuario: colapsa capas de historial
+   * (conversaciones, sección previa) y trunca el historial hacia adelante
+   * antes de apilar la nueva sección → ATRÁS del móvil nunca queda "muerto".
+   */
+  const navigateFromUser = async (targetId, options = {}) => {
+    await BackNavigation.reset();
+    setActiveSection(targetId, options);
+  };
+
   navButtons.forEach(btn => {
-    btn.addEventListener('click', () => setActiveSection(btn.dataset.section));
+    btn.addEventListener('click', () => navigateFromUser(btn.dataset.section));
   });
 
   // Exponer para uso global
-  window.App.setActiveSection = setActiveSection;
+  window.App.setActiveSection = (targetId, options) => {
+    // Solo las llamadas marcadas explícitamente como internas (callbacks de
+    // ATRÁS con noHistory) evitan el colapso del historial; todo lo demás
+    // (onclick inline, banners push, detalle de aula) es navegación del
+    // usuario → reset + push de capa de sección.
+    if (options && options.noHistory) {
+      setActiveSection(targetId, options);
+    } else {
+      navigateFromUser(targetId, options || {});
+    }
+  };
   window.App._setActiveSection = setActiveSection; // Alias interno para el proxy global
+
+  BackNavigation.init();
 
   // Restaurar última sección (sección "boletines" eliminada → redirigir a calificaciones)
   const rawLastSection = localStorage.getItem('maestra_last_section') || 't-home';

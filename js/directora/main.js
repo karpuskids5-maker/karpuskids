@@ -11,6 +11,7 @@ import { BadgeSystem } from '/js/shared/badges.js';
 import { RealtimeManager } from '/js/shared/realtime-manager.js';
 import { QueryCache } from '/js/shared/query-cache.js';
 import { GradesModule } from './grades.module.js';
+import { BackNavigation } from '/js/shared/back-navigation.js';
 const debounce = (fn, delay) => {
   let timeout;
   return (...args) => {
@@ -129,9 +130,23 @@ window.openGlobalModal = function(html, wide = false) {
 };
 
 /**
- * ?? Navegaci�n Global
+ * ?? Navegación Global
  */
-export function goToSection(sectionId) {
+export function goToSection(sectionId, opts = {}) {
+  if (!sectionId) return;
+
+  // Navegación de usuario (default): colapsa capas de historial abiertas
+  // (conversaciones de chat) y trunca el historial hacia adelante antes de
+  // aplicar la sección → ATRÁS del móvil nunca queda "muerto".
+  // Llamadas internas/arranque pasan { pushHistory: false }.
+  if (opts.pushHistory !== false) {
+    BackNavigation.reset().then(() => _applySection(sectionId, opts));
+    return;
+  }
+  _applySection(sectionId, opts);
+}
+
+function _applySection(sectionId, opts = {}) {
   if (!sectionId) return;
 
   Helpers.vibrate?.('light');
@@ -168,6 +183,11 @@ export function goToSection(sectionId) {
   if (target) {
     target.classList.add('active');
     AppState.set('currentSection', sectionId);
+
+    // ✅ HISTORIAL (PWA): ATRÁS físico → regresa a la sección anterior sin recargar
+    if (opts.pushHistory !== false && prevSection && prevSection !== sectionId) {
+      BackNavigation.push(() => goToSection(prevSection, { pushHistory: false }), { kind: 'section' });
+    }
 
     // ✨ Transición fluida Premium
     UIPremium.applySectionTransition(sectionId);
@@ -417,7 +437,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     loadProfile();
 
     // 5. Iniciar Dashboard por defecto
-    goToSection('dashboard');
+    goToSection('dashboard', { pushHistory: false });
 
     // 5b. Buscadores en tiempo real (Debounced)
     const setupSearch = (id, module) => {

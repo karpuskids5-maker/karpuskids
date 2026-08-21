@@ -27,13 +27,19 @@ export const Modal = {
     document.getElementById(id)?.remove();
     const modal = document.createElement('div');
     // z-index 3000: por encima del header sticky (200), overlay (1040) y sidebar (1050).
-    // items-start + m-auto + overflow-y:auto en el overlay: centra cuando hay
-    // espacio y permite scroll sin que el contenido quede recortado arriba en móvil.
-    // pt-16 en móvil baja el modal debajo del header para que no choque.
+    // Sheet detection: si el content incluye la marca 'kk-is-sheet', alinear al fondo en móvil.
+    const isSheet = content.includes('kk-is-sheet');
     modal.id = id;
-    modal.className = 'fixed inset-0 flex items-start justify-center overflow-y-auto p-2 sm:p-4 pt-16 sm:pt-4';
-    modal.style.cssText = 'z-index:3000;background:rgba(15,23,42,0.6);backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px);animation:fadeInModal 0.15s ease-out;-webkit-overflow-scrolling:touch;overscroll-behavior:contain;';
-    modal.innerHTML = `<div id="${id}-inner" class="relative m-auto" style="max-width:calc(100vw - 1rem);max-height:calc(100vh - 1rem);max-height:calc(100dvh - 1rem);overflow-y:auto;overscroll-behavior:contain;-webkit-overflow-scrolling:touch;">${content}</div>`;
+    modal.className = isSheet
+      ? 'fixed inset-0 flex items-end sm:items-center justify-center overscroll-contain'
+      : 'fixed inset-0 flex items-center justify-center overflow-y-auto overscroll-contain p-3 sm:p-4';
+    modal.style.cssText = 'z-index:3000;background:rgba(15,23,42,0.6);backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px);animation:fadeInModal 0.15s ease-out;-webkit-overflow-scrolling:touch;';
+
+    if (isSheet) {
+      modal.innerHTML = `<div id="${id}-inner" class="relative w-full sm:m-auto flex justify-center" style="max-width:28rem;">${content}</div>`;
+    } else {
+      modal.innerHTML = `<div id="${id}-inner" class="relative m-auto" style="max-width:calc(100vw - 1.5rem);max-height:calc(100dvh - 1.5rem);overflow-y:auto;overscroll-behavior:contain;-webkit-overflow-scrolling:touch;">${content}</div>`;
+    }
 
     modal.onclick = (e) => {
       if (e.target === modal) this.close(id);

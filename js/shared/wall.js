@@ -254,9 +254,11 @@ const WallModule = {
       .wall-like-main .wall-emoji{display:inline-block;transition:transform 0.15s;font-size:15px}
       .wall-like-main:active .wall-emoji,.wall-like-main.active .wall-emoji{transform:scale(1.3)}
       .wall-like-label{font-size:11px;font-weight:800}
-      .wall-reaction-picker{position:absolute;bottom:calc(100% + 10px);left:50%;transform:translateX(-50%);background:white;border-radius:40px;padding:8px 10px;display:flex;gap:6px;box-shadow:0 12px 40px rgba(0,0,0,0.2),0 2px 8px rgba(0,0,0,0.1);border:1px solid #f1f5f9;z-index:200;animation:wall-reaction-picker-in 0.22s cubic-bezier(.34,1.56,.64,1);white-space:nowrap}
-      .wall-reaction-picker::after{content:'';position:absolute;bottom:-6px;left:50%;transform:translateX(-50%);border:6px solid transparent;border-top-color:white;filter:drop-shadow(0 1px 1px rgba(0,0,0,0.08))}
-      .wall-reaction-picker-btn{font-size:22px;cursor:pointer;border:none;background:none;padding:3px 4px;border-radius:50%;transition:transform 0.15s;line-height:1;display:flex;align-items:center;justify-content:center;-webkit-tap-highlight-color:transparent}
+      .wall-reaction-picker{position:fixed;left:0;top:0;background:white;border-radius:40px;padding:8px 12px;display:flex;gap:4px;box-shadow:0 12px 40px rgba(0,0,0,0.2),0 2px 8px rgba(0,0,0,0.1);border:1px solid #f1f5f9;z-index:9999;animation:wall-reaction-picker-in 0.22s cubic-bezier(.34,1.56,.64,1);white-space:nowrap}
+      .wall-reaction-picker::after{content:'';position:absolute;top:100%;left:var(--arrow-x,50%);transform:translateX(-50%);border:6px solid transparent;border-top-color:white;filter:drop-shadow(0 1px 1px rgba(0,0,0,0.08))}
+      .wall-reaction-picker.flip::after{top:auto;bottom:100%;border-top-color:transparent;border-bottom-color:white}
+      .wall-reaction-picker-btn{font-size:26px;width:38px;height:38px;cursor:pointer;border:none;background:none;border-radius:50%;transition:transform 0.15s;line-height:1;display:flex;align-items:center;justify-content:center;-webkit-tap-highlight-color:transparent}
+      @media (min-width:640px){.wall-reaction-picker{padding:8px 10px;gap:6px}.wall-reaction-picker-btn{font-size:22px;width:auto;height:auto;padding:3px 4px}}
       .wall-reaction-picker-btn:hover,.wall-reaction-picker-btn:focus-visible{transform:scale(1.45) translateY(-5px)}
       .wall-counter{font-weight:700;font-size:11px;color:#64748b;min-width:14px;display:inline-block}
       .wall-counter.hidden{display:none}
@@ -366,7 +368,8 @@ const WallModule = {
         scheduled_at, views_count, tagged_students,
         classroom:classrooms(name),
         teacher:profiles(name, avatar_url),
-        likes(user_id${this._supportsReactionType === false ? '' : ', reaction_type'})`;
+        likes(user_id${this._supportsReactionType === false ? '' : ', reaction_type'}),
+        comments(count)`;
       const FLAT_SELECT = `
         id, content, media_url, media_type, image_url, images, title, created_at, updated_at,
         teacher_name, teacher_avatar, is_pinned, comments_enabled, expire_days,
@@ -653,7 +656,8 @@ const WallModule = {
     const isSlow = this._detectSlowNetwork();
     const profile = this._appState?.get('profile');
     const isStaff = ['directora','maestra','asistente','admin'].includes(profile?.role);
-    const canPin = isStaff;
+    // Moderación (fijar / eliminar / desactivar comentarios): solo Directora y Admin
+    const canPin = ['directora','admin'].includes(profile?.role);
     const canComment = p.comments_enabled !== false && profile?.role;
 
     // ── Media: álbum, video o imagen ──
@@ -765,7 +769,7 @@ const WallModule = {
                 <i data-lucide="share-2" class="w-4 h-4"></i>
               </button>
               ${canComment ? `
-              <button onclick="WallModule.openCommentSection('${p.id}')"
+              <button onclick="WallModule.toggleCommentSection('${p.id}')"
                 class="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold text-slate-500 hover:text-blue-500 hover:bg-blue-50 transition-all"
                 aria-label="Ver y escribir comentarios">
                 <i data-lucide="message-circle" class="w-4 h-4"></i>
@@ -1209,8 +1213,35 @@ const WallModule = {
                 onclick="WallModule.closeReactionPicker();WallModule.toggleReaction('${postId}','${type}')"
                 aria-label="Reaccionar con ${emoji}">${emoji}</button>`;
     }).join('');
-    anchorEl.style.position = 'relative';
-    anchorEl.appendChild(picker);
+    // Fijo al viewport (evita clipping por overflow-hidden del post) y medimos sin animación
+    picker.style.animation = 'none';
+    document.body.appendChild(picker);
+
+    const r  = anchorEl.getBoundingClientRect();
+    const pw = picker.offsetWidth;
+    const ph = picker.offsetHeight;
+    const margin = 8;
+
+    // Centrar sobre el botón y "clamp" dentro del viewport
+    let left = r.left + r.width / 2 - pw / 2;
+    left = Math.max(margin, Math.min(left, window.innerWidth - pw - margin));
+
+    // Preferencia: arriba del botón; si no cabe, abajo
+    let top = r.top - ph - 12;
+    const flip = top < 60;
+    if (flip) top = r.bottom + 12;
+    top = Math.max(margin, Math.min(top, window.innerHeight - ph - margin));
+
+    picker.style.left = `${Math.round(left)}px`;
+    picker.style.top  = `${Math.round(top)}px`;
+
+    // Flecha apuntando al botón (x relativa al picker ya clampeado)
+    let arrowX = r.left + r.width / 2 - left;
+    arrowX = Math.max(18, Math.min(arrowX, pw - 18));
+    picker.style.setProperty('--arrow-x', `${Math.round(arrowX)}px`);
+    if (flip) picker.classList.add('flip');
+
+    picker.style.animation = '';
     setTimeout(() => {
       const close = (e) => {
         if (!picker.contains(e.target)) { this.closeReactionPicker(); document.removeEventListener('click', close); }

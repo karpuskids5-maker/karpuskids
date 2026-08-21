@@ -249,6 +249,12 @@ export const ChatModule = {
       : contact.name.charAt(0);
     if (headerArea) headerArea.style.display = 'flex';
 
+    // ✅ Mostrar input de envío siempre al seleccionar un contacto
+    const inputArea = document.querySelector('#chatConversationPanel .chat-input-sticky');
+    if (inputArea) { inputArea.style.display = ''; }
+    const sendInput = document.getElementById('messageInput');
+    if (sendInput) { sendInput.disabled = false; sendInput.value = ''; }
+
     // ✅ Limpiar badge de no leídos del contacto abierto
     document.querySelector(`#chatContactsList [data-contact-id="${contactId}"] .kk-unread-badge`)?.remove();
 
