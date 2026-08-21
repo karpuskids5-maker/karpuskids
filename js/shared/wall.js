@@ -27,7 +27,7 @@ const optimizeImageUrl = (url, opts = {}) => {
 
 /** Detecta error 400 de PostgREST por columna inexistente (ej: likes.reaction_type) */
 const _isMissingColumnError = (err, col) =>
-  !!err && (err.code === '42703' || new RegExp(`\\b${col}\\b`, 'i').test(err.message || ''));
+  !!err && (err.code === '42703' || new RegExp(String.raw`\b${col}\b`, 'i').test(err.message || ''));
 
 /** XSS-safe sanitization */
 const _sanitizeHTML = (str) => {
@@ -136,9 +136,9 @@ const uploadWithRetry = async (bucket, path, blob, mimeType, onProgress, maxRetr
 // ─── Draft localStorage ───────────────────────────────────────────────────────
 const DraftManager = {
   KEY: 'karpus_wall_draft',
-  save(data) { try { localStorage.setItem(this.KEY, JSON.stringify({ ...data, savedAt: Date.now() })); } catch (_) {} },
+  save(data) { try { localStorage.setItem(this.KEY, JSON.stringify({ ...data, savedAt: Date.now() })); } catch (e) { console.warn('[Wall] Draft save failed:', e); } },
   load() { try { const d = localStorage.getItem(this.KEY); return d ? JSON.parse(d) : null; } catch (_) { return null; } },
-  clear() { try { localStorage.removeItem(this.KEY); } catch (_) {} }
+  clear() { try { localStorage.removeItem(this.KEY); } catch (e) { console.warn('[Wall] Draft clear failed:', e); } }
 };
 
 // ─── WallModule Principal ─────────────────────────────────────────────────────
@@ -238,10 +238,32 @@ const WallModule = {
       .wall-video-duration{position:absolute;bottom:8px;right:10px;background:rgba(0,0,0,0.65);color:white;font-size:9px;font-weight:900;padding:2px 7px;border-radius:8px;backdrop-filter:blur(4px)}
       .wall-custom-video{width:100%;max-height:420px;background:#000;border-radius:0}
       .wall-progress-bar{height:3px;background:linear-gradient(90deg,#f97316,#22c55e);border-radius:2px;transition:width 0.1s linear}
+      @keyframes wall-like-pop{0%{transform:scale(1)}30%{transform:scale(1.45)}60%{transform:scale(0.9)}100%{transform:scale(1)}}
+      @keyframes wall-particle-fly{0%{opacity:1;transform:translate(0,0) scale(1)}100%{opacity:0;transform:translate(var(--tx),var(--ty)) scale(0.3)}}
+      @keyframes wall-counter-bump{0%{transform:scale(1)}40%{transform:scale(1.25)}100%{transform:scale(1)}}
+      @keyframes wall-reaction-picker-in{from{opacity:0;transform:translateY(8px) scale(0.9)}to{opacity:1;transform:translateY(0) scale(1)}}
+      @keyframes wall-reply-in{from{opacity:0;transform:translateX(-8px)}to{opacity:1;transform:translateX(0)}}
       .wall-reaction-bar{display:flex;gap:3px;flex-wrap:wrap}
-      .wall-reaction-btn{padding:3px 7px;border-radius:12px;border:1px solid #e2e8f0;background:white;cursor:pointer;font-size:13px;transition:all 0.15s;display:flex;align-items:center;gap:2px;line-height:1}
+      .wall-reaction-btn{padding:3px 7px;border-radius:12px;border:1px solid #e2e8f0;background:white;cursor:pointer;font-size:13px;transition:all 0.15s;display:flex;align-items:center;gap:2px;line-height:1;position:relative;user-select:none}
       .wall-reaction-btn:hover{background:#f8fafc;border-color:#cbd5e1;transform:scale(1.12)}
       .wall-reaction-btn.active{background:#eff6ff;border-color:#93c5fd;box-shadow:0 0 0 2px #bfdbfe}
+      .wall-reaction-btn.wall-like-pop{animation:wall-like-pop 0.4s cubic-bezier(.36,.07,.19,.97)}
+      .wall-like-main{display:inline-flex;align-items:center;gap:5px;padding:6px 14px;border-radius:24px;border:1.5px solid #e2e8f0;background:white;cursor:pointer;font-size:12px;font-weight:700;color:#64748b;transition:all 0.15s;user-select:none;position:relative;-webkit-tap-highlight-color:transparent}
+      .wall-like-main:hover,.wall-like-main:focus-visible{border-color:#f9a8d4;background:#fdf2f8;color:#e11d48}
+      .wall-like-main.active{border-color:#f9a8d4;background:#fdf2f8;color:#e11d48;box-shadow:0 0 0 2px #fecdd3}
+      .wall-like-main .wall-emoji{display:inline-block;transition:transform 0.15s;font-size:15px}
+      .wall-like-main:active .wall-emoji,.wall-like-main.active .wall-emoji{transform:scale(1.3)}
+      .wall-like-label{font-size:11px;font-weight:800}
+      .wall-reaction-picker{position:absolute;bottom:calc(100% + 10px);left:50%;transform:translateX(-50%);background:white;border-radius:40px;padding:8px 10px;display:flex;gap:6px;box-shadow:0 12px 40px rgba(0,0,0,0.2),0 2px 8px rgba(0,0,0,0.1);border:1px solid #f1f5f9;z-index:200;animation:wall-reaction-picker-in 0.22s cubic-bezier(.34,1.56,.64,1);white-space:nowrap}
+      .wall-reaction-picker::after{content:'';position:absolute;bottom:-6px;left:50%;transform:translateX(-50%);border:6px solid transparent;border-top-color:white;filter:drop-shadow(0 1px 1px rgba(0,0,0,0.08))}
+      .wall-reaction-picker-btn{font-size:22px;cursor:pointer;border:none;background:none;padding:3px 4px;border-radius:50%;transition:transform 0.15s;line-height:1;display:flex;align-items:center;justify-content:center;-webkit-tap-highlight-color:transparent}
+      .wall-reaction-picker-btn:hover,.wall-reaction-picker-btn:focus-visible{transform:scale(1.45) translateY(-5px)}
+      .wall-counter{font-weight:700;font-size:11px;color:#64748b;min-width:14px;display:inline-block}
+      .wall-counter.hidden{display:none}
+      .wall-counter-bump{animation:wall-counter-bump 0.35s ease}
+      .wall-particle{position:absolute;pointer-events:none;font-size:14px;z-index:99;animation:wall-particle-fly 0.7s ease forwards}
+      .wall-reply-item{animation:wall-reply-in 0.25s ease;margin-left:28px;margin-top:4px}
+      .wall-reply-toggle{font-size:10px;font-weight:700;color:#6366f1;cursor:pointer;background:none;border:none;padding:0 4px;}
       .wall-pinned-badge{background:linear-gradient(135deg,#f59e0b,#d97706);color:white;padding:2px 8px;border-radius:8px;font-size:8px;font-weight:900;text-transform:uppercase;letter-spacing:0.05em}
       .wall-net-slow{background:#fef3c7;border:1px solid #fcd34d;border-radius:10px;padding:8px 12px;margin-bottom:10px;font-size:10px;font-weight:700;color:#92400e;display:flex;align-items:center;gap:6px}
       .wall-view-count{font-size:9px;color:#94a3b8;font-weight:700;display:flex;align-items:center;gap:3px}
@@ -271,7 +293,9 @@ const WallModule = {
         sel.innerHTML = '<option value="">Todas las aulas</option>';
         cls.forEach(c => { const o = document.createElement('option'); o.value = c.id; o.textContent = c.name; sel.appendChild(o); });
       }
-    } catch (_) {}
+    } catch (e) {
+      console.warn('[Wall] loadClassrooms failed:', e);
+    }
   },
 
   setupFilters() {
@@ -455,6 +479,7 @@ const WallModule = {
       else container.innerHTML = html;
 
       ImageLoader.observe(container);
+      this._setupLongPressReactions(container);
 
       if ((posts || []).length < this._pageSize) {
         this._hasMore = false;
@@ -509,6 +534,45 @@ const WallModule = {
     document.querySelectorAll('video.wall-custom-video').forEach(v => this._videoObserver.observe(v));
   },
 
+  /** Long-press en el botón ❤️ abre el picker de reacciones (380ms) */
+  _setupLongPressReactions(container) {
+    container.querySelectorAll('[id^="like-main-"]').forEach(btn => {
+      if (btn.dataset.lpReady) return;
+      btn.dataset.lpReady = '1';
+      let timer     = null;
+      let moved     = false;
+      let didLongPress = false;
+
+      const start = () => {
+        moved = false; didLongPress = false;
+        timer = setTimeout(() => {
+          if (moved) return;
+          didLongPress = true;
+          const postId = btn.id.replace('like-main-', '');
+          const wrap   = document.getElementById(`like-btn-wrap-${postId}`);
+          if (wrap) this.openReactionPicker(postId, wrap);
+          if (navigator.vibrate) navigator.vibrate(15);
+        }, 380);
+      };
+
+      const cancel = () => { clearTimeout(timer); timer = null; };
+      const move   = () => { moved = true; cancel(); };
+
+      // Bloquear el click si fue long-press
+      btn.addEventListener('click', (e) => {
+        if (didLongPress) { e.stopImmediatePropagation(); didLongPress = false; }
+      }, true);
+
+      btn.addEventListener('touchstart',  start,  { passive: true });
+      btn.addEventListener('touchend',    cancel, { passive: true });
+      btn.addEventListener('touchcancel', cancel, { passive: true });
+      btn.addEventListener('touchmove',   move,   { passive: true });
+      btn.addEventListener('mousedown',   start);
+      btn.addEventListener('mouseup',     cancel);
+      btn.addEventListener('mouseleave',  cancel);
+    });
+  },
+
   /** Registra que el usuario vio los posts (throttled, fire & forget) */
   _registerViews(postIds) {
     const user = this._appState?.get('user');
@@ -519,7 +583,7 @@ const WallModule = {
     const newIds = postIds.filter(id => !seen.has(id));
     if (!newIds.length) return;
     newIds.forEach(id => seen.add(id));
-    try { sessionStorage.setItem(key, JSON.stringify([...seen])); } catch (_) {}
+    try { sessionStorage.setItem(key, JSON.stringify([...seen])); } catch (e) { console.warn('[Wall] Session storage write failed:', e); }
     // Fire & forget - incrementar vistas en BD
     newIds.forEach(id => {
       supabase.rpc('increment_post_views', { p_post_id: id }).catch(() => {});
@@ -567,7 +631,10 @@ const WallModule = {
     if (!url) return null;
     if (/^https?:\/\//i.test(url)) return optimizeImageUrl(url, opts);
     const clean = url.replace(/^(posts|karpus-uploads|avatars|classroom_media)\//, '');
-    const bucket = url.includes('avatar') ? 'karpus-uploads' : url.includes('classroom_media') ? 'classroom_media' : 'posts';
+    let bucket;
+    if (url.includes('avatar')) bucket = 'karpus-uploads';
+    else if (url.includes('classroom_media')) bucket = 'classroom_media';
+    else bucket = 'posts';
     const path = url.includes('avatar') ? `avatars/${clean}` : clean;
     const { data } = supabase.storage.from(bucket).getPublicUrl(path);
     return optimizeImageUrl(data?.publicUrl, opts);
@@ -575,7 +642,7 @@ const WallModule = {
 
   _getAvatarColor(name) {
     const colors = ['bg-blue-100 text-blue-600','bg-emerald-100 text-emerald-600','bg-purple-100 text-purple-600','bg-amber-100 text-amber-600','bg-rose-100 text-rose-600','bg-indigo-100 text-indigo-600','bg-teal-100 text-teal-600'];
-    let h = 0; for (const c of (name || '')) h = c.charCodeAt(0) + ((h << 5) - h);
+    let h = 0; for (const c of (name || '')) h = c.codePointAt(0) + ((h << 5) - h);
     return colors[Math.abs(h) % colors.length];
   },
 
@@ -586,9 +653,6 @@ const WallModule = {
     const isSlow = this._detectSlowNetwork();
     const profile = this._appState?.get('profile');
     const isStaff = ['directora','maestra','asistente','admin'].includes(profile?.role);
-    const isDirectora = profile?.role === 'directora';
-    const isMaestra = profile?.role === 'maestra';
-    const canDelete = isStaff;
     const canPin = isStaff;
     const canComment = p.comments_enabled !== false && profile?.role;
 
@@ -606,7 +670,7 @@ const WallModule = {
     const totalReactions = Object.values(p.reaction_counts || {}).reduce((a,b) => a+b, 0);
     const reactionChips = Object.entries(p.reaction_counts || {})
       .sort((a,b) => b[1]-a[1]).slice(0,3)
-      .map(([type, count]) => `<span class="inline-flex items-center gap-0.5 text-[10px] font-bold text-slate-500 bg-slate-100 rounded-full px-1.5 py-0.5">${type === 'like' ? '❤️' : type} ${count}</span>`)
+      .map(([type, count]) => `<span class="inline-flex items-center gap-0.5 text-[10px] font-bold text-slate-500 bg-slate-100 rounded-full px-1.5 py-0.5 cursor-pointer hover:bg-slate-200 transition-colors" onclick="WallModule.showReactionsList('${p.id}')">${type === 'like' ? '❤️' : type} ${count}</span>`)
       .join('');
 
     // ── Alumnos etiquetados ──
@@ -625,6 +689,18 @@ const WallModule = {
     const viewsHtml = isStaff && p.views_count > 0
       ? `<span class="wall-view-count"><i data-lucide="eye" class="w-3 h-3"></i>${p.views_count}</span>`
       : '';
+
+    // ── Like button label/emoji (extracted to avoid nested ternaries) ──
+    const likeEmoji = (p.user_reaction && p.user_reaction !== 'like') ? p.user_reaction : '❤️';
+    let likeLabel;
+    if (!p.user_reaction) likeLabel = 'Me gusta';
+    else if (p.user_reaction === 'like') likeLabel = 'Me gusta';
+    else likeLabel = _sanitizeHTML(p.user_reaction);
+
+    // ── Reaction total counter html (extracted to avoid nested ternary) ──
+    const reactionTotalHtml = totalReactions > 0
+      ? `<span id="reaction-total-${p.id}" class="text-[10px] font-bold text-slate-400 wall-counter">${totalReactions}</span>`
+      : `<span id="reaction-total-${p.id}" class="text-[10px] font-bold text-slate-400 wall-counter hidden"></span>`;
 
     // ── Botones staff ──
     const staffButtons = canPin ? `
@@ -661,36 +737,61 @@ const WallModule = {
           ${taggedHtml}
 
           <div class="flex items-center justify-between pt-4 border-t border-slate-50 mt-3">
-            <div class="flex items-center gap-1">
-              <div class="wall-reaction-bar" id="reactions-${p.id}">
-                ${REACTION_EMOJIS.map(emoji => {
-                  const type = emoji === '❤️' ? 'like' : emoji;
-                  const isActive = p.user_reaction === type;
-                  return `<button onclick="WallModule.toggleReaction('${p.id}','${type}')" class="wall-reaction-btn ${isActive ? 'active' : ''}" title="${type}" aria-label="Reaccionar con ${type}">${emoji}</button>`;
-                }).join('')}
-              </div>
-              ${totalReactions > 0 ? `<div class="flex items-center gap-1 ml-2">${reactionChips}<span class="text-[10px] font-bold text-slate-400">${totalReactions}</span></div>` : ''}
-            </div>
+            <!-- ❤️ Botón principal de reacción + chips -->
             <div class="flex items-center gap-2">
-              <button onclick="WallModule.shareToChat('${p.id}')" class="text-slate-400 hover:text-indigo-500 transition-colors p-1" title="Compartir al chat" aria-label="Compartir">
+              <div class="relative" id="like-btn-wrap-${p.id}">
+                <!-- Botón principal: tap = like rápido, hold = picker -->
+                <button id="like-main-${p.id}"
+                  class="wall-like-main ${p.user_reaction ? 'active' : ''}"
+                  onclick="WallModule._onLikeMainClick('${p.id}', event)"
+                  oncontextmenu="event.preventDefault();WallModule.openReactionPicker('${p.id}',document.getElementById('like-btn-wrap-${p.id}'))"
+                  aria-label="Me gusta"
+                  aria-pressed="${!!p.user_reaction}">
+                  <span class="wall-emoji">${likeEmoji}</span>
+                  <span class="wall-like-label">${likeLabel}</span>
+                </button>
+              </div>
+              <!-- Chips de conteo clickeables -->
+              <div id="reaction-chips-${p.id}"
+                data-counts='${JSON.stringify(p.reaction_counts || {})}'
+                class="flex items-center gap-1 flex-wrap">
+                ${reactionChips}${reactionTotalHtml}
+              </div>
+            </div>
+
+            <!-- 💬 Comentarios + compartir -->
+            <div class="flex items-center gap-2">
+              <button onclick="WallModule.shareToChat('${p.id}')" class="text-slate-300 hover:text-indigo-500 transition-colors p-1.5 rounded-lg hover:bg-indigo-50" title="Compartir al chat" aria-label="Compartir">
                 <i data-lucide="share-2" class="w-4 h-4"></i>
               </button>
               ${canComment ? `
-              <button onclick="WallModule.toggleCommentSection('${p.id}')" class="flex items-center gap-1.5 text-xs font-bold text-slate-500 hover:text-blue-500 transition-colors" aria-label="Comentarios">
+              <button onclick="WallModule.openCommentSection('${p.id}')"
+                class="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold text-slate-500 hover:text-blue-500 hover:bg-blue-50 transition-all"
+                aria-label="Ver y escribir comentarios">
                 <i data-lucide="message-circle" class="w-4 h-4"></i>
-                <span id="comment-count-${p.id}">${p.comments?.[0]?.count ?? 0}</span>
+                <span id="comment-count-${p.id}" class="wall-counter">${p.comments?.[0]?.count ?? 0}</span>
               </button>` : ''}
             </div>
           </div>
 
           ${canComment ? `
-          <div id="comments-section-${p.id}" class="hidden mt-4 pt-4 border-t border-slate-50 bg-slate-50/50 -mx-5 px-5 pb-2">
-            <div id="comments-list-${p.id}" class="space-y-3 mb-3 max-h-60 overflow-y-auto">
-              <p class="text-center text-xs text-slate-400 py-2">Cargando comentarios...</p>
+          <div id="comments-section-${p.id}" class="hidden mt-3 -mx-5">
+            <!-- Lista de comentarios -->
+            <div id="comments-list-${p.id}" class="space-y-3 px-5 pb-3 max-h-72 overflow-y-auto border-t border-slate-100 pt-3">
+              <p class="text-center text-xs text-slate-400 italic py-2">Toca el ícono para cargar comentarios.</p>
             </div>
-            <div class="flex gap-2">
-              <input type="text" id="comment-input-${p.id}" class="flex-1 px-3 py-2 text-xs border border-slate-200 rounded-xl focus:ring-2 focus:ring-${accent}-400 outline-none" placeholder="Escribe un comentario..." onkeypress="if(event.key==='Enter') WallModule.sendComment('${p.id}')" aria-label="Escribir comentario">
-              <button onclick="WallModule.sendComment('${p.id}')" class="p-2 bg-${accent}-600 text-white rounded-xl hover:bg-${accent}-700 transition-colors" aria-label="Enviar comentario"><i data-lucide="send" class="w-4 h-4"></i></button>
+            <!-- Input fijo al fondo -->
+            <div class="flex gap-2 px-4 py-3 border-t border-slate-100 bg-white sticky bottom-0">
+              <input type="text" id="comment-input-${p.id}"
+                class="flex-1 px-3 py-2.5 text-sm border border-slate-200 rounded-2xl focus:ring-2 focus:ring-${accent}-300 focus:border-${accent}-400 outline-none bg-slate-50"
+                placeholder="Escribe un comentario..."
+                onkeypress="if(event.key==='Enter')WallModule.sendComment('${p.id}')"
+                aria-label="Escribir comentario">
+              <button onclick="WallModule.sendComment('${p.id}')"
+                class="p-2.5 bg-${accent}-600 text-white rounded-2xl hover:bg-${accent}-700 active:scale-95 transition-all flex-shrink-0"
+                aria-label="Enviar comentario">
+                <i data-lucide="send" class="w-4 h-4"></i>
+              </button>
             </div>
           </div>` : ''}
         </div>
@@ -793,7 +894,7 @@ const WallModule = {
   nextAlbumSlide(postId, total) {
     const track = document.getElementById(`album-track-${postId}`);
     if (!track) return;
-    const cur = parseInt(track.dataset.currentSlide || '0');
+    const cur = Number.parseInt(track.dataset.currentSlide || '0');
     this.goToAlbumSlide(postId, (cur + 1) % total);
   },
 
@@ -801,7 +902,7 @@ const WallModule = {
     const track = document.getElementById(`album-track-${postId}`);
     if (!track) return;
     const total = track.children.length;
-    const cur = parseInt(track.dataset.currentSlide || '0');
+    const cur = Number.parseInt(track.dataset.currentSlide || '0');
     this.goToAlbumSlide(postId, (cur - 1 + total) % total);
   },
 
@@ -874,7 +975,7 @@ const WallModule = {
         <i data-lucide="x" class="w-5 h-5"></i>
       </button>
       <div class="relative max-w-5xl w-full" onclick="event.stopPropagation()">${content}</div>`;
-    lb.onclick = () => { lb.remove(); if (isVideo) {} };
+    lb.onclick = () => { lb.remove(); };
     // Liberación de memoria al cerrar
     lb.addEventListener('remove', () => {
       const vid = lb.querySelector('video');
@@ -904,10 +1005,22 @@ const WallModule = {
     if (!postEl) return;
     const current = postEl.dataset.userReaction;
     const isSame = current === reactionType;
+
+    // ── Optimistic update INMEDIATO (no espera Supabase) ──────────────────────
+    const newReaction = isSame ? '' : reactionType;
+    postEl.dataset.userReaction = newReaction;
+    this._refreshReactionUI(postId, isSame ? -1 : current ? 0 : 1, reactionType, isSame ? current : null);
+
+    // ── Animación pop + partículas ────────────────────────────────────────────
+    if (!isSame) {
+      this._animateLikePop(postId, reactionType);
+      if (navigator.vibrate) navigator.vibrate(10);
+    }
+
+    // ── Sincronizar con Supabase en segundo plano ────────────────────────────
     try {
       if (isSame) {
         await supabase.from('likes').delete().eq('post_id', postId).eq('user_id', user.id);
-        postEl.dataset.userReaction = '';
       } else {
         if (current) await supabase.from('likes').delete().eq('post_id', postId).eq('user_id', user.id);
         let insertErr = null;
@@ -920,30 +1033,200 @@ const WallModule = {
           ({ error: insertErr } = await supabase.from('likes').insert({ post_id: postId, user_id: user.id }));
         }
         if (insertErr) throw insertErr;
-        postEl.dataset.userReaction = reactionType;
-        if (navigator.vibrate) navigator.vibrate(10);
+        // Notificar al autor del post (fire & forget)
+        this._notifyPostAuthor(postId, reactionType);
       }
-      this._refreshReactionUI(postId);
-    } catch (_) {}
+    } catch (_) {
+      // Revertir optimistic update si falla
+      postEl.dataset.userReaction = current || '';
+      this._refreshReactionUI(postId, isSame ? 1 : current ? 0 : -1, reactionType, null);
+    }
   },
 
-  _refreshReactionUI(postId) {
-    const postEl = document.getElementById(`post-${postId}`);
+  _animateLikePop(postId, reactionType) {
+    const emoji = reactionType === 'like' ? '❤️' : reactionType;
+    // Pop en el botón activo
     const bar = document.getElementById(`reactions-${postId}`);
-    if (!postEl || !bar) return;
-    const current = postEl.dataset.userReaction;
-    bar.querySelectorAll('.wall-reaction-btn').forEach(btn => {
-      const emoji = btn.textContent.trim();
-      const type = emoji === '❤️' ? 'like' : emoji;
-      btn.classList.toggle('active', current === type);
-    });
+    const btn = bar?.querySelector(`[data-reaction="${reactionType}"]`);
+    if (btn) {
+      btn.classList.remove('wall-like-pop');
+      btn.offsetWidth; // reflow trigger for animation restart
+      btn.classList.add('wall-like-pop');
+      setTimeout(() => btn.classList.remove('wall-like-pop'), 450);
+    }
+    // Partículas voladoras
+    const postEl = document.getElementById(`post-${postId}`);
+    const reactionBar = document.getElementById(`reactions-${postId}`);
+    if (!postEl || !reactionBar) return;
+    const rect = reactionBar.getBoundingClientRect();
+    const postRect = postEl.getBoundingClientRect();
+    for (let i = 0; i < 4; i++) {
+      const p = document.createElement('span');
+      p.className = 'wall-particle';
+      const tx = (Math.random() - 0.5) * 60; // NOSONAR - safe for UI animation
+      const ty = -(20 + Math.random() * 40);  // NOSONAR - safe for UI animation
+      p.style.cssText = `
+        left:${rect.left - postRect.left + rect.width / 2}px;
+        top:${rect.top - postRect.top}px;
+        --tx:${tx}px;--ty:${ty}px;
+        animation-delay:${i * 80}ms;
+      `;
+      p.textContent = emoji;
+      postEl.style.position = 'relative';
+      postEl.appendChild(p);
+      setTimeout(() => p.remove(), 900);
+    }
   },
 
+  /** Notifica al autor del post cuando alguien reacciona (fire & forget) */
+  async _notifyPostAuthor(postId, reactionType) {
+    try {
+      const actor = this._appState?.get('user');
+      const actorProfile = this._appState?.get('profile');
+      if (!actor) return;
+      const { data: post } = await supabase.from('posts').select('teacher_id').eq('id', postId).single();
+      if (!post || post.teacher_id === actor.id) return; // no auto-notificar
+      const emoji = reactionType === 'like' ? '❤️' : reactionType;
+      await supabase.from('wall_notifications').insert({
+        user_id:    post.teacher_id,
+        actor_id:   actor.id,
+        actor_name: actorProfile?.name || 'Alguien',
+        type:       'reaction',
+        post_id:    postId,
+        message:    `${emoji} reaccionó a tu publicación`,
+      });
+    } catch (_) { /* silencioso */ }
+  },
+
+  // ── Reacción UI helpers ───────────────────────────────────────────────────────
   async toggleLike(postId) { await this.toggleReaction(postId, 'like'); },
 
+  /** Tap en el botón principal: like rápido. Long-press abre picker. */
+  _onLikeMainClick(postId, event) {
+    // Si el picker ya está visible, no hacer nada (lo cierra el click-outside)
+    const existingPicker = document.getElementById(`reaction-picker-${postId}`);
+    if (existingPicker) { this.closeReactionPicker(); return; }
+    // Tap normal = toggle ❤️
+    this.toggleReaction(postId, 'like');
+  },
+
+  _refreshReactionUI(postId, delta = 0, added = null, removed = null) {
+    const postEl = document.getElementById(`post-${postId}`);
+    if (!postEl) return;
+    const current = postEl.dataset.userReaction;
+
+    // Actualizar botón principal
+    const likeMain = document.getElementById(`like-main-${postId}`);
+    if (likeMain) {
+      const isActive = !!current;
+      const emoji    = (current && current !== 'like') ? current : '❤️';
+      const label    = current === 'like' ? 'Me gusta' : (current || 'Me gusta');
+      likeMain.classList.toggle('active', isActive);
+      likeMain.setAttribute('aria-pressed', String(isActive));
+      const emojiEl = likeMain.querySelector('.wall-emoji');
+      const labelEl = likeMain.querySelector('.wall-like-label');
+      if (emojiEl) emojiEl.textContent = emoji;
+      if (labelEl) labelEl.textContent = label;
+    }
+
+    this._updateReactionChips(postId, delta, added, removed);
+  },
+
+  _updateReactionChips(postId, delta, added, removed) {
+    const chipsEl = document.getElementById(`reaction-chips-${postId}`);
+    if (!chipsEl) return;
+    let counts = {};
+    try { counts = JSON.parse(chipsEl.dataset.counts || '{}'); } catch (e) { console.warn('[Wall] Failed to parse reaction counts:', e); }
+    if (added)   counts[added]   = (counts[added]   || 0) + 1;
+    if (removed) counts[removed] = Math.max(0, (counts[removed] || 0) - 1);
+    chipsEl.dataset.counts = JSON.stringify(counts);
+
+    const total = Object.values(counts).reduce((a, b) => a + b, 0);
+    const totalEl = document.getElementById(`reaction-total-${postId}`);
+
+    if (total === 0) {
+      chipsEl.innerHTML = '';
+      return;
+    }
+
+    const top = Object.entries(counts).filter(([, v]) => v > 0).sort((a, b) => b[1] - a[1]).slice(0, 3);
+    const chips = top.map(([type, count]) =>
+      `<span class="inline-flex items-center gap-0.5 text-[10px] font-bold text-slate-500 bg-slate-100 rounded-full px-1.5 py-0.5 cursor-pointer hover:bg-slate-200 transition-colors"
+             onclick="WallModule.showReactionsList('${postId}')">${type === 'like' ? '❤️' : type} ${count}</span>`
+    ).join('');
+
+    if (totalEl) {
+      // Solo reemplazar chips, mantener el span de total
+      const existingTotal = totalEl.cloneNode(true);
+      chipsEl.innerHTML = chips;
+      existingTotal.textContent = total;
+      existingTotal.classList.remove('wall-counter-bump');
+      chipsEl.appendChild(existingTotal);
+      existingTotal.offsetWidth; // reflow trigger for animation restart
+      existingTotal.classList.add('wall-counter-bump');
+      setTimeout(() => existingTotal.classList.remove('wall-counter-bump'), 400);
+    } else {
+      chipsEl.innerHTML = chips +
+        `<span id="reaction-total-${postId}" class="text-[10px] font-bold text-slate-400">${total}</span>`;
+    }
+  },
+
+  async showReactionsList(postId) {
+    try {
+      const { data: likes } = await supabase.from('likes')
+        .select('reaction_type, profile:profiles!likes_user_id_fkey(name)')
+        .eq('post_id', postId).order('created_at', { ascending: false }).limit(20);
+      if (!likes?.length) return;
+      const rows = likes.map(l => {
+        const name  = Array.isArray(l.profile) ? l.profile[0]?.name : l.profile?.name;
+        const emoji = (!l.reaction_type || l.reaction_type === 'like') ? '❤️' : l.reaction_type;
+        return `<div class="flex items-center gap-2 py-1.5 px-4 hover:bg-slate-50">
+          <span class="text-lg leading-none">${emoji}</span>
+          <span class="text-sm font-bold text-slate-700">${_sanitizeHTML(name || 'Usuario')}</span>
+        </div>`;
+      }).join('');
+      window.openGlobalModal(`
+        <div class="modal-header bg-gradient-to-r from-rose-500 to-pink-500 text-white p-5 rounded-t-3xl">
+          <h3 class="text-base font-black">Reacciones</h3>
+        </div>
+        <div class="py-2 max-h-64 overflow-y-auto">${rows}</div>
+        <div class="p-4 border-t">
+          <button onclick="App.ui.closeModal()" class="w-full py-2.5 bg-slate-100 rounded-2xl text-sm font-black text-slate-600">Cerrar</button>
+        </div>`);
+    } catch (_) { /* silencioso */ }
+  },
+
+  openReactionPicker(postId, anchorEl) {
+    this.closeReactionPicker();
+    const picker = document.createElement('div');
+    picker.id = `reaction-picker-${postId}`;
+    picker.className = 'wall-reaction-picker';
+    picker.setAttribute('role', 'dialog');
+    picker.setAttribute('aria-label', 'Selector de reacciones');
+    picker.innerHTML = REACTION_EMOJIS.map(emoji => {
+      const type = emoji === '❤️' ? 'like' : emoji;
+      return `<button class="wall-reaction-picker-btn" title="${type}"
+                onclick="WallModule.closeReactionPicker();WallModule.toggleReaction('${postId}','${type}')"
+                aria-label="Reaccionar con ${emoji}">${emoji}</button>`;
+    }).join('');
+    anchorEl.style.position = 'relative';
+    anchorEl.appendChild(picker);
+    setTimeout(() => {
+      const close = (e) => {
+        if (!picker.contains(e.target)) { this.closeReactionPicker(); document.removeEventListener('click', close); }
+      };
+      document.addEventListener('click', close);
+    }, 50);
+  },
+
+  closeReactionPicker() {
+    document.querySelectorAll('[id^="reaction-picker-"]').forEach(el => el.remove());
+  },
+
   // ── Comentarios ──────────────────────────────────────────────────────────────
-  async sendComment(postId) {
-    const input = document.getElementById(`comment-input-${postId}`);
+  async sendComment(postId, parentId = null) {
+    const inputId = parentId ? `reply-input-${parentId}` : `comment-input-${postId}`;
+    const input = document.getElementById(inputId);
     const raw = input?.value.trim();
     if (!raw) return;
 
@@ -958,7 +1241,7 @@ const WallModule = {
     const profile = this._appState?.get('profile');
     if (!user) return;
 
-    let userName = 'Usuario';
+    let userName;
     if (profile?.role === 'padre') {
       const { data: st } = await supabase.from('students').select('name').eq('parent_id', user.id).maybeSingle();
       userName = st?.name || profile.name || 'Padre';
@@ -966,58 +1249,150 @@ const WallModule = {
       userName = profile?.name || 'Personal';
     }
 
-    const list = document.getElementById(`comments-list-${postId}`);
+    const list = parentId
+      ? document.getElementById(`replies-list-${parentId}`)
+      : document.getElementById(`comments-list-${postId}`);
+
     const tempId = `temp-${Date.now()}`;
     if (list) {
       list.querySelector('.italic')?.remove();
       const colorCls = this._getAvatarColor(userName);
       const el = document.createElement('div');
-      el.id = tempId; el.className = 'flex gap-2 text-xs opacity-60 wall-slide-up';
+      el.id = tempId;
+      el.className = parentId
+        ? 'wall-reply-item flex gap-2 text-xs opacity-60'
+        : 'flex gap-2 text-xs opacity-60 wall-slide-up';
       el.innerHTML = `
-        <div class="w-7 h-7 rounded-full ${colorCls} flex items-center justify-center font-black text-[10px] shrink-0">${_sanitizeHTML(userName.charAt(0))}</div>
-        <div class="bg-white p-3 rounded-2xl rounded-tl-none border border-slate-100 shadow-sm flex-1">
-          <div class="flex justify-between mb-1">
-            <span class="font-black text-slate-800 text-[11px]">${_sanitizeHTML(userName)}</span>
-            <span class="text-[9px] text-slate-400 font-bold">ahora</span>
-          </div>
-          <p class="text-slate-600 leading-relaxed">${_sanitizeHTML(content)}</p>
+        <div class="w-6 h-6 rounded-full ${colorCls} flex items-center justify-center font-black text-[9px] shrink-0">${_sanitizeHTML(userName.charAt(0))}</div>
+        <div class="bg-white p-2.5 rounded-2xl rounded-tl-none border border-slate-100 shadow-sm flex-1">
+          <span class="font-black text-slate-800 text-[11px]">${_sanitizeHTML(userName)}</span>
+          <p class="text-slate-600 leading-relaxed mt-0.5">${_sanitizeHTML(content)}</p>
         </div>`;
       list.appendChild(el);
       list.scrollTop = list.scrollHeight;
     }
 
     input.value = '';
+    // Reset reply hint if present
+    if (parentId) {
+      const hint = document.getElementById(`reply-hint-${parentId}`);
+      if (hint) hint.remove();
+    }
     this._lastPostTime = now;
 
     try {
-      const { error } = await supabase.from('comments').insert({ post_id: postId, user_id: user.id, user_name: userName, content });
+      const payload = {
+        post_id:           postId,
+        user_id:           user.id,
+        user_name:         userName,
+        content,
+        parent_comment_id: parentId || null,
+      };
+      const { error, data: newComment } = await supabase.from('comments').insert(payload).select('id').single();
       if (error) throw error;
       document.getElementById(tempId)?.classList.remove('opacity-60');
-      const cnt = document.getElementById(`comment-count-${postId}`);
-      if (cnt) cnt.textContent = parseInt(cnt.textContent || '0') + 1;
+      if (!parentId) {
+        const cnt = document.getElementById(`comment-count-${postId}`);
+        if (cnt) {
+          cnt.textContent = Number.parseInt(cnt.textContent || '0') + 1;
+          cnt.classList.remove('wall-counter-bump');
+          cnt.offsetWidth; // reflow trigger for animation restart
+          cnt.classList.add('wall-counter-bump');
+          setTimeout(() => cnt.classList.remove('wall-counter-bump'), 400);
+        }
+        // Notificar autor del post
+        this._notifyCommentAuthor(postId, newComment?.id, userName, content);
+      }
     } catch (_) {
       document.getElementById(tempId)?.remove();
       input.value = raw;
     }
   },
 
+  /** Muestra/oculta el campo de respuesta bajo un comentario */
+  showReplyInput(postId, commentId, replyToName) {
+    // Quitar inputs de reply anteriores
+    document.querySelectorAll('[id^="reply-input-wrap-"]').forEach(el => el.remove());
+    const commentEl = document.getElementById(`comment-item-${commentId}`);
+    if (!commentEl) return;
+
+    const wrap = document.createElement('div');
+    wrap.id = `reply-input-wrap-${commentId}`;
+    wrap.className = 'flex gap-2 mt-2 wall-reply-in';
+    wrap.innerHTML = `
+      <div id="reply-hint-${commentId}" class="wall-comment-reply-hint text-indigo-400">↩ Respondiendo a ${_sanitizeHTML(replyToName)}</div>
+      <div class="flex gap-1.5 flex-1">
+        <input type="text" id="reply-input-${commentId}"
+          class="flex-1 px-3 py-1.5 text-xs border border-indigo-200 rounded-xl focus:ring-2 focus:ring-indigo-300 outline-none bg-indigo-50/50"
+          placeholder="Responder a ${_sanitizeHTML(replyToName)}..."
+          onkeypress="if(event.key==='Enter') WallModule.sendComment('${postId}', '${commentId}')">
+        <button onclick="WallModule.sendComment('${postId}', '${commentId}')"
+          class="p-1.5 bg-indigo-500 text-white rounded-xl hover:bg-indigo-600 transition-colors" aria-label="Enviar respuesta">
+          <i data-lucide="send" class="w-3.5 h-3.5"></i>
+        </button>
+      </div>`;
+    commentEl.appendChild(wrap);
+    document.getElementById(`reply-input-${commentId}`)?.focus();
+    if (window.lucide) lucide.createIcons();
+  },
+
+  /** Notifica al autor del post de un nuevo comentario (fire & forget) */
+  async _notifyCommentAuthor(postId, commentId, actorName, content) {
+    try {
+      const actor = this._appState?.get('user');
+      if (!actor) return;
+      const { data: post } = await supabase.from('posts').select('teacher_id').eq('id', postId).single();
+      if (!post || post.teacher_id === actor.id) return;
+      await supabase.from('wall_notifications').insert({
+        user_id:    post.teacher_id,
+        actor_id:   actor.id,
+        actor_name: actorName,
+        type:       'comment',
+        post_id:    postId,
+        comment_id: commentId,
+        message:    `💬 comentó: "${content.slice(0, 60)}${content.length > 60 ? '…' : ''}"`,
+      });
+    } catch (_) { /* silencioso */ }
+  },
+
+  /** Abre la sección de comentarios y hace focus en el input (abre teclado en móvil) */
+  async openCommentSection(postId) {
+    const section = document.getElementById(`comments-section-${postId}`);
+    if (!section) return;
+    const wasHidden = section.classList.contains('hidden');
+    section.classList.remove('hidden');
+
+    const list = document.getElementById(`comments-list-${postId}`);
+    if (list && !list.querySelector('.bg-white, [id^="comment-item-"]')) {
+      list.innerHTML = `<div class="py-4 text-center"><div class="animate-spin w-5 h-5 border-2 border-slate-200 border-t-slate-400 rounded-full mx-auto"></div></div>`;
+      const comments = await this._fetchComments(postId);
+      this.renderComments(postId, comments);
+    }
+
+    // Focus en el input → abre teclado en móvil
+    const input = document.getElementById(`comment-input-${postId}`);
+    if (input) {
+      setTimeout(() => {
+        input.focus();
+        input.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      }, wasHidden ? 200 : 50);
+    }
+    if (window.lucide) lucide.createIcons();
+  },
+
   async toggleCommentSection(postId) {
     const section = document.getElementById(`comments-section-${postId}`);
     if (!section) return;
-    section.classList.toggle('hidden');
-    if (!section.classList.contains('hidden')) {
-      const list = document.getElementById(`comments-list-${postId}`);
-      if (list && !list.querySelector('.bg-white')) {
-        list.innerHTML = `<div class="py-4 text-center"><div class="animate-spin w-5 h-5 border-2 border-slate-200 border-t-slate-400 rounded-full mx-auto"></div></div>`;
-        const comments = await this._fetchComments(postId);
-        this.renderComments(postId, comments);
-      }
+    if (section.classList.contains('hidden')) {
+      await this.openCommentSection(postId);
+    } else {
+      section.classList.add('hidden');
     }
   },
 
   async _fetchComments(postId) {
     const { data } = await supabase.from('comments')
-      .select('id, content, user_name, created_at, user_id, profile:profiles!comments_user_id_fkey(name, avatar_url, role)')
+      .select('id, content, user_name, created_at, user_id, parent_comment_id, profile:profiles!comments_user_id_fkey(name, avatar_url, role)')
       .eq('post_id', postId).order('created_at', { ascending: true });
 
     const parentComments = (data || []).filter(c => {
@@ -1039,23 +1414,60 @@ const WallModule = {
   renderComments(postId, comments) {
     const container = document.getElementById(`comments-list-${postId}`);
     if (!container) return;
-    if (!comments.length) { container.innerHTML = '<p class="text-center text-[10px] text-slate-400 italic py-2">Sé el primero en comentar.</p>'; return; }
-    container.innerHTML = comments.map(c => {
-      const pr = Array.isArray(c.profile) ? c.profile[0] : (c.profile || null);
-      const name = (pr?.role === 'padre' && c._studentName) ? c._studentName : (pr?.name || c.user_name || 'Usuario');
-      const colorCls = this._getAvatarColor(name);
-      return `
-        <div class="flex gap-2 text-xs wall-slide-up">
-          <div class="w-7 h-7 rounded-full ${colorCls} flex items-center justify-center font-black text-[10px] shrink-0">${_sanitizeHTML(name.charAt(0))}</div>
-          <div class="bg-white p-3 rounded-2xl rounded-tl-none border border-slate-100 shadow-sm flex-1">
-            <div class="flex justify-between mb-1">
-              <span class="font-black text-slate-800 text-[11px]">${_sanitizeHTML(name)}</span>
-              <span class="text-[9px] text-slate-400 font-bold">${new Date(c.created_at).toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'})}</span>
-            </div>
-            <p class="text-slate-600 leading-relaxed">${_sanitizeHTML(c.content)}</p>
+    if (!comments.length) {
+      container.innerHTML = '<p class="text-center text-[10px] text-slate-400 italic py-2">Sé el primero en comentar.</p>';
+      return;
+    }
+    const roots    = comments.filter(c => !c.parent_comment_id);
+    const replies  = comments.filter(c => !!c.parent_comment_id);
+    const replyMap = {};
+    replies.forEach(r => {
+      if (!replyMap[r.parent_comment_id]) replyMap[r.parent_comment_id] = [];
+      replyMap[r.parent_comment_id].push(r);
+    });
+    container.innerHTML = roots.map(c => this._renderCommentItem(c, postId, replyMap)).join('');
+  },
+
+  _renderCommentItem(c, postId, replyMap = {}) {
+    const pr = Array.isArray(c.profile) ? c.profile[0] : (c.profile || null);
+    const name = (pr?.role === 'padre' && c._studentName) ? c._studentName : (pr?.name || c.user_name || 'Usuario');
+    const colorCls = this._getAvatarColor(name);
+    const time = new Date(c.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+    const childReplies = replyMap[c.id] || [];
+    const canReply = !!this._appState?.get('user');
+    const safeName = _sanitizeHTML(name.replace(/'/g, '&#39;'));
+
+    const repliesHtml = childReplies.map(r => {
+      const rpr = Array.isArray(r.profile) ? r.profile[0] : (r.profile || null);
+      const rname = (rpr?.role === 'padre' && r._studentName) ? r._studentName : (rpr?.name || r.user_name || 'Usuario');
+      const rColor = this._getAvatarColor(rname);
+      const rTime = new Date(r.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+      return `<div class="wall-reply-item flex gap-1.5 text-xs">
+        <div class="w-6 h-6 rounded-full ${rColor} flex items-center justify-center font-black text-[9px] shrink-0">${_sanitizeHTML(rname.charAt(0))}</div>
+        <div class="bg-indigo-50 p-2 rounded-2xl rounded-tl-none border border-indigo-100 flex-1">
+          <div class="flex justify-between mb-0.5">
+            <span class="font-black text-slate-700 text-[11px]">${_sanitizeHTML(rname)}</span>
+            <span class="text-[9px] text-slate-400 font-bold">${rTime}</span>
           </div>
-        </div>`;
+          <p class="text-slate-600 leading-relaxed">${_sanitizeHTML(r.content)}</p>
+        </div>
+      </div>`;
     }).join('');
+
+    return `<div class="flex gap-2 text-xs wall-slide-up" id="comment-item-${c.id}">
+      <div class="w-7 h-7 rounded-full ${colorCls} flex items-center justify-center font-black text-[10px] shrink-0">${_sanitizeHTML(name.charAt(0))}</div>
+      <div class="flex-1 min-w-0">
+        <div class="bg-white p-3 rounded-2xl rounded-tl-none border border-slate-100 shadow-sm">
+          <div class="flex justify-between mb-1">
+            <span class="font-black text-slate-800 text-[11px]">${_sanitizeHTML(name)}</span>
+            <span class="text-[9px] text-slate-400 font-bold">${time}</span>
+          </div>
+          <p class="text-slate-600 leading-relaxed">${_sanitizeHTML(c.content)}</p>
+        </div>
+        ${canReply ? `<button class="wall-reply-toggle" onclick="WallModule.showReplyInput('${postId}','${c.id}','${safeName}')" aria-label="Responder">↩ Responder</button>` : ''}
+        <div id="replies-list-${c.id}" class="mt-1 space-y-2">${repliesHtml}</div>
+      </div>
+    </div>`;
   },
 
   // ── Fijar / Borrar / Toggles ─────────────────────────────────────────────────
@@ -1137,7 +1549,6 @@ const WallModule = {
   subscribeRealtime() {
     this._unsubscribeRealtime();
     const classroomId = this._options.classroomId;
-    const self = this;
 
     this._realtimeChannel = supabase.channel(`wall_${classroomId || 'global'}_${Date.now()}`)
       .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'posts' }, (payload) => {
@@ -1149,7 +1560,7 @@ const WallModule = {
           btn.id = 'wall-new-posts-indicator';
           btn.className = 'fixed top-24 left-1/2 -translate-x-1/2 bg-orange-500 text-white px-6 py-2.5 rounded-full text-[10px] font-black uppercase shadow-2xl animate-bounce cursor-pointer z-50 flex items-center gap-2 border-2 border-white/20 backdrop-blur-md';
           btn.innerHTML = '⬆ Nuevas publicaciones disponibles';
-          btn.onclick = () => { window.scrollTo({ top: 0, behavior: 'smooth' }); self.applyFilters(); btn.remove(); };
+          btn.onclick = () => { window.scrollTo({ top: 0, behavior: 'smooth' }); this.applyFilters(); btn.remove(); };
           document.body.appendChild(btn);
           setTimeout(() => btn.remove(), 8000);
         }
@@ -1169,20 +1580,32 @@ const WallModule = {
         if (el) { el.classList.add('opacity-0'); setTimeout(() => el.remove(), 300); }
       })
       .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'likes' }, (payload) => {
-        const uid = self._appState?.get('user')?.id;
-        if (uid && payload.new.user_id === uid) self._refreshReactionUI(payload.new.post_id);
+        const uid = this._appState?.get('user')?.id;
+        const postId = payload.new.post_id;
+        if (uid && payload.new.user_id === uid) {
+          this._refreshReactionUI(postId);
+        } else {
+          // Like de otro usuario — actualizar chips sin cambiar estado activo del usuario actual
+          this._updateReactionChips(postId, 1, payload.new.reaction_type || 'like', null);
+        }
       })
       .on('postgres_changes', { event: 'DELETE', schema: 'public', table: 'likes' }, (payload) => {
-        const uid = self._appState?.get('user')?.id;
-        if (uid && payload.old?.user_id === uid) self._refreshReactionUI(payload.old.post_id);
+        const uid = this._appState?.get('user')?.id;
+        const postId = payload.old?.post_id;
+        if (!postId) return;
+        if (uid && payload.old?.user_id === uid) {
+          this._refreshReactionUI(postId);
+        } else {
+          this._updateReactionChips(postId, -1, null, payload.old?.reaction_type || 'like');
+        }
       })
       .subscribe((status) => {
-        if (status === 'CHANNEL_ERROR') setTimeout(() => { if (self._realtimeChannel) self.subscribeRealtime(); }, 5000);
+        if (status === 'CHANNEL_ERROR') setTimeout(() => { if (this._realtimeChannel) this.subscribeRealtime(); }, 5000);
       });
   },
 
   _unsubscribeRealtime() {
-    if (this._realtimeChannel) { try { supabase.removeChannel(this._realtimeChannel); } catch (_) {} this._realtimeChannel = null; }
+    if (this._realtimeChannel) { try { supabase.removeChannel(this._realtimeChannel); } catch (e) { console.warn('[Wall] removeChannel failed:', e); } this._realtimeChannel = null; }
     if (this._observer) { this._observer.disconnect(); this._observer = null; }
     if (this._videoObserver) { this._videoObserver.disconnect(); this._videoObserver = null; }
   },
@@ -1220,7 +1643,9 @@ const WallModule = {
         for (const p of due) {
           await supabase.from('posts').update({ status: 'published', scheduled_at: null }).eq('id', p.id);
         }
-      } catch (_) {}
+      } catch (e) {
+        console.warn('[Wall] Scheduler error:', e);
+      }
     }, 60_000); // cada minuto
   },
 
@@ -1271,8 +1696,8 @@ const WallModule = {
   },
 
   _updateTrimmer() {
-    const start = parseFloat(document.getElementById('trim-start')?.value || 0);
-    const end = parseFloat(document.getElementById('trim-end')?.value || 30);
+    const start = Number.parseFloat(document.getElementById('trim-start')?.value || 0);
+    const end = Number.parseFloat(document.getElementById('trim-end')?.value || 30);
     const clamped = Math.min(end, start + 30);
     document.getElementById('trim-start-val').textContent = start.toFixed(1);
     document.getElementById('trim-end-val').textContent = clamped.toFixed(1);
@@ -1283,8 +1708,8 @@ const WallModule = {
   async _applyTrim(originalUrl) {
     const btn = document.getElementById('btn-apply-trim');
     if (btn) { btn.disabled = true; btn.textContent = 'Procesando...'; }
-    const start = parseFloat(document.getElementById('trim-start')?.value || 0);
-    const end = parseFloat(document.getElementById('trim-end')?.value || 30);
+    const start = Number.parseFloat(document.getElementById('trim-start')?.value || 0);
+    const end = Number.parseFloat(document.getElementById('trim-end')?.value || 30);
     const modal = document.getElementById('wall-trimmer');
 
     // Nota: recorte real requiere FFmpeg WASM. Aquí se usa el segmento con nota informativa.
@@ -1392,7 +1817,6 @@ const WallModule = {
    */
   async uploadMedia(file, onProgress = null) {
     const isVideo = file.type.startsWith('video/') || (file instanceof Blob && !file.type.startsWith('image/'));
-    const mimeVideo = 'video/mp4';
     const mimeWebP = 'image/webp';
 
     if (isVideo) {
@@ -1401,7 +1825,7 @@ const WallModule = {
 
       // 2) Validar duración (solo para File, no para Blob grabado en tiempo real)
       if (file instanceof File) {
-        const { ok, duration } = await validateVideoDuration(file);
+        const { ok } = await validateVideoDuration(file);
         if (!ok) {
           // Abrir trimmer como alternativa
           return new Promise((resolve, reject) => {
@@ -1440,16 +1864,15 @@ const WallModule = {
         const { data: tUrl } = supabase.storage.from('posts').getPublicUrl(thumbPath);
         thumbnailUrl = tUrl.publicUrl;
       }
-    } catch (_) {}
-
-    await uploadWithRetry('posts', path, file, 'video/mp4', onProgress);
+    } catch (e) {
+      console.warn('[Wall] Thumbnail generation failed:', e);
+    }
     const { data: urlData } = supabase.storage.from('posts').getPublicUrl(path);
     return { mediaUrl: urlData.publicUrl, mediaType: 'video', thumbnailUrl };
   },
 
   /** Subida en segundo plano con notificación al terminar */
   uploadInBackground(file, postData) {
-    const taskId = _uuid();
     Helpers.toast('Subida iniciada en segundo plano...', 'info');
 
     (async () => {
@@ -1478,7 +1901,9 @@ const WallModule = {
         const store = tx.objectStore('posts');
         posts.forEach(p => store.put({ ...p, _cachedAt: Date.now() }));
       };
-    } catch (_) {}
+    } catch (e) {
+      console.warn('[Wall] IndexedDB cache write failed:', e);
+    }
   },
 
   async _getLocalCachedPosts() {
@@ -1494,7 +1919,7 @@ const WallModule = {
           all.onerror = () => resolve([]);
         };
         req.onerror = () => resolve([]);
-      } catch (_) { resolve([]); }
+      } catch (e) { console.warn('[Wall] IndexedDB read failed:', e); resolve([]); }
     });
   },
 

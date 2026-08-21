@@ -3,6 +3,21 @@ import { Helpers } from '../shared/helpers.js';
 import { supabase, sendPush } from '../shared/supabase.js';
 import { ChatModule as SharedChat } from '../shared/chat.js';
 import { ScrollModule } from '../shared/scroll.module.js';
+import { ChatView, ChatListState } from '../shared/chat-view.js';
+import {
+  buildThreadHTML, prependThreadHTML, appendLiveMessage, waBubbleHTML,
+  chatListItemHTML, reactionChipsHTML
+} from '../shared/chat-render.js';
+import {
+  bindMessageActions, closeMessageActions,
+  showReplyBar, hideReplyBar, openForwardModal, markRowDeleted
+} from '../shared/chat-actions.js';
+
+const CHAT_PLACEHOLDER_HTML = `
+  <div class="h-full flex flex-col items-center justify-center text-slate-400 opacity-40">
+    <i data-lucide="message-circle" class="w-16 h-16 mb-4"></i>
+    <p class="font-medium">Selecciona una conversación</p>
+  </div>`;
 
 export const ChatModule = {
   _currentUserId: null,
@@ -11,6 +26,8 @@ export const ChatModule = {
   _channel: null,
   _allContacts: [],
   _topScrollDestroy: null,
+  _previews: {},          // vista previa del último mensaje por contacto
+  _pendingReply: null,    // respuesta citada pendiente
 
   async init() {
     const { data: { user } } = await supabase.auth.getUser();
@@ -20,6 +37,9 @@ export const ChatModule = {
     // Get current user profile for avatar
     const { data: profile } = await supabase.from('profiles').select('name, avatar_url').eq('id', user.id).single();
     this._currentUserProfile = profile || {};
+
+    // ✅ Presencia global (puntos verdes en la lista + estado en header)
+    SharedChat.subscribeGlobalPresence((online) => this._renderPresence(online));
 
     // Bind send button + enter key — once only
     const sendBtn = document.getElementById('btnSendChatMessage');
@@ -32,17 +52,84 @@ export const ChatModule = {
       });
     }
 
-    document.getElementById('chatSearchInput')?.addEventListener('input', () => this._renderContacts());
-    document.getElementById('chatRoleFilter')?.addEventListener('change', () => this._loadContacts());
-    document.getElementById('chatBackBtn')?.addEventListener('click', () => {
-      document.getElementById('chatAppContainer')?.classList.remove('show-chat');
-      this._unsubscribe();
-    });
+    const searchInput = document.getElementById('chatSearchInput');
+    if (searchInput && !searchInput._kkBound) {
+      searchInput._kkBound = true;
+      searchInput.addEventListener('input', () => this._renderContacts());
+    }
+
+    // ✅ Restaurar búsqueda preservada (una sola vez, tras bindear el listener)
+    ChatListState.restoreUI('directora', { searchEl: searchInput });
+    const roleFilter = document.getElementById('chatRoleFilter');
+    if (roleFilter && !roleFilter._kkBound) {
+      roleFilter._kkBound = true;
+      roleFilter.addEventListener('change', () => this._loadContacts());
+    }
+
+    // ✅ Botón atrás — móvil y escritorio, una sola vez (usa historial)
+    const backBtn = document.getElementById('chatBackBtn');
+    if (backBtn && !backBtn._kkBound) {
+      backBtn._kkBound = true;
+      backBtn.addEventListener('click', () => ChatView.back());
+    }
 
     // Expose for inline onclick
     window._chatSelect = (id) => this.selectChat(id);
 
     await this._loadContacts();
+  },
+
+  /**
+   * Restaura la vista inicial del chat (placeholder "Selecciona una conversación")
+   */
+  _closeConversationUI() {
+    this._activeContactId = null;
+    this._conversationId = null;
+    this._pendingReply = null;
+    this._unsubscribe();
+    closeMessageActions();
+    hideReplyBar();
+    if (this._topScrollDestroy) { this._topScrollDestroy(); this._topScrollDestroy = null; }
+    document.getElementById('chatActiveHeader')?.classList.add('hidden');
+    document.getElementById('chatInputArea')?.classList.add('hidden');
+    document.getElementById('chatTypingIndicator')?.classList.add('hidden');
+    const container = document.getElementById('chatMessagesContainer');
+    if (container) {
+      container.innerHTML = CHAT_PLACEHOLDER_HTML;
+      if (window.lucide) lucide.createIcons();
+    }
+  },
+
+  /**
+   * Abre la vista conversación con historial integrado —
+   * el botón atrás del navegador NO recarga la página
+   */
+  _openChatView() {
+    ChatView.open({
+      apply: () => {
+        // En móvil muestra el panel de conversación; en escritorio no tiene efecto
+        document.getElementById('chatAppContainer')?.classList.add('show-chat');
+      },
+      revert: () => {
+        document.getElementById('chatAppContainer')?.classList.remove('show-chat');
+        this._closeConversationUI();
+      }
+    });
+  },
+
+  /**
+   * API para el banner global: abrir conversación por userId
+   */
+  openChatWithUser(userId) {
+    if (this._allContacts.some(c => c.id === userId)) {
+      this.selectChat(userId);
+      return true;
+    }
+    return false;
+  },
+
+  isActiveChatOpen(msg) {
+    return !!this._activeContactId && !!msg?.conversation_id && msg.conversation_id === this._conversationId;
   },
 
   async _loadContacts() {
@@ -103,10 +190,38 @@ export const ChatModule = {
         return contact;
       });
 
+      // ✅ Vista previa del último mensaje por contacto
+      const contactIds = this._allContacts.map(c => c.id).filter(Boolean);
+      this._previews = await SharedChat.getLastMessagePreviews(contactIds);
+
+      // Orden: último mensaje más reciente primero; sin mensajes → por no leídos
+      this._allContacts.sort((a, b) => {
+        const ta = this._previews[a.id]?.created_at ? new Date(this._previews[a.id].created_at).getTime() : 0;
+        const tb = this._previews[b.id]?.created_at ? new Date(this._previews[b.id].created_at).getTime() : 0;
+        if (ta !== tb) return tb - ta;
+        return b.unread - a.unread;
+      });
+
       this._renderContacts();
     } catch (e) {
       console.error('Chat contacts error:', e);
       list.innerHTML = Helpers.emptyState('Error al cargar contactos');
+    }
+  },
+
+  /** Puntos de presencia en la lista + estado en header */
+  _renderPresence(onlineSet) {
+    document.querySelectorAll('#chatContactsList [data-contact-id]').forEach(el => {
+      const dot = el.querySelector('.kk-online-dot');
+      if (dot) dot.classList.toggle('is-online', onlineSet.has(el.dataset.contactId));
+    });
+    if (this._activeContactId) {
+      const metaEl = document.getElementById('chatActiveMeta');
+      if (metaEl && metaEl.dataset.baseMeta) {
+        const online = onlineSet.has(this._activeContactId);
+        metaEl.innerHTML = `<span class="kk-header-status ${online ? 'is-online' : ''}">
+          <span class="kk-status-dot"></span>${online ? 'En línea' : Helpers.escapeHTML(metaEl.dataset.baseMeta)}</span>`;
+      }
     }
   },
 
@@ -120,21 +235,29 @@ export const ChatModule = {
 
     if (!filtered.length) { list.innerHTML = Helpers.emptyState('Sin contactos'); return; }
 
-    list.innerHTML = filtered.map(c => `
-      <div data-contact-id="${c.id}" class="flex items-center gap-3 p-3 rounded-2xl hover:bg-slate-100 cursor-pointer transition-all group relative">
-        <div class="relative shrink-0">
-          <div class="w-11 h-11 rounded-full bg-slate-200 flex items-center justify-center font-bold text-slate-500 overflow-hidden">
-            ${c.avatar ? `<img src="${c.avatar}" class="w-full h-full object-cover">` : (c.name || '?').charAt(0)}
-          </div>
-          ${c.unread > 0 ? `<span class="absolute -top-1 -right-1 min-w-[18px] h-[18px] bg-rose-500 text-white text-[9px] font-black rounded-full flex items-center justify-center px-1 shadow animate-pulse">${c.unread > 9 ? '9+' : c.unread}</span>` : ''}
-        </div>
-        <div class="min-w-0 flex-1">
-          <div class="font-bold text-slate-800 text-sm truncate ${c.unread > 0 ? 'text-slate-900' : ''}">${Helpers.escapeHTML(c.name || 'Sin nombre')}</div>
-          ${c.parentName ? `<div class="text-[10px] text-slate-500 font-bold truncate">👤 ${Helpers.escapeHTML(c.parentName)}</div>` : ''}
-          <div class="text-[10px] text-slate-400 font-bold uppercase truncate">${c.roleLabel}${c.studentName && c.parentName ? '' : c.meta !== 'Personal Karpus' ? ' · ' + Helpers.escapeHTML(c.meta) : ''}</div>
-        </div>
-        ${c.unread > 0 ? `<div class="w-2 h-2 bg-rose-500 rounded-full shrink-0"></div>` : ''}
-      </div>`).join('');
+    list.innerHTML = filtered.map(c => chatListItemHTML({
+      c: { id: c.id, name: c.name || 'Sin nombre', avatar: c.avatar },
+      unread: c.unread,
+      lastMsg: this._previews[c.id] || null,
+      online: SharedChat.getOnlineUsers().has(c.id),
+      sub: c.parentName ? `👤 ${c.parentName} · ${c.roleLabel}` : c.roleLabel,
+      avatarBg: 'bg-blue-100 text-blue-600'
+    })).join('');
+
+    // ✅ Restaurar scroll preservado (experiencia PWA)
+    const savedList = ChatListState.load('directora');
+    if (savedList.scrollTop) requestAnimationFrame(() => { list.scrollTop = savedList.scrollTop; });
+    if (!list._kkScrollSave) {
+      list._kkScrollSave = true;
+      let tSave = null;
+      list.addEventListener('scroll', () => {
+        clearTimeout(tSave);
+        tSave = setTimeout(() => ChatListState.save('directora', {
+          ...ChatListState.load('directora'),
+          scrollTop: list.scrollTop
+        }), 300);
+      }, { passive: true });
+    }
 
     // Delegate click
     if (!list._bound) {
@@ -157,8 +280,8 @@ export const ChatModule = {
     contact.unread = 0;
     this._renderContacts();
 
-    // Mobile: show chat panel
-    document.getElementById('chatAppContainer')?.classList.add('show-chat');
+    // ✅ VISTA MÓVIL/DESKTOP + HISTORIAL (botón atrás sin recargar)
+    this._openChatView();
 
     // Update header
     const nameEl   = document.getElementById('chatActiveName');
@@ -167,15 +290,25 @@ export const ChatModule = {
     const headerEl = document.getElementById('chatActiveHeader');
     const inputEl  = document.getElementById('chatInputArea');
 
-    if (nameEl)   nameEl.textContent   = contact.name;
-    if (metaEl)   metaEl.textContent   = contact.parentName
+    const baseMeta = contact.parentName
       ? `${contact.roleLabel} · 👤 ${contact.parentName} · ${contact.meta.split(' · ').slice(-1)[0] || ''}`
       : contact.roleLabel + ' · ' + contact.meta;
+
+    if (nameEl)   nameEl.textContent   = contact.name;
+    if (metaEl) {
+      metaEl.textContent = baseMeta;
+      metaEl.dataset.baseMeta = baseMeta;
+      this._renderPresence(SharedChat.getOnlineUsers());
+    }
     if (avatarEl) avatarEl.innerHTML   = contact.avatar
       ? `<img src="${contact.avatar}" class="w-full h-full object-cover">`
       : (contact.name || '?').charAt(0);
     headerEl?.classList.remove('hidden');
     inputEl?.classList.remove('hidden');
+
+    // ✅ Limpiar respuesta pendiente anterior
+    hideReplyBar();
+    this._pendingReply = null;
 
     await this._loadMessages();
     this._subscribeRealtime();
@@ -202,14 +335,39 @@ export const ChatModule = {
       }
       this._conversationId = conversationId;
 
-      container.innerHTML = '';
+      // Marcar como leídos al abrir
+      if (conversationId) SharedChat.markAsRead(conversationId);
+
+      container.classList.add('wa-wallpaper');
+
+      // ✅ Acciones de mensaje: mantener presionado / clic derecho (siempre, idempotente)
+      bindMessageActions(container, {
+        myId: this._currentUserId,
+        onReply: (msg) => {
+          const senderName = msg.sender_id === this._currentUserId
+            ? 'ti' : (this._allContacts.find(c => c.id === msg.sender_id)?.name || 'Contacto');
+          this._pendingReply = { id: msg.id, senderName, content: msg.content };
+          showReplyBar(document.getElementById('chatInputArea'), { senderName, content: msg.content }, () => { this._pendingReply = null; });
+        },
+        onForward: (msg) => {
+          const targets = this._allContacts.filter(c => c.id).map(c => ({ id: c.id, name: c.name, avatar: c.avatar }));
+          openForwardModal(targets, async (ct) => {
+            await SharedChat.sendMessage(this._currentUserId, ct.id, msg.content);
+          });
+        },
+        onReact: async (msgId, emoji) => SharedChat.toggleReaction(msgId, emoji),
+        onDelete: async (msgId) => SharedChat.deleteMessage(msgId)
+      });
+
       if (!messages.length) {
         container.innerHTML = '<div class="flex-1 flex flex-col items-center justify-center text-slate-400 opacity-60 gap-2"><i data-lucide="message-circle" class="w-10 h-10 text-blue-300"></i><p class="text-sm">Inicia la conversación</p></div>';
         if (window.lucide) lucide.createIcons();
         return;
       }
 
-      messages.forEach(m => this._appendMessage(m));
+      this._resolveReplyPreviews(messages);
+      container.innerHTML = buildThreadHTML(messages, (m) => this._bubbleHtml(m));
+
       this._scrollToBottom();
 
       // Top-scroll para cargar mensajes anteriores
@@ -221,15 +379,7 @@ export const ChatModule = {
           const { messages: older } = await SharedChat.loadConversation(
             this._activeContactId, this._conversationId, true
           );
-          if (older.length) {
-            const frag = document.createDocumentFragment();
-            const tmp = document.createElement('div');
-            older.forEach(m => {
-              tmp.innerHTML = this._buildBubble(m);
-              while (tmp.firstChild) frag.appendChild(tmp.firstChild);
-            });
-            container.insertBefore(frag, container.firstChild);
-          }
+          if (older.length) prependThreadHTML(container, older, (m) => this._bubbleHtml(m));
         }
       });
       this._topScrollDestroy = destroy;
@@ -240,38 +390,39 @@ export const ChatModule = {
     }
   },
 
-  _buildBubble(msg) {
+  /** Resuelve las citas de respuesta contra los mensajes ya cargados */
+  _resolveReplyPreviews(messages) {
+    if (!messages?.length) return;
+    const byId = new Map(messages.filter(m => m.id).map(m => [String(m.id), m]));
+    messages.forEach(m => {
+      if (m.reply_to && !m._replyPreview) {
+        const src = byId.get(String(m.reply_to));
+        if (src) m._replyPreview = { sender_name: src.sender_name || '', content: src.content || '' };
+      }
+    });
+  },
+
+  _bubbleHtml(msg) {
     const isMine = msg.sender_id === this._currentUserId;
-    const time   = new Date(msg.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-    
-    // Get avatar for sender
-    const sender = isMine 
-      ? this._currentUserProfile 
-      : this._allContacts.find(c => c.id === msg.sender_id);
-    
-    const avatarUrl = isMine ? (sender?.avatar_url || null) : (msg.sender_avatar || sender?.avatar);
-    const name = isMine ? (sender?.name || '') : (msg.sender_name || sender?.name || '');
-    
-    // Build avatar HTML
-    const avatarHtml = avatarUrl 
-      ? `<img src="${avatarUrl}" class="w-full h-full object-cover">` 
-      : `<span class="text-sm font-bold">${name.charAt(0) || ''}</span>`;
-    
-    return `<div class="flex ${isMine ? 'justify-end flex-row-reverse' : 'justify-start'} mb-3 gap-2">
-      <div class="w-8 h-8 rounded-full bg-slate-200 flex items-center justify-center font-bold text-slate-500 overflow-hidden shrink-0">
-        ${avatarHtml}
-      </div>
-      <div class="msg-bubble ${isMine ? 'msg-me' : 'msg-them'} max-w-[80%]">
-        <div class="whitespace-pre-wrap break-words">${Helpers.escapeHTML(msg.content || '')}</div>
-        <div class="text-[9px] ${isMine ? 'text-blue-100' : 'text-slate-400'} mt-1 text-right opacity-80">${time}</div>
-      </div>
-    </div>`;
+
+    // ✅ ¿Quién escribió? — resolver contacto para mensajes entrantes
+    const sender = isMine ? this._currentUserProfile : this._allContacts.find(c => c.id === msg.sender_id);
+    const senderName = isMine ? (sender?.name || '') : (msg.sender_name || sender?.name || 'Contacto');
+    const avatarUrl = isMine ? (sender?.avatar_url || null) : (msg.sender_avatar || sender?.avatar || null);
+
+    return waBubbleHTML({
+      m: msg, myId: this._currentUserId,
+      senderName,
+      avatarUrl,
+      showName: true,
+      showAvatar: true
+    });
   },
 
   _appendMessage(msg) {
     const container = document.getElementById('chatMessagesContainer');
     if (!container) return;
-    container.insertAdjacentHTML('beforeend', this._buildBubble(msg));
+    container.insertAdjacentHTML('beforeend', this._bubbleHtml(msg));
   },
 
   async sendMessage() {
@@ -279,11 +430,19 @@ export const ChatModule = {
     const text  = input?.value.trim();
     if (!text || !this._activeContactId || !this._currentUserId) return;
 
+    const reply = this._pendingReply;
     input.value = '';
     input.disabled = true;
+    hideReplyBar();
+    this._pendingReply = null;
 
-    // Optimistic append
-    this._appendMessage({ content: text, sender_id: this._currentUserId, created_at: new Date().toISOString() });
+    // Optimistic append (con cita si es respuesta)
+    const optimistic = {
+      content: text, sender_id: this._currentUserId,
+      created_at: new Date().toISOString(),
+      _replyPreview: reply ? { sender_name: reply.senderName, content: reply.content } : null
+    };
+    this._appendMessage(optimistic);
     ScrollModule.scrollToBottom(document.getElementById('chatMessagesContainer'), true);
 
     try {
@@ -291,7 +450,8 @@ export const ChatModule = {
         this._currentUserId,
         this._activeContactId,
         text,
-        this._conversationId
+        this._conversationId,
+        reply?.id || null
       );
 
       if (!this._conversationId && conversationId) {
@@ -333,6 +493,31 @@ export const ChatModule = {
           typingEl.classList.remove('hidden');
         } else {
           typingEl.classList.add('hidden');
+        }
+      },
+      null,
+      // Read receipts (✓✓)
+      (receipt) => {
+        if (!receipt?.id || !receipt.is_read) return;
+        const msgEl = document.getElementById(`msg-${receipt.id}`);
+        const checks = msgEl?.querySelector('.kk-checks');
+        if (checks) { checks.textContent = '✓✓'; checks.classList.add('is-read'); }
+      },
+      // Reacciones / eliminados en tiempo real
+      (updated) => {
+        if (!updated?.id) return;
+        const row = document.getElementById(`msg-${updated.id}`);
+        if (!row) return;
+        const bubble = row.querySelector('.kk-msg-bubble');
+        if (!bubble) return;
+        if (updated.deleted_at && !row.classList.contains('is-deleted')) {
+          markRowDeleted(row);
+          row.classList.add('is-deleted');
+          return;
+        }
+        bubble.querySelector('.kk-reaction-chips')?.remove();
+        if (updated.reactions && Object.keys(updated.reactions).length) {
+          bubble.insertAdjacentHTML('beforeend', reactionChipsHTML(updated.reactions, this._currentUserId));
         }
       }
     );

@@ -4,6 +4,21 @@ import { Helpers, escapeHtml } from './helpers.js';
 import { Helpers as SharedHelpers } from '../shared/helpers.js';
 import { ChatModule as SharedChatModule } from '../shared/chat.js';
 import { ScrollModule } from '../shared/scroll.module.js';
+import { ChatView, ChatListState } from '../shared/chat-view.js';
+import {
+  buildThreadHTML, prependThreadHTML, appendLiveMessage, waBubbleHTML,
+  chatListItemHTML, reactionChipsHTML
+} from '../shared/chat-render.js';
+import {
+  bindMessageActions, closeMessageActions,
+  showReplyBar, hideReplyBar, openForwardModal, markRowDeleted
+} from '../shared/chat-actions.js';
+
+const CHAT_PLACEHOLDER_HTML = `
+  <div class="flex-1 flex flex-col items-center justify-center text-slate-400 opacity-40 py-12">
+    <i data-lucide="message-square" class="w-16 h-16 mb-4"></i>
+    <p class="font-medium">Selecciona un contacto para comenzar</p>
+  </div>`;
 
 export const ChatModule = {
   _contacts: [],
@@ -11,6 +26,68 @@ export const ChatModule = {
   _conversationId: null,
   _channel: null,
   _topScrollDestroy: null,
+  _previews: {},        // vista previa del último mensaje por contacto
+  _pendingReply: null,  // respuesta citada pendiente
+
+  /**
+   * Restaura la vista inicial del chat (placeholder "Selecciona un contacto")
+   */
+  _closeConversationUI() {
+    this._activeContact = null;
+    this._conversationId = null;
+    this._pendingReply = null;
+    closeMessageActions();
+    hideReplyBar();
+    const header = document.getElementById('chatActiveHeader');
+    const inputArea = document.querySelector('#chatConversationPanel .chat-input-sticky');
+    const container = document.getElementById('chatMessages');
+    if (header) header.style.display = 'none';
+    if (inputArea) inputArea.style.display = 'none';
+    if (container) {
+      container.innerHTML = CHAT_PLACEHOLDER_HTML;
+      if (window.lucide) lucide.createIcons();
+    }
+    if (this._channel) { supabase.removeChannel(this._channel); this._channel = null; }
+    if (this._topScrollDestroy) { this._topScrollDestroy(); this._topScrollDestroy = null; }
+  },
+
+  /**
+   * Abre la vista conversación (móvil: lista ↔ chat) con historial integrado —
+   * el botón atrás del navegador NO recarga la página
+   */
+  _openChatView() {
+    ChatView.open({
+      apply: () => {
+        const lp = document.getElementById('chatListPanel');
+        const cp = document.getElementById('chatConversationPanel');
+        if (lp) lp.style.display = 'none';
+        if (cp) cp.style.display = 'flex';
+      },
+      revert: () => {
+        const lp = document.getElementById('chatListPanel');
+        const cp = document.getElementById('chatConversationPanel');
+        if (cp) cp.style.display = '';
+        if (lp) lp.style.display = '';
+        this._closeConversationUI();
+      }
+    });
+  },
+
+  /**
+   * API para el banner global: abrir conversación por userId
+   */
+  async openChatWithUser(userId) {
+    if (!this._contacts.length) await this.loadContacts();
+    if (this._contacts.some(c => c.id === userId)) {
+      this.selectContact(userId);
+      return true;
+    }
+    return false;
+  },
+
+  isActiveChatOpen(msg) {
+    return !!this._activeContact && !!msg?.conversation_id && msg.conversation_id === this._conversationId;
+  },
 
   async init() {
     const list = document.getElementById('chatContactsList');
@@ -27,6 +104,25 @@ export const ChatModule = {
           if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); this.sendMessage(); }
         });
       }
+    }
+
+    // Botón atrás — móvil y escritorio, una sola vez (usa historial)
+    const backBtn = document.getElementById('chatBackBtn');
+    if (backBtn && !backBtn._kkBound) {
+      backBtn._kkBound = true;
+      backBtn.addEventListener('click', () => ChatView.back());
+    }
+
+    // Búsqueda de contactos
+    const searchInput = document.getElementById('chatSearchInput');
+    if (searchInput && !searchInput._kkBound) {
+      searchInput._kkBound = true;
+      searchInput.addEventListener('input', () => {
+        const q = searchInput.value.trim().toLowerCase();
+        list.querySelectorAll('[data-contact-id]').forEach(el => {
+          el.style.display = el.textContent.toLowerCase().includes(q) ? '' : 'none';
+        });
+      });
     }
 
     // Delegación para seleccionar contacto
@@ -52,24 +148,71 @@ export const ChatModule = {
         return;
       }
 
-      this._contacts = await SharedChatModule.loadPadreContacts(student.id);
+      const [contacts, unreadRes] = await Promise.all([
+        SharedChatModule.loadPadreContacts(student.id),
+        SharedChatModule.getUnreadCounts().catch(() => ({ counts: {} }))
+      ]);
+      this._contacts = contacts;
+      const unreadMap = unreadRes?.counts || {};
 
       if (!this._contacts.length) {
         list.innerHTML = Helpers.emptyState('No hay contactos disponibles');
         return;
       }
 
-      list.innerHTML = this._contacts.map(c =>
-        '<div data-contact-id="' + c.id + '" class="flex items-center gap-3 p-3 rounded-2xl hover:bg-white hover:shadow-sm cursor-pointer transition-all border border-transparent hover:border-slate-100 group mb-1">' +
-          '<div class="w-12 h-12 rounded-full bg-green-100 text-green-700 flex items-center justify-center font-bold overflow-hidden border-2 border-green-50 shrink-0 aspect-square shadow-sm">' +
-            (c.avatar_url ? '<img src="' + c.avatar_url + '" class="w-full h-full object-cover">' : c.name.charAt(0)) +
-          '</div>' +
-          '<div class="min-w-0 flex-1">' +
-            '<div class="font-bold text-slate-700 text-sm truncate group-hover:text-green-700">' + escapeHtml(c.name) + '</div>' +
-            '<div class="text-[10px] text-slate-400 font-bold uppercase truncate">' + (c.roleLabel || c.role || '') + '</div>' +
-          '</div>' +
-        '</div>'
-      ).join('');
+      // ✅ Vista previa del último mensaje + presencia global (en paralelo)
+      const contactIds = this._contacts.map(c => c.id).filter(Boolean);
+      const [previews] = await Promise.all([
+        SharedChatModule.getLastMessagePreviews(contactIds),
+        Promise.resolve(SharedChatModule.subscribeGlobalPresence((online) => {
+          document.querySelectorAll('#chatContactsList [data-contact-id]').forEach(el => {
+            const dot = el.querySelector('.kk-online-dot');
+            if (dot) dot.classList.toggle('is-online', online.has(el.dataset.contactId));
+          });
+          // Estado en header del chat abierto
+          const activeId = this._activeContact?.id;
+          const metaEl = activeId && document.getElementById('chatActiveMeta');
+          if (metaEl && metaEl.dataset.baseMeta) {
+            const isOnline = online.has(activeId);
+            metaEl.innerHTML = `<span class="kk-header-status ${isOnline ? 'is-online' : ''}">
+              <span class="kk-status-dot"></span>${isOnline ? 'En línea' : escapeHtml(metaEl.dataset.baseMeta)}</span>`;
+          }
+        }))
+      ]);
+      this._previews = previews;
+
+      // Orden: último mensaje más reciente primero; sin mensajes → por no leídos
+      this._contacts.sort((a, b) => {
+        const ta = previews[a.id]?.created_at ? new Date(previews[a.id].created_at).getTime() : 0;
+        const tb = previews[b.id]?.created_at ? new Date(previews[b.id].created_at).getTime() : 0;
+        if (ta !== tb) return tb - ta;
+        return (unreadMap[b.id] || 0) - (unreadMap[a.id] || 0);
+      });
+
+      list.innerHTML = this._contacts.map(c => chatListItemHTML({
+        c: { id: c.id, name: c.name, avatar: c.avatar_url },
+        unread: unreadMap[c.id] || 0,
+        lastMsg: previews[c.id] || null,
+        online: SharedChatModule.getOnlineUsers().has(c.id),
+        sub: c.roleLabel || c.role || '',
+        avatarBg: 'bg-green-100 text-green-700'
+      })).join('');
+
+      // ✅ Restaurar búsqueda / scroll preservados (experiencia PWA)
+      ChatListState.restoreUI('padre', { searchEl: document.getElementById('chatSearchInput') });
+      const savedList = ChatListState.load('padre');
+      if (savedList.scrollTop) requestAnimationFrame(() => { list.scrollTop = savedList.scrollTop; });
+      if (!list._kkScrollSave) {
+        list._kkScrollSave = true;
+        let tSave = null;
+        list.addEventListener('scroll', () => {
+          clearTimeout(tSave);
+          tSave = setTimeout(() => ChatListState.save('padre', {
+            ...ChatListState.load('padre'),
+            scrollTop: list.scrollTop
+          }), 300);
+        }, { passive: true });
+      }
 
     } catch (err) {
       list.innerHTML = Helpers.emptyState('Error al cargar contactos');
@@ -83,41 +226,35 @@ export const ChatModule = {
     this._activeContact = contact;
     this._conversationId = null;
 
-    // Mobile: ocultar lista, mostrar conversación
-    const listPanel = document.getElementById('chatListPanel');
-    const convPanel = document.getElementById('chatConversationPanel');
-    if (listPanel && convPanel) {
-      listPanel.classList.add('chat-hidden');
-      convPanel.classList.remove('chat-hidden');
-      convPanel.classList.add('flex');
-    }
+    // ✅ VISTA MÓVIL/DESKTOP + HISTORIAL (botón atrás sin recargar)
+    this._openChatView();
 
-    // Actualizar header
+    // Actualizar header (visible — contiene el botón volver)
     const headerName   = document.getElementById('chatActiveName');
     const headerMeta   = document.getElementById('chatActiveMeta');
     const headerAvatar = document.getElementById('chatActiveAvatar');
     const headerArea   = document.getElementById('chatActiveHeader');
 
+    const baseMeta = contact.roleLabel || contact.role || '';
     if (headerName)   headerName.textContent   = contact.name;
-    if (headerMeta)   headerMeta.textContent   = contact.roleLabel || contact.role || '';
+    if (headerMeta) {
+      headerMeta.textContent = baseMeta;
+      headerMeta.dataset.baseMeta = baseMeta;
+      const isOnline = SharedChatModule.getOnlineUsers().has(contactId);
+      headerMeta.innerHTML = `<span class="kk-header-status ${isOnline ? 'is-online' : ''}">
+        <span class="kk-status-dot"></span>${isOnline ? 'En línea' : escapeHtml(baseMeta)}</span>`;
+    }
     if (headerAvatar) headerAvatar.innerHTML   = contact.avatar_url
       ? '<img src="' + contact.avatar_url + '" class="w-full h-full object-cover">'
       : contact.name.charAt(0);
-    if (headerArea) { headerArea.classList.remove('hidden'); headerArea.classList.add('flex'); }
+    if (headerArea) headerArea.style.display = 'flex';
 
-    // Back button
-    const backBtn = document.getElementById('chatBackBtn');
-    if (backBtn) {
-      const newBack = backBtn.cloneNode(true);
-      backBtn.parentNode.replaceChild(newBack, backBtn);
-      newBack.addEventListener('click', () => {
-        if (listPanel && convPanel) {
-          convPanel.classList.add('chat-hidden');
-          convPanel.classList.remove('flex');
-          listPanel.classList.remove('chat-hidden');
-        }
-      });
-    }
+    // ✅ Limpiar badge de no leídos del contacto abierto
+    document.querySelector(`#chatContactsList [data-contact-id="${contactId}"] .kk-unread-badge`)?.remove();
+
+    // ✅ Limpiar respuesta pendiente anterior
+    hideReplyBar();
+    this._pendingReply = null;
 
     await this.loadMessages();
     this.initRealtime();
@@ -126,15 +263,16 @@ export const ChatModule = {
   async loadMessages(loadMore = false) {
     const container = document.getElementById('chatMessages');
     if (!container) return;
+    const myId = AppState.get('user')?.id;
 
     if (!loadMore) {
       // Skeleton de burbujas para no dejar pantalla en blanco mientras carga
       container.innerHTML = `
         <div class="flex flex-col gap-3 p-2 animate-pulse">
           <div class="flex justify-start gap-2"><div class="w-7 h-7 rounded-full bg-slate-200 shrink-0"></div><div class="bg-slate-100 rounded-2xl h-10 w-48"></div></div>
-          <div class="flex justify-end gap-2 flex-row-reverse"><div class="w-7 h-7 rounded-full bg-slate-200 shrink-0"></div><div class="bg-green-100 rounded-2xl h-10 w-36"></div></div>
+          <div class="flex justify-end gap-2"><div class="w-7 h-7 rounded-full bg-slate-200 shrink-0"></div><div class="bg-green-100 rounded-2xl h-10 w-36"></div></div>
           <div class="flex justify-start gap-2"><div class="w-7 h-7 rounded-full bg-slate-200 shrink-0"></div><div class="bg-slate-100 rounded-2xl h-16 w-56"></div></div>
-          <div class="flex justify-end gap-2 flex-row-reverse"><div class="w-7 h-7 rounded-full bg-slate-200 shrink-0"></div><div class="bg-green-100 rounded-2xl h-10 w-44"></div></div>
+          <div class="flex justify-end gap-2"><div class="w-7 h-7 rounded-full bg-slate-200 shrink-0"></div><div class="bg-green-100 rounded-2xl h-10 w-44"></div></div>
           <div class="flex justify-start gap-2"><div class="w-7 h-7 rounded-full bg-slate-200 shrink-0"></div><div class="bg-slate-100 rounded-2xl h-10 w-32"></div></div>
         </div>`;
       SharedChatModule.resetPagination(this._conversationId);
@@ -146,26 +284,35 @@ export const ChatModule = {
       );
       this._conversationId = conversationId;
 
-      if (!loadMore) {
-        container.innerHTML = '';
-        if (!messages.length) {
-          container.innerHTML = '<div class="h-full flex flex-col items-center justify-center text-slate-400 text-sm"><p>No hay mensajes aun.</p><p class="text-xs mt-1">Escribe el primero.</p></div>';
-          return;
-        }
-      }
+      // Marcar como leídos al abrir
+      if (!loadMore && conversationId) SharedChatModule.markAsRead(conversationId);
 
-      const user = AppState.get('user');
-      if (loadMore) {
-        // Insertar al principio
-        const frag = document.createDocumentFragment();
-        messages.forEach(m => {
-          const div = this._buildBubble(m, user?.id);
-          frag.appendChild(div);
-        });
-        container.insertBefore(frag, container.firstChild);
-      } else {
-        messages.forEach(m => container.appendChild(this._buildBubble(m, user?.id)));
+      if (!loadMore) {
+        container.classList.add('wa-wallpaper');
+        this._resolveReplyPreviews(messages);
+        container.innerHTML = messages.length
+          ? buildThreadHTML(messages, (m) => this._bubbleHtml(m, myId))
+          : '<div class="h-full flex flex-col items-center justify-center text-slate-400 text-sm"><p>No hay mensajes aun.</p><p class="text-xs mt-1">Escribe el primero.</p></div>';
         ScrollModule.scrollToBottom(container);
+
+        // ✅ Acciones de mensaje: mantener presionado / clic derecho
+        bindMessageActions(container, {
+          myId,
+          onReply: (msg) => {
+            const senderName = msg.sender_id === myId ? 'ti' : (this._contacts.find(c => c.id === msg.sender_id)?.name || 'Contacto');
+            this._pendingReply = { id: msg.id, senderName, content: msg.content };
+            showReplyBar(document.querySelector('#chatConversationPanel .chat-input-sticky'), { senderName, content: msg.content }, () => { this._pendingReply = null; });
+          },
+          onForward: (msg) => {
+            const targets = this._contacts.filter(c => c.id).map(c => ({ id: c.id, name: c.name, avatar: c.avatar_url }));
+            openForwardModal(targets, async (ct) => {
+              const u = AppState.get('user');
+              await SharedChatModule.sendMessage(u?.id, ct.id, msg.content);
+            });
+          },
+          onReact: async (msgId, emoji) => SharedChatModule.toggleReaction(msgId, emoji),
+          onDelete: async (msgId) => SharedChatModule.deleteMessage(msgId)
+        });
 
         // Activar top-scroll para cargar más
         if (this._topScrollDestroy) this._topScrollDestroy();
@@ -176,51 +323,45 @@ export const ChatModule = {
           });
           this._topScrollDestroy = destroy;
         }
+      } else if (messages.length) {
+        prependThreadHTML(container, messages, (m) => this._bubbleHtml(m, myId));
       }
 
     } catch (err) {
-      if (!loadMore) container.innerHTML = SharedHelpers.errorState('Error al cargar mensajes');
-      if (window.lucide) lucide.createIcons();
+      if (!loadMore) {
+        container.innerHTML = SharedHelpers.errorState('Error al cargar mensajes');
+        if (window.lucide) lucide.createIcons();
+      }
     }
   },
 
-  _buildBubble(m, myId) {
+  /** Resuelve las citas de respuesta contra los mensajes ya cargados */
+  _resolveReplyPreviews(messages) {
+    if (!messages?.length) return;
+    const byId = new Map(messages.filter(m => m.id).map(m => [String(m.id), m]));
+    messages.forEach(m => {
+      if (m.reply_to && !m._replyPreview) {
+        const src = byId.get(String(m.reply_to));
+        if (src) m._replyPreview = { sender_name: src.sender_name || '', content: src.content || '' };
+      }
+    });
+  },
+
+  _bubbleHtml(m, myId) {
     const isMine = m.sender_id === myId;
-    const div = document.createElement('div');
-    div.className = 'flex ' + (isMine ? 'justify-end flex-row-reverse' : 'justify-start') + ' mb-3 gap-2';
 
-    // Get avatar for sender
-    const sender = isMine 
-      ? AppState.get('profile') 
-      : this._contacts.find(c => c.id === m.sender_id);
-    
-    const avatarUrl = isMine ? (sender?.avatar_url || null) : (m.sender_avatar || sender?.avatar_url);
-    const name = isMine ? (sender?.name || '') : (m.sender_name || sender?.name || '');
-    
-    // Build avatar HTML
-    const avatarHtml = avatarUrl 
-      ? `<img src="${avatarUrl}" class="w-full h-full object-cover">` 
-      : `<span class="text-sm font-bold">${name.charAt(0) || ''}</span>`;
+    // ✅ ¿Quién escribió? — resolver contacto para mensajes entrantes
+    const sender = isMine ? AppState.get('profile') : this._contacts.find(c => c.id === m.sender_id);
+    const senderName = isMine ? (sender?.name || '') : (m.sender_name || sender?.name || 'Contacto');
+    const avatarUrl = isMine ? (sender?.avatar_url || null) : (m.sender_avatar || sender?.avatar_url || null);
 
-    // Read receipt: show "Visto" for my sent messages that have been read
-    const readReceipt = isMine && m.read_at
-      ? '<span class="text-[8px] text-green-300 font-bold ml-1">✓✓ Visto</span>'
-      : (isMine && m.is_read ? '<span class="text-[8px] text-green-300 font-bold ml-1">✓✓</span>' : '');
-
-    div.innerHTML =
-      '<div class="w-8 h-8 rounded-full bg-green-100 text-green-700 flex items-center justify-center font-bold overflow-hidden shrink-0 aspect-square">' +
-        avatarHtml +
-      '</div>' +
-      '<div class="max-w-[80%] px-4 py-2 rounded-2xl text-sm shadow-sm ' +
-        (isMine ? 'bg-green-600 text-white rounded-tr-none' : 'bg-white border border-slate-100 text-slate-700 rounded-tl-none') +
-      '">' +
-        '<p class="whitespace-pre-wrap">' + escapeHtml(m.content) + '</p>' +
-        '<p class="text-[9px] ' + (isMine ? 'text-green-200' : 'text-slate-400') + ' mt-1 text-right uppercase font-bold flex items-center justify-end gap-1">' +
-          new Date(m.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) +
-          readReceipt +
-        '</p>' +
-      '</div>';
-    return div;
+    return waBubbleHTML({
+      m, myId,
+      senderName,
+      avatarUrl,
+      showName: true,
+      showAvatar: true
+    });
   },
 
   async sendMessage() {
@@ -237,23 +378,30 @@ export const ChatModule = {
     const profile = AppState.get('profile');
     if (!user) return;
 
+    const reply = this._pendingReply;
     input.value = '';
     input.disabled = true;
+    hideReplyBar();
+    this._pendingReply = null;
     // Stop typing indicator
     if (this._conversationId) {
       SharedChatModule.broadcastTyping(this._conversationId, profile?.name || 'Padre', false);
     }
 
-    // Optimistic append
+    // Optimistic append (con cita si es respuesta)
     const container = document.getElementById('chatMessages');
     if (container) {
-      container.appendChild(this._buildBubble({ sender_id: user.id, content, created_at: new Date().toISOString() }, user.id));
+      container.insertAdjacentHTML('beforeend', this._bubbleHtml({
+        sender_id: user.id, content,
+        created_at: new Date().toISOString(),
+        _replyPreview: reply ? { sender_name: reply.senderName, content: reply.content } : null
+      }, user.id));
       ScrollModule.scrollToBottom(container, true);
     }
 
     try {
       const { conversationId } = await SharedChatModule.sendMessage(
-        user.id, this._activeContact.id, content, this._conversationId
+        user.id, this._activeContact.id, content, this._conversationId, reply?.id || null
       );
       if (!this._conversationId && conversationId) {
         this._conversationId = conversationId;
@@ -297,7 +445,7 @@ export const ChatModule = {
           if (container) {
             // Remove typing indicator if present
             document.getElementById('typing-indicator')?.remove();
-            container.appendChild(this._buildBubble(newMsg, user?.id));
+            appendLiveMessage(container, newMsg, (m) => this._bubbleHtml(m, user?.id));
             ScrollModule.scrollToBottom(container, true);
           }
           // Mark as read
@@ -327,6 +475,31 @@ export const ChatModule = {
           }
         } else {
           existing?.remove();
+        }
+      },
+      null,
+      // Read receipts (✓✓)
+      (receipt) => {
+        if (!receipt?.id || !receipt.is_read) return;
+        const msgEl = document.getElementById(`msg-${receipt.id}`);
+        const checks = msgEl?.querySelector('.kk-checks');
+        if (checks) { checks.textContent = '✓✓'; checks.classList.add('is-read'); }
+      },
+      // Reacciones / eliminados en tiempo real
+      (updated) => {
+        if (!updated?.id) return;
+        const row = document.getElementById(`msg-${updated.id}`);
+        if (!row) return;
+        const bubble = row.querySelector('.kk-msg-bubble');
+        if (!bubble) return;
+        if (updated.deleted_at && !row.classList.contains('is-deleted')) {
+          markRowDeleted(row);
+          row.classList.add('is-deleted');
+          return;
+        }
+        bubble.querySelector('.kk-reaction-chips')?.remove();
+        if (updated.reactions && Object.keys(updated.reactions).length) {
+          bubble.insertAdjacentHTML('beforeend', reactionChipsHTML(updated.reactions, user?.id));
         }
       }
     );

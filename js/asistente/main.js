@@ -9,6 +9,15 @@ import { UIPremium } from '/js/shared/ui-premium.js';
 import { FileManager } from '/js/shared/FileManager.js';
 import { CarnetsModule } from '/js/shared/carnets.module.js';
 import { ScrollModule } from '/js/shared/scroll.module.js';
+import { ChatView, ChatListState } from '/js/shared/chat-view.js';
+import {
+  buildThreadHTML, prependThreadHTML, appendLiveMessage, waBubbleHTML,
+  formatDayLabel, chatListItemHTML, reactionChipsHTML
+} from '/js/shared/chat-render.js';
+import {
+  bindMessageActions, closeMessageActions,
+  showReplyBar, hideReplyBar, openForwardModal, markRowDeleted
+} from '/js/shared/chat-actions.js';
 import SchoolEngine from '/js/shared/school-engine.js';
 import { GradesModule } from '../directora/grades.module.js';
 
@@ -16,6 +25,57 @@ let _chatModule = null;
 async function getChatModule() {
   if (!_chatModule) _chatModule = (await import('/js/shared/chat.js')).ChatModule;
   return _chatModule;
+}
+
+// Metadatos de contactos del chat del asistente: { id: { name, role, avatar_url } }
+const _assistantContacts = {};
+let _assistantReply = null; // respuesta citada pendiente
+
+/**
+ * Restaura la vista inicial del chat (placeholder "Selecciona un contacto")
+ */
+function closeAssistantConversationUI() {
+  AppState.set('activeChatUserId', null);
+  AppState.set('activeConversationId', null);
+  closeMessageActions();
+  hideReplyBar();
+  _assistantReply = null;
+  const header = document.getElementById('chatActiveHeader');
+  const inputArea = document.getElementById('chatInputArea');
+  const container = document.getElementById('chatMessagesContainer');
+  if (header) header.style.display = 'none';
+  if (inputArea) inputArea.style.display = 'none';
+  if (container) {
+    container.innerHTML = `
+      <div class="flex-1 flex flex-col items-center justify-center text-slate-400 opacity-40 py-12">
+        <i data-lucide="messages-square" class="w-14 h-14 mb-3"></i>
+        <p class="font-medium text-sm">Selecciona un contacto</p>
+      </div>`;
+    if (window.lucide) lucide.createIcons();
+  }
+  document.getElementById('chatTypingIndicator')?.classList.add('hidden');
+}
+
+/**
+ * Abre la vista conversación (móvil: lista ↔ chat; escritorio: deselección)
+ * con integración de historial — el botón atrás NO recarga la página
+ */
+function openAssistantChatView() {
+  ChatView.open({
+    apply: () => {
+      const lp = document.getElementById('chatListPanel');
+      const cp = document.getElementById('chatConversationPanel');
+      if (lp) lp.style.display = 'none';
+      if (cp) cp.style.display = 'flex';
+    },
+    revert: () => {
+      const lp = document.getElementById('chatListPanel');
+      const cp = document.getElementById('chatConversationPanel');
+      if (cp) cp.style.display = '';
+      if (lp) lp.style.display = '';
+      closeAssistantConversationUI();
+    }
+  });
 }
 
 // Definir objeto App globalmente para evitar ReferenceError en onclicks del HTML
@@ -117,6 +177,21 @@ document.addEventListener('DOMContentLoaded', async () => {
   
   AppState.set('user', auth.user);
   AppState.set('profile', auth.profile);
+
+  // 🔔 Banner global de mensajes entrantes (visible en todo el panel)
+  import('/js/shared/incoming-banner.js').then(({ IncomingBanner }) => {
+    IncomingBanner.init({
+      uid: auth.user.id,
+      isActiveChat: (msg) => {
+        const activeConv = AppState.get('activeConversationId');
+        return !!activeConv && msg?.conversation_id === activeConv;
+      },
+      onOpen: (senderId) => {
+        window.goToSection?.('chat');
+        setTimeout(() => window.selectAssistantChat?.(senderId), 400);
+      }
+    });
+  }).catch(() => {});
 
   // ?? Sistema de badges por secci�n
   BadgeSystem.init(auth.user.id);
@@ -455,6 +530,10 @@ function initNavigation() {
             });
             break;
           case 'chat':
+            // Al entrar: lista visible, conversación cerrada (sin recargar)
+            document.getElementById('chatListPanel')?.style.setProperty('display', '');
+            document.getElementById('chatConversationPanel')?.style.setProperty('display', '');
+            ChatView.reset();
             await initAssistantChat();
             break;
           case 'videocall': {
@@ -501,6 +580,12 @@ function initNavigation() {
         case 'aulas':      import('./modules/rooms.js').then(m => m.RoomsModule.loadRooms?.()); break;
         case 'calificaciones': import('../directora/grades.module.js').then(m => m.GradesModule.init()); break;
         case 'pagos':      import('./payments.js').then(m => m.PaymentsModule.loadPayments?.()); break;
+        case 'chat':
+          document.getElementById('chatListPanel')?.style.setProperty('display', '');
+          document.getElementById('chatConversationPanel')?.style.setProperty('display', '');
+          ChatView.reset();
+          await initAssistantChat();
+          break;
         case 'calendario':
           import('../shared/calendar-view.js').then(({ CalendarView }) => {
             SchoolEngine.refresh().then(() => {
@@ -753,27 +838,47 @@ async function initProfile() {
 
 // --- Funciones Globales de Ventana ---
 window.selectAssistantChat = async (userId, name, role, avatarUrl = null) => {
-  const chatList = document.getElementById('chatListPanel');
-  const chatConv = document.getElementById('chatConversationPanel');
-  const user = AppState.get('user');
-  const profile = AppState.get('profile');
-  
-  if (window.innerWidth < 768) {
-    chatList?.classList.add('chat-hidden');
-    chatConv?.classList.remove('chat-hidden');
-    chatConv?.classList.add('flex');
+  // ✅ Resolver metadatos del contacto desde caché local (evita strings complejos en onclick)
+  const meta = _assistantContacts[userId] || {};
+  try { name = decodeURIComponent(name || meta.name || ''); } catch (_) { name = meta.name || name || ''; }
+  role = role || meta.role || '';
+  avatarUrl = (avatarUrl && avatarUrl !== 'null') ? avatarUrl : (meta.avatar_url || '');
+
+  // ✅ Fallback: si el contacto no está en caché (apertura desde banner), buscar perfil
+  if (!name) {
+    try {
+      const { data: p } = await supabase.from('profiles')
+        .select('name, role, avatar_url').eq('id', userId).maybeSingle();
+      if (p) { name = p.name || 'Contacto'; role = p.role || role; avatarUrl = avatarUrl || p.avatar_url || ''; }
+    } catch (_) {}
   }
 
-  // UI Header
+  // ✅ VISTA MÓVIL/DESKTOP + HISTORIAL (botón atrás sin recargar)
+  openAssistantChatView();
+
+  // ✅ BOTÓN ATRÁS — móvil y escritorio, una sola vez
+  const backBtn = document.getElementById('chatBackBtn');
+  if (backBtn && !backBtn._kkBound) {
+    backBtn._kkBound = true;
+    backBtn.addEventListener('click', () => ChatView.back());
+  }
+
+  // ✅ Header visible al entrar a una conversación (contiene el botón volver)
+  document.getElementById('chatActiveHeader')?.style.setProperty('display', 'flex');
+
+  // ✅ Limpiar badge de no leídos del contacto abierto
+  document.querySelector(`#chatContactsList [data-user-id="${userId}"] .kk-unread-badge`)?.remove();
+
+  // ✅ UI Header
   const nameEl = document.getElementById('chatActiveName');
   const metaEl = document.getElementById('chatActiveMeta');
   const avatarEl = document.getElementById('chatActiveAvatar');
   const inputArea = document.getElementById('chatInputArea');
-  
+
   // ✅ ENRIQUECIMIENTO DE CONTEXTO: Título con nombre del Estudiante (solo activos)
   const { data: student } = await supabase
     .from('students')
-    .select('name')
+    .select('id, name')
     .eq('parent_id', userId)
     .is('deleted_at', null)
     .eq('is_active', true)
@@ -781,8 +886,15 @@ window.selectAssistantChat = async (userId, name, role, avatarUrl = null) => {
     .limit(1)
     .maybeSingle();
   if (nameEl) nameEl.textContent = student ? `Estudiante: ${student.name}` : name;
-  if (metaEl) metaEl.textContent = student ? `Padre: ${name}` : (role || 'Usuario');
-  
+  if (metaEl) {
+    const base = student ? `Padre: ${name}` : (role || 'Usuario');
+    metaEl.textContent = base;
+    metaEl.dataset.baseMeta = base;
+    const online = (await getChatModule()).getOnlineUsers().has(userId);
+    metaEl.innerHTML = `<span class="kk-header-status ${online ? 'is-online' : ''}">
+      <span class="kk-status-dot"></span>${online ? 'En línea' : Helpers.escapeHTML(base)}</span>`;
+  }
+
   // ✅ BOTONES DE ACCESO RÁPIDO (Directora/Asistente)
   const headerActions = document.getElementById('chatHeaderActions');
   if (headerActions) {
@@ -796,7 +908,7 @@ window.selectAssistantChat = async (userId, name, role, avatarUrl = null) => {
     ` : '';
     if (window.lucide) lucide.createIcons();
   }
-  
+
   if (avatarEl) {
     if (avatarUrl && avatarUrl !== 'null') {
       avatarEl.innerHTML = `<img src="${avatarUrl}" class="w-full h-full object-cover">`;
@@ -804,13 +916,41 @@ window.selectAssistantChat = async (userId, name, role, avatarUrl = null) => {
       avatarEl.innerHTML = (name || '?').charAt(0);
     }
   }
-  inputArea?.classList.remove('hidden');
+  inputArea?.style.setProperty('display', '');
+
+  // ✅ Limpiar respuesta pendiente anterior
+  hideReplyBar();
+  _assistantReply = null;
+
+  const user = AppState.get('user');
+  const profile = AppState.get('profile');
 
     // ✅ Reset UI al cambiar de chat
     AppState.set('activeChatUserId', userId);
 
     const container = document.getElementById('chatMessagesContainer');
-  if (container) container.innerHTML = '<div class="p-8 text-center"><div class="animate-spin w-6 h-6 border-2 border-teal-500 border-t-transparent rounded-full mx-auto"></div></div>';
+  if (container) {
+    container.innerHTML = '<div class="p-8 text-center"><div class="animate-spin w-6 h-6 border-2 border-teal-500 border-t-transparent rounded-full mx-auto"></div></div>';
+
+    // ✅ Acciones de mensaje: mantener presionado / clic derecho
+    bindMessageActions(container, {
+      myId: user.id,
+      onReply: (msg) => {
+        const currentId = AppState.get('activeChatUserId');
+        const senderName = msg.sender_id === user.id ? 'ti' : (_assistantContacts[currentId]?.name || 'Contacto');
+        _assistantReply = { id: msg.id, senderName, content: msg.content };
+        showReplyBar(document.getElementById('chatInputArea'), { senderName, content: msg.content }, () => { _assistantReply = null; });
+      },
+      onForward: (msg) => {
+        const targets = Object.values(_assistantContacts).filter(c => c.id);
+        openForwardModal(targets, async (contact) => {
+          await (await getChatModule()).sendMessage(user.id, contact.id, msg.content);
+        });
+      },
+      onReact: async (msgId, emoji) => (await getChatModule()).toggleReaction(msgId, emoji),
+      onDelete: async (msgId) => (await getChatModule()).deleteMessage(msgId)
+    });
+  }
 
   try {
     let messages = [], conversationId = null;
@@ -830,8 +970,10 @@ window.selectAssistantChat = async (userId, name, role, avatarUrl = null) => {
     if (conversationId) (await getChatModule()).markAsRead(conversationId);
 
     if (container) {
-      container.innerHTML = messages.length 
-        ? messages.map(m => _msgBubble(m, user.id)).join('')
+      container.classList.add('wa-wallpaper');
+      _resolveReplyPreviews(messages);
+      container.innerHTML = messages.length
+        ? buildThreadHTML(messages, (m) => _msgBubble(m, user.id))
         : '<div class="p-8 text-center text-slate-400 text-xs font-bold uppercase tracking-widest">No hay mensajes previos</div>';
       ScrollModule.scrollToBottom(container, false);
 
@@ -843,8 +985,7 @@ window.selectAssistantChat = async (userId, name, role, avatarUrl = null) => {
           loadFn: async () => {
             const { messages: moreMsg, hasMore } = await (await getChatModule()).loadConversation(userId, conversationId, true);
             if (moreMsg.length > 0) {
-              const html = moreMsg.map(m => _msgBubble(m, user.id)).join('');
-              container.insertAdjacentHTML('afterbegin', html);
+              prependThreadHTML(container, moreMsg, (m) => _msgBubble(m, user.id));
             }
           }
         });
@@ -853,11 +994,11 @@ window.selectAssistantChat = async (userId, name, role, avatarUrl = null) => {
 
     // Subscribe Realtime
     if (conversationId) {
-      (await getChatModule()).subscribeToConversation(conversationId, 
+      (await getChatModule()).subscribeToConversation(conversationId,
         (newMsg) => {
           if (newMsg.sender_id === user.id) return;
           if (container) {
-            container.insertAdjacentHTML('beforeend', _msgBubble(newMsg, user.id));
+            appendLiveMessage(container, newMsg, (m) => _msgBubble(m, user.id));
             ScrollModule.scrollToBottom(container, true);
           }
         },
@@ -877,10 +1018,26 @@ window.selectAssistantChat = async (userId, name, role, avatarUrl = null) => {
         },
         (receipt) => {
           // Read receipt handler (✓✓)
+          if (!receipt?.id || !receipt.is_read) return;
           const msgEl = document.getElementById(`msg-${receipt.id}`);
-          if (msgEl && receipt.is_read) {
-            const checks = msgEl.querySelector('.read-status');
-            if (checks) checks.innerHTML = '✓✓';
+          const checks = msgEl?.querySelector('.kk-checks');
+          if (checks) { checks.textContent = '✓✓'; checks.classList.add('is-read'); }
+        },
+        (updated) => {
+          // ✅ REACCIONES / ELIMINADOS en tiempo real
+          if (!updated?.id) return;
+          const row = document.getElementById(`msg-${updated.id}`);
+          if (!row) return;
+          const bubble = row.querySelector('.kk-msg-bubble');
+          if (!bubble) return;
+          if (updated.deleted_at && !row.classList.contains('is-deleted')) {
+            markRowDeleted(row);
+            row.classList.add('is-deleted');
+            return;
+          }
+          bubble.querySelector('.kk-reaction-chips')?.remove();
+          if (updated.reactions && Object.keys(updated.reactions).length) {
+            bubble.insertAdjacentHTML('beforeend', reactionChipsHTML(updated.reactions, user.id));
           }
         }
       );
@@ -906,13 +1063,18 @@ async function initAssistantChat() {
 
   try {
     // Cargar contactos — solo perfiles activos con nombre válido
-    const { data: profiles, error } = await supabase
-      .from('profiles')
-      .select('id, name, avatar_url, role')
-      .neq('id', user.id)
-      .is('deleted_at', null)
-      .not('name', 'is', null)
-      .order('name');
+    const [profilesRes, unreadRes] = await Promise.all([
+      supabase
+        .from('profiles')
+        .select('id, name, avatar_url, role')
+        .neq('id', user.id)
+        .is('deleted_at', null)
+        .not('name', 'is', null)
+        .order('name'),
+      getChatModule().then(m => m.getUnreadCounts()).catch(() => ({ counts: {} }))
+    ]);
+    const { data: profiles, error } = profilesRes;
+    const unreadMap = unreadRes?.counts || {};
 
     if (error) throw error;
 
@@ -945,25 +1107,80 @@ async function initAssistantChat() {
       return;
     }
 
+    // ✅ Vista previa del último mensaje + presencia global (en paralelo)
+    const contactIds = activeProfiles.filter(p => p.id).map(p => p.id);
+    const [previews] = await Promise.all([
+      getChatModule().then(m => m.getLastMessagePreviews(contactIds)),
+      getChatModule().then(m => m.subscribeGlobalPresence(online => _updatePresenceUI(online)))
+    ]);
+
+    // Orden: último mensaje más reciente primero; sin mensajes → por no leídos
+    activeProfiles.sort((a, b) => {
+      const ta = previews[a.id]?.created_at ? new Date(previews[a.id].created_at).getTime() : 0;
+      const tb = previews[b.id]?.created_at ? new Date(previews[b.id].created_at).getTime() : 0;
+      if (ta !== tb) return tb - ta;
+      return (unreadMap[a.id] || 0) - (unreadMap[b.id] || 0);
+    });
+
     list.innerHTML = activeProfiles.map(p => {
+      const unread = unreadMap[p.id] || 0;
       const studentName = p.role === 'padre' ? (studentMap[p.id] || null) : null;
       const mainTitle = studentName ? `Estudiante: ${studentName}` : (p.name || 'Sin nombre');
       const subTitle = studentName ? `Padre: ${p.name || 'Sin nombre'}` : (p.role || 'Usuario');
+      const roleLabel = p.role === 'directora' ? 'Directora'
+        : p.role === 'asistente' ? 'Asistente'
+        : p.role === 'maestra' ? 'Maestra' : (p.role || 'Usuario');
 
-      return `
-      <div onclick="window.selectAssistantChat('${p.id}', '${Helpers.escapeHTML(p.name)}', '${p.role}', '${p.avatar_url || ''}')" 
-           data-user-id="${p.id}"
-           class="flex items-center gap-3 p-3 rounded-2xl hover:bg-white hover:shadow-sm cursor-pointer transition-all border border-transparent hover:border-slate-100 group mb-1 relative">
-        <div class="w-12 h-12 rounded-full bg-teal-100 text-teal-700 flex items-center justify-center font-bold overflow-hidden border-2 border-teal-50 shrink-0 shadow-sm">
-          ${p.avatar_url ? `<img src="${p.avatar_url}" class="w-full h-full object-cover">` : (p.name || '?').charAt(0)}
-        </div>
-        <div class="absolute bottom-3 left-11 w-3.5 h-3.5 bg-slate-300 border-2 border-white rounded-full presence-indicator"></div>
-        <div class="min-w-0 flex-1">
-          <div class="font-bold text-slate-700 text-sm truncate group-hover:text-teal-700">${Helpers.escapeHTML(mainTitle)}</div>
-          <div class="text-[10px] text-slate-400 font-bold uppercase truncate">${Helpers.escapeHTML(subTitle)}</div>
-        </div>
-      </div>
-    `}).join('');
+      // ✅ Guardar metadatos localmente — onclick solo pasa el ID (seguro ante comillas/apóstrofes)
+      _assistantContacts[p.id] = { id: p.id, name: p.name || 'Sin nombre', role: p.role, avatar_url: p.avatar_url || '' };
+
+      return chatListItemHTML({
+        c: { id: p.id, name: mainTitle, avatar: p.avatar_url },
+        unread,
+        lastMsg: previews[p.id] || null,
+        online: false,
+        sub: subTitle,
+        avatarBg: 'bg-teal-100 text-teal-700',
+        extraAttr: `data-user-id="${p.id}"`
+      });
+    }).join('');
+
+    // ✅ Buscador de contactos (una sola vez)
+    const searchInputEl = document.getElementById('chatSearchInput');
+    if (searchInputEl && !searchInputEl._kkBound) {
+      searchInputEl._kkBound = true;
+      searchInputEl.addEventListener('input', () => {
+        const q = searchInputEl.value.trim().toLowerCase();
+        list.querySelectorAll('.kk-chat-item').forEach(el => {
+          el.style.display = (!q || el.textContent.toLowerCase().includes(q)) ? '' : 'none';
+        });
+      });
+    }
+
+    // ✅ Restaurar búsqueda / scroll preservados (experiencia PWA)
+    ChatListState.restoreUI('asistente', { searchEl: searchInputEl });
+    const savedList = ChatListState.load('asistente');
+    if (savedList.scrollTop) requestAnimationFrame(() => { list.scrollTop = savedList.scrollTop; });
+    if (!list._kkScrollSave) {
+      list._kkScrollSave = true;
+      let tSave = null;
+      list.addEventListener('scroll', () => {
+        clearTimeout(tSave);
+        tSave = setTimeout(() => ChatListState.save('asistente', {
+          ...ChatListState.load('asistente'),
+          scrollTop: list.scrollTop
+        }), 300);
+      }, { passive: true });
+    }
+
+    // ✅ Delegación de clic en la lista (una sola vez)
+    if (!list._kkClickBound) {
+      list._kkClickBound = true;
+      list.addEventListener('click', (e) => {
+        const row = e.target.closest('.kk-chat-item');
+        if (row?.dataset.userId) window.selectAssistantChat(row.dataset.userId);
+      });
+    }
 
     // Listeners para envío
     const sendBtn = document.getElementById('btnSendChatMessage');
@@ -979,28 +1196,35 @@ async function initAssistantChat() {
         const convId = AppState.get('activeConversationId');
         if (!text || !destId) return;
 
+        const reply = _assistantReply;
         input.value = '';
+        hideReplyBar();
+        _assistantReply = null;
         const tempId = `temp-${Date.now()}`;
         const container = document.getElementById('chatMessagesContainer');
-        container?.insertAdjacentHTML('beforeend', _msgBubble({ id: tempId, sender_id: user.id, content: text }, user.id));
+        container?.insertAdjacentHTML('beforeend', _msgBubble({
+          id: tempId, sender_id: user.id, content: text,
+          _replyPreview: reply ? { sender_name: reply.senderName, content: reply.content } : null
+        }, user.id));
         ScrollModule.scrollToBottom(container, true);
 
         try {
-          const res = await (await getChatModule()).sendMessage(user.id, destId, text, convId);
+          const res = await (await getChatModule()).sendMessage(user.id, destId, text, convId, reply?.id || null);
           // Actualizar ID temporal con el real de Supabase
           const tempMsg = document.getElementById(`msg-${tempId}`);
-          if (tempMsg && res.id) {
-            tempMsg.id = `msg-${res.id}`;
-            const timeSpan = tempMsg.querySelector('span:first-child');
-            if (timeSpan) timeSpan.textContent = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+          if (tempMsg && res.message?.id) {
+            tempMsg.id = `msg-${res.message.id}`;
+            const timeSpan = tempMsg.querySelector('.kk-msg-time');
+            const now = new Date();
+            if (timeSpan) timeSpan.textContent = `${formatDayLabel(now)} · ${now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`;
           }
           if (!convId && res.conversationId) {
             AppState.set('activeConversationId', res.conversationId);
           }
-        } catch (_) { 
+        } catch (_) {
           const tempMsg = document.getElementById(`msg-${tempId}`);
           if (tempMsg) tempMsg.style.opacity = '0.5';
-          Helpers.toast('Error al enviar', 'error'); 
+          Helpers.toast('Error al enviar', 'error');
         }
       };
 
@@ -1024,55 +1248,64 @@ async function initAssistantChat() {
 }
 
 /**
- * Actualiza los indicadores de presencia en la lista de contactos
+ * Actualiza los indicadores de presencia en la lista de contactos.
+ * Acepta un Set de user_id (presencia global) o el presenceState del canal.
  */
-function _updatePresenceUI(presenceState) {
-  const onlineUsers = new Set();
-  Object.values(presenceState).forEach(p => {
-    p.forEach(presence => onlineUsers.add(presence.user_id));
-  });
+function _updatePresenceUI(presenceSource) {
+  let onlineUsers;
+  if (presenceSource instanceof Set) {
+    onlineUsers = presenceSource;
+  } else {
+    onlineUsers = new Set();
+    Object.values(presenceSource || {}).forEach(p => {
+      p.forEach(presence => onlineUsers.add(presence.user_id));
+    });
+  }
 
   document.querySelectorAll('#chatContactsList [data-user-id]').forEach(el => {
-    const userId = el.dataset.userId;
-    const indicator = el.querySelector('.presence-indicator');
-    if (indicator) {
-      if (onlineUsers.has(userId)) {
-        indicator.classList.remove('bg-slate-300');
-        indicator.classList.add('bg-emerald-500');
-      } else {
-        indicator.classList.remove('bg-emerald-500');
-        indicator.classList.add('bg-slate-300');
-      }
+    const dot = el.querySelector('.kk-online-dot');
+    if (dot) dot.classList.toggle('is-online', onlineUsers.has(el.dataset.userId));
+  });
+
+  // Estado en el header del chat abierto
+  const activeId = AppState.get('activeChatUserId');
+  if (activeId) {
+    const metaEl = document.getElementById('chatActiveMeta');
+    if (metaEl && metaEl.dataset.baseMeta) {
+      const online = onlineUsers.has(activeId);
+      metaEl.innerHTML = `<span class="kk-header-status ${online ? 'is-online' : ''}">
+        <span class="kk-status-dot"></span>${online ? 'En línea' : Helpers.escapeHTML(metaEl.dataset.baseMeta)}</span>`;
+    }
+  }
+}
+
+/** Resuelve las citas de respuesta contra los mensajes ya cargados */
+function _resolveReplyPreviews(messages) {
+  if (!messages?.length) return;
+  const byId = new Map(messages.filter(m => m.id).map(m => [String(m.id), m]));
+  messages.forEach(m => {
+    if (m.reply_to && !m._replyPreview) {
+      const src = byId.get(String(m.reply_to));
+      if (src) m._replyPreview = { sender_name: src.sender_name || '', content: src.content || '' };
     }
   });
 }
 
 function _msgBubble(m, myId) {
   const isMe = m.sender_id === myId;
-  const isRead = m.is_read || false;
-  const msgId = m.id || `temp-${Date.now()}`;
 
-  // Get avatar for sender
+  // ✅ ¿Quién escribió? — resolver contacto activo para mensajes entrantes
   const profile = AppState.get('profile');
-  const senderName = isMe ? (profile?.name || '') : (m.sender_name || '');
-  const avatarUrl = isMe ? (profile?.avatar_url || null) : (m.sender_avatar || null);
+  const activeId = AppState.get('activeChatUserId');
+  const contact = !isMe && activeId ? _assistantContacts[activeId] : null;
+  const senderName = isMe ? (profile?.name || '') : (m.sender_name || contact?.name || 'Contacto');
+  const avatarUrl = isMe ? (profile?.avatar_url || null) : (m.sender_avatar || contact?.avatar_url || null);
 
-  // Build avatar HTML
-  const avatarHtml = avatarUrl 
-    ? `<img src="${avatarUrl}" class="w-full h-full object-cover">` 
-    : `<span class="text-sm font-bold">${senderName.charAt(0) || ''}</span>`;
-
-  return `
-    <div id="msg-${msgId}" class="flex ${isMe ? 'justify-end flex-row-reverse' : 'justify-start'} mb-3 gap-2 animate-slideInUp">
-      <div class="w-8 h-8 rounded-full bg-teal-100 text-teal-700 flex items-center justify-center font-bold overflow-hidden shrink-0">
-        ${avatarHtml}
-      </div>
-      <div class="max-w-[80%] px-4 py-2.5 rounded-2xl text-sm shadow-sm ${isMe ? 'bg-teal-600 text-white rounded-tr-none' : 'bg-white text-slate-700 rounded-tl-none border border-slate-100'}">
-        <p class="leading-relaxed">${Helpers.escapeHTML(m.content)}</p>
-        <div class="flex items-center justify-end gap-1 text-[9px] mt-1 opacity-60 font-bold uppercase tracking-tighter">
-          <span>${m.created_at ? new Date(m.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : 'Enviando...'}</span>
-          ${isMe ? `<span class="read-status text-[11px] leading-none">${isRead ? '✓✓' : '✓'}</span>` : ''}
-        </div>
-      </div>
-    </div>`;
+  return waBubbleHTML({
+    m, myId,
+    senderName,
+    avatarUrl,
+    showName: true,
+    showAvatar: true
+  });
 }

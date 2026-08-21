@@ -179,6 +179,20 @@ document.addEventListener('DOMContentLoaded', async () => {
     AppState.set('user', auth.user);
     AppState.set('profile', auth.profile);
 
+    // 🔔 Banner global de mensajes entrantes (visible en todo el panel)
+    import('./chat.js').then(({ ChatModule }) => {
+      import('/js/shared/incoming-banner.js').then(({ IncomingBanner }) => {
+        IncomingBanner.init({
+          uid: auth.user.id,
+          isActiveChat: (msg) => ChatModule.isActiveChatOpen?.(msg),
+          onOpen: (senderId) => {
+            App.navigateTo('notifications');
+            setTimeout(() => { ChatModule.openChatWithUser?.(senderId); }, 400);
+          }
+        });
+      }).catch(() => {});
+    }).catch(() => {});
+
     // Inicializar School Engine
     await SchoolEngine.init({ forceRefresh: true });
     AppState.set('schoolYear', SchoolEngine.getSchoolYear());

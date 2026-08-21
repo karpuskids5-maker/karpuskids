@@ -6,6 +6,10 @@ import { withTimeout } from './db-utils.js';
 
 const MSG_PAGE_SIZE = 20;
 
+// Columnas base (siempre existen) + columnas opcionales (requieren migración)
+const MSG_SELECT_BASE = 'id, conversation_id, sender_id, receiver_id, content, is_read, read_at, created_at';
+const MSG_SELECT_FULL = `${MSG_SELECT_BASE}, sender_name, sender_avatar, reactions, reply_to, deleted_at`;
+
 /**
  * 💬 ChatModule: Cerebro unificado de mensajería
  * Maneja la lógica compleja de conversaciones, participantes y realtime.
@@ -14,6 +18,163 @@ export const ChatModule = {
   _activeSubscription: null,
   // Paginación por conversación: { [convId]: { page, hasMore, loading } }
   _pagination: {},
+  // ¿La BD ya tiene las columnas extendidas? (null = desconocido, se autodetecta)
+  _extendedCols: null,
+  // Canal global de presencia compartido entre paneles
+  _presenceChannel: null,
+  _presenceOnline: new Set(),
+  _presenceCbs: new Set(),
+
+  /**
+   * Select de mensajes con autodetección de columnas extendidas
+   * (reactions / reply_to / deleted_at requieren migración).
+   */
+  async _msgSelect() {
+    if (this._extendedCols !== null) {
+      return this._extendedCols ? MSG_SELECT_FULL : MSG_SELECT_BASE;
+    }
+    try {
+      const { error } = await supabase.from('messages').select(MSG_SELECT_FULL).limit(1);
+      this._extendedCols = !error;
+    } catch (_) {
+      this._extendedCols = false;
+    }
+    return this._extendedCols ? MSG_SELECT_FULL : MSG_SELECT_BASE;
+  },
+
+  /**
+   * Vista previa del último mensaje por contacto: { [contactId]: { content, created_at, sender_id, mine } }
+   * Una sola query para toda la lista (mensajes directos usan sender_id + receiver_id).
+   */
+  async getLastMessagePreviews(contactIds) {
+    const ids = (contactIds || []).filter(Boolean);
+    if (!ids.length) return {};
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return {};
+
+      const sel = await this._msgSelect();
+      const { data, error } = await supabase
+        .from('messages')
+        .select(sel)
+        .or(
+          `and(sender_id.eq.${user.id},receiver_id.in.(${ids.join(',')})),` +
+          `and(receiver_id.eq.${user.id},sender_id.in.(${ids.join(',')}))`
+        )
+        .order('created_at', { ascending: false })
+        .limit(300);
+
+      if (error) return {};
+
+      const previews = {};
+      (data || []).forEach(m => {
+        // Los mensajes vienen ordenados desc → el primero de cada contacto es el último
+        const otherId = m.sender_id === user.id ? m.receiver_id : m.sender_id;
+        if (!otherId || previews[otherId]) return;
+        previews[otherId] = {
+          content: m.deleted_at ? '' : (m.content || ''),
+          created_at: m.created_at,
+          sender_id: m.sender_id,
+          mine: m.sender_id === user.id,
+          deleted: !!m.deleted_at
+        };
+      });
+      return previews;
+    } catch (_) {
+      return {};
+    }
+  },
+
+  /**
+   * Presencia global (lista completa): canal compartido con tracking propio.
+   * Devuelve un Set con los user_id en línea; onChange se llama en cada sync.
+   */
+  subscribeGlobalPresence(onChange) {
+    if (onChange && !this._presenceCbs.has(onChange)) this._presenceCbs.add(onChange);
+    if (this._presenceChannel) return this._presenceChannel;
+
+    const channel = supabase.channel('karpus_presence');
+    channel
+      .on('presence', { event: 'sync' }, () => {
+        try {
+          const state = channel.presenceState();
+          const online = new Set();
+          Object.values(state).forEach(arr => (arr || []).forEach(p => p.user_id && online.add(p.user_id)));
+          this._presenceOnline = online;
+          this._presenceCbs.forEach(cb => { try { cb(online); } catch (_) {} });
+        } catch (_) {}
+      })
+      .subscribe(async (status) => {
+        if (status === 'SUBSCRIBED') {
+          try {
+            const { data: { user } } = await supabase.auth.getUser();
+            if (user) await channel.track({ user_id: user.id, online_at: new Date().toISOString() });
+          } catch (_) {}
+        }
+      });
+
+    this._presenceChannel = channel;
+    return channel;
+  },
+
+  /** IDs en línea conocidos (Set) */
+  getOnlineUsers() {
+    return this._presenceOnline;
+  },
+
+  /**
+   * Reaccionar a un mensaje: reactions = { [userId]: emoji }. Toggle (mismo emoji → quita).
+   */
+  async toggleReaction(messageId, emoji) {
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user || !messageId) return null;
+
+      const sel = await this._msgSelect();
+      if (!this._extendedCols) return null; // sin columna reactions en BD
+
+      const { data: msg } = await supabase.from('messages').select(sel).eq('id', messageId).single();
+      if (!msg) return null;
+
+      const reactions = { ...(msg.reactions || {}) };
+      if (reactions[user.id] === emoji) delete reactions[user.id];
+      else reactions[user.id] = emoji;
+
+      const { data: updated, error } = await supabase
+        .from('messages')
+        .update({ reactions })
+        .eq('id', messageId)
+        .select(sel)
+        .single();
+
+      if (error) return null;
+      return updated;
+    } catch (_) {
+      return null;
+    }
+  },
+
+  /**
+   * Eliminar (borrado lógico) un mensaje propio.
+   * Si la BD no tiene deleted_at, solo se elimina localmente (el caller decide).
+   * @returns {boolean} true si se eliminó en servidor
+   */
+  async deleteMessage(messageId) {
+    try {
+      if (!this._extendedCols) {
+        // Autodetectar una vez más por si la migración llegó tarde
+        await this._msgSelect();
+        if (!this._extendedCols) return false;
+      }
+      const { error } = await supabase
+        .from('messages')
+        .update({ deleted_at: new Date().toISOString(), content: 'Mensaje eliminado' })
+        .eq('id', messageId);
+      return !error;
+    } catch (_) {
+      return false;
+    }
+  },
 
   /**
    * Obtiene un mapa de mensajes no leídos por remitente { userId: count }
@@ -92,10 +253,15 @@ export const ChatModule = {
         const from = state.page * MSG_PAGE_SIZE;
         const to   = from + MSG_PAGE_SIZE - 1;
 
-        const { data: messages, error } = await supabase
+        const sel = await this._msgSelect();
+        let query = supabase
           .from('messages')
-          .select('id, conversation_id, sender_id, receiver_id, content, is_read, read_at, created_at')
-          .eq('conversation_id', conversationId)
+          .select(sel)
+          .eq('conversation_id', conversationId);
+
+        if (this._extendedCols) query = query.is('deleted_at', null);
+
+        const { data: messages, error } = await query
           .order('created_at', { ascending: false })  // más recientes primero
           .range(from, to);
 
@@ -122,7 +288,8 @@ export const ChatModule = {
         return { messages: [], conversationId: null, hasMore: false };
       }
 
-      const messages = (data || []).slice(-MSG_PAGE_SIZE);
+      const visible = (data || []).filter(m => !m.deleted_at);
+      const messages = visible.slice(-MSG_PAGE_SIZE);
       const foundConvId = messages.length > 0 ? messages[0].conversation_id : null;
 
       if (foundConvId) {
@@ -149,10 +316,11 @@ export const ChatModule = {
   },
 
   /**
-   * Envía un mensaje. 
+   * Envía un mensaje.
    * 🔥 Lógica Inteligente: Si no existe conversación, la crea automáticamente junto con los participantes.
+   * @param {string|null} replyToId — id del mensaje al que se responde (opcional)
    */
-  async sendMessage(senderId, receiverId, content, conversationId = null) {
+  async sendMessage(senderId, receiverId, content, conversationId = null, replyToId = null) {
     try {
       let activeConvId = conversationId;
 
@@ -193,18 +361,33 @@ export const ChatModule = {
         }
       }
 
-      // 2. Insertar el mensaje
-      const { data: message, error: msgError } = await supabase
-        .from('messages')
-        .insert({
-          conversation_id: activeConvId,
-          sender_id: senderId,
-          receiver_id: receiverId,   // keep for NOT NULL compat until migration runs
-          content: content.trim(),
-          is_read: false
-        })
-        .select()
-        .single();
+      // 2. Insertar el mensaje (con reply_to si la BD lo soporta)
+      const payload = {
+        conversation_id: activeConvId,
+        sender_id: senderId,
+        receiver_id: receiverId,   // keep for NOT NULL compat until migration runs
+        content: content.trim(),
+        is_read: false
+      };
+
+      let message = null, msgError = null;
+      if (replyToId && this._extendedCols) {
+        const res = await supabase
+          .from('messages')
+          .insert({ ...payload, reply_to: replyToId })
+          .select()
+          .single();
+        message = res.data; msgError = res.error;
+        if (msgError) { message = null; msgError = null; } // fallback sin reply_to
+      }
+      if (!message) {
+        const res = await supabase
+          .from('messages')
+          .insert(payload)
+          .select()
+          .single();
+        message = res.data; msgError = res.error;
+      }
 
       if (msgError) throw msgError;
 
@@ -217,7 +400,7 @@ export const ChatModule = {
   /**
    * Suscripción Realtime Unificada — con typing indicators, presence y read receipts
    */
-  subscribeToConversation(conversationId, onMessage, onTyping, onPresence, onReadReceipt) {
+  subscribeToConversation(conversationId, onMessage, onTyping, onPresence, onReadReceipt, onMessageUpdate) {
     this.unsubscribe();
 
     const channelName = `chat_cv_${conversationId}`;
@@ -233,13 +416,15 @@ export const ChatModule = {
       }, (payload) => {
         if (payload.new) {
           // Marcar como leído si el chat está abierto (lado receptor)
-          if (payload.new.sender_id !== supabase.auth.getUser().data?.user?.id) {
-            this.markAsRead(conversationId);
-          }
+          supabase.auth.getUser().then(({ data }) => {
+            if (payload.new.sender_id !== data?.user?.id) {
+              this.markAsRead(conversationId);
+            }
+          }).catch(() => {});
           onMessage(payload.new);
         }
       })
-      // 2. Read receipts (Doble Check)
+      // 2. Read receipts (Doble Check) + reacciones/eliminados
       .on('postgres_changes', {
         event: 'UPDATE',
         schema: 'public',
@@ -247,6 +432,7 @@ export const ChatModule = {
         filter: `conversation_id=eq.${conversationId}`
       }, (payload) => {
         if (payload.new && onReadReceipt) onReadReceipt(payload.new);
+        if (payload.new && onMessageUpdate) onMessageUpdate(payload.new);
       })
       // 3. Typing indicator via broadcast
       .on('broadcast', { event: 'typing' }, (payload) => {
@@ -295,6 +481,17 @@ export const ChatModule = {
       this._activeSubscription = null;
       this._activeChannelName = null;
       this._activeConvId = null;
+    }
+  },
+
+  /** Obtiene un mensaje por id (para renderizar la cita de una respuesta) */
+  async getMessageById(messageId) {
+    try {
+      const sel = await this._msgSelect();
+      const { data } = await supabase.from('messages').select(sel).eq('id', messageId).maybeSingle();
+      return data || null;
+    } catch (_) {
+      return null;
     }
   },
 
