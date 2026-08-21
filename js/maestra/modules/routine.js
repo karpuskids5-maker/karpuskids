@@ -752,38 +752,32 @@ function _injectV8Styles() {
     .routine-section-toggle[aria-expanded="true"] .acc-chevron{transform:rotate(180deg);}
     .routine-section-body{overflow:hidden;transition:max-height .3s ease,opacity .25s ease;}
     .routine-section-body.collapsed{max-height:0!important;opacity:0;padding-top:0;padding-bottom:0;pointer-events:none;}
-    /* ✅ Móvil: rutina más compacta — botones y contenedores pequeños, sin choques */
+    /* ✅ Móvil: rutina — layout correcto sin choques ni overflow */
     @media (max-width:640px){
-      #routineWrapper > * + *{margin-top:10px !important;}
-      #routineWrapper > div{border-radius:1.25rem !important;}
-      .routine-section-toggle{padding:11px 14px !important;}
-      .routine-section-toggle h3{font-size:12px !important;}
-      .timeline-header-icon{width:34px !important;height:34px !important;font-size:15px !important;border-radius:14px !important;}
-      /* Timeline: altura máxima reducida para que quepa en pantalla */
-      #timelineExpanded > div{max-height:52vh !important;}
-      /* Header timeline: botones no desbordan */
-      #timelineContainer .routine-section-toggle{flex-wrap:wrap;gap:8px !important;}
-      #timelineContainer .routine-section-toggle > div:last-child{flex-wrap:wrap;gap:6px !important;}
-      /* Acciones del aula */
-      #accionesBody,#alumnosBody{padding-left:10px !important;padding-right:10px !important;padding-bottom:12px !important;}
-      /* Acciones: 3 columnas en móvil para que los botones no se aplasten */
+      /* Wrapper: sin border-radius override que rompe scroll */
+      #routineWrapper{padding-bottom:6rem;}
+
+      /* ── Timeline container ── */
+      #timelineContainer .routine-section-toggle{padding:10px 12px !important;}
+      #timelineExpanded > div{max-height:55vh !important;}
+
+      /* ── Acciones: 3 columnas, botones no se aplastan ── */
+      #accionesBody{padding:10px !important;}
       #accionesBody .grid{grid-template-columns:repeat(3,1fr) !important;gap:6px !important;}
-      #accionesBody .grid button{padding:10px 4px !important;border-radius:14px !important;}
-      #accionesBody .grid button span:first-child{font-size:22px !important;}
-      #accionesBody .grid button span:last-child{font-size:8px !important;word-break:break-word;}
-      /* Chips de filtro compactos */
-      #routineFilterChips{gap:6px !important;}
-      #routineFilterChips button{padding:5px 9px !important;min-height:30px !important;gap:3px !important;font-size:9px !important;}
-      /* Tarjetas de alumno: 2 columnas compactas */
-      #routineStudentsGrid{gap:8px !important;}
+      #accionesBody .grid button{padding:10px 4px !important;border-radius:14px !important;min-width:0 !important;}
+      #accionesBody .grid button span:first-child{font-size:20px !important;display:block;}
+      #accionesBody .grid button span:last-child{font-size:7.5px !important;word-break:break-word;display:block;line-height:1.2;margin-top:2px;}
+
+      /* ── Alumno body: el overflow-x del chip scroll no debe ser clipado ── */
+      #alumnosBody{padding:10px 0 12px !important;}
+      #routineFilterChips{padding:0 10px !important;margin-bottom:10px !important;}
+      #routineStudentsGrid{padding:0 10px;gap:8px !important;}
       #routineStudentsGrid .swipe-card > div:last-child{padding:10px !important;border-radius:18px !important;}
-      #routineStudentsGrid .swipe-card .w-11{width:36px !important;height:36px !important;}
-      /* Banners colectivos (siesta / retiros / momento del día) */
-      #routineWrapper .bg-white.border-2{padding:12px !important;gap:10px !important;}
-      #routineWrapper .bg-white.border-2 .w-12{width:38px !important;height:38px !important;font-size:16px !important;}
-      /* Botones "Registrar todos" / "Despertar todos" en banners */
-      #routineWrapper .bg-white.border-2 button{padding:8px 12px !important;font-size:9px !important;white-space:nowrap;}
-      /* Botón + insertar evento entre filas */
+
+      /* ── Banners (siesta / retiros / momento del día) ── */
+      #routineWrapper > div[style*="border-color"]{padding:12px !important;gap:8px !important;}
+
+      /* ── Botón + insertar entre filas ── */
       [data-insert-slot]{margin:-4px 0 !important;height:16px !important;}
     }
     /* ✅ Modales tipo sheet (se abren desde abajo en móvil) */
@@ -1119,29 +1113,29 @@ function _renderRoutineLayout({ todayLabel, students, logsMap, withReport, sched
     <!-- ═══ NIVEL 1: TIMELINE DEL DÍA ═══ -->
     <div class="bg-white border border-slate-100 rounded-[2rem] overflow-hidden" id="timelineContainer" style="box-shadow:0 4px 24px rgba(0,0,0,0.04);">
       <!-- Header (clickeable para colapsar) -->
-      <div class="routine-section-toggle px-4 sm:px-5 py-4 flex flex-wrap items-center justify-between gap-3 border-b border-slate-100" style="background:linear-gradient(135deg, #f8fafc 0%, #ffffff 100%);" onclick="App.toggleRoutineSection('timeline')" aria-expanded="true" aria-controls="timelineBody">
-        <div class="flex items-center gap-3 min-w-0">
-          <div class="timeline-header-icon w-10 h-10 rounded-2xl flex items-center justify-center text-white text-lg shadow-md shrink-0" style="background:linear-gradient(135deg, #FF8A00, #f97316);box-shadow:0 4px 12px rgba(255,138,0,0.3);">📅</div>
-          <div class="min-w-0">
-            <h3 class="text-sm font-black text-slate-800">Timeline del Día</h3>
+      <div class="routine-section-toggle px-4 sm:px-5 py-3 sm:py-4 border-b border-slate-100" style="background:linear-gradient(135deg, #f8fafc 0%, #ffffff 100%);" onclick="App.toggleRoutineSection('timeline')" aria-expanded="true" aria-controls="timelineBody">
+        <!-- Fila 1: icono + título + chevron -->
+        <div class="flex items-center gap-3 w-full">
+          <div class="timeline-header-icon w-9 h-9 sm:w-10 sm:h-10 rounded-2xl flex items-center justify-center text-white text-base sm:text-lg shadow-md shrink-0" style="background:linear-gradient(135deg, #FF8A00, #f97316);box-shadow:0 4px 12px rgba(255,138,0,0.3);">📅</div>
+          <div class="min-w-0 flex-1">
+            <h3 class="text-sm font-black text-slate-800 leading-tight">Timeline del Día</h3>
             <p class="text-[10px] font-bold text-slate-400 uppercase tracking-wider capitalize truncate">${todayLabel}</p>
           </div>
+          <span class="acc-chevron text-slate-400 text-xs shrink-0">▼</span>
         </div>
-        <div class="flex items-center gap-2 flex-wrap">
-          <button onclick="event.stopPropagation();App.openAllEventsMenu()"
-            class="flex items-center gap-1 px-2.5 py-2 bg-indigo-50 hover:bg-indigo-100 rounded-xl transition-all text-[10px] font-black text-indigo-600 uppercase tracking-widest active:scale-95">
-            <span class="text-sm">➕</span>
-            <span class="hidden sm:inline">Eventos</span>
+        <!-- Fila 2: botones de acción (siempre visibles, no se ocultan) -->
+        <div class="flex items-center gap-2 mt-2.5 flex-wrap" onclick="event.stopPropagation()">
+          <button onclick="App.openAllEventsMenu()"
+            class="flex items-center gap-1.5 px-3 py-2 bg-indigo-50 hover:bg-indigo-100 rounded-xl transition-all text-[10px] font-black text-indigo-600 uppercase tracking-widest active:scale-95">
+            <span>➕</span><span>Eventos</span>
           </button>
-          <button onclick="event.stopPropagation();App.openScheduleManager()"
-            class="flex items-center gap-1 px-2.5 py-2 bg-slate-100 hover:bg-slate-200 rounded-xl transition-all text-[10px] font-black text-slate-500 uppercase tracking-widest active:scale-95">
-            <span class="text-sm">⚙️</span>
-            <span class="hidden sm:inline">Rutina</span>
+          <button onclick="App.openScheduleManager()"
+            class="flex items-center gap-1.5 px-3 py-2 bg-slate-100 hover:bg-slate-200 rounded-xl transition-all text-[10px] font-black text-slate-500 uppercase tracking-widest active:scale-95">
+            <span>⚙️</span><span>Configurar</span>
           </button>
-          <span class="hidden sm:inline-flex items-center text-[10px] font-black text-[#28B54D] bg-green-50 border border-green-200 px-3 py-1.5 rounded-full">
-            ${withReport}/${students.length} reportes
+          <span class="ml-auto text-[10px] font-black text-[#28B54D] bg-green-50 border border-green-200 px-2.5 py-1 rounded-full whitespace-nowrap">
+            ${withReport}/${students.length} ✓
           </span>
-          <span class="acc-chevron text-slate-400 text-xs">▼</span>
         </div>
       </div>
 
@@ -1196,33 +1190,33 @@ function _renderRoutineLayout({ todayLabel, students, logsMap, withReport, sched
 
     <!-- Banner Siestas Activas -->
     ${activeSiestas.length > 0 ? `
-    <div class="bg-white border-2 border-purple-200 rounded-[1.5rem] p-4 flex items-center gap-4 shadow-sm" style="background:linear-gradient(135deg, #faf5ff 0%, #f0f0ff 100%);">
-      <div class="w-12 h-12 text-white rounded-2xl flex items-center justify-center text-xl shrink-0 shadow-lg animate-pulse" style="background:linear-gradient(135deg, #9333ea, #7c3aed);box-shadow:0 4px 14px rgba(147,51,234,0.35);">😴</div>
-      <div class="flex-1">
+    <div class="bg-white border-2 border-purple-200 rounded-[1.5rem] p-3 sm:p-4 flex items-center gap-3 sm:gap-4 shadow-sm" style="background:linear-gradient(135deg, #faf5ff 0%, #f0f0ff 100%);">
+      <div class="w-10 h-10 sm:w-12 sm:h-12 text-white rounded-2xl flex items-center justify-center text-lg sm:text-xl shrink-0 shadow-lg animate-pulse" style="background:linear-gradient(135deg, #9333ea, #7c3aed);box-shadow:0 4px 14px rgba(147,51,234,0.35);">😴</div>
+      <div class="flex-1 min-w-0">
         <p class="text-sm font-black text-purple-800">${activeSiestas.length} siesta${activeSiestas.length > 1 ? 's' : ''} activa${activeSiestas.length > 1 ? 's' : ''}</p>
-        <p class="text-[11px] font-bold text-purple-600">
+        <p class="text-[10px] font-bold text-purple-600 truncate">
           ${activeSiestas.slice(0,2).map(s => {
             const log = logsMap[s.id] || {};
             const openSiesta = (log.events || []).filter(e => e.type === 'siesta').find(e => e.open);
             const elapsed = openSiesta ? Math.round((Date.now() - new Date(openSiesta.created_at).getTime()) / 60000) : '?';
-            return `${s.name.split(' ')[0]} <span class="text-purple-400" data-siesta-elapsed="${openSiesta?.created_at || ''}">${elapsed}min</span>`;
-          }).join(', ')}${activeSiestas.length > 2 ? ` y ${activeSiestas.length - 2} más` : ''}
+            return `${s.name.split(' ')[0]} <span data-siesta-elapsed="${openSiesta?.created_at || ''}">${elapsed}min</span>`;
+          }).join(', ')}${activeSiestas.length > 2 ? ` +${activeSiestas.length - 2}` : ''}
         </p>
       </div>
-      <button onclick="App.wakeAllSiestas()" class="px-4 py-2.5 text-white rounded-2xl font-black text-[10px] uppercase tracking-widest hover:brightness-110 active:scale-95 transition-all shadow-lg" style="background:linear-gradient(135deg, #9333ea, #7c3aed);box-shadow:0 4px 14px rgba(147,51,234,0.35);">
-        Despertar todos
+      <button onclick="App.wakeAllSiestas()" class="shrink-0 px-3 py-2 text-white rounded-xl font-black text-[9px] uppercase tracking-wide hover:brightness-110 active:scale-95 transition-all shadow-lg" style="background:linear-gradient(135deg, #9333ea, #7c3aed);">
+        Despertar
       </button>
     </div>
     ` : ''}
 
     <!-- Banner Salidas del Día (estudiantes retirados: ya no reciben más eventos) -->
     ${retirados.length > 0 ? `
-    <div class="bg-white border-2 border-blue-300 rounded-[1.5rem] p-4 flex items-center gap-4 shadow-sm" style="background:linear-gradient(135deg, #eff6ff 0%, #f0f9ff 100%);">
-      <div class="w-12 h-12 text-white rounded-2xl flex items-center justify-center text-xl shrink-0 shadow-lg" style="background:linear-gradient(135deg, #3b82f6, #2563eb);box-shadow:0 4px 14px rgba(59,130,246,0.35);">🚪</div>
-      <div class="flex-1">
-        <p class="text-sm font-black text-blue-800">${retirados.length} estudiante${retirados.length > 1 ? 's' : ''} se retiró${retirados.length > 1 ? 'n' : ''} del centro</p>
-        <p class="text-[11px] font-bold text-blue-600">
-          ${retirados.slice(0,2).map(s => s.name.split(' ')[0]).join(', ')}${retirados.length > 2 ? ` y ${retirados.length - 2} más` : ''} · ya no reciben más eventos
+    <div class="bg-white border-2 border-blue-300 rounded-[1.5rem] p-3 sm:p-4 flex items-center gap-3 sm:gap-4 shadow-sm" style="background:linear-gradient(135deg, #eff6ff 0%, #f0f9ff 100%);">
+      <div class="w-10 h-10 sm:w-12 sm:h-12 text-white rounded-2xl flex items-center justify-center text-lg sm:text-xl shrink-0 shadow-lg" style="background:linear-gradient(135deg, #3b82f6, #2563eb);box-shadow:0 4px 14px rgba(59,130,246,0.35);">🚪</div>
+      <div class="flex-1 min-w-0">
+        <p class="text-sm font-black text-blue-800">${retirados.length} estudiante${retirados.length > 1 ? 's' : ''} retirado${retirados.length > 1 ? 's' : ''}</p>
+        <p class="text-[10px] font-bold text-blue-600 truncate">
+          ${retirados.slice(0,2).map(s => s.name.split(' ')[0]).join(', ')}${retirados.length > 2 ? ` +${retirados.length - 2}` : ''} · sin más eventos
         </p>
       </div>
     </div>
@@ -1230,32 +1224,32 @@ function _renderRoutineLayout({ todayLabel, students, logsMap, withReport, sched
 
     <!-- Alerta Momento del Día (solo si queda algún alumno sin registrar para ese evento) -->
     ${scheduleNowNeedsAction ? `
-    <div class="bg-white border-2 rounded-[1.5rem] p-4 flex items-center gap-4 shadow-sm" style="border-color:rgba(255,138,0,0.3);background:linear-gradient(135deg, #fff7ed 0%, #fffbeb 100%);">
-      <div class="w-12 h-12 text-white rounded-2xl flex items-center justify-center text-xl shrink-0 shadow-lg" style="background:linear-gradient(135deg, #FF8A00, #f97316);box-shadow:0 4px 14px rgba(255,138,0,0.35);">
+    <div class="bg-white border-2 rounded-[1.5rem] p-3 sm:p-4 flex items-center gap-3 sm:gap-4 shadow-sm" style="border-color:rgba(255,138,0,0.3);background:linear-gradient(135deg, #fff7ed 0%, #fffbeb 100%);">
+      <div class="w-10 h-10 sm:w-12 sm:h-12 text-white rounded-2xl flex items-center justify-center text-lg sm:text-xl shrink-0 shadow-lg" style="background:linear-gradient(135deg, #FF8A00, #f97316);box-shadow:0 4px 14px rgba(255,138,0,0.35);">
         ${EVENT_TYPES[scheduleNow.type]?.icon || _getScheduleEventIcon(scheduleNow.type)}
       </div>
-      <div class="flex-1">
-        <p class="text-[10px] font-black uppercase tracking-wider" style="color:#FF8A00;">Momento del día</p>
-        <p class="text-sm font-black text-slate-800">Es hora del ${scheduleNow.label}</p>
+      <div class="flex-1 min-w-0">
+        <p class="text-[10px] font-black uppercase tracking-wider" style="color:#FF8A00;">Ahora</p>
+        <p class="text-sm font-black text-slate-800 truncate">${scheduleNow.label}</p>
       </div>
       <button onclick="App.openBulkEventModal('${scheduleNow.type}', '${_formatTime12(scheduleNow.hour, scheduleNow.minute)}')"
-        class="px-4 py-2.5 text-white rounded-2xl font-black text-[10px] uppercase tracking-widest hover:brightness-110 active:scale-95 transition-all shadow-lg" style="background:linear-gradient(135deg, #FF8A00, #f97316);box-shadow:0 4px 14px rgba(255,138,0,0.35);">
-        Registrar todos
+        class="shrink-0 px-3 py-2 text-white rounded-xl font-black text-[9px] uppercase tracking-wide hover:brightness-110 active:scale-95 transition-all shadow-lg" style="background:linear-gradient(135deg, #FF8A00, #f97316);">
+        Registrar
       </button>
     </div>
     ` : ''}
 
     <!-- Acciones Colectivas del Aula (colapsable) -->
     <div class="bg-white border border-slate-100 rounded-[2rem] shadow-lg overflow-hidden" style="box-shadow:0 4px 24px rgba(0,0,0,0.04);">
-      <div class="routine-section-toggle px-5 py-4 flex items-center justify-between" onclick="App.toggleRoutineSection('acciones')" aria-expanded="false" aria-controls="accionesBody">
+      <div class="routine-section-toggle px-4 sm:px-5 py-3 sm:py-4 flex items-center justify-between" onclick="App.toggleRoutineSection('acciones')" aria-expanded="false" aria-controls="accionesBody">
         <div>
           <p class="text-[10px] font-black text-slate-400 uppercase tracking-widest">Acciones del Aula</p>
           <p class="text-[9px] font-bold text-slate-300 mt-0.5">${withReport} de ${students.length} reportados</p>
         </div>
         <span class="acc-chevron text-slate-400 text-xs">▼</span>
       </div>
-      <div id="accionesBody" class="routine-section-body collapsed px-5 pb-5">
-        <div class="grid grid-cols-4 sm:grid-cols-6 gap-2.5">
+      <div id="accionesBody" class="routine-section-body collapsed px-4 sm:px-5 pb-4 sm:pb-5">
+        <div class="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-6 gap-2 sm:gap-2.5">
           ${Object.entries(EVENT_TYPES).map(([type, meta]) => {
             const softBgs = {slate:'#f1f5f9',blue:'#eff6ff',sky:'#f0f9ff',amber:'#fffbeb',indigo:'#eef2ff',rose:'#fff1f2',purple:'#faf5ff',teal:'#f0fdfa',orange:'#fff7ed',yellow:'#fefce8',green:'#f0fdf4',lime:'#f7fee7',cyan:'#ecfeff'};
             const softBorders = {slate:'#cbd5e1',blue:'#93c5fd',sky:'#7dd3fc',amber:'#fcd34d',indigo:'#a5b4fc',rose:'#fda4af',purple:'#d8b4fe',teal:'#5eead4',orange:'#fdba74',yellow:'#fde047',green:'#86efac',lime:'#bef264',cyan:'#67e8f9'};
@@ -1263,9 +1257,9 @@ function _renderRoutineLayout({ todayLabel, students, logsMap, withReport, sched
             const hovBorder = softBorders[meta.color] || '#cbd5e1';
             return `
             <button onclick="App.openBulkEventModal('${type}')"
-              class="flex flex-col items-center gap-1.5 p-3 hover:bg-white border-2 border-transparent rounded-[1.2rem] transition-all active:scale-90 group" style="background:${bg};box-shadow:0 1px 3px rgba(0,0,0,0.04);--hov-bc:${hovBorder};" onmouseenter="this.style.borderColor=this.style.getPropertyValue('--hov-bc')" onmouseleave="this.style.borderColor='transparent'">
-              <span class="text-2xl group-hover:scale-110 transition-transform">${meta.icon}</span>
-              <span class="text-[9px] font-black uppercase tracking-tight leading-tight text-center" style="color:${hovBorder};">${meta.label}</span>
+              class="flex flex-col items-center gap-1 p-2.5 sm:p-3 hover:bg-white border-2 border-transparent rounded-[1.2rem] transition-all active:scale-90 group" style="background:${bg};box-shadow:0 1px 3px rgba(0,0,0,0.04);--hov-bc:${hovBorder};" onmouseenter="this.style.borderColor=this.style.getPropertyValue('--hov-bc')" onmouseleave="this.style.borderColor='transparent'">
+              <span class="text-xl sm:text-2xl group-hover:scale-110 transition-transform leading-none">${meta.icon}</span>
+              <span class="text-[8px] sm:text-[9px] font-black uppercase tracking-tight leading-tight text-center mt-0.5" style="color:${hovBorder};">${meta.label}</span>
             </button>`;
           }).join('')}
         </div>
@@ -1290,7 +1284,7 @@ function _renderRoutineLayout({ todayLabel, students, logsMap, withReport, sched
       })()}
 
       <!-- Header colapsable -->
-      <div class="routine-section-toggle px-5 py-4 flex items-center justify-between" onclick="App.toggleRoutineSection('alumnos')" aria-expanded="true" aria-controls="alumnosBody">
+      <div class="routine-section-toggle px-4 sm:px-5 py-3 sm:py-4 flex items-center justify-between" onclick="App.toggleRoutineSection('alumnos')" aria-expanded="true" aria-controls="alumnosBody">
         <div>
           <p class="text-[10px] font-black text-slate-400 uppercase tracking-widest">Alumnos</p>
           <p class="text-[9px] font-bold text-slate-300 mt-0.5">${_filterStudents(students, _routineFilter, logsMap).length} de ${_getPresentStudentIds().length} presentes</p>
@@ -1298,7 +1292,7 @@ function _renderRoutineLayout({ todayLabel, students, logsMap, withReport, sched
         <span class="acc-chevron text-slate-400 text-xs">▼</span>
       </div>
 
-      <div id="alumnosBody" class="routine-section-body px-5 pb-5">
+      <div id="alumnosBody" class="routine-section-body">
         <!-- Filtros rápidos -->
         ${(() => {
           const counts = _getFilterCounts(students, logsMap);
@@ -1310,10 +1304,10 @@ function _renderRoutineLayout({ todayLabel, students, logsMap, withReport, sched
             { key: 'retirado', label: 'Retirados', icon: '🚪' },
           ];
           return `
-          <div id="routineFilterChips" class="flex items-center gap-1.5 mb-3 overflow-x-auto pb-1" style="scrollbar-width:none;-webkit-overflow-scrolling:touch;">
+          <div id="routineFilterChips" class="flex items-center gap-1.5 px-4 sm:px-5 pt-2 pb-3 overflow-x-auto" style="scrollbar-width:none;-webkit-overflow-scrolling:touch;">
             ${filters.map(f => `
               <button data-filter="${f.key}" onclick="App.setRoutineFilter('${f.key}')"
-                class="flex items-center gap-1 px-3 py-2 rounded-xl text-[10px] font-black uppercase tracking-wider whitespace-nowrap transition-all active:scale-95 shrink-0 min-h-[36px] ${
+                class="flex items-center gap-1 px-3 py-2 rounded-xl text-[10px] font-black uppercase tracking-wider whitespace-nowrap transition-all active:scale-95 shrink-0 min-h-[34px] ${
                   _routineFilter === f.key
                     ? 'bg-gradient-to-r from-orange-500 to-amber-500 text-white shadow-lg shadow-orange-200 border border-orange-400'
                     : 'bg-slate-50 text-slate-500 border border-slate-200 hover:bg-slate-100 hover:text-slate-700 hover:border-slate-300'
@@ -1325,7 +1319,7 @@ function _renderRoutineLayout({ todayLabel, students, logsMap, withReport, sched
           </div>`;
         })()}
 
-        <div class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-3" id="routineStudentsGrid"></div>
+        <div class="px-4 sm:px-5 pb-5 grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-3" id="routineStudentsGrid"></div>
       </div>
     </div>
 

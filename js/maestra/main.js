@@ -1112,6 +1112,21 @@ function initClassTabs(defaultTab = null) {
 
   window.App.activateTab = activateTab;
 
+  // ✅ Botón atrás del detalle de aula → regresa a la lista de aulas (t-home)
+  const backToClassesBtn = document.getElementById('backToClasses');
+  if (backToClassesBtn && !backToClassesBtn._kkBound) {
+    backToClassesBtn._kkBound = true;
+    backToClassesBtn.addEventListener('click', () => {
+      // Si BackNavigation tiene capas propias (conversación de chat abierta, etc.)
+      // las consume primero. Si no, navega al home directamente.
+      if (BackNavigation.depth > 0) {
+        BackNavigation.back();
+      } else {
+        navigateFromUser('t-home');
+      }
+    });
+  }
+
   // Activar tab inicial
   const tabToActivate = defaultTab || localStorage.getItem('maestra_last_tab') || 'feed';
   activateTab(tabToActivate);
