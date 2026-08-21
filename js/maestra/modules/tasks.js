@@ -359,6 +359,20 @@ export async function viewTaskSubmissions(taskId) {
           </button>
         </div>
         ${closedBanner}
+        ${periodOpen ? `
+        <!-- Calificación Rápida en Lote -->
+        <div class="mb-4 p-4 bg-gradient-to-r from-orange-50 to-amber-50 border-2 border-orange-200 rounded-2xl">
+          <div class="flex items-center gap-2 mb-2">
+            <span class="text-lg">⚡</span>
+            <p class="text-[10px] font-black text-orange-600 uppercase tracking-widest">Calificación Rápida</p>
+          </div>
+          <div class="flex items-center gap-2 flex-wrap">
+            <p class="text-[9px] font-bold text-slate-500">Aplicar a todos sin calificar:</p>
+            <button onclick="App._bulkGradeAll('${taskId}','logrado')" class="px-3 py-1.5 bg-green-100 hover:bg-green-200 border border-green-300 rounded-xl text-[9px] font-black text-green-700 transition-all active:scale-95">✅ Logrado</button>
+            <button onclick="App._bulkGradeAll('${taskId}','proceso')" class="px-3 py-1.5 bg-amber-100 hover:bg-amber-200 border border-amber-300 rounded-xl text-[9px] font-black text-amber-700 transition-all active:scale-95">🔄 En Proceso</button>
+            <button onclick="App._bulkGradeAll('${taskId}','iniciado')" class="px-3 py-1.5 bg-sky-100 hover:bg-sky-200 border border-sky-300 rounded-xl text-[9px] font-black text-sky-700 transition-all active:scale-95">🚀 Iniciado</button>
+          </div>
+        </div>` : ''}
         <div class="space-y-4 overflow-y-auto pr-2 flex-1">
           ${students.length > 0 ? students.map(s => {
             const sub = subMap[s.id];
@@ -480,6 +494,54 @@ export async function submitGrade(taskId, studentId) {
     safeToast('Error al calificar', 'error');
   }
 }
+
+// ── CALIFICACIÓN RÁPIDA EN LOTE ───────────────────────────────────────────────
+const _RUBRIC_MAP = {
+  logrado:  { letter: 'A', score: 90, stars: 5, label: 'Logrado', emoji: '✅' },
+  proceso:  { letter: 'B', score: 70, stars: 3, label: 'En Proceso', emoji: '🔄' },
+  iniciado: { letter: 'C', score: 50, stars: 1, label: 'Iniciado', emoji: '🚀' },
+};
+
+window._bulkGradeAll = async (taskId, rubricKey) => {
+  const rubric = _RUBRIC_MAP[rubricKey];
+  if (!rubric) return;
+  const classroom = AppState.get('classroom');
+  const { open: periodOpen } = await _getPeriodStatus(classroom?.id);
+  if (!periodOpen) { safeToast('El período está cerrado', 'warning'); return; }
+
+  const students = AppState.get('students') || [];
+  const { data: existing } = await supabase
+    .from('task_evidences')
+    .select('student_id, status')
+    .eq('task_id', taskId);
+
+  const gradedIds = new Set((existing || []).filter(e => e.status === 'graded').map(e => e.student_id));
+  const toGrade = students.filter(s => !gradedIds.has(s.id));
+
+  if (!toGrade.length) { safeToast('Todos ya están calificados', 'info'); return; }
+  if (!confirm(`¿Aplicar "${rubric.label}" (${rubric.emoji}) a ${toGrade.length} alumno${toGrade.length > 1 ? 's' : ''} sin calificar?`)) return;
+
+  try {
+    const period = AppState.get('activePeriod');
+    await Promise.all(toGrade.map(s =>
+      supabase.from('task_evidences').upsert({
+        task_id: taskId,
+        student_id: s.id,
+        classroom_id: classroom.id,
+        period_id: period?.id || null,
+        status: 'graded',
+        grade_letter: rubric.letter,
+        score_v2: rubric.score,
+        stars: rubric.stars,
+        comment: `${rubric.emoji} ${rubric.label}`,
+      }, { onConflict: 'task_id,student_id' })
+    ));
+    safeToast(`${rubric.emoji} ${rubric.label} aplicado a ${toGrade.length} alumno${toGrade.length > 1 ? 's' : ''}`);
+    viewTaskSubmissions(taskId);
+  } catch (e) {
+    safeToast('Error al calificar en lote', 'error');
+  }
+};
 
 // ── CALIFICACIONES V2: Actividades Evaluables ───────────────
 

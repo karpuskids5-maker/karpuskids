@@ -104,6 +104,7 @@ const EVENT_META = {
   limpieza_colaborativa: { icon: '🧹', label: 'Cuidado del Aula' },
   biblioteca_rincon: { icon: '📖', label: 'Biblioteca'         },
   cuento_siesta:     { icon: '💤', label: 'Cuento para dormir' },
+  salida:            { icon: '👋', label: 'Salida'              },
   // Actividades por edad
   estimulacion_visual:       { icon: '👀', label: 'Estimulación visual' },
   seguimiento_objetos:       { icon: '🎈', label: 'Seguimiento de objetos' },
@@ -531,6 +532,11 @@ function _timeToMins(isoStr) {
 }
 
 function _renderTimeline(events, schedule = [], date = '') {
+  const student = AppState.get('currentStudent') || {};
+  const exitTimeStr = student.exit_time || '';
+  const exitMins = exitTimeStr ? parseInt(exitTimeStr.split(':')[0], 10) * 60 + parseInt(exitTimeStr.split(':')[1], 10) : 0;
+  const hasExitTime = !!exitTimeStr;
+
   const sched = schedule.length ? schedule : _DEFAULT_SCHEDULE;
   const isToday = date === _todayStr();
   const now = isToday ? new Date() : null;
@@ -542,6 +548,10 @@ function _renderTimeline(events, schedule = [], date = '') {
     if (!loggedByType[ev.type]) loggedByType[ev.type] = [];
     loggedByType[ev.type].push(ev);
   });
+
+  // Detectar si el estudiante ya fue retirado (salida real por ponchador)
+  const salidaEvent = events.find(e => e.type === 'salida');
+  const wasPickedUp = !!salidaEvent;
 
   // Último slot del horario que ya comenzó (hoy)
   let activeIdx = -1;
@@ -557,12 +567,16 @@ function _renderTimeline(events, schedule = [], date = '') {
 
   // ── Bloques del horario programado ──
   sched.forEach((ev, i) => {
+    const timeMins = ev.hour * 60 + ev.minute;
     const timeStr = _formatTime12(ev.hour, ev.minute);
-    const endMins = ev.hour * 60 + ev.minute + (ev.duration || 30);
+    const endMins = timeMins + (ev.duration || 30);
     const endTimeStr = _formatTime12(Math.floor(endMins / 60), endMins % 60);
     const isPast = i < activeIdx;
     const isActive = i === activeIdx;
     const isFuture = i > activeIdx;
+
+    // Si el estudiante tiene hora de salida, no mostrar eventos que empiecen después de esa hora
+    if (hasExitTime && timeMins >= exitMins) return;
 
     // Verificar si este tipo de evento tiene registros
     const evType = ev.type;
@@ -646,8 +660,39 @@ function _renderTimeline(events, schedule = [], date = '') {
     });
   });
 
+  // ── Evento de Salida (automático desde ponchador) ──
+  if (wasPickedUp && salidaEvent) {
+    const salTime = _timeToMins(salidaEvent.created_at);
+    const salTimeStr = salidaEvent.created_at
+      ? _formatTime(salidaEvent.created_at)
+      : (hasExitTime ? _formatTime12(Math.floor(exitMins / 60), exitMins % 60) : '');
+    const salDetail = salidaEvent.comment || 'Entrega registrada desde ponchador';
+    timeline.push({
+      timeMins: salTime >= 0 ? salTime : exitMins,
+      html: `
+    <div class="relative flex items-start gap-4 p-3 rounded-2xl border-2 border-blue-200 bg-gradient-to-r from-blue-50 to-sky-50/50">
+      <div class="w-9 h-9 rounded-xl flex items-center justify-center text-base shrink-0 z-10" style="background:linear-gradient(135deg,#2563eb,#3b82f6);color:white;box-shadow:0 4px 12px rgba(37,99,235,0.3);">
+        👋
+      </div>
+      <div class="flex-1 pb-1">
+        <div class="flex items-center gap-2 mb-0.5">
+          <span class="text-[11px] font-black text-blue-600">${salTimeStr}</span>
+          <span class="px-2 py-0.5 bg-blue-100 text-blue-600 text-[7px] font-black uppercase rounded-lg">👋 Salida</span>
+        </div>
+        <p class="text-xs font-black text-slate-700 leading-tight">Entrega del estudiante</p>
+        ${salDetail ? `<p class="text-[10px] font-medium text-slate-500 mt-0.5 leading-snug">${salDetail}</p>` : ''}
+      </div>
+    </div>`,
+    });
+  }
+
   // ── Eventos reales no programados (fiebre, accidente, golpe, medicamento, nota, etc.) ──
-  events.filter(ev => !scheduleTypes.has(ev.type)).forEach(ev => {
+  events.filter(ev => !scheduleTypes.has(ev.type) && ev.type !== 'salida').forEach(ev => {
+    // Si tiene hora de salida, no mostrar eventos después de esa hora
+    if (hasExitTime && ev.created_at) {
+      const evMins = _timeToMins(ev.created_at);
+      if (evMins >= exitMins) return;
+    }
     const meta = EVENT_META[ev.type] || { icon: '📋', label: ev.type };
     let detail = '';
     let alertCls = '';

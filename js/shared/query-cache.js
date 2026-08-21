@@ -146,5 +146,55 @@ export const QueryCache = {
       else expired++;
     }
     return { fresh, stale, expired, inflight: _inflight.size, total: _store.size };
+  },
+
+  // ═══ IndexedDB persistence ═══
+  async _openIDB() {
+    return new Promise((resolve, reject) => {
+      const req = indexedDB.open('karpus_qcache', 1);
+      req.onupgradeneeded = (e) => {
+        const db = e.target.result;
+        if (!db.objectStoreNames.contains('cache')) db.createObjectStore('cache');
+      };
+      req.onsuccess = (e) => resolve(e.target.result);
+      req.onerror = (e) => reject(e.target.error);
+    });
+  },
+
+  /** Save all fresh/stale entries to IndexedDB */
+  async saveToIDB() {
+    try {
+      const db = await this._openIDB();
+      const now = Date.now();
+      const entries = {};
+      for (const [k, v] of _store) {
+        if (now < v.staleAt) entries[k] = v;
+      }
+      return new Promise((resolve) => {
+        const tx = db.transaction('cache', 'readwrite');
+        tx.objectStore('cache').put(entries, 'data');
+        tx.oncomplete = () => resolve(true);
+        tx.onerror = () => resolve(false);
+      });
+    } catch (_) { return false; }
+  },
+
+  /** Hydrate in-memory cache from IndexedDB on startup */
+  async hydrateFromIDB() {
+    try {
+      const db = await this._openIDB();
+      return new Promise((resolve) => {
+        const tx = db.transaction('cache', 'readonly');
+        const req = tx.objectStore('cache').get('data');
+        req.onsuccess = () => {
+          const entries = req.result || {};
+          for (const [k, v] of Object.entries(entries)) {
+            if (Date.now() < v.staleAt) _store.set(k, v);
+          }
+          resolve(true);
+        };
+        req.onerror = () => resolve(false);
+      });
+    } catch (_) { return false; }
   }
 };

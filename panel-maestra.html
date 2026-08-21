@@ -657,6 +657,12 @@
                   class="w-full pl-9 pr-4 py-2 bg-white border border-slate-200 rounded-xl text-sm focus:ring-2 focus:ring-orange-500 outline-none transition-all"
                   placeholder="Buscar contacto...">
               </div>
+              <div class="flex gap-1.5 mt-2" id="chatFilterChips">
+                <button data-filter="all" class="chatFilterChip px-2 py-0.5 text-[9px] font-bold bg-orange-100 text-orange-700 rounded-lg transition-all">Todos</button>
+                <button data-filter="unread" class="chatFilterChip px-2 py-0.5 text-[9px] font-bold bg-slate-100 text-slate-500 rounded-lg transition-all">Sin leer</button>
+                <button data-filter="parents" class="chatFilterChip px-2 py-0.5 text-[9px] font-bold bg-slate-100 text-slate-500 rounded-lg transition-all">Padres</button>
+                <button data-filter="staff" class="chatFilterChip px-2 py-0.5 text-[9px] font-bold bg-slate-100 text-slate-500 rounded-lg transition-all">Equipo</button>
+              </div>
             </div>
             <div id="chatContactsList" class="flex-1 overflow-y-auto p-2 space-y-1" style="-webkit-overflow-scrolling:touch;">
               <div class="p-4 text-center text-slate-400 text-sm">Cargando contactos...</div>
@@ -680,6 +686,11 @@
               </div>
             </div>
 
+            <!-- Horario de atención -->
+            <div id="chatOfficeHours" class="hidden px-4 py-2 bg-teal-50 border-b border-teal-100 text-center">
+              <span class="text-[10px] font-bold text-teal-600"></span>
+            </div>
+
             <!-- Mensajes con scroll propio -->
             <div id="chatMessagesContainer" class="chat-messages-scroll relative">
               <div class="flex-1 flex flex-col items-center justify-center text-slate-400 opacity-40 py-12">
@@ -695,6 +706,14 @@
 
             <!-- Input fijo abajo -->
             <div id="chatInputArea" class="chat-input-sticky">
+              <!-- Respuestas rápidas -->
+              <div id="chatQuickReplies" class="flex flex-wrap gap-1.5 mb-2">
+                <button onclick="App._quickReply('¡Hola! 👋')" class="px-2.5 py-1 text-[9px] font-bold bg-orange-50 text-orange-600 border border-orange-200 rounded-xl hover:bg-orange-100 transition-all active:scale-95">¡Hola! 👋</button>
+                <button onclick="App._quickReply('¿Cómo está hoy? 😊')" class="px-2.5 py-1 text-[9px] font-bold bg-blue-50 text-blue-600 border border-blue-200 rounded-xl hover:bg-blue-100 transition-all active:scale-95">¿Cómo está hoy? 😊</button>
+                <button onclick="App._quickReply('Se porte muy bien hoy 🌟')" class="px-2.5 py-1 text-[9px] font-bold bg-yellow-50 text-yellow-600 border border-yellow-200 rounded-xl hover:bg-yellow-100 transition-all active:scale-95">Se porte muy bien 🌟</button>
+                <button onclick="App._quickReply('Necesito hablar con usted 📞')" class="px-2.5 py-1 text-[9px] font-bold bg-purple-50 text-purple-600 border border-purple-200 rounded-xl hover:bg-purple-100 transition-all active:scale-95">Necesito hablar 📞</button>
+                <button onclick="App._quickReply('Recordatorio: Traer ropa de cambio 👕')" class="px-2.5 py-1 text-[9px] font-bold bg-teal-50 text-teal-600 border border-teal-200 rounded-xl hover:bg-teal-100 transition-all active:scale-95">Traer ropa 👕</button>
+              </div>
               <div class="flex gap-3 items-end">
                 <textarea id="chatMessageInput" rows="1"
                   class="flex-1 bg-slate-100 border-0 rounded-2xl px-4 py-3 focus:ring-2 focus:ring-orange-500 resize-none outline-none text-sm"
@@ -1063,6 +1082,39 @@
         });
       }
     });
+
+    // ═══ SYNC QUEUE INDICATOR ═══
+    (function initSyncIndicator() {
+      const indicator = document.createElement('div');
+      indicator.id = 'syncQueueIndicator';
+      indicator.className = 'fixed bottom-20 right-4 z-[9998] hidden';
+      indicator.innerHTML = `
+        <div class="flex items-center gap-2 px-3 py-2 bg-slate-800 text-white rounded-2xl shadow-2xl text-[10px] font-black uppercase tracking-widest transition-all">
+          <span class="w-2 h-2 rounded-full bg-amber-400 animate-pulse"></span>
+          <span id="syncQueueCount">0</span> pendiente(s)
+        </div>`;
+      document.body.appendChild(indicator);
+
+      async function updateIndicator() {
+        try {
+          const { OfflineQueue } = await import('/js/shared/offline-queue.js');
+          const count = await OfflineQueue.pendingCount();
+          const el = document.getElementById('syncQueueIndicator');
+          const countEl = document.getElementById('syncQueueCount');
+          if (!el || !countEl) return;
+          if (count > 0) {
+            el.classList.remove('hidden');
+            countEl.textContent = count;
+          } else {
+            el.classList.add('hidden');
+          }
+        } catch (_) {}
+      }
+      window.addEventListener('online', updateIndicator);
+      window.addEventListener('offline', updateIndicator);
+      setInterval(updateIndicator, 15000);
+      updateIndicator();
+    })();
   </script>
 </body>
 </html>

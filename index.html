@@ -48,7 +48,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Nunito:wght@400;600;700;800;900&family=Poppins:wght@700;800;900&display=swap" rel="stylesheet">
-  <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css" rel="stylesheet">
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css" rel="stylesheet" integrity="sha384-b558949e76d8015d3414b221862deffdd5addc9c70e2065070da120b108814d2550b1eff0f9e7fc17b2b348440370743" crossorigin="anonymous">
   <link rel="stylesheet" href="css/karpus-tailwind.css">
   <style>
     :root{--kk-orange:#FF9800;--kk-blue:#2196F3;--kk-pink:#E91E63;--kk-green:#4CAF50;--kk-purple:#9C27B0;}
@@ -101,8 +101,10 @@
     /* ── Film strip ── */
     .film-strip{display:flex;width:max-content;animation:scrollLeft 42s linear infinite;gap:14px;}
     .film-strip:hover{animation-play-state:paused;}
-    .film-strip img{height:230px;width:auto;object-fit:cover;flex-shrink:0;border-radius:18px;cursor:pointer;transition:transform .3s,box-shadow .3s;}
-    .film-strip img:hover{transform:scale(1.05);box-shadow:0 16px 40px rgba(0,0,0,0.22);}
+    .film-strip img{height:230px;width:auto;object-fit:cover;flex-shrink:0;border-radius:18px;transition:transform .3s,box-shadow .3s;}
+    .film-btn{background:none;border:none;padding:0;cursor:pointer;flex-shrink:0;border-radius:18px;overflow:hidden;transition:transform .3s,box-shadow .3s;}
+    .film-btn:hover,.film-btn:focus-visible{transform:scale(1.05);box-shadow:0 16px 40px rgba(0,0,0,0.22);outline:2px solid #FF9800;outline-offset:2px;}
+    .film-btn img{height:230px;width:auto;object-fit:cover;display:block;}
 
     /* ── Testimonials ── */
     .testi-strip{display:flex;width:max-content;animation:scrollLeft 52s linear infinite;gap:18px;}
@@ -144,11 +146,12 @@
     .sec-label{display:inline-block;font-size:11px;font-weight:900;text-transform:uppercase;letter-spacing:.12em;padding:5px 16px;border-radius:50px;margin-bottom:14px;}
 
     /* ── Lightbox ── */
-    #lb{position:fixed;inset:0;background:rgba(0,0,0,0.93);z-index:9999;display:none;align-items:center;justify-content:center;backdrop-filter:blur(10px);}
-    #lb.open{display:flex;}
+    #lb{border:none;padding:0;background:transparent;max-width:100vw;max-height:100vh;}
+    #lb::backdrop{background:rgba(0,0,0,0.93);backdrop-filter:blur(10px);}
+    #lb[open]{display:flex;align-items:center;justify-content:center;position:fixed;inset:0;width:100%;height:100%;}
     #lb img{max-width:90vw;max-height:88vh;border-radius:16px;box-shadow:0 40px 80px rgba(0,0,0,0.5);}
-    #lb-close{position:absolute;top:20px;right:24px;color:white;background:rgba(255,255,255,0.12);border:none;width:44px;height:44px;border-radius:50%;display:flex;align-items:center;justify-content:center;cursor:pointer;font-size:1.3rem;transition:background .2s;}
-    #lb-close:hover{background:rgba(255,255,255,0.22);}
+    #lb-close{position:fixed;top:20px;right:24px;color:white;background:rgba(255,255,255,0.12);border:none;width:44px;height:44px;border-radius:50%;display:flex;align-items:center;justify-content:center;cursor:pointer;font-size:1.3rem;transition:background .2s;z-index:1;}
+    #lb-close:hover,#lb-close:focus-visible{background:rgba(255,255,255,0.22);outline:2px solid white;}
 
     /* ── Responsive ── */
     .two-col{display:grid;grid-template-columns:1fr 1fr;gap:64px;align-items:center;}
@@ -176,6 +179,7 @@
       .three-col{grid-template-columns:1fr;}
       .footer-grid{grid-template-columns:1fr;gap:32px;}
       .film-strip img{height:165px;}
+      .film-btn img{height:165px;}
       .prog-card{width:145px;}
       .prog-card img{height:125px;}
       .testi-card{flex:0 0 285px;}
@@ -191,7 +195,7 @@
 ════════════════════════════════════════════════════════════ -->
 <header class="site-header" id="siteHeader">
   <div style="max-width:1280px;margin:0 auto;padding:0 20px;">
-    <nav style="display:flex;align-items:center;justify-content:space-between;height:70px;">
+    <nav aria-label="Navegación principal" style="display:flex;align-items:center;justify-content:space-between;height:70px;">
 
       <!-- Logo -->
       <a href="#inicio" style="display:flex;align-items:center;gap:10px;">
@@ -204,19 +208,21 @@
       </a>
 
       <!-- Desktop links -->
-      <nav class="md-nav" style="display:none;align-items:center;gap:30px;">
-        <a href="#nosotros"  class="nav-link">Nosotros</a>
-        <a href="#programas" class="nav-link">Programas</a>
-        <a href="#app"       class="nav-link">App</a>
-        <a href="#galeria"   class="nav-link">Galería</a>
-        <a href="#contacto"  class="nav-link">Contacto</a>
+      <nav class="md-nav" aria-label="Links de sección" style="display:none;align-items:center;gap:30px;">
+        <a href="#nosotros"  class="nav-link" onfocus="this.style.outline='2px solid #FF9800'" onblur="this.style.outline=''">Nosotros</a>
+        <a href="#programas" class="nav-link" onfocus="this.style.outline='2px solid #FF9800'" onblur="this.style.outline=''">Programas</a>
+        <a href="#app"       class="nav-link" onfocus="this.style.outline='2px solid #FF9800'" onblur="this.style.outline=''">App</a>
+        <a href="#galeria"   class="nav-link" onfocus="this.style.outline='2px solid #FF9800'" onblur="this.style.outline=''">Galería</a>
+        <a href="#contacto"  class="nav-link" onfocus="this.style.outline='2px solid #FF9800'" onblur="this.style.outline=''">Contacto</a>
       </nav>
 
       <div style="display:flex;align-items:center;gap:10px;">
         <a href="login.html"
           style="display:inline-flex;align-items:center;gap:6px;background:linear-gradient(135deg,#FF9800,#E91E63);color:white;font-weight:900;font-size:13px;padding:10px 22px;border-radius:50px;box-shadow:0 4px 16px rgba(255,152,0,.4);transition:transform .2s,box-shadow .2s;"
           onmouseover="this.style.transform='translateY(-2px)';this.style.boxShadow='0 8px 24px rgba(255,152,0,.5)'"
-          onmouseout="this.style.transform='';this.style.boxShadow='0 4px 16px rgba(255,152,0,.4)'">
+          onmouseout="this.style.transform='';this.style.boxShadow='0 4px 16px rgba(255,152,0,.4)'"
+          onfocus="this.style.transform='translateY(-2px)';this.style.boxShadow='0 8px 24px rgba(255,152,0,.5)'"
+          onblur="this.style.transform='';this.style.boxShadow='0 4px 16px rgba(255,152,0,.4)'">
           <i class="bi bi-person-circle"></i> Acceso
         </a>
         <button id="mobBtn" class="mob-btn"
@@ -228,11 +234,11 @@
 
     <!-- Mobile menu -->
     <div id="mobMenu" style="display:none;background:#fff;border-top:1px solid #f1f5f9;padding:10px 0 14px;border-radius:0 0 16px 16px;box-shadow:0 8px 24px rgba(0,0,0,0.08);">
-      <a href="#nosotros"  style="display:block;padding:12px 16px;font-weight:700;color:#475569;border-radius:10px;">Nosotros</a>
-      <a href="#programas" style="display:block;padding:12px 16px;font-weight:700;color:#475569;border-radius:10px;">Programas</a>
-      <a href="#app"       style="display:block;padding:12px 16px;font-weight:700;color:#475569;border-radius:10px;">App</a>
-      <a href="#galeria"   style="display:block;padding:12px 16px;font-weight:700;color:#475569;border-radius:10px;">Galería</a>
-      <a href="#contacto"  style="display:block;padding:12px 16px;font-weight:700;color:#475569;border-radius:10px;">Contacto</a>
+      <a href="#nosotros"  style="display:block;padding:12px 16px;font-weight:700;color:#475569;border-radius:10px;" onfocus="this.style.background='#f8fafc'" onblur="this.style.background=''">Nosotros</a>
+      <a href="#programas" style="display:block;padding:12px 16px;font-weight:700;color:#475569;border-radius:10px;" onfocus="this.style.background='#f8fafc'" onblur="this.style.background=''">Programas</a>
+      <a href="#app"       style="display:block;padding:12px 16px;font-weight:700;color:#475569;border-radius:10px;" onfocus="this.style.background='#f8fafc'" onblur="this.style.background=''">App</a>
+      <a href="#galeria"   style="display:block;padding:12px 16px;font-weight:700;color:#475569;border-radius:10px;" onfocus="this.style.background='#f8fafc'" onblur="this.style.background=''">Galería</a>
+      <a href="#contacto"  style="display:block;padding:12px 16px;font-weight:700;color:#475569;border-radius:10px;" onfocus="this.style.background='#f8fafc'" onblur="this.style.background=''">Contacto</a>
       <a href="login.html" style="display:block;margin:8px 16px 0;padding:12px;text-align:center;background:linear-gradient(135deg,#FF9800,#E91E63);color:white;font-weight:900;border-radius:14px;">Acceso Padres</a>
     </div>
   </div>
@@ -243,8 +249,9 @@
 ════════════════════════════════════════════════════════════ -->
 <section class="hero" id="inicio">
   <!-- Video background (muted, autoplay) -->
-  <video class="hero-video" autoplay muted loop playsinline poster="img/karpus.jpg">
+  <video class="hero-video" autoplay muted loop playsinline poster="img/karpus.jpg" aria-label="Video de fondo Karpus Kids">
     <source src="/img/mundo.jpg" type="video/mp4">
+    <track kind="captions" srclang="es" label="Español" default>
   </video>
   <div class="hero-overlay"></div>
 
@@ -275,19 +282,23 @@
         <a href="https://wa.me/18298038424?text=¡Hola!%20Quiero%20información%20sobre%20Karpus%20Kids" target="_blank"
           style="display:inline-flex;align-items:center;gap:8px;background:linear-gradient(135deg,#25D366,#128C7E);color:white;font-weight:900;font-size:14px;padding:15px 30px;border-radius:14px;box-shadow:0 8px 24px rgba(37,211,102,.4);transition:transform .2s,box-shadow .2s;"
           onmouseover="this.style.transform='translateY(-3px)';this.style.boxShadow='0 14px 32px rgba(37,211,102,.5)'"
-          onmouseout="this.style.transform='';this.style.boxShadow='0 8px 24px rgba(37,211,102,.4)'">
+          onmouseout="this.style.transform='';this.style.boxShadow='0 8px 24px rgba(37,211,102,.4)'"
+          onfocus="this.style.transform='translateY(-3px)';this.style.boxShadow='0 14px 32px rgba(37,211,102,.5)'"
+          onblur="this.style.transform='';this.style.boxShadow='0 8px 24px rgba(37,211,102,.4)'">
           <i class="bi bi-whatsapp" style="font-size:18px;"></i> Contáctanos por WhatsApp
         </a>
         <a href="#programas"
           style="display:inline-flex;align-items:center;gap:8px;background:rgba(255,255,255,.12);border:2px solid rgba(255,255,255,.25);color:white;font-weight:900;font-size:14px;padding:15px 28px;border-radius:14px;backdrop-filter:blur(8px);transition:background .2s;"
           onmouseover="this.style.background='rgba(255,255,255,.2)'"
-          onmouseout="this.style.background='rgba(255,255,255,.12)'">
+          onmouseout="this.style.background='rgba(255,255,255,.12)'"
+          onfocus="this.style.background='rgba(255,255,255,.2)'"
+          onblur="this.style.background='rgba(255,255,255,.12)'">
           <i class="bi bi-play-circle-fill"></i> Ver programas
         </a>
       </div>
 
       <!-- Stats pill -->
-      <div class="fade-up-4" style="display:inline-flex;gap:0;background:rgba(255,255,255,.08);border:1px solid rgba(255,255,255,.12);border-radius:20px;padding:18px 28px;backdrop-filter:blur(8px);flex-wrap:wrap;gap:4px;">
+      <div class="fade-up-4" style="display:inline-flex;background:rgba(255,255,255,.08);border:1px solid rgba(255,255,255,.12);border-radius:20px;padding:18px 28px;backdrop-filter:blur(8px);flex-wrap:wrap;gap:4px;">
         <div style="flex:1;text-align:center;min-width:80px;padding:0 8px;">
           <div style="font-size:clamp(1.8rem,3.5vw,2.6rem);font-weight:900;color:#FF9800;line-height:1;">120+</div>
           <div style="font-size:10px;font-weight:800;color:rgba(255,255,255,.45);text-transform:uppercase;letter-spacing:.08em;margin-top:4px;">Familias</div>
@@ -377,7 +388,8 @@
       </div>
       <a href="https://wa.me/18298038424" target="_blank"
         style="display:inline-flex;align-items:center;gap:6px;background:linear-gradient(135deg,#E91E63,#FF9800);color:white;font-weight:900;font-size:13px;padding:12px 24px;border-radius:50px;box-shadow:0 4px 16px rgba(233,30,99,.3);transition:transform .2s;"
-        onmouseover="this.style.transform='translateY(-2px)'" onmouseout="this.style.transform=''">
+        onmouseover="this.style.transform='translateY(-2px)'" onmouseout="this.style.transform=''"
+        onfocus="this.style.transform='translateY(-2px)'" onblur="this.style.transform=''">
         <i class="bi bi-whatsapp"></i> Más información
       </a>
     </div>
@@ -495,7 +507,7 @@
 }
 </style>
 
-<div id="seccionTarifas" role="region" aria-label="Tarifas y precios">
+<section id="seccionTarifas" aria-label="Tarifas y precios">
   <div class="pt-blob pt-blob-1"></div>
   <div class="pt-blob pt-blob-2"></div>
   <div class="pt-blob pt-blob-3"></div>
@@ -583,7 +595,7 @@
       </a>
     </div>
   </div>
-</div>
+</section>
 
 <script>
 (function(){
@@ -668,7 +680,8 @@
     <div style="text-align:center;margin-top:44px;">
       <a href="https://wa.me/18298038424?text=¡Hola!%20Quiero%20inscribir%20a%20mi%20hijo%20en%20Karpus%20Kids" target="_blank"
         style="display:inline-flex;align-items:center;gap:8px;background:linear-gradient(135deg,#25D366,#128C7E);color:white;font-weight:900;font-size:14px;padding:15px 32px;border-radius:14px;box-shadow:0 8px 24px rgba(37,211,102,.4);transition:transform .2s;"
-        onmouseover="this.style.transform='translateY(-2px)'" onmouseout="this.style.transform=''">
+        onmouseover="this.style.transform='translateY(-2px)'" onmouseout="this.style.transform=''"
+        onfocus="this.style.transform='translateY(-2px)'" onblur="this.style.transform=''">
         <i class="bi bi-whatsapp" style="font-size:18px;"></i> Iniciar inscripción ahora
       </a>
     </div>
@@ -728,7 +741,8 @@
 
       <a href="https://wa.me/18298038424?text=¡Hola!%20Quiero%20agendar%20una%20visita%20a%20Karpus%20Kids" target="_blank"
         style="display:inline-flex;align-items:center;gap:8px;background:linear-gradient(135deg,#25D366,#128C7E);color:white;font-weight:900;font-size:14px;padding:14px 28px;border-radius:14px;box-shadow:0 6px 20px rgba(37,211,102,.35);transition:transform .2s;"
-        onmouseover="this.style.transform='translateY(-2px)'" onmouseout="this.style.transform=''">
+        onmouseover="this.style.transform='translateY(-2px)'" onmouseout="this.style.transform=''"
+        onfocus="this.style.transform='translateY(-2px)'" onblur="this.style.transform=''">
         <i class="bi bi-whatsapp" style="font-size:18px;"></i> Agendar una visita
       </a>
     </div>
@@ -846,7 +860,8 @@
 
       <a href="login.html"
         style="display:inline-flex;align-items:center;gap:8px;background:linear-gradient(135deg,#FF9800,#E91E63);color:white;font-weight:900;font-size:14px;padding:14px 28px;border-radius:14px;box-shadow:0 8px 24px rgba(255,152,0,.4);transition:transform .2s;"
-        onmouseover="this.style.transform='translateY(-2px)'" onmouseout="this.style.transform=''">
+        onmouseover="this.style.transform='translateY(-2px)'" onmouseout="this.style.transform=''"
+        onfocus="this.style.transform='translateY(-2px)'" onblur="this.style.transform=''">
         <i class="bi bi-box-arrow-in-right"></i> Acceder al panel de padres
       </a>
     </div>
@@ -865,53 +880,53 @@
   <!-- Row 1 — left to right -->
   <div style="overflow:hidden;padding:4px 0;margin-bottom:14px;">
     <div class="film-strip">
-      <img src="img/2.jpg"  loading="lazy" alt="Karpus Kids" onclick="openLb(this.src)">
-      <img src="img/3.jpg"  loading="lazy" alt="Karpus Kids" onclick="openLb(this.src)">
-      <img src="img/4.jpg"  loading="lazy" alt="Karpus Kids" onclick="openLb(this.src)">
-      <img src="img/5.jpg"  loading="lazy" alt="Karpus Kids" onclick="openLb(this.src)">
-      <img src="img/6.jpg"  loading="lazy" alt="Karpus Kids" onclick="openLb(this.src)">
-      <img src="img/7.jpg"  loading="lazy" alt="Karpus Kids" onclick="openLb(this.src)">
-      <img src="img/8.jpg"  loading="lazy" alt="Karpus Kids" onclick="openLb(this.src)">
-      <img src="img/9.jpg"  loading="lazy" alt="Karpus Kids" onclick="openLb(this.src)">
-      <img src="img/10.jpg" loading="lazy" alt="Karpus Kids" onclick="openLb(this.src)">
-      <img src="img/11.jpg" loading="lazy" alt="Karpus Kids" onclick="openLb(this.src)">
-      <img src="img/12.jpg" loading="lazy" alt="Karpus Kids" onclick="openLb(this.src)">
+      <button class="film-btn" onclick="openLb('img/2.jpg')"  aria-label="Ver foto 2"><img src="img/2.jpg"  loading="lazy" alt=""></button>
+      <button class="film-btn" onclick="openLb('img/3.jpg')"  aria-label="Ver foto 3"><img src="img/3.jpg"  loading="lazy" alt=""></button>
+      <button class="film-btn" onclick="openLb('img/4.jpg')"  aria-label="Ver foto 4"><img src="img/4.jpg"  loading="lazy" alt=""></button>
+      <button class="film-btn" onclick="openLb('img/5.jpg')"  aria-label="Ver foto 5"><img src="img/5.jpg"  loading="lazy" alt=""></button>
+      <button class="film-btn" onclick="openLb('img/6.jpg')"  aria-label="Ver foto 6"><img src="img/6.jpg"  loading="lazy" alt=""></button>
+      <button class="film-btn" onclick="openLb('img/7.jpg')"  aria-label="Ver foto 7"><img src="img/7.jpg"  loading="lazy" alt=""></button>
+      <button class="film-btn" onclick="openLb('img/8.jpg')"  aria-label="Ver foto 8"><img src="img/8.jpg"  loading="lazy" alt=""></button>
+      <button class="film-btn" onclick="openLb('img/9.jpg')"  aria-label="Ver foto 9"><img src="img/9.jpg"  loading="lazy" alt=""></button>
+      <button class="film-btn" onclick="openLb('img/10.jpg')" aria-label="Ver foto 10"><img src="img/10.jpg" loading="lazy" alt=""></button>
+      <button class="film-btn" onclick="openLb('img/11.jpg')" aria-label="Ver foto 11"><img src="img/11.jpg" loading="lazy" alt=""></button>
+      <button class="film-btn" onclick="openLb('img/12.jpg')" aria-label="Ver foto 12"><img src="img/12.jpg" loading="lazy" alt=""></button>
       <!-- duplicate for seamless loop -->
-      <img src="img/2.jpg"  loading="lazy" alt="Karpus Kids">
-      <img src="img/3.jpg"  loading="lazy" alt="Karpus Kids">
-      <img src="img/4.jpg"  loading="lazy" alt="Karpus Kids">
-      <img src="img/5.jpg"  loading="lazy" alt="Karpus Kids">
-      <img src="img/6.jpg"  loading="lazy" alt="Karpus Kids">
-      <img src="img/7.jpg"  loading="lazy" alt="Karpus Kids">
-      <img src="img/8.jpg"  loading="lazy" alt="Karpus Kids">
-      <img src="img/9.jpg"  loading="lazy" alt="Karpus Kids">
-      <img src="img/10.jpg" loading="lazy" alt="Karpus Kids">
-      <img src="img/11.jpg" loading="lazy" alt="Karpus Kids">
-      <img src="img/12.jpg" loading="lazy" alt="Karpus Kids">
+      <img src="img/2.jpg"  loading="lazy" alt="Karpus Kids" aria-hidden="true">
+      <img src="img/3.jpg"  loading="lazy" alt="Karpus Kids" aria-hidden="true">
+      <img src="img/4.jpg"  loading="lazy" alt="Karpus Kids" aria-hidden="true">
+      <img src="img/5.jpg"  loading="lazy" alt="Karpus Kids" aria-hidden="true">
+      <img src="img/6.jpg"  loading="lazy" alt="Karpus Kids" aria-hidden="true">
+      <img src="img/7.jpg"  loading="lazy" alt="Karpus Kids" aria-hidden="true">
+      <img src="img/8.jpg"  loading="lazy" alt="Karpus Kids" aria-hidden="true">
+      <img src="img/9.jpg"  loading="lazy" alt="Karpus Kids" aria-hidden="true">
+      <img src="img/10.jpg" loading="lazy" alt="Karpus Kids" aria-hidden="true">
+      <img src="img/11.jpg" loading="lazy" alt="Karpus Kids" aria-hidden="true">
+      <img src="img/12.jpg" loading="lazy" alt="Karpus Kids" aria-hidden="true">
     </div>
   </div>
   <!-- Row 2 — right to left (reverse) -->
   <div style="overflow:hidden;padding:4px 0;">
     <div style="display:flex;width:max-content;animation:scrollLeft 50s linear infinite reverse;gap:14px;">
-      <img src="img/1.jpg"  loading="lazy" alt="Karpus Kids" style="height:180px;width:auto;object-fit:cover;flex-shrink:0;border-radius:16px;cursor:pointer;" onclick="openLb(this.src)">
-      <img src="img/5.jpg"  loading="lazy" alt="Karpus Kids" style="height:180px;width:auto;object-fit:cover;flex-shrink:0;border-radius:16px;cursor:pointer;" onclick="openLb(this.src)">
-      <img src="img/8.jpg"  loading="lazy" alt="Karpus Kids" style="height:180px;width:auto;object-fit:cover;flex-shrink:0;border-radius:16px;cursor:pointer;" onclick="openLb(this.src)">
-      <img src="img/11.jpg" loading="lazy" alt="Karpus Kids" style="height:180px;width:auto;object-fit:cover;flex-shrink:0;border-radius:16px;cursor:pointer;" onclick="openLb(this.src)">
-      <img src="img/3.jpg"  loading="lazy" alt="Karpus Kids" style="height:180px;width:auto;object-fit:cover;flex-shrink:0;border-radius:16px;cursor:pointer;" onclick="openLb(this.src)">
-      <img src="img/6.jpg"  loading="lazy" alt="Karpus Kids" style="height:180px;width:auto;object-fit:cover;flex-shrink:0;border-radius:16px;cursor:pointer;" onclick="openLb(this.src)">
-      <img src="img/9.jpg"  loading="lazy" alt="Karpus Kids" style="height:180px;width:auto;object-fit:cover;flex-shrink:0;border-radius:16px;cursor:pointer;" onclick="openLb(this.src)">
-      <img src="img/12.jpg" loading="lazy" alt="Karpus Kids" style="height:180px;width:auto;object-fit:cover;flex-shrink:0;border-radius:16px;cursor:pointer;" onclick="openLb(this.src)">
-      <img src="img/2.jpg"  loading="lazy" alt="Karpus Kids" style="height:180px;width:auto;object-fit:cover;flex-shrink:0;border-radius:16px;cursor:pointer;" onclick="openLb(this.src)">
+      <button class="film-btn" onclick="openLb('img/1.jpg')"  aria-label="Ver foto 1"  style="height:180px;"><img src="img/1.jpg"  loading="lazy" alt="" style="height:180px;width:auto;object-fit:cover;border-radius:16px;"></button>
+      <button class="film-btn" onclick="openLb('img/5.jpg')"  aria-label="Ver foto 5"  style="height:180px;"><img src="img/5.jpg"  loading="lazy" alt="" style="height:180px;width:auto;object-fit:cover;border-radius:16px;"></button>
+      <button class="film-btn" onclick="openLb('img/8.jpg')"  aria-label="Ver foto 8"  style="height:180px;"><img src="img/8.jpg"  loading="lazy" alt="" style="height:180px;width:auto;object-fit:cover;border-radius:16px;"></button>
+      <button class="film-btn" onclick="openLb('img/11.jpg')" aria-label="Ver foto 11" style="height:180px;"><img src="img/11.jpg" loading="lazy" alt="" style="height:180px;width:auto;object-fit:cover;border-radius:16px;"></button>
+      <button class="film-btn" onclick="openLb('img/3.jpg')"  aria-label="Ver foto 3"  style="height:180px;"><img src="img/3.jpg"  loading="lazy" alt="" style="height:180px;width:auto;object-fit:cover;border-radius:16px;"></button>
+      <button class="film-btn" onclick="openLb('img/6.jpg')"  aria-label="Ver foto 6"  style="height:180px;"><img src="img/6.jpg"  loading="lazy" alt="" style="height:180px;width:auto;object-fit:cover;border-radius:16px;"></button>
+      <button class="film-btn" onclick="openLb('img/9.jpg')"  aria-label="Ver foto 9"  style="height:180px;"><img src="img/9.jpg"  loading="lazy" alt="" style="height:180px;width:auto;object-fit:cover;border-radius:16px;"></button>
+      <button class="film-btn" onclick="openLb('img/12.jpg')" aria-label="Ver foto 12" style="height:180px;"><img src="img/12.jpg" loading="lazy" alt="" style="height:180px;width:auto;object-fit:cover;border-radius:16px;"></button>
+      <button class="film-btn" onclick="openLb('img/2.jpg')"  aria-label="Ver foto 2"  style="height:180px;"><img src="img/2.jpg"  loading="lazy" alt="" style="height:180px;width:auto;object-fit:cover;border-radius:16px;"></button>
       <!-- duplicate -->
-      <img src="img/1.jpg"  loading="lazy" alt="Karpus Kids" style="height:180px;width:auto;object-fit:cover;flex-shrink:0;border-radius:16px;">
-      <img src="img/5.jpg"  loading="lazy" alt="Karpus Kids" style="height:180px;width:auto;object-fit:cover;flex-shrink:0;border-radius:16px;">
-      <img src="img/8.jpg"  loading="lazy" alt="Karpus Kids" style="height:180px;width:auto;object-fit:cover;flex-shrink:0;border-radius:16px;">
-      <img src="img/11.jpg" loading="lazy" alt="Karpus Kids" style="height:180px;width:auto;object-fit:cover;flex-shrink:0;border-radius:16px;">
-      <img src="img/3.jpg"  loading="lazy" alt="Karpus Kids" style="height:180px;width:auto;object-fit:cover;flex-shrink:0;border-radius:16px;">
-      <img src="img/6.jpg"  loading="lazy" alt="Karpus Kids" style="height:180px;width:auto;object-fit:cover;flex-shrink:0;border-radius:16px;">
-      <img src="img/9.jpg"  loading="lazy" alt="Karpus Kids" style="height:180px;width:auto;object-fit:cover;flex-shrink:0;border-radius:16px;">
-      <img src="img/12.jpg" loading="lazy" alt="Karpus Kids" style="height:180px;width:auto;object-fit:cover;flex-shrink:0;border-radius:16px;">
-      <img src="img/2.jpg"  loading="lazy" alt="Karpus Kids" style="height:180px;width:auto;object-fit:cover;flex-shrink:0;border-radius:16px;">
+      <img src="img/1.jpg"  loading="lazy" alt="Karpus Kids" style="height:180px;width:auto;object-fit:cover;flex-shrink:0;border-radius:16px;" aria-hidden="true">
+      <img src="img/5.jpg"  loading="lazy" alt="Karpus Kids" style="height:180px;width:auto;object-fit:cover;flex-shrink:0;border-radius:16px;" aria-hidden="true">
+      <img src="img/8.jpg"  loading="lazy" alt="Karpus Kids" style="height:180px;width:auto;object-fit:cover;flex-shrink:0;border-radius:16px;" aria-hidden="true">
+      <img src="img/11.jpg" loading="lazy" alt="Karpus Kids" style="height:180px;width:auto;object-fit:cover;flex-shrink:0;border-radius:16px;" aria-hidden="true">
+      <img src="img/3.jpg"  loading="lazy" alt="Karpus Kids" style="height:180px;width:auto;object-fit:cover;flex-shrink:0;border-radius:16px;" aria-hidden="true">
+      <img src="img/6.jpg"  loading="lazy" alt="Karpus Kids" style="height:180px;width:auto;object-fit:cover;flex-shrink:0;border-radius:16px;" aria-hidden="true">
+      <img src="img/9.jpg"  loading="lazy" alt="Karpus Kids" style="height:180px;width:auto;object-fit:cover;flex-shrink:0;border-radius:16px;" aria-hidden="true">
+      <img src="img/12.jpg" loading="lazy" alt="Karpus Kids" style="height:180px;width:auto;object-fit:cover;flex-shrink:0;border-radius:16px;" aria-hidden="true">
+      <img src="img/2.jpg"  loading="lazy" alt="Karpus Kids" style="height:180px;width:auto;object-fit:cover;flex-shrink:0;border-radius:16px;" aria-hidden="true">
     </div>
   </div>
 </section>
@@ -990,7 +1005,8 @@
       <p style="color:rgba(255,255,255,.58);font-size:14px;line-height:1.72;margin-bottom:26px;">Accede al panel de tu hijo, ve fotos, reportes de asistencia, calificaciones y comunícate con las maestras — todo en un solo lugar.</p>
       <a href="login.html"
         style="display:inline-flex;align-items:center;gap:8px;background:linear-gradient(135deg,#FF9800,#E91E63);color:white;font-weight:900;font-size:13px;padding:13px 26px;border-radius:12px;box-shadow:0 6px 20px rgba(255,152,0,.4);transition:transform .2s;"
-        onmouseover="this.style.transform='translateY(-2px)'" onmouseout="this.style.transform=''">
+        onmouseover="this.style.transform='translateY(-2px)'" onmouseout="this.style.transform=''"
+        onfocus="this.style.transform='translateY(-2px)'" onblur="this.style.transform=''">
         <i class="bi bi-box-arrow-in-right"></i> Acceder al Panel
       </a>
     </div>
@@ -1003,7 +1019,8 @@
       <p style="color:rgba(255,255,255,.58);font-size:14px;line-height:1.72;margin-bottom:26px;">¿Listo para conocernos? Nuestro equipo está disponible para mostrarte las instalaciones y responder todas tus preguntas.</p>
       <a href="https://wa.me/18298038424?text=¡Hola!%20Quiero%20agendar%20una%20visita%20a%20Karpus%20Kids" target="_blank"
         style="display:inline-flex;align-items:center;gap:8px;background:linear-gradient(135deg,#25D366,#128C7E);color:white;font-weight:900;font-size:13px;padding:13px 26px;border-radius:12px;box-shadow:0 6px 20px rgba(37,211,102,.4);transition:transform .2s;"
-        onmouseover="this.style.transform='translateY(-2px)'" onmouseout="this.style.transform=''">
+        onmouseover="this.style.transform='translateY(-2px)'" onmouseout="this.style.transform=''"
+        onfocus="this.style.transform='translateY(-2px)'" onblur="this.style.transform=''">
         <i class="bi bi-whatsapp"></i> Agendar por WhatsApp
       </a>
     </div>
@@ -1031,9 +1048,9 @@
         </div>
         <p style="font-size:14px;line-height:1.72;color:rgba(255,255,255,.45);max-width:300px;margin-bottom:20px;">Estancia infantil de confianza en San Cristóbal. Cuidado experto, educación integral y tecnología para las familias modernas.</p>
         <div style="display:flex;gap:10px;">
-          <a href="https://wa.me/18298038424" target="_blank" style="width:38px;height:38px;background:rgba(255,255,255,.08);border-radius:10px;display:flex;align-items:center;justify-content:center;color:rgba(255,255,255,.65);font-size:16px;transition:background .2s,color .2s;" onmouseover="this.style.background='#25D366';this.style.color='white'" onmouseout="this.style.background='rgba(255,255,255,.08)';this.style.color='rgba(255,255,255,.65)'"><i class="bi bi-whatsapp"></i></a>
-          <a href="https://instagram.com" target="_blank" style="width:38px;height:38px;background:rgba(255,255,255,.08);border-radius:10px;display:flex;align-items:center;justify-content:center;color:rgba(255,255,255,.65);font-size:16px;transition:background .2s,color .2s;" onmouseover="this.style.background='#E91E63';this.style.color='white'" onmouseout="this.style.background='rgba(255,255,255,.08)';this.style.color='rgba(255,255,255,.65)'"><i class="bi bi-instagram"></i></a>
-          <a href="https://facebook.com" target="_blank" style="width:38px;height:38px;background:rgba(255,255,255,.08);border-radius:10px;display:flex;align-items:center;justify-content:center;color:rgba(255,255,255,.65);font-size:16px;transition:background .2s,color .2s;" onmouseover="this.style.background='#2196F3';this.style.color='white'" onmouseout="this.style.background='rgba(255,255,255,.08)';this.style.color='rgba(255,255,255,.65)'"><i class="bi bi-facebook"></i></a>
+          <a href="https://wa.me/18298038424" target="_blank" aria-label="WhatsApp" style="width:38px;height:38px;background:rgba(255,255,255,.08);border-radius:10px;display:flex;align-items:center;justify-content:center;color:rgba(255,255,255,.65);font-size:16px;transition:background .2s,color .2s;" onmouseover="this.style.background='#25D366';this.style.color='white'" onmouseout="this.style.background='rgba(255,255,255,.08)';this.style.color='rgba(255,255,255,.65)'" onfocus="this.style.background='#25D366';this.style.color='white'" onblur="this.style.background='rgba(255,255,255,.08)';this.style.color='rgba(255,255,255,.65)'"><i class="bi bi-whatsapp"></i></a>
+          <a href="https://instagram.com" target="_blank" aria-label="Instagram" style="width:38px;height:38px;background:rgba(255,255,255,.08);border-radius:10px;display:flex;align-items:center;justify-content:center;color:rgba(255,255,255,.65);font-size:16px;transition:background .2s,color .2s;" onmouseover="this.style.background='#E91E63';this.style.color='white'" onmouseout="this.style.background='rgba(255,255,255,.08)';this.style.color='rgba(255,255,255,.65)'" onfocus="this.style.background='#E91E63';this.style.color='white'" onblur="this.style.background='rgba(255,255,255,.08)';this.style.color='rgba(255,255,255,.65)'"><i class="bi bi-instagram"></i></a>
+          <a href="https://facebook.com" target="_blank" aria-label="Facebook" style="width:38px;height:38px;background:rgba(255,255,255,.08);border-radius:10px;display:flex;align-items:center;justify-content:center;color:rgba(255,255,255,.65);font-size:16px;transition:background .2s,color .2s;" onmouseover="this.style.background='#2196F3';this.style.color='white'" onmouseout="this.style.background='rgba(255,255,255,.08)';this.style.color='rgba(255,255,255,.65)'" onfocus="this.style.background='#2196F3';this.style.color='white'" onblur="this.style.background='rgba(255,255,255,.08)';this.style.color='rgba(255,255,255,.65)'"><i class="bi bi-facebook"></i></a>
         </div>
       </div>
 
@@ -1044,12 +1061,12 @@
         <div>
           <h4 style="font-size:12px;font-weight:900;color:white;text-transform:uppercase;letter-spacing:.1em;margin-bottom:16px;">Navegación</h4>
           <ul style="list-style:none;display:flex;flex-direction:column;gap:10px;">
-            <li><a href="#nosotros"  style="color:rgba(255,255,255,.45);font-size:14px;font-weight:600;transition:color .2s;" onmouseover="this.style.color='#FF9800'" onmouseout="this.style.color='rgba(255,255,255,.45)'">Nosotros</a></li>
-            <li><a href="#programas" style="color:rgba(255,255,255,.45);font-size:14px;font-weight:600;transition:color .2s;" onmouseover="this.style.color='#FF9800'" onmouseout="this.style.color='rgba(255,255,255,.45)'">Programas</a></li>
-            <li><a href="#app"       style="color:rgba(255,255,255,.45);font-size:14px;font-weight:600;transition:color .2s;" onmouseover="this.style.color='#FF9800'" onmouseout="this.style.color='rgba(255,255,255,.45)'">App</a></li>
-            <li><a href="#galeria"   style="color:rgba(255,255,255,.45);font-size:14px;font-weight:600;transition:color .2s;" onmouseover="this.style.color='#FF9800'" onmouseout="this.style.color='rgba(255,255,255,.45)'">Galería</a></li>
-            <li><a href="login.html" style="color:rgba(255,255,255,.45);font-size:14px;font-weight:600;transition:color .2s;" onmouseover="this.style.color='#FF9800'" onmouseout="this.style.color='rgba(255,255,255,.45)'">Acceso Padres</a></li>
-            <li><a href="politica-privacidad.html" style="color:rgba(255,255,255,.45);font-size:14px;font-weight:600;transition:color .2s;" onmouseover="this.style.color='#FF9800'" onmouseout="this.style.color='rgba(255,255,255,.45)'">Privacidad</a></li>
+            <li><a href="#nosotros"  style="color:rgba(255,255,255,.45);font-size:14px;font-weight:600;transition:color .2s;" onmouseover="this.style.color='#FF9800'" onmouseout="this.style.color='rgba(255,255,255,.45)'" onfocus="this.style.color='#FF9800'" onblur="this.style.color='rgba(255,255,255,.45)'">Nosotros</a></li>
+            <li><a href="#programas" style="color:rgba(255,255,255,.45);font-size:14px;font-weight:600;transition:color .2s;" onmouseover="this.style.color='#FF9800'" onmouseout="this.style.color='rgba(255,255,255,.45)'" onfocus="this.style.color='#FF9800'" onblur="this.style.color='rgba(255,255,255,.45)'">Programas</a></li>
+            <li><a href="#app"       style="color:rgba(255,255,255,.45);font-size:14px;font-weight:600;transition:color .2s;" onmouseover="this.style.color='#FF9800'" onmouseout="this.style.color='rgba(255,255,255,.45)'" onfocus="this.style.color='#FF9800'" onblur="this.style.color='rgba(255,255,255,.45)'">App</a></li>
+            <li><a href="#galeria"   style="color:rgba(255,255,255,.45);font-size:14px;font-weight:600;transition:color .2s;" onmouseover="this.style.color='#FF9800'" onmouseout="this.style.color='rgba(255,255,255,.45)'" onfocus="this.style.color='#FF9800'" onblur="this.style.color='rgba(255,255,255,.45)'">Galería</a></li>
+            <li><a href="login.html" style="color:rgba(255,255,255,.45);font-size:14px;font-weight:600;transition:color .2s;" onmouseover="this.style.color='#FF9800'" onmouseout="this.style.color='rgba(255,255,255,.45)'" onfocus="this.style.color='#FF9800'" onblur="this.style.color='rgba(255,255,255,.45)'">Acceso Padres</a></li>
+            <li><a href="politica-privacidad.html" style="color:rgba(255,255,255,.45);font-size:14px;font-weight:600;transition:color .2s;" onmouseover="this.style.color='#FF9800'" onmouseout="this.style.color='rgba(255,255,255,.45)'" onfocus="this.style.color='#FF9800'" onblur="this.style.color='rgba(255,255,255,.45)'">Privacidad</a></li>
           </ul>
         </div>
 
@@ -1057,7 +1074,7 @@
         <div>
           <h4 style="font-size:12px;font-weight:900;color:white;text-transform:uppercase;letter-spacing:.1em;margin-bottom:16px;">Contacto</h4>
           <div style="display:flex;flex-direction:column;gap:14px;">
-            <a href="https://wa.me/18298038424" target="_blank" style="display:flex;align-items:center;gap:10px;color:rgba(255,255,255,.45);font-size:14px;transition:color .2s;" onmouseover="this.style.color='#25D366'" onmouseout="this.style.color='rgba(255,255,255,.45)'">
+            <a href="https://wa.me/18298038424" target="_blank" aria-label="Llamar por WhatsApp" style="display:flex;align-items:center;gap:10px;color:rgba(255,255,255,.45);font-size:14px;transition:color .2s;" onmouseover="this.style.color='#25D366'" onmouseout="this.style.color='rgba(255,255,255,.45)'" onfocus="this.style.color='#25D366'" onblur="this.style.color='rgba(255,255,255,.45)'">
               <i class="bi bi-whatsapp" style="font-size:16px;flex-shrink:0;"></i>
               <span>+1 (829) 803-8424</span>
             </a>
@@ -1078,7 +1095,7 @@
       <div>
         <h4 style="font-size:12px;font-weight:900;color:white;text-transform:uppercase;letter-spacing:.1em;margin-bottom:16px;">Ubicación</h4>
         <div style="border-radius:18px;overflow:hidden;box-shadow:0 12px 32px rgba(0,0,0,.3);border:1px solid rgba(255,255,255,.1);">
-          <iframe src="https://www.google.com/maps/embed?pb=!1m18!1m12!1m3!1d3785.686618411939!2d-70.09190389999999!3d18.407108499999996!2m3!1f0!2f0!3f0!3m2!1i1024!2i768!4f13.1!3m3!1m2!1s0x8ea55f2cf6f6cc17%3A0x31dbf4c810db6cd7!2sKarpus%20Kids!5e0!3m2!1ses-419!2sdo!4v1777343675017!5m2!1ses-419!2sdo" width="100%" height="200" style="border:0;display:block;" allowfullscreen="" loading="lazy" referrerpolicy="no-referrer-when-downgrade"></iframe>
+          <iframe src="https://www.google.com/maps/embed?pb=!1m18!1m12!1m3!1d3785.686618411939!2d-70.09190389999999!3d18.407108499999996!2m3!1f0!2f0!3f0!3m2!1i1024!2i768!4f13.1!3m3!1m2!1s0x8ea55f2cf6f6cc17%3A0x31dbf4c810db6cd7!2sKarpus%20Kids!5e0!3m2!1ses-419!2sdo!4v1777343675017!5m2!1ses-419!2sdo" width="100%" height="200" style="border:0;display:block;" allowfullscreen="" loading="lazy" referrerpolicy="no-referrer-when-downgrade" title="Ubicación de Karpus Kids en Google Maps"></iframe>
         </div>
       </div>
 
@@ -1090,7 +1107,9 @@
       <p style="font-size:12px;color:rgba(255,255,255,.28);">Hecho por Luis Alfredo Cabrera Reyes · 849-711-4907</p>
       <a href="https://wa.me/18497114807?text=Hola,%20necesito%20soporte%20t%C3%A9cnico" target="_blank"
         style="display:inline-flex;align-items:center;gap:6px;font-size:12px;font-weight:700;color:rgba(255,255,255,.45);transition:color .2s;margin-top:4px;"
-        onmouseover="this.style.color='#25D366'" onmouseout="this.style.color='rgba(255,255,255,.45)'">
+        onmouseover="this.style.color='#25D366'" onmouseout="this.style.color='rgba(255,255,255,.45)'"
+        onfocus="this.style.color='#25D366'" onblur="this.style.color='rgba(255,255,255,.45)'"
+        aria-label="Soporte técnico por WhatsApp">
         <i class="bi bi-headset" style="font-size:14px;"></i> Soporte técnico
       </a>
     </div>
@@ -1105,10 +1124,10 @@
 <a href="https://instagram.com"     target="_blank" class="fab fab-ig" title="Instagram"><i class="bi bi-instagram"></i></a>
 
 <!-- ── LIGHTBOX ── -->
-<div id="lb" onclick="closeLb()">
-  <button id="lb-close" onclick="closeLb()">✕</button>
-  <img id="lb-img" src="" alt="Karpus Kids" onclick="event.stopPropagation()">
-</div>
+<dialog id="lb" aria-label="Visor de imágenes">
+  <button id="lb-close" onclick="closeLb()" aria-label="Cerrar visor">✕</button>
+  <img id="lb-img" src="" alt="Foto Karpus Kids">
+</dialog>
 
 <script>
   // ── Navbar scroll ─────────────────────────────────────────────────────────
@@ -1131,13 +1150,13 @@
 
   // ── Lightbox ──────────────────────────────────────────────────────────────
   function openLb(src) {
+    const dlg = document.getElementById('lb');
     document.getElementById('lb-img').src = src;
-    document.getElementById('lb').classList.add('open');
-    document.body.style.overflow = 'hidden';
+    dlg.showModal();
   }
   function closeLb() {
-    document.getElementById('lb').classList.remove('open');
-    document.body.style.overflow = '';
+    const dlg = document.getElementById('lb');
+    dlg.close();
   }
   document.addEventListener('keydown', e => { if (e.key === 'Escape') closeLb(); });
 

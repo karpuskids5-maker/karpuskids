@@ -48,6 +48,9 @@ export async function initAttendance(options = {}) {
       MaestraApi.getAttendance(classroom.id, today)
     ]);
 
+    // ✅ Sync AppState so the routine module detects present students
+    AppState.set('attendance', attendance || []);
+
     const attMap = {};
     (attendance || []).forEach(a => attMap[a.student_id] = a.status);
     
@@ -211,6 +214,16 @@ export async function markAllPresent() {
         }
         safeToast(`${records.length} registros guardados sin conexión — se sincronizarán pronto`, 'info');
       }
+      // ✅ Sync AppState so routine module detects all present students immediately
+      const bulkAtt = AppState.get('attendance') || [];
+      const updatedBulkAtt = [...bulkAtt];
+      records.forEach(r => {
+        const rid = Number(r.student_id);
+        const idx = updatedBulkAtt.findIndex(a => Number(a.student_id) === rid);
+        if (idx >= 0) updatedBulkAtt[idx] = { ...updatedBulkAtt[idx], status: r.status };
+        else updatedBulkAtt.push({ student_id: rid, status: r.status });
+      });
+      AppState.set('attendance', updatedBulkAtt);
     }
 
       safeToast('Asistencia masiva completada');
@@ -291,8 +304,15 @@ export async function registerAttendance(studentId, status) {
 
   try {
     let statusLiteral = status === 'present' ? 'Presente' : status === 'late' ? 'Tarde' : 'Ausente';
+    const now = new Date().toISOString();
 
     const attRecord = { student_id: studentId, classroom_id: classroom?.id, date: today, status };
+    // Record real arrival/departure time
+    if (status === 'present' || status === 'late') {
+      attRecord.check_in = now;
+    } else if (status === 'absent') {
+      attRecord.check_out = now;
+    }
     if (!attRecord.classroom_id) {
       safeToast('Error: no hay aula asignada', 'error');
       return;
@@ -324,6 +344,13 @@ export async function registerAttendance(studentId, status) {
 
       showNotifyFeedback({ sent: 1, type: 'attendance', label: student.name });
     }
+
+    // ✅ Sync AppState so routine module detects the presence change immediately
+    const currentAtt = AppState.get('attendance') || [];
+    const numStudentId = Number(studentId);
+    const updatedAtt = currentAtt.filter(a => Number(a.student_id) !== numStudentId);
+    updatedAtt.push({ student_id: numStudentId, status, check_in: status !== 'absent' ? now : null });
+    AppState.set('attendance', updatedAtt);
 
     safeToast(`Asistencia: ${statusLiteral}`);
     await initAttendance({ silent: true });

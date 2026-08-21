@@ -366,9 +366,29 @@ CREATE TABLE IF NOT EXISTS public.posts (
   teacher_avatar  text,
   likes_count     integer DEFAULT 0,
   comments_count  integer DEFAULT 0,
+  is_pinned       boolean DEFAULT false,
+  comments_enabled boolean DEFAULT true,
+  expire_days     integer,
+  scheduled_at    timestamptz,
+  status          text DEFAULT 'published',
+  views_count     integer DEFAULT 0,
+  tagged_students jsonb DEFAULT '[]'::jsonb,
+  thumbnail_url   text,
+  author_role     text,
   updated_at      timestamp with time zone DEFAULT now(),
   created_at      timestamp with time zone DEFAULT now() NOT NULL
 );
+
+-- Idempotente: agrega columnas que pudieran faltar si la tabla ya existía
+ALTER TABLE public.posts ADD COLUMN IF NOT EXISTS is_pinned boolean DEFAULT false;
+ALTER TABLE public.posts ADD COLUMN IF NOT EXISTS comments_enabled boolean DEFAULT true;
+ALTER TABLE public.posts ADD COLUMN IF NOT EXISTS expire_days integer;
+ALTER TABLE public.posts ADD COLUMN IF NOT EXISTS scheduled_at timestamptz;
+ALTER TABLE public.posts ADD COLUMN IF NOT EXISTS status text DEFAULT 'published';
+ALTER TABLE public.posts ADD COLUMN IF NOT EXISTS views_count integer DEFAULT 0;
+ALTER TABLE public.posts ADD COLUMN IF NOT EXISTS tagged_students jsonb DEFAULT '[]'::jsonb;
+ALTER TABLE public.posts ADD COLUMN IF NOT EXISTS thumbnail_url text;
+ALTER TABLE public.posts ADD COLUMN IF NOT EXISTS author_role text;
 
 -- 4.12 COMMENTS & LIKES
 CREATE TABLE IF NOT EXISTS public.comments (
@@ -1031,6 +1051,8 @@ CREATE INDEX IF NOT EXISTS idx_posts_teacher_id          ON public.posts (teache
 CREATE INDEX IF NOT EXISTS idx_posts_period              ON public.posts (period_id, classroom_id);
 CREATE INDEX IF NOT EXISTS idx_posts_classroom_created   ON public.posts (classroom_id, created_at DESC) WHERE classroom_id IS NOT NULL;
 CREATE INDEX IF NOT EXISTS idx_posts_school_year         ON public.posts (school_year_id) WHERE school_year_id IS NOT NULL;
+CREATE INDEX IF NOT EXISTS idx_posts_status_scheduled   ON public.posts (status, scheduled_at) WHERE status = 'scheduled';
+CREATE INDEX IF NOT EXISTS idx_posts_is_pinned           ON public.posts (is_pinned) WHERE is_pinned = true;
 
 -- Tasks
 CREATE INDEX IF NOT EXISTS idx_tasks_period              ON public.tasks (period_id, classroom_id);
@@ -1875,6 +1897,38 @@ BEGIN
         SELECT * INTO v_attendance FROM public.attendance WHERE student_id = v_student.id AND date = v_today;
         IF v_attendance.id IS NOT NULL THEN UPDATE public.attendance SET check_out = v_now, status = 'retirado' WHERE id = v_attendance.id; END IF;
         INSERT INTO public.door_punches (student_id, punch_type, punched_at, date) VALUES (v_student.id,'check_out',v_now,v_today) ON CONFLICT DO NOTHING;
+
+        -- Auto-crear evento "salida" en daily_logs para que aparezca en la rutina del padre
+        BEGIN
+          INSERT INTO public.daily_logs (student_id, classroom_id, date, status, events)
+          VALUES (
+            v_student.id, v_student.classroom_id, v_today, 'published',
+            jsonb_build_array(
+              jsonb_build_object(
+                'type', 'salida',
+                'scheduled_time', to_char(v_now AT TIME ZONE 'America/Santo_Domingo', 'HH12:MI AM'),
+                'created_at', v_now::text,
+                'comment', 'Salida registrada desde ponchador'
+              )
+            )
+          )
+          ON CONFLICT (student_id, date) DO UPDATE
+            SET events = CASE
+              WHEN NOT public.daily_logs.events @> '[{"type":"salida"}]'::jsonb
+              THEN public.daily_logs.events || jsonb_build_array(
+                jsonb_build_object(
+                  'type', 'salida',
+                  'scheduled_time', to_char(v_now AT TIME ZONE 'America/Santo_Domingo', 'HH12:MI AM'),
+                  'created_at', v_now::text,
+                  'comment', 'Salida registrada desde ponchador'
+                )
+              )
+              ELSE public.daily_logs.events
+            END;
+        EXCEPTION WHEN OTHERS THEN
+          -- Si falla la inserción del daily_log, no afecta el punch principal
+          NULL;
+        END;
       ELSE
         RETURN jsonb_build_object('success',false,'message',v_name||' ya registró entrada y salida hoy');
       END IF;

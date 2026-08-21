@@ -182,6 +182,26 @@ export async function initChat() {
       searchInput.addEventListener('input', handler);
     }
 
+    // Chat filter chips
+    const filterChips = document.querySelectorAll('.chatFilterChip');
+    filterChips.forEach(chip => {
+      chip.addEventListener('click', () => {
+        filterChips.forEach(c => { c.classList.remove('bg-orange-100', 'text-orange-700'); c.classList.add('bg-slate-100', 'text-slate-500'); });
+        chip.classList.remove('bg-slate-100', 'text-slate-500');
+        chip.classList.add('bg-orange-100', 'text-orange-700');
+        const filter = chip.dataset.filter;
+        container.querySelectorAll('[onclick*="selectChatContact"]').forEach(el => {
+          const role = el.querySelector('.text-\\[10px\\]')?.textContent?.toLowerCase() || '';
+          const hasUnread = el.querySelector('.bg-red-500') !== null;
+          let show = true;
+          if (filter === 'unread') show = hasUnread;
+          else if (filter === 'parents') show = role.includes('padre');
+          else if (filter === 'staff') show = role.includes('directora') || role.includes('asistente');
+          el.style.display = show ? '' : 'none';
+        });
+      });
+    });
+
     // Wire send button — clone to remove old listeners
     const btnSend = document.getElementById('btnSendChatMessage');
     const inputMsg = document.getElementById('chatMessageInput');
@@ -204,6 +224,28 @@ export async function selectChatContact(userId, name, meta) {
   try { meta = decodeURIComponent(meta || ''); } catch (_) {}
   activeChatUserId = userId;
   activeConversationId = null;
+
+  // Office hours banner
+  const officeEl = document.getElementById('chatOfficeHours');
+  if (officeEl) {
+    const now = new Date();
+    const h = now.getHours();
+    const isWorkHours = h >= 8 && h < 16;
+    const days = now.getDay();
+    const isWorkDay = days >= 1 && days <= 5;
+    const span = officeEl.querySelector('span');
+    if (!isWorkDay || !isWorkHours) {
+      officeEl.classList.remove('hidden');
+      if (span) span.textContent = `🕐 Fuera de horario laboral (L-V 8:00–16:00). El mensaje se enviará al volver.`;
+      officeEl.className = 'px-4 py-2 bg-amber-50 border-b border-amber-100 text-center';
+      if (span) span.className = 'text-[10px] font-bold text-amber-600';
+    } else {
+      officeEl.classList.remove('hidden');
+      if (span) span.textContent = `✅ Horario activo — Responderé lo antes posible`;
+      officeEl.className = 'px-4 py-2 bg-teal-50 border-b border-teal-100 text-center';
+      if (span) span.className = 'text-[10px] font-bold text-teal-600';
+    }
+  }
 
   // Destruir top-scroll anterior
   _topScrollDestroy?.();

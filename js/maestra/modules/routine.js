@@ -22,6 +22,48 @@ let _undoPayload = null;
 let _bulkScheduledTime = null;
 let _timelineExpanded = true;
 let _classroomSchedule = [];
+let _routineFilter = 'all';
+let _siestaTimerInterval = null;
+
+// ── PLANTILLAS DE COMENTARIOS FRECUENTES ──────────────────────────────────────
+const COMMENT_TEMPLATES = [
+  { icon: '😊', text: 'Se portó excelente hoy' },
+  { icon: '🤝', text: 'Compartió juguetes con sus compañeros' },
+  { icon: '🎨', text: 'Participó activamente en la actividad' },
+  { icon: '📚', text: 'Mostró interés en las actividades' },
+  { icon: '🍽️', text: 'Comió bien hoy' },
+  { icon: '😴', text: 'Durmió toda la siesta' },
+  { icon: '😢', text: 'Se mostró triste durante la mañana' },
+  { icon: '🤒', text: 'Presentó malestar leve' },
+  { icon: '💪', text: 'Fue muy independiente hoy' },
+  { icon: '🗣️', text: 'Habló con sus compañeros' },
+];
+
+// ── AUTO-SAVE DRAFTS (localStorage) ───────────────────────────────────────────
+function _draftKey(studentId) {
+  const today = new Date().toISOString().split('T')[0];
+  return `karpus_draft_${studentId}_${today}`;
+}
+function _saveDraft(studentId, data) {
+  try { localStorage.setItem(_draftKey(studentId), JSON.stringify(data)); } catch (_) {}
+}
+function _getDraft(studentId) {
+  try { const d = localStorage.getItem(_draftKey(studentId)); return d ? JSON.parse(d) : null; } catch (_) { return null; }
+}
+function _clearDraft(studentId) {
+  try { localStorage.removeItem(_draftKey(studentId)); } catch (_) {}
+}
+function _autoSaveField(studentId, field, value) {
+  const draft = _getDraft(studentId) || {};
+  draft[field] = value;
+  draft._savedAt = Date.now();
+  _saveDraft(studentId, draft);
+}
+
+function _autoSaveNote(studentId, value) {
+  _autoSaveField(studentId, 'notes', value);
+}
+window._routineAutoSaveNote = _autoSaveNote;
 
 // ── Constantes de Eventos ─────────────────────────────────────────────────────
 const EVENT_TYPES = {
@@ -128,6 +170,7 @@ const EVENT_CATALOG = [
   { type: 'cepillado',        label: 'Cepillado',       icon: '🪥', category: 'higiene',        defaultDuration: 10 },
   { type: 'lavado_manos',     label: 'Lavado de manos', icon: '🧼', category: 'higiene',        defaultDuration: 5  },
   { type: 'crema',            label: 'Crema / Solar',   icon: '🧴', category: 'higiene',        defaultDuration: 5  },
+  { type: 'cambio_ropa',      label: 'Cambio de ropa',   icon: '👕', category: 'higiene',        defaultDuration: 5  },
   // Actividades
   { type: 'actividad',        label: 'Actividad',       icon: '📚', category: 'actividades',    defaultDuration: 30 },
   { type: 'manualidad',       label: 'Manualidad',      icon: '🎨', category: 'actividades',    defaultDuration: 45 },
@@ -166,6 +209,8 @@ const EVENT_CATALOG = [
   { type: 'logro_destacado',  label: 'Refuerzo Positivo', icon: '👏', category: 'social',       defaultDuration: 5  },
   { type: 'objeto_apego',     label: 'Objeto de Transición', icon: '🧸', category: 'social',    defaultDuration: 15 },
   { type: 'intercambio_detalles', label: 'Intercambio de Detalles', icon: '🎁', category: 'social', defaultDuration: 20 },
+  // Salida
+  { type: 'salida',             label: 'Salida',            icon: '👋', category: 'salida',         defaultDuration: 5  },
   // Aprendizaje
   { type: 'proyecto',         label: 'Proyecto',        icon: '🎯', category: 'aprendizaje',    defaultDuration: 45 },
   { type: 'lectura',          label: 'Cuento',          icon: '📖', category: 'aprendizaje',    defaultDuration: 20 },
@@ -514,7 +559,8 @@ function _countReportedStudents(logsMap, students) {
 
 function _isStudentPresent(studentId) {
   const attendance = AppState.get('attendance') || [];
-  const record = attendance.find(a => a.student_id === studentId);
+  const numId = Number(studentId);
+  const record = attendance.find(a => Number(a.student_id) === numId);
   return record?.status === 'present' || record?.status === 'late';
 }
 
@@ -522,7 +568,8 @@ function _isStudentPresent(studentId) {
 // La maestra NO puede cambiar de aula, pero el padre/la puerta marca el retiro.
 function _isStudentRetirado(studentId) {
   const attendance = AppState.get('attendance') || [];
-  const record = attendance.find(a => a.student_id === studentId);
+  const numId = Number(studentId);
+  const record = attendance.find(a => Number(a.student_id) === numId);
   return record?.status === 'retirado';
 }
 
@@ -550,6 +597,119 @@ function _isStudentNearExit(student) {
   const exitMins = (h || 0) * 60 + (m || 0);
   const nowMins = now.getHours() * 60 + now.getMinutes();
   return nowMins >= exitMins - 30 && nowMins <= exitMins + 30;
+}
+
+// ── FILTROS RÁPIDOS DE ESTADO ────────────────────────────────────────────────
+function _filterStudents(students, filter, logsMap) {
+  if (filter === 'all') return students;
+  return students.filter(s => {
+    const log = logsMap[s.id];
+    const isPresent = _isStudentPresent(s.id);
+    const isRetirado = _isStudentRetirado(s.id);
+    const hasReport = log && (log.mood || log.food || log.nap || log.notes || (log.events && log.events.length));
+    const activeSiesta = (log?.events || []).filter(e => e.type === 'siesta').some(e => e.open === true);
+    const nearExit = isPresent && !isRetirado && _isStudentNearExit(s);
+    switch (filter) {
+      case 'unreported': return isPresent && !isRetirado && !hasReport;
+      case 'siesta': return activeSiesta;
+      case 'near_exit': return nearExit;
+      case 'retirado': return isRetirado;
+      default: return true;
+    }
+  });
+}
+
+function _setRoutineFilter(filter) {
+  _routineFilter = filter;
+  document.querySelectorAll('#routineFilterChips button').forEach(b => {
+    const active = b.dataset.filter === filter;
+    b.classList.toggle('bg-gradient-to-r', active);
+    b.classList.toggle('from-orange-500', active);
+    b.classList.toggle('to-amber-500', active);
+    b.classList.toggle('text-white', active);
+    b.classList.toggle('shadow-lg', active);
+    b.classList.toggle('shadow-orange-200', active);
+    b.classList.toggle('border-orange-400', active);
+    b.classList.toggle('bg-slate-50', !active);
+    b.classList.toggle('text-slate-500', !active);
+    b.classList.toggle('border-slate-200', !active);
+    b.classList.toggle('hover:bg-slate-100', !active);
+    b.classList.toggle('hover:text-slate-700', !active);
+    b.classList.toggle('hover:border-slate-300', !active);
+  });
+  _refreshStudentCards();
+}
+export const setRoutineFilter = _setRoutineFilter;
+
+function _toggleRoutineSection(section) {
+  const body = document.getElementById(`${section}Body`);
+  const toggle = body?.previousElementSibling?.querySelector('.routine-section-toggle') ||
+                 document.querySelector(`[aria-controls="${section}Body"]`);
+  if (!body || !toggle) return;
+  const expanded = toggle.getAttribute('aria-expanded') === 'true';
+  toggle.setAttribute('aria-expanded', String(!expanded));
+  if (expanded) {
+    body.classList.add('collapsed');
+  } else {
+    body.classList.remove('collapsed');
+    body.style.maxHeight = body.scrollHeight + 'px';
+    setTimeout(() => { body.style.maxHeight = ''; }, 300);
+  }
+}
+export const toggleRoutineSection = _toggleRoutineSection;
+
+function _getFilterCounts(students, logsMap) {
+  const counts = { all: students.length, unreported: 0, siesta: 0, near_exit: 0, retirado: 0 };
+  students.forEach(s => {
+    const log = logsMap[s.id];
+    const isPresent = _isStudentPresent(s.id);
+    const isRetirado = _isStudentRetirado(s.id);
+    const hasReport = log && (log.mood || log.food || log.nap || log.notes || (log.events && log.events.length));
+    const activeSiesta = (log?.events || []).filter(e => e.type === 'siesta').some(e => e.open === true);
+    const nearExit = isPresent && !isRetirado && _isStudentNearExit(s);
+    if (isPresent && !isRetirado && !hasReport) counts.unreported++;
+    if (activeSiesta) counts.siesta++;
+    if (nearExit) counts.near_exit++;
+    if (isRetirado) counts.retirado++;
+  });
+  return counts;
+}
+
+// ── CRONÓMETRO DE SIESTA EN TIEMPO REAL ──────────────────────────────────────
+function _startSiestaTimers() {
+  if (_siestaTimerInterval) clearInterval(_siestaTimerInterval);
+  _siestaTimerInterval = setInterval(_updateSiestaTimers, 30000);
+  _updateSiestaTimers();
+}
+
+function _stopSiestaTimers() {
+  if (_siestaTimerInterval) { clearInterval(_siestaTimerInterval); _siestaTimerInterval = null; }
+}
+
+function _updateSiestaTimers() {
+  document.querySelectorAll('[data-siesta-elapsed]').forEach(el => {
+    const startIso = el.dataset.siestaElapsed;
+    if (!startIso) return;
+    const mins = Math.round((Date.now() - new Date(startIso).getTime()) / 60000);
+    el.textContent = `${mins}min`;
+  });
+}
+
+// ── CÁLCULO AUTOMÁTICO DE LECHE DEL DÍA ──────────────────────────────────────
+function _getDailyMilkSummary(logsMap, students) {
+  let totalOz = 0;
+  let count = 0;
+  students.forEach(s => {
+    const log = logsMap[s.id];
+    if (!log?.events) return;
+    log.events.forEach(e => {
+      if ((e.type === 'biberon' || e.type === 'milk') && e.oz) {
+        totalOz += parseFloat(e.oz) || 0;
+        count++;
+      }
+    });
+  });
+  return { totalOz, count };
 }
 
 // ── V8: helpers de cronología ─────────────────────────────────────────────────
@@ -584,8 +744,14 @@ function _injectV8Styles() {
     .tl-insert-btn{background:#fff;border:2px solid #FF8A00;color:#FF8A00;border-radius:9999px;width:26px;height:26px;display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:900;line-height:1;box-shadow:0 2px 8px rgba(255,138,0,0.35);cursor:pointer;transition:transform .15s ease,background .15s ease,color .15s ease;}
     .tl-insert-btn:hover{background:#FF8A00;color:#fff;transform:scale(1.1);}
     .tl-insert-btn:active{transform:scale(.9);}
-    #scheduleOrderList .schedule-order-row select{font-size:9px;font-weight:700;color:#475569;background:#fff;border:1px solid #e2e8f0;border-radius:8px;padding:2px 4px;outline:none;}
+    #scheduleOrderList .schedule-order-row select{font-size:11px;font-weight:700;color:#475569;background:#fff;border:1px solid #e2e8f0;border-radius:10px;padding:6px 8px;outline:none;min-height:36px;min-width:52px;-webkit-appearance:auto;appearance:auto;}
     #scheduleOrderList .schedule-order-row select:focus{border-color:#FF8A00;}
+    @media(min-width:640px){#scheduleOrderList .schedule-order-row select{font-size:9px;padding:2px 4px;min-height:auto;min-width:auto;}}
+    .routine-section-toggle{cursor:pointer;user-select:none;-webkit-tap-highlight-color:transparent;}
+    .routine-section-toggle .acc-chevron{transition:transform .25s ease;}
+    .routine-section-toggle[aria-expanded="true"] .acc-chevron{transform:rotate(180deg);}
+    .routine-section-body{overflow:hidden;transition:max-height .3s ease,opacity .25s ease;}
+    .routine-section-body.collapsed{max-height:0!important;opacity:0;padding-top:0;padding-bottom:0;pointer-events:none;}
     .acc-section summary{list-style:none;}
     .acc-section summary::-webkit-details-marker{display:none;}
     .acc-section summary::marker{content:"";}
@@ -593,7 +759,16 @@ function _injectV8Styles() {
     .acc-section[open]{background:#fff;border-color:#e2e8f0;box-shadow:0 1px 4px rgba(0,0,0,0.04);}
     #ageFilterChips button{color:#fff;border-color:rgba(255,255,255,.35);background:rgba(255,255,255,.12);}
     #ageFilterChips button:hover{background:rgba(255,255,255,.25);}
-    #ageFilterChips button.active-age{background:#fff;color:#f97316;border-color:#fff;}`;
+    #ageFilterChips button.active-age{background:#fff;color:#f97316;border-color:#fff;}
+    /* Swipe card styles */
+    .swipe-card{position:relative;overflow:hidden;touch-action:pan-y;}
+    .swipe-card .swipe-action-left{position:absolute;top:0;left:0;bottom:0;width:60px;display:flex;align-items:center;justify-content:center;background:linear-gradient(90deg,#ef4444,#dc2626);color:#fff;font-size:20px;opacity:0;transition:opacity .15s;pointer-events:none;}
+    .swipe-card .swipe-action-right{position:absolute;top:0;right:0;bottom:0;width:60px;display:flex;align-items:center;justify-content:center;background:linear-gradient(270deg,#22c55e,#16a34a);color:#fff;font-size:20px;opacity:0;transition:opacity .15s;pointer-events:none;}
+    .swipe-card.swiping-left .swipe-action-left{opacity:1;}
+    .swipe-card.swiping-right .swipe-action-right{opacity:1;}
+    .swipe-card .swipe-hint{position:absolute;top:50%;transform:translateY(-50%);font-size:8px;font-weight:900;text-transform:uppercase;letter-spacing:.05em;pointer-events:none;opacity:0;transition:opacity .15s;}
+    .swipe-card.swiping-left .swipe-hint-left{opacity:.8;left:8px;color:#fff;}
+    .swipe-card.swiping-right .swipe-hint-right{opacity:.8;right:8px;color:#fff;}`;
   document.head.appendChild(style);
 }
 
@@ -711,13 +886,23 @@ export async function initRoutine() {
 
     await _loadSchedule(classroom.id);
 
-    const { data: todayLogs, error } = await supabase
+    let todayLogs = [];
+    const { data: logsData, error: logsError } = await supabase
       .from('daily_logs')
       .select('id, student_id, mood, food, nap, notes, status, created_at, infant_data, events')
       .eq('classroom_id', classroom.id)
       .eq('date', today);
 
-    if (error) throw error;
+    if (logsError) {
+      const { data: fallbackLogs } = await supabase
+        .from('daily_logs')
+        .select('id, student_id, mood, food, nap, notes, created_at')
+        .eq('classroom_id', classroom.id)
+        .eq('date', today);
+      todayLogs = (fallbackLogs || []).map(l => ({ ...l, status: 'published', infant_data: [], events: [] }));
+    } else {
+      todayLogs = logsData || [];
+    }
 
     const logsMap = {};
     (todayLogs || []).forEach(l => { logsMap[l.student_id] = l; });
@@ -742,8 +927,10 @@ export async function initRoutine() {
     if (window.lucide) window.lucide.createIcons();
 
     _startAutoRegisterClock();
+    _startSiestaTimers();
 
   } catch (e) {
+    console.error('[routine] Error cargando rutina:', e);
     container.innerHTML = '<div class="text-center p-10 text-rose-500 font-bold">Error al cargar rutina. Intenta de nuevo.</div>';
   }
 }
@@ -895,8 +1082,8 @@ function _renderRoutineLayout({ todayLabel, students, logsMap, withReport, sched
 
     <!-- ═══ NIVEL 1: TIMELINE DEL DÍA ═══ -->
     <div class="bg-white border border-slate-100 rounded-[2rem] overflow-hidden" id="timelineContainer" style="box-shadow:0 4px 24px rgba(0,0,0,0.04);">
-      <!-- Header -->
-      <div class="px-4 sm:px-5 py-4 flex flex-wrap items-center justify-between gap-3 border-b border-slate-100" style="background:linear-gradient(135deg, #f8fafc 0%, #ffffff 100%);">
+      <!-- Header (clickeable para colapsar) -->
+      <div class="routine-section-toggle px-4 sm:px-5 py-4 flex flex-wrap items-center justify-between gap-3 border-b border-slate-100" style="background:linear-gradient(135deg, #f8fafc 0%, #ffffff 100%);" onclick="App.toggleRoutineSection('timeline')" aria-expanded="true" aria-controls="timelineBody">
         <div class="flex items-center gap-3 min-w-0">
           <div class="w-10 h-10 rounded-2xl flex items-center justify-center text-white text-lg shadow-md shrink-0" style="background:linear-gradient(135deg, #FF8A00, #f97316);box-shadow:0 4px 12px rgba(255,138,0,0.3);">📅</div>
           <div class="min-w-0">
@@ -905,12 +1092,12 @@ function _renderRoutineLayout({ todayLabel, students, logsMap, withReport, sched
           </div>
         </div>
         <div class="flex items-center gap-2 flex-wrap">
-          <button onclick="App.openAllEventsMenu()"
+          <button onclick="event.stopPropagation();App.openAllEventsMenu()"
             class="flex items-center gap-1 px-2.5 py-2 bg-indigo-50 hover:bg-indigo-100 rounded-xl transition-all text-[10px] font-black text-indigo-600 uppercase tracking-widest active:scale-95">
             <span class="text-sm">➕</span>
             <span class="hidden sm:inline">Eventos</span>
           </button>
-          <button onclick="App.openScheduleManager()"
+          <button onclick="event.stopPropagation();App.openScheduleManager()"
             class="flex items-center gap-1 px-2.5 py-2 bg-slate-100 hover:bg-slate-200 rounded-xl transition-all text-[10px] font-black text-slate-500 uppercase tracking-widest active:scale-95">
             <span class="text-sm">⚙️</span>
             <span class="hidden sm:inline">Rutina</span>
@@ -918,53 +1105,52 @@ function _renderRoutineLayout({ todayLabel, students, logsMap, withReport, sched
           <span class="hidden sm:inline-flex items-center text-[10px] font-black text-[#28B54D] bg-green-50 border border-green-200 px-3 py-1.5 rounded-full">
             ${withReport}/${students.length} reportes
           </span>
-          <button onclick="App.toggleTimeline()" id="btnToggleTimeline"
-            class="flex items-center gap-1.5 px-3 py-2 bg-slate-100 hover:bg-slate-200 rounded-xl transition-all text-[10px] font-black text-slate-500 uppercase tracking-widest active:scale-95">
-            <span id="timelineToggleIcon">${window.innerWidth < 640 ? '📅' : (_timelineExpanded ? '▲' : '▼')}</span>
-            <span id="timelineToggleLabel">${window.innerWidth < 640 ? 'Eventos' : (_timelineExpanded ? 'Ocultar' : 'Abrir')}</span>
-          </button>
+          <span class="acc-chevron text-slate-400 text-xs">▼</span>
         </div>
       </div>
 
-      <!-- Timeline Expandido: Ventana Vertical con Detalles -->
-      <div id="timelineExpanded" class="${_timelineExpanded ? '' : 'hidden'}">
-        <div class="max-h-[320px] sm:max-h-[420px] overflow-y-auto custom-scrollbar">
-          <div class="relative p-3 sm:p-5">
-            <!-- Línea vertical conectora -->
-            <div class="absolute left-[38px] top-5 bottom-5 w-0.5 bg-gradient-to-b from-[#FF8A00]/30 via-slate-200 to-slate-100"></div>
+      <!-- Timeline Body (colapsable) -->
+      <div id="timelineBody" class="routine-section-body">
+        <!-- Timeline Expandido: Ventana Vertical con Detalles -->
+        <div id="timelineExpanded" class="${_timelineExpanded ? '' : 'hidden'}">
+          <div class="max-h-[320px] sm:max-h-[420px] overflow-y-auto custom-scrollbar">
+            <div class="relative p-3 sm:p-5">
+              <!-- Línea vertical conectora -->
+              <div class="absolute left-[38px] top-5 bottom-5 w-0.5 bg-gradient-to-b from-[#FF8A00]/30 via-slate-200 to-slate-100"></div>
 
-            <div class="space-y-2">
-              ${_renderTimelineEventRows()}
+              <div class="space-y-2">
+                ${_renderTimelineEventRows()}
+              </div>
             </div>
           </div>
         </div>
-      </div>
 
-      <!-- Timeline Colapsado: Barra Horizontal de Emojis -->
-      <div id="timelineCollapsed" class="${_timelineExpanded ? 'hidden' : ''} px-4 py-3 border-t border-slate-100 w-full max-w-full" style="overflow:hidden;">
-        <div class="overflow-x-auto w-full" style="scrollbar-width:none;-webkit-overflow-scrolling:touch;overscroll-behavior-x:contain;" id="timelineCollapsedScroll">
-          <div class="flex items-center gap-1.5 min-w-max py-1" style="min-width:max-content;">
-            ${schedule.map((ev, i) => {
-              const state    = _getTimelineState(ev);
-              const isActive = state === 'in_progress';
-              const isTimePast = state === 'completed';
-              const isRegistered = students.filter(s => _isStudentPresent(s.id) && (logsMap[s.id]?.events || []).some(e => e.type === ev.type)).length > 0;
-              const isDone   = isTimePast && isRegistered;
-              const isMissed = isTimePast && !isRegistered;
-              return `
-              <button onclick="App.openBulkEventModal('${ev.type}', '${_formatTime12(ev.hour, ev.minute)}')"
-                class="flex flex-col items-center gap-1 px-3 py-2 rounded-2xl transition-all active:scale-90 shrink-0 ${
-                  isActive ? 'bg-[#FF8A00]/10 scale-110 shadow-sm' :
-                  isDone ? 'bg-green-50' :
-                  isMissed ? 'bg-amber-50' : 'hover:bg-slate-50'
-                }">
-                <span class="text-xl leading-none ${isActive ? 'drop-shadow-md' : ''}">${_getScheduleEventIcon(ev.type)}</span>
-                ${isActive ? '<span class="w-1.5 h-1.5 bg-[#FF8A00] rounded-full tl-pulse"></span>' :
-                  isDone ? '<span class="w-1.5 h-1.5 bg-[#28B54D] rounded-full"></span>' :
-                  isMissed ? '<span class="w-1.5 h-1.5 bg-amber-500 rounded-full"></span>' :
-                  '<span class="w-1.5 h-1.5 bg-slate-200 rounded-full"></span>'}
-              </button>`;
-            }).join('')}
+        <!-- Timeline Colapsado: Barra Horizontal de Emojis -->
+        <div id="timelineCollapsed" class="${_timelineExpanded ? 'hidden' : ''} px-4 py-3 border-t border-slate-100 w-full max-w-full" style="overflow:hidden;">
+          <div class="overflow-x-auto w-full" style="scrollbar-width:none;-webkit-overflow-scrolling:touch;overscroll-behavior-x:contain;" id="timelineCollapsedScroll">
+            <div class="flex items-center gap-1.5 min-w-max py-1" style="min-width:max-content;">
+              ${schedule.map((ev, i) => {
+                const state    = _getTimelineState(ev);
+                const isActive = state === 'in_progress';
+                const isTimePast = state === 'completed';
+                const isRegistered = students.filter(s => _isStudentPresent(s.id) && (logsMap[s.id]?.events || []).some(e => e.type === ev.type)).length > 0;
+                const isDone   = isTimePast && isRegistered;
+                const isMissed = isTimePast && !isRegistered;
+                return `
+                <button onclick="App.openBulkEventModal('${ev.type}', '${_formatTime12(ev.hour, ev.minute)}')"
+                  class="flex flex-col items-center gap-1 px-3 py-2 rounded-2xl transition-all active:scale-90 shrink-0 ${
+                    isActive ? 'bg-[#FF8A00]/10 scale-110 shadow-sm' :
+                    isDone ? 'bg-green-50' :
+                    isMissed ? 'bg-amber-50' : 'hover:bg-slate-50'
+                  }">
+                  <span class="text-xl leading-none ${isActive ? 'drop-shadow-md' : ''}">${_getScheduleEventIcon(ev.type)}</span>
+                  ${isActive ? '<span class="w-1.5 h-1.5 bg-[#FF8A00] rounded-full tl-pulse"></span>' :
+                    isDone ? '<span class="w-1.5 h-1.5 bg-[#28B54D] rounded-full"></span>' :
+                    isMissed ? '<span class="w-1.5 h-1.5 bg-amber-500 rounded-full"></span>' :
+                    '<span class="w-1.5 h-1.5 bg-slate-200 rounded-full"></span>'}
+                </button>`;
+              }).join('')}
+            </div>
           </div>
         </div>
       </div>
@@ -979,7 +1165,12 @@ function _renderRoutineLayout({ todayLabel, students, logsMap, withReport, sched
       <div class="flex-1">
         <p class="text-sm font-black text-purple-800">${activeSiestas.length} siesta${activeSiestas.length > 1 ? 's' : ''} activa${activeSiestas.length > 1 ? 's' : ''}</p>
         <p class="text-[11px] font-bold text-purple-600">
-          ${activeSiestas.slice(0,2).map(s => s.name.split(' ')[0]).join(', ')}${activeSiestas.length > 2 ? ` y ${activeSiestas.length - 2} más` : ''}
+          ${activeSiestas.slice(0,2).map(s => {
+            const log = logsMap[s.id] || {};
+            const openSiesta = (log.events || []).filter(e => e.type === 'siesta').find(e => e.open);
+            const elapsed = openSiesta ? Math.round((Date.now() - new Date(openSiesta.created_at).getTime()) / 60000) : '?';
+            return `${s.name.split(' ')[0]} <span class="text-purple-400" data-siesta-elapsed="${openSiesta?.created_at || ''}">${elapsed}min</span>`;
+          }).join(', ')}${activeSiestas.length > 2 ? ` y ${activeSiestas.length - 2} más` : ''}
         </p>
       </div>
       <button onclick="App.wakeAllSiestas()" class="px-4 py-2.5 text-white rounded-2xl font-black text-[10px] uppercase tracking-widest hover:brightness-110 active:scale-95 transition-all shadow-lg" style="background:linear-gradient(135deg, #9333ea, #7c3aed);box-shadow:0 4px 14px rgba(147,51,234,0.35);">
@@ -1018,40 +1209,88 @@ function _renderRoutineLayout({ todayLabel, students, logsMap, withReport, sched
     </div>
     ` : ''}
 
-    <!-- Acciones Colectivas del Aula -->
-    <div class="bg-white border border-slate-100 rounded-[2rem] p-5 shadow-lg" style="box-shadow:0 4px 24px rgba(0,0,0,0.04);">
-      <div class="flex items-center justify-between mb-4">
+    <!-- Acciones Colectivas del Aula (colapsable) -->
+    <div class="bg-white border border-slate-100 rounded-[2rem] shadow-lg overflow-hidden" style="box-shadow:0 4px 24px rgba(0,0,0,0.04);">
+      <div class="routine-section-toggle px-5 py-4 flex items-center justify-between" onclick="App.toggleRoutineSection('acciones')" aria-expanded="false" aria-controls="accionesBody">
         <div>
           <p class="text-[10px] font-black text-slate-400 uppercase tracking-widest">Acciones del Aula</p>
           <p class="text-[9px] font-bold text-slate-300 mt-0.5">${withReport} de ${students.length} reportados</p>
         </div>
+        <span class="acc-chevron text-slate-400 text-xs">▼</span>
       </div>
-      <div class="grid grid-cols-4 sm:grid-cols-6 gap-2.5">
-        ${Object.entries(EVENT_TYPES).map(([type, meta]) => {
-          const softBgs = {slate:'#f1f5f9',blue:'#eff6ff',sky:'#f0f9ff',amber:'#fffbeb',indigo:'#eef2ff',rose:'#fff1f2',purple:'#faf5ff',teal:'#f0fdfa',orange:'#fff7ed',yellow:'#fefce8',green:'#f0fdf4',lime:'#f7fee7',cyan:'#ecfeff'};
-          const softBorders = {slate:'#cbd5e1',blue:'#93c5fd',sky:'#7dd3fc',amber:'#fcd34d',indigo:'#a5b4fc',rose:'#fda4af',purple:'#d8b4fe',teal:'#5eead4',orange:'#fdba74',yellow:'#fde047',green:'#86efac',lime:'#bef264',cyan:'#67e8f9'};
-          const bg = softBgs[meta.color] || '#f1f5f9';
-          const hovBorder = softBorders[meta.color] || '#cbd5e1';
-          return `
-          <button onclick="App.openBulkEventModal('${type}')"
-            class="flex flex-col items-center gap-1.5 p-3 hover:bg-white border-2 border-transparent rounded-[1.2rem] transition-all active:scale-90 group" style="background:${bg};box-shadow:0 1px 3px rgba(0,0,0,0.04);--hov-bc:${hovBorder};" onmouseenter="this.style.borderColor=this.style.getPropertyValue('--hov-bc')" onmouseleave="this.style.borderColor='transparent'">
-            <span class="text-2xl group-hover:scale-110 transition-transform">${meta.icon}</span>
-            <span class="text-[9px] font-black uppercase tracking-tight leading-tight text-center" style="color:${hovBorder};">${meta.label}</span>
-          </button>`;
-        }).join('')}
+      <div id="accionesBody" class="routine-section-body collapsed px-5 pb-5">
+        <div class="grid grid-cols-4 sm:grid-cols-6 gap-2.5">
+          ${Object.entries(EVENT_TYPES).map(([type, meta]) => {
+            const softBgs = {slate:'#f1f5f9',blue:'#eff6ff',sky:'#f0f9ff',amber:'#fffbeb',indigo:'#eef2ff',rose:'#fff1f2',purple:'#faf5ff',teal:'#f0fdfa',orange:'#fff7ed',yellow:'#fefce8',green:'#f0fdf4',lime:'#f7fee7',cyan:'#ecfeff'};
+            const softBorders = {slate:'#cbd5e1',blue:'#93c5fd',sky:'#7dd3fc',amber:'#fcd34d',indigo:'#a5b4fc',rose:'#fda4af',purple:'#d8b4fe',teal:'#5eead4',orange:'#fdba74',yellow:'#fde047',green:'#86efac',lime:'#bef264',cyan:'#67e8f9'};
+            const bg = softBgs[meta.color] || '#f1f5f9';
+            const hovBorder = softBorders[meta.color] || '#cbd5e1';
+            return `
+            <button onclick="App.openBulkEventModal('${type}')"
+              class="flex flex-col items-center gap-1.5 p-3 hover:bg-white border-2 border-transparent rounded-[1.2rem] transition-all active:scale-90 group" style="background:${bg};box-shadow:0 1px 3px rgba(0,0,0,0.04);--hov-bc:${hovBorder};" onmouseenter="this.style.borderColor=this.style.getPropertyValue('--hov-bc')" onmouseleave="this.style.borderColor='transparent'">
+              <span class="text-2xl group-hover:scale-110 transition-transform">${meta.icon}</span>
+              <span class="text-[9px] font-black uppercase tracking-tight leading-tight text-center" style="color:${hovBorder};">${meta.label}</span>
+            </button>`;
+          }).join('')}
+        </div>
+        <button onclick="App.registerMissingStudents()" class="w-full mt-3 py-2.5 bg-slate-50 hover:bg-slate-100 border-2 border-dashed border-slate-200 rounded-2xl text-[10px] font-black text-slate-400 uppercase tracking-widest transition-all active:scale-95">
+          Registrar faltantes
+        </button>
       </div>
-      <button onclick="App.registerMissingStudents()" class="w-full mt-3 py-2.5 bg-slate-50 hover:bg-slate-100 border-2 border-dashed border-slate-200 rounded-2xl text-[10px] font-black text-slate-400 uppercase tracking-widest transition-all active:scale-95">
-        Registrar faltantes
-      </button>
     </div>
 
-    <!-- ═══ NIVEL 3: TARJETAS DE LOS ALUMNOS ═══ -->
-    <div>
-      <div class="flex items-center justify-between mb-3 px-1">
-        <p class="text-[10px] font-black text-slate-400 uppercase tracking-widest">Alumnos</p>
-        <span class="text-[9px] font-bold text-slate-300">${_getPresentStudentIds().length} presentes</span>
+    <!-- ═══ NIVEL 3: TARJETAS DE LOS ALUMNOS (colapsable) ═══ -->
+    <div class="bg-white border border-slate-100 rounded-[2rem] overflow-hidden shadow-sm" style="box-shadow:0 2px 12px rgba(0,0,0,0.03);">
+      <!-- Resumen de leche del día -->
+      ${(() => {
+        const milk = _getDailyMilkSummary(logsMap, students);
+        if (milk.count === 0) return '';
+        return `
+        <div class="flex items-center gap-2 mx-5 mt-4 px-3 py-2 bg-blue-50 rounded-xl border border-blue-100">
+          <span class="text-sm">🍼</span>
+          <span class="text-[9px] font-black text-blue-600 uppercase tracking-wider">Leche hoy:</span>
+          <span class="text-[10px] font-black text-blue-800">${milk.totalOz} oz total · ${milk.count} registro${milk.count > 1 ? 's' : ''}</span>
+        </div>`;
+      })()}
+
+      <!-- Header colapsable -->
+      <div class="routine-section-toggle px-5 py-4 flex items-center justify-between" onclick="App.toggleRoutineSection('alumnos')" aria-expanded="true" aria-controls="alumnosBody">
+        <div>
+          <p class="text-[10px] font-black text-slate-400 uppercase tracking-widest">Alumnos</p>
+          <p class="text-[9px] font-bold text-slate-300 mt-0.5">${_filterStudents(students, _routineFilter, logsMap).length} de ${_getPresentStudentIds().length} presentes</p>
+        </div>
+        <span class="acc-chevron text-slate-400 text-xs">▼</span>
       </div>
-      <div class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-3" id="routineStudentsGrid"></div>
+
+      <div id="alumnosBody" class="routine-section-body px-5 pb-5">
+        <!-- Filtros rápidos -->
+        ${(() => {
+          const counts = _getFilterCounts(students, logsMap);
+          const filters = [
+            { key: 'all', label: 'Todos', icon: '👥' },
+            { key: 'unreported', label: 'Sin Reportar', icon: '⚠️' },
+            { key: 'siesta', label: 'Durmiendo', icon: '😴' },
+            { key: 'near_exit', label: 'Próx. Salir', icon: '⏰' },
+            { key: 'retirado', label: 'Retirados', icon: '🚪' },
+          ];
+          return `
+          <div id="routineFilterChips" class="flex items-center gap-1.5 mb-3 overflow-x-auto pb-1" style="scrollbar-width:none;-webkit-overflow-scrolling:touch;">
+            ${filters.map(f => `
+              <button data-filter="${f.key}" onclick="App.setRoutineFilter('${f.key}')"
+                class="flex items-center gap-1 px-3 py-2 rounded-xl text-[10px] font-black uppercase tracking-wider whitespace-nowrap transition-all active:scale-95 shrink-0 min-h-[36px] ${
+                  _routineFilter === f.key
+                    ? 'bg-gradient-to-r from-orange-500 to-amber-500 text-white shadow-lg shadow-orange-200 border border-orange-400'
+                    : 'bg-slate-50 text-slate-500 border border-slate-200 hover:bg-slate-100 hover:text-slate-700 hover:border-slate-300'
+                }">
+                <span class="text-xs">${f.icon}</span>
+                <span>${f.label}</span>
+                ${counts[f.key] > 0 ? `<span class="min-w-[18px] h-[18px] rounded-full ${_routineFilter === f.key ? 'bg-white/25 text-white' : 'bg-orange-100 text-orange-600'} flex items-center justify-center text-[8px] font-black">${counts[f.key]}</span>` : ''}
+              </button>`).join('')}
+          </div>`;
+        })()}
+
+        <div class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-3" id="routineStudentsGrid"></div>
+      </div>
     </div>
 
     <p class="text-[10px] text-slate-400 text-center font-medium pb-2">
@@ -1077,6 +1316,10 @@ function _renderStudentRoutineCard(s, log) {
   const isRetirado = _isStudentRetirado(s.id);
   const nearExit   = !isRetirado && isPresent && _isStudentNearExit(s);
 
+  // Alerta de temperatura elevada
+  const lastTemp = events.filter(e => e.type === 'temperatura' && e.temp != null).pop();
+  const hasFever = lastTemp && parseFloat(lastTemp.temp) >= 37.5;
+
   const moodEmojiMap = {};
   MOOD_OPTIONS.forEach(m => { moodEmojiMap[m.value] = m.icon; });
   const moodEmojis = { ...moodEmojiMap, feliz: '😀', normal: '😐', triste: '😢', enojado: '😡' };
@@ -1092,8 +1335,14 @@ function _renderStudentRoutineCard(s, log) {
   if (hasBiberon)                               eventTypes.push('🍼');
 
   return `
-    <div onclick="App.openStudentRoutine('${s.id}')"
-      class="group relative bg-white rounded-[1.5rem] p-3 border-2 ${isRetirado ? 'border-blue-400 bg-blue-50/60' : !isPresent ? 'border-dashed border-slate-200 opacity-60' : isDraft ? 'border-dashed border-[#FF8A00]/40 bg-orange-50/20' : isValid ? 'border-[#28B54D]/30' : 'border-slate-100'} hover:border-[#FF8A00] hover:shadow-xl hover:shadow-orange-100 transition-all cursor-pointer active:scale-95 flex flex-col overflow-hidden">
+    <div class="swipe-card" data-student-id="${s.id}" data-present="${isPresent}" data-retirado="${isRetirado}">
+      <div class="swipe-action-left">🚫</div>
+      <div class="swipe-action-left swipe-hint-left" style="position:absolute;top:50%;left:8px;transform:translateY(-50%);font-size:7px;font-weight:900;text-transform:uppercase;color:#fff;">Ausente</div>
+      <div class="swipe-action-right">🍽️</div>
+      <div class="swipe-action-right swipe-hint-right" style="position:absolute;top:50%;right:8px;transform:translateY(-50%);font-size:7px;font-weight:900;text-transform:uppercase;color:#fff;">Comió todo</div>
+      <div onclick="App.openStudentRoutine('${s.id}')"
+        class="group relative bg-white rounded-[1.5rem] p-3 border-2 ${hasFever ? 'border-red-400 bg-red-50/40 shadow-lg shadow-red-100/50' : isRetirado ? 'border-blue-400 bg-blue-50/60' : !isPresent ? 'border-dashed border-slate-200 opacity-60' : isDraft ? 'border-dashed border-[#FF8A00]/40 bg-orange-50/20' : isValid ? 'border-[#28B54D]/30' : 'border-slate-100'} hover:border-[#FF8A00] hover:shadow-xl hover:shadow-orange-100 transition-all cursor-pointer active:scale-95 flex flex-col overflow-hidden">
+      ${hasFever ? '<div class="absolute top-2 left-2 z-10"><span class="px-2 py-0.5 bg-red-500 text-white text-[8px] font-black uppercase rounded-lg shadow-sm animate-pulse">🔥 Fiebre ' + lastTemp.temp + '°C</span></div>' : ''}
 
       ${isRetirado ? '<div class="absolute top-2 left-2 z-10"><span class="px-2 py-0.5 bg-blue-500 text-white text-[8px] font-black uppercase rounded-lg shadow-sm">Salió del centro</span></div>' : ''}
       ${nearExit ? '<div class="absolute top-2 left-2 z-10"><span class="px-2 py-0.5 bg-amber-500 text-white text-[8px] font-black uppercase rounded-lg shadow-sm animate-pulse">⏰ Próximo a salir</span></div>' : ''}
@@ -1444,8 +1693,64 @@ function _renderSubParams(eventType) {
                 ${t}°${fiebre ? '<span class="absolute -top-1 -right-1 text-[8px]">🔥</span>' : ''}
               </button>`;}).join('')}
           </div>
-        </div>`;
+      </div>
+    </div>`;
+}
+
+// ── SWIPE GESTURE HANDLER ─────────────────────────────────────────────────────
+let _swipeStartX = 0, _swipeStartY = 0, _swipeCurrentCard = null, _swipeLocked = false;
+function _initSwipeHandlers() {
+  const grid = document.getElementById('routineStudentsGrid');
+  if (!grid || grid.dataset.swipeBound) return;
+  grid.dataset.swipeBound = '1';
+  grid.addEventListener('pointerdown', _onSwipeStart, { passive: true });
+  grid.addEventListener('pointermove', _onSwipeMove, { passive: false });
+  grid.addEventListener('pointerup', _onSwipeEnd, { passive: true });
+  grid.addEventListener('pointercancel', _onSwipeEnd, { passive: true });
+  grid.addEventListener('pointerleave', _onSwipeEnd, { passive: true });
+}
+function _onSwipeStart(e) {
+  const card = e.target.closest('.swipe-card');
+  if (!card) return;
+  if (card.dataset.present !== 'true' || card.dataset.retirado === 'true') return;
+  _swipeStartX = e.clientX;
+  _swipeStartY = e.clientY;
+  _swipeCurrentCard = card;
+  _swipeLocked = false;
+}
+function _onSwipeMove(e) {
+  if (!_swipeCurrentCard || _swipeLocked) return;
+  const dx = e.clientX - _swipeStartX;
+  const dy = e.clientY - _swipeStartY;
+  if (Math.abs(dy) > Math.abs(dx) && Math.abs(dx) < 15) { _swipeCurrentCard = null; return; }
+  if (Math.abs(dx) < 10) return;
+  e.preventDefault();
+  const inner = _swipeCurrentCard.querySelector('[onclick]');
+  if (inner) inner.style.transform = `translateX(${Math.max(-60, Math.min(60, dx))}px)`;
+  _swipeCurrentCard.classList.toggle('swiping-left', dx < -15);
+  _swipeCurrentCard.classList.toggle('swiping-right', dx > 15);
+}
+function _onSwipeEnd(e) {
+  if (!_swipeCurrentCard) return;
+  const card = _swipeCurrentCard;
+  const inner = card.querySelector('[onclick]');
+  const dx = (e.clientX || 0) - _swipeStartX;
+  if (inner) inner.style.transform = '';
+  card.classList.remove('swiping-left', 'swiping-right');
+  if (Math.abs(dx) > 50) {
+    _swipeLocked = true;
+    const sid = card.dataset.studentId;
+    if (dx < -50) {
+      App.safeToast('⬅️ Deslizó izquierda — registrar como ausente');
+    } else if (dx > 50) {
+      App.registerIndividualEvent(sid, 'desayuno', { obs: 'Comió todo (swipe rápido)' });
+      App.safeToast('➡️ Deslizó derecha — registrado como comió todo');
     }
+    setTimeout(() => { _swipeCurrentCard = null; }, 100);
+  } else {
+    _swipeCurrentCard = null;
+  }
+}
     case 'medicamento':
       return `
         <div class="space-y-3">
@@ -1713,7 +2018,12 @@ function _refreshStudentCards() {
   const logsMap  = AppState.get('logsMap') || {};
   const grid = document.getElementById('routineStudentsGrid');
   if (!grid) return;
-  grid.innerHTML = students.map(s => _renderStudentRoutineCard(s, logsMap[s.id] || {})).join('');
+  const filtered = _filterStudents(students, _routineFilter, logsMap);
+  grid.innerHTML = filtered.map(s => _renderStudentRoutineCard(s, logsMap[s.id] || {})).join('');
+  if (filtered.length === 0) {
+    grid.innerHTML = '<div class="col-span-full text-center py-8 text-slate-400"><p class="text-2xl mb-2">🔍</p><p class="text-[11px] font-bold">No hay alumnos en esta categoría</p></div>';
+  }
+  if (typeof _initSwipeHandlers === 'function') _initSwipeHandlers();
   if (window.lucide) window.lucide.createIcons();
 }
 
@@ -1972,6 +2282,37 @@ function _renderStandardRoutineUI(student, log, modalId) {
             ${routineQuickHTML}
           </div>`, false)}
 
+        ${_accSection('Pañales', '🧷', `
+          <div class="space-y-3">
+            <div class="grid grid-cols-2 gap-2">
+              <button onclick="App.registerIndividualEvent('${student.id}','panal_humedo',{crema:document.getElementById('diaper-cream-${student.id}')?.checked,consistencia:null,ropa_cambio:document.getElementById('diaper-change-${student.id}')?.checked})"
+                class="flex flex-col items-center gap-1.5 p-3 bg-sky-50 hover:bg-sky-100 border-2 border-sky-200 rounded-2xl transition-all active:scale-90">
+                <span class="text-2xl">💧</span>
+                <span class="text-[9px] font-black text-sky-700 uppercase">Mojado</span>
+              </button>
+              <button onclick="App.registerIndividualEvent('${student.id}','panal_sucio',{crema:document.getElementById('diaper-cream-${student.id}')?.checked,consistencia:document.getElementById('diaper-consist-${student.id}')?.value||null,ropa_cambio:document.getElementById('diaper-change-${student.id}')?.checked})"
+                class="flex flex-col items-center gap-1.5 p-3 bg-amber-50 hover:bg-amber-100 border-2 border-amber-200 rounded-2xl transition-all active:scale-90">
+                <span class="text-2xl">💩</span>
+                <span class="text-[9px] font-black text-amber-700 uppercase">Sucio</span>
+              </button>
+            </div>
+            <div class="flex items-center gap-3 px-1">
+              <label class="flex items-center gap-1.5 text-[9px] font-bold text-slate-500 cursor-pointer">
+                <input type="checkbox" id="diaper-cream-${student.id}" class="accent-orange-500 w-3.5 h-3.5"> 🧴 Crema
+              </label>
+              <label class="flex items-center gap-1.5 text-[9px] font-bold text-slate-500 cursor-pointer">
+                <input type="checkbox" id="diaper-change-${student.id}" class="accent-blue-500 w-3.5 h-3.5"> 👕 Ropa
+              </label>
+              <select id="diaper-consist-${student.id}" class="text-[9px] font-bold text-slate-500 bg-slate-50 border border-slate-200 rounded-lg px-1.5 py-1 outline-none">
+                <option value="">Consistencia</option>
+                <option value="blanda">Blanda</option>
+                <option value="semisolida">Semisólida</option>
+                <option value="solida">Sólida</option>
+                <option value="liquida">Líquida</option>
+              </select>
+            </div>
+          </div>`, false)}
+
         ${_accSection('Eventos del día', '⚡', `
           <div class="grid grid-cols-4 gap-2">
             ${[
@@ -1983,6 +2324,7 @@ function _renderStandardRoutineUI(student, log, modalId) {
               {type:'bano',        icon:'🚽', label:'Baño'},
               {type:'lavado_manos', icon:'🧼', label:'Lavado'},
               {type:'cepillado',   icon:'🪥', label:'Cepillado'},
+              {type:'cambio_ropa', icon:'👕', label:'Ropa'},
             ].map(ev => `
               <button onclick="App.registerIndividualEvent('${student.id}','${ev.type}',{})"
                 class="flex flex-col items-center gap-1 p-2.5 bg-slate-50 hover:bg-slate-100 border-2 border-transparent hover:border-slate-200 rounded-xl transition-all active:scale-90">
@@ -2002,9 +2344,19 @@ function _renderStandardRoutineUI(student, log, modalId) {
           </div>`, false)}
 
         ${_accSection('Observaciones', '📝', `
-          <textarea id="modal-note-${student.id}" rows="3"
-            class="w-full p-4 bg-slate-50 border-2 border-slate-100 rounded-2xl text-sm font-medium outline-none focus:border-[#FF8A00] transition-all resize-none"
-            placeholder="Escribe aquí...">${safeEscapeHTML(currentNotes)}</textarea>`, true)}
+          <div class="space-y-2">
+            <div class="flex flex-wrap gap-1.5 mb-2">
+              ${COMMENT_TEMPLATES.map(t => `
+                <button onclick="const ta=document.getElementById('modal-note-${student.id}');if(ta){ta.value=ta.value?(ta.value+' '+t.text):t.text;ta.focus();}"
+                  class="flex items-center gap-1 px-2 py-1 bg-slate-50 hover:bg-orange-50 border border-slate-100 hover:border-orange-200 rounded-lg transition-all active:scale-95 text-[8px] font-bold text-slate-500 hover:text-orange-600">
+                  <span>${t.icon}</span><span class="truncate max-w-[80px]">${t.text.substring(0,20)}...</span>
+                </button>`).join('')}
+            </div>
+            <textarea id="modal-note-${student.id}" rows="3"
+              oninput="if(window.App._autoSaveNote) App._autoSaveNote('${student.id}', this.value)"
+              class="w-full p-4 bg-slate-50 border-2 border-slate-100 rounded-2xl text-sm font-medium outline-none focus:border-[#FF8A00] transition-all resize-none"
+              placeholder="Escribe aquí...">${safeEscapeHTML(currentNotes || (_getDraft(student.id)?.notes || ''))}</textarea>
+          </div>`, true)}
 
         ${_accSection('Registro del día', '🕐', `
           <div class="space-y-3 max-h-64 overflow-y-auto pr-1" id="ind-timeline-${student.id}">${timelineHTML}</div>`, false)}
@@ -2265,6 +2617,7 @@ export async function saveRoutineInModal(sid) {
   const today     = new Date().toISOString().split('T')[0];
   try {
     await MaestraApi.upsertDailyLog({ student_id: sid, classroom_id: classroom.id, date: today, mood, food, nap: sleep, notes: note });
+    _clearDraft(sid);
     Modal.close('routineStudentModal');
     safeToast('Reporte guardado');
     await _refreshLogsMap(classroom.id, today);
@@ -2308,12 +2661,15 @@ export async function publishAll() {
     await MaestraApi.publishDailyLogs(drafts.map(d => d.id));
     safeToast('Reportes publicados', 'success');
     document.getElementById('btnPublishAll')?.classList.add('hidden');
+    const students = AppState.get('students') || [];
+    students.forEach(s => _clearDraft(s.id));
     await _refreshLogsMap(classroom.id, today);
     _reRenderTimeline();
   } catch (e) { safeToast('Error al publicar', 'error'); }
 }
 
 export async function updateRoutineField(studentId, field, value) {
+  _autoSaveField(studentId, field, value);
   await saveRoutineLog(studentId, field, value);
 }
 
@@ -2634,22 +2990,22 @@ function _renderScheduleOrderHTML() {
     const minuteOpts = [...new Set([...minutes, (s.minute ?? 0)])].sort((a,b) => a-b);
     const autoOn = true;
     return `
-      <div class="schedule-order-row flex flex-wrap items-center gap-2 p-2.5 rounded-2xl border-2 bg-white transition-all" draggable="true"
+      <div class="schedule-order-row flex flex-wrap items-center gap-2 p-3 rounded-2xl border-2 bg-white transition-all" draggable="true"
         data-type="${s.type}" data-idx="${i}" data-hour="${s.hour ?? 8}" data-minute="${s.minute ?? 0}" data-auto="1"
         style="border-color:#e2e8f0;">
         <span class="drag-handle text-slate-300 text-sm shrink-0" title="Arrastrar para reordenar">⋮⋮</span>
         <span class="text-lg shrink-0">${meta.icon}</span>
         <div class="flex-1 min-w-0 basis-32 sm:basis-0">
           <p class="text-[10px] font-black text-slate-700 truncate">${meta.label}</p>
-          <div class="flex flex-wrap items-center gap-1.5 mt-1">
+          <div class="flex flex-wrap items-center gap-2 mt-1.5">
             <select data-sched-hour="${s.type}" onchange="App.cascadeScheduleShift('${s.type}')">
               ${Array.from({length: 24}, (_, h) => `<option value="${h}" ${(s.hour ?? 8) === h ? 'selected' : ''}>${String(h).padStart(2,'0')}</option>`).join('')}
             </select>
-            <span class="text-[9px] text-slate-300">:</span>
+            <span class="text-[10px] text-slate-300 font-bold">:</span>
             <select data-sched-minute="${s.type}" onchange="App.cascadeScheduleShift('${s.type}')">
               ${minuteOpts.map(m => `<option value="${m}" ${(s.minute ?? 0) === m ? 'selected' : ''}>${String(m).padStart(2,'0')}</option>`).join('')}
             </select>
-            <select data-sched-duration="${s.type}" onchange="App.cascadeScheduleShift('${s.type}')">
+            <select data-sched-duration="${s.type}" onchange="App.cascadeScheduleShift('${s.type}')" class="min-w-[64px]">
               ${[5,10,15,20,30,45,60,90,120].map(d => `<option value="${d}" ${(s.duration ?? meta.defaultDuration ?? 30) === d ? 'selected' : ''}>${d}min</option>`).join('')}
             </select>
           </div>
@@ -2719,12 +3075,14 @@ export function cascadeScheduleShift(type) {
   const block = _classroomSchedule[idx];
   const newHour = parseInt(row.querySelector('[data-sched-hour]')?.value, 10) || 0;
   const newMin  = parseInt(row.querySelector('[data-sched-minute]')?.value, 10) || 0;
+  const newDuration = parseInt(row.querySelector('[data-sched-duration]')?.value, 10) || block.duration || 30;
   const oldStart = (parseInt(row.dataset.hour, 10) || 0) * 60 + (parseInt(row.dataset.minute, 10) || 0);
   const newStart = newHour * 60 + newMin;
   const delta = newStart - oldStart;
 
   block.hour = newHour;
   block.minute = newMin;
+  block.duration = newDuration;
 
   if (delta && document.getElementById('cfgRecalc')?.checked) {
     for (let j = idx + 1; j < _classroomSchedule.length; j++) {

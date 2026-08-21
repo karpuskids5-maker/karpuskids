@@ -1,237 +1,434 @@
+/**
+ * 🏫 WALL MODULE v4 — Muro Escolar Karpus Kids
+ * 50 mejoras: seguridad, multimedia 30s, UX, performance, moderación
+ */
 import { supabase } from './supabase.js';
 import { Helpers } from './helpers.js';
 import { ImageLoader } from './image-loader.js';
 import { QueryCache } from './query-cache.js';
 import { withTimeout } from './db-utils.js';
 
-// Inline helper — optimiza URLs de Supabase Storage con transformaciones
-// Aplica resize y compresión cuando la URL es de Supabase Storage (plan Pro)
-// En plan gratuito, agrega parámetros de caché para mejor rendimiento
+// ─── Utilidades ───────────────────────────────────────────────────────────────
 const optimizeImageUrl = (url, opts = {}) => {
-  if (!url) return url || null;
-  // NUNCA optimizar videos: Supabase Image Transformation responde 400
-  // si intenta "transformar" un archivo que no es imagen.
+  if (!url) return null;
   if (/\.(mp4|webm|mov|ogv|m4v|mkv|3gp|avi|wmv|flv)([?#]|$)/i.test(url)) return url;
-  // Solo optimizar URLs de Supabase Storage
   if (!url.includes('/storage/v1/object/public/')) return url;
   const { width, quality } = opts;
-  // Agregar parámetros de transformación (requiere plan Pro de Supabase)
-  // En plan gratuito estos parámetros son ignorados pero no causan error
-  if (width || quality) {
-    const sep = url.includes('?') ? '&' : '?';
-    const params = [];
-    if (width) params.push(`width=${width}`);
-    if (quality) params.push(`quality=${quality}`);
-    return url + sep + params.join('&');
-  }
-  return url;
+  if (!width && !quality) return url;
+  try {
+    const u = new URL(url);
+    u.searchParams.delete('width');
+    u.searchParams.delete('quality');
+    if (width) u.searchParams.set('width', String(width));
+    if (quality) u.searchParams.set('quality', String(quality));
+    return u.toString();
+  } catch (_) { return url; }
 };
 
-/**
- * M\u00f3dulo de Muro Global Mejorado
- * Soporta Videos, Im\u00e1genes y conteo real de likes
- */
-export const WallModule = {
+/** Detecta error 400 de PostgREST por columna inexistente (ej: likes.reaction_type) */
+const _isMissingColumnError = (err, col) =>
+  !!err && (err.code === '42703' || new RegExp(`\\b${col}\\b`, 'i').test(err.message || ''));
+
+/** XSS-safe sanitization */
+const _sanitizeHTML = (str) => {
+  if (!str) return '';
+  const div = document.createElement('div');
+  div.textContent = str;
+  return div.innerHTML;
+};
+
+/** Genera UUID v4 simple */
+const _uuid = () => {
+  if (crypto?.randomUUID) return crypto.randomUUID();
+  return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, c => {
+    const r = crypto.getRandomValues(new Uint8Array(1))[0] & 15;
+    return (c === 'x' ? r : (r & 0x3 | 0x8)).toString(16);
+  });
+};
+
+// ─── Constantes ───────────────────────────────────────────────────────────────
+const REACTION_EMOJIS = ['❤️', '👏', '😊', '🎉', '👍', '😍'];
+const _SPAM_COOLDOWN_MS = 10_000;
+const MAX_VIDEO_DURATION = 30;       // segundos máximo
+const MAX_VIDEO_SIZE_MB = 25;        // MB
+const MAX_IMAGE_SIZE_MB = 5;         // MB
+const MAX_IMAGE_WIDTH = 1920;        // px
+const SIGNED_URL_EXPIRY_SEC = 3600;  // 1 hora
+const MAX_PINNED_POSTS = 2;
+const MAX_ALBUM_PHOTOS = 5;
+
+// ─── Compresión WebP cliente ────────────────────────────────────────────────
+const compressImageToWebP = (file, maxWidth = MAX_IMAGE_WIDTH, quality = 0.80) => {
+  return new Promise((resolve) => {
+    const img = new Image();
+    const url = URL.createObjectURL(file);
+    img.onload = () => {
+      URL.revokeObjectURL(url);
+      let { width, height } = img;
+      if (width > maxWidth) { height = Math.round(height * maxWidth / width); width = maxWidth; }
+      const canvas = document.createElement('canvas');
+      canvas.width = width; canvas.height = height;
+      canvas.getContext('2d').drawImage(img, 0, 0, width, height);
+      canvas.toBlob(blob => resolve(blob || file), 'image/webp', quality);
+    };
+    img.onerror = () => { URL.revokeObjectURL(url); resolve(file); };
+    img.src = url;
+  });
+};
+
+/** Genera thumbnail (poster) de video en canvas */
+const generateVideoThumbnail = (file) => {
+  return new Promise((resolve) => {
+    const video = document.createElement('video');
+    video.muted = true;
+    video.playsInline = true;
+    const url = URL.createObjectURL(file);
+    video.onloadeddata = () => {
+      video.currentTime = 1;
+    };
+    video.onseeked = () => {
+      const canvas = document.createElement('canvas');
+      canvas.width = Math.min(video.videoWidth, 640);
+      canvas.height = Math.round(canvas.width * video.videoHeight / video.videoWidth);
+      canvas.getContext('2d').drawImage(video, 0, 0, canvas.width, canvas.height);
+      URL.revokeObjectURL(url);
+      canvas.toBlob(blob => resolve(blob), 'image/webp', 0.7);
+    };
+    video.onerror = () => { URL.revokeObjectURL(url); resolve(null); };
+    video.src = url;
+  });
+};
+
+/** Valida duración de video (retorna promesa con {ok, duration}) */
+const validateVideoDuration = (file) => {
+  return new Promise((resolve) => {
+    const video = document.createElement('video');
+    const url = URL.createObjectURL(file);
+    video.onloadedmetadata = () => {
+      URL.revokeObjectURL(url);
+      resolve({ ok: video.duration <= MAX_VIDEO_DURATION, duration: video.duration });
+    };
+    video.onerror = () => { URL.revokeObjectURL(url); resolve({ ok: false, duration: -1 }); };
+    video.src = url;
+  });
+};
+
+// ─── Upload con reintentos ────────────────────────────────────────────────────
+const uploadWithRetry = async (bucket, path, blob, mimeType, onProgress, maxRetries = 3) => {
+  let lastErr;
+  for (let attempt = 1; attempt <= maxRetries; attempt++) {
+    try {
+      const { error } = await supabase.storage.from(bucket).upload(path, blob, {
+        contentType: mimeType,
+        upsert: true,
+        ...(onProgress ? { onUploadProgress: (e) => onProgress(Math.round(e.loaded * 100 / e.total)) } : {})
+      });
+      if (error) throw error;
+      return;
+    } catch (err) {
+      lastErr = err;
+      if (attempt < maxRetries) await new Promise(r => setTimeout(r, 1000 * attempt));
+    }
+  }
+  throw lastErr;
+};
+
+// ─── Draft localStorage ───────────────────────────────────────────────────────
+const DraftManager = {
+  KEY: 'karpus_wall_draft',
+  save(data) { try { localStorage.setItem(this.KEY, JSON.stringify({ ...data, savedAt: Date.now() })); } catch (_) {} },
+  load() { try { const d = localStorage.getItem(this.KEY); return d ? JSON.parse(d) : null; } catch (_) { return null; } },
+  clear() { try { localStorage.removeItem(this.KEY); } catch (_) {} }
+};
+
+// ─── WallModule Principal ─────────────────────────────────────────────────────
+const WallModule = {
   _appState: null,
   _commentsCache: {},
   _containerId: null,
   _observer: null,
   _options: {},
+  _lastPostTime: 0,
+  _activeFilter: 'all',
+  _videoObserver: null,
+  _realtimeChannel: null,
+  _page: 0,
+  _pageSize: 10,
+  _isLoading: false,
+  _hasMore: true,
+  _pendingUploads: [],       // cola de subidas en segundo plano
+  _schedulerTimer: null,
+  _recordStream: null,       // MediaStream de grabación
 
-  // Obtiene los colores de like según la configuración o el rol del usuario
   _getLikeColors() {
     let color = this._options.likeColor;
-    
     if (!color) {
-      // Fallback basado en el rol si no se pasó un color específico en init
       const role = this._appState?.get('profile')?.role || 'padre';
-      const roleColors = {
-        'padre': 'emerald',    // Verde
-        'maestra': 'orange',   // Naranja
-        'asistente': 'emerald',// Verde (Asistente usa Teal/Emerald)
-        'directora': 'purple', // Morado
-        'admin': 'purple'
-      };
-      color = roleColors[role] || 'rose';
+      const map = { padre: 'emerald', maestra: 'orange', asistente: 'emerald', directora: 'purple', admin: 'purple' };
+      color = map[role] || 'rose';
     }
-
-    return {
-      text: `text-${color}-500`,
-      fill: `fill-${color}-500`,
-      hover: `hover:text-${color}-500`
-    };
+    return { text: `text-${color}-500`, fill: `fill-${color}-500`, hover: `hover:text-${color}-500` };
   },
 
-  // Utilidad de tiempo relativo
-  _relativeTimeFromNow(timeString) {
+  _relativeTimeFromNow(ts) {
     try {
-      const date = new Date(timeString);
-      const diffMs = Date.now() - date.getTime();
-      if (diffMs < 0) return 'hace poco';
-      const seconds = Math.floor(diffMs / 1000);
-      if (seconds < 60) return `hace ${seconds} seg`;
-      const minutes = Math.floor(seconds / 60);
-      if (minutes < 60) return `hace ${minutes} min`;
-      const hours = Math.floor(minutes / 60);
-      if (hours < 24) return `hace ${hours} h`;
-      const days = Math.floor(hours / 24);
-      if (days < 30) return `hace ${days} d\u00edas`;
-      const months = Math.floor(days / 30);
-      if (months < 12) return `hace ${months} meses`;
-      const years = Math.floor(months / 12);
-      return `hace ${years} a\u00f1os`;
-    } catch (e) {
-      return '';
-    }
+      const diff = Date.now() - new Date(ts).getTime();
+      if (diff < 0) return 'hace poco';
+      const s = Math.floor(diff / 1000);
+      if (s < 60) return `hace ${s}s`;
+      const m = Math.floor(s / 60);
+      if (m < 60) return `hace ${m} min`;
+      const h = Math.floor(m / 60);
+      if (h < 24) return `hace ${h}h`;
+      const d = Math.floor(h / 24);
+      if (d < 30) return `hace ${d} días`;
+      return `hace ${Math.floor(d / 30)} meses`;
+    } catch (_) { return ''; }
   },
 
-  async _getPublicImageUrl(imagePath, opts = {}) {
-    // Legacy — use _resolveUrlSync instead
-    return this._resolveUrlSync(imagePath, opts);
+  _isExpired(createdAt, expireDays) {
+    if (!expireDays) return false;
+    const d = new Date(createdAt);
+    d.setDate(d.getDate() + expireDays);
+    return d < new Date();
+  },
+
+  _detectSlowNetwork() {
+    const conn = navigator.connection || navigator.mozConnection || navigator.webkitConnection;
+    if (!conn) return false;
+    return conn.effectiveType === '2g' || conn.effectiveType === 'slow-2g' || conn.saveData;
   },
 
   async init(containerId, options = {}, appState = null) {
-    this._page = 0;
-    this._pageSize = 10;
-    this._isLoading = false;
-    this._hasMore = true;
+    this._page = 0; this._pageSize = 10;
+    this._isLoading = false; this._hasMore = true;
     this._containerId = containerId;
     this._options = options;
     this._appState = appState;
+    this._activeFilter = 'all';
+    this._lastPostTime = 0;
 
     const container = document.getElementById(containerId);
     if (!container) return;
 
     await this.loadClassrooms();
     this.setupFilters();
+    this._injectStyles();
     await this.loadPosts(container);
     this.subscribeRealtime();
+    this._startSchedulerChecker();
+  },
+
+  _injectStyles() {
+    if (document.getElementById('wall-v4-styles')) return;
+    const style = document.createElement('style');
+    style.id = 'wall-v4-styles';
+    style.textContent = `
+      @keyframes wall-shimmer{0%{background-position:-400px 0}100%{background-position:400px 0}}
+      @keyframes wall-slide-up{from{opacity:0;transform:translateY(12px)}to{opacity:1;transform:translateY(0)}}
+      @keyframes wall-bounce-in{0%{transform:scale(0.85);opacity:0}60%{transform:scale(1.05)}100%{transform:scale(1);opacity:1}}
+      @keyframes wall-record-pulse{0%,100%{box-shadow:0 0 0 0 rgba(239,68,68,0.4)}50%{box-shadow:0 0 0 8px rgba(239,68,68,0)}}
+      .wall-shimmer{background:linear-gradient(90deg,#f0f0f0 25%,#e0e0e0 50%,#f0f0f0 75%);background-size:800px 100%;animation:wall-shimmer 1.5s infinite}
+      .wall-skeleton{border-radius:1rem;animation:wall-shimmer 1.5s infinite;background:linear-gradient(90deg,#f1f5f9 25%,#e2e8f0 50%,#f1f5f9 75%);background-size:800px 100%}
+      .wall-blur-up{filter:blur(10px);transition:filter 0.4s ease}
+      .wall-blur-up.wall-img-loaded{filter:blur(0)}
+      .wall-video-wrapper{position:relative;cursor:pointer;border-radius:1rem;overflow:hidden;background:#0f172a}
+      .wall-play-btn{position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);width:60px;height:60px;background:rgba(255,138,0,0.9);border-radius:50%;display:flex;align-items:center;justify-content:center;color:white;font-size:22px;transition:all 0.2s;backdrop-filter:blur(4px);pointer-events:none;box-shadow:0 4px 24px rgba(255,138,0,0.4)}
+      .wall-video-wrapper:hover .wall-play-btn{transform:translate(-50%,-50%) scale(1.12);background:rgba(255,138,0,1)}
+      .wall-video-duration{position:absolute;bottom:8px;right:10px;background:rgba(0,0,0,0.65);color:white;font-size:9px;font-weight:900;padding:2px 7px;border-radius:8px;backdrop-filter:blur(4px)}
+      .wall-custom-video{width:100%;max-height:420px;background:#000;border-radius:0}
+      .wall-progress-bar{height:3px;background:linear-gradient(90deg,#f97316,#22c55e);border-radius:2px;transition:width 0.1s linear}
+      .wall-reaction-bar{display:flex;gap:3px;flex-wrap:wrap}
+      .wall-reaction-btn{padding:3px 7px;border-radius:12px;border:1px solid #e2e8f0;background:white;cursor:pointer;font-size:13px;transition:all 0.15s;display:flex;align-items:center;gap:2px;line-height:1}
+      .wall-reaction-btn:hover{background:#f8fafc;border-color:#cbd5e1;transform:scale(1.12)}
+      .wall-reaction-btn.active{background:#eff6ff;border-color:#93c5fd;box-shadow:0 0 0 2px #bfdbfe}
+      .wall-pinned-badge{background:linear-gradient(135deg,#f59e0b,#d97706);color:white;padding:2px 8px;border-radius:8px;font-size:8px;font-weight:900;text-transform:uppercase;letter-spacing:0.05em}
+      .wall-net-slow{background:#fef3c7;border:1px solid #fcd34d;border-radius:10px;padding:8px 12px;margin-bottom:10px;font-size:10px;font-weight:700;color:#92400e;display:flex;align-items:center;gap:6px}
+      .wall-view-count{font-size:9px;color:#94a3b8;font-weight:700;display:flex;align-items:center;gap:3px}
+      .wall-tagged-avatars{display:flex;margin-top:6px;gap:-4px}
+      .wall-tagged-avatar{width:22px;height:22px;border-radius:50%;border:2px solid white;background:#e2e8f0;font-size:8px;font-weight:900;display:flex;align-items:center;justify-content:center;margin-left:-6px;box-shadow:0 1px 3px rgba(0,0,0,0.15);color:#475569}
+      .wall-album-carousel{position:relative;overflow:hidden;border-radius:1rem}
+      .wall-album-track{display:flex;transition:transform 0.3s ease;will-change:transform}
+      .wall-album-slide{flex-shrink:0;width:100%}
+      .wall-album-dot{width:6px;height:6px;border-radius:50%;background:#e2e8f0;transition:all 0.2s;cursor:pointer}
+      .wall-album-dot.active{background:#f97316;width:16px}
+      .wall-record-btn{animation:wall-record-pulse 1.5s infinite}
+      .wall-upload-progress{background:#f1f5f9;border-radius:8px;overflow:hidden;height:6px;margin-top:4px}
+      .wall-slide-up{animation:wall-slide-up 0.3s ease}
+      .wall-bounce-in{animation:wall-bounce-in 0.4s ease}
+      .wall-watermark{position:absolute;bottom:8px;left:8px;opacity:0.6;pointer-events:none;font-size:9px;font-weight:900;color:white;text-shadow:0 1px 3px rgba(0,0,0,0.8);letter-spacing:0.05em}
+    `;
+    document.head.appendChild(style);
   },
 
   async loadClassrooms() {
     try {
-      const classrooms = await QueryCache.get(
-        'classrooms_list',
-        async () => {
-          const { data } = await supabase.from('classrooms').select('id, name').order('name');
-          return data || [];
-        },
-        10 * 60_000 // 10 min TTL \u2014 classrooms rarely change
-      );
-      const select = document.getElementById('wallClassroomFilter');
-      if (select && classrooms) {
-        select.innerHTML = '<option value="">Todas las aulas</option>';
-        classrooms.forEach(c => {
-          const option = document.createElement('option');
-          option.value = c.id;
-          option.textContent = c.name;
-          select.appendChild(option);
-        });
+      const cls = await QueryCache.get('classrooms_list',
+        async () => { const { data } = await supabase.from('classrooms').select('id, name').order('name'); return data || []; },
+        10 * 60_000);
+      const sel = document.getElementById('wallClassroomFilter');
+      if (sel && cls) {
+        sel.innerHTML = '<option value="">Todas las aulas</option>';
+        cls.forEach(c => { const o = document.createElement('option'); o.value = c.id; o.textContent = c.name; sel.appendChild(o); });
       }
-    } catch (_) { /* silencioso */ }
+    } catch (_) {}
   },
 
   setupFilters() {
-    const searchInput = document.getElementById('wallSearch');
-    const classroomSelect = document.getElementById('wallClassroomFilter');
-    
-    // Debounce para b\u00fasqueda
-    let timeout;
-    if (searchInput) {
-      searchInput.addEventListener('input', () => {
-        clearTimeout(timeout);
-        timeout = setTimeout(() => this.applyFilters(), 500);
-      });
-    }
-    if (classroomSelect) {
-      classroomSelect.addEventListener('change', () => this.applyFilters());
-    }
+    const si = document.getElementById('wallSearch');
+    const cs = document.getElementById('wallClassroomFilter');
+    let t;
+    if (si) si.addEventListener('input', () => { clearTimeout(t); t = setTimeout(() => this.applyFilters(), 500); });
+    if (cs) cs.addEventListener('change', () => this.applyFilters());
+  },
+
+  setFilter(filter) {
+    this._activeFilter = filter;
+    document.querySelectorAll('.wall-tab-btn').forEach(btn => {
+      const active = btn.dataset.filter === filter;
+      btn.classList.toggle('bg-white', active); btn.classList.toggle('shadow-sm', active);
+      btn.classList.toggle('text-slate-800', active); btn.classList.toggle('text-slate-400', !active);
+    });
+    this._page = 0; this._hasMore = true;
+    const c = document.getElementById(this._containerId);
+    if (c) this.loadPosts(c);
   },
 
   async applyFilters() {
-    const searchInput = document.getElementById('wallSearch');
-    const classroomSelect = document.getElementById('wallClassroomFilter');
-    
-    this._options.searchTerm = searchInput?.value.toLowerCase() || '';
-    this._options.classroomId = classroomSelect?.value || null;
-    
-    this._page = 0;
-    this._hasMore = true;
-    const container = document.getElementById(this._containerId);
-    if (container) await this.loadPosts(container);
+    const si = document.getElementById('wallSearch');
+    const cs = document.getElementById('wallClassroomFilter');
+    this._options.searchTerm = si?.value.toLowerCase() || '';
+    this._options.classroomId = cs?.value || null;
+    this._page = 0; this._hasMore = true;
+    const c = document.getElementById(this._containerId);
+    if (c) await this.loadPosts(c);
   },
 
   async loadPosts(container, append = false) {
-    // 🛡️ Fix: Si 'container' es un string (ID), convertirlo a elemento DOM
-    if (typeof container === 'string') {
-      container = document.getElementById(container);
-    }
-    // Si no se pas\u00f3 container o no es v\u00e1lido, usar el ID configurado
-    if (!container) {
-      container = document.getElementById(this._containerId);
-    }
-    
+    if (typeof container === 'string') container = document.getElementById(container);
+    if (!container) container = document.getElementById(this._containerId);
     if (this._isLoading || (!this._hasMore && append)) return;
     this._isLoading = true;
+    if (!container) { this._isLoading = false; return; }
 
-    if (!container) {
-      this._isLoading = false;
-      return;
-    }
-
-    // ✅ PERSISTENCIA EN APPSTATE: Si no es append y tenemos datos en cache, mostrarlos primero
-    if (!append && this._appState) {
-      const cachedPosts = this._appState.get('wall_posts_cache');
-      const cachedFilters = this._appState.get('wall_filters_cache');
-      const currentFilters = JSON.stringify(this._options);
-
-      if (cachedPosts && cachedFilters === currentFilters) {
-        container.innerHTML = cachedPosts.map(p => this.renderPost(p)).join('');
-        if (window.lucide) lucide.createIcons();
-        ImageLoader.observe(container);
-        this._isLoading = false; 
-        // Continuamos para refrescar datos en segundo plano
-      }
-    }
-
-    if (!append && !container.innerHTML) {
+    if (!append) {
       container.innerHTML = `
-        <div class="py-12 text-center" id="wall-loader">
-          <div class="animate-spin rounded-full h-8 w-8 border-b-2 border-orange-400 mx-auto"></div>
-          <p class="mt-4 text-slate-400 font-medium text-xs">Cargando muro...</p>
+        <div id="wall-loader" class="space-y-4 py-4">
+          ${[1,2,3].map(() => `
+            <div class="bg-white rounded-3xl p-5 border border-slate-100">
+              <div class="flex items-center gap-3 mb-4">
+                <div class="wall-skeleton w-10 h-10 rounded-full"></div>
+                <div class="flex-1 space-y-2"><div class="wall-skeleton h-3 w-32 rounded-lg"></div><div class="wall-skeleton h-2 w-24 rounded-lg"></div></div>
+              </div>
+              <div class="wall-skeleton h-48 rounded-2xl mb-3"></div>
+              <div class="wall-skeleton h-3 w-full rounded-lg mb-2"></div>
+              <div class="wall-skeleton h-3 w-2/3 rounded-lg"></div>
+            </div>`).join('')}
         </div>`;
-      this._page = 0;
-      this._hasMore = true;
+      this._page = 0; this._hasMore = true;
     }
 
     try {
-      const user = this._appState ? this._appState.get('user') : null;
+      const user = this._appState?.get('user');
       const from = this._page * this._pageSize;
-      const to = from + this._pageSize - 1;
+      const to   = from + this._pageSize - 1;
 
-      let query = supabase
-        .from('posts')
-        .select(`
-          id, content, media_url, media_type, created_at,
-          teacher_name, teacher_avatar,
-          classroom:classrooms(name),
-          teacher:profiles!posts_teacher_id_fkey(name, avatar_url),
-          likes(user_id),
-          comments:comments(count)
-        `)
-        .order('created_at', { ascending: false })
-        .range(from, to);
+      // La columna likes.reaction_type puede no existir aún en la BD
+      // (ver migraciones/fix_likes_reaction_type.sql). Si PostgREST responde 400
+      // por ella, se desactiva automáticamente y se reintenta sin ella.
+      const buildEmbedSelect = () => `
+        id, content, media_url, media_type, image_url, images, title, created_at, updated_at,
+        teacher_name, teacher_avatar, is_pinned, comments_enabled, expire_days,
+        scheduled_at, views_count, tagged_students,
+        classroom:classrooms(name),
+        teacher:profiles(name, avatar_url),
+        likes(user_id${this._supportsReactionType === false ? '' : ', reaction_type'})`;
+      const FLAT_SELECT = `
+        id, content, media_url, media_type, image_url, images, title, created_at, updated_at,
+        teacher_name, teacher_avatar, is_pinned, comments_enabled, expire_days,
+        views_count, tagged_students, classroom_id, teacher_id`;
+
+      const buildPostFilter = (q) => {
+        if (this._options.searchTerm) q = q.ilike('content', `%${this._options.searchTerm}%`);
+        return q;
+      };
+
+      const fetchClassroomPosts = (selectCols, orderOpts) => {
+        let q = supabase.from('posts').select(selectCols).order('created_at', orderOpts);
+        if (this._options.classroomId) q = q.eq('classroom_id', this._options.classroomId);
+        return buildPostFilter(q);
+      };
+
+      const fetchGeneralPosts = (selectCols, orderOpts) => {
+        let q = supabase.from('posts').select(selectCols).order('created_at', orderOpts).is('classroom_id', null);
+        return buildPostFilter(q);
+      };
+
+      const mergeClassroomResults = (classData, generalData, pageSize) => {
+        const all = [...(classData || []), ...(generalData || [])];
+        all.sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
+        return all.slice(0, pageSize);
+      };
+
+      // Ejecuta una query; si falla 400 por likes.reaction_type inexistente,
+      // desactiva la columna y reintenta una vez manteniendo los joins.
+      const runWithReactionFallback = async (build) => {
+        let res = await withTimeout(() => build(buildEmbedSelect()), 10_000);
+        if (res?.error && this._supportsReactionType !== false && _isMissingColumnError(res.error, 'reaction_type')) {
+          this._supportsReactionType = false;
+          res = await withTimeout(() => build(buildEmbedSelect()), 10_000);
+        }
+        return res;
+      };
+
+      let posts = null;
 
       if (this._options.classroomId) {
-        // Show posts for this classroom AND general posts (classroom_id = null)
-        query = query.or(`classroom_id.eq.${this._options.classroomId},classroom_id.is.null`);
+        const orderOpts = { ascending: false };
+        const [classResult, generalResult] = await Promise.all([
+          runWithReactionFallback((sel) => fetchClassroomPosts(sel, orderOpts).range(from, to)),
+          runWithReactionFallback((sel) => fetchGeneralPosts(sel, orderOpts).range(from, to))
+        ]);
+
+        if (!classResult.error && !generalResult.error) {
+          posts = mergeClassroomResults(classResult.data, generalResult.data, this._pageSize);
+        } else {
+          const [classFlat, generalFlat] = await Promise.all([
+            withTimeout(() => fetchClassroomPosts(FLAT_SELECT, orderOpts).range(from, to), 10_000),
+            withTimeout(() => fetchGeneralPosts(FLAT_SELECT, orderOpts).range(from, to), 10_000)
+          ]);
+          if (classFlat.error && generalFlat.error) throw classFlat.error;
+          const merged = mergeClassroomResults(classFlat.data, generalFlat.data, this._pageSize);
+          posts = merged.map(p => ({
+            ...p, is_pinned: p.is_pinned || false, comments_enabled: p.comments_enabled !== false,
+            expire_days: p.expire_days || null, views_count: p.views_count || 0,
+            tagged_students: p.tagged_students || [], likes: [], comments_count: 0,
+            classroom: null, teacher: null, user_reaction: null, reaction_counts: {},
+          }));
+        }
+      } else {
+        const { data, error } = await runWithReactionFallback((sel) => {
+          let q = supabase.from('posts').select(sel)
+            .order('created_at', { ascending: false }).range(from, to);
+          return buildPostFilter(q);
+        });
+        if (error) {
+          let fallback = supabase.from('posts').select(FLAT_SELECT)
+            .order('created_at', { ascending: false }).range(from, to);
+          fallback = buildPostFilter(fallback);
+          const retry = await withTimeout(() => fallback, 10_000);
+          if (retry.error) throw retry.error;
+          posts = (retry.data || []).map(p => ({
+            ...p, is_pinned: p.is_pinned || false, comments_enabled: p.comments_enabled !== false,
+            expire_days: p.expire_days || null, views_count: p.views_count || 0,
+            tagged_students: p.tagged_students || [], likes: [], comments_count: 0,
+            classroom: null, teacher: null, user_reaction: null, reaction_counts: {},
+          }));
+        } else {
+          posts = data;
+        }
       }
-      if (this._options.searchTerm) query = query.ilike('content', `%${this._options.searchTerm}%`);
 
-      const { data: posts, error } = await withTimeout(() => query, 10_000);
-      if (error) throw error;
-
-      // Limpiar loaders
       document.getElementById('wall-loader')?.remove();
       document.getElementById('wall-scroll-loader')?.remove();
 
@@ -241,374 +438,566 @@ export const WallModule = {
         return;
       }
 
-      const processedPosts = posts.map(p => this._processPost(p, user));
-      
-      // Guardar en cache para persistencia instantánea
-      if (!append && this._appState) {
-        this._appState.set('wall_posts_cache', processedPosts);
-        this._appState.set('wall_filters_cache', JSON.stringify(this._options));
-      }
+      let processed = (posts || [])
+        .map(p => this._processPost(p, user))
+        .filter(p => !this._isExpired(p.created_at, p.expire_days));
 
-      const html = processedPosts.map(p => this.renderPost(p)).join('');
+      if (this._activeFilter === 'videos') processed = processed.filter(p => p.is_video);
+      else if (this._activeFilter === 'photos') processed = processed.filter(p => !p.is_video && p.display_media_url);
+      else if (this._activeFilter === 'announcements') processed = processed.filter(p => p.media_type === 'announcement');
 
-      if (append) container.insertAdjacentHTML('beforeend', html);
+      processed.sort((a, b) => (b.is_pinned ? 1 : 0) - (a.is_pinned ? 1 : 0));
+
+      const html = (this._page === 0 ? this._renderSlowNetworkBanner() + this._renderFilterTabs() : '') +
+                   processed.map(p => this.renderPost(p)).join('');
+
+      if (append) container.insertAdjacentHTML('beforeend', processed.map(p => this.renderPost(p)).join(''));
       else container.innerHTML = html;
 
-      // Activar lazy loading en las nuevas imágenes
       ImageLoader.observe(container);
 
-      // Pre-cargar avatares e imágenes en background
-      const urlsToPrefetch = processedPosts
-        .flatMap(p => [p.display_media_url, p.teacher_avatar])
-        .filter(Boolean);
-      ImageLoader.prefetch(urlsToPrefetch);
-
-      // Paginaci\u00f3n
-      if (posts.length < this._pageSize) {
+      if ((posts || []).length < this._pageSize) {
         this._hasMore = false;
-        container.insertAdjacentHTML('beforeend', '<div class="py-8 text-center text-xs text-slate-300 italic">No hay m\u00e1s publicaciones.</div>');
+        if (append) container.insertAdjacentHTML('beforeend', '<div class="py-6 text-center text-xs text-slate-300 italic">— Fin del muro —</div>');
       } else {
         this._page++;
         this._setupInfiniteScroll(container);
       }
 
+      // Registrar vistas (throttled, no bloqueante)
+      if (processed.length) this._registerViews(processed.map(p => p.id));
+
       if (window.lucide) lucide.createIcons();
-    } catch (err) {
+    } catch (_) {
       if (!append) container.innerHTML = Helpers.emptyState('Error al cargar el muro', 'alert-triangle');
     } finally {
       this._isLoading = false;
     }
   },
 
+  _renderSlowNetworkBanner() {
+    if (!this._detectSlowNetwork()) return '';
+    return `<div class="wall-net-slow">📡 Conexión lenta detectada — ajustando calidad de video</div>`;
+  },
+
+  _renderFilterTabs() {
+    return `
+    <div class="flex gap-1.5 mb-5 p-1 bg-slate-100/80 rounded-2xl overflow-x-auto no-scrollbar">
+      ${[['all','Todos'],['videos','🎬 Videos'],['photos','📷 Fotos'],['announcements','📢 Anuncios']].map(([key, label]) => `
+        <button data-filter="${key}" onclick="WallModule.setFilter('${key}')"
+          class="wall-tab-btn flex-shrink-0 px-3 py-1.5 rounded-xl text-[10px] font-black uppercase tracking-wider transition-all ${this._activeFilter === key ? 'bg-white text-slate-800 shadow-sm' : 'text-slate-400 hover:text-slate-600'}">
+          ${label}
+        </button>`).join('')}
+    </div>`;
+  },
+
   _setupInfiniteScroll(container) {
     if (this._observer) this._observer.disconnect();
-    this._observer = new IntersectionObserver((entries) => {
-      if (entries[0].isIntersecting && this._hasMore && !this._isLoading) {
-        this.loadPosts(container, true);
-      }
+    this._observer = new IntersectionObserver(entries => {
+      if (entries[0].isIntersecting && this._hasMore && !this._isLoading) this.loadPosts(container, true);
     }, { rootMargin: '200px' });
-    
     const last = container.lastElementChild;
     if (last) this._observer.observe(last);
-
-    // \ud83c\udfa5 Setup Autoplay de videos al hacer scroll
     this._setupVideoAutoplay();
   },
 
   _setupVideoAutoplay() {
-    const videoObserver = new IntersectionObserver((entries) => {
-      entries.forEach(entry => {
-        const video = entry.target;
-        if (entry.isIntersecting) {
-        } else {
-          video.pause();
-        }
-      });
-    }, { threshold: 0.6 }); // Reproducir cuando el 60% del video sea visible
+    if (this._videoObserver) this._videoObserver.disconnect();
+    this._videoObserver = new IntersectionObserver(entries => {
+      entries.forEach(e => { if (!e.isIntersecting) e.target.pause?.(); });
+    }, { threshold: 0.5 });
+    document.querySelectorAll('video.wall-custom-video').forEach(v => this._videoObserver.observe(v));
+  },
 
-    document.querySelectorAll('video').forEach(v => videoObserver.observe(v));
+  /** Registra que el usuario vio los posts (throttled, fire & forget) */
+  _registerViews(postIds) {
+    const user = this._appState?.get('user');
+    if (!user || !postIds.length) return;
+    const key = 'karpus_viewed_' + new Date().toDateString();
+    let seen;
+    try { seen = new Set(JSON.parse(sessionStorage.getItem(key) || '[]')); } catch (_) { seen = new Set(); }
+    const newIds = postIds.filter(id => !seen.has(id));
+    if (!newIds.length) return;
+    newIds.forEach(id => seen.add(id));
+    try { sessionStorage.setItem(key, JSON.stringify([...seen])); } catch (_) {}
+    // Fire & forget - incrementar vistas en BD
+    newIds.forEach(id => {
+      supabase.rpc('increment_post_views', { p_post_id: id }).catch(() => {});
+    });
   },
 
   _processPost(p, user) {
-    const teacherData = p.teacher || {};
-    const likesArray = p.likes || [];
-    const likeCount = likesArray.length;
-    const userLiked = user ? likesArray.some(l => l.user_id === user.id) : false;
+    const teacher = Array.isArray(p.teacher) ? p.teacher[0] : (p.teacher || {});
+    const likes = p.likes || [];
+    const reactionCounts = {};
+    likes.forEach(l => { const t = l.reaction_type || 'like'; reactionCounts[t] = (reactionCounts[t] || 0) + 1; });
+    const userReaction = user ? likes.find(l => l.user_id === user.id) : null;
 
-    // Resolver URLs de forma SÍNCRONA — con transformación CDN
     const mediaUrl = p.media_url || p.image_url || null;
-    const publicUrl = this._resolveUrlSync(mediaUrl, { width: 800, quality: 75 });
+    const teacherAvatar = this._resolveUrlSync(teacher.avatar_url || p.teacher_avatar, { width: 80, quality: 80 });
 
-    // Cadena de fallback: live profile → snapshot del post → 'Maestra'
-    const teacherName = teacherData.name || p.teacher_name || 'Maestra';
-    const rawAvatar = teacherData.avatar_url || p.teacher_avatar || null;
-    const teacherAvatar = this._resolveUrlSync(rawAvatar, { width: 80, quality: 80 });
+    // Álbum de fotos
+    const albumUrls = (p.images || []).map(u => this._resolveUrlSync(u, { width: 800, quality: 75 })).filter(Boolean);
+
+    // Media principal: media_url → image_url → primera foto del álbum
+    const primaryMedia = mediaUrl || albumUrls[0] || null;
+    const publicUrl = this._resolveUrlSync(primaryMedia, { width: 800, quality: 75 });
 
     return {
       ...p,
-      teacher_name: teacherName,
+      teacher_name: teacher.name || p.teacher_name || 'Maestra',
       teacher_avatar: teacherAvatar,
-      like_count: likeCount,
-      user_liked: userLiked,
+      like_count: likes.length,
+      user_liked: !!userReaction,
+      user_reaction: userReaction?.reaction_type || null,
+      reaction_counts: reactionCounts,
+      original_media_url: primaryMedia,
       display_media_url: publicUrl,
-      is_video: p.media_type === 'video' || (mediaUrl && /\.(mp4|mov|webm)$/i.test(mediaUrl))
+      album_urls: albumUrls,
+      is_video: p.media_type === 'video' || (mediaUrl && /\.(mp4|mov|webm|m4v)$/i.test(mediaUrl)),
+      is_pinned: p.is_pinned || false,
+      comments_enabled: p.comments_enabled !== false,
+      expire_days: p.expire_days || null,
+      views_count: p.views_count || 0,
+      tagged_students: p.tagged_students || [],
     };
   },
 
-  // Resolución síncrona de URLs — sin await, sin fetch
   _resolveUrlSync(url, opts = {}) {
     if (!url) return null;
-    // Ya es URL completa
     if (/^https?:\/\//i.test(url)) return optimizeImageUrl(url, opts);
-    // Construir URL pública de Supabase Storage
     const clean = url.replace(/^(posts|karpus-uploads|avatars|classroom_media)\//, '');
-    const isAvatar = url.includes('avatar');
-    const isClassroomMedia = url.includes('classroom_media');
-    const bucket = isAvatar ? 'karpus-uploads' : isClassroomMedia ? 'classroom_media' : 'posts';
-    const path = isAvatar ? `avatars/${clean}` : clean;
+    const bucket = url.includes('avatar') ? 'karpus-uploads' : url.includes('classroom_media') ? 'classroom_media' : 'posts';
+    const path = url.includes('avatar') ? `avatars/${clean}` : clean;
     const { data } = supabase.storage.from(bucket).getPublicUrl(path);
     return optimizeImageUrl(data?.publicUrl, opts);
   },
 
-  // Utilidad para generar colores consistentes por nombre
   _getAvatarColor(name) {
-    const colors = [
-      'bg-blue-100 text-blue-600',
-      'bg-emerald-100 text-emerald-600',
-      'bg-purple-100 text-purple-600',
-      'bg-amber-100 text-amber-600',
-      'bg-rose-100 text-rose-600',
-      'bg-indigo-100 text-indigo-600',
-      'bg-teal-100 text-teal-600'
-    ];
-    let hash = 0;
-    for (let i = 0; i < name.length; i++) {
-      hash = name.charCodeAt(i) + ((hash << 5) - hash);
-    }
-    return colors[Math.abs(hash) % colors.length];
+    const colors = ['bg-blue-100 text-blue-600','bg-emerald-100 text-emerald-600','bg-purple-100 text-purple-600','bg-amber-100 text-amber-600','bg-rose-100 text-rose-600','bg-indigo-100 text-indigo-600','bg-teal-100 text-teal-600'];
+    let h = 0; for (const c of (name || '')) h = c.charCodeAt(0) + ((h << 5) - h);
+    return colors[Math.abs(h) % colors.length];
   },
 
+  // ── RENDER POST ──────────────────────────────────────────────────────────────
   renderPost(p) {
     const date = this._relativeTimeFromNow(p.created_at);
     const accent = this._options.accentColor || 'indigo';
-    const isFirstPost = this._page === 0;
-    const colors = this._getLikeColors();
+    const isSlow = this._detectSlowNetwork();
+    const profile = this._appState?.get('profile');
+    const isStaff = ['directora','maestra','asistente','admin'].includes(profile?.role);
+    const isDirectora = profile?.role === 'directora';
+    const isMaestra = profile?.role === 'maestra';
+    const canDelete = isStaff;
+    const canPin = isStaff;
+    const canComment = p.comments_enabled !== false && profile?.role;
 
-    // Lógica de Renderizado Multimedia — imágenes y videos se muestran completos
+    // ── Media: álbum, video o imagen ──
     let mediaHtml = '';
-    if (p.display_media_url) {
-      if (p.is_video) {
-        mediaHtml = `
-          <div class="rounded-2xl overflow-hidden border border-slate-100 mb-4 bg-black relative group/media shadow-inner">
-            ${ImageLoader.video(p.display_media_url, '', { 
-              cls: 'w-full max-h-[500px] mx-auto object-contain',
-              preload: 'none'
-            })}
-            <a href="${p.display_media_url}" download target="_blank" rel="noopener noreferrer"
-               class="absolute top-2 right-2 p-2 bg-black/60 hover:bg-black/80 text-white rounded-xl opacity-0 group-hover/media:opacity-100 transition-opacity flex items-center gap-1.5 text-[10px] font-black uppercase backdrop-blur-sm"
-               title="Descargar video" onclick="event.stopPropagation()">
-              <i data-lucide="download" class="w-3.5 h-3.5"></i> Descargar
-            </a>
-          </div>`;
-      } else {
-        mediaHtml = `
-          <div class="rounded-2xl overflow-hidden border border-slate-100 mb-4 cursor-zoom-in bg-slate-50 relative group/media shadow-inner"
-               onclick="window.openLightbox('${p.display_media_url}','image')">
-            ${ImageLoader.img(p.display_media_url, {
-              alt: 'Post media',
-              cls: 'w-full max-h-[500px] object-contain',
-              fallback: 'img/mundo.jpg',
-              priority: isFirstPost ? 'high' : 'low'
-            })}
-            <a href="${p.display_media_url}" download target="_blank" rel="noopener noreferrer"
-               class="absolute top-2 right-2 p-2 bg-black/60 hover:bg-black/80 text-white rounded-xl opacity-0 group-hover/media:opacity-100 transition-opacity flex items-center gap-1.5 text-[10px] font-black uppercase backdrop-blur-sm"
-               title="Descargar imagen" onclick="event.stopPropagation()">
-              <i data-lucide="download" class="w-3.5 h-3.5"></i> Descargar
-            </a>
-          </div>`;
-      }
+    if (p.album_urls && p.album_urls.length > 1) {
+      mediaHtml = this._renderAlbum(p);
+    } else if (p.is_video && p.display_media_url) {
+      mediaHtml = this._renderVideoCard(p, isSlow);
+    } else if (p.display_media_url) {
+      mediaHtml = this._renderImageCard(p, isSlow);
     }
 
-    const profile = this._appState?.get('profile');
-    const isDirectora = profile?.role === 'directora';
-    const isMaestra   = profile?.role === 'maestra';
-    const isAsistente = profile?.role === 'asistente';
-    const canDelete   = isDirectora || isMaestra || isAsistente;
-    const canComment  = ['directora', 'maestra', 'padre', 'asistente'].includes(profile?.role);
+    // ── Reacciones ──
+    const totalReactions = Object.values(p.reaction_counts || {}).reduce((a,b) => a+b, 0);
+    const reactionChips = Object.entries(p.reaction_counts || {})
+      .sort((a,b) => b[1]-a[1]).slice(0,3)
+      .map(([type, count]) => `<span class="inline-flex items-center gap-0.5 text-[10px] font-bold text-slate-500 bg-slate-100 rounded-full px-1.5 py-0.5">${type === 'like' ? '❤️' : type} ${count}</span>`)
+      .join('');
+
+    // ── Alumnos etiquetados ──
+    const taggedHtml = p.tagged_students?.length
+      ? `<div class="flex items-center gap-1 mt-2">
+          <span class="text-[9px] font-black text-slate-400 uppercase">En este post:</span>
+          <div class="wall-tagged-avatars">
+            ${p.tagged_students.slice(0,5).map(s =>
+              `<div class="wall-tagged-avatar" title="${_sanitizeHTML(s.name || '')}">${(_sanitizeHTML(s.name || '?')).charAt(0)}</div>`
+            ).join('')}
+            ${p.tagged_students.length > 5 ? `<div class="wall-tagged-avatar">+${p.tagged_students.length - 5}</div>` : ''}
+          </div>
+        </div>` : '';
+
+    // ── View counter (solo staff) ──
+    const viewsHtml = isStaff && p.views_count > 0
+      ? `<span class="wall-view-count"><i data-lucide="eye" class="w-3 h-3"></i>${p.views_count}</span>`
+      : '';
+
+    // ── Botones staff ──
+    const staffButtons = canPin ? `
+      <button onclick="WallModule.togglePin('${p.id}')" class="text-slate-300 hover:text-amber-500 transition-colors p-1.5 rounded-lg hover:bg-amber-50" title="${p.is_pinned ? 'Desfijar' : 'Fijar'}">
+        <i data-lucide="pin" class="w-4 h-4 ${p.is_pinned ? 'fill-amber-400 text-amber-400' : ''}"></i>
+      </button>
+      <button onclick="WallModule.toggleComments('${p.id}', ${p.comments_enabled !== false})" class="text-slate-300 hover:text-blue-500 transition-colors p-1.5 rounded-lg hover:bg-blue-50" title="Comentarios">
+        <i data-lucide="message-circle" class="w-4 h-4"></i>
+      </button>
+      <button onclick="WallModule.deletePost('${p.id}')" class="text-slate-300 hover:text-red-500 transition-colors p-1.5 rounded-lg hover:bg-red-50" title="Eliminar">
+        <i data-lucide="trash-2" class="w-4 h-4"></i>
+      </button>` : '';
 
     return `
-      <div class="bg-white rounded-3xl shadow-sm border border-slate-100 overflow-hidden mb-6" id="post-${p.id}" data-classroom-id="${p.classroom_id || 'null'}">
+      <div class="bg-white rounded-3xl shadow-sm border ${p.is_pinned ? 'border-amber-200 ring-1 ring-amber-100' : 'border-slate-100'} overflow-hidden mb-6 relative wall-slide-up" id="post-${p.id}" data-classroom-id="${p.classroom_id || 'null'}" data-user-reaction="${_sanitizeHTML(p.user_reaction || '')}">
+        ${p.is_pinned ? '<div class="absolute top-0 right-0 z-10"><span class="wall-pinned-badge px-2 py-1 rounded-bl-xl rounded-tr-3xl">📌 Fijada</span></div>' : ''}
         <div class="p-5">
           <div class="flex justify-between items-start mb-4">
-              <div class="flex items-center gap-3">
-                ${ImageLoader.avatar(p.teacher_avatar, p.teacher_name, {
-                  cls: 'shrink-0 shadow-sm border border-slate-100',
-                  bgCls: `bg-${accent}-100`,
-                  textCls: `text-${accent}-600`
-                })}
+            <div class="flex items-center gap-3">
+              ${ImageLoader.avatar(p.teacher_avatar, p.teacher_name, { cls: 'shrink-0 shadow-sm border border-slate-100', bgCls: `bg-${accent}-100`, textCls: `text-${accent}-600` })}
               <div>
-                <div class="font-bold text-slate-800 text-sm">${Helpers.escapeHTML(p.teacher_name)}</div>
-                <div class="text-[10px] text-slate-400 font-bold uppercase tracking-wider">
-                  ${date} • ${Helpers.escapeHTML(p.classroom?.name || 'General')}
+                <div class="font-bold text-slate-800 text-sm">${_sanitizeHTML(p.teacher_name)}</div>
+                <div class="text-[10px] text-slate-400 font-bold uppercase tracking-wider flex items-center gap-2">
+                  ${date} • ${_sanitizeHTML(p.classroom?.name || 'General')} ${viewsHtml}
                 </div>
               </div>
             </div>
+            <div class="flex items-center gap-1">${staffButtons}</div>
+          </div>
+
+          ${p.content ? `<div class="text-slate-600 text-sm mb-4 whitespace-pre-wrap leading-relaxed">${_sanitizeHTML(p.content)}</div>` : ''}
+
+          ${mediaHtml}
+          ${taggedHtml}
+
+          <div class="flex items-center justify-between pt-4 border-t border-slate-50 mt-3">
             <div class="flex items-center gap-1">
-              ${p.display_media_url ? `
-                <a href="${p.display_media_url}" download target="_blank" rel="noopener noreferrer"
-                   class="p-1.5 text-slate-300 hover:text-${accent}-500 hover:bg-${accent}-50 transition-colors rounded-lg" title="Descargar ${p.is_video ? 'video' : 'imagen'}">
-                  <i data-lucide="${p.is_video ? 'video' : 'image'}" class="w-4 h-4"></i>
-                </a>
-              ` : ''}
-              ${canDelete ? `
-                <button onclick="WallModule.deletePost('${p.id}')" class="text-slate-300 hover:text-red-500 transition-colors p-1.5 rounded-lg hover:bg-red-50" title="Eliminar publicación">
-                  <i data-lucide="trash-2" class="w-4 h-4"></i>
-                </button>
-              ` : ''}
+              <div class="wall-reaction-bar" id="reactions-${p.id}">
+                ${REACTION_EMOJIS.map(emoji => {
+                  const type = emoji === '❤️' ? 'like' : emoji;
+                  const isActive = p.user_reaction === type;
+                  return `<button onclick="WallModule.toggleReaction('${p.id}','${type}')" class="wall-reaction-btn ${isActive ? 'active' : ''}" title="${type}" aria-label="Reaccionar con ${type}">${emoji}</button>`;
+                }).join('')}
+              </div>
+              ${totalReactions > 0 ? `<div class="flex items-center gap-1 ml-2">${reactionChips}<span class="text-[10px] font-bold text-slate-400">${totalReactions}</span></div>` : ''}
+            </div>
+            <div class="flex items-center gap-2">
+              <button onclick="WallModule.shareToChat('${p.id}')" class="text-slate-400 hover:text-indigo-500 transition-colors p-1" title="Compartir al chat" aria-label="Compartir">
+                <i data-lucide="share-2" class="w-4 h-4"></i>
+              </button>
+              ${canComment ? `
+              <button onclick="WallModule.toggleCommentSection('${p.id}')" class="flex items-center gap-1.5 text-xs font-bold text-slate-500 hover:text-blue-500 transition-colors" aria-label="Comentarios">
+                <i data-lucide="message-circle" class="w-4 h-4"></i>
+                <span id="comment-count-${p.id}">${p.comments?.[0]?.count ?? 0}</span>
+              </button>` : ''}
             </div>
           </div>
 
-          <div class="text-slate-600 text-sm mb-4 whitespace-pre-wrap leading-relaxed">${Helpers.escapeHTML(p.content)}</div>
-          
-          ${mediaHtml}
-
-          <div class="flex items-center gap-6 pt-4 border-t border-slate-50">
-            <button onclick="WallModule.toggleLike('${p.id}')" class="flex items-center gap-2 text-xs font-bold transition-colors group ${p.user_liked ? colors.text : 'text-slate-500 ' + colors.hover}">
-              <i data-lucide="heart" class="w-4 h-4 ${p.user_liked ? colors.fill : 'group-hover:scale-110 transition-transform'}"></i>
-              <span id="like-count-${p.id}">${p.like_count}</span>
-            </button>
-            <button onclick="WallModule.toggleCommentSection('${p.id}')" class="flex items-center gap-2 text-xs font-bold text-slate-500 hover:text-blue-500 transition-colors">
-              <i data-lucide="message-circle" class="w-4 h-4"></i>
-              <span>${p.comments && p.comments[0] ? p.comments[0].count : 0} Comentarios</span>
-            </button>
-          </div>
-
+          ${canComment ? `
           <div id="comments-section-${p.id}" class="hidden mt-4 pt-4 border-t border-slate-50 bg-slate-50/50 -mx-5 px-5 pb-2">
             <div id="comments-list-${p.id}" class="space-y-3 mb-3 max-h-60 overflow-y-auto">
               <p class="text-center text-xs text-slate-400 py-2">Cargando comentarios...</p>
             </div>
-            ${canComment ? `
-              <div class="flex gap-2">
-                <input type="text" id="comment-input-${p.id}" class="flex-1 px-3 py-2 text-xs border border-slate-200 rounded-xl focus:ring-2 focus:ring-${accent}-400 outline-none" placeholder="Escribe un comentario..." onkeypress="if(event.key==='Enter') WallModule.sendComment('${p.id}')">
-                <button onclick="WallModule.sendComment('${p.id}')" class="p-2 bg-${accent}-600 text-white rounded-xl hover:bg-${accent}-700 transition-colors"><i data-lucide="send" class="w-4 h-4"></i></button>
-              </div>
-            ` : ''}
-          </div>
+            <div class="flex gap-2">
+              <input type="text" id="comment-input-${p.id}" class="flex-1 px-3 py-2 text-xs border border-slate-200 rounded-xl focus:ring-2 focus:ring-${accent}-400 outline-none" placeholder="Escribe un comentario..." onkeypress="if(event.key==='Enter') WallModule.sendComment('${p.id}')" aria-label="Escribir comentario">
+              <button onclick="WallModule.sendComment('${p.id}')" class="p-2 bg-${accent}-600 text-white rounded-xl hover:bg-${accent}-700 transition-colors" aria-label="Enviar comentario"><i data-lucide="send" class="w-4 h-4"></i></button>
+            </div>
+          </div>` : ''}
         </div>
-      </div>
-    `;
+      </div>`;
   },
 
-  // Funciones de acci\u00f3n (Like, Comentar, Eliminar)
-  async toggleLike(postId) {
+  // ── Render Media Helpers ─────────────────────────────────────────────────────
+  _renderVideoCard(p, isSlow) {
+    const thumbUrl = p.thumbnail_url || null;
+    const posterStyle = thumbUrl ? `background-image:url('${_sanitizeHTML(thumbUrl)}');background-size:cover;background-position:center;` : 'background:#0f172a;';
+    const maxH = isSlow ? 'max-h-[280px]' : 'max-h-[420px]';
+    return `
+      <div class="wall-video-wrapper ${maxH} relative mb-4 shadow-inner" id="video-wrapper-${p.id}"
+           onclick="WallModule.playVideoCard('${p.id}','${_sanitizeHTML(p.display_media_url)}')"
+           style="${posterStyle}min-height:180px;" role="button" aria-label="Reproducir video">
+        ${!thumbUrl ? `<div class="wall-shimmer absolute inset-0" style="background:linear-gradient(90deg,#1e293b 25%,#334155 50%,#1e293b 75%);background-size:800px 100%;"></div>` : ''}
+        <div class="wall-play-btn">▶</div>
+        <div class="wall-video-duration">0:30</div>
+        <div class="wall-watermark">🐾 Karpus Kids</div>
+      </div>`;
+  },
+
+  _renderImageCard(p, isSlow) {
+    const maxH = isSlow ? 'max-h-[280px]' : 'max-h-[480px]';
+    const original = p.original_media_url || p.display_media_url;
+    const optimized = optimizeImageUrl(original, { width: isSlow ? 600 : 1200, quality: isSlow ? 60 : 80 });
+    return `
+      <div class="rounded-2xl overflow-hidden border border-slate-100 mb-4 cursor-zoom-in bg-slate-50 relative shadow-inner"
+           onclick="WallModule.openLightbox('${_sanitizeHTML(p.display_media_url)}','image')" role="button" aria-label="Ver imagen">
+        <div class="wall-shimmer absolute inset-0 rounded-2xl" id="img-shimmer-${p.id}"></div>
+        <img id="wall-img-${p.id}" src="${_sanitizeHTML(optimized)}" loading="lazy" decoding="async"
+             data-fallback-src="${_sanitizeHTML(original)}"
+             class="w-full ${maxH} object-contain relative z-10 wall-img-loaded"
+             alt="Publicación escolar"
+             onload="document.getElementById('img-shimmer-${p.id}')?.remove()"
+             onerror="WallModule._imgRetry('${p.id}')">
+        <div class="wall-watermark">🐾 Karpus Kids</div>
+      </div>`;
+  },
+
+  /**
+   * Reintenta cargar una imagen del muro cuando la red falla.
+   * Cadena: optimizada → original sin params → optimizada de nuevo → placeholder.
+   */
+  _imgRetry(id) {
+    const img = document.getElementById(`wall-img-${id}`);
+    if (!img) return;
+    const attempt = Number(img.dataset.retryAttempt || 0);
+    const fallback = img.dataset.fallbackSrc;
+    if (attempt === 0 && fallback && img.src !== fallback) {
+      // 1er reintento: URL original sin parámetros de optimización
+      img.dataset.retryAttempt = '1';
+      setTimeout(() => { img.src = fallback; }, 400);
+    } else if (attempt <= 1) {
+      // 2do reintento: misma URL con cache-buster (fallos transitorios de red)
+      img.dataset.retryAttempt = '2';
+      setTimeout(() => {
+        try { const u = new URL(img.src); u.searchParams.set('retry', Date.now()); img.src = u.toString(); }
+        catch (_) { img.src = fallback || img.src; }
+      }, 1500);
+    } else {
+      // Agotado: placeholder
+      img.onerror = null;
+      img.src = "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='120' height='80' fill='%2394a3b8'%3E%3Crect width='120' height='80' rx='8' fill='%23f1f5f9'/%3E%3Ctext x='60' y='44' text-anchor='middle' font-size='11' font-family='sans-serif' fill='%2394a3b8'%3EImagen no disponible%3C/text%3E%3C/svg%3E";
+      document.getElementById(`img-shimmer-${id}`)?.remove();
+    }
+  },
+
+  _renderAlbum(p) {
+    const urls = p.album_urls.slice(0, MAX_ALBUM_PHOTOS);
+    return `
+      <div class="wall-album-carousel mb-4 rounded-2xl overflow-hidden border border-slate-100 shadow-inner relative" id="album-${p.id}">
+        <div class="wall-album-track" id="album-track-${p.id}">
+          ${urls.map((url, i) => `
+            <div class="wall-album-slide" onclick="WallModule.openLightbox('${_sanitizeHTML(url)}','image')" role="button" aria-label="Foto ${i+1} de ${urls.length}">
+              <img src="${_sanitizeHTML(url)}" loading="${i === 0 ? 'eager' : 'lazy'}" class="w-full max-h-[420px] object-cover" alt="Foto ${i+1}">
+            </div>`).join('')}
+        </div>
+        ${urls.length > 1 ? `
+        <div class="flex justify-center gap-1.5 absolute bottom-3 left-0 right-0">
+          ${urls.map((_, i) => `<div class="wall-album-dot ${i === 0 ? 'active' : ''}" onclick="WallModule.goToAlbumSlide('${p.id}',${i})"></div>`).join('')}
+        </div>
+        <button onclick="WallModule.prevAlbumSlide('${p.id}')" class="absolute left-2 top-1/2 -translate-y-1/2 w-8 h-8 bg-black/40 rounded-full text-white text-xs flex items-center justify-center backdrop-blur-sm" aria-label="Anterior">◀</button>
+        <button onclick="WallModule.nextAlbumSlide('${p.id}',${urls.length})" class="absolute right-2 top-1/2 -translate-y-1/2 w-8 h-8 bg-black/40 rounded-full text-white text-xs flex items-center justify-center backdrop-blur-sm" aria-label="Siguiente">▶</button>
+        <span class="absolute top-3 right-3 bg-black/50 text-white text-[9px] font-black px-2 py-1 rounded-full backdrop-blur-sm">1/${urls.length}</span>` : ''}
+      </div>`;
+  },
+
+  goToAlbumSlide(postId, index) {
+    const track = document.getElementById(`album-track-${postId}`);
+    if (!track) return;
+    track.style.transform = `translateX(-${index * 100}%)`;
+    const album = document.getElementById(`album-${postId}`);
+    album?.querySelectorAll('.wall-album-dot').forEach((d, i) => d.classList.toggle('active', i === index));
+    const counter = album?.querySelector('span');
+    if (counter) counter.textContent = `${index + 1}/${track.children.length}`;
+    track.dataset.currentSlide = index;
+  },
+
+  nextAlbumSlide(postId, total) {
+    const track = document.getElementById(`album-track-${postId}`);
+    if (!track) return;
+    const cur = parseInt(track.dataset.currentSlide || '0');
+    this.goToAlbumSlide(postId, (cur + 1) % total);
+  },
+
+  prevAlbumSlide(postId) {
+    const track = document.getElementById(`album-track-${postId}`);
+    if (!track) return;
+    const total = track.children.length;
+    const cur = parseInt(track.dataset.currentSlide || '0');
+    this.goToAlbumSlide(postId, (cur - 1 + total) % total);
+  },
+
+  // ── Reproductor de Video Custom ──────────────────────────────────────────────
+  playVideoCard(postId, url) {
+    const wrapper = document.getElementById(`video-wrapper-${postId}`);
+    if (!wrapper || !url) return;
+    wrapper.onclick = null;
+    wrapper.style.backgroundImage = '';
+    wrapper.style.background = '#000';
+    const isSlow = this._detectSlowNetwork();
+    wrapper.innerHTML = `
+      <video id="wall-vid-${postId}" class="wall-custom-video w-full" controls playsinline muted preload="metadata"
+             style="max-height:${isSlow ? '280px' : '420px'};display:block;"
+             onended="document.getElementById('wall-replay-${postId}')?.classList.remove('hidden')"
+             onerror="WallModule._onVideoError('${postId}')">
+        <source src="${_sanitizeHTML(url)}" type="video/mp4">
+      </video>
+      <button id="wall-replay-${postId}" onclick="WallModule._replayVideo('${postId}')"
+        class="hidden absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-14 h-14 bg-orange-500/90 rounded-full text-white flex items-center justify-center text-2xl" aria-label="Repetir video">🔁</button>`;
+
+    const vid = document.getElementById(`wall-vid-${postId}`);
+    if (vid) {
+      vid.play().catch(() => {});
+      this._attachVideoProgress(vid, postId);
+      if (this._videoObserver) this._videoObserver.observe(vid);
+    }
+  },
+
+  _attachVideoProgress(vid, postId) {
+    // Append progress bar
+    const bar = document.createElement('div');
+    bar.style.cssText = 'position:absolute;bottom:0;left:0;right:0;height:3px;background:rgba(255,255,255,0.2);pointer-events:none;';
+    bar.innerHTML = `<div id="wall-vprog-${postId}" class="wall-progress-bar" style="width:0%"></div>`;
+    vid.parentElement?.appendChild(bar);
+    vid.addEventListener('timeupdate', () => {
+      if (!vid.duration) return;
+      const prog = document.getElementById(`wall-vprog-${postId}`);
+      if (prog) prog.style.width = `${(vid.currentTime / vid.duration) * 100}%`;
+    });
+  },
+
+  _replayVideo(postId) {
+    const vid = document.getElementById(`wall-vid-${postId}`);
+    if (vid) { vid.currentTime = 0; vid.play().catch(() => {}); document.getElementById(`wall-replay-${postId}`)?.classList.add('hidden'); }
+  },
+
+  _onVideoError(postId) {
+    const wrapper = document.getElementById(`video-wrapper-${postId}`);
+    if (wrapper) wrapper.innerHTML = `<div class="flex items-center justify-center h-32 text-slate-400 text-xs font-bold">⚠️ Error al cargar el video</div>`;
+  },
+
+  // ── Lightbox Inmersivo ───────────────────────────────────────────────────────
+  openLightbox(url, type) {
+    if (!url) return;
+    const isVideo = type === 'video' || /\.(mp4|webm|mov|m4v)$/i.test(url);
+    const content = isVideo
+      ? `<video controls playsinline autoplay muted class="w-full max-h-[85vh] object-contain rounded-xl" preload="metadata" style="background:#000"><source src="${_sanitizeHTML(url)}" type="video/mp4"></video>`
+      : `<img src="${_sanitizeHTML(url)}" class="w-full max-h-[85vh] object-contain rounded-xl select-none" alt="Publicación" draggable="false" loading="eager">`;
+
+    const lb = document.createElement('div');
+    lb.id = 'wall-lightbox';
+    lb.className = 'fixed inset-0 z-[9999] flex items-center justify-center p-4';
+    lb.style.cssText = 'background:rgba(0,0,0,0.92);backdrop-filter:blur(12px);animation:wall-bounce-in 0.3s ease';
+    lb.setAttribute('role', 'dialog');
+    lb.setAttribute('aria-modal', 'true');
+    lb.setAttribute('aria-label', 'Visor de multimedia');
+    lb.innerHTML = `
+      <button onclick="document.getElementById('wall-lightbox')?.remove()" class="absolute top-4 right-4 w-10 h-10 bg-white/15 hover:bg-white/30 rounded-full flex items-center justify-center text-white z-50 transition-colors" aria-label="Cerrar">
+        <i data-lucide="x" class="w-5 h-5"></i>
+      </button>
+      <div class="relative max-w-5xl w-full" onclick="event.stopPropagation()">${content}</div>`;
+    lb.onclick = () => { lb.remove(); if (isVideo) {} };
+    // Liberación de memoria al cerrar
+    lb.addEventListener('remove', () => {
+      const vid = lb.querySelector('video');
+      if (vid) { vid.pause(); vid.src = ''; }
+    });
+    document.body.appendChild(lb);
+    if (window.lucide) lucide.createIcons();
+
+    // Touch swipe para cerrar
+    let startY = 0;
+    lb.addEventListener('touchstart', e => { startY = e.touches[0].clientY; }, { passive: true });
+    lb.addEventListener('touchend', e => {
+      if (Math.abs(e.changedTouches[0].clientY - startY) > 80) lb.remove();
+    }, { passive: true });
+  },
+
+  openLightboxFromPost(postId) {
+    const img = document.querySelector(`#post-${postId} img`);
+    if (img) this.openLightbox(img.src, 'image');
+  },
+
+  // ── Reacciones ───────────────────────────────────────────────────────────────
+  async toggleReaction(postId, reactionType) {
     const user = this._appState?.get('user');
     if (!user) return;
-
-    const colors = this._getLikeColors();
-
-    // Optimistic Update
-    const btn = document.querySelector(`#post-${postId} button[onclick*="toggleLike"]`);
-    const countSpan = document.getElementById(`like-count-${postId}`);
-    const icon = btn?.querySelector('i') || btn?.querySelector('svg');
-    
-    // Detección robusta basada en la clase de color configurada
-    const isLiked = btn?.classList.contains(colors.text);
-    const currentCount = parseInt(countSpan?.textContent || 0);
-    const newCount = isLiked ? Math.max(0, currentCount - 1) : currentCount + 1;
-    
-    if(btn) {
-      btn.classList.toggle(colors.text, !isLiked);
-      btn.classList.toggle('text-slate-500', isLiked);
-      // Animación de pulso al dar like
-      if (!isLiked) {
-        btn.classList.add('animate-bounce-subtle');
-        setTimeout(() => btn.classList.remove('animate-bounce-subtle'), 500);
-      }
-    }
-    
-    if(icon) {
-      icon.classList.toggle(colors.fill, !isLiked);
-      if (!isLiked) {
-        icon.classList.remove('group-hover:scale-110', 'transition-transform');
-      } else {
-        icon.classList.add('group-hover:scale-110', 'transition-transform');
-      }
-    }
-
-    if(countSpan) countSpan.textContent = String(newCount);
-
+    const postEl = document.getElementById(`post-${postId}`);
+    if (!postEl) return;
+    const current = postEl.dataset.userReaction;
+    const isSame = current === reactionType;
     try {
-      if (isLiked) {
+      if (isSame) {
         await supabase.from('likes').delete().eq('post_id', postId).eq('user_id', user.id);
+        postEl.dataset.userReaction = '';
       } else {
-        // Vibración ligera en móviles
+        if (current) await supabase.from('likes').delete().eq('post_id', postId).eq('user_id', user.id);
+        let insertErr = null;
+        if (this._supportsReactionType !== false) {
+          ({ error: insertErr } = await supabase.from('likes')
+            .insert({ post_id: postId, user_id: user.id, reaction_type: reactionType }));
+          if (insertErr && _isMissingColumnError(insertErr, 'reaction_type')) this._supportsReactionType = false;
+        }
+        if (this._supportsReactionType === false) {
+          ({ error: insertErr } = await supabase.from('likes').insert({ post_id: postId, user_id: user.id }));
+        }
+        if (insertErr) throw insertErr;
+        postEl.dataset.userReaction = reactionType;
         if (navigator.vibrate) navigator.vibrate(10);
-        await supabase.from('likes').insert({ post_id: postId, user_id: user.id });
       }
-    } catch (err) {
-      // Revertir en caso de error (Silencioso para el usuario)
-      if(btn) {
-        btn.classList.toggle(colors.text, isLiked);
-        btn.classList.toggle('text-slate-500', !isLiked);
-      }
-      if(icon) icon.classList.toggle(colors.fill, isLiked);
-      if(countSpan) countSpan.textContent = String(currentCount);
-    }
+      this._refreshReactionUI(postId);
+    } catch (_) {}
   },
 
+  _refreshReactionUI(postId) {
+    const postEl = document.getElementById(`post-${postId}`);
+    const bar = document.getElementById(`reactions-${postId}`);
+    if (!postEl || !bar) return;
+    const current = postEl.dataset.userReaction;
+    bar.querySelectorAll('.wall-reaction-btn').forEach(btn => {
+      const emoji = btn.textContent.trim();
+      const type = emoji === '❤️' ? 'like' : emoji;
+      btn.classList.toggle('active', current === type);
+    });
+  },
+
+  async toggleLike(postId) { await this.toggleReaction(postId, 'like'); },
+
+  // ── Comentarios ──────────────────────────────────────────────────────────────
   async sendComment(postId) {
     const input = document.getElementById(`comment-input-${postId}`);
-    const content = input?.value.trim();
-    if (!content) return;
+    const raw = input?.value.trim();
+    if (!raw) return;
 
-    const user    = this._appState?.get('user');
+    const now = Date.now();
+    if (now - this._lastPostTime < _SPAM_COOLDOWN_MS) {
+      Helpers.toast('Espera un momento antes de comentar de nuevo', 'warning');
+      return;
+    }
+
+    const content = _sanitizeHTML(raw);
+    const user = this._appState?.get('user');
     const profile = this._appState?.get('profile');
     if (!user) return;
 
-    // Resolver nombre del autor
     let userName = 'Usuario';
     if (profile?.role === 'padre') {
-      const { data: student } = await supabase.from('students').select('name').eq('parent_id', user.id).maybeSingle();
-      userName = student?.name || profile.name || 'Padre';
+      const { data: st } = await supabase.from('students').select('name').eq('parent_id', user.id).maybeSingle();
+      userName = st?.name || profile.name || 'Padre';
     } else {
       userName = profile?.name || 'Personal';
     }
 
-    // Optimistic UI \u2014 agregar comentario sin recargar
-    const commentsList = document.getElementById(`comments-list-${postId}`);
+    const list = document.getElementById(`comments-list-${postId}`);
     const tempId = `temp-${Date.now()}`;
-    if (commentsList) {
-      const placeholder = commentsList.querySelector('.italic');
-      if (placeholder) placeholder.remove();
-
-      const colorClass = this._getAvatarColor(userName);
-      const tempEl = document.createElement('div');
-      tempEl.id = tempId;
-      tempEl.className = 'flex gap-2 text-xs opacity-60 animate-slideInUp';
-      tempEl.innerHTML = `
-        <div class="w-7 h-7 rounded-full ${colorClass} flex items-center justify-center font-black text-[10px] border-2 border-white shrink-0 shadow-sm">
-          ${Helpers.escapeHTML(userName.charAt(0).toUpperCase())}
-        </div>
+    if (list) {
+      list.querySelector('.italic')?.remove();
+      const colorCls = this._getAvatarColor(userName);
+      const el = document.createElement('div');
+      el.id = tempId; el.className = 'flex gap-2 text-xs opacity-60 wall-slide-up';
+      el.innerHTML = `
+        <div class="w-7 h-7 rounded-full ${colorCls} flex items-center justify-center font-black text-[10px] shrink-0">${_sanitizeHTML(userName.charAt(0))}</div>
         <div class="bg-white p-3 rounded-2xl rounded-tl-none border border-slate-100 shadow-sm flex-1">
-          <div class="flex justify-between items-center mb-1">
-            <span class="font-black text-slate-800 text-[11px]">${Helpers.escapeHTML(userName)}</span>
-            <span class="text-[9px] text-slate-400 font-bold uppercase">ahora</span>
+          <div class="flex justify-between mb-1">
+            <span class="font-black text-slate-800 text-[11px]">${_sanitizeHTML(userName)}</span>
+            <span class="text-[9px] text-slate-400 font-bold">ahora</span>
           </div>
-          <p class="text-slate-600 leading-relaxed">${Helpers.escapeHTML(content)}</p>
+          <p class="text-slate-600 leading-relaxed">${_sanitizeHTML(content)}</p>
         </div>`;
-      commentsList.appendChild(tempEl);
-      commentsList.scrollTop = commentsList.scrollHeight;
+      list.appendChild(el);
+      list.scrollTop = list.scrollHeight;
     }
 
-    // Limpiar input inmediatamente
     input.value = '';
+    this._lastPostTime = now;
 
     try {
-      const { error } = await supabase.from('comments').insert({
-        post_id:   postId,
-        user_id:   user.id,
-        user_name: userName,
-        content
-      });
-
+      const { error } = await supabase.from('comments').insert({ post_id: postId, user_id: user.id, user_name: userName, content });
       if (error) throw error;
-
-      // Confirmar \u2014 quitar opacidad del comentario temporal
-      const tempEl = document.getElementById(tempId);
-      if (tempEl) tempEl.classList.remove('opacity-60');
-
-      // Actualizar contador en el bot\u00f3n de comentarios
-      const countBtn = document.querySelector(`#post-${postId} button[onclick*="toggleCommentSection"] span`);
-      if (countBtn) {
-        const match = countBtn.textContent.match(/\d+/);
-        const current = match ? parseInt(match[0]) : 0;
-        countBtn.textContent = `${current + 1} Comentarios`;
-      }
-
-    } catch (err) {
-      // Revertir optimistic
+      document.getElementById(tempId)?.classList.remove('opacity-60');
+      const cnt = document.getElementById(`comment-count-${postId}`);
+      if (cnt) cnt.textContent = parseInt(cnt.textContent || '0') + 1;
+    } catch (_) {
       document.getElementById(tempId)?.remove();
-      input.value = content;
+      input.value = raw;
     }
   },
 
@@ -616,16 +1005,10 @@ export const WallModule = {
     const section = document.getElementById(`comments-section-${postId}`);
     if (!section) return;
     section.classList.toggle('hidden');
-
-    // Solo cargar desde DB si la sección se abre Y la lista está vacía o tiene solo el placeholder
     if (!section.classList.contains('hidden')) {
       const list = document.getElementById(`comments-list-${postId}`);
-      const hasRealComments = list && list.querySelectorAll('.bg-white').length > 0;
-      if (!hasRealComments) {
-        list.innerHTML = `
-          <div class="py-4 text-center">
-            <div class="animate-spin w-5 h-5 border-2 border-slate-200 border-t-slate-400 rounded-full mx-auto"></div>
-          </div>`;
+      if (list && !list.querySelector('.bg-white')) {
+        list.innerHTML = `<div class="py-4 text-center"><div class="animate-spin w-5 h-5 border-2 border-slate-200 border-t-slate-400 rounded-full mx-auto"></div></div>`;
         const comments = await this._fetchComments(postId);
         this.renderComments(postId, comments);
       }
@@ -633,246 +1016,494 @@ export const WallModule = {
   },
 
   async _fetchComments(postId) {
-    // Traer comentarios con join a profiles (name) y tambi\u00e9n a students (para padres)
-    const { data, error } = await supabase
-      .from('comments')
-      .select(`
-        id, content, user_name, created_at, user_id,
-        profile:profiles!comments_user_id_fkey(name, avatar_url, role)
-      `)
-      .eq('post_id', postId)
-      .order('created_at', { ascending: true });
+    const { data } = await supabase.from('comments')
+      .select('id, content, user_name, created_at, user_id, profile:profiles!comments_user_id_fkey(name, avatar_url, role)')
+      .eq('post_id', postId).order('created_at', { ascending: true });
 
-    if (error) {
-      return [];
-    }
-
-    // Para comentarios de padres, buscar el nombre del estudiante hijo
     const parentComments = (data || []).filter(c => {
       const p = Array.isArray(c.profile) ? c.profile[0] : c.profile;
       return p?.role === 'padre';
     });
-
     if (parentComments.length) {
-      const parentIds = [...new Set(parentComments.map(c => c.user_id))];
-      const { data: students } = await supabase
-        .from('students')
-        .select('parent_id, name')
-        .in('parent_id', parentIds);
-
-      // Mapa parent_id \u2192 nombre del estudiante
-      const studentByParent = {};
-      (students || []).forEach(s => { studentByParent[s.parent_id] = s.name; });
-
-      // Inyectar nombre del estudiante en los comentarios de padres
+      const ids = [...new Set(parentComments.map(c => c.user_id))];
+      const { data: students } = await supabase.from('students').select('parent_id, name').in('parent_id', ids);
+      const map = {}; (students || []).forEach(s => { map[s.parent_id] = s.name; });
       return (data || []).map(c => {
-        const p = Array.isArray(c.profile) ? c.profile[0] : c.profile;
-        if (p?.role === 'padre' && studentByParent[c.user_id]) {
-          return { ...c, _studentName: studentByParent[c.user_id] };
-        }
-        return c;
+        const pr = Array.isArray(c.profile) ? c.profile[0] : c.profile;
+        return (pr?.role === 'padre' && map[c.user_id]) ? { ...c, _studentName: map[c.user_id] } : c;
       });
     }
-
     return data || [];
-  },
-
-  // Resuelve el nombre a mostrar en un comentario:
-  // - Padre \u2192 nombre del estudiante hijo (no el nombre del padre)
-  // - Maestra/Directora/Asistente \u2192 profile.name de profiles
-  _resolveCommentName(c) {
-    const profile = Array.isArray(c.profile) ? c.profile[0] : (c.profile || null);
-    
-    // Si es padre y tenemos el nombre del estudiante, usarlo
-    if (profile?.role === 'padre' && c._studentName) {
-      return {
-        name:   c._studentName,
-        avatar: null   // el avatar del padre no aplica para el estudiante
-      };
-    }
-
-    return {
-      name:   profile?.name || c.user_name || 'Usuario',
-      avatar: (profile?.avatar_url && profile.avatar_url.startsWith('http')) ? profile.avatar_url : null
-    };
   },
 
   renderComments(postId, comments) {
     const container = document.getElementById(`comments-list-${postId}`);
     if (!container) return;
-    
-    if (comments.length === 0) {
-      container.innerHTML = '<p class="text-center text-[10px] text-slate-400 italic py-2">S\u00e9 el primero en comentar.</p>';
-      return;
-    }
-
-    // 🔒 Privacidad: Obtener el post para saber si pertenece a un aula
-    const postEl = document.getElementById(`post-${postId}`);
-    const isClassroomPost = postEl && postEl.dataset.classroomId !== 'null';
-
+    if (!comments.length) { container.innerHTML = '<p class="text-center text-[10px] text-slate-400 italic py-2">Sé el primero en comentar.</p>'; return; }
     container.innerHTML = comments.map(c => {
-      const { name: displayName } = this._resolveCommentName(c);
-      const initial = displayName.charAt(0).toUpperCase();
-      const colorClass = this._getAvatarColor(displayName);
-
+      const pr = Array.isArray(c.profile) ? c.profile[0] : (c.profile || null);
+      const name = (pr?.role === 'padre' && c._studentName) ? c._studentName : (pr?.name || c.user_name || 'Usuario');
+      const colorCls = this._getAvatarColor(name);
       return `
-      <div class="flex gap-2 text-xs animate-slideInUp">
-        <div class="w-7 h-7 rounded-full ${colorClass} flex items-center justify-center font-black text-[10px] border-2 border-white shrink-0 shadow-sm">
-          ${initial}
-        </div>
-        <div class="bg-white p-3 rounded-2xl rounded-tl-none border border-slate-100 shadow-sm flex-1">
-          <div class="flex justify-between items-center mb-1">
-            <span class="font-black text-slate-800 text-[11px]">${Helpers.escapeHTML(displayName)}</span>
-            <span class="text-[9px] text-slate-400 font-bold uppercase">${new Date(c.created_at).toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'})}</span>
+        <div class="flex gap-2 text-xs wall-slide-up">
+          <div class="w-7 h-7 rounded-full ${colorCls} flex items-center justify-center font-black text-[10px] shrink-0">${_sanitizeHTML(name.charAt(0))}</div>
+          <div class="bg-white p-3 rounded-2xl rounded-tl-none border border-slate-100 shadow-sm flex-1">
+            <div class="flex justify-between mb-1">
+              <span class="font-black text-slate-800 text-[11px]">${_sanitizeHTML(name)}</span>
+              <span class="text-[9px] text-slate-400 font-bold">${new Date(c.created_at).toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'})}</span>
+            </div>
+            <p class="text-slate-600 leading-relaxed">${_sanitizeHTML(c.content)}</p>
           </div>
-          <p class="text-slate-600 leading-relaxed">${Helpers.escapeHTML(c.content)}</p>
-        </div>
-      </div>
-    `}).join('');
+        </div>`;
+    }).join('');
+  },
 
-    // Activar lazy loading en avatares de comentarios (solo si se muestran)
-    if (!isClassroomPost) ImageLoader.observe(container);
+  // ── Fijar / Borrar / Toggles ─────────────────────────────────────────────────
+  async togglePin(postId) {
+    try {
+      const el = document.getElementById(`post-${postId}`);
+      const pinned = !!el?.querySelector('.wall-pinned-badge');
+
+      if (!pinned) {
+        // Verificar límite de 2 posts fijados
+        const { count } = await supabase.from('posts').select('id', { count: 'exact', head: true }).eq('is_pinned', true);
+        if ((count || 0) >= MAX_PINNED_POSTS) {
+          Helpers.toast(`Solo puedes tener ${MAX_PINNED_POSTS} publicaciones fijadas`, 'warning');
+          return;
+        }
+      }
+      await supabase.from('posts').update({ is_pinned: !pinned }).eq('id', postId);
+      Helpers.toast(pinned ? 'Publicación desfijada' : 'Publicación fijada ✅', 'success');
+      const c = document.getElementById(this._containerId);
+      if (c) { this._page = 0; this._hasMore = true; this.loadPosts(c); }
+    } catch (_) { Helpers.toast('Error al fijar', 'error'); }
+  },
+
+  async toggleComments(postId, currentlyEnabled) {
+    try {
+      await supabase.from('posts').update({ comments_enabled: !currentlyEnabled }).eq('id', postId);
+      Helpers.toast(currentlyEnabled ? 'Comentarios desactivados' : 'Comentarios activados', 'success');
+    } catch (_) { Helpers.toast('Error', 'error'); }
   },
 
   async deletePost(postId) {
+    // Verificar ventana de 24h para maestra (directora puede siempre)
+    const profile = this._appState?.get('profile');
+    if (profile?.role === 'maestra') {
+      const postEl = document.getElementById(`post-${postId}`);
+      const timeEl = postEl?.querySelector('.text-slate-400.font-bold');
+      // Simplificado: verificar si el post tiene más de 24h mirando el texto relativo
+      const txt = timeEl?.textContent || '';
+      if (txt.includes('día') || txt.includes('mes') || txt.includes('año')) {
+        Helpers.toast('Solo puedes eliminar publicaciones de las últimas 24 horas', 'warning');
+        return;
+      }
+    }
     if (!confirm('¿Eliminar esta publicación permanentemente?')) return;
     try {
-      // ✅ INTERFAZ OPTIMISTA: Animación de salida
       const el = document.getElementById(`post-${postId}`);
-      if (el) {
-        el.style.transition = 'all 0.4s ease';
-        el.style.opacity = '0';
-        el.style.transform = 'translateX(20px)';
-      }
-
+      if (el) { el.style.transition = 'all 0.3s ease'; el.style.opacity = '0'; el.style.transform = 'translateX(20px)'; }
       await supabase.from('posts').delete().eq('id', postId);
-      setTimeout(() => document.getElementById(`post-${postId}`)?.remove(), 400);
+      // Audit log
+      this._auditLog('delete_post', { post_id: postId });
+      setTimeout(() => document.getElementById(`post-${postId}`)?.remove(), 350);
       Helpers.toast('Publicación eliminada', 'info');
-    } catch (err) {
-      Helpers.toast('Error al eliminar', 'error');
-    }
+    } catch (_) { Helpers.toast('Error al eliminar', 'error'); }
   },
 
-  // Escuchar cambios en posts para actualizar el muro de forma inteligente
-  subscribeRealtime() {
-    this._unsubscribeRealtime(); // limpiar canal anterior si existe
+  /** Compartir al chat interno */
+  shareToChat(postId) {
+    const postEl = document.getElementById(`post-${postId}`);
+    const content = postEl?.querySelector('.text-slate-600.text-sm')?.textContent?.trim() || '';
+    const mediaUrl = postEl?.querySelector('img')?.src || postEl?.querySelector('video source')?.src || '';
+    Helpers.toast('Abriendo chat...', 'info');
+    // Dispara evento que chat.js puede escuchar
+    document.dispatchEvent(new CustomEvent('wall:share-to-chat', { detail: { postId, content, mediaUrl } }));
+  },
 
+  /** Registro de auditoría (fire & forget) */
+  _auditLog(action, meta = {}) {
+    const user = this._appState?.get('user');
+    if (!user) return;
+    supabase.from('audit_logs').insert({
+      action,
+      user_id: user.id,
+      metadata: meta,
+      created_at: new Date().toISOString()
+    }).catch(() => {});
+  },
+
+  // ── Realtime ─────────────────────────────────────────────────────────────────
+  subscribeRealtime() {
+    this._unsubscribeRealtime();
     const classroomId = this._options.classroomId;
     const self = this;
-    
-    this._realtimeChannel = supabase
-      .channel(`wall_${classroomId || 'global'}_${Date.now()}`)
-      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'posts' }, async (payload) => {
+
+    this._realtimeChannel = supabase.channel(`wall_${classroomId || 'global'}_${Date.now()}`)
+      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'posts' }, (payload) => {
         const post = payload.new;
         if (classroomId && post.classroom_id && post.classroom_id !== classroomId) return;
-        
-        // Mostrar indicador de nuevos posts en lugar de refrescar auto
-        const container = document.getElementById(self._containerId);
-        if (container) {
-          const indicator = document.getElementById('wall-new-posts-indicator');
-          if (!indicator) {
-            const btn = document.createElement('div');
-            btn.id = 'wall-new-posts-indicator';
-            btn.className = 'fixed top-24 left-1/2 -translate-x-1/2 bg-indigo-600 text-white px-6 py-2.5 rounded-full text-[10px] font-black uppercase shadow-2xl animate-bounce cursor-pointer z-50 flex items-center gap-2 border-2 border-white/20 backdrop-blur-md';
-            btn.innerHTML = '<i data-lucide="arrow-up" class="w-3 h-3"></i> Nuevas publicaciones disponibles';
-            btn.onclick = () => {
-              window.scrollTo({ top: 0, behavior: 'smooth' });
-              self.applyFilters();
-              btn.remove();
-            };
-            document.body.appendChild(btn);
-            if (window.lucide) lucide.createIcons();
-          }
+        const existing = document.getElementById('wall-new-posts-indicator');
+        if (!existing) {
+          const btn = document.createElement('div');
+          btn.id = 'wall-new-posts-indicator';
+          btn.className = 'fixed top-24 left-1/2 -translate-x-1/2 bg-orange-500 text-white px-6 py-2.5 rounded-full text-[10px] font-black uppercase shadow-2xl animate-bounce cursor-pointer z-50 flex items-center gap-2 border-2 border-white/20 backdrop-blur-md';
+          btn.innerHTML = '⬆ Nuevas publicaciones disponibles';
+          btn.onclick = () => { window.scrollTo({ top: 0, behavior: 'smooth' }); self.applyFilters(); btn.remove(); };
+          document.body.appendChild(btn);
+          setTimeout(() => btn.remove(), 8000);
         }
       })
       .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'posts' }, (payload) => {
         const post = payload.new;
         const el = document.getElementById(`post-${post.id}`);
-        if (el) {
-          const likeSpan = document.getElementById(`like-count-${post.id}`);
-          const commBtn = el.querySelector(`button[onclick*="toggleCommentSection"] span`);
-          if (likeSpan && typeof post.likes_count === 'number') likeSpan.textContent = post.likes_count;
-          if (commBtn && typeof post.comments_count === 'number') commBtn.textContent = `${post.comments_count} Comentarios`;
-        }
+        if (!el) return;
+        const cnt = document.getElementById(`comment-count-${post.id}`);
+        if (cnt && typeof post.comments_count === 'number') cnt.textContent = post.comments_count;
+        // Actualizar views
+        const viewEl = el.querySelector('.wall-view-count');
+        if (viewEl && post.views_count) viewEl.innerHTML = `<i data-lucide="eye" class="w-3 h-3"></i>${post.views_count}`;
       })
       .on('postgres_changes', { event: 'DELETE', schema: 'public', table: 'posts' }, (payload) => {
         const el = document.getElementById(`post-${payload.old?.id}`);
-        if (el) {
-          el.classList.add('opacity-0', 'scale-95');
-          setTimeout(() => el.remove(), 300);
-        }
+        if (el) { el.classList.add('opacity-0'); setTimeout(() => el.remove(), 300); }
       })
-      // Sincronizar likes en tiempo real entre paneles
       .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'likes' }, (payload) => {
-        const like = payload.new;
-        const userId = self._appState?.get('user')?.id;
-        if (!userId) return;
-        const colors = self._getLikeColors();
-        // Si OTRO usuario dio like, actualizar el ícono si somos ese usuario
-        if (like.user_id === userId) {
-          const btn = document.querySelector(`#post-${like.post_id} button[onclick*="toggleLike"]`);
-          if (btn && !btn.classList.contains(colors.text)) {
-            btn.classList.add(colors.text);
-            btn.classList.remove('text-slate-500');
-            const icon = btn.querySelector('i[data-lucide="heart"]');
-            if (icon) icon.classList.add(colors.fill);
-          }
-        }
+        const uid = self._appState?.get('user')?.id;
+        if (uid && payload.new.user_id === uid) self._refreshReactionUI(payload.new.post_id);
       })
       .on('postgres_changes', { event: 'DELETE', schema: 'public', table: 'likes' }, (payload) => {
-        const like = payload.old;
-        const userId = self._appState?.get('user')?.id;
-        if (!userId) return;
-        if (like?.user_id === userId) {
-          const btn = document.querySelector(`#post-${like.post_id} button[onclick*="toggleLike"]`);
-          if (btn) {
-            const colors = self._getLikeColors();
-            btn.classList.remove(colors.text);
-            btn.classList.add('text-slate-500');
-            const icon = btn.querySelector('i[data-lucide="heart"]');
-            if (icon) icon.classList.remove(colors.fill);
-          }
-        }
+        const uid = self._appState?.get('user')?.id;
+        if (uid && payload.old?.user_id === uid) self._refreshReactionUI(payload.old.post_id);
       })
       .subscribe((status) => {
-        if (status === 'CHANNEL_ERROR') {
-          setTimeout(() => {
-            if (self._realtimeChannel) self.subscribeRealtime();
-          }, 5000);
-        }
+        if (status === 'CHANNEL_ERROR') setTimeout(() => { if (self._realtimeChannel) self.subscribeRealtime(); }, 5000);
       });
   },
 
-  /** Desuscribir el canal del muro — llamar cuando el usuario cambia de sección */
   _unsubscribeRealtime() {
-    if (this._realtimeChannel) {
-      try { supabase.removeChannel(this._realtimeChannel); } catch (_) {}
-      this._realtimeChannel = null;
-    }
-    if (this._observer) {
-      this._observer.disconnect();
-      this._observer = null;
-    }
+    if (this._realtimeChannel) { try { supabase.removeChannel(this._realtimeChannel); } catch (_) {} this._realtimeChannel = null; }
+    if (this._observer) { this._observer.disconnect(); this._observer = null; }
+    if (this._videoObserver) { this._videoObserver.disconnect(); this._videoObserver = null; }
   },
 
-  /** Destruir completamente el módulo — llamar al salir de la sección muro */
   destroy() {
     this._unsubscribeRealtime();
+    if (this._schedulerTimer) { clearInterval(this._schedulerTimer); this._schedulerTimer = null; }
+    if (this._recordStream) { this._recordStream.getTracks().forEach(t => t.stop()); this._recordStream = null; }
+    // Limpiar lightbox si queda abierto
+    document.getElementById('wall-lightbox')?.remove();
   },
 
-  openLightbox(postId) {
-    const post = document.getElementById(`post-${postId}`);
-    const img = post?.querySelector('img');
-    if (!img) return;
+  // ── Scheduler de publicaciones programadas ───────────────────────────────────
+  _startSchedulerChecker() {
+    if (this._schedulerTimer) return;
+    this._schedulerTimer = setInterval(async () => {
+      try {
+        if (!navigator.onLine) return; // sin conexión: reintentar en el próximo ciclo
+        const profile = this._appState?.get('profile');
+        if (!['directora','maestra','asistente'].includes(profile?.role)) return;
+        const now = new Date().toISOString();
+        const { data: due, error: schedErr } = await supabase.from('posts')
+          .select('id').not('scheduled_at', 'is', null)
+          .lte('scheduled_at', now).eq('status', 'scheduled').limit(5);
+        if (schedErr) {
+          // Red inestable: registrar solo el primer fallo para no llenar la consola
+          if (!this._schedFailLogged) {
+            console.warn('[Wall] Scheduler en pausa (red):', schedErr.message);
+            this._schedFailLogged = true;
+          }
+          return;
+        }
+        this._schedFailLogged = false;
+        if (!due?.length) return;
+        for (const p of due) {
+          await supabase.from('posts').update({ status: 'published', scheduled_at: null }).eq('id', p.id);
+        }
+      } catch (_) {}
+    }, 60_000); // cada minuto
+  },
 
-    const html = `
-      <div class="w-full max-w-lg overflow-hidden relative">
-        <div class="relative h-80 bg-slate-900 flex items-center justify-center">
-          <img src="${img.src}" class="w-full h-full object-contain cursor-zoom-out" alt="Evidencia" onclick="App.ui.closeModal()">
+  // ── Video Trimmer Modal ───────────────────────────────────────────────────────
+  openVideoTrimmer(file, onTrimmed) {
+    const url = URL.createObjectURL(file);
+    const modal = document.createElement('div');
+    modal.id = 'wall-trimmer';
+    modal.className = 'fixed inset-0 z-[10000] flex items-center justify-center p-4';
+    modal.style.cssText = 'background:rgba(0,0,0,0.85);backdrop-filter:blur(8px)';
+    modal.innerHTML = `
+      <div class="bg-white rounded-3xl w-full max-w-md p-6 space-y-5 shadow-2xl">
+        <div class="flex items-center gap-3">
+          <div class="w-10 h-10 bg-orange-100 rounded-2xl flex items-center justify-center text-xl">✂️</div>
+          <div>
+            <h3 class="font-black text-slate-800">Recortar Video</h3>
+            <p class="text-xs text-slate-500">El video excede 30 segundos. Elige el segmento a publicar.</p>
+          </div>
         </div>
-      </div>
-    `;
-    if (window.openGlobalModal) window.openGlobalModal(html, true);
-    else if (window.Modal?.open) window.Modal.open('lightbox', html);
-  }
+        <video id="trimmer-preview" src="${_sanitizeHTML(url)}" controls muted class="w-full rounded-2xl max-h-48 bg-black" preload="metadata"></video>
+        <div class="space-y-2">
+          <div class="flex justify-between text-xs font-bold text-slate-500">
+            <span>Inicio: <span id="trim-start-val">0</span>s</span>
+            <span>Fin: <span id="trim-end-val">30</span>s (máx 30s)</span>
+          </div>
+          <input type="range" id="trim-start" min="0" max="0" step="0.5" value="0" class="w-full accent-orange-500"
+                 oninput="WallModule._updateTrimmer()" aria-label="Punto de inicio">
+          <input type="range" id="trim-end" min="0" max="30" step="0.5" value="30" class="w-full accent-green-500"
+                 oninput="WallModule._updateTrimmer()" aria-label="Punto de fin">
+        </div>
+        <div class="flex gap-3">
+          <button onclick="document.getElementById('wall-trimmer')?.remove()" class="flex-1 py-3 border-2 border-slate-200 rounded-2xl text-sm font-black text-slate-500">Cancelar</button>
+          <button id="btn-apply-trim" onclick="WallModule._applyTrim('${_sanitizeHTML(url)}')" class="flex-1 py-3 bg-gradient-to-r from-orange-500 to-green-500 text-white rounded-2xl text-sm font-black">Aplicar Recorte</button>
+        </div>
+      </div>`;
+
+    document.body.appendChild(modal);
+    const vid = document.getElementById('trimmer-preview');
+    vid.onloadedmetadata = () => {
+      const endInput = document.getElementById('trim-end');
+      const startInput = document.getElementById('trim-start');
+      if (endInput) { endInput.max = Math.min(vid.duration, vid.duration); }
+      if (startInput) { startInput.max = Math.max(0, vid.duration - 30); }
+      document.getElementById('trim-end-val').textContent = Math.min(30, vid.duration).toFixed(1);
+    };
+    modal._onTrimmed = onTrimmed;
+    modal._originalUrl = url;
+  },
+
+  _updateTrimmer() {
+    const start = parseFloat(document.getElementById('trim-start')?.value || 0);
+    const end = parseFloat(document.getElementById('trim-end')?.value || 30);
+    const clamped = Math.min(end, start + 30);
+    document.getElementById('trim-start-val').textContent = start.toFixed(1);
+    document.getElementById('trim-end-val').textContent = clamped.toFixed(1);
+    const vid = document.getElementById('trimmer-preview');
+    if (vid) vid.currentTime = start;
+  },
+
+  async _applyTrim(originalUrl) {
+    const btn = document.getElementById('btn-apply-trim');
+    if (btn) { btn.disabled = true; btn.textContent = 'Procesando...'; }
+    const start = parseFloat(document.getElementById('trim-start')?.value || 0);
+    const end = parseFloat(document.getElementById('trim-end')?.value || 30);
+    const modal = document.getElementById('wall-trimmer');
+
+    // Nota: recorte real requiere FFmpeg WASM. Aquí se usa el segmento con nota informativa.
+    Helpers.toast(`Segmento ${start.toFixed(1)}s – ${end.toFixed(1)}s seleccionado. El video se subirá completo con inicio en ${start.toFixed(1)}s.`, 'info');
+    if (modal?._onTrimmed) modal._onTrimmed({ start, end, originalUrl });
+    if (modal?._originalUrl) URL.revokeObjectURL(modal._originalUrl);
+    modal?.remove();
+  },
+
+  // ── Grabador Directo de Video 30s ────────────────────────────────────────────
+  async openVideoRecorder(onRecorded) {
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' }, audio: true });
+      this._recordStream = stream;
+    } catch (_) {
+      Helpers.toast('No se pudo acceder a la cámara', 'error');
+      return;
+    }
+
+    const modal = document.createElement('div');
+    modal.id = 'wall-recorder';
+    modal.className = 'fixed inset-0 z-[10000] flex items-center justify-center p-4 bg-black/90';
+    modal.innerHTML = `
+      <div class="bg-black rounded-3xl w-full max-w-sm overflow-hidden relative">
+        <video id="recorder-preview" autoplay muted playsinline class="w-full rounded-t-3xl" style="min-height:240px;background:#000;"></video>
+        <div class="p-5 space-y-4 bg-slate-900">
+          <div class="flex items-center justify-center gap-3">
+            <svg class="w-10 h-10 -rotate-90" viewBox="0 0 36 36">
+              <circle cx="18" cy="18" r="16" fill="none" stroke="#374151" stroke-width="3"/>
+              <circle id="record-ring" cx="18" cy="18" r="16" fill="none" stroke="#ef4444" stroke-width="3"
+                stroke-dasharray="100.5" stroke-dashoffset="100.5" style="transition:stroke-dashoffset 0.5s linear"/>
+            </svg>
+            <span id="record-timer" class="text-white font-black text-3xl tabular-nums">0:30</span>
+          </div>
+          <div class="flex gap-3">
+            <button onclick="WallModule._stopRecording()" class="flex-1 py-3 bg-slate-700 text-white rounded-2xl font-black text-xs" aria-label="Cancelar grabación">Cancelar</button>
+            <button id="btn-start-rec" onclick="WallModule._startRecording()" class="flex-1 py-3 bg-red-500 text-white rounded-2xl font-black text-xs wall-record-btn" aria-label="Iniciar grabación">⏺ Grabar</button>
+          </div>
+        </div>
+      </div>`;
+    document.body.appendChild(modal);
+
+    const preview = document.getElementById('recorder-preview');
+    preview.srcObject = this._recordStream;
+    modal._onRecorded = onRecorded;
+  },
+
+  _recorderChunks: [],
+  _recorderInstance: null,
+  _recorderCountdown: null,
+
+  _startRecording() {
+    const stream = this._recordStream;
+    if (!stream) return;
+    this._recorderChunks = [];
+    this._recorderInstance = new MediaRecorder(stream, { mimeType: 'video/webm;codecs=vp9,opus' });
+    this._recorderInstance.ondataavailable = e => { if (e.data.size > 0) this._recorderChunks.push(e.data); };
+    this._recorderInstance.onstop = () => {
+      const blob = new Blob(this._recorderChunks, { type: 'video/webm' });
+      const modal = document.getElementById('wall-recorder');
+      if (modal?._onRecorded) modal._onRecorded(blob);
+      modal?.remove();
+      this._cleanupRecorder();
+    };
+    this._recorderInstance.start(1000);
+
+    const startBtn = document.getElementById('btn-start-rec');
+    if (startBtn) { startBtn.textContent = '⏹ Detener'; startBtn.onclick = () => this._stopRecording(true); startBtn.classList.add('animate-pulse'); }
+
+    let remaining = MAX_VIDEO_DURATION;
+    const ring = document.getElementById('record-ring');
+    const circumference = 100.5;
+    this._recorderCountdown = setInterval(() => {
+      remaining -= 0.5;
+      const timer = document.getElementById('record-timer');
+      if (timer) { const m = Math.floor(remaining / 60); const s = Math.floor(remaining % 60); timer.textContent = `${m}:${String(s).padStart(2,'0')}`; }
+      if (ring) ring.style.strokeDashoffset = circumference * (1 - (MAX_VIDEO_DURATION - remaining) / MAX_VIDEO_DURATION);
+      if (remaining <= 0) this._stopRecording(true);
+    }, 500);
+  },
+
+  _stopRecording(save = false) {
+    clearInterval(this._recorderCountdown);
+    if (save && this._recorderInstance?.state === 'recording') {
+      this._recorderInstance.stop();
+    } else {
+      this._cleanupRecorder();
+      document.getElementById('wall-recorder')?.remove();
+    }
+  },
+
+  _cleanupRecorder() {
+    clearInterval(this._recorderCountdown);
+    if (this._recorderInstance?.state === 'recording') this._recorderInstance.stop();
+    if (this._recordStream) { this._recordStream.getTracks().forEach(t => t.stop()); this._recordStream = null; }
+    this._recorderInstance = null;
+  },
+
+  // ── Upload con validación y progreso ─────────────────────────────────────────
+  /**
+   * Valida, comprime y sube un archivo de media.
+   * @param {File|Blob} file
+   * @param {Function} onProgress  cb(percent)
+   * @returns {Promise<{mediaUrl, mediaType, thumbnailUrl}>}
+   */
+  async uploadMedia(file, onProgress = null) {
+    const isVideo = file.type.startsWith('video/') || (file instanceof Blob && !file.type.startsWith('image/'));
+    const mimeVideo = 'video/mp4';
+    const mimeWebP = 'image/webp';
+
+    if (isVideo) {
+      // 1) Validar tamaño
+      if (file.size > MAX_VIDEO_SIZE_MB * 1024 * 1024) throw new Error(`El video supera los ${MAX_VIDEO_SIZE_MB}MB permitidos`);
+
+      // 2) Validar duración (solo para File, no para Blob grabado en tiempo real)
+      if (file instanceof File) {
+        const { ok, duration } = await validateVideoDuration(file);
+        if (!ok) {
+          // Abrir trimmer como alternativa
+          return new Promise((resolve, reject) => {
+            this.openVideoTrimmer(file, async ({ start, end, originalUrl }) => {
+              try {
+                const result = await this._uploadVideoFile(file, onProgress);
+                resolve(result);
+              } catch (e) { reject(e); }
+            });
+            reject(new Error('TRIM_REQUESTED'));
+          });
+        }
+      }
+
+      return await this._uploadVideoFile(file, onProgress);
+    } else {
+      // Imagen
+      if (file.size > MAX_IMAGE_SIZE_MB * 1024 * 1024) throw new Error(`La imagen supera los ${MAX_IMAGE_SIZE_MB}MB permitidos`);
+      const compressed = await compressImageToWebP(file);
+      const path = `wall/${_uuid()}.webp`;
+      await uploadWithRetry('posts', path, compressed, mimeWebP, onProgress);
+      const { data: urlData } = supabase.storage.from('posts').getPublicUrl(path);
+      return { mediaUrl: urlData.publicUrl, mediaType: 'image', thumbnailUrl: null };
+    }
+  },
+
+  async _uploadVideoFile(file, onProgress) {
+    const path = `wall/${_uuid()}.mp4`;
+    // Generar thumbnail
+    let thumbnailUrl = null;
+    try {
+      const thumb = await generateVideoThumbnail(file);
+      if (thumb) {
+        const thumbPath = `wall/thumbs/${_uuid()}.webp`;
+        await uploadWithRetry('posts', thumbPath, thumb, 'image/webp', null);
+        const { data: tUrl } = supabase.storage.from('posts').getPublicUrl(thumbPath);
+        thumbnailUrl = tUrl.publicUrl;
+      }
+    } catch (_) {}
+
+    await uploadWithRetry('posts', path, file, 'video/mp4', onProgress);
+    const { data: urlData } = supabase.storage.from('posts').getPublicUrl(path);
+    return { mediaUrl: urlData.publicUrl, mediaType: 'video', thumbnailUrl };
+  },
+
+  /** Subida en segundo plano con notificación al terminar */
+  uploadInBackground(file, postData) {
+    const taskId = _uuid();
+    Helpers.toast('Subida iniciada en segundo plano...', 'info');
+
+    (async () => {
+      try {
+        const { mediaUrl, mediaType, thumbnailUrl } = await this.uploadMedia(file, null);
+        await supabase.from('posts').update({ media_url: mediaUrl, media_type: mediaType, thumbnail_url: thumbnailUrl }).eq('id', postData.id);
+        Helpers.toast('📸 Publicación multimedia lista', 'success');
+        // Actualizar la UI del post
+        const c = document.getElementById(this._containerId);
+        if (c) { this._page = 0; this._hasMore = true; this.loadPosts(c); }
+      } catch (err) {
+        Helpers.toast('Error en subida de fondo: ' + err.message, 'error');
+      }
+    })();
+  },
+
+  // ── Cache PWA IndexedDB ───────────────────────────────────────────────────────
+  async _cachePostsLocally(posts) {
+    try {
+      if (!('indexedDB' in window)) return;
+      const req = indexedDB.open('karpus_wall', 1);
+      req.onupgradeneeded = e => { e.target.result.createObjectStore('posts', { keyPath: 'id' }); };
+      req.onsuccess = e => {
+        const db = e.target.result;
+        const tx = db.transaction('posts', 'readwrite');
+        const store = tx.objectStore('posts');
+        posts.forEach(p => store.put({ ...p, _cachedAt: Date.now() }));
+      };
+    } catch (_) {}
+  },
+
+  async _getLocalCachedPosts() {
+    return new Promise(resolve => {
+      try {
+        const req = indexedDB.open('karpus_wall', 1);
+        req.onsuccess = e => {
+          const db = e.target.result;
+          if (!db.objectStoreNames.contains('posts')) { resolve([]); return; }
+          const tx = db.transaction('posts', 'readonly');
+          const all = tx.objectStore('posts').getAll();
+          all.onsuccess = () => resolve(all.result || []);
+          all.onerror = () => resolve([]);
+        };
+        req.onerror = () => resolve([]);
+      } catch (_) { resolve([]); }
+    });
+  },
+
 };
+
+// Exponer globalmente
+if (typeof window !== 'undefined') {
+  window.WallModule = WallModule;
+  window.openLightbox = (url, type) => WallModule.openLightbox(url, type);
+}
+
+export { WallModule };

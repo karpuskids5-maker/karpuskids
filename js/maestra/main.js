@@ -1,6 +1,7 @@
 import { ensureRole, supabase, initOneSignal, sendPush, emitEvent, initSessionTimeout, sanitizePushPayload, validateFileUpload, safeFileName, sanitizeText } from '/js/shared/supabase.js';
 import { SchoolEngine } from '/js/shared/school-engine.js';
 import { RealtimeManager } from '/js/shared/realtime-manager.js';
+import { QueryCache } from '/js/shared/query-cache.js';
 import { AppState } from './state.js';
 import { MaestraApi } from './api.js';
 import { Helpers } from '/js/shared/helpers.js';
@@ -27,7 +28,7 @@ const _lastLoad = {};
 // Los onclick inline en HTML dinámico necesitan window.Modal disponible de inmediato
 window.Modal = Modal;
 const { initAttendance, markAllPresent, registerAttendance } = Attendance;
-const { initRoutine, updateRoutineField, saveRoutineLog, openStudentRoutine, updateRoutineFieldInModal, saveRoutineInModal, openBulkEventModal, confirmBulkEvent, wakeAllSiestas, wakeStudentSiesta, undoLastBulk, publishAll, registerIndividualEvent, toggleTimeline, openExtraEventModal, confirmExtraEvent, registerMissingStudents, insertEventAt, openInsertEventPicker, moveScheduleEvent, cascadeScheduleShift, toggleScheduleAuto, filterEventsByAge, stopAutoRegisterClock, paginateScheduleCatalog, paginateAllEvents } = Routine;
+const { initRoutine, updateRoutineField, saveRoutineLog, openStudentRoutine, updateRoutineFieldInModal, saveRoutineInModal, openBulkEventModal, confirmBulkEvent, wakeAllSiestas, wakeStudentSiesta, undoLastBulk, publishAll, registerIndividualEvent, toggleTimeline, openExtraEventModal, confirmExtraEvent, registerMissingStudents, insertEventAt, openInsertEventPicker, moveScheduleEvent, cascadeScheduleShift, toggleScheduleAuto, filterEventsByAge, stopAutoRegisterClock, paginateScheduleCatalog, paginateAllEvents, setRoutineFilter, refreshRoutineAttendance, toggleRoutineSection } = Routine;
 const { initTasks, openEditTaskModal, deleteTask, openNewTaskModal, viewTaskSubmissions, submitGrade } = Tasks;
 const { initGradesV2, openNewActivityModal, gradeActivity, saveGradeV2, deleteActivityV2, toggleArea, deleteArea, openStudentGradesList, viewStudentGrades, openAreasManager, openStudentResultGrid, editStudentScore, editTaskScore } = Tasks;
 const { openStudentProfile, registerIncidentModal } = Students;
@@ -88,6 +89,9 @@ window.App = {
   openInsertEventPicker: Routine.openInsertEventPicker,
   insertEventAt: Routine.insertEventAt,
   toggleScheduleAuto: Routine.toggleScheduleAuto,
+  setRoutineFilter: Routine.setRoutineFilter,
+  toggleRoutineSection: Routine.toggleRoutineSection,
+  _autoSaveNote: (sid, val) => window._routineAutoSaveNote?.(sid, val),
 
   // Tasks
   initTasks: Tasks.initTasks,
@@ -96,6 +100,7 @@ window.App = {
   openNewTaskModal: Tasks.openNewTaskModal,
   viewTaskSubmissions: Tasks.viewTaskSubmissions,
   submitGrade: Tasks.submitGrade,
+  _bulkGradeAll: (taskId, key) => window._bulkGradeAll?.(taskId, key),
 
   // Grades V2
   initGradesV2: Tasks.initGradesV2,
@@ -125,6 +130,10 @@ window.App = {
   // Chat
   initChat: ChatApp.initChat,
   selectChatContact: ChatApp.selectChatContact,
+  _quickReply: (text) => {
+    const input = document.getElementById('chatMessageInput');
+    if (input) { input.value = text; input.focus(); input.dispatchEvent(new Event('input')); }
+  },
 
   // Permits
   permits: { init: () => import('./modules/permits.js').then(m => m.PermitsModule.init()) },
@@ -178,6 +187,10 @@ document.addEventListener('DOMContentLoaded', async () => {
 
   const auth = await ensureRole(['maestra', 'admin']);
   if (!auth) return;
+
+  // Hydrate QueryCache from IndexedDB for offline-first
+  await QueryCache.hydrateFromIDB();
+  setInterval(() => QueryCache.saveToIDB(), 30_000);
 
   // Activar session timeout por inactividad (30 min)
   initSessionTimeout();
@@ -476,7 +489,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     
     window.WallModule.init('muroPostsContainer', { 
       accentColor: 'orange',
-      classroomId: classroom.id
+      classroomId: initial.id
     }, AppState);
 
   } catch (e) {
@@ -519,7 +532,21 @@ function initRealtimeUpdates(classroomId) {
       })
       // Actualizar badge de calificaciones pendientes en tiempo real
       .on('postgres_changes', { event: '*', schema: 'public', table: 'grades' }, () => loadPendingGradesBadge())
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'activities' }, () => loadPendingGradesBadge());
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'activities' }, () => loadPendingGradesBadge())
+      // ✅ Sync attendance changes from QR scanner / assistant in real-time
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'attendance', filter: `classroom_id=eq.${classroomId}` }, (payload) => {
+        const att = payload.new;
+        if (!att) return;
+        // Update AppState attendance immediately
+        const currentAtt = AppState.get('attendance') || [];
+        const numSid = Number(att.student_id);
+        const idx = currentAtt.findIndex(a => Number(a.student_id) === numSid);
+        if (idx >= 0) currentAtt[idx] = { ...currentAtt[idx], status: att.status, check_in: att.check_in, check_out: att.check_out };
+        else currentAtt.push({ student_id: numSid, status: att.status, check_in: att.check_in, check_out: att.check_out });
+        AppState.set('attendance', [...currentAtt]);
+        // Refresh routine if active (so timeline detects present students)
+        refreshRoutineAttendance();
+      });
   });
 }
 
@@ -1085,6 +1112,7 @@ async function startJitsi() {
 }
 
 async function openNewPostModal() {
+  const students = AppState.get('students') || [];
   const html = `
     <div class="bg-white w-full max-w-lg rounded-[2.5rem] shadow-2xl p-8 animate-fadeIn">
       <div class="flex justify-between items-start mb-6">
@@ -1094,6 +1122,19 @@ async function openNewPostModal() {
       <div class="space-y-4">
         <textarea id="postContent" rows="4" class="w-full p-4 bg-slate-50 border-none rounded-2xl text-sm outline-none resize-none focus:ring-2 focus:ring-orange-400" placeholder="¿Qué quieres compartir con la clase?"></textarea>
         
+        <!-- Etiquetar alumnos -->
+        <div>
+          <p class="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2">Etiquetar alumnos (opcional)</p>
+          <div class="flex flex-wrap gap-1.5 max-h-24 overflow-y-auto" id="postTagChips">
+            <button type="button" onclick="document.querySelectorAll('#postTagChips button[data-sid]').forEach(b=>{b.classList.toggle('bg-orange-100');b.classList.toggle('border-orange-400');b.classList.toggle('text-orange-700');b.classList.toggle('bg-slate-50');b.classList.toggle('border-slate-200');b.classList.toggle('text-slate-500');})" class="px-2 py-1 text-[8px] font-black uppercase bg-orange-100 border border-orange-300 text-orange-700 rounded-lg transition-all active:scale-95">Todos</button>
+            ${students.map(s => `
+              <button type="button" data-sid="${s.id}" onclick="this.classList.toggle('bg-orange-100');this.classList.toggle('border-orange-400');this.classList.toggle('text-orange-700');this.classList.toggle('bg-slate-50');this.classList.toggle('border-slate-200');this.classList.toggle('text-slate-500');" class="px-2 py-1 text-[8px] font-black bg-slate-50 border border-slate-200 text-slate-500 rounded-lg transition-all active:scale-95">
+                ${safeEscapeHTML(s.name.split(' ')[0])}
+              </button>
+            `).join('')}
+          </div>
+        </div>
+
         <div class="relative">
           <input type="file" id="postFile" class="hidden" accept="image/*,video/*" onchange="document.getElementById('fileName').textContent = this.files[0]?.name || 'Adjuntar foto/video'">
           <label for="postFile" class="flex items-center gap-3 p-3 border-2 border-dashed border-slate-200 rounded-2xl cursor-pointer hover:bg-slate-50 hover:border-orange-300 transition-all">
@@ -1154,12 +1195,17 @@ async function submitNewPost() {
     const { data: { user } } = await supabase.auth.getUser();
     const classroom = AppState.get('classroom');
 
+    // Collect tagged student IDs
+    const taggedSids = [...document.querySelectorAll('#postTagChips button[data-sid].bg-orange-100')]
+      .map(b => Number(b.dataset.sid));
+
     const { error } = await supabase.from('posts').insert({
       content,
       media_url: mediaUrl,
       media_type: mediaType,
       teacher_id: user.id,
-      classroom_id: classroom.id
+      classroom_id: classroom.id,
+      ...(taggedSids.length ? { tagged_students: taggedSids } : {})
     });
 
     if (error) throw error;

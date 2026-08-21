@@ -88,14 +88,21 @@
 
   // ── Evento beforeinstallprompt ─────────────────────────────────────────────
   window.addEventListener('beforeinstallprompt', (e) => {
+    const loginBtn = document.getElementById('installAppBtn');
+    const wantsBanner = !document.getElementById('loginForm') && shouldShowBanner();
+
+    // Sin UI propia que mostrar: dejar que el navegador muestre su banner nativo
+    // (evita el aviso "must call prompt()" en consola).
+    if (!loginBtn && !wantsBanner) return;
+
     e.preventDefault();
     deferredPrompt = e;
 
     // Botón en login
-    updateLoginBtn(true);
+    if (loginBtn) updateLoginBtn(true);
 
     // Banner en paneles (con pequeño delay para no interrumpir la carga)
-    if (!document.getElementById('loginForm') && shouldShowBanner()) {
+    if (wantsBanner) {
       setTimeout(showInstallBanner, 3000);
     }
   });
