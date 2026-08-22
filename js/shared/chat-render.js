@@ -100,8 +100,8 @@ export function waBubbleHTML({ m, myId, senderName = '', avatarUrl = null, showN
     ? `<span class="kk-checks ${(m.read_at || m.is_read) ? 'is-read' : ''}">${(m.read_at || m.is_read) ? '✓✓' : '✓'}</span>`
     : '';
 
-  const nameLine = (!isMine && showName && senderName)
-    ? `<div class="kk-sender-name">${_esc(senderName)}</div>` : '';
+  const nameLine = (showName && senderName)
+    ? `<div class="kk-sender-name ${isMine ? 'text-right opacity-70' : ''}">${_esc(senderName)}</div>` : '';
 
   const avatar = showAvatar
     ? `<div class="kk-msg-avatar">${avatarUrl

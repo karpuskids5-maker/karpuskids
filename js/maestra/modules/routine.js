@@ -750,32 +750,30 @@ function _injectV8Styles() {
     .routine-section-toggle{cursor:pointer;user-select:none;-webkit-tap-highlight-color:transparent;}
     .routine-section-toggle .acc-chevron{transition:transform .25s ease;}
     .routine-section-toggle[aria-expanded="true"] .acc-chevron{transform:rotate(180deg);}
-    .routine-section-body{overflow:hidden;transition:max-height .3s ease,opacity .25s ease;}
+    .routine-section-body{overflow-y:hidden;overflow-x:visible;transition:max-height .3s ease,opacity .25s ease;}
     .routine-section-body.collapsed{max-height:0!important;opacity:0;padding-top:0;padding-bottom:0;pointer-events:none;}
     /* ✅ Móvil: rutina — layout correcto sin choques ni overflow */
     @media (max-width:640px){
-      /* Wrapper: sin border-radius override que rompe scroll */
-      #routineWrapper{padding-bottom:6rem;}
+      /* Wrapper */
+      #routineWrapper{padding-bottom:6rem;overflow-x:hidden;}
 
       /* ── Timeline container ── */
       #timelineContainer .routine-section-toggle{padding:10px 12px !important;}
       #timelineExpanded > div{max-height:55vh !important;}
 
       /* ── Acciones: 3 columnas, botones no se aplastan ── */
-      #accionesBody{padding:10px !important;}
-      #accionesBody .grid{grid-template-columns:repeat(3,1fr) !important;gap:6px !important;}
-      #accionesBody .grid button{padding:10px 4px !important;border-radius:14px !important;min-width:0 !important;}
-      #accionesBody .grid button span:first-child{font-size:20px !important;display:block;}
-      #accionesBody .grid button span:last-child{font-size:7.5px !important;word-break:break-word;display:block;line-height:1.2;margin-top:2px;}
+      #accionesBody{padding:10px 8px !important;}
+      #accionesBody .grid{grid-template-columns:repeat(3,1fr) !important;gap:5px !important;}
+      #accionesBody .grid button{padding:8px 2px !important;border-radius:12px !important;min-width:0 !important;}
+      #accionesBody .grid button span:first-child{font-size:18px !important;display:block;}
+      #accionesBody .grid button span:last-child{font-size:7px !important;word-break:break-word;display:block;line-height:1.2;margin-top:1px;}
 
-      /* ── Alumno body: el overflow-x del chip scroll no debe ser clipado ── */
-      #alumnosBody{padding:10px 0 12px !important;}
-      #routineFilterChips{padding:0 10px !important;margin-bottom:10px !important;}
-      #routineStudentsGrid{padding:0 10px;gap:8px !important;}
-      #routineStudentsGrid .swipe-card > div:last-child{padding:10px !important;border-radius:18px !important;}
+      /* ── Chips de filtro en grid, sin clipping ── */
+      #routineFilterChips{grid-template-columns:repeat(3,1fr) !important;gap:5px !important;padding:8px 8px 10px !important;}
 
-      /* ── Banners (siesta / retiros / momento del día) ── */
-      #routineWrapper > div[style*="border-color"]{padding:12px !important;gap:8px !important;}
+      /* ── Cards alumno ── */
+      #routineStudentsGrid{padding:0 8px 12px !important;gap:6px !important;}
+      #routineStudentsGrid .swipe-card > div:last-child{padding:8px !important;border-radius:16px !important;}
 
       /* ── Botón + insertar entre filas ── */
       [data-insert-slot]{margin:-4px 0 !important;height:16px !important;}
@@ -1304,22 +1302,22 @@ function _renderRoutineLayout({ todayLabel, students, logsMap, withReport, sched
             { key: 'retirado', label: 'Retirados', icon: '🚪' },
           ];
           return `
-          <div id="routineFilterChips" class="flex items-center gap-1.5 px-4 sm:px-5 pt-2 pb-3 overflow-x-auto" style="scrollbar-width:none;-webkit-overflow-scrolling:touch;">
+          <div id="routineFilterChips" class="grid grid-cols-3 sm:flex sm:flex-nowrap gap-1.5 px-4 sm:px-5 pt-2 pb-3 sm:overflow-x-auto" style="scrollbar-width:none;">
             ${filters.map(f => `
               <button data-filter="${f.key}" onclick="App.setRoutineFilter('${f.key}')"
-                class="flex items-center gap-1 px-3 py-2 rounded-xl text-[10px] font-black uppercase tracking-wider whitespace-nowrap transition-all active:scale-95 shrink-0 min-h-[34px] ${
+                class="flex items-center justify-center gap-1 px-2 py-2 rounded-xl text-[9px] sm:text-[10px] font-black uppercase tracking-wider whitespace-nowrap transition-all active:scale-95 shrink-0 min-h-[34px] ${
                   _routineFilter === f.key
                     ? 'bg-gradient-to-r from-orange-500 to-amber-500 text-white shadow-lg shadow-orange-200 border border-orange-400'
                     : 'bg-slate-50 text-slate-500 border border-slate-200 hover:bg-slate-100 hover:text-slate-700 hover:border-slate-300'
                 }">
-                <span class="text-xs">${f.icon}</span>
-                <span>${f.label}</span>
-                ${counts[f.key] > 0 ? `<span class="min-w-[18px] h-[18px] rounded-full ${_routineFilter === f.key ? 'bg-white/25 text-white' : 'bg-orange-100 text-orange-600'} flex items-center justify-center text-[8px] font-black">${counts[f.key]}</span>` : ''}
+                <span class="text-xs leading-none">${f.icon}</span>
+                <span class="leading-tight">${f.label}</span>
+                ${counts[f.key] > 0 ? `<span class="min-w-[16px] h-[16px] rounded-full ${_routineFilter === f.key ? 'bg-white/25 text-white' : 'bg-orange-100 text-orange-600'} flex items-center justify-center text-[8px] font-black">${counts[f.key]}</span>` : ''}
               </button>`).join('')}
           </div>`;
         })()}
 
-        <div class="px-4 sm:px-5 pb-5 grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-3" id="routineStudentsGrid"></div>
+        <div class="px-4 sm:px-5 pb-5 grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-2 sm:gap-3" id="routineStudentsGrid"></div>
       </div>
     </div>
 

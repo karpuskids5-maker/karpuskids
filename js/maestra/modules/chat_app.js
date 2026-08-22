@@ -560,7 +560,19 @@ function _msgBubble(m, myId) {
   const isMe = m.sender_id === myId;
   const contact = !isMe && activeChatUserId ? _contactsCache.get(activeChatUserId) : null;
   const profile = AppState.get('profile');
-  const senderName = isMe ? (profile?.name || '') : (m.sender_name || contact?.name || 'Contacto');
+
+  // Build the visible sender name — never empty so bubbles are always identified
+  let senderName;
+  if (isMe) {
+    senderName = profile?.name || 'Yo';
+  } else {
+    // Prefer the stored name from contact cache, fall back to message field, then generic
+    const contactDisplay = contact
+      ? (contact.childName ? `👨‍👩‍👧 ${contact.childName}` : contact.name)
+      : null;
+    senderName = contactDisplay || m.sender_name || 'Contacto';
+  }
+
   const avatarUrl = isMe ? (profile?.avatar_url || null) : (m.sender_avatar || contact?.avatar || null);
 
   return waBubbleHTML({
