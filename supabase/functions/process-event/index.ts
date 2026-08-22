@@ -98,10 +98,12 @@ Deno.serve(async (req) => {
 
       case 'post.created': {
         const { classroom_id, teacher_name, content_preview } = data;
-        const { data: students } = await supabase
+        // Audiencia: aula específica o GENERAL (todos los estudiantes)
+        let studentsQuery = supabase
           .from('students')
-          .select('p1_email, p1_name, p2_email, p2_name')
-          .eq('classroom_id', classroom_id);
+          .select('p1_email, p1_name, p2_email, p2_name');
+        if (classroom_id) studentsQuery = studentsQuery.eq('classroom_id', classroom_id);
+        const { data: students } = await studentsQuery;
 
         const emails: Promise<unknown>[] = [];
 
@@ -130,48 +132,63 @@ Deno.serve(async (req) => {
       }
 
       case 'attendance.marked': {
-        const { parent_id, student_name, status } = data;
+        // Flujo unificado: el cliente envía el PUSH (notifyParents); aquí solo
+        // el EMAIL — siempre a los CORREOS DE NOTIFICACIÓN del estudiante
+        // (p1_email/p2_email). Resuelve todo desde student_id para que la
+        // notificación nunca se pierda, haya o no cuenta de padre vinculada.
+        const { student_id, parent_id: legacyParentId, parent_email: legacyEmail, student_name: nameIn, status } = data;
         const label = status === 'present' ? 'Presente' : status === 'absent' ? 'Ausente' : 'Tardanza';
         const color = status === 'present' ? '#16a34a' : status === 'absent' ? '#dc2626' : '#f59e0b';
 
-        const tasks: Promise<unknown>[] = [];
-
-        // Push
-        if (parent_id) {
-          tasks.push(sendPushToUser(parent_id, 'Asistencia - ' + student_name, student_name + ' fue marcado como ' + label + ' hoy.', 'attendance', 'panel_padres.html'));
+        let student: { name?: string; p1_email?: string; p1_name?: string; p2_email?: string; p2_name?: string; parent_id?: string } | null = null;
+        if (student_id) {
+          const { data: s } = await supabase
+            .from('students')
+            .select('name, p1_email, p1_name, p2_email, p2_name, parent_id')
+            .eq('id', student_id)
+            .maybeSingle();
+          student = s ?? null;
         }
 
-        // Email — buscar el email del padre desde profiles
-        if (resend && parent_id) {
-          const { data: parentProfile } = await supabase
-            .from('profiles')
-            .select('email, name')
-            .eq('id', parent_id)
-            .maybeSingle();
+        const studentName = student?.name || nameIn || 'El estudiante';
+        let recipients = [
+          student?.p1_email ? { email: student.p1_email, name: student.p1_name || 'familia' } : null,
+          student?.p2_email ? { email: student.p2_email, name: student.p2_name || 'familia' } : null,
+        ].filter(Boolean) as { email: string; name: string }[];
 
-          const parentEmail = parentProfile?.email;
-          const parentName = parentProfile?.name || 'familia';
-          if (parentEmail) {
-            const attHtml = emailWrap(
-              '<h2 style="color:' + color + ';margin:0 0 12px">Reporte de Asistencia</h2>' +
-              '<p style="color:#374151">Hola <b>' + parentName + '</b>,</p>' +
-              '<p style="color:#374151">El estudiante <b>' + student_name + '</b> fue marcado como <b>' + label + '</b> hoy.</p>' +
-              '<div style="background:' + (status === 'present' ? '#f0fdf4' : status === 'absent' ? '#fef2f2' : '#fffbeb') + ';border-radius:8px;padding:12px 16px;margin:16px 0;border-left:4px solid ' + color + '">' +
-              '<p style="margin:0;color:' + color + ';font-weight:700;font-size:16px">' + label + '</p>' +
-              '</div>' +
-              '<a href="https://karpuskids.com/panel_padres.html" style="display:inline-block;padding:12px 24px;background:' + color + ';color:white;text-decoration:none;border-radius:8px;font-weight:bold">Ver mi Panel</a>'
-            );
-            tasks.push(resend.emails.send({
+        // Fallback legacy: email directo o correo de la cuenta del padre
+        if (!recipients.length && legacyEmail) {
+          recipients = [{ email: legacyEmail, name: 'familia' }];
+        } else if (!recipients.length) {
+          const pid = student?.parent_id || legacyParentId;
+          if (pid && resend) {
+            const { data: pp } = await supabase.from('profiles').select('email, name').eq('id', pid).maybeSingle();
+            if (pp?.email) recipients = [{ email: pp.email, name: pp.name || 'familia' }];
+          }
+        }
+
+        const emails: Promise<unknown>[] = [];
+        for (const r of recipients) {
+          if (resend) {
+            emails.push(resend.emails.send({
               from: FROM_EMAIL,
-              to: parentEmail,
-              subject: 'Asistencia: ' + student_name + ' - ' + label,
-              html: attHtml
+              to: r.email,
+              subject: 'Asistencia: ' + studentName + ' - ' + label,
+              html: emailWrap(
+                '<h2 style="color:' + color + ';margin:0 0 12px">Reporte de Asistencia</h2>' +
+                '<p style="color:#374151">Hola <b>' + r.name + '</b>,</p>' +
+                '<p style="color:#374151">El estudiante <b>' + studentName + '</b> fue marcado como <b>' + label + '</b> hoy.</p>' +
+                '<div style="background:' + (status === 'present' ? '#f0fdf4' : status === 'absent' ? '#fef2f2' : '#fffbeb') + ';border-radius:8px;padding:12px 16px;margin:16px 0;border-left:4px solid ' + color + '">' +
+                '<p style="margin:0;color:' + color + ';font-weight:700;font-size:16px">' + label + '</p>' +
+                '</div>' +
+                '<a href="https://karpuskids.com/panel_padres.html" style="display:inline-block;padding:12px 24px;background:' + color + ';color:white;text-decoration:none;border-radius:8px;font-weight:bold">Ver mi Panel</a>'
+              )
             }));
           }
         }
 
-        await Promise.allSettled(tasks);
-        result = { sent: tasks.length > 0 };
+        await Promise.allSettled(emails);
+        result = { sent_emails: emails.length };
         break;
       }
 

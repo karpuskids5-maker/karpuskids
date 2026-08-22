@@ -1,4 +1,5 @@
-import { ensureRole, supabase, initOneSignal } from '/js/shared/supabase.js';
+import { ensureRole, supabase, initOneSignal, sendPush, emitEvent } from '/js/shared/supabase.js';
+import { showNotifyFeedback } from '/js/shared/notify-feedback.js';
 import { AppState } from './state.js';
 import { Helpers } from '/js/shared/helpers.js';
 import { BadgeSystem } from '/js/shared/badges.js';
@@ -402,6 +403,36 @@ async function submitNewPost() {
 
     if (error) throw error;
     Helpers.toast('Publicado correctamente', 'success');
+
+    // 🔔 Notificar a padres: push + email — audiencia: aula o GENERAL
+    try {
+      const audienceClassroom = classroomSelect?.value || null;
+      let q = supabase.from('students').select('id, parent_id');
+      if (audienceClassroom) q = q.eq('classroom_id', audienceClassroom);
+      const { data: audience } = await q;
+      const list = audience || [];
+      const preview = content.length > 80 ? content.substring(0, 80) + '…' : content;
+      const parentIds = [...new Set(list.map(s => s.parent_id).filter(Boolean))];
+
+      const results = await Promise.allSettled(parentIds.map(pid => sendPush({
+        user_id: pid,
+        title: '📢 Nueva publicación — Karpus Kids',
+        message: preview,
+        type: 'post',
+        link: '/panel_padres.html#feed'
+      })));
+      const sent = results.filter(r => r.status === 'fulfilled' && r.value?.ok !== false).length;
+
+      const profile = (await supabase.from('profiles').select('name').eq('id', user.id).maybeSingle()).data;
+      emitEvent('post.created', {
+        classroom_id: audienceClassroom,
+        teacher_name: profile?.name || 'Asistente',
+        content_preview: preview
+      }).catch(() => {});
+
+      if (sent > 0) showNotifyFeedback({ sent, type: 'post', label: audienceClassroom ? 'Muro del aula' : 'Muro general' });
+    } catch (_) { /* la publicación ya está guardada; notificación best-effort */ }
+
     window._closeAsistenteModal();
   } catch (err) {
     Helpers.toast('Error al publicar: ' + (err.message || ''), 'error');

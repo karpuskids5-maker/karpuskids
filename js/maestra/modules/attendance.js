@@ -1,8 +1,8 @@
-import { supabase, sendPush, emitEvent } from '/js/shared/supabase.js';
+import { supabase, emitEvent } from '/js/shared/supabase.js';
 import { AppState } from '../state.js';
 import { MaestraApi } from '../api.js';
 import { UI } from './ui.js';
-import { notifyParents, showNotifyFeedback } from '/js/shared/notify-feedback.js';
+import { notifyParents } from '/js/shared/notify-feedback.js';
 import { OfflineQueue } from '/js/shared/offline-queue.js';
 import { Helpers } from '/js/shared/helpers.js';
 
@@ -326,24 +326,25 @@ export async function registerAttendance(studentId, status) {
 
     const student = (AppState.get('students') || []).find(s => s.id === studentId);
 
-    // Enviar notificación push + email al padre
-    if (student?.parent_id) {
-      sendPush({
-        user_id: student.parent_id,
-        title: 'Asistencia Karpus',
-        message: `${student.name} ha sido marcado como ${statusLiteral} hoy.`,
-        link: 'panel_padres.html#attendance'
-      }).catch(() => {});
+    // 🔔 PUSH a las cuentas de padres vinculadas + banner de confirmación
+    //    (mismo patrón que publicaciones y tareas)
+    notifyParents({
+      students: student ? [student] : [],
+      title: 'Asistencia Karpus',
+      message: `${student?.name || 'El estudiante'} fue marcado como ${statusLiteral} hoy.`,
+      type: 'attendance',
+      link: '/panel_padres.html#attendance',
+      label: student?.name || ''
+    }).catch(() => {});
 
-      // Email vía process-event (en background, no bloquea UI)
-      emitEvent('attendance.marked', {
-        parent_id: student.parent_id,
-        student_name: student.name,
-        status
-      }).catch(() => {});
-
-      showNotifyFeedback({ sent: 1, type: 'attendance', label: student.name });
-    }
+    // 📧 EMAIL a los correos de notificación del estudiante vía process-event.
+    //    Se envía SIEMPRE (con o sin cuenta de padre vinculada): el backend
+    //    resuelve p1_email/p2_email desde student_id.
+    emitEvent('attendance.marked', {
+      student_id: studentId,
+      student_name: student?.name || '',
+      status
+    }).catch(() => {});
 
     // ✅ Sync AppState so routine module detects the presence change immediately
     const currentAtt = AppState.get('attendance') || [];

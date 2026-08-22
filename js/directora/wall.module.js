@@ -4,8 +4,9 @@
  * compresión WebP, validación 30s, álbum multi-foto, grabación directa,
  * programación, borradores, preview, etiquetado de alumnos.
  */
-import { supabase } from '../shared/supabase.js';
+import { supabase, sendPush, emitEvent } from '../shared/supabase.js';
 import { Helpers } from '../shared/helpers.js';
+import { showNotifyFeedback } from '../shared/notify-feedback.js';
 import { WallModule as SharedWallModule } from '../shared/wall.js';
 
 export const WallModule = {
@@ -488,11 +489,61 @@ export const WallModule = {
     const { error } = await supabase.from('posts').insert(payload);
     if (error) throw error;
 
+    // 🔔 Notificar a padres: push + email — SOLO publicaciones inmediatas
+    //    (las programadas se notifican cuando el sistema las publica).
+    //    Audiencia: aula seleccionada o GENERAL (todos los estudiantes).
+    if (payload.status !== 'scheduled') {
+      this._notifyParentsOfPost({
+        classroomId: payload.classroom_id || null,
+        content: payload.content || '',
+        userId: user.id
+      }).catch(() => {});
+    }
+
     try { localStorage.removeItem('karpus_wall_draft'); } catch (e) { console.warn('[Wall] No se pudo limpiar borrador:', e); }
 
     return this._isScheduledPost(scheduledAt)
       ? `Programado para ${new Date(scheduledAt).toLocaleString()}`
       : 'Publicación compartida ✅';
+  },
+
+  /**
+   * 🔔 Notifica a los padres de la audiencia del post (aula o general):
+   * push a cuentas vinculadas + email vía process-event (p1/p2).
+   */
+  async _notifyParentsOfPost({ classroomId, content, userId }) {
+    try {
+      let q = supabase.from('students').select('id, parent_id');
+      if (classroomId) q = q.eq('classroom_id', classroomId);
+      const { data: students } = await q;
+      const list = students || [];
+      if (!list.length) return;
+
+      const preview = content && content.length > 80 ? content.substring(0, 80) + '…' : (content || '');
+      const parentIds = [...new Set(list.map(s => s.parent_id).filter(Boolean))];
+
+      const results = await Promise.allSettled(parentIds.map(pid =>
+        sendPush({
+          user_id: pid,
+          title: '📢 Nueva publicación — Karpus Kids',
+          message: preview,
+          type: 'post',
+          link: '/panel_padres.html#feed'
+        })
+      ));
+      const sent = results.filter(r => r.status === 'fulfilled' && r.value?.ok !== false).length;
+
+      const profile = (await supabase.from('profiles').select('name').eq('id', userId).maybeSingle()).data;
+      await emitEvent('post.created', {
+        classroom_id: classroomId,
+        teacher_name: profile?.name || 'Dirección',
+        content_preview: preview
+      });
+
+      if (sent > 0) showNotifyFeedback({ sent, type: 'post', label: classroomId ? 'Muro del aula' : 'Muro general' });
+    } catch (e) {
+      console.warn('[Wall] No se pudo notificar la publicación:', e);
+    }
   },
 
   _readFormValues() {

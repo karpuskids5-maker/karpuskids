@@ -17,6 +17,10 @@ export const BadgeSystem = {
     await this._loadCounts();
     this._subscribeRealtime();
     this._loadPostsBadgeOnEnter();
+    // 📣 Banner de novedades del dashboard (mismo ciclo de vida en los 4 paneles)
+    import('./event-banner.js').then(function(m) {
+      try { m.EventBanner.init(userId); } catch (_) {}
+    }).catch(function() {});
   },
 
   // Indicador del muro al ingresar: cuenta posts nuevos desde la última visita
