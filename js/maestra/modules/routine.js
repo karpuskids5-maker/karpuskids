@@ -1302,7 +1302,7 @@ function _renderRoutineLayout({ todayLabel, students, logsMap, withReport, sched
             { key: 'retirado', label: 'Retirados', icon: '🚪' },
           ];
           return `
-          <div id="routineFilterChips" class="grid grid-cols-3 sm:flex sm:flex-nowrap gap-1.5 px-4 sm:px-5 pt-2 pb-3 sm:overflow-x-auto" style="scrollbar-width:none;">
+          <div id="routineFilterChips" class="flex flex-wrap gap-1.5 px-4 sm:px-5 pt-2 pb-3">
             ${filters.map(f => `
               <button data-filter="${f.key}" onclick="App.setRoutineFilter('${f.key}')"
                 class="flex items-center justify-center gap-1 px-2 py-2 rounded-xl text-[9px] sm:text-[10px] font-black uppercase tracking-wider whitespace-nowrap transition-all active:scale-95 shrink-0 min-h-[34px] ${
@@ -1362,6 +1362,16 @@ function _renderStudentRoutineCard(s, log) {
   if (events.some(e => e.type === 'bano'))      eventTypes.push('🚽');
   if (hasBiberon)                               eventTypes.push('🍼');
 
+  // Badges de estado en flujo normal (NUNCA absolutos: no enciman el
+  // nombre/avatar en pantallas pequeñas y siempre se ven completos)
+  const cardBadges = [];
+  if (hasFever)   cardBadges.push(`<span class="px-2 py-0.5 bg-red-500 text-white text-[8px] font-black uppercase rounded-lg shadow-sm animate-pulse whitespace-nowrap">🔥 Fiebre ${lastTemp.temp}°C</span>`);
+  if (isRetirado) cardBadges.push('<span class="px-2 py-0.5 bg-blue-500 text-white text-[8px] font-black uppercase rounded-lg shadow-sm whitespace-nowrap">🚪 Salió del centro</span>');
+  if (nearExit)   cardBadges.push('<span class="px-2 py-0.5 bg-amber-500 text-white text-[8px] font-black uppercase rounded-lg shadow-sm animate-pulse whitespace-nowrap">⏰ Próximo a salir</span>');
+  if (!isRetirado && !isPresent) cardBadges.push('<span class="px-2 py-0.5 bg-slate-400 text-white text-[8px] font-black uppercase rounded-lg whitespace-nowrap">Ausente</span>');
+  if (isDraft)    cardBadges.push('<span class="px-2 py-0.5 bg-[#FF8A00] text-white text-[8px] font-black uppercase rounded-lg whitespace-nowrap">Borrador</span>');
+  if (activeSiesta) cardBadges.push('<span class="px-2 py-0.5 bg-purple-500 text-white text-[8px] font-black uppercase rounded-lg shadow-sm animate-pulse whitespace-nowrap">😴 Durmiendo</span>');
+
   return `
     <div class="swipe-card" data-student-id="${s.id}" data-present="${isPresent}" data-retirado="${isRetirado}">
       <div class="swipe-action-left">🚫</div>
@@ -1370,13 +1380,7 @@ function _renderStudentRoutineCard(s, log) {
       <div class="swipe-action-right swipe-hint-right" style="position:absolute;top:50%;right:8px;transform:translateY(-50%);font-size:7px;font-weight:900;text-transform:uppercase;color:#fff;">Comió todo</div>
       <div onclick="App.openStudentRoutine('${s.id}')"
         class="group relative bg-white rounded-[1.5rem] p-3 border-2 ${hasFever ? 'border-red-400 bg-red-50/40 shadow-lg shadow-red-100/50' : isRetirado ? 'border-blue-400 bg-blue-50/60' : !isPresent ? 'border-dashed border-slate-200 opacity-60' : isDraft ? 'border-dashed border-[#FF8A00]/40 bg-orange-50/20' : isValid ? 'border-[#28B54D]/30' : 'border-slate-100'} hover:border-[#FF8A00] hover:shadow-xl hover:shadow-orange-100 transition-all cursor-pointer active:scale-95 flex flex-col overflow-hidden">
-      ${hasFever ? '<div class="absolute top-2 left-2 z-10"><span class="px-2 py-0.5 bg-red-500 text-white text-[8px] font-black uppercase rounded-lg shadow-sm animate-pulse">🔥 Fiebre ' + lastTemp.temp + '°C</span></div>' : ''}
-
-      ${isRetirado ? '<div class="absolute top-2 left-2 z-10"><span class="px-2 py-0.5 bg-blue-500 text-white text-[8px] font-black uppercase rounded-lg shadow-sm">Salió del centro</span></div>' : ''}
-      ${nearExit ? '<div class="absolute top-2 left-2 z-10"><span class="px-2 py-0.5 bg-amber-500 text-white text-[8px] font-black uppercase rounded-lg shadow-sm animate-pulse">⏰ Próximo a salir</span></div>' : ''}
-      ${!isRetirado && !isPresent ? '<div class="absolute top-2 left-2 z-10"><span class="px-2 py-0.5 bg-slate-400 text-white text-[8px] font-black uppercase rounded-lg">Ausente</span></div>' : ''}
-      ${isDraft ? '<div class="absolute top-2 left-2 z-10"><span class="px-2 py-0.5 bg-[#FF8A00] text-white text-[8px] font-black uppercase rounded-lg">Borrador</span></div>' : ''}
-      ${activeSiesta ? '<div class="absolute top-2 left-2 z-10 w-6 h-6 bg-purple-500 rounded-full flex items-center justify-center text-sm shadow-md animate-pulse">😴</div>' : ''}
+      ${cardBadges.length ? `<div class="flex flex-wrap gap-1 mb-2">${cardBadges.join('')}</div>` : ''}
 
       <div class="flex items-center gap-2.5 mb-2">
         <div class="w-11 h-11 rounded-xl bg-orange-50 border-2 border-white shadow-inner overflow-hidden shrink-0 flex items-center justify-center font-black text-base text-orange-300 group-hover:scale-105 transition-transform">

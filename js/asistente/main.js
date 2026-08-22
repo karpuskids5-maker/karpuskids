@@ -128,7 +128,9 @@ window.App = {
     closeModal:    ()    => import('./payments.js').then(m => m.PaymentsModule.closeModal()),
     filterBy:      (s)   => import('./payments.js').then(m => m.PaymentsModule.filterBy(s)),
     waiveMora:     (id)  => import('./payments.js').then(m => m.PaymentsModule.waiveMora(id)),
-    _confirmApproval: (id) => import('./payments.js').then(m => m.PaymentsModule._confirmApproval(id))
+    _confirmApproval: (id) => import('./payments.js').then(m => m.PaymentsModule._confirmApproval(id)),
+    sendPaymentReminder: (id, ch) => import('./payments.js').then(m => m.PaymentsModule.sendPaymentReminder(id, ch)),
+    sendDigitalReceipt:  (id, ch) => import('./payments.js').then(m => m.PaymentsModule.sendDigitalReceipt(id, ch)),
   },
   students: {
     init: () => import('./modules/students.js').then(m => m.StudentsModule.init()),
@@ -670,6 +672,45 @@ function initNavigation() {
       wrapper?.classList.toggle('sidebar-collapsed');
     });
   }
+
+  // -- Submenús colapsables + persistencia (localStorage) --------------------
+  const SUBMENU_KEY = 'karpus_asistente_submenu_state';
+  try {
+    const saved = JSON.parse(localStorage.getItem(SUBMENU_KEY) || '{}');
+    document.querySelectorAll('.kk-submenu-toggle').forEach(toggle => {
+      const key = toggle.dataset.submenu;
+      const items = document.getElementById('submenu-' + key);
+      if (!items) return;
+
+      const isCollapsed = saved[key] === false;
+      if (isCollapsed) {
+        items.classList.add('collapsed');
+        toggle.classList.remove('active');
+        toggle.setAttribute('aria-expanded', 'false');
+      } else {
+        items.classList.remove('collapsed');
+        toggle.classList.add('active');
+        toggle.setAttribute('aria-expanded', 'true');
+      }
+
+      toggle.addEventListener('click', (e) => {
+        e.stopPropagation();
+        const willCollapse = !items.classList.contains('collapsed');
+        items.classList.toggle('collapsed', willCollapse);
+        toggle.classList.toggle('active', !willCollapse);
+        toggle.setAttribute('aria-expanded', String(!willCollapse));
+        try {
+          const cur = JSON.parse(localStorage.getItem(SUBMENU_KEY) || '{}');
+          cur[key] = !willCollapse;
+          localStorage.setItem(SUBMENU_KEY, JSON.stringify(cur));
+        } catch (_) {}
+      });
+    });
+  } catch (_) {}
+
+  // -- Persistencia de filtros: se usa FiltersStore de state.js (window._kkFiltersStore)
+  //    ya expuesto al cargar el módulo — NO redefinir aquí para mantener
+  //    una única fuente de verdad y prefijos consistentes en localStorage.
 }
 
 

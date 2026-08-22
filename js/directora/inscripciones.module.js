@@ -3,6 +3,9 @@ import { Helpers } from '../shared/helpers.js';
 import { auditLog } from '../shared/db-utils.js';
 import { StudentRecordModal } from '../shared/student-record-modal.js';
 import { computeAge } from '../shared/birthday-utils.js';
+import { FiltersStore } from '../asistente/state.js';
+
+const INSCRIPCIONES_FILTER_KEY = 'asistente_inscripciones_filters_v1';
 
 const STATUS_META = {
   pending:   { label: 'Pendiente',  cls: 'bg-amber-100 text-amber-700',  dot: 'bg-amber-500' },
@@ -18,6 +21,24 @@ export const InscripcionesModule = {
   _list: [],
   _filter: 'pending',
   _query: '',
+
+  _persistFilters() {
+    FiltersStore.save(INSCRIPCIONES_FILTER_KEY, { filter: this._filter, query: this._query });
+  },
+
+  _applyPersistedFilters() {
+    const saved = FiltersStore.load(INSCRIPCIONES_FILTER_KEY, null);
+    if (!saved) return;
+    if (saved.filter && typeof saved.filter === 'string') this._filter = saved.filter;
+    if (typeof saved.query === 'string') this._query = saved.query;
+    const filterSel = document.getElementById('filterPrereg');
+    const searchInp = document.getElementById('searchPrereg');
+    if (filterSel) {
+      const hasOpt = [...filterSel.options].some(o => o.value === this._filter);
+      filterSel.value = hasOpt ? this._filter : 'pending';
+    }
+    if (searchInp) searchInp.value = this._query;
+  },
 
   async init() {
     try {
@@ -36,9 +57,11 @@ export const InscripcionesModule = {
       Helpers.setTxt('inscRejected', count('rejected'));
 
       this._renderBadge(count('pending'));
+      this._applyPersistedFilters();
       this.render();
       this._wireFilters();
     } catch (e) {
+      Helpers.safeLog('error', 'Error init Inscripciones:', e);
       Helpers.toast('Error al cargar preinscripciones: ' + (e.message || e), 'error');
     }
   },
@@ -54,12 +77,20 @@ export const InscripcionesModule = {
     const search = document.getElementById('searchPrereg');
     if (search && !search._bound) {
       search._bound = true;
-      search.addEventListener('input', () => { this._query = search.value; this.render(); });
+      search.addEventListener('input', Helpers.debounce(() => {
+        this._query = search.value;
+        this._persistFilters();
+        this.render();
+      }, 250));
     }
     const sel = document.getElementById('filterPrereg');
     if (sel && !sel._bound) {
       sel._bound = true;
-      sel.addEventListener('change', () => { this._filter = sel.value; this.render(); });
+      sel.addEventListener('change', () => {
+        this._filter = sel.value;
+        this._persistFilters();
+        this.render();
+      });
     }
   },
 
@@ -148,27 +179,55 @@ export const InscripcionesModule = {
     if (!prereg) { Helpers.toast('Preinscripción no encontrada', 'warning'); return; }
     StudentRecordModal.open({
       prereg,
-      onSaved: () => this.init(),
+      onSaved: () => {
+        this.init();
+        // Sincronizar inmediatamente la lista de estudiantes sin recargar
+        try { window.dispatchEvent(new CustomEvent('karpus:students-changed')); } catch (_) {}
+        try {
+          import('../asistente/modules/students.js')
+            .then(m => m.StudentsModule.loadStudents?.())
+            .catch(() => {});
+        } catch (_) {}
+      },
     });
   },
 
   async reject(id) {
     const prereg = this._list.find(r => String(r.id) === String(id));
     const name = prereg?.student_name || 'este estudiante';
-    const ok = window.confirm('¿Rechazar la preinscripción de "' + name + '"?');
-    if (!ok) return;
+
+    const opts = {
+      title: 'Rechazar preinscripción',
+      message: `Rechazar solicitud de "${name}".`,
+      confirmLabel: 'Rechazar',
+      cancelLabel: 'Cancelar',
+      tone: 'rose',
+      icon: 'shield-alert',
+      placeholder: 'Justifique el motivo del rechazo para el expediente (requerido)...',
+      requireReason: true
+    };
+
+    const modalResult = typeof window._karpusJustifiedConfirm === 'function'
+      ? await window._karpusJustifiedConfirm(opts)
+      : (window.confirm(`¿Rechazar la preinscripción de "${name}"?`) ? { confirmed: true, reason: 'Rechazada por el staff el ' + new Date().toLocaleDateString() } : null);
+
+    if (!modalResult?.confirmed) return;
+    const notes = modalResult.reason && modalResult.reason.trim()
+      ? `${modalResult.reason.trim()} — ${new Date().toLocaleDateString()}`
+      : 'Rechazada por el staff el ' + new Date().toLocaleDateString();
 
     try {
       const { error } = await supabase.rpc('review_preregistration', {
         p_id: id,
         p_status: 'rejected',
-        p_notes: 'Rechazada por el staff el ' + new Date().toLocaleDateString(),
+        p_notes: notes,
       });
       if (error) throw error;
-      await auditLog('preregistration.rejected', { prereg_id: id, student_name: prereg?.student_name });
+      await auditLog('preregistration.rejected', { prereg_id: id, student_name: prereg?.student_name, reason: modalResult.reason || null });
       Helpers.toast('Preinscripción rechazada', 'info');
       this.init();
     } catch (e) {
+      Helpers.safeLog('error', 'Error rejecting prereg:', e);
       Helpers.toast('Error al rechazar: ' + (e.message || e), 'error');
     }
   },

@@ -8,6 +8,7 @@ import { OfflineCache } from '../shared/offline-cache.js';
  */
 export const TasksModule = {
   _studentId: null,
+  _activeFilter: 'pending',
 
   /**
    * Inicializa el módulo
@@ -21,6 +22,7 @@ export const TasksModule = {
     if (filtersContainer && !filtersContainer._initialized) {
       Helpers.delegate(filtersContainer, 'button', 'click', (e, btn) => {
         const filter = btn.dataset.filter || 'pending';
+        this._activeFilter = filter;
         this.loadTasks(filter);
         
         // Actualizar UI de botones
@@ -46,7 +48,8 @@ export const TasksModule = {
       list._initialized = true;
     }
 
-    await this.loadTasks('pending');
+    // 🔁 Restaurar el filtro activo previo (no perder contexto al volver)
+    await this.loadTasks(this._activeFilter);
   },
 
   /**
@@ -138,14 +141,7 @@ export const TasksModule = {
       if (error) throw error;
 
       // ✅ ÉXITO: Confetti y Mensaje Motivador
-      if (window.confetti) {
-        confetti({
-          particleCount: 150,
-          spread: 70,
-          origin: { y: 0.6 },
-          colors: ['#f59e0b', '#3b82f6', '#10b981']
-        });
-      }
+      window.App?.celebrate?.(['#f59e0b', '#3b82f6', '#10b981']);
 
       Helpers.toast('¡Misión cumplida! Tarea enviada', 'success');
       
@@ -164,7 +160,7 @@ export const TasksModule = {
       `);
 
       modal.classList.add('hidden');
-      await this.loadTasks('pending');
+      await this.loadTasks(this._activeFilter);
 
     } catch (e) {
       Helpers.toast('Error al enviar tarea', 'error');
@@ -226,6 +222,7 @@ export const TasksModule = {
   async loadTasks(filter = 'pending') {
     const container = document.getElementById('tasksList');
     if (!container) return;
+    this._activeFilter = filter;
 
     container.innerHTML = Helpers.skeleton(3, 'h-32');
 
@@ -345,6 +342,11 @@ export const TasksModule = {
             ? `<button data-action="view" data-id="${t.id}" class="flex-1 py-2.5 bg-green-50 text-green-700 border border-green-200 rounded-xl font-black text-[10px] uppercase tracking-widest hover:bg-green-100 transition-all">\u2705 Ver Entrega</button>`
             : `<button data-action="submit" data-id="${t.id}" class="flex-1 py-2.5 bg-green-500 text-white rounded-xl font-black text-[10px] uppercase tracking-widest hover:bg-green-600 shadow-md shadow-green-200 transition-all">\uD83D\uDE80 Enviar Tarea</button>`
           }
+          ${isOverdue ? `
+          <button onclick="App.navigateTo('grades')" title="Ver calificaciones y progreso de tu hijo/a"
+            class="px-3 py-2.5 bg-amber-50 text-amber-700 border border-amber-200 rounded-xl font-black text-[10px] uppercase tracking-widest hover:bg-amber-100 transition-all shrink-0">
+            🏆 Progreso
+          </button>` : ''}
         </div>
       </div>
     `;

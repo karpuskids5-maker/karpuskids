@@ -1,41 +1,104 @@
 import { supabase } from '../shared/supabase.js';
 import { Helpers } from '../shared/helpers.js';
+import { FiltersStore } from './state.js';
+
+const ACCESS_FILTER_KEY = 'asistente_access_filters_v1';
 
 let isProcessing = false;
 let _accessChart = null;
+
+function _detectAutoPunchType() {
+  const now = new Date();
+  const hr = now.getHours();
+  const min = now.getMinutes();
+  const time = hr * 60 + min;
+
+  const ENTRY_WINDOW_START = 6 * 60;       // 06:00 AM
+  const ENTRY_WINDOW_END   = 13 * 60 + 30; // 01:30 PM
+  const EXIT_WINDOW_START  = 11 * 60;      // 11:00 AM  (cobertura parcial: retiro anticipado)
+  const EXIT_WINDOW_END    = 19 * 60;      // 07:00 PM
+
+  if (time >= ENTRY_WINDOW_START && time < EXIT_WINDOW_START) return 'present';
+  if (time >= EXIT_WINDOW_START && time <= EXIT_WINDOW_END) return 'retirado';
+  if (time >= EXIT_WINDOW_END) return 'retirado';
+  return 'present';
+}
 
 export const AccessModule = {
 
   async init() {
     this._initFilters();
     this._initOfflineSupport();
+    this._applyPersistedFilters();
     await this.loadStats();
     await this.loadHistory();
+    this.updateChart();
     this._bindSearch();
+  },
+
+  _persistFilters() {
+    const from = document.getElementById('accessFilterFrom')?.value || '';
+    const to = document.getElementById('accessFilterTo')?.value || '';
+    const status = document.getElementById('accessFilterStatus')?.value || 'all';
+    const query = document.getElementById('searchAccessTable')?.value || '';
+    FiltersStore.save(ACCESS_FILTER_KEY, { from, to, status, query });
+  },
+
+  _applyPersistedFilters() {
+    const saved = FiltersStore.load(ACCESS_FILTER_KEY, null);
+    if (!saved) return;
+    const f = document.getElementById('accessFilterFrom');
+    const t = document.getElementById('accessFilterTo');
+    const s = document.getElementById('accessFilterStatus');
+    const q = document.getElementById('searchAccessTable');
+    if (f && saved.from) f.value = saved.from;
+    if (t && saved.to)   t.value = saved.to;
+    if (s && saved.status) {
+      const hasOpt = [...s.options].some(o => o.value === saved.status);
+      s.value = hasOpt ? saved.status : 'all';
+    }
+    if (q && saved.query)  q.value = saved.query;
   },
 
   _initFilters() {
     const today = new Date().toISOString().split('T')[0];
     const fromInput = document.getElementById('accessFilterFrom');
     const toInput   = document.getElementById('accessFilterTo');
-    
-    if (fromInput) fromInput.value = today;
-    if (toInput) toInput.value = today;
 
-    document.getElementById('btnApplyAccessFilters')?.addEventListener('click', () => {
-      this.loadStats();
-      this.loadHistory();
-      this.updateChart();
-    });
+    if (fromInput && !fromInput.value) fromInput.value = today;
+    if (toInput && !toInput.value) toInput.value = today;
+
+    const statusSel = document.getElementById('accessFilterStatus');
+    if (statusSel && !statusSel._bound) {
+      statusSel._bound = true;
+      statusSel.addEventListener('change', () => {
+        this._persistFilters();
+        this.loadStats();
+        this.loadHistory();
+        this.updateChart();
+      });
+    }
+
+    const btnApply = document.getElementById('btnApplyAccessFilters');
+    if (btnApply && !btnApply._bound) {
+      btnApply._bound = true;
+      btnApply.addEventListener('click', () => {
+        this._persistFilters();
+        this.loadStats();
+        this.loadHistory();
+        this.updateChart();
+      });
+    }
   },
 
   _bindSearch() {
     const input = document.getElementById('searchAccessTable');
-    if (input) {
-      input.addEventListener('input', Helpers.debounce((e) => {
-        this.loadHistory(e.target.value);
-      }, 300));
-    }
+    if (!input || input._bound) return;
+    input._bound = true;
+    input.addEventListener('input', Helpers.debounce((e) => {
+      this._persistFilters();
+      this.loadHistory(e.target.value);
+    }, 320));
   },
 
   setPunchType(type) {
@@ -51,12 +114,37 @@ export const AccessModule = {
   },
 
   async openScanner() {
-    this._punchType = 'present'; // Default
+    const autoType = _detectAutoPunchType();
+    this._punchType = autoType;
     const modal = document.getElementById('qrScannerModal');
     if (!modal) return;
     modal.classList.remove('hidden');
     modal.style.display = 'flex';
-    this.setPunchType('present');
+    this.setPunchType(autoType);
+
+    const badge = document.getElementById('autoPunchBadge');
+    if (badge) {
+      badge.classList.remove('hidden');
+      badge.innerHTML = `
+        <div class="flex items-center gap-2 bg-gradient-to-r from-teal-500/10 to-emerald-500/10 text-teal-800 border border-teal-200 rounded-2xl px-4 py-2 text-xs font-black uppercase tracking-wider">
+          <i data-lucide="${autoType === 'present' ? 'log-in' : 'log-out'}" class="w-4 h-4"></i>
+          Auto-detectado: ${autoType === 'present' ? 'ENTRADA' : 'SALIDA'}
+          <button type="button" id="btnToggleManualPunch" class="ml-2 px-2 py-1 bg-white/80 text-teal-700 rounded-lg border border-teal-100 hover:bg-teal-50 text-[10px]">Cambiar</button>
+        </div>`;
+      if (window.lucide) lucide.createIcons();
+      const toggleBtn = document.getElementById('btnToggleManualPunch');
+      if (toggleBtn) {
+        toggleBtn.addEventListener('click', (e) => {
+          e.preventDefault();
+          const manualRow = document.getElementById('punchTypeManualRow');
+          if (manualRow) {
+            manualRow.classList.remove('hidden');
+            manualRow.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+          }
+          badge.classList.add('hidden');
+        });
+      }
+    }
 
     try {
       if (!window.Html5QrcodeScanner) {
@@ -65,7 +153,7 @@ export const AccessModule = {
 
       this._scanner = new Html5Qrcode("qrReaderInline");
       const config = { fps: 10, qrbox: { width: 250, height: 250 } };
-      
+
       await this._scanner.start({ facingMode: "environment" }, config, (decodedText) => {
         this.register(decodedText, this._punchType);
         this.closeScanner();
@@ -108,7 +196,7 @@ export const AccessModule = {
       if (!offline.length) return;
 
       Helpers.showLoader('Sincronizando datos...');
-      
+
       for (const p of offline) {
         await supabase.rpc('process_door_punch', {
           p_code: p.matricula
@@ -204,10 +292,10 @@ export const AccessModule = {
         time: new Date().toISOString()
       });
       localStorage.setItem('karpus_offline_punches', JSON.stringify(offline));
-      
+
       // Feedback visual offline
       Helpers.toast('Acceso guardado localmente (Offline)', 'warning');
-      
+
       // Feedback sonoro (si está disponible)
       try { new Audio('assets/sounds/offline.mp3').play().catch(()=>{}); } catch(_){}
 
@@ -220,7 +308,7 @@ export const AccessModule = {
   toggleExteriorMode() {
     const btn = document.getElementById('btnExteriorMode');
     const isDark = document.body.classList.toggle('exterior-mode');
-    
+
     if (isDark) {
       document.documentElement.style.setProperty('--bg', '#000000');
       document.documentElement.style.setProperty('--surface', '#1a1a1a');
@@ -258,7 +346,7 @@ export const AccessModule = {
               </div>
             </div>
           </div>
-          
+
           <div class="p-8">
             <div class="flex items-center gap-6 mb-8 p-4 bg-slate-50 rounded-3xl border-2 border-slate-100">
               <div class="w-20 h-20 rounded-2xl bg-white border-4 border-white shadow-md overflow-hidden shrink-0">
@@ -327,7 +415,7 @@ export const AccessModule = {
     const color = isEntry ? 'emerald' : 'blue';
     const icon  = isEntry ? 'check-circle' : 'log-out';
     const title = isEntry ? 'Entrada Registrada' : 'Salida Registrada';
-    
+
     // Feedback de Sonido
     try {
       const audio = new Audio(isEntry ? 'assets/sounds/success.mp3' : 'assets/sounds/exit.mp3');
@@ -353,7 +441,7 @@ export const AccessModule = {
       overlay.classList.remove('hidden');
       overlay.style.display = 'flex';
       if (window.lucide) lucide.createIcons();
-      
+
       setTimeout(() => {
         overlay.classList.add('hidden');
         overlay.style.display = 'none';
@@ -366,7 +454,7 @@ export const AccessModule = {
     try {
       const from = document.getElementById('accessFilterFrom')?.value;
       const to = document.getElementById('accessFilterTo')?.value;
-      
+
       // Estadísticas de estudiantes (desde attendance)
       let qAtt = supabase.from('attendance').select('status, check_out');
       if (from) qAtt = qAtt.gte('date', from);
@@ -382,7 +470,7 @@ export const AccessModule = {
       const present  = (attData || []).filter(r => ['present', 'late'].includes(r.status)).length;
       const late     = (attData || []).filter(r => r.status === 'late').length;
       const checkouts = (attData || []).filter(r => r.status === 'retirado').length;
-      
+
       // Personal presente (tienen check_in pero no necesariamente check_out aún)
       // Para simplificar, contamos los check_ins del personal
       const staffIns = (staffData || []).filter(p => p.punch_type === 'check_in').length;
@@ -398,7 +486,7 @@ export const AccessModule = {
   },
 
   // ── Historial Detallado (Tabla) ───────────────────────────────────────────
-  async loadHistory(query = '') {
+  async loadHistory(query) {
     const tbody = document.getElementById('accessTableBody');
     if (!tbody) return;
 
@@ -408,6 +496,8 @@ export const AccessModule = {
       const fromInput = document.getElementById('accessFilterFrom')?.value;
       const toInput   = document.getElementById('accessFilterTo')?.value;
       const status    = document.getElementById('accessFilterStatus')?.value;
+      const qInput    = document.getElementById('searchAccessTable')?.value || '';
+      const term = query || qInput;
 
       // Por defecto mostrar solo HOY si no hay filtros manuales
       const todayStr = new Date().toISOString().split('T')[0];
@@ -485,10 +575,10 @@ export const AccessModule = {
       });
 
       // 7. Filtro por nombre/ID
-      if (query) {
-        const term = query.toLowerCase();
+      if (term) {
+        const t = term.toLowerCase();
         combined = combined.filter(c =>
-          c.name.toLowerCase().includes(term) || c.id_code.toLowerCase().includes(term)
+          c.name.toLowerCase().includes(t) || c.id_code.toLowerCase().includes(t)
         );
       }
 
@@ -503,7 +593,7 @@ export const AccessModule = {
         const dateStr = new Date(log.date + 'T12:00:00').toLocaleDateString('es-DO', { day: '2-digit', month: 'short' });
         const inTime = log.check_in ? new Date(log.check_in).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '--:--';
         const outTime = log.check_out ? new Date(log.check_out).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '--:--';
-        
+
         let statusBadge = '';
         if (log.status === 'present') statusBadge = '<span class="px-2.5 py-1 bg-emerald-50 text-emerald-600 rounded-lg text-[9px] font-black uppercase tracking-tighter shadow-sm border border-emerald-100">Entrada</span>';
         else if (log.status === 'late') statusBadge = '<span class="px-2.5 py-1 bg-amber-50 text-amber-600 rounded-lg text-[9px] font-black uppercase tracking-tighter shadow-sm border border-amber-100">Tardanza</span>';

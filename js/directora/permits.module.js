@@ -1,6 +1,7 @@
 import { supabase } from '../shared/supabase.js';
 import { TABLES } from '../shared/constants.js';
 import { Helpers } from '../shared/helpers.js';
+import { auditLog } from '../shared/db-utils.js';
 
 export const PermitsModule = {
   async init() {
@@ -30,7 +31,7 @@ export const PermitsModule = {
 
       Helpers.setTxt('statPermitsToday', todayPermits?.length || 0);
       Helpers.setTxt('statPermitsPending', pendingPermits?.length || 0);
-    } catch (e) { console.error(e); }
+    } catch (e) { Helpers.safeLog('error', 'Error loadStats permits:', e); }
   },
 
   async loadHistory() {
@@ -91,28 +92,93 @@ export const PermitsModule = {
       
       if (window.lucide) lucide.createIcons();
     } catch (e) {
-      console.error(e);
+      Helpers.safeLog('error', 'Error loadHistory permits:', e);
       tbody.innerHTML = '<tr><td colspan="5" class="text-center py-8 text-rose-500 font-bold">Error al cargar historial.</td></tr>';
     }
   },
 
   async updateStatus(id, newStatus) {
-    const confirm = await Helpers.confirm(`\u00bfSeguro que desea marcar esta solicitud como ${newStatus}?`);
-    if (!confirm) return;
+    const isApproved = newStatus === 'approved';
+    const staffName = (await this._fetchPermitById(id))?.profiles?.name || 'Personal';
+
+    const opts = isApproved
+      ? {
+          title: 'Aprobar solicitud',
+          message: `Aprobar solicitud de ${staffName}.`,
+          confirmLabel: 'Aprobar',
+          tone: 'teal',
+          icon: 'check-circle-2',
+          placeholder: 'Opcional: comentario sobre la aprobación...',
+          requireReason: false
+        }
+      : {
+          title: 'Rechazar solicitud',
+          message: `Rechazar solicitud de ${staffName}.`,
+          confirmLabel: 'Rechazar',
+          tone: 'rose',
+          icon: 'shield-alert',
+          placeholder: 'Justifique el motivo del rechazo (requerido)...',
+          requireReason: true
+        };
+
+    const modalResult = typeof window._karpusJustifiedConfirm === 'function'
+      ? await window._karpusJustifiedConfirm(opts)
+      : (window.confirm(`${opts.title} ${opts.message}`) ? { confirmed: true, reason: '' } : null);
+
+    if (!modalResult?.confirmed) return;
 
     try {
+      const userId = (await supabase.auth.getUser()).data?.user?.id;
+      const payload = { status: newStatus };
+      if (userId) payload.approved_by = userId;
+      if (modalResult.reason) payload.admin_notes = modalResult.reason; // Intento guardar notas
+
       const { error } = await supabase
         .from(TABLES.STAFF_PERMITS)
-        .update({ status: newStatus, approved_by: (await supabase.auth.getUser()).data.user.id })
+        .update(payload)
         .eq('id', id);
 
-      if (error) throw error;
-      Helpers.toast('Estado actualizado correctamente', 'success');
+      if (error) {
+        // Si falla por admin_notes inexistente, reintento sin el campo
+        if (/column.*admin_notes.*does not exist/i.test(error?.message || '')) {
+          const { error: e2 } = await supabase
+            .from(TABLES.STAFF_PERMITS)
+            .update({ status: newStatus, approved_by: userId })
+            .eq('id', id);
+          if (e2) throw e2;
+        } else {
+          throw error;
+        }
+      }
+
+      try {
+        await auditLog(
+          isApproved ? 'staff_permit.approved' : 'staff_permit.rejected',
+          { permit_id: id, staff_name: staffName, reason: modalResult.reason || null }
+        );
+      } catch (_) {}
+
+      Helpers.toast(
+        isApproved ? 'Solicitud aprobada' : 'Solicitud rechazada',
+        isApproved ? 'success' : 'info'
+      );
       this.loadHistory();
       this.loadStats();
     } catch (e) {
+      Helpers.safeLog('error', 'Error updateStatus permit:', e);
       Helpers.toast('Error al actualizar estado', 'error');
     }
+  },
+
+  async _fetchPermitById(id) {
+    try {
+      const { data } = await supabase
+        .from(TABLES.STAFF_PERMITS)
+        .select('id, type, profiles:staff_id(name)')
+        .eq('id', id)
+        .maybeSingle();
+      return data || null;
+    } catch (_) { return null; }
   },
 
   async viewDetails(id) {

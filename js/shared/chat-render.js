@@ -101,7 +101,7 @@ export function waBubbleHTML({ m, myId, senderName = '', avatarUrl = null, showN
     : '';
 
   const nameLine = (showName && senderName)
-    ? `<div class="kk-sender-name ${isMine ? 'text-right opacity-70' : ''}">${_esc(senderName)}</div>` : '';
+    ? `<div class="kk-sender-name ${isMine ? 'is-mine' : 'is-theirs'}" title="${_esc(senderName)}">${_esc(senderName)}</div>` : '';
 
   const avatar = showAvatar
     ? `<div class="kk-msg-avatar">${avatarUrl

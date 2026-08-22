@@ -3,6 +3,9 @@ import { Helpers } from '../../shared/helpers.js';
 import { FileManager } from '../../shared/FileManager.js';
 import { QueryCache } from '../../shared/query-cache.js';
 import { StudentRecordModal } from '../../shared/student-record-modal.js';
+import { FiltersStore } from '../state.js';
+
+const FILTER_KEY = 'asistente_students_filters_v1';
 
 const IC = 'w-full px-4 py-2.5 border-2 border-slate-100 rounded-2xl outline-none focus:ring-4 focus:ring-teal-100 focus:border-teal-400 bg-slate-50/50 transition-all text-sm font-medium';
 const LC = 'block text-[11px] font-black text-slate-400 uppercase tracking-wider mb-1.5 ml-1';
@@ -14,44 +17,121 @@ export const StudentsModule = {
 
   async init() {
     this._page = 1;
+    this._bindClassroomFilter();
+    this._bindStatusFilter();
+    this._bindSearch();
+    this._applyPersistedFilters();
     await this.loadStudents();
     document.getElementById('btnAddStudent')?.addEventListener('click', () => this.openModal());
-    this._bindSearch();
+  },
+
+  _persistFilters() {
+    const search = document.getElementById('searchStudentInput')?.value?.toLowerCase().trim() || '';
+    const classroom = document.getElementById('filterStudentClassroom')?.value || 'all';
+    const status = document.getElementById('filterStudentStatus')?.value || 'all';
+    FiltersStore.save(FILTER_KEY, { search, classroom, status });
+  },
+
+  _applyPersistedFilters() {
+    const saved = FiltersStore.load(FILTER_KEY, null);
+    if (!saved) return;
+    const searchInput = document.getElementById('searchStudentInput');
+    const classSel = document.getElementById('filterStudentClassroom');
+    const statusSel = document.getElementById('filterStudentStatus');
+    if (searchInput && saved.search) { searchInput.value = saved.search; }
+    if (classSel && saved.classroom) {
+      // Valida que la opción exista, si no usa "all"
+      const hasOpt = [...classSel.options].some(o => o.value === saved.classroom);
+      classSel.value = hasOpt ? saved.classroom : 'all';
+    }
+    if (statusSel && saved.status) {
+      const hasOpt = [...statusSel.options].some(o => o.value === saved.status);
+      statusSel.value = hasOpt ? saved.status : 'all';
+    }
+  },
+
+  _bindClassroomFilterOnce: null,
+
+  _bindClassroomFilter() {
+    const sel = document.getElementById('filterStudentClassroom');
+    if (!sel || sel._bound) return;
+    sel._bound = true;
+    sel.addEventListener('change', () => {
+      this._page = 1;
+      this._persistFilters();
+      this._renderFromCache();
+    });
+  },
+
+  _bindStatusFilter() {
+    const sel = document.getElementById('filterStudentStatus');
+    if (!sel || sel._bound) return;
+    sel._bound = true;
+    sel.addEventListener('change', () => {
+      this._page = 1;
+      this._persistFilters();
+      this._renderFromCache();
+    });
   },
 
   _bindSearch() {
     const input = document.getElementById('searchStudentInput');
     if (!input || input._bound) return;
     input._bound = true;
+    let t = null;
     input.addEventListener('input', (e) => {
-      this._page = 1;
-      this._renderPage(e.target.value.toLowerCase().trim());
+      if (t) clearTimeout(t);
+      t = setTimeout(() => {
+        this._page = 1;
+        this._persistFilters();
+        this._renderFromCache();
+      }, 220);
     });
   },
 
-  _renderPage(query = '') {
-    const tbody = document.getElementById('studentsTableBody');
-    if (!tbody) return;
+  _currentFilters() {
+    const q = (document.getElementById('searchStudentInput')?.value || '').toLowerCase().trim();
+    const cr = document.getElementById('filterStudentClassroom')?.value || 'all';
+    const st = document.getElementById('filterStudentStatus')?.value || 'all';
+    return { q, cr, st };
+  },
 
-    let filtered = this._allStudents;
-    if (query) {
-      filtered = this._allStudents.filter(s =>
-        s.name.toLowerCase().includes(query) ||
-        (s.matricula || '').toLowerCase().includes(query) ||
-        (s.p1_name || '').toLowerCase().includes(query)
+  _applyFiltersOn(list) {
+    const { q, cr, st } = this._currentFilters();
+    let result = list || [];
+    if (st === 'active') result = result.filter(s => !!s.is_active);
+    if (st === 'inactive') result = result.filter(s => !s.is_active);
+    if (cr !== 'all') result = result.filter(s => String(s.classroom_id) === String(cr));
+    if (q) {
+      const qq = q.toLowerCase();
+      result = result.filter(s =>
+        (s.name || '').toLowerCase().includes(qq) ||
+        (s.matricula || '').toLowerCase().includes(qq) ||
+        (s.p1_name || '').toLowerCase().includes(qq)
       );
     }
+    return result;
+  },
 
-    const total = filtered.length;
+  _renderFromCache() {
+    const list = this._applyFiltersOn(this._allStudents);
+    const total = list.length;
     const totalPages = Math.max(1, Math.ceil(total / this._pageSize));
     if (this._page > totalPages) this._page = totalPages;
     const start = (this._page - 1) * this._pageSize;
-    const page = filtered.slice(start, start + this._pageSize);
+    const page = list.slice(start, start + this._pageSize);
+    this._renderPageContent(page, total, totalPages);
+  },
 
-    if (!page.length) {
+  _renderPageContent(page, total, totalPages) {
+    const tbody = document.getElementById('studentsTableBody');
+    if (!tbody) return;
+    const { q } = this._currentFilters();
+
+    if (!page || !page.length) {
       tbody.innerHTML = `<tr><td colspan="4" class="px-6 py-12 text-center">
         <div class="opacity-30 mb-2"><i data-lucide="search-x" class="w-12 h-12 mx-auto"></i></div>
-        <p class="text-sm font-bold text-slate-400">${query ? `Sin resultados para "${query}"` : 'No hay estudiantes registrados.'}</p>
+        <p class="text-sm font-bold text-slate-400">${q ? `Sin resultados para "${q}"` : 'No hay estudiantes registrados.'}</p>
       </td></tr>`;
       if (window.lucide) lucide.createIcons();
       this._renderPagination(0, 0, 0);
@@ -122,15 +202,15 @@ export const StudentsModule = {
       </div>`;
     document.getElementById('btnPrevPage')?.addEventListener('click', () => {
       this._page--;
-      this._renderPage(document.getElementById('searchStudentInput')?.value?.toLowerCase().trim() || '');
+      this._renderFromCache();
     });
     document.getElementById('btnNextPage')?.addEventListener('click', () => {
       this._page++;
-      this._renderPage(document.getElementById('searchStudentInput')?.value?.toLowerCase().trim() || '');
+      this._renderFromCache();
     });
   },
 
-  async loadStudents(query = '') {
+  async loadStudents() {
     const tbody = document.getElementById('studentsTableBody');
     if (!tbody) return;
 
@@ -150,7 +230,7 @@ export const StudentsModule = {
 
       this._allStudents = students || [];
       this._page = 1;
-      this._renderPage(query);
+      this._renderFromCache();
     } catch (e) {
       Helpers.safeLog('error', 'Error loadStudents:', e);
       tbody.innerHTML = '<tr><td colspan="4">' + Helpers.errorState('Error al cargar datos') + '</td></tr>';
@@ -158,7 +238,7 @@ export const StudentsModule = {
   },
 
   async _deleteStudent(id, name) {
-    const ok = confirm(`\u00bfEst\u00e1s seguro de eliminar al estudiante "${name}"?\n\nEsta acci\u00f3n no se puede deshacer.`);
+    const ok = confirm(`¿Estás seguro de eliminar al estudiante "${name}"?\n\nEsta acción no se puede deshacer.`);
     if (!ok) return;
 
     try {
@@ -173,7 +253,7 @@ export const StudentsModule = {
   },
 
   async openModal(studentId = null) {
-    const id = studentId ? parseInt(studentId, 10) : null;
+    const id = studentId ? Number.parseInt(studentId, 10) : null;
     await StudentRecordModal.open({
       mode: id ? 'edit' : 'create',
       studentId: id || null,

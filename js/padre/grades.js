@@ -28,10 +28,15 @@ export const GradesModule = {
     if (!select) return;
     const periods = AppState.get('periods') || [];
     const activePeriod = AppState.get('activePeriod');
+    // 🔁 Preservar la elección del usuario entre visitas a la sección
+    const previous = select.value;
     select.innerHTML = periods.length
       ? '<option value="">Periodo actual</option>' +
         periods.map(p => `<option value="${p.id}" ${activePeriod && p.id === activePeriod.id ? 'selected' : ''}>${Helpers.escapeHTML(p.name)} ${p.status === 'closed' ? '(Cerrado)' : ''}</option>`).join('')
       : '<option value="">Sin periodos disponibles</option>';
+    if (previous && [...select.options].some(o => o.value === previous)) {
+      select.value = previous;
+    }
   },
 
   async loadGrades(studentId, overridePeriodId = null) {

@@ -157,8 +157,9 @@ body.panel-padre-body #btnLogout:hover {
   .sidebar-node {
     flex-direction: column;
     font-size: 9px;
-    min-width: 64px;
-    padding: 8px 6px;
+    min-width: 48px;
+    max-width: 64px;
+    padding: 7px 4px;
     text-align: center;
     transform: none !important;
   }
@@ -166,6 +167,15 @@ body.panel-padre-body #btnLogout:hover {
   .sidebar-node.active {
     transform: translateY(-4px) !important;
     box-shadow: 0 6px 16px rgba(0,0,0,0.2);
+  }
+  /* ✅ Ultra-compact: extra small phones (<360px) */
+  @media (max-width: 359px) {
+    .sidebar-node {
+      min-width: 40px;
+      padding: 6px 2px;
+      font-size: 8px;
+    }
+    .sidebar-node i { width: 18px !important; height: 18px !important; }
   }
 }
 
@@ -283,3 +293,143 @@ body.panel-padre-body select:focus {
 /* ── Header ────────────────────────────────────────────── */
 body.panel-padre-body .guardian-name-display,
 body.panel-padre-body .text-emerald-600 { color: var(--green-deep) !important; }
+
+/* ============================================================
+   🎨 SISTEMA DE DISEÑO BASE — TOKENS ÚNICOS (Etapa 2)
+   Radios: cards 24px · inputs/modales 16px · botones/badges 12px
+   Elevación: card suave / card activa verde
+   ============================================================ */
+body.panel-padre-body {
+  --kk-radius-card: 24px;
+  --kk-radius-input: 16px;
+  --kk-radius-btn: 12px;
+  --kk-shadow-card: 0 10px 25px -5px rgba(0, 0, 0, 0.04);
+  --kk-shadow-raised: 0 20px 30px -10px rgba(16, 185, 129, 0.15);
+}
+
+/* ── Botones estandarizados ───────────────────────────── */
+.kk-btn-primary {
+  background: var(--green) !important;
+  color: #fff !important;
+  font-weight: 800;
+  border-radius: var(--kk-radius-btn);
+  box-shadow: 0 4px 14px rgba(34, 197, 94, 0.35);
+  transition: var(--transition);
+}
+.kk-btn-primary:hover { background: var(--green-deep) !important; }
+.kk-btn-primary:active { transform: scale(0.96); }
+
+.kk-btn-secondary {
+  background: var(--green-soft) !important;
+  color: var(--green-deep) !important;
+  font-weight: 800;
+  border: 1.5px solid var(--green-light) !important;
+  border-radius: var(--kk-radius-btn);
+  transition: var(--transition);
+}
+.kk-btn-secondary:hover { background: var(--green-light) !important; }
+.kk-btn-secondary:active { transform: scale(0.96); }
+
+.kk-btn-ghost {
+  background: transparent !important;
+  color: #64748b !important;
+  font-weight: 800;
+  border-radius: var(--kk-radius-btn);
+  transition: var(--transition);
+}
+.kk-btn-ghost:hover { background: #f1f5f9 !important; }
+
+.kk-btn-danger {
+  background: #ef4444 !important;
+  color: #fff !important;
+  font-weight: 800;
+  border-radius: var(--kk-radius-btn);
+  box-shadow: 0 4px 14px rgba(239, 68, 68, 0.3);
+  transition: var(--transition);
+}
+.kk-btn-danger:hover { background: #dc2626 !important; }
+.kk-btn-danger:active { transform: scale(0.96); }
+
+/* ── Inputs homogéneos en formularios del panel ───────── */
+body.panel-padre-body #paymentForm input,
+body.panel-padre-body #paymentForm select,
+body.panel-padre-body #paymentForm textarea,
+body.panel-padre-body #formAbsence input,
+body.panel-padre-body #formAbsence select,
+body.panel-padre-body #formAbsence textarea,
+body.panel-padre-body #profile input,
+body.panel-padre-body #profile select,
+body.panel-padre-body #profile textarea,
+body.panel-padre-body #scheduleModal input,
+body.panel-padre-body #scheduleModal select {
+  border-radius: var(--kk-radius-input) !important;
+}
+
+/* ── Modales con radio unificado ──────────────────────── */
+#modalAbsence > div,
+#modalTaskDetail > div,
+#scheduleModal > div,
+#contactProfileModal > div {
+  border-radius: var(--kk-radius-card, 24px);
+}
+
+/* ── Cards internas con elevación token ───────────────── */
+body.panel-padre-body section .bg-white {
+  box-shadow: var(--kk-shadow-card);
+}
+
+/* ── CTA pulsante sutil para acciones pendientes ──────── */
+@keyframes kkPulseCta {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(16, 185, 129, 0.35); }
+  50%      { box-shadow: 0 0 0 8px rgba(16, 185, 129, 0); }
+}
+.kk-pulse-cta { animation: kkPulseCta 2.2s ease-out infinite; }
+
+/* Flash de confirmación al precargar montos */
+@keyframes kkFlashInput {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(34, 197, 94, 0); }
+  30%      { box-shadow: 0 0 0 6px rgba(34, 197, 94, 0.35); }
+}
+.kk-flash-input { animation: kkFlashInput 0.8s ease-in-out 2; }
+
+/* ── Header móvil: breadcrumb + botón atrás ───────────── */
+#btnSectionBack {
+  width: 38px; height: 38px;
+  display: flex; align-items: center; justify-content: center;
+  border-radius: 12px;
+  background: #fff;
+  border: 1.5px solid #e2e8f0;
+  color: #334155;
+  flex-shrink: 0;
+  transition: var(--transition);
+  cursor: pointer;
+}
+#btnSectionBack:hover { background: #f1f5f9; }
+#btnSectionBack:active { transform: scale(0.92); }
+
+#crumbRoot {
+  background: none; border: none; cursor: pointer;
+  color: #059669; font-weight: 800;
+  padding: 0;
+}
+#crumbRoot:hover { text-decoration: underline; }
+.kk-crumb-sep { color: #cbd5e1; font-weight: 800; }
+
+/* ── Bottom-nav ultra compacta (<375px) — Etapa 4 ─────── */
+@media (max-width: 374px) {
+  body.panel-padre-body .sidebar-nav { padding-left: 4px; padding-right: 4px; gap: 3px; }
+  .sidebar-node {
+    min-width: 44px;           /* objetivo táctil mínimo */
+    max-width: none;
+    padding: 7px 2px;
+    font-size: 8px;
+    letter-spacing: -0.02em;
+  }
+  .sidebar-node i { width: 18px !important; height: 18px !important; }
+}
+
+/* Calendario de asistencia: celdas más cómodas en móvil */
+@media (max-width: 480px) {
+  #calendarGrid { gap: 6px !important; }
+  #calendarGrid > div { font-size: 11px; }
+}

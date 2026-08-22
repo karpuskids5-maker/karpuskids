@@ -158,13 +158,25 @@ export const Helpers = {
   })(),
 
   /**
-   * Estado vac�o visual
-   */
-  emptyState: (msg, icon = '?') => `
-    <div class="flex flex-col items-center justify-center py-12 px-4 text-center opacity-60 animate-fade-in">
+    * Estado vacío visual — con CTA opcional { label, action }
+    */
+  emptyCtaRegistry: {},
+  _emptyCtaSeq: 0,
+
+  emptyState: (msg, icon = '?', cta = null) => {
+    let ctaHtml = '';
+    if (cta && cta.label && typeof cta.action === 'function') {
+      const id = 'ec' + (++Helpers._emptyCtaSeq);
+      Helpers.emptyCtaRegistry[id] = cta.action;
+      ctaHtml = `<button type="button" data-empty-cta="${id}" class="mt-4 px-5 py-2.5 rounded-xl bg-emerald-500 hover:bg-emerald-600 text-white text-xs font-black uppercase tracking-widest shadow-md active:scale-95 transition-all">${Helpers.escapeHTML(cta.label)}</button>`;
+    }
+    return `
+    <div class="flex flex-col items-center justify-center py-12 px-4 text-center opacity-80 animate-fade-in">
       <div class="text-4xl mb-3">${icon}</div>
-      <p class="text-sm font-bold text-slate-400 uppercase tracking-widest">${Helpers.escapeHTML(msg)}</p>
-    </div>`,
+      <p class="text-sm font-bold text-slate-500 uppercase tracking-widest max-w-xs leading-relaxed">${Helpers.escapeHTML(msg)}</p>
+      ${ctaHtml}
+    </div>`;
+  },
 
   /**
    * Skeleton loader mejorado con Shimmer
@@ -214,4 +226,14 @@ export const Helpers = {
 // Named export for compatibility with module imports
 export function escapeHtml(str = '') {
   return Helpers.escapeHTML(str);
+}
+
+// Delegación global para CTAs dentro de estados vacíos (emptyState con { label, action })
+if (typeof document !== 'undefined') {
+  document.addEventListener('click', (e) => {
+    const btn = e.target.closest('[data-empty-cta]');
+    if (!btn) return;
+    const action = Helpers.emptyCtaRegistry[btn.dataset.emptyCta];
+    if (typeof action === 'function') action();
+  });
 }

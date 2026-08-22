@@ -10,6 +10,7 @@ import { Prefetch } from '../shared/prefetch.js';
 import { VideoCallUI } from '../shared/videocall-ui.js';
 import { computeAge } from '../shared/birthday-utils.js';
 import { RealtimeManager } from '../shared/realtime-manager.js';
+import { BackNavigation } from '../shared/back-navigation.js';
 import { initLiveClassListener } from './attendance_live.js';
 import { DynamicBanner } from './dynamic-banner.js';
 
@@ -24,6 +25,9 @@ window.App = {
   routine: { initRoutinePanel: (sid) => import('./routine.js').then(m => m.RoutineModule.initRoutinePanel(sid)) },
   reinscripcion: { init: (sid) => import('./reinscripcion.js').then(m => m.ReinscripcionModule.init(sid)) },
   navigateTo: navigateTo,
+  goBack: () => _goBack(),
+  openTeacherChat: () => _openTeacherChat(),
+  celebrate: (colors) => _celebrate(colors),
   openDigitalID: openDigitalID,
   switchStudent: switchStudent,
   updateHeaderProfile: updateHeaderProfile,
@@ -178,6 +182,9 @@ document.addEventListener('DOMContentLoaded', async () => {
 
     AppState.set('user', auth.user);
     AppState.set('profile', auth.profile);
+
+    // ⬅️ Historial base para ATRÁS físico (PWA) + breadcrumb
+    BackNavigation.init();
 
     // 🔔 Banner global de mensajes entrantes (visible en todo el panel)
     import('./chat.js').then(({ ChatModule }) => {
@@ -543,7 +550,9 @@ function renderHomeCards(student, data) {
       icon: ICONS.card,
       color: payColor,
       iconBg: payIconBg,
-      target: 'payments'
+      target: 'payments',
+      pulse: debtTotal > 0,
+      debt: debtTotal
     },
     {
       title: 'Notas',
@@ -557,15 +566,15 @@ function renderHomeCards(student, data) {
   ];
 
   grid.innerHTML = cards.map(card =>
-    '<div class="bg-white rounded-2xl p-4 border-2 ' + card.color + ' shadow-sm hover:shadow-lg hover:-translate-y-1 transition-all cursor-pointer group relative" data-target="' + card.target + '">' +
+    '<div class="bg-white rounded-2xl p-4 border-2 ' + card.color + (card.pulse ? ' kk-pulse-cta' : '') + ' shadow-sm hover:shadow-lg hover:-translate-y-1 transition-all cursor-pointer group relative" data-target="' + card.target + '"' + (card.debt > 0 ? ' data-debt="' + card.debt + '"' : '') + '>' +
       '<span id="badge-card-' + card.target + '" class="hidden absolute -top-1.5 -right-1.5 min-w-[18px] h-[18px] bg-rose-500 text-white text-[9px] font-black rounded-full flex items-center justify-center shadow px-1 z-10">0</span>' +
       '<div class="flex justify-between items-start mb-3">' +
         '<div class="w-11 h-11 rounded-xl ' + card.iconBg + ' flex items-center justify-center text-xl shadow-sm group-hover:scale-110 transition-transform">' + card.icon + '</div>' +
         '<i data-lucide="chevron-right" class="w-4 h-4 text-slate-300 group-hover:text-slate-500 transition-colors mt-1"></i>' +
       '</div>' +
-      '<p class="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-0.5">' + card.title + '</p>' +
+      '<p class="text-[10px] font-black text-slate-500 uppercase tracking-widest mb-0.5">' + card.title + '</p>' +
       '<h4 class="text-sm font-black text-slate-800 leading-tight">' + card.value + '</h4>' +
-      '<p class="text-[10px] font-bold text-slate-500 mt-0.5">' + card.sub + '</p>' +
+      '<p class="text-[10px] font-bold ' + (card.pulse ? 'text-emerald-700' : 'text-slate-500') + ' mt-0.5">' + card.sub + '</p>' +
     '</div>'
   ).join('');
 
@@ -810,12 +819,37 @@ const _SECTION_THEMES = {
   payments: '#059669', 'live-attendance': '#10B981', reenrollment: '#F59E0B'
 };
 
-export async function navigateTo(targetId) {
+const _SECTION_NAMES = {
+  home: 'Inicio', class: 'Muro del Aula', tasks: 'Tareas',
+  routine: 'Rutina Diaria', grades: 'Calificaciones', attendance: 'Asistencia',
+  payments: 'Pagos', profile: 'Mi Perfil', chat: 'Chat',
+  notifications: 'Chat', videocall: 'Videollamada', reenrollment: 'Reinscripción',
+  'live-attendance': 'Asistencia en Vivo'
+};
+
+// 🧠 Memoria de scroll por sección — no perder contexto visual al volver
+const _scrollMem = {};
+
+export async function navigateTo(targetId, opts = {}) {
   if (!targetId) return;
+  const prevId = AppState.get('currentSection') || 'home';
+
+  // Misma sección: no reapilar historial ni recargar (preserva filtros/tabs)
+  if (targetId === prevId && !opts.force) {
+    _closeMobileSidebar();
+    return;
+  }
+
   Helpers.vibrate?.('light');
 
   // LIMPIEZA DE REALTIME: Eliminar canales al cambiar de sección
   if (RealtimeManager?.unsubscribeAll) RealtimeManager.unsubscribeAll(['notifications', 'live_status']);
+
+  // 💬 Conversación de chat abierta → cerrarla limpiamente al saltar de sección
+  if (BackNavigation.topKind() === 'chat') BackNavigation.dropTop(true);
+
+  // 📍 Guardar scroll de la sección que abandonamos
+  _scrollMem[prevId] = window.scrollY;
 
   document.querySelectorAll('.section').forEach(sec => {
     sec.classList.add('hidden');
@@ -837,7 +871,71 @@ export async function navigateTo(targetId) {
     btn.classList.toggle('active', isActive);
   });
 
+  // ⬅️ Historial físico: ATRÁS del navegador/móvil regresa a la sección previa
+  if (!opts.fromHistory && prevId !== targetId) {
+    BackNavigation.push(() => navigateTo(prevId, { fromHistory: true }), { kind: 'section' });
+  }
+
+  // 🧭 Header contextual: breadcrumb + botón atrás + título del documento
+  _updateNavContextUI(targetId);
+
+  // 📜 Restaurar scroll guardado de esta sección
+  requestAnimationFrame(() => { window.scrollTo(0, _scrollMem[targetId] ?? 0); });
+
   _closeMobileSidebar();
+}
+
+/**
+ * 🧭 Actualiza breadcrumb y visibilidad del botón atrás según la sección activa
+ */
+function _updateNavContextUI(targetId) {
+  const name = _SECTION_NAMES[targetId] || targetId;
+  const labelEl = document.getElementById('mobileSectionLabel');
+  if (labelEl) labelEl.textContent = name;
+
+  const isHome = targetId === 'home';
+  document.getElementById('btnSectionBack')?.classList.toggle('hidden', isHome);
+  document.getElementById('crumbRoot')?.classList.toggle('hidden', isHome);
+  document.getElementById('crumbSep')?.classList.toggle('hidden', isHome);
+
+  document.title = `${name} · Karpus Kids`;
+}
+
+/**
+ * ⬅️ Atrás de UI: consume la capa superior del historial o cae a Inicio
+ */
+function _goBack() {
+  if (BackNavigation.depth > 0) BackNavigation.back();
+  else navigateTo('home');
+}
+
+/**
+ * 💬 Acceso directo al chat con la maestra desde cualquier módulo
+ * (asistencia, rutina, tareas) — abre conversación con el teacher del aula
+ */
+async function _openTeacherChat() {
+  const student = AppState.get('currentStudent');
+  const teacherId = student?.classrooms?.teacher_id || null;
+  navigateTo('notifications');
+  try {
+    const m = await import('./chat.js');
+    await m.ChatModule.init();
+    if (teacherId) await m.ChatModule.openChatWithUser(String(teacherId));
+  } catch (_) { /* silencioso */ }
+}
+
+/**
+ * 🎉 Celebración consistente (confetti) para entregas/pagos/logros
+ */
+function _celebrate(colors) {
+  if (window.confetti) {
+    confetti({
+      particleCount: 130,
+      spread: 75,
+      origin: { y: 0.6 },
+      colors: colors || ['#10b981', '#3b82f6', '#f59e0b']
+    });
+  }
 }
 
 function _applySectionTheme(targetId) {
@@ -925,8 +1023,15 @@ function _initVideocallSection() {
 
 function setupNavigation() {
   Helpers.delegate(document.body, '[data-target]', 'click', (_e, el) => {
+    // 💳 Pago vencido: precargar monto al entrar desde el dashboard (Etapa 3)
+    const debt = parseFloat(el.dataset.debt || '0');
+    if (debt > 0 && el.dataset.target === 'payments') {
+      AppState.set('paymentPrefill', { amount: debt, fromDashboard: true });
+    }
     navigateTo(el.dataset.target);
   });
+  // Botón atrás del header móvil
+  Helpers.delegate(document.body, '#btnSectionBack', 'click', () => _goBack());
 }
 
 function setupGlobalListeners() {
@@ -1254,9 +1359,9 @@ async function switchStudent(studentId) {
     // Refrescar el badge de reinscripción para el nuevo hijo
     import('./reinscripcion.js').then(m => m.ReinscripcionModule.checkBadge(selected.id));
 
-    // Si estamos en una sección específica, reiniciarla
+    // Si estamos en una sección específica, reiniciarla (forzado por cambio de hijo)
     const currentSection = AppState.get('currentSection') || 'home';
-    navigateTo(currentSection);
+    navigateTo(currentSection, { force: true });
 
     Helpers.hideLoader();
     Helpers.toast(`Perfil de ${selected.name.split(' ')[0]} cargado`, 'success');

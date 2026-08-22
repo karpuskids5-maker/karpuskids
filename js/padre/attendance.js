@@ -44,8 +44,15 @@ export const AttendanceModule = {
       }
     }
 
+    // 🔁 Respetar la selección previa del usuario (no reiniciar al mes actual)
     const now = new Date();
-    await this.loadAttendance(now.getFullYear(), now.getMonth() + 1);
+    const savedVal = filter?.value || '';
+    if (/^\d{4}-\d{2}$/.test(savedVal)) {
+      const [y, m] = savedVal.split('-').map(Number);
+      await this.loadAttendance(y, m);
+    } else {
+      await this.loadAttendance(now.getFullYear(), now.getMonth() + 1);
+    }
 
     // ── Inicializar formulario de ausencia ──────────────────────────────────
     this._initAbsenceForm();
@@ -290,7 +297,16 @@ export const AttendanceModule = {
     if (!container) return;
 
     if (!data.length) {
-      container.innerHTML = Helpers.emptyState('Sin registros este mes', '\uD83D\uDCC5');
+      container.innerHTML = Helpers.emptyState('Sin registros este mes', '\uD83D\uDCC5', {
+        label: 'Reportar Ausencia',
+        action: () => {
+          const modal = document.getElementById('modalAbsence');
+          if (modal) {
+            modal.classList.remove('hidden');
+            modal.classList.add('flex');
+          }
+        }
+      });
       return;
     }
 

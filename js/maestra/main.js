@@ -1055,15 +1055,11 @@ function initClassTabs(defaultTab = null) {
     tabBtns.forEach(b => {
       if (b.dataset.tab === targetTab) {
         const isRoutine = targetTab === 'daily-routine';
-        
-        // Estilo Naranja Vibrante solicitado por el usuario
         b.classList.add('active', isRoutine ? 'bg-orange-600' : 'bg-orange-500', 'text-white', 'ring-4', 'ring-orange-100');
         b.classList.remove('bg-slate-100', 'text-slate-600', 'text-slate-500');
-        
-        // Efecto visual extra para Rutina
-        if (isRoutine) {
-           b.classList.add('animate-pulse-subtle');
-        }
+        if (isRoutine) b.classList.add('animate-pulse-subtle');
+        // Scroll the active chip into view in the horizontal bar
+        b.scrollIntoView({ behavior: 'smooth', inline: 'center', block: 'nearest' });
       }
     });
 

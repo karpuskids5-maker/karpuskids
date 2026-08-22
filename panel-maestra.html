@@ -196,13 +196,17 @@
     }
 
     @media (max-width: 768px) {
-      .chat-shell { 
-        height: calc(100vh - 120px); 
-        border-radius: 0; 
-        margin: -1rem; /* Full width */
+      .chat-shell {
+        /* ✅ FIX: el wrapper de contenido usa p-2 (0.5rem) en móvil.
+           El margen negativo debe coincidir exactamente o el panel
+           se desborda y se corta el borde derecho (choque con pantalla). */
+        height: calc(100dvh - 160px);
+        border-radius: 1rem;
+        margin: -0.5rem;
         border: none;
+        max-width: 100%;
       }
-      .chat-list-col { width: 100%; border-right: none; }
+      .chat-list-col { width: 100%; max-width: 100%; min-width: 0; border-right: none; }
       .chat-conv-col { 
         position: fixed;
         top: 0;
@@ -358,6 +362,148 @@
     #tab-daily-routine .group:hover {
       z-index: 10;
     }
+
+    /* ═══════════════════════════════════════════════
+       ✅ RESPONSIVE HARDENING — fallbacks en CSS plano
+       (independientes del Tailwind compilado, que está
+       desactualizado y no incluye varias utilidades)
+    ═══════════════════════════════════════════════ */
+
+    /* Este panel NO tiene bottom-nav: quitar el colchón fantasma de 72px
+       que premium-mobile.css agrega y que deja los contenedores flotando. */
+    body.panel-maestra-body {
+      padding-bottom: var(--safe-area-bottom, 0px);
+      overflow-x: hidden;
+    }
+
+    /* Ninguna sección ni contenedor puede rebasar el viewport */
+    .section { max-width: 100%; min-width: 0; }
+    .section > * { min-width: 0; max-width: 100%; }
+    .class-tab-content { max-width: 100%; min-width: 0; overflow-x: clip; }
+    #layoutShell img, #layoutShell iframe, #layoutShell video { max-width: 100%; }
+
+    /* ── Rutina: wrappers sin desborde horizontal ── */
+    #routineWrapper {
+      max-width: 100%;
+      overflow-x: hidden;
+      padding-bottom: 5rem;
+    }
+    #routineWrapper > * { min-width: 0; max-width: 100%; }
+    /* Fallback .space-y-5 (no existe en el Tailwind compilado) */
+    #routineWrapper > * + * { margin-top: 1.25rem; }
+
+    /* ── Timeline del Día: contenedor siempre dentro de pantalla ── */
+    #timelineContainer { max-width: 100%; min-width: 0; }
+    #timelineContainer .routine-section-toggle { min-width: 0; }
+    #timelineExpanded { min-width: 0; max-width: 100%; }
+    /* Scroll interno garantizado (.max-h-[62vh]/.sm:max-h-[420px] no existen) */
+    #timelineExpanded > div:first-child {
+      max-height: min(62vh, 430px);
+      overflow-y: auto;
+      -webkit-overflow-scrolling: touch;
+      overscroll-behavior-y: contain;
+      min-width: 0;
+    }
+    @media (max-width: 640px) {
+      #timelineExpanded > div:first-child { max-height: 55vh; }
+    }
+    /* Fallback .space-y-2 entre filas del timeline */
+    #timelineExpanded .space-y-2 { display: flex; flex-direction: column; gap: 0.5rem; }
+    #timelineExpanded .relative { min-width: 0; }
+
+    /* ── Chips de filtro del contenedor Alumnos ──
+       Garantiza envoltura real: "Próx. Salir" y "Retirados" quedan ABAJO
+       de los otros tres, nunca cortados por la pantalla. */
+    #routineFilterChips {
+      display: flex !important;
+      flex-wrap: wrap !important;
+      gap: 6px;
+      max-width: 100%;
+    }
+    #routineFilterChips button {
+      flex: 1 1 calc(33.333% - 4px);
+      min-width: 0;
+      max-width: 100%;
+      min-height: 34px;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+    #routineFilterChips button span { min-width: 0; }
+    #routineFilterChips button span.leading-tight {
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+    /* Badge contador (fallback .min-w-[16px]/.h-[16px] faltantes) */
+    #routineFilterChips button span[class*="rounded-full"] {
+      min-width: 16px;
+      height: 16px;
+      flex-shrink: 0;
+    }
+    @media (min-width: 641px) {
+      /* Desktop: fila natural sin estirar */
+      #routineFilterChips button { flex: 0 0 auto; }
+    }
+
+    /* Grid de tarjetas de alumnos nunca desborda */
+    #routineStudentsGrid { width: 100%; max-width: 100%; min-width: 0; }
+    #routineStudentsGrid > * { min-width: 0; max-width: 100%; }
+
+    /* ── Typing indicator (fallback .bottom-[80px] faltante) ── */
+    #chatTypingIndicator {
+      position: absolute;
+      bottom: 90px;
+      left: 1.5rem;
+      right: 1.5rem;
+    }
+
+    /* ═══════════════════════════════════════════════
+       💬 CHAT — Identificación clara de quién escribe
+       (yo = naranja a la derecha · contacto = blanco a
+       la izquierda con nombre visible y avatar)
+    ═══════════════════════════════════════════════ */
+    .kk-msg-bubble { max-width: min(85%, 480px); }
+    @media (min-width: 769px) {
+      .kk-msg-bubble { max-width: min(72%, 520px); }
+    }
+
+    /* Burbuja propia: degradado naranja Karpus, texto blanco */
+    #t-chat .kk-msg-bubble.kk-out {
+      background: linear-gradient(135deg, #f97316, #ea580c);
+      color: #fff;
+      border-bottom-right-radius: 4px;
+    }
+    #t-chat .kk-msg-bubble.kk-out .kk-msg-meta { color: rgba(255,255,255,.92); opacity: 1; }
+    #t-chat .kk-msg-bubble.kk-out .kk-checks { color: #fde68a; opacity: 1; }
+    #t-chat .kk-msg-bubble.kk-out .kk-checks.is-read { color: #86efac; }
+    #t-chat .kk-msg-bubble.kk-out .kk-msg-deleted,
+    #t-chat .kk-msg-bubble.kk-out .kk-msg-text em { color: rgba(255,255,255,.85); }
+
+    /* Nombre del emisor DENTRO de la burbuja */
+    .kk-sender-name.is-theirs {
+      color: #7c3aed;                 /* violeta: legible sobre burbuja blanca */
+      text-align: left;
+      opacity: 1;
+    }
+    .kk-sender-name.is-mine {
+      color: rgba(255,255,255,.9);    /* blanco translúcido sobre naranja */
+      text-align: right;
+      opacity: 1;
+    }
+
+    /* Avatares diferenciados: mío con anillo naranja, contacto neutro */
+    .kk-msg-row.is-in .kk-msg-avatar {
+      background: #eef2ff; color: #4338ca;
+      box-shadow: 0 0 0 2px #c7d2fe;
+    }
+    .kk-msg-row.is-out .kk-msg-avatar {
+      background: #ffedd5; color: #c2410c;
+      box-shadow: 0 0 0 2px #fb923c;
+    }
+
+    /* Cola visual de la burbuja para lectura inmediata del lado */
+    .kk-msg-row.is-out .kk-msg-bubble { border-top-right-radius: 4px; margin-left: auto; }
+    .kk-msg-row.is-in  .kk-msg-bubble { border-top-left-radius: 4px; }
   </style>
 </head>
 <body class="bg-slate-50 text-slate-800 font-nunito panel-maestra-body" style="overflow-y:auto;overflow-x:hidden;">
@@ -550,48 +696,26 @@
           </div>
         </header>
 
-        <!-- Tabs — compact grid on mobile, horizontal on desktop -->
-        <div class="mb-4">
-          <!-- Mobile: 3x2 grid -->
-          <div class="grid grid-cols-3 gap-2 md:hidden">
-            <button class="class-tab-btn active flex flex-col items-center gap-1 py-2.5 px-2 rounded-2xl font-black text-[10px] uppercase tracking-wider bg-orange-600 text-white transition-all" data-tab="feed">
-              <i data-lucide="layout" class="w-4 h-4"></i><span>Muro</span>
+        <!-- Tabs — scrollable chip bar (mobile & desktop) -->
+        <div class="mb-3">
+          <div class="flex gap-1.5 overflow-x-auto pb-1" style="scrollbar-width:none;-webkit-overflow-scrolling:touch;" id="classTabsBar">
+            <button class="class-tab-btn active shrink-0 flex items-center gap-1.5 px-3 py-2 rounded-xl font-black text-[10px] uppercase tracking-wider bg-orange-600 text-white shadow-sm transition-all active:scale-95" data-tab="feed">
+              <i data-lucide="layout" class="w-3.5 h-3.5 shrink-0"></i><span>Muro</span>
             </button>
-            <button class="class-tab-btn flex flex-col items-center gap-1 py-2.5 px-2 rounded-2xl font-black text-[10px] uppercase tracking-wider bg-slate-100 text-slate-600 hover:bg-orange-50 hover:text-orange-600 transition-all" data-tab="daily-routine">
-              <i data-lucide="clipboard-list" class="w-4 h-4"></i><span>Rutina</span>
+            <button class="class-tab-btn shrink-0 flex items-center gap-1.5 px-3 py-2 rounded-xl font-black text-[10px] uppercase tracking-wider bg-slate-100 text-slate-600 hover:bg-orange-50 hover:text-orange-600 transition-all active:scale-95" data-tab="daily-routine">
+              <i data-lucide="clipboard-list" class="w-3.5 h-3.5 shrink-0"></i><span>Rutina</span>
             </button>
-            <button class="class-tab-btn flex flex-col items-center gap-1 py-2.5 px-2 rounded-2xl font-black text-[10px] uppercase tracking-wider bg-slate-100 text-slate-600 hover:bg-orange-50 hover:text-orange-600 transition-all" data-tab="students">
-              <i data-lucide="users" class="w-4 h-4"></i><span>Alumnos</span>
+            <button class="class-tab-btn shrink-0 flex items-center gap-1.5 px-3 py-2 rounded-xl font-black text-[10px] uppercase tracking-wider bg-slate-100 text-slate-600 hover:bg-orange-50 hover:text-orange-600 transition-all active:scale-95" data-tab="students">
+              <i data-lucide="users" class="w-3.5 h-3.5 shrink-0"></i><span>Alumnos</span>
             </button>
-            <button class="class-tab-btn flex flex-col items-center gap-1 py-2.5 px-2 rounded-2xl font-black text-[10px] uppercase tracking-wider bg-slate-100 text-slate-600 hover:bg-orange-50 hover:text-orange-600 transition-all" data-tab="attendance">
-              <i data-lucide="calendar-check" class="w-4 h-4"></i><span>Asistencia</span>
+            <button class="class-tab-btn shrink-0 flex items-center gap-1.5 px-3 py-2 rounded-xl font-black text-[10px] uppercase tracking-wider bg-slate-100 text-slate-600 hover:bg-orange-50 hover:text-orange-600 transition-all active:scale-95" data-tab="attendance">
+              <i data-lucide="calendar-check" class="w-3.5 h-3.5 shrink-0"></i><span>Asistencia</span>
             </button>
-            <button class="class-tab-btn flex flex-col items-center gap-1 py-2.5 px-2 rounded-2xl font-black text-[10px] uppercase tracking-wider bg-slate-100 text-slate-600 hover:bg-orange-50 hover:text-orange-600 transition-all" data-tab="tasks">
-              <i data-lucide="backpack" class="w-4 h-4"></i><span>Tareas</span>
+            <button class="class-tab-btn shrink-0 flex items-center gap-1.5 px-3 py-2 rounded-xl font-black text-[10px] uppercase tracking-wider bg-slate-100 text-slate-600 hover:bg-orange-50 hover:text-orange-600 transition-all active:scale-95" data-tab="tasks">
+              <i data-lucide="backpack" class="w-3.5 h-3.5 shrink-0"></i><span>Tareas</span>
             </button>
-            <button class="class-tab-btn flex flex-col items-center gap-1 py-2.5 px-2 rounded-2xl font-black text-[10px] uppercase tracking-wider bg-slate-100 text-slate-600 hover:bg-orange-50 hover:text-orange-600 transition-all" data-tab="videocall">
-              <i data-lucide="video" class="w-4 h-4"></i><span>Video</span>
-            </button>
-          </div>
-          <!-- Desktop: horizontal tabs -->
-          <div class="hidden md:flex gap-1 border-b border-slate-200 overflow-x-auto" style="scrollbar-width:none">
-            <button class="class-tab-btn active shrink-0 px-4 py-2.5 rounded-t-xl font-black text-xs uppercase tracking-wider bg-orange-600 text-white transition-colors" data-tab="feed">
-              <i data-lucide="layout" class="w-3.5 h-3.5 inline mr-1"></i>Muro
-            </button>
-            <button class="class-tab-btn shrink-0 px-4 py-2.5 rounded-t-xl font-black text-xs uppercase tracking-wider text-slate-500 hover:bg-slate-100 transition-colors" data-tab="daily-routine">
-              <i data-lucide="clipboard-list" class="w-3.5 h-3.5 inline mr-1"></i>Rutina
-            </button>
-            <button class="class-tab-btn shrink-0 px-4 py-2.5 rounded-t-xl font-black text-xs uppercase tracking-wider text-slate-500 hover:bg-slate-100 transition-colors" data-tab="students">
-              <i data-lucide="users" class="w-3.5 h-3.5 inline mr-1"></i>Alumnos
-            </button>
-            <button class="class-tab-btn shrink-0 px-4 py-2.5 rounded-t-xl font-black text-xs uppercase tracking-wider text-slate-500 hover:bg-slate-100 transition-colors" data-tab="attendance">
-              <i data-lucide="calendar-check" class="w-3.5 h-3.5 inline mr-1"></i>Asistencia
-            </button>
-            <button class="class-tab-btn shrink-0 px-4 py-2.5 rounded-t-xl font-black text-xs uppercase tracking-wider text-slate-500 hover:bg-slate-100 transition-colors" data-tab="tasks">
-              <i data-lucide="backpack" class="w-3.5 h-3.5 inline mr-1"></i>Tareas
-            </button>
-            <button class="class-tab-btn shrink-0 px-4 py-2.5 rounded-t-xl font-black text-xs uppercase tracking-wider text-slate-500 hover:bg-slate-100 transition-colors" data-tab="videocall">
-              <i data-lucide="video" class="w-3.5 h-3.5 inline mr-1"></i>Video
+            <button class="class-tab-btn shrink-0 flex items-center gap-1.5 px-3 py-2 rounded-xl font-black text-[10px] uppercase tracking-wider bg-slate-100 text-slate-600 hover:bg-orange-50 hover:text-orange-600 transition-all active:scale-95" data-tab="videocall">
+              <i data-lucide="video" class="w-3.5 h-3.5 shrink-0"></i><span>Video</span>
             </button>
           </div>
         </div>

@@ -18,6 +18,73 @@ export const PaymentsModule = {
     if (form) form.onsubmit = (e) => this.submitPaymentProof(e);
     this._initMoraCalculator();
     await this.loadPayments();
+    this._consumePrefill();
+  },
+
+  /**
+   * 💳 Precarga el monto pendiente al llegar desde el dashboard o el banner
+   */
+  _consumePrefill() {
+    const prefill = AppState.get('paymentPrefill');
+    if (!prefill?.amount) return;
+    AppState.set('paymentPrefill', null);
+    const amountInput = document.getElementById('paymentAmount');
+    if (!amountInput) return;
+
+    amountInput.value = Number(prefill.amount).toFixed(2);
+    amountInput.dispatchEvent(new Event('input', { bubbles: true }));
+
+    setTimeout(() => {
+      document.getElementById('paymentForm')?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      amountInput.classList.add('kk-flash-input');
+      setTimeout(() => amountInput.classList.remove('kk-flash-input'), 1700);
+      Helpers.toast('Monto pendiente precargado — solo falta tu comprobante', 'info');
+    }, 350);
+  },
+
+  /**
+   * 🚨 1-clic: selecciona el pago más urgente, calcula mora y precarga el total
+   */
+  applyUrgentPayment() {
+    const urgent = (this._payments || [])
+      .filter(p => !['paid'].includes((p.status || '').toLowerCase()))
+      .map(p => ({ ...p, days: daysUntilDue(p.due_date) }))
+      .filter(p => p.days !== null)
+      .sort((a, b) => a.days - b.days)[0];
+
+    if (!urgent) {
+      document.getElementById('paymentForm')?.scrollIntoView({ behavior: 'smooth' });
+      return;
+    }
+
+    const total = Number(urgent.amount || 0) + calcMora(urgent.due_date);
+
+    // Seleccionar el mes del pago urgente si está entre las opciones
+    const monthSelect = document.getElementById('paymentMonth');
+    if (monthSelect && urgent.month_paid) {
+      const MONTH_MAP = {
+        'enero':'01','febrero':'02','marzo':'03','abril':'04','mayo':'05','junio':'06',
+        'julio':'07','agosto':'08','septiembre':'09','octubre':'10','noviembre':'11','diciembre':'12'
+      };
+      const key = String(urgent.month_paid).toLowerCase().trim();
+      const norm = /^\d{4}-\d{2}$/.test(key)
+        ? key
+        : (MONTH_MAP[key] ? `${new Date().getFullYear()}-${MONTH_MAP[key]}` : null);
+      if (norm && [...monthSelect.options].some(o => o.value === norm)) {
+        monthSelect.value = norm;
+      }
+    }
+
+    const amountInput = document.getElementById('paymentAmount');
+    if (amountInput) {
+      amountInput.value = total.toFixed(2);
+      amountInput.dispatchEvent(new Event('input', { bubbles: true }));
+      amountInput.classList.add('kk-flash-input');
+      setTimeout(() => amountInput.classList.remove('kk-flash-input'), 1700);
+    }
+
+    document.getElementById('paymentForm')?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    Helpers.toast(`Total precargado con mora: RD$${Helpers.formatCurrency(total)}`, 'info');
   },
 
   /**
@@ -230,7 +297,7 @@ export const PaymentsModule = {
           <div class="flex-1 min-w-0 overflow-hidden">
             <p class="font-black text-white text-sm leading-tight truncate">${cfg.title}</p>
             <p class="text-white/80 text-xs font-medium mt-1 leading-relaxed break-words">${cfg.msg}</p>
-            <button onclick="document.getElementById('paymentForm')?.scrollIntoView({behavior:'smooth'})"
+            <button onclick="window.PaymentsModule?.applyUrgentPayment?.()"
               class="${cfg.btnCls} font-black text-xs px-4 py-2 rounded-xl mt-3 inline-block active:scale-95 transition-transform whitespace-nowrap">
               ${cfg.btn}
             </button>
@@ -724,14 +791,7 @@ export const PaymentsModule = {
       setP(100);
 
       // ✅ ÉXITO: Confetti
-      if (window.confetti) {
-        confetti({
-          particleCount: 150,
-          spread: 70,
-          origin: { y: 0.6 },
-          colors: ['#10b981', '#3b82f6', '#f59e0b']
-        });
-      }
+      window.App?.celebrate?.();
       
       setTimeout(() => {
         document.getElementById('payment-upload-progress')?.remove();

@@ -566,11 +566,10 @@ function _msgBubble(m, myId) {
   if (isMe) {
     senderName = profile?.name || 'Yo';
   } else {
-    // Prefer the stored name from contact cache, fall back to message field, then generic
-    const contactDisplay = contact
-      ? (contact.childName ? `👨‍👩‍👧 ${contact.childName}` : contact.name)
-      : null;
-    senderName = contactDisplay || m.sender_name || 'Contacto';
+    // Quien ESCRIBE es el contacto (padre / staff): mostrar su propio nombre.
+    // El nombre del hijo ya es visible en el encabezado de la conversación,
+    // así cada burbuja identifica sin ambigüedad quién escribió.
+    senderName = contact?.name || m.sender_name || 'Contacto';
   }
 
   const avatarUrl = isMe ? (profile?.avatar_url || null) : (m.sender_avatar || contact?.avatar || null);
