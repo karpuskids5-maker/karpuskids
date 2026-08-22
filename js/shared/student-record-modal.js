@@ -546,6 +546,22 @@ export const StudentRecordModal = {
     return p;
   },
 
+  // Los correos de notificación (tutor 1 y 2) reciben las credenciales;
+  // el correo de acceso (login) NO se usa como destino salvo fallback.
+  _credentialsRecipients(src = this._form) {
+    const seen = new Set();
+    const list = [];
+    [src.p1_email, src.p2_email].forEach(e => {
+      const v = String(e || '').trim();
+      if (v.includes('@')) {
+        const k = v.toLowerCase();
+        if (!seen.has(k)) { seen.add(k); list.push(v); }
+      }
+    });
+    if (!list.length && src.login_email) list.push(String(src.login_email).trim());
+    return list;
+  },
+
   _sendCredentialsEmail(to, password) {
     const studentName = this._form.name || 'tu hijo(a)';
     const parentName = this._form.p1_name || '';
@@ -1579,8 +1595,11 @@ export const StudentRecordModal = {
           console.warn('[Credentials] Password update failed:', error || data?.error);
         }
       }
-      await this._sendCredentialsEmail(email, this._parentPassword);
-      Helpers.toast('Credenciales enviadas', 'success');
+      const recipients = this._credentialsRecipients();
+      for (const rcpt of recipients) {
+        await this._sendCredentialsEmail(rcpt, this._parentPassword);
+      }
+      Helpers.toast('Credenciales enviadas a: ' + recipients.join(', '), 'success');
     } catch (e) {
       Helpers.toast('No se pudieron crear/enviar las credenciales: ' + (e.message || e), 'error');
     }
@@ -1847,9 +1866,11 @@ export const StudentRecordModal = {
         login_email: payload.login_email,
       });
 
-      if (payload.login_email && password) {
+      if (password) {
         try {
-          await this._sendCredentialsEmail(payload.login_email, password);
+          for (const rcpt of this._credentialsRecipients(payload)) {
+            await this._sendCredentialsEmail(rcpt, password);
+          }
         } catch (emailErr) {
           console.error('[CreateStudent] Email send error:', emailErr);
         }
@@ -1927,9 +1948,11 @@ export const StudentRecordModal = {
         login_email: payload.login_email,
       });
 
-      if (payload.login_email && password) {
+      if (password) {
         try {
-          await this._sendCredentialsEmail(payload.login_email, password);
+          for (const rcpt of this._credentialsRecipients(payload)) {
+            await this._sendCredentialsEmail(rcpt, password);
+          }
         } catch (emailErr) {
           console.error('[Admission] Email send error:', emailErr);
           Helpers.toast('Advertencia: credenciales creadas pero no se pudo enviar el correo.', 'warning');

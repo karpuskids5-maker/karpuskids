@@ -778,6 +778,9 @@ function _injectV8Styles() {
       /* ── Botón + insertar entre filas ── */
       [data-insert-slot]{margin:-4px 0 !important;height:16px !important;}
     }
+    /* ✅ Tablet/desktop: grid de acciones amplía columnas (sm:/md: ausentes en el build) */
+    @media(min-width:641px){#accionesBody .grid{grid-template-columns:repeat(4,1fr);gap:8px;}}
+    @media(min-width:768px){#accionesBody .grid{grid-template-columns:repeat(6,1fr);gap:10px;}}
     /* ✅ Modales tipo sheet (se abren desde abajo en móvil) */
     .kk-sheet-modal{position:fixed;inset:0;z-index:3000;display:flex;align-items:flex-end;justify-content:center;background:rgba(15,23,42,0.6);backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px);}
     @media(min-width:640px){.kk-sheet-modal{align-items:center;}}
@@ -2211,7 +2214,12 @@ function _renderStandardRoutineUI(student, log, modalId) {
     </div>`;
 
   return `
-    <div class="bg-white w-full max-w-md rounded-[2rem] shadow-2xl overflow-hidden animate-fadeIn flex flex-col" style="max-height:calc(100vh - 16px);max-height:calc(100dvh - 16px);">
+    <style>
+      @keyframes sheetUp{from{transform:translateY(60px);opacity:.4}to{transform:translateY(0);opacity:1}}
+      #${modalId}-inner{animation:sheetUp .26s cubic-bezier(.32,.72,.3,1);width:100%;max-width:28rem;}
+    </style><!-- kk-is-sheet -->
+    <div class="bg-white w-full max-w-md rounded-t-[2rem] sm:rounded-[2rem] shadow-2xl overflow-hidden flex flex-col" style="max-height:calc(100dvh - env(safe-area-inset-top,0px) - 8px);">
+      <div class="pt-2 pb-1 flex justify-center sm:hidden shrink-0"><span class="w-10 h-1.5 rounded-full bg-slate-200"></span></div>
       <!-- Header con gradiente -->
       <div class="p-3.5 sm:p-5 text-white relative overflow-hidden shrink-0" style="background:linear-gradient(135deg, #FF8A00 0%, #f97316 40%, #ec4899 100%);">
         <div class="absolute -top-10 -right-10 w-40 h-40 rounded-full blur-3xl" style="background:rgba(255,255,255,0.1);"></div>
@@ -2488,7 +2496,12 @@ function _renderInfantRoutineUI(student, log, modalId) {
   const activities = ['Sensorial','Motricidad','Música','Lectura','Juego libre','Estimulación temprana','Arte'];
 
   return `
-    <div class="bg-white w-full max-w-md rounded-[2rem] shadow-2xl overflow-hidden animate-fadeIn flex flex-col" style="max-height:calc(100vh - 16px);max-height:calc(100dvh - 16px);">
+    <style>
+      @keyframes sheetUp{from{transform:translateY(60px);opacity:.4}to{transform:translateY(0);opacity:1}}
+      #${modalId}-inner{animation:sheetUp .26s cubic-bezier(.32,.72,.3,1);width:100%;max-width:28rem;}
+    </style><!-- kk-is-sheet -->
+    <div class="bg-white w-full max-w-md rounded-t-[2rem] sm:rounded-[2rem] shadow-2xl overflow-hidden flex flex-col" style="max-height:calc(100dvh - env(safe-area-inset-top,0px) - 8px);">
+      <div class="pt-2 pb-1 flex justify-center sm:hidden shrink-0"><span class="w-10 h-1.5 rounded-full bg-slate-200"></span></div>
       <div class="p-3.5 sm:p-5 text-white relative overflow-hidden" style="background:linear-gradient(135deg, #3b82f6 0%, #6366f1 50%, #8b5cf6 100%);">
         <div class="absolute -top-10 -right-10 w-40 h-40 rounded-full blur-3xl" style="background:rgba(255,255,255,0.1);"></div>
         <button onclick="Modal.close('${modalId}')" class="absolute top-2.5 right-2.5 p-2 rounded-full hover:bg-white/30 border border-white/20 z-10" style="background:rgba(255,255,255,0.2);backdrop-filter:blur(4px);">
@@ -3218,7 +3231,12 @@ export async function openScheduleManager() {
   const schedule = _classroomSchedule.length ? _classroomSchedule : DEFAULT_SCHEDULE;
 
   const content = `
-    <div class="bg-white w-full max-w-lg rounded-[2rem] shadow-2xl overflow-hidden animate-fadeIn flex flex-col" style="max-height:calc(100dvh - 5rem);">
+    <style>
+      @keyframes sheetUp{from{transform:translateY(60px);opacity:.4}to{transform:translateY(0);opacity:1}}
+      #${modalId}-inner{animation:sheetUp .26s cubic-bezier(.32,.72,.3,1);width:100%;max-width:32rem;}
+    </style><!-- kk-is-sheet -->
+    <div class="bg-white w-full max-w-lg rounded-t-[2rem] sm:rounded-[2rem] shadow-2xl overflow-hidden flex flex-col" style="max-height:calc(100dvh - env(safe-area-inset-top,0px) - 8px);">
+      <div class="pt-2 pb-1 flex justify-center sm:hidden shrink-0"><span class="w-10 h-1.5 rounded-full bg-slate-200"></span></div>
       <!-- Header -->
       <div class="p-4 sm:p-5 text-white relative overflow-hidden shrink-0" style="background:linear-gradient(135deg, #FF8A00 0%, #f97316 50%, #ec4899 100%);">
         <div class="absolute -top-10 -right-10 w-40 h-40 rounded-full blur-3xl" style="background:rgba(255,255,255,0.1);"></div>
@@ -3278,7 +3296,7 @@ export async function openScheduleManager() {
       </div>
 
       <!-- Footer -->
-      <div class="p-4 shrink-0 border-t border-slate-100">
+      <div class="p-4 shrink-0 border-t border-slate-100" style="padding-bottom:max(1rem, env(safe-area-inset-bottom, 0px));">
         <div class="flex gap-2">
           <button onclick="App.resetScheduleToDefault()"
             class="px-4 py-3 bg-slate-100 hover:bg-slate-200 rounded-2xl text-[10px] font-black text-slate-500 uppercase tracking-widest transition-all active:scale-95">
@@ -3476,7 +3494,12 @@ export function openAllEventsMenu() {
   _allEventsPage = 1;
 
   const content = `
-    <div class="bg-white w-full max-w-sm rounded-[2rem] shadow-2xl overflow-hidden animate-fadeIn flex flex-col" style="max-height:calc(100dvh - 5rem);">
+    <style>
+      @keyframes sheetUp{from{transform:translateY(60px);opacity:.4}to{transform:translateY(0);opacity:1}}
+      #${modalId}-inner{animation:sheetUp .26s cubic-bezier(.32,.72,.3,1);width:100%;max-width:28rem;}
+    </style><!-- kk-is-sheet -->
+    <div class="bg-white w-full max-w-sm rounded-t-[2rem] sm:rounded-[2rem] shadow-2xl overflow-hidden flex flex-col" style="max-height:calc(100dvh - env(safe-area-inset-top,0px) - 8px);">
+      <div class="pt-2 pb-1 flex justify-center sm:hidden shrink-0"><span class="w-10 h-1.5 rounded-full bg-slate-200"></span></div>
       <div class="p-4 sm:p-5 text-white relative overflow-hidden shrink-0" style="background:linear-gradient(135deg, #8B5CF6 0%, #6366F1 50%, #3B82F6 100%);">
         <div class="absolute -top-8 -right-8 w-32 h-32 rounded-full blur-2xl" style="background:rgba(255,255,255,0.1);"></div>
         <div class="relative flex items-center gap-3 sm:gap-4">

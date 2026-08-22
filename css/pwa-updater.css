@@ -2,19 +2,19 @@
    Extraídos de js/pwa-updater.js (inyección dinámica <style>) para permitir
    una Content Security Policy sin 'unsafe-inline'. El anillo usa C = 2π·54 = 339.29. */
 
-#kpu-banner{position:fixed;top:12px;left:50%;transform:translateX(-50%) translateY(-160%);width:min(92vw,600px);z-index:99999;
+#kpu-banner{position:fixed;top:calc(12px + env(safe-area-inset-top,0px));left:50%;transform:translateX(-50%) translateY(-160%);width:min(92vw,600px);z-index:99999;
   font-family:'Nunito',system-ui,sans-serif;transition:transform .55s cubic-bezier(.34,1.56,.64,1),opacity .4s;}
 #kpu-banner.kpu-on{transform:translateX(-50%) translateY(0);opacity:1;}
 .kpu-banner-card{position:relative;overflow:hidden;display:flex;align-items:center;gap:12px;padding:12px 14px;border-radius:20px;
   background:linear-gradient(135deg,#FF8A00,#f97316);box-shadow:0 18px 48px rgba(249,115,22,.42),inset 0 1px 0 rgba(255,255,255,.35);
   border:1px solid rgba(255,255,255,.35);color:#fff;}
 .kpu-banner-card::after{content:'';position:absolute;inset:0;background:linear-gradient(110deg,transparent 20%,rgba(255,255,255,.28) 50%,transparent 80%);
-  transform:translateX(-120%);animation:kpuShine 3.2s ease-in-out infinite;}
+  transform:translateX(-120%);animation:kpuShine 3.2s ease-in-out infinite;pointer-events:none;}
 .kpu-banner-icon{flex-shrink:0;width:46px;height:46px;border-radius:14px;display:flex;align-items:center;justify-content:center;
   font-size:24px;background:rgba(255,255,255,.22);box-shadow:0 4px 10px rgba(0,0,0,.12),inset 0 1px 0 rgba(255,255,255,.4);}
 .kpu-banner-txt{flex:1;min-width:0;}
-.kpu-banner-title{font-size:13px;font-weight:900;letter-spacing:.2px;line-height:1.2;}
-.kpu-banner-sub{font-size:10px;font-weight:700;opacity:.92;margin-top:2px;}
+.kpu-banner-title{font-size:13px;font-weight:900;letter-spacing:.2px;line-height:1.25;}
+.kpu-banner-sub{font-size:10px;font-weight:700;opacity:.92;margin-top:2px;line-height:1.35;}
 .kpu-banner-btn{flex-shrink:0;padding:10px 16px;border:0;border-radius:13px;cursor:pointer;font-family:inherit;
   font-size:11px;font-weight:900;text-transform:uppercase;letter-spacing:.5px;color:#b45309;background:#fff;
   box-shadow:0 6px 18px rgba(0,0,0,.18);transition:transform .15s,box-shadow .15s;animation:kpuPulse 2.2s ease-in-out infinite;}
@@ -25,9 +25,22 @@
   background:rgba(255,255,255,.12);border:1px solid rgba(255,255,255,.25);transition:background .15s,color .15s;}
 .kpu-banner-later:hover{background:rgba(255,255,255,.22);color:#fff;}
 .kpu-banner-later:active{transform:scale(.96);}
-@media (max-width:420px){
-  .kpu-banner-later{padding:4px 6px;font-size:9px;}
-  .kpu-banner-btn{padding:10px 12px;}
+
+/* ✅ Móvil: banner en 2 filas — texto completo legible y botones táctiles (≥44px).
+   Fila 1: icono + textos · Fila 2: "Actualizar ahora" (ancho) + "Ahora no". */
+@media (max-width:520px){
+  #kpu-banner{width:min(94vw,430px);}
+  .kpu-banner-card{display:grid;grid-template-columns:auto 1fr auto;grid-template-areas:
+      "icon txt txt"
+      "btn  btn later";
+    gap:7px 10px;align-items:center;padding:12px 13px;border-radius:18px;}
+  .kpu-banner-card::after{animation:none;}
+  .kpu-banner-icon{grid-area:icon;width:38px;height:38px;font-size:19px;border-radius:11px;}
+  .kpu-banner-txt{grid-area:txt;}
+  .kpu-banner-title{font-size:13.5px;}
+  .kpu-banner-sub{font-size:11px;margin-top:1px;}
+  .kpu-banner-btn{grid-area:btn;width:100%;min-height:44px;padding:10px 14px;font-size:12px;border-radius:13px;letter-spacing:.6px;-webkit-tap-highlight-color:transparent;}
+  .kpu-banner-later{grid-area:later;min-height:44px;padding:8px 13px;font-size:10.5px;border-radius:13px;-webkit-tap-highlight-color:transparent;}
 }
 
 #kpu-overlay{position:fixed;inset:0;z-index:99999;overflow:hidden;font-family:'Nunito',system-ui,sans-serif;
@@ -42,7 +55,7 @@
 
 .kpu-card{position:relative;z-index:2;height:100%;display:flex;flex-direction:column;align-items:center;justify-content:center;
   text-align:center;padding:24px;color:#fff;}
-.kpu-ring-wrap{position:relative;width:150px;height:150px;animation:kpuPop .7s cubic-bezier(.34,1.56,.64,1) both;}
+.kpu-ring-wrap{position:relative;width:min(150px,50vw);height:min(150px,50vw);animation:kpuPop .7s cubic-bezier(.34,1.56,.64,1) both;}
 .kpu-ring{width:100%;height:100%;transform:rotate(-90deg);}
 .kpu-ring-track{fill:none;stroke:rgba(255,255,255,.14);stroke-width:9;}
 .kpu-ring-progress{fill:none;stroke:url(#kpuGrad);stroke-width:9;stroke-linecap:round;
@@ -50,11 +63,11 @@
 .kpu-logo{position:absolute;inset:20px;border-radius:50%;overflow:hidden;border:3px solid rgba(255,255,255,.85);
   box-shadow:0 10px 30px rgba(0,0,0,.45),0 0 0 8px rgba(255,255,255,.08);animation:kpuRings 2.6s ease-out infinite;}
 .kpu-logo img{width:100%;height:100%;object-fit:cover;}
-.kpu-pct{margin:26px 0 2px;font-size:44px;font-weight:900;line-height:1;font-family:'Poppins','Nunito',sans-serif;
+.kpu-pct{margin:26px 0 2px;font-size:clamp(34px,12vw,44px);font-weight:900;line-height:1;font-family:'Poppins','Nunito',sans-serif;
   background:linear-gradient(180deg,#fff,#cbd5e1);-webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent;}
-.kpu-pct-sym{font-size:24px;}
-.kpu-title{margin-top:12px;font-size:19px;font-weight:900;font-family:'Poppins','Nunito',sans-serif;letter-spacing:.3px;}
-.kpu-msg{margin-top:6px;font-size:12.5px;font-weight:700;color:#94a3b8;min-height:18px;transition:opacity .28s ease;opacity:1;}
+.kpu-pct-sym{font-size:.55em;}
+.kpu-title{margin-top:12px;font-size:clamp(17px,5vw,19px);font-weight:900;font-family:'Poppins','Nunito',sans-serif;letter-spacing:.3px;padding:0 8px;}
+.kpu-msg{margin-top:6px;font-size:clamp(11.5px,3.4vw,12.5px);font-weight:700;color:#94a3b8;min-height:18px;transition:opacity .28s ease;opacity:1;padding:0 16px;}
 .kpu-bar{width:min(300px,78vw);height:8px;margin-top:22px;border-radius:999px;background:rgba(255,255,255,.14);overflow:hidden;}
 .kpu-bar-fill{height:100%;width:0%;border-radius:999px;background:linear-gradient(90deg,#FF8A00,#fb923c,#28B54D);
   box-shadow:0 0 14px rgba(251,146,60,.65);transition:width .18s linear;background-size:200% 100%;animation:kpuStripes 1.6s linear infinite;}

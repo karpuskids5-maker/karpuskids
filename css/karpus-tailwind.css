@@ -140,4 +140,10 @@
 .select-none{-webkit-user-select:none;-moz-user-select:none;user-select:none}
 .text-\[7px\]{font-size:7px;line-height:1}
 .ring-\[#28B54D\]{--tw-ring-opacity:1;--tw-ring-color:rgb(40 181 77/var(--tw-ring-opacity,1))}
+/* Rutina v8: sheets + acciones */
+.rounded-t-\[2rem\]{border-top-left-radius:2rem;border-top-right-radius:2rem}
+.rounded-\[1\.2rem\]{border-radius:1.2rem}
+.min-h-\[34px\]{min-height:34px}
+.max-h-\[62vh\]{max-height:62vh}
+@media(min-width:640px){.sm\:rounded-\[2rem\]{border-radius:2rem}}
 
