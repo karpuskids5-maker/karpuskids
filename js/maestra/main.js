@@ -491,6 +491,16 @@ document.addEventListener('DOMContentLoaded', async () => {
     // 🔴 Sistema de badges por sección
     BadgeSystem.init(auth.user.id);
 
+    // ✅ Mensaje entrante en tiempo real → refrescar badge total del chat
+    window.addEventListener('karpus:message-received', (e) => {
+      const msg = e.detail || {};
+      if (!msg.sender_id || msg.sender_id === auth.user.id) return;
+      // Si la conversación abierta es justamente esa, ya se leyó al mostrarse
+      const activeConv = AppState.get('activeConversationId');
+      if (activeConv && msg.conversation_id === activeConv) return;
+      loadMaestraUnreadBadge(auth.user.id);
+    });
+
     // ── Sidebar: cerrar al navegar en móvil ────────────────────────────────────────
     const sidebar = document.getElementById('sidebar');
     const overlay = document.getElementById('sidebarOverlay');
@@ -868,7 +878,8 @@ function initNavigation() {
     // Lógica de refresco inteligente (TTL: 2 minutos)
     const now = Date.now();
     const isFresh = _lastLoad[cleanId] && (now - _lastLoad[cleanId] < 120000);
-    if (isFresh) return;
+    // El chat NUNCA se salta: los indicadores de no leídos deben estar al día
+    if (isFresh && cleanId !== 'chat') return;
     _lastLoad[cleanId] = now;
 
     if (cleanId === 'home') initDashboard();

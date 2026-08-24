@@ -179,13 +179,19 @@ export const BadgeSystem = {
       table: 'messages'
     }, function(payload) {
       if (payload.new && payload.new.sender_id === self._userId) return;
-      
+
+      // 📣 Aviso global para los módulos de chat de cada panel: actualizan
+      // el indicador (badge rojo) del contacto que escribió en la lista.
+      try {
+        window.dispatchEvent(new CustomEvent('karpus:message-received', { detail: payload.new }));
+      } catch (_) {}
+
       // ✅ REGLA DE NO DUPLICACIÓN: Ignorar si el chat con esta conversación ya está abierto
       const activeConvId = (window.AppState && AppState.get('activeConversationId'));
       if (activeConvId && payload.new.conversation_id === activeConvId) return;
 
       const active = self._getActiveSection();
-      if (active === 'notifications' || active === 'chat' || active === 'comunicacion') return;
+      if (active === 'notifications' || active === 'chat' || active === 'comunicacion' || active === 't-chat') return;
       // Panel padre
       const prevN = self._getBadgeCount('notifications');
       self._renderBadge('notifications', prevN + 1);

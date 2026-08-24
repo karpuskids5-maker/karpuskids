@@ -459,7 +459,8 @@ function initNavigation() {
     Helpers.vibrate?.('light');
 
     // ✅ LIMPIEZA DE REALTIME: Eliminar canales al cambiar de sección
-    RealtimeManager.unsubscribeAll(['notifications']);
+    // (proteger banner de actividades + badges: sobreviven la navegación)
+    RealtimeManager.unsubscribeAll(['notifications', 'eventbanner_*', 'badges_*']);
 
     // Desuscribir muro al salir (ahorro de recursos Realtime)
     const prevSection = AppState.get('currentSection');

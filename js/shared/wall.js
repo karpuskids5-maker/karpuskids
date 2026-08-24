@@ -200,8 +200,12 @@ const WallModule = {
   },
 
   async init(containerId, options = {}, appState = null) {
+    // Invalida cualquier carga en vuelo de una inicialización anterior
+    const initToken = (this._initToken = (this._initToken || 0) + 1);
+    this._seq = (this._seq || 0) + 1;
     this._page = 0; this._pageSize = 10;
     this._isLoading = false; this._hasMore = true;
+    this._autoRetried = false;
     this._containerId = containerId;
     this._options = options;
     this._appState = appState;
@@ -212,9 +216,11 @@ const WallModule = {
     if (!container) return;
 
     await this.loadClassrooms();
+    if (initToken !== this._initToken) return; // otra init() la reemplazó
     this.setupFilters();
     this._injectStyles();
     await this.loadPosts(container);
+    if (initToken !== this._initToken) return;
     this.subscribeRealtime();
     this._startSchedulerChecker();
   },
@@ -333,9 +339,14 @@ const WallModule = {
   async loadPosts(container, append = false) {
     if (typeof container === 'string') container = document.getElementById(container);
     if (!container) container = document.getElementById(this._containerId);
-    if (this._isLoading || (!this._hasMore && append)) return;
+    if (!container) return;
+    if (append && (this._isLoading || !this._hasMore)) return;
+    // Cargas completas nuevas pueden "pisar" a una en curso: el token de
+    // secuencia descarta los resultados obsoletos de forma segura.
+
+    // Token de secuencia: cada nueva carga invalida los resultados de las anteriores
+    const seq = (this._seq = (this._seq || 0) + 1);
     this._isLoading = true;
-    if (!container) { this._isLoading = false; return; }
 
     if (!append) {
       container.innerHTML = `
@@ -459,9 +470,13 @@ const WallModule = {
       document.getElementById('wall-loader')?.remove();
       document.getElementById('wall-scroll-loader')?.remove();
 
+      // Una carga más reciente reemplazó a esta: descartar resultado sin tocar el DOM
+      if (seq !== this._seq) return;
+
       if ((!posts || posts.length === 0) && !append) {
         container.innerHTML = Helpers.emptyState('No hay publicaciones recientes.', 'layout');
         this._hasMore = false;
+        this._autoRetried = false;
         return;
       }
 
@@ -496,10 +511,31 @@ const WallModule = {
       if (processed.length) this._registerViews(processed.map(p => p.id));
 
       if (window.lucide) lucide.createIcons();
-    } catch (_) {
-      if (!append) container.innerHTML = Helpers.emptyState('Error al cargar el muro', 'alert-triangle');
+      this._autoRetried = false;
+    } catch (err) {
+      console.error('[Wall] Error cargando publicaciones:', err?.message || err, err);
+      // Una carga más reciente reemplazó a esta: no pintar el error
+      if (seq !== this._seq) return;
+      if (!append) {
+        // Reintento automático único: al arrancar el panel muchas consultas
+        // compiten en paralelo y la primera carga puede fallar por red/sesión.
+        if (!this._autoRetried) {
+          this._autoRetried = true;
+          setTimeout(() => {
+            if (seq === this._seq) this.loadPosts(container, false).catch(() => {});
+          }, 1500);
+          return;
+        }
+        container.innerHTML = `
+          <div class="py-10 text-center">
+            <i data-lucide="wifi-off" class="w-8 h-8 mx-auto text-slate-300 mb-2"></i>
+            <p class="text-slate-400 text-sm font-bold mb-3">No se pudieron cargar las publicaciones</p>
+            <button onclick="WallModule.loadPosts('${container.id}')" class="px-4 py-2 bg-orange-500 text-white rounded-xl text-xs font-black hover:bg-orange-600 transition-colors">Reintentar</button>
+          </div>`;
+        if (window.lucide) lucide.createIcons();
+      }
     } finally {
-      this._isLoading = false;
+      if (seq === this._seq) this._isLoading = false;
     }
   },
 

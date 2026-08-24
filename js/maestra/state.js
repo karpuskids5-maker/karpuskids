@@ -14,6 +14,8 @@ const _state = new SafeAppState({
   currentSection: 'dashboard',
   students: [],
   attendance: [],
+  // Chat: conversación abierta (para suprimir badge de lo que ya se está leyendo)
+  activeConversationId: null,
   // School Engine
   schoolYear: null,
   activePeriod: null,

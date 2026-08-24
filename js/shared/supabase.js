@@ -54,17 +54,28 @@ supabase.auth.onAuthStateChange((event, session) => {
 });
 
 // Interceptar errores 401 globalmente y refrescar token
-// IMPORTANTE: usar flag para evitar loop infinito
-let _refreshing = false;
+// IMPORTANTE: compartir UNA sola promesa de refresh entre todas las peticiones
+// que reciban 401 a la vez (al abrir el panel disparan decenas en paralelo);
+// si cada una refrescara por su cuenta, las demás fallarían sin reintento.
+let _refreshPromise = null;
+function _sharedRefreshSession() {
+  if (!_refreshPromise) {
+    _refreshPromise = supabase.auth.refreshSession().finally(() => {
+      // Liberar en el siguiente microtask para agrupar ráfagas simultáneas
+      setTimeout(() => { _refreshPromise = null; }, 0);
+    });
+  }
+  return _refreshPromise;
+}
 const _originalFetch = window.fetch;
 window.fetch = async function(...args) {
   const url = typeof args[0] === 'string' ? args[0] : args[0]?.url;
   const isSupabase = url && url.includes(SUPABASE_URL);
-  
+
   if (isSupabase) {
     const options = args[1] || {};
     options.headers = options.headers || {};
-    
+
     // Inyectar apikey solo si falta (útil para Edge Functions o fetch directo)
     if (!options.headers['apikey']) {
       options.headers['apikey'] = SUPABASE_ANON_KEY;
@@ -81,37 +92,27 @@ window.fetch = async function(...args) {
     args[1] = options;
   }
 
-  const res = await _originalFetch.apply(this, args);
-  
-  // Interceptar 401 para intentar refrescar sesión
-  if (res.status === 401 && isSupabase && !_refreshing && !url.includes('/auth/v1/')) {
-    _refreshing = true;
-    try {
-      Helpers.safeLog('warn', '[supabase-js] 401 detectado, intentando refrescar sesión...');
-      // Intentar refresh una única vez
-      const { data: refreshed, error } = await supabase.auth.refreshSession();
-      if (!error && refreshed?.session) {
-        Helpers.safeLog('log', '[supabase-js] Sesión refrescada con éxito. Reintentando petición...');
-        
-        // Clonar opciones y actualizar el header Authorization con el nuevo token
-        const retryOptions = args[1] || {};
-        retryOptions.headers = { 
-          ...retryOptions.headers, 
-          'Authorization': `Bearer ${refreshed.session.access_token}` 
-        };
-        args[1] = retryOptions;
+  let res = await _originalFetch.apply(this, args);
 
-        return _originalFetch.apply(this, args);
-      } else {
-        Helpers.safeLog('error', '[supabase-js] Falló el refresco de sesión:', error);
-        // Si el refresh falla con 401, redirigir a login para evitar loop
-        window.location.href = 'login.html';
-      }
-    } catch (e) {
-      Helpers.safeLog('error', '[supabase-js] Error al intentar refrescar sesión:', e);
+  // Interceptar 401 para intentar refrescar sesión
+  if (res.status === 401 && isSupabase && !url.includes('/auth/v1/')) {
+    Helpers.safeLog('warn', '[supabase-js] 401 detectado, esperando refresco de sesión compartido...');
+    const { data: refreshed, error } = await _sharedRefreshSession();
+    if (!error && refreshed?.session) {
+      Helpers.safeLog('log', '[supabase-js] Sesión refrescada con éxito. Reintentando petición...');
+      // Reintentar ESTA petición con el token nuevo (todas las que esperaron
+      // el mismo refresh también reintentan → ninguna se pierde)
+      const retryOptions = args[1] || {};
+      retryOptions.headers = {
+        ...retryOptions.headers,
+        'Authorization': `Bearer ${refreshed.session.access_token}`
+      };
+      args[1] = retryOptions;
+      res = await _originalFetch.apply(this, args);
+    } else {
+      Helpers.safeLog('error', '[supabase-js] Falló el refresco de sesión:', error);
+      // Si el refresh falla con 401, redirigir a login para evitar loop
       window.location.href = 'login.html';
-    } finally {
-      _refreshing = false;
     }
   }
   return res;

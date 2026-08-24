@@ -49,7 +49,9 @@ export function getBirthdayInfo(birthDate) {
   const daysUntil = Math.round(diffMs / (1000 * 60 * 60 * 24));
   const isToday = daysUntil === 0;
   const isUpcoming = daysUntil > 0 && daysUntil <= 7;
-  const ageTurning = nextBday.getFullYear() - y + 1;
+  // La edad que cumple es el año del próximo cumpleaños menos el de nacimiento
+  // (ej.: nace 2023-08-31 → su cumpleaños de 2026 es cuando cumple 3)
+  const ageTurning = nextBday.getFullYear() - y;
 
   return { isToday, isUpcoming, daysUntil, month: m, day: d, ageTurning };
 }

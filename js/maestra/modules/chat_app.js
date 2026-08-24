@@ -22,7 +22,77 @@ let _lastPreviews = {};        // vista previa del último mensaje por contacto
 // ✅ Caché de contactos para el banner global y aperturas por ID
 const _contactsCache = new Map();
 
+// ✅ Estado de la lista para el indicador EN VIVO de no leídos por contacto
+let _listContacts = [];        // contactos ordenados (se reordenan al llegar mensajes)
+let _unreadCounts = {};        // { userId: count }
+let _liveListenerBound = false;
+
 const _LIST_STATE_KEY = 'maestra';
+
+/** Ordena la lista (último mensaje primero) y re-renderiza preservando búsqueda */
+function _sortAndRenderChatList() {
+  const container = document.getElementById('chatContactsList');
+  if (!container || !_listContacts.length) return;
+
+  const sorted = [..._listContacts].sort((a, b) => {
+    const ta = _lastPreviews[a.id]?.created_at ? new Date(_lastPreviews[a.id].created_at).getTime() : 0;
+    const tb = _lastPreviews[b.id]?.created_at ? new Date(_lastPreviews[b.id].created_at).getTime() : 0;
+    if (ta !== tb) return tb - ta;
+    return (_unreadCounts[b.id] || 0) - (_unreadCounts[a.id] || 0);
+  });
+  _listContacts = sorted;
+
+  _renderChatList(container, sorted, _unreadCounts);
+
+  // Restaurar puntos de presencia tras el re-render (estado cacheado)
+  _renderPresenceDots(ChatModule.getOnlineUsers());
+
+  // Re-aplicar el filtro de búsqueda vigente tras re-render
+  const q = document.getElementById('chatSearchInput')?.value?.toLowerCase().trim();
+  if (q) {
+    container.querySelectorAll('.kk-chat-item').forEach(el => {
+      el.style.display = el.textContent.toLowerCase().includes(q) ? '' : 'none';
+    });
+  }
+}
+
+/**
+ * ✅ Indicador en vivo: cuando un contacto escribe, su badge rojo de no
+ * leídos aparece al instante en la lista (sin recargar ni reabrir el chat).
+ */
+function _handleIncomingMessageLive(msg) {
+  try {
+    if (!msg?.sender_id || msg.sender_id === AppState.get('user')?.id) return;
+    // Si la conversación con este remitente ya está abierta, el mensaje se
+    // muestra y se marca como leído por la suscripción activa → sin badge.
+    if (activeChatUserId === msg.sender_id) return;
+
+    const meta = _contactsCache.get(msg.sender_id);
+
+    // Vista previa + contador
+    _lastPreviews[msg.sender_id] = {
+      content: msg.content || '',
+      created_at: msg.created_at || new Date().toISOString(),
+      sender_id: msg.sender_id,
+      mine: false
+    };
+    _unreadCounts[msg.sender_id] = (_unreadCounts[msg.sender_id] || 0) + 1;
+
+    // Contacto nuevo (llegó mensaje de alguien aún no listado)
+    if (meta && !_listContacts.some(c => c.id === msg.sender_id)) {
+      _listContacts.push(meta);
+      _contactsCache.set(meta.id, meta);
+    }
+
+    _sortAndRenderChatList();
+  } catch (_) { /* silencioso */ }
+}
+
+function _bindLiveMessageListener() {
+  if (_liveListenerBound) return;
+  _liveListenerBound = true;
+  window.addEventListener('karpus:message-received', (e) => _handleIncomingMessageLive(e.detail));
+}
 
 /** Aplica/actualiza los puntos de presencia en la lista */
 function _renderPresenceDots(onlineSet) {
@@ -274,6 +344,11 @@ export async function initChat() {
       return (unreadMap[b.id] || 0) - (unreadMap[a.id] || 0);
     });
 
+    // ✅ Guardar estado para el indicador en vivo de no leídos
+    _listContacts = sorted;
+    _unreadCounts = { ...(unreadMap || {}) };
+    _bindLiveMessageListener();
+
     _renderChatList(container, sorted, unreadMap);
 
     // Buscador con debounce via ScrollModule (antes de restaurar estado)
@@ -358,6 +433,7 @@ export async function initChat() {
 function closeConversationUI() {
   activeChatUserId = null;
   activeConversationId = null;
+  AppState.set('activeConversationId', null);
   ChatModule.unsubscribe();
   closeMessageActions();
   hideReplyBar();
@@ -461,6 +537,8 @@ export async function selectChatContact(userId, name, meta) {
 
   // ✅ Limpiar badge de no leídos del contacto abierto
   document.querySelector(`#chatContactsList [data-user-id="${userId}"] .kk-unread-badge`)?.remove();
+  _unreadCounts[userId] = 0;
+  document.querySelector(`#chatContactsList [data-user-id="${userId}"]`)?.setAttribute('data-unread', '0');
 
   // ✅ Limpiar respuesta pendiente anterior
   hideReplyBar();
@@ -510,6 +588,7 @@ async function loadChatMessages(otherUserId, loadMore = false) {
 
     if (!activeConversationId && conversationId) {
       activeConversationId = conversationId;
+      AppState.set('activeConversationId', conversationId);
       subscribeToChat(activeConversationId);
       ChatModule.markAsRead(activeConversationId);
     }
@@ -618,10 +697,10 @@ async function sendChatMessage() {
     );
     if (!activeConversationId && conversationId) {
       activeConversationId = conversationId;
+      AppState.set('activeConversationId', conversationId);
       subscribeToChat(activeConversationId);
     }
   } catch (err) {
-
     safeToast('Error al enviar mensaje', 'error');
     // Revertir optimistic
     container?.lastElementChild?.remove();

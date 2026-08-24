@@ -69,10 +69,19 @@ export const RealtimeManager = {
     }
   },
 
-  /** Elimina todos los canales (llamar en logout o cambio de sección) */
+  /**
+   * Elimina todos los canales (llamar en logout o cambio de sección).
+   * Las entradas de `except` que terminan en '*' se tratan como prefijo:
+   *   unsubscribeAll(['eventbanner_*', 'badges_*'])
+   */
   unsubscribeAll(except = []) {
+    const exact = new Set(except.filter(e => !e.endsWith('*')));
+    const prefixes = except.filter(e => e.endsWith('*')).map(e => e.slice(0, -1));
     for (const [name, ch] of _channels) {
-      if (except.includes(name)) continue;
+      if (
+        exact.has(name) ||
+        prefixes.some(p => name.startsWith(p))
+      ) continue;
       supabase.removeChannel(ch);
       _channels.delete(name);
       _retries.delete(name);
@@ -87,11 +96,17 @@ export const RealtimeManager = {
 
 // Limpiar canales al cerrar la pestaña
 window.addEventListener('beforeunload', () => RealtimeManager.unsubscribeAll());
+
+// Canales globales que NUNCA se limpian por inactividad: el banner de
+// actividades y los badges deben seguir vivos aunque el usuario regrese
+// después de mucho rato (antes quedaban mudos hasta recargar).
+const _GLOBAL_PREFIXES = ['eventbanner_', 'badges_'];
+
 // Limpiar al perder visibilidad por más de 5 min (ahorro de conexiones)
 let _hiddenTimer = null;
 document.addEventListener('visibilitychange', () => {
   if (document.hidden) {
-    _hiddenTimer = setTimeout(() => RealtimeManager.unsubscribeAll(), 5 * 60_000);
+    _hiddenTimer = setTimeout(() => RealtimeManager.unsubscribeAll(_GLOBAL_PREFIXES.map(p => p + '*')), 5 * 60_000);
   } else {
     clearTimeout(_hiddenTimer);
   }

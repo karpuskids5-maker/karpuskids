@@ -59,6 +59,13 @@ export const EventBanner = {
   _watchTimer: null,
   _lastState: '',
 
+  // Alcance para filtrar eventos por aula (evita falsos avisos cruzados):
+  //   padre   → Set con las aulas de SUS hijos (null = sin datos, no filtra)
+  //   maestra → Set con los student_id de SU(S) aula(s)
+  _scopeReady: null,
+  _classroomIds: null,
+  _studentIds: null,
+
   // ── Ciclo de vida ─────────────────────────────────────────────────────────
   init(userId) {
     if (!userId || this._uid) return;
@@ -70,6 +77,46 @@ export const EventBanner = {
     this._loadQueue();
     this._subscribe();
     this._startWatch();
+    this._loadScope();
+  },
+
+  /** Resuelve el alcance por aula del usuario (fire & forget, una sola vez) */
+  _loadScope() {
+    if (this._scopeReady) return;
+    const self = this;
+    this._scopeReady = (async () => {
+      try {
+        if (self._role === 'padre') {
+          const { data } = await supabase.from('students')
+            .select('classroom_id').eq('parent_id', self._uid);
+          self._classroomIds = new Set((data || []).map(s => s.classroom_id).filter(Boolean));
+        } else if (self._role === 'maestra') {
+          const { data: rooms } = await supabase.from('classrooms')
+            .select('id').eq('teacher_id', self._uid);
+          const roomIds = (rooms || []).map(r => r.id);
+          if (roomIds.length) {
+            const { data } = await supabase.from('students')
+              .select('id').in('classroom_id', roomIds);
+            self._studentIds = new Set((data || []).map(s => s.id));
+          } else {
+            self._studentIds = new Set();
+          }
+        }
+      } catch (_) { /* sin alcance: los handlers caen al modo "sin filtro" */ }
+    })();
+  },
+
+  /** true si el evento aplica al alcance del usuario (null = no se pudo saber → sí) */
+  _inScope(kind, id) {
+    if (kind === 'classroom') {
+      if (this._classroomIds === null) return true;
+      return id == null ? true : this._classroomIds.has(id); // posts generales pasan
+    }
+    if (kind === 'student') {
+      if (this._studentIds === null) return true;
+      return this._studentIds.has(id);
+    }
+    return true;
   },
 
   _detectRole() {
@@ -116,29 +163,47 @@ export const EventBanner = {
     ch.on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'messages' },
       p => self._onMessage(p.new));
 
-    // 3) Publicaciones del muro
+    // 3) Publicaciones del muro (padre: solo su aula o generales)
     ch.on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'posts' },
-      p => self._onPost(p.new));
+      p => {
+        self._loadScope();
+        self._scopeReady.then(() => {
+          if (self._role === 'padre' && !self._inScope('classroom', p.new.classroom_id)) return;
+          self._onPost(p.new);
+        });
+      });
 
-    // 4) Tareas nuevas (padre)
+    // 4) Tareas nuevas (padre, filtradas por las aulas de sus hijos)
     if (self._role === 'padre') {
       ch.on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'tasks' },
-        p => self._push({
-          id: 'tasks:' + p.new.id, icon: '📝',
-          title: 'Nueva tarea' + (p.new.title ? ': ' + p.new.title : ''),
-          sub: p.new.due_date ? 'Entrega: ' + p.new.due_date : '',
-          target: 'tasks'
-        }));
+        p => {
+          self._loadScope();
+          self._scopeReady.then(() => {
+            if (!self._inScope('classroom', p.new.classroom_id)) return;
+            self._push({
+              id: 'tasks:' + p.new.id, icon: '📝',
+              title: 'Nueva tarea' + (p.new.title ? ': ' + p.new.title : ''),
+              sub: p.new.due_date ? 'Entrega: ' + p.new.due_date : '',
+              target: 'tasks'
+            });
+          });
+        });
     }
 
-    // 5) Entregas de tareas (maestra)
+    // 5) Entregas de tareas (maestra, solo estudiantes de su aula)
     if (self._role === 'maestra') {
       ch.on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'task_evidences' },
-        p => self._push({
-          id: 'task_evidences:' + p.new.id, icon: '📥',
-          title: 'Nueva entrega de tarea',
-          sub: '', target: 't-home'
-        }));
+        p => {
+          self._loadScope();
+          self._scopeReady.then(() => {
+            if (!self._inScope('student', p.new.student_id)) return;
+            self._push({
+              id: 'task_evidences:' + p.new.id, icon: '📥',
+              title: 'Nueva entrega de tarea',
+              sub: '', target: 't-home'
+            });
+          });
+        });
     }
 
     // 6) Pagos: comprobante nuevo (personal) / confirmado (padre)
@@ -176,6 +241,25 @@ export const EventBanner = {
           sub: '', target: 'staff-permits'
         }));
     }
+
+    // 9) Comentarios y reacciones en publicaciones propias (wall.js → autor)
+    ch.on('postgres_changes', {
+      event: 'INSERT', schema: 'public', table: 'wall_notifications',
+      filter: 'user_id=eq.' + self._uid
+    }, p => self._onWallNotification(p.new));
+  },
+
+  async _onWallNotification(n) {
+    if (!n) return;
+    const isComment = n.type === 'comment';
+    this._push({
+      id: 'wall_notifications:' + n.id,
+      icon: isComment ? '💬' : '❤️',
+      title: (n.actor_name || 'Alguien') +
+             (isComment ? ' comentó en tu publicación' : ' reaccionó a tu publicación'),
+      sub: isComment ? String(n.message || '').replace(/^.*?comentó:\s*/i, '').slice(0, 80) : '',
+      target: this._role === 'padre' ? 'class' : 'muro',
+    });
   },
 
   async _onNotification(n) {
@@ -194,6 +278,9 @@ export const EventBanner = {
       message:    { i: '💬', s: this._chatTarget(),                                  t: 'Nuevo mensaje' },
       receipt:    { i: '💳', s: 'pagos',                                             t: 'Nuevo comprobante' },
       inquiry:    { i: '🆕', s: 'reportes',                                          t: 'Nueva consulta' },
+      // Tipos producidos por el sistema que antes se descartaban:
+      alert:           { i: '💳', s: 'payments',   t: 'Actualización de pagos' },      // ← trigger notify_parent_on_new_charge
+      report_received: { i: '📋', s: 'reportes',   t: 'Nuevo reporte' },               // ← directora/reports.module.js
     };
     const meta = map[t];
     if (!meta) return;

@@ -843,7 +843,8 @@ export async function navigateTo(targetId, opts = {}) {
   Helpers.vibrate?.('light');
 
   // LIMPIEZA DE REALTIME: Eliminar canales al cambiar de sección
-  if (RealtimeManager?.unsubscribeAll) RealtimeManager.unsubscribeAll(['notifications', 'live_status']);
+  // (proteger banner de actividades + badges: sobreviven la navegación)
+  if (RealtimeManager?.unsubscribeAll) RealtimeManager.unsubscribeAll(['notifications', 'live_status', 'eventbanner_*', 'badges_*']);
 
   // 💬 Conversación de chat abierta → cerrarla limpiamente al saltar de sección
   if (BackNavigation.topKind() === 'chat') BackNavigation.dropTop(true);
