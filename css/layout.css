@@ -345,6 +345,14 @@ video.karpus-img-loading { background: #1e293b; }
   font-size: 10px; font-weight: 900; letter-spacing: 0.06em;
   text-transform: uppercase; margin-bottom: 2px; color: #0d9488;
 }
+/* Nombre del remitente en burbuja saliente (yo) */
+.kk-msg-row.is-out .kk-sender-name,
+.kk-sender-name.is-mine {
+  color: rgba(255,255,255,0.9);
+  text-align: right;
+}
+/* Nombre del contacto en burbuja entrante */
+.kk-sender-name.is-theirs { color: #0d9488; }
 .kk-msg-text { margin: 0; white-space: pre-wrap; }
 .kk-msg-meta {
   display: flex; align-items: center; justify-content: flex-end; gap: 4px;

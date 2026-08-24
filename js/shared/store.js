@@ -341,7 +341,7 @@ export function _openProductDetail(pid){
         <div class="absolute bottom-2.5 left-1/2 -translate-x-1/2 flex gap-1.5" id="pdDots">
           ${p.images.map((_,i)=>`<span data-pddot="${i}" onclick="StoreModule._pdSetImg(${i})" class="w-1.5 h-1.5 rounded-full transition-all cursor-pointer ${i===0?'bg-white w-4':'bg-white/45'}"></span>`).join('')}
         </div>`:''}
-        ${imgs[0]?`<span class="absolute bottom-2.5 left-2.5 flex items-center gap-1 px-2 py-1 bg-black/45 backdrop-blur text-white text-[9px] font-black uppercase tracking-wider rounded-full pointer-events-none">
+        ${p.images?.[0]?`<span class="absolute bottom-2.5 left-2.5 flex items-center gap-1 px-2 py-1 bg-black/45 backdrop-blur text-white text-[9px] font-black uppercase tracking-wider rounded-full pointer-events-none">
           <i data-lucide="zoom-in" class="w-3 h-3"></i> Toca para ampliar
         </span>`:''}
       </div>
