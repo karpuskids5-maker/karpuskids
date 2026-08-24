@@ -334,6 +334,12 @@
             <i data-lucide="clipboard-list" class="text-cyan-300"></i>
             <span class="label">Calificaciones</span>
           </button>
+          <!-- Tienda Escolar -->
+          <button data-section="tienda" class="nav-btn kk-nav-item relative" data-tooltip="Tienda Escolar">
+            <i data-lucide="shopping-bag" class="text-lime-300"></i>
+            <span class="label">Tienda</span>
+            <span id="badge-tienda" class="hidden kk-badge">0</span>
+          </button>
           <button data-section="calendario" class="nav-btn kk-nav-item" data-tooltip="Calendario Escolar">
             <i data-lucide="calendar-range" class="text-violet-300"></i>
             <span class="label">Calendario Escolar</span>
@@ -1364,6 +1370,11 @@
             <div class="animate-spin w-8 h-8 border-2 border-orange-500 rounded-full border-t-transparent"></div>
           </div>
         </div>
+      </section>
+
+      <!-- TIENDA ESCOLAR -->
+      <section id="tienda" class="section">
+        <div id="store-asistente-container"></div>
       </section>
 
       <!-- PERFIL (Nueva Sección) -->

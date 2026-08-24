@@ -133,8 +133,11 @@ Deno.serve(async (req) => {
     const SA_KEY       = Deno.env.get('GOOGLE_PRIVATE_KEY')         ?? '';
     const SHEET_ID     = Deno.env.get('GOOGLE_SPREADSHEET_ID')      ?? GOOGLE_SPREADSHEET_ID;
 
-    if (!SUPABASE_URL || !SERVICE_KEY) return json({ error: 'Missing Supabase env vars' }, 500);
-    if (!SA_EMAIL || !SA_KEY || !SHEET_ID) return json({ error: 'Missing Google env vars' }, 500);
+    // Sin credenciales configuradas: responder OK pero marcando que se omitió,
+    // para no generar errores 500 visibles (el backup es opcional).
+    if (!SUPABASE_URL || !SERVICE_KEY || !SA_EMAIL || !SA_KEY || !SHEET_ID) {
+      return json({ ok: true, skipped: true, reason: 'Backup a Sheets no configurado (faltan variables de entorno de Google)' });
+    }
 
     const supabase = createClient(SUPABASE_URL, SERVICE_KEY, { auth: { persistSession: false } });
 

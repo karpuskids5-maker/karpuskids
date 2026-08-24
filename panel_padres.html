@@ -389,6 +389,11 @@
           <i data-lucide="user" class="w-5 h-5"></i>
           <span class="hidden md:inline">Mi Perfil</span>
         </button>
+        <!-- Tienda Escolar -->
+        <button type="button" data-target="store" class="sidebar-node node-store relative" aria-label="Tienda">
+          <i data-lucide="shopping-bag" class="w-5 h-5"></i>
+          <span class="hidden md:inline">Tienda</span>
+        </button>
         <!-- Cerrar Sesión — horizontal en móvil, al final en desktop -->
         <button type="button" id="btnLogout"
           class="sidebar-node md:hidden flex-shrink-0"
@@ -1075,6 +1080,11 @@
 
         <!-- ELIMINADO: QR DE ACCESO COMO SECCIÓN SEPARADA -->
       </div>
+
+      <!-- ── TIENDA ESCOLAR ──────────────────────────────────────────────── -->
+      <section id="store" class="section hidden">
+        <div id="store-padre-container"></div>
+      </section>
 
       <!-- MODALS -->
       <div id="modalAbsence" tabindex="-1" class="fixed inset-0 z-50 hidden items-center justify-center bg-slate-900/40 backdrop-blur-md" role="dialog" aria-modal="true">

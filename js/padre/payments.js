@@ -7,6 +7,16 @@ import { Helpers } from './helpers.js';
 import { calcMora, getMoraBreakdown, normalizeStatus, daysUntilDue } from '../shared/payment-service.js';
 import { emitEvent } from '../shared/supabase.js';
 
+// 🗓️ "2026-08" → "Agosto 2026" (etiqueta legible; si no es YYYY-MM devuelve tal cual)
+function monthLabel(m) {
+  const s = String(m || '');
+  if (!/^\d{4}-\d{2}$/.test(s)) return s;
+  const [y, mo] = s.split('-');
+  const name = new Date(Number(y), Number(mo) - 1, 1)
+    .toLocaleDateString('es-DO', { month: 'long' });
+  return `${name.charAt(0).toUpperCase()}${name.slice(1)} ${y}`;
+}
+
 export const PaymentsModule = {
   _studentId: null,
   _payments:  [],
@@ -251,7 +261,7 @@ export const PaymentsModule = {
 
     const days   = urgent?.days ?? 0;
     const amount = Helpers.formatCurrency(totalDebt);
-    const month  = urgent?.month_paid || 'tus mensualidades';
+    const month  = urgent?.month_paid ? monthLabel(urgent.month_paid) : 'tus mensualidades';
     let cfg;
 
     if (days < 0) {
@@ -341,7 +351,7 @@ export const PaymentsModule = {
                 ${mora > 0 ? '⚠️' : (isPaid ? '✅' : (p.method === 'transferencia' ? '🏦' : '💵'))}
               </div>
               <div class="min-w-0">
-                <p class="font-black text-slate-800 text-sm truncate">${Helpers.escapeHTML(p.month_paid || p.concept || 'Colegiatura')}</p>
+                <p class="font-black text-slate-800 text-sm truncate">${Helpers.escapeHTML(monthLabel(p.month_paid) || p.concept || 'Colegiatura')}</p>
                 <div class="flex items-center gap-1.5 mt-0.5 flex-wrap">
                   <span class="text-[9px] font-bold text-slate-400 uppercase">${Helpers.formatDate(p.created_at)}</span>
                   ${p.bank ? `<span class="text-[9px] font-bold text-slate-500 bg-slate-100 px-1.5 py-0.5 rounded-full">🏦 ${Helpers.escapeHTML(p.bank)}</span>` : ''}
@@ -427,7 +437,7 @@ export const PaymentsModule = {
     const classroom   = student.classrooms?.name || 'Sin aula';
     const amount      = Number(payment.amount || 0);
     const amountFmt   = Helpers.formatCurrency(amount);
-    const monthPaid   = payment.month_paid || 'Mensualidad';
+    const monthPaid   = monthLabel(payment.month_paid) || 'Mensualidad';
     const paidDate    = payment.paid_date
       ? new Date(payment.paid_date).toLocaleDateString('es-DO', { day: 'numeric', month: 'long', year: 'numeric' })
       : new Date().toLocaleDateString('es-DO', { day: 'numeric', month: 'long', year: 'numeric' });

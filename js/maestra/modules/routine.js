@@ -67,14 +67,14 @@ window._routineAutoSaveNote = _autoSaveNote;
 
 // ── Constantes de Eventos ─────────────────────────────────────────────────────
 const EVENT_TYPES = {
-  bienvenida:    { icon: '👋', label: 'Bienvenida', color: 'slate'  },
-  biberon:      { icon: '🍼', label: 'Biberón',    color: 'blue'   },
+  bienvenida:    { icon: '👋', label: 'Bienvenida',  color: 'teal'   },
+  biberon:      { icon: '🍼', label: 'Biberón',     color: 'pink'   },
   panal_humedo: { icon: '💧', label: 'Pañal 💧',   color: 'sky'    },
   panal_sucio:  { icon: '💩', label: 'Pañal 💩',   color: 'amber'  },
-  siesta:       { icon: '😴', label: 'Siesta',      color: 'indigo' },
+  siesta:       { icon: '😴', label: 'Siesta',      color: 'purple' },
   temperatura:  { icon: '🌡️', label: 'Temperatura', color: 'rose'   },
   medicamento:  { icon: '💊', label: 'Medicamento', color: 'purple' },
-  bano:         { icon: '🚽', label: 'Baño',        color: 'teal'   },
+  bano:         { icon: '🚽', label: 'Baño',        color: 'blue'   },
   animo:        { icon: '😊', label: 'Ánimo',       color: 'orange' },
   desayuno:     { icon: '🥐', label: 'Desayuno',    color: 'yellow' },
   actividad:    { icon: '📚', label: 'Actividad',   color: 'blue'   },
@@ -84,10 +84,6 @@ const EVENT_TYPES = {
   nota:         { icon: '📝', label: 'Nota',        color: 'slate'  },
   cepillado:    { icon: '🪥', label: 'Cepillado',   color: 'cyan'   },
   lavado_manos: { icon: '🧼', label: 'Lavado',      color: 'sky'    },
-  biberon:      { icon: '🍼', label: 'Biberón',     color: 'pink'   },
-  bano:         { icon: '🚽', label: 'Baño',        color: 'blue'   },
-  siesta:       { icon: '😴', label: 'Siesta',      color: 'purple' },
-  bienvenida:   { icon: '👋', label: 'Bienvenida',  color: 'teal'   },
 };
 
 const DEFAULT_SCHEDULE = [
@@ -768,8 +764,14 @@ function _injectV8Styles() {
       #accionesBody .grid button span:first-child{font-size:18px !important;display:block;}
       #accionesBody .grid button span:last-child{font-size:7px !important;word-break:break-word;display:block;line-height:1.2;margin-top:1px;}
 
-      /* ── Chips de filtro en grid, sin clipping ── */
-      #routineFilterChips{grid-template-columns:repeat(3,1fr) !important;gap:5px !important;padding:8px 8px 10px !important;}
+      /* ── Chips de filtro: cuadrícula adaptativa (3 col, 2 en pantallas angostas) ── */
+      #routineFilterChips{display:grid !important;width:100% !important;grid-template-columns:repeat(auto-fit,minmax(100px,1fr)) !important;gap:5px !important;padding:8px 8px 10px !important;}
+      #routineFilterChips button{width:100%;min-width:0;justify-content:center;}
+
+      /* ── Contenedores fluidos: timeline, acciones del aula, banners ── */
+      #routineWrapper > div{max-width:100%;min-width:0;}
+      #timelineContainer .routine-section-toggle .flex.items-center.gap-3{min-width:0;}
+      #routineStudentsGrid .swipe-card{width:100%;min-width:0;}
 
       /* ── Cards alumno ── */
       #routineStudentsGrid{padding:0 8px 12px !important;gap:6px !important;}
@@ -1336,20 +1338,19 @@ function _renderStudentRoutineCard(s, log) {
   const mood       = isValid && log.mood  ? log.mood  : null;
   const food       = isValid && log.food  ? log.food  : null;
   const sleep      = isValid && log.nap   ? log.nap   : null;
-  const note       = isValid && log.notes ? true       : false;
   const isDraft    = isValid && log.status === 'draft';
   const isInfant   = s.age_type === 'meses' || s.age_type === 'mes';
   const events     = isValid ? (log.events || log.infant_data || []) : [];
   const lastEvent  = events.length ? events[events.length - 1] : null;
   const hasBiberon = events.some(e => e.type === 'biberon' || e.type === 'milk' || e.type === 'structured_entry');
-  const activeSiesta = events.filter(e => e.type === 'siesta').some(e => e.open === true);
+  const activeSiesta = events.some(e => e.type === 'siesta' && e.open === true);
   const isPresent  = _isStudentPresent(s.id);
   const isRetirado = _isStudentRetirado(s.id);
   const nearExit   = !isRetirado && isPresent && _isStudentNearExit(s);
 
   // Alerta de temperatura elevada
-  const lastTemp = events.filter(e => e.type === 'temperatura' && e.temp != null).pop();
-  const hasFever = lastTemp && parseFloat(lastTemp.temp) >= 37.5;
+  const lastTemp = events.findLast(e => e.type === 'temperatura' && e.temp != null);
+  const hasFever = lastTemp && Number.parseFloat(lastTemp.temp) >= 37.5;
 
   const moodEmojiMap = {};
   MOOD_OPTIONS.forEach(m => { moodEmojiMap[m.value] = m.icon; });
@@ -2733,13 +2734,13 @@ export async function registerIndividualEvent(sid, type, extra = {}) {
   if (_isStudentRetirado(sid)) { safeToast('Este estudiante se retiró del centro: no se registran más eventos', 'warning'); return; }
   if (!_isStudentPresent(sid)) { safeToast('Este estudiante no está presente: no se pueden registrar eventos', 'warning'); return; }
   if (type === 'temperatura' && extra.temp != null) {
-    const t = parseFloat(extra.temp);
-    if (isNaN(t) || t < 30 || t > 45) { safeToast('Temperatura inválida (30-45°C)', 'error'); return; }
+const t = Number.parseFloat(extra.temp);
+if (Number.isNaN(t) || t < 30 || t > 45) { safeToast('Temperatura inválida (30-45°C)', 'error'); return; }
     extra.temp = t;
   }
   if (type === 'biberon' && extra.oz != null) {
-    const o = parseFloat(extra.oz);
-    if (isNaN(o) || o < 0 || o > 32) { safeToast('Onzas inválidas (0-32oz)', 'error'); return; }
+const o = Number.parseFloat(extra.oz);
+if (Number.isNaN(o) || o < 0 || o > 32) { safeToast('Onzas inválidas (0-32oz)', 'error'); return; }
     extra.oz = o;
   }
   ['nombre', 'dosis', 'autorizacion', 'texto', 'obs', 'motivo'].forEach(k => {
@@ -3028,31 +3029,49 @@ function _renderScheduleOrderHTML() {
   if (!schedule.length) return '<p class="text-center text-[10px] font-bold text-slate-300 py-4">Sin bloques. Agrega eventos desde el catálogo.</p>';
   return schedule.map((s, i) => {
     const meta = _getEventMeta(s.type) || { label: s.type, icon: '⏰', defaultDuration: 30 };
-    const minutes = [0,5,10,15,20,25,30,35,40,45,50,55];
-    const minuteOpts = [...new Set([...minutes, (s.minute ?? 0)])].sort((a,b) => a-b);
-    const autoOn = true;
+    const endMins = (s.hour ?? 8) * 60 + (s.minute ?? 0) + (s.duration ?? meta.defaultDuration ?? 30);
+    const endH = Math.floor(endMins / 60) % 24;
+    const endM = endMins % 60;
+    const endStr = `${String(endH).padStart(2,'0')}:${String(endM).padStart(2,'0')}`;
     return `
       <div class="schedule-order-row flex flex-wrap items-center gap-2 p-3 rounded-2xl border-2 bg-white transition-all" draggable="true"
-        data-type="${s.type}" data-idx="${i}" data-hour="${s.hour ?? 8}" data-minute="${s.minute ?? 0}" data-auto="1"
+        data-type="${s.type}" data-idx="${i}" data-hour="${s.hour ?? 8}" data-minute="${s.minute ?? 0}" data-duration="${s.duration ?? meta.defaultDuration ?? 30}" data-auto="1"
         style="border-color:#e2e8f0;">
-        <span class="drag-handle text-slate-300 text-sm shrink-0" title="Arrastrar para reordenar">⋮⋮</span>
+        <span class="drag-handle text-slate-300 text-sm shrink-0 cursor-grab" title="Arrastrar para reordenar">⋮⋮</span>
         <span class="text-lg shrink-0">${meta.icon}</span>
-        <div class="flex-1 min-w-0 basis-32 sm:basis-0">
+        <div class="flex-1 min-w-0">
           <p class="text-[10px] font-black text-slate-700 truncate">${meta.label}</p>
+          <!-- Fila de controles -->
           <div class="flex flex-wrap items-center gap-2 mt-1.5">
-            <select data-sched-hour="${s.type}" onchange="App.cascadeScheduleShift('${s.type}')">
-              ${Array.from({length: 24}, (_, h) => `<option value="${h}" ${(s.hour ?? 8) === h ? 'selected' : ''}>${String(h).padStart(2,'0')}</option>`).join('')}
+            <!-- Hora inicio -->
+            <div class="flex items-center gap-0.5">
+              <select data-sched-hour="${s.type}" onchange="App.cascadeScheduleShift('${s.type}')"
+                class="text-[11px] font-bold text-slate-600 bg-white border border-slate-200 rounded-lg px-1.5 py-1 outline-none focus:border-[#FF8A00]">
+                ${Array.from({length:24},(_,h)=>`<option value="${h}" ${(s.hour??8)===h?'selected':''}>${String(h).padStart(2,'0')}</option>`).join('')}
+              </select>
+              <span class="text-[10px] text-slate-400 font-bold">:</span>
+              <select data-sched-minute="${s.type}" onchange="App.cascadeScheduleShift('${s.type}')"
+                class="text-[11px] font-bold text-slate-600 bg-white border border-slate-200 rounded-lg px-1.5 py-1 outline-none focus:border-[#FF8A00]">
+                ${[0,5,10,15,20,25,30,35,40,45,50,55].map(m=>`<option value="${m}" ${(s.minute??0)===m?'selected':''}>${String(m).padStart(2,'0')}</option>`).join('')}
+              </select>
+            </div>
+            <!-- Duración -->
+            <select data-sched-duration="${s.type}" onchange="App.cascadeScheduleShift('${s.type}')"
+              class="text-[11px] font-bold text-slate-600 bg-white border border-slate-200 rounded-lg px-1.5 py-1 outline-none focus:border-[#FF8A00] min-w-[68px]">
+              ${[5,10,15,20,25,30,45,60,90,120].map(d=>`<option value="${d}" ${(s.duration??(meta.defaultDuration??30))===d?'selected':''}>${d} min</option>`).join('')}
             </select>
-            <span class="text-[10px] text-slate-300 font-bold">:</span>
-            <select data-sched-minute="${s.type}" onchange="App.cascadeScheduleShift('${s.type}')">
-              ${minuteOpts.map(m => `<option value="${m}" ${(s.minute ?? 0) === m ? 'selected' : ''}>${String(m).padStart(2,'0')}</option>`).join('')}
-            </select>
-            <select data-sched-duration="${s.type}" onchange="App.cascadeScheduleShift('${s.type}')" class="min-w-[64px]">
-              ${[5,10,15,20,30,45,60,90,120].map(d => `<option value="${d}" ${(s.duration ?? meta.defaultDuration ?? 30) === d ? 'selected' : ''}>${d}min</option>`).join('')}
-            </select>
+            <!-- Fin calculado (read-only) -->
+            <span data-sched-end="${s.type}" class="text-[10px] font-black text-slate-400 bg-slate-50 border border-slate-100 px-2 py-1 rounded-lg whitespace-nowrap">
+              → ${endStr}
+            </span>
+          </div>
+          <!-- Barra visual de duración relativa -->
+          <div class="mt-1.5 h-1 bg-slate-100 rounded-full overflow-hidden">
+            <div class="h-full rounded-full" style="background:#FF8A00;width:${Math.min(100,Math.round(((s.duration??(meta.defaultDuration??30))/120)*100))}%;transition:width .25s ease;"></div>
           </div>
         </div>
-        <button onclick="App.removeEventFromSchedule('${s.type}')" class="p-1.5 hover:bg-red-50 rounded-lg text-slate-300 hover:text-red-500 transition-colors shrink-0" title="Quitar">
+        <button onclick="App.removeEventFromSchedule('${s.type}')"
+          class="p-1.5 hover:bg-red-50 rounded-lg text-slate-300 hover:text-red-500 transition-colors shrink-0" title="Quitar del horario">
           <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/></svg>
         </button>
       </div>`;
@@ -3069,7 +3088,7 @@ function _bindScheduleDrag() {
   list.addEventListener('dragstart', (e) => {
     const row = e.target.closest('.schedule-order-row');
     if (!row) return;
-    _dragFromIdx = parseInt(row.dataset.idx, 10);
+    _dragFromIdx = Number.parseInt(row.dataset.idx, 10);
     row.classList.add('dragging');
     e.dataTransfer.effectAllowed = 'move';
     try { e.dataTransfer.setData('text/plain', String(_dragFromIdx)); } catch (_) {}
@@ -3087,7 +3106,7 @@ function _bindScheduleDrag() {
     e.preventDefault();
     const row = e.target.closest('.schedule-order-row');
     list.querySelectorAll('.schedule-order-row').forEach(r => r.classList.remove('drop-target'));
-    if (row && _dragFromIdx != null) moveScheduleEvent(_dragFromIdx, parseInt(row.dataset.idx, 10));
+    if (row && _dragFromIdx != null) moveScheduleEvent(_dragFromIdx, Number.parseInt(row.dataset.idx, 10));
     _dragFromIdx = null;
   });
 
@@ -3105,36 +3124,82 @@ export function moveScheduleEvent(from, to) {
   const [item] = schedule.splice(from, 1);
   schedule.splice(to, 0, item);
   _classroomSchedule = schedule;
+
+  // Auto-cascade desde el primer bloque afectado:
+  // los bloques anteriores al punto de inserción conservan su hora;
+  // desde el punto de inserción en adelante se encadenan.
+  const pivot = Math.min(from, to);
+  for (let j = pivot + 1; j < _classroomSchedule.length; j++) {
+    const prev = _classroomSchedule[j - 1];
+    const prevEnd = (prev.hour ?? 0) * 60 + (prev.minute ?? 0) + (prev.duration ?? 30);
+    const t = _minutesToTime(prevEnd);
+    _classroomSchedule[j].hour   = t.hour;
+    _classroomSchedule[j].minute = t.minute;
+  }
+
   _refreshScheduleManagerUI();
 }
 
 // ── RECÁLCULO EN CASCADA ─────────────────────────────────────────────────────
 export function cascadeScheduleShift(type) {
-  const row = document.querySelector(`#scheduleOrderList .schedule-order-row[data-type="${type}"]`);
-  if (!row) return;
-  const idx = _classroomSchedule.findIndex(s => s.type === type);
-  if (idx < 0) return;
-  const block = _classroomSchedule[idx];
-  const newHour = parseInt(row.querySelector('[data-sched-hour]')?.value, 10) || 0;
-  const newMin  = parseInt(row.querySelector('[data-sched-minute]')?.value, 10) || 0;
-  const newDuration = parseInt(row.querySelector('[data-sched-duration]')?.value, 10) || block.duration || 30;
-  const oldStart = (parseInt(row.dataset.hour, 10) || 0) * 60 + (parseInt(row.dataset.minute, 10) || 0);
-  const newStart = newHour * 60 + newMin;
-  const delta = newStart - oldStart;
+  const list = document.getElementById('scheduleOrderList');
+  if (!list) return;
 
-  block.hour = newHour;
-  block.minute = newMin;
-  block.duration = newDuration;
+  // 1. Leer los valores del bloque que cambió
+  const changedRow = list.querySelector(`.schedule-order-row[data-type="${type}"]`);
+  if (!changedRow) return;
 
-  if (delta && document.getElementById('cfgRecalc')?.checked) {
-    for (let j = idx + 1; j < _classroomSchedule.length; j++) {
-      const b = _classroomSchedule[j];
-      const t = _minutesToTime((b.hour ?? 0) * 60 + (b.minute ?? 0) + delta);
-      b.hour = t.hour;
-      b.minute = t.minute;
-    }
+  const changedIdx = _classroomSchedule.findIndex(s => s.type === type);
+  if (changedIdx < 0) return;
+
+  const newHour     = Number.parseInt(changedRow.querySelector('[data-sched-hour]')?.value     ?? '8',  10);
+  const newMin      = Number.parseInt(changedRow.querySelector('[data-sched-minute]')?.value   ?? '0',  10);
+  const newDuration = Number.parseInt(changedRow.querySelector('[data-sched-duration]')?.value ?? '30', 10);
+
+  // Actualizar el bloque modificado
+  _classroomSchedule[changedIdx].hour     = newHour;
+  _classroomSchedule[changedIdx].minute   = newMin;
+  _classroomSchedule[changedIdx].duration = newDuration;
+
+  // 2. Recálculo automático en cascada:
+  //    Cada bloque posterior comienza exactamente donde termina el anterior.
+  for (let j = changedIdx + 1; j < _classroomSchedule.length; j++) {
+    const prev = _classroomSchedule[j - 1];
+    const prevEnd = (prev.hour ?? 0) * 60 + (prev.minute ?? 0) + (prev.duration ?? 30);
+    const t = _minutesToTime(prevEnd);
+    _classroomSchedule[j].hour   = t.hour;
+    _classroomSchedule[j].minute = t.minute;
   }
-  _refreshScheduleManagerUI();
+
+  // 3. Actualizar el DOM en vivo (sin re-renderizar todo) para UX fluida
+  _classroomSchedule.forEach((s, i) => {
+    const row = list.querySelector(`.schedule-order-row[data-type="${s.type}"]`);
+    if (!row) return;
+
+    // Actualizar data-attrs del row para futuros cálculos
+    row.dataset.hour     = s.hour ?? 0;
+    row.dataset.minute   = s.minute ?? 0;
+    row.dataset.duration = s.duration ?? 30;
+
+    if (i !== changedIdx) {
+      // Sincronizar los selects de los bloques desplazados
+      const hourSel = row.querySelector('[data-sched-hour]');
+      const minSel  = row.querySelector('[data-sched-minute]');
+      if (hourSel) hourSel.value = String(s.hour ?? 0);
+      if (minSel)  minSel.value  = String(s.minute ?? 0);
+    }
+
+    // Actualizar el indicador de hora de fin
+    const endMins = (s.hour ?? 0) * 60 + (s.minute ?? 0) + (s.duration ?? 30);
+    const endH    = Math.floor(endMins / 60) % 24;
+    const endM    = endMins % 60;
+    const endEl   = row.querySelector(`[data-sched-end="${s.type}"]`);
+    if (endEl) endEl.textContent = `→ ${String(endH).padStart(2,'0')}:${String(endM).padStart(2,'0')}`;
+
+    // Actualizar la barra visual de duración
+    const bar = row.querySelector('.h-full.rounded-full');
+    if (bar) bar.style.width = `${Math.min(100, Math.round(((s.duration ?? 30) / 120) * 100))}%`;
+  });
 }
 
 function _renderScheduleConfigHTML() {
@@ -3444,9 +3509,9 @@ export async function saveScheduleManager() {
     const schedule = rows.map(row => {
       const type = row.dataset.type;
       const meta = _getEventMeta(type) || { label: type, icon: '⏰', defaultDuration: 30, category: 'personalizados' };
-      const hour = parseInt(row.querySelector('[data-sched-hour]')?.value, 10) || 8;
-      const minute = parseInt(row.querySelector('[data-sched-minute]')?.value, 10) || 0;
-      const duration = parseInt(row.querySelector('[data-sched-duration]')?.value, 10) || meta.defaultDuration || 30;
+      const hour = Number.parseInt(row.querySelector('[data-sched-hour]')?.value, 10) || 8;
+      const minute = Number.parseInt(row.querySelector('[data-sched-minute]')?.value, 10) || 0;
+      const duration = Number.parseInt(row.querySelector('[data-sched-duration]')?.value, 10) || meta.defaultDuration || 30;
       return {
         type,
         label: meta.label || type,

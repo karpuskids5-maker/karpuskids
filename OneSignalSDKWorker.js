@@ -34,8 +34,8 @@ self.addEventListener('message', event => {
 });
 
 // ── VERSIÓN DE CACHÉ ────────────────────────────────────────────────────────
-// ⚠️ INCREMENTAR en cada deploy: karpus-v1.0.28 → karpus-v1.0.29 ...
-const CACHE_VERSION = 'karpus-v1.0.29';
+// ⚠️ INCREMENTAR en cada deploy: karpus-v1.0.38 → karpus-v1.0.39 ...
+const CACHE_VERSION = 'karpus-v1.0.40';
 const CACHE_NAME    = CACHE_VERSION;
 
 // Assets precacheados en la instalación (mínimos, network-first en runtime)

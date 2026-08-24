@@ -824,7 +824,7 @@ const _SECTION_NAMES = {
   routine: 'Rutina Diaria', grades: 'Calificaciones', attendance: 'Asistencia',
   payments: 'Pagos', profile: 'Mi Perfil', chat: 'Chat',
   notifications: 'Chat', videocall: 'Videollamada', reenrollment: 'Reinscripción',
-  'live-attendance': 'Asistencia en Vivo'
+  'live-attendance': 'Asistencia en Vivo', store: 'Tienda Escolar'
 };
 
 // 🧠 Memoria de scroll por sección — no perder contexto visual al volver
@@ -979,6 +979,7 @@ function _runSection(targetId) {
     case 'grades':          import('./grades.js').then(m => m.GradesModule.init(student?.id)); break;
     case 'reenrollment':    import('./reinscripcion.js').then(m => m.ReinscripcionModule.init(student?.id)); break;
     case 'routine':         _initRoutineSection(student); break;
+    case 'store':           import('../shared/store.js').then(m => m.initStorePadre('store-padre-container')); break;
     case 'qr-access':       _initPadreQR(student); break;
     case 'videocall':       _initVideocallSection(); break;
   }

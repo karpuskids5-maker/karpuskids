@@ -588,6 +588,9 @@ function initNavigation() {
           case 'calificaciones':
             await import('../directora/grades.module.js').then(m => m.GradesModule.init());
             break;
+          case 'tienda':
+            await import('../shared/store.js').then(m => m.initStoreAsistente('store-asistente-container'));
+            break;
           case 'perfil':
             initProfile();
             import('../shared/notify-permission.js').then(m => m.NotifyPermission.requestIfNeeded());
@@ -617,6 +620,7 @@ function initNavigation() {
         case 'inscripciones': import('../directora/inscripciones.module.js').then(m => m.InscripcionesModule.init()); break;
         case 'aulas':      import('./modules/rooms.js').then(m => m.RoomsModule.loadRooms?.()); break;
         case 'calificaciones': import('../directora/grades.module.js').then(m => m.GradesModule.init()); break;
+        case 'tienda':      import('../shared/store.js').then(m => m.initStoreAsistente('store-asistente-container')); break;
         case 'pagos':      import('./payments.js').then(m => m.PaymentsModule.loadPayments?.()); break;
         case 'chat':
           document.getElementById('chatListPanel')?.style.setProperty('display', '');

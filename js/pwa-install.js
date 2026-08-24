@@ -31,52 +31,6 @@
     }
   }
 
-  // ── Banner flotante para paneles ───────────────────────────────────────────
-  function showInstallBanner() {
-    if (document.getElementById('pwa-install-banner')) return;
-    if (isInstalled()) return;
-
-    const banner = document.createElement('div');
-    banner.id = 'pwa-install-banner';
-    banner.className = [
-      'fixed bottom-4 left-4 right-4 md:left-auto md:right-6 md:w-80',
-      'bg-white rounded-2xl shadow-2xl border border-green-100 p-4',
-      'flex items-center gap-3 z-[9998]',
-      'animate-slide-up'
-    ].join(' ');
-
-    banner.innerHTML =
-      '<div class="w-12 h-12 bg-green-100 rounded-xl flex items-center justify-center text-2xl flex-shrink-0">\uD83C\uDF93</div>' +
-      '<div class="flex-1 min-w-0">' +
-        '<p class="font-black text-slate-800 text-sm leading-tight">Instala Karpus Kids</p>' +
-        '<p class="text-[10px] font-bold text-slate-400 mt-0.5">Acceso r\u00E1pido desde tu pantalla de inicio</p>' +
-      '</div>' +
-      '<div class="flex flex-col gap-1.5 flex-shrink-0">' +
-        '<button id="pwa-install-btn" class="px-3 py-1.5 bg-green-500 text-white rounded-xl text-[10px] font-black uppercase hover:bg-green-600 transition-colors">Instalar</button>' +
-        '<button id="pwa-dismiss-btn" class="px-3 py-1.5 bg-slate-100 text-slate-500 rounded-xl text-[10px] font-black uppercase hover:bg-slate-200 transition-colors">Ahora no</button>' +
-      '</div>';
-
-    document.body.appendChild(banner);
-
-    document.getElementById('pwa-install-btn')?.addEventListener('click', async () => {
-      if (deferredPrompt) {
-        deferredPrompt.prompt();
-        const { outcome } = await deferredPrompt.userChoice;
-        if (outcome === 'accepted') {
-          banner.remove();
-          localStorage.setItem('pwa-dismissed', 'installed');
-        }
-        deferredPrompt = null;
-      }
-    });
-
-    document.getElementById('pwa-dismiss-btn')?.addEventListener('click', () => {
-      banner.remove();
-      // Recordar por 3 días
-      localStorage.setItem('pwa-dismissed', String(Date.now() + 3 * 24 * 60 * 60 * 1000));
-    });
-  }
-
   // ── Verificar si debe mostrar el banner ────────────────────────────────────
   function shouldShowBanner() {
     if (isInstalled()) return false;
@@ -89,22 +43,15 @@
   // ── Evento beforeinstallprompt ─────────────────────────────────────────────
   window.addEventListener('beforeinstallprompt', (e) => {
     const loginBtn = document.getElementById('installAppBtn');
-    const wantsBanner = !document.getElementById('loginForm') && shouldShowBanner();
 
-    // Sin UI propia que mostrar: dejar que el navegador muestre su banner nativo
-    // (evita el aviso "must call prompt()" en consola).
-    if (!loginBtn && !wantsBanner) return;
+    // En los paneles NO llamamos e.preventDefault(): dejamos que Chrome muestre
+    // su mini-banner nativo de instalación (mejor UX y evita el aviso de consola
+    // "must call prompt()"). Solo login.html captura el evento para su botón.
+    if (!loginBtn) return;
 
     e.preventDefault();
     deferredPrompt = e;
-
-    // Botón en login
-    if (loginBtn) updateLoginBtn(true);
-
-    // Banner en paneles (con pequeño delay para no interrumpir la carga)
-    if (wantsBanner) {
-      setTimeout(showInstallBanner, 3000);
-    }
+    updateLoginBtn(true);
   });
 
   // ── Botón en login.html ────────────────────────────────────────────────────

@@ -249,6 +249,9 @@ function _applySection(sectionId, opts = {}) {
       case 'staff-permits':
         import('./permits.module.js').then(m => m.PermitsModule.init());
         break;
+      case 'tienda':
+        import('../shared/store.js').then(m => m.initStoreAsistente('store-directora-container'));
+        break;
       case 'configuracion':
         loadProfile();
         import('../shared/notify-permission.js').then(m => m.NotifyPermission.requestIfNeeded());

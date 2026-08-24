@@ -483,6 +483,10 @@
           <span class="label">Pagos</span>
           <span id="badge-pagos" class="hidden kk-badge">0</span>
         </button>
+        <button data-section="tienda" class="kk-nav-item" data-tooltip="Tienda Escolar">
+          <i data-lucide="shopping-bag" class="text-lime-300"></i>
+          <span class="label">Tienda</span>
+        </button>
 
         <div class="kk-nav-section label">Sistema</div>
         <button data-section="anio-escolar" class="kk-nav-item" data-tooltip="Año Escolar">
@@ -674,6 +678,16 @@
             <h3 class="font-black text-slate-800 text-lg relative z-10">Permisos y Faltas</h3>
             <p class="text-slate-500 text-xs mt-1 relative z-10">Gestión de ausencias, permisos médicos y faltas del personal.</p>
           </div>
+
+          <!-- Tienda Escolar -->
+          <div id="cardTienda" data-action="go-section" data-section="tienda" class="bg-white p-6 rounded-3xl shadow-sm border border-slate-100 hover:shadow-md hover:-translate-y-1 active:scale-95 transition-all duration-300 text-left group cursor-pointer relative overflow-hidden">
+            <div class="absolute top-0 right-0 w-24 h-24 bg-lime-500/5 rounded-full -mr-12 -mt-12 group-hover:bg-lime-500/10 transition-colors"></div>
+            <div class="w-14 h-14 bg-lime-50 rounded-2xl flex items-center justify-center mb-4 group-hover:bg-lime-600 transition-colors relative z-10">
+              <i data-lucide="shopping-bag" class="w-7 h-7 text-lime-600 group-hover:text-white transition-colors"></i>
+            </div>
+            <h3 class="font-black text-slate-800 text-lg relative z-10">Tienda Escolar</h3>
+            <p class="text-slate-500 text-xs mt-1 relative z-10">Catálogo de productos, pedidos y control de inventario.</p>
+          </div>
         </div>
 
       </section>
@@ -826,6 +840,11 @@
             <div class="animate-spin w-8 h-8 border-2 border-rose-500 rounded-full border-t-transparent"></div>
           </div>
         </div>
+      </section>
+
+      <!-- TIENDA ESCOLAR -->
+      <section id="tienda" class="section">
+        <div id="store-directora-container"></div>
       </section>
 
       <!-- ESTUDIANTES -->

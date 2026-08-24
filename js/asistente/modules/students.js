@@ -1,6 +1,5 @@
-import { supabase, createClient, SUPABASE_URL, SUPABASE_ANON_KEY } from '../../shared/supabase.js';
+import { supabase } from '../../shared/supabase.js';
 import { Helpers } from '../../shared/helpers.js';
-import { FileManager } from '../../shared/FileManager.js';
 import { QueryCache } from '../../shared/query-cache.js';
 import { StudentRecordModal } from '../../shared/student-record-modal.js';
 import { FiltersStore } from '../state.js';
@@ -128,7 +127,7 @@ export const StudentsModule = {
     if (!tbody) return;
     const { q } = this._currentFilters();
 
-    if (!page || !page.length) {
+    if (!page?.length) {
       tbody.innerHTML = `<tr><td colspan="4" class="px-6 py-12 text-center">
         <div class="opacity-30 mb-2"><i data-lucide="search-x" class="w-12 h-12 mx-auto"></i></div>
         <p class="text-sm font-bold text-slate-400">${q ? `Sin resultados para "${q}"` : 'No hay estudiantes registrados.'}</p>
@@ -187,7 +186,7 @@ export const StudentsModule = {
       if (!wrapper) return;
       container = document.createElement('div');
       container.id = 'studentsPagination';
-      wrapper.insertAdjacentElement('afterend', container);
+      wrapper.after(container);
     }
     if (totalPages <= 1) { container.innerHTML = ''; return; }
     const start = (page - 1) * this._pageSize + 1;

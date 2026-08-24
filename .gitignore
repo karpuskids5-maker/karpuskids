@@ -36,7 +36,7 @@ data/*.db-wal
 
 # Legacy files (no longer used)
 app.js
-store.js
+/store.js
 update_main.cjs
 update_asistente_main.cjs
 fix_escapes.cjs

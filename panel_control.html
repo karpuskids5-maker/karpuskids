@@ -10,6 +10,12 @@
   <link rel="manifest" href="manifest.json">
   <style>html{display:none;}</style>
   <script>if(self===top){document.documentElement.style.display='block';}else{top.location=self.location;}</script>
+  <!-- Service Worker — PWA: registrar temprano, silencioso si falla -->
+  <script>
+    if ('serviceWorker' in navigator) {
+      navigator.serviceWorker.register('/OneSignalSDKWorker.js', { scope: '/' }).catch(() => {});
+    }
+  </script>
   <link href="https://fonts.googleapis.com/css2?family=Nunito:wght@400;600;700;800;900&family=Poppins:wght@700;800;900&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="css/bootstrap-icons.min.css">
   <link rel="stylesheet" href="css/karpus-modern.css">
@@ -55,6 +61,7 @@
     .kpi.k-red::before{background:linear-gradient(90deg,#ef4444,#f87171);}
     .kpi.k-blue::before{background:linear-gradient(90deg,#3b82f6,#60a5fa);}
     .kpi.k-yellow::before{background:linear-gradient(90deg,#eab308,#facc15);}
+    .kpi.k-purple::before{background:linear-gradient(90deg,#8b5cf6,#a78bfa);}
     .kpi-val{font-family:'Poppins',sans-serif;font-size:2rem;font-weight:900;line-height:1;margin-bottom:4px;}
     .kpi-lbl{font-size:11px;font-weight:800;color:var(--muted);text-transform:uppercase;letter-spacing:.08em;}
     .kpi-icon{position:absolute;right:16px;top:50%;transform:translateY(-50%);font-size:2.2rem;opacity:.12;}
@@ -125,12 +132,72 @@
     .live-dot{width:8px;height:8px;background:#22c55e;border-radius:50%;animation:pulse 2s infinite;}
     @keyframes pulse{0%,100%{box-shadow:0 0 0 0 rgba(34,197,94,.4)}50%{box-shadow:0 0 0 6px rgba(34,197,94,0)}}
 
+    /* ── Feature Flags (Módulos y Visibilidad) ── */
+    .ff-card{background:var(--surface2);border:1px solid var(--border);border-radius:14px;padding:14px 16px;display:flex;align-items:center;gap:12px;transition:border .2s;}
+    .ff-card:hover{border-color:rgba(99,102,241,.4);}
+    .ff-icon{width:38px;height:38px;border-radius:10px;display:flex;align-items:center;justify-content:center;font-size:17px;flex-shrink:0;}
+    .ff-switch{position:relative;width:44px;height:24px;flex-shrink:0;cursor:pointer;margin-left:auto;}
+    .ff-switch input{opacity:0;width:0;height:0;position:absolute;}
+    .ff-slider{position:absolute;inset:0;background:rgba(255,255,255,.15);border-radius:50px;transition:.2s;}
+    .ff-slider:before{content:'';position:absolute;width:18px;height:18px;left:3px;top:3px;background:white;border-radius:50%;transition:.2s;}
+    .ff-switch input:checked + .ff-slider{background:#22c55e;}
+    .ff-switch input:checked + .ff-slider:before{transform:translateX(20px);}
+    .ff-chk{width:16px;height:16px;accent-color:#6366f1;cursor:pointer;display:block;margin:0 auto;}
+    .ff-chk:disabled{opacity:.3;cursor:not-allowed;}
+    .ff-off-row td{opacity:.45;}
+
     /* ── Mobile ── */
     @media(max-width:768px){
       #sidebar{position:fixed;left:-240px;z-index:100;transition:left .3s;}
       #sidebar.open{left:0;}
       #main{width:100%;}
+      #mobMenuBtn{display:block !important;}
+      #content{padding:14px;}
+      .grid-2,.grid-3{grid-template-columns:1fr !important;}
+      /* Targets táctiles más cómodos */
+      .nav-item{padding:13px 14px;font-size:14px;}
+      .btn{padding:10px 16px;}
+      .tbl td,.tbl th{padding:9px 10px;}
+      /* Topbar compacto: oculta reloj y subtítulo para ganar espacio */
+      #topClock{display:none !important;}
+      #pageSubtitle{display:none;}
+      #topbar{height:54px;padding:0 14px;}
+      .kpi{padding:16px;}
+      .kpi-val{font-size:1.6rem;}
     }
+    @media(max-width:420px){
+      .kpi-grid{grid-template-columns:repeat(2,1fr) !important;gap:10px;}
+      .nav-badge{font-size:8px;padding:2px 5px;min-width:16px;}
+    }
+
+    /* ── Backdrop del menú lateral móvil ── */
+    #sidebarBackdrop{display:none;position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:99;backdrop-filter:blur(2px);animation:fadeIn .25s ease;}
+    #sidebarBackdrop.show{display:block;}
+    @keyframes fadeIn{from{opacity:0}to{opacity:1}}
+
+    /* ── Sidebar con gradiente Deep Space ── */
+    #sidebar{background:linear-gradient(180deg,#111827 0%,#0c1222 100%);}
+
+    /* ── Toasts ── */
+    #toastWrap{position:fixed;top:70px;right:20px;z-index:10000;display:flex;flex-direction:column;gap:10px;pointer-events:none;max-width:min(90vw,360px);}
+    .toast{pointer-events:auto;display:flex;align-items:center;gap:10px;background:var(--surface2);border:1px solid var(--border);border-left:3px solid var(--accent);border-radius:12px;padding:12px 16px;font-size:13px;font-weight:800;color:var(--text);box-shadow:0 12px 32px rgba(0,0,0,.45);animation:toastIn .3s ease;}
+    .toast.out{animation:toastOut .3s ease forwards;}
+    .toast-success{border-left-color:#22c55e;}
+    .toast-error{border-left-color:#ef4444;}
+    .toast-warn{border-left-color:#f97316;}
+    .toast-info{border-left-color:#6366f1;}
+    @keyframes toastIn{from{opacity:0;transform:translateX(24px)}to{opacity:1;transform:none}}
+    @keyframes toastOut{to{opacity:0;transform:translateX(24px)}}
+
+    /* ── Buscadores con icono de lupa ── */
+    .inp-search{background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='13' height='13' viewBox='0 0 16 16' fill='%2394a3b8'%3E%3Cpath d='M11.742 10.344a6.5 6.5 0 1 0-1.397 1.398h-.001l3.85 3.85a1 1 0 0 0 1.415-1.414l-3.85-3.85zm-5.242.156a4.5 4.5 0 1 1 0-9 4.5 4.5 0 0 1 0 9z'/%3E%3C/svg%3E");background-repeat:no-repeat;background-position:11px center;padding-left:32px !important;}
+    .inp-search:focus{background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='13' height='13' viewBox='0 0 16 16' fill='%23a5b4fc'%3E%3Cpath d='M11.742 10.344a6.5 6.5 0 1 0-1.397 1.398h-.001l3.85 3.85a1 1 0 0 0 1.415-1.414l-3.85-3.85zm-5.242.156a4.5 4.5 0 1 1 0-9 4.5 4.5 0 0 1 0 9z'/%3E%3C/svg%3E");}
+
+    /* ── Resaltado de coincidencias en búsquedas ── */
+    mark.hl{background:rgba(99,102,241,.35);color:#e0e7ff;border-radius:3px;padding:0 2px;}
+
+    /* ── Sombra de profundidad en modales ── */
+    #userModal > div{box-shadow:0 24px 64px rgba(0,0,0,.55);}
   </style>
 </head>
 <body>
@@ -140,6 +207,12 @@
   <div class="spinner"></div>
   <span style="font-size:13px;font-weight:800;color:var(--muted);">Verificando acceso...</span>
 </div>
+
+<!-- TOASTS -->
+<div id="toastWrap" aria-live="polite"></div>
+
+<!-- BACKDROP menú móvil -->
+<div id="sidebarBackdrop" onclick="closeSidebar()"></div>
 
 <!-- SIDEBAR -->
 <nav id="sidebar">
@@ -166,9 +239,10 @@
 
   <div class="nav-section">Usuarios</div>
   <button class="nav-item" onclick="goTo('usuarios')"><i class="bi bi-people-fill"></i> Todos los Usuarios</button>
-  <button class="nav-item" onclick="goTo('padres')"><i class="bi bi-person-heart"></i> Padres</button>
-  <button class="nav-item" onclick="goTo('maestras')"><i class="bi bi-person-workspace"></i> Maestras</button>
-  <button class="nav-item" onclick="goTo('directoras')"><i class="bi bi-person-badge-fill"></i> Directoras</button>
+
+  <div class="nav-section">Contenido</div>
+  <button class="nav-item" onclick="goTo('muro')"><i class="bi bi-columns-gap"></i> Muro Escolar <span class="nav-badge" id="badge-wall" style="background:#6366f1;">0</span></button>
+  <button class="nav-item" onclick="goTo('chat')"><i class="bi bi-chat-dots-fill"></i> Chat & Mensajería <span class="nav-badge" id="badge-chatmsg" style="background:#3b82f6;">0</span></button>
 
   <div class="nav-section">Operaciones</div>
   <button class="nav-item" onclick="goTo('pagos')"><i class="bi bi-credit-card-fill"></i> Pagos</button>
@@ -176,6 +250,7 @@
   <button class="nav-item" onclick="goTo('errores')"><i class="bi bi-bug-fill"></i> Errores del Sistema</button>
 
   <div class="nav-section">Sistema</div>
+  <button class="nav-item" onclick="goTo('modulos')"><i class="bi bi-toggles"></i> Módulos y Visibilidad</button>
   <button class="nav-item" onclick="goTo('seguridad')"><i class="bi bi-shield-exclamation"></i> Seguridad</button>
   <button class="nav-item" onclick="goTo('configuracion')"><i class="bi bi-gear-fill"></i> Configuración</button>
 
@@ -198,7 +273,7 @@
   <!-- TOPBAR -->
   <div id="topbar">
     <div style="display:flex;align-items:center;gap:12px;">
-      <button id="mobMenuBtn" onclick="document.getElementById('sidebar').classList.toggle('open')" style="display:none;background:none;border:none;color:var(--text);font-size:20px;cursor:pointer;"><i class="bi bi-list"></i></button>
+      <button id="mobMenuBtn" onclick="toggleSidebar()" style="display:none;background:none;border:none;color:var(--text);font-size:22px;cursor:pointer;padding:6px;"><i class="bi bi-list"></i></button>
       <div>
         <div style="font-size:15px;font-weight:900;color:var(--text);" id="pageTitle">Dashboard</div>
         <div style="font-size:11px;color:var(--muted);" id="pageSubtitle">Vista general del sistema</div>
@@ -276,7 +351,7 @@
     <div class="section" id="sec-auditoria">
       <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;flex-wrap:wrap;gap:10px;">
         <div style="display:flex;gap:8px;flex-wrap:wrap;">
-          <input class="inp" id="auditSearch" placeholder="Buscar usuario, acción..." style="width:220px;" oninput="filterAudit()">
+          <input class="inp inp-search" id="auditSearch" placeholder="Buscar usuario, acción... ( / )" style="width:220px;" oninput="filterAudit()">
           <select class="inp" id="auditRole" style="width:140px;" onchange="filterAudit()">
             <option value="">Todos los roles</option>
             <option value="padre">Padre</option>
@@ -333,7 +408,7 @@
     ══════════════════════════════════════════════════════ -->
     <div class="section" id="sec-usuarios">
       <div style="display:flex;gap:8px;margin-bottom:16px;flex-wrap:wrap;">
-        <input class="inp" id="userSearch" placeholder="Buscar nombre, email..." style="width:240px;" oninput="filterUsers()">
+        <input class="inp inp-search" id="userSearch" placeholder="Buscar nombre, email, tel... ( / )" style="width:240px;" oninput="filterUsers()">
         <select class="inp" id="userRoleFilter" style="width:140px;" onchange="filterUsers()">
           <option value="">Todos los roles</option>
           <option value="padre">Padre</option>
@@ -355,11 +430,54 @@
     </div>
 
     <!-- ══════════════════════════════════════════════════════
-         PADRES / MAESTRAS / DIRECTORAS (shared template)
-    ══════════════════════════════════════════════════════ -->
-    <div class="section" id="sec-padres"><div class="panel"><div class="panel-hdr"><h3 id="roleTitle-padres">Padres</h3></div><div style="overflow-x:auto;"><table class="tbl"><thead><tr><th>Nombre</th><th>Email</th><th>Estudiantes</th><th>Pagos</th><th>Último acceso</th><th>Estado</th></tr></thead><tbody id="roleBody-padres"><tr><td colspan="6" style="text-align:center;padding:24px;color:var(--muted);">Cargando...</td></tr></tbody></table></div></div></div>
-    <div class="section" id="sec-maestras"><div class="panel"><div class="panel-hdr"><h3>Maestras y Asistentes</h3></div><div style="overflow-x:auto;"><table class="tbl"><thead><tr><th>Nombre</th><th>Email</th><th>Rol</th><th>Aula</th><th>Asistencias</th><th>Estado</th></tr></thead><tbody id="roleBody-maestras"><tr><td colspan="6" style="text-align:center;padding:24px;color:var(--muted);">Cargando...</td></tr></tbody></table></div></div></div>
-    <div class="section" id="sec-directoras"><div class="panel"><div class="panel-hdr"><h3>Directoras</h3></div><div style="overflow-x:auto;"><table class="tbl"><thead><tr><th>Nombre</th><th>Email</th><th>Escuela</th><th>Último acceso</th><th>Estado</th></tr></thead><tbody id="roleBody-directoras"><tr><td colspan="5" style="text-align:center;padding:24px;color:var(--muted);">Cargando...</td></tr></tbody></table></div></div></div>
+          MURO ESCOLAR
+     ══════════════════════════════════════════════════════ -->
+    <div class="section" id="sec-muro">
+      <div class="kpi-grid" style="grid-template-columns:repeat(auto-fit,minmax(160px,1fr));margin-bottom:16px;">
+        <div class="kpi k-indigo"><div class="kpi-val" id="wall-total">—</div><div class="kpi-lbl">Publicaciones</div><i class="bi bi-columns-gap kpi-icon"></i></div>
+        <div class="kpi k-blue"><div class="kpi-val" id="wall-comments">—</div><div class="kpi-lbl">Comentarios</div><i class="bi bi-chat-left-text-fill kpi-icon"></i></div>
+        <div class="kpi k-orange"><div class="kpi-val" id="wall-likes">—</div><div class="kpi-lbl">Reacciones</div><i class="bi bi-heart-fill kpi-icon"></i></div>
+        <div class="kpi k-green"><div class="kpi-val" id="wall-week">—</div><div class="kpi-lbl">Nuevos (7 días)</div><i class="bi bi-graph-up-arrow kpi-icon"></i></div>
+      </div>
+      <div class="panel">
+        <div class="panel-hdr"><h3><i class="bi bi-columns-gap" style="color:#6366f1;margin-right:6px;"></i>Publicaciones del muro</h3><span id="wallCount" style="font-size:11px;color:var(--muted);"></span></div>
+        <div style="overflow-x:auto;">
+          <table class="tbl">
+            <thead><tr><th>Fecha</th><th>Autor</th><th>Aula</th><th>Contenido</th><th>❤</th><th>💬</th><th>Vistas</th><th>Estado</th></tr></thead>
+            <tbody id="wallBody"><tr><td colspan="8" style="text-align:center;padding:24px;color:var(--muted);">Cargando...</td></tr></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <!-- ══════════════════════════════════════════════════════
+         CHAT & MENSAJERÍA
+     ══════════════════════════════════════════════════════ -->
+    <div class="section" id="sec-chat">
+      <div class="kpi-grid" style="grid-template-columns:repeat(auto-fit,minmax(160px,1fr));margin-bottom:16px;">
+        <div class="kpi k-blue"><div class="kpi-val" id="chat-convos">—</div><div class="kpi-lbl">Conversaciones</div><i class="bi bi-collection-fill kpi-icon"></i></div>
+        <div class="kpi k-indigo"><div class="kpi-val" id="chat-today">—</div><div class="kpi-lbl">Mensajes hoy</div><i class="bi bi-send-fill kpi-icon"></i></div>
+        <div class="kpi k-purple"><div class="kpi-val" id="chat-week">—</div><div class="kpi-lbl">Mensajes (7 días)</div><i class="bi bi-envelope-paper-fill kpi-icon"></i></div>
+        <div class="kpi k-orange"><div class="kpi-val" id="chat-unread">—</div><div class="kpi-lbl">Sin leer</div><i class="bi bi-bell-fill kpi-icon"></i></div>
+      </div>
+      <div class="grid-2" style="margin-bottom:16px;">
+        <div class="panel">
+          <div class="panel-hdr"><h3>Mensajes recientes</h3><span id="chatMsgCount" style="font-size:11px;color:var(--muted);"></span></div>
+          <div style="overflow-x:auto;max-height:420px;">
+            <table class="tbl">
+              <thead><tr><th>Fecha</th><th>Remitente</th><th>Mensaje</th><th>Estado</th></tr></thead>
+              <tbody id="chatBody"><tr><td colspan="4" style="text-align:center;padding:24px;color:var(--muted);">Cargando...</td></tr></tbody>
+            </table>
+          </div>
+        </div>
+        <div class="panel">
+          <div class="panel-hdr"><h3>Tipo de conversaciones</h3></div>
+          <div class="panel-body" id="convTypeList">
+            <div style="text-align:center;padding:20px;color:var(--muted);font-size:13px;">Cargando...</div>
+          </div>
+        </div>
+      </div>
+    </div>
 
     <!-- ══════════════════════════════════════════════════════
          PAGOS
@@ -472,15 +590,85 @@
     </div>
 
     <!-- ══════════════════════════════════════════════════════
+         MÓDULOS Y VISIBILIDAD (Feature Flags)
+    ══════════════════════════════════════════════════════ -->
+    <div class="section" id="sec-modulos">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;flex-wrap:wrap;gap:10px;">
+        <p style="font-size:13px;color:var(--muted);font-weight:600;">Controla qué módulos del ecosistema Karpus Kids están activos y quién puede verlos. Los cambios se sincronizan en vivo con todos los dispositivos.</p>
+        <div style="display:flex;align-items:center;gap:10px;">
+          <span id="ffStatus" style="font-size:11px;font-weight:800;color:#4ade80;">✓ Sincronizado</span>
+          <button id="ffSaveBtn" class="btn btn-primary" onclick="saveFlags()" disabled><i class="bi bi-cloud-arrow-up-fill"></i> Guardar cambios</button>
+        </div>
+      </div>
+
+      <!-- Interruptores globales -->
+      <div class="panel" style="margin-bottom:16px;">
+        <div class="panel-hdr"><h3><i class="bi bi-power" style="color:#22c55e;margin-right:6px;"></i>Interruptores Globales</h3><span style="font-size:10px;color:var(--muted);font-weight:700;">ON/OFF instantáneo por módulo</span></div>
+        <div class="panel-body">
+          <div id="ffToggles" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(250px,1fr));gap:12px;"></div>
+        </div>
+      </div>
+
+      <!-- Matriz de permisos por rol -->
+      <div class="panel" style="margin-bottom:16px;">
+        <div class="panel-hdr"><h3><i class="bi bi-grid-3x3-gap-fill" style="color:#6366f1;margin-right:6px;"></i>Matriz de Permisos por Panel y Rol</h3><span style="font-size:10px;color:var(--muted);font-weight:700;">Visible para cada rol</span></div>
+        <div style="overflow-x:auto;">
+          <table class="tbl" id="ffMatrixTable">
+            <thead><tr>
+              <th>Módulo</th>
+              <th style="text-align:center;">Padre 👨‍👩‍👧</th>
+              <th style="text-align:center;">Maestra 👩‍🏫</th>
+              <th style="text-align:center;">Asistente 🧑‍💼</th>
+              <th style="text-align:center;">Directora 🏫</th>
+            </tr></thead>
+            <tbody id="ffMatrixBody"></tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- Overrides individuales -->
+      <div class="panel">
+        <div class="panel-hdr"><h3><i class="bi bi-person-lock" style="color:#f97316;margin-right:6px;"></i>Control por Usuario Específico</h3><span style="font-size:10px;color:var(--muted);font-weight:700;">Sobreescribe la matriz global</span></div>
+        <div class="panel-body">
+          <input class="inp inp-search" id="ffUserSearch" placeholder="Buscar usuario por nombre, correo o teléfono..." style="max-width:420px;" oninput="ffSearchUsers()">
+          <div id="ffSearchResults" style="margin-top:12px;display:flex;flex-direction:column;gap:8px;"></div>
+
+          <div style="margin-top:18px;font-size:11px;font-weight:900;color:var(--muted);text-transform:uppercase;letter-spacing:.08em;margin-bottom:8px;">Overrides activos (<span id="ffOverrideCount">0</span>)</div>
+          <div id="ffOverrideList" style="display:flex;flex-direction:column;gap:8px;">
+            <div style="text-align:center;padding:14px;color:var(--muted);font-size:12px;">Sin overrides individuales. Busca un usuario arriba para crear uno.</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ══════════════════════════════════════════════════════
          CONFIGURACIÓN
     ══════════════════════════════════════════════════════ -->
     <div class="section" id="sec-configuracion">
+      <!-- Alertas por correo -->
+      <div class="panel" style="margin-bottom:16px;">
+        <div class="panel-hdr"><h3><i class="bi bi-envelope-at-fill" style="color:#3b82f6;margin-right:6px;"></i>Alertas por Correo Electrónico</h3><span style="font-size:10px;color:var(--muted);font-weight:700;">Resumen de fraude y errores del sistema</span></div>
+        <div class="panel-body">
+          <p style="font-size:13px;color:var(--muted);margin-bottom:14px;">Recibe un resumen automático cuando se detecten alertas de riesgo alto o errores críticos. El envío usa la Edge Function <code style="color:#a5b4fc;">send-email</code>.</p>
+          <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:center;">
+            <input class="inp" id="alertEmailTo" placeholder="Correo destinatario" style="flex:1;min-width:220px;" type="email">
+            <label class="ff-switch" title="Activar alertas automáticas" style="margin-left:0;">
+              <input type="checkbox" id="autoAlertToggle" onchange="toggleAutoAlerts(this.checked)">
+              <span class="ff-slider"></span>
+            </label>
+            <span id="autoAlertState" style="font-size:11px;font-weight:800;color:var(--muted);">Automático: OFF</span>
+            <button class="btn btn-primary" onclick="sendAdminReport(true)" id="btnSendReport"><i class="bi bi-send-fill"></i> Enviar reporte ahora</button>
+          </div>
+          <div id="reportEmailMsg" style="margin-top:10px;font-size:12px;font-weight:700;"></div>
+        </div>
+      </div>
       <div class="grid-2">
         <div class="panel">
           <div class="panel-hdr"><h3><i class="bi bi-person-gear" style="color:#6366f1;margin-right:6px;"></i>Mi perfil de administrador</h3></div>
           <div class="panel-body" style="display:flex;flex-direction:column;gap:14px;">
             <div><label style="font-size:11px;font-weight:900;color:var(--muted);text-transform:uppercase;letter-spacing:.08em;display:block;margin-bottom:6px;">Nombre</label><input class="inp" id="cfgName" placeholder="Tu nombre"></div>
             <div><label style="font-size:11px;font-weight:900;color:var(--muted);text-transform:uppercase;letter-spacing:.08em;display:block;margin-bottom:6px;">Email</label><input class="inp" id="cfgEmail" disabled style="opacity:.5;"></div>
+            <div><label style="font-size:11px;font-weight:900;color:var(--muted);text-transform:uppercase;letter-spacing:.08em;display:block;margin-bottom:6px;">Bio / Presentación</label><textarea class="inp" id="cfgBio" rows="2" placeholder="Presentación del administrador visible en el sistema..." style="resize:vertical;"></textarea></div>
             <button class="btn btn-primary" onclick="saveAdminProfile()"><i class="bi bi-check-lg"></i> Guardar cambios</button>
           </div>
         </div>
@@ -506,6 +694,10 @@
               <div style="display:flex;justify-content:space-between;align-items:center;padding:10px;background:var(--surface2);border-radius:10px;">
                 <span style="font-size:13px;font-weight:700;">Realtime</span>
                 <span class="badge badge-green"><i class="bi bi-circle-fill" style="font-size:6px;"></i> Activo</span>
+              </div>
+              <div style="display:flex;justify-content:space-between;align-items:center;padding:10px;background:var(--surface2);border-radius:10px;">
+                <span style="font-size:13px;font-weight:700;">Notificaciones del Navegador</span>
+                <button id="notifPermBtn" class="badge badge-gray" style="border:none;cursor:pointer;font-family:inherit;" onclick="requestNotifPermission()" title="Clic para activar/desactivar">Verificando...</button>
               </div>
               <div style="display:flex;justify-content:space-between;align-items:center;padding:10px;background:var(--surface2);border-radius:10px;">
                 <span style="font-size:13px;font-weight:700;">Total usuarios</span>
@@ -540,5 +732,7 @@
 
 <script src="js/shared/supabase-js.min.js" defer></script>
 <script type="module" src="js/control/main.js"></script>
+<script src="js/pwa-install.js" defer></script>
+<script src="js/pwa-updater.js" defer></script>
 </body>
 </html>

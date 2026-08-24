@@ -1,12 +1,16 @@
 /**
  * auto-payment-cycle — Edge Function
  * Genera cobros mensuales automáticamente para todos los estudiantes activos.
- * - Corre el día 1 de cada mes (genera cobros del mes actual)
- * - También rellena meses anteriores que no tienen cobros (backfill)
- * - Se puede forzar con header x-force-run: true
+ * - REGLA DE NEGOCIO: los cobros del mes M se generan a partir del día
+ *   `generation_day` (25) de ese mismo mes — antes de esa fecha el padre
+ *   NO ve ningún cobro nuevo.
+ * - NUNCA genera cobros de meses anteriores (backfill) ni de meses futuros:
+ *   se respeta la fecha de inscripción (start_date) de cada estudiante.
+ * - Se puede forzar con header x-force-run: true o body {"force":true}
  *
- * Cron recomendado: día 1 de cada mes a las 6am RD (10:00 UTC)
- *   '0 10 1 * *'
+ * Cron recomendado: DIARIO a las 6am RD (10:00 UTC) — '0 10 * * *'
+ * (es idempotente y está blindado por generation_day, así que correr
+ * diario es seguro y garantiza que genere apenas llegue el día 25).
  */
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
@@ -38,28 +42,50 @@ Deno.serve(async (req) => {
     // ── Configuración ────────────────────────────────────────────────────────
     const { data: settings } = await supabase
       .from('school_settings').select('generation_day, due_day').eq('id', 1).single();
-    const dueDay = settings?.due_day ?? 5;
+    const dueDay        = settings?.due_day ?? 5;
+    const generationDay = settings?.generation_day ?? 25;
 
     const now = new Date();
+
+    // ── Fecha LOCAL de República Dominicana (evita desfase UTC al cerrar mes:
+    //    sin esto, el 31/ago 8pm RD ya contaría como septiembre) ─────────────
+    const rdDate = new Intl.DateTimeFormat('en-CA', {
+      timeZone: 'America/Santo_Domingo',
+    }).format(now); // "YYYY-MM-DD"
+    const [rdY, rdM, rdD] = rdDate.split('-').map(Number);
+
+    // ── Regla: NO generar antes del día 25 (generation_day) del mes ─────────
+    // Mientras tanto el padre no ve ningún cobro nuevo. x-force-run lo omite.
+    if (!forceRun && rdD < generationDay) {
+      return json({
+        ok: true,
+        skipped: true,
+        reason: `Hoy es día ${rdD} (RD): los cobros se generan a partir del día ${generationDay}.`,
+        ran_at: now.toISOString(),
+      });
+    }
 
     // ── Estudiantes activos con cuota ────────────────────────────────────────
     const { data: students, error: sErr } = await supabase
       .from('students')
-      .select('id, name, monthly_fee')
+      .select('id, name, monthly_fee, start_date')
       .eq('is_active', true)
       .gt('monthly_fee', 0);
     if (sErr) return json({ error: sErr.message }, 500);
     if (!students?.length) return json({ ok: true, generated: 0, message: 'No active students with fee' });
 
     // ── Determinar qué meses necesitan cobros ────────────────────────────────
-    // Genera cobros para el mes actual + los últimos 3 meses (backfill)
-    const monthsToProcess: string[] = [];
-    for (let offset = -2; offset <= 0; offset++) {
-      const d = new Date(now.getFullYear(), now.getMonth() + offset, 1);
-      monthsToProcess.push(`${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`);
-    }
+    // SOLO el mes actual. Sin backfill: los cobros de meses anteriores se
+    // registran manualmente desde el panel para no cobrar a estudiantes que
+    // aún no estaban inscritos.
+    const monthKey = `${rdY}-${String(rdM).padStart(2, '0')}`;
+    const monthsToProcess: string[] = [monthKey];
 
     console.log('[auto-payment-cycle] Processing months:', monthsToProcess);
+
+    // Último día del mes en proceso (para comparar con la fecha de inscripción)
+    const lastDayOfMonth = new Date(rdY, rdM, 0)
+      .toISOString().split('T')[0];
 
     let totalGenerated = 0;
     const results: Record<string, number> = {};
@@ -80,7 +106,13 @@ Deno.serve(async (req) => {
         .not('status', 'eq', 'deleted');
 
       const existingIds = new Set((existing || []).map((p: { student_id: string }) => String(p.student_id)));
-      const missing = students.filter(s => !existingIds.has(String(s.id)));
+
+      // Solo estudiantes inscritos a más tardar el último día del mes:
+      // evita cobrar a quienes ingresan después o aún no ingresan.
+      const missing = students.filter(s =>
+        !existingIds.has(String(s.id)) &&
+        (!s.start_date || s.start_date <= lastDayOfMonth)
+      );
 
       if (!missing.length) {
         console.log(`[auto-payment-cycle] ${monthKey}: all students covered`);
@@ -111,11 +143,10 @@ Deno.serve(async (req) => {
     }
 
     // ── Marcar vencidos ──────────────────────────────────────────────────────
-    const todayStr = now.toISOString().split('T')[0];
     await supabase.from('payments')
       .update({ status: 'overdue' })
       .eq('status', 'pending')
-      .lt('due_date', todayStr);
+      .lt('due_date', rdDate);
 
     console.log(`[auto-payment-cycle] ✅ Total generated: ${totalGenerated}`);
 

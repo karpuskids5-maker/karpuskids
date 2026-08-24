@@ -7,9 +7,11 @@
   <meta http-equiv="X-Content-Type-Options" content="nosniff">
   <meta http-equiv="Referrer-Policy" content="strict-origin-when-cross-origin">
   <meta http-equiv="Permissions-Policy" content="camera=(), microphone=(), geolocation=(), payment=()">
-  <meta http-equiv="Content-Security-Policy" content="default-src 'self' https://*.supabase.co wss://*.supabase.co; script-src 'self' 'unsafe-inline' 'unsafe-eval' https://cdn.onesignal.com https://onesignal.com https://api.onesignal.com https://cdn.jsdelivr.net https://meet.jit.si; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com https://cdn.jsdelivr.net; img-src 'self' data: blob: https:; connect-src 'self' https://*.supabase.co wss://*.supabase.co https://cdn.onesignal.com https://onesignal.com https://api.onesignal.com https://fonts.googleapis.com https://fonts.gstatic.com https://cdn.jsdelivr.net https://meet.jit.si wss://meet.jit.si; frame-src 'self' blob: https://meet.jit.si; worker-src 'self' blob:; object-src 'none'; form-action 'self'; base-uri 'self';">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self' https://*.supabase.co wss://*.supabase.co; script-src 'self' 'unsafe-inline' https://cdn.onesignal.com https://onesignal.com https://api.onesignal.com https://cdn.jsdelivr.net https://meet.jit.si; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com https://cdn.jsdelivr.net; img-src 'self' data: blob: https://*.supabase.co https://*.githubusercontent.com https://lh3.googleusercontent.com https://meet.jit.si; connect-src 'self' https://*.supabase.co wss://*.supabase.co https://cdn.onesignal.com https://onesignal.com https://api.onesignal.com https://fonts.googleapis.com https://fonts.gstatic.com https://cdn.jsdelivr.net https://meet.jit.si wss://meet.jit.si; frame-src 'self' blob: https://meet.jit.si; worker-src 'self' blob:; object-src 'none'; form-action 'self'; base-uri 'self';">
   <style>html{display:none;}</style>
   <!-- X-Frame-Options debe ser configurado por el servidor, no por meta tag -->
+  <!-- NOSONAR Web:S7039 — unsafe-inline y wildcards requeridos por Supabase y OneSignal -->
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self' https://*.supabase.co wss://*.supabase.co; script-src 'self' 'unsafe-inline' https://cdn.onesignal.com https://onesignal.com https://api.onesignal.com https://cdn.jsdelivr.net https://meet.jit.si; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com https://cdn.jsdelivr.net; img-src 'self' data: blob: https://*.supabase.co https://*.githubusercontent.com https://lh3.googleusercontent.com https://meet.jit.si; connect-src 'self' https://*.supabase.co wss://*.supabase.co https://cdn.onesignal.com https://onesignal.com https://api.onesignal.com https://fonts.googleapis.com https://fonts.gstatic.com https://cdn.jsdelivr.net https://meet.jit.si wss://meet.jit.si; frame-src 'self' blob: https://meet.jit.si; worker-src 'self' blob:; object-src 'none'; form-action 'self'; base-uri 'self';">
   <script>if(self===top){document.documentElement.style.display='block';}else{top.location=self.location;}</script>
   <title>Karpus Kids — Panel Maestra</title>
   <link rel="icon" href="logo/favicon.ico" type="image/x-icon">
@@ -71,7 +73,7 @@
     /* ═══════════════════════════════════════════════
        SECCIONES — ocultas por defecto, visibles con .active
     ═══════════════════════════════════════════════ */
-    .section { display: none; opacity: 0; }
+    .section { display: none; opacity: 0; max-width: 100%; min-width: 0; }
     .section.active {
       display: block;
       opacity: 1;
@@ -363,6 +365,39 @@
       z-index: 10;
     }
 
+    /* ═══ Tabs del aula (Muro/Rutina/Alumnos/Asistencia/Tareas/Video) ═══
+       Móvil: cuadrícula de 3 columnas (2 filas) — en pantallas muy angostas
+       los textos se centran y reducen. Desktop: chips horizontales scrollables. */
+    @media (max-width: 639px) {
+      #classTabsBar {
+        display: grid !important;
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+        gap: 6px;
+        overflow: visible;
+      }
+      #classTabsBar .class-tab-btn {
+        justify-content: center;
+        text-align: center;
+        width: 100%;
+        min-width: 0;
+        padding-left: 4px;
+        padding-right: 4px;
+      }
+      #classTabsBar .class-tab-btn span {
+        font-size: 9px;
+        letter-spacing: 0.02em;
+      }
+    }
+    @media (max-width: 359px) {
+      #classTabsBar { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    }
+    @media (min-width: 640px) {
+      #classTabsBar {
+        display: flex;
+        overflow-x: auto;
+      }
+    }
+
     /* ═══════════════════════════════════════════════
        ✅ RESPONSIVE HARDENING — fallbacks en CSS plano
        (independientes del Tailwind compilado, que está
@@ -377,7 +412,6 @@
     }
 
     /* Ninguna sección ni contenedor puede rebasar el viewport */
-    .section { max-width: 100%; min-width: 0; }
     .section > * { min-width: 0; max-width: 100%; }
     .class-tab-content { max-width: 100%; min-width: 0; overflow-x: clip; }
     #layoutShell img, #layoutShell iframe, #layoutShell video { max-width: 100%; }
@@ -473,7 +507,7 @@
       color: #fff;
       border-bottom-right-radius: 4px;
     }
-    #t-chat .kk-msg-bubble.kk-out .kk-msg-meta { color: rgba(255,255,255,.92); opacity: 1; }
+    #t-chat .kk-msg-bubble.kk-out .kk-msg-meta { color: #431407; opacity: 1; }
     #t-chat .kk-msg-bubble.kk-out .kk-checks { color: #fde68a; opacity: 1; }
     #t-chat .kk-msg-bubble.kk-out .kk-checks.is-read { color: #86efac; }
     #t-chat .kk-msg-bubble.kk-out .kk-msg-deleted,
@@ -1221,7 +1255,7 @@
 
       async function updateIndicator() {
         try {
-          const { OfflineQueue } = await import('/js/shared/offline-queue.js');
+          const { OfflineQueue } = await import('./js/shared/offline-queue.js');
           const count = await OfflineQueue.pendingCount();
           const el = document.getElementById('syncQueueIndicator');
           const countEl = document.getElementById('syncQueueCount');
@@ -1232,7 +1266,7 @@
           } else {
             el.classList.add('hidden');
           }
-        } catch (_) {}
+        } catch (e) { console.warn('[SyncQueue] No se pudo leer la cola offline:', e?.message); }
       }
       window.addEventListener('online', updateIndicator);
       window.addEventListener('offline', updateIndicator);

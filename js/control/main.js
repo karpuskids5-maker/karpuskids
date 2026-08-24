@@ -1,5 +1,9 @@
-import { supabase } from '../shared/supabase.js';
+import { supabase, SUPABASE_URL, SUPABASE_ANON_KEY } from '../shared/supabase.js';
 import { logError } from '../shared/db-utils.js';
+import {
+  MODULES, ROLES, ROLE_LABELS, moduleDefault,
+  loadFlags, getFlags, setLocalFlags, normalizeFlags, onFlagsChange
+} from '../shared/feature-flags.js';
 
 // Bloquear redirección por SIGNED_OUT desde el primer momento
 // (antes de DOMContentLoaded, para que onAuthStateChange no interrumpa el init)
@@ -21,6 +25,110 @@ let allAttend   = [];
 let allPunches  = [];
 let fraudEvents = [];
 let currentUser = null;
+let allWallPosts = [];      // Muro Escolar
+let allChatMsgs  = [];      // Chat: mensajes recientes
+let allConvos    = [];      // Chat: conversaciones
+
+// Feature flags (Módulos y Visibilidad)
+let ffData = null;            // copia editable de los flags
+let ffDirty = false;          // hay cambios sin guardar
+let ffLoaded = false;
+let ffExpandedUser = null;    // uuid del override expandido en la UI
+let ffSearchTimer = null;
+let _clockInterval = null;    // referencia para limpieza de intervalo del reloj
+let _sessionInterval = null;  // referencia para limpieza del refresco periódico de sesión
+let _realtimeChannel = null;  // referencia al canal realtime activo (evita duplicados)
+
+// Roles válidos para asignación (whitelist estricta)
+const VALID_ROLES = ['padre', 'maestra', 'asistente', 'directora', 'admin'];
+
+// ── Toasts: notificaciones emergentes para cambios administrativos ───────────
+window.showToast = function(msg, type = 'info') {
+  const wrap = document.getElementById('toastWrap');
+  if (!wrap) { alert(msg); return; }
+  const icons  = { success: 'bi-check-circle-fill', error: 'bi-x-circle-fill', warn: 'bi-exclamation-triangle-fill', info: 'bi-info-circle-fill' };
+  const colors = { success: '#22c55e', error: '#ef4444', warn: '#f97316', info: '#6366f1' };
+  const t = document.createElement('div');
+  t.className = 'toast toast-' + type;
+  t.innerHTML = `<i class="bi ${icons[type] || icons.info}" style="color:${colors[type] || colors.info};flex-shrink:0;"></i><span>${escH(msg)}</span>`;
+  wrap.appendChild(t);
+  while (wrap.children.length > 4) wrap.firstChild.remove();
+  setTimeout(() => { t.classList.add('out'); setTimeout(() => t.remove(), 320); }, 3800);
+};
+
+// ── Resaltado de coincidencias en búsquedas ──────────────────────────────────
+function highlightMatch(text, q) {
+  const s = String(text ?? '');
+  if (!q) return escH(s);
+  const idx = s.toLowerCase().indexOf(String(q).toLowerCase());
+  if (idx === -1) return escH(s);
+  return escH(s.slice(0, idx)) +
+    '<mark class="hl">' + escH(s.slice(idx, idx + String(q).length)) + '</mark>' +
+    escH(s.slice(idx + String(q).length));
+}
+
+// ── Preferencias del panel persistidas en localStorage ───────────────────────
+const PREFS_KEY = 'karpus_panel_control_prefs';
+function loadPrefs() {
+  try { return JSON.parse(localStorage.getItem(PREFS_KEY) || '{}') || {}; } catch (_) { return {}; }
+}
+function savePrefs(patch) {
+  try { localStorage.setItem(PREFS_KEY, JSON.stringify({ ...loadPrefs(), ...patch })); } catch (_) {}
+}
+
+// ── Filtros con debounce (300ms) ─────────────────────────────────────────────
+let _auditDebounce = null;
+let _usersDebounce = null;
+window.filterAudit = function() {
+  clearTimeout(_auditDebounce);
+  _auditDebounce = setTimeout(() => window._applyAuditFilters(), 300);
+};
+window.filterUsers = function() {
+  clearTimeout(_usersDebounce);
+  _usersDebounce = setTimeout(() => window._applyUserFilters(), 300);
+};
+
+// ── Resiliencia global: promesas rechazadas no críticas ──────────────────────
+window.addEventListener('unhandledrejection', (e) => {
+  const msg = String(e?.reason?.message || e?.reason || '');
+  // Filtrar ruido de red/IndexedDB que no afecta la operación
+  if (/network|fetch|indexeddb|quota|aborted|timeout/i.test(msg)) {
+    console.warn('[Karpus] Promesa rechazada (no crítica):', msg);
+    e.preventDefault();
+  }
+});
+
+// ── Atajos de teclado: "/" o Ctrl+K enfoca el buscador de la sección activa; Esc cierra modal/menú ──
+document.addEventListener('keydown', (e) => {
+  // Escape: cerrar modal abierto o menú lateral móvil
+  if (e.key === 'Escape') {
+    const m = document.getElementById('userModal');
+    if (m && m.style.display !== 'none' && m.style.display !== '') {
+      m.style.display = 'none';
+      return;
+    }
+    document.getElementById('sidebar')?.classList.remove('open');
+    return;
+  }
+  const tag = (e.target?.tagName || '').toLowerCase();
+  if (tag === 'input' || tag === 'textarea' || tag === 'select') return;
+  const isSearchKey = e.key === '/' || ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'k');
+  if (!isSearchKey) return;
+  e.preventDefault();
+  const active = document.querySelector('.section.active')?.id.replace('sec-', '');
+  const targets = { auditoria: 'auditSearch', usuarios: 'userSearch', modulos: 'ffUserSearch' };
+  const targetId = targets[active];
+  const focusIt = () => {
+    const el = document.getElementById(targetId);
+    if (el) { el.focus(); el.select?.(); }
+  };
+  if (targetId) {
+    focusIt();
+  } else {
+    goTo('usuarios');
+    setTimeout(focusIt, 80);
+  }
+});
 
 // ── Init ──────────────────────────────────────────────────────────────────────
 function _setLoaderMsg(msg) {
@@ -90,7 +198,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     try {
       const cached = JSON.parse(localStorage.getItem(CACHE_KEY) || 'null');
       if (cached && cached.role && cached.ts && (Date.now() - cached.ts) < 3600000) {
-        profile = { id: userId, email: userEmail, name: cached.name || userEmail.split('@')[0], role: cached.role };
+        profile = { id: userId, email: userEmail, name: cached.name || userEmail.split('@')[0], role: cached.role, bio: cached.bio || '' };
       }
     } catch (_) {}
 
@@ -126,7 +234,7 @@ document.addEventListener('DOMContentLoaded', async () => {
       try {
         const { data, error } = await supabase
           .from('profiles')
-          .select('id, name, email, role')
+          .select('id, name, email, role, bio')
           .eq('id', userId);
 
         clearTimeout(profileTimer);
@@ -139,7 +247,7 @@ document.addEventListener('DOMContentLoaded', async () => {
           if (rawProfile) {
             profile = rawProfile;
             try {
-              localStorage.setItem(CACHE_KEY, JSON.stringify({ role: profile.role, name: profile.name, ts: Date.now() }));
+              localStorage.setItem(CACHE_KEY, JSON.stringify({ role: profile.role, name: profile.name, bio: profile.bio || '', ts: Date.now() }));
             } catch (_) {}
           }
         } else if (error) {
@@ -203,16 +311,32 @@ document.addEventListener('DOMContentLoaded', async () => {
     const adminAvatar = document.getElementById('adminAvatar');
     const cfgEmail    = document.getElementById('cfgEmail');
     const cfgName     = document.getElementById('cfgName');
+    const cfgBio      = document.getElementById('cfgBio');
 
     if (adminName)   adminName.textContent   = profile.name || userEmail;
     if (adminAvatar) adminAvatar.textContent = (profile.name || userEmail)[0].toUpperCase();
     if (cfgEmail)    cfgEmail.value          = userEmail || '';
     if (cfgName)     cfgName.value           = profile.name || '';
+    if (cfgBio)      cfgBio.value            = profile.bio || '';
+
+    // Restaurar preferencias del módulo de alertas por correo
+    const prefs0 = loadPrefs();
+    const alertEmailTo = document.getElementById('alertEmailTo');
+    if (alertEmailTo) alertEmailTo.value = prefs0.reportEmail || userEmail || '';
+    const autoToggle = document.getElementById('autoAlertToggle');
+    if (autoToggle) autoToggle.checked = !!prefs0.autoEmailAlerts;
+    const autoState = document.getElementById('autoAlertState');
+    if (autoState) {
+      autoState.textContent = 'Automático: ' + (prefs0.autoEmailAlerts ? 'ON' : 'OFF');
+      autoState.style.color = prefs0.autoEmailAlerts ? '#4ade80' : 'var(--muted)';
+    }
 
     const loader = document.getElementById('loader');
     if (loader) loader.classList.add('hidden');
 
-    setInterval(() => {
+    // Reloj superior (intervalo referenciado para poder limpiarlo)
+    if (_clockInterval) clearInterval(_clockInterval);
+    _clockInterval = setInterval(() => {
       const clock = document.getElementById('topClock');
       if (clock) clock.textContent = new Date().toLocaleString('es-DO', { dateStyle: 'short', timeStyle: 'medium' });
     }, 1000);
@@ -223,7 +347,28 @@ document.addEventListener('DOMContentLoaded', async () => {
     }
 
     await refreshAll();
+    _sectionLoadedAt.dashboard = Date.now();
+
+    // Restaurar última sección visitada (preferencias persistidas)
+    const lastSection = loadPrefs().lastSection;
+    goTo(typeof lastSection === 'string' && document.getElementById('sec-' + lastSection) ? lastSection : 'dashboard');
+
+    updateNotifUI();
+    checkEdgeFunctionsHealth();
     startRealtime();
+
+    // Refresco proactivo de sesión: cada 4 min verifica si el JWT vence en <5 min
+    if (_sessionInterval) clearInterval(_sessionInterval);
+    _sessionInterval = setInterval(async () => {
+      try {
+        const { data } = await supabase.auth.getSession();
+        const exp = data?.session?.expires_at || 0;
+        if (exp && (exp - Math.floor(Date.now() / 1000)) < 300) {
+          const { error: rErr } = await supabase.auth.refreshSession();
+          if (rErr) console.warn('[Karpus] No se pudo refrescar la sesión:', rErr.message);
+        }
+      } catch (_) {}
+    }, 4 * 60 * 1000);
 
   } catch (err) {
     clearTimeout(loaderTimeout);
@@ -245,38 +390,71 @@ document.addEventListener('DOMContentLoaded', async () => {
 });
 
 // ── Navigation ────────────────────────────────────────────────────────────────
-window.goTo = function(id) {
+// Lazy loading: cada sección recarga sus datos si tienen más de 30s de antigüedad
+const STALE_MS = 30000;
+const _sectionLoadedAt = {};
+const SECTION_LOADERS = {
+  auditoria:  [loadAudit],
+  usuarios:   [loadUsers],
+  muro:       [loadWallPosts, loadClassrooms],
+  chat:       [loadChatData],
+  pagos:      [loadPayments],
+  asistencia: [loadAttendance],
+};
+function _isSectionStale(id) {
+  return !_sectionLoadedAt[id] || (Date.now() - _sectionLoadedAt[id]) > STALE_MS;
+}
+async function _lazyLoadSection(id) {
+  const fns = SECTION_LOADERS[id];
+  if (!fns || !_isSectionStale(id)) return;
+  _sectionLoadedAt[id] = Date.now();
+  await Promise.allSettled(fns.map(f => f()));
+}
+
+window.goTo = async function(id) {
   document.querySelectorAll('.section').forEach(s => s.classList.remove('active'));
   document.querySelectorAll('.nav-item').forEach(b => b.classList.remove('active'));
   document.getElementById('sec-' + id)?.classList.add('active');
   document.querySelector(`[onclick="goTo('${id}')"]`)?.classList.add('active');
+
+  // Cerrar menú lateral en móvil tras navegar
+  document.getElementById('sidebar')?.classList.remove('open');
+  _syncSidebarBackdrop();
 
   const titles = {
     dashboard:    ['Dashboard', 'Vista general del sistema'],
     auditoria:    ['Auditoría', 'Registro completo de movimientos'],
     fraude:       ['Alertas de Fraude', 'Detección automática de patrones sospechosos'],
     usuarios:     ['Usuarios', 'Todos los usuarios del sistema'],
-    padres:       ['Padres', 'Gestión de padres de familia'],
-    maestras:     ['Maestras y Asistentes', 'Personal docente'],
-    directoras:   ['Directoras', 'Administración escolar'],
+    muro:         ['Muro Escolar', 'Publicaciones, reacciones y comentarios'],
+    chat:         ['Chat & Mensajería', 'Conversaciones entre padres y personal'],
     pagos:        ['Pagos', 'Historial financiero completo'],
     asistencia:   ['Asistencia', 'Control de entradas y salidas'],
     errores:      ['Errores del Sistema', 'Log de errores y excepciones'],
+    modulos:      ['Módulos y Visibilidad', 'Control total de módulos por rol y usuario'],
+    seguridad:    ['Seguridad', 'Fuerza bruta y estado del sistema'],
     configuracion:['Configuración', 'Ajustes del panel de control'],
   };
   const [title, sub] = titles[id] || ['Panel', ''];
   document.getElementById('pageTitle').textContent    = title;
   document.getElementById('pageSubtitle').textContent = sub;
 
+  // Persistir preferencia de sección
+  savePrefs({ lastSection: id });
+
+  await _lazyLoadSection(id);
+
+  if (id === 'dashboard')   renderDashboard();
   if (id === 'auditoria')   renderAuditTable(allAudit);
   if (id === 'fraude')      renderFraud();
   if (id === 'usuarios')    renderUsers(allUsers);
-  if (id === 'padres')      renderPadres();
-  if (id === 'maestras')    renderMaestras();
-  if (id === 'directoras')  renderRoleTable('directoras', allUsers.filter(u => u.role === 'directora'));
+  if (id === 'muro')        renderWall();
+  if (id === 'chat')        renderChat();
   if (id === 'pagos')       renderPayments();
   if (id === 'asistencia')  renderAttendance();
   if (id === 'errores')     renderErrors();
+  if (id === 'modulos')     initModulesUI();
+  if (id === 'configuracion') checkEdgeFunctionsHealth();
   if (id === 'seguridad')   { renderBruteForce(); loadSecurityStats(); loadPaymentAudit(); }
 };
 
@@ -285,7 +463,8 @@ window.refreshAll = async function() {
   try {
     await Promise.allSettled([
       loadUsers(), loadAudit(), loadPayments(),
-      loadAttendance(), loadStudents(), loadClassrooms(), loadPunches()
+      loadAttendance(), loadStudents(), loadClassrooms(), loadPunches(),
+      loadWallPosts(), loadChatData()
     ]);
     renderDashboard();
   } catch (err) {
@@ -381,7 +560,8 @@ async function loadStudents() {
   try {
     const { data } = await supabase
       .from('students')
-      .select('id, name, parent_id, classroom_id, is_active, matricula');
+      .select('id, name, parent_id, classroom_id, is_active, matricula')
+      .limit(500);
     allStudents = data || [];
     const kpi = document.getElementById('kpi-students');
     if (kpi) kpi.textContent = allStudents.filter(s => s.is_active).length;
@@ -393,11 +573,150 @@ async function loadStudents() {
 
 async function loadClassrooms() {
   try {
-    const { data } = await supabase.from('classrooms').select('id, name, teacher_id');
+    const { data } = await supabase.from('classrooms').select('id, name, teacher_id').limit(200);
     allClassrooms = data || [];
   } catch (err) { 
     logError('panel_control', err?.message || String(err), err?.stack || '', 'loadClassrooms').catch(() => {});
     allClassrooms = []; 
+  }
+}
+
+// ── Muro Escolar ─────────────────────────────────────────────────────────────
+async function loadWallPosts() {
+  try {
+    const { data, error } = await supabase
+      .from('posts')
+      .select('id, title, content, teacher_name, classroom_id, likes_count, comments_count, views_count, is_pinned, status, media_type, created_at')
+      .order('created_at', { ascending: false })
+      .limit(200);
+    if (error) throw error;
+    allWallPosts = data || [];
+  } catch (err) {
+    // Fallback sin columnas opcionales
+    try {
+      const { data } = await supabase
+        .from('posts')
+        .select('id, content, teacher_name, classroom_id, likes_count, comments_count, created_at')
+        .order('created_at', { ascending: false })
+        .limit(200);
+      allWallPosts = data || [];
+    } catch (err2) {
+      logError('panel_control', err2?.message || String(err2), err2?.stack || '', 'loadWallPosts_fallback').catch(() => {});
+      allWallPosts = [];
+    }
+  }
+  const badge = document.getElementById('badge-wall');
+  if (badge) badge.textContent = allWallPosts.length;
+}
+
+function renderWall() {
+  const set = (id, v) => { const el = document.getElementById(id); if (el) el.textContent = v; };
+  const since7 = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString();
+  set('wall-total', allWallPosts.length);
+  set('wall-comments', allWallPosts.reduce((s, p) => s + Number(p.comments_count || 0), 0));
+  set('wall-likes', allWallPosts.reduce((s, p) => s + Number(p.likes_count || 0), 0));
+  set('wall-week', allWallPosts.filter(p => (p.created_at || '') >= since7).length);
+  const countEl = document.getElementById('wallCount');
+  if (countEl) countEl.textContent = allWallPosts.length + ' publicaciones';
+
+  const tbody = document.getElementById('wallBody');
+  if (!tbody) return;
+  if (!allWallPosts.length) { tbody.innerHTML = '<tr><td colspan="8" style="text-align:center;padding:24px;color:var(--muted);">Sin publicaciones en el muro</td></tr>'; return; }
+  tbody.innerHTML = allWallPosts.slice(0, 100).map(p => {
+    const room = allClassrooms.find(c => c.id === p.classroom_id);
+    const dt = p.created_at ? new Date(p.created_at).toLocaleDateString('es-DO', { day: '2-digit', month: 'short' }) : '—';
+    const txt = [p.title, p.content].filter(Boolean).join(' — ');
+    return `<tr>
+      <td style="font-size:11px;color:var(--muted);white-space:nowrap;">${dt}</td>
+      <td style="font-weight:800;">${escH(p.teacher_name || '—')}</td>
+      <td style="color:var(--muted);font-size:12px;">${room ? escH(room.name) : 'General'}</td>
+      <td style="max-width:260px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:12px;">${escH(txt || '—')}</td>
+      <td style="color:#fb923c;font-weight:900;">${Number(p.likes_count || 0)}</td>
+      <td style="color:#60a5fa;font-weight:900;">${Number(p.comments_count || 0)}</td>
+      <td style="color:var(--muted);">${Number(p.views_count || 0)}</td>
+      <td>${p.is_pinned ? '<span class="badge badge-yellow"><i class="bi bi-pin-angle-fill"></i> Fijado</span>' : '<span class="badge badge-green">Publicado</span>'}</td>
+    </tr>`;
+  }).join('');
+}
+
+// ── Chat & Mensajería ────────────────────────────────────────────────────────
+async function loadChatData() {
+  try {
+    const [msgsRes, convRes] = await Promise.allSettled([
+      supabase.from('messages')
+        .select('id, sender_name, sender_id, receiver_id, content, is_read, created_at')
+        .order('created_at', { ascending: false })
+        .limit(300),
+      supabase.from('conversations')
+        .select('id, type, classroom_id, created_at')
+        .order('created_at', { ascending: false })
+        .limit(200),
+    ]);
+    allChatMsgs = msgsRes.status === 'fulfilled' ? (msgsRes.value.data || []) : [];
+    allConvos   = convRes.status === 'fulfilled' ? (convRes.value.data || []) : [];
+  } catch (err) {
+    logError('panel_control', err?.message || String(err), err?.stack || '', 'loadChatData').catch(() => {});
+    allChatMsgs = []; allConvos = [];
+  }
+  const badge = document.getElementById('badge-chatmsg');
+  if (badge) badge.textContent = allChatMsgs.length;
+}
+
+const CONVO_TYPE_LABELS = {
+  direct_message: ['Mensajes Directos', 'badge-blue'],
+  private:        ['Privados',          'badge-purple'],
+  classroom:      ['Grupales de Aula',  'badge-green'],
+  group:          ['Grupos',            'badge-orange'],
+};
+
+function renderChat() {
+  const set = (id, v) => { const el = document.getElementById(id); if (el) el.textContent = v; };
+  const todayStr = new Date().toISOString().slice(0, 10);
+  const since7 = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString();
+  set('chat-convos', allConvos.length);
+  set('chat-today', allChatMsgs.filter(m => (m.created_at || '').startsWith(todayStr)).length);
+  set('chat-week', allChatMsgs.filter(m => (m.created_at || '') >= since7).length);
+  set('chat-unread', allChatMsgs.filter(m => m.is_read === false).length);
+  const countEl = document.getElementById('chatMsgCount');
+  if (countEl) countEl.textContent = allChatMsgs.length + ' mensajes recientes';
+
+  const tbody = document.getElementById('chatBody');
+  if (tbody) {
+    if (!allChatMsgs.length) {
+      tbody.innerHTML = '<tr><td colspan="4" style="text-align:center;padding:24px;color:var(--muted);">Sin mensajes registrados</td></tr>';
+    } else {
+      tbody.innerHTML = allChatMsgs.slice(0, 80).map(m => `<tr>
+        <td style="font-size:11px;color:var(--muted);white-space:nowrap;">${m.created_at ? new Date(m.created_at).toLocaleString('es-DO', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' }) : '—'}</td>
+        <td style="font-weight:800;max-width:140px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${escH(m.sender_name || m.sender_id?.slice(0, 8) || '—')}</td>
+        <td style="max-width:240px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:12px;color:var(--text);">${escH(m.content)}</td>
+        <td>${m.is_read === false ? '<span class="badge badge-yellow">Sin leer</span>' : '<span class="badge badge-gray">Leído</span>'}</td>
+      </tr>`).join('');
+    }
+  }
+
+  const list = document.getElementById('convTypeList');
+  if (list) {
+    const counts = {};
+    allConvos.forEach(c => { const t = c.type || 'direct_message'; counts[t] = (counts[t] || 0) + 1; });
+    const entries = Object.entries(counts).sort((a, b) => b[1] - a[1]);
+    if (!entries.length) {
+      list.innerHTML = '<div style="text-align:center;padding:20px;color:var(--muted);font-size:13px;">Sin conversaciones registradas</div>';
+      return;
+    }
+    const max = entries[0][1];
+    list.innerHTML = entries.map(([type, n]) => {
+      const [label, cls] = CONVO_TYPE_LABELS[type] || [type, 'badge-gray'];
+      const pct = allConvos.length ? Math.round((n / allConvos.length) * 100) : 0;
+      return `<div style="margin-bottom:12px;">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:5px;">
+          <span class="badge ${cls}">${escH(label)}</span>
+          <span style="font-size:13px;font-weight:900;color:var(--text);">${n} <span style="color:var(--muted);font-size:10px;">(${pct}%)</span></span>
+        </div>
+        <div style="height:6px;background:rgba(255,255,255,.06);border-radius:50px;overflow:hidden;">
+          <div style="height:100%;width:${pct}%;background:linear-gradient(90deg,#6366f1,#8b5cf6);border-radius:50px;"></div>
+        </div>
+      </div>`;
+    }).join('');
   }
 }
 
@@ -444,26 +763,43 @@ async function renderDashboard() {
       .filter(p => ['paid','pagado','confirmado','approved'].includes((p.status||'').toLowerCase()))
       .reduce((s, p) => s + Number(p.amount || 0), 0);
     const kpiRevenue = document.getElementById('kpi-revenue');
-    if (kpiRevenue) kpiRevenue.textContent = revenue.toLocaleString('es-DO');
+    if (kpiRevenue) kpiRevenue.textContent = fmtMoney(revenue).replace('RD$', '');
     detectFraud();
+    maybeSendAutoAlert();
     const kpiAlerts = document.getElementById('kpi-alerts');
     if (kpiAlerts) kpiAlerts.textContent = fraudEvents.length;
     const badgeFraud = document.getElementById('badge-fraud');
     if (badgeFraud) badgeFraud.textContent = fraudEvents.length;
     
-    // ✅ HEALTHCHECK: Estado del Ciclo de Pagos
-    const { data: health } = await supabase.rpc('check_payment_cycle_health');
+    // ✅ HEALTHCHECK: Estado del Ciclo de Pagos (con captura de error amigable)
+    const { data: health, error: healthErr } = await supabase.rpc('check_payment_cycle_health');
     const healthWidget = document.getElementById('paymentHealthWidget');
     if (healthWidget) {
-      const isOk = health?.status === 'ok';
-      healthWidget.className = `card ${isOk ? 'border-l-emerald-500' : 'border-l-rose-500'} border-l-4`;
+      const isMissing = healthErr && (
+        /could not find the function|schema cache|404/i.test(healthErr.message || '') ||
+        (healthErr.code || '') === '42883'
+      );
+      const isOk = !isMissing && !healthErr && health?.status === 'ok';
+      // Preservar las clases base del KPI (antes se pisaban con clases inexistentes)
+      healthWidget.className = 'kpi ' + (isOk ? 'k-blue' : 'k-red');
+      let msg, badge;
+      if (isMissing) {
+        msg = 'Función check_payment_cycle_health no instalada. Ejecuta el SQL de migración para activar el monitoreo.';
+        badge = '<span class="badge badge-yellow">N/D</span>';
+      } else if (healthErr) {
+        msg = 'No se pudo verificar el ciclo de pagos: ' + (healthErr.message || 'error desconocido');
+        badge = '<span class="badge badge-red">ERROR</span>';
+      } else {
+        msg = health?.message || (isOk ? 'Ciclo de pagos operando normalmente' : 'Revisar estado del ciclo');
+        badge = `<span class="badge ${isOk ? 'badge-green' : 'badge-red'}">${isOk ? 'OK' : 'ERROR'}</span>`;
+      }
       healthWidget.innerHTML = `
         <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;">
-          <h3 class="card-title">Salud del Ciclo</h3>
-          <span class="badge ${isOk ? 'badge-green' : 'badge-red'}">${isOk ? 'OK' : 'ERROR'}</span>
+          <div class="kpi-lbl">Salud del Ciclo</div>
+          ${badge}
         </div>
-        <p style="font-size:11px;color:var(--muted);margin-bottom:12px;">${health?.message || 'Verificando...'}</p>
-        ${!isOk ? `<button onclick="App.runEmergencyCycle()" class="btn-primary" style="width:100%;background:#ef4444;font-size:10px;padding:8px;">Reparar Ahora</button>` : ''}
+        <p style="font-size:11px;color:var(--muted);margin-bottom:${!isOk && !isMissing ? '12px' : '0'};">${escH(msg)}</p>
+        ${!isOk && !isMissing ? `<button onclick="App.runEmergencyCycle()" class="btn btn-danger" style="width:100%;justify-content:center;font-size:10px;padding:8px;">Reparar Ahora</button>` : ''}
       `;
     }
 
@@ -477,30 +813,78 @@ window.App = window.App || {};
 window.App.runEmergencyCycle = async function() {
   if (!confirm('¿Ejecutar ciclo de pagos de emergencia?')) return;
   const { data, error } = await supabase.rpc('run_payment_cycle');
-  if (error) alert('Error: ' + error.message);
-  else alert('Éxito: ' + data.generated + ' cobros generados.');
-  window.location.reload();
+  if (error) { showToast('Error al ejecutar ciclo: ' + error.message, 'error'); return; }
+  showToast(`✅ Ciclo ejecutado: ${data?.generated ?? '?'} cobros generados. Recargando...`, 'success');
+  setTimeout(() => window.location.reload(), 1200);
+};
+
+// Restauración de estado inicial: recupera el panel ante cambios bruscos de conexión
+window.App.resetState = async function() {
+  try {
+    // Invalidar caché local del perfil para forzar revalidación contra DB
+    if (currentUser?.id) localStorage.removeItem('karpus_ctrl_profile_' + currentUser.id);
+  } catch (_) {}
+  await refreshAll();
+  if (_sectionActive('auditoria'))  renderAuditTable(allAudit);
+  if (_sectionActive('usuarios'))   renderUsers(allUsers);
+  if (_sectionActive('pagos'))      renderPayments();
+  if (_sectionActive('asistencia')) renderAttendance();
 };
 
 // ── Charts ────────────────────────────────────────────────────────────────────
 let chartActivity = null, chartRoles = null, chartPaymentsChart = null, chartAttendChart = null;
 
+// Espera pasiva por Chart.js (se carga con defer y puede llegar después del módulo)
+let _chartWaiter = null;
+function onChartReady(cb) {
+  if (typeof window.Chart !== 'undefined') { cb(); return; }
+  if (_chartWaiter) return; // ya hay una espera en curso
+  let tries = 0;
+  _chartWaiter = setInterval(() => {
+    tries++;
+    if (typeof window.Chart !== 'undefined') {
+      clearInterval(_chartWaiter); _chartWaiter = null;
+      cb();
+    } else if (tries > 40) { // ~10s máximo, luego desistir en silencio
+      clearInterval(_chartWaiter); _chartWaiter = null;
+    }
+  }, 250);
+}
+
 function renderCharts() {
+  // Guard: la librería se carga con defer y puede no estar lista → reintentar cuando llegue
+  if (typeof Chart === 'undefined') { console.warn('[Karpus] Chart.js no disponible aún'); onChartReady(renderCharts); return; }
   const canvasActivity = document.getElementById('chartActivity');
   if (canvasActivity) {
     const actCtx = canvasActivity.getContext('2d');
     if (actCtx) {
       if (chartActivity) chartActivity.destroy();
       try {
-        const rc = { padre: 0, maestra: 0, directora: 0 };
-        allUsers.forEach(u => { if (rc[u.role] !== undefined) rc[u.role]++; });
+        // Actividad real: logins por rol en los últimos 7 días (desde audit_logs)
+        const days7 = Array.from({ length: 7 }, (_, i) => {
+          const d = new Date(); d.setDate(d.getDate() - (6 - i));
+          return d.toISOString().slice(0, 10);
+        });
+        const roleDefs = [
+          ['padre', 'Padres', '#6366f1'],
+          ['maestra', 'Maestras', '#22c55e'],
+          ['directora', 'Directoras', '#f97316'],
+        ];
+        const datasets = roleDefs.map(([role, label, color]) => ({
+          label,
+          backgroundColor: color,
+          borderRadius: 6,
+          barThickness: 12,
+          data: days7.map(d => allAudit.filter(a =>
+            (a.action || '').toLowerCase().includes('login') &&
+            (a.created_at || '').startsWith(d) &&
+            (allUsers.find(u => u.id === a.user_id)?.role === role)
+          ).length)
+        }));
         chartActivity = new Chart(actCtx, {
           type: 'bar',
-          data: {
-            labels: ['Padres','Maestras','Directoras'],
-            datasets: [{ label: 'Usuarios', data: [rc.padre, rc.maestra, rc.directora], backgroundColor: ['#6366f1','#22c55e','#f97316'], borderRadius: 6, barThickness: 20 }]
-          },
-          options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } }, scales: { x: { grid: { display: false }, ticks: { color: '#94a3b8', font: { size: 11 } } }, y: { beginAtZero: true, grid: { color: 'rgba(255,255,255,0.05)' }, ticks: { color: '#94a3b8' } } } }
+          data: { labels: days7.map(d => d.slice(5)), datasets },
+          options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { position: 'bottom', labels: { color: '#94a3b8', font: { size: 10 }, usePointStyle: true } } }, scales: { x: { stacked: true, grid: { display: false }, ticks: { color: '#94a3b8', font: { size: 11 } } }, y: { stacked: true, beginAtZero: true, ticks: { precision: 0, color: '#94a3b8' }, grid: { color: 'rgba(255,255,255,0.05)' } } } }
         });
       } catch (_) {}
     }
@@ -512,6 +896,7 @@ function renderCharts() {
       if (chartRoles) chartRoles.destroy();
       const rc = { padre: 0, maestra: 0, directora: 0, asistente: 0, admin: 0 };
       allUsers.forEach(u => { if (rc[u.role] !== undefined) rc[u.role]++; });
+      const totalRoles = Object.values(rc).reduce((s, v) => s + v, 0);
       try {
         chartRoles = new Chart(roleCtx, {
           type: 'doughnut',
@@ -519,7 +904,22 @@ function renderCharts() {
             labels: ['Padres','Maestras','Directoras','Asistentes','Admin'],
             datasets: [{ data: [rc.padre, rc.maestra, rc.directora, rc.asistente, rc.admin], backgroundColor: ['#6366f1','#22c55e','#f97316','#3b82f6','#eab308'], borderWidth: 2, borderColor: '#ffffff' }]
           },
-          options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { position: 'bottom', labels: { color: '#94a3b8', font: { size: 10 }, padding: 15, usePointStyle: true } } }, cutout: '70%' }
+          options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+              legend: { position: 'bottom', labels: { color: '#94a3b8', font: { size: 10 }, padding: 15, usePointStyle: true } },
+              tooltip: {
+                callbacks: {
+                  label: (ctx) => {
+                    const pct = totalRoles ? Math.round((ctx.parsed / totalRoles) * 100) : 0;
+                    return ` ${ctx.label}: ${ctx.parsed} (${pct}%)`;
+                  }
+                }
+              }
+            },
+            cutout: '70%'
+          }
         });
       } catch (_) {}
     }
@@ -573,13 +973,13 @@ function renderAuditTable(data) {
       <td class="py-3 px-4"><span class="badge ${roleBadge[role]||'badge-gray'} text-[9px] uppercase">${role}</span></td>
       <td class="py-3 px-4"><span class="badge ${badge} text-[9px] uppercase">${action}</span></td>
       <td class="py-3 px-4"><div class="max-w-[180px] truncate text-slate-400 text-[10px] font-mono">${escH(JSON.stringify(a.payload || {}))}</div></td>
-      <td class="py-3 px-4 text-slate-400 text-[10px] font-bold">Cloud</td>
+      <td class="py-3 px-4 text-slate-400 text-[10px] font-bold">${escH(a.payload?.ip || a.payload?.device || 'Cloud')}</td>
       <td class="py-3 px-4"><span class="w-2 h-2 rounded-full bg-emerald-400 inline-block shadow-[0_0_8px_rgba(52,211,153,0.6)]"></span></td>
     </tr>`;
   }).join('');
 }
 
-window.filterAudit = function() {
+window._applyAuditFilters = function() {
   const q    = document.getElementById('auditSearch')?.value.toLowerCase() || '';
   const role = document.getElementById('auditRole')?.value || '';
   const act  = document.getElementById('auditAction')?.value || '';
@@ -593,17 +993,32 @@ window.filterAudit = function() {
   renderAuditTable(filtered);
 };
 
+// CSV seguro: escapa comillas y envuelve cada campo para no desalinear columnas en Excel
+function csvField(v) {
+  const s = String(v ?? '');
+  return '"' + s.replace(/"/g, '""') + '"';
+}
+
 window.exportAudit = function() {
-  const rows = [['Fecha','Usuario','Email','Rol','Acción','Detalle']];
+  if (!allAudit.length) { showToast('No hay registros de auditoría para exportar.', 'warn'); return; }
+  const rows = [['Fecha','Usuario','Email','Rol','Acción','Detalle','Estado']];
   allAudit.forEach(a => {
     const user = allUsers.find(u => u.id === a.user_id);
-    rows.push([a.created_at, user?.name||'', user?.email||'', user?.role||'', a.action||'', JSON.stringify(a.payload || {}).replace(/,/g,';')]);
+    rows.push([
+      a.created_at ? new Date(a.created_at).toLocaleString('es-DO') : '',
+      user?.name || '', user?.email || '', user?.role || '',
+      a.action || '',
+      JSON.stringify(a.payload || {}),
+      'ok'
+    ].map(csvField));
   });
-  const csv = rows.map(r => r.join(',')).join('\n');
-  const blob = new Blob([csv], { type: 'text/csv' });
+  // Punto y coma como separador: compatible con Excel configurado en es-DO
+  const csv = '\ufeff' + rows.map(r => r.join(';')).join('\r\n');
+  const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
   const url  = URL.createObjectURL(blob);
   const a    = document.createElement('a'); a.href = url; a.download = 'auditoria_karpus.csv'; a.click();
   URL.revokeObjectURL(url);
+  showToast(`Exportados ${allAudit.length} registros a CSV.`, 'success');
 };
 
 // ── Fraud detection ───────────────────────────────────────────────────────────
@@ -622,7 +1037,7 @@ function detectFraud() {
   });
   allPayments.forEach(p => {
     if (Number(p.amount || 0) > 50000) {
-      fraudEvents.push({ type: 'Pago inusual', user: p.students?.p1_name || p.students?.name || '—', detail: `Monto: RD$${Number(p.amount).toLocaleString()}`, risk: 'alto', date: p.created_at });
+      fraudEvents.push({ type: 'Pago inusual', user: p.students?.p1_name || p.students?.name || '—', detail: `Monto: ${fmtMoney(p.amount)}`, risk: 'alto', date: p.created_at });
     }
   });
   const payKey = {};
@@ -671,15 +1086,22 @@ function renderFraud() {
     return;
   }
   const riskBadge = { alto: 'badge-red', medio: 'badge-yellow', bajo: 'badge-blue' };
-  tbody.innerHTML = fraudEvents.map(f => `<tr class="border-b border-rose-50 hover:bg-rose-50/20 transition-colors">
+  tbody.innerHTML = fraudEvents.map((f, i) => `<tr class="border-b border-rose-50 hover:bg-rose-50/20 transition-colors">
     <td class="py-3 px-4 text-[10px] text-slate-400 font-mono">${f.date ? new Date(f.date).toLocaleString('es-DO') : '—'}</td>
     <td class="py-3 px-4 font-black text-slate-700 uppercase text-xs">${escH(f.user)}</td>
-    <td class="py-3 px-4 font-bold text-orange-600 text-xs">${f.type}</td>
+    <td class="py-3 px-4 font-bold text-orange-600 text-xs">${escH(f.type)}</td>
     <td class="py-3 px-4 text-slate-400 text-xs italic">${escH(f.detail)}</td>
-    <td class="py-3 px-4"><span class="badge ${riskBadge[f.risk]||'badge-gray'} uppercase text-[9px] font-black">${f.risk}</span></td>
-    <td class="py-3 px-4 text-right"><button class="px-3 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-600 rounded-lg text-[10px] font-black uppercase transition-colors" onclick="alert('Investigando: ${escH(f.user)}')">Investigar</button></td>
+    <td class="py-3 px-4"><span class="badge ${riskBadge[f.risk]||'badge-gray'} uppercase text-[9px] font-black">${escH(f.risk)}</span></td>
+    <td class="py-3 px-4 text-right"><button class="px-3 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-600 rounded-lg text-[10px] font-black uppercase transition-colors" onclick="investigateFraud(${i})">Investigar</button></td>
   </tr>`).join('');
 }
+
+// Investigación por índice: nunca interpolar datos del usuario dentro del onclick
+window.investigateFraud = function(i) {
+  const f = fraudEvents[i];
+  if (!f) return;
+  alert('Investigando evento:\n\nTipo: ' + f.type + '\nUsuario: ' + f.user + '\nDetalle: ' + f.detail);
+};
 
 function renderFraudAlertsList() {
   detectFraud();
@@ -691,7 +1113,7 @@ function renderFraudAlertsList() {
   }
   const riskColor = { alto: 'alert-red', medio: 'alert-yellow', bajo: 'alert-green' };
   el.innerHTML = fraudEvents.slice(0, 5).map(f =>
-    `<div class="alert ${riskColor[f.risk]||'alert-yellow'}"><i class="bi bi-exclamation-triangle-fill"></i><div><div style="font-weight:900;">${f.type}</div><div style="font-size:12px;opacity:.8;">${f.user} — ${f.detail}</div></div></div>`
+    `<div class="alert ${riskColor[f.risk]||'alert-yellow'}"><i class="bi bi-exclamation-triangle-fill"></i><div><div style="font-weight:900;">${escH(f.type)}</div><div style="font-size:12px;opacity:.8;">${escH(f.user)} — ${escH(f.detail)}</div></div></div>`
   ).join('');
 }
 
@@ -716,6 +1138,8 @@ function renderUsers(data) {
   document.getElementById('userCount').textContent = data.length + ' usuarios';
   if (!data.length) { tbody.innerHTML = '<tr><td colspan="7" style="text-align:center;padding:24px;color:var(--muted);">Sin usuarios</td></tr>'; return; }
   const roleBadge = { padre: 'badge-blue', maestra: 'badge-green', directora: 'badge-orange', asistente: 'badge-purple', admin: 'badge-yellow' };
+  // Query actual para resaltar coincidencias en tiempo real
+  const q = document.getElementById('userSearch')?.value.trim() || '';
   tbody.innerHTML = data.map(u => {
     const created = u.created_at ? new Date(u.created_at).toLocaleDateString('es-DO') : '—';
     const lastAccess = getLastAccess(u.id);
@@ -723,26 +1147,26 @@ function renderUsers(data) {
     return `<tr>
       <td><div style="display:flex;align-items:center;gap:8px;">
         <div style="width:32px;height:32px;background:linear-gradient(135deg,#6366f1,#8b5cf6);border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:900;color:white;flex-shrink:0;">${initials}</div>
-        <div><div style="font-weight:800;font-size:12px;">${escH(u.name||'Sin nombre')}</div><div style="font-size:10px;color:var(--muted);">${escH(u.phone||'')}</div></div>
+        <div><div style="font-weight:800;font-size:12px;">${highlightMatch(u.name || 'Sin nombre', q)}</div><div style="font-size:10px;color:var(--muted);">${highlightMatch(u.phone || '', q)}</div></div>
       </div></td>
-      <td style="font-size:12px;color:var(--muted);">${escH(u.email||'—')}</td>
+      <td style="font-size:12px;color:var(--muted);">${highlightMatch(u.email || '—', q)}</td>
       <td><span class="badge ${roleBadge[u.role]||'badge-gray'}">${u.role||'—'}</span></td>
       <td style="font-size:11px;color:var(--muted);">${created}</td>
       <td style="font-size:11px;color:var(--muted);">${lastAccess}</td>
       <td><span class="badge badge-green">Activo</span></td>
       <td style="display:flex;gap:4px;">
         <button class="btn btn-ghost" style="padding:4px 8px;font-size:10px;" onclick="viewUser('${u.id}')"><i class="bi bi-eye"></i></button>
-        <button class="btn btn-ghost" style="padding:4px 8px;font-size:10px;" onclick="resetPassword('${u.id}','${escH(u.email||'')}')"><i class="bi bi-key"></i></button>
+        <button class="btn btn-ghost" style="padding:4px 8px;font-size:10px;" onclick="resetPassword('${u.id}')"><i class="bi bi-key"></i></button>
       </td>
     </tr>`;
   }).join('');
 }
 
-window.filterUsers = function() {
+window._applyUserFilters = function() {
   const q    = document.getElementById('userSearch')?.value.toLowerCase() || '';
   const role = document.getElementById('userRoleFilter')?.value || '';
   const filtered = allUsers.filter(u =>
-    (!q    || (u.name||'').toLowerCase().includes(q) || (u.email||'').toLowerCase().includes(q)) &&
+    (!q    || (u.name||'').toLowerCase().includes(q) || (u.email||'').toLowerCase().includes(q) || (u.phone||'').toLowerCase().includes(q)) &&
     (!role || u.role === role)
   );
   renderUsers(filtered);
@@ -776,7 +1200,7 @@ window.viewUser = function(id) {
         ${students.length ? _infoRow('Estudiantes', students.map(s=>s.name).join(', ')) : ''}
       </div>
       <div style="display:flex;gap:8px;flex-wrap:wrap;">
-        <button class="btn btn-primary" onclick="resetPassword('${u.id}','${escH(u.email||'')}');document.getElementById('userModal').style.display='none'">
+        <button class="btn btn-primary" onclick="resetPassword('${u.id}');document.getElementById('userModal').style.display='none'">
           <i class="bi bi-key"></i> Cambiar contraseña
         </button>
         <button class="btn btn-ghost" onclick="document.getElementById('userModal').style.display='none'">Cerrar</button>
@@ -802,6 +1226,10 @@ function _createModal() {
 
 // ── Password reset ────────────────────────────────────────────────────────────
 window.resetPassword = function(userId, email) {
+  // Resolver email desde la caché de usuarios: evita inyectar strings con
+  // apóstrofes/comillas dentro del atributo onclick (XSS + SyntaxError)
+  const u = allUsers.find(x => x.id === userId);
+  email = email || u?.email || '';
   const modal = document.getElementById('userModal') || _createModal();
   modal.innerHTML = `
     <div style="background:var(--surface);border:1px solid var(--border);border-radius:20px;padding:28px;width:min(90vw,400px);">
@@ -836,9 +1264,27 @@ window.resetPassword = function(userId, email) {
 };
 
 window.generateRandomPassword = function() {
-  const chars = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789!@#$%";
-  let pwd = "";
-  for (let i = 0; i < 10; i++) pwd += chars.charAt(Math.floor(Math.random() * chars.length));
+  // Generación criptográficamente segura
+  const lower = 'abcdefghijklmnopqrstuvwxyz';
+  const upper = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ';
+  const nums  = '0123456789';
+  const syms  = '!@#$%&*?';
+  const all   = lower + upper + nums + syms;
+  let pwd = '';
+  try {
+    const rnd = new Uint32Array(14);
+    crypto.getRandomValues(rnd);
+    for (let i = 0; i < 14; i++) pwd += all.charAt(rnd[i] % all.length);
+    // Garantizar al menos un carácter de cada tipo
+    if (!/[a-z]/.test(pwd)) pwd = pwd.slice(1) + lower.charAt(crypto.getRandomValues(new Uint32Array(1))[0] % lower.length);
+    if (!/[A-Z]/.test(pwd)) pwd = pwd.slice(1) + upper.charAt(crypto.getRandomValues(new Uint32Array(1))[0] % upper.length);
+    if (!/[0-9]/.test(pwd)) pwd = pwd.slice(1) + nums.charAt(crypto.getRandomValues(new Uint32Array(1))[0] % nums.length);
+    if (!/[!@#$%&*?]/.test(pwd)) pwd = pwd.slice(1) + syms.charAt(crypto.getRandomValues(new Uint32Array(1))[0] % syms.length);
+  } catch (_) {
+    const chars = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789!@#$%";
+    pwd = "";
+    for (let i = 0; i < 12; i++) pwd += chars.charAt(Math.floor(Math.random() * chars.length));
+  }
   document.getElementById('newPwdInput').value = pwd;
   document.getElementById('newPwdConfirm').value = pwd;
   const msg = document.getElementById('pwdMsg');
@@ -878,109 +1324,64 @@ window.doResetPassword = async function(userId) {
     });
 
     msg.style.color = '#4ade80'; msg.textContent = '✅ Contraseña actualizada correctamente.';
+    showToast('Contraseña actualizada para ' + email, 'success');
     setTimeout(() => { document.getElementById('userModal').style.display = 'none'; }, 1500);
   } catch (e) {
     msg.style.color = '#f87171'; msg.textContent = '❌ Error: ' + e.message;
+    showToast('Error al resetear contraseña: ' + e.message, 'error');
     logError('panel_control', e.message, e.stack || '', 'doResetPassword').catch(() => {});
   }
 };
 
-// ── Padres table (with student count + last access) ───────────────────────────
-function renderPadres() {
-  const tbody = document.getElementById('roleBody-padres');
-  if (!tbody) return;
-  const data = allUsers.filter(u => u.role === 'padre');
-  if (!data.length) { tbody.innerHTML = '<tr><td colspan="6" style="text-align:center;padding:24px;color:var(--muted);">Sin registros</td></tr>'; return; }
-  tbody.innerHTML = data.map(u => {
-    const students = allStudents.filter(s => s.parent_id === u.id);
-    const payments = allPayments.filter(p => students.some(s => s.id === p.student_id));
-    const lastAccess = getLastAccess(u.id);
-    return `<tr>
-      <td style="font-weight:800;">${escH(u.name||'—')}</td>
-      <td style="color:var(--muted);font-size:12px;">${escH(u.email||'—')}</td>
-      <td>${students.length ? students.map(s => escH(s.name)).join(', ') : '<span style="color:var(--muted);">—</span>'}</td>
-      <td style="font-weight:800;color:#4ade80;">${payments.length}</td>
-      <td style="font-size:11px;color:var(--muted);">${lastAccess}</td>
-      <td><span class="badge badge-green">Activo</span></td>
-    </tr>`;
-  }).join('');
-}
-
-// ── Maestras table (with classroom + last access) ─────────────────────────────
-function renderMaestras() {
-  const tbody = document.getElementById('roleBody-maestras');
-  if (!tbody) return;
-  const data = allUsers.filter(u => ['maestra','asistente'].includes(u.role));
-  if (!data.length) { tbody.innerHTML = '<tr><td colspan="6" style="text-align:center;padding:24px;color:var(--muted);">Sin registros</td></tr>'; return; }
-  tbody.innerHTML = data.map(u => {
-    const classroom = allClassrooms.find(c => c.teacher_id === u.id);
-    const lastAccess = getLastAccess(u.id);
-    return `<tr>
-      <td style="font-weight:800;">${escH(u.name||'—')}</td>
-      <td style="color:var(--muted);font-size:12px;">${escH(u.email||'—')}</td>
-      <td><span class="badge ${u.role==='asistente'?'badge-purple':'badge-green'}">${u.role}</span></td>
-      <td style="color:var(--muted);">${classroom ? escH(classroom.name) : '—'}</td>
-      <td style="font-size:11px;color:var(--muted);">${lastAccess}</td>
-      <td><span class="badge badge-green">Activo</span></td>
-    </tr>`;
-  }).join('');
-}
-
-function renderRoleTable(role, data) {
-  const tbody = document.getElementById(`roleBody-${role}`);
-  if (!tbody) return;
-  if (!data.length) { tbody.innerHTML = `<tr><td colspan="5" style="text-align:center;padding:24px;color:var(--muted);">Sin registros</td></tr>`; return; }
-  tbody.innerHTML = data.map(u => {
-    const lastAccess = getLastAccess(u.id);
-    return `<tr>
-      <td style="font-weight:800;">${escH(u.name||'—')}</td>
-      <td style="color:var(--muted);font-size:12px;">${escH(u.email||'—')}</td>
-      <td>Karpus Kids</td>
-      <td style="font-size:11px;color:var(--muted);">${lastAccess}</td>
-      <td><span class="badge badge-green">Activo</span></td>
-    </tr>`;
-  }).join('');
-}
-
 // ── Payments ──────────────────────────────────────────────────────────────────
+// Normalización unificada de estados de pago (paid/approved/pagado/confirmado)
+function isPaidStatus(s) {
+  return ['paid', 'approved', 'pagado', 'confirmado'].includes(String(s || '').toLowerCase());
+}
+
 function renderPayments() {
-  const approved = allPayments.filter(p => p.status === 'paid' || p.status === 'approved').length;
-  const pending  = allPayments.filter(p => p.status === 'pending').length;
-  const rejected = allPayments.filter(p => p.status === 'rejected').length;
-  const total    = allPayments.filter(p => p.status === 'paid' || p.status === 'approved').reduce((s,p) => s + Number(p.amount||0), 0);
+  const approved = allPayments.filter(p => isPaidStatus(p.status)).length;
+  const pending  = allPayments.filter(p => ['pending','pendiente','review'].includes((p.status||'').toLowerCase())).length;
+  const rejected = allPayments.filter(p => !isPaidStatus(p.status) && !['pending','pendiente','review'].includes((p.status||'').toLowerCase())).length;
+  const total    = allPayments.filter(p => isPaidStatus(p.status)).reduce((s,p) => s + Number(p.amount||0), 0);
   document.getElementById('pay-approved').textContent = approved;
   document.getElementById('pay-pending').textContent  = pending;
   document.getElementById('pay-rejected').textContent = rejected;
-  document.getElementById('pay-total').textContent    = 'RD$' + total.toLocaleString('es-DO');
+  document.getElementById('pay-total').textContent    = fmtMoney(total);
 
   const months = {};
-  allPayments.filter(p => p.status === 'paid' || p.status === 'approved').forEach(p => {
+  allPayments.filter(p => isPaidStatus(p.status)).forEach(p => {
     const m = p.month_paid || p.created_at?.slice(0,7) || '—';
     months[m] = (months[m] || 0) + Number(p.amount || 0);
   });
   const labels = Object.keys(months).sort().slice(-6);
   const values = labels.map(l => months[l]);
-  const ctx = document.getElementById('chartPayments')?.getContext('2d');
-  if (ctx) {
-    if (chartPaymentsChart) chartPaymentsChart.destroy();
-    chartPaymentsChart = new Chart(ctx, {
-      type: 'bar',
-      data: { labels, datasets: [{ label: 'Ingresos RD$', data: values, backgroundColor: 'rgba(34,197,94,.7)', borderRadius: 8 }] },
-      options: { responsive: true, plugins: { legend: { display: false } }, scales: { x: { ticks: { color: '#64748b' }, grid: { color: 'rgba(255,255,255,.04)' } }, y: { ticks: { color: '#64748b' }, grid: { color: 'rgba(255,255,255,.04)' } } } }
-    });
-  }
+  const drawPaymentsChart = () => {
+    const ctx = document.getElementById('chartPayments')?.getContext('2d');
+    if (!ctx || typeof Chart === 'undefined') return;
+    try {
+      if (chartPaymentsChart) chartPaymentsChart.destroy();
+      chartPaymentsChart = new Chart(ctx, {
+        type: 'bar',
+        data: { labels, datasets: [{ label: 'Ingresos RD$', data: values, backgroundColor: 'rgba(34,197,94,.7)', borderRadius: 8 }] },
+        options: { responsive: true, plugins: { legend: { display: false } }, scales: { x: { ticks: { color: '#64748b' }, grid: { color: 'rgba(255,255,255,.04)' } }, y: { ticks: { color: '#64748b' }, grid: { color: 'rgba(255,255,255,.04)' } } } }
+      });
+    } catch (_) {}
+  };
+  if (typeof Chart !== 'undefined') drawPaymentsChart();
+  else onChartReady(drawPaymentsChart);
 
   const tbody = document.getElementById('paymentsBody');
   if (!tbody) return;
-  const statusBadge = { paid: 'badge-green', approved: 'badge-green', pending: 'badge-yellow', rejected: 'badge-red', review: 'badge-blue', overdue: 'badge-red' };
+  const statusBadge = { paid: 'badge-green', approved: 'badge-green', pagado: 'badge-green', confirmado: 'badge-green', pending: 'badge-yellow', pendiente: 'badge-yellow', rejected: 'badge-red', review: 'badge-blue', overdue: 'badge-red' };
   tbody.innerHTML = allPayments.slice(0, 100).map(p => `<tr>
     <td style="font-size:11px;color:var(--muted);">${p.created_at ? new Date(p.created_at).toLocaleDateString('es-DO') : '—'}</td>
     <td style="font-weight:800;">${escH(p.student?.name||'—')}</td>
     <td style="color:var(--muted);">${escH(p.student?.p1_name||'—')}</td>
-    <td style="font-weight:900;color:#4ade80;">RD$${Number(p.amount||0).toLocaleString()}</td>
+    <td style="font-weight:900;color:#4ade80;">${fmtMoney(p.amount)}</td>
     <td>${escH(p.method||'—')}</td>
     <td>${escH(p.bank||'—')}</td>
-    <td><span class="badge ${statusBadge[p.status]||'badge-gray'}">${p.status||'—'}</span></td>
+    <td><span class="badge ${statusBadge[(p.status||'').toLowerCase()]||'badge-gray'}">${escH(p.status||'—')}</span></td>
   </tr>`).join('') || '<tr><td colspan="7" style="text-align:center;padding:24px;color:var(--muted);">Sin pagos</td></tr>';
 }
 
@@ -994,15 +1395,20 @@ function renderAttendance() {
     return d.toISOString().split('T')[0];
   });
   const counts = days.map(d => allAttend.filter(a => a.date === d).length);
-  const ctx = document.getElementById('chartAttendance')?.getContext('2d');
-  if (ctx) {
-    if (chartAttendChart) chartAttendChart.destroy();
-    chartAttendChart = new Chart(ctx, {
-      type: 'line',
-      data: { labels: days.map(d => d.slice(5)), datasets: [{ label: 'Asistencias', data: counts, borderColor: '#3b82f6', backgroundColor: 'rgba(59,130,246,.1)', fill: true, tension: .4, pointRadius: 4, pointBackgroundColor: '#3b82f6' }] },
-      options: { responsive: true, plugins: { legend: { display: false } }, scales: { x: { ticks: { color: '#64748b' }, grid: { color: 'rgba(255,255,255,.04)' } }, y: { ticks: { color: '#64748b' }, grid: { color: 'rgba(255,255,255,.04)' } } } }
-    });
-  }
+  const drawAttendChart = () => {
+    const ctx = document.getElementById('chartAttendance')?.getContext('2d');
+    if (!ctx || typeof Chart === 'undefined') return;
+    try {
+      if (chartAttendChart) chartAttendChart.destroy();
+      chartAttendChart = new Chart(ctx, {
+        type: 'line',
+        data: { labels: days.map(d => d.slice(5)), datasets: [{ label: 'Asistencias', data: counts, borderColor: '#3b82f6', backgroundColor: 'rgba(59,130,246,.1)', fill: true, tension: .4, pointRadius: 4, pointBackgroundColor: '#3b82f6' }] },
+        options: { responsive: true, plugins: { legend: { display: false } }, scales: { x: { ticks: { color: '#64748b' }, grid: { color: 'rgba(255,255,255,.04)' } }, y: { ticks: { color: '#64748b' }, grid: { color: 'rgba(255,255,255,.04)' } } } }
+      });
+    } catch (_) {}
+  };
+  if (typeof Chart !== 'undefined') drawAttendChart();
+  else onChartReady(drawAttendChart);
 
   const tbody = document.getElementById('attendanceBody');
   if (!tbody) return;
@@ -1053,9 +1459,16 @@ async function renderErrors() {
 }
 
 window.clearErrors = async function() {
-  if (!confirm('¿Limpiar todos los errores registrados?')) return;
-  await supabase.from('system_errors').delete().lt('created_at', new Date().toISOString());
-  renderErrors();
+  if (!confirm('¿Limpiar todos los errores registrados?\n\nEsta acción truncará la tabla system_errors y no se puede deshacer.')) return;
+  try {
+    const { error } = await supabase.from('system_errors').delete().lt('created_at', new Date().toISOString());
+    if (error) throw error;
+    showToast('Registro de errores limpiado.', 'success');
+    await renderErrors();
+  } catch (e) {
+    showToast('No se pudieron borrar los errores: ' + (e?.message || e), 'error');
+    logError('panel_control', e?.message || String(e), e?.stack || '', 'clearErrors').catch(() => {});
+  }
 };
 
 // ── Brute Force Monitor ───────────────────────────────────────────────────────
@@ -1141,12 +1554,17 @@ window.renderBruteForce = async function() {
 // ── Config ────────────────────────────────────────────────────────────────────
 window.saveAdminProfile = async function() {
   const name = document.getElementById('cfgName')?.value.trim();
-  if (!name) return;
-  const { error } = await supabase.from('profiles').update({ name }).eq('id', currentUser.id);
-  if (error) { alert('Error: ' + error.message); return; }
+  const bio  = document.getElementById('cfgBio')?.value.trim() || '';
+  if (!name) { showToast('El nombre no puede estar vacío.', 'warn'); return; }
+  const { error } = await supabase.from('profiles').update({ name, bio }).eq('id', currentUser.id);
+  if (error) { showToast('Error al guardar perfil: ' + error.message, 'error'); return; }
   document.getElementById('adminName').textContent = name;
   document.getElementById('adminAvatar').textContent = name[0].toUpperCase();
-  alert('Perfil actualizado correctamente.');
+  try {
+    localStorage.setItem('karpus_ctrl_profile_' + currentUser.id,
+      JSON.stringify({ role: currentUser.role, name, bio, ts: Date.now() }));
+  } catch (_) {}
+  showToast('✅ Perfil actualizado correctamente.', 'success');
 };
 
 window.changeUserRole = async function() {
@@ -1154,6 +1572,8 @@ window.changeUserRole = async function() {
   const role  = document.getElementById('roleChangeVal')?.value;
   const msg   = document.getElementById('roleChangeMsg');
   if (!email || !role) { msg.style.color = '#f87171'; msg.textContent = 'Completa todos los campos.'; return; }
+  // Validación estricta: el rol debe estar en la whitelist
+  if (!VALID_ROLES.includes(role)) { msg.style.color = '#f87171'; msg.textContent = 'Rol no válido.'; return; }
 
   // Confirmación antes de ejecutar
   if (!confirm(`¿Confirmas cambiar el rol de "${email}" a "${role}"?\n\nEsta acción es sensible y quedará registrada en auditoría.`)) return;
@@ -1180,10 +1600,12 @@ window.changeUserRole = async function() {
 
     msg.style.color = '#4ade80';
     msg.textContent = `✅ Rol de ${email} cambiado a "${role}" correctamente.`;
+    showToast(`Rol de ${email} cambiado a "${role}".`, 'success');
     await loadUsers();
   } catch (e) {
     msg.style.color = '#f87171';
     msg.textContent = 'Error: ' + e.message;
+    showToast('Error al cambiar rol: ' + e.message, 'error');
     logError('panel_control', e.message, e.stack || '', 'changeUserRole').catch(() => {});
   }
 };
@@ -1201,38 +1623,549 @@ window.testEmail = async function() {
       }
     });
     if (error) throw new Error(error.message || JSON.stringify(error));
-    if (data?.error) throw new Error(data.error);
+    if (data?.error) throw new Error(typeof data.error === 'string' ? data.error : JSON.stringify(data.error));
     document.getElementById('emailTestResult').innerHTML =
-      '<span style="color:#4ade80;font-weight:900;">✅ Correo enviado (ID: ' + (data?.id || 'ok') + ')</span>';
+      '<span style="color:#4ade80;font-weight:900;">✅ Correo enviado (ID: ' + escH(data?.id || 'ok') + ')</span>';
   } catch (e) {
+    // Traducir fallos del proveedor/Edge Function a mensajes accionables
+    const raw = String(e?.message || e || '');
+    let friendly;
+    if (/function not found|not deployed|404|nonexistent|non existent/i.test(raw)) {
+      friendly = 'La Edge Function "send-email" no está desplegada en este entorno.';
+    } else if (/provider|smtp|bounce|reject|quota|api.?key|unauthorized|domain|sender/i.test(raw)) {
+      friendly = 'El proveedor de correo reportó una falla. Revisa la configuración SMTP/API de la Edge Function "send-email".';
+    } else if (/failed to fetch|network/i.test(raw)) {
+      friendly = 'Sin conexión con el servidor de funciones. Verifica tu red.';
+    } else {
+      friendly = raw;
+    }
     document.getElementById('emailTestResult').innerHTML =
-      '<span style="color:#f87171;font-weight:900;">❌ Error: ' + escH(e.message) + '</span>';
+      '<span style="color:#f87171;font-weight:900;">❌ ' + escH(friendly) + '</span>';
   } finally {
     if (btn) { btn.disabled = false; btn.textContent = '📧 Probar correo'; }
   }
 };
 
+// ══ MÓDULOS Y VISIBILIDAD (Feature Flags) ════════════════════════════════════
+async function initModulesUI() {
+  if (!ffLoaded) {
+    await loadFlags();
+    ffData = JSON.parse(JSON.stringify(getFlags()));
+    ffDirty = false;
+    ffLoaded = true;
+    subscribeFlagsRemote();
+  }
+  renderFFToggles();
+  renderFFMatrix();
+  renderFFOverrides();
+}
+
+// Sincronización en vivo: otro dispositivo guardó cambios → reflejar aquí
+function subscribeFlagsRemote() {
+  onFlagsChange((flags) => {
+    if (!ffLoaded || ffDirty) return; // no pisar cambios sin guardar del admin
+    ffData = JSON.parse(JSON.stringify(flags));
+    if (document.getElementById('sec-modulos')?.classList.contains('active')) {
+      renderFFToggles();
+      renderFFMatrix();
+      renderFFOverrides();
+    }
+  });
+}
+
+function updateFFStatus() {
+  const el  = document.getElementById('ffStatus');
+  const btn = document.getElementById('ffSaveBtn');
+  if (ffDirty) {
+    if (el)  { el.textContent = '● Cambios sin guardar'; el.style.color = '#fb923c'; }
+    if (btn) btn.disabled = false;
+  } else {
+    if (el)  { el.textContent = '✓ Sincronizado'; el.style.color = '#4ade80'; }
+    if (btn) btn.disabled = true;
+  }
+}
+
+function _modCfg(key) {
+  if (!ffData.modules[key]) ffData.modules[key] = moduleDefault();
+  return ffData.modules[key];
+}
+
+window.ffToggleModule = function(key, checked) {
+  _modCfg(key).enabled = !!checked;
+  ffDirty = true;
+  renderFFToggles();
+  renderFFMatrix();
+  updateFFStatus();
+};
+
+window.ffRolePerm = function(key, role, checked) {
+  const cfg = _modCfg(key);
+  if (!cfg.roles) cfg.roles = {};
+  cfg.roles[role] = !!checked;
+  ffDirty = true;
+  renderFFToggles();
+  renderFFMatrix();
+  updateFFStatus();
+};
+
+function renderFFToggles() {
+  const grid = document.getElementById('ffToggles');
+  if (!grid || !ffData) return;
+  grid.innerHTML = MODULES.map(m => {
+    const enabled = (ffData.modules[m.key] || {}).enabled !== false;
+    return `<div class="ff-card">
+      <div class="ff-icon" style="background:${m.color}1f;"><i class="bi ${m.icon}" style="color:${m.color};"></i></div>
+      <div style="min-width:0;">
+        <div style="font-size:12px;font-weight:900;color:var(--text);">${escH(m.label)}</div>
+        <div style="font-size:10px;font-weight:800;color:${enabled ? '#4ade80' : '#f87171'};">${enabled ? 'Activo' : 'Desactivado globalmente'}</div>
+      </div>
+      <label class="ff-switch" title="${enabled ? 'Desactivar' : 'Activar'} ${escH(m.label)}">
+        <input type="checkbox" ${enabled ? 'checked' : ''} onchange="ffToggleModule('${m.key}', this.checked)">
+        <span class="ff-slider"></span>
+      </label>
+    </div>`;
+  }).join('');
+}
+
+function renderFFMatrix() {
+  const tbody = document.getElementById('ffMatrixBody');
+  if (!tbody || !ffData) return;
+  tbody.innerHTML = MODULES.map(m => {
+    const cfg = ffData.modules[m.key] || {};
+    const enabled = cfg.enabled !== false;
+    const cells = ROLES.map(r =>
+      `<td style="text-align:center;"><input type="checkbox" class="ff-chk" ${cfg.roles?.[r] !== false ? 'checked' : ''} ${enabled ? '' : 'disabled'} onchange="ffRolePerm('${m.key}','${r}', this.checked)" title="${escH(m.label)} — ${ROLE_LABELS[r]}"></td>`
+    ).join('');
+    return `<tr class="${enabled ? '' : 'ff-off-row'}">
+      <td><span class="badge" style="background:${m.color}1f;color:${m.color};"><i class="bi ${m.icon}" style="margin-right:4px;"></i>${escH(m.label)}</span></td>
+      ${cells}
+    </tr>`;
+  }).join('');
+}
+
+window.ffSearchUsers = function() {
+  clearTimeout(ffSearchTimer);
+  ffSearchTimer = setTimeout(async () => {
+    const q   = document.getElementById('ffUserSearch')?.value.trim() || '';
+    const box = document.getElementById('ffSearchResults');
+    if (!box) return;
+    if (q.length < 2) { box.innerHTML = ''; return; }
+    box.innerHTML = '<div style="text-align:center;padding:10px;color:var(--muted);font-size:12px;">Buscando...</div>';
+    try {
+      // Sanitizar comodines/caracteres reservados del filtro .or()
+      const safe = q.replace(/[%_,()]/g, '');
+      const { data, error } = await supabase.from('profiles')
+        .select('id, name, email, role')
+        .or(`name.ilike.%${safe}%,email.ilike.%${safe}%`)
+        .limit(6);
+      if (error) throw error;
+      if (!data?.length) {
+        box.innerHTML = '<div style="text-align:center;padding:10px;color:var(--muted);font-size:12px;">Sin resultados para esa búsqueda.</div>';
+        return;
+      }
+      box.innerHTML = data.map(u => `
+        <div style="display:flex;align-items:center;gap:10px;background:var(--surface2);border:1px solid var(--border);border-radius:12px;padding:8px 12px;">
+          <div style="width:30px;height:30px;border-radius:50%;background:linear-gradient(135deg,#6366f1,#8b5cf6);display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:900;color:white;flex-shrink:0;">${escH((u.name||u.email||'?')[0].toUpperCase())}</div>
+          <div style="flex:1;min-width:0;">
+            <div style="font-size:12px;font-weight:800;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${escH(u.name||u.email)}</div>
+            <div style="font-size:10px;color:var(--muted);">${escH(u.email||'')} · ${escH(u.role||'sin rol')}</div>
+          </div>
+          ${ffData.overrides[u.id] ? '<span class="badge badge-orange" style="flex-shrink:0;">con override</span>' : ''}
+          <button class="btn btn-ghost" style="padding:4px 10px;font-size:10px;flex-shrink:0;" onclick="ffAddOverride('${u.id}')">Configurar</button>
+        </div>`).join('');
+    } catch (e) {
+      box.innerHTML = `<div class="alert alert-red"><i class="bi bi-x-circle-fill"></i> Error al buscar: ${escH(e.message)}</div>`;
+    }
+  }, 300);
+};
+
+window.ffAddOverride = function(userId) {
+  if (!userId || !ffData) return;
+  if (!ffData.overrides[userId]) ffData.overrides[userId] = {};
+  ffExpandedUser = userId;
+  const inp = document.getElementById('ffUserSearch'); if (inp) inp.value = '';
+  const res = document.getElementById('ffSearchResults'); if (res) res.innerHTML = '';
+  ffDirty = true;
+  renderFFOverrides();
+  updateFFStatus();
+};
+
+window.ffRemoveOverride = function(userId) {
+  if (!userId || !ffData) return;
+  delete ffData.overrides[userId];
+  if (ffExpandedUser === userId) ffExpandedUser = null;
+  ffDirty = true;
+  renderFFOverrides();
+  updateFFStatus();
+};
+
+window.ffSetOverride = function(userId, modKey, value) {
+  if (!userId || !modKey || !ffData) return;
+  if (!ffData.overrides[userId]) ffData.overrides[userId] = {};
+  if (value === 'inherit') delete ffData.overrides[userId][modKey];
+  else ffData.overrides[userId][modKey] = value;
+  ffDirty = true;
+  updateFFStatus();
+};
+
+window.ffToggleExpand = function(userId) {
+  ffExpandedUser = ffExpandedUser === userId ? null : userId;
+  renderFFOverrides();
+};
+
+function _overrideUserCard(userId, ov) {
+  const u = allUsers.find(x => x.id === userId);
+  const name  = u?.name  || u?.email || (userId.slice(0, 8) + '…');
+  const email = u?.email || userId;
+  const activeKeys = Object.keys(ov || {});
+  const expanded = ffExpandedUser === userId;
+  let detail = '';
+  if (expanded) {
+    detail = `<div style="margin-top:10px;display:grid;grid-template-columns:repeat(auto-fill,minmax(230px,1fr));gap:6px;">
+      ${MODULES.map(m => {
+        const val = ov[m.key] || 'inherit';
+        return `<div style="display:flex;align-items:center;gap:8px;">
+          <div style="flex:1;min-width:0;font-size:11px;font-weight:700;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${escH(m.label)}</div>
+          <select class="inp" style="width:auto;padding:4px 8px;font-size:11px;" onchange="ffSetOverride('${userId}','${m.key}', this.value)">
+            <option value="inherit" ${val === 'inherit' ? 'selected' : ''}>Heredar matriz</option>
+            <option value="allow"   ${val === 'allow'   ? 'selected' : ''}>✅ Permitir siempre</option>
+            <option value="deny"    ${val === 'deny'    ? 'selected' : ''}>🚫 Bloquear siempre</option>
+          </select>
+        </div>`;
+      }).join('')}
+    </div>`;
+  }
+  return `<div style="background:var(--surface2);border:1px solid ${expanded ? 'rgba(99,102,241,.4)' : 'var(--border)'};border-radius:12px;padding:10px 14px;">
+    <div style="display:flex;align-items:center;gap:10px;">
+      <button onclick="ffToggleExpand('${userId}')" style="background:none;border:none;cursor:pointer;font-size:13px;color:#a5b4fc;padding:0;width:16px;">${expanded ? '▾' : '▸'}</button>
+      <div style="min-width:0;flex:1;">
+        <div style="font-size:12px;font-weight:800;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${escH(name)} ${activeKeys.length ? `<span class="badge badge-purple" style="margin-left:4px;">${activeKeys.length} regla${activeKeys.length > 1 ? 's' : ''}</span>` : ''}</div>
+        <div style="font-size:10px;color:var(--muted);">${escH(email)}</div>
+      </div>
+      <button class="btn btn-danger" style="padding:4px 10px;font-size:10px;" onclick="ffRemoveOverride('${userId}')"><i class="bi bi-trash"></i></button>
+    </div>
+    ${detail}
+  </div>`;
+}
+
+function renderFFOverrides() {
+  const list  = document.getElementById('ffOverrideList');
+  const count = document.getElementById('ffOverrideCount');
+  if (!list || !ffData) return;
+  const ids = Object.keys(ffData.overrides || {});
+  if (count) count.textContent = ids.length;
+  if (!ids.length) {
+    list.innerHTML = '<div style="text-align:center;padding:14px;color:var(--muted);font-size:12px;">Sin overrides individuales. Busca un usuario arriba para crear uno.</div>';
+    return;
+  }
+  list.innerHTML = ids.map(id => _overrideUserCard(id, ffData.overrides[id])).join('');
+}
+
+window.saveFlags = async function() {
+  const btn = document.getElementById('ffSaveBtn');
+  if (btn) { btn.disabled = true; btn.innerHTML = '<i class="bi bi-arrow-repeat"></i> Guardando...'; }
+  try {
+    // Limpieza: descartar overrides que quedaron sin reglas efectivas
+    Object.keys(ffData.overrides).forEach(uid => {
+      if (!Object.keys(ffData.overrides[uid]).length) delete ffData.overrides[uid];
+    });
+    const payload = normalizeFlags(ffData);
+    const { error } = await supabase.from('school_settings')
+      .update({ feature_flags: payload })
+      .eq('id', 1);
+    if (error) throw error;
+
+    setLocalFlags(payload);
+    ffData = JSON.parse(JSON.stringify(payload));
+    ffDirty = false;
+    updateFFStatus();
+    renderFFToggles();
+    renderFFMatrix();
+    renderFFOverrides();
+
+    // Auditoría inmutable del cambio de configuración
+    supabase.from('audit_logs').insert({
+      user_id: currentUser.id,
+      action: 'admin.update_feature_flags',
+      payload: {
+        changed_by: currentUser.email,
+        modules_configured: Object.keys(payload.modules),
+        users_with_overrides: Object.keys(payload.overrides).length
+      }
+    }).then(() => {}).catch(() => {});
+
+    const st = document.getElementById('ffStatus');
+    if (st) { st.textContent = '✓ Guardado — sincronizado en todos los dispositivos'; st.style.color = '#4ade80'; }
+    showToast('Permisos guardados y sincronizados en vivo.', 'success');
+  } catch (e) {
+    showToast('Error al guardar flags: ' + (e.message || e), 'error');
+    logError('panel_control', e?.message || String(e), e?.stack || '', 'saveFlags').catch(() => {});
+    updateFFStatus();
+  } finally {
+    if (btn) btn.innerHTML = '<i class="bi bi-cloud-arrow-up-fill"></i> Guardar cambios';
+  }
+};
+
+// ── Alertas por Correo Electrónico (resumen de fraude/errores) ───────────────
+const AUTO_ALERT_COOLDOWN_MS = 60 * 60 * 1000; // máx. 1 correo automático por hora
+let _lastAutoReportAt = 0;
+let _emailAlertBusy = false;
+
+window.toggleAutoAlerts = function(enabled) {
+  savePrefs({ autoEmailAlerts: !!enabled });
+  const st = document.getElementById('autoAlertState');
+  if (st) {
+    st.textContent = 'Automático: ' + (enabled ? 'ON' : 'OFF');
+    st.style.color = enabled ? '#4ade80' : 'var(--muted)';
+  }
+  showToast(enabled ? 'Alertas automáticas por correo activadas.' : 'Alertas automáticas desactivadas.', enabled ? 'success' : 'info');
+};
+
+function _buildReportHtml() {
+  const high = fraudEvents.filter(f => f.risk === 'alto');
+  const now = new Date().toLocaleString('es-DO', { dateStyle: 'full', timeStyle: 'short' });
+  const rows = fraudEvents.slice(0, 10).map(f =>
+    `<tr><td style="padding:6px 10px;border-bottom:1px solid #e5e7eb;">${escH(f.type)}</td><td style="padding:6px 10px;border-bottom:1px solid #e5e7eb;">${escH(f.user)}</td><td style="padding:6px 10px;border-bottom:1px solid #e5e7eb;color:${f.risk === 'alto' ? '#dc2626' : '#d97706'};font-weight:bold;">${escH(f.risk)}</td></tr>`
+  ).join('') || '<tr><td colspan="3" style="padding:10px;color:#16a34a;">Sin eventos sospechosos ✅</td></tr>';
+  return `<div style="font-family:Arial,sans-serif;padding:24px;background:#f8fafc;">
+    <h2 style="color:#4338ca;margin:0 0 4px;">🛡️ Karpus Kids — Reporte del Panel de Control</h2>
+    <p style="color:#64748b;font-size:12px;margin:0 0 18px;">Generado: ${now}</p>
+    <div style="display:flex;gap:12px;margin-bottom:20px;">
+      <div style="flex:1;background:white;border-radius:12px;padding:14px;text-align:center;border:1px solid #e5e7eb;"><div style="font-size:22px;font-weight:900;color:${fraudEvents.length ? '#dc2626' : '#16a34a'};">${fraudEvents.length}</div><div style="font-size:11px;color:#64748b;">Alertas de fraude</div></div>
+      <div style="flex:1;background:white;border-radius:12px;padding:14px;text-align:center;border:1px solid #e5e7eb;"><div style="font-size:22px;font-weight:900;color:#dc2626;">${high.length}</div><div style="font-size:11px;color:#64748b;">Riesgo alto</div></div>
+      <div style="flex:1;background:white;border-radius:12px;padding:14px;text-align:center;border:1px solid #e5e7eb;"><div style="font-size:22px;font-weight:900;color:#4338ca;">${allUsers.filter(u => !u.role).length}</div><div style="font-size:11px;color:#64748b;">Usuarios sin rol</div></div>
+      <div style="flex:1;background:white;border-radius:12px;padding:14px;text-align:center;border:1px solid #e5e7eb;"><div style="font-size:22px;font-weight:900;color:#4338ca;">${allUsers.length}</div><div style="font-size:11px;color:#64748b;">Usuarios totales</div></div>
+    </div>
+    <h3 style="color:#334155;font-size:14px;">Eventos detectados</h3>
+    <table style="width:100%;border-collapse:collapse;background:white;border-radius:10px;overflow:hidden;font-size:12px;">
+      <thead><tr style="background:#eef2ff;"><th style="text-align:left;padding:8px 10px;">Tipo</th><th style="text-align:left;padding:8px 10px;">Usuario</th><th style="text-align:left;padding:8px 10px;">Riesgo</th></tr></thead>
+      <tbody>${rows}</tbody>
+    </table>
+    <p style="color:#94a3b8;font-size:11px;margin-top:18px;">Correo automático del Panel de Control — Karpus Kids</p>
+  </div>`;
+}
+
+async function _resolveReportRecipient() {
+  // Prioridad: campo del formulario → email del admin → buzón institucional
+  const input = document.getElementById('alertEmailTo')?.value.trim();
+  if (input && /.+@.+\..+/.test(input)) {
+    try { savePrefs({ reportEmail: input }); } catch (_) {}
+    return input;
+  }
+  try { if (loadPrefs().reportEmail) return loadPrefs().reportEmail; } catch (_) {}
+  if (currentUser?.email) return currentUser.email;
+  return 'impulsodigital@gmail.com';
+}
+
+window.sendAdminReport = async function(manual = false) {
+  if (_emailAlertBusy) return;
+  const to = await _resolveReportRecipient();
+  const msgEl = document.getElementById('reportEmailMsg');
+  const btn = document.getElementById('btnSendReport');
+  if (!to) { if (manual) showToast('Configura un correo destinatario.', 'warn'); return; }
+  _emailAlertBusy = true;
+  if (btn) { btn.disabled = true; btn.innerHTML = '<i class="bi bi-hourglass-split"></i> Enviando...'; }
+  if (manual && msgEl) { msgEl.style.color = '#94a3b8'; msgEl.textContent = 'Enviando reporte a ' + to + '...'; }
+  try {
+    const { data, error } = await supabase.functions.invoke('send-email', {
+      body: {
+        to,
+        subject: '🛡️ Karpus Kids — Reporte del Panel (' + new Date().toLocaleDateString('es-DO') + ')',
+        html: _buildReportHtml(),
+      }
+    });
+    if (error) throw new Error(error.message || JSON.stringify(error));
+    if (data?.error) throw new Error(typeof data.error === 'string' ? data.error : JSON.stringify(data.error));
+    _lastAutoReportAt = Date.now();
+    if (manual) {
+      if (msgEl) { msgEl.style.color = '#4ade80'; msgEl.textContent = '✅ Reporte enviado correctamente a ' + to; }
+      showToast('Reporte enviado a ' + to, 'success');
+    } else {
+      console.info('[Karpus] Alerta automática enviada a', to);
+    }
+  } catch (e) {
+    const raw = String(e?.message || e || '');
+    const friendly = /function not found|not deployed|404/i.test(raw)
+      ? 'La Edge Function "send-email" no está desplegada.'
+      : /provider|smtp|reject|quota|api.?key|unauthorized/i.test(raw)
+        ? 'El proveedor de correo rechazó el envío.'
+        : raw;
+    if (manual) {
+      if (msgEl) { msgEl.style.color = '#f87171'; msgEl.textContent = '❌ ' + friendly; }
+      showToast('No se pudo enviar el reporte: ' + friendly, 'error');
+    } else {
+      console.warn('[Karpus] Falló alerta automática:', friendly);
+    }
+  } finally {
+    _emailAlertBusy = false;
+    if (btn) { btn.disabled = false; btn.innerHTML = '<i class="bi bi-send-fill"></i> Enviar reporte ahora'; }
+  }
+};
+
+// Envío automático silencioso: riesgo alto detectado + cooldown de 1 hora
+function maybeSendAutoAlert() {
+  try { if (!loadPrefs().autoEmailAlerts) return; } catch (_) { return; }
+  if (_emailAlertBusy) return;
+  if ((Date.now() - _lastAutoReportAt) < AUTO_ALERT_COOLDOWN_MS) return;
+  const hasHighRisk = fraudEvents.some(f => f.risk === 'alto');
+  if (hasHighRisk) sendAdminReport(false);
+}
+
 // ── Realtime ──────────────────────────────────────────────────────────────────
+function _sectionActive(id) {
+  return document.getElementById('sec-' + id)?.classList.contains('active');
+}
+
 function startRealtime() {
-  supabase.channel('admin-realtime')
+  // Desduplicación: cancelar y limpiar cualquier canal previo antes de re-suscribir
+  if (_realtimeChannel) {
+    try { supabase.removeChannel(_realtimeChannel); } catch (_) {}
+    _realtimeChannel = null;
+  }
+  _realtimeChannel = supabase.channel('admin-realtime')
     .on('postgres_changes', { event: '*', schema: 'public', table: 'payments' }, async () => {
-      await loadPayments(); detectFraud();
-      document.getElementById('badge-fraud').textContent = fraudEvents.length;
+      await loadPayments();
+      detectFraud();
+      const bf = document.getElementById('badge-fraud');
+      if (bf) bf.textContent = fraudEvents.length;
+      if (_sectionActive('dashboard')) renderDashboard();
+      if (_sectionActive('pagos'))     renderPayments();
     })
     .on('postgres_changes', { event: '*', schema: 'public', table: 'attendance' }, async () => {
       await loadAttendance();
+      // KPI de asistencia del día + tabla si está visible
+      const today = new Date().toISOString().split('T')[0];
+      const kpi = document.getElementById('kpi-attendance');
+      if (kpi) kpi.textContent = allAttend.filter(a => a.date === today).length;
+      if (_sectionActive('asistencia')) renderAttendance();
     })
     .on('postgres_changes', { event: '*', schema: 'public', table: 'door_punches' }, async () => {
       await loadPunches();
     })
+    .on('postgres_changes', { event: '*', schema: 'public', table: 'posts' }, async () => {
+      await loadWallPosts();
+      if (_sectionActive('muro')) renderWall();
+    })
+    .on('postgres_changes', { event: '*', schema: 'public', table: 'messages' }, async () => {
+      await loadChatData();
+      if (_sectionActive('chat')) renderChat();
+    })
     .subscribe();
 }
 
-// ── Logout ────────────────────────────────────────────────────────────────────
+// ── Menú lateral móvil (hamburguesa + backdrop) ──────────────────────────────
+function _syncSidebarBackdrop() {
+  const bd = document.getElementById('sidebarBackdrop');
+  const open = document.getElementById('sidebar')?.classList.contains('open');
+  if (bd) bd.classList.toggle('show', !!open && window.innerWidth <= 768);
+}
+window.toggleSidebar = function() {
+  const sb = document.getElementById('sidebar');
+  if (!sb) return;
+  sb.classList.toggle('open');
+  _syncSidebarBackdrop();
+};
+window.closeSidebar = function() {
+  document.getElementById('sidebar')?.classList.remove('open');
+  _syncSidebarBackdrop();
+};
+window.addEventListener('resize', () => {
+  if (window.innerWidth > 768) window.closeSidebar();
+});// ── Limpieza al abandonar el panel (canales realtime + intervalos) ───────────
+// Nota: este panel usa UN único canal persistente ('admin-realtime') compartido
+// por todas las secciones — no hay canales por sección que desduplicar.
+window.addEventListener('pagehide', () => {
+  if (_clockInterval) { clearInterval(_clockInterval); _clockInterval = null; }
+  if (_sessionInterval) { clearInterval(_sessionInterval); _sessionInterval = null; }
+  try { supabase.removeAllChannels(); } catch (_) {}
+  _realtimeChannel = null;
+});
+
+// ── Logout con limpieza total: suscripciones realtime, intervalos y caché local ──
 window.doLogout = async function() {
+  try {
+    // 1. Cancelar todas las suscripciones realtime
+    try { supabase.removeAllChannels(); } catch (_) {}
+    _realtimeChannel = null;
+    // 2. Detener intervalos activos (reloj + refresco de sesión)
+    if (_clockInterval)   { clearInterval(_clockInterval);   _clockInterval = null; }
+    if (_sessionInterval) { clearInterval(_sessionInterval); _sessionInterval = null; }
+    // 3. Limpiar caché local del panel (perfiles cacheados)
+    Object.keys(localStorage)
+      .filter(k => k.startsWith('karpus_ctrl_'))
+      .forEach(k => localStorage.removeItem(k));
+  } catch (_) {}
   await supabase.auth.signOut();
   window.location.href = 'login.html';
 };
+
+// ── Notificaciones del navegador: estado y solicitud de permiso ──────────────
+function updateNotifUI(perm) {
+  const btn = document.getElementById('notifPermBtn');
+  if (!btn) return;
+  const p = perm || ('Notification' in window ? Notification.permission : 'unsupported');
+  const map = {
+    granted:     ['badge-green',  '✅ Activadas'],
+    denied:      ['badge-red',    '🚫 Bloqueadas'],
+    default:     ['badge-yellow', '⚠️ Clic para activar'],
+    unsupported: ['badge-gray',   'No soportadas'],
+  };
+  const [cls, label] = map[p] || map.unsupported;
+  btn.className = 'badge ' + cls;
+  btn.textContent = label;
+}
+
+window.requestNotifPermission = async function() {
+  if (!('Notification' in window)) { showToast('Este navegador no soporta notificaciones.', 'warn'); return; }
+  if (Notification.permission === 'granted') { showToast('Las notificaciones ya están activadas.', 'info'); return; }
+  try {
+    const perm = await Notification.requestPermission();
+    updateNotifUI(perm);
+    showToast(
+      perm === 'granted' ? 'Notificaciones del navegador activadas.' :
+      perm === 'denied'  ? 'Permiso de notificaciones bloqueado.' : 'Permiso pendiente.',
+      perm === 'granted' ? 'success' : 'warn'
+    );
+  } catch (_) { /* usuario canceló */ }
+};
+
+// ── Monitoreo de salud de Edge Functions ─────────────────────────────────────
+// Un gateway de Supabase responde 401/400 si la función existe (exige JWT) y
+// 404 si no está desplegada — sin efectos secundarios ni envíos reales.
+async function checkEdgeFunctionsHealth() {
+  const el = document.getElementById('funcStatus');
+  if (!el) return;
+  el.className = 'badge badge-gray';
+  el.textContent = 'Verificando...';
+  const names = ['send-email', 'admin-reset-password'];
+  const base = String(SUPABASE_URL || '').replace(/\/$/, '');
+  if (!base) { el.className = 'badge badge-yellow'; el.textContent = 'N/D'; return; }
+  try {
+    const statuses = await Promise.all(names.map(n =>
+      fetch(`${base}/functions/v1/${n}`, { method: 'GET', headers: { apikey: SUPABASE_ANON_KEY } })
+        .then(r => r.status)
+        .catch(() => 0)
+    ));
+    const deployed = statuses.filter(s => s === 401 || s === 400 || s === 200).length;
+    const missing  = statuses.filter(s => s === 404).length;
+    const unknown  = statuses.filter(s => s === 0).length;
+    if (deployed === names.length) {
+      el.className = 'badge badge-green';
+      el.innerHTML = '<i class="bi bi-circle-fill" style="font-size:6px;"></i> Activas';
+    } else if (missing === names.length) {
+      el.className = 'badge badge-red';
+      el.innerHTML = '<i class="bi bi-circle-fill" style="font-size:6px;"></i> No desplegadas';
+    } else if (unknown === names.length) {
+      el.className = 'badge badge-yellow'; el.textContent = 'N/D';
+    } else {
+      el.className = 'badge badge-yellow';
+      el.textContent = `${deployed}/${names.length} activas`;
+    }
+  } catch (_) {
+    el.className = 'badge badge-yellow';
+    el.textContent = 'N/D';
+  }
+}
 
 // ── Security Stats ────────────────────────────────────────────────────────────
 window.loadSecurityStats = async function() {
@@ -1311,4 +2244,8 @@ window.loadPaymentAudit = async function() {
 // ── Helpers ───────────────────────────────────────────────────────────────────
 function escH(str) {
   return String(str || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+function fmtMoney(n) {
+  return 'RD$' + Number(n || 0).toLocaleString('es-DO', { maximumFractionDigits: 2 });
 }
