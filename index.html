@@ -21,8 +21,8 @@
     "@type": "ChildCare",
     "name": "Karpus Kids",
     "description": "Estancia infantil segura y amorosa en San Cristóbal. Cuidado experto, educación integral y app exclusiva para padres.",
-    "url": "https://karpuskids.com",
-    "telephone": "+18298038424",
+    "url": "https://karpuskids.com/",
+    "telephone": "+18298038484",
     "image": "https://karpuskids.com/img/karpus.jpg",
     "address": {
       "@type": "PostalAddress",
@@ -39,9 +39,23 @@
     "priceRange": "$$",
     "openingHours": "Mo-Fr 07:00-18:00",
     "sameAs": [
-      "https://wa.me/18298038424"
+      "https://wa.me/18298038484"
     ]
   }
+  </script>
+  <link rel="manifest" href="manifest.json">
+  <script src="https://cdn.onesignal.com/sdks/web/v16/OneSignalSDK.page.js" defer></script>
+  <script>
+    window.OneSignalDeferred = window.OneSignalDeferred || [];
+    OneSignalDeferred.push(async function(OneSignal) {
+      await OneSignal.init({
+        appId: "b19313ce-0df3-4c90-9519-866468a30628",
+        safari_web_id: "web.onesignal.auto.63402434-7a0e-473d-9d21-f095166311e9",
+        notifyButton: {
+          enable: false
+        }
+      });
+    });
   </script>
   <link rel="icon" href="logo/favicon.ico" sizes="any">
   <link rel="apple-touch-icon" href="logo/apple-touch-icon.png">
@@ -249,8 +263,8 @@
 ════════════════════════════════════════════════════════════ -->
 <section class="hero" id="inicio">
   <!-- Video background (muted, autoplay) -->
-  <video class="hero-video" autoplay muted loop playsinline poster="img/karpus.jpg" aria-label="Video de fondo Karpus Kids">
-    <source src="/img/mundo.jpg" type="video/mp4">
+  <video class="hero-video video-bg" autoplay muted loop playsinline poster="img/karpus.jpg" aria-label="Video de fondo Karpus Kids">
+    <source src="img/14.mp4" type="video/mp4">
     <track kind="captions" srclang="es" label="Español" default>
   </video>
   <div class="hero-overlay"></div>
@@ -279,7 +293,7 @@
 
       <!-- CTAs -->
       <div class="fade-up-4" style="display:flex;flex-wrap:wrap;gap:14px;margin-bottom:52px;">
-        <a href="https://wa.me/18298038424?text=¡Hola!%20Quiero%20información%20sobre%20Karpus%20Kids" target="_blank"
+        <a href="https://wa.me/18298038484?text=¡Hola!%20Quiero%20información%20sobre%20Karpus%20Kids" target="_blank"
           style="display:inline-flex;align-items:center;gap:8px;background:linear-gradient(135deg,#25D366,#128C7E);color:white;font-weight:900;font-size:14px;padding:15px 30px;border-radius:14px;box-shadow:0 8px 24px rgba(37,211,102,.4);transition:transform .2s,box-shadow .2s;"
           onmouseover="this.style.transform='translateY(-3px)';this.style.boxShadow='0 14px 32px rgba(37,211,102,.5)'"
           onmouseout="this.style.transform='';this.style.boxShadow='0 8px 24px rgba(37,211,102,.4)'"
@@ -329,7 +343,7 @@
 <!-- ── ALERT BANNER ── -->
 <div style="background:linear-gradient(90deg,#E91E63,#FF9800,#E91E63);background-size:200% 100%;animation:shimmer 4s linear infinite;color:white;text-align:center;padding:13px 20px;font-weight:800;font-size:13px;letter-spacing:.03em;">
   🔥 ¡Cupos limitados para este mes! &nbsp;·&nbsp;
-  <a href="https://wa.me/18298038424" target="_blank" style="color:white;text-decoration:underline;font-weight:900;">Reserva el tuyo ahora →</a>
+  <a href="https://wa.me/18298038484" target="_blank" style="color:white;text-decoration:underline;font-weight:900;">Reserva el tuyo ahora →</a>
 </div>
 
 <!-- ════════════════════════════════════════════════════════════
@@ -384,9 +398,9 @@
       <div>
         <span class="sec-label" style="background:#fdf2f8;color:#E91E63;">Nuestros programas</span>
         <h2 style="font-size:clamp(1.9rem,3.5vw,2.8rem);font-weight:900;color:#1e293b;margin:0 0 8px;">Programas para cada edad</h2>
-        <p style="color:#64748b;font-size:15px;">Cuidado, estimulacion  y educación integral para el nivel inicial.</p>
+        <p style="color:#64748b;font-size:15px;">Cuidado, estimulación y educación integral para el nivel inicial.</p>
       </div>
-      <a href="https://wa.me/18298038424" target="_blank"
+      <a href="https://wa.me/18298038484" target="_blank"
         style="display:inline-flex;align-items:center;gap:6px;background:linear-gradient(135deg,#E91E63,#FF9800);color:white;font-weight:900;font-size:13px;padding:12px 24px;border-radius:50px;box-shadow:0 4px 16px rgba(233,30,99,.3);transition:transform .2s;"
         onmouseover="this.style.transform='translateY(-2px)'" onmouseout="this.style.transform=''"
         onfocus="this.style.transform='translateY(-2px)'" onblur="this.style.transform=''">
@@ -590,7 +604,7 @@
     <div class="pt-cta">
       <div class="pt-cta-title">¡Separa tu cupo hoy!</div>
       <p class="pt-cta-sub">¿Cualquier duda? ¡Coméntanos! Estamos listos para ayudarte.</p>
-      <a href="https://wa.me/18298038424?text=%C2%A1Hola!%20Quiero%20informaci%C3%B3n%20sobre%20precios%20e%20inscripci%C3%B3n" target="_blank" class="pt-cta-btn">
+      <a href="https://wa.me/18298038484?text=%C2%A1Hola!%20Quiero%20informaci%C3%B3n%20sobre%20precios%20e%20inscripci%C3%B3n" target="_blank" class="pt-cta-btn">
         <i class="bi bi-whatsapp" style="font-size:20px;color:#25D366;"></i> Consultar por WhatsApp
       </a>
     </div>
@@ -678,7 +692,7 @@
       </div>
     </div>
     <div style="text-align:center;margin-top:44px;">
-      <a href="https://wa.me/18298038424?text=¡Hola!%20Quiero%20inscribir%20a%20mi%20hijo%20en%20Karpus%20Kids" target="_blank"
+      <a href="https://wa.me/18298038484?text=¡Hola!%20Quiero%20inscribir%20a%20mi%20hijo%20en%20Karpus%20Kids" target="_blank"
         style="display:inline-flex;align-items:center;gap:8px;background:linear-gradient(135deg,#25D366,#128C7E);color:white;font-weight:900;font-size:14px;padding:15px 32px;border-radius:14px;box-shadow:0 8px 24px rgba(37,211,102,.4);transition:transform .2s;"
         onmouseover="this.style.transform='translateY(-2px)'" onmouseout="this.style.transform=''"
         onfocus="this.style.transform='translateY(-2px)'" onblur="this.style.transform=''">
@@ -697,7 +711,7 @@
     <!-- Image block -->
     <div style="position:relative;" class="obs-fade">
       <div style="border-radius:28px;overflow:hidden;box-shadow:0 24px 64px rgba(0,0,0,.14);aspect-ratio:4/3;">
-        <img src="/img/1.jpg" alt="Karpus Kids instalaciones" loading="lazy" style="width:100%;height:100%;object-fit:cover;">
+        <img src="img/1.jpg" alt="Karpus Kids instalaciones" loading="lazy" style="width:100%;height:100%;object-fit:cover;">
       </div>
       <!-- Floating badge -->
       <div style="position:absolute;bottom:-20px;right:-16px;background:#fff;border-radius:20px;padding:16px 20px;box-shadow:0 12px 32px rgba(0,0,0,.12);border:2px solid #f1f5f9;min-width:155px;">
@@ -708,7 +722,7 @@
       <div style="position:absolute;top:-16px;left:-16px;width:64px;height:64px;border-radius:50%;border:4px dashed #FF9800;opacity:.35;"></div>
       <!-- Second image overlay -->
       <div style="position:absolute;bottom:24px;left:-24px;width:130px;height:130px;border-radius:18px;overflow:hidden;border:4px solid white;box-shadow:0 8px 24px rgba(0,0,0,.15);" class="hide-mobile">
-        <img src="/img/karpus.jpg" alt="Karpus Kids" loading="lazy" style="width:100%;height:100%;object-fit:cover;">
+        <img src="img/karpus.jpg" alt="Karpus Kids" loading="lazy" style="width:100%;height:100%;object-fit:cover;">
       </div>
     </div>
 
@@ -717,7 +731,7 @@
       <span class="sec-label" style="background:#fff7ed;color:#FF9800;">Nuestra historia</span>
       <h2 style="font-size:clamp(1.9rem,3.5vw,2.8rem);font-weight:900;color:#1e293b;margin-bottom:18px;">Confianza familiar por más de 5 años</h2>
       <p style="color:#64748b;font-size:15px;line-height:1.78;margin-bottom:16px;">
-        Desde nuestra fundación, <strong class="kk"><span class="k1">K</span><span class="k2">a</span><span class="k3">r</span><span class="k4">p</span><span class="k5">u</span><span class="k6">s</span> <span class="k7">K</span><span class="k8">i</span><span class="k9">d</span><span class="k10">s</span></strong> ha sido un socio de confianza para las familias de San Cristobal. Nuestra fundadora, Karonlyn García, creó este espacio con una misión clara: cuidado y educación de alta calidad para cada niño, cada familia, cada día.
+        Desde nuestra fundación, <strong class="kk"><span class="k1">K</span><span class="k2">a</span><span class="k3">r</span><span class="k4">p</span><span class="k5">u</span><span class="k6">s</span> <span class="k7">K</span><span class="k8">i</span><span class="k9">d</span><span class="k10">s</span></strong> ha sido un socio de confianza para las familias de San Cristóbal. Nuestra fundadora, Karonlyn García, creó este espacio con una misión clara: cuidado y educación de alta calidad para cada niño, cada familia, cada día.
       </p>
       <p style="color:#64748b;font-size:15px;line-height:1.78;margin-bottom:28px;">
         Contamos con personal certificado, instalaciones modernas y una app exclusiva que mantiene a los padres conectados en todo momento.
@@ -739,7 +753,7 @@
         </div>
       </div>
 
-      <a href="https://wa.me/18298038424?text=¡Hola!%20Quiero%20agendar%20una%20visita%20a%20Karpus%20Kids" target="_blank"
+      <a href="https://wa.me/18298038484?text=¡Hola!%20Quiero%20agendar%20una%20visita%20a%20Karpus%20Kids" target="_blank"
         style="display:inline-flex;align-items:center;gap:8px;background:linear-gradient(135deg,#25D366,#128C7E);color:white;font-weight:900;font-size:14px;padding:14px 28px;border-radius:14px;box-shadow:0 6px 20px rgba(37,211,102,.35);transition:transform .2s;"
         onmouseover="this.style.transform='translateY(-2px)'" onmouseout="this.style.transform=''"
         onfocus="this.style.transform='translateY(-2px)'" onblur="this.style.transform=''">
@@ -1017,7 +1031,7 @@
       </div>
       <h3 style="font-size:1.6rem;font-weight:900;color:#fff;margin-bottom:12px;">Agenda una Visita</h3>
       <p style="color:rgba(255,255,255,.58);font-size:14px;line-height:1.72;margin-bottom:26px;">¿Listo para conocernos? Nuestro equipo está disponible para mostrarte las instalaciones y responder todas tus preguntas.</p>
-      <a href="https://wa.me/18298038424?text=¡Hola!%20Quiero%20agendar%20una%20visita%20a%20Karpus%20Kids" target="_blank"
+      <a href="https://wa.me/18298038484?text=¡Hola!%20Quiero%20agendar%20una%20visita%20a%20Karpus%20Kids" target="_blank"
         style="display:inline-flex;align-items:center;gap:8px;background:linear-gradient(135deg,#25D366,#128C7E);color:white;font-weight:900;font-size:13px;padding:13px 26px;border-radius:12px;box-shadow:0 6px 20px rgba(37,211,102,.4);transition:transform .2s;"
         onmouseover="this.style.transform='translateY(-2px)'" onmouseout="this.style.transform=''"
         onfocus="this.style.transform='translateY(-2px)'" onblur="this.style.transform=''">
@@ -1048,7 +1062,7 @@
         </div>
         <p style="font-size:14px;line-height:1.72;color:rgba(255,255,255,.45);max-width:300px;margin-bottom:20px;">Estancia infantil de confianza en San Cristóbal. Cuidado experto, educación integral y tecnología para las familias modernas.</p>
         <div style="display:flex;gap:10px;">
-          <a href="https://wa.me/18298038424" target="_blank" aria-label="WhatsApp" style="width:38px;height:38px;background:rgba(255,255,255,.08);border-radius:10px;display:flex;align-items:center;justify-content:center;color:rgba(255,255,255,.65);font-size:16px;transition:background .2s,color .2s;" onmouseover="this.style.background='#25D366';this.style.color='white'" onmouseout="this.style.background='rgba(255,255,255,.08)';this.style.color='rgba(255,255,255,.65)'" onfocus="this.style.background='#25D366';this.style.color='white'" onblur="this.style.background='rgba(255,255,255,.08)';this.style.color='rgba(255,255,255,.65)'"><i class="bi bi-whatsapp"></i></a>
+          <a href="https://wa.me/18298038484" target="_blank" aria-label="WhatsApp" style="width:38px;height:38px;background:rgba(255,255,255,.08);border-radius:10px;display:flex;align-items:center;justify-content:center;color:rgba(255,255,255,.65);font-size:16px;transition:background .2s,color .2s;" onmouseover="this.style.background='#25D366';this.style.color='white'" onmouseout="this.style.background='rgba(255,255,255,.08)';this.style.color='rgba(255,255,255,.65)'" onfocus="this.style.background='#25D366';this.style.color='white'" onblur="this.style.background='rgba(255,255,255,.08)';this.style.color='rgba(255,255,255,.65)'"><i class="bi bi-whatsapp"></i></a>
           <a href="https://instagram.com" target="_blank" aria-label="Instagram" style="width:38px;height:38px;background:rgba(255,255,255,.08);border-radius:10px;display:flex;align-items:center;justify-content:center;color:rgba(255,255,255,.65);font-size:16px;transition:background .2s,color .2s;" onmouseover="this.style.background='#E91E63';this.style.color='white'" onmouseout="this.style.background='rgba(255,255,255,.08)';this.style.color='rgba(255,255,255,.65)'" onfocus="this.style.background='#E91E63';this.style.color='white'" onblur="this.style.background='rgba(255,255,255,.08)';this.style.color='rgba(255,255,255,.65)'"><i class="bi bi-instagram"></i></a>
           <a href="https://facebook.com" target="_blank" aria-label="Facebook" style="width:38px;height:38px;background:rgba(255,255,255,.08);border-radius:10px;display:flex;align-items:center;justify-content:center;color:rgba(255,255,255,.65);font-size:16px;transition:background .2s,color .2s;" onmouseover="this.style.background='#2196F3';this.style.color='white'" onmouseout="this.style.background='rgba(255,255,255,.08)';this.style.color='rgba(255,255,255,.65)'" onfocus="this.style.background='#2196F3';this.style.color='white'" onblur="this.style.background='rgba(255,255,255,.08)';this.style.color='rgba(255,255,255,.65)'"><i class="bi bi-facebook"></i></a>
         </div>
@@ -1074,9 +1088,9 @@
         <div>
           <h4 style="font-size:12px;font-weight:900;color:white;text-transform:uppercase;letter-spacing:.1em;margin-bottom:16px;">Contacto</h4>
           <div style="display:flex;flex-direction:column;gap:14px;">
-            <a href="https://wa.me/18298038424" target="_blank" aria-label="Llamar por WhatsApp" style="display:flex;align-items:center;gap:10px;color:rgba(255,255,255,.45);font-size:14px;transition:color .2s;" onmouseover="this.style.color='#25D366'" onmouseout="this.style.color='rgba(255,255,255,.45)'" onfocus="this.style.color='#25D366'" onblur="this.style.color='rgba(255,255,255,.45)'">
+            <a href="https://wa.me/18298038484" target="_blank" aria-label="Llamar por WhatsApp" style="display:flex;align-items:center;gap:10px;color:rgba(255,255,255,.45);font-size:14px;transition:color .2s;" onmouseover="this.style.color='#25D366'" onmouseout="this.style.color='rgba(255,255,255,.45)'" onfocus="this.style.color='#25D366'" onblur="this.style.color='rgba(255,255,255,.45)'">
               <i class="bi bi-whatsapp" style="font-size:16px;flex-shrink:0;"></i>
-              <span>+1 (829) 803-8424</span>
+              <span>+1 (829) 803-8484</span>
             </a>
             <div style="display:flex;align-items:flex-start;gap:10px;color:rgba(255,255,255,.45);font-size:14px;">
               <i class="bi bi-geo-alt-fill" style="font-size:16px;flex-shrink:0;margin-top:2px;"></i>
@@ -1120,7 +1134,7 @@
 
 
 <!-- ── FABs ── -->
-<a href="https://wa.me/18298038424" target="_blank" class="fab fab-ws" title="WhatsApp"><i class="bi bi-whatsapp"></i></a>
+<a href="https://wa.me/18298038484" target="_blank" class="fab fab-ws" title="WhatsApp"><i class="bi bi-whatsapp"></i></a>
 <a href="https://instagram.com"     target="_blank" class="fab fab-ig" title="Instagram"><i class="bi bi-instagram"></i></a>
 
 <!-- ── LIGHTBOX ── -->
@@ -1185,6 +1199,13 @@
       if (t) { e.preventDefault(); t.scrollIntoView({ behavior: 'smooth', block: 'start' }); }
     });
   });
+
+  // ── Service Worker registration ───────────────────────────────────────────
+  if ('serviceWorker' in navigator) {
+    window.addEventListener('load', () => {
+      navigator.serviceWorker.register('/OneSignalSDKWorker.js', { scope: '/' }).catch(() => {});
+    });
+  }
 </script>
 </body>
 </html>
