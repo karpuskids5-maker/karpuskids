@@ -34,12 +34,16 @@ export const Api = {
    * 💰 Estado financiero completo
    */
   async getStudentFinancialStatus(studentId) {
+    const currentMonth = new Date().getFullYear() + '-' + String(new Date().getMonth() + 1).padStart(2, '0');
+
     const [student, allPending, history] = await Promise.all([
       handle(supabase.from(TABLES.STUDENTS).select('monthly_fee, due_day').eq('id', studentId).single(), 'getStudentFee'),
       handle(supabase.from(TABLES.PAYMENTS)
         .select('id, amount, status, due_date, month_paid, evidence_url, proof_url, method')
         .eq('student_id', studentId)
         .in('status', ['pending', 'overdue'])
+        .or(`month_paid.eq.${currentMonth},month_paid.is.null`)
+        .is('deleted_at', null)
         .order('due_date', { ascending: true })
         .limit(24), 'getPendingPayments'),
       handle(supabase.from(TABLES.PAYMENTS)

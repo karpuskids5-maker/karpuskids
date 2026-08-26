@@ -154,11 +154,16 @@ export const PaymentsModule = {
 
     container.innerHTML = Helpers.skeleton(3, 'h-24');
     try {
+      // Solo traer pagos del mes actual (YYYY-MM)
+      const now = new Date();
+      const currentMonth = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
+
       const { data, error } = await supabase
         .from(TABLES.PAYMENTS)
         .select('id,student_id,amount,concept,status,due_date,created_at,paid_date,method,month_paid,evidence_url,notes')
         .eq('student_id', this._studentId)
         .is('deleted_at', null)
+        .or(`month_paid.eq.${currentMonth},month_paid.is.null`)
         .order('due_date', { ascending: false });
       if (error) throw error;
 
