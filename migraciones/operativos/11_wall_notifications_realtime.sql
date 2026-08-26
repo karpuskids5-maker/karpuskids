@@ -55,8 +55,10 @@ CREATE POLICY "wall_notifications_insert_auth" ON public.wall_notifications
   FOR INSERT WITH CHECK (auth.role() = 'authenticated');
 
 -- ── C. Publicación realtime ────────────────────────────────────────────────
--- EventBanner (js/shared/event-banner.js) escucha estas tablas vía
--- postgres_changes; sin estar en la publicación los eventos nunca llegan.
+-- Todas las tablas que los paneles escuchan vía postgres_changes
+-- (js/**/*: badges, event-banner, rutina del padre, asistencia live, muro…).
+-- Sin estar en la publicación los eventos NUNCA llegan — p. ej. daily_logs:
+-- sin ella, la rutina que registra la maestra no aparece sola en el panel padre.
 DO $$
 DECLARE
   t text;
@@ -70,7 +72,15 @@ BEGIN
     'task_evidences',
     'payments',
     'staff_permits',
-    'inquiries'
+    'inquiries',
+    'daily_logs',
+    'classroom_event_schedule',
+    'attendance',
+    'activities',
+    'grades',
+    'likes',
+    'door_punches',
+    'classrooms'
   ]
   LOOP
     IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_schema = 'public' AND table_name = t)

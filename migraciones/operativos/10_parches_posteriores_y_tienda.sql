@@ -335,35 +335,42 @@ ALTER TABLE store_order_items  ENABLE ROW LEVEL SECURITY;
 ALTER TABLE store_inventory    ENABLE ROW LEVEL SECURITY;
 
 -- Categorías: lectura pública (autenticados)
+DROP POLICY IF EXISTS "store_categories_read" ON store_categories;
 CREATE POLICY "store_categories_read" ON store_categories
   FOR SELECT TO authenticated USING (TRUE);
 
 -- Productos: lectura pública (autenticados)
+DROP POLICY IF EXISTS "store_products_read" ON store_products;
 CREATE POLICY "store_products_read" ON store_products
   FOR SELECT TO authenticated USING (is_active = TRUE);
 
 -- Productos: escritura solo staff
+DROP POLICY IF EXISTS "store_products_write_staff" ON store_products;
 CREATE POLICY "store_products_write_staff" ON store_products
   FOR ALL TO authenticated
   USING   (get_my_role() IN ('directora','asistente','admin'))
   WITH CHECK (get_my_role() IN ('directora','asistente','admin'));
 
 -- Pedidos: padre ve solo los suyos
+DROP POLICY IF EXISTS "store_orders_parent_read" ON store_orders;
 CREATE POLICY "store_orders_parent_read" ON store_orders
   FOR SELECT TO authenticated
   USING (parent_id = auth.uid() OR get_my_role() IN ('directora','asistente','admin'));
 
 -- Pedidos: padre puede crear los suyos
+DROP POLICY IF EXISTS "store_orders_parent_insert" ON store_orders;
 CREATE POLICY "store_orders_parent_insert" ON store_orders
   FOR INSERT TO authenticated
   WITH CHECK (parent_id = auth.uid());
 
 -- Pedidos: staff puede actualizar estado
+DROP POLICY IF EXISTS "store_orders_staff_update" ON store_orders;
 CREATE POLICY "store_orders_staff_update" ON store_orders
   FOR UPDATE TO authenticated
   USING (get_my_role() IN ('directora','asistente','admin'));
 
 -- Ítems: heredan permisos del pedido
+DROP POLICY IF EXISTS "store_order_items_read" ON store_order_items;
 CREATE POLICY "store_order_items_read" ON store_order_items
   FOR SELECT TO authenticated
   USING (
@@ -374,6 +381,7 @@ CREATE POLICY "store_order_items_read" ON store_order_items
     )
   );
 
+DROP POLICY IF EXISTS "store_order_items_insert" ON store_order_items;
 CREATE POLICY "store_order_items_insert" ON store_order_items
   FOR INSERT TO authenticated
   WITH CHECK (
@@ -384,6 +392,7 @@ CREATE POLICY "store_order_items_insert" ON store_order_items
   );
 
 -- Inventario: solo staff
+DROP POLICY IF EXISTS "store_inventory_staff" ON store_inventory;
 CREATE POLICY "store_inventory_staff" ON store_inventory
   FOR ALL TO authenticated
   USING   (get_my_role() IN ('directora','asistente','admin'))
@@ -425,9 +434,11 @@ CREATE INDEX IF NOT EXISTS idx_store_sizes_product ON store_product_sizes(produc
 -- RLS para tallas
 ALTER TABLE store_product_sizes ENABLE ROW LEVEL SECURITY;
 
+DROP POLICY IF EXISTS "store_sizes_read" ON store_product_sizes;
 CREATE POLICY "store_sizes_read" ON store_product_sizes
   FOR SELECT TO authenticated USING (TRUE);
 
+DROP POLICY IF EXISTS "store_sizes_write_staff" ON store_product_sizes;
 CREATE POLICY "store_sizes_write_staff" ON store_product_sizes
   FOR ALL TO authenticated
   USING   (get_my_role() IN ('directora','asistente','admin'))
@@ -1837,6 +1848,7 @@ GRANT USAGE, SELECT ON ALL SEQUENCES IN SCHEMA public   TO authenticated;
 
 -- Política INSERT de posts
 DROP POLICY IF EXISTS "posts_insert" ON public.posts;
+DROP POLICY IF EXISTS "posts_insert" ON posts;
 CREATE POLICY "posts_insert" ON public.posts
   FOR INSERT WITH CHECK (auth.uid() = teacher_id AND get_my_role() IN ('directora','asistente','maestra','admin'));
 

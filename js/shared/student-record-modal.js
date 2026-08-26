@@ -225,6 +225,46 @@ export const StudentRecordModal = {
       .limit(100);
     this._charges = charges.data || [];
 
+    if (this._charges.length) {
+      if (!this._form.monthly_fee) {
+        const lastM = this._charges.find(c => c.type === 'mensualidad' && c.amount > 0);
+        if (lastM) this._form.monthly_fee = lastM.amount;
+      }
+      if (!this._form.prolongado_fee) {
+        const lastP = this._charges.find(c => c.type === 'prolongado' && c.amount > 0);
+        if (lastP) this._form.prolongado_fee = lastP.amount;
+      }
+      if (!this._form.inscription_fee) {
+        const lastI = this._charges.find(c => c.type === 'inscripcion' && c.amount > 0);
+        if (lastI) this._form.inscription_fee = lastI.amount;
+      }
+      if (!this._form.discount_pct) {
+        const lastD = this._charges.find(c => c.discount_pct > 0);
+        if (lastD) this._form.discount_pct = lastD.discount_pct;
+      }
+    } else {
+      const { data: pays } = await supabase
+        .from('payments')
+        .select('amount, concept')
+        .eq('student_id', id)
+        .order('created_at', { ascending: false })
+        .limit(20);
+      if (pays?.length) {
+        if (!this._form.monthly_fee) {
+          const m = pays.find(p => /mensualidad/i.test(p.concept) && p.amount > 0);
+          if (m) this._form.monthly_fee = m.amount;
+        }
+        if (!this._form.prolongado_fee) {
+          const p2 = pays.find(p => /prolongado/i.test(p.concept) && p.amount > 0);
+          if (p2) this._form.prolongado_fee = p2.amount;
+        }
+        if (!this._form.inscription_fee) {
+          const i = pays.find(p => /inscripci/i.test(p.concept) && p.amount > 0);
+          if (i) this._form.inscription_fee = i.amount;
+        }
+      }
+    }
+
     await this._loadSiblings();
     await this._loadHistory();
   },

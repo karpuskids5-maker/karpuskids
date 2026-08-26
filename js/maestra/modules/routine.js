@@ -462,6 +462,112 @@ function _formatDate(dateStr) {
   return d.toLocaleDateString('es-ES', { weekday: 'long', day: 'numeric', month: 'long' });
 }
 
+// ── FEED DE EVENTOS DEL AULA (todos los alumnos, orden cronológico) ───────────
+function _eventFeedDetail(ev) {
+  let d = '';
+  if (ev.type === 'biberon') {
+    const p = [];
+    if (ev.oz) p.push(`${ev.oz} oz`);
+    if (ev.milk_temp) p.push(ev.milk_temp);
+    d = p.join(' · ');
+  }
+  else if (ev.type === 'temperatura' || ev.type === 'fiebre') d = ev.temp ? `${ev.temp}°C${parseFloat(ev.temp) >= 37.5 ? ' ⚠️' : ''}` : '';
+  else if (ev.type === 'medicamento' || ev.type === 'medicamento_extra') d = [ev.nombre, ev.dosis].filter(Boolean).join(' · ');
+  else if (ev.type === 'animo') d = MOOD_OPTIONS.find(m => m.value === ev.mood)?.label || '';
+  else d = [ev.texto, ev.obs, ev.motivo].filter(Boolean).join(' ').substring(0, 80);
+  return d;
+}
+
+function _getAllClassroomEvents() {
+  const students = AppState.get('students') || [];
+  const logsMap  = AppState.get('logsMap') || {};
+  const out = [];
+  students.forEach(s => {
+    (logsMap[s.id]?.events || []).forEach(ev => {
+      if (!ev || !ev.created_at) return;
+      out.push({ studentName: s.name || 'Alumno', studentId: s.id, ev });
+    });
+  });
+  out.sort((a, b) => new Date(b.ev.created_at) - new Date(a.ev.created_at));
+  return out;
+}
+
+const _FEED_ICON_BGS = {
+  biberon:'#f0f9ff', temperatura:'#fef2f2', fiebre:'#fef2f2',
+  medicamento:'#faf5ff', medicamento_extra:'#faf5ff',
+  animo:'#fff7ed', siesta:'#eef2ff', nota:'#f0fdf4'
+};
+
+function _renderClassroomEventRow(item) {
+  const meta = _getEventMeta(item.ev.type) || { icon: '📋', label: item.ev.type };
+  const detail = _eventFeedDetail(item.ev);
+  const bg = _FEED_ICON_BGS[item.ev.type] || '#f1f5f9';
+  const firstName = item.studentName.split(' ')[0];
+  return `
+    <div class="flex items-start gap-2.5 p-2 rounded-xl hover:bg-slate-50 transition-colors">
+      <div class="w-8 h-8 rounded-lg flex items-center justify-center text-sm shrink-0" style="background:${bg};">${meta.icon}</div>
+      <div class="flex-1 min-w-0">
+        <p class="text-xs font-black text-slate-700 leading-tight truncate">
+          ${firstName}${detail ? ` <span class="font-bold text-slate-400">· ${detail}</span>` : ''}
+        </p>
+        <p class="text-[9px] font-bold text-slate-400 uppercase tracking-wide truncate">${meta.label}</p>
+      </div>
+      <span class="text-[9px] font-black text-slate-400 shrink-0 mt-0.5">${_formatTime(item.ev.created_at)}</span>
+    </div>`;
+}
+
+function _renderClassroomEventsFeed(limit = 10) {
+  const all = _getAllClassroomEvents();
+  if (!all.length) {
+    return '<p class="text-center text-[11px] font-bold text-slate-300 py-4">Aún no hay eventos registrados hoy</p>';
+  }
+  const shown = all.slice(0, limit).map(_renderClassroomEventRow).join('');
+  const moreBtn = all.length > limit ? `
+    <button onclick="App.openClassroomEventsSheet()"
+      class="w-full mt-1 py-2 rounded-xl bg-slate-50 hover:bg-slate-100 transition-colors text-[10px] font-black text-slate-500 uppercase tracking-widest active:scale-[0.98]">
+      Ver todos los registros (${all.length})
+    </button>` : '';
+  return shown + moreBtn;
+}
+
+export async function openClassroomEventsSheet() {
+  const modalId = 'classroomEventsModal';
+  const today   = new Date().toISOString().split('T')[0];
+  const all     = _getAllClassroomEvents();
+
+  const content = `
+    <style>
+      @keyframes sheetUp{from{transform:translateY(60px);opacity:.4}to{transform:translateY(0);opacity:1}}
+      #${modalId}-inner{animation:sheetUp .26s cubic-bezier(.32,.72,.3,1);width:100%;max-width:28rem;}
+    </style><!-- kk-is-sheet -->
+    <div class="bg-white w-full rounded-t-[2rem] sm:rounded-[2rem] shadow-2xl overflow-hidden flex flex-col" style="max-height:calc(100dvh - env(safe-area-inset-top,0px) - 8px);">
+      <div class="pt-2 pb-1 flex justify-center sm:hidden shrink-0"><span class="w-10 h-1.5 rounded-full bg-slate-200"></span></div>
+      <div class="px-4 sm:px-5 pb-3 pt-1 flex items-center justify-between gap-3 border-b border-slate-100 shrink-0">
+        <div class="flex items-center gap-2.5 min-w-0">
+          <div class="w-9 h-9 rounded-xl flex items-center justify-center text-base shrink-0" style="background:linear-gradient(135deg, #6366f1, #8b5cf6);box-shadow:0 4px 10px rgba(99,102,241,0.3);">📝</div>
+          <div class="min-w-0">
+            <h3 class="text-sm font-black text-slate-800">Registro del Aula</h3>
+            <p class="text-[9px] font-bold text-slate-400 uppercase tracking-wider">${all.length} evento${all.length !== 1 ? 's' : ''} hoy · ${_formatDate(today)}</p>
+          </div>
+        </div>
+        <button onclick="Modal.close('${modalId}')" class="p-2 bg-slate-100 hover:bg-slate-200 rounded-full transition-colors shrink-0" aria-label="Cerrar">
+          <svg class="w-4 h-4 text-slate-500" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/></svg>
+        </button>
+      </div>
+      <div class="overflow-y-auto flex-1 custom-scrollbar px-3 py-2 space-y-0.5" style="-webkit-overflow-scrolling:touch;">
+        ${all.length ? all.map(_renderClassroomEventRow).join('') : '<p class="text-center text-[11px] font-bold text-slate-300 py-8">Aún no hay eventos registrados hoy</p>'}
+      </div>
+      <div class="p-3 sm:p-4 shrink-0" style="background:#f8fafc;border-top:1px solid #e2e8f0;padding-bottom:max(12px,env(safe-area-inset-bottom,12px));">
+        <button onclick="Modal.close('${modalId}'); App.openAllEventsMenu()"
+          class="w-full py-3 rounded-2xl font-black text-xs uppercase tracking-widest transition-all active:scale-[0.98]" style="background:#FF8A00 !important;color:#fff !important;border:2px solid #E67A00 !important;box-shadow:0 4px 14px rgba(255,138,0,0.35);">
+          ➕ Registrar nuevo evento
+        </button>
+      </div>
+    </div>`;
+
+  Modal.open(modalId, content);
+}
+
 function _getActiveSiestas(students, logsMap) {
   return students.filter(s => {
     const events = logsMap[s.id]?.events || [];
@@ -960,6 +1066,7 @@ export async function initRoutine() {
     });
 
     _refreshStudentCards();
+    _paintActionGrid();
     if (window.lucide) window.lucide.createIcons();
 
     _startAutoRegisterClock();
@@ -1014,7 +1121,8 @@ function _renderTimelineEventRows() {
     return `
     <div class="relative">
       <div
-        onclick="App.openBulkEventModal('${ev.type}', '${timeStr}')"
+        onclick="App.timelineEventTap('${ev.type}', '${timeStr}')"
+        ondblclick="App.quickConfirmBulkEvent('${ev.type}', '${timeStr}')"
         class="relative flex items-start gap-3 sm:gap-4 w-full p-2.5 sm:p-3 rounded-2xl transition-all active:scale-[0.98] cursor-pointer ${rowBgCls}" data-index="${i}">
 
         <div class="w-9 h-9 rounded-xl flex items-center justify-center text-base shrink-0 z-10 transition-all ${isActive ? 'text-white shadow-lg scale-110 tl-pulse' : 'text-slate-500'}" style="${isActive ? 'background:linear-gradient(135deg, #FF8A00, #f97316);box-shadow:0 4px 12px rgba(255,138,0,0.3);' : `background:${activeSoftBgs[ev.type] || '#f1f5f9'};`}">
@@ -1087,6 +1195,12 @@ async function openTimelineSheet() {
           <div class="absolute left-[38px] top-5 bottom-5 w-0.5 bg-gradient-to-b from-[#FF8A00]/30 via-slate-200 to-slate-100"></div>
           <div class="space-y-2">${rows}</div>
         </div>
+
+        <!-- Registro del Aula: feed cronológico -->
+        <div class="mt-4 pt-3 border-t border-slate-100">
+          <h4 class="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1.5 px-1">📝 Registro del aula hoy</h4>
+          ${_renderClassroomEventsFeed(15)}
+        </div>
       </div>
       <div class="p-3 sm:p-4 shrink-0" style="background:#f8fafc;border-top:1px solid #e2e8f0;padding-bottom:max(12px,env(safe-area-inset-bottom,12px));">
         <button onclick="Modal.close('${modalId}'); App.openBulkEventModal('animo')"
@@ -1128,6 +1242,15 @@ function _renderRoutineLayout({ todayLabel, students, logsMap, withReport, sched
         </div>
         <!-- Fila 2: botones de acción (siempre visibles, no se ocultan) -->
         <div class="flex items-center gap-2 mt-2.5 flex-wrap" onclick="event.stopPropagation()">
+          <button id="tlAutoSwitch" onclick="App.toggleTimelineAuto()" data-on="${_isTimelineAutoEnabled() ? '1' : '0'}"
+            title="Activa/desactiva la ejecución automática del timeline"
+            class="flex items-center gap-1.5 px-3 py-2 rounded-xl transition-all text-[10px] font-black uppercase tracking-widest active:scale-95 border ${_isTimelineAutoEnabled() ? 'bg-green-50 text-[#28B54D] border-green-200 hover:bg-green-100' : 'bg-slate-100 text-slate-400 border-slate-200 hover:bg-slate-200'}">
+            <span>${_isTimelineAutoEnabled() ? '⚡' : '⏸️'}</span>
+            <span>Auto</span>
+            <span class="w-7 h-4 rounded-full relative transition-colors ${_isTimelineAutoEnabled() ? 'bg-[#28B54D]' : 'bg-slate-300'}">
+              <span class="absolute top-0.5 w-3 h-3 bg-white rounded-full shadow transition-all ${_isTimelineAutoEnabled() ? 'left-[16px]' : 'left-0.5'}"></span>
+            </span>
+          </button>
           <button onclick="App.openAllEventsMenu()"
             class="flex items-center gap-1.5 px-3 py-2 bg-indigo-50 hover:bg-indigo-100 rounded-xl transition-all text-[10px] font-black text-indigo-600 uppercase tracking-widest active:scale-95">
             <span>➕</span><span>Eventos</span>
@@ -1170,7 +1293,8 @@ function _renderRoutineLayout({ todayLabel, students, logsMap, withReport, sched
                 const isDone   = isTimePast && isRegistered;
                 const isMissed = isTimePast && !isRegistered;
                 return `
-                <button onclick="App.openBulkEventModal('${ev.type}', '${_formatTime12(ev.hour, ev.minute)}')"
+                <button onclick="App.timelineEventTap('${ev.type}', '${_formatTime12(ev.hour, ev.minute)}')"
+                  ondblclick="App.quickConfirmBulkEvent('${ev.type}', '${_formatTime12(ev.hour, ev.minute)}')"
                   class="flex flex-col items-center gap-1 px-3 py-2 rounded-2xl transition-all active:scale-90 shrink-0 ${
                     isActive ? 'bg-[#FF8A00]/10 scale-110 shadow-sm' :
                     isDone ? 'bg-green-50' :
@@ -1185,6 +1309,23 @@ function _renderRoutineLayout({ todayLabel, students, logsMap, withReport, sched
               }).join('')}
             </div>
           </div>
+        </div>
+      </div>
+
+      <!-- Registro del Aula: feed cronológico de TODOS los eventos de todos los alumnos -->
+      <div class="routine-section-toggle px-4 sm:px-5 py-3 border-t border-slate-100" style="background:linear-gradient(135deg, #f8fafc 0%, #ffffff 100%);" onclick="App.toggleRoutineSection('aulafeed')" aria-expanded="true" aria-controls="aulafeedBody">
+        <div class="flex items-center gap-3 w-full">
+          <div class="w-9 h-9 rounded-xl flex items-center justify-center text-base shrink-0 text-white shadow-md" style="background:linear-gradient(135deg, #6366f1, #8b5cf6);box-shadow:0 4px 12px rgba(99,102,241,0.3);">📝</div>
+          <div class="min-w-0 flex-1">
+            <h3 class="text-sm font-black text-slate-800 leading-tight">Registro del Aula</h3>
+            <p class="text-[10px] font-bold text-slate-400 uppercase tracking-wider truncate">Todos los eventos de hoy · ${_getAllClassroomEvents().length} registros</p>
+          </div>
+          <span class="acc-chevron text-slate-400 text-xs shrink-0">▼</span>
+        </div>
+      </div>
+      <div id="aulafeedBody" class="routine-section-body">
+        <div class="max-h-[40vh] overflow-y-auto custom-scrollbar px-3 sm:px-4 py-2">
+          ${_renderClassroomEventsFeed(10)}
         </div>
       </div>
     </div>
@@ -1252,19 +1393,28 @@ function _renderRoutineLayout({ todayLabel, students, logsMap, withReport, sched
         <span class="acc-chevron text-slate-400 text-xs">▼</span>
       </div>
       <div id="accionesBody" class="routine-section-body collapsed px-4 sm:px-5 pb-4 sm:pb-5">
-        <div class="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-6 gap-2 sm:gap-2.5">
-          ${Object.entries(EVENT_TYPES).map(([type, meta]) => {
-            const softBgs = {slate:'#f1f5f9',blue:'#eff6ff',sky:'#f0f9ff',amber:'#fffbeb',indigo:'#eef2ff',rose:'#fff1f2',purple:'#faf5ff',teal:'#f0fdfa',orange:'#fff7ed',yellow:'#fefce8',green:'#f0fdf4',lime:'#f7fee7',cyan:'#ecfeff'};
-            const softBorders = {slate:'#cbd5e1',blue:'#93c5fd',sky:'#7dd3fc',amber:'#fcd34d',indigo:'#a5b4fc',rose:'#fda4af',purple:'#d8b4fe',teal:'#5eead4',orange:'#fdba74',yellow:'#fde047',green:'#86efac',lime:'#bef264',cyan:'#67e8f9'};
-            const bg = softBgs[meta.color] || '#f1f5f9';
-            const hovBorder = softBorders[meta.color] || '#cbd5e1';
-            return `
-            <button onclick="App.openBulkEventModal('${type}')"
-              class="flex flex-col items-center gap-1 p-2.5 sm:p-3 hover:bg-white border-2 border-transparent rounded-[1.2rem] transition-all active:scale-90 group" style="background:${bg};box-shadow:0 1px 3px rgba(0,0,0,0.04);--hov-bc:${hovBorder};" onmouseenter="this.style.borderColor=this.style.getPropertyValue('--hov-bc')" onmouseleave="this.style.borderColor='transparent'">
-              <span class="text-xl sm:text-2xl group-hover:scale-110 transition-transform leading-none">${meta.icon}</span>
-              <span class="text-[8px] sm:text-[9px] font-black uppercase tracking-tight leading-tight text-center mt-0.5" style="color:${hovBorder};">${meta.label}</span>
-            </button>`;
-          }).join('')}
+        <style>
+          #accionesBody .action-tile.selected{border-color:#6366f1 !important;background:#eef2ff !important;box-shadow:0 0 0 3px rgba(99,102,241,.18) !important;}
+          #accionesBody .action-hint{display:flex;align-items:center;gap:1.5px;font-size:8px;font-weight:800;text-transform:uppercase;letter-spacing:.08em;color:#94a3b8;}
+        </style>
+        <div class="flex items-center justify-between gap-2 mb-2 flex-wrap">
+          <p class="action-hint">👆 Toque: seleccionar &nbsp;·&nbsp; 👆👆 Doble toque: confirmar y registrar</p>
+          <input id="actionSearch" type="text" oninput="App.filterClassroomActions(this.value)" placeholder="🔍 Buscar en todas..."
+            class="flex-1 min-w-[120px] max-w-[220px] px-3 py-1.5 bg-slate-50 border-2 border-slate-100 rounded-xl text-[11px] font-bold text-slate-600 placeholder:text-slate-300 outline-none focus:border-indigo-200 transition-all">
+        </div>
+        <!-- Pager de categorías: anterior / siguiente -->
+        <div class="flex items-center gap-2 mb-2 bg-slate-50 border border-slate-100 rounded-2xl px-2 py-1.5">
+          <button onclick="App.prevActionCategory()" aria-label="Categoría anterior"
+            class="w-8 h-8 shrink-0 rounded-xl bg-white border border-slate-200 hover:border-indigo-300 hover:bg-indigo-50 flex items-center justify-center text-slate-500 font-black transition-all active:scale-90 shadow-sm">◀</button>
+          <div id="actionCatLabel" class="flex-1 text-center text-[10px] font-black uppercase tracking-widest truncate"></div>
+          <button onclick="App.nextActionCategory()" aria-label="Categoría siguiente"
+            class="w-8 h-8 shrink-0 rounded-xl bg-white border border-slate-200 hover:border-indigo-300 hover:bg-indigo-50 flex items-center justify-center text-slate-500 font-black transition-all active:scale-90 shadow-sm">▶</button>
+        </div>
+        <div id="actionTilesGrid" class="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-6 gap-2 sm:gap-2.5 max-h-[46vh] overflow-y-auto custom-scrollbar pr-1 content-start">
+          ${(() => {
+            const cats = _getActionCategories();
+            return _renderActionTileButtons(cats.length ? cats[_actionCategoryIdx].events : []);
+          })()}
         </div>
         <button onclick="App.registerMissingStudents()" class="w-full mt-3 py-2.5 bg-slate-50 hover:bg-slate-100 border-2 border-dashed border-slate-200 rounded-2xl text-[10px] font-black text-slate-400 uppercase tracking-widest transition-all active:scale-95">
           Registrar faltantes
@@ -1857,6 +2007,200 @@ window._bulkSelectAll = (select) => {
     else { b.classList.remove('selected','ring-2','ring-[#28B54D]'); }
   });
 };
+
+// ── SWITCH AUTO-TIMELINE + DOBLE CLIC CON CONFIRMACIÓN ────────────────────────
+// Eventos que necesitan parámetros (oz, temperatura, medicamento…): al confirmar
+// se abre el formulario masivo en lugar de registrar directo.
+const _BULK_NEEDS_PARAMS = new Set(['biberon', 'temperatura', 'medicamento', 'animo', 'nota', 'siesta']);
+
+let _selectedActionType = null;
+let _tlAutoHintAt = 0;
+
+function _tlAutoKey() {
+  const classroom = AppState.get('classroom');
+  return `karpus_tl_auto_${classroom?.id || 'default'}`;
+}
+
+function _isTimelineAutoEnabled() {
+  try { return localStorage.getItem(_tlAutoKey()) !== '0'; } catch { return true; }
+}
+
+function _setTimelineAutoEnabled(on) {
+  try { localStorage.setItem(_tlAutoKey(), on ? '1' : '0'); } catch { /* noop */ }
+}
+
+export function toggleTimelineAuto() {
+  const next = !_isTimelineAutoEnabled();
+  _setTimelineAutoEnabled(next);
+  safeToast(next
+    ? '⚡ Timeline automático ACTIVADO: los eventos se registran solos en su hora'
+    : '⏸️ Timeline automático DESACTIVADO: nada se ejecuta solo ni al tocar', next ? 'success' : 'warning');
+  _reRenderTimeline();
+}
+
+// Toque sobre un bloque del timeline (expandido o barra colapsada):
+// con Auto ON abre el registro masivo (comportamiento de siempre);
+// con Auto OFF no ejecuta nada — solo informa cómo registrarlo.
+export function timelineEventTap(eventType, timeStr) {
+  if (_isTimelineAutoEnabled()) { openBulkEventModal(eventType, timeStr); return; }
+  const now = Date.now();
+  if (now - _tlAutoHintAt > 2500) {
+    _tlAutoHintAt = now;
+    safeToast('⏸️ Auto-timeline desactivado · doble clic para registrar con confirmación', 'info');
+  }
+}
+
+// Doble clic (timeline o contenedor de eventos) → hoja de confirmación.
+export function quickConfirmBulkEvent(eventType, scheduledTime = null) {
+  if (!eventType) return;
+  const students = AppState.get('students') || [];
+  const presentCount = students.filter(s => _isStudentPresent(s.id) && !_isStudentRetirado(s.id)).length;
+  if (!presentCount) { safeToast('No hay alumnos presentes para registrar', 'warning'); return; }
+
+  const meta = _getEventMeta(eventType) || { icon: '📝', label: eventType };
+  const needsParams = _BULK_NEEDS_PARAMS.has(eventType);
+  const modalId = 'quickBulkConfirm';
+
+  const content = `
+    <style>
+      @keyframes popIn{from{transform:scale(.92);opacity:.4}to{transform:scale(1);opacity:1}}
+      #${modalId}-inner{animation:popIn .18s cubic-bezier(.32,.72,.3,1);width:min(92vw,24rem);}
+    </style>
+    <div class="bg-white rounded-[2rem] shadow-2xl overflow-hidden">
+      <div class="px-5 pt-5 pb-4 text-center">
+        <div class="w-14 h-14 mx-auto rounded-2xl flex items-center justify-center text-2xl shadow-lg" style="background:linear-gradient(135deg,#FF8A00,#f97316);box-shadow:0 6px 16px rgba(255,138,0,.35);">${meta.icon}</div>
+        <h3 class="mt-3 text-base font-black text-slate-800">¿Registrar "${meta.label}"?</h3>
+        <p class="text-xs font-bold text-slate-400 mt-1">
+          Se aplicará a los <span class="text-[#28B54D]">${presentCount}</span> alumno${presentCount !== 1 ? 's' : ''} presente${presentCount !== 1 ? 's' : ''}
+          ${needsParams ? '<br><span class="text-slate-500">Después podrás agregar los detalles</span>' : ''}
+        </p>
+      </div>
+      <div class="grid grid-cols-2 gap-2 px-5 pb-5">
+        <button onclick="Modal.close('${modalId}')" class="py-3 rounded-2xl bg-slate-100 hover:bg-slate-200 text-slate-500 font-black text-[11px] uppercase tracking-widest transition-all active:scale-95">Cancelar</button>
+        <button onclick="window._quickBulkGo && window._quickBulkGo()" class="py-3 rounded-2xl font-black text-[11px] uppercase tracking-widest text-white transition-all active:scale-95" style="background:#28B54D !important;box-shadow:0 4px 12px rgba(40,181,77,.35);">✓ Confirmar</button>
+      </div>
+    </div>`;
+
+  Modal.open(modalId, content);
+
+  window._quickBulkGo = () => {
+    Modal.close(modalId);
+    openBulkEventModal(eventType, scheduledTime);
+    // Tipos simples: los chips ya vienen seleccionados (presentes) → confirmar solo.
+    if (!needsParams) setTimeout(() => document.getElementById('btnBulkConfirm')?.click(), 120);
+  };
+}
+
+// Selección por toque simple en el contenedor Acciones del Aula (NO registra).
+export function selectClassroomAction(btn, type) {
+  if (_selectedActionType === type) {
+    _selectedActionType = null;
+    btn.classList.remove('selected');
+    return;
+  }
+  _selectedActionType = type;
+  document.querySelectorAll('#accionesBody .action-tile.selected').forEach(b => b.classList.remove('selected'));
+  btn.classList.add('selected');
+}
+
+// Buscador del catálogo de eventos (busca en TODAS las categorías).
+export function filterClassroomActions(query) {
+  _paintActionGrid(query || '');
+}
+
+// ── CATÁLOGO POR CATEGORÍAS (navegación horizontal ◀ ▶) ──────────────────────
+let _actionCategoryIdx = 0;
+
+// Universo completo: tipos core + catálogo V8 + extras, sin duplicados.
+function _getAllActionTypes() {
+  const map = new Map();
+  Object.entries(EVENT_TYPES).forEach(([t, m]) => map.set(t, m));
+  EVENT_CATALOG.forEach(e => {
+    if (!map.has(e.type)) map.set(e.type, { icon: e.icon, label: e.label, color: CATEGORIES[e.category]?.color || 'slate' });
+  });
+  EXTRA_EVENT_TYPES.forEach(e => {
+    if (!map.has(e.type)) map.set(e.type, { icon: e.icon, label: e.label, color: 'red' });
+  });
+  return [...map.entries()];
+}
+
+const _EXTRA_INCIDENT_TYPES = new Set(['accidente', 'golpe', 'llamada_padres', 'otro']);
+
+function _getActionCategories() {
+  const cats = new Map();
+  const ensure = (key, label, icon, color) => {
+    if (!cats.has(key)) cats.set(key, { key, label, icon, color, events: [] });
+    return cats.get(key);
+  };
+  Object.entries(CATEGORIES).forEach(([k, c]) => ensure(k, c.label, c.icon, c.color));
+  _getAllActionTypes().forEach(pair => {
+    const [type] = pair;
+    const catMeta = EVENT_CATALOG.find(e => e.type === type);
+    let key = catMeta?.category;
+    if (!key && _EXTRA_INCIDENT_TYPES.has(type)) key = 'incidentes';
+    if (!key) key = 'personalizados';
+    if (!cats.has(key)) {
+      ensure(key, CATEGORIES[key]?.label || (key.charAt(0).toUpperCase() + key.slice(1)), CATEGORIES[key]?.icon || '⭐', CATEGORIES[key]?.color || 'slate');
+    }
+    cats.get(key).events.push(pair);
+  });
+  return [...cats.values()].filter(c => c.events.length > 0);
+}
+
+const _normSearch = s => String(s).toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+
+function _renderActionTileButtons(events) {
+  const softBgs = {slate:'#f1f5f9',blue:'#eff6ff',sky:'#f0f9ff',amber:'#fffbeb',indigo:'#eef2ff',rose:'#fff1f2',purple:'#faf5ff',teal:'#f0fdfa',orange:'#fff7ed',yellow:'#fefce8',green:'#f0fdf4',lime:'#f7fee7',cyan:'#ecfeff',red:'#fef2f2',pink:'#fdf2f8',violet:'#f5f3ff',emerald:'#ecfdf5'};
+  const softBorders = {slate:'#cbd5e1',blue:'#93c5fd',sky:'#7dd3fc',amber:'#fcd34d',indigo:'#a5b4fc',rose:'#fda4af',purple:'#d8b4fe',teal:'#5eead4',orange:'#fdba74',yellow:'#fde047',green:'#86efac',lime:'#bef264',cyan:'#67e8f9',red:'#fca5a5',pink:'#f9a8d4',violet:'#c4b5fd',emerald:'#6ee7b7'};
+  return events.map(([type, meta]) => {
+    const bg = softBgs[meta.color] || '#f1f5f9';
+    const hovBorder = softBorders[meta.color] || '#cbd5e1';
+    const searchText = _normSearch(`${meta.label} ${type}`);
+    const isSelected = _selectedActionType === type;
+    return `
+    <button data-action-type="${type}" data-search="${searchText}"
+      onclick="App.selectClassroomAction(this, '${type}')"
+      ondblclick="App.quickConfirmBulkEvent('${type}')"
+      title="Toque: seleccionar · Doble toque: registrar al aula"
+      class="action-tile ${isSelected ? 'selected' : ''} flex flex-col items-center gap-1 p-2.5 sm:p-3 hover:bg-white border-2 rounded-[1.2rem] transition-all active:scale-90 group border-transparent" style="background:${bg};box-shadow:0 1px 3px rgba(0,0,0,0.04);--hov-bc:${hovBorder};" onmouseenter="if(!this.classList.contains('selected'))this.style.borderColor=this.style.getPropertyValue('--hov-bc')" onmouseleave="if(!this.classList.contains('selected'))this.style.borderColor='transparent'">
+      <span class="text-xl sm:text-2xl group-hover:scale-110 transition-transform leading-none">${meta.icon}</span>
+      <span class="text-[8px] sm:text-[9px] font-black uppercase tracking-tight leading-tight text-center mt-0.5" style="color:${hovBorder};">${meta.label}</span>
+    </button>`;
+  }).join('');
+}
+
+function _paintActionGrid(filterTerm = '') {
+  const grid = document.getElementById('actionTilesGrid');
+  if (!grid) return;
+  const cats = _getActionCategories();
+  if (!cats.length) { grid.innerHTML = ''; return; }
+  _actionCategoryIdx = Math.min(Math.max(_actionCategoryIdx, 0), cats.length - 1);
+
+  const term = filterTerm.trim();
+  let events, labelText;
+  if (term) {
+    events = cats.flatMap(c => c.events).filter(([type, m]) => _normSearch(`${m.label} ${type}`).includes(_normSearch(term)));
+    labelText = `<span class="text-indigo-500">🔍 ${events.length} resultado${events.length !== 1 ? 's' : ''} en todas las categorías</span>`;
+  } else {
+    const cat = cats[_actionCategoryIdx];
+    events = cat.events;
+    labelText = `<span style="color:#6366f1;">${cat.icon} ${cat.label}</span> <span class="text-slate-300">·</span> <span class="text-slate-400">${_actionCategoryIdx + 1}/${cats.length}</span>`;
+  }
+  grid.innerHTML = _renderActionTileButtons(events);
+
+  const lbl = document.getElementById('actionCatLabel');
+  if (lbl) lbl.innerHTML = labelText;
+}
+
+export function setActionCategory(idx) {
+  const n = _getActionCategories().length;
+  if (!n) return;
+  _actionCategoryIdx = ((idx % n) + n) % n;
+  _paintActionGrid((document.getElementById('actionSearch')?.value || ''));
+}
+
+export const prevActionCategory = () => setActionCategory(_actionCategoryIdx - 1);
+export const nextActionCategory = () => setActionCategory(_actionCategoryIdx + 1);
 
 // ── RATE LIMITERS ──────────────────────────────────────────────────────────────
 const _bulkEventLimiter = new RateLimiter('bulk_event', 10, 60_000); // max 10 por minuto
@@ -2814,6 +3158,7 @@ async function _reRenderTimeline() {
     scheduleNow, activeSiestas, today, classroom
   });
   _refreshStudentCards();
+  _paintActionGrid();
   if (window.lucide) window.lucide.createIcons();
 }
 
@@ -2845,6 +3190,7 @@ export function stopAutoRegisterClock() {
 }
 
 async function _checkAutoRegister() {
+  if (!_isTimelineAutoEnabled()) { _autoRunning = false; return; }
   if (_autoRunning) return;
   _autoRunning = true;
   try {

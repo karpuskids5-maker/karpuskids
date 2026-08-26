@@ -201,8 +201,8 @@ BEGIN
   SELECT COALESCE(generation_day,25), COALESCE(due_day,5) INTO v_gen_day, v_due_day
   FROM public.school_settings WHERE id = 1;
 
-  v_target_month := to_char(v_now + interval '1 month', 'YYYY-MM');
-  v_due_date     := (date_trunc('month', v_now + interval '2 months') + (v_due_day - 1) * interval '1 day')::date;
+  v_target_month := to_char(v_now, 'YYYY-MM');
+  v_due_date     := (date_trunc('month', v_now + interval '1 month') + (v_due_day - 1) * interval '1 day')::date;
 
   FOR v_student IN
     SELECT s.id, s.monthly_fee, s.prolongado_fee, s.start_date
@@ -259,7 +259,7 @@ DECLARE
   v_grace_count int := 0; v_existing_count int := 0;
 BEGIN
   SELECT COALESCE(generation_day,25) INTO v_gen_day FROM public.school_settings WHERE id = 1;
-  v_target_month := to_char(current_date + interval '1 month', 'YYYY-MM');
+  v_target_month := to_char(current_date, 'YYYY-MM');
   SELECT count(*), coalesce(sum(monthly_fee + prolongado_fee),0)
   INTO v_gen_count, v_total_amount
   FROM public.students WHERE is_active = true AND monthly_fee > 0
@@ -282,7 +282,7 @@ BEGIN
   IF v_today < v_gen_day THEN
     RETURN jsonb_build_object('status','ok','message','Aún no llega el día de generación');
   END IF;
-  v_month_key := to_char(current_date + interval '1 month', 'YYYY-MM');
+  v_month_key := to_char(current_date, 'YYYY-MM');
   SELECT EXISTS (SELECT 1 FROM public.payments WHERE month_paid = v_month_key AND concept = 'Mensualidad' AND deleted_at IS NULL)
   INTO v_has_payments;
   IF v_has_payments THEN RETURN jsonb_build_object('status','ok','message','Ciclo ejecutado correctamente');

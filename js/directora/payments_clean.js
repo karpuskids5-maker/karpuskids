@@ -4,6 +4,7 @@ import { Helpers } from '/js/shared/helpers.js';
 import { UIHelpers } from './ui.module.js';
 import { supabase } from '/js/shared/supabase.js';
 import { MES, MES_LABEL } from '/js/shared/payment-service.js';
+import { SchoolEngine } from '/js/shared/school-engine.js';
 
 export const PaymentsModule = {
   settings: { due_day: 5, generation_day: 25 },
@@ -49,7 +50,7 @@ export const PaymentsModule = {
       const ys = document.getElementById('filterPaymentYear');
       const ss = document.getElementById('filterPaymentStatus');
       const qs = document.getElementById('searchPaymentStudent');
-      if (ms && filters.month) ms.value = filters.month;
+      if (ms && filters.month && filters.month !== 'all') ms.value = filters.month;
       if (ys && filters.year)  ys.value = filters.year;
       if (ss && filters.status) ss.value = filters.status;
       if (qs && filters.search) qs.value = filters.search;
@@ -118,20 +119,6 @@ export const PaymentsModule = {
       }
 
       const monthKey = (yv && mv && mv !== 'all') ? `${yv}-${String(mv).padStart(2,'0')}` : maxVisibleMonthKey;
-
-      // Si el usuario selecciona un mes que aún no debe ser visible
-      if (mv && mv !== 'all' && monthKey > maxVisibleMonthKey) {
-        const mi = parseInt(mv, 10) - 1;
-        const label = MES_LABEL[mi] || mv;
-        tbody.innerHTML = `<tr><td colspan="8" class="text-center py-16">
-          <div class="flex flex-col items-center gap-3">
-            <div class="w-14 h-14 bg-indigo-50 rounded-full flex items-center justify-center text-2xl">📅</div>
-            <p class="font-black text-slate-600 text-sm">Los cobros de ${label} ${yv} se generan el día ${genDay}</p>
-            <p class="text-xs text-slate-400 font-medium">Vuelve a partir del día ${genDay} para ver este periodo.</p>
-          </div></td></tr>`;
-        if (window.lucide) lucide.createIcons();
-        return;
-      }
 
       const SEL = 'id,student_id,amount,concept,status,due_date,created_at,paid_date,method,bank,reference,month_paid,evidence_url,mora_amount,total_due,student_name,classroom_name';
 
@@ -356,9 +343,9 @@ export const PaymentsModule = {
     }).join('');
 
     window.openGlobalModal(
-      '<div class="bg-gradient-to-r from-purple-600 to-indigo-600 text-white p-6 rounded-t-3xl flex items-center justify-between">' +
-        '<div class="flex items-center gap-3"><div class="w-12 h-12 bg-white/20 rounded-2xl flex items-center justify-center text-2xl">\uD83D\uDCB0</div>' +
-        '<div><h3 class="text-xl font-black">Registrar Pago</h3><p class="text-xs text-white/70 font-bold uppercase tracking-widest">Cobro Manual</p></div></div>' +
+      '<div class="bg-gradient-to-r from-purple-600 to-indigo-600 text-white p-6 rounded-t-3xl flex items-center gap-3">' +
+        '<div class="w-12 h-12 bg-white/20 rounded-2xl flex items-center justify-center text-2xl">\uD83D\uDCB0</div>' +
+        '<div><h3 class="text-xl font-black">Registrar Pago</h3><p class="text-xs text-white/70 font-bold uppercase tracking-widest">Cobro Manual</p></div>' +
       '</div>' +
       '<div class="p-6 bg-slate-50/30" id="modalPayment"><div class="grid grid-cols-1 md:grid-cols-2 gap-4">' +
         '<div class="md:col-span-2"><label class="' + lc + '">Estudiante (Pendientes/Vencidos)</label>' +
@@ -454,16 +441,20 @@ export const PaymentsModule = {
             }
           }
 
-          // Sincronizar mes del pago
-          if (monthPaid && monthSelect) {
-            const opt2 = monthSelect.querySelector(`option[value="${monthPaid}"]`);
-            if (opt2) monthSelect.value = monthPaid;
+          // Sincronizar mes del pago → siempre mes actual
+          const nowSel = new Date();
+          const currentMonth = String(nowSel.getMonth() + 1).padStart(2, '0');
+          if (monthSelect) {
+            const opt2 = monthSelect.querySelector(`option[value="${currentMonth}"]`);
+            if (opt2) monthSelect.value = currentMonth;
           }
 
-          // Sincronizar fecha límite
-          if (dueDate) {
-            const dueDateInput = document.getElementById('payDueDate');
-            if (dueDateInput) dueDateInput.value = dueDate;
+          // Sincronizar fecha límite → 5to del mes siguiente
+          const dueDateInput = document.getElementById('payDueDate');
+          if (dueDateInput) {
+            const dueMonth = nowSel.getMonth() + 2 > 12 ? 1 : nowSel.getMonth() + 2;
+            const dueYear  = nowSel.getMonth() + 2 > 12 ? nowSel.getFullYear() + 1 : nowSel.getFullYear();
+            dueDateInput.value = `${dueYear}-${String(dueMonth).padStart(2, '0')}-05`;
           }
         });
 
@@ -625,12 +616,25 @@ export const PaymentsModule = {
   async showCyclePreview() {
     Helpers.showLoader('Calculando resumen del ciclo...');
     try {
-      // ✅ OBTENCIÓN DE DATOS DESDE EL SERVIDOR (RPC)
-      // Centraliza la lógica de previsualización para que coincida con la ejecución real
-      const { data, error } = await supabase.rpc('preview_payment_cycle');
-      if (error) throw error;
+      const [rpcRes, studentsRes] = await Promise.all([
+        supabase.rpc('preview_payment_cycle'),
+        supabase.from('students').select('monthly_fee, prolongado_fee').eq('is_active', true).gt('monthly_fee', 0)
+      ]);
+      if (rpcRes.error) throw rpcRes.error;
 
-      const { count, total_amount, grace_count, existing_count, target_month_label } = data;
+      const { count = 0, existing_count = 0 } = rpcRes.data;
+      const activeStudents = studentsRes.data || [];
+      const totalEstimate = activeStudents.reduce((sum, s) => sum + (s.monthly_fee || 0) + (s.prolongado_fee || 0), 0);
+
+      const activePeriod = SchoolEngine.getActivePeriod();
+      const allPeriods = SchoolEngine.getAllPeriods();
+      const openPeriod = activePeriod || allPeriods.find(p => p.status === 'open') || allPeriods[0];
+      const periodLabel = openPeriod?.name || 'Sin periodo activo';
+
+      const now = new Date();
+      const billingMonthLabel = `${MES_LABEL[now.getMonth()]} ${now.getFullYear()}`;
+
+      const grace_count = (count > 0 && existing_count > 0) ? existing_count : 0;
 
       Helpers.hideLoader();
 
@@ -639,7 +643,7 @@ export const PaymentsModule = {
           <div class="bg-gradient-to-r from-indigo-600 to-purple-600 p-8 text-white text-center">
             <div class="w-20 h-20 bg-white/20 rounded-3xl flex items-center justify-center mx-auto mb-4 text-3xl shadow-lg backdrop-blur-md">📅</div>
             <h3 class="text-2xl font-black">Resumen del Ciclo</h3>
-            <p class="text-indigo-100 font-bold uppercase tracking-widest text-[10px] mt-1">Periodo: ${target_month_label}</p>
+            <p class="text-indigo-100 font-bold uppercase tracking-widest text-[10px] mt-1">${periodLabel} · ${billingMonthLabel}</p>
           </div>
           
           <div class="p-8 space-y-6 bg-slate-50/50">
@@ -650,7 +654,7 @@ export const PaymentsModule = {
               </div>
               <div class="bg-white p-4 rounded-3xl border border-slate-100 shadow-sm">
                 <p class="text-[9px] font-black text-slate-400 uppercase tracking-wider mb-1">Total Estimado</p>
-                <p class="text-xl font-black text-slate-700">RD$${Helpers.formatCurrency(total_amount)}</p>
+                <p class="text-xl font-black text-slate-700">RD$${Helpers.formatCurrency(totalEstimate)}</p>
               </div>
             </div>
 
@@ -667,7 +671,7 @@ export const PaymentsModule = {
 
             <div class="p-4 bg-indigo-50 rounded-2xl border border-indigo-100">
               <p class="text-[10px] text-indigo-700 font-bold leading-relaxed">
-                ℹ️ Los cobros se generan automáticamente para estudiantes activos. La fecha de vencimiento será el día ${this.settings.due_day} del mes próximo.
+                ℹ️ Los cobros se generan automáticamente para ${activeStudents.length} estudiantes activos. La fecha de vencimiento será el día ${this.settings.due_day} del mes siguiente.
               </p>
             </div>
           </div>

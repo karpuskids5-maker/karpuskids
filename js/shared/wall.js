@@ -625,7 +625,7 @@ const WallModule = {
     try { sessionStorage.setItem(key, JSON.stringify([...seen])); } catch (e) { console.warn('[Wall] Session storage write failed:', e); }
     // Fire & forget - incrementar vistas en BD
     newIds.forEach(id => {
-      supabase.rpc('increment_post_views', { p_post_id: id }).catch(() => {});
+      Promise.resolve(supabase.rpc('increment_post_views', { p_post_id: id })).catch(() => {});
     });
   },
 

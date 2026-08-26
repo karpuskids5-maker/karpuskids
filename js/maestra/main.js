@@ -107,6 +107,14 @@ window.App = {
   toggleScheduleAuto: Routine.toggleScheduleAuto,
   setRoutineFilter: Routine.setRoutineFilter,
   toggleRoutineSection: Routine.toggleRoutineSection,
+  openClassroomEventsSheet: Routine.openClassroomEventsSheet,
+  toggleTimelineAuto: Routine.toggleTimelineAuto,
+  timelineEventTap: Routine.timelineEventTap,
+  quickConfirmBulkEvent: Routine.quickConfirmBulkEvent,
+  selectClassroomAction: Routine.selectClassroomAction,
+  filterClassroomActions: Routine.filterClassroomActions,
+  prevActionCategory: Routine.prevActionCategory,
+  nextActionCategory: Routine.nextActionCategory,
   _autoSaveNote: (sid, val) => window._routineAutoSaveNote?.(sid, val),
 
   // Tasks
@@ -194,7 +202,18 @@ window.addEventListener('unhandledrejection', (e) => {
 document.addEventListener('DOMContentLoaded', async () => {
   // Logout seguro — limpia todo el almacenamiento
   document.getElementById('logoutBtn')?.addEventListener('click', async () => {
-    try { localStorage.clear(); } catch (_) {}
+    try {
+      const preserved = {};
+      for (const key of ['maestra_last_section', 'maestra_last_classroom', 'maestra_last_tab']) {
+        const v = localStorage.getItem(key);
+        if (v !== null) preserved[key] = v;
+      }
+      for (const key of Object.keys(localStorage)) {
+        if (key.startsWith('karpus_tl_auto_')) preserved[key] = localStorage.getItem(key);
+      }
+      localStorage.clear();
+      for (const [k, v] of Object.entries(preserved)) localStorage.setItem(k, v);
+    } catch (_) {}
     try { sessionStorage.clear(); } catch (_) {}
     try { if (window.caches) caches.keys().then(k => k.forEach(c => caches.delete(c))); } catch (_) {}
     await supabase.auth.signOut();

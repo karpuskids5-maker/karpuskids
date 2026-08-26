@@ -158,6 +158,7 @@ export const PaymentsModule = {
         .from(TABLES.PAYMENTS)
         .select('id,student_id,amount,concept,status,due_date,created_at,paid_date,method,month_paid,evidence_url,notes')
         .eq('student_id', this._studentId)
+        .is('deleted_at', null)
         .order('due_date', { ascending: false });
       if (error) throw error;
 
@@ -764,6 +765,7 @@ export const PaymentsModule = {
         .eq('student_id', student.id)
         .or(`month_paid.eq."${month}",month_paid.eq."${monthRaw}"`)
         .neq('status', 'paid')
+        .is('deleted_at', null)
         .limit(1);
 
       if (fetchErr) throw fetchErr;
