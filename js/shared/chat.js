@@ -54,21 +54,23 @@ export const ChatModule = {
       if (!user) return {};
 
       const sel = await this._msgSelect();
-      const { data, error } = await supabase
-        .from('messages')
-        .select(sel)
-        .or(
-          `and(sender_id.eq.${user.id},receiver_id.in.(${ids.join(',')})),` +
-          `and(receiver_id.eq.${user.id},sender_id.in.(${ids.join(',')}))`
-        )
-        .order('created_at', { ascending: false })
-        .limit(300);
 
-      if (error) return {};
+      // Dos queries simples en vez de un OR complejo que causa error 500 en PostgREST
+      const [sentRes, receivedRes] = await Promise.all([
+        supabase.from('messages').select(sel)
+          .eq('sender_id', user.id).in('receiver_id', ids)
+          .order('created_at', { ascending: false }).limit(300),
+        supabase.from('messages').select(sel)
+          .eq('receiver_id', user.id).in('sender_id', ids)
+          .order('created_at', { ascending: false }).limit(300)
+      ]);
+
+      if (sentRes.error && receivedRes.error) return {};
+
+      const all = [...(sentRes.data || []), ...(receivedRes.data || [])];
 
       const previews = {};
-      (data || []).forEach(m => {
-        // Los mensajes vienen ordenados desc → el primero de cada contacto es el último
+      all.forEach(m => {
         const otherId = m.sender_id === user.id ? m.receiver_id : m.sender_id;
         if (!otherId || previews[otherId]) return;
         previews[otherId] = {
@@ -189,7 +191,7 @@ export const ChatModule = {
         .from('messages')
         .select('sender_id')
         .eq('receiver_id', user.id)
-        .eq('is_read', false);
+        .or('is_read.eq.false,is_read.is.null');
 
       if (error) return { total: 0, counts: {} };
 
@@ -326,7 +328,6 @@ export const ChatModule = {
 
       // 1. Si no hay conversationId, buscar una existente o crearla
       if (!activeConvId) {
-        // Buscar conversación privada existente entre estos dos usuarios
         let convId = null;
 
         // Intentar con RPC primero
@@ -338,34 +339,58 @@ export const ChatModule = {
         if (!rpcRes.error && rpcRes.data) {
           convId = rpcRes.data;
         } else {
-          // Fallback: crear manualmente si el RPC no existe
-          const { data: newConv } = await supabase
+          // Fallback: crear manualmente si el RPC no existe o falla
+          const { data: newConv, error: convErr } = await supabase
             .from('conversations')
             .insert({ type: 'direct_message' })
             .select('id')
             .single();
 
-          if (newConv?.id) {
-            convId = newConv.id;
-            await supabase.from('conversation_participants').insert([
-              { conversation_id: convId, user_id: senderId },
-              { conversation_id: convId, user_id: receiverId }
-            ]).catch(() => {});
+          if (convErr || !newConv?.id) {
+            throw new Error('No se pudo crear la conversación: ' + (convErr?.message || 'unknown'));
+          }
+
+          convId = newConv.id;
+
+          // Insertar participantes — si falla, eliminar la conversación huérfana
+          const { error: partErr } = await supabase.from('conversation_participants').insert([
+            { conversation_id: convId, user_id: senderId },
+            { conversation_id: convId, user_id: receiverId }
+          ]);
+
+          if (partErr) {
+            // Intentar limpiar conversación huérfana
+            try { await supabase.from('conversations').delete().eq('id', convId); } catch (_) {}
+            throw new Error('No se pudieron agregar participantes: ' + partErr.message);
           }
         }
 
-        if (convId) {
-          activeConvId = convId;
-        } else {
-          throw new Error('No se pudo crear o encontrar la conversación');
-        }
+        if (!convId) throw new Error('No se pudo crear o encontrar la conversación');
+        activeConvId = convId;
       }
 
-      // 2. Insertar el mensaje (con reply_to si la BD lo soporta)
+      // 2. Verificar que soy participante de la conversación (RLS lo requiere)
+      const { data: isParticipant } = await supabase
+        .from('conversation_participants')
+        .select('user_id')
+        .eq('conversation_id', activeConvId)
+        .eq('user_id', senderId)
+        .maybeSingle();
+
+      if (!isParticipant) {
+        // Soy participante no verificado — forzar inserción como participante
+        try {
+          await supabase.from('conversation_participants').insert(
+            { conversation_id: activeConvId, user_id: senderId }
+          );
+        } catch (_) {}
+      }
+
+      // 3. Insertar el mensaje
       const payload = {
         conversation_id: activeConvId,
         sender_id: senderId,
-        receiver_id: receiverId,   // keep for NOT NULL compat until migration runs
+        receiver_id: receiverId,
         content: content.trim(),
         is_read: false
       };
@@ -377,10 +402,18 @@ export const ChatModule = {
           .insert({ ...payload, reply_to: replyToId })
           .select()
           .single();
-        message = res.data; msgError = res.error;
-        if (msgError) { message = null; msgError = null; } // fallback sin reply_to
-      }
-      if (!message) {
+        if (res.error) {
+          // fallback sin reply_to
+          const res2 = await supabase
+            .from('messages')
+            .insert(payload)
+            .select()
+            .single();
+          message = res2.data; msgError = res2.error;
+        } else {
+          message = res.data;
+        }
+      } else {
         const res = await supabase
           .from('messages')
           .insert(payload)
@@ -393,6 +426,7 @@ export const ChatModule = {
 
       return { message, conversationId: activeConvId };
     } catch (err) {
+      console.error('[ChatModule.sendMessage]', err);
       throw err;
     }
   },

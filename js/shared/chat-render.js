@@ -185,7 +185,7 @@ export function chatListItemHTML({ c, unread = 0, lastMsg = null, online = false
 
   return `
   <div data-contact-id="${_esc(String(c.id || ''))}" ${extraAttr}
-       class="kk-chat-item ${disabled ? 'is-disabled' : ''}">
+       class="kk-chat-item ${disabled ? 'is-disabled' : ''} ${unread > 0 ? 'has-unread' : ''}">
     <div class="kk-chat-item-avatar-wrap">
       <div class="kk-chat-item-avatar ${avatarBg}">
         ${c.avatar ? `<img src="${_esc(c.avatar)}" alt="" loading="lazy">` : `<span>${initial}</span>`}

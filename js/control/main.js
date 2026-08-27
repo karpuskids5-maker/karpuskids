@@ -400,6 +400,7 @@ const SECTION_LOADERS = {
   chat:       [loadChatData],
   pagos:      [loadPayments],
   asistencia: [loadAttendance],
+  analytics:  [loadAudit, loadUsers, loadAttendance, loadPunches],
 };
 function _isSectionStale(id) {
   return !_sectionLoadedAt[id] || (Date.now() - _sectionLoadedAt[id]) > STALE_MS;
@@ -430,6 +431,7 @@ window.goTo = async function(id) {
     chat:         ['Chat & Mensajería', 'Conversaciones entre padres y personal'],
     pagos:        ['Pagos', 'Historial financiero completo'],
     asistencia:   ['Asistencia', 'Control de entradas y salidas'],
+    analytics:    ['Analítica', 'Eficiencia de maestros y tráfico de usuarios'],
     errores:      ['Errores del Sistema', 'Log de errores y excepciones'],
     modulos:      ['Módulos y Visibilidad', 'Control total de módulos por rol y usuario'],
     seguridad:    ['Seguridad', 'Fuerza bruta y estado del sistema'],
@@ -452,6 +454,7 @@ window.goTo = async function(id) {
   if (id === 'chat')        renderChat();
   if (id === 'pagos')       renderPayments();
   if (id === 'asistencia')  renderAttendance();
+  if (id === 'analytics')   { renderTeacherEfficiency(); renderLoginAnalytics(); renderTrafficAnalytics(); }
   if (id === 'errores')     renderErrors();
   if (id === 'modulos')     initModulesUI();
   if (id === 'configuracion') checkEdgeFunctionsHealth();
@@ -586,13 +589,12 @@ async function loadWallPosts() {
   try {
     const { data, error } = await supabase
       .from('posts')
-      .select('id, title, content, teacher_name, classroom_id, likes_count, comments_count, views_count, is_pinned, status, media_type, created_at')
+      .select('id, title, content, teacher_name, classroom_id, likes_count, comments_count, views_count, is_pinned, status, media_type, media_url, image_url, images, created_at')
       .order('created_at', { ascending: false })
       .limit(200);
     if (error) throw error;
     allWallPosts = data || [];
   } catch (err) {
-    // Fallback sin columnas opcionales
     try {
       const { data } = await supabase
         .from('posts')
@@ -609,13 +611,24 @@ async function loadWallPosts() {
   if (badge) badge.textContent = allWallPosts.length;
 }
 
+function _getWallMediaUrl(p) {
+  if (p.media_url) return p.media_url;
+  if (p.image_url) return p.image_url;
+  if (p.images && Array.isArray(p.images) && p.images.length) return p.images[0];
+  return null;
+}
+function _isVideoUrl(url) {
+  return /\.(mp4|webm|ogg|mov)($|\?)/i.test(url) || /video/i.test(url);
+}
+
 function renderWall() {
   const set = (id, v) => { const el = document.getElementById(id); if (el) el.textContent = v; };
   const since7 = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString();
   set('wall-total', allWallPosts.length);
   set('wall-comments', allWallPosts.reduce((s, p) => s + Number(p.comments_count || 0), 0));
   set('wall-likes', allWallPosts.reduce((s, p) => s + Number(p.likes_count || 0), 0));
-  set('wall-week', allWallPosts.filter(p => (p.created_at || '') >= since7).length);
+  const photoCount = allWallPosts.filter(p => _getWallMediaUrl(p)).length;
+  set('wall-photos', photoCount);
   const countEl = document.getElementById('wallCount');
   if (countEl) countEl.textContent = allWallPosts.length + ' publicaciones';
 
@@ -626,11 +639,13 @@ function renderWall() {
     const room = allClassrooms.find(c => c.id === p.classroom_id);
     const dt = p.created_at ? new Date(p.created_at).toLocaleDateString('es-DO', { day: '2-digit', month: 'short' }) : '—';
     const txt = [p.title, p.content].filter(Boolean).join(' — ');
+    const media = _getWallMediaUrl(p);
+    const mediaBadge = media ? '<span class="badge badge-purple" style="font-size:8px;margin-left:4px;">📷</span>' : '';
     return `<tr>
       <td style="font-size:11px;color:var(--muted);white-space:nowrap;">${dt}</td>
       <td style="font-weight:800;">${escH(p.teacher_name || '—')}</td>
       <td style="color:var(--muted);font-size:12px;">${room ? escH(room.name) : 'General'}</td>
-      <td style="max-width:260px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:12px;">${escH(txt || '—')}</td>
+      <td style="max-width:260px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:12px;">${escH(txt || '—')}${mediaBadge}</td>
       <td style="color:#fb923c;font-weight:900;">${Number(p.likes_count || 0)}</td>
       <td style="color:#60a5fa;font-weight:900;">${Number(p.comments_count || 0)}</td>
       <td style="color:var(--muted);">${Number(p.views_count || 0)}</td>
@@ -639,14 +654,59 @@ function renderWall() {
   }).join('');
 }
 
+// ── Wall Gallery ──────────────────────────────────────────────────────────────
+window.renderWallGallery = function() {
+  const grid = document.getElementById('wallGalleryGrid');
+  if (!grid) return;
+  if (!allWallPosts.length) { grid.innerHTML = '<div style="text-align:center;padding:40px;color:var(--muted);">Sin publicaciones</div>'; return; }
+  grid.innerHTML = allWallPosts.filter(p => _getWallMediaUrl(p)).slice(0, 100).map(p => {
+    const url = _getWallMediaUrl(p);
+    const isVid = _isVideoUrl(url);
+    const dt = p.created_at ? new Date(p.created_at).toLocaleDateString('es-DO') : '';
+    const author = p.teacher_name || '';
+    const content = [p.title, p.content].filter(Boolean).join(' — ');
+    return `<div class="gallery-item" onclick="openLightbox('${escH(url)}','${escH(author + ' — ' + dt)}')">
+      ${isVid ? `<video src="${escH(url)}" style="width:100%;height:100%;object-fit:cover;" muted preload="metadata"></video>` : `<img src="${escH(url)}" alt="" loading="lazy">`}
+      <div class="overlay"><div class="overlay-text">📷 ${escH(author)} · ${dt}</div></div>
+    </div>`;
+  }).join('') || '<div style="text-align:center;padding:40px;color:var(--muted);">Sin fotos ni videos</div>';
+  const countEl = document.getElementById('galleryCount');
+  if (countEl) countEl.textContent = allWallPosts.filter(p => _getWallMediaUrl(p)).length + ' multimedia';
+};
+
+window.renderWallMedia = function() {
+  const grid = document.getElementById('wallMediaGrid');
+  if (!grid) return;
+  const allMedia = [];
+  allWallPosts.forEach(p => {
+    const url = _getWallMediaUrl(p);
+    if (url) allMedia.push({ url, author: p.teacher_name || '—', date: p.created_at, likes: p.likes_count || 0, comments: p.comments_count || 0 });
+    if (p.images && Array.isArray(p.images)) {
+      p.images.slice(1).forEach(u => {
+        if (u && u !== url) allMedia.push({ url: u, author: p.teacher_name || '—', date: p.created_at, likes: p.likes_count || 0, comments: p.comments_count || 0 });
+      });
+    }
+  });
+  grid.innerHTML = allMedia.slice(0, 150).map(m => {
+    const dt = m.date ? new Date(m.date).toLocaleDateString('es-DO') : '';
+    const isVid = _isVideoUrl(m.url);
+    return `<div class="gallery-item" onclick="openLightbox('${escH(m.url)}','${escH(m.author + ' · ' + dt + ' · ❤' + m.likes)}')">
+      ${isVid ? `<video src="${escH(m.url)}" style="width:100%;height:100%;object-fit:cover;" muted preload="metadata"></video>` : `<img src="${escH(m.url)}" alt="" loading="lazy">`}
+      <div class="overlay"><div class="overlay-text">📷 ${escH(m.author)} · ${dt}</div></div>
+    </div>`;
+  }).join('') || '<div style="text-align:center;padding:40px;color:var(--muted);">Sin fotos ni videos en publicaciones</div>';
+  const countEl = document.getElementById('mediaCount');
+  if (countEl) countEl.textContent = allMedia.length + ' archivos multimedia';
+};
+
 // ── Chat & Mensajería ────────────────────────────────────────────────────────
 async function loadChatData() {
   try {
     const [msgsRes, convRes] = await Promise.allSettled([
       supabase.from('messages')
-        .select('id, sender_name, sender_id, receiver_id, content, is_read, created_at')
+        .select('id, sender_name, sender_id, receiver_id, receiver_name, content, attachment_url, attachment_type, is_read, created_at')
         .order('created_at', { ascending: false })
-        .limit(300),
+        .limit(500),
       supabase.from('conversations')
         .select('id, type, classroom_id, created_at')
         .order('created_at', { ascending: false })
@@ -676,21 +736,27 @@ function renderChat() {
   set('chat-convos', allConvos.length);
   set('chat-today', allChatMsgs.filter(m => (m.created_at || '').startsWith(todayStr)).length);
   set('chat-week', allChatMsgs.filter(m => (m.created_at || '') >= since7).length);
-  set('chat-unread', allChatMsgs.filter(m => m.is_read === false).length);
+  const mediaCount = allChatMsgs.filter(m => m.attachment_url).length;
+  set('chat-media', mediaCount);
   const countEl = document.getElementById('chatMsgCount');
   if (countEl) countEl.textContent = allChatMsgs.length + ' mensajes recientes';
 
   const tbody = document.getElementById('chatBody');
   if (tbody) {
     if (!allChatMsgs.length) {
-      tbody.innerHTML = '<tr><td colspan="4" style="text-align:center;padding:24px;color:var(--muted);">Sin mensajes registrados</td></tr>';
+      tbody.innerHTML = '<tr><td colspan="5" style="text-align:center;padding:24px;color:var(--muted);">Sin mensajes registrados</td></tr>';
     } else {
-      tbody.innerHTML = allChatMsgs.slice(0, 80).map(m => `<tr>
-        <td style="font-size:11px;color:var(--muted);white-space:nowrap;">${m.created_at ? new Date(m.created_at).toLocaleString('es-DO', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' }) : '—'}</td>
-        <td style="font-weight:800;max-width:140px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${escH(m.sender_name || m.sender_id?.slice(0, 8) || '—')}</td>
-        <td style="max-width:240px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:12px;color:var(--text);">${escH(m.content)}</td>
-        <td>${m.is_read === false ? '<span class="badge badge-yellow">Sin leer</span>' : '<span class="badge badge-gray">Leído</span>'}</td>
-      </tr>`).join('');
+      tbody.innerHTML = allChatMsgs.slice(0, 80).map(m => {
+        const receiverName = m.receiver_name || allUsers.find(u => u.id === m.receiver_id)?.name || m.receiver_id?.slice(0, 8) || '—';
+        const hasMedia = m.attachment_url ? ' <span class="badge badge-purple" style="font-size:8px;">📷</span>' : '';
+        return `<tr>
+          <td style="font-size:11px;color:var(--muted);white-space:nowrap;">${m.created_at ? new Date(m.created_at).toLocaleString('es-DO', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' }) : '—'}</td>
+          <td style="font-weight:800;max-width:120px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${escH(m.sender_name || m.sender_id?.slice(0, 8) || '—')}</td>
+          <td style="font-weight:700;max-width:120px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:11px;color:var(--muted);">→ ${escH(receiverName)}</td>
+          <td style="max-width:220px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:12px;color:var(--text);">${escH(m.content || '')}${hasMedia}</td>
+          <td>${m.is_read === false ? '<span class="badge badge-yellow">Sin leer</span>' : '<span class="badge badge-gray">Leído</span>'}</td>
+        </tr>`;
+      }).join('');
     }
   }
 
@@ -718,6 +784,90 @@ function renderChat() {
       </div>`;
     }).join('');
   }
+}
+
+// ── Chat Conversations viewer ─────────────────────────────────────────────────
+window.renderChatConversations = function() {
+  const container = document.getElementById('convListContainer');
+  if (!container) return;
+  const countEl = document.getElementById('convoCount');
+
+  // Build conversation pairs: who talked to whom
+  const pairs = {};
+  allChatMsgs.forEach(m => {
+    const sid = m.sender_id || '';
+    const rid = m.receiver_id || '';
+    if (!sid || !rid) return;
+    const key = [sid, rid].sort().join('|');
+    if (!pairs[key]) pairs[key] = { user1: sid, user2: rid, msgs: [], count: 0 };
+    pairs[key].msgs.push(m);
+    pairs[key].count++;
+  });
+
+  const sorted = Object.values(pairs).sort((a, b) => b.count - a.count);
+
+  if (!sorted.length) {
+    container.innerHTML = '<div style="text-align:center;padding:40px;color:var(--muted);">Sin conversaciones registradas</div>';
+    if (countEl) countEl.textContent = '0 conversaciones';
+    return;
+  }
+
+  if (countEl) countEl.textContent = sorted.length + ' conversaciones';
+
+  container.innerHTML = sorted.slice(0, 50).map(p => {
+    const u1 = allUsers.find(u => u.id === p.user1);
+    const u2 = allUsers.find(u => u.id === p.user2);
+    const name1 = u1?.name || u1?.email || p.user1?.slice(0, 8) || '?';
+    const name2 = u2?.name || u2?.email || p.user2?.slice(0, 8) || '?';
+    const role1 = u1?.role || '?';
+    const role2 = u2?.role || '?';
+    const lastMsg = p.msgs.sort((a, b) => (b.created_at || '').localeCompare(a.created_at || ''))[0];
+    const lastTime = lastMsg?.created_at ? new Date(lastMsg.created_at).toLocaleString('es-DO', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' }) : '—';
+    const lastContent = lastMsg?.content || '';
+    const unread = p.msgs.filter(m => m.is_read === false).length;
+    const colors = ['#6366f1', '#22c55e', '#f97316', '#3b82f6', '#8b5cf6', '#ef4444', '#eab308'];
+    const c1 = colors[Math.abs(hashStr(p.user1)) % colors.length];
+    const c2 = colors[Math.abs(hashStr(p.user2)) % colors.length];
+
+    return `<div class="convo-card">
+      <div class="convo-avatar" style="background:${c1};">${(name1[0]||'?').toUpperCase()}</div>
+      <div style="font-size:11px;color:var(--muted);">↔</div>
+      <div class="convo-avatar" style="background:${c2};">${(name2[0]||'?').toUpperCase()}</div>
+      <div class="convo-meta">
+        <div class="convo-name">${escH(name1)} <span class="badge badge-gray" style="font-size:8px;">${role1}</span> ↔ ${escH(name2)} <span class="badge badge-gray" style="font-size:8px;">${role2}</span></div>
+        <div class="convo-preview">${escH(lastContent.slice(0, 60))}${lastContent.length > 60 ? '...' : ''}</div>
+        <div style="font-size:10px;color:var(--muted);margin-top:2px;">Último: ${lastTime}</div>
+      </div>
+      <div style="display:flex;flex-direction:column;align-items:center;gap:4px;">
+        <div class="convo-count">${p.count} msg</div>
+        ${unread > 0 ? `<span class="badge badge-red" style="font-size:8px;">${unread} sin leer</span>` : ''}
+      </div>
+    </div>`;
+  }).join('');
+};
+
+// ── Chat Media gallery ────────────────────────────────────────────────────────
+window.renderChatMedia = function() {
+  const grid = document.getElementById('chatMediaGrid');
+  if (!grid) return;
+  const mediaMsgs = allChatMsgs.filter(m => m.attachment_url);
+  grid.innerHTML = mediaMsgs.slice(0, 100).map(m => {
+    const dt = m.created_at ? new Date(m.created_at).toLocaleDateString('es-DO') : '';
+    const author = m.sender_name || '—';
+    const isVid = _isVideoUrl(m.attachment_url);
+    return `<div class="gallery-item" onclick="openLightbox('${escH(m.attachment_url)}','${escH(author + ' · ' + dt)}')">
+      ${isVid ? `<video src="${escH(m.attachment_url)}" style="width:100%;height:100%;object-fit:cover;" muted preload="metadata"></video>` : `<img src="${escH(m.attachment_url)}" alt="" loading="lazy">`}
+      <div class="overlay"><div class="overlay-text">💬 ${escH(author)} · ${dt}</div></div>
+    </div>`;
+  }).join('') || '<div style="text-align:center;padding:40px;color:var(--muted);">Sin archivos multimedia en chat</div>';
+  const countEl = document.getElementById('chatMediaCount');
+  if (countEl) countEl.textContent = mediaMsgs.length + ' archivos';
+};
+
+function hashStr(s) {
+  let h = 0;
+  for (let i = 0; i < String(s).length; i++) { h = ((h << 5) - h) + String(s).charCodeAt(i); h |= 0; }
+  return h;
 }
 
 async function loadAttendance() {
@@ -1431,6 +1581,247 @@ function renderAttendance() {
     </tr>`;
   }).join('');
 }
+
+// ── Analytics: Teacher Efficiency + Login Tracking ────────────────────────────
+let _chartTeacherTime = null, _chartLoginHeat = null, _chartTraffic = null;
+
+// Teacher efficiency: ranking by average check-in time
+window.renderTeacherEfficiency = function() {
+  const container = document.getElementById('teacherRanking');
+  if (!container) return;
+
+  // Group attendance by teacher/classroom and calculate avg check-in time
+  const teacherStats = {};
+  allAttend.forEach(a => {
+    if (!a.check_in) return;
+    const teacherId = a.classroom?.teacher_id || a.classroom_id || null;
+    const teacherName = a.classroom?.name || allClassrooms.find(c => c.id === a.classroom_id)?.name || 'Sin aula';
+    if (!teacherStats[teacherName]) teacherStats[teacherName] = { name: teacherName, checkIns: [], count: 0 };
+    const d = new Date(a.check_in);
+    const mins = d.getHours() * 60 + d.getMinutes();
+    teacherStats[teacherName].checkIns.push(mins);
+    teacherStats[teacherName].count++;
+  });
+
+  // Calculate average and sort by earliest
+  const ranked = Object.values(teacherStats)
+    .filter(t => t.checkIns.length > 0)
+    .map(t => {
+      const avg = t.checkIns.reduce((s, v) => s + v, 0) / t.checkIns.length;
+      t.avgMinutes = avg;
+      t.avgTime = `${String(Math.floor(avg / 60)).padStart(2, '0')}:${String(Math.round(avg % 60)).padStart(2, '0')}`;
+      return t;
+    })
+    .sort((a, b) => a.avgMinutes - b.avgMinutes);
+
+  if (!ranked.length) {
+    container.innerHTML = '<div style="text-align:center;padding:40px;color:var(--muted);">Sin datos de asistencia para calcular eficiencia</div>';
+    return;
+  }
+
+  const best = ranked[0].avgMinutes;
+  const worst = ranked[ranked.length - 1].avgMinutes;
+  const range = worst - best || 1;
+  const rankColors = ['#22c55e', '#4ade80', '#facc15', '#fb923c', '#ef4444'];
+
+  container.innerHTML = ranked.map((t, i) => {
+    const pct = Math.max(10, Math.round(100 - ((t.avgMinutes - best) / range) * 90));
+    const color = rankColors[Math.min(i, rankColors.length - 1)];
+    const medal = i === 0 ? '🥇' : i === 1 ? '🥈' : i === 2 ? '🥉' : `#${i + 1}`;
+    return `<div class="eff-row">
+      <div class="eff-rank" style="background:${color};">${medal}</div>
+      <div style="flex:1;min-width:0;">
+        <div style="font-size:13px;font-weight:900;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${escH(t.name)}</div>
+        <div style="font-size:11px;color:var(--muted);">${t.count} registros · Entrada promedio: <strong style="color:${color};">${t.avgTime}</strong></div>
+        <div class="eff-bar" style="margin-top:4px;"><div class="eff-bar-fill" style="width:${pct}%;background:${color};"></div></div>
+      </div>
+    </div>`;
+  }).join('');
+
+  // Chart: average check-in times
+  const canvas = document.getElementById('chartTeacherTime');
+  if (canvas && typeof Chart !== 'undefined') {
+    const ctx = canvas.getContext('2d');
+    if (ctx) {
+      if (_chartTeacherTime) _chartTeacherTime.destroy();
+      try {
+        _chartTeacherTime = new Chart(ctx, {
+          type: 'bar',
+          data: {
+            labels: ranked.map(t => t.name.slice(0, 12)),
+            datasets: [{
+              label: 'Hora promedio entrada',
+              data: ranked.map(t => t.avgMinutes),
+              backgroundColor: ranked.map((_, i) => rankColors[Math.min(i, rankColors.length - 1)] + 'cc'),
+              borderRadius: 8,
+              barThickness: 24
+            }]
+          },
+          options: {
+            responsive: true,
+            indexAxis: 'y',
+            plugins: { legend: { display: false } },
+            scales: {
+              x: {
+                ticks: { color: '#94a3b8', callback: v => `${String(Math.floor(v / 60)).padStart(2, '0')}:${String(v % 60).padStart(2, '0')}` },
+                grid: { color: 'rgba(255,255,255,.04)' }
+              },
+              y: { ticks: { color: '#94a3b8', font: { size: 11 } }, grid: { display: false } }
+            }
+          }
+        });
+      } catch (_) {}
+    }
+  }
+
+  // KPI: most punctual
+  const kpiEl = document.getElementById('an-punctual');
+  if (kpiEl && ranked.length) kpiEl.textContent = ranked[0].name.slice(0, 12);
+};
+
+// Login analytics from audit_logs
+window.renderLoginAnalytics = function() {
+  const since7 = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString();
+  const loginLogs = allAudit.filter(a => (a.action || '').toLowerCase().includes('login') && (a.created_at || '') >= since7);
+
+  // KPI: logins today
+  const todayStr = new Date().toISOString().slice(0, 10);
+  const todayLogins = loginLogs.filter(l => (l.created_at || '').startsWith(todayStr));
+  const kpiEl = document.getElementById('an-logins-today');
+  if (kpiEl) kpiEl.textContent = todayLogins.length;
+
+  // Per-user login count (7 days)
+  const userLogins = {};
+  loginLogs.forEach(l => {
+    if (!l.user_id) return;
+    if (!userLogins[l.user_id]) userLogins[l.user_id] = { count: 0, last: l.created_at, hours: {} };
+    userLogins[l.user_id].count++;
+    if (l.created_at > userLogins[l.user_id].last) userLogins[l.user_id].last = l.created_at;
+    const h = new Date(l.created_at).getHours();
+    userLogins[l.user_id].hours[h] = (userLogins[l.user_id].hours[h] || 0) + 1;
+  });
+
+  // Table
+  const tbody = document.getElementById('loginUserBody');
+  const countEl = document.getElementById('loginUserCount');
+  if (tbody) {
+    const sorted = Object.entries(userLogins).sort((a, b) => b[1].count - a[1].count);
+    if (countEl) countEl.textContent = sorted.length + ' usuarios activos (7d)';
+    tbody.innerHTML = sorted.map(([uid, stats]) => {
+      const user = allUsers.find(u => u.id === uid);
+      const name = user?.name || '—';
+      const role = user?.role || '—';
+      const roleBadge = { padre: 'badge-blue', maestra: 'badge-green', directora: 'badge-orange', asistente: 'badge-purple', admin: 'badge-yellow' };
+      const peakHour = Object.entries(stats.hours || {}).sort((a, b) => b[1] - a[1])[0];
+      const peakLabel = peakHour ? `${String(peakHour[0]).padStart(2, '0')}:00` : '—';
+      const lastTime = stats.last ? new Date(stats.last).toLocaleString('es-DO', { dateStyle: 'short', timeStyle: 'short' }) : '—';
+      return `<tr>
+        <td style="font-weight:800;">${escH(name)}</td>
+        <td><span class="badge ${roleBadge[role] || 'badge-gray'}">${role}</span></td>
+        <td style="font-weight:900;color:#6366f1;">${stats.count}</td>
+        <td style="font-size:11px;color:var(--muted);">${lastTime}</td>
+        <td><span class="badge badge-indigo" style="background:rgba(99,102,241,.15);color:#a5b4fc;">🕐 ${peakLabel}</span></td>
+      </tr>`;
+    }).join('') || '<tr><td colspan="5" style="text-align:center;padding:24px;color:var(--muted);">Sin logins en 7 días</td></tr>';
+  }
+
+  // Chart: logins by day (7d) per role
+  const canvas = document.getElementById('chartLoginHeat');
+  if (canvas && typeof Chart !== 'undefined') {
+    const ctx = canvas.getContext('2d');
+    if (ctx) {
+      if (_chartLoginHeat) _chartLoginHeat.destroy();
+      const days7 = Array.from({ length: 7 }, (_, i) => { const d = new Date(); d.setDate(d.getDate() - (6 - i)); return d.toISOString().slice(0, 10); });
+      const roleDefs = [['padre', 'Padres', '#6366f1'], ['maestra', 'Maestras', '#22c55e'], ['directora', 'Directoras', '#f97316']];
+      try {
+        _chartLoginHeat = new Chart(ctx, {
+          type: 'bar',
+          data: {
+            labels: days7.map(d => d.slice(5)),
+            datasets: roleDefs.map(([role, label, color]) => ({
+              label, backgroundColor: color, borderRadius: 6, barThickness: 14,
+              data: days7.map(d => loginLogs.filter(l => (l.created_at || '').startsWith(d) && allUsers.find(u => u.id === l.user_id)?.role === role).length)
+            }))
+          },
+          options: { responsive: true, plugins: { legend: { position: 'bottom', labels: { color: '#94a3b8', font: { size: 10 }, usePointStyle: true } } }, scales: { x: { stacked: true, grid: { display: false }, ticks: { color: '#94a3b8' } }, y: { stacked: true, beginAtZero: true, ticks: { precision: 0, color: '#94a3b8' }, grid: { color: 'rgba(255,255,255,.05)' } } } }
+        });
+      } catch (_) {}
+    }
+  }
+};
+
+// Traffic analytics: logins by hour of day
+window.renderTrafficAnalytics = function() {
+  const since7 = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString();
+  const loginLogs = allAudit.filter(a => (a.action || '').toLowerCase().includes('login') && (a.created_at || '') >= since7);
+
+  // Peak hour
+  const hourCounts = {};
+  for (let h = 0; h < 24; h++) hourCounts[h] = 0;
+  loginLogs.forEach(l => {
+    const h = new Date(l.created_at).getHours();
+    hourCounts[h] = (hourCounts[h] || 0) + 1;
+  });
+  const peakHour = Object.entries(hourCounts).sort((a, b) => b[1] - a[1])[0];
+  const kpiEl = document.getElementById('an-peak-hour');
+  if (kpiEl) kpiEl.textContent = peakHour ? `${String(peakHour[0]).padStart(2, '0')}:00` : '—';
+
+  // KPI: active now (last 30 min)
+  const now30m = new Date(Date.now() - 30 * 60 * 1000).toISOString();
+  const activeNow = allAudit.filter(a => (a.action || '').toLowerCase().includes('login') && (a.created_at || '') >= now30m);
+  const kpiActive = document.getElementById('an-active-now');
+  if (kpiActive) kpiActive.textContent = new Set(activeNow.map(a => a.user_id)).size;
+
+  // Traffic chart
+  const canvas = document.getElementById('chartTraffic');
+  if (canvas && typeof Chart !== 'undefined') {
+    const ctx = canvas.getContext('2d');
+    if (ctx) {
+      if (_chartTraffic) _chartTraffic.destroy();
+      try {
+        const labels = Array.from({ length: 24 }, (_, i) => `${String(i).padStart(2, '0')}:00`);
+        _chartTraffic = new Chart(ctx, {
+          type: 'line',
+          data: {
+            labels,
+            datasets: [{
+              label: 'Logins',
+              data: labels.map((_, i) => hourCounts[i] || 0),
+              borderColor: '#f97316',
+              backgroundColor: 'rgba(249,115,22,.1)',
+              fill: true, tension: .4, pointRadius: 3, pointBackgroundColor: '#f97316'
+            }]
+          },
+          options: { responsive: true, plugins: { legend: { display: false } }, scales: { x: { ticks: { color: '#64748b', maxRotation: 0 }, grid: { color: 'rgba(255,255,255,.04)' } }, y: { beginAtZero: true, ticks: { precision: 0, color: '#64748b' }, grid: { color: 'rgba(255,255,255,.04)' } } } }
+        });
+      } catch (_) {}
+    }
+  }
+
+  // Top users list
+  const topEl = document.getElementById('topUsersList');
+  if (topEl) {
+    const userCounts = {};
+    loginLogs.forEach(l => { if (l.user_id) userCounts[l.user_id] = (userCounts[l.user_id] || 0) + 1; });
+    const sorted = Object.entries(userCounts).sort((a, b) => b[1] - a[1]).slice(0, 10);
+    const maxC = sorted[0]?.[1] || 1;
+    topEl.innerHTML = sorted.map(([uid, count]) => {
+      const user = allUsers.find(u => u.id === uid);
+      const name = user?.name || user?.email || uid?.slice(0, 8) || '—';
+      const pct = Math.round((count / maxC) * 100);
+      return `<div style="display:flex;align-items:center;gap:10px;margin-bottom:10px;">
+        <div style="width:28px;height:28px;background:linear-gradient(135deg,#6366f1,#8b5cf6);border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:900;color:white;flex-shrink:0;">${(name[0]||'?').toUpperCase()}</div>
+        <div style="flex:1;min-width:0;">
+          <div style="font-size:12px;font-weight:800;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${escH(name)}</div>
+          <div style="height:4px;background:rgba(255,255,255,.06);border-radius:50px;margin-top:3px;overflow:hidden;">
+            <div style="height:100%;width:${pct}%;background:linear-gradient(90deg,#f97316,#fb923c);border-radius:50px;"></div>
+          </div>
+        </div>
+        <span style="font-size:12px;font-weight:900;color:#f97316;">${count}</span>
+      </div>`;
+    }).join('') || '<div style="text-align:center;padding:20px;color:var(--muted);">Sin actividad</div>';
+  }
+};
 
 // ── Errors ────────────────────────────────────────────────────────────────────
 async function renderErrors() {

@@ -35,23 +35,31 @@ export function getBirthdayInfo(birthDate) {
   const [y, m, d] = birthDate.split('-').map(Number);
   if (!y || !m || !d) return null;
 
-  const now = new Date();
-  const thisYear = now.getFullYear();
+  const now     = new Date();
+  const todayY  = now.getFullYear();
+  const todayM  = now.getMonth() + 1; // 1-based
+  const todayD  = now.getDate();
 
-  // This year's birthday
-  let nextBday = new Date(thisYear, m - 1, d);
-  // If already passed this year, use next year
-  if (nextBday < new Date(thisYear, now.getMonth(), now.getDate())) {
-    nextBday = new Date(thisYear + 1, m - 1, d);
-  }
+  // Determinar si el cumpleaños de este año ya pasó
+  // Comparación puramente de componentes de fecha (sin zonas horarias)
+  const bdayThisYear_month = m;
+  const bdayThisYear_day   = d;
+  const alreadyPassed =
+    bdayThisYear_month < todayM ||
+    (bdayThisYear_month === todayM && bdayThisYear_day < todayD);
 
-  const diffMs = nextBday.getTime() - new Date(thisYear, now.getMonth(), now.getDate()).getTime();
-  const daysUntil = Math.round(diffMs / (1000 * 60 * 60 * 24));
-  const isToday = daysUntil === 0;
+  const bdayYear  = alreadyPassed ? todayY + 1 : todayY;
+  const nextBday  = new Date(bdayYear, m - 1, d);
+  const todayDate = new Date(todayY,   todayM - 1, todayD);
+
+  // Días exactos sin decimales ni DST (enteros de medianoche a medianoche)
+  const daysUntil = Math.floor((nextBday.getTime() - todayDate.getTime()) / (1000 * 60 * 60 * 24));
+
+  const isToday    = daysUntil === 0;
   const isUpcoming = daysUntil > 0 && daysUntil <= 7;
-  // La edad que cumple es el año del próximo cumpleaños menos el de nacimiento
-  // (ej.: nace 2023-08-31 → su cumpleaños de 2026 es cuando cumple 3)
-  const ageTurning = nextBday.getFullYear() - y;
+
+  // Edad que cumple = año del próximo cumpleaños − año de nacimiento
+  const ageTurning = bdayYear - y;
 
   return { isToday, isUpcoming, daysUntil, month: m, day: d, ageTurning };
 }

@@ -41,6 +41,11 @@ function _ensureBannerEl() {
     <div class="kk-chat-banner-body">
       <div class="kk-chat-banner-name">Nuevo mensaje</div>
       <div class="kk-chat-banner-preview"></div>
+      <div class="kk-banner-quick-reply" style="display:flex;gap:6px;margin-top:6px;">
+        <button data-qr="Entendido 👍" style="font-size:10px;padding:3px 8px;border-radius:10px;background:#f0fdf4;color:#16a34a;border:1px solid #bbf7d0;cursor:pointer;font-weight:700;">Entendido 👍</button>
+        <button data-qr="Gracias 🙏" style="font-size:10px;padding:3px 8px;border-radius:10px;background:#eff6ff;color:#2563eb;border:1px solid #bfdbfe;cursor:pointer;font-weight:700;">Gracias 🙏</button>
+        <button data-qr="Voy a revisarlo 📋" style="font-size:10px;padding:3px 8px;border-radius:10px;background:#fefce8;color:#ca8a04;border:1px solid #fef08a;cursor:pointer;font-weight:700;">Voy a revisarlo 📋</button>
+      </div>
     </div>
     <button class="kk-chat-banner-close" aria-label="Cerrar">✕</button>`;
   document.body.appendChild(_bannerEl);
@@ -48,6 +53,14 @@ function _ensureBannerEl() {
   // Click en el banner → abrir chat con el remitente
   _bannerEl.addEventListener('click', (e) => {
     if (e.target.closest('.kk-chat-banner-close')) return;
+    // Quick reply → enviar mensaje directamente
+    const qrBtn = e.target.closest('[data-qr]');
+    if (qrBtn && _currentSender && _cfg?.onOpen) {
+      const text = qrBtn.dataset.qr;
+      _sendQuickReplyFromBanner(_currentSender, text);
+      _dismiss();
+      return;
+    }
     const senderId = _currentSender;
     _dismiss();
     if (senderId && _cfg?.onOpen) {
@@ -56,6 +69,15 @@ function _ensureBannerEl() {
   });
   _bannerEl.querySelector('.kk-chat-banner-close')?.addEventListener('click', _dismiss);
   return _bannerEl;
+}
+
+async function _sendQuickReplyFromBanner(senderId, text) {
+  try {
+    const { ChatModule } = await import('./chat.js');
+    const { supabase: sb } = await import('./supabase.js');
+    const { data: { user } } = await sb.auth.getUser();
+    if (user) await ChatModule.sendMessage(user.id, senderId, text, null, null);
+  } catch (_) {}
 }
 
 function _show({ name, avatarUrl, preview, timeTxt }) {

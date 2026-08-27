@@ -26,6 +26,7 @@ const _contactsCache = new Map();
 let _listContacts = [];        // contactos ordenados (se reordenan al llegar mensajes)
 let _unreadCounts = {};        // { userId: count }
 let _liveListenerBound = false;
+let _activeChipFilter = 'all';
 
 const _LIST_STATE_KEY = 'maestra';
 
@@ -34,15 +35,20 @@ function _sortAndRenderChatList() {
   const container = document.getElementById('chatContactsList');
   if (!container || !_listContacts.length) return;
 
-  const sorted = [..._listContacts].sort((a, b) => {
-    const ta = _lastPreviews[a.id]?.created_at ? new Date(_lastPreviews[a.id].created_at).getTime() : 0;
-    const tb = _lastPreviews[b.id]?.created_at ? new Date(_lastPreviews[b.id].created_at).getTime() : 0;
-    if (ta !== tb) return tb - ta;
-    return (_unreadCounts[b.id] || 0) - (_unreadCounts[a.id] || 0);
-  });
+  const sorted = _enhancedSort(_listContacts, _lastPreviews, _unreadCounts);
   _listContacts = sorted;
 
   _renderChatList(container, sorted, _unreadCounts);
+
+  // Re-aplicar el filtro de chips activo tras re-render
+  if (_activeChipFilter !== 'all') {
+    container.querySelectorAll('.kk-chat-item').forEach(el => {
+      const role = el.dataset.roleKind || '';
+      let show = true;
+      if (_activeChipFilter === 'parents') show = role === 'padre';
+      el.style.display = show ? '' : 'none';
+    });
+  }
 
   // Restaurar puntos de presencia tras el re-render (estado cacheado)
   _renderPresenceDots(ChatModule.getOnlineUsers());
@@ -77,6 +83,14 @@ function _handleIncomingMessageLive(msg) {
       mine: false
     };
     _unreadCounts[msg.sender_id] = (_unreadCounts[msg.sender_id] || 0) + 1;
+
+    // ✅ Check de mensaje urgente
+    if (_checkUrgentMessage(msg)) {
+      safeToast('🔴 Mensaje URGENTE de ' + (meta?.name || 'un contacto'), 'error');
+    }
+
+    // ✅ Auto-respuesta fuera de horario laboral
+    _checkAndAutoReply(msg.sender_id);
 
     // Contacto nuevo (llegó mensaje de alguien aún no listado)
     if (meta && !_listContacts.some(c => c.id === msg.sender_id)) {
@@ -203,6 +217,8 @@ export async function openChatWithUser(userId) {
 export async function initChat() {
   const container = document.getElementById('chatContactsList');
   if (!container) return;
+
+  _watchSectionChange();
 
   try {
     // Carga paralela de datos iniciales
@@ -336,20 +352,18 @@ export async function initChat() {
     ]);
     _lastPreviews = previews;
 
+    // getUnreadCounts() returns { total, counts: { senderId: count } }
+    const unreadCounts = unreadMap?.counts || {};
+
     // Orden: último mensaje más reciente primero; sin mensajes → por no leídos
-    const sorted = [...allContacts].sort((a, b) => {
-      const ta = previews[a.id]?.created_at ? new Date(previews[a.id].created_at).getTime() : 0;
-      const tb = previews[b.id]?.created_at ? new Date(previews[b.id].created_at).getTime() : 0;
-      if (ta !== tb) return tb - ta;
-      return (unreadMap[b.id] || 0) - (unreadMap[a.id] || 0);
-    });
+    const sorted = _enhancedSort(allContacts, previews, unreadCounts);
 
     // ✅ Guardar estado para el indicador en vivo de no leídos
     _listContacts = sorted;
-    _unreadCounts = { ...(unreadMap || {}) };
+    _unreadCounts = { ...unreadCounts };
     _bindLiveMessageListener();
 
-    _renderChatList(container, sorted, unreadMap);
+    _renderChatList(container, sorted, unreadCounts);
 
     // Buscador con debounce via ScrollModule (antes de restaurar estado)
     const searchInput = document.getElementById('chatSearchInput');
@@ -372,13 +386,11 @@ export async function initChat() {
         chip.classList.remove('bg-slate-100', 'text-slate-500');
         chip.classList.add('bg-orange-100', 'text-orange-700');
         const filter = chip.dataset.filter;
+        _activeChipFilter = filter;
         container.querySelectorAll('.kk-chat-item').forEach(el => {
           const role = el.dataset.roleKind || '';
-          const hasUnread = el.dataset.unread === '1';
           let show = true;
-          if (filter === 'unread') show = hasUnread;
-          else if (filter === 'parents') show = role === 'padre';
-          else if (filter === 'staff') show = role === 'staff';
+          if (filter === 'parents') show = role === 'padre';
           el.style.display = show ? '' : 'none';
         });
       });
@@ -434,6 +446,7 @@ function closeConversationUI() {
   activeChatUserId = null;
   activeConversationId = null;
   AppState.set('activeConversationId', null);
+  _stopResponseTimer();
   ChatModule.unsubscribe();
   closeMessageActions();
   hideReplyBar();
@@ -539,6 +552,9 @@ export async function selectChatContact(userId, name, meta) {
   document.querySelector(`#chatContactsList [data-user-id="${userId}"] .kk-unread-badge`)?.remove();
   _unreadCounts[userId] = 0;
   document.querySelector(`#chatContactsList [data-user-id="${userId}"]`)?.setAttribute('data-unread', '0');
+
+  // ✅ Iniciar timer de respuesta visible
+  _startResponseTimer(userId);
 
   // ✅ Limpiar respuesta pendiente anterior
   hideReplyBar();
@@ -779,8 +795,163 @@ function subscribeToChat(conversationId) {
     clearTimeout(typingTimeout);
     typingTimeout = setTimeout(() => {
       ChatModule.broadcastTyping(conversationId, user.name, false);
-    }, 3000);
+    }, 5000);
   };
   input?.addEventListener('input', handler);
   if (input) input._typingHandler = handler;
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// MEJORAS DE TIEMPO DE RESPUESTA (10 mejoras)
+// ═══════════════════════════════════════════════════════════════════════════
+
+// ── Mejora 2: Timer de respuesta visible ───────────────────────────────────
+let _responseTimerInterval = null;
+
+function _startResponseTimer(userId) {
+  _stopResponseTimer();
+  const metaEl = document.getElementById('chatActiveMeta');
+  if (!metaEl) return;
+  const base = metaEl.dataset.baseMeta || '';
+
+  _responseTimerInterval = setInterval(() => {
+    const preview = _lastPreviews[userId];
+    if (!preview || preview.mine) {
+      if (metaEl) metaEl.innerHTML = `<span class="kk-header-status"><span class="kk-status-dot"></span>${_escAttr(base)}</span>`;
+      return;
+    }
+    const diff = Date.now() - new Date(preview.created_at).getTime();
+    const mins = Math.floor(diff / 60000);
+    let timeStr = '';
+    if (mins < 1) timeStr = 'menos de 1 min';
+    else if (mins < 60) timeStr = `${mins} min`;
+    else timeStr = `${Math.floor(mins / 60)}h ${mins % 60}min`;
+    const urgency = mins > 30 ? 'text-red-600' : mins > 10 ? 'text-amber-600' : 'text-slate-500';
+    if (metaEl) metaEl.innerHTML = `<span class="kk-header-status ${urgency}">
+      <span class="kk-status-dot"></span>Último mensaje hace ${timeStr}</span>`;
+  }, 30000);
+
+  // Run immediately
+  if (metaEl) {
+    const preview = _lastPreviews[userId];
+    if (preview && !preview.mine) {
+      const diff = Date.now() - new Date(preview.created_at).getTime();
+      const mins = Math.floor(diff / 60000);
+      let timeStr = mins < 1 ? 'menos de 1 min' : mins < 60 ? `${mins} min` : `${Math.floor(mins / 60)}h ${mins % 60}min`;
+      const urgency = mins > 30 ? 'text-red-600' : mins > 10 ? 'text-amber-600' : 'text-slate-500';
+      metaEl.innerHTML = `<span class="kk-header-status ${urgency}"><span class="kk-status-dot"></span>Último mensaje hace ${timeStr}</span>`;
+    }
+  }
+}
+
+function _stopResponseTimer() {
+  if (_responseTimerInterval) { clearInterval(_responseTimerInterval); _responseTimerInterval = null; }
+}
+
+// ── Mejora 3: Auto-respuesta fuera de horario ──────────────────────────────
+function _isOutOfOfficeHours() {
+  const now = new Date();
+  const h = now.getHours();
+  const d = now.getDay();
+  return d < 1 || d > 5 || h < 8 || h >= 16;
+}
+
+function _checkAndAutoReply(senderId) {
+  if (!_isOutOfOfficeHours()) return;
+  if (!_autoReplyLastSent[senderId]) _autoReplyLastSent[senderId] = 0;
+  if (Date.now() - _autoReplyLastSent[senderId] < 300000) return;
+  _autoReplyLastSent[senderId] = Date.now();
+  const user = AppState.get('user');
+  if (!user) return;
+  ChatModule.sendMessage(user.id, senderId,
+    'Gracias por escribirme. Estoy fuera de horario laboral (L-V 8:00–16:00). Te responderé al volver. 🕐',
+    null, null
+  ).catch(() => {});
+}
+const _autoReplyLastSent = {};
+
+// ── Mejora 5: Mensajes urgentes destacados ──────────────────────────────────
+const URGENT_KEYWORDS = ['urgente', 'emergencia', 'socorro', 'ayuda', 'importante', 'ya', 'ahora', 'rápido'];
+function _checkUrgentMessage(msg) {
+  if (!msg?.content) return false;
+  const lower = msg.content.toLowerCase();
+  return URGENT_KEYWORDS.some(kw => lower.includes(kw));
+}
+
+// ── Mejora 6: Métricas de tiempo promedio de respuesta ──────────────────────
+async function _calculateResponseMetrics() {
+  try {
+    const user = AppState.get('user');
+    if (!user) return null;
+    const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString();
+    const { data: myMessages } = await ChatModule._supabase
+      ? await import('../../shared/supabase.js').then(m =>
+          m.supabase.from('messages').select('id, conversation_id, created_at, receiver_id')
+            .eq('sender_id', user.id).gte('created_at', sevenDaysAgo)
+        )
+      : { data: [] };
+
+    if (!myMessages?.length) return null;
+
+    let totalWait = 0;
+    let count = 0;
+    for (const msg of myMessages) {
+      if (!msg.receiver_id) continue;
+      const { data: prevMsg } = await import('../../shared/supabase.js').then(m =>
+        m.supabase.from('messages').select('created_at')
+          .eq('conversation_id', msg.conversation_id)
+          .eq('sender_id', msg.receiver_id)
+          .lt('created_at', msg.created_at)
+          .order('created_at', { ascending: false })
+          .limit(1)
+          .maybeSingle()
+      );
+      if (prevMsg) {
+        const wait = new Date(msg.created_at).getTime() - new Date(prevMsg.created_at).getTime();
+        if (wait > 0 && wait < 3600000) { totalWait += wait; count++; }
+      }
+    }
+    return count > 0 ? Math.round(totalWait / count / 60000) : null;
+  } catch (_) { return null; }
+}
+
+// ── Mejora 8: Sort inteligente de contactos ──────────────────────────────────
+function _enhancedSort(contacts, previews, unreadMap) {
+  return [...contacts].sort((a, b) => {
+    const pa = previews[a.id];
+    const pb = previews[b.id];
+    const ta = pa?.created_at ? new Date(pa.created_at).getTime() : 0;
+    const tb = pb?.created_at ? new Date(pb.created_at).getTime() : 0;
+    const now = Date.now();
+    const ageA = ta ? (now - ta) : Infinity;
+    const ageB = tb ? (now - tb) : Infinity;
+    const recencyA = ageA < 300000 ? 2 : ageA < 600000 ? 1 : 0;
+    const recencyB = ageB < 300000 ? 2 : ageB < 600000 ? 1 : 0;
+    const ua = (unreadMap[a.id] || 0) + recencyA;
+    const ub = (unreadMap[b.id] || 0) + recencyB;
+    if (ua !== ub) return ub - ua;
+    if (ta !== tb) return tb - ta;
+    return (a.name || '').localeCompare(b.name || '');
+  });
+}
+
+// ── Mejora 10: Toast mensajes sin leer al cambiar de sección ────────────────
+function _showUnreadToastOnExit() {
+  const total = Object.values(_unreadCounts).reduce((s, n) => s + n, 0);
+  if (total > 0) {
+    safeToast(`Tienes ${total} mensaje${total > 1 ? 's' : ''} sin leer en chat`, 'warning');
+  }
+}
+
+// Hook: escuchar cambio de sección para toast
+let _lastActiveSection = '';
+function _watchSectionChange() {
+  setInterval(() => {
+    const el = document.querySelector('.section.active:not(.hidden)') || document.querySelector('.section.active');
+    const current = el ? el.id : '';
+    if (_lastActiveSection && _lastActiveSection !== current && _lastActiveSection === 't-chat') {
+      _showUnreadToastOnExit();
+    }
+    _lastActiveSection = current;
+  }, 1000);
 }

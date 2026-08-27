@@ -18,6 +18,7 @@ import { UI } from './modules/ui.js';
 
 import { UIPremium } from '/js/shared/ui-premium.js';
 import { BackNavigation } from '/js/shared/back-navigation.js';
+import { loadFlags, isEnabled, onFlagsChange, MODULES } from '/js/shared/feature-flags.js';
 
 window.safeToast = UI.safeToast;
 const { safeToast, safeEscapeHTML, Modal } = UI;
@@ -156,7 +157,9 @@ window.App = {
   selectChatContact: ChatApp.selectChatContact,
   _quickReply: (text) => {
     const input = document.getElementById('chatMessageInput');
+    const sendBtn = document.getElementById('btnSendChatMessage');
     if (input) { input.value = text; input.focus(); input.dispatchEvent(new Event('input')); }
+    if (sendBtn) setTimeout(() => sendBtn.click(), 150);
   },
 
   // Permits
@@ -510,6 +513,11 @@ document.addEventListener('DOMContentLoaded', async () => {
     // 🔴 Sistema de badges por sección
     BadgeSystem.init(auth.user.id);
 
+    // ── Feature Flags: ocultar módulos desactivados por el admin ──
+    await loadFlags();
+    _applyModuleVisibility();
+    onFlagsChange(() => _applyModuleVisibility());
+
     // ✅ Mensaje entrante en tiempo real → refrescar badge total del chat
     window.addEventListener('karpus:message-received', (e) => {
       const msg = e.detail || {};
@@ -672,6 +680,9 @@ async function initDashboard() {
         </div>
       `).join('');
     }
+
+    // ✅ Card de mensajes sin responder
+    _renderUnreadMessagesCard();
 
     // Grid de Estudiantes (Tab)
     const classGrid = document.getElementById('classroomStudentsGrid');
@@ -838,6 +849,53 @@ window.App.sendAbsenceAlerts = async () => {
 };
 
 /**
+ * 🔧 Feature Flags: ocultar/mostrar módulos según configuración del admin
+ */
+function _applyModuleVisibility() {
+  const userId = AppState.get('user')?.id;
+  const role = 'maestra';
+
+  // Sidebar buttons: data-section → feature flag key mapping
+  const sidebarMap = {
+    't-chat':    'chat',
+    't-grades':  'grades',
+  };
+  Object.entries(sidebarMap).forEach(([sectionId, flagKey]) => {
+    const btn = document.querySelector(`button[data-section="${sectionId}"]`);
+    if (btn) {
+      const visible = isEnabled(flagKey, role, userId);
+      btn.style.display = visible ? '' : 'none';
+    }
+  });
+
+  // Class detail tabs: data-tab → feature flag key mapping
+  const tabMap = {
+    'feed':          'wall',
+    'daily-routine': 'routine',
+    'attendance':    'attendance_live',
+    'tasks':         'tasks',
+    'videocall':     'video_calls',
+  };
+  Object.entries(tabMap).forEach(([tabKey, flagKey]) => {
+    const btn = document.querySelector(`.class-tab-btn[data-tab="${tabKey}"]`);
+    if (btn) {
+      const visible = isEnabled(flagKey, role, userId);
+      btn.style.display = visible ? '' : 'none';
+    }
+  });
+
+  // If current section is hidden by flag, redirect to home
+  const currentSection = document.querySelector('.section.active');
+  if (currentSection) {
+    const sectionId = currentSection.id;
+    const flagForSection = sidebarMap[sectionId];
+    if (flagForSection && !isEnabled(flagForSection, role, userId)) {
+      window.App.setActiveSection?.('t-home');
+    }
+  }
+}
+
+/**
  * 🧭 Navegación
  */
 function initNavigation() {
@@ -850,6 +908,14 @@ function initNavigation() {
   const setActiveSection = (targetId, options = {}) => {
     const fullId = targetId.startsWith('t-') ? targetId : `t-${targetId}`;
     const cleanId = targetId.replace('t-', '');
+
+    // Feature Flags: block navigation to disabled modules
+    const userId = AppState.get('user')?.id;
+    const ffSidebarMap = { 't-chat': 'chat', 't-grades': 'grades' };
+    if (ffSidebarMap[fullId] && !isEnabled(ffSidebarMap[fullId], 'maestra', userId)) {
+      safeToast('Este módulo está desactivado.', 'warning');
+      return;
+    }
 
     Helpers.vibrate?.('light');
 
@@ -1075,6 +1141,10 @@ function initClassTabs(defaultTab = null) {
   const tabContents = document.querySelectorAll('.class-tab-content');
 
   const activateTab = (targetTab) => {
+    // Feature Flags: block disabled tabs
+    const ffTabMap = { 'feed': 'wall', 'daily-routine': 'routine', 'attendance': 'attendance_live', 'tasks': 'tasks', 'videocall': 'video_calls' };
+    if (ffTabMap[targetTab] && !isEnabled(ffTabMap[targetTab], 'maestra', AppState.get('user')?.id)) return;
+
     // 1. Resetear TODOS los botones
     tabBtns.forEach(b => {
       b.classList.remove('active', 'bg-orange-600', 'bg-orange-500', 'text-white', 'ring-4', 'ring-orange-100');
@@ -1154,7 +1224,12 @@ function initClassTabs(defaultTab = null) {
   }
 
   // Activar tab inicial
-  const tabToActivate = defaultTab || localStorage.getItem('maestra_last_tab') || 'feed';
+  let tabToActivate = defaultTab || localStorage.getItem('maestra_last_tab') || 'feed';
+  // If default tab is disabled by feature flags, fall back to first available tab
+  const ffTabMap = { 'feed': 'wall', 'daily-routine': 'routine', 'attendance': 'attendance_live', 'tasks': 'tasks', 'videocall': 'video_calls' };
+  if (ffTabMap[tabToActivate] && !isEnabled(ffTabMap[tabToActivate], 'maestra', AppState.get('user')?.id)) {
+    tabToActivate = 'feed';
+  }
   activateTab(tabToActivate);
 }
 
@@ -1501,6 +1576,44 @@ function _initMaestraQR(profile, user) {
   
   // Usar una API de QR externa o librería si está disponible
   container.innerHTML = `<img src="https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=${encodeURIComponent(qrData)}" class="mx-auto border-4 border-white shadow-lg rounded-2xl" alt="QR Maestra">`;
+}
+
+/**
+ * ✅ Card de mensajes sin responder — se muestra en el dashboard
+ */
+async function _renderUnreadMessagesCard() {
+  try {
+    const user = AppState.get('user');
+    if (!user) return;
+    const { count } = await supabase
+      .from('messages')
+      .select('id', { count: 'exact', head: true })
+      .eq('receiver_id', user.id)
+      .eq('is_read', false);
+    const total = count || 0;
+    if (total <= 0) return;
+
+    const grid = document.getElementById('classesGrid');
+    if (!grid) return;
+
+    const card = document.createElement('div');
+    card.className = 'col-span-full';
+    card.innerHTML = `
+      <div onclick="App.setActiveSection('t-chat')" class="p-5 bg-gradient-to-r from-rose-50 to-orange-50 rounded-[2rem] border-2 border-rose-200 shadow-sm hover:shadow-lg hover:border-rose-300 transition-all cursor-pointer flex items-center gap-4">
+        <div class="w-14 h-14 rounded-2xl bg-rose-500 text-white flex items-center justify-center shadow-lg">
+          <i data-lucide="message-square" class="w-7 h-7"></i>
+        </div>
+        <div class="flex-1 min-w-0">
+          <div class="font-black text-slate-800 text-lg">Tienes ${total} mensaje${total > 1 ? 's' : ''} sin leer</div>
+          <div class="text-xs font-bold text-rose-500 uppercase tracking-widest">De padres esperando respuesta</div>
+        </div>
+        <div class="shrink-0">
+          <i data-lucide="arrow-right" class="w-6 h-6 text-rose-400"></i>
+        </div>
+      </div>`;
+    grid.parentNode.insertBefore(card, grid.nextSibling);
+    if (window.lucide) window.lucide.createIcons();
+  } catch (_) {}
 }
 
 function initGrades() {

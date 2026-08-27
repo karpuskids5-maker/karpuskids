@@ -7,9 +7,8 @@
  *   - Escucha Supabase Realtime (canal propio, independiente del BadgeSystem).
  *   - Cola PERSISTENTE (localStorage por usuario): si el usuario recarga o
  *     estaba en otra sección, la novedad sigue ahí esperando ser vista.
- *   - Se muestra SOLO en el inicio/dashboard del panel (#home / #t-home /
- *     #dashboard). Vive DENTRO de la sección (flujo normal del documento):
- *     abre su espacio y empuja el contenido hacia abajo — nunca tapa nada.
+ *   - Se muestra SIEMPRE como banner sticky en la parte superior del contenido,
+ *     visible en todas las secciones del panel (no solo en el inicio).
  *   - Cada tarjeta: icono + título claro ("Ana te escribió", "Nueva tarea…",
  *     "Nuevo comprobante de pago") + hora. Clic → navega a la sección.
  *   - Tras 15 s sin interacción colapsa a una pastilla compacta con el
@@ -355,7 +354,7 @@ export const EventBanner = {
     this._render();
   },
 
-  // ── Visibilidad (solo en el inicio del panel) ─────────────────────────────
+  // ── Visibilidad (banner siempre visible en todas las secciones) ───────────
   _activeId() {
     const el = document.querySelector('.section.active:not(.hidden)') ||
                document.querySelector('.section.active');
@@ -365,14 +364,11 @@ export const EventBanner = {
   _startWatch() {
     if (this._watchTimer) return;
     this._watchTimer = setInterval(() => {
-      const on = this._activeId() === this._homeId;
-      const state = on ? 'on' : 'off';
-      if (state === this._lastState) return;
-      this._lastState = state;
+      if (!this._queue.length) return;
       this._render();
-    }, 500);
+    }, 2000);
     document.addEventListener('visibilitychange', () => {
-      if (!document.hidden) { this._lastState = ''; }
+      if (!document.hidden) { this._render(); }
     });
   },
 
@@ -397,15 +393,16 @@ export const EventBanner = {
   _render() {
     this._injectStyles();
     const bar = document.getElementById('kk-event-banner');
-    const onHome = this._lastState === 'on' || this._activeId() === this._homeId;
 
-    if (!onHome || !this._queue.length) {
+    if (!this._queue.length) {
       if (bar) bar.remove();
       clearTimeout(this._collapseTimer);
       return;
     }
 
-    const host = document.getElementById(this._homeId);
+    // Insertar en #layoutShell como primer hijo (sticky, visible en todas las secciones)
+    const host = document.getElementById('layoutShell') ||
+                 document.getElementById(this._homeId);
     if (!host) return;
     let el = bar;
     if (!el) {

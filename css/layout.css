@@ -37,7 +37,7 @@ html, body {
   .app-content-wrapper          { margin-left: 288px; height: 100dvh; overflow: hidden; }
   .panel-asistente-body
     .app-content-wrapper         { margin-left: 280px; }
-  .app-content-wrapper.sidebar-collapsed { margin-left: 90px; }
+  .app-content-wrapper.sidebar-collapsed { margin-left: 80px; }
 }
 
 /* Móvil: sin margin, sin overflow hidden */
@@ -110,7 +110,7 @@ body:not(.panel-padre-body) aside#sidebar::-webkit-scrollbar { display: none; }
 @media (max-width: 767px) {
   body:not(.panel-padre-body) aside#sidebar {
     transform: translateX(-100%);
-    width: 280px !important;
+    width: 260px !important;
   }
   body:not(.panel-padre-body) aside#sidebar.mobile-visible {
     transform: translateX(0) !important;
@@ -479,7 +479,13 @@ video.karpus-img-loading { background: #1e293b; }
 .kk-chat-item-time {
   flex-shrink: 0; font-size: 10px; font-weight: 700; color: #94a3b8;
 }
-.kk-chat-item.has-unread .kk-chat-item-name { color: #0f172a; }
+.kk-chat-item.has-unread {
+  background: rgba(239, 68, 68, 0.06);
+  border-left: 3px solid #ef4444;
+  padding-left: calc(0.6rem - 3px);
+}
+.kk-chat-item.has-unread .kk-chat-item-name { color: #0f172a; font-weight: 900; }
+.kk-chat-item.has-unread .kk-chat-item-preview { color: #334155; font-weight: 700; }
 .kk-chat-item-bottom {
   display: flex; align-items: center; justify-content: space-between; gap: 0.5rem;
   margin-top: 1px;

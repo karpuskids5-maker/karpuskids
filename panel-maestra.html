@@ -11,7 +11,6 @@
   <style>html{display:none;}</style>
   <!-- X-Frame-Options debe ser configurado por el servidor, no por meta tag -->
   <!-- NOSONAR Web:S7039 — unsafe-inline y wildcards requeridos por Supabase y OneSignal -->
-  <meta http-equiv="Content-Security-Policy" content="default-src 'self' https://*.supabase.co wss://*.supabase.co; script-src 'self' 'unsafe-inline' https://cdn.onesignal.com https://onesignal.com https://api.onesignal.com https://cdn.jsdelivr.net https://meet.jit.si; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com https://cdn.jsdelivr.net; img-src 'self' data: blob: https://*.supabase.co https://*.githubusercontent.com https://lh3.googleusercontent.com https://meet.jit.si https://api.qrserver.com; connect-src 'self' https://*.supabase.co wss://*.supabase.co https://cdn.onesignal.com https://onesignal.com https://api.onesignal.com https://fonts.googleapis.com https://fonts.gstatic.com https://cdn.jsdelivr.net https://meet.jit.si wss://meet.jit.si; frame-src 'self' blob: https://meet.jit.si; worker-src 'self' blob:; object-src 'none'; form-action 'self'; base-uri 'self';">
   <script>if(self===top){document.documentElement.style.display='block';}else{top.location=self.location;}</script>
   <title>Karpus Kids — Panel Maestra</title>
   <link rel="icon" href="logo/favicon.ico" type="image/x-icon">
@@ -28,14 +27,14 @@
        SIDEBAR
     ═══════════════════════════════════════════════ */
     aside#sidebar {
-      width: 280px;
+      width: 260px;
       transition: all .3s cubic-bezier(0.34, 1.56, 0.64, 1);
       overflow-y: auto;
       overflow-x: hidden;
       scrollbar-width: none;
     }
     aside#sidebar::-webkit-scrollbar { display: none; }
-    aside#sidebar.collapsed { width: 80px; }
+    aside#sidebar.collapsed { width: 70px; }
     aside#sidebar .label { transition: opacity .2s ease, visibility .2s; }
     aside#sidebar.collapsed .label { opacity: 0; visibility: hidden; pointer-events: none; width: 0; height: 0; position: absolute; }
     aside#sidebar nav i { transition: all .15s ease; }
@@ -56,15 +55,15 @@
     }
 
     @media (min-width: 769px) {
-      #layoutShell { margin-left: 280px; }
-      #layoutShell.sidebar-collapsed { margin-left: 80px !important; }
-      aside#sidebar.collapsed:hover { width: 280px; z-index: 60; }
+      #layoutShell { margin-left: 260px; }
+      #layoutShell.sidebar-collapsed { margin-left: 70px !important; }
+      aside#sidebar.collapsed:hover { width: 260px; z-index: 60; }
       aside#sidebar.collapsed:hover .label { opacity: 1; visibility: visible; position: static; width: auto; height: auto; }
     }
 
     @media (max-width: 768px) {
       #layoutShell { margin-left: 0 !important; }
-      aside#sidebar { transform: translateX(-100%); width: 280px !important; z-index: 100; }
+      aside#sidebar { transform: translateX(-100%); width: 260px !important; z-index: 100; }
       aside#sidebar.mobile-visible { transform: translateX(0); }
       aside#sidebar.collapsed .label { opacity: 1; visibility: visible; position: static; width: auto; height: auto; }
       #sidebarOverlay.visible { display: block; opacity: 1; }
@@ -86,8 +85,8 @@
     ═══════════════════════════════════════════════ */
     #classesGrid {
       display: grid;
-      grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
-      gap: 1.5rem;
+      grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+      gap: 0.75rem;
     }
     #classesGrid > div {
       position: relative;
@@ -97,23 +96,6 @@
       touch-action: manipulation;
       pointer-events: auto; /* ✅ FIX: asegurar eventos */
     }
-
-    /* ═══════════════════════════════════════════════
-       STAT BLOCKS
-    ═══════════════════════════════════════════════ */
-    .stat-block {
-      border-radius: 24px; padding: 1.5rem; color: white;
-      position: relative; overflow: hidden;
-      box-shadow: 0 10px 15px -3px rgba(0,0,0,0.1);
-      transition: transform 0.3s; border-bottom: 6px solid rgba(0,0,0,0.2);
-      min-height: 120px;
-    }
-    .stat-block:hover { transform: translateY(-6px); }
-    .stat-block i { opacity: 0.8; transform: rotate(-10deg); position: absolute; right: -10px; bottom: -10px; width: 80px; height: 80px; }
-    .sb-blue   { background: linear-gradient(135deg, #1E3A8A, #1E40AF); }
-    .sb-green  { background: linear-gradient(135deg, #16a34a, #15803d); }
-    .sb-orange { background: linear-gradient(135deg, #F97316, #C2410C); }
-    .sb-purple { background: linear-gradient(135deg, #7c3aed, #6d28d9); }
 
     /* ═══════════════════════════════════════════════
        TABS DE AULA — scroll horizontal sin romper body
@@ -252,10 +234,6 @@
     @media (max-width: 640px) {
       .nav-btn-toy { padding: 10px 14px; gap: 8px; font-size: 14px; }
       .nav-btn-toy i { width: 18px; height: 18px; }
-      .stat-block { padding: 12px; min-height: 100px; }
-      .stat-block h3 { font-size: 1.5rem; }
-      .stat-block p { font-size: 0.75rem; }
-      .stat-block i { width: 50px; height: 50px; }
       .notebook-paper { padding-left: 1.25rem; border-left-width: 3px; }
       .post-actions { flex-wrap: wrap; gap: 8px; }
       .post-actions button { flex: 1; min-width: 100px; justify-content: center; }
@@ -318,12 +296,12 @@
     /* Nav buttons */
     .nav-btn-toy {
       background: rgba(255,255,255,0.15); color: white;
-      border-radius: 14px; padding: 12px 18px; font-weight: 600;
-      transition: all .25s ease; display: flex; align-items: center; gap: 12px;
-      margin-bottom: 8px; cursor: pointer; -webkit-tap-highlight-color: transparent;
+      border-radius: 10px; padding: 9px 14px; font-weight: 600; font-size: 12px;
+      transition: all .25s ease; display: flex; align-items: center; gap: 10px;
+      cursor: pointer; -webkit-tap-highlight-color: transparent;
       touch-action: manipulation;
     }
-    .nav-btn-toy:hover { background: white; color: #F97316; transform: translateX(6px); }
+    .nav-btn-toy:hover { background: white; color: #F97316; transform: translateX(4px); }
 
     /* ═══════════════════════════════════════════════
        ROUTINE UI IMPROVEMENTS (Mobile First)
@@ -420,16 +398,16 @@
     #routineWrapper {
       max-width: 100%;
       overflow-x: hidden;
-      padding-bottom: 5rem;
+      padding-bottom: 3rem;
     }
     #routineWrapper > * { min-width: 0; max-width: 100%; }
     /* Fallback .space-y-5 (no existe en el Tailwind compilado) */
     #routineWrapper > * + * { margin-top: 1.25rem; }
 
     /* ── Timeline del Día: contenedor siempre dentro de pantalla ── */
-    #timelineContainer { max-width: 100%; min-width: 0; }
+    #timelineContainer { max-width: 100%; min-width: 0; display: none !important; }
     #timelineContainer .routine-section-toggle { min-width: 0; }
-    #timelineExpanded { min-width: 0; max-width: 100%; }
+    #timelineExpanded { min-width: 0; max-width: 100%; display: none !important; }
     /* Scroll interno garantizado (.max-h-[62vh]/.sm:max-h-[420px] no existen) */
     #timelineExpanded > div:first-child {
       max-height: min(62vh, 430px);
@@ -543,67 +521,66 @@
 <body class="bg-slate-50 text-slate-800 font-nunito panel-maestra-body" style="overflow-y:auto;overflow-x:hidden;">
   <div class="min-h-screen flex" style="overflow:visible;">
     <!-- SIDEBAR -->
-    <aside id="sidebar" class="bg-gradient-to-b from-orange-500 to-orange-700 shadow-2xl border-r-4 border-orange-300 p-4 fixed inset-y-0 left-0 z-50 rounded-r-3xl transition-transform duration-300">
-      <button id="toggleSidebar" class="absolute -right-3 top-6 bg-white rounded-full p-1 shadow-md border border-slate-100 text-slate-500 hover:text-orange-600 hidden md:block">
+    <aside id="sidebar" class="bg-gradient-to-b from-orange-500 to-orange-700 shadow-2xl border-r-4 border-orange-300 p-3 fixed inset-y-0 left-0 z-50 rounded-r-2xl transition-transform duration-300">
+      <button id="toggleSidebar" class="absolute -right-3 top-5 bg-white rounded-full p-1 shadow-md border border-slate-100 text-slate-500 hover:text-orange-600 hidden md:block">
         <i data-lucide="chevron-left" id="toggleSidebarIcon" class="w-4 h-4"></i>
       </button>
       
-      <div class="flex items-center gap-3 mb-6">
-        <div class="h-12 w-12 rounded-2xl bg-white flex items-center justify-center shadow-lg overflow-hidden shrink-0 border border-orange-200">
-          <img src="img/mundo.jpg" alt="logo" loading="eager" class="w-full h-full object-contain p-1.5" />
+      <div class="flex items-center gap-2.5 mb-4">
+        <div class="h-10 w-10 rounded-xl bg-white flex items-center justify-center shadow-lg overflow-hidden shrink-0 border border-orange-200">
+          <img src="img/mundo.jpg" alt="logo" loading="eager" class="w-full h-full object-contain p-1" />
         </div>
         <div class="label overflow-hidden">
-          <h3 class="font-black text-white text-lg tracking-tight drop-shadow-md karpus-kids-inline whitespace-nowrap">
+          <h3 class="font-black text-white text-base tracking-tight drop-shadow-md karpus-kids-inline whitespace-nowrap">
             <span class="k-1">K</span><span class="k-2">a</span><span class="k-3">r</span><span class="k-4">p</span><span class="k-5">u</span><span class="k-6">s</span> <span class="k-7">K</span><span class="k-8">i</span><span class="k-9">d</span><span class="k-10">s</span>
           </h3>
-          <p class="text-xs text-orange-100 font-bold truncate">Panel Maestra</p>
+          <p class="text-[10px] text-orange-100 font-bold truncate">Panel Maestra</p>
         </div>
       </div>
 
-      <!-- Perfil Debajo del Texto (Solicitado) -->
-      <div class="mb-6 px-2 flex items-center gap-3 bg-white/10 p-3 rounded-2xl backdrop-blur-sm border border-white/10">
-        <div class="w-10 h-10 rounded-full bg-white flex items-center justify-center text-orange-600 font-black shadow-md border-2 border-orange-200 overflow-hidden" id="sidebarAvatar">
-          <span class="text-lg">M</span>
+      <!-- Perfil -->
+      <div class="mb-4 px-2 flex items-center gap-2.5 bg-white/10 p-2 rounded-xl backdrop-blur-sm border border-white/10">
+        <div class="w-8 h-8 rounded-full bg-white flex items-center justify-center text-orange-600 font-black shadow-md border-2 border-orange-200 overflow-hidden" id="sidebarAvatar">
+          <span class="text-sm">M</span>
         </div>
-        <div class="label overflow-hidden">
-          <h3 class="text-sm font-bold text-white truncate user-name-display" id="sidebarName">Cargando...</h3>
-          <p class="text-[10px] text-orange-100 truncate user-email-display" id="sidebarEmail">...</p>
+        <div class="label overflow-hidden min-w-0">
+          <h3 class="text-xs font-bold text-white truncate user-name-display" id="sidebarName">Cargando...</h3>
+          <p class="text-[9px] text-orange-100 truncate user-email-display" id="sidebarEmail">...</p>
         </div>
       </div>
 
-      <nav class="space-y-2 p-2 mb-4 relative z-10">
+      <nav class="space-y-1 p-1.5 mb-3 relative z-10">
         <button data-section="t-home" class="nav-btn-toy w-full active relative" aria-selected="true">
-          <i data-lucide="home" class="w-5 h-5"></i>
+          <i data-lucide="home" class="w-4 h-4"></i>
           <span class="label">Mis Clases</span>
-          <span id="badge-t-home" class="hidden absolute -top-1.5 -right-1.5 min-w-[20px] h-5 px-1 bg-rose-500 text-white text-[9px] font-black rounded-full flex items-center justify-center shadow-md">0</span>
+          <span id="badge-t-home" class="hidden absolute -top-1 -right-1 min-w-[18px] h-[18px] px-1 bg-rose-500 text-white text-[8px] font-black rounded-full flex items-center justify-center shadow-md">0</span>
         </button>
         <button data-section="t-chat" class="nav-btn-toy w-full relative">
-          <i data-lucide="message-square" class="w-5 h-5"></i>
+          <i data-lucide="message-square" class="w-4 h-4"></i>
           <span class="label">Chat</span>
-          <span id="badge-t-chat" class="hidden absolute -top-1.5 -right-1.5 min-w-[20px] h-5 px-1 bg-rose-500 text-white text-[9px] font-black rounded-full flex items-center justify-center shadow-md">0</span>
+          <span id="badge-t-chat" class="hidden absolute -top-1 -right-1 min-w-[18px] h-[18px] px-1 bg-rose-500 text-white text-[8px] font-black rounded-full flex items-center justify-center shadow-md">0</span>
         </button>
         <button data-section="t-grades" class="nav-btn-toy w-full relative">
-          <i data-lucide="graduation-cap" class="w-5 h-5"></i>
+          <i data-lucide="graduation-cap" class="w-4 h-4"></i>
           <span class="label">Calificaciones</span>
-          <span id="badge-t-grades" class="hidden absolute -top-1.5 -right-1.5 min-w-[20px] h-5 px-1 bg-rose-500 text-white text-[9px] font-black rounded-full flex items-center justify-center shadow-md">0</span>
+          <span id="badge-t-grades" class="hidden absolute -top-1 -right-1 min-w-[18px] h-[18px] px-1 bg-rose-500 text-white text-[8px] font-black rounded-full flex items-center justify-center shadow-md">0</span>
         </button>
         <button data-section="t-permits" class="nav-btn-toy w-full relative">
-          <i data-lucide="calendar-off" class="w-5 h-5"></i>
+          <i data-lucide="calendar-off" class="w-4 h-4"></i>
           <span class="label">Mis Permisos</span>
         </button>
         <button data-section="t-profile" class="nav-btn-toy w-full">
-          <i data-lucide="user-circle" class="w-5 h-5"></i>
+          <i data-lucide="user-circle" class="w-4 h-4"></i>
           <span class="label">Mi Perfil</span>
         </button>
         <button id="logoutBtn" class="nav-btn-toy w-full">
-          <i data-lucide="log-out" class="w-5 h-5"></i>
+          <i data-lucide="log-out" class="w-4 h-4"></i>
           <span class="label">Cerrar sesión</span>
         </button>
       </nav>
 
-      <!-- Icono Grande Decorativo (Lápiz) -->
       <div class="absolute bottom-4 right-4 opacity-20 pointer-events-none transform -rotate-12">
-        <i data-lucide="pencil" class="w-32 h-32 text-white"></i>
+        <i data-lucide="pencil" class="w-24 h-24 text-white"></i>
       </div>
     </aside>
 
@@ -619,137 +596,111 @@
 
     <!-- MAIN -->
     <main class="flex-1 transition-all duration-300" id="layoutShell">
-      <!-- HEADER STICKY MÓVIL — igual que panel asistente -->
+      <!-- HEADER STICKY MÓVIL -->
       <header class="header md:hidden">
         <button
-          class="menu-btn-mobile p-2.5 rounded-xl bg-white shadow-sm border border-slate-100 text-slate-600 hover:bg-orange-50 hover:text-orange-600 transition-colors active:scale-95"
+          class="menu-btn-mobile p-2 rounded-xl bg-white shadow-sm border border-slate-100 text-slate-600 hover:bg-orange-50 hover:text-orange-600 transition-colors active:scale-95"
           aria-label="Abrir menú"
           style="position:relative;z-index:200;">
-          <i data-lucide="menu" class="w-5 h-5"></i>
+          <i data-lucide="menu" class="w-4 h-4"></i>
         </button>
-        <span class="text-xs font-semibold text-slate-400 uppercase tracking-widest ml-2">Panel Maestra</span>
+        <span class="text-[10px] font-semibold text-slate-400 uppercase tracking-widest ml-1.5">Panel Maestra</span>
       </header>
 
       <!-- CONTENIDO SCROLLABLE -->
-      <div class="p-2 sm:p-4 md:p-6 pb-24 md:pb-6" style="overflow-x:hidden;">
+      <div class="p-2 md:p-4 pb-20 md:pb-4" style="overflow-x:hidden;">
 
       <!-- SECTION: HOME (Mis Clases) -->
       <section id="t-home" class="section active">
-        <header class="mb-6">
-          <h1 class="text-2xl md:text-3xl font-black text-slate-800 flex flex-wrap items-center gap-2">
+        <header class="mb-4">
+          <h1 class="text-xl md:text-2xl font-black text-slate-800 flex items-center gap-2">
             <span>🧑‍🏫</span> <span>Hola, <span class="user-name-display text-orange-600">Maestra</span>!</span>
           </h1>
-          <p class="text-slate-500 font-medium">¡Listo para un día lleno de aprendizaje!</p>
+          <p class="text-slate-500 text-sm font-medium">¡Listo para aprender hoy!</p>
         </header>
 
-        <!-- Top Cards (Bloques) -->
-        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
-          <div class="stat-block sb-blue">
-            <h3 class="text-3xl font-black" id="statClasses">-</h3>
-            <p class="font-bold text-blue-100">Mis Clases</p>
-            <i data-lucide="library"></i>
-          </div>
-          <div class="stat-block sb-green">
-            <h3 class="text-3xl font-black" id="statStudents">-</h3>
-            <p class="font-bold text-white/80">Total Alumnos</p>
-            <i data-lucide="users"></i>
-          </div>
-          <div class="stat-block sb-orange">
-            <h3 class="text-3xl font-black" id="statIncidents">-</h3>
-            <p class="font-bold text-white/80">Incidentes Hoy</p>
-            <i data-lucide="alert-circle"></i>
-          </div>
-          <div class="stat-block sb-purple">
-            <h3 class="text-3xl font-black" id="statPresent">-</h3>
-            <p class="font-bold text-white/80">Asistencia Hoy</p>
-            <i data-lucide="calendar-check"></i>
-          </div>
-        </div>
-
-        <!-- 🚀 NUEVOS WIDGETS DE AUTOMATIZACIÓN -->
-        <div class="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-8">
+        <!-- 🚀 WIDGETS DE AUTOMATIZACIÓN -->
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-3 mb-4">
           <!-- Widget: Actividad Próxima -->
-          <div id="nextActivityWidget" class="lg:col-span-2 bg-white rounded-[2.5rem] p-6 border border-slate-100 shadow-sm flex flex-col md:flex-row items-center gap-6">
-            <div class="w-20 h-20 bg-orange-100 text-orange-600 rounded-[2rem] flex items-center justify-center shrink-0 animate-bounce-subtle">
-              <i data-lucide="clock" class="w-10 h-10"></i>
+          <div id="nextActivityWidget" class="md:col-span-2 bg-white rounded-2xl p-4 border border-slate-100 shadow-sm flex items-center gap-4">
+            <div class="w-12 h-12 bg-orange-100 text-orange-600 rounded-xl flex items-center justify-center shrink-0">
+              <i data-lucide="clock" class="w-6 h-6"></i>
             </div>
-            <div class="text-center md:text-left flex-1">
-              <p class="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] mb-1">Actividad en curso / Próxima</p>
-              <h4 id="nextActivityTitle" class="text-xl font-black text-slate-800">Cargando horario...</h4>
-              <p id="nextActivityTime" class="text-sm font-bold text-orange-500 mt-1">--:--</p>
+            <div class="flex-1 min-w-0">
+              <p class="text-[9px] font-black text-slate-400 uppercase tracking-widest">Próxima actividad</p>
+              <h4 id="nextActivityTitle" class="text-sm font-black text-slate-800 truncate">Cargando...</h4>
+              <p id="nextActivityTime" class="text-xs font-bold text-orange-500">--:--</p>
             </div>
-            <button onclick="App.navigateTo('t-home', 'daily-routine')" class="px-6 py-3 bg-slate-50 hover:bg-orange-50 text-slate-600 hover:text-orange-600 rounded-2xl font-black text-[10px] uppercase tracking-widest transition-all border border-slate-100">Ver Rutina</button>
+            <button onclick="App.navigateTo('t-home', 'daily-routine')" class="px-3 py-1.5 bg-slate-50 hover:bg-orange-50 text-slate-600 hover:text-orange-600 rounded-lg font-black text-[9px] uppercase tracking-widest transition-all border border-slate-100 shrink-0">Ver Rutina</button>
           </div>
 
           <!-- Widget: Alerta de Ponche -->
-          <div id="punchAlertWidget" class="bg-rose-50 border border-rose-100 rounded-[2.5rem] p-6 flex flex-col justify-center hidden">
-            <div class="flex items-center gap-4 mb-3">
-              <div class="w-10 h-10 bg-rose-500 text-white rounded-xl flex items-center justify-center shadow-lg shadow-rose-200">
-                <i data-lucide="user-minus" class="w-5 h-5"></i>
+          <div id="punchAlertWidget" class="bg-rose-50 border border-rose-100 rounded-2xl p-4 flex flex-col justify-center hidden">
+            <div class="flex items-center gap-3 mb-2">
+              <div class="w-8 h-8 bg-rose-500 text-white rounded-lg flex items-center justify-center shadow-sm">
+                <i data-lucide="user-minus" class="w-4 h-4"></i>
               </div>
-              <h4 class="font-black text-rose-900 text-sm uppercase tracking-tighter">Faltan por Ponchar</h4>
+              <h4 class="font-black text-rose-900 text-xs uppercase tracking-tight">Faltan Ponchar</h4>
             </div>
-            <p id="punchAlertText" class="text-xs font-bold text-rose-700/80 mb-4">3 niños aún no han marcado entrada hoy.</p>
-            <button onclick="App.sendAbsenceAlerts()" class="w-full py-3 bg-white text-rose-600 rounded-xl font-black text-[10px] uppercase tracking-widest shadow-sm hover:shadow-md transition-all active:scale-95">Enviar Avisos</button>
+            <p id="punchAlertText" class="text-[11px] font-bold text-rose-700/80 mb-3">3 niños sin marcar.</p>
+            <button onclick="App.sendAbsenceAlerts()" class="w-full py-2 bg-white text-rose-600 rounded-lg font-black text-[9px] uppercase tracking-widest shadow-sm hover:shadow-md transition-all active:scale-95">Enviar Avisos</button>
           </div>
 
           <!-- Widget: Tareas por Calificar -->
-          <div id="tasksToGradeWidget" class="bg-indigo-50 border border-indigo-100 rounded-[2.5rem] p-6 flex flex-col justify-center hidden">
-            <div class="flex items-center gap-4 mb-3">
-              <div class="w-10 h-10 bg-indigo-500 text-white rounded-xl flex items-center justify-center shadow-lg shadow-indigo-200">
-                <i data-lucide="award" class="w-5 h-5"></i>
+          <div id="tasksToGradeWidget" class="bg-indigo-50 border border-indigo-100 rounded-2xl p-4 flex flex-col justify-center hidden">
+            <div class="flex items-center gap-3 mb-2">
+              <div class="w-8 h-8 bg-indigo-500 text-white rounded-lg flex items-center justify-center shadow-sm">
+                <i data-lucide="award" class="w-4 h-4"></i>
               </div>
-              <h4 class="font-black text-indigo-900 text-sm uppercase tracking-tighter">Tareas por Calificar</h4>
+              <h4 class="font-black text-indigo-900 text-xs uppercase tracking-tight">Tareas por Calificar</h4>
             </div>
-            <p id="tasksToGradeText" class="text-xs font-bold text-indigo-700/80 mb-4">Tienes 5 entregas pendientes de revisar.</p>
-            <button onclick="App.navigateTo('t-home', 'tasks')" class="w-full py-3 bg-white text-indigo-600 rounded-xl font-black text-[10px] uppercase tracking-widest shadow-sm hover:shadow-md transition-all active:scale-95">Ir a Tareas</button>
+            <p id="tasksToGradeText" class="text-[11px] font-bold text-indigo-700/80 mb-3">5 entregas pendientes.</p>
+            <button onclick="App.navigateTo('t-home', 'tasks')" class="w-full py-2 bg-white text-indigo-600 rounded-lg font-black text-[9px] uppercase tracking-widest shadow-sm hover:shadow-md transition-all active:scale-95">Ir a Tareas</button>
           </div>
         </div>
         
-        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6" id="classesGrid">
+        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3" id="classesGrid">
           <!-- Cargando... -->
-          <div class="col-span-full py-12 text-center text-slate-500">Cargando aulas...</div>
+          <div class="col-span-full py-8 text-center text-slate-500">Cargando aulas...</div>
         </div>
       </section>
 
       <!-- SECTION: CLASS DETAIL (Detalle de Aula) -->
       <section id="t-class-detail" class="section">
-        <header class="mb-4 flex items-center gap-4">
-          <button id="backToClasses" class="p-2 hover:bg-slate-100 rounded-full transition-colors text-slate-600 shrink-0">
-            <i data-lucide="arrow-left" class="w-6 h-6"></i>
+        <header class="mb-3 flex items-center gap-3">
+          <button id="backToClasses" class="p-1.5 hover:bg-slate-100 rounded-full transition-colors text-slate-600 shrink-0">
+            <i data-lucide="arrow-left" class="w-5 h-5"></i>
           </button>
           <div class="min-w-0 flex-1">
-            <h1 class="text-xl md:text-2xl font-bold text-slate-800 truncate" id="currentClassName">Nombre del Aula</h1>
-            <p class="text-sm text-slate-500" id="class-detail-subtitle">Vista detallada</p>
+            <h1 class="text-lg md:text-xl font-bold text-slate-800 truncate" id="currentClassName">Aula</h1>
+            <p class="text-xs text-slate-500" id="class-detail-subtitle">Vista detallada</p>
           </div>
-          <div class="flex gap-2 shrink-0">
-            <button id="btnGenerateReport" onclick="App.openDailyReport()" class="flex items-center gap-2 px-4 py-2 bg-orange-100 border border-orange-200 rounded-xl text-sm font-bold text-orange-700 hover:bg-orange-200 transition-colors">
-              <i data-lucide="clipboard-list" class="w-4 h-4"></i>
-              <span class="hidden sm:inline">Reporte</span>
-            </button>
-          </div>
+          <button id="btnGenerateReport" onclick="App.openDailyReport()" class="flex items-center gap-1.5 px-3 py-1.5 bg-orange-100 border border-orange-200 rounded-lg text-xs font-bold text-orange-700 hover:bg-orange-200 transition-colors shrink-0">
+            <i data-lucide="clipboard-list" class="w-3.5 h-3.5"></i>
+            <span class="hidden sm:inline">Reporte</span>
+          </button>
         </header>
 
         <!-- Tabs — scrollable chip bar (mobile & desktop) -->
-        <div class="mb-3">
-          <div class="flex gap-1.5 overflow-x-auto pb-1" style="scrollbar-width:none;-webkit-overflow-scrolling:touch;" id="classTabsBar">
-            <button class="class-tab-btn active shrink-0 flex items-center gap-1.5 px-3 py-2 rounded-xl font-black text-[10px] uppercase tracking-wider bg-orange-600 text-white shadow-sm transition-all active:scale-95" data-tab="feed">
-              <i data-lucide="layout" class="w-3.5 h-3.5 shrink-0"></i><span>Muro</span>
+        <div class="mb-2">
+          <div class="flex gap-1 overflow-x-auto pb-1" style="scrollbar-width:none;-webkit-overflow-scrolling:touch;" id="classTabsBar">
+            <button class="class-tab-btn active shrink-0 flex items-center gap-1 px-2.5 py-1.5 rounded-lg font-black text-[9px] uppercase tracking-wider bg-orange-600 text-white shadow-sm transition-all active:scale-95" data-tab="feed">
+              <i data-lucide="layout" class="w-3 h-3 shrink-0"></i><span>Muro</span>
             </button>
-            <button class="class-tab-btn shrink-0 flex items-center gap-1.5 px-3 py-2 rounded-xl font-black text-[10px] uppercase tracking-wider bg-slate-100 text-slate-600 hover:bg-orange-50 hover:text-orange-600 transition-all active:scale-95" data-tab="daily-routine">
-              <i data-lucide="clipboard-list" class="w-3.5 h-3.5 shrink-0"></i><span>Rutina</span>
+            <button class="class-tab-btn shrink-0 flex items-center gap-1 px-2.5 py-1.5 rounded-lg font-black text-[9px] uppercase tracking-wider bg-slate-100 text-slate-600 hover:bg-orange-50 hover:text-orange-600 transition-all active:scale-95" data-tab="daily-routine">
+              <i data-lucide="clipboard-list" class="w-3 h-3 shrink-0"></i><span>Rutina</span>
             </button>
-            <button class="class-tab-btn shrink-0 flex items-center gap-1.5 px-3 py-2 rounded-xl font-black text-[10px] uppercase tracking-wider bg-slate-100 text-slate-600 hover:bg-orange-50 hover:text-orange-600 transition-all active:scale-95" data-tab="students">
-              <i data-lucide="users" class="w-3.5 h-3.5 shrink-0"></i><span>Alumnos</span>
+            <button class="class-tab-btn shrink-0 flex items-center gap-1 px-2.5 py-1.5 rounded-lg font-black text-[9px] uppercase tracking-wider bg-slate-100 text-slate-600 hover:bg-orange-50 hover:text-orange-600 transition-all active:scale-95" data-tab="students">
+              <i data-lucide="users" class="w-3 h-3 shrink-0"></i><span>Alumnos</span>
             </button>
-            <button class="class-tab-btn shrink-0 flex items-center gap-1.5 px-3 py-2 rounded-xl font-black text-[10px] uppercase tracking-wider bg-slate-100 text-slate-600 hover:bg-orange-50 hover:text-orange-600 transition-all active:scale-95" data-tab="attendance">
-              <i data-lucide="calendar-check" class="w-3.5 h-3.5 shrink-0"></i><span>Asistencia</span>
+            <button class="class-tab-btn shrink-0 flex items-center gap-1 px-2.5 py-1.5 rounded-lg font-black text-[9px] uppercase tracking-wider bg-slate-100 text-slate-600 hover:bg-orange-50 hover:text-orange-600 transition-all active:scale-95" data-tab="attendance">
+              <i data-lucide="calendar-check" class="w-3 h-3 shrink-0"></i><span>Asistencia</span>
             </button>
-            <button class="class-tab-btn shrink-0 flex items-center gap-1.5 px-3 py-2 rounded-xl font-black text-[10px] uppercase tracking-wider bg-slate-100 text-slate-600 hover:bg-orange-50 hover:text-orange-600 transition-all active:scale-95" data-tab="tasks">
-              <i data-lucide="backpack" class="w-3.5 h-3.5 shrink-0"></i><span>Tareas</span>
+            <button class="class-tab-btn shrink-0 flex items-center gap-1 px-2.5 py-1.5 rounded-lg font-black text-[9px] uppercase tracking-wider bg-slate-100 text-slate-600 hover:bg-orange-50 hover:text-orange-600 transition-all active:scale-95" data-tab="tasks">
+              <i data-lucide="backpack" class="w-3 h-3 shrink-0"></i><span>Tareas</span>
             </button>
-            <button class="class-tab-btn shrink-0 flex items-center gap-1.5 px-3 py-2 rounded-xl font-black text-[10px] uppercase tracking-wider bg-slate-100 text-slate-600 hover:bg-orange-50 hover:text-orange-600 transition-all active:scale-95" data-tab="videocall">
-              <i data-lucide="video" class="w-3.5 h-3.5 shrink-0"></i><span>Video</span>
+            <button class="class-tab-btn shrink-0 flex items-center gap-1 px-2.5 py-1.5 rounded-lg font-black text-[9px] uppercase tracking-wider bg-slate-100 text-slate-600 hover:bg-orange-50 hover:text-orange-600 transition-all active:scale-95" data-tab="videocall">
+              <i data-lucide="video" class="w-3 h-3 shrink-0"></i><span>Video</span>
             </button>
           </div>
         </div>
@@ -800,9 +751,9 @@
 
       <!-- SECTION: CHAT UNIFICADO -->
       <section id="t-chat" class="section">
-        <header class="mb-4">
-          <h1 class="text-2xl font-black text-slate-800">Centro de Comunicación</h1>
-          <p class="text-slate-500 text-sm font-medium">Habla con padres y dirección en tiempo real.</p>
+        <header class="mb-3">
+          <h1 class="text-xl font-black text-slate-800">Centro de Comunicación</h1>
+          <p class="text-slate-500 text-xs font-medium">Habla con padres y dirección en tiempo real.</p>
         </header>
 
         <div class="chat-shell">
@@ -817,9 +768,7 @@
               </div>
               <div class="flex gap-1.5 mt-2" id="chatFilterChips">
                 <button data-filter="all" class="chatFilterChip px-2 py-0.5 text-[9px] font-bold bg-orange-100 text-orange-700 rounded-lg transition-all">Todos</button>
-                <button data-filter="unread" class="chatFilterChip px-2 py-0.5 text-[9px] font-bold bg-slate-100 text-slate-500 rounded-lg transition-all">Sin leer</button>
                 <button data-filter="parents" class="chatFilterChip px-2 py-0.5 text-[9px] font-bold bg-slate-100 text-slate-500 rounded-lg transition-all">Padres</button>
-                <button data-filter="staff" class="chatFilterChip px-2 py-0.5 text-[9px] font-bold bg-slate-100 text-slate-500 rounded-lg transition-all">Equipo</button>
               </div>
             </div>
             <div id="chatContactsList" class="flex-1 overflow-y-auto p-2 space-y-1" style="-webkit-overflow-scrolling:touch;">
@@ -888,59 +837,59 @@
 
       <!-- SECTION: PERMISOS Y FALTAS (MAESTRA) -->
       <section id="t-permits" class="section">
-        <header class="mb-6">
-          <h1 class="text-2xl md:text-3xl font-black text-slate-800 flex items-center gap-3">
-            <span class="p-2 bg-emerald-100 text-emerald-600 rounded-2xl"><i data-lucide="calendar-off" class="w-6 h-6"></i></span>
+        <header class="mb-4">
+          <h1 class="text-xl md:text-2xl font-black text-slate-800 flex items-center gap-2">
+            <span class="p-1.5 bg-emerald-100 text-emerald-600 rounded-lg"><i data-lucide="calendar-off" class="w-5 h-5"></i></span>
             Mis Permisos y Faltas
           </h1>
-          <p class="text-slate-500 font-medium">Solicita permisos y revisa tu historial de ausencias</p>
+          <p class="text-slate-500 text-sm font-medium">Solicita permisos y revisa tu historial</p>
         </header>
 
-        <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        <div class="grid grid-cols-1 lg:grid-cols-3 gap-4">
           <!-- Formulario de Solicitud -->
-          <div class="bg-white p-6 rounded-[2.5rem] border border-slate-100 shadow-sm">
-            <h3 class="text-lg font-black text-slate-800 mb-4">Nueva Solicitud</h3>
-            <form id="formRequestPermit" class="space-y-4">
+          <div class="bg-white p-4 rounded-2xl border border-slate-100 shadow-sm">
+            <h3 class="text-sm font-black text-slate-800 mb-3">Nueva Solicitud</h3>
+            <form id="formRequestPermit" class="space-y-3">
               <div>
-                <label class="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1.5 ml-1">Tipo de Permiso</label>
-                <select id="permitType" required class="w-full px-4 py-3 bg-slate-50 border-2 border-slate-50 rounded-2xl outline-none focus:border-emerald-400 focus:bg-white transition-all text-sm font-bold">
+                <label class="block text-[9px] font-black text-slate-400 uppercase tracking-widest mb-1 ml-1">Tipo de Permiso</label>
+                <select id="permitType" required class="w-full px-3 py-2 bg-slate-50 border-2 border-slate-50 rounded-xl outline-none focus:border-emerald-400 focus:bg-white transition-all text-xs font-bold">
                   <option value="permission">Permiso Personal</option>
-                  <option value="medical">Cita / Permiso M\u00e9dico</option>
+                  <option value="medical">Cita / Permiso Médico</option>
                   <option value="absence">Inasistencia</option>
                   <option value="other">Otro</option>
                 </select>
               </div>
-              <div class="grid grid-cols-2 gap-4">
+              <div class="grid grid-cols-2 gap-3">
                 <div>
-                  <label class="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1.5 ml-1">Desde</label>
-                  <input type="date" id="permitStart" required class="w-full px-4 py-3 bg-slate-50 border-2 border-slate-50 rounded-2xl outline-none focus:border-emerald-400 focus:bg-white transition-all text-sm font-bold">
+                  <label class="block text-[9px] font-black text-slate-400 uppercase tracking-widest mb-1 ml-1">Desde</label>
+                  <input type="date" id="permitStart" required class="w-full px-3 py-2 bg-slate-50 border-2 border-slate-50 rounded-xl outline-none focus:border-emerald-400 focus:bg-white transition-all text-xs font-bold">
                 </div>
                 <div>
-                  <label class="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1.5 ml-1">Hasta</label>
-                  <input type="date" id="permitEnd" required class="w-full px-4 py-3 bg-slate-50 border-2 border-slate-50 rounded-2xl outline-none focus:border-emerald-400 focus:bg-white transition-all text-sm font-bold">
+                  <label class="block text-[9px] font-black text-slate-400 uppercase tracking-widest mb-1 ml-1">Hasta</label>
+                  <input type="date" id="permitEnd" required class="w-full px-3 py-2 bg-slate-50 border-2 border-slate-50 rounded-xl outline-none focus:border-emerald-400 focus:bg-white transition-all text-xs font-bold">
                 </div>
               </div>
               <div>
-                <label class="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1.5 ml-1">Motivo / Raz\u00f3n</label>
-                <textarea id="permitReason" required rows="3" placeholder="Explique brevemente el motivo..." class="w-full px-4 py-3 bg-slate-50 border-2 border-slate-50 rounded-2xl outline-none focus:border-emerald-400 focus:bg-white transition-all text-sm font-bold resize-none"></textarea>
+                <label class="block text-[9px] font-black text-slate-400 uppercase tracking-widest mb-1 ml-1">Motivo / Razón</label>
+                <textarea id="permitReason" required rows="2" placeholder="Explique brevemente..." class="w-full px-3 py-2 bg-slate-50 border-2 border-slate-50 rounded-xl outline-none focus:border-emerald-400 focus:bg-white transition-all text-xs font-bold resize-none"></textarea>
               </div>
-              <button type="submit" class="w-full py-4 bg-emerald-600 text-white rounded-2xl font-black text-xs uppercase tracking-widest shadow-lg shadow-emerald-100 hover:bg-emerald-700 active:scale-95 transition-all flex items-center justify-center gap-2">
-                <i data-lucide="send" class="w-4 h-4"></i> Enviar Solicitud
+              <button type="submit" class="w-full py-2.5 bg-emerald-600 text-white rounded-xl font-black text-[10px] uppercase tracking-widest shadow-lg shadow-emerald-100 hover:bg-emerald-700 active:scale-95 transition-all flex items-center justify-center gap-2">
+                <i data-lucide="send" class="w-3.5 h-3.5"></i> Enviar Solicitud
               </button>
             </form>
           </div>
 
           <!-- Historial -->
-          <div class="lg:col-span-2 bg-white p-6 rounded-[2.5rem] border border-slate-100 shadow-sm">
-            <h3 class="text-lg font-black text-slate-800 mb-4">Mi Historial</h3>
+          <div class="lg:col-span-2 bg-white p-4 rounded-2xl border border-slate-100 shadow-sm">
+            <h3 class="text-sm font-black text-slate-800 mb-3">Mi Historial</h3>
             <div style="width:100%;overflow-x:auto;-webkit-overflow-scrolling:touch;">
-              <table style="min-width:360px;" class="w-full text-left">
+              <table style="min-width:320px;" class="w-full text-left">
                 <thead>
                   <tr class="text-slate-400 border-b border-slate-50">
-                    <th class="px-4 py-3 text-[10px] font-black uppercase tracking-widest whitespace-nowrap">Tipo</th>
-                    <th class="px-4 py-3 text-[10px] font-black uppercase tracking-widest whitespace-nowrap">Fecha inicio</th>
-                    <th class="px-4 py-3 text-[10px] font-black uppercase tracking-widest whitespace-nowrap">Fecha fin</th>
-                    <th class="px-4 py-3 text-[10px] font-black uppercase tracking-widest whitespace-nowrap text-center">Estado</th>
+                    <th class="px-3 py-2 text-[9px] font-black uppercase tracking-widest whitespace-nowrap">Tipo</th>
+                    <th class="px-3 py-2 text-[9px] font-black uppercase tracking-widest whitespace-nowrap">Desde</th>
+                    <th class="px-3 py-2 text-[9px] font-black uppercase tracking-widest whitespace-nowrap">Hasta</th>
+                    <th class="px-3 py-2 text-[9px] font-black uppercase tracking-widest whitespace-nowrap text-center">Estado</th>
                   </tr>
                 </thead>
                 <tbody id="my-permits-table-body" class="divide-y divide-slate-50">
@@ -953,94 +902,94 @@
       </section>
 
       <!-- SECTION: PROFILE -->
-      <section id="t-profile" class="section pt-14 md:pt-0 pb-8">
+      <section id="t-profile" class="section pt-10 md:pt-0 pb-6">
         <div id="notifPermissionSlot"></div>
-        <header class="mb-6">
-          <h1 class="text-2xl font-bold text-slate-800">Mi Perfil Docente</h1>
-          <p class="text-slate-500">Gestiona tu información personal y presentación.</p>
+        <header class="mb-4">
+          <h1 class="text-xl font-bold text-slate-800">Mi Perfil Docente</h1>
+          <p class="text-slate-500 text-sm">Gestiona tu información personal.</p>
         </header>
         
-        <div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
+        <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
           <!-- Tarjeta de Identidad (Izquierda) -->
           <div class="lg:col-span-1">
-            <div class="bg-white rounded-3xl shadow-sm border border-orange-100 p-6 text-center relative">
-              <div class="absolute top-0 left-0 w-full h-24 bg-gradient-to-br from-orange-400 to-red-500"></div>
+            <div class="bg-white rounded-2xl shadow-sm border border-orange-100 p-4 text-center relative">
+              <div class="absolute top-0 left-0 w-full h-16 bg-gradient-to-br from-orange-400 to-red-500 rounded-t-2xl"></div>
               
-              <div class="relative z-10 mt-8 mb-4">
-                <div class="w-32 h-32 mx-auto bg-white rounded-full p-1 shadow-lg relative group cursor-pointer">
-                  <div id="profileAvatar" class="w-full h-full rounded-full flex items-center justify-center font-black text-3xl text-orange-600 bg-orange-50 overflow-hidden"></div>
+              <div class="relative z-10 mt-6 mb-3">
+                <div class="w-24 h-24 mx-auto bg-white rounded-full p-1 shadow-lg relative group cursor-pointer">
+                  <div id="profileAvatar" class="w-full h-full rounded-full flex items-center justify-center font-black text-2xl text-orange-600 bg-orange-50 overflow-hidden"></div>
                   <div class="absolute inset-0 bg-black/30 rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
-                    <i data-lucide="camera" class="text-white w-8 h-8"></i>
+                    <i data-lucide="camera" class="text-white w-6 h-6"></i>
                   </div>
                   <input type="file" id="profileAvatarInput" accept="image/*" class="absolute inset-0 opacity-0 cursor-pointer">
                 </div>
               </div>
               
-              <h2 class="text-xl font-black text-slate-800 user-name-display">Maestra</h2>
-              <p class="text-sm font-bold text-orange-500 mb-4">Docente Titular</p>
+              <h2 class="text-lg font-black text-slate-800 user-name-display">Maestra</h2>
+              <p class="text-xs font-bold text-orange-500 mb-3">Docente Titular</p>
               
-              <div class="flex justify-center gap-2 mb-6">
-                <span class="px-3 py-1 bg-orange-50 text-orange-700 rounded-full text-xs font-bold">Karpus Kids</span>
-                <span class="px-3 py-1 bg-blue-50 text-blue-700 rounded-full text-xs font-bold">Verificado</span>
+              <div class="flex justify-center gap-2 mb-4">
+                <span class="px-2 py-0.5 bg-orange-50 text-orange-700 rounded-full text-[10px] font-bold">Karpus Kids</span>
+                <span class="px-2 py-0.5 bg-blue-50 text-blue-700 rounded-full text-[10px] font-bold">Verificado</span>
               </div>
             </div>
           </div>
 
           <!-- Formulario de Edición (Derecha) -->
           <div class="lg:col-span-2">
-            <div class="bg-white rounded-3xl shadow-sm border border-slate-100 p-4 md:p-8">
-              <h3 class="font-bold text-lg text-slate-800 mb-6 flex items-center gap-2">
-                <i data-lucide="user-cog" class="text-orange-500"></i> Editar Información
+            <div class="bg-white rounded-2xl shadow-sm border border-slate-100 p-4 md:p-6">
+              <h3 class="font-bold text-sm text-slate-800 mb-4 flex items-center gap-2">
+                <i data-lucide="user-cog" class="text-orange-500 w-4 h-4"></i> Editar Información
               </h3>
               
-              <form id="profileForm" class="space-y-6">
-                <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+              <form id="profileForm" class="space-y-3">
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
                   <div>
-                    <label class="block text-sm font-bold text-slate-600 mb-2">Nombre Completo</label>
-                    <input type="text" id="profName" class="w-full px-4 py-3 rounded-xl border border-slate-200 focus:border-orange-400 focus:ring-2 focus:ring-orange-100 outline-none transition-all font-bold text-slate-700">
+                    <label class="block text-sm font-bold text-slate-600 mb-1">Nombre Completo</label>
+                    <input type="text" id="profName" class="w-full px-3 py-2 rounded-xl border border-slate-200 focus:border-orange-400 focus:ring-2 focus:ring-orange-100 outline-none transition-all font-bold text-slate-700 text-sm">
                   </div>
                   <div>
-                    <label class="block text-sm font-bold text-slate-600 mb-2">Teléfono</label>
-                    <input type="tel" id="profPhone" class="w-full px-4 py-3 rounded-xl border border-slate-200 focus:border-orange-400 focus:ring-2 focus:ring-orange-100 outline-none transition-all font-medium text-slate-700">
+                    <label class="block text-sm font-bold text-slate-600 mb-1">Teléfono</label>
+                    <input type="tel" id="profPhone" class="w-full px-3 py-2 rounded-xl border border-slate-200 focus:border-orange-400 focus:ring-2 focus:ring-orange-100 outline-none transition-all font-medium text-slate-700 text-sm">
                   </div>
                 </div>
 
                 <div>
-                  <label class="block text-sm font-bold text-slate-600 mb-2">Correo Electrónico</label>
-                  <input type="email" id="profEmail" class="w-full px-4 py-3 rounded-xl border border-slate-200 bg-slate-50 text-slate-500 cursor-not-allowed" readonly>
-                  <p class="text-xs text-slate-400 mt-1">El correo no se puede cambiar.</p>
+                  <label class="block text-sm font-bold text-slate-600 mb-1">Correo Electrónico</label>
+                  <input type="email" id="profEmail" class="w-full px-3 py-2 rounded-xl border border-slate-200 bg-slate-50 text-slate-500 cursor-not-allowed text-sm" readonly>
+                  <p class="text-[10px] text-slate-400 mt-0.5">El correo no se puede cambiar.</p>
                 </div>
 
                 <div>
-                  <label class="block text-sm font-bold text-slate-600 mb-2">Presentación / Biografía</label>
-                  <textarea id="profBio" rows="4" class="w-full px-4 py-3 rounded-xl border border-slate-200 focus:border-orange-400 focus:ring-2 focus:ring-orange-100 outline-none transition-all text-slate-600" placeholder="Cuéntanos un poco sobre ti, tu experiencia y lo que te gusta de enseñar..."></textarea>
+                  <label class="block text-sm font-bold text-slate-600 mb-1">Presentación / Biografía</label>
+                  <textarea id="profBio" rows="2" class="w-full px-3 py-2 rounded-xl border border-slate-200 focus:border-orange-400 focus:ring-2 focus:ring-orange-100 outline-none transition-all text-slate-600 text-sm" placeholder="Cuéntanos un poco sobre ti..."></textarea>
                 </div>
 
-                <div class="pt-4 flex justify-end">
-                  <button type="submit" id="btnSaveProfile" class="bg-orange-600 text-white px-8 py-3 rounded-xl font-bold shadow-lg shadow-orange-200 hover:bg-orange-700 transition-transform active:scale-95 flex items-center gap-2">
-                    <i data-lucide="save" class="w-5 h-5"></i> Guardar Cambios
+                <div class="pt-1 flex justify-end">
+                  <button type="submit" id="btnSaveProfile" class="bg-orange-600 text-white px-6 py-2 rounded-xl font-bold shadow-lg shadow-orange-200 hover:bg-orange-700 transition-transform active:scale-95 flex items-center gap-2 text-sm">
+                    <i data-lucide="save" class="w-4 h-4"></i> Guardar Cambios
                   </button>
                 </div>
               </form>
 
               <!-- SECCIÓN QR INTEGRADA (MAESTRA) -->
-              <div id="maestra-qr-section" class="mt-12 pt-8 border-t border-slate-100">
-                <div class="bg-slate-50 rounded-[2.5rem] p-4 md:p-8 flex flex-col md:flex-row items-center gap-6 md:gap-8 border border-slate-100">
-                  <div id="maestra-qr-container" class="bg-white p-4 rounded-3xl border-2 border-slate-100 shadow-lg shrink-0">
-                    <div class="w-40 h-40 flex items-center justify-center text-slate-300">
-                      <i data-lucide="qr-code" class="w-10 h-10"></i>
+              <div id="maestra-qr-section" class="mt-6 pt-6 border-t border-slate-100">
+                <div class="bg-slate-50 rounded-2xl p-4 flex flex-col md:flex-row items-center gap-4 border border-slate-100">
+                  <div id="maestra-qr-container" class="bg-white p-3 rounded-2xl border-2 border-slate-100 shadow-lg shrink-0">
+                    <div class="w-28 h-28 flex items-center justify-center text-slate-300">
+                      <i data-lucide="qr-code" class="w-8 h-8"></i>
                     </div>
                   </div>
                   <div class="text-center md:text-left flex-1">
-                    <h4 class="text-xl font-black text-slate-800 mb-2">Mi Código QR de Identificación</h4>
-                    <p class="text-sm text-slate-500 font-medium mb-4">Usa este código para registrar tu entrada y salida de la estancia en el sistema de ponche digital.</p>
-                    <div class="flex flex-wrap gap-3 justify-center md:justify-start">
-                      <div class="px-4 py-2 bg-white rounded-xl border border-slate-200 shadow-sm">
-                        <p class="text-[9px] font-black text-slate-400 uppercase tracking-widest leading-none mb-1">ID Empleado</p>
-                        <p id="maestra-qr-matricula" class="text-lg font-black text-slate-700 leading-none">--</p>
+                    <h4 class="text-base font-black text-slate-800 mb-1">Mi Código QR de Identificación</h4>
+                    <p class="text-xs text-slate-500 font-medium mb-3">Registra tu entrada y salida en el sistema de ponche digital.</p>
+                    <div class="flex flex-wrap gap-2 justify-center md:justify-start">
+                      <div class="px-3 py-1.5 bg-white rounded-lg border border-slate-200 shadow-sm">
+                        <p class="text-[8px] font-black text-slate-400 uppercase tracking-widest leading-none mb-0.5">ID Empleado</p>
+                        <p id="maestra-qr-matricula" class="text-sm font-black text-slate-700 leading-none">--</p>
                       </div>
-                      <button onclick="window.App?.printMaestraQR?.()" class="px-6 py-2 bg-slate-800 text-white rounded-xl font-black text-[10px] uppercase tracking-wider hover:bg-slate-900 transition-all flex items-center gap-2">
-                        <i data-lucide="printer" class="w-3.5 h-3.5"></i> Imprimir QR
+                      <button onclick="window.App?.printMaestraQR?.()" class="px-4 py-1.5 bg-slate-800 text-white rounded-lg font-black text-[9px] uppercase tracking-wider hover:bg-slate-900 transition-all flex items-center gap-1.5">
+                        <i data-lucide="printer" class="w-3 h-3"></i> Imprimir QR
                       </button>
                     </div>
                   </div>

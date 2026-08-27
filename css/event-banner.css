@@ -1,9 +1,10 @@
 /* 📣 KarpusEventBanner — Banner de novedades del Dashboard
-   Vive DENTRO de la sección de inicio (flujo normal): abre su espacio y
-   empuja el contenido hacia abajo. Nunca es position:fixed → no tapa nada.
-   Estilos neutros para integrarse con los 4 paneles. */
+   Sticky en la parte superior de #layoutShell, visible en todas las secciones.
+   No es position:fixed → no tapa contenido, pero siempre está visible. */
 
-#kk-event-banner{display:flex;flex-direction:column;gap:7px;margin:0 0 14px;width:100%;}
+#kk-event-banner{display:flex;flex-direction:column;gap:7px;padding:10px 16px;width:100%;
+  position:sticky;top:0;z-index:50;background:linear-gradient(180deg,#fff 0%,rgba(255,255,255,0.95) 80%,rgba(255,255,255,0) 100%);
+  backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);}
 
 .eb-card{display:flex;align-items:center;gap:10px;width:100%;text-align:left;cursor:pointer;
   background:#fff;border:1px solid #e2e8f0;border-left:4px solid #FF8A00;border-radius:16px;
