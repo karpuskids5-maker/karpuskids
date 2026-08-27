@@ -55,6 +55,10 @@
     }
 
     @media (min-width: 769px) {
+      /* ✅ FIX: forzar 260px — karpus-modern.css impone 288px
+         con mayor especificidad, lo que tapaba el contenido
+         (layoutShell arranca en 260px). */
+      body.panel-maestra-body aside#sidebar { width: 260px; }
       #layoutShell { margin-left: 260px; }
       #layoutShell.sidebar-collapsed { margin-left: 70px !important; }
       aside#sidebar.collapsed:hover { width: 260px; z-index: 60; }
