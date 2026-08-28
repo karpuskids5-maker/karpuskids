@@ -511,6 +511,28 @@ async function submit() {
     });
     if (error) { throw error; }
 
+    // ── Programa Embajadores: registrar referido si vino con código `ref` ──
+    const refCode = new URLSearchParams(window.location.search).get('ref');
+    if (refCode && rowId) {
+      try {
+        // Preservar datos de contacto de la familia y nombre para el seguimiento
+        const p1 = payload.parent_1 || {};
+        const famName = [p1.name, payload.student_last_name].filter(Boolean).join(' ').trim() || 'Familia Interesada';
+        await supabase.functions.invoke('process-referral', {
+          body: {
+            action: 'preregistration',
+            code: refCode,
+            prereg_id: rowId,
+            family: famName,
+            email: p1.email || null,
+            phone: p1.phone || null
+          }
+        });
+      } catch (refErr) {
+        console.warn('Referido no registrado (no bloquea la preinscripción):', refErr);
+      }
+    }
+
     const docs = {};
     const keys = Object.keys(STATE.docs);
     await Promise.all(keys.map(async (key) => {

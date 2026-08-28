@@ -3,9 +3,13 @@
 
 **Propietario:** Luis Alfredo Cabrera Reyes  
 **Empresa:** Impulso Digital  
-**Versión del Sistema:** 4.0 — Agosto 2026  
+**Versión del Sistema:** 4.1 — Agosto 2026  
 **Plataforma:** Web PWA (Progressive Web App)  
-**Backend:** Supabase (PostgreSQL 15 + Auth + Storage + Realtime)  
+**Backend:** Supabase (PostgreSQL 15 + Auth + Storage + Realtime + Edge Functions)  
+
+> **Nota:** Esta revisión documenta también los **Panel de Control / Directora** (no cubiertos antes),
+> el **Programa Embajadores (referidos)**, el **Hero Emocional** del padre, la **edge function
+> `process-referral`** y las migraciones operativas 11–12. Todo según el código fuente actual.
 
 ---
 
@@ -77,8 +81,24 @@ Usados por todos los paneles:
 | `offline-queue.js` | Cola de operaciones pendientes sin conexión; se sincronizan al reconectar |
 | `boletin-pdf.js` | Generación de boletines académicos en PDF con jsPDF |
 | `carnets.module.js` | Generación de carnets/credenciales de estudiantes |
-| `student-record-modal.js` | Modal universal de ficha de estudiante (CRUD completo) |
+| `student-record-modal.js` | Modal universal de ficha de estudiante (CRUD completo incluido enlace de referido & aprobación/inscripción: `_triggerReferralEnrollment`) |
 | `incoming-banner.js` | Banner global de mensajes entrantes visible en cualquier sección |
+| `onboarding.js` | Tour/onboarding guiado al primer ingreso |
+| `event-banner.js` | Banner de eventos/anuncios dinámicos |
+| `confirm-dialog.js` | Diálogo de confirmación reutilizable |
+| `lightbox.js` | Visor de imágenes a pantalla completa |
+| `config.js` / `constants.js` | Configuración y constantes globales |
+| `feature-flags.js` | Flags de funcionalidad activadas/desactivadas |
+| `db-utils.js` | Utilidades de base de datos (queries helper) |
+| `state.js` / `store.js` | Estado compartido y store global (IndexedDB/localStorage) |
+| `birthday-utils.js` | Utilidades de cumpleaños |
+| `load-pdf.js` | Carga/visor de documentos PDF |
+| `prefetch.js` / `scroll.module.js` | Precarga de recursos y scroll infinito mejorado |
+| `FileManager.js` | Gestión de archivos subidos |
+| `notify-feedback.js` | Feedback de notificaciones push |
+| `payment-queue.js` | Cola de operaciones de pago offline |
+| `supabase-wrapper.js` | Wrapper ligero del cliente Supabase |
+| `supabase-js.min.js`, `lucide.min.js`, etc. | Librerías vendor (Supabase, Lucide, Chart.js, jsPDF, html5-qrcode, QRCode, confetti) |
 | `notify-permission.js` | Solicitud de permisos de notificaciones push |
 | `calendar-view.js` | Vista de calendario del año escolar y períodos |
 | `videocall.js` / `videocall-ui.js` | Integración de videollamadas Jitsi Meet |
@@ -171,7 +191,9 @@ Usados por todos los paneles:
 | **Chat** | Mensajería directa con la maestra y directora |
 | **Videollamada** | Entrar a la sala de clase en vivo |
 | **Reinscripción** | Formulario habilitado durante el período de reinscripción |
-| **Mi Perfil** | Datos del padre/madre, foto del estudiante, cambio de contraseña |
+| **Mi Perfil** | Datos del padre/madre, foto del estudiante, cambio de contraseña. Incluye pestañas **"Mi Perfil"** y **"Embajadores"** (`data-profile-tab`, layout balanceado 44/44) |
+| **Embajadores** | Programa de referidos: código único + QR, copiar/WhatsApp/compartir, tarjeta gráfica, niveles Bronce→Leyenda, monedero de recompensas (`get_embajador_dashboard`) |
+| **Hero Emocional** | Bienvenida personalizada (`#emotionalHero`): saludo por hora, indicador de ánimo en vivo, burbujas "Recuerdos del día" |
 
 **Archivos JS principales:**
 - `js/padre/main.js` — Inicialización, autenticación, navegación, BackNavigation PWA
@@ -185,6 +207,65 @@ Usados por todos los paneles:
 - `js/padre/profile.js` — Perfil familiar
 - `js/padre/reinscripcion.js` — Reinscripción
 - `js/padre/appState.js` — Estado global del panel padre
+- `js/padre/embajadores.js` — Módulo Embajadores / referidos (`EmbajadoresModule`)
+- `js/padre/emotional-home.js` — Hero de bienvenida emocional (`EmotionalHome`)
+- `js/padre/dynamic-banner.js` — Banner dinámico contextual
+- `js/padre/helpers.js` — Utilidades del panel padre (`Helpers`, `escapeHtml`)
+
+---
+
+### 5.4 Panel Directora (`panel_directora.html`)
+
+**Propósito:** Centro de control y supervisión total del centro. La Directora tiene visibilidad y
+gestión completa de todos los módulos, convirtiendo preinscripciones en estudiantes matriculados.
+
+| Módulo | Descripción |
+|--------|-------------|
+| **Dashboard** | KPIs globales del centro, gráficos, actividad reciente y alertas |
+| **Estudiantes** (`students.module.js`) | CRUD completo, ficha, matrícula, asignación de aula, promoción |
+| **Inscripciones** (`inscripciones.module.js`) | Flujo de matrícula: aprueba una preinscripción y la convierte en estudiante activo. **Dispara automáticamente la recompensa de referido** si la preinscripción tiene `referral_code` (edge function `process-referral` → `enrollment`) |
+| **Preinscripciones** (`inquiries.module.js`) | Lista pública de solicitudes de matrícula pendientes |
+| **Aulas** (`rooms.module.js`) | Gestión de salones, capacidad, maestra asignada, ocupación |
+| **Maestros** (`teachers.module.js`) | CRUD de docentes, asignación de aula, credenciales QR |
+| **Calificaciones** (`grades.module.js`) | Configuración de actividades, áreas por aula, boletín dinámico, cierre de períodos |
+| **Asistencia** (`attendance.module.js`) | Pase de lista global, reportes |
+| **Accesos QR** (`access.module.js`) | Escáner de entrada/salida y ponches |
+| **Pagos** (`payments_clean.js`) | Módulo financiero: aprobación, mora, ciclo anual, auditoría |
+| **Muro Escolar** (`wall.module.js`) | Publicaciones generales para todos los padres |
+| **Reportes** (`reports.module.js`) | Reportes operativos y financieros |
+| **Chat** (`chat.module.js`) | Mensajería con todos los perfiles |
+| **Año Escolar** (`school-year.module.js`) | Años escolares, períodos, estados (draft/enrollment/active/closed), promoción |
+| **Automatización** (`automation.js`) | Reglas de automatización de tareas/cargos |
+| **Permisos** (`permits.module.js`) | Permisos laborales del personal |
+| **Perfil / Dashboard** (`dashboard.service.js`, `state.js`, `ui.module.js`) | Servicio de datos del dashboard, estado y utilidades UI |
+
+**Archivos JS principales (modular por dominio):**
+- `js/directora/main.js` — Inicialización, navegación, autenticación (~37 KB)
+- `js/directora/api.js` — Capa de acceso a Supabase
+- `js/directora/students.module.js`, `inscripciones.module.js`, `inquiries.module.js`
+- `js/directora/rooms.module.js`, `teachers.module.js`
+- `js/directora/grades.module.js` (calificaciones/boletín), `attendance.module.js`
+- `js/directora/payments_clean.js`, `access.module.js`, `wall.module.js`, `reports.module.js`
+- `js/directora/school-year.module.js`, `automation.js`, `chat.module.js`, `permits.module.js`
+- `js/directora/state.js`, `dashboard.service.js`, `ui.module.js`
+
+---
+
+### 5.5 Panel de Control (`panel_control.html`)
+
+**Propósito:** Panel técnico de administración global del sistema (control/configuración avanzada).
+
+| Módulo | Descripción |
+|--------|-------------|
+| **Control total** | Administración/gestión técnica por encima de los demás paneles |
+| **UI / configuración** | Utilidades de interfaz y estado global |
+
+**Archivos JS principales:**
+- `js/control/main.js` — Lógica principal del panel de control (~142 KB, incluye la mayor parte de la lógica de configuración)
+- `js/control/ui-v3.js` — Utilidades de interfaz v3
+
+> **Nota:** El panel de control concentra la administración técnica del sistema; sus capacidades se
+> superponen con las de Directora/`admin` y dan acceso de gestión extendida.
 
 ---
 
@@ -246,6 +327,9 @@ Usados por todos los paneles:
 | `notifications` | Notificaciones in-app | `user_id`, `title`, `message`, `type`, `is_read` |
 | `audit_logs` | Registro de auditoría general | `action`, `user_id`, `metadata` |
 | `wall_notifications` | Notificaciones del muro | `user_id`, `actor_id`, `type`, `post_id` |
+| `referral_codes` | Código único por familia | `id`, `parent_id`, `code`, `qr_url`, `total_invites_sent`, `successful_conversions` |
+| `referrals` | Seguimiento de referidos | `id`, `referrer_parent_id`, `referred_family_name`, `referred_email/phone`, `status` (invited/registered/visited/enrolled/rejected), `reward_status`, `prereg_id`, `enrolled_student_id`, `enrolled_at` |
+| `referral_rewards` | Monedero de recompensas | `id`, `parent_id`, `referral_id`, `reward_type` (monthly_discount/free_month/cashback), `amount`, `is_used`, `applied_to_payment_id` (bigint), `used_at`, `expires_at` |
 
 ---
 
@@ -286,6 +370,17 @@ Usados por todos los paneles:
 | `search_students(query, limit)` | Búsqueda full-text de estudiantes |
 | `log_timeline_event(classroom_id, event_type, target_students, ...)` | Registra evento en la cronología de rutina |
 | `audit_report_change(report_id, changes)` | Registra cambios en boletines |
+| `submit_preinscripcion(...)` | Crea la preinscripción pública (consolidada 05) y captura `referral_code` |
+| `ensure_referral_code(p_parent_id)` | Crea idempotente el código único de familia (`KARPUS-APELLIDO-###`), `SECURITY DEFINER` |
+| `register_referral(family, email, phone, prereg_id)` | Registra manualmente un referido (estado `invited`) |
+| `apply_referral_reward(reward_id, payment_id)` | Aplica un crédito del monedero a una mensualidad y lo marca usado |
+| `get_embajador_dashboard()` | Tablero del padre: código, referidos, saldo del monedero y recompensas |
+| `increment_referral_count(code_id)` | Incrementa contador de invitaciones (usada por edge function; grant a `service_role`) |
+
+> **Referidos (migración 12, `12_referidos_embajadores.sql`):** define las tablas
+> `referral_codes`, `referrals` y `referral_rewards` con su RLS (staff ve todo; cada padre solo lo suyo),
+> así como las RPC de referidos. Escala de recompensas: Bronce (1 matrícula → 15% dcto.), Plata (2 → 35%),
+> Oro (3 → 1 mes gratis), Leyenda (4 → $100 USD crédito).
 
 ---
 
@@ -339,6 +434,29 @@ Todas las tablas tienen RLS activo. Políticas principales:
 | `classroom_media` | Media del aula (actividades, rutina) |
 | *(evidencias de pagos)* | URLs guardadas en `payments.evidence_url` |
 | *(evidencias de tareas)* | URLs guardadas en `task_evidences.file_url` |
+
+---
+
+### 7.7 Supabase Edge Functions (`supabase/functions/`)
+
+Patrón común: `createClient` vía `https://esm.sh/@supabase/supabase-js@2`, cabeceras CORS inline,
+`Deno.serve`. El frontend invoca con `supabase.functions.invoke('<name>', { body })`.
+
+| Función | Acciones | Descripción |
+|---------|----------|-------------|
+| `process-referral` | `preregistration`, `enrollment` | Engine del Programa Embajadores. `preregistration`: recibe `code`/`prereg_id`, sella la preinscripción con `referral_code`/`referral_parent_id` e inserta el referido. `enrollment`: resuelve el referido (por `referral_id` o `prereg_id`), cuenta matrículas, actualiza nivel y **emite recompensa** (Bronce/Plata/Oro/Leyenda) + notificación de celebración. Registrada en `supabase/config.toml` (`verify_jwt = false`) |
+| `auto-payment-cycle` | — | Ciclo mensual de pagos (alternativa a pg_cron) |
+| `payment-reminders` | — | Recordatorios de pagos vía push/email |
+| `create-student-with-parent` | — | Crea estudiante vinculado a un padre |
+| `run-migration` / `exec-sql` | — | Ejecutores de SQL/migraciones desde dashboard |
+| `admin-delete-user` / `admin-reset-password` | — | Administración de usuarios |
+| `backup-to-sheets` | — | Backup a Google Sheets |
+| `custom-recovery` | — | Recuperación de cuenta personalizada |
+| `get-posts` | — | Servicio de posts (alt. al query directo) |
+| `process-event` | — | Procesamiento de eventos (rutina/timeline) |
+| `resize-image` | — | Redimensión de imágenes |
+| `send-email` / `send-push` | — | Correo y push (OneSignal) |
+| `_shared` | — | Librerías compartidas entre funciones |
 
 ---
 
@@ -412,6 +530,19 @@ Todas las tablas tienen RLS activo. Políticas principales:
 - Actualizaciones automáticas del SW con banner de aviso
 - Soporte de safe-area (`env(safe-area-inset)`) para iPhone X+
 
+### Programa Embajadores (Referidos)
+- Código único por familia generado en BD (`KARPUS-APELLIDO-###`) + QR en el panel del padre
+- Captura del parámetro `?ref=<código>` en `preinscripcion.html` (`js/preinscripcion.js`) y envío a la edge function `process-referral` (acción `preregistration`)
+- Al aprobar la matrícula, `student-record-modal.js` (`_triggerReferralEnrollment`) dispara `process-referral` (acción `enrollment`)
+- Escala de recompensas: Bronce (1 → 15%), Plata (2 → 35%), Oro (3 → **1 mes gratis**), Leyenda (4 → $100 USD)
+- Monedero digital con saldo y créditos (`referral_rewards`); celebración con confeti al ganar una recompensa
+- Compartir por WhatsApp, copiar enlace, descargar tarjeta gráfica con QR
+
+### Hero Emocional (Panel Padre)
+- Bienvenida con saludo por hora y nombre de la familia
+- Indicador de ánimo en vivo según la asistencia del día (feliz, puntual, ausente)
+- Burbujas "Recuerdos del día" (historia de 24h con gradientes)
+
 ---
 
 ## 9. ACCESO Y CONFIGURACIÓN TÉCNICA
@@ -440,13 +571,17 @@ SUPABASE_ANON_KEY = '[JWT público de solo lectura anónima]'
 
 ```
 karpus/
-├── panel_padres.html           # Panel del padre/madre
+├── panel_padres.html           # Panel del padre/madre (home emocional + Embajadores)
 ├── panel-maestra.html          # Panel de la maestra
 ├── panel_asistente.html        # Panel del asistente
+├── panel_directora.html        # Panel de la directora
+├── panel_control.html          # Panel de control técnico
 ├── login.html                  # Página de autenticación
-├── preinscripcion.html         # Formulario público de preinscripción
+├── recuperar.html              # Recuperación de contraseña
+├── preinscripcion.html         # Formulario público de preinscripción (captura ?ref=)
 ├── attendance-live.html        # Asistencia en vivo (pantalla TV)
 ├── index.html                  # Página de inicio / landing
+├── terminos-uso.html / politica-privacidad.html
 ├── css/
 │   ├── layout.css              # Sistema de layout global (chat, sidebar, secciones)
 │   ├── panel-padre.css         # Estilos específicos del panel padre
@@ -455,47 +590,78 @@ karpus/
 │   ├── premium-mobile.css      # Mejoras móvil premium
 │   └── theme.css               # Tokens de color y tipografía
 ├── js/
-│   ├── shared/                 # Módulos compartidos
-│   ├── padre/                  # Lógica del panel padre
-│   ├── maestra/                # Lógica del panel maestra
+│   ├── shared/                 # Módulos compartidos (supabase, helpers, wall, chat, student-record-modal, etc.)
+│   ├── padre/                  # Lógica del panel padre (incl. embajadores.js, emotional-home.js)
+│   ├── maestra/                # Lógica del panel maestra (+ modules/)
 │   ├── asistente/              # Lógica del panel asistente
+│   ├── directora/              # Lógica del panel directora (módulos por dominio)
+│   ├── control/                # Lógica del panel de control (main.js, ui-v3.js)
 │   ├── login.js
 │   ├── preinscripcion.js
 │   └── pwa-install.js / pwa-updater.js
+├── supabase/
+│   ├── functions/              # Edge functions (process-referral, payment-reminders, send-email, etc.)
+│   │   └── process-referral/   # Motor de recompensas Embajadores
+│   └── config.toml             # Registro de funciones (verify_jwt)
+├── server/                     # Servidor local (api.cjs, web.cjs, auth.cjs, dbProvider.cjs)
 ├── logo/                       # Íconos PWA y favicon
 ├── img/                        # Imágenes del sistema
 ├── data/                       # Base de datos SQLite local (desarrollo)
-├── migraciones/                # Historial de migraciones SQL
+├── migraciones/
+│   └── operativos/             # 01 → 12 (incl. 12_referidos_embajadores.sql), patches
+├── propuesta.md                # Propuesta UX + Sistema de Referidos (fuente)
 └── karpus_schema_completo.sql  # Esquema maestro de base de datos
 ```
+
+### Historial de migraciones (`migraciones/operativos/`)
+
+| Migración | Contenido |
+|-----------|-----------|
+| `01_nucleo_y_tablas_base.sql` | Esquema base: profiles, classrooms, students, periodos, etc. |
+| `02_tablas_pagos_academico_operacion.sql` | Pagos, académico y operación |
+| `03_indices_rls.sql` | Índices y Row Level Security |
+| `04_funciones_mora_pagos_asistencia_chat.sql` | Mora, pagos, asistencia, chat |
+| `05_funciones_consolidadas_preinscripcion.sql` | `student_preregistrations`, `submit_preinscripcion` |
+| `06_periodos_cierre_ano_escolar_calificaciones.sql` | Ciclo escolar, cierre, calificaciones |
+| `07_seguridad_storage_cron_vistas.sql` | Seguridad, storage, cron, vistas |
+| `08_posts_rls_pagos_2026_reinscripcion_tareas.sql` | Muro, pagos 2026, reinscripción, tareas |
+| `09_areas_por_aula_boletin_dinamico.sql` | Áreas por aula, boletín dinámico |
+| `10_parches_posteriores_y_tienda.sql` | Parches posteriores y tienda |
+| `11_limpieza_pagos_incorrectos.sql` | Limpieza de pagos incorrectos |
+| `11_wall_notifications_realtime.sql` | Notificaciones del muro en tiempo real |
+| `12_hermanos_sibling_id.sql` | Campo de hermanos (`sibling_id`) |
+| `12_referidos_embajadores.sql` | **Sistema Embajadores/referidos** (referral_codes, referrals, referral_rewards, RPCs) |
+| `PATCH_*.sql` | Parches puntuales (chat columns, mark messages read, RLS recursion fix) |
 
 ---
 
 ## 11. MATRIZ DE CAPACIDADES POR ROL
 
-| Capacidad | Directora | Asistente | Maestra | Padre |
-|-----------|:---------:|:---------:|:-------:|:-----:|
-| Ver todos los estudiantes | ✅ | ✅ | Solo su aula | Solo su hijo |
-| Crear/editar estudiantes | ✅ | ✅ | ❌ | ❌ |
-| Gestionar pagos | ✅ | ✅ | ❌ | Ver / enviar comprobante |
-| Aprobar pagos | ✅ | ✅ | ❌ | ❌ |
-| Publicar en el muro | ✅ | ✅ | Solo su aula | ❌ |
-| Ver el muro | ✅ | ✅ | Su aula | Solo su aula |
-| Registrar rutina | ✅ | ❌ | Solo su aula | ❌ |
-| Ver rutina del hijo | ✅ | ✅ | Su aula | Solo su hijo |
-| Asistencia QR | ✅ | ✅ | Su aula | Reportar ausencia |
-| Calificaciones (editar) | ✅ | Solo lectura | Su aula | ❌ |
-| Calificaciones (ver) | ✅ | ✅ | Su aula | Solo su hijo |
-| Chat | ✅ | ✅ | ✅ | ✅ |
-| Videollamada | ✅ | ✅ | Crear sala | Entrar a sala |
-| Gestionar usuarios | ✅ | ✅ | ❌ | ❌ |
-| Accesos QR (escanear) | ✅ | ✅ | ✅ | ❌ |
-| Boletín PDF | ✅ | Solo lectura | Su aula | Descargar de su hijo |
-| Inscripciones | ✅ | ✅ | ❌ | ❌ |
-| Permisos laborales | ✅ (aprobar) | ✅ (aprobar) | Solicitar | ❌ |
+| Capacidad | Directora | Asistente | Maestra | Padre | Control |
+|-----------|:---------:|:---------:|:-------:|:-----:|:------:|
+| Ver todos los estudiantes | ✅ | ✅ | Solo su aula | Solo su hijo | ✅ |
+| Crear/editar estudiantes | ✅ | ✅ | ❌ | ❌ | ✅ |
+| Gestionar pagos | ✅ | ✅ | ❌ | Ver / enviar comprobante | ✅ |
+| Aprobar pagos | ✅ | ✅ | ❌ | ❌ | ✅ |
+| Publicar en el muro | ✅ | ✅ | Solo su aula | ❌ | ✅ |
+| Ver el muro | ✅ | ✅ | Su aula | Solo su aula | ✅ |
+| Registrar rutina | ✅ | ❌ | Solo su aula | ❌ | ✅ |
+| Ver rutina del hijo | ✅ | ✅ | Su aula | Solo su hijo | ✅ |
+| Asistencia QR | ✅ | ✅ | Su aula | Reportar ausencia | ✅ |
+| Calificaciones (editar) | ✅ | Solo lectura | Su aula | ❌ | ✅ |
+| Calificaciones (ver) | ✅ | ✅ | Su aula | Solo su hijo | ✅ |
+| Chat | ✅ | ✅ | ✅ | ✅ | ✅ |
+| Videollamada | ✅ | ✅ | Crear sala | Entrar a sala | ✅ |
+| Gestionar usuarios | ✅ | ✅ | ❌ | ❌ | ✅ |
+| Accesos QR (escanear) | ✅ | ✅ | ✅ | ❌ | ✅ |
+| Boletín PDF | ✅ | Solo lectura | Su aula | Descargar de su hijo | ✅ |
+| Inscripciones | ✅ | ✅ | ❌ | ❌ | ✅ |
+| Aprobar matrícula → recompensa referido | ✅ | ❌ | ❌ | ❌ | ✅ |
+| Embajadores (ver su QR/referidos) | ❌ | ❌ | ❌ | ✅ | ❌ |
+| Permisos laborales | ✅ (aprobar) | ✅ (aprobar) | Solicitar | ❌ | ✅ |
 
 ---
 
-*Documentación generada desde el código fuente — Agosto 2026*  
+*Documentación generada desde el código fuente — Agosto 2026 (v4.1)*  
 *Sistema Karpus Kids — desarrollado por Impulso Digital*  
 *Propietario: Luis Alfredo Cabrera Reyes*

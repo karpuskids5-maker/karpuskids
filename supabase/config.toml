@@ -9,3 +9,6 @@ verify_jwt = false
 
 [functions.send-email]
 verify_jwt = true
+
+[functions.process-referral]
+verify_jwt = false

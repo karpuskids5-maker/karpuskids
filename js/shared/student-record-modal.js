@@ -64,6 +64,8 @@ export const StudentRecordModal = {
   _consents: {},
   _signature: '',
   _siblings: [],
+  _siblingCandidates: [],
+  _siblingId: '',
   _history: [],
   _historyParts: {},
   _form: {},
@@ -87,6 +89,8 @@ export const StudentRecordModal = {
     this._consents = {};
     this._signature = '';
     this._siblings = [];
+    this._siblingCandidates = [];
+    this._siblingId = '';
     this._history = [];
     this._historyParts = {};
     this._tab = 'info';
@@ -97,6 +101,13 @@ export const StudentRecordModal = {
     if (this._mode === 'edit') await this._loadStudent(studentId);
     else if (this._mode === 'admit') this._fromPrereg();
     else this._emptyForm();
+
+    // Precargar candidatos de hermanos si la casilla ya está marcada
+    // (así el select aparece lleno al abrir el expediente en modo edición)
+    if (this._form?.has_siblings) {
+      await this._loadSiblingCandidates();
+      await this._loadSiblings();
+    }
 
     this._renderShell();
   },
@@ -185,6 +196,7 @@ export const StudentRecordModal = {
       exit_time: student.exit_time || '',
       start_date: student.start_date || student.estimated_entry_date || new Date().toISOString().split('T')[0],
       has_siblings: !!student.has_siblings, sibling_name: student.sibling_name || '',
+      sibling_id: student.sibling_id ? String(student.sibling_id) : '',
       classroom_id: student.classroom_id ? String(student.classroom_id) : '',
       is_active: student.is_active !== false,
       login_email: student.login_email || '',
@@ -337,23 +349,164 @@ export const StudentRecordModal = {
     if (!this._form.inscription_fee && pick('inscripcion') != null) this._form.inscription_fee = pick('inscripcion');
   },
 
-  async _loadSiblings() {
-    // Solo mostrar hermanos si la directora/asistente marcó explícitamente has_siblings = true
-    // NO detectar automáticamente por similitud de datos ni por parent_id compartido
-    if (!this._form?.has_siblings || !this._parentId) {
-      this._siblings = [];
+  async _loadSiblingCandidates() {
+    if (!this._form?.has_siblings) {
+      this._siblingCandidates = [];
       return;
     }
-    // Requiere que el otro estudiante también tenga has_siblings = true
-    // para evitar falsos positivos cuando dos estudiantes comparten tutor
-    // sin haber sido vinculados como hermanos por el staff
     const { data } = await supabase
       .from('students')
-      .select('id, name, matricula, classroom_id, classrooms:classroom_id(name), is_active, has_siblings')
-      .eq('parent_id', this._parentId)
-      .eq('has_siblings', true)
-      .is('deleted_at', null);
-    this._siblings = (data || []).filter(s => s.id !== this._student?.id);
+      .select('id, name, last_name, matricula, classroom_id, classrooms:classroom_id(name), is_active')
+      .eq('is_active', true)
+      .is('deleted_at', null)
+      .order('name')
+      .limit(500);
+    this._siblingCandidates = (data || []).filter(s => !this._student || String(s.id) !== String(this._student.id));
+
+    // ✅ Restaurar sibling_id desde la columna guardada en BD (primera prioridad)
+    const savedSiblingId = String(this._form?.sibling_id || '').trim();
+    if (savedSiblingId && !this._siblingId) {
+      this._siblingId = savedSiblingId;
+      this._form.sibling_id = savedSiblingId;
+      return; // sibling_id ya está resuelto, no necesitamos resolver por nombre
+    }
+
+    // Fallback: si solo hay sibling_name, intentar resolverlo a un ID
+    const stored = String(this._form?.sibling_name || '').trim().toLowerCase();
+    if (stored && !this._siblingId && !this._form.sibling_id) {
+      const hit = this._siblingCandidates.find(s => {
+        const full = ((s.name || '') + ' ' + (s.last_name || '')).trim().toLowerCase();
+        return full === stored || String(s.name || '').toLowerCase() === stored;
+      });
+      if (hit) {
+        this._siblingId = String(hit.id);
+        this._form.sibling_id = String(hit.id);
+      }
+    }
+  },
+
+  _siblingOptionsHTML() {
+    if (!this._siblingCandidates.length) {
+      return '<option value="">-- Sin estudiantes disponibles --</option>';
+    }
+    const resolvedId = String(this._siblingId || this._form.sibling_id || '');
+    return '<option value="">-- Selecciona un estudiante --</option>' + this._siblingCandidates.map(s => {
+      const full = ((s.name || '') + ' ' + (s.last_name || '')).trim();
+      const label = full + (s.classrooms?.name ? ' — ' + s.classrooms.name : '') + (s.matricula ? ' (M: ' + s.matricula + ')' : '');
+      const selected = resolvedId && String(s.id) === resolvedId ? 'selected' : '';
+      return `<option value="${s.id}" ${selected}>${Helpers.escapeHTML(label)}</option>`;
+    }).join('');
+  },
+
+  _siblingWrapHTML() {
+    return `
+      <div>
+        <label class="${LABEL}">Selecciona el hermano inscrito</label>
+        <select data-f="sibling_id" class="${INPUT}">${this._siblingOptionsHTML()}</select>
+      </div>
+      <div class="mt-3">
+        <label class="${LABEL}">O escribe el nombre del hermano (si no aparece en la lista)</label>
+        <input data-f="sibling_name" placeholder="Nombre del hermano inscrito" value="${Helpers.escapeHTML(String(this._form.sibling_name || ''))}" class="${INPUT}">
+      </div>
+      <p class="text-[10px] text-slate-400 font-bold mt-2 ml-1">Al elegir un estudiante de la lista se guarda como hermano vinculado y se muestra en la pestaña Familia.</p>`;
+  },
+
+  _wireSiblingWrap() {
+    const wrap = document.getElementById('srm-sibling-wrap');
+    if (!wrap) return;
+    const sel = wrap.querySelector('[data-f="sibling_id"]');
+    const nameEl = wrap.querySelector('[data-f="sibling_name"]');
+    if (sel && !sel.dataset.wired) {
+      sel.dataset.wired = '1';
+      sel.onchange = async () => {
+        this._form.sibling_id = sel.value;
+        this._siblingId = sel.value;
+        if (!sel.value) return;
+        const cand = this._siblingCandidates.find(s => String(s.id) === sel.value);
+        if (cand && nameEl) {
+          const full = ((cand.name || '') + ' ' + (cand.last_name || '')).trim();
+          nameEl.value = full;
+          this._form.sibling_name = full;
+        }
+        await this._loadSiblings();
+      };
+    }
+    if (nameEl && !nameEl.dataset.wired) {
+      nameEl.dataset.wired = '1';
+      nameEl.oninput = () => {
+        this._form.sibling_name = nameEl.value;
+        if (this._form.sibling_name.trim()) {
+          this._form.sibling_id = '';
+          this._siblingId = '';
+          if (sel) sel.value = '';
+        }
+      };
+    }
+  },
+
+  async _loadSiblings() {
+    this._siblings = [];
+    if (!this._form?.has_siblings) return;
+    // 1) Hermanos compartiendo tutor (parent_id) marcados como hermanos
+    if (this._parentId) {
+      const { data } = await supabase
+        .from('students')
+        .select('id, name, last_name, matricula, classroom_id, classrooms:classroom_id(name), is_active, has_siblings, sibling_id')
+        .eq('parent_id', this._parentId)
+        .eq('has_siblings', true)
+        .is('deleted_at', null);
+      this._siblings = (data || []).filter(s => s.id !== this._student?.id);
+    }
+    // 2) Hermano seleccionado explícitamente POR ID (desde el dropdown).
+    //    Esto tiene prioridad y funciona incluso si no comparten tutor.
+    const explicitId = String(this._siblingId || this._form.sibling_id || '').trim();
+    if (explicitId) {
+      // Buscar en candidatos cargados primero (eficiente)
+      let match = this._siblingCandidates.find(s => String(s.id) === explicitId);
+      // Si no está en candidatos, consultar a la BD
+      if (!match) {
+        const { data } = await supabase
+          .from('students')
+          .select('id, name, last_name, matricula, classroom_id, classrooms:classroom_id(name), is_active, has_siblings, sibling_id')
+          .eq('id', parseInt(explicitId, 10))
+          .is('deleted_at', null)
+          .maybeSingle();
+        if (data) match = data;
+      }
+      if (match && !this._siblings.some(x => String(x.id) === String(match.id)) && String(match.id) !== String(this._student?.id)) {
+        this._siblings.push({
+          id: match.id,
+          name: ((match.name || '') + ' ' + (match.last_name || '')).trim() || match.name || 'Hermano',
+          matricula: match.matricula,
+          classroom_id: match.classroom_id,
+          classrooms: match.classrooms,
+          is_active: match.is_active,
+          has_siblings: true,
+        });
+      }
+    }
+    // 3) Hermano resuelto por coincidencia con nombre guardado en sibling_name (fallback).
+    //    Solo se usa si no hay selección explícita por ID.
+    if (!explicitId) {
+      const stored = String(this._form?.sibling_name || '').trim().toLowerCase();
+      if (stored) {
+        const match = this._siblingCandidates.find(s =>
+          ((s.name || '') + ' ' + (s.last_name || '')).trim().toLowerCase() === stored ||
+          String(s.name || '').toLowerCase() === stored
+        );
+        if (match && !this._siblings.some(x => String(x.id) === String(match.id))) {
+          this._siblings.push({
+            id: match.id,
+            name: ((match.name || '') + ' ' + (match.last_name || '')).trim(),
+            matricula: match.matricula,
+            classroom_id: match.classroom_id,
+            classrooms: match.classrooms,
+            is_active: match.is_active,
+            has_siblings: true,
+          });
+        }
+      }
+    }
   },
 
   async _loadHistory() {
@@ -759,7 +912,7 @@ export const StudentRecordModal = {
             <span class="text-sm font-black text-amber-700 uppercase">¿Tiene hermano(s) en el centro?</span>
           </label>
           <div id="srm-sibling-wrap" class="mt-3 ${f.has_siblings ? '' : 'hidden'}">
-            ${this._authedField('sibling_name', 'Nombre(s) del hermano', 'Nombre del hermano inscrito')}
+            ${f.has_siblings ? this._siblingWrapHTML() : ''}
           </div>
         </div>
 
@@ -855,11 +1008,31 @@ export const StudentRecordModal = {
     }
     const sib = document.querySelector('[data-f="has_siblings"]');
     if (sib) {
-      sib.onchange = () => {
+      sib.onchange = async () => {
         this._form.has_siblings = sib.checked;
-        document.getElementById('srm-sibling-wrap')?.classList.toggle('hidden', !sib.checked);
+        const wrap = document.getElementById('srm-sibling-wrap');
+        if (!sib.checked) {
+          this._form.sibling_id = '';
+          this._form.sibling_name = '';
+          this._siblingId = '';
+          this._siblings = [];
+          if (wrap) {
+            wrap.classList.add('hidden');
+            wrap.innerHTML = '';
+          }
+        } else {
+          await this._loadSiblingCandidates();
+          if (wrap) {
+            wrap.classList.remove('hidden');
+            wrap.innerHTML = this._siblingWrapHTML();
+            if (window.lucide) lucide.createIcons();
+            this._wireSiblingWrap();
+          }
+        }
         this._loadSiblings();
       };
+      // Ya marcada al abrir → asegurar wiring de los campos del sibling
+      this._wireSiblingWrap();
     }
     this._wireClassroomLevelSync();
     this._wireScheduleDefaults();
@@ -1685,6 +1858,93 @@ export const StudentRecordModal = {
    * abiertas (tabla de estudiantes y sección de aulas) para que se
    * actualicen sin necesidad de recargar la página.
    */
+  // ---------------------------------------------------------------- SIBLING BIDIRECCIONAL
+  /**
+   * Vincula hermanos en ambos sentidos en la BD y sincroniza parent_id
+   * para que el panel de padres muestre ambos estudiantes.
+   * Se llama DESPUÉS de guardar el estudiante actual.
+   */
+  async _syncSiblingBidirectional(studentId, payload, studentParentId) {
+    const siblingId = String(this._siblingId || this._form.sibling_id || '').trim();
+    const hasSiblings = !!this._form?.has_siblings;
+    if (!hasSiblings || !siblingId || !studentId) return;
+
+    const siblingIdNum = parseInt(siblingId, 10);
+    if (!siblingIdNum) return;
+
+    // Nombre completo del estudiante actual (el que se está guardando)
+    const currentFull = ((payload.name || '') + ' ' + (payload.last_name || '')).trim() || (payload.name || 'Hermano');
+
+    try {
+      // 1) Cargar datos del hermano seleccionado (para obtener su parent_id y nombre)
+      const { data: sibData, error: sibErr } = await supabase
+        .from('students')
+        .select('id, name, last_name, parent_id, has_siblings, sibling_name, sibling_id')
+        .eq('id', siblingIdNum)
+        .maybeSingle();
+      if (sibErr || !sibData) return;
+
+      const sibParentId = sibData.parent_id || null;
+
+      // --- SINCRONIZACIÓN DE parent_id (esencial para el panel de padres) ---
+      // Regla: si uno tiene parent_id y el otro no → asignar al que le falta.
+      // Si ambos tienen y son DIFERENTES → no mezclamos cuentas, pero sí marcamos
+      // has_siblings y sibling_name para que aparezcan en la ficha del expediente.
+      let finalParentId = studentParentId || sibParentId;
+
+      if (finalParentId) {
+        const updatesForThis = {};
+        const updatesForSib = {};
+
+        // Estudiante actual no tiene parent_id pero el hermano sí → asignarle el del hermano
+        if (!studentParentId && sibParentId) {
+          updatesForThis.parent_id = sibParentId;
+          // Actualizar también en el estado local
+          this._parentId = sibParentId;
+        }
+        // El hermano no tiene parent_id pero el estudiante actual sí → asignarle al hermano
+        if (studentParentId && !sibParentId) {
+          updatesForSib.parent_id = studentParentId;
+          finalParentId = studentParentId;
+        }
+
+        if (Object.keys(updatesForThis).length) {
+          await supabase.from('students').update(updatesForThis).eq('id', studentId);
+        }
+        if (Object.keys(updatesForSib).length) {
+          await supabase.from('students').update(updatesForSib).eq('id', siblingIdNum);
+        }
+      }
+
+      // --- VINCULACIÓN BIDIRECCIONAL (has_siblings + sibling_name + sibling_id) ---
+      // Actualizar el registro del hermano: marcar has_siblings, poner el nombre
+      // y el sibling_id apuntando de regreso al estudiante actual (bidireccional)
+      const siblingFullName = ((sibData.name || '') + ' ' + (sibData.last_name || '')).trim() || sibData.name || '';
+      await supabase.from('students').update({
+        has_siblings: true,
+        sibling_name: currentFull,
+        sibling_id: parseInt(String(studentId), 10) || null,  // ✅ FK bidireccional
+      }).eq('id', siblingIdNum);
+
+      // Asegurarse que EN EL ESTUDIANTE ACTUAL también quede sibling_name y sibling_id actualizados
+      const updForCurrent = {};
+      if (siblingFullName && String(payload.sibling_name || '').trim() !== siblingFullName) {
+        updForCurrent.sibling_name = siblingFullName;
+      }
+      // Guardar sibling_id en el estudiante actual (el que se está editando)
+      if (!payload.sibling_id) {
+        updForCurrent.sibling_id = siblingIdNum;
+      }
+      if (Object.keys(updForCurrent).length) {
+        await supabase.from('students').update(updForCurrent).eq('id', studentId);
+      }
+
+    } catch (e) {
+      // No debe bloquear el flujo principal
+      console.warn('[Sibling] Error sincronización bidireccional:', e);
+    }
+  },
+
   _afterSave() {
     try { QueryCache.invalidate('dir_students'); } catch (_) {}
     try { QueryCache.invalidate('dir_classrooms'); } catch (_) {}
@@ -1718,6 +1978,7 @@ export const StudentRecordModal = {
       estimated_entry_date: f.start_date || null,
       has_siblings: !!f.has_siblings,
       sibling_name: f.sibling_name || null,
+      sibling_id: f.sibling_id ? parseInt(f.sibling_id, 10) : null,
       login_email: f.login_email || null,
       classroom_id: f.classroom_id ? parseInt(f.classroom_id, 10) : null,
       is_active: f.is_active !== false,
@@ -1897,6 +2158,10 @@ export const StudentRecordModal = {
 
       await this._generateCharges(inserted.id, payload);
 
+      // Vinculación bidireccional de hermanos y sincronización de parent_id
+      const resolvedParentIdCreate = this._parentId || payload.parent_id || null;
+      await this._syncSiblingBidirectional(inserted.id, payload, resolvedParentIdCreate);
+
       await auditLog('student.created', {
         student_id: inserted.id,
         student_name: payload.name,
@@ -1965,6 +2230,10 @@ export const StudentRecordModal = {
       const studentId = inserted.id;
       await this._generateCharges(studentId, payload);
 
+      // Vinculación bidireccional de hermanos y sincronización de parent_id
+      const resolvedParentIdAdmit = this._parentId || payload.parent_id || null;
+      await this._syncSiblingBidirectional(studentId, payload, resolvedParentIdAdmit);
+
       if (this._prereg?.id) {
         const upd = await supabase.rpc('review_preregistration', {
           p_id: this._prereg.id,
@@ -1976,6 +2245,9 @@ export const StudentRecordModal = {
           .from('student_preregistrations')
           .update({ converted_student_id: studentId })
           .eq('id', this._prereg.id);
+
+        // 🎖️ Programa Embajadores: disparar recompensa si la preinscripción vino con referido
+        await this._triggerReferralEnrollment(this._prereg, studentId);
       }
 
       await auditLog('student.admitted', {
@@ -2010,6 +2282,49 @@ export const StudentRecordModal = {
     }
   },
 
+  /**
+   * 🎖️ Programa Embajadores: dispara la recompensa del referido al matricular.
+   * Busca la preinscripción con código de referido y notifica la edge function
+   * process-referral (action: enrollment) para marcar al referido como matriculado
+   * y otorgar la recompensa del nivel correspondiente.
+   * Fire-and-forget: no bloquea ni condiciona la admisión.
+   */
+  async _triggerReferralEnrollment(prereg, studentId) {
+    try {
+      if (!prereg?.id) return;
+      const hasReferral = prereg.referral_code || prereg.referral_parent_id;
+
+      // Si no hay referencia explícita en la preinscripción, verificar si hay
+      // una fila de referido ya vinculada por prereg_id.
+      let shouldFire = !!hasReferral;
+      if (!shouldFire) {
+        const { data: linked } = await supabase
+          .from('referrals')
+          .select('id')
+          .eq('prereg_id', Number(prereg.id))
+          .maybeSingle();
+        shouldFire = !!linked;
+      }
+      if (!shouldFire) return;
+
+      // Fire-and-forget con resultado informativo
+      const { data, error } = await supabase.functions.invoke('process-referral', {
+        body: {
+          action: 'enrollment',
+          prereg_id: Number(prereg.id),
+          student_id: studentId != null ? Number(studentId) : null,
+        },
+      });
+      if (error) throw error;
+      if (data?.ok && data?.reward_inserted) {
+        Helpers.toast('🎉 Crédito Embajador otorgado a la familia promotora', 'success');
+      }
+    } catch (e) {
+      // No bloquea la admisión; solo registramos
+      try { Helpers.safeLog('warn', 'Referral enrollment (no bloqueante):', e); } catch (_) {}
+    }
+  },
+
   async _saveChanges() {
     if (this._saving) return;
     this._saveForm();
@@ -2024,6 +2339,10 @@ export const StudentRecordModal = {
 
       const { error } = await supabase.from('students').update(payload).eq('id', studentId);
       if (error) throw error;
+
+      // Vinculación bidireccional de hermanos y sincronización de parent_id
+      const resolvedParentId = this._parentId || payload.parent_id || null;
+      await this._syncSiblingBidirectional(studentId, payload, resolvedParentId);
 
       await auditLog('student.updated', {
         student_id: studentId,

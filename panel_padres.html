@@ -470,6 +470,9 @@
       <!-- DASHBOARD INFANTIL -->
       <section id="home" class="section">
 
+        <!-- Hero de Bienvenida Emocional ("Resumen de Felicidad") -->
+        <div id="emotionalHero"></div>
+
         <!-- Banner dinámico unico — rotativo con prioridad -->
         <div id="dynamicBanner" class="mb-6 hidden"></div>
 
@@ -949,7 +952,21 @@
             </div>
 
             <!-- Formulario Perfil -->
-            <div class="p-8 md:p-10 flex-1">
+            <div class="p-2 md:p-4">
+              <div class="flex gap-2 bg-slate-100 p-1.5 rounded-2xl mb-4 max-w-md mx-auto w-full">
+                <button type="button" data-profile-tab="edit"
+                  class="profile-tab flex-1 py-2.5 rounded-xl text-xs md:text-sm font-black uppercase tracking-wider transition-all flex items-center justify-center gap-2 bg-white text-emerald-700 shadow-sm">
+                  <i data-lucide="user" class="w-4 h-4"></i> Mi Perfil
+                </button>
+                <button type="button" data-profile-tab="embajadores"
+                  class="profile-tab flex-1 py-2.5 rounded-xl text-xs md:text-sm font-black uppercase tracking-wider transition-all flex items-center justify-center gap-2 text-slate-500 hover:text-emerald-700">
+                  <i data-lucide="gift" class="w-4 h-4"></i> Embajadores
+                </button>
+              </div>
+            </div>
+
+            <!-- Edición del perfil -->
+            <div id="profileEditContent" class="p-8 md:p-10 flex-1">
               <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 md:gap-10">
                 <!-- Datos del Estudiante -->
                 <div class="space-y-6">
@@ -1071,6 +1088,9 @@
                 </div>
               </div>
             </div>
+
+            <!-- PROGRAMA EMBAJADORES KARPUS (Referidos) -->
+            <div id="embajadoresContainer" class="p-6 md:p-10 flex-1 hidden"></div>
           </div>
         </section>
 

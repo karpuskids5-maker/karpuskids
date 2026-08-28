@@ -13,6 +13,7 @@ import { RealtimeManager } from '../shared/realtime-manager.js';
 import { BackNavigation } from '../shared/back-navigation.js';
 import { initLiveClassListener } from './attendance_live.js';
 import { DynamicBanner } from './dynamic-banner.js';
+import { EmotionalHome } from './emotional-home.js';
 
 window.App = {
   feed: { init: (cid) => import('./feed.js').then(m => m.FeedModule.init(cid)) },
@@ -236,18 +237,37 @@ document.addEventListener('DOMContentLoaded', async () => {
       return;
     }
 
-    const currentStudent = students[0];
-    AppState.set('students', students);
+    // ✅ Cargar hermanos vinculados por sibling_id (incluso si tienen diferente parent_id)
+    let allStudents = [...students];
+    const siblingIds = students
+      .map(s => s.sibling_id)
+      .filter(id => id && !students.some(s => String(s.id) === String(id)));
+
+    if (siblingIds.length) {
+      const { data: siblings } = await supabase
+        .from('students')
+        .select('*, classrooms(id, name, level, teacher_id)')
+        .in('id', siblingIds)
+        .eq('is_active', true);
+      if (siblings?.length) {
+        // Agregar al mismo parent_id para que el panel padre pueda cambiar entre ellos
+        const enriched = siblings.map(s => ({ ...s, parent_id: auth.user.id, _linked_sibling: true }));
+        allStudents = [...allStudents, ...enriched];
+      }
+    }
+
+    const currentStudent = allStudents[0];
+    AppState.set('students', allStudents);
 
     // 🔗 Deep link del boletín (código QR): ?boletin=<id>&periodo=<id>
     const urlParams = new URLSearchParams(window.location.search);
     const deepBoletin = urlParams.get('boletin');
     const deepPeriodo = urlParams.get('periodo');
-    const selectedStudent = _pickDeepLinkStudent(students, deepBoletin) || currentStudent;
+    const selectedStudent = _pickDeepLinkStudent(allStudents, deepBoletin) || currentStudent;
     AppState.set('currentStudent', selectedStudent);
 
     // Actualizar sidebar y header ANTES de cargar datos
-    updateHeaderProfile(auth.profile, selectedStudent, students);
+    updateHeaderProfile(auth.profile, selectedStudent, allStudents);
     setupNavigation();
     setupGlobalListeners();
 
@@ -399,6 +419,9 @@ async function refreshDashboard() {
 
   renderHomeCards(student, { finance, academic, todayAtt: todayAtt?.status });
   renderDailySummary(logs, schedule);
+
+  // Hero de bienvenida emocional (no bloquea)
+  import('./emotional-home.js').then(m => m.EmotionalHome.init());
 
   // checkActiveMeetings en background — no bloquea las tarjetas
   checkActiveMeetings().catch(err => console.warn('checkActiveMeetings falló:', err));
@@ -1002,6 +1025,51 @@ function _initProfileSection(student) {
     _initPadreQR(student);
     NotifyPermission.requestIfNeeded();
   });
+  _setupProfileTabs();
+}
+
+// ── Tab "Mi Perfil / Embajadores" en la sección de perfil ─────────────────────
+let _profileTabsBound = false;
+function _setupProfileTabs() {
+  const showEdit = function (e) {
+    const edit = document.getElementById('profileEditContent');
+    const emb = document.getElementById('embajadoresContainer');
+    const tabs = document.querySelectorAll('[data-profile-tab]');
+    tabs.forEach(t => {
+      const active = t.getAttribute('data-profile-tab') === 'edit';
+      t.className = 'profile-tab flex-1 py-2.5 rounded-xl text-xs md:text-sm font-black uppercase tracking-wider transition-all flex items-center justify-center gap-2 ' +
+        (active ? 'bg-white text-emerald-700 shadow-sm' : 'text-slate-500 hover:text-emerald-700');
+    });
+    if (edit) edit.classList.remove('hidden');
+    if (emb) emb.classList.add('hidden');
+    if (window.lucide) lucide.createIcons();
+  };
+
+  const showEmbajadores = function () {
+    const edit = document.getElementById('profileEditContent');
+    const emb = document.getElementById('embajadoresContainer');
+    const tabs = document.querySelectorAll('[data-profile-tab]');
+    tabs.forEach(t => {
+      const active = t.getAttribute('data-profile-tab') === 'embajadores';
+      t.className = 'profile-tab flex-1 py-2.5 rounded-xl text-xs md:text-sm font-black uppercase tracking-wider transition-all flex items-center justify-center gap-2 ' +
+        (active ? 'bg-white text-emerald-700 shadow-sm' : 'text-slate-500 hover:text-emerald-700');
+    });
+    if (edit) edit.classList.add('hidden');
+    if (emb) emb.classList.remove('hidden');
+    if (window.lucide) lucide.createIcons();
+    import('./embajadores.js').then(m => m.EmbajadoresModule.init(emb));
+  };
+
+  const show = (tab) => (tab === 'embajadores' ? showEmbajadores() : showEdit());
+
+  if (!_profileTabsBound) {
+    Helpers.delegate(document.body, '[data-profile-tab]', 'click', (_e, el) => {
+      show(el.getAttribute('data-profile-tab'));
+    });
+    _profileTabsBound = true;
+  }
+  // Resetear al tab "Mi Perfil" por defecto cada vez que se entra
+  show('edit');
 }
 
 function _initRoutineSection(student) {
