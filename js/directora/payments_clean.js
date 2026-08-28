@@ -249,6 +249,7 @@ export const PaymentsModule = {
     const waiveMoraBtn = (mora > 0)
       ? '<button onclick="App.payments.waiveMora(\'' + p.id + '\')" class="p-1.5 bg-violet-50 text-violet-600 rounded-lg hover:bg-violet-100 transition-colors" title="Quitar Mora"><i data-lucide="shield-off" class="w-4 h-4"></i></button>'
       : '';
+    const editAmountBtn = '<button onclick="App.payments.editPaymentAmount(\'' + p.id + '\', ' + Number(p.amount || 0) + ')" class="p-1.5 bg-amber-50 text-amber-600 rounded-lg hover:bg-amber-100 transition-colors" title="Modificar Precio/Monto"><i data-lucide="edit-3" class="w-4 h-4"></i></button>';
     const deleteBtn   = '<button onclick="App.payments.delete(\'' + p.id + '\')" class="p-1.5 bg-rose-50 text-rose-500 rounded-lg hover:bg-rose-100 transition-colors" title="Eliminar"><i data-lucide="trash-2" class="w-4 h-4"></i></button>';
     const voucherCell = p.evidence_url
       ? '<a href="' + p.evidence_url + '" target="_blank" rel="noopener noreferrer" class="inline-flex items-center gap-1 text-sky-600 hover:text-sky-800 text-xs font-bold uppercase"><i data-lucide="external-link" class="w-3 h-3"></i>Ver</a>'
@@ -262,7 +263,7 @@ export const PaymentsModule = {
       '<td class="px-6 py-3.5"><div class="text-[10px] font-bold text-slate-600 uppercase truncate max-w-[120px]">' + Helpers.escapeHTML(p.bank || '-') + '</div><div class="text-[9px] text-slate-400 font-bold">' + Helpers.escapeHTML(p.reference || '') + '</div></td>' +
       '<td class="px-6 py-3.5"><div class="text-[11px] font-bold text-slate-700">' + (p.paid_date ? new Date(p.paid_date).toLocaleDateString('es-ES') : ds) + '</div><div class="text-[9px] text-slate-400 font-bold uppercase">' + (p.paid_date ? 'Pagado' : 'Vence') + '</div></td>' +
       '<td class="px-6 py-3.5 text-center">' + voucherCell + '</td>' +
-      '<td class="px-6 py-3.5 text-center"><div class="flex justify-center gap-1.5">' + approveBtn + waiveMoraBtn + deleteBtn + '</div></td>' +
+      '<td class="px-6 py-3.5 text-center"><div class="flex justify-center gap-1.5">' + approveBtn + waiveMoraBtn + editAmountBtn + deleteBtn + '</div></td>' +
     '</tr>';
   },
 
@@ -726,6 +727,38 @@ export const PaymentsModule = {
       Helpers.hideLoader();
       console.error('[Payments] runCycle error:', e);
       Helpers.toast('Error crítico en el servidor: ' + (e.message || 'Consulta al administrador'), 'error');
+    }
+  },
+
+  /**
+   * Modificar precio/monto de una mensualidad específica de un mes
+   */
+  async editPaymentAmount(id, currentAmount) {
+    const input = prompt(`Ingresa el nuevo precio/monto para este mes (RD$):`, currentAmount || '');
+    if (input === null) return; // Cancelado
+    const newAmount = parseFloat(input);
+    if (isNaN(newAmount) || newAmount < 0) {
+      Helpers.toast('Por favor ingresa un monto válido igual o mayor a 0', 'warning');
+      return;
+    }
+
+    try {
+      const { error } = await supabase
+        .from('payments')
+        .update({
+          amount: newAmount,
+          updated_at: new Date().toISOString()
+        })
+        .eq('id', id);
+
+      if (error) throw error;
+
+      Helpers.toast(`Monto actualizado a RD$${Helpers.formatCurrency(newAmount)}`, 'success');
+      await this.loadPayments();
+      this.loadStats();
+    } catch (e) {
+      console.error('[Payments] editPaymentAmount error:', e);
+      Helpers.toast('Error al actualizar el monto: ' + (e.message || e), 'error');
     }
   },
 
