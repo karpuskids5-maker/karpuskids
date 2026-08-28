@@ -163,7 +163,6 @@ export const PaymentsModule = {
         .select('id,student_id,amount,concept,status,due_date,created_at,paid_date,method,month_paid,evidence_url,notes')
         .eq('student_id', this._studentId)
         .is('deleted_at', null)
-        .or(`month_paid.eq.${currentMonth},month_paid.is.null`)
         .order('due_date', { ascending: false });
       if (error) throw error;
 
