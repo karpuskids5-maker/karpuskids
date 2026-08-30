@@ -680,6 +680,7 @@
         <i class="bi bi-sun"></i><i class="bi bi-moon-stars"></i>
       </button>
       <button onclick="togglePrivacyMode()" id="btnPrivacy" class="tb-btn" title="Modo privacidad (ocultar cifras)"><i class="bi bi-eye-slash"></i></button>
+      <button onclick="openHelpShortcutsModal()" class="tb-btn" title="Centro de Ayuda y Atajos"><i class="bi bi-question-circle"></i></button>
     </div>
   </div>
 
@@ -856,11 +857,21 @@
         <div class="kpi k-green"><div class="kpi-val" id="wall-photos">—</div><div class="kpi-lbl">Fotos</div><i class="bi bi-camera-fill kpi-icon"></i></div>
       </div>
       <div class="tab-bar">
-        <button class="tab-btn active" onclick="switchWallTab('table')"><i class="bi bi-list"></i> Lista</button>
+        <button class="tab-btn active" onclick="switchWallTab('feed')"><i class="bi bi-view-list"></i> Muro Infinito</button>
+        <button class="tab-btn" onclick="switchWallTab('table')"><i class="bi bi-list"></i> Tabla Detallada</button>
         <button class="tab-btn" onclick="switchWallTab('gallery')"><i class="bi bi-grid-3x3-gap"></i> Galería</button>
         <button class="tab-btn" onclick="switchWallTab('media')"><i class="bi bi-camera-reels"></i> Fotos y Videos</button>
       </div>
-      <div id="wallTabTable">
+      <div id="wallTabFeed">
+        <div style="max-width:680px;margin:0 auto;" id="wallInfiniteFeedContainer">
+          <!-- Post Feed Item Card template rendered in JS -->
+        </div>
+        <div id="wallFeedScrollTrigger" style="text-align:center;padding:20px;color:var(--muted);font-size:12px;display:none;">
+          <div class="spinner" style="width:24px;height:24px;margin:0 auto 8px;"></div>
+          <span>Cargando más publicaciones del muro...</span>
+        </div>
+      </div>
+      <div id="wallTabTable" style="display:none;">
         <div class="panel">
           <div class="panel-hdr"><h3><i class="bi bi-columns-gap" style="color:#6366f1;margin-right:6px;"></i>Publicaciones del muro</h3><span id="wallCount" style="font-size:11px;color:var(--muted);"></span></div>
           <div style="overflow-x:auto;">
@@ -895,9 +906,21 @@
         <div class="kpi k-purple"><div class="kpi-val" id="chat-week">—</div><div class="kpi-lbl">Mensajes (7 días)</div><i class="bi bi-envelope-paper-fill kpi-icon"></i></div>
         <div class="kpi k-orange"><div class="kpi-val" id="chat-media">—</div><div class="kpi-lbl">Archivos compartidos</div><i class="bi bi-image-fill kpi-icon"></i></div>
       </div>
+      <div style="display:flex;gap:8px;margin-bottom:16px;flex-wrap:wrap;align-items:center;justify-content:space-between;">
+        <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;">
+          <input class="inp inp-search" id="chatSearchInput" placeholder="Buscar mensajes, palabras clave, usuarios... ( / )" style="width:280px;" oninput="filterChatMessages()">
+          <select class="inp" id="chatCategoryFilter" style="width:200px;" onchange="filterChatMessages()">
+            <option value="">Todas las conversaciones</option>
+            <option value="sensitive">⚠️ Temas Sensibles / Alertas</option>
+            <option value="unread">📩 Sin leer</option>
+            <option value="media">📷 Con multimedia</option>
+          </select>
+        </div>
+        <button class="btn btn-primary" onclick="exportChatAudit()"><i class="bi bi-download"></i> Exportar Auditoría Chat</button>
+      </div>
       <div class="tab-bar">
-        <button class="tab-btn active" onclick="switchChatTab('messages')"><i class="bi bi-chat-dots"></i> Mensajes</button>
-        <button class="tab-btn" onclick="switchChatTab('conversations')"><i class="bi bi-people"></i> Conversaciones</button>
+        <button class="tab-btn active" onclick="switchChatTab('messages')"><i class="bi bi-chat-dots"></i> Inspección de Mensajes</button>
+        <button class="tab-btn" onclick="switchChatTab('conversations')"><i class="bi bi-people"></i> Directorio de Conversaciones</button>
         <button class="tab-btn" onclick="switchChatTab('media')"><i class="bi bi-image"></i> Fotos y Videos</button>
       </div>
       <div id="chatTabMessages">
@@ -906,8 +929,8 @@
             <div class="panel-hdr"><h3>Mensajes recientes</h3><span id="chatMsgCount" style="font-size:11px;color:var(--muted);"></span></div>
             <div style="overflow-x:auto;max-height:420px;">
               <table class="tbl">
-                <thead><tr><th>Fecha</th><th>De</th><th>Para</th><th>Mensaje</th><th>Estado</th></tr></thead>
-                <tbody id="chatBody"><tr><td colspan="5" style="text-align:center;padding:24px;color:var(--muted);">Cargando...</td></tr></tbody>
+                <thead><tr><th>Fecha</th><th>De</th><th>Para</th><th>Mensaje</th><th>Estado</th><th>Acción</th></tr></thead>
+                <tbody id="chatBody"><tr><td colspan="6" style="text-align:center;padding:24px;color:var(--muted);">Cargando...</td></tr></tbody>
               </table>
             </div>
           </div>
@@ -1262,10 +1285,12 @@
 <script>
   // Tab switching for Muro
   function switchWallTab(tab) {
-    ['table','gallery','media'].forEach(t => {
-      document.getElementById('wallTab' + t.charAt(0).toUpperCase() + t.slice(1)).style.display = t === tab ? '' : 'none';
+    ['feed','table','gallery','media'].forEach(t => {
+      const el = document.getElementById('wallTab' + t.charAt(0).toUpperCase() + t.slice(1));
+      if (el) el.style.display = t === tab ? '' : 'none';
     });
-    document.querySelectorAll('#sec-muro .tab-btn').forEach((b,i) => b.classList.toggle('active', ['table','gallery','media'][i] === tab));
+    document.querySelectorAll('#sec-muro .tab-btn').forEach((b,i) => b.classList.toggle('active', ['feed','table','gallery','media'][i] === tab));
+    if (tab === 'feed') window.renderWallInfiniteFeed?.();
     if (tab === 'gallery') window.renderWallGallery?.();
     if (tab === 'media') window.renderWallMedia?.();
   }

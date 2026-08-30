@@ -26,6 +26,7 @@ export const MODULES = [
   { key: 'payments',     label: 'Pagos & Cobros',      icon: 'bi-credit-card-fill',  color: '#22c55e' },
   { key: 'routine',      label: 'Rutina Diaria',       icon: 'bi-clock-history',     color: '#8b5cf6' },
   { key: 'grades',       label: 'Calificaciones',      icon: 'bi-award-fill',        color: '#eab308' },
+  { key: 'attendance',   label: 'Asistencia General',  icon: 'bi-calendar-check',    color: '#10b981' },
   { key: 'qr_access',    label: 'Control Accesos QR',  icon: 'bi-qr-code-scan',      color: '#ef4444' },
   { key: 'video_calls',  label: 'Videollamadas',       icon: 'bi-camera-video-fill', color: '#06b6d4' },
   { key: 'reenrollment', label: 'Reinscripción',       icon: 'bi-arrow-repeat',      color: '#ec4899' },
@@ -39,6 +40,10 @@ export const MODULES = [
   { key: 'push_notifications',label: 'Notificaciones Push',   icon: 'bi-bell-fill',           color: '#fb7185' },
   { key: 'preregistration',   label: 'Preinscripciones',      icon: 'bi-person-plus-fill',    color: '#2dd4bf' },
   { key: 'carnets',           label: 'Carnet Digital',        icon: 'bi-person-badge',        color: '#c084fc' },
+  { key: 'referrals',         label: 'Programa Referidos',    icon: 'bi-people-fill',         color: '#38bdf8' },
+  { key: 'medical',           label: 'Expediente Médico',     icon: 'bi-heart-pulse-fill',    color: '#f43f5e' },
+  { key: 'menu',              label: 'Menú de Comedor',       icon: 'bi-egg-fried',           color: '#f59e0b' },
+  { key: 'documents',         label: 'Documentos & Firmas',   icon: 'bi-file-earmark-pdf',    color: '#a855f7' },
 ];
 
 let _cache = null;
