@@ -12,25 +12,24 @@ const json = (data: unknown, status = 200) =>
     headers: { ...CORS, 'Content-Type': 'application/json' },
   });
 
-// Escala de recompensas del Programa Embajadores (propuesta.md §4.3)
-// Base mensual de referencia (RD$). Los montos reales se calculan según la
-// cuota configurada del colegio (finance_config.monthly_fee).
+// Escala de recompensas de la campaña "Comparte y ahorra" (propuesta.md)
+// 1 familia matriculada = 50% de descuento · 2 familias = mensualidad gratis
+// 3+ familias = crédito (el excedente no se pierde).
 const REWARD_TIERS = [
-  { minEnrolled: 1, label: 'Bronce',   rewardType: 'monthly_discount', discountPct: 15 },
-  { minEnrolled: 2, label: 'Plata',    rewardType: 'monthly_discount', discountPct: 35 },
-  { minEnrolled: 3, label: 'Oro',      rewardType: 'free_month',       discountPct: 100 },
-  { minEnrolled: 4, label: 'Leyenda',  rewardType: 'cashback',         amount: 100 },
+  { minEnrolled: 1, label: 'Comparte y ahorra', rewardType: 'monthly_discount', discountPct: 50 },
+  { minEnrolled: 2, label: 'Comparte y ahorra', rewardType: 'free_month',       discountPct: 100 },
+  { minEnrolled: 3, label: 'Comparte y ahorra', rewardType: 'cashback',         discountPct: 100, amount: 5000 },
 ];
 
 const REWARD_DESCRIPTIONS: Record<string, string> = {
-  monthly_discount: 'Descuento en tu próxima mensualidad por referido matriculado',
-  free_month:       '1 MES TOTALMENTE GRATIS de mensualidad por referidos matrinuclados 🎉',
-  cashback:         'Crédito acumulable en Monedero Escolar por ser Leyenda Karpus',
+  monthly_discount: '50% de descuento en tu próxima mensualidad por tu recomendación ❤️',
+  free_month:       '¡Mensualidad gratis! 2 familias se matricularon con tu enlace 🎉',
+  cashback:         'Crédito Karpus por referidos adicionales (excedente de la campaña)',
 };
 
 /**
- * Calcula la recompensa para un embajador según su número de referidos matriculados.
- * Devuelve el objeto de recompensa a insertar.
+ * Calcula la recompensa de la campaña "Comparte y ahorra" según el número de
+ * referidos matriculados. Devuelve el objeto de recompensa a insertar.
  */
 function computeReward(enrolledCount: number): { reward_type: string; amount: number | null; discount_pct: number; description: string } | null {
   if (enrolledCount < 1) return null;
@@ -42,7 +41,7 @@ function computeReward(enrolledCount: number): { reward_type: string; amount: nu
     reward_type: tier.rewardType,
     amount: tier.amount != null ? tier.amount : 0,
     discount_pct: tier.discountPct,
-    description: REWARD_DESCRIPTIONS[tier.rewardType] || 'Recompensa Embajador Karpus',
+    description: REWARD_DESCRIPTIONS[tier.rewardType] || 'Descuento por referido Karpus Kids',
   };
 }
 
@@ -204,18 +203,18 @@ async function handleEnrollment(supabase: any, payload: { referral_id?: string; 
 }
 
 /**
- * Envía notificación interna + push de celebración al padre promotor.
+ * Envía notificación interna + push de celebración al padre que recomendó.
  */
 async function sendCelebration(supabase: any, parentId: string, enrolledCount: number, reward: { reward_type: string; description: string; discount_pct: number }) {
-  let title = '¡Tienes un nuevo referido matriculado! 🎉';
-  let message = `La familia completó su inscripción. Has ganado una recompensa Embajador Karpus.`;
+  let title = '¡Tu recomendación dio resultado! 🎉';
+  let message = 'La familia completó su inscripción. Gracias por compartir Karpus Kids.';
 
   if (reward.reward_type === 'free_month') {
-    title = '¡Eres Embajador ORO! 🏆';
-    message = 'Tu 1 MES GRATIS de mensualidad está listo en tu Monedero Escolar.';
+    title = '¡Mensualidad gratis! 🎉';
+    message = '2 familias se matricularon con tu enlace. Tu próxima mensualidad está cubierta.';
   } else if (reward.reward_type === 'cashback') {
-    title = '¡Leyenda Karpus! 👑';
-    message = 'Recibiste $100 USD en crédito acumulable en tu Monedero Escolar.';
+    title = '¡Gracias por compartir Karpus Kids! ❤️';
+    message = 'Recibiste crédito Karpus por tus referidos adicionales.';
   } else if (reward.discount_pct) {
     message = `Recibiste ${reward.discount_pct}% de descuento en tu próxima mensualidad.`;
   }

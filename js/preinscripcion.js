@@ -511,7 +511,7 @@ async function submit() {
     });
     if (error) { throw error; }
 
-    // ── Programa Embajadores: registrar referido si vino con código `ref` ──
+    // ── Comparte y ahorra: registrar referido si vino con código `ref` ──
     const refCode = new URLSearchParams(window.location.search).get('ref');
     if (refCode && rowId) {
       try {

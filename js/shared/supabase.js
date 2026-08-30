@@ -379,10 +379,10 @@ export async function ensureRole(requiredRoles) {
 }
 
 // ── Email via Resend (Edge Function send-email) ───────────────────────────────
-export async function sendEmail(to, subject, html, text) {
+export async function sendEmail(to, subject, html, text, attachments) {
   try {
     const { data, error } = await supabase.functions.invoke('send-email', {
-      body: { to, subject, html, text }
+      body: { to, subject, html, text, attachments }
     });
 
     if (error) {

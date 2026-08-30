@@ -415,7 +415,8 @@ export const PaymentsModule = {
           method, bank, reference, notes,
           validated_by,
           students:student_id (
-            name, p1_name, p1_email, p2_name,
+            name, last_name, matricula, birth_date, age, age_type,
+            p1_name, p2_name, p1_phone, p2_phone, p1_email, p2_email,
             classrooms:classroom_id ( name )
           )
         `)
@@ -554,136 +555,45 @@ export const PaymentsModule = {
     modal.addEventListener('click', (e) => { if (e.target === modal) modal.remove(); });
     document.body.appendChild(modal);
 
-    // Botón de descarga PDF con jsPDF
+    // Botón de descarga PDF (formato oficial A4 compartido con Directora)
     modal.querySelector('#btnDownloadPDF').addEventListener('click', () => {
-      this._downloadReceiptPDF({
-        receiptNo, studentName, parentName, classroom, paidDate,
-        method, bank: payment.bank, reference: payment.reference,
-        monthPaid, amountFmt, approvedBy, amount
-      });
+      this._downloadReceiptPDF(payment, approvedBy, amount);
     });
   },
 
   /**
-   * 📄 Genera y descarga el recibo como PDF usando jsPDF
+   * 📄 Descarga la factura oficial (A4) usando el módulo compartido de facturación.
    */
-  async _downloadReceiptPDF(data) {
+  async _downloadReceiptPDF(payment, approvedBy, tendered = 0) {
     const btn = document.getElementById('btnDownloadPDF');
     if (btn) { btn.textContent = '⏳ Generando...'; btn.disabled = true; }
-
     try {
-      // Cargar jsPDF si no está disponible
-      if (!window.jspdf) {
-        await new Promise((resolve, reject) => {
-          const s = document.createElement('script');
-          s.src = 'js/shared/jspdf.min.js';
-          s.onload = resolve; s.onerror = reject;
-          document.head.appendChild(s);
-        });
-      }
-
-      const { jsPDF } = window.jspdf;
-      const doc = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a5' });
-      const W = doc.internal.pageSize.getWidth();
-
-      // ── Header verde ──────────────────────────────────────────
-      doc.setFillColor(22, 163, 74);
-      doc.roundedRect(0, 0, W, 42, 0, 0, 'F');
-      doc.setTextColor(255, 255, 255);
-      doc.setFont('helvetica', 'bold');
-      doc.setFontSize(18);
-      doc.text('Karpus Kids', W / 2, 16, { align: 'center' });
-      doc.setFontSize(8);
-      doc.setFont('helvetica', 'normal');
-      doc.text('RECIBO DE PAGO OFICIAL', W / 2, 23, { align: 'center' });
-      doc.setFontSize(10);
-      doc.setFont('courier', 'bold');
-      doc.text(data.receiptNo, W / 2, 33, { align: 'center' });
-
-      // ── Sello aprobado ────────────────────────────────────────
-      doc.setFillColor(240, 253, 244);
-      doc.rect(0, 42, W, 16, 'F');
-      doc.setTextColor(21, 128, 61);
-      doc.setFont('helvetica', 'bold');
-      doc.setFontSize(10);
-      doc.text('Pago Confirmado y Aprobado', 14, 51);
-      doc.setFontSize(8);
-      doc.setFont('helvetica', 'normal');
-      doc.text(`Aprobado por: ${data.approvedBy}`, 14, 57);
-
-      // ── Datos del estudiante ──────────────────────────────────
-      let y = 68;
-      doc.setFillColor(248, 250, 252);
-      doc.roundedRect(10, y - 5, W - 20, 36, 3, 3, 'F');
-      doc.setTextColor(148, 163, 184);
-      doc.setFontSize(7);
-      doc.setFont('helvetica', 'bold');
-      doc.text('DATOS DEL ESTUDIANTE', 14, y);
-      y += 6;
-
-      const col2 = W / 2 + 2;
-      const infoRows = [
-        ['Estudiante', data.studentName, 'Aula', data.classroom],
-        ['Padre/Tutor', data.parentName, 'Fecha de Pago', data.paidDate]
-      ];
-      doc.setFontSize(8);
-      for (const [l1, v1, l2, v2] of infoRows) {
-        doc.setTextColor(100, 116, 139); doc.setFont('helvetica', 'normal');
-        doc.text(l1, 14, y); doc.text(l2, col2, y);
-        doc.setTextColor(30, 41, 59); doc.setFont('helvetica', 'bold');
-        doc.text(String(v1), 14, y + 4); doc.text(String(v2), col2, y + 4);
-        y += 11;
-      }
-
-      // ── Detalle del pago ──────────────────────────────────────
-      y += 2;
-      doc.setTextColor(148, 163, 184);
-      doc.setFontSize(7);
-      doc.setFont('helvetica', 'bold');
-      doc.text('DETALLE DEL PAGO', 14, y);
-      y += 6;
-
-      const detailRows = [
-        ['Concepto', data.monthPaid],
-        ['Método de Pago', data.method],
-        ...(data.bank ? [['Banco', data.bank]] : []),
-        ...(data.reference ? [['Referencia', data.reference]] : [])
-      ];
-
-      doc.setFontSize(9);
-      for (const [label, value] of detailRows) {
-        doc.setTextColor(100, 116, 139); doc.setFont('helvetica', 'normal');
-        doc.text(label, 14, y);
-        doc.setTextColor(30, 41, 59); doc.setFont('helvetica', 'bold');
-        doc.text(String(value), W - 14, y, { align: 'right' });
-        doc.setDrawColor(241, 245, 249);
-        doc.line(14, y + 2, W - 14, y + 2);
-        y += 9;
-      }
-
-      // Total row
-      doc.setFillColor(240, 253, 244);
-      doc.roundedRect(10, y - 4, W - 20, 12, 2, 2, 'F');
-      doc.setTextColor(21, 128, 61);
-      doc.setFont('helvetica', 'bold');
-      doc.setFontSize(11);
-      doc.text('TOTAL PAGADO', 14, y + 4);
-      doc.text(data.amountFmt, W - 14, y + 4, { align: 'right' });
-      y += 18;
-
-      // ── Footer ────────────────────────────────────────────────
-      doc.setFillColor(248, 250, 252);
-      doc.roundedRect(10, y, W - 20, 20, 3, 3, 'F');
-      doc.setTextColor(148, 163, 184);
-      doc.setFontSize(7);
-      doc.setFont('helvetica', 'normal');
-      doc.text('San Cristóbal, República Dominicana', W / 2, y + 6, { align: 'center' });
-      doc.text('Este recibo es un comprobante oficial de pago de Karpus Kids.', W / 2, y + 11, { align: 'center' });
-      doc.setFont('courier', 'normal');
-      doc.text(`ID: ${data.receiptNo} · ${new Date().toLocaleDateString('es-DO')}`, W / 2, y + 16, { align: 'center' });
-
-      doc.save(`Recibo-${data.receiptNo}.pdf`);
-      Helpers.toast('Recibo descargado', 'success');
+      const { downloadFactura } = await import('../shared/factura.js');
+      const st = payment.students || {};
+      const parentName = st.p1_name || st.p2_name || 'Padre/Tutor';
+      const parentEmail = st.p1_email || st.p2_email || null;
+      const parentPhone = st.p1_phone || st.p2_phone || '';
+      const amount = Number(payment.amount || 0);
+      const change = Math.max(0, (tendered || amount) - amount);
+      await downloadFactura(payment, {
+        student: st,
+        parent: { name: parentName, email: parentEmail, phone: parentPhone },
+        amount,
+        subtotal: amount,
+        descuento: 0,
+        recargo: 0,
+        total: amount,
+        tendered: tendered || amount,
+        change,
+        month: payment.month_paid || 'Colegiatura',
+        method: payment.method || 'efectivo',
+        concept: payment.concept || 'Mensualidad',
+        dueDate: payment.due_date || null,
+        paidDate: payment.paid_date || null,
+        status: payment.status || 'paid',
+        approvedBy: approvedBy || 'Administración Karpus Kids'
+      });
+      Helpers.toast('Factura descargada', 'success');
     } catch (err) {
       console.error('Error generando PDF:', err);
       Helpers.toast('Error al generar PDF', 'error');

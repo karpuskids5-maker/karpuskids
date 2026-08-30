@@ -51,6 +51,7 @@ window.App = {
     filterBy: (v) => import('./payments_clean.js').then(m => m.PaymentsModule.filterBy?.(v)),
     delete: (id) => import('./payments_clean.js').then(m => m.PaymentsModule.delete(id)),
     waiveMora: (id) => import('./payments_clean.js').then(m => m.PaymentsModule.waiveMora(id)),
+    editPaymentAmount: (id) => import('./payments_clean.js').then(m => m.PaymentsModule.editPaymentAmount(id)),
   },
   attendance: {
     init: () => import('./attendance.module.js').then(m => m.AttendanceModule.init()),

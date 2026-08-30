@@ -357,10 +357,15 @@ export const PaymentsModule = {
         '<div><label class="' + lc + '">Mes que se cobra</label><select id="payMonthPaid" class="' + ic + '">' + mo + '</select></div>' +
         '<div><label class="' + lc + '">Fecha Limite</label><input id="payDueDate" type="date" class="' + ic + '" value="' + dd + '"></div>' +
         '<div><label class="' + lc + '">Metodo</label><select id="payMethod" class="' + ic + '"><option value="efectivo">Efectivo</option><option value="transferencia">Transferencia</option><option value="tarjeta">Tarjeta</option></select></div>' +
-        '<div><label class="' + lc + '">Estado</label><select id="payStatus" class="' + ic + '"><option value="paid">Pagado</option><option value="pending">Pendiente</option></select></div>' +
-      '</div></div>' +
+        '<div><label class="' + lc + '">Estado</label><select id="payStatus" class="' + ic + '"><option value="paid">Pagado</option><option value="pending" selected>Pendiente</option></select></div>' +
+        '<div><label class="' + lc + '">Monto Dado / Efectivo ($)</label><input id="payTendered" type="number" step="0.01" min="0" class="' + ic + '" placeholder="0.00" inputmode="decimal"></div>' +
+        '<div><label class="' + lc + '">Devuelta ($)</label><input id="payChange" type="text" class="' + ic + '" readonly placeholder="0.00" style="background:#f1f5f9;font-weight:800;color:#334155;"></div>' +
+      '</div>' +
+      '<div id="payChangeAlert" class="hidden px-6 py-3 text-xs font-black text-rose-600 bg-rose-50 border-t border-rose-100"></div>' +
+      '</div>' +
       '<div class="bg-white p-5 rounded-b-3xl border-t border-slate-100 flex justify-end gap-3">' +
         '<button onclick="App.ui.closeModal()" class="px-6 py-2.5 text-slate-500 font-black text-xs uppercase hover:bg-slate-50 rounded-2xl">Cancelar</button>' +
+        '<button id="btnPrintInvoiceAction" class="px-6 py-2.5 bg-white text-indigo-600 border-2 border-indigo-200 rounded-2xl font-black text-xs uppercase hover:bg-indigo-50 transition-all">Imprimir Factura</button>' +
         '<button id="btnSavePaymentAction" class="px-10 py-2.5 bg-gradient-to-r from-purple-600 to-indigo-600 text-white rounded-2xl font-black text-xs uppercase shadow-lg shadow-purple-100 transition-all hover:-translate-y-0.5 active:scale-95">Registrar Pago</button>' +
       '</div>'
     );
@@ -396,6 +401,32 @@ export const PaymentsModule = {
             }).join('');
         }
 
+        // Devuelta = montoDado - monto (en tiempo real)
+        const recalcChange = () => {
+          const amt = parseFloat(document.getElementById('payAmount')?.value || 0);
+          const tend = parseFloat(document.getElementById('payTendered')?.value || 0);
+          const chgInput = document.getElementById('payChange');
+          const alertBox = document.getElementById('payChangeAlert');
+          if (chgInput) {
+            const chg = tend - amt;
+            chgInput.value = (chg > 0 ? chg : 0).toFixed(2);
+            chgInput.style.color = chg < 0 ? '#dc2626' : '#16a34a';
+          }
+          if (alertBox) {
+            const isCash = (document.getElementById('payMethod')?.value || 'efectivo') === 'efectivo';
+            if (isCash && tend > 0 && tend < amt) {
+              alertBox.classList.remove('hidden');
+              alertBox.textContent = 'El monto dado es menor al total (' + 'RD$' + amt.toFixed(2) + '). Falta: RD$' + (amt - tend).toFixed(2);
+            } else {
+              alertBox.classList.add('hidden');
+            }
+          }
+        };
+        ['payAmount', 'payTendered', 'payMethod'].forEach(id => {
+          const el = document.getElementById(id);
+          if (el) el.addEventListener('input', recalcChange);
+        });
+
         // Auto-fill monto + mora al seleccionar estudiante
         select.addEventListener('change', (e) => {
           const opt = e.target.selectedOptions[0];
@@ -403,6 +434,9 @@ export const PaymentsModule = {
             document.getElementById('payStudentInfo')?.classList.add('hidden');
             return;
           }
+          // Los estudiantes listados estan pendientes/vencidos → Estado por defecto "Pendiente"
+          const statusSel = document.getElementById('payStatus');
+          if (statusSel) statusSel.value = 'pending';
           const fee = parseFloat(opt.dataset.fee || 0);
           const dueDate = opt.dataset.due;
           const monthPaid = opt.dataset.month;
@@ -441,6 +475,8 @@ export const PaymentsModule = {
             }
           }
 
+          recalcChange();
+
           // Sincronizar mes del pago → siempre mes actual
           const nowSel = new Date();
           const currentMonth = String(nowSel.getMonth() + 1).padStart(2, '0');
@@ -463,6 +499,7 @@ export const PaymentsModule = {
     } catch (_) {}
 
     document.getElementById('btnSavePaymentAction')?.addEventListener('click', () => this.saveManualPayment());
+    document.getElementById('btnPrintInvoiceAction')?.addEventListener('click', () => this._printInvoiceFromModal());
     if (window.lucide) lucide.createIcons();
   },
 
@@ -475,9 +512,12 @@ export const PaymentsModule = {
     const met = document.getElementById('payMethod')?.value || 'efectivo';
     const sta = document.getElementById('payStatus')?.value || 'paid';
     const pd  = sta === 'paid' ? new Date().toISOString() : null;
+    const tendered = parseFloat(document.getElementById('payTendered')?.value || 0) || 0;
 
     if (!sid) return Helpers.toast('Selecciona un estudiante', 'warning');
     if (!amt || amt <= 0) return Helpers.toast('Ingresa un monto valido', 'warning');
+    if ((met === 'efectivo') && sta === 'paid' && tendered <= 0) return Helpers.toast('Ingresa el monto dado en efectivo', 'warning');
+    if ((met === 'efectivo') && tendered > 0 && tendered < amt) return Helpers.toast('El monto dado no cubre el total', 'warning');
 
     const saveBtn = document.getElementById('btnSavePaymentAction');
     if (saveBtn) { saveBtn.disabled = true; saveBtn.textContent = 'Guardando...'; }
@@ -538,12 +578,50 @@ export const PaymentsModule = {
         DirectorApi.sendPaymentReceipt(pay.id).catch(() => {});
         try {
           const { data: p } = await DirectorApi.getPaymentById(pay.id);
-          if (p) {
-            const { notifyPaymentApproved } = await import('../shared/supabase.js');
-            const email = p.students?.p1_email || p.students?.p2_email || null;
-            const amountStr = 'RD$' + Number(amt).toLocaleString('es-DO', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-            await notifyPaymentApproved(pay.id, email, p.students?.name || 'Estudiante', amountStr, mp || 'Colegiatura');
+          const studentName = p?.students?.name || 'Estudiante';
+          const parentEmail = p?.students?.p1_email || p?.students?.p2_email || null;
+          const amountStr = 'RD$' + Number(amt).toLocaleString('es-DO', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+
+          // Construir y enviar la factura (PDF) como adjunto
+          try {
+            const { buildFactura } = await import('../shared/factura.js');
+            const when = new Date();
+            const parentName = p?.students?.p1_name || p?.students?.p2_name || null;
+            const built = await buildFactura(p, {
+              student: p?.students || {},
+              parent: { name: parentName, email: parentEmail, phone: (p?.students?.p1_phone || p?.students?.p2_phone || '') },
+              amount: amt,
+              subtotal: amt,
+              descuento: 0,
+              recargo: 0,
+              total: amt,
+              tendered,
+              change: Math.max(0, tendered - amt),
+              month: mp || 'Colegiatura',
+              method: met,
+              concept: con,
+              dueDate: dd || null,
+              paidDate: when.toISOString(),
+              status: sta,
+              approvedBy: 'Administración Karpus Kids',
+              note: 'Pagado desde el panel de la Directora.'
+            });
+            const { sendEmail } = await import('../shared/supabase.js');
+            if (parentEmail && built?.pdfBase64) {
+              await sendEmail(
+                parentEmail,
+                'Factura de Pago - ' + (mp || 'Colegiatura') + ' · ' + built.data.receiptNo,
+                await this._buildReceiptEmailHTML(studentName, built.data.total, mp || 'Colegiatura', built.data.receiptNo),
+                'Adjuntamos la factura de tu pago registrado.',
+                [{ filename: 'Factura-' + built.data.receiptNo + '.pdf', content: built.pdfBase64 }]
+              ).catch(() => {});
+            }
+          } catch (pdfErr) {
+            console.warn('[Payments] No se pudo enviar factura PDF:', pdfErr);
           }
+
+          const { notifyPaymentApproved } = await import('../shared/supabase.js');
+          await notifyPaymentApproved(pay.id, parentEmail, studentName, amountStr, mp || 'Colegiatura');
         } catch (_) {}
       }
     } catch (e) {
@@ -553,6 +631,74 @@ export const PaymentsModule = {
       UIHelpers.setLoading(false, '#modalPayment');
       if (saveBtn) { saveBtn.disabled = false; saveBtn.textContent = 'Registrar Pago'; }
     }
+  },
+
+  // Requiere las librerías de la factura (jsPDF, autotable, QR)
+  async _ensureFacturaLibs() {
+    try {
+      const { loadFacturaLibs } = await import('../shared/factura.js');
+      return await loadFacturaLibs();
+    } catch (_) { return false; }
+  },
+
+  // Imprime la factura del estudiante/monto seleccionados en el modal (formato oficial)
+  async _printInvoiceFromModal() {
+    try {
+      const select = document.getElementById('payStudentSelect');
+      const opt = select?.selectedOptions?.[0];
+      if (!opt?.value) return Helpers.toast('Selecciona un estudiante', 'warning');
+
+      const { printFactura, getActivePeriodLabel } = await import('../shared/factura.js');
+      const sid = opt.value;
+      const amt = parseFloat(document.getElementById('payAmount')?.value || opt.dataset.fee || 0);
+      const month = document.getElementById('payMonthPaid')?.value || opt.dataset.month || null;
+      const due = document.getElementById('payDueDate')?.value || opt.dataset.due || null;
+
+      const { data: s } = await supabase
+        .from('students')
+        .select('name, last_name, matricula, birth_date, age, age_type, p1_name, p2_name, p1_phone, p2_phone, p1_email, p2_email, classrooms:classroom_id(name)')
+        .eq('id', sid)
+        .single();
+
+      const period = await getActivePeriodLabel();
+      await printFactura({}, {
+        student: s || {},
+        parent: { name: (s?.p1_name || s?.p2_name || null), email: (s?.p1_email || s?.p2_email || null), phone: (s?.p1_phone || s?.p2_phone || '') },
+        amount: amt,
+        subtotal: amt,
+        descuento: 0,
+        recargo: 0,
+        total: amt,
+        tendered: 0,
+        change: 0,
+        month: month || 'Colegiatura',
+        method: 'efectivo',
+        concept: document.getElementById('payConcept')?.value?.trim() || 'Mensualidad',
+        dueDate: due || null,
+        status: 'pending',
+        period,
+        approvedBy: 'Administración Karpus Kids'
+      });
+    } catch (e) {
+      console.error('[Payments] _printInvoiceFromModal error:', e);
+      Helpers.toast('No se pudo generar la factura', 'error');
+    }
+  },
+
+  // HTML del correo de confirmación con la factura adjunta
+  async _buildReceiptEmailHTML(studentName, total, month, receiptNo) {
+    const { fmtRD } = await import('../shared/factura.js');
+    return '<div style="font-family:Arial,Helvetica,sans-serif;background:#f8fafc;padding:24px;border-radius:14px;max-width:480px">' +
+      '<div style="background:#141c30;color:#fff;padding:18px;border-radius:12px;font-weight:800;font-size:17px">Karpus Kids</div>' +
+      '<div style="background:#fff;border:1px solid #e2e8f0;border-radius:12px;padding:18px;margin-top:12px">' +
+      '<p style="margin:0 0 12px;color:#0f172a;font-size:14px;font-weight:700">Hola ' + studentName + ',</p>' +
+      '<p style="margin:0 0 12px;color:#475569;font-size:13px;line-height:1.5">Registramos tu pago por la colegiatura y te enviamos la factura oficial adjunta.</p>' +
+      '<table style="width:100%;border-collapse:collapse;font-size:13px">' +
+        '<tr><td style="padding:6px 0;color:#64748b">Periodo</td><td style="padding:6px 0;text-align:right;font-weight:700;color:#0f172a">' + month + '</td></tr>' +
+        '<tr><td style="padding:6px 0;color:#64748b">Total pagado</td><td style="padding:6px 0;text-align:right;font-weight:800;color:#16a34a">' + fmtRD(total) + '</td></tr>' +
+      '</table>' +
+      '<p style="margin:14px 0 0;font-size:11px;color:#94a3b8">Recibo: ' + (receiptNo || '—') + '</p>' +
+      '</div></div>';
   },
 
   async markPaid(id) {

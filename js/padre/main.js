@@ -28,6 +28,7 @@ window.App = {
   navigateTo: navigateTo,
   goBack: () => _goBack(),
   openTeacherChat: () => _openTeacherChat(),
+  openReferidos: () => _openReferidos(),
   celebrate: (colors) => _celebrate(colors),
   openDigitalID: openDigitalID,
   switchStudent: switchStudent,
@@ -225,6 +226,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     
     if (isProd) { await _initPush(auth.user); }
 
+    // 1) Consulta primaria: estudiantes con parent_id = usuario logueado
     const { data: students, error } = await supabase
       .from('students')
       .select('*, classrooms(id, name, level, teacher_id)')
@@ -232,29 +234,232 @@ document.addEventListener('DOMContentLoaded', async () => {
       .order('name');
 
     if (error) throw error;
-    if (!students?.length) {
+
+    let allStudents = [...(students || [])];
+
+    // ------------------------------------------------------------------
+    // ✅ CURAR AUTOVINCULACIÓN CORRUPTA: si sibling_id === propio id
+    // ------------------------------------------------------------------
+    const curedMap = new Map();
+    const seenIds = new Set(allStudents.map(s => String(s.id)));
+    allStudents.forEach(s => {
+      const sId = String(s.id);
+      const sibId = s.sibling_id ? String(s.sibling_id) : '';
+      if (sibId && sibId === sId) {
+        curedMap.set(sId, true);
+        s.has_siblings = false;
+        s.sibling_id = null;
+        // Fire-and-forget: limpiar en BD
+        try {
+          supabase.from('students').update({
+            has_siblings: false,
+            sibling_id: null,
+          }).eq('id', s.id);
+        } catch (_) {}
+      }
+    });
+
+    // ------------------------------------------------------------------
+    // ✅ RECOLECTAR identidad familiar: emails y cédulas de los tutores
+    //    de todos los estudiantes ya encontrados por parent_id.
+    // ------------------------------------------------------------------
+    const familyEmails = new Set();
+    const familyCedulas = new Set();
+    const collectIdentity = (s) => {
+      if (!s) return;
+      [s.p1_email, s.p2_email].forEach(v => {
+        const e = String(v || '').trim().toLowerCase();
+        if (e) familyEmails.add(e);
+      });
+      [s.p1_cedula, s.p2_cedula].forEach(v => {
+        const c = String(v || '').trim().replace(/\D/g, '');
+        if (c) familyCedulas.add(c);
+      });
+    };
+    allStudents.forEach(collectIdentity);
+
+    // Si la búsqueda por parent_id no arrojó nada, sembrar la identidad
+    // con el email de la cuenta del padre (los estudiantes guardan p1_email/p2_email).
+    if (!allStudents.length && auth.user?.email) {
+      familyEmails.add(String(auth.user.email).trim().toLowerCase());
+    }
+
+    // ------------------------------------------------------------------
+    // ✅ AGRUPACIÓN TRANSITIVA por identidad compartida (email/cédula de tutor).
+    //    Captura hermanos aunque tengan distinto parent_id o sin sibling_id,
+    //    iterando hasta no encontrar más miembros de la familia.
+    // ------------------------------------------------------------------
+    let familyList = [];
+    if (familyEmails.size || familyCedulas.size) {
+      try {
+        const { data: fam = [] } = await supabase
+          .from('students')
+          .select('*, classrooms(id, name, level, teacher_id)')
+          .is('deleted_at', null)
+          .order('name')
+          .limit(300);
+        familyList = fam;
+      } catch (_) {}
+    }
+    let familyChanged = true;
+    let familyRound = 0;
+    while (familyChanged && familyRound < 4) {
+      familyChanged = false;
+      familyRound++;
+      for (const s of familyList) {
+        const key = String(s.id);
+        if (seenIds.has(key)) continue;
+        const hasEmail = [s.p1_email, s.p2_email]
+          .map(v => String(v || '').trim().toLowerCase()).filter(Boolean)
+          .some(ev => familyEmails.has(ev));
+        const hasCedula = [s.p1_cedula, s.p2_cedula]
+          .map(v => String(v || '').trim().replace(/\D/g, '')).filter(Boolean)
+          .some(cv => familyCedulas.has(cv));
+        if (hasEmail || hasCedula) {
+          allStudents.push({ ...s, parent_id: auth.user.id, _linked_family: true });
+          seenIds.add(key);
+          collectIdentity(s);
+          familyChanged = true;
+        }
+      }
+    }
+
+    // ------------------------------------------------------------------
+    // ✅ COLECCIÓN DE IDs de hermanos por sibling_id (dirección FORWARD).
+    //    Se cargan aunque tengan distinto email/cédula/parent_id.
+    // ------------------------------------------------------------------
+    const forwardIds = new Set();
+    const siblingNamesToSearch = [];
+    allStudents.forEach(s => {
+      const sibId = s.sibling_id ? String(s.sibling_id) : '';
+      if (sibId && !seenIds.has(sibId) && !curedMap.has(String(s.id))) {
+        forwardIds.add(sibId);
+      }
+      // Fallback: recopilar sibling_name (si no hay sibling_id)
+      if (!sibId && s.has_siblings && s.sibling_name?.trim()) {
+        siblingNamesToSearch.push(String(s.sibling_name).trim().toLowerCase());
+      }
+    });
+
+    // Búsqueda inversa: estudiantes que TIENEN a alguno de mis hijos como sibling_id
+    if (seenIds.size) {
+      try {
+        const { data: reverseSibs } = await supabase
+          .from('students')
+          .select('*, classrooms(id, name, level, teacher_id)')
+          .in('sibling_id', [...seenIds]);
+        if (reverseSibs?.length) {
+          reverseSibs.forEach(s => {
+            if (!seenIds.has(String(s.id))) forwardIds.add(String(s.id));
+          });
+        }
+      } catch (_) {}
+    }
+
+    // Cargar hermanos por sibling_id (dirección forward)
+    if (forwardIds.size) {
+      try {
+        const { data: siblings } = await supabase
+          .from('students')
+          .select('*, classrooms(id, name, level, teacher_id)')
+          .in('id', [...forwardIds]);
+        if (siblings?.length) {
+          siblings.forEach(s => {
+            if (!seenIds.has(String(s.id))) {
+              allStudents.push({ ...s, parent_id: auth.user.id, _linked_sibling: true });
+              seenIds.add(String(s.id));
+            }
+          });
+        }
+      } catch (_) {}
+    }
+
+    // ------------------------------------------------------------------
+    // ✅ FALLBACK: buscar por sibling_name (MATCH FUZZY tokens + startsWith)
+    // ------------------------------------------------------------------
+    if (siblingNamesToSearch.length) {
+      const uniqueNames = [...new Set(siblingNamesToSearch)].filter(n => n.length >= 2);
+      for (const searchName of uniqueNames) {
+        if (seenIds.size > 15) break;
+        // Tokenizar la búsqueda (nombres compuestos como "Candido Mathias" = 2 tokens)
+        const searchTokens = searchName.split(/\s+/).filter(t => t.length >= 2);
+        try {
+          const { data: nameMatches } = await supabase
+            .from('students')
+            .select('*, classrooms(id, name, level, teacher_id)')
+            .is('deleted_at', null)
+            .order('name')
+            .limit(200);
+          if (nameMatches?.length) {
+            const hit = nameMatches.find(s => {
+              if (seenIds.has(String(s.id))) return false;
+              const full = ((s.name || '') + ' ' + (s.last_name || '')).trim().toLowerCase();
+              const justName = String(s.name || '').toLowerCase();
+              if (!full) return false;
+              // 1) Coincidencia EXACTA
+              if (full === searchName || justName === searchName) return true;
+              // 2) EMPIEZA por la búsqueda (Candido Mathias ⊆ Candido Mathias Ravelo Samuel)
+              if (full.startsWith(searchName) || justName.startsWith(searchName)) return true;
+              // 3) TODOS los tokens de búsqueda están presentes en el nombre completo
+              if (searchTokens.length) {
+                const fullTokens = full.split(/\s+/);
+                return searchTokens.every(tok => fullTokens.includes(tok));
+              }
+              return false;
+            });
+            if (hit) {
+              allStudents.push({ ...hit, parent_id: auth.user.id, _linked_sibling: true, _matched_by_name: true });
+              seenIds.add(String(hit.id));
+            }
+          }
+        } catch (_) {}
+      }
+    }
+
+    // ------------------------------------------------------------------
+    // ✅ Deduplicación final y ordenamiento
+    // ------------------------------------------------------------------
+    const finalSeen = new Set();
+    const diagnostics = { cured_self: 0, linked: 0, by_name: 0, by_family: 0, total: 0 };
+    allStudents = allStudents
+      .filter(s => {
+        const key = String(s.id);
+        if (finalSeen.has(key)) return false;
+        finalSeen.add(key);
+        // ✅ CURAR pasada final: eliminar cualquier rastro de autovinculación
+        const sib = s.sibling_id ? String(s.sibling_id) : '';
+        if (sib && sib === key) {
+          s.has_siblings = false;
+          s.sibling_id = null;
+          diagnostics.cured_self++;
+        }
+        if (s._linked_sibling) diagnostics.linked++;
+        if (s._matched_by_name) diagnostics.by_name++;
+        if (s._linked_family) diagnostics.by_family++;
+        return true;
+      })
+      .sort((a, b) => String(a.name || '').localeCompare(String(b.name || '')));
+
+    diagnostics.total = allStudents.length;
+
+    if (!diagnostics.total) {
       _showEmptyStudents();
       return;
     }
 
-    // ✅ Cargar hermanos vinculados por sibling_id (incluso si tienen diferente parent_id)
-    let allStudents = [...students];
-    const siblingIds = students
-      .map(s => s.sibling_id)
-      .filter(id => id && !students.some(s => String(s.id) === String(id)));
-
-    if (siblingIds.length) {
-      const { data: siblings } = await supabase
-        .from('students')
-        .select('*, classrooms(id, name, level, teacher_id)')
-        .in('id', siblingIds)
-        .eq('is_active', true);
-      if (siblings?.length) {
-        // Agregar al mismo parent_id para que el panel padre pueda cambiar entre ellos
-        const enriched = siblings.map(s => ({ ...s, parent_id: auth.user.id, _linked_sibling: true }));
-        allStudents = [...allStudents, ...enriched];
-      }
-    }
+    // ✅ TOAST DIAGNÓSTICO VISIBLE: cuántos estudiantes cargados + por qué estrategia
+    try {
+      let msg = `✅ Cargados ${diagnostics.total} estudiante(s)`;
+      const parts = [];
+      if (diagnostics.cured_self) parts.push(`${diagnostics.cured_self} corregido(s)`);
+      if (diagnostics.by_family) parts.push(`${diagnostics.by_family} por email/cédula de tutor`);
+      if (diagnostics.by_name) parts.push(`${diagnostics.by_name} por nombre hermano`);
+      if (diagnostics.linked) parts.push(`${diagnostics.linked} vinculados por sibling_id`);
+      if (parts.length) msg += ` · ${parts.join(', ')}`;
+      msg += ' — haz clic en los chips para cambiar.';
+      if (typeof Helpers !== 'undefined' && Helpers.toast) Helpers.toast(msg, diagnostics.total > 1 ? 'success' : 'info', 5000);
+      console.info('[Karpus][Familia]', diagnostics);
+    } catch (_) {}
 
     const currentStudent = allStudents[0];
     AppState.set('students', allStudents);
@@ -1028,48 +1233,42 @@ function _initProfileSection(student) {
   _setupProfileTabs();
 }
 
-// ── Tab "Mi Perfil / Embajadores" en la sección de perfil ─────────────────────
+// ── Tab "Mi Perfil / Comparte y ahorra" en la sección de perfil ─────────────────────
 let _profileTabsBound = false;
+function _switchProfileTab(tabName) {
+  const edit = document.getElementById('profileEditContent');
+  const ref = document.getElementById('referidosContainer');
+  const tabs = document.querySelectorAll('[data-profile-tab]');
+  tabs.forEach(t => {
+    const active = t.getAttribute('data-profile-tab') === tabName;
+    t.className = 'profile-tab flex-1 py-2.5 rounded-xl text-xs md:text-sm font-black uppercase tracking-wider transition-all flex items-center justify-center gap-2 ' +
+      (active ? 'bg-white text-emerald-700 shadow-sm' : 'text-slate-500 hover:text-emerald-700');
+  });
+  if (edit) edit.classList.toggle('hidden', tabName !== 'edit');
+  if (ref) ref.classList.toggle('hidden', tabName !== 'referidos');
+  if (window.lucide) lucide.createIcons();
+  if (tabName === 'referidos') {
+    import('./referidos.js').then(m => m.ReferidosModule.init(ref));
+  }
+}
+
+/** Abre la sección de referidos desde cualquier punto (p.ej. el banner dinámico) */
+async function _openReferidos() {
+  if (AppState.get('currentSection') !== 'profile') {
+    await navigateTo('profile');
+  }
+  _switchProfileTab('referidos');
+}
+
 function _setupProfileTabs() {
-  const showEdit = function (e) {
-    const edit = document.getElementById('profileEditContent');
-    const emb = document.getElementById('embajadoresContainer');
-    const tabs = document.querySelectorAll('[data-profile-tab]');
-    tabs.forEach(t => {
-      const active = t.getAttribute('data-profile-tab') === 'edit';
-      t.className = 'profile-tab flex-1 py-2.5 rounded-xl text-xs md:text-sm font-black uppercase tracking-wider transition-all flex items-center justify-center gap-2 ' +
-        (active ? 'bg-white text-emerald-700 shadow-sm' : 'text-slate-500 hover:text-emerald-700');
-    });
-    if (edit) edit.classList.remove('hidden');
-    if (emb) emb.classList.add('hidden');
-    if (window.lucide) lucide.createIcons();
-  };
-
-  const showEmbajadores = function () {
-    const edit = document.getElementById('profileEditContent');
-    const emb = document.getElementById('embajadoresContainer');
-    const tabs = document.querySelectorAll('[data-profile-tab]');
-    tabs.forEach(t => {
-      const active = t.getAttribute('data-profile-tab') === 'embajadores';
-      t.className = 'profile-tab flex-1 py-2.5 rounded-xl text-xs md:text-sm font-black uppercase tracking-wider transition-all flex items-center justify-center gap-2 ' +
-        (active ? 'bg-white text-emerald-700 shadow-sm' : 'text-slate-500 hover:text-emerald-700');
-    });
-    if (edit) edit.classList.add('hidden');
-    if (emb) emb.classList.remove('hidden');
-    if (window.lucide) lucide.createIcons();
-    import('./embajadores.js').then(m => m.EmbajadoresModule.init(emb));
-  };
-
-  const show = (tab) => (tab === 'embajadores' ? showEmbajadores() : showEdit());
-
   if (!_profileTabsBound) {
     Helpers.delegate(document.body, '[data-profile-tab]', 'click', (_e, el) => {
-      show(el.getAttribute('data-profile-tab'));
+      _switchProfileTab(el.getAttribute('data-profile-tab') || 'edit');
     });
     _profileTabsBound = true;
   }
   // Resetear al tab "Mi Perfil" por defecto cada vez que se entra
-  show('edit');
+  _switchProfileTab('edit');
 }
 
 function _initRoutineSection(student) {
@@ -1108,7 +1307,8 @@ function setupGlobalListeners() {
   // Solo actualizar header cuando cambia el estudiante
   AppState.subscribe('currentStudent', (student) => {
     if (student) {
-      updateHeaderProfile(AppState.get('profile'), student);
+      const allStudents = AppState.get('students') || [];
+      updateHeaderProfile(AppState.get('profile'), student, allStudents);
       if (student.classroom_id) initLiveClassListener(student.classroom_id);
     }
   });
@@ -1246,18 +1446,19 @@ async function openDigitalID() {
   }
 }
 
-function updateHeaderProfile(profile, student, allStudents = []) {
+function updateHeaderProfile(profile, student, allStudents) {
+  const students = (allStudents && allStudents.length) ? allStudents : (AppState.get('students') || []);
   const studentName = student?.name || 'Estudiante';
 
   const sidebarName = document.getElementById('sidebar-student-name');
   if (sidebarName) sidebarName.textContent = studentName;
 
-  _wireStudentSwitcher(student, allStudents);
-  _renderSiblingChips(allStudents, student);
+  _wireStudentSwitcher(student, students);
+  _renderSiblingChips(students, student);
   _renderSidebarAvatar(student, studentName);
   _renderHeaderAvatars(student, studentName);
   _renderNameDisplays(student, studentName);
-  _renderProfileSiblings(allStudents, student);
+  _renderProfileSiblings(students, student);
 
   if (window.lucide) lucide.createIcons();
 }
