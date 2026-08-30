@@ -621,6 +621,200 @@ function _isVideoUrl(url) {
   return /\.(mp4|webm|ogg|mov)($|\?)/i.test(url) || /video/i.test(url);
 }
 
+let _wallFeedLimit = 10;
+let _wallFeedObserver = null;
+
+window.renderWallInfiniteFeed = function() {
+  const container = document.getElementById('wallInfiniteFeedContainer');
+  if (!container) return;
+
+  if (!allWallPosts.length) {
+    container.innerHTML = '<div style="text-align:center;padding:40px;color:var(--muted);">Sin publicaciones en el muro escolar</div>';
+    return;
+  }
+
+  const postsToShow = allWallPosts.slice(0, _wallFeedLimit);
+
+  container.innerHTML = postsToShow.map(p => {
+    const room = allClassrooms.find(c => c.id === p.classroom_id);
+    const dt = p.created_at ? new Date(p.created_at).toLocaleString('es-DO', { dateStyle: 'medium', timeStyle: 'short' }) : '—';
+    const mediaUrl = _getWallMediaUrl(p);
+    const isVid = mediaUrl ? _isVideoUrl(mediaUrl) : false;
+    const author = p.teacher_name || 'Personal Karpus';
+    const avatar = (author[0] || 'K').toUpperCase();
+
+    return `<div class="panel" style="margin-bottom:20px;border-radius:20px;">
+      <div style="padding:16px 20px;display:flex;align-items:center;justify-content:space-between;border-bottom:1px solid var(--border);">
+        <div style="display:flex;align-items:center;gap:12px;">
+          <div style="width:42px;height:42px;border-radius:50%;background:linear-gradient(135deg,#6366f1,#8b5cf6);display:flex;align-items:center;justify-content:center;font-size:16px;font-weight:900;color:white;box-shadow:0 4px 12px rgba(99,102,241,0.3);">
+            ${avatar}
+          </div>
+          <div>
+            <div style="font-size:14px;font-weight:900;color:var(--text);display:flex;align-items:center;gap:6px;">
+              ${escH(author)}
+              <span class="badge badge-indigo" style="font-size:9px;">👩‍🏫 Docente</span>
+              ${p.is_pinned ? '<span class="badge badge-yellow" style="font-size:9px;">📌 Fijado</span>' : ''}
+            </div>
+            <div style="font-size:11px;color:var(--muted);margin-top:2px;">
+              🏫 ${room ? escH(room.name) : 'Toda la Escuela'} · 🕒 ${dt}
+            </div>
+          </div>
+        </div>
+        <span class="badge badge-gray" style="font-size:10px;"><i class="bi bi-eye"></i> ${Number(p.views_count || 0)} vistas</span>
+      </div>
+
+      <div style="padding:18px 20px;">
+        ${p.title ? `<div style="font-size:16px;font-weight:900;color:var(--text);margin-bottom:8px;font-family:var(--font-display);">${escH(p.title)}</div>` : ''}
+        <div style="font-size:13px;color:var(--text2);line-height:1.5;margin-bottom:14px;white-space:pre-wrap;">${escH(p.content || '')}</div>
+
+        ${mediaUrl ? `
+          <div style="border-radius:14px;overflow:hidden;margin-bottom:14px;max-height:420px;background:black;display:flex;align-items:center;justify-content:center;border:1px solid var(--border);">
+            ${isVid ? `<video src="${escH(mediaUrl)}" controls style="width:100%;max-height:420px;object-fit:contain;"></video>` : `<img src="${escH(mediaUrl)}" style="width:100%;max-height:420px;object-fit:cover;cursor:pointer;" onclick="openLightbox('${escH(mediaUrl)}','${escH(author + ' · ' + dt)}')" loading="lazy">`}
+          </div>
+        ` : ''}
+
+        <div style="display:flex;align-items:center;justify-content:space-between;border-top:1px solid var(--border);padding-top:12px;margin-top:8px;">
+          <div style="display:flex;align-items:center;gap:16px;">
+            <button class="btn btn-ghost" style="padding:6px 12px;font-size:11px;color:#fb923c;" onclick="viewPostLikes('${p.id}')">
+              <i class="bi bi-heart-fill"></i> ${Number(p.likes_count || 0)} Me Gusta
+            </button>
+            <button class="btn btn-ghost" style="padding:6px 12px;font-size:11px;color:#60a5fa;" onclick="togglePostCommentsInspect('${p.id}')">
+              <i class="bi bi-chat-left-text-fill"></i> ${Number(p.comments_count || 0)} Comentarios
+            </button>
+          </div>
+        </div>
+
+        <div id="postCommentsSection-${p.id}" style="display:none;margin-top:14px;padding-top:14px;border-top:1px dashed var(--border);">
+          <div style="font-size:12px;font-weight:900;color:var(--text);margin-bottom:10px;">💬 Comentarios de Padres y Personal:</div>
+          <div id="postCommentsList-${p.id}" style="display:flex;flex-direction:column;gap:8px;max-height:260px;overflow-y:auto;padding-right:4px;">
+            <div style="font-size:11px;color:var(--muted);text-align:center;">Cargando comentarios...</div>
+          </div>
+        </div>
+      </div>
+    </div>`;
+  }).join('');
+
+  // Setup infinite scroll observer trigger
+  const trigger = document.getElementById('wallFeedScrollTrigger');
+  if (trigger) {
+    if (_wallFeedLimit < allWallPosts.length) {
+      trigger.style.display = 'block';
+      if (!_wallFeedObserver) {
+        _wallFeedObserver = new IntersectionObserver(entries => {
+          if (entries[0].isIntersecting && _wallFeedLimit < allWallPosts.length) {
+            _wallFeedLimit += 10;
+            window.renderWallInfiniteFeed();
+          }
+        }, { threshold: 0.1 });
+      }
+      _wallFeedObserver.observe(trigger);
+    } else {
+      trigger.style.display = 'none';
+    }
+  }
+};
+
+window.viewPostLikes = async function(postId) {
+  const post = allWallPosts.find(p => p.id === postId);
+  if (!post) return;
+
+  const modal = document.getElementById('userModal') || _createModal();
+  modal.innerHTML = `
+    <div style="background:var(--surface);border:1px solid var(--border);border-radius:20px;padding:24px;width:min(90vw,420px);">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;">
+        <h3 style="font-size:15px;font-weight:900;color:var(--text);display:flex;align-items:center;gap:6px;">
+          <i class="bi bi-heart-fill" style="color:#ef4444;"></i> Personas que dieron Me Gusta
+        </h3>
+        <button onclick="document.getElementById('userModal').style.display='none'" style="background:none;border:none;color:var(--muted);font-size:20px;cursor:pointer;">✕</button>
+      </div>
+      <div id="postLikesModalList" style="max-height:300px;overflow-y:auto;display:flex;flex-direction:column;gap:8px;">
+        <div style="text-align:center;padding:20px;color:var(--muted);font-size:12px;">Cargando lista de Me gusta...</div>
+      </div>
+      <div style="margin-top:16px;text-align:right;">
+        <button class="btn btn-ghost" onclick="document.getElementById('userModal').style.display='none'">Cerrar</button>
+      </div>
+    </div>
+  `;
+  modal.style.cssText = 'display:flex;position:fixed;inset:0;background:rgba(0,0,0,.75);z-index:9999;align-items:center;justify-content:center;';
+
+  try {
+    const { data: likes } = await supabase
+      .from('likes')
+      .select('user_id, created_at, profile:profiles!likes_user_id_fkey(name, email, role, avatar_url)')
+      .eq('post_id', postId);
+
+    const listEl = document.getElementById('postLikesModalList');
+    if (!listEl) return;
+
+    if (!likes || !likes.length) {
+      listEl.innerHTML = '<div style="text-align:center;padding:20px;color:var(--muted);font-size:12px;">Aún no tiene reacciones registrados en BD.</div>';
+      return;
+    }
+
+    listEl.innerHTML = likes.map(l => {
+      const name = l.profile?.name || l.profile?.email || l.user_id?.slice(0, 8) || 'Usuario';
+      const role = l.profile?.role || 'padre';
+      const avatar = (name[0] || '?').toUpperCase();
+      return `<div style="display:flex;align-items:center;gap:10px;background:var(--surface2);padding:8px 12px;border-radius:12px;border:1px solid var(--border);">
+        <div style="width:32px;height:32px;border-radius:50%;background:linear-gradient(135deg,#6366f1,#8b5cf6);display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:900;color:white;">
+          ${avatar}
+        </div>
+        <div style="flex:1;min-width:0;">
+          <div style="font-size:12px;font-weight:800;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${escH(name)}</div>
+          <div style="font-size:10px;color:var(--muted);">${escH(role)}</div>
+        </div>
+        <span style="font-size:14px;color:#ef4444;">❤</span>
+      </div>`;
+    }).join('');
+  } catch (e) {
+    const listEl = document.getElementById('postLikesModalList');
+    if (listEl) listEl.innerHTML = `<div style="text-align:center;padding:20px;color:var(--muted);font-size:12px;">Conteo total: ${post.likes_count || 0} personas.</div>`;
+  }
+};
+
+window.togglePostCommentsInspect = async function(postId) {
+  const section = document.getElementById(`postCommentsSection-${postId}`);
+  if (!section) return;
+
+  const isHidden = section.style.display === 'none';
+  section.style.display = isHidden ? 'block' : 'none';
+
+  if (isHidden) {
+    const list = document.getElementById(`postCommentsList-${postId}`);
+    if (!list) return;
+
+    try {
+      const { data: comments } = await supabase
+        .from('comments')
+        .select('id, content, user_name, created_at, user_id, profile:profiles!comments_user_id_fkey(name, email, role)')
+        .eq('post_id', postId)
+        .order('created_at', { ascending: true });
+
+      if (!comments || !comments.length) {
+        list.innerHTML = '<div style="font-size:11px;color:var(--muted);text-align:center;padding:10px;">Sin comentarios registrados en este anuncio</div>';
+        return;
+      }
+
+      list.innerHTML = comments.map(c => {
+        const name = c.profile?.name || c.user_name || c.profile?.email || 'Usuario';
+        const role = c.profile?.role || 'padre';
+        const dt = c.created_at ? new Date(c.created_at).toLocaleString('es-DO', { dateStyle: 'short', timeStyle: 'short' }) : '';
+        return `<div style="background:var(--surface2);border:1px solid var(--border);border-radius:10px;padding:8px 12px;">
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:3px;">
+            <div style="font-size:11px;font-weight:900;color:var(--text);display:flex;align-items:center;gap:6px;">
+              ${escH(name)} <span class="badge badge-gray" style="font-size:8px;">${role}</span>
+            </div>
+            <span style="font-size:9px;color:var(--muted);">${dt}</span>
+          </div>
+          <div style="font-size:12px;color:var(--text2);line-height:1.3;">${escH(c.content || '')}</div>
+        </div>`;
+      }).join('');
+    } catch (e) {
+      list.innerHTML = '<div style="font-size:11px;color:var(--muted);text-align:center;padding:10px;">No se pudieron cargar los comentarios.</div>';
+    }
+  }
+};
+
 function renderWall() {
   const set = (id, v) => { const el = document.getElementById(id); if (el) el.textContent = v; };
   const since7 = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString();
@@ -631,6 +825,8 @@ function renderWall() {
   set('wall-photos', photoCount);
   const countEl = document.getElementById('wallCount');
   if (countEl) countEl.textContent = allWallPosts.length + ' publicaciones';
+
+  window.renderWallInfiniteFeed();
 
   const tbody = document.getElementById('wallBody');
   if (!tbody) return;
@@ -729,6 +925,149 @@ const CONVO_TYPE_LABELS = {
   group:          ['Grupos',            'badge-orange'],
 };
 
+// Keywords sensibles para moderación y prevención
+const SENSITIVE_KEYWORDS = ['pago', 'mora', 'queja', 'reclamo', 'problema', 'accidente', 'enfermo', 'medicina', 'urgente', 'director', 'salida', 'falta', 'bullying', 'golpe'];
+
+function isSensitiveMessage(txt) {
+  if (!txt) return false;
+  const lower = txt.toLowerCase();
+  return SENSITIVE_KEYWORDS.some(kw => lower.includes(kw));
+}
+
+window.filterChatMessages = function() {
+  const q = document.getElementById('chatSearchInput')?.value.toLowerCase().trim() || '';
+  const filter = document.getElementById('chatCategoryFilter')?.value || '';
+  const countEl = document.getElementById('chatMsgCount');
+  const tbody = document.getElementById('chatBody');
+
+  if (!tbody) return;
+
+  const filtered = allChatMsgs.filter(m => {
+    const sender = (m.sender_name || allUsers.find(u => u.id === m.sender_id)?.name || m.sender_id || '').toLowerCase();
+    const receiver = (m.receiver_name || allUsers.find(u => u.id === m.receiver_id)?.name || m.receiver_id || '').toLowerCase();
+    const content = (m.content || '').toLowerCase();
+
+    const matchQ = !q || sender.includes(q) || receiver.includes(q) || content.includes(q);
+
+    let matchFilter = true;
+    if (filter === 'sensitive') matchFilter = isSensitiveMessage(m.content);
+    if (filter === 'unread') matchFilter = m.is_read === false;
+    if (filter === 'media') matchFilter = !!m.attachment_url;
+
+    return matchQ && matchFilter;
+  });
+
+  if (countEl) countEl.textContent = `${filtered.length} de ${allChatMsgs.length} mensajes`;
+
+  if (!filtered.length) {
+    tbody.innerHTML = '<tr><td colspan="6" style="text-align:center;padding:24px;color:var(--muted);">Sin mensajes que coincidan con la búsqueda</td></tr>';
+    return;
+  }
+
+  tbody.innerHTML = filtered.slice(0, 100).map(m => {
+    const receiverName = m.receiver_name || allUsers.find(u => u.id === m.receiver_id)?.name || m.receiver_id?.slice(0, 8) || '—';
+    const senderName = m.sender_name || allUsers.find(u => u.id === m.sender_id)?.name || m.sender_id?.slice(0, 8) || '—';
+    const hasMedia = m.attachment_url ? ` <span class="badge badge-purple" style="font-size:8px;cursor:pointer;" onclick="openLightbox('${escH(m.attachment_url)}')">📷 Ver adjunto</span>` : '';
+    const sensitiveBadge = isSensitiveMessage(m.content) ? ' <span class="badge badge-red" style="font-size:8px;">⚠️ Sensible</span>' : '';
+
+    return `<tr>
+      <td style="font-size:11px;color:var(--muted);white-space:nowrap;">${m.created_at ? new Date(m.created_at).toLocaleString('es-DO', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' }) : '—'}</td>
+      <td style="font-weight:800;max-width:130px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${highlightMatch(senderName, q)}</td>
+      <td style="font-weight:700;max-width:130px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:11px;color:var(--muted);">→ ${highlightMatch(receiverName, q)}</td>
+      <td style="max-width:280px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:12px;color:var(--text);">${highlightMatch(m.content || '', q)}${hasMedia}${sensitiveBadge}</td>
+      <td>${m.is_read === false ? '<span class="badge badge-yellow">Sin leer</span>' : '<span class="badge badge-gray">Leído</span>'}</td>
+      <td><button class="btn btn-ghost" style="padding:4px 8px;font-size:10px;" onclick="inspectChatThread('${m.sender_id}','${m.receiver_id}')"><i class="bi bi-chat-text"></i> Ver hilo</button></td>
+    </tr>`;
+  }).join('');
+};
+
+window.inspectChatThread = function(user1Id, user2Id) {
+  if (!user1Id || !user2Id) return;
+  const u1 = allUsers.find(u => u.id === user1Id);
+  const u2 = allUsers.find(u => u.id === user2Id);
+  const name1 = u1?.name || u1?.email || user1Id.slice(0, 8);
+  const name2 = u2?.name || u2?.email || user2Id.slice(0, 8);
+  const role1 = u1?.role || 'usuario';
+  const role2 = u2?.role || 'usuario';
+
+  // Get all messages between user1 and user2
+  const thread = allChatMsgs.filter(m =>
+    (m.sender_id === user1Id && m.receiver_id === user2Id) ||
+    (m.sender_id === user2Id && m.receiver_id === user1Id)
+  ).sort((a, b) => (a.created_at || '').localeCompare(b.created_at || ''));
+
+  const modal = document.getElementById('userModal') || _createModal();
+  modal.innerHTML = `
+    <div style="background:var(--surface);border:1px solid var(--border);border-radius:20px;padding:24px;width:min(92vw,620px);max-height:85vh;display:flex;flex-direction:column;">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;border-bottom:1px solid var(--border);padding-bottom:12px;">
+        <div>
+          <div style="font-size:15px;font-weight:900;color:var(--text);display:flex;align-items:center;gap:8px;">
+            <span>💬 Hilo de Conversación Auditoría</span>
+          </div>
+          <div style="font-size:11px;color:var(--muted);margin-top:2px;">
+            ${escH(name1)} <span class="badge badge-gray" style="font-size:8px;">${role1}</span> ↔ ${escH(name2)} <span class="badge badge-gray" style="font-size:8px;">${role2}</span>
+          </div>
+        </div>
+        <button onclick="document.getElementById('userModal').style.display='none'" style="background:none;border:none;color:var(--muted);font-size:20px;cursor:pointer;">✕</button>
+      </div>
+
+      <div style="flex:1;overflow-y:auto;padding:12px;display:flex;flex-direction:column;gap:12px;background:rgba(0,0,0,0.2);border-radius:12px;margin-bottom:16px;" id="chatThreadMessages">
+        ${thread.length === 0 ? '<div style="text-align:center;padding:30px;color:var(--muted);">Sin mensajes en esta conversación</div>' :
+          thread.map(m => {
+            const isUser1 = m.sender_id === user1Id;
+            const senderName = isUser1 ? name1 : name2;
+            const align = isUser1 ? 'flex-start' : 'flex-end';
+            const bg = isUser1 ? 'var(--surface2)' : 'rgba(99,102,241,0.18)';
+            const border = isUser1 ? 'var(--border)' : 'rgba(99,102,241,0.3)';
+            const time = m.created_at ? new Date(m.created_at).toLocaleString('es-DO', { dateStyle: 'short', timeStyle: 'short' }) : '';
+            const sensitive = isSensitiveMessage(m.content);
+
+            return `<div style="align-self:${align};max-width:82%;background:${bg};border:1px solid ${border};border-radius:14px;padding:10px 14px;">
+              <div style="display:flex;justify-content:space-between;align-items:center;gap:12px;margin-bottom:4px;">
+                <span style="font-size:11px;font-weight:900;color:var(--text);">${escH(senderName)}</span>
+                <span style="font-size:9px;color:var(--muted);">${time}</span>
+              </div>
+              <div style="font-size:13px;color:var(--text);line-height:1.4;word-break:break-word;">${escH(m.content || '')}</div>
+              ${m.attachment_url ? `<div style="margin-top:8px;"><a href="${escH(m.attachment_url)}" target="_blank" style="color:#818cf8;font-size:11px;font-weight:800;text-decoration:none;"><i class="bi bi-paperclip"></i> Ver archivo adjunto</a></div>` : ''}
+              ${sensitive ? `<div style="margin-top:4px;"><span class="badge badge-red" style="font-size:8px;">⚠️ Contenido sensible detectado</span></div>` : ''}
+            </div>`;
+          }).join('')
+        }
+      </div>
+
+      <div style="display:flex;justify-content:space-between;align-items:center;border-top:1px solid var(--border);padding-top:12px;">
+        <span style="font-size:11px;color:var(--muted);">${thread.length} mensajes en total</span>
+        <button class="btn btn-ghost" onclick="document.getElementById('userModal').style.display='none'">Cerrar</button>
+      </div>
+    </div>
+  `;
+  modal.style.cssText = 'display:flex;position:fixed;inset:0;background:rgba(0,0,0,.75);z-index:9999;align-items:center;justify-content:center;';
+};
+
+window.exportChatAudit = function() {
+  if (!allChatMsgs.length) { showToast('No hay mensajes para exportar.', 'warn'); return; }
+  const rows = [['Fecha','Remitente ID','Remitente Nombre','Destinatario ID','Destinatario Nombre','Mensaje','Adjunto','Estado Leído','Sensible']];
+  allChatMsgs.forEach(m => {
+    rows.push([
+      m.created_at ? new Date(m.created_at).toLocaleString('es-DO') : '',
+      m.sender_id || '',
+      m.sender_name || '',
+      m.receiver_id || '',
+      m.receiver_name || '',
+      m.content || '',
+      m.attachment_url || '',
+      m.is_read ? 'Leído' : 'Sin leer',
+      isSensitiveMessage(m.content) ? 'Sí' : 'No'
+    ].map(csvField));
+  });
+  const csv = '\ufeff' + rows.map(r => r.join(';')).join('\r\n');
+  const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+  const url  = URL.createObjectURL(blob);
+  const a    = document.createElement('a'); a.href = url; a.download = 'auditoria_chat_karpus.csv'; a.click();
+  URL.revokeObjectURL(url);
+  showToast(`Exportados ${allChatMsgs.length} mensajes a CSV.`, 'success');
+};
+
 function renderChat() {
   const set = (id, v) => { const el = document.getElementById(id); if (el) el.textContent = v; };
   const todayStr = new Date().toISOString().slice(0, 10);
@@ -738,27 +1077,8 @@ function renderChat() {
   set('chat-week', allChatMsgs.filter(m => (m.created_at || '') >= since7).length);
   const mediaCount = allChatMsgs.filter(m => m.attachment_url).length;
   set('chat-media', mediaCount);
-  const countEl = document.getElementById('chatMsgCount');
-  if (countEl) countEl.textContent = allChatMsgs.length + ' mensajes recientes';
 
-  const tbody = document.getElementById('chatBody');
-  if (tbody) {
-    if (!allChatMsgs.length) {
-      tbody.innerHTML = '<tr><td colspan="5" style="text-align:center;padding:24px;color:var(--muted);">Sin mensajes registrados</td></tr>';
-    } else {
-      tbody.innerHTML = allChatMsgs.slice(0, 80).map(m => {
-        const receiverName = m.receiver_name || allUsers.find(u => u.id === m.receiver_id)?.name || m.receiver_id?.slice(0, 8) || '—';
-        const hasMedia = m.attachment_url ? ' <span class="badge badge-purple" style="font-size:8px;">📷</span>' : '';
-        return `<tr>
-          <td style="font-size:11px;color:var(--muted);white-space:nowrap;">${m.created_at ? new Date(m.created_at).toLocaleString('es-DO', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' }) : '—'}</td>
-          <td style="font-weight:800;max-width:120px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${escH(m.sender_name || m.sender_id?.slice(0, 8) || '—')}</td>
-          <td style="font-weight:700;max-width:120px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:11px;color:var(--muted);">→ ${escH(receiverName)}</td>
-          <td style="max-width:220px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:12px;color:var(--text);">${escH(m.content || '')}${hasMedia}</td>
-          <td>${m.is_read === false ? '<span class="badge badge-yellow">Sin leer</span>' : '<span class="badge badge-gray">Leído</span>'}</td>
-        </tr>`;
-      }).join('');
-    }
-  }
+  window.filterChatMessages();
 
   const list = document.getElementById('convTypeList');
   if (list) {
@@ -1098,7 +1418,34 @@ function renderRecentAudit() {
   }).join('');
 }
 
-// ── Full audit table ──────────────────────────────────────────────────────────
+// ── Full audit table with JSON Payload Inspector ──────────────────────────────
+window.inspectAuditPayload = function(auditIndex) {
+  const item = allAudit[auditIndex];
+  if (!item) return;
+
+  const modal = document.getElementById('userModal') || _createModal();
+  modal.innerHTML = `
+    <div style="background:var(--surface);border:1px solid var(--border);border-radius:20px;padding:24px;width:min(90vw,540px);max-height:85vh;display:flex;flex-direction:column;">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;border-bottom:1px solid var(--border);padding-bottom:12px;">
+        <h3 style="font-size:15px;font-weight:900;color:var(--text);display:flex;align-items:center;gap:6px;">
+          🔍 Inspección de Payload JSON (ID #${item.id || 'N/A'})
+        </h3>
+        <button onclick="document.getElementById('userModal').style.display='none'" style="background:none;border:none;color:var(--muted);font-size:20px;cursor:pointer;">✕</button>
+      </div>
+      <div style="font-size:11px;color:var(--muted);margin-bottom:12px;">
+        Acción: <strong style="color:var(--text);">${escH(item.action || '—')}</strong> · Fecha: ${item.created_at ? new Date(item.created_at).toLocaleString('es-DO') : '—'}
+      </div>
+      <div style="flex:1;overflow-y:auto;background:rgba(0,0,0,0.4);border:1px solid var(--border);border-radius:12px;padding:14px;font-family:monospace;font-size:12px;color:#a5b4fc;white-space:pre-wrap;word-break:break-word;">
+${escH(JSON.stringify(item.payload || {}, null, 2))}
+      </div>
+      <div style="margin-top:16px;text-align:right;">
+        <button class="btn btn-ghost" onclick="document.getElementById('userModal').style.display='none'">Cerrar</button>
+      </div>
+    </div>
+  `;
+  modal.style.cssText = 'display:flex;position:fixed;inset:0;background:rgba(0,0,0,.75);z-index:9999;align-items:center;justify-content:center;';
+};
+
 function renderAuditTable(data) {
   const tbody = document.getElementById('auditBody');
   if (!tbody) return;
@@ -1122,7 +1469,11 @@ function renderAuditTable(data) {
       </td>
       <td class="py-3 px-4"><span class="badge ${roleBadge[role]||'badge-gray'} text-[9px] uppercase">${role}</span></td>
       <td class="py-3 px-4"><span class="badge ${badge} text-[9px] uppercase">${action}</span></td>
-      <td class="py-3 px-4"><div class="max-w-[180px] truncate text-slate-400 text-[10px] font-mono">${escH(JSON.stringify(a.payload || {}))}</div></td>
+      <td class="py-3 px-4">
+        <div class="max-w-[180px] truncate text-slate-400 text-[10px] font-mono cursor-pointer" onclick="inspectAuditPayload(${i})" title="Clic para ver JSON completo">
+          ${escH(JSON.stringify(a.payload || {}))}
+        </div>
+      </td>
       <td class="py-3 px-4 text-slate-400 text-[10px] font-bold">${escH(a.payload?.ip || a.payload?.device || 'Cloud')}</td>
       <td class="py-3 px-4"><span class="w-2 h-2 rounded-full bg-emerald-400 inline-block shadow-[0_0_8px_rgba(52,211,153,0.6)]"></span></td>
     </tr>`;
@@ -2640,3 +2991,44 @@ function escH(str) {
 function fmtMoney(n) {
   return 'RD$' + Number(n || 0).toLocaleString('es-DO', { maximumFractionDigits: 2 });
 }
+
+// ── Centro de Ayuda & Atajos Modal ──────────────────────────────────────────
+window.openHelpShortcutsModal = function() {
+  const modal = document.getElementById('userModal') || _createModal();
+  modal.innerHTML = `
+    <div style="background:var(--surface);border:1px solid var(--border);border-radius:20px;padding:24px;width:min(92vw,560px);max-height:85vh;display:flex;flex-direction:column;">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;border-bottom:1px solid var(--border);padding-bottom:12px;">
+        <h3 style="font-size:16px;font-weight:900;color:var(--text);display:flex;align-items:center;gap:8px;">
+          <i class="bi bi-question-circle-fill" style="color:#6366f1;"></i> Centro de Ayuda & Atajos de Teclado
+        </h3>
+        <button onclick="document.getElementById('userModal').style.display='none'" style="background:none;border:none;color:var(--muted);font-size:20px;cursor:pointer;">✕</button>
+      </div>
+
+      <div style="flex:1;overflow-y:auto;display:flex;flex-direction:column;gap:16px;padding-right:4px;">
+        <div style="background:var(--surface2);padding:14px;border-radius:12px;border:1px solid var(--border);">
+          <div style="font-size:12px;font-weight:900;color:var(--text);margin-bottom:8px;text-transform:uppercase;letter-spacing:.08em;">⚡ Atajos Rápidos de Teclado</div>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;font-size:12px;">
+            <div><kbd class="kbd">Ctrl</kbd> + <kbd class="kbd">K</kbd> Búsqueda global</div>
+            <div><kbd class="kbd">/</kbd> Enfocar filtro de sección</div>
+            <div><kbd class="kbd">Esc</kbd> Cerrar modales y paneles</div>
+            <div><kbd class="kbd">Ctrl</kbd> + <kbd class="kbd">P</kbd> Modo impresión limpia</div>
+          </div>
+        </div>
+
+        <div style="background:var(--surface2);padding:14px;border-radius:12px;border:1px solid var(--border);">
+          <div style="font-size:12px;font-weight:900;color:var(--text);margin-bottom:8px;text-transform:uppercase;letter-spacing:.08em;">🛡️ Capacidades del Control Center</div>
+          <ul style="font-size:12px;color:var(--text2);line-height:1.6;padding-left:18px;">
+            <li><strong>Muro Infinito:</strong> Visualización en tiempo real de anuncios, reacciones de padres y lista completa de comentarios.</li>
+            <li><strong>Inspector de Chat:</strong> Auditoría de conversaciones, hilos cruzados entre usuarios y alertas de temas sensibles.</li>
+            <li><strong>Matriz de Permisos:</strong> Control granular por módulo, rol de usuario e incluso overrides específicos por persona.</li>
+          </ul>
+        </div>
+      </div>
+
+      <div style="margin-top:16px;text-align:right;border-top:1px solid var(--border);padding-top:12px;">
+        <button class="btn btn-primary" onclick="document.getElementById('userModal').style.display='none'">Entendido</button>
+      </div>
+    </div>
+  `;
+  modal.style.cssText = 'display:flex;position:fixed;inset:0;background:rgba(0,0,0,.75);z-index:9999;align-items:center;justify-content:center;';
+};
