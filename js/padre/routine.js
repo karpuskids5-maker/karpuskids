@@ -434,12 +434,27 @@ function _renderFullPanel(log, weekLogs, date, studentId, schedule = []) {
     <!-- ESTADÍSTICAS ACUMULADAS -->
     ${_renderDayStats(totalNapMins, totalOz, wetDiapers, dirtyDiapers, events)}
 
+    <!-- MOMENTO ESTRELLA DEL DÍA (NEUROCIENCIA EMOCIONAL) -->
+    <div class="bg-gradient-to-r from-amber-500/10 via-emerald-500/10 to-teal-500/10 border border-emerald-200/60 rounded-[1.5rem] p-5 relative overflow-hidden shadow-sm">
+      <div class="absolute -right-4 -bottom-4 w-20 h-20 bg-amber-200/30 rounded-full blur-xl pointer-events-none"></div>
+      <div class="flex items-center justify-between gap-2 mb-2">
+        <div class="flex items-center gap-2">
+          <span class="w-7 h-7 bg-gradient-to-tr from-amber-400 to-yellow-500 text-white rounded-lg flex items-center justify-center text-sm shadow-sm animate-breathe">✨</span>
+          <p class="text-[11px] font-black text-amber-700 uppercase tracking-widest">Momento Estrella del Día</p>
+        </div>
+        <span class="text-[9px] font-black text-emerald-600 bg-emerald-100/80 px-2.5 py-0.5 rounded-full uppercase">Neuro-Conexión</span>
+      </div>
+      <p class="text-xs font-extrabold text-slate-700 leading-relaxed">
+        ${log.notes ? `&ldquo;${Helpers.escapeHTML ? Helpers.escapeHTML(log.notes) : log.notes}&rdquo;` : `¡Hoy fue un día fantástico de nuevos descubrimientos, risas y desarrollo de autonomía en el aula! 🌟`}
+      </p>
+    </div>
+
     <!-- OBSERVACIONES DE LA MAESTRA -->
     ${log.notes ? `
     <div class="bg-gradient-to-br from-[#28B54D]/5 to-green-50 border border-green-200 rounded-[1.5rem] p-5">
       <div class="flex items-center gap-2 mb-3">
         <span class="text-lg">✏️</span>
-        <p class="text-[11px] font-black text-[#28B54D] uppercase tracking-widest">Nota de la maestra</p>
+        <p class="text-[11px] font-black text-[#28B54D] uppercase tracking-widest">Nota pedagógica de la maestra</p>
       </div>
       <p class="text-sm font-medium text-slate-700 italic leading-relaxed">&ldquo;${Helpers.escapeHTML ? Helpers.escapeHTML(log.notes) : log.notes}&rdquo;</p>
     </div>` : ''}

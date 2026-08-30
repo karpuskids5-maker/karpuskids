@@ -94,39 +94,45 @@ export const EmotionalHome = {
     if (window.lucide) lucide.createIcons();
   },
 
-  /** Highlight Reel: resumen de recuerdos/tips felices del día */
+  /** Highlight Reel: resumen de recuerdos/tips felices del día con Neuro-Dopamina */
   async _renderReel(container, student) {
     const reel = document.createElement('div');
     reel.className = 'mb-6';
+    const firstName = (student.name || 'pequeño').split(' ')[0];
+    const safeFirstName = Helpers?.escapeHTML ? Helpers.escapeHTML(firstName) : escapeHtml(firstName);
+
     reel.innerHTML = `
       <div class="flex items-center justify-between mb-3">
-        <h3 class="text-sm font-black text-slate-700 flex items-center gap-2">
-          <span class="w-8 h-8 bg-emerald-100 text-emerald-600 rounded-xl flex items-center justify-center text-base">📸</span>
-          Recuerdos del día
+        <h3 class="text-sm font-black text-slate-800 flex items-center gap-2">
+          <span class="w-8 h-8 bg-gradient-to-tr from-emerald-400 to-teal-500 text-white rounded-xl flex items-center justify-center text-base shadow-sm animate-breathe">📸</span>
+          Recuerdos del Día de ${safeFirstName}
         </h3>
-        <span class="text-[10px] font-black text-slate-400 uppercase tracking-widest">Historias de 24h</span>
+        <button onclick="window.App?.navigateTo('routine')" class="text-[10px] font-black text-[#28B54D] uppercase tracking-widest hover:underline flex items-center gap-1">
+          Ver Línea de Tiempo <i data-lucide="sparkles" class="w-3 h-3"></i>
+        </button>
       </div>
-      <div class="flex gap-3 overflow-x-auto no-scrollbar pb-1">
-        ${this._storyBubble('🍎', 'Primer alimento', '#F43F5E')}
-        ${this._storyBubble('🧩', 'Hora del juego', '#F59E0B')}
-        ${this._storyBubble('😴', 'Siesta reconfortante', '#8B5CF6')}
-        ${this._storyBubble('🎨', 'Arte y creatividad', '#10B981')}
-        ${this._storyBubble('🤝', 'Compañerismo', '#0EA5E9')}
+      <div class="flex gap-3 overflow-x-auto no-scrollbar pb-2">
+        ${this._storyBubble('🍎', 'Nutrición', '#F43F5E', 'routine')}
+        ${this._storyBubble('🧩', 'Autonomía', '#F59E0B', 'routine')}
+        ${this._storyBubble('😴', 'Descanso', '#8B5CF6', 'routine')}
+        ${this._storyBubble('🎨', 'Creatividad', '#10B981', 'class')}
+        ${this._storyBubble('🤝', 'Social', '#0EA5E9', 'routine')}
+        ${this._storyBubble('🏆', 'Logro Hoy', '#EC4899', 'grades')}
       </div>
     `;
     container.appendChild(reel);
     if (window.lucide) lucide.createIcons();
   },
 
-  _storyBubble(emoji, label, color) {
+  _storyBubble(emoji, label, color, targetSection = 'routine') {
     return `
-      <div class="flex flex-col items-center gap-1.5 shrink-0 w-20 group cursor-pointer">
-        <div class="w-16 h-16 rounded-full p-[3px]" style="background:conic-gradient(${color}, #FACC15, ${color})">
-          <div class="w-full h-full rounded-full bg-white flex items-center justify-center text-3xl group-hover:scale-105 transition-transform">
+      <div onclick="window.App?.navigateTo('${targetSection}')" class="flex flex-col items-center gap-1.5 shrink-0 w-20 group cursor-pointer active:scale-95 transition-transform">
+        <div class="w-16 h-16 rounded-full p-[3px] shadow-sm group-hover:shadow-md transition-shadow" style="background:conic-gradient(${color}, #FACC15, ${color})">
+          <div class="w-full h-full rounded-full bg-white flex items-center justify-center text-3xl group-hover:scale-110 transition-transform">
             ${emoji}
           </div>
         </div>
-        <p class="text-[10px] font-bold text-slate-500 text-center leading-tight">${label}</p>
+        <p class="text-[10px] font-black text-slate-600 text-center leading-tight group-hover:text-emerald-600 transition-colors">${label}</p>
       </div>
     `;
   }
