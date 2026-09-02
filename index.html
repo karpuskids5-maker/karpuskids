@@ -211,6 +211,24 @@
     .kk-don-thumb img{width:100%;height:100%;object-fit:cover;display:block;}
     .kk-don-thumb-more{display:flex;align-items:center;justify-content:center;color:#FFB74D;font-size:11px;font-weight:900;cursor:default;}
     @media(max-width:900px){.kk-don-camp{flex-direction:column;align-items:flex-start;text-align:center;}.kk-don-camp-img{width:100%;height:150px;border-radius:14px;}}
+    /* Donaciones — arregla el corte en móvil: el inline grid (1.2fr 1fr) de #donGrid
+       anulaba el media query de .two-col-cta. Con !important forzamos 1 columna (alineado
+       con el media query de las tarjetas .kk-don-camp) y evitamos el desbordamiento. */
+    @media(max-width:900px){
+      #donGrid{grid-template-columns:1fr !important;gap:22px;}
+      #donGrid .kk-don-camp{padding:18px;}
+      #donQuick{grid-template-columns:repeat(2,1fr) !important;gap:8px;}
+      .kk-don-btn{width:100%;}
+      .kk-don-meta{flex-wrap:wrap;justify-content:center;}
+      .kk-don-camp-body p{word-break:break-word;overflow-wrap:anywhere;}
+      .kk-don-thumbs{justify-content:center;}
+    }
+    /* Pantallas muy pequeñas: menos padding de la sección y botón a todo el ancho */
+    @media(max-width:400px){
+      #donaciones{padding:64px 16px !important;}
+      #donGrid .kk-don-camp{padding:14px;}
+      .kk-don-camp-body p{font-size:11.5px;}
+    }
     @media print {
       body *{visibility:hidden !important;}
       #kkReceipt, #kkReceipt *{visibility:visible !important;}
