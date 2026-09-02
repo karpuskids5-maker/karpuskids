@@ -1620,16 +1620,14 @@ const WallModule = {
     this._realtimeChannel = supabase.channel(`wall_${classroomId || 'global'}_${Date.now()}`)
       .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'posts' }, (payload) => {
         const post = payload.new;
+        // Ignorar posts programados (aún no publicados)
+        if (post.status === 'scheduled' || (post.scheduled_at && new Date(post.scheduled_at) > new Date())) return;
+        // Respetar el filtro de aula (cuando el muro está filtrando por aula)
         if (classroomId && post.classroom_id && post.classroom_id !== classroomId) return;
-        const existing = document.getElementById('wall-new-posts-indicator');
-        if (!existing) {
-          const btn = document.createElement('div');
-          btn.id = 'wall-new-posts-indicator';
-          btn.className = 'fixed top-24 left-1/2 -translate-x-1/2 bg-orange-500 text-white px-6 py-2.5 rounded-full text-[10px] font-black uppercase shadow-2xl animate-bounce cursor-pointer z-50 flex items-center gap-2 border-2 border-white/20 backdrop-blur-md';
-          btn.innerHTML = '⬆ Nuevas publicaciones disponibles';
-          btn.onclick = () => { window.scrollTo({ top: 0, behavior: 'smooth' }); this.applyFilters(); btn.remove(); };
-          document.body.appendChild(btn);
-          setTimeout(() => btn.remove(), 8000);
+        // Si pudimos renderizarlo en vivo, lo insertamos al inicio del feed (realtime real).
+        if (!this._prependLivePost(post)) {
+          // Fallback: si no aplica al feed actual (búsqueda/filtro activo), mostrar banner.
+          this._showNewPostsBanner();
         }
       })
       .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'posts' }, (payload) => {
@@ -1675,6 +1673,60 @@ const WallModule = {
     if (this._realtimeChannel) { try { supabase.removeChannel(this._realtimeChannel); } catch (e) { console.warn('[Wall] removeChannel failed:', e); } this._realtimeChannel = null; }
     if (this._observer) { this._observer.disconnect(); this._observer = null; }
     if (this._videoObserver) { this._videoObserver.disconnect(); this._videoObserver = null; }
+  },
+
+  /**
+   * 🔄 Inserta en vivo una publicación recién creada al inicio del feed.
+   * Retorna true si se insertó; false si no aplica al feed actual (filtro,
+   * búsqueda, ya cargada, etc.) para que el caller muestre el banner.
+   */
+  _prependLivePost(post) {
+    try {
+      const container = document.getElementById(this._containerId);
+      if (!container) return false;
+      // No insertar si el contenedor está mostrando un estado vacío/error/loader
+      if (container.querySelector('#wall-loader') || container.querySelector('.empty-state')) return false;
+      // Ya existe ese post → no duplicar
+      if (document.getElementById(`post-${post.id}`)) return true;
+      // Búsqueda activa: respetar coincidencia
+      const q = (this._options.searchTerm || '').trim().toLowerCase();
+      if (q && !((post.content || '').toLowerCase().includes(q))) return false;
+      // Filtros de tab activos (videos/photos/announcements) → no forzar inserción
+      if (this._activeFilter === 'videos' && !(post.media_url && /\.(mp4|mov|webm|m4v)$/i.test(post.media_url))) return false;
+      if (this._activeFilter === 'photos' && !post.media_url && !post.image_url) return false;
+      if (this._activeFilter === 'announcements' && post.media_type !== 'announcement') return false;
+      // Expiración
+      if (this._isExpired(post.created_at, post.expire_days)) return false;
+
+      const user = this._appState?.get('user');
+      const processed = this._processPost(post, user);
+
+      const loaderEl = document.querySelector('#wall-scroll-loader');
+      container.insertAdjacentHTML('afterbegin', this.renderPost(processed));
+      ImageLoader.observe(container);
+      this._setupLongPressReactions(container);
+      if (window.lucide) lucide.createIcons();
+
+      // Si el post trae media, registrar vista (no bloqueante)
+      if (processed.display_media_url) this._registerViews([processed.id]);
+      return true;
+    } catch (e) {
+      console.warn('[Wall] No se pudo insertar post en vivo:', e);
+      return false;
+    }
+  },
+
+  /** Muestra el banner "nuevas publicaciones disponibles" (fallback). */
+  _showNewPostsBanner() {
+    const existing = document.getElementById('wall-new-posts-indicator');
+    if (existing) return;
+    const btn = document.createElement('div');
+    btn.id = 'wall-new-posts-indicator';
+    btn.className = 'fixed top-24 left-1/2 -translate-x-1/2 bg-orange-500 text-white px-6 py-2.5 rounded-full text-[10px] font-black uppercase shadow-2xl animate-bounce cursor-pointer z-50 flex items-center gap-2 border-2 border-white/20 backdrop-blur-md';
+    btn.innerHTML = '⬆ Nuevas publicaciones disponibles';
+    btn.onclick = () => { window.scrollTo({ top: 0, behavior: 'smooth' }); this.applyFilters(); btn.remove(); };
+    document.body.appendChild(btn);
+    setTimeout(() => btn.remove(), 8000);
   },
 
   destroy() {

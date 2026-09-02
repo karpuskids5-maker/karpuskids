@@ -111,18 +111,25 @@ window.App = {
 // `App.donaciones`. Mantenemos ambos para evitar errores de "not defined".
 window.App.donations = window.App.donaciones;
 
-window.WallModule = {
-  init: (...a) => import('./wall.module.js').then(m => m.WallModule.init(...a)),
-  loadPosts: (...a) => import('./wall.module.js').then(m => m.WallModule.loadPosts(...a)),
-  destroy: (...a) => import('./wall.module.js').then(m => m.WallModule.destroy(...a)),
-  toggleCommentSection: (...a) => import('./wall.module.js').then(m => m.WallModule.toggleCommentSection(...a)),
-  sendComment: (...a) => import('./wall.module.js').then(m => m.WallModule.sendComment(...a)),
-  deletePost: (...a) => import('./wall.module.js').then(m => m.WallModule.deletePost(...a)),
-  toggleLike: (...a) => import('./wall.module.js').then(m => m.WallModule.toggleLike(...a)),
-  openNewPostModal: (...a) => import('./wall.module.js').then(m => m.WallModule.openNewPostModal(...a)),
-  submitNewPost: (...a) => import('./wall.module.js').then(m => m.WallModule.submitNewPost(...a)),
-  loadClassroomsForPost: (...a) => import('./wall.module.js').then(m => m.WallModule.loadClassroomsForPost(...a)),
-};
+// El muro (wall.module.js) inyecta HTML con oninput/onclick inline que llaman a
+// WallModule.<metodo>() (p. ej. _scheduleDraftSave, submitNewPost, _tagStudent...).
+// Para que esos handlers funcionen sin recargar y sin romper, exponemos un Proxy
+// que reenvía CUALQUIER método al módulo (import().then). Así también sobrevive a
+// que shared/wall.js intente reasignar window.WallModule con el módulo básico.
+const _wallModuleCache = {};
+const _forwardWall = (prop) => (...args) =>
+  import('./wall.module.js').then(m => {
+    const fn = m.WallModule[prop];
+    if (typeof fn !== 'function') throw new Error(`WallModule.${prop} no es una función`);
+    return fn.apply(m.WallModule, args);
+  });
+window.WallModule = new Proxy({}, {
+  get(_t, prop) {
+    if (typeof prop !== 'string') return undefined;
+    if (!(prop in _wallModuleCache)) _wallModuleCache[prop] = _forwardWall(prop);
+    return _wallModuleCache[prop];
+  },
+});
 
 window.openGlobalModal = function(html, wide = false) {
   const container = document.getElementById('globalModalContainer');

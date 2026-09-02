@@ -574,6 +574,12 @@ export const WallModule = {
       const successMsg = await this._buildAndInsertPost(form);
       Helpers.toast(successMsg, 'success');
       App.ui.closeModal();
+      // 🔄 Realtime: refrescar el muro inmediatamente para que la publicación
+      //    aparezca sin recargar la página (el INSERT del realtime puede tardar
+      //    en llegar; recargamos de forma proactiva y no bloqueante).
+      const c = this._containerId || 'muroPostsContainer';
+      this.loadPosts(c).catch(() => {});
+      document.getElementById('wall-new-posts-indicator')?.remove();
     } catch (err) {
       console.error('[Wall] submitNewPost error:', err);
       Helpers.toast('Error al publicar. Intenta de nuevo.', 'error');
