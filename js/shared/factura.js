@@ -14,7 +14,7 @@ export const CENTRO = {
   email: 'karpuskids@gmail.com',
   direccion: 'San Cristóbal',
   horario: 'Lun–Vie: 7:00 AM – 6:00 PM',
-  rnc: '', // Sin RNC publicado por el momento
+  rnc: '133-46572-8',
   url: 'https://karpuskids.com'
 };
 
@@ -105,6 +105,51 @@ async function generateQR(text) {
       }
     });
   } catch (_) { return null; }
+}
+
+/* ── Iconos vectoriales del encabezado ─────────────────────────
+   Los glifos unicode (⌂☎✉⛅) no existen en la codificación WinAnsi
+   de la fuente Helvetica de jsPDF y se renderizan rotos. En su
+   lugar dibujamos iconos vectoriales limpios y legibles. */
+function iconChip(doc, x, cy, type, color) {
+  const size = 3.6;
+  const r = 1.05;
+  const bg = color || [251, 146, 60];
+  const cx = x + size / 2;
+  doc.setFillColor(bg[0], bg[1], bg[2]);
+  doc.roundedRect(x, cy - size / 2, size, size, r, r, 'F');
+  doc.setFillColor(255, 255, 255);
+  doc.setDrawColor(255, 255, 255);
+  doc.setLineWidth(0.4);
+  switch (type) {
+    case 'pin': { // marcador de ubicación
+      doc.circle(cx, cy - 0.55, 0.88, 'F');
+      doc.triangle(cx, cy - 0.1, cx - 0.82, cy + 1.05, cx + 0.82, cy + 1.05, 'F');
+      break;
+    }
+    case 'phone': { // auricular
+      doc.roundedRect(cx - 1.05, cy - 0.5, 2.1, 1.0, 0.5, 0.5, 'F');
+      doc.circle(cx - 0.9, cy - 1.0, 0.24, 'F');
+      doc.circle(cx + 0.9, cy + 1.0, 0.24, 'F');
+      break;
+    }
+    case 'mail': { // sobre con solapa
+      doc.roundedRect(cx - 0.92, cy - 0.62, 1.84, 1.24, 0.28, 0.28, 'S');
+      doc.line(cx - 0.92, cy - 0.62, cx, cy + 0.05, 'S');
+      doc.line(cx + 0.92, cy - 0.62, cx, cy + 0.05, 'S');
+      break;
+    }
+    case 'rnc': { // credencial / RNC institucional
+      doc.roundedRect(cx - 0.95, cy - 0.72, 1.9, 1.44, 0.32, 0.32, 'F');
+      doc.setFillColor(bg[0], bg[1], bg[2]);
+      doc.circle(cx - 0.36, cy - 0.18, 0.26, 'F');
+      doc.roundedRect(cx - 0.72, cy + 0.36, 0.72, 0.16, 0.05, 0.05, 'F');
+      doc.roundedRect(cx + 0.03, cy - 0.4, 0.84, 0.14, 0.04, 0.04, 'F');
+      doc.roundedRect(cx + 0.03, cy - 0.12, 0.84, 0.14, 0.04, 0.04, 'F');
+      doc.roundedRect(cx + 0.03, cy + 0.16, 0.84, 0.14, 0.04, 0.04, 'F');
+      break;
+    }
+  }
 }
 
 /* ── Utilidades ──────────────────────────────────────────────── */
@@ -258,10 +303,20 @@ export async function buildFactura(p, opts = {}) {
   doc.text(CENTRO.eslogan, tx, 22);
   doc.setFontSize(8);
   doc.setTextColor(203, 213, 225);
-  doc.text('\u2302 ' + CENTRO.direccion, tx, 29);
-  doc.text('\u260E ' + CENTRO.telefono, tx, 34);
-  doc.text('\u2709 ' + CENTRO.email, tx, 39);
-  if (CENTRO.rnc) doc.text('\u26C5 RNC: ' + CENTRO.rnc, tx, 48.5);
+  iconChip(doc, tx, 29, 'pin');
+  doc.text(CENTRO.direccion, tx + 5.5, 29);
+  iconChip(doc, tx, 34, 'phone');
+  doc.text(CENTRO.telefono, tx + 5.5, 34);
+  iconChip(doc, tx, 39, 'mail');
+  doc.text(CENTRO.email, tx + 5.5, 39);
+  if (CENTRO.rnc) {
+    iconChip(doc, tx, 48.5, 'rnc');
+    doc.setFont('helvetica', 'bold');
+    doc.setTextColor(255, 255, 255);
+    doc.text('RNC: ' + CENTRO.rnc, tx + 5.5, 48.5);
+    doc.setFont('helvetica', 'normal');
+    doc.setTextColor(203, 213, 225);
+  }
 
   // ── 2) Tarjeta COMPROBANTE DE PAGO ───────────────────────────
   const carteY = 58;
@@ -307,9 +362,19 @@ export async function buildFactura(p, opts = {}) {
   y = carteY + cardH + 10;
 
   // ── 3) ESTUDIANTE / PADRE separados ─────────────────────────
-  const boxH = 30;
+  // Cada campo muestra su ETIQUETA (gris) arriba y su VALOR (negro)
+  // debajo, con aire suficiente para que nada choque entre sí.
+  const boxH = 40;
   const gw = 4;
   const colW = (CW - gw) / 2;
+  const halfW = colW / 2;
+
+  const studName = [st.name, st.last_name].filter(Boolean).join(' ') || 'Estudiante';
+  const studMat = st.matricula || '—';
+  const studAula = st.classrooms?.name || 'Sin aula';
+  const pName = parent?.name || st.p1_name || st.p2_name || '—';
+  const pPhone = parent?.phone || st.p1_phone || st.p2_phone || '—';
+  const pEmail = st.p1_email || st.p2_email || '—';
 
   // ESTUDIANTE
   doc.setFillColor(244, 246, 250);
@@ -317,22 +382,22 @@ export async function buildFactura(p, opts = {}) {
   doc.setTextColor(148, 163, 184);
   doc.setFont('helvetica', 'bold');
   doc.setFontSize(8);
-  doc.text('ESTUDIANTE', M + 5, y + 7);
-  const sRows = [
-    ['Nombre', [st.name, st.last_name].filter(Boolean).join(' ') || 'Estudiante'],
-    ['Matrícula', st.matricula || '—'],
-    ['Aula', st.classrooms?.name || 'Sin aula']
-  ];
+  doc.text('ESTUDIANTE', M + 8, y + 8);
   doc.setFont('helvetica', 'normal');
-  doc.setFontSize(8);
-  let sy = y + 11.5;
-  for (const [lbl, val] of sRows) {
-    doc.setTextColor(100, 116, 139); doc.text(lbl, M + 5, sy);
-    doc.setTextColor(30, 41, 59); doc.setFont('helvetica', 'bold');
-    doc.text(String(val).slice(0, 40), M + colW / 2 + 2, sy, { maxWidth: colW / 2 - 6 });
-    doc.setFont('helvetica', 'normal');
-    sy += 4.2;
-  }
+  doc.setTextColor(100, 116, 139);
+  doc.text('Nombre completo', M + 8, y + 16);
+  doc.setTextColor(30, 41, 59);
+  doc.setFont('helvetica', 'bold');
+  doc.text(studName, M + 8, y + 22, { maxWidth: colW - 16 });
+  doc.setFont('helvetica', 'normal');
+  doc.setTextColor(100, 116, 139);
+  doc.text('Matrícula', M + 8, y + 30);
+  doc.text('Aula', M + 8 + halfW, y + 30);
+  doc.setTextColor(30, 41, 59);
+  doc.setFont('helvetica', 'bold');
+  doc.text(studMat, M + 8, y + 36, { maxWidth: halfW - 16 });
+  doc.text(studAula, M + 8 + halfW, y + 36, { maxWidth: halfW - 12 });
+  doc.setFont('helvetica', 'normal');
 
   // PADRE / TUTOR
   const padX = M + colW + gw;
@@ -341,24 +406,22 @@ export async function buildFactura(p, opts = {}) {
   doc.setTextColor(148, 163, 184);
   doc.setFont('helvetica', 'bold');
   doc.setFontSize(8);
-  doc.text('PADRE / TUTOR', padX + 5, y + 7);
-  const pName = parent?.name || st.p1_name || st.p2_name || '—';
-  const pPhone = parent?.phone || st.p1_phone || st.p2_phone || '—';
-  const pEmail = st.p1_email || st.p2_email || '—';
-  const pRows = [
-    ['Nombre', pName],
-    ['Teléfono', pPhone],
-    ['Correo', pEmail]
-  ];
+  doc.text('PADRE / TUTOR', padX + 8, y + 8);
   doc.setFont('helvetica', 'normal');
-  let py = y + 12;
-  for (const [lbl, val] of pRows) {
-    doc.setTextColor(100, 116, 139); doc.text(lbl, padX + 5, py);
-    doc.setTextColor(30, 41, 59); doc.setFont('helvetica', 'bold');
-    doc.text(String(val).slice(0, 40), padX + colW / 2 + 2, py, { maxWidth: colW / 2 - 6 });
-    doc.setFont('helvetica', 'normal');
-    py += 6;
-  }
+  doc.setTextColor(100, 116, 139);
+  doc.text('Nombre', padX + 8, y + 16);
+  doc.setTextColor(30, 41, 59);
+  doc.setFont('helvetica', 'bold');
+  doc.text(pName, padX + 8, y + 22, { maxWidth: colW - 16 });
+  doc.setFont('helvetica', 'normal');
+  doc.setTextColor(100, 116, 139);
+  doc.text('Teléfono', padX + 8, y + 30);
+  doc.text('Correo', padX + 8 + halfW, y + 30);
+  doc.setTextColor(30, 41, 59);
+  doc.setFont('helvetica', 'bold');
+  doc.text(pPhone, padX + 8, y + 36, { maxWidth: halfW - 16 });
+  doc.text(pEmail, padX + 8 + halfW, y + 36, { maxWidth: halfW - 12 });
+  doc.setFont('helvetica', 'normal');
 
   y += boxH + 8;
 
