@@ -623,10 +623,81 @@
           <p class="text-slate-500 text-sm font-medium">¡Listo para aprender hoy!</p>
         </header>
 
+        <!-- 📊 MÉTRICAS DEL DÍA -->
+        <div class="grid grid-cols-2 md:grid-cols-4 items-stretch gap-3 mb-4">
+          <!-- Alumnos -->
+          <div class="relative overflow-hidden rounded-2xl p-5 shadow-lg flex flex-col justify-between h-full group transition-all hover:-translate-y-0.5 hover:shadow-xl"
+               style="background:linear-gradient(135deg,#7c3aed 0%,#4f46e5 60%,#3730a3 100%)">
+            <div class="absolute -right-5 -top-5 w-20 h-20 bg-white/10 rounded-full"></div>
+            <div class="absolute right-8 -bottom-8 w-16 h-16 bg-black/10 rounded-full"></div>
+            <div class="relative flex items-center justify-between mb-3">
+              <div class="w-10 h-10 rounded-xl bg-white/15 backdrop-blur flex items-center justify-center shadow-inner group-hover:scale-110 transition-transform">
+                <i data-lucide="users" class="w-5 h-5 text-white"></i>
+              </div>
+              <span class="text-[9px] font-black uppercase tracking-widest text-white/80 bg-white/10 px-2 py-1 rounded-full">Activos</span>
+            </div>
+            <div class="relative">
+              <p class="text-3xl font-black leading-none drop-shadow" id="statStudents">0</p>
+              <p class="text-[11px] font-black uppercase tracking-widest text-white/80 mt-1.5">Alumnos</p>
+            </div>
+          </div>
+
+          <!-- Aulas -->
+          <div class="relative overflow-hidden rounded-2xl p-5 shadow-lg flex flex-col justify-between h-full group transition-all hover:-translate-y-0.5 hover:shadow-xl"
+               style="background:linear-gradient(135deg,#4f46e5 0%,#3b82f6 60%,#1e3a8a 100%)">
+            <div class="absolute -right-5 -top-5 w-20 h-20 bg-white/10 rounded-full"></div>
+            <div class="absolute right-8 -bottom-8 w-16 h-16 bg-black/10 rounded-full"></div>
+            <div class="relative flex items-center justify-between mb-3">
+              <div class="w-10 h-10 rounded-xl bg-white/15 backdrop-blur flex items-center justify-center shadow-inner group-hover:scale-110 transition-transform">
+                <i data-lucide="home" class="w-5 h-5 text-white"></i>
+              </div>
+              <span class="text-[9px] font-black uppercase tracking-widest text-white/80 bg-white/10 px-2 py-1 rounded-full">Asignadas</span>
+            </div>
+            <div class="relative">
+              <p class="text-3xl font-black leading-none drop-shadow" id="statClasses">0</p>
+              <p class="text-[11px] font-black uppercase tracking-widest text-white/80 mt-1.5">Aulas</p>
+            </div>
+          </div>
+
+          <!-- Incidentes -->
+          <div class="relative overflow-hidden rounded-2xl p-5 shadow-lg flex flex-col justify-between h-full group transition-all hover:-translate-y-0.5 hover:shadow-xl"
+               style="background:linear-gradient(135deg,#f43f5e 0%,#e11d48 60%,#9f1239 100%)">
+            <div class="absolute -right-5 -top-5 w-20 h-20 bg-white/10 rounded-full"></div>
+            <div class="absolute right-8 -bottom-8 w-16 h-16 bg-black/10 rounded-full"></div>
+            <div class="relative flex items-center justify-between mb-3">
+              <div class="w-10 h-10 rounded-xl bg-white/15 backdrop-blur flex items-center justify-center shadow-inner group-hover:scale-110 transition-transform">
+                <i data-lucide="alert-octagon" class="w-5 h-5 text-white"></i>
+              </div>
+              <span class="text-[9px] font-black uppercase tracking-widest text-white/80 bg-white/10 px-2 py-1 rounded-full">Hoy</span>
+            </div>
+            <div class="relative">
+              <p class="text-3xl font-black leading-none drop-shadow" id="statIncidents">0</p>
+              <p class="text-[11px] font-black uppercase tracking-widest text-white/80 mt-1.5">Incidentes</p>
+            </div>
+          </div>
+
+          <!-- Presentes -->
+          <div class="relative overflow-hidden rounded-2xl p-5 shadow-lg flex flex-col justify-between h-full group transition-all hover:-translate-y-0.5 hover:shadow-xl"
+               style="background:linear-gradient(135deg,#10b981 0%,#059669 60%,#065f46 100%)">
+            <div class="absolute -right-5 -top-5 w-20 h-20 bg-white/10 rounded-full"></div>
+            <div class="absolute right-8 -bottom-8 w-16 h-16 bg-black/10 rounded-full"></div>
+            <div class="relative flex items-center justify-between mb-3">
+              <div class="w-10 h-10 rounded-xl bg-white/15 backdrop-blur flex items-center justify-center shadow-inner group-hover:scale-110 transition-transform">
+                <i data-lucide="user-check" class="w-5 h-5 text-white"></i>
+              </div>
+              <span class="text-[9px] font-black uppercase tracking-widest text-white/80 bg-white/10 px-2 py-1 rounded-full">Hoy</span>
+            </div>
+            <div class="relative">
+              <p class="text-3xl font-black leading-none drop-shadow" id="statPresent">0</p>
+              <p class="text-[11px] font-black uppercase tracking-widest text-white/80 mt-1.5">Presentes</p>
+            </div>
+          </div>
+        </div>
+
         <!-- 🚀 WIDGETS DE AUTOMATIZACIÓN -->
-        <div class="grid grid-cols-1 md:grid-cols-3 gap-3 mb-4">
+        <div class="grid grid-cols-1 md:grid-cols-3 items-stretch gap-3 mb-4">
           <!-- Widget: Actividad Próxima -->
-          <div id="nextActivityWidget" class="md:col-span-2 bg-white rounded-2xl p-4 border border-slate-100 shadow-sm flex items-center gap-4">
+          <div id="nextActivityWidget" class="md:col-span-2 h-full bg-white rounded-2xl p-4 border border-slate-100 shadow-sm flex items-center gap-4">
             <div class="w-12 h-12 bg-orange-100 text-orange-600 rounded-xl flex items-center justify-center shrink-0">
               <i data-lucide="clock" class="w-6 h-6"></i>
             </div>
@@ -639,7 +710,7 @@
           </div>
 
           <!-- Widget: Alerta de Ponche -->
-          <div id="punchAlertWidget" class="bg-rose-50 border border-rose-100 rounded-2xl p-4 flex flex-col justify-center hidden">
+          <div id="punchAlertWidget" class="h-full bg-rose-50 border border-rose-100 rounded-2xl p-4 flex flex-col justify-center hidden">
             <div class="flex items-center gap-3 mb-2">
               <div class="w-8 h-8 bg-rose-500 text-white rounded-lg flex items-center justify-center shadow-sm">
                 <i data-lucide="user-minus" class="w-4 h-4"></i>
@@ -651,7 +722,7 @@
           </div>
 
           <!-- Widget: Tareas por Calificar -->
-          <div id="tasksToGradeWidget" class="bg-indigo-50 border border-indigo-100 rounded-2xl p-4 flex flex-col justify-center hidden">
+          <div id="tasksToGradeWidget" class="h-full bg-indigo-50 border border-indigo-100 rounded-2xl p-4 flex flex-col justify-center hidden">
             <div class="flex items-center gap-3 mb-2">
               <div class="w-8 h-8 bg-indigo-500 text-white rounded-lg flex items-center justify-center shadow-sm">
                 <i data-lucide="award" class="w-4 h-4"></i>

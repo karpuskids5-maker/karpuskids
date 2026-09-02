@@ -102,12 +102,14 @@ a > svg[data-lucide] {
 .kk-sidebar::before {
   content: '';
   position: absolute;
-  top: -60px; left: -60px;
-  width: 200px; height: 200px;
-  background: radial-gradient(circle, rgba(255,255,255,0.18) 0%, transparent 70%);
+  inset: 0;
+  background:
+    radial-gradient(circle at 20% 0%, rgba(255,255,255,0.20) 0%, transparent 45%),
+    radial-gradient(circle at 90% 100%, rgba(255,152,0,0.12) 0%, transparent 45%),
+    radial-gradient(circle at 15% 90%, rgba(236,72,153,0.12) 0%, transparent 45%);
   pointer-events: none;
   z-index: 0;
-  animation: kk-glow 4s ease-in-out infinite;
+  animation: kk-glow 5s ease-in-out infinite;
 }
 
 /* Patrón de puntos decorativo */
@@ -183,16 +185,18 @@ a > svg[data-lucide] {
   align-items: center;
   gap: 10px;
   padding: 10px 12px;
-  margin: 0 8px 12px;
-  background: rgba(255,255,255,0.12);
-  border: 1px solid rgba(255,255,255,0.15);
+  margin: 4px 8px 12px;
+  background: linear-gradient(135deg, rgba(255,255,255,0.16), rgba(255,255,255,0.05));
+  border: 1px solid rgba(255,255,255,0.18);
   border-radius: 16px;
   backdrop-filter: blur(8px);
-  transition: background 0.2s;
+  transition: all 0.2s;
+  box-shadow: inset 0 1px 0 rgba(255,255,255,0.2), 0 4px 14px rgba(0,0,0,0.12);
 }
 
 .kk-sidebar-profile:hover {
-  background: rgba(255,255,255,0.18);
+  background: linear-gradient(135deg, rgba(255,255,255,0.24), rgba(255,255,255,0.08));
+  transform: translateY(-1px);
 }
 
 .kk-sidebar-profile-avatar {
@@ -273,18 +277,24 @@ a > svg[data-lucide] {
 }
 
 .kk-nav-item.active {
-  background: rgba(255,255,255,0.22);
+  background: linear-gradient(90deg, rgba(255,255,255,0.28), rgba(255,255,255,0.10));
   color: white;
-  box-shadow: 0 2px 12px rgba(0,0,0,0.15), inset 0 1px 0 rgba(255,255,255,0.2);
+  box-shadow: 0 2px 12px rgba(0,0,0,0.18), inset 0 1px 0 rgba(255,255,255,0.22);
 }
 
 .kk-nav-item.active::before {
   content: '';
   position: absolute;
-  left: 0; top: 20%; bottom: 20%;
+  left: 0; top: 18%; bottom: 18%;
   width: 3px;
-  background: white;
+  background: linear-gradient(180deg, #fff, rgba(255,255,255,0.4));
   border-radius: 0 3px 3px 0;
+  box-shadow: 0 0 8px rgba(255,255,255,0.6);
+}
+
+.kk-nav-item.active i {
+  transform: scale(1.12);
+  filter: drop-shadow(0 0 4px rgba(255,255,255,0.4));
 }
 
 .kk-nav-item i {
@@ -335,26 +345,151 @@ a > svg[data-lucide] {
   animation: kk-spin-slow 30s linear infinite;
 }
 
-/* ── Section divider ─────────────────────────────────────── */
+/* ── Section divider (estáticos de otros paneles) ────────── */
 .kk-nav-section {
   position: relative;
   z-index: 1;
+  display: flex;
+  align-items: center;
+  gap: 8px;
   font-size: 9px;
   font-weight: 900;
   text-transform: uppercase;
   letter-spacing: 0.14em;
-  color: rgba(255,255,255,0.4);
-  padding: 8px 12px 4px;
-  margin-top: 4px;
+  color: rgba(255,255,255,0.45);
+  padding: 14px 12px 6px;
+  margin-top: 6px;
+}
+
+.kk-nav-section::before {
+  content: '';
+  width: 12px;
+  height: 2px;
+  border-radius: 2px;
+  background: linear-gradient(90deg, rgba(255,255,255,0.6), rgba(255,255,255,0.1));
+  flex-shrink: 0;
+}
+
+.kk-nav-section:first-child {
+  padding-top: 4px;
+  margin-top: 2px;
+}
+
+/* ── Secciones colapsables del sidebar (directora) ───────── */
+.kk-nav-section-toggle {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  width: 100%;
+  border: none;
+  background: transparent;
+  cursor: pointer;
+  font-size: 9px;
+  font-weight: 900;
+  text-transform: uppercase;
+  letter-spacing: 0.14em;
+  color: rgba(255,255,255,0.5);
+  padding: 12px 12px 6px;
+  margin-top: 6px;
+  text-align: left;
+  transition: color 0.2s, background 0.2s;
+  border-radius: 10px;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.kk-nav-section-toggle:first-child {
+  padding-top: 4px;
+  margin-top: 2px;
+}
+
+.kk-nav-section-toggle:hover {
+  color: rgba(255,255,255,0.9);
+}
+
+.kk-nav-section-toggle::before {
+  content: '';
+  width: 12px;
+  height: 2px;
+  border-radius: 2px;
+  background: linear-gradient(90deg, rgba(255,255,255,0.7), rgba(255,255,255,0.15));
+  flex-shrink: 0;
+}
+
+.kk-nav-section-label {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.kk-nav-chevron {
+  flex-shrink: 0;
+  width: 16px;
+  height: 16px;
+  opacity: 0.7;
+  transition: transform 0.3s ease, opacity 0.2s;
+}
+
+.kk-nav-section-toggle[aria-expanded="false"] .kk-nav-chevron {
+  transform: rotate(-90deg);
+  opacity: 0.55;
+}
+
+/* Contenedor del grupo de ítems con animación de altura */
+.kk-nav-group {
+  position: relative;
+  z-index: 1;
+  display: block;
+  overflow: hidden;
+  max-height: 400px;
+  opacity: 1;
+  transform-origin: top;
+  transition: max-height 0.35s cubic-bezier(0.4,0,0.2,1), opacity 0.3s ease, margin 0.3s ease;
+}
+
+.kk-nav-group.collapsed {
+  max-height: 0;
+  opacity: 0;
+  margin: 0;
+  overflow: hidden;
+  pointer-events: none;
+}
+
+/* ── Sidebar colapsado (iconos, escritorio): mostraremos los grupos
+      siempre expandidos para que todos los iconos sigan clicables ── */
+@media (min-width: 768px) {
+  aside#sidebar.collapsed .kk-nav-group.collapsed {
+    max-height: 400px;
+    opacity: 1;
+    pointer-events: auto;
+  }
+  aside#sidebar.collapsed .kk-nav-section-toggle {
+    display: none;
+  }
+  aside#sidebar.collapsed .kk-nav-group.collapsed { display: block; }
+}
+
+/* ── Móvil: grupo siempre usa la animación estándar ──────── */
+@media (max-width: 767px) {
+  aside#sidebar .kk-nav-group.collapsed {
+    max-height: 0;
+    opacity: 0;
+    margin: 0;
+    pointer-events: none;
+  }
 }
 
 /* ── Badge ───────────────────────────────────────────────── */
 .kk-badge {
   position: absolute;
-  top: 6px; right: 6px;
+  top: 8px; right: 8px;
   min-width: 18px;
   height: 18px;
-  background: #ef4444;
+  background: linear-gradient(135deg, #f43f5e, #e11d48);
   color: white;
   font-size: 9px;
   font-weight: 900;
@@ -363,7 +498,8 @@ a > svg[data-lucide] {
   align-items: center;
   justify-content: center;
   padding: 0 4px;
-  box-shadow: 0 2px 6px rgba(239,68,68,0.5);
+  border: 1.5px solid rgba(255,255,255,0.35);
+  box-shadow: 0 2px 8px rgba(244,63,94,0.6);
   animation: kk-pulse-ring 2s infinite;
 }
 

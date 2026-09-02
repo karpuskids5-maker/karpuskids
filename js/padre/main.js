@@ -505,6 +505,9 @@ document.addEventListener('DOMContentLoaded', async () => {
     document.getElementById('btnLogout')?.addEventListener('click', logoutHandler);
     document.getElementById('btnLogoutDesktop')?.addEventListener('click', logoutHandler);
 
+    // 🧭 Sidebar colapsable de escritorio (conjunto desplegable de secciones)
+    setupSidebarCollapse();
+
     // Badge de mensajes no leídos
     loadUnreadBadge();
     initMessageBadgeRealtime();
@@ -1044,7 +1047,8 @@ function _renderStandardSummary(container, rows) {
 // ── Navegación ────────────────────────────────────────────────────────────────
 const _SECTION_THEMES = {
   home: '#0ea5e9', tasks: '#F59E0B', class: '#3B82F6',
-  payments: '#059669', 'live-attendance': '#10B981', reenrollment: '#F59E0B'
+  payments: '#059669', 'live-attendance': '#10B981', reenrollment: '#F59E0B',
+  donaciones: '#10B981'
 };
 
 const _SECTION_NAMES = {
@@ -1052,7 +1056,7 @@ const _SECTION_NAMES = {
   routine: 'Rutina Diaria', grades: 'Calificaciones', attendance: 'Asistencia',
   payments: 'Pagos', profile: 'Mi Perfil', chat: 'Chat',
   notifications: 'Chat', videocall: 'Videollamada', reenrollment: 'Reinscripción',
-  'live-attendance': 'Asistencia en Vivo', store: 'Tienda Escolar'
+  'live-attendance': 'Asistencia en Vivo', donaciones: 'Donaciones'
 };
 
 // 🧠 Memoria de scroll por sección — no perder contexto visual al volver
@@ -1208,7 +1212,7 @@ function _runSection(targetId) {
     case 'grades':          import('./grades.js').then(m => m.GradesModule.init(student?.id)); break;
     case 'reenrollment':    import('./reinscripcion.js').then(m => m.ReinscripcionModule.init(student?.id)); break;
     case 'routine':         _initRoutineSection(student); break;
-    case 'store':           import('../shared/store.js').then(m => m.initStorePadre('store-padre-container')); break;
+    case 'donaciones':      import('./donaciones.js').then(m => m.DonacionesModule.init()); break;
     case 'qr-access':       _initPadreQR(student); break;
     case 'videocall':       _initVideocallSection(); break;
   }
@@ -1290,9 +1294,25 @@ function _initVideocallSection() {
   });
 }
 
+function setupSidebarCollapse() {
+  const sidebar = document.getElementById('sidebar');
+  const collapseBtn = document.getElementById('sidebarCollapseBtn');
+  const expandBtn = document.getElementById('sidebarExpandBtn');
+  if (!sidebar) return;
+  const apply = (collapsed) => {
+    sidebar.classList.toggle('collapsed', collapsed);
+    try { localStorage.setItem('karpusSidebarCollapsed', collapsed ? '1' : '0'); } catch (_) { /* entornos sin storage */ }
+  };
+  collapseBtn?.addEventListener('click', () => apply(true));
+  expandBtn?.addEventListener('click', () => apply(false));
+  let saved = '0';
+  try { saved = localStorage.getItem('karpusSidebarCollapsed') || '0'; } catch (_) { /* silencioso */ }
+  if (saved === '1' && window.innerWidth >= 768) apply(true);
+}
+
 function setupNavigation() {
+  // 💳 Pago vencido: precargar monto al entrar desde el dashboard (Etapa 3)
   Helpers.delegate(document.body, '[data-target]', 'click', (_e, el) => {
-    // 💳 Pago vencido: precargar monto al entrar desde el dashboard (Etapa 3)
     const debt = parseFloat(el.dataset.debt || '0');
     if (debt > 0 && el.dataset.target === 'payments') {
       AppState.set('paymentPrefill', { amount: debt, fromDashboard: true });

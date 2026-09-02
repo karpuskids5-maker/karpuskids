@@ -23,9 +23,6 @@ export const EmotionalHome = {
     // Indicador de ánimo en vivo
     const status = AppState.get('todayAttendance');
     this._renderStatus(container, student, status);
-
-    // Highlight Reel del día (log de rutina)
-    await this._renderReel(container, student);
   },
 
   _greetingByHour() {
@@ -92,42 +89,5 @@ export const EmotionalHome = {
       hero.insertAdjacentElement('afterend', badge);
     }
     if (window.lucide) lucide.createIcons();
-  },
-
-  /** Highlight Reel: resumen de recuerdos/tips felices del día */
-  async _renderReel(container, student) {
-    const reel = document.createElement('div');
-    reel.className = 'mb-6';
-    reel.innerHTML = `
-      <div class="flex items-center justify-between mb-3">
-        <h3 class="text-sm font-black text-slate-700 flex items-center gap-2">
-          <span class="w-8 h-8 bg-emerald-100 text-emerald-600 rounded-xl flex items-center justify-center text-base">📸</span>
-          Recuerdos del día
-        </h3>
-        <span class="text-[10px] font-black text-slate-400 uppercase tracking-widest">Historias de 24h</span>
-      </div>
-      <div class="flex gap-3 overflow-x-auto no-scrollbar pb-1">
-        ${this._storyBubble('🍎', 'Primer alimento', '#F43F5E')}
-        ${this._storyBubble('🧩', 'Hora del juego', '#F59E0B')}
-        ${this._storyBubble('😴', 'Siesta reconfortante', '#8B5CF6')}
-        ${this._storyBubble('🎨', 'Arte y creatividad', '#10B981')}
-        ${this._storyBubble('🤝', 'Compañerismo', '#0EA5E9')}
-      </div>
-    `;
-    container.appendChild(reel);
-    if (window.lucide) lucide.createIcons();
-  },
-
-  _storyBubble(emoji, label, color) {
-    return `
-      <div class="flex flex-col items-center gap-1.5 shrink-0 w-20 group cursor-pointer">
-        <div class="w-16 h-16 rounded-full p-[3px]" style="background:conic-gradient(${color}, #FACC15, ${color})">
-          <div class="w-full h-full rounded-full bg-white flex items-center justify-center text-3xl group-hover:scale-105 transition-transform">
-            ${emoji}
-          </div>
-        </div>
-        <p class="text-[10px] font-bold text-slate-500 text-center leading-tight">${label}</p>
-      </div>
-    `;
   }
 };

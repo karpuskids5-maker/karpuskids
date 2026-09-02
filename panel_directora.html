@@ -438,65 +438,97 @@
 
       <!-- Nav -->
       <nav class="flex-1 overflow-y-auto kk-scroll px-2 py-1 space-y-0.5 relative z-10">
-        <div class="kk-nav-section label">Principal</div>
-        <button data-section="dashboard" class="kk-nav-item" data-tooltip="Dashboard">
-          <i data-lucide="layout-dashboard" class="text-blue-300"></i>
-          <span class="label">Dashboard</span>
-        </button>
 
-        <div class="kk-nav-section label">Gestión</div>
-        <button data-section="maestros" class="kk-nav-item relative" data-tooltip="Maestros">
-          <i data-lucide="user-cog" class="text-green-300"></i>
-          <span class="label">Maestros</span>
-          <span id="badge-maestros" class="hidden kk-badge">0</span>
+        <button type="button" class="kk-nav-section-toggle" data-section-toggle="principal" aria-expanded="true">
+          <span class="kk-nav-section-label">Principal</span>
+          <i data-lucide="chevron-down" class="kk-nav-chevron w-3.5 h-3.5"></i>
         </button>
-        <button data-section="estudiantes" class="kk-nav-item relative" data-tooltip="Estudiantes">
-          <i data-lucide="graduation-cap" class="text-orange-300"></i>
-          <span class="label">Estudiantes</span>
-          <span id="badge-estudiantes" class="hidden kk-badge">0</span>
-        </button>
-        <button data-section="inscripciones" class="kk-nav-item relative" data-tooltip="Inscripciones">
-          <i data-lucide="clipboard-check" class="text-cyan-300"></i>
-          <span class="label">Inscripciones</span>
-          <span id="badge-inscripciones" class="hidden kk-badge">0</span>
-        </button>
-        <button data-section="aulas" class="kk-nav-item" data-tooltip="Aulas">
-          <i data-lucide="school" class="text-purple-300"></i>
-          <span class="label">Aulas</span>
-        </button>
+        <div class="kk-nav-group" id="kk-navgroup-principal">
+          <button data-section="dashboard" class="kk-nav-item" data-tooltip="Dashboard">
+            <i data-lucide="layout-dashboard" class="text-blue-300"></i>
+            <span class="label">Dashboard</span>
+          </button>
+        </div>
 
-        <div class="kk-nav-section label">Académico</div>
-        <button data-section="asistencia" class="kk-nav-item relative" data-tooltip="Asistencia">
-          <i data-lucide="calendar-check-2" class="text-pink-300"></i>
-          <span class="label">Asistencia</span>
-          <span id="badge-asistencia" class="hidden kk-badge">0</span>
+        <button type="button" class="kk-nav-section-toggle" data-section-toggle="gestion" aria-expanded="true">
+          <span class="kk-nav-section-label">Gestión</span>
+          <i data-lucide="chevron-down" class="kk-nav-chevron w-3.5 h-3.5"></i>
         </button>
-        <button data-section="calificaciones" class="kk-nav-item relative" data-tooltip="Calificaciones">
-          <i data-lucide="star" class="text-teal-300"></i>
-          <span class="label">Calificaciones</span>
-          <span id="badge-calificaciones" class="hidden kk-badge">0</span>
-        </button>
+        <div class="kk-nav-group" id="kk-navgroup-gestion">
+          <button data-section="maestros" class="kk-nav-item relative" data-tooltip="Maestros">
+            <i data-lucide="user-cog" class="text-green-300"></i>
+            <span class="label">Maestros</span>
+            <span id="badge-maestros" class="hidden kk-badge">0</span>
+          </button>
+          <button data-section="estudiantes" class="kk-nav-item relative" data-tooltip="Estudiantes">
+            <i data-lucide="graduation-cap" class="text-orange-300"></i>
+            <span class="label">Estudiantes</span>
+            <span id="badge-estudiantes" class="hidden kk-badge">0</span>
+          </button>
+          <button data-section="inscripciones" class="kk-nav-item relative" data-tooltip="Inscripciones">
+            <i data-lucide="clipboard-check" class="text-cyan-300"></i>
+            <span class="label">Inscripciones</span>
+            <span id="badge-inscripciones" class="hidden kk-badge">0</span>
+          </button>
+          <button data-section="aulas" class="kk-nav-item" data-tooltip="Aulas">
+            <i data-lucide="school" class="text-purple-300"></i>
+            <span class="label">Aulas</span>
+          </button>
+        </div>
 
-        <div class="kk-nav-section label">Finanzas</div>
-        <button data-section="pagos" class="kk-nav-item relative" data-tooltip="Pagos">
-          <i data-lucide="banknote" class="text-yellow-300"></i>
-          <span class="label">Pagos</span>
-          <span id="badge-pagos" class="hidden kk-badge">0</span>
+        <button type="button" class="kk-nav-section-toggle" data-section-toggle="academico" aria-expanded="true">
+          <span class="kk-nav-section-label">Académico</span>
+          <i data-lucide="chevron-down" class="kk-nav-chevron w-3.5 h-3.5"></i>
         </button>
-        <button data-section="tienda" class="kk-nav-item" data-tooltip="Tienda Escolar">
-          <i data-lucide="shopping-bag" class="text-lime-300"></i>
-          <span class="label">Tienda</span>
-        </button>
+        <div class="kk-nav-group" id="kk-navgroup-academico">
+          <button data-section="asistencia" class="kk-nav-item relative" data-tooltip="Asistencia">
+            <i data-lucide="calendar-check-2" class="text-pink-300"></i>
+            <span class="label">Asistencia</span>
+            <span id="badge-asistencia" class="hidden kk-badge">0</span>
+          </button>
+          <button data-section="calificaciones" class="kk-nav-item relative" data-tooltip="Calificaciones">
+            <i data-lucide="star" class="text-teal-300"></i>
+            <span class="label">Calificaciones</span>
+            <span id="badge-calificaciones" class="hidden kk-badge">0</span>
+          </button>
+        </div>
 
-        <div class="kk-nav-section label">Sistema</div>
-        <button data-section="anio-escolar" class="kk-nav-item" data-tooltip="Año Escolar">
-          <i data-lucide="calendar-range" class="text-violet-300"></i>
-          <span class="label">Año Escolar</span>
+        <button type="button" class="kk-nav-section-toggle" data-section-toggle="finanzas" aria-expanded="true">
+          <span class="kk-nav-section-label">Finanzas</span>
+          <i data-lucide="chevron-down" class="kk-nav-chevron w-3.5 h-3.5"></i>
         </button>
-        <button data-section="configuracion" class="kk-nav-item" data-tooltip="Configuración">
-          <i data-lucide="sliders-horizontal" class="text-slate-300"></i>
-          <span class="label">Configuración</span>
+        <div class="kk-nav-group" id="kk-navgroup-finanzas">
+          <button data-section="pagos" class="kk-nav-item relative" data-tooltip="Pagos">
+            <i data-lucide="banknote" class="text-yellow-300"></i>
+            <span class="label">Pagos</span>
+            <span id="badge-pagos" class="hidden kk-badge">0</span>
+          </button>
+          <button data-section="tienda" class="kk-nav-item" data-tooltip="Tienda Escolar">
+            <i data-lucide="shopping-bag" class="text-lime-300"></i>
+            <span class="label">Tienda</span>
+          </button>
+          <button data-section="donaciones" class="kk-nav-item relative" data-tooltip="Donaciones y Fondos">
+            <i data-lucide="heart-handshake" class="text-rose-300"></i>
+            <span class="label">Donaciones</span>
+            <span id="badge-donaciones" class="hidden kk-badge">0</span>
+          </button>
+        </div>
+
+        <button type="button" class="kk-nav-section-toggle" data-section-toggle="sistema" aria-expanded="true">
+          <span class="kk-nav-section-label">Sistema</span>
+          <i data-lucide="chevron-down" class="kk-nav-chevron w-3.5 h-3.5"></i>
         </button>
+        <div class="kk-nav-group" id="kk-navgroup-sistema">
+          <button data-section="anio-escolar" class="kk-nav-item" data-tooltip="Año Escolar">
+            <i data-lucide="calendar-range" class="text-violet-300"></i>
+            <span class="label">Año Escolar</span>
+          </button>
+          <button data-section="configuracion" class="kk-nav-item" data-tooltip="Configuración">
+            <i data-lucide="sliders-horizontal" class="text-slate-300"></i>
+            <span class="label">Configuración</span>
+          </button>
+        </div>
+
       </nav>
 
       <!-- Logout -->
@@ -588,6 +620,16 @@
             </div>
             <p class="text-3xl font-bold text-indigo-800 mb-1" id="kpiClassrooms">0</p>
             <p class="text-xs text-indigo-600 font-medium">Aulas activas</p>
+          </div>
+
+          <!-- Incidencias (Rose) -->
+          <div data-action="go-section" data-section="reportes" class="bg-rose-100 p-5 rounded-2xl border border-rose-200 shadow-md hover:shadow-md hover:-translate-y-1 transition-all duration-300 group cursor-pointer">
+            <div class="flex justify-between items-start mb-2">
+              <div class="p-2 bg-rose-200 rounded-xl text-rose-700 shadow-sm group-hover:scale-110 transition-transform"><i data-lucide="siren" class="w-6 h-6"></i></div>
+              <span class="text-xs font-bold text-rose-600 bg-white/60 px-2 py-1 rounded-full">Pendientes</span>
+            </div>
+            <p class="text-3xl font-bold text-rose-800 mb-1" id="kpiIncidents">0</p>
+            <p class="text-xs text-rose-600 font-medium">Incidencias activas</p>
           </div>
 
           <!-- Asistencia (Verde Menta) -->
@@ -845,6 +887,115 @@
       <!-- TIENDA ESCOLAR -->
       <section id="tienda" class="section">
         <div id="store-directora-container"></div>
+      </section>
+
+      <!-- DONACIONES & FONDOS -->
+      <section id="donaciones" class="section">
+        <!-- Encabezado -->
+        <div class="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-6">
+          <div>
+            <h1 class="text-2xl font-black text-slate-800 tracking-tight flex items-center gap-2">
+              <span class="w-10 h-10 rounded-2xl bg-rose-100 text-rose-600 flex items-center justify-center"><i data-lucide="heart-handshake" class="w-5 h-5"></i></span>
+              Gestión de Donaciones & Fundraising
+            </h1>
+            <p class="text-slate-500 font-medium text-sm mt-1">Campañas, donantes, comprobantes y certificados deducibles.</p>
+          </div>
+          <div class="flex flex-wrap gap-2">
+            <button onclick="App.donations.exportCSV()" class="px-4 py-2.5 bg-emerald-50 text-emerald-700 border border-emerald-200 rounded-xl text-sm hover:bg-emerald-100 font-bold flex items-center gap-2">
+              <i data-lucide="sheet" class="w-4 h-4"></i> Exportar CSV
+            </button>
+            <button onclick="App.donations.openCampaignModal()" class="px-4 py-2.5 bg-rose-600 text-white rounded-xl text-sm hover:bg-rose-700 shadow-md font-bold flex items-center gap-2">
+              <i data-lucide="plus" class="w-4 h-4"></i> Nueva Campaña
+            </button>
+          </div>
+        </div>
+
+        <!-- Alerta de donaciones grandes pendientes -->
+        <div id="donAlertLarge" class="hidden mb-5"></div>
+
+        <!-- KPIs -->
+        <div class="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-5 gap-4 mb-6">
+          <div class="bg-rose-50 text-rose-700 rounded-2xl p-4 shadow-sm border border-rose-100">
+            <div class="text-[10px] font-bold uppercase opacity-70 mb-1">Total recaudado</div>
+            <div class="text-lg md:text-xl font-black" id="donKpiTotal">RD$ 0.00</div>
+          </div>
+          <div class="bg-emerald-50 text-emerald-700 rounded-2xl p-4 shadow-sm border border-emerald-100">
+            <div class="text-[10px] font-bold uppercase opacity-70 mb-1">Donantes únicos</div>
+            <div class="text-lg md:text-xl font-black" id="donKpiDonors">0</div>
+          </div>
+          <div class="bg-amber-50 text-amber-700 rounded-2xl p-4 shadow-sm border border-amber-100">
+            <div class="text-[10px] font-bold uppercase opacity-70 mb-1">Por validar</div>
+            <div class="text-lg md:text-xl font-black" id="donKpiPending">0</div>
+          </div>
+          <div class="bg-sky-50 text-sky-700 rounded-2xl p-4 shadow-sm border border-sky-100">
+            <div class="text-[10px] font-bold uppercase opacity-70 mb-1">Campañas activas</div>
+            <div class="text-lg md:text-xl font-black" id="donKpiCampaigns">0</div>
+          </div>
+          <div class="bg-violet-50 text-violet-700 rounded-2xl p-4 shadow-sm border border-violet-100">
+            <div class="text-[10px] font-bold uppercase opacity-70 mb-1">Certificados</div>
+            <div class="text-lg md:text-xl font-black" id="donKpiCertified">0</div>
+          </div>
+        </div>
+
+        <!-- Campañas -->
+        <div class="bg-white rounded-2xl shadow-sm border border-slate-100 mb-6 overflow-hidden">
+          <div class="px-5 py-4 border-b border-slate-100 flex items-center justify-between">
+            <h2 class="font-black text-slate-800 text-sm flex items-center gap-2"><i data-lucide="megaphone" class="w-4 h-4 text-rose-500"></i> Campañas de Recaudación</h2>
+            <span class="text-xs font-bold text-slate-400 uppercase tracking-wider" id="donCampCount"></span>
+          </div>
+          <div id="donCampList" class="p-5"></div>
+        </div>
+
+        <!-- Historial de donaciones -->
+        <div class="bg-white rounded-2xl shadow-sm border border-slate-100 mb-6 overflow-hidden">
+          <div class="px-5 py-4 border-b border-slate-100 flex flex-wrap gap-3 items-center justify-between">
+            <h2 class="font-black text-slate-800 text-sm flex items-center gap-2"><i data-lucide="file-text" class="w-4 h-4 text-rose-500"></i> Historial de Donaciones</h2>
+            <div class="relative w-full md:w-60">
+              <i data-lucide="search" class="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400"></i>
+              <input id="donSearch" oninput="App.donations.renderDonations()" placeholder="Buscar donante o ref..." class="pl-9 pr-3 py-2 border border-slate-200 rounded-xl text-sm w-full focus:ring-2 focus:ring-rose-500 outline-none bg-slate-50 focus:bg-white" />
+            </div>
+          </div>
+          <div class="px-5 pt-4 flex flex-wrap gap-2" id="donStatusFilters"></div>
+          <div class="overflow-x-auto">
+            <table class="w-full text-sm">
+              <thead class="bg-slate-50 text-slate-500 text-[11px] uppercase tracking-wider">
+                <tr>
+                  <th class="px-5 py-3 text-left font-black">Fecha</th>
+                  <th class="px-4 py-3 text-left font-black">Referencia</th>
+                  <th class="px-4 py-3 text-left font-black">Donante</th>
+                  <th class="px-4 py-3 text-left font-black">Campaña</th>
+                  <th class="px-4 py-3 text-left font-black">Monto</th>
+                  <th class="px-4 py-3 text-left font-black">Método</th>
+                  <th class="px-4 py-3 text-left font-black">Estado</th>
+                  <th class="px-4 py-3 text-right font-black">Acciones</th>
+                </tr>
+              </thead>
+              <tbody id="donTableBody"></tbody>
+            </table>
+          </div>
+        </div>
+
+        <!-- Directorio de donantes -->
+        <div class="bg-white rounded-2xl shadow-sm border border-slate-100 overflow-hidden">
+          <div class="px-5 py-4 border-b border-slate-100 flex items-center justify-between">
+            <h2 class="font-black text-slate-800 text-sm flex items-center gap-2"><i data-lucide="users" class="w-4 h-4 text-rose-500"></i> Directorio de Donantes</h2>
+            <button onclick="App.donations.exportDonorsCSV()" class="text-xs font-bold text-emerald-700 bg-emerald-50 hover:bg-emerald-100 border border-emerald-200 rounded-lg px-3 py-1.5 flex items-center gap-1.5"><i data-lucide="download" class="w-3.5 h-3.5"></i> Exportar</button>
+          </div>
+          <div class="overflow-x-auto">
+            <table class="w-full text-sm">
+              <thead class="bg-slate-50 text-slate-500 text-[11px] uppercase tracking-wider">
+                <tr>
+                  <th class="px-5 py-3 text-left font-black">Donante</th>
+                  <th class="px-4 py-3 text-left font-black">Contacto</th>
+                  <th class="px-4 py-3 text-left font-black">Aportes</th>
+                  <th class="px-4 py-3 text-left font-black">Total aportado</th>
+                  <th class="px-4 py-3 text-left font-black">Último aporte</th>
+                </tr>
+              </thead>
+              <tbody id="donDonorBody"></tbody>
+            </table>
+          </div>
+        </div>
       </section>
 
       <!-- ESTUDIANTES -->

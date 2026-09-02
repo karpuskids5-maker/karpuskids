@@ -12,3 +12,6 @@ verify_jwt = true
 
 [functions.process-referral]
 verify_jwt = false
+
+[functions.upload-receipt]
+verify_jwt = false

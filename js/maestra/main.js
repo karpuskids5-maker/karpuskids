@@ -528,6 +528,13 @@ document.addEventListener('DOMContentLoaded', async () => {
       loadMaestraUnreadBadge(auth.user.id);
     });
 
+    // ✅ Al leer/responder mensajes dentro del chat → recalcular badge y card
+    // al instante (fuente del bug "respondí pero sigue diciendo sin leer")
+    window.addEventListener('karpus:messages-read', () => {
+      loadMaestraUnreadBadge(auth.user.id);
+      _renderUnreadMessagesCard();
+    });
+
     // ── Sidebar: cerrar al navegar en móvil ────────────────────────────────────────
     const sidebar = document.getElementById('sidebar');
     const overlay = document.getElementById('sidebarOverlay');
@@ -1583,8 +1590,15 @@ function _initMaestraQR(profile, user) {
  */
 async function _renderUnreadMessagesCard() {
   try {
+    // ✅ Eliminar tarjeta previa SIEMPRE: evita duplicados al volver al home
+    // y elimina tarjetas obsoletas cuando ya se leyó/respondió en el chat.
+    document.getElementById('unreadMessagesCard')?.remove();
+
+    const grid = document.getElementById('classesGrid');
+    if (!grid) return;
     const user = AppState.get('user');
     if (!user) return;
+
     const { count } = await supabase
       .from('messages')
       .select('id', { count: 'exact', head: true })
@@ -1593,10 +1607,8 @@ async function _renderUnreadMessagesCard() {
     const total = count || 0;
     if (total <= 0) return;
 
-    const grid = document.getElementById('classesGrid');
-    if (!grid) return;
-
     const card = document.createElement('div');
+    card.id = 'unreadMessagesCard';
     card.className = 'col-span-full';
     card.innerHTML = `
       <div onclick="App.setActiveSection('t-chat')" class="p-5 bg-gradient-to-r from-rose-50 to-orange-50 rounded-[2rem] border-2 border-rose-200 shadow-sm hover:shadow-lg hover:border-rose-300 transition-all cursor-pointer flex items-center gap-4">

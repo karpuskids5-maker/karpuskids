@@ -28,7 +28,7 @@ BEGIN
     END IF;
     RAISE EXCEPTION 'No se puede modificar o eliminar un pago ya validado y aprobado.';
   END IF;
-  RETURN OLD;
+  RETURN NEW;
 END;
 $$;
 DROP TRIGGER IF EXISTS trg_protect_paid_records ON public.payments;

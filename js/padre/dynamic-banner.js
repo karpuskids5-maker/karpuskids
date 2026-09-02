@@ -26,7 +26,6 @@ const GRADIENTS = {
   schedule:     'linear-gradient(135deg,#34d399,#22c55e,#14b8a6)',
   new_post:     'linear-gradient(135deg,#f97316,#ea580c,#f59e0b)',
   school:       'linear-gradient(135deg,#8b5cf6,#7c3aed,#6d28d9)',
-  referido:     'linear-gradient(135deg,#10B981,#0EA5E9,#06b6d4)',
 };
 
 const ANIMATIONS = {
@@ -45,8 +44,6 @@ const DynamicBanner = {
   _postCheckTimer: null,
   _lastPostCount: 0,
   _lastPostCheck: 0,
-  _referralCode: null,
-  _referralLoading: null,
 
   init() {
     this._container = document.getElementById('dynamicBanner');
@@ -60,9 +57,6 @@ const DynamicBanner = {
 
     if (this._postCheckTimer) clearInterval(this._postCheckTimer);
     this._postCheckTimer = setInterval(() => this._checkNewPosts(), 30000);
-
-    // Cargar el enlace de referido en segundo plano para la campaña "Comparte y ahorra"
-    this._loadReferralCode().then(() => { this.refresh(); });
   },
 
   destroy() {
@@ -76,65 +70,6 @@ const DynamicBanner = {
     this._collectSlides();
     this._render();
     this._startRotation();
-  },
-
-  /** Obtiene (o crea) el código de referido del padre para la campaña */
-  async _loadReferralCode() {
-    if (this._referralLoading) return this._referralLoading;
-    const profile = AppState.get('profile');
-    if (!profile?.id) return null;
-
-    this._referralLoading = (async () => {
-      try {
-        const { data } = await supabase
-          .from('referral_codes')
-          .select('code')
-          .eq('parent_id', profile.id)
-          .maybeSingle();
-        if (data?.code) { this._referralCode = data.code; return this._referralCode; }
-        const { data: ensure } = await supabase.rpc('ensure_referral_code', { p_parent_id: profile.id });
-        if (ensure?.code) { this._referralCode = ensure.code; }
-      } catch (e) {
-        console.warn('[banner] load referral code:', e);
-      }
-      return this._referralCode;
-    })();
-    return this._referralLoading;
-  },
-
-  /** Ventana de la campaña temporal "Comparte y ahorra" (29 AGO — 15 SEP) */
-  _isReferralCampaignActive() {
-    const now = new Date();
-    const start = new Date(now.getFullYear(), 7, 29, 0, 0, 0);
-    const end = new Date(now.getFullYear(), 8, 15, 23, 59, 59);
-    return now >= start && now <= end;
-  },
-
-  _referralDaysLeft() {
-    const now = new Date();
-    const end = new Date(now.getFullYear(), 8, 15, 23, 59, 59);
-    return Math.max(0, Math.ceil((end - now) / 86400000));
-  },
-
-  _referralLink() {
-    return this._referralCode
-      ? `https://karpuskids.com/preinscripcion.html?ref=${encodeURIComponent(this._referralCode)}`
-      : '';
-  },
-
-  _referralMessage() {
-    const link = this._referralLink();
-    return `❤️ Quería compartirte Karpus Kids.\n\nMi hijo/a forma parte de esta comunidad y pensé que quizás también podría interesarte para tu familia.\n\nAhora tienen una promoción especial para nuevas familias 👇\n\n${link}\n\nSi decides matricular a tu hijo/a, puedes conocer todos los detalles desde aquí.\n\n¡Quizás nos vemos en Karpus Kids! 🥰`;
-  },
-
-  _shareReferral() {
-    const openWhatsApp = () => {
-      const link = this._referralLink();
-      if (!link) { Helpers.toast('Tu enlace aún no está listo. Inténtalo de nuevo.', 'warning'); return; }
-      window.open(`https://wa.me/?text=${encodeURIComponent(this._referralMessage())}`, '_blank');
-    };
-    if (this._referralCode) { openWhatsApp(); return; }
-    this._loadReferralCode().then(() => openWhatsApp());
   },
 
   _collectSlides() {
@@ -337,21 +272,6 @@ const DynamicBanner = {
         title: 'Horario del estudiante',
         msg: `Aún no has registrado el horario de entrada y salida de ${name}.`,
         cta: { label: 'Configurar', action: () => App.openScheduleModal() },
-      });
-    }
-
-    // ── CAMPAÑA REFERIDOS: "Comparte y ahorra" ──
-    if (this._isReferralCampaignActive() && this._referralCode) {
-      const daysLeft = this._referralDaysLeft();
-      slides.push({
-        id: 'referido',
-        priority: 15,
-        gradient: GRADIENTS.referido,
-        icon: '❤️',
-        anim: ANIMATIONS.pulse,
-        title: 'Comparte Karpus Kids y ahorra 50%',
-        msg: `Cada familia que se matricula con tu enlace = 50% de descuento en tu mensualidad. ${daysLeft > 0 ? `La campaña termina en ${daysLeft} día${daysLeft === 1 ? '' : 's'}.` : '¡Último día hoy!'}`,
-        cta: { label: 'Compartir enlace', action: () => this._shareReferral() },
       });
     }
 

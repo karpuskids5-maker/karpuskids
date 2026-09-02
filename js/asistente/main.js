@@ -129,6 +129,7 @@ window.App = {
     closeModal:    ()    => import('./payments.js').then(m => m.PaymentsModule.closeModal()),
     filterBy:      (s)   => import('./payments.js').then(m => m.PaymentsModule.filterBy(s)),
     waiveMora:     (id)  => import('./payments.js').then(m => m.PaymentsModule.waiveMora(id)),
+    applyDiscount: (id)  => import('./payments.js').then(m => m.PaymentsModule.applyDiscount(id)),
     _confirmApproval: (id) => import('./payments.js').then(m => m.PaymentsModule._confirmApproval(id)),
     sendPaymentReminder: (id, ch) => import('./payments.js').then(m => m.PaymentsModule.sendPaymentReminder(id, ch)),
     sendDigitalReceipt:  (id, ch) => import('./payments.js').then(m => m.PaymentsModule.sendDigitalReceipt(id, ch)),

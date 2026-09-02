@@ -186,3 +186,23 @@ ORDER BY ordinal_position;
 -- ═══════════════════════════════════════════════════════════════════════════
 -- FIN DEL PARCHE
 -- ═══════════════════════════════════════════════════════════════════════════
+
+-- ═══════════════════════════════════════════════════════════════════════════
+-- PARCHE: increment_post_views — contador de vistas de publicaciones del muro
+-- ═══════════════════════════════════════════════════════════════════════════
+-- SÍNTOMA: 4xx/404 en /rest/v1/rpc/increment_post_views desde js/shared/wall.js
+-- CAUSA:   La función RPC nunca se creó en la base de datos (solo se llama
+--          desde el frontend en _registerViews).
+-- ACCIÓN:  Idempotente, puede re-ejecutarse sin daño.
+-- ═══════════════════════════════════════════════════════════════════════════
+
+CREATE OR REPLACE FUNCTION public.increment_post_views(p_post_id bigint)
+RETURNS void LANGUAGE sql SECURITY DEFINER SET search_path = public AS $$
+  UPDATE public.posts
+    SET views_count = COALESCE(views_count, 0) + 1
+  WHERE id = p_post_id;
+$$;
+
+GRANT EXECUTE ON FUNCTION public.increment_post_views(bigint) TO authenticated;
+GRANT EXECUTE ON FUNCTION public.increment_post_views(bigint) TO anon;
+GRANT EXECUTE ON FUNCTION public.increment_post_views(bigint) TO service_role;

@@ -120,27 +120,41 @@ export const PaymentsModule = {
 
       const monthKey = (yv && mv && mv !== 'all') ? `${yv}-${String(mv).padStart(2,'0')}` : maxVisibleMonthKey;
 
-      const SEL = 'id,student_id,amount,concept,status,due_date,created_at,paid_date,method,bank,reference,month_paid,evidence_url,mora_amount,total_due,student_name,classroom_name';
+      const SEL = 'id,student_id,amount,concept,status,due_date,created_at,paid_date,method,bank,reference,month_paid,evidence_url,proof_url,mora_amount,total_due,student_name,classroom_name,original_amount,discount_pct,discount_amount,discount_reason';
+      const SEL_LEGACY = 'id,student_id,amount,concept,status,due_date,created_at,paid_date,method,bank,reference,month_paid,evidence_url,proof_url,mora_amount,total_due,student_name,classroom_name';
 
-      let q = supabase.from('v_payments_with_mora').select(SEL);
+      const build = (s) => {
+        let q = supabase.from('v_payments_with_mora').select(s);
+        if (mv === 'all' || !mv) {
+          // Todos los meses del año seleccionado
+          q = q.gte('month_paid', (yv || currentYear) + '-01')
+               .lte('month_paid', maxVisibleMonthKey);
+          if (sf && sf !== 'all') q = q.eq('status', sf);
+        } else if (sf === 'all') {
+          q = q.or(`and(status.eq.overdue,month_paid.lt.${maxVisibleMonthKey}),month_paid.eq.${monthKey}`);
+        } else if (sf === 'pending' || sf === 'overdue' || sf === 'review') {
+          q = q.eq('status', sf).lte('month_paid', maxVisibleMonthKey);
+        } else {
+          q = q.eq('month_paid', monthKey);
+          if (sf && sf !== 'all') q = q.eq('status', sf);
+        }
+        return q.order('month_paid', { ascending: false }).order('due_date', { ascending: true });
+      };
 
-      if (mv === 'all' || !mv) {
-        // Todos los meses del año seleccionado
-        q = q.gte('month_paid', (yv || currentYear) + '-01')
-             .lte('month_paid', maxVisibleMonthKey);
-        if (sf && sf !== 'all') q = q.eq('status', sf);
-      } else if (sf === 'all') {
-        q = q.or(`and(status.eq.overdue,month_paid.lt.${maxVisibleMonthKey}),month_paid.eq.${monthKey}`);
-      } else if (sf === 'pending' || sf === 'overdue' || sf === 'review') {
-        q = q.eq('status', sf).lte('month_paid', maxVisibleMonthKey);
-      } else {
-        q = q.eq('month_paid', monthKey);
-        if (sf && sf !== 'all') q = q.eq('status', sf);
+      let data, error;
+      try {
+        const r = await build(SEL);
+        if (r.error) {
+          const r2 = await build(SEL_LEGACY);
+          data = r2.data; error = r2.error;
+        } else {
+          data = r.data; error = null;
+        }
+      } catch (err_) {
+        const r2 = await build(SEL_LEGACY).catch(() => null);
+        if (!r2 || r2.error) throw err_;
+        data = r2.data; error = null;
       }
-
-      q = q.order('month_paid', { ascending: false }).order('due_date', { ascending: true });
-
-      let { data, error } = await q;
       if (error) throw error;
 
       let list = data || [];
@@ -220,6 +234,9 @@ export const PaymentsModule = {
     const ip  = sk !== 'paid';
     const ds  = p.due_date ? new Date(p.due_date + 'T00:00:00').toLocaleDateString('es-ES') : '-';
     const af  = 'RD$' + Number(p.amount || 0).toLocaleString('es-DO', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+    const discPct = Number(p.discount_pct || 0);
+    const origAmt = Number(p.original_amount || 0);
+    const hasDisc = discPct > 0 || Number(p.discount_amount || 0) > 0;
 
     // Mora acumulada (usando valores de la vista de Postgres)
     const mora         = Number(p.mora_amount || 0);
@@ -246,23 +263,33 @@ export const PaymentsModule = {
     }
 
     const approveBtn  = ip ? '<button onclick="App.payments.markPaid(\'' + p.id + '\')" class="p-1.5 bg-emerald-50 text-emerald-600 rounded-lg hover:bg-emerald-100 transition-colors" title="Aprobar"><i data-lucide="check" class="w-4 h-4"></i></button>' : '';
+    const discountBtn = '<button onclick="App.payments.applyDiscount(\'' + p.id + '\')" class="p-1.5 bg-amber-50 text-amber-600 rounded-lg hover:bg-amber-100 transition-colors" title="Aplicar / quitar descuento"><i data-lucide="badge-percent" class="w-4 h-4"></i></button>';
     const waiveMoraBtn = (mora > 0)
       ? '<button onclick="App.payments.waiveMora(\'' + p.id + '\')" class="p-1.5 bg-violet-50 text-violet-600 rounded-lg hover:bg-violet-100 transition-colors" title="Quitar Mora"><i data-lucide="shield-off" class="w-4 h-4"></i></button>'
       : '';
     const deleteBtn   = '<button onclick="App.payments.delete(\'' + p.id + '\')" class="p-1.5 bg-rose-50 text-rose-500 rounded-lg hover:bg-rose-100 transition-colors" title="Eliminar"><i data-lucide="trash-2" class="w-4 h-4"></i></button>';
-    const voucherCell = p.evidence_url
-      ? '<a href="' + p.evidence_url + '" target="_blank" rel="noopener noreferrer" class="inline-flex items-center gap-1 text-sky-600 hover:text-sky-800 text-xs font-bold uppercase"><i data-lucide="external-link" class="w-3 h-3"></i>Ver</a>'
+    const voucherUrl = p.evidence_url || p.proof_url;
+    const voucherCell = voucherUrl
+      ? '<a href="' + voucherUrl + '" target="_blank" rel="noopener noreferrer" class="group inline-flex flex-col items-center gap-1" title="Ver comprobante / foto del pago">' +
+          '<span class="w-10 h-10 rounded-lg overflow-hidden border border-slate-200 bg-slate-50 flex items-center justify-center">' +
+            '<img src="' + voucherUrl + '" alt="Comprobante" class="w-full h-full object-cover group-hover:scale-105 transition-transform">' +
+          '</span>' +
+        '</a>'
       : '<span class="text-slate-300 text-xs">-</span>';
 
     return '<tr class="hover:bg-slate-50 border-b border-slate-100 transition-colors' + (sk === 'overdue' ? ' bg-rose-50/20' : '') + '" data-id="' + p.id + '">' +
       '<td class="px-6 py-3.5"><div class="flex items-center gap-3"><div class="w-8 h-8 rounded-xl bg-indigo-50 text-indigo-600 flex items-center justify-center font-black text-sm flex-shrink-0">' + Helpers.escapeHTML((stu.name || '?').charAt(0).toUpperCase()) + '</div><div><div class="font-bold text-slate-800 text-sm">' + Helpers.escapeHTML(stu.name || '-') + '</div><div class="text-[10px] text-slate-400 font-bold uppercase">' + (stu.classrooms?.name || 'Sin aula') + '</div></div></div></td>' +
       '<td class="px-6 py-3.5 text-center"><span class="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[10px] font-black uppercase ' + st.c + '"><i data-lucide="' + st.i + '" class="w-3 h-3"></i>' + st.l + '</span></td>' +
-      '<td class="px-6 py-3.5 text-right"><div class="font-black text-slate-800">' + af + '</div>' + (ip ? '<div class="flex flex-col items-end gap-0.5 mt-0.5">' + ub + '</div>' : '') + '</td>' +
+      '<td class="px-6 py-3.5 text-right">' +
+      (hasDisc && origAmt > 0 ? '<div class="text-[9px] font-black text-slate-400 line-through">' + 'RD$' + origAmt.toLocaleString('es-DO', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + '</div>' : '') +
+      '<div class="font-black text-slate-800">' + af + '</div>' +
+      (hasDisc ? '<span class="inline-flex items-center gap-1 mt-0.5 px-1.5 py-0.5 bg-amber-50 border border-amber-200 rounded-full text-[9px] font-black text-amber-700 uppercase" title="Descuento ' + (p.discount_reason || '') + '"><i data-lucide="badge-percent" class="w-2.5 h-2.5"></i> -' + discPct + '%</span>' : '') +
+      (ip ? '<div class="flex flex-col items-end gap-0.5 mt-0.5">' + ub + '</div>' : '') + '</td>' +
       '<td class="px-6 py-3.5"><span class="text-[10px] font-black uppercase text-slate-500 bg-slate-100 px-2 py-0.5 rounded-md">' + (p.method || '-') + '</span></td>' +
       '<td class="px-6 py-3.5"><div class="text-[10px] font-bold text-slate-600 uppercase truncate max-w-[120px]">' + Helpers.escapeHTML(p.bank || '-') + '</div><div class="text-[9px] text-slate-400 font-bold">' + Helpers.escapeHTML(p.reference || '') + '</div></td>' +
       '<td class="px-6 py-3.5"><div class="text-[11px] font-bold text-slate-700">' + (p.paid_date ? new Date(p.paid_date).toLocaleDateString('es-ES') : ds) + '</div><div class="text-[9px] text-slate-400 font-bold uppercase">' + (p.paid_date ? 'Pagado' : 'Vence') + '</div></td>' +
       '<td class="px-6 py-3.5 text-center">' + voucherCell + '</td>' +
-      '<td class="px-6 py-3.5 text-center"><div class="flex justify-center gap-1.5">' + approveBtn + waiveMoraBtn + deleteBtn + '</div></td>' +
+      '<td class="px-6 py-3.5 text-center"><div class="flex justify-center gap-1.5">' + discountBtn + approveBtn + waiveMoraBtn + deleteBtn + '</div></td>' +
     '</tr>';
   },
 
@@ -332,15 +359,27 @@ export const PaymentsModule = {
     const ic = 'w-full px-4 py-2.5 border-2 border-slate-100 rounded-2xl outline-none focus:ring-4 focus:ring-purple-100 focus:border-purple-400 bg-slate-50/50 transition-all text-sm font-bold text-slate-700';
     const lc = 'block text-[11px] font-black text-slate-400 uppercase tracking-wider mb-1.5 ml-1';
     const modalDate = new Date();
-    const curMonth = modalDate.getMonth();
-    const curYear  = modalDate.getFullYear();
-    const nextM = curMonth + 1 > 11 ? 0 : curMonth + 1;
-    const nextY = curMonth + 1 > 11 ? curYear + 1 : curYear;
-    const dd = `${nextY}-${String(nextM + 1).padStart(2,'0')}-${String(this.settings.due_day || 5).padStart(2,'0')}`;
+    const curMonth  = modalDate.getMonth();
+    const curYear   = modalDate.getFullYear();
+    const genDay    = Number(this.settings.generation_day) || 25;
+    // Mes a cobrar por defecto = mes visible del sistema (regla del día de
+    // generación): el actual si ya pasó el gen_day; si no, el anterior.
+    let tgtMonth = curMonth, tgtYear = curYear;
+    if (modalDate.getDate() < genDay) {
+      tgtMonth = curMonth === 0 ? 11 : curMonth - 1;
+      tgtYear  = curMonth === 0 ? curYear - 1 : curYear;
+    }
+    // Vencimiento = día due_day del mes siguiente al mes cobrado.
+    const dueMonth = tgtMonth + 1 > 11 ? 0 : tgtMonth + 1;
+    const dueYear  = tgtMonth + 1 > 11 ? tgtYear + 1 : tgtYear;
+    const dd = `${dueYear}-${String(dueMonth + 1).padStart(2,'0')}-${String(this.settings.due_day || 5).padStart(2,'0')}`;
     const mo = MES.map((m, i) => {
-      const val = `${curYear}-${String(i + 1).padStart(2, '0')}`;
-      return '<option value="' + val + '"' + (i === curMonth ? ' selected' : '') + '>' + MES_LABEL[i] + '</option>';
+      const val = `${tgtYear}-${String(i + 1).padStart(2, '0')}`;
+      return '<option value="' + val + '"' + (i === tgtMonth ? ' selected' : '') + '>' + MES_LABEL[i] + '</option>';
     }).join('');
+
+    // Estado del descuento para este registro (base = monto original a cobrar)
+    this._disc = { base: 0, pct: 0, amt: 0, reason: '', source: 'pct' };
 
     window.openGlobalModal(
       '<div class="bg-gradient-to-r from-purple-600 to-indigo-600 text-white p-6 rounded-t-3xl flex items-center gap-3">' +
@@ -354,6 +393,19 @@ export const PaymentsModule = {
         '</div>' +
         '<div><label class="' + lc + '">Monto ($)</label><input id="payAmount" type="number" step="0.01" min="0" class="' + ic + '" placeholder="0.00"></div>' +
         '<div><label class="' + lc + '">Concepto</label><input id="payConcept" type="text" class="' + ic + '" value="Mensualidad"></div>' +
+        '<div class="md:col-span-2">' +
+          '<button type="button" id="payToggleDiscount" class="w-full px-4 py-2.5 border-2 border-dashed border-amber-300 bg-amber-50/60 text-amber-700 rounded-2xl font-black text-xs uppercase flex items-center justify-center gap-2 hover:bg-amber-50 transition-all active:scale-[0.98]">' +
+            '<i data-lucide="badge-percent" class="w-4 h-4"></i> Aplicar Descuento' +
+          '</button>' +
+          '<div id="payDiscountSection" class="hidden mt-3 p-4 bg-white border border-amber-200 rounded-2xl space-y-3">' +
+            '<div class="grid grid-cols-2 gap-3">' +
+              '<div><label class="' + lc + '">Porcentaje (%)</label><input id="payDiscountPct" type="number" step="0.01" min="0" max="100" class="' + ic + '" placeholder="10" inputmode="decimal"></div>' +
+              '<div><label class="' + lc + '">Descuento (RD$)</label><input id="payDiscountAmount" type="number" step="0.01" min="0" class="' + ic + '" placeholder="0.00" inputmode="decimal"></div>' +
+            '</div>' +
+            '<div><label class="' + lc + '">Motivo del descuento</label><input id="payDiscountReason" type="text" class="' + ic + '" placeholder="Ej: Becado, pronto pago, acuerdo especial..."></div>' +
+            '<div id="payDiscountPreview" class="p-2.5 bg-amber-50 border border-amber-100 rounded-xl text-[11px] font-bold text-amber-700"></div>' +
+          '</div>' +
+        '</div>' +
         '<div><label class="' + lc + '">Mes que se cobra</label><select id="payMonthPaid" class="' + ic + '">' + mo + '</select></div>' +
         '<div><label class="' + lc + '">Fecha Limite</label><input id="payDueDate" type="date" class="' + ic + '" value="' + dd + '"></div>' +
         '<div><label class="' + lc + '">Metodo</label><select id="payMethod" class="' + ic + '"><option value="efectivo">Efectivo</option><option value="transferencia">Transferencia</option><option value="tarjeta">Tarjeta</option></select></div>' +
@@ -465,6 +517,20 @@ export const PaymentsModule = {
             setTimeout(() => amtInput.classList.remove('ring-2', 'ring-purple-100'), 1000);
           }
 
+          // Reiniciar el estado del descuento para este estudiante
+          this._baseTotal = total > 0 ? total : 0;
+          this._disc.base   = this._baseTotal;
+          this._disc.pct    = 0;
+          this._disc.amt    = 0;
+          this._disc.reason = '';
+          this._disc.source = 'pct';
+          const pdPct  = document.getElementById('payDiscountPct');
+          const pdAmt  = document.getElementById('payDiscountAmount');
+          const pdPrev = document.getElementById('payDiscountPreview');
+          if (pdPct) pdPct.value = '';
+          if (pdAmt) pdAmt.value = '';
+          if (pdPrev) pdPrev.textContent = '';
+
           // Mostrar info de mora si aplica
           if (infoDiv) {
             if (mora > 0) {
@@ -485,12 +551,94 @@ export const PaymentsModule = {
             if (opt2) monthSelect.value = currentMonth;
           }
 
-          // Sincronizar fecha límite → 5to del mes siguiente
+          // Sincronizar fecha límite → día due_day del mes siguiente al mes cobrado
           const dueDateInput = document.getElementById('payDueDate');
+          const mpVal = monthSelect?.value || '';
           if (dueDateInput) {
-            const dueMonth = nowSel.getMonth() + 2 > 12 ? 1 : nowSel.getMonth() + 2;
-            const dueYear  = nowSel.getMonth() + 2 > 12 ? nowSel.getFullYear() + 1 : nowSel.getFullYear();
-            dueDateInput.value = `${dueYear}-${String(dueMonth).padStart(2, '0')}-05`;
+            if (/^\d{4}-\d{2}$/.test(mpVal)) {
+              const [my, mm] = mpVal.split('-').map(Number);
+              const dm = mm === 12 ? 1 : mm + 1;
+              const dy = mm === 12 ? my + 1 : my;
+              dueDateInput.value = `${dy}-${String(dm).padStart(2, '0')}-${String(this.settings.due_day || 5).padStart(2, '0')}`;
+            } else {
+              dueDateInput.value = dd;
+            }
+          }
+        });
+
+        // ── Descuento en el registro de pago (aplica % y/o RD$ automáticamente) ──
+        const discSection   = document.getElementById('payDiscountSection');
+        const discPctEl     = document.getElementById('payDiscountPct');
+        const discAmtEl     = document.getElementById('payDiscountAmount');
+        const discReasonEl  = document.getElementById('payDiscountReason');
+        const discPrevEl    = document.getElementById('payDiscountPreview');
+        const discBtn       = document.getElementById('payToggleDiscount');
+
+        const recalcDiscount = () => {
+          const base = this._disc.base || 0;
+          if (!base) return;
+          if (this._disc.source === 'amt') {
+            this._disc.amt = Math.max(0, Math.min(parseFloat(discAmtEl?.value || 0) || 0, base));
+            this._disc.pct = base > 0 ? +(this._disc.amt / base * 100).toFixed(2) : 0;
+            if (discPctEl) discPctEl.value = this._disc.pct > 0 ? this._disc.pct : '';
+          } else {
+            this._disc.pct = Math.max(0, Math.min(parseFloat(discPctEl?.value || 0) || 0, 100));
+            this._disc.amt = +(base * this._disc.pct / 100).toFixed(2);
+            if (discAmtEl) discAmtEl.value = this._disc.amt > 0 ? this._disc.amt : '';
+          }
+          const net = Math.max(0, +(base - this._disc.amt).toFixed(2));
+          const amtInput = document.getElementById('payAmount');
+          if (amtInput) amtInput.value = net.toFixed(2);
+          if (discPrevEl) {
+            discPrevEl.textContent = this._disc.amt > 0
+              ? 'Original: RD$' + base.toFixed(2) + '  →  Descuento: -RD$' + this._disc.amt.toFixed(2) + '  →  A cobrar: RD$' + net.toFixed(2)
+              : 'Sin descuento aplicado';
+          }
+          recalcChange();
+        };
+
+        const resetDiscount = () => {
+          this._baseTotal = this._baseTotal || 0;
+          this._disc.base = this._baseTotal;
+          this._disc.pct = 0; this._disc.amt = 0; this._disc.reason = '';
+          if (discPctEl) discPctEl.value = '';
+          if (discAmtEl) discAmtEl.value = '';
+          if (discReasonEl) discReasonEl.value = '';
+          if (discPrevEl) discPrevEl.textContent = '';
+          const amtInput = document.getElementById('payAmount');
+          if (amtInput && this._baseTotal > 0) amtInput.value = this._baseTotal.toFixed(2);
+          recalcChange();
+        };
+
+        discBtn?.addEventListener('click', () => {
+          if (!discSection) return;
+          const willHide = !discSection.classList.contains('hidden');
+          discSection.classList.toggle('hidden');
+          if (willHide) {
+            resetDiscount();
+            discBtn.innerHTML = '<i data-lucide="badge-percent" class="w-4 h-4"></i> Aplicar Descuento';
+          } else {
+            if (this._disc.base <= 0) this._disc.base = this._baseTotal || 0;
+            this._disc.source = 'pct';
+            recalcDiscount();
+            discBtn.innerHTML = '<i data-lucide="badge-percent" class="w-4 h-4"></i> Ocultar Descuento';
+          }
+          if (window.lucide) lucide.createIcons();
+        });
+
+        discPctEl?.addEventListener('focus', () => { this._disc.source = 'pct'; });
+        discPctEl?.addEventListener('input', () => { this._disc.source = 'pct'; recalcDiscount(); });
+        discAmtEl?.addEventListener('focus', () => { this._disc.source = 'amt'; });
+        discAmtEl?.addEventListener('input', () => { this._disc.source = 'amt'; recalcDiscount(); });
+        discReasonEl?.addEventListener('input', () => { this._disc.reason = discReasonEl.value.trim(); });
+        document.getElementById('payMonthPaid')?.addEventListener('change', () => {
+          const mpVal = document.getElementById('payMonthPaid')?.value || '';
+          const dueDateInput = document.getElementById('payDueDate');
+          if (dueDateInput && /^\d{4}-\d{2}$/.test(mpVal)) {
+            const [my, mm] = mpVal.split('-').map(Number);
+            const dm = mm === 12 ? 1 : mm + 1;
+            const dy = mm === 12 ? my + 1 : my;
+            dueDateInput.value = `${dy}-${String(dm).padStart(2, '0')}-${String(this.settings.due_day || 5).padStart(2, '0')}`;
           }
         });
 
@@ -513,6 +661,13 @@ export const PaymentsModule = {
     const sta = document.getElementById('payStatus')?.value || 'paid';
     const pd  = sta === 'paid' ? new Date().toISOString() : null;
     const tendered = parseFloat(document.getElementById('payTendered')?.value || 0) || 0;
+
+    // Descuento aplicado en el registro (si se activó la sección)
+    const hasDisc    = this._disc && Number(this._disc.amt || 0) > 0;
+    const discountAmt = hasDisc ? Number(this._disc.amt) : 0;
+    const discountPct = hasDisc ? Number(this._disc.pct || 0) : 0;
+    const discountReason = hasDisc ? (this._disc.reason || 'Descuento') : null;
+    const originalAmt = hasDisc && Number(this._disc.base || 0) > 0 ? Number(this._disc.base) : null;
 
     if (!sid) return Helpers.toast('Selecciona un estudiante', 'warning');
     if (!amt || amt <= 0) return Helpers.toast('Ingresa un monto valido', 'warning');
@@ -546,6 +701,7 @@ export const PaymentsModule = {
           amount: amt, concept: con, method: met, status: sta,
           due_date: dd || null, paid_date: pd,
           month_paid: mp,
+          original_amount: originalAmt, discount_pct: discountPct, discount_amount: discountAmt, discount_reason: discountReason,
           updated_at: new Date().toISOString()
         }).eq('id', existing.id).select().single();
         if (upErr) throw upErr;
@@ -554,6 +710,7 @@ export const PaymentsModule = {
         const { data: inserted, error: insErr } = await supabase.from('payments').insert({
           student_id: sid, amount: amt, concept: con, method: met, status: sta,
           month_paid: mp, due_date: dd || null, paid_date: pd,
+          original_amount: originalAmt, discount_pct: discountPct, discount_amount: discountAmt, discount_reason: discountReason,
           created_at: new Date().toISOString()
         }).select().single();
         if (insErr) {
@@ -591,8 +748,8 @@ export const PaymentsModule = {
               student: p?.students || {},
               parent: { name: parentName, email: parentEmail, phone: (p?.students?.p1_phone || p?.students?.p2_phone || '') },
               amount: amt,
-              subtotal: amt,
-              descuento: 0,
+              subtotal: originalAmt || amt,
+              descuento: discountAmt,
               recargo: 0,
               total: amt,
               tendered,
@@ -665,8 +822,8 @@ export const PaymentsModule = {
         student: s || {},
         parent: { name: (s?.p1_name || s?.p2_name || null), email: (s?.p1_email || s?.p2_email || null), phone: (s?.p1_phone || s?.p2_phone || '') },
         amount: amt,
-        subtotal: amt,
-        descuento: 0,
+        subtotal: (this._disc?.amt > 0 && this._disc?.base > 0) ? this._disc.base : amt,
+        descuento: this._disc?.amt > 0 ? this._disc.amt : 0,
         recargo: 0,
         total: amt,
         tendered: 0,
@@ -701,9 +858,117 @@ export const PaymentsModule = {
       '</div></div>';
   },
 
+  async applyDiscount(id) {
+    const p = (AppState.get('paymentsData') || []).find(x => String(x.id) === String(id));
+    if (!p) return Helpers.toast('Pago no encontrado', 'warning');
+
+    const orig  = Number(p.original_amount || p.amount || 0);
+    const cur   = Number(p.amount || 0);
+    const curP  = Number(p.discount_pct || 0);
+    const saved = Math.max(0, (orig - cur).toFixed(2));
+
+    const ic = 'w-full px-4 py-2.5 border-2 border-slate-100 rounded-2xl outline-none focus:ring-4 focus:ring-purple-100 focus:border-purple-400 bg-slate-50/50 transition-all text-sm font-bold text-slate-700';
+    const lc = 'block text-[11px] font-black text-slate-400 uppercase tracking-wider mb-1.5 ml-1';
+    const inputCls = 'w-full px-4 py-2.5 border-2 rounded-2xl outline-none focus:ring-4 transition-all text-sm font-bold';
+
+    window.openGlobalModal(
+      '<div class="bg-gradient-to-r from-amber-500 to-orange-500 text-white p-6 rounded-t-3xl flex items-center gap-3">' +
+        '<div class="w-12 h-12 bg-white/20 rounded-2xl flex items-center justify-center"><i data-lucide="badge-percent" class="w-7 h-7"></i></div>' +
+        '<div><h3 class="text-xl font-black">Aplicar Descuento</h3><p class="text-xs text-white/70 font-bold uppercase tracking-widest">Mensualidad · ' + Helpers.escapeHTML(p.student_name || 'Estudiante') + '</p></div>' +
+      '</div>' +
+      '<div class="p-6 bg-slate-50/30 space-y-4" id="discModalBody">' +
+        '<div class="p-4 bg-white rounded-2xl border border-slate-100 grid grid-cols-3 gap-3 text-center">' +
+          '<div><div class="text-[9px] font-black text-slate-400 uppercase tracking-wider mb-1">Monto Original</div><div class="font-black text-slate-700 text-sm" id="discOrig">' + Helpers.formatCurrency(orig) + '</div></div>' +
+          '<div><div class="text-[9px] font-black text-slate-400 uppercase tracking-wider mb-1">Desc. Actual</div><div class="font-black text-teal-600 text-sm">' + (curP > 0 ? '-' + curP + '% ' : '') + Helpers.formatCurrency(saved) + '</div></div>' +
+          '<div><div class="text-[9px] font-black text-slate-400 uppercase tracking-wider mb-1">Nuevo Total</div><div class="font-black text-emerald-600 text-sm" id="discNew">' + Helpers.formatCurrency(cur) + '</div></div>' +
+        '</div>' +
+        '<div class="grid grid-cols-2 gap-3">' +
+          '<button id="discModePct" class="px-3 py-2 rounded-xl bg-amber-500 text-white font-black text-xs uppercase active:scale-95 transition-all">Porcentaje %</button>' +
+          '<button id="discModeFixed" class="px-3 py-2 rounded-xl bg-slate-100 text-slate-500 font-black text-xs uppercase hover:bg-slate-200 active:scale-95 transition-all">Monto Fijo RD$</button>' +
+        '</div>' +
+        '<div>' +
+          '<label id="discValueLabel" class="' + lc + '">Porcentaje a aplicar (%)</label>' +
+          '<input id="discValue" type="number" step="0.01" min="0" max="100" class="' + inputCls + ' border-slate-100 focus:ring-amber-100 focus:border-amber-400 bg-slate-50/50" value="' + curP + '" placeholder="10">' +
+        '</div>' +
+        '<div>' +
+          '<label class="' + lc + '">Motivo del descuento (requerido si aplica)</label>' +
+          '<input id="discReason" type="text" class="' + ic + '" placeholder="Ej: Becado, acuerdo especial, pronto pago..." value="' + (p.discount_reason ? Helpers.escapeHTML(p.discount_reason) : '') + '">' +
+        '</div>' +
+        '<div class="p-3 bg-indigo-50 border border-indigo-100 rounded-2xl text-[11px] font-bold text-indigo-700 flex items-start gap-2">' +
+          '<i data-lucide="info" class="w-4 h-4 mt-0.5 flex-shrink-0"></i>' +
+          '<span>El descuento aplica a esta mensualidad tanto si se paga en <strong>efectivo</strong> como por <strong>transferencia</strong>, y queda registrado con auditoría.</span>' +
+        '</div>' +
+      '</div>' +
+      '<div class="bg-white p-5 rounded-b-3xl border-t border-slate-100 flex justify-end gap-3">' +
+        '<button onclick="UIHelpers.closeModal()" class="px-6 py-2.5 text-slate-500 font-black text-xs uppercase hover:bg-slate-50 rounded-2xl">Cancelar</button>' +
+        '<button id="btnSaveDiscountAction" class="px-8 py-2.5 bg-gradient-to-r from-amber-500 to-orange-500 text-white rounded-2xl font-black text-xs uppercase shadow-lg shadow-amber-100 active:scale-95">Guardar Descuento</button>' +
+      '</div>'
+    );
+
+    let mode = 'pct';
+    const valueInput = document.getElementById('discValue');
+    const newLabel   = document.getElementById('discNew');
+    const pctBtn     = document.getElementById('discModePct');
+    const fixedBtn   = document.getElementById('discModeFixed');
+
+    const paint = (m) => {
+      mode = m;
+      pctBtn.className   = 'px-3 py-2 rounded-xl font-black text-xs uppercase active:scale-95 transition-all ' + (m === 'pct' ? 'bg-amber-500 text-white' : 'bg-slate-100 text-slate-500 hover:bg-slate-200');
+      fixedBtn.className = 'px-3 py-2 rounded-xl font-black text-xs uppercase active:scale-95 transition-all ' + (m === 'fixed' ? 'bg-amber-500 text-white' : 'bg-slate-100 text-slate-500 hover:bg-slate-200');
+      const vLabel = document.getElementById('discValueLabel');
+      if (vLabel) vLabel.textContent = m === 'pct' ? 'Porcentaje a aplicar (%)' : 'Monto fijo a descontar (RD$)';
+      if (valueInput) { if (m === 'pct') valueInput.max = 100; else valueInput.removeAttribute('max'); }
+      if (m === 'pct' && valueInput && !Number(valueInput.dataset.touched)) valueInput.value = curP || '';
+    };
+    pctBtn?.addEventListener('click', () => paint('pct'));
+    fixedBtn?.addEventListener('click', () => { valueInput.dataset.touched = '1'; paint('fixed'); if (valueInput) valueInput.value = saved > 0 ? saved : ''; });
+
+    const preview = () => {
+      const v = Math.max(0, parseFloat(valueInput?.value || 0) || 0);
+      let disc = mode === 'pct' ? orig * v / 100 : v;
+      disc = Math.min(disc, orig);
+      const net = Math.max(0, orig - disc);
+      if (newLabel) newLabel.textContent = Helpers.formatCurrency(net);
+    };
+    valueInput?.addEventListener('input', preview);
+
+    document.getElementById('btnSaveDiscountAction')?.addEventListener('click', async () => {
+      const v = Math.max(0, parseFloat(valueInput?.value || 0) || 0);
+      const reason = (document.getElementById('discReason')?.value || '').trim();
+      const isRemove = v === 0;
+      if (!isRemove && !reason) return Helpers.toast('Indica el motivo del descuento', 'warning');
+      if (mode === 'pct' && v > 100) return Helpers.toast('El porcentaje no puede superar 100%', 'warning');
+      const btn = document.getElementById('btnSaveDiscountAction');
+      if (btn) { btn.disabled = true; btn.textContent = 'Guardando...'; }
+      try {
+        const pct = mode === 'pct' ? v : null;
+        const fixed = mode === 'fixed' ? v : null;
+        const { data, error } = await supabase.rpc('apply_payment_discount', { p_payment_id: id, p_pct: pct, p_reason: reason, p_fixed: fixed });
+        if (error) throw error;
+        if (data?.error) return Helpers.toast(data.error, 'error');
+        Helpers.toast(isRemove ? 'Descuento eliminado' : 'Descuento aplicado correctamente', 'success');
+        UIHelpers.closeModal();
+        await this.loadPayments();
+        this.loadStats();
+      } catch (e) {
+        Helpers.toast('Error al aplicar descuento: ' + (e.message || e), 'error');
+        if (btn) { btn.disabled = false; btn.textContent = 'Guardar Descuento'; }
+      }
+    });
+    if (window.lucide) lucide.createIcons();
+  },
+
   async markPaid(id) {
     try {
       Helpers.vibrate('success');
+      // Descuento ANTES de aprobar: si el pago viene en revisión y aún no tiene
+      // descuento, ofrecer aplicarlo primero (el monto queda fijo al aprobar).
+      const p = (AppState.get('paymentsData') || []).find(x => String(x.id) === String(id));
+      const hasDisc = p && (Number(p.discount_pct || 0) > 0 || Number(p.discount_amount || 0) > 0);
+      if (p && this._st(p) === 'review' && !hasDisc && window.confirm('Aplicar un descuento antes de aprobar este pago?\n\nOK = abrir descuento · Cancelar = aprobar ahora mismo')) {
+        await this.applyDiscount(id);
+        return;
+      }
       // Usar RPC seguro que valida comprobante antes de aprobar
       const { data, error: rpcError } = await supabase.rpc('approve_payment', {
         p_payment_id: id,
@@ -714,8 +979,17 @@ export const PaymentsModule = {
 
       // Obtener datos del pago para notificar y activar estudiante
       const { data: pay } = await supabase.from('payments')
-        .select('student_id, amount, month_paid, students:student_id(name, p1_email, p2_email)')
+        .select('student_id, amount, month_paid, status, students:student_id(name, p1_email, p2_email)')
         .eq('id', id).single();
+
+      // Verificar que la aprobación SÍ persistió (el trigger fn_protect_paid_records
+      // con `RETURN OLD` descartaba los UPDATE de pagos no aprobados sin error).
+      if (!pay || pay.status !== 'paid') {
+        Helpers.toast('No se pudo aprobar: aplica la migración 16 (sección 8) en Supabase SQL Editor y reintenta.', 'error');
+        await this.loadPayments();
+        this.loadStats();
+        return;
+      }
 
       // Activar estudiante al aprobar pago
       if (pay?.student_id) {

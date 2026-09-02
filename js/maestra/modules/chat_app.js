@@ -108,6 +108,13 @@ function _bindLiveMessageListener() {
   window.addEventListener('karpus:message-received', (e) => _handleIncomingMessageLive(e.detail));
 }
 
+/** Avisa al panel (badge + card del dashboard) que los no leídos cambiaron */
+function _notifyUnreadChanged() {
+  try {
+    window.dispatchEvent(new CustomEvent('karpus:messages-read'));
+  } catch (_) { /* silencioso */ }
+}
+
 /** Aplica/actualiza los puntos de presencia en la lista */
 function _renderPresenceDots(onlineSet) {
   document.querySelectorAll('#chatContactsList [data-contact-id]').forEach(el => {
@@ -606,7 +613,8 @@ async function loadChatMessages(otherUserId, loadMore = false) {
       activeConversationId = conversationId;
       AppState.set('activeConversationId', conversationId);
       subscribeToChat(activeConversationId);
-      ChatModule.markAsRead(activeConversationId);
+      await ChatModule.markAsRead(activeConversationId);
+      _notifyUnreadChanged();
     }
 
     _resolveReplyPreviews(messages);
@@ -716,6 +724,7 @@ async function sendChatMessage() {
       AppState.set('activeConversationId', conversationId);
       subscribeToChat(activeConversationId);
     }
+    _notifyUnreadChanged();
   } catch (err) {
     safeToast('Error al enviar mensaje', 'error');
     // Revertir optimistic

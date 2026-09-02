@@ -680,6 +680,7 @@
         <i class="bi bi-sun"></i><i class="bi bi-moon-stars"></i>
       </button>
       <button onclick="togglePrivacyMode()" id="btnPrivacy" class="tb-btn" title="Modo privacidad (ocultar cifras)"><i class="bi bi-eye-slash"></i></button>
+      <button onclick="openHelpCenter()" class="tb-btn" title="Centro de ayuda y atajos"><i class="bi bi-question-lg"></i></button>
     </div>
   </div>
 
@@ -856,11 +857,19 @@
         <div class="kpi k-green"><div class="kpi-val" id="wall-photos">—</div><div class="kpi-lbl">Fotos</div><i class="bi bi-camera-fill kpi-icon"></i></div>
       </div>
       <div class="tab-bar">
-        <button class="tab-btn active" onclick="switchWallTab('table')"><i class="bi bi-list"></i> Lista</button>
+        <button class="tab-btn active" onclick="switchWallTab('feed')"><i class="bi bi-window-stack"></i> Muro</button>
+        <button class="tab-btn" onclick="switchWallTab('table')"><i class="bi bi-list"></i> Lista</button>
         <button class="tab-btn" onclick="switchWallTab('gallery')"><i class="bi bi-grid-3x3-gap"></i> Galería</button>
         <button class="tab-btn" onclick="switchWallTab('media')"><i class="bi bi-camera-reels"></i> Fotos y Videos</button>
       </div>
-      <div id="wallTabTable">
+      <div id="wallTabFeed">
+        <div class="panel">
+          <div class="panel-hdr"><h3><i class="bi bi-window-stack" style="color:#6366f1;margin-right:6px;"></i>Feed del Muro Escolar</h3><span id="feedStatus" style="font-size:11px;color:var(--muted);"></span></div>
+          <div id="wallFeedContainer" style="max-height:75vh;overflow-y:auto;padding:4px 2px;"></div>
+          <div id="feedSentinel" style="height:1px;"></div>
+        </div>
+      </div>
+      <div id="wallTabTable" style="display:none;">
         <div class="panel">
           <div class="panel-hdr"><h3><i class="bi bi-columns-gap" style="color:#6366f1;margin-right:6px;"></i>Publicaciones del muro</h3><span id="wallCount" style="font-size:11px;color:var(--muted);"></span></div>
           <div style="overflow-x:auto;">
@@ -901,6 +910,21 @@
         <button class="tab-btn" onclick="switchChatTab('media')"><i class="bi bi-image"></i> Fotos y Videos</button>
       </div>
       <div id="chatTabMessages">
+        <div style="display:flex;flex-wrap:wrap;gap:8px;align-items:center;justify-content:space-between;margin-bottom:12px;">
+          <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;">
+            <input class="inp inp-search" id="chatSearch" placeholder="Buscar en mensajes... " style="width:180px;" oninput="filterChat()">
+            <select class="inp" id="chatSender" style="width:140px;" onchange="filterChat()"></select>
+            <select class="inp" id="chatReceiver" style="width:140px;" onchange="filterChat()"></select>
+            <select class="inp" id="chatCategory" style="width:150px;" onchange="filterChat()">
+              <option value="">Todas las categorías</option>
+              <option value="unread">🔴 Sin leer</option>
+              <option value="sensitive">⚠️ Sensibles</option>
+              <option value="media">📷 Con archivos</option>
+            </select>
+          </div>
+          <button class="btn btn-primary" onclick="exportChatCSV()"><i class="bi bi-download"></i> Exportar CSV</button>
+        </div>
+        <div id="chatInspectorStrip" style="display:none;gap:8px;flex-wrap:wrap;margin-bottom:10px;"></div>
         <div class="grid-2" style="margin-bottom:16px;">
           <div class="panel">
             <div class="panel-hdr"><h3>Mensajes recientes</h3><span id="chatMsgCount" style="font-size:11px;color:var(--muted);"></span></div>
@@ -1262,12 +1286,13 @@
 <script>
   // Tab switching for Muro
   function switchWallTab(tab) {
-    ['table','gallery','media'].forEach(t => {
+    ['feed','table','gallery','media'].forEach(t => {
       document.getElementById('wallTab' + t.charAt(0).toUpperCase() + t.slice(1)).style.display = t === tab ? '' : 'none';
     });
-    document.querySelectorAll('#sec-muro .tab-btn').forEach((b,i) => b.classList.toggle('active', ['table','gallery','media'][i] === tab));
+    document.querySelectorAll('#sec-muro .tab-btn').forEach((b,i) => b.classList.toggle('active', ['feed','table','gallery','media'][i] === tab));
     if (tab === 'gallery') window.renderWallGallery?.();
     if (tab === 'media') window.renderWallMedia?.();
+    if (tab === 'feed') window.renderWallFeed?.();
   }
   // Tab switching for Chat
   function switchChatTab(tab) {
@@ -1316,12 +1341,7 @@
   let _dashRange = 'today';
   function setDashRange(range) {
     _dashRange = range;
-    document.querySelectorAll('.dash-range').forEach(btn => {
-      const active = btn.dataset.range === range;
-      btn.style.background = active ? 'linear-gradient(135deg,#6366f1,#8b5cf6)' : '';
-      btn.style.color = active ? '#fff' : '';
-    });
-    // Delegar a main.js si expone un hook
+    document.querySelectorAll('.dash-range').forEach(btn => btn.classList.toggle('active', btn.dataset.range === range));
     if (typeof window.refreshDashboard === 'function') window.refreshDashboard(range);
     else if (typeof window.refreshAll === 'function') window.refreshAll();
   }

@@ -39,6 +39,12 @@ export const MODULES = [
   { key: 'push_notifications',label: 'Notificaciones Push',   icon: 'bi-bell-fill',           color: '#fb7185' },
   { key: 'preregistration',   label: 'Preinscripciones',      icon: 'bi-person-plus-fill',    color: '#2dd4bf' },
   { key: 'carnets',           label: 'Carnet Digital',        icon: 'bi-person-badge',        color: '#c084fc' },
+  // ── Módulos ampliados (Informe de Mejoras — Control Center) ──
+  { key: 'attendance',        label: 'Asistencia General',    icon: 'bi-calendar2-check-fill', color: '#4ade80' },
+  { key: 'referrals',         label: 'Programa de Referidos', icon: 'bi-gift-fill',            color: '#22d3ee' },
+  { key: 'medical_records',   label: 'Expediente Médico',     icon: 'bi-journal-medical',      color: '#f472b6' },
+  { key: 'lunch_menu',        label: 'Menú de Comedor',       icon: 'bi-egg-fried',            color: '#fbbf24' },
+  { key: 'documents',         label: 'Documentos & Firmas',   icon: 'bi-file-earmark-check-fill', color: '#a3e635' },
 ];
 
 let _cache = null;

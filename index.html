@@ -186,6 +186,36 @@
       .hide-mobile{display:none!important;}
     }
     @media(min-width:769px){.md-nav{display:flex!important;}.mob-btn{display:none!important;}}
+
+    /* ── Donaciones ── */
+    .kk-don-qck{padding:10px 6px;border-radius:12px;border:1px solid rgba(255,255,255,.12);background:rgba(255,255,255,.06);color:rgba(255,255,255,.8);font-weight:800;font-size:12.5px;cursor:pointer;transition:all .2s;}
+    .kk-don-qck:hover{border-color:#FF9800;color:#FFB74D;}
+    .kk-don-qck.active{background:linear-gradient(135deg,#FF9800,#E91E63);color:#fff;border-color:transparent;box-shadow:0 6px 18px rgba(255,152,0,.35);}
+    .kk-don-camp{background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.09);border-radius:22px;padding:22px;display:flex;gap:18px;align-items:center;transition:transform .25s,border-color .25s;}
+    .kk-don-camp:hover{transform:translateY(-4px);border-color:rgba(255,152,0,.35);}
+    .kk-don-camp-img{width:76px;height:76px;border-radius:16px;flex-shrink:0;display:flex;align-items:center;justify-content:center;background:linear-gradient(135deg,rgba(255,152,0,.25),rgba(233,30,99,.25));overflow:hidden;}
+    .kk-don-camp-img img{width:100%;height:100%;object-fit:cover;}
+    .kk-don-camp-body{flex:1;min-width:0;}
+    .kk-don-camp-body h4{font-size:15px;font-weight:900;color:#fff;margin-bottom:3px;}
+    .kk-don-camp-body p{font-size:12px;color:rgba(255,255,255,.55);line-height:1.6;margin-bottom:10px;}
+    .kk-don-prog{height:8px;background:rgba(255,255,255,.08);border-radius:50px;overflow:hidden;margin-bottom:8px;}
+    .kk-don-prog span{display:block;height:100%;background:linear-gradient(90deg,#FF9800,#E91E63);border-radius:50px;transition:width .6s ease;}
+    .kk-don-meta{display:flex;justify-content:space-between;align-items:center;gap:10px;font-size:11.5px;}
+    .kk-don-meta b{color:#FFB74D;font-size:13px;}
+    .kk-don-meta .kk-don-muted{color:rgba(255,255,255,.45);font-weight:700;}
+    .kk-don-btn{background:rgba(255,255,255,.08);border:1px solid rgba(255,255,255,.15);color:#fff;font-weight:900;font-size:12px;padding:9px 16px;border-radius:10px;cursor:pointer;transition:all .2s;white-space:nowrap;}
+    .kk-don-btn:hover{background:#FF9800;border-color:#FF9800;}
+    .kk-don-thumbs{display:flex;gap:6px;margin-bottom:10px;flex-wrap:wrap;}
+    .kk-don-thumb{width:40px;height:40px;border-radius:10px;overflow:hidden;display:block;border:1px solid rgba(255,255,255,.12);background:rgba(255,255,255,.05);transition:transform .2s,border-color .2s;}
+    .kk-don-thumb:hover{transform:scale(1.08);border-color:rgba(255,152,0,.5);}
+    .kk-don-thumb img{width:100%;height:100%;object-fit:cover;display:block;}
+    .kk-don-thumb-more{display:flex;align-items:center;justify-content:center;color:#FFB74D;font-size:11px;font-weight:900;cursor:default;}
+    @media(max-width:900px){.kk-don-camp{flex-direction:column;align-items:flex-start;text-align:center;}.kk-don-camp-img{width:100%;height:150px;border-radius:14px;}}
+    @media print {
+      body *{visibility:hidden !important;}
+      #kkReceipt, #kkReceipt *{visibility:visible !important;}
+      #kkReceipt{position:absolute;left:0;top:0;width:100%;}
+    }
   </style>
 </head>
 <body>
@@ -213,6 +243,7 @@
         <a href="#programas" class="nav-link" onfocus="this.style.outline='2px solid #FF9800'" onblur="this.style.outline=''">Programas</a>
         <a href="#app"       class="nav-link" onfocus="this.style.outline='2px solid #FF9800'" onblur="this.style.outline=''">App</a>
         <a href="#galeria"   class="nav-link" onfocus="this.style.outline='2px solid #FF9800'" onblur="this.style.outline=''">Galería</a>
+        <a href="#donaciones" class="nav-link" onfocus="this.style.outline='2px solid #FF9800'" onblur="this.style.outline=''">Donaciones</a>
         <a href="#contacto"  class="nav-link" onfocus="this.style.outline='2px solid #FF9800'" onblur="this.style.outline=''">Contacto</a>
       </nav>
 
@@ -238,6 +269,7 @@
       <a href="#programas" style="display:block;padding:12px 16px;font-weight:700;color:#475569;border-radius:10px;" onfocus="this.style.background='#f8fafc'" onblur="this.style.background=''">Programas</a>
       <a href="#app"       style="display:block;padding:12px 16px;font-weight:700;color:#475569;border-radius:10px;" onfocus="this.style.background='#f8fafc'" onblur="this.style.background=''">App</a>
       <a href="#galeria"   style="display:block;padding:12px 16px;font-weight:700;color:#475569;border-radius:10px;" onfocus="this.style.background='#f8fafc'" onblur="this.style.background=''">Galería</a>
+      <a href="#donaciones" style="display:block;padding:12px 16px;font-weight:700;color:#475569;border-radius:10px;" onfocus="this.style.background='#f8fafc'" onblur="this.style.background=''">Donaciones</a>
       <a href="#contacto"  style="display:block;padding:12px 16px;font-weight:700;color:#475569;border-radius:10px;" onfocus="this.style.background='#f8fafc'" onblur="this.style.background=''">Contacto</a>
       <a href="login.html" style="display:block;margin:8px 16px 0;padding:12px;text-align:center;background:linear-gradient(135deg,#FF9800,#E91E63);color:white;font-weight:900;border-radius:14px;">Acceso Padres</a>
     </div>
@@ -1028,6 +1060,124 @@
 </section>
 
 <!-- ════════════════════════════════════════════════════════════
+     DONACIONES — Portal público de recaudación de fondos
+════════════════════════════════════════════════════════════ -->
+<section id="donaciones" class="cta-dark" style="padding:88px 24px;">
+  <div class="blob" style="width:600px;height:600px;background:radial-gradient(circle,rgba(255,152,0,.12),transparent 70%);top:-200px;left:-100px;"></div>
+  <div style="max-width:1280px;margin:0 auto;position:relative;z-index:1;">
+
+    <div class="obs-fade" style="text-align:center;max-width:720px;margin:0 auto 48px;">
+      <span class="sec-label" style="background:rgba(255,152,0,.15);color:#FFB74D;">Filantropía</span>
+      <h2 style="font-size:clamp(1.9rem,4vw,2.8rem);font-weight:900;color:#fff;line-height:1.15;margin-bottom:16px;">Tu aporte transforma <span style="background:linear-gradient(90deg,#FF9800,#E91E63);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;">vidas</span></h2>
+      <p style="color:rgba(255,255,255,.6);font-size:1.02rem;line-height:1.75;font-weight:500;">Cada donación ayuda a financiar becas, mejoras de infraestructura y programas de nutrición para los niños de nuestra comunidad.</p>
+    </div>
+
+    <div style="display:grid;grid-template-columns:1.2fr 1fr;gap:28px;" class="two-col-cta" id="donGrid">
+
+      <!-- Campañas -->
+      <div class="obs-fade" style="display:flex;flex-direction:column;gap:18px;" id="donCampanas"></div>
+
+      <!-- Formulario -->
+      <div class="obs-fade" style="background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.1);border-radius:28px;padding:32px;backdrop-filter:blur(10px);height:max-content;">
+        <h3 style="font-size:1.35rem;font-weight:900;color:#fff;margin-bottom:6px;">Haz tu donación</h3>
+        <p style="font-size:12.5px;color:rgba(255,255,255,.5);margin-bottom:22px;font-weight:600;">Recibe tu código de referencia de seguimiento al instante.</p>
+
+        <div id="donForm" style="display:flex;flex-direction:column;gap:14px;">
+          <div>
+            <label style="font-size:11px;font-weight:800;color:rgba(255,255,255,.65);text-transform:uppercase;letter-spacing:.06em;display:block;margin-bottom:6px;">Causa</label>
+            <select id="donCamp" style="width:100%;padding:12px 14px;border-radius:12px;border:1px solid rgba(255,255,255,.12);background:rgba(255,255,255,.06);color:#fff;font-size:13px;font-weight:600;outline:none;"></select>
+          </div>
+
+          <div>
+            <label style="font-size:11px;font-weight:800;color:rgba(255,255,255,.65);text-transform:uppercase;letter-spacing:.06em;display:block;margin-bottom:6px;">Monto (RD$)</label>
+            <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-bottom:8px;" id="donQuick">
+              <button type="button" data-a="500"   class="kk-don-qck">500</button>
+              <button type="button" data-a="1000"  class="kk-don-qck">1,000</button>
+              <button type="button" data-a="2500"  class="kk-don-qck">2,500</button>
+              <button type="button" data-a="5000"  class="kk-don-qck">5,000</button>
+            </div>
+            <input type="number" id="donAmount" min="1" step="any" placeholder="Monto personalizado" style="width:100%;padding:12px 14px;border-radius:12px;border:1px solid rgba(255,255,255,.12);background:rgba(255,255,255,.06);color:#fff;font-size:14px;font-weight:700;outline:none;">
+          </div>
+
+          <div>
+            <label style="font-size:11px;font-weight:800;color:rgba(255,255,255,.65);text-transform:uppercase;letter-spacing:.06em;display:block;margin-bottom:6px;">Tipo de donante</label>
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;">
+              <select id="donType" style="width:100%;padding:12px 14px;border-radius:12px;border:1px solid rgba(255,255,255,.12);background:rgba(255,255,255,.06);color:#fff;font-size:13px;font-weight:600;outline:none;">
+                <option value="persona">Persona Física</option>
+                <option value="empresa">Empresa (RNC)</option>
+              </select>
+              <select id="donMethod" style="width:100%;padding:12px 14px;border-radius:12px;border:1px solid rgba(255,255,255,.12);background:rgba(255,255,255,.06);color:#fff;font-size:13px;font-weight:600;outline:none;">
+                <option value="transfer">Transferencia</option>
+                <option value="card">Tarjeta</option>
+                <option value="cash">Efectivo</option>
+              </select>
+            </div>
+          </div>
+
+          <input id="donName" type="text" placeholder="Nombre completo / Razón Social" style="width:100%;padding:12px 14px;border-radius:12px;border:1px solid rgba(255,255,255,.12);background:rgba(255,255,255,.06);color:#fff;font-size:14px;font-weight:600;outline:none;">
+          <input id="donEmail" type="email" placeholder="Correo electrónico" style="width:100%;padding:12px 14px;border-radius:12px;border:1px solid rgba(255,255,255,.12);background:rgba(255,255,255,.06);color:#fff;font-size:14px;font-weight:600;outline:none;">
+          <input id="donPhone" type="tel" placeholder="Teléfono / WhatsApp (opcional)" style="width:100%;padding:12px 14px;border-radius:12px;border:1px solid rgba(255,255,255,.12);background:rgba(255,255,255,.06);color:#fff;font-size:14px;font-weight:600;outline:none;">
+          <input id="donTaxId" type="text" placeholder="Cédula / RNC (para comprobante fiscal)" style="width:100%;padding:12px 14px;border-radius:12px;border:1px solid rgba(255,255,255,.12);background:rgba(255,255,255,.06);color:#fff;font-size:14px;font-weight:600;outline:none;">
+
+          <div id="donBankBox" style="background:rgba(255,152,0,.08);border:1px dashed rgba(255,152,0,.3);border-radius:14px;padding:14px;">
+            <div style="font-size:11px;font-weight:900;color:#FFB74D;text-transform:uppercase;letter-spacing:.06em;margin-bottom:8px;">Detalles para transferencia</div>
+            <div style="font-size:12px;color:rgba(255,255,255,.75);line-height:1.75;" id="donBankInfo">
+              <div><b>BHD:</b> 0108-8839-72-5234-5564</div>
+              <div><b>Popular:</b> 888-234-55-67 (Ahorros)</div>
+              <div><b>Banreservas:</b> 960-882-65-43-22</div>
+              <div style="margin-top:6px;color:rgba(255,255,255,.5);font-size:11px;">Adjunta tu volante bancario tras donar.</div>
+            </div>
+          </div>
+
+          <div>
+            <label style="font-size:11px;font-weight:800;color:rgba(255,255,255,.65);text-transform:uppercase;letter-spacing:.06em;display:block;margin-bottom:6px;">Volante bancario (opcional)</label>
+            <div id="donUploadBox" style="border:2px dashed rgba(255,255,255,.15);border-radius:14px;padding:20px;text-align:center;cursor:pointer;transition:border-color .2s,background .2s;" onmouseover="this.style.borderColor='rgba(255,152,0,.5)';this.style.background='rgba(255,152,0,.05)'" onmouseout="this.style.borderColor='rgba(255,255,255,.15)';this.style.background='transparent'">
+              <input type="file" id="donReceipt" accept="image/*,.pdf" style="display:none;">
+              <div id="donUploadPlaceholder">
+                <i class="bi bi-cloud-arrow-up" style="font-size:28px;color:rgba(255,255,255,.3);display:block;margin-bottom:6px;"></i>
+                <span style="font-size:12px;color:rgba(255,255,255,.5);font-weight:600;">Haz clic o arrastra tu comprobante de pago</span>
+                <div style="font-size:10.5px;color:rgba(255,255,255,.3);margin-top:4px;">JPG, PNG o PDF — máx. 5 MB</div>
+              </div>
+              <div id="donUploadPreview" style="display:none;"></div>
+            </div>
+            <div id="donUploadProgress" style="display:none;margin-top:8px;">
+              <div style="height:4px;background:rgba(255,255,255,.1);border-radius:4px;overflow:hidden;">
+                <div id="donUploadBar" style="height:100%;width:0%;background:linear-gradient(90deg,#FF9800,#E91E63);border-radius:4px;transition:width .3s;"></div>
+              </div>
+              <div style="font-size:10.5px;color:rgba(255,255,255,.4);margin-top:4px;font-weight:600;" id="donUploadStatus">Subiendo…</div>
+            </div>
+          </div>
+
+          <label style="display:flex;align-items:center;gap:10px;cursor:pointer;font-size:12.5px;color:rgba(255,255,255,.6);font-weight:600;">
+            <input type="checkbox" id="donAnon" style="width:16px;height:16px;accent-color:#FF9800;border-radius:4px;">
+            Hacer donación anónima (ocultar mi nombre en la lista pública)
+          </label>
+
+          <button id="donBtn" onclick="submitDonation()" style="width:100%;padding:15px;border:none;border-radius:14px;background:linear-gradient(135deg,#FF9800,#E91E63);color:#fff;font-weight:900;font-size:15px;cursor:pointer;box-shadow:0 8px 24px rgba(255,152,0,.4);transition:transform .2s,box-shadow .2s;">Donar ahora</button>
+
+          <div id="donMsg" style="font-size:13px;font-weight:700;color:rgba(255,255,255,.8);text-align:center;display:none;"></div>
+        </div>
+
+        <!-- Confirmación -->
+        <div id="donSuccess" style="display:none;text-align:center;padding:18px 6px;">
+          <div style="width:64px;height:64px;background:rgba(34,197,94,.15);border-radius:50%;display:flex;align-items:center;justify-content:center;margin:0 auto 16px;">
+            <i class="bi bi-check-lg" style="font-size:30px;color:#4ade80;"></i>
+          </div>
+          <h3 style="font-size:1.4rem;font-weight:900;color:#fff;margin-bottom:8px;">¡Gracias por tu aporte!</h3>
+          <p style="color:rgba(255,255,255,.65);font-size:13.5px;line-height:1.7;margin-bottom:14px;">Tu donación quedó registrada con la referencia de seguimiento:</p>
+          <div id="donRef" style="font-size:15px;font-weight:900;color:#FFB74D;background:rgba(255,152,0,.1);border:1px dashed rgba(255,152,0,.4);border-radius:12px;padding:12px;margin-bottom:18px;"></div>
+          <div style="display:flex;gap:10px;justify-content:center;flex-wrap:wrap;">
+            <button onclick="downloadReceipt()" style="padding:12px 20px;border:none;border-radius:12px;background:linear-gradient(135deg,#25D366,#128C7E);color:#fff;font-weight:900;font-size:13px;cursor:pointer;"><i class="bi bi-file-earmark-pdf"></i> Descargar Recibo</button>
+            <button onclick="resetDonationForm()" style="padding:12px 20px;border:2px solid rgba(255,255,255,.2);background:transparent;color:#fff;font-weight:900;font-size:13px;border-radius:12px;cursor:pointer;">Nueva donación</button>
+          </div>
+        </div>
+
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ════════════════════════════════════════════════════════════
      FOOTER
 ════════════════════════════════════════════════════════════ -->
 <footer id="contacto" style="background:#0a0f1e;color:rgba(255,255,255,.65);padding:64px 24px 32px;">
@@ -1065,6 +1215,7 @@
             <li><a href="#programas" style="color:rgba(255,255,255,.45);font-size:14px;font-weight:600;transition:color .2s;" onmouseover="this.style.color='#FF9800'" onmouseout="this.style.color='rgba(255,255,255,.45)'" onfocus="this.style.color='#FF9800'" onblur="this.style.color='rgba(255,255,255,.45)'">Programas</a></li>
             <li><a href="#app"       style="color:rgba(255,255,255,.45);font-size:14px;font-weight:600;transition:color .2s;" onmouseover="this.style.color='#FF9800'" onmouseout="this.style.color='rgba(255,255,255,.45)'" onfocus="this.style.color='#FF9800'" onblur="this.style.color='rgba(255,255,255,.45)'">App</a></li>
             <li><a href="#galeria"   style="color:rgba(255,255,255,.45);font-size:14px;font-weight:600;transition:color .2s;" onmouseover="this.style.color='#FF9800'" onmouseout="this.style.color='rgba(255,255,255,.45)'" onfocus="this.style.color='#FF9800'" onblur="this.style.color='rgba(255,255,255,.45)'">Galería</a></li>
+            <li><a href="#donaciones" style="color:rgba(255,255,255,.45);font-size:14px;font-weight:600;transition:color .2s;" onmouseover="this.style.color='#FF9800'" onmouseout="this.style.color='rgba(255,255,255,.45)'" onfocus="this.style.color='#FF9800'" onblur="this.style.color='rgba(255,255,255,.45)'">Donaciones</a></li>
             <li><a href="login.html" style="color:rgba(255,255,255,.45);font-size:14px;font-weight:600;transition:color .2s;" onmouseover="this.style.color='#FF9800'" onmouseout="this.style.color='rgba(255,255,255,.45)'" onfocus="this.style.color='#FF9800'" onblur="this.style.color='rgba(255,255,255,.45)'">Acceso Padres</a></li>
             <li><a href="politica-privacidad.html" style="color:rgba(255,255,255,.45);font-size:14px;font-weight:600;transition:color .2s;" onmouseover="this.style.color='#FF9800'" onmouseout="this.style.color='rgba(255,255,255,.45)'" onfocus="this.style.color='#FF9800'" onblur="this.style.color='rgba(255,255,255,.45)'">Privacidad</a></li>
           </ul>
@@ -1185,6 +1336,465 @@
       if (t) { e.preventDefault(); t.scrollIntoView({ behavior: 'smooth', block: 'start' }); }
     });
   });
+</script>
+
+<script>
+  // ═════════════════════════════════════════════════════════════════════
+  //  MÓDULO PÚBLICO DE DONACIONES (index.html)
+  //  Credenciales públicas (anon) — mantener en sintonía con js/shared/config.js
+  // ═════════════════════════════════════════════════════════════════════
+  (function () {
+    const SUPABASE_URL      = 'https://wwnfonkvemimwiqjpkij.supabase.co';
+    const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Ind3bmZvbmt2ZW1pbXdpcWpwa2lqIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Njc4MzY0MzUsImV4cCI6MjA4MzQxMjQzNX0.n5VW-3U0r2nRlwC8pDstQLowu9MZ3aWHMzXVVNFQaDo';
+
+    let supabase = null;
+
+    function esc(v) {
+      return String(v ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+    }
+    function fmtRD(v) {
+      return 'RD$ ' + Number(v || 0).toLocaleString('es-DO', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+    }
+
+    function loadSdk() {
+      return new Promise((resolve, reject) => {
+        if (window.supabase?.createClient) return resolve(window.supabase);
+        const s = document.createElement('script');
+        s.src = 'js/shared/supabase-js.min.js';
+        s.onload = () => resolve(window.supabase);
+        s.onerror = () => reject(new Error('No se pudo cargar Supabase SDK'));
+        document.head.appendChild(s);
+      });
+    }
+
+    async function loadCampaigns() {
+      const grid = document.getElementById('donCampanas');
+      const sel  = document.getElementById('donCamp');
+      if (!grid || !sel) return;
+
+      grid.innerHTML = '<div style="text-align:center;padding:40px;color:rgba(255,255,255,.5);font-size:14px;">Cargando campañas…</div>';
+
+      try {
+        supabase = supabase || await loadSdk();
+        const client = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
+          auth: { persistSession: false, autoRefreshToken: false },
+          db: { schema: 'public' }
+        });
+
+        const { data, error } = await client
+          .from('donation_campaigns')
+          .select('id, title, description, target_amount, raised_amount, cover_image_url, images, is_active, end_date')
+          .eq('is_active', true)
+          .order('created_at', { ascending: false });
+
+        if (error) throw error;
+        window.kkCampaigns = data || [];
+
+        // Opciones del formulario
+        const opts = ['<option value="">Donación General (sin campaña)</option>']
+          .concat((data || []).map(c => `<option value="${c.id}">${esc(c.title)}</option>`))
+          .join('');
+        sel.innerHTML = opts;
+
+        if (!data || !data.length) {
+          grid.innerHTML = '<div style="text-align:center;padding:36px;color:rgba(255,255,255,.5);font-size:14px;">Aún no hay campañas activas — tu donación general hace la diferencia.</div>';
+          return;
+        }
+
+        const totalTarget = data.reduce((s, c) => s + Number(c.target_amount || 0), 0);
+        const totalRaised = data.reduce((s, c) => s + Number(c.raised_amount || 0), 0);
+        const pct = totalTarget > 0 ? Math.min(100, (totalRaised / totalTarget) * 100) : 0;
+        const now = new Date();
+        const daysLeft = c => {
+          if (!c.end_date) return '';
+          const days = Math.ceil((new Date(c.end_date + 'T23:59:59') - now) / 86400000);
+          return days >= 0 ? `Quedan ${days} día${days === 1 ? '' : 's'}` : 'Finalizada';
+        };
+
+        const summary = `<div class="kk-don-camp" style="justify-content:space-between;">
+          <div style="flex:1;min-width:0;">
+            <div style="font-size:11px;font-weight:900;color:rgba(255,255,255,.45);text-transform:uppercase;letter-spacing:.08em;margin-bottom:4px;">Recaudación general</div>
+            <div style="font-size:12.5px;color:rgba(255,255,255,.7);font-weight:700;">${data.length} campaña(s) activa(s)</div>
+            <div class="kk-don-prog" style="margin-top:10px;"><span style="width:${pct.toFixed(1)}%"></span></div>
+            <div class="kk-don-meta"><b>${fmtRD(totalRaised)}</b><span class="kk-don-muted">de ${fmtRD(totalTarget)} · ${pct.toFixed(0)}%</span></div>
+          </div>
+        </div>`;
+
+        grid.innerHTML = summary + data.map(c => {
+          const raised = Number(c.raised_amount || 0);
+          const target = Number(c.target_amount || 0);
+          const cpct = target > 0 ? Math.min(100, (raised / target) * 100) : 0;
+          const gallery = (c.images && c.images.length
+            ? c.images
+            : (c.cover_image_url ? [c.cover_image_url] : [])).filter(Boolean).slice(0, 5);
+          const mainImg = gallery[0] || c.cover_image_url;
+          const img = mainImg
+            ? `<img src="${esc(mainImg)}" alt="${esc(c.title)}" loading="lazy" onerror="this.onerror=null;this.outerHTML='<i class=&quot;bi bi-heart-fill&quot; style=&quot;font-size:30px;color:#FFB74D;&quot;></i>'">`
+            : `<i class="bi bi-heart-fill" style="font-size:30px;color:#FFB74D;"></i>`;
+          const thumbs = gallery.length > 1
+            ? `<div class="kk-don-thumbs">${gallery.map(g =>
+                `<a href="${esc(g)}" target="_blank" rel="noopener" aria-label="Ver foto" class="kk-don-thumb"><img src="${esc(g)}" alt="" loading="lazy" onerror="this.style.display='none'"></a>`).join('')}
+              </div>`
+            : '';
+          return `<div class="kk-don-camp">
+            <div class="kk-don-camp-img">${img}</div>
+            <div class="kk-don-camp-body">
+              <h4>${esc(c.title)}</h4>
+              <p>${esc(c.description || '')}</p>
+              ${thumbs}
+              <div class="kk-don-prog"><span style="width:${cpct.toFixed(1)}%"></span></div>
+              <div class="kk-don-meta">
+                <b>${fmtRD(raised)}</b>
+                <span class="kk-don-muted">de ${fmtRD(target)} · ${cpct.toFixed(0)}% · ${esc(daysLeft(c))}</span>
+              </div>
+            </div>
+            <button class="kk-don-btn" onclick="pickCampaign(${c.id})">Donar a esta causa</button>
+          </div>`;
+        }).join('');
+      } catch (err) {
+        grid.innerHTML = '<div style="text-align:center;padding:36px;color:rgba(255,255,255,.5);font-size:14px;">No pudimos cargar las campañas. Intenta más tarde.</div>';
+        console.error('donaciones:', err);
+      }
+    }
+
+    window.pickCampaign = function (id) {
+      const sel = document.getElementById('donCamp');
+      if (sel) sel.value = String(id);
+      const sec = document.getElementById('donaciones');
+      if (sec) sec.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      const amt = document.getElementById('donAmount');
+      if (amt) amt.focus();
+    };
+
+    // Montos rápidos
+    document.addEventListener('DOMContentLoaded', () => {
+      document.querySelectorAll('#donQuick .kk-don-qck').forEach(btn => {
+        btn.addEventListener('click', () => {
+          document.querySelectorAll('#donQuick .kk-don-qck').forEach(b => b.classList.remove('active'));
+          btn.classList.add('active');
+          const input = document.getElementById('donAmount');
+          if (input) input.value = btn.dataset.a;
+        });
+      });
+      document.getElementById('donAmount')?.addEventListener('input', e => {
+        document.querySelectorAll('#donQuick .kk-don-qck').forEach(b => b.classList.toggle('active', Number(b.dataset.a) === Number(e.target.value)));
+      });
+    });
+
+    function getCampaignName(id) {
+      const c = (window.kkCampaigns || []).find(x => String(x.id) === String(id));
+      return c ? c.title : 'Donación General';
+    }
+
+    function methodLabel(m) {
+      return ({ transfer: 'Transferencia Bancaria', card: 'Tarjeta de Crédito/Débito', cash: 'Efectivo' })[m] || m;
+    }
+
+    async function submitDonation() {
+      const msg = document.getElementById('donMsg');
+      const btn = document.getElementById('donBtn');
+      const setMsg = (t, ok) => { if (msg) { msg.style.display = 'block'; msg.textContent = t; msg.style.color = ok ? '#4ade80' : '#f87171'; } };
+
+      const amount  = parseFloat(document.getElementById('donAmount').value);
+      const name    = (document.getElementById('donName').value || '').trim();
+      const email   = (document.getElementById('donEmail').value || '').trim();
+      const phone   = (document.getElementById('donPhone').value || '').trim();
+      const taxId   = (document.getElementById('donTaxId').value || '').trim();
+      const type    = document.getElementById('donType').value;
+      const method  = document.getElementById('donMethod').value;
+      const campId  = document.getElementById('donCamp').value;
+      const anon    = document.getElementById('donAnon').checked;
+
+      if (!amount || amount <= 0) return setMsg('Ingresa un monto válido.', false);
+      if (name.length < 2) return setMsg('Ingresa tu nombre o razón social.', false);
+      if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) return setMsg('Ingresa un correo electrónico válido.', false);
+
+      btn.disabled = true;
+      btn.textContent = 'Procesando donación…';
+      setMsg('', true);
+
+      let receiptUrl = null;
+      try {
+        if (!supabase) {
+          supabase = await loadSdk();
+        }
+        const client = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
+          auth: { persistSession: false, autoRefreshToken: false },
+          db: { schema: 'public' }
+        });
+
+        // Subir volante bancario (si se adjuntó) antes de registrar la donación
+        if (window.kkReceiptFile) {
+          const urlEl = document.getElementById('donUploadStatus');
+          if (urlEl) urlEl.textContent = 'Subiendo comprobante…';
+          receiptUrl = await uploadDonReceipt(window.kkReceiptFile);
+        }
+
+        const { data, error } = await client.rpc('register_donation', {
+          p_campaign_id: campId ? parseInt(campId, 10) : null,
+          p_donor_name: name,
+          p_donor_email: email,
+          p_donor_phone: phone || null,
+          p_donor_tax_id: taxId || null,
+          p_is_company: type === 'empresa',
+          p_is_anonymous: anon,
+          p_amount: amount,
+          p_payment_method: method,
+          p_bank_name: null,
+          p_receipt_url: receiptUrl
+        });
+
+        if (error) throw new Error(error.message || 'Error al registrar la donación');
+
+        window.kkReceipt = {
+          ref: data?.tracking_ref || '',
+          id: data?.donation_id || '',
+          amount,
+          campaign: getCampaignName(campId),
+          name: anon ? 'Anónimo' : name,
+          email,
+          phone,
+          taxId,
+          type,
+          method,
+          date: new Date().toLocaleString('es-DO', { day: '2-digit', month: 'long', year: 'numeric', hour: '2-digit', minute: '2-digit' })
+        };
+
+        document.getElementById('donForm').style.display = 'none';
+        document.getElementById('donRef').textContent = window.kkReceipt.ref;
+        document.getElementById('donSuccess').style.display = 'block';
+
+        // ── Confirmación por correo (fire-and-forget, Edge Function send-email) ──
+        try {
+          const html = `
+            <div style="font-family:Nunito,Arial,sans-serif;background:#f8fafc;padding:24px;color:#0f172a;">
+              <div style="max-width:560px;margin:0 auto;background:#fff;border-radius:16px;overflow:hidden;border:1px solid #e2e8f0;">
+                <div style="background:linear-gradient(135deg,#FF9800,#E91E63);padding:20px;color:#fff;">
+                  <div style="font-weight:900;font-size:18px;">Karpus Kids</div>
+                  <div style="font-size:12px;opacity:.85;">Recibo de donación</div>
+                </div>
+                <div style="padding:24px;">
+                  <p style="font-size:15px;font-weight:700;">Hola, ${esc(name)}:</p>
+                  <p style="font-size:13px;line-height:1.7;color:#475569;">Recibimos tu donación. Guárdala con este número de referencia para el seguimiento:</p>
+                  <div style="margin:18px 0;padding:14px;background:#fff7ed;border:2px dashed #fdba74;border-radius:12px;text-align:center;font-weight:900;font-size:16px;color:#c2410c;">${window.kkReceipt.ref}</div>
+                  <table style="width:100%;font-size:13px;color:#334155;">
+                    <tr><td style="padding:4px 0;color:#64748b;">Monto</td><td style="text-align:right;font-weight:800;">${fmtRD(amount)}</td></tr>
+                    <tr><td style="padding:4px 0;color:#64748b;">Campaña</td><td style="text-align:right;font-weight:800;">${esc(window.kkReceipt.campaign)}</td></tr>
+                    <tr><td style="padding:4px 0;color:#64748b;">Método</td><td style="text-align:right;font-weight:800;">${esc(methodLabel(method))}</td></tr>
+                    <tr><td style="padding:4px 0;color:#64748b;">Fecha</td><td style="text-align:right;font-weight:800;">${esc(window.kkReceipt.date)}</td></tr>
+                  </table>
+                  <p style="font-size:12px;line-height:1.6;color:#94a3b8;margin-top:16px;">La donación está pendiente de validación. Si realizaste una transferencia, adjunta tu volante bancario respondiendo a este correo. Gracias por cambiar vidas. 💛</p>
+                </div>
+              </div>
+            </div>`;
+          client.functions.invoke('send-email', {
+            body: {
+              to: email,
+              subject: 'Karpus Kids · Confirmación de donación ' + window.kkReceipt.ref,
+              html,
+              text: 'Gracias por tu donación. Referencia: ' + window.kkReceipt.ref
+            }
+          }).catch(() => {});
+        } catch (_) {}
+      } catch (err) {
+        setMsg(err?.message || 'Ocurrió un error. Inténtalo de nuevo.', false);
+        console.error('submitDonation:', err);
+      } finally {
+        btn.disabled = false;
+        btn.textContent = 'Donar ahora';
+      }
+    }
+
+    window.submitDonation = submitDonation;
+
+    window.resetDonationForm = function () {
+      ['donAmount','donName','donEmail','donPhone','donTaxId'].forEach(id => { const el = document.getElementById(id); if (el) el.value = ''; });
+      document.getElementById('donAnon').checked = false;
+      document.getElementById('donSuccess').style.display = 'none';
+      document.getElementById('donForm').style.display = 'flex';
+      document.querySelectorAll('#donQuick .kk-don-qck').forEach(b => b.classList.remove('active'));
+      const msg = document.getElementById('donMsg'); if (msg) msg.style.display = 'none';
+      window.kkReceiptFile = null;
+      const prev = document.getElementById('donUploadPreview');
+      if (prev) { prev.style.display = 'none'; prev.innerHTML = ''; }
+      const ph = document.getElementById('donUploadPlaceholder');
+      if (ph) ph.style.display = '';
+      const prog = document.getElementById('donUploadProgress');
+      if (prog) prog.style.display = 'none';
+    };
+
+    // ── Upload de volante bancario ──────────────────────────────────────────
+    window.kkReceiptFile = null;
+
+    (function initDonUpload() {
+      const box    = document.getElementById('donUploadBox');
+      const input  = document.getElementById('donReceipt');
+      const ph     = document.getElementById('donUploadPlaceholder');
+      const prev   = document.getElementById('donUploadPreview');
+      if (!box || !input) return;
+
+      box.addEventListener('click', (e) => { if (e.target === input) return; input.click(); });
+
+      box.addEventListener('dragover', (e) => { e.preventDefault(); box.style.borderColor = 'rgba(255,152,0,.6)'; box.style.background = 'rgba(255,152,0,.06)'; });
+      box.addEventListener('dragleave', () => { box.style.borderColor = ''; box.style.background = ''; });
+      box.addEventListener('drop', (e) => {
+        e.preventDefault(); box.style.borderColor = ''; box.style.background = '';
+        const f = e.dataTransfer.files[0];
+        if (f) handleDonFile(f);
+      });
+
+      input.addEventListener('change', () => { if (input.files[0]) handleDonFile(input.files[0]); });
+
+      function handleDonFile(file) {
+        if (file.size > 5 * 1024 * 1024) {
+          const msg = document.getElementById('donMsg');
+          if (msg) { msg.style.display = 'block'; msg.textContent = 'El archivo no puede superar 5 MB.'; msg.style.color = '#f87171'; }
+          return;
+        }
+        window.kkReceiptFile = file;
+        ph.style.display = 'none';
+        prev.style.display = 'block';
+        if (file.type.startsWith('image/')) {
+          const reader = new FileReader();
+          reader.onload = (e) => {
+            prev.innerHTML = '<div style="position:relative;display:inline-block;"><img src="' + e.target.result + '" style="max-height:120px;border-radius:10px;border:2px solid rgba(255,255,255,.15);display:block;"><button onclick="event.stopPropagation();clearDonFile()" style="position:absolute;top:-6px;right:-6px;width:22px;height:22px;border-radius:50%;background:#ef4444;color:#fff;border:2px solid #0a0f1e;font-size:11px;cursor:pointer;display:flex;align-items:center;justify-content:center;line-height:1;">✕</button><div style="font-size:10.5px;color:rgba(255,255,255,.5);margin-top:6px;font-weight:600;text-align:center;">' + esc(file.name) + ' (' + (file.size / 1024).toFixed(0) + ' KB)</div></div>';
+          };
+          reader.readAsDataURL(file);
+        } else {
+          prev.innerHTML = '<div style="display:flex;align-items:center;gap:10px;"><i class="bi bi-file-earmark-pdf" style="font-size:32px;color:#ef4444;"></i><div><div style="font-size:12px;color:rgba(255,255,255,.8);font-weight:700;">' + esc(file.name) + '</div><div style="font-size:10.5px;color:rgba(255,255,255,.4);">' + (file.size / 1024).toFixed(0) + ' KB</div></div><button onclick="event.stopPropagation();clearDonFile()" style="margin-left:auto;width:22px;height:22px;border-radius:50%;background:#ef4444;color:#fff;border:none;font-size:11px;cursor:pointer;">✕</button></div>';
+        }
+      }
+    })();
+
+    window.clearDonFile = function () {
+      window.kkReceiptFile = null;
+      const input = document.getElementById('donReceipt');
+      if (input) input.value = '';
+      const prev = document.getElementById('donUploadPreview');
+      if (prev) { prev.style.display = 'none'; prev.innerHTML = ''; }
+      const ph = document.getElementById('donUploadPlaceholder');
+      if (ph) ph.style.display = '';
+    };
+
+    async function compressDonImage(file) {
+      if (!file.type.startsWith('image/') || file.size < 100 * 1024) return file;
+      return new Promise((resolve) => {
+        const reader = new FileReader();
+        reader.onload = (e) => {
+          const img = new Image();
+          img.onload = () => {
+            const canvas = document.createElement('canvas');
+            let w = img.width, h = img.height;
+            if (w > 800 || h > 800) { const r = Math.min(800 / w, 800 / h); w = Math.round(w * r); h = Math.round(h * r); }
+            canvas.width = w; canvas.height = h;
+            canvas.getContext('2d').drawImage(img, 0, 0, w, h);
+            canvas.toBlob((blob) => {
+              if (!blob) { resolve(file); return; }
+              resolve(new File([blob], file.name.replace(/\.[^.]+$/, '') + '.webp', { type: 'image/webp' }));
+            }, 'image/webp', 0.75);
+          };
+          img.onerror = () => resolve(file);
+          img.src = e.target.result;
+        };
+        reader.onerror = () => resolve(file);
+        reader.readAsDataURL(file);
+      });
+    }
+
+    async function uploadDonReceipt(file) {
+      if (!file) return null;
+      const prog  = document.getElementById('donUploadProgress');
+      const bar   = document.getElementById('donUploadBar');
+      const stat  = document.getElementById('donUploadStatus');
+      if (prog) prog.style.display = 'block';
+      if (bar) bar.style.width = '20%';
+      if (stat) stat.textContent = 'Comprimiendo imagen…';
+
+      const compressed = await compressDonImage(file);
+      if (bar) bar.style.width = '50%';
+      if (stat) stat.textContent = 'Subiendo comprobante…';
+
+      try {
+        const client = supabase || await loadSdk();
+        const dbClient = client.createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
+          auth: { persistSession: false, autoRefreshToken: false },
+          db: { schema: 'public' }
+        });
+
+        // Convertir a base64
+        const base64 = await new Promise((res, rej) => {
+          const r = new FileReader();
+          r.onload  = (e) => res(String(e.target.result).replace(/^data:[^;]+;base64,/, ''));
+          r.onerror = rej;
+          r.readAsDataURL(compressed);
+        });
+
+        // Edge Function upload-receipt: permite subidas anónimas de forma segura
+        if (bar) bar.style.width = '70%';
+        const { data, error } = await dbClient.functions.invoke('upload-receipt', {
+          body: { base64, mimeType: compressed.type || (compressed.name.endsWith('.pdf') ? 'application/pdf' : 'image/jpeg') }
+        });
+        if (error) throw new Error(error.message || 'Error al subir comprobante');
+
+        if (data?.publicUrl) {
+          if (bar) bar.style.width = '100%';
+          if (stat) stat.textContent = '✓ Comprobante subido';
+          if (stat) stat.style.color = '';
+          return data.publicUrl;
+        }
+        throw new Error('Respuesta inválida al subir comprobante');
+      } catch (err) {
+        if (stat) { stat.textContent = '⚠ No se pudo subir el comprobante — la donación se registra sin foto'; stat.style.color = '#fbbf24'; }
+        console.error('don-receipt-upload:', err);
+        return null;
+      }
+    }
+
+    window.downloadReceipt = function () {
+      const r = window.kkReceipt;
+      if (!r) return;
+      const METHODLABEL = methodLabel(r.method);
+      const receipt = document.createElement('div');
+      receipt.id = 'kkReceipt';
+      receipt.style.cssText = 'display:none;font-family:Nunito,sans-serif;color:#0f172a;background:#fff;padding:32px;max-width:640px;margin:0 auto;';
+      receipt.innerHTML = `
+        <div style="border:2px solid #FF9800;border-radius:16px;padding:24px;">
+          <div style="display:flex;align-items:center;gap:12px;border-bottom:2px dashed #e2e8f0;padding-bottom:16px;margin-bottom:16px;">
+            <div style="width:46px;height:46px;border-radius:12px;overflow:hidden;flex-shrink:0;"><img src="img/mundo.jpg" style="width:100%;height:100%;object-fit:cover;"></div>
+            <div>
+              <div style="font-weight:900;font-size:17px;">Karpus Kids</div>
+              <div style="font-size:11px;color:#64748b;font-weight:700;">Centro Educativo de Estancia Infantil</div>
+            </div>
+            <div style="margin-left:auto;text-align:right;">
+              <div style="font-size:10px;font-weight:900;color:#FF9800;text-transform:uppercase;letter-spacing:.08em;">Recibo de Donación</div>
+              <div style="font-size:12px;font-weight:800;color:#0f172a;">${esc(r.ref)}</div>
+            </div>
+          </div>
+          <div style="font-size:12px;line-height:1.9;color:#334155;">
+            <div style="display:flex;justify-content:space-between;"><span style="color:#64748b;">Fecha</span><b>${esc(r.date)}</b></div>
+            <div style="display:flex;justify-content:space-between;"><span style="color:#64748b;">Donante</span><b>${esc(r.name)}</b></div>
+            <div style="display:flex;justify-content:space-between;"><span style="color:#64748b;">Correo</span><b>${esc(r.email)}</b></div>
+            ${r.phone ? `<div style="display:flex;justify-content:space-between;"><span style="color:#64748b;">Teléfono</span><b>${esc(r.phone)}</b></div>` : ''}
+            ${r.taxId ? `<div style="display:flex;justify-content:space-between;"><span style="color:#64748b;">Cédula / RNC</span><b>${esc(r.taxId)}</b></div>` : ''}
+            <div style="display:flex;justify-content:space-between;"><span style="color:#64748b;">Campaña</span><b>${esc(r.campaign)}</b></div>
+            <div style="display:flex;justify-content:space-between;"><span style="color:#64748b;">Método</span><b>${esc(METHODLABEL)}</b></div>
+          </div>
+          <div style="border-radius:12px;background:#fff7ed;border:1px solid #fed7aa;padding:14px 18px;margin-top:18px;display:flex;justify-content:space-between;align-items:center;">
+            <span style="font-weight:900;color:#9a3412;">Monto total (DOP)</span>
+            <span style="font-weight:900;font-size:22px;color:#c2410c;">${fmtRD(r.amount)}</span>
+          </div>
+          <div style="font-size:10.5px;color:#94a3b8;margin-top:16px;line-height:1.6;">
+            Este recibo es preliminar. La donación está pendiente de validación por nuestro equipo. Si fue realizada por transferencia, adjunta tu volante bancario al responder este correo. El certificado deducible de impuestos se emite una vez validada la donación.
+          </div>
+        </div>`;
+      document.body.appendChild(receipt);
+      window.setTimeout(() => window.print(), 350);
+    };
+
+    // Cargar campañas
+    if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', loadCampaigns);
+    else loadCampaigns();
+  })();
 </script>
 </body>
 </html>

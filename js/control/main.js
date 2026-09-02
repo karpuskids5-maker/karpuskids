@@ -38,6 +38,7 @@ let ffSearchTimer = null;
 let _clockInterval = null;    // referencia para limpieza de intervalo del reloj
 let _sessionInterval = null;  // referencia para limpieza del refresco periódico de sesión
 let _realtimeChannel = null;  // referencia al canal realtime activo (evita duplicados)
+let _dashRange = 'today';     // filtro temporal activo del dashboard (Hoy/7d/Mes/Año)
 
 // Roles válidos para asignación (whitelist estricta)
 const VALID_ROLES = ['padre', 'maestra', 'asistente', 'directora', 'admin'];
@@ -450,7 +451,7 @@ window.goTo = async function(id) {
   if (id === 'auditoria')   renderAuditTable(allAudit);
   if (id === 'fraude')      renderFraud();
   if (id === 'usuarios')    renderUsers(allUsers);
-  if (id === 'muro')        renderWall();
+  if (id === 'muro')        { renderWall(); window.renderWallFeed?.(); }
   if (id === 'chat')        renderChat();
   if (id === 'pagos')       renderPayments();
   if (id === 'asistencia')  renderAttendance();
@@ -704,7 +705,7 @@ async function loadChatData() {
   try {
     const [msgsRes, convRes] = await Promise.allSettled([
       supabase.from('messages')
-        .select('id, sender_name, sender_id, receiver_id, receiver_name, content, attachment_url, attachment_type, is_read, created_at')
+        .select('id, conversation_id, sender_id, sender_name, sender_avatar, receiver_id, content, is_read, read_at, created_at')
         .order('created_at', { ascending: false })
         .limit(500),
       supabase.from('conversations')
@@ -738,27 +739,9 @@ function renderChat() {
   set('chat-week', allChatMsgs.filter(m => (m.created_at || '') >= since7).length);
   const mediaCount = allChatMsgs.filter(m => m.attachment_url).length;
   set('chat-media', mediaCount);
-  const countEl = document.getElementById('chatMsgCount');
-  if (countEl) countEl.textContent = allChatMsgs.length + ' mensajes recientes';
 
-  const tbody = document.getElementById('chatBody');
-  if (tbody) {
-    if (!allChatMsgs.length) {
-      tbody.innerHTML = '<tr><td colspan="5" style="text-align:center;padding:24px;color:var(--muted);">Sin mensajes registrados</td></tr>';
-    } else {
-      tbody.innerHTML = allChatMsgs.slice(0, 80).map(m => {
-        const receiverName = m.receiver_name || allUsers.find(u => u.id === m.receiver_id)?.name || m.receiver_id?.slice(0, 8) || '—';
-        const hasMedia = m.attachment_url ? ' <span class="badge badge-purple" style="font-size:8px;">📷</span>' : '';
-        return `<tr>
-          <td style="font-size:11px;color:var(--muted);white-space:nowrap;">${m.created_at ? new Date(m.created_at).toLocaleString('es-DO', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' }) : '—'}</td>
-          <td style="font-weight:800;max-width:120px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${escH(m.sender_name || m.sender_id?.slice(0, 8) || '—')}</td>
-          <td style="font-weight:700;max-width:120px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:11px;color:var(--muted);">→ ${escH(receiverName)}</td>
-          <td style="max-width:220px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:12px;color:var(--text);">${escH(m.content || '')}${hasMedia}</td>
-          <td>${m.is_read === false ? '<span class="badge badge-yellow">Sin leer</span>' : '<span class="badge badge-gray">Leído</span>'}</td>
-        </tr>`;
-      }).join('');
-    }
-  }
+  populateChatSelects();
+  filterChat();
 
   const list = document.getElementById('convTypeList');
   if (list) {
@@ -829,7 +812,7 @@ window.renderChatConversations = function() {
     const c1 = colors[Math.abs(hashStr(p.user1)) % colors.length];
     const c2 = colors[Math.abs(hashStr(p.user2)) % colors.length];
 
-    return `<div class="convo-card">
+    return `<div class="convo-card" onclick="viewThread('${p.user1}','${p.user2}')" style="cursor:pointer;" title="Ver hilo completo">
       <div class="convo-avatar" style="background:${c1};">${(name1[0]||'?').toUpperCase()}</div>
       <div style="font-size:11px;color:var(--muted);">↔</div>
       <div class="convo-avatar" style="background:${c2};">${(name2[0]||'?').toUpperCase()}</div>
@@ -905,15 +888,30 @@ async function loadAttendance() {
 async function renderDashboard() {
   try {
     const now = new Date();
-    const monthStr = `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}`;
-    const monthPays = allPayments.filter(p => p.created_at?.startsWith(monthStr));
+    // ❖ Filtro temporal: Hoy / 7 días / Mes / Año
+    const rangeStart = _dashRange === 'today' ? new Date().setHours(0,0,0,0)
+      : _dashRange === '7d' ? Date.now() - 7 * 24 * 3600 * 1000
+      : _dashRange === 'month' ? new Date(now.getFullYear(), now.getMonth(), 1).getTime()
+      : new Date(now.getFullYear(), 0, 1).getTime(); // year
+    const rangePays = allPayments.filter(p => {
+      const t = new Date(p.created_at).getTime();
+      return Number.isFinite(t) && t >= rangeStart;
+    });
+    const RANGE_LABELS = { today: 'hoy', '7d': '7 días', month: 'mes', year: 'año' };
+    const rl = RANGE_LABELS[_dashRange] || 'mes';
     const kpiPayments = document.getElementById('kpi-payments');
-    if (kpiPayments) kpiPayments.textContent = monthPays.length;
-    const revenue = monthPays
+    if (kpiPayments) kpiPayments.textContent = rangePays.length;
+    const revenue = rangePays
       .filter(p => ['paid','pagado','confirmado','approved'].includes((p.status||'').toLowerCase()))
       .reduce((s, p) => s + Number(p.amount || 0), 0);
     const kpiRevenue = document.getElementById('kpi-revenue');
     if (kpiRevenue) kpiRevenue.textContent = fmtMoney(revenue).replace('RD$', '');
+    const lblPay = document.querySelector('#kpi-payments + .kpi-lbl');
+    const lblRev = document.querySelector('#kpi-revenue + .kpi-lbl');
+    if (lblPay) lblPay.textContent = `Pagos (${rl})`;
+    if (lblRev) lblRev.textContent = `Ingresos (${rl})`;
+    // Sincronizar botones del selector de rango
+    document.querySelectorAll('.dash-range').forEach(b => b.classList.toggle('active', b.dataset.range === _dashRange));
     detectFraud();
     maybeSendAutoAlert();
     const kpiAlerts = document.getElementById('kpi-alerts');
@@ -1102,6 +1100,7 @@ function renderRecentAudit() {
 function renderAuditTable(data) {
   const tbody = document.getElementById('auditBody');
   if (!tbody) return;
+  window._lastAuditRows = data;             // para el visor JSON de payloads
   document.getElementById('auditCount').textContent = data.length + ' registros';
   if (!data.length) { tbody.innerHTML = '<tr><td colspan="8" style="text-align:center;padding:24px;color:var(--muted);">Sin registros de auditoría</td></tr>'; return; }
   const roleBadge = { padre: 'badge-blue', maestra: 'badge-green', directora: 'badge-orange', asistente: 'badge-purple', admin: 'badge-yellow' };
@@ -1122,7 +1121,7 @@ function renderAuditTable(data) {
       </td>
       <td class="py-3 px-4"><span class="badge ${roleBadge[role]||'badge-gray'} text-[9px] uppercase">${role}</span></td>
       <td class="py-3 px-4"><span class="badge ${badge} text-[9px] uppercase">${action}</span></td>
-      <td class="py-3 px-4"><div class="max-w-[180px] truncate text-slate-400 text-[10px] font-mono">${escH(JSON.stringify(a.payload || {}))}</div></td>
+      <td class="py-3 px-4"><div class="max-w-[220px] flex items-center gap-1"><div class="truncate text-slate-400 text-[10px] font-mono">${escH(JSON.stringify(a.payload || {}))}</div>${a.payload && Object.keys(a.payload).length ? `<button onclick="viewAuditPayload(${i})" class="px-1.5 py-0.5 text-[9px] font-black rounded bg-slate-100 hover:bg-indigo-100 hover:text-indigo-600 transition-colors shrink-0" title="Ver JSON completo">{ }</button>` : ''}</div></td>
       <td class="py-3 px-4 text-slate-400 text-[10px] font-bold">${escH(a.payload?.ip || a.payload?.device || 'Cloud')}</td>
       <td class="py-3 px-4"><span class="w-2 h-2 rounded-full bg-emerald-400 inline-block shadow-[0_0_8px_rgba(52,211,153,0.6)]"></span></td>
     </tr>`;
@@ -2640,3 +2639,443 @@ function escH(str) {
 function fmtMoney(n) {
   return 'RD$' + Number(n || 0).toLocaleString('es-DO', { maximumFractionDigits: 2 });
 }
+
+// ═══════════════════════════════════════════════════════════════════════════
+// MEJORAS CONTROL CENTER — Informe Técnico
+// (Inspector de Chat, Hilos, Palabras sensibles, Muro Infinito, Visor JSON,
+//  Centro de Ayuda, Filtro temporal del dashboard)
+// ═══════════════════════════════════════════════════════════════════════════
+
+// ── Palabras clave sensibles (atención prioritaria) ────────────────────────
+const SENSITIVE_KEYWORDS = [
+  'mora','pago','queja','reclamo','salud','enfermo','enfermedad','fiebre','alergia','medicamento',
+  'accidente','golpe','sangre','lesion','bullying','acoso','maltrato','violencia','pelea','amenaza',
+  'denuncia','urgencia','emergencia','socorro','desaparecido'
+];
+
+function findSensitiveHits(text) {
+  const t = ' ' + String(text || '').toLowerCase() + ' ';
+  const hits = [];
+  SENSITIVE_KEYWORDS.forEach(k => {
+    const w = new RegExp('\\b' + k + '\\b', 'i');
+    if (w.test(String(text || ''))) hits.push(k);
+  });
+  return [...new Set(hits)];
+}
+
+function renderSensitiveText(text) {
+  let html = escH(String(text || ''));
+  const words = [...new Set((String(text || '').toLowerCase().match(/[a-záéíóúñü0-9]+/g) || []))];
+  words.forEach(w => {
+    if (SENSITIVE_KEYWORDS.includes(w)) {
+      const re = new RegExp('\\b(' + w.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + ')\\b', 'gi');
+      html = html.replace(re, '<mark style="background:rgba(239,68,68,.22);color:#fca5a5;border-radius:4px;padding:0 2px;">$1</mark>');
+    }
+  });
+  return html || '—';
+}
+
+// ── Modal genérico del Control Center ──────────────────────────────────────
+function openCtrlModal(title, bodyHTML, opts) {
+  opts = opts || {};
+  let ov = document.getElementById('ctrlModalOverlay');
+  if (!ov) {
+    ov = document.createElement('div');
+    ov.id = 'ctrlModalOverlay';
+    ov.style.cssText = 'position:fixed;inset:0;z-index:10000;background:rgba(0,0,0,.65);backdrop-filter:blur(6px);display:flex;align-items:flex-start;justify-content:center;padding:5vh 16px 24px;';
+    ov.addEventListener('click', e => { if (e.target === ov) closeCtrlModal(); });
+    document.body.appendChild(ov);
+  }
+  const w = opts.width || 720;
+  ov.innerHTML = `
+    <div style="background:var(--surface);border:1px solid var(--border-focus);border-radius:18px;width:min(${w}px,96vw);box-shadow:0 28px 80px rgba(0,0,0,.6);display:flex;flex-direction:column;max-height:88vh;overflow:hidden;">
+      <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;padding:14px 18px;border-bottom:1px solid var(--border);">
+        <h3 style="font-size:14px;font-weight:900;color:var(--text);margin:0;display:flex;align-items:center;gap:8px;">${title}</h3>
+        <button onclick="closeCtrlModal()" style="background:rgba(255,255,255,.06);border:1px solid var(--border);border-radius:8px;width:28px;height:28px;color:var(--text);cursor:pointer;font-size:14px;line-height:1;">✕</button>
+      </div>
+      <div id="ctrlModalBody" style="overflow-y:auto;padding:16px 18px;flex:1;">${bodyHTML}</div>
+      <div style="padding:12px 18px;border-top:1px solid var(--border);display:flex;justify-content:flex-end;">
+        <button class="btn btn-ghost" onclick="closeCtrlModal()" style="font-size:11px;">Cerrar</button>
+      </div>
+    </div>`;
+  ov.style.display = 'flex';
+}
+window.openCtrlModal = openCtrlModal;
+window.closeCtrlModal = function() {
+  const m = document.getElementById('ctrlModalOverlay');
+  if (m) m.style.display = 'none';
+};
+
+// ── Inspector de Chat: filtros avanzados + palabras sensibles ──────────────
+function populateChatSelects() {
+  const sendSel = document.getElementById('chatSender');
+  const recvSel = document.getElementById('chatReceiver');
+  if (!sendSel || !recvSel) return;
+  const users = new Map();
+  allChatMsgs.forEach(m => {
+    if (m.sender_id) {
+      const u = allUsers.find(x => x.id === m.sender_id);
+      users.set(m.sender_id, u ? (u.name || u.email || m.sender_name || m.sender_id.slice(0, 8)) : (m.sender_name || m.sender_id.slice(0, 8)));
+    }
+    if (m.receiver_id) {
+      const u = allUsers.find(x => x.id === m.receiver_id);
+      users.set(m.receiver_id, u ? (u.name || u.email || m.receiver_name || m.receiver_id.slice(0, 8)) : (m.receiver_name || m.receiver_id.slice(0, 8)));
+    }
+  });
+  const opts = (sel, ph) => sel.innerHTML = '<option value="">' + ph + '</option>' +
+    [...users.entries()].map(([id, n]) => '<option value="' + id + '">' + escH(n) + '</option>').join('');
+  opts(sendSel, 'Todos los remitentes');
+  opts(recvSel, 'Todos los destinatarios');
+}
+
+window.filterChat = function() {
+  const tbody = document.getElementById('chatBody');
+  if (!tbody) return;
+  const q      = (document.getElementById('chatSearch')?.value || '').toLowerCase().trim();
+  const sendId = document.getElementById('chatSender')?.value || '';
+  const recvId = document.getElementById('chatReceiver')?.value || '';
+  const cat    = document.getElementById('chatCategory')?.value || '';
+  let rows = allChatMsgs.slice();
+  if (q) {
+    rows = rows.filter(m =>
+      (m.content || '').toLowerCase().includes(q) ||
+      (m.sender_name || '').toLowerCase().includes(q) ||
+      (m.receiver_name || '').toLowerCase().includes(q)
+    );
+  }
+  if (sendId) rows = rows.filter(m => m.sender_id === sendId);
+  if (recvId) rows = rows.filter(m => m.receiver_id === recvId);
+  if (cat === 'unread')    rows = rows.filter(m => m.is_read === false);
+  if (cat === 'media')     rows = rows.filter(m => !!m.attachment_url);
+  if (cat === 'sensitive') rows = rows.filter(m => !!findSensitiveHits(m.content).length);
+  const visible = rows.slice(0, 120);
+
+  const countEl = document.getElementById('chatMsgCount');
+  if (countEl) countEl.textContent = allChatMsgs.length + ' mensajes · ' + visible.length + ' filtrados';
+
+  if (!visible.length) {
+    tbody.innerHTML = '<tr><td colspan="5" style="text-align:center;padding:24px;color:var(--muted);">Sin mensajes que coincidan con el filtro</td></tr>';
+  } else {
+    tbody.innerHTML = visible.map(m => {
+      const receiverName = m.receiver_name || allUsers.find(u => u.id === m.receiver_id)?.name || m.receiver_id?.slice(0, 8) || '—';
+      const hasMedia = m.attachment_url ? ' <span class="badge badge-purple" style="font-size:8px;">📷</span>' : '';
+      const sense = findSensitiveHits(m.content);
+      const senseBadge = sense.length ? `<span class="badge badge-red" style="font-size:7px;" title="${escH(sense.join(', '))}">⚠ ${escH(sense.slice(0, 2).join('/'))}</span>` : '';
+      return `<tr>
+        <td style="font-size:11px;color:var(--muted);white-space:nowrap;">${m.created_at ? new Date(m.created_at).toLocaleString('es-DO', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' }) : '—'}</td>
+        <td style="font-weight:800;max-width:110px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${escH(m.sender_name || m.sender_id?.slice(0, 8) || '—')}</td>
+        <td style="font-weight:700;max-width:110px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:11px;color:var(--muted);">→ ${escH(receiverName)}</td>
+        <td style="max-width:230px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:12px;color:var(--text);">${renderSensitiveText(m.content)}${hasMedia}</td>
+        <td>${m.is_read === false ? '<span class="badge badge-yellow">Sin leer</span>' : '<span class="badge badge-gray">Leído</span>'}${senseBadge}</td>
+      </tr>`;
+    }).join('');
+  }
+
+  // Strip resumen del inspector
+  const strip = document.getElementById('chatInspectorStrip');
+  if (strip) {
+    const unread = allChatMsgs.filter(m => m.is_read === false).length;
+    const sens   = allChatMsgs.filter(m => !!findSensitiveHits(m.content).length).length;
+    const med    = allChatMsgs.filter(m => m.attachment_url).length;
+    if (unread || sens || med) {
+      strip.style.display = 'flex';
+      strip.innerHTML = [
+        unread ? `<span class="badge badge-yellow" style="font-size:9px;">🔴 ${unread} sin leer</span>` : '',
+        sens ? `<span class="badge badge-red" style="font-size:9px;">⚠️ ${sens} con palabras sensibles</span>` : '',
+        med ? `<span class="badge badge-purple" style="font-size:9px;">📷 ${med} con archivos</span>` : ''
+      ].filter(Boolean).join('');
+    } else {
+      strip.style.display = 'none';
+    }
+  }
+};
+
+function _downloadCSV(csv, name) {
+  const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+  const url  = URL.createObjectURL(blob);
+  const a    = document.createElement('a'); a.href = url; a.download = name; a.click();
+  URL.revokeObjectURL(url);
+}
+
+// Exportar matriz de chat a CSV (con BOM para Excel)
+window.exportChatCSV = function() {
+  if (!allChatMsgs.length) { showToast('No hay mensajes para exportar.', 'warn'); return; }
+  const rows = [['Fecha', 'De', 'Para', 'Mensaje', 'Archivo', 'Leído', 'Sensible']];
+  allChatMsgs.forEach(m => {
+    const receiverName = m.receiver_name || allUsers.find(u => u.id === m.receiver_id)?.name || m.receiver_id?.slice(0, 8) || '—';
+    rows.push([
+      m.created_at ? new Date(m.created_at).toLocaleString('es-DO') : '',
+      m.sender_name || m.sender_id || '',
+      receiverName,
+      m.content || '',
+      m.attachment_url || '',
+      m.is_read === false ? 'No' : 'Sí',
+      findSensitiveHits(m.content).join(', ')
+    ].map(csvField));
+  });
+  _downloadCSV('\ufeff' + rows.map(r => r.join(';')).join('\r\n'), 'auditoria_chat_karpus.csv');
+  showToast(`Exportados ${allChatMsgs.length} mensajes a CSV.`, 'success');
+};
+
+// ── Hilo de conversación (modal cronológico) ────────────────────────────────
+function _threadMessages(user1, user2) {
+  return allChatMsgs.filter(m =>
+    (m.sender_id === user1 && m.receiver_id === user2) ||
+    (m.sender_id === user2 && m.receiver_id === user1)
+  ).sort((a, b) => (a.created_at || '').localeCompare(b.created_at || ''));
+}
+
+window.viewThread = function(user1, user2) {
+  const msgs = _threadMessages(user1, user2);
+  const u1 = allUsers.find(u => u.id === user1);
+  const u2 = allUsers.find(u => u.id === user2);
+  const name1 = u1?.name || u1?.email || user1.slice(0, 8) || 'Usuario';
+  const name2 = u2?.name || u2?.email || user2.slice(0, 8) || 'Usuario';
+  const role1 = u1?.role || '';
+  const role2 = u2?.role || '';
+  if (!msgs.length) {
+    openCtrlModal(`Hilo: ${escH(name1)} ↔ ${escH(name2)}`,
+      '<p style="text-align:center;color:var(--muted);padding:24px;">Sin mensajes entre estos usuarios en el periodo cargado.</p>');
+    return;
+  }
+  const bubbles = msgs.map(m => {
+    const is1 = m.sender_id === user1;
+    const who = is1 ? name1 : name2;
+    const time = m.created_at ? new Date(m.created_at).toLocaleString('es-DO', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' }) : '';
+    const read = m.is_read === false ? '<span style="font-size:9px;color:#fbbf24;font-weight:800;">● sin leer</span>' : '';
+    const med = m.attachment_url ? `<div style="margin-top:6px;"><img src="${escH(m.attachment_url)}" style="max-width:180px;border-radius:10px;"></div>` : '';
+    return `<div style="display:flex;${is1 ? 'justify-content:flex-start' : 'justify-content:flex-end'};margin-bottom:10px;">
+      <div style="max-width:82%;background:${is1 ? 'rgba(99,102,241,.12)' : 'rgba(34,197,94,.14)'};border:1px solid ${is1 ? 'rgba(99,102,241,.25)' : 'rgba(34,197,94,.25)'};border-radius:14px;padding:9px 12px;">
+        <div style="font-size:10px;font-weight:900;color:${is1 ? '#a5b4fc' : '#86efac'};margin-bottom:3px;">${escH(who)} ${time}</div>
+        <div style="font-size:13px;color:var(--text);word-break:break-word;">${renderSensitiveText(m.content)}</div>
+        ${med}
+        <div style="margin-top:4px;">${read}</div>
+      </div>
+    </div>`;
+  }).join('');
+  openCtrlModal(`Hilo: ${escH(name1)} ${role1 ? `<span class="badge badge-gray" style="font-size:8px;">${role1}</span>` : ''} ↔ ${escH(name2)} ${role2 ? `<span class="badge badge-gray" style="font-size:8px;">${role2}</span>` : ''} <span style="color:var(--muted);font-size:11px;">(${msgs.length})</span>`,
+    `<div style="max-height:54vh;overflow-y:auto;padding:4px;">${bubbles}</div>
+     <div style="margin-top:12px;display:flex;justify-content:flex-end;">
+       <button class="btn btn-primary" onclick="exportThreadCSV('${user1}','${user2}')" style="font-size:11px;"><i class="bi bi-download"></i> Exportar hilo CSV</button>
+     </div>`, { width: 760 });
+};
+
+window.exportThreadCSV = function(user1, user2) {
+  const msgs = _threadMessages(user1, user2);
+  if (!msgs.length) { showToast('Sin mensajes en este hilo.', 'warn'); return; }
+  const n1 = allUsers.find(u => u.id === user1)?.name || user1.slice(0, 8);
+  const n2 = allUsers.find(u => u.id === user2)?.name || user2.slice(0, 8);
+  const rows = [['Fecha', 'Remitente', 'Destinatario', 'Mensaje', 'Archivo', 'Leído', 'Sensible']];
+  msgs.forEach(m => {
+    const is1 = m.sender_id === user1;
+    rows.push([
+      m.created_at ? new Date(m.created_at).toLocaleString('es-DO') : '',
+      is1 ? n1 : n2, is1 ? n2 : n1,
+      m.content || '', m.attachment_url || '',
+      m.is_read === false ? 'No' : 'Sí',
+      findSensitiveHits(m.content).join(', ')
+    ].map(csvField));
+  });
+  _downloadCSV('\ufeff' + rows.map(r => r.join(';')).join('\r\n'), 'hilo_chat_karpus.csv');
+  showToast(`Hilo exportado (${msgs.length} mensajes).`, 'success');
+};
+
+// ── Muro Infinito: feed con scroll infinito ─────────────────────────────────
+let _feedState = { page: 0, limit: 8, loading: false, done: false };
+let _feedObserver = null;
+
+window.renderWallFeed = function() {
+  const container = document.getElementById('wallFeedContainer');
+  if (!container) return;
+  const status = document.getElementById('feedStatus');
+  _feedState = { page: 0, limit: 8, loading: false, done: false };
+  container.innerHTML = '<div class="feed-sentinel-inner" style="height:2px;"></div>';
+  if (status) status.textContent = 'Cargando feed...';
+  if (!_feedObserver) {
+    _feedObserver = new IntersectionObserver((entries) => {
+      if (entries[0]?.isIntersecting) _loadWallFeedPage();
+    }, { root: container, rootMargin: '160px' });
+  }
+  _feedObserver.disconnect();
+  _feedObserver.observe(container.querySelector('.feed-sentinel-inner'));
+  _loadWallFeedPage();
+};
+
+async function _loadWallFeedPage() {
+  if (_feedState.loading || _feedState.done) return;
+  _feedState.loading = true;
+  const container = document.getElementById('wallFeedContainer');
+  const status = document.getElementById('feedStatus');
+  try {
+    const from = _feedState.page * _feedState.limit;
+    const to   = from + _feedState.limit - 1;
+    const { data, error } = await supabase
+      .from('posts')
+      .select('id, title, content, teacher_name, author_role, classroom_id, likes_count, comments_count, views_count, is_pinned, status, media_type, media_url, image_url, images, created_at')
+      .order('created_at', { ascending: false })
+      .range(from, to);
+    if (error) throw error;
+    const batch = data || [];
+    _feedState.done = batch.length < _feedState.limit;
+    _feedState.page++;
+    const inner = container?.querySelector('.feed-sentinel-inner');
+    if (inner) inner.insertAdjacentHTML('beforebegin', batch.map(p => _feedCardHTML(p)).join(''));
+    if (_feedState.done) {
+      if (inner) inner.insertAdjacentHTML('beforebegin', '<div class="feed-end" style="text-align:center;padding:16px;color:var(--muted);font-size:11px;font-weight:800;">—— Fin del feed 🎉 ——</div>');
+      _feedObserver?.disconnect();
+      if (status) status.textContent = '— Todo cargado';
+    } else {
+      if (status) status.textContent = `— ${_feedState.page * _feedState.limit} publicaciones`;
+    }
+  } catch (_) {
+    if (status) status.textContent = 'Error cargando feed';
+  } finally {
+    _feedState.loading = false;
+  }
+}
+
+function _feedCardHTML(p) {
+  const room = allClassrooms.find(c => c.id === p.classroom_id);
+  const dt = p.created_at ? new Date(p.created_at).toLocaleString('es-DO', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' }) : '';
+  const author = p.teacher_name || 'Docente';
+  const role = p.author_role === 'directora' ? 'Directora' : p.author_role === 'asistente' ? 'Asistente' : 'Maestra';
+  const initials = (author[0] || '?').toUpperCase();
+  const color = p.author_role === 'directora' ? '#f97316' : p.author_role === 'asistente' ? '#8b5cf6' : '#22c55e';
+  const txt = [p.title, p.content].filter(Boolean).join(' — ');
+  const media = _getWallMediaUrl(p);
+  const mediaHTML = media ? (_isVideoUrl(media)
+    ? `<video src="${escH(media)}" controls style="width:100%;max-height:300px;object-fit:cover;border-radius:12px;margin-top:10px;"></video>`
+    : `<img src="${escH(media)}" loading="lazy" onclick="openLightbox('${escH(media)}','${escH(author + ' · ' + dt)}')" style="width:100%;max-height:300px;object-fit:cover;border-radius:12px;margin-top:10px;cursor:zoom-in;">`) : '';
+  return `<div class="feed-card" style="background:var(--surface2);border:1px solid var(--border);border-radius:16px;padding:14px;margin-bottom:12px;box-shadow:0 4px 18px rgba(0,0,0,.18);">
+    <div style="display:flex;align-items:center;gap:10px;margin-bottom:8px;">
+      <div style="width:40px;height:40px;border-radius:50%;background:${color};display:flex;align-items:center;justify-content:center;font-weight:900;color:#fff;font-size:16px;flex-shrink:0;">${initials}</div>
+      <div style="min-width:0;">
+        <div style="font-weight:900;color:var(--text);font-size:13px;">${escH(author)} <span class="badge" style="font-size:7px;background:${color}20;color:${color};">${escH(role)}</span></div>
+        <div style="font-size:10px;color:var(--muted);">${escH(room?.name || 'Aula General')} · ${dt}${p.is_pinned ? ' · <span class="badge badge-yellow" style="font-size:7px;"><i class="bi bi-pin-angle-fill"></i> Fijado</span>' : ''}</div>
+      </div>
+    </div>
+    ${txt ? `<div style="font-size:13px;color:var(--text);line-height:1.5;">${renderSensitiveText(txt)}</div>` : ''}
+    ${mediaHTML}
+    <div style="display:flex;gap:6px;margin-top:12px;flex-wrap:wrap;">
+      <button class="btn btn-ghost" style="font-size:10px;padding:5px 10px;" onclick="openPostReactions(${p.id})"><i class="bi bi-heart-fill" style="color:#fb923c;"></i> ${Number(p.likes_count || 0)}</button>
+      <button class="btn btn-ghost" style="font-size:10px;padding:5px 10px;" onclick="togglePostComments(${p.id})"><i class="bi bi-chat-left-text" style="color:#60a5fa;"></i> ${Number(p.comments_count || 0)}</button>
+      <span class="btn btn-ghost" style="font-size:10px;padding:5px 10px;pointer-events:none;"><i class="bi bi-eye"></i> ${Number(p.views_count || 0)}</span>
+    </div>
+    <div id="post-comments-c${p.id}" style="margin-top:10px;"></div>
+  </div>`;
+}
+
+// Visor de reacciones (quién dio Me gusta)
+window.openPostReactions = async function(postId) {
+  try {
+    const { data } = await supabase
+      .from('likes')
+      .select('reaction_type, profile:profiles!likes_user_id_fkey(name, avatar_url, role)')
+      .eq('post_id', postId).order('created_at', { ascending: false }).limit(30);
+    const rows = (data || []).map(l => {
+      const pr = Array.isArray(l.profile) ? l.profile[0] : l.profile;
+      const name = pr?.name || 'Usuario';
+      const emoji = !l.reaction_type || l.reaction_type === 'like' ? '❤️' : l.reaction_type;
+      return `<div style="display:flex;align-items:center;gap:10px;padding:9px 6px;border-bottom:1px solid var(--border);">
+        <span style="font-size:16px;">${emoji}</span>
+        <div style="flex:1;min-width:0;">
+          <div style="font-size:12px;font-weight:800;color:var(--text);">${escH(name)}</div>
+          <div style="font-size:10px;color:var(--muted);">${escH(pr?.role || '')}</div>
+        </div>
+      </div>`;
+    }).join('');
+    openCtrlModal(`<i class="bi bi-heart-fill" style="color:#fb923c;"></i> Reacciones de la publicación`,
+      rows ? `<div style="max-height:46vh;overflow-y:auto;">${rows}</div>` : '<p style="text-align:center;color:var(--muted);padding:24px;">Aún no hay reacciones.</p>', { width: 440 });
+  } catch (_) {
+    showToast('No se pudieron cargar las reacciones.', 'error');
+  }
+};
+
+// Inspector de comentarios
+window.togglePostComments = async function(postId) {
+  const cont = document.getElementById('post-comments-c' + postId);
+  if (!cont) return;
+  if (cont.dataset.open === '1') { cont.innerHTML = ''; cont.dataset.open = '0'; return; }
+  cont.innerHTML = '<p style="text-align:center;color:var(--muted);font-size:11px;padding:8px;">Cargando comentarios...</p>';
+  try {
+    const { data } = await supabase
+      .from('comments')
+      .select('id, content, user_name, created_at, user_id, profile:profiles!comments_user_id_fkey(name, role)')
+      .eq('post_id', postId).order('created_at', { ascending: true });
+    const list = (data || []).map(c => {
+      const pr = Array.isArray(c.profile) ? c.profile[0] : c.profile;
+      const name = c.user_name || pr?.name || (c.user_id ? String(c.user_id).slice(0, 8) : '—');
+      const role = pr?.role || '';
+      const time = c.created_at ? new Date(c.created_at).toLocaleString('es-DO', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' }) : '';
+      const roleBadge = role === 'padre' ? 'badge-blue' : role === 'maestra' ? 'badge-green' : role === 'directora' ? 'badge-orange' : 'badge-gray';
+      return `<div style="display:flex;gap:9px;padding:8px 6px;border-bottom:1px solid var(--border);">
+        <div style="min-width:0;flex:1;">
+          <div style="font-size:10px;font-weight:900;color:var(--muted);">${escH(name)} <span class="badge ${roleBadge}" style="font-size:7px;">${escH(role)}</span> · ${time}</div>
+          <div style="font-size:12px;color:var(--text);margin-top:2px;">${renderSensitiveText(c.content)}</div>
+        </div>
+      </div>`;
+    }).join('');
+    cont.innerHTML = list
+      ? `<div style="background:rgba(255,255,255,.03);border:1px solid var(--border);border-radius:12px;padding:8px 10px;">${list}</div>`
+      : '<p style="font-size:10px;color:var(--muted);font-style:italic;text-align:center;">Sin comentarios.</p>';
+    cont.dataset.open = '1';
+  } catch (_) {
+    cont.innerHTML = '<p style="font-size:10px;color:#f87171;text-align:center;">Error al cargar comentarios.</p>';
+  }
+};
+
+// ── Visor JSON de payloads de auditoría ─────────────────────────────────────
+window.viewAuditPayload = function(i) {
+  const row = (window._lastAuditRows || [])[i];
+  if (!row) return;
+  let pretty = '';
+  try { pretty = JSON.stringify(row.payload || {}, null, 2); } catch (_) { pretty = String(row.payload || ''); }
+  const user = allUsers.find(u => u.id === row.user_id);
+  openCtrlModal(`<i class="bi bi-json" style="color:#6366f1;"></i> Payload JSON`,
+    `<div style="font-size:11px;color:var(--muted);margin-bottom:10px;">${escH(row.action || '')} · ${escH(user?.name || user?.email || row.user_id?.slice(0, 8) || '—')} · ${row.created_at ? new Date(row.created_at).toLocaleString('es-DO') : ''}</div>
+     <pre style="background:rgba(15,23,42,.6);border:1px solid var(--border);border-radius:12px;padding:14px;max-height:50vh;overflow:auto;font-size:11px;line-height:1.6;color:#a5b4fc;white-space:pre-wrap;word-break:break-word;">${escH(pretty)}</pre>
+     <div style="margin-top:10px;display:flex;gap:8px;">
+       <button class="btn btn-primary" style="font-size:11px;" onclick="copyAuditJSON(this)"><i class="bi bi-clipboard"></i> Copiar JSON</button>
+     </div>`, { width: 640 });
+};
+
+window.copyAuditJSON = function(btn) {
+  const pre = btn?.closest('#ctrlModalBody')?.querySelector('pre');
+  if (!pre) return;
+  navigator.clipboard.writeText(pre.textContent).then(() => {
+    showToast('JSON copiado al portapapeles.', 'success');
+  }).catch(() => {});
+};
+
+// ── Centro de Ayuda & Atajos ────────────────────────────────────────────────
+window.openHelpCenter = function() {
+  const shortcuts = [
+    ['Ctrl+K / ⌘K', 'Búsqueda global'],
+    ['/ (en sección)', 'Enfocar el buscador activo'],
+    ['1 - 9', 'Navegar secciones principales'],
+    ['F5', 'Actualizar todos los datos'],
+    ['Esc', 'Cerrar modales / menús'],
+    ['Doble clic en celda', 'Copiar valor de una tabla'],
+  ];
+  openCtrlModal(`<i class="bi bi-question-circle-fill" style="color:#6366f1;"></i> Centro de Ayuda & Atajos`,
+    `<div style="font-size:12px;color:var(--muted);margin-bottom:14px;line-height:1.6;">Atajos de teclado y gestos disponibles en este panel de control.</div>
+     <div style="display:grid;gap:8px;">
+       ${shortcuts.map(([k, d]) => `<div style="display:flex;align-items:center;justify-content:space-between;gap:10px;background:var(--surface2);border:1px solid var(--border);border-radius:10px;padding:9px 12px;">
+         <span style="font-size:12px;color:var(--text);font-weight:700;">${d}</span>
+         <kbd style="font-size:10px;font-weight:800;color:var(--accent);background:rgba(99,102,241,.12);border:1px solid var(--border);border-radius:6px;padding:3px 9px;white-space:nowrap;">${k}</kbd>
+       </div>`).join('')}
+     </div>
+     <div style="margin-top:14px;font-size:11px;color:var(--muted);line-height:1.7;">
+       <b style="color:var(--text);">Consejos:</b> usa el botón <b style="color:var(--text);">Exportar CSV</b> para descargar auditorías compatibles con Excel. Los mensajes con palabras sensibles (<i>mora, queja, salud, accidente, bullying... </i>) se resaltan en rojo. Pulsa <b style="color:var(--text);">{ }</b> en cualquier payload de auditoría para verlo formateado.
+     </div>`, { width: 540 });
+};
+
+// ── Filtro temporal del Dashboard (Hoy / 7 días / Mes / Año) ────────────────
+window.refreshDashboard = async function(range) {
+  if (range) {
+    _dashRange = range;
+    try { localStorage.setItem('karpus_dash_range', range); } catch (_) {}
+  }
+  document.querySelectorAll('.dash-range').forEach(b => b.classList.toggle('active', b.dataset.range === _dashRange));
+  await renderDashboard();
+};

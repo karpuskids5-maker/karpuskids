@@ -5,13 +5,14 @@
 
 // ── 1. Tab switching: Muro ────────────────────────────────────────────────
 function switchWallTab(tab) {
-  ['table','gallery','media'].forEach(t => {
+  ['feed','table','gallery','media'].forEach(t => {
     const el = document.getElementById('wallTab' + t.charAt(0).toUpperCase() + t.slice(1));
     if (el) el.style.display = t === tab ? '' : 'none';
   });
-  document.querySelectorAll('#sec-muro .tab-btn').forEach((b,i) => b.classList.toggle('active', ['table','gallery','media'][i] === tab));
+  document.querySelectorAll('#sec-muro .tab-btn').forEach((b,i) => b.classList.toggle('active', ['feed','table','gallery','media'][i] === tab));
   if (tab === 'gallery') window.renderWallGallery?.();
   if (tab === 'media') window.renderWallMedia?.();
+  if (tab === 'feed') window.renderWallFeed?.();
 }
 
 // ── 2. Tab switching: Chat ────────────────────────────────────────────────

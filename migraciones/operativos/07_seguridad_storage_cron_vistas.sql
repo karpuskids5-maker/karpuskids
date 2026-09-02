@@ -50,7 +50,7 @@ BEGIN
   IF OLD.status = 'paid' AND (SELECT role FROM public.profiles WHERE id = auth.uid()) NOT IN ('admin') THEN
     RAISE EXCEPTION 'No se puede modificar o eliminar un pago ya validado y aprobado.';
   END IF;
-  RETURN OLD;
+  RETURN NEW;
 END;
 $$;
 DROP TRIGGER IF EXISTS trg_protect_paid_records ON public.payments;

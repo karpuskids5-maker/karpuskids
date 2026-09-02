@@ -52,6 +52,7 @@ window.App = {
     delete: (id) => import('./payments_clean.js').then(m => m.PaymentsModule.delete(id)),
     waiveMora: (id) => import('./payments_clean.js').then(m => m.PaymentsModule.waiveMora(id)),
     editPaymentAmount: (id) => import('./payments_clean.js').then(m => m.PaymentsModule.editPaymentAmount(id)),
+    applyDiscount: (id) => import('./payments_clean.js').then(m => m.PaymentsModule.applyDiscount(id)),
   },
   attendance: {
     init: () => import('./attendance.module.js').then(m => m.AttendanceModule.init()),
@@ -75,6 +76,24 @@ window.App = {
     init: () => import('./automation.js').then(m => m.AutomationModule.init()),
   },
   reports: { init: () => import('./reports.module.js').then(m => m.ReportsModule.init()) },
+  donaciones: {
+    init: () => import('./donations.module.js').then(m => m.DonationsModule.init()),
+    openCampaignModal: (id) => import('./donations.module.js').then(m => m.DonationsModule.openCampaignModal(id)),
+    saveCampaign: () => import('./donations.module.js').then(m => m.DonationsModule.saveCampaign()),
+    toggleCampaign: (id) => import('./donations.module.js').then(m => m.DonationsModule.toggleCampaign(id)),
+    deleteCampaign: (id) => import('./donations.module.js').then(m => m.DonationsModule.deleteCampaign(id)),
+    setFilter: (f) => import('./donations.module.js').then(m => m.DonationsModule.setFilter(f)),
+    renderDonations: () => import('./donations.module.js').then(m => m.DonationsModule.renderDonations()),
+    approveDonation: (id) => import('./donations.module.js').then(m => m.DonationsModule.approveDonation(id)),
+    rejectDonation: (id) => import('./donations.module.js').then(m => m.DonationsModule.rejectDonation(id)),
+    certifyDonation: (id) => import('./donations.module.js').then(m => m.DonationsModule.certifyDonation(id)),
+    viewDonation: (id) => import('./donations.module.js').then(m => m.DonationsModule.viewDonation(id)),
+    pickCampaignImages: () => import('./donations.module.js').then(m => m.DonationsModule.pickCampaignImages()),
+    removeCampImage: (kind, idx) => import('./donations.module.js').then(m => m.DonationsModule.removeCampImage(kind, idx)),
+    generateCertificate: (id) => import('./donations.module.js').then(m => m.DonationsModule.generateCertificate(id)),
+    exportCSV: () => import('./donations.module.js').then(m => m.DonationsModule.exportCSV()),
+    exportDonorsCSV: () => import('./donations.module.js').then(m => m.DonationsModule.exportDonorsCSV()),
+  },
   wall: {
     toggleCommentSection: (pid) => import('./wall.module.js').then(m => m.WallModule.toggleCommentSection(pid)),
     sendComment: (pid) => import('./wall.module.js').then(m => m.WallModule.sendComment(pid)),
@@ -86,6 +105,11 @@ window.App = {
   carnets: CarnetsModule,
   schoolYear: SchoolYearModule,
 };
+
+// Alias: el módulo de donaciones usa `App.donations` (inglés) en sus
+// manejadores inline, mientras que la API pública se expone como
+// `App.donaciones`. Mantenemos ambos para evitar errores de "not defined".
+window.App.donations = window.App.donaciones;
 
 window.WallModule = {
   init: (...a) => import('./wall.module.js').then(m => m.WallModule.init(...a)),
@@ -253,6 +277,9 @@ function _applySection(sectionId, opts = {}) {
       case 'tienda':
         import('../shared/store.js').then(m => m.initStoreAsistente('store-directora-container'));
         break;
+      case 'donaciones':
+        import('./donations.module.js').then(m => m.DonationsModule.init());
+        break;
       case 'configuracion':
         loadProfile();
         import('../shared/notify-permission.js').then(m => m.NotifyPermission.requestIfNeeded());
@@ -264,6 +291,18 @@ function _applySection(sectionId, opts = {}) {
 
     // Marcar badge como leído al entrar
     BadgeSystem.mark(sectionId);
+
+    // Abrir automáticamente el grupo del sidebar al que pertenece la sección
+    const GROUP_OF_SECTION = {
+      dashboard: 'principal',
+      maestros: 'gestion', estudiantes: 'gestion', inscripciones: 'gestion', aulas: 'gestion',
+      asistencia: 'academico', calificaciones: 'academico',
+      pagos: 'finanzas', tienda: 'finanzas', donaciones: 'finanzas',
+      'anio-escolar': 'sistema', configuracion: 'sistema'
+    };
+    if (window.__kkOpenSectionGroup && GROUP_OF_SECTION[sectionId]) {
+      window.__kkOpenSectionGroup(GROUP_OF_SECTION[sectionId], false);
+    }
   }
 
   // Actualizar Botones Nav (Sidebar)
@@ -532,6 +571,70 @@ document.addEventListener('DOMContentLoaded', async () => {
         if (window.innerWidth <= 768) closeSidebar();
       });
     });
+
+    // 7c. Colapsar sidebar en escritorio (botón #toggleSidebar)
+    const sidebarCollapseBtn = document.getElementById('toggleSidebar');
+    const contentWrapper = document.querySelector('.app-content-wrapper');
+    function setDesktopCollapsed(collapsed, persist = true) {
+      if (!sidebar) return;
+      sidebar.classList.toggle('collapsed', collapsed);
+      contentWrapper?.classList.toggle('sidebar-collapsed', collapsed);
+      if (persist) { try { localStorage.setItem('kk_directora_sidebar_collapsed', collapsed ? '1' : '0'); } catch (_) {} }
+    }
+    sidebarCollapseBtn?.addEventListener('click', () => {
+      setDesktopCollapsed(!sidebar.classList.contains('collapsed'));
+    });
+
+    // 7d. Secciones colapsables del sidebar (móvil + escritorio)
+    const SIDEBAR_SECTIONS_KEY = 'kk_directora_sections_state';
+    let sectionState = {};
+    try { sectionState = JSON.parse(localStorage.getItem(SIDEBAR_SECTIONS_KEY) || '{}'); } catch (_) { sectionState = {}; }
+
+    function applySidebarGroupState(toggle) {
+      const key = toggle.dataset.sectionToggle;
+      const group = document.getElementById('kk-navgroup-' + key);
+      if (!group) return;
+      const isCollapsed = sectionState[key] === false;
+      group.classList.toggle('collapsed', isCollapsed);
+      toggle.setAttribute('aria-expanded', isCollapsed ? 'false' : 'true');
+    }
+
+    function openSidebarGroup(key, save = true) {
+      if (!key) return;
+      sectionState[key] = true;
+      if (save) { try { localStorage.setItem(SIDEBAR_SECTIONS_KEY, JSON.stringify(sectionState)); } catch (_) {} }
+      const group = document.getElementById('kk-navgroup-' + key);
+      if (group) group.classList.remove('collapsed');
+      const toggle = document.querySelector(`.kk-nav-section-toggle[data-section-toggle="${key}"]`);
+      if (toggle) toggle.setAttribute('aria-expanded', 'true');
+    }
+
+    document.querySelectorAll('.kk-nav-section-toggle').forEach(toggle => {
+      applySidebarGroupState(toggle);
+      toggle.addEventListener('click', (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        const key = toggle.dataset.sectionToggle;
+        if (!key) return;
+        const group = document.getElementById('kk-navgroup-' + key);
+        if (!group) return;
+        const willCollapse = !group.classList.contains('collapsed');
+        group.classList.toggle('collapsed', willCollapse);
+        toggle.setAttribute('aria-expanded', willCollapse ? 'false' : 'true');
+        sectionState[key] = !willCollapse;
+        try { localStorage.setItem(SIDEBAR_SECTIONS_KEY, JSON.stringify(sectionState)); } catch (_) {}
+      });
+    });
+
+    // Exponer para que _applySection abra el grupo de la sección activa
+    window.__kkOpenSectionGroup = openSidebarGroup;
+
+    // Estado inicial: en escritorio restaurar colapso del sidebar; en móvil expandido
+    if (window.innerWidth >= 768) {
+      try { setDesktopCollapsed(localStorage.getItem('kk_directora_sidebar_collapsed') === '1', false); } catch (_) {}
+    } else {
+      sidebar?.classList.remove('collapsed');
+    }
 
     // 7b. Navegación global: dashboard cards + sidebar nav buttons
     document.addEventListener('click', (e) => {
