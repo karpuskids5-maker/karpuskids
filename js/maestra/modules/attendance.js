@@ -8,6 +8,84 @@ import { Helpers } from '/js/shared/helpers.js';
 
 const { safeToast, safeEscapeHTML, Modal } = UI;
 
+// Auto-detección de ausentes: se marca automáticamente a quien no ha llegado
+// una vez pasada la hora de entrada (check_in_end) + 2 horas.
+let _absentTimer = null;
+const ABSENT_CHECK_INTERVAL = 5 * 60 * 1000; // cada 5 minutos
+
+function _scheduleAbsentCheck() {
+  if (_absentTimer) { clearInterval(_absentTimer); _absentTimer = null; }
+  _absentTimer = setInterval(async () => {
+    // Si el panel ya no está visible, detener el timer
+    const listContainer = document.getElementById('attendanceList');
+    if (!listContainer || !listContainer.isConnected || !listContainer.offsetParent) {
+      try { clearInterval(_absentTimer); } catch (_) {}
+      _absentTimer = null;
+      return;
+    }
+    const marked = await _runAbsentDetection(true);
+    // Si se marcaron nuevos ausentes, refrescar la vista en silencio
+    if (marked > 0) await initAttendance({ silent: true });
+  }, ABSENT_CHECK_INTERVAL);
+}
+
+async function _runAbsentDetection(silent) {
+  let marked = 0;
+  try {
+    const res = await MaestraApi.markAbsentStudents();
+    marked = res.marked || 0;
+
+    // Notificar a los padres de los estudiantes recién marcados como ausentes
+    if (marked > 0 && Array.isArray(res.students) && res.students.length) {
+      const withParent = res.students.filter(s => s && s.parent_id);
+      if (withParent.length) {
+        // Mostrar el motivo si el padre ya lo reportó; si no, indicar que no llegó
+        const parts = withParent.map(s => {
+          const mot = (s.reason && String(s.reason).trim()) ? ` (${s.reason})` : '';
+          return `${s.name || 'Un estudiante'}${mot}`;
+        });
+        const single = withParent.length === 1;
+        const message = single
+          ? `Hemos detectado que ${withParent[0].name || 'tu hijo/a'} no ha llegado hoy${withParent[0].reason ? `. Motivo registrado: ${withParent[0].reason}` : '. Si va a faltar, infórmanos.'}`
+          : `No llegaron hoy: ${parts.join(', ')}. Mire el reporte del día en la app.`;
+        notifyParents({
+          students: withParent,
+          title: 'Karpus Kids 👀 Ausencia detectada',
+          message,
+          type: 'attendance',
+          link: withParent[0] && withParent[0].id
+            ? 'panel_padres.html?rutina=' + withParent[0].id
+            : 'panel_padres.html',
+          label: 'Ausencia detectada'
+        });
+      }
+    }
+
+    if (!silent && marked > 0) {
+      safeToast(`🔍 ${marked} estudiante(s) marcados como ausentes automáticamente`, 'info');
+    }
+  } catch (err) {
+    Helpers.safeLog('warn', 'Detección automática de ausentes:', err);
+  }
+  return marked;
+}
+
+/**
+ * 🔍 Detección manual de ausentes (botón del panel).
+ */
+export async function detectAbsents() {
+  const listContainer = document.getElementById('attendanceList');
+  if (listContainer) {
+    listContainer.style.opacity = '0.55';
+    listContainer.style.transition = 'opacity .25s';
+  }
+  const marked = await _runAbsentDetection(false);
+  // Refrescar la lista para reflejar los ausentes detectados
+  await initAttendance({ silent: true });
+  if (listContainer) listContainer.style.opacity = '1';
+  return marked;
+}
+
 // Start auto-sync when online
 OfflineQueue.startAutoSync(({ synced }) => {
   safeToast(`✅ ${synced} registro(s) de asistencia sincronizados`, 'success');
@@ -42,6 +120,11 @@ export async function initAttendance(options = {}) {
   }
 
   try {
+    // 0. Detección automática de ausentes + timer periódico
+    //    (marca como 'absent' a quien no ha llegado pasada la hora de entrada + 2h)
+    await _runAbsentDetection(true);
+    _scheduleAbsentCheck();
+
     // 1. Cargar solicitudes y asistencia en paralelo
     const [_, attendance] = await Promise.all([
       _loadAbsenceRequests(classroom?.id, students),
@@ -60,9 +143,14 @@ export async function initAttendance(options = {}) {
             <h4 class="font-black text-slate-800 text-lg">Control de Asistencia</h4>
             <p class="text-[10px] text-slate-400 font-bold uppercase tracking-widest mt-0.5">Gestión diaria de presencia en aula</p>
           </div>
-          <button onclick="App.markAllPresent()" class="px-6 py-3 bg-emerald-500 text-white rounded-2xl text-xs font-black uppercase shadow-lg shadow-emerald-100 hover:bg-emerald-600 transition-all flex items-center gap-2 active:scale-95">
-            <i data-lucide="check-check" class="w-4 h-4"></i> Marcar Todos
-          </button>
+          <div class="flex items-center gap-2">
+            <button onclick="App.detectAbsents()" class="px-4 py-3 bg-rose-500 text-white rounded-2xl text-xs font-black uppercase shadow-lg shadow-rose-100 hover:bg-rose-600 transition-all flex items-center gap-2 active:scale-95">
+              <i data-lucide="user-x" class="w-4 h-4"></i> Detectar ausentes
+            </button>
+            <button onclick="App.markAllPresent()" class="px-4 py-3 bg-emerald-500 text-white rounded-2xl text-xs font-black uppercase shadow-lg shadow-emerald-100 hover:bg-emerald-600 transition-all flex items-center gap-2 active:scale-95">
+              <i data-lucide="check-check" class="w-4 h-4"></i> Marcar Todos
+            </button>
+          </div>
         </div>
 
         <!-- 🖥️ VISTA TABLA (DESKTOP) -->

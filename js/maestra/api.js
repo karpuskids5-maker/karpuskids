@@ -92,6 +92,29 @@ export const MaestraApi = {
   },
 
   /**
+   * Detecta y marca como 'absent' a los estudiantes que no han llegado,
+   * una vez pasada la hora de entrada (check_in_end) + 2 horas.
+   * Devuelve { marked, parents, students } con los estudiantes marcados.
+   */
+  async markAbsentStudents() {
+    try {
+      const { data, error } = await supabase.rpc('mark_absent_students');
+      if (error) {
+        QueryCache.invalidatePrefix('maestra_attendance');
+        return { marked: 0, parents: [], students: [] };
+      }
+      const res = (typeof data === 'object' && data) ? data : {};
+      return {
+        marked: Number.isFinite(res.marked) ? res.marked : 0,
+        parents: Array.isArray(res.parents) ? res.parents : [],
+        students: Array.isArray(res.students) ? res.students : []
+      };
+    } catch (e) {
+      return { marked: 0, parents: [], students: [] };
+    }
+  },
+
+  /**
    * Tareas — filtradas por período activo del aula
    */
   async getTasksByClassroom(classroomId, periodId = null) {

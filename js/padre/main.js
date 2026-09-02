@@ -158,6 +158,13 @@ function _applyDeepLink(deepBoletin, deepPeriodo) {
   }, 800);
 }
 
+function _applyRoutineDeepLink(selectedStudent) {
+  if (!selectedStudent) return;
+  AppState.set('currentStudent', selectedStudent);
+  updateHeaderProfile(AppState.get('profile'), selectedStudent, AppState.get('students') || []);
+  navigateTo('routine', { force: true });
+}
+
 function _preloadQRCode() {
   setTimeout(() => {
     if (!window.QRCode) {
@@ -470,10 +477,13 @@ document.addEventListener('DOMContentLoaded', async () => {
     AppState.set('students', allStudents);
 
     // 🔗 Deep link del boletín (código QR): ?boletin=<id>&periodo=<id>
+    //    y del reporte del día (ausencia): ?rutina=<student_id>
     const urlParams = new URLSearchParams(window.location.search);
     const deepBoletin = urlParams.get('boletin');
     const deepPeriodo = urlParams.get('periodo');
-    const selectedStudent = _pickDeepLinkStudent(allStudents, deepBoletin) || currentStudent;
+    const deepRutina = urlParams.get('rutina');
+    const deepTarget = deepRutina || deepBoletin;
+    const selectedStudent = _pickDeepLinkStudent(allStudents, deepTarget) || currentStudent;
     AppState.set('currentStudent', selectedStudent);
 
     // Actualizar sidebar y header ANTES de cargar datos
@@ -491,6 +501,9 @@ document.addEventListener('DOMContentLoaded', async () => {
 
     // 🔗 Si viene de un QR del boletín, ir directo a calificaciones y pre-seleccionar el período
     _applyDeepLink(deepBoletin, deepPeriodo);
+
+    // 🔗 Si viene del aviso de ausencia, ir directo al reporte del día del estudiante
+    if (deepRutina) _applyRoutineDeepLink(selectedStudent);
 
     // Mostrar skeletons inmediatamente
     _showSkeletons();

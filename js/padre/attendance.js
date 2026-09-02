@@ -203,7 +203,7 @@ export const AttendanceModule = {
 
       const { data, error } = await supabase
         .from('attendance')
-        .select('id, student_id, date, status, check_in, check_out')
+        .select('id, student_id, date, status, check_in, check_out, absence_reason')
         .eq('student_id', this._studentId)
         .gte('date', startDate)
         .lte('date', endDate)
@@ -322,14 +322,19 @@ export const AttendanceModule = {
     container.innerHTML = data.map(a => {
       const statusKey = a.status?.toLowerCase();
       const st  = statusMap[statusKey] || { label: a.status, cls: 'bg-slate-100 text-slate-600' };
+      const isAbsent = statusKey === 'absent' || statusKey === 'ausente';
+      const reasonHtml = (isAbsent && a.absence_reason)
+        ? '<p class="text-[10px] font-bold text-rose-500 mt-1 flex items-start gap-1"><span>📝</span><span>' + Helpers.escapeHTML(a.absence_reason) + '</span></p>'
+        : (isAbsent ? '<p class="text-[10px] font-bold text-slate-400 mt-1">Sin motivo registrado</p>' : '');
       const day = parseInt(a.date.split('-')[2], 10);
       return (
         '<div class="flex items-center justify-between p-4 bg-white rounded-2xl border border-slate-100 shadow-sm mb-3 group hover:shadow-md transition-all">' +
           '<div class="flex items-center gap-4">' +
-            '<div class="w-10 h-10 rounded-xl bg-slate-50 flex items-center justify-center text-sm font-black text-slate-400 group-hover:bg-emerald-50 group-hover:text-emerald-500 transition-colors">' + day + '</div>' +
+            '<div class="w-10 h-10 rounded-xl bg-slate-50 flex items-center justify-center text-sm font-black text-slate-400 group-hover:bg-rose-50 group-hover:text-rose-500 transition-colors">' + day + '</div>' +
             '<div>' +
               '<p class="text-sm font-black text-slate-800">' + Helpers.formatDate(a.date) + '</p>' +
               '<p class="text-[10px] font-bold text-slate-400 uppercase tracking-widest">' + (a.check_in ? 'Ingreso: ' + a.check_in : 'Sin registro de hora') + '</p>' +
+              reasonHtml +
             '</div>' +
           '</div>' +
           '<span class="px-3 py-1 rounded-full text-[9px] font-black uppercase tracking-tighter ' + st.cls + '">' + st.label + '</span>' +

@@ -65,6 +65,7 @@ window.App = {
   // Attendance
   registerAttendance: Attendance.registerAttendance,
   markAllPresent: Attendance.markAllPresent,
+  detectAbsents: Attendance.detectAbsents,
   initAttendance: Attendance.initAttendance,
   handleAttendancePointerDown: Attendance.handleAttendancePointerDown,
   handleAttendancePointerUp: Attendance.handleAttendancePointerUp,
