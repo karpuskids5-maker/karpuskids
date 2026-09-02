@@ -7,7 +7,7 @@
 import { supabase, sendPush, emitEvent } from '../shared/supabase.js';
 import { Helpers } from '../shared/helpers.js';
 import { showNotifyFeedback } from '../shared/notify-feedback.js';
-import { WallModule as SharedWallModule } from '../shared/wall.js';
+import { WallModule as SharedWallModule, generateVideoThumbnail } from '../shared/wall.js';
 
 export const WallModule = {
   ...SharedWallModule,
@@ -418,7 +418,8 @@ export const WallModule = {
     const path = `posts/${Date.now()}_rec.webm`;
     await this._uploadFile('posts', path, blob, mimeType);
     const { data: u } = supabase.storage.from('posts').getPublicUrl(path);
-    return { mediaUrl: u.publicUrl, mediaType, imagesArr: [] };
+    const thumbnailUrl = await this._uploadVideoThumb(blob);
+    return { mediaUrl: u.publicUrl, mediaType, thumbnailUrl, imagesArr: [] };
   },
 
   async _uploadVideoFile(file) {
@@ -426,7 +427,26 @@ export const WallModule = {
     const path = `posts/${Date.now()}.${ext}`;
     await this._uploadFile('posts', path, file, file.type);
     const { data: u } = supabase.storage.from('posts').getPublicUrl(path);
-    return { mediaUrl: u.publicUrl, mediaType: 'video', imagesArr: [] };
+    const thumbnailUrl = await this._uploadVideoThumb(file);
+    return { mediaUrl: u.publicUrl, mediaType: 'video', thumbnailUrl, imagesArr: [] };
+  },
+
+  /**
+   * 🎬 Genera la PORTADA del video en canvas (fragmento: 20% del video o 10s,
+   * el menor) y la sube al storage. Devuelve la URL pública o null si falla.
+   */
+  async _uploadVideoThumb(videoFile) {
+    try {
+      const thumb = await generateVideoThumbnail(videoFile);
+      if (!thumb) return null;
+      const thumbPath = `wall/thumbs/${Date.now()}_${crypto.randomUUID?.().slice(0, 6) || ''}.webp`;
+      await this._uploadFile('posts', thumbPath, thumb, 'image/webp');
+      const { data: t } = supabase.storage.from('posts').getPublicUrl(thumbPath);
+      return t?.publicUrl || null;
+    } catch (e) {
+      console.warn('[Wall] Portada de video no generada:', e);
+      return null;
+    }
   },
 
   async _uploadSingleImage(file) {
@@ -456,13 +476,14 @@ export const WallModule = {
     return !!scheduledAt && new Date(scheduledAt) > new Date();
   },
 
-  _buildPostPayload({ content, classroomId, scheduledAt, expireDays, mediaUrl, mediaType, imagesArr, user }) {
+  _buildPostPayload({ content, classroomId, scheduledAt, expireDays, mediaUrl, mediaType, thumbnailUrl, imagesArr, user }) {
     const isScheduled    = this._isScheduledPost(scheduledAt);
     return {
       content:         content || null,
       classroom_id:    classroomId || null,
       media_url:       mediaUrl,
       media_type:      mediaType,
+      thumbnail_url:   thumbnailUrl || null,
       images:          imagesArr.length > 1 ? imagesArr : null,
       teacher_id:      user.id,
       scheduled_at:    isScheduled ? new Date(scheduledAt).toISOString() : null,
@@ -483,8 +504,8 @@ export const WallModule = {
     if (!user) throw new Error('Sin sesión');
 
     const filesToUpload = this._resolveFilesToUpload(mediaFileInput);
-    const { mediaUrl, mediaType, imagesArr } = await this._resolveMediaUpload(filesToUpload);
-    const payload = this._buildPostPayload({ content, classroomId, scheduledAt, expireDays, mediaUrl, mediaType, imagesArr, user });
+    const { mediaUrl, mediaType, thumbnailUrl, imagesArr } = await this._resolveMediaUpload(filesToUpload);
+    const payload = this._buildPostPayload({ content, classroomId, scheduledAt, expireDays, mediaUrl, mediaType, thumbnailUrl, imagesArr, user });
 
     const { error } = await supabase.from('posts').insert(payload);
     if (error) throw error;

@@ -15,6 +15,11 @@ import { initLiveClassListener } from './attendance_live.js';
 import { DynamicBanner } from './dynamic-banner.js';
 import { EmotionalHome } from './emotional-home.js';
 
+// Timer de "recogida" (pick-up). Se declara a nivel de módulo: antes estaba solo
+// referenciado en switchStudent(), lo que lanzaba un ReferenceError y abortaba el
+// cambio de perfil de hermanos sin mostrar ningún error ni cambio en la UI.
+let _pickupTimer = null;
+
 window.App = {
   feed: { init: (cid) => import('./feed.js').then(m => m.FeedModule.init(cid)) },
   payments: { init: (sid) => import('./payments.js').then(m => m.PaymentsModule.init(sid)) },

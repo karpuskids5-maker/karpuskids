@@ -76,25 +76,54 @@ const compressImageToWebP = (file, maxWidth = MAX_IMAGE_WIDTH, quality = 0.80) =
   });
 };
 
-/** Genera thumbnail (poster) de video en canvas */
+/** Genera thumbnail (poster) de video en canvas.
+ * Punto de captura: el 20% del video O 10 segundos (se usa el menor de ambos),
+ * de modo que la portada sea representativa sin quedarse en el segundo 0 o 1.
+ */
 const generateVideoThumbnail = (file) => {
   return new Promise((resolve) => {
     const video = document.createElement('video');
     video.muted = true;
     video.playsInline = true;
+    video.preload = 'auto';
     const url = URL.createObjectURL(file);
-    video.onloadeddata = () => {
-      video.currentTime = 1;
+    let captured = false;
+
+    const _targetTime = () => {
+      const duration = video.duration || 30;
+      // 20% del video o 10s, el que sea menor (nunca 0, nunca por encima de la duración).
+      return Math.max(0.1, Math.min(10, duration * 0.2));
     };
-    video.onseeked = () => {
-      const canvas = document.createElement('canvas');
-      canvas.width = Math.min(video.videoWidth, 640);
-      canvas.height = Math.round(canvas.width * video.videoHeight / video.videoWidth);
-      canvas.getContext('2d').drawImage(video, 0, 0, canvas.width, canvas.height);
-      URL.revokeObjectURL(url);
-      canvas.toBlob(blob => resolve(blob), 'image/webp', 0.7);
+
+    const capture = () => {
+      if (captured) return;
+      captured = true;
+      try {
+        const w = video.videoWidth || 640;
+        const h = video.videoHeight || 360;
+        const canvas = document.createElement('canvas');
+        canvas.width  = Math.min(w, 640);
+        canvas.height = Math.round(canvas.width * h / w);
+        canvas.getContext('2d').drawImage(video, 0, 0, canvas.width, canvas.height);
+        URL.revokeObjectURL(url);
+        canvas.toBlob(blob => resolve(blob), 'image/webp', 0.7);
+      } catch (e) {
+        URL.revokeObjectURL(url);
+        resolve(null);
+      }
     };
-    video.onerror = () => { URL.revokeObjectURL(url); resolve(null); };
+
+    video.onloadedmetadata = () => {
+      try { video.currentTime = _targetTime(); } catch (_) { capture(); }
+    };
+    // Captura cuando el seek llega al frame objetivo.
+    video.onseeked = capture;
+    // Fallback: algunos navegadores no disparan 'seeked' de forma fiable;
+    // capturamos al alcanzar el punto objetivo durante la reproducción real.
+    video.ontimeupdate = () => {
+      if (Math.abs(video.currentTime - _targetTime()) < 0.25) capture();
+    };
+    video.onerror = () => { if (!captured) { URL.revokeObjectURL(url); resolve(null); } };
     video.src = url;
   });
 };
@@ -374,7 +403,7 @@ const WallModule = {
       // (ver migraciones/fix_likes_reaction_type.sql). Si PostgREST responde 400
       // por ella, se desactiva automáticamente y se reintenta sin ella.
       const buildEmbedSelect = () => `
-        id, content, media_url, media_type, image_url, images, title, created_at, updated_at,
+        id, content, media_url, media_type, image_url, images, thumbnail_url, title, created_at, updated_at,
         teacher_name, teacher_avatar, is_pinned, comments_enabled, expire_days,
         scheduled_at, views_count, tagged_students,
         classroom:classrooms(name),
@@ -382,7 +411,7 @@ const WallModule = {
         likes(user_id${this._supportsReactionType === false ? '' : ', reaction_type'}),
         comments(count)`;
       const FLAT_SELECT = `
-        id, content, media_url, media_type, image_url, images, title, created_at, updated_at,
+        id, content, media_url, media_type, image_url, images, thumbnail_url, title, created_at, updated_at,
         teacher_name, teacher_avatar, is_pinned, comments_enabled, expire_days,
         views_count, tagged_students, classroom_id, teacher_id`;
 
@@ -2056,4 +2085,4 @@ if (typeof window !== 'undefined') {
   window.openLightbox = (url, type) => WallModule.openLightbox(url, type);
 }
 
-export { WallModule };
+export { WallModule, generateVideoThumbnail };
