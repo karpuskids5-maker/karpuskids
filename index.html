@@ -7,7 +7,9 @@
   <meta name="description" content="Karpus Kids — Guardería y estancia infantil en San Cristóbal, República Dominicana. Cuidado seguro, educación integral y app exclusiva para padres. ¡Inscribe a tu hijo hoy!">
   <meta name="keywords" content="guardería San Cristóbal, estancia infantil San Cristóbal, preescolar San Cristóbal, cuidado niños San Cristóbal, educación infantil San Cristóbal, Karpus Kids">
   <meta name="robots" content="index, follow">
+  <link rel="manifest" href="manifest.json">
   <link rel="canonical" href="https://karpuskids.com/">
+<script src="https://cdn.onesignal.com/sdks/web/v16/OneSignalSDK.page.js" defer></script>
   <meta property="og:title" content="Karpus Kids — Guardería y Estancia Infantil en San Cristóbal">
   <meta property="og:description" content="Guardería y estancia infantil en San Cristóbal, República Dominicana. Cuidado experto, educación integral y app exclusiva para padres.">
   <meta property="og:type" content="website">
@@ -21,7 +23,7 @@
     "@type": "ChildCare",
     "name": "Karpus Kids",
     "description": "Estancia infantil segura y amorosa en San Cristóbal. Cuidado experto, educación integral y app exclusiva para padres.",
-    "url": "https://karpuskids.com",
+    "url": "https://karpuskids.com/",
     "telephone": "+18298038424",
     "image": "https://karpuskids.com/img/karpus.jpg",
     "address": {
@@ -60,6 +62,17 @@
     a{text-decoration:none;}
 
     /* ── Brand colors ── */
+    /* ── Karpus Kids Colored Branding ── */
+    .karpus-kids-colored .k1, .kk .k1{color:#FF9800}.karpus-kids-colored .k2, .kk .k2{color:#2196F3}.karpus-kids-colored .k3, .kk .k3{color:#E91E63}
+    .karpus-kids-colored .k4, .kk .k4{color:#4CAF50}.karpus-kids-colored .k5, .kk .k5{color:#FF9800}.karpus-kids-colored .k6, .kk .k6{color:#2196F3}
+    .karpus-kids-colored .k7, .kk .k7{color:#4CAF50}.karpus-kids-colored .k8, .kk .k8{color:#E91E63}.karpus-kids-colored .k9, .kk .k9{color:#2196F3}.karpus-kids-colored .k10, .kk .k10{color:#FF9800}
+
+    /* ── Hero Video ── */
+    .video-bg{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;opacity:0.35;}
+
+    @media(min-width:769px){
+      #mobBtn{display:none !important;}
+    }
     .kk .k1{color:#FF9800}.kk .k2{color:#2196F3}.kk .k3{color:#E91E63}
     .kk .k4{color:#4CAF50}.kk .k5{color:#FF9800}.kk .k6{color:#2196F3}
     .kk .k7{color:#4CAF50}.kk .k8{color:#E91E63}.kk .k9{color:#2196F3}.kk .k10{color:#FF9800}
@@ -221,6 +234,20 @@
 <body>
 
 <!-- ════════════════════════════════════════════════════════════
+     MOBILE MENU & OVERLAY
+════════════════════════════════════════════════════════════ -->
+<div id="mobMenuOverlay" onclick="toggleMenu(true)" style="display:none;position:fixed;inset:0;background:rgba(15,23,42,0.6);backdrop-filter:blur(4px);z-index:90;"></div>
+<div id="mobMenu" style="display:none;position:fixed;top:70px;left:0;width:100%;max-height:calc(100vh - 70px);overflow-y:auto;background:#fff;border-top:1px solid #f1f5f9;padding:16px 20px 24px;box-shadow:0 12px 32px rgba(0,0,0,0.15);z-index:100;">
+  <a href="#nosotros" onclick="toggleMenu(true)" style="display:block;padding:12px 16px;font-weight:700;color:#475569;border-radius:10px;" onfocus="this.style.background='#f8fafc'" onblur="this.style.background=''">Nosotros</a>
+  <a href="#programas" onclick="toggleMenu(true)" style="display:block;padding:12px 16px;font-weight:700;color:#475569;border-radius:10px;" onfocus="this.style.background='#f8fafc'" onblur="this.style.background=''">Programas</a>
+  <a href="#app" onclick="toggleMenu(true)" style="display:block;padding:12px 16px;font-weight:700;color:#475569;border-radius:10px;" onfocus="this.style.background='#f8fafc'" onblur="this.style.background=''">App</a>
+  <a href="#galeria" onclick="toggleMenu(true)" style="display:block;padding:12px 16px;font-weight:700;color:#475569;border-radius:10px;" onfocus="this.style.background='#f8fafc'" onblur="this.style.background=''">Galería</a>
+  <a href="#donaciones" onclick="toggleMenu(true)" style="display:block;padding:12px 16px;font-weight:700;color:#475569;border-radius:10px;" onfocus="this.style.background='#f8fafc'" onblur="this.style.background=''">Donaciones</a>
+  <a href="#contacto" onclick="toggleMenu(true)" style="display:block;padding:12px 16px;font-weight:700;color:#475569;border-radius:10px;" onfocus="this.style.background='#f8fafc'" onblur="this.style.background=''">Contacto</a>
+  <a href="login.html" onclick="toggleMenu(true)" style="display:block;margin:12px 0 0;padding:14px;text-align:center;background:linear-gradient(135deg,#FF9800,#E91E63);color:white;font-weight:900;border-radius:14px;">Acceso Padres</a>
+</div>
+
+<!-- ════════════════════════════════════════════════════════════
      NAVBAR
 ════════════════════════════════════════════════════════════ -->
 <header class="site-header" id="siteHeader">
@@ -232,7 +259,7 @@
         <div style="width:40px;height:40px;border-radius:12px;overflow:hidden;box-shadow:0 3px 10px rgba(0,0,0,0.18);flex-shrink:0;">
           <img src="img/mundo.jpg" alt="Logo" style="width:100%;height:100%;object-fit:cover;">
         </div>
-        <span class="kk" style="font-size:20px;font-weight:900;line-height:1;">
+        <span class="karpus-kids-colored" style="font-size:20px;font-weight:900;line-height:1;">
           <span class="k1">K</span><span class="k2">a</span><span class="k3">r</span><span class="k4">p</span><span class="k5">u</span><span class="k6">s</span>&#32;<span class="k7">K</span><span class="k8">i</span><span class="k9">d</span><span class="k10">s</span>
         </span>
       </a>
@@ -256,23 +283,14 @@
           onblur="this.style.transform='';this.style.boxShadow='0 4px 16px rgba(255,152,0,.4)'">
           <i class="bi bi-person-circle"></i> Acceso
         </a>
-        <button id="mobBtn" class="mob-btn"
+        <button id="mobBtn" class="mob-btn" onclick="toggleMenu()" aria-label="Abrir menú de navegación"
           style="display:flex;align-items:center;justify-content:center;width:42px;height:42px;border:none;background:#f1f5f9;border-radius:10px;cursor:pointer;">
           <i class="bi bi-list" id="mobIcon" style="font-size:20px;color:#475569;"></i>
         </button>
       </div>
     </nav>
 
-    <!-- Mobile menu -->
-    <div id="mobMenu" style="display:none;background:#fff;border-top:1px solid #f1f5f9;padding:10px 0 14px;border-radius:0 0 16px 16px;box-shadow:0 8px 24px rgba(0,0,0,0.08);">
-      <a href="#nosotros"  style="display:block;padding:12px 16px;font-weight:700;color:#475569;border-radius:10px;" onfocus="this.style.background='#f8fafc'" onblur="this.style.background=''">Nosotros</a>
-      <a href="#programas" style="display:block;padding:12px 16px;font-weight:700;color:#475569;border-radius:10px;" onfocus="this.style.background='#f8fafc'" onblur="this.style.background=''">Programas</a>
-      <a href="#app"       style="display:block;padding:12px 16px;font-weight:700;color:#475569;border-radius:10px;" onfocus="this.style.background='#f8fafc'" onblur="this.style.background=''">App</a>
-      <a href="#galeria"   style="display:block;padding:12px 16px;font-weight:700;color:#475569;border-radius:10px;" onfocus="this.style.background='#f8fafc'" onblur="this.style.background=''">Galería</a>
-      <a href="#donaciones" style="display:block;padding:12px 16px;font-weight:700;color:#475569;border-radius:10px;" onfocus="this.style.background='#f8fafc'" onblur="this.style.background=''">Donaciones</a>
-      <a href="#contacto"  style="display:block;padding:12px 16px;font-weight:700;color:#475569;border-radius:10px;" onfocus="this.style.background='#f8fafc'" onblur="this.style.background=''">Contacto</a>
-      <a href="login.html" style="display:block;margin:8px 16px 0;padding:12px;text-align:center;background:linear-gradient(135deg,#FF9800,#E91E63);color:white;font-weight:900;border-radius:14px;">Acceso Padres</a>
-    </div>
+
   </div>
 </header>
 
@@ -281,7 +299,8 @@
 ════════════════════════════════════════════════════════════ -->
 <section class="hero" id="inicio">
   <!-- Video background (muted, autoplay) -->
-  <video class="hero-video" autoplay muted loop playsinline poster="img/karpus.jpg" aria-label="Video de fondo Karpus Kids">
+  <video class="hero-video video-bg" autoplay muted loop playsinline poster="img/karpus.jpg" aria-label="Video de fondo Karpus Kids">
+    <source src="img/14.mp4" type="video/mp4">
     <source src="img/video%20karpus%20kids.mp4" type="video/mp4">
     <track kind="captions" srclang="es" label="Español" default>
   </video>
@@ -749,7 +768,7 @@
       <span class="sec-label" style="background:#fff7ed;color:#FF9800;">Nuestra historia</span>
       <h2 style="font-size:clamp(1.9rem,3.5vw,2.8rem);font-weight:900;color:#1e293b;margin-bottom:18px;">Confianza familiar por más de 5 años</h2>
       <p style="color:#64748b;font-size:15px;line-height:1.78;margin-bottom:16px;">
-        Desde nuestra fundación, <strong class="kk"><span class="k1">K</span><span class="k2">a</span><span class="k3">r</span><span class="k4">p</span><span class="k5">u</span><span class="k6">s</span> <span class="k7">K</span><span class="k8">i</span><span class="k9">d</span><span class="k10">s</span></strong> ha sido un socio de confianza para las familias de San Cristobal. Nuestra fundadora, Karonlyn García, creó este espacio con una misión clara: cuidado y educación de alta calidad para cada niño, cada familia, cada día.
+        Desde nuestra fundación, <strong class="karpus-kids-colored"><span class="k1">K</span><span class="k2">a</span><span class="k3">r</span><span class="k4">p</span><span class="k5">u</span><span class="k6">s</span> <span class="k7">K</span><span class="k8">i</span><span class="k9">d</span><span class="k10">s</span></strong> ha sido un socio de confianza para las familias de San Cristobal. Nuestra fundadora, Karonlyn García, creó este espacio con una misión clara: cuidado y educación de alta calidad para cada niño, cada familia, cada día.
       </p>
       <p style="color:#64748b;font-size:15px;line-height:1.78;margin-bottom:28px;">
         Contamos con personal certificado, instalaciones modernas y una app exclusiva que mantiene a los padres conectados en todo momento.
@@ -1192,7 +1211,7 @@
           <div style="width:40px;height:40px;border-radius:12px;overflow:hidden;flex-shrink:0;">
             <img src="img/mundo.jpg" alt="Karpus Kids" style="width:100%;height:100%;object-fit:cover;">
           </div>
-          <span class="kk" style="font-size:20px;font-weight:900;line-height:1;">
+          <span class="karpus-kids-colored" style="font-size:20px;font-weight:900;line-height:1;">
             <span class="k1">K</span><span class="k2">a</span><span class="k3">r</span><span class="k4">p</span><span class="k5">u</span><span class="k6">s</span>&#32;<span class="k7">K</span><span class="k8">i</span><span class="k9">d</span><span class="k10">s</span>
           </span>
         </div>
@@ -1277,7 +1296,7 @@
 <!-- ── LIGHTBOX ── -->
 <dialog id="lb" aria-label="Visor de imágenes">
   <button id="lb-close" onclick="closeLb()" aria-label="Cerrar visor">✕</button>
-  <img id="lb-img" src="" alt="Foto Karpus Kids">
+  <img id="lb-img" src="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='1' height='1'%3E%3C/svg%3E" alt="Foto Karpus Kids">
 </dialog>
 
 <script>
@@ -1286,18 +1305,19 @@
   window.addEventListener('scroll', () => hdr.classList.toggle('scrolled', scrollY > 40), { passive: true });
 
   // ── Mobile menu ───────────────────────────────────────────────────────────
-  const mobBtn  = document.getElementById('mobBtn');
-  const mobMenu = document.getElementById('mobMenu');
-  const mobIcon = document.getElementById('mobIcon');
-  mobBtn.addEventListener('click', () => {
-    const open = mobMenu.style.display === 'block';
-    mobMenu.style.display = open ? 'none' : 'block';
-    mobIcon.className = open ? 'bi bi-list' : 'bi bi-x-lg';
-  });
-  mobMenu.querySelectorAll('a').forEach(a => a.addEventListener('click', () => {
-    mobMenu.style.display = 'none';
-    mobIcon.className = 'bi bi-list';
-  }));
+  window.toggleMenu = function(forceClose = false) {
+    const menu = document.getElementById('mobMenu');
+    const overlay = document.getElementById('mobMenuOverlay');
+    const icon = document.getElementById('mobIcon');
+    if (!menu || !overlay) return;
+    const isCurrentlyOpen = menu.style.display === 'block';
+    const shouldOpen = forceClose ? false : !isCurrentlyOpen;
+
+    menu.style.display = shouldOpen ? 'block' : 'none';
+    overlay.style.display = shouldOpen ? 'block' : 'none';
+    if (icon) icon.className = shouldOpen ? 'bi bi-x-lg' : 'bi bi-list';
+    document.body.style.overflow = shouldOpen ? 'hidden' : '';
+  };
 
   // ── Lightbox ──────────────────────────────────────────────────────────────
   function openLb(src) {
@@ -1795,6 +1815,27 @@
     if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', loadCampaigns);
     else loadCampaigns();
   })();
+</script>
+<script>
+  // PWA Service Worker & OneSignal Init
+  if ('serviceWorker' in navigator) {
+    window.addEventListener('load', () => {
+      navigator.serviceWorker.register('OneSignalSDKWorker.js').catch(() => {});
+    });
+  }
+  window.OneSignalDeferred = window.OneSignalDeferred || [];
+  window.OneSignalDeferred.push(async function(OneSignal) {
+    try {
+      await OneSignal.init({
+        appId: "3df1bf6e-ffef-4d32-aa59-86a02b66ca6b",
+        safari_web_id: "web.onesignal.auto.63402434-7a0e-473d-9d21-f095166311e9",
+        allowLocalhostAsSecureOrigin: false,
+        serviceWorkerPath: 'OneSignalSDKWorker.js'
+      });
+    } catch (err) {
+      console.warn('OneSignal init:', err);
+    }
+  });
 </script>
 </body>
 </html>
