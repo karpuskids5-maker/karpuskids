@@ -1992,9 +1992,15 @@ const WallModule = {
 
 };
 
-// Exponer globalmente
+// Exponer globalmente.
+// IMPORTANTE: solo asignar si aún no existe un wrapper más completo (p. ej. el de
+// js/directora/main.js o js/maestra/main.js, que exponen submitNewPost,
+// _scheduleDraftSave, etc.). Si sobreescribimos aquí, esos métodos se pierden y los
+// onclick/oninput inline del muro rompen con "WallModule.xxx is not a function".
 if (typeof window !== 'undefined') {
-  window.WallModule = WallModule;
+  if (!window.WallModule) {
+    window.WallModule = WallModule;
+  }
   window.openLightbox = (url, type) => WallModule.openLightbox(url, type);
 }
 
