@@ -733,101 +733,158 @@ const CONVO_TYPE_LABELS = {
 function renderChat() {
   const set = (id, v) => { const el = document.getElementById(id); if (el) el.textContent = v; };
   const todayStr = new Date().toISOString().slice(0, 10);
-  const since7 = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString();
   set('chat-convos', allConvos.length);
   set('chat-today', allChatMsgs.filter(m => (m.created_at || '').startsWith(todayStr)).length);
-  set('chat-week', allChatMsgs.filter(m => (m.created_at || '') >= since7).length);
+  const unreadTotal = allChatMsgs.filter(m => m.is_read === false).length;
+  set('chat-unread-total', unreadTotal);
   const mediaCount = allChatMsgs.filter(m => m.attachment_url).length;
   set('chat-media', mediaCount);
 
   populateChatSelects();
   filterChat();
-
-  const list = document.getElementById('convTypeList');
-  if (list) {
-    const counts = {};
-    allConvos.forEach(c => { const t = c.type || 'direct_message'; counts[t] = (counts[t] || 0) + 1; });
-    const entries = Object.entries(counts).sort((a, b) => b[1] - a[1]);
-    if (!entries.length) {
-      list.innerHTML = '<div style="text-align:center;padding:20px;color:var(--muted);font-size:13px;">Sin conversaciones registradas</div>';
-      return;
-    }
-    const max = entries[0][1];
-    list.innerHTML = entries.map(([type, n]) => {
-      const [label, cls] = CONVO_TYPE_LABELS[type] || [type, 'badge-gray'];
-      const pct = allConvos.length ? Math.round((n / allConvos.length) * 100) : 0;
-      return `<div style="margin-bottom:12px;">
-        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:5px;">
-          <span class="badge ${cls}">${escH(label)}</span>
-          <span style="font-size:13px;font-weight:900;color:var(--text);">${n} <span style="color:var(--muted);font-size:10px;">(${pct}%)</span></span>
-        </div>
-        <div style="height:6px;background:rgba(255,255,255,.06);border-radius:50px;overflow:hidden;">
-          <div style="height:100%;width:${pct}%;background:linear-gradient(90deg,#6366f1,#8b5cf6);border-radius:50px;"></div>
-        </div>
-      </div>`;
-    }).join('');
-  }
+  filterConversations();
 }
 
 // ── Chat Conversations viewer ─────────────────────────────────────────────────
-window.renderChatConversations = function() {
-  const container = document.getElementById('convListContainer');
-  if (!container) return;
-  const countEl = document.getElementById('convoCount');
-
-  // Build conversation pairs: who talked to whom
+function _buildConversationPairs() {
   const pairs = {};
   allChatMsgs.forEach(m => {
     const sid = m.sender_id || '';
     const rid = m.receiver_id || '';
     if (!sid || !rid) return;
     const key = [sid, rid].sort().join('|');
-    if (!pairs[key]) pairs[key] = { user1: sid, user2: rid, msgs: [], count: 0 };
+    if (!pairs[key]) pairs[key] = { user1: sid, user2: rid, msgs: [], count: 0, unread: 0, hasMedia: false, lastAt: '' };
     pairs[key].msgs.push(m);
     pairs[key].count++;
+    if (m.is_read === false) pairs[key].unread++;
+    if (m.attachment_url) pairs[key].hasMedia = true;
+    if (m.created_at > pairs[key].lastAt) pairs[key].lastAt = m.created_at;
   });
+  return Object.values(pairs).sort((a, b) => {
+    if (a.unread > 0 && b.unread === 0) return -1;
+    if (a.unread === 0 && b.unread > 0) return 1;
+    return (b.lastAt || '').localeCompare(a.lastAt || '');
+  });
+}
 
-  const sorted = Object.values(pairs).sort((a, b) => b.count - a.count);
+function _getUserName(userId) {
+  const u = allUsers.find(x => x.id === userId);
+  return u?.name || u?.email || userId?.slice(0, 8) || '?';
+}
+function _getUserRole(userId) {
+  return allUsers.find(x => x.id === userId)?.role || '';
+}
+function _getUserAvatarColor(userId) {
+  const colors = ['#6366f1', '#22c55e', '#f97316', '#3b82f6', '#8b5cf6', '#ef4444', '#eab308', '#06b6d4', '#ec4899'];
+  return colors[Math.abs(hashStr(userId || '')) % colors.length];
+}
 
-  if (!sorted.length) {
-    container.innerHTML = '<div style="text-align:center;padding:40px;color:var(--muted);">Sin conversaciones registradas</div>';
-    if (countEl) countEl.textContent = '0 conversaciones';
+function _getConversationPreview(msgs) {
+  const sorted = msgs.sort((a, b) => (b.created_at || '').localeCompare(a.created_at || ''));
+  const last = sorted[0];
+  if (!last) return { text: '', time: '' };
+  const text = last.content || (last.attachment_url ? '📷 Archivo adjunto' : '');
+  const time = last.created_at ? _relativeTime(last.created_at) : '';
+  return { text, time };
+}
+
+function _relativeTime(dateStr) {
+  const now = Date.now();
+  const then = new Date(dateStr).getTime();
+  const diff = now - then;
+  const mins = Math.floor(diff / 60000);
+  if (mins < 1) return 'ahora';
+  if (mins < 60) return mins + 'm';
+  const hrs = Math.floor(mins / 60);
+  if (hrs < 24) return hrs + 'h';
+  const days = Math.floor(hrs / 24);
+  if (days < 7) return days + 'd';
+  return new Date(dateStr).toLocaleDateString('es-DO', { day: '2-digit', month: 'short' });
+}
+
+window.filterConversations = function() {
+  const q = (document.getElementById('convoSearch')?.value || '').toLowerCase().trim();
+  const filter = document.getElementById('convoFilterType')?.value || '';
+  const pairs = _buildConversationPairs();
+  let filtered = pairs;
+  if (q) {
+    filtered = filtered.filter(p => {
+      const n1 = _getUserName(p.user1).toLowerCase();
+      const n2 = _getUserName(p.user2).toLowerCase();
+      const preview = (p.msgs[0]?.content || '').toLowerCase();
+      return n1.includes(q) || n2.includes(q) || preview.includes(q);
+    });
+  }
+  if (filter === 'unread') filtered = filtered.filter(p => p.unread > 0);
+  if (filter === 'today') {
+    const todayStr = new Date().toISOString().slice(0, 10);
+    filtered = filtered.filter(p => p.lastAt?.startsWith(todayStr));
+  }
+  if (filter === 'media') filtered = filtered.filter(p => p.hasMedia);
+  _renderConversationCards(filtered);
+};
+
+window.renderChatConversations = function() {
+  window.filterConversations();
+};
+
+function _renderConversationCards(pairs) {
+  const container = document.getElementById('convListContainer');
+  if (!container) return;
+  const countEl = document.getElementById('convoResultCount');
+  if (countEl) countEl.textContent = pairs.length + ' conversaciones';
+  if (!pairs.length) {
+    container.innerHTML = '<div style="text-align:center;padding:48px 20px;color:var(--muted);"><i class="bi bi-chat-square-dots" style="font-size:36px;display:block;margin-bottom:10px;opacity:.4;"></i><div style="font-size:13px;font-weight:700;">Sin conversaciones</div><div style="font-size:11px;margin-top:4px;">No se encontraron conversaciones con los filtros seleccionados</div></div>';
     return;
   }
+  container.innerHTML = pairs.map(p => {
+    const n1 = _getUserName(p.user1);
+    const n2 = _getUserName(p.user2);
+    const r1 = _getUserRole(p.user1);
+    const r2 = _getUserRole(p.user2);
+    const c1 = _getUserAvatarColor(p.user1);
+    const c2 = _getUserAvatarColor(p.user2);
+    const { text, time } = _getConversationPreview(p.msgs);
+    const hasUnread = p.unread > 0;
+    const roleBadgeColors = { padre: 'badge-blue', maestra: 'badge-green', directora: 'badge-orange', asistente: 'badge-purple', admin: 'badge-yellow' };
+    const rb1 = roleBadgeColors[r1] || 'badge-gray';
+    const rb2 = roleBadgeColors[r2] || 'badge-gray';
+    const sensitiveHits = p.msgs.some(m => findSensitiveHits(m.content).length > 0);
 
-  if (countEl) countEl.textContent = sorted.length + ' conversaciones';
-
-  container.innerHTML = sorted.slice(0, 50).map(p => {
-    const u1 = allUsers.find(u => u.id === p.user1);
-    const u2 = allUsers.find(u => u.id === p.user2);
-    const name1 = u1?.name || u1?.email || p.user1?.slice(0, 8) || '?';
-    const name2 = u2?.name || u2?.email || p.user2?.slice(0, 8) || '?';
-    const role1 = u1?.role || '?';
-    const role2 = u2?.role || '?';
-    const lastMsg = p.msgs.sort((a, b) => (b.created_at || '').localeCompare(a.created_at || ''))[0];
-    const lastTime = lastMsg?.created_at ? new Date(lastMsg.created_at).toLocaleString('es-DO', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' }) : '—';
-    const lastContent = lastMsg?.content || '';
-    const unread = p.msgs.filter(m => m.is_read === false).length;
-    const colors = ['#6366f1', '#22c55e', '#f97316', '#3b82f6', '#8b5cf6', '#ef4444', '#eab308'];
-    const c1 = colors[Math.abs(hashStr(p.user1)) % colors.length];
-    const c2 = colors[Math.abs(hashStr(p.user2)) % colors.length];
-
-    return `<div class="convo-card" onclick="viewThread('${p.user1}','${p.user2}')" style="cursor:pointer;" title="Ver hilo completo">
-      <div class="convo-avatar" style="background:${c1};">${(name1[0]||'?').toUpperCase()}</div>
-      <div style="font-size:11px;color:var(--muted);">↔</div>
-      <div class="convo-avatar" style="background:${c2};">${(name2[0]||'?').toUpperCase()}</div>
-      <div class="convo-meta">
-        <div class="convo-name">${escH(name1)} <span class="badge badge-gray" style="font-size:8px;">${role1}</span> ↔ ${escH(name2)} <span class="badge badge-gray" style="font-size:8px;">${role2}</span></div>
-        <div class="convo-preview">${escH(lastContent.slice(0, 60))}${lastContent.length > 60 ? '...' : ''}</div>
-        <div style="font-size:10px;color:var(--muted);margin-top:2px;">Último: ${lastTime}</div>
+    return `<div class="convo-card" onclick="viewThread('${p.user1}','${p.user2}')" style="cursor:pointer;${hasUnread ? 'border-color:rgba(99,102,241,.35);background:rgba(99,102,241,.06);' : ''}">
+      <!-- Avatars -->
+      <div style="position:relative;flex-shrink:0;">
+        <div class="convo-avatar" style="background:${c1};width:44px;height:44px;font-size:17px;">${(n1[0]||'?').toUpperCase()}</div>
+        <div class="convo-avatar" style="background:${c2};width:32px;height:32px;font-size:13px;position:absolute;bottom:-4px;right:-8px;border:2px solid var(--surface);">${(n2[0]||'?').toUpperCase()}</div>
       </div>
-      <div style="display:flex;flex-direction:column;align-items:center;gap:4px;">
-        <div class="convo-count">${p.count} msg</div>
-        ${unread > 0 ? `<span class="badge badge-red" style="font-size:8px;">${unread} sin leer</span>` : ''}
+      <!-- Info -->
+      <div class="convo-meta" style="flex:1;min-width:0;">
+        <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;">
+          <span class="convo-name" style="font-size:13px;">${escH(n1)}</span>
+          <span class="badge ${rb1}" style="font-size:7px;">${escH(r1)}</span>
+          <span style="color:var(--muted);font-size:10px;">↔</span>
+          <span class="convo-name" style="font-size:13px;">${escH(n2)}</span>
+          <span class="badge ${rb2}" style="font-size:7px;">${escH(r2)}</span>
+        </div>
+        <div style="display:flex;align-items:center;gap:6px;margin-top:3px;">
+          <div class="convo-preview" style="flex:1;font-size:11px;color:var(--muted);">${escH(text.slice(0, 70))}${text.length > 70 ? '...' : ''}</div>
+          <span style="font-size:10px;color:var(--muted);white-space:nowrap;">${time}</span>
+        </div>
+        <!-- Tags -->
+        <div style="display:flex;gap:4px;margin-top:4px;flex-wrap:wrap;">
+          ${hasUnread ? `<span class="badge badge-red" style="font-size:8px;padding:2px 7px;"><i class="bi bi-envelope-fill" style="font-size:7px;"></i> ${p.unread} sin leer</span>` : ''}
+          ${sensitiveHits ? '<span class="badge badge-yellow" style="font-size:8px;padding:2px 7px;"><i class="bi bi-exclamation-triangle-fill" style="font-size:7px;"></i> Sensible</span>' : ''}
+          ${p.hasMedia ? '<span class="badge badge-purple" style="font-size:8px;padding:2px 7px;"><i class="bi bi-image" style="font-size:7px;"></i> Archivos</span>' : ''}
+        </div>
+      </div>
+      <!-- Count badge -->
+      <div style="display:flex;flex-direction:column;align-items:center;gap:4px;flex-shrink:0;">
+        <div style="font-size:13px;font-weight:900;color:${hasUnread ? 'var(--accent)' : 'var(--muted)'};background:${hasUnread ? 'rgba(99,102,241,.12)' : 'rgba(255,255,255,.04)'};padding:4px 10px;border-radius:50px;min-width:36px;text-align:center;">${p.count}</div>
+        <div style="font-size:8px;color:var(--muted);">msgs</div>
       </div>
     </div>`;
   }).join('');
-};
+}
 
 // ── Chat Media gallery ────────────────────────────────────────────────────────
 window.renderChatMedia = function() {
@@ -856,12 +913,11 @@ function hashStr(s) {
 async function loadAttendance() {
   const today = new Date().toISOString().split('T')[0];
   try {
-    // Fetch attendance with student names
     const { data, error } = await supabase
       .from('attendance')
       .select('id, date, check_in, check_out, status, student_id, classroom_id, student:student_id(name), classroom:classroom_id(name)')
       .order('date', { ascending: false })
-      .limit(300);
+      .limit(500);
     
     if (error) throw error;
     allAttend = data || [];
@@ -869,13 +925,12 @@ async function loadAttendance() {
     const kpi = document.getElementById('kpi-attendance');
     if (kpi) kpi.textContent = todayCount;
   } catch (err) {
-    // Fallback without joins
     try {
       const { data } = await supabase
         .from('attendance')
         .select('id, date, check_in, check_out, status, student_id, classroom_id')
         .order('date', { ascending: false })
-        .limit(300);
+        .limit(500);
       allAttend = data || [];
     } catch (err2) { 
       logError('panel_control', err2?.message || String(err2), err2?.stack || '', 'loadAttendance_fallback').catch(() => {});
@@ -1463,7 +1518,24 @@ window.doResetPassword = async function(userId) {
     const { data, error } = await supabase.functions.invoke('admin-reset-password', {
       body: { user_id: userId, new_password: pwd }
     });
-    if (error || data?.error) throw new Error(error?.message || data?.error || 'Error desconocido');
+
+    // Handle edge function errors with detailed messages
+    if (error) {
+      const errMsg = error?.message || error?.context || JSON.stringify(error);
+      // Detect common issues
+      let friendlyMsg = errMsg;
+      if (/function not found|not deployed|404|nonexistent/i.test(errMsg)) {
+        friendlyMsg = 'La Edge Function "admin-reset-password" no está desplegada. Ejecuta: supabase functions deploy admin-reset-password';
+      } else if (/Missing env vars|Variables de entorno/i.test(errMsg)) {
+        friendlyMsg = 'Faltan variables de entorno en la Edge Function. Configura SUPABASE_SERVICE_ROLE_KEY como secret.';
+      } else if (/Failed to fetch|network|CORS/i.test(errMsg)) {
+        friendlyMsg = 'Error de red al conectar con la Edge Function. Verifica tu conexión.';
+      } else if (/500/i.test(errMsg)) {
+        friendlyMsg = 'Error interno del servidor. Verifica que el SUPABASE_SERVICE_ROLE_KEY esté configurado como secret en Supabase.';
+      }
+      throw new Error(friendlyMsg);
+    }
+    if (data?.error) throw new Error(data.error);
 
     // Auditoría inmutable
     await supabase.from('audit_logs').insert({
@@ -1535,10 +1607,64 @@ function renderPayments() {
 }
 
 // ── Attendance ────────────────────────────────────────────────────────────────
+window.switchAttendTab = function(tab) {
+  ['today','absent','frequency','chart'].forEach(t => {
+    const el = document.getElementById('attendTab' + t.charAt(0).toUpperCase() + t.slice(1));
+    if (el) el.style.display = t === tab ? '' : 'none';
+  });
+  document.querySelectorAll('#sec-asistencia .tab-btn').forEach((b,i) => b.classList.toggle('active', ['today','absent','frequency','chart'][i] === tab));
+};
+
 function renderAttendance() {
   const today = new Date().toISOString().split('T')[0];
   document.getElementById('attendanceDate').textContent = new Date().toLocaleDateString('es-DO', { dateStyle: 'full' });
 
+  // ── KPIs de hoy ──
+  const todayData = allAttend.filter(a => a.date === today);
+  const activeStudents = allStudents.filter(s => s.is_active);
+  const presentIds = new Set(todayData.filter(a => ['present','presente'].includes((a.status||'').toLowerCase())).map(a => a.student_id));
+  const lateIds = new Set(todayData.filter(a => ['late','tarde'].includes((a.status||'').toLowerCase())).map(a => a.student_id));
+  const checkedInIds = new Set(todayData.map(a => a.student_id));
+  const absentToday = activeStudents.filter(s => !checkedInIds.has(s.id));
+  const pendingCheck = activeStudents.filter(s => !checkedInIds.has(s.id));
+
+  const setKpi = (id, v) => { const el = document.getElementById(id); if (el) el.textContent = v; };
+  setKpi('att-present', presentIds.size);
+  setKpi('att-absent', absentToday.length);
+  setKpi('att-late', lateIds.size);
+  setKpi('att-pending', pendingCheck.length);
+
+  // ── Tab: Registros Hoy ──
+  const tbody = document.getElementById('attendanceBody');
+  if (tbody) {
+    if (!todayData.length) {
+      tbody.innerHTML = '<tr><td colspan="5" style="text-align:center;padding:24px;color:var(--muted);">Sin registros de asistencia hoy</td></tr>';
+    } else {
+      const statusBadge = { present: 'badge-green', presente: 'badge-green', absent: 'badge-red', ausente: 'badge-red', late: 'badge-yellow', tarde: 'badge-yellow', retirado: 'badge-blue' };
+      tbody.innerHTML = todayData.map(a => {
+        const studentName = a.student?.name || allStudents.find(s => s.id === a.student_id)?.name || String(a.student_id || '—');
+        const classroomName = a.classroom?.name || allClassrooms.find(c => c.id === a.classroom_id)?.name || '—';
+        const checkIn  = a.check_in  ? new Date(a.check_in).toLocaleTimeString('es-DO',{hour:'2-digit',minute:'2-digit'}) : '—';
+        const checkOut = a.check_out ? new Date(a.check_out).toLocaleTimeString('es-DO',{hour:'2-digit',minute:'2-digit'}) : '—';
+        return `<tr>
+          <td style="font-weight:800;">${escH(studentName)}</td>
+          <td style="color:var(--muted);">${escH(classroomName)}</td>
+          <td style="color:#4ade80;">${checkIn}</td>
+          <td style="color:#60a5fa;">${checkOut}</td>
+          <td><span class="badge ${statusBadge[(a.status||'').toLowerCase()]||'badge-gray'}">${a.status||'—'}</span></td>
+        </tr>`;
+      }).join('');
+    }
+  }
+
+  // ── Tab: Ausentes ──
+  renderAbsentList(absentToday);
+  renderEarliestArrivals(todayData);
+
+  // ── Tab: Frecuencia ──
+  renderFrequencyStats();
+
+  // ── Tab: Gráficas ──
   const days = Array.from({ length: 14 }, (_, i) => {
     const d = new Date(); d.setDate(d.getDate() - (13 - i));
     return d.toISOString().split('T')[0];
@@ -1558,27 +1684,150 @@ function renderAttendance() {
   };
   if (typeof Chart !== 'undefined') drawAttendChart();
   else onChartReady(drawAttendChart);
+}
 
-  const tbody = document.getElementById('attendanceBody');
-  if (!tbody) return;
-  const todayData = allAttend.filter(a => a.date === today);
-  if (!todayData.length) { tbody.innerHTML = '<tr><td colspan="6" style="text-align:center;padding:24px;color:var(--muted);">Sin registros hoy</td></tr>'; return; }
-  const statusBadge = { present: 'badge-green', absent: 'badge-red', late: 'badge-yellow', retirado: 'badge-blue' };
-  tbody.innerHTML = todayData.map(a => {
-    // Resolve student name: from join or from allStudents
-    const studentName = a.student?.name || allStudents.find(s => s.id === a.student_id)?.name || String(a.student_id || '—');
-    const classroomName = a.classroom?.name || allClassrooms.find(c => c.id === a.classroom_id)?.name || '—';
-    const checkIn  = a.check_in  ? new Date(a.check_in).toLocaleTimeString('es-DO',{hour:'2-digit',minute:'2-digit'}) : '—';
-    const checkOut = a.check_out ? new Date(a.check_out).toLocaleTimeString('es-DO',{hour:'2-digit',minute:'2-digit'}) : '—';
-    return `<tr>
-      <td style="font-weight:800;">${escH(studentName)}</td>
-      <td><span class="badge badge-blue">Estudiante</span></td>
-      <td style="color:#4ade80;">${checkIn}</td>
-      <td style="color:#60a5fa;">${checkOut}</td>
-      <td style="color:var(--muted);">${escH(classroomName)}</td>
-      <td><span class="badge ${statusBadge[a.status]||'badge-gray'}">${a.status||'—'}</span></td>
-    </tr>`;
+function renderAbsentList(absentToday) {
+  const container = document.getElementById('absentList');
+  if (!container) return;
+  const countEl = document.getElementById('absentCount');
+  if (countEl) countEl.textContent = absentToday.length + ' estudiantes';
+  if (!absentToday.length) {
+    container.innerHTML = '<div style="text-align:center;padding:32px;color:var(--muted);"><i class="bi bi-check-circle-fill" style="font-size:28px;color:#4ade80;display:block;margin-bottom:8px;"></i>Todos los estudiantes están presentes</div>';
+    return;
+  }
+  container.innerHTML = absentToday.map(s => {
+    const room = allClassrooms.find(c => c.id === s.classroom_id);
+    const colors = ['#ef4444', '#f97316', '#eab308', '#8b5cf6', '#ec4899'];
+    const color = colors[Math.abs(hashStr(s.id)) % colors.length];
+    return `<div style="display:flex;align-items:center;gap:10px;padding:10px 12px;border-bottom:1px solid var(--border);transition:background .2s;" onmouseenter="this.style.background='rgba(239,68,68,.06)'" onmouseleave="this.style.background='none'">
+      <div style="width:36px;height:36px;border-radius:50%;background:${color};display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:900;color:white;flex-shrink:0;">${(s.name||'?')[0].toUpperCase()}</div>
+      <div style="flex:1;min-width:0;">
+        <div style="font-size:13px;font-weight:800;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${escH(s.name||'Sin nombre')}</div>
+        <div style="font-size:10px;color:var(--muted);">${room ? escH(room.name) : 'Sin aula'} · ID: ${escH(s.matricula||s.id?.slice(0,8)||'—')}</div>
+      </div>
+      <span class="badge badge-red" style="font-size:9px;">Ausente</span>
+    </div>`;
   }).join('');
+}
+
+function renderEarliestArrivals(todayData) {
+  const container = document.getElementById('earliestList');
+  if (!container) return;
+  const withTime = todayData
+    .filter(a => a.check_in)
+    .map(a => {
+      const d = new Date(a.check_in);
+      const mins = d.getHours() * 60 + d.getMinutes();
+      const name = a.student?.name || allStudents.find(s => s.id === a.student_id)?.name || '—';
+      return { name, mins, time: d.toLocaleTimeString('es-DO',{hour:'2-digit',minute:'2-digit'}), status: a.status };
+    })
+    .sort((a, b) => a.mins - b.mins);
+
+  if (!withTime.length) {
+    container.innerHTML = '<div style="text-align:center;padding:32px;color:var(--muted);">Sin registros de entrada hoy</div>';
+    return;
+  }
+  const rankColors = ['#22c55e', '#4ade80', '#facc15', '#fb923c', '#ef4444'];
+  container.innerHTML = withTime.slice(0, 15).map((t, i) => {
+    const medal = i === 0 ? '🥇' : i === 1 ? '🥈' : i === 2 ? '🥉' : `#${i+1}`;
+    const color = rankColors[Math.min(i, rankColors.length - 1)];
+    const isLate = ['late','tarde'].includes((t.status||'').toLowerCase());
+    return `<div style="display:flex;align-items:center;gap:10px;padding:9px 12px;border-bottom:1px solid var(--border);">
+      <div style="width:30px;height:30px;border-radius:50%;background:${color};display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:900;color:white;flex-shrink:0;">${medal}</div>
+      <div style="flex:1;min-width:0;">
+        <div style="font-size:13px;font-weight:800;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${escH(t.name)}</div>
+      </div>
+      <div style="text-align:right;">
+        <div style="font-size:13px;font-weight:900;color:${isLate ? '#fbbf24' : '#4ade80'};">${t.time}</div>
+        ${isLate ? '<span class="badge badge-yellow" style="font-size:7px;">Tardío</span>' : '<span class="badge badge-green" style="font-size:7px;">Puntual</span>'}
+      </div>
+    </div>`;
+  }).join('');
+}
+
+function renderFrequencyStats() {
+  const container = document.getElementById('mostAbsentList');
+  const container2 = document.getElementById('mostPunctualList');
+  if (!container && !container2) return;
+
+  // Calculate attendance frequency per student (last 30 days)
+  const since30 = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
+  const activeStudents = allStudents.filter(s => s.is_active);
+
+  // Get unique school days in last 30 days
+  const schoolDays = new Set();
+  allAttend.filter(a => a.date >= since30).forEach(a => schoolDays.add(a.date));
+  const totalDays = schoolDays.size || 1;
+
+  // Absences per student
+  const absences = {};
+  activeStudents.forEach(s => { absences[s.id] = { name: s.name, total: 0, late: 0, present: 0, avgArrival: [] }; });
+  allAttend.filter(a => a.date >= since30).forEach(a => {
+    if (!absences[a.student_id]) return;
+    const st = (a.status||'').toLowerCase();
+    if (st === 'absent' || st === 'ausente' || !a.check_in) absences[a.student_id].total++;
+    else if (st === 'late' || st === 'tarde') { absences[a.student_id].late++; absences[a.student_id].present++; }
+    else absences[a.student_id].present++;
+    if (a.check_in) {
+      const d = new Date(a.check_in);
+      absences[a.student_id].avgArrival.push(d.getHours() * 60 + d.getMinutes());
+    }
+  });
+
+  // Most absent students
+  if (container) {
+    const sorted = Object.values(absences).sort((a, b) => b.total - a.total).filter(s => s.total > 0);
+    if (!sorted.length) {
+      container.innerHTML = '<div style="text-align:center;padding:32px;color:var(--muted);"><i class="bi bi-check-circle-fill" style="font-size:28px;color:#4ade80;display:block;margin-bottom:8px;"></i>Sin ausencias registradas en 30 días</div>';
+    } else {
+      container.innerHTML = sorted.slice(0, 15).map((s, i) => {
+        const pct = Math.round((s.total / totalDays) * 100);
+        const barColor = pct > 30 ? '#ef4444' : pct > 15 ? '#f59e0b' : '#3b82f6';
+        return `<div style="display:flex;align-items:center;gap:12px;padding:10px 12px;border-bottom:1px solid var(--border);">
+          <div style="width:30px;height:30px;border-radius:50%;background:${barColor};display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:900;color:white;flex-shrink:0;">#${i+1}</div>
+          <div style="flex:1;min-width:0;">
+            <div style="font-size:12px;font-weight:800;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${escH(s.name||'Sin nombre')}</div>
+            <div style="height:5px;background:rgba(255,255,255,.06);border-radius:50px;margin-top:4px;overflow:hidden;">
+              <div style="height:100%;width:${pct}%;background:${barColor};border-radius:50px;transition:width .6s ease;"></div>
+            </div>
+          </div>
+          <div style="text-align:right;flex-shrink:0;">
+            <div style="font-size:14px;font-weight:900;color:${barColor};">${s.total}</div>
+            <div style="font-size:9px;color:var(--muted);">${pct}% ausente</div>
+          </div>
+        </div>`;
+      }).join('');
+    }
+  }
+
+  // Most punctual students
+  if (container2) {
+    const withAvg = Object.values(absences)
+      .filter(s => s.avgArrival.length > 0)
+      .map(s => {
+        const avg = s.avgArrival.reduce((a, b) => a + b, 0) / s.avgArrival.length;
+        return { ...s, avgMinutes: avg, avgTime: `${String(Math.floor(avg / 60)).padStart(2,'0')}:${String(Math.round(avg%60)).padStart(2,'0')}` };
+      })
+      .sort((a, b) => a.avgMinutes - b.avgMinutes);
+
+    if (!withAvg.length) {
+      container2.innerHTML = '<div style="text-align:center;padding:32px;color:var(--muted);">Sin datos de llegada</div>';
+    } else {
+      container2.innerHTML = withAvg.slice(0, 15).map((s, i) => {
+        const rankColors = ['#22c55e', '#4ade80', '#facc15', '#fb923c', '#ef4444'];
+        const color = rankColors[Math.min(i, rankColors.length - 1)];
+        const medal = i === 0 ? '🥇' : i === 1 ? '🥈' : i === 2 ? '🥉' : `#${i+1}`;
+        return `<div style="display:flex;align-items:center;gap:10px;padding:9px 12px;border-bottom:1px solid var(--border);">
+          <div style="width:30px;height:30px;border-radius:50%;background:${color};display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:900;color:white;flex-shrink:0;">${medal}</div>
+          <div style="flex:1;min-width:0;">
+            <div style="font-size:12px;font-weight:800;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${escH(s.name||'Sin nombre')}</div>
+            <div style="font-size:10px;color:var(--muted);">${s.present + s.total} registros · ${s.late} tardíos</div>
+          </div>
+          <div style="font-size:14px;font-weight:900;color:${color};">${s.avgTime}</div>
+        </div>`;
+      }).join('');
+    }
+  }
 }
 
 // ── Analytics: Teacher Efficiency + Login Tracking ────────────────────────────

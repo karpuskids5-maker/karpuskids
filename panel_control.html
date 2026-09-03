@@ -901,18 +901,33 @@
       <div class="kpi-grid" style="grid-template-columns:repeat(auto-fit,minmax(160px,1fr));margin-bottom:16px;">
         <div class="kpi k-blue"><div class="kpi-val" id="chat-convos">—</div><div class="kpi-lbl">Conversaciones</div><i class="bi bi-collection-fill kpi-icon"></i></div>
         <div class="kpi k-indigo"><div class="kpi-val" id="chat-today">—</div><div class="kpi-lbl">Mensajes hoy</div><i class="bi bi-send-fill kpi-icon"></i></div>
-        <div class="kpi k-purple"><div class="kpi-val" id="chat-week">—</div><div class="kpi-lbl">Mensajes (7 días)</div><i class="bi bi-envelope-paper-fill kpi-icon"></i></div>
+        <div class="kpi k-purple"><div class="kpi-val" id="chat-unread-total">—</div><div class="kpi-lbl">Sin leer</div><i class="bi bi-envelope-exclamation-fill kpi-icon"></i></div>
         <div class="kpi k-orange"><div class="kpi-val" id="chat-media">—</div><div class="kpi-lbl">Archivos compartidos</div><i class="bi bi-image-fill kpi-icon"></i></div>
       </div>
       <div class="tab-bar">
-        <button class="tab-btn active" onclick="switchChatTab('messages')"><i class="bi bi-chat-dots"></i> Mensajes</button>
-        <button class="tab-btn" onclick="switchChatTab('conversations')"><i class="bi bi-people"></i> Conversaciones</button>
+        <button class="tab-btn active" onclick="switchChatTab('conversations')"><i class="bi bi-people"></i> Conversaciones</button>
+        <button class="tab-btn" onclick="switchChatTab('messages')"><i class="bi bi-chat-dots"></i> Todos los Mensajes</button>
         <button class="tab-btn" onclick="switchChatTab('media')"><i class="bi bi-image"></i> Fotos y Videos</button>
       </div>
-      <div id="chatTabMessages">
+      <!-- Tab: Conversaciones (principal) -->
+      <div id="chatTabConversations">
+        <div style="display:flex;gap:8px;align-items:center;margin-bottom:12px;flex-wrap:wrap;">
+          <input class="inp inp-search" id="convoSearch" placeholder="Buscar conversación..." style="width:240px;" oninput="filterConversations()">
+          <select class="inp" id="convoFilterType" style="width:160px;" onchange="filterConversations()">
+            <option value="">Todos los tipos</option>
+            <option value="unread">🔴 Sin leer</option>
+            <option value="today">📅 Hoy</option>
+            <option value="media">📷 Con archivos</option>
+          </select>
+          <span id="convoResultCount" style="font-size:11px;color:var(--muted);margin-left:auto;"></span>
+        </div>
+        <div id="convListContainer" style="display:flex;flex-direction:column;gap:6px;max-height:70vh;overflow-y:auto;"></div>
+      </div>
+      <!-- Tab: Todos los mensajes -->
+      <div id="chatTabMessages" style="display:none;">
         <div style="display:flex;flex-wrap:wrap;gap:8px;align-items:center;justify-content:space-between;margin-bottom:12px;">
           <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;">
-            <input class="inp inp-search" id="chatSearch" placeholder="Buscar en mensajes... " style="width:180px;" oninput="filterChat()">
+            <input class="inp inp-search" id="chatSearch" placeholder="Buscar en mensajes..." style="width:180px;" oninput="filterChat()">
             <select class="inp" id="chatSender" style="width:140px;" onchange="filterChat()"></select>
             <select class="inp" id="chatReceiver" style="width:140px;" onchange="filterChat()"></select>
             <select class="inp" id="chatCategory" style="width:150px;" onchange="filterChat()">
@@ -925,30 +940,17 @@
           <button class="btn btn-primary" onclick="exportChatCSV()"><i class="bi bi-download"></i> Exportar CSV</button>
         </div>
         <div id="chatInspectorStrip" style="display:none;gap:8px;flex-wrap:wrap;margin-bottom:10px;"></div>
-        <div class="grid-2" style="margin-bottom:16px;">
-          <div class="panel">
-            <div class="panel-hdr"><h3>Mensajes recientes</h3><span id="chatMsgCount" style="font-size:11px;color:var(--muted);"></span></div>
-            <div style="overflow-x:auto;max-height:420px;">
-              <table class="tbl">
-                <thead><tr><th>Fecha</th><th>De</th><th>Para</th><th>Mensaje</th><th>Estado</th></tr></thead>
-                <tbody id="chatBody"><tr><td colspan="5" style="text-align:center;padding:24px;color:var(--muted);">Cargando...</td></tr></tbody>
-              </table>
-            </div>
-          </div>
-          <div class="panel">
-            <div class="panel-hdr"><h3>Tipo de conversaciones</h3></div>
-            <div class="panel-body" id="convTypeList">
-              <div style="text-align:center;padding:20px;color:var(--muted);font-size:13px;">Cargando...</div>
-            </div>
-          </div>
-        </div>
-      </div>
-      <div id="chatTabConversations" style="display:none;">
         <div class="panel">
-          <div class="panel-hdr"><h3><i class="bi bi-people" style="color:#6366f1;margin-right:6px;"></i>Todas las conversaciones</h3><span id="convoCount" style="font-size:11px;color:var(--muted);"></span></div>
-          <div class="panel-body" id="convListContainer" style="max-height:600px;overflow-y:auto;"></div>
+          <div class="panel-hdr"><h3>Mensajes recientes</h3><span id="chatMsgCount" style="font-size:11px;color:var(--muted);"></span></div>
+          <div style="overflow-x:auto;max-height:520px;">
+            <table class="tbl">
+              <thead><tr><th>Fecha</th><th>De</th><th>Para</th><th>Mensaje</th><th>Estado</th></tr></thead>
+              <tbody id="chatBody"><tr><td colspan="5" style="text-align:center;padding:24px;color:var(--muted);">Cargando...</td></tr></tbody>
+            </table>
+          </div>
         </div>
       </div>
+      <!-- Tab: Fotos y Videos -->
       <div id="chatTabMedia" style="display:none;">
         <div class="panel">
           <div class="panel-hdr"><h3><i class="bi bi-image" style="color:#f97316;margin-right:6px;"></i>Fotos y videos compartidos</h3><span id="chatMediaCount" style="font-size:11px;color:var(--muted);"></span></div>
@@ -984,15 +986,61 @@
          ASISTENCIA
     ══════════════════════════════════════════════════════ -->
     <div class="section" id="sec-asistencia">
-      <div class="panel" style="margin-bottom:16px;">
-        <div class="panel-hdr"><h3><i class="bi bi-graph-up" style="color:#3b82f6;margin-right:6px;"></i>Asistencia últimos 14 días</h3></div>
-        <div class="panel-body"><canvas id="chartAttendance" height="160"></canvas></div>
+      <!-- KPIs Asistencia -->
+      <div class="kpi-grid" style="grid-template-columns:repeat(auto-fit,minmax(160px,1fr));margin-bottom:16px;">
+        <div class="kpi k-green"><div class="kpi-val" id="att-present">—</div><div class="kpi-lbl">Presentes hoy</div><i class="bi bi-check-circle-fill kpi-icon"></i></div>
+        <div class="kpi k-red"><div class="kpi-val" id="att-absent">—</div><div class="kpi-lbl">Ausentes hoy</div><i class="bi bi-x-circle-fill kpi-icon"></i></div>
+        <div class="kpi k-yellow"><div class="kpi-val" id="att-late">—</div><div class="kpi-lbl">Tardíos hoy</div><i class="bi bi-clock-fill kpi-icon"></i></div>
+        <div class="kpi k-blue"><div class="kpi-val" id="att-pending">—</div><div class="kpi-lbl">Sin marcar</div><i class="bi bi-hourglass-split kpi-icon"></i></div>
       </div>
-      <div class="panel">
-        <div class="panel-hdr"><h3>Registros de hoy</h3><span id="attendanceDate" style="font-size:11px;color:var(--muted);"></span></div>
-        <div style="overflow-x:auto;">
-          <table class="tbl"><thead><tr><th>Nombre</th><th>Tipo</th><th>Entrada</th><th>Salida</th><th>Aula</th><th>Estado</th></tr></thead>
-          <tbody id="attendanceBody"><tr><td colspan="6" style="text-align:center;padding:24px;color:var(--muted);">Cargando...</td></tr></tbody></table>
+      <!-- Tabs -->
+      <div class="tab-bar">
+        <button class="tab-btn active" onclick="switchAttendTab('today')"><i class="bi bi-calendar-check"></i> Registros Hoy</button>
+        <button class="tab-btn" onclick="switchAttendTab('absent')"><i class="bi bi-person-x"></i> Ausentes</button>
+        <button class="tab-btn" onclick="switchAttendTab('frequency')"><i class="bi bi-bar-chart-line"></i> Frecuencia</button>
+        <button class="tab-btn" onclick="switchAttendTab('chart')"><i class="bi bi-graph-up"></i> Gráficas</button>
+      </div>
+      <!-- Tab: Registros Hoy -->
+      <div id="attendTabToday">
+        <div class="panel">
+          <div class="panel-hdr"><h3><i class="bi bi-calendar-check" style="color:#22c55e;margin-right:6px;"></i>Registros de hoy</h3><span id="attendanceDate" style="font-size:11px;color:var(--muted);"></span></div>
+          <div style="overflow-x:auto;">
+            <table class="tbl"><thead><tr><th>Nombre</th><th>Aula</th><th>Entrada</th><th>Salida</th><th>Estado</th></tr></thead>
+            <tbody id="attendanceBody"><tr><td colspan="5" style="text-align:center;padding:24px;color:var(--muted);">Cargando...</td></tr></tbody></table>
+          </div>
+        </div>
+      </div>
+      <!-- Tab: Ausentes -->
+      <div id="attendTabAbsent" style="display:none;">
+        <div class="grid-2" style="margin-bottom:16px;">
+          <div class="panel">
+            <div class="panel-hdr"><h3><i class="bi bi-person-x-fill" style="color:#ef4444;margin-right:6px;"></i>Ausentes hoy</h3><span id="absentCount" style="font-size:11px;color:var(--muted);"></span></div>
+            <div class="panel-body" id="absentList" style="max-height:420px;overflow-y:auto;"></div>
+          </div>
+          <div class="panel">
+            <div class="panel-hdr"><h3><i class="bi bi-clock-history" style="color:#f59e0b;margin-right:6px;"></i>Llegadas más tempranas</h3></div>
+            <div class="panel-body" id="earliestList" style="max-height:420px;overflow-y:auto;"></div>
+          </div>
+        </div>
+      </div>
+      <!-- Tab: Frecuencia -->
+      <div id="attendTabFrequency" style="display:none;">
+        <div class="grid-2" style="margin-bottom:16px;">
+          <div class="panel">
+            <div class="panel-hdr"><h3><i class="bi bi-exclamation-triangle-fill" style="color:#ef4444;margin-right:6px;"></i>Más faltistas (últimos 30 días)</h3></div>
+            <div class="panel-body" id="mostAbsentList" style="max-height:420px;overflow-y:auto;"></div>
+          </div>
+          <div class="panel">
+            <div class="panel-hdr"><h3><i class="bi bi-award-fill" style="color:#22c55e;margin-right:6px;"></i>Más puntuales (últimos 30 días)</h3></div>
+            <div class="panel-body" id="mostPunctualList" style="max-height:420px;overflow-y:auto;"></div>
+          </div>
+        </div>
+      </div>
+      <!-- Tab: Gráficas -->
+      <div id="attendTabChart" style="display:none;">
+        <div class="panel" style="margin-bottom:16px;">
+          <div class="panel-hdr"><h3><i class="bi bi-graph-up" style="color:#3b82f6;margin-right:6px;"></i>Asistencia últimos 14 días</h3></div>
+          <div class="panel-body"><canvas id="chartAttendance" height="160"></canvas></div>
         </div>
       </div>
     </div>
@@ -1296,10 +1344,11 @@
   }
   // Tab switching for Chat
   function switchChatTab(tab) {
-    ['messages','conversations','media'].forEach(t => {
-      document.getElementById('chatTab' + t.charAt(0).toUpperCase() + t.slice(1)).style.display = t === tab ? '' : 'none';
+    ['conversations','messages','media'].forEach(t => {
+      const el = document.getElementById('chatTab' + t.charAt(0).toUpperCase() + t.slice(1));
+      if (el) el.style.display = t === tab ? '' : 'none';
     });
-    document.querySelectorAll('#sec-chat .tab-btn').forEach((b,i) => b.classList.toggle('active', ['messages','conversations','media'][i] === tab));
+    document.querySelectorAll('#sec-chat .tab-btn').forEach((b,i) => b.classList.toggle('active', ['conversations','messages','media'][i] === tab));
     if (tab === 'conversations') window.renderChatConversations?.();
     if (tab === 'media') window.renderChatMedia?.();
   }
@@ -1450,10 +1499,11 @@
 
   // Tab switching for Chat
   function switchChatTab(tab) {
-    ['messages','conversations','media'].forEach(t => {
-      document.getElementById('chatTab' + t.charAt(0).toUpperCase() + t.slice(1)).style.display = t === tab ? '' : 'none';
+    ['conversations','messages','media'].forEach(t => {
+      const el = document.getElementById('chatTab' + t.charAt(0).toUpperCase() + t.slice(1));
+      if (el) el.style.display = t === tab ? '' : 'none';
     });
-    document.querySelectorAll('#sec-chat .tab-btn').forEach((b,i) => b.classList.toggle('active', ['messages','conversations','media'][i] === tab));
+    document.querySelectorAll('#sec-chat .tab-btn').forEach((b,i) => b.classList.toggle('active', ['conversations','messages','media'][i] === tab));
     if (tab === 'conversations') window.renderChatConversations?.();
     if (tab === 'media') window.renderChatMedia?.();
   }
