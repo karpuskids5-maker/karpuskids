@@ -48,10 +48,15 @@ export const DashboardModule = {
         const cachedStats = QueryCache.getStale(
           'asis_dashboard_stats',
           async () => {
-            const [studentsRes, attendanceRes, paymentsRes, incomeRes] = await Promise.allSettled([
+            // Auto-detección de ausentes (misma regla: check_in_end + 2h)
+            try { await supabase.rpc('mark_absent_students'); } catch (_) {}
+
+            const [studentsRes, attendanceRes, absentRes, paymentsRes, incomeRes] = await Promise.allSettled([
               supabase.from('students').select('*', { count: 'exact', head: true }),
               supabase.from('attendance').select('*', { count: 'exact', head: true })
                 .eq('date', today).in('status', ['present', 'presente']),
+              supabase.from('attendance').select('*', { count: 'exact', head: true })
+                .eq('date', today).in('status', ['absent', 'ausente']),
               supabase.from('payments').select('*', { count: 'exact', head: true })
                 .in('status', ['pending', 'review']),
               supabase.from('payments').select('amount')
@@ -61,6 +66,7 @@ export const DashboardModule = {
             return {
               studentsCount:   get(studentsRes).count  || 0,
               attendanceCount: get(attendanceRes).count || 0,
+              absentCount:     get(absentRes).count || 0,
               paymentsCount:   get(paymentsRes).count  || 0,
               incomeTotal:     (get(incomeRes).data || []).reduce((s, p) => s + Number(p.amount || 0), 0)
             };
@@ -77,10 +83,11 @@ export const DashboardModule = {
     }
 ,
 
-  _applyStats({ studentsCount, attendanceCount, paymentsCount, incomeTotal }) {
+  _applyStats({ studentsCount, attendanceCount, absentCount, paymentsCount, incomeTotal }) {
     const set = (id, v) => { const el = document.getElementById(id); if (el) el.textContent = v; };
     set('statStudents',   studentsCount);
     set('statAttendance', attendanceCount);
+    set('statAbsent',     absentCount);
     set('statPayments',   paymentsCount);
     set('statIncome',     incomeTotal.toLocaleString('es-DO', { minimumFractionDigits: 2 }));
     set('welcomeName',    (AppState.get('profile')?.name || 'Asistente').split(' ')[0]);

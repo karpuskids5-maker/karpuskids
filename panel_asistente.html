@@ -760,7 +760,7 @@
         </div>
 
         <!-- KPI Cards -->
-        <div class="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+        <div class="grid grid-cols-2 lg:grid-cols-5 gap-4 mb-6">
           <div class="bg-gradient-to-br from-blue-500 to-blue-600 p-5 rounded-2xl shadow-md text-white relative overflow-hidden group cursor-pointer" data-section="estudiantes">
             <div class="relative z-10">
               <div class="flex items-center gap-2 mb-2">
@@ -783,6 +783,18 @@
               <p class="text-xs text-emerald-100 mt-0.5">Presentes hoy</p>
             </div>
             <i data-lucide="calendar-check" class="absolute -bottom-4 -right-4 w-20 h-20 text-white/10 rotate-12 group-hover:scale-110 transition-transform duration-500"></i>
+          </div>
+
+          <div class="bg-gradient-to-br from-rose-500 to-red-600 p-5 rounded-2xl shadow-md text-white relative overflow-hidden group">
+            <div class="relative z-10">
+              <div class="flex items-center gap-2 mb-2">
+                <div class="p-1.5 bg-white/20 rounded-xl"><i data-lucide="user-x" class="w-4 h-4"></i></div>
+                <span class="text-[10px] font-black text-orange-100 uppercase tracking-wider">Ausencias</span>
+              </div>
+              <p class="text-3xl font-black" id="statAbsent">-</p>
+              <p class="text-xs text-orange-100 mt-0.5">Ausentes hoy</p>
+            </div>
+            <i data-lucide="user-minus" class="absolute -bottom-4 -right-4 w-20 h-20 text-white/10 rotate-12 group-hover:scale-110 transition-transform duration-500"></i>
           </div>
 
           <div class="bg-gradient-to-br from-orange-400 to-red-500 p-5 rounded-2xl shadow-md text-white relative overflow-hidden group cursor-pointer" data-section="pagos">

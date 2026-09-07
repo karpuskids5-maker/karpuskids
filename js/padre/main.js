@@ -754,6 +754,10 @@ function renderHomeCards(student, data) {
   };
   const currentAtt = attLabels[todayAtt?.toLowerCase()] || 'Hoy';
 
+  // Estilos según estado de asistencia de hoy (ausente → rojo)
+  const attLower = todayAtt?.toLowerCase();
+  const isAbsentToday = attLower === 'absent' || attLower === 'ausente';
+
   // Iconos como unicode para evitar problemas de encoding
   const ICONS = {
     calendar:  '\uD83D\uDCC5', // 📅
@@ -770,8 +774,8 @@ function renderHomeCards(student, data) {
       value: currentAtt,
       sub: todayAtt ? 'Actualizado' : 'Ver registro',
       icon: ICONS.calendar,
-      color: todayAtt ? 'border-emerald-300' : 'border-emerald-200',
-      iconBg: todayAtt ? 'bg-emerald-500 text-white' : 'bg-emerald-100 text-emerald-700',
+      color: isAbsentToday ? 'border-rose-300 ring-2 ring-rose-200' : (todayAtt ? 'border-emerald-300' : 'border-emerald-200'),
+      iconBg: isAbsentToday ? 'bg-rose-100 text-rose-700' : (todayAtt ? 'bg-emerald-500 text-white' : 'bg-emerald-100 text-emerald-700'),
       target: 'live-attendance'
     },
     {
@@ -1369,7 +1373,9 @@ function setupGlobalListeners() {
       const subEl = attCard.querySelector('p:last-child');
       if (valEl) valEl.textContent = label;
       if (subEl) subEl.textContent = 'Actualizado ahora';
-      attCard.className = attCard.className.replace(/border-\w+-\d+/g, 'border-emerald-300');
+      const absentNow = ['absent', 'ausente'].includes(status?.toLowerCase());
+      attCard.className = attCard.className.replace(/ring-\w+/g, '');
+      attCard.className = attCard.className.replace(/border-\w+-\d+/g, absentNow ? 'border-rose-300 ring-2 ring-rose-200' : 'border-emerald-300');
     }
   });
 }

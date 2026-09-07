@@ -111,6 +111,7 @@ export const updateDashboardStats = (stats = {}) => {
   };
   if (stats.students !== undefined) set('statStudents', stats.students);
   if (stats.present !== undefined) set('statPresent', stats.present);
+  if (stats.absent !== undefined) set('statAbsent', stats.absent);
   if (stats.incidents !== undefined) set('statIncidents', stats.incidents);
   if (stats.classes !== undefined) set('statClasses', stats.classes);
 };

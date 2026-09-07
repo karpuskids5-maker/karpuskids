@@ -52,6 +52,7 @@ export const DashboardService = {
           teachers:        kpis.teachers || 0,
           classrooms:      kpis.classrooms || 0,
           present:         kpis.attendance_today ?? 0,
+          absent:          kpis.absent_today ?? 0,
           attendance:      kpis.attendance_pct || 0,
           pendingInquiries: kpis.inquiries || 0,
           pending_amount:  totalPending,

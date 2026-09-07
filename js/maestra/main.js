@@ -652,6 +652,20 @@ async function initDashboard() {
         .eq('teacher_id', AppState.get('user').id)
     ]);
 
+    // Auto-detección de ausentes en background (check_in_end + 2h)
+    MaestraApi.markAbsentStudents()
+      .then(async (res) => {
+        if ((res.marked || 0) > 0) {
+          const att = await MaestraApi.getAttendance(classroom.id, today);
+          AppState.set('attendance', att || []);
+          UI.updateDashboardStats({
+            present: (att || []).filter(a => ['present', 'late'].includes(a.status)).length,
+            absent: (att || []).filter(a => ['absent', 'ausente'].includes(a.status)).length
+          });
+        }
+      })
+      .catch(() => {});
+
     AppState.set('students', students || []);
     AppState.set('attendance', attendance || []);
 
@@ -659,6 +673,7 @@ async function initDashboard() {
     UI.updateDashboardStats({
       students: students?.length || 0,
       present: (attendance || []).filter(a => ['present', 'late'].includes(a.status)).length,
+      absent: (attendance || []).filter(a => ['absent', 'ausente'].includes(a.status)).length,
       incidents: incidentRes.count || 0,
       classes: classesRes.count || 0
     });

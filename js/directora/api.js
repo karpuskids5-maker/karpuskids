@@ -58,6 +58,9 @@ export const DirectorApi = {
         maxVisibleMonthKey = `${prevY}-${String(prevM).padStart(2, '0')}`;
       }
 
+      // Auto-detección de ausentes antes de medir (check_in_end + 2h)
+      try { await supabase.rpc('mark_absent_students'); } catch (_) {}
+
       const { data: rpcData, error: rpcError } = await supabase.rpc('get_dashboard_kpis', { p_month: monthText || maxVisibleMonthKey });
       
       const { data: pp } = await supabase
@@ -69,6 +72,7 @@ export const DirectorApi = {
         return { 
           data: {
             ...rpcData,
+            absent_today: Number.isFinite(rpcData.absent_today) ? rpcData.absent_today : 0,
             pending_payments: pendingAmount
           }, 
           error: null 
@@ -83,11 +87,12 @@ export const DirectorApi = {
         supabase.from('profiles').select('*', { count: 'exact', head: true }).in('role', ['maestra', 'asistente']),
         supabase.from('classrooms').select('*', { count: 'exact', head: true }),
         supabase.from('attendance').select('*', { count: 'exact', head: true }).eq('date', today).in('status', ['present', 'late']),
+        supabase.from('attendance').select('*', { count: 'exact', head: true }).eq('date', today).in('status', ['absent', 'ausente']),
         supabase.from('inquiries').select('*', { count: 'exact', head: true }).not('status', 'in', '("resolved","closed")')
       ]);
 
       const get = (r) => r.status === 'fulfilled' ? r.value : { count: 0, data: [] };
-      const [totalRes, teachersRes, classroomsRes, attendanceRes, inquiriesRes] = results.map(get);
+      const [totalRes, teachersRes, classroomsRes, attendanceRes, absentRes, inquiriesRes] = results.map(get);
 
       return {
         data: {
@@ -96,6 +101,7 @@ export const DirectorApi = {
           teachers:         teachersRes.count    || 0,
           classrooms:       classroomsRes.count  || 0,
           attendance_today: attendanceRes.count  || 0,
+          absent_today:     absentRes.count      || 0,
           pending_payments: pendingAmount,
           inquiries:        inquiriesRes.count   || 0
         },

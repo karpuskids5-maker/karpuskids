@@ -92,6 +92,10 @@ const DirectorUI = {
     const totalToday   = data?.attendance?.today?.total ?? studentCount;
     Helpers.setTxt('kpiAttendance', presentToday);
 
+    // Ausentes hoy (KPI rojo)
+    const absentToday = data?.attendance?.today?.absent ?? kpis.absent ?? kpis.absent_today ?? 0;
+    Helpers.setTxt('kpiAbsent', absentToday);
+
     // Tasa de asistencia como subtexto
     if (totalToday > 0) {
       const rate = Math.round((presentToday / totalToday) * 100);

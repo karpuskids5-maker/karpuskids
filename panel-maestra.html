@@ -624,7 +624,7 @@
         </header>
 
         <!-- 📊 MÉTRICAS DEL DÍA -->
-        <div class="grid grid-cols-2 md:grid-cols-4 items-stretch gap-3 mb-4">
+        <div class="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-5 items-stretch gap-3 mb-4">
           <!-- Alumnos -->
           <div class="relative overflow-hidden rounded-2xl p-5 shadow-lg flex flex-col justify-between h-full group transition-all hover:-translate-y-0.5 hover:shadow-xl"
                style="background:linear-gradient(135deg,#7c3aed 0%,#4f46e5 60%,#3730a3 100%)">
@@ -690,6 +690,23 @@
             <div class="relative">
               <p class="text-3xl font-black leading-none drop-shadow" id="statPresent">0</p>
               <p class="text-[11px] font-black uppercase tracking-widest text-white/80 mt-1.5">Presentes</p>
+            </div>
+          </div>
+
+          <!-- Ausentes -->
+          <div class="relative overflow-hidden rounded-2xl p-5 shadow-lg flex flex-col justify-between h-full group transition-all hover:-translate-y-0.5 hover:shadow-xl"
+               style="background:linear-gradient(135deg,#f43f5e 0%,#e11d48 60%,#9f1239 100%)">
+            <div class="absolute -right-5 -top-5 w-20 h-20 bg-white/10 rounded-full"></div>
+            <div class="absolute right-8 -bottom-8 w-16 h-16 bg-black/10 rounded-full"></div>
+            <div class="relative flex items-center justify-between mb-3">
+              <div class="w-10 h-10 rounded-xl bg-white/15 backdrop-blur flex items-center justify-center shadow-inner group-hover:scale-110 transition-transform">
+                <i data-lucide="user-minus" class="w-5 h-5 text-white"></i>
+              </div>
+              <span class="text-[9px] font-black uppercase tracking-widest text-white/80 bg-white/10 px-2 py-1 rounded-full">Hoy</span>
+            </div>
+            <div class="relative">
+              <p class="text-3xl font-black leading-none drop-shadow" id="statAbsent">0</p>
+              <p class="text-[11px] font-black uppercase tracking-widest text-white/80 mt-1.5">Ausentes</p>
             </div>
           </div>
         </div>
