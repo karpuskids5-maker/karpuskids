@@ -19,6 +19,7 @@ export const PaymentsModule = {
       const on = (id, ev, fn) => document.getElementById(id)?.addEventListener(ev, fn);
       on('filterPaymentMonth',    'change', () => { this._saveFilters(); this.loadPayments(); });
       on('filterPaymentYear',     'change', () => { this._saveFilters(); this.loadPayments(); });
+      on('filterPaymentConcept', 'change', () => { this._saveFilters(); this.loadPayments(); });
       on('filterPaymentStatus',   'change', () => { this._saveFilters(); this.loadPayments(); });
       on('searchPaymentStudent',  'input',  () => { this._saveFilters(); this.loadPayments(); });
       on('btnNewPayment',         'click',  () => this.openPaymentModal());
@@ -33,10 +34,11 @@ export const PaymentsModule = {
 
   _saveFilters() {
     const filters = {
-      month:  document.getElementById('filterPaymentMonth')?.value,
-      year:   document.getElementById('filterPaymentYear')?.value,
-      status: document.getElementById('filterPaymentStatus')?.value,
-      search: document.getElementById('searchPaymentStudent')?.value
+      month:   document.getElementById('filterPaymentMonth')?.value,
+      year:    document.getElementById('filterPaymentYear')?.value,
+      concept: document.getElementById('filterPaymentConcept')?.value,
+      status:  document.getElementById('filterPaymentStatus')?.value,
+      search:  document.getElementById('searchPaymentStudent')?.value
     };
     sessionStorage.setItem('karpus_payment_filters', JSON.stringify(filters));
   },
@@ -48,10 +50,12 @@ export const PaymentsModule = {
       const filters = JSON.parse(saved);
       const ms = document.getElementById('filterPaymentMonth');
       const ys = document.getElementById('filterPaymentYear');
+      const cs = document.getElementById('filterPaymentConcept');
       const ss = document.getElementById('filterPaymentStatus');
       const qs = document.getElementById('searchPaymentStudent');
       if (ms && filters.month && filters.month !== 'all') ms.value = filters.month;
       if (ys && filters.year)  ys.value = filters.year;
+      if (cs && filters.concept) cs.value = filters.concept;
       if (ss && filters.status) ss.value = filters.status;
       if (qs && filters.search) qs.value = filters.search;
     } catch (_) {}
@@ -98,6 +102,7 @@ export const PaymentsModule = {
     try {
       const mv = document.getElementById('filterPaymentMonth')?.value;
       const yv = document.getElementById('filterPaymentYear')?.value;
+      const cv = document.getElementById('filterPaymentConcept')?.value;
       const sf = document.getElementById('filterPaymentStatus')?.value;
       const sq = document.getElementById('searchPaymentStudent')?.value?.trim();
 
@@ -161,6 +166,18 @@ export const PaymentsModule = {
       if (sq) {
         const query = sq.toLowerCase();
         list = list.filter(p => p.student_name?.toLowerCase().includes(query));
+      }
+
+      if (cv && cv !== 'all') {
+        list = list.filter(p => {
+          const c = (p.concept || '').toLowerCase();
+          if (cv === 'mensualidad') return c.includes('mensualidad') || c.includes('colegiatura') || !c;
+          if (cv === 'inscripcion') return c.includes('inscripci') && !c.includes('reinscripci');
+          if (cv === 'reinscripcion') return c.includes('reinscripci');
+          if (cv === 'tienda') return c.includes('tienda') || c.includes('pedido') || c.includes('uniforme');
+          if (cv === 'especial') return !c.includes('mensualidad') && !c.includes('colegiatura') && !c.includes('inscripci') && !c.includes('tienda');
+          return true;
+        });
       }
 
       AppState.set('paymentsData', list);
@@ -277,8 +294,22 @@ export const PaymentsModule = {
         '</a>'
       : '<span class="text-slate-300 text-xs">-</span>';
 
+    const conceptText = p.concept || 'Mensualidad';
+    let conceptBadge = '<span class="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[9px] font-black uppercase bg-slate-100 text-slate-600"><i data-lucide="calendar" class="w-2.5 h-2.5"></i> ' + Helpers.escapeHTML(conceptText) + '</span>';
+    if (/tienda|pedido|uniforme/i.test(conceptText)) {
+      conceptBadge = '<span class="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[9px] font-black uppercase bg-orange-100 text-orange-700 border border-orange-200"><i data-lucide="shopping-bag" class="w-2.5 h-2.5"></i> ' + Helpers.escapeHTML(conceptText) + '</span>';
+    } else if (/reinscripci/i.test(conceptText)) {
+      conceptBadge = '<span class="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[9px] font-black uppercase bg-indigo-100 text-indigo-700 border border-indigo-200"><i data-lucide="backpack" class="w-2.5 h-2.5"></i> ' + Helpers.escapeHTML(conceptText) + '</span>';
+    } else if (/inscripci/i.test(conceptText)) {
+      conceptBadge = '<span class="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[9px] font-black uppercase bg-emerald-100 text-emerald-700 border border-emerald-200"><i data-lucide="file-text" class="w-2.5 h-2.5"></i> ' + Helpers.escapeHTML(conceptText) + '</span>';
+    } else if (/mensualidad|colegiatura/i.test(conceptText)) {
+      conceptBadge = '<span class="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[9px] font-black uppercase bg-blue-100 text-blue-700 border border-blue-200"><i data-lucide="calendar" class="w-2.5 h-2.5"></i> ' + Helpers.escapeHTML(conceptText) + '</span>';
+    } else {
+      conceptBadge = '<span class="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[9px] font-black uppercase bg-purple-100 text-purple-700 border border-purple-200"><i data-lucide="star" class="w-2.5 h-2.5"></i> ' + Helpers.escapeHTML(conceptText) + '</span>';
+    }
+
     return '<tr class="hover:bg-slate-50 border-b border-slate-100 transition-colors' + (sk === 'overdue' ? ' bg-rose-50/20' : '') + '" data-id="' + p.id + '">' +
-      '<td class="px-6 py-3.5"><div class="flex items-center gap-3"><div class="w-8 h-8 rounded-xl bg-indigo-50 text-indigo-600 flex items-center justify-center font-black text-sm flex-shrink-0">' + Helpers.escapeHTML((stu.name || '?').charAt(0).toUpperCase()) + '</div><div><div class="font-bold text-slate-800 text-sm">' + Helpers.escapeHTML(stu.name || '-') + '</div><div class="text-[10px] text-slate-400 font-bold uppercase">' + (stu.classrooms?.name || 'Sin aula') + '</div></div></div></td>' +
+      '<td class="px-6 py-3.5"><div class="flex items-center gap-3"><div class="w-8 h-8 rounded-xl bg-indigo-50 text-indigo-600 flex items-center justify-center font-black text-sm flex-shrink-0">' + Helpers.escapeHTML((stu.name || '?').charAt(0).toUpperCase()) + '</div><div><div class="font-bold text-slate-800 text-sm flex items-center gap-2">' + Helpers.escapeHTML(stu.name || '-') + ' ' + conceptBadge + '</div><div class="text-[10px] text-slate-400 font-bold uppercase">' + (stu.classrooms?.name || 'Sin aula') + '</div></div></div></td>' +
       '<td class="px-6 py-3.5 text-center"><span class="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[10px] font-black uppercase ' + st.c + '"><i data-lucide="' + st.i + '" class="w-3 h-3"></i>' + st.l + '</span></td>' +
       '<td class="px-6 py-3.5 text-right">' +
       (hasDisc && origAmt > 0 ? '<div class="text-[9px] font-black text-slate-400 line-through">' + 'RD$' + origAmt.toLocaleString('es-DO', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + '</div>' : '') +
@@ -979,8 +1010,25 @@ export const PaymentsModule = {
 
       // Obtener datos del pago para notificar y activar estudiante
       const { data: pay } = await supabase.from('payments')
-        .select('student_id, amount, month_paid, status, students:student_id(name, p1_email, p2_email)')
+        .select('student_id, amount, concept, reference, month_paid, status, students:student_id(name, p1_email, p2_email)')
         .eq('id', id).single();
+
+      // Si el pago corresponde a un pedido de tienda, actualizar el pedido en store_orders
+      if (pay && pay.concept && /tienda|pedido/i.test(pay.concept)) {
+        try {
+          // Extraer ID de pedido si está en reference o concept
+          let orderId = pay.reference;
+          if (!orderId && pay.concept) {
+            const m = pay.concept.match(/#([a-f0-9\-]+)/i);
+            if (m) orderId = m[1];
+          }
+          if (orderId) {
+            await supabase.from('store_orders').update({ status: 'confirmed', updated_at: new Date().toISOString() }).eq('id', orderId);
+          }
+        } catch (stErr) {
+          console.warn('[Payments] No se pudo actualizar orden de tienda:', stErr);
+        }
+      }
 
       // Verificar que la aprobación SÍ persistió (el trigger fn_protect_paid_records
       // con `RETURN OLD` descartaba los UPDATE de pagos no aprobados sin error).
@@ -1274,5 +1322,123 @@ export const PaymentsModule = {
       this.settings.due_day = d;
       Helpers.toast('Configuracion guardada', 'success');
     } catch (e) { Helpers.toast('Error: ' + e.message, 'error'); }
+  },
+
+  async openConceptsModal() {
+    UIHelpers.openModal(`
+      <div class="bg-gradient-to-r from-purple-600 to-indigo-600 text-white p-6 rounded-t-3xl flex items-center justify-between">
+        <div class="flex items-center gap-3">
+          <div class="w-10 h-10 bg-white/20 rounded-xl flex items-center justify-center text-xl">🏷️</div>
+          <div>
+            <h3 class="text-lg font-black">Gestor de Conceptos de Pago</h3>
+            <p class="text-xs text-purple-100 font-medium">Crea y administra conceptos (Mensualidad, Reinscripción, Tienda, etc.)</p>
+          </div>
+        </div>
+        <button onclick="UIHelpers.closeModal()" class="text-white/80 hover:text-white font-bold text-xl">&times;</button>
+      </div>
+      <div class="p-6 bg-slate-50/50 space-y-6" id="conceptsModalContent">
+        <!-- Formulario nuevo concepto -->
+        <div class="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm space-y-3">
+          <h4 class="text-xs font-black uppercase text-slate-500 tracking-wider">Añadir Nuevo Concepto</h4>
+          <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
+            <input id="newConceptName" type="text" placeholder="Nombre (ej. Colegiatura 2026)" class="px-3 py-2 border rounded-xl text-xs font-bold bg-slate-50 outline-none focus:bg-white">
+            <input id="newConceptAmount" type="number" step="0.01" min="0" placeholder="Monto Defecto RD$" class="px-3 py-2 border rounded-xl text-xs font-bold bg-slate-50 outline-none focus:bg-white">
+            <select id="newConceptType" class="px-3 py-2 border rounded-xl text-xs font-bold bg-slate-50 outline-none focus:bg-white">
+              <option value="mensualidad">Mensualidad / Colegiatura</option>
+              <option value="inscripcion">Inscripción</option>
+              <option value="reinscripcion">Reinscripción</option>
+              <option value="tienda">Tienda Escolar</option>
+              <option value="especial" selected>Especial / Evento / Otros</option>
+            </select>
+          </div>
+          <button id="btnCreateConcept" onclick="App.payments.createConcept()" class="w-full py-2 bg-purple-600 text-white rounded-xl font-black text-xs uppercase tracking-wider hover:bg-purple-700 transition-all shadow-sm flex items-center justify-center gap-2">
+            <i data-lucide="plus" class="w-4 h-4"></i> Guardar Concepto
+          </button>
+        </div>
+
+        <!-- Lista de conceptos -->
+        <div>
+          <h4 class="text-xs font-black uppercase text-slate-500 tracking-wider mb-3">Conceptos Registrados</h4>
+          <div id="conceptsListContainer" class="space-y-2 max-h-60 overflow-y-auto pr-1">
+            <p class="text-center text-xs text-slate-400 py-4">Cargando conceptos...</p>
+          </div>
+        </div>
+      </div>
+    `);
+
+    if (window.lucide) lucide.createIcons();
+    await this.loadConceptsList();
+  },
+
+  async loadConceptsList() {
+    const container = document.getElementById('conceptsListContainer');
+    if (!container) return;
+    try {
+      const { data, error } = await supabase.from('payment_concepts').select('*').order('id', { ascending: true });
+      if (error) throw error;
+
+      if (!data || !data.length) {
+        container.innerHTML = `<p class="text-center text-xs text-slate-400 py-4">No hay conceptos registrados aún</p>`;
+        return;
+      }
+
+      container.innerHTML = data.map(c => `
+        <div class="bg-white p-3 rounded-xl border border-slate-100 flex items-center justify-between gap-3 shadow-2xs">
+          <div class="flex items-center gap-3">
+            <span class="w-8 h-8 rounded-lg bg-purple-50 text-purple-600 flex items-center justify-center font-bold text-xs">🏷️</span>
+            <div>
+              <p class="text-xs font-bold text-slate-800">${Helpers.escapeHTML(c.name || c.concept)}</p>
+              <p class="text-[10px] text-slate-400 uppercase font-black">${c.type || 'Especial'} · RD$${Number(c.default_amount || 0).toFixed(2)}</p>
+            </div>
+          </div>
+          <div class="flex items-center gap-2">
+            <button onclick="App.payments.toggleConceptActive(${c.id}, ${!c.is_active})" class="px-2.5 py-1 rounded-lg text-[10px] font-black uppercase ${c.is_active ? 'bg-emerald-50 text-emerald-700 border border-emerald-200' : 'bg-slate-100 text-slate-400'}">
+              ${c.is_active ? 'Activo' : 'Inactivo'}
+            </button>
+          </div>
+        </div>
+      `).join('');
+
+      if (window.lucide) lucide.createIcons();
+    } catch (e) {
+      console.error('Error loading concepts:', e);
+      container.innerHTML = `<p class="text-center text-xs text-rose-500 py-4">Error al cargar conceptos</p>`;
+    }
+  },
+
+  async createConcept() {
+    const name = document.getElementById('newConceptName')?.value?.trim();
+    const amount = parseFloat(document.getElementById('newConceptAmount')?.value || 0);
+    const type = document.getElementById('newConceptType')?.value || 'especial';
+
+    if (!name) return Helpers.toast('Ingresa el nombre del concepto', 'warning');
+
+    try {
+      const { error } = await supabase.from('payment_concepts').insert({
+        name,
+        concept: name,
+        default_amount: amount,
+        type,
+        is_active: true
+      });
+      if (error) throw error;
+      Helpers.toast('Concepto creado correctamente', 'success');
+      document.getElementById('newConceptName').value = '';
+      document.getElementById('newConceptAmount').value = '';
+      await this.loadConceptsList();
+    } catch (e) {
+      Helpers.toast('Error al crear concepto: ' + (e.message || e), 'error');
+    }
+  },
+
+  async toggleConceptActive(id, newStatus) {
+    try {
+      const { error } = await supabase.from('payment_concepts').update({ is_active: newStatus }).eq('id', id);
+      if (error) throw error;
+      Helpers.toast('Estado actualizado', 'success');
+      await this.loadConceptsList();
+    } catch (e) {
+      Helpers.toast('Error al actualizar: ' + (e.message || e), 'error');
+    }
   }
 };

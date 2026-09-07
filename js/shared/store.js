@@ -572,25 +572,82 @@ export async function submitOrder(){
   if(!_cart.length)return;
   const notes=document.getElementById('storeOrderNotes')?.value?.trim()||null;
   const studentId=window.AppState?.get('currentStudent')?.id||null;
+  const totalAmount=_total();
   const btn=document.querySelector('#storeCartModal button[onclick*="submitOrder"]');
   if(btn){btn.disabled=true;btn.textContent='Enviando...';}
   try{
-    const{error}=await supabase.rpc('create_store_order',{
+    const{data, error}=await supabase.rpc('create_store_order',{
       p_student_id:studentId,
       p_items:_cart.map(i=>({product_id:i.product_id,quantity:i.quantity,size_label:i.sz||null})),
       p_notes:notes
     });
     if(error)throw error;
+
     _cart=[];_badge();
     document.getElementById('storeCartModal')?.remove();
     if(window.confetti)confetti({particleCount:100,spread:65,origin:{y:0.6},colors:['#10b981','#84cc16','#f59e0b']});
-    _toast('¡Pedido enviado! La escuela lo confirmará pronto 🎉');
+
+    // Ofrecer redirección modal para ir a pagar a la sección de pagos
+    _showStoreOrderPayModal(data, totalAmount);
+
     await _loadMyOrders();
     await _loadCatalogPadre();
   }catch(e){
     _toast('Error: '+(e.message||''),'error');
     if(btn){btn.disabled=false;btn.innerHTML='<i data-lucide="send" class="w-4 h-4"></i> Enviar Pedido';if(window.lucide)lucide.createIcons();}
   }
+}
+
+function _showStoreOrderPayModal(orderId, totalAmount){
+  const modal=document.createElement('div');
+  modal.id='storeOrderPayModal';
+  modal.className='fixed inset-0 bg-slate-900/60 backdrop-blur-xs z-50 flex items-center justify-center p-4 kk-fade-in';
+  modal.innerHTML=`
+    <div class="bg-white rounded-3xl max-w-md w-full overflow-hidden shadow-2xl p-6 text-center space-y-4">
+      <div class="w-16 h-16 bg-emerald-100 rounded-2xl flex items-center justify-center mx-auto text-3xl">🛒</div>
+      <h3 class="text-xl font-black text-slate-800">¡Pedido Realizado con Éxito!</h3>
+      <p class="text-xs text-slate-500 font-medium">Tu pedido de la Tienda Escolar por <strong class="text-slate-800 font-black">RD$ ${_fmt(totalAmount)}</strong> ha sido registrado.</p>
+
+      <div class="p-4 bg-amber-50 border border-amber-200 rounded-2xl text-left text-xs text-amber-800 font-medium space-y-1">
+        <p class="font-black flex items-center gap-1"><i data-lucide="info" class="w-4 h-4"></i> Adjunta tu comprobante de pago</p>
+        <p>Puedes ir directamente a la sección de pagos para enviar el comprobante de transferencia bancaria y agilizar la entrega.</p>
+      </div>
+
+      <div class="flex flex-col gap-2 pt-2">
+        <button id="btnGoPayStoreOrder" class="w-full py-3 bg-emerald-600 hover:bg-emerald-700 text-white rounded-2xl font-black text-xs uppercase tracking-wider shadow-lg shadow-emerald-200 transition-all flex items-center justify-center gap-2">
+          <i data-lucide="credit-card" class="w-4 h-4"></i> Ir a Pagos y Subir Comprobante
+        </button>
+        <button onclick="document.getElementById('storeOrderPayModal')?.remove()" class="w-full py-2.5 bg-slate-100 text-slate-600 rounded-2xl font-bold text-xs uppercase hover:bg-slate-200 transition-colors">
+          Entendido, Pagaré Más Tarde
+        </button>
+      </div>
+    </div>
+  `;
+  document.body.appendChild(modal);
+  if(window.lucide)lucide.createIcons();
+
+  document.getElementById('btnGoPayStoreOrder')?.addEventListener('click', ()=>{
+    document.getElementById('storeOrderPayModal')?.remove();
+    // Guardar prefill en AppState
+    if(window.AppState){
+      window.AppState.set('paymentPrefill', {
+        amount: totalAmount,
+        concept: 'Pedido Tienda Escolar',
+        orderId: orderId
+      });
+    }
+    // Navegar a la pestaña de pagos si existe el switch
+    const navBtn = document.querySelector('[data-section="pagos"]');
+    if(navBtn) navBtn.click();
+    else {
+      // O scroll a la sección
+      document.getElementById('pagos')?.scrollIntoView({behavior:'smooth'});
+    }
+    // Trigger consume prefill si payments module está activo
+    if(window.PaymentsModule?._consumePrefill){
+      setTimeout(()=>window.PaymentsModule._consumePrefill(), 300);
+    }
+  });
 }
 export function _chQty(cartKey,delta){
   const item=_cart.find(i=>_ckey(i.product_id,i.sz)===cartKey);

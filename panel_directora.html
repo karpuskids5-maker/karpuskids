@@ -1533,7 +1533,10 @@
             <h1 class="text-3xl font-bold text-slate-800 tracking-tight">Gestión Financiera</h1>
             <p class="text-slate-500 font-medium">Control de ingresos, mensualidades y transferencias</p>
           </div>
-          <div>
+          <div class="flex flex-wrap gap-2">
+            <button id="btnManageConcepts" onclick="App.payments.openConceptsModal()" class="px-4 py-3 bg-purple-100 text-purple-700 rounded-xl font-black text-sm uppercase tracking-wider hover:bg-purple-200 transition-all flex items-center gap-2 active:scale-95">
+              <i data-lucide="tags" class="w-5 h-5"></i> Gestor Conceptos
+            </button>
             <button id="btnNewPayment" class="px-6 py-3 bg-indigo-600 text-white rounded-xl font-black text-sm uppercase tracking-wider hover:bg-indigo-700 shadow-lg shadow-indigo-200 transition-all flex items-center gap-2 active:scale-95">
               <i data-lucide="plus-circle" class="w-5 h-5"></i> Registrar Pago
             </button>
@@ -1674,7 +1677,15 @@
                     <option value="2027">2027</option>
                  </select>
                </div>
-               <select id="filterPaymentStatus" class="px-3 py-2 border rounded-xl text-sm bg-slate-50">
+               <select id="filterPaymentConcept" class="px-3 py-2 border rounded-xl text-sm bg-slate-50 font-bold text-slate-700">
+                  <option value="all">Todos los conceptos</option>
+                  <option value="mensualidad">Mensualidad</option>
+                  <option value="inscripcion">Inscripción</option>
+                  <option value="reinscripcion">Reinscripción</option>
+                  <option value="tienda">Tienda Escolar</option>
+                  <option value="especial">Especial / Otros</option>
+               </select>
+               <select id="filterPaymentStatus" class="px-3 py-2 border rounded-xl text-sm bg-slate-50 font-bold text-slate-700">
                   <option value="all">Todos los estados</option>
                   <option value="paid">Aprobados</option>
                   <option value="pending">Pendiente</option>
