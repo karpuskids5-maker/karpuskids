@@ -39,16 +39,40 @@ export const PaymentsModule = {
     if (!prefill?.amount) return;
     AppState.set('paymentPrefill', null);
     const amountInput = document.getElementById('paymentAmount');
+    const conceptSelect = document.getElementById('paymentConcept');
     if (!amountInput) return;
 
     amountInput.value = Number(prefill.amount).toFixed(2);
     amountInput.dispatchEvent(new Event('input', { bubbles: true }));
 
+    if (conceptSelect && prefill.concept) {
+      // Buscar coincidencia o fijar el valor
+      let matched = false;
+      for (let opt of conceptSelect.options) {
+        if (opt.value.toLowerCase().includes(prefill.concept.toLowerCase()) || prefill.concept.toLowerCase().includes(opt.value.toLowerCase())) {
+          conceptSelect.value = opt.value;
+          matched = true;
+          break;
+        }
+      }
+      if (!matched && prefill.concept) {
+        const opt = document.createElement('option');
+        opt.value = prefill.concept;
+        opt.textContent = prefill.concept;
+        opt.selected = true;
+        conceptSelect.appendChild(opt);
+      }
+    }
+
+    if (prefill.orderId) {
+      this._pendingOrderId = prefill.orderId;
+    }
+
     setTimeout(() => {
       document.getElementById('paymentForm')?.scrollIntoView({ behavior: 'smooth', block: 'center' });
       amountInput.classList.add('kk-flash-input');
       setTimeout(() => amountInput.classList.remove('kk-flash-input'), 1700);
-      Helpers.toast('Monto pendiente precargado — solo falta tu comprobante', 'info');
+      Helpers.toast('Monto y concepto precargados — adjunta tu comprobante', 'info');
     }, 350);
   },
 
@@ -615,6 +639,7 @@ export const PaymentsModule = {
     const fileInput = document.getElementById('paymentFileInput');
     const file   = fileInput?.files[0];
     const amount = parseFloat(document.getElementById('paymentAmount')?.value || '0');
+    const concept = document.getElementById('paymentConcept')?.value?.trim() || 'Mensualidad';
     const monthRaw = document.getElementById('paymentMonth')?.value?.trim();
     const method = document.getElementById('paymentMethod')?.value || 'transferencia';
     const bank   = document.getElementById('paymentBank')?.value?.trim() || null;
@@ -693,6 +718,8 @@ export const PaymentsModule = {
             evidence_url: publicUrl,
             proof_url: publicUrl,
             status: 'review', 
+            concept: concept,
+            reference: this._pendingOrderId || null,
             method, 
             bank
           })
@@ -704,6 +731,8 @@ export const PaymentsModule = {
           student_id: student.id, 
           amount, 
           month_paid: month,
+          concept: concept,
+          reference: this._pendingOrderId || null,
           method, 
           bank, 
           evidence_url: publicUrl,
@@ -713,6 +742,7 @@ export const PaymentsModule = {
         });
         if (insertErr) throw insertErr;
       }
+      this._pendingOrderId = null;
       
       this._showSuccessConfirmation(amount, monthRaw, bank);
       setP(100);
