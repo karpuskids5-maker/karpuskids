@@ -1,53 +1,64 @@
 /**
  * 📧 send-email — Edge Function
- * Envía correos via Resend. No depende de _shared/cors.ts.
+ * Envía correos via Resend. Requiere autenticación.
  */
 import { Resend } from "https://esm.sh/resend@2.1.0";
-
-const CORS = {
-  'Access-Control-Allow-Origin':  '*',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type, x-application-name',
-  'Access-Control-Allow-Methods': 'POST, OPTIONS',
-};
+import { getCorsHeaders } from "../_shared/cors.ts";
+import { verifyAuth } from "../_shared/auth.ts";
 
 const RESEND_API_KEY = Deno.env.get('RESEND_API_KEY') ?? '';
 const FROM_ADDRESS   = Deno.env.get('FROM_EMAIL') ?? 'Karpus Kids <avisos@karpuskids.com>';
-
-const json = (data: unknown, status = 200) =>
-  new Response(JSON.stringify(data), {
-    status,
-    headers: { ...CORS, 'Content-Type': 'application/json' },
-  });
+const ALLOWED_ROLES  = ['admin', 'directora', 'asistente'];
 
 Deno.serve(async (req) => {
-  if (req.method === 'OPTIONS') return new Response('ok', { headers: CORS });
+  const cors = getCorsHeaders(req);
+  if (req.method === 'OPTIONS') return new Response('ok', { headers: cors });
 
   try {
+    // ── Auth verification ──────────────────────────────────────────────────
+    const auth = await verifyAuth(req, ALLOWED_ROLES);
+    if (!auth.ok) {
+      return new Response(JSON.stringify({ error: auth.error }), {
+        status: auth.status || 401,
+        headers: { ...cors, 'Content-Type': 'application/json' },
+      });
+    }
+
     const body = await req.json();
     const { to, subject, html, text, attachments } = body;
 
     // Validación de schema
     if (!to || !subject || (!html && !text)) {
-      return json({ error: 'Missing required fields: to, subject, html or text' }, 400);
+      return new Response(JSON.stringify({ error: 'Missing required fields: to, subject, html or text' }), {
+        status: 400, headers: { ...cors, 'Content-Type': 'application/json' },
+      });
     }
     // Validar formato de email
     const toList = Array.isArray(to) ? to : [to];
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
     if (!toList.every(e => typeof e === 'string' && emailRegex.test(e))) {
-      return json({ error: 'Invalid email address in "to" field' }, 400);
+      return new Response(JSON.stringify({ error: 'Invalid email address in "to" field' }), {
+        status: 400, headers: { ...cors, 'Content-Type': 'application/json' },
+      });
     }
     if (typeof subject !== 'string' || subject.length > 500) {
-      return json({ error: 'Invalid subject' }, 400);
+      return new Response(JSON.stringify({ error: 'Invalid subject' }), {
+        status: 400, headers: { ...cors, 'Content-Type': 'application/json' },
+      });
     }
     // Limitar tamaño del body para evitar abuso
     const bodySize = JSON.stringify(body).length;
-    if (bodySize > 500_000) { // 500KB max
-      return json({ error: 'Request body too large' }, 413);
+    if (bodySize > 500_000) {
+      return new Response(JSON.stringify({ error: 'Request body too large' }), {
+        status: 413, headers: { ...cors, 'Content-Type': 'application/json' },
+      });
     }
 
     if (!RESEND_API_KEY) {
       console.error('[send-email] RESEND_API_KEY not configured');
-      return json({ error: 'Email service not configured' }, 500);
+      return new Response(JSON.stringify({ error: 'Email service not configured' }), {
+        status: 500, headers: { ...cors, 'Content-Type': 'application/json' },
+      });
     }
 
     const resend = new Resend(RESEND_API_KEY);
@@ -71,15 +82,21 @@ Deno.serve(async (req) => {
 
     if (error) {
       console.error('[send-email] Resend error:', error);
-      return json({ error: error.message }, 400);
+      return new Response(JSON.stringify({ error: error.message }), {
+        status: 400, headers: { ...cors, 'Content-Type': 'application/json' },
+      });
     }
 
     console.log('[send-email] ✅ Sent:', data?.id, '→', Array.isArray(to) ? `${to.length} recipient(s)` : '1 recipient');
-    return json({ success: true, id: data?.id });
+    return new Response(JSON.stringify({ success: true, id: data?.id }), {
+      headers: { ...cors, 'Content-Type': 'application/json' },
+    });
 
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);
     console.error('[send-email] Unexpected error:', msg);
-    return json({ error: msg }, 500);
+    return new Response(JSON.stringify({ error: 'Internal server error' }), {
+      status: 500, headers: { ...cors, 'Content-Type': 'application/json' },
+    });
   }
 });

@@ -4,34 +4,29 @@
  * Incluye posts generales (classroom_id IS NULL) + posts del aula del estudiante.
  */
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { getCorsHeaders } from "../_shared/cors.ts";
 
-const CORS = {
-  'Access-Control-Allow-Origin':  '*',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type, x-application-name',
-  'Access-Control-Allow-Methods': 'POST, GET, OPTIONS',
-};
-
-const json = (data: unknown, status = 200) =>
+const json = (data: unknown, status = 200, req?: Request) =>
   new Response(JSON.stringify(data), {
     status,
-    headers: { ...CORS, 'Content-Type': 'application/json' },
+    headers: { ...getCorsHeaders(req), 'Content-Type': 'application/json' },
   });
 
 Deno.serve(async (req) => {
-  if (req.method === 'OPTIONS') return new Response('ok', { headers: CORS });
+  if (req.method === 'OPTIONS') return new Response('ok', { headers: getCorsHeaders(req) });
 
   try {
     const SUPABASE_URL = Deno.env.get('SUPABASE_URL') ?? '';
     const SERVICE_KEY  = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '';
 
     if (!SUPABASE_URL || !SERVICE_KEY) {
-      return json({ error: 'Missing SUPABASE_URL or SUPABASE_SERVICE_ROLE_KEY' }, 500);
+      return json({ error: 'Missing SUPABASE_URL or SUPABASE_SERVICE_ROLE_KEY' }, 500, req);
     }
 
     // Verificar autenticación del caller usando el JWT del header
     const authHeader = req.headers.get('Authorization') ?? '';
     if (!authHeader.startsWith('Bearer ')) {
-      return json({ error: 'Missing authorization header' }, 401);
+      return json({ error: 'Missing authorization header' }, 401, req);
     }
 
     // Usar service role para leer sin RLS
@@ -43,7 +38,7 @@ Deno.serve(async (req) => {
     const token = authHeader.replace('Bearer ', '');
     const { data: { user }, error: authErr } = await admin.auth.getUser(token);
     if (authErr || !user) {
-      return json({ error: 'Token inválido' }, 401);
+      return json({ error: 'Token inválido' }, 401, req);
     }
 
     // Parsear classroom_id del body
@@ -75,7 +70,7 @@ Deno.serve(async (req) => {
     const { data: posts, error } = await query;
     if (error) {
       console.error('[get-posts] DB error:', error.message);
-      return json({ error: error.message }, 400);
+      return json({ error: error.message }, 400, req);
     }
 
     // Resolver URLs de media relativas a URLs públicas de Supabase Storage
@@ -94,11 +89,11 @@ Deno.serve(async (req) => {
     });
 
     console.log(`[get-posts] user=${user.id} classroom=${classroomId} posts=${resolvedPosts.length}`);
-    return json({ posts: resolvedPosts });
+    return json({ posts: resolvedPosts }, 200, req);
 
   } catch (e) {
     const msg = e instanceof Error ? e.message : String(e);
     console.error('[get-posts] Fatal:', msg);
-    return json({ error: msg }, 500);
+    return json({ error: msg }, 500, req);
   }
 });

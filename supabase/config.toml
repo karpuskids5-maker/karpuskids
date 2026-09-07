@@ -1,17 +1,53 @@
 [functions.send-push]
-verify_jwt = false
+verify_jwt = true
 
 [functions.process-event]
-verify_jwt = false
+verify_jwt = true
 
 [functions.run-migration]
-verify_jwt = false
+verify_jwt = true
 
 [functions.send-email]
 verify_jwt = true
 
 [functions.process-referral]
-verify_jwt = false
+verify_jwt = true
 
 [functions.upload-receipt]
+verify_jwt = false
+
+[functions.auto-payment-cycle]
+verify_jwt = true
+
+[functions.payment-reminders]
+verify_jwt = true
+
+[functions.admin-reset-password]
+verify_jwt = true
+
+[functions.admin-delete-user]
+verify_jwt = true
+
+[functions.backup-to-sheets]
+verify_jwt = true
+
+[functions.get-posts]
+verify_jwt = true
+
+[functions.exec-sql]
+verify_jwt = true
+
+[functions.create-student-with-parent]
+verify_jwt = true
+
+[functions.resize-image]
+verify_jwt = true
+
+[functions.custom-recovery]
+verify_jwt = false
+
+[functions.kiosk-notify]
+verify_jwt = false
+
+[functions.donation-receipt]
 verify_jwt = false

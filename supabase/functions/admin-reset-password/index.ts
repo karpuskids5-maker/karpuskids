@@ -1,19 +1,14 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { getCorsHeaders } from "../_shared/cors.ts";
 
-const CORS = {
-  'Access-Control-Allow-Origin':  '*',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type, x-application-name',
-  'Access-Control-Allow-Methods': 'POST, OPTIONS',
-};
-
-const json = (data: unknown, status = 200) =>
+const json = (data: unknown, status = 200, req?: Request) =>
   new Response(JSON.stringify(data), {
     status,
-    headers: { ...CORS, 'Content-Type': 'application/json' },
+    headers: { ...getCorsHeaders(req), 'Content-Type': 'application/json' },
   });
 
 Deno.serve(async (req) => {
-  if (req.method === 'OPTIONS') return new Response('ok', { headers: CORS });
+  if (req.method === 'OPTIONS') return new Response('ok', { headers: getCorsHeaders(req) });
 
   try {
     const SUPABASE_URL  = Deno.env.get('SUPABASE_URL')              ?? '';
@@ -25,13 +20,13 @@ Deno.serve(async (req) => {
         hasUrl: !!SUPABASE_URL,
         hasServiceKey: !!SERVICE_KEY,
       });
-      return json({ error: 'Variables de entorno del servidor no configuradas. Verifica SUPABASE_URL y SUPABASE_SERVICE_ROLE_KEY.' }, 500);
+      return json({ error: 'Variables de entorno del servidor no configuradas. Verifica SUPABASE_URL y SUPABASE_SERVICE_ROLE_KEY.' }, 500, req);
     }
 
     // Verify caller is authenticated
     const authHeader = req.headers.get('Authorization') ?? '';
     if (!authHeader) {
-      return json({ error: 'No se proporcionó token de autenticación.' }, 401);
+      return json({ error: 'No se proporcionó token de autenticación.' }, 401, req);
     }
 
     const callerClient = createClient(SUPABASE_URL, ANON_KEY || SERVICE_KEY, {
@@ -40,7 +35,7 @@ Deno.serve(async (req) => {
     });
     const { data: { user: caller }, error: authErr } = await callerClient.auth.getUser();
     if (authErr || !caller) {
-      return json({ error: 'No autenticado. Inicia sesión nuevamente.' }, 401);
+      return json({ error: 'No autenticado. Inicia sesión nuevamente.' }, 401, req);
     }
 
     // Check admin/directora/asistente role
@@ -53,25 +48,25 @@ Deno.serve(async (req) => {
 
     if (profileErr) {
       console.error('[admin-reset-password] Profile query error:', profileErr);
-      return json({ error: 'Error al verificar permisos: ' + profileErr.message }, 500);
+      return json({ error: 'Error al verificar permisos: ' + profileErr.message }, 500, req);
     }
 
     const allowedRoles = ['admin', 'directora', 'asistente'];
     if (!allowedRoles.includes(profile?.role)) {
-      return json({ error: 'Acceso denegado. Solo administradores, directoras o asistentes.' }, 403);
+      return json({ error: 'Acceso denegado. Solo administradores, directoras o asistentes.' }, 403, req);
     }
 
     const body = await req.json().catch(() => null);
     if (!body) {
-      return json({ error: 'Cuerpo de petición inválido.' }, 400);
+      return json({ error: 'Cuerpo de petición inválido.' }, 400, req);
     }
 
     const { user_id, new_password } = body;
     if (!user_id || !new_password) {
-      return json({ error: 'Faltan parámetros requeridos: user_id y new_password.' }, 400);
+      return json({ error: 'Faltan parámetros requeridos: user_id y new_password.' }, 400, req);
     }
     if (new_password.length < 6) {
-      return json({ error: 'La contraseña debe tener al menos 6 caracteres.' }, 400);
+      return json({ error: 'La contraseña debe tener al menos 6 caracteres.' }, 400, req);
     }
 
     // Update password using service role (admin API)
@@ -81,14 +76,14 @@ Deno.serve(async (req) => {
 
     if (updateErr) {
       console.error('[admin-reset-password] Update error:', updateErr);
-      return json({ error: 'Error al actualizar contraseña: ' + updateErr.message }, 400);
+      return json({ error: 'Error al actualizar contraseña: ' + updateErr.message }, 400, req);
     }
 
-    return json({ ok: true, message: 'Contraseña actualizada correctamente', user_id });
+    return json({ ok: true, message: 'Contraseña actualizada correctamente', user_id }, 200, req);
 
   } catch (e) {
     const msg = e instanceof Error ? e.message : String(e);
     console.error('[admin-reset-password] Unexpected error:', msg);
-    return json({ error: 'Error interno del servidor: ' + msg }, 500);
+    return json({ error: 'Error interno del servidor: ' + msg }, 500, req);
   }
 });

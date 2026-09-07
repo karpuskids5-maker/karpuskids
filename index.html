@@ -1605,7 +1605,7 @@
                 </div>
               </div>
             </div>`;
-          client.functions.invoke('send-email', {
+          client.functions.invoke('donation-receipt', {
             body: {
               to: email,
               subject: 'Karpus Kids · Confirmación de donación ' + window.kkReceipt.ref,

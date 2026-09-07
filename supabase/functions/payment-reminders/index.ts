@@ -11,17 +11,15 @@
  */
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { Resend } from "https://esm.sh/resend@2.1.0";
+import { getCorsHeaders } from "../_shared/cors.ts";
+import { verifyAuth } from "../_shared/auth.ts";
 
-const CORS = {
-  'Access-Control-Allow-Origin':  '*',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type, x-application-name',
-  'Access-Control-Allow-Methods': 'POST, OPTIONS',
-};
+const ALLOWED_ROLES = ['admin', 'directora', 'asistente'];
 
-const json = (data: unknown, status = 200) =>
+const json = (data: unknown, status = 200, req?: Request) =>
   new Response(JSON.stringify(data), {
     status,
-    headers: { ...CORS, 'Content-Type': 'application/json' },
+    headers: { ...getCorsHeaders(req), 'Content-Type': 'application/json' },
   });
 
 // Calcula mora: RD$50/día, cada 7 días = bloque de RD$500
@@ -40,15 +38,21 @@ function formatCurrency(n: number): string {
 }
 
 Deno.serve(async (req) => {
-  if (req.method === 'OPTIONS') return new Response('ok', { headers: CORS });
+  if (req.method === 'OPTIONS') return new Response('ok', { headers: getCorsHeaders(req) });
 
   try {
+    // ── Auth verification ──────────────────────────────────────────────────
+    const auth = await verifyAuth(req, ALLOWED_ROLES);
+    if (!auth.ok) {
+      return json({ error: auth.error }, auth.status || 401, req);
+    }
+
     const SUPABASE_URL = Deno.env.get('SUPABASE_URL')              ?? '';
     const SERVICE_KEY  = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '';
     const RESEND_KEY   = Deno.env.get('RESEND_API_KEY')            ?? '';
     const FROM_EMAIL   = Deno.env.get('FROM_EMAIL')                ?? 'Karpus Kids <avisos@karpuskids.com>';
 
-    if (!SUPABASE_URL || !SERVICE_KEY) return json({ error: 'Missing env vars' }, 500);
+    if (!SUPABASE_URL || !SERVICE_KEY) return json({ error: 'Missing env vars' }, 500, req);
 
     const supabase = createClient(SUPABASE_URL, SERVICE_KEY, { auth: { persistSession: false } });
     const resend   = RESEND_KEY ? new Resend(RESEND_KEY) : null;
@@ -110,7 +114,7 @@ Deno.serve(async (req) => {
           .gte('due_date', monthStart)
           .lte('due_date', monthEnd);
 
-        if (e2) return json({ error: e2.message }, 500);
+        if (e2) return json({ error: e2.message }, 500, req);
         allPayments = byDate ?? [];
       }
       updateTimestamp = false; // manual no actualiza last_reminder_sent para no bloquear reenvíos
@@ -135,7 +139,7 @@ Deno.serve(async (req) => {
           .in('status', ['overdue', 'pending'])
           .lte('due_date', in3daysStr);
 
-        if (err2) return json({ error: err2.message }, 500);
+        if (err2) return json({ error: err2.message }, 500, req);
         allPayments = fallback ?? [];
       } else {
         allPayments = data ?? [];
@@ -144,11 +148,11 @@ Deno.serve(async (req) => {
     }
 
     console.log(`[payment-reminders] Found ${allPayments.length} payments to remind`);
-    return await processReminders(supabase, resend, FROM_EMAIL, allPayments, updateTimestamp);
+    return await processReminders(supabase, resend, FROM_EMAIL, allPayments, updateTimestamp, req);
 
   } catch (e) {
     console.error('[payment-reminders] fatal:', e);
-    return json({ error: String(e) }, 500);
+    return json({ error: String(e) }, 500, req);
   }
 });
 
@@ -157,13 +161,10 @@ async function processReminders(
   resend: InstanceType<typeof Resend> | null,
   fromEmail: string,
   payments: Record<string, unknown>[],
-  updateTimestamp: boolean
+  updateTimestamp: boolean,
+  req?: Request
 ): Promise<Response> {
-  const CORS = {
-    'Access-Control-Allow-Origin':  '*',
-    'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type, x-application-name',
-    'Access-Control-Allow-Methods': 'POST, OPTIONS',
-  };
+  const CORS = getCorsHeaders(req);
 
   let emailsSent = 0;
   let pushesSent = 0;

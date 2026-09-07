@@ -29,6 +29,13 @@ let allWallPosts = [];      // Muro Escolar
 let allChatMsgs  = [];      // Chat: mensajes recientes
 let allConvos    = [];      // Chat: conversaciones
 
+// ── Control Total: datos reales de logins, revisión, problemas y donaciones ──
+let _loginStats     = null;  // RPC get_login_stats(): agregado por usuario (7d/30d)
+let _loginSeries    = null;  // RPC get_login_series(): series diarias/horarias
+let _revisionData   = null;  // Pagos en revisión (status='review')
+let _problemasData  = null;  // Incidencias + reportes + consultas abiertas
+let _donacionesData = null;  // Campañas + donaciones recientes
+
 // Feature flags (Módulos y Visibilidad)
 let ffData = null;            // copia editable de los flags
 let ffDirty = false;          // hay cambios sin guardar
@@ -39,9 +46,21 @@ let _clockInterval = null;    // referencia para limpieza de intervalo del reloj
 let _sessionInterval = null;  // referencia para limpieza del refresco periódico de sesión
 let _realtimeChannel = null;  // referencia al canal realtime activo (evita duplicados)
 let _dashRange = 'today';     // filtro temporal activo del dashboard (Hoy/7d/Mes/Año)
+let _loadProb = false;        // evita disparos repetidos de loadProblemasData desde el dashboard
 
 // Roles válidos para asignación (whitelist estricta)
 const VALID_ROLES = ['padre', 'maestra', 'asistente', 'directora', 'admin'];
+
+// Fecha local "YYYY-MM-DD" (Rep. Dominicana) — NO usar toISOString() para "hoy",
+// porque toISOString() es UTC y puede caer en el día anterior cerca de medianoche.
+function localToday() {
+  const d = new Date();
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+}
+function localYYYYMMDD(d = new Date()) {
+  const dd = new Date(d);
+  return `${dd.getFullYear()}-${String(dd.getMonth() + 1).padStart(2, '0')}-${String(dd.getDate()).padStart(2, '0')}`;
+}
 
 // ── Toasts: notificaciones emergentes para cambios administrativos ───────────
 window.showToast = function(msg, type = 'info') {
@@ -275,7 +294,7 @@ document.addEventListener('DOMContentLoaded', async () => {
       clearTimeout(loaderTimeout);
       window._karpusInitializing = false;
       const el = document.getElementById('loader');
-      if (el) el.innerHTML = '<div style="text-align:center;padding:32px;max-width:440px"><div style="font-size:32px;margin-bottom:12px">🔒</div><p style="color:#f87171;font-weight:800;font-size:14px;margin-bottom:8px">Sin perfil configurado</p><p style="color:#94a3b8;font-size:12px;margin-bottom:8px">Tu cuenta no tiene un perfil en la tabla profiles.</p><p style="color:#64748b;font-size:11px;margin-bottom:4px">Email: ' + userEmail + '</p><p style="color:#64748b;font-size:10px;margin-bottom:16px;font-family:monospace">UUID: ' + userId + '</p><div style="background:#1e293b;border:1px solid rgba(99,102,241,.3);border-radius:10px;padding:12px;margin-bottom:16px;text-align:left"><p style="color:#94a3b8;font-size:11px;font-weight:700;margin-bottom:6px">Ejecuta en Supabase SQL Editor:</p><code style="color:#a5b4fc;font-size:10px;line-height:1.6;display:block;white-space:pre-wrap">INSERT INTO public.profiles (id, email, name, role, accepted_terms) VALUES (\'' + userId + '\', \'' + userEmail + '\', \'Administrador\', \'admin\', true) ON CONFLICT (id) DO UPDATE SET role = \'admin\';</code></div><div style="display:flex;gap:8px;justify-content:center;flex-wrap:wrap"><button onclick="window.location.reload()" style="background:#6366f1;color:white;border:none;padding:10px 20px;border-radius:10px;font-weight:800;cursor:pointer;font-size:12px">Reintentar</button><button onclick="window._signOutAndRedirect()" style="background:rgba(255,255,255,.1);color:#94a3b8;border:1px solid rgba(255,255,255,.1);padding:10px 20px;border-radius:10px;font-weight:800;cursor:pointer;font-size:12px">Cerrar Sesión</button></div></div>';
+      if (el) el.innerHTML = '<div style="text-align:center;padding:32px;max-width:440px"><div style="font-size:32px;margin-bottom:12px">🔒</div><p style="color:#f87171;font-weight:800;font-size:14px;margin-bottom:8px">Sin perfil configurado</p><p style="color:#94a3b8;font-size:12px;margin-bottom:8px">Tu cuenta no tiene un perfil en la tabla profiles.</p><p style="color:#64748b;font-size:11px;margin-bottom:4px">Email: ' + escH(userEmail) + '</p><p style="color:#64748b;font-size:10px;margin-bottom:16px;font-family:monospace">UUID: ' + escH(userId) + '</p><div style="background:#1e293b;border:1px solid rgba(99,102,241,.3);border-radius:10px;padding:12px;margin-bottom:16px;text-align:left"><p style="color:#94a3b8;font-size:11px;font-weight:700;margin-bottom:6px">Ejecuta en Supabase SQL Editor:</p><code style="color:#a5b4fc;font-size:10px;line-height:1.6;display:block;white-space:pre-wrap">INSERT INTO public.profiles (id, email, name, role, accepted_terms) VALUES (\'' + escH(userId) + '\', \'' + escH(userEmail) + '\', \'Administrador\', \'admin\', true) ON CONFLICT (id) DO UPDATE SET role = \'admin\';</code></div><div style="display:flex;gap:8px;justify-content:center;flex-wrap:wrap"><button onclick="window.location.reload()" style="background:#6366f1;color:white;border:none;padding:10px 20px;border-radius:10px;font-weight:800;cursor:pointer;font-size:12px">Reintentar</button><button onclick="window._signOutAndRedirect()" style="background:rgba(255,255,255,.1);color:#94a3b8;border:1px solid rgba(255,255,255,.1);padding:10px 20px;border-radius:10px;font-weight:800;cursor:pointer;font-size:12px">Cerrar Sesión</button></div></div>';
       return;
     }
 
@@ -303,7 +322,29 @@ document.addEventListener('DOMContentLoaded', async () => {
       return;
     }
 
-    // ── Paso 5: Mostrar panel ─────────────────────────────────────────────────
+    // ── Paso 5: Suspensión temporal del servicio ──────────────────────────────
+    // Solo el admin (dueño) accede al panel_control durante una suspensión.
+    // Si la directora intenta entrar mientras está suspendido → pantalla de suspensión.
+    let _businessSuspended = false;
+    try {
+      const { data: _susp, error: _suspErr } = await Promise.race([
+        supabase.rpc('is_business_suspended'),
+        new Promise((_, reject) => setTimeout(() => reject(new Error('susp_timeout')), 4000))
+      ]);
+      _businessSuspended = !_suspErr && _susp === true;
+    } catch (_) { _businessSuspended = false; }
+
+    window._businessSuspended = _businessSuspended;
+
+    if (_businessSuspended && userRole !== 'admin') {
+      // Solo el dueño admin gestiona la reactivación; la directora se bloquea igual que el resto.
+      window._karpusSuspensionRedirect = true;
+      await supabase.auth.signOut();
+      window.location.href = 'login.html?reason=suspended';
+      return;
+    }
+
+    // ── Paso 6: Mostrar panel ─────────────────────────────────────────────────
     clearTimeout(loaderTimeout);
     window._karpusInitializing = false;
     currentUser = profile;
@@ -349,6 +390,10 @@ document.addEventListener('DOMContentLoaded', async () => {
 
     await refreshAll();
     _sectionLoadedAt.dashboard = Date.now();
+
+    // Suspensión: estado inicial del banner/tarjeta (solo admin llega a este punto)
+    refreshSuspensionStatus().catch(() => {});
+    startPanelSuspensionWatchdog();
 
     // Restaurar última sección visitada (preferencias persistidas)
     const lastSection = loadPrefs().lastSection;
@@ -399,9 +444,12 @@ const SECTION_LOADERS = {
   usuarios:   [loadUsers],
   muro:       [loadWallPosts, loadClassrooms],
   chat:       [loadChatData],
-  pagos:      [loadPayments],
+  pagos:      [loadPayments, loadRevisionData],
   asistencia: [loadAttendance],
-  analytics:  [loadAudit, loadUsers, loadAttendance, loadPunches],
+  analytics:  [loadAudit, loadUsers, loadAttendance, loadPunches, loadLoginStats],
+  problemas:  [loadProblemasData],
+  donaciones: [loadDonacionesData],
+  monitoreo:  [],
 };
 function _isSectionStale(id) {
   return !_sectionLoadedAt[id] || (Date.now() - _sectionLoadedAt[id]) > STALE_MS;
@@ -430,12 +478,13 @@ window.goTo = async function(id) {
     usuarios:     ['Usuarios', 'Todos los usuarios del sistema'],
     muro:         ['Muro Escolar', 'Publicaciones, reacciones y comentarios'],
     chat:         ['Chat & Mensajería', 'Conversaciones entre padres y personal'],
-    pagos:        ['Pagos', 'Historial financiero completo'],
+    pagos:        ['Pagos', 'Historial financiero y pagos en revisión'],
     asistencia:   ['Asistencia', 'Control de entradas y salidas'],
-    analytics:    ['Analítica', 'Eficiencia de maestros y tráfico de usuarios'],
-    errores:      ['Errores del Sistema', 'Log de errores y excepciones'],
+    analytics:    ['Analítica', 'Eficiencia, logins y actividad de usuarios'],
+    problemas:    ['Problemas e Incidencias', 'Incidentes, reportes y consultas abiertas'],
+    donaciones:   ['Donaciones', 'Campañas, recaudación y aportes pendientes'],
+    monitoreo:    ['Monitoreo del Sistema', 'Estado, seguridad y errores'],
     modulos:      ['Módulos y Visibilidad', 'Control total de módulos por rol y usuario'],
-    seguridad:    ['Seguridad', 'Fuerza bruta y estado del sistema'],
     configuracion:['Configuración', 'Ajustes del panel de control'],
   };
   const [title, sub] = titles[id] || ['Panel', ''];
@@ -453,13 +502,14 @@ window.goTo = async function(id) {
   if (id === 'usuarios')    renderUsers(allUsers);
   if (id === 'muro')        { renderWall(); window.renderWallFeed?.(); }
   if (id === 'chat')        renderChat();
-  if (id === 'pagos')       renderPayments();
+  if (id === 'pagos')       { renderPayments(); renderRevision(); }
   if (id === 'asistencia')  renderAttendance();
-  if (id === 'analytics')   { renderTeacherEfficiency(); renderLoginAnalytics(); renderTrafficAnalytics(); }
-  if (id === 'errores')     renderErrors();
+  if (id === 'analytics')   { renderTeacherEfficiency(); renderLoginAnalytics(); renderTrafficAnalytics(); renderActivity(); }
+  if (id === 'problemas')   renderProblemas();
+  if (id === 'donaciones')  renderDonaciones();
+  if (id === 'monitoreo')   { renderBruteForce(); loadSecurityStats(); loadPaymentAudit(); renderErrors(); }
   if (id === 'modulos')     initModulesUI();
-  if (id === 'configuracion') checkEdgeFunctionsHealth();
-  if (id === 'seguridad')   { renderBruteForce(); loadSecurityStats(); loadPaymentAudit(); }
+  if (id === 'configuracion') { checkEdgeFunctionsHealth(); window.loadBackupStatus?.(); }
 };
 
 // ── Refresh ───────────────────────────────────────────────────────────────────
@@ -468,7 +518,8 @@ window.refreshAll = async function() {
     await Promise.allSettled([
       loadUsers(), loadAudit(), loadPayments(),
       loadAttendance(), loadStudents(), loadClassrooms(), loadPunches(),
-      loadWallPosts(), loadChatData()
+      loadWallPosts(), loadChatData(),
+      loadLoginStats(), loadRevisionData(), loadProblemasData(), loadDonacionesData(),
     ]);
     renderDashboard();
   } catch (err) {
@@ -484,6 +535,7 @@ async function loadUsers() {
       .order('created_at', { ascending: false })
       .limit(300);
     allUsers = data || [];
+    window._allUsers = allUsers;
     const kpi = document.getElementById('kpi-users');
     if (kpi) kpi.textContent = allUsers.length;
     const cfgCount = document.getElementById('cfgUserCount');
@@ -705,15 +757,16 @@ async function loadChatData() {
   try {
     const [msgsRes, convRes] = await Promise.allSettled([
       supabase.from('messages')
-        .select('id, conversation_id, sender_id, sender_name, sender_avatar, receiver_id, content, is_read, read_at, created_at')
+        .select('id, conversation_id, sender_id, sender_name, sender_avatar, receiver_id, content, is_read, read_at, created_at, deleted_at')
         .order('created_at', { ascending: false })
-        .limit(500),
+        .limit(5000),
       supabase.from('conversations')
         .select('id, type, classroom_id, created_at')
         .order('created_at', { ascending: false })
-        .limit(200),
+        .limit(2000),
     ]);
     allChatMsgs = msgsRes.status === 'fulfilled' ? (msgsRes.value.data || []) : [];
+    allChatMsgs = allChatMsgs.filter(m => !m.deleted_at);
     allConvos   = convRes.status === 'fulfilled' ? (convRes.value.data || []) : [];
   } catch (err) {
     logError('panel_control', err?.message || String(err), err?.stack || '', 'loadChatData').catch(() => {});
@@ -732,7 +785,7 @@ const CONVO_TYPE_LABELS = {
 
 function renderChat() {
   const set = (id, v) => { const el = document.getElementById(id); if (el) el.textContent = v; };
-  const todayStr = new Date().toISOString().slice(0, 10);
+  const todayStr = localToday();
   set('chat-convos', allConvos.length);
   set('chat-today', allChatMsgs.filter(m => (m.created_at || '').startsWith(todayStr)).length);
   const unreadTotal = allChatMsgs.filter(m => m.is_read === false).length;
@@ -741,7 +794,7 @@ function renderChat() {
   set('chat-media', mediaCount);
 
   populateChatSelects();
-  filterChat();
+  _applyChatFilter();
   filterConversations();
 }
 
@@ -779,27 +832,35 @@ function _getUserAvatarColor(userId) {
   return colors[Math.abs(hashStr(userId || '')) % colors.length];
 }
 
-function _getConversationPreview(msgs) {
-  const sorted = msgs.sort((a, b) => (b.created_at || '').localeCompare(a.created_at || ''));
-  const last = sorted[0];
-  if (!last) return { text: '', time: '' };
-  const text = last.content || (last.attachment_url ? '📷 Archivo adjunto' : '');
-  const time = last.created_at ? _relativeTime(last.created_at) : '';
-  return { text, time };
+// Nombre legible del remitente/destinatario de un mensaje (profiles > sender_name)
+function _senderLabel(m) {
+  if (!m) return '¿?';
+  const u = m.sender_id ? allUsers.find(x => x.id === m.sender_id) : null;
+  return (u?.name || u?.email || m.sender_name || String(m.sender_id || '').slice(0, 8) || '¿?');
 }
-
-function _relativeTime(dateStr) {
-  const now = Date.now();
-  const then = new Date(dateStr).getTime();
-  const diff = now - then;
-  const mins = Math.floor(diff / 60000);
-  if (mins < 1) return 'ahora';
-  if (mins < 60) return mins + 'm';
-  const hrs = Math.floor(mins / 60);
-  if (hrs < 24) return hrs + 'h';
-  const days = Math.floor(hrs / 24);
-  if (days < 7) return days + 'd';
-  return new Date(dateStr).toLocaleDateString('es-DO', { day: '2-digit', month: 'short' });
+function _receiverLabel(m) {
+  if (!m) return '¿?';
+  const u = m.receiver_id ? allUsers.find(x => x.id === m.receiver_id) : null;
+  return (u?.name || u?.email || m.receiver_name || String(m.receiver_id || '').slice(0, 8) || '¿?');
+}
+// "12 ago · 14:32"
+function _msgTime(m) {
+  if (!m?.created_at) return '';
+  return new Date(m.created_at).toLocaleString('es-DO', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' });
+}
+// "hoy", "ayer" o fecha corta (para el preview)
+function _msgTimeShort(m) {
+  if (!m?.created_at) return '';
+  const d = new Date(m.created_at);
+  const now = new Date();
+  const today = localYYMD(now), day = localYYMD(d), yest = localYYMD(new Date(now.getTime() - 864e5));
+  const hm = d.toLocaleTimeString('es-DO', { hour: '2-digit', minute: '2-digit' });
+  if (today === day) return 'hoy ' + hm;
+  if (yest === day)  return 'ayer ' + hm;
+  return _msgTime(m);
+}
+function localYYMD(d) {
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
 }
 
 window.filterConversations = function() {
@@ -811,13 +872,18 @@ window.filterConversations = function() {
     filtered = filtered.filter(p => {
       const n1 = _getUserName(p.user1).toLowerCase();
       const n2 = _getUserName(p.user2).toLowerCase();
-      const preview = (p.msgs[0]?.content || '').toLowerCase();
-      return n1.includes(q) || n2.includes(q) || preview.includes(q);
+      // Buscar en TODOS los mensajes de la conversación, no solo el último
+      const inMsgs = p.msgs.some(m =>
+        (m.content || '').toLowerCase().includes(q) ||
+        _senderLabel(m).toLowerCase().includes(q) ||
+        _receiverLabel(m).toLowerCase().includes(q)
+      );
+      return n1.includes(q) || n2.includes(q) || inMsgs;
     });
   }
   if (filter === 'unread') filtered = filtered.filter(p => p.unread > 0);
   if (filter === 'today') {
-    const todayStr = new Date().toISOString().slice(0, 10);
+    const todayStr = localToday();
     filtered = filtered.filter(p => p.lastAt?.startsWith(todayStr));
   }
   if (filter === 'media') filtered = filtered.filter(p => p.hasMedia);
@@ -832,7 +898,7 @@ function _renderConversationCards(pairs) {
   const container = document.getElementById('convListContainer');
   if (!container) return;
   const countEl = document.getElementById('convoResultCount');
-  if (countEl) countEl.textContent = pairs.length + ' conversaciones';
+  if (countEl) countEl.textContent = pairs.length + ' conversaciones · ' + allChatMsgs.length + ' mensajes';
   if (!pairs.length) {
     container.innerHTML = '<div style="text-align:center;padding:48px 20px;color:var(--muted);"><i class="bi bi-chat-square-dots" style="font-size:36px;display:block;margin-bottom:10px;opacity:.4;"></i><div style="font-size:13px;font-weight:700;">Sin conversaciones</div><div style="font-size:11px;margin-top:4px;">No se encontraron conversaciones con los filtros seleccionados</div></div>';
     return;
@@ -844,43 +910,51 @@ function _renderConversationCards(pairs) {
     const r2 = _getUserRole(p.user2);
     const c1 = _getUserAvatarColor(p.user1);
     const c2 = _getUserAvatarColor(p.user2);
-    const { text, time } = _getConversationPreview(p.msgs);
     const hasUnread = p.unread > 0;
     const roleBadgeColors = { padre: 'badge-blue', maestra: 'badge-green', directora: 'badge-orange', asistente: 'badge-purple', admin: 'badge-yellow' };
     const rb1 = roleBadgeColors[r1] || 'badge-gray';
     const rb2 = roleBadgeColors[r2] || 'badge-gray';
-    const sensitiveHits = p.msgs.some(m => findSensitiveHits(m.content).length > 0);
+    const nBadge1 = r1 ? `<span class="badge ${rb1}" style="font-size:7px;">${escH(r1)}</span>` : '';
+    const nBadge2 = r2 ? `<span class="badge ${rb2}" style="font-size:7px;">${escH(r2)}</span>` : '';
 
-    return `<div class="convo-card" onclick="viewThread('${p.user1}','${p.user2}')" style="cursor:pointer;${hasUnread ? 'border-color:rgba(99,102,241,.35);background:rgba(99,102,241,.06);' : ''}">
+    // Últimos 3 mensajes de la conversación (p.msgs viene en orden descendente)
+    const history = p.msgs.slice(0, 3).map(mh => {
+      const sm = mh.sender_id === p.user1 ? n1 : (_getUserName(mh.sender_id) || mh.sender_name || '¿?');
+      const txt = mh.content || (mh.attachment_url ? '📷 Archivo adjunto' : '');
+      return `
+        <div style="display:flex;align-items:baseline;gap:6px;padding:2px 0;">
+          <span style="font-size:9px;font-weight:900;color:${mh.sender_id === p.user1 ? '#a5b4fc' : '#86efac'};white-space:nowrap;">${escH(sm)}</span>
+          <span style="flex:1;min-width:0;font-size:11px;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${renderSensitiveText(txt)}</span>
+          <span style="font-size:9px;color:var(--muted);white-space:nowrap;">${_msgTimeShort(mh)}</span>
+        </div>`;
+    }).join('');
+
+    return `<div class="convo-card" onclick="viewThread('${p.user1}','${p.user2}')" style="cursor:pointer;align-items:flex-start;${hasUnread ? 'border-color:rgba(99,102,241,.35);background:rgba(99,102,241,.06);' : ''}">
       <!-- Avatars -->
       <div style="position:relative;flex-shrink:0;">
-        <div class="convo-avatar" style="background:${c1};width:44px;height:44px;font-size:17px;">${(n1[0]||'?').toUpperCase()}</div>
+        <div class="convo-avatar" style="background:${c1};width:46px;height:46px;font-size:17px;">${(n1[0]||'?').toUpperCase()}</div>
         <div class="convo-avatar" style="background:${c2};width:32px;height:32px;font-size:13px;position:absolute;bottom:-4px;right:-8px;border:2px solid var(--surface);">${(n2[0]||'?').toUpperCase()}</div>
       </div>
-      <!-- Info -->
+      <!-- Contenido -->
       <div class="convo-meta" style="flex:1;min-width:0;">
-        <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;">
-          <span class="convo-name" style="font-size:13px;">${escH(n1)}</span>
-          <span class="badge ${rb1}" style="font-size:7px;">${escH(r1)}</span>
-          <span style="color:var(--muted);font-size:10px;">↔</span>
-          <span class="convo-name" style="font-size:13px;">${escH(n2)}</span>
-          <span class="badge ${rb2}" style="font-size:7px;">${escH(r2)}</span>
+        <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;">
+          <div style="display:flex;align-items:center;gap:5px;flex-wrap:wrap;min-width:0;">
+            <span class="convo-name">${escH(n1)}</span>${nBadge1}
+            <span style="color:var(--muted);font-size:11px;">↔</span>
+            <span class="convo-name">${escH(n2)}</span>${nBadge2}
+          </div>
+          <div style="display:flex;align-items:center;gap:6px;flex-shrink:0;">
+            <span style="font-size:10px;color:var(--muted);white-space:nowrap;">${escH(p.msgs.length)} msg</span>
+            <div class="convo-count" style="background:${hasUnread ? 'rgba(99,102,241,.18)' : 'rgba(255,255,255,.05)'};color:${hasUnread ? 'var(--accent)' : 'var(--muted)'};">${hasUnread ? p.unread + ' sin leer' : p.count}</div>
+          </div>
         </div>
-        <div style="display:flex;align-items:center;gap:6px;margin-top:3px;">
-          <div class="convo-preview" style="flex:1;font-size:11px;color:var(--muted);">${escH(text.slice(0, 70))}${text.length > 70 ? '...' : ''}</div>
-          <span style="font-size:10px;color:var(--muted);white-space:nowrap;">${time}</span>
-        </div>
-        <!-- Tags -->
-        <div style="display:flex;gap:4px;margin-top:4px;flex-wrap:wrap;">
+        <div class="convo-preview-wrap" style="padding:3px 0 0;">${history}</div>
+        <div style="display:flex;gap:4px;margin-top:6px;flex-wrap:wrap;">
           ${hasUnread ? `<span class="badge badge-red" style="font-size:8px;padding:2px 7px;"><i class="bi bi-envelope-fill" style="font-size:7px;"></i> ${p.unread} sin leer</span>` : ''}
-          ${sensitiveHits ? '<span class="badge badge-yellow" style="font-size:8px;padding:2px 7px;"><i class="bi bi-exclamation-triangle-fill" style="font-size:7px;"></i> Sensible</span>' : ''}
+          ${p.msgs.some(m => findSensitiveHits(m.content).length > 0) ? '<span class="badge badge-yellow" style="font-size:8px;padding:2px 7px;"><i class="bi bi-exclamation-triangle-fill" style="font-size:7px;"></i> Sensible</span>' : ''}
           ${p.hasMedia ? '<span class="badge badge-purple" style="font-size:8px;padding:2px 7px;"><i class="bi bi-image" style="font-size:7px;"></i> Archivos</span>' : ''}
+          <button class="btn btn-ghost" style="margin-left:auto;padding:3px 10px;font-size:10px;" onclick="event.stopPropagation();viewThread('${p.user1}','${p.user2}')"><i class="bi bi-eye-fill"></i> Ver hilo (${p.msgs.length})</button>
         </div>
-      </div>
-      <!-- Count badge -->
-      <div style="display:flex;flex-direction:column;align-items:center;gap:4px;flex-shrink:0;">
-        <div style="font-size:13px;font-weight:900;color:${hasUnread ? 'var(--accent)' : 'var(--muted)'};background:${hasUnread ? 'rgba(99,102,241,.12)' : 'rgba(255,255,255,.04)'};padding:4px 10px;border-radius:50px;min-width:36px;text-align:center;">${p.count}</div>
-        <div style="font-size:8px;color:var(--muted);">msgs</div>
       </div>
     </div>`;
   }).join('');
@@ -911,7 +985,7 @@ function hashStr(s) {
 }
 
 async function loadAttendance() {
-  const today = new Date().toISOString().split('T')[0];
+  const today = localToday();
   try {
     const { data, error } = await supabase
       .from('attendance')
@@ -965,6 +1039,20 @@ async function renderDashboard() {
     const lblRev = document.querySelector('#kpi-revenue + .kpi-lbl');
     if (lblPay) lblPay.textContent = `Pagos (${rl})`;
     if (lblRev) lblRev.textContent = `Ingresos (${rl})`;
+
+    // Control total en el dashboard: pagos en revisión + problemas abiertos
+    const reviewCount = allPayments.filter(p => (p.status || '').toLowerCase() === 'review').length;
+    const kpiReview = document.getElementById('kpi-review');
+    if (kpiReview) kpiReview.textContent = reviewCount;
+    const kpiProblemas = document.getElementById('kpi-problemas');
+    if (kpiProblemas && _problemasData) kpiProblemas.textContent = _problemasData.total;
+    if (!_problemasData && !_loadProb) {
+      _loadProb = true;
+      loadProblemasData().then(() => {
+        const el = document.getElementById('kpi-problemas');
+        if (el) el.textContent = (_problemasData?.total ?? '—');
+      });
+    }
     // Sincronizar botones del selector de rango
     document.querySelectorAll('.dash-range').forEach(b => b.classList.toggle('active', b.dataset.range === _dashRange));
     detectFraud();
@@ -1030,7 +1118,7 @@ window.App.resetState = async function() {
   await refreshAll();
   if (_sectionActive('auditoria'))  renderAuditTable(allAudit);
   if (_sectionActive('usuarios'))   renderUsers(allUsers);
-  if (_sectionActive('pagos'))      renderPayments();
+  if (_sectionActive('pagos'))      { renderPayments(); renderRevision(); }
   if (_sectionActive('asistencia')) renderAttendance();
 };
 
@@ -1038,18 +1126,22 @@ window.App.resetState = async function() {
 let chartActivity = null, chartRoles = null, chartPaymentsChart = null, chartAttendChart = null;
 
 // Espera pasiva por Chart.js (se carga con defer y puede llegar después del módulo)
+let _chartWaiters = [];
 let _chartWaiter = null;
 function onChartReady(cb) {
   if (typeof window.Chart !== 'undefined') { cb(); return; }
+  _chartWaiters.push(cb);
   if (_chartWaiter) return; // ya hay una espera en curso
   let tries = 0;
   _chartWaiter = setInterval(() => {
     tries++;
     if (typeof window.Chart !== 'undefined') {
       clearInterval(_chartWaiter); _chartWaiter = null;
-      cb();
+      const queue = _chartWaiters; _chartWaiters = [];
+      queue.forEach(f => { try { f(); } catch (_) {} });
     } else if (tries > 40) { // ~10s máximo, luego desistir en silencio
       clearInterval(_chartWaiter); _chartWaiter = null;
+      _chartWaiters = [];
     }
   }, 250);
 }
@@ -1063,26 +1155,29 @@ function renderCharts() {
     if (actCtx) {
       if (chartActivity) chartActivity.destroy();
       try {
-        // Actividad real: logins por rol en los últimos 7 días (desde audit_logs)
+        // Actividad real: logins por rol en los últimos 7 días (login_attempts vía RPC)
+        if (!_loginStats) loadLoginStats().then(() => renderCharts());
         const days7 = Array.from({ length: 7 }, (_, i) => {
           const d = new Date(); d.setDate(d.getDate() - (6 - i));
-          return d.toISOString().slice(0, 10);
+          return localYYYYMMDD(d);
         });
         const roleDefs = [
           ['padre', 'Padres', '#6366f1'],
           ['maestra', 'Maestras', '#22c55e'],
           ['directora', 'Directoras', '#f97316'],
+          ['asistente', 'Asistentes', '#3b82f6'],
         ];
+        const daily = (_loginSeries?.daily || []).reduce((acc, d) => {
+          const k = (d.day || '') + '|' + (d.rol || '');
+          acc[k] = (acc[k] || 0) + (d.count || 0);
+          return acc;
+        }, {});
         const datasets = roleDefs.map(([role, label, color]) => ({
           label,
           backgroundColor: color,
           borderRadius: 6,
           barThickness: 12,
-          data: days7.map(d => allAudit.filter(a =>
-            (a.action || '').toLowerCase().includes('login') &&
-            (a.created_at || '').startsWith(d) &&
-            (allUsers.find(u => u.id === a.user_id)?.role === role)
-          ).length)
+          data: days7.map(d => daily[d + '|' + role] || 0)
         }));
         chartActivity = new Chart(actCtx, {
           type: 'bar',
@@ -1241,7 +1336,7 @@ function detectFraud() {
   });
   allPayments.forEach(p => {
     if (Number(p.amount || 0) > 50000) {
-      fraudEvents.push({ type: 'Pago inusual', user: p.students?.p1_name || p.students?.name || '—', detail: `Monto: ${fmtMoney(p.amount)}`, risk: 'alto', date: p.created_at });
+      fraudEvents.push({ type: 'Pago inusual', user: p.student?.p1_name || p.student?.name || '—', detail: `Monto: ${fmtMoney(p.amount)}`, risk: 'alto', date: p.created_at });
     }
   });
   const payKey = {};
@@ -1616,7 +1711,7 @@ window.switchAttendTab = function(tab) {
 };
 
 function renderAttendance() {
-  const today = new Date().toISOString().split('T')[0];
+  const today = localToday();
   document.getElementById('attendanceDate').textContent = new Date().toLocaleDateString('es-DO', { dateStyle: 'full' });
 
   // ── KPIs de hoy ──
@@ -1667,7 +1762,7 @@ function renderAttendance() {
   // ── Tab: Gráficas ──
   const days = Array.from({ length: 14 }, (_, i) => {
     const d = new Date(); d.setDate(d.getDate() - (13 - i));
-    return d.toISOString().split('T')[0];
+    return localYYYYMMDD(d);
   });
   const counts = days.map(d => allAttend.filter(a => a.date === d).length);
   const drawAttendChart = () => {
@@ -1751,7 +1846,7 @@ function renderFrequencyStats() {
   if (!container && !container2) return;
 
   // Calculate attendance frequency per student (last 30 days)
-  const since30 = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
+  const since30 = localYYYYMMDD(new Date(Date.now() - 30 * 24 * 60 * 60 * 1000));
   const activeStudents = allStudents.filter(s => s.is_active);
 
   // Get unique school days in last 30 days
@@ -1929,58 +2024,49 @@ window.renderTeacherEfficiency = function() {
 
 // Login analytics from audit_logs
 window.renderLoginAnalytics = function() {
-  const since7 = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString();
-  const loginLogs = allAudit.filter(a => (a.action || '').toLowerCase().includes('login') && (a.created_at || '') >= since7);
+  const stats  = _loginStats;
+  const series = _loginSeries;
 
-  // KPI: logins today
-  const todayStr = new Date().toISOString().slice(0, 10);
-  const todayLogins = loginLogs.filter(l => (l.created_at || '').startsWith(todayStr));
+  // KPI: logins hoy (data real de login_attempts vía RPC, o fallback de auditoría)
   const kpiEl = document.getElementById('an-logins-today');
-  if (kpiEl) kpiEl.textContent = todayLogins.length;
+  if (kpiEl) kpiEl.textContent = stats?.totals?.logins_today ?? 0;
 
-  // Per-user login count (7 days)
-  const userLogins = {};
-  loginLogs.forEach(l => {
-    if (!l.user_id) return;
-    if (!userLogins[l.user_id]) userLogins[l.user_id] = { count: 0, last: l.created_at, hours: {} };
-    userLogins[l.user_id].count++;
-    if (l.created_at > userLogins[l.user_id].last) userLogins[l.user_id].last = l.created_at;
-    const h = new Date(l.created_at).getHours();
-    userLogins[l.user_id].hours[h] = (userLogins[l.user_id].hours[h] || 0) + 1;
-  });
-
-  // Table
-  const tbody = document.getElementById('loginUserBody');
+  const tbody   = document.getElementById('loginUserBody');
   const countEl = document.getElementById('loginUserCount');
-  if (tbody) {
-    const sorted = Object.entries(userLogins).sort((a, b) => b[1].count - a[1].count);
-    if (countEl) countEl.textContent = sorted.length + ' usuarios activos (7d)';
-    tbody.innerHTML = sorted.map(([uid, stats]) => {
-      const user = allUsers.find(u => u.id === uid);
-      const name = user?.name || '—';
-      const role = user?.role || '—';
-      const roleBadge = { padre: 'badge-blue', maestra: 'badge-green', directora: 'badge-orange', asistente: 'badge-purple', admin: 'badge-yellow' };
-      const peakHour = Object.entries(stats.hours || {}).sort((a, b) => b[1] - a[1])[0];
-      const peakLabel = peakHour ? `${String(peakHour[0]).padStart(2, '0')}:00` : '—';
-      const lastTime = stats.last ? new Date(stats.last).toLocaleString('es-DO', { dateStyle: 'short', timeStyle: 'short' }) : '—';
-      return `<tr>
-        <td style="font-weight:800;">${escH(name)}</td>
-        <td><span class="badge ${roleBadge[role] || 'badge-gray'}">${role}</span></td>
-        <td style="font-weight:900;color:#6366f1;">${stats.count}</td>
-        <td style="font-size:11px;color:var(--muted);">${lastTime}</td>
-        <td><span class="badge badge-indigo" style="background:rgba(99,102,241,.15);color:#a5b4fc;">🕐 ${peakLabel}</span></td>
-      </tr>`;
-    }).join('') || '<tr><td colspan="5" style="text-align:center;padding:24px;color:var(--muted);">Sin logins en 7 días</td></tr>';
-  }
+  if (!tbody) { _setLoginFallbackHint(); return; }
 
-  // Chart: logins by day (7d) per role
+  const roleBadge = { padre: 'badge-blue', maestra: 'badge-green', directora: 'badge-orange', asistente: 'badge-purple', admin: 'badge-yellow' };
+  const users = (stats?.users || []).slice().sort((a, b) => (b.l30 || 0) - (a.l30 || 0) || (b.l7 || 0) - (a.l7 || 0));
+
+  const active7  = users.filter(u => (u.l7 || 0) > 0).length;
+  const active30 = users.filter(u => (u.l30 || 0) > 0).length;
+  if (countEl) countEl.textContent = `${active30} usuarios activos (mes) · ${active7} (semana)`;
+
+  tbody.innerHTML = users.length ? users.map((u, i) => {
+    const top = i === 0 && (u.l30 || 0) > 0;
+    return `<tr style="${top ? 'background:rgba(99,102,241,.06);' : ''}">
+      <td style="font-weight:800;">${top ? '🏆&nbsp;' : ''}${escH(u.name || u.email || '—')}</td>
+      <td><span class="badge ${roleBadge[u.role] || 'badge-gray'}">${escH(u.role || '—')}</span></td>
+      <td style="font-weight:900;color:#6366f1;">${u.l7 || 0}</td>
+      <td style="font-weight:900;color:#8b5cf6;">${u.l30 || 0}</td>
+      <td style="font-size:11px;color:var(--muted);">${u.last_login ? new Date(u.last_login).toLocaleString('es-DO', { dateStyle: 'short', timeStyle: 'short' }) : '—'}</td>
+      <td><span class="badge badge-indigo" style="background:rgba(99,102,241,.15);color:#a5b4fc;">🕐 ${u.peak_hour != null ? String(u.peak_hour).padStart(2, '0') + ':00' : '—'}</span></td>
+    </tr>`;
+  }).join('') : '<tr><td colspan="6" style="text-align:center;padding:24px;color:var(--muted);">Sin logins registrados en el último mes</td></tr>';
+
+  // Heatmap: logins por día y rol (últimos 7 días) — data real
   const canvas = document.getElementById('chartLoginHeat');
   if (canvas && typeof Chart !== 'undefined') {
     const ctx = canvas.getContext('2d');
     if (ctx) {
       if (_chartLoginHeat) _chartLoginHeat.destroy();
-      const days7 = Array.from({ length: 7 }, (_, i) => { const d = new Date(); d.setDate(d.getDate() - (6 - i)); return d.toISOString().slice(0, 10); });
-      const roleDefs = [['padre', 'Padres', '#6366f1'], ['maestra', 'Maestras', '#22c55e'], ['directora', 'Directoras', '#f97316']];
+      const days7 = Array.from({ length: 7 }, (_, i) => { const d = new Date(); d.setDate(d.getDate() - (6 - i)); return localYYYYMMDD(d); });
+      const roleDefs = [['padre','Padres','#6366f1'],['maestra','Maestras','#22c55e'],['directora','Directoras','#f97316'],['asistente','Asistentes','#3b82f6']];
+      const daily = (series?.daily || []).reduce((acc, d) => {
+        const k = (d.day || '') + '|' + (d.rol || '');
+        acc[k] = (acc[k] || 0) + (d.count || 0);
+        return acc;
+      }, {});
       try {
         _chartLoginHeat = new Chart(ctx, {
           type: 'bar',
@@ -1988,7 +2074,7 @@ window.renderLoginAnalytics = function() {
             labels: days7.map(d => d.slice(5)),
             datasets: roleDefs.map(([role, label, color]) => ({
               label, backgroundColor: color, borderRadius: 6, barThickness: 14,
-              data: days7.map(d => loginLogs.filter(l => (l.created_at || '').startsWith(d) && allUsers.find(u => u.id === l.user_id)?.role === role).length)
+              data: days7.map(d => daily[d + '|' + role] || 0)
             }))
           },
           options: { responsive: true, plugins: { legend: { position: 'bottom', labels: { color: '#94a3b8', font: { size: 10 }, usePointStyle: true } } }, scales: { x: { stacked: true, grid: { display: false }, ticks: { color: '#94a3b8' } }, y: { stacked: true, beginAtZero: true, ticks: { precision: 0, color: '#94a3b8' }, grid: { color: 'rgba(255,255,255,.05)' } } } }
@@ -1996,29 +2082,27 @@ window.renderLoginAnalytics = function() {
       } catch (_) {}
     }
   }
+  _setLoginFallbackHint();
 };
 
 // Traffic analytics: logins by hour of day
 window.renderTrafficAnalytics = function() {
-  const since7 = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString();
-  const loginLogs = allAudit.filter(a => (a.action || '').toLowerCase().includes('login') && (a.created_at || '') >= since7);
+  const stats  = _loginStats;
+  const series = _loginSeries;
 
-  // Peak hour
-  const hourCounts = {};
-  for (let h = 0; h < 24; h++) hourCounts[h] = 0;
-  loginLogs.forEach(l => {
-    const h = new Date(l.created_at).getHours();
-    hourCounts[h] = (hourCounts[h] || 0) + 1;
-  });
-  const peakHour = Object.entries(hourCounts).sort((a, b) => b[1] - a[1])[0];
+  // Hora pico (7d reales)
+  const peak = stats?.totals?.peak_hour;
   const kpiEl = document.getElementById('an-peak-hour');
-  if (kpiEl) kpiEl.textContent = peakHour ? `${String(peakHour[0]).padStart(2, '0')}:00` : '—';
+  if (kpiEl) kpiEl.textContent = peak != null ? `${String(peak).padStart(2, '0')}:00` : '—';
 
-  // KPI: active now (last 30 min)
-  const now30m = new Date(Date.now() - 30 * 60 * 1000).toISOString();
-  const activeNow = allAudit.filter(a => (a.action || '').toLowerCase().includes('login') && (a.created_at || '') >= now30m);
+  // KPI: actividad de la hora actual del día
+  const nowHour = new Date().getHours();
+  const hourToday = (series?.hourly_today || []).find(h => h.hour === nowHour);
   const kpiActive = document.getElementById('an-active-now');
-  if (kpiActive) kpiActive.textContent = new Set(activeNow.map(a => a.user_id)).size;
+  if (kpiActive) kpiActive.textContent = hourToday?.count ?? 0;
+
+  const hourSeries = series?.hourly || Array.from({ length: 24 }, (_, i) => ({ hour: i, count: 0 }));
+  const hourArr = Array.from({ length: 24 }, (_, i) => hourSeries.find(h => h.hour === i)?.count || 0);
 
   // Traffic chart
   const canvas = document.getElementById('chartTraffic');
@@ -2034,7 +2118,7 @@ window.renderTrafficAnalytics = function() {
             labels,
             datasets: [{
               label: 'Logins',
-              data: labels.map((_, i) => hourCounts[i] || 0),
+              data: hourArr,
               borderColor: '#f97316',
               backgroundColor: 'rgba(249,115,22,.1)',
               fill: true, tension: .4, pointRadius: 3, pointBackgroundColor: '#f97316'
@@ -2046,41 +2130,429 @@ window.renderTrafficAnalytics = function() {
     }
   }
 
-  // Top users list
+  // Top usuarios (por logins del mes)
   const topEl = document.getElementById('topUsersList');
   if (topEl) {
-    const userCounts = {};
-    loginLogs.forEach(l => { if (l.user_id) userCounts[l.user_id] = (userCounts[l.user_id] || 0) + 1; });
-    const sorted = Object.entries(userCounts).sort((a, b) => b[1] - a[1]).slice(0, 10);
-    const maxC = sorted[0]?.[1] || 1;
-    topEl.innerHTML = sorted.map(([uid, count]) => {
-      const user = allUsers.find(u => u.id === uid);
-      const name = user?.name || user?.email || uid?.slice(0, 8) || '—';
-      const pct = Math.round((count / maxC) * 100);
+    const topUsers = (stats?.users || []).slice().sort((a, b) => (b.l30 || 0) - (a.l30 || 0)).slice(0, 10);
+    const maxC = topUsers[0]?.l30 || 1;
+    topEl.innerHTML = topUsers.map(u => {
+      const name = u.name || u.email || '—';
+      const pct = Math.round(((u.l30 || 0) / maxC) * 100);
       return `<div style="display:flex;align-items:center;gap:10px;margin-bottom:10px;">
-        <div style="width:28px;height:28px;background:linear-gradient(135deg,#6366f1,#8b5cf6);border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:900;color:white;flex-shrink:0;">${(name[0]||'?').toUpperCase()}</div>
+        <div style="width:28px;height:28px;background:linear-gradient(135deg,#6366f1,#8b5cf6);border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:900;color:white;flex-shrink:0;">${(name[0] || '?').toUpperCase()}</div>
         <div style="flex:1;min-width:0;">
           <div style="font-size:12px;font-weight:800;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${escH(name)}</div>
           <div style="height:4px;background:rgba(255,255,255,.06);border-radius:50px;margin-top:3px;overflow:hidden;">
             <div style="height:100%;width:${pct}%;background:linear-gradient(90deg,#f97316,#fb923c);border-radius:50px;"></div>
           </div>
         </div>
-        <span style="font-size:12px;font-weight:900;color:#f97316;">${count}</span>
+        <span style="font-size:12px;font-weight:900;color:#f97316;">${u.l30 || 0}</span>
       </div>`;
     }).join('') || '<div style="text-align:center;padding:20px;color:var(--muted);">Sin actividad</div>';
+  }
+  _setLoginFallbackHint();
+};
+
+// ══ CONTROL TOTAL · Logins reales, pagos en revisión, problemas y donaciones ══
+// Fuentes reales: login_attempts (vía RPC), payments, incidents/reports/inquiries
+// y donation_campaigns/donations. Los badges del sidebar se actualizan en vivo.
+
+let _loginLoading = false;
+
+function _setLoginFallbackHint() {
+  const hints = document.querySelectorAll('.login-stats-hint');
+  if (!hints.length) return;
+  const viaAudit = !_loginStats || _loginStats._viaAudit;
+  hints.forEach(hint => {
+    hint.style.display = viaAudit ? 'flex' : 'none';
+    hint.innerHTML = viaAudit
+      ? `<i class="bi bi-info-circle-fill"></i> Para logins 100% reales (login_attempts) ejecuta la migración <b>21_control_total.sql</b> en Supabase → SQL Editor. Por ahora se muestran datos de auditoría.`
+      : '';
+  });
+}
+
+async function loadLoginStats() {
+  if (_loginLoading) return;
+  _loginLoading = true;
+  try {
+    const [statsRes, seriesRes] = await Promise.allSettled([
+      supabase.rpc('get_login_stats'),
+      supabase.rpc('get_login_series'),
+    ]);
+    const stats  = statsRes.status === 'fulfilled' ? statsRes.value?.data : null;
+    const series = seriesRes.status === 'fulfilled' ? seriesRes.value?.data : null;
+    if (stats && Array.isArray(stats.users)) {
+      _loginStats  = stats;
+      _loginSeries = series;
+      _loginLoading = false;
+      const b = document.getElementById('badge-login');
+      if (b) b.textContent = stats.totals?.logins_today ?? 0;
+      return;
+    }
+  } catch (_) {}
+  _loginLoading = false;
+
+  // Fallback: si la migración 21 aún no se ejecutó, derivar de auditoría
+  const since7 = new Date(Date.now() - 7 * 864e5).toISOString();
+  const since30 = new Date(Date.now() - 30 * 864e5).toISOString();
+  const logs = allAudit.filter(a => (a.action || '').toLowerCase().includes('login'));
+  const agg = {}; const hours = {};
+  logs.forEach(a => {
+    if (!a.user_id) return;
+    const u = agg[a.user_id] || (agg[a.user_id] = { l7: 0, l30: 0, last: '', _h: {} });
+    if ((a.created_at || '') >= since7) u.l7++;
+    if ((a.created_at || '') >= since30) u.l30++;
+    if ((a.created_at || '') > u.last) u.last = a.created_at || '';
+    const h = new Date(a.created_at).getHours();
+    u._h[h] = (u._h[h] || 0) + 1;
+    hours[h] = (hours[h] || 0) + 1;
+  });
+  const daily = {};
+  logs.filter(a => (a.created_at || '') >= since7).forEach(a => {
+    const day = localYYYYMMDD(new Date(a.created_at));
+    const user = allUsers.find(x => x.id === a.user_id);
+    const role = user?.role || 'sin_perfil';
+    daily[day + '|' + role] = (daily[day + '|' + role] || 0) + 1;
+  });
+  const hourArr = Array.from({ length: 24 }, (_, i) => ({ hour: i, count: hours[i] || 0 }));
+  const users = Object.entries(agg).map(([uid, u]) => {
+    const user = allUsers.find(x => x.id === uid);
+    const peak = Object.entries(u._h).sort((a, b) => b[1] - a[1])[0];
+    return {
+      user_id: uid, name: user?.name || user?.email || uid.slice(0, 8),
+      email: user?.email || '', role: user?.role || '—',
+      l7: u.l7, l30: u.l30, last_login: u.last || null,
+      peak_hour: peak ? Number(peak[0]) : null,
+    };
+  });
+  _loginStats = {
+    totals: {
+      logins_7d: users.reduce((s, u) => s + u.l7, 0),
+      logins_30d: users.reduce((s, u) => s + u.l30, 0),
+      logins_today: logs.filter(l => (l.created_at || '').startsWith(localToday())).length,
+      users_7d: users.filter(u => u.l7 > 0).length,
+      users_30d: users.length,
+      peak_hour: Object.entries(hours).sort((a, b) => b[1] - a[1])[0]?.[0] ?? null,
+    },
+    users, _viaAudit: true,
+  };
+  _loginSeries = {
+    daily: Object.entries(daily).map(([k, count]) => { const [day, rol] = k.split('|'); return { day, rol, count }; }),
+    hourly: hourArr, hourly_today: hourArr, _viaAudit: true,
+  };
+  const badge = document.getElementById('badge-login');
+  if (badge) badge.textContent = _loginStats.totals.logins_today;
+}
+
+window.renderActivity = function() {
+  const stats = _loginStats;
+  const set = (id, v) => { const el = document.getElementById(id); if (el) el.textContent = v; };
+  if (!stats) { set('act-logins-today', '—'); _setLoginFallbackHint(); return; }
+  set('act-logins-today', stats.totals?.logins_today ?? 0);
+  set('act-logins-7d', stats.totals?.logins_7d ?? 0);
+  set('act-logins-30d', stats.totals?.logins_30d ?? 0);
+  set('act-users-30d', stats.totals?.users_30d ?? 0);
+  set('act-peak', stats.totals?.peak_hour != null ? `${String(stats.totals.peak_hour).padStart(2, '0')}:00` : '—');
+
+  const sorted = (stats.users || []).slice().sort((a, b) => (b.l30 || 0) - (a.l30 || 0) || (b.l7 || 0) - (a.l7 || 0));
+  const top = sorted[0];
+
+  const topCard = document.getElementById('act-top-card');
+  if (topCard) {
+    if (top && (top.l30 || 0) > 0) {
+      const name = top.name || top.email || '—';
+      const initial = (name[0] || '?').toUpperCase();
+      topCard.innerHTML = `
+        <div style="display:flex;align-items:center;gap:14px;">
+          <div style="width:52px;height:52px;border-radius:14px;background:linear-gradient(135deg,#6366f1,#8b5cf6);display:flex;align-items:center;justify-content:center;font-size:20px;font-weight:900;color:#fff;box-shadow:0 6px 20px rgba(99,102,241,.4);flex-shrink:0;">${escH(initial)}</div>
+          <div style="flex:1;min-width:0;">
+            <div style="font-size:10px;font-weight:900;text-transform:uppercase;letter-spacing:.12em;color:#8b5cf6;">Usuario más activo</div>
+            <div style="font-size:17px;font-weight:900;color:var(--text);margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">🏆 ${escH(name)}</div>
+            <div style="font-size:11px;color:var(--muted);margin-top:2px;">Rol: <b style="color:var(--text);">${escH(top.role || '—')}</b> · Último acceso: ${top.last_login ? new Date(top.last_login).toLocaleString('es-DO', { dateStyle: 'short', timeStyle: 'short' }) : '—'}</div>
+          </div>
+          <div style="text-align:right;flex-shrink:0;">
+            <div style="font-size:22px;font-weight:900;color:#8b5cf6;line-height:1;">${top.l30 || 0}</div>
+            <div style="font-size:10px;color:var(--muted);font-weight:700;">ingresos / 30d</div>
+            <div style="font-size:15px;font-weight:900;color:#6366f1;margin-top:6px;">${top.l7 || 0} <span style="font-size:10px;color:var(--muted);font-weight:700;">en 7d</span></div>
+          </div>
+        </div>`;
+    } else {
+      topCard.innerHTML = '<div style="text-align:center;padding:18px;color:var(--muted);font-size:13px;">Aún no hay logins registrados en el último mes.</div>';
+    }
+  }
+
+  const tbody = document.getElementById('actUserBody');
+  if (tbody) {
+    const roleBadge = { padre: 'badge-blue', maestra: 'badge-green', directora: 'badge-orange', asistente: 'badge-purple', admin: 'badge-yellow' };
+    tbody.innerHTML = sorted.length ? sorted.map((u, i) => {
+      const topRow = i === 0 && (u.l30 || 0) > 0;
+      return `<tr style="${topRow ? 'background:rgba(99,102,241,.06);' : ''}">
+        <td style="font-weight:800;">${topRow ? '🏆&nbsp;' : ''}${escH(u.name || u.email || '—')}</td>
+        <td style="font-size:11px;color:var(--muted);">${escH(u.email || '—')}</td>
+        <td><span class="badge ${roleBadge[u.role] || 'badge-gray'}">${escH(u.role || '—')}</span></td>
+        <td style="font-weight:900;color:#6366f1;">${u.l7 || 0}</td>
+        <td style="font-weight:900;color:#8b5cf6;">${u.l30 || 0}</td>
+        <td style="font-size:11px;color:var(--muted);">${u.last_login ? new Date(u.last_login).toLocaleString('es-DO', { dateStyle: 'short', timeStyle: 'short' }) : '—'}</td>
+        <td><span class="badge badge-indigo" style="background:rgba(99,102,241,.15);color:#a5b4fc;">🕐 ${u.peak_hour != null ? String(u.peak_hour).padStart(2, '0') + ':00' : '—'}</span></td>
+      </tr>`;
+    }).join('') : '<tr><td colspan="7" style="text-align:center;padding:24px;color:var(--muted);">Sin logins registrados en el último mes</td></tr>';
+  }
+  _setLoginFallbackHint();
+};
+
+function _renderRevisionBadges() {
+  const b = document.getElementById('badge-rev');
+  if (b) b.textContent = (_revisionData?.total ?? 0) || 0;
+  const tab = document.getElementById('tab-rev-badge');
+  if (tab) tab.textContent = (_revisionData?.total ?? 0) || '';
+  const kpi = document.getElementById('pay-revision-count');
+  if (kpi) kpi.textContent = (_revisionData?.total ?? 0) || '—';
+}
+function _renderProblemasBadges() {
+  const b = document.getElementById('badge-prob');
+  if (b) b.textContent = (_problemasData?.total ?? 0) || 0;
+}
+function _renderDonacionesBadges() {
+  const b = document.getElementById('badge-don');
+  if (b) b.textContent = (_donacionesData?.pendientes ?? 0) || 0;
+}
+async function _refreshProblemasRT() {
+  await loadProblemasData();
+  _renderProblemasBadges();
+  const kpi = document.getElementById('kpi-problemas');
+  if (kpi) kpi.textContent = _problemasData?.total ?? '—';
+  if (_sectionActive('problemas')) renderProblemas();
+}
+async function _refreshDonacionesRT() {
+  await loadDonacionesData();
+  _renderDonacionesBadges();
+  if (_sectionActive('donaciones')) renderDonaciones();
+}
+
+// ── Pagos en revisión ─────────────────────────────────────────────────────────
+async function loadRevisionData() {
+  try {
+    const [pay, stu, clr] = await Promise.allSettled([
+      supabase.from('payments')
+        .select('id, amount, method, bank, reference, month_paid, created_at, updated_at, proof_url, evidence_url, notes, student_id')
+        .eq('status', 'review').is('deleted_at', null)
+        .order('updated_at', { ascending: true }).limit(300),
+      supabase.from('students').select('id, name, p1_name, classroom_id').limit(600),
+      supabase.from('classrooms').select('id, name').limit(200),
+    ]);
+    const students = (stu.status === 'fulfilled' ? stu.value.data || [] : []).reduce((m, s) => { m[s.id] = s; return m; }, {});
+    const classrooms = (clr.status === 'fulfilled' ? clr.value.data || [] : []).reduce((m, c) => { m[c.id] = c.name; return m; }, {});
+    const items = (pay.status === 'fulfilled' ? (pay.value.data || []) : []).map(p => {
+      const st = students[p.student_id];
+      const dias = p.updated_at ? Math.max(0, Math.floor((Date.now() - new Date(p.updated_at).getTime()) / 864e5)) : 0;
+      return {
+        ...p,
+        student_name: st?.name || st?.p1_name || '—',
+        aula: st?.classroom_id ? classrooms[st.classroom_id] : '—',
+        dias,
+        prueba: !!(p.proof_url || p.evidence_url),
+      };
+    });
+    _revisionData = {
+      total: items.length,
+      monto: items.reduce((s, p) => s + Number(p.amount || 0), 0),
+      conPrueba: items.filter(p => p.prueba).length,
+      sinPrueba: items.filter(p => !p.prueba).length,
+      items,
+    };
+  } catch (err) {
+    logError('panel_control', err?.message || String(err), err?.stack || '', 'loadRevisionData').catch(() => {});
+    _revisionData = { total: 0, monto: 0, conPrueba: 0, sinPrueba: 0, items: [] };
+  }
+  _renderRevisionBadges();
+}
+
+window.renderRevision = function() {
+  const set = (id, v) => { const el = document.getElementById(id); if (el) el.textContent = v; };
+  const d = _revisionData || { total: 0, monto: 0, conPrueba: 0, sinPrueba: 0, items: [] };
+  set('rev-total', d.total);
+  set('rev-monto', fmtMoney(d.monto));
+  set('rev-con', d.conPrueba);
+  set('rev-sin', d.sinPrueba);
+  const tbody = document.getElementById('revBody');
+  if (!tbody) return;
+  tbody.innerHTML = d.items.length ? d.items.map(p => `
+      <tr>
+        <td style="font-weight:800;">${escH(p.student_name)}</td>
+        <td style="font-size:11px;color:var(--muted);">${escH(p.aula)}</td>
+        <td style="font-size:12px;">${escH(p.month_paid || p.reference || '—')}</td>
+        <td style="font-weight:900;color:#f59e0b;">${fmtMoney(p.amount)}</td>
+        <td style="font-size:11px;">${escH(p.method || '—')}</td>
+        <td>${p.prueba ? '<span class="badge badge-green"><i class="bi bi-check-circle-fill"></i> Sí</span>' : '<span class="badge badge-red"><i class="bi bi-x-circle-fill"></i> No</span>'}</td>
+        <td><span class="badge ${p.dias >= 3 ? 'badge-red' : p.dias >= 1 ? 'badge-yellow' : 'badge-blue'}">${p.dias} día${p.dias === 1 ? '' : 's'}</span></td>
+        <td style="font-size:11px;color:var(--muted);">${p.created_at ? new Date(p.created_at).toLocaleDateString('es-DO') : '—'}</td>
+        <td>${(p.proof_url || p.evidence_url) ? `<a href="${escH(p.proof_url || p.evidence_url)}" target="_blank" rel="noopener" class="btn btn-ghost" style="padding:4px 8px;font-size:10px;"><i class="bi bi-eye"></i> Ver</a>` : '<span style="color:var(--muted);font-size:11px;">—</span>'}</td>
+      </tr>
+    `).join('') : '<tr><td colspan="9" style="text-align:center;padding:26px;color:var(--muted);">🎉 No hay pagos en revisión.</td></tr>';
+};
+
+// ── Problemas e incidencias (incidents + reports + inquiries) ────────────────
+async function loadProblemasData() {
+  try {
+    const [inc, rep, inq, stu, usr] = await Promise.allSettled([
+      supabase.from('incidents')
+        .select('id, student_id, severity, status, description, reported_at')
+        .in('status', ['received', 'review'])
+        .order('reported_at', { ascending: false }).limit(100),
+      supabase.from('reports')
+        .select('id, title, reporter_id, reporter_role, target_type, category, severity, status, priority, created_at')
+        .in('status', ['pending', 'in_progress', 'escalated']).is('deleted_at', null)
+        .order('created_at', { ascending: false }).limit(100),
+      supabase.from('inquiries')
+        .select('id, subject, priority, status, parent_id, created_at')
+        .not('status', 'in', '("resolved","closed")')
+        .order('created_at', { ascending: false }).limit(100),
+      supabase.from('students').select('id, name, p1_name').limit(600),
+      supabase.from('profiles').select('id, name').limit(300),
+    ]);
+    const students = (stu.status === 'fulfilled' ? stu.value.data || [] : []).reduce((m, s) => { m[s.id] = s.name || s.p1_name; return m; }, {});
+    const users = (usr.status === 'fulfilled' ? usr.value.data || [] : []).reduce((m, u) => { m[u.id] = u.name; return m; }, {});
+    const items = [];
+    (inc.status === 'fulfilled' ? inc.value.data || [] : []).forEach(r => items.push({
+      fuente: 'incidente', etiqueta: ['Incidente', 'badge-red'],
+      titulo: r.description || 'Incidente', autor: students[r.student_id] || '—',
+      nivel: r.severity, estado: r.status, fecha: r.reported_at,
+    }));
+    (rep.status === 'fulfilled' ? rep.value.data || [] : []).forEach(r => items.push({
+      fuente: 'reporte', etiqueta: ['Reporte', 'badge-purple'],
+      titulo: r.title || 'Reporte', autor: users[r.reporter_id] || r.reporter_role || '—',
+      nivel: r.severity, estado: r.status, fecha: r.created_at,
+    }));
+    (inq.status === 'fulfilled' ? inq.value.data || [] : []).forEach(r => items.push({
+      fuente: 'consulta', etiqueta: ['Consulta', 'badge-blue'],
+      titulo: r.subject || 'Consulta', autor: users[r.parent_id] || '—',
+      nivel: r.priority, estado: r.status, fecha: r.created_at,
+    }));
+    items.sort((a, b) => String(b.fecha || '').localeCompare(String(a.fecha || '')));
+    _problemasData = {
+      total: items.length,
+      incidentes: items.filter(i => i.fuente === 'incidente').length,
+      reportes: items.filter(i => i.fuente === 'reporte').length,
+      consultas: items.filter(i => i.fuente === 'consulta').length,
+      items,
+    };
+  } catch (err) {
+    logError('panel_control', err?.message || String(err), err?.stack || '', 'loadProblemasData').catch(() => {});
+    _problemasData = { total: 0, incidentes: 0, reportes: 0, consultas: 0, items: [] };
+  }
+  _renderProblemasBadges();
+}
+
+window.renderProblemas = function() {
+  const set = (id, v) => { const el = document.getElementById(id); if (el) el.textContent = v; };
+  const d = _problemasData || { total: 0, incidentes: 0, reportes: 0, consultas: 0, items: [] };
+  set('pr-total', d.total);
+  set('pr-incidentes', d.incidentes);
+  set('pr-reportes', d.reportes);
+  set('pr-consultas', d.consultas);
+  const tbody = document.getElementById('probBody');
+  if (!tbody) return;
+  const nivelBadge = { alta: 'badge-red', media: 'badge-yellow', leve: 'badge-blue', high: 'badge-red', critical: 'badge-red', medium: 'badge-yellow', low: 'badge-blue' };
+  const estadoLabel = { received: 'Recibido', review: 'En revisión', pending: 'Pendiente', in_progress: 'En curso', escalated: 'Escalado', resolved: 'Resuelto', closed: 'Cerrado' };
+  tbody.innerHTML = d.items.length ? d.items.map(p => `
+      <tr>
+        <td><span class="badge ${p.etiqueta[1]}">${p.etiqueta[0]}</span></td>
+        <td style="font-size:12px;max-width:300px;"><div style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${escH(p.titulo)}</div></td>
+        <td style="font-size:11px;color:var(--muted);">${escH(p.autor)}</td>
+        <td><span class="badge ${nivelBadge[p.nivel] || 'badge-gray'}">${escH(p.nivel || '—')}</span></td>
+        <td><span class="badge badge-orange">${escH(estadoLabel[p.estado] || p.estado || '—')}</span></td>
+        <td style="font-size:11px;color:var(--muted);">${p.fecha ? new Date(p.fecha).toLocaleString('es-DO', { dateStyle: 'short', timeStyle: 'short' }) : '—'}</td>
+      </tr>
+    `).join('') : '<tr><td colspan="6" style="text-align:center;padding:26px;color:var(--muted);">🎉 Sin problemas abiertos.</td></tr>';
+};
+
+// ── Donaciones (campañas + aportes recientes) ────────────────────────────────
+async function loadDonacionesData() {
+  try {
+    const [camps, dons] = await Promise.allSettled([
+      supabase.from('donation_campaigns')
+        .select('id, title, target_amount, raised_amount, is_active, start_date, end_date, created_at')
+        .order('created_at', { ascending: false }).limit(50),
+      supabase.from('donations')
+        .select('id, tracking_ref, campaign_id, donor_name, is_anonymous, amount, currency, payment_method, status, created_at')
+        .order('created_at', { ascending: false }).limit(100),
+    ]);
+    const campaigns = camps.status === 'fulfilled' ? (camps.value.data || []) : [];
+    const donations = dons.status === 'fulfilled' ? (dons.value.data || []) : [];
+    const campTitle = campaigns.reduce((m, c) => { m[c.id] = c.title; return m; }, {});
+    _donacionesData = {
+      campaigns,
+      activas: campaigns.filter(c => c.is_active).length,
+      recaudado: campaigns.reduce((s, c) => s + Number(c.raised_amount || 0), 0),
+      donaciones: donations.length,
+      pendientes: donations.filter(d => d.status === 'pending').length,
+      montoPendiente: donations.filter(d => d.status === 'pending').reduce((s, d) => s + Number(d.amount || 0), 0),
+      recientes: donations.slice(0, 10).map(d => ({ ...d, campaign_title: campTitle[d.campaign_id] || 'Sin campaña' })),
+    };
+  } catch (err) {
+    logError('panel_control', err?.message || String(err), err?.stack || '', 'loadDonacionesData').catch(() => {});
+    _donacionesData = { campaigns: [], activas: 0, recaudado: 0, donaciones: 0, pendientes: 0, montoPendiente: 0, recientes: [] };
+  }
+  _renderDonacionesBadges();
+}
+
+window.renderDonaciones = function() {
+  const set = (id, v) => { const el = document.getElementById(id); if (el) el.textContent = v; };
+  const d = _donacionesData || { campaigns: [], activas: 0, recaudado: 0, donaciones: 0, pendientes: 0, montoPendiente: 0, recientes: [] };
+  set('dn-activas', d.activas);
+  set('dn-recaudado', fmtMoney(d.recaudado));
+  set('dn-donaciones', d.donaciones);
+  set('dn-pendientes', d.pendientes + (d.montoPendiente ? ' · ' + fmtMoney(d.montoPendiente) : ''));
+
+  const camp = document.getElementById('dnCampaigns');
+  if (camp) {
+    camp.innerHTML = d.campaigns.length ? d.campaigns.map(c => {
+      const pct = c.target_amount > 0 ? Math.min(100, Math.round((Number(c.raised_amount) / Number(c.target_amount)) * 100)) : 0;
+      return `<div style="padding:12px 16px;border:1px solid var(--border);border-radius:12px;background:var(--surface2);">
+        <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:8px;">
+          <div style="font-size:13px;font-weight:800;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${escH(c.title)}</div>
+          <span class="badge ${c.is_active ? 'badge-green' : 'badge-gray'}">${c.is_active ? 'Activa' : 'Inactiva'}</span>
+        </div>
+        <div style="display:flex;align-items:center;gap:10px;">
+          <div style="flex:1;height:8px;background:rgba(255,255,255,.08);border-radius:50px;overflow:hidden;">
+            <div style="height:100%;width:${pct}%;background:linear-gradient(90deg,#10b981,#22c55e);border-radius:50px;"></div>
+          </div>
+          <span style="font-size:11px;font-weight:900;color:#22c55e;">${pct}%</span>
+        </div>
+        <div style="font-size:11px;color:var(--muted);margin-top:6px;">${fmtMoney(c.raised_amount)} de ${fmtMoney(c.target_amount)}</div>
+      </div>`;
+    }).join('') : '<div style="text-align:center;padding:20px;color:var(--muted);">Sin campañas creadas.</div>';
+  }
+
+  const tbody = document.getElementById('dnBody');
+  if (tbody) {
+    const statusBadge = { pending: ['badge-yellow', 'En revisión'], approved: ['badge-green', 'Aprobada'], certified: ['badge-blue', 'Certificada'], rejected: ['badge-red', 'Rechazada'] };
+    tbody.innerHTML = d.recientes.length ? d.recientes.map(don => {
+      const [cls, lbl] = statusBadge[don.status] || ['badge-gray', don.status];
+      const donor = don.is_anonymous ? 'Anónimo' : don.donor_name;
+      return `<tr>
+        <td style="font-size:11px;font-weight:800;color:var(--muted);">${escH(don.tracking_ref || '—')}</td>
+        <td style="font-weight:800;">${escH(donor)}</td>
+        <td style="font-size:11px;color:var(--muted);max-width:180px;"><div style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${escH(don.campaign_title || '—')}</div></td>
+        <td style="font-weight:900;color:#10b981;">${fmtMoney(don.amount)}</td>
+        <td><span class="badge ${cls}">${lbl}</span></td>
+        <td style="font-size:11px;color:var(--muted);">${don.created_at ? new Date(don.created_at).toLocaleDateString('es-DO') : '—'}</td>
+      </tr>`;
+    }).join('') : '<tr><td colspan="6" style="text-align:center;padding:26px;color:var(--muted);">Aún no hay donaciones registradas.</td></tr>';
   }
 };
 
 // ── Errors ────────────────────────────────────────────────────────────────────
 async function renderErrors() {
   const tbody = document.getElementById('errorsBody');
-  if (!tbody) return;
+  const badgeEl = document.getElementById('tab-err-badge');
   try {
     const { data: dbErrors } = await supabase
       .from('system_errors')
       .select('created_at, panel, message, stack, url, user_id')
       .order('created_at', { ascending: false })
       .limit(100);
+    if (badgeEl) badgeEl.textContent = (dbErrors?.length || 0) || '';
     if (dbErrors?.length) {
       tbody.innerHTML = dbErrors.map(e => `<tr>
         <td style="font-size:11px;color:var(--muted);">${e.created_at ? new Date(e.created_at).toLocaleString('es-DO') : '—'}</td>
@@ -2094,7 +2566,7 @@ async function renderErrors() {
   } catch (err) {
     logError('panel_control', err?.message || String(err), err?.stack || '', 'renderErrors').catch(() => {});
   }
-  tbody.innerHTML = '<tr><td colspan="5" style="text-align:center;padding:24px;color:var(--muted);">✅ Sin errores registrados</td></tr>';
+  if (tbody) tbody.innerHTML = '<tr><td colspan="5" style="text-align:center;padding:24px;color:var(--muted);">✅ Sin errores registrados</td></tr>';
 }
 
 window.clearErrors = async function() {
@@ -2545,6 +3017,109 @@ window.saveFlags = async function() {
   }
 };
 
+// ── Suspensión temporal del servicio ─────────────────────────────────────────
+function _suspMsg(text, ok) {
+  const el = document.getElementById('suspMsg');
+  if (el) { el.textContent = text; el.style.color = ok ? '#4ade80' : '#f87171'; }
+}
+
+window.refreshSuspensionStatus = async function() {
+  const pill    = document.getElementById('suspStatusPill');
+  const detail  = document.getElementById('suspStatusDetail');
+  const toggle  = document.getElementById('suspToggleBtn');
+  const tLabel  = document.getElementById('suspToggleLabel');
+  const reason  = document.getElementById('suspReasonInput');
+  const reasonW = document.getElementById('suspReasonWrap');
+  const icon    = document.getElementById('suspIcon');
+  const banner  = document.getElementById('suspBanner');
+  const bannerR = document.getElementById('suspBannerReason');
+
+  let suspended = false;
+  let info = null;
+  try {
+    const { data, error } = await Promise.race([
+      supabase.rpc('get_business_suspension_info'),
+      new Promise((_, reject) => setTimeout(() => reject(new Error('timeout')), 4000))
+    ]);
+    if (!error && data && typeof data === 'object') { info = data; suspended = data.status === 'suspended'; }
+  } catch (_) {}
+
+  window._businessSuspended = suspended;
+
+  if (pill) {
+    pill.className = 'badge ' + (suspended ? 'badge-red' : 'badge-green');
+    pill.innerHTML = '<i class="bi bi-circle-fill" style="font-size:7px;"></i> ' + (suspended ? 'Suspendido' : 'Activo');
+  }
+  if (detail) {
+    if (!suspended) {
+      detail.textContent = 'El sistema funciona con normalidad. Todos los usuarios pueden acceder.';
+    } else if (info?.suspended_at) {
+      const d = new Date(info.suspended_at);
+      detail.textContent = 'Desactivado el ' + d.toLocaleString('es-DO', { dateStyle: 'short', timeStyle: 'short' });
+    } else {
+      detail.textContent = 'Servicio bloqueado para todos los usuarios.';
+    }
+  }
+  if (toggle) { toggle.title = suspended ? 'Reactivar el servicio para todos los usuarios' : 'Bloquear el acceso de todos los usuarios'; }
+  if (tLabel) tLabel.textContent = suspended ? 'Reactivar servicio' : 'Suspender servicio';
+  if (icon) icon.className = 'bi ' + (suspended ? 'bi-toggle-on' : 'bi-toggle-off');
+  if (reason) { reason.value = info?.suspension_reason || ''; }
+  if (reasonW) reasonW.classList.toggle('hidden', !suspended);
+
+  if (banner) {
+    if (suspended) {
+      banner.classList.remove('hidden');
+      if (bannerR && info?.suspension_reason) bannerR.textContent = 'Motivo: ' + info.suspension_reason + ' — todos los usuarios bloqueados.';
+      else if (bannerR) bannerR.textContent = 'Todos los usuarios están bloqueados hasta reactivar el servicio.';
+    } else {
+      banner.classList.add('hidden');
+    }
+  }
+};
+
+let _suspWatchdog = null;
+function startPanelSuspensionWatchdog() {
+  if (_suspWatchdog) clearInterval(_suspWatchdog);
+  _suspWatchdog = setInterval(async () => {
+    try {
+      const { data, error } = await supabase.rpc('is_business_suspended');
+      const suspended = !error && data === true;
+      if (suspended && !window._businessSuspended) {
+        await refreshSuspensionStatus();
+      } else if (!suspended && window._businessSuspended) {
+        await refreshSuspensionStatus();
+      }
+    } catch (_) {}
+  }, 90000);
+}
+
+window.toggleSuspension = async function() {
+  const suspendNow = !window._businessSuspended;
+  const reason     = (document.getElementById('suspReasonInput')?.value || '').trim();
+  _suspMsg(suspendNow ? 'Aplicando suspensión...' : 'Reactivando servicio...', true);
+
+  const { data, error } = await supabase.rpc('set_business_suspended', {
+    p_suspended: suspendNow,
+    p_reason: suspendNow ? reason || null : null
+  });
+
+  if (error || !data?.ok) {
+    _suspMsg('Error al cambiar el estado del servicio.', false);
+    logError('panel_control', error?.message || 'set_business_suspended fail', '', 'toggleSuspension').catch(() => {});
+    return;
+  }
+
+  await refreshSuspensionStatus();
+  _suspMsg(suspendNow ? 'Servicio suspendido. Todos los usuarios fueron bloqueados.' : 'Servicio reactivado. Los usuarios ya pueden ingresar.', true);
+
+  // Auditoría inmutable
+  supabase.from('audit_logs').insert({
+    user_id: currentUser.id,
+    action: 'business.status_change',
+    payload: { to: suspendNow ? 'suspended' : 'active', by: currentUser.email }
+  }).then(() => {}).catch(() => {});
+};
+
 // ── Alertas por Correo Electrónico (resumen de fraude/errores) ───────────────
 const AUTO_ALERT_COOLDOWN_MS = 60 * 60 * 1000; // máx. 1 correo automático por hora
 let _lastAutoReportAt = 0;
@@ -2667,13 +3242,15 @@ function startRealtime() {
       detectFraud();
       const bf = document.getElementById('badge-fraud');
       if (bf) bf.textContent = fraudEvents.length;
+      await loadRevisionData();
+      _renderRevisionBadges();
       if (_sectionActive('dashboard')) renderDashboard();
-      if (_sectionActive('pagos'))     renderPayments();
+      if (_sectionActive('pagos'))     { renderPayments(); renderRevision(); }
     })
     .on('postgres_changes', { event: '*', schema: 'public', table: 'attendance' }, async () => {
       await loadAttendance();
       // KPI de asistencia del día + tabla si está visible
-      const today = new Date().toISOString().split('T')[0];
+      const today = localToday();
       const kpi = document.getElementById('kpi-attendance');
       if (kpi) kpi.textContent = allAttend.filter(a => a.date === today).length;
       if (_sectionActive('asistencia')) renderAttendance();
@@ -2689,6 +3266,11 @@ function startRealtime() {
       await loadChatData();
       if (_sectionActive('chat')) renderChat();
     })
+    .on('postgres_changes', { event: '*', schema: 'public', table: 'incidents' }, () => _refreshProblemasRT())
+    .on('postgres_changes', { event: '*', schema: 'public', table: 'inquiries' }, () => _refreshProblemasRT())
+    .on('postgres_changes', { event: '*', schema: 'public', table: 'reports' }, () => _refreshProblemasRT())
+    .on('postgres_changes', { event: '*', schema: 'public', table: 'donations' }, () => _refreshDonacionesRT())
+    .on('postgres_changes', { event: '*', schema: 'public', table: 'donation_campaigns' }, () => _refreshDonacionesRT())
     .subscribe();
 }
 
@@ -2769,8 +3351,10 @@ window.requestNotifPermission = async function() {
 };
 
 // ── Monitoreo de salud de Edge Functions ─────────────────────────────────────
-// Un gateway de Supabase responde 401/400 si la función existe (exige JWT) y
-// 404 si no está desplegada — sin efectos secundarios ni envíos reales.
+// NO usar GET: con el JWT que inyecta supabase.js el request atraviesa el auth,
+// y en funciones tipo admin-reset-password un GET sin body lanza 500.
+// Se sondea con POST + body benigno { check: true } → la función responde
+// 400/403/401 (desplegada) o 404 (no desplegada), sin efectos secundarios.
 async function checkEdgeFunctionsHealth() {
   const el = document.getElementById('funcStatus');
   if (!el) return;
@@ -2780,12 +3364,26 @@ async function checkEdgeFunctionsHealth() {
   const base = String(SUPABASE_URL || '').replace(/\/$/, '');
   if (!base) { el.className = 'badge badge-yellow'; el.textContent = 'N/D'; return; }
   try {
+    const { data: { session } } = await supabase.auth.getSession();
+    const token = session?.access_token || '';
+    // Sin token no podemos sondear de forma segura (las funciones antiguas
+    // revientan en 500 con Authorization vacío). Mejor mostrar N/D.
+    if (!token) { el.className = 'badge badge-yellow'; el.textContent = 'N/D'; return; }
     const statuses = await Promise.all(names.map(n =>
-      fetch(`${base}/functions/v1/${n}`, { method: 'GET', headers: { apikey: SUPABASE_ANON_KEY } })
+      fetch(`${base}/functions/v1/${n}`, {
+        method: 'POST',
+        headers: {
+          apikey: SUPABASE_ANON_KEY,
+          Authorization: 'Bearer ' + token,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ check: true }),
+      })
         .then(r => r.status)
         .catch(() => 0)
     ));
-    const deployed = statuses.filter(s => s === 401 || s === 400 || s === 200).length;
+    // 400/403/401/200 = la función existe y respondió (online); 404 = no desplegada
+    const deployed = statuses.filter(s => [200, 400, 401, 403].includes(s)).length;
     const missing  = statuses.filter(s => s === 404).length;
     const unknown  = statuses.filter(s => s === 0).length;
     if (deployed === names.length) {
@@ -2805,6 +3403,42 @@ async function checkEdgeFunctionsHealth() {
     el.textContent = 'N/D';
   }
 }
+
+// ── Backup (respaldo a Google Sheets) ─────────────────────────────────────────
+window.loadBackupStatus = async function() {
+  try {
+    const { data } = await supabase.from('system_events')
+      .select('created_at')
+      .eq('type', 'backup.completed')
+      .order('created_at', { ascending: false })
+      .limit(1)
+      .maybeSingle();
+    const el = document.getElementById('backupLast');
+    if (el) el.textContent = data?.created_at
+      ? new Date(data.created_at).toLocaleString('es-DO')
+      : 'Sin respaldos registrados';
+  } catch (_) {}
+};
+
+window.runBackupNow = async function() {
+  const btn = document.getElementById('btnRunBackup');
+  const res = document.getElementById('backupResult');
+  if (btn) { btn.disabled = true; btn.textContent = 'Ejecutando...'; }
+  if (res) { res.textContent = ''; res.style.color = 'var(--muted)'; }
+  try {
+    const { data, error } = await supabase.rpc('run_daily_backup');
+    if (error) {
+      if (res) { res.textContent = '❌ ' + (error.message || 'Error al ejecutar el respaldo'); res.style.color = '#f87171'; }
+    } else {
+      if (res) { res.textContent = '✅ ' + (data?.message || 'Respaldo solicitado'); res.style.color = '#22c55e'; }
+      window.loadBackupStatus();
+    }
+  } catch (e) {
+    if (res) { res.textContent = '❌ Ocurrió un error inesperado'; res.style.color = '#f87171'; }
+  } finally {
+    if (btn) { btn.disabled = false; btn.textContent = 'Ejecutar respaldo ahora'; }
+  }
+};
 
 // ── Security Stats ────────────────────────────────────────────────────────────
 window.loadSecurityStats = async function() {
@@ -2962,14 +3596,8 @@ function populateChatSelects() {
   if (!sendSel || !recvSel) return;
   const users = new Map();
   allChatMsgs.forEach(m => {
-    if (m.sender_id) {
-      const u = allUsers.find(x => x.id === m.sender_id);
-      users.set(m.sender_id, u ? (u.name || u.email || m.sender_name || m.sender_id.slice(0, 8)) : (m.sender_name || m.sender_id.slice(0, 8)));
-    }
-    if (m.receiver_id) {
-      const u = allUsers.find(x => x.id === m.receiver_id);
-      users.set(m.receiver_id, u ? (u.name || u.email || m.receiver_name || m.receiver_id.slice(0, 8)) : (m.receiver_name || m.receiver_id.slice(0, 8)));
-    }
+    if (m.sender_id) users.set(m.sender_id, _senderLabel(m));
+    if (m.receiver_id) users.set(m.receiver_id, _receiverLabel(m));
   });
   const opts = (sel, ph) => sel.innerHTML = '<option value="">' + ph + '</option>' +
     [...users.entries()].map(([id, n]) => '<option value="' + id + '">' + escH(n) + '</option>').join('');
@@ -2978,6 +3606,11 @@ function populateChatSelects() {
 }
 
 window.filterChat = function() {
+  clearTimeout(_chatDebounce);
+  _chatDebounce = setTimeout(_applyChatFilter, 300);
+};
+let _chatDebounce = null;
+function _applyChatFilter() {
   const tbody = document.getElementById('chatBody');
   if (!tbody) return;
   const q      = (document.getElementById('chatSearch')?.value || '').toLowerCase().trim();
@@ -2988,8 +3621,8 @@ window.filterChat = function() {
   if (q) {
     rows = rows.filter(m =>
       (m.content || '').toLowerCase().includes(q) ||
-      (m.sender_name || '').toLowerCase().includes(q) ||
-      (m.receiver_name || '').toLowerCase().includes(q)
+      _senderLabel(m).toLowerCase().includes(q) ||
+      _receiverLabel(m).toLowerCase().includes(q)
     );
   }
   if (sendId) rows = rows.filter(m => m.sender_id === sendId);
@@ -3006,16 +3639,20 @@ window.filterChat = function() {
     tbody.innerHTML = '<tr><td colspan="5" style="text-align:center;padding:24px;color:var(--muted);">Sin mensajes que coincidan con el filtro</td></tr>';
   } else {
     tbody.innerHTML = visible.map(m => {
-      const receiverName = m.receiver_name || allUsers.find(u => u.id === m.receiver_id)?.name || m.receiver_id?.slice(0, 8) || '—';
-      const hasMedia = m.attachment_url ? ' <span class="badge badge-purple" style="font-size:8px;">📷</span>' : '';
+      const senderName   = _senderLabel(m);
+      const receiverName = _receiverLabel(m);
+      const hasMedia = m.attachment_url ? ` <span class="badge badge-purple" style="font-size:8px;">📷</span>` : '';
       const sense = findSensitiveHits(m.content);
-      const senseBadge = sense.length ? `<span class="badge badge-red" style="font-size:7px;" title="${escH(sense.join(', '))}">⚠ ${escH(sense.slice(0, 2).join('/'))}</span>` : '';
+      const senseBadge = sense.length ? `<span class="badge badge-red" style="font-size:8px;" title="${escH(sense.join(', '))}">⚠ ${escH(sense.slice(0, 2).join('/'))}</span>` : '';
+      const fecha = m.created_at
+        ? new Date(m.created_at).toLocaleString('es-DO', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' })
+        : '—';
       return `<tr>
-        <td style="font-size:11px;color:var(--muted);white-space:nowrap;">${m.created_at ? new Date(m.created_at).toLocaleString('es-DO', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' }) : '—'}</td>
-        <td style="font-weight:800;max-width:110px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${escH(m.sender_name || m.sender_id?.slice(0, 8) || '—')}</td>
-        <td style="font-weight:700;max-width:110px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:11px;color:var(--muted);">→ ${escH(receiverName)}</td>
-        <td style="max-width:230px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:12px;color:var(--text);">${renderSensitiveText(m.content)}${hasMedia}</td>
-        <td>${m.is_read === false ? '<span class="badge badge-yellow">Sin leer</span>' : '<span class="badge badge-gray">Leído</span>'}${senseBadge}</td>
+        <td style="font-size:11px;color:var(--muted);white-space:nowrap;">${fecha}</td>
+        <td style="font-weight:800;font-size:12px;white-space:nowrap;">${escH(senderName)}</td>
+        <td style="font-weight:700;font-size:12px;color:var(--muted);white-space:nowrap;">→ ${escH(receiverName)}</td>
+        <td style="min-width:240px;max-width:340px;font-size:12px;color:var(--text);white-space:normal;word-break:break-word;">${renderSensitiveText(m.content)}${hasMedia}</td>
+        <td style="white-space:nowrap;">${m.is_read === false ? '<span class="badge badge-yellow">Sin leer</span>' : '<span class="badge badge-gray">Leído</span>'}${senseBadge}</td>
       </tr>`;
     }).join('');
   }
@@ -3051,7 +3688,7 @@ window.exportChatCSV = function() {
   if (!allChatMsgs.length) { showToast('No hay mensajes para exportar.', 'warn'); return; }
   const rows = [['Fecha', 'De', 'Para', 'Mensaje', 'Archivo', 'Leído', 'Sensible']];
   allChatMsgs.forEach(m => {
-    const receiverName = m.receiver_name || allUsers.find(u => u.id === m.receiver_id)?.name || m.receiver_id?.slice(0, 8) || '—';
+    const receiverName = allUsers.find(u => u.id === m.receiver_id)?.name || m.receiver_id?.slice(0, 8) || '—';
     rows.push([
       m.created_at ? new Date(m.created_at).toLocaleString('es-DO') : '',
       m.sender_name || m.sender_id || '',

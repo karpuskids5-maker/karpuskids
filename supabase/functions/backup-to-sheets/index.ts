@@ -1,13 +1,14 @@
 // @ts-nocheck
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
-import { corsHeaders } from "../_shared/cors.ts";
+import { getCorsHeaders } from "../_shared/cors.ts";
+import { verifyAuth } from "../_shared/auth.ts";
 
-const CORS = corsHeaders;
+const ALLOWED_ROLES = ['admin', 'directora'];
 
-const json = (data, status = 200) =>
+const json = (data, status = 200, req = null) =>
   new Response(JSON.stringify(data), {
     status,
-    headers: { ...CORS, 'Content-Type': 'application/json' },
+    headers: { ...getCorsHeaders(req), 'Content-Type': 'application/json' },
   });
 
 const fmt = (d) => d ? new Date(d).toLocaleString('es-DO') : '';
@@ -124,9 +125,24 @@ async function writeToSheet(token, spreadsheetId, sheetName, rows) {
 
 // ── Main ──────────────────────────────────────────────────────────────────────
 Deno.serve(async (req) => {
-  if (req.method === 'OPTIONS') return new Response('ok', { headers: CORS });
+  if (req.method === 'OPTIONS') return new Response('ok', { headers: getCorsHeaders(req) });
 
   try {
+    // ── Auth verification ──────────────────────────────────────────────────
+    // Acepta: (a) staff autenticado (admin/directora/asistente), o
+    // (b) el service role key (invocación programada server-side desde
+    //     run_daily_backup / pg_cron / pg_net).
+    const authHeader = req.headers.get('Authorization') || '';
+    const svcKeyInternal = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || '';
+    const isServiceKeyInternal = !!svcKeyInternal && authHeader === `Bearer ${svcKeyInternal}`;
+
+    if (!isServiceKeyInternal) {
+      const auth = await verifyAuth(req, ALLOWED_ROLES);
+      if (!auth.ok) {
+        return json({ error: auth.error }, auth.status || 401, req);
+      }
+    }
+
     const SUPABASE_URL = Deno.env.get('SUPABASE_URL')               ?? '';
     const SERVICE_KEY  = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')  ?? '';
     const SA_EMAIL     = Deno.env.get('GOOGLE_SERVICE_ACCOUNT_EMAIL') ?? '';
@@ -136,7 +152,7 @@ Deno.serve(async (req) => {
     // Sin credenciales configuradas: responder OK pero marcando que se omitió,
     // para no generar errores 500 visibles (el backup es opcional).
     if (!SUPABASE_URL || !SERVICE_KEY || !SA_EMAIL || !SA_KEY || !SHEET_ID) {
-      return json({ ok: true, skipped: true, reason: 'Backup a Sheets no configurado (faltan variables de entorno de Google)' });
+      return json({ ok: true, skipped: true, reason: 'Backup a Sheets no configurado (faltan variables de entorno de Google)' }, 200, req);
     }
 
     const supabase = createClient(SUPABASE_URL, SERVICE_KEY, { auth: { persistSession: false } });
@@ -242,9 +258,9 @@ Deno.serve(async (req) => {
       }
     }
 
-    return json({ success: true, timestamp, results });
+    return json({ success: true, timestamp, results }, 200, req);
 
   } catch (e) {
-    return json({ error: String(e) }, 500);
+    return json({ error: String(e) }, 500, req);
   }
 });

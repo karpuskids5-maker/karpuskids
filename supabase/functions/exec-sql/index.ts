@@ -1,42 +1,35 @@
 // @ts-nocheck
 // Ejecuta SQL arbitrario vía la RPC run_ddl_migration.
-// GATE: SOLO acepta la SUPABASE_SERVICE_ROLE_KEY como Bearer (nunca exponer al cliente).
+// GATE: SOLO acepta service_role autenticado (verificación server-side).
 import { getCorsHeaders } from '../_shared/cors.ts';
+import { verifyAuth } from '../_shared/auth.ts';
 
 Deno.serve(async (req) => {
   const corsHeaders = getCorsHeaders(req);
   if (req.method === 'OPTIONS') return new Response('ok', { headers: corsHeaders });
 
   try {
+    const jsonResp = (data, status = 200) => new Response(JSON.stringify(data), {
+      status, headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+    });
+
+    // Accept either: direct service_role key OR authenticated admin/directora user
     const authHeader = req.headers.get('Authorization') || '';
-    const svcNew = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || '';
-    const projectRef = Deno.env.get('SUPABASE_URL')?.replace(/^https:\/\/([^.]+)\..*$/, '$1') || '';
+    const svcKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || '';
+    const isServiceKeyAuth = !!svcKey && authHeader === `Bearer ${svcKey}`;
 
-    let authorized = !!svcNew && authHeader === `Bearer ${svcNew}`;
-    if (!authorized && authHeader.startsWith('Bearer ')) {
-      try {
-        const parts = authHeader.slice(7).split('.');
-        if (parts.length === 3) {
-          const b64u = (s: string) => Uint8Array.from(atob(s.replace(/-/g, '+').replace(/_/g, '/')), c => c.charCodeAt(0));
-          const p = JSON.parse(new TextDecoder().decode(b64u(parts[1])));
-          const notExpired = !p.exp || p.exp > Math.floor(Date.now() / 1000);
-          authorized = p.role === 'service_role' && p.ref === projectRef && notExpired;
-        }
-      } catch (_) {}
-    }
-
-    if (!authorized) {
-      return new Response(JSON.stringify({ ok: false, error: 'No autorizado' }), {
-        status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' }
-      });
+    if (!isServiceKeyAuth) {
+      // Verify JWT properly via Supabase (validates signature server-side)
+      const auth = await verifyAuth(req, ['admin', 'directora']);
+      if (!auth.ok) {
+        return jsonResp({ ok: false, error: 'No autorizado' }, 403);
+      }
     }
 
     const body = await req.json().catch(() => ({}));
     const ddl = typeof body.ddl === 'string' ? body.ddl : '';
     if (!ddl.trim()) {
-      return new Response(JSON.stringify({ ok: false, error: 'Falta el campo ddl' }), {
-        status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' }
-      });
+      return jsonResp({ ok: false, error: 'Falta el campo ddl' }, 400);
     }
 
     const { createClient } = await import('https://esm.sh/@supabase/supabase-js@2');
@@ -48,15 +41,11 @@ Deno.serve(async (req) => {
 
     const { error } = await admin.rpc('run_ddl_migration', { ddl });
     if (error) {
-      return new Response(JSON.stringify({ ok: false, error: error.message }), {
-        status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' }
-      });
+      return jsonResp({ ok: false, error: 'Error ejecutando SQL' }, 200);
     }
-    return new Response(JSON.stringify({ ok: true }), {
-      headers: { ...corsHeaders, 'Content-Type': 'application/json' }
-    });
+    return jsonResp({ ok: true });
   } catch (e) {
-    return new Response(JSON.stringify({ ok: false, error: String(e) }), {
+    return new Response(JSON.stringify({ ok: false, error: 'Error interno' }), {
       status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' }
     });
   }

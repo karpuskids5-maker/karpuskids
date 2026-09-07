@@ -1,454 +1,274 @@
-Exactamente. **Yo eliminaría por completo la sensación de “trabaja para Karpus Kids”**. El padre no debe sentirse embajador, vendedor ni empleado.
 
-La propuesta debe sentirse como:
+Quiero implementar en mi sistema una función profesional de **SUSPENSIÓN TEMPORAL DEL SERVICIO POR EMPRESA**, debido a falta de pago de la mensualidad.
 
-> **“Si comparto Karpus Kids con alguien y esa persona se inscribe, me ahorro dinero en mi mensualidad.”**
+IMPORTANTE:
 
-Y si quieres que sea realmente atractivo, **50% de una mensualidad por cada familia nueva matriculada** es un incentivo bastante más claro que tu sistema actual.
+* NO eliminar usuarios.
+* NO eliminar datos.
+* NO modificar ni romper funcionalidades existentes.
+* NO cambiar el diseño general del sistema.
+* La suspensión debe aplicarse a TODA la empresa/estancia, no usuario por usuario.
+* Mantener intacta toda la información existente.
+* Antes de modificar código, analiza la arquitectura actual, autenticación, tablas de Supabase, relaciones entre usuarios y empresa y políticas RLS.
 
-## 🔥 Campaña que yo implementaría
+### 1. ESTADO DE LA EMPRESA
 
-### ❤️ “Comparte y ahorra”
+Utiliza la tabla `business` existente si ya existe.
 
-**Invita a una familia a conocer Karpus Kids.**
+Agregar, únicamente si no existen, los campos necesarios para controlar el estado:
 
-Si esa familia se matricula gracias a tu recomendación:
+* `status`: `active` o `suspended`
+* `suspended_at`
+* `suspension_reason` (puede existir internamente, pero NO mostrarlo al cliente)
 
-### 🎁 ¡Recibes 50% de descuento en tu mensualidad!
+El estado por defecto debe ser:
 
-Sin puntos.
-Sin niveles.
-Sin complicaciones.
+`active`
 
-**1 familia matriculada = 50% de descuento**
+### 2. COMPORTAMIENTO CUANDO LA EMPRESA ESTÁ ACTIVA
 
-**2 familias = 100% de descuento**
+Si:
 
-**3 familias = 150% de descuento**
+`business.status = active`
 
-Pero aquí pondría una regla importante: **el descuento acumulado debe tener límites**, por ejemplo, que pueda aplicarse como máximo a 1 mensualidad gratis por campaña o que el excedente se convierta en crédito. Así evitas regalar demasiado dinero.
+el sistema debe funcionar exactamente como funciona actualmente.
 
----
+NO modificar:
 
-# ⚡ Y sí: hagamos una campaña temporal
+* Dashboard
+* módulos
+* permisos
+* usuarios
+* navegación
+* datos
+* funcionalidades existentes
 
-Para conseguir estudiantes **ahora**, yo no la dejaría abierta indefinidamente.
+### 3. COMPORTAMIENTO CUANDO LA EMPRESA ESTÁ SUSPENDIDA
 
-### 🔥 CAMPAÑA ESPECIAL DE MATRÍCULA
+Si:
 
-**“Comparte Karpus Kids y ahorra”**
+`business.status = suspended`
 
-📅 **29 de agosto – 15 de septiembre**
+NINGÚN usuario perteneciente a esa empresa debe poder utilizar el sistema.
 
-> Este período es especial. Durante la campaña, cada nueva familia que se matricule mediante tu enlace te dará derecho a un **50% de descuento en tu mensualidad**.
+Esto incluye:
 
-### ⏰ Termina en:
+* Director
+* Administradores
+* Maestros
+* Asistentes
+* Padres
+* Cualquier otro usuario asociado a esa empresa
 
-**15 días**
+Después de iniciar sesión, el sistema debe comprobar el estado de la empresa.
 
-Y debajo:
+Si está suspendida:
 
-**🎁 Tu beneficio: 50% de descuento**
+1. No cargar el dashboard.
+2. No permitir acceso a los módulos.
+3. No permitir consultas normales de datos.
+4. Cerrar la sesión si corresponde.
+5. Mostrar una pantalla/modal de suspensión.
 
----
+### 4. DISEÑO DE LA VENTANA DE SUSPENSIÓN
 
-# 📱 Así cambiaría tu pantalla
+Crear una pantalla visualmente profesional, limpia y moderna.
 
-Tu pantalla actual tiene demasiada lógica de “programa de afiliados”.
+NO mostrar el motivo de la suspensión.
 
-Yo quitaría:
+Mostrar únicamente:
 
-❌ Bronce
-❌ Plata
-❌ Oro
-❌ Leyenda
-❌ Puntos
-❌ Monedero
-❌ “Conviértete en embajador”
+**Sistema temporalmente suspendido**
 
-Y pondría algo mucho más emocional:
+Texto:
 
----
+**En este momento el acceso al sistema se encuentra temporalmente suspendido.**
 
-## ❤️ Comparte Karpus Kids
+Debajo:
 
-### Y ahorra en tu próxima mensualidad
+**Para obtener asistencia o solicitar la reactivación del servicio, comuníquese con nosotros.**
 
-**¿Conoces una familia que podría formar parte de nuestra comunidad?**
+Botón principal:
 
-Compártele Karpus Kids.
+**Contactar soporte**
 
-Si se matricula utilizando tu enlace:
+El botón debe abrir WhatsApp directamente al número:
 
-# 🎁 GANAS 50% DE DESCUENTO
+**8497114807**
 
-### Tu beneficio actual
+Utilizar el enlace de WhatsApp correspondiente:
 
-**0 familias confirmadas**
+`https://wa.me/18497114807`
 
-`○ ○ ○`
+El botón debe abrir WhatsApp en una nueva pestaña/ventana cuando sea posible.
 
-**Todavía no tienes descuentos**
+### 5. DISEÑO VISUAL
 
-### Tu enlace personal
+La ventana debe sentirse como una plataforma SaaS profesional.
 
-`karpuskids.com/i/LIAM82`
+Utilizar:
 
-**[📲 Compartir por WhatsApp]**
+* Fondo limpio.
+* Tarjeta central.
+* Icono de bloqueo/suspensión.
+* Título grande.
+* Texto corto.
+* Botón de WhatsApp claramente visible.
+* Diseño responsive para computadora, tablet y móvil.
+* Bordes redondeados.
+* Sombras suaves.
+* Buena separación entre elementos.
 
-**[🔗 Copiar enlace]**
+NO utilizar un diseño agresivo, rojo intenso o que parezca un error del sistema.
 
-**[▣ Compartir QR]**
+La sensación debe ser:
 
----
+"El servicio está temporalmente inactivo y puedes comunicarte con soporte."
 
-# 🧠 Hay un cambio psicológico MUY importante
+### 6. SESIONES YA ABIERTAS
 
-No pondría:
+MUY IMPORTANTE:
 
-> **“Trae una familia y gana.”**
+Si una empresa está activa y un usuario ya tiene una sesión abierta, pero posteriormente el administrador cambia:
 
-Porque eso hace que parezca una comisión.
+`status = suspended`
 
-Pondría:
+el usuario no debe poder continuar utilizando el sistema indefinidamente.
 
-> ### **“Comparte lo que te gusta y ahorra en tu mensualidad ❤️”**
+Implementar una comprobación periódica del estado de la empresa mientras el usuario está conectado.
 
-Eso cambia completamente la percepción.
+Por ejemplo, verificar cada pocos minutos o utilizando el mecanismo más eficiente disponible en la arquitectura actual.
 
-El padre piensa:
+Si detecta:
 
-> “Yo ya estoy pagando la estancia. Si conozco alguien que también busca una, le comparto esto y puedo ahorrar.”
+`status = suspended`
 
-Mucho más natural.
+debe:
 
----
+1. Detener las operaciones del sistema.
+2. Evitar nuevas consultas/modificaciones.
+3. Cerrar la sesión de forma segura.
+4. Mostrar la pantalla de suspensión.
 
-# 💰 ¿Cómo debería funcionar?
+### 7. SEGURIDAD
 
-Supongamos que la mensualidad cuesta:
+NO depender únicamente de JavaScript/frontend para realizar la suspensión.
 
-**RD$10,000**
+Revisar las políticas RLS existentes de Supabase y determinar la mejor forma de impedir que una empresa suspendida continúe accediendo a sus datos mediante consultas directas.
 
-El padre comparte su enlace.
+No eliminar ni modificar políticas RLS existentes de forma destructiva.
 
-Una nueva familia entra:
+Crear las nuevas políticas necesarias de forma compatible con la arquitectura actual.
 
-> **“Has llegado por recomendación de Liam ❤️”**
+IMPORTANTE:
+La suspensión debe afectar solamente a la empresa suspendida.
 
-La familia solicita información.
+Una empresa activa NO debe verse afectada.
 
-Posteriormente se matricula y realiza su pago.
+### 8. REACTIVACIÓN
 
-Entonces:
+Desde el panel administrativo del propietario del sistema debe ser posible cambiar:
 
-### Liam recibe:
+`suspended → active`
 
-**RD$5,000 de crédito**
+Cuando la empresa vuelva a estar:
 
-Ese crédito se aplica automáticamente a su próxima mensualidad.
+`active`
 
-Por ejemplo:
+sus usuarios deben poder iniciar sesión y utilizar nuevamente el sistema con todos sus datos intactos.
 
-```text
-Mensualidad
-RD$10,000
+No crear nuevamente los usuarios.
 
-Descuento por referido
--RD$5,000
+No restaurar datos.
 
-TOTAL
-RD$5,000
-```
+No duplicar registros.
 
----
+Simplemente permitir nuevamente el acceso.
 
-# 🔥 Y si consigue dos familias
+### 9. PANEL ADMINISTRATIVO
 
-Supongamos:
+Agregar al panel administrativo una opción para controlar el estado de cada empresa.
 
-**2 familias × RD$5,000 = RD$10,000**
+Mostrar:
 
-Su mensualidad:
+**Estado: ACTIVO**
+o
+**Estado: SUSPENDIDO**
 
-**RD$10,000**
+Agregar una acción:
 
-Resultado:
+**Suspender servicio**
 
-### 🎉 ¡Mensualidad gratis!
+y cuando esté suspendida:
 
-Pero yo lo mostraría visualmente:
+**Reactivar servicio**
 
-## 🎉 ¡LO LOGRASTE!
+Antes de suspender, mostrar una confirmación:
 
-**Conseguiste 2 familias**
+**¿Deseas suspender temporalmente el servicio de esta empresa?**
 
-### Tu próxima mensualidad:
+Indicar que todos los usuarios asociados perderán temporalmente el acceso.
 
-~~RD$10,000~~
+### 10. IMPLEMENTACIÓN SEGURA
 
-# RD$0
+ANTES de escribir código:
 
-**¡Ahorraste RD$10,000! ❤️**
+1. Analiza las tablas existentes.
+2. Identifica cómo se relaciona cada usuario con `business_id`.
+3. Identifica cómo funciona actualmente Supabase Auth.
+4. Revisa las políticas RLS.
+5. Identifica los archivos responsables del login.
+6. Identifica el sistema actual de rutas/protección de páginas.
+7. Identifica si existe algún sistema de permisos o roles.
 
-Esto es muchísimo más motivador que:
+Después presenta un pequeño plan de implementación.
 
-> “Nivel Oro desbloqueado.”
+Luego realiza los cambios.
 
----
+NO reemplaces archivos completos si solamente es necesario modificar una parte.
 
-# 📲 El botón de WhatsApp debe ser protagonista
+NO elimines funcionalidades existentes.
 
-No pondría “Copiar enlace” como primera opción.
+NO cambies nombres de variables, tablas o funciones existentes innecesariamente.
 
-Pondría:
+### 11. CRITERIOS DE ACEPTACIÓN
 
-# 🟢 Compartir por WhatsApp
+La implementación estará correcta únicamente si:
 
-Porque en República Dominicana es probablemente el canal más natural para esto.
+✓ Empresa activa → sistema funciona normalmente.
 
-Al pulsar, se genera:
+✓ Empresa suspendida → ningún usuario de esa empresa puede acceder al sistema.
 
-❤️ Quería compartirte Karpus Kids.
+✓ Usuario con sesión abierta → pierde acceso cuando la empresa es suspendida.
 
-Mi hijo/a forma parte de esta comunidad y pensé que quizás también podría interesarte para tu familia.
+✓ Pantalla de suspensión aparece correctamente.
 
-Ahora tienen una promoción especial para nuevas familias 👇
+✓ No se muestra ningún motivo de suspensión.
 
-🔗 [ENLACE PERSONAL]
+✓ Aparece botón "Contactar soporte".
 
-Si decides matricular a tu hijo/a, puedes conocer todos los detalles desde aquí.
+✓ El botón abre WhatsApp al número 8497114807.
 
-¡Quizás nos vemos en Karpus Kids! 🥰
+✓ Empresa reactivada → vuelve a funcionar normalmente.
 
-**Importante:** no pondría en el mensaje:
+✓ Ningún dato se elimina.
 
-> “Si te inscribes me ganas 50%.”
+✓ Ningún usuario se elimina.
 
-Eso puede hacer que parezca una venta.
+✓ Otras empresas activas continúan funcionando normalmente.
 
-El beneficio para el padre puede mostrarse **dentro de su aplicación**, mientras que el mensaje se siente como una recomendación genuina.
+✓ La implementación funciona correctamente en móvil, tablet y computadora.
 
----
+✓ No se rompen las funcionalidades actuales.
 
-# 🎁 Pero hay algo todavía más inteligente
+✓ Las políticas de seguridad de Supabase siguen protegiendo correctamente los datos.
 
-Dale un beneficio también a la nueva familia.
+Al finalizar, explícame exactamente:
 
-Por ejemplo:
-
-### Familia nueva
-
-**10% de descuento en inscripción**
-
-### Padre que recomienda
-
-**50% de descuento en mensualidad**
-
-Entonces el padre puede decir:
-
-> “Te puedo recomendar Karpus Kids y tienen una promoción para nuevas familias.”
-
-Eso elimina todavía más la sensación de estar vendiendo.
-
----
-
-# 🚨 Una regla que pondría sí o sí
-
-El 50% **no debe desbloquearse por simplemente registrarse**.
-
-Debe ser:
-
-```text
-Compartido
-↓
-Clic
-↓
-Familia interesada
-↓
-Solicitud de información
-↓
-Proceso de admisión
-↓
-Matrícula
-↓
-Pago confirmado
-↓
-✅ Referido válido
-↓
-💰 50% descuento
-```
-
-Y el sistema debería mostrar:
-
-### Mi recomendación
-
-**Ana Pérez**
-
-🟡 Interesada
-
-> Todavía no genera descuento.
-
-Luego:
-
-**Ana Pérez**
-
-🔵 En proceso de matrícula
-
-> Tu beneficio está pendiente.
-
-Y finalmente:
-
-**Ana Pérez**
-
-🟢 Matrícula confirmada
-
-### 🎉 ¡Ganaste 50% de descuento!
-
----
-
-# 🔥 Incluso puedes crear un pequeño efecto de recompensa
-
-Cuando se confirme:
-
-> 🎉 **¡Felicidades, Liam!**
->
-> La familia de Ana acaba de matricularse en Karpus Kids.
->
-> Como agradecimiento por compartir nuestra comunidad:
->
-> # 🎁 Ganaste 50%
->
-> **RD$5,000 de crédito**
->
-> Se aplicará automáticamente a tu próxima mensualidad.
-
-**[Ver mi descuento]**
-
-Esto hace que el padre **sienta la recompensa**.
-
----
-
-# 📊 Y la pantalla puede mostrar el ahorro
-
-En vez de:
-
-> “Monedero Karpus: RD$0”
-
-pondría:
-
-## 💰 Tu ahorro
-
-**RD$5,000**
-
-> Has ahorrado gracias a tus recomendaciones.
-
-Y debajo:
-
-### Este mes
-
-**1 familia recomendada**
-
-🟢 Matrícula confirmada
-
-### Beneficio
-
-**50% de descuento**
-
----
-
-# 🏆 Y eliminaría el nombre “Embajador”
-
-Para esta campaña específicamente.
-
-Porque:
-
-**Embajador = trabajo/representación**
-
-mientras que:
-
-**Comparte y ahorra = beneficio personal**
-
-Mucho más adecuado.
-
-Podrías dejar posteriormente un programa de embajadores más avanzado, pero **ahora mismo tu objetivo es conseguir matrículas**, no construir un programa corporativo de afiliados.
-
----
-
-# 🚀 Mi versión final para Karpus Kids
-
-Yo pondría exactamente esta estructura:
-
-### ❤️ Comparte Karpus Kids
-
-**Una recomendación puede ayudarte a ahorrar.**
-
-> Comparte Karpus Kids con una familia que pueda estar interesada.
-
-### 🎁 POR CADA FAMILIA QUE SE MATRICULE:
-
-# 50% DE DESCUENTO
-
-**en tu próxima mensualidad**
-
----
-
-### 🔥 PROMOCIÓN ESPECIAL
-
-**Campaña de matrícula**
-
-**29 AGO — 15 SEP**
-
-⏰ **Tiempo restante: 15 días**
-
----
-
-### 💰 Tu ahorro
-
-# RD$0
-
-**Todavía no tienes referidos confirmados.**
-
----
-
-### 🚀 Empieza ahora
-
-**[🟢 Compartir por WhatsApp]**
-
-**[🔗 Copiar mi enlace]**
-
-**[▣ Compartir QR]**
-
----
-
-### Tus recomendaciones
-
-**Todavía no tienes recomendaciones.**
-
-> Comparte Karpus Kids con alguien que pueda necesitarlo. ❤️
-
----
-
-Y cuando consiga uno:
-
-### 🎉 ¡Tienes una recompensa!
-
-**1 familia matriculada**
-
-`██████████░░░░`
-
-# 50% de descuento
-
-**RD$5,000**
-
-> Se aplicará automáticamente a tu próxima mensualidad.
-
----
-
-**Esta versión me gusta mucho más para tu situación actual**, porque no le estás pidiendo al padre que “trabaje consiguiendo estudiantes”. Le estás diciendo:
-
-> **“Si conoces a alguien que pueda necesitar Karpus Kids, compártelo. Si esa familia se queda, nosotros te agradecemos con la mitad de tu mensualidad.”**
-
-Es sencillo, tangible y fácil de entender en **3 segundos**.
-
-Y técnicamente, además, es bastante fácil de integrar con el sistema que ya tienes: **Supabase + código único + enlace de referido + seguimiento de matrícula + crédito/descuento automático**.
+* qué archivos modificaste,
+* qué tablas modificaste,
+* qué políticas RLS modificaste o agregaste,
+* cómo funciona la suspensión,
+* cómo funciona la reactivación,
+* y cómo puedo probar todo sin afectar empresas reales.
+a

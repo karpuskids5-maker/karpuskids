@@ -1,4 +1,4 @@
-import { supabase, initOneSignal, TERMS_VERSION } from "./shared/supabase.js";
+import { supabase, initOneSignal, TERMS_VERSION, isBusinessSuspended } from "./shared/supabase.js";
 
 // ── Protección contra fuerza bruta (3 intentos → 1 min de espera) ─────────────
 const RATE_LIMIT = {
@@ -64,6 +64,28 @@ document.addEventListener('DOMContentLoaded', async () => {
   // ── Verificar si ya hay sesión activa ────────────────────────────────────
   const urlParams = new URLSearchParams(window.location.search);
   const reason    = urlParams.get('reason');
+
+  // ── Banner grande de suspensión (sube desde abajo) ───────────────────────
+  const suspBanner = document.getElementById('suspBanner');
+  const suspClose  = document.getElementById('suspBannerClose');
+
+  function showSuspBanner() {
+    if (!suspBanner) return;
+    if (suspBanner.classList.contains('hidden')) {
+      suspBanner.classList.remove('hidden');
+      requestAnimationFrame(() => suspBanner.classList.add('susp-banner-open'));
+    }
+  }
+
+  if (suspClose) suspClose.addEventListener('click', () => {
+    if (suspBanner) suspBanner.classList.add('hidden');
+  });
+
+  // 1) Llegamos desde una redirección por suspensión (login.html?reason=suspended)
+  if (reason === 'suspended') showSuspBanner();
+  // 2) Verificación en segundo plano: si la empresa está suspendida, mostrar
+  //    el banner aunque el usuario abra login.html directamente.
+  try { if (await isBusinessSuspended()) showSuspBanner(); } catch (_) {}
 
   const { data: { session } } = await supabase.auth.getSession();
   
@@ -279,6 +301,16 @@ async function redirectByRole(userId) {
       asistente: 'panel_asistente.html',
       admin:     'panel_control.html'
     };
+
+    // ── Suspensión temporal del servicio ────────────────────────────
+    // Solo el rol 'admin' (dueño) entra aunque la empresa esté suspendida
+    // (para reactivar el servicio desde su panel de control).
+    if (role !== 'admin' && await isBusinessSuspended()) {
+      window._karpusSuspensionRedirect = true;
+      await supabase.auth.signOut();
+      window.location.href = 'login.html?reason=suspended';
+      return;
+    }
 
     if (routes[role]) {
       window.location.href = routes[role];

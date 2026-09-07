@@ -1,4 +1,4 @@
-# 📑 INFORME TÉCNICO Y PLAN DE MEJORAS DE LA SECCIÓN DE PAGOS
+#   📑 INFORME TÉCNICO Y PLAN DE MEJORAS DE LA SECCIÓN DE PAGOS
 **Karpus Kids — Centro Educativo Infantil**
 
 ---

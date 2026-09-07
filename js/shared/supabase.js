@@ -37,6 +37,10 @@ supabase.auth.onAuthStateChange((event, session) => {
     localStorage.removeItem('karpus_maestra_state');
     localStorage.removeItem('karpus_padre_state');
     localStorage.removeItem('karpus_asistente_state');
+    if (window._karpusSuspensionRedirect) {
+      window.location.href = 'login.html?reason=suspended';
+      return;
+    }
     window.location.href = 'login.html';
   }
   if (event === 'INITIAL_SESSION' || event === 'SIGNED_IN') {
@@ -262,6 +266,48 @@ export function sanitizeText(text, maxLength = 500) {
 
 export const TERMS_VERSION = '1.0';
 
+// ── Suspensión temporal del servicio ─────────────────────────────────────────
+/**
+ * isBusinessSuspended: consulta la fuente autoritativa (server-side,
+ * SECURITY DEFINER) del estado de la empresa. Fail-open si el RPC no existe.
+ */
+export async function isBusinessSuspended() {
+  try {
+    const { data, error } = await supabase.rpc('is_business_suspended');
+    if (error) {
+      Helpers.safeLog('warn', '[Suspension] RPC no disponible:', error.message);
+      return false;
+    }
+    return data === true;
+  } catch (_) {
+    return false;
+  }
+}
+
+let _watchdogStarted = false;
+
+/**
+ * startBusinessWatchdog: vigila en segundo plano el estado del servicio.
+ * Si la empresa pasa a suspendida mientras hay una sesión abierta,
+ * cierra la sesión y devuelve al usuario al login (banner de suspensión).
+ * El rol 'admin' (dueño) queda exento.
+ */
+export function startBusinessWatchdog(intervalMs = 90000, isAdmin = false) {
+  if (_watchdogStarted || isAdmin) return;
+  _watchdogStarted = true;
+  setInterval(async () => {
+    try {
+      const path = window.location.pathname || '';
+      if (path.includes('login.html')) return;
+      if (await isBusinessSuspended()) {
+        window._karpusSuspensionRedirect = true;
+        await supabase.auth.signOut().catch(() => {});
+        window.location.href = 'login.html?reason=suspended';
+      }
+    } catch (_) {}
+  }, intervalMs);
+}
+
 /**
  * ensureRole: Verifica el rol del usuario actual y retorna {user, profile}
  */
@@ -355,6 +401,20 @@ export async function ensureRole(requiredRoles) {
 
   if (!resolvedProfile) {
     // No redirigir — dejar que el panel maneje el estado sin perfil
+  }
+
+  // ── Suspensión temporal del servicio ──────────────────────────────
+  // El rol 'admin' (dueño de la plataforma) siempre puede acceder; los
+  // demás roles de una empresa suspendida vuelven al login con banner.
+  if (resolvedProfile?.role?.toLowerCase() !== 'admin') {
+    if (await isBusinessSuspended()) {
+      window._karpusSuspensionRedirect = true;
+      await supabase.auth.signOut().catch(() => {});
+      window.location.href = 'login.html?reason=suspended';
+      return null;
+    }
+    // Vigilar estado en segundo plano para detectar suspensión futura
+    startBusinessWatchdog(90000, false);
   }
 
   if (resolvedProfile && !roles.includes(resolvedProfile.role?.toLowerCase())) {

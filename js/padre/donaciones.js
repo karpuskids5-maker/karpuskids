@@ -21,6 +21,8 @@ export const DonacionesModule = {
   _anon: null,
   _profile: null,
   _receipt: null,
+  _bankAccounts: [],
+  _bankInstructions: '',
 
   async init() {
     const container = document.getElementById('donaciones-padre-container');
@@ -44,6 +46,17 @@ export const DonacionesModule = {
         .order('created_at', { ascending: false });
       if (error) throw error;
       this._campaigns = data || [];
+
+      // Cuentas institucionales para transferencia
+      try {
+        const { data: st } = await this._anon
+          .from('donation_settings')
+          .select('bank_accounts, transfer_instructions')
+          .eq('id', 1)
+          .maybeSingle();
+        this._bankAccounts = (st?.bank_accounts && Array.isArray(st.bank_accounts)) ? st.bank_accounts : [];
+        this._bankInstructions = st?.transfer_instructions || '';
+      } catch (_) { this._bankAccounts = []; this._bankInstructions = ''; }
 
       const totalTarget = this._campaigns.reduce((s, c) => s + Number(c.target_amount || 0), 0);
       const totalRaised = this._campaigns.reduce((s, c) => s + Number(c.raised_amount || 0), 0);
@@ -172,9 +185,45 @@ export const DonacionesModule = {
                 ${BANK_OPTIONS.map(b => `<option>${b}</option>`).join('')}
               </select>
             </div>
+            <div id="don-parent-accounts" class="mt-2.5 hidden">
+              <label class="block text-[11px] font-black text-slate-500 uppercase tracking-wider mb-1.5">Cuentas institucionales para transferir</label>
+              <div class="space-y-2">
+                ${this._bankAccounts.length ? this._bankAccounts.map(a => `
+                  <div class="rounded-xl border border-emerald-200 bg-emerald-50/60 p-3">
+                    <div class="flex items-center justify-between">
+                      <span class="text-xs font-black text-emerald-700">${escapeHtml(a.bank || '')}</span>
+                      <span class="text-[10px] font-bold text-emerald-600 uppercase">${escapeHtml(a.type || '')}</span>
+                    </div>
+                    <div class="mt-1 flex items-center gap-2">
+                      <code class="text-sm font-black text-slate-800 tracking-widest select-all bg-white px-2 py-1 rounded-lg border border-emerald-100">${escapeHtml(a.account || '')}</code>
+                      <button type="button" data-copy="${escapeHtml((a.account || '').replace(/\s+/g, ''))}" class="don-copy text-[10px] font-black bg-emerald-600 text-white rounded-lg px-2 py-1">Copiar</button>
+                    </div>
+                    ${a.owner ? `<p class="mt-1 text-[10px] text-slate-500 font-bold">Titular: ${escapeHtml(a.owner)}</p>` : ''}
+                  </div>`).join('') : '<p class="text-[11px] text-slate-400 italic">Consulta las cuentas institucionales por WhatsApp.</p>'}
+                ${this._bankInstructions ? `<p class="text-[10px] text-slate-400 font-bold mt-1">${escapeHtml(this._bankInstructions)}</p>` : ''}
+              </div>
+            </div>
           </div>
           <div>
-            <label class="block text-[11px] font-black text-slate-500 uppercase tracking-wider mb-1.5">Nombre o razón social</label>
+            <label class="block text-[11px] font-black text-slate-500 uppercase tracking-wider mb-1.5">Frecuencia</label>
+            <div class="grid grid-cols-2 gap-2">
+              <button type="button" data-freq="one_time"
+                class="freq-btn rounded-xl border border-emerald-500 bg-emerald-500 text-white px-3 py-3 text-xs font-black transition-all">Donación única</button>
+              <button type="button" data-freq="monthly"
+                class="freq-btn rounded-xl border border-slate-200 bg-slate-50 text-slate-600 px-3 py-3 text-xs font-black transition-all hover:bg-emerald-100 hover:text-emerald-700">Aporte mensual</button>
+            </div>
+          </div>
+          <div>
+            <label class="block text-[11px] font-black text-slate-500 uppercase tracking-wider mb-1.5">Tipo de donante</label>
+            <div class="grid grid-cols-2 gap-2">
+              <button type="button" data-dtype="person"
+                class="dtype-btn rounded-xl border border-emerald-500 bg-emerald-500 text-white px-3 py-3 text-xs font-black transition-all">Persona Física</button>
+              <button type="button" data-dtype="company"
+                class="dtype-btn rounded-xl border border-slate-200 bg-slate-50 text-slate-600 px-3 py-3 text-xs font-black transition-all hover:bg-emerald-100 hover:text-emerald-700">Empresa</button>
+            </div>
+          </div>
+          <div>
+            <label class="block text-[11px] font-black text-slate-500 uppercase tracking-wider mb-1.5" id="don-parent-name-label">Nombre completo</label>
             <input id="don-parent-name" type="text" value="${escapeHtml(profile.name || '')}" placeholder="Tu nombre"
               class="w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-3 text-sm font-bold text-slate-700 shadow-sm focus:outline-none focus:ring-2 focus:ring-emerald-400 focus:bg-white transition-all">
           </div>
@@ -189,8 +238,8 @@ export const DonacionesModule = {
               class="w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-3 text-sm font-bold text-slate-700 shadow-sm focus:outline-none focus:ring-2 focus:ring-emerald-400 focus:bg-white transition-all">
           </div>
           <div>
-            <label class="block text-[11px] font-black text-slate-500 uppercase tracking-wider mb-1.5">RNC / Cédula (opcional)</label>
-            <input id="don-parent-taxid" type="text" value="" placeholder="Para empresas"
+            <label class="block text-[11px] font-black text-slate-500 uppercase tracking-wider mb-1.5">RNC / Cédula</label>
+            <input id="don-parent-taxid" type="text" value="" placeholder="Cédula o RNC"
               class="w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-3 text-sm font-bold text-slate-700 shadow-sm focus:outline-none focus:ring-2 focus:ring-emerald-400 focus:bg-white transition-all">
           </div>
         </div>
@@ -291,7 +340,7 @@ export const DonacionesModule = {
       if (form) form.style.display = 'none';
       container.insertAdjacentHTML('beforeend', this._renderSuccess());
 
-      this._anon.functions.invoke('send-email', {
+      this._anon.functions.invoke('donation-receipt', {
         body: {
           to: email,
           subject: 'Karpus Kids · Confirmación de donación ' + this._receipt.ref,

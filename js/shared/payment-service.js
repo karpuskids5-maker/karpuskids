@@ -49,23 +49,22 @@ export const PaymentService = {
     return data || [];
   },
 
-  async approve(id) {
+  async approve(id, note = '') {
+    // Use server-side RPC (approve_payment) which enforces role + proof checks
+    const { data, error } = await supabase.rpc('approve_payment', {
+      p_payment_id: id,
+      p_notes: note || null
+    });
+    if (error) throw error;
+    if (data?.error) throw new Error(data.error);
+
     const { data: p, error: fe } = await supabase
       .from('payments').select(PAYMENT_COLS_WITH_STUDENT).eq('id', id).single();
     if (fe) throw fe;
 
-    // Validaciones antes de aprobar
-    if (!p) throw new Error('Pago no encontrado');
-    if (p.status === 'paid') throw new Error('Este pago ya fue aprobado');
-    if (Number(p.amount || 0) <= 0) throw new Error('El monto del pago no es válido');
-
-    const { error } = await supabase
-      .from('payments').update({ status: 'paid', paid_date: new Date().toISOString() }).eq('id', id);
-    if (error) throw error;
-
-    const student = p.students;
-    const amount  = Helpers.formatCurrency(Number(p.amount||0));
-    const month   = p.month_paid || 'Colegiatura';
+    const student = p?.students;
+    const amount  = Helpers.formatCurrency(Number(p?.amount||0));
+    const month   = p?.month_paid || 'Colegiatura';
 
     if (student?.parent_id) {
       sendPush({
@@ -88,14 +87,16 @@ export const PaymentService = {
   },
 
   async reject(id, reason = '') {
+    const { data: p, error: fe } = await supabase
+      .from('payments').select('students:student_id(parent_id)').eq('id', id).single();
+    if (fe) throw fe;
+
     const { error } = await supabase
       .from('payments')
       .update({ status: 'rechazado', notes: reason || null })
       .eq('id', id);
     if (error) throw error;
 
-    const { data: p } = await supabase
-      .from('payments').select('students:student_id(parent_id)').eq('id', id).single();
     if (p?.students?.parent_id) {
       sendPush({
         user_id: p.students.parent_id,

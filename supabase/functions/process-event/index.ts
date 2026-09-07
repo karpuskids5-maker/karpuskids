@@ -1,35 +1,39 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { Resend } from "https://esm.sh/resend@2.1.0";
+import { getCorsHeaders } from "../_shared/cors.ts";
+import { verifyAuth } from "../_shared/auth.ts";
 
-const CORS = {
-  'Access-Control-Allow-Origin':  '*',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type, x-application-name',
-  'Access-Control-Allow-Methods': 'POST, OPTIONS',
-};
+const ALLOWED_ROLES = ['admin', 'directora', 'asistente', 'maestra'];
 
-const json = (data: unknown, status = 200) =>
+const json = (data: unknown, status = 200, req?: Request) =>
   new Response(JSON.stringify(data), {
     status,
-    headers: { ...CORS, 'Content-Type': 'application/json' },
+    headers: { ...getCorsHeaders(req), 'Content-Type': 'application/json' },
   });
 
 Deno.serve(async (req) => {
-  if (req.method === 'OPTIONS') return new Response('ok', { headers: CORS });
+  if (req.method === 'OPTIONS') return new Response('ok', { headers: getCorsHeaders(req) });
 
   try {
+    // ── Auth verification ──────────────────────────────────────────────────
+    const auth = await verifyAuth(req, ALLOWED_ROLES);
+    if (!auth.ok) {
+      return json({ error: auth.error }, auth.status || 401, req);
+    }
+
     const SUPABASE_URL  = Deno.env.get('SUPABASE_URL')              ?? '';
     const SERVICE_KEY   = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '';
     const ANON_KEY      = Deno.env.get('SUPABASE_ANON_KEY')         ?? '';
     const RESEND_KEY    = Deno.env.get('RESEND_API_KEY')            ?? '';
     const FROM_EMAIL    = Deno.env.get('FROM_EMAIL')                ?? 'Karpus Kids <avisos@karpuskids.com>';
 
-    if (!SUPABASE_URL || !SERVICE_KEY) return json({ error: 'Missing env vars' }, 500);
+    if (!SUPABASE_URL || !SERVICE_KEY) return json({ error: 'Missing env vars' }, 500, req);
 
     const supabase = createClient(SUPABASE_URL, SERVICE_KEY, { auth: { persistSession: false } });
     const resend   = RESEND_KEY ? new Resend(RESEND_KEY) : null;
 
     const { type, data } = await req.json();
-    if (!type) return json({ error: 'Missing event type' }, 400);
+    if (!type) return json({ error: 'Missing event type' }, 400, req);
 
     console.log('[process-event] type:', type, '| data keys:', Object.keys(data || {}));
 
@@ -292,11 +296,11 @@ Deno.serve(async (req) => {
         result = { skipped: true, type };
     }
 
-    return json({ ok: true, type, ...result });
+    return json({ ok: true, type, ...result }, 200, req);
 
   } catch (e) {
     const msg = e instanceof Error ? e.message : String(e);
     console.error('[process-event] Fatal:', msg);
-    return json({ error: msg }, 500);
+    return json({ error: msg }, 500, req);
   }
 });

@@ -13,26 +13,30 @@
  * diario es seguro y garantiza que genere apenas llegue el día 25).
  */
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { getCorsHeaders } from "../_shared/cors.ts";
+import { verifyAuth } from "../_shared/auth.ts";
 
-const CORS = {
-  'Access-Control-Allow-Origin':  '*',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type, x-application-name',
-  'Access-Control-Allow-Methods': 'POST, OPTIONS',
-};
+const ALLOWED_ROLES = ['admin', 'directora', 'asistente'];
 
-const json = (data: unknown, status = 200) =>
+const json = (data: unknown, status = 200, req?: Request) =>
   new Response(JSON.stringify(data), {
     status,
-    headers: { ...CORS, 'Content-Type': 'application/json' },
+    headers: { ...getCorsHeaders(req), 'Content-Type': 'application/json' },
   });
 
 Deno.serve(async (req) => {
-  if (req.method === 'OPTIONS') return new Response('ok', { headers: CORS });
+  if (req.method === 'OPTIONS') return new Response('ok', { headers: getCorsHeaders(req) });
 
   try {
+    // ── Auth verification ──────────────────────────────────────────────────
+    const auth = await verifyAuth(req, ALLOWED_ROLES);
+    if (!auth.ok) {
+      return json({ error: auth.error }, auth.status || 401, req);
+    }
+
     const SUPABASE_URL = Deno.env.get('SUPABASE_URL')              ?? '';
     const SERVICE_KEY  = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '';
-    if (!SUPABASE_URL || !SERVICE_KEY) return json({ error: 'Missing env vars' }, 500);
+    if (!SUPABASE_URL || !SERVICE_KEY) return json({ error: 'Missing env vars' }, 500, req);
 
     const supabase = createClient(SUPABASE_URL, SERVICE_KEY, { auth: { persistSession: false } });
 
@@ -71,8 +75,8 @@ Deno.serve(async (req) => {
       .select('id, name, monthly_fee, start_date')
       .eq('is_active', true)
       .gt('monthly_fee', 0);
-    if (sErr) return json({ error: sErr.message }, 500);
-    if (!students?.length) return json({ ok: true, generated: 0, message: 'No active students with fee' });
+    if (sErr) return json({ error: sErr.message }, 500, req);
+    if (!students?.length) return json({ ok: true, generated: 0, message: 'No active students with fee' }, 200, req);
 
     // ── Determinar qué meses necesitan cobros ────────────────────────────────
     // SOLO el mes actual. Sin backfill: los cobros de meses anteriores se
@@ -155,11 +159,11 @@ Deno.serve(async (req) => {
       generated: totalGenerated,
       by_month:  results,
       ran_at:    now.toISOString(),
-    });
+    }, 200, req);
 
   } catch (e) {
     const msg = e instanceof Error ? e.message : String(e);
     console.error('[auto-payment-cycle] Fatal:', msg);
-    return json({ error: msg }, 500);
+    return json({ error: msg }, 500, req);
   }
 });
