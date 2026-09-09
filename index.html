@@ -300,7 +300,7 @@
 <section class="hero" id="inicio">
   <!-- Video background (muted, autoplay) -->
   <video class="hero-video" autoplay muted loop playsinline poster="img/karpus.jpg" aria-label="Video de fondo Karpus Kids">
-    <source src="img/video%20karpus%20kids.mp4" type="video/mp4">
+    <source src="img/14.mp4" type="video/mp4">
     <track kind="captions" srclang="es" label="Español" default>
   </video>
   <div class="hero-overlay"></div>
@@ -1399,13 +1399,22 @@
           db: { schema: 'public' }
         });
 
-        const { data, error } = await client
+        let res = await client
           .from('donation_campaigns')
           .select('id, title, description, target_amount, raised_amount, cover_image_url, images, is_active, end_date')
           .eq('is_active', true)
           .order('created_at', { ascending: false });
 
-        if (error) throw error;
+        if (res.error && res.error.message && res.error.message.includes('images')) {
+          res = await client
+            .from('donation_campaigns')
+            .select('id, title, description, target_amount, raised_amount, cover_image_url, is_active, end_date')
+            .eq('is_active', true)
+            .order('created_at', { ascending: false });
+        }
+
+        if (res.error) throw res.error;
+        const data = res.data;
         window.kkCampaigns = data || [];
 
         // Opciones del formulario
