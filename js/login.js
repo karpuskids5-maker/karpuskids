@@ -83,7 +83,17 @@ document.addEventListener('DOMContentLoaded', async () => {
 
   // 1) Llegamos desde una redirección por suspensión (login.html?reason=suspended)
   if (reason === 'suspended') showSuspBanner();
-  // 2) Verificación en segundo plano: si la empresa está suspendida, mostrar
+  // 2) Cuenta desactivada (maestra/asistente inactiva) — banner personalizado
+  if (reason === 'inactive') {
+    const icon = suspBanner?.querySelector('.text-5xl');
+    if (icon) icon.textContent = '🔒';
+    const title = suspBanner?.querySelector('h2');
+    if (title) title.textContent = 'Cuenta desactivada';
+    const txt = suspBanner?.querySelector('p');
+    if (txt) txt.textContent = 'Tu acceso fue desactivado por la administración. Ya no puedes ingresar al panel. Contacta a la directora para reactivar tu cuenta.';
+    showSuspBanner();
+  }
+  // 3) Verificación en segundo plano: si la empresa está suspendida, mostrar
   //    el banner aunque el usuario abra login.html directamente.
   try { if (await isBusinessSuspended()) showSuspBanner(); } catch (_) {}
 
@@ -280,7 +290,7 @@ async function redirectByRole(userId) {
   try {
     const { data: profile, error } = await supabase
       .from('profiles')
-      .select('role')
+      .select('role, is_active')
       .eq('id', userId)
       .maybeSingle();
 
@@ -290,6 +300,17 @@ async function redirectByRole(userId) {
       alert('Tu cuenta no tiene un perfil configurado. Por favor, contacta al administrador.');
       await supabase.auth.signOut();
       window.location.reload();
+      return;
+    }
+
+    // ── Cuenta desactivada ──────────────────────────────────────────
+    // La directora marcó al personal como inactivo: no puede ingresar al
+    // panel. Se cierra la sesión y se muestra el banner.
+    const inactiveRole = profile.is_active === false && profile.role !== 'admin';
+    if (inactiveRole) {
+      window._karpusInactiveRedirect = true;
+      await supabase.auth.signOut();
+      window.location.href = 'login.html?reason=inactive';
       return;
     }
 

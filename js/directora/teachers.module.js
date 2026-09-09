@@ -10,7 +10,7 @@ export const TeachersModule = {
     const container = document.getElementById(renderTargetId);
     if (!container) return;
 
-    const loadingHtml = '<tr><td colspan="5" class="text-center py-8">Cargando...</td></tr>';
+    const loadingHtml = '<tr><td colspan="6" class="text-center py-8">Cargando...</td></tr>';
     container.innerHTML = loadingHtml;
 
     try {
@@ -48,7 +48,7 @@ export const TeachersModule = {
 
       if (window.lucide) lucide.createIcons();
     } catch (e) {
-      container.innerHTML = '<tr><td colspan="5" class="text-center py-8">' + Helpers.errorState('Error al cargar personal', 'App.teachers.init()') + '</td></tr>';
+      container.innerHTML = '<tr><td colspan="6" class="text-center py-8">' + Helpers.errorState('Error al cargar personal', 'App.teachers.init()') + '</td></tr>';
       if (window.lucide) lucide.createIcons();
     }
   },
@@ -58,11 +58,11 @@ export const TeachersModule = {
     if (!container) return;
 
     if (!staff.length) {
-      container.innerHTML = '<tr><td colspan="5" class="text-center py-8 text-slate-500">No hay personal que coincida.</td></tr>';
+      container.innerHTML = '<tr><td colspan="6" class="text-center py-8 text-slate-500">No hay personal que coincida.</td></tr>';
       return;
     }
     container.innerHTML = staff.map(t => `
-        <tr class="hover:bg-slate-50 transition-colors cursor-pointer" ondblclick="App.teachers.openModal('${t.id}')">
+        <tr class="hover:bg-slate-50 transition-colors cursor-pointer ${t.is_active === false ? 'opacity-60 bg-slate-50' : ''}" ondblclick="App.teachers.openModal('${t.id}')">
           <td class="p-4 font-bold text-slate-700">${Helpers.escapeHTML(t.name)}</td>
           <td class="p-4 text-slate-500">${t.email}</td>
           <td class="p-4">
@@ -73,6 +73,11 @@ export const TeachersModule = {
             </div>
           </td>
           <td class="p-4"><span class="px-3 py-1 bg-indigo-50 text-indigo-600 rounded-full text-[10px] font-black uppercase tracking-wider">${t.role}</span></td>
+          <td class="p-4">
+            ${t.is_active === false
+              ? '<span class="px-3 py-1 bg-rose-100 text-rose-700 rounded-full text-[10px] font-black uppercase tracking-wider"><i data-lucide="ban" class="w-3 h-3 inline-block mr-1"></i>Inactiva</span>'
+              : '<span class="px-3 py-1 bg-emerald-100 text-emerald-700 rounded-full text-[10px] font-black uppercase tracking-wider"><i data-lucide="check-circle-2" class="w-3 h-3 inline-block mr-1"></i>Activa</span>'}
+          </td>
           <td class="p-4 text-right">
             <div class="flex justify-end gap-2">
               <button onclick="App.teachers.openModal('${t.id}')" class="w-9 h-9 flex items-center justify-center bg-indigo-50 text-indigo-600 hover:bg-indigo-600 hover:text-white rounded-xl transition-all" title="Editar">
@@ -139,6 +144,11 @@ export const TeachersModule = {
     try {
       let res;
       if (id) {
+        if (!payload.is_active) {
+          const teacher = (AppState.get('teachers') || []).find(t => t.id === id);
+          const ok = window.confirm(`¿Desactivar a "${teacher?.name || 'esta maestra'}"?\n\nPerderá el acceso al panel de inmediato hasta que la reactives.`);
+          if (!ok) { UI.setLoading(false); return; }
+        }
         res = await DirectorApi.updateTeacher(id, payload);
       } else {
         if (!password || password.length < 6) throw new Error('Contraseña requerida (mínimo 6 caracteres)');
@@ -162,7 +172,18 @@ export const TeachersModule = {
       
       const { error } = res || {};
       if (error) throw new Error(error?.message || error?.details || JSON.stringify(error));
-      
+
+      // ── Cierre automático de acceso: si la cuenta pasó a inactiva, revocar
+      // sus sesiones en Supabase para que pierda acceso de inmediato.
+      if (id && payload.is_active === false) {
+        const { error: signOutErr } = await supabase.functions.invoke('admin-sign-out', {
+          body: { user_id: id }
+        });
+        if (signOutErr) {
+          console.warn('[Teachers] No se pudo revocar la sesión de inmediato (¿edge function desplegada?):', signOutErr?.message || signOutErr);
+        }
+      }
+
       Helpers.toast(id ? 'Maestra actualizada' : 'Maestra creada', 'success');
       UI.closeModal();
       this.init();

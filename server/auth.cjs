@@ -135,11 +135,17 @@ async function loadProfile(req, res, next) {
   try {
     const { data: profile, error } = await supabase
       .from('profiles')
-      .select('id, role, name, email')
+      .select('id, role, name, email, is_active')
       .eq('id', req.user.id)
       .maybeSingle();
 
     if (error) return res.status(500).json({ error: 'Error verificando perfil' });
+
+    // Cuenta desactivada por la directora → sin acceso al API
+    if (profile && profile.is_active === false && profile.role !== 'admin') {
+      return res.status(403).json({ error: 'Cuenta desactivada. Contacta a la administración.', code: 'ACCOUNT_INACTIVE' });
+    }
+
     req.profile = profile || null;
     next();
   } catch (e) {
@@ -157,11 +163,15 @@ async function requireAdmin(req, res, next) {
   try {
     const { data: profile } = await supabase
       .from('profiles')
-      .select('role')
+      .select('role, is_active')
       .eq('id', req.user.id)
       .single();
 
     if (!profile) return res.status(403).json({ error: 'Perfil no encontrado' });
+
+    if (profile.is_active === false && profile.role !== 'admin') {
+      return res.status(403).json({ error: 'Cuenta desactivada. Contacta a la administración.', code: 'ACCOUNT_INACTIVE' });
+    }
 
     const allowedRoles = ['directora', 'admin', 'control'];
     if (!allowedRoles.includes(profile.role)) {
@@ -185,11 +195,15 @@ async function requireStaff(req, res, next) {
   try {
     const { data: profile } = await supabase
       .from('profiles')
-      .select('role')
+      .select('role, is_active')
       .eq('id', req.user.id)
       .single();
 
     if (!profile) return res.status(403).json({ error: 'Perfil no encontrado' });
+
+    if (profile.is_active === false && profile.role !== 'admin') {
+      return res.status(403).json({ error: 'Cuenta desactivada. Contacta a la administración.', code: 'ACCOUNT_INACTIVE' });
+    }
 
     const allowedRoles = ['directora', 'asistente', 'maestra', 'admin', 'control'];
     if (!allowedRoles.includes(profile.role)) {

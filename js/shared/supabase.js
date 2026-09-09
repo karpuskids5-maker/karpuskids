@@ -37,6 +37,10 @@ supabase.auth.onAuthStateChange((event, session) => {
     localStorage.removeItem('karpus_maestra_state');
     localStorage.removeItem('karpus_padre_state');
     localStorage.removeItem('karpus_asistente_state');
+    if (window._karpusInactiveRedirect) {
+      window.location.href = 'login.html?reason=inactive';
+      return;
+    }
     if (window._karpusSuspensionRedirect) {
       window.location.href = 'login.html?reason=suspended';
       return;
@@ -266,6 +270,58 @@ export function sanitizeText(text, maxLength = 500) {
 
 export const TERMS_VERSION = '1.0';
 
+// ── Vigilancia de cuenta activa (maestra/asistente) ──────────────────────────
+let _accountWatchdogStarted = false;
+
+/**
+ * startAccountWatchdog: vigila el estado is_active del perfil.
+ * Si la cuenta pasa a inactiva (la desactivó la directora), cierra la
+ * sesión y regresa al login con banner "cuenta desactivada".
+ * El rol 'admin' (dueño) queda exento.
+ */
+export function startAccountWatchdog(userId, isAdmin = false) {
+  if (_accountWatchdogStarted || isAdmin) return;
+  _accountWatchdogStarted = true;
+
+  // Realtime: cierre casi inmediato cuando la directora la desactiva.
+  try {
+    const path = window.location.pathname || '';
+    if (!path.includes('login.html')) {
+      const channel = supabase
+        .channel('account-status-watchdog')
+        .on('postgres_changes',
+          { event: 'UPDATE', schema: 'public', table: 'profiles', filter: `id=eq.${userId}` },
+          (payload) => {
+            if (payload.new && payload.new.is_active === false) {
+              window._karpusInactiveRedirect = true;
+              supabase.auth.signOut().catch(() => {});
+              window.location.href = 'login.html?reason=inactive';
+            }
+          })
+        .subscribe();
+      window.addEventListener('beforeunload', () => { try { supabase.removeChannel(channel); } catch (_) {} });
+    }
+  } catch (_) {}
+
+  // Fallback: polling periódico por si el realtime no está disponible.
+  setInterval(async () => {
+    try {
+      const path = window.location.pathname || '';
+      if (path.includes('login.html')) return;
+      const { data } = await supabase
+        .from('profiles')
+        .select('is_active')
+        .eq('id', userId)
+        .maybeSingle();
+      if (data && data.is_active === false) {
+        window._karpusInactiveRedirect = true;
+        await supabase.auth.signOut().catch(() => {});
+        window.location.href = 'login.html?reason=inactive';
+      }
+    } catch (_) {}
+  }, 30000);
+}
+
 // ── Suspensión temporal del servicio ─────────────────────────────────────────
 /**
  * isBusinessSuspended: consulta la fuente autoritativa (server-side,
@@ -377,7 +433,7 @@ export async function ensureRole(requiredRoles) {
   ]);
 
   const [profileRes, termsRes] = await Promise.all([
-    withTimeout(supabase.from('profiles').select('id, role, name, email, avatar_url, phone, bio').eq('id', user.id).maybeSingle()),
+    withTimeout(supabase.from('profiles').select('id, role, name, email, avatar_url, phone, bio, is_active').eq('id', user.id).maybeSingle()),
     withTimeout(supabase.from('terms_acceptance').select('user_id').eq('user_id', user.id).eq('terms_version', TERMS_VERSION).maybeSingle())
   ]).catch(() => [{ data: null, error: new Error('timeout') }, { data: null, error: new Error('timeout') }]);
 
@@ -416,6 +472,18 @@ export async function ensureRole(requiredRoles) {
     // Vigilar estado en segundo plano para detectar suspensión futura
     startBusinessWatchdog(90000, false);
   }
+
+  // ── Cuenta desactivada (maestra/asistente marcada como inactiva) ───────
+  // No puede ingresar al panel: se cierra la sesión y se regresa al login.
+  if (resolvedProfile?.role?.toLowerCase() !== 'admin' && resolvedProfile?.is_active === false) {
+    window._karpusInactiveRedirect = true;
+    await supabase.auth.signOut().catch(() => {});
+    window.location.href = 'login.html?reason=inactive';
+    return null;
+  }
+  // Vigilar la cuenta en segundo plano: si la directora la desactiva mientras
+  // el personal ya está dentro, el panel se cierra automáticamente.
+  startAccountWatchdog(user.id);
 
   if (resolvedProfile && !roles.includes(resolvedProfile.role?.toLowerCase())) {
     // Admin can access any panel (they have their own panel_control.html)

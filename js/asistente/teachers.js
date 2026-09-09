@@ -277,10 +277,27 @@ export const TeachersModule = {
 
     try {
       if (id) {
-        const updates = { name, phone, role };
+        if (!isActive) {
+          const ok = window.confirm(`¿Desactivar a "${name}"?\n\nPerderá el acceso al panel de inmediato hasta que la reactives.`);
+          if (!ok) {
+            if (btn) { btn.disabled = false; btn.textContent = 'Guardar Personal'; }
+            return;
+          }
+        }
+        const updates = { name, phone, role, is_active: isActive };
         if (matricula !== null) updates.access_code = matricula;
         const { error } = await supabase.from('profiles').update(updates).eq('id', id);
         if (error) throw error;
+
+        // Cierre automático de acceso: si la cuenta pasó a inactiva, revocar sesiones
+        if (!isActive) {
+          const { error: signOutErr } = await supabase.functions.invoke('admin-sign-out', {
+            body: { user_id: id }
+          });
+          if (signOutErr) {
+            console.warn('[Teachers] No se pudo revocar la sesión de inmediato (¿edge function desplegada?):', signOutErr?.message || signOutErr);
+          }
+        }
         // Limpiar todas las asignaciones previas y reasignar las seleccionadas
         await supabase.from('classrooms').update({ teacher_id: null }).eq('teacher_id', id);
         for (const cid of classroomIds) {
