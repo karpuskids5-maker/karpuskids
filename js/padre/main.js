@@ -641,7 +641,7 @@ async function refreshDashboard() {
 
   if (finance?.config) AppState.set('financeConfig', finance.config);
   if (finance?.history) AppState.set('financeHistory', finance.history);
-  AppState.set('todayAttendance', todayAtt?.status || null);
+  AppState.set('todayAttendance', todayAtt?.status || 'absent');
 
   renderHomeCards(student, { finance, academic, todayAtt: todayAtt?.status });
   renderDailySummary(logs, schedule);

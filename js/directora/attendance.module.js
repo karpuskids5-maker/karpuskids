@@ -113,10 +113,16 @@ export const AttendanceModule = {
         q = q.gte('date', from).lte('date', to);
       }
 
-      const { data, error } = await q;
-      if (error) throw error;
+      const [attRes, studentsRes] = await Promise.all([
+        q,
+        this._mode === 'day'
+          ? supabase.from('students').select('id', { count: 'exact', head: true }).eq('is_active', true).not('classroom_id', 'is', null)
+          : Promise.resolve({ count: 0 })
+      ]);
+      if (attRes.error) throw attRes.error;
 
-      this._data = data || [];
+      this._data = attRes.data || [];
+      this._activeStudentCount = studentsRes.count || 0;
       this._populateRoomFilter();
       this._renderKPIs();
       this._renderTable();
@@ -156,12 +162,25 @@ export const AttendanceModule = {
     const d = this._data;
     const total    = d.length;
     const present  = d.filter(r => ['present','presente'].includes(norm(r.status))).length;
-    const absent   = d.filter(r => ['absent','ausente'].includes(norm(r.status))).length;
     const late     = d.filter(r => ['late','tarde'].includes(norm(r.status))).length;
-    const rate     = total > 0 ? Math.round((present / total) * 100) : 0;
+    const presentOrLate = present + late;
 
-    Helpers.setTxt('attKpiTotal',   total);
-    Helpers.setTxt('attKpiPresent', present);
+    // En modo día: ausentes = estudiantes activos sin registro de presente/tarde/retirado
+    // En modo rango: ausentes = registros con status absent/ausente (no tenemos el total de activos por día)
+    let absent;
+    if (this._mode === 'day' && this._activeStudentCount > 0) {
+      absent = this._activeStudentCount - presentOrLate;
+      if (absent < 0) absent = 0;
+    } else {
+      absent = d.filter(r => ['absent','ausente'].includes(norm(r.status))).length;
+    }
+
+    const rate = this._activeStudentCount > 0
+      ? Math.round((presentOrLate / this._activeStudentCount) * 100)
+      : (total > 0 ? Math.round((present / total) * 100) : 0);
+
+    Helpers.setTxt('attKpiTotal',   this._mode === 'day' && this._activeStudentCount > 0 ? this._activeStudentCount : total);
+    Helpers.setTxt('attKpiPresent', presentOrLate);
     Helpers.setTxt('attKpiAbsent',  absent);
     Helpers.setTxt('attKpiLate',    late);
     Helpers.setTxt('attKpiRate',    rate + '%');

@@ -52,21 +52,26 @@ export const DashboardModule = {
             try { await supabase.rpc('mark_absent_students'); } catch (_) {}
 
             const [studentsRes, attendanceRes, absentRes, paymentsRes, incomeRes] = await Promise.allSettled([
-              supabase.from('students').select('*', { count: 'exact', head: true }),
+              supabase.from('students').select('*', { count: 'exact', head: true })
+                .eq('is_active', true).not('classroom_id', 'is', null),
               supabase.from('attendance').select('*', { count: 'exact', head: true })
-                .eq('date', today).in('status', ['present', 'presente']),
-              supabase.from('attendance').select('*', { count: 'exact', head: true })
-                .eq('date', today).in('status', ['absent', 'ausente']),
+                .eq('date', today).in('status', ['present', 'presente', 'late', 'tarde']),
+              supabase.from('attendance').select('student_id')
+                .eq('date', today).in('status', ['present', 'presente', 'late', 'tarde']),
               supabase.from('payments').select('*', { count: 'exact', head: true })
                 .in('status', ['pending', 'review']),
               supabase.from('payments').select('amount')
                 .eq('status', 'paid').eq('month_paid', monthKey)
             ]);
             const get = (r) => r.status === 'fulfilled' ? r.value : {};
+            const activeCount = get(studentsRes).count || 0;
+            const presentCount = get(attendanceRes).count || 0;
+            // Ausentes = estudiantes activos sin registro de presente/tarde hoy
+            const absentCount = Math.max(0, activeCount - presentCount);
             return {
-              studentsCount:   get(studentsRes).count  || 0,
-              attendanceCount: get(attendanceRes).count || 0,
-              absentCount:     get(absentRes).count || 0,
+              studentsCount:   activeCount,
+              attendanceCount: presentCount,
+              absentCount:     absentCount,
               paymentsCount:   get(paymentsRes).count  || 0,
               incomeTotal:     (get(incomeRes).data || []).reduce((s, p) => s + Number(p.amount || 0), 0)
             };

@@ -83,25 +83,29 @@ export const DirectorApi = {
       const today = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
       
       const results = await Promise.allSettled([
-        supabase.from('students').select('*', { count: 'exact', head: true }).eq('is_active', true),
+        supabase.from('students').select('*', { count: 'exact', head: true }).eq('is_active', true).not('classroom_id', 'is', null),
         supabase.from('profiles').select('*', { count: 'exact', head: true }).in('role', ['maestra', 'asistente']),
         supabase.from('classrooms').select('*', { count: 'exact', head: true }),
-        supabase.from('attendance').select('*', { count: 'exact', head: true }).eq('date', today).in('status', ['present', 'late']),
-        supabase.from('attendance').select('*', { count: 'exact', head: true }).eq('date', today).in('status', ['absent', 'ausente']),
+        supabase.from('attendance').select('*', { count: 'exact', head: true }).eq('date', today).in('status', ['present', 'late', 'presente', 'tarde']),
         supabase.from('inquiries').select('*', { count: 'exact', head: true }).not('status', 'in', '("resolved","closed")')
       ]);
 
       const get = (r) => r.status === 'fulfilled' ? r.value : { count: 0, data: [] };
-      const [totalRes, teachersRes, classroomsRes, attendanceRes, absentRes, inquiriesRes] = results.map(get);
+      const [totalRes, teachersRes, classroomsRes, attendanceRes, inquiriesRes] = results.map(get);
+
+      // Ausentes = estudiantes activos sin registro de presente/tarde hoy
+      const activeCount = totalRes.count || 0;
+      const presentCount = attendanceRes.count || 0;
+      const absentCount = Math.max(0, activeCount - presentCount);
 
       return {
         data: {
-          active:           totalRes.count || 0,
-          total:            totalRes.count || 0,
+          active:           activeCount,
+          total:            activeCount,
           teachers:         teachersRes.count    || 0,
           classrooms:       classroomsRes.count  || 0,
-          attendance_today: attendanceRes.count  || 0,
-          absent_today:     absentRes.count      || 0,
+          attendance_today: presentCount,
+          absent_today:     absentCount,
           pending_payments: pendingAmount,
           inquiries:        inquiriesRes.count   || 0
         },
