@@ -267,11 +267,15 @@ const WallModule = {
       .wall-skeleton{border-radius:1rem;animation:wall-shimmer 1.5s infinite;background:linear-gradient(90deg,#f1f5f9 25%,#e2e8f0 50%,#f1f5f9 75%);background-size:800px 100%}
       .wall-blur-up{filter:blur(10px);transition:filter 0.4s ease}
       .wall-blur-up.wall-img-loaded{filter:blur(0)}
-      .wall-video-wrapper{position:relative;cursor:pointer;border-radius:1rem;overflow:hidden;background:#0f172a}
-      .wall-play-btn{position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);width:60px;height:60px;background:rgba(255,138,0,0.9);border-radius:50%;display:flex;align-items:center;justify-content:center;color:white;font-size:22px;transition:all 0.2s;backdrop-filter:blur(4px);pointer-events:none;box-shadow:0 4px 24px rgba(255,138,0,0.4)}
-      .wall-video-wrapper:hover .wall-play-btn{transform:translate(-50%,-50%) scale(1.12);background:rgba(255,138,0,1)}
-      .wall-video-duration{position:absolute;bottom:8px;right:10px;background:rgba(0,0,0,0.65);color:white;font-size:9px;font-weight:900;padding:2px 7px;border-radius:8px;backdrop-filter:blur(4px)}
-      .wall-custom-video{width:100%;max-height:420px;background:#000;border-radius:0}
+      .wall-video-wrapper{position:relative;cursor:pointer;border-radius:1.25rem;overflow:hidden;background:#0f172a;aspect-ratio:4/5;max-height:520px;width:100%;display:flex;align-items:center;justify-content:center;}
+      .wall-play-btn{position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);width:56px;height:56px;background:rgba(0,0,0,0.55);border:1.5px solid rgba(255,255,255,0.4);border-radius:50%;display:flex;align-items:center;justify-content:center;color:white;font-size:20px;transition:all 0.25s cubic-bezier(0.175, 0.885, 0.32, 1.275);backdrop-filter:blur(8px);pointer-events:none;box-shadow:0 8px 32px rgba(0,0,0,0.3)}
+      .wall-video-wrapper:hover .wall-play-btn{transform:translate(-50%,-50%) scale(1.1);background:rgba(255,138,0,0.95);border-color:transparent;}
+      .wall-video-duration{position:absolute;bottom:12px;right:12px;background:rgba(0,0,0,0.7);color:white;font-size:9px;font-weight:900;padding:3px 8px;border-radius:12px;backdrop-filter:blur(6px);border:1px solid rgba(255,255,255,0.15)}
+      .wall-audio-badge{position:absolute;bottom:12px;left:12px;background:rgba(0,0,0,0.7);color:white;font-size:11px;padding:5px 8px;border-radius:50%;backdrop-filter:blur(6px);border:1px solid rgba(255,255,255,0.15);cursor:pointer;z-index:10;transition:transform 0.15s;}
+      .wall-audio-badge:active{transform:scale(0.85)}
+      .wall-custom-video{width:100%;height:100%;object-fit:cover;background:#000;border-radius:1.25rem;}
+      .wall-doubletap-heart{position:absolute;top:50%;left:50%;transform:translate(-50%,-50%) scale(0);pointer-events:none;font-size:72px;z-index:30;transition:transform 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275), opacity 0.4s ease;opacity:0;}
+      .wall-doubletap-heart.pop{transform:translate(-50%,-50%) scale(1.2);opacity:1;}
       .wall-progress-bar{height:3px;background:linear-gradient(90deg,#f97316,#22c55e);border-radius:2px;transition:width 0.1s linear}
       @keyframes wall-like-pop{0%{transform:scale(1)}30%{transform:scale(1.45)}60%{transform:scale(0.9)}100%{transform:scale(1)}}
       @keyframes wall-particle-fly{0%{opacity:1;transform:translate(0,0) scale(1)}100%{opacity:0;transform:translate(var(--tx),var(--ty)) scale(0.3)}}
@@ -597,8 +601,46 @@ const WallModule = {
   _setupVideoAutoplay() {
     if (this._videoObserver) this._videoObserver.disconnect();
     this._videoObserver = new IntersectionObserver(entries => {
-      entries.forEach(e => { if (!e.isIntersecting) e.target.pause?.(); });
-    }, { threshold: 0.5 });
+      entries.forEach(e => {
+        const vid = e.target;
+        if (e.isIntersecting) {
+          if (vid.paused) {
+            vid.play().catch(() => {});
+          }
+        } else {
+          if (!vid.paused) {
+            vid.pause();
+          }
+        }
+      });
+    }, { threshold: 0.65 });
+
+    // Observar wrappers de video no inicializados
+    document.querySelectorAll('.wall-video-wrapper').forEach(wrapper => {
+      if (!wrapper.dataset.autoplayObserved) {
+        wrapper.dataset.autoplayObserved = '1';
+        const wrapperObs = new IntersectionObserver((entries) => {
+          entries.forEach(entry => {
+            if (entry.isIntersecting) {
+              let vid = wrapper.querySelector('video');
+              if (!vid) {
+                const postId = wrapper.dataset.postId || wrapper.id.replace('video-wrapper-', '');
+                const url = wrapper.dataset.videoUrl;
+                if (url) {
+                  WallModule.playVideoCard(postId, url);
+                  vid = wrapper.querySelector('video');
+                }
+              }
+              if (vid && this._videoObserver) {
+                this._videoObserver.observe(vid);
+              }
+            }
+          });
+        }, { threshold: 0.65 });
+        wrapperObs.observe(wrapper);
+      }
+    });
+
     document.querySelectorAll('video.wall-custom-video').forEach(v => this._videoObserver.observe(v));
   },
 
@@ -871,14 +913,17 @@ const WallModule = {
   _renderVideoCard(p, isSlow) {
     const thumbUrl = p.thumbnail_url || null;
     const posterStyle = thumbUrl ? `background-image:url('${_sanitizeHTML(thumbUrl)}');background-size:cover;background-position:center;` : 'background:#0f172a;';
-    const maxH = isSlow ? 'max-h-[280px]' : 'max-h-[420px]';
     return `
-      <div class="wall-video-wrapper ${maxH} relative mb-4 shadow-inner" id="video-wrapper-${p.id}"
-           onclick="WallModule.playVideoCard('${p.id}','${_sanitizeHTML(p.display_media_url)}')"
-           style="${posterStyle}min-height:180px;" role="button" aria-label="Reproducir video">
+      <div class="wall-video-wrapper relative mb-4 shadow-inner group" id="video-wrapper-${p.id}"
+           data-post-id="${p.id}"
+           data-video-url="${_sanitizeHTML(p.display_media_url)}"
+           onclick="WallModule._handleVideoCardClick('${p.id}','${_sanitizeHTML(p.display_media_url)}', event)"
+           style="${posterStyle}" role="button" aria-label="Reproducir video">
         ${!thumbUrl ? `<div class="wall-shimmer absolute inset-0" style="background:linear-gradient(90deg,#1e293b 25%,#334155 50%,#1e293b 75%);background-size:800px 100%;"></div>` : ''}
-        <div class="wall-play-btn">▶</div>
+        <div class="wall-play-btn" id="play-btn-${p.id}">▶</div>
         <div class="wall-video-duration">0:30</div>
+        <button id="audio-badge-${p.id}" class="wall-audio-badge hidden" onclick="event.stopPropagation();WallModule.toggleMute('${p.id}')" aria-label="Audio">🔇</button>
+        <div id="dt-heart-${p.id}" class="wall-doubletap-heart">❤️</div>
         <div class="wall-watermark">🐾 Karpus Kids</div>
       </div>`;
   },
@@ -975,23 +1020,68 @@ const WallModule = {
     this.goToAlbumSlide(postId, (cur - 1 + total) % total);
   },
 
-  // ── Reproductor de Video Custom ──────────────────────────────────────────────
+  // ── Gestor de Doble-Tap / Click en Video ────────────────────────────────────
+  _lastClickTime: {},
+  _handleVideoCardClick(postId, url, e) {
+    const now = Date.now();
+    const last = this._lastClickTime[postId] || 0;
+    if (now - last < 300) {
+      // Doble tap -> Reacción ❤️ estilo Instagram
+      this._triggerDoubleTapHeart(postId);
+      this._lastClickTime[postId] = 0;
+      return;
+    }
+    this._lastClickTime[postId] = now;
+
+    const vid = document.getElementById(`wall-vid-${postId}`);
+    if (!vid) {
+      this.playVideoCard(postId, url);
+    } else {
+      this.toggleMute(postId);
+    }
+  },
+
+  _triggerDoubleTapHeart(postId) {
+    const heart = document.getElementById(`dt-heart-${postId}`);
+    if (heart) {
+      heart.classList.add('pop');
+      setTimeout(() => heart.classList.remove('pop'), 600);
+    }
+    this.toggleReaction(postId, 'like');
+  },
+
+  toggleMute(postId) {
+    const vid = document.getElementById(`wall-vid-${postId}`);
+    const badge = document.getElementById(`audio-badge-${postId}`);
+    if (!vid) return;
+    vid.muted = !vid.muted;
+    if (badge) badge.textContent = vid.muted ? '🔇' : '🔊';
+  },
+
+  // ── Reproductor de Video Custom Autónomo Estilo IG ─────────────────────────
   playVideoCard(postId, url) {
     const wrapper = document.getElementById(`video-wrapper-${postId}`);
     if (!wrapper || !url) return;
-    wrapper.onclick = null;
     wrapper.style.backgroundImage = '';
     wrapper.style.background = '#000';
-    const isSlow = this._detectSlowNetwork();
+
+    // Ocultar play button genérico y mostrar audio badge
+    const playBtn = document.getElementById(`play-btn-${postId}`);
+    const audioBadge = document.getElementById(`audio-badge-${postId}`);
+    if (playBtn) playBtn.classList.add('hidden');
+    if (audioBadge) {
+      audioBadge.classList.remove('hidden');
+      audioBadge.textContent = '🔇';
+    }
+
     wrapper.innerHTML = `
-      <video id="wall-vid-${postId}" class="wall-custom-video w-full" controls playsinline muted preload="metadata"
-             style="max-height:${isSlow ? '280px' : '420px'};display:block;"
-             onended="document.getElementById('wall-replay-${postId}')?.classList.remove('hidden')"
+      <video id="wall-vid-${postId}" class="wall-custom-video w-full h-full object-cover" playsinline loop muted preload="auto"
              onerror="WallModule._onVideoError('${postId}')">
         <source src="${_sanitizeHTML(url)}" type="video/mp4">
       </video>
-      <button id="wall-replay-${postId}" onclick="WallModule._replayVideo('${postId}')"
-        class="hidden absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-14 h-14 bg-orange-500/90 rounded-full text-white flex items-center justify-center text-2xl" aria-label="Repetir video">🔁</button>`;
+      <button id="audio-badge-${postId}" class="wall-audio-badge" onclick="event.stopPropagation();WallModule.toggleMute('${postId}')" aria-label="Audio">🔇</button>
+      <div id="dt-heart-${postId}" class="wall-doubletap-heart">❤️</div>
+      <div class="wall-watermark">🐾 Karpus Kids</div>`;
 
     const vid = document.getElementById(`wall-vid-${postId}`);
     if (vid) {
