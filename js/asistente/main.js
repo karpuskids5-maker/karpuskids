@@ -261,6 +261,8 @@ document.addEventListener('DOMContentLoaded', async () => {
     destroy: (...a) => import('/js/shared/wall.js').then(m => m.WallModule.destroy(...a)),
     toggleCommentSection: (...a) => import('/js/shared/wall.js').then(m => m.WallModule.toggleCommentSection(...a)),
     sendComment: (...a) => import('/js/shared/wall.js').then(m => m.WallModule.sendComment(...a)),
+    editPost: (...a) => import('/js/shared/wall.js').then(m => m.WallModule.editPost(...a)),
+    _saveEditedPost: (...a) => import('/js/shared/wall.js').then(m => m.WallModule._saveEditedPost(...a)),
     deletePost: (...a) => import('/js/shared/wall.js').then(m => m.WallModule.deletePost(...a)),
     toggleLike: (...a) => import('/js/shared/wall.js').then(m => m.WallModule.toggleLike(...a)),
     openNewPostModal: (...a) => import('/js/shared/wall.js').then(m => m.WallModule.openNewPostModal(...a)),

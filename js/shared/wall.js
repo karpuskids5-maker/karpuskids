@@ -597,8 +597,12 @@ const WallModule = {
   _setupVideoAutoplay() {
     if (this._videoObserver) this._videoObserver.disconnect();
     this._videoObserver = new IntersectionObserver(entries => {
-      entries.forEach(e => { if (!e.isIntersecting) e.target.pause?.(); });
-    }, { threshold: 0.5 });
+      entries.forEach(e => {
+        if (!e.isIntersecting && !e.target.paused) {
+          e.target.pause?.();
+        }
+      });
+    }, { threshold: 0.1 });
     document.querySelectorAll('video.wall-custom-video').forEach(v => this._videoObserver.observe(v));
   },
 
@@ -772,13 +776,19 @@ const WallModule = {
       : `<span id="reaction-total-${p.id}" class="text-[10px] font-bold text-slate-400 wall-counter hidden"></span>`;
 
     // ── Botones staff ──
-    const staffButtons = canPin ? `
+    const canEdit = isStaff;
+    const staffButtons = isStaff ? `
+      ${canPin ? `
       <button onclick="WallModule.togglePin('${p.id}')" class="text-slate-300 hover:text-amber-500 transition-colors p-1.5 rounded-lg hover:bg-amber-50" title="${p.is_pinned ? 'Desfijar' : 'Fijar'}">
         <i data-lucide="pin" class="w-4 h-4 ${p.is_pinned ? 'fill-amber-400 text-amber-400' : ''}"></i>
+      </button>` : ''}
+      <button onclick="WallModule.editPost('${p.id}')" class="text-slate-300 hover:text-indigo-500 transition-colors p-1.5 rounded-lg hover:bg-indigo-50" title="Editar publicación">
+        <i data-lucide="pencil" class="w-4 h-4"></i>
       </button>
+      ${canPin ? `
       <button onclick="WallModule.toggleComments('${p.id}', ${p.comments_enabled !== false})" class="text-slate-300 hover:text-blue-500 transition-colors p-1.5 rounded-lg hover:bg-blue-50" title="Comentarios">
         <i data-lucide="message-circle" class="w-4 h-4"></i>
-      </button>
+      </button>` : ''}
       <button onclick="WallModule.deletePost('${p.id}')" class="text-slate-300 hover:text-red-500 transition-colors p-1.5 rounded-lg hover:bg-red-50" title="Eliminar">
         <i data-lucide="trash-2" class="w-4 h-4"></i>
       </button>` : '';
@@ -870,13 +880,17 @@ const WallModule = {
   // ── Render Media Helpers ─────────────────────────────────────────────────────
   _renderVideoCard(p, isSlow) {
     const thumbUrl = p.thumbnail_url || null;
+    const videoSrcWithTime = (p.display_media_url && !p.display_media_url.includes('#t=')) ? `${p.display_media_url}#t=0.1` : p.display_media_url;
     const posterStyle = thumbUrl ? `background-image:url('${_sanitizeHTML(thumbUrl)}');background-size:cover;background-position:center;` : 'background:#0f172a;';
     const maxH = isSlow ? 'max-h-[280px]' : 'max-h-[420px]';
     return `
       <div class="wall-video-wrapper ${maxH} relative mb-4 shadow-inner" id="video-wrapper-${p.id}"
            onclick="WallModule.playVideoCard('${p.id}','${_sanitizeHTML(p.display_media_url)}')"
            style="${posterStyle}min-height:180px;" role="button" aria-label="Reproducir video">
-        ${!thumbUrl ? `<div class="wall-shimmer absolute inset-0" style="background:linear-gradient(90deg,#1e293b 25%,#334155 50%,#1e293b 75%);background-size:800px 100%;"></div>` : ''}
+        ${thumbUrl
+          ? ''
+          : `<video src="${_sanitizeHTML(videoSrcWithTime)}" preload="metadata" muted playsinline class="w-full h-full object-cover pointer-events-none absolute inset-0 opacity-80"></video>`
+        }
         <div class="wall-play-btn">▶</div>
         <div class="wall-video-duration">0:30</div>
         <div class="wall-watermark">🐾 Karpus Kids</div>
@@ -984,7 +998,7 @@ const WallModule = {
     wrapper.style.background = '#000';
     const isSlow = this._detectSlowNetwork();
     wrapper.innerHTML = `
-      <video id="wall-vid-${postId}" class="wall-custom-video w-full" controls playsinline muted preload="metadata"
+      <video id="wall-vid-${postId}" class="wall-custom-video w-full" controls playsinline muted preload="auto"
              style="max-height:${isSlow ? '280px' : '420px'};display:block;"
              onended="document.getElementById('wall-replay-${postId}')?.classList.remove('hidden')"
              onerror="WallModule._onVideoError('${postId}')">
@@ -1029,7 +1043,7 @@ const WallModule = {
     if (!url) return;
     const isVideo = type === 'video' || /\.(mp4|webm|mov|m4v)$/i.test(url);
     const content = isVideo
-      ? `<video controls playsinline autoplay muted class="w-full max-h-[85vh] object-contain rounded-xl" preload="metadata" style="background:#000"><source src="${_sanitizeHTML(url)}" type="video/mp4"></video>`
+      ? `<video controls playsinline autoplay muted class="w-full max-h-[85vh] object-contain rounded-xl" preload="auto" style="background:#000"><source src="${_sanitizeHTML(url)}" type="video/mp4"></video>`
       : `<img src="${_sanitizeHTML(url)}" class="w-full max-h-[85vh] object-contain rounded-xl select-none" alt="Publicación" draggable="false" loading="eager">`;
 
     const lb = document.createElement('div');
@@ -1592,6 +1606,87 @@ const WallModule = {
       await supabase.from('posts').update({ comments_enabled: !currentlyEnabled }).eq('id', postId);
       Helpers.toast(currentlyEnabled ? 'Comentarios desactivados' : 'Comentarios activados', 'success');
     } catch (_) { Helpers.toast('Error', 'error'); }
+  },
+
+  async editPost(postId) {
+    try {
+      const { data: post, error } = await supabase.from('posts').select('*').eq('id', postId).single();
+      if (error || !post) throw new Error('No se pudo cargar la publicación');
+
+      const { data: classrooms } = await supabase.from('classrooms').select('id, name').order('name');
+      const clsOptions = (classrooms || []).map(c =>
+        `<option value="${c.id}" ${post.classroom_id === c.id ? 'selected' : ''}>${_sanitizeHTML(c.name)}</option>`
+      ).join('');
+
+      const html = `
+        <div class="modal-header bg-gradient-to-r from-indigo-600 to-purple-600 text-white p-6 rounded-t-3xl flex justify-between items-center">
+          <div class="flex items-center gap-3">
+            <div class="w-10 h-10 bg-white/20 rounded-2xl flex items-center justify-center text-xl">✏️</div>
+            <div>
+              <h3 class="text-lg font-black">Editar Publicación</h3>
+              <p class="text-xs text-white/70">Muro Escolar</p>
+            </div>
+          </div>
+          <button onclick="window.closeGlobalModal?.() || App.ui?.closeModal()" class="text-white/80 hover:text-white text-xl font-bold">×</button>
+        </div>
+        <div class="p-6 bg-white space-y-4 max-h-[70vh] overflow-y-auto">
+          <div>
+            <label class="block text-xs font-bold text-slate-500 mb-1">Mensaje</label>
+            <textarea id="editPostContent" rows="4"
+              class="w-full px-4 py-3 border-2 border-slate-100 rounded-2xl outline-none focus:ring-4 focus:ring-indigo-100 focus:border-indigo-400 text-sm font-medium resize-none bg-slate-50">${_sanitizeHTML(post.content || '')}</textarea>
+          </div>
+          <div>
+            <label class="block text-xs font-bold text-slate-500 mb-1">Aula</label>
+            <select id="editPostClassroom"
+              class="w-full px-4 py-3 border-2 border-slate-100 rounded-2xl outline-none focus:ring-4 focus:ring-indigo-100 focus:border-indigo-400 text-sm font-medium bg-slate-50">
+              <option value="">General (Todos)</option>
+              ${clsOptions}
+            </select>
+          </div>
+        </div>
+        <div class="p-5 border-t bg-slate-50 rounded-b-3xl flex justify-end gap-2">
+          <button onclick="window.closeGlobalModal?.() || App.ui?.closeModal()" class="px-5 py-2.5 text-slate-500 font-bold text-xs uppercase hover:bg-slate-100 rounded-2xl transition-all">Cancelar</button>
+          <button id="btnSaveEditPost" onclick="WallModule._saveEditedPost('${postId}')" class="px-6 py-2.5 bg-gradient-to-r from-indigo-600 to-purple-600 text-white rounded-2xl font-black text-xs uppercase shadow-md hover:shadow-lg transition-all">Guardar Cambios</button>
+        </div>`;
+
+      if (window.openGlobalModal) {
+        window.openGlobalModal(html);
+      } else if (window.App?.Modal?.open) {
+        window.App.Modal.open('editPostModal', html);
+      } else {
+        alert('Modal no disponible');
+      }
+    } catch (err) {
+      Helpers.toast(err.message || 'Error al abrir edición', 'error');
+    }
+  },
+
+  async _saveEditedPost(postId) {
+    const btn = document.getElementById('btnSaveEditPost');
+    const newContent = document.getElementById('editPostContent')?.value?.trim() || '';
+    const newClassroom = document.getElementById('editPostClassroom')?.value || null;
+
+    if (btn) { btn.disabled = true; btn.textContent = 'Guardando...'; }
+
+    try {
+      const { error } = await supabase.from('posts').update({
+        content: newContent,
+        classroom_id: newClassroom,
+        updated_at: new Date().toISOString()
+      }).eq('id', postId);
+
+      if (error) throw error;
+
+      Helpers.toast('Publicación actualizada correctamente', 'success');
+      if (window.closeGlobalModal) window.closeGlobalModal();
+      else if (window.App?.ui?.closeModal) window.App.ui.closeModal();
+
+      const c = document.getElementById(this._containerId);
+      if (c) { this._page = 0; this._hasMore = true; this.loadPosts(c); }
+    } catch (err) {
+      Helpers.toast('Error al actualizar publicación', 'error');
+      if (btn) { btn.disabled = false; btn.textContent = 'Guardar Cambios'; }
+    }
   },
 
   async deletePost(postId) {
