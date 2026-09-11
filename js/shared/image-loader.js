@@ -110,7 +110,8 @@ export const ImageLoader = {
 
   video(src, poster = '', opts = {}) {
     const { cls = 'w-full max-h-[500px] mx-auto', controls = true } = opts;
-    return `<video data-src="${src}" ${poster ? `data-poster="${poster}"` : ''} class="karpus-img karpus-img-loading ${cls}" ${controls ? 'controls' : ''} playsinline preload="none"></video>`;
+    const formattedSrc = (src && !poster && !src.includes('#t=')) ? `${src}#t=0.1` : src;
+    return `<video data-src="${formattedSrc}" ${poster ? `data-poster="${poster}"` : ''} class="karpus-img karpus-img-loading ${cls}" ${controls ? 'controls' : ''} playsinline preload="metadata"></video>`;
   },
 
   skeleton(cls = 'w-full h-48') {
